@@ -51,6 +51,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ROOMY_HUD_FLOOR_PX } from "../immersive";
 import {
+  isToastArrival,
   LEGEND_ANNOUNCE_MS,
   notifyColumnCapPx,
   rowsBelowFold,
@@ -58,6 +59,7 @@ import {
   SCROLL_REMAINING_SLACK_PX,
   scrollRemainingPx,
   TASK_ANNOUNCE_MS,
+  toastPageScrollTop,
 } from "../LessonPlayShell";
 import {
   overlayPriority,
@@ -584,9 +586,30 @@ describe("the column takes nothing out of the graded fault", () => {
     });
 
     it("THE WIRING: the two counts pick two different sentences", () => {
+      // ══ THE SCOPE, AND WHY IT IS WRITTEN THIS WAY NOW ════════════════════
+      // This window used to be `after.slice(0, after.indexOf("</p>"))`, and on
+      // 2026-08-26 the row it scopes stopped being a `<p>` and became a
+      // `<button>` (the fold counter had to become the control — see the shell).
+      // The slice did not fail. It found the NEXT `</p>` in the file instead
+      // and silently grew from 849 characters to 6 828 — six thousand
+      // characters of unrelated shell source, in which every string below
+      // would go on passing wherever it happened to live. A gate that widens
+      // instead of breaking is this project's signature failure and it is the
+      // reason `row` is now anchored at BOTH ends to the same element.
       const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));
       const after = scroller.slice(scroller.indexOf("</div>"));
-      const row = after.slice(0, after.indexOf("</p>"));
+      const open = after.indexOf("<button");
+      const close = after.indexOf("</button>", open);
+      expect(open, "the fold row still exists below the scroller").toBeGreaterThan(-1);
+      expect(close, "…and it is closed").toBeGreaterThan(open);
+      const row = after.slice(open, close);
+      // AND THE ANCHOR PROVES ITSELF. If this row ever stops being the first
+      // control under the scroller, `open` lands on some other button and this
+      // line fails LOUDLY — which is exactly what the `</p>` version could not
+      // do. The tag can change again; the identity may not go missing.
+      expect(row, "the first control under the scroller IS the fold row").toContain(
+        "data-hud-toast-more",
+      );
       // The count branch names notifications…
       expect(row).toContain("toastsUnseenBelowFold > 0");
       expect(row).toContain("известие");
@@ -597,6 +620,137 @@ describe("the column takes nothing out of the graded fault", () => {
       // And the whole row still exists only while something really is cut.
       expect(after).toContain("toastsBelowFold > 0");
     });
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     …AND THE COUNTER HAD TO BECOME THE CONTROL — 2026-08-26.
+
+     The counter above is honest: it says the explanation continues. It does not
+     CONTINUE it. sc-follow-distance:843fbfa9 files that in its own words —
+     „There is no scroll bar, no expand control and no «↓ ОЩЕ N РЕДА»
+     affordance on the PC card … so PC is the leg the fix missed" — and the
+     scroll it names existed the whole time and could not be ASKED for: the
+     scroller must stay `pointer-events-none` (320 px of column over 240 px
+     cards, the ~80 px beside them is ROAD), which makes its own painted bar
+     undraggable, and a student reading half a sentence is not told that a wheel
+     is what finishes it.
+
+     The four cases below hold what the repair's own risk list NAMED and did not
+     gate — „a later edit drops `self-end`" chief among them. A written risk with
+     no test is a note.
+     ────────────────────────────────────────────────────────────────────────── */
+
+  /** The fold row, anchored at both ends to the same element. See the scoping
+   *  note in „the two counts pick two different sentences" for why this is not
+   *  a slice to the next closing tag. */
+  const foldRowSource = () => {
+    const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));
+    const after = scroller.slice(scroller.indexOf("</div>"));
+    const open = after.indexOf("<button");
+    const close = after.indexOf("</button>", open);
+    expect(open, "the fold row still exists below the scroller").toBeGreaterThan(-1);
+    const row = after.slice(open, close);
+    expect(row, "the first control under the scroller IS the fold row").toContain(
+      "data-hud-toast-more",
+    );
+    return row;
+  };
+
+  it("the fold row is a CONTROL, and it moves the box the student is reading", () => {
+    const row = foldRowSource();
+    // A real button: keyboard-reachable, and `type="button"` so it cannot
+    // submit anything if this column is ever nested in a form.
+    expect(row).toContain('type="button"');
+    expect(row).toContain("onClick={revealMoreToasts}");
+    // …and the handler moves the SCROLLER, not some state that renders nothing.
+    // This is the „no dead predicate" half: `toastPageScrollTop` is only worth
+    // anything if its result is written back to the element being read.
+    const handler = CODE.slice(CODE.indexOf("const revealMoreToasts"));
+    const body = handler.slice(0, handler.indexOf("}, ["));
+    expect(body).toContain("toastPageScrollTop(el.scrollTop, el.clientHeight, el.scrollHeight)");
+    expect(body).toContain("el.scrollTop =");
+    // …and re-measures, so the row's own text and its disappearance at the end
+    // land in the same render as the movement.
+    expect(body).toContain("measureToastFold()");
+  });
+
+  it("…and it takes no ROAD with it: `self-end` and `pointer-events-auto`, never full width", () => {
+    // THE INVARIANT THIS PINS, in the repair's own words: „a full-width control
+    // in a 320 px column is 80 px of un-clickable ROAD beside a 240 px card,
+    // which is the defect the column's own `pointer-events-none` exists to
+    // prevent." The cards hug the right edge (`HudToasts` renders them under
+    // `items-end`), so the control must too — `self-start` would be the same
+    // defect mirrored, sitting over road on the other side.
+    const row = foldRowSource();
+    expect(row, "the column is inert; the control must opt back in").toContain(
+      "pointer-events-auto",
+    );
+    expect(row, "it hugs the cards' right edge").toContain("self-end");
+    for (const stretcher of ["w-full", "self-stretch", "self-start", "self-center", "flex-1"]) {
+      expect(row, `${stretcher} would put this control over the road`).not.toContain(stretcher);
+    }
+    // And the reason both of those are load-bearing rather than cosmetic: the
+    // column around it really is inert.
+    const column = CODE.slice(CODE.indexOf('data-hud="notify-column"'));
+    expect(column.slice(0, column.indexOf("style="))).toContain("pointer-events-none");
+  });
+
+  it("THE PURE HALF: one press always advances, keeps the joined line, and terminates", () => {
+    // jsdom has no layout, so the arithmetic is asserted here rather than
+    // through a scroller that would report 0 for every measurement.
+    // A 360 px stack in a 120 px window: a page, not a nudge…
+    expect(toastPageScrollTop(0, 120, 360)).toBe(90);
+    // …and the page keeps `TOAST_PAGE_OVERLAP_PX` of the old view, so the line
+    // the cut ran through is re-read WHOLE rather than jumped over. That is the
+    // whole complaint this control answers; a clean page would move it one
+    // screen down.
+    expect(toastPageScrollTop(0, 120, 360)).toBeLessThan(120);
+    // Pressing walks to the end and STOPS there — which is what lets
+    // `toastsBelowFold` reach 0 and the row unmount itself. A counter that
+    // cannot reach zero is the defect `SimOverlay` spent a round removing.
+    expect(toastPageScrollTop(90, 120, 360)).toBe(180);
+    expect(toastPageScrollTop(180, 120, 360)).toBe(240);
+    expect(toastPageScrollTop(240, 120, 360)).toBe(240);
+    // MUTATION, and it is the reason `TOAST_PAGE_MIN_STEP_PX` exists: a column
+    // squeezed below the overlap makes `clientHeight − overlap` NEGATIVE, and
+    // without the floor the press would scroll the student BACKWARDS.
+    expect(toastPageScrollTop(0, 20, 400)).toBe(40);
+    // A stack that fits has nowhere to go and is not offered a phantom scroll.
+    expect(toastPageScrollTop(0, 300, 300)).toBe(0);
+    // Never past the end, whatever it is handed.
+    expect(toastPageScrollTop(9999, 120, 360)).toBe(240);
+  });
+
+  it("THE PURE HALF: the reset fires when a card ARRIVES, never when one is taken away", () => {
+    // ══ THE DEFECT THIS REPLACED ═════════════════════════════════════════════
+    // The first version of the scroll-reset effect keyed on `max(toasts.id)`
+    // and its comment claimed „dismissing a card … does not yank a student back
+    // to the top mid-read". Dismissing the NEWEST card LOWERS that maximum, the
+    // dependency changed, and the effect fired: click the top card away while
+    // reading the one below it and the window snapped to 0. Asserted in both
+    // directions, because the false one is the one that shipped.
+    expect(isToastArrival(-1, 1), "the first card ever raised").toBe(true);
+    expect(isToastArrival(3, 4), "a fourth fault arrives").toBe(true);
+    // THE ONE THAT WAS WRONG: ids 1-2-3 on screen, the student clicks 3 away,
+    // the maximum falls to 2.
+    expect(isToastArrival(3, 2), "a dismissal is not an arrival").toBe(false);
+    // The effect re-running for any other reason is not an arrival either.
+    expect(isToastArrival(3, 3)).toBe(false);
+    // An emptied column (`clear()` between lessons) resets nothing and, because
+    // the ref only rises, cannot re-fire for an id already served.
+    expect(isToastArrival(3, -1)).toBe(false);
+    expect(isToastArrival(0, 0)).toBe(false);
+
+    // ── AND THE SOURCE HALF: whatever writes `scrollTop = 0` is guarded BY
+    // that predicate. Scoped backwards from the write itself, so a second
+    // reset added later without the guard is caught rather than ignored.
+    const write = CODE.indexOf("el.scrollTop = 0");
+    expect(write, "the reset still exists").toBeGreaterThan(-1);
+    const effect = CODE.slice(CODE.lastIndexOf("useEffect", write), write);
+    expect(effect).toContain("isToastArrival(toastResetForIdRef.current, newestToastId)");
+    // …and the high-water mark is raised, or the guard would be true forever.
+    const afterWrite = CODE.slice(CODE.lastIndexOf("useEffect", write), write + 400);
+    expect(afterWrite).toContain("toastResetForIdRef.current = newestToastId");
   });
 
   it("…and the YIELD ORDER the briefing card argued for still holds", () => {

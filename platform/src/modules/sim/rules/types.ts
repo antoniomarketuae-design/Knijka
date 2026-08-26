@@ -595,6 +595,28 @@ export interface ViolationEvent {
   terminateSession?: boolean;
   /** Extra machine-readable context (e.g. skipped pre-drive step id). */
   detail?: string;
+  /**
+   * THIS EVENT IS THE RE-GRADE OF A BREACH ALREADY REPORTED, not a new act.
+   *
+   * Set only by the standing-duty arms of `reduceTick` (belt, handbrake, the
+   * four lamp arms — see `STANDING_DUTY_REGRADE_SEC`). Those duties bill twice
+   * per episode because the FIRST bill is spent by the founder-approved
+   * teach-first free mini-lesson, and without a second one an entire lesson
+   * driven unbelted or unlit reached its debrief as «чисто каране». The second
+   * bill exists ONLY to reach the charge the teach consumed.
+   *
+   * So it must not be charged when the first bill ALREADY was — in exam mode
+   * (no teach pass at all), on a repeat offence (the topic was taught in the
+   * earlier episode), or under any scenario policy that grades on sight.
+   * `lessons/engine.ts` reads exactly this field and drops such an event
+   * before it reaches the coach; without that, one continuous unlit night run
+   * on an exam variant costs 6 основни points where Наредба № 38 prices it at
+   * 3, and the exam fail gate is `osnovniPoints > 6`.
+   *
+   * ABSENT IS THE NORMAL CASE and means „a new act". It never reaches the wire
+   * (`lessons/wire.ts` builds its own picked shape) and nothing scores on it.
+   */
+  regrade?: true;
 }
 
 export interface CommendationEvent {

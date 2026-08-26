@@ -1963,6 +1963,63 @@ export function lessonQueueBinding(s: LessonQueueState): LessonQueueBinding {
 export const BRIEFING_FADE_PX = 10;
 export const BRIEFING_FADE_MASK_CSS = `linear-gradient(to bottom, #000 calc(100% - ${BRIEFING_FADE_PX}px), transparent)`;
 
+/**
+ * How much of the CURRENT window the toast column keeps when its „покажи"
+ * control pages down, px.
+ *
+ * A page and not a nudge: the thing under the cut is the tail of a THEO-4
+ * explanation, and a 40 px step would make the student press four times to
+ * finish a sentence. A page with an OVERLAP and not a clean page, because a
+ * clean one lands the reader after the line the cut ran through — the exact
+ * complaint this control exists to answer, moved one screen down. Two 15 px
+ * line boxes is enough to carry the sentence across the join.
+ */
+const TOAST_PAGE_OVERLAP_PX = 30;
+/** …and a floor, so a column squeezed to nothing still advances. */
+const TOAST_PAGE_MIN_STEP_PX = 40;
+
+/**
+ * WHERE ONE PRESS OF „покажи" LEAVES THE READING WINDOW.
+ *
+ * Pure, and separated from the handler for the reason every other measured
+ * thing in this file is: `revealMoreToasts` can only be exercised with a real
+ * scroller, and jsdom has no layout, so arithmetic left inside it is arithmetic
+ * no test can watch break. The two properties that matter are both assertable
+ * here — it always ADVANCES (a control that can return the same number is a
+ * counter that cannot reach zero, the defect `SimOverlay` spent a round
+ * removing) and it TERMINATES at `scrollHeight − clientHeight`, which is what
+ * makes `toastsBelowFold` reach 0 and this row unmount itself.
+ */
+export function toastPageScrollTop(
+  scrollTop: number,
+  clientHeight: number,
+  scrollHeight: number,
+): number {
+  const max = Math.max(0, scrollHeight - clientHeight);
+  const step = Math.max(TOAST_PAGE_MIN_STEP_PX, clientHeight - TOAST_PAGE_OVERLAP_PX);
+  return Math.min(Math.max(0, scrollTop) + step, max);
+}
+
+/**
+ * Did a toast ARRIVE, or was one taken away?
+ *
+ * ══ WHY THIS IS A FUNCTION AND NOT A DEPENDENCY ARRAY ═══════════════════════
+ * The first version of the scroll-reset effect keyed on `max(toasts.map(id))`
+ * and its comment claimed that „dismissing a card — which rewrites the array —
+ * does not yank a student back to the top mid-read". That was FALSE, and it was
+ * false in the direction that hurts: dismissing the NEWEST card LOWERS that
+ * maximum, so the dependency changed, the effect re-ran, and clicking the top
+ * card away while reading the one below it snapped the window back to 0. The
+ * maximum of a shrinking array is not a high-water mark.
+ *
+ * So the question is asked against the highest id this column has ALREADY
+ * reset for, a number that only ever rises. True exactly once per id — on the
+ * render the card appears — and never on a removal.
+ */
+export function isToastArrival(resetForId: number, newestId: number): boolean {
+  return newestId >= 0 && newestId > resetForId;
+}
+
 export function BriefingCard({
   steps,
   onClose,
@@ -4567,6 +4624,102 @@ export function LessonPlayShell({
     // box: `HudToasts` returns null with nothing to show, so the element the
     // observer needs does not exist until the first fault.
   }, [measureToastFold, toasts, toastsQuiet, compact]);
+  /* ══════════════════════════════════════════════════════════════════════════
+     …AND A CONTROL, WHICH IS THE HALF THE ROOMY LEG NEVER GOT — 2026-08-26.
+
+     The counter above landed on 2026-08-25 and is honest: it says the
+     explanation continues. What it does not do is CONTINUE it. The
+     overflow-clip lane files that in the row's own words — „There is no scroll
+     bar, no expand control and no «↓ ОЩЕ N РЕДА» affordance on the PC card —
+     the mobile fault card on this same commit has one … so PC is the leg the
+     fix missed" (sc-follow-distance/pc-wrong/04-t017s) — and the three PC rows
+     beside it photograph the same edge: «…платното за движение. Излизането» /
+     «от платното е самото», guillotined, and under the cut nothing to press.
+
+     THE SCROLL EXISTED AND COULD NOT BE ASKED FOR. `[data-hud-toast-scroller]`
+     is `overflow-y-auto`, so a wheel over a card has moved it since the 25th —
+     but the box is `pointer-events-none` (it has to be: it is 320 px of column
+     over 240 px cards, and the 80 px beside them is ROAD), which makes its own
+     styled scrollbar undraggable, and a student reading a half sentence is not
+     told that a wheel is what finishes it. A sentence that names a gesture is
+     not an affordance; a thing you press is.
+
+     SO THE COUNTER BECOMES THE CONTROL. Same row, same place, same text plus a
+     verb — one page of the reading window per press, with `TOAST_PAGE_OVERLAP_PX`
+     of the old view kept so the line the cut ran through is re-read whole. The
+     row already only exists while `toastsBelowFold > 0`, so pressing it
+     repeatedly walks to the end and the control then disappears by itself: a
+     control that cannot reach zero is the counter defect `SimOverlay` spent a
+     round removing.
+
+     WHAT IT COSTS, stated rather than declared away: a chip is ~24 px where the
+     bare line was ~10, and this row is a `shrink-0` sibling of the scroller, so
+     the reading window loses ~14 px — one line — WHILE A FOLD EXISTS. That is
+     the trade this file has already made twice in the other direction and it is
+     the right one here: one line fewer of a text that is admitted to be cut,
+     bought with the only way to reach the rest of it.
+
+     AND WHAT IT CANNOT DO, WRITTEN HERE RATHER THAN FOUND LATER: IT CANNOT
+     OUTLIVE ITS OWN CARD. `ttlFor` in `HudToasts.tsx` gives a violation or a
+     «Научи» card `TEACHING_TOAST_TTL_MS` = 8 000 ms of WALL time — a
+     `window.setTimeout` that, as that file says in as many words, „keeps
+     running while a teach moment freezes the drive" — and pressing this does
+     not cancel or extend it. So the roomy leg's whole reading budget is eight
+     seconds from the moment the card was raised, however many times this is
+     pressed, and a 14–20 line THEO-4 explanation is not eight seconds of
+     reading at driving load. The phone leg's route to the same text
+     (`SimOverlay` → `setOpenItem` → the shell's `overlaySheetOpen` → `paused`)
+     STOPS THE CAR. The two legs are therefore NOT symmetric and this is the
+     weaker one; that asymmetry is a property of the column, not of this row.
+
+     AND THE TTL IS DELIBERATELY LEFT ALONE. Extending it on a press is the
+     obvious repair and it would un-fix a different one: the card prints its own
+     age (`toastAgeBg`) off the very clock that removes it, which is what makes
+     «преди 8 с» mean „about to expire" — stated as an invariant at
+     `HudToasts.tsx` („the age and the card's own lifetime are read off one
+     clock and cannot disagree … true by construction rather than by tuning"),
+     and written to end an ambiguity the sweep filed twice, that from one frame
+     „a student cannot tell a record of something eight seconds ago from an
+     accusation about the 33 he is doing now". A card reading «преди 25 с» and
+     still up would put that ambiguity straight back. Whether the roomy leg gets
+     the phone's shape — a car-stopping route to the full text — is a decision
+     about what the notify column IS, and it is left filed as one instead of
+     being smuggled in under a layout repair.
+     ══════════════════════════════════════════════════════════════════════════ */
+  const revealMoreToasts = useCallback(() => {
+    const el = toastScrollRef.current;
+    if (el === null) return;
+    el.scrollTop = toastPageScrollTop(el.scrollTop, el.clientHeight, el.scrollHeight);
+    // `scrollTop =` fires `scroll` asynchronously but updates the property
+    // synchronously, so re-measuring here is what makes the row's text (and its
+    // own disappearance at the end) land in the SAME render as the movement.
+    measureToastFold();
+  }, [measureToastFold]);
+  /* ── …AND THE NEWEST VERDICT MAY NOT BE SCROLLED OUT OF SIGHT BY IT.
+     The column stacks newest-first, so a scroller left part way down by the
+     control above would put the next −10 ОПАСНА ГРЕШКА off the top of its own
+     window. Before this control there was no way to leave `scrollTop` at
+     anything but 0, so nothing had to say this; now something does.
+
+     ON ARRIVAL ONLY, and the first version of this effect did not manage that
+     — see `isToastArrival`, which now holds the reason and is asserted in both
+     directions next door. The short form: the maximum id of a SHRINKING array
+     falls when the newest card is dismissed, so the effect that keyed on it
+     fired on removals too and snapped a mid-read window back to 0. The
+     high-water ref only rises. */
+  const toastResetForIdRef = useRef(-1);
+  const newestToastId = toasts.reduce((m, t) => (t.id > m ? t.id : m), -1);
+  useEffect(() => {
+    if (!isToastArrival(toastResetForIdRef.current, newestToastId)) return;
+    const el = toastScrollRef.current;
+    // No scroller yet means nothing has been scrolled, so there is nothing to
+    // reset — and the id is NOT recorded, so the first card that finds a real
+    // box still gets its reset.
+    if (el === null) return;
+    toastResetForIdRef.current = newestToastId;
+    el.scrollTop = 0;
+    measureToastFold();
+  }, [newestToastId, measureToastFold]);
 
   const skipDebrief = useCallback(() => {
     setEndExpanded(false);
@@ -5562,9 +5715,35 @@ export function LessonPlayShell({
                   sentence is the only affordance both the student and the
                   instrument can see. */}
               {toastsBelowFold > 0 ? (
-                <p
+                <button
+                  type="button"
+                  onClick={revealMoreToasts}
+                  data-hud-toast-more=""
                   aria-live="polite"
-                  className="shrink-0 text-right text-[9px] font-black uppercase tracking-wider text-warning"
+                  // `pointer-events-auto` because the column is inert, and
+                  // `self-end` because it must be: a full-width control in a
+                  // 320 px column is 80 px of un-clickable ROAD beside a 240 px
+                  // card, which is the defect the column's own
+                  // `pointer-events-none` exists to prevent. It hugs the cards'
+                  // right edge and takes no road with it.
+                  //
+                  // BOTH OF THOSE ARE NOW GATED, because „a later edit drops
+                  // `self-end`" was written down as a risk and a written risk
+                  // with no test is a note, not a guard:
+                  // `shellClipAffordances.test.ts` → „the control is a control
+                  // and it takes no ROAD with it", which fails on either class
+                  // going missing and on a full-width one arriving.
+                  //
+                  // AND IT DROPS FOCUS WHEN IT GOES — named, not repaired. The
+                  // last press takes `toastsBelowFold` to 0, this row unmounts,
+                  // and a keyboard user lands on <body>. That is the column's
+                  // EXISTING behaviour rather than a new one: every toast card
+                  // in it is a `<button>` that already unmounts under focus on
+                  // its own 8 s TTL. There is also nowhere honest to hand focus
+                  // to — the ✕ would put Enter on „destroy the explanation",
+                  // and a new tab stop on the inert scroller is a change to the
+                  // drive's tab order, not a layout repair.
+                  className="pointer-events-auto shrink-0 self-end rounded-full border border-warning/50 px-2.5 py-1 text-right text-[9px] font-black uppercase tracking-wider text-warning transition hover:border-warning hover:text-foreground motion-reduce:transition-none"
                 >
                   {/* TWO SENTENCES, because the fold answers two different
                       questions and only one of them is a count. When something
@@ -5576,13 +5755,20 @@ export function LessonPlayShell({
                       sentence names what continues, in the vocabulary
                       `TeachMomentOverlay` and `MistakeConsequenceOverlay`
                       already use for the same cut. Saying „още 1 известие" there
-                      would promise a second notification that does not exist. */}
+                      would promise a second notification that does not exist.
+                      ── AND BOTH NOW END IN A VERB, 2026-08-26. „превърти"
+                      named a gesture the student had to already know he could
+                      make; „покажи" names what the thing he is pressing does.
+                      The count keeps its own sentence for the reason above —
+                      the two answer different questions — and neither of them
+                      shortens the explanation to fit, which is the one repair
+                      this row is not allowed to make. */}
                   {toastsUnseenBelowFold > 0
                     ? `↓ още ${toastsUnseenBelowFold} ${
                         toastsUnseenBelowFold === 1 ? "известие" : "известия"
-                      }`
-                    : "↓ обяснението продължава — превърти"}
-                </p>
+                      } — покажи`
+                    : "↓ обяснението продължава — покажи"}
+                </button>
               ) : null}
             </>
           )}

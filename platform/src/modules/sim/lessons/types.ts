@@ -584,6 +584,38 @@ export type ObjectiveEvalState =
        * at rest, for having done nothing.
        */
       everOutside: boolean;
+      /**
+       * WHAT THIS APPROACH DID WITH THE SPEED CAP, as opposed to what the whole
+       * arrival contract did — which is `capMet`, and which is a conjunction:
+       * on the 29 gates that carry a lamp or gear demand beside their cap,
+       * `capMet` is false on a car that honoured the cap perfectly and only
+       * missed the switch. Grading the cap needed its own word.
+       *
+       *   „honoured" — the cap arm was satisfied at least once on this approach
+       *                (at or under the cap, inside the acceptance or the grace
+       *                capsule). Sticky: what the car does afterwards is
+       *                `capMet`'s to withdraw and win back, exactly as shipped.
+       *   „blown"    — the car went THROUGH the authored disc more than
+       *                `REACH_ZONE_CAP_SLACK_KMH` over a FLOW cap having never
+       *                honoured it, so the approach the banner names has
+       *                already happened badly and no later slow frame beside
+       *                the mark may re-issue the certificate.
+       *   undefined  — neither yet.
+       *
+       * The two are mutually exclusive per frame (one needs speed ≤ cap, the
+       * other > cap + slack), which is why they share one field.
+       *
+       * NOT `overCapNoted`, which fires at the bare cap, never clears, and
+       * exists only to make the HUD card speak. This one carries the slack
+       * band, ignores halt gates, and IS cleared by a genuine fresh approach
+       * (see `stepReachZone`) — self-correction is the one thing a drill must
+       * never punish.
+       *
+       * OPTIONAL, and absent means „neither" — every hand-built eval state (the
+       * rigs, the fixtures, every replay recorded before this field existed)
+       * omits it and behaves exactly as shipped.
+       */
+      approachCap?: "honoured" | "blown";
     }
   | {
       type: "passSignal";

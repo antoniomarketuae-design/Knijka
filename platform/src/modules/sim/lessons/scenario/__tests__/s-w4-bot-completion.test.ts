@@ -835,7 +835,7 @@ describe("wave-4 bot completion — sc-vp-handbrake at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: the raised lever TEACHES чл. 20 on the A9 channel, once", () => {
+  it("counter-proof: the raised lever TEACHES чл. 20 once — and, still raised ten seconds later, is GRADED once", () => {
     // HANDBRAKE_LEFT_ON is a teachable второстепенна fault, so its FIRST
     // encounter PAUSES with a card instead of merely docking a point — which is
     // the pedagogy: the student dragging the car has not connected the lamp to
@@ -843,6 +843,20 @@ describe("wave-4 bot completion — sc-vp-handbrake at L3", () => {
     // stays up for the whole drive, so the detector's episode never resets: ONE
     // card, not a rattle of them. The §9 exact-code assert lives on the trace
     // gate: traces/__tests__/sc-vp-handbrake-traces.
+    //
+    // THE SECOND HALF WAS ADDED 2026-08-26 AND THE ASSERTION IT REPLACES WAS
+    // THE DEFECT (`rules/engine.ts STANDING_DUTY_REGRADE_SEC`). This used to
+    // read `expect(...violations).toEqual([])` — one teach, no charge, ever —
+    // and that is precisely how a whole lesson driven with the lever up, the
+    // lamps off or the belt undone reached its debrief on «Опасни 0 · Основни
+    // 0 · Второстепенни 0» under «чисто каране по изпитния лист». The free
+    // mini-lesson exists to forgive a first MISTAKE; it was forgiving the
+    // entire drive, because the reducer billed a standing duty once and never
+    // asked again. It now asks exactly once more, ten driving seconds later.
+    //
+    // The claim this test was written for is UNCHANGED and still pinned: ONE
+    // card, not a rattle of them — and now also ONE charge, not a rattle of
+    // those (`STANDING_DUTY_MAX_BILLS` = 2 bills per episode, total).
     let s = createLessonSession(compileScenario(SC_VP_HANDBRAKE, 3));
     const taught: string[] = [];
     recordScVpHandbrakeDrive(loadDistrict("vp-ready-v1"), "mistake-handbrake-on", {
@@ -853,7 +867,8 @@ describe("wave-4 bot completion — sc-vp-handbrake at L3", () => {
       },
     });
     expect(taught).toEqual(["HANDBRAKE_LEFT_ON"]);
-    expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
+    const billed = s.events.filter((e) => e.kind === "violation");
+    expect(billed.map((e) => e.code)).toEqual(["HANDBRAKE_LEFT_ON"]);
     // The drill still COMPLETES: the route was never the problem, the lever was.
     // That asymmetry is the template's claim — this fault is invisible to the
     // objectives and visible only to the cockpit channel, which is exactly why

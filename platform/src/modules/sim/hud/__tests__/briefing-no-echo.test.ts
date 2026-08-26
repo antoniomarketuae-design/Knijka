@@ -320,6 +320,24 @@ describe("SimOverlay's card cannot go back to clipping its own text", () => {
     expect(sheet, "the sheet stopped painting the number the body counts from").toContain(
       "shown.lineOrdinal",
     );
+    // ── AND IT ASKS THE MODULE WHAT A POSITION IS — 2026-08-26.
+    //
+    // The guard here was `typeof shown.lineOrdinal === "number"`, which admits
+    // `NaN` and `0`, while the pure half handed back `steps[0].n` unfiltered and
+    // `briefing-numbering.test.ts` modelled a third rule of its own. Three
+    // answers, and the loosest was the one on the glass: an unusable ordinal
+    // painted «NaN. » / «0. » in the headline face over a body that still opens
+    // at «2.» — a worse sentence than the unnumbered lead the twenty-one w10
+    // frames filed. `isUsableLineOrdinal` is now the single rule and both ends
+    // call it; this pins the surface end, because a `typeof` check reads
+    // perfectly reasonable in a diff and restores the split in one line.
+    expect(
+      sheet,
+      "the sheet went back to its own idea of a usable ordinal — see isUsableLineOrdinal",
+    ).toContain("isUsableLineOrdinal(shown.lineOrdinal)");
+    expect(sheet, "a `typeof … === \"number\"` guard admits NaN and 0").not.toMatch(
+      /typeof\s+shown\.lineOrdinal\s*===/,
+    );
   });
 
   it("the read sheet's own title is no longer a fragment", () => {

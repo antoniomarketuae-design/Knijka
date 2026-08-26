@@ -93,6 +93,7 @@ import {
   type RefObject,
 } from "react";
 import {
+  isUsableLineOrdinal,
   overlayCarriesMoment,
   overlayMomentBg,
   OVERLAY_MOMENT_TICK_MS,
@@ -706,6 +707,173 @@ export function peekScrimMaskCss(
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE SHADE STOPPED ABOVE «ЗАЩО». 2026-08-26.
+
+   THE GROUND ABOVE WAS THE RIGHT FIX FOR THE WORDS AND IT NEVER REACHED THE
+   CONTROLS. Filed against four lessons in the same sentence, and it is the same
+   sentence every time — sc-park-zebra:9ce33786 states the mechanism outright:
+
+     „the ПРОЧЕТИ and РАЗБРАХ pills — this card's controls — fall below the
+      scrim's bottom edge, and the parked cars behind them read straight through
+      both … THE CONTAINER WAS EXTENDED BEHIND THE TEXT AND NOT BEHIND THE
+      BUTTONS."
+
+   MEASURED, ON THE POST-GROUND FRAMES AND NOT THE FILED ONES.
+   `w10-4/sc-signal-dead__mobile-right/04-t106s.png` (iPhone 16 landscape,
+   852 × 393 at dpr 3). A 130-device-px-wide strip of flat pavement was read
+   straight down through the card's own column:
+
+     device y   504 → 556   luminance 44 → 133, a clean 48 px ramp
+     below 556  flat 133    the bare world
+     above 504  ~29.5       the world under a 0.80 shade
+
+   48 device px is `PEEK_SCRIM_FEATHER_PX.bottom` (16 CSS px) exactly, so the
+   flat core ends at device 507 = **CSS 169** = the column's top (73.24) plus
+   its `notifyColumnMaxHeightCss` ceiling (95.76). The card's BOX. And the
+   «ЗАЩО»/«×» chips on that same frame occupy device 440–565, i.e. **CSS 146.7
+   to 188.3**: the bottom 19 CSS px of a 44 px control hang past the flat core,
+   the last 3 of them past the ramp as well, on nothing at all.
+
+   WHY THE BOX IS NOT THE CARD — AND THIS FILE ALREADY KNEW.
+   `sim-overlay-scrim.test.ts` says it in the one place nobody could act on it:
+   „the notification column … is `max-height`-capped at 95.76 px sideways WHILE
+   THE CARD IT HOLDS LAYS OUT TALLER, so the control row would be left
+   unshaded." The card is the column's only flex item and carries an explicit
+   `min-height: OVERLAY_PEEK_HEIGHT_PX` (44), which overrides `min-h-0`'s
+   automatic minimum — so the flex algorithm SHRINKS the card's border box to
+   the column's 95.76 px ceiling while its four rows, every one of them
+   `shrink-0` around a text window with a 2.375 rem floor, lay out at ~115. The
+   rows overflow the box visibly (nothing on this path sets `overflow`), and an
+   absolutely positioned child inset from that box cannot see them.
+
+   SO THE SHADE IS SIZED TO WHAT THE CARD PAINTS, NOT TO WHAT IT MEASURES.
+   Nothing about the card's layout changes and not one glyph moves: the chips
+   are already at CSS 188.3 today, unreadable. The only thing that moves is the
+   bottom edge of the ground under them.
+
+   AND IT IS MEASURED RATHER THAN ARITHMETIC, for the reason this file gives
+   two blocks down about the fold counter: the row set is conditional (a card
+   with no fold has no row 2c, a plain line has no control row at all), the
+   chrome's height is a browser fact — leading, the student's zoom, the
+   uppercase chip's own line box — and a height computed in TypeScript is the
+   „measures something weaker than the requirement it is named for" trap this
+   project has already paid for twice. `getBoundingClientRect` on the rows the
+   card actually has is the browser's own answer to the only question asked.
+
+   THE BOUND IS THE CARD ITSELF, WHICH IS WHY THERE IS NO CAP ON THIS NUMBER.
+   „It claims not one pixel the card was not already standing on" is the
+   sentence the 0.80 block was written around, and it stays literally true: the
+   overhang is defined as the distance from the box's bottom to the LOWEST ROW
+   THE CARD IS ALREADY PAINTING. A shade that stopped short of its own words is
+   the defect; a shade that guessed a number past them would be a curtain.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * How far the card's rows hang below the card's own border box, in px.
+ *
+ * Pure, so the arithmetic is testable without a browser: the hook below hands
+ * it `card.getBoundingClientRect().bottom` and the same `.bottom` for every
+ * in-flow row, and the shade's `bottom` inset is grown by what comes back.
+ *
+ * `Math.ceil`, not `round`: half a device pixel of a control standing on bare
+ * world is the same finding one twentieth of the way down.
+ */
+export function paintedOverhangPx(cardBottomPx: number, rowBottomsPx: readonly number[]): number {
+  let painted = cardBottomPx;
+  for (const bottom of rowBottomsPx) {
+    if (Number.isFinite(bottom) && bottom > painted) painted = bottom;
+  }
+  const over = painted - cardBottomPx;
+  return Number.isFinite(over) && over > 0 ? Math.ceil(over) : 0;
+}
+
+/**
+ * …and the browser half of it, hung off the shade element's own ref so the two
+ * card shapes (the `<button>` that IS the dismiss control and the `<div>` that
+ * holds controls of its own) need no ref of their own: the shade is a child of
+ * whichever one rendered, so `parentElement` IS the card.
+ *
+ * TWO OBSERVERS, AND THE SECOND ONE IS NOT BELT-AND-BRACES. A `ResizeObserver`
+ * fires when a box CHANGES SIZE — it is silent when the fold row appears,
+ * because the card is pinned at the column's ceiling and its existing rows do
+ * not move, so the overhang would grow by a whole row with nothing measuring
+ * it. Row 2c and row 3 are both conditional (`peekFold.lines`, `momentBg`,
+ * `cardIsDismissButton`), so a row arriving is a `childList` mutation and
+ * nothing else, and `MutationObserver` is the observer for that.
+ *
+ * THE SYNCHRONOUS READ IS THE ONE THIS FILE'S OTHER HOOK REFUSES, and the
+ * difference is the cadence, not the principle: `useFoldLines` bans a layout
+ * read in the effect body because that effect re-keys on every new item and
+ * this component re-renders on the shell's 150 ms HUD poll. `sync()` runs once
+ * on mount and once per ROW-COMPOSITION CHANGE — a handful of times in a drive
+ * — because that is the one event neither observer reports on its own.
+ *
+ * Engines with neither observer measure once and keep it: an overhang of 0 is
+ * exactly today's shipped geometry, so the floor of this change is „no worse".
+ */
+function useCardOverhang(key: string): [RefObject<HTMLDivElement | null>, number] {
+  const scrimRef = useRef<HTMLDivElement | null>(null);
+  // 0 on the server and on the first paint, which is the honest start: an
+  // unmeasured card has not shown that anything hangs past it, and 0 renders
+  // the exact inset this element shipped with.
+  const [overhangPx, setOverhangPx] = useState(0);
+  const measure = useCallback(() => {
+    const scrim = scrimRef.current;
+    const card = scrim === null ? null : scrim.parentElement;
+    if (scrim === null || card === null) return;
+    const box = card.getBoundingClientRect();
+    const rowBottoms: number[] = [];
+    for (const child of Array.from(card.children)) {
+      // The shade is sized FROM the rows; measuring it into them would be a
+      // ratchet that grows the ground by its own feather every pass.
+      if (child === scrim) continue;
+      const rect = child.getBoundingClientRect();
+      // A row that rendered nothing (the `<span aria-hidden />` placeholder in
+      // the moment row) has no box and must not vote.
+      if (rect.width === 0 && rect.height === 0) continue;
+      rowBottoms.push(rect.bottom);
+    }
+    const next = paintedOverhangPx(box.bottom, rowBottoms);
+    // `setState` with an unchanged number bails out of the re-render, and this
+    // is wired to a ResizeObserver over a live WebGL canvas.
+    setOverhangPx((prev) => (prev === next ? prev : next));
+  }, []);
+  useEffect(() => {
+    const scrim = scrimRef.current;
+    const card = scrim === null ? null : scrim.parentElement;
+    if (scrim === null || card === null) return;
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    const sync = () => {
+      if (ro !== null) {
+        // Re-aimed rather than added to: a row that has just been removed must
+        // stop being observed, or its stale box keeps voting for a card height
+        // that is no longer painted.
+        ro.disconnect();
+        ro.observe(card);
+        for (const child of Array.from(card.children)) {
+          if (child !== scrim) ro.observe(child);
+        }
+      }
+      measure();
+    };
+    const mo = typeof MutationObserver === "undefined" ? null : new MutationObserver(sync);
+    if (mo !== null) mo.observe(card, { childList: true });
+    sync();
+    return () => {
+      if (ro !== null) ro.disconnect();
+      if (mo !== null) mo.disconnect();
+    };
+  }, [key, measure]);
+  // A TUPLE AND NOT A RECORD, which is a lint fact and not a taste one:
+  // `react-hooks/refs` treats every property read off an object that HOLDS a
+  // ref as „accessing a ref during render" — it already fires twelve times on
+  // this file for `peekFold.lines` and `sheetFold.maskCss` — so a record here
+  // would add four more false positives to a rule that is right about nothing
+  // in this file. Destructured, the number is a number.
+  return [scrimRef, overhangPx];
+}
+
 /**
  * The counter, wired to a scroll window.
  *
@@ -1066,6 +1234,28 @@ export function SimOverlay({
   const tapDismissCard = useTapActivation(dismiss);
   const tapCloseSheet = useTapActivation(() => setOpenItem(null));
   const tapSheetAck = useTapActivation(acknowledge);
+  /* ── THE SENTENCE THAT WAS CUT IS ITSELF THE WAY TO THE REST — 2026-08-26.
+     The overflow-clip lane, eight phone rows, one shape: «Удари човек. Това е
+     най-» and then «↓ ОЩЕ 11 РЕДА» (sc-hz-emergency-stop/mobile-right/
+     04-t102s), «↓ ОЩЕ 12 РЕДА» over NOT ONE line of body (sc-vu-cyclist-hook/
+     04-t029s), «↓ ОЩЕ 20 РЕДА» on the arrival briefing (sc-vu-emergency/
+     01-arrival). The rest is not lost — «Защо» / «Прочети» beside the counter
+     opens the whole authored text with the car stopped — but the ONE thing on
+     the card that a student's hand actually goes to, the half sentence he is
+     reading, answered nothing at all. He was being asked to read a number, work
+     out that it referred to text he could not see, and then find a 44 px chip.
+     So the cut text becomes the same control the chip is. It is a SHORTCUT and
+     not a new affordance: identical action (`setOpenItem`), and the labelled,
+     keyboard-reachable, screen-reader-announced route is still the chip — which
+     is why no `role`/`tabIndex` is added here and a second focus stop is not
+     invented for one action.
+     `useTapActivation` and not `onClick`, for the reason every other control on
+     this card uses it (doc 91 · C2: a touch-born click reaches only the primary
+     pointer, and a thumb is already on the throttle) — and it is also what makes
+     this safe on a SCROLLER: the browser fires `pointercancel` the moment a
+     press turns into a pan, which disarms the press, so dragging the window
+     still scrolls it and only a clean tap opens the sheet. */
+  const tapCutText = useTapActivation(() => setOpenItem(shown));
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════
@@ -1197,6 +1387,18 @@ export function SimOverlay({
   const foldKey =
     shown === null ? "" : `${shown.id} ${shown.lineBg} ${shown.detailBg ?? ""}`;
   const peekFold = useFoldLines(`peek ${foldKey}`);
+  // …and the ground's own measurement, keyed on the same identity: a new item
+  // is a new row set, and the row set is what decides how far the card paints
+  // past the box the column pins it to. The block at `paintedOverhangPx` has
+  // the pavement scan that found the shade stopping 19 px above «ЗАЩО».
+  // `open` is in the key for the same reason `sheetFold`'s is: the peek is
+  // REPLACED by the sheet (`open ? null :` below), so opening and closing it
+  // hands this hook a different DOM node for the same item. Without it the
+  // observers would stay aimed at the detached one and the shade behind the
+  // re-mounted card would never be measured again.
+  const [peekScrimRef, peekScrimOverhangPx] = useCardOverhang(
+    `peek ${open ? "open" : "shut"} ${foldKey}`,
+  );
   // …and the sheet's own window, which had no counter at all. A SECOND hook and
   // not a shared one: the two boxes are never on screen together (the peek is
   // not rendered while the sheet is up — `open ? null :` below), they lead at
@@ -1299,6 +1501,19 @@ export function SimOverlay({
      ══════════════════════════════════════════════════════════════════════════ */
   const whyReachable = whyIsReachable(shown, peekFold.why);
   const whyFoldedLines = Math.max(0, peekFold.why.detailLines - peekFold.why.visibleLines);
+  /**
+   * Is there text under the fold RIGHT NOW, on a card that has somewhere to
+   * send the reader?
+   *
+   * Both halves are load-bearing. `peekFold.lines` is the measured counter the
+   * «↓ още N реда» row already prints — so the tap exists exactly when, and only
+   * when, that row admits something is hidden; a card whose text fits keeps a
+   * window that does nothing but scroll, and a tap on words that are all on the
+   * screen never opens a modal the student did not ask for. `hasDetail` is what
+   * the sheet is FOR: without it `setOpenItem` would open a surface with the
+   * same line the peek is already showing.
+   */
+  const textIsCut = hasDetail && peekFold.lines > 0;
   const closable = !blocking && shown.noDismiss !== true;
   // …and when a card holds no OTHER control, the card itself is the button —
   // the `HudToasts` grammar, so the phone and the desktop dismiss the same way.
@@ -1516,14 +1731,35 @@ export function SimOverlay({
              be announced and it must not eat the tap that dismisses the card
              (the whole card is a `<button>` in the plain-line shape). */}
       <div
+        ref={peekScrimRef}
         data-sim-overlay-scrim=""
         data-hud-ink=""
+        // THE OVERHANG, AS A FACT A DRIVE CAN PHOTOGRAPH — the same grammar as
+        // `data-sim-overlay-why-folded` two shapes down. Absent when the card
+        // fits its box, because an absent attribute is the honest rendering of
+        // „nothing hangs past it" and is also what the server render emits.
+        //
+        // IT STAYS BELOW `data-hud-ink`, and that is not tidiness:
+        // `unpanelInkExemption.test.ts` reads the 200 characters after
+        // `data-sim-overlay-scrim=""` looking for the exemption, and a
+        // paragraph pushed in front of it fails that check — which is the
+        // check standing between this shade and a stylesheet that deletes it.
+        data-sim-overlay-overhang={peekScrimOverhangPx > 0 ? peekScrimOverhangPx : undefined}
         aria-hidden
         style={{
           position: "absolute",
           top: `${-PEEK_SCRIM_FEATHER_PX.top}px`,
           right: `${-PEEK_SCRIM_FEATHER_PX.right}px`,
-          bottom: `${-PEEK_SCRIM_FEATHER_PX.bottom}px`,
+          // ── THE ONE INSET THAT IS NOT THE CONSTANT, AND THE BLOCK AT
+          //    `paintedOverhangPx` IS WHY. The other three sides bound a box
+          //    the card's rows stay inside; the BOTTOM is the side they hang
+          //    past, because the column's `max-height` shrinks this card's
+          //    border box below its own content. The feather is unchanged and
+          //    still lives entirely in the overhang — the mask's
+          //    `calc(100% - bottom)` is relative to THIS element, so the flat
+          //    core now ends exactly on the lowest row the card paints instead
+          //    of exactly on a box that stopped 19 px above «ЗАЩО».
+          bottom: `${-(PEEK_SCRIM_FEATHER_PX.bottom + peekScrimOverhangPx)}px`,
           left: `${-PEEK_SCRIM_FEATHER_PX.left}px`,
           zIndex: -1,
           pointerEvents: "none",
@@ -1570,8 +1806,16 @@ export function SimOverlay({
         ref={peekFold.ref}
         onScroll={peekFold.onScroll}
         data-sim-overlay-text=""
-        className="flex min-h-0 min-w-0 shrink flex-col gap-0.5 overflow-y-auto"
+        // THE STATE A DRIVE CAN PHOTOGRAPH, beside the one the card already
+        // carries (`data-sim-overlay-why-folded`): absent means the text is
+        // whole and the window is inert, present means the half sentence on the
+        // glass is now itself the way to the whole of it. See `tapCutText`.
+        data-sim-overlay-text-cut={textIsCut ? "" : undefined}
+        className={`flex min-h-0 min-w-0 shrink flex-col gap-0.5 overflow-y-auto${
+          textIsCut ? " cursor-pointer" : ""
+        }`}
         style={textWindowStyle}
+        {...(textIsCut ? tapCutText : null)}
       >
         {/* Row 2 — THE LINE. No clamp: it is `shrink-0` inside the window, so it
             lays out at a whole number of line boxes and the window scrolls past
@@ -2224,7 +2468,16 @@ export function SimOverlay({
                      copy gates that read `lineBg`. `tabular-nums` keeps «10.»
                      from shifting the sentence's first glyph against «1.». */}
               <h2 className="break-words text-sm font-extrabold leading-snug text-foreground">
-                {typeof shown.lineOrdinal === "number" ? (
+                {/* THE GUARD IS THE MODULE'S, NOT THIS FILE'S — 2026-08-26. It read
+                    `typeof shown.lineOrdinal === "number"`, and `NaN` is a number, and
+                    so is `0`: an unusable ordinal painted «NaN. » / «0. » in the
+                    headline face over a body that still opens at «2.» instead of
+                    falling through to the bare line `briefing-numbering.test.ts`
+                    promises. `briefingBg` is a public contract field and only
+                    `scenario/compile.ts` renumbers 1..N, which is why
+                    `briefingLineOrdinal` refuses to hard-code 1 — and that refusal is
+                    only safe if both ends of the wire agree what a position IS. */}
+                {isUsableLineOrdinal(shown.lineOrdinal) ? (
                   <span className="tabular-nums">{shown.lineOrdinal}. </span>
                 ) : null}
                 {shown.lineBg}

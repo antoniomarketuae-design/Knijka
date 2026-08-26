@@ -1645,20 +1645,36 @@ function stepReachZone(
     st.prevPos !== null &&
     dist(st.prevPos.x, st.prevPos.y, params.x, params.y) <= params.radiusM + REACH_ZONE_GRACE_M;
   let approachFrom = st.approachFrom;
+  // A FRESH APPROACH IS THE ONE WAY BACK, and it is exactly the edge the axis
+  // re-latches on — the same event, the same direction guard, so the two can
+  // never disagree about whether the student is „coming at it again". Consumed
+  // by `approachBlown` below; the axis itself is unchanged.
+  let freshApproach = false;
   if (inGraceRing && !prevInGraceRing) {
     const entryFrom = st.prevPos ?? here;
     if (approachFrom === null) {
       approachFrom = entryFrom;
+      freshApproach = true;
     } else {
       const oldX = params.x - approachFrom.x;
       const oldY = params.y - approachFrom.y;
       const newX = params.x - entryFrom.x;
       const newY = params.y - entryFrom.y;
-      if (oldX * newX + oldY * newY > 0) approachFrom = entryFrom;
+      if (oldX * newX + oldY * newY > 0) {
+        approachFrom = entryFrom;
+        freshApproach = true;
+      }
     }
   }
   let inApproachGrace = false;
   let beyondMark = false;
+  // AT OR PAST THE MARK ON THE STUDENT'S OWN APPROACH AXIS — the one thing
+  // `beyondMark` cannot say, because that flag exists only for waypoints that
+  // declared a paint boundary. Null when the axis is unknown (no ring entry
+  // yet, or an entry latched on top of the mark itself), and null is read as
+  // „still approaching" everywhere below: an unknown must never become a
+  // refusal. Consumed by `approachBlown`.
+  let alongMark: number | null = null;
   if (approachFrom !== null) {
     const ax = params.x - approachFrom.x;
     const ay = params.y - approachFrom.y;
@@ -1669,6 +1685,7 @@ function stepReachZone(
       const rx = tick.position.x - params.x;
       const ry = tick.position.y - params.y;
       const along = rx * ux + ry * uy; // + = beyond the mark
+      alongMark = along;
       const lateral = Math.abs(rx * uy - ry * ux); // across the approach
       // B18/FR-24 — where the ACCEPTANCE ends, on this same axis and sign
       // convention. `acceptBeforeMarkM` is the SIGNED offset from the paint to
@@ -1741,8 +1758,24 @@ function stepReachZone(
   // A cap honoured and then thrown away before arrival is not honoured. See
   // REACH_ZONE_CAP_SLACK_KMH for the five drills that banked one during their
   // acceleration run and arrived 11–19 км/ч over it with a green tick.
-  const capSpent =
-    cap !== undefined && onApproachSide && speedKmh > cap + REACH_ZONE_CAP_SLACK_KMH;
+  //
+  // ── …AND THE ARRIVAL FRAME IS ONE OF THE FRAMES THAT SPENDS IT ────────────
+  // (round 11, 2026-08-26 — see `approachBlown` below for the measurement.)
+  //
+  // `onApproachSide` is a POINT test against the tick's own position, and the
+  // arrival is a SEGMENT test („A WAYPOINT IS CROSSED, NOT SAMPLED"). So the
+  // two halves of one contract were measured against different objects, and at
+  // the tick rate this product actually runs at the gap between them is the
+  // whole capsule: at 58 км/ч one 0.5 s tick covers 8 m against a 15 m capsule,
+  // and above ~110 км/ч a single tick clears the capsule entirely. A car that
+  // banks the cap from below on the way up and then JUMPS the mark had no frame
+  // in which it was both on the approach side and over the cap, so nothing ever
+  // spent the latch — probe C of `reach-zone-blown-approach.test.ts`: one sample
+  // at 28 in the ring, the next at 58 nineteen metres past a mark capped at 30,
+  // green tick. Reading the spend off the swept face too costs nothing and
+  // refuses nobody who did not go through the mark over the cap.
+  const overCapNow = cap !== undefined && speedKmh > cap + REACH_ZONE_CAP_SLACK_KMH;
+  const capSpent = overCapNow && (onApproachSide || sweptAcceptance);
 
   // ── THE STATE HALF OF THE ARRIVAL CONTRACT (2026-08-19) ──────────────────
   // See `ReachZoneWitnessDemands` above for the five drills and the frame.
@@ -1789,15 +1822,123 @@ function stepReachZone(
   const controllerHere = controllerDemand ? controllerVerdictHere(tick) : null;
   const controllerSpent = controllerHere === "halt";
 
-  // ONE LATCH FOR THE WHOLE CONTRACT, because `ObjectiveEvalState.reachZone`
-  // belongs to lessons/types.ts and this lane may not add a field to it — and
-  // because an arrival contract is one thing: the speed, the lamps and the
-  // direction are what the banner asks for AT THE MARK, so they are earned
-  // together on one frame and any of them thrown away spends the latch. A zone
-  // that demands only a cap is bit-identical to shipped (the two state arms
-  // collapse to `true`/`false`), which `objectives.test.ts` sweeps.
+  // ── THE APPROACH THAT WAS ALREADY THROWN AWAY (round 11, 2026-08-26) ──────
+  //
+  // WHAT WAS BROKEN, and it is the last hole in the sweep-161 cap contract.
+  // `capMet` may be re-earned on ANY later frame the car is at the mark at or
+  // under the cap — the anti-trap rule, written for a student who arrives a
+  // shade fast and brakes while still on the mark. Nothing in it asked whether
+  // the car was still APPROACHING. So the certificate could also be collected
+  // by a car that had already gone THROUGH the mark at twice the cap and then
+  // slowed, rolled back, or simply came to rest inside the disc.
+  //
+  // MEASURED THROUGH THIS EVALUATOR, not inferred — `reach-zone-blown-approach
+  // .test.ts` replays the four shapes and the shipped code credits three of
+  // them. The sweep frames each drill was filed on read the same way, taking
+  // the leg's own `run.log` speed samples against the gate the template
+  // authors:
+  //
+  //   drill / gate                   cap  at the mark  ✓ printed at  run top
+  //   sc-ac-highbeam-lead/sc-ahl-follow 45   ~59         0:37         59
+  //   sc-crossing-bus-shadow/sc-bsh-appr 30   ~58        0:33         58
+  //   sc-crossing-white-cane/sc-wcn-appr 40   ~50        0:29         59
+  //   sc-hazard-obstacle/sc-obs-approach 46   ~57        0:32         59
+  //
+  // Every one of those ticks lands SECONDS AFTER the car crossed the gate — in
+  // each case the leg's own samples put it far over the cap when it went
+  // through and far under it when the tick printed. `sc-crossing-bus-shadow/
+  // pc-wrong` is the whole class in one protocol: «✓ Приближи камиона и
+  // пътеката с готовност за спиране 0:33» directly above «Грешки (6)», with
+  // «Твърде бързо приближаване към пешеходна пътека −10 изпитни т. ОПАСНА
+  // ГРЕШКА» and «Удар в пешеходец» inside it, on a drive whose own machine
+  // summary reads „top 58 км/ч · 0 full stops". The student who floors it past
+  // the crossing is handed the certificate for approaching it ready to stop.
+  //
+  // THE BAND IS THE ONE ALREADY THERE. „Blown" is not „over the cap" — it is
+  // over `cap + REACH_ZONE_CAP_SLACK_KMH`, the same 5 км/ч the spend above
+  // uses and the same number the rule engine grades speeding with. So the
+  // population this refuses is EXACTLY the population `capSpent` already
+  // refuses; the change is only that the refusal now sticks for the rest of
+  // that approach instead of being erased by the next slow frame. B4 (brake to
+  // the cap on the approach, coast a shade above it through the mark) and B5
+  // (stop SHORT of a halt mark) are untouched — neither is ever more than the
+  // slack over its cap, and the halt drills sit at 0 км/ч.
+  //
+  // AND IT CANNOT TRAP ANYONE, which is the half checked before the half that
+  // refuses: `freshApproach` clears it on the same ring-entry edge, with the
+  // same direction guard, that re-latches the approach axis. A student who
+  // overshoots, backs off down the road and comes at the mark again gets a
+  // clean slate — the escape hatch this file has always documented — while a
+  // car that drifts back in from the FAR side does not, because that is not an
+  // approach (B18/FR-24, the same dot ≤ 0 test).
+  //
+  // ONLY THE CAP ARM. The lamp, gear and officer arms keep their own „lighting
+  // up at the mark earns it on the next frame" rescue verbatim: a cockpit state
+  // is switched at a moment, and a moment cannot be blown on the way in.
+  //
+  // AND ONLY A FLOW CAP, WHICH IS NOT A DETAIL — it is the whole difference
+  // between „be here already slowed" and „come to rest here", and getting it
+  // wrong breaks 166 correct drives. MEASURED, not reasoned: the first cut of
+  // this arm armed on every cap, and the bot-completion suites went from 0
+  // failures to 166 in one run. `sc-acs-mark` is the shape — «Спри точно на
+  // маркираната позиция», radius 4, cap 6 — where ARRIVING IN MOTION IS THE
+  // ACT: the shadow reaches it at ~22 км/ч and brakes to a standstill on the
+  // mark, so „over the cap at the disc" is true of every correct drive that
+  // ever completed it. `REACH_ZONE_HALT_CAP_KMH` already draws exactly this
+  // line for the grace capsule's standstill arm, and it draws it here for the
+  // same reason.
+  //
+  // AND „BLOWN" MEANS THROUGH THE MARK, NOT NEAR IT. Braking hard while still
+  // SHORT of the mark — even inside the disc — is the approach being saved, and
+  // saving it is what the coach card asks for in so many words («Намали СЕГА,
+  // докато си върху точката»); that re-earn is `approach-cap-contract.test.ts`'s
+  // „is not a trap" row and it stays green. What cannot be taken back is a mark
+  // the car has already gone PAST at speed: there is no approach left to
+  // perform, and every one of the four filed drills is that shape. `alongMark`
+  // is null while the axis is unknown, and unknown counts as still approaching.
+  //
+  // AND ONLY ON AN APPROACH THAT NEVER HONOURED THE CAP AT ALL. A car that
+  // arrived legally and lost the speed afterwards has performed the approach
+  // the banner names; what it then did on top of the mark is `capSpent`'s to
+  // withdraw and its to win back — the rescue the 29 gates carrying a lamp or
+  // gear demand beside their cap depend on, since their whole mistake lane is
+  // „entered under the cap with the switch still off"
+  // (`objective-notice-shown-cap.test.ts`'s sc-ac-fog row is that drive).
+  //
+  // WHICH IS WHY THE STATE IS `approachCap` AND NOT `capMet`. `capMet` is the
+  // WHOLE arrival contract — cap AND lamps AND gear AND the officer — so on
+  // those 29 gates it is false on a car whose cap discipline was perfect. The
+  // cap needed a word of its own, and `honoured` is it. The two values are
+  // mutually exclusive per frame (≤ cap versus > cap + slack), so they share
+  // one field.
+  const capArmHere = cap !== undefined && speedKmh <= cap && (inAcceptance || graceArmed);
+  const pastMark = alongMark !== null && alongMark >= 0;
+  const isFlowCap = cap !== undefined && cap > REACH_ZONE_HALT_CAP_KMH;
+  const carried = freshApproach ? undefined : st.approachCap;
+  const blownHere =
+    isFlowCap && overCapNow && pastMark && (inAcceptance || sweptAcceptance);
+  const approachCap: "honoured" | "blown" | undefined =
+    carried === "honoured" || (carried === undefined && capArmHere)
+      ? "honoured"
+      : carried === "blown" || blownHere
+        ? "blown"
+        : undefined;
+  const approachBlown = approachCap === "blown";
+
+  // ONE LATCH FOR THE WHOLE CONTRACT, because an arrival contract is one thing:
+  // the speed, the lamps and the direction are what the banner asks for AT THE
+  // MARK, so they are earned together on one frame and any of them thrown away
+  // spends the latch. A zone that demands only a cap is bit-identical to
+  // shipped (the two state arms collapse to `true`/`false`), which
+  // `objectives.test.ts` sweeps.
+  //
+  // (This comment used to add „and because `ObjectiveEvalState.reachZone`
+  // belongs to lessons/types.ts and this lane may not add a field to it". That
+  // was a lane boundary, not a design reason, and round 11 held the file that
+  // owns it — hence `approachCap`. The one-latch shape stayed anyway: it is
+  // the honest one for a contract read on a single frame.)
   const contractEarned =
-    (cap === undefined || (speedKmh <= cap && (inAcceptance || graceArmed))) &&
+    (cap === undefined || (!approachBlown && capArmHere)) &&
     (lampDemand === undefined || (lampOk && atMark)) &&
     (gearDemand === undefined || (gearOk && atMark)) &&
     (!controllerDemand || controllerHere === "proceed");
@@ -1825,6 +1966,7 @@ function stepReachZone(
     approachFrom,
     prevPos: here,
     everOutside,
+    ...(approachCap !== undefined ? { approachCap } : {}),
   };
   return {
     done,

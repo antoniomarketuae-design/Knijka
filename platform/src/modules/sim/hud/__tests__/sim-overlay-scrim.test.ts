@@ -61,6 +61,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  paintedOverhangPx,
   PEEK_SCRIM_ALPHA,
   PEEK_SCRIM_FEATHER_PX,
   PEEK_SCRIM_RGB,
@@ -525,9 +526,21 @@ describe("it has no edge, which is the whole difference from the box he had remo
       expect(px, `${side} feather`).toBeGreaterThanOrEqual(8);
       expect(px, `${side} feather`).toBeLessThanOrEqual(32);
     }
-    for (const side of ["top", "right", "bottom", "left"] as const) {
+    // THREE SIDES ARE THE CONSTANT NEGATED, AND THE FOURTH IS THE CONSTANT PLUS
+    // WHAT THE CARD PAINTS PAST ITS OWN BOX — 2026-08-26. The block at
+    // `paintedOverhangPx` has the pavement scan: the column's `max-height`
+    // shrinks the card's border box to 95.76 px sideways while its rows lay out
+    // at ~115, so an inset measured from that box left the bottom 19 CSS px of
+    // the 44 px «ЗАЩО»/«×» chips standing on world. The FEATHER is untouched —
+    // the mask's `calc(100% - bottom)` is relative to the shade's own box, so
+    // the ramp still lives entirely in the overhang; what moved is where that
+    // box ends.
+    for (const side of ["top", "right", "left"] as const) {
       expect(SRC).toContain(`${side}: \`\${-PEEK_SCRIM_FEATHER_PX.${side}}px\``);
     }
+    expect(SRC).toContain(
+      "bottom: `${-(PEEK_SCRIM_FEATHER_PX.bottom + peekScrimOverhangPx)}px`",
+    );
     // …and the hard edge is bounded: the BACKGROUND gradient is untouched, so
     // that top line still dissolves over the last 26 px on the left and 12 on
     // the right. A stroke with no corners is not the rounded strip the
@@ -628,5 +641,98 @@ describe("the wiring, because a stripped style is a diff that changes no pixel",
     // added a background to this card and had to not put the box back.
     expect(cls).not.toMatch(/\bborder\b/);
     expect(cls).not.toMatch(/\brounded-full\b/);
+  });
+});
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   THE GROUND REACHED THE WORDS AND STOPPED ABOVE THE CONTROLS — 2026-08-26.
+
+   The `describe` above proves the shade is FULL STRENGTH over the card's box.
+   It was, and the box is not the card. Filed four times in one sentence, and
+   sc-park-zebra:9ce33786 names the mechanism without needing the source:
+
+     „the ПРОЧЕТИ and РАЗБРАХ pills — this card's controls — fall below the
+      scrim's bottom edge … THE CONTAINER WAS EXTENDED BEHIND THE TEXT AND NOT
+      BEHIND THE BUTTONS."
+
+   MEASURED on `w10-4/sc-signal-dead__mobile-right/04-t106s.png` (iPhone 16
+   landscape, dpr 3), reading a 130-device-px strip of flat pavement straight
+   down through the card's own column: luminance 44 at device y 504 ramping to
+   133 at 556 and flat thereafter. A 48-device-px ramp is `FEATHER.bottom`
+   (16 CSS) exactly, so the flat core ends at device 507 = CSS 169 = the
+   column's top 73.24 plus its ceiling 95.76 — the BOX. The «ЗАЩО»/«×» chips on
+   that frame run device 440–565 = CSS 146.7–188.3, so 19 CSS px of a 44 px
+   control hung past the flat core and the last 3 past the ramp as well.
+
+   THEO-4 IS WHY THIS IS NOT A COSMETIC ROW. «ЗАЩО» is the control behind which
+   the authored, law-cited explanation lives. Requirement zero says a student is
+   never handed a bare verdict — and on a card whose verdict is «−10 ИЗПИТНИ Т.»
+   the only route to the reason is a chip whose lower half was printed on a
+   building facade.
+   ════════════════════════════════════════════════════════════════════════════ */
+describe("the shade is sized to what the card PAINTS, not to the box it measures", () => {
+  it("is zero when every row sits inside the box — today's shipped geometry", () => {
+    // The floor of this change: a card that fits gets the inset it always had,
+    // and the server render (which has measured nothing) emits exactly that.
+    expect(paintedOverhangPx(169, [92, 120, 169])).toBe(0);
+    expect(paintedOverhangPx(169, [])).toBe(0);
+  });
+
+  it("is the LOWEST row's overhang, in the units the frame was measured in", () => {
+    // The frame above, in CSS px: box bottom 169, chips bottom 188.3.
+    expect(paintedOverhangPx(169, [110, 146.7, 188.3])).toBe(20);
+    // …and it is the lowest row that decides, not the last one measured.
+    expect(paintedOverhangPx(169, [188.3, 110])).toBe(20);
+  });
+
+  it("rounds UP, because half a device pixel of «ЗАЩО» on world is the finding", () => {
+    expect(paintedOverhangPx(100, [100.02])).toBe(1);
+  });
+
+  it("never runs backwards, so the shade can only ever grow to meet its own words", () => {
+    // A row ABOVE the box's bottom edge must not pull the ground up off the
+    // text — that would answer this finding by re-opening the one before it.
+    expect(paintedOverhangPx(169, [10])).toBe(0);
+    expect(paintedOverhangPx(Number.NaN, [188.3])).toBe(0);
+    expect(paintedOverhangPx(169, [Number.NaN, 188.3])).toBe(20);
+  });
+
+  it("is WIRED — the measurement reaches the one declaration that paints", () => {
+    // The dead-predicate check, and it is the one this project keeps failing:
+    // a number computed and read by nothing is a row that stays open while the
+    // ledger moves. Three links, each asserted rather than assumed.
+    //
+    // 1. the hook is called with the card's own identity …
+    expect(SRC).toContain("const [peekScrimRef, peekScrimOverhangPx] = useCardOverhang(");
+    // …and that identity carries `open`, because the peek is REPLACED by the
+    // sheet rather than hidden behind it: the same item re-mounts as a new DOM
+    // node, and observers left on the old one measure a card nobody can see.
+    expect(SRC).toContain('`peek ${open ? "open" : "shut"} ${foldKey}`,');
+    // 2. … its ref is on the shade element, which is how the hook finds the
+    //    card at all (`scrimRef.current.parentElement`), and it must therefore
+    //    be a child of the card rather than of the column …
+    expect(SRC).toContain("ref={peekScrimRef}");
+    expect(SRC).toContain("const card = scrim === null ? null : scrim.parentElement;");
+    // 3. … and the value lands in the inset that decides where the flat core
+    //    ends. Without this line the other two are a measurement of nothing.
+    expect(SRC).toContain(
+      "bottom: `${-(PEEK_SCRIM_FEATHER_PX.bottom + peekScrimOverhangPx)}px`",
+    );
+    // …and the pure half is what the hook calls, not a second implementation.
+    expect(SRC).toContain("const next = paintedOverhangPx(box.bottom, rowBottoms);");
+  });
+
+  it("watches for a ROW ARRIVING, which a ResizeObserver cannot see", () => {
+    // Row 2c («↓ още N реда», the moment stamp) and row 3 (the controls) are
+    // conditional. The card is pinned at the column's ceiling, so a new row
+    // resizes NOTHING that is already observed — it is a `childList` mutation
+    // and nothing else. A ResizeObserver-only version of this hook would leave
+    // the shade a whole row short exactly on the cards that have a fold, i.e.
+    // the ones whose explanation is cut, i.e. the ones «ЗАЩО» matters most on.
+    expect(SRC).toContain("new MutationObserver(sync)");
+    expect(SRC).toContain("mo.observe(card, { childList: true })");
+    // …and the shade must not measure itself, or every pass adds its own
+    // feather to the overhang it is computing.
+    expect(SRC).toContain("if (child === scrim) continue;");
   });
 });

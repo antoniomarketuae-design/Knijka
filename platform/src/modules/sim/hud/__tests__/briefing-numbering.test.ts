@@ -68,8 +68,17 @@ function renderedRows(steps: Rung["steps"]): string[] {
   // sc-crossing-child-ball. The number is carried as DATA (briefingLineOrdinal)
   // and painted by SimOverlay in its own span, so the row a student reads is the
   // two composed — which is what this file asserts, unchanged in intent.
+  //
+  // ── ONE AUTHORITY, NOT TWO — 2026-08-26. This read `ord === null || !(ord > 0)`,
+  //    i.e. this file carried its own idea of „usable" while the module handed
+  //    back `steps[0].n` raw and the sheet admitted it on `typeof === "number"`.
+  //    Three answers to one question, and the LOOSEST of them was the one on the
+  //    glass — «NaN. » and «0. » would have painted. `briefingLineOrdinal` is now
+  //    null-or-usable (`isUsableLineOrdinal`), so the model here is the plain
+  //    null check, and a regression that lets a non-position through fails the
+  //    two corpus rows below instead of being absorbed by a second guard.
   const ord = briefingLineOrdinal(steps);
-  const head = ord === null || !(ord > 0) ? briefingLineBg(steps) : ord + ". " + briefingLineBg(steps);
+  const head = ord === null ? briefingLineBg(steps) : ord + ". " + briefingLineBg(steps);
   return [head, ...(body === null ? [] : body.split(String.fromCharCode(10)))].filter(
     (s) => s.length > 0,
   );
@@ -153,5 +162,46 @@ describe("the briefing card reads as one list, and the list starts at 1", () => 
     expect(briefingLineBg([{ n: 0, textBg: "Само това." }])).toBe("Само това.");
     expect(briefingLineBg([{ n: Number.NaN, textBg: "Само това." }])).toBe("Само това.");
     expect(briefingLineBg([])).toBe("");
+
+    // ── …AND UNTIL 2026-08-26 THAT WAS THE WHOLE OF IT, WHICH IS TO SAY IT WAS
+    //    VACUOUS. Every assertion above reads `briefingLineBg`, and that
+    //    function has never carried an ordinal in any version of this file — the
+    //    number lives in `briefingLineOrdinal` and is painted by `SimOverlay` in
+    //    its own span. So the case NAMED „no usable ordinal is printed bare"
+    //    could not fail whatever the ordinal did, and what the ordinal actually
+    //    did was hand `steps[0].n` back raw to a surface guarding on
+    //    `typeof === "number"` — a test that admits `NaN` is a number, and a
+    //    sheet that would have painted «NaN. Само това.» in the headline face
+    //    over a body still opening at «2.».
+    //
+    //    THE ASSERTIONS THE NAME WAS ALWAYS MAKING:
+    expect(briefingLineOrdinal([{ n: 0, textBg: "Само това." }])).toBeNull();
+    expect(briefingLineOrdinal([{ n: Number.NaN, textBg: "Само това." }])).toBeNull();
+    expect(briefingLineOrdinal([{ n: -1, textBg: "Само това." }])).toBeNull();
+    expect(briefingLineOrdinal([{ n: 1.5, textBg: "Само това." }])).toBeNull();
+    expect(briefingLineOrdinal([{ n: Number.POSITIVE_INFINITY, textBg: "Само това." }])).toBeNull();
+    expect(briefingLineOrdinal([])).toBeNull();
+    // …and a REAL position still comes through, taken from the step and not
+    // from a literal 1 — the contract `briefingLineOrdinal`'s docstring keeps.
+    expect(briefingLineOrdinal([{ n: 1, textBg: "Първо." }])).toBe(1);
+    expect(briefingLineOrdinal([{ n: 3, textBg: "Трето." }])).toBe(3);
+  });
+
+  it("the row a bare ordinal produces is the line itself, with no prefix at all", () => {
+    // The composed row, not the pieces: this is what the sheet paints, and it
+    // is the half a reader checks. `renderedRows` is the model of that
+    // composition (see its own note), so this is the mutation for the branch —
+    // if `briefingLineOrdinal` went back to returning `steps[0].n` raw, the
+    // first row here would open «0. » and this fails.
+    const bare = renderedRows([
+      { n: 0, textBg: "Само това." },
+      { n: 2, textBg: "И това." },
+    ]);
+    expect(bare[0]).toBe("Само това.");
+    expect(bare[0]!.startsWith("0")).toBe(false);
+    expect(bare[0]!.includes("NaN")).toBe(false);
+    // The body is untouched by any of this — it keeps the authored numbering,
+    // which is `briefing-no-echo.test.ts`'s contract and not this file's.
+    expect(bare[1]).toBe("2. И това.");
   });
 });

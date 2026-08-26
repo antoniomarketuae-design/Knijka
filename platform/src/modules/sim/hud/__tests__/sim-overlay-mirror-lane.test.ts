@@ -229,11 +229,27 @@ describe("the SHADE is judged too, and it is not the column's rectangle", () => 
     // 1. THE INSETS ARE THE CONSTANT, NEGATED. If a later edit types a number
     //    here, `scrimRect` above stops describing the shipped element and this
     //    whole block becomes a measurement of a fiction.
-    for (const side of ["top", "right", "bottom", "left"] as const) {
+    //
+    //    ── THREE OF THEM, AS OF 2026-08-26, AND THE FOURTH IS STILL DERIVED.
+    //    The BOTTOM inset now reads `FEATHER.bottom + peekScrimOverhangPx` —
+    //    the card's border box is shrunk to the column's ceiling by the flex
+    //    algorithm while its rows lay out taller, so a bottom inset measured
+    //    from that box left the «ЗАЩО»/«×» chips standing on world
+    //    (`sim-overlay-scrim.test.ts` has the pavement scan). It is irrelevant
+    //    to THIS file's judgement, which is about the mirror band above the
+    //    card: `scrimRect` carries x, y and width and no height, and the
+    //    overhang can only ever move the shade's FLOOR further from the
+    //    mirror. It is asserted here anyway, so that a later edit which quietly
+    //    replaces the derivation with a typed number is caught by the file that
+    //    reasons about this element's rectangle.
+    for (const side of ["top", "right", "left"] as const) {
       expect(CODE, `${side} inset`).toContain(
         `${side}: \`\${-PEEK_SCRIM_FEATHER_PX.${side}}px\``,
       );
     }
+    expect(CODE, "bottom inset").toContain(
+      "bottom: `${-(PEEK_SCRIM_FEATHER_PX.bottom + peekScrimOverhangPx)}px`",
+    );
     // 2. THE CARD'S TOP EDGE IS THE COLUMN'S TOP. The column is a bare
     //    `flex flex-col items-end` with the card as its only child, so any
     //    padding or margin on `CARD_CLASS` would put the shade somewhere else

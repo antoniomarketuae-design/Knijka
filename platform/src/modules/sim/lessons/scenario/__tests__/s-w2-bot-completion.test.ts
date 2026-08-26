@@ -804,7 +804,7 @@ describe("wave-2 bot completion — sc-ac-night-overdrive at L3", () => {
     expect(scoreRubric(r, SC_AC_NIGHT_OVERDRIVE.rubric!).stars).toBe(1);
   });
 
-  it("counter-proof: the dark drive TEACHES HEADLIGHTS_OFF_AT_NIGHT (first encounter)", () => {
+  it("counter-proof: the dark drive TEACHES HEADLIGHTS_OFF_AT_NIGHT, then GRADES it once", () => {
     let s = createLessonSession(compileScenario(SC_AC_NIGHT_OVERDRIVE, 3));
     const taught: string[] = [];
     recordScAcNightOverdriveDrive(loadDistrict("ov-oncoming-v1"), "mistake-lights-off", {
@@ -819,8 +819,21 @@ describe("wave-2 bot completion — sc-ac-night-overdrive at L3", () => {
     // session.events — the student is taught чл. 70, not merely docked. The §9
     // code assert lives on the trace gate, where the recorder's own engine
     // grades every encounter: traces/__tests__/sc-ac-night-overdrive-traces.
+    //
+    // AND THE SECOND HALF, ADDED 2026-08-26 (`rules/engine.ts
+    // STANDING_DUTY_REGRADE_SEC`) — the line it replaces asserted that a drive
+    // which ran the WHOLE night section dark books no violation at all, ever.
+    // That is the finding: `sc-ac-night-lights / pc-wrong` reached its debrief
+    // on «Опасни 0 · Основни 0 · Второстепенни 0» under «Какво се получи
+    // добре: чисто каране по изпитния лист», having driven the entire night
+    // section unlit. The free mini-lesson forgives a first MISTAKE, not a
+    // lesson-long omission; the lamps still teach first, and are then graded
+    // ONCE, ten driving seconds later (`STANDING_DUTY_MAX_BILLS` = 2 bills per
+    // episode, so the debrief can never grow a rattle of lamp rows either).
     expect(taught).toEqual(["HEADLIGHTS_OFF_AT_NIGHT"]);
-    expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
+    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
+      "HEADLIGHTS_OFF_AT_NIGHT",
+    ]);
   });
 
   it("the trailer never grades the live student: it is a RECORDER rect (the wet-braking mold)", () => {

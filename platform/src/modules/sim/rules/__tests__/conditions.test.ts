@@ -225,10 +225,56 @@ describe("lights-in-snow detector (O28)", () => {
     expect(got).not.toContain("CLEAN_DRIVING");
   });
 
-  it("re-arms only on a genuine correction, so one uncorrected omission bills once", () => {
+  it("re-arms only on a genuine correction: an uncorrected omission bills the teach and the grade, and never a third time", () => {
+    // REPLACED DELIBERATELY, 2026-08-26 (`STANDING_DUTY_REGRADE_SEC`). This
+    // asserted `toBe(1)`, and ONE was exactly the defect: the single bill a
+    // standing lamp omission produced was spent by the teach-first free
+    // mini-lesson (`scenarios/policy.ts`), so `sc-ac-night-lights / pc-wrong`
+    // and `sc-ac-rain-lights / pc-wrong` — both driven with the lamps off from
+    // end to end — reached their debriefs on «Опасни 0 · Основни 0 ·
+    // Второстепенни 0» under «Какво се получи добре: чисто каране по изпитния
+    // лист — нито едно нарушение не влезе в точките».
+    //
+    // The claim the test was written to protect — „a flicker is not a second
+    // offence, and only a genuine correction re-arms" — is UNCHANGED and is
+    // what the `toBe(2)` half now pins: 30 s of unbroken omission produces the
+    // teach at the sustain and the grade ten driving seconds later, and then
+    // stops. The ceiling is the point (`STANDING_DUTY_MAX_BILLS`): without it
+    // this drive would print three rows, and a three-minute one eighteen —
+    // the runaway shape the same sweep files as critical on sc-junction-scan.
     const ticks = cruise(0, 30, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" });
     const n = codes(drive(ticks).events).filter((c) => c === "HEADLIGHTS_OFF_IN_RAIN").length;
-    expect(n).toBe(1);
+    expect(n).toBe(2);
+
+    // AND THE TWO BILLS ARE NOT ALIKE — the second says so. `regrade` is what
+    // lets `lessons/engine.ts` refuse to CHARGE one continuous breach twice
+    // (exam mode has no teach pass to absorb the first bill); without the mark
+    // the layer above cannot tell a re-grade from a fresh offence, and a
+    // candidate books 6 основни points for one unlit run priced at 3.
+    const lamps = drive(ticks)
+      .events.filter((e) => e.kind === "violation" && e.code === "HEADLIGHTS_OFF_IN_RAIN")
+      .map((e) => (e.kind === "violation" ? e.regrade === true : false));
+    expect(lamps).toEqual([false, true]);
+
+    // …and the ceiling holds however long the omission runs: 180 s is nine
+    // re-grade windows and still exactly two bills.
+    const long = cruise(0, 180, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" });
+    const nLong = codes(drive(long).events).filter((c) => c === "HEADLIGHTS_OFF_IN_RAIN").length;
+    expect(nLong).toBe(2);
+  });
+
+  it("a genuine correction ends the episode, so a SECOND omission is billed as its own offence", () => {
+    // The other direction of the same ceiling: `bills` is zeroed by the reset
+    // that re-arms the episode, so a driver who switches the lamps on and
+    // later off again has committed a second offence, not a fifth helping of
+    // the first.
+    const ticks = [
+      ...cruise(0, 20, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" }),
+      ...cruise(21, 30, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "low" }),
+      ...cruise(31, 50, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" }),
+    ];
+    const n = codes(drive(ticks).events).filter((c) => c === "HEADLIGHTS_OFF_IN_RAIN").length;
+    expect(n).toBe(4);
   });
 });
 

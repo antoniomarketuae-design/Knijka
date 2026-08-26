@@ -26,6 +26,17 @@
  *  - A speeding episode that escalates from minor to dangerous emits BOTH
  *    events (both mistakes really happened); if speed jumps straight into the
  *    dangerous band, only the dangerous event fires.
+ *  - A ONE-SWITCH DUTY (belt, handbrake, the four lamp arms) that is STILL
+ *    breached ten driving seconds after the student was shown it is billed
+ *    once more, and then never again (STANDING_DUTY_REGRADE_SEC /
+ *    STANDING_DUTY_MAX_BILLS). One bill per episode was the whole reason a
+ *    lesson driven end-to-end unlit could reach its debrief as «чисто каране»:
+ *    the single bill was spent on the teach-first free mini-lesson and the
+ *    reducer never asked a second time. Two bills — the teach and the grade —
+ *    is what the официален изпитен лист prices the offence at — and it is
+ *    charged ONCE: the re-bill carries `regrade`, and `lessons/engine.ts` drops
+ *    it when the code has already been charged (exam mode, a repeat offence, a
+ *    grade-on-sight policy), so one continuous breach can never cost twice.
  *  - Both pedestrian-crossing violations can fire on one crossing (approach
  *    too fast, then still failing to yield) — they are distinct mistakes and
  *    each deserves immediate feedback. Any опасна already fails the session.
@@ -51,6 +62,7 @@ import {
   type SimTick,
   type SimTickEvent,
   type TurnDirection,
+  type ViolationEvent,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +82,13 @@ interface EpisodeState {
    */
   resetSince: number | null;
   lastEmitAt: number | null;
+  /**
+   * How many times THIS episode has billed (stepSustainedEpisode only; zeroed
+   * by the same reset that re-arms it). Read solely by the `maxBills` ceiling
+   * — see `STANDING_DUTY_MAX_BILLS`. The two speeding calls pass no ceiling
+   * and are unaffected by it, so their behaviour is byte-identical.
+   */
+  bills: number;
 }
 
 /**
@@ -440,6 +459,7 @@ const IDLE_EPISODE: EpisodeState = {
   emitted: false,
   resetSince: null,
   lastEmitAt: null,
+  bills: 0,
 };
 
 /**
@@ -725,6 +745,91 @@ const ACT_REVERSE_REOPEN_M = ACT_REOPEN_TRAVEL_M;
  * own, and it is the difference between one false conviction and five.
  */
 const WRONG_WAY_REARM_SEC = 4;
+
+/**
+ * THE STANDING-DUTY RE-GRADE — how long a CONTINUING breach of a one-switch
+ * duty may run after the student has been shown it, before it is billed the
+ * one time the изпитен лист prices, seconds.
+ *
+ * WHAT WAS PHOTOGRAPHED, and it is the whole lane. `sc-ac-night-lights /
+ * pc-wrong` drove its entire night section with the lamps off and its debrief
+ * reads «Какво се получи добре: чисто каране по изпитния лист — нито едно
+ * нарушение не влезе в точките», over «Опасни 0 · Основни 0 · Второстепенни
+ * 0». `sc-ac-rain-lights / pc-wrong` is the same sheet, word for word, on a
+ * rain lesson driven unlit. `sc-pk-stop-vs-park / mobile-right` drives 134 s
+ * with the КОЛАН button red and the leg's own run.log records 34 of its 42
+ * sampled beats as `card=-/-`: not one violation card in the whole drive.
+ * Three lessons whose entire subject is a switch, and none of them can mark it.
+ *
+ * WHY, and it is not the coach's fault. `stepEpisode` fires a violation ONCE
+ * per episode and never again however long the breach lasts (`if (!e.emitted
+ * …) { e.emitted = true; return true; }`), and every one-switch duty in this
+ * file uses it: belt, handbrake, night lamps, rain lamps, fog lamps, snow
+ * lamps. The single event it produces is then the FIRST encounter of its
+ * topic, and teach-first-then-grade — the founder-approved discipline
+ * (`scenarios/policy.ts`) — spends it on the free mini-lesson. The engine's own
+ * words on the leg's debrief: «Първата среща не се наказва — точно затова я
+ * показахме. При повторение вече влиза в изпитния лист.» There is never a
+ * повторение, because the reducer never asks a second time. So the free lesson,
+ * which exists to forgive a first MISTAKE, ends up forgiving the entire drive.
+ *
+ * WHAT THIS IS NOT. It is not a cadence and not a ladder: `STANDING_DUTY_MAX_
+ * BILLS` below holds the episode to TWO bills — the teach and the grade — so a
+ * breach held for three minutes still costs exactly what Наредба № 38 prices
+ * it at, once, and can never produce the fifteen-row runaway this same sweep
+ * files as critical elsewhere (`sc-junction-stop`, `sc-junction-scan`).
+ *
+ * WHY TEN SECONDS.
+ *  · The teach card PAUSES the sim (the audited legs record «1 pause layer
+ *    drained»), and sim time does not advance while it is up, so this is ten
+ *    seconds of DRIVING after the student was told.
+ *  · `speedingRearmSec` (4 s) is this engine's declared unit of „a correction
+ *    that counts"; ten is more than two of them, deliberately generous, because
+ *    a false second bill costs trust and the student may be mid-manoeuvre.
+ *  · It has to reach the drives the audit photographed. Both AC legs above end
+ *    at ~20 s of driving (run.log beats 04-t001s…04-t017s), so the engine's
+ *    existing 20 s repeat cadence (`speedingRepeatSec`) would have expired
+ *    AFTER the drive and moved nothing.
+ *  · And it cannot punish a reaction: at the 59 км/ч both legs hold, ten
+ *    seconds is 164 m of road driven unlit — nobody reaches a light switch in
+ *    a hundred and sixty metres.
+ *
+ * TWO BILLS ARE NOT TWO CHARGES, and that distinction is load-bearing. The
+ * second bill exists ONLY to reach the charge the free lesson consumed, so it
+ * carries `regrade: true` (`rules/types.ts`) and `lessons/engine.ts` DROPS it
+ * whenever the code has already been charged. Three cases where it has:
+ *  · exam mode — `coachStep` opts.examMode scores unconditionally, so the
+ *    FIRST bill is the charge and there is no teach to make up for;
+ *  · a repeat offence — the topic was taught in the earlier episode, so the
+ *    first bill of the second episode already grades;
+ *  · any scenario whose policy grades this topic on sight.
+ * Without that drop, a candidate on a NIGHT exam variant (`examBank.ts`) who
+ * drives twelve seconds unbelted and unlit books 12 наказателни точки where
+ * Наредба № 38 prices the pair at 6 — and the exam gates are `osnovniPoints >
+ * 6` / `totalPoints > 9` (`rules/summary.ts`, `lessons/exam.ts`). That is a
+ * false FAIL in the highest-stakes mode the product has, which is why the
+ * reducer marks the re-grade instead of pretending the two bills are alike.
+ * The mode itself is still invisible here: the reducer states a FACT about the
+ * event („this is the same breach again"), and the layer that knows what was
+ * charged decides. Grading policy stays out of the detector.
+ */
+const STANDING_DUTY_REGRADE_SEC = 10;
+
+/**
+ * How many bills ONE standing-duty episode may ever produce.
+ *
+ * TWO: the teach and the grade. The first is the founder-approved free
+ * mini-lesson (`scenarios/policy.ts` — „the first time a driver meets a
+ * scenario we TEACH it"); the second is the charge the официален изпитен лист
+ * prices the offence at, and Наредба № 38 prices «Движение без предпазен
+ * колан» and «Движение нощем без светлини» ONCE at 3 наказателни точки, not
+ * per minute. A third bill would tell the student nothing he was not told at
+ * the second and would only add a row — which is precisely the shape
+ * `sc-junction-stop / pc-wrong` («Грешки (48)», fifteen identical rows) and
+ * `sc-junction-scan / pc-wrong` («Грешки (62)») are filed as critical for.
+ * The ceiling is what makes this repair unable to become that defect.
+ */
+const STANDING_DUTY_MAX_BILLS = 2;
 
 /**
  * WRONG_WAY on an АВТОМАГИСТРАЛА — the card names the road the student is on
@@ -1089,6 +1194,17 @@ function stepEpisode(
  * measured number, so it has no saw-tooth to counterweight; what it has is a
  * signal that flickers, and `rearmSec` is exactly the guard against a flicker
  * being read as a second act (see WRONG_WAY_REARM_SEC).
+ *
+ * 2026-08-26: the six ONE-SWITCH DUTIES opt in too (belt, handbrake, and the
+ * four lamp arms), with `repeatSec` STANDING_DUTY_REGRADE_SEC and a `maxBills`
+ * ceiling of two. They came from plain `stepEpisode`, which bills once and
+ * never asks again — and that single bill is spent by the teach-first free
+ * lesson, so an entire lesson driven unbelted or unlit reached the debrief as
+ * «чисто каране … нито едно нарушение не влезе в точките». See
+ * STANDING_DUTY_REGRADE_SEC for the three legs that photographed it.
+ *
+ * `maxBills` 0 = no ceiling, which is what the two speeding calls pass, so
+ * their behaviour (and every recorded drive's speeding ledger) is unchanged.
  */
 function stepSustainedEpisode(
   e: EpisodeState,
@@ -1098,6 +1214,7 @@ function stepSustainedEpisode(
   sustainSec: number,
   rearmSec: number,
   repeatSec: number,
+  maxBills = 0,
 ): boolean {
   if (reset) {
     e.activeSince = null;
@@ -1105,6 +1222,10 @@ function stepSustainedEpisode(
     if (t - e.resetSince >= rearmSec) {
       e.emitted = false;
       e.lastEmitAt = null;
+      // A genuine correction ENDS the episode, so the ceiling starts over with
+      // it: a driver who buckles up and later unbuckles again has committed a
+      // second offence, not a fifth helping of the first.
+      e.bills = 0;
     }
     return false;
   }
@@ -1121,13 +1242,38 @@ function stepSustainedEpisode(
     if (t - e.activeSince < sustainSec) return false;
     e.emitted = true;
     e.lastEmitAt = t;
+    e.bills += 1;
     return true;
   }
-  if (repeatSec > 0 && e.lastEmitAt !== null && t - e.lastEmitAt >= repeatSec) {
+  if (
+    repeatSec > 0 &&
+    e.lastEmitAt !== null &&
+    t - e.lastEmitAt >= repeatSec &&
+    (maxBills <= 0 || e.bills < maxBills)
+  ) {
     e.lastEmitAt = t;
+    e.bills += 1;
     return true;
   }
   return false;
+}
+
+/**
+ * THE STANDING-DUTY PUSH — the one place the two bills stop being alike.
+ *
+ * Called immediately after `stepSustainedEpisode` returned true, so `ep.bills`
+ * is THIS bill's number. Bill 1 is a new act. Bill 2 is the SAME breach ten
+ * driving seconds later, and it exists only to reach the charge the teach-first
+ * free lesson consumed (see `STANDING_DUTY_REGRADE_SEC`) — so it is marked, and
+ * `lessons/engine.ts` drops it when the code has already been charged. That is
+ * what keeps exam mode, where the first bill grades, from billing one
+ * continuous unlit run twice and failing a candidate Наредба № 38 passes.
+ *
+ * The mark is a FACT about the event, not a policy: „this is the same breach
+ * again". What to do with it belongs to the layer that knows what was charged.
+ */
+function standingDutyBill(ep: EpisodeState, v: ViolationEvent): ViolationEvent {
+  return ep.bills > 1 ? { ...v, regrade: true } : v;
 }
 
 /**
@@ -1272,6 +1418,48 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const t = tick.t;
   const speed = tick.speedKmh;
   const events: RuleEvent[] = [];
+
+  /*
+   * WITHDRAWN 2026-08-26 — WHY THIS FILE DOES *NOT* STAND ITS SPAN DETECTORS
+   * DOWN ON `tick.edgeId === null`, written here so the next reader does not
+   * re-add the gate that was tried and pulled.
+   *
+   * The evidence for it is real: `.audit-frames/w10-4/frames/
+   * sc-sp-curve__mobile-wrong/04-t154s.png` is an unbroken green plane with two
+   * trees in it, the carriageway visible only in the mirror, 96 км/ч, and
+   * «⚠ −3 ИЗПИТНИ Т. · Несъобразена скорост в завой» live on the glass. The car
+   * really is convicted under a span it is not on, because every authored span
+   * is resolved from the lane fix's ARCLENGTH and the lane fix survives the
+   * kerb — only `edgeId` is nulled.
+   *
+   * A gate of the form `edgeId !== null` CANNOT repair that, for one measured
+   * reason: `edgeId` goes null at 0.97 m past the kerb, not at thirty metres
+   * (`runtime/worldRuntime.ts` OFF_CARRIAGEWAY_M = OFF_CARRIAGEWAY_BODY_
+   * ALLOWANCE_M = chassis half-width 0.85 + the deliberately-drivable kerb
+   * 0.12). Nothing on the tick separates that field from a car with one wheel
+   * over the kerb — and one wheel over the kerb is EXACTLY where the learner
+   * behaviour these detectors exist to correct happens:
+   *  · В27 (`illegalBanRest` below): the whole subject of `sc-pk-stop-vs-park`
+   *    is stopping where stopping is forbidden, and the way a learner does it
+   *    is half on the pavement. A gate acquits the lesson's own mistake.
+   *  · the curve advisory: running WIDE onto the verge is the CONSEQUENCE of
+   *    „несъобразена скорост в завой", so a gate would acquit the fault at the
+   *    instant it produced its result — and its reset (`advisory === undefined`)
+   *    would re-arm the sustain on the way back, so a driver oscillating over
+   *    the line through a bend could clear the corner unbilled.
+   * The 96,908-pose sweep in `lessons/finish.ts` licenses only the other
+   * direction — that nothing ON the carriageway reads off-network. It says
+   * nothing about the kerb-straddle band, which is where all of this happens.
+   *
+   * AND THE LAYER ABOVE HAS ALREADY RULED ON IT. `runtime/worldRuntime.ts`'s
+   * surface-consult header: „`maxSpeedKmh`, `wrongWay`, `laneId`, the zone flags
+   * and every опасна channel stay exactly as shipped off the asphalt. Silencing
+   * them would trade a wrong charge for NO charge … must still be a conviction,
+   * not a shrug." The repair that header routes instead is an OFF_CARRIAGEWAY
+   * code naming the real fault AT THE KERB — `rules/types.ts` + this file + the
+   * violation catalogue + a lawRef the founder signs. That is the fix. A blanket
+   * acquittal is not, so `sc-sp-curve:45e7e4fb` stays an OPEN row.
+   */
 
   // Frame-to-frame derivatives (A12 tolerance bands). dt of 0 (duplicate
   // timestamp) or a first frame yields neutral rates — detectors then judge
@@ -1664,11 +1852,42 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   const moving = speed > cfg.movingSpeedKmh;
-  if (stepEpisode(s.seatbelt, !tick.seatbeltOn && moving, tick.seatbeltOn, t, cfg.seatbeltSustainSec)) {
-    events.push(makeViolation("SEATBELT_OFF_WHILE_MOVING", t));
+  // THE ONE-SWITCH DUTIES (STANDING_DUTY_REGRADE_SEC — the belt, the handbrake
+  // and the four lamp arms below). Each is a state the driver ends with a
+  // single control action, and each used to bill ONCE per episode however long
+  // the breach ran — the bill the free mini-lesson then spent, which is how a
+  // whole lesson driven unbelted reached its debrief as «чисто каране». They
+  // now re-grade ONCE, ten driving seconds after the student was shown the
+  // rule, and never a third time — and that second bill is MARKED (see
+  // `standingDutyBill`), so the layer that knows what was already charged can
+  // refuse to charge one continuous breach twice.
+  if (
+    stepSustainedEpisode(
+      s.seatbelt,
+      !tick.seatbeltOn && moving,
+      tick.seatbeltOn,
+      t,
+      cfg.seatbeltSustainSec,
+      0,
+      STANDING_DUTY_REGRADE_SEC,
+      STANDING_DUTY_MAX_BILLS,
+    )
+  ) {
+    events.push(standingDutyBill(s.seatbelt, makeViolation("SEATBELT_OFF_WHILE_MOVING", t)));
   }
-  if (stepEpisode(s.handbrake, tick.handbrakeOn && moving, !tick.handbrakeOn, t, cfg.handbrakeSustainSec)) {
-    events.push(makeViolation("HANDBRAKE_LEFT_ON", t));
+  if (
+    stepSustainedEpisode(
+      s.handbrake,
+      tick.handbrakeOn && moving,
+      !tick.handbrakeOn,
+      t,
+      cfg.handbrakeSustainSec,
+      0,
+      STANDING_DUTY_REGRADE_SEC,
+      STANDING_DUTY_MAX_BILLS,
+    )
+  ) {
+    events.push(standingDutyBill(s.handbrake, makeViolation("HANDBRAKE_LEFT_ON", t)));
   }
   // The one derivation of the low-beam duty (see `lowBeamDuty`): the three arms
   // below — night here, rain and snowfall further down — read it instead of
@@ -1678,15 +1897,18 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // `snow && !rain && !isNight`.
   const lampDuty = lowBeamDuty(tick);
   if (
-    stepEpisode(
+    stepSustainedEpisode(
       s.headlights,
       lampDuty === "night" && tick.headlights === "off" && moving,
       !tick.isNight || tick.headlights !== "off",
       t,
       cfg.headlightsSustainSec,
+      0,
+      STANDING_DUTY_REGRADE_SEC,
+      STANDING_DUTY_MAX_BILLS,
     )
   ) {
-    events.push(makeViolation("HEADLIGHTS_OFF_AT_NIGHT", t));
+    events.push(standingDutyBill(s.headlights, makeViolation("HEADLIGHTS_OFF_AT_NIGHT", t)));
   }
 
   // Crossed the solid осева (OV-04/SN-03 escalation — ADR-006 stage 2b): the
@@ -1872,6 +2094,9 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   //    overshoot corrected within the sustain never bills; reverse
   //    maneuvering is exempt. Reset re-arms only after genuine correction
   //    (at/under the advisory) or after leaving the span — one bill per act.
+  //  - NOT gated on «is there asphalt under the car»: see the withdrawn-gate
+  //    note at the top of reduceTick. Running WIDE onto the verge is this
+  //    fault's own consequence, and `edgeId` nulls one metre past the kerb.
   const advisoryKmh = tick.curveAdvisoryKmh;
   const curveOverspeed =
     advisoryKmh !== undefined &&
@@ -1893,9 +2118,18 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // Lights in rain (daytime — night is covered by HEADLIGHTS_OFF_AT_NIGHT).
   const rainNoLights = lampDuty === "rain" && tick.headlights === "off" && moving;
   if (
-    stepEpisode(s.rainLights, rainNoLights, !raining || tick.headlights !== "off", t, cfg.rainLightsSustainSec)
+    stepSustainedEpisode(
+      s.rainLights,
+      rainNoLights,
+      !raining || tick.headlights !== "off",
+      t,
+      cfg.rainLightsSustainSec,
+      0,
+      STANDING_DUTY_REGRADE_SEC,
+      STANDING_DUTY_MAX_BILLS,
+    )
   ) {
-    events.push(makeViolation("HEADLIGHTS_OFF_IN_RAIN", t));
+    events.push(standingDutyBill(s.rainLights, makeViolation("HEADLIGHTS_OFF_IN_RAIN", t)));
   }
 
   // Fog lamps in fog (AC-03, чл. 74 — при значително намалена видимост
@@ -1907,9 +2141,18 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // and reaching the V toggle.
   const fogNoFogLights = foggy && tick.fogLightsOn !== true && moving;
   if (
-    stepEpisode(s.fogLights, fogNoFogLights, !foggy || tick.fogLightsOn === true, t, cfg.fogLightsSustainSec)
+    stepSustainedEpisode(
+      s.fogLights,
+      fogNoFogLights,
+      !foggy || tick.fogLightsOn === true,
+      t,
+      cfg.fogLightsSustainSec,
+      0,
+      STANDING_DUTY_REGRADE_SEC,
+      STANDING_DUTY_MAX_BILLS,
+    )
   ) {
-    events.push(makeViolation("FOG_LIGHTS_OFF_IN_FOG", t));
+    events.push(standingDutyBill(s.fogLights, makeViolation("FOG_LIGHTS_OFF_IN_FOG", t)));
   }
 
   // Lights in SNOWFALL (O28, чл. 70, ал. 1 — the third arm of the low-beam
@@ -1947,9 +2190,20 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   //    knob: one reduced-visibility duty, one grace.
   const snowNoLights = lampDuty === "snow" && tick.headlights === "off" && moving;
   if (
-    stepEpisode(s.snowLights, snowNoLights, !snowy || tick.headlights !== "off", t, cfg.rainLightsSustainSec)
+    stepSustainedEpisode(
+      s.snowLights,
+      snowNoLights,
+      !snowy || tick.headlights !== "off",
+      t,
+      cfg.rainLightsSustainSec,
+      0,
+      STANDING_DUTY_REGRADE_SEC,
+      STANDING_DUTY_MAX_BILLS,
+    )
   ) {
-    events.push(makeViolation("HEADLIGHTS_OFF_IN_RAIN", t, SNOW_LIGHTS_COPY));
+    events.push(
+      standingDutyBill(s.snowLights, makeViolation("HEADLIGHTS_OFF_IN_RAIN", t, SNOW_LIGHTS_COPY)),
+    );
   }
 
   // Following distance (2-second rule) — only above stop-and-go speed, when a

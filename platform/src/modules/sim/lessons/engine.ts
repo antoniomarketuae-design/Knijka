@@ -416,6 +416,28 @@ function objectiveNotice(
     const measuredBg = arrivedOnThisFrame
       ? `а стигна дотук с ${measuredKmh} км/ч`
       : `а върху точката вдигна скоростта до ${measuredKmh} км/ч`;
+    // ── AND THE ADVICE HAS TO MATCH THE GRADER (round 11, 2026-08-26) ────────
+    //
+    // «Намали СЕГА, докато си върху точката» is true only while the approach
+    // can still be saved. Since `objectives.ts approachBlown` it cannot always
+    // be: a car more than REACH_ZONE_CAP_SLACK_KMH over its own cap AT the
+    // authored disc has thrown the approach away, and braking beside the mark
+    // afterwards no longer re-issues the certificate — that re-earn was exactly
+    // the hole that handed «Приближи камиона и пътеката с готовност за спиране»
+    // to a drive convicted of «Твърде бързо приближаване към пешеходна пътека»
+    // in the same protocol.
+    //
+    // So the card reads the same bit the grader reads and says the true thing
+    // in each case (THEO-4: what was observed, what is wanted, what to do —
+    // never a bare verdict, and never an instruction that will not work). What
+    // it deliberately does NOT say is „turn round and come again": on the
+    // motorway rungs that would be advice to commit an offence. The corrective
+    // it gives is the one the lesson actually teaches — brake EARLIER, before
+    // the mark.
+    const blownApproach = after.approachCap === "blown";
+    const tailBg = blownApproach
+      ? "— това е над допустимото и задачата остава неизпълнена. Намаляване след маркера вече не се отчита: измерва се самото приближаване, а то вече се случи с тази скорост. Намалявай по-рано — още преди маркера. Урокът продължава и разборът показва задачата накрая."
+      : "— затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.";
     return {
       kind: "lesson",
       titleBg: "Стигна точката, но твърде бързо",
@@ -463,7 +485,7 @@ function objectiveNotice(
       // «тази скорост» two clauses down still resolves in both forms: it is
       // the speed the card just printed, which is the speed that would carry
       // him past the mark if he keeps it.
-      explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, ${measuredBg} — затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.`,
+      explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, ${measuredBg} ${tailBg}`,
     };
   }
   if (
@@ -696,12 +718,48 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     coachedNew.push({ code: e.code, titleBg: e.titleBg, t: e.t });
     coachedCount += 1;
   };
+  /**
+   * ONE CONTINUOUS BREACH, ONE CHARGE — the standing-duty re-grade guard.
+   *
+   * `rules/engine.ts` bills a one-switch duty (belt, handbrake, the four lamp
+   * arms) TWICE per episode, ten driving seconds apart, because the first bill
+   * is spent by the teach-first free mini-lesson: without a second one, a whole
+   * lesson driven unbelted or unlit reaches its debrief on «Опасни 0 · Основни
+   * 0 · Второстепенни 0» under «чисто каране по изпитния лист». The second bill
+   * therefore exists ONLY to reach the charge the teach consumed, and it says
+   * so — `regrade: true` means „this is the same breach, not a new act".
+   *
+   * So when the code has ALREADY been charged, the re-grade has nothing left to
+   * add and is dropped here, before the coach ever sees it. Three ways it can
+   * already have been charged, and all three are live:
+   *  · EXAM MODE — `coach.ts` scores unconditionally under examMode, so the
+   *    first bill IS the charge. Without this drop a candidate on a night exam
+   *    variant (`examBank.ts` ships them) who runs twelve seconds unbelted and
+   *    unlit books 12 наказателни точки where Наредба № 38 prices the pair at
+   *    6, against gates of `osnovniPoints > 6` and `totalPoints > 9`
+   *    (`rules/summary.ts`, `exam.ts`) — a false FAIL on the изпит.
+   *  · A REPEAT OFFENCE — the driver buckled up, unbuckled again, and the new
+   *    episode's first bill grades on its own (prior encounter). The second
+   *    offence costs its 3 points once, not twice.
+   *  · A GRADE-ON-SIGHT policy for that topic (`scenarios/policy.ts`).
+   * The TEACH is never suppressed: an unscored first bill leaves the ledger
+   * empty, so the re-grade passes and lands as the single charge it exists to
+   * be. Requirement-zero holds — the student is taught, then charged once.
+   */
+  let chargedCodes: Set<string> | undefined;
+  const alreadyCharged = (code: string): boolean =>
+    // Built LAZILY: this runs in the render loop, and a re-grade arrives at
+    // most twice per episode, so a clean drive never pays for the set at all.
+    (chargedCodes ??= new Set(
+      prev.events.filter((x) => x.kind === "violation").map((x) => x.code as string),
+    )).has(code) || scoredEvents.some((x) => x.kind === "violation" && x.code === code);
   for (const e of ruleEvents) {
     if (e.kind === "commendation") {
       hudEvents.push({ kind: "commendation", titleBg: e.titleBg });
       scoredEvents.push(e);
       continue;
     }
+    if (e.regrade === true && alreadyCharged(e.code)) continue;
     // SPD #39/#48: DISPLAY text only — the FOLLOWING family carries the
     // measured time-gap readout; every other code passes through unchanged.
     // The scored event (scoredEvents/state.events/wire) keeps catalog copy.

@@ -277,6 +277,14 @@ export interface SimOverlayItem {
    *
    * `null`/absent for every item that is not one step of an authored list — a
    * fault card, a commendation, a task line. Do not invent one.
+   *
+   * AND „A NUMBER" IS NOT THE TEST — `isUsableLineOrdinal` IS. `NaN` and `0`
+   * are numbers; a list position is a whole number from one. The surface used
+   * to admit this field on `typeof === "number"` and would have painted
+   * «NaN. » / «0. » over a body that still opens at «2.». Both the producer
+   * (`briefingLineOrdinal`) and the painter (`SimOverlay`'s sheet <h2>) run the
+   * one predicate now, so a producer that cannot name a position gets the bare
+   * line the contract promises rather than an invented prefix.
    */
   lineOrdinal?: number | null;
   /** Leading chip: „ЗАДАЧА 2/3", „−2 т.", „Изпит". */
@@ -757,9 +765,45 @@ export function briefingBodyBg(steps: readonly BriefingStepBg[]): string | null 
  * which step lands on the line; a hard-coded 1 would keep claiming „first"
  * through a change that made it something else, which is the failure mode the
  * contract note above `briefingLineBg` exists to prevent.
+ *
+ * ── …AND „STEPS[0].N" IS NOT THE SAME THING AS „A NUMBER" — 2026-08-26. ─────
+ *
+ * This returned `steps[0].n` raw, and the surface admitted it on `typeof x ===
+ * "number"`. `NaN` IS a number and so is `0`, so an unusable ordinal did not
+ * fall through to the bare line the contract promises — it painted «NaN. » or
+ * «0. » in the headline face over a body that still opens at «2.», which is a
+ * worse sentence than the unnumbered lead the twenty-one w10 frames filed.
+ *
+ * `briefingBg` is a PUBLIC contract field (`contracts.ts:188`), not a scenario
+ * private: `scenario/compile.ts` renumbers 1..N today and nothing at the
+ * boundary makes any other producer do so — which is exactly why this function
+ * refuses to hard-code 1. The refusal only works if „not a position" comes back
+ * as `null`. `isUsableLineOrdinal` is that rule, and it is the SAME function
+ * the surface guards with (`SimOverlay.tsx`, the sheet's <h2>), so the data
+ * side and the glass cannot answer this question differently.
  */
 export function briefingLineOrdinal(steps: readonly BriefingStepBg[]): number | null {
-  return steps.length > 0 ? steps[0]!.n : null;
+  const n = steps.length > 0 ? steps[0]!.n : null;
+  return isUsableLineOrdinal(n) ? n : null;
+}
+
+/**
+ * CAN THIS NUMBER BE SHOWN TO A STUDENT AS A POSITION IN A LIST?
+ *
+ * A list position is a whole number from one. Everything else — `NaN`, `0`, a
+ * negative, `1.5`, `Infinity`, `null`, absent — is „this row has no position",
+ * and the contract for that case is the BARE line: `briefing-numbering.test.ts`
+ * names it „printed bare, not under an invented one", because a HUD that writes
+ * a number no author supplied is the HUD writing copy (ADR-002).
+ *
+ * ONE function for both ends of the wire on purpose. The pure half
+ * (`briefingLineOrdinal`) and the painting half (`SimOverlay`'s sheet <h2>) each
+ * had their own answer — `steps[0].n` unfiltered on one side, `typeof === "number"`
+ * on the other — so between them „usable" meant two different things and the
+ * looser one won at the only place a student can see. Both call this now.
+ */
+export function isUsableLineOrdinal(n: number | null | undefined): n is number {
+  return typeof n === "number" && Number.isInteger(n) && n >= 1;
 }
 
 /**

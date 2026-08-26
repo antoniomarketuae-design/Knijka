@@ -106,6 +106,70 @@ describe("exam mode grades every mistake from tick one", () => {
 });
 
 // ---------------------------------------------------------------------------
+// One continuous breach, ONE charge — the standing-duty re-grade guard
+// ---------------------------------------------------------------------------
+
+/** Night cruise at 30 км/ч, one tick per second, [t0, t1] inclusive. */
+function nightCruise(t0: number, t1: number, headlights: "off" | "low") {
+  const out = [];
+  for (let t = t0; t <= t1; t += 1) {
+    out.push(makeTick({ t, speedKmh: 30, isNight: true, headlights }));
+  }
+  return out;
+}
+
+const lampCharges = (s: LessonSessionState) =>
+  s.events.filter((e) => e.kind === "violation" && e.code === "HEADLIGHTS_OFF_AT_NIGHT");
+
+describe("a standing duty held in breach is CHARGED once, however long it runs", () => {
+  // WHY THIS EXISTS. `rules/engine.ts` bills a one-switch duty TWICE per
+  // episode (`STANDING_DUTY_REGRADE_SEC`), because in training the first bill
+  // is spent by the teach-first free mini-lesson — without a second one an
+  // entire lesson driven unlit reaches its debrief as «чисто каране по изпитния
+  // лист». In the EXAM there is no teach pass: `coach.ts` scores from tick one,
+  // so both bills would grade and one continuous breach would cost twice its
+  // base. HEADLIGHTS_OFF_AT_NIGHT is основна/3, the gates are `osnovniPoints >
+  // 6` and `totalPoints > 9`, and `examBank.ts` ships night variants — so an
+  // unmarked re-grade is a FALSE FAIL on the изпит, not a rounding error.
+  // The reducer marks the second bill `regrade`; `engine.ts` drops it when the
+  // code has already been charged.
+
+  it("EXAM: 30 s unlit at night = ONE charge, not two", () => {
+    const r = run(createLessonSession(examLesson), nightCruise(0, 30, "off"));
+    expect(lampCharges(r.state)).toHaveLength(1);
+    expect(r.taught).toHaveLength(0); // no teach pass in the exam
+    // …and the HUD said it exactly once too: a dropped re-grade toasts nothing.
+    expect(r.hud.filter((e) => e.kind === "violation")).toHaveLength(1);
+  });
+
+  it("TRAINING: the same drive TEACHES once and then charges once", () => {
+    const c = run(createLessonSession(trainingLesson), nightCruise(0, 30, "off"));
+    // The teach is never suppressed — requirement-zero: the student is shown
+    // the rule before he is docked for it.
+    expect(c.taught.map((m) => m.code)).toEqual(["HEADLIGHTS_OFF_AT_NIGHT"]);
+    // …and the re-grade lands, because the teach left the ledger empty. This
+    // is the whole repair: `mistakes.length === 0` is now false, so debrief.ts
+    // cannot print «чисто каране» over a lesson driven in the dark.
+    expect(lampCharges(c.state)).toHaveLength(1);
+  });
+
+  it("a genuine correction, then a SECOND omission, costs two charges — not four", () => {
+    // The reducer emits four bills here (two episodes × two). Two of them are
+    // re-grades of a breach already charged, and both are dropped: the price is
+    // one charge per offence, in both modes.
+    const stream = [
+      ...nightCruise(0, 20, "off"),
+      ...nightCruise(21, 30, "low"), // lamps on — a real correction, episode ends
+      ...nightCruise(31, 55, "off"), // …and off again: a second offence
+    ];
+    expect(lampCharges(run(createLessonSession(examLesson), stream).state)).toHaveLength(2);
+    const training = run(createLessonSession(trainingLesson), stream);
+    expect(training.taught).toHaveLength(1); // taught once, then charged twice
+    expect(lampCharges(training.state)).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Termination fold (pure)
 // ---------------------------------------------------------------------------
 

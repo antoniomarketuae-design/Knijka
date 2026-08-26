@@ -1581,10 +1581,21 @@ describe("reachZone acceptBeforeMarkM — the acceptance stops where the paint d
      *
      * So: over the 40 km/h cap all the way down the approach, dropping to a
      * legal speed only at `compliesAtY`, and finishing 8 m past the mark.
+     *
+     * `beforeKmh` WAS 60 AND IS NOW 44 (round 11, 2026-08-26), for the same
+     * reason the cap above is „kept at 40 on purpose": this fixture is about
+     * the CUT and must vary nothing else. Since `objectives.ts approachBlown`,
+     * going through the mark itself more than `REACH_ZONE_CAP_SLACK_KMH` over
+     * the cap is refused on ANY capped zone, cut or not — so a 60 km/h barge
+     * would now be refused by the SPEED contract before the geometry got a
+     * word in, and the `UNCUT` control („the before picture") would stop
+     * isolating anything. 44 is still over the 40 cap, so every assertion below
+     * still turns on where the driver first complies; it is simply not over it
+     * by enough to be a different finding.
      */
     const barge = (compliesAtY: number) => ({
       toY: -26,
-      beforeKmh: 60,
+      beforeKmh: 44,
       afterKmh: 20,
       slowAtY: compliesAtY,
     });

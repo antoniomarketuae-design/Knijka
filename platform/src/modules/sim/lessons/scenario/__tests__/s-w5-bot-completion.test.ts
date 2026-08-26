@@ -169,13 +169,27 @@ describe("wave-5 bot completion — sc-ac-truck-spray at L3", () => {
     expect(r.passed).toBe(false);
   });
 
-  it("counter-proof: the unlit drive TEACHES чл. 70 — on a sheet that still COMPLETES", () => {
+  it("counter-proof: the unlit drive TEACHES чл. 70, then GRADES it once — on a sheet that still COMPLETES", () => {
     // The mirror image of the demo above, and the reason both exist: this driver's
     // gap and speed are the shadow's, verbatim. The route was never the problem,
     // the lamp was — so the drill completes and the card IS the lesson
     // (teach-first, not punish; doc 76 §0). If this demo also billed a following
     // code — or the one above also billed the lamp — each card would name two
-    // faults and teach neither.
+    // faults and teach neither. That claim is untouched: still exactly one code
+    // on both channels.
+    //
+    // WHAT CHANGED, 2026-08-26, AND WHY THE OLD LINE WAS THE DEFECT ITSELF
+    // (`rules/engine.ts STANDING_DUTY_REGRADE_SEC`). This asserted
+    // `expect(...violations).toEqual([])` — the unlit drive taught and NEVER
+    // charged, however long the lamps stayed off. That is the finding filed
+    // against this very lesson: `.audit-frames/sweep161/sc-ac-truck-spray/
+    // pc-wrong/08-debrief.png` prints «Какво се получи добре: чисто каране по
+    // изпитния лист — нито едно нарушение не влезе в точките» over a drive
+    // that ran the whole rain section dark. Teach-first forgives a first
+    // MISTAKE; billing a standing duty once meant it forgave the whole drive.
+    // The lamp now also books the ONE charge Наредба № 38 prices it at, ten
+    // driving seconds after the student was shown the rule — and never a
+    // third time (`STANDING_DUTY_MAX_BILLS`).
     let s = createLessonSession(compileScenario(SC_AC_TRUCK_SPRAY, 3));
     const taught: string[] = [];
     recordScAcTruckSprayDrive(loadDistrict("mw-v1"), "mistake-lights-off", {
@@ -186,8 +200,39 @@ describe("wave-5 bot completion — sc-ac-truck-spray at L3", () => {
       },
     });
     expect(taught).toEqual(["HEADLIGHTS_OFF_IN_RAIN"]);
-    expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
+    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
+      "HEADLIGHTS_OFF_IN_RAIN",
+    ]);
     expect(buildLessonResult(s).completedAll).toBe(true);
+  });
+
+  it("…and at L4, which is EXAM MODE, the same unlit drive is charged ONCE, not twice", () => {
+    // THE SECOND HALF OF THE SAME REPAIR, AND THE HALF THAT COULD HAVE FAILED A
+    // CANDIDATE. L4 of this template compiles with `examMode: true` (asserted in
+    // the rung test below), and `coach.ts` grades from tick one under examMode —
+    // there is no free mini-lesson to absorb the first of the two standing-duty
+    // bills. MEASURED on this very trace with the guard disabled: charges at
+    // t=3.63 s AND t=13.63 s, i.e. one continuous unlit run billed twice. On the
+    // основна codes that is 6 наказателни точки for a breach Наредба № 38 prices
+    // at 3, against exam gates of `osnovniPoints > 6` / `totalPoints > 9` — a
+    // FALSE FAIL. The reducer marks the re-grade and `lessons/engine.ts` drops it
+    // once the code has been charged, so the exam charge is single and lands at
+    // the FIRST bill (3.63 s), where an examiner would have written it.
+    const l4 = compileScenario(SC_AC_TRUCK_SPRAY, 4);
+    expect(l4.examMode).toBe(true);
+    let s = createLessonSession(l4);
+    const taught: string[] = [];
+    recordScAcTruckSprayDrive(loadDistrict("mw-v1"), "mistake-lights-off", {
+      onTick: (tick) => {
+        const step = applyTick(s, tick);
+        s = step.state;
+        for (const m of step.teachMoments ?? []) taught.push(m.code);
+      },
+    });
+    expect(taught).toEqual([]); // no teach pass on an exam
+    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
+      "HEADLIGHTS_OFF_IN_RAIN",
+    ]);
   });
 
   it("compiles at every authored rung; L5 drops the night ON the rain without re-tuning", () => {
