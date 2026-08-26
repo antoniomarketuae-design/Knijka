@@ -189,11 +189,60 @@ for (const f of files) {
   }
 }
 
-fs.writeFileSync(FIND + "/chunk-split.jsonl", childRows.map((r) => JSON.stringify(r)).join("\n") + "\n");
-console.log("wrote " + childRows.length + " children to chunk-split.jsonl");
+/**
+ * MERGE, NEVER OVERWRITE — 2026-08-23.
+ *
+ * This was a bare `writeFileSync`, and it is the only writer in this file that
+ * did NOT take a `.pre-split` backup first: the one file it could destroy was
+ * the one file it did not copy. On a second run — a `splits.jsonl` naming 4 new
+ * parents on top of the original 230 — it replaced 647 existing children with
+ * 13 and dropped 638 findings out of the corpus. `filed` fell 1462 -> 824.
+ *
+ * What made it dangerous rather than merely wrong: every counter then AGREED on
+ * the new number, because agreement is computed from the same files. The
+ * corpus was recovered from the `ledger/audit` branch, which is precisely why
+ * that branch exists.
+ *
+ * A second run is not hypothetical. The standing order is wave after wave, and
+ * each wave that splits a compound row runs this file again.
+ *
+ * Children are keyed by parent + childIndex, so re-running with an unchanged
+ * `splits.jsonl` is now a no-op instead of an amputation.
+ */
+const SPLIT_FILE = FIND + "/chunk-split.jsonl";
+const childKey = (r) => String(r.splitFrom) + "#" + String(r.childIndex);
+const mergedChildren = new Map();
+if (fs.existsSync(SPLIT_FILE)) {
+  fs.copyFileSync(SPLIT_FILE, SPLIT_FILE + ".pre-split");
+  for (const line of fs.readFileSync(SPLIT_FILE, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const j = JSON.parse(line);
+      mergedChildren.set(childKey(j), j);
+    } catch {
+      // A malformed line is not a reason to drop every good line beside it.
+    }
+  }
+}
+const childrenBefore = mergedChildren.size;
+for (const r of childRows) mergedChildren.set(childKey(r), r);
+fs.writeFileSync(SPLIT_FILE, [...mergedChildren.values()].map((r) => JSON.stringify(r)).join("\n") + "\n");
+console.log(
+  "chunk-split.jsonl: " + childrenBefore + " existing + " + childRows.length + " from this run = " + mergedChildren.size + " children",
+);
+if (mergedChildren.size < childrenBefore) {
+  console.log("  REFUSING TO BE QUIET: the file SHRANK. That should be impossible — investigate before trusting any count.");
+}
 
-fs.copyFileSync(CLOSURES, CLOSURES + ".pre-split");
-fs.appendFileSync(CLOSURES, retire.map((r) => JSON.stringify(r)).join("\n") + "\n");
+// Guarded: an empty `retire` used to append `"" + "\n"`, i.e. a blank line into
+// the middle of the closures ledger on every no-op run. Readers skip blanks, so
+// it broke no count — which is exactly why it would have accumulated silently,
+// one line per wave, in the file that is the audit's only record of what was
+// retired and on what evidence.
+if (retire.length) {
+  fs.copyFileSync(CLOSURES, CLOSURES + ".pre-split");
+  fs.appendFileSync(CLOSURES, retire.map((r) => JSON.stringify(r)).join("\n") + "\n");
+}
 console.log("appended " + retire.length + " retirement(s) to closures.jsonl");
 console.log("");
 console.log("chunk-split.jsonl must be in finding-reader's ADDITIVE set or supersession eats it.");
