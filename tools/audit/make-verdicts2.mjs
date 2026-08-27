@@ -83,6 +83,25 @@ if (!fs.existsSync(resultsPath)) {
  */
 const DRIVE_ROOT = path.dirname(resultsPath);
 const win = (p) => String(p).split("/").join(String.fromCharCode(92));
+
+/**
+ * THE ROUND TAG — without it, this round is silently outranked by the last one.
+ *
+ * wave-c-post ranks a line as roundOf(i)*2 + (correctedBy === "verify" ? 1 : 0),
+ * and roundOf only advances at a line whose correctedBy is set to something
+ * OTHER than "verify". So untagged judge lines join whatever round block
+ * precedes them — and every  line already in that block outranks them,
+ * however much older it is.
+ *
+ * MEASURED 2026-08-27: the last boundary was line 2723, so 1,628 lines shared
+ * one block and w11-era verifiers were beating fresh w12 judgements. Two
+ * verifiers found it independently. Tagging the round moved that adjudication
+ * from 56 to 73 retirements.
+ *
+ * The tag is the drive directory the judges are reading, so it is unique per
+ * sweep and needs no bookkeeping.
+ */
+const ROUND_TAG = path.basename(DRIVE_ROOT);
 const driven = new Map();
 for (const line of fs.readFileSync(resultsPath, "utf8").split("\n")) {
   if (!line.trim()) continue;
@@ -312,7 +331,13 @@ const RULES = [
   "Append one JSON object per finding to",
   "    E:\\AI driver\\.audit-frames\\wave-c\\verdicts.jsonl",
   "with these fields:",
-  "    { findingId, lesson, severity, verdict, evidenceFrame, evidenceQuote, why }",
+  "    { findingId, lesson, severity, verdict, evidenceFrame, evidenceQuote, why,",
+"      correctedBy: \"" + ROUND_TAG + "\" }",
+"",
+"correctedBy MUST be exactly \"" + ROUND_TAG + "\" on every line you write. It is not",
+"decoration: the poster ranks a round by it, and an UNTAGGED line joins the",
+"PREVIOUS round, where every older verify line outranks it. Leave it off and",
+"your judgement is silently discarded in favour of a week-old one.",
   "One line per finding, append-only, NEVER rewrite the file — other judges are",
   "appending to it at the same moment. Every finding the reader printed gets exactly",
   "one line: a finding you leave out is indistinguishable from one you never saw.",

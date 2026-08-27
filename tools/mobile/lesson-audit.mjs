@@ -1092,6 +1092,31 @@ for (const l of ["РАЗБРАХ", "Разбрах"]) {
 }
 await beat("03-ready");
 
+// ── FASTEN THE SEATBELT ────────────────────────────────────────────────────
+//
+// MEASURED 2026-08-27: 194 of 204 drives in the w12 sweep were charged
+// «Движение без предпазен колан −3». That is not a product defect. It is the
+// founder's ruling working as designed — LessonScene.tsx records it against
+// commit 265629d: every one of the 150 scenarios spawns ready-to-drive with
+// EXACTLY ONE item left outstanding, the belt, «because the belt is the one
+// pre-drive step whose omission the rule engine goes on grading for the whole
+// session».
+//
+// So the harness was driving like a student who never buckles up, and the
+// product was correctly failing it. The cost was not the 3 points: it put a
+// 3-point floor under EVERY score in the sweep, which makes every «does a good
+// drive get credited» finding unanswerable and inflates the wrong-vs-right
+// comparison the whole audit rests on.
+//
+// KeyB is the binding — scene/cabin.ts:489 maps seatbelt to KeyB. There is no DOM
+// hook for the belt state, so this cannot self-verify in-drive; it is verified
+// the way the ledger verifies everything — by whether the fault stops being
+// charged in the debrief. If «предпазен колан» keeps appearing after this,
+// the press is not landing and the next reader should say so loudly rather
+// than assume it worked.
+await page.keyboard.press("KeyB").catch(() => {});
+await page.waitForTimeout(400);
+
 // ── THE PEDALS ─────────────────────────────────────────────────────────────
 //
 // Held as STATE, not as bare key events, for one reason that has already put a
