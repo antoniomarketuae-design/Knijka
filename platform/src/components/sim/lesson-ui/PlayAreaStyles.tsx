@@ -892,11 +892,77 @@ ${TOUCH_BAND_CSS_VARS}
          two, which is every portrait profile in the ladder.
            852 × 393  192 → 161      393 × 852  330 → 330 (unchanged)
            780 × 360  188 → 147      360 × 780  292 → 292 (unchanged) */
+      /* ⚠ 2026-08-27 · THIS RULE IS INERT, AND UNTIL NOW IT WAS ALSO WRONG.
+         Kept and corrected rather than deleted, and both halves are written
+         down so the next reader does not repair the copy that is not shipping.
+         (No backticks anywhere in this block on purpose: every character here
+         is inside a template literal, and one backtick ends the stylesheet.)
+
+         WHY IT IS INERT. SimOverlay moved this column's „top" off the phone
+         layout's CORNER DATUM and onto the interior mirror's lane on
+         2026-08-17, and — because a „max-height" is measured from the box's
+         own top edge — it had to write the CEILING in the same declaration,
+         INLINE («an inline style outranks every selector», the same cascade
+         fact the „right"/„width" note two blocks down was learned from). Its
+         own source says what that leaves here: „The stylesheet's compact
+         max-height rule is therefore now INERT for this element — it is the
+         sibling lane's to delete." Both elements that carry this handle are
+         covered: SimOverlay's peek column writes maxHeight inline, and this
+         shell's own column carries „hidden" whenever data-sim-compact is on.
+         hud-off-the-road.test.ts states the same thing from the other side and
+         asks for the rule to STAY as the fallback, which is why this is a
+         correction and not a deletion.
+
+         WHY THE FALLBACK HAD TO BE CORRECTED. Inert is not the same as
+         harmless. What stood here was NOTIFY_COLUMN_TOP_CSS_COMPACT — 8 px —
+         against a column whose top is 73.24 px on the handset this catalogue
+         is shot at: a ceiling measured from a top the product abandoned. That
+         is exactly the half-landed swap sim-overlay-mirror-lane.test.ts exists
+         to prevent, sitting in a rule no test reads because no pixel depends
+         on it; the day anyone moves the ceiling back out of the inline style
+         it would put the card's floor at 0.596 of the stage, through a hazard
+         band that starts at 0.53. The floor was already the same length on
+         both sides — sim-overlay-mirror-lane.test.ts pins
+         SIM_OVERLAY_COLUMN_FLOOR_CSS to notifyColumnFloorCss() — so the top
+         was the only term that disagreed, and it is the term the swap moved.
+
+         …AND THE ARITHMETIC THE SWAP ACTUALLY BOUGHT, recorded here because
+         nothing in the tree states it and five w12 rows are about it. On
+         852 × 393 (iPhone 16 landscape, the profile the sweep is driven on)
+         the BAND term is the binding one and it is exact:
+
+           393 × NOTIFY_COLUMN_MAX_STAGE_FRACTION − 73.24
+             = 168.99 − 73.24 = 95.75 px
+
+         and SimOverlay's own resolved table says the same from the other end
+         („852 × 393  top 8 → 73.23   ceiling 161 → 95.76").
+
+         95.75 px — against touchArc.test.ts's own MEASURED_WORST_CARD_PX of
+         106.3, the height that file calls „the floor the column's own cap may
+         never fall under … a cap below this clips an authored sentence". That
+         guard still certifies the whole ladder because it computes
+         height − floor − 8 (the abandoned datum) and never applies the band
+         term at all — its own assertion for this profile is 192. So the guard
+         reads 192 where the product ships 95.75, and it is the guard that is
+         stale, not the ceiling that is arbitrary. This is the measurable part
+         of the w12 rows that photograph two lines of a 26-line briefing under
+         «↓ ОЩЕ N РЕДА» (sc-mw-discipline, sc-sp-limit-end, sc-ac-snow,
+         sc-vu-emergency, sc-ov-oncoming-gap).
+
+         IT IS NOT FIXABLE FROM THIS FILE, and the shape of the wrong fix is
+         worth naming: the shipped ceiling is SimOverlay.tsx's inline
+         maxHeight and the 0.43 is notifyColumn.ts's, so the only lever here
+         would be an !important override — which would also widen the column
+         for the toast column and the task row, and THOSE are on the glass
+         while the student drives. That is the distinction
+         mirror-lane-corridor.test.ts asserts one screen down («the peek's
+         rule … must NOT have inherited the wider bound»), and it is right.
+         Routed with the numbers rather than forced. */
       [data-sim-compact="on"] [data-sim-stage] [data-hud="notify-column"],
       [data-sim-compact="on"] [data-sim-stage]:has([data-hud="demo-deck"]) [data-hud="notify-column"] {
         max-height: ${notifyColumnMaxHeightCss(
           notifyColumnFloorCss(),
-          NOTIFY_COLUMN_TOP_CSS_COMPACT,
+          NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
         )};
       }
 

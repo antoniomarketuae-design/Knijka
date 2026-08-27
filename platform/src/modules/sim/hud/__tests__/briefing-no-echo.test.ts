@@ -261,7 +261,16 @@ describe("SimOverlay's card cannot go back to clipping its own text", () => {
   });
 
   it("the control row cannot shrink — it is the only way out of a blocking card", () => {
-    expect(OVERLAY_SRC).toMatch(/mt-0\.5 flex shrink-0 items-center justify-end/);
+    // `mt-0.5` LEFT THIS CLASS LIST ON 2026-08-27 AND THE ASSERTION DID NOT
+    // WEAKEN. The chips now sit inside the row that also carries the moment
+    // stamp and the fold label, so the top margin belongs to that row and not
+    // to the chips inside it. What this test is about — the chips are
+    // `shrink-0`, so a short column can never put the only way out of a
+    // blocking card under its own fold — is exactly what is still asserted.
+    expect(OVERLAY_SRC).toMatch(/flex shrink-0 items-center justify-end/);
+    // …and the row that holds them cannot shrink either, which is the other
+    // half of the same guarantee and was previously carried by the same string.
+    expect(OVERLAY_SRC).toMatch(/mt-0\.5 flex shrink-0 flex-wrap items-center justify-between/);
   });
 
   /**

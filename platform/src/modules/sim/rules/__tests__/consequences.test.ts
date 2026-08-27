@@ -655,9 +655,35 @@ describe("a conditional figure never appears without its condition", () => {
     // „Колко точки?" has an answer even when „колко лева?" does not, because
     // чл. 6, ал. 1 is an exhaustive list and absence from it is a fact today —
     // not a fact conditional on a crash that has not happened.
+    //
+    // THE ONE EXEMPTION, AND IT IS CHECKED RATHER THAN DECLARED — w12,
+    // `sc-merge-accel-lane:93685d58`, 2026-08-27. The paragraph above holds
+    // while the gate is HARM: the crash has not happened, so the licence answer
+    // is the same whichever branch one day bites, and stating it is a kindness.
+    // It does NOT hold when the gate is the ROAD. `WRONG_WAY` bills ONE exam
+    // fault on a one-way street (чл. 183, ал. 4, т. 15 — absent from the list,
+    // нула) and on a motorway carriageway (чл. 178ж, ал. 1 → чл. 6, ал. 1,
+    // т. 7 — петнадесет). Both are facts today; what the printing seam cannot
+    // see is which road the student was on. Stating either figure at the top
+    // there is not caution — it is the exact sentence the finding was filed on,
+    // «Книжка: 0 контролни точки — не е в списъка» printed over a motorway act.
+    //
+    // So the answer may be dropped ONLY by a row whose own branches genuinely
+    // give more than one licence answer. Every harm-gated row this assertion
+    // was written for has branches that agree, and still has to state it.
     for (const [code, road] of Object.entries(ROAD_CONSEQUENCES)) {
       if (road?.kind !== "conditional") continue;
-      expect(road.controlPoints, `${code}: a conditional row must state the licence answer`).toBeDefined();
+      if (road.controlPoints === undefined) {
+        const answers = new Set(
+          road.branches.map((b) => `${b.controlPoints.status}:${b.controlPoints.points ?? "—"}`),
+        );
+        expect(
+          answers.size,
+          `${code}: a conditional row may drop the licence answer only when its own branches disagree about it`,
+        ).toBeGreaterThan(1);
+      } else {
+        expect(road.controlPoints, `${code}: a conditional row must state the licence answer`).toBeDefined();
+      }
       expect(road.duties.length, `${code}: name the duty that was actually broken`).toBeGreaterThan(0);
       // …and the headline must not smuggle the gated figure into the summary.
       expect(road.headlineBg, code).not.toMatch(/\d+\s*(лв\.|€)/);

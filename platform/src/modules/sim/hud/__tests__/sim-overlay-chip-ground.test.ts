@@ -144,7 +144,11 @@ describe("…and the ground is actually wired to the three controls", () => {
    * into the column's styles would make „no chip uses a tint as a ground" an
    * assertion about a surface this row does not own.
    */
-  const rowStart = CODE.indexOf('"mt-0.5 flex shrink-0 items-center justify-end gap-1"');
+  // `mt-0.5` left this class list on 2026-08-27: the chips moved inside the row
+  // that also carries the moment stamp and the fold label, so the top margin is
+  // now that row's. The slice this anchors is unchanged — it still starts at the
+  // chips' own container and still ends after the ✕.
+  const rowStart = CODE.indexOf('"flex shrink-0 items-center justify-end gap-1"');
   const row = CODE.slice(rowStart, CODE.indexOf("</>", CODE.indexOf("{...tapDismissChip}")));
 
   it("the control row is still findable (anchor check)", () => {

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   notifyColumnMaxHeightCss,
   notifyColumnMaxHeightPx,
+  notifyColumnTopPx,
   notifyColumnWidthPx,
   HAZARD_BAND_TOP_FRACTION,
   NOTIFY_COLUMN_GUTTER_PX,
@@ -251,15 +252,112 @@ describe("row 2 · the fold has a name and a number", () => {
     expect(OVERLAY_CODE).toMatch(/const foldKey =\s*\n?\s*shown === null \? "" : `\$\{shown\.id\}/);
   });
 
-  it("the text window keeps a floor of two whole line boxes plus the fade", () => {
+  it("the text window keeps a floor of THREE whole title line boxes", () => {
     // The window is the ONE shrinkable item in the card, so every pixel row 1's
     // ceiling gives up comes out of here — and a window of 1.38 line boxes is
     // exactly the 2026-08-14 defect (`overflow: hidden` cutting the second line
     // through the middle of its glyphs).
-    expect(OVERLAY).toContain('minHeight: "2.375rem"');
-    const LINE = 13.75; // 11 px at `leading-tight`
-    const FADE = 10; // TEXT_FADE_PX
-    expect(2.375 * 16).toBeGreaterThanOrEqual(2 * LINE + FADE);
+    //
+    // ── 2.375 rem → 2.75 rem, 2026-08-27, AND THE UNIT CHANGED WITH IT.
+    //
+    // The old floor was „two line boxes plus the fade", and the fade term was
+    // wrong twice over: `padding-bottom` sits INSIDE `clientHeight` on a scroll
+    // container, so it costs the visible text nothing, and it is 10 px of
+    // scrollable emptiness that `foldLinesBelow` has to subtract back out.
+    // Two line boxes was the whole budget, and on every compact profile the
+    // card's TITLE takes both — which is why `w12/frames/
+    // sc-junction-blind__mobile-right/04-t058s.png` charges a student −10 for
+    // «Непропускане на пътно / превозно средство с» and never finishes the
+    // name. The floor is the window on every shipped compact profile since the
+    // mirror-lane swap took the column's ceiling to 95.8 / 87.0 px, so this
+    // number IS the card's reading surface and is asserted as one.
+    expect(OVERLAY).toContain('minHeight: "2.75rem"');
+    const TITLE_LINE = 13.75; // 11 px at `leading-tight` — `lineBg`
+    const BODY_LINE = 15.125; // 11 px at `leading-snug`  — `detailBg`
+    // THREE title lines: every `titleBg` in the shipped catalogue finishes.
+    expect(2.75 * 16).toBeGreaterThanOrEqual(3 * TITLE_LINE);
+    // …or a two-line title AND one whole line of the authored WHY, which is the
+    // first line of explanation these cards have put on the glass in landscape.
+    expect(2.75 * 16).toBeGreaterThanOrEqual(2 * TITLE_LINE + BODY_LINE);
+    // AND IT IS PAID FOR, NOT BORROWED — the stamp row was merged into the
+    // control row in the same commit, which returns 14 px (a 10 px
+    // `leading-none` band, its `mt-0.5` and the card's `gap-0.5`) to a card
+    // that already paints past its column. Net −8 px, so the card's floor moves
+    // OUT of the hazard band (`NOTIFY_COLUMN_MAX_STAGE_FRACTION`'s derivation)
+    // rather than further into it. If the merge is ever undone, this floor has
+    // to be re-derived with it.
+    expect(OVERLAY).not.toMatch(/mt-0\.5 flex shrink-0 flex-wrap items-center justify-between gap-x-2"/);
+    expect(OVERLAY).toContain(
+      'mt-0.5 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1',
+    );
+  });
+
+  /**
+   * …AND THE ARITHMETIC THAT PAID FOR IT, AS A GATE RATHER THAN A PARAGRAPH.
+   *
+   * The floor above is only legitimate because the card that grows by 6 px also
+   * SHEDS a row worth 14, and „legitimate" here has one meaning and it is
+   * `HAZARD_BAND_TOP_FRACTION`: the peek may not paint into the band a 2.2 m
+   * sign at 30 m and a pedestrian at 15 m are projected into. That is the whole
+   * reason `NOTIFY_COLUMN_MAX_STAGE_FRACTION` exists, and the card ALREADY
+   * paints past the column's ceiling by design („a card whose chrome needs more
+   * than 95.8 px paints past the ceiling rather than losing its buttons",
+   * notifyColumn.ts) — so the ceiling is not what keeps the card out of the
+   * band. Nothing did. This does.
+   *
+   * THE CHROME IS TYPED HERE AND THAT IS A HAND-KEPT COPY, stated rather than
+   * hidden: these are Tailwind classes in `SimOverlay.tsx`'s own JSX and there
+   * is no run-time length to import. Each one is anchored to the literal it
+   * comes from in the assertion below, so a class edit that changes a height
+   * fails HERE instead of on a phone three waves later.
+   */
+  it("the card's floor stays out of the hazard band on every shipped compact profile", () => {
+    // Row 1 — the tone glyph, the chip and the „+N" badge. The badge's own
+    // `leading-[18px]` plus its 1 px border on each side is the tallest thing
+    // in the row and therefore the row.
+    expect(OVERLAY).toContain("leading-[18px]");
+    const ROW_1 = 20;
+    // The text window's floor — read off the source, not retyped.
+    const floorRem = /minHeight: "([\d.]+)rem"/.exec(OVERLAY)?.[1];
+    expect(floorRem, "the text window's floor moved — re-anchor this test").toBeDefined();
+    const WINDOW = Number(floorRem) * 16;
+    // The merged stamp/control row — `h-11` chips set its height, `mt-0.5` its
+    // margin. On a card with no chips it is the 10 px `leading-none` stamp
+    // instead, i.e. strictly shorter, so the chip case is the binding one.
+    expect(OVERLAY).toContain("flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation");
+    const ROW_3 = 44 + 2;
+    // `gap-0.5` between the card's three in-flow children (the shade is
+    // absolutely positioned and is not one).
+    expect(OVERLAY).toContain("flex-col items-stretch gap-0.5 text-left");
+    const GAPS = 2 * 2;
+    const cardPx = ROW_1 + WINDOW + ROW_3 + GAPS;
+
+    // WHAT THIS DOES NOT COVER, said rather than implied: the merged row is
+    // `flex-wrap`, so if the stamp and the chips ever cannot share a 180 px
+    // lane the stamp takes a line of its own and the card is ~4 px taller than
+    // the number below. That degradation is bounded and is still 10 px shorter
+    // than the two-row shape it replaces; a wrap cannot be computed from source
+    // text and is not asserted here.
+    //
+    // The three profiles `notifyColumn.ts` enumerates for the compact ladder.
+    for (const stage of [
+      { width: 852, height: 393 },
+      { width: 780, height: 360 },
+      { width: 780, height: 340 },
+    ]) {
+      const top = notifyColumnTopPx(stage, true);
+      const bandTop = stage.height * HAZARD_BAND_TOP_FRACTION;
+      expect(
+        top + cardPx,
+        `${stage.width}×${stage.height}: the peek's floor is inside the hazard band`,
+      ).toBeLessThan(bandTop);
+    }
+
+    // AND THE OTHER DIRECTION, so this cannot be satisfied by shrinking the
+    // words: the window must still hold the three title line boxes the floor
+    // above is sized for. A future edit that buys clearance out of the reading
+    // surface fails here rather than passing quietly.
+    expect(WINDOW).toBeGreaterThanOrEqual(3 * 13.75);
   });
 
   it("…and the whole authored text is still one 44 px tap away, unclamped", () => {

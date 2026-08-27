@@ -125,6 +125,71 @@ const PARKED_CAR_Y = 185;
  * crosses the player's lane centre at s = 5.44 (x = 4.06) ≈ 2.18 s after it —
  * i.e. exactly when a driver who did NOT brake arrives — and has cleared the
  * roadway (s > 17.625, x < −8.125) by ≈ 7.1 s.
+ *
+ * ── THE WARNING WINDOW WAS A DISTANCE AND THE LESSON PROMISES SECONDS ──────
+ *    (wave 5, 2026-08-27 — and the claim it was filed under is REFUTED first,
+ *    because a repair written against a claim that is already false is how a
+ *    lane certifies itself.)
+ *
+ * FILED: „minTriggerSpeedKmh 25, so a 16–19 км/ч crawl never arms the dart —
+ * the child never appears and the student is told he passed the
+ * emergency-braking drill." The first half of that is no longer true at HEAD.
+ * `orchestrator/runners.ts` ships DART_CREEP_RELEASE_M (the L8 creep backstop):
+ * BELOW the floor the walker still releases once the player is inside 8 m of
+ * the crossing and pointed at it, and a genuinely cancelled encounter now
+ * resolves `notEncountered` instead of silently awarding the drill. So she DOES
+ * appear at a crawl, and the „told he passed" half is not carried by the one
+ * measured leg either: `.audit-frames/w12/frames/sc-hz-emergency-stop__mobile-
+ * right` is НЕИЗДЪРЖАН, 13 т., with Задачи 2 and 3 unticked.
+ *
+ * WHAT THAT LEG DOES PROVE, and it is the defect underneath the filing: the
+ * drill's whole warning budget swings by 22 m on a hundredth of a km/h. On that
+ * leg the top speed was 16 км/ч and Задача 1 «Мини участъка с разрешената
+ * скорост» ticked at 1:06 — a briefing that opens «стабилизирай се на 50 км/ч»
+ * credited a 16 км/ч crawl for it. And at 16 км/ч the 25 floor is missed, so
+ * the child came out at the 8 m backstop = 1.8 s of warning, of which ~1 s is
+ * reaction. Step 3 of this drill's own briefing promises «до спирането имаш
+ * около две секунди». At 25.1 км/ч the student gets 4.3 s; at 24.9 he gets 1.8.
+ * A reaction drill whose stimulus timing is a step function of approach speed
+ * measures the approach, not the reaction.
+ *
+ * THE FIX IS THE ONE `contracts.ts` ALREADY PRESCRIBES for this exact failure
+ * („a hazard that CAREFUL DRIVING SUPPRESSED"), and the same pair
+ * `templates-roundabout2.ts` RB_PED_CROSSER settled on: state the horizon in
+ * SECONDS and drop the floor to the corpus norm. Census of all 33 staged
+ * `pedestrianDartOut` specs in this folder: 28 sit at 6–12 km/h; the only three
+ * above are this one and the two accident-scene bystanders below.
+ *
+ *   · `triggerEtaSec: 2.2` — she is released when the player is 2.2 s away,
+ *     whatever speed he is doing, so the window step 3 names is the window
+ *     every student actually gets. `triggerDistM` stays the OUTER bound
+ *     (contracts.ts), so nobody is ever released EARLIER than the authored
+ *     30 m: at the drill's design 50 км/ч the horizon is 13.89 × 2.2 = 30.6 m,
+ *     the 30 m bound governs, and every committed recording is untouched —
+ *     which the trace gate re-replays.
+ *   · `minTriggerSpeedKmh: 14` — and 14 is DERIVED, not picked. `runners.ts`
+ *     releases a below-floor player at `max(DART_CREEP_RELEASE_M,
+ *     floor × KMH_TO_MPS × triggerEtaSec)`, and that `max` is a step wherever
+ *     the product is under 8 m — so the floor has to be at least
+ *     8 / (0.2778 × 2.2) = 13.1 км/ч for the release to be CONTINUOUS across
+ *     it. At 10 it is not: the encounter battery („the meeting point is
+ *     SPEED-INVARIANT") is red at exactly 10.0 км/ч, meeting her 7.25 m along
+ *     a walk it wanted at 5.50. 14 makes the two branches agree at 8.56 m and
+ *     the battery green. Nothing on this map relies on the floor to keep her
+ *     out of a reversing arc (the geometries that do are in
+ *     templates-parking2.ts and are untouched); she is 150 m up a straight
+ *     street from the spawn and `approaching()` still gates her.
+ *
+ * THE INVARIANT THIS BUYS — every student gets AT LEAST the two seconds step 3
+ * promises, at every speed:
+ *   ≥ 49.1 км/ч   the authored 30 m governs (2.2 s at 50, byte-identical);
+ *   14–49 км/ч    speed × 2.2 s — 9.8 m at 16 км/ч, i.e. 2.2 s against the
+ *                 1.8 s the 8 m backstop used to hand the same driver;
+ *   < 14 км/ч     a flat 8.56 m, which is 2.2 s at 14 and MORE below it
+ *                 (2.6 s at 12, 3.9 s at 8) — the band moves only in the
+ *                 generous direction, so nothing here can ambush anyone.
+ * At 16 км/ч the reaction + full-force stop spends ≈ 5.5 m of the 9.8, so the
+ * window is honest at the low end rather than a trap.
  */
 export const SC_HZ_EMERGENCY_STOP_DART: PedestrianDartOutSpec = {
   id: "sc-hzes-child",
@@ -142,7 +207,10 @@ export const SC_HZ_EMERGENCY_STOP_DART: PedestrianDartOutSpec = {
   roadFromM: 1.375,
   roadToM: 17.625,
   triggerDistM: 30,
-  minTriggerSpeedKmh: 25,
+  // 25 -> 14 with the ETA horizon below: see the block above. The seconds are
+  // what this drill teaches; the metres are only the ceiling on them.
+  minTriggerSpeedKmh: 14,
+  triggerEtaSec: 2.2,
   variant: "child", // R3 P6: the PE-04 figure renders as the small child rig
 };
 
@@ -658,6 +726,47 @@ const ACC_BAN_TO_Y = 195;
  * PEDESTRIAN_CONTACT_M 1.5 for every frame, whatever the timing). A tight pass
  * that stays on x ≈ 5.5 threads exactly where he is walking — the tight-and-fast
  * demo finds him (or the wreck rects beside him); both are COLLISION.
+ *
+ * ── THE SHADOW WAS TUNED AROUND THE RELEASE FLOOR, WHICH IS THE TELL ───────
+ *    (wave 5, 2026-08-27 — the sc-hzes-child block above is the same repair
+ *    and carries the full reasoning; this is its second and third instance.)
+ *
+ * `traces/scHzAccidentScene.ts` says it out loud in its own comment: the
+ * correct demonstration sheds to „~26 [км/ч] … enough over 22 that the
+ * bystander arms". A drill whose taught act is «намали» and «мини БАВНО», whose
+ * own wide-pass gate caps at 32 км/ч and whose lawful band therefore runs all
+ * the way down, had its correct drive pinned four km/h above an arbitrary
+ * release floor so that the scene would happen at all. Below 22 the release
+ * fell to the flat 8 m creep backstop (`DART_CREEP_RELEASE_M`): the student who
+ * obeyed the instruction hardest got two people stepping into his lane 8 m
+ * ahead instead of a tableau he could read from 26.
+ *
+ * THE REPAIR IS THE FLOOR, NOT A CLOCK, AND THE DIFFERENCE IS THE WALK. The
+ * child above gets `triggerEtaSec` because her walk is 19 m long and the lesson
+ * is WHEN she is in front of you. These two walk 3.4 m and 3.2 m and then STOP,
+ * standing in the curb half of the lane for the rest of the drive — so „where is
+ * she along the walk when you arrive" has no answer past 2.43 s / 2.91 s, and
+ * the ETA battery's own speed-invariance law (`want = speedMps × eta`, checked
+ * against `roadToM`) is unsatisfiable for them by construction. Authoring the
+ * field here was tried and is red at 22.0 and 18.0 км/ч
+ * (`orchestrator/__tests__/encounter-battery.test.ts`, „the meeting point is
+ * SPEED-INVARIANT"): it asks a bounded walk to behave like an unbounded one.
+ *
+ * What these two need is simply for the AUTHORED METRES to govern at every pace
+ * the drill invites, and only the floor stood in the way. 22 → 8 and 18 → 8 (the
+ * corpus norm; 28 of the folder's 33 dart specs sit at 6–12). Above 8 км/ч both
+ * now release at their own 26 m / 34 m at any speed, which is exactly what the
+ * shadow's 26 км/ч already got — so nothing about the committed recordings
+ * moves, and the trace gate re-checks it. Below 8 км/ч the flat creep backstop
+ * still applies, unchanged.
+ *
+ * WHAT IT BUYS, stated at its real size rather than inflated: at a 20 км/ч
+ * lawful pass the tableau is now readable from 26 m instead of animating 8 m off
+ * the bumper. It does not make them still be WALKING on arrival at every speed —
+ * a driver slow enough will meet two people standing at a wreck, which is a true
+ * picture of a wreck and not a defect. The «непредвидимо платно» the copy
+ * promises is guaranteed only near the taught pace, and that is the honest
+ * limit of a bounded walk.
  */
 export const SC_HZ_ACCIDENT_BYSTANDER: PedestrianDartOutSpec = {
   id: "sc-hzac-bystander",
@@ -674,7 +783,9 @@ export const SC_HZ_ACCIDENT_BYSTANDER: PedestrianDartOutSpec = {
   roadFromM: 0,
   roadToM: 3.4,
   triggerDistM: 26,
-  minTriggerSpeedKmh: 22,
+  // 22 -> 8: the corpus norm, so the authored 26 m governs at every lawful pace
+  // this drill invites. See the block above.
+  minTriggerSpeedKmh: 8,
 };
 
 /**
@@ -716,7 +827,8 @@ const SC_HZ_ACCIDENT_BYSTANDER_2: PedestrianDartOutSpec = {
   roadFromM: 0,
   roadToM: 3.2,
   triggerDistM: 34,
-  minTriggerSpeedKmh: 18,
+  // 18 -> 8, for the reason recorded above SC_HZ_ACCIDENT_BYSTANDER.
+  minTriggerSpeedKmh: 8,
 };
 
 /**

@@ -327,6 +327,21 @@ const TOUCH_HINT_STORAGE_KEY = "sim.touchHintSeen";
       a control that paints its own box and does not depend on this ground").
       That sentence is corrected at the shade, below.
 
+      ── AND THE RAMP MOVED OUT FROM UNDER THE CHIP ON 2026-08-27 (sweep w12,
+         the same sentence filed six more times). The paragraph above stays as
+         written because it is why THIS constant exists, but its last clause is
+         history now: the card carries `PEEK_SCRIM_FEATHER_PX` as PADDING under
+         `box-sizing: content-box`, so `inset: 0` and the mask's
+         `calc(100% - 16px)` resolve against a box that is 16 px taller than the
+         ink and the ramp runs BELOW the button, not through it.
+
+         WHICH IS WHAT THIS NUMBER WAS ALWAYS FOR. β = 0.50 is derived from the
+         card's own 0.80 being present underneath; until that repair it was
+         present for the chip's top edge only, so the composite the frames
+         actually show is 0.90 → 0.50 down a 44 px control rather than the flat
+         0.90 the identity below computes. Nothing here changes: the arithmetic
+         was right and the ground it assumed is now there.
+
    ── THE FIX IS SimOverlay'S, NOT A NEW ONE. The peek's three chips were filed
       with the identical sentence four times („the «ЗАЩО ↓10» and «✕» pills are
       unfilled outlines sitting directly on the parked cars") and that module
@@ -2812,10 +2827,55 @@ export function ReadyScene({
           // on the keyboard legend below it is `relative isolate`, where the
           // element genuinely has neither without them — and the case in
           // `unpanelInkExemption.test.ts` now asserts each surface's own.
+          //
+          // ── `content-box` + THE PADDING BELOW ARE THE FEATHER'S ROOM, AND
+          //    THEY ARE THE WHOLE OF THE w12 REPAIR. sweep w12, 2026-08-27,
+          //    nine „no panel" rows and six „«РАЗБРАХ» floats detached" rows.
+          //    The mechanism is at the shade itself; what this element has to
+          //    provide is a box that is BIGGER THAN THE INK by exactly the
+          //    published feather, so the ramps have somewhere to be that is not
+          //    on top of a glyph.
+          //
+          //    `box-sizing: content-box` is what makes that possible without
+          //    touching PlayAreaStyles: `width` and `max-height` there then
+          //    size the CONTENT box, so the prose keeps its 180 px measure and
+          //    its ceiling to the pixel — no line re-wraps, no copy is clipped
+          //    that was not clipped before — while the padding box (which is
+          //    what an `inset: 0` child sizes to, and what `overflow: hidden`
+          //    clips to) grows to 180 + 26 + 12 and 16 px taller.
+          //
+          //    WHAT IT COSTS, stated rather than discovered later: the card's
+          //    outer box grows 38 px to the road side and 16 px down, and the
+          //    prose sits 12 px further from the mirror column than it did.
+          //    None of that is ink — it is where the shade fades from 0.80 to
+          //    0 — and the hint is touch-only, once per device
+          //    (`shouldShowTouchHint`), so it is the first lesson of a phone's
+          //    life and never again.
           className="pointer-events-none absolute right-3 top-3 z-30 isolate flex min-h-0 max-w-full flex-col items-end gap-1.5 overflow-hidden text-right"
           role="note"
           aria-label="Съвети за игра на телефон"
-          style={{ textShadow: "0 1px 4px rgba(0,0,0,0.96), 0 0 14px rgba(0,0,0,0.8)" }}
+          style={{
+            textShadow: "0 1px 4px rgba(0,0,0,0.96), 0 0 14px rgba(0,0,0,0.8)",
+            // INLINE AND NOT A UTILITY CLASS. Tailwind's preflight sets
+            // `box-sizing: border-box` on `*`, and this declaration is the one
+            // thing in the pair that must not be losable to a cascade or to a
+            // utility being renamed: without it the padding below comes OUT of
+            // the 180 px measure instead of being added around it, which
+            // re-wraps the copy and clips the reverse-gear sentence — the
+            // repair inverted into the defect it replaces. An inline style
+            // cannot be outranked by a stylesheet, so the two travel together.
+            boxSizing: "content-box",
+            // Derived from the published feather, never re-typed — the shade
+            // below hands the SAME three numbers to the gradient and the mask,
+            // and if they ever stop agreeing the flat core stops coinciding
+            // with the ink, which is the defect this pair exists to close.
+            // `top` is 0 by that constant (above this card is the mirror's
+            // lane), so there is no `paddingTop` here and the card's top edge
+            // does not move.
+            paddingLeft: `${PEEK_SCRIM_FEATHER_PX.left}px`,
+            paddingRight: `${PEEK_SCRIM_FEATHER_PX.right}px`,
+            paddingBottom: `${PEEK_SCRIM_FEATHER_PX.bottom}px`,
+          }}
         >
           {/* ── THE GROUND THIS CARD NEVER HAD — sweep w10, 2026-08-24 ────────
               `sc-ac-wet-braking/mobile-right/03-ready.png`, iPhone 16 sideways,
@@ -2853,16 +2913,55 @@ export function ReadyScene({
               element paints nothing and the diff changes no pixel — which is
               how the tier picker's fill survived a whole unpanel pass.
 
-              INSET AND NOT BLED. SimOverlay hangs its shade outside the card by
-              `PEEK_SCRIM_FEATHER_PX`; this root is `overflow-hidden` (the
-              scroll-window fix above depends on it), so an overhang would be
-              clipped to nothing and the geometry is `inset: 0` instead. The
-              published feather is still what is handed to the gradient, so the
-              ramps are the same 26 px on the road side and 12 px on the stage
-              side — they simply run INSIDE the box. The cost is that the flat
-              core is 38 px narrower than the card rather than 38 px wider, and
-              the two sentences are `text-right` in a right-aligned column, so
-              the side that loses ground is the empty one.
+              INSET, AND THE BOX IS WHAT WAS MADE BIGGER. SimOverlay hangs its
+              shade outside the card by `PEEK_SCRIM_FEATHER_PX`; this root is
+              `overflow-hidden` (the scroll-window fix above depends on it, and
+              PlayAreaStyles declares it again), so an overhang would be clipped
+              to nothing. The geometry stays `inset: 0` — but `inset: 0` and
+              `overflow: hidden` both resolve against the PADDING box, so the
+              card now carries the feather as padding (with `box-sizing:
+              content-box` on the root, so PlayAreaStyles' `width` and
+              `max-height` still size the INK) and the flat core lands exactly
+              on the ink.
+
+              ⚠ WHAT STOOD HERE UNTIL 2026-08-27 WAS FALSE, and fifteen rows of
+                sweep w12 are what it cost. It read: „The cost is that the flat
+                core is 38 px narrower than the card rather than 38 px wider,
+                and the two sentences are `text-right` in a right-aligned
+                column, so the side that loses ground is the empty one."
+
+                A RIGHT-ALIGNED COLUMN HAS NO EMPTY SIDE. Every line is flush
+                RIGHT, so every line's last glyphs stand in the 12 px right
+                ramp; and text wraps to fill the measure, so the longest line of
+                each paragraph reaches the LEFT edge too and starts inside the
+                26 px one. MEASURED off the w12 frames the rows were judged on
+                (iPhone 16 landscape, 852 × 393 at dpr 3, glyph extents read in
+                device px and divided by 3):
+
+                  card box                     x 1624 → 2164 device (180 CSS)
+                  «натисни пак надолу — минава на»  x 1626 → 2164  (181 CSS)
+                  «Ляв палец — волан. Десен палец»  x 1644 → 2164  (173 CSS)
+
+                — i.e. the cyan line that teaches how to select R begins 0.7 CSS
+                px inside a ramp that is at alpha ≈ 0 there and does not reach
+                0.4 for another 13 px. Its first word is the one every reader of
+                every frame described as „painted straight onto the building";
+                `sc-speed-dangerous`, `sc-crossing-white-cane` and
+                `sc-park-wall` all show the same two words standing on the ramp.
+                That is `PEEK_SCRIM_FEATHER_PX`'s own „a glyph standing on a
+                partial ground is the defect this shade exists to close, not a
+                milder version of it", and this card had it on three sides.
+
+                THE MEASURE IS UNTOUCHED BY THE REPAIR, which is the reason the
+                fix is padding and not a narrower column. `width` and
+                `max-height` in PlayAreaStyles size the CONTENT box under
+                `box-sizing: content-box`, so the prose still lays out at 180 px
+                and still stops at the corridor's ceiling: no line re-wraps and
+                nothing is clipped that was not clipped before. Padding the
+                PROSE instead would have cost a line — «Ляв палец … Десен палец»
+                measures 173 of 180 px, so any inset at all pushes «палец» down
+                — and the card has 2.26 px of slack on this stage, so that line
+                would have come off the bottom of the reverse-gear sentence.
 
               ── AND THE VERTICAL FEATHER TRAVELS WITH IT, which the first draft
                  of this element dropped. `SimOverlay` paints its shade with
@@ -2874,32 +2973,39 @@ export function ReadyScene({
                  no radius to end it — a plate edge by another name, i.e. the
                  2026-08-03 register through the back door.
 
-                 THE MASK RAMPS INSIDE THE BOX rather than in an overhang there
-                 is no room for. No prose is inside the ramp — the two sentences
-                 are in the `min-h-0 shrink` window above the button — which is
-                 the same judgement `PEEK_SCRIM_FEATHER_PX` records for its own
+                 THE MASK RAMPS IN THE PADDING, WHICH IS THE ONLY PLACE IT MAY
+                 BE. `PEEK_SCRIM_FEATHER_PX` records the judgement for its own
                  bottom („right and bottom face the stage's own edge and the
                  instrument band, where a shorter ramp is invisible anyway"),
-                 and it is why the ramp may be here and may NOT be under the key
-                 list two components down, where the bottom 16 px is a row of
-                 teaching.
+                 and the same constant's site records why the ramp may NOT be
+                 under the key list two components down: „a 16 px ramp would run
+                 under the LAST ROW OF KEYS, prose on a partial ground."
 
-                 ⚠ THE SECOND HALF OF THAT SENTENCE WAS WRONG UNTIL 2026-08-27,
-                   and eight rows of sweep w11 are what it cost. It read: „that
-                   is only acceptable because of WHAT is in the bottom 16 px:
-                   the «Разбрах» ack … a control that paints its own box and
-                   does not depend on this ground." It does not depend on this
-                   ground, agreed — but it did not paint a box either. A
-                   `color-mix(… 18%, transparent)` is a TINT, and a tint over
-                   tarmac is an outline. So the ramp was spent on the one
-                   control the card owns: the card measures ~127 CSS px, the
-                   chip is its last ~46, and the ground under a 44 px touch
-                   target ran 0.80 → 0 from its top edge to its bottom.
-                   ACK_CHIP_GROUND_ALPHA's site has the frames, the alphas read
-                   off them and the eight finding ids; the chip now carries the
-                   card's own near-black at 0.50 under that unchanged tint, so
-                   the ramp is free to be a soft edge again and takes nothing
-                   with it when it goes.
+                 ⚠ AND IT RAN UNDER THIS CARD'S ONE CONTROL UNTIL 2026-08-27 —
+                   eight rows of sweep w11 („the «РАЗБРАХ» button floats
+                   detached below the text with no visual tie to it") and six
+                   more of w12. With the mask measured over a box that STOPPED
+                   at the ink, `calc(100% - 16px)` fell inside the chip: the
+                   card measures ~127 CSS px, the chip is its last ~46, so the
+                   ground under a 44 px touch target ran 0.80 → 0 from its top
+                   edge to its bottom and the last third of it was live road.
+                   That is why eight readers of eight different frames all
+                   called the chip loose — the prose stood on 0.80 and the
+                   control did not, so nothing on the glass said they were one
+                   surface.
+
+                   `ACK_CHIP_GROUND_ALPHA` is the other half and it is now the
+                   half it was DERIVED to be. Its arithmetic assumes the card's
+                   own 0.80 is under the chip („1 − (1 − 0.80)(1 − β) = 0.90");
+                   with the ramp there, the shipped composite was 0.90 at the
+                   chip's top and 0.50 at its bottom, i.e. the number was right
+                   and the ground it was computed against was absent. The
+                   padding moves the ramp BELOW the chip, so the pair reaches
+                   0.90 across the whole control, as written — and the prose and
+                   the button now share one uninterrupted flat core, which is
+                   the tie those fourteen rows ask for and the only kind this
+                   surface may have (a plate, a border and a radius are what the
+                   2026-08-03 register took off it).
 
                  THE TOP EDGE STAYS HARD, on purpose and not by omission:
                  `PEEK_SCRIM_FEATHER_PX.top` is 0 because above this card is the

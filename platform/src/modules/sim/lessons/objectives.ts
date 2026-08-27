@@ -1651,6 +1651,64 @@ export function yieldFailedVoidsObjective(
   return !yieldCleanHonoured(demand, { ...EMPTY_CONTEXT, ...ctx });
 }
 
+/** Which half of the arrival contract's STATE demand is being refused. */
+export type ReachZoneStateRefusal =
+  | { kind: "lamps"; demand: ReachZoneLampDemand }
+  | { kind: "gear" };
+
+/**
+ * WHY THE STATE HALF OF THE ARRIVAL CONTRACT IS REFUSING ON THIS FRAME — the
+ * read `lessons/engine.ts objectiveNotice` needs to say so out loud, and the
+ * reason it did not exist until now (round 12, 2026-08-27).
+ *
+ * WHAT WAS BROKEN, and it is a THEO-4 hole rather than a grading one. The lamp
+ * and gear demands shipped on 2026-08-19 (`ReachZoneWitnessDemands`) and are
+ * derived from the banner, so 29 shipped gates acquired one without anybody
+ * authoring a key — `objectiveNotice`'s own census names them: sc-acn-lit ×5,
+ * sc-acr-lit ×4, sc-ahl-follow ×5, sc-acf-adapted ×5, sc-acs-approach ×5,
+ * sc-pbe-out ×5. Every one of those gates ALSO carries a cap, and the ONE card
+ * this evaluator can raise is the cap card, gated on `overCapNoted` — which
+ * latches only when `speedKmh > cap`.
+ *
+ * So the drive those 29 gates exist to teach — arriving LAWFULLY, at or under
+ * the cap, with the switch still unmoved — was refused its certificate and told
+ * NOTHING. Not by this file, and not by the rule engine either: the demand's own
+ * docblock records `HEADLIGHTS_OFF_AT_NIGHT` firing zero times on the same
+ * drive, which is the silence that left five green ticks standing for a year.
+ * `sc-ac-night-lights/pc-right/04-t116s.png` is the frame the demand was cut
+ * from; the repair stopped the false ✓ and put nothing in its place, so on the
+ * lesson whose entire subject is reaching for that switch the student now gets
+ * a task that simply never ticks. Doc 64 THEO-4 forbids exactly that: «no bare
+ * correct/wrong verdicts anywhere, ever».
+ *
+ * IT GRADES NOTHING. This is a pure read of the same two demands
+ * `stepReachZone` already evaluates, called by the notice composer and by
+ * nothing else; no term of `done`, `capMet` or any latch consults it, so no
+ * drive changes verdict. A caller that cannot answer (a hand-built tick with no
+ * `headlights`) is handled by `lampDemandMet`'s own „unknown is OFF" rule,
+ * which is the polarity the demand is authored under — and such a caller has no
+ * HUD to raise a card on anyway.
+ *
+ * THE GEAR ARM REPORTS ONLY THE FORWARD CASE, deliberately. `gearOk` is
+ * „IN REVERSE AND MOVING", so a car standing still in R fails it — and a
+ * reverse manoeuvre legitimately pauses. Announcing «стигна на преден ход» to a
+ * student who is stopped mid-shunt with the lever already on R would be a false
+ * statement about the cockpit, and a false card is worse than a missing one.
+ * The pause resolves itself the moment he moves; the forward arrival does not.
+ */
+export function reachZoneStateRefusal(
+  params: ObjectiveParams,
+  tick: SimTick,
+): ReachZoneStateRefusal | null {
+  if (params.kind !== "reachZone") return null;
+  const p = params as WitnessedReachZoneParams;
+  if (p.requireLamps !== undefined && !lampDemandMet(p.requireLamps, tick)) {
+    return { kind: "lamps", demand: p.requireLamps };
+  }
+  if (p.requireGear !== undefined && tick.gear >= 0) return { kind: "gear" };
+  return null;
+}
+
 /**
  * Default centring tolerance at rest, m — the authored CENTRING bar, and since
  * sweep 161 no longer the whole acceptance. See `PARK_CAR_HALF_LENGTH_M` for
@@ -2488,8 +2546,51 @@ function stepReachZone(
   const done = reached && capMet && vruOk && contactOk && railOk && yieldOk;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
+  //
+  // ── …AND „ON THE MARK" IS THE SWEPT FACE, BECAUSE THE REFUSAL IS ──────────
+  // (round 12, 2026-08-27.)
+  //
+  // WHAT WAS BROKEN. This latch is the ONLY channel in the product that
+  // explains a withheld cap certificate — `lessons/engine.ts objectiveNotice`
+  // renders «Задачата иска да си тук с не повече от N км/ч …» off exactly this
+  // bit, and no rule-engine card covers it (a gate cap is a lesson's demand,
+  // not a posted limit, so nothing is billed when it is missed). It was armed
+  // on `inAcceptance` — a POINT test against the tick's own position — while
+  // every arm that WITHDRAWS the certificate is armed on the swept face too:
+  // `capSpent = overCapNow && (onApproachSide || sweptAcceptance)`. The two
+  // halves of one contract were measured against different objects, which is
+  // the same asymmetry the block at REACH_ZONE_CAP_SLACK_KMH closed for the
+  // grader one round earlier — and „A WAYPOINT IS CROSSED, NOT SAMPLED" states
+  // the size of the gap in its own census: at PHYSICS_MAX_FRAME_DT = 0.5 s per
+  // tick, 71 of the catalogue's 1,720 reachZone gates are narrower than ONE
+  // 50 км/ч tick and 167 are narrower than one at 90.
+  //
+  // WHERE IT BITES, from the shipped catalogue rather than from the general
+  // case: `sc-mwms-join` and `sc-mwms-hold` are radius 6 — a 12 m disc — on a
+  // motorway rung whose own banner asks for 120–130 км/ч, where one tick
+  // covers 18–19.4 m; `sc-hzbp-approach` is radius 12 against a 140 км/ч road
+  // (`w12/frames/sc-hz-breakdown-pulloff__pc-wrong/run.log` samples that leg at
+  // 145 км/ч for a full minute, i.e. 20.1 m of travel per tick against a 24 m
+  // disc). On those gates a sample INSIDE the disc is the exception, so the
+  // fast drive — the one this whole contract exists to refuse — was the drive
+  // most likely to be refused in SILENCE. That is a bare verdict, and doc 64
+  // THEO-4 forbids one anywhere in this product: «no bare correct/wrong
+  // verdicts, ever».
+  //
+  // IT CREDITS AND REFUSES NOBODY. `overCapNoted` is read by one caller and
+  // that caller composes a `lesson` HudEvent; it is not a term of `done`, of
+  // `capMet` or of any latch. Widening it can only ever ADD an explanation to a
+  // drive that was already being refused — the population is unchanged, and
+  // `!done` still keeps the card off a drive that was credited.
+  //
+  // THE TAIL IS THE CALLER'S HALF. On a swept-only frame the car is already
+  // PAST the disc, so «Намали СЕГА, докато си върху точката» would be an
+  // instruction that cannot work; `objectiveNotice` now picks the corrective
+  // from where the car actually is on the frame the card is composed, which is
+  // the half of THEO-4 that says never give advice that will not work.
   const overCapNoted =
-    st.overCapNoted || (!done && inAcceptance && cap !== undefined && speedKmh > cap);
+    st.overCapNoted ||
+    (!done && (inAcceptance || sweptAcceptance) && cap !== undefined && speedKmh > cap);
 
   const evalState: ObjectiveEvalState = {
     type: "reachZone",

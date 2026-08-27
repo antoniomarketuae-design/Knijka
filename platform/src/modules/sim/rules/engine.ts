@@ -1102,6 +1102,12 @@ const MOTORWAY_CRAWL_REGRADE_SEC = 6;
  * per-event road-price channel through `SessionEndScreen`'s FaultCard, which
  * is not this seam. Reported.
  *
+ * SETTLED WITHOUT THAT CHANNEL — w12, 2026-08-27. The seam still cannot see
+ * `detail`, so `consequences.ts ROAD_CONSEQUENCES.WRONG_WAY` stopped asserting
+ * ONE price: it is a `conditional` row whose two branches are the two roads.
+ * Nothing in this file moved for it, and `realWorldBg` stays unreachable for
+ * this code.
+ *
  * NOT the whole row either, and said out loud: the SIX bills are the flicker
  * half, and `WRONG_WAY_REARM_SEC` above owns it. This changes what one bill
  * SAYS, not how many there are.

@@ -315,6 +315,56 @@ function asMesh(o: Object3D | undefined): Mesh | null {
 // panel cannot go higher (the authored kit hides it) and cannot come forward
 // (the founder band). Both asserted landmarks — cowl fy and the header fy —
 // are untouched, so the acceptance test stays green on its own terms.
+//
+// ── THE TABLE ABOVE STOPS BEFORE THE DEVICE THE FOUNDER REVIEWS ON ──────────
+// 2026-08-27, catalogue row sc-mw-emergency-lane:3ffb0692 („the rear-view
+// mirror is a black housing floating detached in open sky above the windscreen
+// header, skewed off-axis and clipped by the top edge of the screen, on every
+// mobile frame"). NOT REPAIRED HERE — the fix is a composition ruling, not a
+// number this lane may pick. What IS banked is the measurement, because the
+// omission from the three-row table above is the whole of the defect.
+//
+// The projection is the shipped one — `cockpit-camera-contract.test.ts`'s
+// camera (COCKPIT_EYE (0.24, 0.71, −0.255), quat FLIP_Y · Euler(−4°),
+// `cockpitVFovForAspect`), reproduced as plain math and CHECKED against this
+// block's own published datum: it returns roofFront fy 0.9578 at 16:9, i.e.
+// the 0.95779 the re-solve above states, to five places.
+//
+//   profile                     aspect  vFOV    roof front  hood  glass  cowl
+//   16:9 reference              1.778   47.00°  0.9578   0.9643  0.8891  0.307
+//   1440×900                    1.600   51.57°  0.9120   0.9178  0.8502  0.326
+//   iphone16-landscape 852×393  2.168   39.25°  1.0583   1.0661  0.9745  0.264
+//   small-landscape    780×360  2.167   39.27°  1.0579   1.0658  0.9742  0.264
+//
+// ON BOTH PHONE PROFILES, AT REST, EVERY PIECE OF CABIN ABOVE THE MIRROR GLASS
+// IS OFF THE TOP OF THE FRAME: the headliner's front edge at fy 1.058 and the
+// mirror hood at 1.066 are 5.8 % and 6.6 % of frame height past the edge, and
+// the glass at 0.974 is the only thing left up there — which is exactly the
+// „floating rectangle, clipped at the top, nothing attaching it to the cabin"
+// the row photographed, and it is R0 round 2's defect returning on an aspect
+// that was never in this table. (`FOV_WIDEN_COCKPIT` pulls the edge back to
+// 0.9896 at full lean on the throttle, so it grazes the frame at speed and is
+// gone at rest — which is why it reads as intermittent rather than as broken.)
+//
+// AND THE BUDGET IS THERE, in the founder's own units: hFOV is locked, so a
+// narrower vFOV puts the cowl at 0.264 on a phone against 0.307 at 16:9 —
+// 73.6 % world where the reference build ships 69.3 %. A header that cost the
+// phone up to ~4 % of frame height would still leave it composed no tighter
+// than the desktop the band was ruled on.
+//
+// WHAT IT IS NOT: a bigger slab. A static panel cannot be „just at the top
+// edge" at both 1.778 and 2.168 — the vFOVs differ by 20 %, so the same ray
+// lands 10 points of frame height apart. Bisected against the projection
+// above, a front edge that reaches fy 0.985 on the phone is z 0.6172 at
+// ROOF_Y (i.e. THROUGH the windscreen tint plane at 0.556) or y 0.9083 at
+// ROOF_FRONT_Z — and BOTH, being the same ray, arrive at fy 0.8977 at 16:9,
+// which spends 10.2 % of the reference frame's height on a ceiling against
+// today's 4.2 %. The two shapes that can work are an
+// aspect-solved header lip (zero height at 16:9, opening as vFOV narrows —
+// keyed off `cockpitVFovForAspect(aspect)` and NOT the live widened fov, or it
+// breathes with the throttle) or bringing the whole mirror station down on wide
+// aspects, which reopens B58's ruling about the В26 «50». Both need the
+// six-profile render this lane cannot run.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------

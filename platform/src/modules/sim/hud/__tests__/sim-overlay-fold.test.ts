@@ -477,4 +477,59 @@ describe("§RUN the mounted card measures its own window", () => {
     mounted.unmount();
     for (const t of targets) expect(t.length, "an observer survived the unmount").toBe(0);
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ONE COUNT PER CARD — 2026-08-27, and the frame that made it a defect.
+   *
+   * `w12/frames/sc-junction-blind__mobile-right/04-t058s.png`, iPhone 16
+   * landscape, cropped 2.2×. One card, twelve pixels between them:
+   *
+   *     преди 3 с        ↓ ОЩЕ 10 РЕДА
+   *     ЗАЩО ↓8    ✕
+   *
+   * Neither number is wrong. `peekFold.lines` counts every line under the cut —
+   * on that frame the folded THIRD LINE of the fault's own name is one of them —
+   * and `whyFoldedLines` counts the explanation only. That is exactly why they
+   * may not both be printed: a student who has just been charged −10 for an
+   * ОПАСНА ГРЕШКА reads two counts of one fold and concludes the grader cannot
+   * count. The one with a 44 px tap behind it is the one that speaks.
+   *
+   * BOTH DIRECTIONS ARE HERE, because suppressing the label unconditionally
+   * would delete the only fold affordance a card with no «Защо» chip has —
+   * `sc-park-zebra__mobile-right/04-t002s.png`'s «↓ ОЩЕ 1 РЕД» is that card.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  it("the chip carries the count, so the label stands down", () => {
+    // The real peek: a title row and an identified BODY row, i.e. the shape
+    // every violation and every briefing has on the glass.
+    const { mounted } = mountPeek();
+    mounted.observers.forEach((o) => o.fire());
+    const tree = mounted.rerender();
+
+    // 4 of 11 body lines are inside the cut, so `whyIsReachable` is false and
+    // the chip is the surface that reports the size of what it holds.
+    const why = collectProps(tree, (p) => "aria-expanded" in p);
+    expect(why.length, "the «Защо» chip must still be on the card").toBe(1);
+    const label = String((why[0] as { children?: unknown }).children ?? "");
+    expect(label, "the chip stopped naming the size of what it holds").toContain("↓");
+
+    // THE ANTI-VACUITY HALF, and it is the whole value of this row: the label
+    // is silent because it STOOD DOWN, not because there was nothing to say.
+    // `data-sim-overlay-text-cut` is `hasDetail && peekFold.lines > 0` — the
+    // same measured counter the band prints — so its presence proves the band
+    // had a number and did not print it.
+    const windows = collectProps(tree, (p) => "data-sim-overlay-text" in p);
+    expect(
+      (windows[0] as { "data-sim-overlay-text-cut"?: string })["data-sim-overlay-text-cut"],
+      "nothing was folded here — this fixture no longer tests the dedup",
+    ).toBe("");
+
+    // …and the 10 px band beside the stamp says nothing, because the chip has.
+    expect(
+      foldCounters(tree),
+      "two counters for one fold — the sc-junction-blind reading",
+    ).toEqual([]);
+    mounted.unmount();
+  });
 });

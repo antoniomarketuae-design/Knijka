@@ -258,6 +258,51 @@ describe("§3 C · the belt-off state, read off the source", () => {
     expect(css).toContain('button[aria-label="Закопчай предпазния колан"]');
   });
 
+  // ── §3d · AND THE DISC STANDS ON A GROUND — sc-junction-gap:e87d5be1 ───────
+  //
+  // The cross-lane contract above is exactly WHY this assertion has to live
+  // here. `PlayAreaStyles` gives this one station a FILL — `color-mix(danger
+  // 20 %, transparent)` pulsing to 42 % — and a fill on nothing is a window:
+  // measured on the row's own frame (w12 sc-junction-gap__mobile-right/
+  // 01-arrival.png) the parked car's window rectangle and panel edges read
+  // straight through the warning, because the flank ghost behind it is a
+  // GRADIENT (α 0.72–0.88, feathering to 0) and never a ground. The block at
+  // `WarningPlate` carries the pixel numbers.
+  //
+  // Three properties, and each one is a way the repair could rot back into the
+  // defect while still being present: the plate has to be BEHIND the control
+  // (a plate over the glyph is worse than none), it has to be a DISC (a square
+  // ground under a round button paints four black corners on the road), and its
+  // ink has to be genuinely OPAQUE. The last one is pinned as a property rather
+  // than as a literal, because „rgba(0,0,0,0.9)" would pass any spelling test
+  // and would still be the finding.
+  it("§3d the belt's warning disc stands on an opaque ground, not on the road", () => {
+    const beltStation = SRC.slice(
+      SRC.indexOf('<ArcStation index={0} padH={DRIVE_PAD_H} side="right">'),
+    ).slice(0, 900);
+    expect(beltStation).toContain("<WarningPlate />");
+    expect(
+      beltStation.indexOf("<WarningPlate />"),
+      "the plate must be rendered BEFORE the button, i.e. behind it",
+    ).toBeLessThan(beltStation.indexOf('labelBg="Закопчай предпазния колан"'));
+
+    const plate = CODE.slice(CODE.indexOf("function WarningPlate("));
+    expect(plate, "the plate must not be hit-testable").toContain("pointer-events-none");
+    expect(plate, "…nor announced: the station's one control is the button").toContain(
+      "aria-hidden",
+    );
+    expect(plate, "…and it must be the button's own 44 px disc").toContain(
+      "absolute inset-0 rounded-full",
+    );
+    expect(plate, "…painted under the control rather than over it").toContain("zIndex: -1");
+
+    const ink = /const WARNING_PLATE_INK = "([^"]+)"/.exec(CODE)?.[1] ?? "";
+    expect(ink, "the plate's ink must be declared").not.toBe("");
+    expect(ink, "an alpha channel on a backing plate IS the defect").toMatch(
+      /^(#[0-9a-fA-F]{6}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\))$/,
+    );
+  });
+
   it("the shell's «МЕНЮ» reads the dock's lane rather than a literal of its own", () => {
     // ── THE DEFECT THIS PINS, 2026-08-18 ────────────────────────────────────
     //

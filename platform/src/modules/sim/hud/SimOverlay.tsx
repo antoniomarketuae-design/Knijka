@@ -1651,6 +1651,33 @@ export function SimOverlay({
   const whyReachable = whyIsReachable(shown, peekFold.why);
   const whyFoldedLines = Math.max(0, peekFold.why.detailLines - peekFold.why.visibleLines);
   /**
+   * ONE COUNT PER CARD — and the two it replaces did not agree.
+   *
+   * `w12/frames/sc-junction-blind__mobile-right/04-t058s.png`, cropped 2.2×,
+   * one card, twelve pixels apart: «↓ ОЩЕ 10 РЕДА» on the stamp row and
+   * «ЗАЩО ↓8» on the chip. Neither is wrong — `peekFold.lines` counts every
+   * line under the cut, including the folded third line of the fault's own
+   * NAME, and `whyFoldedLines` counts the explanation only — and that is
+   * precisely why they may not both be on the glass. A student who has just
+   * been charged −10 reads two numbers for one fold and concludes the grader
+   * cannot count, which is the reading this whole programme exists to prevent.
+   *
+   * WHICH ONE SPEAKS IS NOT A COIN TOSS. `↓N` appears on the chip only when
+   * `whyIsReachable` is false, i.e. only when the explanation is mostly under
+   * the fold — the state the label exists to report — and the chip is a
+   * labelled, 44 px, screen-reader-announced control that OPENS the text, while
+   * the label is a 10 px `aria-hidden` band that does nothing. So when both
+   * would speak, the one with the tap wins and the band stands down.
+   *
+   * The label is not deleted: on a card with no «Защо» chip — a task line, a
+   * piece of guidance, the `cardIsDismissButton` shape — it is the only thing
+   * on the glass that says the sentence continues (`sc-park-zebra__mobile-right
+   * /04-t002s.png`, «↓ ОЩЕ 1 РЕД»), and there `hasDetail` is false by
+   * construction, so this predicate cannot suppress it.
+   */
+  const chipCarriesFoldCount = hasDetail && !whyReachable;
+  const showFoldLabel = peekFold.lines > 0 && !chipCarriesFoldCount;
+  /**
    * Is there text under the fold RIGHT NOW, on a card that has somewhere to
    * send the reader?
    *
@@ -1818,14 +1845,51 @@ export function SimOverlay({
     // one the block above was written for — a window of 1.38 line boxes, whose
     // `overflow: hidden` cuts the second line through the middle of its glyphs.
     //
-    // 2.375 rem = TWO whole 13.75 px line boxes plus the 10 px fade. Below that
-    // the card overflows its column instead, which is visible and reportable;
-    // silently amputated Bulgarian is neither. It is inert at every size that
-    // ships (the tightest cap in the ladder, 780 × 360 landscape, leaves this
-    // window ~67 px) and exists so that a future tightening of
-    // `NOTIFY_COLUMN_MAX_STAGE_FRACTION` cannot re-create the 2026-08-14 defect
-    // by arithmetic nobody re-measures.
-    minHeight: "2.375rem",
+    // ── ⚠ IT IS NOT INERT ANY MORE, AND THAT IS WHY THE FAULT NAME WAS CUT.
+    //    2026-08-27, sweep w12.
+    //
+    // The line that stood here said „It is inert at every size that ships (the
+    // tightest cap in the ladder, 780 × 360 landscape, leaves this window
+    // ~67 px)". That was true of a 147 px column. The MIRROR-LANE swap took the
+    // compact column's top from 8 px to `NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN`
+    // and its ceiling with it — 161 → 95.8 px at 852 × 393, 147 → 87.0 at
+    // 780 × 360 — and this window is the card's only `shrink` item, so from
+    // that commit on the floor is not a guard: IT IS THE WINDOW. Every compact
+    // profile lands on it exactly.
+    //
+    // WHAT 2.375 rem BUYS, AND WHAT IT COSTS. 38 px of visible text against a
+    // 13.75 px title line box is TWO title lines and nothing else, and
+    // `foldWindowPx` then snaps the cut to the title's own second edge. Read
+    // off the shipped build — `w12/frames/sc-junction-blind__mobile-right/
+    // 04-t058s.png`, iPhone 16 landscape, cropped 2.2× :
+    //
+    //   ⚠ −10 ИЗПИТНИ Т.
+    //   Непропускане на пътно
+    //   превозно средство с          ← the fault NAME, cut at a preposition
+    //   преди 3 с        ↓ ОЩЕ 10 РЕДА
+    //   ЗАЩО ↓8    ✕                 ← and the two counters disagree, 10 vs 8
+    //
+    // The third line is «с предимство». A student is charged −10 for an ОПАСНА
+    // ГРЕШКА and the card does not finish saying which one. That is not a fold
+    // of the explanation — the fold is legitimate and announced — it is the
+    // VERDICT'S SUBJECT below the cut, and no counter makes that acceptable.
+    //
+    // 2.75 rem = 44 px = THREE whole 13.75 px title line boxes (41.25), which is
+    // every `titleBg` in the shipped catalogue, or a two-line title plus one
+    // whole 15.125 px body line — the first line of authored WHY these cards
+    // have ever put on the glass in landscape.
+    //
+    // IT IS PAID FOR, NOT BORROWED. The stamp row and the control row are one
+    // row now (see the merged row below), which returns 14 px to a card that
+    // was already 122 px tall inside a 95.8 px box. Net −8 px, and the floor of
+    // the card moves OUT of the hazard band rather than further into it:
+    //   852 × 393  73.24 + 108.7 = 181.9  ·  band starts at 0.53 × 393 = 208.3
+    //   780 × 360  67.76 + 108.7 = 176.5  ·  band 190.8
+    //   780 × 340  64.44 + 108.7 = 173.1  ·  band 180.2   (122 px was 186.4 —
+    //                                        i.e. 6 px INSIDE it, today)
+    // `NOTIFY_COLUMN_MAX_STAGE_FRACTION`'s own derivation is what those three
+    // lines are checked against; nothing here relaxes it.
+    minHeight: "2.75rem",
     // ── THE BAND IS NOW THE LINE GRID WHENEVER THERE IS A FOLD — 2026-08-18.
     //
     // It used to be a fixed 10 px gradient, and sweep 161 filed the result 29
@@ -2083,38 +2147,82 @@ export function SimOverlay({
              2026-08-14 when `line-clamp-6` was hiding 215 px behind „…" and
              saying nothing. On a card with ≥12 px of slack the cost is zero.
              STILL OWED: the 852 × 393 before/after of `sc-sp-curve__mobile-wrong
-             /04-t193s`, which settles it by looking. */}
-      {momentBg !== null || peekFold.lines > 0 ? (
-        <div className="mt-0.5 flex shrink-0 flex-wrap items-center justify-between gap-x-2">
-          {momentBg !== null ? (
-            <span
-              data-sim-overlay-moment=""
-              className="shrink-0 whitespace-nowrap text-[10px] font-semibold tabular-nums leading-none"
-            >
-              {momentBg}
-            </span>
-          ) : (
-            <span aria-hidden />
-          )}
-          {peekFold.lines > 0 ? (
-            <span
-              data-sim-overlay-fold=""
-              aria-hidden
-              className="shrink-0 text-[10px] font-black uppercase leading-none tracking-wider"
-            >
-              ↓ още {peekFold.lines} {peekFold.lines === 1 ? "ред" : "реда"}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
+             /04-t193s`, which settles it by looking.
 
-      {/* Row 3 — the controls, right-aligned under the words. Absent only on the
-          card that IS a control. `shrink-0`, and that is the half of this fix
-          that keeps it from being a trap: these two 44 px chips are the only
-          way out of a blocking briefing, and a flex row that shrinks would put
-          them under the fold of a card the student cannot scroll past. */}
+             ⚠ SETTLED, AND AGAINST THIS PARAGRAPH — 2026-08-27, sweep w12. There
+             is no card with ≥12 px of slack. The compact column's ceiling is
+             95.8 / 87.0 px and the text window is the card's only `shrink` item,
+             so every compact profile lands on the window's floor exactly: the
+             12 px came out of authored Bulgarian on every violation card in the
+             corpus, and «↓ още 1 ред» was the self-announcement of a fault NAME
+             that stops at «превозно средство с». The row is not deleted — it is
+             the two children below, riding in the CONTROL row, where a 10 px
+             band beside a 44 px chip costs nothing at all. */}
+      {/* ── ROW 3 — THE STAMP AND THE CONTROLS, ON ONE ROW. 2026-08-27.
+             They were two rows and the second one was free only on paper.
+
+             WHAT THE SECOND ROW COST. The stamp row is a 10 px `leading-none`
+             band plus its own `mt-0.5`, and the gap above it, i.e. 14 px of a
+             card the column pins at 95.8 px — and the block at the text
+             window's `minHeight` has the frame where those 14 px are the
+             difference between a fault NAME that finishes and one that stops at
+             «превозно средство с». The chips are 44 px tall and the stamp is 10;
+             it rides in the same row with `items-center` and the row's height
+             does not change at all. Nothing is deleted, nothing is smaller, and
+             the card ends up 14 px shorter.
+
+             `flex-wrap` + `gap-y-1` is the degradation and it is deliberate: if
+             «преди 8 с» and three 44 px chips ever cannot share a 180 px lane,
+             the stamp wraps to a line of its own — which is exactly today's
+             layout — instead of the chips shrinking. `briefing-no-echo` forbids
+             a clip on anything here that is not an uppercase chip, so a wrap is
+             the only honest way for this row to run out of room.
+
+             THE COUNT IS PRINTED ONCE PER CARD, and that is a repair rather
+             than tidiness. The same frame carries «↓ ОЩЕ 10 РЕДА» on the stamp
+             row and «ЗАЩО ↓8» on the chip 12 px below it: two counters of one
+             fold, disagreeing, because `peekFold.lines` counts everything under
+             the cut (the folded third line of the TITLE among it) and
+             `whyFoldedLines` counts the explanation only. A student reading
+             both learns that the product cannot count. So when the chip is
+             carrying the number — `whyReachable === false`, which is the only
+             state that puts `↓N` on it — the label stands down and the labelled,
+             44 px, tappable one is the one that speaks. See `showFoldLabel`. */}
+      {momentBg !== null || showFoldLabel || !cardIsDismissButton ? (
+        <div className="mt-0.5 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          {/* LEFT — the moment, „against the words it dates" (2026-08-25). */}
+          <div className="flex min-w-0 items-center gap-x-2">
+            {momentBg !== null ? (
+              <span
+                data-sim-overlay-moment=""
+                className="shrink-0 whitespace-nowrap text-[10px] font-semibold tabular-nums leading-none"
+              >
+                {momentBg}
+              </span>
+            ) : null}
+          </div>
+          {/* RIGHT — and the fold KEEPS THE RIGHT EDGE IT HAS HAD SINCE
+              2026-08-16, which is why it is here and not beside the moment.
+              On the `cardIsDismissButton` shape it is the only thing in this
+              group, so a card like `sc-park-zebra__mobile-right/04-t002s.png`
+              („↓ ОЩЕ 1 РЕД", right-aligned) is pixel-unchanged. */}
+          <div className="flex shrink-0 items-center gap-2">
+            {showFoldLabel ? (
+              <span
+                data-sim-overlay-fold=""
+                aria-hidden
+                className="shrink-0 text-[10px] font-black uppercase leading-none tracking-wider"
+              >
+                ↓ още {peekFold.lines} {peekFold.lines === 1 ? "ред" : "реда"}
+              </span>
+            ) : null}
+      {/* The controls, right-aligned. Absent only on the card that IS a
+          control. `shrink-0`, and that is the half of this fix that keeps it
+          from being a trap: these two 44 px chips are the only way out of a
+          blocking briefing, and a flex row that shrinks would put them under
+          the fold of a card the student cannot scroll past. */}
       {cardIsDismissButton ? null : (
-        <div className="mt-0.5 flex shrink-0 items-center justify-end gap-1">
+        <div className="flex shrink-0 items-center justify-end gap-1">
           {hasDetail ? (
             <button
               type="button"
@@ -2233,6 +2341,9 @@ export function SimOverlay({
           ) : null}
         </div>
       )}
+          </div>
+        </div>
+      ) : null}
     </>
   );
 

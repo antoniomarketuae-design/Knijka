@@ -1768,6 +1768,13 @@ export const COLLISION_CONTACT_COPY: Record<
  * чл. 183, ал. 4 (100 лв.) on a street versus чл. 178ж, ал. 1 on a motorway —
  * and `realWorldBg` has no per-event channel at all, so that half is reported
  * rather than smuggled in here.
+ *
+ * THAT HALF LANDED — w12, 2026-08-27, and NOT through this table. `roadCon‐
+ * sequenceFor` still cannot see `detail`, so `consequences.ts` stopped claiming
+ * an unconditional price instead: `ROAD_CONSEQUENCES.WRONG_WAY` is a
+ * `conditional` row whose branches are the two ROADS, each figure printed with
+ * its road in front of it. `realWorldBg` below is unreachable for this code
+ * (the structured row wins in `roadConsequenceFor`) and is left as written.
  */
 export const WRONG_WAY_ROAD_MOTORWAY = "motorway";
 

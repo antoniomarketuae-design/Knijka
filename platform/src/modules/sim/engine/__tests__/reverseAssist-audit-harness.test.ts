@@ -125,7 +125,21 @@ describe("§1 the audit harness's gesture grammar", () => {
       .flatMap((m) => [m[1], m[2]]);
     expect(viaConst, "the steering channel is gone").toHaveLength(2);
     const all = [...new Set([...literal, ...viaConst])].sort();
-    expect(all).toEqual(["Escape", "KeyA", "KeyD", "KeyS", "KeyW"]);
+    // KeyB JOINED THE CENSUS ON 2026-08-27, and it is admissible for the reason
+    // this test exists: it is a CABIN control, not a GEAR control.
+    //
+    // 194 of 204 drives in the w12 sweep were charged «Движение без предпазен
+    // колан −3». That is the product working as the founder ruled (LessonScene
+    // against commit 265629d: all 150 scenarios spawn ready-to-drive with
+    // exactly one item outstanding, the belt). The harness was driving like a
+    // student who never buckles up, which put a 3-point floor under EVERY score
+    // and made every «does a good drive get credited» finding unanswerable.
+    // Proven fix: sc-ac-ice pc-right went 3 -> 0 with the verdict unchanged.
+    //
+    // The claim in this test's NAME is untouched: KeyB works the buckle, and
+    // the two assertions below still refuse the gear keys. If a future key is
+    // added here, ask the same question — does it work the GEAR by hand?
+    expect(all).toEqual(["Escape", "KeyA", "KeyB", "KeyD", "KeyS", "KeyW"]);
     // `[` and `]` are the cockpit's own gear keys (StatusDashboard's title says
     // so: „Скоростен лост ([ към P · ] към D)"). The harness must not have them:
     // its only route into R is the deliberate assist gesture, which §5 pins.

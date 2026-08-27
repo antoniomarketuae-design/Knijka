@@ -47,11 +47,13 @@ import {
   type PreDriveStepId,
 } from "../procedures";
 import {
+  REACH_ZONE_GRACE_M,
   contactVoidsObjective,
   createEvalState,
   parseObjectiveParams,
   personContactVoidsObjective,
   railBarredVoidsObjective,
+  reachZoneStateRefusal,
   stepObjective,
   yieldFailedVoidsObjective,
   type ObjectiveContext,
@@ -439,10 +441,38 @@ function objectiveNotice(
     // motorway rungs that would be advice to commit an offence. The corrective
     // it gives is the one the lesson actually teaches — brake EARLIER, before
     // the mark.
+    //
+    // ── …AND „ДОКАТО СИ ВЪРХУ ТОЧКАТА" HAS TO BE TRUE OF THIS FRAME ─────────
+    // (round 12, 2026-08-27.)
+    //
+    // `approachCap` is not the only way the mark ends up behind the car.
+    // `objectives.ts overCapNoted` now latches on the SWEPT face as well — the
+    // block of that name carries the census: at 0.5 s per tick, 71 of 1,720
+    // catalogue gates are narrower than one 50 км/ч tick, and the motorway
+    // rungs (`sc-mwms-join`/`-hold`, radius 6 against 18–19 m of travel per
+    // tick) are usually crossed with NO sample inside the disc at all. Until
+    // that widening the fast drive was refused in silence; with it, the card
+    // can now be composed on a frame whose own position is already past the
+    // paint, and «Намали СЕГА, докато си върху точката» would then be an
+    // instruction that cannot work — the second half of THEO-4, and the one
+    // this card's own comment already holds itself to.
+    //
+    // So the corrective is chosen from WHERE THE CAR IS on the frame the card
+    // is written, measured against the same acceptance the evaluator uses (the
+    // authored disc plus REACH_ZONE_GRACE_M of approach-side capsule — the
+    // region in which `atMark` is still true and switching or braking still
+    // re-earns the contract). Outside it there is nothing left to save, which
+    // is the same sentence `blownApproach` says for the other reason.
+    const distToMarkM = Math.hypot(
+      tick.position.x - params.x,
+      tick.position.y - params.y,
+    );
+    const stillAtTheMark = distToMarkM <= params.radiusM + REACH_ZONE_GRACE_M;
     const blownApproach = after.approachCap === "blown";
-    const tailBg = blownApproach
-      ? "— това е над допустимото и задачата остава неизпълнена. Намаляване след маркера вече не се отчита: измерва се самото приближаване, а то вече се случи с тази скорост. Намалявай по-рано — още преди маркера. Урокът продължава и разборът показва задачата накрая."
-      : "— затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.";
+    const tailBg =
+      blownApproach || !stillAtTheMark
+        ? "— това е над допустимото и задачата остава неизпълнена. Намаляване след маркера вече не се отчита: измерва се самото приближаване, а то вече се случи с тази скорост. Намалявай по-рано — още преди маркера. Урокът продължава и разборът показва задачата накрая."
+        : "— затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.";
     return {
       kind: "lesson",
       titleBg: "Стигна точката, но твърде бързо",
@@ -492,6 +522,102 @@ function objectiveNotice(
       // him past the mark if he keeps it.
       explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, ${measuredBg} ${tailBg}`,
     };
+  }
+  // ── THE OTHER HALF OF THE ARRIVAL CONTRACT FINALLY SPEAKS (round 12,
+  //    2026-08-27 — `objectives.ts reachZoneStateRefusal` carries the census,
+  //    the frame and the year the silence lasted) ─────────────────────────────
+  //
+  // The cap branch above is the only card this composer had, and it is gated on
+  // `speedKmh > cap`. The lamp and gear demands are refused independently of
+  // speed, so the drive those 29 gates exist to teach — arriving LAWFULLY with
+  // the switch unmoved — reached the mark, was refused, and was told nothing by
+  // this file or by the rule engine (the demand's own docblock records
+  // `HEADLIGHTS_OFF_AT_NIGHT` firing zero times on the same drive). A task that
+  // silently never ticks is the bare verdict doc 64 THEO-4 forbids.
+  //
+  // ONE CARD, ON THE ARRIVAL FRAME, AND NO NEW STATE. `before.reached` is false
+  // exactly once per run — the same discriminator the aorist above uses, and
+  // `ObjectiveEvalState.reachZone` belongs to lessons/types.ts, so a fresh latch
+  // field is not this lane's to add. `!after.capMet` keeps the card off a gate
+  // that is being granted: on the arrival frame with the state unmet the latch
+  // is spent (`lampSpent`/`gearSpent` in `stepReachZone`), so the certificate is
+  // genuinely withheld whenever this fires.
+  //
+  // MUTUALLY EXCLUSIVE WITH THE CAP CARD BY CONSTRUCTION, so the student never
+  // gets two explanations of one refusal and never the wrong one of the two:
+  // the branch above needs `speedKmh > cap`, this one needs the speed to be
+  // within the cap (or the gate to carry none). A drive that is BOTH too fast
+  // and unlit is told about the speed first, which is the fault that also has a
+  // grader; the lamps are still there to be reported on the next approach.
+  if (
+    params.kind === "reachZone" &&
+    after.type === "reachZone" &&
+    (before.type !== "reachZone" || !before.reached) &&
+    after.reached &&
+    !after.capMet &&
+    (params.maxSpeedKmh === undefined || Math.abs(tick.speedKmh) <= params.maxSpeedKmh)
+  ) {
+    const refusal = reachZoneStateRefusal(params, tick);
+    if (refusal !== null) {
+      // The same „is there anything left to save" test the cap tail uses, and
+      // for the same reason: `contractEarned` needs `atMark`, so flicking the
+      // switch earns the tick on the next frame WHILE the car is on the mark or
+      // in the approach capsule, and does nothing at all once it is past.
+      const dM = Math.hypot(tick.position.x - params.x, tick.position.y - params.y);
+      const stillAtTheMark = dM <= params.radiusM + REACH_ZONE_GRACE_M;
+      if (refusal.kind === "lamps") {
+        // What the banner promised, in the words the cockpit uses for the
+        // switch the student has to find (СВЕТЛ / МЪГЛА on the touch flank,
+        // KeyL on the desktop). «fog» is the чл. 74 pairing — an ADDITION to
+        // the dipped beams, never a substitute — so it asks for both by name.
+        const wantedBg =
+          refusal.demand === "fog"
+            ? "с фарове за мъгла ЗАЕДНО с късите светлини"
+            : refusal.demand === "high"
+              ? "с ДЪЛГИ светлини"
+              : refusal.demand === "low"
+                ? "с КЪСИ светлини"
+                : "ОСВЕТЕН — с включени светлини";
+        // WHAT IS ACTUALLY ON, read off the same field the grader reads —
+        // never a blanket «телтейлът е тъмен». `lampDemandMet` refuses the
+        // WRONG beam as well as no beam (demand "low" against `headlights:
+        // "high"` is a refusal on a car whose lamps are plainly lit), so a
+        // fixed „your lights are off" clause would be a false statement about
+        // the cockpit on exactly the drive sc-ac-highbeam-lead is about. THEO-4
+        // asks for the observation before the instruction; a wrong observation
+        // is worse than none.
+        const nowBg =
+          tick.headlights === "high"
+            ? "сега светят ДЪЛГИТЕ"
+            : tick.headlights === "low"
+              ? "сега светят само късите"
+              : "фаровете са изгасени";
+        const observedBg =
+          refusal.demand === "fog" && tick.headlights !== "off"
+            ? "а фаровете за мъгла са изключени"
+            : `а ${nowBg}`;
+        return {
+          kind: "lesson",
+          titleBg: "Стигна точката, но без светлините, които задачата иска",
+          explanationBg:
+            `Задачата иска да минеш тук ${wantedBg}, ${observedBg}. ` +
+            (stillAtTheMark
+              ? "Нагласи ги СЕГА, докато си върху точката — задачата се отчита на следващия кадър. Ако я подминеш така, остава неизпълнена, но урокът продължава и разборът я показва накрая."
+              : "Подмина точката така, затова задачата остава неизпълнена: светлините се нагласят ПРЕДИ участъка, не в него. Урокът продължава и разборът показва задачата накрая."),
+          lawRef: refusal.demand === "fog" ? "ЗДвП чл. 74" : "ЗДвП чл. 70",
+        };
+      }
+      return {
+        kind: "lesson",
+        titleBg: "Стигна точката на преден ход",
+        explanationBg:
+          "Задачата иска това място да се мине НА ЗАДЕН ХОД, а лостът е на преден. " +
+          (stillAtTheMark
+            ? "Включи R и мини мястото назад — задачата се отчита, когато колата наистина се движи на заден ход. Урокът продължава и разборът я показва накрая."
+            : "Мястото е вече зад теб, затова задачата остава неизпълнена. Заден ход се включва ПРЕДИ маневрата, не след нея. Урокът продължава и разборът показва задачата накрая."),
+        lawRef: "ЗДвП чл. 40",
+      };
+    }
   }
   if (
     params.kind === "completeManeuver" &&

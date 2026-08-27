@@ -1212,6 +1212,40 @@ export const SC_CROSSING_WHITE_CANE: ScenarioSpec = {
  * student really was convicted at, 60 m earlier at the stop line — is real and
  * is closed at `signalPlan` below.
  */
+/**
+ * ── AND SHE HAD FINISHED CROSSING BEFORE HE GOT THERE ─────────────────────
+ *    (wave 5, 2026-08-27 — found while settling the signal half of
+ *    sc-pe-jaywalker:7746da56, on the same drive.)
+ *
+ * `.audit-frames/w12/frames/sc-pe-jaywalker__mobile-right`, whole sheet:
+ * ИЗДЪРЖАН, both objectives ticked (0:56 and 2:02), COMMENDATIONS (0), no
+ * «Разминавания на косъм» section at all, and not one pedestrian event in
+ * 112 s. «Пешеходец на червено» was passed clean with no пешеходец in it.
+ *
+ * THE ARITHMETIC, and it is `triggerDistM`'s standing one — metres against a
+ * clock. She is released 55 m out and needs 1.07 s to reach the carriageway
+ * and 11.9 s to clear it (16.25 m at 1.5 m/s). That leg's mean pace was
+ * ≈ 1.4 m/s, so those 55 m took ≈ 39 s: she stepped off the west kerb, crossed
+ * the whole street and stood on the east pavement more than twenty seconds
+ * before the car arrived at a bare zebra. It is the founder's own
+ * sc-zebra-approach photograph — «Чакаш правилно» in front of nobody — one
+ * lesson to the left, and `contracts.ts` documents `triggerEtaSec` as its fix.
+ *
+ * 9.0 s is the sibling value `templates-flow.ts` sc-za-ped already ships on the
+ * identical geometry (55 m, floor 10, a 1+1 street), and it lands where this
+ * drill needs her: 1.5 × 9.0 = 13.5 m along a walk that starts at x = −9.73, so
+ * she is at x = 3.77 — inside the player's own lane (LANE_2 = 4.06) — at the
+ * moment he arrives, at every pace below the (55/9)×3.6 = 22 км/ч crossover.
+ * Above it the authored 55 m still governs, so the shadow and the „аз съм на
+ * зелено" demo (both a flat 28 км/ч over the release point) are untouched and
+ * the committed recordings replay byte for byte; the collision demo's strike is
+ * an AUTHORED `{ kind: "collision" }` step, not a simulated one, so its verdict
+ * cannot move with her either. The trace gate re-checks all three.
+ *
+ * The floor stays 10: 10 × KMH_TO_MPS × 9.0 = 25 m ≥ DART_CREEP_RELEASE_M, so
+ * the release is continuous across it (the discontinuity that number has to
+ * clear is written out at SC_HZ_EMERGENCY_STOP_DART in templates-hazards2.ts).
+ */
 const JAY_PED: PedestrianDartOutSpec = {
   id: "sc-jay-ped",
   kind: "pedestrianDartOut",
@@ -1225,6 +1259,7 @@ const JAY_PED: PedestrianDartOutSpec = {
   roadToM: 17.85,
   triggerDistM: 55,
   minTriggerSpeedKmh: 10,
+  triggerEtaSec: 9.0,
 };
 
 export const SC_PE_JAYWALKER: ScenarioSpec = {
@@ -1265,7 +1300,50 @@ export const SC_PE_JAYWALKER: ScenarioSpec = {
   },
   instructionsBg: [
     { n: 1, textBg: "Тръгни на север — напред е светофарно кръстовище, а малко след него има пешеходна пътека." },
-    { n: 2, textBg: "Светофарът за теб е зелен — премини кръстовището с готовност: гледай и пътеката отвъд него." },
+    // ── «СВЕТОФАРЪТ ЗА ТЕБ Е ЗЕЛЕН» WAS PRESENT TENSE, AND FOR THE FIRST 22 s
+    //    OF EVERY SESSION IT WAS FALSE (sc-pe-jaywalker:7746da56, wave 5).
+    //
+    // The row was filed as „the vehicle signal facing the player reads RED",
+    // reopened from CLOSED on a pixel count, and the useful thing to say about
+    // it is neither of those: the LAMP IS RIGHT AND THE SENTENCE IS WRONG, and
+    // both halves are measured rather than argued.
+    //
+    // MEASURED on `createWorldRuntime("pe-jay-v1")` with this template's own
+    // `signalPlan` armed from the spawn — the phase of cluster `sx-n-c`, which
+    // is the head this approach reads, over the first two minutes:
+    //
+    //     0.0 red · 22.0 redYellow · 23.0 green · 43.0 yellow · 46.0 red
+    //             · 72.0 redYellow · 73.0 green · 93.0 yellow · 96.0 red
+    //
+    // So the lamp a student is looking at while he acknowledges «Разбрах» is
+    // RED, and stays red for 22 s; on the 77.3 m approach it is red for 26 of
+    // every 50 s. `signalPlan.greenFresh` (below) owns only the last 10.1 m —
+    // it pins a fresh 20 s green the moment he enters the ring, which is why
+    // the G8 gate and §4 of pe-sweep161-truth both find GREEN AT THE LINE at
+    // every pace, and why re-probing it here at burst-23-with-dwell profiles
+    // out to a 40 s dwell per cycle, and at a flat 3.85 км/ч crawl, returns
+    // green at the line every time. The pin is not broken. The claim about the
+    // other 67 m is.
+    //
+    // WHAT IT COST, on `.audit-frames/w12/frames/sc-pe-jaywalker__mobile-right`:
+    // «Защо чакаш: червен сигнал · Спрял си пред стоп-линията и на червено това
+    // е правилното» at t035/t040/t045, «the lawful wait was withdrawn after 10s»,
+    // 1 lawful wait honoured (10 s) — a student stopped at red for ten seconds
+    // on a lesson whose briefing had told him, flatly, that his light was green.
+    // The verdict was ИЗДЪРЖАН and the jaywalk still happened, so nothing here
+    // is a grading defect; what it teaches is that the briefing may be ignored,
+    // which is the one lesson this product cannot afford to give.
+    //
+    // The sentence now says what the world does: the lamp cycles while you
+    // approach, it will be green when you arrive, and you do not chase it. That
+    // last clause is the better teaching anyway (чл. 20 ал. 2 — a green read
+    // from 70 m is a green you may not still have), and it makes the lawful
+    // 10 s wait a thing the drill predicted instead of a thing it denied.
+    {
+      n: 2,
+      textBg:
+        "Отдалече лампата сменя фазите — не гони зеленото. На кръстовището за теб ще е зелено: премини с готовност, гледай пътеката отвъд него.",
+    },
     {
       n: 3,
       textBg:

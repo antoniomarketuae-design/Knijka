@@ -1477,45 +1477,61 @@ const DANGER_179_1_5_OVERTAKE: ConditionalPenalty = {
 };
 
 /**
- * WRONG_WAY'S SECOND ROAD, PRICED — w11, `sc-merge-accel-lane:93685d58`,
- * 2026-08-27.
+ * WRONG_WAY'S TWO ROADS, EACH PRICED AS ITS OWN OFFENCE — w12,
+ * `sc-merge-accel-lane:93685d58`, 2026-08-27.
  *
- * WHAT THE PREVIOUS REPAIR SAID IT WAS LEAVING BEHIND, verbatim, in
- * `catalog.ts WRONG_WAY_ROAD_COPY`: „What genuinely differs is the PRICE —
- * чл. 183, ал. 4 (100 лв.) on a street versus чл. 178ж, ал. 1 on a motorway —
- * and `realWorldBg` has no per-event channel at all, so that half is reported
- * rather than smuggled in here." The verifier then re-drove it and read the
- * card back: under the NEW motorway title the money apparatus was still the
- * one-way street's — „51,13 €", „0 контролни точки", and a closing note
- * reading «Този ред е за постоянната забрана и за еднопосочната улица» on a
- * lesson («Включване в магистрала през лентата за ускоряване») whose district
- * `mw-entry-v1` contains no street at all.
+ * WHAT WAS ON THE GLASS. In «Включване в магистрала през лентата за ускоряване»
+ * — district `mw-entry-v1`, which contains no street at all — the card carried
+ * the motorway TITLE the previous repair had landed, and underneath it the
+ * one-way street's entire money apparatus: «Глоба: 51,13 € (100 лв.)»,
+ * «Книжка: 0 контролни точки — не е в списъка», «Съставът: „…се движи в
+ * забранената посока на еднопосочен път."». The real article — чл. 178ж, ал. 1,
+ * 1000 лв., three months of лишаване, 15 контролни точки — was printed below
+ * all of that, under `FaultCard`'s «Ако от това излезе беля» header, i.e. as
+ * something that happens only IF harm follows. A seventeen-year-old was being
+ * told that driving against the traffic on a motorway costs a hundred лева and
+ * nothing at all off his licence.
  *
- * SO IT IS PRICED HERE, AS A CONDITION, WHICH IS THE ONE SHAPE THAT IS TRUE ON
- * BOTH ROADS. `roadConsequenceFor` is keyed by `ViolationCode` and by nothing
- * else — the per-act `detail` that already splits the TITLE cannot reach it
- * without `hud/FaultCard.tsx` and `lessons/debrief.ts` passing `event.detail`,
- * which are two other lanes' files. A `ConditionalPenalty` needs no such
- * channel: it prints the figure WITH THE CONDITION STILL ATTACHED, which is
- * this file's own rule for every figure the simulator has not established
- * (see the `ConditionalPenalty` docblock), and both live surfaces already
- * render `escalation` — `FaultCard.tsx` at its «Ако от това излезе беля» block
- * and `debrief.ts roadLines` through `gatedLineBg`.
+ * WHY THE FIGURES COULD NOT SIMPLY BE SWAPPED. `roadConsequenceFor` is keyed by
+ * `ViolationCode` and by nothing else, and ONE code grades both acts: Наредба
+ * № 38, прил. № 5, т. 10, б. „в" reads „пътен възел ИЛИ път с еднопосочно
+ * движение", so one clause, one severity and one mark cover a street and a
+ * motorway carriageway alike. The road the student is on travels on the event
+ * as `detail` and reaches the TITLE (`catalog.ts WRONG_WAY_ROAD_COPY`), but the
+ * two surfaces that print the PRICE call `roadConsequenceFor(event.code)` with
+ * the code alone — `hud/FaultCard.tsx` and `lessons/debrief.ts`, neither of
+ * them this module's file to edit.
  *
- * ⚠ ROUTED, TWICE, so neither half is mistaken for finished:
- *  · the STRUCTURED street figures (`fine`, `controlPoints`, `offenceQuote`)
- *    still print above this line for a motorway act. Closing that needs the
- *    per-act road channel — `roadConsequenceFor(code, detail)` plus the two
- *    call sites named above — and it is not this file's to land alone.
- *  · `FaultCard`'s escalation HEADER is worded for harm („Ако от това излезе
- *    беля"), and this step escalates on the ROAD rather than on harm. The
- *    sentence itself opens «Когато…» and reads correctly under any header;
- *    generalising the header belongs to the lane that owns `hud/`.
+ * SO THE ROW STOPPED CLAIMING A PRICE IT DOES NOT HAVE. This file's standing
+ * rule for a figure whose precondition the printing seam has not established is
+ * to show the figure WITH ITS CONDITION ATTACHED (see the `ConditionalPenalty`
+ * docblock). Here the condition is the ROAD. Both prices are therefore branches
+ * of one `conditional` row — a shape BOTH live surfaces already render:
+ * `FaultCard` prints branches under the neutral header «Кога все пак се плаща»,
+ * which is the second half of this finding (чл. 178ж stops being filed under
+ * harm), and `debrief.ts roadLines` prints them through `gatedLineBg`. Neither
+ * surface can now name a лв. figure that is false for the road he was on.
  *
- * The лишаване is in the fine's own `banBg` (the same sentence states it, which
- * `__tests__/consequences.test.ts` asserts); `gatedLineBg` does not print a ban
- * today, so `noteBg` above says it in words as well — a three-month
- * disqualification is not a detail a student may have to infer.
+ * WHY NOT A SECOND `ViolationCode`. Because the exam half is genuinely one
+ * fault: the clause, the class and the 10 изпитни точки are identical on both
+ * roads, and splitting the code to make a lookup convenient would put a second
+ * row in the Наредба № 38 taxonomy that the наредба does not have. What differs
+ * is the ЗДвП offence, and that is what moved.
+ *
+ * WHAT REMAINS ROUTED, and it is smaller than what it replaces:
+ *  · a surface that KNOWS the road could print ONE crisp figure instead of two
+ *    conditioned ones. That needs `roadConsequenceFor(code, detail)` plus the
+ *    two call sites above passing `event.detail`; the registry it would read is
+ *    one literal beside this constant. Reported with the exact lines rather than
+ *    landed half — an optional parameter no caller passes is not a repair, and
+ *    the conditional row is CORRECT on both roads without it.
+ *  · `fine.banBg` reaches the glass ONLY through the speeding ladder
+ *    (`FaultCard` tier rows; `debrief` rung list). `moneyBg` and `gatedLineBg`
+ *    both drop it, so a три-месечно лишаване attached to any `single` row or to
+ *    any branch is invisible today. That is why the three months is ALSO said in
+ *    words in `headlineBg` below — the same workaround the previous `noteBg`
+ *    needed, kept because a disqualification is not a detail a student may be
+ *    left to infer.
  */
 const WRONG_WAY_MOTORWAY_CASE: ConditionalPenalty = {
   conditionBg:
@@ -1532,6 +1548,30 @@ const WRONG_WAY_MOTORWAY_CASE: ConditionalPenalty = {
     15,
     "за движение в платното за насрещно движение по автомагистрала и скоростен път (чл. 178ж, ал. 1, предл. 2 от ЗДвП) - 15 контролни точки;",
     "Тук изчерпателният списък по чл. 6, ал. 1 стига — и стига високо: 15 контролни точки наведнъж, от книжка, която при първоначално издаване не е и пълна. Забележи, че т. 7 е ВТОРОТО предложение на чл. 178ж, ал. 1: първото е аварийната лента, а това е насрещното платно.",
+  ),
+};
+
+/**
+ * THE OTHER ROAD, AND WHY IT IS A BRANCH AND NOT THE HEADLINE.
+ *
+ * „Глоба 100 лв." is a true sentence about a one-way street and a false one
+ * about a motorway act, and one code bills both, so the street figure printed
+ * flat is exactly the defect above with the roads exchanged. It keeps every
+ * number, every citation and every word it had as the row's ungated price; all
+ * that moved is that the road it is true of now stands in front of it.
+ *
+ * THE CONDITION CARRIES THE CONDUCT because `conditional` has no `offenceQuote`
+ * slot, and the `Съставът:` line the shape drops was the third string this
+ * finding names. It is deliberately NOT wrapped in „…": it paraphrases чл. 183,
+ * ал. 4, т. 15 in the точка's own vocabulary, and this file does not put
+ * quotation marks around a sentence it has not cut from an act.
+ */
+const WRONG_WAY_STREET_CASE: ConditionalPenalty = {
+  conditionBg:
+    "когато си навлязъл след знак, забраняващ влизането, или си се движил в забранената посока на еднопосочен път",
+  fine: fine(100, null, F183("ал. 4", "т. 15", 100)),
+  controlPoints: notListed(
+    "Чл. 183, ал. 4, т. 15 не е сред двадесет и двете нарушения в чл. 6, ал. 1 — а списъкът е изчерпателен. Глоба има, книжката остава непокътната.",
   ),
 };
 
@@ -2231,14 +2271,15 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
   // -- 2026-08-09, consequences-priority wave: the twenty a student meets most
   //    where the statutory home is unambiguous. ------------------------------
 
+  /**
+   * ONE EXAM FAULT, TWO ЗДвП OFFENCES — so the price is conditioned on the
+   * ROAD and never printed flat. The whole argument, the frame and what is
+   * still routed are at `WRONG_WAY_MOTORWAY_CASE` above.
+   */
   WRONG_WAY: {
-    kind: "single",
-    offenceBg: "движение в забранената посока на еднопосочен път (или навлизане след знак, забраняващ влизането)",
-    offenceQuote: T183(
-      "ал. 4",
-      "т. 15",
-      "навлиза след знак, забраняващ влизането на съответното пътно превозно средство, или се движи в забранената посока на еднопосочен път.",
-    ),
+    kind: "conditional",
+    offenceBg:
+      "движение в забранената посока — по еднопосочен път, след знак, забраняващ влизането, или срещу движението по автомагистрала",
     duties: [
       DUTY(
         "чл. 6",
@@ -2250,19 +2291,37 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
         "ЗДвП чл. 6, т. 1",
         "съобразяват своето поведение със сигналите на длъжностните лица, упълномощени да регулират или да контролират движението по пътищата, както и със светлинните сигнали, с пътните знаци и с пътната маркировка;",
       ),
+      // The motorway half of the duty, so the card teaches the rule the heavy
+      // branch below prices. Same two quotes the аварийна лента row stands on.
+      DUTY(
+        "чл. 58",
+        "ЗДвП чл. 58",
+        "При движение по автомагистрала на водача е забранено:",
+      ),
+      DUTY(
+        "чл. 58",
+        "ЗДвП чл. 58, т. 4",
+        "да се движи в платното за насрещно движение или в лентата за принудително спиране.",
+      ),
     ],
-    fine: fine(100, null, F183("ал. 4", "т. 15", 100)),
-    controlPoints: notListed(
-      "Чл. 183, ал. 4, т. 15 не е сред двадесет и двете нарушения в чл. 6, ал. 1 — а списъкът е изчерпателен. Глоба има, книжката остава непокътната.",
-    ),
-    escalation: [
+    headlineBg:
+      "Колко струва това на пътя се решава от ПЪТЯ, а не от последиците — затова тук няма една сума, а две, и всяка е изписана долу с пътя си пред нея. По улица — еднопосочна или след знак „Влизането забранено“ — важи чл. 183, ал. 4, т. 15 и книжката остава непокътната. Срещу движението по автомагистрала или скоростен път е друг член и друг мащаб: ЗДвП чл. 178ж, ал. 1 — там падат и контролни точки, и самата книжка се отнема за срок от три месеца. Отделно и още по-тежко се наказва нарушението на ВРЕМЕННА забрана (ЗДвП чл. 183, ал. 7) — и там законът предвижда лишаване от право.",
+    // The street first, because it is the road most students will be on; the
+    // motorway SECOND and not last, because a branch after the harm row reads
+    // as a sub-case of harm, which is the header this repair moved out of.
+    branches: [
+      WRONG_WAY_STREET_CASE,
+      WRONG_WAY_MOTORWAY_CASE,
       DANGER_179_1_5(
         "И тежкият състав не е в списъка за този случай: чл. 6, ал. 1 стига до чл. 179, ал. 1, т. 5 само за изпреварване (т. 9) и за неспиране на знак „Спри!“ (т. 15). Забраненото влизане не е нито едното.",
       ),
-      WRONG_WAY_MOTORWAY_CASE,
     ],
-    noteBg:
-      "Отделен, много по-тежък състав важи, когато забраната е ВРЕМЕННА (ЗДвП чл. 183, ал. 7) — там законът предвижда и лишаване от право. Числата горе са за еднопосочната улица и за постоянната забрана. Тръгнеш ли срещу движението по АВТОМАГИСТРАЛА или скоростен път, това е друг член и друг мащаб — ЗДвП чл. 178ж, ал. 1: глоба 1000 лв., лишаване от право да управлява моторно превозно средство за срок от три месеца и 15 контролни точки по чл. 6, ал. 1, т. 7 от Наредба № Iз-2539. Условният ред за магистралата е изписан по-долу.",
+    // `controlPoints` IS OMITTED, and that is the point of the row. The shape
+    // offers this slot for „the one figure that is true unconditionally", and
+    // zero контролни точки is true only on the street: printing it here would
+    // put «0 контролни точки — не е в списъка» above a motorway act, which is
+    // the exact sentence this finding was filed on. Each branch carries its own
+    // licence answer instead — нула on the street, петнадесет on the motorway.
   },
 
   NOT_KEEPING_RIGHT: {

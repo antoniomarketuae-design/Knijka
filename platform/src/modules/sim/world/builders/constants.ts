@@ -370,6 +370,61 @@ export const SPEED_GLYPH_DIGIT_W_M = 2.4;
 export const SPEED_GLYPH_STROKE_M = 0.5;
 export const SPEED_GLYPH_DIGIT_GAP_M = 0.9;
 
+// --- the „BUS" lane legend (Наредба № 2/2001 — the M-legend that NAMES a
+// лента за движение на ППС от редовните линии) -------------------------------
+//
+// THE DEFECT (sweep 161 / w12, sc-merge-bus-pullout, major). The drill's own
+// instruction 1 is «Дясната лента е бус лента — в нея е спирката, и там не се
+// кара», and the auditor drove all 206 s of it and reported: „right lane is an
+// unbroken row of privately parked saloons and a pickup behind a solid white
+// edge line with a plain dashed lane divider — no bus-lane paint, no BUS
+// legend, no blue lane sign". Measured on the shipped tree, that reading is
+// correct and the cause is two files agreeing to say nothing:
+//
+//   · `markings.authoredSolidBoundaries` paints the laneId-0 SEAM for a
+//     `busLane` span (BUS_LANE_SEAM_WIDTH_M) — a white line, and a white line
+//     is what an ordinary kerbside edge line looks like too;
+//   · `zoneSigns.ts` states in its own header that „marking-only kinds
+//     (solidCenterLine М1, busLane, emergencyLane М2, noParking) … place
+//     nothing", and `SignKind` has no Д24 member and the kit no Д24 face, so
+//     no post can be placed without inventing a plate — the exact thing
+//     `signFaces.ts`'s honesty rule forbids.
+//
+// So the ONE thing left that both is lawful and needs no new asset is the
+// thing a Bulgarian bus lane actually carries on its surface: the word BUS,
+// painted down the middle of the restricted lane. The three districts that
+// author the zone (`mg-busstop-v1`, `ov-bus-v1`, `district-v1`'s four Охридски
+// spans) already carry `signRef: "BUS"` on it, and mg-busstop-v1 even names
+// the act — `meta.scenario.busLaneY.lawRef = "Наредба № 2/2001 — BUS"`. The
+// legend is retrieval, not invention.
+//
+// Procedural, in the same markings accumulator, on the `paintSpeedGlyphs`
+// precedent: no texture, no atlas slot, painted LAST, and a district that
+// authors no `busLane` zone keeps a byte-identical marking buffer.
+//
+/** Letter box of the legend. Road legends elongate along travel — the same
+ *  reason SPEED_GLYPH_DIGIT_H_M is 2.5× its width — so „BUS" reads as square
+ *  type from the driving seat and not as a squat smear. */
+export const BUS_LEGEND_LETTER_H_M = 6.0;
+export const BUS_LEGEND_LETTER_W_M = 1.6;
+export const BUS_LEGEND_STROKE_M = 0.4;
+export const BUS_LEGEND_LETTER_GAP_M = 0.5;
+/**
+ * Total width of „BUS" = 3 × 1.6 + 2 × 0.5 = 5.8 m, which is 0.71 of
+ * LANE_WIDTH_M (8.125 m at the 2.5× perceptual road scale). A real 2.4 m
+ * legend in a real 3.25 m lane is 0.74 — so the legend keeps its own margin
+ * inside the lane it names and can never touch the seam that bounds it.
+ */
+export const BUS_LEGEND_TOTAL_W_M =
+  3 * BUS_LEGEND_LETTER_W_M + 2 * BUS_LEGEND_LETTER_GAP_M;
+/** First legend this far into the ZONE (not the edge): the shortest authored
+ *  span in the tree is district-v1's 29.38 m, and 8 + 6 = 14 m fits inside it,
+ *  so every authored bus lane in the world gets at least one legend. */
+export const BUS_LEGEND_INSET_M = 8;
+/** Repeat pitch along the span — a driver who joined mid-lane meets one within
+ *  a block. mg-busstop-v1's 400 m span takes five. */
+export const BUS_LEGEND_PITCH_M = 90;
+
 /** Facade bay module (whole-bay UV offsets snap to this). */
 export const FACADE_BAY_M = 3;
 /**

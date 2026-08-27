@@ -11,6 +11,13 @@ import type { ParkingBaySpec } from "../../contracts";
 import type { District, DistrictZone } from "../types";
 import {
   BUS_LANE_SEAM_WIDTH_M,
+  BUS_LEGEND_INSET_M,
+  BUS_LEGEND_LETTER_GAP_M,
+  BUS_LEGEND_LETTER_H_M,
+  BUS_LEGEND_LETTER_W_M,
+  BUS_LEGEND_PITCH_M,
+  BUS_LEGEND_STROKE_M,
+  BUS_LEGEND_TOTAL_W_M,
   CENTER_LINE_WIDTH_M,
   CURB_CHAMFER_M,
   CURB_FOOT_TINT,
@@ -72,6 +79,9 @@ export interface MarkingBuildResult {
   /** Painted zone-speed numeral quads („30"/„20" road glyphs — founder R3
    *  #33/#34; 0 on every map without a qualifying zone edge). */
   speedGlyphQuads: number;
+  /** „BUS" legend quads painted down an authored `busLane` span (Наредба
+   *  № 2/2001). 0 on the 102 districts that author no such zone. */
+  busLegendQuads: number;
   /** М18 „триъгълник" symbols painted before an М7 линия за изчакване
    *  (Наредба № 2/2001 чл. 23 ал. 3). 0 on every map with no Б1 approach. */
   giveWayTriangles: number;
@@ -1003,6 +1013,167 @@ function paintSpeedGlyphs(acc: MeshAccumulator, district: District, network: Roa
 }
 
 // ---------------------------------------------------------------------------
+// THE „BUS" LEGEND — the word that turns a restricted lane into a lane a
+// student can READ (sweep 161 / w12 sc-merge-bus-pullout; constants.ts carries
+// the frames and the two files that agreed to say nothing).
+//
+// WHAT IT IS NOT: a grading channel. `runtime/worldRuntime` grades the busLane
+// span off `district.zones` and the reducer off `tick.laneId`; neither reads a
+// triangle. This pass only makes the world state the fact the drill already
+// bills against — the doc-86 T1 rule («the grader and the painter must name
+// the SAME boundary») applied to the lane rather than to the line.
+//
+// WHICH LANE. Exactly the one `authoredSolidBoundaries` seams: laneId 0, the
+// curb lane, on every bank the seam is drawn on — both banks of a two-way
+// edge, the single travel direction of a one-way. It is deliberately the SAME
+// derivation, restated from the same three numbers (travelHalf, lanes,
+// oneway), so a future map cannot get a legend in a lane that has no seam or a
+// seam around a lane with no legend.
+// ---------------------------------------------------------------------------
+
+/** Letter strokes in the legend's own frame: [u0, v0, u1, v1] metres, origin
+ *  at the letter's bottom-left, u right of travel and v ALONG travel (so the
+ *  glyph reads upright to the driver approaching it — paintSpeedGlyphs' frame).
+ *
+ *  Straight rects only, like the seven-segment numerals: the markings mesh has
+ *  one primitive and a road legend is stencil type, so nothing is lost. */
+const BUS_LEGEND_STROKES: Readonly<Record<string, ReadonlyArray<[number, number, number, number]>>> =
+  (() => {
+    const w = BUS_LEGEND_LETTER_W_M;
+    const h = BUS_LEGEND_LETTER_H_M;
+    const t = BUS_LEGEND_STROKE_M;
+    const midLo = h / 2 - t / 2;
+    const midHi = h / 2 + t / 2;
+    return {
+      // Squared B: full-height left stem, three bars off it, and one right stem
+      // inset by a stroke at each end so the corners read as shoulders.
+      B: [
+        [0, 0, t, h],
+        [t, h - t, w, h],
+        [t, midLo, w, midHi],
+        [t, 0, w, t],
+        [w - t, t, w, h - t],
+      ],
+      U: [
+        [0, t, t, h],
+        [w - t, t, w, h],
+        [0, 0, w, t],
+      ],
+      S: [
+        [0, h - t, w, h],
+        [0, midLo, t, h - t],
+        [0, midLo, w, midHi],
+        [w - t, t, w, midHi],
+        [0, 0, w, t],
+      ],
+    };
+  })();
+
+/**
+ * Legend stations for one bank inside one span, in LINE arclength.
+ *
+ * `[a, b]` is the zone's span clipped to the drawn line. A station is the
+ * glyph's NEAR end in the driver's own travel direction, and every returned
+ * station has the whole 6 m glyph inside the span — a legend half outside its
+ * own lane restriction would name the wrong metres.
+ */
+function busLegendStations(a: number, b: number, bank: 1 | -1): number[] {
+  const out: number[] = [];
+  const len = b - a;
+  if (!(len >= BUS_LEGEND_INSET_M + BUS_LEGEND_LETTER_H_M)) return out;
+  for (
+    let d = BUS_LEGEND_INSET_M;
+    d + BUS_LEGEND_LETTER_H_M <= len;
+    d += BUS_LEGEND_PITCH_M
+  ) {
+    // Forward bank enters at `a` and reads up the line; the reverse bank enters
+    // at `b` and reads down it, so its own „ahead" is the line's backward.
+    out.push(bank === 1 ? a + d : b - d);
+  }
+  return out;
+}
+
+/**
+ * Paint „BUS" down the curb lane of every authored `busLane` span.
+ *
+ * Returns the quads painted — 0 for the 102 shipped districts that author no
+ * such zone, which is the byte-identity contract this pass is appended last
+ * for.
+ */
+function paintBusLaneLegend(
+  acc: MeshAccumulator,
+  district: District,
+  network: RoadNetwork,
+): number {
+  const zones = district.zones;
+  if (!zones || zones.length === 0) return 0;
+  let quads = 0;
+  for (const eb of network.edges) {
+    if (!eb.line) continue;
+    const lanes = Math.max(1, eb.edge.lanes);
+    // The seam painter's own guard: with one lane per direction there is no
+    // boundary between laneId 0 and laneId 1, so there is no separate lane to
+    // name and this pass declines rather than painting the word across the
+    // only lane there is.
+    const lanesPerDir = eb.edge.oneway ? lanes : Math.max(1, Math.floor(lanes / 2));
+    if (lanesPerDir < 2) continue;
+    const line = trimPolyline(eb.line, 0.8, 0.8, 2.5);
+    if (!line) continue;
+    const lineLen = polylineLength(line);
+    const travelHalf = eb.halfWidth - eb.parkingM;
+    // The legend has to fit INSIDE the lane it names, or it reads as paint on
+    // the seam. LANE_WIDTH_M is the drawn lane; 5.8 m of legend leaves 1.16 m
+    // of margin each side at the shipped width, and a future narrow lane drops
+    // the legend rather than overhanging its own boundary.
+    if (BUS_LEGEND_TOTAL_W_M > LANE_WIDTH_M - 0.4) continue;
+    const laneCenter = travelHalf - LANE_WIDTH_M / 2;
+    // `s0` is the geometry arclength the drawn line starts at — the frame
+    // `authoredSolidBoundaries` maps zone spans through, restated here rather
+    // than re-derived (see the arclength note above that function).
+    const s0 = eb.trimFrom + 0.8;
+    for (const z of zones) {
+      if (z.kind !== "busLane") continue;
+      if (z.edgeId !== eb.edge.id) continue;
+      if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
+      const a = Math.max(0, Math.min(lineLen, z.fromM - s0));
+      const b = Math.max(0, Math.min(lineLen, z.toM - s0));
+      if (b - a <= 0) continue;
+      for (const bank of eb.edge.oneway ? ([1] as const) : ([1, -1] as const)) {
+        for (const station of busLegendStations(a, b, bank)) {
+          const at = pointAlong(line, station);
+          const fwd = bank === 1 ? at.tangent : mul(at.tangent, -1);
+          const right = perpRight(fwd);
+          const base = add(at.point, mul(right, laneCenter));
+          for (let i = 0; i < 3; i++) {
+            const letter = "BUS"[i]!;
+            const u0 =
+              -BUS_LEGEND_TOTAL_W_M / 2 + i * (BUS_LEGEND_LETTER_W_M + BUS_LEGEND_LETTER_GAP_M);
+            for (const [x0, y0, x1, y1] of BUS_LEGEND_STROKES[letter]!) {
+              const corners: Vec2[] = [
+                [u0 + x0, y0],
+                [u0 + x1, y0],
+                [u0 + x1, y1],
+                [u0 + x0, y1],
+              ];
+              const idx = corners.map(([u, v], c) => {
+                const p = add(add(base, mul(right, u)), mul(fwd, v));
+                return acc.vertex(toWorld(p[0], p[1], MARKING_Y), UP, [
+                  c === 1 || c === 2 ? 1 : 0,
+                  c >= 2 ? 1 : 0,
+                ]);
+              });
+              acc.quad(idx[0]!, idx[1]!, idx[2]!, idx[3]!);
+              quads++;
+            }
+          }
+        }
+      }
+    }
+  }
+  return quads;
+}
+
+// ---------------------------------------------------------------------------
 
 export function buildMarkings(
   district: District,
@@ -1173,6 +1344,12 @@ export function buildMarkings(
   const speedGlyphQuads = paintSpeedGlyphs(acc, district, network);
   markingQuads += speedGlyphQuads;
 
+  // -- the „BUS" legend down an authored bus lane — appended after everything
+  //    for the same byte-identity reason: 102 of the 105 shipped districts
+  //    author no `busLane` zone and keep an identical marking buffer ---------
+  const busLegendQuads = paintBusLaneLegend(acc, district, network);
+  markingQuads += busLegendQuads;
+
   return {
     markings: acc,
     markingQuads,
@@ -1181,6 +1358,7 @@ export function buildMarkings(
     parkingBays: parkingBays.length,
     laneArrowQuads,
     speedGlyphQuads,
+    busLegendQuads,
     giveWayTriangles,
   };
 }

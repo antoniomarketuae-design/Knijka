@@ -3011,6 +3011,11 @@ export function TouchControls({
       <FlankGhost side="right" padH={DRIVE_PAD_H} stations={ARC_STATIONS_RIGHT} />
       {snap !== null && !snap.seatbeltOn ? (
         <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
+          {/* THE ONE FILLED SURFACE ON THIS SCREEN GETS THE ONE OPAQUE GROUND —
+              catalogue row sc-junction-gap:e87d5be1, 2026-08-27. See the block
+              at `WarningPlate` for the measurement; it is the only station that
+              needs one, because it is the only station that is a DISC. */}
+          <WarningPlate />
           <GlyphButton
             labelBg="Закопчай предпазния колан"
             captionBg="Колан"
@@ -3498,6 +3503,82 @@ function FlankGhost({
         [side === "left" ? "borderTopRightRadius" : "borderTopLeftRadius"]: "0.75rem",
         [side === "left" ? "borderBottomRightRadius" : "borderBottomLeftRadius"]: "0.75rem",
       }}
+    />
+  );
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE BELT DISC WAS A WINDOW — sc-junction-gap:e87d5be1, 2026-08-27.
+ *
+ * „Unlike the Л/З/Д stack beside it, the КОЛАН warning disc has no backing
+ *  plate of its own — it is a translucent red circle floating directly on
+ *  world geometry, and on this frame the geometry under it is a parked yellow
+ *  car."
+ *
+ * THE FRAME IS RIGHT, AND THE GHOST BAND ABOVE IS NOT THE ANSWER.
+ *
+ *   · `FlankGhost` DOES reach this station, by construction and not by luck:
+ *     the band's `bottom` is `arcStation(0, …).bottom` term for term, and its
+ *     `height` is `ARC_PITCH · (4 − 1) + ROW_H`, i.e. station 0's box to
+ *     station 3's top. Nothing here is missing a plate for want of geometry.
+ *   · IT IS STILL A WINDOW, because a gradient is not a ground. The band's
+ *     plateau is α 0.72–0.88 and the disc's own fill is `color-mix(danger
+ *     20 %, transparent)` pulsing to 42 % (PlayAreaStyles, the belt rule).
+ *     Composite them and 12–28 % of the world survives the black, ~70 % of
+ *     THAT survives the red.
+ *
+ * MEASURED on `.audit-frames/w12/frames/sc-junction-gap__mobile-right/
+ * 01-arrival.png` (2556 × 1179, iPhone 16 landscape, DPR 3), which is the row's
+ * own evidence frame. Outside the disc the parked car reads srgb(113, 90, 37)
+ * where its body is lit and near-black where its glass is — ~100 levels of
+ * contrast. INSIDE the disc, sampling two rows clear of the ⚠ glyph, the
+ * «КОЛАН» caption and the border ring (device y 570 and y 620, x 2245 → 2330),
+ * the red returns 42 … 64: a 10–22 level swing that tracks the car's window and
+ * panel edges. That is ~11–20 % of the scene's contrast landing inside a
+ * WARNING, and at 2.2× the door line and the window rectangle are unmistakable
+ * — which is exactly what the row photographed.
+ *
+ * SO THE FIX IS A GROUND, NOT A DARKER GRADIENT. Raising the ghost's alpha
+ * would pay for one control by pushing three captions' worth of band toward a
+ * black slab down the edge of the road — the thing the plateau block above
+ * spent a whole round NOT doing. This station is the only one on either flank
+ * that is a FILLED shape rather than a glyph on a halo, so it is the only one
+ * that reads as a surface, and a surface you can see a car through is not a
+ * surface. It gets its own opaque disc, exactly its own 44 px box, and nothing
+ * else on the flank changes.
+ *
+ * WHY BLACK AND NOT DANGER RED: the ink is the flank register's own
+ * (`FlankGhost` is `rgba(0,0,0,α)`), so composited under the 20–42 % danger
+ * fill the disc arrives at the same deep maroon the frames already show —
+ * the founder's „the reddest thing on the screen" is untouched, minus the
+ * world behind it. A solid red plate would also have made the `--danger`
+ * caption «КОЛАН» unreadable on its own ground.
+ *
+ * `zIndex: -1` rather than a stacking order the button has to opt into: the
+ * plate must sit UNDER the button's fill, its border, its glyph and its
+ * caption, and `[data-hud="touch-controls"]` is `absolute z-10`, i.e. a
+ * stacking context of its own — so a negative index can only ever fall to the
+ * back of THIS overlay and never behind the canvas. `pointer-events-none` and
+ * `aria-hidden` keep it out of both the hit test and the a11y tree: the
+ * station's target is still the 44 px button and nothing else.
+ *
+ * LIVE, AND SAY WHERE: `LessonScene` mounts `TouchControls` on
+ * `hasTouchScreen()`, and this station renders on `!snap.seatbeltOn` — i.e.
+ * on every phone drive from the moment the scene loads until the student
+ * buckles up, which is the whole of the pre-drive checklist every lesson
+ * opens with. NOTE for whoever re-drives it: the w12+ harness now fastens the
+ * belt, so a sweep leg will photograph this disc only before that step.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const WARNING_PLATE_INK = "rgb(0, 0, 0)";
+function WarningPlate() {
+  return (
+    <span
+      aria-hidden
+      data-warning-plate=""
+      className="pointer-events-none absolute inset-0 rounded-full"
+      style={{ backgroundColor: WARNING_PLATE_INK, zIndex: -1 }}
     />
   );
 }
