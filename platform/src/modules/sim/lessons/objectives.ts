@@ -151,6 +151,16 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       if (p.requireRailClear !== undefined) {
         out.requireRailClear = parseRailClearDemand(objective, p.requireRailClear);
       }
+      // THE HALT MADE FOR A PERSON ON FOOT (requireHaltForVru), same law as the
+      // waited-for person below it: authored wins, the title fills in.
+      if (p.requireHaltForVru !== undefined) {
+        if (p.requireHaltForVru !== true) {
+          throw new ObjectiveSpecError(objective.id, "reachZone requireHaltForVru must be true");
+        }
+        out.requireHaltForVru = true;
+      } else if (deriveHaltForVruDemand(objective.titleBg)) {
+        out.requireHaltForVru = true;
+      }
       // THE WAITED-FOR PERSON, same law: authored wins, the title fills in.
       // No conflict guard is needed — this demand never touches the `capMet`
       // latch (see `ReachZoneWitnessDemands`), so it can share a zone with any
@@ -1019,6 +1029,62 @@ export interface ReachZoneWitnessDemands {
    * leaves the demand met, so every such caller is bit-identical to shipped.
    */
   requireYieldClean?: ReachZoneYieldDemand;
+  /**
+   * «СПРИ ПРЕД ЧОВЕКА» — the eighth demand, and the first that is not a NEW
+   * question but the fourth one's OTHER banner family (2026-08-27,
+   * sc-hz-emergency-stop:42c93d49 / :a15ebca4).
+   *
+   * WHAT IS BROKEN, measured on `w13/frames/sc-hz-emergency-stop__mobile-right`
+   * and not inferred from a summary. Beat `04-t064s` carries «Задача 2/3 Спри
+   * преди детето — с пълна спирачка, в лентата». The NEXT beat, `04-t070s`,
+   * carries BOTH of these on one screen:
+   *
+   *   −10 изпитни т.  Удар в пешеходец   (a fresh card, "+2" badge)
+   *   ✓ Спри преди детето — с пълна спирачка, в лентата
+   *
+   * and the sheet closes «Задачи от маршрута ✓ Спри преди детето … 1:27» over
+   * «Грешки (2)» whose first row is that strike. The drive ran the child down
+   * and was told, in the same instant, that it had stopped before her.
+   * `sc-hzes-stop` is `{kind:"reachZone", x:LANE_X, y:146, radiusM:4,
+   * maxSpeedKmh:6}` — a halt disc four metres short of her line. Coming to rest
+   * near the mark was the whole certificate; nothing asked whether she was
+   * still standing.
+   *
+   * A SEPARATE KEY FROM `requireVruUntouched`, DELIBERATELY, and it reads the
+   * SAME fact. `deriveVruWaitDemand`'s census, its eleven-title teeth and its
+   * «Спри преди детето does NOT match» row are all pinned in
+   * `reach-zone-vru-untouched.test.ts` against the ONE gate that families of
+   * drills depend on; widening that matcher in place would have rewritten a
+   * shipped census to close a different row. Two keys, two matchers, two teeth
+   * tests, one context field — and the two may diverge later without either
+   * having to argue with the other's frames.
+   *
+   * AND THE ARGUMENT THAT KEPT IT OUT IS ANSWERED, not ignored. That census
+   * excluded this title because „its certificate was true when issued … the car
+   * DID stop before her; the strike came on the move-off, which is objective 3's
+   * claim". That is a fact about ONE recorded drive, and the ordering is not a
+   * property of the drill: the frames above show the strike arriving BEFORE the
+   * tick, on the same beat. A demand read per frame answers both orderings
+   * correctly — a strike already on the ledger refuses the certificate, and a
+   * strike that comes afterwards cannot touch it, because a completed objective
+   * is never re-stepped.
+   *
+   * IT CANNOT COST ANYONE A PASS. `COLLISION` with a person is опасна and
+   * terminating (Наредба № 38 чл. 48, ал. 3) — every drive this can refuse was
+   * already НЕИЗДЪРЖАН before the objective was consulted. What the refusal
+   * removes is the CONTRADICTION between the two halves of one sheet, never a
+   * verdict.
+   *
+   * AND IT IS NOT A SILENT VERDICT (THEO-4): the same drive is holding the
+   * −10 «Удар в пешеходец» card with its catalogue explanation, its «✔
+   * Правилното действие» corrective and its law refs, and the debrief repeats
+   * all three. This removes a contradiction from a protocol that already
+   * explains itself.
+   *
+   * Outside the `capMet` latch, like the fourth, fifth and sixth: a struck
+   * person is session-monotone, so the read is pure per frame.
+   */
+  requireHaltForVru?: true;
 }
 
 /**
@@ -1185,6 +1251,53 @@ const VRU_WAIT_TITLE =
 /** True when the banner claims a person on foot was waited for. */
 export function deriveVruWaitDemand(titleBg: string): boolean {
   return VRU_WAIT_TITLE.test(titleBg);
+}
+
+/**
+ * «СПРИ ПРЕД/ПРЕДИ + a person on foot» — the OTHER banner family that makes a
+ * claim about a human being's fate (see `ReachZoneWitnessDemands.
+ * requireHaltForVru` for the frame). CENSUSED over every `titleBg:` in
+ * `scenario/templates-*.ts` (2026-08-27) rather than guessed, exactly like the
+ * officer, waited-for-person and yield matchers above, because an over-wide
+ * matcher here would withhold a certificate a student earned — the failure the
+ * founder ranks worst. TWENTY-SEVEN titles in the catalogue name a person on
+ * foot; four of them are objective titles that also carry a halt imperative,
+ * and three claim the halt was FOR that person:
+ *
+ *   CLAIMS (→ demand)
+ *     «Спри преди детето — с пълна спирачка, в лентата»  sc-hzes-stop   2 of 3
+ *     «Спри пред пътеката за появилия се пешеходец»      sc-pnu-halt    2 of 3
+ *     «Спри пред тротоара и пропусни пешеходеца»         sc-mfp-walk-yield 1 of N
+ *
+ *   NOT CLAIMED (→ none)
+ *     «Остани зад детето, докато лъкатуши»    sc-vucc-hold-back — a claim about
+ *       relative POSITION behind a moving rider, not a halt. Refusing it on a
+ *       struck body would be right in every reading I can construct, and that is
+ *       exactly why it is left out: no frame has asked for it, and this file
+ *       adds demands that a measured drive requires, not demands that sound
+ *       correct. Recorded here so the next census starts from the answer.
+ *     «Спри напълно на стоп-линията преди релсите» / «Спри пред релсите…» —
+ *       a halt before a PLACE; the person alternatives below never match them.
+ *     Every «Удар в …», «Непропускане на …», «Преминаване през …» — those are
+ *       the rule engine's own FAULT titles and a mistake demo's name. They can
+ *       never reach this matcher (it is called with `objective.titleBg` alone),
+ *       and the negative lookbehind on «спри» keeps «Спиране …» out regardless.
+ *
+ * The 40-character window between the verb and the person is the same bound
+ * `VRU_WAIT_TITLE` uses, and for the same reason: it keeps «Спри на маркера и
+ * изчакай, докато отсрещният поток … пешеходец» — a sentence that mentions a
+ * walker in a later clause — from acquiring a demand about him.
+ *
+ * Both halves are pinned by the teeth rows in
+ * `__tests__/reach-zone-halt-for-vru.test.ts`, so a matcher that quietly
+ * stopped matching fails the build instead of silently emptying the census.
+ */
+const HALT_FOR_VRU_TITLE =
+  /(?<![\p{L}])спри(?![\p{L}])[^.;!?]{0,40}?(?<![\p{L}])(?:преди|пред)(?![\p{L}])[^.;!?]{0,40}?(?<![\p{L}])(?:дете(?:то)?|децата|пешеходец(?:а|ът)?|пешеходеца|пешеходц(?:и|ите)|незрящия)(?![\p{L}])/iu;
+
+/** True when the banner claims the car halted FOR a person on foot. */
+export function deriveHaltForVruDemand(titleBg: string): boolean {
+  return HALT_FOR_VRU_TITLE.test(titleBg);
 }
 
 /**
@@ -1431,13 +1544,34 @@ function railClearHonoured(ctx: ObjectiveContext): boolean {
   return ctx.enteredRailBarredInRun !== true;
 }
 
+/**
+ * Was the halt the banner promises still a halt FOR a living person? Reads the
+ * one fact `vruWaitHonoured` reads first and for the identical reason — a
+ * struck person is session-monotone and outranks everything — but it does NOT
+ * consult the dart record.
+ *
+ * THAT OMISSION IS THE DESIGN, not an oversight. `vruWaitHonoured` asks about
+ * an ENCOUNTER («изчакай детето» — did the staged child resolve clean), so a
+ * later encounter resolving clean redeems the run. This demand asks about an
+ * ACT the student either performed or did not («спри преди детето»), and the
+ * three gates in its census sit on drills where the person may be staged
+ * (`sc-hzes-stop`) or ambient (`sc-mfp-walk-yield`, `sc-pnu-halt`) — an ambient
+ * walker has no `pedestrianDartOut` outcome at all, so reading the dart record
+ * here would leave two of the three gates witnessing nothing. The struck body
+ * is a fact about the drive that both kinds produce.
+ */
+function haltForVruHonoured(ctx: ObjectiveContext): boolean {
+  return ctx.struckAPersonInRun !== true;
+}
+
 /** True when the demands a reachZone makes are met by the whole zone contract. */
 function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
-  // `requireVruUntouched`, `requireNoContact` and `requireRailClear` are
-  // deliberately absent: none of them rides the `capMet` latch (all three facts
-  // are session-monotone, so none needs eval-state memory), and folding any of
-  // them in would flip `capMet`'s initial value on a demand the latch
-  // arithmetic cannot spend or re-earn.
+  // `requireVruUntouched`, `requireNoContact`, `requireRailClear`,
+  // `requireYieldClean` and `requireHaltForVru` are deliberately absent: none
+  // of them rides the `capMet` latch (every one of those facts is
+  // session-monotone, or monotone within its window, so none needs eval-state
+  // memory), and folding any of them in would flip `capMet`'s initial value on
+  // a demand the latch arithmetic cannot spend or re-earn.
   return (
     params.maxSpeedKmh !== undefined ||
     params.requireLamps !== undefined ||
@@ -1649,6 +1783,33 @@ export function yieldFailedVoidsObjective(
   const demand = (params as WitnessedReachZoneParams).requireYieldClean;
   if (demand === undefined) return false;
   return !yieldCleanHonoured(demand, { ...EMPTY_CONTEXT, ...ctx });
+}
+
+/**
+ * …AND THE SAME QUESTION FOR «СПРИ ПРЕД ЧОВЕКА», asked BEFORE it was needed
+ * rather than after.
+ *
+ * NO CENSUS MEMBER IS TERMINAL TODAY — `sc-hzes-stop` is 2 of 3, `sc-pnu-halt`
+ * is 2 of 3 and `sc-mfp-walk-yield` is the first of its chain — so `engine.ts`'s
+ * `!onTerminal` arm already lets a refused drive reach its protocol and this
+ * predicate is inert at HEAD. It is written anyway, and that is the lesson
+ * `yieldFailedVoidsObjective` records in its own title: both gates IT covers
+ * happened to be last, and a repair that removes a false certificate by
+ * creating a drive that cannot end has not repaired anything. A template that
+ * moves this claim onto its final rung must not be able to re-open that trap
+ * silently.
+ *
+ * Kept separate from `personContactVoidsObjective` rather than merged, on the
+ * same rule as their four neighbours: the two demands are two different claims
+ * about the same fact, and a gate carrying one must not be answered for by the
+ * other.
+ */
+export function personHaltVoidsObjective(
+  params: ObjectiveParams,
+  struckAPersonInRun: boolean,
+): boolean {
+  if (!struckAPersonInRun || params.kind !== "reachZone") return false;
+  return (params as WitnessedReachZoneParams).requireHaltForVru === true;
 }
 
 /** Which half of the arrival contract's STATE demand is being refused. */
@@ -2543,7 +2704,15 @@ function stepReachZone(
   // never consults this and is bit-identical to shipped.
   const yieldOk =
     params.requireYieldClean === undefined || yieldCleanHonoured(params.requireYieldClean, ctx);
-  const done = reached && capMet && vruOk && contactOk && railOk && yieldOk;
+  // ── «СПРИ ПРЕД ЧОВЕКА» (requireHaltForVru) ────────────────────────────────
+  // Fifth arm of the same shape and the fifth outside the `capMet` latch. The
+  // frame it closes is one beat of one drive: `w13/…/sc-hz-emergency-stop__
+  // mobile-right/04-t070s` carries «−10 изпитни т. Удар в пешеходец» and
+  // «✓ Спри преди детето — с пълна спирачка, в лентата» on the same screen.
+  // A halt disc four metres short of the child could say where the car came to
+  // rest and nothing about whether she was still standing; now it can.
+  const haltForVruOk = params.requireHaltForVru !== true || haltForVruHonoured(ctx);
+  const done = reached && capMet && vruOk && contactOk && railOk && yieldOk && haltForVruOk;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
   //

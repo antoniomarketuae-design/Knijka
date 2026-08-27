@@ -90,7 +90,7 @@
  * that exemption is a different lane's file and is the other half of this fix.
  */
 
-import { LAMP_KEYS, type ClusterFaceMesh } from "@/modules/sim/cockpit";
+import { LAMP_KEYS, type ClusterFaceMesh, type LampKey } from "@/modules/sim/cockpit";
 
 /** An axis-aligned element on the face, in design units — structurally the
  *  same shape clusterLayout's `FaceRect` occlusion helpers take. */
@@ -129,6 +129,68 @@ export const CABIN_RAIL_COL_X: readonly number[] = [130, 160, 190, 220];
 export const CABIN_RAIL_ROW_Y: readonly number[] = [1, -29];
 
 /**
+ * WHICH LAMP TAKES WHICH SLOT — and it is not LAMP_KEYS order.
+ *
+ * `cabinRailSlot` fills the grid in reading order, so whatever list is walked
+ * decides which four lamps get the row that clears BOTH cameras (y 1) and which
+ * four get the row this file's own PC measurement says does not (y −29: `oil`
+ * 9…17 units behind the rim, `battery` −6…+2, `temp` glyph kept but HALO
+ * CLIPPED in two of three frames). Until 2026-08-27 that list was LAMP_KEYS,
+ * whose order is the AUTHORED single-row rail's — „outboard turn arrows like a
+ * real cluster" (clusterLayout) — a choice made when the rail was one row of
+ * eight and nothing was hidden by anything. Read against a 4 × 2 grid it hands
+ * the safe row to `arrowLeft, belt, brake, engine` and the clipped row to
+ * `oil, battery, temp, arrowRight`.
+ *
+ * `temp` IS THE ONE LAMP THAT CANNOT AFFORD IT, and the reason is not a
+ * preference: it is the only telltale in the product with NO TWIN ANYWHERE ELSE
+ * ON THE GLASS. The status dashboard's strip carries Двигател · Колан ·
+ * Светлини · Мъгла · Чистачки · Ръчна · Авар. (read straight off
+ * `w13/frames/sc-hz-breakdown-pulloff__pc-wrong/run.log`'s own HUD dump) and no
+ * temperature row at all, and the turn arrows are repeated at cockpit scale by
+ * the «МИГАЧ» rail controls the student is already pressing. It is also the
+ * only lamp the DIRECTOR can light (`TelltaleStimulusSpec.lamp` is the
+ * single-value union "temperature", contracts.ts), which makes it the entire
+ * stimulus of three lessons — sc-hz-breakdown-pulloff (critical: «на таблото
+ * светва червената контролна лампа … Червено значи: спри безопасно сега»),
+ * sc-vp-telltale and sc-vp-telltale-red. And the halo is not decoration: this
+ * file's own header says a 28-unit cell is enough to read PRESENCE and COLOUR
+ * and not the glyph, so on the desktop the clipped half was the half that made
+ * the red read as a warning at all.
+ *
+ * `temp` TAKES SLOT 3 — (220, 1), the roomiest cell on the PC silhouette (rim
+ * at −84 there against −24 at x 130), because the column table above is the one
+ * that gets worse to the left and the lamp a lesson is BUILT on should sit in
+ * the cell with the most margin, not merely in the safe row.
+ *
+ * WHAT THE DEMOTED PAIR LOSE, stated rather than glossed: `arrowLeft` and
+ * `arrowRight` move into the clipped row, so on the desktop their halos are
+ * cut the way `temp`'s was. That is the cheaper loss twice over — they are
+ * `go`-green confirmations rather than warnings (clusterReadout's tone law),
+ * and they are the two telltales with a full-size HUD twin. `oil` and
+ * `battery` do not move at all; they were already in the lower row, they light
+ * only while the engine is NOT running (clusterReadout: „ignition on, engine
+ * not running, both red lamps lit"), and that is a stationary pre-drive moment
+ * where the student can lean in.
+ *
+ * NOTHING ELSE MOVES. `LAMP_KEYS` is untouched, so the authored reel rail —
+ * the layout the founder signed off, and the mount with no wheel in front of
+ * it — is byte-identical.
+ */
+export const CABIN_RAIL_PRIORITY: readonly LampKey[] = [
+  // Row 0 (y 1) — clears the rim on mobile AND on PC.
+  "belt",
+  "brake",
+  "engine",
+  "temp",
+  // Row 1 (y −29) — clips on PC; nothing here is a warning without a twin.
+  "oil",
+  "battery",
+  "arrowLeft",
+  "arrowRight",
+];
+
+/**
  * Cell scale against the authored rail: 40 → 28 units of glyph, 56 → 39.2 of
  * halo, so the halo/glyph ratio the founder's „a label is not a telltale"
  * ruling produced survives intact.
@@ -150,6 +212,9 @@ export interface CabinRailOptions {
   rows?: readonly number[];
   /** Cell scale against the authored LAMP_CELL / LAMP_HALO. */
   scale?: number;
+  /** Slot order (CABIN_RAIL_PRIORITY by default) — the mutation tests drive
+   *  the grid with the old LAMP_KEYS order through this seam. */
+  order?: readonly LampKey[];
 }
 
 /** Slot i (LAMP_KEYS order) as a reading-order cell of the cols × rows grid. */
@@ -227,6 +292,7 @@ export function applyCabinTelltaleRail(
   const cols = options.cols ?? CABIN_RAIL_COL_X;
   const rows = options.rows ?? CABIN_RAIL_ROW_Y;
   const scale = options.scale ?? CABIN_RAIL_SCALE;
+  const order = options.order ?? CABIN_RAIL_PRIORITY;
   // MORE LAMPS THAN SLOTS: relocate the ones that fit and leave the rest where
   // the layout authored them. Three behaviours were available and this is the
   // least harmful of them. Stacking two lamps in one slot makes a telltale
@@ -237,7 +303,7 @@ export function applyCabinTelltaleRail(
   // beside this file pins `cols × rows === LAMP_KEYS.length`, so a ninth lamp
   // goes red in the gate with a message that says the wedge needs re-solving.
   const slots = cols.length * rows.length;
-  LAMP_KEYS.forEach((key, i) => {
+  order.forEach((key, i) => {
     if (i >= slots) return;
     const { cx, cy } = cabinRailSlot(i, { cols, rows });
     // Halo first, glyph second — same order the builder emits them in, so a

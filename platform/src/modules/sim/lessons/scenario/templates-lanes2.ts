@@ -861,6 +861,31 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
 // specific and reportable: the district's sight geometry exists in the data,
 // in the collider and in the grading, and the student cannot see it. That is
 // the scene layer's row, filed rather than guessed at from here.
+//
+// W13 2026-08-27 — „THE ROUTE ITSELF WAS REBUILT" IS THE ONE THING THAT DID
+// NOT HAPPEN, and the next reader must not spend a wave on gen_ov_crest.mjs.
+// The w13 judge of `sc-ov-crest-curve:d2368fa3` wrote that the open-country
+// road with guard rail and mountain backdrop „is gone, replaced by an urban
+// block street". ov-crest-v1 is unchanged: one `unclassified` edge, posted 90,
+// 902.04 m, TWO authored buildings (`ovc-b-slope`, `ovc-b-barn`), and the
+// `content/world/` and `platform/public/world/` copies are byte-identical, so
+// the map that loads is the map in this repo. The apartment blocks come from
+// `world/builders/worldRim.ts` (wave 3, bbf1223), which
+// `buildWorldGeometry.ts:472` runs on EVERY district declaring a `meta.mapKind`
+// — all 102 `scenario-*` maps, this извънградски път included — standing a
+// contiguous belt of 9–22 m masses (TERMINUS_CLOSE_MIN/MAX_HEIGHT_M) 43–57 m
+// outside the declared box (TERRAIN_MARGIN_M 60 − WORLD_RIM_TERRAIN_INSET_M 3,
+// less TERMINUS_CLOSE_DEPTH_M 14), which `buildBuildings` then skins through
+// the city facade kit. A rural drill is walled in six-storey blocks by a
+// builder that has never read `edge.class`. It also RE-OPENS the paragraph
+// above in the student's favour: `ovc-b-slope` may well be drawn now — what
+// the rebase frames showed was an open horizon, and w13 shows a built one.
+// The FLAT-HORIZON half of the row is untouched by any of this and stays
+// answered by the „било is narrative" rule at the top: `District` geometry is
+// `[number, number][]` (world/types.ts:54) and no elevation exists anywhere in
+// the engine, so no generator could put a crest here. Full measurement, the two
+// exact worldRim edits and the graded side effect are in
+// `environment/weather.ts` §2c. None of those files is this one.
 // ---------------------------------------------------------------------------
 
 /** ov-crest-v1 pins, denormalized from the committed map by value (the L7 copy

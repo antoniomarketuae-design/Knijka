@@ -360,24 +360,40 @@ describe(`${ID} — bus-stop furniture (KNOWN GAPS, pinned)`, () => {
     expect(world.stats.signs.noStopping).toBe(2);
   });
 
-  it("renders NO shelter and NO зигзаг — the teaching rides the copy, the grading rides the spans", () => {
+  it("renders NO modelled shelter — still a gap, and still pinned", () => {
     const world = buildWorldGeometry(assertDistrict(loadRaw(ID)), { seed: 7 });
     // props.ts only places shelters on primary/secondary edges anchored to a
     // degree >= 3 node. Both are unavailable here BY DESIGN: arterial rank posts
     // stop lines and a junction posts stop lines — either would acquit the very
     // rest this map exists to convict. The pocket renders as plain curb.
+    //
+    // What DOES stand there today is not a model: `scene/scenarioSceneryProps.
+    // busStopSheltersOf` derives a wall panel from the same authored span, held
+    // by LessonScene rather than by the world builder. So `world.busStops` is
+    // still 0 and the FIX is unchanged — a `busStop?: boolean` on DistrictZone
+    // (or a span candidate in props.ts's bus-stop pass) that both honour.
     expect(world.busStops).toHaveLength(0);
-    // markings.ts now reads District.zones — but only for the SOLID kinds
-    // (solidCenterLine осева, bus/emergency curb seams). A noStopping span still
-    // paints no зигзаг, so stripping THIS map's zones leaves the marking buffer
-    // byte-identical: the зигзаг gap remains. FIX for both: a `busStop?: boolean`
-    // on DistrictZone that props/markings honour.
-    const zoneless = buildWorldGeometry(
-      assertDistrict({ ...(loadRaw(ID) as District), zones: undefined }),
-      { seed: 7 },
-    );
-    expect(world.stats.markingQuads).toBe(zoneless.stats.markingQuads);
-    expect(world.markings.positions.length).toBe(zoneless.markings.positions.length);
+  });
+
+  it("DOES paint the зигзаг, and the BAN — not the pocket — is where it starts", () => {
+    // CLOSED 2026-08-27 (was the other half of the pin above). The row this
+    // repairs is sweep 161 / w13 `sc-pk-busstop-ban:0d1afe87` (critical): „the
+    // coach says the carriageway zigzag starts HERE … and there is no zigzag
+    // marking on the tarmac at all … the zone exists only as a translucent
+    // teal/amber tint painted by the HUD."
+    //
+    // The template's whole claim is that the zone is BIGGER than the навес, and
+    // the mark is the only thing on the street that can say so. So the test is
+    // not „some paint appeared": it is that stripping the two `noStopping` bans
+    // SHORTENS the mark — because the pocket alone (180–210) is exactly the
+    // wrong answer, the one the drill's second mistake card bills.
+    const raw = loadRaw(ID) as District;
+    const world = buildWorldGeometry(assertDistrict(raw), { seed: 7 });
+    const zoneless = buildWorldGeometry(assertDistrict({ ...raw, zones: undefined }), { seed: 7 });
+    expect(world.stats.markingQuads).toBeGreaterThan(zoneless.stats.markingQuads);
+    // 150–210 against 180–210: twice the span, twice the strokes.
+    expect(world.stats.markingQuads - zoneless.stats.markingQuads).toBe(15);
+    expect(world.markings.positions.length).toBeGreaterThan(zoneless.markings.positions.length);
   });
 });
 

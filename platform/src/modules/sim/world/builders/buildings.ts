@@ -21,7 +21,9 @@
  *   warm/cool split, deterministic per building id, multiplied into the same
  *   vertex colors — the 238 prisms stop being identical white at zero cost.
  * - Roofs merged into one mesh (flat, ear-clip triangulated).
- * - Collider: wall quads only, merged into a single trimesh.
+ * - Collider: one CLOSED SLAB per footprint edge (six faces), merged into a
+ *   single trimesh. See WALL_COLLIDER_THICKNESS_M for why it is not the wall
+ *   quad it was until 2026-08-27.
  */
 
 import type { DistrictBuilding } from "../types";
@@ -74,6 +76,88 @@ const CORNICE_REVEAL_TINT = 0.55;
  *  the wall pointing at the sky, so it is the brightest thing on the prism. */
 const CORNICE_CAP_TINT = 1.14;
 
+/**
+ * DEPTH OF THE WALL THE PHYSICS SEES — the collider only, never a rendered
+ * surface. Until 2026-08-27 `buildOne` wrote ONE full-height QUAD per footprint
+ * edge into `colliderAcc`, so the mass every building in the product owns was
+ * an open tube of zero-thickness triangles: no floor, no cap, and — the part
+ * that matters — no INSIDE for a solver to depenetrate against.
+ *
+ * WHY THAT IS THE DEFECT AND NOT MERELY UNTIDY. A rapier trimesh is a SURFACE.
+ * Contact against one triangle is resolved along that triangle's plane, and the
+ * side the solver pushes toward is the side the body's centre is already on. A
+ * box that ends one substep with its centre past a zero-thickness wall is
+ * therefore pushed FURTHER IN on the next one — the wall stops being an
+ * obstacle and becomes a door. That is the shape of six sweep161/w13 rows
+ * (sc-ac-night-overdrive pc-wrong t039s at 95 км/ч; sc-ln-turn-lane-arrows
+ * mobile-wrong t022s at rest with the glass full of wall and the mirror full of
+ * street; sc-ov-being-overtaken; sc-maneuver-3point t016s still doing 49 км/ч
+ * inside the mesh; sc-maneuver-uturn; sc-ac-aquaplane), and it is the one the
+ * collision barrel's own header ends on: „the wall exists, is full height, is
+ * in the physics world, and is at the place the car went through … WHAT REMAINS
+ * is why a swept dynamic body crosses it."
+ *
+ * WHAT THE FRAMES DO NOT PROVE, SO NOBODY QUOTES THEM AS MORE THAN THEY ARE.
+ * „the camera is inside the mesh" is a READING of those frames, not a
+ * measurement, and the cockpit lens makes it a cheap one: `COCKPIT_EYE` sits
+ * 0.255 m BEHIND the chassis origin and the chassis half-length is 2.02 m
+ * (vehicle/tuning), so a car stopped nose-to-wall has its eye 2.28 m from the
+ * facade — and at that range a 17 m wall covers the entire windscreen with no
+ * sky and no ground, which is exactly what a frame „from inside the mesh" looks
+ * like. The same arithmetic explains the vehicle-contact rows (2.02 + 2.05 =
+ * 4.07 m centre-to-centre at bumper contact ⇒ 2.28 m of air to a body that
+ * still fills the glass). This change is justified by the CODE — a
+ * zero-thickness trimesh cannot depenetrate a body whose centre has crossed it
+ * — not by the frames, and the drive that settles the frames is
+ * `sc-maneuver-3point` pc-wrong, where t011s is 49 км/ч on the street and t016s
+ * is 49 км/ч with the glass full of wall. A body that is STOPPED at the wall
+ * closes it; a body still doing 49 does not.
+ *
+ * A SLAB ANSWERS IT WITHOUT A NEW BODY TYPE. Each edge now emits a closed
+ * six-face box: the OUTER face is exactly where the quad was (so nothing about
+ * where a car is stopped moves, and the rendered facade is untouched), and the
+ * mass grows INWARD, into the volume nothing draws. A body that crosses the
+ * outer face now meets the inner one, and the nearest face at every depth
+ * inside the slab is still a face that pushes it back out of the building.
+ *
+ * THE NUMBER IS DERIVED, NOT CHOSEN. The physics step is FIXED at
+ * `vehicle/tuning.FIXED_DT` = 1/60 s (`<Physics timeStep={FIXED_DT}>`,
+ * LessonScene), and the fastest thing the catalogue posts is mw-v1's
+ * «РЕЖИМ Нормален ≤150». 150 км/ч ÷ 3.6 ÷ 60 = 0.694 m of travel in one step,
+ * so a slab thinner than that could be crossed whole between two contact
+ * queries and the fix would be a decoration. 1.0 m carries 44 % over the worst
+ * case the product can author and is also an honest panel-block wall+structure
+ * depth, so it can never reach a rendered surface from the inside.
+ *
+ * CLAMPED PER BUILDING, because the catalogue has masses that are not blocks:
+ * the thinnest footprint in `content/world` is 1.20 m (`pe-b-nf-yardwall-e`,
+ * `rxt-b-island`). `slabThicknessM` holds the slab to 0.4 of the footprint's
+ * shorter AABB span, so two opposite walls of a yard wall meet in the middle
+ * instead of reaching past each other.
+ */
+export const WALL_COLLIDER_THICKNESS_M = 1.0;
+
+/**
+ * Slab depth for one footprint, m — `WALL_COLLIDER_THICKNESS_M` held to 0.4 of
+ * the ring's shorter AABB span. Exported because it is the half of the rule a
+ * test can check without rebuilding a district.
+ */
+export function slabThicknessM(ring: readonly Vec2[]): number {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of ring) {
+    minX = Math.min(minX, p[0]);
+    maxX = Math.max(maxX, p[0]);
+    minY = Math.min(minY, p[1]);
+    maxY = Math.max(maxY, p[1]);
+  }
+  const span = Math.min(maxX - minX, maxY - minY);
+  if (!Number.isFinite(span) || span <= 0) return WALL_COLLIDER_THICKNESS_M;
+  return Math.min(WALL_COLLIDER_THICKNESS_M, span * 0.4);
+}
+
 export function facadeVariant(buildingId: string, height: number, kind?: string): number {
   // A school is never hashed into the residential palette: it is the ONE
   // building on the street a driver has to recognise (founder item 61).
@@ -112,6 +196,8 @@ function buildOne(
 ): [number, number, number, number] {
   const ring = toCCW(b.footprint as Vec2[]);
   const h = resolveBuildingHeightM(b);
+  /** Collider slab depth for THIS footprint (WALL_COLLIDER_THICKNESS_M). */
+  const slabT = slabThicknessM(ring);
   const bandTop = Math.min(GROUND_BAND_M, h - 0.5);
   // Whole-bay U / whole-floor V shift of the baked bay texture per building —
   // de-correlates the lit-window pattern across the 238 prisms for free.
@@ -208,12 +294,59 @@ function buildOne(
       }
     }
 
-    // Collider: single full-height quad.
-    const cb0 = colliderAcc.vertex(toWorld(p0[0], p0[1], 0), n, [0, 0]);
-    const cb1 = colliderAcc.vertex(toWorld(p1[0], p1[1], 0), n, [0, 0]);
-    const ct1 = colliderAcc.vertex(toWorld(p1[0], p1[1], h), n, [0, 0]);
-    const ct0 = colliderAcc.vertex(toWorld(p0[0], p0[1], h), n, [0, 0]);
-    colliderAcc.quad(cb0, cb1, ct1, ct0);
+    // Collider: a CLOSED full-height SLAB, outer face on the footprint line and
+    // the depth taken INWARD (WALL_COLLIDER_THICKNESS_M says why it is not the
+    // single quad this used to be). `nIn` is the inward district-space offset.
+    const inX = -nx * slabT;
+    const inY = -ny * slabT;
+    const q0x = p0[0] + inX;
+    const q0y = p0[1] + inY;
+    const q1x = p1[0] + inX;
+    const q1y = p1[1] + inY;
+    const nInward: [number, number, number] = [-nx, 0, ny];
+    const DOWN: [number, number, number] = [0, -1, 0];
+    // Along-edge (world) unit direction, for the two end caps' normals.
+    const ex = dx / segLen;
+    const ez = -dy / segLen;
+    const nEndBack: [number, number, number] = [-ex, 0, -ez];
+    const nEndFwd: [number, number, number] = [ex, 0, ez];
+    // Outer face (unchanged from the quad that stood here).
+    const a0 = colliderAcc.vertex(toWorld(p0[0], p0[1], 0), n, [0, 0]);
+    const a1 = colliderAcc.vertex(toWorld(p1[0], p1[1], 0), n, [0, 0]);
+    const a1t = colliderAcc.vertex(toWorld(p1[0], p1[1], h), n, [0, 0]);
+    const a0t = colliderAcc.vertex(toWorld(p0[0], p0[1], h), n, [0, 0]);
+    colliderAcc.quad(a0, a1, a1t, a0t);
+    // Inner face.
+    const b0 = colliderAcc.vertex(toWorld(q0x, q0y, 0), nInward, [0, 0]);
+    const b1 = colliderAcc.vertex(toWorld(q1x, q1y, 0), nInward, [0, 0]);
+    const b1t = colliderAcc.vertex(toWorld(q1x, q1y, h), nInward, [0, 0]);
+    const b0t = colliderAcc.vertex(toWorld(q0x, q0y, h), nInward, [0, 0]);
+    colliderAcc.quad(b1, b0, b0t, b1t);
+    // Cap and floor — the two faces that made the old mass an open tube.
+    const t0 = colliderAcc.vertex(toWorld(p0[0], p0[1], h), UP, [0, 0]);
+    const t1 = colliderAcc.vertex(toWorld(p1[0], p1[1], h), UP, [0, 0]);
+    const t1i = colliderAcc.vertex(toWorld(q1x, q1y, h), UP, [0, 0]);
+    const t0i = colliderAcc.vertex(toWorld(q0x, q0y, h), UP, [0, 0]);
+    colliderAcc.quad(t0, t1, t1i, t0i);
+    const f0 = colliderAcc.vertex(toWorld(p0[0], p0[1], 0), DOWN, [0, 0]);
+    const f1 = colliderAcc.vertex(toWorld(p1[0], p1[1], 0), DOWN, [0, 0]);
+    const f1i = colliderAcc.vertex(toWorld(q1x, q1y, 0), DOWN, [0, 0]);
+    const f0i = colliderAcc.vertex(toWorld(q0x, q0y, 0), DOWN, [0, 0]);
+    colliderAcc.quad(f0i, f1i, f1, f0);
+    // End caps, so each slab is watertight on its own (neighbouring slabs
+    // overlap at the corners — a union of solids is still a solid, and a gap
+    // between two of them is INSIDE the mass, unreachable without crossing an
+    // outer face first).
+    const e0 = colliderAcc.vertex(toWorld(p0[0], p0[1], 0), nEndBack, [0, 0]);
+    const e0t = colliderAcc.vertex(toWorld(p0[0], p0[1], h), nEndBack, [0, 0]);
+    const e0it = colliderAcc.vertex(toWorld(q0x, q0y, h), nEndBack, [0, 0]);
+    const e0i = colliderAcc.vertex(toWorld(q0x, q0y, 0), nEndBack, [0, 0]);
+    colliderAcc.quad(e0, e0t, e0it, e0i);
+    const e1 = colliderAcc.vertex(toWorld(p1[0], p1[1], 0), nEndFwd, [0, 0]);
+    const e1i = colliderAcc.vertex(toWorld(q1x, q1y, 0), nEndFwd, [0, 0]);
+    const e1it = colliderAcc.vertex(toWorld(q1x, q1y, h), nEndFwd, [0, 0]);
+    const e1t = colliderAcc.vertex(toWorld(p1[0], p1[1], h), nEndFwd, [0, 0]);
+    colliderAcc.quad(e1, e1i, e1it, e1t);
   }
 
   // Roof: ear-clip the ring at height h (CCW input -> up-facing output).

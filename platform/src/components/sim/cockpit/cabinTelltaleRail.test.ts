@@ -61,6 +61,7 @@ import {
 import {
   applyCabinTelltaleRail,
   CABIN_RAIL_COL_X,
+  CABIN_RAIL_PRIORITY,
   CABIN_RAIL_ROW_Y,
   CABIN_RAIL_SCALE,
   cabinRailSlot,
@@ -192,10 +193,12 @@ describe("and it takes nothing away", () => {
     expect(glyph).toHaveLength(LAMP_KEYS.length);
     const seen = new Set(glyph.map((r) => `${r.cx},${r.cy}`));
     expect(seen.size).toBe(LAMP_KEYS.length);
-    glyph.forEach((r, i) => {
+    // Slots are filled in CABIN_RAIL_PRIORITY order, not LAMP_KEYS order — see
+    // that constant for the frame that moved `temp` out of the clipped row.
+    CABIN_RAIL_PRIORITY.forEach((key, i) => {
+      const r = glyph[LAMP_KEYS.indexOf(key)]!;
       const slot = cabinRailSlot(i);
-      expect(r.cx).toBeCloseTo(slot.cx, 3);
-      expect(r.cy).toBeCloseTo(slot.cy, 3);
+      expect({ key, cx: r.cx, cy: r.cy }).toEqual({ key, cx: slot.cx, cy: slot.cy });
     });
   });
 
@@ -252,15 +255,61 @@ describe("and it takes nothing away", () => {
   it("never stacks two lamps in a slot — the overflow stays authored instead", () => {
     const face = buildClusterFaceMesh({ dialNumerals: false });
     applyCabinTelltaleRail(face, { cols: [130, 160], rows: [1] });
-    const moved = LAMP_KEYS.slice(0, 2).map((k) => quadRect(face.positions, face.lampGlyphQuad[k]));
+    const moved = CABIN_RAIL_PRIORITY.slice(0, 2).map((k) =>
+      quadRect(face.positions, face.lampGlyphQuad[k]),
+    );
     expect(moved.map((r) => r.cx)).toEqual([130, 160]);
     // …and every lamp past the last slot is still exactly where it was built,
     // which is the OLD defect for that lamp and a regression for no other.
-    LAMP_KEYS.slice(2).forEach((k, j) => {
+    for (const k of CABIN_RAIL_PRIORITY.slice(2)) {
       const r = quadRect(face.positions, face.lampGlyphQuad[k]);
-      expect(r.cx).toBeCloseTo(lampSlotX(j + 2), 3);
-      expect(r.cy).toBeCloseTo(LAMP_CY, 3);
-    });
+      expect({ k, cx: r.cx, cy: r.cy }).toEqual({
+        k,
+        cx: lampSlotX(LAMP_KEYS.indexOf(k)),
+        cy: LAMP_CY,
+      });
+    }
+  });
+});
+
+/**
+ * THE ORDER IS THE FIX — sc-hz-breakdown-pulloff:d1e95ccc (critical) and the
+ * two sc-vp-telltale rows behind it.
+ *
+ * The grid did not move on 2026-08-27; WHICH LAMP SITS WHERE IN IT did. This
+ * file's subject file measured, on three PC frames, that the lower row does not
+ * clear the rim there — and reading-order-by-LAMP_KEYS put `temp` in it. `temp`
+ * is the only lamp the director can light, the only stimulus three lessons
+ * have, and the only telltale with no twin anywhere else on the glass.
+ */
+describe("the priority list — which four lamps get the row that clears both cameras", () => {
+  it("is a permutation of LAMP_KEYS, so no lamp is dropped and none is doubled", () => {
+    expect([...CABIN_RAIL_PRIORITY].sort()).toEqual([...LAMP_KEYS].sort());
+  });
+
+  it("puts `temp` in the upper row — the one the PC camera does not clip", () => {
+    const slot = cabinRailSlot(CABIN_RAIL_PRIORITY.indexOf("temp"));
+    expect(slot.cy).toBe(CABIN_RAIL_ROW_Y[0]);
+    // …and in the roomiest COLUMN of it: the wheel silhouette gets worse to the
+    // left on both cameras, so the lamp a lesson is built on takes the last cell.
+    expect(slot.cx).toBe(CABIN_RAIL_COL_X[CABIN_RAIL_COL_X.length - 1]);
+  });
+
+  it("gives the upper row to the four lamps that warn while the car is moving", () => {
+    const upper = CABIN_RAIL_PRIORITY.filter(
+      (_, i) => cabinRailSlot(i).cy === CABIN_RAIL_ROW_Y[0],
+    );
+    expect([...upper].sort()).toEqual(["belt", "brake", "engine", "temp"]);
+  });
+
+  it("demotes only lamps that are green, or that light before the drive starts", () => {
+    // `oil` and `battery` are red ONLY while the engine is not running
+    // (clusterReadout's lamp law), and the two arrows are `go`-green with a
+    // full-size «МИГАЧ» twin on the HUD rail. Nothing here is a moving warning.
+    const lower = CABIN_RAIL_PRIORITY.filter(
+      (_, i) => cabinRailSlot(i).cy === CABIN_RAIL_ROW_Y[1],
+    );
+    expect([...lower].sort()).toEqual(["arrowLeft", "arrowRight", "battery", "oil"]);
   });
 });
 

@@ -2051,10 +2051,107 @@ ${TOUCH_BAND_CSS_VARS}
         display: none;
       }
 
+${LIFTED_SHEET_FLOOR_CSS}
 ${UNPANEL_CSS}
     `}</style>
   );
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A BOTTOM SHEET THAT DOES NOT REACH THE BOTTOM NEEDS A BOTTOM — sc-rb-exit-
+ * signal:a57347d2, and it is the shell's own instrument band that lifts it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * THE FILING, verbatim: „The card's rounded bottom border is cut off, so the
+ * panel reads as chopped." The verifier who re-drove it added the measurement
+ * that turns it from a look into a diagnosis — off
+ * `.audit-frames/w13/frames/sc-rb-exit-signal__mobile-right/02-briefing.png`,
+ * cropped to 300 %: „the blue left border terminates on a flat horizontal cut,
+ * there is no bottom-left radius and no bottom stroke, while the same card's
+ * TOP-left corner is a fully drawn rounded blue border in the same frame."
+ *
+ * RE-MEASURED HERE, on that frame (2556 × 1179 device px at dpr 3 — the
+ * 852 × 393 stage this catalogue is shot at). The card's fill and its left
+ * hairline both end at device y ≈ 1057.5, i.e. **40.5 CSS px above the bottom
+ * of the picture**, and `COMPACT_DASH_HEIGHT_PX` is 40. That is not a
+ * coincidence and it is not a clip: it is the sheet standing exactly where it
+ * is told to.
+ *
+ * WHAT IS ACTUALLY WRONG, then, is the CLASS LIST and not the geometry. Both
+ * sheets in this product are authored flush-to-floor —
+ *
+ *   SimOverlay.tsx:2557        rounded-t-2xl border-x border-t   (the read sheet)
+ *   TeachMomentOverlay.tsx:350 rounded-t-2xl border-x border-t   (compact teach)
+ *
+ * — a top edge, two sides, and deliberately NO BOTTOM, because a sheet whose
+ * bottom edge is the screen's bottom edge has no bottom edge to draw. Both
+ * anchor `bottom: var(--sim-dash-h, 0px)`, and that is `0px` on every roomy
+ * layout and every ended session, where the authored shape is exactly right.
+ * On a phone mid-session it is 40 px, and the same shape becomes a card with a
+ * square strokeless edge hanging in mid-air over the instruments.
+ *
+ * WHY THAT IS WORTH A RULE. This product's largest filed defect family is
+ * instructions that really are cut off — the ↓ ОЩЕ N РЕДА rows next door. A
+ * card that merely LOOKS cut off is charged at the same price by the only
+ * reader who matters: a seventeen-year-old who stops believing he has been
+ * shown the whole instruction. Nothing below the cut is missing here (the
+ * frame shows all five steps and «Разбрах» inside the box) — which is the
+ * whole reason the edge has to say so.
+ *
+ * ── WHY IT IS A STYLESHEET RULE AND NOT TWO COMPONENT EDITS ────────────────
+ *
+ * `SimOverlay.tsx` belongs to the hud lane; `data-hud` is the vocabulary this
+ * file is built on for exactly that case (see this file's own header, and the
+ * tier picker's fill three blocks down, which is the same call made the same
+ * way). No `!important` is needed and none is used: `border-x border-t` sets
+ * only three widths and `rounded-t-2xl` only two radii, so the four
+ * declarations below collide with nothing, and this <style> is unlayered
+ * against Tailwind's layered utilities anyway.
+ *
+ * ── AND THE COMPACT TEACH SHEET IS DELIBERATELY NOT IN THIS SELECTOR ───────
+ *
+ * It carries the identical class list and it would be one more comma. It is
+ * left out because `TeachMomentOverlay`'s `compact` branch IS NOT MOUNTED on
+ * the /simulator route: `LessonPlayShell:6648` renders it under
+ * `!compact && …` and passes `compact={false}` — on a phone the teach moment
+ * is a row in the overlay queue instead (`LessonPlayShell:4494`) — and the
+ * only other importer in
+ * the tree is `app/dev/popup-rig/popup-rig-client.tsx`, a dev rig. Adding it
+ * would be a repair to a surface no student can reach — reported instead, so
+ * that whoever revives the phone teach sheet inherits the finished shape
+ * rather than the bug.
+ *
+ * Exported so `liftedSheetFloor.test.ts` can APPLY the selector to the markup
+ * SimOverlay actually ships rather than grep for its characters — the failure
+ * mode `unpanelInkExemption.test.ts` was written after, where a rule in a
+ * template literal rots into a no-op with no type error and no red test.
+ */
+export const LIFTED_SHEET_FLOOR_CSS = `
+      /* The gate is "data-sim-dash-lift", written by LessonPlayShell from the
+         SAME expression that fills "--sim-dash-h", so „is there a band" has one
+         answer. Absent on roomy and after the session ends — where the sheet
+         really does sit on the floor and the authored top-only shape is right.
+         "> section" is the read sheet's own box; the wrapper it hangs in is the
+         "[data-hud=overlay-read]" dialog and carries no border of its own.
+         (No back-ticks anywhere in this block: it is a template literal, and
+         one would end the string with no type error until the parser reaches
+         the next one.) */
+      [data-sim-dash-lift="on"] [data-sim-stage] [data-hud="overlay-read"] > section {
+        /* Matches the three sides "border-x border-t" already draw, and picks
+           up the inline "border-color" the component sets for all four. */
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        /* 1rem = Tailwind's "2xl", i.e. the two radii "rounded-t-2xl" gives the
+           top of this same box. The card is "overflow-hidden", so this also
+           clips its content — measured against the widest thing at the bottom:
+           «Разбрах» is inset 12 px ("px-3") and sits 8 px ("pb-2") above the
+           edge, where a 1rem corner has cut only 16 − √(16² − 8²) = 2.1 px of
+           width. Nothing on the control is touched. */
+        border-bottom-left-radius: 1rem;
+        border-bottom-right-radius: 1rem;
+      }
+`;
 
 /* ===========================================================================
    THE UNPANEL LAYER — the driving HUD stops being a web page over a road.

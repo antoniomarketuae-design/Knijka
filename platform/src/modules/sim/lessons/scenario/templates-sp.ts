@@ -1214,6 +1214,32 @@ export const SC_SP_CURVE: ScenarioSpec = {
     // blocks, lamps, a left-verge parapet and a full rank of parked cars beside
     // a correctly posted 90 disc.
     //
+    // FOUND, 2026-08-27, AND IT IS NAMED HERE SO NOBODY HUNTS IT A THIRD TIME.
+    // `world/builders/worldRim.ts`, added by the wave-3 repair (bbf1223) for
+    // „the world simply runs out and the car keeps going".
+    // `buildWorldGeometry.ts:472` calls `buildWorldRim` on EVERY district whose
+    // `meta.mapKind` is a string — 102 `scenario-*` maps plus poligon-v1, i.e.
+    // every map this file ships on — and it emits a CONTIGUOUS belt of building
+    // masses on all four sides, handed to `buildBuildings(..., extraVolumes)`,
+    // which pushes them through the same walls / roofs / collider accumulators
+    // and the same `facadeVariant` hash as an authored блок. Read off
+    // `builders/constants.ts`: the faces stand 43 m (inner) to 57 m (outer)
+    // outside the declared box — TERRAIN_MARGIN_M 60 − WORLD_RIM_TERRAIN_INSET_M
+    // 3, less TERMINUS_CLOSE_DEPTH_M 14, a mass stepping in by up to
+    // WORLD_RIM_STEP_M 6 more — and are clamped to 9…22 m tall
+    // (TERMINUS_CLOSE_MIN/MAX_HEIGHT_M). sp-curve-v1's box is −36.12…376 ×
+    // −6…404.13, so the belt runs the whole length of the drill on both
+    // shoulders. It reads `district.meta`, `district.buildings` and the road
+    // POLYLINES; it never reads `edge.class`, so a 90 km/h извънградски път and
+    // a residential street get the identical wall. That is the missing half of
+    // the routing above — props.ts explains the lamps, the parapet and the
+    // parked rank; worldRim explains the five-storey blocks.
+    //
+    // Still no scenario-side lever, and the exact edits (put the district in the
+    // rim mass id so the belt stops repeating; make the belt's KIND follow
+    // `edge.class`) plus the graded side effect are measured in
+    // `environment/weather.ts` §2c.
+    //
     // There is still no scenario-side lever: the spec carries no streetscape
     // field, and sp-curve-v1's only other spawn (`spc-spawn-exit`, x = 355,
     // y = 385.94) is PAST the curve, so it cannot be used to skip the dressed

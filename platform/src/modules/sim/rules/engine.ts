@@ -435,6 +435,23 @@ export interface RuleEngineState {
   solidCross: EpisodeState;
   /** Sustained car travel in an authored bus lane (SN-05). */
   busLane: EpisodeState;
+  /**
+   * Seconds of bus-lane travel ACCRUED inside the currently-open episode — see
+   * `BUS_LANE_REGRADE_SEC` and `stepAccruedEpisode` for why the sustain counts
+   * qualifying seconds instead of demanding they be consecutive (the crawl past
+   * a queue is the fault's own shape). Zeroed by the SAME reset that re-arms the
+   * episode: leaving lane 0, or leaving the span.
+   */
+  busLaneCruiseSec: number;
+  /**
+   * THE SECOND BILL of one continuous bus-lane cruise — the same condition and
+   * the same reset as `busLane`, on an accrued sustain that is
+   * `BUS_LANE_REGRADE_SEC` longer, so it can only ever fire AFTER the first bill
+   * and exactly once. See `BUS_LANE_REGRADE_SEC`.
+   */
+  busLaneRegrade: EpisodeState;
+  /** The re-grade episode's own accrued ledger (see `busLaneCruiseSec`). */
+  busLaneRegradeSec: number;
   // -- RAIL PACK slice 1 (ADR-006 stage 3a) ----------------------------------
   /**
    * Railway-crossing entry tracker (RX-01/RX-02): the band entry is graded at
@@ -1049,6 +1066,81 @@ const SPEED_REGRADE_SEC = 6;
 const MOTORWAY_CRAWL_REGRADE_SEC = 6;
 
 /**
+ * THE SAME TWO DEFECTS, ON THE BUS LANE — seconds of qualifying travel after
+ * the first bill before the breach is re-graded (w13 · lane „rules",
+ * sc-ov-bus-lane:b309af77, 2026-08-27).
+ *
+ * ── WHAT WAS PHOTOGRAPHED, AND IT IS THE WHOLE LESSON ────────────────────────
+ * `sc-ov-bus-lane` is a pure lane-choice drill: no staged actor, ambient zero,
+ * and by its own spec „the only gradable act is which lane the driver travels".
+ * Its briefing says it in one line — «движението на автомобили в бус лентата е
+ * забранено, дори тя да е празна». BOTH audited legs finish with that act
+ * ungraded:
+ *  · `.audit-frames/w13/frames/sc-ov-bus-lane__pc-right/_audit-debrief.json` —
+ *    «Грешки (4)», 10 наказателни точки, and the four are mirror, indicator,
+ *    mirror, lane-keeping. Not one row names the bus lane.
+ *  · `…__pc-wrong/_audit-debrief.json` — «Грешки (2)», both «Превишена
+ *    скорост», on the leg whose authored mistake is literally
+ *    «Пътуване по бус лентата» (`templates-lanes.ts`, codeRefs
+ *    DRIVING_IN_BUS_LANE).
+ * A lesson that cannot grade its own subject is the defect this product can
+ * least afford, and this one could not grade it on either side.
+ *
+ * ── WHY, HALF ONE: THE SUSTAIN DEMANDED CONSECUTIVE SECONDS ──────────────────
+ * The detector was on plain `stepEpisode`, whose clock is reset by ONE frame of
+ * falsehood — and `busLaneCruise` carries `moving` (> `movingSpeedKmh` = 5).
+ * The right leg's own `run.log` speed ladder, every sampled beat of the drive:
+ *   45 · 1 · 0 · 0 · 1 · 3 · 0 · 12 · 3 · 0 · 4 · 15 · 9 · 0 · 10 · 16 · 0 · 3 · 14 …
+ * Under 5 км/ч on more beats than over it, and never four unbroken seconds
+ * above it in the whole 208 s run. The 4 s sustain was therefore unreachable on
+ * the drive the lesson is about. This is verbatim `stepAccruedEpisode`'s own
+ * motivating case one code over — the motorway crawl, «205 s … TWENTY-EIGHT
+ * full stops … the one fault the lesson is named after never booked» — and the
+ * shape is the same for the same reason: THE STOP-START CRAWL IS THE FAULT'S
+ * OWN SHAPE. A bus lane is used precisely to creep past the queue it runs
+ * beside. So the clock counts QUALIFYING seconds instead of demanding they be
+ * consecutive; every per-frame gate the detector already carried is untouched,
+ * and the ledger is still zeroed by the SAME reset (leaving lane 0 or leaving
+ * the span), so a car that genuinely returns to the general lane starts over.
+ *
+ * ── WHY, HALF TWO: THE ONE BILL WAS SPENT ON THE FREE LESSON ─────────────────
+ * DRIVING_IN_BUS_LANE is основна (3), so `policyForViolation` returns
+ * `undefined` and `ev-lane-discipline`'s `policyDefault`
+ * („teach-first-then-grade") governs: the FIRST encounter is taught, not
+ * charged. `stepEpisode` bills once per episode and never asks again — so even
+ * on the fast leg, where the sustain WAS reachable, the single bill lands on a
+ * teach card and the ledger stays empty. That is verbatim
+ * `STANDING_DUTY_REGRADE_SEC`'s defect and verbatim `MOTORWAY_CRAWL_REGRADE_SEC`'s
+ * (whose code shares this one's `teach-first-then-grade` mapping), so it takes
+ * their answer: a second episode object with a strictly larger accrued
+ * threshold, marked `regrade`, which `lessons/engine.ts` (`applyTick`, the
+ * `alreadyCharged` guard) DROPS wherever the code has already been charged.
+ *
+ * ── THE NUMBER ───────────────────────────────────────────────────────────────
+ * 6 s, the same as the crawl's, and for the same argument: it is one and a half
+ * times the 4 s window that billed him in the first place, so the re-grade
+ * means „he was shown the rule and then went on travelling the bus lane for
+ * half as long again". A student who answers the card the way the lesson asks —
+ * mirror, left indicator, out into the general lane — trips the reset and
+ * accrues nothing, so this bill can never reach him. And it must reach the
+ * drive that was photographed: 208 s in the lane, so six accrued seconds is
+ * spent many times over.
+ *
+ * ── WHAT THIS DELIBERATELY DOES NOT TOUCH ────────────────────────────────────
+ *  · The detector's GATES. Not one moves — the ≤3 s right-turn transit, the
+ *    declared-right-indicator exemption, the single-lane degenerate span and
+ *    the reverse exemption are the same predicates, and `line-marking-
+ *    detectors.test.ts` still holds them.
+ *  · `EMERGENCY_LANE_DRIVING`, this detector's twin two blocks down. It shares
+ *    the consecutive-sustain shape exactly and is a candidate for the same
+ *    first half — but it is опасна, so `policyForViolation` returns
+ *    „always-grade" and the re-grade half is dead there by construction, and no
+ *    frame in this wave photographs a CRAWL in an emergency lane. Measured, not
+ *    assumed: it is reported, not widened here.
+ */
+const BUS_LANE_REGRADE_SEC = 6;
+
+/**
  * WRONG_WAY on an АВТОМАГИСТРАЛА — the card names the road the student is on
  * (w10-4, sc-merge-accel-lane:93685d58, 2026-08-25).
  *
@@ -1296,6 +1388,9 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     banZoneStop: { ...IDLE_EPISODE },
     solidCross: { ...IDLE_EPISODE },
     busLane: { ...IDLE_EPISODE },
+    busLaneCruiseSec: 0,
+    busLaneRegrade: { ...IDLE_EPISODE },
+    busLaneRegradeSec: 0,
     rail: { approachSeen: false, prevPhase: null },
     railRest: { ...IDLE_EPISODE },
     curveSpeed: { ...IDLE_EPISODE },
@@ -1356,6 +1451,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     banZoneStop: { ...s.banZoneStop },
     solidCross: { ...s.solidCross },
     busLane: { ...s.busLane },
+    busLaneRegrade: { ...s.busLaneRegrade },
     rail: { ...s.rail },
     railRest: { ...s.railRest },
     curveSpeed: { ...s.curveSpeed },
@@ -3024,16 +3120,49 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     moving &&
     forwardGear &&
     tick.indicator !== "right";
-  if (
-    stepEpisode(
-      s.busLane,
-      busLaneCruise,
-      tick.busLaneRight !== true || tick.laneId !== 0,
-      t,
-      cfg.busLaneSustainSec,
-    )
-  ) {
+  // ACCRUED, NOT CONSECUTIVE, AND RE-GRADED ONCE (2026-08-27 — see
+  // `BUS_LANE_REGRADE_SEC` for both frames and the whole argument). The gates
+  // above are unchanged; what changed is that the 4 s no longer has to be one
+  // unbroken run, because a bus lane is used precisely to CREEP past the queue
+  // beside it and `moving` was resetting the clock on every one of those creeps
+  // (the audited right leg never held > 5 км/ч for four seconds in 208 s and
+  // booked nothing at all). The reset is the same one the detector always had —
+  // leaving lane 0 or leaving the span — so a driver who does what the lesson
+  // asks and pulls out into the general lane still zeroes the ledger.
+  const busLaneReset = tick.busLaneRight !== true || tick.laneId !== 0;
+  const busLaneStep = stepAccruedEpisode(
+    s.busLane,
+    s.busLaneCruiseSec,
+    busLaneCruise,
+    busLaneReset,
+    t,
+    dt,
+    cfg.busLaneSustainSec,
+  );
+  s.busLaneCruiseSec = busLaneStep.accruedSec;
+  if (busLaneStep.fired) {
     events.push(makeViolation("DRIVING_IN_BUS_LANE", t));
+  }
+  // THE RE-GRADE THE FREE LESSON CONSUMED. The SAME condition, the SAME reset
+  // and the SAME per-frame credit as the bill above, on an accrued sustain that
+  // is `BUS_LANE_REGRADE_SEC` longer — so it can only ever fire AFTER that bill
+  // has fired, never instead of it, and it fires exactly once per continuous
+  // cruise. Marked `regrade`, which `lessons/engine.ts` drops the moment the
+  // code has already been charged, so exam mode and repeat offences are
+  // byte-identical; it moves the ledger only where the single bill was spent on
+  // the teach and the student was charged nothing for travelling the bus lane.
+  const busLaneRegradeStep = stepAccruedEpisode(
+    s.busLaneRegrade,
+    s.busLaneRegradeSec,
+    busLaneCruise,
+    busLaneReset,
+    t,
+    dt,
+    cfg.busLaneSustainSec + BUS_LANE_REGRADE_SEC,
+  );
+  s.busLaneRegradeSec = busLaneRegradeStep.accruedSec;
+  if (busLaneRegradeStep.fired) {
+    events.push({ ...makeViolation("DRIVING_IN_BUS_LANE", t), regrade: true });
   }
 
   // Railway crossing (RAIL PACK slice 1, ADR-006 stage 3a — doc 72 RX-01/02/03,

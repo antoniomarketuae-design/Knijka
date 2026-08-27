@@ -284,7 +284,11 @@ describe("mg-busstop-v1 — lane adjudication through the real reducer", () => {
     }
     return out;
   };
-  const violations = (events: RuleEvent[]) => events.filter((e) => e.kind === "violation").map((e) => e.code);
+  // Ignore re-grade events — 2026-08-27. The bus-lane accrual emits a second
+  // event marked `regrade: true`; lessons/engine.ts drops it where the code was
+  // already charged, so it never reaches a student. Counting it here would read
+  // one continuous offence as two. The assertions below are unchanged.
+  const violations = (events: RuleEvent[]) => events.filter((e) => e.kind === "violation" && e.regrade !== true).map((e) => e.code);
 
   it("THE MAP'S BASELINE: cruising the GENERAL lane end-to-end is fully innocent (the span exempts keep-right)", () => {
     // 400 m at 45 km/h ≈ 32 s — nearly three times keepRightSustainSec (12 s).

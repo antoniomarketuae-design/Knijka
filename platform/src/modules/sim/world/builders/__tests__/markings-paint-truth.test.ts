@@ -215,10 +215,11 @@
  *     skew clamp markings.ts keeps private, the 1/cos span widening, the refuge
  *     island's kerbed gap and the staggered half's walk along the street.
  * The catalogue now grades
- * 4,251 of the corpus's 10,911 marking quads — 38.96%, up from one in 6.7. It
- * is 85% of the DISTRICTS and 39% of the PAINT because the 16 still outside are
+ * 4,223 of the corpus's 10,964 marking quads — 38.52%, up from one in 6.7. It
+ * is 84% of the DISTRICTS and 39% of the PAINT because the 17 still outside are
  * the biggest maps in the corpus. They are attributed one by one, as before: 6
- * painted numerals, 5 roundabout rings, 3 arrow maps, 2 bus-lane legends. Every number in that
+ * painted numerals, 5 roundabout rings, 3 arrow maps, 2 bus-lane legends, 1
+ * bus-stop зигзаг. Every number in that
  * sentence is a test rather than a claim — including the sentence itself, which
  * „the catalogue's reach is measured, not claimed in a comment" GENERATES from
  * the mesh and requires to appear verbatim both here and on `censusCorpus`.
@@ -2716,8 +2717,8 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
  * rather than the source is what stops the domain from drifting when a map grows
  * a feature: the district simply leaves the domain and says so.
  *
- * 89 districts of 105 — and
- * 4,251 of the corpus's 10,911 marking quads — 38.96%, which is the number that
+ * 88 districts of 105 — and
+ * 4,223 of the corpus's 10,964 marking quads — 38.52%, which is the number that
  * matters, because a district is not a unit of paint. This block was titled
  * „every quad the world paints is a quad the world was authored to paint" while
  * it graded one quad in 6.7. It is now titled what it does, and the fraction is
@@ -2754,6 +2755,7 @@ type CensusExclusion =
   | "laneArrow"
   | "speedGlyph"
   | "busLegend"
+  | "busStopZigzag"
   | "roundabout";
 
 /** Every district in the corpus, built once, each tagged with what (if anything)
@@ -2795,7 +2797,24 @@ const censusCorpus = (() => {
                 // кара» and the world drew nothing to read.
                 m.busLegendQuads
                 ? "busLegend"
-                : null;
+                : // THE BUS-STOP ЗИГЗАГ (markings.paintBusStopZigzag) joins
+                  // them for the same reason and is placed LAST for the same
+                  // reason the legend is placed after the ring: `mg-busstop-v1`
+                  // authors both a bus lane and a stop and had already left for
+                  // the legend, so exactly ONE district moves here —
+                  // `pk-busstop-v1`, 28 quads — and the totals below move by
+                  // exactly its paint.
+                  //
+                  // Restating it in the catalogue is a chain of 30 mitred
+                  // strokes whose corners overlap by half a stroke, i.e. the
+                  // same stencil restatement the header routes for the
+                  // numerals and has not spent. Taken so the spirka can say
+                  // where it BEGINS: sc-pk-busstop-ban's instruction 2 is
+                  // «Зоната ѝ не започва ПРИ НАВЕСА — започва там, където
+                  // започва зигзагът» and the tarmac drew nothing to read.
+                  m.busStopZigzagQuads
+                  ? "busStopZigzag"
+                  : null;
       out.push({ id, built, outside });
     }
     cache = out;
@@ -3698,12 +3717,12 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
       districts: corpus.length,
       booked: booked(corpus),
       triangles: bookedTriangles(corpus),
-    }).toEqual({ districts: 105, booked: 11019, triangles: 108 });
+    }).toEqual({ districts: 105, booked: 11072, triangles: 108 });
     expect({
       districts: domain.length,
       booked: booked(domain),
       triangles: bookedTriangles(domain),
-    }).toEqual({ districts: 89, booked: 4265, triangles: 14 });
+    }).toEqual({ districts: 88, booked: 4237, triangles: 14 });
     // The mesh, and the booking it is supposed to equal. 59% of the denominator
     // below still sits in the 14 excluded districts — they are the biggest maps
     // in the corpus, which is why 87% of the DISTRICTS is only 41% of the PAINT
@@ -3711,10 +3730,10 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
     // place the reach is checked against geometry rather than against a counter.
     const corpusMesh = meshQuads(corpus);
     const domainMesh = meshQuads(domain);
-    expect(corpusMesh).toBe(booked(corpus) - bookedTriangles(corpus)); // 10,911
-    expect(domainMesh).toBe(booked(domain) - bookedTriangles(domain)); //  4,251
+    expect(corpusMesh).toBe(booked(corpus) - bookedTriangles(corpus)); // 10,964
+    expect(domainMesh).toBe(booked(domain) - bookedTriangles(domain)); //  4,223
     const share = ((domainMesh / corpusMesh) * 100).toFixed(2);
-    expect(share).toBe("38.96");
+    expect(share).toBe("38.52");
     // „NOT CLAIMED IN A COMMENT" IS NOW ITSELF A CHECK. The line this replaces
     // — `expect(share.toFixed(1)).toBe("14.8")` — could not fail: with both
     // totals pinned exactly two lines above it, the ratio was arithmetic, and
@@ -3771,7 +3790,14 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
       const key = d.outside ?? "in";
       tally[key] = (tally[key] ?? 0) + 1;
     }
-    expect(tally).toEqual({ in: 89, laneArrow: 3, speedGlyph: 6, roundabout: 5, busLegend: 2 });
+    expect(tally).toEqual({
+      in: 88,
+      laneArrow: 3,
+      speedGlyph: 6,
+      roundabout: 5,
+      busLegend: 2,
+      busStopZigzag: 1,
+    });
   });
 
   it("convicts paint whose corners straddle two edges", () => {

@@ -5288,6 +5288,39 @@ export function LessonPlayShell({
       // …and this one is what PlayAreaStyles uses to fold the scene's own
       // desktop chrome away on a phone.
       data-sim-compact={compact ? "on" : undefined}
+      // ── THE INSTRUMENT BAND IS LIFTING THE BOTTOM SHEETS OFF THE FLOOR, AND
+      //    UNTIL NOW NOTHING ON THE CASCADE COULD KNOW IT — sc-rb-exit-signal:
+      //    a57347d2, `w13/frames/sc-rb-exit-signal__mobile-right/02-briefing.png`.
+      //
+      // The read sheet and the compact teach sheet are authored as BOTTOM
+      // SHEETS — `rounded-t-2xl border-x border-t`, i.e. a top edge, two sides
+      // and NO BOTTOM — because a sheet flush with the floor has no bottom edge
+      // to draw. That is exactly right while `--sim-dash-h` is `0px`, which is
+      // every roomy layout and every ended session.
+      //
+      // ON A PHONE MID-SESSION IT IS `COMPACT_DASH_HEIGHT_PX`, 40. Both sheets
+      // anchor `bottom: var(--sim-dash-h, 0px)`, so the box stops 40 px short of
+      // the screen and its square, strokeless bottom edge is left hanging in
+      // mid-air. MEASURED off the frame above (2556 × 1179 at dpr 3, i.e. the
+      // 852 × 393 stage): the card's fill ends at device y 1057.5 — 121.5 device
+      // px = 40.5 CSS px above the bottom — and at 300 % the blue left border
+      // „runs down and stops dead at a flat horizontal edge" while the SAME
+      // card's top-left corner is a fully drawn rounded stroke. The reader of
+      // that frame called the panel „chopped", and in a product whose largest
+      // filed defect family is instructions that really are cut off, a card that
+      // merely LOOKS cut off costs the same thing: the student stops trusting
+      // that he has been shown all of it.
+      //
+      // WHY AN ATTRIBUTE AND NOT `[data-sim-compact="on"]`. The lift is not
+      // „compact", it is `dashHeightPx > 0` — `ended` zeroes the band while the
+      // layout stays compact, and a sheet still open on that frame would get a
+      // floor edge it does not need. Written from the SAME expression that fills
+      // `--sim-dash-h` four hundred lines down, so the flag and the length
+      // cannot disagree about whether there is a band.
+      //
+      // ITS CONSUMER IS `LIFTED_SHEET_FLOOR_CSS` in `PlayAreaStyles`, which is
+      // mounted by this component (below) — not a measurement waiting for one.
+      data-sim-dash-lift={dashHeightPx > 0 ? "on" : undefined}
       // ONE OVERLAY AT A TIME, ENFORCED ACROSS COMPONENT TREES. While the
       // queue is speaking, the two scene-owned corner widgets (difficulty
       // picker, telltale edge chips) stand down — otherwise the „one line"

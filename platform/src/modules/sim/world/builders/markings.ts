@@ -18,6 +18,12 @@ import {
   BUS_LEGEND_PITCH_M,
   BUS_LEGEND_STROKE_M,
   BUS_LEGEND_TOTAL_W_M,
+  BUS_STOP_ZIGZAG_AMPLITUDE_M,
+  BUS_STOP_ZIGZAG_KERB_INSET_M,
+  BUS_STOP_ZIGZAG_MIN_SPAN_M,
+  BUS_STOP_ZIGZAG_STROKE_M,
+  BUS_STOP_ZIGZAG_WAVELENGTH_M,
+  BUS_STOP_ZIGZAG_ZONE_JOIN_M,
   CENTER_LINE_WIDTH_M,
   CURB_CHAMFER_M,
   CURB_FOOT_TINT,
@@ -82,6 +88,10 @@ export interface MarkingBuildResult {
   /** „BUS" legend quads painted down an authored `busLane` span (Наредба
    *  № 2/2001). 0 on the 102 districts that author no such zone. */
   busLegendQuads: number;
+  /** Зигзаг quads painted along the kerb of an authored BUS STOP (the districts'
+   *  own citation: „ЗДвП-98-1 / Наредба № 2/2001 — зигзаг"). 0 on the 103
+   *  districts that author no stop span. */
+  busStopZigzagQuads: number;
   /** М18 „триъгълник" symbols painted before an М7 линия за изчакване
    *  (Наредба № 2/2001 чл. 23 ал. 3). 0 on every map with no Б1 approach. */
   giveWayTriangles: number;
@@ -1174,6 +1184,173 @@ function paintBusLaneLegend(
 }
 
 // ---------------------------------------------------------------------------
+// THE BUS-STOP ЗИГЗАГ — see constants.ts for the row, the frames and the
+// citation. This is the painter; the numbers and the argument live there.
+//
+// WHERE THE SPAN COMES FROM, and why it is not a third list. Two districts in
+// the shipped tree carry a bus stop the lesson is ENTIRELY about, and both
+// author it in `meta.scenario` rather than as a `buildings[].kind === "busStop"`
+// frontage — the same blind spot `scene/scenarioSceneryProps.busStopSheltersOf`
+// was written for, read here through the same two authored keys so the навес
+// and the зигзаг can never name different metres:
+//
+//   pk-busstop-v1  busStopPocketY { fromY 180, toY 210 }   sc-pk-busstop-ban
+//   mg-busstop-v1  busBayY        { fromY 130, toY 176 }   sc-merge-bus-pullout
+//
+// AND THEN THE BAN EXTENDS IT, which is the whole teaching point of the drill.
+// `pk-busstop-v1` authors TWO abutting `noStopping` zones — 150–180 („зигзаг")
+// and 180–210 („спирка") — and its instruction 2 is «Зоната ѝ не започва ПРИ
+// НАВЕСА — започва там, където започва зигзагът». Painting only the pocket
+// would draw the mark at the навес and teach the exact mistake the drill bills.
+// So the span grows through every same-edge `noStopping` zone it touches, and
+// stops there: a `busLane` zone is a LANE, not a stop (mg-busstop-v1's runs the
+// whole 400 m street), and extending into one would zigzag a boulevard.
+//
+// WHAT IT DOES NOT DO: grade. `runtime/worldRuntime` bills the ban off
+// `district.zones` and nothing reads a triangle — this pass only makes the
+// street state the boundary the reducer already convicts on.
+
+/** A stroke of the zigzag: a thick quad from `a` to `b`, its ends overlapped by
+ *  half a stroke so consecutive strokes mitre into one continuous line. */
+function paintZigzagStroke(acc: MeshAccumulator, a: Vec2, b: Vec2, width: number): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy);
+  if (!(len > 1e-6)) return 0;
+  const dir = norm([dx, dy]);
+  const mid: Vec2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  paintQuad(acc, mid, dir, len / 2 + width / 2, width / 2);
+  return 1;
+}
+
+/** The stop span a district authors in `meta.scenario`, in district Y, or null.
+ *  Straight-street generator maps only — the same guard `busStopSheltersOf`
+ *  keeps, and for its reason: a curved map's span has no Y interval at all. */
+function authoredBusStopSpanY(district: District): { fromY: number; toY: number } | null {
+  const scenario = (district.meta as { scenario?: unknown } | undefined)?.scenario;
+  if (typeof scenario !== "object" || scenario === null) return null;
+  const s = scenario as Record<string, unknown>;
+  if (s.archetype !== "straight-street") return null;
+  for (const key of ["busStopPocketY", "busBayY"] as const) {
+    const raw = s[key];
+    if (typeof raw !== "object" || raw === null) continue;
+    const span = raw as { fromY?: unknown; toY?: unknown };
+    const fromY = span.fromY;
+    const toY = span.toY;
+    if (typeof fromY !== "number" || typeof toY !== "number") continue;
+    if (!Number.isFinite(fromY) || !Number.isFinite(toY) || !(fromY < toY)) continue;
+    return { fromY, toY };
+  }
+  return null;
+}
+
+/** Which side of the edge's forward tangent the stop is on, from the district's
+ *  own `laneCenterRightM` (positive = east on these north-running streets, and
+ *  `perpRight([0,1])` is east). 0 = not stated ⇒ this pass declines. */
+function authoredStopSideSign(district: District): 1 | -1 | 0 {
+  const scenario = (district.meta as { scenario?: unknown } | undefined)?.scenario;
+  if (typeof scenario !== "object" || scenario === null) return 0;
+  const v = (scenario as Record<string, unknown>).laneCenterRightM;
+  if (typeof v !== "number" || !Number.isFinite(v) || v === 0) return 0;
+  return v > 0 ? 1 : -1;
+}
+
+/**
+ * Paint the зигзаг along the kerb of every authored bus stop.
+ *
+ * Returns the quads painted — 0 for the 103 shipped districts that author no
+ * stop span, which is the byte-identity contract this pass is appended last for.
+ */
+function paintBusStopZigzag(
+  acc: MeshAccumulator,
+  district: District,
+  network: RoadNetwork,
+): number {
+  const spanY = authoredBusStopSpanY(district);
+  if (spanY === null) return 0;
+  const side = authoredStopSideSign(district);
+  if (side === 0) return 0;
+  const zones = district.zones ?? [];
+  let quads = 0;
+
+  for (const eb of network.edges) {
+    if (!eb.line) continue;
+    const g = eb.edge.geometry as Vec2[];
+    if (!Array.isArray(g) || g.length < 2) continue;
+    // The span is a Y interval on a north-running generator street; resolve it
+    // onto THIS edge by projection rather than by assuming y === arclength, and
+    // decline the edge if either end does not land on it. `projectOntoPolyline`
+    // clamps to the ends, so a far-away edge answers with a large distance and
+    // is refused here rather than silently marked.
+    const gx = g[0][0];
+    const a0 = projectOntoPolyline(g, [gx, spanY.fromY]);
+    const a1 = projectOntoPolyline(g, [gx, spanY.toY]);
+    if (!(a0.distance <= 1 && a1.distance <= 1)) continue;
+    // `laneCenterRightM` is a DISTRICT-x offset, and this pass turns it into a
+    // side of the edge's own forward tangent — which is only the same thing
+    // while the street runs NORTH (`perpRight([0,1])` is +x). Both shipped stop
+    // maps do ([[0,0],[0,340]] and [[0,0],[0,400]]); a generator that ever
+    // emits one southbound would otherwise put the mark on the far kerb, so
+    // the assumption is CHECKED here rather than trusted.
+    if (!(a0.tangent[1] > 0.9)) continue;
+    let from = Math.min(a0.s, a1.s);
+    let to = Math.max(a0.s, a1.s);
+    if (!(to - from > 1e-6)) continue;
+
+    // Grow through every abutting `noStopping` ban on this edge (see the block
+    // above). Bounded: each pass must strictly grow the span or the loop ends.
+    for (let pass = 0; pass <= zones.length; pass++) {
+      let grew = false;
+      for (const z of zones) {
+        if (z.kind !== "noStopping" || z.edgeId !== eb.edge.id) continue;
+        if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
+        if (z.toM < from - BUS_STOP_ZIGZAG_ZONE_JOIN_M) continue;
+        if (z.fromM > to + BUS_STOP_ZIGZAG_ZONE_JOIN_M) continue;
+        if (z.fromM < from) {
+          from = z.fromM;
+          grew = true;
+        }
+        if (z.toM > to) {
+          to = z.toM;
+          grew = true;
+        }
+      }
+      if (!grew) break;
+    }
+
+    const line = trimPolyline(eb.line, 0.8, 0.8, 2.5);
+    if (!line) continue;
+    const lineLen = polylineLength(line);
+    // Same arclength frame `paintBusLaneLegend` maps zone spans through.
+    const s0 = eb.trimFrom + 0.8;
+    const la = Math.max(0, Math.min(lineLen, from - s0));
+    const lb = Math.max(0, Math.min(lineLen, to - s0));
+    if (lb - la < BUS_STOP_ZIGZAG_MIN_SPAN_M) continue;
+
+    const travelHalf = eb.halfWidth - eb.parkingM;
+    const outer = travelHalf - BUS_STOP_ZIGZAG_KERB_INSET_M;
+    const inner = outer - BUS_STOP_ZIGZAG_AMPLITUDE_M;
+    // The band has to live INSIDE the curb lane, or the mark is about a lane
+    // the stop does not touch; and on a two-way edge with one lane per
+    // direction it must not reach the осева. Both are refusals, not clamps.
+    if (!(inner > 0.2)) continue;
+    if (BUS_STOP_ZIGZAG_KERB_INSET_M + BUS_STOP_ZIGZAG_AMPLITUDE_M > LANE_WIDTH_M - 0.4) continue;
+
+    const half = BUS_STOP_ZIGZAG_WAVELENGTH_M / 2;
+    const strokes = Math.floor((lb - la) / half);
+    let prev: Vec2 | null = null;
+    for (let i = 0; i <= strokes; i++) {
+      const at = pointAlong(line, la + i * half);
+      const off = i % 2 === 0 ? outer : inner;
+      const p = add(at.point, mul(perpRight(at.tangent), side * off));
+      if (prev !== null) quads += paintZigzagStroke(acc, prev, p, BUS_STOP_ZIGZAG_STROKE_M);
+      prev = p;
+    }
+  }
+  return quads;
+}
+
+// ---------------------------------------------------------------------------
 
 export function buildMarkings(
   district: District,
@@ -1350,6 +1527,12 @@ export function buildMarkings(
   const busLegendQuads = paintBusLaneLegend(acc, district, network);
   markingQuads += busLegendQuads;
 
+  // -- the ЗИГЗАГ along an authored bus stop — appended after everything for
+  //    the same byte-identity reason: 103 of the 105 shipped districts author
+  //    no stop span and keep an identical marking buffer --------------------
+  const busStopZigzagQuads = paintBusStopZigzag(acc, district, network);
+  markingQuads += busStopZigzagQuads;
+
   return {
     markings: acc,
     markingQuads,
@@ -1359,6 +1542,7 @@ export function buildMarkings(
     laneArrowQuads,
     speedGlyphQuads,
     busLegendQuads,
+    busStopZigzagQuads,
     giveWayTriangles,
   };
 }

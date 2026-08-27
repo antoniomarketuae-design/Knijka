@@ -425,6 +425,67 @@ export const BUS_LEGEND_INSET_M = 8;
  *  a block. mg-busstop-v1's 400 m span takes five. */
 export const BUS_LEGEND_PITCH_M = 90;
 
+// ---------------------------------------------------------------------------
+// THE BUS-STOP ЗИГЗАГ — the kerb marking that says where a spirka BEGINS
+// ---------------------------------------------------------------------------
+//
+// THE ROW (sweep 161 / w13, sc-pk-busstop-ban, CRITICAL, re-verified across the
+// whole steered drive): „At t126s the coach says the carriageway zigzag starts
+// HERE and that from here on it is the bus-stop zone — and there is no zigzag
+// marking on the tarmac at all … The zone exists only as a translucent
+// teal/amber tint painted by the HUD, so the student is trained to read a
+// coaching overlay instead of the street, and would have nothing to read in a
+// real one."
+//
+// The drill's own instruction 2 is «Зоната ѝ не започва ПРИ НАВЕСА — започва
+// там, където започва зигзагът», and its second mistake card is «Водачът спря
+// ПРЕДИ НАВЕСА и реши, че е извън спирката». BOTH sentences name a mark the
+// world never drew, so the lesson graded a boundary the student could not see —
+// the doc-86 T1 rule («the grader and the painter must name the SAME boundary»)
+// broken at the one boundary this whole drill is about.
+//
+// THE CITATION IS THE DISTRICT'S OWN, not this file's. `pk-busstop-v1` authors
+// the marking span itself and carries the act with it:
+//   zone `pkbs-z-stop-marking` … signRef "ЗДвП-98-1 / Наредба № 2/2001 — зигзаг"
+//   zone `pkbs-z-stop-pocket`  … signRef "ЗДвП-98-1 — спирка"
+// so this pass paints what the data already says is there and cites what the
+// data already cites (ADR-002: retrieved, never recalled — no marking number is
+// invented here).
+//
+// GEOMETRY. A continuous zigzag along the kerb side of the curb lane, inside
+// the carriageway, its outer peaks clear of the solid edge line and its inner
+// peaks inside the lane it marks. White, because the markings mesh has ONE
+// material and a second one would be a new draw call and a new atlas slot for
+// a colour; the SHAPE is what a driver reads a spirka by, and it is the shape
+// that was missing. Stated rather than hidden: a Bulgarian bus-stop zigzag is
+// yellow, and that remains a debt on the marking material, not on this pass.
+
+/** Stroke of the zigzag line, m — the В26 numeral stroke's sibling: thick
+ *  enough to survive the mip chain at 60 m, thin enough not to read as hatch. */
+export const BUS_STOP_ZIGZAG_STROKE_M = 0.15;
+/** Peak-to-peak amplitude across the lane, m. */
+export const BUS_STOP_ZIGZAG_AMPLITUDE_M = 1.1;
+/** One full V along the street, m — two of them per 8 m of stop, so the
+ *  shortest authored span in the tree (mg-busstop-v1's 46 m bay) carries 11. */
+export const BUS_STOP_ZIGZAG_WAVELENGTH_M = 4.0;
+/**
+ * Gap between the carriageway edge and the zigzag's OUTER peak, m.
+ *
+ * Sized against the solid edge line the same edges already carry, so the two
+ * marks never touch: with a parking band the edge line sits ON `travelHalf`
+ * (mg-busstop-v1, tertiary → band [16.10, 16.40]); without one it is inset by
+ * EDGE_LINE_INSET_M (pk-busstop-v1, residential → band [7.475, 7.775]). At 0.9
+ * the outer peak plus half a stroke reaches 15.425 / 7.300 — clear on both.
+ */
+export const BUS_STOP_ZIGZAG_KERB_INSET_M = 0.9;
+/** Shortest span worth marking, m. Below one wavelength plus a peak the mark
+ *  is a chevron, not a zigzag, and a driver cannot read it as a stop. */
+export const BUS_STOP_ZIGZAG_MIN_SPAN_M = 8;
+/** Two authored spans this close in arclength are ONE stop zone, m. The
+ *  pk-busstop-v1 pair abuts exactly (150–180 then 180–210) and the drill's
+ *  whole point is that the zone starts at the FIRST of them. */
+export const BUS_STOP_ZIGZAG_ZONE_JOIN_M = 0.5;
+
 /** Facade bay module (whole-bay UV offsets snap to this). */
 export const FACADE_BAY_M = 3;
 /**

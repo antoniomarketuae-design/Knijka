@@ -52,6 +52,7 @@ import {
   createEvalState,
   parseObjectiveParams,
   personContactVoidsObjective,
+  personHaltVoidsObjective,
   railBarredVoidsObjective,
   reachZoneStateRefusal,
   stepObjective,
@@ -1586,7 +1587,15 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
             ...(terminalActiveSince !== null
               ? { objectiveActiveSinceSec: terminalActiveSince }
               : {}),
-          }));
+          }) ||
+          // «Спри пред човека» (`requireHaltForVru`) is monotone in exactly the
+          // same way. No census member is terminal at HEAD (sc-hzes-stop 2/3,
+          // sc-pnu-halt 2/3, sc-mfp-walk-yield first of its chain), so the arm
+          // is inert today and `!onTerminal` above already covers every refusal
+          // it can make. It is wired anyway, because the yield term one line up
+          // is the record of what happens when that assumption is left implicit
+          // and a template later moves the claim onto the last rung.
+          personHaltVoidsObjective(params[currentIndex], struckAPersonInRun));
       if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {

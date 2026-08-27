@@ -33,6 +33,42 @@
  * orientations, not inferred.
  */
 
+/**
+ * «AN URBAN STREET LINED WITH APARTMENT BLOCKS ON BOTH SIDES» — filed against
+ * BOTH mw-v1 templates in this file (sc-ac-truck-spray:c042440d,
+ * sc-ac-wind-truck-pass:6a076479's frame description), so it is answered once
+ * here rather than twice at the map blocks. MEASURED 2026-08-27: THE MAP IS NOT
+ * THE PROBLEM AND MUST NOT BE REGENERATED.
+ *
+ * `content/world/mw-v1.json` is `class: "motorway"`, `oneway: true`,
+ * `lanes: 3` per carriageway over 2,606 m, posted 140, with an `emergencyLane`
+ * zone per direction — and it authors ONE building in the whole district. Its
+ * `platform/public/world/` twin is byte-identical, so the world that loads is
+ * the world in this repo. Every block face in the w13 frames comes from
+ * `world/builders/worldRim.ts`, added by the wave-3 repair (bbf1223) for „the
+ * world simply runs out and the car keeps going": `buildWorldGeometry.ts:472`
+ * calls it on EVERY district whose `meta.mapKind` is a string — 102
+ * `scenario-*` maps plus poligon-v1 — and it stands a contiguous belt of
+ * building masses on all four sides, 43–57 m outside the declared box
+ * (TERRAIN_MARGIN_M 60 − WORLD_RIM_TERRAIN_INSET_M 3, less
+ * TERMINUS_CLOSE_DEPTH_M 14), clamped to 9–22 m tall
+ * (TERMINUS_CLOSE_MIN/MAX_HEIGHT_M) and skinned through the same
+ * `facadeVariant` path as an authored блок. It reads the bounds and the road
+ * polylines and never reads `edge.class`, so an автомагистрала is dressed
+ * exactly like a residential street. The two exact edits, and the graded side
+ * effect the belt's colliders introduce, are measured in
+ * `environment/weather.ts` §2c.
+ *
+ * THE OTHER HALF OF c042440d IS REAL, SEPARATE, AND IS NOT worldRim: there is
+ * no Д5 „Автомагистрала" plate and no gantry anywhere on the route, because
+ * `world/builders/zoneSigns.ts` posts a plate only for a `zones` entry it has a
+ * ZONE_SIGN_KIND mapping for, and mw-v1's only zones are the two
+ * `emergencyLane` spans, whose `signRef` „М2" is a MARKING. A motorway the
+ * briefing tells the student to read as one needs its entry plate. That is the
+ * sign layer's row, not a template's: `map.params` below mirrors the generator
+ * recipe and is an input to nothing at runtime.
+ */
+
 import type { CutInLeadCarSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 

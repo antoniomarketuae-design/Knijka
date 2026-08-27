@@ -74,7 +74,15 @@ describe("sc-ov-bus-lane — mistakes grade their exact codes (doc 76 §9 stage 
       const codes = [...new Set(violationCodes(drive))].sort();
       expect(codes).toEqual([...SC_OV_BUS_LANE.mistakes[i].codeRefs].sort());
       // Exactly ONE bill for the one bus-lane cruise.
-      expect(violationCodes(drive).filter((c) => c === "DRIVING_IN_BUS_LANE")).toHaveLength(1);
+      // Count CHARGES, not raw reducer events — 2026-08-27. The bus-lane re-grade
+    // emits a second event marked `regrade: true`, dropped by lessons/engine.ts
+    // wherever the code was already charged, so the student is still billed once.
+    // The demand is unchanged: EXACTLY ONE CHARGE.
+    expect(
+      drive.ruleEvents.filter(
+        (e) => e.kind === "violation" && e.code === "DRIVING_IN_BUS_LANE" && e.regrade !== true,
+      ),
+    ).toHaveLength(1);
       expect(codes).not.toContain("NOT_KEEPING_RIGHT");
       expect(codes).not.toContain("LANE_CHANGE_WITHOUT_INDICATOR");
       expect(codes).not.toContain("LANE_CHANGE_WITHOUT_MIRROR_CHECK");

@@ -365,6 +365,58 @@ function asMesh(o: Object3D | undefined): Mesh | null {
 // breathes with the throttle) or bringing the whole mirror station down on wide
 // aspects, which reopens B58's ruling about the В26 «50». Both need the
 // six-profile render this lane cannot run.
+//
+// ── AND THE FIRST OF THOSE TWO IS DEAD. MEASURED 2026-08-27, TWICE ─────────
+// Same row (sc-mw-emergency-lane:3ffb0692), still open, still not repaired
+// here — but one of the two candidate shapes above can be struck off without
+// a render, so the next lane does not spend a round discovering it.
+//
+// A HEADER LIP HAS TO BE DRAWN ABOVE THE MIRROR GLASS, AND ON THIS HANDSET
+// THERE IS NO SCREEN ABOVE THE MIRROR GLASS.
+//
+//   INSTRUMENT 1 — THE SHIPPED FRAME. `.audit-frames/w13/frames/
+//   sc-mw-emergency-lane__mobile-right/04-t090s.png`, 2556 × 1179, the row's
+//   own evidence frame. Reading ROW 0 of the image across the mirror:
+//     x 1576…1720   srgb(3,2,2)        — bezel, cut by the canvas edge
+//     x 1756…2040   srgb(125,142,165)  — the REFLECTION: reflected sky, the
+//                                        same tone the glass carries at row 40
+//     x 2044…2068   srgb(28,28,28)     — the far bezel, also cut
+//   i.e. 284 device px — 95 CSS px of a ~150 CSS px mirror — of live GLASS
+//   touching the top row of the screen. The row's „clipped by the top edge" is
+//   not about the housing. It is the reflective surface itself.
+//
+//   INSTRUMENT 2 — THE SHIPPED PROJECTION, which agrees. The glass's top edge
+//   is chassis y 0.9086 (B58's own figure) running z 0.470 → 0.417 across the
+//   quad (the pre-raise vertex line in the MIRROR POD block; MirrorRig's lift
+//   pulls it along the eye ray, i.e. to SMALLER z, which only raises it
+//   further — so these are the conservative end). At aspect 2.168 that edge
+//   projects to fy 0.9916 at its far corner and 1.0233 at its near one: at or
+//   past the canvas edge across the whole mirror, against 0.903…0.929 at 16:9
+//   and 0.863…0.886 at 1440 × 900. `hotspot_mirror_rear`'s proxy says the same
+//   from its own constants — `hotspotScreenRect(…).top` is −0.134 on both
+//   phone profiles against +0.032 at 1440 × 900 — and that pair is now a gate
+//   (`__tests__/cockpitMirrorEdge.test.ts`, „the mirror's TOP edge").
+//
+// SO THE LIP'S BUDGET IS NEGATIVE, not merely small. The widest strip of sky
+// anywhere above the glass on that handset is 0.8 % of frame height — 3.3 CSS
+// px, at ONE corner — and the lip the block above solves for lands at fy
+// 0.985, i.e. BELOW the glass top at every x. The band would be painted across
+// the top of the reflection, on the one surface `sc-pk-move-off`,
+// `sc-vp-handbrake` and `sc-park-bay-exit-rev` grade a glance at. That is a
+// worse defect than the one it repairs, and it is the failure mode this file
+// has already shipped three times (R0 rounds 2–4: a fairing that missed the
+// bar by 30 mm, then a slab five times the width of the part it hid).
+//
+// WHAT IS LEFT IS THEREFORE THE SECOND SHAPE ONLY, and it is not a code fix:
+// the mirror station has to come DOWN on wide aspects, ~39 mm brings the hood
+// from fy 1.0661 to 0.99 there — still higher in frame than the 0.9643 the
+// 16:9 build B58 signed off carries, so the В26 «50» it was raised for is no
+// more hidden on a phone than it already is on a desktop. But the station is
+// half ASSET: `tools/glb/raise_interior_mirror.mjs` bakes the 168
+// `interior_shell` vertices and the `hotspot_mirror_rear` node, and B58's own
+// note says moving the glass alone „does nothing: the authored casing then
+// becomes the occluder". A runtime per-aspect drop cannot move baked vertices,
+// so this is an asset + founder-ruling change, not a constant in this file.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------

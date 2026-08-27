@@ -48,6 +48,16 @@ import {
   TOAST_MAX_VISIBLE,
   visibleToasts,
 } from "./hudPreferences";
+// THE SHADE, TAKEN AND NOT RESTATED — same module, same lane. `SimOverlay`
+// owns the derivation of α 0.80 and of the feather, and its own test derives
+// its assertions from these exports; a second copy of either number here is
+// how the roomy card and the phone's peek would drift apart again. See the
+// block above `ToastGround`.
+import {
+  PEEK_SCRIM_FEATHER_PX,
+  peekScrimBackgroundCss,
+  peekScrimMaskCss,
+} from "./SimOverlay";
 
 export interface HudToast {
   id: number;
@@ -237,6 +247,157 @@ const SEVERITY_META = {
   vtorostepenna: { label: "Второстепенна", color: "var(--accent-soft)" },
 } as const;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE ROOMY CARD NEVER GOT THE GROUND THE PHONE'S DID — 2026-08-27, wave 6.
+
+   TWO DEFECTS, ONE SENTENCE OF ARITHMETIC, and they compound rather than sit
+   side by side.
+
+   1 · NO GROUND. `SimOverlay`'s 2026-08-19 block („THE CARD HAD NO GROUND, AND
+       ON A BRIGHT WORLD THAT IS 1.3 : 1") measured the world this HUD's cards
+       stand on across four filed frames and found the brightest pixel to be
+       rgb(204, 205, 206) — render-white facade. It then gave the PHONE's peek a
+       shade at α 0.80 and proved the number from both sides. THIS card is the
+       same card on the roomy leg, it is on the same `GHOST_SURFACES` list (so
+       `PlayAreaStyles`' UNPANEL sweep strips its fill to `transparent
+       !important`), and it was left standing on bare world. Against that pixel:
+
+                                    bare world   under the 0.80 ground
+         --foreground  the title       1.47 : 1        11.87 : 1
+         --muted       the WHY         1.01 : 1         8.18 : 1   ← THE ROW
+         --danger      ОПАСНА ГРЕШКА   1.77 : 1         4.57 : 1     THAT IS
+         --warning     Основна грешка  1.01 : 1         8.01 : 1     THE POINT
+         --accent-2    📚 Научи         1.05 : 1         7.73 : 1
+
+       1.01 : 1 is not „low contrast". The authored explanation — the half of
+       this card THEO-4 requirement zero exists for, the reason the toast is not
+       a bare verdict — and the facade behind it are the same colour to a
+       hundredth. `sc-roundabout-entry/pc-right/04-t090s.png` and
+       `sc-ov-solid-return/mobile-right/04-t041s.png` are the same reading with
+       and without the shade, twelve hours apart on the same build.
+
+   2 · AND THE CARD DIMMED ITSELF ON TOP OF IT. `opacity-90` rode on the
+       INTERACTIVE arm of the class list — i.e. on every card in production,
+       because the shell passes `onDismiss={dismiss}` (`LessonPlayShell.tsx`,
+       the `<HudToasts …>` mount). It is a tenth off the whole subtree: the
+       class word, the «−10 изпитни т.», the fault name, the explanation, the
+       law chip and the two-stop black text-shadow the UNPANEL register uses to
+       buy contrast without a box — so the thing that restores legibility is
+       dimmed in lockstep with the ink it is restoring. `hover:opacity-100` was
+       the remedy, on a card the student reads with both hands on the wheel.
+
+       `SimOverlay` has already ruled on this exact class, on this exact token:
+       „AND IT IS AT FULL OPACITY, 2026-08-19. It carried `opacity-90` … on a
+       ГРУБА violation that is `--danger`, so 0.9 of it over the shade below
+       reads 3.97 : 1 — under AA". `sim-overlay-scrim.test.ts` wrote that up as
+       a rule with a name — „no element on this card knocks its own ink back
+       under the floor" — and this card was knocking ALL of its ink back, over
+       no shade at all.
+
+   THE TWO ARE ONE REPAIR AND NOT TWO, which is why they land together: with
+   the ground added and `opacity-90` left in place, `--danger` reads 3.95 : 1 —
+   still under AA. The dimming has to go for the ground to deliver anything.
+
+   THE SHADE IS THE PEEK'S, IMPORTED RATHER THAN RESTATED. `PEEK_SCRIM_*` and
+   its two CSS builders are exported from `SimOverlay.tsx` — the same lane, the
+   same module — and they carry the whole derivation with them: α 0.80 is the
+   alpha at which the quietest ink clears AA against the brightest world the
+   sweep photographed, capped by the founder's other rule that the world under
+   it must stay „dimmed, and still plainly two different things" (1.37 : 1), so
+   a hazard is never hidden. A second copy of 0.80 here is how the two would
+   drift, and `sim-overlay-scrim.test.ts` derives its assertions from those
+   exports, so this card inherits that guard instead of needing its own.
+
+   AND IT IS STILL NOT A PANEL — the 2026-08-03 ruling that took the box off
+   this column („a full-width rounded strip ending in a SOLID BRAND-BLUE
+   «Разбрах» button. THAT IS A COOKIE BANNER") is about a SHAPE: a border, a
+   radius, an edge. The shade has none of the three, every side ramps to alpha
+   0 outside the card's own box, and it claims not one pixel the card was not
+   already standing on. The left rule in the fault's colour still paints ABOVE
+   it, so the severity glance is unchanged.
+
+   WHAT REPLACES THE DIMMING AS THE „THIS IS CLICKABLE" CUE: the ✕ that is
+   already in the header row brightens on hover (`group` here,
+   `group-hover:text-foreground` on `DismissGlyph`). The affordance moves onto
+   the one glyph whose whole job is to say „press me" and off the verdict.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The column's own gap, as a number — `gap-2` on the `<div>` at the bottom of
+ * this file, restated here because the shade has to know it and Tailwind class
+ * strings are not readable at runtime. `hud-toast-ground.test.ts` asserts the
+ * class is still what this says it is, so the two cannot drift silently.
+ */
+const TOAST_COLUMN_GAP_PX = 8;
+
+/**
+ * The shade's bleed, and the ONE number that is not the peek's.
+ *
+ * THE PEEK IS A COLUMN OF ONE; THIS IS A COLUMN OF TWO. `TOAST_MAX_VISIBLE`
+ * stacks cards 8 px apart, and the peek's 16 px bottom feather would put the
+ * older card's ramp 8 px INSIDE the newer one's flat 0.80 core — two shades on
+ * one pixel, i.e. 1 − (1 − 0.8)(1 − 0.4) ≈ 0.88 in an 8 px band across the top
+ * of every card below the first. That is past the 0.80 the block above spends
+ * two paragraphs deriving, and past it in the one direction the founder's
+ * „still plainly two different things" rule bounds. So the bottom bleed is
+ * clamped to the gap: the ramp still lives entirely OUTSIDE the card's own box
+ * (feather === bleed, which is what keeps the flat core coincident with the box
+ * — see `peekScrimMaskCss`), and it now stops before it reaches anything else's.
+ *
+ * `Math.min` and not a literal 8: if a later wave narrows the peek's feather
+ * below the gap, this follows it down rather than quietly becoming the larger
+ * of the two. The other three sides are the peek's, untouched — left faces the
+ * road and is the long ramp, right and top face the stage's own edge.
+ */
+const TOAST_SCRIM_FEATHER_PX = {
+  ...PEEK_SCRIM_FEATHER_PX,
+  bottom: Math.min(PEEK_SCRIM_FEATHER_PX.bottom, TOAST_COLUMN_GAP_PX),
+} as const;
+
+/**
+ * The card's ground: the peek's shade, on the card that never got one.
+ *
+ * `aria-hidden` + `pointer-events: none` — it is a shade. It must not be
+ * announced and it must not eat the click that dismisses the card, which on
+ * this surface IS the whole `<button>`.
+ *
+ * `data-hud-ink` IS WHAT LETS IT PAINT AT ALL, and is not tidiness: the UNPANEL
+ * sweep is `[data-sim-stage] .hud-ghost :is(div, …):not([data-hud-ink])` with
+ * `background-image: none !important`, and this element is a `<div>` inside a
+ * `.hud-ghost`. Without the attribute this whole component would be a diff that
+ * changes no pixel — the way the tier picker's filled segment survived a whole
+ * unpanel pass. `unpanelInkExemption.test.ts` holds the stylesheet end of the
+ * same contract for the peek's shade and the touch hint's.
+ */
+function ToastGround() {
+  return (
+    <div
+      data-hud="toast-scrim"
+      data-hud-ink=""
+      aria-hidden
+      style={{
+        position: "absolute",
+        top: `${-TOAST_SCRIM_FEATHER_PX.top}px`,
+        right: `${-TOAST_SCRIM_FEATHER_PX.right}px`,
+        // NO overhang term, unlike the peek's. That card is `max-height`-capped
+        // by its column and paints rows past its own border box, so its shade
+        // has to be measured. This column caps nothing — `LessonPlayShell`
+        // scrolls it instead — so the card's box IS what the card paints, and a
+        // measured inset here would be arithmetic with no question behind it.
+        bottom: `${-TOAST_SCRIM_FEATHER_PX.bottom}px`,
+        left: `${-TOAST_SCRIM_FEATHER_PX.left}px`,
+        zIndex: -1,
+        pointerEvents: "none",
+        backgroundImage: peekScrimBackgroundCss(TOAST_SCRIM_FEATHER_PX),
+        // Both spellings: `mask-image` is unprefixed in current WebKit and
+        // prefixed in the versions still on phones in this market.
+        WebkitMaskImage: peekScrimMaskCss(TOAST_SCRIM_FEATHER_PX),
+        maskImage: peekScrimMaskCss(TOAST_SCRIM_FEATHER_PX),
+      }}
+    />
+  );
+}
+
 /**
  * The dismissible shell every card shares.
  *
@@ -264,16 +425,31 @@ function ToastShell({
   // the toast still says WHY, it just no longer paints a box to say it in.
   // A left rule in the fault's own colour replaces the border-on-a-fill so the
   // severity is still readable at a glance.
+  //
+  // ── `relative isolate`, AND NEITHER IS A BOX. 2026-08-27, wave 6. They are
+  //    what the shade below needs and nothing else: `relative` makes this card
+  //    the containing block for it, `isolate` makes it the shade's STACKING
+  //    CONTEXT so a `z-index: -1` child cannot climb past this card and sink
+  //    behind the WebGL backdrop. `SimOverlay`'s own block on the peek's shade
+  //    has the WebKit screenshot where that exact escape produced a fix which
+  //    changed no pixel while every unit assertion stayed green. Still no
+  //    border, no radius, no blur, no `backdrop-filter` on this element.
+  //
+  // ── AND `opacity-90` IS GONE FROM THE INTERACTIVE ARM. See the block above
+  //    `ToastGround` for the arithmetic; the short version is that it was a
+  //    tenth off the WHOLE card — the class word, the points, the fault name
+  //    and the authored explanation — applied for no reason except that the
+  //    card happens to be clickable, with `hover:opacity-100` as the remedy on
+  //    a surface the student reads while driving and never hovers.
   const className =
-    `hud-ghost hud-toast-in ${TOAST_CARD_WIDTH_CLASS} border-l-2 py-1 pl-2.5 pr-1 text-left ` +
-    (interactive
-      ? "pointer-events-auto cursor-pointer opacity-90 transition hover:opacity-100 motion-reduce:transition-none"
-      : "pointer-events-none");
+    `hud-ghost hud-toast-in ${TOAST_CARD_WIDTH_CLASS} relative isolate border-l-2 py-1 pl-2.5 pr-1 text-left ` +
+    (interactive ? "group pointer-events-auto cursor-pointer" : "pointer-events-none");
   const style = { borderColor: color };
 
   if (!interactive) {
     return (
       <div className={className} style={style}>
+        <ToastGround />
         {children}
       </div>
     );
@@ -287,6 +463,7 @@ function ToastShell({
       className={className}
       style={style}
     >
+      <ToastGround />
       {children}
     </button>
   );
@@ -329,11 +506,26 @@ function ToastFooter({ lawRef, ageBg }: { lawRef: string | undefined; ageBg: str
   );
 }
 
-/** The ✕ hint in the card's header row — it must LOOK dismissible. */
+/**
+ * The ✕ hint in the card's header row — it must LOOK dismissible.
+ *
+ * AND IT IS NOW WHERE THE HOVER FEEDBACK LIVES. 2026-08-27: the card used to
+ * say „clickable" by sitting at `opacity-90` and going to 100 on hover, i.e. by
+ * dimming the verdict, the points and the authored explanation by a tenth for
+ * the whole of every drive to buy a mouse-over cue nobody driving ever
+ * collects. The cue moves onto this glyph, whose only job is to say „press me":
+ * `group` is on the card (`ToastShell`), so the ink change is the same
+ * interaction with none of the cost. `text-muted → text-foreground` is a
+ * brighten, so the glyph never gets quieter than it is now, and `motion-reduce`
+ * drops the transition rather than the change.
+ */
 function DismissGlyph({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <span aria-hidden className="ml-1 shrink-0 text-[11px] font-black leading-none text-muted">
+    <span
+      aria-hidden
+      className="ml-1 shrink-0 text-[11px] font-black leading-none text-muted transition group-hover:text-foreground motion-reduce:transition-none"
+    >
       ✕
     </span>
   );

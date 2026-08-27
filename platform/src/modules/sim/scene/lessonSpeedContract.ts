@@ -70,8 +70,42 @@
  * adopt it are `hud/StatusDashboard.tsx` (`GovernorCapMark`),
  * `components/sim/RouteGuidance.tsx` (`capLineBg`) and `components/sim/
  * LessonScene.tsx` (which threads both numbers), **none of which this lane
- * owns** — see the lane report. Until they do, the glass is unchanged and the
- * 22 rows stand.
+ * owns** — see the lane report.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * WHERE IT ACTUALLY STANDS (corrected 2026-08-27 — the paragraph above ended
+ * „Until they do, the glass is unchanged and the 22 rows stand", and that had
+ * been false for a wave).
+ *
+ * ONE of the three has adopted it: `hud/StatusDashboard.GovernorCapMark` calls
+ * `readSpeedContract` (StatusDashboard.tsx:434), reads `modeAboveLaw` instead
+ * of its own hand-kept inequality, prints «задачата иска ≤N» off `binding` /
+ * `bindingKmh`, and carries `lineBg` in its `aria-label`/`title`. The other two
+ * still do not — `RouteGuidance.capLineBg` derives its own number and
+ * `LessonScene` only threads `taskCapKmh` through.
+ *
+ * AND THE ROWS DID NOT CLOSE, which is the part worth writing down rather than
+ * quietly deleting. Sweep 161 / w13 re-photographs all three
+ * (`sc-crossing-child-ball:b2be3466`, `sc-sig-controller-postures:e245bd5c`,
+ * `sc-rb-lane-choice:ff5f8190`) and the strip now reads, on one line:
+ *
+ *     50 · РЕЖИМ Нормален ≤60 · знакът важи · задачата иска ≤20
+ *
+ * The third number arrived; the PRECEDENCE did not. «знакът важи» is rendered
+ * from `modeAboveLaw` alone and means „the sign beats the MODE" — but a student
+ * reads it as „the sign is the number you are judged by", and here it is not:
+ * `binding` is `"task"` and the billed number is 20. So the bar now states two
+ * ceilings and one word that appears to pick the wrong one of them.
+ *
+ * THE RESOLUTION IS ALREADY HERE AND IS NOT THE THING THAT IS MISSING —
+ * `lineBg` says it in full («Знакът е 50 — това е законът. Задачата иска ≤20:
+ * по-строгото важи. РЕЖИМ ≤60 е таван на колата, не разрешение.») and is on
+ * the element's `title`, i.e. everywhere except the glass. What is missing is
+ * ONE render branch in `GovernorCapMark`: when `reading.binding === "task"`,
+ * the «знакът важи» chip must not stand alone. No new field is added here for
+ * it — every input that branch needs is already on `SpeedContractReading`, and
+ * a field no caller reads is the defect class this programme measured at 51 of
+ * 82 repairs.
  */
 
 import type { District } from "@/modules/sim/world";

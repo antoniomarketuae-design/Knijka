@@ -954,6 +954,29 @@ const MGB_BUS: CutInLeadCarSpec = {
  *      scene/scenarioSceneryProps.ts, exactly the seam sc-merge-from-property
  *      records for its бензиностанция.
  *
+ *      RE-MEASURED 2026-08-27, AND THE ASK IS NOW SMALLER AND MORE EXACT THAN
+ *      THE PARAGRAPH ABOVE — because half of it has since shipped and drew the
+ *      wrong object, which is worse than not shipping. `busStopSheltersOf`
+ *      (scene/scenarioSceneryProps.ts:706) already reads `meta.scenario
+ *      .busBayY` and is already on the LIVE path (`heldSceneryFor` :931), and
+ *      mg-busstop-v1 passes every one of its gates: archetype
+ *      „straight-street", laneCenterRightM 12.19, lanesPerDirection 2, busBayY
+ *      130…176. So a shelter IS emitted, at x ≈ 19.75, y = 153. What it is
+ *      cannot be recognised: `SHELTER_LENGTH/HEIGHT/THICKNESS_M` are
+ *      4.5 × 2.5 × 0.2 (:686-688) and every `kind: "wall"` obstacle renders
+ *      through ONE branch — `components/sim/ScenarioObstacles.tsx:611
+ *      ObstacleWall`, a single `boxGeometry` in flat `#8d8a83`. The student is
+ *      shown a 20 cm grey fence panel on the verge. That is why the w13 judge
+ *      wrote «no навес, no stop pole, no bus-bay marking» while the code that
+ *      places one is green: the predicate is live, the pixels are not a спирка.
+ *      THE CHEAP EXACT FIX, end-to-end already supported: give
+ *      `content/world/mg-busstop-v1.json` (and its `platform/public/world/`
+ *      twin) ONE building with `kind: "busStop"` over the bay. `props.ts`
+ *      builds the MODELLED shelter from that frontage, and `busStopSheltersOf`
+ *      stands down by its own first guard (:709-713) so no second навес
+ *      appears. `DistrictBuilding.kind` already admits it (world/types.ts:234
+ *      — `"school" | "busStop"`); no new type, no new renderer.
+ *
  * Both are OUTSIDE this file and neither moves a graded metre. What WAS inside
  * it — the floor that kept the rig in the бус лента at every taught pace, and
  * the compiled gate that certified the yield before the rig had moved — is

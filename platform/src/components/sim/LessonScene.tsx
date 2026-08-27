@@ -2503,7 +2503,41 @@ export function ReadyScene({
           „Клавиши" legend [must not be] opening over the tutorial card by
           default". It shares the top-left slot with the checklist and the step
           card, and on a keyboard-first legend the first thing a mouse-first
-          lesson shows is a wall of key caps. One click still opens it. */}
+          lesson shows is a wall of key caps. One click still opens it.
+
+          ── ⏸ THE BIRTH IS FILED AGAIN AND IT IS NOT FIXED HERE — sweep w6,
+             2026-08-27, sc-junction-rhr:96062896 („the «Клавиши · за напреднали»
+             panel is expanded by default when the student arrives"), repeated
+             on sc-ac-truck-spray, sc-vp-readiness and sc-pk-move-off. The row
+             is REAL and it reproduces: `w13/sc-junction-rhr__pc-right/
+             01-arrival.png` has the sheet open before the student has touched
+             anything, and `03-ready.png` still does. It is also, exactly, what
+             the expression below is written to produce, so it is a DECISION and
+             not a bug — and it is not one this lane may take:
+
+               · the default's reason is founder-facing and stated on the
+                 component („collapsing it outright would hide the keyboard from
+                 a first-time student who has no other way to discover the
+                 controls"). Whether it still holds now that the collapsed state
+                 is a LABELLED pill — «⌨ Клавиши · за напреднали ▸», one click,
+                 always on the glass — is the founder's question, not a lane's;
+               · the expression below is pinned as SOURCE TEXT by
+                 `__tests__/controlsLegendLifetime.test.ts` („the founder-facing
+                 default is untouched"), a file this lane does not own, so
+                 narrowing it here lands a red suite in someone else's file;
+               · the obvious narrowing — a device-wide „seen" flag, the shape
+                 the touch hint next door already has — was explicitly REJECTED
+                 for this panel by the lane that gave it a lifetime, in that
+                 same test: „There is no device-wide «seen» flag for a piece of
+                 per-lesson furniture."
+
+             So the row stays open, with the three artefacts that would have to
+             move together named. What DID land is the lifetime
+             (`controlsLegendLifetime.ts`): the sheet folds to its pill once the
+             car is genuinely moving, so the occlusion is bounded to the
+             standstill the student reads the briefing in — which is precisely
+             the window sc-junction-rhr's own step 3 („първо наляво, после
+             НАДЯСНО") needs the glass for. */}
       <ControlsHelp
         defaultOpen={!touchOnly && !driveLockedAtMount}
         topdownAllowed={topdownInCycle}
@@ -3013,6 +3047,65 @@ export function ReadyScene({
                  rather than re-decided. Its ends dissolve over the 26 px and
                  12 px horizontal ramps, so what remains is a stroke with no
                  corners — SimOverlay's own reading of the identical edge.
+
+              ── ✅ RE-MEASURED ON THE POST-REPAIR FRAMES — sweep w6, 2026-08-27.
+                 THE SHADE SHIPS. Three rows came back saying it does not
+                 (sc-crossing-white-cane:452ab297 „no panel … a vignette at one
+                 edge", sc-ov-solid-return:6c0e0f12 part (a), and
+                 sc-crossing-white-cane:90a1ced1 „the «РАЗБРАХ» pill stands on
+                 its own tint"). They do not reproduce on `.audit-frames/w13`,
+                 which is this commit. Written down because FOUR sweeps have now
+                 mis-measured this one surface the same way and the next one
+                 deserves the method rather than another paragraph.
+
+                 WHY THE MEAN SAYS „NO PANEL" AND IS WRONG. Every refutation
+                 quotes a mean luma over a ~1000 × 400 block („38.4 → 38.1"). On
+                 every mobile leg in the corpus the world inside this card's box
+                 is a PARKED LORRY at luma 15–35 — already darker than the shade
+                 would make it — so the mean cannot move and the statistic is
+                 blind by construction. The only columns that CAN move are the
+                 ones over bright world, and on these legs those sit at the
+                 card's left edge — which is why every note describes „a ~160 px
+                 left-edge feather and nothing else". That feather IS the shade;
+                 it is `PEEK_SCRIM_FEATHER_PX.left`.
+
+                 THE MEASUREMENT THAT ANSWERS IT: 01-arrival is the same camera
+                 pose with the hint NOT painted (run.log: „✗ NOT ON THE GLASS")
+                 and 03-ready is it painted, so per pixel solve the compositing
+                 equation instead of averaging —
+                 α = (L_arrival − L_ready) / (L_arrival − L_shade), L_shade =
+                 luma(PEEK_SCRIM_RGB) = 10.0 — over the pixels whose ARRIVAL
+                 luma is > 100, and take percentiles. Eight legs, iPhone 16
+                 landscape 852 × 393 at dpr 3 (sc-ac-snow, sc-ac-crosswind,
+                 sc-ac-wet-braking, sc-crossing-white-cane, sc-crossing-child-
+                 ball, sc-junction-rhr, sc-junction-blind, sc-ov-oncoming-gap,
+                 sc-rb-ped-exit), median α:
+
+                   above the card (device y 120–212)   0.00   ← control
+                   left of the padding box (x ≤ 1490)  0.00   ← control
+                   the 26 px left ramp (x 1520–1590)   0.32 – 0.42
+                   the flat core under the prose       0.87 – 0.94  (p25 ≥ 0.78)
+                   inside «РАЗБРАХ» (y 482–502)        0.82, p95 0.90
+
+                 — i.e. `PEEK_SCRIM_ALPHA` 0.80 under every glyph, the ramps at
+                 half alpha where they belong, and 0.00 where there is no card.
+                 `ACK_CHIP_GROUND_ALPHA`'s „1 − (1 − 0.80)(1 − 0.50) = 0.90"
+                 lands on the pill to the second decimal, so the pill's ground
+                 is DEEPER than the prose's, not absent. That it also reads
+                 BRIGHTER than the road is the 18 % accent tint doing its
+                 identity job on top — the refutations compared the pill to the
+                 bare world instead of to the ground beside it.
+
+                 AND THE GEOMETRY THE `content-box` PAIR ABOVE EXISTS FOR: on
+                 this stage `right` resolves to 12 + 59 (notch) + 60 (flank) =
+                 131 CSS, so the border box is x 503 → 721 CSS and the INK box
+                 x 529 → 709 (device 1587 → 2127). Leftmost glyph pixel on the
+                 binding line («натисни пак надолу — минава на»), measured on
+                 four legs: device x 1591 — 4 px inside the ink edge, i.e. clear
+                 of the ramp, which is what the w12 repair claimed and nothing
+                 had checked. Bottom: the ramp fits α 0.80 → 0 across device
+                 y 589 → 643 and the button's box ends at 594, so the ramp is
+                 BELOW the control, also as claimed.
                  ────────────────────────────────────────────────────────────*/}
           <div
             data-hud="touch-hint-scrim"
@@ -3060,7 +3153,27 @@ export function ReadyScene({
                 16.6 % of the screen — on an orientation where the thumb layout
                 cannot be used yet anyway. So portrait carries the one
                 instruction that is actionable right now, and the gesture
-                teaching arrives in landscape, where the thumbs are. */}
+                teaching arrives in landscape, where the thumbs are.
+
+                ⚠ AND IT IS READ AS A CLIPPED HEADING EVERY SWEEP. Filed
+                  2026-08-27 as sc-ov-oncoming-gap:e8b1bae7 — „the teach card's
+                  own heading «Завърти телефона хоризонтално» is cut off above
+                  the top of the viewport, so the card starts mid-text at «Ляв
+                  палец»" — against three lessons at once (sc-rb-ped-exit,
+                  sc-junction-blind). It is not clipped and there is nothing
+                  above the viewport: this line is `display: none` in LANDSCAPE,
+                  which is the only orientation the corpus photographs, and the
+                  card's own top edge sits 73.3 CSS px BELOW y = 0 (device 220,
+                  measured as the shade's hard top edge on the w13 frames —
+                  `NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN`). What produces the row
+                  is the probe: run.log prints `textContent`, which includes
+                  `display: none` subtrees, so the harness reads a string the
+                  glass never carried and every reader then hunts for it. The
+                  markup is correct as it stands — the fix, if one is wanted,
+                  belongs to the probe (tools/) and would be `innerText` or a
+                  visibility filter. Do not delete or unhide this line to make
+                  the row go away; portrait needs it and landscape must not
+                  have it. */}
             <p className="hidden shrink-0 text-xs font-black [@media(orientation:portrait)]:block">
               Завърти телефона хоризонтално
             </p>

@@ -214,6 +214,81 @@
 //    улицата е суха и черна.» The А15 post is placed; the season it warns
 //    about is not.
 //
+// 2c. AND THE SEASON IS NOW THE SMALLER HALF OF IT. MEASURED 2026-08-27 —
+//    „SAME STRETCH OF STREET" IS A BUILDER, NOT A PRESET, AND IT ARRIVED IN
+//    WAVE 3. §2b routes the ice pair's summer look to a `winter` flag +
+//    `presets.ts` + „bare trees / grey verges in the world module", and that
+//    is still the right address for the LIGHT and the FOLIAGE. It is no
+//    longer the whole address, and a reader who works only that list will
+//    re-derive a season for a defect that is 43 m of invented city block.
+//
+//    `world/builders/worldRim.ts` (added in bbf1223, the wave-3 repair for
+//    „the world simply runs out and the car keeps going") builds a CONTIGUOUS
+//    BELT OF BUILDING MASSES around every district whose `meta.mapKind` is a
+//    string — 102 `scenario-*` + poligon-v1, i.e. every map any lesson in this
+//    file runs on. `buildWorldGeometry.ts:472` calls it unconditionally and
+//    hands the result to `buildBuildings(..., extraVolumes)`, which pushes the
+//    masses through the SAME walls / roofs / collider accumulators as an
+//    authored блок. Read out of `builders/constants.ts`, the belt's OUTER face
+//    stands at TERRAIN_MARGIN_M(60) − WORLD_RIM_TERRAIN_INSET_M(3) = 57 m
+//    outside the declared box; its NOMINAL inner face at 57 −
+//    TERMINUS_CLOSE_DEPTH_M(14) = 43 m, and a mass may step in by up to
+//    WORLD_RIM_STEP_M(6) more, so 37…43 m is the honest inner band. Height is
+//    clamped to 9…22 m (TERMINUS_CLOSE_MIN/MAX_HEIGHT_M).
+//
+//    ON THE ICE PAIR'S OWN MAPS. ac-ice-v1, ac-night-v1 and ac-rain-v1 declare
+//    the IDENTICAL box (minX −28.12, minY 0, maxX 14.125, maxY 360), so the
+//    belt's east run stands at x 51.1…71.1 and its west run at x −85.1…−65.1,
+//    both for the full 360 m plus the corners. The own lane is x = 4.06, so
+//    the nearest face is 47.1…53.1 m off the student's right shoulder; a 22 m
+//    mass at 47 m subtends 25°. Those three lessons author ONE building each
+//    (ac-ice-v1 height 6 „default", ac-night-v1 7 „default"); ac-rain-v1
+//    authors 19. Every OTHER block face in their frames is this belt.
+//
+//    AND IT IS THE SAME BELT, MASS FOR MASS. The id is composed at
+//    worldRim.ts:264 as `world-rim-${side}-${i}` — the DISTRICT IS NOT IN IT.
+//    So `hash01('rim-depth:'+id)`, `hashString('rim-height:'+id)` and — via
+//    `buildings.ts:268` — `facadeVariant(b.id, …)` all return the same values
+//    on any two districts that split their runs the same way. Two 360 m
+//    streets with one bounds box get the same positions, the same depths, the
+//    same heights and the same facade variants. That is the whole of the audit
+//    row this file has been carrying as a weather problem — sc-ac-ice
+//    :86eab7e9, „the same mid-rise block facades … as sc-ac-bridge-ice" — and
+//    nothing in this store, in `presets.ts` or in a season flag can move it.
+//
+//    IT ALSO RE-DRESSES MAPS THAT ARE NOT STREETS: mw-v1 authors ONE building
+//    over 2,606 m of motorway and ov-crest-v1 TWO over 900 m of извънградски
+//    път, which is why sc-ac-truck-spray's «Магистрала» and sc-ov-crest-curve's
+//    «Учебен извънградски път» both photograph as a boulevard walled by
+//    six-storey blocks in w13 while their district JSONs are unchanged (the
+//    `content/world/` and `platform/public/world/` copies are byte-identical
+//    for all fifteen maps in this lane — the world that loads IS the world
+//    that is authored). The w13 judges read that as „the route itself was
+//    rebuilt"; the route was not touched.
+//
+//    THE EXACT EDITS, NEITHER OF THEM IN THIS FILE:
+//      · worldRim.ts:264 — put the district in the mass id
+//        (`world-rim-${district.meta.district}-${side}-${i}`), or key the three
+//        hashes off it, so the belt stops being one building repeated across
+//        the catalogue;
+//      · worldRim.ts — the belt's KIND must follow the road class. A rim for
+//        `class: "motorway"` or a rural `unclassified` is a treeline, an
+//        embankment or a field edge, not a 22 m facade; today `frontageHeightM`
+//        is the only per-district input and it clamps to [9, 22] whatever the
+//        map is.
+//    A THIRD ONE IS GRADED, AND IT IS THE SHARP ONE: the belt's walls go into
+//    `colliders.buildings` (buildings.ts:269 — the same accumulator), so
+//    reaching the edge of the drawn world is now booked as «Удар в неподвижно
+//    препятствие», Наредба № 38 прил. 5 т. 10 б. „в", −10 изпитни точки,
+//    ОПАСНА ГРЕШКА, exam terminated. On `.audit-frames/w13/frames/
+//    sc-ov-oneway__pc-right` the RIGHT leg ends exactly there: 0 км/ч against a
+//    flat unlit facade at 04-t133s, objectives 2/3 unmet, and the fault card's
+//    own words are «пътят ѝ е излязъл извън платното за движение». Before
+//    wave 3 that drive ended on a green plane and graded nothing. Leaving the
+//    training area must not be a Наредба-38 dangerous error — it needs its own
+//    end-of-drive event, or the rim colliders must be excluded from COLLISION.
+//    Filed against the world/scene lane; nothing here can reach it.
+//
 // 3. THIS STORE HOLDS THE LOOK; NOTHING HOLDS THE GRIP, AND THE TWO ARE
 //    AUTHORED SEPARATELY. What the student SEES comes from
 //    `environment.{rain,fog,snow}` → setWeatherTarget → these channels. What

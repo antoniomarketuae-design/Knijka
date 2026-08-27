@@ -25,7 +25,7 @@ import { describe, expect, it } from "vitest";
 
 import { cockpitMirrorBottomFraction, idleMirrorEdgePx } from "../CameraRig";
 import { COCKPIT_HFOV_RAD, cockpitVFovForAspect } from "@/modules/sim/vehicle";
-import { hotspotScreenRect } from "@/modules/sim/scene/vitok/cabinLook";
+import { hotspotScreenRect, projectCockpitPoint } from "@/modules/sim/scene/vitok/cabinLook";
 
 /**
  * The founder's handset, landscape: 2556×1179 device px at dpr 3 → 852×393 CSS.
@@ -40,6 +40,30 @@ const PC_FOV = cockpitVFovForAspect(PC_ASPECT);
 
 /** FOV_WIDEN_COCKPIT is 5° at ~130 km/h; the rig adds it to the base fov. */
 const SPEED_WIDEN_DEG = 5;
+
+/** The 780×360 profile — the second phone shape `touchArc.test.ts`'s LADDER
+ *  sweeps, and the tighter of the two. */
+const SMALL_ASPECT = 780 / 360;
+
+/**
+ * The interior mirror GLASS's top edge, chassis-local — B58's own numbers,
+ * restated here rather than imported because they live in a comment and in a
+ * baked asset. The shipped edge is the constant-height line y 0.9086 running
+ * z 0.470 → 0.417 across the quad (`VitokCockpit.tsx`, MIRROR POD). MirrorRig
+ * then lifts the quad along the EYE RAY, i.e. toward SMALLER z, which projects
+ * HIGHER — so these two points are the conservative end of the real edge.
+ */
+const GLASS_TOP_FAR: readonly [number, number, number] = [-0.083, 0.9086, 0.47];
+const GLASS_TOP_NEAR: readonly [number, number, number] = [0.119, 0.9086, 0.417];
+
+/**
+ * The lower edge an „aspect-solved header lip" would have to reach to be worth
+ * drawing, as a fraction of frame height from the BOTTOM — the figure
+ * `VitokCockpit.tsx`'s own re-solve arrives at (fy 0.985 puts the band at
+ * 1.5 % of frame height on the handset). It is a candidate, not a shipped
+ * number; it is here so the assertion below can refute it by arithmetic.
+ */
+const HEADER_LIP_CANDIDATE_FY = 0.985;
 
 describe("cockpitMirrorBottomFraction — the edge the DOM rail steps below", () => {
   it("reports a real edge on the founder's handset, where the frames show one", () => {
@@ -167,5 +191,83 @@ describe("idleMirrorEdgePx — the case analysis the cockpit branch was missing"
     // `Math.round(NaN)` reaches the DOM as the string "NaNpx".
     expect(idleMirrorEdgePx("cockpit", "forward", HIS_FOV, 0)).toBe(0);
     expect(idleMirrorEdgePx("cockpit", "forward", HIS_FOV, Number.NaN)).toBe(0);
+  });
+});
+
+/**
+ * THE MIRROR'S *TOP* EDGE — catalogue row sc-mw-emergency-lane:3ffb0692, filed
+ * three sweeps running: „the rear-view mirror is a black housing floating
+ * detached in open sky above the windscreen header, skewed off-axis and clipped
+ * by the top edge of the screen, on every mobile frame."
+ *
+ * THE ROW IS NOT CLOSED BY THESE ASSERTIONS and this file does not pretend it
+ * is. What they pin is the DATUM the repair turns on, because the repair was
+ * about to be attempted in the wrong shape.
+ *
+ * `VitokCockpit.tsx` names two candidate fixes: an aspect-solved HEADER LIP
+ * that opens as the vFOV narrows, or bringing the whole mirror station down on
+ * wide aspects. A lip has to be drawn ABOVE the glass — and on the founder's
+ * handset there is no screen above the glass to draw it in. Measured on the
+ * row's own evidence frame (`.audit-frames/w13/frames/
+ * sc-mw-emergency-lane__mobile-right/04-t090s.png`, 2556 × 1179): ROW 0 of the
+ * image carries srgb(125,142,165) from x 1756 to x 2040 — the reflected sky,
+ * i.e. 284 device px / 95 CSS px of live REFLECTION touching the top row of the
+ * screen, with cut bezel either side of it. The shipped projection says the
+ * same thing from the shipped constants, and that is what is asserted here.
+ *
+ * MUTATION THAT MATTERS: solve the lip anyway and its lower edge lands at
+ * fy 0.985, which the last case shows is BELOW the glass top at every x on
+ * that handset — a dark band across the top of the reflection, on the surface
+ * three lessons grade a glance at.
+ */
+describe("the mirror's TOP edge — why a header lip cannot be the fix", () => {
+  it("puts the whole mirror proxy off the top of the canvas on both phones", () => {
+    // `top` is a fraction from the canvas TOP, so negative = above the canvas.
+    // The mirror is not merely high on these profiles; it is PAST the edge.
+    for (const aspect of [HIS_ASPECT, SMALL_ASPECT]) {
+      const rect = hotspotScreenRect("hotspot_mirror_rear", "forward", aspect);
+      expect(rect).not.toBeNull();
+      expect(rect!.top).toBeLessThan(-0.12);
+    }
+  });
+
+  it("does NOT on the PC window — this is an aspect defect, not a mirror defect", () => {
+    // The same geometry, the same pose, a window 0.57 narrower: the proxy is
+    // fully on the canvas. Nothing about the mirror is broken; the hFOV lock
+    // spends the phone's vertical angle and the cabin rides off the top.
+    const rect = hotspotScreenRect("hotspot_mirror_rear", "forward", PC_ASPECT);
+    expect(rect).not.toBeNull();
+    expect(rect!.top).toBeGreaterThan(0);
+  });
+
+  it("clips the GLASS, not just the housing — which is what the frame shows", () => {
+    // The row reads as „a housing clipped at the top". It is worse than that:
+    // the reflective surface itself is cut. `.y` is fy from the BOTTOM, so
+    // ≥ 1 means the point is above the canvas.
+    const far = projectCockpitPoint(GLASS_TOP_FAR, "forward", HIS_ASPECT);
+    const near = projectCockpitPoint(GLASS_TOP_NEAR, "forward", HIS_ASPECT);
+    expect(far.ahead && near.ahead).toBe(true);
+    // The near corner is past the edge outright…
+    expect(near.y).toBeGreaterThan(1);
+    // …and the far one, the lowest point of the whole top edge, is inside by
+    // less than 1 % of frame height — 3.3 CSS px of a 393 px window.
+    expect(far.y).toBeGreaterThan(0.99);
+    expect(far.y).toBeLessThan(1);
+    // On the PC window the same edge sits a comfortable way down the frame.
+    expect(projectCockpitPoint(GLASS_TOP_NEAR, "forward", PC_ASPECT).y).toBeLessThan(0.9);
+  });
+
+  it("leaves a header lip nowhere to go: the solved edge lands ON the reflection", () => {
+    // THE REFUTATION, as arithmetic rather than as a rendered opinion. A lip is
+    // only worth drawing if its lower edge is BELOW the frame top and ABOVE the
+    // glass. On the handset those two constraints have no overlap.
+    const glassTopFy = projectCockpitPoint(GLASS_TOP_FAR, "forward", HIS_ASPECT).y;
+    expect(HEADER_LIP_CANDIDATE_FY).toBeLessThan(glassTopFy);
+
+    // And the failure is specific to the wide aspect — at 16:9 the same
+    // candidate clears the glass by more than 5 % of frame height, which is why
+    // the option looked reasonable when it was written down.
+    const refGlassTopFy = projectCockpitPoint(GLASS_TOP_NEAR, "forward", 16 / 9).y;
+    expect(HEADER_LIP_CANDIDATE_FY).toBeGreaterThan(refGlassTopFy + 0.05);
   });
 });
