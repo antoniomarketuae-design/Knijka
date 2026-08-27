@@ -190,6 +190,21 @@ function wallTopM(meshes: readonly MeshData[], rect: [number, number, number, nu
   return top;
 }
 
+/** The furthest NORTH any built facade reaches inside a district-space rect. */
+function wallMaxYIn(meshes: readonly MeshData[], rect: [number, number, number, number]): number {
+  let far = -Infinity;
+  for (const m of meshes) {
+    const p = m.positions;
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i]!;
+      const y = -p[i + 2]!;
+      if (x < rect[0] || x > rect[2] || y < rect[1] || y > rect[3]) continue;
+      far = Math.max(far, y);
+    }
+  }
+  return far;
+}
+
 /** The lot's own roadway: the `service` edge, as authored. */
 function aisleOf(d: District) {
   const e = d.roads.edges.filter((r) => r.class === "service");
@@ -355,7 +370,15 @@ describe("the enclosure's dimensions are the ones that were reasoned about", () 
     expect(clearAheadM(segs, [11.5, -60], 0)).toBeCloseTo(32.03, 2);
     // North end: the flanks run PAST the dead end far enough to butt into the
     // end frontage, so the two corners of the U are joins, not 18 m slits.
-    expect(clearAheadM(segs, [11.5, 100], 180) - 100).toBeCloseTo(-72, 2);
+    //
+    // Read off the mesh in the flank's own band rather than by firing a ray
+    // back from y = 100. That probe stood 60 m outside the district's own box
+    // (`lot-perp-v1` maxY = 40) and it stopped meaning what it says the day
+    // `builders/worldRim.ts` landed: the first facade on that line is now the
+    // WORLD's edge at y = 97, which is that pass working, not this one
+    // failing. The window ends at y = 74 — north of the join being measured,
+    // south of anything the belt can build (its inner face is ≥ 77 here).
+    expect(wallMaxYIn(world.buildingWalls, [11.12, -29, 25.2, 74])).toBeCloseTo(72, 2);
   });
 
   it("faces its facades at the driver, not away from him", () => {
@@ -470,8 +493,33 @@ function synthetic(opts: {
   } as unknown as District;
 }
 
+/**
+ * Facade vertices standing IN THE LOT'S OWN NEIGHBOURHOOD.
+ *
+ * SCOPED, and narrowed rather than widened, since `builders/worldRim.ts`
+ * landed. That pass belts the district's BOX with frontage so a student who
+ * drives off the carriageway meets an edge instead of an empty plane; on these
+ * synthetics the box is ±300 m, so the belt lands at |x|, |y| ≈ 351–357 and an
+ * unscoped count carries 10 800 vertices of world rim on EVERY fixture below —
+ * at which point all four gates read „> 0" and none of them bites again.
+ *
+ * The window is 200 m about the origin. The enclosure this file is about cannot
+ * leave it: its flanks run the aisle (y ∈ [−28, 120]) at |x| ≤ 25 even on the
+ * deep-bay branch, and its frontage closes the dead end at y ≈ 138–152. The
+ * belt cannot enter it: it stands 151 m outside. So the count is the same
+ * measurement it always was, on every document this file builds.
+ */
+const LOT_NEIGHBOURHOOD_M = 200;
 const wallCount = (d: District) =>
-  buildWorldGeometry(d).buildingWalls.reduce((n, m) => n + m.positions.length, 0);
+  buildWorldGeometry(d).buildingWalls.reduce((n, m) => {
+    let hits = 0;
+    for (let i = 0; i < m.positions.length; i += 3) {
+      const x = m.positions[i]!;
+      const y = -m.positions[i + 2]!;
+      if (Math.abs(x) <= LOT_NEIGHBOURHOOD_M && Math.abs(y) <= LOT_NEIGHBOURHOOD_M) hits += 3;
+    }
+    return n + hits;
+  }, 0);
 
 describe("the enclosure's four gates, and the branch the catalogue never binds", () => {
   it("needs the map to author bays — an empty aisle is not a car park", () => {

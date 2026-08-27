@@ -22,6 +22,14 @@ const NO_QUALITY_MEASURED =
   "Нито един показател за качеството на маневрата не бе измерен на това каране: " +
   "звездите горе идват само от изпитния лист — наказателни точки и изпълнени задачи — " +
   "а не от оценка на самото изпълнение.";
+/**
+ * The third clause, duplicated for the same reason as the two above: what the
+ * under-par „Ориентировъчно време" row now says about the ориентир itself.
+ */
+const PAR_NOT_A_TARGET =
+  "Ориентирът е груба мярка колко трае маршрутът в спокойно темпо, а не цел за " +
+  "надбягване: по-бързото каране не добавя звезда и не променя изпитния лист. " +
+  "Безопасната скорост я определя пътят — знакът, видимостта и хората по него.";
 
 const RUBRIC: RubricSpec = {
   placement: { objectiveId: "park" },
@@ -421,9 +429,114 @@ describe("scoreRubric", () => {
       expect(line.detailBg, line.id).not.toContain(NOT_IN_STARS);
       expect(line.detailBg, line.id).not.toContain(NO_QUALITY_MEASURED);
     }
-    // Par time reports measured:true and is informational — it must be spared.
+    // Par time reports measured:true and is informational — it must be spared
+    // BOTH consequence clauses. It carries its own sentence (below) and that
+    // one is neither of these; the pin stays an exact `toBe` on the whole
+    // string so „spared" cannot quietly become „spared, plus whatever else
+    // somebody appended".
     const par = breakdownBg.find((l) => l.id === "parTime")!;
-    expect(par.detailBg).toBe("75 с — в ориентира от 90 с.");
+    expect(par.detailBg).toBe(`75 с — в ориентира от 90 с. ${PAR_NOT_A_TARGET}`);
+  });
+
+  // -------------------------------------------------------------------------
+  // THE ROW THAT TOLD THE FLAT-OUT DRIVE IT WAS THE RIGHT ONE.
+  //
+  // MEASURED · w11 · `sc-vu-pass-clearance` (the lesson whose subject IS
+  // slowing down beside a vulnerable road user), read off its two
+  // `_audit-debrief.json` cards:
+  //     pc-wrong  51 s flat out, never met a road user
+  //               → „51 с — в ориентира от 60 с."
+  //     pc-right  206 s careful → „206 с при ориентир 60 с — спокойно, …"
+  // Everything else on the two cards is identical (ИЗДЪРЖАН, 3 наказателни
+  // точки, ★★☆, same XP), so this row was the only thing separating them and
+  // it separated them the wrong way. `sc-pk-move-off/pc-wrong` — 59 км/ч with
+  // the 50 disc live — got the same congratulation: „48 с — в ориентира от
+  // 55 с".
+  //
+  // The number is untouched (doc 76 §6: time never moves a star, and it still
+  // does not — `points` stays null and the fold ignores it). What is asserted
+  // here is that the UNDER-par side is no longer a bare verdict pointing at
+  // speed, and that the OVER-par side — the half that was already right — is
+  // byte-identical to what shipped.
+  // -------------------------------------------------------------------------
+  describe("the ориентир is not a target to beat", () => {
+    it("under the ориентир, the row says beating it earns nothing", () => {
+      const par = scoreRubric(makeResult(), RUBRIC).breakdownBg.find((l) => l.id === "parTime")!;
+      expect(par.detailBg).toContain("75 с — в ориентира от 90 с.");
+      expect(par.detailBg).toContain(PAR_NOT_A_TARGET);
+      // THEO-4: the reason, not just the refusal — the card names what sets a
+      // safe speed instead of leaving „не е цел" as another bare verdict.
+      expect(par.detailBg).toContain("Безопасната скорост я определя пътят");
+      // And it is still informational: no points, no star.
+      expect(par.points).toBeNull();
+      expect(scoreRubric(makeResult(), RUBRIC).stars).toBe(
+        scoreRubric(makeResult(), { ...RUBRIC, parTimeSec: 1 }).stars,
+      );
+    });
+
+    it("over the ориентир the line is byte-identical to what shipped", () => {
+      // The half that already carried the north-star sentence. Changing it
+      // would also break `lessons/__tests__/b15-lawful-wait.test.ts`, which
+      // pins it with its own exact `toBe` — pinned here too so a lane editing
+      // this file sees it without having to find that suite.
+      const slow = makeResult({ durationSec: 200 });
+      const par = scoreRubric(slow, RUBRIC).breakdownBg.find((l) => l.id === "parTime")!;
+      expect(par.detailBg).toBe("200 с при ориентир 90 с — спокойно, точността е преди скоростта.");
+      expect(par.detailBg).not.toContain(PAR_NOT_A_TARGET);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // AN ABORTED DRIVE HAS NOT DRIVEN THE ROUTE THE ОРИЕНТИР DESCRIBES.
+  //
+  // MEASURED · w11 · 59 lanes end with «Урокът беше прекъснат преди края» and
+  // every one of them also printed „N с при ориентир M с" — two surfaces of one
+  // result screen disagreeing about the same drive. This lane's own exhibit is
+  // `sc-vp-readiness/pc-wrong`: „259 с при ориентир 55 с" on a drive that
+  // reached neither of its two checkpoints.
+  // -------------------------------------------------------------------------
+  describe("a lesson that was cut short is not billed against the whole-route ориентир", () => {
+    const abortedPar = (over: Partial<LessonResult> = {}) =>
+      scoreRubric(makeResult({ aborted: true, completedAll: false, passed: false, ...over }), RUBRIC)
+        .breakdownBg.find((l) => l.id === "parTime")!;
+
+    it("names the time as time-until-the-abort and refuses the comparison, with a reason", () => {
+      const par = abortedPar({ durationSec: 259 });
+      expect(par.detailBg).toContain("259 с до прекъсването");
+      expect(par.detailBg).not.toContain("при ориентир");
+      expect(par.detailBg).not.toContain("в ориентира");
+      expect(par.detailBg).toContain("не стигна до края");
+      // THEO-4: a withheld comparison still owes the student the way to get it.
+      expect(par.detailBg).toContain("Карай маршрута докрай");
+    });
+
+    it("BOTH numbers stay on the card — refusing a comparison is not hiding one", () => {
+      // The failure mode this branch is one keystroke away from: a mismatch
+      // somebody filed a row about, quietly deleted instead of explained.
+      const par = abortedPar({ durationSec: 259 });
+      expect(par.detailBg).toContain("259 с");
+      expect(par.detailBg).toContain("90 с"); // RUBRIC.parTimeSec
+    });
+
+    it("a drive that ENDED — however badly — keeps its comparison exactly as filed", () => {
+      // sc-ln-decisive-change:5c5e69a6 („175 с срещу ориентир 60 с") ended
+      // naturally with a task unmet. Its comparison is real and must survive:
+      // an unfinished OBJECTIVE is not an unfinished DRIVE.
+      const par = scoreRubric(
+        makeResult({ durationSec: 175, completedAll: false, passed: false, aborted: false }),
+        { parTimeSec: 60 },
+      ).breakdownBg.find((l) => l.id === "parTime")!;
+      expect(par.detailBg).toBe("175 с при ориентир 60 с — спокойно, точността е преди скоростта.");
+    });
+
+    it("the lawful-wait subtraction still applies, and the star is still untouched", () => {
+      const par = abortedPar({ durationSec: 211, yieldWaitSec: 47 });
+      expect(par.detailBg).toContain("164 с до прекъсването");
+      expect(par.detailBg).toContain("47 с чакане на предимство не се броят");
+      expect(par.points).toBeNull();
+      // An aborted session is floored at one star by the cap, not by this row.
+      expect(scoreRubric(makeResult({ aborted: true }), RUBRIC).stars).toBe(1);
+    });
   });
 
   // -------------------------------------------------------------------------

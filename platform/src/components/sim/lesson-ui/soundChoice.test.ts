@@ -310,3 +310,64 @@ describe("the ⚙ sheet can absorb the row it was just given", () => {
     );
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   …AND THE DESKTOP BAR CARRIES THE SAME ROW — w11, 2026-08-27.
+
+   The block above proves the ⚙ SHEET renders the control, and the sheet is
+   `compact ? <PlayMenu …> : null`. On a roomy screen there is no sheet at all —
+   by design, because „every row of the compact sheet is already a button on
+   this bar" (the shell's own micro-menu census, written beside «Качество»).
+   That sentence was true when it was written and stopped being true the day the
+   «Звук» row landed, and six w11 rows are the receipt:
+
+     sc-sp-limit-end:f5a72845  „The pc settings row is painted in full in every
+       frame and carries advisor frequency, notifications, abort, quality and
+       fullscreen — nothing about sound."
+     sc-sp-eco-coast:185b04f0 · sc-mw-min-speed:3226bd59 ·
+     sc-sp-wet-limit-plate:12ad2d84 · sc-vu-cyclist-hook:c9fb5cdf ·
+     sc-mw-discipline:b87b3683 — all six photographed on `pc-right` frames.
+
+   WHAT IT STILL DOES NOT CLOSE, restated so a later reader does not close those
+   rows on the strength of this: every one of them names volume AND mute AND a
+   state indicator. The level lives in `scene/simAudio.ts` and there is nothing
+   in this lane to bind a slider to. Two nouns of three.
+   ────────────────────────────────────────────────────────────────────────── */
+describe("…AND SO DOES THE ROOMY BAR", () => {
+  /** The desktop settings row, anchored on «Качество» — the row that was the
+   *  LAST time this exact hole was found and closed. */
+  const barAt = LIVE.indexOf("Качество: {qualityValueBg(qualitySelection, quality)}");
+
+  it("finds the bar at all (the scan is the instrument; prove it works)", () => {
+    // A pin that matched nothing would pass the cases below in the reassuring
+    // direction, which is this project's standing failure mode.
+    expect(barAt, "the roomy quality button moved — re-anchor").toBeGreaterThan(-1);
+  });
+
+  /**
+   * MUTATION: comment the whole `{!ended ? (<button … Звук …>)}` block out.
+   * Red, because `LIVE` is the comment-filtered source.
+   */
+  it("paints a sound control on the desktop, not only in the phone's sheet", () => {
+    const tail = LIVE.slice(barAt);
+    expect(tail.slice(0, tail.indexOf("</div>"))).toContain("onClick={toggleSimAudioMuted}");
+    // …and the STATE WORD is on the glass, which is the half a drive harness
+    // can photograph. Read off the same store the sheet reads, so the two
+    // surfaces cannot show different states of one bit.
+    expect(tail.slice(0, tail.indexOf("</div>"))).toContain("Звук {soundValueBg(soundMuted)}");
+  });
+
+  /**
+   * THEO-4: a setting that changes what the student LEARNS may not ship as a
+   * bare state word. A muted session teaches a systematically faster car
+   * (doc 82 §4.4). The bar has no room for a second line, so the trade rides in
+   * `title` — «Качество»'s own answer to the same constraint on the same row.
+   */
+  it("says what muting costs, in the sheet's own words", () => {
+    const tail = LIVE.slice(barAt);
+    expect(tail.slice(0, tail.indexOf("</div>"))).toContain("title={soundHintBg(soundMuted)}");
+    expect(tail.slice(0, tail.indexOf("</div>"))).toContain(
+      "aria-label={soundAriaLabelBg(soundMuted)}",
+    );
+  });
+});

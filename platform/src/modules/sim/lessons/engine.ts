@@ -53,7 +53,10 @@ import {
   personContactVoidsObjective,
   railBarredVoidsObjective,
   stepObjective,
+  yieldFailedVoidsObjective,
   type ObjectiveContext,
+  type YieldFaultCode,
+  type YieldFaultRecord,
 } from "./objectives";
 import { shownObjectiveCapKmh, stepYieldVoice } from "./advisor";
 import { foldTrainingScore, type PenaltyEscalation } from "./escalation";
@@ -580,6 +583,46 @@ function isBarredRailEntry(e: ScorableEvent): boolean {
   );
 }
 
+/**
+ * The three billed rows that falsify a «пропусни …» banner — the ledger
+ * `ReachZoneParams.requireYieldClean` consults (`objectives.ts` carries the
+ * drive, the census and the window; `yieldCleanHonoured` carries the read).
+ *
+ * TYPED AGAINST THE REAL UNION ON PURPOSE. `YieldFaultCode` is declared in
+ * `objectives.ts` so that evaluator keeps its single dependency on `rules/`,
+ * and this `Set<ViolationCode>` is where the two vocabularies are made to
+ * agree: a rename or a retirement in `rules/types.ts` fails the build here
+ * instead of quietly emptying the gate — the instrument bug this programme has
+ * shipped four times.
+ *
+ * IT READS THE BILL, NOT THE TRACKER, exactly like `isBarredRailEntry` above
+ * and for the argument `objectives.ts railClearHonoured` sets out: what reaches
+ * this predicate is a fault the protocol already prints, with its copy, its
+ * corrective and its law refs, so the withheld certificate is never the
+ * student's first news of the failure.
+ *
+ * AND IT CANNOT COST ANYONE A PASS. All three are `severityClass: "opasna"`
+ * (catalog.ts), and one опасна is «допусната е опасна грешка — директно
+ * неиздържан» on its own. So every drive this demand can refuse was already
+ * failed by the sheet before the objective was consulted: what the refusal
+ * removes is the CONTRADICTION between the two halves of that sheet, never a
+ * verdict. `reach-zone-yield-clean.test.ts` asserts the severity so that a
+ * later reclassification cannot quietly turn this into a demand that decides
+ * pass/fail by itself.
+ */
+const YIELD_FAULT_CODES: ReadonlySet<ViolationEvent["code"]> = new Set<ViolationEvent["code"]>([
+  "FAILED_TO_YIELD",
+  "EMERGENCY_NOT_YIELDED",
+  "PEDESTRIAN_NOT_YIELDED",
+]);
+
+function isYieldFault(e: ScorableEvent): e is ViolationEvent {
+  return e.kind === "violation" && YIELD_FAULT_CODES.has(e.code);
+}
+
+/** Shared empty ledger — see the read below for why the clean frame gets one. */
+const NO_YIELD_FAULTS: readonly YieldFaultRecord[] = [];
+
 /** Map rule-engine output onto the HUD event contract (toasts). */
 function toHudEvents(events: ReadonlyArray<RuleEvent>): HudEvent[] {
   return events.map((e) =>
@@ -968,6 +1011,27 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // channel that breaks when a template moves a mark.
   const enteredRailBarredInRun =
     prev.events.some(isBarredRailEntry) || scoredEvents.some(isBarredRailEntry);
+  // …AND THE BILLED FAILURES TO GIVE WAY, on the same two halves of the same
+  // ledger, for `ReachZoneParams.requireYieldClean`. Both halves for the reason
+  // the block above gives: on `sc-signal-flashing` the −10 and the disc are
+  // five seconds apart, so a car that is billed on the frame it also crosses
+  // the waypoint must not be certified by a ledger one frame stale.
+  //
+  // NOT A BOOLEAN, unlike its three neighbours: this demand refuses inside a
+  // WINDOW, so the evaluator needs the time each fault was billed on and which
+  // road user it was about. Folded once here rather than per objective — the
+  // ledger is the same for all of them.
+  //
+  // THE CLEAN FRAME ALLOCATES NOTHING, and on a 60 Hz reducer that is worth the
+  // extra line: the overwhelming majority of frames in the corpus carry no
+  // yield fault at all, and those pay two `some` scans over a handful of events
+  // and return the shared empty array. The build runs only once a fault exists.
+  const yieldFaults: readonly YieldFaultRecord[] =
+    prev.events.some(isYieldFault) || scoredEvents.some(isYieldFault)
+      ? [...prev.events, ...scoredEvents]
+          .filter(isYieldFault)
+          .map((e) => ({ code: e.code as YieldFaultCode, tSec: e.t }))
+      : NO_YIELD_FAULTS;
 
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
@@ -1009,12 +1073,30 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // (applyStagedOutcome) + the run-wide met-reds tally. Rebuilt per
       // iteration — a red met by the objective that just completed must be
       // visible to the next one on the same frame.
+      //
+      // THE WINDOW `requireYieldClean` REFUSES INSIDE. The chain is strictly
+      // sequential, so the moment this objective became the active one is the
+      // moment its predecessor completed; the first one has been active since
+      // the session began. Recomputed per iteration for the same reason the
+      // met-reds tally is — an objective that completed on THIS frame moves the
+      // next one's window to THIS frame, and a stale bound would hand the new
+      // gate its predecessor's faults.
+      //
+      // `null` COMPLETION IS „UNKNOWN", NOT „ZERO". A rebuilt or replayed state
+      // whose done objective carries no timestamp leaves the field off the
+      // context entirely, which leaves the demand MET — widening the window to
+      // the whole run instead would turn a missing number into a refusal, and
+      // unknown may never become a refusal.
+      const activeSince =
+        currentIndex === 0 ? 0 : objectives[currentIndex - 1].completedAtSec;
       const ctx: ObjectiveContext = {
         stagedOutcomes: prev.stagedOutcomes ?? [],
         redsMetInRun: countRedsMet(evalStates),
         ...(struckAPersonInRun ? { struckAPersonInRun: true } : {}),
         ...(struckABodyInRun ? { struckABodyInRun: true } : {}),
         ...(enteredRailBarredInRun ? { enteredRailBarredInRun: true } : {}),
+        ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
+        ...(activeSince !== null ? { objectiveActiveSinceSec: activeSince } : {}),
       };
       const before = evalStates[currentIndex];
       const step = stepObjective(current.params, before, tick, ctx);
@@ -1346,6 +1428,12 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // of the route. Nothing is graded by it: the objective keeps its honest
       // `active` status and `buildLessonResult` reports finished-and-failed, so
       // the certificate is still refused. Only the strand goes.
+      //
+      // The same window rule the objective loop applies, re-derived for the
+      // index the chain is standing on NOW (the loop may have advanced it).
+      // `null` stays „unknown" and leaves the strand exactly where it was.
+      const terminalActiveSince =
+        currentIndex === 0 ? 0 : objectives[currentIndex - 1].completedAtSec;
       const terminalUnearnable =
         onTerminal &&
         (personContactVoidsObjective(params[currentIndex], struckAPersonInRun) ||
@@ -1359,7 +1447,20 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           // guarded drills put the gated disc last, so without it the student
           // who drove under the boom could reach the чл. 52 protocol only by
           // quitting (`railBarredVoidsObjective`).
-          railBarredVoidsObjective(params[currentIndex], enteredRailBarredInRun));
+          railBarredVoidsObjective(params[currentIndex], enteredRailBarredInRun) ||
+          // The yield term is monotone within its window and BOTH gates that
+          // carry it are the last objective of their drill (sc-sflash-cross,
+          // sc-sdead-cross — 2 of 2 each), so without this arm the repair that
+          // removes the false give-way certificate would replace it with a
+          // drive that cannot end. `yieldFailedVoidsObjective` carries the
+          // reasoning; the window is recomputed here off the same rule the
+          // objective loop uses, because `currentIndex` has moved since.
+          yieldFailedVoidsObjective(params[currentIndex], {
+            yieldFaults,
+            ...(terminalActiveSince !== null
+              ? { objectiveActiveSinceSec: terminalActiveSince }
+              : {}),
+          }));
       if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {

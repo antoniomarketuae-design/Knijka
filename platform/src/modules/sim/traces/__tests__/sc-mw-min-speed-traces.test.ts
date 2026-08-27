@@ -56,6 +56,18 @@ const X_LEFT = -8.12;
 function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"));
 }
+/**
+ * The raw reducer bills for one code, in order, with the w11 re-grade marking
+ * (rules/engine.ts MOTORWAY_CRAWL_REGRADE_SEC): a continuing второстепенна
+ * breach is billed TWICE — the teach the free mini-lesson spends, and the
+ * charge it consumed — and lessons/engine.ts drops the MARKED one wherever the
+ * code was already charged, so the изпитен лист still sees one point.
+ */
+function billMarks(d: RecordedDrive, code: string): boolean[] {
+  return d.ruleEvents
+    .filter((e) => e.kind === "violation" && e.code === code)
+    .map((e) => (e as { regrade?: true }).regrade === true);
+}
 function violationCodes(d: RecordedDrive): string[] {
   return d.ruleEvents.filter((e) => e.kind === "violation").map((e) => e.code);
 }
@@ -126,11 +138,14 @@ describe("sc-mw-min-speed — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-mw-min-speed — the demo PAIR: one variable, two verdicts (doc 76 §9 stage 5)", () => {
-  it("„Пълзене с 40 в активната лента“: exactly DRIVING_TOO_SLOW_FOR_MOTORWAY, once", () => {
+  it("„Пълзене с 40 в активната лента“: exactly DRIVING_TOO_SLOW_FOR_MOTORWAY, taught then charged", () => {
     const drive = drives.get("mistake-crawl-right")!;
     const codes = violationCodes(drive);
     expect([...new Set(codes)].sort()).toEqual([...SC_MW_MIN_SPEED.mistakes[0].codeRefs].sort());
-    expect(codes.filter((c) => c === "DRIVING_TOO_SLOW_FOR_MOTORWAY")).toHaveLength(1);
+    // ONE code, TWO bills, and the second is the marked re-grade — the teach
+    // and the charge it consumed (w11, MOTORWAY_CRAWL_REGRADE_SEC). One raw
+    // bill was what let a whole crawl reach its debrief on «Второстепенни 0».
+    expect(billMarks(drive, "DRIVING_TOO_SLOW_FOR_MOTORWAY")).toEqual([false, true]);
     // The lane is the RIGHT one — keep-right must stay silent, or the demo
     // would be teaching two faults while claiming one.
     expect(codes).not.toContain("NOT_KEEPING_RIGHT");
@@ -145,7 +160,9 @@ describe("sc-mw-min-speed — the demo PAIR: one variable, two verdicts (doc 76 
     const drive = drives.get("mistake-crawl-left")!;
     const codes = violationCodes(drive);
     expect([...new Set(codes)].sort()).toEqual([...SC_MW_MIN_SPEED.mistakes[1].codeRefs].sort());
-    expect(codes.filter((c) => c === "DRIVING_TOO_SLOW_FOR_MOTORWAY")).toHaveLength(1);
+    // The crawl: teach + marked re-grade (see the right-lane case above).
+    expect(billMarks(drive, "DRIVING_TOO_SLOW_FOR_MOTORWAY")).toEqual([false, true]);
+    // Keep-right is untouched by this repair and is still a single bill.
     expect(codes.filter((c) => c === "NOT_KEEPING_RIGHT")).toHaveLength(1);
     expect(codes).not.toContain("EMERGENCY_LANE_DRIVING");
     expect(codes).not.toContain("SPEEDING_OVER_LIMIT");

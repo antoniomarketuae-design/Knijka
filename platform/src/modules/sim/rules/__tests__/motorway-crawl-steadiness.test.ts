@@ -89,11 +89,15 @@ describe("motorway crawl — a steadiness test the live loop can actually pass",
   });
 
   it("books 30 s of jittery 12 км/ч crawl on a 140 км/ч motorway", () => {
-    expect(crawlBills(jitteryCrawl(30, 12))).toBe(1);
+    // TWO bills since w11 (MOTORWAY_CRAWL_REGRADE_SEC): the teach and the
+    // grade. This file's subject is unchanged — whether the jitter lets the
+    // crawl QUALIFY at all — and 0 is still the failing answer.
+    expect(crawlBills(jitteryCrawl(30, 12))).toBe(2);
   });
 
-  it("…and it is still ONE bill, not one per wobble", () => {
-    expect(crawlBills(jitteryCrawl(200, 12))).toBe(1);
+  it("…and it is still not one bill per wobble", () => {
+    // 200 s of jitter is thousands of wobbles and exactly two rows.
+    expect(crawlBills(jitteryCrawl(200, 12))).toBe(2);
   });
 
   it("the averaging length is load-bearing: at the shared 0.04 s window the crawl goes unbooked", () => {

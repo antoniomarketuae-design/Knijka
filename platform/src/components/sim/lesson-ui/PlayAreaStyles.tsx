@@ -1197,6 +1197,47 @@ ${TOUCH_BAND_CSS_VARS}
         transform: translate(-50%, -50%);
       }
 
+      /* …AND THE FOLD CONTROL BESIDE IT PAYS THE SAME 44 px — 2026-08-27.
+
+         ⚠ NO BACKTICKS IN THIS COMMENT. Every rule in this file lives inside a
+         JS template literal, so one backtick here ends the stylesheet and the
+         rest of the file is parsed as code — 80 syntax errors from a quotation
+         mark. That is why the paragraphs around this one quote with «…» and
+         „…" and never with the identifier-quote the rest of the lane uses.
+
+         The ИНСТРУКЦИИ panel had exactly ONE exit and it was a one-way door:
+         onClose clears briefingOpen for the rest of the lesson and nothing
+         re-opens it. sc-ov-crossing-overtake:4bce6fca photographs what that
+         costs — the five-step panel on a DRIVING beat at 11 км/ч, blanking the
+         right kerb the lesson's own step 4 says a person may step out from —
+         so a student who wants the road back has to choose between the road and
+         the authored steps, permanently. The fold («▾», beside the ✕) is the
+         third option, and it is the same 18 px ring on the same argument: the
+         column cannot afford a painted 44 px square.
+
+         WHY A SECOND BLOCK AND NOT A COMMA. popupClose.test.ts pins the close
+         rule by its exact selector text — a regex requiring «[data-hud-close]»
+         to be followed directly by «::before {», and another requiring it to be
+         followed directly by «{ … position: relative» — so a «:is(…)» or a
+         comma-joined selector turns that suite red while changing no pixel.
+         Duplicated deliberately, and the duplication is GATED rather than
+         trusted: briefingFoldControl.test.ts asserts the two ::before bodies
+         are character-identical, so the day one of them is retuned the other
+         cannot silently keep the old number. */
+      [data-hud-fold] {
+        position: relative;
+        z-index: 1;
+      }
+      [data-hud-fold]::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 2.75rem;
+        height: 2.75rem;
+        transform: translate(-50%, -50%);
+      }
+
       /* …AND THE SAME ON THE END-OF-LESSON SCREEN — ROW A2.
 
          His item 2 asks for three things: Space skips the debrief, the screen
@@ -1888,11 +1929,59 @@ ${TOUCH_BAND_CSS_VARS}
          now start at the SAME point of the right-edge column: before this the
          audio chip was centred at the top and the task banner was centred under
          it, so „they do not collide" was an accident of two panels each being
-         in the wrong place. :has(> *) is the honest test — the shell's column
-         is always mounted and is usually empty, and an empty column must not
-         suppress anything. The chip comes back the moment the task line retires
-         (TASK_ANNOUNCE_MS, seven seconds). */
-      [data-sim-stage]:has([data-hud="notify-column"] > *) [data-hud="audio-prompt"] {
+         in the wrong place.
+
+         ⚠ THE SENTENCE THAT USED TO END THIS PARAGRAPH WAS FALSE, AND IT IS THE
+         WHOLE OF THE «audio-prompt» DEAD-SURFACE CLASS — w11, 2026-08-27.
+
+         It read: „:has(> *) is the honest test — the shell's column is always
+         mounted and is USUALLY EMPTY, and an empty column must not suppress
+         anything. The chip comes back the moment the task line retires
+         (TASK_ANNOUNCE_MS, seven seconds)."
+
+         Both halves are wrong against the tree:
+
+           1. THE COLUMN IS NEVER EMPTY. Its first child is the objective
+              banner, and the banner is up for the whole lesson — it is the
+              ЗАДАЧА line on every roomy frame in the catalogue. There is no
+              „task line retires" here; that seven-second clock belongs to the
+              COMPACT overlay queue, which is a different surface in a different
+              file. So on a roomy screen this rule is not a priority, it is a
+              permanent kill switch.
+           2. AND IT REACHES THE PHONE TOO, WHICH IT WAS NEVER MEANT TO. The
+              shell writes «hidden» on this column when compact
+              (LessonPlayShell: className={… compact ? "hidden" : ""}), i.e. the
+              whole thing is display:none on a phone — but :has() matches the
+              TREE, not the box, so a display:none column with children still
+              satisfies :has(> *) and this desktop rule silenced the chip on
+              every mobile beat as well.
+
+         WHAT THAT COST, from the drives rather than from reasoning: sweep w11
+         reports «✗ NOT ON THE GLASS — audio-prompt» on 68 of 68 beats across
+         all four legs of sc-vu-emergency-junction (pc-right 2/2, pc-wrong 2/2,
+         mobile-right 22/22, mobile-wrong 42/42), and the same line on
+         sc-mw-discipline, sc-sp-eco-coast, sc-sp-limit-end, sc-mw-min-speed,
+         sc-sp-wet-limit-plate, sc-vu-cyclist-hook, sc-ac-aquaplane,
+         sc-crossing-white-cane and sc-park-gap-short. Held in the DOM on every
+         beat, painted on none — one selector, nine lessons, seven filed rows.
+
+         THE FIX IS THE ONE TOKEN THAT MAKES THE PREDICATE SAY WHAT IT MEANT:
+         the column must be VISIBLE and carrying something. «:not(.hidden)» is
+         the shell's own switch, read rather than duplicated, so the two cannot
+         drift. That restores the phone to the C1 LADDER above — which is where
+         the arbitration for this chip actually lives («overlay-active» and
+         «:has(touch-hint)» a few rules up, both still in force and both dead
+         for as long as this rule was doing their job for them).
+
+         WHAT IS STILL NOT FIXED, and it is stated instead of being implied by
+         the diff: ON ROOMY THE CHIP IS STILL NEVER PAINTED, because the banner
+         really is permanent and this chip is positioned on the column's OWN box
+         (same top, same right, same width — the rule 800 lines up). Showing it
+         would stack it on the ЗАДАЧА line. Making it visible there needs a
+         PLACE for it, not a predicate, and that is a question about what the
+         notify column is rather than a scoping bug. Filed, not smuggled in. */
+      [data-sim-stage]:has([data-hud="notify-column"]:not(.hidden) > *)
+        [data-hud="audio-prompt"] {
         display: none;
       }
 

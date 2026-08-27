@@ -179,6 +179,10 @@ import { toggleSimAudioMuted, useSimAudioMuted } from "@/modules/sim/scene/simAu
 import { useQualitySelection } from "./QualityPresetSelector";
 import { CalibrationGate, CalibrationPendingCard } from "./CalibrationGate";
 import { HudCloseButton } from "./HudCloseButton";
+// The one floor in this lane for „the car is genuinely under way", borrowed
+// rather than re-decided — see `briefingStandsDown` below for why the briefing
+// panel is now the third surface in this lane to stand on it.
+import { TOUCH_HINT_MOVING_KMH } from "./touchHintLifetime";
 import {
   exitFullscreen,
   FULLSCREEN_CHANGE_EVENTS,
@@ -2020,12 +2024,64 @@ export function isToastArrival(resetForId: number, newestId: number): boolean {
   return newestId >= 0 && newestId > resetForId;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHEN THE BRIEFING STOPS BEING TEACHING AND STARTS BEING A WINDOW BLIND.
+ *
+ * THE FRAME. `sc-ov-crossing-overtake/pc-right/04-t112s.png` (w11), 1440 × 900:
+ * the car is doing 11 км/ч on the approach to a pedestrian crossing and the
+ * five-step ИНСТРУКЦИИ panel is still up, ~320 px of a ~1165 px stage anchored
+ * to the right edge. What is under it is the right kerb, the right-hand lane
+ * and the parked cars along it — the side of the road this lesson's own step 4
+ * says a person may step out from („най-вероятно пропуска човек, когото ти не
+ * виждаш иззад колата му"). The panel is covering the hazard its own sentence
+ * is about, which is the one way a teaching surface can make a student less
+ * safe rather than more.
+ *
+ * AND THE SAME FRAME SHOWS THE RULE ALREADY EXISTS. The «⌨ Клавиши» legend in
+ * the top-left corner of that very frame is a bare pill, because
+ * `controlsLegendLifetime.ts` — this lane, this rule, this floor — stands it
+ * down the first time the car is genuinely moving. `touchHintLifetime.ts` does
+ * the same for the thumb card. The briefing was the only first-run reading
+ * surface in the corridor with no lifetime at all: its ONE control was a ✕ that
+ * destroys the authored steps for the rest of the lesson.
+ *
+ * SO IT FOLDS, IT DOES NOT DISAPPEAR — and that distinction is the whole of the
+ * THEO-4 argument. `PlayAreaStyles` states the principle for this corridor in
+ * as many words: „A teaching card is never treated this way: it moves, it does
+ * not disappear." A student who is driving gets the road back; the steps become
+ * a labelled chip in the same slot, one click from being whole again, which is
+ * exactly the shape the phone has shipped since the peek existed («↓ ОЩЕ N
+ * РЕДА» + «ПРОЧЕТИ»). The roomy leg was the asymmetric one.
+ *
+ * ONCE, AND NEVER AGAINST THE STUDENT. The fold is latched in a ref and fires
+ * at most once per mounted card. A student who opens the chip has answered the
+ * question this rule is guessing at, and the panel then stays open for the rest
+ * of the lesson however often the car stops and starts — the „auto-hide that
+ * will not let you look" is the same crime as the panel that will not go away,
+ * pointing the other way (`controlsLegendLifetime`'s own sentence).
+ *
+ * `Math.abs`, because reversing is driving, and a NaN is FALSE: a speed that
+ * cannot be read is not evidence that anyone is driving, and an unreadable
+ * number must never be the thing that takes the authored steps off the glass.
+ * Both directions are the ones that cost nothing, and both are the rulings the
+ * two sibling files in this lane already wrote down.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function briefingStandsDown(speedKmh: number): boolean {
+  if (!Number.isFinite(speedKmh)) return false;
+  return Math.abs(speedKmh) > TOUCH_HINT_MOVING_KMH;
+}
+
 export function BriefingCard({
   steps,
   onClose,
+  speedKmh,
 }: {
   steps: ReadonlyArray<{ n: number; textBg: string }>;
   onClose: () => void;
+  /** The cluster's own reading — see `briefingStandsDown`. */
+  speedKmh: number;
 }) {
   // ── HOW MANY STEPS ARE BELOW THE FOLD RIGHT NOW ────────────────────────────
   //
@@ -2043,6 +2099,32 @@ export function BriefingCard({
   // estimate does.
   const listRef = useRef<HTMLOListElement | null>(null);
   const [below, setBelow] = useState(0);
+  /** The list's own `scrollTop`, mirrored so the control row can render off it.
+   *  See the note beside its write in `measure`. */
+  const [scrollTopPx, setScrollTopPx] = useState(0);
+  /** The lifetime — the frame and the ruling are at `briefingStandsDown`. */
+  const [folded, setFolded] = useState(false);
+  /** Fired at most once per mounted card, and never again after the student has
+   *  opened the chip: see the „once, and never against the student" paragraph. */
+  const foldedOnceRef = useRef(false);
+  useEffect(() => {
+    if (foldedOnceRef.current) return;
+    if (!briefingStandsDown(speedKmh)) return;
+    foldedOnceRef.current = true;
+    setFolded(true);
+  }, [speedKmh]);
+  const unfold = useCallback(() => {
+    // The latch stays set. A student who asks for the steps back while driving
+    // has answered the question the rule above is guessing at, and the panel is
+    // his for the rest of the lesson — the ✕ is still there when he wants the
+    // glass back, and the header's own fold control if he wants it recoverably.
+    foldedOnceRef.current = true;
+    setFolded(false);
+  }, []);
+  const fold = useCallback(() => {
+    foldedOnceRef.current = true;
+    setFolded(true);
+  }, []);
   /**
    * ── THE CUT IS ON THE LINE GRID NOW, WHICH IS THE ROUTED HALF ─────────────
    * The paragraph at the `<ol>` ends „Both rows stay open on the snap", and
@@ -2120,6 +2202,14 @@ export function BriefingCard({
     // snap and the box: the two arguments cannot give different numbers here.
     // Threading `win.bottomPx` would look like a guard and guard nothing.
     setBelow(rowsBelowFold(rows, ol.scrollTop, ol.clientHeight));
+    // …AND WHERE THE READING WINDOW IS, which the counter alone cannot say.
+    // `below` reaching 0 means „nothing is under the cut" and is true both of a
+    // briefing that FITS and of one the student has paged to the END of. Those
+    // are opposite states and the control under the list has to tell them
+    // apart: the first needs no chrome at all, the second needs the way back to
+    // step 1 — otherwise the last press of «покажи» strands the reader at the
+    // bottom of a list whose opening steps are now the unreachable ones.
+    setScrollTopPx(ol.scrollTop);
   }, []);
   useEffect(() => {
     const ol = listRef.current;
@@ -2145,7 +2235,99 @@ export function BriefingCard({
     const ro = new ResizeObserver(measure);
     ro.observe(ol);
     return () => ro.disconnect();
-  }, [measure, steps]);
+    // `folded` is in the deps because the fold UNMOUNTS the `<ol>`: without it
+    // the observer stays attached to a detached node and the counter freezes at
+    // whatever it read before the card became a chip — a number about a list
+    // that is no longer on the glass, which is the dead-predicate shape one
+    // layer down. Re-opening re-observes and the first reading is the
+    // observer's own, exactly as at mount.
+  }, [measure, steps, folded]);
+  /* ══════════════════════════════════════════════════════════════════════════
+     …AND THE COUNTER BECOMES THE CONTROL — 2026-08-27.
+
+     THE ROWS. `sc-ov-crest-curve:79eb1226` („cuts off after item 4 with no
+     scrollbar — items 5 and 6, which carry the whole decision rule, are simply
+     not shown") and `sc-sp-wet-limit-plate:f687c293` („the last steps of the
+     briefing are never drawn"), both re-judged STILL on the w11 re-drive. The
+     second one's verifier did the measurement this repair is built on: it
+     cropped the list's right edge at ×5 and found „no scrollbar of any kind",
+     and then quoted this file's own admission back at it — `scrollbar-width:
+     thin` paints an OVERLAY bar that exists only DURING a scroll, „which is the
+     engine the founder is actually on".
+
+     SO THE SCROLL EXISTED AND COULD NOT BE ASKED FOR. Word for word the
+     diagnosis the sibling column got on 2026-08-26 (`revealMoreToasts`, forty
+     lines down): the box moves under a wheel, the counter says something is
+     under the cut, and there is nothing to press. „A sentence that names a
+     gesture is not an affordance; a thing you press is." The briefing was the
+     leg that repair did not reach — and unlike the toast column this one has no
+     8 s TTL racing it, so a press here buys the student the whole authored
+     text.
+
+     THE ARITHMETIC IS `toastPageScrollTop`, TAKEN AND NOT RE-DERIVED, name and
+     all. It is already exported, already gated on both properties that matter
+     (it always ADVANCES, and it TERMINATES at `scrollHeight − clientHeight` so
+     the row can reach zero and unmount itself), and its overlap — 30 px, two
+     15 px toast lines — is a little over two of this list's 13.75 px line
+     boxes, i.e. the same „carry the sentence across the join" it was chosen
+     for. Renaming it to suit a second caller would churn a pinned export for a
+     noun; the shared name is the honest record that both columns page the same
+     way.
+
+     AND THE WAY BACK, WHICH THE TOAST COLUMN DOES NOT NEED AND THIS ONE DOES.
+     A toast is a verdict about a moment and is removed by its own clock; a
+     briefing is a numbered procedure the student re-reads. The last press of
+     «покажи» takes `below` to 0 and, with only the counter's predicate, every
+     control on the card would vanish — leaving the reader parked at step 8 with
+     steps 1–3 now the unreachable ones and, on the founder's engine, still no
+     bar to drag. So the row has a second state, and it is bound to
+     `scrollTopPx` rather than to `below`, because „nothing is under the cut" is
+     true of a briefing that FITS as well (where the correct chrome is none —
+     the invariant the row below has carried since it was written).
+     ══════════════════════════════════════════════════════════════════════════ */
+  const revealMoreSteps = useCallback(() => {
+    const ol = listRef.current;
+    if (ol === null) return;
+    ol.scrollTop = toastPageScrollTop(ol.scrollTop, ol.clientHeight, ol.scrollHeight);
+    // `scrollTop =` fires `scroll` asynchronously but updates the property
+    // synchronously, so re-measuring here lands the new count, the new mask and
+    // the row's own disappearance in the SAME render as the movement.
+    measure();
+  }, [measure]);
+  const restartSteps = useCallback(() => {
+    const ol = listRef.current;
+    if (ol === null) return;
+    ol.scrollTop = 0;
+    measure();
+  }, [measure]);
+  if (folded) {
+    return (
+      <button
+        type="button"
+        onClick={unfold}
+        // NAMED FOR THE HARNESS, deliberately. The drive census lists elements
+        // by `data-hud` and reports the ones held in the tree but never painted
+        // («✗ NOT ON THE GLASS» — the shape that left the audio prompt dead in
+        // 68 of 68 beats). A fold whose chip does not reach the glass would be
+        // this repair failing in exactly that direction, silently; with a name
+        // the next drive says so on every beat it exists.
+        data-hud="briefing-folded"
+        // …and row A6's hit rect, the same one the ✕ and the ▾ carry: a 9 px
+        // chip is ~22 px tall, and no control in this column may be under 44.
+        data-hud-fold=""
+        aria-label={`Покажи инструкциите за упражнението — ${steps.length} ${
+          steps.length === 1 ? "стъпка" : "стъпки"
+        }`}
+        // `self-end` for `revealMoreToasts`' reason, which is the same reason
+        // here: this column is 320 px over a card that is narrower than it, and
+        // the strip beside the card is ROAD. A full-width chip would put an
+        // un-clickable target over the kerb this fold exists to uncover.
+        className="pointer-events-auto flex shrink-0 items-center gap-1.5 self-end rounded-full border border-border bg-background/85 px-2.5 py-1 text-right text-[9px] font-black uppercase tracking-wider text-accent backdrop-blur transition hover:text-foreground motion-reduce:transition-none"
+      >
+        ⓘ Инструкции · {steps.length} {steps.length === 1 ? "стъпка" : "стъпки"} ▸
+      </button>
+    );
+  }
   return (
     // NOT `hud-ghost`, deliberately, and this is the one place in this wave
     // where the UNPANEL sweep is declined. Rendered ghosted at 1280×800 the
@@ -2173,6 +2355,44 @@ export function BriefingCard({
     >
       <div className="flex shrink-0 items-center gap-2">
         <p className="text-[10px] font-black uppercase tracking-wider text-accent">Инструкции</p>
+        {/* ── THE NON-DESTRUCTIVE WAY TO GET THE ROAD BACK, 2026-08-27.
+            Until this control the card had exactly ONE exit and it was a one-way
+            door: `onClose` clears `briefingOpen` for the rest of the lesson and
+            nothing re-opens it. So a student who wanted the right kerb back —
+            the very thing `sc-ov-crossing-overtake:4bce6fca` photographs the
+            panel covering — had to choose between the road and the authored
+            steps, permanently. This folds to the same chip the lifetime folds
+            to, so the choice costs nothing. The ✕ beside it keeps its meaning
+            («Скрий инструкциите» = gone), because a student who has read the
+            briefing is entitled to be rid of it.
+
+            ⚠ THE WRAPPER IS LOAD-BEARING, AND IT WAS FOUND BY LOOKING RATHER
+            THAN BY READING. `HudCloseButton` carries its own `ml-auto`. Written
+            as two SIBLINGS each with `ml-auto`, flexbox splits the free space
+            BETWEEN them: rendered on `/dev/popup-rig` at 1440 × 900 the ▾
+            landed at x 1127 and the ✕ at x 1237 — 110 px apart, with the fold
+            control stranded in the middle of a 320 px card. One `ml-auto` on a
+            content-sized wrapper pushes the PAIR to the edge, and the inner
+            `ml-auto` becomes the no-op it should always have been here. */}
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={fold}
+          // ROW A6's hit rect, on a second handle. The ring stays 18 px — the
+          // column cannot afford a painted 44 px square, which is that row's
+          // whole argument — and an unpainted `::before` in `PlayAreaStyles`
+          // carries the target. It is `data-hud-fold` and not `data-hud-close`
+          // because this control does not close anything and `popupClose.
+          // test.ts` counts that attribute; the two rules are asserted
+          // IDENTICAL there rather than merged, because that suite pins the
+          // close selector's exact text.
+          data-hud-fold=""
+          aria-label="Сгъни инструкциите"
+          title="Сгъни инструкциите"
+          className="pointer-events-auto relative -my-0.5 flex h-[18px] w-[18px] shrink-0 touch-manipulation items-center justify-center rounded-full border border-border text-[10px] font-black leading-none text-muted transition hover:border-foreground hover:text-foreground motion-reduce:transition-none"
+        >
+          <span aria-hidden>▾</span>
+        </button>
         {/* A6, 2026-08-04. This control existed — it just could not be hit. It
             was `px-1.5 text-xs` with no height of its own: a ~24 × 18 px target
             on the screen row C2 was closed on the rule that nothing may be
@@ -2180,6 +2400,7 @@ export function BriefingCard({
             (HudCloseButton), which paints an 18 px ring and carries a 44 px hit
             rect it does not paint. */}
         <HudCloseButton onClick={onClose} labelBg="Скрий инструкциите" />
+        </span>
       </div>
       {/* ── THE LIST TAKES THE HEIGHT THE COLUMN ACTUALLY HAS ────────────────
           A five-step briefing on a 390 px-tall landscape window is tall enough
@@ -2266,28 +2487,49 @@ export function BriefingCard({
           bottom sits on the fade's opaque edge. One without the other is
           either a permanently greyed final step or no fade at all.
 
-          NOT THE LINE-GRID SNAP. `SimOverlay.foldMaskCss` has a second branch
-          that moves the cut onto a line boundary so no glyph is ever partly
-          painted; it needs a live measurement of the row edges against the
-          scrollport, which this card already takes for `rowsBelowFold` but does
-          not keep. That is the stronger repair and it is NOT done here —
-          faded-through is better than sliced-through and is not the same as
-          uncut. Routed with the measurement it needs: `listRowsInScrollCoords`
-          already returns the edges; what is missing is a `snappedBottomPx`
-          beside `rowsBelowFold` and a `maskImage` fed from it.
+          THE LINE-GRID SNAP — ✅ LANDED, and this paragraph used to route it.
+          It read „NOT THE LINE-GRID SNAP … what is missing is a
+          `snappedBottomPx` beside `rowsBelowFold` and a `maskImage` fed from
+          it". That is `foldWin` / `foldWindowPx` / `foldMaskCss` above and it
+          has shipped; re-read against the tree rather than inherited, because a
+          routing note that outlives its own repair sends the next reader to fix
+          something twice.
 
-          AND IT CLOSES NEITHER ROW IT WAS FILED UNDER, which is worth writing
+          AND IT CLOSED NEITHER ROW IT WAS FILED UNDER, which is worth writing
           down beside the change rather than in a report. `sc-ov-crest-curve`
           asks for items 5 and 6, „which carry the whole decision rule" — a
           fade does not show them, and the counter that answers the other half
           of that row landed in an earlier round, not this one.
           `sc-sp-wet-limit-plate` says the last step „cannot be read … is
           unreachable"; read literally, dimming the fragment makes it less
-          legible, not more. What this change actually buys is the SIGNAL: a
+          legible, not more. What that change bought is the SIGNAL: a
           horizontally guillotined line reads as a rendering fault and a faded
           one reads as „there is more", so the counter above stops arguing with
-          the picture and the student has a reason to scroll. Both rows stay
-          open on the snap. ────────────────────────────────────────────────*/}
+          the picture and the student has a reason to scroll.
+
+          ── AND WHAT w11 ADDED, AND WHAT IT STILL DOES NOT BUY ───────────────
+          The counter is a BUTTON now (the block above `revealMoreSteps`), so
+          „a reason to scroll" is no longer the whole answer — there is a thing
+          to press, which is what both rows have been asking for since they were
+          filed as „no scrollbar".
+
+          BOTH ROWS STILL STAY OPEN, and the reason is arithmetic rather than
+          taste, so it is written here instead of being argued in a report.
+          `sc-ov-crest-curve` was re-judged on „still not readable at ARRIVAL",
+          and at arrival nothing has been pressed. Measured on that row's own
+          frame (`sc-ov-crest-curve/pc-right/01-arrival.png`, 1440 × 900): the
+          stage is ~1160 × 655, the column top resolves to 164, its cap is
+          655 − 164 − 108 − 56 = 327 px, and of that the objective banner and a
+          hint toast take ~110, leaving this card ~217 — while the eight
+          authored steps run to ~20 wrapped lines at 13.75 px, i.e. ~285 px of
+          list plus 28 of header. The panel cannot hold the briefing in the
+          corridor it has ON ANY of these lessons, so „every step on the glass
+          at arrival" is not a defect in this card's layout; it is a question
+          about whether the roomy leg gets the phone's second surface (the
+          overlay sheet «ПРОЧЕТИ» opens, which STOPS THE CAR). That is a
+          decision about what the notify column IS — the same sentence
+          `revealMoreToasts` had to write about its own leg — and it is filed,
+          not smuggled in under a control. ──────────────────────────────────*/}
       <ol
         ref={listRef}
         onScroll={measure}
@@ -2355,12 +2597,28 @@ export function BriefingCard({
           12 px of the card and hides nothing. It exists only while something is
           genuinely below the fold, so a briefing that fits carries no chrome. */}
       {below > 0 ? (
-        <p
+        <button
+          type="button"
+          onClick={revealMoreSteps}
+          data-hud-briefing-more=""
           aria-live="polite"
-          className="mt-0.5 shrink-0 text-[9px] font-black uppercase tracking-wider text-muted"
+          // `self-start` and not full width: the card is `w-full` of a column
+          // whose spare strip is road, and the counter has always been a
+          // left-hugging row. It stays one; it simply became pressable.
+          className="mt-0.5 shrink-0 self-start rounded-full border border-border px-2 py-0.5 text-left text-[9px] font-black uppercase tracking-wider text-muted transition hover:border-accent hover:text-foreground motion-reduce:transition-none"
         >
-          ↓ още {below} {below === 1 ? "стъпка" : "стъпки"}
-        </p>
+          ↓ още {below} {below === 1 ? "стъпка" : "стъпки"} — покажи
+        </button>
+      ) : scrollTopPx > 1 ? (
+        <button
+          type="button"
+          onClick={restartSteps}
+          data-hud-briefing-more="restart"
+          aria-live="polite"
+          className="mt-0.5 shrink-0 self-start rounded-full border border-border px-2 py-0.5 text-left text-[9px] font-black uppercase tracking-wider text-muted transition hover:border-accent hover:text-foreground motion-reduce:transition-none"
+        >
+          ↑ от стъпка 1 — покажи
+        </button>
       ) : null}
     </div>
   );
@@ -5256,6 +5514,59 @@ export function LessonPlayShell({
               Качество: {qualityValueBg(qualitySelection, quality)}
             </button>
           ) : null}
+          {/* ── «ЗВУК» — THE SECOND ROW THE PHONE HAD AND THE DESKTOP DID NOT
+              — w11, 2026-08-27, and the paragraph above is why this one is
+              filed rather than noticed.
+
+              That census („checked row by row against the sheet: «Съветник»,
+              «Въпроси», «Известия», «Прекрати», «Цял екран» are all here …
+              One was not") was true when it was written and stopped being true
+              on 2026-08-26, when the ⚙ sheet grew a «Звук» row. Nobody re-read
+              it, so the bar shipped six of the sheet's seven — and SIX w11 rows
+              say exactly what that costs, in the same words on five different
+              lessons:
+
+                sc-sp-eco-coast:185b04f0   „no volume or mute control anywhere
+                  in the shell, no audio indicator, nothing in the ⚙/menu row"
+                sc-sp-limit-end:f5a72845   „The pc settings row is painted in
+                  full in every frame and carries advisor frequency,
+                  notifications, abort, quality and fullscreen — nothing about
+                  sound."
+                sc-mw-min-speed:3226bd59 · sc-sp-wet-limit-plate:12ad2d84 ·
+                sc-vu-cyclist-hook:c9fb5cdf · sc-mw-discipline:b87b3683
+
+              WHAT THIS DOES AND DOES NOT CLOSE, because `soundChoice.ts`
+              already wrote the ceiling down and it has not moved: those rows
+              name volume AND mute AND a state indicator. This ships the mute
+              and the INDICATOR — «Звук вкл.» / «Звук изкл.» is painted in every
+              frame of the bar, which is the half the harness can photograph —
+              and there is still no volume, because the level lives in
+              `scene/simAudio.ts` and there is nothing in this lane to bind a
+              slider to. Two nouns of three, on rows that stay open.
+
+              THE TRADE IS IN `title` FOR «Качество»'S REASON: a top bar has no
+              room for a second row, and under THEO-4 a setting that changes
+              what the student LEARNS may not ship as a bare state word. A muted
+              session teaches a systematically faster car (doc 82 §4.4) — the
+              sentence and its 70-character budget are in `soundChoice.ts`, so
+              the bar and the sheet cannot drift into saying different things
+              about the same switch.
+
+              PRESENT DURING THE EXAM, for the sheet row's own reason: „an exam
+              whose stimulus is a siren (чл. 91) is unpassable to a student who
+              muted the sim three lessons ago and has no way to find out". */}
+          {!ended ? (
+            <button
+              type="button"
+              className="btn-ghost px-3 py-1.5 text-xs"
+              onClick={toggleSimAudioMuted}
+              aria-pressed={soundMuted}
+              title={soundHintBg(soundMuted)}
+              aria-label={soundAriaLabelBg(soundMuted)}
+            >
+              Звук {soundValueBg(soundMuted)}
+            </button>
+          ) : null}
           {/* QW1: fullscreen toggle — the same control exits (Esc works too).
               Hidden where the API does not exist: a button that cannot do its
               one job is worse than no button, and the CSS immersive layout has
@@ -5648,7 +5959,17 @@ export function LessonPlayShell({
           !ended &&
           activeQuiz === null &&
           teachQueue.length === 0 ? (
-            <BriefingCard steps={briefing} onClose={closeBriefing} />
+            <BriefingCard
+              steps={briefing}
+              onClose={closeBriefing}
+              // THE WIRE FOR THE LIFETIME. `snap.speedKmh` is the cluster's own
+              // reading (`snapshotOf`: `lastTick?.speedKmh ?? 0`), i.e. the same
+              // number the instrument prints and the same one `rules/engine.ts`
+              // grades against — so the panel's idea of „he is driving now"
+              // cannot drift from the grader's. `briefingStandsDown` carries the
+              // frame and the ruling.
+              speedKmh={snap.speedKmh}
+            />
           ) : null}
 
           {/* Toasts — the bottom of the same column, so a graded fault arrives

@@ -129,6 +129,30 @@
  *    scenario ARCHETYPE and matches nothing there. OWNER:
  *    `world/builders/buildWorldGeometry.ts` + `world/builders/terrain.ts`.
  *
+ *    ── 2026-08-27 · HALF OF THIS ONE IS ANSWERED, AND IT IS THE HALF THE
+ *       FRAMES ARE OF. `world/builders/worldRim.ts` now belts every district
+ *       that declares a `mapKind` (103 of the 105 — both OSM extracts are
+ *       excluded on purpose, see its gate) with a contiguous row of building
+ *       masses 37–43 m past the declared bounds, through the same
+ *       `extraVolumes` seam the lot enclosure uses: zero draw calls, and the
+ *       walls land in `colliders.buildings`. On tj-emerge-v1 — sc-junction-left's
+ *       own map — the authored streetwall stops at x = −69 and restarts at
+ *       x = +68, so the 137 m of horizon a student sees from the stop line at
+ *       (4.06, −18) is exactly the gap; the belt fills it. `world/__tests__/
+ *       world-rim.test.ts` §2 fires 72 rays from every authored spawn on nine
+ *       maps and requires each one to meet a facade before it reaches
+ *       `districtWorldEdge`.
+ *
+ *       WHAT IS NOT ANSWERED, so this is not read as closed. The row's other
+ *       half — „a 400 m concrete apron", i.e. `terrainPaved` zoning off the
+ *       terminus masses on `scenario-street` / `scenario-junction` — is
+ *       untouched: the belt is deliberately kept OUT of the terrain pass's aabb
+ *       list (a 20 m paved ring around every map is a bigger version of the same
+ *       defect), and the terminus masses that cause the apron are still in it.
+ *       And nothing out there is DRESSED: no kerb, no marking, no pavement, no
+ *       parked cars between the last asphalt and the belt. „No far-side street"
+ *       is still true; „no buildings" is not.
+ *
  * WHAT WAS TRIED HERE AND REFUTED, so it is not tried again. (i) „the parked
  * decoration stands in the graded cell" — measured with the shipped
  * `computeParkedCars` over all 17 scenario bays and all 11 curriculum/полигон/

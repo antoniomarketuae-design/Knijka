@@ -79,8 +79,18 @@ describe("motorway crawl — the stop-start chicane the old clock could not book
     expect(crawlBills(crawl(3))).toBe(1);
   });
 
-  it("…and 205 s of it is still ONE bill, not one per creep", () => {
-    expect(crawlBills(crawl(45))).toBe(1);
+  it("…and 205 s of it is TWO bills — the teach and the grade — not one per creep", () => {
+    // 45 creeps, and the sheet shows two rows, not forty-five. The second is
+    // the w11 re-grade (MOTORWAY_CRAWL_REGRADE_SEC): the code is второстепенна,
+    // so the first bill is spent by the teach-first free mini-lesson, which is
+    // how `sc-mw-discipline / mobile-right` crawled 273 s to «Второстепенни
+    // 0 | 0». The ceiling is still two — the runaway this file exists to
+    // prevent cannot come back through it.
+    const bills = drive(crawl(45)).events.filter(
+      (e) => e.code === "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+    );
+    expect(bills).toHaveLength(2);
+    expect(bills.map((e) => (e as { regrade?: true }).regrade === true)).toEqual([false, true]);
   });
 
   it("a lawful merge from rest up to cruise never accrues a second", () => {

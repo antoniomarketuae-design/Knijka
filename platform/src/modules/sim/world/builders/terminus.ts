@@ -123,8 +123,13 @@ const overlaps = (a: Aabb, b: Aabb, pad: number): boolean =>
  * The height the closing mass takes from the street it closes: the MEDIAN of
  * the district's own frontage, clamped into the band. A median rather than a
  * mean so one 34 m block cannot pull a low-rise street's end into a tower.
+ *
+ * EXPORTED for `builders/worldRim.ts`, which asks the same question about the
+ * same district and must not answer it a second way — a rim whose height came
+ * from its own median would drift from the closure standing 25 m in front of
+ * it the first time either median changed.
  */
-function frontageHeightM(district: District): number {
+export function frontageHeightM(district: District): number {
   const hs = district.buildings
     .filter((b) => Array.isArray(b.footprint) && b.footprint.length >= 3)
     .map((b) => resolveBuildingHeightM(b))

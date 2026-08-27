@@ -520,7 +520,14 @@ describe("mw-exit-v1 — exit adjudication through the real reducer", () => {
     // On the APPROACH, where the live span exempts laneId 1 from keep-right —
     // the crawl is the only fault on offer.
     const events = exitDrive(() => ({ x: X_CRUISE, kmh: 40 }), 100, 300);
-    expect(violations(events)).toEqual(["DRIVING_TOO_SLOW_FOR_MOTORWAY"]);
+    // TWO bills for a CONTINUING crawl — the teach the free mini-lesson spends
+    // and the marked charge it consumed (w11, rules/engine.ts
+    // MOTORWAY_CRAWL_REGRADE_SEC); `lessons/engine.ts` drops the marked one
+    // wherever the code was already charged, so the sheet still prices it once.
+    expect(violations(events)).toEqual([
+      "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+      "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+    ]);
   });
 
   it("THE RAMP ENVELOPE: the advisory pace is innocent, motorway pace on the bend grades exactly SPEED_TOO_FAST_FOR_CURVE", () => {

@@ -30,11 +30,26 @@ describe("motorway crawl detector (DRIVING_TOO_SLOW_FOR_MOTORWAY)", () => {
     expect(codes(drive(ticks).events)).toContain("DRIVING_TOO_SLOW_FOR_MOTORWAY");
   });
 
-  it("fires ONCE per crawl episode, however long it lasts", () => {
+  it("fires TWICE per crawl episode — the teach and the grade — and never again", () => {
+    // w11, MOTORWAY_CRAWL_REGRADE_SEC. One bill per episode was the whole
+    // reason `sc-mw-discipline / mobile-right` crawled 273 s on a 140 км/ч
+    // motorway and reached «Второстепенни 0 | 0»: the code is второстепенна, so
+    // the teach-first free mini-lesson spent the only bill the episode had. The
+    // second — marked `regrade`, and dropped by `lessons/engine.ts` wherever the
+    // code was already charged — is the charge that lesson consumed.
     const ticks: ReturnType<typeof tick>[] = [];
     for (let t = 0; t <= 30; t += 1) ticks.push(mw(t, { speedKmh: 42 }));
-    const all = codes(drive(ticks).events).filter((c) => c === "DRIVING_TOO_SLOW_FOR_MOTORWAY");
-    expect(all).toHaveLength(1);
+    const all = drive(ticks).events.filter((e) => e.code === "DRIVING_TOO_SLOW_FOR_MOTORWAY");
+    expect(all).toHaveLength(2);
+    expect(all.map((e) => (e as { regrade?: true }).regrade === true)).toEqual([false, true]);
+  });
+
+  it("never bills a third time, however long the crawl lasts", () => {
+    const ticks: ReturnType<typeof tick>[] = [];
+    for (let t = 0; t <= 600; t += 1) ticks.push(mw(t, { speedKmh: 42 }));
+    expect(
+      codes(drive(ticks).events).filter((c) => c === "DRIVING_TOO_SLOW_FOR_MOTORWAY"),
+    ).toHaveLength(2);
   });
 
   it("a second, distinct crawl AFTER a genuine recovery bills again (two acts)", () => {

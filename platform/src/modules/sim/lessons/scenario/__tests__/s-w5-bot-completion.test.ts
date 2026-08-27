@@ -466,7 +466,7 @@ describe("wave-5 bot completion — sc-mw-min-speed at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: at L3 the right-lane crawl TEACHES чл. 22, ал. 1 — and never finishes the road", () => {
+  it("counter-proof: at L3 the right-lane crawl is TAUGHT first and then costs its point", () => {
     // DRIVING_TOO_SLOW_FOR_MOTORWAY is второстепенна, and the coach warns once
     // before grading regardless of mapping (scenarios/coach.ts) — so the FIRST
     // encounter PAUSES with a card and does NOT dock a point. That is the right
@@ -474,6 +474,19 @@ describe("wave-5 bot completion — sc-mw-min-speed at L3", () => {
     // learner makes while believing he is being SAFE. A point would just confuse
     // him; the card tells him why slow is not the same as safe. The §9 exact-code
     // assert lives on the trace gate.
+    //
+    // …AND THEN THE CHARGE THE CARD CONSUMED (w11, MOTORWAY_CRAWL_REGRADE_SEC).
+    // This assertion used to end at `events == []` / `score == 0` — „taught, not
+    // punished" — and that ZERO is exactly what `sc-mw-discipline:9e8f6966`
+    // photographed at full scale: 273 s of crawling on a 140 км/ч motorway,
+    // «Второстепенни 0 | 0», with «Твърде бавно движение по автомагистрала»
+    // filed under «Учебни моменти (не влизат в точките)». Teaching first is
+    // right; teaching INSTEAD is what let a whole lesson driven at 12 км/ч cost
+    // nothing. The re-grade fires after six further ACCRUED crawl seconds — a
+    // student who answers the card by accelerating never accrues them — and it
+    // is marked, so `lessons/engine.ts` drops it wherever the code was already
+    // charged (exam mode, a repeat, a grade-on-sight policy: the L4 case below
+    // is unchanged at 1 point / 2 points).
     let s = createLessonSession(compileScenario(SC_MW_MIN_SPEED, 3));
     const taught: string[] = [];
     recordScMwMinSpeedDrive(loadDistrict("mw-v1"), "mistake-crawl-right", {
@@ -484,9 +497,12 @@ describe("wave-5 bot completion — sc-mw-min-speed at L3", () => {
       },
     });
     const r = buildLessonResult(s);
+    // The TEACH is untouched: one card, on the first encounter, as before.
     expect(taught).toEqual(["DRIVING_TOO_SLOW_FOR_MOTORWAY"]);
-    expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
-    expect(r.score).toBe(0); // taught, not punished
+    // What is new is the single charge behind it — one row, one point, once.
+    const charged = s.events.filter((e) => e.kind === "violation");
+    expect(charged.map((e) => e.code)).toEqual(["DRIVING_TOO_SLOW_FOR_MOTORWAY"]);
+    expect(r.score).toBe(1); // taught first, then charged once — never twice
     // The lane was RIGHT, so the crawler DOES clear the first gate — and then
     // simply never gets to the end of the kilometre. That asymmetry is the
     // template's grading claim: this driver is not lost, he is too slow.

@@ -65,6 +65,32 @@ export default defineConfig({
     // partition audit that runs in both gates would stop covering it.
     include: [...VITEST_INCLUDE],
     environment: "node",
+      // PER-TEST TIME BUDGET — a clock, not a gate. 2026-08-27.
+      //
+      // vitest default 5 s was written for a small suite. This one is 1,022
+      // files and ~16,300 tests on --maxWorkers=2, and a full run takes
+      // 590-1,080 s wall-clock on a 7200 rpm disk. Under that contention,
+      // filesystem-walking and district-loading tests are starved past 5 s and
+      // go red WITHOUT ANY ASSERTION FAILING. Measured on this tree, each
+      // standalone versus inside a full run:
+      //
+      //   tools/assets/publicBudget       0.75 s alone   19.6 s under load
+      //   tutor/providerIntegration       0.33 s alone   11.4 s under load
+      //   traffic/scenery-sightline T6    1.28 s alone    >5 s under load
+      //   traces/barrel-bundle-weight     1.9 s alone     >5 s under load
+      //   runtime/world-edge-warning      3.3 s alone     >5 s under load
+      //
+      // NOT ONE is slower than its own baseline; they are queued behind other
+      // files. Patching them one timeout at a time is whack-a-mole: every
+      // repair wave adds test files and starves the next shortest budget.
+      //
+      // 60 s is ~18x the slowest real standalone time here, so a genuine hang
+      // still fails. Same reasoning as the drive supervisor 900 s against a
+      // 510 s longest real drive (tools/mobile/lib/limits.mjs). NO ASSERTION IS
+      // RELAXED: a false red under load is worse than no red, because it
+      // teaches the next reader to skip past a real one.
+      testTimeout: 60_000,
+      hookTimeout: 60_000,
     coverage: {
       provider: "v8",
       reporter: ["text-summary", "json-summary"],

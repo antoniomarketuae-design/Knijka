@@ -270,6 +270,19 @@ describe("mw-v1 — motorway adjudication through the real reducer", () => {
   };
   const violations = (events: RuleEvent[]) =>
     events.filter((e) => e.kind === "violation").map((e) => e.code);
+  /**
+   * THE CRAWL IS BILLED TWICE, and the assertions below say so in full rather
+   * than collapsing to a set — a count that stops being asserted is a count
+   * nothing protects.
+   *
+   * `DRIVING_TOO_SLOW_FOR_MOTORWAY` is второстепенна and rides the w11 re-grade
+   * (rules/engine.ts `MOTORWAY_CRAWL_REGRADE_SEC`): a CONTINUING crawl produces
+   * the teach the founder-approved free mini-lesson spends, and then the marked
+   * charge it consumed — which `lessons/engine.ts` drops wherever the code was
+   * already charged, so the изпитен лист still prices it once. Never a third:
+   * that ceiling is pinned in `rules/__tests__/motorway-crawl-regrade.test.ts`.
+   */
+  const CRAWL_BILLS = ["DRIVING_TOO_SLOW_FOR_MOTORWAY", "DRIVING_TOO_SLOW_FOR_MOTORWAY"];
 
   it("the disciplined cruise — 125 in the right TRAVEL lane — is fully innocent (keep-right exempts lane 1)", () => {
     const events = motorwayDrive(() => ({ x: X_CRUISE, kmh: 125 }));
@@ -277,9 +290,9 @@ describe("mw-v1 — motorway adjudication through the real reducer", () => {
     expect(events.some((e) => e.kind === "commendation" && e.code === "CLEAN_DRIVING")).toBe(true);
   });
 
-  it("the causeless 40 km/h crawl grades exactly DRIVING_TOO_SLOW_FOR_MOTORWAY — once", () => {
+  it("the causeless 40 km/h crawl grades exactly DRIVING_TOO_SLOW_FOR_MOTORWAY — taught, then charged", () => {
     const events = motorwayDrive(() => ({ x: X_CRUISE, kmh: 40 }), 400);
-    expect(violations(events)).toEqual(["DRIVING_TOO_SLOW_FOR_MOTORWAY"]);
+    expect(violations(events)).toEqual(CRAWL_BILLS);
   });
 
   it("the 130 km/h left-lane hog grades exactly NOT_KEEPING_RIGHT (OV-11 at speed, zero new code)", () => {
@@ -314,12 +327,9 @@ describe("mw-v1 — motorway adjudication through the real reducer", () => {
   // keep-right emergencyLaneRight seam), so a future guard on either could
   // silently swallow the other and leave the template's demo grading one code
   // while its card promises two.
-  it("the causeless 40 km/h crawl IN THE LEFT LANE grades BOTH codes — once each", () => {
+  it("the causeless 40 km/h crawl IN THE LEFT LANE grades BOTH codes — neither swallows the other", () => {
     const events = motorwayDrive(() => ({ x: X_LEFT, kmh: 40 }), 400);
-    expect([...violations(events)].sort()).toEqual([
-      "DRIVING_TOO_SLOW_FOR_MOTORWAY",
-      "NOT_KEEPING_RIGHT",
-    ]);
+    expect([...violations(events)].sort()).toEqual([...CRAWL_BILLS, "NOT_KEEPING_RIGHT"]);
   });
 
   it("…and the low speed is no excuse for the lane: keep-right does not need motorway pace", () => {

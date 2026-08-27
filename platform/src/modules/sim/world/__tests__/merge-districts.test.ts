@@ -383,7 +383,14 @@ describe("mw-entry-v1 — merge adjudication through the real reducer", () => {
 
   it("the causeless 40 km/h crawl on the CARRIAGEWAY grades DRIVING_TOO_SLOW_FOR_MOTORWAY (the SP-10 floor is armed)", () => {
     const events = entryDrive(() => ({ x: X_CRUISE, kmh: 40 }), TAPER_Y + 5, TAPER_Y + 200);
-    expect(violations(events)).toEqual(["DRIVING_TOO_SLOW_FOR_MOTORWAY"]);
+    // TWO bills for a CONTINUING crawl — the teach the free mini-lesson spends
+    // and the marked charge it consumed (w11, rules/engine.ts
+    // MOTORWAY_CRAWL_REGRADE_SEC); `lessons/engine.ts` drops the marked one
+    // wherever the code was already charged, so the sheet still prices it once.
+    expect(violations(events)).toEqual([
+      "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+      "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+    ]);
   });
 });
 

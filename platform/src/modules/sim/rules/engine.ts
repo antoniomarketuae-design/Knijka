@@ -45,6 +45,11 @@
  *    is most of the catalogue's lessons — reached its debrief on «Второстепенни
  *    0 0 · ИЗДЪРЖАН · +100 XP», and the conditions code, which has no cadence at
  *    all, was free at any length. Same `regrade` discipline, same drop.
+ *  - AND THE MOTORWAY CRAWL, the third and last code in that family
+ *    (MOTORWAY_CRAWL_REGRADE_SEC). Its clock counts QUALIFYING seconds rather
+ *    than wall seconds, so a student who answers the card by accelerating —
+ *    which by construction stops the frames qualifying — never meets the second
+ *    bill; one who keeps crawling steadily does. Same `regrade`, same drop.
  *  - Both pedestrian-crossing violations can fire on one crossing (approach
  *    too fast, then still failing to yield) — they are distinct mistakes and
  *    each deserves immediate feedback. Any опасна already fails the session.
@@ -466,6 +471,15 @@ export interface RuleEngineState {
    * same reset that re-arms the episode (recovery / leaving the motorway).
    */
   motorwayCrawlSec: number;
+  /**
+   * THE SECOND BILL of one continuous crawl — the same condition and the same
+   * reset as `motorwaySlow`, on an accrued sustain that is
+   * `MOTORWAY_CRAWL_REGRADE_SEC` longer, so it can only ever fire AFTER the
+   * first bill and exactly once. See `MOTORWAY_CRAWL_REGRADE_SEC`.
+   */
+  motorwaySlowRegrade: EpisodeState;
+  /** The re-grade episode's own accrued ledger (see `motorwayCrawlSec`). */
+  motorwayCrawlRegradeSec: number;
   /**
    * Sustained DRIVING in the лента за принудително спиране (laneId 0 inside
    * an authored emergencyLane span). One bill per excursion; re-arms on
@@ -953,6 +967,88 @@ const STANDING_DUTY_MAX_BILLS = 2;
 const SPEED_REGRADE_SEC = 6;
 
 /**
+ * THE SAME RE-GRADE, FOR THE MOTORWAY CRAWL — ACCRUED seconds of qualifying
+ * crawl after the first bill (w11 · lane „engine", sc-mw-discipline:9e8f6966).
+ *
+ * ── WHAT WAS MEASURED, and it is the whole row ───────────────────────────────
+ * `.audit-frames/w11/frames/sc-mw-discipline__mobile-right` — 273 s on a
+ * 140 км/ч motorway (mw-v1: `motorway: true`, `maxspeed` 140), top speed
+ * 24 км/ч, 23 full stops, 287.2 m of witness path — reaches its debrief on
+ * «Опасни грешки 0 | 0 · Основни 1 | 3 · Второстепенни 0 | 0», the single
+ * основна being the harness's own unbuckled belt. The row was filed as „no code
+ * convicts the crawl". IT DOES. The leg's own `_audit-debrief.json` carries
+ *
+ *   «Учебни моменти (не влизат в точките): • Твърде бавно движение по
+ *    автомагистрала»
+ *
+ * — `DRIVING_TOO_SLOW_FOR_MOTORWAY` fired, was shown, and was priced at ZERO.
+ * The detector was never the defect. The BILL COUNT was: `stepAccruedEpisode`
+ * emits once per episode and never again however long the crawl runs, the code
+ * is второстепенна (`catalog.ts`, 1 наказателна точка), so
+ * `policyForViolation` hands it the teach-first default — and the founder-
+ * approved free mini-lesson spends the only bill the episode will ever produce.
+ * The debrief then prints this engine's own promise, «Първата среща не се
+ * наказва … При повторение вече влиза в изпитния лист», over 273 s that never
+ * got a повторение because the reducer never asked a second time.
+ *
+ * That is verbatim `STANDING_DUTY_REGRADE_SEC`'s defect and verbatim
+ * `SPEED_REGRADE_SEC`'s. The six one-switch duties were repaired in one wave and
+ * the two second-degree speed codes in the next; the crawl — the ONLY code on
+ * the sheet that grades „не пълзи", the subject of `sc-mw-discipline`,
+ * `sc-mw-min-speed` and `sc-fo-motorway-gap` — was left on the old model. This
+ * is the same repair on the same argument, and it is the third and last of that
+ * family in this file.
+ *
+ * ── WHY SIX, AND WHY THEY ARE ACCRUED SECONDS ────────────────────────────────
+ * Six is `SPEED_REGRADE_SEC`, and for its stated reason: the corrective act is
+ * one pedal. Lifting off (`SPEED_REGRADE_SEC`) and pressing down are the same
+ * kind of act, and both are the first line of the card the student has just
+ * dismissed — which is why neither gets the ten seconds the duties are given for
+ * a hand that may be wanted on the wheel.
+ *
+ * What is DIFFERENT here, and it is the safety property that makes six safe:
+ * this clock counts QUALIFYING seconds, not wall seconds (`stepAccruedEpisode`
+ * — the same ledger the first bill is drawn on, so the two are the same series
+ * and the re-grade can never overtake the bill it re-grades). A frame accrues
+ * only while every one of the crawl's own gates still holds — motorway, moving,
+ * under `motorwayMinFlowKmh`, STEADY, no lead inside the queue gap, no crossing,
+ * no hazard, forward gear, out of the emergency lane. A student who answers the
+ * card by accelerating is by construction not steady (|a| leaves
+ * `motorwaySlowSteadyMps2` the moment he presses), so his recovery accrues
+ * NOTHING and this bill never reaches him; 0 → 50 км/ч at a gentle 1 m/s² is
+ * fourteen seconds in which the ledger does not move. Six qualifying seconds is
+ * therefore „he was shown the rule and then held the crawl, steadily, for one
+ * and a half times the window that billed him in the first place".
+ * And it has to reach the drive that was photographed: that leg holds 10–16 км/ч
+ * across forty-three sampled beats over 273 s, so six accrued seconds is spent
+ * many times over, while the 4 s first bill lands early enough that the re-grade
+ * still has the whole drive in front of it.
+ *
+ * ── TWO BILLS ARE STILL NOT TWO CHARGES ──────────────────────────────────────
+ * The re-grade carries `regrade: true`, so `lessons/engine.ts` (`applyTick`,
+ * the `alreadyCharged` guard) DROPS it wherever the code has already been
+ * charged — exam mode, a repeat offence, a grade-on-sight policy. In exam mode
+ * the ledger is byte-identical to today. It exists only to reach the ONE
+ * наказателна точка the free lesson consumed, and the episode can produce no
+ * third bill: it is a second episode object with a strictly larger threshold,
+ * so it fires exactly once and is zeroed by the same recovery that re-arms the
+ * first.
+ *
+ * ── WHAT THIS DELIBERATELY DOES NOT TOUCH ────────────────────────────────────
+ *  · The crawl's GATES. Not one of them moves. A drive that books nothing today
+ *    books nothing after this — including `sc-mw-discipline`'s sibling legs
+ *    where a stopped body inside `motorwaySlowQueueGapM` disarms the detector
+ *    outright (measured through this reducer: a lead reported at 40 m turns 23
+ *    creeps into zero bills and two CLEAN_DRIVING commendations). Whether that
+ *    exemption is right is a separate, open question about a channel this file
+ *    does not own; it is reported, not widened here.
+ *  · `EMERGENCY_LANE_DRIVING`, the crawl's neighbour. It is опасна, so
+ *    `policyForViolation` returns „always-grade" and its FIRST bill is the
+ *    charge — a re-grade there is dead by construction.
+ */
+const MOTORWAY_CRAWL_REGRADE_SEC = 6;
+
+/**
  * WRONG_WAY on an АВТОМАГИСТРАЛА — the card names the road the student is on
  * (w10-4, sc-merge-accel-lane:93685d58, 2026-08-25).
  *
@@ -1199,6 +1295,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     curveSpeed: { ...IDLE_EPISODE },
     motorwaySlow: { ...IDLE_EPISODE },
     motorwayCrawlSec: 0,
+    motorwaySlowRegrade: { ...IDLE_EPISODE },
+    motorwayCrawlRegradeSec: 0,
     emergencyLane: { ...IDLE_EPISODE },
   };
 }
@@ -1256,6 +1354,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     railRest: { ...s.railRest },
     curveSpeed: { ...s.curveSpeed },
     motorwaySlow: { ...s.motorwaySlow },
+    motorwaySlowRegrade: { ...s.motorwaySlowRegrade },
     emergencyLane: { ...s.emergencyLane },
   };
 }
@@ -2658,6 +2757,33 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   s.motorwayCrawlSec = crawlStep.accruedSec;
   if (crawlStep.fired) {
     events.push(makeViolation("DRIVING_TOO_SLOW_FOR_MOTORWAY", t));
+  }
+  // THE RE-GRADE THE FREE LESSON CONSUMED (MOTORWAY_CRAWL_REGRADE_SEC — the
+  // debrief that proves it and the whole argument are there). The SAME
+  // condition, the SAME reset and the SAME per-frame credit as the bill above,
+  // on an accrued sustain that is `MOTORWAY_CRAWL_REGRADE_SEC` longer — so it
+  // can only ever fire AFTER that bill has fired, never instead of it, and it
+  // fires exactly once per continuous crawl.
+  //
+  // Additive on purpose: the first bill's episode, ledger and instant are
+  // untouched, so every drive this reducer books today it still books at the
+  // same tick. What is added is ONE bill, marked `regrade`, which
+  // `lessons/engine.ts` drops the moment the code has already been charged. In
+  // exam mode, on a repeat offence and under a grade-on-sight policy the ledger
+  // does not move at all; it moves only where the single bill was spent on the
+  // teach and the student was charged nothing for 273 s of crawling.
+  const crawlRegrade = stepAccruedEpisode(
+    s.motorwaySlowRegrade,
+    s.motorwayCrawlRegradeSec,
+    motorwayCrawl,
+    tick.motorway !== true || speed >= cfg.motorwayMinFlowKmh,
+    t,
+    dt,
+    cfg.motorwaySlowSustainSec + MOTORWAY_CRAWL_REGRADE_SEC,
+  );
+  s.motorwayCrawlRegradeSec = crawlRegrade.accruedSec;
+  if (crawlRegrade.fired) {
+    events.push({ ...makeViolation("DRIVING_TOO_SLOW_FOR_MOTORWAY", t), regrade: true });
   }
 
   // Emergency-lane driving (чл. 58, т. 4 „да се движи… в лентата за принудително

@@ -186,6 +186,18 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         }
         out.requireNoContact = true;
       }
+      // THE YIELD THE BANNER SAYS HAPPENED (see `ReachZoneWitnessDemands.
+      // requireYieldClean` for the drive, the census and the window). AUTHORED
+      // WINS, TITLE FILLS IN — the same law the lamp, gear, officer and
+      // waited-for-person demands are parsed under, and for the same reason:
+      // the banner is the certificate the student reads, so the gate may not
+      // certify less than the banner says.
+      if (p.requireYieldClean !== undefined) {
+        out.requireYieldClean = parseYieldDemand(objective, p.requireYieldClean);
+      } else {
+        const yielded = deriveYieldDemand(objective.titleBg);
+        if (yielded !== undefined) out.requireYieldClean = yielded;
+      }
       // SIGNED (FR-24): + = the mark sits past the paint, − = the paint is
       // ahead of the mark. The only rejected value is one that would empty the
       // acceptance disc — a cut deeper than the radius leaves nowhere legal to
@@ -488,6 +500,28 @@ export interface ObjectiveContext {
    * OPTIONAL, and absent means „unknown", never „yes".
    */
   enteredRailBarredInRun?: boolean;
+  /**
+   * Every billed failure-to-yield in the run so far, with the session second it
+   * was billed on — the ledger `ReachZoneParams.requireYieldClean` consults.
+   * Read off the SCORED events (`lessons/engine.ts isYieldFault`), so what
+   * reaches this field is a fault the protocol already prints and explains,
+   * never a raw tracker frame.
+   *
+   * OPTIONAL, and absent means „unknown", never „none was billed"— it simply
+   * leaves the demand met, exactly like the four fields above it.
+   */
+  yieldFaults?: readonly YieldFaultRecord[];
+  /**
+   * When the objective being stepped BECAME the active one, in session seconds.
+   * The chain is strictly sequential, so this is the moment its predecessor
+   * completed (0 for the first). It is the lower bound of the window
+   * `requireYieldClean` refuses inside, and nothing else reads it.
+   *
+   * OPTIONAL, and absent means „the caller cannot say", which leaves the yield
+   * demand met rather than refusing on an unknown window. `EMPTY_CONTEXT` and
+   * every hand-built caller omit it and behave exactly as shipped.
+   */
+  objectiveActiveSinceSec?: number;
 }
 
 const EMPTY_CONTEXT: ObjectiveContext = { stagedOutcomes: [], redsMetInRun: 0 };
@@ -912,7 +946,119 @@ export interface ReachZoneWitnessDemands {
    * the recorded drive that killed it.
    */
   requireRailClear?: true;
+  /**
+   * THE YIELD THE BANNER SAYS HAPPENED — the seventh demand, and the first one
+   * whose refusal is bounded by a WINDOW rather than by the whole run
+   * (2026-08-27, sc-signal-flashing:fe1889f5).
+   *
+   * WHAT IS BROKEN, read off `w11/frames/sc-signal-flashing__mobile-right`
+   * (31 frames, TRACKED 100 %, steered, ended naturally, EVIDENCE complete).
+   * `_audit-debrief.json` prints, on one screen:
+   *
+   *   Задачи от маршрута  ✓ Приближи мигащото жълто бавно…       1:04
+   *                       ✓ Премини правó напред, СЛЕД КАТО
+   *                         ПРОПУСНЕШ идващия отдясно            1:48
+   *   Грешки (2)          ✗ Непропускане на пътно превозно
+   *                         средство с предимство −10 изпитни т.
+   *                         ОПАСНА ГРЕШКА                    в 1:43
+   *   Разбор              «…допусната е опасна грешка: „Непропускане на пътно
+   *                       превозно средство с предимство“ … ЗАДАЧИТЕ ОТ
+   *                       МАРШРУТА СА ИЗПЪЛНЕНИ.»
+   *
+   * Five seconds. The instructor convicts the student of not giving way and
+   * then certifies, twice, that he gave way. The frames carry the same order
+   * with no clock to argue about: at `04-t092s` the −10 card is on the glass
+   * with «Задача 2/2 … след като пропуснеш идващия отдясно» still OPEN, and at
+   * `04-t099s` that very task is ticked. `sc-sflash-cross` is
+   * `{kind:"reachZone", x:4.06, y:45, radiusM:9}` — a bare disc 45 m north of
+   * the junction. Arrival was the whole certificate.
+   *
+   * THE CHANNEL IS THE LESSON'S OWN. `SC_SIGNAL_FLASHING.mistakes[]` cites
+   * `FAILED_TO_YIELD` twice, by name, as the fault this drill exists to teach;
+   * the rule engine bills it («Непропускане на пътно превозно средство с
+   * предимство», ЗДвП чл. 47/48/50) and `lessons/engine.ts` already holds that
+   * ledger — both halves of it, `prev.events` and the events of the frame being
+   * stepped. Nothing new observes anything: the gate reads the verdict the
+   * grader that owns this duty has already written, exactly as
+   * `requireRailClear` does and for the same reason argued in
+   * `railClearHonoured`.
+   *
+   * A WINDOW, NOT THE RUN, and this is the one place this file departs from its
+   * three session-monotone demands. «Пропусни колата с предимство НА ВТОРОТО
+   * кръстовище» (`sc-jx-giveway-b1/sc-jxgb-yield`) is a drill with two Б1
+   * junctions in a row: a student who barged the FIRST one and then gave way
+   * properly at the second told the truth about the second, and a run-wide read
+   * would call him a liar. So the refusal is bounded below by the moment this
+   * objective BECAME the active one — the chain is strictly sequential, so that
+   * moment is exactly when its predecessor completed
+   * (`ObjectiveContext.objectiveActiveSinceSec`, filled in by
+   * `lessons/engine.ts`). On the drive above the window is [1:04, 1:48] and the
+   * fault at 1:43 sits inside it; at `sc-jxgb-yield` the first junction's
+   * failure falls before `sc-jxgb-roll` completes and is outside it.
+   *
+   * WHICH LEDGER ROWS FALSIFY WHICH BANNER — `traffic` reads
+   * FAILED_TO_YIELD + EMERGENCY_NOT_YIELDED, `pedestrian` reads
+   * PEDESTRIAN_NOT_YIELDED. Split rather than pooled because a banner that
+   * promises a pedestrian was let through is not falsified by a vehicle the
+   * same student cut up: the certificate would be withdrawn for something it
+   * never claimed, and a false refusal is the crime this programme exists to
+   * end. `ReachZoneYieldDemand` carries the third, pooled kind that was cut
+   * before it shipped, and the drill that would have suffered from it.
+   *
+   * IT IS NOT A SILENT VERDICT (THEO-4). The withheld tick never arrives alone:
+   * the same drive is holding the rule engine's own −10 card, with the
+   * catalogue's explanation and its «✔ Правилното действие» corrective, raised
+   * five seconds earlier and repeated on the debrief with its law refs. This
+   * demand removes a contradiction from a protocol that already explains
+   * itself; it does not introduce a new unexplained one.
+   *
+   * OUTSIDE THE `capMet` LATCH, like the fourth, fifth and sixth: the ledger is
+   * append-only within a window, so the read is pure per frame and needs no
+   * eval-state memory. UNKNOWN IS NEVER A REFUSAL — a context that carries no
+   * window (every fixture, rig and hand-built replay, and `EMPTY_CONTEXT`)
+   * leaves the demand met, so every such caller is bit-identical to shipped.
+   */
+  requireYieldClean?: ReachZoneYieldDemand;
 }
+
+/**
+ * The three ledger rows that can falsify a «пропусни …» banner, named here
+ * rather than imported from `rules/types.ts` so this evaluator keeps its one
+ * dependency on that module (`SimTick`). `lessons/engine.ts` is the only
+ * producer and its `isYieldFault` predicate is pinned against the real
+ * `ViolationCode` union, so a rename over there fails the build rather than
+ * quietly emptying this gate.
+ */
+export type YieldFaultCode =
+  | "FAILED_TO_YIELD"
+  | "EMERGENCY_NOT_YIELDED"
+  | "PEDESTRIAN_NOT_YIELDED";
+
+/**
+ * Which road user the banner claims was let through.
+ *
+ * TWO KINDS AND NOT THREE. A pooled „either" kind was cut before it shipped:
+ * its only candidate was `sc-pzl-exit` («Пълзи до устието на изхода и пропусни
+ * улицата»), and pooling would have let a PEDESTRIAN_NOT_YIELDED billed inside
+ * the living zone — where the drill's own objectives 2 and 3 are about people
+ * in the carriageway — withdraw a certificate about joining the STREET. That is
+ * a certificate withheld for something it never claimed, which is the false
+ * refusal this split exists to prevent. The narrower demand forgoes a refusal;
+ * the wider one invents one, and only the second is a defect.
+ */
+export type ReachZoneYieldDemand = "traffic" | "pedestrian";
+
+/** One billed yield failure, as `lessons/engine.ts` reads it off the ledger. */
+export interface YieldFaultRecord {
+  code: YieldFaultCode;
+  /** Session seconds — the same `tick.t` clock `completedAtSec` is stamped on. */
+  tSec: number;
+}
+
+const YIELD_DEMAND_CODES: Record<ReachZoneYieldDemand, readonly YieldFaultCode[]> = {
+  traffic: ["FAILED_TO_YIELD", "EMERGENCY_NOT_YIELDED"],
+  pedestrian: ["PEDESTRIAN_NOT_YIELDED"],
+};
 
 export type WitnessedReachZoneParams = ReachZoneParams & ReachZoneWitnessDemands;
 
@@ -1041,6 +1187,66 @@ export function deriveVruWaitDemand(titleBg: string): boolean {
   return VRU_WAIT_TITLE.test(titleBg);
 }
 
+/**
+ * «ПРОПУСНИ / ПРОПУСНЕШ» — the banner states outright that another road user
+ * was let through. CENSUSED over every `titleBg:` in `scenario/templates-*.ts`
+ * (2026-08-27) rather than guessed, exactly like the officer and the
+ * waited-for-person matchers above, because an over-wide matcher here would
+ * withhold a certificate a student earned — the failure the founder ranks
+ * worst. NINE objective titles in the catalogue carry the verb; six of them
+ * claim the act and three name only a READINESS to perform it:
+ *
+ *   CLAIMS (→ demand)
+ *     «Премини правó напред, след като пропуснеш идващия отдясно»  sc-sflash-cross
+ *     «Премини наляво, след като пропуснеш идващия отдясно»        sc-sdead-cross
+ *     «Пропусни колата с предимство на второто кръстовище»         sc-jxgb-yield
+ *     «Намали, за да пропуснеш потеглящия автобус»                 sc-mgb-ease
+ *     «Спри пред тротоара и пропусни пешеходеца»                   sc-mfp-walk-yield
+ *     «Пълзи до устието на изхода и пропусни улицата»              sc-pzl-exit
+ *
+ *   READINESS ONLY (→ none; the graded half is the authored cap, and these
+ *   three sit deliberately outside the matcher for the same reason
+ *   `ACTOR_CLAIM` in `stop-claim-gates.test.ts` spares an actor named as
+ *   scenery — «готовност» is a state of the driver, not a fate of the actor)
+ *     «Приближи равнозначното кръстовище с готовност да пропуснеш»
+ *     «Приближи завоя с готовност да пропуснеш»
+ *     «Приближи завоя бавно, готов да пропуснеш и двете посоки»
+ *
+ * The lookbehind kills «Непропускане …» (the rule engine's own fault titles,
+ * which must never author a demand on an objective), and the inflection list is
+ * closed to the imperative and the 2nd-person present the catalogue actually
+ * uses. Both halves are pinned by the teeth rows in
+ * `__tests__/reach-zone-yield-clean.test.ts`, so a matcher that quietly stopped
+ * matching fails the build instead of silently emptying the census.
+ */
+const YIELD_TITLE = /(?<![\p{L}])пропусн(?:и|еш|ете)(?![\p{L}])/iu;
+/** «с готовност да пропуснеш» / «готов да пропуснеш» — a posture, not a fate. */
+const YIELD_TITLE_READINESS = /готов(?:ност|а|о|и)?\s+(?:да\s+)?пропусн/iu;
+/**
+ * The banner names a person on foot as the one let through. The census has ONE
+ * member — «Спри пред тротоара и пропусни пешеходеца» — and the `дете`
+ * alternatives are not census members but a ROUTING guard: if a template is
+ * ever retitled «пропусни детето», this sends it to the pedestrian ledger
+ * instead of letting it fall through to the vehicle one, where the demand would
+ * consult a row that drill can never bill. An unmatched title is inert; a
+ * MISrouted one certifies against the wrong grader, which is worse.
+ */
+const YIELD_TITLE_PEDESTRIAN = /пешеходец|пешеходц|пешеходка|дете(?:то)?|децата/iu;
+
+/**
+ * Which yield, if any, this banner certifies. `undefined` = it certifies none,
+ * and every gate that gets `undefined` is bit-identical to shipped.
+ *
+ * «Пропусни УЛИЦАТА» (`sc-pzl-exit`) falls through to `traffic` deliberately —
+ * see `ReachZoneYieldDemand` for the pooled kind that was cut and why.
+ */
+export function deriveYieldDemand(titleBg: string): ReachZoneYieldDemand | undefined {
+  if (!YIELD_TITLE.test(titleBg)) return undefined;
+  if (YIELD_TITLE_READINESS.test(titleBg)) return undefined;
+  if (YIELD_TITLE_PEDESTRIAN.test(titleBg)) return "pedestrian";
+  return "traffic";
+}
+
 function parseLampDemand(objective: LessonObjective, v: unknown): ReachZoneLampDemand {
   if (v === "lit" || v === "low" || v === "high" || v === "fog") return v;
   throw new ObjectiveSpecError(
@@ -1111,6 +1317,22 @@ function parseRailClearDemand(objective: LessonObjective, v: unknown): true {
     throw new ObjectiveSpecError(objective.id, "reachZone requireRailClear must be true");
   }
   return true;
+}
+
+/**
+ * THE YIELD. No conflict guard, for the same reason as the raised arm above:
+ * this demand never touches the `capMet` latch, so it can share a zone with any
+ * at-mark demand without the single-frame conjunction problem
+ * `parseControllerDemand` exists to refuse. What is refused is a malformed
+ * value — a stray string here would otherwise read as „no demand" and silently
+ * un-gate a give-way certificate.
+ */
+function parseYieldDemand(objective: LessonObjective, v: unknown): ReachZoneYieldDemand {
+  if (v === "traffic" || v === "pedestrian") return v;
+  throw new ObjectiveSpecError(
+    objective.id,
+    'reachZone requireYieldClean must be "traffic" | "pedestrian"',
+  );
 }
 
 /**
@@ -1277,6 +1499,35 @@ function noContactHonoured(ctx: ObjectiveContext): boolean {
   return ctx.struckABodyInRun !== true;
 }
 
+/**
+ * Was the yield the banner promised billed as a FAILURE inside this
+ * objective's own window? (see `ReachZoneWitnessDemands.requireYieldClean` for
+ * the drive, the census and why the window exists.)
+ *
+ * THREE WAYS TO ANSWER „MET", and all three are the same law this file states
+ * everywhere else — unknown must never become a refusal:
+ *   · no ledger on the context at all (fixture, rig, replay, EMPTY_CONTEXT);
+ *   · no window on the context (the caller cannot say when the gate opened);
+ *   · a ledger that carries nothing of this demand's kind inside the window.
+ *
+ * `>=` on the lower bound is deliberate: a failure billed on the very frame the
+ * previous objective completed is the barge that ENDED that approach and BEGAN
+ * this one, and it belongs to the certificate being issued now. There is no
+ * upper bound to test — the engine hands over the ledger as it stands on the
+ * frame being stepped, so „so far" is the whole of it.
+ */
+function yieldCleanHonoured(demand: ReachZoneYieldDemand, ctx: ObjectiveContext): boolean {
+  const faults = ctx.yieldFaults;
+  if (faults === undefined || faults.length === 0) return true;
+  const since = ctx.objectiveActiveSinceSec;
+  if (since === undefined) return true;
+  const codes = YIELD_DEMAND_CODES[demand];
+  for (const f of faults) {
+    if (f.tSec >= since && codes.includes(f.code)) return false;
+  }
+  return true;
+}
+
 function vruWaitHonoured(ctx: ObjectiveContext): boolean {
   // A struck person outranks the encounter record in both directions: it
   // refuses a run the dart never armed for, and it refuses one whose LAST dart
@@ -1362,6 +1613,42 @@ export function railBarredVoidsObjective(
 ): boolean {
   if (!enteredRailBarredInRun || params.kind !== "reachZone") return false;
   return (params as WitnessedReachZoneParams).requireRailClear === true;
+}
+
+/**
+ * …AND THE SAME QUESTION FOR THE YIELD, WHICH IS THE ONE THAT WOULD OTHERWISE
+ * HAVE SHIPPED A NEW DEFECT WITH THE FIX.
+ *
+ * `requireYieldClean` is monotone WITHIN its window — the ledger only appends,
+ * and the window's lower bound is a completed predecessor's timestamp, which
+ * cannot move — so once the failure is billed the gate is shut for the rest of
+ * the run. BOTH the drives this demand was written for put that gate LAST:
+ * `sc-sflash-cross` is 2 of 2 and `sc-sdead-cross` is 2 of 2. Without this arm
+ * the chain would never advance, `currentIndex` would never reach
+ * `objectives.length`, the run-out would never arm — and a student who failed
+ * to give way could reach the −10 «Непропускане на пътно превозно средство с
+ * предимство» card that teaches him чл. 47/48/50 only by quitting, forfeiting
+ * the attempt's XP and its calibration. That is the exact trap
+ * `personContactVoidsObjective` was written to avoid, one demand later; a
+ * repair that removes a false certificate by creating a drive that cannot end
+ * has not repaired anything.
+ *
+ * ONE REFUSAL, NEVER A TRAP: the objective keeps its honest `active` status and
+ * `buildLessonResult` still reports finished-and-failed, so the certificate is
+ * withheld and only the strand goes.
+ *
+ * Takes the two context fields rather than a boolean because the answer depends
+ * on WHICH yield the banner claimed and WHEN the gate opened, and only the
+ * evaluator that owns `YIELD_DEMAND_CODES` should be deciding either.
+ */
+export function yieldFailedVoidsObjective(
+  params: ObjectiveParams,
+  ctx: Pick<ObjectiveContext, "yieldFaults" | "objectiveActiveSinceSec">,
+): boolean {
+  if (params.kind !== "reachZone") return false;
+  const demand = (params as WitnessedReachZoneParams).requireYieldClean;
+  if (demand === undefined) return false;
+  return !yieldCleanHonoured(demand, { ...EMPTY_CONTEXT, ...ctx });
 }
 
 /**
@@ -2186,7 +2473,19 @@ function stepReachZone(
   // latch because the fact is session-monotone: the entry was adjudicated once,
   // by the grader that owns it, and a later frame cannot un-adjudicate it.
   const railOk = params.requireRailClear !== true || railClearHonoured(ctx);
-  const done = reached && capMet && vruOk && contactOk && railOk;
+  // ── THE YIELD THE BANNER SAYS HAPPENED (requireYieldClean) ────────────────
+  // Fourth arm of the same shape and the fourth outside the `capMet` latch —
+  // but the first bounded by a WINDOW rather than by the whole run, because
+  // one drill in the catalogue («…на второто кръстовище») asks for the same
+  // act twice and a run-wide read would answer for the wrong junction. See
+  // `ReachZoneWitnessDemands.requireYieldClean` for the drive this closes:
+  // «✓ Премини правó напред, след като пропуснеш идващия отдясно 1:48» printed
+  // five seconds under «✗ Непропускане на пътно превозно средство с
+  // предимство −10 изпитни т. в 1:43». A zone whose banner promises no yield
+  // never consults this and is bit-identical to shipped.
+  const yieldOk =
+    params.requireYieldClean === undefined || yieldCleanHonoured(params.requireYieldClean, ctx);
+  const done = reached && capMet && vruOk && contactOk && railOk && yieldOk;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
   const overCapNoted =

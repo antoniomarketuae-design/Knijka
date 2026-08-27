@@ -2868,6 +2868,27 @@ export function TouchControls({
           `"left" | "right" | "rear"` and stops there (scene/cabin.ts), which is
           the other half of those two rows and is not this file's to close.
 
+          AND THE ADDRESS, so the third lane to be sent here stops at the door.
+          sc-pk-move-off:6aa68f53 (critical) and sc-vp-handbrake:20bf57db both
+          name this file. A station is 20 lines of JSX; the capability it would
+          have to call does not exist anywhere in the product, so a «РАМО» cell
+          added here would be a button wired to nothing — the dead-predicate
+          class, filed as a repair. What has to move first, in order:
+            · `modules/sim/scene/cabin.ts:22` — `MirrorGlanceKind`, and the
+              `GlanceState` machine at :422 that starts/ends/updates one;
+            · `components/sim/CameraRig.tsx:290` — `GLANCE_OFFSETS`, a
+              `Record<MirrorGlanceKind, …>`, so a new kind must be given a yaw
+              and a pitch or the camera cannot perform the look;
+            · `modules/sim/engine/glanceView.ts:54` — the structurally identical
+              twin that must stay assignable;
+            · the A2 procedure observer, which is what makes the glance GRADED
+              rather than a camera trick — and grading is the whole of both rows
+              („the graded blind-spot step cannot be performed").
+          `modules/sim/engine/reverseView.ts:57` already states the same gap
+          from the other side: „a student who wants to look over his shoulder on
+          demand has no button for it — the shoulder check is automatic-on-R
+          only". Two files now say it; neither of them is this one.
+
           WIDTH, MEASURED RATHER THAN HOPED. A station is `TOUCH_MIN_PX` = 44 px
           and `FLANK_LANE_PX` = 8 + 44 + 8 keeps a further 8 px clear on each
           side of it, so a caption has 60 px before it reaches any other surface.
@@ -3112,6 +3133,56 @@ export function TouchControls({
             active={snap?.seatbeltOn ?? false}
             onClick={() => cabin()?.toggleSeatbelt()}
           />
+          {/* ══ THE LIGHTS ARE HERE, AND A BEAM TELLTALE IS NOT THIS FILE'S ══
+              2026-08-27, rows sc-ac-night-lights:ebeb0e44 and
+              sc-ac-highbeam-lead:b0ee7eff („no СВЕТЛИНИ control or indicator
+              anywhere on the mobile glass"). Half of that is answered right
+              here and half of it cannot be answered in this file at all — the
+              split is written down so the next reader does not edit the wrong
+              one, which is how both rows arrived at THIS file twice.
+
+              THE CONTROL EXISTS AND IS ONE TAP DEEP. This cell's face is the
+              live beam state («СВЕТЛ» / «КЪСИ» / «ДЪЛГИ») and its handler is
+              the same `cycleHeadlights()` the cockpit hotspot and the L key
+              call. Its door — the ⚙ dock — is on the glass unconditionally
+              (see `ARC_STATIONS_LEFT`, and every mobile run.log in the w11
+              sweep carries «⚙Кола» in its control census, 78 beats of
+              sc-ac-night-lights included). The row's „the shared settings
+              sheet has no lights entry either" is measurable and false. What
+              IS true is that no drive in that sweep ever tapped the dock, and
+              that a log grep for «СВЕТЛИНИ» cannot match a cell whose face is
+              «СВЕТЛ» — which is how a present control was read as absent.
+
+              THE TELLTALE DOES NOT EXIST, AND IT IS TWO FILES AWAY. On a phone
+              the beam state is nowhere unless this sheet is open:
+                · `modules/sim/hud/StatusDashboard.tsx` — the `compact` branch
+                  drops „both blinker arrows, the seatbelt, headlight, fog,
+                  wiper, parking-brake and hazard telltales" on the stated
+                  premise that „the car already lights [them]";
+                · `modules/sim/cockpit/clusterLayout.ts:LAMP_KEYS` — the car
+                  lights eight lamps (arrowLeft, belt, brake, engine, oil,
+                  battery, temp, arrowRight) and NONE of them is a beam lamp;
+                  `clusterReadout.ts`'s `ClusterInputs` carries no headlight
+                  channel to light one with.
+              So the premise is false and the state falls between the two, and
+              neither file is this one.
+
+              WHY IT CANNOT BE SMUGGLED IN HERE EITHER, in the ladder's own
+              numbers (`touchArc.test.ts`'s LADDER). A fifth station makes the
+              band `insetB + padH + ARC_LIFT + 44·4 + 44`:
+                iphone16-landscape 852×393  21 + 136 + 0 + 220 = 377 of 393 →
+                  the top box lands 16 px from the top edge;
+                small-landscape   780×360    0 + 136 + 0 + 220 = 356 of 360 → 4 px.
+              And a third top-rail WORD wraps the rail onto a second row in
+              portrait (~167 px between «Меню» and the column against ~176 px of
+              button), past the single row `TOP_RAIL_ROW_CSS` promises to every
+              surface that has to clear this corridor. Right station 0 is free
+              once the belt is on — and gating the lights on the belt is the
+              2026-08-17 dock defect rebuilt: the w11 night-lights drive carries
+              «⚠Колан» in all 78 of its control censuses, so a cell behind it
+              would not have appeared in one frame of the lesson it is for.
+              All three are geometry changes that need the six-profile browser
+              sweep this lane cannot run. */}
           <SheetCell
             textBg={
               snap?.headlights === "high"
@@ -3311,15 +3382,88 @@ function ArcStation({
  * nothing behind them are still boxes with nothing behind them.
  *
  * It is a GRADIENT and not a slab, and the direction is the argument: strongest
- * against the glass, ~0 at the inboard edge. That reads as an edge rail rather
- * than as a panel laid on the road, and it puts the density where the eye needs
- * it — the outer half of each glyph — for a fraction of a slab's ink. Measured
- * cost is in the wave's own before/after table rather than asserted here.
+ * against the glass, 0 at the inboard edge. That reads as an edge rail rather
+ * than as a panel laid on the road.
  *
  * No `backdrop-filter`, deliberately: doc 91 §I20/§D12d priced a blur over a
  * live WebGL canvas and it is among the most expensive things a phone
  * compositor can be asked for. A flat gradient is free.
+ *
+ * ── THE RAMP RAN ACROSS THE CONTROL, WHICH IS THE SAME AS NO RAMP AT ALL ────
+ * 2026-08-27, catalogue rows sc-junction-gap:7c020096 / :e87d5be1 / :3c4f9a27.
+ *
+ * The sentence above used to end „…and it puts the density where the eye needs
+ * it — the outer half of each glyph — for a fraction of a slab's ink." Both
+ * halves of that were wrong about this code. The band is `ARC_EDGE` (8) +
+ * `ROW_H` (44) = 52 px wide, and the STATION BOX starts at 8 and runs to 52 —
+ * so the ramp's strong end was spent entirely on the 8 px gutter OUTBOARD of
+ * the control, and the whole caption stood on the tail. There is no „outer half
+ * of the glyph" in a 52 px band whose last 44 px are the glyph.
+ *
+ * MEASURED, and it needs no browser: the ghost's own TOP EDGE is a horizontal
+ * line with the same building wall above it and below it, so one subtraction
+ * reads the alpha off a shipped frame. `.audit-frames/w11/frames/
+ * sc-crossing-bus-shadow__mobile-right/03-ready.png`, iPhone 16 landscape,
+ * DPR 3, edge at device y 179, luminance above → below:
+ *
+ *   device x 178   the band's OUTER edge (0 px; that is the safe-area inset,
+ *                  not the physical glass)             85.5 → 52.4    α 0.39
+ *   device x 202   the station box's OUTER edge       86.2 → 60.4    α 0.30
+ *   device x 240…290  the caption «МИГАЧ» itself      83.6 → 63.5    α 0.13–0.24
+ *   device x 330   the inboard edge                   82.9 → 81.4    α 0.02
+ *
+ * against the α 0.78 the PC's own keyboard panel achieves on the same wave
+ * (srgb(29,32,35) inside it vs srgb(134,132,126) on the same facade band). A
+ * caption standing on 0.17 of black is a caption standing on a parked car, and
+ * that is exactly what the three rows above photographed: a yellow car's door
+ * line through «Д ОГЛЕДАЛО», its wheel arch through the red «КОЛАН» disc.
+ *
+ * SO THE PLATEAU IS THE FIX, AND IT IS STATED IN THE BAND'S OWN LENGTHS rather
+ * than in percentages, because the two ends of this gradient are not decorative
+ * positions — they are `ARC_EDGE` and `ROW_H`, the same two constants
+ * `arcStation()` builds the box out of. Written as percentages they would
+ * silently stop lining up with the control the day either one moves:
+ *
+ *   0 px                       α 0 — feathered in, so the OUTBOARD edge cannot
+ *                              become a hard black rule floating in the road
+ *   ARC_EDGE (8 px)            α EDGE 0.88 — the station box starts here
+ *   8 + 44 − FEATHER (46 px)   α INBOARD 0.72 — still under the caption
+ *   52 px (100 %)              α 0 — the inner feather, 6 px
+ *
+ * so every column the glyph and the caption stand on is 0.72–0.88, i.e. at or
+ * past the PC panel's 0.78, and NEITHER edge of the fill is a step. That second
+ * half is not cosmetics: a first pass at this repair used one hard-edged ramp,
+ * and composited over the shipped frame it put a 0.88 black rule down the road
+ * 59 px inboard of the glass — the safe-area inset the band is offset by — which
+ * is a worse surface than the one it replaced. Feather both ends and the fill
+ * reads as a shadow under the rail, which is what „ghost fill" meant.
+ *
+ * WHAT THIS COSTS THE ROAD: NOTHING, and that is the project's own arithmetic,
+ * not a plea. „Any pixel a control paints on is NOT road, translucent or not"
+ * (the rule at the top of this file) means this 52 × 176 rect per flank has
+ * been fully charged since the day it was drawn. The rect is untouched here —
+ * same `width` (so `touchArc.test.ts`'s „a band is edge + 44 wide, full stop"
+ * stays true of the PAINT and not only of the hit boxes), same `height`
+ * (`touchDock.test.tsx` pins that string), same `bottom`, same radii. Only the
+ * alpha profile moves.
+ *
+ * AND THE GEOMETRY CLAIM IN :3c4f9a27 IS REFUTED, not repaired. That row reads
+ * „the two МИГАЧ controls got none [no plate]". They have one: the measurement
+ * above puts the ghost's top edge at device y 179 = CSS 59.7 from the top, and
+ * `bottom + height` = (0 + 136 + 0 + 21) + (44·3 + 44) = 333 CSS off the bottom
+ * of a 393 CSS stage = 60.0 from the top. The band IS the four stations' own
+ * column, top to bottom, on both flanks — `stations` has been 4 on each side
+ * since the dock moved. What the frame shows under the two indicators is an
+ * A-pillar that is already near-black, where 0.17 of black adds nothing an eye
+ * can find. Weak, not absent; the plateau fixes the same symptom either way.
  */
+/** Alpha at the station box's outer edge, and at its far side. Both ends of the
+ *  fill run out to 0 across `FLANK_GHOST_FEATHER_PX`, so it has no step. */
+const FLANK_GHOST_ALPHA_EDGE = 0.88;
+const FLANK_GHOST_ALPHA_INBOARD = 0.72;
+/** The inner run-out, px. It eats the caption's last ~4 px of the 42 px
+ *  «ОГЛЕДАЛО» sets, which is the whole price of not having a hard edge. */
+const FLANK_GHOST_FEATHER_PX = 6;
 function FlankGhost({
   side,
   padH,
@@ -3343,7 +3487,14 @@ function FlankGhost({
         height,
         width: `calc(${rem(ARC_EDGE_PX)} + ${ROW_H})`,
         ...from,
-        background: `linear-gradient(to ${side === "left" ? "right" : "left"}, rgba(0,0,0,0.34), rgba(0,0,0,0.05))`,
+        background:
+          `linear-gradient(to ${side === "left" ? "right" : "left"}, ` +
+          `rgba(0,0,0,0) 0px, ` +
+          `rgba(0,0,0,${FLANK_GHOST_ALPHA_EDGE}) ${rem(ARC_EDGE_PX)}, ` +
+          `rgba(0,0,0,${FLANK_GHOST_ALPHA_INBOARD}) calc(${rem(ARC_EDGE_PX)} + ${ROW_H} - ${rem(
+            FLANK_GHOST_FEATHER_PX,
+          )}), ` +
+          `rgba(0,0,0,0) 100%)`,
         [side === "left" ? "borderTopRightRadius" : "borderTopLeftRadius"]: "0.75rem",
         [side === "left" ? "borderBottomRightRadius" : "borderBottomLeftRadius"]: "0.75rem",
       }}

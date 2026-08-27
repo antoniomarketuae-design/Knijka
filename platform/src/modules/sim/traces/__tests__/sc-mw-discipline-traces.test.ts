@@ -46,6 +46,18 @@ function loadDistrict(id: string): unknown {
 function violationCodes(d: RecordedDrive): string[] {
   return d.ruleEvents.filter((e) => e.kind === "violation").map((e) => e.code);
 }
+/**
+ * The raw reducer bills for one code, in order, with the w11 re-grade marking
+ * (rules/engine.ts MOTORWAY_CRAWL_REGRADE_SEC): a continuing второстепенна
+ * breach is billed TWICE — the teach the free mini-lesson spends, and the
+ * charge it consumed — and lessons/engine.ts drops the MARKED one wherever the
+ * code was already charged, so the изпитен лист still sees one point.
+ */
+function billMarks(d: RecordedDrive, code: string): boolean[] {
+  return d.ruleEvents
+    .filter((e) => e.kind === "violation" && e.code === code)
+    .map((e) => (e as { regrade?: true }).regrade === true);
+}
 function commendationCodes(d: RecordedDrive): string[] {
   return d.ruleEvents.filter((e) => e.kind === "commendation").map((e) => e.code);
 }
@@ -99,11 +111,15 @@ describe("sc-mw-discipline — mistake demos grade their exact codes (doc 76 §9
     for (const s of cruising) expect(s.x, `y=${s.y}`).toBeLessThan(-6);
   });
 
-  it("„Пълзене с 40“: exactly DRIVING_TOO_SLOW_FOR_MOTORWAY, once — transitions exempt", () => {
+  it("„Пълзене с 40“: exactly DRIVING_TOO_SLOW_FOR_MOTORWAY — taught, then charged, transitions exempt", () => {
     const drive = drives.get("mistake-crawl")!;
     const codes = violationCodes(drive);
     expect([...new Set(codes)].sort()).toEqual([...SC_MW_DISCIPLINE.mistakes[1].codeRefs].sort());
-    expect(codes.filter((c) => c === "DRIVING_TOO_SLOW_FOR_MOTORWAY")).toHaveLength(1);
+    // ONE code, TWO bills, the second marked (w11, MOTORWAY_CRAWL_REGRADE_SEC).
+    // The single raw bill is what `sc-mw-discipline:9e8f6966` photographed:
+    // 273 s of crawling, «Второстепенни 0 | 0», the code shown only under
+    // «Учебни моменти (не влизат в точките)».
+    expect(billMarks(drive, "DRIVING_TOO_SLOW_FOR_MOTORWAY")).toEqual([false, true]);
     expect(codes).not.toContain("NOT_KEEPING_RIGHT"); // the crawl stays in the RIGHT lane
     // The crawl really held ~40 — far under the flow floor, never over it.
     expect(maxKmh(drive)).toBeLessThan(45);

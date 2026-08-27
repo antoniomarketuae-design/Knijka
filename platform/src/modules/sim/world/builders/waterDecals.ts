@@ -97,6 +97,23 @@
  * shoot `sc-ac-aquaplane__pc-right/04-t155s.png` before and after.
  *
  * The geometry cannot fix that; only the shading can. Routed there.
+ *
+ * ── 2026-08-27 · THE METALNESS HALF WAS TAKEN, THE FRAME IS STILL OWED ──────
+ *
+ * `StaticWorld.tsx`'s water material now declares `metalness={0}`. Only that
+ * one number moved: `color`, `opacity`, `roughness` and `envMapIntensity` are
+ * exactly as they were, because the paragraph above is right that retuning them
+ * from a source scan is how a round gets spent. 0.55 was not a tuning — it is a
+ * value no dielectric can hold, and the reasoning is at the change site.
+ *
+ * THE ROW IS STILL OPEN. `sc-ac-aquaplane:d1f500fc` was not claimed on this,
+ * and the drive that settles it is the one this note already named: shoot
+ * `sc-ac-aquaplane__pc-right/04-t147s.png` (the beat whose own card says «Във
+ * водата» over grey asphalt) before and after, at the same station, and read
+ * the luminance step across the carriageway. If the sheet is still invisible at
+ * metalness 0, the next suspect is `opacity 0.4` — a 40 % veil over a road that
+ * `wetnessToRoadParams` has already darkened to 0.6× has little left to say —
+ * and THAT one is a tuning, so it needs the frame first, not after.
  * ---------------------------------------------------------------------------
  */
 

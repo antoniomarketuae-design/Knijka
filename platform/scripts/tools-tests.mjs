@@ -264,6 +264,19 @@ export const VITEST_TEST_KEYS = {
   coverage:
     "v8 instrumentation of SOURCE files. Its own include/exclude/thresholds decide what is " +
     "REPORTED, and its thresholds can fail the run loudly; none of them decide what is COLLECTED.",
+  testTimeout:
+    "the per-test clock. It cannot deselect a file: every collected file still runs and every " +
+    "assertion still executes — a test that exceeds it FAILS LOUDLY rather than being skipped, " +
+    "which is the opposite of deselection. Raised to 60 s on 2026-08-27 because the default 5 s " +
+    "starved tests under contention: measured here, publicBudget runs 0.75 s alone and 19.6 s " +
+    "inside a full run, providerIntegration 0.33 s alone and 11.4 s under load, scenery-sightline " +
+    "T6 1.28 s alone against a >5 s red. None got slower; they queue behind 1,022 files on " +
+    "--maxWorkers=2. 60 s is ~18x the slowest real standalone time, so a genuine hang still " +
+    "fails — the same reasoning as the drive supervisor 900 s against a 510 s longest real drive.",
+  hookTimeout:
+    "the same clock for beforeAll/afterAll. Identical argument: a hook that exceeds it fails the " +
+    "file loudly; it cannot remove a file from collection. Kept equal to testTimeout so a slow " +
+    "fixture and a slow test are not judged on two different scales.",
 };
 
 /** Any file either runner could plausibly be expected to run. */

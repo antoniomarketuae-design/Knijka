@@ -964,6 +964,75 @@ export const TERMINUS_CLOSE_TERRAIN_INSET_M = 6;
  *  grows out of the street's own last block. */
 export const TERMINUS_CLOSE_BUILDING_CLEAR_M = 3;
 
+// --- THE WORLD'S RIM (builders/worldRim.ts) ---------------------------------
+//
+// TERMINUS_CLOSE_* above closes ONE AXIS: the dead end of a street, in the
+// direction that street runs. It leaves the other 350° of the horizon open, and
+// `runtime/district.ts`'s census says what is out there — the drawn world is
+// exactly `bounds ± TERRAIN_MARGIN_M`, and on 64 of the 105 committed districts
+// the declared box IS the road network's bounding box, so a student who simply
+// drives OFF the carriageway crosses 60 m of empty ground and then leaves the
+// authored world entirely. Past that line the ground is
+// `environment/groundBackdropShader.ts`'s 480 m camera-following disc: the
+// horizon, not the world. That disc is the "featureless green/grey plane under
+// an empty horizon" of every void frame in the w11 sweep, and the reason the
+// mirror inset keeps rendering a full city street in the same frame is simply
+// that the city is BEHIND the car — it never stopped existing, the car left it.
+//
+// These constants stand the frontage that marks the line. They deliberately
+// reuse the terminus block's depth, height band, lattice guards and clearances:
+// the questions "how deep is a block", "how tall may a closing mass be" and
+// "how far must it stay off a centreline" are already answered above, and a
+// second set of answers is a second set of numbers to keep in sync.
+
+/**
+ * Keep-in from the drawn ground's outer rim, m — the rim's OUTER face stands
+ * this far inside `bounds ± TERRAIN_MARGIN_M`.
+ *
+ * Smaller than TERMINUS_CLOSE_TERRAIN_INSET_M (6 m) on purpose. That inset
+ * buys slack for a mass placed on an arbitrary street heading; the rim is
+ * axis-aligned with the ground quad itself, so the only thing an inset buys
+ * here is a strip of ground BEHIND the wall that no car can reach — and every
+ * metre of it is a metre of void the student can still get to on the near
+ * side. 3 m is enough that terrain relief (TERRAIN_MAX_RELIEF_M = 0.25 m)
+ * cannot expose the ground edge under a wall foot.
+ */
+export const WORLD_RIM_TERRAIN_INSET_M = 3;
+/**
+ * Frontage length of one rim mass, m. A run is divided into a whole number of
+ * masses as close to this as fits, so the belt is CONTIGUOUS by construction —
+ * adjacent masses share an exact edge and no slit can open on a sight line.
+ *
+ * 34 m is a Sofia панелен блок's long side. It is also what keeps the belt
+ * cheap: the median committed district takes 36 masses, i.e. ~940 triangles
+ * and — because every one of them goes through `buildBuildings`' existing
+ * facade/roof accumulators — ZERO additional draw calls.
+ */
+export const WORLD_RIM_SPAN_M = 34;
+/**
+ * How far a mass may be pushed INWARD from the nominal inner face, m, so the
+ * belt reads as a row of blocks rather than one 1.3 km slab. Same number and
+ * same job as TERMINUS_CLOSE_STEP_M. Only the inner face moves: the outer face
+ * stays flush at the keep-in line (nothing can ever see it) and the corners
+ * butt at the NOMINAL inner face, so the jitter cannot open a corner.
+ */
+export const WORLD_RIM_STEP_M = 6;
+/**
+ * Thinnest a rim mass may end up, m, after its inner face has been pushed out
+ * past frontage the map already authored inside the band. Below this the block
+ * is a wall rather than a building — and it is not needed, because the mass
+ * that pushed it that far out is itself standing in the belt and closing the
+ * same sight line.
+ */
+export const WORLD_RIM_MIN_DEPTH_M = 5;
+/**
+ * How much of the district's frontage median the four height steps take. The
+ * result is clamped into TERMINUS_CLOSE_MIN/MAX_HEIGHT_M exactly as a terminus
+ * closure is, so a low-rise micro-map gets a low-rise edge and nothing anywhere
+ * becomes a tower.
+ */
+export const WORLD_RIM_HEIGHT_STEPS = [0.72, 0.88, 1, 1.16] as const;
+
 // --- streetscape v2 dressing (doc 70 REF 1 + REF 3) --------------------------
 
 /** Leafy-tree row spacing along arterial streets (REF 3's tree-lined roads). */

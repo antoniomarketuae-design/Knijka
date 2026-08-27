@@ -37,6 +37,7 @@ import { analyzeRoundabouts, buildRoundabouts } from "./roundabout";
 import { buildTerminusClosure } from "./terminus";
 import { buildTerrain } from "./terrain";
 import { buildWaterDecals } from "./waterDecals";
+import { buildWorldRim } from "./worldRim";
 
 export const DEFAULT_SEED = 1337;
 
@@ -462,10 +463,37 @@ export function buildWorldGeometry(
   // because a car park's roadway is `service`. Empty on all 91 non-lot
   // districts; see `lotEnclosure`.
   const lotEdges = lotEnclosure(district, network);
-  const buildings = buildBuildings(district.buildings, towerIds, [
+  // THE WORLD'S RIM (builders/worldRim.ts). terminus.ts closes ONE axis — the
+  // dead end of a street, in the direction that street runs; this closes the
+  // other 350°, which is the direction every void frame in the w11 sweep was
+  // shot in. It stands down wherever the map already carries frontage that far
+  // out, so it is additive against the authored world by construction. LAST in
+  // `extraVolumes`, and the terrain call below leans on that (see there).
+  const worldRim = buildWorldRim(district, network, [
+    ...district.buildings,
     ...terminusClosures.map((c) => c.volume),
     ...lotEdges,
   ]);
+  const buildings = buildBuildings(district.buildings, towerIds, [
+    ...terminusClosures.map((c) => c.volume),
+    ...lotEdges,
+    ...worldRim,
+  ]);
+  // THE AABBs THE GROUND-USE ZONING MAY SEE. `buildBuildings` appends the extra
+  // volumes to `aabbs` in the order they were handed in, so dropping the last
+  // `worldRim.length` entries drops exactly the rim and nothing else.
+  //
+  // The rim is kept out of TERRAIN, and only terrain — `terrain.ts` paves every
+  // cell within TERRAIN_PAVE_NEAR_BUILDING_M (20 m) of a building box, so a
+  // belt that ran all the way round the world would lay a 20 m concrete ring
+  // around every district. `lessonWorldRecipe`'s header already files stray
+  // `terrainPaved` as a defect in its own right („a car that leaves the
+  // carriageway drives onto a 400 m concrete apron"), and answering a void with
+  // a ring road of pavement would be answering it with a bigger one. PROPS do
+  // still see the rim (below): the terminus grove plants up to 44 m past a
+  // boundary end, which is inside the belt, and a tree growing out of a wall is
+  // the one thing worse than no wall.
+  const nonRimAabbs = buildings.aabbs.slice(0, buildings.aabbs.length - worldRim.length);
   // School dressing — name board + yard railing per `kind: "school"` footprint
   // (founder item 61). Empty on every district that authors none, so this is
   // additive: no existing map's geometry moves by a vertex.
@@ -519,7 +547,7 @@ export function buildWorldGeometry(
   const terrain = buildTerrain(
     district,
     network,
-    lotApron ? [...buildings.aabbs, lotApron] : buildings.aabbs,
+    lotApron ? [...nonRimAabbs, lotApron] : nonRimAabbs,
     112,
   );
 

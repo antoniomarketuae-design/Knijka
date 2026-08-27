@@ -360,8 +360,34 @@ export const BG_URBAN_DEFAULT_KMH = 50;
 // no road. That disc is the "featureless grey/green plane" in the audit
 // frames: it is the horizon, not the world.)
 //
-// NOTHING MARKS THAT LINE, and nothing can, because until this block existed no
-// module could name it. MEASURED over all 105 committed district-v1 documents
+// ── WHAT MARKS THAT LINE, since 2026-08-27 ─────────────────────────────────
+//
+// This block used to open „NOTHING MARKS THAT LINE, and nothing can, because
+// until this block existed no module could name it", and close by saying it
+// „draws nothing and ends nothing" because the consumers were another lane's.
+// Half of that is now out of date and is struck rather than left standing.
+//
+// `world/builders/worldRim.ts` belts every AUTHORED MICRO-MAP — the 102
+// `scenario-*` documents and `poligon-v1`, all 103 that declare a `meta.mapKind`
+// — with a contiguous row of building masses just inside this rectangle. It is
+// built through the same `extraVolumes` seam as the terminus closure, so it
+// costs no draw call and its walls are in `colliders.buildings`: a student who
+// drives off the carriageway now meets a city edge instead of an empty plane,
+// and cannot pass it. Its near face stands 37–43 m past the declared bounds,
+// i.e. `worldEdgeClearanceM` reads 17–23 m where the wall is — so
+// WORLD_EDGE_WARN_M below fires 12–18 m before a car reaches it, and the wall
+// itself is visible from anywhere on the map, which is the part a card cannot
+// do. The census that follows is unchanged and is what SIZED that belt.
+//
+// TWO THINGS IT DELIBERATELY DOES NOT DO, so this block is not read as more
+// than it says. It does not move this rectangle: the GROUND still ends at
+// `bounds ± TERRAIN_MARGIN_M` and every number below still stands. And it is
+// not built on `district-v1` / `d2-v1` — those two are Sofia under an ODbL
+// notice and their box is a cut through a city whose streets genuinely
+// continue, so they keep the defect and a city edge stays an open question
+// (`worldRim.ts`'s gate carries the reasoning).
+//
+// MEASURED over all 105 committed district-v1 documents
 // in content/world, taking the closest any drivable centreline comes to it:
 //
 //   64 districts   60.000 m   — the declared box IS the network's bounding box,
@@ -404,8 +430,20 @@ export const BG_URBAN_DEFAULT_KMH = 50;
 // WHAT THIS BLOCK IS AND IS NOT. It is the MEASURE — the one place that answers
 // "how much authored world is left in front of this car", so the drawn barrier,
 // the instructor's warning and the ending gate all read the same number instead
-// of each re-deriving it. It draws nothing and it ends nothing: those consumers
-// live in files this lane does not own (see the routing note in the fix report).
+// of each re-deriving it. It still draws nothing itself: the barrier is
+// `world/builders/worldRim.ts` (above) and the warning is
+// `components/sim/lesson-ui/LessonPlayShell.tsx`, which consumes
+// `worldEdgeWarning` at the tick. IT STILL ENDS NOTHING — no lesson terminates
+// on a clearance, and a car that stops against the belt is simply a car that
+// has stopped. That consumer is `lessons/finish.ts`, which this lane does not
+// own, and it is not written.
+//
+// ONE STRING GOES STALE WITH THIS AND IS NOT THIS FILE'S TO FIX. The rim card
+// LessonPlayShell puts on the glass says «Оттук нататък няма нито път, нито
+// сграда — теренът просто свършва.» On the 103 belted maps there is now a
+// сграда, and the copy should say so — it is a virtual instructor's sentence
+// (THEO-4) and it is currently telling the student something the windscreen
+// contradicts. Routed, not edited.
 // ---------------------------------------------------------------------------
 
 /**

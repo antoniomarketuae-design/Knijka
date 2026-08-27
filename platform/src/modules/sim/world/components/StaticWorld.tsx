@@ -550,7 +550,28 @@ export function StaticWorld({
           roughness so the sky/HDRI smears into a wet mirror. Slightly Y-lifted
           above the paint AND polygonOffset (belt + braces against z-fighting
           on the long flat span). icePatch spans render NOTHING by design —
-          invisible black ice is the AC-08 lesson. */}
+          invisible black ice is the AC-08 lesson.
+
+          `metalness` IS ZERO AND CANNOT BE ANYTHING ELSE. Water is a
+          DIELECTRIC: its gloss is Fresnel, not metallic reflectance, and there
+          is no physical material at 0.55 at all. The value shipped here until
+          2026-08-27 was 0.55, and `builders/waterDecals.ts`'s routing note
+          measured what it cost — half-metal removes 55 % of the diffuse (metals
+          have none), so the near-black albedo that is supposed to darken the
+          carriageway spends less than half its budget, and what replaces it is
+          an environment reflection TINTED BY THAT SAME NEAR-BLACK: neither dark
+          nor bright, over a rain-darkened road that is already both. That is
+          the sheet nobody can see in sc-ac-aquaplane/pc-right/04-t147s.png.
+          At 0 the diffuse darkens fully and the sky smear is the sky's colour,
+          which is the whole visual cue standing water has.
+
+          WHAT THIS FIX HAS NOT HAD IS A LOOK. This lane cannot render a frame,
+          and the row it belongs to (sc-ac-aquaplane:d1f500fc) is NOT claimed on
+          the strength of it: the note's own instruction — „shoot
+          sc-ac-aquaplane__pc-right/04-t147s.png before and after" — is still
+          owed. What is claimed is narrower and does not need a frame: one value
+          that no material can physically hold has been replaced by the one it
+          can. */}
       {geometries.waterDecals.getAttribute("position") &&
       geometries.waterDecals.getAttribute("position").count > 0 ? (
         <mesh geometry={geometries.waterDecals} receiveShadow={receive} renderOrder={2}>
@@ -562,7 +583,7 @@ export function StaticWorld({
             polygonOffset
             polygonOffsetFactor={-4}
             roughness={0.12}
-            metalness={0.55}
+            metalness={0}
             envMapIntensity={ROAD_ENV_INTENSITY}
           />
         </mesh>

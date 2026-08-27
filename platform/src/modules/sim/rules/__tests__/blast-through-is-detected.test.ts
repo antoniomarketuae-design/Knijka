@@ -126,8 +126,20 @@ describe("the detectors DO fire on the drives the sweep called silent", () => {
   });
 
   it("a 13 км/ч crawl on a motorway edge bills — «no minimum-speed rule» is false", () => {
-    expect(violations(drive(held(40, { speedKmh: 13, maxSpeedKmh: 130, motorway: true })).events)).toEqual([
-      ["DRIVING_TOO_SLOW_FOR_MOTORWAY", 4],
+    // TWO bills, and the second is the point (w11, MOTORWAY_CRAWL_REGRADE_SEC).
+    // `sc-mw-discipline / mobile-right` crawled 273 s and reached its debrief on
+    // «Второстепенни 0 | 0» with «Твърде бавно движение по автомагистрала»
+    // filed under «Учебни моменти (не влизат в точките)» — the one bill this
+    // detector produced was spent by the teach-first free mini-lesson. The
+    // re-grade at 4 + 6 accrued seconds is the charge that lesson consumed; it
+    // carries `regrade`, so `lessons/engine.ts` drops it wherever the code was
+    // already charged, and no third bill exists at any length.
+    const events = drive(
+      held(40, { speedKmh: 13, maxSpeedKmh: 130, motorway: true }),
+    ).events.filter((e) => e.kind === "violation");
+    expect(events.map((e) => [e.code, Number(e.t.toFixed(1)), e.regrade === true])).toEqual([
+      ["DRIVING_TOO_SLOW_FOR_MOTORWAY", 4, false],
+      ["DRIVING_TOO_SLOW_FOR_MOTORWAY", 10, true],
     ]);
   });
 

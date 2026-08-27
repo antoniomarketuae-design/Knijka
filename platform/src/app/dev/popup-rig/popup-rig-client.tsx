@@ -377,7 +377,15 @@ export function PopupRigClient() {
               />
             ) : null}
             {briefingUp ? (
-              <BriefingCard steps={BRIEFING} onClose={() => setBriefingUp(false)} />
+              // `speedKmh={0}` — this rig has no vehicle, so the card is held in
+              // its standing state and never folds. `briefingStandsDown` is the
+              // shell's wire (`snap.speedKmh`); a rig that invented a speed here
+              // would be photographing a state the product does not produce.
+              <BriefingCard
+                steps={BRIEFING}
+                onClose={() => setBriefingUp(false)}
+                speedKmh={0}
+              />
             ) : null}
             {/* Parity with the shell: it renders `{compact ? null : <HudToasts/>}`
                 because a 240 px toast card does not belong in a 141 px column —

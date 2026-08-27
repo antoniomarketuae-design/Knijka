@@ -708,6 +708,155 @@ export function peekScrimMaskCss(
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   A GROUND SIZED FOR READING IS NOT A GROUND FOR A 44 px CONTROL — 2026-08-27.
+
+   FILED FOUR TIMES IN ONE SENTENCE, and the sentence is about the chips and not
+   about the card: „The card's «ЗАЩО» control lands on top of world geometry
+   (traffic-light poles, vehicles, world signs)" (sc-ov-solid-return:5cb8eb40),
+   „The card's controls land on top of world geometry … the «ЗАЩО ↓10» and «✕»
+   pills are unfilled outlines sitting directly on the parked cars"
+   (sc-park-zebra:9ce33786), „The card's ЗАЩО button is drawn over the traffic"
+   (sc-ov-night-gap:a150c99c), „its ЗАЩО / ✕ buttons are drawn on top of the
+   world traffic" (sc-ov-oncoming-gap:0a7d0af9).
+
+   FIRST, THE HALF OF THOSE NOTES THAT IS STALE, because a repair that chases it
+   would be chasing nothing. Three of the four also say the chips „hang below the
+   panel edge". They do not, and `useCardOverhang` above is why. MEASURED on
+   `w11/frames/sc-park-zebra__mobile-right/04-t013s.png` (iPhone 16 landscape,
+   852 × 393 at dpr 3), reading the shade's own alpha down the card's column
+   against a matched strip of bare world beside it, and the ✕'s two border arcs
+   off the same column:
+
+     the column's top                device  220  = CSS  73.3   (= the constant)
+     the ✕ chip's box                device  439 – 570 = CSS 146.3 – 190.0
+     the shade's flat core ends at   device ≈571  = CSS ≈190.3, then the ramp
+     the column's `max-height` ends at             CSS 169.0   (73.24 + 95.76)
+
+   So the card paints 116.7 px of rows into a 95.76 px box, and the ground ends
+   on the LOWEST ROW THE CARD PAINTS — 0.3 px past the bottom of a 44 px control
+   whose own box ends 21 px past the card's. That is exactly what
+   `paintedOverhangPx` promises, measured on the shipped build. Nothing here
+   changes it, and a repair aimed at it would move no pixel.
+
+   WHAT IS NOT STALE IS WHAT THE GROUND DOES ONCE IT GETS THERE. The block above
+   sizes it for READING — 0.80 is the alpha at which the quietest ink clears AA
+   — and it is capped at 0.80 by the founder's other rule, that the world under
+   it must stay „dimmed, and still plainly two different things" (1.37 : 1) so a
+   hazard is never hidden. 1.37 : 1 is the right answer under a paragraph. Inside
+   a 44 px touch target it means the world's own edges are OBJECTS INSIDE THE
+   CONTROL. Measured, same two frames, luminance sampled inside each chip's own
+   box with the glyph rows avoided (sd = how much of the world survives):
+
+     sc-park-zebra 04-t013s     «ЗАЩО» interior  sd 5.80   the card's bare
+                                 ✕     interior  sd 0.62   ground beside them:
+                                                            sd 5.85
+     sc-ov-return-gap 04-t081s  «ЗАЩО» interior  sd 15.67  bare world, no
+                                 ✕     interior  sd 11.89  shade:  sd 44.35
+
+   The first frame's ✕ is flat only because the world behind it happens to be;
+   the second frame settles it — a parked queue's body, its window pillar and a
+   wheel arch are legible INSIDE both chips, and inside «ЗАЩО» the residual is
+   statistically the same as the unshaded card ground next to it. The ✕'s 12 %
+   tone tint removes about a quarter of it. «ЗАЩО» removes none, because «ЗАЩО»
+   HAS NO FILL AT ALL — it is the one control in the row the 2026-08-13 census
+   skipped, and it is the one that opens the authored explanation.
+
+   THE CENSUS ASKED A DIFFERENT QUESTION OF IT, WHICH IS WHY IT PASSED. Its rule
+   was „give it ink or delete it" and it recorded «Защо» at 81.8 % against this
+   ✕'s 0.0 % — see the ✕'s own site below, which is where those two numbers are
+   written down. WHATEVER that 81.8 % counted, it was not this: the frames above
+   are of the same control at the same commit with a parked truck legible inside
+   it. „Does the control paint ink of its own box" and „does the WORLD paint
+   inside the control's box" are two questions, and only the first was asked.
+
+   SO THE THREE CHIPS GET A GROUND OF THEIR OWN, AND THE NUMBER IS THIS FILE'S.
+   The card's ground may not exceed 0.80. The block above already computed the
+   next rung and rejected it: „At 0.90 it would be 1.13 and at 1.00 exactly 1.00,
+   one flat rectangle, which is the panel this may not become." 0.90 is rejected
+   FOR THE CARD because the card is a window onto the road. A chip is not: three
+   44 px targets are 3 × 44² = 5 808 px² of a 334 836 px² stage — 1.7 % — in the
+   corner the notification column already owns, and every pixel of it is inside a
+   box the chip was already painting a border and a label on. The shade's own
+   sentence holds literally: it claims not one pixel the control was not already
+   standing on.
+
+   0.90 IS THEREFORE THE TOTAL, AND THE CHIP'S OWN ALPHA IS DERIVED FROM IT
+   rather than typed, so that an edit to `PEEK_SCRIM_ALPHA` re-picks this instead
+   of leaving the paragraph to rot: 1 − (1 − 0.80)(1 − β) = 0.90 ⇒ β = 0.50.
+
+   AND IT IS STILL A TRANSLUCENT CHIP. 1.13 : 1 is dimmed, not erased — the
+   world is still there behind the control, which is what the 2026-08-03 review
+   asked for („his reference has PAUSE and VIEW as two small translucent chips").
+   What it is not is the thing that review deleted: a SOLID BRAND-BLUE button.
+   The ground is the card's own near-black, the tone tints (18 % on the
+   acknowledgement, 12 % on the ✕) are unchanged and now sit ABOVE the ground so
+   they keep their identity job, and the 45 % border is untouched.
+
+   `data-hud-ink` ON «ЗАЩО» IS WHAT LETS THE FIX PAINT, AND IS NOT TIDINESS.
+   PlayAreaStyles' UNPANEL sweep is
+     [data-sim-stage] .hud-ghost :is(div, span, button, kbd, …):not([data-hud-ink])
+   with `background-color: transparent !important` AND `background-image: none
+   !important`. «ЗАЩО» is a `<button>` inside the ghost and carried no such
+   attribute, so a fill added without it would have been a diff that changes no
+   pixel — the exact way the tier picker's filled segment survived a whole
+   unpanel pass. Its two row-mates already carry it and say so at their own
+   sites; this is the third, and `sim-overlay-chip-ground.test.ts` reads it off
+   THIS button's own attributes rather than off the row, because a slice that
+   began one line lower found the acknowledgement's copy of the attribute and
+   called it «ЗАЩО»'s — which it did, for one revision of that test.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The chip ground that composites with a card ground of `cardAlpha` to `total`.
+ *
+ * Two alpha layers over the same pixel leave `(1 − a)(1 − b)` of the world, so
+ * the pair reads as `1 − (1 − a)(1 − b)`. Solved for the second layer, clamped
+ * to [0, 1] because a `total` below the card's own ground is not a lighter chip,
+ * it is a request this compositor cannot honour and must not silently invert.
+ */
+export function chipGroundAlphaFor(cardAlpha: number, totalAlpha: number): number {
+  const room = 1 - cardAlpha;
+  if (!(room > 0)) return 0;
+  const beta = 1 - (1 - totalAlpha) / room;
+  if (!Number.isFinite(beta)) return 0;
+  return Math.min(1, Math.max(0, beta));
+}
+
+/**
+ * The total the card's ground and a chip's own ground reach together: the rung
+ * the 0.80 block measured at 1.13 : 1 and rejected for the CARD, adopted here
+ * because a 44 px control is not a window onto the road.
+ */
+export const PEEK_CHIP_TOTAL_ALPHA = 0.9;
+
+/** …and the chip's own layer, derived rather than typed. 0.50 at today's 0.80. */
+export const PEEK_CHIP_GROUND_ALPHA = chipGroundAlphaFor(PEEK_SCRIM_ALPHA, PEEK_CHIP_TOTAL_ALPHA);
+
+/**
+ * The chip's ground.
+ *
+ * IT IS THE SECOND COLOUR OF THE CHIP'S OWN `color-mix`, NOT A SECOND LAYER, and
+ * that is a correctness point rather than a tidiness one. A chip's tone tint has
+ * to stay ON TOP of its ground — the tint is the chip's identity and a tint
+ * under a 50 % ground is a tone halved to buy the ground — and CSS paints
+ * `background-image` ABOVE `background-color`, so „ground in the colour, tint in
+ * the image" gets the order exactly backwards.
+ *
+ * `color-mix(in srgb, …)` premultiplies by alpha, so mixing an OPAQUE tone at
+ * p % with this ground at (100 − p) % is arithmetically identical to painting
+ * the tone at p % source-over the ground:
+ *
+ *   mix   α = p·1 + (1−p)·a      premultiplied = p·C + (1−p)·a·G
+ *   over  α = p + a·(1−p)        premultiplied = p·C + a·(1−p)·G
+ *
+ * — the same two expressions. So one declaration carries both, in the right
+ * order, with nothing for a future layer edit to invert.
+ */
+export function peekChipGroundCss(alpha: number = PEEK_CHIP_GROUND_ALPHA): string {
+  return `rgba(${SCRIM_RGB_CSS}, ${alpha})`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    …AND THE SHADE STOPPED ABOVE «ЗАЩО». 2026-08-26.
 
    THE GROUND ABOVE WAS THE RIGHT FIX FOR THE WORDS AND IT NEVER REACHED THE
@@ -1969,6 +2118,11 @@ export function SimOverlay({
           {hasDetail ? (
             <button
               type="button"
+              // THE GROUND THE 2026-08-13 CENSUS SKIPPED — see the block at
+              // `peekChipGroundCss`. `data-hud-ink` is what makes the fill
+              // survive PlayAreaStyles' UNPANEL sweep; without it this style
+              // property is a diff that changes no pixel.
+              data-hud-ink=""
               {...tapWhy}
               aria-expanded={open}
               // 44 px in BOTH axes. A 24 px chip with a big label is the
@@ -1978,6 +2132,12 @@ export function SimOverlay({
               className="flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full border px-2 text-[11px] font-black uppercase tracking-wider"
               style={{
                 color,
+                // NO tone tint on this one, deliberately: the register ladder
+                // („the loud one clears the line, the quiet one hides it") is
+                // the ack's 18 % and the ✕'s 12 %, and this chip's identity is
+                // its tone-coloured LABEL. What it was missing is the ground
+                // underneath, which is all this line adds.
+                backgroundColor: peekChipGroundCss(),
                 borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
               }}
             >
@@ -2013,7 +2173,13 @@ export function SimOverlay({
               {...tapAck}
               className="flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full border px-3 text-[11px] font-black uppercase tracking-wider text-foreground"
               style={{
-                backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)`,
+                // THE 18 % IS THE SAME 18 %. All that changed is what it is
+                // mixed WITH: it used to be `transparent`, i.e. the tone alone
+                // on whatever the card's shade left of the world, and it is now
+                // the same tone at the same strength over the chip's own ground
+                // — see `peekChipGroundCss` for why one `color-mix` and not two
+                // background layers, and the block above it for the frames.
+                backgroundColor: `color-mix(in srgb, ${color} 18%, ${peekChipGroundCss()})`,
                 borderColor: `color-mix(in srgb, ${color} 55%, transparent)`,
               }}
             >
@@ -2050,7 +2216,15 @@ export function SimOverlay({
               aria-label="Скрий известието"
               className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border text-muted"
               style={{
-                backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
+                // …and the 12 % keeps its register over the same ground.
+                // MEASURED BEFORE THIS, on
+                // `w11/…/sc-ov-return-gap__mobile-wrong/04-t081s.png`: a parked
+                // queue's body, its window pillar and a wheel arch were legible
+                // INSIDE this 44 px disc — interior luminance sd 11.89 against
+                // 15.67 in the unfilled «ЗАЩО» beside it and 44.35 in the bare
+                // world. 12 % of a tone is an IDENTITY, not a ground; the
+                // census's „give it ink" was answered with the wrong one.
+                backgroundColor: `color-mix(in srgb, ${color} 12%, ${peekChipGroundCss()})`,
                 borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
               }}
             >

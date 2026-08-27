@@ -16,7 +16,13 @@
  *                 the card — see the row's own note);
  *  - par time   ← LessonResult.durationSec vs rubric.parTimeSec —
  *                 INFORMATIONAL ONLY, never affects stars (doc 76 §6: time
- *                 pressure is an L5 condition, not a rubric penalty).
+ *                 pressure is an L5 condition, not a rubric penalty). And the
+ *                 row now SAYS so on the side that used to read as praise:
+ *                 being under the ориентир is not an achievement on a driving
+ *                 lesson (PAR_TIME_NOT_A_TARGET_BG — 42 of the 51 „в ориентира"
+ *                 congratulations in the w11 corpus went to the bot driving
+ *                 badly on purpose), and an ABORTED drive is no longer billed
+ *                 against a route it never finished (PAR_TIME_ABORTED_BG).
  *
  * Star fold (documented, deliberately simple v1):
  *  - each MEASURED component scores 0..2 points; ratio = earned / (2 × n);
@@ -118,6 +124,106 @@ const NO_QUALITY_MEASURED_BG =
   "Нито един показател за качеството на маневрата не бе измерен на това каране: " +
   "звездите горе идват само от изпитния лист — наказателни точки и изпълнени задачи — " +
   "а не от оценка на самото изпълнение.";
+
+/**
+ * THE ONLY LINE ON THE CARD THAT TOLD THE FLAT-OUT DRIVE IT WAS THE RIGHT ONE.
+ *
+ * MEASURED · w11 · `sc-vu-pass-clearance` — the lesson whose entire subject is
+ * slowing down and leaving a metre and a half beside a vulnerable road user.
+ * Its two drives, read off `_audit-debrief.json`:
+ *
+ *   pc-wrong  51 s, flat out, never met a road user
+ *             → «Ориентировъчно време — 51 с — в ориентира от 60 с.»
+ *   pc-right  206 s, careful, slowed for the road users the lesson exists for
+ *             → «Ориентировъчно време — 206 с при ориентир 60 с — спокойно,
+ *                точността е преди скоростта.»
+ *
+ * Everything else on those two cards is IDENTICAL — same ИЗДЪРЖАН, same 3
+ * наказателни точки (the seatbelt), same ★★☆, same XP. So the par-time row is
+ * the ONLY row that distinguishes them, and it said the seventeen-second-per-
+ * hundred-metres drive was the one on target. `sc-pk-move-off/pc-wrong` — the
+ * lane the harness drives WRONG on purpose, top 59 км/ч with the 50 disc live —
+ * gets the same congratulation: «48 с — в ориентира от 55 с». On a product
+ * whose north-star test is „does this produce safer drivers", the one sentence
+ * that separates a careful drive from a fast one was rewarding the fast one.
+ *
+ * AND IT IS NOT TWO LANES. Every `_audit-debrief.json` in `.audit-frames/w11/
+ * frames` that carries this row was read and sorted by which branch it printed
+ * and by which way the harness was told to drive that lane:
+ *
+ *              «в ориентира» (under)   «при ориентир» (over)
+ *      -wrong           42                      35
+ *      -right            9                     145
+ *
+ * Of the 51 congratulations the product issued across that corpus, 42 went to
+ * the bot that was driving BADLY on purpose — sc-ac-aquaplane, sc-follow-
+ * tailgater, sc-ov-solid-line, sc-signal-response, sc-sp-wet-limit-plate,
+ * sc-speed-transition, the lot. The careful bot collected the „спокойно,
+ * точността е преди скоростта" line 145 times. The row was not occasionally
+ * pointing the wrong way; on this corpus it pointed the wrong way 82 % of the
+ * times it spoke approvingly.
+ *
+ * WHY THE COPY AND NOT THE FOLD. Doc 76 §6 is explicit that time is
+ * INFORMATIONAL — it may never move a star — and it does not: `points: null`,
+ * `measuredCount` untouched, and the star fold below never reads
+ * `parTimeSec`. The defect was never in the arithmetic. It was that the row
+ * was written as a two-sided VERDICT — target met / target missed — so the
+ * „met" side read as praise for speed with nothing to say it was not. THEO-4
+ * (doc 64, founder-ratified) forbids a bare verdict; „в ориентира от 60 с." is
+ * a bare verdict, and on this lesson it is a bare verdict pointing the wrong
+ * way.
+ *
+ * The over-par branch already carries the north-star sentence («спокойно,
+ * точността е преди скоростта») and is left byte-identical — deliberately, and
+ * not only because `b15-lawful-wait.test.ts` pins it with an exact `toBe`: it
+ * is the half that was already right, and the two halves now say the same
+ * thing about what the ориентир is.
+ *
+ * WHAT THIS DOES NOT CLOSE, so nobody reads more into it than it does: the two
+ * drives still land on the same star row, the same verdict and the same XP,
+ * because nothing on this lesson MEASURES the manoeuvre (`rubric: {
+ * parTimeSec: 60 }`, like 128 of 162 shipped rubrics — doc 86 D7). Removing
+ * the reward for speed is not the same as rewarding care. That half needs an
+ * authored quality component, which lives in `templates-*.ts`.
+ */
+const PAR_TIME_NOT_A_TARGET_BG =
+  "Ориентирът е груба мярка колко трае маршрутът в спокойно темпо, а не цел за " +
+  "надбягване: по-бързото каране не добавя звезда и не променя изпитния лист. " +
+  "Безопасната скорост я определя пътят — знакът, видимостта и хората по него.";
+
+/**
+ * THE COMPARISON THE ROW MADE AGAINST A ROUTE THAT WAS NEVER DRIVEN.
+ *
+ * `parTimeSec` is authored as the guideline for the WHOLE lesson. `durationSec`
+ * on an ABORTED session is the time the student spent not finishing it. The row
+ * put the two either side of „при ориентир" anyway, so a student who pressed
+ * «Прекрати урока» was told he was three to five times over a guideline for a
+ * route he stopped part-way through — one card below the debrief's own «Урокът
+ * беше прекъснат преди края». Two surfaces of the same result screen, saying
+ * different things about the same drive.
+ *
+ * MEASURED · w11 · 59 of the corpus's lanes end that way and every one of them
+ * printed a comparison. My own lane's exhibits are four of them, including the
+ * frame `sc-vp-readiness:f1469fc5` is filed on — «259 с при ориентир 55 с» on a
+ * drive that never reached either of its two checkpoints. (The 253–291 s
+ * cluster is the audit harness's own budget wall, not a student's pace; that is
+ * why it is so uniform. The defect is not the harness's — a real student who
+ * quits at 30 s of a 55 s lesson gets the OTHER branch and is congratulated for
+ * being „в ориентира" on a lesson he abandoned.)
+ *
+ * WHAT IT DOES NOT DO — and this matters, because withholding a comparison is
+ * one keystroke away from hiding a mismatch somebody filed a row about. BOTH
+ * NUMBERS STAY ON THE CARD, his and the ориентир's; only the claim that one is
+ * a verdict on the other is dropped, and the row says why and what would make
+ * the comparison mean something. `sc-ln-decisive-change:5c5e69a6` — 175 s
+ * against a 60 s ориентир — is deliberately NOT covered: that drive ended
+ * naturally, so its comparison is real and its row keeps printing exactly what
+ * the finding says it prints.
+ */
+const PAR_TIME_ABORTED_BG = (parSec: number) =>
+  `Ориентирът от ${parSec} с е за целия урок, а този не стигна до края — затова ` +
+  `двете числа не се сравняват тук. Карай маршрута докрай и тогава времето ти ` +
+  `има срещу какво да се мери.`;
 
 export function scoreRubric(
   result: LessonResult,
@@ -426,9 +532,20 @@ export function scoreRubric(
     breakdownBg.push({
       id: "parTime",
       labelBg: "Ориентировъчно време",
-      detailBg: over
-        ? `${Math.round(drivingSec)} с при ориентир ${Math.round(rubric.parTimeSec)} с${waitNote} — спокойно, точността е преди скоростта.`
-        : `${Math.round(drivingSec)} с — в ориентира от ${Math.round(rubric.parTimeSec)} с${waitNote}.`,
+      detailBg: result.aborted
+        ? // The student ended the lesson himself, so `durationSec` does not
+          // cover the route `parTimeSec` describes and neither branch below is
+          // true of him. Both numbers still print — see PAR_TIME_ABORTED_BG.
+          `${Math.round(drivingSec)} с до прекъсването${waitNote}. ${PAR_TIME_ABORTED_BG(Math.round(rubric.parTimeSec))}`
+        : over
+          ? `${Math.round(drivingSec)} с при ориентир ${Math.round(rubric.parTimeSec)} с${waitNote} — спокойно, точността е преди скоростта.`
+          : // UNDER the ориентир. The number and the clause that carries it are
+            // byte-identical to what shipped; what follows is the reason the
+            // row owed a student who has just been told he beat a guideline on
+            // a driving lesson. See PAR_TIME_NOT_A_TARGET_BG for the corpus
+            // census — 42 of the 51 congratulations went to the bot driving
+            // badly on purpose.
+            `${Math.round(drivingSec)} с — в ориентира от ${Math.round(rubric.parTimeSec)} с${waitNote}. ${PAR_TIME_NOT_A_TARGET_BG}`,
       points: null,
       measured: true,
     });
@@ -475,20 +592,39 @@ export function scoreRubric(
     // economy + observation, all abstaining) and `sc-vp-handbrake`
     // (observation) stop printing a grade with no sentence attached to it.
     //
-    // THE OTHER HALF NEEDS ONE THING THIS FILE DOES NOT OWN. 128 of 154
-    // catalog rubrics (doc 86 D7) author NO quality component at all — six of
-    // my eight lessons are literally `rubric: { parTimeSec: 55 }` — so
-    // `breakdownBg` holds ONE row, „Ориентировъчно време", and there is nowhere
-    // to put the sentence. It cannot go on the par-time row:
-    // `lessons/__tests__/b15-lawful-wait.test.ts:331` pins that string with an
-    // exact `toBe` on exactly this rubric shape. It needs its own row, which
-    // needs one more member in `RubricBreakdownLine["id"]` (types.ts, a file no
-    // lane owns and this one may not edit) — after which
-    // `s-w5-bot-completion.test.ts:781`, an exact `toEqual(["observation",
-    // "parTime"])`, has to stay green: emit the row ONLY when no quality
-    // component is authored at all, which is precisely the case s-w5 is not.
-    // `sc-pk-move-off/pc-wrong` — ★★★ over a 59 км/ч speeding card — is that
-    // half, and it stays open.
+    // THE OTHER HALF NEEDED ONE THING THIS FILE DOES NOT OWN — AND IT LANDED
+    // SOMEWHERE ELSE, WHICH THIS COMMENT WENT ON DENYING FOR FOUR DAYS.
+    //
+    // The paragraph that stood here read: 128 of 154 catalog rubrics author NO
+    // quality component at all, so `breakdownBg` holds ONE row („Ориентировъчно
+    // време") and there is nowhere to hang `NO_QUALITY_MEASURED_BG`; it cannot
+    // go on the par-time row, because `lessons/__tests__/b15-lawful-wait
+    // .test.ts:331` pins that string with an exact `toBe`; therefore it needs a
+    // new member in `RubricBreakdownLine["id"]` (scenario/types.ts) — „and it
+    // stays open".
+    //
+    // Every clause of that is still true EXCEPT the conclusion. The sentence is
+    // not a row: it is the CARD's account of its own star row, and the card
+    // belongs to `hud/SessionEndScreen.tsx`, which now derives it there —
+    // `unmeasuredStarsNoteBg`, rendered above the breakdown list, guarded so it
+    // speaks only into silence (no cap sentence from `manoeuvreGradeReasonBg`,
+    // no row carrying `points`, and no row other than par time, which is the
+    // 12 observation-only templates it would otherwise lie to). No new id, no
+    // types.ts edit, and `s-w5-bot-completion.test.ts`'s exact
+    // `toEqual(["observation", "parTime"])` never came near it.
+    //
+    // The routing note is corrected rather than deleted because a stale one is
+    // worse than none — it sends the next reader to build a thing that is
+    // already running (`lessons/finish.ts` learned the same lesson on
+    // `stepOffNetwork`'s arm and says so at length). What is still open here is
+    // only the NUMBER, for the reason the paragraph above gives: „full stars
+    // from cleanliness" is a stated contract behind ~141 assertions, and moving
+    // it is an ADR.
+    //
+    // `sc-pk-move-off/pc-wrong` is the exhibit and it has moved on too: at w11
+    // it prints ★★☆, not ★★★, because the seatbelt fault costs it the third
+    // star — the 59 км/ч in the 50 zone still books nothing, and that half is
+    // `rules/engine.ts`'s speeding detector, not this file's star fold.
     stars = result.completedAll && result.score === 0 ? 3 : result.completedAll ? 2 : 1;
   }
   // Caps: quality never outranks legality.

@@ -382,7 +382,23 @@ describe("row 3 · the first-run hint is in the right corridor, not on the road"
     // …and NOT as the solid pill the 2026-08-03 review called a cookie banner:
     // the same 18 %/55 % chip SimOverlay's acknowledgement already ships.
     expect(hintBlock).toContain('color-mix(in srgb, var(--accent) 18%, transparent)');
-    expect(OVERLAY_CODE).toContain("color-mix(in srgb, ${color} 18%, transparent)");
+    // ── THE SECOND COLOUR MOVED ON THE OVERLAY, AND ONLY THERE — 2026-08-27.
+    //
+    // This line used to read `…18%, transparent)`, i.e. it asserted the two
+    // chips were character-identical. SimOverlay's ack now mixes the SAME 18 %
+    // with the peek chips' own ground instead of with `transparent`, because
+    // the peek's three controls stand on live road and the world was resolving
+    // inside them (`sim-overlay-chip-ground.test.ts` has the frames and the
+    // derivation). This card does not: `[data-hud="touch-hint"]` is its own
+    // ghost with `overflow: hidden`, and nothing filed against it.
+    //
+    // SO THE ASSERTION IS NARROWED, LOUDLY, TO THE HALF THAT IS STILL TRUE —
+    // the 18 % REGISTER, which is what „not a solid brand button" means — and
+    // it still bites in both directions: 100 % fails it, and so does a chip
+    // with no `backgroundColor` at all, which is the state «ЗАЩО» shipped in.
+    // If the touch hint is ever given a ground of its own, this pair becomes
+    // one string again and this comment is the record of why it was two.
+    expect(OVERLAY_CODE).toMatch(/backgroundColor: `color-mix\(in srgb, \$\{color\} 18%,/);
   });
 
   it("…and it is small type, because the lane is 180 px and not 334", () => {
