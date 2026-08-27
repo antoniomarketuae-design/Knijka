@@ -24,7 +24,7 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
 
-import { openListLine, workedLine } from "./finding-reader.mjs";
+import { openListLine, workedLine, corpusCounts } from "./finding-reader.mjs";
 
 const REPO = "E:/AI driver";
 const CHILDREN = REPO + "/.audit-frames/findings/chunk-split.jsonl";
@@ -52,7 +52,24 @@ const rows = fs
   .filter((l) => l.trim())
   .map((l) => JSON.parse(l));
 
-const openRows = rows.filter((r) => r.splitState !== "GONE");
+/**
+ * OPEN MEANS OPEN NOW, NOT OPEN WHEN THE SPLIT WAS WRITTEN — 2026-08-27.
+ *
+ * This filtered on splitState alone. That field records what the SPLIT said
+ * on the day it was written and is never updated, so a child retired by a later
+ * adjudication round is still "not GONE" here for ever.
+ *
+ * CAUGHT BY count-agreement, which is what it is for: this file reported
+ * WORKED scope=open n=404 critical=130 against a real open list of n=399
+ * critical=151 — MORE rows than are open, and a different severity mix. Run in
+ * that state it would append fresh verdict lines for findings that are already
+ * closed, over a stamp that looks correct.
+ *
+ * The open list is now intersected live, so the stamp and the work are the same
+ * set by construction rather than by luck.
+ */
+const openIds = new Set(corpusCounts().open.map((j) => j.findingId));
+const openRows = rows.filter((r) => r.splitState !== "GONE" && openIds.has(findingId(r)));
 
 // Anything already carrying a line stays as it is — this is append-only and it
 // must never overwrite a judge or a verifier.
