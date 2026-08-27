@@ -144,7 +144,98 @@ const FADE_END_M = 120;
  */
 export const BEYOND_GOAL_OPACITY = 0.8;
 
-const ARROW_Y = 2.6;
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE TURN CHEVRON HAD NOTHING UNDER IT, AND IT HUNG WHERE THE EYE MUST LOOK.
+ *
+ * W11 / sc-jx-equal-left:085e4ed7, verbatim: *„a large pale-teal chevron floats
+ * unattached in mid-air beside the beam, at driver eye level, drawn flat across
+ * the facade of the building beyond the junction … no post, no ground contact
+ * and no perspective relationship to the road."*
+ *
+ * THE PRODUCT HAS ALREADY RULED ON THIS EXACT SHAPE. It is the founder's own
+ * three-part complaint about the marker's «КАРАЙ ДОТУК» chip, quoted in
+ * `scene/guidanceRoute.ts`'s MARKER'S SIGN header: *„HANGS IN MID-AIR … a dark
+ * billboard floating at BUILDING HEIGHT in the middle of the street … It reads
+ * as unfinished, and it sits on the vanishing point — the exact place a driver
+ * must look."* The chip was answered by giving it a post and taking it off the
+ * axis. The chevron is the last surface in this file that was never answered,
+ * and it fails the same three tests:
+ *
+ *   1. NOTHING HELD IT UP. `ARROW_Y` was 2.6 m with no support of any kind —
+ *      and 2.6 is `SHAFT_EYE_CLEAR_M`, i.e. the height at which the marker
+ *      shaft is still fully transparent, so there was never anything between
+ *      the chevron and the road even when the shaft was on.
+ *   2. IT WAS AT EYE HEIGHT. Projected from the 1.2 m cockpit eye at the 20 m
+ *      setback, a 1.7 m billboard centred at 2.6 m spans 1.5°…6.4° ABOVE the
+ *      horizon — across the junction mouth, over the facades, in the band the
+ *      left-right scan uses. That is the same occlusion argument register rows
+ *      B24/B27 already won against the marker shaft, on the one object in this
+ *      file that never got the treatment.
+ *   3. IT HAD NO GROUND RELATIONSHIP. A camera-independent plane with no
+ *      contact shadow reads as a decal on whatever is behind it, which is what
+ *      the filed frame photographs: the chevron painted on a building.
+ *
+ * THE ANSWER, and it is the ribbon's own grammar rather than a new one: the
+ * chevron comes DOWN over the asphalt it is describing, leans over that road
+ * instead of standing across it, and stands on a pool of light. Same mesh,
+ * same colour, same blend,
+ * same visibility horizon — only the pose moved, plus one 32-triangle pool.
+ *
+ *   ARROW_Y 0.62 m, tilted ARROW_TILT_RAD (60° off vertical): the plate's
+ *   1.7 m width projects to 1.7·cos 60° = 0.85 m of height and lays 1.47 m of
+ *   itself along the road, so the chevron spans y 0.195 → 1.045 m, and 1.14 m
+ *   at the top of the 0.12 m extrusion — under the 1.2 m cockpit eye. The whole
+ *   cue is therefore below the horizon, over the tarmac, and out of the scan
+ *   band. At the 20 m setback it still subtends 2.7° vertically — ≈ 82 px of
+ *   the 1179 px phone frame the row was filed on (vFOV 39.3° ⇒ 30 px/deg) —
+ *   and 4.3° across, so it did not get smaller to read, it moved to where a
+ *   road cue belongs.
+ *
+ * WHY NOT FLAT ON THE ROAD LIKE A PAINTED М-СТРЕЛКА, which was the first
+ * instinct: measured through the same camera, a 1.7 m marking lying flat 20 m
+ * ahead of a 1.2 m eye occupies 0.65° of height — about 19 px — and is
+ * illegible. The lean is what buys back the height a flat marking loses to
+ * foreshortening while keeping the foot on the ground.
+ *
+ * THE EXTRUSION CAME DOWN WITH IT, 0.28 → 0.12 m, and that is arithmetic
+ * rather than taste: `extrudeGeometry` builds along local +Z, which used to be
+ * the depth AWAY from a vertical billboard and is now mostly UP. At 0.28 the
+ * plate's top would land at 1.287 m — 9 cm clear of the eye — and put the cue
+ * back on the horizon it was moved off; at 0.12 it does not, and 0.12 m of
+ * thickness on a 1.5 m plate still reads as an object rather than a decal.
+ *
+ * WHY NOT A POST. The chevron rides `routePointAt`, i.e. the centre of the
+ * student's OWN lane. A post there is a virtual obstacle standing in the
+ * carriageway, which is a worse thing to teach than a floating arrow.
+ *
+ * WHICH WAY IT LEANS DEPENDS ON THE HAND OF THE TURN, and that was checked
+ * rather than assumed. The tilt is about the plate's own +X (the exit
+ * direction), so its top tips toward the driver on a LEFT turn and away from
+ * him on a RIGHT one. It does not matter and here is the arithmetic: the
+ * silhouette is set by the width axis, which projects to 1.7·cos 60° on either
+ * hand, and the plate is `DoubleSide` in one flat colour, so a right turn shows
+ * the back face at the same 53 % foreshortening a left turn shows the front one
+ * at. Both hands get the same height, the same ground run and the same pool. A
+ * sign flip would buy a ~2° difference in silhouette at the 20 m setback and
+ * cost a per-frame branch on a quantity (the route tangent at the setback) this
+ * loop does not otherwise carry.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const ARROW_Y = 0.62;
+/** Lean off vertical, rad. 60° — see the block above for where it comes from. */
+const ARROW_TILT_RAD = (60 * Math.PI) / 180;
+/** Radius of the chevron's contact pool, m. Sized to the PLATE and not to the
+ *  lane: the plate is 1.5 m long and lays 1.7·sin 60° = 1.47 m of ground run
+ *  once it is tilted, and `POOL_FRAG`'s bright core ends at r 0.55 — 1.3 m
+ *  across at this radius, i.e. the plate's own footprint, with the skirt
+ *  feathering out past it. A pool sized to the lane would read as a second
+ *  marker rather than as this one's contact. */
+const ARROW_POOL_RADIUS_M = 1.2;
+/** …and how bright. Half the marker pool's, because this one is a CONTACT
+ *  shadow's positive — it exists to say „this object stands here", not to mark
+ *  a target the engine grades. */
+const ARROW_POOL_OPACITY = 0.26;
 /** Arrow sits this far before the junction node (2.5×-scaled mouths — a safe
  * fixed setback per doc 68 A7). */
 const ARROW_BEFORE_JUNCTION_M = 20;
@@ -562,10 +653,53 @@ const RIBBON_FRAG = /* glsl */ `
 const SHAFT_EYE_CLEAR_M = 2.6;
 /** …and reaches full density here. */
 const SHAFT_FULL_M = 5.0;
-/** Distance at which the shaft starts dissolving as you arrive… */
-const SHAFT_PROX_START_M = 26;
+/**
+ * Distance at which the shaft starts dissolving as you arrive…
+ *
+ * ── W11 / sc-jx-equal-left:5ad020ac — „A VERTICAL CYAN BEAM RISES OUT OF THE
+ *    CARRIAGEWAY INTO THE SKY." The dissolve window was 26 → 9 m, and 26 m is
+ *    the distance at which this column stops being a shaft of light and starts
+ *    being a slab of sky. The three terms above are a FAR-FIELD instrument and
+ *    nothing said so.
+ *
+ * MEASURED OFF THE FILED FRAME, not argued from the shader.
+ * `.audit-frames/w11/frames/sc-jx-equal-left__mobile-right/04-t039s.png`
+ * (2556 × 1179, hFOV ≈ 90° / vFOV ≈ 39.3° at that aspect — see
+ * `cockpitVFovForAspect`). The column is 210 px wide there, and a 2 m tube
+ * (2 · PILLAR_RADIUS) subtending 210 of 2556 px across 90° is **≈ 15 m away**
+ * — inside the old window, where `prox` still returns 0.32 and the thing is
+ * still painted. At 15 m the two ends of the tube land like this:
+ *
+ *   base  SHAFT_EYE_CLEAR_M 2.6 m over a 1.2 m eye →  5.2° up  → ~123 px ABOVE
+ *         the horizon, i.e. clear of every roofline in the frame;
+ *   top   PILLAR_HEIGHT 11 m                        → 32.5° up → 767 px above
+ *         the horizon, i.e. off the top of a frame that only has 590.
+ *
+ * Both ends leave the picture, so what is left on the glass is a translucent
+ * band with no foot and no cap — which is exactly the two sentences the row
+ * files. Nothing is wrong with the shader; the shaft was simply still on at a
+ * range where its own geometry cannot read as a shaft.
+ *
+ * THE SAME ARITHMETIC PICKS THE NEW WINDOW. Ask for the range at which the
+ * base sits on the road and the top is inside the frame, and it is ~48 m:
+ *
+ *   at 48 m  base  atan(1.4 / 48) =  1.7° →  39 px above the horizon (on the
+ *                  road, at the frame's own scale)
+ *            top   atan(9.8 / 48) = 11.5° → 271 px, well inside the picture
+ *
+ * So the shaft is FULL only where it is legible as a shaft, and it is gone by
+ * 28 m — before it can degenerate. This can only make B24/B27 (the founder's
+ * „the driver's eye is inside the 11 m cylinder and the entire world goes flat
+ * green") stricter: the column now leaves EARLIER on every approach and never
+ * later, and the ground pool below — which has no proximity term at all — is
+ * what marks the spot from 28 m in, exactly as this block already said it
+ * would. `scene/guidanceRoute.ts`'s marker-sign header quotes the old 9 m in
+ * its „nothing held the chip up" argument; that argument is unaffected — the
+ * shaft is now absent over a LONGER stretch of the approach, not a shorter one.
+ */
+const SHAFT_PROX_START_M = 48;
 /** …and is completely gone. Past this the ground pool alone marks the spot. */
-const SHAFT_PROX_END_M = 9;
+const SHAFT_PROX_END_M = 28;
 
 const PILLAR_VERT = /* glsl */ `
   varying vec2 vUv;
@@ -1061,6 +1195,27 @@ export function RouteGuidance({
     [accent],
   );
 
+  /** The chevron's own pool — see the mesh below and the ARROW_Y block for why
+   *  it is a second material and not the marker's. No ref: nothing mutates it
+   *  after mount, unlike `poolMatRef`, whose colour carries the speed warning. */
+  const arrowPoolMatArgs = useMemo<[THREE.ShaderMaterialParameters]>(
+    () => [
+      {
+        vertexShader: POOL_VERT,
+        fragmentShader: POOL_FRAG,
+        uniforms: {
+          uColor: { value: accent.clone() },
+          uOpacity: { value: ARROW_POOL_OPACITY },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      },
+    ],
+    [accent],
+  );
+
   // --- Turn chevron: flat arrowhead in local XY, +X forward, extruded. ---
   const arrowGeoArgs = useMemo<[THREE.Shape, THREE.ExtrudeGeometryOptions]>(() => {
     const shape = new THREE.Shape();
@@ -1069,13 +1224,20 @@ export function RouteGuidance({
     shape.lineTo(-0.18, 0);
     shape.lineTo(-0.55, -0.85);
     shape.closePath();
-    return [shape, { depth: 0.28, bevelEnabled: false }];
+    // 0.12, not 0.28 — the extrusion axis is now mostly UP (see the ARROW_Y
+    // block: local +Z leans to (0, 0.87, 0.50) once the plate is tilted), so
+    // the depth is height, and height is the budget this repair is spending.
+    return [shape, { depth: 0.12, bevelEnabled: false }];
   }, []);
 
   const ribbonRef = useRef<THREE.Mesh>(null);
   const ribbonGeoRef = useRef<THREE.BufferGeometry>(null);
   const ribbonMatRef = useRef<THREE.ShaderMaterial>(null);
   const arrowRef = useRef<THREE.Mesh>(null);
+  /** The chevron's contact pool — the thing that says the plate stands on this
+   *  road rather than on the building behind it. Its own mesh and not a child
+   *  of the arrow, because it must NOT inherit the arrow's bob or its pulse. */
+  const arrowPoolRef = useRef<THREE.Mesh>(null);
   const markerRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
   const ringMatRef = useRef<THREE.MeshBasicMaterial>(null);
@@ -1129,7 +1291,19 @@ export function RouteGuidance({
         else slots[i]!.set(MUTE_UNUSED_S, MUTE_UNUSED_S);
       }
     }
-    if (arrowRef.current) arrowRef.current.visible = false; // per-frame logic re-shows it
+    if (arrowRef.current) {
+      arrowRef.current.visible = false; // per-frame logic re-shows it
+      // THE LEAN, SET ONCE. `rotation.order` and `rotation.x` are POSE — they
+      // never change with the route — so they are seeded here rather than
+      // rewritten 60 times a second beside the yaw. "YXZ" makes the Euler
+      // compose as RY(yaw) · RX(−tilt), i.e. the plate tips in its own frame
+      // and the yaw then turns the tipped plate toward the exit; three's
+      // default "XYZ" would do it the other way round and swing the chevron's
+      // tip up out of the road plane on every turn that is not dead ahead.
+      arrowRef.current.rotation.order = "YXZ";
+      arrowRef.current.rotation.x = -ARROW_TILT_RAD;
+    }
+    if (arrowPoolRef.current) arrowPoolRef.current.visible = false;
     const marker = markerRef.current;
     if (marker) {
       const showMarker = goal !== null && goal.kind === "point" && goal.marker;
@@ -1305,20 +1479,40 @@ export function RouteGuidance({
         break;
       }
     }
+    const arrowPool = arrowPoolRef.current;
     if (turn && turn.s - headS < ARROW_VISIBLE_AHEAD_M) {
       const s = Math.max(2, turn.s - ARROW_BEFORE_JUNCTION_M);
       const scratchPt = scratchPtRef.current;
       routePointAt(route, s, scratchPt);
-      const bob = reducedMotion ? 0 : 0.15 * Math.sin(t * 1.6);
+      // The hover is now a HOVER and not a drift: it was 0.15 m around a 2.6 m
+      // centre, where nothing could tell you what it was moving relative to. At
+      // 0.62 m over a pool that does not move, 0.06 m is a cue that the plate is
+      // held above the road — which is the reading the pool is there to give.
+      const bob = reducedMotion ? 0 : 0.06 * Math.sin(t * 1.6);
       arrow.position.set(scratchPt.x, ARROW_Y + bob, -scratchPt.y);
       // District dir (dx, dy) → three: rotation.y = atan2(dy, dx) points local
       // +X along the exit direction (derived from the axis mapping x, −z).
+      //
+      // …AND THE LEAN COMPOSES AFTER IT, WHICH IS WHY THE ORDER IS "YXZ".
+      // three's default "XYZ" builds R = RX·RY·RZ, i.e. it would apply the yaw
+      // INSIDE the tilt and swing the chevron's tip out of the road plane. What
+      // this needs is RY(yaw) · RX(−tilt): tilt the plate in its own frame, then
+      // turn the whole thing to face the exit. `rotation.order` is set once in
+      // the layout effect (it is pose, not per-frame state) — see there.
       arrow.rotation.y = Math.atan2(turn.dirY, turn.dirX);
       const pulse = reducedMotion ? 1 : 1 + 0.07 * Math.sin(t * 2.2);
       arrow.scale.setScalar(pulse);
       arrow.visible = true;
+      if (arrowPool) {
+        // The pool stays ON the asphalt at a fixed height and does NOT take the
+        // bob — a contact shadow that rises with the object it belongs to is
+        // the floating read all over again.
+        arrowPool.position.set(scratchPt.x, 0.045, -scratchPt.y);
+        arrowPool.visible = true;
+      }
     } else {
       arrow.visible = false;
+      if (arrowPool) arrowPool.visible = false;
     }
   });
 
@@ -1349,6 +1543,19 @@ export function RouteGuidance({
           blending={THREE.NormalBlending}
           side={THREE.DoubleSide}
         />
+      </mesh>
+      {/* THE CHEVRON'S CONTACT POOL — the half of 085e4ed7 that a pose change
+          alone cannot buy. Lowering the plate puts it over the asphalt; this is
+          what says it is STANDING on that asphalt. Same shader as the marker's
+          ground pool (a soft radial wash, no hard rim — a hard edge is the
+          debug-gizmo read this file removed once already), its own material so
+          the speed-cap tint that mutates the marker pool's colour can never
+          reach a cue that is about direction. renderOrder 17: under the ribbon
+          (20) and under the marker's own pool (18), because where a route bends
+          across itself the ROUTE is the thing that must stay readable. */}
+      <mesh ref={arrowPoolRef} rotation={[-Math.PI / 2, 0, 0]} renderOrder={17}>
+        <circleGeometry args={[ARROW_POOL_RADIUS_M, 32]} />
+        <shaderMaterial args={arrowPoolMatArgs} />
       </mesh>
       <group ref={markerRef}>
         <mesh position={[0, PILLAR_HEIGHT / 2 + 0.02, 0]} renderOrder={19}>

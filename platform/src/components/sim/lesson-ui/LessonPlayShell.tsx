@@ -1968,6 +1968,53 @@ export const BRIEFING_FADE_PX = 10;
 export const BRIEFING_FADE_MASK_CSS = `linear-gradient(to bottom, #000 calc(100% - ${BRIEFING_FADE_PX}px), transparent)`;
 
 /**
+ * …AND THE TOAST STACK'S OWN, WHICH IS NOT THE BRIEFING'S — 2026-08-27.
+ *
+ * W11 / sc-signal-response:92c94379. The mechanism half of that row is repaired
+ * — the «↓ обяснението продължава — покажи» control below this scroller is on
+ * the glass and the mask is applied — and the verifier says so and then names
+ * the residue: *„on the re-drive it does not merely stop mid-sentence, it
+ * severs a whole text line through the letter bodies."*
+ *
+ * LOOKED AT, ×4, on the frame the row cites
+ * (`w11/frames/sc-signal-response__pc-right/04-t043s.png`, the «НАУЧИ ·
+ * Чакането Е маневрата» card): the ramp is doing exactly what it was written to
+ * do and it is TOO SHORT FOR THIS SURFACE. `BRIEFING_FADE_PX` is 10 because it
+ * was solved against an 11 px `leading-tight` line in the briefing list — and
+ * against the briefing's own `pb-2.5`, which is the same 10 px, so the two are
+ * a matched pair and neither may move on its own. The toast cards are set much
+ * larger: `HudToasts` gives the title `text-sm leading-snug` (14 × 1.375 =
+ * 19.25 px) and the body `text-xs leading-snug` (16.5 px). A 10 px ramp under a
+ * 19.25 px line leaves the glyph TOPS at ≈ 0.95 alpha and takes the bottoms to
+ * 0 — a line at nearly full ink with its lower half missing, which is the
+ * definition of a severed line rather than a faded one.
+ *
+ * 28 px is 1.45 × the tallest line box on this surface. At that length the
+ * topmost pixel of a fully-cut line is already at ≈ 0.31 alpha and the whole
+ * partial line dissolves instead of being guillotined, which is the reading the
+ * mask exists to produce („a horizontally guillotined line reads as a rendering
+ * fault, a faded one reads as «there is more»"). It stops short of two body
+ * lines (33 px) on purpose: a longer ramp would start dimming a line the
+ * student can read in full, and this repair is not allowed to shorten the
+ * explanation to make it fit.
+ *
+ * A SEPARATE CONSTANT AND NOT A BIGGER `BRIEFING_FADE_PX`: that value is
+ * pinned to the briefing list's padding by `briefingOverflow.test.tsx`
+ * (`expect(BRIEFING_FADE_PX).toBe(10)` beside `pb-2.5`), and raising it would
+ * put a permanently greyed last STEP on a card that has no such problem. Two
+ * surfaces, two line boxes, two numbers — each derived from the type it is
+ * fading. `shellClipAffordances.test.ts` holds this one against the line box it
+ * is derived from, so a future type change fails a test instead of quietly
+ * restoring the slice.
+ */
+export const TOAST_FADE_PX = 28;
+export const TOAST_FADE_MASK_CSS = `linear-gradient(to bottom, #000 calc(100% - ${TOAST_FADE_PX}px), transparent)`;
+/** The tallest line box `HudToasts` paints — `text-sm leading-snug`, i.e.
+ *  14 px × 1.375. The number `TOAST_FADE_PX` is derived from, exported so the
+ *  gate can assert the RELATIONSHIP rather than the literal. */
+export const TOAST_TALLEST_LINE_PX = 19.25;
+
+/**
  * How much of the CURRENT window the toast column keeps when its „покажи"
  * control pages down, px.
  *
@@ -6067,20 +6114,30 @@ export function LessonPlayShell({
                 className="pointer-events-none flex min-h-0 flex-col overflow-y-auto [flex-shrink:1] [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]"
                 style={
                   // ── …AND THE CUT LINE IS FADED, NOT GUILLOTINED ──────────
-                  // The same mask, the same 10 px and the same predicate the
-                  // briefing list carries one card up, for the same reason and
-                  // now on the surface that needs it most. Four of this wave's
-                  // PC rows do not say „I could not scroll", they say the card
-                  // is „truncated mid-sentence … with no ellipsis, no scrollbar
+                  // The same mask and the same predicate the briefing list
+                  // carries one card up, for the same reason and now on the
+                  // surface that needs it most. Four of this wave's PC rows do
+                  // not say „I could not scroll", they say the card is
+                  // „truncated mid-sentence … with no ellipsis, no scrollbar
                   // and no expand control" (sc-ac-aquaplane) — a horizontally
                   // guillotined line reads as a rendering fault, a faded one
                   // reads as „there is more". Bound to `toastsBelowFold > 0`
                   // and not left unconditional, so a stack that fits, and a
                   // stack scrolled to its end, carry no chrome at all.
+                  //
+                  // …BUT NOT THE SAME LENGTH, since 2026-08-27. It was
+                  // `BRIEFING_FADE_MASK_CSS`'s 10 px, which is solved against
+                  // the briefing's 11 px line and its matching `pb-2.5`, and
+                  // this stack's tallest line is 19.25 px — so a 10 px ramp
+                  // left the glyph tops at ≈ 0.95 alpha with their bottoms cut
+                  // away, which is what sc-signal-response:92c94379 photographs
+                  // («it severs a whole text line through the letter bodies»).
+                  // `TOAST_FADE_PX` is derived from THIS surface's type; the
+                  // derivation and the 28 are at its declaration.
                   toastsBelowFold > 0
                     ? {
-                        WebkitMaskImage: BRIEFING_FADE_MASK_CSS,
-                        maskImage: BRIEFING_FADE_MASK_CSS,
+                        WebkitMaskImage: TOAST_FADE_MASK_CSS,
+                        maskImage: TOAST_FADE_MASK_CSS,
                       }
                     : undefined
                 }

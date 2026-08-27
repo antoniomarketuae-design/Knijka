@@ -519,7 +519,7 @@ export const SC_SPEED_RAIN: ScenarioSpec = {
       titleBg: "Като на сухо — 72 при знак 50 в дъжда",
       whatWentWrongBg:
         "Колата подмина знака В26 „50“ и ускори до около 72 км/ч, все едно е сух, открит път. 72 при ограничение 50 е над +10 км/ч — това е ОПАСНА грешка, която на изпита прекратява явяването на място (Наредба № 38). А тук грешката е двойна: мокрият и тъмен път искат скорост ЧУВСТВИТЕЛНО ПОД знака (около 38 км/ч, чл. 20), не над него. Знакът е таван за идеални условия — не покана да го надскочиш.",
-      codeRefs: ["SPEEDING_DANGEROUS"],
+      codeRefs: ["SPEEDING_DANGEROUS", "SPEED_TOO_FAST_FOR_CONDITIONS"],
     },
     {
       traceRef: { path: "content/traces/sc-speed-rain/mistake-flow-along.trace.json" },

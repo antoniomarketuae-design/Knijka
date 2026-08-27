@@ -2299,8 +2299,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("POOR_LANE_KEEPING", t));
   }
 
-  // Speed for the conditions: within the posted limit, but too fast for rain /
-  // fog / snow / night. (Above the limit is regular speeding, handled above.)
+  // Speed for the conditions: too fast for rain / fog / snow / night.
   // Factors compose by MIN — the single most restrictive condition governs;
   // the product would double-bill a rainy night (A12). A factor of 1 means
   // the condition does not reduce the prudent speed at all. Shipped default
@@ -2317,8 +2316,56 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   );
   const conditionsReduced = conditionFactor < 1;
   const conditionLimit = limit * conditionFactor;
-  const tooFastForConditions =
-    conditionsReduced && moving && speed > conditionLimit && speed <= bands.gradedAbove;
+  /*
+   * THE WINTER RULE USED TO SWITCH ITSELF OFF AT THE EXACT SPEED IT IS ABOUT
+   * (2026-08-27, `sc-ac-snow:6ed473c3`). This condition carried a fourth
+   * conjunct — `&& speed <= bands.gradedAbove` — under the sentence „(Above the
+   * limit is regular speeding, handled above.)". It did not hold, and the
+   * arithmetic is the whole argument:
+   *
+   *   posted 50 · snow 0.5  ⇒  conditionLimit  25   ← what the lesson teaches
+   *   posted 50 · grace 5   ⇒  bands.gradedAbove 55  ← where the old gate closed
+   *
+   * so every speed from 55 upwards — 2.2× the winter envelope and beyond —
+   * left `tooFastForConditions` FALSE. The one band in which a snow lesson
+   * cannot mark a snow fault was the fast half of it.
+   *
+   * MEASURED, NOT REASONED. `.audit-frames/w11/frames/sc-ac-snow__pc-wrong`:
+   * top speed 59 км/ч against an on-screen «дръж под 25 км/ч» and instruction
+   * «зимният таван тук е 25», and its `MISTAKES (4)` are колан −3, «Движение в
+   * снеговалеж без светлини» −1 and two contacts. Not one speed rule, on the
+   * lesson whose entire subject is winter speed. The same gate silences fog
+   * (envelope 30) and rain (42.5) the same way, above 55.
+   *
+   * AND THE GATE COULD NOT EVEN DELEGATE. Its excuse was that SPEEDING_* bills
+   * instead — but the три-lesson teach spends SPEEDING_OVER_LIMIT's first bill
+   * (`SPEED_REGRADE_SEC`), and even when it lands it prices +9 over a posted 50
+   * as ONE второстепенна point while the student is at 2.4× the envelope чл. 20,
+   * ал. 2 demands. „Handled above" was handled as the wrong fault.
+   *
+   * TWO LAWS, TWO BILLS — the precedent is nine lines down in this same file.
+   * SPEED_TOO_FAST_FOR_CURVE is „DELIBERATELY NOT capped at the graced posted
+   * limit the way the conditions code is … where the driver is ALSO over the
+   * limit, the SPEEDING_* codes bill their own distinct fault — two laws, two
+   * lessons". чл. 21 (посоченото ограничение) and чл. 20, ал. 2 (да спреш пред
+   * всяко предвидимо препятствие) are different duties with different lessons,
+   * and this line now grades them the way the curve line already did.
+   *
+   * WHAT IT CANNOT DO IS RUN AWAY. The code is второстепенна (−1), `stepEpisode`
+   * bills once per episode and the re-grade adds exactly one more — so the most
+   * this can add to any drive is 2 наказателни точки, and only to a drive that
+   * was over the prudent envelope for `conditionsSpeedSustainSec` in weather the
+   * world itself declared. Every innocent case in `__tests__/conditions.test.ts`
+   * (22 in snow, 25 in fog, 28 in a snowy foggy rain, 40 in rain, and every dry
+   * tick) is under both the envelope AND the old cap, so it is untouched: this
+   * moves nothing except the band the lessons are taught in.
+   *
+   * The road half cannot double-charge either: this code's `ROAD_CONSEQUENCES`
+   * row is `kind: "conditional"` with no ungated money of its own
+   * („Несъобразената скорост няма собствена глоба в ЗДвП"), so a drive that is
+   * also speeding still prints exactly one price — the speeding ladder's.
+   */
+  const tooFastForConditions = conditionsReduced && moving && speed > conditionLimit;
   const conditionsSpeedReset = !conditionsReduced || speed <= conditionLimit;
   if (
     stepEpisode(

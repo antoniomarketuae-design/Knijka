@@ -385,8 +385,16 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,
     titleBg: "Несъобразена с условията скорост",
+    // THE FIRST CLAUSE USED TO READ «Караше в рамките на ограничението, но…»
+    // AND IT BECAME FALSE THE DAY THE DETECTOR STARTED REACHING THE FAST HALF
+    // OF ITS OWN LESSON (2026-08-27, sc-ac-snow:6ed473c3). `engine.ts` capped
+    // `tooFastForConditions` at the graced posted limit, so this row could only
+    // ever fire under it and the sentence was true by construction; the cap is
+    // gone — a snow lesson whose envelope is 25 has to be able to mark 59 —
+    // so the sentence has to stop assuming it. It says the same thing without
+    // the assumption: the DUTY is чл. 20, ал. 2, and it binds at every speed.
     explanationBg:
-      "Караше в рамките на ограничението, но твърде бързо за условията — дъжд, мъгла, сняг или тъмно. Съобразената скорост е тази, при която можеш да спреш в рамките на видимото платно. При намалена видимост и хлъзгав път намали още.",
+      "Караше твърде бързо за условията — дъжд, мъгла, сняг или тъмно. Ограничението на знака е таван за сух и светъл път, а не разрешение при мокър или заснежен: съобразената скорост е тази, при която можеш да спреш в рамките на видимото платно. При намалена видимост и хлъзгав път намали още.",
     correctiveBg:
       "При дъжд свали 10–15% под ограничението, в гъста мъгла — почти наполовина, а на сняг и повече: заснежената настилка държи под половината от сухото сцепление. Карай така, че да можеш да спреш в рамките на видимия участък пред теб.",
     // ал. 2 named — that is the sentence about conditions („да се съобразяват с

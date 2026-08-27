@@ -287,7 +287,7 @@ describe("wave-9 bot completion — sc-sp-wet-limit-plate at L3", () => {
   it("counter-proof: the over-limit drive in the wet surfaces SPEEDING_OVER_LIMIT, no CLEAN_DRIVING", () => {
     const { codes, commends } = driveDemo("mistake-over-limit-in-wet");
     expect(codes).toContain("SPEEDING_OVER_LIMIT");
-    expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+    expect(codes).toContain("SPEED_TOO_FAST_FOR_CONDITIONS"); // over the limit AND over what the wet road allows — two duties, two codes
     expect(commends).not.toContain("CLEAN_DRIVING");
   });
 });

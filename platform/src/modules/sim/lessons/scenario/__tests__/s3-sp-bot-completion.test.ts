@@ -178,9 +178,9 @@ describe("S3-B counter-proofs — speed mistakes grade through the live pipeline
     const codes = driveViolationCodes(outcome);
     expect(codes).toContain("SPEEDING_DANGEROUS");
     expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
-    // 72 > graced 55 puts it out of the conditions code's at/under-graced range —
-    // the wet envelope is proven by the „поток" demo below, not this one.
-    expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+    // The conditions code is no longer capped at the graced limit: a wet, dark road
+    // asks for a speed CHOSEN BELOW the sign (чл. 20, ал. 2), so 72 breaches both.
+    expect(codes).toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
     expect(outcome.result.passed).toBe(false);
     expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
   });

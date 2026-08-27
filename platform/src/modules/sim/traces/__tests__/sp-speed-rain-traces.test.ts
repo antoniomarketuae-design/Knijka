@@ -76,7 +76,7 @@ describe("sc-speed-rain — mistake demos grade their exact codes (doc 76 §9 st
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_SPEED_RAIN.mistakes[0].codeRefs].sort());
     expect(codes).not.toContain("SPEEDING_OVER_LIMIT"); // crosses the 55–60 minor band too fast to arm
-    expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS"); // 72 > graced 55: conditions code is capped at the graced limit
+    expect(codes).toContain("SPEED_TOO_FAST_FOR_CONDITIONS"); // чл. 20, ал. 2: rain+night demand a speed well UNDER the sign, so 72 breaches conditions AND the limit
     expect(codes).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
   });
 

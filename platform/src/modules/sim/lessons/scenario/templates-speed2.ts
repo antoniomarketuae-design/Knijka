@@ -612,7 +612,7 @@ export const SC_SP_WET_LIMIT_PLATE: ScenarioSpec = {
       titleBg: "Пълно превишение в дъжда",
       whatWentWrongBg:
         "Тук колата дори не спази основния знак: около 57 км/ч по улица с ограничение 50, и то в дъжд. Това е превишаване над самото ограничение (второстепенна грешка), а на мокра настилка е двойно безотговорно — табелата искаше 40, а стрелката показа 57. Първо се спазва знакът, после и табелата под него.",
-      codeRefs: ["SPEEDING_OVER_LIMIT"],
+      codeRefs: ["SPEEDING_OVER_LIMIT", "SPEED_TOO_FAST_FOR_CONDITIONS"],
     },
   ],
   teach: {

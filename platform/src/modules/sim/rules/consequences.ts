@@ -1476,6 +1476,65 @@ const DANGER_179_1_5_OVERTAKE: ConditionalPenalty = {
   controlPoints: CP_T9_OVERTAKE_DANGER,
 };
 
+/**
+ * WRONG_WAY'S SECOND ROAD, PRICED — w11, `sc-merge-accel-lane:93685d58`,
+ * 2026-08-27.
+ *
+ * WHAT THE PREVIOUS REPAIR SAID IT WAS LEAVING BEHIND, verbatim, in
+ * `catalog.ts WRONG_WAY_ROAD_COPY`: „What genuinely differs is the PRICE —
+ * чл. 183, ал. 4 (100 лв.) on a street versus чл. 178ж, ал. 1 on a motorway —
+ * and `realWorldBg` has no per-event channel at all, so that half is reported
+ * rather than smuggled in here." The verifier then re-drove it and read the
+ * card back: under the NEW motorway title the money apparatus was still the
+ * one-way street's — „51,13 €", „0 контролни точки", and a closing note
+ * reading «Този ред е за постоянната забрана и за еднопосочната улица» on a
+ * lesson («Включване в магистрала през лентата за ускоряване») whose district
+ * `mw-entry-v1` contains no street at all.
+ *
+ * SO IT IS PRICED HERE, AS A CONDITION, WHICH IS THE ONE SHAPE THAT IS TRUE ON
+ * BOTH ROADS. `roadConsequenceFor` is keyed by `ViolationCode` and by nothing
+ * else — the per-act `detail` that already splits the TITLE cannot reach it
+ * without `hud/FaultCard.tsx` and `lessons/debrief.ts` passing `event.detail`,
+ * which are two other lanes' files. A `ConditionalPenalty` needs no such
+ * channel: it prints the figure WITH THE CONDITION STILL ATTACHED, which is
+ * this file's own rule for every figure the simulator has not established
+ * (see the `ConditionalPenalty` docblock), and both live surfaces already
+ * render `escalation` — `FaultCard.tsx` at its «Ако от това излезе беля» block
+ * and `debrief.ts roadLines` through `gatedLineBg`.
+ *
+ * ⚠ ROUTED, TWICE, so neither half is mistaken for finished:
+ *  · the STRUCTURED street figures (`fine`, `controlPoints`, `offenceQuote`)
+ *    still print above this line for a motorway act. Closing that needs the
+ *    per-act road channel — `roadConsequenceFor(code, detail)` plus the two
+ *    call sites named above — and it is not this file's to land alone.
+ *  · `FaultCard`'s escalation HEADER is worded for harm („Ако от това излезе
+ *    беля"), and this step escalates on the ROAD rather than on harm. The
+ *    sentence itself opens «Когато…» and reads correctly under any header;
+ *    generalising the header belongs to the lane that owns `hud/`.
+ *
+ * The лишаване is in the fine's own `banBg` (the same sentence states it, which
+ * `__tests__/consequences.test.ts` asserts); `gatedLineBg` does not print a ban
+ * today, so `noteBg` above says it in words as well — a three-month
+ * disqualification is not a detail a student may have to infer.
+ */
+const WRONG_WAY_MOTORWAY_CASE: ConditionalPenalty = {
+  conditionBg:
+    "когато обратната посока е платното за насрещно движение по автомагистрала или скоростен път",
+  fine: fine(1000, BAN_THREE_MONTHS, {
+    actFile: "zdvp.json",
+    unitRef: "чл. 178ж",
+    citationBg: "ЗДвП чл. 178ж, ал. 1",
+    quoteBg:
+      "Наказва се с лишаване от право да управлява моторно превозно средство за срок от три месеца и глоба 1000 лв. водач, който се движи в лентата за принудително спиране по автомагистрала, без да са налице изключенията по чл. 58, т. 3 или в платното за насрещно движение по автомагистрала и скоростен път.",
+  }),
+  controlPoints: CP(
+    "т. 7",
+    15,
+    "за движение в платното за насрещно движение по автомагистрала и скоростен път (чл. 178ж, ал. 1, предл. 2 от ЗДвП) - 15 контролни точки;",
+    "Тук изчерпателният списък по чл. 6, ал. 1 стига — и стига високо: 15 контролни точки наведнъж, от книжка, която при първоначално издаване не е и пълна. Забележи, че т. 7 е ВТОРОТО предложение на чл. 178ж, ал. 1: първото е аварийната лента, а това е насрещното платно.",
+  ),
+};
+
 /** чл. 179, ал. 2 — the crash row. Never in the exhaustive list. */
 const CRASH_CASE: ConditionalPenalty = {
   conditionBg: CRASH_CONDITION_BG,
@@ -2200,9 +2259,10 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
       DANGER_179_1_5(
         "И тежкият състав не е в списъка за този случай: чл. 6, ал. 1 стига до чл. 179, ал. 1, т. 5 само за изпреварване (т. 9) и за неспиране на знак „Спри!“ (т. 15). Забраненото влизане не е нито едното.",
       ),
+      WRONG_WAY_MOTORWAY_CASE,
     ],
     noteBg:
-      "Отделен, много по-тежък състав важи, когато забраната е ВРЕМЕННА (ЗДвП чл. 183, ал. 7) — там законът предвижда и лишаване от право. Този ред е за постоянната забрана и за еднопосочната улица.",
+      "Отделен, много по-тежък състав важи, когато забраната е ВРЕМЕННА (ЗДвП чл. 183, ал. 7) — там законът предвижда и лишаване от право. Числата горе са за еднопосочната улица и за постоянната забрана. Тръгнеш ли срещу движението по АВТОМАГИСТРАЛА или скоростен път, това е друг член и друг мащаб — ЗДвП чл. 178ж, ал. 1: глоба 1000 лв., лишаване от право да управлява моторно превозно средство за срок от три месеца и 15 контролни точки по чл. 6, ал. 1, т. 7 от Наредба № Iз-2539. Условният ред за магистралата е изписан по-долу.",
   },
 
   NOT_KEEPING_RIGHT: {

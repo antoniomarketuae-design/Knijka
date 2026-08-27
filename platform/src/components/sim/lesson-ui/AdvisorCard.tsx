@@ -82,7 +82,17 @@
 
 import { IconBook } from "@/components/icons";
 import type { AdvisorPrompt } from "@/modules/sim/lessons";
+import { peekScrimBackgroundCss } from "@/modules/sim/hud";
 import { HudCloseButton } from "./HudCloseButton";
+
+/**
+ * The advisor ground's horizontal ramps, px — and they are the card's own
+ * `px-3` and not a chosen number. Feather === the padding is what puts the flat
+ * core exactly under the text box: every glyph on this card stands on full
+ * ground, and both ramps live in margin that carries no ink. See the block at
+ * the shade's site for why this shade may not bleed the way `SimOverlay`'s does.
+ */
+const ADVISOR_GROUND_FEATHER_PX = { left: 12, right: 12 } as const;
 
 export function AdvisorCard({
   prompt,
@@ -96,8 +106,83 @@ export function AdvisorCard({
     <div
       role="status"
       aria-label="Съветник — следващо действие"
-      className="hud-ghost pointer-events-none flex w-full min-w-0 flex-col gap-1 rounded-2xl border border-accent-2/60 px-3 py-1.5 select-none"
+      // `relative isolate` is what the shade below hangs on, and `isolate` is
+      // not decoration: a `z-index: -1` child in a box that is NOT a stacking
+      // context paints behind the nearest ancestor that is, which in this tree
+      // is the play stage — i.e. the shade would slide under the 3D canvas and
+      // this fix would be a diff that changes no pixel.
+      className="hud-ghost pointer-events-none relative isolate flex w-full min-w-0 flex-col gap-1 rounded-2xl border border-accent-2/60 px-3 py-1.5 select-none"
     >
+      {/* ── THE GROUND UNDER THE INSTRUCTOR'S SENTENCE ─────────────────────
+          W11 / sc-pe-night-unlit:bf7188c6: *„the words «Спри пред пътеката за
+          появилия се пешеходец» with the lit building windows, the vertical
+          railing bars and the standing dark pedestrian figure all reading
+          straight through the card body behind them."*
+
+          THE TRANSPARENCY IS NOT A BUG — it is the UNPANEL register, and the
+          register is right. `PlayAreaStyles`' sweep strips fill from every
+          `.hud-ghost` on the founder's own 2026-08-03 direction, and this card
+          is a ghost on purpose: a strip across the road that carries a solid
+          plate is furniture on a windscreen. What the register also says, in
+          its own header, is that the rule has an edge — „a look is not worth
+          costing a student the rule they just broke" — and it ships the exact
+          instrument for that edge: `data-hud-ink`, the one attribute the sweep
+          exempts. `SimOverlay` closed three criticals of this same shape with
+          it («the ИНСТРУКЦИИ card has NO panel background at all … the briefing
+          text is painted straight onto the street»).
+
+          THIS CARD IS THE OTHER SIDE OF THAT EDGE, and the lesson that filed it
+          says why: sc-pe-night-unlit is a NIGHT drill whose whole subject is
+          picking a dark figure out of a dark background. Text that shares its
+          pixels with that figure does not merely become hard to read — it puts
+          the instructor's sentence on top of the exact silhouette the drill is
+          training the eye to find. So the sentence gets a ground and the card
+          keeps everything else: the same ink `SimOverlay`'s violation card two
+          slots up in this same column uses (rgba(6, 11, 20) at
+          `PEEK_SCRIM_ALPHA`, imported rather than restated so a re-skin moves
+          both), so the column reads as one instrument and not as two design
+          languages.
+
+          IT IS INSET TO THE PADDING BOX, AND THAT IS THE ONE THING THIS SHADE
+          DOES DIFFERENTLY FROM THE VIOLATION CARD'S. That card bleeds past
+          itself and feathers 26 px into the road because `CARD_CLASS` has no
+          padding — „row 1's tone glyph and «−N т.» chip start at y = 0", so a
+          ramp inside it would leave a glyph on a partial ground. THIS card has
+          `px-3`, i.e. 12 px of clear padding on each side, so the ramps fit
+          entirely inside its own margin: the flat core begins exactly where the
+          first glyph does (117 px content box on the phone column, 12 + 93 + 12),
+          no glyph ever stands on a partial ground, and — the reason it matters
+          here — the shade never reaches the CARD'S OWN HAIRLINE. A bleeding
+          shade would cover `border-accent-2/60`, because a border is painted in
+          the element's own phase and a `z-index: -1` child paints after it: the
+          outline that the UNPANEL register leaves behind as „exactly the
+          reference's hairline" would have been composited down to rgb(9, 54, 55)
+          by the very fix meant to make the card readable.
+
+          `z-index: -1` and not a `::before`: the rows above are ordinary
+          in-flow content and in-flow content paints BEFORE positioned
+          descendants, so an `auto` sibling would land on the words it exists to
+          make readable. `aria-hidden` + `pointer-events-none` because it is a
+          shade: it must not be announced, and this card is `pointer-events-none`
+          end to end precisely so a tap meant for the road is not eaten by a
+          hint. `data-hud-ink` IS LOAD-BEARING — without it the sweep's second
+          selector hands this div `background-image: none !important` and the
+          frame comes back exactly as filed. ────────────────────────────── */}
+      <div
+        data-hud-ink=""
+        data-advisor-ground=""
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: -1,
+          pointerEvents: "none",
+          // `rounded-2xl` is 1rem on the BORDER box; the padding box this is
+          // inset to is one border-width smaller, so its corner is 1rem − 1px.
+          borderRadius: "calc(1rem - 1px)",
+          backgroundImage: peekScrimBackgroundCss(ADVISOR_GROUND_FEATHER_PX),
+        }}
+      />
       <span className="flex min-w-0 items-center gap-2">
         <span
           aria-hidden

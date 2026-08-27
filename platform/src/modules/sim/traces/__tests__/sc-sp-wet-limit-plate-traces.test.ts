@@ -82,7 +82,7 @@ describe("sc-sp-wet-limit-plate — mistake demos grade their exact codes (doc 7
     const drive = drives.get("mistake-over-limit-in-wet")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_SP_WET_LIMIT_PLATE.mistakes[1].codeRefs].sort());
-    expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+    expect(codes).toContain("SPEED_TOO_FAST_FOR_CONDITIONS"); // the wet envelope is breached as well as the plate — the demo's own prose says «табелата искаше 40»
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
     expect(codes).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
   });

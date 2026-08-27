@@ -759,7 +759,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-speed-rain",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-speed-rain/mistake-dry-speed.trace.json",
-    "faultTimeSec": 8.57,
+    "faultTimeSec": 8.35,
     "requiredActors": [],
     "governingControl": {
       "kind": "sign",

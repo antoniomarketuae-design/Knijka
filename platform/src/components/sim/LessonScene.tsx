@@ -114,7 +114,9 @@ import {
   createDashboardStatus,
   FollowGapCue,
   followGapTarget,
+  PEEK_SCRIM_ALPHA,
   PEEK_SCRIM_FEATHER_PX,
+  PEEK_SCRIM_RGB,
   peekScrimBackgroundCss,
   peekScrimMaskCss,
   RearProximityCue,
@@ -276,6 +278,122 @@ const NIGHT_ENV_ROTATION = new Euler(0, 0, 0);
 
 /** P1: localStorage key marking the one-time touch orientation hint as seen. */
 const TOUCH_HINT_STORAGE_KEY = "sim.touchHintSeen";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE ACK CHIP'S OWN GROUND — sweep w11, 2026-08-27.
+
+   FILED EIGHT TIMES, ONE SENTENCE, EIGHT LESSONS: „the hint's «РАЗБРАХ» button
+   floats detached below the text with no visual tie to it"
+   (sc-crossing-child-ball:a846ca99, sc-crossing-white-cane:90a1ced1,
+   sc-rb-ped-exit:5fa0ff2e, sc-park-zebra:85de2236, sc-park-wall:30a41030,
+   sc-crossing-bus-shadow:4515fc5e, sc-park-45-rev:95119078,
+   sc-speed-dangerous:a284d02c, and the second half of
+   sc-ov-solid-return:6c0e0f12).
+
+   ── FIRST, THE HALF OF THOSE NOTES THAT IS STALE, because a repair aimed at it
+      would move no pixel and the next sweep deserves the numbers. Every one of
+      the eight says some version of „the scrim behind the hint text ENDS ABOVE
+      the button", and nine SEPARATE rows on the same card say the copy itself
+      has „no panel … only a ~20 % wash … the parked cars and the sky read
+      straight through". Neither is true on this build.
+
+      MEASURED off the w11 frames themselves (iPhone 16 landscape, 852 × 393 at
+      dpr 3), reading the shade's own alpha down the card's column against a
+      matched strip of bare world beside it —
+
+        sc-speed-dangerous 03-ready   bare sky rgb(166,171,174) at device x<1620
+          device y 430, card interior      rgb( 38, 43, 51)  ⇒ α = 0.80
+          device y 580, card interior      rgb( 74, 74, 73)  ⇒ α = 0.17  (ramp)
+          device y 610, card interior      = the world              α ≈ 0
+        sc-crossing-child-ball 03-ready
+          device y 250 (sky 154) ⇒ α 0.87 · y 500 (world 118) ⇒ α 0.88
+          device y 560 ⇒ α 0.57 (ramp) · y 600 ⇒ α ≈ 0
+
+      0.80 is `PEEK_SCRIM_ALPHA` exactly, the ramp is 48 device px = the
+      published `PEEK_SCRIM_FEATHER_PX.bottom` (16 CSS px) exactly, and it ends
+      at CSS 200 ≈ the card's own box. So the shade is dense, it is the
+      published one, and it covers the WHOLE card — prose and control alike.
+      „No panel" and „it stops above the button" are both refuted.
+
+   ── WHAT IS NOT STALE IS WHERE THAT RAMP LANDS. The card measures ~127 CSS px
+      and the ack chip is its last ~46. The bottom feather is 16. So the ramp
+      runs ENTIRELY INSIDE THE ONE CONTROL THE CARD OWNS: at the chip's top the
+      ground is 0.80 and at its bottom edge it is 0. The chip's own box is
+      `color-mix(in srgb, var(--accent) 18%, transparent)` — a TINT with no
+      ground — so the bottom third of a 44 px touch target stands on live road,
+      which is why eight readers of eight different frames all called it loose.
+
+      The shade's own site claimed the opposite in writing („the «Разбрах» ack …
+      a control that paints its own box and does not depend on this ground").
+      That sentence is corrected at the shade, below.
+
+   ── THE FIX IS SimOverlay'S, NOT A NEW ONE. The peek's three chips were filed
+      with the identical sentence four times („the «ЗАЩО ↓10» and «✕» pills are
+      unfilled outlines sitting directly on the parked cars") and that module
+      answered it on 2026-08-27: a chip is not a window onto the road the way a
+      paragraph's ground is, so the pair of layers may reach 0.90 where the card
+      alone may not exceed 0.80 — 1.13 : 1, „dimmed, not erased", the world
+      still legible inside the control.
+
+   ── AND IT IS DERIVED, NOT TYPED, for the reason that module states: an edit to
+      `PEEK_SCRIM_ALPHA` must re-pick this instead of leaving a paragraph to rot.
+      Two alpha layers leave (1 − a)(1 − b) of the world, so
+      1 − (1 − 0.80)(1 − β) = 0.90 ⇒ β = 0.50.
+
+      ⚠ THE ARITHMETIC IS RE-STATED HERE AND THAT IS A CONCESSION, NOT A CHOICE.
+        `chipGroundAlphaFor` / `peekChipGroundCss` / `PEEK_CHIP_TOTAL_ALPHA` all
+        exist in `modules/sim/hud/SimOverlay.tsx` and NONE of them is re-exported
+        from `modules/sim/hud/index.ts`, and doc-05 forbids a component reaching
+        past a module's barrel. What travels through the barrel today is
+        `PEEK_SCRIM_ALPHA` and `PEEK_SCRIM_RGB`, so the CARD's alpha — the one
+        number that can move — is read and only the 0.90 rung is written down.
+        When the hud lane publishes those three names this block collapses to an
+        import, and `unpanelInkExemption.test.ts` already owns the pattern for
+        asserting a barrel name rather than an import line.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The total the card's ground and the ack chip's own ground reach together —
+ * SimOverlay's `PEEK_CHIP_TOTAL_ALPHA`, the rung 0.80 was measured at and
+ * rejected FOR THE CARD (a card is a window onto the road) and adopted for a
+ * 44 px control (it is not).
+ */
+const ACK_CHIP_TOTAL_ALPHA = 0.9;
+
+/**
+ * …and the chip's own layer, derived from the published card alpha. 0.50.
+ *
+ * Clamped to [0, 1] for the reason `chipGroundAlphaFor` states — a total below
+ * the card's own ground is not a lighter chip, it is a request this compositor
+ * cannot honour and must not silently invert — and ROUNDED because the naive
+ * expression is 0.5000000000000001 in binary floating point and that number
+ * would ship into the DOM as the chip's alpha.
+ */
+const ACK_CHIP_GROUND_ALPHA =
+  PEEK_SCRIM_ALPHA >= 1
+    ? 0
+    : Math.min(
+        1,
+        Math.max(0, Math.round((1 - (1 - ACK_CHIP_TOTAL_ALPHA) / (1 - PEEK_SCRIM_ALPHA)) * 1000) / 1000),
+      );
+
+/**
+ * The ack chip's ground: the CARD's own near-black, at that alpha.
+ *
+ * It is painted as `background-color` with the unchanged 18 % tint above it in
+ * `background-image`, and the ORDER is the correctness point rather than a
+ * tidiness one — CSS paints `background-image` above `background-color`, and a
+ * tint UNDER its own ground is a tone halved to buy the ground. Composited, the
+ * pair is arithmetically identical to SimOverlay's single
+ * `color-mix(in srgb, var(--accent) 18%, <ground>)` (that function's own proof:
+ * `color-mix` premultiplies, so mixing an opaque tone at p % with a ground at
+ * (100 − p) % is the same expression as painting the tone at p % source-over
+ * that ground), and it keeps the 18 % register on the page as one literal,
+ * which is what `hud-off-the-road.test.ts` reads to prove this is still the
+ * chip the founder signed off and not the „SOLID BRAND-BLUE «Разбрах»" the
+ * 2026-08-03 review deleted.
+ */
+const ACK_CHIP_GROUND_CSS = `rgba(${PEEK_SCRIM_RGB.join(", ")}, ${ACK_CHIP_GROUND_ALPHA})`;
 
 /**
  * Perf readout opt-in: `?simPerf=1` on the URL, or `localStorage["sim.perfLog"]
@@ -2757,17 +2875,31 @@ export function ReadyScene({
                  2026-08-03 register through the back door.
 
                  THE MASK RAMPS INSIDE THE BOX rather than in an overhang there
-                 is no room for, and that is only acceptable because of WHAT is
-                 in the bottom 16 px: the «Разбрах» ack, `min-h-11` with its own
-                 `data-hud-ink` tint and a 55 % hairline, i.e. a control that
-                 paints its own box and does not depend on this ground. No
-                 prose is inside the ramp — the two sentences are in the
-                 `min-h-0 shrink` window above the button. That is the same
-                 judgement `PEEK_SCRIM_FEATHER_PX` records for its own bottom
-                 („right and bottom face the stage's own edge and the instrument
-                 band, where a shorter ramp is invisible anyway"), and it is why
-                 the ramp may be here and may NOT be under the key list two
-                 components down, where the bottom 16 px is a row of teaching.
+                 is no room for. No prose is inside the ramp — the two sentences
+                 are in the `min-h-0 shrink` window above the button — which is
+                 the same judgement `PEEK_SCRIM_FEATHER_PX` records for its own
+                 bottom („right and bottom face the stage's own edge and the
+                 instrument band, where a shorter ramp is invisible anyway"),
+                 and it is why the ramp may be here and may NOT be under the key
+                 list two components down, where the bottom 16 px is a row of
+                 teaching.
+
+                 ⚠ THE SECOND HALF OF THAT SENTENCE WAS WRONG UNTIL 2026-08-27,
+                   and eight rows of sweep w11 are what it cost. It read: „that
+                   is only acceptable because of WHAT is in the bottom 16 px:
+                   the «Разбрах» ack … a control that paints its own box and
+                   does not depend on this ground." It does not depend on this
+                   ground, agreed — but it did not paint a box either. A
+                   `color-mix(… 18%, transparent)` is a TINT, and a tint over
+                   tarmac is an outline. So the ramp was spent on the one
+                   control the card owns: the card measures ~127 CSS px, the
+                   chip is its last ~46, and the ground under a 44 px touch
+                   target ran 0.80 → 0 from its top edge to its bottom.
+                   ACK_CHIP_GROUND_ALPHA's site has the frames, the alphas read
+                   off them and the eight finding ids; the chip now carries the
+                   card's own near-black at 0.50 under that unchanged tint, so
+                   the ramp is free to be a soft edge again and takes nothing
+                   with it when it goes.
 
                  THE TOP EDGE STAYS HARD, on purpose and not by omission:
                  `PEEK_SCRIM_FEATHER_PX.top` is 0 because above this card is the
@@ -2880,10 +3012,47 @@ export function ReadyScene({
             // register that replaced it and that he signed off — SimOverlay's
             // ack chip, 18 % tint on a 55 % hairline, light ink — so the two
             // acknowledgements on this screen are one object rather than two.
+            //
+            // ── …AND A TINT IS NOT A GROUND. sweep w11, 2026-08-27, filed eight
+            //    times in one sentence — „the «РАЗБРАХ» button floats detached
+            //    below the text with no visual tie to it". TWO THINGS were true
+            //    of it and neither was the mechanism those notes name (the card's
+            //    shade does NOT stop above this button; measured at
+            //    ACK_CHIP_GROUND_ALPHA's site, it covers the whole card):
+            //
+            //    1. THE SHADE'S BOTTOM RAMP IS SPENT ENTIRELY ON THIS CONTROL.
+            //       Card ~127 CSS px, chip the last ~46, feather 16 — so the
+            //       ground under a 44 px touch target runs 0.80 → 0 top to
+            //       bottom and the last third of it is live road. The `18%,
+            //       transparent` mix has no ground of its own to carry it, which
+            //       is the peek's «ЗАЩО» defect on the surface beside it. It now
+            //       stands on the CARD'S OWN near-black at 0.50, so the two
+            //       layers read 0.90 where the shade is up and 0.50 where the
+            //       ramp has gone — never nothing. The 18 % tint is unchanged
+            //       and, because `background-image` paints above
+            //       `background-color`, still on top where it belongs.
+            //
+            //    2. IT WAS NOT THE PROSE'S COLUMN. `items-end` on the card left
+            //       this chip at its natural ~120 px inside a 180 px lane, so it
+            //       shared no edge with the two sentences and every reader
+            //       described it as sitting beside/below them rather than as
+            //       their footer. `w-full` makes its left and right edges the
+            //       prose's own — the tie those eight rows ask for is the shared
+            //       column, not another rectangle — and it hands a thumb the
+            //       whole lane instead of two thirds of it. `justify-center`
+            //       keeps the label where it already read.
+            //
+            //    NOT A PANEL AND NOT THE COOKIE BANNER: 180 × 44 is 2.4 % of an
+            //    852 × 393 stage, the world stays legible inside it at 1.13 : 1
+            //    (SimOverlay's measurement of the same pair), and there is still
+            //    no blur, no shadow and no radius but the pill's own.
             data-hud-ink=""
-            className="pointer-events-auto flex min-h-11 shrink-0 items-center rounded-full border px-4 text-[11px] font-black uppercase tracking-wider text-foreground"
+            className="pointer-events-auto flex min-h-11 shrink-0 w-full items-center justify-center rounded-full border px-4 text-[11px] font-black uppercase tracking-wider text-foreground"
             style={{
-              backgroundColor: "color-mix(in srgb, var(--accent) 18%, transparent)",
+              backgroundColor: ACK_CHIP_GROUND_CSS,
+              backgroundImage:
+                "linear-gradient(color-mix(in srgb, var(--accent) 18%, transparent), " +
+                "color-mix(in srgb, var(--accent) 18%, transparent))",
               borderColor: "color-mix(in srgb, var(--accent) 55%, transparent)",
             }}
           >

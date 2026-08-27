@@ -736,10 +736,59 @@ export const SC_ED_D2_STOP_ADDRESS: ScenarioSpec = {
     // per rung from `sc-edsa-planned-approach`, and a numeral hard-coded in the
     // briefing would be a second copy of it, free to drift, on the one drill
     // whose whole finding is numbers that disagree.
+    //
+    // ── …AND THE SEQUENCING WAS PUT WHERE NOBODY READS IT (w11, 2026-08-26,
+    //    `.audit-frames/w11/frames/sc-ed-d2-stop-address__pc-right/
+    //    04-t129s.png`) ──────────────────────────────────────────────────────
+    //
+    // The re-drive credits the mitigation above and then photographs what it
+    // missed. On the glass at t129s the ИНСТРУКЦИИ panel shows steps 1–4 and
+    // ends in «↓ ОЩЕ 4 СТЪПКИ»: step 3's «набери спокойни 45 км/ч» is legible,
+    // and step 6 — the step that said which of the two numbers is graded — is
+    // BELOW THE FOLD. The chip beside it reads «дръж под 32 км/ч». So the
+    // student who reads what he is shown reads 45, is measured against 32, and
+    // the sentence that reconciles them is one he has to scroll for.
+    //
+    // That is this repo's own rule, already written down twice and applied to
+    // the wrong file both times: `templates-flow.ts`'s briefing-budget block
+    // („a step-1 past ~96 characters leaves ZERO characters of the rest of the
+    // briefing above the fold") and `templates-parking3.ts`'s ORDER OF THE
+    // FIRST STEP („an act that keeps the student out of a parked car cannot be
+    // the act below the fold, and it cannot be the last five words of a
+    // sentence whose first words send him up the row"). The fold is a property
+    // of the SURFACE, so the fix is not a shorter step 6 — it is that the
+    // disambiguation must live in the same step as the numeral it disambiguates.
+    //
+    // So step 3 now carries the pointer itself, in the same sentence as the 45,
+    // at the place the panel actually shows. Step 6 keeps a short
+    // back-reference for the student who reaches it — redundancy above AND
+    // below the fold is the point, not an accident. Still no numeral for the
+    // cap, for the reason above: `advisor.ts` speaks the compiled per-rung
+    // figure and this file must not ship a second copy of it.
+    //
+    // AND THE POSTED 50 LEFT THE PANEL, which is the other half of the row and
+    // is a deletion rather than a sentence. The finding counts FOUR numbers on
+    // one screen; two of them are this template's (the 45 and the задача's cap)
+    // and two are not (the В26 disc, and the governor's ≤80 — `districtMaxLegalKmh`
+    // over the whole Лозенец cut, whose viaduct is 80; `scene/lessonSpeedContract.ts`
+    // names the three surfaces that must adopt one resolution and none is in
+    // this module). What this file could do is stop printing a THIRD copy of a
+    // number the world already posts six pixels away: «ограничението е 50 —
+    // карай под него» became «под знака». The law is unchanged and still
+    // delivered — by the disc, which is where a driver reads a limit — and the
+    // instruction panel now carries exactly one speed, the one it commands.
+    // The budget is unchanged too: step 3 is 184 characters against 178 before,
+    // so the pointer is bought with the numeral rather than with the fold.
+    //
+    // `__tests__/d2-stop-address-speeds.test.ts` is the guard and it still
+    // passes on all four of its clauses (checked against the compiled
+    // briefing): briefNums = {45}, and the strings «задачата на екрана»,
+    // «по което те оценяват» and «СРЕДАТА на блока» all survive — they simply
+    // moved from step 6 up into step 3.
     {
       n: 3,
       textBg:
-        "Излез в лентата и набери спокойни 45 км/ч — това е скоростта за СРЕДАТА на блока, не за последните метри. Улицата е жилищна, ограничението е 50 — карай под него, без да пълзиш.",
+        "Излез в лентата и набери спокойни 45 км/ч — под знака, темпото за СРЕДАТА на блока. При приближаването важи другото, по-ниско число от задачата на екрана — онова, по което те оценяват.",
     },
     {
       n: 4,
@@ -754,7 +803,7 @@ export const SC_ED_D2_STOP_ADDRESS: ScenarioSpec = {
     {
       n: 6,
       textBg:
-        "Планирай спирането отрано: огледало, десен мигач, плавно намаляване и спиране плътно вдясно до бордюра. Числото в задачата на екрана е онова, по което те оценяват при приближаването — не скоростта от точка 3. Ако трябва да набиеш спирачките, за да уловиш мястото — мястото не е удобно.",
+        "Планирай спирането отрано: огледало, десен мигач, плавно намаляване и спиране плътно вдясно до бордюра. Скоростта тук е числото от задачата, не 45-те от точка 3. Ако трябва да набиеш спирачките, за да уловиш мястото — мястото не е удобно.",
     },
     { n: 7, textBg: "Спри напълно, задръж колата и остави мигача изключен, когато си спрял." },
   ],

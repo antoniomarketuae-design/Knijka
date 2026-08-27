@@ -59,6 +59,8 @@ import {
   SCROLL_REMAINING_SLACK_PX,
   scrollRemainingPx,
   TASK_ANNOUNCE_MS,
+  TOAST_FADE_PX,
+  TOAST_TALLEST_LINE_PX,
   toastPageScrollTop,
 } from "../LessonPlayShell";
 import {
@@ -874,11 +876,29 @@ describe("the column takes nothing out of the graded fault", () => {
     // card is „truncated mid-sentence … with no ellipsis, no scrollbar and no
     // expand control" (sc-ac-aquaplane:0ae00f29). The mask is the signal half:
     // a horizontally guillotined line reads as a rendering fault, a faded one
-    // reads as „there is more". Same constant, same 10 px and same predicate
-    // the briefing list one card up already carries.
+    // reads as „there is more". Same predicate the briefing list one card up
+    // already carries.
+    //
+    // ── AND THE RAMP IS THE ONE THIS SURFACE'S TYPE ASKS FOR, 2026-08-27.
+    //    It was `BRIEFING_FADE_MASK_CSS` — 10 px, solved against the briefing
+    //    list's 11 px `leading-tight` line AND pinned to that list's matching
+    //    `pb-2.5` by `briefingOverflow.test.tsx`. The toast stack's tallest
+    //    line is `text-sm leading-snug` = 19.25 px, so 10 px left the glyph
+    //    TOPS at ≈ 0.95 alpha with their bottoms cut off — a severed line, not
+    //    a faded one, which is exactly what sc-signal-response:92c94379
+    //    photographs on `w11/…/sc-signal-response__pc-right/04-t043s.png`.
+    //
+    //    THE ASSERTION IS THE RELATIONSHIP AND NOT THE LITERAL, deliberately:
+    //    a test that pinned „28" would go green on a future type change that
+    //    put the slice straight back. It bites from BOTH ends — long enough
+    //    that a fully cut line is already dissolving, and short enough that the
+    //    ramp cannot start eating a line the student could have read whole.
     const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));
     const decls = scroller.slice(0, scroller.indexOf("<HudToasts"));
-    expect(decls).toContain("BRIEFING_FADE_MASK_CSS");
+    expect(decls).toContain("TOAST_FADE_MASK_CSS");
+    expect(decls).not.toContain("BRIEFING_FADE_MASK_CSS");
+    expect(TOAST_FADE_PX).toBeGreaterThan(TOAST_TALLEST_LINE_PX);
+    expect(TOAST_FADE_PX).toBeLessThan(2 * TOAST_TALLEST_LINE_PX);
     // Both spellings — unprefixed in current WebKit, prefixed in the engine the
     // founder reads this on.
     expect(decls).toContain("WebkitMaskImage");
