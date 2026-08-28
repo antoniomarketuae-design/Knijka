@@ -61,6 +61,47 @@
  *
  * TO RE-OPEN EITHER FINDING: drive a lesson whose logged speed actually goes
  * negative, and read the frames from that. Nothing else settles it.
+ *
+ * ── THAT DRIVE HAPPENED, AND THE FRAME ACQUITS THIS MODULE (2026-08-28) ─────
+ *
+ * `w10-4` re-drove sc-ed-reverse-line with the selector actually in R and
+ * captured `frames/sc-ed-reverse-line__pc-right/05r-reverse-R.png` — the first
+ * frame in the corpus in which anything this file decides was ever rendered.
+ * It shows the shoulder check: the cockpit camera is looking back over the
+ * right shoulder past the head restraint and out the rear side glass, which is
+ * `COCKPIT_SHOULDER_YAW` −1.85 rad + `COCKPIT_SHOULDER_PITCH` applied through
+ * the swing, i.e. the exact behaviour instruction 4 asks for («обърни се и
+ * гледай през рамо назад … чл. 40»). The prediction above was that the two
+ * rows could not be settled from a forward-view frame; settled from a reverse
+ * one, the shoulder-check half is simply not a defect.
+ *
+ * TWO CHILDREN OF THAT ROW CAME BACK ON THAT FRAME AND NEITHER LANDS HERE:
+ *
+ *  · `sc-ed-reverse-line:e05f2cee` „no rear proximity read-out at any point of
+ *    the reverse". True of the frame and correct of the product. The badge
+ *    exists (`hud/RearProximityCue.tsx`, mounted at `LessonScene.tsx`:2553)
+ *    and its honesty contract is that it renders ONLY for a real body behind:
+ *    `hud/rearProximity.ts` `stepRearCue` opens with
+ *    `if (!Number.isFinite(gapM)) return null`. This drill runs on poligon-v1
+ *    because that ground has NOTHING staged on it — the scenario's own header
+ *    (`lessons/scenario/templates-exam.ts`, sc-ed-reverse-line) says „no
+ *    signals, no crossings, no other actors … that emptiness IS the drill". So
+ *    there is nothing behind the car to measure, and a distance to nothing is
+ *    the false-warning class (doc 62 #39/#48) that burned the founder's trust.
+ *    What this lesson could honestly show is DISTANCE TRAVELLED — its third
+ *    gate is „спри след 25 метра" and nothing on the glass counts them — and
+ *    that is an objective/RouteGuidance surface, not a reverse-view decision.
+ *
+ *  · `sc-ed-reverse-line:1f812456` „there is no rear-facing camera image". Also
+ *    true, and it is the shape of the lesson rather than a gap in it. The
+ *    instruction the drill grades is «обърни се и гледай през рамо назад, не
+ *    разчитай само на огледалото (чл. 40)»; a reverse camera would perform
+ *    that duty FOR the student, on an exam manoeuvre (Наредба-38) whose
+ *    category-B examination car does not have one. The row's own splitWhy asks
+ *    for a ruling rather than an implementation, and this is it: the absence is
+ *    the lesson. Overturnable by the founder, and if it is ever overturned the
+ *    camera belongs behind an explicit setting, never as the default view of a
+ *    manoeuvre the state examines by shoulder check.
  */
 
 import type { SelectorPosition } from "../vehicle";

@@ -455,6 +455,51 @@ function asMesh(o: Object3D | undefined): Mesh | null {
 // every aspect because it is the same ray. The headliner band, the window
 // fraction and the „does the authored overhead kit hide the ceiling" argument
 // below are therefore all UNCHANGED BY CONSTRUCTION; only the mirror moved.
+//
+// ── READ THE SENTENCE ABOVE NARROWLY: „identical at every aspect" IS TRUE OF
+//    THE 0.03 PX AND FALSE OF THE 0.9578 (2026-08-28, `sc-mw-emergency-lane:
+//    3ffb0692`) ──────────────────────────────────────────────────────────────
+//
+// The two rays land on the same ROW as each other at any aspect. WHICH row
+// that is, is `0.5 + 0.5·tan(θ)/tan(vFOV/2)`, and the cockpit derives vFOV
+// from the LIVE aspect (`cockpitVFovForAspect`, doc 71 §4.9): 47° at the 16:9
+// the numbers above were solved at, 39.25° on the founder's phone in landscape
+// (2556×1179 → aspect 2.168). Every fy above therefore moves, and outward.
+// Projected through the shipped constants (COCKPIT_DEP + COCKPIT_CAM_OFFSET,
+// COCKPIT_PITCH_BASE 4° down) — the 16:9 column reproduces this block's own
+// 0.9578 to four decimals, which is what says the model is the shipped one:
+//
+//                                         fy @ 16:9    fy @ 2.168:1
+//   v2 windscreen header edge (0.850, 0.16)   0.9797       1.0849  OFF SCREEN
+//   headliner front edge (ROOF_Y, ROOF_FRONT_Z) 0.9578     1.0583  OFF SCREEN
+//   mirror hood top (y 0.9551)                0.9591       1.0599  OFF SCREEN
+//   mirror GLASS top edge (y 0.9086)          0.9031       0.9916  in frame
+//
+// So on every phone landscape frame in the corpus the housing is cut by the
+// top of the screen and EVERYTHING THAT ATTACHES IT TO THE CAR — header pad,
+// headliner, the POD arm — is above the frame. R0 round 2's „the mirror hangs
+// in open sky" is back, not because anything here moved, but because the
+// window shape moved and this geometry is authored against one window shape.
+// It is visible on `w10-4/frames/sc-mw-emergency-lane__mobile-right/
+// 04-t202s.png` and repeats on 01-arrival / 04-t027s / 04-t207s of that lesson
+// and on every other mobile-landscape cockpit frame in sweep 161.
+//
+// NOTHING IN THIS FILE CAN FIX IT, and that is arithmetic rather than
+// reluctance: keeping the header edge in frame at 2.168:1 needs it at θ ≤ 19°,
+// i.e. ROOF_FRONT_Z ≈ 0.61 — forward of the mirror housing's own front face
+// (z 0.560) and therefore outside the windscreen. The lever is the vFOV floor,
+// in `vehicle/tuning.ts` `cockpitVFovForAspect`, which today clamps only from
+// ABOVE (COCKPIT_FOV_MAX 56, „the distance-judgment hard rule outranks the
+// hFOV hold") and has no floor at all. The symmetric clamp is
+// `Math.max(…, COCKPIT_FOV)`: the header needs 46.97° and COCKPIT_FOV is 47,
+// so the reference composition is exactly the floor, wider windows go back to
+// gaining world horizontally, and the cabin-integrity rule outranks the hFOV
+// hold in the direction the ceiling already does. Routed, not done — that file
+// belongs to another lane, and flooring it at THIS call site alone would leave
+// `RouteGuidance`, `hud/notifyColumn`, `scene/vitok/cabinLook` and
+// `world/components/worldLabel` predicting a narrower frame than the camera
+// renders, which is the two-places-that-must-agree defect this cockpit has
+// already been burned by twice.
 // ---------------------------------------------------------------------------
 
 /**

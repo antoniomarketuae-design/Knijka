@@ -1226,7 +1226,7 @@ function paintZigzagStroke(acc: MeshAccumulator, a: Vec2, b: Vec2, width: number
 /** The stop span a district authors in `meta.scenario`, in district Y, or null.
  *  Straight-street generator maps only — the same guard `busStopSheltersOf`
  *  keeps, and for its reason: a curved map's span has no Y interval at all. */
-function authoredBusStopSpanY(district: District): { fromY: number; toY: number } | null {
+export function authoredBusStopSpanY(district: District): { fromY: number; toY: number } | null {
   const scenario = (district.meta as { scenario?: unknown } | undefined)?.scenario;
   if (typeof scenario !== "object" || scenario === null) return null;
   const s = scenario as Record<string, unknown>;
@@ -1247,7 +1247,7 @@ function authoredBusStopSpanY(district: District): { fromY: number; toY: number 
 /** Which side of the edge's forward tangent the stop is on, from the district's
  *  own `laneCenterRightM` (positive = east on these north-running streets, and
  *  `perpRight([0,1])` is east). 0 = not stated ⇒ this pass declines. */
-function authoredStopSideSign(district: District): 1 | -1 | 0 {
+export function authoredStopSideSign(district: District): 1 | -1 | 0 {
   const scenario = (district.meta as { scenario?: unknown } | undefined)?.scenario;
   if (typeof scenario !== "object" || scenario === null) return 0;
   const v = (scenario as Record<string, unknown>).laneCenterRightM;

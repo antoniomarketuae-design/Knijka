@@ -16,13 +16,13 @@
  *
  * The trace gate replays exactly these through the production stack:
  *  - shadow: follows the truck at ~55 through the В24 approach, brakes to the
- *    А1 advisory BEFORE the bend, holds ~40 through the whole blind arc while
+ *    А1 advisory BEFORE the bend, holds ~40 through the whole closed arc while
  *    both oncoming cars sweep past in their own lane, then passes in the legal
  *    straight → ZERO violations + CLEAN_DRIVING. On this 1+1 the bank flip
  *    renumbers no lane, so NO lane-change code (positive or negative) can
  *    exist — the pass's innocence is the corridor's silence (scOvNightGap's
  *    ruling, verbatim);
- *  - „Изпреварване в слепия завой": identical pacing right up to the bend, then
+ *  - „Изпреварване в закрития завой": identical pacing right up to the bend, then
  *    pulls onto the oncoming bank mid-arc — where car 0 is closing head-on out
  *    of the curve — and holds it unbraked past YIELD_CONVICT_SUSTAIN_SEC →
  *    grades EXACTLY OVERTAKE_INSUFFICIENT_GAP (опасна). The pass runs at the
@@ -48,6 +48,44 @@
  * lane x = 4.06, spawn ovc-spawn-approach (4.06, 15) heading north), arc center
  * (135, 240) — inside-lane radius 130.94, oncoming-lane radius 139.06 — exit
  * leg east at y = 370.94 (own) / 379.06 (oncoming bank), road 902.04 m.
+ *
+ * ---------------------------------------------------------------------------
+ * W16 — sc-ov-crest-curve:d8834e1d (critical). THE DECK CAPTIONS SAID «СЛЯП»
+ * AND «ИЗЗАД СКЛОНА» ON A WORLD THAT HAS NEITHER.
+ *
+ * The template's own strings were repaired in wave 7 (templates-lanes2.ts:
+ * instruction 2 stopped saying „и се скрива зад склона", the patience banner
+ * stopped saying «СЛЯП»), and the row stayed OPEN because the half a student
+ * actually WATCHES was never touched: `annotation.textBg` travels inside the
+ * committed trace JSON and is painted by the demonstration deck
+ * (TraceTimeline.tsx:779/:794, data-hud="deck-caption") over the shadow drive.
+ * Six of this file's captions still asserted the two claims the audit
+ * photographed:
+ *
+ *   .audit-frames/w10-1/frames/sc-ov-crest-curve__mobile-right/04-t172s.png —
+ *   the box truck, the road round the bend and the plain beyond it all plainly
+ *   in view from the driving seat.
+ *
+ * THE TWO CLAIMS ARE NOT EQUALLY WRONG, so they do not get the same repair.
+ *  · «изскачат иззад СКЛОНА» is FALSE OUTRIGHT and always was: this district's
+ *    format carries no elevation channel at all and its `meta.scenario
+ *    .archetype` is "rural-curve" — there is no slope for anything to come out
+ *    from behind. Deleted, in both places.
+ *  · «СЛЯП завой» is an OVERCLAIM, not a falsehood. What occludes here is one
+ *    18 × 18 m, 9 m block authored inside the arc, and the sight distance it
+ *    leaves has been measured off the committed district (lanes2-rebase-actor-
+ *    truth.test.ts §2): 229 m at the В24, 157 m entering the arc, 141 m at the
+ *    worst station — against the ~450 m straight a whole pass of this 57 км/ч
+ *    truck needs. So the captions carry the NUMBER instead of the adjective,
+ *    and use the template's own settled word («закрит») where a name is needed.
+ *    A student told he can see nothing, who looks up and sees a hundred and
+ *    fifty metres of road, learns that this product's words do not mean what
+ *    they say.
+ *
+ * THE BAN AND EVERY GRADED CODE ARE UNTOUCHED — 141–229 m of visible oncoming
+ * road against the 450 m the manoeuvre needs is чл. 43's «ограничена видимост»
+ * exactly. This is a wording repair; not one sample, event time or rule code
+ * moves, and the re-recorded traces differ only in these six strings.
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -122,13 +160,13 @@ export function scOvCrestCurveShadowScript(): DriveScript {
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 90]], targetKmh: 50, stopAtEnd: false },
       { kind: "annotation", textBg: "Знак В24: оттук нататък не се изпреварва — забраната започва при знака, не при завоя." },
       { kind: "drive", points: [[X_LANE, 90], [X_LANE, 150], [X_LANE, 205]], targetKmh: 55, stopAtEnd: false },
-      { kind: "annotation", textBg: "Знак А1 с табела „40“ — завоят е сляп. Свали скоростта на правата, ПРЕДИ дъгата." },
+      { kind: "annotation", textBg: "Знак А1 с табела „40“ — оттук виждаш към 150 метра напред. Свали скоростта на правата, ПРЕДИ дъгата." },
       // Braked to the advisory before the arc entry (55 → 40 in ~35 m).
       { kind: "drive", points: [[X_LANE, 205], [X_LANE, 240]], targetKmh: 40, stopAtEnd: false },
-      // The whole blind arc at the advisory, behind the truck. Both oncoming
+      // The whole closed arc at the advisory, behind the truck. Both oncoming
       // cars sweep past here — in their own lane, which is the entire lesson.
       { kind: "drive", points: arcPoints(R_OWN, 0, 90), targetKmh: 40, stopAtEnd: false },
-      { kind: "annotation", textBg: "Ето ги насрещните — изскачат иззад склона. Точно тях не виждаше отпреди завоя." },
+      { kind: "annotation", textBg: "Ето ги насрещните — в своята лента. Отпреди завоя ги нямаше: дъгата ти отваря пътя на части." },
       // Out of the bend onto the legal straight; the ban span ended at x = 135.
       { kind: "drive", points: [[ARC_CX, EXIT_Y], [152, EXIT_Y]], targetKmh: 52, stopAtEnd: false },
       { kind: "annotation", textBg: "Правата: сега виждаш свободен участък за ЦЯЛАТА маневра — сега е разрешено." },
@@ -146,13 +184,13 @@ export function scOvCrestCurveShadowScript(): DriveScript {
       { kind: "indicator", setting: "off" },
       { kind: "drive", points: [[498, EXIT_Y], [560, EXIT_Y]], targetKmh: 60 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Готово: търпение в слепия завой, чисто изпреварване на правата след него." },
+      { kind: "annotation", textBg: "Готово: търпение в закрития завой, чисто изпреварване на правата след него." },
     ],
   };
 }
 
 // ---------------------------------------------------------------------------
-// Mistake demo 1 — „Изпреварване в слепия завой" (OVERTAKE_INSUFFICIENT_GAP)
+// Mistake demo 1 — „Изпреварване в закрития завой" (OVERTAKE_INSUFFICIENT_GAP)
 // ---------------------------------------------------------------------------
 
 export function scOvCrestCurveMistakeBlindPassScript(): DriveScript {
@@ -180,7 +218,7 @@ export function scOvCrestCurveMistakeBlindPassScript(): DriveScript {
       // anchor): the gamble the corridor adjudicator convicts. A lift anywhere
       // in here would be the OV-08 abort and would stand the conviction down.
       { kind: "drive", points: arcPoints(R_OUT, 37, 52), targetKmh: 44, stopAtEnd: false },
-      { kind: "annotation", textBg: "Иззад склона излиза кола — прозорецът, който „изглеждаше празен“, е секунди." },
+      { kind: "annotation", textBg: "Иззад дъгата излиза кола — прозорецът, който „изглеждаше празен“, е секунди." },
       // Dives back at the SAME speed (no braking — the abort must not stand the
       // conviction down); the staged car's guard is what averts the head-on.
       { kind: "drive", points: arcRamp(R_OUT, R_OWN, 52, 64), targetKmh: 44, stopAtEnd: false },
@@ -200,7 +238,7 @@ export function scOvCrestCurveMistakeBlindPassScript(): DriveScript {
 export function scOvCrestCurveMistakeCurveSpeedScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: табелата под А1 препоръчва 40, а водачът влиза в слепия завой с 54." },
+      { kind: "annotation", textBg: "Грешка: табелата под А1 препоръчва 40, а водачът влиза в закрития завой с 54." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 90]], targetKmh: 50, stopAtEnd: false },
       { kind: "drive", points: [[X_LANE, 90], [X_LANE, 150], [X_LANE, 205]], targetKmh: 55, stopAtEnd: false },
@@ -214,7 +252,7 @@ export function scOvCrestCurveMistakeCurveSpeedScript(): DriveScript {
       { kind: "annotation", textBg: "В дъгата сцеплението се дели между завиване и спиране — а спирачка тук вече няма да има." },
       { kind: "drive", points: [[ARC_CX, EXIT_Y], [300, EXIT_Y]], targetKmh: 60 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Цялото намаляване се прави ПРЕДИ завоя — в сляпа дъга караш толкова, колкото виждаш." },
+      { kind: "annotation", textBg: "Цялото намаляване се прави ПРЕДИ завоя — в закрита дъга караш толкова, колкото виждаш." },
     ],
   };
 }

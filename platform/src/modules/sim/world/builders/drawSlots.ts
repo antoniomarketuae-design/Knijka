@@ -64,6 +64,7 @@ export interface StaticDrawSlotInput {
   parkingKits: readonly StaticTransform[];
   utilityPoles: readonly { spanM: number }[];
   railings: readonly StaticTransform[];
+  medianBarriers: readonly StaticTransform[];
   /** Merged static surfaces the world builder itself emits (roads, terrain…). */
   staticMeshes: number;
   /** Authored city-kit models, one instanced group per model. */
@@ -125,7 +126,11 @@ export function staticDrawSlotTerms(input: StaticDrawSlotInput): DrawSlotTerm[] 
   }
   add("signs", signSlots);
 
-  add("streetlights", input.streetlights.length > 0 ? 2 : 0);
+  // Housing + lens, plus the NIGHT-ONLY ground pool (wave 8, sc-ov-night-gap:
+  // „every street lamp along the road is dark" — WorldProps.Streetlights).
+  // Counted unconditionally: this is a CEILING, the night flag is not a build
+  // input, and a budget that only holds by day is not a budget.
+  add("streetlights", input.streetlights.length > 0 ? 3 : 0);
   add("furniture", furnitureFamilies(input.streetlights.length));
 
   const treeKinds = new Set<TreeKind>();
@@ -140,6 +145,9 @@ export function staticDrawSlotTerms(input: StaticDrawSlotInput): DrawSlotTerm[] 
   add("parking-kits", input.parkingKits.length > 0 ? 1 : 0);
   add("utility-poles", input.utilityPoles.length > 0 ? 2 : 0);
   add("pavement-parapet", input.railings.length > 0 ? 1 : 0);
+  // Wave 8 — the motorway median barrier is its own instanced mesh, on its own
+  // list, for the reason WorldGeometry.medianBarriers states.
+  add("median-barrier", input.medianBarriers.length > 0 ? 1 : 0);
 
   return terms;
 }
@@ -168,6 +176,7 @@ export function staticDrawSlotInputFromWorld(world: WorldGeometry): StaticDrawSl
     parkingKits: world.parkingKits,
     utilityPoles: world.utilityPoles,
     railings: world.railings,
+    medianBarriers: world.medianBarriers,
     staticMeshes: 13,
     cityModels: CITY_MODELS.length,
     waterSheet: world.waterDecals.positions.length > 0,

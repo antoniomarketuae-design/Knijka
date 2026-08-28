@@ -105,15 +105,93 @@ export interface EnvironmentPreset {
   /**
    * Fog target in SNOW WEATHER (doc 72 AC-08 winter grip — the snowfall
    * veil); blended in by snow intensity. DELIBERATELY LIGHTER than the fog
-   * bank: heavy snowfall shortens usable sight to ~80–120 m (at 0.012,
-   * FogExp2 transmittance is ~40 % at 80 m and ~9 % at 130 m) — you see the
-   * road, you just cannot STOP on it (the grip physics carries the lesson).
+   * bank: heavy snowfall shortens usable sight to ~80–120 m — YOU SEE THE
+   * ROAD, YOU JUST CANNOT STOP ON IT (the grip physics carries the lesson).
    * Cold desaturated white, never the warm haze. This color pulls double
    * duty: SnowFlakes fall through it AND the hemisphere ground bounce lerps
    * toward it (SNOW_GROUND_WHITEN) so the world reads snow-lit — the
    * particles + light blend carry the look; white ground textures remain
    * world-module asset work (the original scope note, now half-closed).
    * FOG weather wins over snow when both are on (fog is the denser veil).
+   *
+   * THE TWO SENTENCES ABOVE ARE THE DESIGN; UNTIL 2026-08-28 THE NUMBERS
+   * BELOW DID NOT IMPLEMENT EITHER OF THEM, AND THAT IS THE WHOLE OF
+   * sc-ac-snow:0c76a9e9 („a student cannot tell sc-ac-snow from sc-ac-fog by
+   * looking at the arrival screen", critical). Both halves were measured on
+   * the corpus frames rather than reasoned:
+   *
+   *  · „~80–120 m usable sight" DID NOT REPRODUCE. At the shipped 0.012,
+   *    FogExp2 transmittance e^−(d·s)² is 50 % at 69 m and 4 % at 150 m —
+   *    a bank, not a veil, and only 1.67× further than the fog lesson's own
+   *    42 m. Both lessons ended in a grey wall inside the same city block,
+   *    which is why the student's whole forward view read the same in each.
+   *    Measured on
+   *    `.audit-frames/w14/frames/sc-ac-snow__pc-right/03-ready.png` against
+   *    `.audit-frames/w13/frames/sc-ac-fog__pc-right/03-ready.png` (same map
+   *    `ac-rain-v1`, same DAY preset — a clean A/B), mean sRGB, L709:
+   *      far road (830,395 60×14)   snow 137.9/153.2/165.0 L150.8
+   *                                 fog  141.5/155.2/166.0 L153.1  → 1.5 %
+   *      sky      (700,140 120×30)  snow 186.4/190.2/195.3 L189.7
+   *                                 fog  176.4/180.5/185.6 L180.0  → 5.4 %
+   *    while the near road — where `roadSurfaceToParams`' snow term reaches —
+   *    is 23.5 % apart (106.3 vs 86.1). The lane's own lane is separated; the
+   *    view down the street is not. That is why this is a HAZE row.
+   *
+   *  · „COLD DESATURATED WHITE, NEVER THE WARM HAZE" WAS FALSE BY
+   *    MEASUREMENT. The shipped day pair was snow #e8ebef (R−B = −7) against
+   *    fog #c9cdd2 (R−B = −9): the SNOW veil was the WARMER of the two, by
+   *    two levels, and at dusk the split was the right sign but only because
+   *    fog is warm there. A claim in this file is worth nothing if the hex
+   *    beside it says otherwise.
+   *
+   * SO THE DENSITIES ARE NOW DERIVED FROM THE SENTENCE, NOT TASTE: solve
+   * e^−(d·s)² = 0.5 for the stated ~80–120 m and take the middle — s ≈
+   * 0.693^0.5 / 100 ≈ 0.0083 by day, shipped as 0.0085: inside the band, and
+   * leaving room for the day < dusk < night thickening every other spec in
+   * this file uses. That lands day sight at 98 m against fog's 42 m — a
+   * 2.35× split, which is a difference a seventeen-year-old reads off the
+   * arrival screen without being told.
+   *
+   * AND THE SEPARATION HAS TO BE THIS ONE, not a prettier veil, because of
+   * what the two lessons TEACH. sc-ac-fog step 5 is «виждаш 50 метра — значи
+   * спирачният ти път … е под 50»: fog is a SIGHT envelope. sc-ac-snow says
+   * nothing about sight and everything about grip («снегът държи около 40 %
+   * от сухото — спирачката спира 2,5 пъти по-дълго»). A picture that renders
+   * snow as a visibility bank teaches the student to pick their speed off
+   * what they can SEE on a surface where that is exactly the wrong rule —
+   * you can see perfectly well on ice. Making the snow street VISIBLE is the
+   * safety content of this constant, not decoration.
+   *
+   * NO DRIVE WAS TAKEN ON THIS, SO IT SHIPS AS A FALSIFIABLE PREDICTION
+   * RATHER THAN AS A PHOTOGRAPH — the R0 look is OWED, and saying so is worth
+   * more than an R0 claim nobody can check. `fogWeather` was deliberately NOT
+   * touched, so the fog lesson is an unmoved control and one re-drive settles
+   * this. Depths were solved out of the frames above (FogExp2 f = 1−e^−(d·s)²,
+   * inverted against the near-road scene colour 94/107/120 and the tone-mapped
+   * veil 186.4/190.2/195.3): the mid rectangle (620,400 120×30) sits at ~46 m
+   * and the far one (830,395 60×14) at ~73 m. Same rectangles, same frames,
+   * next round:
+   *                        BEFORE (w14)   PREDICTED     fog control (w13)
+   *   mid road   L709        127.4          ~118            127.9
+   *   far road   L709        150.8          ~135            153.1
+   *   sky        L709        189.7          ~197            180.0
+   *   sky        R−B          −8.9          ~−15             −9.3
+   * i.e. snow-vs-fog goes from 0.4 % / 1.5 % / 5.4 % apart to roughly
+   * 8 % / 12 % / 10 %, and the sign is the honest one: the SNOW street gets
+   * DARKER at distance because the road is visible through the veil, while
+   * the fog street stays a bright wall. If a re-drive shows the two still
+   * within a few percent, this change is wrong and the residue is in
+   * `SkyDome.tsx`'s SNOW_SKY_WASH / `SimEnvironment.tsx`'s SNOW_*_DIM, not
+   * here.
+   *
+   * WHAT THIS CHANGE DOES NOT FIX, so the next reader does not re-derive it:
+   * the pavements, kerbs, verges and parked cars still carry no snow (only
+   * `world/textures/snowCover.ts`'s five prop materials and the carriageway
+   * do), and thinning the veil UNCOVERS that — a snowed road beside bare
+   * concrete. Measured on the same w14 frame: road L106.3 against pavement
+   * L112.4. Routed to the world module, where the previous lane's own R0
+   * criterion („the road must read paler than the concrete pavement") was
+   * already recorded as unreachable from the road multiply.
    */
   snowWeather: FogSpec;
   /**
@@ -190,8 +268,11 @@ export const SNOW_GROUND_WHITEN = 0.85;
  * (cockpit ~1.2 m, chase ~5 m) sit far below the cap and render full density —
  * the cap is an honest VIEW-AID concession (topdown is an L1 aid view; the
  * graded envelope always follows tick.fog, never the camera). The SNOW haze
- * rides the SAME cap (0.012 × 110 m ≈ 1.32 optical would white the map out
- * too) — one view-aid law for every weather veil.
+ * rides the SAME cap — one view-aid law for every weather veil. It still bites
+ * after the 2026-08-28 veil retune (0.0085 × 110 m ≈ 0.94 optical, above 0.75),
+ * and it has to: what the cap bounds is the DENSITY × ALTITUDE product under a
+ * topdown camera, not the veil's own strength, so a thinner veil moves the
+ * bound further out rather than removing it.
  */
 export const FOG_TOPDOWN_MAX_OPTICAL = 0.75;
 
@@ -295,9 +376,11 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     rainFog: { color: "#7c8794", density: 0.0042 },
     // Day fog: bright desaturated grey (fog scatters daylight) — ~50 m sight.
     fogWeather: { color: "#c9cdd2", density: 0.02 },
-    // Day snow: bright COLD white haze, lighter than fog (~80–120 m usable
-    // sight) — the snowfall veil, not a blinding bank.
-    snowWeather: { color: "#e8ebef", density: 0.012 },
+    // Day snow: bright COLD white veil — 50 % transmittance at 98 m against
+    // the fog bank's 42 m, so the street ahead SURVIVES the snowfall and does
+    // not survive the fog. R−B = −15 (fog's is −9): now actually the colder
+    // of the two, which the docblock has claimed since it was written.
+    snowWeather: { color: "#eef4fd", density: 0.0085 },
     exposure: 1.15,
   },
 
@@ -336,9 +419,11 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     rainFog: { color: "#787c84", density: 0.005 },
     // Dusk fog: the low warm light barely tints the bank.
     fogWeather: { color: "#aca7a3", density: 0.022 },
-    // Dusk snow: cold grey-blue veil — the day < dusk < night ordering of the
-    // fog specs, mirrored.
-    snowWeather: { color: "#c3c6cc", density: 0.013 },
+    // Dusk snow: cold grey-blue veil, sight ~90 m. The sharpest of the three
+    // splits and the cheapest: dusk FOG is a WARM bank (#aca7a3, R−B = +9)
+    // and dusk snowfall is a cold one (R−B = −30), so the two dusk lessons
+    // separate on hue before they separate on depth.
+    snowWeather: { color: "#ccd8ea", density: 0.0092 },
     exposure: 1.1,
   },
 
@@ -379,9 +464,12 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     // Night fog: a faintly-lit dark grey (streetlights glow into the bank),
     // denser than day — night fog is the blindest condition we render.
     fogWeather: { color: "#1a2028", density: 0.024 },
-    // Night snow: a faintly-lit cold grey veil (headlights glitter into the
-    // flakes), densest of the three snow specs.
-    snowWeather: { color: "#252b34", density: 0.015 },
+    // Night snow: a faintly-lit cold BLUE-grey veil (headlights glitter into
+    // the flakes), densest of the three snow specs — sight ~79 m against
+    // night fog's ~35 m, the blindest thing this rig renders. Lifted above
+    // night fog's #1a2028 in value as well as in hue: a snowfall throws the
+    // headlights back at you, a fog bank swallows them.
+    snowWeather: { color: "#2f3c50", density: 0.0105 },
     exposure: 0.95,
   },
 };

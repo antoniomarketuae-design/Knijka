@@ -660,23 +660,70 @@ export function HudToasts({
   return (
     // The WRAPPER stays inert so the column never eats a click meant for the
     // road behind it; only the cards themselves are `pointer-events-auto`.
-    <div
-      aria-live="polite"
-      data-hud="toasts"
-      className="pointer-events-none flex flex-col items-end gap-2 select-none"
-    >
-      {shown.map((t) => (
-        <ToastCard
-          key={t.id}
-          event={t.event}
-          ageBg={
-            t.raisedAtMs !== undefined && toastCarriesAge(t.event.kind)
-              ? toastAgeBg(t.raisedAtMs, nowMs)
-              : null
-          }
-          onDismiss={onDismiss ? () => onDismiss(t.id) : null}
-        />
-      ))}
+    <div className="pointer-events-none flex flex-col items-end gap-2 select-none">
+      {/* ═══════════════════════════════════════════════════════════════════
+          `[data-hud="toasts"]` HOLDS CARDS AND ONLY CARDS — 2026-08-28, w8.
+
+          THE BOX IS NOT DECORATION, IT IS A MEASURING INSTRUMENT. The shell
+          counts the fold off THIS element's children and says so at its own
+          site: „The rows are read off `[data-hud="toasts"]`'s children —
+          `HudToasts` owns that box, so this measures what is actually painted"
+          (`LessonPlayShell.tsx`, `measureToastFold`, ~5185). Those children
+          then go through `rowsFullyBelowFold`, whose count picks the SENTENCE
+          the fold control prints, and that sentence is a claim about GRADED
+          FAULTS: „N is the number of graded faults the student has not seen a
+          pixel of" (`LessonPlayShell.tsx`, the label, ~6531).
+
+          «Изчисти известията» WAS THE LAST OF THOSE CHILDREN. It renders
+          exactly when `shown.length > 1`, i.e. on the busiest moment the column
+          has, and it is a CONTROL — so from the moment a second fault arrives
+          the counter had one more „graded fault" in it than the drive
+          contained, and the miscount was always in the direction of alarm.
+
+          MEASURED, AND THE FRAME PROVES IT ARITHMETICALLY RATHER THAN BY EYE.
+          `.audit-frames/w14/frames/sc-ac-crosswind__pc-wrong/04-t021s.png`
+          (1440 × 900, driven on 6399a8d, and this file is byte-identical from
+          there to HEAD) prints «↓ ОЩЕ 2 ИЗВЕСТИЯ — ПОКАЖИ» under a single
+          «Удар в пешеходец» card. `TOAST_MAX_VISIBLE` is 2. One card is on the
+          glass, so AT MOST ONE other notification can exist — «още 2 известия»
+          is not a debatable reading, it is impossible. The third child was this
+          button. Same sentence on
+          `w14/frames/sc-junction-rhr__pc-wrong/04-t016s.png`.
+
+          WHY IT IS WORTH A WAVE. The student is seventeen and the card he is
+          reading is cut mid-clause («…Затова към пешеходците се кара с»). The
+          one control offered to him announces OTHER notifications, and it
+          over-announces them. He presses it expecting a second fault, gets the
+          rest of a sentence and a button, and learns that the count on a fault
+          column is not to be trusted — on the surface whose entire job is to
+          make him believe the verdict enough to change how he drives.
+
+          THE FIX IS THE BOX AND NOT THE ARITHMETIC. `rowsFullyBelowFold` is
+          right; it was fed a control. Nothing about the button changes — same
+          markup, same classes, same place on the screen, still inside the
+          shell's scroller so a wheel still reaches it — it simply stops being a
+          row in the list the instrument reads. The one thing that moves is
+          `aria-live`, which follows the cards: a polite region should announce
+          faults, not the appearance of the control that clears them.
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div
+        aria-live="polite"
+        data-hud="toasts"
+        className="flex w-full flex-col items-end gap-2"
+      >
+        {shown.map((t) => (
+          <ToastCard
+            key={t.id}
+            event={t.event}
+            ageBg={
+              t.raisedAtMs !== undefined && toastCarriesAge(t.event.kind)
+                ? toastAgeBg(t.raisedAtMs, nowMs)
+                : null
+            }
+            onDismiss={onDismiss ? () => onDismiss(t.id) : null}
+          />
+        ))}
+      </div>
       {onDismissAll && shown.length > 1 ? (
         <button
           type="button"

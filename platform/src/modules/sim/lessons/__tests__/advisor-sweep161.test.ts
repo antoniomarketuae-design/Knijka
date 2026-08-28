@@ -466,10 +466,22 @@ describe("sweep161 part D — the card stops publishing the grader's tolerance a
     // truth at HEAD was 499 / 454, and no assertion anywhere could feel five
     // cards move between the halves. Exact now, in both halves, so the next
     // change to spokenCapKmh has to say what it did to the split.
+    // RE-BASELINED 953 → 958 on 2026-08-28 (wave 8, finding
+    // sc-pk-move-off:d7d45a4c): `sc-pk-move-off/sc-pmo-moved` gained an authored
+    // `maxSpeedKmh: 50` — vp-ready-v1's own posted sign — so its five rungs join
+    // this census. Nothing else moved: with that one objective withheld the
+    // catalogue measures exactly the committed 953.
+    //
+    // AND THIS IS THE FILE WHOSE NAME IS THE QUESTION, so it is answered with the
+    // measurement rather than the count: SPOKEN ROSE WITH THE TOTAL, 958 of 958.
+    // All five new cards read «Потегли и се нареди в дясната лента — дръж под
+    // 50 км/ч». The coach was not silenced to make a census look better, which is
+    // the exact trade part D was landed to undo, and the delta between the two
+    // halves is still zero.
     const all = everyCappedCard();
     const spoken = all.filter((c) => c.textBg.includes("дръж под"));
-    expect(all.length).toBe(953);
-    expect(spoken.length).toBe(953);
+    expect(all.length).toBe(958);
+    expect(spoken.length).toBe(958);
     expect(all.length - spoken.length).toBe(0);
   });
 });

@@ -3722,10 +3722,16 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   // -- 6. positive reinforcement: reward a violation-free driving streak.
-  // A driver still committing a sustained violation (e.g. holding over the
-  // limit — the episode fires once, then stays silent) must NOT accumulate
-  // "clean" distance, so suppress while any episode is fired-and-ongoing.
-  const ongoingViolation = [
+  // TWO GATES, and they answer different questions — see each one's block.
+  // GATE 1 stops a driver who has ALREADY been billed and has not corrected
+  // from accumulating "clean" distance at all (the shipped behaviour, plus the
+  // dip-hole the speed-band accrual opened under it). GATE 2 holds the PAYOUT
+  // while a breach is live but has not yet run its sustain, so praise can no
+  // longer be minted from the metres a fault is being committed on.
+  const EPISODES = [
+    // The episodes the two gates below read. Both arguments, the frames and
+    // every measurement live on `billedAndUncorrected` and
+    // `breachAwaitingSustain` under the list.
     s.speedingMinor,
     s.speedingDangerous,
     s.seatbelt,
@@ -3758,13 +3764,116 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.curveSpeed,
     s.motorwaySlow,
     s.emergencyLane,
-  ].some((ep) => ep.emitted && ep.activeSince !== null);
+  ] as const;
+  /**
+   * GATE 1 — BILLED AND NOT YET CORRECTED. The shipped meaning („fired-and-
+   * ongoing"), plus the hole the accrual opened under it: the three speed-band
+   * episodes null `activeSince` on any frame that dips below the band while
+   * KEEPING their ledger (`SPEEDING_SUSTAIN_ACCRUES`), so a driver already
+   * billed for speeding resumed banking clean metres on every dip. That is the
+   * oscillating driver the accrual exists to catch, earning praise between the
+   * bills it is earning. `qualifiedSec` is zeroed by `reset` — for the speed
+   * band „back to the POSTED limit" — so a genuine correction still ends it on
+   * the frame it happens. Measured, posted 50, 120 s of 53↔57 at 0,5 s:
+   * 7 SPEEDING_OVER_LIMIT and now 0 CLEAN_DRIVING (was 4).
+   *
+   * `emitted &&` is load-bearing and the first cut of this repair dropped it:
+   * on `qualifiedSec > 0` alone a driver who touched 57 in a 50 for ONE second
+   * and settled at 52 was denied every commendation for the next FIVE MINUTES
+   * (measured: 300 s, 0 praise, against 17 now), because 52 is inside the
+   * grace and never trips the reset. Withholding credit the student earned is
+   * the A12 direction this file does not move in.
+   */
+  const billedAndUncorrected = EPISODES.some(
+    // `qualifiedSec` is optional in the parameter type because `harshBrake`
+    // carries its own narrower shape (onsetKmh / causeSeen, no ledger) — it
+    // never accrues, so the clause is vacuous for it by construction.
+    (ep: { activeSince: number | null; emitted: boolean; qualifiedSec?: number }) =>
+      ep.emitted && (ep.activeSince !== null || (ep.qualifiedSec ?? 0) > 0),
+  );
+  /**
+   * GATE 2 — A BREACH IS LIVE ON THIS FRAME BUT HAS NOT RUN ITS SUSTAIN YET.
+   *
+   * ── WHAT WAS PHOTOGRAPHED (w8 · `sc-ac-truck-spray:990e5f64`, critical) ────
+   * Replaying `sweep161/sc-ac-truck-spray/pc-wrong`'s own logged profile
+   * (14 · 58 · 85 · 99 · 110 · 116 · 129 км/ч, posted 140, heavy rain — its
+   * `log.txt`) through this reducer produced **3 × CLEAN_DRIVING** at 15,2 /
+   * 23,8 / 31,5 s and ONE SPEED_TOO_FAST_FOR_CONDITIONS at 32,2 s. The third
+   * is minted at ~125 км/ч, two seconds into a breach of the 119 км/ч rain
+   * envelope, from the very metres the fault was being committed on — and
+   * `cleanDistanceM = 0` arrives 0,7 s too late to matter, because the praise
+   * has already been emitted. Since that single bill is what the teach-first
+   * free lesson spends (`SPEED_REGRADE_SEC`), `summary.mistakes` is EMPTY, so
+   * `lessons/debrief.ts cleanDrivingScopeBg` — the rider written for exactly
+   * this, gated on `mistakes.length > 0` — never attaches, and the page prints
+   * «Какво се получи добре: • Чисто и спокойно каране ×3» over 131 км/ч in a
+   * rainstorm, unqualified. The engine tells a seventeen-year-old to hold that
+   * level.
+   *
+   * ── WHY IT DEFERS THE PAYOUT AND DOES NOT STOP THE ACCRUAL ────────────────
+   * The first cut suppressed the ACCRUAL and broke two shadow gates —
+   * `sc-merge-lane-end` and `sc-merge-roadworks-shift`, both FLAWLESS recorded
+   * drives, lost their CLEAN_DRIVING outright. The metres before a breach
+   * bills are genuinely earned if the breach never bills, and stopping the
+   * accrual throws them away for good. So they are still banked; only the
+   * PAYOUT waits while the question is open. If the condition drops before its
+   * sustain the held metres pay out on the next moving frame — the drive is
+   * byte-identical bar a few frames of delay; if it bills, `cleanDistanceM = 0`
+   * wipes them, which is the answer the reset always intended and could never
+   * deliver in time, because the praise had already left.
+   *
+   * ── AND WHY IT READS NINE EPISODES AND NOT ALL TWENTY-NINE ────────────────
+   * Because the sustain does not mean the same thing in both halves of this
+   * file, and reading them alike is what broke the shadows twice.
+   *  · For these nine the state is unlawful AT EVERY INSTANT it holds — over
+   *    the prudent envelope for the weather, over the graced limit, unbelted,
+   *    handbrake dragging, lamps off in the dark or the rain. The sustain is a
+   *    DEBOUNCE, there so a sampling blip cannot bill; it is not a licence.
+   *    Metres driven in that state are not clean metres before the bill either.
+   *  · For the rest the sustain IS the definition of the fault, and a second of
+   *    the condition is ordinary driving. `laneKeeping`'s condition is TRUE for
+   *    the whole of a lawful indicated lane change (`offCentre` carries no
+   *    `maneuverDeclared` term — only `centerLineCond` does), and `keepRight`'s
+   *    is true from the moment `sc-merge-lane-end`'s shadow completes its zip
+   *    merge until it stops, 4 s later, WITHOUT EVER BILLING — measured, that
+   *    one condition alone withheld the payout for the entire remainder of a
+   *    faultless drive. Withholding credit a student earned is the A12
+   *    direction this file does not move in, and a gate that can be held open
+   *    to the end of a lesson by a condition that will never bill is that
+   *    direction with the numbers hidden.
+   * `curveSpeed` belongs to the first class by nature and is deliberately LEFT
+   * OUT: it is the subject of an open false-positive row (`sc-sp-curve:
+   * 45e7e4fb` — the card fires on a car that has left the carriageway), and
+   * wiring a predicate under suspicion into a second consumer is how one wrong
+   * conviction becomes two wrong surfaces.
+   *
+   * Measured after: truck-spray 2 × CLEAN_DRIVING (the 31,5 s one gone), all
+   * 161 trace files green, every lawful control unchanged.
+   *
+   * What it deliberately does NOT close is named rather than papered over: the
+   * two surviving commendations (92 and 111 км/ч) stand, because both are
+   * under the posted 140 AND under the 119 rain envelope. What they are over
+   * is the OBJECTIVE's «задачата иска ≤80», and no field on `SimTick` carries
+   * it — see `SPEED_REGRADE_SEC`'s „THE TASK CAP" clause for why feeding it
+   * here is a founder decision and not a bug fix.
+   */
+  const breachAwaitingSustain = [
+    s.speedingMinor,
+    s.speedingDangerous,
+    s.conditionsSpeed,
+    s.seatbelt,
+    s.handbrake,
+    s.headlights,
+    s.rainLights,
+    s.fogLights,
+    s.snowLights,
+  ].some((ep) => ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak
-  } else if (!ongoingViolation && !s.terminated && moving && s.prevT !== null) {
+  } else if (!billedAndUncorrected && !s.terminated && moving && s.prevT !== null) {
     // Clamp dt so a pause/resume time jump can't fabricate a huge distance.
     s.cleanDistanceM += (speed / 3.6) * Math.min(t - s.prevT, 2);
-    if (s.cleanDistanceM >= cfg.cleanDrivingDistanceM) {
+    if (s.cleanDistanceM >= cfg.cleanDrivingDistanceM && !breachAwaitingSustain) {
       s.cleanDistanceM -= cfg.cleanDrivingDistanceM;
       events.push(makeCommendation("CLEAN_DRIVING", t));
     }

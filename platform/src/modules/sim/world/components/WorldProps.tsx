@@ -1910,6 +1910,61 @@ function RailBarriers({
 // Streetlights (GLB housing + emissive head gated on night)
 // ---------------------------------------------------------------------------
 
+/** Diameter of the pool one lamp throws, m — a Bulgarian street lamp on a
+ *  ~9 m column with a 1.5 m arm lights a patch roughly two lane widths across
+ *  at the perceptual road scale. Big enough that consecutive lamps at
+ *  SCENARIO_STREETLIGHT_SPACING_M read as a chain of pools rather than as
+ *  isolated spots; small enough that the road between them is still dark,
+ *  which is what the drill's «тъмно е» has to stay true of. */
+const LAMP_POOL_DIAMETER_M = 16;
+/** How far along the lamp's own arm the pool's centre sits, m — over the
+ *  carriageway rather than over the column, because that is where the arm
+ *  reaches and where a lamp actually throws. */
+const LAMP_POOL_ARM_REACH_M = 2.2;
+/** Clearance over the placement's own base, m — and the base is the foot of the
+ *  COLUMN, which stands on the pavement at `SIDEWALK_TOP_Y` (ROAD_Y 0.02 +
+ *  CURB_HEIGHT_M 0.12 = 0.14). This read „only has to be off the pavement
+ *  plane, never off the road's" while the disc was offset onto the footway; now
+ *  that it is offset over the carriageway (see `geo.translate` below) the same
+ *  0.05 is 0.17 m above the tarmac, not 0.05. Additive with `depthWrite: false`
+ *  and `renderOrder: 2`, so nothing z-fights either way — but a flat disc that
+ *  floats parallaxes, and an 8 m radius seen from a 1.2 m eye at 40 m carries
+ *  that float several metres down the view ray. LEFT AT 0.05 DELIBERATELY: the
+ *  right plane is a question for a night frame (doc 66 R0), not for arithmetic,
+ *  and the 16 m disc straddles the kerb so there is no single correct height. */
+const LAMP_POOL_Y_M = 0.05;
+/** Peak alpha. LOW ON PURPOSE — see the block in `Streetlights`: the drill this
+ *  repairs grades judging a gap by headlights on an unlit road, and a street lit
+ *  like a boulevard takes that skill away. */
+const LAMP_POOL_OPACITY = 0.34;
+/** Warm sodium-ish pool, the same family as the lens emissive (0xffe6c2) so the
+ *  two read as one lamp. Fictional, like every colour in this kit (ADR-001). */
+const LAMP_POOL_COLOR = "255, 226, 186";
+
+/**
+ * A radial falloff disc: opaque-white at the centre, transparent at the rim,
+ * with a squared falloff so it reads as light and not as a painted circle. One
+ * 128 px canvas for the whole district; the material is additive, so the alpha
+ * channel is doing the shaping and the RGB stays constant.
+ */
+function makeLampPoolTexture(): THREE.CanvasTexture {
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, `rgba(${LAMP_POOL_COLOR}, 1)`);
+  g.addColorStop(0.35, `rgba(${LAMP_POOL_COLOR}, 0.55)`);
+  g.addColorStop(0.7, `rgba(${LAMP_POOL_COLOR}, 0.14)`);
+  g.addColorStop(1, `rgba(${LAMP_POOL_COLOR}, 0)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function Streetlights({
   world,
   assets,
@@ -1954,10 +2009,111 @@ function Streetlights({
     [glow],
   );
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // THE LAMP THAT LIT NOTHING — wave 8, sc-ov-night-gap:5085441f (critical).
+  //
+  // «A lesson graded on judging distance by headlights has no lit lamps …
+  // every street lamp along the road is dark. The only light in the scene is
+  // the ego's own beam.» Two of that row's three clauses were refuted by
+  // measurement in an earlier wave (the lead car's tail lamps read 2.2× their
+  // daylight red at night; the oncoming headlights were counted in pixels);
+  // the surviving one was routed here with `emissiveIntensity: night ? 2.6 : 0`
+  // quoted as the confirming line — and the quote is the whole diagnosis.
+  //
+  // That intensity is real and it is on the `lamp_lit` MATERIAL only, which in
+  // `street_lamp.glb` is one thin lens strip on the underside of the arm. At
+  // 700 % on the frame it is there: a warm sliver a few pixels long on an
+  // otherwise black head, 40 m away. So the lamp is not unlit — it is a lamp
+  // that lights NOTHING. There is no pool on the road, no wash on the pole, no
+  // reason for the object to exist in the picture at all, and a student who
+  // has to judge distance in the dark is given a row of poles that neither
+  // help him nor tell him the road is lit.
+  //
+  // WHAT THIS ADDS, and why it is a decal and not a light. Twenty-plus
+  // `PointLight`s is a forward-renderer's per-fragment loop and would cost more
+  // than the whole static world; the product's own precedent for „a light that
+  // is a picture" is `ScenarioObstacles`' blob shadow and `RouteGuidance`'s
+  // ground pool. So each lamp gets ONE additive disc on the tarmac under its
+  // arm — one instanced draw for the whole district, no depth write, no
+  // shadowing, gone entirely by day.
+  //
+  // KEPT SUBTLE ON PURPOSE, and this is the part the lesson constrains: the
+  // drill is «Тъмно е и си извън града» and it grades judging a gap by
+  // headlights. A street lit like a boulevard would take that skill away, which
+  // is the same trap `snowCover.ts` records for sign faces. LAMP_POOL_OPACITY
+  // is therefore low enough that the road under a lamp reads as lit ground and
+  // not as daylight, and `additive` means it can only ever brighten — the lane
+  // markings under it stay exactly as legible as they were.
+  const pool = useMemo(() => {
+    if (!night || lights.length === 0) return null;
+    const tex = makeLampPoolTexture();
+    const geo = new THREE.PlaneGeometry(LAMP_POOL_DIAMETER_M, LAMP_POOL_DIAMETER_M);
+    geo.rotateX(-Math.PI / 2);
+    const material = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      opacity: LAMP_POOL_OPACITY,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    });
+    // The pool sits on the ROAD under the arm, not under the column: the arm
+    // reaches out over the carriageway, which is where a lamp actually throws.
+    // `createInstancedMesh` gives each instance the placement's yaw, so the
+    // offset is applied in the lamp's own frame by baking it into the plane.
+    //
+    // +Z IS THE ROAD — AND THIS SHIPPED AS −Z (fixed at wave 8 integration).
+    // The comment above was right and the line under it did the opposite, so
+    // here is the whole chain, re-derived, because a sign flip made on a wrong
+    // derivation lands 4.4 m out in the OTHER direction:
+    //
+    //   1. `street_lamp.glb` runs its arm out along local +X — steel_black
+    //      x −0.075…1.116 (column + arm), lamp_head 0.741…1.299, lamp_lit
+    //      0.791…1.249, all with |z| ≤ 0.12, walked out of the accessor bounds.
+    //   2. Both streetlight bakes above apply `rotateY: -Math.PI / 2`, and
+    //      R_y(−π/2)·(1,0,0) = (0,0,+1): AFTER THE BAKE THE ARM IS ON +Z.
+    //      Neither bake sets `centerXZ`, so the instance origin stays the foot
+    //      of the mast and this offset is measured from the column.
+    //   3. `yawFromFacing` (builders/mesh.ts) is by definition the yaw that
+    //      aims local +Z along a placement's facing.
+    //   4. `props.ts` sets that facing to `mul(r, -side)` against a column
+    //      standing at `+side · (halfWidth + SIDEWALK_WIDTH_M + 0.4)` —
+    //      «Arm reaches over the road: face toward the centerline».
+    //
+    // So +Z is the carriageway and −Z is the footway. On sp-creep-v1 the
+    // column stands 16.02 m from its centreline and the disc's bright middle
+    // was landing at 18.22 m instead of 13.82 m: the only pool of light in the
+    // scene, pooled on the pavement, on the drill («тъмно е и си извън града»)
+    // whose whole subject is what a driver can see at night.
+    //
+    // It had no gate at all — `drawSlots` counts families and is blind to
+    // direction. `__tests__/lamp-pool-direction.test.ts` now re-measures every
+    // link of the chain above off the shipped GLB and this file's own source,
+    // and holds the SIGN rather than the number, so a re-export or a changed
+    // bake angle has to satisfy the claim instead of invalidating the gate.
+    geo.translate(0, LAMP_POOL_Y_M, LAMP_POOL_ARM_REACH_M);
+    const mesh = createInstancedMesh(geo, material, lights, {
+      name: "streetlight-pools",
+    });
+    mesh.renderOrder = 2;
+    return { tex, geo, material, mesh };
+  }, [lights, night]);
+  useEffect(
+    () => () => {
+      if (!pool) return;
+      pool.tex.dispose();
+      pool.geo.dispose();
+      pool.material.dispose();
+      pool.mesh.dispose();
+    },
+    [pool],
+  );
+
   return (
     <group name="streetlights">
       <primitive object={housing} />
       <primitive object={glow.mesh} />
+      {pool ? <primitive object={pool.mesh} /> : null}
     </group>
   );
 }
@@ -2244,8 +2400,25 @@ function B65Furniture({
         }),
       );
     }
+    // WAVE 8 — the motorway median barrier (sc-mw-emergency-lane: „no median
+    // barrier between the carriageways … it does not read as a магистрала").
+    // Its own mesh and its own name, not appended to the parapet's list: the
+    // two objects have opposite contracts (a parapet on a motorway is the
+    // defect `motorway-is-not-a-street.test.ts` convicts) and a reader looking
+    // at the scene graph has to be able to tell them apart. Same panel geometry
+    // and the same steel material — the honest stopgap the builder documents.
+    if (world.medianBarriers.length > 0 && assets.railingPanel) {
+      out.push(
+        createInstancedMesh(
+          assets.railingPanel,
+          assets.materials.streetSteel,
+          world.medianBarriers,
+          { castShadow, name: "motorway-median-barrier" },
+        ),
+      );
+    }
     return { out, disposables };
-  }, [assets, world.utilityPoles, world.railings, preset.castShadows]);
+  }, [assets, world.utilityPoles, world.railings, world.medianBarriers, preset.castShadows]);
 
   useEffect(
     () => () => {

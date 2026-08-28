@@ -363,6 +363,108 @@
  * 5 m of bay depth inside the drawn lane, measured at −2.13…−2.53 m by §2 of
  * the success-path battery, and it is still not authorable from this file.
  */
+
+/**
+ * THE LANE-HOLDER'S CERTIFICATE — wave 8, 2026-08-28. Repair (1) of the two the
+ * note above could only write down, plus the sweep that turns its arithmetic
+ * into a measurement, plus the four rows it does NOT close and why.
+ *
+ * WHAT WAS MEASURED, through the production chain and not by argument:
+ * `compileScenario(spec, rung)` → `parseObjectiveParams` → `createEvalState` →
+ * `stepObjective`, driven with a car that CREEPS UP THE LANE IT SPAWNS IN at
+ * 5 км/ч from y = −30 and halts on the setup mark's own y. All ten cells
+ * (four drills × the rungs) came back CREDITED, at every rung:
+ *
+ *   drill              spawn x   first body contact on that line   setup mark
+ *   sc-park-van          4.06      y = −8.25                        y =  6.30
+ *   sc-park-45-rev       4.06      y = −11.00                       y =  6.00
+ *   sc-park-wall         4.06      y = −8.25                        y = 11.70
+ *   sc-park-double       4.06      y = −8.25                        y =  6.30
+ *   sc-park-gap-short    4.06      NONE (clearance +0.470 m)        y =  5.67
+ *
+ * So on the four blocked drills the car is INSIDE a parked body 14–20 m before
+ * it reaches the mark, and «✓ Задача 1: спри в изходната позиция …» is printed
+ * anyway. That is the frame the wave-7 note photographed, reproduced
+ * deterministically instead of once.
+ *
+ * WHY A RADIUS COULD NEVER HAVE CLOSED IT, which is why repair (2) is not the
+ * one taken. The grace capsule's lateral bound is `radiusM` about the STUDENT'S
+ * OWN approach axis, not about the road, so shrinking the disc slides the
+ * accepted band down the aisle instead of removing it: at radiusM 2 a car
+ * halted at (4.06, 9.88) on lot-wall-v1 — still in the row — sits at lateral
+ * 2.00 m along −3.05 m against a −7 m bound and is still credited.
+ * `requireNoContact` is not a tolerance and has no such geometry.
+ *
+ * WHY THE TERM IS EXACTLY RIGHT HERE, and this is the line the table above
+ * exists to prove: on these four districts the first contact is SOUTH of the
+ * mark on every rung, so „reached the mark having struck nothing" IMPLIES
+ * „left the curb lane". The demand therefore certifies the act the briefing's
+ * step 1 asks for, without claiming a lateral coordinate no gate can read.
+ *
+ * AND IT REFUSES NOBODY ELSE. Negative control, same sweep with a CLEAN ledger:
+ * the patched gate and the shipped gate agree on every one of the twenty cells
+ * — `noContactHonoured` reads `undefined` as „unknown", never as „yes". The
+ * committed shadow completes both objectives at all five rungs on all four
+ * drills with the key in place, at the same seconds as before (29.4 → 40.8 s
+ * van, 29.3 → 40.6 s 45-rev, 31.5 → 43.9 s wall, 30.5 → 42.9 s double). And a
+ * certificate already EARNED cannot be withdrawn: the engine never re-steps a
+ * completed objective, so a contact during the reverse cannot retract a halt
+ * that was clean when it was performed.
+ *
+ * AND THE DRIVE STILL ENDS. `engine.ts` `contactVoidsObjective` returns true
+ * for these gates, and the finish zone arms whenever the chain is not standing
+ * on its terminal objective — so the student who struck the row reaches the
+ * debrief that explains the ПТП rather than having to quit and forfeit the
+ * attempt. `objectiveBg` on all four now states the second price in words
+ * (THEO-4: the refusal explains itself before it happens, not after).
+ *
+ * gap-short IS DELIBERATELY NOT IN THE SET, and the table says why: its lane
+ * holds +0.470 m and its lane-holder strikes nothing, so the key would refuse
+ * nobody there and could only ever punish a contact made somewhere else.
+ *
+ * THE ONE EDIT THIS LANE STILL MAY NOT MAKE, unchanged in shape from the note
+ * above: `lessons/__tests__/reach-zone-no-contact.test.ts` §2 is a deliberate
+ * catalogue-wide census —
+ *   expect(bound).toEqual(["sc-hazard-obstacle/sc-obs-cleared"])
+ * — and it must become the five-name list (sc-obs-cleared plus sc-pvn-setup,
+ * sc-p45r-setup, sc-pwl-setup, sc-pdb-setup). That census is doing its job:
+ * it is what makes a second author read this block before adding a sixth.
+ *
+ * ── AND THE FOUR SWEEP ROWS THIS DOES NOT CLOSE, because they are not true ──
+ *
+ * «Задача 2 never ticks, so the lesson cannot be completed» (45-rev, wall).
+ * Answered with a RATE rather than a photograph, measured on the production
+ * evaluator by rigidly displacing each drill's committed shadow in its own BAY
+ * FRAME and asking which displacements still complete. The completing set is a
+ * box, not a point, at every one of the twenty cells:
+ *
+ *   rung   along the bay      across it        yaw
+ *   L1     −0.70 … +0.75 m    ±0.375–0.475 m   ±15°
+ *   L3     −0.45 … +0.50 m    ±0.375–0.475 m   ±10°
+ *   L5     −0.40 … +0.50 m    ±0.375–0.425 m   ±8–8.5°
+ *
+ * — i.e. „inside the lines, straight, at rest", which is the manoeuvre. Not one
+ * cell is empty. The 0-for-N across the audit rounds is the DRIVER: every leg
+ * of these four in `.audit-frames/{proof,proof2,rebase,w10-*,w11..w14}` is
+ * TRACKING-disqualified by the harness's own log (WANDERED at |err| median
+ * 31.2°, or BLIND at 35–38 % ribbon), and a reverse park has to finish within
+ * 8–15° of the bay axis.
+ *
+ * «The correct drive collides — the staged geometry is at fault» (gap-short).
+ * Its spawn lane clears every armed body by +0.470 m and the free
+ * straight-line corridor is x ∈ [−8, +4.5], which CONTAINS the spawn lane. The
+ * cited leg's own neighbouring frame,
+ * `sweep161/sc-park-gap-short/mobile-right/04-t156s.png`, is open grass with no
+ * road and no parked car in it, 16 s before the ПТП card. The lot ran out; the
+ * geometry did not close.
+ *
+ * «Both right legs collide twice, for 20 наказателни точки» (wall). The
+ * freshest round for this drill, `.audit-frames/w10-4`, bills ONE опасна on
+ * both legs — `_audit-debrief.json` "score": 10 on pc-right and on
+ * mobile-right. At w14 the 20 is a collision plus «Превишаване с повече от
+ * 10 км/ч», and that one is the harness's own launch: the card reads «Отчетена
+ * скорост 39,5 км/ч при разрешени 20» at t = 1 s, before the lot.
+ */
 import type { ScenarioSpec } from "./types";
 import type { ParkingBaySpec } from "../../contracts";
 
@@ -469,8 +571,23 @@ export const SC_PARK_GAP_SHORT: ScenarioSpec = {
   family: "parking",
   tagsBg: ["паркиране", "успоредно", "заден ход", "късо място", "прецизност"],
   titleBg: "Късо място край бордюра",
+  // CLAIM GATE — wave 8, 2026-08-28. The sentence sold TWO things as halves of
+  // the two ticks and neither gate reads either. Measured through the
+  // production evaluator on this drill's own compiled rungs:
+  //   · «на половин метър от предната кола» — the setup disc accepts
+  //     x ∈ [−1.30, 8.70] at L3/L4/L5 and x ∈ [−3.80, 11.20] at L1, i.e. wider
+  //     than the whole lot; every lateral position a car can hold here is
+  //     inside it. (The NUMBER is honest — the shadow's halt leaves 0.48 m to
+  //     the neighbour's paint edge — it is simply not what ticks.)
+  //   · «от първи опит» — `stepParkInBay`'s `done` is
+  //     `inBay && stopped && entryOk && aligned && heldFor >= holdSec`
+  //     (objectives.ts). `attempts` appears in none of those terms; it is the
+  //     ECONOMY rubric's, which is where the sentence now sends it.
+  // Both duties keep their place — the half-metre in briefing step 2 and the
+  // teach card, the single attempt in `rubric.economy` — and the sentence now
+  // says which surface pays for each (THEO-4: the judgement explains itself).
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция на половин метър от предната кола — в късо място тя е единствената, която работи; после влез на заден ход от първи опит, защото поправка няма къде да се направи.",
+    "Две задачи, в този ред: първо спри в изходната позиция до предната кола; после влез на заден ход в късото място и спри напълно в очертанията. Половин метър встрани и влизане от първи опит не са отметки, а цена: отметката за Задача 1 мери само къде спираш и колко бавно, а Задача 2 се зачита и от втория опит — но половин метър е единствената изходна позиция, от която седем метра стигат, и всеки допълнителен опит сваля звезди от оценката на маневрата.",
   archetypeIds: ["PK-01"],
   conceptIds: ["c-reversing", "c-maneuver-principles", "c-safety-space"],
   map: {
@@ -758,7 +875,7 @@ export const SC_PARK_VAN: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "перпендикулярно", "ограничена видимост"],
   titleBg: "Гнездо до бус — заден ход с ограничена видимост",
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция покрай свободното гнездо; после влез на заден ход, като държиш работещо разстояние от буса — той е по-широк от очертанията си и закрива всичко зад себе си. Излизането в средата на алеята не е една от двете задачи — редът стои в лентата, в която тръгваш, и допирът до него се наказва като опасна грешка, а не като пропусната отметка.",
+    "Две задачи, в този ред: първо спри в изходната позиция покрай свободното гнездо; после влез на заден ход, като държиш работещо разстояние от буса — той е по-широк от очертанията си и закрива всичко зад себе си. Излизането в средата на алеята не е трета задача, а условието за първата: бусът и редът стоят в лентата, в която тръгваш, и допирът до тях струва двойно — опасна грешка по изпитния лист И незачетена Задача 1, защото позиция, стигната през чужда кола, не е изходна позиция.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-mirrors-blind-spots", "c-safety-space"],
   map: {
@@ -819,7 +936,10 @@ export const SC_PARK_VAN: ScenarioSpec = {
     {
       id: "sc-pvn-setup",
       titleBg: "Задача 1: спри в изходната позиция покрай гнездото",
-      params: { kind: "reachZone", x: 0.9, y: 6.3, radiusM: 5, maxSpeedKmh: 6 },
+      // THE CONTACT TERM — wave 8, and see THE LANE-HOLDER'S CERTIFICATE at the
+      // top of this file for the sweep and the arithmetic. Nothing else moved:
+      // x, y, radiusM and the cap are the values parking3-claim-gates §2 pins.
+      params: { kind: "reachZone", x: 0.9, y: 6.3, radiusM: 5, maxSpeedKmh: 6, requireNoContact: true },
     },
     {
       id: "sc-pvn-park",
@@ -901,8 +1021,15 @@ export const SC_PARK_45_REV: ScenarioSpec = {
   family: "parking",
   tagsBg: ["паркиране", "косо място", "заден ход", "45 градуса"],
   titleBg: "Косо място на заден ход",
+  // …AND THE HALF THE TITLE LOST BUT THE SENTENCE KEPT (wave 8). The claim-gates
+  // wave took «подмини мястото и спри успоредно на алеята» out of the TASK
+  // TITLE because `ReachZoneParams` has x, y, radiusM and a cap and no heading
+  // field — and then left the same two claims standing here, inside «първо
+  // спри в изходната позиция…», where a reader takes them for the first tick.
+  // They are duties, not ticks, and the sentence now says which surface holds
+  // each: briefing 2–3 teaches them and the examiner watches them.
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция край косия ред, подминал мястото и успоредно на алеята; после влез на заден ход с точно 45° завъртане — устата на това място гледа назад и напред просто няма как да се влезе. Излизането в средата на алеята не е една от двете задачи — косите коли стоят в лентата, в която тръгваш, и допирът до тях се наказва като опасна грешка, а не като пропусната отметка.",
+    "Две задачи, в този ред: първо спри в изходната позиция край косия ред; после влез на заден ход с точно 45° завъртане — устата на това място гледа назад и напред просто няма как да се влезе. Отметката за Задача 1 мери само къде спираш и колко бавно — че си подминал мястото и стоиш успоредно, го учат стъпки 2–3 и го гледа изпитващият. Излизането в средата на алеята не е трета задача, а условието за първата: косите коли стоят в лентата, в която тръгваш, и допирът до тях струва двойно — опасна грешка по изпитния лист И незачетена Задача 1.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-maneuver-principles", "c-mirrors-blind-spots"],
   map: {
@@ -966,7 +1093,9 @@ export const SC_PARK_45_REV: ScenarioSpec = {
       // south of, the space was credited with having driven past it — the
       // exact pose mistake-nose-in convicts one screen down.
       titleBg: "Задача 1: спри в изходната позиция край косия ред",
-      params: { kind: "reachZone", x: 0.9, y: 6.0, radiusM: 5, maxSpeedKmh: 6 },
+      // THE CONTACT TERM — wave 8; see THE LANE-HOLDER'S CERTIFICATE at the top
+      // of this file. The pose is unchanged (parking3-claim-gates §2).
+      params: { kind: "reachZone", x: 0.9, y: 6.0, radiusM: 5, maxSpeedKmh: 6, requireNoContact: true },
     },
     {
       id: "sc-p45r-park",
@@ -1321,7 +1450,7 @@ export const SC_PARK_WALL: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "гараж", "крайно гнездо", "стена"],
   titleBg: "Крайно гнездо до стената на гаража",
   objectiveBg:
-    "Две задачи, в този ред: първо спри РАНО в изходната позиция, защото стената в края на реда не оставя място за широк замах; после влез на заден ход в последното гнездо, следейки разстоянието до стената. Средата на алеята не е една от двете задачи — тези коли стоят в лентата, в която тръгваш, и допирът до тях се наказва като опасна грешка, а не като пропусната отметка.",
+    "Две задачи, в този ред: първо спри РАНО в изходната позиция, защото стената в края на реда не оставя място за широк замах; после влез на заден ход в последното гнездо, следейки разстоянието до стената. Средата на алеята не е трета задача, а условието за първата: тези коли стоят в лентата, в която тръгваш, и допирът до тях струва двойно — опасна грешка по изпитния лист И незачетена Задача 1, защото позиция, стигната през чужда кола, не е изходна позиция.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-maneuver-principles", "c-mirrors-blind-spots"],
   map: {
@@ -1382,7 +1511,11 @@ export const SC_PARK_WALL: ScenarioSpec = {
       // enforced and gated: briefing step 1 (parking3-claim-gates §3) and now
       // `objectiveBg`, which names the fault that bills it.
       titleBg: "Задача 1: спри в изходната позиция край крайното гнездо",
-      params: { kind: "reachZone", x: 0.9, y: 11.7, radiusM: 5, maxSpeedKmh: 6 },
+      // THE CONTACT TERM — wave 8. The wave-7 note above ends „the lateral half
+      // a radius cannot close"; this is the term that closes it, and the sweep
+      // that proves it is THE LANE-HOLDER'S CERTIFICATE at the top of the file.
+      // The pose is unchanged (parking3-claim-gates §2).
+      params: { kind: "reachZone", x: 0.9, y: 11.7, radiusM: 5, maxSpeedKmh: 6, requireNoContact: true },
     },
     {
       id: "sc-pwl-park",
@@ -1605,7 +1738,7 @@ export const SC_PARK_DOUBLE: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "тесен коридор", "два реда", "супермаркет"],
   titleBg: "Два реда гнезда — паркиране в тесен коридор",
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция покрай гнездото, защото отсрещният ред оставя под шест метра свободен коридор; после влез на заден ход със замах, който започва от средата — широкият подход тук е удар в чужда кола. Средата на алеята не е една от двете задачи — и двата реда стоят в лентите, и допирът до тях се наказва като опасна грешка, а не като пропусната отметка.",
+    "Две задачи, в този ред: първо спри в изходната позиция покрай гнездото, защото отсрещният ред оставя под шест метра свободен коридор; после влез на заден ход със замах, който започва от средата — широкият подход тук е удар в чужда кола. Средата на алеята не е трета задача, а условието за първата: и двата реда стоят в лентите, и допирът до тях струва двойно — опасна грешка по изпитния лист И незачетена Задача 1, защото позиция, стигната през чужда кола, не е изходна позиция.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-maneuver-principles", "c-safety-space"],
   map: {
@@ -1665,7 +1798,9 @@ export const SC_PARK_DOUBLE: ScenarioSpec = {
       // the title now names only the halt. The corridor itself is briefing steps
       // 1–3 and `objectiveBg`.
       titleBg: "Задача 1: спри в изходната позиция между двата реда",
-      params: { kind: "reachZone", x: 0.9, y: 6.3, radiusM: 5, maxSpeedKmh: 6 },
+      // THE CONTACT TERM — wave 8; see THE LANE-HOLDER'S CERTIFICATE at the top
+      // of this file. The pose is unchanged (parking3-claim-gates §2).
+      params: { kind: "reachZone", x: 0.9, y: 6.3, radiusM: 5, maxSpeedKmh: 6, requireNoContact: true },
     },
     {
       id: "sc-pdb-park",

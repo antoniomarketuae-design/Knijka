@@ -976,21 +976,89 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
     },
     {
       id: "sc-jscan-exit",
-      // Re-worded for the three-drills census (see sc-jstop-approach). Both
-      // things the disc proves are still named — the завой is «десния» and the
-      // arm is «на изток». What is NOT here, deliberately, is the car this
-      // drill stages from the left: «след като колата отляво премине» would be
-      // a yield certificate on a plain disc, which is the exact crime the
-      // title-truth wave below removed.
-      titleBg: "Завърши десния завой и продължи на изток",
-      // TITLE-TRUTH WAVE (see sc-jrhr-cross). Same rewrite as sc-jstop-exit,
-      // same map: it read «…и ПРОДЪЛЖИ ПО ПЪТЯ С ПРЕДИМСТВО», and a reachZone
-      // tick can prove neither priority nor the ляво-дясно-ляво scan this
-      // drill is about. East-arm eastbound lane center, 55 m out on
-      // tj-stop-v1's 150 m east arm, reachable only through the completed
-      // right turn. The scan stays graded by the config-gated
-      // JUNCTION_SCAN_INCOMPLETE detector (ruleConfig below) and the stop by
-      // sc-jscan-line; params untouched, `done` bit-identical.
+      /**
+       * ONE ROUTE UNDER TWO NAMES, THE HALF COPY COULD NOT REACH — wave 8,
+       * `sc-junction-stop:5d3cc55e` · `sc-junction-scan:e6834882` ·
+       * `sc-junction-scan:28e782ab` · `sc-junction-gap:c437f449`.
+       *
+       * VERIFIED AT HEAD, not taken from the brief. `SC_JUNCTION_STOP` (:302)
+       * and this template (:918) declare the same `districtId` (tj-stop-v1),
+       * the same `spawnPointId` (tj-spawn-south) and the same three gate
+       * params, field for field:
+       *     approach {reachZone 4.06, −45, r8, cap 30}
+       *     line     {passSignal tj-n-c, 0, 0, r45, stopSign}
+       *     exit     {reachZone 55, −4.06, r9}
+       * The wave-7 lane could only move the SENTENCES (the note below), and the
+       * re-drive judged it still one drill: `.audit-frames/w10-2/frames/
+       * sc-junction-stop__pc-right/08-debrief-p5.png` and `w10-3/frames/
+       * sc-junction-scan__pc-right/08-debrief-p4.png` print three tasks each
+       * that are the same three ACTS in different words. Different words are
+       * not a different lesson.
+       *
+       * SO THIS CHIP NOW GRADES SOMETHING THE STOP DRILL'S DOES NOT, and it is
+       * the act this drill exists for: the WAIT. «Пропуснеш» arms
+       * `deriveYieldDemand` (objectives.ts :1444, landed 2026-08-27 for
+       * sc-signal-flashing:fe1889f5), which fills in `requireYieldClean:
+       * "traffic"` — a per-frame read of the run's billed FAILED_TO_YIELD
+       * ledger, bounded below by the moment THIS objective became active, i.e.
+       * the stop-line crossing. The drive that stops, does not look, and pulls
+       * out in front of the staged car is exactly `mistake-no-scan` /
+       * `mistake-single-glance` (both cite FAILED_TO_YIELD by name below), and
+       * it can no longer collect a ✓ for the manoeuvre while the same sheet
+       * convicts it of taking the car's priority. `sc-jstop-exit` makes no such
+       * claim and acquires no such demand: the stop drill stages no conflict
+       * and its two demos bill STOP_SIGN_NO_FULL_STOP. Three tasks each, and
+       * from here they are no longer the same three.
+       *
+       * IT IS NOT THE CERTIFICATE THE TITLE-TRUTH WAVE REMOVED, and the
+       * difference is the whole argument. That wave's note (kept verbatim
+       * below) refused «след като колата отляво премине» because in 2026-08 a
+       * reachZone tick could witness NOTHING about another road user. It can
+       * now witness the half that matters to a student: the refusal. The
+       * positive half — „he really did wait" — is still not witnessable, but on
+       * THIS drill it cannot be dodged either: `witnessArm.nearLineM 6` holds
+       * the car until the player is at the line, so arriving late does not
+       * delete the encounter (see SC_JUNCTION_SCAN_CONFLICT's L7 note).
+       *
+       * ONE REFUSAL, NEVER A TRAP — checked before the half that refuses, not
+       * after, because this gate is 3 of 3 and a withheld LAST tick is how a
+       * drive stops being able to end. `lessons/engine.ts:1585` folds
+       * `yieldFailedVoidsObjective` into `terminalUnearnable` BY PARAMS, not by
+       * id, so the finish gate arms anyway: the objective keeps its honest
+       * `active` status, `buildLessonResult` still reports finished-and-failed,
+       * and the student reaches the −10 «Непропускане на пътно превозно
+       * средство с предимство» card with its ЗДвП чл. 47/48/50 corrective
+       * instead of having to quit and forfeit the attempt. The two rows already
+       * carrying this demand (sc-sflash-cross, sc-sdead-cross) are last in their
+       * drills too, which is why that arm exists at all. NOTE for the reader of
+       * `engine.ts`: the comment there still says „BOTH gates that carry it" —
+       * it is three now.
+       *
+       * ⚠ ONE GATE IN A FILE THIS LANE DOES NOT OWN CONVICTS THIS SENTENCE, and
+       * it is stale rather than wrong: `scenario/__tests__/
+       * junctions-title-truth.test.ts` (first describe, the `continue` on
+       * `maxSpeedKmh`/`acceptBeforeMarkM`) was written when no channel read a
+       * yield claim, so it forbids «пропусн…» on every plain disc in this
+       * family. Its own reference implementation now contradicts it —
+       * `templates-signals.ts sc-sflash-cross` ships this exact shape at HEAD
+       * and is spared only because the signals group is out of that file's
+       * scope. The reported repair adds ONE line to its skip: exempt a title
+       * that arms `deriveYieldDemand` ON A DRILL THAT STAGES THE CONFLICT IT
+       * NAMES, so an unredeemable certificate is still convicted. Reported to
+       * the integrator; not edited here.
+       *
+       * ── kept from the TITLE-TRUTH WAVE (see sc-jrhr-cross) ──
+       * It read «…и ПРОДЪЛЖИ ПО ПЪТЯ С ПРЕДИМСТВО», and a reachZone tick can
+       * prove neither priority nor the ляво-дясно-ляво scan this drill is
+       * about. Both things the disc really proves are still named — the завой
+       * is «десния» and the arm is «на изток». East-arm eastbound lane center,
+       * 55 m out on tj-stop-v1's 150 m east arm, reachable only through the
+       * completed right turn. The scan stays graded by the config-gated
+       * JUNCTION_SCAN_INCOMPLETE detector (ruleConfig below) and the stop by
+       * sc-jscan-line. PARAMS UNTOUCHED — the demand rides the sentence, so a
+       * drive that yields keeps a bit-identical `done`.
+       */
+      titleBg: "Завърши десния завой на изток, след като пропуснеш колата отляво",
       params: { kind: "reachZone", x: 55, y: -4.06, radiusM: 9 },
     },
   ],
@@ -1040,13 +1108,57 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
   // correct for the ENCOUNTER — and it left the entire graded approach on a
   // dead street, so the ляво-дясно-ляво ritual was a ritual about nothing.
   //
-  // A template BASELINE, so the §7 ladder does the rest: L1 gets 2 cars (a
-  // beginner is not made to read a boulevard), L2 3, L3/L4 4. Never an
-  // absolute rung count — the same shape sc-junction-rhr's L5 already proves
-  // this map family hosts (vehicleCount 8 on the sibling tj-rhr-v1). The trace
-  // recorder reads `staged` only (traces/scJunctionScan.ts:188), so every
-  // committed ghost stays byte-identical.
-  traffic: { vehicleCount: 4 },
+  // NO `traffic` KEY — AND THE AUTHORED ONE THAT USED TO BE HERE IS WHY
+  // (wave 8, 2026-08-28). T9 wrote `traffic: { vehicleCount: 4 }` here with the
+  // note „the §7 ladder does the rest: L1 gets 2 cars (a beginner is not made
+  // to read a boulevard), L2 3, L3/L4 4". That reasoning is sound for a drill
+  // about anything else — and it is the wrong shape for THIS one, for a reason
+  // that was measured after it was written:
+  //
+  //  · `compile.ts rungTraffic` treats an AUTHORED count as the author's final
+  //    word and never clamps it, while a FAMILY baseline ladders between the
+  //    measured `SCENARIO_FAMILY_TRAFFIC_FLOOR` 4 and `…_CEILING` 6. So the key
+  //    did not merely set a number, it OPTED THIS DRILL OUT OF THE FLOOR — the
+  //    floor whose own doc block says it is „the count below which the drill's
+  //    own SUBJECT disappears".
+  //  · Compiled: 2 / 3 / 4 / 4 / 6 against the family's 4 / 4 / 5 / 5 / 6. The
+  //    rung a beginner starts on ran two cars — and `SCENARIO_FAMILY_TRAFFIC_
+  //    BASELINE`'s table records n=2 as „the dead boulevard he filmed".
+  //  · MEASURED, not inferred: `traffic/__tests__/ambient-presence.test.ts`
+  //    names this exact row in its scope note — „`sc-junction-scan`
+  //    (templates-junctions.ts, `traffic: { vehicleCount: 4 }`) still measures
+  //    cross 13 % / 1 pass per minute at L1 … a real open row for the lane that
+  //    owns that file". This is that lane, and this is that row.
+  //
+  // Dropping the key hands the drill to the junction family's own baseline, so
+  // the lesson whose SUBJECT is the car you did not see stops being the
+  // quietest junction in the family. Its sibling `SC_JUNCTION_STOP` stands on
+  // the same district and the same spawn with no `traffic` key and clears that
+  // gate today, which is what makes 4 / 4 / 5 / 5 / 6 a measurement here rather
+  // than a hope — and re-running that suite after the change, `sc-junction-scan
+  // @L1 (tj-stop-v1): the crossing arm is not dead` now passes beside it. The
+  // trace recorder reads `staged` only (traces/scJunctionScan.ts:188) and
+  // ambient agents never enter a recording, so every committed ghost stays
+  // byte-identical.
+  //
+  // WHAT IT COSTS, MEASURED AND NOT HIDDEN — two rung censuses move, and both
+  // are rosters in files this lane does not own (reported to the integrator):
+  //  · `lessons/__tests__/rung-ladder-census.test.ts:214` pins „L1 → L2 adds
+  //    nothing on at most 166 templates". It is 167 after this change, and the
+  //    ONE template that made that row read 166 instead of 167 was THIS one.
+  //    Read what it was buying with it: scan's L1 → L2 was a world step only
+  //    because L1 sat at two cars — BELOW the family floor — so the „addition"
+  //    at L2 was the drill climbing back out of the hole the missing floor put
+  //    it in. A rung that is perceptible because the rung under it is broken is
+  //    not a rung. The ratchet number is honest at 167; the ladder did not get
+  //    worse, the row stopped flattering itself.
+  //  · `lessons/difficulty.ts L5_PLUS_ONE_CAR_ONLY` (:246) gains this id: L4→L5
+  //    is now 5 → 6 rather than 4 → 6, i.e. inside MIN_PERCEPTIBLE_VEHICLE_RISE.
+  //    That is the same thin L5 `sc-junction-stop` already carries on line 247
+  //    of that list, on the same map, for the same reason — the family street is
+  //    at its measured jam ceiling and the next rung has to be AUTHORED. It is a
+  //    named residual either way; it is now named for both siblings instead of
+  //    one, which is what they always were.
   conditions: { weather: "dry" },
   // The junction-scan detector is default-OFF (it would false-fire the exam
   // bank's unglanced Б2 crossings); this drill opts it in so the LIVE session
@@ -1292,7 +1404,66 @@ export const SC_JX_GIVEWAY_B1: ScenarioSpec = {
   success: [
     {
       id: "sc-jxgb-roll",
-      titleBg: "Премини първия Б1 след оглед, без излишно спиране",
+      /**
+       * `sc-jx-giveway-b1:22714146` — „objective 1 is explicitly «без излишно
+       * спиране» … the one behaviour the lesson is named after is not measured
+       * at all". UPHELD on the structure, and its evidence half REFUTED; both
+       * are on the record because the next reader deserves the true one.
+       *
+       * UPHELD: this is a BARE disc — `{4.06, 22, r8}`, no cap, no mark-cut, no
+       * demand — and it certified two acts on arrival. «след оглед» is a scan,
+       * and «без излишно спиране» is the ABSENCE of a stop. `stepReachZone`
+       * (objectives.ts) is handed params, prev, tick and an `ObjectiveContext`
+       * that carries staged outcomes, reds met, three struck-body ledgers, the
+       * yield ledger and an activation clock — and NO stop count, of any kind.
+       * Nothing anywhere in the engine measures «без излишно спиране»: the rule
+       * catalogue has no offence for it and no commendation for its opposite.
+       * So the drill's own thesis — Б1 is not „Спри!" — was the one thing on
+       * this sheet that could be ticked by doing the exact opposite of it. A
+       * student who came to a dead halt at an empty Б1, looked at nothing and
+       * rolled on collected «✓ Премини първия Б1 след оглед, без излишно
+       * спиране». That is the failure this programme ranks worst, in the
+       * generous direction.
+       *
+       * REFUTED — the drive the finding reasons from never got there. Its
+       * frame is `.audit-frames/sweep161/sc-jx-giveway-b1/pc-right/
+       * 08-debrief.png` (0 наказателни точки, НЕИЗДЪРЖАН, «Урокът беше
+       * прекъснат преди края») and the run's own `drive.log` closes with
+       * „top 15 км/ч · 4 full stops · 4 lawful waits (180s) … ended naturally:
+       * false — forced via «Прекрати урока»". 180 of those 205 seconds are
+       * standstill and the car never left the first arm. The three objectives
+       * were not „measured and ignored"; they were never REACHED, and the
+       * finding's „21 full stops" belongs to some other leg. The defect is real
+       * and it is structural — it is not the thing that frame photographs.
+       *
+       * WHAT CHANGED HERE, AND WHAT DID NOT. The sentence now says only what
+       * the disc can see — you are 22 m north of the first Б1 mouth on the
+       * northbound lane, so the first junction is behind you — plus the reason
+       * this drill sends you through it, addressed to the student rather than
+       * asserted about him (THEO-4: a chip may teach, it may not certify what
+       * nothing watched). The DUTIES keep their real graders and are untouched:
+       * the look is billed by the config-gated `JUNCTION_SCAN_INCOMPLETE`
+       * detector this template opts into (`mistake-no-scan` cites it at THIS
+       * mouth), the priority by FAILED_TO_YIELD at mouth 2, and the thesis is
+       * spelled out in instruction 2 and in `teach.whyBg`.
+       *
+       * THE MEASUREMENT IS ROUTED, NOT ABANDONED. r07 refused to build a
+       * title-derived demand on a census of one, and r16 called that „the right
+       * call under the dead-predicate rule". RE-RUN HERE and it still holds:
+       * `/без излишн(о|и) спиран/` over every `titleBg:` in
+       * `scenario/templates-*.ts` returns two hits, and only ONE of them is a
+       * gate — this one. The other is `templates-junctions3.ts`'s LESSON title
+       * («По пътя с предимство — без излишни спирания», sc-jx-priority-
+       * confidence), which grades nothing and certifies nothing. So a matcher
+       * built on this phrase would still be a guess wearing a census's clothes.
+       * The honest channel is instead a `minSpeedKmh` on `ReachZoneParams`
+       * (lessons/types.ts), read by `stepReachZone` the way `maxSpeedKmh` is —
+       * „this gate is earned while still ROLLING", which is this drill's claim
+       * exactly, authored per gate rather than sniffed out of prose. Neither
+       * file is this lane's, so the edit is reported rather than made, and the
+       * sentence stops promising it in the meantime.
+       */
+      titleBg: "Премини първото кръстовище и продължи на север — тук Б1 не изисква стоп",
       // Just north of jxg-n-j1 (the clear mouth) — reached while rolling.
       params: { kind: "reachZone", x: 4.06, y: 22, radiusM: 8 },
     },

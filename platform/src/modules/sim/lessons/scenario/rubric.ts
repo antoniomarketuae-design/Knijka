@@ -640,6 +640,38 @@ export function scoreRubric(
   //    so on the one scenario the predicate was built for it changed nothing.
   //    The corpus it was reasoned from was four waves stale.
   //
+  //    1a. AND THAT PARAGRAPH IS ITSELF HALF FALSE — corrected 2026-08-28,
+  //    round 14, because it is the sentence that will stop the next wave from
+  //    landing the repair. It reads the PC lane only. The row it was answering
+  //    (`sc-pk-move-off:948b1cab`) says «BOTH WRONG LANES» and its headline is
+  //    the MOBILE one, and three consecutive splits recorded that lane as
+  //    „NOT EXERCISED — the phone half has never once been driven". IT HAS
+  //    BEEN, TWICE, and both legs are on disk:
+  //
+  //      .audit-frames/canary-fill/frames/sc-pk-move-off__mobile-wrong  25 Aug
+  //      .audit-frames/fill-1/frames/sc-pk-move-off__mobile-wrong       26 Aug
+  //
+  //    `fill-1/.../run.log`, verbatim: «DRIVE: wrong · top 59 км/ч», an in-drive
+  //    card «Превишена скорост · Отчетена скорост 58,8 км/ч при разрешени 50
+  //    км/ч», and then «VERDICT: ИЗДЪРЖАН · SCORE: 0 наказателни точки · 3 от 3
+  //    звезди · +100 XP». On the phone the 58,8 lands on the TEACH-FIRST channel
+  //    and is never billed — «Учебни моменти (не влизат в точките): •
+  //    Потегляне без оглеждане • Движение без предпазен колан • …и още 1» — so
+  //    `result.score` is 0, no cap applies, and the fold below hands out three
+  //    stars. The PC lane charges it and the phone lane does not; the predicate
+  //    was built for exactly the lane nobody looked at.
+  //
+  //    THE REVERT IS STILL RIGHT. Reasons 2 and 3 below are untouched by this
+  //    correction — fifteen model drives would still be demoted, and the
+  //    demotion would still be bare — so the exhibit's return does not make the
+  //    star cap safe to rebuild here. What it changes is that «the exhibit did
+  //    not reproduce» may no longer be quoted as a reason to close the row. It
+  //    reproduces, on a phone, on the lesson about looking before you pull out,
+  //    and the card tells that student «не наруши нищо» three lines under three
+  //    things he broke. See „WHAT IT WOULD TAKE TO LAND IT" below: the sentence
+  //    is `hud/SessionEndScreen.tsx`'s and the star is an ADR's, and neither is
+  //    this file's to write alone.
+  //
   // 2. ITS ACTUAL LIVE POPULATION WAS THE REFERENCE DRIVES. Scanning every
   //    `_audit-debrief.json` in `.audit-frames/w14` for a rendered «Учебни
   //    моменти (не влизат в точките):» list finds 92 legs; FIFTEEN of them are

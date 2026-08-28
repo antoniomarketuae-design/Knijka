@@ -588,9 +588,57 @@ export function advisorPromptForObjective(
           // „shift down into reverse". An instructor sitting beside an
           // automatic says what the hand does: move the lever to R. The chip
           // still names the key that really moves it (advisor honesty rule).
+          //
+          // ── TWO CARDS, ONE MANOEUVRE, TWO NOUNS FOR THE SAME PLACE ────────
+          // sc-park-gap-short:d1383890, re-seen 2026-08-28 on
+          // `.audit-frames/sweep161/sc-park-gap-short/pc-right/04-t178s.png`
+          // at 300 %. The two cards are stacked with ~10 px between them:
+          //
+          //   ObjectiveBanner  «Задача 2: влез на заден ход в късото място и
+          //                     спри напълно»
+          //   AdvisorCard      «Премести лоста на R и паркирай на заден ход в
+          //                     клетката»
+          //
+          // `advisorEchoTrim` (LessonPlayShell) cannot help: it only removes a
+          // prompt that STARTS with the banner's own sentence, and this one is
+          // a DIFFERENT sentence saying the same thing — the worse case, since
+          // the second half re-issues the manoeuvre («паркирай на заден ход»)
+          // and renames its target («клетката» against the banner's «късото
+          // място»). A seventeen-year-old reading two instructions has to
+          // decide which one is the task; there is only one manoeuvre and
+          // there is no cell.
+          //
+          // SO THE CARD KEEPS ONLY WHAT THE BANNER DOES NOT SAY: which way the
+          // lever goes, and what happens if it does not. That is the whole of
+          // the advisor's contract one screen up („say what to do now") and it
+          // is the half the banner structurally cannot carry — the banner is
+          // the objective, the selector is the act. The manoeuvre and its
+          // target are the banner's, said once.
+          //
+          // THEO-4: neither line is a bare imperative. Each states the rule of
+          // the selector («само R върви назад») and the consequence of getting
+          // it wrong («на D газта пак ще те подкара напред»), which is the
+          // mistake this pair of drills actually books — templates-parking3
+          // `sc-park-gap-long` grades «Излишен заден ход, при това без
+          // наблюдение» on the forward twin. No article number: this is
+          // instructor reasoning about a lever, not law recall (ADR-002).
+          //
+          // THE STEM «Премести лоста на R» IS LOAD-BEARING AND IS KEPT
+          // VERBATIM. `tools/mobile/lesson-audit.mjs`'s REVERSE_DEMAND_RE
+          // (`…на заден ход…|Премести лоста на R`) is one of the two things
+          // that arm the harness's deliberate reverse gesture, and
+          // `engine/__tests__/reverseAssist-audit-harness.test.ts:349` pins
+          // that literal. Nothing in the PRODUCT parses this string —
+          // `deriveGearDemand` (objectives.ts:1358) reads the objective's
+          // TITLE, not the advisor's sentence — so dropping «на заден ход»
+          // from the card moves no gate and no demand.
           return params.entry === "forward"
-            ? { textBg: "Остави лоста на D — влез напред в клетката и спри напълно", keys: ["]"] }
-            : { textBg: "Премести лоста на R и паркирай на заден ход в клетката", keys: ["["] };
+            ? { textBg: "Остави лоста на D — D е за напред; заден ход тук не ти трябва", keys: ["]"] }
+            : {
+                textBg:
+                  "Премести лоста на R — заден ход има само на R; на D газта пак ще те подкара напред",
+                keys: ["["],
+              };
         case "roundabout": {
           const entered = evalState?.type === "roundabout" && evalState.entered;
           return entered

@@ -192,7 +192,14 @@ describe("the number the bar publishes is the number the student was told", () =
     // The advisor's own invariant, restated on this side of the wire: „EVERY
     // capped objective states the number it is graded on". If it holds there and
     // this reader is right, the bar is never blank on a capped rung.
-    expect(capped.length).toBe(953);
+    // RE-BASELINED 953 → 958 on 2026-08-28 (wave 8, finding
+    // sc-pk-move-off:d7d45a4c): the five rungs of `sc-pk-move-off/sc-pmo-moved`,
+    // newly authored `maxSpeedKmh: 50`. With that one objective withheld the
+    // catalogue is exactly the committed 953, so nothing else crossed the line.
+    // The reader holds on all five — each publishes 50 against a gate of 50, so
+    // the bar is not blank on the new rung and it does not out-ask the gate by a
+    // single km/h (the direction that would refuse an obedient student).
+    expect(capped.length).toBe(958);
     const silent = capped.filter((c) => taskCapKmhFromPrompt(prompt(c.textBg)) === undefined);
     expect(silent).toEqual([]);
   });

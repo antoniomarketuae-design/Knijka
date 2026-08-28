@@ -111,6 +111,41 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       // that only PROMISES it in the banner gets the promise enforced, because
       // the banner is the certificate the student reads and the gate may not
       // certify less than the banner says.
+      // THE VISIBILITY FALLTHROUGH IS REVERTED — 2026-08-28, ratified by two
+      // adversarial verifiers against `reach-zone-witness.test.ts`.
+      //
+      // It read `deriveLampDemand(t) ?? deriveVisibilitySpeedLampDemand(t)`, so a
+      // banner naming no lamp at all could still acquire a `lamps: "lit"` demand
+      // from the words «съобразена за видимостта скорост». Two gates joined the
+      // witness roster that way: `sc-ac-night-overdrive/sc-acno-adapted` and
+      // `sc-pe-night-unlit/sc-pnu-approach`. No template moved — the demand was
+      // manufactured entirely by the matcher.
+      //
+      // WHY IT HAD TO GO, AND IT IS NOT THAT THE DEMAND IS WRONG. «Съобразена за
+      // видимостта скорост» IS arguably false with the lamps off, so on the
+      // merits the demand is defensible. The objection is to the ROUTE:
+      //
+      //  1. `reach-zone-witness.test.ts:86-95` pins five strings as
+      //     `deriveLampDemand(...) === undefined` under the heading "a LIT CAR is
+      //     demanded; an unlit PLACE is not". Those five assertions STILL PASSED
+      //     while `parseObjectiveParams` began returning "lit" for two of them.
+      //     The fallthrough was arranged so the letter of the pin survives and
+      //     its meaning inverts — invisible to the test written to catch it, and
+      //     visible only to a census counting the roster.
+      //  2. The refusal it produces cites a requirement the banner never made.
+      //     `reachZoneStateRefusal` -> `engine.ts:569 refusal.kind === "lamps"`
+      //     prints «Стигна точката, но без светлините, които задачата иска» on a
+      //     card whose own sentence names no lights. That is the exact failure
+      //     the fog remedy exists to avoid.
+      //  3. `deriveVisibilitySpeedLampDemand`, `deriveCockpitReadyDemand` and
+      //     `requireCockpitReady` ship with ZERO test references anywhere in
+      //     platform/src — a matcher that invents a demand and carries no census
+      //     of its own.
+      //
+      // The honest route is to RETITLE the two objectives so the banner says
+      // «осветен» (not «с къси светлини», which names a beam the drill does not
+      // require), and let the first matcher read it. Until then the underlying
+      // finding stays OPEN: `mistake-lights-off` completes this gate today.
       const lamps =
         p.requireLamps === undefined
           ? deriveLampDemand(objective.titleBg)
@@ -121,6 +156,27 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
           ? deriveGearDemand(objective.titleBg)
           : parseGearDemand(objective, p.requireGear);
       if (gear !== undefined) out.requireGear = gear;
+      // «С ГОТОВ КОКПИТ» (requireCockpitReady) — the same law as the lamps and
+      // the gear beside it: authored wins, the title fills in, because the
+      // banner is the certificate the student reads and the gate may not
+      // certify less than the banner says. See the demand's own block comment
+      // for the drill, the census and the two switches.
+      //
+      // PARSED BEFORE THE OFFICER, not after, and that placement is the whole
+      // of the conflict guard: this is an AT-MARK demand, so `hasAtMarkDemand`
+      // must be able to see it on `out` when `parseControllerDemand` reads it
+      // three lines down. (The lawful-speed arm below is parsed after and is
+      // therefore invisible to that guard — a hole this arm deliberately does
+      // not widen. It is named in the wave report rather than fixed here,
+      // because moving a shipped parse order is a change of its own.)
+      if (p.requireCockpitReady !== undefined) {
+        if (p.requireCockpitReady !== true) {
+          throw new ObjectiveSpecError(objective.id, "reachZone requireCockpitReady must be true");
+        }
+        out.requireCockpitReady = true;
+      } else if (deriveCockpitReadyDemand(objective.titleBg)) {
+        out.requireCockpitReady = true;
+      }
       // THE OFFICER'S PERMISSION, same law: authored wins, the title fills in.
       // An AUTHORED key that cannot be honoured throws (the author asked for it
       // in so many words); a DERIVED one that cannot be honoured is dropped and
@@ -1173,6 +1229,70 @@ export interface ReachZoneWitnessDemands {
    * leaves the demand met.
    */
   requireLawfulSpeed?: true;
+  /**
+   * «С ГОТОВ КОКПИТ» — the belt fastened and the handbrake down, for a gate
+   * whose own banner puts its name to them (round 14, 2026-08-28).
+   *
+   * THE DRIVE. `sc-vp-readiness` („Готовност преди тръгване", VP-02 + VP-05) is
+   * the drill whose ENTIRE subject is those two switches: instruction 1 is
+   * «закопчай предпазния колан», instruction 2 is «свали ръчната спирачка
+   * докрай», and it ships two mistake demos — `mistake-no-belt` and
+   * `mistake-handbrake` — that exist to be the counter-examples. Its first
+   * objective reads «Мини контролната зона с готов кокпит» and its params are
+   * `{ kind: "reachZone", x, y: 180, radiusM: 10, maxSpeedKmh: 55 }`: a place
+   * and a speed. Nothing about the cockpit. So a car that drives the control
+   * zone with the belt off and the handbrake up collects a written certificate
+   * that its cockpit was ready, on the one lesson in the catalogue that is
+   * about nothing else — the exact shape `requireLamps` was cut for on
+   * 2026-08-19 («a title that promises more than that is a certificate nobody
+   * signed»).
+   *
+   * THE FINDING IT CLOSES, verbatim: `sc-vp-readiness:97c472e2` — „The only
+   * reason the wrong lane fails is that it did not finish the route … Nothing
+   * about the cockpit-readiness subject enters the outcome." It was filed
+   * against `scenario/rubric.ts`, which scores stars from measurement channels
+   * and authors none of its own; the subject could not enter the outcome
+   * because no gate in the lesson ever asked about it. This is where it asks.
+   *
+   * THE CENSUS, over every `titleBg:` in `templates-*.ts` + `specs.ts`
+   * (2026-08-28): the string «кокпит» appears in exactly ONE objective title in
+   * the whole tree, and it is this one. The nineteen «готовност …» banners the
+   * catalogue does carry — «Приближи кръстовището с готовност за спиране» and
+   * its family — are about the DRIVER's readiness to stop or to yield and name
+   * no cockpit; the matcher asks for the word itself, so none of them can
+   * acquire this demand and none of them does. (`sc-vp-readiness`'s own
+   * mistake rows «Тръгване без колан» / «Тръгване с вдигната ръчна» are
+   * `mistakes[].titleBg`, which `parseObjectiveParams` is never handed.)
+   *
+   * BOTH CHANNELS ARE MANDATORY ON THE CONTRACT — `SimTick.seatbeltOn` and
+   * `SimTick.handbrakeOn` are `boolean`, not optional — so unlike the lamps
+   * there is no „unknown" polarity to choose and no fixture can be silently
+   * refused: `lessons/__tests__/fixtures.ts` and the recorder both build the
+   * innocent pair (`seatbeltOn: true`, `handbrakeOn: false`) and stay met.
+   *
+   * AN AT-MARK ARM, so it rides the `capMet` latch beside the cap, the lamps,
+   * the gear and the lawful-speed ceiling: a cockpit state is switched at a
+   * moment, it is read on the swept face exactly as the lamps are, and
+   * fastening the belt while still on the mark earns the tick on the next frame
+   * — the same rescue the 29 lamp/gear gates depend on.
+   *
+   * WHAT IT DOES NOT DO, and this is reported rather than patched from here:
+   * `reachZoneStateRefusal` does NOT report this demand, because
+   * `lessons/engine.ts objectiveNotice` branches on `refusal.kind === "lamps"`
+   * and returns the GEAR card for anything else — a cockpit refusal routed
+   * through it today would tell the student his lever was in D, which is a
+   * false statement about his cockpit and worse than a missing one. THEO-4 is
+   * not left bare in the meantime and that is the reason it is safe to land
+   * split: unlike the lamp class (whose own docblock records
+   * `HEADLIGHTS_OFF_AT_NIGHT` firing ZERO times on the drive it refused), both
+   * halves of this demand already have loud graders that fire at the moment of
+   * the fault — `SEATBELT_OFF_WHILE_MOVING` (основна, чл. 137а) and
+   * `HANDBRAKE_LEFT_ON` — and `s4-ac-vp-bot-completion.test.ts` measures both
+   * surfacing through the live pipeline on this template's own recordings. The
+   * one-line `engine.ts` arm that would give the refusal its own card is named
+   * in the wave report.
+   */
+  requireCockpitReady?: true;
 }
 
 /**
@@ -1267,6 +1387,104 @@ export function deriveLampDemand(titleBg: string): ReachZoneLampDemand | undefin
 export function deriveGearDemand(titleBg: string): ReachZoneGearDemand | undefined {
   if (GEAR_TITLE_REVERSE_PURPOSE.test(titleBg)) return undefined;
   return GEAR_TITLE_REVERSE.test(titleBg) ? "reverse" : undefined;
+}
+
+/**
+ * «СПОРЕД ВИДИМОСТТА», ON A ROAD THE BANNER ITSELF CALLS UNLIT — the lamp
+ * demand `deriveLampDemand` may not make, and the reason it is a second matcher
+ * instead of a looser first one (round 14, 2026-08-28).
+ *
+ * `deriveLampDemand`'s own block comment lists these two banners under „← the
+ * road → none" and its lookbehind kills «неосветен…» on purpose: «осветен»
+ * there describes the PLACE, not the car, and reading it as a lamp promise
+ * would be a matcher inventing a demand from a word about the asphalt.
+ * `reach-zone-witness.test.ts:90–95` pins both strings as undefined. Every
+ * word of that stands, and none of it is touched here.
+ *
+ * WHAT IT MISSED IS THE OTHER HALF OF THE SAME SENTENCE. These banners do not
+ * claim a lamp; they claim a speed CHOSEN FOR THE VISIBILITY. On an unlit road
+ * at night the visibility IS the beam — that is not an inference, it is what
+ * both drills teach in their own instruction 1:
+ *
+ *   sc-ac-night-overdrive  «Включи късите светлини — нощ е и отвъд снопа им
+ *                           пътят е черен.»        (title: «Не изпреварвай
+ *                                                   собствените си фарове»)
+ *   sc-pe-night-unlit      «Провери, че късите светлини са включени — без тях
+ *                           нямаш дори 40-те метра, които те показват.»
+ *
+ * — so a car with its lamps off has no beam, therefore no visibility, therefore
+ * no speed that can be „adapted to" it. The certificate is false on its face.
+ *
+ * MEASURED AT HEAD, not argued. `.audit-frames/w14/frames/
+ * sc-ac-night-overdrive__pc-right` (2026-08-27, TRACKED 100 %) puts both halves
+ * on one result card:
+ *
+ *   ✓ Мини неосветения участък със съобразена за видимостта скорост   2:44
+ *   ✗ Движение нощем без светлини  −3 изпитни т. · ОСНОВНА ГРЕШКА
+ *
+ * The same drive, in the same debrief, certified and convicted for the same
+ * cockpit. And the template's own counter-example says it a second way: the
+ * `mistake-lights-off` script (`traces/scAcNightOverdrive.ts`, „adapted ~50
+ * km/h but headlights OFF") completes this gate today, exactly as sc-ac-fog's
+ * «Без фарове за мъгла» demo used to complete its own.
+ *
+ * THE CENSUS, over every objective `titleBg:` in `templates-*.ts` + `specs.ts`
+ * (2026-08-28), because the risk here is a false REFUSAL. Requiring BOTH words
+ * — «неосветен…» and «видимост» — returns exactly two rows, and they are these
+ * two. The other three catalogue strings carrying «видимост» are SCENARIO
+ * titles («Кръстовище с ограничена видимост», „Гнездо до бус — заден ход с
+ * ограничена видимост") or a mistake row, and `parseObjectiveParams` is never
+ * handed any of them; the other two carrying «неосветен» are scenario titles
+ * too (`sc-park-night`, `sc-pe-night-unlit`). Neither drill can be reached
+ * except at night: both compile `environment.timeOfDay === "night"`
+ * (`s-w2`/`s-w4-bot-completion.test.ts` assert it), so the demand can never
+ * land on a day lesson where the lamps are optional.
+ *
+ * "lit", NOT "low", AND THAT IS THE FALSE-REFUSAL GUARD. Both briefings order
+ * the DIPPED beams, but on an unlit extra-urban road with nothing oncoming the
+ * high beam is lawful and better (чл. 71), and a student who uses it has more
+ * visibility, not less. `lampDemandMet("lit")` accepts either; demanding "low"
+ * would refuse the better drive, which is the failure this project ranks worst.
+ *
+ * The correct shadows are unaffected — both scripts declare
+ * `{ kind: "headlights", setting: "low" }` before they move — and the refusal
+ * that IS new arrives with the card the lamp class already ships
+ * (`lessons/engine.ts objectiveNotice` → «Стигна точката, но без светлините,
+ * които задачата иска», ЗДвП чл. 70), so no THEO-4 debt is created.
+ */
+/*
+ * `deriveVisibilitySpeedLampDemand` AND ITS TWO REGEXES WERE REMOVED WITH THE
+ * FALLTHROUGH THEY FED — 2026-08-28. The reasoning above is kept because it is
+ * good and the demand may well be right on the merits; what was wrong was the
+ * route. See the block at `parseObjectiveParams`' `requireLamps` for why, and
+ * for the honest replacement: retitle the two objectives so the banner says
+ * «осветен» and let `deriveLampDemand` read it.
+ *
+ * The function is deleted rather than left standing because after the revert it
+ * had no caller anywhere in `platform/src` and no test referenced it — an
+ * exported predicate nothing reads, which is the exact class this wave spent
+ * itself finding. Its underlying finding stays OPEN in the ledger:
+ * `mistake-lights-off` completes that gate today.
+ */
+
+/** The banner's cockpit-readiness promise (see `requireCockpitReady`). */
+const COCKPIT_TITLE_READY = /(?<![\p{L}])кокпит/iu;
+
+/** True when the banner says the cockpit was ready at the mark. */
+export function deriveCockpitReadyDemand(titleBg: string): boolean {
+  return COCKPIT_TITLE_READY.test(titleBg);
+}
+
+/**
+ * Is the cockpit-readiness demand honoured on THIS frame? Both channels are
+ * mandatory on `SimTick`, so there is no „unknown" arm to argue about: the belt
+ * is fastened and the handbrake is down, or it is not. `handbrakeOn` is tested
+ * for `!== true` rather than `=== false` so a caller that ever loosens the
+ * contract to optional keeps the innocent reading, which is the polarity every
+ * other demand in this file uses for a channel it does not own.
+ */
+function cockpitReadyMet(tick: SimTick): boolean {
+  return tick.seatbeltOn === true && tick.handbrakeOn !== true;
 }
 
 /**
@@ -1546,7 +1764,10 @@ function hasAtMarkDemand(p: WitnessedReachZoneParams): boolean {
     // officer's permission, whose whole design note is that one `capMet` latch
     // cannot hold two moments. The census has no such gate today and the guard
     // is what keeps it that way.
-    p.requireLawfulSpeed === true
+    p.requireLawfulSpeed === true ||
+    // The tenth, and an at-mark state exactly like the lamps: the belt and the
+    // handbrake are read on the frame the disc is swept.
+    p.requireCockpitReady === true
   );
 }
 
@@ -1733,7 +1954,12 @@ function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
     // it is a state of the car at the mark, the latch can both spend it and
     // re-earn it, and a gate that carries it and nothing else (`sc-swp-finish`)
     // must start UNMET or the arrival alone would satisfy the contract again.
-    params.requireLawfulSpeed === true
+    params.requireLawfulSpeed === true ||
+    // The tenth, folded in for exactly the same reason: it is a state of the
+    // car at the mark, the latch spends and re-earns it, and a future gate
+    // carrying it without a cap must start UNMET rather than being handed the
+    // contract by the arrival.
+    params.requireCockpitReady === true
   );
 }
 
@@ -2690,6 +2916,17 @@ function stepReachZone(
   const lampSpent = lampDemand !== undefined && atMark && !lampOk;
   const gearSpent = gearDemand !== undefined && inAcceptance && goingForward;
 
+  // ── «С ГОТОВ КОКПИТ» — the belt and the handbrake (requireCockpitReady) ───
+  // The tenth demand, and geometrically the LAMPS' twin rather than the cap's:
+  // both channels are discrete latched cockpit states, so they are read off the
+  // swept face for the same reason («A WAYPOINT IS CROSSED, NOT SAMPLED» — a
+  // narrow disc a 50 км/ч tick can step over must not refuse a correct drive),
+  // and spent by the same test. A zone without the key never consults it and is
+  // bit-identical to shipped.
+  const cockpitDemand = params.requireCockpitReady === true;
+  const cockpitOk = !cockpitDemand || cockpitReadyMet(tick);
+  const cockpitSpent = cockpitDemand && atMark && !cockpitOk;
+
   // ── «РАЗРЕШЕНАТА СКОРОСТ» — THE SIGN'S NUMBER (requireLawfulSpeed) ────────
   // The demand's block comment carries the drive, the census and the band.
   // Geometry, deliberately, is the CAP ARM'S and not the lamps': a speed may
@@ -2830,6 +3067,10 @@ function stepReachZone(
     (cap === undefined || (!approachBlown && capArmHere)) &&
     (lampDemand === undefined || (lampOk && atMark)) &&
     (gearDemand === undefined || (gearOk && atMark)) &&
+    // The tenth arm, on the lamps' geometry (`atMark` — the swept face or the
+    // approach capsule) because it is the same kind of fact: a switch position
+    // held while the car crossed the mark.
+    (!cockpitDemand || (cockpitOk && atMark)) &&
     (!controllerDemand || controllerHere === "proceed") &&
     // The ninth arm, earned on the cap arm's geometry (a point test at the
     // student's own position) rather than the lamps' swept face — see the
@@ -2838,7 +3079,14 @@ function stepReachZone(
   const capMet = !hasArrivalDemand(params)
     ? true
     : (st.capMet &&
-        !(capSpent || lampSpent || gearSpent || controllerSpent || lawfulSpent)) ||
+        !(
+          capSpent ||
+          lampSpent ||
+          gearSpent ||
+          cockpitSpent ||
+          controllerSpent ||
+          lawfulSpent
+        )) ||
       contractEarned;
   // ── THE WAITED-FOR PERSON (see `ReachZoneWitnessDemands`) ─────────────────
   // A pure per-frame read of the session's staged-outcome record, OUTSIDE the

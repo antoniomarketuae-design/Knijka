@@ -272,7 +272,61 @@ export interface LessonSpec {
    *  SNOW weather (doc 72 AC-08 winter grip): a LIGHTER cold haze + milder
    *  dim (SimEnvironment snowWeather specs), and the runtime feeds tick.snow
    *  so the snow conditions envelope arms (no lamp duty). Additive — absent =
-   *  today's clear/rain behavior, byte-identical. */
+   *  today's clear/rain behavior, byte-identical.
+   *
+   *  THERE IS NO SEASON HERE, AND THAT IS THE ADDRESS OF TWO STANDING AUDIT
+   *  ROWS — sc-ac-bridge-ice:7eb16029 and sc-ac-ice:5372f176. Both lessons
+   *  author `weather: "dry"` (correctly: black ice is invisible and a dry
+   *  black street IS the lesson) and both open on a briefing that says
+   *  «зимна сутрин е около нулата» over full-leaf green trees, a blue sky and
+   *  warm sun on the facades. Re-measured 2026-08-28 on
+   *  `.audit-frames/w14/frames/sc-ac-ice__pc-right/03-ready.png` and
+   *  `…/sc-ac-bridge-ice__pc-right/03-ready.png` — two DIFFERENT districts,
+   *  mean sRGB over identical rectangles: sky 153.8/170.8/191.6 in both,
+   *  facade 137.6/148.5/161.7 vs 137.5/148.5/161.6, tree canopy 73.4/97.4/75.5
+   *  vs 73.8/97.7/75.6, near road L117.3 vs L117.5. Two lessons, one summer
+   *  morning, to within a third of a level on every band.
+   *
+   *  WHY NO WINTER FLAG IS ADDED HERE BY THE LANE THAT WROTE THIS NOTE. A
+   *  boolean on this line is inert on its own: nothing between it and the
+   *  render rig would read it, and this corpus has measured 51 of 82 audited
+   *  repairs shipping exactly that — a correct value with no consumer. The
+   *  chain is six edits in five files and only this one is in the weather
+   *  lane's ownership, so the flag is specified here and landed together with
+   *  its readers, or not at all:
+   *    1. THIS line — `winter?: boolean` beside rain/fog/snow. It is a SEASON,
+   *       orthogonal to `timeOfDay`, and must not be spelled as a fourth
+   *       time-of-day: `TimeOfDay` is `Record`-keyed at `RainStreaks.tsx:33`
+   *       and `SnowFlakes.tsx:46`, so widening that union turns an authoring
+   *       change into a compile error in two render files — and a winter DUSK
+   *       is a lesson someone will want.
+   *    2. `lessons/scenario/types.ts` `ConditionAxis` — `winter?: boolean`.
+   *       The authoring vocabulary is `weather?: "dry"|"rain"|"fog"|"snow"`
+   *       and none of those four is a season; „dry" is what the ice pair
+   *       needs to keep saying about the SURFACE.
+   *    3. `lessons/scenario/compile.ts:1140-1148` — the one site that folds
+   *       ConditionAxis into this field. Add `winter` to the guard and one
+   *       more spread line.
+   *    4. `components/sim/LessonScene.tsx:1469-1477` + `:2190` — read it
+   *       beside `timeOfDay`/`rain`/`fog`/`snow` and pass `winter={winter}`
+   *       into `<SimEnvironment>`; that component already forwards its rig to
+   *       `SkyDome`.
+   *    5. `environment/SimEnvironment.tsx` — accept the prop and grade the
+   *       preset through a pure `winterGrade(preset)` exported from
+   *       `environment/presets.ts`: cold low key, blue-shifted hemisphere, no
+   *       warm facade bounce. The grade is data and belongs in presets; the
+   *       selection is a prop and belongs in the component.
+   *    6. The world module — bare trees and grey verges. This is the half a
+   *       student actually sees: a winter light grade under full-leaf green
+   *       canopies still photographs as July, so shipping 1-5 alone would
+   *       close neither row.
+   *  Then author `winter: true` on the two ice templates and on sc-ac-snow.
+   *
+   *  AND ONE HALF OF 5372f176 IS NOT A SEASON PROBLEM AT ALL: „the two ice
+   *  lessons are IDENTICAL" is `world/builders/worldRim.ts:264`, whose mass
+   *  ids (`world-rim-${side}-${i}`) carry no district, so two districts with
+   *  the same bounds get the same belt, mass for mass, height for height,
+   *  facade variant for facade variant. No flag on this line can move that. */
   environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean; fog?: boolean; snow?: boolean };
   /**
    * ADR-006 stage 4a — OPT-IN physics overrides for the LIVE VehicleSim.
@@ -1235,7 +1289,65 @@ export interface PoliceStopSpec extends StagedEventBase {
 export interface TelltaleStimulusSpec extends StagedEventBase {
   kind: "telltaleStimulus";
   /** Which lamp lights. v1: the red engine-temperature telltale (ЗДвП чл. 20
-   *  doctrine: red = спри безопасно сега). */
+   *  doctrine: red = спри безопасно сега).
+   *
+   *  READ THIS BEFORE WIDENING THE UNION — THE FIELD IS NOT READ BY ANYTHING.
+   *  Checked in the tree 2026-08-28, not assumed: `grep -rn '\.lamp\b'` over
+   *  `platform/src` returns two COMMENTS (templates-hazards2.ts:1171,
+   *  traces/scHzBreakdownPulloff.ts:73) and no code.
+   *  `TelltaleStimulusRunner` (orchestrator/runners.ts:3704-3745) takes the
+   *  whole spec and touches `trigger`/`triggerDistM`/`stop`/`stopRadiusM`/
+   *  `stopSpeedKmh`/`ignoreBeyondM` only; the channel it raises is the
+   *  BOOLEAN `telltaleLit` (`:3710`, `:3743`), the director ORs every runner's
+   *  into one bit (`orchestrator/director.ts:113-114`,
+   *  `orchestrator/types.ts:138`), `LessonScene.tsx:4226-4228` copies that bit
+   *  to a ref, `VitokCockpit.tsx:1649` assigns it to `tempWarnOn`, and
+   *  `cockpit/clusterReadout.ts:135` turns it into `set(out.temp, "warn")`.
+   *  One bit, one lamp, one colour. So adding `| "checkEngine"` here alone
+   *  changes nothing on screen — it makes a wider dead field.
+   *
+   *  THAT SINGLE COLOUR IS THE ADDRESS OF sc-vp-telltale-red:775b58cc
+   *  (critical). SC_VP_TELLTALE_RED's whole subject is the TRIAGE — «цветът на
+   *  лампата решава какво правиш», amber = carry on calmly to a garage, red =
+   *  pull over now — and its own template docblock already records the
+   *  „HONEST LIMIT" that the amber half is narrative only. Looked at, not
+   *  only read: on `.audit-frames/w10-4/frames/sc-vp-telltale-red__mobile-
+   *  right/04-t106s.png`, crop (1150,950 400×220) at 5×, the two lit lamps are
+   *  the same salmon-red and nothing on the cluster is amber. A student cannot
+   *  practise a discrimination the instrument cannot express.
+   *
+   *  THE PAINTER IS NOT THE PROBLEM — `clusterReadout.ts` already has the
+   *  amber class (`LampTone` „caution", used by `out.engine` while the engine
+   *  is not turning) and `InstrumentCluster` paints it. The missing link is a
+   *  SECOND stimulus channel, and it is six edits in five files, none of them
+   *  in the weather lane's ownership:
+   *    1. THIS union — `lamp: "temperature" | "checkEngine"`, and START READING
+   *       IT in the runner. Only the union widens here; no new spec kind is
+   *       needed, because a template that wants both cues simply stages TWO
+   *       `telltaleStimulus` events on one route (the amber earlier, the red
+   *       at the existing trigger).
+   *    2. `orchestrator/runners.ts:3710/3743` — raise the channel the spec
+   *       NAMES: keep `telltaleLit` for `"temperature"`, add
+   *       `telltaleCautionLit` for `"checkEngine"`.
+   *    3. `orchestrator/director.ts:113-114` + `orchestrator/types.ts:138` —
+   *       OR the second channel the same way, as a second getter.
+   *    4. `components/sim/LessonScene.tsx:1799/2300/2320/4226-4228` and
+   *       `components/sim/VehicleRig.tsx:293/397/695` — a second ref, threaded
+   *       exactly like `telltaleLitRef`.
+   *    5. `components/sim/vitok/VitokCockpit.tsx:1649` +
+   *       `modules/sim/cockpit/clusterReadout.ts:32/48/135` — a
+   *       `cautionWarnOn` input; the engine lamp becomes
+   *       `set(out.engine, input.cautionWarnOn || !input.engineOn ?
+   *       "caution" : "off", input.cautionWarnOn)` so the staged amber pulses
+   *       and the cold-engine amber keeps its steady behaviour.
+   *    6. `lessons/scenario/templates-cockpit2.ts:213-236` — stage the amber
+   *       event ahead of the „continue-smoothly" checkpoint and retire the
+   *       „HONEST LIMIT" paragraph.
+   *  ADR-002: this needs NO new offence code and NO new article. The duty is
+   *  the one the template already cites (ЗДвП чл. 20 / чл. 139, doc-65
+   *  ev-warning-light), the runner emits zero SimTick events either way, and
+   *  the grading stays the two existing objectives. It is a STIMULUS change
+   *  only. */
   lamp: "temperature";
   /** The lamp lights when the player first comes within `triggerDistM` of
    *  this point while moving (or has already passed it — the backstop, so a

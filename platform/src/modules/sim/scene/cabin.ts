@@ -19,6 +19,56 @@ import { SCENARIO_TEMPLATES, scenarioById } from "@/modules/sim/lessons";
 
 export type IndicatorSetting = "off" | "left" | "right";
 export type HeadlightSetting = "off" | "low" | "high";
+/**
+ * THE THREE GLANCES THE CAR CAN PERFORM — AND THE FOURTH IT CANNOT.
+ *
+ * There is no SHOULDER member, and this line is the reason five graded rows
+ * across the catalogue cannot be closed. Read this before adding one.
+ *
+ * WHAT THE PRODUCT ASKS FOR. `sc-pk-move-off` briefing step 4 reads «Хвърли
+ * поглед и през ЛЯВОТО рамо — в мъртвата зона, която огледалото не показва»
+ * (templates-cockpit.ts:224); `sc-vp-handbrake` step 3 says the same
+ * (templates-cockpit2.ts:109) and then authors it as a RUBRIC MOMENT,
+ * „Поглед през ляво рамо в мъртвата зона" (:137). Neither platform has a
+ * control that answers it — the ten painted mobile stations are Изглед,
+ * Пауза, two Мигач, Клакс, Кола, Колан and three Огледало; the key list is
+ * Q / E / F, the three members below. The student is told to do something
+ * the interface cannot accept, and then graded on it.
+ *
+ * WHAT THE PRODUCT DOES INSTEAD, WHICH IS WORSE THAN NOTHING. Because the
+ * fourth kind does not exist, the LEFT DOOR MIRROR has been made to stand in
+ * for the blind spot in three places: `scVpHandbrake.ts:81` records
+ * `{ kind: "glance", mirror: "left" }` under the comment „mirror + shoulder";
+ * `rules/engine.ts:2159-2163` discharges MOVE_OFF_WITHOUT_OBSERVATION (an
+ * основна fault) on `lastGlanceAt.left ?? lastGlanceAt.rear`; and until it was
+ * fixed, `lessons/scenario/observation.ts` credited a shoulder moment from a
+ * glance of any kind. The mirror cannot see the blind spot — that is the
+ * definition of the blind spot — so every one of those teaches a
+ * seventeen-year-old the one habit that gets a cyclist killed on a move-off.
+ *
+ * ADDING THE MEMBER IS NOT THE FIX ON ITS OWN, AND ALONE IT BREAKS THE BUILD.
+ * A fourth kind must arrive together with all of these, in one change:
+ *   · `components/sim/CameraRig.tsx:290` — `GLANCE_OFFSETS`, a
+ *     `Record<MirrorGlanceKind, {yaw, pitch}>`, and `REAR_VIEW_FOV_DEG`
+ *     beside it: both stop compiling the moment a member is added, and a
+ *     shoulder look needs a real yaw (past the B-pillar, ~±1.9 rad) rather
+ *     than a mirror aspect;
+ *   · `modules/sim/engine/glanceView.ts:54` — `GlanceViewMirror`, the
+ *     structurally identical twin that must stay assignable, and
+ *     `CHASE_GLANCE_ASPECT_RAD` keyed by it;
+ *   · `scene/vitok/cabinLook.ts:65` — `CabinLookPoseId`, so the MOUSE can
+ *     reach it (founder FR-17/FR-25: „first and upmost it must be with the
+ *     mouse"), and `vitok/hotspots.ts:52`;
+ *   · `components/sim/TouchControls.tsx` — the «РАМО» station, which that
+ *     file has already sized (44 px, ≥60 px of caption room) and declined to
+ *     add while this line stops at three;
+ *   · `rules/engine.ts:236` `lastGlanceAt: Record<MirrorKind, …>` and :2159 —
+ *     without this the glance is a camera trick, not a graded act, and
+ *     grading is the whole of the rows above.
+ * `modules/sim/engine/reverseView.ts:57` states the same gap from its own
+ * side: the shoulder check is automatic-on-R only, with no button for a
+ * student who wants to look on demand.
+ */
 export type MirrorGlanceKind = "left" | "right" | "rear";
 
 /** Indicator blink period (s): 600 ms full cycle => 300 ms on / 300 ms off. */

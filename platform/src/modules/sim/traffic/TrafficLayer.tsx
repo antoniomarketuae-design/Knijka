@@ -125,13 +125,28 @@ import {
   BOXY_MAX_INSTANCES,
   BOXY_MAX_INSTANCES_LOW,
   buildAnimalRig,
+  buildSprayCurtain,
   buildTrafficFleet,
+  disposeSprayCurtain,
   disposeTrafficFleet,
   DRACO_DECODER_PATH,
+  emitsSpray,
   FLEET,
   FLEET_URLS,
+  SPRAY_SLABS,
+  sprayActiveSlabs,
+  sprayDensity,
+  spraySlabShape,
   updateEmergencyStrobe,
 } from "./vehicleFleet";
+// ВОДНАТА ПЕЛЕНА reads the LIVE weather store, not a prop, and that is on
+// purpose: `SimEnvironment` already owns the rain ramp (it calls
+// setWeatherTarget/stepWeather every frame from `lesson.environment.rain`), and
+// `RainStreaks` / `SkyDome` / `WindshieldDroplets` all read the same store the
+// same way inside their own useFrame. A second rain channel plumbed as a prop
+// could disagree with the sky, and a plume that outlives the storm is exactly
+// the dishonesty this row was filed about.
+import { getRainIntensity } from "../environment/weather";
 
 // Pedestrian palettes: tops (existing 4 variants) + trousers per variant.
 const PED_COLORS = ["#b8895a", "#6d8a67", "#7a6f9b", "#a0524d"];
@@ -1185,6 +1200,30 @@ export function bubbleWhollyVisible(
 const BUBBLE_ANFAS_ENTER = 0.55;
 const BUBBLE_ANFAS_EXIT = 0.45;
 
+/**
+ * Fraction of the viewport's HEIGHT, measured down from the top, that belongs
+ * to the play shell's control strip and may never be painted over by a world
+ * caption.
+ *
+ * MEASURED, not chosen. On `.audit-frames/w10-2/frames/sc-signal-controller__
+ * mobile-right/04-t046s.png` (2556 × 1179 device px) the МЕНЮ / ИЗГЛЕД / ПАУЗА
+ * pills are circles whose lowest ink sits at y ≈ 150 px — 12.7 % of the frame.
+ * On that same frame the caption card's top edge is at y ≈ 103, i.e. INSIDE the
+ * ПАУЗА pill: its dark body and its green accent border run through the pill's
+ * lower-right quadrant and a green world glyph is painted inside the circle.
+ * 0.13 is that measurement rounded away from the HUD.
+ *
+ * WHY `bubbleWhollyVisible` COULD NOT CATCH THIS, and why this is a second
+ * gate rather than a wider version of the first: that predicate asks whether
+ * the card fits in the VIEWPORT. This card fits the viewport perfectly. It is
+ * whole, it is legible, and it is lying across a button. The two failures are
+ * different questions and the earlier lane answered only one of them.
+ */
+export const HUD_TOP_RESERVED_FRAC = 0.13;
+
+/** NDC y above which a point is inside the reserved strip (NDC +1 = top). */
+const HUD_TOP_NDC = 1 - 2 * HUD_TOP_RESERVED_FRAC;
+
 /** Left+right ink margin inside the card, px of the 1024 px canvas. The
  *  border stroke is 7 px and the corner radius 34, so 44 keeps a centred line
  *  clear of the rounded accent frame rather than merely inside the bitmap. */
@@ -1525,6 +1564,32 @@ export function TrafficLayer({
   // Parked-car blob shadows (static, placed with the parked pass).
   const parkBlobRef = useRef<InstancedMesh>(null);
 
+  // ВОДНАТА ПЕЛЕНА (FO-04/FO-06) — the spray curtain trailing every heavy
+  // staged vehicle. `sprayIdx` maps vehicle index -> emitter ordinal, or -1;
+  // it is built ONCE per system, so the frame loop never asks a Set anything.
+  // A lesson that stages no truck/van/emergency gets nSprayEmitters === 0, the
+  // whole block below is never mounted and the cost is one `> 0` test.
+  const sprayIdx = useMemo(() => {
+    const map = new Int32Array(system.vehicles.length).fill(-1);
+    let n = 0;
+    for (let i = 0; i < system.vehicles.length; i++) {
+      if (emitsSpray(system.vehicles[i])) map[i] = n++;
+    }
+    return { map, count: n };
+  }, [system]);
+  const nSprayEmitters = sprayIdx.count;
+  const sprayRef = useRef<InstancedMesh>(null);
+  const sprayCurtain = useMemo(
+    () => (nSprayEmitters > 0 ? buildSprayCurtain() : null),
+    [nSprayEmitters],
+  );
+  useEffect(
+    () => () => {
+      if (sprayCurtain) disposeSprayCurtain(sprayCurtain);
+    },
+    [sprayCurtain],
+  );
+
   // Pedestrian part geometries — origin baked at the joint (shoulder/hip) so
   // one instance matrix swings the limb; torso origin at the hips. Owned here,
   // disposed on unmount.
@@ -1840,6 +1905,11 @@ export function TrafficLayer({
     const head = headRef.current;
     const blink = blinkRef.current;
     const wheel = fleet.wheel;
+    // ВОДНАТА ПЕЛЕНА: null on every lesson that stages no heavy vehicle, so the
+    // store is not even read there. `getRainIntensity` is the same 0..1 ramp
+    // the sky and the windshield are already reading this frame.
+    const spray = nSprayEmitters > 0 ? sprayRef.current : null;
+    const rainNow = spray ? getRainIntensity() : 0;
     if (vehBlob && brake && head && blink && wheel) {
       let blinkColorDirty = false;
       for (let i = 0; i < nVeh; i++) {
@@ -1893,6 +1963,14 @@ export function TrafficLayer({
             }
           } else {
             for (let w = 0; w < 4; w++) wheel.setMatrixAt(i * 4 + w, dummy.matrix);
+          }
+          // A culled emitter's curtain goes with it — otherwise the plume of a
+          // truck 500 m behind you hangs in the air at the draw-distance edge.
+          if (spray && sprayIdx.map[i] >= 0) {
+            const e = sprayIdx.map[i];
+            for (let sl = 0; sl < SPRAY_SLABS; sl++) {
+              spray.setMatrixAt(e * SPRAY_SLABS + sl, dummy.matrix);
+            }
           }
           scratch.prevYaw[i] = yaw;
           continue;
@@ -1957,6 +2035,49 @@ export function TrafficLayer({
           dummy.updateMatrix();
           blink.setMatrixAt(i * 2 + side, dummy.matrix);
         }
+
+        // ВОДНАТА ПЕЛЕНА — the curtain THIS vehicle throws off THIS vehicle's
+        // tyres (sc-ac-truck-spray briefing 3/4/9). It is written here, inside
+        // the emitter's own placement, for the reason the whole row turns on:
+        // the plume is the truck's, it trails the truck's `rearZ`, and it has
+        // to end up BETWEEN the eye and the truck's tail lamps — which a
+        // scene-wide weather value can never do.
+        if (spray && sprayIdx.map[i] >= 0) {
+          const e = sprayIdx.map[i];
+          const tailX = tx + rig.rearZ * sin;
+          const tailZ = tz + rig.rearZ * cos;
+          // The camera IS the student's eye (CameraRig seats it in the
+          // cockpit), so this gap is literally the one briefing 9 talks about:
+          // close in and you buy MORE curtain, not more sight.
+          const ex = tailX - cam.x;
+          const ez = tailZ - cam.z;
+          const eyeGapM = Math.sqrt(ex * ex + ez * ez);
+          const k = sprayActiveSlabs(sprayDensity(rainNow, v.speedMps, eyeGapM));
+          // Cylindrical billboard toward the eye: a curtain seen edge-on is a
+          // line, and the one view that matters here is from directly behind.
+          const faceYaw = Math.atan2(cam.x - tailX, cam.z - tailZ);
+          for (let sl = 0; sl < SPRAY_SLABS; sl++) {
+            if (sl < k) {
+              const shape = spraySlabShape(sl, rig.halfWidth);
+              const oz = rig.rearZ - shape.backM;
+              dummy.position.set(tx + oz * sin, shape.centerY, tz + oz * cos);
+              dummy.rotation.set(0, faceYaw, 0);
+              dummy.scale.set(shape.widthM, shape.heightM, 1);
+            } else {
+              // Unused slabs collapse to nothing — the density IS how many are
+              // switched on, so a dry road leaves all five at scale 0.
+              dummy.position.set(tx, 0, tz);
+              dummy.rotation.set(0, 0, 0);
+              dummy.scale.set(0, 0, 0);
+            }
+            dummy.updateMatrix();
+            spray.setMatrixAt(e * SPRAY_SLABS + sl, dummy.matrix);
+          }
+          // Hand the scratch back exactly as the wheel block below expects it.
+          dummy.scale.set(1, 1, 1);
+          dummy.rotation.set(0, yaw, 0);
+        }
+
         // Wheels — qYaw(+steer on fronts) * roll about local X. Standard
         // models: the shared X-axial geometry scaled to the model radius.
         // Custom-wheel models (hero SUV): the model's own left/right meshes
@@ -2045,6 +2166,7 @@ export function TrafficLayer({
       brake.instanceMatrix.needsUpdate = true;
       head.instanceMatrix.needsUpdate = true;
       blink.instanceMatrix.needsUpdate = true;
+      if (spray) spray.instanceMatrix.needsUpdate = true;
       if (blinkColorDirty && blink.instanceColor) blink.instanceColor.needsUpdate = true;
     }
 
@@ -2302,7 +2424,41 @@ export function TrafficLayer({
           // curb warden are no longer the same size. Reading it back out of the
           // per-actor scratch is what keeps the two from ever drifting apart.
           const headY = PED_HEAD_Y * scratch.pedHeight[bubbleOwner];
-          const cy = headY + BUBBLE_GAP_M + (BUBBLE_H_M * s) / 2;
+          const halfH = (BUBBLE_H_M * s) / 2;
+          let cy = headY + BUBBLE_GAP_M + halfH;
+
+          // KEEP IT OFF THE CONTROLS (sc-signal-controller:3598e38c). A card
+          // that grows with range climbs the frame: at the far end of the band
+          // its top edge lands in the top 8–9 % of a phone viewport, which is
+          // where МЕНЮ / ИЗГЛЕД / ПАУЗА live, and it was photographed drawing
+          // its body and its accent border THROUGH the ПАУЗА pill.
+          //
+          // The card comes DOWN rather than disappearing, because the caption
+          // is the teaching and the pill is only a button. The budget it may
+          // spend is bounded by the officer himself: his SHOULDERS are the
+          // posture (`officerArmTarget` swings the arms about them), so the
+          // card's lower edge may descend to his shoulder line and no further.
+          // Past that the card would bury the very gesture it captions, and a
+          // hidden card is honest where a card over the arms is not.
+          const shoulderY = PED_SHOULDER_Y * scratch.pedHeight[bubbleOwner];
+          const dropBudget = Math.max(0, headY + BUBBLE_GAP_M - shoulderY);
+          scratch.v3.set(ox, cy + halfH, oz).project(frame.camera);
+          let hudClear = scratch.v3.y <= HUD_TOP_NDC;
+          if (!hudClear && dropBudget > 0) {
+            const above = scratch.v3.y;
+            // One metre lower, to read the local NDC slope. The perspective
+            // divide makes this non-linear, so the result is a first guess that
+            // the re-projection below either accepts or refuses — never a
+            // number anything is asserted on.
+            scratch.v3.set(ox, cy + halfH - 1, oz).project(frame.camera);
+            const perM = above - scratch.v3.y;
+            if (perM > 1e-4) {
+              cy -= Math.min(dropBudget, (above - HUD_TOP_NDC) / perM);
+              scratch.v3.set(ox, cy + halfH, oz).project(frame.camera);
+              hudClear = scratch.v3.y <= HUD_TOP_NDC;
+            }
+          }
+
           bubble.position.set(ox, cy, oz);
           bubble.scale.set(s, s, 1);
           bubble.quaternion.copy(frame.camera.quaternion); // billboard
@@ -2316,11 +2472,11 @@ export function TrafficLayer({
             cy,
             oz,
             (BUBBLE_W_M * s) / 2,
-            (BUBBLE_H_M * s) / 2,
+            halfH,
             scratch.bubbleWhole,
             scratch.v3,
           );
-          bubble.visible = scratch.bubbleWhole;
+          bubble.visible = scratch.bubbleWhole && hudClear;
         }
       }
     }
@@ -2464,6 +2620,24 @@ export function TrafficLayer({
         <boxGeometry args={[0.12, 0.1, 0.08]} />
         <meshBasicMaterial color="#ffffff" toneMapped={false} />
       </instancedMesh>
+
+      {/* ВОДНАТА ПЕЛЕНА — SPRAY_SLABS camera-facing quads trailing each heavy
+          staged vehicle (sc-ac-truck-spray). Mounted ONLY when the lesson
+          stages an emitter, exactly like the parked-blob pass: one extra draw
+          call and ~10 triangles on the four templates that need it, and
+          literally nothing anywhere else. Geometry + material are the shared
+          curtain from vehicleFleet (the rig owns its own plume); `dispose`
+          stays with the buildSprayCurtain cleanup effect above, so React must
+          not free them on unmount. */}
+      {sprayCurtain ? (
+        <instancedMesh
+          name="traffic-spray"
+          ref={sprayRef}
+          args={[sprayCurtain.geometry, sprayCurtain.material, nSprayEmitters * SPRAY_SLABS]}
+          frustumCulled={false}
+          dispose={null}
+        />
+      ) : null}
 
       {/* Pedestrians — articulated six-part skeleton, one InstancedMesh per
           part (arms/legs pack 2 instances per agent). */}

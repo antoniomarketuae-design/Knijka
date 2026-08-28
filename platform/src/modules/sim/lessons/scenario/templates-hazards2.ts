@@ -1190,11 +1190,65 @@ export const SC_HZ_BREAKDOWN_PULLOFF: ScenarioSpec = {
   success: [
     {
       id: "sc-hzbp-approach",
-      titleBg: "Мини участъка с разрешена скорост",
+      /**
+       * ONE WORD WAS CERTIFYING 2,600 METRES THAT A 12 m DISC NEVER SAW —
+       * sc-hz-breakdown-pulloff:c375e345, routed VERIFIED to this file by r16
+       * („Routing to templates-hazards2.ts is the right address").
+       *
+       * THE FRAME. `.audit-frames/sweep161/sc-hz-breakdown-pulloff/pc-wrong/
+       * 08-debrief.png` — **4 наказателни точки · НЕИЗДЪРЖАН**, four counts of
+       * «Превишена скорост» after a 145 км/ч run in a 140 zone — printed on the
+       * same protocol as «✓ Мини УЧАСТЪКА с разрешена скорост 0:41». The
+       * product convicts the speeding and hands out a certificate that the
+       * section was driven lawfully, in one document.
+       *
+       * WHAT IS AND IS NOT WRONG HERE, because getting this backwards is how
+       * the row survived two waves. The GATE is honest: this disc stands at
+       * y = 200 of a route that ends at y = 378, it carries `maxSpeedKmh` 130
+       * under a posted 140, and its banner's «разрешена скорост» derives
+       * `requireLawfulSpeed` (objectives.ts — the /разрешена(та) скорост/
+       * matcher), which reads `SimTick.maxSpeedKmh` off the road itself. The
+       * drive was doing 86–95 when it crossed, so the tick at 0:41 states
+       * something TRUE. The 145 км/ч happened ~900 m later, on road this
+       * objective had already been spent on.
+       *
+       * THE WORD «УЧАСТЪКА» IS THE FALSEHOOD, and it is not fixable by tuning
+       * the number. `requireLawfulSpeed` is an AT-MARK arm by construction — it
+       * rides the `capMet` latch, earned and spent on the swept face and its
+       * approach capsule — so no cap on a point disc can witness a section, and
+       * `ReachZoneParams` has no term that spans one. Tightening 130 would have
+       * been the wrong repair twice over: it does not reach the 145, and on a
+       * road posted 140 it would start REFUSING a student cruising a lawful,
+       * safe 110 the „разрешена скорост" banner had just told him was fine —
+       * a false refusal, which the founder ranks worst.
+       *
+       * SO THE BANNER NAMES THE PLACE IT STANDS. «Мини контролната зона с
+       * разрешена скорост» is the same sentence this catalogue already uses for
+       * a checkpoint disc (`sc-acn-lit`, `sc-vpr-ready`), it keeps the
+       * /разрешена скорост/ substring so the derived `requireLawfulSpeed`
+       * demand is untouched, and it stops claiming road the objective was never
+       * on. Same law this family applied to `sc-obs-cleared` and `sc-acw-pass`:
+       * a gate may not say a word its params cannot spend.
+       *
+       * ROUTED, NOT SILENTLY DROPPED — two things this cannot reach:
+       *  1. a `sinceArmed` window term (‘no speeding fault booked between this
+       *     objective arming and completing’) would let a banner honestly say
+       *     «участъка». That is `lessons/objectives.ts` + the evaluator, not a
+       *     template;
+       *  2. the reason the 145 was reachable at all is that this drill's
+       *     TERMINAL is `sc-hzbp-stop`, and `lessons/engine.ts` steps
+       *     `routeFinishZone` only while the chain is NOT on its terminal — so
+       *     a car that overruns the emergency-lane stop has 2,200 m of mw-v1
+       *     left and nothing to end it (`terminalDepartureZone` is pinned
+       *     `null`). The harness force-closed that leg; a student would sit in
+       *     it. Reported, and NOT claimed closed here.
+       */
+      titleBg: "Мини контролната зона с разрешена скорост",
       // Right-lane checkpoint BEFORE the trigger (y 200 < 250) — the objectives
       // complete in order, so the pull-off stop below is graded only on the far
       // side of the stimulus. Limit is 140; 130 keeps the gate lawful without
-      // forcing a crawl.
+      // forcing a crawl (the shadow crosses here at 95, the pace instruction 1
+      // asks for).
       params: { kind: "reachZone", x: BP_X_CRUISE, y: 200, radiusM: 12, maxSpeedKmh: 130 },
     },
     {

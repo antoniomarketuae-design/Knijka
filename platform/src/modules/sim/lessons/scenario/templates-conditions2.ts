@@ -1113,11 +1113,102 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
       // leaves the lane, the clip demo never reaches the far marker — so чл. 20
       // ал. 2 is graded by the objective and the LANE discipline by the shipped
       // POOR_LANE_KEEPING detector.
-      params: { kind: "reachZone", x: MW_X_OVERTAKE, y: 340, radiusM: 12, maxSpeedKmh: 100 },
+      //
+      // ── THE RADIUS WAS TWICE THE LANE PITCH, SO „ИЗЛЕЗ В ЛЯВАТА ЛЕНТА" WAS
+      //    EARNED WITHOUT LEAVING THE RIGHT ONE — 2026-08-28,
+      //    sc-ac-wind-truck-pass:aa37b361 (routed here by lane r07, endorsed by
+      //    verifier r16 as „a better diagnosis than the row's") ──────────────
+      //
+      // The retitle above was correct and insufficient. It moved the banner
+      // onto the two things a capped zone in the overtaking lane really does
+      // prove — but only ONE of them was actually provable, because the zone
+      // could not tell the two lanes apart. mw-v1's own meta says it in
+      // numbers: `laneCruiseX: 0`, `laneLeftX: -8.12` — a pitch of 8.12 m —
+      // against `radiusM: 12`, widened by the L1 ladder to 17. A car that never
+      // touched the steering, cruising straight up x = 0, sits 8.12 m from this
+      // mark: inside the disc at EVERY rung. So the half of the banner that
+      // says «в ЛЯВАТА лента» was decided by a circle that contains both lanes,
+      // and the drive in the frames — wheel untouched, road ahead empty —
+      // collected it.
+      //
+      // 4.5 IS THE LANE, MEASURED, NOT A SMALLER-IS-SAFER GUESS. The drawn lane
+      // is 8.12 m, so its half-width is 4.06: a radius of 4.5 accepts the whole
+      // of the overtaking lane INCLUDING both its edges, and `stepReachZone`
+      // bounds the approach capsule's LATERAL term by the same radius, so the
+      // acceptance never leaks sideways however long the approach. The ladder
+      // widens by `min(0.5·r, REACH_ZONE_GRACE_M, chainCap)`, giving 6.75 at L1
+      // and 4.5 at L3–L5 — still 1.4 m short of the cruise lane's centre line
+      // at the most forgiving rung. One number, two properties: no honest line
+      // through the correct lane is refused at any rung, and no line through
+      // the wrong one is credited at any rung.
+      //
+      // The committed shadow passes 0.85 m from this mark at 70 км/ч
+      // (content/traces/sc-ac-wind-truck-pass/shadow-correct.trace.json), so
+      // `s-w9-bot-completion.test.ts`'s L3 chain keeps 3.6 m of margin.
+      params: { kind: "reachZone", x: MW_X_OVERTAKE, y: 340, radiusM: 4.5, maxSpeedKmh: 100 },
     },
     {
+      /**
+       * «ВЪРНИ СЕ В ДЯСНАТА ЛЕНТА» GETS A GATE THAT CAN SEE A LANE — and the
+       * terminal keeps the one property a terminal must have.
+       *
+       * THE ROW'S OWN QUOTE is this promise, off the debrief of the drive that
+       * never steered: «✓ Върни се в дясната лента и стигни края на отсечката
+       * 1:55». It was one objective doing two jobs badly. Its disc stood at the
+       * CRUISE lane (x = 0) with radiusM 12 → 17 at L1, so a car still sitting
+       * in the overtaking lane 8.12 m away was certified as having returned to
+       * the right one; and it is the LAST objective, which is the reason the
+       * obvious repair — shrink it, as the pass gate above was shrunk — is the
+       * wrong one and is deliberately not made.
+       *
+       * WHY SHRINKING THE TERMINAL WOULD HAVE BEEN A WORSE DEFECT THAN THE ONE
+       * IT CLOSED. `lessons/engine.ts` steps `routeFinishZone` only while the
+       * chain is NOT on its terminal objective; on the terminal the only escape
+       * is `terminalRescueZone`, which needs a STANDSTILL held 12 s within the
+       * zone, and `terminalDepartureZone` is pinned `null` at HEAD (see its
+       * block in engine.ts). A student who reaches y = 600 still in the
+       * overtaking lane would therefore have missed a tightened terminal disc,
+       * failed the rescue by not stopping, and driven on down 2,000 m of
+       * remaining motorway with no ending at all. Trading „it ticks a lane it
+       * cannot see" for „the lesson never finishes" is the trade doc 86 §7 R6
+       * forbids.
+       *
+       * SO THE CLAIM MOVES TO A GATE THAT CAN CARRY IT. This one is not
+       * terminal: miss it and the drive simply continues to y = 600, where the
+       * wide terminal ends the lesson normally and the debrief walks the task
+       * that stayed open — which is exactly the ending the student needs
+       * («не се прибра в дясната лента преди края»), instead of a hang. The
+       * lane pitch argument is the pass gate's, unchanged: 4.5 accepts the
+       * whole cruise lane and refuses the overtaking lane's centre at every
+       * rung.
+       *
+       * NO CAP, ON PURPOSE. This gate asks ONE question — which lane are you in
+       * — and `stepReachZone` arms its approach-grace capsule only for a zone
+       * carrying a speed or paint term. Leaving the cap off keeps the
+       * acceptance the swept disc itself, so the lane answer cannot be widened
+       * by a long approach. The speed through the gust is already graded twice:
+       * by `sc-acw-pass`'s cap 100 upstream and by POOR_LANE_KEEPING live on
+       * the real crosswind force.
+       *
+       * MEASURED: the committed shadow is at x = −0.12 at y = 469 and x = 0.00
+       * from y = 487 on, i.e. it has completed the return before this mark and
+       * passes within about 0.1 m of it at 76 км/ч, so the L3 bot-completion
+       * chain (`s-w9-bot-completion.test.ts`, which asserts `completedAll`)
+       * gains a task it already performs. ЗДвП чл. 20, ал. 2 is the law this
+       * whole drill cites and it is unchanged — nothing new is recalled here.
+       */
+      id: "sc-acw-back",
+      titleBg: "Прибери се обратно в дясната лента след изпреварването",
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 480, radiusM: 4.5 },
+    },
+    {
+      // THE BANNER KEEPS ONLY WHAT THIS DISC MEASURES. The lane half moved to
+      // `sc-acw-back` above (which can see a lane); what is left here is the
+      // arrival, and the arrival is all a 12 m → 17 m terminal disc can honestly
+      // certify. Same law this file already applies to «изпревари»: a gate may
+      // not say a word its params cannot spend.
       id: "sc-acw-finish",
-      titleBg: "Върни се в дясната лента и стигни края на отсечката",
+      titleBg: "Стигни края на отсечката",
       params: { kind: "reachZone", x: MW_X_CRUISE, y: 600, radiusM: 12 },
     },
   ],

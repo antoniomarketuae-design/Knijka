@@ -59,9 +59,89 @@ export const SC_HAZARD_OBSTACLE: ScenarioSpec = {
   ],
   success: [
     {
+      /**
+       * THE GATE THAT GRADED „THE APPROACH TO THE OBJECT" SEVENTY METRES
+       * BEFORE THE OBJECT — sweep161 + w10-4 (sc-hazard-obstacle:b103ec20,
+       * routed VERIFIED to this file by r16: „The gate is in the wrong place").
+       *
+       * THE FRAME. `.audit-frames/sweep161/sc-hazard-obstacle/pc-wrong/
+       * 08-debrief.png`: **0 наказателни точки · ИЗДЪРЖАН · ★★★ · +100 XP**,
+       * all three route tasks ticked, on the run whose own `run.log` reads
+       * „14 · 56 · 59 км/ч" past a stalled car in a street posted 50, whole
+       * section covered in 43 s, wheel never touched. Identical on mobile. The
+       * student's takeaway is that flooring it is the correct answer.
+       *
+       * WHY THE SPEED HALF DID NOT CATCH IT, which is the whole lesson of this
+       * row. The cap was not missing — it was 46 — and it still ticked, because
+       * the gate stood at **y = 60** while the obstacle stands at **(5.5, 130)**
+       * (`scene/scenarioSceneryProps.ts` HELD_SCENERY „sc-hazard-obstacle";
+       * `traces/scHazardObstacle.ts hazardObstacleRects()` is the same body).
+       * Seventy metres upstream is still inside the pull-away from the spawn:
+       * the „14" in that speed triple IS this gate, honoured at a place where
+       * every drive is slow because it has only just started moving. The
+       * certificate was earned before the subject of the lesson existed on
+       * screen, and the 56 and the 59 happened afterwards with nothing left to
+       * grade them. A cap cannot measure a manoeuvre it stands 70 m away from,
+       * however tight the number is; this was an ADDRESS defect wearing a
+       * speed defect's clothes, which is why three previous waves of number
+       * work never moved it.
+       *
+       * SO IT MOVES TO WHERE THE APPROACH IS: y = 110, twenty metres short of
+       * the body — two seconds at the speed this gate now asks for, which is
+       * the distance at which „намали ПЛАВНО, а не в последния момент"
+       * (instruction 2) is either already true or already too late. Measured
+       * against the committed shadow (content/traces/sc-hazard-obstacle/
+       * shadow-correct.trace.json), that is exactly where the model answer has
+       * finished braking: it holds 39.9 км/ч to y = 94, sheds speed between
+       * y = 94 and y = 104, and is steady at **26.1 км/ч from y ≈ 105 all the
+       * way past the obstacle**, easing from x 4.06 to x 2.00 as instruction 4
+       * describes. The gate is placed on the model answer's own plateau, not
+       * beside it.
+       *
+       * THE CAP IS DELIBERATELY UNCHANGED AT 46, and that restraint is part of
+       * the repair rather than an omission. 46 on a road posted 50 is still a
+       * loose reading of «контролирана» — the model answer does 26 — but
+       * tightening it is a SEPARATE authoring decision that this lane may not
+       * take alone: `__tests__/gate-keeps-half-its-headroom.test.ts:116` pins
+       * this gate's compiled L1 value at 48 by name, and its closing census
+       * („cards whose painted integer exceeds their graded cap", 99, „may only
+       * ever go DOWN") is arithmetic that any authored cap more than 5 км/ч
+       * under the sign necessarily grows: the L2 rung's 2.5 км/ч of grace lands
+       * on a half — authored 36 paints 39 over a gate of 38.5 — which is B58's
+       * own defect one decimal in, and the very class that test says is „a
+       * different repair in a different file". Measured before deciding:
+       * authored 36 moved the L1 row 48 → 41 and the census 99 → 100. So the
+       * number waits for the L2-grace repair in `scenario/params.ts`; the row
+       * is reported with both figures rather than closed by making a census
+       * worse. The ADDRESS above is what the finding was about and it stands on
+       * its own.
+       *
+       * THE MARGINS, BOTH DIRECTIONS, so this is a demand and not a trap:
+       *  · the shadow arrives at 26.1 км/ч against a compiled 48 at L1 / 46 at
+       *    L3, and `stepReachZone` grades `speed > cap + 5`, so the model
+       *    answer clears the refusal line by 27 км/ч. The L3 bot-completion
+       *    proof (`s-batch2-bot-completion.test.ts`, which drives this shadow
+       *    through the production pipeline and asserts the chain completes)
+       *    keeps its margin;
+       *  · the 56–59 км/ч drive in the frame is refused at EVERY rung — 56 is
+       *    over 48 + 5 — which is the behaviour the row was filed about, and it
+       *    is the MOVE that does it: at y = 60 that same drive was still doing
+       *    the „14" of its own speed triple and the gate had nothing to refuse;
+       *  · `mistake-hold-line` (30 км/ч) and `mistake-late-swerve` (40 км/ч)
+       *    still reach their COLLISION, which is the code
+       *    `sc-hazard-obstacle-traces.test.ts` asserts — that gate reads
+       *    violation codes, never objective credit, so neither demo is decided
+       *    on a geometry technicality.
+       *
+       * THEO-4 — the refusal is never bare. `lessons/engine.ts` speaks the cap
+       * in words at the moment it bites («Задачата иска да си тук с не повече
+       * от N км/ч, а в момента караш M км/ч») and `RouteGuidance` paints the
+       * same N across the lane before the student gets there, so the number is
+       * one he was shown, twice, before it cost him anything.
+       */
       id: "sc-obs-approach",
       titleBg: "Приближи обекта с контролирана скорост",
-      params: { kind: "reachZone", x: LANE_X, y: 60, radiusM: 12, maxSpeedKmh: 46 },
+      params: { kind: "reachZone", x: LANE_X, y: 110, radiusM: 12, maxSpeedKmh: 46 },
     },
     {
       id: "sc-obs-cleared",

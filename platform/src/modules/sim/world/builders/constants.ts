@@ -1134,6 +1134,21 @@ export const WORLD_RIM_SPAN_M = 34;
  */
 export const WORLD_RIM_STEP_M = 6;
 /**
+ * Height of the rim on a district with NO street-class carriageway, m — the
+ * motorway embankment / noise bank (wave 8, sc-mw-emergency-lane's «it does not
+ * read as a магистрала» and sc-ac-truck-spray's «an urban street lined with
+ * apartment blocks on both sides», both photographed on mw-v1, which authors
+ * ONE building over 2,606 m).
+ *
+ * 3.2 m is load-bearing at both ends and is mutated in `world-rim.test.ts`:
+ * BELOW ~2 m the belt stops closing the horizon and the „world simply runs out"
+ * row it was built for comes back through it; ABOVE the parked-fleet-plus-a-bit
+ * band it stops reading as ground and starts reading as building again, which
+ * is the defect. It is also taller than the hero (1.5 m) at 43 m out, so it is
+ * an edge the student can see from the carriageway and not a kerb he discovers.
+ */
+export const WORLD_RIM_BANK_HEIGHT_M = 3.2;
+/**
  * Thinnest a rim mass may end up, m, after its inner face has been pushed out
  * past frontage the map already authored inside the band. Below this the block
  * is a wall rather than a building — and it is not needed, because the mass

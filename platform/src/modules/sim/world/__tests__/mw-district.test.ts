@@ -458,3 +458,72 @@ describe("mw-v1: the divided carriageway the finding says is missing", () => {
     }
   });
 });
+
+/**
+ * WAVE 8 — THE РАЗДЕЛИТЕЛНА ИВИЦА.
+ *
+ * sc-mw-emergency-lane (major): «2600 m of motorway carrying exactly one
+ * vehicle — the staged broken-down car. No other traffic in either direction
+ * across 67 mobile and 74 pc frames, NO MEDIAN BARRIER BETWEEN THE CARRIAGEWAYS,
+ * no motorway sign, no gantry, no distance boards. It does not read as a
+ * магистрала.»
+ *
+ * Of the four objects it names, the barrier is the one the kit can draw
+ * honestly — Д5, the gantry and the distance boards are faces `SIGN_KINDS` does
+ * not hold, and this module's law is to place nothing rather than guess a face.
+ * It is also the one that is a DRIVING fact rather than a label: a barrier is
+ * why the oncoming direction may be treated as gone, why there is no turning
+ * round, and why a stop is only ever to the right.
+ */
+describe("mw-v1 — the motorway has a median barrier between its carriageways", () => {
+  const district = assertDistrict(loadRaw("mw-v1"));
+  const world = buildWorldGeometry(district, { seed: 7 });
+
+  it("runs continuously down the median for the whole 2.6 km", () => {
+    expect(world.stats.medianBarriers).toBe(world.medianBarriers.length);
+    // 2600 m at RAILING_RUN_M (6.055) = 429 whole panels, centred on the run.
+    expect(world.medianBarriers.length).toBe(429);
+    // CONTINUOUS, not the parapet's 5-on/4-off rhythm: consecutive panels are
+    // exactly one run apart with no gap anywhere. A guard rail with holes in it
+    // is not a guard rail.
+    const ys = world.medianBarriers.map((t) => -t.position[2]).sort((a, b) => a - b);
+    for (let i = 1; i < ys.length; i++) {
+      expect(ys[i] - ys[i - 1]).toBeCloseTo(6.055, 3);
+    }
+    expect(ys[0]).toBeGreaterThan(0);
+    expect(ys[ys.length - 1]).toBeLessThan(2600);
+  });
+
+  it("stands in the median, clear of both carriageways", () => {
+    // The two carriageways are the district's own: mw-e-nb on x = 0 and
+    // mw-e-sb on x = −30.37, each 3 lanes wide (halfWidth 12.19), so the median
+    // is x ∈ [−18.18, −12.19] and its centre is −15.185.
+    const xs = [...new Set(world.medianBarriers.map((t) => +t.position[0].toFixed(3)))];
+    expect(xs).toHaveLength(1);
+    expect(xs[0]).toBeCloseTo(-15.185, 2);
+    // …which is 2.995 m of clearance to each ribbon edge — the 6 m median the
+    // generator's own params.medianM names, halved.
+    expect(Math.abs(xs[0]) - 12.19).toBeGreaterThan(2.9);
+    expect(30.37 - Math.abs(xs[0]) - 12.19).toBeGreaterThan(2.9);
+  });
+
+  it("ADDITIVE: an undivided road gets none, and neither does a lone carriageway", () => {
+    // The control that matters is a district with motorway edges that are NOT
+    // an anti-parallel pair, and one with no motorway at all.
+    for (const id of ["zb-v1", "pk-busstop-v1", "hz-roadworks-v1"]) {
+      expect(buildWorldGeometry(assertDistrict(loadRaw(id)), { seed: 7 }).stats.medianBarriers, id)
+        .toBe(0);
+    }
+  });
+
+  it("NON-VACUITY: delete the second carriageway and the barrier goes with it", () => {
+    const oneWay: District = {
+      ...district,
+      roads: {
+        ...district.roads,
+        edges: district.roads.edges.filter((e) => e.id !== "mw-e-sb"),
+      },
+    };
+    expect(buildWorldGeometry(oneWay, { seed: 7 }).stats.medianBarriers).toBe(0);
+  });
+});

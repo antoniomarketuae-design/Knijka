@@ -226,9 +226,132 @@ export const SC_PK_MOVE_OFF: ScenarioSpec = {
   ],
   success: [
     {
+      /**
+       * THE CHIP THAT CERTIFIED A LANE IT COULD NOT SEE AND A SPEED IT NEVER
+       * READ — sweep161, `sc-pk-move-off/pc-wrong/04-t012s.png`
+       * (sc-pk-move-off:d7d45a4c).
+       *
+       * ONE FRAME CARRIES BOTH HALVES. At 0:12 the cluster reads **59 км/ч**,
+       * a «Превишена скорост» teach card is open on the right — „Движеше се
+       * над разрешената скорост… ЗДвП чл. 21, ал. 1" — and the task chip
+       * «Потегли и се нареди в дясната лента» is already GREEN. The product
+       * convicts the speed and certifies the manoeuvre on the same screen, in
+       * the same second, to the same seventeen-year-old.
+       *
+       * WHY IT WAS GREEN. The params were `{x: 4.06, y: 150, radiusM: 14}` — a
+       * place and nothing else, widened by the L1 ladder to **19 m**. Two
+       * separate lies follow from that one line:
+       *
+       *  · «в дясната лента» — vp-ready-v1 is a 1+1 street on an 8.125 m lane
+       *    pitch, so the OPPOSING lane centre is 8.12 m from this mark. A 19 m
+       *    disc swallows both lanes, both verges and the pavement: a car
+       *    completing the whole exercise on the wrong side of the road
+       *    collected a written certificate that it had settled into the right
+       *    one. The banner named a lane the gate could not distinguish.
+       *  · «карай центрирано ПОД ОГРАНИЧЕНИЕТО» (instruction 5) — no cap at
+       *    all. The sibling on this very map authors one (`sc-vpr-ready`
+       *    maxSpeedKmh 55); this one authored none, which is why the r06
+       *    controlled experiment is decisive: sc-vp-readiness and
+       *    sc-pk-move-off share vp-ready-v1, BOTH wrong lanes ran 59 км/ч, and
+       *    readiness REFUSED while move-off TICKED. Same map, same speed,
+       *    opposite verdicts — the difference is the authored key, and it is
+       *    authored here.
+       *
+       * THE RADIUS IS 4, AND 4 IS DERIVED, not chosen for feeling. The ladder
+       * widens by `min(0.5·r, REACH_ZONE_GRACE_M, chainCap)` (scenario/
+       * params.ts widenRadius), so 4 compiles to 6 at L1 and 4 at L3–L5, and
+       * `stepReachZone`'s approach capsule bounds LATERAL deviation by the same
+       * radius. Read against the 8.125 m lane that means, at EVERY rung: the
+       * whole of the correct lane is accepted (kerb-side x = 8.06 is 4.0 out,
+       * inside even the unaided ring) and the opposing lane centre at 8.12 m is
+       * refused. The claim becomes checkable without refusing one honest line
+       * through the student's own lane — which is why this is not simply „make
+       * it smaller".
+       *
+       * THE CAP IS THE SIGN, NOT A NEW NUMBER (ADR-002 — nothing here recalls a
+       * limit). vp-ready-v1 posts 50 and `map.params.maxspeedKmh` is 50, so
+       * `widenSpeedCap` compiles 50 at every rung: authored == posted leaves
+       * zero headroom for the grace to spend, which is exactly the B58 shape
+       * that file refuses to inflate. The authored cap is the WHOLE of the
+       * speed discipline this gate measures.
+       *
+       * `requireLawfulSpeed` IS NOT ENFORCED HERE — a hole, stated, not a
+       * tidy-up (wave 8). This objective carried `requireLawfulSpeed: true`
+       * beside the cap. It was meant to say „and also read `SimTick.maxSpeedKmh`
+       * — the limit the runtime resolves off the road itself — so if this drill
+       * is ever re-mapped the banner still cannot certify an overspeed." It
+       * could not compile, and it could not have worked, on two independent
+       * counts:
+       *
+       *  · `ReachZoneParams` (lessons/types.ts) declares no such field, so the
+       *    literal was a TS2353 excess property. The arm lives on
+       *    `ReachZoneWitnessDemands` (objectives.ts) — a widening interface the
+       *    AUTHORING type is not, by that interface's own docblock.
+       *  · even declared, `serializeObjectiveParams` (scenario/params.ts) emits
+       *    only maxSpeedKmh / acceptBeforeMarkM / requireNoContact /
+       *    requireRailClear for a reachZone, so the key would be dropped on the
+       *    way to the compiled `LessonObjective` and `parseObjectiveParams`
+       *    would never see it. The only live route into that arm from a
+       *    scenario template today is `deriveLawfulSpeedDemand(titleBg)`.
+       *
+       * DELETED RATHER THAN CAST THROUGH, because a cast ships exactly the
+       * `sc-swp-finish` shape this docblock convicts — a banner certifying a
+       * discipline no evaluator measures. WHAT THE DELETION DOES NOT COST: this
+       * drill is fixed to vp-ready-v1 at 50, so cap and sign are the same
+       * number and the sweep161 frame (59 км/ч, green chip) is refused either
+       * way. WHAT IT COSTS: the re-map guard. Move `map.districtId` to a road
+       * posted below 50 and the authored cap goes stale at 50 while the sign
+       * says less. ROUTED, NOT claimed closed — the two edits that would let
+       * this gate say it are `requireLawfulSpeed?: true;` on `ReachZoneParams`
+       * (lessons/types.ts) and one carry line in the reachZone case of
+       * `serializeObjectiveParams` (scenario/params.ts); both are other lanes'
+       * files.
+       *
+       * AND THE TITLE MAKES NO SPEED CLAIM — checked before deleting, because a
+       * deletion must not quietly re-create the defect above. «Потегли и се
+       * нареди в дясната лента» names a manoeuvre and a LANE; the lane is what
+       * radiusM 4 measures. It carries none of the three phrasings
+       * `deriveLawfulSpeedDemand` reads (/разрешена(та) скорост/, /без
+       * превишение/, /таван/), so nothing is derived either. The speed promise
+       * on this drill is instruction 5's «под ограничението», and the cap is
+       * what keeps it.
+       *
+       * IT CANNOT REFUSE A DRIVE THE SHEET WOULD PASS. `stepReachZone` grades
+       * `speedKmh > cap + REACH_ZONE_CAP_SLACK_KMH` (5), and 5 IS the rule
+       * engine's own `speedingGraceMaxKmh` — so the population this chip now
+       * withholds from is a SUBSET of the population already holding the
+       * «Превишена скорост» card with its чл. 21 citation and its corrective.
+       * THEO-4 is satisfied the way `requireYieldClean` and `requireHaltForVru`
+       * satisfy it: the withheld tick REMOVES a contradiction from a protocol
+       * that already explains itself; it does not add a silent verdict. The
+       * frame above is the proof — the explanation was already on screen.
+       *
+       * MEASURED AGAINST ALL THREE COMMITTED RECORDINGS before landing
+       * (content/traces/sc-pk-move-off/*): shadow-correct, mistake-no-look and
+       * mistake-curb-glance every one passes within 0.10 m of this mark at
+       * 39.9 км/ч with 0.00 m of lateral deviation, so the §5 zero-violation
+       * replay and both §9 code asserts are untouched — the mistake demos still
+       * fail on MOVE_OFF_WITHOUT_OBSERVATION, which is the fault they exist to
+       * show, and not on a geometry technicality.
+       *
+       * WHAT IS STILL NOT MEASURED BY THIS CHIP, stated so nobody reads it as
+       * more than it is: the OBSERVATION. Mirror and shoulder are graded — this
+       * template arms `moveOffObservationEnabled` below and
+       * MOVE_OFF_WITHOUT_OBSERVATION bills the fault live — but they are graded
+       * by the RULE ENGINE, not by this gate, because `ReachZoneParams` has no
+       * glance term. A `requireObservedBefore`-style demand in the
+       * `requireLamps`/`requireCockpitReady` mould is the honest home for it.
+       * Routed, and NOT claimed closed here.
+       */
       id: "sc-pmo-moved",
       titleBg: "Потегли и се нареди в дясната лента",
-      params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 14 },
+      params: {
+        kind: "reachZone",
+        x: LANE_X,
+        y: 150,
+        radiusM: 4,
+        maxSpeedKmh: 50,
+      },
     },
     {
       id: "sc-pmo-finish",

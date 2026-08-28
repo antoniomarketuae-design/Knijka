@@ -290,3 +290,52 @@ describe("zb-v1 through the traffic lane graph + system", () => {
     expect(traffic.staged("zb-test-ped")!.finished).toBe(true);
   });
 });
+
+/**
+ * REFUTATION, KEPT AS A GATE — the „blank grey triangle" on the left kerb.
+ *
+ * sc-zebra-approach (wave 8, minor): «A blank grey triangle on a pole stands at
+ * the left kerb — no border, no symbol — a few metres from a correctly rendered
+ * А18 pedestrian sign on the other side. The same failed sign asset seen in
+ * sc-ed-poligon-chain.» The frame it is read off is
+ * `.audit-frames/sweep161/sc-zebra-approach/mobile-right/04-t087s.png`, and at
+ * 700 % that triangle really is a flat grey plate with no border and no
+ * pictogram.
+ *
+ * IT IS NOT A FAILED ASSET. It is the BACK of the А18 that belongs to the other
+ * direction. `props.ts` posts «one post per direction that has room to read it»
+ * (CROSSING_WARNING_AHEAD_M = 35 m), each on ITS OWN right-hand kerb, facing ITS
+ * OWN approaching traffic. On this map the arithmetic puts two of them at the
+ * SAME station on opposite kerbs — zb-x-1's southbound post at y = 90 + 35 and
+ * zb-x-2's northbound post at y = 160 − 35 are both y = 125 — which is exactly
+ * the „a few metres from a correctly rendered А18 on the other side" the finding
+ * describes. The northbound student reads one face and sees one back, which is
+ * what a real street with signs on both approaches looks like.
+ *
+ * This test exists so the next sweep that photographs that plate finds the
+ * arithmetic already written down.
+ */
+describe("the А18 pair at y = 125 — a face for each direction, a back for the other", () => {
+  it("posts two triangles at one station, on opposite kerbs, facing opposite ways", () => {
+    const district = assertDistrict(loadRaw());
+    const world = buildWorldGeometry(district);
+    const a18 = world.signs.filter((s) => s.kind === "pedestrianCrossing");
+    // Two crossings × two directions, and every post has room on this 220 m
+    // street (35 m ahead of y = 90 and of y = 160 both land inside it).
+    expect(a18).toHaveLength(4);
+    // World space: x is district x, z is −district y.
+    const atY125 = a18.filter((s) => Math.abs(-s.position[2] - 125) < 0.01);
+    expect(atY125, "zb-x-1 southbound + zb-x-2 northbound share y = 125").toHaveLength(2);
+    const [east, west] = [...atY125].sort((a, b) => b.position[0] - a.position[0]);
+    // Opposite kerbs, symmetric about the centreline: halfWidth 8.125 + 0.8.
+    expect(east.position[0]).toBeCloseTo(8.925, 3);
+    expect(west.position[0]).toBeCloseTo(-8.925, 3);
+    // …and turned to face opposite ways, which is the whole refutation: the
+    // one on the student's left CANNOT show him a face, and a face there would
+    // be the real defect (a sign aimed at the wrong traffic).
+    const dYaw = Math.abs(
+      Math.atan2(Math.sin(east.yaw - west.yaw), Math.cos(east.yaw - west.yaw)),
+    );
+    expect(dYaw).toBeCloseTo(Math.PI, 3);
+  });
+});

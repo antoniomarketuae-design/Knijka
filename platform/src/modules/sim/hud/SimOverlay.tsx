@@ -2080,6 +2080,57 @@ export function SimOverlay({
   const chipCarriesFoldCount = hasDetail && !whyReachable;
   const showFoldLabel = peekFold.lines > 0 && !chipCarriesFoldCount;
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * THE SAME RULE, ON THE OTHER WINDOW — 2026-08-28.
+   *
+   * THE SHEET'S CUT LOST ITS BOTTOM CUE AND THE COMMENT STILL PROMISES ONE.
+   * The 2026-08-17 block at the sheet's own counter argues the placement in two
+   * halves — „Announcement at the top, continuation cue at the bottom, nothing
+   * deleted" — and the bottom half was `TEXT_FADE_PX`. One commit later
+   * `foldMaskCss` replaced that fade with a HARD EDGE whenever there IS a fold
+   * (the line-grid snap; a band that ends inside a line box ends inside its
+   * letters). The snap is right and it is not being undone here. What it took
+   * with it is the only thing at the CUT that said the text continued.
+   *
+   * MEASURED AT HEAD, `w14/frames/sc-merge-accel-lane__mobile-right/
+   * 02-briefing.png` (iPhone 16 landscape, 852 × 393 at dpr 3), which is this
+   * lane's own row `sc-merge-accel-lane:b75b356e`:
+   *
+   *   the section        CSS  12.5 → 344 of a 393 px stage — AT its cap, i.e.
+   *                      the whole screen above the instrument band; there is
+   *                      no height to give the text and none is asked for here
+   *   the last line      «6. Изключи мигача и продължи в дясната лента. След
+   *                      края на лентата за ускоряване вдясно вече е
+   *                      аварийната» — WHOLE, flush, no fade, no partial glyph
+   *   8 px below it      the solid blue «Разбрах»
+   *   the only cue       «↓ ОЩЕ 2 РЕДА», 10 px, `aria-hidden`, in the header's
+   *                      top-right corner — about 560 CSS px from the cut
+   *
+   * The two hidden lines are the hard-shoulder warning, which is the safety
+   * point of that lesson. A student reads six complete-looking steps and
+   * presses the button — which is, word for word, the defect the 2026-08-17
+   * block was written for („The student presses it having been shown five of
+   * six instructions and nothing said a sixth existed"), re-created one commit
+   * later by the fix to a different half of the same window.
+   *
+   * SO THE CUE RIDES ON THE ACKNOWLEDGEMENT, AND THE HEADER'S COPY STANDS DOWN.
+   * That is not a new rule: it is `chipCarriesFoldCount` above, applied to the
+   * other window. „When both would speak, the one with the tap wins and the
+   * band stands down" — here the tap is the one that ENDS the reading, it is
+   * 44 px, it is `shrink-0`, it already exists, and it sits directly under the
+   * cut. The count costs no authored Bulgarian at all: `.btn-accent` is an
+   * `inline-flex … gap-2` row, so the label and the count share a button whose
+   * height does not change. The 2026-08-17 arithmetic against a FOURTH ROW
+   * (10 px plus an 8 px gap out of the scroller, i.e. a third line hidden to
+   * announce that two were) is untouched and is exactly why this is not one.
+   *
+   * `blocking` and not `hasAck`: the button is rendered `{blocking ? …}`, so
+   * on every other card the header is still the only place the count can go
+   * and it keeps it.
+   * ══════════════════════════════════════════════════════════════════════════
+   */
+  const ackCarriesSheetFold = blocking && sheetFold.lines > 0;
+  /**
    * Is there text under the fold RIGHT NOW, on a card that has somewhere to
    * send the reader?
    *
@@ -2309,6 +2360,42 @@ export function SimOverlay({
     //                                        i.e. 6 px INSIDE it, today)
     // `NOTIFY_COLUMN_MAX_STAGE_FRACTION`'s own derivation is what those three
     // lines are checked against; nothing here relaxes it.
+    //
+    // ── AND THE FLOOR IS NOT 34 px. REFUTED BY MEASUREMENT — 2026-08-28.
+    //
+    // Wave 8 handed a lane the cause „minHeight '2.75rem' plus paddingBottom
+    // TEXT_FADE_PX leaves ~34 px, so any two-line title eats the whole window
+    // and the BODY GETS ZERO LINES", batched over thirteen rows. It is wrong,
+    // and it is wrong in the direction that invites a repair which would buy
+    // 10 px of nothing at the cost of the card's clearance:
+    //
+    //   `padding-bottom` is INSIDE `clientHeight` on a scroll container. The
+    //   scrollport is the PADDING box, so all 44 px of this window paints
+    //   text; the 10 px is scrollable length AFTER the last line, which is
+    //   why `foldLinesBelow` takes `padBottomPx` back out again rather than
+    //   counting it as a line of Bulgarian.
+    //
+    // Read off the shipped build — `w14/frames/sc-mw-discipline__mobile-right/
+    // 01-arrival.png`, iPhone 16 landscape 852 × 393 at dpr 3, scanning the
+    // card's own column for ink bands:
+    //
+    //   the column's top   device 219  = CSS 73.0   (= the constant)
+    //   title line 1       device 279–302 = CSS  93.00–101.00
+    //   title line 2       device 321–344 = CSS 107.00–115.00   pitch 14 ± 0.33
+    //   title line 3       device 368–391 = CSS 122.67–130.67   → 13.75 px grid
+    //   the shade's core   ends CSS ≈183, then the 16 px feather
+    //
+    // THREE whole title line boxes — 41.25 px of them — render unfaded and
+    // hard-cut on their own grid inside this window. A 34 px window cannot
+    // contain the third one; it would cut it at 6.5 of its 13.75 px. So the
+    // window is 44 px, the floor is doing exactly what the paragraph above
+    // says, and the real cause of „zero body lines" is the one nobody can
+    // spend their way out of: a THREE-line title consumes 41.25 of 44 and the
+    // body's first line needs 15.125 more. `hud-off-the-road.test.ts`'s own
+    // hazard-band gate caps this floor at 45.76 px on the 780 × 340 profile —
+    // 1.76 px of headroom, an eighth of a line. The remedy is the one
+    // `whyIsReachable`'s block already names and it is an AUTHORING one: a
+    // `lineBg` short enough for the peek to finish.
     minHeight: "2.75rem",
     // ── THE BAND IS NOW THE LINE GRID WHENEVER THERE IS A FOLD — 2026-08-18.
     //
@@ -3074,6 +3161,21 @@ export function SimOverlay({
                      guillotined «6.» read as a rendering fault. Announcement at
                      the top, continuation cue at the bottom, nothing deleted.
 
+                     ⚠ THAT LAST SENTENCE WAS TRUE FOR ONE COMMIT — 2026-08-28.
+                     `foldMaskCss` replaced the bottom fade with a HARD EDGE on
+                     the very next wave, whenever there IS a fold, and it was
+                     right to (a band that ends inside a line box ends inside
+                     its letters). So from that commit until this one the sheet
+                     had an announcement at the top and NOTHING at the cut, and
+                     `w14/…/sc-merge-accel-lane__mobile-right/02-briefing.png`
+                     is what that looks like: six complete-looking steps, the
+                     sixth ending flush and unfaded, and a solid blue «Разбрах»
+                     8 px under it. The cue is restored on the acknowledgement
+                     itself — see the block at `ackCarriesSheetFold` — which is
+                     also why THIS row now stands down while that button is up:
+                     one count per surface, the peek's own `chipCarriesFoldCount`
+                     rule.
+
                      IT REACHES ZERO, which the peek's version could not: the
                      rule at the top of this file has `scrollTop` in it and the
                      window below is wired to `onScroll`, so a reader who has
@@ -3086,14 +3188,16 @@ export function SimOverlay({
                      announcing a fold to a screen reader would describe a
                      problem it does not have. */}
               {sheetFold.lines > 0 ? (
-                <span
-                  data-sim-overlay-sheet-fold=""
-                  aria-hidden
-                  className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase leading-none tracking-wider"
-                  style={{ color }}
-                >
-                  ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"}
-                </span>
+                ackCarriesSheetFold ? null : (
+                  <span
+                    data-sim-overlay-sheet-fold=""
+                    aria-hidden
+                    className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase leading-none tracking-wider"
+                    style={{ color }}
+                  >
+                    ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"}
+                  </span>
+                )
               ) : null}
               {/* «⤢ Разгъни панела» STOOD HERE AND IS DELETED, NOT MOVED.
                   It was the escape hatch from a height cap, and the cap is
@@ -3234,6 +3338,32 @@ export function SimOverlay({
                 className="btn-accent w-full shrink-0 justify-center py-3 text-sm"
               >
                 {shown.ackLabelBg ?? "Разбрах"}
+                {/* ── THE CONTINUATION CUE, AT THE CUT — 2026-08-28. The block
+                       at `ackCarriesSheetFold` has the frame, the measurement
+                       that the section is already at its cap, and why this is
+                       the same rule `chipCarriesFoldCount` states for the peek.
+                       It is a SIBLING of the label and not a second row:
+                       `.btn-accent` is `inline-flex items-center justify-center
+                       gap-2`, so the two share this button's existing 44 px and
+                       the scroller above loses nothing.
+                       `aria-hidden`, exactly as the header's copy is: assistive
+                       technology reads the whole body out of the DOM regardless
+                       of scroll position, so announcing a fold to it would
+                       describe a problem it does not have — and it also keeps
+                       the button's accessible name «Разбрах» rather than
+                       appending a number to the one control doc 87 rows C1/C2
+                       are about. No `style={{ color }}`: this rides on the
+                       accent fill and inherits `--accent-foreground`, i.e. the
+                       ink the button already guarantees for its own label. */}
+                {ackCarriesSheetFold ? (
+                  <span
+                    data-sim-overlay-ack-fold=""
+                    aria-hidden
+                    className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase leading-none tracking-wider"
+                  >
+                    ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"}
+                  </span>
+                ) : null}
               </button>
             ) : null}
           </section>

@@ -318,14 +318,43 @@ describe("B58 — the advisor card never says a number the sign forbids", () => 
     expect(p.textBg).not.toContain("52");
   });
 
-  it("the survey PARSED what it judged — 278 cards with a number, 224 without, 0 it could not read", () => {
+  it("the survey PARSED what it judged — 283 cards with a number, 224 without, 0 it could not read", () => {
     // THE GUARD AGAINST THE INSTRUMENT, and the reason the counts are spelt out
     // rather than left as `> 0`. If the suffix wording drifts, every card lands
     // in UNPARSED and this test names it; if the source test in advisor.ts is
     // ever loosened into silence-for-everything, the with-number population
     // collapses and this test names that instead. Either way the invariant
     // below stops being able to pass by inspecting nothing.
-    expect(cards.length).toBe(502);
+    // RE-BASELINED 502 → 507 on 2026-08-28 (wave 8, finding
+    // sc-pk-move-off:d7d45a4c). `sc-pk-move-off/sc-pmo-moved` gained an authored
+    // `maxSpeedKmh: 50`, and this survey admits any compiled reachZone with a cap
+    // on a lesson that posts a limit, so its five rungs enter here too. With that
+    // one objective withheld the survey measures exactly the committed 502.
+    //
+    // THE LIMB THAT MATTERS ON THIS FILE DID NOT MOVE, and it was measured before
+    // the total was touched rather than inferred from a green run afterwards:
+    // UNPARSED IS STILL 0, including across the five new rows. A card the survey
+    // cannot read is a card whose number nobody is checking, so that limb moving
+    // at all would have made this a regression and not a re-baseline.
+    //
+    // THE +5 LANDS ENTIRELY IN „SILENT", 219 → 224, and WITH-NUMBER DOES NOT MOVE
+    // AT ALL (283). That is the correct bucket and not an evasion: this survey
+    // calls `advisorPromptForObjective` with FOUR arguments on purpose — it
+    // withholds the authored cap — and «Потегли и се нареди в дясната лента»
+    // names no number of its own, so with nothing to read the card falls silent
+    // here. It is the same shape the 2026-08-24 sc-sp-curve note below describes,
+    // running in the opposite direction. A silent card prints no figure and so
+    // cannot say a number the sign forbids: `overPostedOffenders` is still empty.
+    // (The FIVE-argument card the product actually shows does speak — «дръж под
+    // 50 км/ч» — and that is pinned next door in advisor-authored-cap and
+    // advisor-sweep161, which is why the two censuses must be read together.)
+    //
+    // The test's NAME is corrected in the same breath: it still claimed „278 with
+    // a number" after the 2026-08-24 re-measure had moved that half to 283, and a
+    // census whose title contradicts its own assertion is the exact rot this file
+    // was written to stop. Old name, for the ledger: „the survey PARSED what it
+    // judged — 278 cards with a number, 224 without, 0 it could not read".
+    expect(cards.length).toBe(507);
     expect(unreadableCards(cards)).toEqual([]);
     const withNumber = cards.filter((c) => c.reading.kind === "number");
     const silent = cards.filter((c) => c.reading.kind === "silent");
@@ -338,7 +367,7 @@ describe("B58 — the advisor card never says a number the sign forbids", () => 
     // between the two populations except that one objective, and the total is
     // unchanged, which is what makes this a restatement and not a relaxation.
     expect(withNumber.length).toBe(283);
-    expect(silent.length).toBe(219);
+    expect(silent.length).toBe(224);
     // Both populations must stay non-trivial for the file to mean anything: a
     // catalog of only-silent cards proves nothing about numbers, and one with
     // no silent cards would mean the source test stopped biting.

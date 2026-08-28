@@ -106,6 +106,68 @@
  * it — every input that branch needs is already on `SpeedContractReading`, and
  * a field no caller reads is the defect class this programme measured at 51 of
  * 82 repairs.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * AND THE PRECEDENCE BRANCH IS NOT WHAT THE THREE ROWS ARE ASKING FOR — the
+ * correction wave 8 had to make, and the reason the paragraph above must not
+ * be read as the closing entry.
+ *
+ * The three rows say, verbatim and identically, „THREE different speed figures
+ * are on screen SIMULTANEOUSLY", and their w13 adjudication says it again:
+ * „the count is unchanged from the parent; only the labelling improved" and
+ * „labelling them did not reduce them". Every edit routed from this header so
+ * far has been a LABEL — name the third number, name the loser, name the
+ * precedence — and each of them adds glyphs to the strip the rows are counting.
+ * Read off `w10-4/frames/sc-mw-emergency-lane__mobile-right/04-t202s.png` at
+ * HEAD, the bar is now
+ *
+ *     140 · РЕЖИМ Нормален ≤150 · знакът важи · задачата иска ≤110
+ *
+ * — one more number and eleven more words than the frame the rows were filed
+ * on. The rows are a COUNT complaint and every answer to date has been a
+ * VOCABULARY answer.
+ *
+ * WHICH OF THE THREE CAN LEAVE, and this file already knows: `SpeedAuthority`
+ * has no `"mode"` member, and its docstring says why — a governor cap is a
+ * ceiling on the THROTTLE, so it can neither be exceeded nor be obeyed. It is
+ * the one figure on that strip that cannot bill. It is also, measured on the
+ * frame above, the LARGEST one (150 against a 140 disc and a 110 gate), which
+ * is the hierarchy in the grader exactly inverted.
+ *
+ * IT STILL EARNS THE GLASS IN TWO STATES, and both are already decided rather
+ * than guessable — this file's own `lineBg` applies precisely this rule to the
+ * SENTENCE (see the governor clause at the foot of `readSpeedContract`: it
+ * renders „only where it can be MISREAD"), and the bar has never applied it to
+ * the NUMERAL:
+ *   · the governor is EASING the throttle right now — a student flooring it
+ *     into a ceiling must be told it is the mode and not a broken engine
+ *     (doc 86 B7, founder item L17/5). `governorIsEasing(capKmh, speedKmh)`,
+ *     which `GovernorCapMark` already computes as `easing`;
+ *   · it BLOCKS the number the drill needs — `reading.modeBlocksBinding`;
+ *   · and at or under the sign it IS the operative ceiling — `!modeAboveLaw` —
+ *     so it keeps the bar, exactly as the font-weight rule already reasons.
+ *
+ * THE EDIT IS ONE PREDICATE AND ONE WRAPPER, both inside `GovernorCapMark`,
+ * and it adds NOTHING here on purpose:
+ *
+ *     const modeSpeaks =
+ *       easing || reading.modeBlocksBinding || !reading.modeAboveLaw;
+ *
+ * and the `governor-register` span, the `governor-mode-cap` span and the
+ * `overLimit` («знакът важи, не режимът») clause render only under it. The
+ * `governor-task-binds` chip, the В26 disc and the whole `aria-label`/`title`
+ * stay untouched, so `lineBg` still states all three ceilings and the
+ * precedence to a screen reader — the strip loses a number, the explanation
+ * loses nothing. On the three filed frames (all `05-stopped.png`, speed 0, cap
+ * above the disc, drill reachable) the bar becomes two numbers, both of which
+ * bill, and the rows close on the count they were filed on.
+ *
+ * WHY IT IS NOT DONE HERE. `hud/StatusDashboard.tsx` is not this lane's file
+ * and a second lane was editing it in the same wave. Every input the predicate
+ * needs is already on `SpeedContractReading` and already read by that
+ * component, so nothing was added here to carry it: a field no caller reads is
+ * the defect class this programme measured at 51 of 82 repairs, and adding one
+ * to route a comment would be that defect committed on purpose.
  */
 
 import type { District } from "@/modules/sim/world";

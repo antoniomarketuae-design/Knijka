@@ -109,3 +109,76 @@ describe("B64 — sp-creep-v1 authors a bus stop and the world builds one", () =
     expect(buildWorldGeometry(stripped).stats.busStops).toBe(0);
   });
 });
+
+/**
+ * WAVE 8 — THE THIRD SOURCE: a stop authored as a SPAN, not as a frontage.
+ *
+ * sc-pk-busstop-ban (critical): «The world does not contain the landmark the
+ * lesson is entirely about … The briefing's навес (shelter) is absent … The
+ * zone exists only as a translucent teal/amber tint painted by the HUD, so the
+ * student is trained to read a coaching overlay instead of the street.»
+ *
+ * The two maps whose whole lesson IS the stop author it in `meta.scenario`
+ * (`busStopPocketY` / `busBayY`) and carry no `kind: "busStop"` building, so
+ * BOTH passes above declined and `scene/scenarioSceneryProps.ts` answered with
+ * a `kind: "wall"` obstacle — which renders as one flat grey box. props.ts now
+ * reads those authored keys itself, through the SAME two helpers the зигзаг
+ * painter uses, and places the real modelled shelter.
+ */
+describe("wave 8 — an authored scenario stop SPAN earns the modelled навес", () => {
+  const CASES = [
+    // district, span fromY, span toY, drawn ribbon half-width, nearest frontage x
+    ["pk-busstop-v1", 180, 210, 8.125, 14.13],
+    ["mg-busstop-v1", 130, 176, 20.25, 22.25],
+  ] as const;
+
+  it.each(CASES)(
+    "%s: one shelter, at the midpoint of its own span and at the kerb",
+    (id, fromY, toY, halfWidth, frontageX) => {
+      const district = load(id);
+      // Neither map may reach this through the frontage pass — that is the
+      // whole reason the third source exists.
+      expect(district.buildings.some((b) => b.kind === "busStop")).toBe(false);
+      const world = buildWorldGeometry(district);
+      expect(world.stats.busStops).toBe(1);
+      const [shelter] = world.busStops;
+      // World space: x is district x, z is −district y.
+      expect(-shelter.position[2]).toBeCloseTo((fromY + toY) / 2, 3);
+      // AT the kerb, on the pavement, on the stop's own side. The front face is
+      // AUTHORED_STOP_KERB_GAP_M (0.35) off the drawn ribbon edge, which is the
+      // anchor that works on both edge classes — the parking band moves the
+      // decoration-band centre by 4 m between them and the old wall-panel
+      // derivation was aimed at that centre.
+      expect(shelter.position[0]).toBeGreaterThan(halfWidth);
+      expect(shelter.position[0] - halfWidth).toBeLessThan(2);
+      // …and never buried in the frontage behind it.
+      expect(shelter.position[0]).toBeLessThan(frontageX);
+      // Standing on the pavement top, not sunk or floating.
+      expect(shelter.position[1]).toBeGreaterThan(0);
+      expect(shelter.position[1]).toBeLessThan(0.5);
+    },
+  );
+
+  it("NON-VACUITY: strip the authored span and the shelter goes with it", () => {
+    const district = load("pk-busstop-v1");
+    const meta = district.meta as unknown as Record<string, unknown>;
+    const scenario = meta.scenario as Record<string, unknown>;
+    const stripped: District = {
+      ...district,
+      meta: {
+        ...district.meta,
+        scenario: { ...scenario, busStopPocketY: undefined, busBayY: undefined },
+      } as typeof district.meta,
+    };
+    expect(buildWorldGeometry(stripped).stats.busStops).toBe(0);
+  });
+
+  it("ADDITIVE: the 103 districts that author no stop span are unchanged", () => {
+    // The two controls the зигзаг pass uses, for the same reason: they come off
+    // straight-street generators and would be the first to be swept up by a
+    // rule that read the archetype instead of the span.
+    for (const id of ["pk-stop-v1", "pe-child-v1", "ov-narrow-v1"]) {
+      expect(buildWorldGeometry(load(id)).stats.busStops, id).toBe(0);
+    }
+  });
+});

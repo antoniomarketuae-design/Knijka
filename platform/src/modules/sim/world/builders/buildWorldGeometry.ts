@@ -630,6 +630,9 @@ export function buildWorldGeometry(
     utilityPoles: props.utilityPoles.length,
     utilityWireSpans: props.utilityPoles.filter((p) => p.spanM > 0).length,
     railings: props.railings.length,
+    /** Wave 8 — the median guard rail of a divided motorway. 0 on the 102
+     *  districts with no anti-parallel motorway pair. */
+    medianBarriers: props.medianBarriers.length,
     /** B65 — the masses that close a street end running out of the world. */
     terminusClosures: terminusClosures.length,
     skidMarks: decals.skidCount,
@@ -662,6 +665,7 @@ export function buildWorldGeometry(
       parkingKits: props.parkingKits,
       utilityPoles: props.utilityPoles,
       railings: props.railings,
+      medianBarriers: props.medianBarriers,
       // roads, junctions, sidewalks, parking lanes, markings, road-decal batch,
       // grass, paved, 4 facade-wall variants, roofs.
       staticMeshes: 13,
@@ -694,6 +698,7 @@ export function buildWorldGeometry(
     billboards: props.billboards,
     utilityPoles: props.utilityPoles,
     railings: props.railings,
+    medianBarriers: props.medianBarriers,
     busStops: props.busStops,
     parkingKits: props.parkingKits,
     schools,

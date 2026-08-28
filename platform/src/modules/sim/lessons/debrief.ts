@@ -56,7 +56,7 @@ import {
   type ViolationCode,
   type ViolationEvent,
 } from "../rules";
-import type { LessonResult } from "./types";
+import type { LessonResult, SessionNearMiss } from "./types";
 
 export interface DebriefOutput {
   /** Plain text (newline-separated sections) — stored in SimSession.debrief. */
@@ -214,9 +214,17 @@ const MAX_COACHED_NAMED = 2;
  * penalise, in silence, as though the two were about different drives. Order-
  * neutral wording on purpose: with an опасна грешка in the run the mistakes
  * block prints ABOVE this line, and below it otherwise.
+ *
+ * THE LEADING „ — " CAME OFF (finding sc-ac-wind-truck-pass:62436dd4). The
+ * sentence is now shared with the RESULT SCREEN's «Похвали» card, which prints
+ * one commendation per row and needs it as a sentence rather than as a
+ * continuation of a bullet. The dash is punctuation for THIS medium and is
+ * added back at the one call site below, so the debrief text is byte-identical
+ * (`debrief-truthfulness.test.ts` pins «Правилно отстъпено предимство — но не
+ * всеки път»). See `commendationRiderBg`.
  */
 const COMMENDATION_CONTRADICTED_BG =
-  " — но не всеки път: същото умение е и сред грешките в този урок. Умението се брои за усвоено, когато го правиш ВСЕКИ път.";
+  "но не всеки път: същото умение е и сред грешките в този урок. Умението се брои за усвоено, когато го правиш ВСЕКИ път.";
 
 export function buildDebrief(
   lesson: LessonSpec,
@@ -241,6 +249,21 @@ export function buildDebrief(
   // plain strings (DebriefContext.coachedMistakes), exactly like MistakeGroup.code.
   const scoredCodes = new Set<string>(summary.mistakes.map((m) => m.code));
   const coached = (context.coachedMistakes ?? []).filter((c) => !scoredCodes.has(c.code));
+  /**
+   * THE THIRD RECORD OF „this drive was not clean", HOISTED because THREE
+   * sentences below have to consult it and one of them is the headline.
+   *
+   * A near miss is graded at nothing by construction (`lessons/types.ts
+   * SessionNearMiss` — „session stat only") and this file does not change that.
+   * It is however a fact the RUN recorded about itself, exactly like a teach
+   * moment, and the sentences that claim a spotless drive were reading only two
+   * of the three channels — see the reservation block in the „издържан" branch
+   * for the measured drive (`sc-vu-pass-clearance:54930e5c`: 0.5 m from a
+   * cyclist, «Точно това иска да види изпитващият»).
+   */
+  const nearMisses = result.nearMisses ?? [];
+  const nearMissCount = nearMisses.length;
+  const closestNearMiss = nearMissClosest(nearMisses);
 
   // -- verdict ---------------------------------------------------------------
   /**
@@ -367,10 +390,53 @@ export function buildDebrief(
           : `${coachedKinds} нарушения бяха показани и този път не влязоха в точките`,
       );
     }
+    /**
+     * …AND THE THIRD RESERVATION THE RUN HAD ALREADY RECORDED AND THIS SENTENCE
+     * NEVER READ — finding `sc-vu-pass-clearance:54930e5c`.
+     *
+     * MEASURED · w10-2 · `sc-vu-pass-clearance` · pc · wrong
+     * (`frames/sc-vu-pass-clearance__pc-wrong/_audit-debrief.json`). One result
+     * screen, two sections, verbatim:
+     *
+     *   section[aria-label="Разминавания на косъм"]
+     *     «Разминавания на косъм (1) … велосипедист — на 0.5 м 0:40»
+     *   section[aria-label="Разбор"]
+     *     «…е издържан: 0 наказателни точки … Точно това иска да види изпитващият.»
+     *
+     * Half a metre from a cyclist at speed, recorded by the product, printed on
+     * the product's own card — and the headline of the debrief beside it told a
+     * seventeen-year-old that this is exactly what the examiner wants to see.
+     * The two channels the sentence DID consult were both silent: the sheet was
+     * clean and (on a leg with no teach moment) so was the teach queue, so
+     * `reservations` was empty and the superlative printed unopposed.
+     *
+     * NOTHING IS RE-GRADED. A near miss folds into no score by construction
+     * (`lessons/types.ts SessionNearMiss` — „session stat only"), `passed` is
+     * untouched, the XP and the stars are untouched. What the line stops doing
+     * is claiming the examiner would have wanted a drive the product itself
+     * flagged. The clearance is the recorded number, not a derived one, and the
+     * closest encounter is the defensible pick for the same reason
+     * `worstSpeedDetail` picks the fastest: it is the rung the student was
+     * actually on.
+     *
+     * PAIRED WITH THE CARD, DELIBERATELY. `hud/SessionEndScreen.tsx` carries
+     * the same reservation on the verdict card itself (`nearMissReservationBg`)
+     * — the card is where the ИЗДЪРЖАН pill, the ★★★ row and the „+100 XP" chip
+     * sit, and the near-miss section is 1 300 px below them. Two surfaces, one
+     * derivation; see that function for the wire gap this side still has.
+     */
+    if (closestNearMiss !== null) {
+      reservations.push(
+        nearMisses.length === 1
+          ? `имаше разминаване на косъм — ${nearMissPhraseBg(closestNearMiss)}`
+          : `имаше ${nearMisses.length} разминавания на косъм, най-близкото ${nearMissPhraseBg(closestNearMiss)}`,
+      );
+    }
     // Each thing pointed at is GUARANTEED to be below: points > 0 implies a
     // billed row, so the mistakes block prints; `coachedKinds > 0` is the very
-    // condition the teach section prints on. No pointer to a section the
-    // student cannot find.
+    // condition the teach section prints on; and the near-miss paragraph prints
+    // on exactly `nearMisses.length > 0`. No pointer to a section the student
+    // cannot find.
     //
     // DESCRIBED, NOT QUOTED BY HEADING, and that is deliberate rather than
     // stylistic: a pointer carrying the literal string „Най-важните грешки"
@@ -378,12 +444,18 @@ export function buildDebrief(
     // „gravity before praise" ordering is asserted by `indexOf` on exactly that
     // string (`debrief-truthfulness.test.ts`). A cross-reference must not be
     // mistakable for the thing it refers to.
-    const where =
-      reservations.length === 2
-        ? "грешките и учебните моменти по-долу"
-        : summary.score.totalPoints > 0
-          ? "грешките по-долу"
-          : "учебните моменти по-долу";
+    //
+    // BUILT FROM THE FLAGS, NOT FROM `reservations.length`. The count keyed the
+    // wording until a THIRD channel joined the list, and „length === 2" then
+    // meant three different pairs — the shape that prints „грешките и учебните
+    // моменти" over a drive that has neither. Each clause is named by the thing
+    // that put it there.
+    const wherePartsBg = [
+      ...(summary.score.totalPoints > 0 ? ["грешките"] : []),
+      ...(coachedKinds > 0 ? ["учебните моменти"] : []),
+      ...(closestNearMiss !== null ? ["разминаванията на косъм"] : []),
+    ];
+    const where = `${joinBg(wherePartsBg)} по-долу`;
     lines.push(
       reservations.length === 0
         ? `${head} Точно това иска да види изпитващият.`
@@ -534,8 +606,16 @@ export function buildDebrief(
      * on record the invitation to HOLD this standard comes off, and the
      * „Учебни моменти" section below says what actually happened.
      */
+    /**
+     * …AND A NEAR MISS REVOKES THE INVITATION FOR THE SAME REASON A TEACH
+     * MOMENT DOES. „задръж това ниво" is an instruction to REPEAT this drive,
+     * and on the measured leg (`sc-vu-pass-clearance` · pc · wrong) the drive
+     * being held up as the standard passed a cyclist at half a metre. The
+     * CLAIM stays true and scoped — the sheet was clean — but a drive the
+     * product itself flagged is not one to reproduce.
+     */
     goodBlock.push(
-      coached.length > 0
+      coached.length > 0 || nearMissCount > 0
         ? "Какво се получи добре: чисто каране по изпитния лист — нито едно нарушение не влезе в точките."
         : "Какво се получи добре: чисто каране без нито едно нарушение по изпитния лист — задръж това ниво.",
     );
@@ -909,12 +989,84 @@ export function buildDebrief(
   }
 
   // -- near misses (A15 — session fact, nothing graded) -----------------------
-  const nearMissCount = result.nearMisses?.length ?? 0;
-  if (nearMissCount > 0) {
+  /**
+   * …AND IT NAMES THE MARGIN NOW. The paragraph gave a COUNT and sent the
+   * student to a map; the one number that makes „на косъм" mean anything — how
+   * close it actually was — was on the result screen's own row («велосипедист —
+   * на 0.5 м») and nowhere in the prose that /review/my-drive replays weeks
+   * later. A bare count is the bare verdict THEO-4 forbids, wearing the
+   * „nothing was graded" sign. Nothing is priced and nothing is re-derived: the
+   * clearance is the recorded figure, printed to the same one decimal the row
+   * beside it uses.
+   */
+  if (closestNearMiss !== null) {
     lines.push("");
     lines.push(
-      `Разминавания на косъм: ${nearMissCount}. Не се броят като грешки, но на пътя късметът не е стратегия — виж къде се случиха на картата на грешките и мини оттам по-бавно и по-широко.`,
+      `Разминавания на косъм: ${nearMissCount} — ${
+        nearMissCount === 1 ? "" : "най-близкото "
+      }${nearMissPhraseBg(closestNearMiss)}. Не се броят като грешки, но на пътя късметът не е стратегия — виж къде се случиха на картата на грешките и мини оттам по-бавно и по-широко.`,
     );
+  }
+
+  // -- the rule this lesson exists for, replayed -------------------------------
+  /**
+   * THE PROTOCOL NEVER TAUGHT THE FACT THE LESSON WAS BUILT AROUND — finding
+   * `sc-ac-wet-braking:e59f82a5`.
+   *
+   * MEASURED · sweep 161 · `sc-ac-wet-braking` · pc · wrong (`run.log`). The
+   * lesson is «Спирачен път на мокро». The student brakes at the dry point,
+   * runs into the stopped car ahead and is shown «20 наказателни точки ·
+   * НЕИЗДЪРЖАН». Searched over the whole captured debrief of that leg: «1,4» —
+   * 0 hits. «спирачен път» — 0 hits. «хлъзг» — 0 hits. «мокр» — 2 hits, and
+   * both are the lesson TITLE. The one sentence the lesson exists to install —
+   * «на мокро спирачният път е около 1,4 пъти по-дълъг от сухия» — appears in
+   * the run exactly twice, both times BEFORE the drive: as briefing step 3 and
+   * as the demonstration caption (line 185 of the same log). By the time he
+   * crashes he has dismissed both, and the debrief that follows never says it
+   * again.
+   *
+   * That shape is not one lesson's. `instructionsBg` on all ~166 templates
+   * carries the rule of the drill in the student's own words, and until this
+   * block NOTHING downstream of the drive read it — the briefing card
+   * (`LessonPlayShell` §4c) is the only consumer and it is gone the moment the
+   * car moves.
+   *
+   * RETRIEVAL, NOT GENERATION (ADR-002). Every character below is the authored
+   * template text, byte-for-byte: `lesson.descriptionBg` is `ScenarioSpec
+   * .objectiveBg` (`scenario/compile.ts:1259`) and `lesson.briefingBg` is
+   * `ScenarioSpec.instructionsBg` with the rung's complication in front
+   * (compile.ts:1274). No law is quoted that the template did not quote, no
+   * number is derived, nothing is re-priced.
+   *
+   * ONLY WHEN THERE IS SOMETHING TO RE-READ. A drive that passed with a clean
+   * sheet, no teach moment and no near miss gets its debrief byte-identical —
+   * the same discipline the verdict line is written to. It is the drive that
+   * went wrong that needs the rule back, and it is exactly that drive which had
+   * to dismiss the briefing to start.
+   *
+   * NOT ON THE «Преживей грешката» SANDBOX. `compile.ts:1373` DELETES the
+   * briefing there on purpose („showing the correct numbered steps beside
+   * „направи грешката нарочно" would be the shell arguing with itself") and
+   * rewrites `descriptionBg` to «…направи грешката: <mistake title>». Replaying
+   * that as „the rule of this lesson" would print the wrong action as the right
+   * one, so the whole block stands out of the way there.
+   */
+  const somethingToRelearn =
+    !result.passed || summary.mistakes.length > 0 || coached.length > 0 || nearMissCount > 0;
+  if (somethingToRelearn && lesson.mistakeExperience === undefined) {
+    const briefing = lesson.briefingBg ?? [];
+    if (briefing.length > 0 || lesson.descriptionBg.length > 0) {
+      lines.push("");
+      lines.push("Правилото на този урок (от инструктажа преди карането):");
+      if (lesson.descriptionBg.length > 0) lines.push(`• ${lesson.descriptionBg}`);
+      // Numbered from the compiled list's own `n`, not from the loop index —
+      // the complication rung renumbers behind its own step 1 (compile.ts) and
+      // the debrief must not invent a second numbering for the same briefing.
+      for (const step of briefing) lines.push(`${step.n}. ${step.textBg}`);
+      lines.push(
+        "Прочети го пак сега, докато карането е прясно — това е разликата между „знам го“ и „правя го“.",
+      );
+    }
   }
 
   // -- what to practice next --------------------------------------------------
@@ -964,7 +1116,11 @@ export function buildDebrief(
     lines.push(
       coached.length > 0
         ? "Какво да упражниш: повтори урока, завърши всички задачи от маршрута и внимавай за учебния момент по-горе."
-        : "Какво да упражниш: повтори урока и завърши всички задачи от маршрута — карането беше чисто по изпитния лист.",
+        : nearMissCount > 0
+          ? // Its own branch and not the teach one: „внимавай за учебния момент"
+            // would point at a section this drive does not have.
+            "Какво да упражниш: повтори урока, завърши всички задачи от маршрута и мини по-широко там, където се размина на косъм."
+          : "Какво да упражниш: повтори урока и завърши всички задачи от маршрута — карането беше чисто по изпитния лист.",
     );
   }
 
@@ -1103,6 +1259,60 @@ function coachedLines(coached: ReadonlyArray<{ code: string; titleBg: string }>)
     rows.push(`• …и още ${counts.size - MAX_COACHED_NAMED} — виж пълния списък в резултата.`);
   }
   return rows;
+}
+
+/**
+ * „a, b и c" — a Bulgarian list, agreeing, from however many clauses there are.
+ *
+ * Written because the clause it serves used to be selected by COUNT, and a
+ * count cannot tell three channels apart (see the `where` block). Empty in,
+ * empty out: the caller never renders it then.
+ */
+function joinBg(parts: readonly string[]): string {
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} и ${parts[parts.length - 1]}`;
+}
+
+/**
+ * WHAT WAS NEARLY HIT, IN ONE WORD — the single source for both post-drive
+ * surfaces.
+ *
+ * `hud/SessionEndScreen.tsx` kept its own copy of this map, which is how two
+ * surfaces of one result screen come to name the same encounter differently.
+ * It imports this one now. Exported rather than duplicated for the reason
+ * `commendationRiderBg` is: a judgement (or a noun) written twice diverges.
+ */
+export const NEAR_MISS_KIND_BG: Record<SessionNearMiss["kind"], string> = {
+  vehicle: "автомобил",
+  pedestrian: "пешеходец",
+  cyclist: "велосипедист",
+};
+
+/**
+ * The TIGHTEST encounter of the run, or null — the only defensible pick for a
+ * one-line summary, for the same reason `worstSpeedDetail` picks the fastest:
+ * it is the margin the student actually drove on. Ties keep the earlier one.
+ */
+export function nearMissClosest(
+  nearMisses: ReadonlyArray<SessionNearMiss>,
+): SessionNearMiss | null {
+  let best: SessionNearMiss | null = null;
+  for (const n of nearMisses) {
+    if (best === null || n.clearanceM < best.clearanceM) best = n;
+  }
+  return best;
+}
+
+/**
+ * „велосипедист на 0,5 м" — the recorded clearance, in the decimal comma this
+ * product writes numbers with, and nothing derived. One decimal because that is
+ * the precision the result screen's own near-miss row prints
+ * (`clearanceM.toFixed(1)`), and two surfaces must not round one measurement
+ * differently.
+ */
+export function nearMissPhraseBg(n: SessionNearMiss): string {
+  return `${NEAR_MISS_KIND_BG[n.kind]} на ${n.clearanceM.toFixed(1).replace(".", ",")} м`;
 }
 
 /** Escalated values can be half-points (3 × 1.5 = 4.5) — print them cleanly. */
@@ -1356,16 +1566,12 @@ function improvementLine(
  * What the student stops being handed is the unscoped reading.
  */
 function commendationLines(result: LessonResult): string[] {
-  const convicted = new Set(result.summary.conceptIds);
-  /** „Чисто" is a claim about the whole sheet, so any scored row falsifies it. */
-  const anyFault = result.summary.mistakes.length > 0;
   const seen = new Map<string, { count: number; contradicted: boolean; unclean: boolean }>();
   for (const c of result.summary.commendations) {
-    const contradicted = c.conceptId !== undefined && convicted.has(c.conceptId);
-    // Keyed on the CODE and not on the title: `rules/catalog.ts` retitles
-    // pooled praise per situation (YIELD_PRAISE_SITUATION_COPY), so a title
-    // match is not a code match on this channel.
-    const unclean = c.code === "CLEAN_DRIVING" && anyFault;
+    // ONE derivation, two surfaces — see `commendationRiderFlags`. The card
+    // asks the same question per ROW; this block ORs the answers across the
+    // rows a title pools, because the bullet stands for all of them.
+    const { contradicted, unclean } = commendationRiderFlags(result.summary, c);
     const prev = seen.get(c.titleBg);
     if (prev === undefined) seen.set(c.titleBg, { count: 1, contradicted, unclean });
     else {
@@ -1374,14 +1580,72 @@ function commendationLines(result: LessonResult): string[] {
       prev.unclean = prev.unclean || unclean;
     }
   }
-  const scope = cleanDrivingScopeBg(result.summary);
   return [...seen.entries()]
     .slice(0, MAX_COMMENDATION_LINES)
-    .map(
-      ([title, g]) =>
-        `• ${title}${g.count > 1 ? ` ×${g.count}` : ""}` +
-        `${g.contradicted ? COMMENDATION_CONTRADICTED_BG : ""}${g.unclean ? scope : ""}`,
-    );
+    .map(([title, g]) => {
+      const rider = commendationRiderBg(result.summary, g);
+      // The dash is this medium's punctuation — see COMMENDATION_CONTRADICTED_BG.
+      return `• ${title}${g.count > 1 ? ` ×${g.count}` : ""}${rider === null ? "" : ` — ${rider}`}`;
+    });
+}
+
+/**
+ * WHICH RIDERS ONE COMMENDATION HAS EARNED ON THIS DRIVE — the two questions
+ * `commendationLines` asks, lifted out so a SECOND surface can ask them.
+ *
+ * MEASURED · w13 · `sc-ac-wind-truck-pass`, both platforms
+ * (`frames/sc-ac-wind-truck-pass__pc-wrong/_audit-debrief.json`, verbatim):
+ * `section[aria-label="Похвали"]` reads «Похвали ✓ Чисто и спокойно каране 0:49
+ * ✓ Чисто и спокойно каране 1:11» — bare title, bare clock, twice — on the same
+ * card that prints «39 наказателни точки · НЕИЗДЪРЖАН · Опасни грешки 3 30»,
+ * one of those опасни a collision two seconds after the second commendation.
+ * The debrief prose beside it now carries the scope (`cleanDrivingScopeBg`);
+ * the CARD carried nothing, so the repair landed on the surface the finding
+ * does not name and the photographed one kept handing out the certificate.
+ *
+ * A JUDGEMENT MADE TWICE IS A JUDGEMENT THAT WILL DIVERGE — this file's own
+ * standing rule («the two surfaces must not diverge», the ledger-close note).
+ * So the derivation lives here, once, and `hud/SessionEndScreen.tsx` reads it;
+ * neither surface can ever again praise a skill the other qualifies.
+ *
+ * Both questions are lookups over the summary, not new opinions:
+ *  · `contradicted` — the praise's `conceptId` is among the ones the MISTAKES
+ *    produced (`rules/summary.ts` builds `conceptIds` from mistakes only), i.e.
+ *    this very skill was also penalised;
+ *  · `unclean` — CLEAN_DRIVING is the one code that names the DRIVE rather than
+ *    a skill, and any scored row falsifies „чисто".
+ */
+export interface CommendationRiders {
+  contradicted: boolean;
+  unclean: boolean;
+}
+
+export function commendationRiderFlags(
+  summary: LessonResult["summary"],
+  c: { code: string; conceptId?: string },
+): CommendationRiders {
+  return {
+    contradicted: c.conceptId !== undefined && summary.conceptIds.includes(c.conceptId),
+    // Keyed on the CODE and not on the title: `rules/catalog.ts` retitles
+    // pooled praise per situation (YIELD_PRAISE_SITUATION_COPY), so a title
+    // match is not a code match on this channel.
+    unclean: c.code === "CLEAN_DRIVING" && summary.mistakes.length > 0,
+  };
+}
+
+/**
+ * The rider text for a set of flags, WITHOUT leading punctuation — null when
+ * the commendation stands unqualified, which is the common case and must stay
+ * byte-identical on both surfaces (a spotless drive's praise is untouched).
+ */
+export function commendationRiderBg(
+  summary: LessonResult["summary"],
+  flags: CommendationRiders,
+): string | null {
+  const parts: string[] = [];
+  if (flags.contradicted) parts.push(COMMENDATION_CONTRADICTED_BG);
+  if (flags.unclean) parts.push(cleanDrivingScopeBg(summary));
+  return parts.length === 0 ? null : parts.join(" — ");
 }
 
 /**
@@ -1405,8 +1669,10 @@ function cleanDrivingScopeBg(summary: LessonResult["summary"]): string {
       : opasni > 1
         ? `в същия урок има и ${opasni} опасни грешки`
         : "в същия урок има и отбелязани грешки";
+  // No leading „ — ": the sentence is shared with the result screen's «Похвали»
+  // card, which prints it as a line of its own. See COMMENDATION_CONTRADICTED_BG.
   return (
-    ` — но само на отделни отсечки от маршрута: ${alsoBg}. Похвалата е за метрите без` +
+    `но само на отделни отсечки от маршрута: ${alsoBg}. Похвалата е за метрите без` +
     ` нито едно нарушение, не за урока — „чисто каране“ се брои чак когато ЦЯЛОТО каране е такова.`
   );
 }

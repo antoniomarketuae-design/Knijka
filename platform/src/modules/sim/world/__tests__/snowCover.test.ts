@@ -16,7 +16,7 @@
  * shippable, and it is a claim about the emitted GLSL, so it is checked as one.
  */
 
-import { readFileSync } from "node:fs";
+import fs, { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ShaderChunk, ShaderLib } from "three";
@@ -31,6 +31,7 @@ import {
   SNOW_COVER_FRAGMENT_ANCHOR,
   SNOW_COVER_MAX,
 } from "../textures/snowCover";
+import { macroOnBeforeCompile } from "../textures/macroVariation";
 
 type ShaderStub = {
   uniforms: Record<string, { value: unknown }>;
@@ -245,5 +246,72 @@ describe("routing: the hook reaches the shipped materials and something writes i
     // A setSnowCover call that is NOT inside a per-frame loop is also dead —
     // the uniform would freeze at whatever the channel read on mount.
     expect(writesUniform(districtSrc.replace(/useFrame\(/g, "useEffect("))).toBe(false);
+  });
+});
+
+/**
+ * WAVE 8 — THE HOOK REACHES THE SURFACES THE FINDING PHOTOGRAPHED.
+ *
+ * sc-ac-snow:cfb2d46d (critical): «No snow has accumulated on any
+ * off-carriageway surface in shot — kerbs, pavements, guard rail and building
+ * faces are all bare.» This file's own header records the root cause and then
+ * attaches the hook in `WorldProps.makeSharedMaterials()` — five PROP
+ * materials. Of the four surfaces the row names, only the guard rail was ever
+ * in scope: kerbs and pavements are `StaticWorld`'s `geometries.sidewalks` and
+ * the verge is `geometries.terrain`, and neither was hooked to anything.
+ *
+ * A predicate with no consumer on the surface it is about is the shape this
+ * programme keeps re-finding, so the gate is on the WIRING, not on the maths.
+ */
+describe("wave 8 — the ground carries the snow term too", () => {
+  const STATIC_WORLD_SRC = fs.readFileSync(
+    path.resolve(__dirname, "../components/StaticWorld.tsx"),
+    "utf8",
+  );
+
+  it("StaticWorld composes the snow hook onto its ground materials", () => {
+    expect(STATIC_WORLD_SRC).toContain("snowCoverOnBeforeCompile(shader)");
+    expect(STATIC_WORLD_SRC).toContain("snowCoverProgramCacheKey()");
+    // Every ground spread is the composed one — terrain, paved courtyards,
+    // roundabout islands and sidewalks, in both the PBR and the canvas-fallback
+    // branch of each: 8 sites.
+    expect(STATIC_WORLD_SRC.match(/\{\.\.\.GROUND_SNOW\}/g)?.length).toBe(8);
+  });
+
+  it("…and NOT onto the asphalt or the paint", () => {
+    // The carriageway has its own snow response (weather.ts SNOW_ROAD_BRIGHTEN)
+    // and the markings must never be buried — this file's own rule for sign
+    // faces and signal lenses, applied to the paint the student is graded on.
+    const roadBlock = STATIC_WORLD_SRC.slice(
+      STATIC_WORLD_SRC.indexOf("{/* Road ribbons:"),
+      STATIC_WORLD_SRC.indexOf("{/* Batched road decals"),
+    );
+    expect(roadBlock).not.toContain("GROUND_SNOW");
+    const paintBlock = STATIC_WORLD_SRC.slice(
+      STATIC_WORLD_SRC.indexOf("{/* Lane markings"),
+      STATIC_WORLD_SRC.indexOf("{/* Lane markings") + 2000,
+    );
+    expect(paintBlock).not.toContain("GROUND_SNOW");
+  });
+
+  it("the two chained hooks do not fight over an anchor", () => {
+    // They share only `#include <common>`, and a string `.replace` substitutes
+    // the FIRST occurrence and leaves the include in place, so the second hook
+    // still finds it. Proven by running the pair over a real shader pair rather
+    // than asserted.
+    const shader = compileStub() as unknown as import("three").WebGLProgramParametersWithUniforms;
+    macroOnBeforeCompile(shader);
+    snowCoverOnBeforeCompile(shader);
+    expect(shader.vertexShader).toContain("varying vec2 vGroundMacroXZ;");
+    expect(shader.vertexShader).toContain("varying float vSnowUp;");
+    expect(shader.fragmentShader).toContain("uniform float uMacroStrength;");
+    expect(shader.fragmentShader).toContain("uniform float uSnowCover;");
+    expect(shader.fragmentShader).toContain(SNOW_COVER_FRAGMENT_ANCHOR);
+    // …and in the other order, because nothing pins which hook runs first.
+    const flipped = compileStub() as unknown as import("three").WebGLProgramParametersWithUniforms;
+    snowCoverOnBeforeCompile(flipped);
+    macroOnBeforeCompile(flipped);
+    expect(flipped.fragmentShader).toContain("uniform float uMacroStrength;");
+    expect(flipped.fragmentShader).toContain("uniform float uSnowCover;");
   });
 });

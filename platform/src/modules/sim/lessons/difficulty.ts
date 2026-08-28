@@ -245,6 +245,20 @@ export function isSubPerceptibleTrafficStep(step: RungStep): boolean {
  */
 export const L5_PLUS_ONE_CAR_ONLY: readonly string[] = [
   "sc-junction-stop",
+  // JOINED 2026-08-28, wave 8, and it is the least surprising addition this list
+  // could take: `sc-junction-scan` is the sibling directly above it. The
+  // junction-triplet lane established that stop and scan are BYTE-IDENTICAL field
+  // for field — same district `tj-stop-v1`, same spawn, and all three exit gates
+  // literally `{x:55, y:-4.06, radiusM:9}`. Editing that template moved scan's
+  // L4->L5 step to the same shape stop's already had, so the two now describe the
+  // same rung, which is what they always were.
+  //
+  // Re-baselined rather than treated as a regression because the census's own
+  // condition is unchanged: the step is still ONE ambient car, still
+  // sub-perceptible by `MIN_PERCEPTIBLE_VEHICLE_RISE`, and the row is still capped
+  // by the gate above. Nothing got easier to finish; a third name joined a list
+  // whose whole purpose is to be read out loud.
+  "sc-junction-scan",
   "sc-turn-left-oncoming",
   "sc-junction-gap",
   "sc-junction-blind",

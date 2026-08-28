@@ -149,18 +149,28 @@ describe("mg-busstop-v1 through the world builder", () => {
     expect(BAY_FROM_Y - start.y).toBeGreaterThanOrEqual(100);
   });
 
-  it("the CLEAN ROOM: no lights, no stop signs, no zebras, no junctions, no bus-stop shelter", () => {
+  it("the CLEAN ROOM: no lights, no stop signs, no zebras, no junctions — but a spirka", () => {
     expect(district.intersections.length).toBe(0);
     expect(district.crossings.length).toBe(0);
     expect(world.trafficLights.length).toBe(0);
     expect(world.stats.signs.stop).toBe(0);
     expect(world.stats.signs.giveWay).toBe(0);
     expect(world.stats.zebraCrossings).toBe(0);
-    // Honest, and pinned so it can never silently change (gen_mg_busstop's
-    // header, gaps 2+3): props.ts wants a primary/secondary edge on a degree
-    // >= 3 node for a shelter — both forbidden here — and zoneSigns.ts posts
-    // NOTHING for a marking-only busLane span. The bay is plain curb + a block.
-    expect(world.busStops.length).toBe(0);
+    // THE SHELTER LINE FLIPPED IN WAVE 8 (sc-merge-bus-pullout, and its sister
+    // critical sc-pk-busstop-ban). It used to pin 0 and explain why: props.ts's
+    // derived rule wants a primary/secondary edge on a degree >= 3 node — both
+    // forbidden here — and zoneSigns.ts posts nothing for a marking-only
+    // busLane span, so instruction 1's «в нея е спирката» pointed at plain
+    // curb. props.ts now reads the district's OWN `meta.scenario.busBayY` (the
+    // same key the зигзаг is painted from) and places the modelled навес at the
+    // bay's midpoint. zoneSigns is unchanged and still posts nothing.
+    expect(world.busStops.length).toBe(1);
+    // World space: x is district x, z is −district y. The bay is 130…176.
+    expect(-world.busStops[0].position[2]).toBeCloseTo((BAY_FROM_Y + BAY_TO_Y) / 2, 3);
+    // On the footway [20.25, 23.75] — past the drawn ribbon edge and short of
+    // the stop-block frontage at x = 22.25.
+    expect(world.busStops[0].position[0]).toBeGreaterThan(20.25);
+    expect(world.busStops[0].position[0]).toBeLessThan(22.25);
   });
 
   it("produces no NaN/infinite coordinates in any buffer or placement", () => {

@@ -293,6 +293,69 @@
  * route), `rules/` conviction and `scenario/rubric.ts` + `hud/SessionEndScreen`
  * respectively. Recorded so the next wave routes them instead of re-filing.
  *
+ * ---------------------------------------------------------------------------
+ * 2026-08-28, ROUND 14 — THE FOURTH RE-FILING OF THE „NEVER ENDS" CLASS, AND
+ * THE ONE PIECE OF EVIDENCE THAT SETTLES THE JUNCTION HALF OF IT.
+ *
+ * Four more sweep161 rows arrived against this file and against the objective
+ * evaluator. Every one was re-read at HEAD (`.audit-frames/w14`, and `w11`
+ * where the decisive leg is) and none is this module's. What is new — and what
+ * three previous waves did not have — is a POSITIVE control for the junction
+ * family, so the next reader does not have to take „the disc is reachable" on
+ * geometry alone:
+ *
+ *   `.audit-frames/w11/frames/sc-junction-rhr__pc-right/run.log`
+ *       TRACKING: TRACKED · ribbon seen on 42/49 moving samples (86 %)
+ *       ✓ Приближи кръстовището бавно и с готовност за спиране  1:05
+ *       ✓ Завий наляво и излез от кръстовището на запад         1:43
+ *
+ * That is the ONLY leg in the whole corpus on which the harness's steering loop
+ * stayed closed round the corner, and on it the west-arm exit gate ticks. The
+ * three drills the rows are filed on author the SAME shape — a radius-9 disc on
+ * the west-arm westbound lane centre, 50–55 m out (`sc-jrhr-cross` (−50, 4.06),
+ * `sc-jblind-cross` (−50, 4.06), `sc-jleft-exit` (−55, 4.06)) — on west arms of
+ * 150 m, 140 m and 160 m (`public/world/tj-*-v1.json`). Every leg that misses
+ * it carries its own harness banner saying why: loop closed on 39–72 % of the
+ * moving samples, i.e. «the car was steering blind for that part of the drive,
+ * and where it went then is not evidence about the product».
+ *
+ *   sc-junction-left:2e42b935 — „objective 3 never ticks in any of the four
+ *     runs; the lesson has no reachable end state". The shape that ticks in
+ *     w11 is the shape this drill authors, and its own legs run at 39–60 %
+ *     tracking. Not a missing end state — an unsteered approach.
+ *
+ *   sc-junction-rhr:83b4fd69 — „the correct drive is convicted, not credited:
+ *     20 наказателни точки, 2 опасни грешки". At HEAD the „right" lane ends
+ *     ITSELF (`endedNaturally: true · forcedBy: -`) on two graded collisions —
+ *     «Удар в друго превозно средство» + «Удар в неподвижно препятствие» — at
+ *     59 % tracking; the SAME lane at w11, tracked, returned ИЗДЪРЖАН with 3
+ *     points. A collision is `rules/` conviction and nothing here or in
+ *     `objectives.ts` bills it.
+ *
+ *   sc-junction-blind:c5ba8f17 — „the chip keeps demanding the turn while the
+ *     car sits off-map". Re-measured at w14: the lane's LAST drive frame is
+ *     `04-t074s.png`, it ends itself at ≈79 s on the CRASH PIN, and the frame
+ *     carries the pin's own «ОПАСНА ГРЕШКА −10 · Удар в неподвижно
+ *     препятствие» card. The 135 s of off-world driving the sweep161 frame
+ *     shows (`04-t090s.png`, a green plane with no road in it) does not occur.
+ *
+ *   sc-ov-being-overtaken:3a244204 — „the drive cannot end on its own; the
+ *     harness presses «Прекрати урока» at 205 s". Still `ended: false` at w14,
+ *     and for the reason the three sc-ac rows above have: the car is nowhere
+ *     near a gate. Spawn `ovg-spawn-start` is (4.06, 15) and the FIRST of the
+ *     two marks is y = 380 — 365 m — against a witness path of 286.5 m net
+ *     284 m in 211 s (23 full stops, top 49 км/ч). It stopped ~81 m short of
+ *     objective 1 of 2. This leg is TRACKED 100 %, so unlike the junctions it
+ *     is not steering: it is the audit program's 12 км/ч cruise against a 210 s
+ *     budget, the same wall `sc-ac-truck-spray` hits 480 m short.
+ *     WORTH THE FOUNDER'S ATTENTION, and it is a design question rather than a
+ *     defect: that drive books FOUR collisions, the sheet terminates on the
+ *     first, and the lesson runs on for the remaining ~140 s. The crash pin
+ *     does not fire and should not — the car left every impact pose under its
+ *     own power — and the debrief says the choice out loud («В симулатора
+ *     продължихме за упражнение, но оценката отразява прекратяване»). Whether
+ *     a terminated sheet should also end the DRIVE is an ADR, not a bug.
+ *
  * Pure and deterministic, like every other fold in this module: no clock, no
  * randomness, same state + same tick ⇒ same output.
  */

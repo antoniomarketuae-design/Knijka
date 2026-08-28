@@ -70,6 +70,8 @@ import {
   TERMINUS_CLOSE_MIN_HEIGHT_M,
   TERMINUS_CLOSE_ROAD_CLEAR_M,
   TERRAIN_MARGIN_M,
+  isMotorwayCarriageway,
+  WORLD_RIM_BANK_HEIGHT_M,
   WORLD_RIM_HEIGHT_STEPS,
   WORLD_RIM_MIN_DEPTH_M,
   WORLD_RIM_SPAN_M,
@@ -241,6 +243,59 @@ export function buildWorldRim(
   for (const eb of network.edges) roadGrid.addPolyline(eb.edge.geometry as Vec2[]);
 
   const baseHeight = frontageHeightM(district);
+
+  // ── WAVE 8, EDIT 1 — THE MASS ID CARRIES ITS DISTRICT ────────────────────
+  //
+  // sc-ac-ice:86eab7e9 (major): «sc-ac-aquaplane, sc-ac-ice and sc-ac-bridge-ice
+  // still render the same stretch of street — the same mid-rise block facades,
+  // the same tree line and the same unbroken kerbside parked-car row.»
+  //
+  // The id used to be `world-rim-${side}-${i}` with NO district in it, and
+  // THREE separate hashes are keyed off it: `hash01('rim-depth:' + id)` below,
+  // `hashString('rim-height:' + id)` below that, and — through
+  // `buildings.ts` — `facadeVariant(b.id, …)`. ac-ice-v1, ac-night-v1 and
+  // ac-rain-v1 declare the IDENTICAL bounds box (−28.12, 0, 14.125, 360), so
+  // they split their runs identically, drew the same masses at the same depths
+  // and the same heights, and skinned them with the same facade variants. The
+  // three lessons were photographed as one street because, outside the 1–19
+  // buildings each map authors, they WERE one street.
+  //
+  // The district id is the one term that distinguishes them, and every other
+  // derived id in this module family already carries one. Nothing else in the
+  // tree matches on this string — measured: the only references to
+  // „world-rim" outside this file are three comments.
+  const districtKey = district.meta.district;
+
+  // ── WAVE 8, EDIT 2 — A МАГИСТРАЛА IS NOT WALLED BY SIX-STOREY BLOCKS ─────
+  //
+  // sc-mw-emergency-lane: «it does not read as a магистрала»; its sister row
+  // sc-ac-truck-spray:c042440d was photographed as «an urban street lined with
+  // apartment blocks on both sides» — on a map that authors ONE building over
+  // 2,606 m of motorway. Every other block face in those frames is this belt,
+  // which reads the bounds and the road polylines and never asked what kind of
+  // road it was closing in.
+  //
+  // A rim belongs on every map (that is the defect this builder answers, and it
+  // is not being undone) — but what stands at the edge of a motorway is an
+  // embankment or a noise bank, not a city block. So the KIND follows the road:
+  // a district with no street-class carriageway at all gets a low continuous
+  // bank instead of a 9–22 m frontage. It still closes the world and still
+  // stops a car, which are the two things the belt is for.
+  //
+  // THE PREDICATE IS THE MODULE'S OWN. `isMotorwayCarriageway` is what every
+  // B65 dressing pass already asks before it puts a lamp or a parapet on a
+  // магистрала (props.ts `dressesAsStreet`), so this uses the same question
+  // rather than a second definition of „motorway". A map with ANY non-motorway
+  // carriageway keeps the city belt — mw-exit-v1 is exactly that case (its ramp
+  // runs into a street, and its 9 lamps / 25 parapet panels in the furniture
+  // budget say the street is dressed), so only the pure motorway segments move.
+  //
+  // NOT DONE, and named rather than guessed at: the RURAL half. ov-crest-v1's
+  // «Учебен извънградски път» is `unclassified`, which dresses as a street
+  // everywhere else in this module, so widening the test to it would re-dress
+  // every residential micro-map in the catalogue on the same line. That needs a
+  // per-district „rural" term the documents do not carry yet.
+  const urbanRim = network.edges.some((eb) => eb.line && !isMotorwayCarriageway(eb.edge));
   // Everything already standing on the map. The belt's OWN masses are
   // deliberately never added to this list, and that is the difference between a
   // belt and a picket fence: adjacent masses SHARE AN EDGE by construction, so
@@ -261,7 +316,7 @@ export function buildWorldRim(
     if (!(runLen > 1)) continue;
     const n = Math.max(1, Math.round(runLen / WORLD_RIM_SPAN_M));
     for (let i = 0; i < n; i++) {
-      const id = `world-rim-${run.side}-${i}`;
+      const id = `world-rim-${districtKey}-${run.side}-${i}`;
       const a0 = run.a0 + (runLen * i) / n;
       const a1 = run.a0 + (runLen * (i + 1)) / n;
       // Only the INNER face steps; the outer stays flush so nothing can see
@@ -326,10 +381,15 @@ export function buildWorldRim(
       const step = WORLD_RIM_HEIGHT_STEPS[
         hashString(`rim-height:${id}`) % WORLD_RIM_HEIGHT_STEPS.length
       ]!;
-      const heightM = Math.min(
-        TERMINUS_CLOSE_MAX_HEIGHT_M,
-        Math.max(TERMINUS_CLOSE_MIN_HEIGHT_M, baseHeight * step),
-      );
+      // The bank is FLAT and unhashed on purpose: a stepped silhouette is what
+      // makes a city edge read as buildings, and an embankment that steps like
+      // a street of blocks would be the same lie in a lower key.
+      const heightM = urbanRim
+        ? Math.min(
+            TERMINUS_CLOSE_MAX_HEIGHT_M,
+            Math.max(TERMINUS_CLOSE_MIN_HEIGHT_M, baseHeight * step),
+          )
+        : WORLD_RIM_BANK_HEIGHT_M;
       out.push({
         id,
         // `heightSource: "height"` so `resolveBuildingHeightM` takes this

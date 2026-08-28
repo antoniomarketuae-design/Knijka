@@ -539,11 +539,66 @@ export function markerRingRadii(goal: GuidancePointGoal): { innerM: number; oute
 /**
  * Lateral offset of the sign from the route, m — kerb side (right of travel).
  *
- * `GATE_HALF_WIDTH_M` is half the perceptual lane, so this stands the post one
- * metre beyond the lane edge: on the pavement, where road signs are, and
- * clear of the wheel track of a car that drives through the gate.
+ * `GATE_HALF_WIDTH_M` is half the perceptual lane, so this stands the post
+ * beyond the lane edge: on the pavement, where road signs are, and clear of the
+ * wheel track of a car that drives through the gate.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * IT STOOD 0.20 m FROM THE ROAD'S OWN SIGN POST, AND THAT IS THE WHOLE ROW.
+ *
+ * sc-zebra-approach (wave 8, major): «The world-space coach label is drawn half
+ * behind the А18 pedestrian-crossing triangle, so the instruction is
+ * unreadable.» The adjudication crop: „The А18 triangle sits squarely across
+ * the MIDDLE of the teal label panel; of the coach text only «Кар» survives on
+ * the left and a single glyph fragment on the right."
+ *
+ * ARITHMETIC, on the shape most of the catalogue uses — the 1-lane-per-direction
+ * scenario street, where the route IS the lane centre:
+ *
+ *   the road's own kerb signs   `world/builders/props.ts` posts every one of
+ *                               them at `eb.halfWidth + 0.8`. halfWidth is
+ *                               LANE_WIDTH_M (8.125), so the post is 8.925 m
+ *                               from the centreline and the route is at
+ *                               LANE_WIDTH_M / 2 = 4.0625 —
+ *                               **4.8625 m from the route**
+ *   the coach's chip (before)   GATE_HALF_WIDTH_M + 1 =
+ *                               **5.0625 m from the route**
+ *
+ * Two posts 0.20 m apart. Not „near": the same place. The А18 plate therefore
+ * stood 2.3 m across a 5.0 m panel — 46 % in, i.e. dead centre, exactly where
+ * `LABEL_TITLE_BASELINE_PX` centres the title — and no fade, weight or size
+ * pass on the chip could ever have helped, because the ink was behind an opaque
+ * object rather than too faint.
+ *
+ * THE FIX IS THE OFFSET, and it is chosen by where it puts the OCCLUDER rather
+ * than by taste. `+ 2.6` stands the coaching post 1.80 m OUTBOARD of the road's
+ * sign band — behind the road's sign, from the driving seat — which moves the
+ * plate from 46 % across the panel to 14 %, i.e. off the centred text and onto
+ * its inboard margin. On the scenario street's own cross-section the post lands
+ * 10.725 m from the centreline: 2.60 m past the kerb (8.125) and still 0.90 m
+ * short of the back of the 3.5 m pavement, so it is street furniture and not a
+ * thing standing in a building.
+ *
+ * WHAT THIS DOES NOT CLAIM. A 5 m billboard beside a 0.9 m triangle can always
+ * be made to overlap by choosing a viewpoint; nothing here promises they never
+ * touch. What it promises is that the coach's post is no longer IN the road's
+ * sign band, so the road's own sign can no longer bisect the instruction — and
+ * `guidance-marker-sign.test.ts` measures that as the clearance rather than as
+ * a number retyped here.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
-export const MARKER_SIGN_LATERAL_M = GATE_HALF_WIDTH_M + 1;
+export const MARKER_SIGN_LATERAL_M = GATE_HALF_WIDTH_M + 2.6;
+
+/**
+ * Where `world/builders/props.ts` stands a kerb sign, measured from the ROUTE
+ * on a 1-lane-per-direction scenario street: `eb.halfWidth + 0.8` from the
+ * centreline, less the outermost lane centre. Pinned BY VALUE (the L7 copy law)
+ * because `props.ts` is a world builder and this is a scene module — the test
+ * re-asserts it against the real `buildWorldGeometry` output on zb-v1, so a
+ * builder that moves its posts convicts this copy instead of silently drifting
+ * back into it.
+ */
+export const WORLD_KERB_SIGN_LATERAL_M = GATE_HALF_WIDTH_M + 0.8;
 
 /**
  * The panel itself. 5.0 × 1.67 m and a 480 × 160 canvas since the 2026-08-03

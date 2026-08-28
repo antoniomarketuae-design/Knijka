@@ -134,6 +134,63 @@ const CORNICE_CAP_TINT = 1.14;
  * `rxt-b-island`). `slabThicknessM` holds the slab to 0.4 of the footprint's
  * shorter AABB span, so two opposite walls of a yard wall meet in the middle
  * instead of reaching past each other.
+ *
+ * ── RE-DRIVEN 2026-08-28. THE SLAB LANDED; THE ROW IT NOMINATED DID NOT CLOSE.
+ * Everything above is still true and still worth having, but the paragraph that
+ * named a decider has been paid out, and the next reader must not re-quote it
+ * as an open question. `6399a8d` landed this slab at 2026-08-27 19:54:27 +0300;
+ * `.audit-frames/w14` re-drove the cluster at 18:25 UTC the same evening, i.e.
+ * against THIS geometry. On the drive this comment nominated as the settler —
+ * `w14/frames/sc-maneuver-3point__pc-wrong` — the beats are 44 / 49 / 49 /
+ * 49 (t016s) / 0 (t021s). t016s is STILL 49 км/ч with the glass full of wall,
+ * so by the test written above („a body that is STOPPED at the wall closes it;
+ * a body still doing 49 does not“) the row did NOT close. No further depth here
+ * will close it either: the beats are ~5 s apart and the car covers 68 m
+ * between two of them, so t016s photographs an APPROACH, not a penetration.
+ * The nominated test could never have discriminated at that sampling rate.
+ *
+ * WHAT DID CHANGE IS THE HALF THAT REACHES THE STUDENT: every drive in the
+ * cluster now ENDS STOPPED AND BILLED. The w14 run.logs — sc-ac-aquaplane
+ * 97→0, sc-ac-night-overdrive 97/95→0, sc-ln-turn-lane-arrows 59→0,
+ * sc-maneuver-uturn 49→1→0, sc-ov-return-gap 97→1→0 — each carry 2–4
+ * «Удар в неподвижно препятствие» with the ЗАЩО explainer behind them.
+ *
+ * AND „THE CAMERA IS INSIDE THE MESH“ IS NOT A READING THIS RENDERER SUPPORTS.
+ * The facade meshes take no `side` prop (world/components/StaticWorld.tsx, the
+ * `geometries.walls.map` block), so they are three.js’ default FrontSide: a
+ * camera INSIDE a building sees that building’s walls CULLED AWAY, not filling
+ * the glass. An opaque, lit, front-facing facade across the whole windscreen is
+ * therefore a camera OUTSIDE the wall — which, with the COCKPIT_EYE arithmetic
+ * two paragraphs up (2.28 m of air from a stopped bumper, a 17 m wall in front
+ * of it), is exactly what a CORRECT stop looks like. File frames against this
+ * file freely, but „the windscreen is full of wall“ is not by itself evidence
+ * of penetration; a speed that does not fall to 0 by the next beat is.
+ *
+ * TWO THINGS THIS FILE IS STILL WRONG ABOUT, BOTH MEASURED ACROSS THE SHIPPED
+ * CORPUS (105 districts / 1228 footprints / 5802 edges) AND BOTH CONFINED TO
+ * `district-v1` — zero occurrences on all 104 scenario/exam/полигон maps — and
+ * left OPEN here rather than half-fixed:
+ *   1. REFLEX-CORNER ESCAPE. The inward offset is taken along each edge’s own
+ *      normal with no regard for its neighbours, so at a concave vertex of a
+ *      real OSM ring the slab pokes back OUT through the adjacent edge: 177
+ *      corners, up to 0.42 m. That is collider mass where nothing is drawn — an
+ *      invisible wall the product then bills −10 for, with an explainer that
+ *      says „то е било там през цялото време“ about something it never showed.
+ *      The obvious repair is NOT free and must not be taken as one: a clamp
+ *      that keeps every offset vertex inside its ring pulls 172 of the 5802
+ *      edges below full depth and 17 of them below 0.1 m — back to the
+ *      zero-thickness sheet this constant exists to abolish. It needs a real
+ *      polygon clip (terminate a slab early where its ring is thin, keep full
+ *      depth everywhere else), not a scalar clamp.
+ *   2. NOT THIS FILE’S, BUT IT ARRIVES HERE, so read it before re-routing a
+ *      pass-through row back to `buildOne`: `cityBuildings.towerPlacement`
+ *      fits a kit tower with `clamp(box.w, natW/STRETCH, natW*STRETCH)` while
+ *      the collider below is built from the FOOTPRINT RING. Where a plot is
+ *      narrower than natW/1.6 the DRAWN tower overhangs its own collider — four
+ *      towers by up to 4.24 m, one pavilion by 1.88 m — so a car can enter a
+ *      VISIBLE building and touch nothing at all. The pavilion branch already
+ *      avoids exactly this and says so in its own comment; the tower branch
+ *      does not.
  */
 export const WALL_COLLIDER_THICKNESS_M = 1.0;
 

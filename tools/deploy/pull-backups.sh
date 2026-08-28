@@ -60,7 +60,25 @@ if [ "${1:-}" = "--check" ]; then
   MODE="check"
   shift
 fi
-DEST="${1:-${KNIJKA_LOCAL_BACKUP_DIR:-$HOME/knijka-backups}}"
+# THE DEFAULT LANDS BESIDE THE CHECKOUT, NOT IN $HOME — 2026-08-28.
+#
+# It used to default to `$HOME/knijka-backups`, and on the dev box $HOME is on
+# C: while the repo is on E:. C: had 12.9 GB free and had been down to 1.08 GB
+# that week; E: had 669 GB. So the one script whose whole job is "get the data
+# off the VPS" defaulted to the drive least able to hold it, and the reason
+# given for not running it was the drive it happened to point at.
+#
+# Deriving the default from the repo root fixes that everywhere rather than on
+# this machine: the dumps land next to the checkout, on whatever volume the
+# checkout is on, on the second developer's box as well as this one.
+# `KNIJKA_LOCAL_BACKUP_DIR` and the positional argument still win.
+#
+# WHAT THIS IS AND IS NOT. It protects against LOSING THE VPS, which is the
+# failure this script exists for. It does NOT protect against losing the disk
+# the repo is on — same drive, one hardware fault. A third copy somewhere off
+# this machine is still owed, and the README says so.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+DEST="${1:-${KNIJKA_LOCAL_BACKUP_DIR:-$(dirname "$REPO_ROOT")/knijka-backups}}"
 
 log() { printf '%s pull-backups: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 die() { log "ERROR: $*" >&2; exit "${2:-1}"; }

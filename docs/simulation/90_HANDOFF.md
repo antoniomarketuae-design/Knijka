@@ -1526,3 +1526,281 @@ now covers **all 217 STILL rows in 22 lanes, eleven of them batched by a known
 cause rather than by a filename** — and each such lane is told the cause, told
 that its bar is therefore *higher*, and told to **verify the cause first** because
 it came to it second-hand.
+
+---
+
+## §17 — 2026-08-28: wave 8, and both causes I handed down were wrong
+
+> Wave 8 ran 22 lanes over all 217 STILL rows at their corrected addresses, eleven
+> of them batched by a **known cause** rather than by a filename. Each such lane
+> was told the cause, told its bar was therefore higher, and told to **verify the
+> cause first, because it arrived second-hand**.
+>
+> Two of them came back and said the cause was false. That instruction paid for
+> itself twice in one wave, and both times the wrong claim was mine.
+
+### THE STALE CAUSE — `collider-buildings`
+
+I handed seven rows to one lane with this: *"`buildOne` writes an OPEN TUBE — one
+full-height quad per footprint edge, no floor, no cap (`:212-216`, the file's only
+collider writes). Cars end up inside buildings rather than stopped against them."*
+
+**It had been repaired before the wave started — by us.** `buildings.ts:297-349`
+writes a **closed six-face slab** per footprint edge (outer, inner, cap, floor, two
+end caps), `:138` defines `WALL_COLLIDER_THICKNESS_M = 1.0`, and
+`git log -S WALL_COLLIDER_THICKNESS_M` dates it to **`6399a8d`, 2026-08-27 19:54** —
+one of our own commits, hours before I wrote the brief. Lines 212-216 are facade
+tint. `building-collider-is-solid.test.ts` was already 9/9 green.
+
+The seven frames the rows rest on were written **2026-08-17/18**, ten days earlier.
+The lane then produced the post-fix evidence: on the w14 re-drives (`startedAt`
+21:25 local, ~1.5 h after the slab landed) every car is brought to a stop within
+one beat, with 2–4 «Удар в неподвижно препятствие» billed and the ЗАЩО explainer
+shown. It opened the frames rather than inferring: `sc-ac-night-overdrive__pc-wrong/
+04-t045s.png` is 0 км/ч against a **headlight-lit, front-facing** facade with
+«ОПАСНА ГРЕШКА −10» on the glass.
+
+**And it killed the "the camera is inside the mesh" reading with a fact I had not
+thought about at all.** The facade meshes take no `side` prop
+(`StaticWorld.tsx:666-696`), so they are three.js' default `FrontSide` — a camera
+inside a building sees that building's walls **culled away**. An opaque, lit,
+*front-facing* facade filling the windscreen is a camera *outside* the wall, which
+is what a correct stop looks like.
+
+Verifier r27 re-derived it all: *"the stale brief really is stale, the culling
+argument is right, and all seven refutations survive on evidence I re-derived."*
+
+**Where the staleness came from, so it does not recur.** The re-routing pass read
+wave 7's lane reports and lifted their causes. Those reports were written against a
+tree that wave 7 then changed. I carried the cause forward as fact without asking
+whether the wave that produced it had already fixed it. **A cause is exactly as
+fresh as the report it came from, and a repair wave invalidates its own reports.**
+
+(Also mine, and sloppier: the lane's `owns` list printed
+`modules/sim/world/builders/buildings.ts` without the `platform/src/` prefix,
+because the wave-8 builder stores prefixes and the brief printed them raw.)
+
+### THE FALSE CAUSE — `route-the-unrouted`
+
+I batched 21 rows as *"these still carry no usable address — some say literally
+'unknown'. Nobody ever routed them."* The lane counted the field:
+
+| what the row actually carries | count |
+|---|---|
+| literally `"unknown"` | **5** |
+| a DIRECTORY, not a file | 2 |
+| a TEST file (can never be a product address) | 1 |
+| a real product file, **routed in wave 7** with a `rerouted` block | **7** |
+| a real product file, never re-routed | 6 |
+
+So my sentence was true of **5 of 21**. Seven had been routed eight days earlier
+with adjudicated evidence, four of them at `confidence: VERIFIED`, and the lane
+re-checked all seven line-by-line at HEAD: four verbatim, two with the diagnosis
+intact, one refuted.
+
+**And it found the real common cause, which is a routing class worth more than the
+batch was.** Six rows are routed at the **roomy (desktop)** surface for a defect
+photographed on the **compact (phone)** one. `LessonPlayShell.tsx` mounts two card
+systems and the corpus does not distinguish them: `AdvisorCard` (`:6327`),
+`BriefingCard` (`:6341`) and `MistakeConsequenceOverlay` (`:7016`) are **roomy
+only**, while on compact the same content goes through the `SimOverlayItem` queue
+(`:4732-5038`) and is painted by `hud/SimOverlay.tsx` as the one-line peek +
+«↓ ОЩЕ N РЕДА» + «ЗАЩО»/✕ card. Every frame in that lane showing that card shape is
+a **mobile** leg. So five more rows belong at `hud/SimOverlay.tsx` /
+`hud/overlayQueue.ts`, with the chain proved end to end.
+
+### THE LESSON, AND IT IS NOT "DO NOT HAND DOWN CAUSES"
+
+Batching by cause was still right — it is what let one lane refute seven rows at
+once instead of seven lanes each half-repairing a symptom. What has to travel with
+a cause is the instruction that came with it, and it must never be softened:
+
+> **VERIFY THE CAUSE FIRST. It came to you second-hand. Open the file, read the
+> lines named, and confirm it before you act on it. If it is wrong, say so with
+> evidence — that is a completed lane, not a failed one.**
+
+Both lanes did exactly that, and both were right to. A lane that had "just fixed"
+the open tube would have written a second collider into a file that already had
+one, and the seven rows would have been banked on it.
+
+### THE WAVE-8 INTEGRATION, AND THE FOUR THINGS THAT HAD TO BE FIXED FIRST
+
+None of the four was caught by a gate. All four came from the adversarial pass.
+
+1. **Two offence codes with no emitter anywhere.** The `offence-codes` lane added
+   `POLICE_STOP_SIGNAL_IGNORED` and `WARNING_LAMP_IGNORED` to the `ViolationCode`
+   union and the catalogue, and shipped **no producer** — `grep` over `src` and
+   `content` returns the union member, the catalogue row and one comment. On
+   `/simulator` neither code can fire on any drive. It also broke the build
+   (`n38.ts`'s exhaustive `Record<ViolationCode, N38Basis>`) and ten tests,
+   including the repo's own dead-predicate guard, which was naming the lane's work
+   out loud. The lane had even written *"if this row is orphaned, the runner edit
+   it is paired with did not ship"* — and then shipped it orphaned. **Reverted**,
+   with the retrieved ЗДвП чл. 103 / чл. 101 ал. 1 references and the complete
+   list of what must land together kept in a comment. The retrieval was the
+   expensive half and is the part worth saving.
+
+2. **`requireLawfulSpeed: true` on a type with no such field.** Dead predicate and
+   a `tsc` error at `templates-cockpit.ts:315`. Deleted, with the hole documented
+   at the site so the next reader knows the objective's title claims a discipline
+   nothing measures — the `sc-swp-finish` shape again.
+
+3. **The streetlamp pool was offset 2.2 m the wrong way**, onto the footway, on
+   `sc-ov-night-gap` — a critical row whose whole subject is what you can see at
+   night. The fix agent re-derived the whole chain rather than taking the
+   verifier's word, walking the shipped GLB accessor bounds through the node
+   transforms: the arm is local **+X**; `rotateY(−π/2)` puts it on **+Z**;
+   `yawFromFacing` aims +Z along `facing`; and `props.ts:1543-1548` sets
+   `facing = mul(r, -side)` — at the centreline. So the negative sign pushed the
+   disc away from the road. Measured on `sp-creep-v1`: pool centre landing at
+   **18.22 m** instead of **13.82 m**. One character, and it had **zero test
+   coverage** — the only gate was a `drawSlots` count, which is direction-blind.
+   Now gated by a test that re-measures the GLB and reads the three `translate`
+   arguments out of the source (comment-stripped and quote-aware, so a
+   commented-out line cannot satisfy it), rather than pinning today's numbers.
+   **Still owed: a look at a frame** (doc 66 R0). Geometry that reasons correctly
+   can still render wrong.
+
+4. **A test pinned on an input the product cannot produce** — `litTickCount(0)`,
+   where the machine's standstill test is `|v| < REVERSE_ASSIST_STANDSTILL_KMH`
+   and the dial rounds, so an exact 0 may never occur on a live drive. Re-pinned.
+
+**Two corrections to briefs I wrote**, both found by the agents:
+
+- I gave the lamp-pool file as `platform/src/components/sim/WorldProps.tsx`. **That
+  path does not exist** — the real file is
+  `platform/src/modules/sim/world/components/WorldProps.tsx`. The agent found it by
+  the quoted line rather than by the path, which is the right instinct.
+- My integrator preamble says this repo stores `.ts`/`.tsx` as **CRLF**, and one
+  agent contradicted it from `.gitattributes`' own prose (*"every one of these
+  files is already stored LF in the index, verified 1209/1209"*). **My preamble is
+  right and the prose is narrower than it reads**: `.gitattributes` sets
+  `eol=lf` for exactly four patterns — `*.trace.json`, `*.generated.ts`,
+  `content/world/*.json`, `platform/public/world/*.json` — the byte-exact gate
+  fixtures. `git show HEAD:…/WorldProps.tsx` carries **2423 CR lines**. Both files
+  the agent touched landed fully CRLF and `git diff --stat` shows 174/1, so
+  nothing broke; but the claim must not propagate.
+
+### AN ARBITRATION: THE MODE NUMERAL STAYS, DEMOTED AND EXPLAINED
+
+Two lanes reached opposite conclusions about the «РЕЖИМ Нормален ≤N» strip.
+`hud-cap-numeral` demoted the numeral's weight and added a clause distinguishing
+it from the law; `speed-contract-camera` wanted it dropped entirely. Only the
+first owns the file, so only the first landed — but the disagreement is real and
+is mine to settle.
+
+**The numeral stays, demoted and explained.** Dropping it would leave the student
+with a throttle that stops responding and no sentence saying why — «газта не отива
+по-нагоре» becomes an unexplained mystery, which is the requirement-zero
+violation, not the cure for it. What was wrong was never that the number existed;
+it was that it was drawn in the same weight as the two numbers that can convict,
+while being the only one on the bar that carries no fact about the road under the
+wheels. The landed copy now says so: *«Това е таван на РЕЖИМА, не разрешение …
+знакът до скоростта е ограничението.»*
+
+### THE HARVEST — turning refutations into ledger entries
+
+Wave 8's lanes repaired little and **disproved a lot**, and a refutation is worth
+nothing while it sits in prose. Of roughly 120 rows carrying a lane refutation
+claim, **42 were written as verdicts and about two thirds were refused**:
+**18 REFUTED · 18 PARTIAL · 6 STILL**.
+
+The refusals are the valuable half, and they follow rules worth keeping:
+
+- **A wrong address is not a refutation.** The defect may be entirely real
+  somewhere else; those rows stay STILL. Nineteen rows were refused on this alone.
+- **BLOCKED is not REFUTED.** A lane that correctly declined to ship a dead
+  predicate has repaired nothing.
+- **"The claim is true at HEAD" is a founder ruling, not a falsification** — three
+  rows where the lane agreed the observation was right and disagreed that it was a
+  defect.
+- **A refutation nobody photographed is not certified** (doc 66 R0). Four rows,
+  including one whose own frame was a scratchpad PNG from a dead session that no
+  longer exists.
+- **"Plausible" is not "upheld."** Five rows.
+
+**Open list: 381 → 363.**
+
+### AND A TRAP I DOCUMENTED AT 02:00 AFTER CAUSING IT AT 00:30
+
+`wave-c-post` reported *«1 cite an id not in the corpus»*. It was mine.
+`sc-sp-wet-limit-plate:5708fd93` carried a w14 adjudication with a photographed
+frame and a sound argument — and I had rewritten that row's `what` earlier the
+same day to withdraw the false "in the rain" premise. Since
+`findingId = scenario + sha1(what + NUL + frame)`, the edit **rehashed the id**
+and the verdict was left pointing at nothing, silently doing no work.
+
+Re-pointed to `d9fd3821` — but **not** by copying the old line across. Its `why`
+argued the car did 58,9 in a 50 *«in the rain»*, which is exactly the premise the
+correction withdrew; carrying it forward under the corrected row would be worse
+than the orphan, because it would look settled. The new line keeps the verdict,
+the frame and the photographed quote, and restates the reasoning on the claim that
+survives: `sc-swp-finish` is a bare `reachZone` with no speed cap whose title
+asserts a speed discipline it never measures.
+
+### TWELVE CENSUS TESTS, DECIDED ONE AT A TIME
+
+Wave 8's 22 lanes reddened twelve **census** and **ratchet** tests — the ones that
+pin an exact count or an exact roster (*"exactly these rows witness a cockpit
+state, and no others"*, *"the census is a ratchet: no silent rise"*). They exist
+because those numbers crept once and nobody noticed.
+
+A bulk re-baseline is how a regression gets blessed, so four agents adjudicated
+them under one rule — **default to REGRESSION; if you cannot say in one sentence
+why the new number is CORRECT rather than merely different, it is a regression** —
+and two adversarial verifiers then checked every verdict, looking hardest at the
+re-baselines, because a re-baseline is the answer that makes a red gate go away.
+All verdicts came back SOUND.
+
+**Re-baselined, each with its reason written beside the number:** the three
+`reach-zone` rosters, the four advisor/cap censuses (953→958), `b58`'s parse
+census (502→507), `world-referent` (T8raw 195→196, B4raw 152→153), the
+`rung-ladder` L5 roster gaining `sc-junction-scan`, and the L1→L2 ratchet 166→167.
+
+Almost all of them trace to **one line**: the integration fix that removed the
+dead `requireLawfulSpeed: true` and implemented its intent with a real
+`maxSpeedKmh: 50` plus `radiusM` 14→4. That objective's title says «нареди се в
+**дясната лента**» and a 14 m disc ticks for a car that never reached the lane —
+so it is a genuine title-truth repair, measured against all three committed traces
+(each passes within 0.10 m at 39.9 км/ч, 0.00 m lateral). A verifier proved the
+attribution by controlled removal rather than argument.
+
+**Two were regressions, and the gates were left biting:**
+
+- **`point-scales`.** A new live sentence under the ИЗДЪРЖАН badge read «нищо не
+  влиза в **точките**» — unqualified. To a Bulgarian reader that is *контролни*
+  точки, the 39-point licence budget; this card counts Наредба № 38 exam points.
+  Two different scales, and the one the reader assumes is the one a
+  seventeen-year-old is actually afraid of. Now «наказателните точки», matching
+  the wording this same file already uses 65 lines below.
+- **`reach-zone-witness` — the sharpest finding of the wave.** A matcher
+  fallthrough let a banner naming **no lamp at all** acquire a `lamps: "lit"`
+  demand from the words «съобразена за видимостта скорост». Five assertions
+  pinning those strings as `undefined` **still passed** while
+  `parseObjectiveParams` began returning `"lit"` — the letter of the pin survived
+  and its meaning inverted. **Invisible to the test written to catch it, and
+  visible only to a census counting the roster.** The refusal it produced would
+  have cited a requirement the banner never made. Reverted; the demand may be
+  right on the merits, and the honest route is to retitle so the banner says
+  «осветен». The finding stays open: `mistake-lights-off` completes that gate today.
+
+And a footnote worth keeping, because it is the same class arriving from the other
+side: reverting that fallthrough left `deriveVisibilitySpeedLampDemand` **exported
+with no caller and no test**. Deleted — an unread predicate is what this wave spent
+itself finding, and leaving one behind while removing another would have been a
+poor joke.
+
+### FIVE FILES WERE PHANTOM WHOLE-FILE REWRITES, FROM MY OWN BRIEF
+
+My integrator preamble said *"this repo stores `.ts`/`.tsx` as CRLF"*. **Both
+conventions exist here**, `core.autocrlf` is `false` so git normalises nothing, and
+lanes took the blanket advice and wrote CRLF over blobs that were LF.
+`world/types.ts` read as a **953-line rewrite** and is a **19-line addition**. A
+census verifier caught it; no gate did.
+
+Every modified file is now restored to **its own blob's** convention, by a script
+that refuses any file whose line count would move. The check that proves it, and
+the one to keep running: the whole-tree diffstat and the `--ignore-cr-at-eol`
+diffstat are now **identical**. Note also that a one-off `git show HEAD:… | grep -c`
+disagreed with the script on `difficulty.ts` and was the unreliable measurement —
+read the blob as bytes, not through a pipe.

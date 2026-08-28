@@ -186,10 +186,37 @@ describe("§2 the catalogue — every motorway carriageway, whatever its class",
       expect(flagged.utilityWireSpans).toBeLessThan(unflagged.utilityWireSpans);
       expect(flagged.railings).toBeLessThan(unflagged.railings);
       expect(flagged.trees).toBeLessThan(unflagged.trees);
-      // Instanced props only, and the A/B differs by the flag alone — the mesh
-      // the perf budget is written against is the same object either way.
-      expect(flagged.vertices).toBe(unflagged.vertices);
-      expect(flagged.triangles).toBe(unflagged.triangles);
+      // THE MESH CLAIM MOVED IN WAVE 8, and it moved because the flag now
+      // reaches one more thing on purpose.
+      //
+      // This used to read `expect(flagged.vertices).toBe(unflagged.vertices)` —
+      // „instanced props only, the mesh is the same object either way". It was
+      // true while the flag only silenced the four dressing passes above, all
+      // of which are instanced placements. sc-mw-emergency-lane («no median
+      // barrier … it does not read as a магистрала») and sc-ac-truck-spray
+      // («an urban street lined with apartment blocks on both sides», on a map
+      // that authors ONE building over 2,606 m) put the WORLD RIM behind the
+      // same flag: a district with no street-class carriageway now closes with
+      // a WORLD_RIM_BANK_HEIGHT_M embankment instead of a 9–22 m frontage, and
+      // a shorter mass is fewer facade bands, so it is genuinely less geometry.
+      //
+      // So the claim becomes the honest one, in the honest direction: the
+      // motorway build is never MORE mesh than the street build, and where the
+      // map still carries a street the two are still identical. mw-exit-v1 is
+      // that second case — its ramp runs into an ordinary street, so its rim
+      // stays urban — which is what keeps this from being a one-sided rule.
+      const hasStreetCarriageway = district.roads.edges.some((e) => !isMotorwayCarriageway(e));
+      if (hasStreetCarriageway) {
+        expect(flagged.vertices, `${id}: still a street map, mesh must not move`).toBe(
+          unflagged.vertices,
+        );
+        expect(flagged.triangles, id).toBe(unflagged.triangles);
+      } else {
+        expect(flagged.vertices, `${id}: the motorway build is never more mesh`).toBeLessThan(
+          unflagged.vertices,
+        );
+        expect(flagged.triangles, id).toBeLessThan(unflagged.triangles);
+      }
     });
   }
 

@@ -18,4 +18,21 @@ MAILTO=""
 # 03:15 UTC daily: verified database dump. Sunday's is kept for 8 weeks.
 # Deploys also take one immediately before every migration — this is the
 # safety net for the days when nobody deploys at all.
-15 3 * * * root /opt/knijka/backup-db.sh scheduled >> /var/log/knijka-backup.log 2>&1
+#
+# ⚠ THE PATH BELOW WAS WRONG UNTIL 2026-08-28, and the way it was wrong is the
+# point. It read `/opt/knijka/backup-db.sh`; the script is at
+# `/opt/knijka/tools/deploy/backup-db.sh`. Installed exactly as written, cron
+# would have run a file that does not exist, every night, for ever — and a
+# backup job that fails silently is indistinguishable from one that works
+# until the day you reach for a dump. Checked on the box: `/var/backups/knijka`
+# did not exist, no `*.dump` existed anywhere on the VPS, and the company had
+# ZERO database backups.
+#
+# ⚠ AND THIS FILE IS NOT WHAT THE VPS ACTUALLY USES. The staging box runs
+# autodeploy from a SYSTEMD TIMER (`knijka-autodeploy.timer`, OnUnitActiveSec
+# 300), not from cron — so installing the autodeploy line above would deploy
+# twice. The backup now runs the same way, `knijka-backup.timer` at 03:15 UTC,
+# installed and proved on 2026-08-28 (Result=success, dump written, verified,
+# retention applied). Keep this file as the portable recipe for a box without
+# systemd; on the staging VPS, the timers are the truth.
+15 3 * * * root /bin/bash /opt/knijka/tools/deploy/backup-db.sh scheduled >> /var/log/knijka-backup.log 2>&1

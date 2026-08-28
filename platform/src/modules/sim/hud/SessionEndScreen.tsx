@@ -92,7 +92,24 @@ import {
   type ParkAlignment,
   type RedMetVia,
   type RubricScore,
+  type SessionNearMiss,
 } from "../lessons";
+/**
+ * DEEP IMPORT, ON PURPOSE, AND IT COSTS THE BUNDLE NOTHING. `debrief.ts` is
+ * already in this route's client chunk — `LessonPlayShell.tsx:79` imports
+ * `buildDebrief` to render the instant fallback text — so what this line buys
+ * is the one thing that matters: the two post-drive surfaces derive their
+ * judgements from ONE function instead of two copies that drift (the pattern
+ * `hud/overheadHint.ts` and `hud/telltaleWarnings.ts` already use inside this
+ * module). See `commendationRiderBg` for the drive that made it necessary.
+ */
+import {
+  NEAR_MISS_KIND_BG,
+  commendationRiderBg,
+  commendationRiderFlags,
+  nearMissClosest,
+  nearMissPhraseBg,
+} from "../lessons/debrief";
 import { FaultCard, ThreeSystemsNote } from "./FaultCard";
 import {
   MistakeMap,
@@ -130,11 +147,13 @@ const PARK_ALIGNMENT_LABELS: Record<ParkAlignment, string> = {
   sloppy: "неточно",
 };
 
-const NEAR_MISS_KIND_LABELS: Record<"vehicle" | "pedestrian" | "cyclist", string> = {
-  vehicle: "автомобил",
-  pedestrian: "пешеходец",
-  cyclist: "велосипедист",
-};
+/**
+ * WAS A SECOND COPY OF `NEAR_MISS_KIND_BG`. Deleted rather than kept in sync:
+ * the debrief prose and this card now name the same encounter out of one map
+ * (`lessons/debrief.ts`), which is the whole of what „the two surfaces must not
+ * diverge" costs when it is paid up front.
+ */
+const NEAR_MISS_KIND_LABELS = NEAR_MISS_KIND_BG;
 
 function clock(tSec: number): string {
   const m = Math.floor(tSec / 60);
@@ -406,6 +425,69 @@ export function unmeasuredStarsNoteBg(
  * why. It is НЕЗАВЪРШЕН: the state the run was actually in, taking nothing the
  * student earned and granting nothing he did not.
  * ------------------------------------------------------------------------- */
+
+/**
+ * THE RESERVATION THE VERDICT CARD HELD AND NEVER PRINTED — finding
+ * `sc-vu-pass-clearance:54930e5c`.
+ *
+ * MEASURED · w10-2 · `sc-vu-pass-clearance` · pc · wrong, read off that leg's
+ * own `_audit-debrief.json`. ONE result screen; these two sections are 1 300 px
+ * apart in it and the scroll record (`08-debrief-p1` … `p6`) puts them six
+ * screenshots apart:
+ *
+ *   верхът of the card  «0 наказателни точки … ИЗДЪРЖАН … +100 XP … ★★★»
+ *   section[aria-label="Разминавания на косъм"]
+ *                       «Разминавания на косъм (1) … велосипедист — на 0.5 м 0:40»
+ *
+ * Half a metre from a cyclist, recorded by the product, on the very card that
+ * hands out the pass, the XP and three stars — and nothing within six screens
+ * of the verdict said so. The near-miss channel is the run's own record that
+ * something went badly; the ИЗДЪРЖАН pill is the loudest thing on the page; and
+ * they had no sentence between them.
+ *
+ * NOTHING IS RE-GRADED AND NOTHING IS TAKEN AWAY. `SessionNearMiss` folds into
+ * no score by construction (`lessons/types.ts` — „session stat only"), and this
+ * function reads it, never writes it: `result.passed`, `result.score`, the star
+ * row, the XP chip and every CTA behave exactly as they did. What the student
+ * gains is the one fact that makes the badge readable — the sheet is clean AND
+ * the drive came within half a metre of a cyclist, and both are true at once.
+ *
+ * ONLY ON A PASS, deliberately. НЕИЗДЪРЖАН and НЕЗАВЪРШЕН already carry their
+ * own account directly under the badge (`failReasons`, `unfinishedVerdictNoteBg`)
+ * and the near-miss section below is not competing with a certificate there; a
+ * third warning paragraph on a failed run is the wallpaper `unmeasuredStarsNoteBg`
+ * warns about. It is the PASS that reads as „nothing to see".
+ *
+ * THE FIGURE IS THE RECORDED ONE. `nearMissClosest` / `nearMissPhraseBg` are the
+ * debrief's own helpers, so the prose in the «Разбор» card and this line cannot
+ * name a different encounter or round the same metre differently.
+ */
+export function nearMissReservationBg(
+  result: LessonResult,
+  verdict: SessionVerdict,
+): string | null {
+  if (verdict !== "passed") return null;
+  const nearMisses: ReadonlyArray<SessionNearMiss> = result.nearMisses ?? [];
+  const closest = nearMissClosest(nearMisses);
+  if (closest === null) return null;
+  const countBg =
+    nearMisses.length === 1
+      ? `едно разминаване на косъм — ${nearMissPhraseBg(closest)}`
+      : `${nearMisses.length} разминавания на косъм, най-близкото ${nearMissPhraseBg(closest)}`;
+  return (
+    `„Издържан“ е за изпитния лист, не за целия път: в това каране има ${countBg}. ` +
+    // „наказателните", not a bare „точките" — 2026-08-28, caught by
+    // rules/__tests__/point-scales.test.ts. To a Bulgarian reader an unqualified
+    // „точки" is КОНТРОЛНИ точки, the 39-point licence budget, and this sentence
+    // is about the Наредба № 38 exam sheet: two different scales, and the one the
+    // reader would assume is the one a seventeen-year-old is actually afraid of.
+    // The sentence already says „е за изпитния лист" one line up; naming the
+    // scale here makes the second half agree with the first.
+    `Нищо не се удари, затова нищо не влиза в наказателните точки — но разминаването на косъм не е ` +
+    `умение, а остатък от късмет. Виж „Разминавания на косъм“ по-долу и мини оттам ` +
+    `по-бавно и по-широко.`
+  );
+}
 
 /** passed · failed (the изпитен лист says so) · unfinished (nothing says so). */
 export type SessionVerdict = "passed" | "failed" | "unfinished";
@@ -945,6 +1027,9 @@ export function SessionEndScreen({
   // badge — see SESSION_VERDICT_LABEL_BG and pointsToneClass.
   const verdict = sessionVerdict(result);
   const unfinishedNoteBg = unfinishedVerdictNoteBg(result);
+  // …and the reservation a PASS can carry — see nearMissReservationBg. Mutually
+  // exclusive with the line above by construction (that one is НЕЗАВЪРШЕН-only).
+  const nearMissNoteBg = nearMissReservationBg(result, verdict);
 
   // The class legend. „(10 т.)" beside a headline about наказателни точки was
   // the last bare unit left on the repaired result screen, and the tariff is
@@ -1106,6 +1191,16 @@ export function SessionEndScreen({
         {unfinishedNoteBg !== null ? (
           <p className="-mt-1 max-w-prose text-center text-xs font-semibold leading-relaxed text-warning">
             {unfinishedNoteBg}
+          </p>
+        ) : null}
+        {/* …and the one reservation an ИЗДЪРЖАН can carry: the run's own
+            near-miss record, which sat six screenshots below this badge while
+            the badge, the ★★★ row and the „+100 XP" chip read as a clean bill.
+            `--warning` and not `--danger`: nothing was hit and nothing is
+            charged — see nearMissReservationBg. */}
+        {nearMissNoteBg !== null ? (
+          <p className="-mt-1 max-w-prose text-center text-xs font-semibold leading-relaxed text-warning">
+            {nearMissNoteBg}
           </p>
         ) : null}
 
@@ -1447,7 +1542,39 @@ export function SessionEndScreen({
         </section>
       ) : null}
 
-      {/* Commendations */}
+      {/* ── Commendations ─────────────────────────────────────────────────────
+          A FALSE CERTIFICATE ON THE PRAISE SURFACE — finding
+          `sc-ac-wind-truck-pass:62436dd4`, and the row stayed open through a
+          repair because the repair landed on the other surface.
+
+          MEASURED · w13 · `sc-ac-wind-truck-pass`, BOTH platforms, read off
+          `frames/sc-ac-wind-truck-pass__pc-wrong/_audit-debrief.json` verbatim:
+
+            section[aria-label="Похвали"]
+              «Похвали ✓ Чисто и спокойно каране 0:49 ✓ Чисто и спокойно каране 1:11»
+
+          …on the card whose headline is «39 наказателни точки · НЕИЗДЪРЖАН» over
+          «Опасни грешки (по 10 изпитни т.) 3 30», one of those three a collision
+          at 1:13 — two seconds after the second commendation, and twelve after
+          the drive up the emergency lane. A student who crashes is told twice,
+          on the card that fails him, that his driving was clean and calm.
+
+          The ENGINE is right: `rules/engine.ts` awards CLEAN_DRIVING per 250 m
+          of violation-free travel and resets on every fresh fault, so both
+          stretches happened and the XP for them is booked off the event
+          (`gamification/xp.ts`). Nothing here deletes a row, re-orders one or
+          touches a number. What was wrong is that the row printed a claim about
+          the DRIVE — „чисто" — with the drive's own fault ledger three
+          centimetres above it and no sentence joining the two. `debrief.ts`
+          fixed exactly that in the PROSE (`cleanDrivingScopeBg`) and the verifier
+          measured the consequence: „SessionEndScreen.tsx:1450-1471 still renders
+          <span className=\"font-semibold\">{c.titleBg}</span> + clock and nothing
+          else — that is the surface the finding names."
+
+          So the rider comes from `lessons/debrief.ts` — the same function, not a
+          copy — and the two surfaces can no longer say different things about
+          one commendation. The dash that joins it to a debrief bullet is that
+          medium's punctuation; here it is a line of its own. ────────────────── */}
       {summary.commendations.length > 0 ? (
         <section aria-label="Похвали" className="card flex flex-col gap-2 p-5">
           <h3 className="text-sm font-extrabold text-success">Похвали</h3>
@@ -1455,15 +1582,31 @@ export function SessionEndScreen({
             {summary.commendations.map((c, i) => {
               const key = `c:${i}`;
               const flash = rowFlash(key);
+              // PER ROW, not per title: this card prints every event, and the
+              // 0:49 stretch and the 1:11 stretch are the same claim made twice.
+              const riderBg = commendationRiderBg(
+                summary,
+                commendationRiderFlags(summary, c),
+              );
               return (
                 <li
                   key={flash.key}
                   ref={registerRow(key)}
-                  className={`flex items-center gap-2 rounded-lg px-1 text-sm ${flash.className}`}
+                  className={`flex flex-col gap-0.5 rounded-lg px-1 text-sm ${flash.className}`}
                 >
-                  <span aria-hidden className="text-success">✓</span>
-                  <span className="font-semibold">{c.titleBg}</span>
-                  <span className="ml-auto text-xs tabular-nums text-muted">{clock(c.t)}</span>
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden className="text-success">✓</span>
+                    <span className="font-semibold">{c.titleBg}</span>
+                    <span className="ml-auto text-xs tabular-nums text-muted">{clock(c.t)}</span>
+                  </div>
+                  {riderBg !== null ? (
+                    // `--warning` and not `--danger`: the praise is EARNED and
+                    // stays; what is added is its scope. Indented under the ✓ so
+                    // it reads as this row's qualification and not as a new row.
+                    <p className="pl-6 text-xs font-semibold leading-relaxed text-warning">
+                      {riderBg}
+                    </p>
+                  ) : null}
                 </li>
               );
             })}

@@ -106,9 +106,18 @@ function run(
 // ---------------------------------------------------------------------------
 
 describe("the banner's own words decide the demand — «пропусни» is an act, «готовност» is a posture", () => {
-  it("matches the six shipped claims", () => {
+  it("matches the seven shipped claims", () => {
     // Every string is a shipped `titleBg`. A matcher that quietly narrowed
     // fails here before it can empty the census in §2.
+    //
+    // The seventh landed wave 8, 2026-08-28 with `sc-jscan-exit`'s retitle —
+    // see the re-baseline note in §2. It is listed here for the same reason as
+    // the other six: this test is the teeth, and a census member whose string
+    // never reaches the matcher's own test is a member nothing would notice
+    // losing.
+    expect(
+      deriveYieldDemand("Завърши десния завой на изток, след като пропуснеш колата отляво"),
+    ).toBe("traffic");
     expect(deriveYieldDemand("Премини правó напред, след като пропуснеш идващия отдясно")).toBe(
       "traffic",
     );
@@ -199,7 +208,7 @@ describe("the two vocabularies agree — the instrument before the census", () =
 });
 
 describe("the catalogue census", () => {
-  it("binds exactly the six rows whose banner certifies a yield", () => {
+  it("binds exactly the seven rows whose banner certifies a yield", () => {
     const bound: string[] = [];
     for (const spec of SCENARIO_TEMPLATES) {
       for (const o of spec.success) {
@@ -216,12 +225,52 @@ describe("the catalogue census", () => {
         }
       }
     }
-    // By name and by kind. An over-wide matcher shows up as a seventh entry, a
+    // By name and by kind. An over-wide matcher shows up as an EIGHTH entry, a
     // dead one as an empty list, and a mis-kinded one as a changed suffix —
     // which matters: `pedestrian` on a vehicle claim would consult a ledger row
     // the drill can never bill.
+    //
+    // ── RE-BASELINED 6 → 7, wave 8, 2026-08-28 (templates-junctions lane) ──
+    //
+    // WHY THE NEW VALUE IS RIGHT, in one sentence: `sc-jscan-exit`'s BANNER was
+    // rewritten this wave to promise a yield in so many words — «Завърши десния
+    // завой на изток, СЛЕД КАТО ПРОПУСНЕШ КОЛАТА ОТЛЯВО» (it read «Завърши
+    // десния завой и продължи на изток» at HEAD b211041) — so the row is a new
+    // census member for the only reason this census accepts one: the sentence
+    // the student reads now certifies that another driver was let through, and
+    // the gate has to be able to refuse it.
+    //
+    // THE MATCHER DID NOT MOVE, and that is the half worth checking first: this
+    // is a TEMPLATE change, not an instrument change. `deriveYieldDemand` and
+    // all three of its regexes (`objectives.ts:1610–1631`) are byte-identical to
+    // HEAD — verified with `git diff`, no hunk touches them. So the raise is the
+    // shipped matcher correctly reading a new sentence, not a widened matcher
+    // sweeping up an old one. `:traffic` is the right kind: the banner names
+    // «колата», a vehicle, and the drill's own two demos cite FAILED_TO_YIELD by
+    // name in `codeRefs` — the ledger row `traffic` consults.
+    //
+    // THE CLAIM IS REDEEMABLE, which is what HEAD's own note said it was not.
+    // That note withheld «след като колата отляво премине» deliberately, because
+    // in 2026-08 «a reachZone tick could witness NOTHING about another road
+    // user». `requireYieldClean` landed 2026-08-27 and that reason has expired:
+    // the drill stages the conflict it names (`witnessArm.nearLineM 6` holds the
+    // car at the line, so arriving late cannot delete the encounter), and the
+    // refusal half is now witnessable. The positive half — „he really did wait"
+    // — still is not, and this row is no exception to that.
+    //
+    // AND IT IS NOT A TRAP, which needed checking because `sc-jscan-exit` is 3
+    // of 3 — the first census member that is terminal AND whose drill can bill
+    // the code. `engine.ts:1585` folds `yieldFailedVoidsObjective` into
+    // `terminalUnearnable` BY PARAMS, not by id (read at :1566–1598), so the
+    // finish gate arms, the objective keeps its honest `active` status, and the
+    // student reaches the −10 «Непропускане на пътно превозно средство с
+    // предимство» card instead of having to quit. NOTE for whoever next opens
+    // `engine.ts`: the comment there still reads „BOTH gates that carry it" and
+    // names sc-sflash-cross / sc-sdead-cross — it is three now, and that comment
+    // is stale. Reported; not edited from this file.
     expect(bound.sort()).toEqual(
       [
+        "sc-junction-scan/sc-jscan-exit:traffic",
         "sc-jx-giveway-b1/sc-jxgb-yield:traffic",
         "sc-merge-bus-pullout/sc-mgb-ease:traffic",
         "sc-merge-from-property/sc-mfp-walk-yield:pedestrian",

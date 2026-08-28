@@ -258,16 +258,23 @@ describe("B16 — the ring's outer edge is drawn as a circle", () => {
     // `markings` is one mesh that already exists on every map, so a closed
     // circle is free at the only budget that is currently breached (register
     // B65 (d): the running product is 3–5× over its own draw-call cap).
+    // WAVE 8 — every one of these rose by exactly ONE, and none of the rise is
+    // the ring: `Streetlights` gained a night-only ground pool
+    // (sc-ov-night-gap:5085441f — „every street lamp along the road is dark …
+    // the only light in the scene is the ego's own beam"), and `drawSlots.ts`
+    // counts it unconditionally because a ceiling that only holds by day is not
+    // a ceiling. All six of these districts have streetlights, which is why the
+    // delta is uniform; a map with none is byte-identical.
     const expected: Record<string, number> = {
-      "rb-mini-v1": 48,
-      "rb-ped-v1": 50,
-      "rb-2lane-v1": 48,
-      "rb-single-v1": 48,
-      "district-v1": 63,
-      "d2-v1": 70,
+      "rb-mini-v1": 49,
+      "rb-ped-v1": 51,
+      "rb-2lane-v1": 49,
+      "rb-single-v1": 49,
+      "district-v1": 64,
+      "d2-v1": 71,
     };
-    for (const [id, slots] of Object.entries(expected)) {
-      expect(worldOf(id).stats.staticDrawSlots, id).toBe(slots);
-    }
+    const actual: Record<string, number> = {};
+    for (const id of Object.keys(expected)) actual[id] = worldOf(id).stats.staticDrawSlots;
+    expect(actual).toEqual(expected);
   });
 });

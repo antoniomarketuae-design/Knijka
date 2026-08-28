@@ -25,6 +25,11 @@ import {
   type LampBank,
 } from "./clusterReadout";
 import { DIAL_MAX_KMH, LAMP_KEYS, TICK_COUNT } from "./clusterLayout";
+// The dial does not get to invent its own definition of „stopped". This is the
+// one every other machine in the sim uses (reverseAssist, reverseStuck,
+// stuckStart, reverseView), and it is the band the STANDSTILL row below sweeps.
+// A type-only-adjacent leaf module: reverseAssist imports nothing but types.
+import { REVERSE_ASSIST_STANDSTILL_KMH } from "../engine/reverseAssist";
 
 /** A car being driven normally: belted, running, rolling, nothing wrong. */
 function nominal(): ClusterInputs {
@@ -99,7 +104,12 @@ describe("gear glyph", () => {
 });
 
 describe("dial tick fill", () => {
-  it("tick 0 stays lit at standstill — the dial is never a dead instrument", () => {
+  it("the COLD instrument is lit, not dead — a blank dial reads as broken", () => {
+    // An exact zero reaches this function from exactly one place: the cold-car
+    // defaults (`createClusterInputs`) and `VitokCockpit`'s sampler, whose
+    // `sim?.speedKmh ?? 0` runs on the frames before the scene first writes.
+    // That is the COLD state. It is NOT what a stopped car feeds — see the next
+    // row, which is where the standstill claim is actually pinned.
     expect(litTickCount(0)).toBe(1);
   });
 
@@ -108,6 +118,72 @@ describe("dial tick fill", () => {
     expect(litTickCount(10)).toBe(2);
     expect(litTickCount(50)).toBe(6);
     expect(litTickCount(80)).toBe(9);
+  });
+
+  // ── sc-vp-readiness:14d53c24 ────────────────────────────────────────────
+  // The cockpit mount ships `dialNumerals={false}` (measured: 5.6 px of ink),
+  // so the ARC is the dial's rate channel there. These three pin the two
+  // properties that channel has to have, and the first is the row itself.
+  it("a moving car never draws the arc a stopped car draws", () => {
+    // 8 km/h is the frame the row was filed on, and the car it was compared
+    // against is the one waiting at the traffic light behind it.
+    //
+    // RE-PINNED 2026-08-28 (integrator, wave 8). This row first shipped as
+    // `litTickCount(8) > litTickCount(0)`, and an exact 0 is NOT what that
+    // second car feeds. `VehicleSim.speedKmh` is `forwardSpeedMs() * 3.6` off
+    // the rigid body, and the two places this repo has MEASURED a stopped car
+    // both put it strictly inside the standstill band, never on it:
+    //
+    //   · `engine/stuckStart.ts` (docblock) — drive rig, eight seconds of full
+    //     throttle against PARKING_BRAKE_FORCE_N: a maximum of 0.32 km/h.
+    //   · `vehicle/parking-envelope.test.ts` "Brake-hold in D" — three seconds
+    //     of held brake at rest, asserting the peak stays under 0.6 km/h.
+    //   · and this file's own `speedDigits(-0.4)` row: „a stopped car jitters
+    //     either side of zero".
+    //
+    // So a pin on an exact 0 proves the property on the one input the running
+    // sim does not produce, and the comparison the row was filed on — the dial
+    // at 8 km/h against the dial at the light — goes unchecked.
+    const STOPPED = 0.32; // measured, above
+    expect(litTickCount(STOPPED)).toBe(1);
+    expect(litTickCount(8)).toBeGreaterThan(litTickCount(STOPPED));
+
+    // …and the whole band, not one sample: every speed the rest of the sim
+    // calls a standstill must draw the standstill arc, or the instrument
+    // contradicts the digits beside it, which round to «0» across all but the
+    // top tenth of the same band (`speedDigits`, pinned above).
+    // Stepped by integer index, never by `v += 0.02`: float accumulation would
+    // walk the last sample onto or past the threshold, and this band is
+    // half-open on purpose — 0.6 itself is the first speed that is NOT a
+    // standstill anywhere in the engine.
+    for (let i = 0; i * 0.02 < REVERSE_ASSIST_STANDSTILL_KMH; i++) {
+      const v = i * 0.02;
+      expect(litTickCount(v), `${v.toFixed(2)} km/h is a standstill`).toBe(1);
+      expect(litTickCount(-v), `-${v.toFixed(2)} km/h is a standstill`).toBe(1);
+    }
+  });
+
+  it("the head tick is the one the NEEDLE is nearest, so the two agree", () => {
+    // `dialAngleRad` puts the needle at v/DIAL_MAX_KMH of the sweep; the lit
+    // head must be the tick that angle lands closest to, never the last tick
+    // fully passed (which read 10 km/h slow at the top of every band).
+    for (const v of [15, 25, 45, 55, 95, 155]) {
+      const needleSpan = (v / DIAL_MAX_KMH) * (TICK_COUNT - 1);
+      expect(litTickCount(v) - 1).toBe(Math.round(needleSpan));
+    }
+  });
+
+  it("the arc never trails the true speed by more than half a step", () => {
+    // `floor` could only ever UNDER-read, by up to a full step (10 km/h): at
+    // 59 km/h the head sat on the 50 tick. Rounding bounds the error both ways
+    // at half a step, which is the most an arc of 17 ticks can promise.
+    const step = DIAL_MAX_KMH / (TICK_COUNT - 1);
+    for (let v = 0; v <= DIAL_MAX_KMH; v += 0.5) {
+      const headKmh = (litTickCount(v) - 1) * step;
+      // Only from one step up: below it the arc is at the standstill/first-tick
+      // end, where the bound is not what the dial is claiming (see the row above).
+      if (v >= step) expect(Math.abs(headKmh - v)).toBeLessThanOrEqual(step / 2);
+    }
   });
 
   it("saturates at full scale and clamps beyond it", () => {

@@ -360,19 +360,30 @@ describe(`${ID} — bus-stop furniture (KNOWN GAPS, pinned)`, () => {
     expect(world.stats.signs.noStopping).toBe(2);
   });
 
-  it("renders NO modelled shelter — still a gap, and still pinned", () => {
+  it("DOES render the modelled shelter — the gap this test used to pin is closed", () => {
     const world = buildWorldGeometry(assertDistrict(loadRaw(ID)), { seed: 7 });
-    // props.ts only places shelters on primary/secondary edges anchored to a
-    // degree >= 3 node. Both are unavailable here BY DESIGN: arterial rank posts
-    // stop lines and a junction posts stop lines — either would acquit the very
-    // rest this map exists to convict. The pocket renders as plain curb.
+    // CLOSED 2026-08-28 (wave 8, sc-pk-busstop-ban:0d1afe87 — „the briefing's
+    // навес (shelter) is absent"). This test pinned `busStops` at 0 and named
+    // its own fix: „a span candidate in props.ts's bus-stop pass". That is what
+    // landed. The two older passes still decline here for the reasons this test
+    // always gave — props.ts's derived rule needs a primary/secondary edge
+    // anchored to a degree >= 3 node, and both are unavailable BY DESIGN
+    // (arterial rank posts stop lines and a junction posts stop lines, either of
+    // which would acquit the very rest this map exists to convict); the frontage
+    // rule needs a `kind: "busStop"` building and this map authors none. The
+    // third source reads the district's own `meta.scenario.busStopPocketY`,
+    // which is the SAME key the зигзаг below is painted from, so the mark and
+    // the shelter can never name different metres.
     //
-    // What DOES stand there today is not a model: `scene/scenarioSceneryProps.
-    // busStopSheltersOf` derives a wall panel from the same authored span, held
-    // by LessonScene rather than by the world builder. So `world.busStops` is
-    // still 0 and the FIX is unchanged — a `busStop?: boolean` on DistrictZone
-    // (or a span candidate in props.ts's bus-stop pass) that both honour.
-    expect(world.busStops).toHaveLength(0);
+    // What is GONE is the stopgap: `scene/scenarioSceneryProps.busStopSheltersOf`
+    // used to derive a `kind: "wall"` panel from this span, and every wall
+    // renders as one flat grey box. The full argument is in that file's header.
+    expect(world.busStops).toHaveLength(1);
+    const [shelter] = world.busStops;
+    // Midpoint of the authored pocket (180…210), on the pavement at the kerb.
+    expect(-shelter.position[2]).toBeCloseTo(195, 3);
+    expect(shelter.position[0]).toBeGreaterThan(8.125); // past the ribbon edge
+    expect(shelter.position[0]).toBeLessThan(11.625); // still on the footway
   });
 
   it("DOES paint the зигзаг, and the BAN — not the pocket — is where it starts", () => {

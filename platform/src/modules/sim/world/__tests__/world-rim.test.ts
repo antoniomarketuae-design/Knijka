@@ -46,11 +46,13 @@ import { describe, expect, it } from "vitest";
 import { districtWorldEdge, parseDistrict, type DistrictBounds } from "../../runtime/district";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import {
+  isMotorwayCarriageway,
   TERMINUS_CLOSE_MAX_HEIGHT_M,
   TERMINUS_CLOSE_MIN_HEIGHT_M,
   TERMINUS_CLOSE_ROAD_CLEAR_M,
   TERRAIN_MARGIN_M,
   TERRAIN_PAVE_NEAR_BUILDING_M,
+  WORLD_RIM_BANK_HEIGHT_M,
 } from "../builders/constants";
 import { analyzeNetwork } from "../builders/network";
 import { buildWorldRim, WORLD_RIM_INNER_M, WORLD_RIM_OUTER_M } from "../builders/worldRim";
@@ -278,13 +280,59 @@ describe("§1 the rim's guards hold on every committed district", () => {
   }, BUDGET_MS);
 
   it("every rim mass takes a height inside the closing band, and none is a tower", () => {
+    // WAVE 8 — TWO BANDS NOW, because a rim is not always a city edge.
+    // sc-mw-emergency-lane («it does not read as a магистрала») and
+    // sc-ac-truck-spray («an urban street lined with apartment blocks on both
+    // sides») were both photographed on mw-v1, which authors ONE building over
+    // 2,606 m of motorway: every block face in those frames was this belt. A
+    // district with NO street-class carriageway now closes with a low
+    // embankment instead, and its band is the bank height exactly — flat and
+    // unhashed, because a stepped silhouette is what makes a belt read as
+    // buildings in the first place.
     for (const id of ids) {
-      for (const m of rimOf(loadDistrict(id))) {
+      const d = loadDistrict(id);
+      const urban = d.roads.edges.some((e) => !isMotorwayCarriageway(e));
+      for (const m of rimOf(d)) {
         expect(m.heightSource, `${id}/${m.id}`).toBe("height");
-        expect(m.height, `${id}/${m.id}`).toBeGreaterThanOrEqual(TERMINUS_CLOSE_MIN_HEIGHT_M);
-        expect(m.height, `${id}/${m.id}`).toBeLessThanOrEqual(TERMINUS_CLOSE_MAX_HEIGHT_M);
+        if (urban) {
+          expect(m.height, `${id}/${m.id}`).toBeGreaterThanOrEqual(TERMINUS_CLOSE_MIN_HEIGHT_M);
+          expect(m.height, `${id}/${m.id}`).toBeLessThanOrEqual(TERMINUS_CLOSE_MAX_HEIGHT_M);
+        } else {
+          expect(m.height, `${id}/${m.id}`).toBe(WORLD_RIM_BANK_HEIGHT_M);
+        }
       }
     }
+  });
+
+  it("the bank fires on the motorway segments and NOWHERE else in the catalogue", () => {
+    // Which maps took the bank is a fact worth naming rather than a side
+    // effect: a rule that started flattening the rim of ordinary streets would
+    // undo the „the world simply runs out" repair this builder exists for, and
+    // would do it silently.
+    const banked = ids.filter((id) => {
+      const masses = rimOf(loadDistrict(id));
+      return masses.length > 0 && masses.every((m) => m.height === WORLD_RIM_BANK_HEIGHT_M);
+    });
+    // mw-entry-v1 and mw-exit-v1 are deliberately NOT here, and measured rather
+    // than assumed: BOTH author an ordinary street carriageway beside their
+    // ramp (an entry ramp comes FROM somewhere and an exit ramp goes TO
+    // somewhere), so their rims stay city edges. That is the control that keeps
+    // this from being „every map with the word motorway in it" — only mw-v1 is
+    // 2.6 km of pure магистрала with nothing else on it.
+    expect(banked.sort()).toEqual(["mw-v1"]);
+  });
+
+  it("the bank still CLOSES the world — it is lower, not absent", () => {
+    // The regression this pass could have introduced: „fix the city wall by
+    // deleting it". Every mass is still emitted, still a solid volume and still
+    // taller than the hero, which is the whole contract §2's rays measure.
+    const urbanRun = rimOf(loadDistrict("zb-v1"));
+    const bankRun = rimOf(loadDistrict("mw-v1"));
+    expect(bankRun.length).toBeGreaterThan(8);
+    expect(urbanRun.length).toBeGreaterThan(8);
+    // Above a car's roofline (the fleet's 1.45 m) at 43 m out, so the student
+    // can see the edge from the carriageway instead of discovering it.
+    expect(WORLD_RIM_BANK_HEIGHT_M).toBeGreaterThan(1.45);
   });
 
   // A FULL build of all 105 documents is ~10 s of CPU on its own; on a loaded

@@ -100,8 +100,26 @@ import {
   type RoadNetwork,
 } from "./network";
 import { terminusEnds } from "./terminus";
+import { authoredBusStopSpanY, authoredStopSideSign } from "./markings";
 import { buildZoneSigns, scenarioSignScale } from "./zoneSigns";
 import { SCENARIO_SIGN_SCALE } from "./constants";
+
+/** A median barrier needs a run long enough to BE one; below this the pair is
+ *  a junction throat, not a divided carriageway. Same floor the pavement
+ *  parapet keeps (RAILING_MIN_RUN_M). */
+const MEDIAN_BARRIER_MIN_RUN_M = 30;
+/** …and the two carriageways must be close enough that the ground between them
+ *  is a разделителна ивица and not a field with two roads in it. mw-v1's own
+ *  median is 6.0 m (`meta.scenario.params.medianM`); mw-entry/mw-exit carry the
+ *  same generator. 14 m leaves room for a wider authored median without
+ *  admitting two separate streets that happen to run opposite ways. */
+const MEDIAN_BARRIER_MAX_GAP_M = 14;
+
+/** Gap between the kerb line and the FRONT face of a навес derived from an
+ *  authored `meta.scenario` stop span, m. Measured from the drawn ribbon edge
+ *  rather than from any band centre, because the parking band exists on some
+ *  edge classes and not others — see the pass that uses it. */
+const AUTHORED_STOP_KERB_GAP_M = 0.35;
 
 /** Every signal head, on every map, renders at this scale (doc 86 L2 — see
  *  `signalSized` in buildProps for why the head is not gated like the plates). */
@@ -117,6 +135,9 @@ export interface PropBuildResult {
   utilityPoles: UtilityPolePlacement[];
   /** Pavement parapet panels (B65). */
   railings: RailingPlacement[];
+  /** Motorway median barrier panels (wave 8) — see WorldGeometry's field for
+   *  why this is not the same list as `railings`. */
+  medianBarriers: RailingPlacement[];
   busStops: StaticTransform[];
   parkingKits: StaticTransform[];
   /** "<nodeId>:<edgeId>" keys of approaches that got a stop sign. */
@@ -474,6 +495,7 @@ export function buildProps(
   const billboards: BillboardPlacement[] = [];
   const utilityPoles: UtilityPolePlacement[] = [];
   const railings: RailingPlacement[] = [];
+  const medianBarriers: RailingPlacement[] = [];
   const busStops: StaticTransform[] = [];
   const parkingKits: StaticTransform[] = [];
   const stopSignApproaches = new Set<string>();
@@ -1627,6 +1649,88 @@ export function buildProps(
     }
   }
 
+  // -- MOTORWAY MEDIAN BARRIER (wave 8) -----------------------------------------
+  //
+  // THE ROW: sc-mw-emergency-lane, major. «2600 m of motorway carrying exactly
+  // one vehicle … NO MEDIAN BARRIER BETWEEN THE CARRIAGEWAYS, no motorway sign,
+  // no gantry, no distance boards. It does not read as a магистрала.» Its
+  // sister row on sc-ac-truck-spray says the same about mw-v1's other tenant.
+  //
+  // OF THE FOUR THINGS IT NAMES, THIS IS THE ONE THE KIT CAN DRAW HONESTLY, and
+  // it is also the one that carries the meaning. Д5 „Автомагистрала", the
+  // gantry and the distance boards are all FACES the sign kit does not hold
+  // (`world/types.ts` SIGN_KINDS), and this module's own law is that a builder
+  // places nothing rather than guess a face. A разделителна ивица needs no art:
+  // it is the single feature that distinguishes a motorway from a wide road,
+  // and — unlike a plate — it is the reason the student may not turn round, may
+  // not cross, and may treat the oncoming direction as gone. That is a driving
+  // fact, not a decoration.
+  //
+  // DERIVED, NEVER AUTHORED. A median exists exactly where two ANTI-PARALLEL
+  // motorway carriageways run alongside each other, which is the same test the
+  // В1 pass above already uses to recognise a divided road
+  // (DIVIDED_TWIN_MAX_LATERAL_M + a tangent dot < −0.8). The barrier runs down
+  // the MIDLINE between the two centrelines, so it needs no authored width:
+  // on mw-v1 the carriageways are x = 0 and x = −30.37, and the midline is
+  // x = −15.185 — dead centre of the 6 m median the generator's own
+  // `params.medianM` names, with 2.995 m of clearance to each ribbon edge
+  // (halfWidth 12.19).
+  //
+  // CONTINUOUS, unlike the pavement parapet above, which runs 5 panels on and 4
+  // off. A guard rail with gaps in it is not a guard rail; the whole point of
+  // the object is that there is no way through.
+  //
+  // HONEST ABOUT THE ASSET: this is `railing_run_6m.glb`, the pavement parapet,
+  // standing in for a W-beam. It is the only barrier run in the kit. What it
+  // gets right is the thing the row is about — a continuous waist-height line
+  // that closes the median for 2.6 km — and what it gets wrong is its profile.
+  // A real ограничителна система is the costed follow-up; a motorway with
+  // nothing at all between the carriageways is the defect.
+  //
+  // ONE PASS PER PAIR: keyed by the sorted edge-id pair, so the barrier is
+  // built once and not once per carriageway.
+  if (lessonScale !== undefined) {
+    const motorwayEdges = network.edges.filter((e) => e.line && isMotorwayEdge(e.edge));
+    const pairsDone = new Set<string>();
+    for (const eb of motorwayEdges) {
+      for (const other of motorwayEdges) {
+        if (other.edge.id === eb.edge.id) continue;
+        const key = [eb.edge.id, other.edge.id].sort().join("|");
+        if (pairsDone.has(key)) continue;
+        const line = eb.line!;
+        const total = polylineLength(line);
+        if (total < MEDIAN_BARRIER_MIN_RUN_M) continue;
+        const mid = pointAlong(line, total / 2);
+        const proj = projectOntoPolyline(other.edge.geometry as Vec2[], mid.point);
+        if (proj.distance > DIVIDED_TWIN_MAX_LATERAL_M) continue;
+        // Anti-parallel = the twin carries the OTHER direction. Two parallel
+        // one-ways are a pair of slip roads, not a divided carriageway.
+        if (mid.tangent[0] * proj.tangent[0] + mid.tangent[1] * proj.tangent[1] >= -0.8) continue;
+        // …and they must not be so far apart that the "median" is a field.
+        const gap = proj.distance - eb.halfWidth - other.halfWidth;
+        if (!(gap > 0) || gap > MEDIAN_BARRIER_MAX_GAP_M) continue;
+        pairsDone.add(key);
+        const slots = Math.floor(total / RAILING_RUN_M);
+        const s0 = (total - slots * RAILING_RUN_M) / 2;
+        for (let i = 0; i < slots; i++) {
+          const s = s0 + (i + 0.5) * RAILING_RUN_M;
+          const at = pointAlong(line, s);
+          const q = projectOntoPolyline(other.edge.geometry as Vec2[], at.point);
+          // The midline of the two centrelines IS the median centre while the
+          // two carriageways are symmetric about it, which is what a generated
+          // motorway is; a hand-drawn asymmetric pair would still land inside
+          // the median because the gap gate above bounds it.
+          const p: Vec2 = [(at.point[0] + q.point[0]) / 2, (at.point[1] + q.point[1]) / 2];
+          medianBarriers.push({
+            position: toWorld(p[0], p[1], ROAD_Y),
+            // Run axis = local +X = along the carriageway.
+            yaw: yawFromFacing(perpRight(at.tangent)),
+          });
+        }
+      }
+    }
+  }
+
   // -- trees (streetscape v2 mix, doc 70 REF 3) ---------------------------------
   // A gantry-hero micro-map (lc-gantry-v1) opts every roadside tree pass out so
   // no canopy occludes the overhead-signal shot; every other district keeps its
@@ -1946,6 +2050,87 @@ export function buildProps(
     });
   }
 
+  // -- AUTHORED SCENARIO STOP SPANS -> the same modelled навес (wave 8) ---------
+  //
+  // THE ROW: sc-pk-busstop-ban, critical. «The world does not contain the
+  // landmark the lesson is entirely about … the briefing's навес (shelter) is
+  // absent … the zone exists only as a translucent teal/amber tint painted by
+  // the HUD, so the student is trained to read a coaching overlay instead of
+  // the street.» Its sister row on mg-busstop-v1 says the same about the
+  // спирка in the бус лента.
+  //
+  // HALF OF IT WAS ALREADY REPAIRED, AND THE HALF THAT WAS NOT IS THIS ONE.
+  // `markings.paintBusStopZigzag` now paints the зигзаг from these very keys
+  // (visible on the tarmac in .audit-frames/w14/frames/sc-pk-busstop-ban__
+  // pc-right/04-t079s.png and 04-t085s.png), so the drill's «зигзагът започва
+  // тук» is true. The навес was answered by `scene/scenarioSceneryProps.
+  // busStopSheltersOf`, which emitted a `kind: "wall"` obstacle — and every
+  // wall renders through ONE branch, `components/sim/ScenarioObstacles.tsx`
+  // ObstacleWall: a single flat `boxGeometry` in `#8d8a83`. On pk-busstop-v1
+  // that put a 4.5 × 2.5 × 0.2 m grey fence panel edge-on against a grey
+  // pavement in front of a grey building — the predicate was live and the
+  // pixels were still not a спирка.
+  //
+  // The шелтър this module already owns IS one: `assets.busStop` (body + a
+  // separate emissive FACE that lights at night, WorldProps.tsx:2305/2344),
+  // the same object the two derived passes above place. The only reason
+  // neither of them reached these maps is their filters — the frontage pass
+  // needs a `kind: "busStop"` building (both maps author `kind: null`) and the
+  // junction pass needs a primary/secondary edge with a junction mouth 28 m
+  // back (both are two-node micro-streets, `residential` and `tertiary`). So
+  // this pass adds the third and last source: the SPAN the district itself
+  // authors, read through the SAME two helpers the зигзаг painter uses, so the
+  // mark and the shelter can never name different metres.
+  //
+  // WHERE IT STANDS. `eb.halfWidth` is the drawn ribbon (travel half + the
+  // parking band on the classes that get one), so measuring the shelter's
+  // FRONT face from the kerb is the only anchor that works on both maps —
+  // this is the correction the old wall-panel derivation could not make,
+  // because its `parkedKerbXOf` anchor was the decoration-band centre and that
+  // sits a whole 4 m band further out on one class than the other:
+  //   pk-busstop-v1 residential, halfWidth 8.125, pavement [8.125, 11.625]
+  //     -> centre 9.15, body [8.475, 9.825] — on the footway, 0.35 m off the kerb
+  //   mg-busstop-v1 tertiary,    halfWidth 20.25, pavement [20.25, 23.75] with
+  //     the stop-block frontage standing at x = 22.25
+  //     -> centre 21.275, body [20.6, 21.95] — 0.30 m clear of that frontage
+  // Both are ON the pavement and both are AT the kerb, which is where a навес
+  // has to be to do its job: rule 2b in scene/scenarioSceneryProps.ts already
+  // keeps the parked row off this span, so nothing stands in front of it.
+  //
+  // AND IT NEVER DOUBLES UP: a map that authors a `kind: "busStop"` frontage
+  // has been served by the pass above and is skipped here.
+  const authoredSpanY = authoredBusStopSpanY(district);
+  const authoredSide = authoredStopSideSign(district);
+  const hasFrontageStop = district.buildings.some((b) => b.kind === "busStop");
+  if (authoredSpanY !== null && authoredSide !== 0 && !hasFrontageStop) {
+    const midY = (authoredSpanY.fromY + authoredSpanY.toY) / 2;
+    for (const eb of network.edges) {
+      if (!eb.line) continue;
+      const g = eb.edge.geometry as Vec2[];
+      if (!Array.isArray(g) || g.length < 2) continue;
+      // Same resolution the зигзаг painter uses: project the authored Y onto
+      // THIS edge and refuse the edge if the span does not land on it, then
+      // check the street really does run north before turning a district-x
+      // sign into a side of the edge's own tangent.
+      const pr = projectOntoPolyline(eb.line, [g[0][0], midY]);
+      if (!(pr.distance <= 1)) continue;
+      const { point, tangent } = pointAlong(eb.line, pr.s);
+      if (!(tangent[1] > 0.9)) continue;
+      const r = perpRight(tangent);
+      const lateral =
+        eb.halfWidth + AUTHORED_STOP_KERB_GAP_M + BUS_STOP_SHELTER_DEPTH_M / 2;
+      const p = add(point, mul(r, authoredSide * lateral));
+      // A shelter whose own CENTRE is inside a frontage would be buried in it;
+      // a back panel brushing one is what a real kerbside навес does.
+      if (insideBuilding(p, 0.1)) continue;
+      busStops.push({
+        position: toWorld(p[0], p[1], SIDEWALK_TOP_Y),
+        yaw: yawFromFacing(mul(r, -authoredSide)), // open side faces the roadway
+      });
+      break; // one authored span, one навес
+    }
+  }
+
   // -- bus-stop shelters (primary/secondary, past the junction mouth) ------------
   // Candidates sit BUS_STOP_FROM_MOUTH_M along the junction-trimmed ribbon
   // (the trim IS the mouth, so >= 25 m is guaranteed), on the right-of-travel
@@ -2030,6 +2215,7 @@ export function buildProps(
     billboards,
     utilityPoles,
     railings,
+    medianBarriers,
     busStops,
     parkingKits,
     stopSignApproaches,

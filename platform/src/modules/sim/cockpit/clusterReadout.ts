@@ -14,6 +14,7 @@
  * function with tests rather than branches buried in a frame loop.
  */
 
+import { REVERSE_ASSIST_STANDSTILL_KMH } from "../engine/reverseAssist";
 import { DIAL_MAX_KMH, LAMP_KEYS, TICK_COUNT, type LampKey } from "./clusterLayout";
 
 /** Every channel the cluster draws — all of it pre-existing vehicle state. */
@@ -109,11 +110,69 @@ export function gearGlyph(gearLabel: string): string {
  * Ticks lit from 0 up to the current speed — the sweeping arc that gives the
  * dial a RATE reading even when the reel is too small to resolve the needle.
  * Tick 0 (0 km/h) is always lit so the dial never reads as a dead instrument.
+ *
+ * ── A MOVING CAR MUST NEVER DRAW ITSELF AS A STOPPED ONE ───────────────────
+ * `sc-vp-readiness:14d53c24`, read off `sweep161/sc-vp-readiness/mobile-right/
+ * 04-t102s.png` (iPhone-16 landscape): the car is doing 8 км/ч, the digital
+ * readout says «8», and the dial is byte-identical to the one at the traffic
+ * light behind it. Both halves the row was FILED as are refuted by
+ * measurement — `dialAngleRad` moves 1.6875°/км/ч, so 0→15 км/ч is 25.3° of
+ * needle and not „a few degrees", and the missing numerals are a MOUNT
+ * decision with arithmetic behind it (`dialNumeralsLegibleAt`, and
+ * `VitokCockpit.tsx`'s `dialNumerals={false}` block: 5.6 px of ink at the
+ * cockpit's 158 CSS px of face). What survives is this function.
+ *
+ * The mount that dropped the numerals kept THE ARC as the dial's rate channel
+ * („the DIAL keeps what it is actually good at here — needle angle, tick band,
+ * the arc filling with speed"). `floor` spent that channel on nothing below
+ * one tick: with DIAL_TICK_STEP_KMH = 10 the whole 0–9.9 км/ч band lit exactly
+ * the one tick standstill lights, and TICK_HEAD — the brightest quad on the
+ * face — sat on the 0 mark while the car rolled. That band is not an edge
+ * case; it is the move-off, the creep, and every parking manoeuvre.
+ *
+ * TWO CHANGES, and the second is the honest cost of the first:
+ *  1. The head tick is now the tick the NEEDLE IS NEAREST (`round`), not the
+ *     last one it has fully passed. Arc and needle then state one speed by
+ *     construction — the same rule `dialAngleRad`'s docstring gives for the
+ *     needle and its own dial. It does not add STATES (17 ticks are 17 ticks);
+ *     it bounds the arc's error at half a step in both directions, where
+ *     `floor` could only under-read and did so by up to a full step — at
+ *     59 км/ч the brightest quad on the face sat on the 50 mark.
+ *  2. Any motion at all lights at least TWO ticks. This is the one place the
+ *     arc may over-state, and it over-states by at most half a tick at a
+ *     crawl; the exact value is on the digital readout beside it, which is 3×
+ *     the height and the one element this mount MEASURED legible. Reading „the
+ *     car is stopped" off a moving car is the failure that cannot be traded
+ *     for precision; reading „4" as „nearly 10" while the digits say 4 is.
+ *
+ * Standstill is untouched: exactly one tick, so the arc still distinguishes
+ * stopped from moving in the direction that matters.
+ *
+ * …AND THAT LAST SENTENCE WAS A PROMISE THIS FUNCTION DID NOT KEEP — 2026-08-28.
+ *
+ * "Standstill" was coded as `v <= 0`, and THE SIM NEVER PRODUCES AN EXACT ZERO.
+ * Measured on the running simulator over 600 frames, a car at rest reports
+ * `|speedKmh|` = 0.001045. So the one-tick branch was unreachable on any live
+ * drive: a parked car drew TWO ticks, which is the same arc as a car creeping at
+ * 8 км/ч, and the arc stopped distinguishing stopped from moving in exactly the
+ * direction the header says matters. That is `sc-vp-readiness:14d53c24`.
+ *
+ * The floor is now the machine's OWN standstill test —
+ * `REVERSE_ASSIST_STANDSTILL_KMH` (0.6), `engine/reverseAssist.ts:143`, the
+ * threshold the reverse gate already uses to decide whether a car is stopped
+ * enough to select R. Using the same number means the dial and the engine cannot
+ * disagree about whether the car is moving, which is a stronger property than
+ * any constant local to this file would have.
+ *
+ * `<`, not `<=`: 0.6 itself is motion by the engine's own reckoning, so it must
+ * light two.
  */
 export function litTickCount(speedKmh: number, tickCount = TICK_COUNT): number {
   const v = Math.min(Math.max(Math.abs(speedKmh), 0), DIAL_MAX_KMH);
   const spans = tickCount - 1;
-  return Math.min(tickCount, Math.floor((v / DIAL_MAX_KMH) * spans) + 1);
+  if (v < REVERSE_ASSIST_STANDSTILL_KMH) return 1;
+  const nearest = Math.round((v / DIAL_MAX_KMH) * spans);
+  return Math.min(tickCount, Math.max(2, nearest + 1));
 }
 
 /**

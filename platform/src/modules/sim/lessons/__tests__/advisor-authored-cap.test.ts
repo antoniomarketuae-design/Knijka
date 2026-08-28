@@ -224,8 +224,37 @@ describe("the instrument, before anything it measures", () => {
   });
 
   it("the catalogue sweep sees the whole catalogue", () => {
+    // RE-BASELINED 953 → 958 on 2026-08-28 (wave 8, the sc-pk-move-off lane,
+    // sweep161 finding sc-pk-move-off:d7d45a4c). THE WHOLE OF THE +5 IS ONE
+    // OBJECTIVE: `sc-pk-move-off/sc-pmo-moved` — «Потегли и се нареди в дясната
+    // лента» — was authored `{x, y, radiusM: 14}` with NO speed cap and now
+    // authors `maxSpeedKmh: 50`. It has five rungs (L1–L4 + l5Wet), so it enters
+    // this census five times where it had entered it zero times.
+    //
+    // WHY 958 IS RIGHT, and not merely different. The chip was photographed GREEN
+    // at 0:12 of `sc-pk-move-off/pc-wrong/04-t012s.png` while the cluster read
+    // 59 км/ч and the «Превишена скорост» teach card (ЗДвП чл. 21, ал. 1) stood
+    // open on the same screen: the product certified the manoeuvre and convicted
+    // the speed in the same second, to the same student. An uncapped gate on a
+    // drill whose own instruction 5 promises «карай центрирано ПОД
+    // ОГРАНИЧЕНИЕТО» is precisely the defect this census exists to expose, so the
+    // honest total is the one that COUNTS that card — 953 was only reachable by
+    // leaving it uncounted. The controlled experiment is on the same map:
+    // sc-vp-readiness authors a cap and REFUSED the 59 км/ч wrong-lane run;
+    // move-off authored none and TICKED it.
+    //
+    // MEASURED, NOT ASSUMED, and this is the load-bearing half: the census with
+    // `sc-pmo-moved` withheld is exactly 953, and its halves are exactly the
+    // committed 309 / 644. Not one other card in the catalogue entered or left,
+    // so this ratchet moved by the width of one authored line and nothing else.
+    // The cap is the street's OWN SIGN (vp-ready-v1 posts 50 and
+    // `map.params.maxspeedKmh` is 50 — ADR-002, nothing recalled), so
+    // authored == posted, `widenSpeedCap` has zero headroom to spend, and B58's
+    // „a gate is never widened above the posted limit" holds at every rung with
+    // no grace to strip. Cross-checked: all 9 sc-pk-move-off trace tests still
+    // pass, so the new gate refuses no drive the sheet would pass.
     const cards = everyCappedCard();
-    expect(cards.length).toBe(953);
+    expect(cards.length).toBe(958);
     expect(new Set(cards.map((c) => c.lessonId)).size).toBeGreaterThan(100);
   });
 
@@ -255,7 +284,7 @@ describe("the instrument, before anything it measures", () => {
 // ---------------------------------------------------------------------------
 
 describe("no capped objective grades against a number the card does not state", () => {
-  it("all 953 capped cards speak a number", () => {
+  it("all 958 capped cards speak a number", () => {
     const silent = everyCappedCard()
       .filter((c) => c.spoken === undefined)
       .map((c) => `${c.lessonId} ${c.objectiveId}: cap=${c.cap} :: ${c.titleBg}`);
@@ -270,10 +299,17 @@ describe("no capped objective grades against a number the card does not state", 
     const cards = everyCappedCard();
     const halt = cards.filter((c) => c.cap <= HALT_CAP_KMH);
     const aboveHalt = cards.filter((c) => c.cap > HALT_CAP_KMH);
-    expect(cards.length).toBe(953);
+    // RE-BASELINED 2026-08-28 (wave 8) — the justification is written out under
+    // „the catalogue sweep sees the whole catalogue" above. The five new rows are
+    // the five rungs of `sc-pk-move-off/sc-pmo-moved` at cap 50, so they land
+    // WHOLLY in the above-halt half: 644 → 649, while the halt band does not move
+    // by one card. The spoken count rises with the total and that is the half
+    // that matters here — all five read «… — дръж под 50 км/ч», so no card was
+    // silenced to make a number fit.
+    expect(cards.length).toBe(958);
     expect(halt.length).toBe(309);
-    expect(aboveHalt.length).toBe(644);
-    expect(cards.filter((c) => c.spoken !== undefined).length).toBe(953);
+    expect(aboveHalt.length).toBe(649);
+    expect(cards.filter((c) => c.spoken !== undefined).length).toBe(958);
   });
 
   it("and the number spoken belongs to somebody — sign, title, halt band or the author's own cap", () => {

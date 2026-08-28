@@ -32,6 +32,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildWorldGeometry } from "@/modules/sim/world/builders/buildWorldGeometry";
+import { assertDistrict } from "@/modules/sim/world/types";
 import {
   GATE_HALF_WIDTH_M,
   MARKER_SIGN_FAR_END_M,
@@ -45,6 +47,7 @@ import {
   MARKER_SIGN_POST_BASE_Y,
   markerSignOffset,
   markerSignOpacity,
+  WORLD_KERB_SIGN_LATERAL_M,
 } from "./guidanceRoute";
 
 /** Cockpit eye height (CameraRig): ~1.2 m above the road. */
@@ -188,5 +191,69 @@ describe("the sign exists only where it can be read", () => {
       }
     }
     expect(lastM - firstM).toBeGreaterThanOrEqual(3 * (50 / 3.6));
+  });
+});
+
+/**
+ * WAVE 8 — THE COACH'S POST IS NOT IN THE ROAD'S SIGN BAND.
+ *
+ * sc-zebra-approach: «the world-space coach label is drawn half behind the А18
+ * pedestrian-crossing triangle, so the instruction is unreadable». The cause
+ * was arithmetic, not art: the chip stood 0.20 m from where `props.ts` posts
+ * every kerb sign, so a 0.9 m plate sat 46 % across a 5.0 m panel — on the
+ * centred title.
+ */
+describe("the coach's sign does not stand where the road's own signs stand", () => {
+  /** The А18 posts `buildWorldGeometry` really emits on zb-v1, so the copied
+   *  constant is checked against the builder rather than against itself. */
+  function zbSignLateralFromRoute(): number {
+    const raw = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname, "../../../../../content/world/zb-v1.json"),
+        "utf8",
+      ),
+    ) as unknown;
+    const world = buildWorldGeometry(assertDistrict(raw));
+    const a18 = world.signs.filter((s) => s.kind === "pedestrianCrossing");
+    expect(a18.length).toBeGreaterThan(0);
+    // zb-v1's street is the north-running centreline x = 0; the northbound
+    // route is the east lane centre at GATE_HALF_WIDTH_M.
+    const east = a18.map((s) => s.position[0]).filter((x) => x > 0);
+    expect(east.length).toBeGreaterThan(0);
+    const kerbX = Math.max(...east);
+    return kerbX - GATE_HALF_WIDTH_M;
+  }
+
+  it("the pinned world-sign band is the band the builder actually uses", () => {
+    expect(zbSignLateralFromRoute()).toBeCloseTo(WORLD_KERB_SIGN_LATERAL_M, 3);
+  });
+
+  it("stands OUTBOARD of it, by enough that a plate cannot bisect the panel", () => {
+    const clearance = MARKER_SIGN_LATERAL_M - WORLD_KERB_SIGN_LATERAL_M;
+    // Outboard, not inboard: the road's sign has to read as being in FRONT of
+    // the coaching plate, which is the honest depth order.
+    expect(clearance).toBeGreaterThan(0);
+    // …and far enough that the plate lands on the panel's inboard margin
+    // rather than on its centred text. The panel is centred on its post, so a
+    // world sign sits `panelW/2 − clearance` in from the inboard edge; asking
+    // that to be inside the first fifth of the panel is the readable form of
+    // „not across the title".
+    const acrossPanel = (MARKER_SIGN_PANEL_W_M / 2 - clearance) / MARKER_SIGN_PANEL_W_M;
+    expect(acrossPanel).toBeLessThan(0.2);
+    // NEGATIVE CONTROL — the shipped-before offset fails this test, which is
+    // what makes it a gate and not a restatement.
+    const before = GATE_HALF_WIDTH_M + 1;
+    const beforeAcross =
+      (MARKER_SIGN_PANEL_W_M / 2 - (before - WORLD_KERB_SIGN_LATERAL_M)) / MARKER_SIGN_PANEL_W_M;
+    expect(beforeAcross).toBeGreaterThan(0.4); // dead centre — the defect
+  });
+
+  it("is still on the pavement of the scenario street, not in a building", () => {
+    // Cross-section of the 1+1 scenario street: kerb at LANE_WIDTH_M (2 ×
+    // GATE_HALF_WIDTH_M), 3.5 m of footway behind it (SIDEWALK_WIDTH_M).
+    const kerbX = 2 * GATE_HALF_WIDTH_M;
+    const postX = GATE_HALF_WIDTH_M + MARKER_SIGN_LATERAL_M;
+    expect(postX).toBeGreaterThan(kerbX);
+    expect(postX).toBeLessThan(kerbX + 3.5);
   });
 });

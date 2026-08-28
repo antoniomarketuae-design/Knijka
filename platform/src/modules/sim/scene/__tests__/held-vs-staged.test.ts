@@ -57,6 +57,13 @@ function heldObb(o: ScenarioObstacleSpec): Obb2D {
       return { ...base, halfLengthM: 0.25, halfWidthM: 0.25 };
     case "animal":
       return { ...base, halfLengthM: 1.1, halfWidthM: 0.28 };
+    // A worker on foot: shoulder span 0.46 by chest depth 0.30 (the
+    // ObstacleWorker body plan in components/sim/ScenarioObstacles.tsx).
+    case "worker":
+      return { ...base, halfLengthM: 0.15, halfWidthM: 0.23 };
+    // The forecourt's canopy footprint (length along the heading, width across).
+    case "fuelStation":
+      return { ...base, halfLengthM: o.lengthM / 2, halfWidthM: o.widthM / 2 };
     default:
       if (o.model === "box_truck") return { ...base, halfLengthM: 3.75, halfWidthM: 1.2 };
       if (o.model === "kargo_v") return { ...base, halfLengthM: 2.67, halfWidthM: 0.99 };

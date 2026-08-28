@@ -60,15 +60,20 @@ import {
   Color,
   type ColorRepresentation,
   CylinderGeometry,
+  DataTexture,
+  DoubleSide,
   DynamicDrawUsage,
   Group,
   InstancedMesh,
+  LinearFilter,
   type Material,
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   type Object3D,
+  PlaneGeometry,
+  RGBAFormat,
   SphereGeometry,
   Vector3,
 } from "three";
@@ -260,6 +265,245 @@ function buildBoxTruckRig(): ModelRig {
     headY: 0.85,
   };
 }
+
+// ---------------------------------------------------------------------------
+// ВОДНАТА ПЕЛЕНА — the spray a heavy vehicle throws off its tyres in rain.
+//
+// WHY IT LIVES HERE AND NOT IN environment/weather.ts (the address, settled
+// twice): spray is emitted BY ONE VEHICLE and it hangs BEHIND THAT VEHICLE.
+// A scene-wide 0..1 in the weather store cannot express that — every driver in
+// the lesson would spray, including the student's own car, and nothing would
+// sit between his eye and the truck's tail lamps. The emitter owns the plume,
+// so the plume is built by the rig file, sized off the rig's own body plan
+// (TRUCK_DIMENSIONS: 7.5 × 2.4 × 3.1) and placed off the rig's own `rearZ`.
+//
+// WHAT IT HAS TO TEACH (sc-ac-truck-spray, briefing 3/4/9 verbatim):
+//   3. „гумите му вдигат пелена от пръски, в която не се вижда нищо"
+//   4. „Не разчитай да видиш в нея нито стоповете му, нито пътя пред него"
+//   9. „Не се доближавай «за да виждаш» — колкото по-близо си, толкова
+//      по-малко виждаш"
+// So a decorative puff is NOT the fix. Three properties are load-bearing:
+//   · it must be BETWEEN the eye and the truck, so it actually washes out the
+//     tail lamps and the road beyond — sight distance the student LOSES;
+//   · it must get WORSE as he closes, or briefing 9 is a slogan he never meets;
+//   · it must vanish when the emitter is slow or the rain stops, or it is a
+//     decoration that lies about the weather.
+//
+// THE MECHANISM is deliberately dumb, because it has to be cheap and it has to
+// be legible from source: SPRAY_SLABS camera-facing quads trailing the rig,
+// each at a fixed low alpha, and the DENSITY is how many of them are switched
+// on. Overlapping translucent slabs compound (1 − (1 − a)^k), so k = 1..5 at
+// a = SPRAY_SLAB_ALPHA walks 0.30 → 0.83 of the view behind the truck. No
+// per-instance alpha (three has none for InstancedMesh), no shader patch, no
+// particle system, ~10 triangles and ONE draw call, and only when a lesson
+// actually stages a spraying profile.
+// ---------------------------------------------------------------------------
+
+/** Profiles that throw a pelena: the tall, heavy, many-wheeled ones the лекция
+ *  names — „камион, автобус или бус". A car throws spray too, but the drill's
+ *  whole discriminator is the HIGH vehicle you cannot see past, and putting a
+ *  curtain behind every hatchback in every rain lesson would bury that. */
+const SPRAY_PROFILES: ReadonlySet<string> = new Set(["truck", "van", "emergency"]);
+
+/** True when this vehicle's profile throws a spray plume in rain. Ambient
+ *  vehicles carry no profile, so the answer for them is always false and every
+ *  non-staged lesson allocates nothing. */
+export function emitsSpray(v: Pick<TrafficVehicleState, "profile">): boolean {
+  return v.profile !== undefined && SPRAY_PROFILES.has(v.profile);
+}
+
+/** Trailing quads per emitter. Five is what the compounding curve needs to
+ *  reach a believable near-whiteout (0.83) without ever hitting 1.0 — the
+ *  truck's silhouette must stay readable, because „не се вижда нищо" is about
+ *  what is BEYOND the truck, not about losing the truck itself. */
+export const SPRAY_SLABS = 5;
+
+/** Alpha of ONE slab. Tuned so k=1 is a visible haze and k=5 is a wall. */
+export const SPRAY_SLAB_ALPHA = 0.3;
+
+/** Below this the tyres are not lifting standing water at all (≈14 км/ч): a
+ *  truck crawling in a jam throws nothing, and the render must say so. */
+export const SPRAY_MIN_SPEED_MPS = 4;
+/** Full plume at ≈65 км/ч — the speed the lesson itself asks the student to
+ *  settle at behind the truck (briefing 7). */
+export const SPRAY_FULL_SPEED_MPS = 18;
+
+/** Inside this range of the emitter's tail the observer is IN the plume. */
+export const SPRAY_NEAR_M = 22;
+/** Beyond this the plume is something you look at, not something you are in. */
+export const SPRAY_FAR_M = 70;
+
+/**
+ * How much of the curtain is switched on, 0..1.
+ *
+ * `rainIntensity` is the live weather store's 0..1 (environment/weather.ts) —
+ * NOT a boolean, so the plume fades in with the storm instead of popping.
+ * `eyeGapM` is the distance from the observer's eye to the emitter.
+ *
+ * The proximity term is the part that carries briefing 9. It never REPLACES
+ * the base — at the drill's pinned ~60 m gap the plume must already be costing
+ * sight distance (briefing 4), which is why the near factor only spans
+ * 0.55 → 1.0 rather than 0 → 1.
+ */
+export function sprayDensity(
+  rainIntensity: number,
+  speedMps: number,
+  eyeGapM: number,
+): number {
+  if (rainIntensity <= 0) return 0;
+  const speed =
+    (speedMps - SPRAY_MIN_SPEED_MPS) / (SPRAY_FULL_SPEED_MPS - SPRAY_MIN_SPEED_MPS);
+  if (speed <= 0) return 0;
+  const near = (SPRAY_FAR_M - eyeGapM) / (SPRAY_FAR_M - SPRAY_NEAR_M);
+  const nearClamped = near < 0 ? 0 : near > 1 ? 1 : near;
+  const base = (rainIntensity > 1 ? 1 : rainIntensity) * (speed > 1 ? 1 : speed);
+  return base * (0.55 + 0.45 * nearClamped);
+}
+
+/** Slabs to draw for a density — 0 means the emitter is drawn with no plume at
+ *  all (dry road, or standing still), which is the honest state and the one
+ *  every non-rain lesson stays in forever. */
+export function sprayActiveSlabs(density: number): number {
+  if (density <= 0) return 0;
+  const k = Math.round(density * SPRAY_SLABS);
+  return k < 1 ? 1 : k > SPRAY_SLABS ? SPRAY_SLABS : k;
+}
+
+/**
+ * Placement of slab `i` behind an emitter, in the emitter's own body space.
+ * Pure so the shape can be asserted without a renderer.
+ *
+ * The plume LIFTS and FANS as it drifts back — that is what makes it read as
+ * thrown water rather than a poster: slab 0 is a low sheet just off the rear
+ * tyres, slab 4 is as tall as the cargo box (3.1 m) and more than twice the
+ * body's width. `backM` is measured behind `rig.rearZ`, so a longer rig pushes
+ * its own curtain further back automatically.
+ */
+export function spraySlabShape(
+  i: number,
+  halfWidthM: number,
+): { backM: number; widthM: number; heightM: number; centerY: number } {
+  const backM = 0.9 + i * 1.35;
+  const widthM = halfWidthM * 2 * (1.15 + 0.3 * i);
+  const topM = 1.25 + 0.5 * i;
+  const bottomM = 0.05;
+  return {
+    backM,
+    widthM,
+    heightM: topM - bottomM,
+    centerY: (topM + bottomM) / 2,
+  };
+}
+
+/** Alpha ramp of one slab, procedurally filled — no canvas, so the fleet stays
+ *  importable in a headless test. Dense at the bottom (the water leaves the
+ *  road there), thinning upward and feathered at both edges so the quad never
+ *  shows a hard rectangle. */
+function buildSprayAlphaTexture(): DataTexture {
+  const W = 96;
+  const H = 96;
+  const data = new Uint8Array(W * H * 4);
+  // Deterministic value noise — road spray is dust, not an airbrush gradient,
+  // and a perfectly smooth ramp is what made the first render read as three
+  // nested rectangles instead of one cloud (looked at, 65 км/ч, 58.7 m gap).
+  const cell = (cx: number, cy: number): number => {
+    let h = (cx * 374761393 + cy * 668265263) | 0;
+    h = (h ^ (h >>> 13)) * 1274126177;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+  };
+  const smooth = (t: number): number => t * t * (3 - 2 * t);
+  const noise = (fx: number, fy: number): number => {
+    const x0 = Math.floor(fx);
+    const y0 = Math.floor(fy);
+    const tx = smooth(fx - x0);
+    const ty = smooth(fy - y0);
+    const a = cell(x0, y0) + (cell(x0 + 1, y0) - cell(x0, y0)) * tx;
+    const b = cell(x0, y0 + 1) + (cell(x0 + 1, y0 + 1) - cell(x0, y0 + 1)) * tx;
+    return a + (b - a) * ty;
+  };
+  for (let y = 0; y < H; y++) {
+    // DataTexture keeps flipY = false, so row 0 is v = 0 — the BOTTOM of the
+    // quad, i.e. the tarmac. `up` therefore runs 0 (road) → 1 (top of slab).
+    const up = y / (H - 1);
+    // Thick where the water leaves the road, thinning upward…
+    const rise = Math.pow(1 - up, 1.6);
+    // …but not a hard cut AT the road: the last 12 % fades in, so the slab
+    // never draws a straight line across the tarmac.
+    const foot = up < 0.12 ? smooth(up / 0.12) : 1;
+    const vertical = rise * foot;
+    for (let x = 0; x < W; x++) {
+      const u = (x / (W - 1)) * 2 - 1; // −1..1 across the slab
+      // cos falloff, not 1 − u²: it reaches zero with zero SLOPE, which is what
+      // kills the visible rectangle edge the parabola left behind.
+      const across = Math.pow(Math.cos((u * Math.PI) / 2), 1.7);
+      // Two octaves of drift, biased so the mean stays near 1 (the noise
+      // breaks the silhouette up; it must not thin the curtain out).
+      const n = 0.62 + 0.5 * noise(u * 3.1 + 7, up * 4.3) + 0.26 * noise(u * 8.3, up * 9.7 + 3);
+      const a = vertical * across * n;
+      const idx = (y * W + x) * 4;
+      // THE RAMP GOES IN RGB, NOT IN A. three's `alphaMap` samples the GREEN
+      // channel (`diffuseColor.a *= texture2D(alphaMap, vUv).g`) — the first
+      // build put this ramp in the alpha channel and left g = 1 everywhere,
+      // and the render came back as three flat hard-edged rectangles stacked
+      // behind the truck. Looked at, not reasoned about: doc 66 R0.
+      const g = Math.round(255 * (a < 0 ? 0 : a > 1 ? 1 : a));
+      data[idx] = g;
+      data[idx + 1] = g;
+      data[idx + 2] = g;
+      data[idx + 3] = 255;
+    }
+  }
+  const tex = new DataTexture(data, W, H, RGBAFormat);
+  // DataTexture defaults to NearestFilter; at the scale a 5.4 m slab occupies
+  // 20 m from the eye that reads as a 64-px checkerboard, not as water.
+  tex.magFilter = LinearFilter;
+  tex.minFilter = LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Geometry + material + texture for the spray curtain. The caller OWNS all
+ *  three and must dispose them (TrafficLayer does it in an unmount effect,
+ *  the same contract as its blob texture). */
+export interface SprayCurtain {
+  geometry: PlaneGeometry;
+  material: MeshBasicMaterial;
+  texture: DataTexture;
+}
+
+/**
+ * Build the shared spray quad. One unit plane; every slab is that plane scaled
+ * by `spraySlabShape`, so the whole curtain is 2 triangles of geometry and one
+ * draw call however many emitters a lesson stages.
+ *
+ * `depthWrite` off (it must not carve a hole in the truck behind it) but depth
+ * TEST on, so once the student passes the truck its plume is correctly hidden
+ * by whatever is now in front of him. `fog` stays on — a curtain that ignored
+ * the scene fog would be the one bright rectangle in a grey motorway.
+ */
+export function buildSprayCurtain(): SprayCurtain {
+  const texture = buildSprayAlphaTexture();
+  const material = new MeshBasicMaterial({
+    // Road spray is lit water dust: near-white, very slightly cool.
+    color: 0xdfe6ea,
+    alphaMap: texture,
+    transparent: true,
+    opacity: SPRAY_SLAB_ALPHA,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  material.name = "traffic_spray";
+  const geometry = new PlaneGeometry(1, 1);
+  return { geometry, material, texture };
+}
+
+/** Free a curtain's owned GPU resources. */
+export function disposeSprayCurtain(c: SprayCurtain): void {
+  c.geometry.dispose();
+  c.material.dispose();
+  c.texture.dispose();
+}
+
 
 /** Emergency-rig body plan, meters (fictional, ADR-001): a compact white
  *  box-van silhouette (~5.6 × 2.1 × 2.5) with a roof-mounted BLUE light bar —

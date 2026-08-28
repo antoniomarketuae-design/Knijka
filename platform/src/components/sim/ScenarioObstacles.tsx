@@ -74,8 +74,10 @@ import type {
   ScenarioObstacleSpec,
   ScenarioPropKind,
   ScenarioPropObstacle,
+  ScenarioFuelStationObstacle,
   ScenarioVehicleObstacle,
   ScenarioWallObstacle,
+  ScenarioWorkerObstacle,
 } from "@/modules/sim/scene/obstacleSpec";
 import type { NpcColliderUserData } from "./NpcColliders";
 
@@ -88,8 +90,10 @@ export type {
   ScenarioObstacleSpec,
   ScenarioPropKind,
   ScenarioPropObstacle,
+  ScenarioFuelStationObstacle,
   ScenarioVehicleObstacle,
   ScenarioWallObstacle,
+  ScenarioWorkerObstacle,
 };
 
 // ---------------------------------------------------------------------------
@@ -300,6 +304,15 @@ export function ScenarioObstacles({
     () => obstacles.filter((o): o is ScenarioAnimalObstacle => o.kind === "animal"),
     [obstacles],
   );
+  const workers = useMemo(
+    () => obstacles.filter((o): o is ScenarioWorkerObstacle => o.kind === "worker"),
+    [obstacles],
+  );
+  const fuelStations = useMemo(
+    () =>
+      obstacles.filter((o): o is ScenarioFuelStationObstacle => o.kind === "fuelStation"),
+    [obstacles],
+  );
 
   // No vehicles = no hittable obstacle bodies. Say so out loud rather than
   // leaving whatever the previous scene published standing.
@@ -323,6 +336,12 @@ export function ScenarioObstacles({
         <ObstacleWall key={`wall-${i}`} spec={w} />
       ))}
       {animals.length > 0 ? <ObstacleAnimals animals={animals} /> : null}
+      {workers.map((w, i) => (
+        <ObstacleWorker key={`worker-${i}`} spec={w} />
+      ))}
+      {fuelStations.map((f, i) => (
+        <ObstacleFuelStation key={`fuel-${i}`} spec={f} />
+      ))}
     </group>
   );
 }
@@ -631,6 +650,192 @@ function ObstacleWall({ spec }: { spec: ScenarioWallObstacle }) {
         <meshStandardMaterial color="#8d8a83" roughness={0.9} />
       </mesh>
     </RigidBody>
+  );
+}
+
+// --- Fuel-station forecourt (canopy + columns + pump islands) ---------------
+
+const FUEL_DECK_THICK_M = 0.5;
+const FUEL_FASCIA_H_M = 0.42;
+const FUEL_COLUMN_W_M = 0.45;
+/** Columns stand this far in from the deck edge, across / along. */
+const FUEL_COLUMN_INSET_ACROSS_M = 0.9;
+const FUEL_COLUMN_INSET_ALONG_M = 1.2;
+const FUEL_ISLAND_W_M = 1.6;
+const FUEL_ISLAND_KERB_H_M = 0.18;
+const FUEL_PUMP_W_M = 0.55;
+const FUEL_PUMP_D_M = 0.9;
+const FUEL_PUMP_H_M = 1.85;
+/** Two pumps per island, at this fraction of the island's half-length. */
+const FUEL_PUMP_ALONG_FRACTION = 0.45;
+
+/**
+ * A forecourt: an off-white canopy deck with a coloured fascia band, four
+ * columns, and pump islands with two pumps each. Entirely fictional — no
+ * livery, no brand marks, no price totem (ADR-001); what makes it read as a
+ * бензиностанция is the silhouette, which is the only part a driver uses.
+ *
+ * Local frame = ObstacleWall's: length runs along the heading (local +Z),
+ * width across it (local +X), Y = 0 at the tarmac.
+ */
+function ObstacleFuelStation({ spec }: { spec: ScenarioFuelStationObstacle }) {
+  const yaw = obstacleYawRad(spec.headingDeg);
+  const halfW = spec.widthM / 2;
+  const halfL = spec.lengthM / 2;
+  const colX = halfW - FUEL_COLUMN_INSET_ACROSS_M;
+  const colZ = halfL - FUEL_COLUMN_INSET_ALONG_M;
+  const columns: Array<[number, number]> = [
+    [-colX, -colZ],
+    [colX, -colZ],
+    [-colX, colZ],
+    [colX, colZ],
+  ];
+  const pumpZ = spec.islandHalfLengthM * FUEL_PUMP_ALONG_FRACTION;
+  return (
+    <group position={[spec.x, 0, -spec.y]} rotation={[0, yaw, 0]} name="scenario-fuel-station">
+      {/* Canopy deck + the fascia band under its rim. No collider: it is
+          `clearanceM` overhead, and a roof a car cannot reach must not be a
+          contact surface. */}
+      <mesh position={[0, spec.clearanceM + FUEL_DECK_THICK_M / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[spec.widthM, FUEL_DECK_THICK_M, spec.lengthM]} />
+        <meshStandardMaterial color="#e9eae6" roughness={0.6} />
+      </mesh>
+      <mesh position={[0, spec.clearanceM - FUEL_FASCIA_H_M / 2, 0]} castShadow>
+        <boxGeometry args={[spec.widthM + 0.12, FUEL_FASCIA_H_M, spec.lengthM + 0.12]} />
+        <meshStandardMaterial color="#1f7a5a" roughness={0.5} />
+      </mesh>
+      {columns.map(([cx, cz], i) => (
+        <RigidBody
+          key={`col-${i}`}
+          type="fixed"
+          colliders={false}
+          position={[cx, 0, cz]}
+        >
+          <CuboidCollider
+            args={[FUEL_COLUMN_W_M / 2, spec.clearanceM / 2, FUEL_COLUMN_W_M / 2]}
+            position={[0, spec.clearanceM / 2, 0]}
+            friction={0.6}
+            restitution={0.05}
+          />
+          <mesh position={[0, spec.clearanceM / 2, 0]} castShadow receiveShadow>
+            <boxGeometry args={[FUEL_COLUMN_W_M, spec.clearanceM, FUEL_COLUMN_W_M]} />
+            <meshStandardMaterial color="#d8dad6" roughness={0.7} />
+          </mesh>
+        </RigidBody>
+      ))}
+      {spec.islandOffsetsM.map((off, i) => (
+        <group key={`island-${i}`} position={[off, 0, 0]}>
+          {/* Kerb slab — drawn, never collided (see obstacleSpec.ts). */}
+          <mesh position={[0, FUEL_ISLAND_KERB_H_M / 2, 0]} receiveShadow>
+            <boxGeometry
+              args={[FUEL_ISLAND_W_M, FUEL_ISLAND_KERB_H_M, spec.islandHalfLengthM * 2]}
+            />
+            <meshStandardMaterial color="#b8b6b0" roughness={0.9} />
+          </mesh>
+          {[-pumpZ, pumpZ].map((pz, j) => (
+            <RigidBody
+              key={`pump-${j}`}
+              type="fixed"
+              colliders={false}
+              position={[0, FUEL_ISLAND_KERB_H_M, pz]}
+            >
+              <CuboidCollider
+                args={[FUEL_PUMP_W_M / 2, FUEL_PUMP_H_M / 2, FUEL_PUMP_D_M / 2]}
+                position={[0, FUEL_PUMP_H_M / 2, 0]}
+                friction={0.6}
+                restitution={0.05}
+              />
+              <mesh position={[0, FUEL_PUMP_H_M / 2, 0]} castShadow receiveShadow>
+                <boxGeometry args={[FUEL_PUMP_W_M, FUEL_PUMP_H_M, FUEL_PUMP_D_M]} />
+                <meshStandardMaterial color="#eceee9" roughness={0.55} />
+              </mesh>
+              {/* The dark display head, so a pump reads as a pump and not as a
+                  bollard from the driving seat. */}
+              <mesh position={[0, FUEL_PUMP_H_M - 0.35, FUEL_PUMP_D_M / 2 + 0.02]}>
+                <boxGeometry args={[FUEL_PUMP_W_M - 0.12, 0.42, 0.06]} />
+                <meshStandardMaterial color="#22262a" roughness={0.4} />
+              </mesh>
+            </RigidBody>
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+// --- Road-works workers (visual dressing, never a collider) ------------------
+
+/**
+ * WORKER BODY PLAN, metres — ground-relative like every other body here
+ * (Y = 0 = boots on the tarmac, facing local +Z, yaw via obstacleYawRad).
+ * Fictional and unbranded (ADR-001): the only thing that has to be right is
+ * what a driver reads at 60 m in a headlight beam, which is the vest and its
+ * retro-reflective band — the exact cue instruction 1 of sc-merge-roadworks-shift
+ * makes the whole lesson out of («те те виждат само осветен»).
+ *
+ * Declarative R3F primitives on purpose: three.js disposes JSX-declared
+ * geometries and materials with the node, so this rig needs none of the
+ * imperative teardown `ObstacleAnimals` carries for its fleet-built rig.
+ * Standing height 1.69 m to the crown — a shade under the 1.75 m the traffic
+ * module's walker uses, because a worker in a helmet reads by silhouette and a
+ * hair over the parked-car roofline (1.45 m) is what keeps him visible over
+ * the row of cones and the works vehicle beside him.
+ */
+const WORKER_VEST_COLOR = "#f2701b"; // hi-vis orange
+const WORKER_BAND_COLOR = "#e8eef0"; // retro-reflective silver band
+const WORKER_TROUSER_COLOR = "#2b3038";
+const WORKER_SKIN_COLOR = "#c9a184"; // the traffic module's own head tone
+const WORKER_HELMET_COLOR = "#f2c14e"; // safety yellow
+
+function ObstacleWorker({ spec }: { spec: ScenarioWorkerObstacle }) {
+  return (
+    <group
+      position={[spec.x, 0, -spec.y]}
+      rotation={[0, obstacleYawRad(spec.headingDeg), 0]}
+      name="scenario-worker"
+    >
+      {/* Legs / work trousers. */}
+      <mesh position={[0, 0.43, 0]} castShadow>
+        <boxGeometry args={[0.36, 0.86, 0.26]} />
+        <meshStandardMaterial color={WORKER_TROUSER_COLOR} roughness={0.85} />
+      </mesh>
+      {/* Vest torso. */}
+      <mesh position={[0, 1.15, 0]} castShadow>
+        <boxGeometry args={[0.46, 0.58, 0.28]} />
+        <meshStandardMaterial color={WORKER_VEST_COLOR} roughness={0.7} />
+      </mesh>
+      {/* The band that answers the headlights — a shade brighter than the vest
+          and wrapped all the way round, so it reads from behind too. */}
+      <mesh position={[0, 1.13, 0]}>
+        <boxGeometry args={[0.48, 0.09, 0.3]} />
+        <meshStandardMaterial
+          color={WORKER_BAND_COLOR}
+          roughness={0.25}
+          metalness={0.1}
+          emissive={WORKER_BAND_COLOR}
+          emissiveIntensity={0.18}
+        />
+      </mesh>
+      {/* Arms. */}
+      <mesh position={[-0.29, 1.13, 0]} castShadow>
+        <boxGeometry args={[0.12, 0.56, 0.14]} />
+        <meshStandardMaterial color={WORKER_VEST_COLOR} roughness={0.7} />
+      </mesh>
+      <mesh position={[0.29, 1.13, 0]} castShadow>
+        <boxGeometry args={[0.12, 0.56, 0.14]} />
+        <meshStandardMaterial color={WORKER_VEST_COLOR} roughness={0.7} />
+      </mesh>
+      {/* Head. */}
+      <mesh position={[0, 1.53, 0]} castShadow>
+        <sphereGeometry args={[0.105, 12, 10]} />
+        <meshStandardMaterial color={WORKER_SKIN_COLOR} roughness={0.9} />
+      </mesh>
+      {/* Helmet dome. */}
+      <mesh position={[0, 1.56, 0]} castShadow>
+        <sphereGeometry args={[0.13, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={WORKER_HELMET_COLOR} roughness={0.55} />
+      </mesh>
+    </group>
   );
 }
 

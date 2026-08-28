@@ -521,6 +521,64 @@
 //    grades him on the drift that belief produces. Fixed at
 //    `lessons/scenario/templates-conditions2.ts` (instructions 3 and 6, and the
 //    objective); the DEPICTION half stays routed to the render layer.
+//
+// 6. WAVE 8, 2026-08-28 — THE HAZE HALF LANDED, IN `presets.ts`, AND THIS
+//    HEADER'S ROUTING OF IT IS NOW SPENT. §1 has said since it was written
+//    that the snow/fog convergence „IS NOT FIXABLE FROM THIS FILE … the
+//    differentiation lives in `presets.ts`". That routing was correct and it
+//    has been acted on rather than re-stated: the DAY/DUSK/NIGHT `snowWeather`
+//    specs were retuned from {#e8ebef 0.012 / #c3c6cc 0.013 / #252b34 0.015} to
+//    {#eef4fd 0.0085 / #ccd8ea 0.0092 / #2f3c50 0.0105}. `fogWeather` was NOT
+//    touched, deliberately, so the next A/B has an unmoved control and any
+//    measured divergence is attributable to one edit.
+//
+//    WHY THOSE NUMBERS. The snowWeather docblock claimed „~80–120 m usable
+//    sight" and „cold desaturated white, never the warm haze"; both were
+//    measured false at HEAD. 0.012 gives 50 % transmittance at 69 m (fog's
+//    0.020 gives 42 m — only 1.67× apart, so both lessons ended in a wall
+//    inside the same block), and #e8ebef has R−B = −7 against fog's −9, i.e.
+//    the snow veil was the WARMER of the two. The new densities are solved
+//    from the sentence — d = √ln2 / s — landing day sight at 98 m against
+//    fog's 42 m, a 2.35× split. The full derivation, the frame rectangles and
+//    the pedagogy (fog is a SIGHT envelope, snow is a GRIP envelope, and
+//    rendering snow as a visibility bank teaches a student to pick speed off
+//    what they can see on a surface where that is the wrong rule) live at the
+//    `snowWeather` field in `presets.ts` rather than here, because that is
+//    where the next person to change the number will be standing.
+//
+//    THE CONSUMERS, NAMED, BECAUSE A RETUNED CONSTANT WITH NO READER IS THIS
+//    PROGRAMME'S FAVOURITE WAY TO SHIP NOTHING. All four pre-exist and are on
+//    the /simulator chain (page.tsx:31 → simulator-client.tsx:45 →
+//    LessonPlayShell.tsx:224 → SceneSlot.tsx:148 → LessonScene.tsx:139 →
+//    SimEnvironment): `SimEnvironment.tsx:233` builds the goal colour from
+//    `preset.snowWeather.color`, `:352` lerps the scene FogExp2 colour onto it
+//    by `snowNow`, `:365-370` takes the density, `:317` lerps the hemisphere
+//    GROUND bounce onto the same colour (SNOW_GROUND_WHITEN), and
+//    `SkyDome.tsx:216` washes the dome 75 % onto it. At `snow = 1` — which is
+//    every frame of sc-ac-snow after `primeWeather` — the fog colour IS
+//    `snowWeather.color` exactly and the density IS `snowWeather.density`, so
+//    the edit reaches the pixel with no new wiring.
+//
+//    WHAT IT DOES NOT REACH, stated so the row is not read as closed twice:
+//    the R0 LOOK IS OWED. The change is derived and arithmetic, and no drive
+//    has been taken on it — the numbers above are a prediction of the frame,
+//    not a photograph of one. And thinning the veil UNCOVERS the world
+//    module: pavements, kerbs, verges and the parked row still carry no snow
+//    (§2a — `world/textures/snowCover.ts` reaches five PROP materials only),
+//    and the less haze there is, the more plainly a snowed carriageway sits
+//    beside bare summer concrete. Measured on the same w14 frame: road L106.3
+//    against pavement L112.4. That is the next lane's row, and it is a world
+//    row, not a weather one.
+//
+//    NOT TOUCHED, AND THE REASON IS THE SAME BOTH TIMES: `SNOW_ROAD_BRIGHTEN`
+//    (1.8) and `SNOW_SUN_DIM` / `SNOW_HEMISPHERE_DIM`. The road multiply
+//    carries a completed R0 look and a stated ceiling (the lane markings must
+//    stay the brightest thing in the carriageway; at 1.8 they lead the road
+//    32 %, and the arithmetic in its own docblock shows the road meets the
+//    paint once the asphalt texel passes 0.70). Raising it without a drive
+//    would trade a measured criterion for an unmeasured one. The two dim
+//    constants have no measurement behind a new value at all, and this file's
+//    whole discipline is that its numbers reproduce.
 
 import { useSyncExternalStore } from "react";
 

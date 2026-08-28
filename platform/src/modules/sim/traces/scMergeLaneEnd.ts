@@ -97,6 +97,47 @@
  * shadow's speed envelope and where it comes to rest, precisely so this claim
  * cannot be re-filed against a file that never made it.
  * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * W16 — sc-merge-lane-end:ae6166e2. THE DECK NARRATED FURNITURE THE WORLD DOES
+ * NOT DRAW, AND THAT HALF WAS THIS FILE'S.
+ *
+ * The row is „the lesson's own event never happens: the lane does not end", and
+ * templates-merging.ts's W15 note routed the COPY half here in as many words:
+ * the sentence the audit photographed on the glass is not an `instructionsBg`
+ * step, it is `annotation.textBg` on the shadow demo, painted by the demo deck
+ * (TraceTimeline.tsx:779/:794).
+ *
+ *   .audit-frames/sweep161/sc-merge-lane-end/pc-right/04-t120s.png — the deck
+ *   caption box reads «Караме в дясната лента. ЗНАКЪТ И МАРКИРОВКАТА казват
+ *   едно: тази лента свършва след около 180 метра» over a carriageway of
+ *   unchanged width with no sign, no taper paint, no chevrons and no merge
+ *   arrow anywhere in the frame.
+ *
+ * TWO CAPTIONS ASSERTED SOMETHING VISIBLE, and neither is drawable today:
+ *  · the shadow's opener claimed a SIGN and a MARKING. `buildWorldGeometry
+ *    (ln-merge-v1)` ships 35 sign kinds and NOT ONE is a narrowing / lane-drop /
+ *    merge sign (world/types.ts:448-526, re-read by the W15 verifier), and the
+ *    map builds `markingQuads` with no taper in them. The claim cannot be true
+ *    on any build of this district.
+ *  · the no-indicator demo claimed «лентата ВЕЧЕ СЕ СТЕСНЯВА». `ln-merge-v1`
+ *    is ONE edge (`lnm-e-street`) carrying `lanes: 2` over all 280 m, so the
+ *    carriageway never narrows anywhere on it.
+ * Both now say what is true and teach the same beat: the lane ends and the
+ * merge is OURS to make — the ratified wording of the template's own
+ * instruction 1 («стеснението е твое, не на другите»), which claims no
+ * furniture.
+ *
+ * WHAT THIS DOES NOT CLOSE, stated so nobody reads the row as finished: the
+ * WORLD half. A student still sees no taper, and making him see one is two
+ * files neither this lane nor the template lane owns — a `laneEnds` (А
+ * „Пътно стеснение") member in `world/builders/signs.ts` plus its census row,
+ * and THEN `tools/maps/gen_ln_merge.mjs` (with its two committed copies)
+ * placing it at `meta.scenario.taperFromY` = 180 with the М-taper paint 180 →
+ * 240 and `lanes` dropping 2 → 1 past it. Until the sign kind exists the
+ * generator has nothing to place. What is gone is the product TELLING the
+ * student it is there while he is looking straight at where it is not.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -131,7 +172,7 @@ const MERGE_KMH = 35;
 export function scMergeLaneEndShadowScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Караме в дясната лента. Знакът и маркировката казват едно: тази лента свършва след около 180 метра." },
+      { kind: "annotation", textBg: "Караме в дясната лента — тя свършва след около 180 метра. Стеснението е наше: ние се съобразяваме." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [SPAWN, [X_ENDING, 108]], targetKmh: CRUISE_KMH, stopAtEnd: false },
       // The observation pair the rubric names: mirror first (where is the gap,
@@ -168,7 +209,7 @@ export function scMergeLaneEndMistakeNoIndicatorScript(): DriveScript {
       { kind: "annotation", textBg: "Грешка: водачът вижда края на лентата, но отлага решението до последния метър — и се пъха мълчаливо." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [SPAWN, [X_ENDING, 140]], targetKmh: CRUISE_KMH, stopAtEnd: false },
-      { kind: "annotation", textBg: "Лентата вече се стеснява, а водачът още кара право напред — чака „да се отвори“." },
+      { kind: "annotation", textBg: "Краят наближава, а водачът още кара право напред — чака „да се отвори“." },
       { kind: "drive", points: [[X_ENDING, 140], [X_ENDING, 200]], targetKmh: 40, stopAtEnd: false },
       // The mirror IS checked — this demo is about the missing signal alone, so
       // the glance sits inside mirrorLookbackSec (5 s) of the wheel-over.

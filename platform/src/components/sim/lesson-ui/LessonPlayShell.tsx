@@ -620,6 +620,13 @@ const PRAISE_ANNOUNCE_MS = 2600;
 const WARNING_ANNOUNCE_MS = 5000;
 /** The two-ribbon colour legend: said once at the start of a guided rung. */
 export const LEGEND_ANNOUNCE_MS = 8000;
+/**
+ * …and „once, plus the one comeback an interruption earns" — the number the
+ * legend's own header promised and the render never enforced. Measured on
+ * `w10-4/frames/sc-lane-change__mobile-right/run.log`: the legend was the
+ * phone's active card on seven of 25 drive beats. See `legendGrants`.
+ */
+export const LEGEND_MAX_GRANTS = 2;
 
 /**
  * Is `key` still within its announcement window?
@@ -1733,6 +1740,41 @@ export function taskAnnounceKey(input: {
   return `task:${input.objectiveIndex}/${input.objectiveTotal}:${input.taskLineBg}:${input.taskDetailBg ?? ""}:${input.taskPing}`;
 }
 
+/**
+ * ── THE OBJECTIVE ROW ITSELF — ONE CONSTRUCTION SITE, TWO CLAIMS ON IT ─────
+ *
+ * Row 7 is built here rather than inline in `advisorTaskRows` because W8 gave
+ * it a SECOND caller: the compact STANDBY, which puts the same row back on the
+ * glass whenever the phone's one slot has nothing louder to say (see
+ * `taskStandbyOn` in the render, and the measured 0-of-25 beats that made it
+ * necessary). Two callers building the same card by hand is the „second
+ * producer" `taskAnnounceKey`'s header refuses; two callers of one builder is
+ * not — the id, the chip, the tone and the detail can only be wrong in one
+ * place, and the shared id is what guarantees the announcement and the standby
+ * can never be selected as two different cards.
+ *
+ * `null` when there is no line to say, which is the same condition the caller
+ * used to test inline (`input.taskLineBg !== null`).
+ */
+export function taskOverlayRow(input: AdvisorTaskRowsInput): SimOverlayItem | null {
+  if (input.taskLineBg === null) return null;
+  return {
+    id: input.taskKey ?? "task",
+    kind: "task",
+    tone: input.mistakeMode ? "danger" : "neutral",
+    chipBg: input.mistakeMode
+      ? "Преживей грешката"
+      : `Задача ${Math.min(input.objectiveIndex, Math.max(1, input.objectiveTotal))}/${input.objectiveTotal}`,
+    lineBg: input.taskLineBg,
+    // O54: the advisor's half, on the row that carries the counter.
+    // `itemEchoesLine` over this pair must stay false — the line is the title
+    // and the detail is what is left once the title has been stripped off it
+    // (`advisorEchoTrim`), so the two cannot be the same sentence unless
+    // somebody re-attaches the prefix.
+    detailBg: input.fold.taskDetailBg,
+  };
+}
+
 export function advisorTaskRows(
   input: AdvisorTaskRowsInput,
   fresh: AdvisorTaskFreshness,
@@ -1766,22 +1808,8 @@ export function advisorTaskRows(
           tone: "good",
           lineBg: fresh.flash.titleBg,
         }
-      : fresh.taskFresh && input.taskLineBg !== null
-        ? {
-            id: input.taskKey ?? "task",
-            kind: "task",
-            tone: input.mistakeMode ? "danger" : "neutral",
-            chipBg: input.mistakeMode
-              ? "Преживей грешката"
-              : `Задача ${Math.min(input.objectiveIndex, Math.max(1, input.objectiveTotal))}/${input.objectiveTotal}`,
-            lineBg: input.taskLineBg,
-            // O54: the advisor's half, on the row that carries the counter.
-            // `itemEchoesLine` over this pair must stay false — the line is the
-            // title and the detail is what is left once the title has been
-            // stripped off it (`advisorEchoTrim`), so the two cannot be the same
-            // sentence unless somebody re-attaches the prefix.
-            detailBg: input.fold.taskDetailBg,
-          }
+      : fresh.taskFresh
+        ? taskOverlayRow(input)
         : null;
 
   return [advisorRow, taskRow];
@@ -4382,8 +4410,49 @@ export function LessonPlayShell({
     lessonDescriptionBg: lesson.descriptionBg,
   });
   const taskLineBg = queue.taskLineBg;
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * W8 · THE PHONE'S ONE SLOT WAS BEING SPENT ON THE LEAST IMPORTANT THING
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * MEASURED, not argued. `w10-4/frames/sc-lane-change__mobile-right/run.log`,
+   * a 138 s drive that ended in a building, 25 drive beats:
+   *
+   *     card=legend   7 beats        card=task   0 beats
+   *     card=-/-     15 beats        ← the slot was EMPTY on 15 of 25
+   *
+   * and on every one of those beats the log prints
+   * «✗ NOT ON THE GLASS — objective-banner: Задача 1/2Установи се в дясната
+   * лента», because `ObjectiveBanner` lives in the notify column and that
+   * column is `compact ? "hidden" : ""` (see its `className` below). The pc leg
+   * of the SAME drive at the SAME beat carries «ЗАДАЧА 2/2 · Премини в лявата
+   * лента след огледало и мигач» in the corner for the whole 147 s.
+   * `fill-w4s4/…/sc-ac-night-lights__mobile-right/run.log` says it again: 5
+   * legend, 0 task, 30 of 42 beats with nothing on the glass at all.
+   *
+   * WHY, AND IT IS NOT PRIORITY. `overlayQueue.ts` ranks task 20 over legend 10,
+   * so the legend never out-ranked anything: the task row is built ONLY while
+   * `useFreshKey(taskKey, TASK_ANNOUNCE_MS)` holds, and `taskKey` changes only
+   * when the OBJECTIVE changes. One objective that lasts 138 s therefore buys
+   * the phone student 7 seconds of knowing what he is being graded on, and then
+   * silence — while 15 beats of that silence had nothing else to say.
+   *
+   * „ANNOUNCE, THEN GET OUT OF THE WAY" (the constant's own header) is right
+   * about the LOUD form and was wrong about the floor. So the announcement keeps
+   * its 7 s exactly as before, and underneath it the objective becomes the
+   * STANDBY: the thing the slot falls back to when the queue has nothing louder.
+   * Three ambient claimants, in the order a student needs them, each yielding to
+   * the next once it has been said:
+   *
+   *   1. the advisor's next action — one window per silent stretch (below);
+   *   2. the ribbon legend — at most twice per scene (`legendGrants`);
+   *   3. the objective — from then on, until something louder interrupts.
+   *
+   * IT IS STILL ONE LINE AND IT IS STILL DISMISSIBLE: the standby reuses the
+   * task row's own id, so A6's `dismissedOverlayIds` sends it away for good and
+   * «Задача» in the ⚙ sheet (`taskPing`) brings it back.
+   */
   const taskFresh = useFreshKey(queue.taskKey, TASK_ANNOUNCE_MS);
-  const advisorFresh = useFreshKey(queue.advisorKey, ADVISOR_ANNOUNCE_MS);
 
   const praiseKey = compact && flash !== null && !ended ? `praise:${flash.key}` : null;
   const praiseFresh = useFreshKey(praiseKey, PRAISE_ANNOUNCE_MS);
@@ -4391,6 +4460,77 @@ export function LessonPlayShell({
   const warningKey =
     compact && !ended && warnings.length > 0 ? `warn:${telltaleWarningsKey(warnings)}` : null;
   const warningFresh = useFreshKey(warningKey, WARNING_ANNOUNCE_MS);
+
+  /**
+   * ── THE SILENCE THE THREE AMBIENT ROWS QUEUE ON ────────────────────────────
+   *
+   * The frame on which the compact overlay layer has nothing LOUD to say — no
+   * praise, no armed fault, no teach moment, no toast, no quiz, no consequence
+   * card, no briefing. `legendQueueSilent` below still spells its own gate out
+   * clause by clause, because that gate is pinned by name in
+   * `shellClipAffordances.test.ts` and a delegation would take the legend's
+   * condition out of the one place a reader is told to look for it.
+   *
+   * `warnings.length === 0` AND NOT MERELY `!warningFresh` is the one clause
+   * here that is not a copy of that gate. A lit telltale retires its full line
+   * after `WARNING_ANNOUNCE_MS` and then keeps a chip on the road (the scene's
+   * telltale cue, «Контролна лампа: температура! Спри спокойно вдясно»), and
+   * PlayAreaStyles hides that chip for as long as the overlay layer is speaking.
+   * A standby that stood through a lit lamp would therefore have covered a
+   * safety cue with an objective line — the founder's rank order for this column
+   * puts the lesson's line above the chips precisely because the line is the
+   * more urgent thing, and while a lamp is lit it is not.
+   */
+  const ambientQueueSilent =
+    compact &&
+    !ended &&
+    !briefingOpen &&
+    snap.phase === "driving" &&
+    !praiseFresh &&
+    !warningFresh &&
+    warnings.length === 0 &&
+    teachQueue.length === 0 &&
+    toasts.length === 0 &&
+    activeQuiz === null &&
+    consequence === null;
+
+  /**
+   * ── CLAIMANT 1 · THE NEXT ACTION, HEARD RATHER THAN MERELY RAISED ──────────
+   *
+   * The compact advisor row had the legend's own bug and nobody had measured it:
+   * `advisorKey` is the prompt's SENTENCE, so `useFreshKey` opens its 6 000 ms
+   * window the moment the prompt arrives — which on every lesson is the frame
+   * the scene mounts, with the briefing (`hint`, priority 60, `blocking`) on top
+   * of it. The window is spent behind a card. `card=advisor` appears on 0 of 25
+   * beats of the sc-lane-change phone leg, and the pc leg carries «Прецени
+   * скоростта на колата зад теб.» at the same beat, which is finding
+   * `sc-lane-change:64313de9` in one line.
+   *
+   * SO THE SENTENCE GETS A SECOND WINDOW, AND THE FIRST ONE IS UNCHANGED.
+   * `advisorAnnounceFresh` is the shipped clock, verbatim, on the binding's own
+   * key: a prompt that CHANGES mid-drive still interrupts the standby for its
+   * six seconds, which is the behaviour that was always intended and is worth
+   * keeping. `advisorHeardFresh` is the missing half — the same key and the same
+   * TTL, opened on the first frame the queue is SILENT, exactly as the legend's
+   * window is two blocks below. It re-opens after an interruption on purpose:
+   * „what am I supposed to be doing now" is the right question to answer again
+   * after a fault card, and it costs at most ADVISOR_ANNOUNCE_MS of the standby.
+   *
+   * TWO CALLS AND NOT ONE WRAPPED CALL, deliberately. `queueTaskEcho.test.ts`
+   * §3.5 requires `useFreshKey(queue.advisorKey, ADVISOR_ANNOUNCE_MS)` to stand
+   * in this file verbatim — „the freshness keys are the binding's keys, the TTL
+   * cannot be re-derived" — and it is right to: the KEY encodes the whole
+   * coaching gate (`advisorOn`/`examMode`/`mistakeMode`/`ended`/`compact`), and a
+   * component that rewrote it would be reading that gate a second time. Delaying
+   * a window is not re-deriving a key, so the delay is a second reader of the
+   * same key rather than an edit to the first.
+   */
+  const advisorAnnounceFresh = useFreshKey(queue.advisorKey, ADVISOR_ANNOUNCE_MS);
+  const advisorHeardFresh = useFreshKey(
+    ambientQueueSilent ? queue.advisorKey : null,
+    ADVISOR_ANNOUNCE_MS,
+  );
+  const advisorFresh = advisorAnnounceFresh || advisorHeardFresh;
 
   /**
    * ── WHAT THE LEGEND HAS TO NAME, AND WHY ITS OLD GATE WAS THE WRONG ONE ────
@@ -4461,22 +4601,108 @@ export function LessonPlayShell({
    * (It is also the shape that keeps this out of a `useRef` read during render,
    * which `react-hooks/refs` is right to refuse: a latch read at render time is a
    * value React is not tracking, on a surface that repaints every 150 ms.)
-   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * ── W8: „ONCE" WAS WRITTEN HERE AND THE CODE NEVER ENFORCED IT ─────────────
+   * MEASURED on `w10-4/frames/sc-lane-change__mobile-right/run.log`: the legend
+   * was the active card on SEVEN of 25 drive beats of a single 138 s run, and on
+   * `fill-w4s4/…/sc-ac-night-lights__mobile-right/run.log` on five of 42. There
+   * is no cap in the paragraph above — only the observation that a re-open needs
+   * a noisy→silent transition, and a real drive supplies one every few seconds
+   * (a toast, a fault card, a praise flash). „It can come back once" was a
+   * design intent that the expression below could not express, so a sentence
+   * about two coloured lines was still being re-read to the student two seconds
+   * before he drove into a building.
+   *
+   * `legendGrants` is the missing half, and it is the paragraph's own rule
+   * rather than the latch it argues against: a grant is spent when a window
+   * CLOSES (the effect's cleanup), never when one opens, so an 8 000 ms window
+   * that is interrupted at second three still counts as the one interruption the
+   * paragraph promises to forgive — and the second silent stretch still gets a
+   * full window. Only the THIRD is refused. Reset per `sceneEpoch`, so a
+   * restarted drill explains its ribbons again.
    */
+  const [legendGrants, setLegendGrants] = useState(0);
+  useEffect(() => {
+    setLegendGrants(0);
+  }, [sceneEpoch]);
   const legendQueueSilent =
     legendApplies &&
+    legendGrants < LEGEND_MAX_GRANTS &&
     !briefingOpen &&
     snap.phase === "driving" &&
     !taskFresh &&
     !advisorFresh &&
     !warningFresh &&
     !praiseFresh &&
+    warnings.length === 0 &&
     teachQueue.length === 0 &&
     toasts.length === 0 &&
     activeQuiz === null &&
     consequence === null;
   const legendKey = legendQueueSilent ? `legend:${sceneEpoch}` : null;
   const legendFresh = useFreshKey(legendKey, LEGEND_ANNOUNCE_MS);
+  useEffect(() => {
+    if (legendKey === null) return;
+    // The window ENDED — the queue went loud again, or the scene restarted.
+    // Spending the grant on the CLOSE and not on the opening frame is what keeps
+    // an interrupted first window from silently consuming the comeback: the key
+    // stays non-null for the whole silent stretch (the standby below reads its
+    // own gate, not this one, so a standing objective does not null it), so this
+    // fires once per stretch and not once per frame.
+    return () => setLegendGrants((n) => n + 1);
+  }, [legendKey]);
+
+  /**
+   * ── CLAIMANT 3 · THE OBJECTIVE, AS THE FLOOR OF THE SLOT ───────────────────
+   *
+   * Everything above has had its say: the advisor's window per silent stretch,
+   * the legend's two per scene. What is left is the sentence the student is
+   * actually being graded on, and on a phone it has nowhere else to live —
+   * `ObjectiveBanner` is mounted inside the right-edge notification column, and
+   * that column carries `hidden` on a compact stage, so the queue is the whole
+   * of it. (The attribute name is deliberately not quoted anywhere in this
+   * paragraph: two guards locate that column by `indexOf` on its `data-hud`
+   * value and read forward, and a doc comment that spells it out higher up the
+   * file moves the anchor into the prose — `shellClipAffordances.test.ts` says
+   * so in as many words, having already caught it once.)
+   *
+   * WHY IT IS A SECOND CANDIDATE AND NOT `taskFresh || standby`. The obvious
+   * shape — widen the freshness flag that `advisorTaskRows` reads — is the one
+   * shape this file may not have, and both reasons are load-bearing:
+   *
+   *   · `shellClipAffordances.test.ts` requires the LEGEND's gate to read
+   *     `!taskFresh`, and the legend must queue behind the ANNOUNCEMENT only. A
+   *     widened `taskFresh` would make `legendQueueSilent` false from the first
+   *     silent frame onwards and the ribbon legend — repaired one wave ago for
+   *     `sc-ln-obstacle-meeting`, „a phone student sees a green and a blue river
+   *     of light with nothing telling him which to follow" — would never be
+   *     shown again on any phone. A repair that silently deletes the previous
+   *     repair is how this corpus grew.
+   *   · `queueTaskEcho.test.ts` §3.5 `toEqual`s the `advisorTaskRows` property
+   *     map, so `taskFresh: taskFresh || …` at that call site is rejected — and
+   *     rightly: it is the exact shape a refuter would use to neutralise the
+   *     gate.
+   *
+   * So the standby is its own candidate, built by the same `taskOverlayRow` the
+   * announced row is built by (ONE construction site — the second producer
+   * growing back is what `taskAnnounceKey`'s header refuses), carrying the SAME
+   * id and listed AFTER the announced row.
+   *
+   * `!taskFresh` IS BELT AND BRACES AND IS KEPT ANYWAY. The list position alone
+   * would already settle it — `selectOverlay` is a stable sort, so at equal
+   * priority the announced row wins — but „already settled by a sort's
+   * stability" is the kind of guarantee that survives until someone adds a
+   * `.sort()` comparator. With this clause the two rows are never candidates on
+   * the same frame at all, so there is no ordering to preserve and no way for
+   * one card to be counted twice.
+   */
+  const taskStandbyOn =
+    ambientQueueSilent &&
+    !taskFresh &&
+    !legendFresh &&
+    !advisorFresh &&
+    queue.taskLineBg !== null &&
+    queue.taskLineBg !== "";
 
   // A micro-quiz and the THEO-3 consequence card are INTERACTIVE PAUSES: they
   // ask a question and wait for the answer, so they are modals by nature and
@@ -4849,6 +5075,28 @@ export function LessonPlayShell({
               }, стрелката и светлинният стълб — маршрутът и целта, до която караш`,
             }
           : null,
+
+        // 9. W8 · THE STANDBY. The objective again, at the BOTTOM of the list,
+        //    for the frames on which nothing above it wanted the slot.
+        //
+        //    It is last on purpose and the position is the whole mechanism:
+        //    `selectOverlay` is a STABLE sort, so at equal priority caller order
+        //    decides, and item 7 above — the 7 000 ms announcement — therefore
+        //    wins every frame it exists. When it has retired this one carries the
+        //    identical card (same builder, same id), which is why the pair can
+        //    never read as two different notifications and why dismissing one
+        //    dismisses both.
+        //
+        //    WHAT IT IS FOR, measured rather than argued:
+        //    `w10-4/frames/sc-lane-change__mobile-right/run.log`, 25 drive beats
+        //    of a 138 s run — legend 7, task 0, and 15 beats with the slot EMPTY
+        //    while the log printed «✗ NOT ON THE GLASS — objective-banner: Задача
+        //    1/2Установи се в дясната лента» at every one of them. The pc leg of
+        //    the same drive carried «ЗАДАЧА 2/2 · Премини в лявата лента след
+        //    огледало и мигач» in the corner for the whole run. A seventeen-year-
+        //    old was steering for two minutes with no statement on the glass of
+        //    what he was being graded on, on the platform this product is for.
+        taskStandbyOn ? taskOverlayRow(queue.rows) : null,
       ];
 
   // A6: a line the student sent away is no longer a candidate. Filtered HERE
@@ -6583,6 +6831,44 @@ export function LessonPlayShell({
                   {minimapOn ? "Скрий мини картата" : "Покажи мини картата"}
                 </span>
               </button>
+            )}
+            {/* ── THE ONE UNNAMED GLYPH ON THE DESKTOP STAGE ──────────────────
+                sc-pk-smooth-stop:ccc26b9f, filed on `pc-right/04-t039s.png`:
+                „an unlabelled circular glyph (a small white world/continents
+                mark) floats at the bottom-right of the play area in every pc
+                frame with no caption".
+
+                The reviewer read the button above, and he is right about the
+                half that matters. It had a `title` and an `sr-only` name — a
+                tooltip nobody hovers a HUD for, and a string only a screen
+                reader hears — while EVERY other control on this stage carries
+                its word in the open: ДВИГАТЕЛ · КОЛАН · СВЕТЛИНИ · МЪГЛА ·
+                ЧИСТАЧКИ · РЪЧНА · АВАР. across the cabin strip, Л/З/Д under the
+                mirror keys. A control whose only label is a pictograph is the
+                same defect as a verdict without its WHY, one layer out: the
+                student is told what to press and never what it does.
+
+                It carries the STATE as well as the noun, because the state was
+                colour-only (accent ring on, muted ring off) and a learner on a
+                dim laptop panel cannot read a ring. The word is the answer to
+                „did my tap do anything", which is the question an icon-only
+                toggle always leaves open.
+
+                Under the disc and not beside it: the lane this column may use is
+                ROOMY_MINIMAP_LANE_PX (= MINIMAP_TOGGLE_SIZE_PX + 8) and the
+                demonstration deck is inset by exactly that much, so a caption on
+                the flank would stand in the deck. Below costs the column ~13 px
+                of height, which is road. */}
+            {compact ? null : (
+              <span
+                aria-hidden
+                className="pointer-events-none flex flex-col items-end leading-none text-muted"
+              >
+                <span className="text-[9px] font-black uppercase tracking-wider">Карта</span>
+                <span className="text-[8px] font-semibold">
+                  {minimapOn ? "вкл." : "изкл."}
+                </span>
+              </span>
             )}
           </div>
         ) : null}

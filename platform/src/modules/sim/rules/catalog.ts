@@ -1358,6 +1358,130 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     ],
     conceptId: "c-cyclists",
   },
+  /*
+   * -------------------------------------------------------------------------
+   * TWO CODES THAT ARE STILL NEEDED AND ARE DELIBERATELY NOT HERE
+   * (added w8, backed out 2026-08-28 — the retrieval survives, the rows did not)
+   * -------------------------------------------------------------------------
+   *
+   * WHAT WAS REMOVED AND WHY. Wave 8 added `POLICE_STOP_SIGNAL_IGNORED` and
+   * `WARNING_LAMP_IGNORED` to `ViolationCode` (types.ts), two rows here and two
+   * rows in `YIELD_PRAISE_SITUATION_COPY` below — and shipped NO EMITTER. No
+   * runner produced either event, so on /simulator neither code could fire on
+   * any drive: the dead-predicate class in its purest form. It also left the
+   * tree red — `n38.ts` `N38_BASIS` is a TOTAL `Record<ViolationCode, N38Basis>`
+   * and lost exhaustiveness (TS2739), the world-referent gate found both
+   * accounted for by nothing, and the praise table's own „no row in the table is
+   * dead" guard named them out loud. All four rows reverted rather than patched
+   * around: an open row with a good address beats a fault code no student can
+   * ever meet.
+   *
+   * THE TWO LESSONS THAT STILL HAVE NO CODE FOR THEIR OWN SUBJECT.
+   *   sc-vp-police-stop  „Спиране по полицейски сигнал"  doc 72 VP-11
+   *   sc-vp-telltale     „Контролна лампа в движение"    doc 72 VP-06
+   *   (both in lessons/scenario/templates-cockpit.ts, from :571 and :748)
+   * Both were authored as COMPLETION DRILLS: the duty is graded ONLY as a
+   * curb-side low-speed reachZone objective, and the wrong way through is billed
+   * under the nearest available code — the police drill's own mistake demo
+   * carries `codeRefs: ["NOT_KEEPING_RIGHT"]` (templates-cockpit.ts:714), the
+   * author reaching for lane discipline because nothing else existed. So a
+   * student who drives past the officer, or drives on under a red lamp, and does
+   * not crash is not convicted of the thing his lesson is about.
+   *
+   * THE LAW — RETRIEVED, NOT RECALLED (ADR-002). Both articles were read out of
+   * `content/law/acts/zdvp.json`. Whoever lands the codes inherits the retrieval,
+   * but re-opens that file rather than trusting this comment if a word of the
+   * quoted text is load-bearing.
+   *
+   *   POLICE_STOP_SIGNAL_IGNORED → lawRef "ЗДвП чл. 103"
+   *     The DRIVER's duty in one sentence: „При подаден сигнал за спиране от
+   *     контролните органи водачът… е длъжен да спре плавно в най-дясната част
+   *     на платното за движение… и да изпълнява неговите указания" — which is
+   *     also, word for word, the procedure VP-11 teaches (плавно, най-вдясно,
+   *     изчакай указанията).
+   *     NOT чл. 170, ал. 3: that defines the SIGNAL and is the OFFICER's duty, so
+   *     it belongs in a provenance note and never in the `lawRef` slot.
+   *     realWorldRefs → "ЗДвП чл. 175, ал. 1, т. 4" — лишаване за три месеца и
+   *     глоба 200 лв. for a driver who „откаже да изпълни нареждане на органите
+   *     за контрол и регулиране на движението".
+   *
+   *   WARNING_LAMP_IGNORED → lawRef "ЗДвП чл. 101, ал. 1"
+   *     „При възникване по време на движение на повреда или неизправност в пътно
+   *     превозно средство, която застрашава безопасността на движението, водачът
+   *     е длъжен да спре и да вземе мерки за нейното отстраняване." The duty is
+   *     literally „спри" — exactly what the red lamp asks and what the drill
+   *     grades. ал. 2 („може да придвижи… до място за отстраняване") is the AMBER
+   *     case and ал. 3 withdraws even that „при… опасни неизправности", so the one
+   *     article carries the red/amber triage doc-65 ev-warning-light teaches.
+   *     realWorldRefs → "ЗДвП чл. 179, ал. 6" — 50 / 200 / 500 лв. by
+   *     незначителни / значителни / опасни неизправности.
+   *
+   *   НАРЕДБА № 38 GROUNDING FOR BOTH: б. „а" (основна, SEVERITY_POINTS.osnovna),
+   *   NOT б. „в". The 10-point list is a CLOSED enumeration of six cases and
+   *   neither act is in it — a контролен орган with a стоп-палка is not the
+   *   „регулировчик" of case 1, and a lit lamp is nobody's „предпоставка за ПТП"
+   *   until something else happens. Charging ten under case 5 would mean
+   *   `conflictEvidence: "geometric"`, which n38.ts forbids on a ten-point code.
+   *   Three points honestly grounded beat ten that are not.
+   *
+   *   WHAT WARNING_LAMP_IGNORED IS NOT: `ENGINE_STALLED` is the nearest shipped
+   *   code and a different act entirely — a stall is the engine dying under the
+   *   driver, this is the driver overruling the car, and it needs the car to KEEP
+   *   GOING. The two must never co-fire.
+   *
+   * THE COMPLETE LIST — SIX PARTS, ONE CHANGE, OR NONE OF IT. This is the whole
+   * reason the rows were backed out instead of left standing: the last attempt
+   * was planned as two changes and only the cheap half shipped.
+   *
+   *   1. EMITTER — `orchestrator/runners.ts`. `PoliceStopRunner` (:2655) and
+   *      `TelltaleStimulusRunner` (:3705) emit ZERO SimTick events today and say
+   *      so in their own headers. Each must resolve its drill BOTH ways in the
+   *      existing `prioritySituation` vocabulary: `{situation, violated: true}`
+   *      on the pass-by / drive-on, `{situation, violated: false, yielded: true}`
+   *      on the compliant pull-over. The `emergency` runner (:2579 praise, :2615
+   *      bill) is the precedent to copy exactly. Situation keys as authored:
+   *      "police-stop-signal" and "warning-lamp".
+   *   2. ENGINE ARM — `rules/engine.ts`. Add both keys to MANOEUVRE_SITUATIONS
+   *      (:4482) — neither act happens at a junction, so neither may be
+   *      place-latched — and both arms to the situation→code chain at :4494,
+   *      beside EMERGENCY_NOT_YIELDED and VULNERABLE_PASS_TOO_CLOSE.
+   *   3. THIS FILE — the two `VIOLATIONS` rows (severityClass "osnovna",
+   *      points SEVERITY_POINTS.osnovna, the lawRef / realWorldRefs above,
+   *      conceptId "c-police-interaction" and "c-technical-condition") AND the
+   *      two `YIELD_PRAISE_SITUATION_COPY` rows below. The compliant leg must be
+   *      praised in the same breath as the charge, or the drill can only convict
+   *      — THEO-4's failure mode with the sign reversed. Measured on
+   *      sc-sig-controller-live/mobile-right: all three route objectives ticked
+   *      and the sheet still read «COMMENDATIONS (0): (none credited)».
+   *   4. N38 BASIS — `rules/n38.ts` `N38_BASIS` (:176) is a total record over
+   *      `ViolationCode`, so a code with no basis row is a COMPILE ERROR. That is
+   *      what caught this attempt. Both rows carry clause „а".
+   *   5. WORLD REFERENT — `world/referents.ts`: either a `REFERENT_RULES` entry
+   *      (:1283 — a `stagedActorRule` on the officer actor is the natural one for
+   *      the police drill) or `NO_WORLD_REFERENT` (:86 — the telltale has no world
+   *      body at all, the lamp being a cockpit channel, so exemption is the honest
+   *      answer there). Plus the census pin in
+   *      `world/__tests__/world-referent.gate.test.ts` (:456-458 — checked 46,
+   *      exempt 13, total 59), which moves only with a written reason.
+   *   6. THE CATALOGUE CENSUSES — `__tests__/consequences.test.ts` („covers every
+   *      violation code"), `naredba-38-classification.test.ts`, `offences.test.ts`
+   *      and `catalog-consequences.test.ts` each enumerate VIOLATIONS, each
+   *      convicted this attempt, and each must be green before it is done.
+   *
+   * THE CLASSROOM HALF THAT WENT WITH THEM — the one thing genuinely lost.
+   * `lesson/compose.ts:61 rulesByConcept()` reads `conceptId` off THIS table to
+   * answer „while I am teaching c-…, which graded fault is this, what does it
+   * cost, and what was the right action?". `c-police-interaction` and
+   * `c-technical-condition` exist in content/concepts.json and
+   * content/sections.json with no catalogue row, so those two lesson beats teach
+   * with no rule opinion at all. It could NOT be kept on its own: `VIOLATIONS` is
+   * `Record<ViolationCode, ViolationSpec>`, so a row needs a real code, and every
+   * consumer keys off `VIOLATIONS` and nothing else (compose.ts:63,
+   * lesson/resolve.ts:152, lesson/interrupt.ts:152) — a parallel table would have
+   * been one more predicate nothing reads, which is the very defect being backed
+   * out here. Landing the six parts above closes the classroom gap as a side
+   * effect; nothing else does.
+   */
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

@@ -184,12 +184,25 @@ describe("StaticWorld binds the pass to the asphalt only", () => {
     expect(road?.length).toBe(6);
     // Terrain, paved courtyards and sidewalks are NOT asphalt and must not
     // pick up the detile — they would then tile at the road's scale.
-    expect(STATIC_WORLD_SRC).toContain("{...MACRO_VARIATION}");
+    //
+    // WAVE 8: the non-asphalt ground spread is now `GROUND_SNOW`, which is
+    // MACRO_VARIATION composed with the snow-cover hook (sc-ac-snow:cfb2d46d —
+    // „kerbs, pavements … are all bare", because snowCover.ts was attached to
+    // the five PROP materials and to nothing this file draws). It is still the
+    // macro hook: `GROUND_SNOW.onBeforeCompile` calls `MACRO_VARIATION`'s, so
+    // this test's claim — the ground keeps the ground hook and the asphalt does
+    // not — is unchanged, and it is checked on both names.
+    expect(STATIC_WORLD_SRC).toContain("{...GROUND_SNOW}");
+    expect(STATIC_WORLD_SRC).toContain("MACRO_VARIATION.onBeforeCompile(shader)");
     const asphaltBlock = STATIC_WORLD_SRC.slice(
       STATIC_WORLD_SRC.indexOf("{/* Road ribbons:"),
       STATIC_WORLD_SRC.indexOf("{/* Batched road decals"),
     );
     expect(asphaltBlock).not.toContain("{...MACRO_VARIATION}");
+    // …and the asphalt must not pick up the snow hook either: `weather.ts`'s
+    // SNOW_ROAD_BRIGHTEN already answers for the carriageway, and two responses
+    // on one surface is the double-application this spread exists to avoid.
+    expect(asphaltBlock).not.toContain("{...GROUND_SNOW}");
   });
 
   it("darkens the asphalt away from the concrete pavement", () => {

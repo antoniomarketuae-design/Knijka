@@ -351,6 +351,47 @@ function WiperIcon({ on, cls = ICON }: { on: boolean; cls?: string }) {
  * The `{nameBg} ≤{cap}` core is deliberately unchanged: `governor-cap.test.ts`
  * pins it as „the mark says WHOSE ceiling it is", and that argument still
  * holds — this pass adds the register around it rather than rewriting it.
+ *
+ * ── 2026-08-28 · THE BAR STATED CEILINGS AND NEVER STATED PRECEDENCE ────────
+ *
+ * Wave 8, five rows, one cause, and the cause as handed down was HALF RIGHT —
+ * which is worth writing down, because it was handed down as verified.
+ *
+ * WHAT WAS TRUE. The numeral is `governorCapKmh` and nothing else, and the
+ * two anchors resolve: `NORMAL_CAP_MARGIN_KMH = 10` (**`vehicle/difficulty.ts`**
+ * :214, applied :282) over the lesson's speed domain.
+ *
+ * WHAT WAS NOT, and both corrections change what a fix may claim:
+ *  · „ALWAYS domain + 10". It is `Math.max(domain + 10, NORMAL_CAP_FLOOR_KMH)`
+ *    — 50 on the eight districts whose domain is 20 or 30 — it is `domain − 10`
+ *    on Начинаещ, it is absent on Напреднал, and `REQUIRED_SPEED_HEADROOM_KMH`
+ *    can raise it again. No copy here may spell the arithmetic out.
+ *  · „carries no road fact". It carries one: the domain IS the fastest legal
+ *    edge of the loaded district. The defect is subtler and is what the copy
+ *    below had to answer — the fact it carries is about the WHOLE MAP, while
+ *    every other number on this bar is about the road under the wheels.
+ *  · „the only one wearing ≤". Stale by one wave: the task chip below has worn
+ *    a ≤ since sweep 161.
+ *
+ * SO THE REAL CAUSE, restated: the bar printed up to three ceilings in one
+ * register — same weight, same ≤, one flat line — and named the BILLING one
+ * nowhere. The resolution existed (`readSpeedContract`) and was spent only on
+ * `title`/`aria-label`, which is a surface a touch screen has no gesture to
+ * open. Computed, correct, and unreadable by the student it was written for.
+ *
+ * THREE CHANGES, all inside this component, none of which moves a number:
+ *  4. The mode numeral drops to `font-normal` when `reading.modeAboveLaw` — it
+ *     is then the one number on the bar that can neither convict nor acquit,
+ *     and it was the heaviest. At or under the sign it is the operative
+ *     ceiling and keeps the bar's weight.
+ *  5. «знакът важи» → «знакът важи, не режимът». The clause always meant „the
+ *     sign beats the MODE"; beside a roadworks briefing that had just taught
+ *     „temporary signage overrides permanent" it read as an endorsement of the
+ *     permanent disc. Naming the loser removes the reading, and turns a bare
+ *     verdict into an explained one (THEO-4).
+ *  6. When the task binds, the chip carries «— по-строгото важи» — the rule,
+ *     not just the number, and verbatim the words `lineBg` had been saying to
+ *     the accessibility tree alone.
  */
 // Exported for `governor-cap.test.ts` ONLY, and deliberately not re-exported
 // from `hud/index.ts`: the mark is an internal part of this bar, not a HUD
@@ -455,10 +496,31 @@ export function GovernorCapMark({
    */
   const taskBinds = reading.binding === "task" && reading.bindingKmh !== undefined;
   const bindingKmh = taskBinds ? Math.round(reading.bindingKmh as number) : null;
+  /**
+   * ── THE ACCESSIBLE NAME ASSERTED THE PRECEDENCE THE GLASS JUST FIXED ──────
+   * Wave 8, the other half of `sc-signal-response:a1989c9a`.
+   *
+   * Both sentences below ended by naming the DISC as the limit („знакът до
+   * скоростта е ограничението" / „важи знакът до скоростта"), which is true
+   * against the governor and false against a stricter drill. `lineBg` then
+   * appended the correction — so a screen-reader user heard the wrong ruler
+   * first and the right one two sentences later, and the two surfaces of this
+   * one element disagreed with each other. `lineBg` already states all three
+   * numbers AND the precedence, so when the task binds the tail is dropped
+   * rather than argued with.
+   *
+   * BYTE-IDENTICAL WHEN NO TASK BINDS — which is every mount without a task
+   * cap and every drill whose gate is slack (B58). Nothing that shipped before
+   * this pass changed its accessible name.
+   */
   const explainBg = `${
     easing
-      ? `Режимът „${nameBg}“ те ограничава на ${cap} км/ч — газта не отива по-нагоре, колата е наред. Смени режима горе вдясно. Това е таван на РЕЖИМА, не разрешение: важи знакът до скоростта.`
-      : `Режимът „${nameBg}“ пуска най-много ${cap} км/ч. Това е таван на РЕЖИМА, не на пътя — знакът до скоростта е ограничението.`
+      ? `Режимът „${nameBg}“ те ограничава на ${cap} км/ч — газта не отива по-нагоре, колата е наред. Смени режима горе вдясно. Това е таван на РЕЖИМА, не разрешение${
+          taskBinds ? "." : ": важи знакът до скоростта."
+        }`
+      : `Режимът „${nameBg}“ пуска най-много ${cap} км/ч. Това е таван на РЕЖИМА, не на пътя${
+          taskBinds ? "." : " — знакът до скоростта е ограничението."
+        }`
   }${reading.lineBg === "" ? "" : ` ${reading.lineBg}`}`;
   return (
     <span
@@ -482,12 +544,58 @@ export function GovernorCapMark({
       >
         Режим
       </span>
-      <span>
+      {/* ── THE MODE NUMERAL IS DEMOTED WHEN IT OUTRANKS NOTHING ────────────
+          Wave 8, rows `sc-sp-wet-limit-plate:dabfa37c` („the largest number on
+          the bar — and the one carrying the ≤ — is above the law") and
+          `sc-mw-discipline:d58e1b61` (disc 140, this numeral ≤150).
+
+          The numeral is `governorCapKmh` — the loaded MAP's fastest legal edge
+          plus `NORMAL_CAP_MARGIN_KMH` (vehicle/difficulty.ts:214, applied :282,
+          floored at NORMAL_CAP_FLOOR_KMH). It is therefore a fact about the car
+          and about the whole district, never about the road under the wheels,
+          and when it sits above the posted disc it is the one number on the bar
+          that can neither convict nor acquit. It was nevertheless drawn in the
+          bar's `font-bold`, i.e. in the same weight as the two numbers that DO
+          bill — so the hierarchy on the glass was the exact inverse of the
+          hierarchy in the grader.
+
+          WEIGHT AND NOT OPACITY, deliberately: at `text-[9px]` over bright
+          tarmac the `hud-ghost` shadow is tuned for this alpha, and fading the
+          glyphs would buy the hierarchy with legibility. Dropping to
+          `font-normal` beside a `font-black` В26 disc and a `font-bold` amber
+          task chip puts the eye where the billing is.
+
+          AND ONLY WHEN IT OUTRANKS NOTHING. At or under the sign the governor
+          IS the operative ceiling — that is the tier doing its job — so it
+          keeps the bar's weight. One predicate, `reading.modeAboveLaw`, the
+          same one the clause below renders from. */}
+      <span
+        data-hud="governor-mode-cap"
+        className={reading.modeAboveLaw ? "font-normal" : undefined}
+      >
         {nameBg} ≤{cap}
       </span>
       {overLimit ? (
+        /* ── „ЗНАКЪТ ВАЖИ" NAMED THE WINNER AND NEVER THE LOSER ─────────────
+           Wave 8, `sc-merge-roadworks-shift:9eab5ce5`. On that briefing frame
+           (`w10-1/frames/sc-merge-roadworks-shift__mobile-wrong/02-briefing`)
+           instruction 2 reads „Временната сигнализация отменя постоянната …
+           тук ограничението в участъка е 30, а не 50" — and six pixels under
+           it the bar said «50 · РЕЖИМ Нормален ≤60 · знакът важи». The clause
+           MEANS „the sign beats the mode"; a student who has just been told
+           that temporary signage overrides permanent reads it as „the 50 you
+           can see is the sign that applies", which is the one sentence that
+           frame must not say. (The world is right: `hz-roadworks-v1` publishes
+           maxspeed 30 on `hzr-e-works` and the disc follows the edge — the car
+           is simply still 216 m short of the taper.)
+
+           Naming the loser costs twelve characters and removes the reading:
+           the clause is now unambiguously about the REGISTER contrast this
+           mark exists for, and says nothing about which sign. It also closes
+           the row's other half — «знакът важи» was itself a bare verdict
+           (THEO-4), true and unexplained; „not the mode" is the explanation. */
         <span data-hud="governor-sign-wins" className="font-bold opacity-90">
-          · знакът важи
+          · знакът важи, не режимът
         </span>
       ) : null}
       {/* THE NUMBER THE STUDENT IS ACTUALLY BILLED AGAINST, when it is neither
@@ -504,6 +612,32 @@ export function GovernorCapMark({
           style={{ color: "var(--warning)", opacity: 1 }}
         >
           · задачата иска ≤{bindingKmh}
+          {/* ── THE PRECEDENCE, WHICH IS WHAT WAS ACTUALLY MISSING ──────────
+              Wave 8, `sc-signal-response:a1989c9a`, read off
+              `wave-c/frames/sc-signal-response__mobile-wrong/04-t012s.png`:
+              the strip said «РЕЖИМ Нормален ≤60 · знакът важи · задачата иска
+              ≤45» with the cluster at 59 км/ч. Three ceilings, and one word —
+              «знакът важи» — that appears to pick the 50. It does not:
+              `reading.binding` is `"task"` here and the billed number is 45.
+
+              `lessonSpeedContract.ts` routed this edit to this component by
+              name („What is missing is ONE render branch in `GovernorCapMark`:
+              when `reading.binding === "task"`, the «знакът важи» chip must not
+              stand alone"), and the sentence it wanted was already written —
+              `SpeedContractReading.lineBg` has said «…: по-строгото важи» since
+              sweep 161. It was on `title`/`aria-label` and nowhere else, i.e.
+              on the one surface a touch screen has no gesture for. This is the
+              same three words on the glass, so the label and the bar now say
+              one thing rather than two.
+
+              UNCONDITIONAL WHEN THE TASK BINDS, and that is sound rather than
+              lazy: the В26 disc above renders in both variants with no
+              conditional of its own, so whenever this chip is on screen the
+              number it is stricter THAN is on screen beside it. B58 keeps the
+              inverse case off the bar entirely — a task cap above the street is
+              slack, `readSpeedContract` never makes it `binding`, and nothing
+              here can print it. */}
+          {" — по-строгото важи"}
         </span>
       )}
     </span>

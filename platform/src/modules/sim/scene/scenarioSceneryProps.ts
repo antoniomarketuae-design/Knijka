@@ -40,11 +40,7 @@
  */
 
 import { parseScenarioLessonId, scenarioById } from "@/modules/sim/lessons";
-import type {
-  ScenarioObstacleSpec,
-  ScenarioPropObstacle,
-  ScenarioWallObstacle,
-} from "./obstacleSpec";
+import type { ScenarioObstacleSpec, ScenarioPropObstacle } from "./obstacleSpec";
 
 // ---------------------------------------------------------------------------
 // Source 1 — district-authored cones (meta.scenario.cones)
@@ -216,6 +212,95 @@ const NARROW_ROWS: readonly ScenarioObstacleSpec[] = (
   visual: true as const,
 }));
 
+/**
+ * THE „ПАРКИРАН РЕД" THAT WAS ONE VAN — sc-ln-obstacle-meeting, ov-narrow-v1
+ * (wave 8, critical). The frame the finding was read off:
+ * `.audit-frames/sweep161/sc-ln-obstacle-meeting/mobile-right/04-t074s.png` —
+ * a 5× crop of it shows ONE dark-navy box body with a red rear-lamp band
+ * (`kargo_v`, the fleet van) standing alone on the tarmac, with open lane on
+ * both sides of it, while instruction 1 says «Напред в ТВОЯТА лента е паркиран
+ * ред — половината ти платно е затворено».
+ *
+ * WHY ONE BODY AND NOT A ROW, exactly. templates-lanes2.ts stages the row as
+ * `LNOM_MEETING.props`: two held actors on the SAME path at `offsetM` 148 and
+ * 161, both at `extraRightOffsetM` 0 ⇒ x = 4.06, the lane centre. That is one
+ * file of two bodies, 13 m apart, at identical height, seen from COCKPIT_EYE
+ * 1.20 m — which is the geometry this file already worked out in full for
+ * sc-follow-standstill above: a same-height body directly behind another on
+ * one line can never poke above it from an eye BELOW the rooflines, at any
+ * distance. So the second van is not missing; it is exactly behind the first,
+ * and the drill's „ред" has always rendered as „кола".
+ *
+ * WHAT THIS ADDS, and it is the picture rather than a number: the kerb file the
+ * word „ред" names, at the |x| = 7.0 the SIBLING TENANT of this very map
+ * already uses (NARROW_ROWS above — same district, same convention, so the two
+ * drills dress ov-narrow-v1 the same way). Bodies span x ∈ [5.95, 8.05] against
+ * the driven carriageway edge at 8.125: flush with the edge line, and the two
+ * staged vans then read as double-parked OUTSIDE the row, which is what a
+ * closed half of a Sofia street actually looks like.
+ *
+ * HITTABLE, deliberately, and against the `visual: true` of the two parked rows
+ * above it. Those two are dressing whose collision consequence is authored in
+ * the RECORDER's ObstacleRect2D channel; there is no rect twin for a kerb row
+ * here, so `visual: true` would be a phantom — «a visual-only body would show
+ * him an obstacle the world lets him drive through», this file's own rule, and
+ * on this drill the whole taught act is that his half is not passable. The
+ * three committed traces are untouched either way: the recorder replays against
+ * ObstacleRect2D and never mounts scene bodies.
+ *
+ * WHAT IT DOES NOT DISTURB, measured against the committed drives themselves
+ * (content/traces/sc-ln-obstacle-meeting/*.trace.json, read sample by sample):
+ *   • the shadow — through y ∈ [134, 176] it runs x = 3.00 (y 134) → 1.43
+ *     (139) → −4.06 (147…165) → 0.11 (173) → 1.39 (175). Its widest RIGHT
+ *     flank anywhere in the row's y-span is 3.85 m (hero half-width 0.85 at
+ *     y = 134) against a body flank of 5.95: 2.10 m of clearance at the worst
+ *     sample, and ≥ 4.7 m over y ∈ [141, 171];
+ *   • the two mistake demos — pull-out sits at x = −4.06 for every sample in
+ *     the span, squeeze never reaches it (its last sample is y = 131.96);
+ *   • the three objective gates — wait (4.06, 130 r4), round (−4.06, 155 r4),
+ *     home (4.06, 205 r4). The row starts at y = 136 (rear face 133.95) and
+ *     ends at y = 171 (front face 173.05), so no gate circle is entered;
+ *   • the staged vans — x = 4.06 ± 0.99 = [3.07, 5.05] against [5.95, 8.05]:
+ *     0.90 m of daylight, so `held-vs-staged.test.ts` sees no re-seating;
+ *   • the curb decoration — rule 3 below opens a 4.69 m circle per body, which
+ *     culls the x = 10.125 band over the row's span. That is the rule doing its
+ *     job: an identical second row of strangers 3.1 m outboard is the exact
+ *     defect the sc-ov-narrow census entry names («the corridor rows at
+ *     |x| = 7.0 got a SECOND row of strangers at |x| = 10.13»).
+ *
+ * WHAT IS *NOT* FIXED HERE, and it is the rest of the finding's sentence.
+ * «Половината ти платно е затворено» is still not literally true of the tarmac:
+ * bodies now hold x ∈ [3.07, 8.05] of an 8.125 m lane, leaving a 3.07 m gap on
+ * the centre-line side that a 1.70 m hero fits through without touching the
+ * осева. That gap is PERCEPTUAL_ROAD_SCALE (contracts.ts:31 — a founder call),
+ * which draws a 3.25 m lane as 8.125 m while a fleet car stays 1.84 m wide: in
+ * Sofia one file of parked cars leaves 1.41 m and closes the lane; here it
+ * leaves 6.29 m. Closing it with bodies would need ~2.5 cars abreast — a street
+ * picture no student will ever meet — so it is left measured and routed, not
+ * faked. It is the same per-district lane scale templates-lanes2.ts:2016 and
+ * templates-parking2.ts:631 already name as the missing capability.
+ */
+const LNOM_PARKED_ROW: readonly ScenarioObstacleSpec[] = (
+  [
+    // Kerb file, parked facing the direction of travel, 7 m pitch (a 4.1 m car
+    // with 2.9 m of gap — the pitch a real kerbside row keeps). Brackets the
+    // two staged vans at y = 148 / 161 so they read as part of one obstruction.
+    [136, "vela_h3"],
+    [143, "corva_s"],
+    [150, "pino"],
+    [157, "dret_90"],
+    [164, "corva_sw"],
+    [171, "arden_x"],
+  ] as const
+).map(([y, model], i) => ({
+  kind: "vehicle" as const,
+  x: 7.0,
+  y,
+  headingDeg: 0,
+  model,
+  seed: 50 + i,
+}));
+
 const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   // traces/scHazardObstacle.ts hazardObstacleRects(): the stalled car
   // curb-side of the driving line the ease-around bends past.
@@ -360,6 +445,129 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
     // the direction of travel.
     { kind: "vehicle", x: 7.6, y: 158.3, headingDeg: 100, model: "arden_x", seed: 9, visual: true },
   ],
+  // ── THE БЕНЗИНОСТАНЦИЯ THAT WAS A BARE GREY APRON (wave 8) ──────────────
+  //
+  // «There is no petrol station. The briefing places the student at the exit of
+  // a бензиностанция facing a boulevard, with a pavement and a cycle lane in
+  // between; the world is a bare grey apron on an empty green plain with
+  // distant mountains — no pumps, no canopy, no shop, no forecourt.»
+  // (.audit-frames/sweep161/sc-merge-from-property/mobile-right/05-stopped.png
+  // — read at full size: apron, mountains, one ghost car, nothing else.)
+  //
+  // THIS IS THE SEAM THE ROW WAS ROUTED TO, twice: templates-merging.ts:1613
+  // («HELD_SCENERY["sc-merge-from-property"] in scene/scenarioSceneryProps.ts»)
+  // and the wave-7 reroute («a template cannot dress a district»). It has stood
+  // at „NOT-DONE (BLOCKED, costed) | Comment only" since; this is the body.
+  //
+  // WHY IT IS NOT DECORATION. The drill is ЗДвП чл. 25 — a driver leaving a
+  // PROPERTY gives way to everything already on the road. The reason a student
+  // must creep out and look twice is that he is coming off private ground, and
+  // a car standing on featureless tarmac has no reason to yield to anyone. The
+  // forecourt IS the premise of the rule.
+  //
+  // GEOMETRY, entirely from mg-property-v1's own numbers:
+  //   • the exit drive `mgp-e-drive` runs (0,0) → (68,0), one lane each way at
+  //     |y| = 4.06, so its drawn ribbon is |y| ≤ 8.125;
+  //   • the ego spawns at `mgp-spawn-forecourt` (62, 4.06) heading 270 (west);
+  //   • the shop `mgp-b-shop` already exists at x ∈ [38, 78], y ∈ [14, 34] —
+  //     so the canopy abuts a building that is already there instead of
+  //     inventing one, which is why the deck stops at y = 14.
+  // The canopy is 26 m along the drive (x ∈ [45, 71]) by 28 m across
+  // (y ∈ [−14, 14]) at 5.2 m clearance. Its four columns stand at
+  // (46.2, ±13.1) and (69.8, ±13.1): 4.98 m clear of the drive ribbon on the
+  // inside and 0.67 m clear of the shop frontage on the outside. The two pump
+  // islands sit at y = ±10.5 (spanning ±[9.7, 11.3]) over x ∈ [50, 66], with
+  // their pumps at x = 54.4 and 61.6 — the nearest of them 6.45 m off the
+  // spawn pose, i.e. in plain sight the moment the student looks right.
+  //
+  // NOTHING DRIVEN GOES NEAR IT, measured on all three committed drives
+  // (content/traces/sc-merge-from-property/*.trace.json): every sample with
+  // x > 40 is at y = 4.06 exactly, on all three. The nearest body edge is the
+  // island kerb at |y| = 9.7 — 4.79 m from a hero flank at 4.91.
+  //
+  // WHAT IS ROUTED AND NOT DONE. The Е7 „Бензиностанция" plate the reroute
+  // pairs with this entry is NOT emitted here and cannot be: `SignKind` carries
+  // "fuel" (world/types.ts) and nothing places it, because there is no district
+  // signal to derive it from — `DistrictBuilding.kind` admits only "school" and
+  // "busStop", so `mgp-b-shop` cannot say what it is. The honest fix is one
+  // `kind: "fuel"` on that building in BOTH copies of mg-property-v1.json plus
+  // an emitter in world/builders/props.ts, and `content/world/` is outside this
+  // lane's ownership, so the pair is reported rather than half-shipped. The
+  // briefing's тротоар and велоалея are likewise a district-geometry ask, not a
+  // dressing one.
+  "sc-merge-from-property": [
+    {
+      kind: "fuelStation",
+      x: 58,
+      y: 0,
+      headingDeg: 90, // length runs along the drive (district +x)
+      lengthM: 26,
+      widthM: 28,
+      clearanceM: 5.2,
+      islandOffsetsM: [-10.5, 10.5],
+      islandHalfLengthM: 8,
+    },
+  ],
+  // ── THE „РЕМОНТЕН УЧАСТЪК" THAT WAS A LINE OF LOOSE CONES (wave 8) ───────
+  //
+  // «The briefing promises people working between the cones — which is the
+  // entire reason it tells you to switch on dipped beams — and no worker, works
+  // vehicle, barrier, beacon or advance warning board exists. The "roadworks"
+  // is a bare line of loose cones on open tarmac.»
+  // (.audit-frames/sweep161/sc-merge-roadworks-shift/mobile-wrong/07-end.png —
+  // read at full size: ten cones, clean tarmac, nothing else in the closure.)
+  //
+  // The sentence the world was failing is not decoration. Instruction 1 —
+  // «в ремонтен участък между конусите работят хора и те те виждат само
+  // осветен» — and instruction 6 — «между конусите се работи» — are the whole
+  // reason this drill arms HEADLIGHTS_OFF_AT_NIGHT (чл. 70) on its L5 rung. A
+  // student who switched the lights on for nobody learned a checklist item; a
+  // student who saw three people in vests inside the closure learned why.
+  //
+  // WHAT IS BODIED HERE, and it is the two the scene can carry honestly: the
+  // WORKERS (the new `worker` kind — see obstacleSpec.ts for why it can render
+  // and must not grade) and a WORKS VEHICLE inside the closure. Both are
+  // district-pinned, not eyeballed: hz-roadworks-v1's own meta.scenario says
+  // `laneClosedX` 4.06, `laneOpenX` −4.06, `worksFromY` 240, `worksToY` 276 and
+  // a cone line at `coneLineX` 0.6, so the closed side of the works section is
+  // exactly x ∈ [0.9, 8.125] (cone half 0.3) over y ∈ [240, 276]. Everything
+  // below stands inside it.
+  //
+  // CLEARANCES, measured against the three committed drives sample by sample
+  // (content/traces/sc-merge-roadworks-shift/*.trace.json):
+  //   • shadow-correct and mistake-no-indicator are on x = −4.06 for every
+  //     sample past y = 233, so nothing here is within 7 m of either;
+  //   • mistake-squeeze-cones is the one that goes through the closure — it
+  //     threads the cone line and holds x = −0.25 from y = 247 to y = 279, i.e.
+  //     a right flank of 0.60 m (hero half-width 0.85). The nearest body here
+  //     is the y = 250 worker at x = 2.6, whose own left edge is 2.35: 1.75 m
+  //     of daylight, so the ghost never drives through a body it cannot hit.
+  //     The works truck's left flank is 3.40 — 2.80 m clear of the same ghost.
+  //
+  // WHAT IS NOT DONE, and why it is not faked. The finding also names a
+  // BARRIER, a BEACON and an ADVANCE WARNING BOARD. The barrier is the only one
+  // the kit could draw (a `wall` renders as a flat grey box) and it is left out
+  // deliberately: the honest place for it is ACROSS the closed lane at the
+  // taper head (y ≈ 241), and mistake-squeeze-cones is at x = 1.22 there with a
+  // right flank of 2.07 — the transverse panel and the committed ghost share
+  // ground, so drawing it would put a solid face through a replayed drive. The
+  // beacon needs an animated emissive the obstacle layer has no frame loop for.
+  // The board is an А23 „Пътни работи" face, and the sign kit has none
+  // (`world/types.ts` SIGN_KINDS): this module's own law is that a builder
+  // places NOTHING rather than guess a face, so it is art-blocked, not coded.
+  "sc-merge-roadworks-shift": [
+    // The works vehicle: the procedural box truck (7.5 × 2.4), nose north,
+    // mid-closure. HITTABLE like every other real vehicle body — a student who
+    // is beside it has already driven past the cone colliders.
+    { kind: "vehicle", x: 4.6, y: 262, headingDeg: 0, model: "box_truck", seed: 61 },
+    // Three workers, spread over the closure so the section reads as worked-on
+    // rather than as one figure standing still. Poses are turned away from the
+    // carriageway (the crew faces its own work), which is also the pose that
+    // puts the reflective band where the headlights are.
+    { kind: "worker", x: 2.6, y: 250, headingDeg: 200, visual: true },
+    { kind: "worker", x: 5.2, y: 256, headingDeg: 250, visual: true },
+    { kind: "worker", x: 3.4, y: 268, headingDeg: 160, visual: true },
+  ],
   // traces/scEdPoligonChain.ts poligonChainConeObstacles(): the bay-mouth
   // cones („Подмини гнездото между конусите") — HITTABLE, the twin contract.
   "sc-ed-poligon-chain": [
@@ -370,6 +578,10 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   // sc-follow-standstill has NO entry on purpose — see the block above the
   // NARROW_ROWS comment: its column is staged actors with rooflines now.
   "sc-ov-narrow": NARROW_ROWS,
+  // The kerb file the briefing's „паркиран ред" names — see the block above
+  // LNOM_PARKED_ROW for the geometry, the clearances and the half that is
+  // measured-and-routed rather than faked.
+  "sc-ln-obstacle-meeting": LNOM_PARKED_ROW,
   // traces/scReels.ts accidentMistake(): the parked car the „собствено ПТП"
   // demo hits then flees. The demo authors the COLLISION as a recorder beat
   // (withWhat "staticObject") but hz-obstacle-v1 shows no body there — the clip
@@ -545,6 +757,10 @@ const HELD_CAR_HALF_DIAG_M = Math.hypot(2.05, 0.92);
 const HELD_VAN_HALF_DIAG_M = Math.hypot(2.67, 0.99);
 const HELD_TRUCK_HALF_DIAG_M = Math.hypot(3.75, 1.2);
 const HELD_ANIMAL_HALF_DIAG_M = Math.hypot(1.1, 0.28);
+/** A worker on foot — the rig's widest slice is shoulder-to-shoulder across the
+ *  arms (0.46 m) by chest depth (0.30 m), so half-extents 0.23 × 0.15
+ *  (components/sim/ScenarioObstacles.tsx ObstacleWorker's body plan). */
+const HELD_WORKER_HALF_DIAG_M = Math.hypot(0.23, 0.15);
 /** A cone/pole is a slim marker (0.25 m half-extents); its own reach is nearly
  *  negligible beside the 2.44 m the parked body brings, but it is not zero. */
 const HELD_PROP_HALF_DIAG_M = Math.hypot(0.25, 0.25);
@@ -558,6 +774,12 @@ function heldHalfDiagM(o: ScenarioObstacleSpec): number {
       return HELD_PROP_HALF_DIAG_M;
     case "animal":
       return HELD_ANIMAL_HALF_DIAG_M;
+    case "worker":
+      return HELD_WORKER_HALF_DIAG_M;
+    // A forecourt's own canopy footprint — the piece a decoration body could
+    // stand inside, and the widest thing the station occupies on the ground.
+    case "fuelStation":
+      return Math.hypot(o.lengthM / 2, o.widthM / 2);
     default:
       return o.model === "box_truck"
         ? HELD_TRUCK_HALF_DIAG_M
@@ -676,58 +898,31 @@ function authoredStopSpansOf(
 // because its pocket sits inside an authored `noStopping` zone), and the test
 // asserts `computeParkedCars` is body-for-body identical before and after.
 
-/** A навес's back panel, m — a Bulgarian shelter is ~4.5 m of kerb and stands
- *  about 2.5 m to its roofline. Both are load-bearing and both are mutated in
- *  the unit test against a bound with a reason: shorter than ONE CIVILIAN CAR
- *  (4.1 m, the fleet „car" profile) it reads as a post rather than a structure,
- *  and lower than a PARKED ROOFLINE (1.45 m, ScenarioObstacles rigTopY's
- *  default) it vanishes the moment one car parks in front of it — which is the
- *  defect it exists to end. */
-const SHELTER_LENGTH_M = 4.5;
-const SHELTER_HEIGHT_M = 2.5;
-const SHELTER_THICKNESS_M = 0.2;
-/** How far BEHIND the curb-decoration band centre the panel stands, m — enough
- *  that a parked car never renders inside the shelter (worst-case parked
- *  half-width 0.95 + the panel's own 0.1), and little enough that it is still
- *  kerb furniture and not part of the building line. */
-const SHELTER_SETBACK_M = 1.5;
-
 /**
- * The bus-stop shelters one district earns from its own authored stop spans.
- * [] for the 90 districts that author none, and [] for a district that already
- * carries a `kind: "busStop"` frontage (props.ts builds the modelled shelter
- * there — two navesa in one place is the defect, not the fix).
+ * THE НАВЕС MOVED TO THE MODULE THAT OWNS THE MODEL — wave 8.
  *
- * Straight-street only: the panel runs along the street at headingDeg 0, which
- * is true exactly while the carriageway is the generator's north-south line.
- * A curved map would need a heading this function cannot derive, so it does not
- * pretend to — it returns [].
+ * This file used to derive the shelter itself, as a `kind: "wall"` obstacle
+ * 4.5 × 2.5 × 0.2 m. The predicate was live (`heldSceneryFor` → lessonWorldRecipe
+ * → LessonScene) and the pixels were still not a спирка: every wall renders
+ * through ONE branch, `components/sim/ScenarioObstacles.tsx` ObstacleWall, a
+ * single flat boxGeometry in #8d8a83 — so pk-busstop-v1's student was shown a
+ * grey fence panel edge-on against a grey pavement in front of a grey building,
+ * and sc-pk-busstop-ban stayed open through three waves with the code that
+ * placed it passing its own tests.
+ *
+ * `world/builders/props.ts` reads the SAME authored keys now and pushes a
+ * `world.busStops` transform instead, which `WorldProps.tsx` draws as the real
+ * modelled shelter — canopy, legs, and a separate emissive face that lights at
+ * night — the same object the frontage and junction passes have always placed.
+ * One навес, one recipe, one look, and it stands AT the kerb rather than at a
+ * decoration-band centre that sits a whole parking band further out on one edge
+ * class than the other (the placement error the old derivation documented at
+ * length here and could not fix from this side).
+ *
+ * WHAT STAYS HERE is rule 2b below: the kerb the stop needs empty. That is a
+ * property of the curb-decoration pass, which this file is the seam for, and
+ * it is what keeps the new shelter from standing behind a parked car.
  */
-export function busStopSheltersOf(districtRaw: unknown): ScenarioWallObstacle[] {
-  if (typeof districtRaw !== "object" || districtRaw === null) return [];
-  const doc = districtRaw as { meta?: { scenario?: unknown }; buildings?: unknown };
-  if (Array.isArray(doc.buildings)) {
-    for (const b of doc.buildings as Array<{ kind?: unknown }>) {
-      if (b && typeof b === "object" && b.kind === "busStop") return [];
-    }
-  }
-  const scenario = doc.meta?.scenario;
-  if (typeof scenario !== "object" || scenario === null) return [];
-  const s = scenario as Record<string, unknown>;
-  if (s.archetype !== "straight-street") return [];
-  const kerbX = parkedKerbXOf(s);
-  if (kerbX === null) return [];
-  return authoredStopSpansOf(s).map((span) => ({
-    kind: "wall" as const,
-    x: kerbX + Math.sign(kerbX) * SHELTER_SETBACK_M,
-    y: (span.fromY + span.toY) / 2,
-    headingDeg: 0,
-    lengthM: SHELTER_LENGTH_M,
-    heightM: SHELTER_HEIGHT_M,
-    thicknessM: SHELTER_THICKNESS_M,
-  }));
-}
-
 /** Circles covering the kerb line x = kerbX from fromY to toY, each wide
  *  enough that a decoration body CENTRED on that kerb inside the span is
  *  caught (the curb pass tests centres, not footprints). */
@@ -928,5 +1123,5 @@ export function heldSceneryFor(
 ): ScenarioObstacleSpec[] {
   const parsed = parseScenarioLessonId(lessonId);
   const dressing = (parsed && HELD_SCENERY[parsed.templateId]) || [];
-  return [...dressing, ...scenarioConesOf(districtRaw), ...busStopSheltersOf(districtRaw)];
+  return [...dressing, ...scenarioConesOf(districtRaw)];
 }

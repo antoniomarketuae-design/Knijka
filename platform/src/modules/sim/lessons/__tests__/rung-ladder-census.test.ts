@@ -29,6 +29,11 @@
  * reasons are written out per family in `lessons/difficulty.ts`. Pinning them
  * is what stops the honest statement „the ladder cannot fill these" from
  * quietly becoming „the ladder used to fill these".
+ *
+ * RE-MEASURED 2026-08-28 (wave 8): the L1 → L2 row is now 0 / 0 / 167 / 0. The
+ * ONE world step that row ever had was `sc-junction-scan`'s, and the raise is
+ * argued at the assertion itself — see „THE RATCHET WAS RAISED" below, which is
+ * the only place in this file a pinned number has ever gone up.
  */
 
 import { describe, expect, it } from "vitest";
@@ -211,7 +216,50 @@ describe("the census, held", () => {
     // scaffolding coming off, and every mechanism that could ADD there needs a
     // map the compiler cannot see. `toBeLessThanOrEqual` is the ratchet — a
     // future lane that gives L2 something real makes this number fall.
-    expect(c.get("L1->L2")!.number + c.get("L1->L2")!.none).toBeLessThanOrEqual(166);
+    //
+    // ── THE RATCHET WAS RAISED, 166 → 167, 2026-08-28 (integrator, wave 8) ──
+    //
+    // WHO AND WHAT. The lane that repaired `sc-junction-scan`
+    // (templates-junctions.ts, rows sc-junction-scan:e6834882 / :28e782ab and
+    // the ambient row named below) deleted that template's authored
+    // `traffic: { vehicleCount: 4 }`, handing the drill to the junction family
+    // baseline. That is the whole of the change, and it is the ONLY template
+    // this row ever counted as a world step: the census now reads
+    // `{ number: 167 }` with an EMPTY not-number list, so 167 is every
+    // template that authors both rungs, and no other row moved.
+    //
+    // WHY IT IS NOT A REGRESSION — the step that was lost was not perceptible,
+    // by this file's own standard. Compiled through DEFAULT_LEVEL_TRAFFIC_SCALE
+    // (0.5 / 0.75 / 1 / 1 / 1.5), the authored 4 laddered to 2 / 3 / 4 / 4 / 6,
+    // so the L1 → L2 "world" step this ratchet was counting as content was
+    // `traffic 2->3` — a rise of ONE car. `MIN_PERCEPTIBLE_VEHICLE_RISE` is 2,
+    // and the describe block below asserts that `traffic 5->6` IS
+    // sub-perceptible. The census was crediting at L1 → L2 exactly the step it
+    // refuses to credit at L4 → L5. 166 was never 166 real rungs.
+    //
+    // WHY THE CHANGE WAS WORTH ITS COST — the L1 the step was bought with was
+    // BELOW the family floor. `rungTraffic` (scenario/compile.ts) never clamps
+    // an AUTHORED count, so the key opted this drill out of
+    // SCENARIO_FAMILY_TRAFFIC_FLOOR — "the count below which the drill's own
+    // SUBJECT disappears" — on a lesson whose subject IS the car you did not
+    // see. `traffic/__tests__/ambient-presence.test.ts` names this template in
+    // its scope note as a real open row measuring cross 13 % / 1 pass per
+    // minute at L1, below its own MIN_PASSAGES_PER_MIN of 2, and excluded only
+    // because it hand-authored a count. It no longer does: that suite now
+    // COLLECTS `sc-junction-scan@L1 (tj-stop-v1): the crossing arm is not dead`
+    // and it passes (verified 2026-08-28, 24 passed). Compiled traffic is now
+    // 4 / 4 / 5 / 5 / 6 — byte-identical to `sc-junction-stop`, its sibling on
+    // the same district and the same spawn.
+    //
+    // WHAT IT COST, NOT HIDDEN: L4 → L5 for this template went 4→6 to 5→6, so
+    // it joins `L5_PLUS_ONE_CAR_ONLY` beside the sibling that was already on
+    // that list for the same reason. That list is the named residual and the
+    // describe block below is what stops it growing quietly.
+    //
+    // THIS RAISE IS NOT A PRECEDENT. It is allowed because the step that
+    // disappeared was measurably imperceptible and the rung underneath it was
+    // measurably dead. A raise without both halves shown is a loosened gate.
+    expect(c.get("L1->L2")!.number + c.get("L1->L2")!.none).toBeLessThanOrEqual(167);
     expect(c.get("L2->L3")!.number + c.get("L2->L3")!.none).toBeLessThanOrEqual(145);
     // Nothing is missing at the bottom of the ladder: every template authors
     // L1, L2 and L3, so a low rung can never be „absent" instead of thin.

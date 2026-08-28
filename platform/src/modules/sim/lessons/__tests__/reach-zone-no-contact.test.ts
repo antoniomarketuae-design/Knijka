@@ -157,11 +157,11 @@ describe("the contact term is written where it is meant, never guessed", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2 · The census — exactly one gate in the whole catalogue carries it
+// 2 · The census — exactly five gates in the whole catalogue carry it
 // ---------------------------------------------------------------------------
 
 describe("the catalogue census", () => {
-  it("binds sc-obs-cleared and nothing else", () => {
+  it("binds the five authored rows and nothing else", () => {
     const bound: string[] = [];
     for (const spec of SCENARIO_TEMPLATES) {
       for (const o of spec.success) {
@@ -177,9 +177,73 @@ describe("the catalogue census", () => {
       }
     }
     // An empty list means the template lost the key and the title is promising
-    // again; a second entry means a later lane authored one without reading
-    // this file. Both are worth failing the build for.
-    expect(bound).toEqual(["sc-hazard-obstacle/sc-obs-cleared"]);
+    // again; a SIXTH entry means a later lane authored one without reading this
+    // file. Both are worth failing the build for.
+    //
+    // ── RE-BASELINED 1 → 5, wave 8, 2026-08-28 (templates-parking3 lane) ──
+    //
+    // WHY THE NEW VALUE IS RIGHT, in one sentence: «Задача 1: спри в изходната
+    // позиция …» certifies that the car came to REST IN A STARTING POSITION,
+    // and a car that reached that mark by driving through the parked row is not
+    // in a starting position but inside another vehicle — so these four gates
+    // now refuse the exact drive `.audit-frames/w10-4/frames/
+    // sc-park-wall__mobile-right/08-debrief-p5.png` photographed, where the ✓
+    // printed one card above «Удар в неподвижно препятствие · ОПАСНА ГРЕШКА ·
+    // −10 изпитни т.».
+    //
+    // The five mechanical claims the raise rests on, each checked against the
+    // tree rather than taken from the lane's own note:
+    //   1. LIVE, not a dead predicate. `params.ts serializeObjectiveParams:49`
+    //      whitelists the key, `engine.ts:1130` computes `struckABodyInRun`,
+    //      `:1572` folds it and `stepReachZone` consults it. Pinned below by
+    //      THE COMPILE BOUNDARY, which now walks all five rows, not one.
+    //   2. IT CANNOT COST A PASS. `isBodyContact` is `code === "COLLISION"`
+    //      only, and COLLISION is `severityClass: "opasna"` / −10
+    //      (`rules/catalog.ts:619`) — «директно неиздържан». Every drive this
+    //      demand can refuse had already failed the sheet before the objective
+    //      was consulted, so the refusal removes a contradiction between the
+    //      two halves of one sheet and can never take a pass away. This is the
+    //      same safety property `reach-zone-yield-clean.test.ts` §2 demands of
+    //      its own codes, and it is why the raise is safe at all.
+    //   3. NO CERTIFICATE IS WITHDRAWN. `engine.ts:1197–1259` steps only
+    //      `objectives[currentIndex]` and `currentIndex` only ever increments,
+    //      so a contact during Задача 2's reverse — which is where these drills
+    //      EXPECT a student to be near bodies — cannot retract a Задача 1 that
+    //      was clean when it was performed.
+    //   4. NO DRIVE IS STRANDED. All four are objective 1 of 2, so `!onTerminal`
+    //      at `engine.ts:1599` arms the finish gate unconditionally and the
+    //      student reaches the debrief that explains the ПТП instead of having
+    //      to quit and forfeit the attempt.
+    //   5. THE TITLES DID NOT MOVE. All four read the same at HEAD b211041 as
+    //      here; the earlier wave that stripped their lateral claim
+    //      («спри рано, в средата на алеята» → the halt only) is already
+    //      shipped. This wave added the key and nothing else — `params.x/y/
+    //      radiusM/maxSpeedKmh` are the values `parking3-claim-gates` §2 pins.
+    //
+    // WHAT THIS RAISE DOES **NOT** CLOSE, written down so no later round reads
+    // it as more than it is. These four titles do NOT name contact the way the
+    // founding member does («Задмини обекта, БЕЗ ДА ГО ЗАКАЧИШ»); the key is a
+    // PROXY here, and it only catches the crash-shaped subset of wrong-position
+    // halts. The geometry hole the lane documented is still open: the mark is
+    // (0.9, y) while the district's own spawn lane centre is x = 4.0625, and the
+    // compiled radius is 5 m (7.5 m at L1/L2), so the acceptance disc is WIDER
+    // THAN THE ROAD and a car that halts in the through lane having touched
+    // nothing still ticks. The honest fix is a radius, not a contact term, and
+    // the catalogue already contains the worked example — `templates-parking.ts
+    // sc-ppf-setup` earns the lateral claim on this same mark with
+    // `radiusM: 3.0`, because |4.0625 − 0.9| = 3.16 > 3.0 excludes the
+    // right-hand lane, and `lane15-parking-depth` asserts that exclusion every
+    // build. Reported to the integrator; the row stays open.
+    expect(bound).toEqual([
+      // The founding member — the only one whose banner names the contact.
+      "sc-hazard-obstacle/sc-obs-cleared",
+      // The four reverse-parking setup halts (wave 8). Ordered as the
+      // catalogue compiles them, which is what `toEqual` compares.
+      "sc-park-van/sc-pvn-setup",
+      "sc-park-45-rev/sc-p45r-setup",
+      "sc-park-wall/sc-pwl-setup",
+      "sc-park-double/sc-pdb-setup",
+    ]);
   });
 
   it("the authored gate really does carry the demand after parsing", () => {
@@ -205,15 +269,29 @@ describe("the catalogue census", () => {
    * `serializeObjectiveParams`. Red on every rung.
    */
   it("THE COMPILE BOUNDARY: the key survives the ladder at every rung", () => {
+    // WALKS ALL FIVE ROWS since the 2026-08-28 re-baseline above, not just the
+    // founding one. The whole point of the whitelist trap is that it is
+    // per-KEY, not per-row — but a raise that only ever compiled the row it
+    // inherited would be exactly the „shipped a measurement, wired it to no
+    // consumer" class this programme has measured 51 times, so the four new
+    // members are driven through `compileScenario` too.
+    const CENSUS: ReadonlyArray<readonly [string, string]> = [
+      ["sc-hazard-obstacle", "sc-obs-cleared"],
+      ["sc-park-van", "sc-pvn-setup"],
+      ["sc-park-45-rev", "sc-p45r-setup"],
+      ["sc-park-wall", "sc-pwl-setup"],
+      ["sc-park-double", "sc-pdb-setup"],
+    ];
+    for (const [specId, objectiveId] of CENSUS)
     for (const level of [1, 2, 3, 4, 5] as const) {
-      const compiled = compileScenario(SCENARIO_TEMPLATES.find((s) => s.id === "sc-hazard-obstacle")!, level);
-      const cleared = compiled.objectives.find((o) => o.id === "sc-obs-cleared");
-      expect(cleared, `L${level} lost sc-obs-cleared`).toBeDefined();
-      expect(cleared!.params.requireNoContact, `L${level} dropped the demand`).toBe(true);
+      const compiled = compileScenario(SCENARIO_TEMPLATES.find((s) => s.id === specId)!, level);
+      const cleared = compiled.objectives.find((o) => o.id === objectiveId);
+      expect(cleared, `L${level} lost ${objectiveId}`).toBeDefined();
+      expect(cleared!.params.requireNoContact, `L${level} dropped the demand on ${objectiveId}`).toBe(true);
       // …and the parse the session actually runs still sees it.
       expect(
         (parseObjectiveParams(cleared!) as WitnessedReachZoneParams).requireNoContact,
-        `L${level}`,
+        `L${level} ${objectiveId}`,
       ).toBe(true);
     }
   });

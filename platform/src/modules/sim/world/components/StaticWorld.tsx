@@ -35,6 +35,7 @@ import {
 import { makeDecalAtlasTexture } from "../textures/decalAtlas";
 import { useFacadeTextures, type FacadeSetName } from "../textures/facadeTextures";
 import { macroOnBeforeCompile, macroProgramCacheKey } from "../textures/macroVariation";
+import { snowCoverOnBeforeCompile, snowCoverProgramCacheKey } from "../textures/snowCover";
 import {
   markingWearOnBeforeCompile,
   markingWearProgramCacheKey,
@@ -85,6 +86,69 @@ const FACADE_NIGHT_GLOW = 3.2;
 const MACRO_VARIATION = {
   onBeforeCompile: macroOnBeforeCompile,
   customProgramCacheKey: macroProgramCacheKey,
+} as const;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SNOW LIES ON THE GROUND TOO — wave 8, sc-ac-snow:cfb2d46d (critical).
+ *
+ * «No snow has accumulated on any off-carriageway surface in shot — kerbs,
+ * pavements, guard rail and building faces are all bare … the left kerb,
+ * pavement slab and the whole run of metal guard railing along the near side
+ * are bare grey.» (.audit-frames/w10-4/frames/sc-ac-snow__pc-right/04-t102s.png.)
+ *
+ * `textures/snowCover.ts` was written for exactly this row and IS wired at HEAD
+ * — `DistrictWorld.tsx` drives the uniform, `WorldProps.makeSharedMaterials()`
+ * attaches the hook. But it attaches it to FIVE materials, all of them PROP
+ * materials (signBody, signalHousing, streetSteel, tree, furniture). Of the
+ * four surfaces the finding names, only the guard rail (streetSteel) was ever
+ * in scope: the KERBS and the PAVEMENT are this file's `geometries.sidewalks`,
+ * and the verge is `geometries.terrain`. The predicate was live, the pixels the
+ * judge photographed were not hooked to it — the dead-consumer shape, on a
+ * shader.
+ *
+ * THE SET IS EXACTLY MACRO_VARIATION'S, and that is not a coincidence: this
+ * spread is already „every GROUND material EXCEPT the asphalt and the paint".
+ *   · the ROAD keeps `ROAD_SURFACE` and its own snow response — `weather.ts`'s
+ *     `roadSurfaceToParams` brightens the carriageway by SNOW_ROAD_BRIGHTEN,
+ *     which is the physically right answer for a flat, trodden, ploughed
+ *     surface and would be double-applied if the hook went here too;
+ *   · the MARKINGS keep `PAINT_WEAR`. Burying the paint under snow is the one
+ *     thing this must not do: the same discipline snowCover.ts states for sign
+ *     faces and signal lenses — „a picture that buries the thing the student is
+ *     graded on fails them for a skill it just took away".
+ *
+ * CHAINING IS SAFE, and it is checked rather than assumed: the two hooks share
+ * only the `#include <common>` anchor, and `String.replace` with a string
+ * substitutes the FIRST occurrence and leaves the include itself in place, so
+ * the second hook still finds it. Their real anchors are disjoint —
+ * macro takes `<worldpos_vertex>` + `<map_fragment>`, snow takes
+ * `<defaultnormal_vertex>` + `<color_fragment>` + `<roughnessmap_fragment>` +
+ * `<metalnessmap_fragment>`. `snowCover.test.ts` fails if a three upgrade
+ * renames any of them.
+ *
+ * FREE OUTSIDE A SNOW LESSON, unchanged: `uSnowCover` is 0 unless the weather
+ * store's snow channel is up, and GLSL `mix(x, y, 0.0)` is bit-identical to x.
+ * The corpus authors `weather: "snow"` exactly once.
+ *
+ * NOT DONE, and named rather than guessed: BUILDING FACES. The finding lists
+ * them, but its own adjudication narrows to «the surfaces actually
+ * photographed», and a vertical wall is CORRECTLY bare — snow does not lie on
+ * it, which is precisely what `SNOW_COVER_FACING_LO` encodes. What would
+ * change is roofs, and the same adjudication says «I did not see rooftops in
+ * either shot». The facade materials carry their own atlas hooks and a third
+ * chained program there is a change that has to be photographed, not argued.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const GROUND_SNOW = {
+  // Composed from MACRO_VARIATION rather than from its parts, so the ground
+  // hook has exactly one definition and the two spreads cannot drift.
+  onBeforeCompile: (shader: THREE.WebGLProgramParametersWithUniforms) => {
+    MACRO_VARIATION.onBeforeCompile(shader);
+    snowCoverOnBeforeCompile(shader);
+  },
+  customProgramCacheKey: () =>
+    `${MACRO_VARIATION.customProgramCacheKey()}|${snowCoverProgramCacheKey()}`,
 } as const;
 
 /**
@@ -374,7 +438,7 @@ export function StaticWorld({
       <mesh geometry={geometries.terrain} receiveShadow={receive}>
         {grass ? (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...GROUND_SNOW}
             map={grass.map}
             normalMap={grass.normalMap ?? undefined}
             roughnessMap={grass.roughnessMap ?? undefined}
@@ -384,7 +448,7 @@ export function StaticWorld({
           />
         ) : (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...GROUND_SNOW}
             map={textures.grass}
             roughness={1}
             metalness={0}
@@ -396,7 +460,7 @@ export function StaticWorld({
       <mesh geometry={geometries.terrainPaved} receiveShadow={receive}>
         {concrete ? (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...GROUND_SNOW}
             map={concrete.map}
             normalMap={concrete.normalMap ?? undefined}
             roughnessMap={concrete.roughnessMap ?? undefined}
@@ -405,7 +469,7 @@ export function StaticWorld({
           />
         ) : (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...GROUND_SNOW}
             map={textures.sidewalk}
             roughness={0.92}
             metalness={0}
@@ -428,7 +492,7 @@ export function StaticWorld({
         >
           {grass ? (
             <meshStandardMaterial
-              {...MACRO_VARIATION}
+              {...GROUND_SNOW}
               map={grass.map}
               normalMap={grass.normalMap ?? undefined}
               roughnessMap={grass.roughnessMap ?? undefined}
@@ -438,7 +502,7 @@ export function StaticWorld({
             />
           ) : (
             <meshStandardMaterial
-              {...MACRO_VARIATION}
+              {...GROUND_SNOW}
               map={textures.grass}
               color={ISLAND_PLANTING_TINT}
               roughness={1}
@@ -593,7 +657,7 @@ export function StaticWorld({
       <mesh geometry={geometries.sidewalks} receiveShadow={receive}>
         {concrete ? (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...GROUND_SNOW}
             map={concrete.map}
             normalMap={concrete.normalMap ?? undefined}
             roughnessMap={concrete.roughnessMap ?? undefined}
@@ -603,7 +667,7 @@ export function StaticWorld({
           />
         ) : (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...GROUND_SNOW}
             map={textures.sidewalk}
             vertexColors
             roughness={0.92}

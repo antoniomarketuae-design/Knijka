@@ -126,8 +126,81 @@ export interface ScenarioAnimalObstacle extends ObstaclePose {
   visual?: boolean;
 }
 
+/**
+ * A ROAD-WORKS WORKER standing inside a coned-off area — a body in a hi-vis
+ * vest with a retro-reflective band, on foot, on the closed side of the cones.
+ *
+ * WHY THIS KIND EXISTS AT ALL (wave 8, sc-merge-roadworks-shift). The drill's
+ * instruction 1 is «в ремонтен участък между конусите работят хора и те те
+ * виждат само осветен», and instruction 6 repeats it — the ENTIRE reason the
+ * lesson makes the student switch on dipped beams is a person who has to see
+ * him. `.audit-frames/sweep161/sc-merge-roadworks-shift/mobile-wrong/07-end.png`
+ * shows a bare line of loose cones on open tarmac: no worker, so the reason for
+ * the headlights is a sentence with nothing behind it. A student who never saw
+ * the person cannot carry the habit to a real works site at dusk.
+ *
+ * NEVER HITTABLE, and this one is not the usual dressing convention — it is a
+ * refusal. The only collision vocabulary a held body can reach here is
+ * `ScenarioObstacles`' untagged fallback, which VehicleRig grades as
+ * "staticObject" and the debrief names «Удар в неподвижно препятствие». Booking
+ * a PERSON as an immovable object is a worse lie than the silence: the drill
+ * would teach that running a worker down costs the same as clipping a bollard.
+ * The vulnerable-user vocabulary lives in the rules engine and the pedestrian
+ * channel, and until a held body can reach it, this kind renders and does not
+ * grade. `visual` is accepted for parity and documents the intent; a worker is
+ * never hittable regardless of its value. Placements therefore keep workers
+ * well inside the closed area, where no legal line and no committed ghost goes
+ * (measured per placement in scenarioSceneryProps.ts).
+ */
+export interface ScenarioWorkerObstacle extends ObstaclePose {
+  kind: "worker";
+  visual?: boolean;
+}
+
+/**
+ * A FUEL-STATION FORECOURT — one canopy on four columns with pump islands
+ * under it. Composite on purpose: the four pieces are only meaningful
+ * together, and a caller that had to place a roof, four posts and four pumps
+ * by hand would place them out of square the first time it was copied.
+ *
+ * WHY IT EXISTS (wave 8, sc-merge-from-property, major). «There is no petrol
+ * station. The briefing places the student at the exit of a бензиностанция
+ * facing a boulevard … the world is a bare grey apron on an empty green plain
+ * with distant mountains — no pumps, no canopy, no shop, no forecourt.»
+ * (.audit-frames/sweep161/sc-merge-from-property/mobile-right/05-stopped.png.)
+ * The drill is ЗДвП чл. 25 — leaving a PROPERTY gives way to everything on the
+ * road — and the whole reason the student is expected to creep out and look is
+ * that he is coming off private ground. A car standing on featureless tarmac
+ * has no reason to yield to anybody; that is the lesson the empty apron erases.
+ *
+ * The station's own frame, so a placement is one line: `headingDeg` points
+ * along `lengthM`, `widthM` runs across it, and the islands are offsets ACROSS
+ * the heading (signed, station-centred).
+ *
+ * COLLIDERS: the columns and the pumps get them (they are solid objects a car
+ * can hit, and the untagged fallback grades „staticObject", which is what a
+ * concrete post is). The canopy deck gets none — it is `clearanceM` overhead.
+ * The island kerbs get none either, deliberately: a 0.18 m kerb collider is the
+ * classic way to beach a rapier chassis on a lip it should have ridden over.
+ */
+export interface ScenarioFuelStationObstacle extends ObstaclePose {
+  kind: "fuelStation";
+  /** Canopy extent ALONG the heading, m. */
+  lengthM: number;
+  /** Canopy extent ACROSS the heading, m. */
+  widthM: number;
+  /** Underside of the canopy deck above the tarmac, m. */
+  clearanceM: number;
+  /** Pump-island centres, m across the heading (signed, station-centred). */
+  islandOffsetsM: readonly number[];
+  /** Half-length of each island along the heading, m. */
+  islandHalfLengthM: number;
+}
+
 export type ScenarioObstacleSpec =
   | ScenarioVehicleObstacle
   | ScenarioPropObstacle
   | ScenarioWallObstacle
-  | ScenarioAnimalObstacle;
+  | ScenarioAnimalObstacle
+  | ScenarioWorkerObstacle
+  | ScenarioFuelStationObstacle;

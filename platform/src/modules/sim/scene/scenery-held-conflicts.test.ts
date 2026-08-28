@@ -144,6 +144,13 @@ function rectOf(o: ScenarioObstacleSpec): Rect {
       return { ...pose, halfLenM: 0.25, halfWM: 0.25 };
     case "animal":
       return { ...pose, halfLenM: 1.1, halfWM: 0.28 };
+    // A worker on foot: shoulder span 0.46 by chest depth 0.30 (the
+    // ObstacleWorker body plan in components/sim/ScenarioObstacles.tsx).
+    case "worker":
+      return { ...pose, halfLenM: 0.15, halfWM: 0.23 };
+    // The forecourt's canopy footprint (length along the heading, width across).
+    case "fuelStation":
+      return { ...pose, halfLenM: o.lengthM / 2, halfWM: o.widthM / 2 };
     default:
       return o.model === "box_truck"
         ? { ...pose, halfLenM: 3.75, halfWM: 1.2 }
@@ -220,9 +227,32 @@ describe("rule 3 — the curb pass keeps off the held dressing", () => {
     // already empty across the spans the shelters stand on). So the 417 term is
     // still the same 417 bodies, in the same places.
     const HZ_DEBRIS = 34; // sc-hz-brake-dont-swerve  (hz-debris-v1)
-    const MG_BUSSTOP = 38; // sc-merge-bus-pullout    (mg-busstop-v1, post rule 2b)
-    const PK_BUSSTOP = 30; // sc-pk-busstop-ban       (pk-busstop-v1, post rule 2b)
-    expect(bodies).toBe(417 + HZ_DEBRIS + MG_BUSSTOP + PK_BUSSTOP);
+    // MG_BUSSTOP (38) and PK_BUSSTOP (30) LEFT in wave 8, and no body moved.
+    // Their whole reason for being in this walk was the derived навес WALL
+    // panel, which is now the modelled shelter `world/builders/props.ts`
+    // places (see the header of scenarioSceneryProps.ts). Neither template has
+    // any held scenery left, so both drop out of TEMPLATES_WITH_DRESSING and
+    // take their maps' curb rows out of the census with them — exactly the way
+    // sc-follow-standstill's 41 left in sweep 161. Rule 2b still empties both
+    // stop kerbs; `__tests__/bus-stop-kerb.test.ts` is what holds that now.
+    // Wave 8: sc-ln-obstacle-meeting gained the kerb file its briefing names, so
+    // ov-narrow-v1 enters the walk a SECOND time — once per tenant, with that
+    // tenant's own rule-3 circles. Its 27-body curb row loses 5 to the new file
+    // (the same six-body row sc-ov-narrow's own entry loses 7 to), so the term
+    // is 22 and NOT a re-count of bodies already in the 417.
+    const NM_LNOM = 22; // sc-ln-obstacle-meeting   (ov-narrow-v1, 27 − 5)
+    // …and the manned works site sc-merge-roadworks-shift gained in the same
+    // wave costs hz-roadworks-v1 ONE more decoration body than the cones alone
+    // did: the works truck standing at (4.6, 262) opens a 5.63 m circle that
+    // reaches one stranger the cone circles did not.
+    const MRS_WORKS_SITE = -1;
+    // …and mg-property-v1 enters the walk for the first time in the same wave,
+    // because sc-merge-from-property finally has a forecourt to dress. Its curb
+    // row is untouched by it — the station stands on the property side of the
+    // exit drive, 45 m from the boulevard the decoration follows — so this is
+    // the map's whole row, not a remainder.
+    const MGP_FORECOURT = 33; // sc-merge-from-property   (mg-property-v1)
+    expect(bodies).toBe(417 + HZ_DEBRIS + NM_LNOM + MRS_WORKS_SITE + MGP_FORECOURT);
   }, 120_000);
 
   it("is what removed them — without rule 3 the same drills seat 12 strangers", () => {
@@ -258,9 +288,14 @@ describe("rule 3 — the curb pass keeps off the held dressing", () => {
       "sc-pe-parked-row-scan": 2,
       "sc-hazard-obstacle": 1,
       "sc-accident-own-conduct": 1,
-      "sc-merge-roadworks-shift": 1,
+      "sc-merge-roadworks-shift": 2,
+      // Wave 8 — the sc-ln-obstacle-meeting kerb file, on the same ov-narrow-v1
+      // whose OTHER tenant already loses 7 here: an identical row of strangers
+      // 3.1 m outboard of the row the drill points at is exactly the harm the
+      // rule exists for, and it is removed the same way on both tenants.
+      "sc-ln-obstacle-meeting": 5,
     });
-    expect(Object.values(perTemplate).reduce((a, b) => a + b, 0)).toBe(12);
+    expect(Object.values(perTemplate).reduce((a, b) => a + b, 0)).toBe(18);
   }, 120_000);
 });
 

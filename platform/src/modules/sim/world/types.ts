@@ -799,6 +799,9 @@ export interface WorldStats {
   utilityWireSpans: number;
   /** Pavement parapet panels (B65). */
   railings: number;
+  /** Motorway median barrier panels (wave 8). 0 on every district without a
+   *  pair of anti-parallel motorway carriageways. */
+  medianBarriers: number;
   /** Masses closing a street end that runs out of the world (B65 — two per
    *  eligible end, 26 triangles each, zero draw calls). */
   terminusClosures: number;
@@ -895,6 +898,22 @@ export interface WorldGeometry {
   /** Pavement parapet panels (B65). Empty on the same maps, for the same
    *  reason. */
   railings: RailingPlacement[];
+  /**
+   * MOTORWAY MEDIAN BARRIER panels — the continuous run down the разделителна
+   * ивица between two anti-parallel motorway carriageways (wave 8).
+   *
+   * A SEPARATE LIST FROM `railings` ON PURPOSE. `motorway-is-not-a-street.test.ts`
+   * pins mw-v1's railings at 0 and is right to: a pavement parapet on a
+   * motorway would be exactly the „street furniture on a магистрала" defect
+   * that battery exists to convict. A median barrier is the opposite — it is
+   * the one object that says the road is NOT a street — so it gets its own
+   * bucket, its own budget line and its own render pass rather than being
+   * smuggled through a list whose contract forbids it.
+   *
+   * Empty on every district with no pair of anti-parallel motorway edges, which
+   * is 102 of the 105 shipped maps.
+   */
+  medianBarriers: RailingPlacement[];
   /** Bus-stop shelters on primary/secondary sidewalks near junction mouths. */
   busStops: StaticTransform[];
   /** Name boards + railings of every `kind: "school"` building (schools.ts).
