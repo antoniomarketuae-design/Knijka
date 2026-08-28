@@ -530,12 +530,47 @@ export async function reuseCachedSession(page, credentials, baseUrl, log = () =>
     return false;
   }
 
+  // ── `SameSite=None` WITHOUT `Secure` IS AN INVALID COOKIE, AND CHROMIUM SAYS SO
+  //
+  // 2026-08-28. Every `pc` leg of the w15 sweep landed on «Влез в акаунта си» —
+  // the sign-in wall — while the `mobile` legs of the SAME lessons drove and
+  // returned real verdicts. Not concurrency: one driver alone reproduced it.
+  //
+  // The two legs are different browsers. `pc` is chromium, `mobile` is webkit
+  // (lesson-audit.mjs:518). The cached cookies read back as:
+  //
+  //     authjs.session-token  domain=localhost secure=false sameSite=None
+  //
+  // and `SameSite=None` REQUIRES `Secure` — Chromium has rejected the pair since
+  // Chrome 80. So `addCookies` took them and chromium never sent them, while
+  // webkit, which is laxer here, sent them fine. The cache is written from
+  // whichever browser signed in last, so a webkit-minted entry silently disabled
+  // every chromium leg that reused it.
+  //
+  // WHAT MADE IT INVISIBLE, and it is the reason this is worth the paragraph: the
+  // server-side check above (`liveSessionEmail`) passes — it sends the cookies as
+  // a raw HTTP header, where SameSite does not apply at all. So the log line says
+  // «reused a live session», truthfully, about a session the browser will not use.
+  // The failure surfaced two steps later as "no verdict surface in the DOM", which
+  // reads as a product defect.
+  //
+  // The repair is to make the cookie valid rather than to special-case a browser:
+  // over plain http a `None` cookie cannot be Secure, and `Lax` is what the app
+  // actually wants for a same-site session cookie. Left alone when `secure` is
+  // true, because there the pair is legal and meant.
+  const usable = cached.cookies.map((c) =>
+    c && c.sameSite === "None" && c.secure !== true ? { ...c, sameSite: "Lax" } : c,
+  );
+  const repaired = usable.filter((c, i) => c !== cached.cookies[i]).length;
   try {
-    await page.context().addCookies(cached.cookies);
+    await page.context().addCookies(usable);
   } catch {
     return false; // e.g. an expired cookie Playwright refuses — sign in for real
   }
-  log(`reused a live session for ${who} — no POST to the budgeted sign-in endpoint`);
+  log(
+    `reused a live session for ${who} — no POST to the budgeted sign-in endpoint` +
+      (repaired ? ` (${repaired} cookie(s) had an invalid SameSite=None without Secure — sent as Lax)` : ""),
+  );
   return true;
 }
 
