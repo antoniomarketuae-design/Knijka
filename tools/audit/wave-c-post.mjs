@@ -93,6 +93,39 @@ const byId = new Map(counts.filed.map((j) => [j.findingId, j]));
 // written correctly, and blocking every legitimate retirement behind it.
 for (const j of splitParents()) if (!byId.has(j.findingId)) byId.set(j.findingId, j);
 
+// …AND THE SAME IS TRUE OF A ROW WHOSE TEXT WAS CORRECTED — 2026-08-28.
+//
+// `findingId` is DERIVED, not stored: `scenario + ":" + sha1(what + NUL + frame)`.
+// So rewriting a finding's `what` — which is the right thing to do when a row was
+// filed on a false premise — REHASHES ITS ID, and every verdict already written
+// about it is left naming an id that no longer exists. It happened the day this
+// was written: `sc-sp-wet-limit-plate:5708fd93` carried a w14 adjudication with a
+// photographed frame and a sound argument, and a correction to that row's text
+// silently orphaned it.
+//
+// That is the same class as the split parents above — the id was real, the row
+// moved — and it must not be confused with the thing this guard exists for, which
+// is a judge INVENTING or MANGLING an id. The two are told apart by whoever made
+// the correction: a superseding line carries `supersededBy` naming the new id, and
+// that is a claim someone had to write down deliberately.
+//
+// Admitted here so a legitimate posting run is not blocked, and reported below so
+// it is never silent.
+const superseded = new Map();
+if (fs.existsSync(VERDICTS)) {
+  for (const l of fs.readFileSync(VERDICTS, "utf8").split("\n")) {
+    if (!l.trim()) continue;
+    let j;
+    try { j = JSON.parse(l); } catch { continue; }
+    if (!j.supersededBy || !j.findingId) continue;
+    // The replacement must itself be a real row, or this is a way to launder a
+    // mangled id into acceptance by pointing it at another mangled id.
+    if (!byId.has(j.supersededBy)) continue;
+    superseded.set(j.findingId, j.supersededBy);
+    if (!byId.has(j.findingId)) byId.set(j.findingId, byId.get(j.supersededBy));
+  }
+}
+
 // --- the verdicts --------------------------------------------------------------
 const rows = [];
 if (fs.existsSync(VERDICTS)) {
@@ -307,6 +340,14 @@ if (!retire.length) {
   console.log("            Nothing new was retired. Every verdict line that could retire a finding");
   console.log("            has already been posted — this run is a no-op, and that is the honest");
   console.log("            answer rather than a re-statement of the last run's result.");
+}
+if (superseded.size) {
+  // Reported every run, never silent: a superseded id means somebody edited a
+  // finding's text after it had been judged, and the old adjudication's reasoning
+  // may rest on the premise that edit withdrew.
+  console.log("\nids whose row was REWRITTEN after it was judged (id is derived from the text):");
+  for (const [was, now] of superseded) console.log("   " + was + "  ->  " + now);
+  console.log("   Their old verdict lines are kept as history and retire nothing on their own.");
 }
 if (unknown.length) {
   console.log("\nids cited by a judge that are not in the corpus (first 10):");
