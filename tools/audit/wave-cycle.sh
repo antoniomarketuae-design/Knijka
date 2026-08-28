@@ -35,6 +35,22 @@ cd "$REPO" || exit 1
 STEP="${1:-status}"
 
 say()  { echo "[$(date +%H:%M:%S)] $*"; }
+
+# THE SERVER IS IDENTIFIED BY ITS ANSWER, NOT BY ITS PORT NUMBER — 2026-08-28.
+# A hardcoded list told the preflight that 3000 belonged to another product; on
+# this box it was ours, the check reported "no dev server" for hours, and a SECOND
+# server got started on top of the first. Two Next servers on one 7200 rpm disk
+# took /api/health from db 127 ms to a 9.7 s TIMEOUT, which reads as a dead
+# database. Only a server answering in OUR shape — carrying a `commit` field,
+# which is what invariant 2 needs anyway — counts. 3000 is probed last.
+discover_port() {
+  for p in 3460 3461 3462 3470 3480 3500 3200 3411 3000; do
+    h=$(curl -s -m 4 "localhost:$p/api/health" 2>/dev/null) || continue
+    case "$h" in *'"commit"'*) echo "$p"; return 0;; esac
+  done
+  return 1
+}
+
 fail() { echo ""; echo "STOPPED: $*"; echo ""; exit 1; }
 
 # ── THE THREE STANDING REDS ────────────────────────────────────────────────
@@ -165,13 +181,38 @@ sweep)
   # contend for the same 7200 rpm disk and the same Turbopack cache and both
   # crawl; the drives then time out and the corpus fills with unsteered legs.
   local_total=$(wc -l < "$LESSONS")
-  say "sweep $ROUND: $local_total lessons over $SHARDS shard(s), one server"
+  # THE PORT COMES FROM THE PREFLIGHT, NOT FROM A DEFAULT — 2026-08-28.
+  # This dispatched with only two arguments, so `drive-supervisor.sh`'s third
+  # parameter fell to its default `http://localhost:3460` while the preflight had
+  # just DISCOVERED the real port (3000 that day). Every drive would have hit a
+  # closed port and the supervisor would have retried each one twelve times.
+  PORT=$(discover_port) || fail "no server answering our /api/health — run preflight first"
+  say "sweep $ROUND: $(wc -l < "$LESSONS") lessons over $SHARDS shard(s), one server on :$PORT"
   mkdir -p "$REPO/.audit-frames/$ROUND"
-  split -n "l/$SHARDS" -d "$LESSONS" "$REPO/.audit-frames/$ROUND/shard-"
-  for f in "$REPO/.audit-frames/$ROUND/shard-"*; do
-    s=$(basename "$f" | sed 's/shard-//')
-    say "  dispatching shard $s ($(wc -l < "$f") lessons) under the supervisor"
-    bash "$REPO/tools/mobile/drive-supervisor.sh" "$ROUND-$s" "$f" &
+
+  # …AND THE SHARD FILES ARE COMMA-SEPARATED, BECAUSE THAT IS WHAT THE SUPERVISOR
+  # READS. It does `--lessons "$(cat "$LIST")"`, which wants a comma list; this
+  # step used `split -n l/N` — a LINE split — so the two halves of the same step
+  # disagreed about what a lesson list is. A one-line comma file cannot be
+  # line-split at all.
+  #
+  # INTERLEAVED, not halved. The re-drive set is sorted heaviest-first, so a
+  # contiguous split hands shard 0 every expensive lesson and leaves shard 1 idle
+  # for the back half of the run.
+  node -e '
+    const fs = require("fs");
+    const names = fs.readFileSync(process.argv[1], "utf8").split(/[\s,]+/).filter(Boolean);
+    const n = Number(process.argv[2]);
+    const out = Array.from({ length: n }, () => []);
+    names.forEach((x, i) => out[i % n].push(x));
+    out.forEach((list, i) => fs.writeFileSync(process.argv[3] + "/shard-" + i + ".txt", list.join(",") + "\n"));
+    console.log(out.map((l, i) => "shard " + i + ": " + l.length).join("  ·  "));
+  ' "$LESSONS" "$SHARDS" "$REPO/.audit-frames/$ROUND" | sed 's/^/    /'
+
+  for f in "$REPO/.audit-frames/$ROUND/shard-"*.txt; do
+    s=$(basename "$f" .txt | sed 's/shard-//')
+    say "  dispatching shard $s under the supervisor"
+    bash "$REPO/tools/mobile/drive-supervisor.sh" "$ROUND-$s" "$f" "http://localhost:$PORT" &
   done
   wait
   say "all shards exited; run: wave-cycle.sh merge $ROUND"
@@ -180,11 +221,27 @@ sweep)
 merge)
   ROUND="${2:-}"
   [ -n "$ROUND" ] || fail "usage: wave-cycle.sh merge <round>"
+  # --halves AND --dest, NOT --from/--to — 2026-08-28.
+  #
+  # `wave-c-merge.mjs` reads `--root`, `--halves` and `--dest` (:49-52). The flags
+  # this step passed do not exist, so they were IGNORED and the tool fell back to
+  # its defaults — `--halves wave-c-a,wave-c-b --dest wave-c`. Both those stale
+  # directories exist and hold zero frame dirs, so it would have merged NOTHING and
+  # printed a success line while a 211-drive sweep sat uncollected in the fill-*
+  # halves. (Worth noting what it did NOT do: the default `--dest wave-c` is the
+  # LIVE ledger directory whose frames banked retirements cite. Had those halves
+  # held anything, the default would have moved frames into it.)
+  #
+  # Halves are NAMES under --root, not paths, and both go in ONE invocation so the
+  # tool can do the job it exists for: detect a lesson/leg appearing in both.
+  HALVES=""
   for d in "$REPO/.audit-frames/fill-$ROUND-"*; do
     [ -d "$d" ] || continue
-    say "merging $(basename "$d")"
-    node "$REPO/tools/audit/wave-c-merge.mjs" --from "$d" --to "$REPO/.audit-frames/$ROUND" 2>&1 | sed 's/^/    /'
+    HALVES="${HALVES:+$HALVES,}$(basename "$d")"
   done
+  [ -n "$HALVES" ] || fail "no fill-$ROUND-* halves to merge — did the sweep write anywhere else?"
+  say "merging halves: $HALVES  ->  $ROUND"
+  node "$REPO/tools/audit/wave-c-merge.mjs" --halves "$HALVES" --dest "$ROUND" 2>&1 | sed 's/^/    /'
   ;;
 
 post)

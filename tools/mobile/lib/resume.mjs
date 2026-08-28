@@ -46,6 +46,47 @@ export const EXIT_JUDGEABLE = 0;
 export const EXIT_EVIDENCE_INCOMPLETE = 1;
 
 /**
+ * …AND THE CODES THIS FILE DID NOT KNOW ABOUT — 2026-08-28.
+ *
+ * The header above enumerates 0-6 and rules that "everything at or above 2 never
+ * reached the lesson". On 2026-08-28 the harness gained two more, and this file
+ * was not told:
+ *
+ *   7 EXIT_DRIVE_NEVER_STARTED   no cockpit answered — a paywall or a dead page
+ *   8 EXIT_LESSON_NOT_PERFORMABLE the cockpit was live and the car was never in a
+ *                                 driving gear: this harness CANNOT drive this lesson
+ *
+ * 7 is correctly re-driven — but only by accident, because it happens to fall
+ * under the old "2 and above" rule. **8 was ALSO re-driven, and that is wrong.**
+ * Its entire meaning is `redrive: false`: `sc-vp-stall` starts in N with a manual
+ * gearbox, this harness's key vocabulary is W/S/A/D/B/Escape, and no amount of
+ * driving will change the answer. Measured on the w15 sweep: one restart re-drove
+ * all three `sc-vp-stall` legs at ~5 minutes each and produced three DUPLICATE
+ * rows, which `wave-c-merge` then flagged as "the halves were not disjoint". On a
+ * long sweep with several restarts that repeats for ever.
+ *
+ * THE FIX ASKS THE OWNING TABLE RATHER THAN ADDING A THIRD LITERAL. Two tables
+ * that must agree, in different files, with nothing comparing them, is exactly the
+ * defect fixed in `wave-c-merge.mjs` the same morning — it kept its own copy of the
+ * state descriptions and printed `undefined` for the two new ones. So this reads
+ * `DRIVE_CLASSES` from `verdict-surface.mjs`, and a code added there in future
+ * cannot silently drift out of sync here.
+ *
+ * Note what "measured" means for code 8, because it is not obvious: the drive is
+ * not a measurement of the LESSON, it is a definitive measurement of the harness's
+ * inability to drive it. For resume purposes those are the same thing — driving it
+ * again cannot change the answer — which is precisely what `redrive: false` says.
+ */
+import { DRIVE_CLASSES } from "../../audit/verdict-surface.mjs";
+
+/** Exit codes whose own class says a re-drive would be wasted. */
+const NEVER_REDRIVE = new Set(
+  Object.values(DRIVE_CLASSES)
+    .filter((c) => c && c.redrive === false && typeof c.exit === "number")
+    .map((c) => c.exit),
+);
+
+/**
  * Did this ledger row measure the lesson, at the build we are driving now?
  * A row from another commit is not a measurement of THIS build, and a row that
  * never reached the lesson is not a measurement at all.
@@ -53,6 +94,7 @@ export const EXIT_EVIDENCE_INCOMPLETE = 1;
 export function countsAsMeasured(row, head) {
   if (!row || typeof row !== "object") return false;
   if (row.head !== head) return false;
+  if (NEVER_REDRIVE.has(row.exit)) return true;
   return row.exit === EXIT_JUDGEABLE || row.exit === EXIT_EVIDENCE_INCOMPLETE;
 }
 
