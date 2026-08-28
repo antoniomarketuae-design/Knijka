@@ -231,7 +231,7 @@
  * A lesson that fails its own drive still exits 0: that is a finding, not a
  * broken run, and conflating the two is how a re-drive lane wastes a day.
  */
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -3000,6 +3000,602 @@ async function disarmReverse() {
   return false;
 }
 
+/* ── PRESS THE PRODUCT'S OWN PLAY BUTTON — 2026-08-28 ───────────────────────
+ *
+ * WHAT WAS MISSING. `content/traces/<id>/shadow-correct.trace.json` exists for
+ * all 167 lessons and the product already replays it: `ShadowCar` drives a
+ * translucent ghost along it and `TraceTimeline` gives that replay a scrub bar
+ * and a transport row, behind the lesson shell's «🎬 Демонстрация ▸» toggle,
+ * granted on every scenario rung this harness drives (`DEFAULT_LEVEL_AIDS[1]
+ * .shadowCar`, and the harness has always opened lessons at `&level=1`). Until
+ * this block THIS FILE CONTAINED ZERO MENTIONS OF «Демонстрация» AND NEVER
+ * PRESSED ▶. Three hundred and seventy-six drives went past a deck sitting on
+ * the glass with the authored correct drive parked inside it.
+ *
+ * AND IT IS PARKED, WHICH IS WHY NOBODY TRIPPED OVER IT BY ACCIDENT.
+ * `demoDeckLifetime.demoDeckAtRest()` — landed 2026-08-24 against
+ * `sc-ed-poligon-chain:746682ab` — sets `playing = false, tSec = 0` at mount,
+ * deliberately: «the deck opens parked at 0:00 and the student presses ▶».
+ * Before that ruling the replay auto-played and the corpus caught it narrating
+ * over a driving car. So a harness that never presses ▶ photographs a
+ * demonstration that has not started, on every lesson, for ever.
+ *
+ * ── WHY THIS AND NOT A STEERING SYSTEM ────────────────────────────────────
+ *
+ * The 13 rows this reaches are all one shape: the guidance loop's only signal
+ * is a ghost RIBBON read off a 1166×210 crop of the windscreen, and ribbon
+ * visibility is a stable per-lesson property (`sc-merge-from-property` never
+ * above 42% across 11 lanes and 8 commits) rather than a flake, so on those
+ * lessons no number of re-drives yields a judgeable leg. The obvious answer —
+ * replay the trace's own inputs — was PROBED FIRST AND FAILS: `steerRad` is
+ * ~0 for the whole tape on every lesson checked (0 non-zero samples of 737 on
+ * `sc-fo-motorway-gap`, 2 of 909 on `sc-junction-scan`, 9 of 3281 on
+ * `sc-ed-poligon-chain`) while the recorded HEADING swings up to 344°. The
+ * tape records the turn and not the input that caused it, so an input replay
+ * would drive straight through every corner AND would look like it worked on
+ * the one straight lesson anybody would test first. Stage 2 above therefore
+ * takes throttle and brake from that tape and nothing else, and steering stays
+ * unsolved.
+ *
+ * The product, however, does not need the input: it replays the trace
+ * KINEMATICALLY. So this beat does not build a driver. It presses play.
+ *
+ * ── WHAT A PHOTOGRAPHED DEMONSTRATION IS EVIDENCE OF, AND WHAT IT IS NOT ───
+ *
+ * A demo frame shows WHAT THE PRODUCT ITSELF ASSERTS A CORRECT DRIVE LOOKS
+ * LIKE on this lesson — the line, the speed, the stops, the annotations — for
+ * a lesson whose correct drive no harness leg has ever completed. That is a
+ * reference a judge can hold a `04-*` frame against, and it is the first time
+ * this corpus has had one.
+ *
+ * IT IS NOT A `-right` LEG AND IT IS EMPHATICALLY NOT A `-wrong` ONE. Nothing
+ * about an imperfect human drive can be read off it. That distinction has to
+ * survive a reader who never opens a picture, so it is carried THREE ways: the
+ * frames are named `03d-demo-*` and never `04-*`; `demo.evidence` in
+ * `_audit-status.json` says it in a sentence; and every note this block writes
+ * opens with the word DEMONSTRATION.
+ *
+ * ── AND THE ANSWER TO „does the product credit its own demonstration" ──────
+ *
+ * MEASURED HERE, ON EVERY LANE THAT RUNS THIS BEAT, AND IT IS NO — with a
+ * mechanism that means the spec's hoped-for reading of that NO is wrong, so it
+ * must not be filed as the spec framed it. `ShadowCar` is a translucent clone
+ * of the hero model driven by `sampleAt` lerp with NO physics body, no
+ * `sampleRef` and no write into the grading path (`ShadowCar.tsx:354` takes
+ * `trace`, `clockRef`, three booleans and a district — and nothing else). The
+ * car `rules/engine.ts` grades is the physics car, and it stays on the spawn
+ * mark for the whole replay. This beat proves that per drive rather than by
+ * argument: `window.__camProbe` is read before ▶ and after the replay ends,
+ * and `demo.ego.movedM` is the answer.
+ *
+ * So «the product cannot credit its own demonstration» is TRUE and is NOT a
+ * first-class defect: the product never claimed the demonstration was a drive,
+ * and a ghost that credited objectives would be the defect. What this beat
+ * settles is narrower and real — that the uncredited objectives on these 13
+ * rows CANNOT be explained by „there is no drivable success path here", because
+ * the product ships a recording of that path and this drive photographs it.
+ *
+ * ── WHAT IT MEASURED, WHICH IS THE ONLY REASON TO KEEP IT ─────────────────
+ *
+ * Same box, same server, commit 405e2056 + this worktree. `before` is the same
+ * lane driven on the tree without this block.
+ *
+ *   sc-junction-scan / pc / right — heading swings 0..90°, objective 3 is the
+ *   right turn and it has never been credited
+ *     before  26 frames, no `03d-demo-*`, no `demo` key in _audit-status.json.
+ *             The deck sat on the glass reading «0:00 / 0:45» for the whole
+ *             drive and no drive in this programme had ever pressed it.
+ *     after   deck present, painted, open · playhead 0 -> 45 s of 45 s in 46 s,
+ *             44 of 45 polls advancing, played to the end and wrapped ·
+ *             03d-demo-open (0:00) / 03d-demo-play (0:21) / 03d-demo-end (0:38)
+ *             · graded car moved 0.00 m · «Задача 1/3» before and after ·
+ *             restored: playhead 0, transport «Пусни», deck as found.
+ *             The drive that followed was normal: positive control 44 км/ч,
+ *             steering LIVE, objectives 1 and 2 credited at 1:26 and 2:06 and
+ *             objective 3 — the turn — dashed, exactly as before.
+ *
+ *   sc-park-left / pc / right — heading 0..338°, `sc-park-left:fcce489f`, and
+ *   the reverse-park objective is uncredited on every leg ever driven
+ *     after   playhead 0 -> 41 s of 42 s in 42 s · frames as above, the 0:19
+ *             one carrying the product's own coaching line for the manoeuvre
+ *             («Преди да пресечеш алеята: ляво огледало, после поглед в двете
+ *             посоки — минаваш през чужд път.») · graded car moved 0.00 m ·
+ *             «Задача 1/2» before and after · restored OK.
+ *             The drive that followed credited «Задача 1: спри в изходната
+ *             позиция…» at 1:45 and left «паркирай на заден ход в лявото
+ *             гнездо» dashed.
+ *
+ *   sc-junction-scan / mobile / right — the deck is in the DOM, off the glass,
+ *             blocked by `touch-hint`; one `03d-demo-blocked` frame and a named
+ *             refusal. See the `!r0.painted` branch for what that measures.
+ *
+ * ── AND THE LIMIT OF THESE FRAMES, WHICH IS NOT SMALL ─────────────────────
+ *
+ * THE CAMERA IS THE PARKED CAR'S. The demonstration is a ghost driving away
+ * from a cockpit that never moves, so it is photographed only while it is
+ * inside that cockpit's field of view — and MEASURED AGAINST THE TRACES
+ * THEMSELVES that window is about the first hundred metres, ending at the
+ * first turn:
+ *
+ *   sc-junction-scan   ghost in the windscreen at 0:21 =  76 m out, heading 0°
+ *                      gone by            0:38 = 106 m out, heading  90°
+ *   sc-park-left       0:21 =  90 m (heading 338°) · 0:38 = 106 m (73°)
+ *   sc-vu-cyclist-hook 0:21 = 102 m (heading  90°) · 0:38 = 116 m (180°)
+ *   sc-ed-d2-city-run  0:21 = 223 m · 0:60 = 573 m · 0:90 = 858 m
+ *
+ * SO THE FRAMES ANSWER ABOUT THE FIRST STRETCH OF A ROUTE AND NOT ABOUT A
+ * PLACE 600 m DOWN IT, and a row filed against one of those places — e.g.
+ * `sc-ed-d2-city-run:a0bdad4b`, a pedestrian plaza the harness reaches at
+ * t≈87 s, i.e. past 800 m of route — is NOT settled by these pictures. Say
+ * that rather than let a reader assume otherwise.
+ *
+ * What every frame does carry for the whole replay is the transport (the
+ * second it is standing on), the caption bank, the annotation ticks and the
+ * objective banner. Nothing here follows the ghost: the product has a top-down
+ * camera on every rung and cycling to it would photograph the WHOLE authored
+ * route, but `data-sim-camera` is read by PlayAreaStyles and by this file's own
+ * band geometry, so a camera this beat failed to restore would re-base every
+ * steering measurement the harness takes. That is the next lane's call, and it
+ * now has the metres above to make it with. Named, not attempted.
+ *
+ * ── IT MUST LEAVE THE SCENE EXACTLY AS IT FOUND IT ────────────────────────
+ *
+ * Every verdict in a 1,462-row ledger was taken with the clock at 0:00, paused,
+ * and the ghost on the trace's first sample — because nobody had ever pressed
+ * ▶. A beat that left the playhead anywhere else would put a ghost car and a
+ * blue ribbon somewhere new in the windscreen band the guidance loop reads, and
+ * would silently re-base every steering measurement this harness takes. So the
+ * beat rewinds to 0, pauses, restores the deck's open state, blurs the button
+ * it clicked, and ASSERTS all of it; a restore that cannot be verified is said
+ * out loud and the drive that follows is marked as not comparable.
+ *
+ * It also runs AFTER `steerLiveness` on purpose. That block's own header calls
+ * its moment „the last instant of the drive at which the car is untouched", and
+ * it is still true: nothing above this line has moved, and this beat presses no
+ * pedal. It runs BEFORE the positive control because the positive control is
+ * what ends the demonstration's life — `demoDeckStandsDown` latches at 5 км/ч,
+ * one-way, and closes the deck and stops the clock. Five seconds of throttle
+ * and there is nothing left to press.
+ *
+ * ── AND WHY THE BODY IS DECLARED HERE AND CALLED THREE HUNDRED LINES DOWN ──
+ *
+ * Not taste. `reverseAssist-audit-harness.test.ts` §6 pins the ORDER of two
+ * statements as source text —
+ *   /await timed\("steer", steerLiveness\);[\s\S]{0,600}?POSITIVE CONTROL/
+ * — because a first draft of the liveness check ran AFTER the positive control,
+ * measured „15 км/ч, throttle DOWN" and correctly refused to run at all. Eleven
+ * kilobytes of declarations between those two statements breaks that regex
+ * while breaking nothing it protects, so the declarations live up here and the
+ * call site stays three lines long. Anything moved back down there turns a
+ * green suite red in a file this lane does not own.
+ */
+/** The cap on how long the replay may run, sized against the corpus rather
+ *  than guessed: the 167 shipped traces run 16.2 s to 164.0 s (median 41.6,
+ *  p90 60.3), so this covers the longest one — `sc-ed-poligon-chain` — with
+ *  room for the poll. Cutting the longest demonstration short would make its
+ *  frames a sample of how fast the box was, which is the exact failure stage 2
+ *  of this wave exists to end. */
+const DEMO_MAX_MS = 200_000;
+/** How often the playhead is read. The deck's own mirror polls the clock at
+ *  its `POLL_MS`, so reading faster buys nothing but layout flushes. */
+const DEMO_POLL_MS = 1000;
+/** ▶ is down and the playhead has not moved for this long: the replay is
+ *  stuck. Named rather than waited out, because „the demonstration is broken"
+ *  and „the demonstration is slow" are different findings. */
+const DEMO_STALL_MS = 8000;
+/** The mid-replay frame is the only optional one. A `pc` screenshot was
+ *  measured at 11,999 ms median against 200 ms on `mobile` (see
+ *  `lastShotCostMs`), and a third frame that costs twelve seconds on every one
+ *  of 167 lanes buys one picture of the middle of a route. Two frames — the
+ *  parked deck and the finished replay — are the artifact; this one is a
+ *  luxury and is taken only where frames are cheap. */
+const DEMO_MID_SHOT_MAX_COST_MS = 3000;
+
+const DEMO_DECK_SEL = '[data-hud="demo-deck"]';
+
+/** Everything this beat did, published so a judge never has to infer it from a
+ *  frame — including on the lanes where it did nothing. */
+const demo = {
+  used: false,
+  why: "not attempted",
+  evidence:
+    "A demonstration frame is the product's own authored CORRECT drive, replayed by its own transport. It is NOT a " +
+    "`right` leg, NOT a `wrong` leg, and says nothing about an imperfect human drive. The graded car does not move " +
+    "during it — see ego.movedM.",
+  deck: null,
+  blockedBy: [],
+  replay: null,
+  objectives: null,
+  ego: null,
+  restored: null,
+};
+
+/** One read of the deck, its transport, the objective banner and the graded
+ *  car's pose. Everything this beat decides on comes from here. */
+const demoRead = () =>
+  page
+    .evaluate(() => {
+      const norm = (s) => (s || "").trim().replace(/\s+/g, " ");
+      const deck = document.querySelector('[data-hud="demo-deck"]');
+      // The same ancestor-chain test `read()` uses, and for the same reason: a
+      // bare rect calls a `display: contents` wrapper invisible, and the four
+      // PlayAreaStyles rules that take this deck off the glass all do it with
+      // `display: none` on an ANCESTOR-side selector.
+      const shown = (el) => {
+        for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+          const cs = getComputedStyle(n);
+          if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0) return false;
+        }
+        const r = el.getBoundingClientRect();
+        return r.width >= 1 && r.height >= 1;
+      };
+      const slider = deck ? deck.querySelector('[role="slider"]') : null;
+      const play = deck ? deck.querySelector('button[aria-label="Пусни"], button[aria-label="Пауза"]') : null;
+      const toggle = deck ? deck.querySelector("button[aria-expanded]") : null;
+      const html = document.documentElement;
+      const p = window.__camProbe;
+      return {
+        present: deck !== null,
+        painted: deck !== null && shown(deck),
+        open: deck ? deck.getAttribute("data-deck-open") : null,
+        // THE FOUR RULES THAT HIDE THIS DECK, READ AS THE STATE EACH ONE KEYS
+        // ON — not guessed from the fact that it is hidden. PlayAreaStyles:
+        // `[data-sim-compact="on"]:has([data-hud="touch-hint"])`,
+        // `html[data-sim-car-sheet="open"]`,
+        // `html[data-sim-overlay-read="open"] [data-sim-compact="on"]`,
+        // `[data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"])`.
+        blockers: {
+          compact: document.querySelector("[data-sim-compact]")?.getAttribute("data-sim-compact") ?? null,
+          touchHint: document.querySelector('[data-hud="touch-hint"]') !== null,
+          carSheet: html.getAttribute("data-sim-car-sheet"),
+          readOverlay: html.getAttribute("data-sim-overlay-read"),
+          playMenu: document.querySelector('[data-hud="play-menu"] [role="menu"]') !== null,
+        },
+        tSec: slider ? Number(slider.getAttribute("aria-valuenow")) : null,
+        durationSec: slider ? Number(slider.getAttribute("aria-valuemax")) : null,
+        tText: slider ? slider.getAttribute("aria-valuetext") : null,
+        sliderPainted: slider !== null && shown(slider),
+        playLabel: play ? play.getAttribute("aria-label") : null,
+        playPainted: play !== null && shown(play),
+        toggleText: toggle ? norm(toggle.textContent) || toggle.getAttribute("aria-label") : null,
+        expanded: toggle ? toggle.getAttribute("aria-expanded") : null,
+        // EVERY COPY, AND NO VISIBILITY TEST AT ALL — the same ruling the gear
+        // read in `read()` carries. On a phone in the cockpit camera this
+        // banner is 0×0 and unpainted for most of a drive, and „the objective
+        // did not credit" and „the banner was not on the glass" are two facts.
+        objectives: [...document.querySelectorAll('[data-hud="objective-banner"]')].map((el) => norm(el.textContent)),
+        // The graded car. Dev-only, read as a WITNESS and never as an input —
+        // the same standing rule the pace tape's index is built under.
+        ego: p ? { x: Number(p.chassisX), z: Number(p.chassisZ), kmh: Number(p.speedKmh) } : null,
+      };
+    })
+    .catch(() => null);
+
+/** «Задача 3/5» → 3, so „did anything credit" is a number and not a diff of
+ *  two Bulgarian sentences. */
+const demoTaskIndex = (lines) => {
+  for (const l of lines ?? []) {
+    const m = /Задача\s+(\d+)\s*\/\s*(\d+)/.exec(l);
+    if (m) return { index: Number(m[1]), total: Number(m[2]) };
+  }
+  return null;
+};
+
+async function runDemo() {
+  /* ONE LANE PER PLATFORM, AND THE OTHER ONE SAYS SO. The demonstration is a
+   * recording: it is byte-identical on the `right` and `wrong` legs of a
+   * platform, and it plays before either leg has driven a metre, so running it
+   * on both would photograph the same replay twice and add ~42 s (the corpus
+   * median) to a lane for nothing. It is NOT skipped per platform — the deck's
+   * default open state, its layout and the rules that hide it all differ
+   * between `mobile` and `pc`, and that difference is itself one of the things
+   * this beat measures. */
+  if (MODE !== "right") {
+    demo.why =
+      "MODE=wrong — the demonstration is a recording and is identical on both legs of a platform; this lesson's `right` lane photographs it";
+    return;
+  }
+  const r0 = await demoRead();
+  if (r0 === null) {
+    demo.why = "the page would not answer the demonstration probe";
+    loud(`THE DEMONSTRATION PROBE GOT NO ANSWER — no deck evidence from this lane.`);
+    return;
+  }
+  demo.deck = {
+    present: r0.present,
+    painted: r0.painted,
+    open: r0.open,
+    toggle: r0.toggleText,
+    durationSec: r0.durationSec,
+    atArrivalSec: r0.tSec,
+    playLabel: r0.playLabel,
+  };
+  if (!r0.present) {
+    /* A LESSON WITH NO DECK IS A FINDING, NOT A SKIP. Every scenario rung this
+     * harness opens is `&level=1`, and `DEFAULT_LEVEL_AIDS[1].shadowCar` is
+     * `true`, so the deck is promised here — unless this lesson's LevelSpec
+     * overrides the aid, or its trace failed to load, and either is worth a
+     * line. */
+    demo.why = "no «🎬 Демонстрация» deck is in this lesson's DOM at all";
+    loud(
+      `NO DEMONSTRATION DECK ON THIS LESSON. The harness opened it at &level=1, where DEFAULT_LEVEL_AIDS[1].shadowCar ` +
+        `is true and the shell should mount «🎬 Демонстрация» — either this rung overrides the aid or its shadow trace ` +
+        `did not load. Nothing about the authored correct drive can be photographed on this lane.`,
+    );
+    return;
+  }
+  if (!r0.painted) {
+    /* THE PRODUCT'S OWN ARBITRATION IS OBEYED AND REPORTED, NOT FOUGHT. Four
+     * PlayAreaStyles rules take this deck off the glass, and each is a
+     * deliberate ruling with a measurement behind it (the phone's first-run
+     * hint is „one sentence, once, and the only thing on that screen a student
+     * can act on"). Clearing the blocker to reach the deck would photograph a
+     * state no student can produce AND would change the frames of the drive
+     * that follows — the hint occludes ~70% of the glass on a phone and the
+     * corpus has rows filed against exactly that. So: name the blocker, take
+     * one picture of the state, and drive.
+     *
+     * WHAT THIS MEASURES ON THE PHONE IS WORTH THE SKIP. `touch-hint` hides
+     * the deck while it is mounted, and `touchHintLifetime` only unmounts it
+     * once the car is genuinely moving — at `movingSpeedKmh` = 5. The deck's
+     * own `demoDeckStandsDown` latches at the SAME 5 км/ч and closes the deck
+     * and stops the clock. So on a phone the demonstration is unreachable for
+     * the whole of the only window in which it is useful, and becomes reachable
+     * one instant after the product has decided the student no longer needs it.
+     * The student can still reopen it deliberately — the stand-down poll fires
+     * once — so this is not „unwatchable"; it is „never watchable BEFORE the
+     * drive", which for a demonstration is the interesting half. */
+    demo.blockedBy = Object.entries(r0.blockers)
+      .filter(([k, v]) => (k === "compact" ? false : v === true || v === "open"))
+      .map(([k]) => k);
+    demo.why = `the deck is in the DOM and off the glass (blocked by: ${demo.blockedBy.join(", ") || "an unlisted rule"})`;
+    loud(
+      `THE DEMONSTRATION DECK IS OFF THE GLASS AT «03-ready» — ${demo.why}. This is the product's own arbitration and ` +
+        `this beat does not fight it: clearing the blocker would photograph a state no student can reach and would ` +
+        `change the occlusion of every frame of the drive below. ON A PHONE THIS IS THE FINDING: the first-run hint ` +
+        `hides the deck until the car moves at 5 км/ч, and `+
+        `demoDeckStandsDown latches at the same 5 км/ч — so the demonstration is off the glass for the whole window ` +
+        `before the drive, and stands itself down the moment it comes back.`,
+    );
+    await shot("03d-demo-blocked");
+    return;
+  }
+
+  // ── OPEN IT, IF THE STUDENT WOULD HAVE HAD TO ────────────────────────────
+  // Roomy screens mount this deck open (`DemoDeck`'s `useState` initialiser);
+  // a phone mounts it collapsed to its pill. Whichever it was is restored at
+  // the end — see the header.
+  const openedByUs = r0.open !== "true";
+  if (openedByUs) {
+    const ok = await press(page.locator(`${DEMO_DECK_SEL} button[aria-expanded]`));
+    await page.waitForTimeout(1200);
+    if (!ok) {
+      demo.why = "the «🎬 Демонстрация» toggle would not answer a press";
+      loud(`THE «🎬 Демонстрация» TOGGLE WOULD NOT OPEN — no replay from this lane.`);
+      return;
+    }
+  }
+
+  const r1 = await demoRead();
+  if (r1 === null || r1.playLabel === null) {
+    demo.why = "the deck is open and carries no transport (no ▶/⏸ button)";
+    loud(`THE DEMONSTRATION DECK CARRIES NO PLAY BUTTON — ${demo.why}.`);
+    return;
+  }
+  demo.deck.open = r1.open;
+  demo.deck.durationSec = r1.durationSec;
+  demo.deck.playLabel = r1.playLabel;
+  const startedPlaying = r1.playLabel === "Пауза";
+  if (startedPlaying) {
+    /* A CONTRADICTION OF A SHIPPED RULING, SO IT IS SHOUTED RATHER THAN
+     * ACCOMMODATED. `demoDeckAtRest()` is supposed to have parked this clock
+     * at mount; a deck already playing when the harness arrives is the exact
+     * defect that ruling closed (`sc-ed-poligon-chain:746682ab`,
+     * `sc-merge-lane-end:16d2fa64`) coming back. */
+    loud(
+      `THE DEMONSTRATION WAS ALREADY PLAYING when the harness arrived (playhead ${r1.tText ?? "?"}). ` +
+        `demoDeckLifetime.demoDeckAtRest() parks this clock at 0:00 paused at mount, on purpose — a replay running ` +
+        `before the student has driven anything is sc-ed-poligon-chain:746682ab reopening.`,
+    );
+  }
+  const objBefore = r1.objectives;
+  const egoBefore = r1.ego;
+  await shot("03d-demo-open");
+
+  // ── ▶ ────────────────────────────────────────────────────────────────────
+  if (!startedPlaying) {
+    const ok = await press(page.locator(`${DEMO_DECK_SEL} button[aria-label="Пусни"]`));
+    if (!ok) {
+      demo.why = "the ▶ «Пусни» button would not answer a press";
+      loud(`THE ▶ «Пусни» BUTTON WOULD NOT ANSWER A PRESS — ${demo.why}.`);
+      return;
+    }
+  }
+  demo.used = true;
+  demo.why = "the product's own transport replayed its authored correct drive";
+
+  const t0Demo = Date.now();
+  let last = r1.tSec ?? 0;
+  let lastMoveAt = t0Demo;
+  let topT = last;
+  let wrapped = false;
+  let stalled = false;
+  let midShot = false;
+  /* ── THE END FRAME IS TAKEN BEFORE THE WRAP, NOT AFTER IT ─────────────────
+   * MEASURED on the first drive this beat ever took (sc-junction-scan/pc/right,
+   * 2026-08-28): `03d-demo-end.png` showed «0:00 / 0:45» — the transport back
+   * at the start, the ghost back on the spawn mark, and the FIRST annotation
+   * on the glass again. The replay does not stop at the end, it LOOPS
+   * (`ShadowCar.tsx:571`), so a frame taken after the loop's exit condition is
+   * a frame of the beginning wearing the name of the end. The picture was
+   * wrong in the reassuring direction — it looked like a finished replay.
+   * So the frame is taken from INSIDE the loop, at 85% of the authored
+   * duration, and the exact second it was taken at is published in
+   * `demo.replay.endFrameAtSec` so no reader has to trust the name. */
+  let endShotAt = null;
+  let samples = 0;
+  let advancing = 0;
+  let capped = false;
+  let rLast = r1;
+  for (;;) {
+    if (Date.now() - t0Demo >= DEMO_MAX_MS) { capped = true; break; }
+    await page.waitForTimeout(DEMO_POLL_MS);
+    const r = await demoRead();
+    if (r === null) continue;
+    rLast = r;
+    samples += 1;
+    const t = r.tSec ?? last;
+    if (t > last + 0.05) { advancing += 1; lastMoveAt = Date.now(); }
+    // THE REPLAY LOOPS, IT DOES NOT STOP. `ShadowCar.tsx:571` — `if
+    // (clock.tSec > end) clock.tSec = loop ? loop.startSec : 0` — so the
+    // playhead WRAPS and `playing` stays true for ever. „It finished" is
+    // therefore a wrap after the playhead had got most of the way along, and
+    // not a `playing === false` this transport will never produce.
+    if (t < last - 0.5 && last >= (r.durationSec ?? 1) * 0.5) { wrapped = true; topT = Math.max(topT, last); break; }
+    if (t > topT) topT = t;
+    last = t;
+    if (!midShot && r.durationSec && t >= r.durationSec * 0.45) {
+      midShot = true;
+      if (lastShotCostMs() <= DEMO_MID_SHOT_MAX_COST_MS) await shot("03d-demo-play");
+    }
+    if (endShotAt === null && r.durationSec && t >= r.durationSec * 0.85) {
+      endShotAt = Number(t.toFixed(1));
+      await shot("03d-demo-end");
+    }
+    if (Date.now() - lastMoveAt >= DEMO_STALL_MS) { stalled = true; break; }
+  }
+  const ranMs = Date.now() - t0Demo;
+
+  // ── ⏸, REWIND, AND PROVE BOTH ────────────────────────────────────────────
+  // A replay that stalled or ran out of budget never reached 85%, so its end
+  // frame is taken here and is a picture of WHERE IT STOPPED. The name is the
+  // same either way and the second it holds is published either way.
+  if (endShotAt === null) {
+    endShotAt = Number(topT.toFixed(1));
+    await shot("03d-demo-end");
+  }
+  const objAfter = rLast.objectives;
+  const egoAfter = rLast.ego;
+  await press(page.locator(`${DEMO_DECK_SEL} button[aria-label="Пауза"]`));
+  await page.waitForTimeout(600);
+  // Back to 0:00 by the transport the student has — a pointer at the left edge
+  // of the scrub bar, which is what `seekFromPointer` reads. `⏮` walks
+  // ANNOTATIONS and would stop at the first one rather than at zero.
+  const bar = page.locator(`${DEMO_DECK_SEL} [role="slider"]`).first();
+  if (await bar.count().catch(() => 0)) {
+    const box = await bar.boundingBox().catch(() => null);
+    if (box) await bar.click({ position: { x: 1, y: Math.max(1, Math.round(box.height / 2)) }, timeout: 5000 }).catch(() => {});
+  }
+  await page.waitForTimeout(600);
+  if (openedByUs) {
+    await press(page.locator(`${DEMO_DECK_SEL} button[aria-expanded]`));
+    await page.waitForTimeout(800);
+  }
+  // The transport buttons carry no `tabIndex={-1}` (the deck's own toggle
+  // does, explicitly, „so this button must not take focus off the canvas"), so
+  // a click leaves one of them focused. Give the canvas its focus back before
+  // a single pedal key is sent.
+  await page.evaluate(() => document.activeElement?.blur?.()).catch(() => {});
+  const rEnd = await demoRead();
+  demo.restored = {
+    tSec: rEnd?.tSec ?? null,
+    playLabel: rEnd?.playLabel ?? null,
+    open: rEnd?.open ?? null,
+    wantedOpen: openedByUs ? "false" : r0.open,
+    ok:
+      rEnd !== null &&
+      (rEnd.tSec ?? 99) <= 1 &&
+      rEnd.playLabel === "Пусни" &&
+      rEnd.open === (openedByUs ? "false" : r0.open),
+  };
+  demo.replay = {
+    durationSec: rLast.durationSec ?? null,
+    reachedSec: Number(topT.toFixed(1)),
+    ranMs,
+    samples,
+    advancingSamples: advancing,
+    completed: wrapped,
+    stalled,
+    capped,
+    startedAlreadyPlaying: startedPlaying,
+    openedByHarness: openedByUs,
+    midFrame: midShot,
+    /** The second of the authored drive that `03d-demo-end.png` actually
+     *  holds — see the note where it is taken. */
+    endFrameAtSec: endShotAt,
+  };
+  const before = demoTaskIndex(objBefore);
+  const after = demoTaskIndex(objAfter);
+  demo.objectives = {
+    before: objBefore,
+    after: objAfter,
+    indexBefore: before,
+    indexAfter: after,
+    credited: before !== null && after !== null ? after.index > before.index : null,
+  };
+  demo.ego = {
+    source: "window.__camProbe (CameraRig.tsx, DEV BUILDS ONLY) — read as a witness, never as an input",
+    before: egoBefore,
+    after: egoAfter,
+    movedM:
+      egoBefore && egoAfter
+        ? Number(Math.hypot(egoAfter.x - egoBefore.x, egoAfter.z - egoBefore.z).toFixed(2))
+        : null,
+  };
+
+  const fin = wrapped
+    ? "played to the end and wrapped"
+    : stalled
+      ? `STALLED — the playhead did not move for ${DEMO_STALL_MS / 1000}s`
+      : capped
+        ? `hit this beat's ${DEMO_MAX_MS / 1000}s cap`
+        : "stopped for a reason this beat did not name";
+  note(
+    `  DEMONSTRATION: pressed ▶ on the product's own «🎬 Демонстрация» deck — ${fin}. Playhead reached ` +
+      `${demo.replay.reachedSec}s of ${demo.replay.durationSec ?? "?"}s in ${Math.round(ranMs / 1000)}s ` +
+      `(${advancing} of ${samples} samples advancing). Frames: 03d-demo-open (0:00, parked), ` +
+      `${midShot ? "03d-demo-play (mid-route), " : ""}03d-demo-end — and that last one holds ${endShotAt ?? "?"}s of the ` +
+      `authored drive, NOT necessarily its final second: this replay LOOPS rather than stopping, so the frame is taken ` +
+      `at 85% and never after the wrap.`,
+  );
+  note(
+    `        WHAT THOSE FRAMES ARE: the product's OWN authored correct drive, replayed by its own transport. NOT a ` +
+      `\`right\` leg, NOT a \`wrong\` leg, and no evidence whatever about an imperfect human drive. They are the ` +
+      `reference a 04-* frame can be held against on a lesson whose correct drive no leg has ever finished.`,
+  );
+  note(
+    `        AND WHAT THEY DO NOT CARRY: the camera is the PARKED car's cockpit, so the ghost is in shot only while it ` +
+      `is in that car's field of view — measured against the traces, about the first 100 m of route, ending at the ` +
+      `first turn (sc-junction-scan: in shot at 0:21 = 76 m out, gone by 0:38 = 106 m out and already 90° round). ` +
+      `So these frames answer about the START of the route and NOT about a place several hundred metres down it. ` +
+      `The transport second, the caption bank, the annotation ticks and the objective banner ARE in every one of them.`,
+  );
+  note(
+    `        AND THE GRADED CAR DID NOT MOVE: ${demo.ego.movedM === null ? "the pose probe did not answer (a production build has none)" : `${demo.ego.movedM} m`}` +
+      ` — the objective banner read «${(objBefore[0] ?? "(none)").slice(0, 60)}» before and ` +
+      `«${(objAfter[0] ?? "(none)").slice(0, 60)}» after` +
+      `${demo.objectives.credited === null ? "" : demo.objectives.credited ? ", so an objective CREDITED during the replay" : ", so NOTHING credited"}. ` +
+      `That is the mechanism and not a defect: ShadowCar drives a translucent clone kinematically, with no physics ` +
+      `body and no write into the grading path, so the car rules/engine.ts grades stayed on the spawn mark. WHAT IT ` +
+      `SETTLES is narrower and real — the uncredited objectives on this lesson cannot be explained by «there is no ` +
+      `drivable success path here», because the product ships a recording of that path and these frames are it.`,
+  );
+  if (stalled || capped) {
+    loud(
+      `THE DEMONSTRATION DID NOT FINISH (${fin}) — 03d-demo-end is a picture of the MIDDLE of the authored drive, ` +
+        `not of its end, and the part of the route after ${demo.replay.reachedSec}s is unphotographed on this lane.`,
+    );
+  }
+  if (!demo.restored.ok) {
+    loud(
+      `THE SCENE WAS NOT RESTORED AFTER THE DEMONSTRATION (playhead ${demo.restored.tSec ?? "?"}s, transport reads ` +
+        `«${demo.restored.playLabel ?? "?"}», deck open=${demo.restored.open ?? "?"} against ${demo.restored.wantedOpen}). ` +
+        `Every verdict in this corpus was taken with the ghost parked on the trace's first sample; a ghost car and a ` +
+        `blue ribbon standing somewhere else sit INSIDE the windscreen band the guidance loop reads, so the steering ` +
+        `numbers from the drive below are NOT comparable with any other drive.`,
+    );
+  }
+}
 /* ── AN ORDINARY LANE MAY NOT BE QUIET ABOUT A DEAD WHEEL — round 3 ─────────
  *
  * HERE — before the positive control, and NOT inside the drive loop — because
@@ -3018,6 +3614,13 @@ async function disarmReverse() {
  */
 await timed("steer", steerLiveness);
 saveStatus({ steering });
+
+// …AND NOW ▶, IN THE SAME WINDOW AND FOR THE SAME REASON: the demonstration
+// can only be watched from a standstill. See PRESS THE PRODUCT'S OWN PLAY
+// BUTTON above — its whole body is declared there so that this call and the
+// liveness call above it stay adjacent.
+await timed("demo", runDemo);
+saveStatus({ demo });
 
 // POSITIVE CONTROL — the car must leave zero, or nothing after this is evidence.
 await throttle(true);
@@ -3705,6 +4308,398 @@ const ROLL_DISTANCE_M = 15;
 const STOP_MS = 3000;
 const LAWFUL_WAIT_MAX_MS = 45_000; // finish.ts YIELD_WAIT_MAX_S is 180 — well inside
 
+/* ── THE `wrong` LEG COMES TO REST — 2026-08-28 ─────────────────────────────
+ *
+ * WHAT WAS MISSING IS BIGGER THAN A MISSING BRANCH. `phase` starts at "flat"
+ * on every MODE=«wrong» lane and there is no `flat` case — but no case could
+ * have helped, because THE WHOLE PHASE BRANCH IS NESTED INSIDE
+ * `if (MODE === "right")`: the gate opened for the „does this task want R?"
+ * question closes 296 lines later, past the end of the reverse branch. A
+ * `flat` case appended to that chain would have been DEAD CODE. So a wrong leg
+ * ran no control law at all — one `throttle(true)` before the loop,
+ * re-asserted after a pause drain, and nothing else for the whole budget.
+ * Measured on this tree, sc-pk-ban-stop/pc/wrong, before this change:
+ *
+ *     DRIVE: wrong · top 59 км/ч · 0 full stops
+ *     TICKS: 51 (0 of them driving)
+ *
+ * Fifty-one ticks, zero of them acting. It never steered, never braked, and
+ * NEVER CAME TO REST.
+ *
+ * WHY „never came to rest" COSTS MORE THAN THE LEGS IT SPOILS. Every «stopping
+ * where forbidden» offence is defined by WHERE THE CAR COMES TO REST.
+ * `rules/engine.ts`'s ban-zone reducer bills ILLEGAL_STOP_IN_BAN_ZONE only
+ * while `speed <= fullStopMaxSpeedKmh` (1 км/ч, rules/types.ts) inside an
+ * authored В27 span, SUSTAINED for `banZoneStopRestSec` (4 s), and it resets
+ * the episode the moment the car moves faster than `movingSpeedKmh` (5). A car
+ * that never stops can commit that offence on NO lesson in the corpus — which
+ * is why every ban-zone lesson in this audit convicts its wrong leg of
+ * «Настъпи сблъсък» plus «Превишена скорост» and never of чл. 98, and why the
+ * sc-pk-ban-stop wrong leg TICKS ITS FIRST OBJECTIVE — «Премини през зоната
+ * В27, без да спираш ✓ 0:29». The leg that exists to break the rule keeps it.
+ *
+ * WHAT THIS IS NOT. It does NOT make `wrong` follow the route. The leg still
+ * holds the throttle flat out with no cruise cap and never touches the wheel,
+ * because a flat-out straight line is what earns its convictions and is what
+ * every verdict ever taken from a wrong leg MEANS. The only thing added is
+ * that it can stop.
+ *
+ * WHY PERIODIC, AND NOT „a stop in the marked zone". This harness has no world
+ * position — it reads a windscreen and a cluster — so a stop aimed at a zone
+ * would need per-lesson coordinates, i.e. an instrument that decides in
+ * advance which conviction it wants. That is manufacturing a fault. A car that
+ * stops carelessly wherever it happens to be IS the offence („само за
+ * минутка"), and the ENGINE keeps every acquittal it already has: a lead
+ * within `banZoneStopQueueGapM`, a person within `banZoneVruAheadM`, a stop
+ * line within 25 m, an armed crossing, reverse gear. The instrument supplies
+ * the behaviour; the product decides whether that place was forbidden.
+ *
+ * AND NOT „one stop at the end of the route" either: this leg ends in a
+ * collision at t≈27 s on the lesson above, so a terminal rest is a rest that
+ * usually never happens.
+ */
+/**
+ * HOW FAR THE `wrong` LEG RUNS FLAT OUT BETWEEN TWO CARELESS RESTS — METRES,
+ * NOT SECONDS, and for a sharper version of ROLL_DISTANCE_M's reason: this leg
+ * runs four times faster, so a 10 s cadence is 40 m on a slow box and 140 m on
+ * a fast one, and a 140 m gap steps over most authored spans without touching
+ * one.
+ *
+ * THE NUMBER IS MEASURED AGAINST THE SPANS IT HAS TO LAND IN. The 16 authored
+ * `noStopping` spans in `content/world/*.json` run 7.5 m to 216 m with a
+ * MEDIAN of 50 m; the two this change is aimed at are 120 m (`pk-ban-v1`,
+ * y 70..190) and a contiguous 60 m (`pk-busstop-v1`, y 150..210). A rest lands
+ * roughly a stopping distance PAST the decision — the leg reaches ~40 км/ч
+ * over 45 m, the pedal takes the measured ~2 s CDP round trip to land, and the
+ * car needs a few seconds more to shed it — so 45 m of cadence puts a rest
+ * about every 85 m of road: one or two inside a 120 m span, about one inside a
+ * 60 m one.
+ *
+ * SHORTER WOULD CONVICT MORE OFTEN AND COST THE LEG ITS TOP SPEED, which is
+ * where most wrong-leg convictions actually come from («Превишена скорост» ×8
+ * on sc-ov-oneway; 58.9 км/ч in a 50 zone on the drive quoted above). 45 m of
+ * run-up still peaks this car over an urban limit.
+ */
+const FLAT_REST_EVERY_M = 45;
+/** …and a CLOCK backstop, because a dial that is not in the DOM reads −1 and
+ *  the metre integral then stands still for ever — the exact conflation the
+ *  `cockpit` census exists for. Same shape as ROLL_MS backing ROLL_DISTANCE_M. */
+const FLAT_REST_MAX_MS = 20_000;
+/** How long the car stands there: TWICE the engine's `banZoneStopRestSec`
+ *  (4 s), so one slow tick cannot cut a rest short of the bar it exists to
+ *  clear. */
+const FLAT_REST_HOLD_MS = 8000;
+/** …and when it will not come to rest at all, SAY SO and roll on. The `stop`
+ *  phase gives a 12 км/ч cruise STOP_MS + 8 s = 11 s; this leg arrives at four
+ *  times that speed with the same actuation latency, so it gets more room
+ *  before it declares the brake unanswered. */
+const FLAT_REST_GIVEUP_MS = 15_000;
+
+/* ── THE PACE TAPE — A DRIVE OF REPRODUCIBLE LENGTH — 2026-08-28 ────────────
+ *
+ * MEASURED ON THIS TREE BEFORE ANYTHING WAS BUILT. `sc-ed-d2-city-run`,
+ * `pc/right`, three drives at 405e2056 minutes apart, nothing changed between
+ * them and nothing else running on the box:
+ *
+ *     run 1  184 s · 16 full stops · witness path 201.6 m · 37 frames · 20 т.
+ *     run 2  265 s · 25 full stops · witness path 352.1 m · 52 frames · 20 т.
+ *     run 3  180 s · 15 full stops · witness path 207.3 m · 36 frames · 30 т.
+ *
+ * Same code, same server, same lesson: 1.5x the wall clock and 1.75x the road.
+ * A ledger row reading «the objective was not credited» rests on WHICH of those
+ * drives it happened to get, and that is why 154 findings sit at UNJUDGED.
+ *
+ * The authored correct drive of that lesson — `content/traces/<id>/shadow-
+ * correct.trace.json`, the recording the product's own «🎬 Демонстрация» deck
+ * plays at «0:00 / 1:50» — covers 971 m in 110.8 s, tops 45 км/ч, and comes to
+ * rest TWICE (at 331 m and at 870 m). This harness covered a fifth to a third
+ * of that road, in twice the time, stopping fifteen to twenty-five times, and
+ * its dial reads 13 -> 3 -> 0 -> 13 -> 3 -> 0 for the whole drive.
+ *
+ * ── IT IS NOT A SPEED SETTING AND IT IS NOT STEERING. IT IS THE ROLL BOUND ──
+ *
+ *     if ((rollM >= ROLL_DISTANCE_M || now - phaseAt >= ROLL_MS) && …)
+ *
+ * `ROLL_MS` is 4000 and its own comment calls it "the safety cap on a roll; the
+ * real bound is metres". MEASURED, IT IS THE ONLY BOUND THAT EVER FIRES. A car
+ * leaving a standstill under CRUISE_KMH = 12 spends its first seconds
+ * accelerating and needs about 6 s to make 15 m, so the 4 s cap always arrives
+ * first, at about 12 m — run 1 above made 201.6 m over 16 rests, i.e. 12.6 m a
+ * cycle, against a 15 m bound. The distance bound is dead code. What is left is
+ * four seconds of whatever the box managed, which is the BOX'S number and not
+ * the road's, and that is the mechanism under the spread.
+ *
+ * ── WHAT THIS ADDS, AND WHY IT CANNOT MAKE A DRIVE SLOWER ──────────────────
+ *
+ * The shipped shadow trace is a per-lesson SPEED-BY-DISTANCE profile of a drive
+ * the product itself calls correct. Folded to one reading per metre it answers
+ * the question the roll phase has always had to guess — how fast may this car
+ * be HERE — so the target becomes
+ *
+ *     target = max(CRUISE_KMH, the SLOWEST the authored drive was
+ *                              over the road just ahead)
+ *
+ * and the `max` is the entire safety argument. The tape may raise the target
+ * and can never lower it. Every stretch where the authored drive is slow — a
+ * crossing, a car park, a junction approach — is therefore driven exactly as it
+ * is driven today, at 12 км/ч behind a 15 m look cadence, and every measurement
+ * ROLL_DISTANCE_M was bought with still holds there. Only the stretches the
+ * product itself drives fast go faster.
+ *
+ * It is also the per-lesson governor `sc-park-gap-long:6e1d02ce` asks for, from
+ * the other side: that row is 40 км/ч in a 20 zone convicting the instrument's
+ * own throttle, and this lesson's tape never exceeds 18 км/ч, so the target
+ * there is capped by the authored drive rather than by a global constant.
+ *
+ * ── AND THE LOOK CADENCE FOLLOWS THE SPEED, IN SECONDS ─────────────────────
+ *
+ * ROLL_DISTANCE_M = 15 exists because 25 m is the radius inside which the
+ * runtime will even consider a car to be waiting for a pedestrian, so the car
+ * must come to rest more often than that. At 12 км/ч, 15 m is 4.5 s of driving,
+ * and it is the SECONDS that carry the argument: a look every 4.5 s catches a
+ * crossing the car is closing on at 12 км/ч. Above CRUISE_KMH the cadence
+ * therefore holds 4.5 s of CRUISING, plus the room the car needs to get up to
+ * speed — because charging the acceleration against the look budget is exactly
+ * what pins this car at 13 км/ч: at a 45 км/ч target the car needs 56 m to
+ * arrive, and a 56 m roll would end at the moment it did.
+ *
+ * ── WHAT IT MEASURED, AND IT IS THE ONLY REASON TO KEEP IT ────────────────
+ *
+ * Same box, same server, same commit, three drives each. `witness path` is the
+ * dev-only pose probe and is independent of everything above.
+ *
+ *   sc-fo-motorway-gap / pc / right
+ *     before (11 stored drives, this box and five earlier commits)
+ *       264–280 s, ALL cut off by the budget · 26–27 full stops ·
+ *       317.9–364.5 m · driving top 15–19 км/ч · objective 1 credited at
+ *       4:07 when at all, objective 2 NEVER credited in the corpus
+ *     after
+ *       110 / 116 / 120 s, all three ENDED NATURALLY · 1–3 stops ·
+ *       693.8 / 721.4 / 735.4 m · top 110–112 км/ч ·
+ *       objective 1 at 0:57 / 0:58 / 0:59, objective 2 at 1:35 / 1:37 ·
+ *       one run ИЗДЪРЖАН, 0 наказателни точки, three stars
+ *
+ *   sc-ed-d2-city-run / pc / right
+ *     before  184 / 265 / 180 s · 16 / 25 / 15 stops · 37 / 52 / 36 frames ·
+ *             201.6 / 352.1 / 207.3 m  (1.75x)
+ *     after    93 /  94 /  93 s ·  1 /  1 /  1 stop  · 19 / 19 / 19 frames ·
+ *             201.3 / 210.2 / 200.5 m  (1.05x)
+ *
+ * THE SECOND TABLE IS THE POINT, not the first. That lesson still ends in a
+ * crash and still credits only objective 1 — the change did not repair it —
+ * but it now does the SAME thing three times, so one drive of it is a sample
+ * of a distribution instead of a draw from one. A graded beat that lands at
+ * 0:57, 0:58 and 0:59 on three consecutive runs is what this stage was for.
+ *
+ * THE RESIDUAL RISK IS WRITTEN DOWN RATHER THAN HIDDEN, and the drive report
+ * repeats it on every lane that uses a tape: where the tape is fast the car now
+ * covers >100 m between two rests, so the blanket cadence is no longer what
+ * catches a crossing — the TAPE is, because the authored drive slows where it
+ * must and the target follows it down. That is a better signal and a weaker
+ * guarantee, and a «Непропускане на пешеходец» on a pace drive has to be read
+ * against `pace.targets` before it is filed against the product.
+ *
+ * ── THE INDEX IS AN ODOMETER, AND IT IS APPROXIMATE ────────────────────────
+ *
+ * The tape is indexed in metres and the metres come from integrating the
+ * SPEEDOMETER — `[aria-label^="Скорост "]`, the dial a student reads — and NOT
+ * from `window.__camProbe`. The pose probe is right there and it is exact, and
+ * the rule this file already keeps is that nothing a student's build does not
+ * publish may enter the control law, or a drive could pass a lesson whose
+ * visible instruments are broken. So the probe stays a WITNESS: this stage
+ * publishes what it witnesses ABOUT the index (`pace.alignment`) and never
+ * steers by it.
+ *
+ * The known error is named because it is not small. The liveness checks that
+ * run BEFORE the control law — «POSITIVE CONTROL: 44 км/ч after 5 s of
+ * throttle» plus two ~1 s steering legs — move the car perhaps 50 m down the
+ * road, and the odometer starts at zero regardless. The index therefore LAGS
+ * the car: the target is the tape's reading for ground already covered, which
+ * is conservative on the way up and LATE TO SLOW DOWN. `PACE_ALIGN_SLACK_M`
+ * below buys the lookahead enough room to cover it, and `pace.alignment`
+ * measures the real offset on every drive so the next stage can decide with a
+ * number instead of an argument.
+ */
+/** Km/h this car gains per second under full throttle — the figure CRUISE_KMH's
+ *  own note measured ("0 -> 45 in 9 s"). */
+const PACE_ACCEL_KMH_PER_S = 5;
+const PACE_ACCEL_MPS2 = PACE_ACCEL_KMH_PER_S / 3.6;
+/** The look cadence IN SECONDS, taken from the shipped constants rather than
+ *  invented: 15 m at 12 км/ч is 4.5 s. */
+const LOOK_EVERY_S = ROLL_DISTANCE_M / (CRUISE_KMH / 3.6);
+/** How far ahead the target reads, in seconds of travel — the room to lift and
+ *  shed speed before the authored drive slows. */
+const PACE_LOOKAHEAD_S = 4;
+/** …and a floor under it, so a crawling car still reads past its own bonnet. */
+const PACE_LOOKAHEAD_MIN_M = 10;
+/** …and the slack for the index lag described above. Capped as a FRACTION of
+ *  the route as well, or a 106 m parking lesson would read its whole route as
+ *  «slow ahead» and never leave 12 км/ч for a reason that has nothing to do
+ *  with the lesson. */
+const PACE_ALIGN_SLACK_M = 60;
+const PACE_ALIGN_SLACK_FRAC = 0.15;
+/** The floor and ceiling on what the throttle gives up to actuation latency. */
+const PACE_LIFT_MIN_KMH = 3;
+const PACE_LIFT_MAX_KMH = 20;
+/** At or under this the tape is standing still. */
+const PACE_REST_KMH = 1;
+
+const PACE_TAPE_PATH = resolve(REPO_ROOT, "content", "traces", SCENARIO, "shadow-correct.trace.json");
+
+/** Everything this stage did, published so a judge never has to infer it from a
+ *  speed trace. */
+const pace = {
+  used: false,
+  why: "not attempted",
+  tape: null,
+  odoM: 0,
+  rolls: 0,
+  capHits: 0,
+  /** every CHANGE of target, with the metre it happened at */
+  targets: [],
+  alignment: null,
+};
+/** Metres since the control law started, integrated from the dial. */
+let paceOdoM = 0;
+
+const loadPaceTape = () => {
+  // A `wrong` leg is not a correct drive and must not be given one: its
+  // convictions are earned flat out and in a straight line, and every verdict
+  // ever taken from a wrong leg means that.
+  if (MODE !== "right") {
+    pace.why = "MODE=wrong — the tape is a correct drive and only a `right` leg may be driven to it";
+    return null;
+  }
+  if (!existsSync(PACE_TAPE_PATH)) {
+    pace.why = `no shadow trace on disk at ${PACE_TAPE_PATH}`;
+    return null;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(readFileSync(PACE_TAPE_PATH, "utf8"));
+  } catch (error) {
+    pace.why = `the shadow trace would not parse (${String(error?.message ?? error)})`;
+    return null;
+  }
+  const s = Array.isArray(doc?.samples) ? doc.samples : [];
+  if (s.length < 2) {
+    pace.why = `the shadow trace holds ${s.length} sample(s)`;
+    return null;
+  }
+  const bins = [];
+  let d = 0;
+  let top = 0;
+  let stops = 0;
+  let inStop = false;
+  let moved = false;
+  for (let i = 1; i < s.length; i += 1) {
+    const a = s[i - 1];
+    const b = s[i];
+    const v = Number(b.speedKmh);
+    if (![a.x, a.y, b.x, b.y, v].every((n) => Number.isFinite(n))) continue;
+    d += Math.hypot(b.x - a.x, b.y - a.y);
+    const k = Math.max(0, Math.floor(d));
+    // ONE READING PER WHOLE METRE, AND IT IS THE SLOWEST SAMPLE IN IT — the
+    // safe direction, because a bin read too fast asks this car to be faster
+    // than the drive the product calls correct.
+    // BIN ZERO IS THE EXCEPTION AND TAKES THE FASTEST. A recording opens with
+    // the car at rest, and a standing START is not a stop to be reproduced; a
+    // `min` there would ask the harness to brake to a halt before it had moved.
+    bins[k] = bins[k] === undefined ? v : k === 0 ? Math.max(bins[k], v) : Math.min(bins[k], v);
+    if (v > top) top = v;
+    if (v > PACE_REST_KMH) moved = true;
+    const at = v <= PACE_REST_KMH;
+    if (at && !inStop && moved) {
+      stops += 1;
+      inStop = true;
+    }
+    if (!at) inStop = false;
+  }
+  const total = Math.floor(d);
+  if (!(total >= 1)) {
+    pace.why = `the shadow trace covers ${d.toFixed(1)} m`;
+    return null;
+  }
+  // A metre nothing sampled inherits the last one that was. At 130 км/ч a 50 ms
+  // sample is 1.8 m from the next, so about half the bins on a motorway are
+  // empty — and an empty bin read as zero is a phantom stop.
+  let last = bins[0] === undefined ? CRUISE_KMH : bins[0];
+  for (let k = 0; k <= total; k += 1) {
+    if (bins[k] === undefined) bins[k] = last;
+    else last = bins[k];
+  }
+  return {
+    path: PACE_TAPE_PATH.slice(REPO_ROOT.length + 1).replace(/\\/g, "/"),
+    samples: s.length,
+    durationSec: Number(doc?.meta?.durationSec) || null,
+    totalM: Number(d.toFixed(1)),
+    topKmh: Number(top.toFixed(1)),
+    stops,
+    bins,
+    first: { x: Number(s[0].x), y: Number(s[0].y) },
+  };
+};
+const paceTape = loadPaceTape();
+if (paceTape !== null) {
+  pace.used = true;
+  pace.why = "driving to the authored shadow's speed-by-distance profile";
+  // The per-metre readings themselves stay out of the status file — a 1 km
+  // route is a thousand numbers a reader will never check, and the file they
+  // came from is named right here.
+  pace.tape = {
+    path: paceTape.path,
+    samples: paceTape.samples,
+    durationSec: paceTape.durationSec,
+    totalM: paceTape.totalM,
+    topKmh: paceTape.topKmh,
+    stops: paceTape.stops,
+  };
+}
+
+/** The slowest the authored drive was over the road just ahead — and NEVER
+ *  below CRUISE_KMH, which is the whole safety argument above. */
+const paceTarget = (odoM, kmh) => {
+  if (paceTape === null) return CRUISE_KMH;
+  // PAST THE END OF THE AUTHORED ROUTE THE TAPE HAS NOTHING TO SAY, and the
+  // honest answer there is the fixed creep this harness has always driven.
+  if (odoM > paceTape.totalM) return CRUISE_KMH;
+  const slack = Math.min(PACE_ALIGN_SLACK_M, PACE_ALIGN_SLACK_FRAC * paceTape.totalM);
+  const aheadM = Math.max(PACE_LOOKAHEAD_MIN_M, (Math.max(0, kmh) / 3.6) * PACE_LOOKAHEAD_S) + slack;
+  const lastBin = paceTape.bins.length - 1;
+  const from = Math.min(lastBin, Math.max(0, Math.floor(odoM)));
+  const to = Math.min(lastBin, Math.floor(odoM + aheadM));
+  let v = Infinity;
+  for (let k = from; k <= to; k += 1) if (paceTape.bins[k] < v) v = paceTape.bins[k];
+  return Number.isFinite(v) ? Math.max(CRUISE_KMH, v) : CRUISE_KMH;
+};
+
+/** What the throttle gives up to the actuation latency. The car keeps
+ *  accelerating for about a tick plus a CDP round trip after the decision to
+ *  lift, at PACE_ACCEL_KMH_PER_S a second — so at the 110 ms ticks measured on
+ *  this box this sits on its floor, 3, the same number `CRUISE_KMH - 3` has
+ *  always used, and unlike that constant it GROWS with a slower box instead of
+ *  standing still while the overshoot does not. Never more than 40% of the
+ *  target, or a slow box would null a 12 км/ч aim entirely. */
+const paceLift = (target) => {
+  const want = (((medianTick() || TICK_MS) * 2) / 1000) * PACE_ACCEL_KMH_PER_S;
+  const ceiling = Math.max(PACE_LIFT_MIN_KMH, Math.min(PACE_LIFT_MAX_KMH, target * 0.4));
+  return Math.max(PACE_LIFT_MIN_KMH, Math.min(ceiling, want));
+};
+
+/** The metres a roll may cover before the car comes to rest and looks. At or
+ *  below CRUISE_KMH it is ROLL_DISTANCE_M, unchanged and deliberately so. */
+const paceLookM = (target) =>
+  target <= CRUISE_KMH
+    ? ROLL_DISTANCE_M
+    : (target / 3.6) ** 2 / (2 * PACE_ACCEL_MPS2) + (target / 3.6) * LOOK_EVERY_S;
+
+/** …and the clock cap behind it, sized at three times the seconds that roll
+ *  SHOULD take — get to speed, then hold it for the look interval. With a tape
+ *  this is a safety cap and never the bound, which is the correction this whole
+ *  stage is: ROLL_MS, measured, was always the bound. */
+const paceRollCapMs = (target) =>
+  paceTape === null ? ROLL_MS : Math.max(ROLL_MS, 3000 * (target / 3.6 / PACE_ACCEL_MPS2 + LOOK_EVERY_S));
+
 /** The stems of every sentence the product says when standing still is correct.
  *  Two from `yieldWaitAdvisorPrompt` (four of the five reasons open «Чакаш
  *  правилно», Б2 opens with its own), two from the yield VOICE's named and
@@ -3934,9 +4929,38 @@ let lastShot = 0;
 let shotBackoffSaid = false;
 let phaseTicks = 0;
 let rollM = 0;
+/** Metres the `wrong` leg has run flat out since its last rest. */
+let flatM = 0;
+/** When that rest was BOOKED — which is not when the phase began, because the
+ *  car spends the first seconds of the phase still braking. */
+let flatRestAt = 0;
 let prevKmh = -1;
 let lostKeys = 0;
 let lastTickAt = Date.now();
+/* ── THE ODOMETER GETS ITS OWN CLOCK, AND MEASURING WHY IS THE FINDING ──────
+ *
+ * `lastTickAt` is assigned at the very END of the loop body, AFTER the phase
+ * work and after the periodic frame — so the interval from `now` to the end of
+ * the tick, which is where the pedals, the guidance scan and a screenshot that
+ * costs seconds all live, IS CHARGED TO NO INTERVAL AT ALL. Every integral
+ * built on `now - lastTickAt` therefore under-counts by however long a tick's
+ * work takes.
+ *
+ * MEASURED, three pace drives, dial integral against the dev-only pose probe's
+ * own path over the same samples: 0.702, 0.632, 0.674. The speedometer is not
+ * the problem — dial ÷ probe speed is 0.935 over 150 moving samples, and the
+ * shipped traces are internally exact (position path ÷ speed integral = 1.000
+ * on all three lessons checked). It is the missing seconds: A THIRD OF THE
+ * ROAD IS NOT BILLED.
+ *
+ * `rollM` IS BUILT ON THE SAME EXPRESSION AND IS LEFT ALONE, deliberately.
+ * ROLL_DISTANCE_M = 15 was tuned against the biased integral, so «fixing» it
+ * here would silently shorten every roll on every lane by a third — including
+ * the no-tape lanes this stage promises not to touch — and no measurement in
+ * this stage covers that. It is REPORTED, not repaired here: the 15 m roll has
+ * always been about 22 m of road.
+ */
+let paceLastAt = Date.now();
 let restLogged = false;
 let drivingTicks = 0;
 const tickMs = [];
@@ -4052,6 +5076,10 @@ while (!ended && Date.now() - t0 < budgetMs) {
     // in that gap would bill the roll for 30 s of travel the car never made
     // (it was frozen), and end the roll phase on the next tick for no reason.
     lastTickAt = Date.now();
+    // …and the odometer's own clock with it, for the same reason and by the
+    // same argument: a frozen world moves no car, and the pace tape is indexed
+    // by road, not by wall clock.
+    paceLastAt = Date.now();
     // ── THE BELIEF ABOUT THE PEDALS DOES NOT SURVIVE A PAUSE ─────────────
     // `holdW`/`holdS` are what the harness THINKS the keyboard is doing, and
     // a key sent while a modal owns the focus can simply never reach the
@@ -4100,6 +5128,20 @@ while (!ended && Date.now() - t0 < budgetMs) {
   }
 
   const now = Date.now();
+  /* ── THE ODOMETER, WHICH IS THE ONLY INDEX THE PACE TAPE IS READ BY ───────
+   *
+   * Integrated from the DIAL, on every tick and in every phase, because the
+   * index has to be a reading a student's build publishes (see THE PACE TAPE
+   * on why `window.__camProbe` may not be it). It is charged FORWARD in
+   * reverse too: the tape is never consulted in R, so the only consequence is
+   * that `pace.odoM` over-reads on a lane that reverses, and the drive report
+   * says so rather than leaving a reader to discover it.
+   *
+   * ON `paceLastAt` AND NOT ON `lastTickAt` — see the note where it is
+   * declared. The tick's own work is seconds of real road and `lastTickAt` does
+   * not cover them. */
+  paceOdoM += (Math.max(0, p.kmh) / 3.6) * ((now - paceLastAt) / 1000);
+  paceLastAt = now;
   // THE CLUSTER IS RECORDED ON EVERY TICK, ON EVERY LESSON, IN BOTH MODES.
   // It costs nothing (`probe` already reads it) and it is the answer to the
   // question 376 drives could not answer: „what gear was this car in?" The
@@ -4430,9 +5472,32 @@ while (!ended && Date.now() - t0 < budgetMs) {
       // (measured at 2.1 s median on the `pc` leg). Between CRUISE-3 and
       // CRUISE+6 the car now simply rolls, which is also what a driver holding
       // a speed actually does with their foot.
+      /* ── HOW FAST, HERE — FROM THE AUTHORED DRIVE, NEVER BELOW THE CREEP ──
+       * See THE PACE TAPE. On a lane with no tape `paceTarget` returns
+       * CRUISE_KMH, `paceLookM` returns ROLL_DISTANCE_M and `paceRollCapMs`
+       * returns ROLL_MS, so every line below is the drive this harness has
+       * always taken — which is what makes this safe to land on a corpus of
+       * 1,462 findings taken with the old one.
+       *
+       * ONE THING IS NOT IDENTICAL, AND IT IS SAID RATHER THAN ROUNDED AWAY.
+       * `CRUISE_KMH - 3` becomes `CRUISE_KMH - paceLift(12)`, and `paceLift`
+       * is 3 at the 110 ms ticks measured on this box but 4.8 on a box slow
+       * enough to make the throttle overshoot by that much. So on a SLOW box a
+       * no-tape lane now aims about 1.8 км/ч lower than it used to. That is
+       * the direction the overshoot argument points and it is under a km/h of
+       * cruise; it is not zero. */
+      const target = paceTarget(paceOdoM, p.kmh);
+      const lift = paceLift(target);
+      if (pace.targets.length === 0 || pace.targets[pace.targets.length - 1].kmh !== Math.round(target)) {
+        pace.targets.push({
+          tSec: Math.round((now - t0) / 1000),
+          odoM: Math.round(paceOdoM),
+          kmh: Math.round(target),
+        });
+      }
       await timed("pedals", async () => {
-        await brake(p.kmh > CRUISE_KMH + BRAKE_CAP_OVER_KMH, p.kmh);
-        await throttle(p.kmh >= 0 && p.kmh < CRUISE_KMH - 3);
+        await brake(p.kmh > target + BRAKE_CAP_OVER_KMH, p.kmh);
+        await throttle(p.kmh >= 0 && p.kmh < target - lift);
       });
       // ── AND THE WHEEL, ON THE SAME TICK AS THE PEDALS ────────────────────
       // Only in the roll phase, and only forward: the stop phase is braking to
@@ -4443,7 +5508,26 @@ while (!ended && Date.now() - t0 < budgetMs) {
       drivingTicks++;
       phaseTicks++;
       rollM += (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
-      if ((rollM >= ROLL_DISTANCE_M || now - phaseAt >= ROLL_MS) && phaseTicks >= 1) {
+      /* ── THE BOUND IS METRES; THE CLOCK IS THE SAFETY CAP ────────────────
+       * Which is what ROLL_DISTANCE_M's own comment always claimed and what,
+       * measured, was never true: at CRUISE_KMH a car leaving a standstill
+       * needs ~6 s to make 15 m, so `ROLL_MS` (4 s) always arrived first, at
+       * about 12 m. The roll was time-bounded, and a time-bounded roll is as
+       * long as the box is fast. When the cap fires now it SAYS SO, because a
+       * roll bounded by the clock is a roll whose length is not the road's. */
+      const lookM = paceLookM(target);
+      const capMs = paceRollCapMs(target);
+      const cappedOut = now - phaseAt >= capMs;
+      if ((rollM >= lookM || cappedOut) && phaseTicks >= 1) {
+        if (cappedOut && rollM < lookM) {
+          pace.capHits += 1;
+          loud(
+            `a roll ran its ${Math.round(capMs / 1000)}s safety cap having covered ${rollM.toFixed(1)} m of the ` +
+              `${lookM.toFixed(0)} m it was aimed at (target ${Math.round(target)} км/ч, dial ${p.kmh} км/ч) — THAT roll ` +
+              `was bounded by the clock, so its length is this box's and not this road's.`,
+          );
+        }
+        pace.rolls += 1;
         // THE WHEEL COMES BACK TO CENTRE BEFORE THE PHASE DOES — see
         // `guideLeaveRoll`. Nothing past this line ever scans again, so a
         // sustained turn left down here turns the car for the whole stop.
@@ -4575,6 +5659,92 @@ while (!ended && Date.now() - t0 < budgetMs) {
     }
   }
 
+  /* ── THE `wrong` LEG'S CONTROL LAW — OUTSIDE THE `right` GATE ON PURPOSE ───
+   *
+   * The phase branch above closes INSIDE `if (MODE === "right")` (see the note
+   * on FLAT_REST_EVERY_M), so a `flat` case appended to that chain would never
+   * have run: the value would have been right and nothing would have read it,
+   * which is the exact failure this programme keeps paying for. The wrong
+   * leg's law therefore stands on its own, here, where a wrong leg reaches it.
+   *
+   * THE GATE ABOVE IS LEFT WHERE IT IS, and that is a judgement, not an
+   * oversight. Moving its brace would re-indent 167 lines of reverse machinery
+   * in a file two more stages of this wave still have to edit, for no
+   * behaviour a `wrong` leg can observe — `roll`, `stop` and `reverse` are
+   * only ever entered from `right`-mode transitions, so the misplaced brace is
+   * latent rather than live. It is REPORTED, not repaired here.
+   */
+  if (MODE !== "right") {
+    if (phase === "flat") {
+      // FLAT OUT AND STRAIGHT — unchanged in what it means. No cruise cap, no
+      // coast band, no wheel: `guideTick` is deliberately not called, because a
+      // wrong leg that follows the route would invalidate every verdict ever
+      // taken from a wrong leg.
+      await timed("pedals", () => throttle(true));
+      drivingTicks++;
+      phaseTicks++;
+      flatM += (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
+      if ((flatM >= FLAT_REST_EVERY_M || now - phaseAt >= FLAT_REST_MAX_MS) && phaseTicks >= 1) {
+        phase = "flat-rest";
+        phaseAt = now;
+        phaseTicks = 0;
+        flatM = 0;
+        flatRestAt = 0;
+        restLogged = false;
+      }
+    } else if (phase === "flat-rest") {
+      phaseTicks++;
+      await throttle(false);
+      // THE SAME STANDSTILL DISCIPLINE THE `stop` PHASE RUNS UNDER, and for the
+      // same reason: press the brake only while the car still MOVES, then hold
+      // it through the rest. A fresh press at a standstill is the auto-reverse
+      // gesture (`brake()` refuses it and counts the refusal). The release at
+      // the far end is a genuine lift at a standstill — safe, because the next
+      // press cannot happen until the car is moving again.
+      if (holdS && p.kmh > 1 && prevKmh >= 0 && p.kmh > prevKmh + 2) {
+        loud(`the brake is held and the car went ${prevKmh} -> ${p.kmh} км/ч — the sim never got the key; re-asserting it.`);
+        await page.keyboard.up("KeyS").catch(() => {});
+        holdS = false;
+        lostKeys += 1;
+      }
+      await brake(true, p.kmh);
+      const atRest = p.kmh >= 0 && p.kmh <= 1;
+      if (atRest && !restLogged) {
+        restLogged = true;
+        flatRestAt = now;
+        stopsMade++;
+        note(
+          `      the wrong leg came to REST at t=${Math.round((now - t0) / 1000)}s (stop ${stopsMade}) and holds it for ` +
+            `${FLAT_REST_HOLD_MS / 1000}s — twice the engine's 4 s ban-zone sustain. Where it stopped is the product's ` +
+            `question, not this harness's.` +
+            (p.lawfulWait === null ? "" : ` A LAWFUL WAIT is declared here («${p.lawfulWait}») and this leg does not honour it — it is the reckless leg, and driving off is its own act, not an instrument fault.`),
+        );
+        if (!shotStopped) { shotStopped = true; await shot("05-stopped"); }
+      }
+      if (restLogged && now - flatRestAt >= FLAT_REST_HOLD_MS) {
+        await brake(false);
+        phase = "flat";
+        phaseAt = now;
+        phaseTicks = 0;
+        flatM = 0;
+      } else if (!restLogged && now - phaseAt >= FLAT_REST_GIVEUP_MS) {
+        // NOT a silent fall-through. „It would not stop" and „it was never
+        // asked to" are different runs, and only one of them says something
+        // about the product.
+        loud(
+          `the wrong leg would not come to rest in ${FLAT_REST_GIVEUP_MS / 1000}s (${p.kmh} км/ч, brake ` +
+            `${holdS ? "down" : "UP"}, throttle ${holdW ? "DOWN" : "up"}) — rolling on, and no „stopping where forbidden" ` +
+            `finding may be drawn from this stretch.`,
+        );
+        await brake(false);
+        phase = "flat";
+        phaseAt = now;
+        phaseTicks = 0;
+        flatM = 0;
+      }
+    }
+  }
+
   // …and the TEXTUAL beat backs off on the same evidence. `read()` costs 2.0 s
   // on the `pc` leg (one innerText plus a rect scan, queued behind the scene's
   // own main-thread work), and at a 5 s cadence that is a third of every tick
@@ -4628,6 +5798,143 @@ note(
     (refusedReversePress ? ` · refused ${refusedReversePress} standstill brake press${refusedReversePress === 1 ? "" : "es"} (would have selected R)` : "") +
     (lostKeys ? ` · re-asserted the brake ${lostKeys}× after the sim lost the key` : ""),
 );
+// ── AND WHOSE BEHAVIOUR THOSE STOPS WERE ───────────────────────────────────
+//
+// The `wrong` leg's rests are the INSTRUMENT'S OWN ACT, and until 2026-08-28
+// this leg made none — so every fault a rest can earn is new to this corpus
+// and a reader comparing an old run.log to a new one will meet it for the
+// first time. Two in particular: «Рязко спиране без причина» (the full brake
+// from cruising speed with nothing ahead — a real causeless harsh stop, and
+// the engine is right to bill it) and «Спиране в забранена зона» (the point of
+// the exercise). Both are the product judging THIS HARNESS'S stop. Neither is
+// evidence that the lesson's authored script commits the fault, and neither is
+// a regression in the product — it is a leg that finally does something the
+// product has always been able to see.
+if (MODE !== "right" && stopsMade > 0) {
+  note(
+    `  WRONG-LEG RESTS: ${stopsMade} careless full stop${stopsMade === 1 ? "" : "s"}, each held ${FLAT_REST_HOLD_MS / 1000}s ` +
+      `(FLAT_REST_EVERY_M = ${FLAT_REST_EVERY_M} m). Any «Рязко спиране без причина» or «Спиране в забранена зона» below is ` +
+      `the product judging THOSE stops — the instrument's behaviour, not the lesson script's. AND IT CUTS THE OTHER WAY: a ` +
+      `careless rest can land on a „спри на разрешеното място" mark and CREDIT it, so a wrong leg that PASSES may have ` +
+      `stopped by luck rather than by driving well — measured on sc-pk-ban-stop/mobile/wrong, 2026-08-28.`,
+  );
+}
+/* ── AND WHAT PACED THIS DRIVE, ON EVERY `right` LANE ──────────────────────
+ *
+ * PRINTED WHETHER OR NOT A TAPE WAS FOUND, and that is the point, exactly as
+ * it is for REVERSE below: „this lesson has no shadow trace" and „this drive
+ * was paced by one" were the same silence before, and the silence read as the
+ * second one. A lane with no tape is a lane whose LENGTH is the box's, and a
+ * reader comparing two of those is not comparing two samples of one thing.
+ */
+if (MODE === "right") {
+  pace.odoM = Number(paceOdoM.toFixed(1));
+  if (paceTape !== null && guideWitness.length > 0) {
+    // MEASURED, NOT USED. `__camProbe` is dev-only and may never enter the
+    // control law (see THE PACE TAPE), but it can say how far from the trace's
+    // own starting point this drive's odometer zero actually sat — the lag the
+    // pre-drive liveness checks leave behind. `y = −z` (LessonScene.tsx:597).
+    const w = guideWitness[0];
+    pace.alignment = {
+      source: "window.__camProbe at the first control tick, against the trace's first sample",
+      offsetM: Number(Math.hypot(w.x - paceTape.first.x, -w.z - paceTape.first.y).toFixed(1)),
+      note:
+        "the odometer starts at 0 there, so this is how far down the road the car already was when the control law " +
+        "took over. It is EVIDENCE: it did not steer, aim or index anything on this drive.",
+    };
+  }
+  if (paceTape === null) {
+    loud(
+      `NO PACE TAPE ON THIS LANE (${pace.why}) — the drive fell back to the fixed ${CRUISE_KMH} км/ч creep behind the ` +
+        `${ROLL_DISTANCE_M} m / ${ROLL_MS / 1000}s roll bound, and measured on this tree that bound is the CLOCK: two runs ` +
+        `of it are two different amounts of road and are not two samples of the same drive.`,
+    );
+  } else {
+    const kk = pace.targets.map((r) => r.kmh);
+    const span = kk.length ? `${Math.min(...kk)}–${Math.max(...kk)} км/ч` : "never set (the roll phase was never entered)";
+    note(
+      `  PACE: ${paceTape.path} — ${paceTape.totalM} m of authored route in ${paceTape.durationSec ?? "?"} s, top ` +
+        `${paceTape.topKmh} км/ч, ${paceTape.stops} authored rest(s). This drive's odometer read ${pace.odoM} m ` +
+        `(${Math.round((pace.odoM / paceTape.totalM) * 100)}% of that route) over ${pace.rolls} roll(s), target ${span}` +
+        (pace.capHits
+          ? ` · ${pace.capHits} roll(s) ended on the CLOCK and not on the metres — those are the box's length, not the road's`
+          : " · every roll ended on its METRES, not on the clock"),
+    );
+    note(
+      `        THE LOOK CADENCE IS NO LONGER BLANKET, and a reader must know it. At or below ${CRUISE_KMH} км/ч it is ` +
+        `${ROLL_DISTANCE_M} m exactly as it has always been; above it the car holds ${LOOK_EVERY_S.toFixed(1)}s of cruising ` +
+        `between two rests, which on a fast stretch is over a hundred metres. What catches a crossing there is the TAPE ` +
+        `slowing down and not the cadence — so «Непропускане на пешеходец» on this lane has to be read against ` +
+        `pace.targets in _audit-status.json before it is filed against the product.`,
+    );
+    /* ── THE TWO FAULTS A FAST LANE EARNS THAT A CRAWLING ONE COULD NOT ─────
+     *
+     * Both are the product judging THIS INSTRUMENT, both are new to the corpus
+     * on 2026-08-28, and both must be said out loud rather than left for a
+     * reader to meet as a regression. Measured on sc-fo-motorway-gap/pc/right,
+     * the first drive this harness has ever taken above 17 км/ч on a motorway
+     * (top 118 км/ч, 1041 m against 364 m, objective one credited at 1:00
+     * instead of 4:07, and «Твърде бавно движение по автомагистрала» — the
+     * self-conviction the old crawl earned — gone):
+     *
+     *  1. «Рязко спиране без причина». The look cadence ends a roll in a FULL
+     *     REST, and from cruising speed that is an emergency-grade stop. The
+     *     engine's own numbers say exactly when: `harshBrakeMinSpeedKmh` 35,
+     *     `harshBrakeDecelMps2` 7, `harshBrakeSustainSec` 0.4 (rules/types.ts).
+     *     IT CANNOT BE PULSED AWAY — a sustain window of 0.4 s is shorter than
+     *     one 500 ms control tick, so the shortest brake this harness can
+     *     press already outlasts it — and it cannot be coasted away either:
+     *     measured on that drive, off-throttle deceleration is about
+     *     0.2 m/s², i.e. two and a half minutes from 118 км/ч to 35. So a rest
+     *     taken above 35 км/ч earns this fault, and the fault is the
+     *     instrument's act.
+     *  2. «Движение по аварийната лента», and any other lane-position fault.
+     *     NOT NEW — the crawling baseline earned that one too, and saying it
+     *     was new would be this file inventing a regression. What is new is how
+     *     SOON: a drive whose guidance loop is BLIND travels in a straight
+     *     line, and a straight line at 118 км/ч leaves the carriageway in a
+     *     fifth of the time it takes at 13. THE PACE TAPE MAKES THE STEERING
+     *     DEFICIT MORE VISIBLE, NOT LESS, and on a lesson that TURNS that is
+     *     the whole story: measured on sc-ed-d2-city-run/pc/right, three paced
+     *     drives and three crawling ones all ended the same way — «Удар в
+     *     неподвижно препятствие», a crash, at a different place every time —
+     *     so the drive's LENGTH there is set by where an unsteered car hits
+     *     something and not by anything in this file. Read the TRACKING line
+     *     above before filing any lane-position fault; on a lane it calls
+     *     BLIND they say nothing about the product.
+     */
+    note(
+      `        AND TWO FAULTS THIS LANE CAN NOW EARN THAT A CRAWL COULD NOT, both the instrument's own act: «Рязко ` +
+        `спиране без причина» (a rest taken above the engine's 35 км/ч harsh-brake onset — unavoidable, the 0.4 s ` +
+        `sustain window is shorter than one control tick) and «Движение по аварийната лента» or any lane-position ` +
+        `fault (a BLIND loop drives straight, and straight at speed leaves the road far sooner). Neither is evidence ` +
+        `about this lesson.`,
+    );
+    if (pace.alignment !== null) {
+      note(
+        `        INDEX ALIGNMENT: the car was ${pace.alignment.offsetM} m from the trace's first sample when this ` +
+          `odometer started at 0 — the ground the pre-drive liveness checks covered. Measured by the dev-only pose ` +
+          `probe and NOT used to drive; the target this lane applied is the tape's reading for ground already passed.`,
+      );
+    }
+    // …AND THE ONE OUTCOME THAT IS A FINDING ABOUT THE PRODUCT RATHER THAN
+    // ABOUT THIS INSTRUMENT: the car covered the whole authored route and the
+    // lesson did not end. That is not „the harness could not get there".
+    if (!ended && pace.odoM >= paceTape.totalM) {
+      loud(
+        `THIS DRIVE COVERED THE WHOLE AUTHORED ROUTE (${pace.odoM} m of ${paceTape.totalM} m) AND THE SESSION DID NOT ` +
+          `END. The distance excuse does not apply to this lane: read the objectives below as evidence about a car that ` +
+          `went the distance the product's own correct drive goes.`,
+      );
+    }
+  }
+}
+// …AND `pace` IS PUBLISHED ON EVERY LANE, INCLUDING THE ONES IT DID NOTHING
+// ON. A `wrong` lane's status file used to carry no `pace` key at all, which is
+// the same silence this block's own opening complains about one level down: an
+// absent field and a field reading `used: false, why: "MODE=wrong…"` are
+// different statements, and only the second one can be read.
+saveStatus({ pace });
 // ── WHAT HAPPENED TO REVERSE, ON EVERY LANE ────────────────────────────────
 //
 // PRINTED WHETHER OR NOT THE LESSON ASKED, and that is the point: „this lesson
