@@ -65,6 +65,8 @@ const owed = FILED ? counts.filed : counts.open;
 
 const splitIds = new Set(splitParents().map((j) => j.findingId));
 let splitLines = 0;
+/** Lines whose row was rewritten after they were judged (see the supersededBy note). */
+let supersededLines = 0;
 
 const rows = [];
 const malformed = [];
@@ -128,6 +130,23 @@ for (const r of rows) {
       splitLines += 1;
       continue;
     }
+    // …AND A LINE WHOSE ROW WAS REWRITTEN IS HISTORY TOO — 2026-08-28.
+    //
+    // `findingId` is derived, `scenario + ":" + sha1(what + NUL + frame)`, so
+    // correcting a finding's text — which is the right thing to do when it was
+    // filed on a false premise — REHASHES its id and orphans every verdict already
+    // written about it. Those lines carry `supersededBy` naming the replacement,
+    // written deliberately by whoever made the correction.
+    //
+    // `wave-c-post.mjs` was taught this the same day and this file was not, so a
+    // clean ledger reported "2 problem(s)" and printed INCOMPLETE — the third
+    // instance in one day of two tools that must agree about the corpus and do not.
+    // A coverage report that cries wolf is a coverage report nobody reads, which is
+    // the same argument the split-parent case above already makes.
+    if (r.supersededBy) {
+      supersededLines += 1;
+      continue;
+    }
     problems.push("unknown findingId " + r.findingId);
     continue;
   }
@@ -186,6 +205,7 @@ console.log("lessons touched    : " + touched.length + " of " + lessons.size);
 console.log("lessons incomplete : " + incomplete.length);
 const dupes = [...seen.entries()].filter(([, v]) => v.length > 1);
 console.log("findings with >1 line: " + dupes.length + "   (a verifier correction is expected to be one of these)");
+if (supersededLines) console.log("rewritten-row lines  : " + supersededLines + "   (their finding's text was corrected after they were judged; history, not an error)");
 console.log("superseded lines     : " + superseded + "   (checked for coverage, not for quality — a later line replaced them)");
 
 if (malformed.length) {
