@@ -30,7 +30,7 @@ REPO="E:/AI driver"
 cd "$REPO" || exit 1
 INT="${1:-90}"
 LOG="$REPO/.audit-frames/watchdog.log"
-PORTS="3460 3461 3462 3470 3480 3500 3200"
+PORTS="3460 3461 3462 3470 3480 3500 3200 3411 3000"
 
 stamp() { date +%H:%M:%S; }
 say()   { echo "[$(stamp)] $*" | tee -a "$LOG"; }
@@ -42,9 +42,12 @@ lastbad=""
 while true; do
   bad=""
 
-  # 1. IS ANYTHING SERVING? Port 3000 is deliberately not in the list: that is
-  #    nexflow, a DIFFERENT product of the founder's, and hitting it has already
-  #    once been mistaken for our app being up.
+  # 1. IS ANYTHING SERVING? 3000 IS in the list now and is checked last — 2026-08-28.
+  #    It was excluded as "nexflow, a different product", and on this box that was
+  #    wrong: knijka's own dev server was on 3000, this watchdog reported "no dev
+  #    server" for hours, and a second server got started on top of it. Identity is
+  #    established by the ANSWER below (db.ok, a commit field), not by the port, so
+  #    a neighbouring product answering here cannot be mistaken for ours.
   PORT=""
   for p in $PORTS; do
     if curl -s -m 4 "localhost:$p/api/health" >/dev/null 2>&1; then PORT=$p; break; fi
