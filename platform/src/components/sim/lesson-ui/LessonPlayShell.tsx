@@ -2015,6 +2015,64 @@ export const TOAST_FADE_MASK_CSS = `linear-gradient(to bottom, #000 calc(100% - 
 export const TOAST_TALLEST_LINE_PX = 19.25;
 
 /**
+ * ══ …AND THE THIRD SCROLLER IN THIS FILE, WHICH HAD NO RAMP AT ALL ══════════
+ *
+ * W7 / `sc-vu-emergency-junction:f8853c85` — „on mobile only the header block
+ * fits and the class table is cut mid-row", re-judged STILL on the re-drive
+ * („the card ends on the bare column header «КЛАС ГРЕШКА … БРОЙ ТОЧКИ» with no
+ * row beneath it at all").
+ *
+ * WHAT THE FRAMES ACTUALLY SHOW, and half the row is refuted by them. The
+ * debrief is PAGED by the harness (`08-debrief-p1…p8.png`), it scrolls, and the
+ * content the row calls missing is on the following page — read on
+ * `fill-w4s1/frames/sc-vu-emergency-junction__mobile-right/`, p1 ends on the XP
+ * note, p3 opens on «Оценка на маневрата». „No row beneath the header" is a
+ * page boundary, not a clipped card, and the fold line under the scroller
+ * («↓ Разборът продължава — превърти за оценката по задачи») is on every one of
+ * those pages saying so.
+ *
+ * WHAT IS NOT REFUTED IS THE CUT ITSELF. On p2 the last visible line —
+ * «…само тази грешка спира и самия изпит (Наредба № 38, чл. 48, ал. 3)» — is
+ * severed HORIZONTALLY through the letter bodies at the scrollport's bottom
+ * edge. The `p-4` in `OVERLAY_SCRIM_CLASS` cannot help: padding moves where the
+ * content ENDS, never where the viewport does, so every mid-scroll position
+ * guillotines whatever line the edge lands in. This file already states the
+ * rule for its other two scrollers — „a horizontally guillotined line reads as
+ * a rendering fault, a faded one reads as «there is more»" — and the debrief,
+ * the longest reading surface in the product and the one surface where a lawRef
+ * is quoted, is the one that never got it. The line the frame severs is the
+ * line carrying the citation.
+ *
+ * 33 px, DERIVED THE SAME WAY `TOAST_FADE_PX` IS. The debrief's reading type is
+ * `text-sm leading-relaxed` (14 × 1.625 = 22.75 px) — 20 of the 22 sized spans
+ * in `SessionEndScreen.tsx` are `text-sm`/`text-xs`, and that is the tallest
+ * PROSE line box on the surface. 1.45 × 22.75 = 32.99: at that ramp the topmost
+ * pixel of a fully-cut line is already at ≈ 0.31 alpha and the partial line
+ * dissolves instead of being guillotined. It stops well short of two body lines
+ * (45.5 px) for `TOAST_FADE_PX`'s reason — a longer ramp would start dimming a
+ * line the student can read in full.
+ *
+ * ⚠ AND ITS LIMIT, STATED RATHER THAN PAPERED OVER: the verdict numeral is
+ * `text-6xl` (60 px, leading-none). A cut landing inside THAT glyph is still
+ * partly guillotined. It is not sized for, on purpose — a 87 px ramp would grey
+ * out three whole lines of prose on every one of the ~40 scroll positions where
+ * the numeral is nowhere near the fold, and the numeral is the one thing on this
+ * screen that also exists as a word («НЕИЗДЪРЖАН») two lines under it.
+ *
+ * NOT A BIGGER `TOAST_FADE_PX` and not a shared one: three surfaces, three line
+ * boxes, three numbers, each derived from the type it is fading — the same
+ * separation `TOAST_FADE_PX` had to make from `BRIEFING_FADE_PX`.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const DEBRIEF_FADE_PX = 33;
+export const DEBRIEF_FADE_MASK_CSS = `linear-gradient(to bottom, #000 calc(100% - ${DEBRIEF_FADE_PX}px), transparent)`;
+/** The tallest PROSE line box `SessionEndScreen` paints — `text-sm
+ *  leading-relaxed`, i.e. 14 px × 1.625. The number `DEBRIEF_FADE_PX` is
+ *  derived from, exported so a gate can assert the RELATIONSHIP and not the
+ *  literal. */
+export const DEBRIEF_TALLEST_LINE_PX = 22.75;
+
+/**
  * How much of the CURRENT window the toast column keeps when its „покажи"
  * control pages down, px.
  *
@@ -6770,6 +6828,34 @@ export function LessonPlayShell({
             // line's height and the line is pushed off the bottom of the
             // overlay, which is the same sentence lost by a different route.
             className={`min-h-0 flex-1 ${OVERLAY_SCRIM_CLASS} [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]`}
+            // ── THE RAMP, AND IT IS BOUND TO THE MEASUREMENT ALREADY HERE ────
+            //
+            // `DEBRIEF_FADE_MASK_CSS` carries the frame, the derivation and the
+            // one case it does not cover. What this line adds is the gate:
+            // `endHasMore` is `scrollRemainingPx(...) > 0`, i.e. the SAME
+            // reading the fold pill under this box renders off, so the ramp and
+            // the sentence announcing it can never disagree — the pill says
+            // „there is more" exactly on the renders where the last line fades,
+            // and both go away together on the render the student reaches the
+            // end. Without the gate the FINAL line of the debrief would be
+            // permanently greyed, which is the defect `BRIEFING_FADE_PX` warns
+            // about, moved one surface over.
+            //
+            // Both spellings for the engine the founder reads this on: an
+            // unprefixed-only `mask-image` is no mask in the WebKit versions
+            // still on phones in this market, and this file's other two ramps
+            // are written the same way.
+            //
+            // MASKING THIS BOX DOES NOT UNCOVER ANYTHING. `OVERLAY_SCRIM_CLASS`
+            // paints `bg-background` here and the wrapper above paints
+            // `bg-background` too (see the fold-line block), so the ramp fades
+            // this element's own ground onto an identical one — §I20's „opaque,
+            // no backdrop-filter" holds across the whole overlay, which is why
+            // the mask can be spent on the text instead of on the road.
+            style={{
+              WebkitMaskImage: endHasMore ? DEBRIEF_FADE_MASK_CSS : undefined,
+              maskImage: endHasMore ? DEBRIEF_FADE_MASK_CSS : undefined,
+            }}
           >
             <div className="flex w-full max-w-2xl flex-col gap-3">
               {/* A2: the compact close control USED to be here, unconditional,

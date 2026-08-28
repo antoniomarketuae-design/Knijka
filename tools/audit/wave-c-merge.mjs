@@ -297,24 +297,36 @@ console.log("  no debrief frame : " + noDebrief.length + "   (these close nothin
 // One line per state that actually occurred, with WHO the state is about, so a
 // product defect can never again be totalled together with an instrument fault
 // or with an unfinished lesson.
-const WHAT = {
-  verdict: "a pill was read off the debrief — judgeable",
-  "not-reached": "the ladder never reached a verdict card — closes nothing",
-  "no-pill": "PRODUCT DEFECT: result screen mounted, NO verdict pill — file it",
-  "no-surface": "PRODUCT DEFECT: no result surface in the DOM — file it",
-  "reader-threw": "INSTRUMENT: the debrief reader threw — says nothing either way",
-  "pre-matcher": "UNKNOWN: drove before verdictSurface existed — «НЕЗАВЪРШЕН» and a pill-less card are indistinguishable here; re-drive",
-  "no-ledger": "INSTRUMENT: no readable _audit-status.json — certifies nothing",
-  disagreement: "INSTRUMENT: the row and the lane ledger disagree — certifies nothing",
-  "unknown-surface": "INSTRUMENT: unrecognised verdictSurface value",
-  died: "INSTRUMENT: the ledger records a phase other than «complete» — a fragment, not an answer",
-  "evidence-incomplete": "INSTRUMENT: the ledger's OWN exit is non-zero — the lane says its evidence is incomplete",
-};
+//
+// THE SENTENCES ARE NOT KEPT HERE -- 2026-08-28.
+//
+// This file used to hold its own `WHAT` map keyed by state name: a duplicate of
+// the one in verdict-surface.mjs that nothing forced to agree with it. When the
+// ladder gained `never-started` and `not-performable`, the loop below went on
+// iterating `Object.keys(LEG_STATES)` and printed
+//
+//        2  never-started   undefined
+//
+// in exactly the run where the sentence is load-bearing. `never-started` is
+// judgeable:false / about:"unknown" because an unentitled paywall and a lesson
+// that crashed into its error boundary leave the SAME silence in the ledger;
+// the sentence is the only thing in the only report an operator reads that
+// tells them to settle it from the debrief text instead of routing a genuine
+// white-screen to RE-DRIVE. Patching the two missing keys in would have left
+// the mechanism -- two maps, two files, nothing forcing agreement -- so the map
+// is gone and each state's own `what` is read instead. The 11 sentences were
+// compared before deleting: byte-identical to the canonical ones.
 console.log("  verdict surface  : (certifiable drives only — exit 0 and a still tree)");
+const PAD = Math.max(...Object.keys(LEG_STATES).map((k) => k.length)) + 2;
 for (const state of Object.keys(LEG_STATES)) {
   const n = states.get(state) ?? 0;
   if (!n) continue;
-  console.log("     " + String(n).padStart(4) + "  " + state.padEnd(16) + WHAT[state]);
+  // A state that reaches LEG_STATES without a sentence must SAY so and name the
+  // file to fix it in. Printing `undefined` is how this bug was shipped once.
+  const what =
+    LEG_STATES[state].what ??
+    "(no sentence for this state in LEG_STATE_WHAT -- add one in tools/audit/verdict-surface.mjs)";
+  console.log("     " + String(n).padStart(4) + "  " + state.padEnd(PAD) + what);
   // Name the product defects. A count of them is a number; a list of them is a
   // work item, and these are the ones somebody has to open.
   if (LEG_STATES[state].about === "product") {

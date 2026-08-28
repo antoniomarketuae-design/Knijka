@@ -225,6 +225,54 @@ const PAR_TIME_ABORTED_BG = (parSec: number) =>
   `двете числа не се сравняват тук. Карай маршрута докрай и тогава времето ти ` +
   `има срещу какво да се мери.`;
 
+/**
+ * THE SAME COMPARISON, ON THE ARM `aborted` DOES NOT REACH — wave 7, lane
+ * rubric, and the row's own comment above predicted it in so many words: „a
+ * real student who quits at 30 s of a 55 s lesson gets the OTHER branch and is
+ * congratulated for being „в ориентира" on a lesson he abandoned."
+ *
+ * MEASURED · sweep161 · `sc-vp-readiness/pc-wrong/audit.log`, the whole card in
+ * four lines:
+ *
+ *     ended: true · endedNaturally: true · drive: top 59 км/ч
+ *     VERDICT: НЕИЗДЪРЖАН · SCORE: 0 наказателни точки · 1 от 3 звезди
+ *     OBJECTIVES (2):  – Мини контролната зона с готов кокпит
+ *                      – Стигни края на отсечката
+ *     „Ориентировъчно време — 47 с — в ориентира от 55 с."
+ *
+ * Both dashes: NEITHER checkpoint was reached. The drive ran off the end of the
+ * road at 59 км/ч with the 50 disc live, met nothing the lesson asks for, and
+ * the one row on the card that carries a number about it CONGRATULATED it for
+ * coming in under a guideline. `aborted` is FALSE there — nobody pressed
+ * «Прекрати урока»; the road simply ran out — so `PAR_TIME_ABORTED_BG` never
+ * fires, and the branch that does is the one that reads as praise.
+ *
+ * The time was short BECAUSE the route was short. A guideline for the whole
+ * lesson beaten by a drive that did none of it is not an achievement, and on a
+ * product whose north-star test is „does this produce safer drivers" it is the
+ * second sentence in this corpus found rewarding the flat-out bot (the first is
+ * `PAR_TIME_NOT_A_TARGET_BG`, one comment up, whose census counted 42 of 51).
+ *
+ * SCOPED TO THE UNDER-PAR SIDE, DELIBERATELY, and this is not timidity about a
+ * pinned test — the two sides differ in kind. The over-par branch says
+ * «спокойно, точността е преди скоростта»: advice that slow is fine, which
+ * cannot mislead whatever the route did. The under-par branch makes a CLAIM —
+ * that a target was met — and that claim is what an unfinished route falsifies.
+ * `__tests__/rubric.test.ts` („a drive that ENDED — however badly — keeps its
+ * comparison exactly as filed", sc-ln-decisive-change:5c5e69a6, 175 s over a
+ * 60 s ориентир with a task unmet) argued that side on purpose and stays
+ * byte-identical; so does `b15-lawful-wait.test.ts`, whose fixture completes.
+ *
+ * BOTH NUMBERS STAY ON THE CARD — the same discipline `PAR_TIME_ABORTED_BG`
+ * states and for the same reason: refusing a comparison is one keystroke away
+ * from hiding the mismatch somebody filed a row about.
+ */
+const PAR_TIME_UNFINISHED_BG = (parSec: number) =>
+  `Ориентирът от ${parSec} с е за целия маршрут, а тук останаха неизпълнени ` +
+  `задачи от него — по-малкото време идва от по-малко изминат маршрут, не от ` +
+  `добро каране. Изпълни всички задачи и тогава времето ти има срещу какво да ` +
+  `се мери.`;
+
 export function scoreRubric(
   result: LessonResult,
   rubric: RubricSpec,
@@ -538,18 +586,109 @@ export function scoreRubric(
           // true of him. Both numbers still print — see PAR_TIME_ABORTED_BG.
           `${Math.round(drivingSec)} с до прекъсването${waitNote}. ${PAR_TIME_ABORTED_BG(Math.round(rubric.parTimeSec))}`
         : over
-          ? `${Math.round(drivingSec)} с при ориентир ${Math.round(rubric.parTimeSec)} с${waitNote} — спокойно, точността е преди скоростта.`
-          : // UNDER the ориентир. The number and the clause that carries it are
-            // byte-identical to what shipped; what follows is the reason the
-            // row owed a student who has just been told he beat a guideline on
-            // a driving lesson. See PAR_TIME_NOT_A_TARGET_BG for the corpus
-            // census — 42 of the 51 congratulations went to the bot driving
-            // badly on purpose.
-            `${Math.round(drivingSec)} с — в ориентира от ${Math.round(rubric.parTimeSec)} с${waitNote}. ${PAR_TIME_NOT_A_TARGET_BG}`,
+          ? // OVER the ориентир — byte-identical to what shipped, on purpose,
+            // and tested that way from two suites. This branch offers ADVICE
+            // („спокойно, точността е преди скоростта"), not a finding that a
+            // target was met, so an unfinished route cannot falsify it.
+            `${Math.round(drivingSec)} с при ориентир ${Math.round(rubric.parTimeSec)} с${waitNote} — спокойно, точността е преди скоростта.`
+          : !result.completedAll
+            ? // UNDER the ориентир on a route whose tasks were NOT all met. The
+              // claim „в ориентира" is exactly the one an unfinished route
+              // falsifies — the time is short because the driving was short.
+              // MEASURED · sweep161 · sc-vp-readiness/pc-wrong: «47 с — в
+              // ориентира от 55 с» with both checkpoints unmet at 59 км/ч.
+              // See PAR_TIME_UNFINISHED_BG.
+              // The ориентир's own number is not dropped — it prints inside
+              // PAR_TIME_UNFINISHED_BG. What is dropped is only the „в
+              // ориентира" verdict laid over it.
+              `${Math.round(drivingSec)} с${waitNote}. ${PAR_TIME_UNFINISHED_BG(Math.round(rubric.parTimeSec))}`
+            : // UNDER the ориентир on a route driven to the end. The number and
+              // the clause that carries it are byte-identical to what shipped;
+              // what follows is the reason the row owed a student who has just
+              // been told he beat a guideline on a driving lesson. See
+              // PAR_TIME_NOT_A_TARGET_BG for the corpus census — 42 of the 51
+              // congratulations went to the bot driving badly on purpose.
+              `${Math.round(drivingSec)} с — в ориентира от ${Math.round(rubric.parTimeSec)} с${waitNote}. ${PAR_TIME_NOT_A_TARGET_BG}`,
       points: null,
       measured: true,
     });
   }
+
+  // -- REVERTED IN WAVE 7 · THE „showedUncharged" STAR CAP · DO NOT REBUILD IT
+  // WITHOUT READING THIS FIRST.
+  //
+  // WHAT WAS BUILT AND TAKEN OUT AGAIN. A predicate here read
+  // `LessonResult.coachedMistakes` — the shown-but-deliberately-uncharged
+  // violations, the teach-first arm's record — and used it twice: the
+  // unmeasured branch below required `!showedUncharged` for its third star, and
+  // the legality cap became `(result.score > 0 || showedUncharged)`. The
+  // ARGUMENT for it still looks right and is left standing where it belongs
+  // (`lessons/types.ts` on the channel, `hud/SessionEndScreen.tsx:465` on the
+  // sentence it already fixed): a drive the simulator had to interrupt to say
+  // «Превишена скорост» is not a drive that earns the product's top mark for
+  // quality, and „чисто" meaning „nothing was BILLED" is exactly the confusion
+  // this corpus keeps filing rows about. What follows is why the code was
+  // nevertheless wrong, measured rather than argued.
+  //
+  // 1. THE EXHIBIT DID NOT REPRODUCE. It was argued from
+  //    `sweep161/sc-pk-move-off/pc-wrong` — «+1 Превишена скорост» beside
+  //    «0 наказателни точки · 3 от 3 звезди». Re-driven at HEAD,
+  //    `.audit-frames/w14/frames/sc-pk-move-off__pc-wrong/_audit-debrief.json`
+  //    reads `verdict ИЗДЪРЖАН · score 1 · „2 от 3 звезди"`, with «Превишена
+  //    скорост −1 изпитна т. · ВТОРОСТЕПЕННА» in the Грешки table. THE SPEEDING
+  //    IS CHARGED NOW. `result.score > 0` alone already caps that drive at 2★,
+  //    so on the one scenario the predicate was built for it changed nothing.
+  //    The corpus it was reasoned from was four waves stale.
+  //
+  // 2. ITS ACTUAL LIVE POPULATION WAS THE REFERENCE DRIVES. Scanning every
+  //    `_audit-debrief.json` in `.audit-frames/w14` for a rendered «Учебни
+  //    моменти (не влизат в точките):» list finds 92 legs; FIFTEEN of them are
+  //    `score 0 · every objective ✓ · currently „3 от 3 звезди"` —
+  //    sc-ac-crosswind__mobile-right, sc-ac-ice__pc-right,
+  //    sc-ed-reverse-line__pc-right and __mobile-right,
+  //    sc-jx-priority-confidence__pc-right, sc-merge-bus-pullout__pc-right,
+  //    sc-ov-lane-keeping__pc-right, sc-pe-zone-living__pc-right,
+  //    sc-pk-ban-stop__pc-right, sc-pk-busstop-ban__pc-right,
+  //    sc-pk-double-park__pc-right, sc-pk-rail-ban__pc-right,
+  //    sc-pk-smooth-stop__pc-right, sc-sp-eco-coast__pc-right,
+  //    sc-zebra-approach__mobile-right. Every one dropped to ★★☆. And that
+  //    count is a FLOOR, not the population: `debrief.ts:243` filters the list
+  //    against `scoredCodes` before rendering it, while this file read
+  //    `result.coachedMistakes` raw, so legs whose coached row was suppressed
+  //    for being charged too would also have been capped without showing why.
+  //    The drives demoted were the model runs — the ones the product exists to
+  //    reward — for items the product itself labels „не влизат в точките".
+  //
+  // 3. THE DEMOTION WAS BARE AND THE CARD THEN CONTRADICTED ITSELF — a direct
+  //    requirement-zero / doc 64 THEO-4 breach, which is the reason this is a
+  //    revert and not a tweak. On those fifteen, `score === 0` and no floor
+  //    applies, so `manoeuvreGradeReasonBg` (`hud/SessionEndScreen.tsx:242`)
+  //    returns null and NO SENTENCE explains the missing star. Worse, all
+  //    fifteen author a parTime-only rubric, so `unmeasuredStarsNoteBg`
+  //    (:332) still passes all three of its guards and keeps printing, beside
+  //    ★★☆: «Звездите идват изцяло от изпитния лист — маршрут, изминат докрай,
+  //    без нито една наказателна точка». Both halves false at once: a bare
+  //    verdict plus two explanations that contradict it.
+  //
+  // WHAT IT WOULD TAKE TO LAND IT, and it is not this file alone. The star
+  // number cannot move until the card can say why it moved, and the sentence
+  // belongs to `hud/SessionEndScreen.tsx` — `manoeuvreGradeReasonBg` needs a
+  // `coachedMistakes`-fed arm returning the cap's reason on `score === 0`, and
+  // `unmeasuredStarsNoteBg` must then fall silent (its first guard already
+  // does that for free once the reason is non-null). The lane that wrote the
+  // cap diagnosed this itself and called that edit mandatory — „not safe to
+  // ship alone" — and the edit was never made; the cap shipped alone anyway.
+  // Beyond the wiring it is also an ADR (CLAUDE.md: strategy changes get one
+  // first): „full stars from cleanliness" is a stated contract behind ~141
+  // assertions, and this would redefine what the third star means.
+  //
+  // ONE MORE REASON THE REVERT IS RIGHT RATHER THAN MERELY SAFE: inside this
+  // same uncommitted tree `lessons/finish.ts` cites «sc-ac-ice (ИЗДЪРЖАН ·
+  // 0 наказателни т. · ★★★)» as its evidence that the lesson ends cleanly, and
+  // sc-ac-ice__pc-right carries a coached moment («Рязко спиране без причина»).
+  // The cap would have falsified another lane's evidence in the same commit.
+  //
+  // The row stays OPEN. Nothing below reads `coachedMistakes` any more.
 
   // -- Star fold.
   let stars: 1 | 2 | 3;
@@ -625,6 +764,18 @@ export function scoreRubric(
     // it prints ★★☆, not ★★★, because the seatbelt fault costs it the third
     // star — the 59 км/ч in the 50 zone still books nothing, and that half is
     // `rules/engine.ts`'s speeding detector, not this file's star fold.
+    //
+    // THAT LAST CLAUSE IS NOW HALF STALE, and it is corrected here rather than
+    // rewritten, because it is the sentence that made a whole wave misfile a
+    // repair. MEASURED at HEAD (`.audit-frames/w14/frames/
+    // sc-pk-move-off__pc-wrong/_audit-debrief.json`): the speeding IS booked —
+    // «Превишена скорост −1 изпитна т.», `score 1`, „2 от 3 звезди". So the
+    // detector charges it, `result.score > 0` caps the card, and the exhibit
+    // needs nothing from this fold. The ROUTING half of the clause still
+    // stands: what is BILLED is the detector's decision, not this file's.
+    // Whether a shown-but-forgiven offence should also cost the third star is
+    // a real and open question — see the REVERTED note above the fold for why
+    // the wave-7 attempt at it had to come back out.
     stars = result.completedAll && result.score === 0 ? 3 : result.completedAll ? 2 : 1;
   }
   // Caps: quality never outranks legality.

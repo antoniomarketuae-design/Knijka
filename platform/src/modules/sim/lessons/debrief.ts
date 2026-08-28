@@ -306,8 +306,90 @@ export function buildDebrief(
           `грешките по-долу.`,
     );
   } else if (result.passed) {
+    /**
+     * „ИЗДЪРЖАН" IS THE LAW'S VERDICT. „ТОЧНО ТОВА ИСКА ДА ВИДИ ИЗПИТВАЩИЯТ"
+     * IS A CERTIFICATE — AND THIS LINE WAS HANDING IT OUT ON DRIVES THE
+     * PRODUCT'S OWN RECORD HAD ALREADY QUALIFIED.
+     *
+     * MEASURED · w13 · counted over every `_audit-debrief.json` in
+     * `.audit-frames/w13/frames`: 181 debriefs captured, 44 of them print this
+     * sentence, and NINETEEN of those 44 also print „Учебни моменти (не влизат
+     * в точките)" — i.e. the drive was SHOWN a violation and A12 deliberately
+     * withheld the charge. `sc-signal-flashing__pc-right` is the whole defect
+     * in two sentences, four lines apart in one paragraph:
+     *
+     *   «…е издържан: 0 наказателни точки от изпитния лист при допустими 9.
+     *    Точно това иска да види изпитващият.»
+     *   «Учебни моменти (не влизат в точките): • Рязко спиране без причина»
+     *
+     * A seventeen-year-old who stamped on the brake for no reason is told, one
+     * paragraph earlier, that this is exactly what the examiner wants to see.
+     * It is the SAME hole `DebriefContext.coachedMistakes` was built to close
+     * one block down: the clean-drive praise line was scoped to the sheet and
+     * the VERDICT sentence above it — the headline, the first thing read —
+     * never was. Four more of the 44 pass carrying three points of основна
+     * грешка on the sheet (`sc-lane-change`, `sc-merge-lane-end`,
+     * `sc-merge-roadworks-shift`, `sc-ov-keep-right`) and collected the same
+     * superlative over it.
+     *
+     * NOTHING IS RE-GRADED, and the drive that earned the sentence keeps it
+     * byte-identical. `passed` is Наредба № 38, приложение № 5, т. 11's own
+     * verdict and is untouched; the points figure is untouched; a spotless
+     * sheet with nothing forgiven still reads exactly as it shipped. What is
+     * withheld is only the claim about what the EXAMINER would have wanted,
+     * on the runs where the product itself recorded a reservation — the same
+     * ruling the rubric already applies on the star row, where a forgiven
+     * violation caps the drive at 2★ (`scenario/rubric.ts`).
+     *
+     * AND IT MAY NOT SAY THE LESSON WOULD HAVE FAILED ON A REPEAT. A
+     * второстепенна is 1 изпитна т. and 0 + 1 is still inside the 9, so that
+     * sentence would be false arithmetic dressed as a warning. The teach
+     * section's own «при повторение вече влиза в изпитния лист» is the true
+     * form of it and stays where it is; this line points at that section
+     * instead of paraphrasing it.
+     */
+    const head = `Урокът „${lesson.titleBg}“ е издържан: ${examPointsWordBg(summary.score.totalPoints)} от изпитния лист при допустими 9.`;
+    // Counted by TITLE, because „Учебни моменти" is deduplicated by title
+    // (`coachedLines`) and the queue behind it was measured EIGHT deep on one
+    // drive — a raw row count here would name a number that section never
+    // prints, which is the „24 over 10" defect in a smaller frame.
+    const coachedKinds = new Set(coached.map((c) => c.titleBg)).size;
+    const reservations: string[] = [];
+    if (summary.score.totalPoints > 0) {
+      reservations.push(
+        `${examPointsWordBg(summary.score.totalPoints)} вече са в листа, а запасът за целия изпит е 9`,
+      );
+    }
+    if (coachedKinds > 0) {
+      reservations.push(
+        coachedKinds === 1
+          ? "едно нарушение беше показано и този път не влезе в точките"
+          : `${coachedKinds} нарушения бяха показани и този път не влязоха в точките`,
+      );
+    }
+    // Each thing pointed at is GUARANTEED to be below: points > 0 implies a
+    // billed row, so the mistakes block prints; `coachedKinds > 0` is the very
+    // condition the teach section prints on. No pointer to a section the
+    // student cannot find.
+    //
+    // DESCRIBED, NOT QUOTED BY HEADING, and that is deliberate rather than
+    // stylistic: a pointer carrying the literal string „Най-важните грешки"
+    // would make this paragraph the FIRST match for it in the document, and the
+    // „gravity before praise" ordering is asserted by `indexOf` on exactly that
+    // string (`debrief-truthfulness.test.ts`). A cross-reference must not be
+    // mistakable for the thing it refers to.
+    const where =
+      reservations.length === 2
+        ? "грешките и учебните моменти по-долу"
+        : summary.score.totalPoints > 0
+          ? "грешките по-долу"
+          : "учебните моменти по-долу";
     lines.push(
-      `Урокът „${lesson.titleBg}“ е издържан: ${examPointsWordBg(summary.score.totalPoints)} от изпитния лист при допустими 9. Точно това иска да види изпитващият.`,
+      reservations.length === 0
+        ? `${head} Точно това иска да види изпитващият.`
+        : `${head} Но „издържан“ не значи „чисто“: ${reservations.join("; ")}. ` +
+          `Изпитващият гледа цялото каране, а не само дали запасът е стигнал — прочети ${where} ` +
+          `и повтори урока с тях наум.`,
     );
   } else if (!result.completedAll) {
     const head = `Урокът „${lesson.titleBg}“ не е завършен — ${unfinishedTaskPhrase(result)}.`;
@@ -984,13 +1066,39 @@ function unfinishedTaskPhrase(result: LessonResult): string {
  * that the NEXT one costs points — which is exactly what the live teach card
  * said and what the debrief then forgot. Deduplicated by title, because the
  * queue that raises these was measured EIGHT deep on one drive.
+ *
+ * …AND A NAME IS NOT A TEACH. Until this lane the whole section was three bare
+ * labels — «• Превишена скорост», «• Рязко спиране без причина», «• Неустойчиво
+ * движение в лентата» — under a heading saying they cost nothing. That is the
+ * bare verdict THEO-4 forbids, wearing the opposite sign: the student is told a
+ * category and given no way to act on it, on the one channel that exists
+ * BECAUSE the sheet stayed silent. Measured on `sc-signal-flashing__pc-right`
+ * (w13), whose only teach row read «• Рязко спиране без причина» and stopped
+ * there, and on `sc-ac-wind-truck-pass__pc-wrong`, two rows, same shape.
+ *
+ * The fix is retrieval, not generation: `VIOLATIONS[code].correctiveBg` is the
+ * authored „какво трябваше да направя" line the catalogue already carries and
+ * the mistakes block already prints for the SCORED half of the same drive
+ * (ADR-002 — the AI never free-recalls; A15 authored copy). A charge is still
+ * not made and no law is quoted: the price stays withheld, the corrective is
+ * given. An uncatalogued code degrades to the bare row exactly as before.
  */
 function coachedLines(coached: ReadonlyArray<{ code: string; titleBg: string }>): string[] {
-  const counts = new Map<string, number>();
-  for (const c of coached) counts.set(c.titleBg, (counts.get(c.titleBg) ?? 0) + 1);
-  const rows = [...counts.entries()]
-    .slice(0, MAX_COACHED_NAMED)
-    .map(([title, n]) => `• ${title}${n > 1 ? ` ×${n}` : ""}`);
+  /** First code seen per title — the corrective is authored per code. */
+  const counts = new Map<string, { n: number; code: string }>();
+  for (const c of coached) {
+    const prev = counts.get(c.titleBg);
+    if (prev === undefined) counts.set(c.titleBg, { n: 1, code: c.code });
+    else prev.n += 1;
+  }
+  const rows: string[] = [];
+  for (const [title, g] of [...counts.entries()].slice(0, MAX_COACHED_NAMED)) {
+    rows.push(`• ${title}${g.n > 1 ? ` ×${g.n}` : ""}`);
+    const corrective = correctiveFor(g.code);
+    // Indented „→" exactly as the mistakes block indents its own corrective, so
+    // the two halves of one drive read as one instructor and not as two.
+    if (corrective !== null) rows.push(`  → Правилното действие: ${corrective}`);
+  }
   if (counts.size > MAX_COACHED_NAMED) {
     rows.push(`• …и още ${counts.size - MAX_COACHED_NAMED} — виж пълния списък в резултата.`);
   }
@@ -1179,7 +1287,25 @@ function improvementLine(
     return `Личен напредък: ${pts(now)} по изпитния лист срещу най-добрите ти ${pts(priorBestScore)} досега за този урок — свали резултата, продължавай така.`;
   }
   if (now === priorBestScore) {
-    return `Изравни най-добрия си резултат за този урок (${pts(priorBestScore)} по изпитния лист). Следващата цел е да го подобриш.`;
+    /**
+     * „СЛЕДВАЩАТА ЦЕЛ Е ДА ГО ПОДОБРИШ" IS AN INSTRUCTION THAT CANNOT BE
+     * CARRIED OUT AT THE BOTTOM OF THE SCALE.
+     *
+     * `score` is penalty points and the floor is zero, so a tie AT zero is the
+     * best sheet the lesson can produce — and the line told the student to beat
+     * it. MEASURED · sweep 161 · `sc-vu-emergency/pc-right/log.txt` (the leg the
+     * ИЗДЪРЖАН + ★★★ + „+100 XP" card was read off) and · w13 ·
+     * `sc-signal-flashing__pc-right`, both verbatim: «Изравни най-добрия си
+     * резултат за този урок (0 наказателни т. по изпитния лист). Следващата цел
+     * е да го подобриш.»
+     *
+     * The honest goal at the floor is REPETITION, which is also the product's
+     * own standing line about what counts as learned (see
+     * COMMENDATION_CONTRADICTED_BG). Every other tie keeps the sentence it had.
+     */
+    return priorBestScore === 0
+      ? `Изравни най-добрия си резултат за този урок (${pts(priorBestScore)} по изпитния лист) — и по-нисък няма, нулата е дъното на скалата. Следващата цел не е по-малко, а същото, повторено: умението се брои за усвоено, когато излиза ВСЕКИ път.`
+      : `Изравни най-добрия си резултат за този урок (${pts(priorBestScore)} по изпитния лист). Следващата цел е да го подобриш.`;
   }
   return `Най-добрият ти резултат за този урок остава ${pts(priorBestScore)} по изпитния лист; този път допусна повече (${pts(now)}). Спокойно — повтори го и ще го стигнеш.`;
 }
@@ -1198,28 +1324,91 @@ function improvementLine(
  * only (rules/summary.ts), so membership means „this drive was penalised for
  * this very skill".
  *
- * CLEAN_DRIVING is the one commendation with no conceptId and it is correctly
- * left alone: it is awarded for a measured violation-free STRETCH, which a
- * fault somewhere else in the drive does not retract.
+ * CLEAN_DRIVING IS THE ONE THAT CANNOT USE THAT AXIS, AND IT WAS THEREFORE
+ * GETTING NOTHING. This paragraph used to read „it is correctly left alone: it
+ * is awarded for a measured violation-free STRETCH, which a fault somewhere
+ * else in the drive does not retract." The premise is true; the conclusion was
+ * measured false on the page.
+ *
+ * MEASURED · w13 · `sc-ac-wind-truck-pass`, BOTH platforms
+ * (`frames/sc-ac-wind-truck-pass__pc-wrong/_audit-debrief.json` and the
+ * `mobile-wrong` twin, plus both `run.log`s): a drive stamped НЕИЗДЪРЖАН · 39
+ * наказателни точки · 3 опасни (one of them a collision at 1:13) · 3 основни,
+ * whose debrief closes with «Какво се получи добре: • Чисто и спокойно каране
+ * ×2» — and whose «Похвали» card prints it twice with clocks, at 0:49 and 1:11.
+ * The 1:11 one is twelve seconds after driving up the emergency lane and two
+ * seconds before the crash. A student who ran into something is told, on the
+ * card that fails him, that his driving was clean and calm.
+ *
+ * The engine is RIGHT: `rules/engine.ts` awards this per 250 m of
+ * violation-free travel and resets the counter on every fresh fault, so each
+ * of those two stretches happened. What is wrong is the SENTENCE. The other
+ * five commendations name a SKILL («Правилно отстъпено предимство») and a skill
+ * is not retracted by the rest of the drive; this one names the DRIVE
+ * («Чисто и спокойно каране») — a claim about the absence of faults — and the
+ * drive is exactly what the mistakes block is about to contradict. So its
+ * contradiction axis is not a `conceptId` it does not have: it is the run's own
+ * fault ledger, which is the only thing „чисто" can mean.
+ *
+ * NOT A DELETION, for the same reason `COMMENDATION_CONTRADICTED_BG` is not
+ * one — the metres were driven and the credit is owed (the XP for them is
+ * booked off the EVENT, `gamification/xp.ts`, and is not touched from here).
+ * What the student stops being handed is the unscoped reading.
  */
 function commendationLines(result: LessonResult): string[] {
   const convicted = new Set(result.summary.conceptIds);
-  const seen = new Map<string, { count: number; contradicted: boolean }>();
+  /** „Чисто" is a claim about the whole sheet, so any scored row falsifies it. */
+  const anyFault = result.summary.mistakes.length > 0;
+  const seen = new Map<string, { count: number; contradicted: boolean; unclean: boolean }>();
   for (const c of result.summary.commendations) {
     const contradicted = c.conceptId !== undefined && convicted.has(c.conceptId);
+    // Keyed on the CODE and not on the title: `rules/catalog.ts` retitles
+    // pooled praise per situation (YIELD_PRAISE_SITUATION_COPY), so a title
+    // match is not a code match on this channel.
+    const unclean = c.code === "CLEAN_DRIVING" && anyFault;
     const prev = seen.get(c.titleBg);
-    if (prev === undefined) seen.set(c.titleBg, { count: 1, contradicted });
+    if (prev === undefined) seen.set(c.titleBg, { count: 1, contradicted, unclean });
     else {
       prev.count += 1;
       prev.contradicted = prev.contradicted || contradicted;
+      prev.unclean = prev.unclean || unclean;
     }
   }
+  const scope = cleanDrivingScopeBg(result.summary);
   return [...seen.entries()]
     .slice(0, MAX_COMMENDATION_LINES)
     .map(
       ([title, g]) =>
-        `• ${title}${g.count > 1 ? ` ×${g.count}` : ""}${g.contradicted ? COMMENDATION_CONTRADICTED_BG : ""}`,
+        `• ${title}${g.count > 1 ? ` ×${g.count}` : ""}` +
+        `${g.contradicted ? COMMENDATION_CONTRADICTED_BG : ""}${g.unclean ? scope : ""}`,
     );
+}
+
+/**
+ * The rider CLEAN_DRIVING needs, said in terms of this drive.
+ *
+ * Order-neutral («в същия урок»), because „gravity before praise" puts the
+ * mistakes block above this line on a dangerous run and below it otherwise —
+ * the same discipline `COMMENDATION_CONTRADICTED_BG` is written to.
+ *
+ * The опасни count is `summary.score.opasniCount`, which is the figure the
+ * verdict above and the protocol table on the same screen both print («Опасни
+ * грешки (по 10 изпитни т.) 3 30»). Nothing is re-derived and nothing is
+ * priced: the rider states WHAT the praise was measured over and leaves every
+ * number where the summary put it.
+ */
+function cleanDrivingScopeBg(summary: LessonResult["summary"]): string {
+  const opasni = summary.score.opasniCount;
+  const alsoBg =
+    opasni === 1
+      ? "в същия урок има и опасна грешка"
+      : opasni > 1
+        ? `в същия урок има и ${opasni} опасни грешки`
+        : "в същия урок има и отбелязани грешки";
+  return (
+    ` — но само на отделни отсечки от маршрута: ${alsoBg}. Похвалата е за метрите без` +
+    ` нито едно нарушение, не за урока — „чисто каране“ се брои чак когато ЦЯЛОТО каране е такова.`
+  );
 }
 
 /** Excess over the limit, for picking the worst event in a speeding group. */

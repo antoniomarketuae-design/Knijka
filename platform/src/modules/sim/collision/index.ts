@@ -135,6 +135,31 @@
  *     inside the lead car's body; no signed separation this module can return
  *     changes that.
  *
+ *     RE-DRIVEN 2026-08-28, AND BOTH HALVES OF THAT SENTENCE HAVE MOVED — read
+ *     this before re-quoting the sweep161 frames, because one of them now
+ *     describes a DIFFERENT defect and the other has been paid.
+ *       · The staged-actor ghost is GONE. `TrafficSystem.stage()` publishes
+ *         every staged vehicle into `this.vehicles` (traffic/system.ts:653) and
+ *         every staged pedestrian into `this.pedestrians` (:679) — the same
+ *         arrays NpcColliders' shell pool scans — and
+ *         `components/sim/__tests__/stagedActorColliders.test.ts` DRIVES the
+ *         player into staged shells through real rapier («staged actors ARE in
+ *         the arrays the shell pool scans»). orchestrator/contact.ts's header
+ *         still said the opposite until today; it is corrected there.
+ *       · sc-ov-return-gap NO LONGER ENDS INSIDE A CAR. On the newest leg
+ *         (.audit-frames/w14, mobile-wrong) it ends at 0 км/ч inside a BUILDING
+ *         — 04-t054s / 04-t059s, the windscreen full of tan interior wall with
+ *         a corner seam, «Удар в неподвижно препятствие» — which is the
+ *         static-world bullet below, not this one. And it bills ONE accident,
+ *         not 25: the episode latch named above is holding.
+ *       · sc-ov-narrow DOES still reproduce (w14 04-t011s / 04-t016s, 0 км/ч,
+ *         the flat grey inside of the oncoming car with its red flank band,
+ *         and the product's own chip reading «Дистанция · 0 м»). What survives
+ *         is therefore not «staged bodies are ghosts» but the SHELL POOL'S
+ *         BUDGET — nearest-N churn over a fixed slot count — and that is
+ *         NpcColliders.tsx's. Measure the BOUND AGENT IDS at the contact frame,
+ *         not the collider count.
+ *
  *     HALF OF BOTH ROWS HAS SINCE BEEN PAID, and the next reader should not
  *     re-fix it: the „42 separate «Пътнотранспортно произшествие» for one
  *     continuous contact" and the „25 collisions / 252 наказателни точки" those
@@ -199,9 +224,30 @@
  *     with `setTranslation` only on spawn and reset, so it is not a teleported
  *     body that CCD would be unable to help.
  *
- *     So the wall exists, is full height, is in the physics world, and is at
- *     the place the car went through. WHAT REMAINS is why a swept dynamic body
- *     crosses it — and it is worth noticing that this is the SAME defect class
+ *     CONFIRMED AGAIN 2026-08-28, AND THE FRAME NOW NAMES THE SURFACE ITSELF.
+ *     The chassis DOES report the wall: on the newest sc-ov-return-gap leg
+ *     (.audit-frames/w14/frames/sc-ov-return-gap__mobile-wrong, 04-t054s and
+ *     04-t059s) the toast is «Удар в неподвижно препятствие» — the untagged
+ *     branch of VehicleRig's `onCollisionEnter`, i.e. rapier DID fire on the
+ *     building trimesh — while the car sits at 0 км/ч with the windscreen full
+ *     of interior wall. So the question is not «is there a body» (there is, and
+ *     it is touched); it is «why does touching it not stop the car», which is
+ *     the manifold's shape and is buildings.ts's / WorldColliders.tsx's.
+ *
+ *     AND THE HALF THAT CONVICTS THE STUDENT IS A THIRD FILE AGAIN, because it
+ *     is what turns «the car is in a wall» into «and he failed for it»:
+ *     `compile.ts:1307` writes `collisionMinKmh: 0` for EVERY scenario lesson
+ *     and VehicleRig.tsx:667 gates on `impactKmh >= collisionMinKmh`, so every
+ *     chassis contact — kerb, terrain, scenery — is a terminating ОПАСНА
+ *     ГРЕШКА and the sub-threshold branch two lines below it («a kerb scuff or
+ *     a bumper nudge. NOT graded») is unreachable for all 150 templates. That
+ *     is already written up at the sc-park-bay-exit-rev row of
+ *     `routing-collision.json`; it is repeated here because five of the six
+ *     rows that keep arriving at THIS directory carry it as their second half.
+ *
+ *     So the wall exists, is full height, is in the physics world, is at the
+ *     place the car went through, and is REPORTED when the car reaches it.
+ *     WHAT REMAINS is why a swept dynamic body crosses it — and it is worth noticing that this is the SAME defect class
  *     this module already fixed one layer up: the GRADER stopped tunnelling
  *     when `ContactProbe` learned to subdivide a long interval, and the frames
  *     say the PHYSICS has not. Measured on the tree of 2026-08-22, while

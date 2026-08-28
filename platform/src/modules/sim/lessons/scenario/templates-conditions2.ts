@@ -67,6 +67,35 @@
  * briefing tells the student to read as one needs its entry plate. That is the
  * sign layer's row, not a template's: `map.params` below mirrors the generator
  * recipe and is an input to nothing at runtime.
+ *
+ * RE-PHOTOGRAPHED 2026-08-27, so the routing is not carried forward on a stale
+ * frame: `.audit-frames/w14/frames/sc-ac-truck-spray__pc-right/04-t101s.png`
+ * (that run’s own `_audit-status.json` is stamped 2026-08-27T17:09:37Z) shows the
+ * 2+2 carriageway, the hard shoulder and a grassed median — mw-v1's geometry is
+ * all there — under a continuous six-storey streetwall on both verges, with no
+ * Д5 plate and no gantry in frame. Nothing in THIS file authors any of that:
+ * `districtId: "mw-v1"` names a committed document whose `content/world/` and
+ * `platform/public/world/` copies are byte-identical. c042440d's address is
+ * `world/builders/zoneSigns.ts` + `world/builders/worldRim.ts`, and both edits
+ * are written out in `environment/weather.ts` §2c.
+ *
+ * AND THE PELENA IS NOT THIS FILE EITHER, although the lesson is. Both spray
+ * rows (`sc-ac-truck-spray:6f13e17b` „no spray and no plume is rendered behind
+ * the truck", `:ebaacf94` „no visibility loss behind the truck") are filed
+ * against `environment/weather.ts`, whose §4 refuses them for the right reason:
+ * spray is emitted BY one vehicle and occludes the air behind THAT vehicle, so
+ * a scene-wide 0..1 in the weather store would make every driver in the lesson
+ * spray. On the same 2026-08-27 frame the road markings, the hard shoulder, the
+ * treeline and the tower blocks directly behind the truck are all sharp and its
+ * tail-lamp bar is crisp, with `ИНСТРУКЦИИ` step 3 legible beside it. The
+ * emitter belongs on the truck rig — `traffic/vehicleFleet.ts:1648`
+ * (TRUCK_MODEL_INDEX, the procedural box truck) mounted through
+ * `traffic/TrafficLayer.tsx:1408` — and must ride `getRainIntensity()` from the
+ * weather store rather than replace it. THE COPY IS DELIBERATELY NOT REWRITTEN
+ * TO MATCH THE EMPTY AIR: unlike sc-ac-bridge-ice's мост (which no district in
+ * the catalogue could ever carry — there is no `bridgeDeck` zone kind), a spray
+ * plume is renderable, and striking «пелена» from FO-04 × FO-06 would delete
+ * the vision-block half of the archetype to make a picture-match go green.
  */
 
 import type { CutInLeadCarSpec } from "../../contracts";
@@ -675,8 +704,29 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
     // is the room the gate below asks the student to spend slowing down — and
     // it is the one landmark this world actually gives him.
     { n: 6, textBg: "Смъкни до около 25 км/ч ОЩЕ на сухия асфалт, докато знакът е пред теб." },
-    // 65 ch
-    { n: 7, textBg: "Мини целия мост с равна газ и прав волан, без нито една корекция." },
+    // 78 ch
+    // WAS „Мини целия мост с равна газ и прав волан, без нито една корекция."
+    // — 2026-08-27, sc-ac-bridge-ice:4dc973d6. This is the ONE instruction the
+    // wave-N bridge strike missed, and it missed it for a reason worth writing
+    // down: `lane-world-claims.test.ts`'s bridge predicate matches the DEICTIC
+    // SPELLINGS it enumerated — /устой|устоя|над дерето|това е мост|
+    // съоръжението|по моста|на моста|мостът е/ — and „целия мост" is none of
+    // them. So steps 3, 5, 6 and 10 and both gate titles were rewritten while
+    // this line went on ordering the student across a bridge, GREEN, in a
+    // district whose only zone is `{ kind: "icePatch", 250→340 }`. Confirmed
+    // still shipping on the 2026-08-27 re-drive: `.audit-frames/w14/frames/
+    // sc-ac-bridge-ice__pc-right/03-ready.png` prints steps 1–6 in the
+    // ИНСТРУКЦИИ panel over apartment blocks that run to the horizon, and
+    // 04-t075s.png shows the А15 post standing on ordinary street asphalt with
+    // no deck, no abutment and no ravine anywhere in frame.
+    //
+    // „хлъзгавата отсечка" is the same 90 m and the same duty — and it is the
+    // wording steps 6 and 10, the objective and gate `sc-acbi-deck` already
+    // use, so the briefing now names one thing consistently instead of two.
+    // THE GATE HOLE IS NOT CLOSED BY THIS EDIT: the predicate still cannot see
+    // a bare „мост" as a claim. Widening it is a test file this lane does not
+    // own — the exact edit is in the lane report.
+    { n: 7, textBg: "Мини цялата хлъзгава отсечка с равна газ и прав волан, без нито една корекция." },
     // 80 ch
     { n: 8, textBg: "Помни: върху леда сцеплението е ~15% от сухото — спирачка и волан почти липсват." },
     // 66 ch
@@ -753,8 +803,31 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
     whyBg:
       "Ледът оставя на гумите около 10–20% от сухото сцепление — спирачният път от 40 км/ч става колкото сухият от 100, а завъртеният волан не завива, а отключва занасяне. Най-коварното е, че той не се вижда: асфалтът на моста лъщи под същото синьо небе като сухата улица зад него. Затова на мост няма реакция — има само предвиждане. Всяка команда, която би те спасила (спирачка, волан, дори газ), изисква сцепление, а точно него ледът ти е взел: единственият момент, в който още имаш сцепление и избор, е ДОКАТО СИ НА СУХОТО. Оттам нататък мостът не ти оставя нищо — нито място да завиеш, нито банкет да избягаш, само парапет отляво и отдясно и дере отдолу. Законът казва същото с две думи: скоростта се съобразява със състоянието на пътното покритие (чл. 20, ал. 2) — а състоянието на моста в мразовита сутрин е лед, докато не се докаже обратното.",
     lawRef: "ЗДвП чл. 20, ал. 2",
+    // THE BRIDGE THAT SURVIVED IN AN EXEMPTED FIELD — 2026-08-27, the second
+    // half of sc-ac-bridge-ice:4dc973d6. `lane-world-claims.test.ts` exempts
+    // `teach.*` because it states the RULE, true on every map; that exemption
+    // is right for `whenBg`/`whyBg` (bridge doctrine, untouched below) and it
+    // was wrong for this string, which is not doctrine at all — it says what
+    // the examiner is watching ON THIS DRIVE. It watched „дали изобщо си видял
+    // МОСТА", counted „липсата на ускорение до ОТСРЕЩНИЯ УСТОЙ", called every
+    // sharp input „върху СЪОРЪЖЕНИЕТО" and ended the exam on „плъзгането в
+    // ПАРАПЕТА". ac-bridge-v1 has none of the four, and the drill's own
+    // COLLISION demo ends in the банкет, not in a parapet — so the one
+    // consequence this paragraph named was the one that cannot happen.
+    // Re-pointed at what the world gives: the А15 post, the 90 m span, the
+    // carriageway edge.
+    //
+    // HONEST LIMIT, so the next reader does not count this as delivered: NO
+    // LIVE READER RENDERS `teach.examinerBg`. `modules/lesson/types.ts:87`
+    // types the ref `field: "when" | "why" | "examiner"` and `compose.ts:231`
+    // is the only construction site — it always asks for "why". The one place
+    // an examiner paragraph reaches a screen is the marketing page, off a
+    // hand-copied constant for a different lesson
+    // (`components/marketing/landing/featuredMistakes.ts:147`). This edit
+    // therefore changes no pixel today; it removes a false sentence from the
+    // corpus before the field acquires the reader its type already promises.
     examinerBg:
-      "Изпитващият следи дали изобщо си видял моста: очаква осезаемо вдигане на газта ПРЕДИ съоръжението, без подкана и без знак, който да го изисква — знакът А15 предупреждава, не задължава. Равномерното преминаване с прав волан и липсата на ускорение до отсрещния устой се четат като зимно четене на пътя; всяка рязка команда върху съоръжението е грешка в преценката, а плъзгането в парапета прекратява изпита.",
+      "Изпитващият следи дали си прочел знака А15: очаква осезаемо вдигане на газта ПРЕДИ хлъзгавата отсечка, без подкана — знакът предупреждава, не задължава. Равномерното преминаване с прав волан и липсата на ускорение до края на отсечката се четат като зимно четене на пътя; всяка рязка команда върху леда е грешка в преценката, а изнасянето извън платното прекратява изпита.",
   },
   levels: [
     { level: 1 },
@@ -903,8 +976,23 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
   family: "conditions",
   tagsBg: ["условия", "страничен вятър", "пориви", "изпреварване", "камион", "контрол на волана"],
   titleBg: "Страничен вятър след камиона",
+  // THE OBJECTIVE CARRIED THE SAME TWO PROMISES THE GATE TITLE WAS ALREADY
+  // STRIPPED OF — 2026-08-27, sc-ac-wind-truck-pass:6a076479. It read
+  // «изпревари бавния камион и бъди готов за порива в мига, в който носът ти
+  // излезе от завета му». Both halves are refused by this file's own measured
+  // notes: `ACTS_WIND_TRUCK`'s header states the pass „is not completed in
+  // world space" (cutInLeadCar has only a matchPlayer mode, so the rig holds
+  // `paceAheadM` forever), and the gate `sc-acw-pass` was retitled to
+  // «Излез в лявата лента до кабината…» for exactly that reason under the rule
+  // „until it exists no gate here may say «изпревари»"; and the lee is not in
+  // the physics at all (see instruction 3). `objectiveBg` is not a gate, but it
+  // IS student-facing on two live surfaces — `lane-world-claims.test.ts`
+  // counts it in `shownToTheStudent`, and `app/(dashboard)/classroom/
+  // lessonToRoom.ts:194` prints it as the caption under the correct take — so
+  // it was making both claims to the student's face while the chip beside it
+  // made neither.
   objectiveBg:
-    "При силен страничен вятър изпревари бавния камион и бъди готов за порива в мига, в който носът ти излезе от завета му: намали преди маневрата, дръж волана здраво и посрещай поривите с леки, постоянни корекции — не с рязко дръпване.",
+    "При силен страничен вятър излез да изпреварваш бавния камион, без да разчиташ на завет зад него — вятърът натиска през целия участък: намали преди маневрата, дръж волана здраво с двете ръце и посрещай поривите с леки, постоянни корекции, не с рязко дръпване.",
   archetypeIds: ["AC-12"],
   conceptIds: [
     "c-vehicle-controls",
@@ -936,14 +1024,55 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
     { n: 1, textBg: "Хвани волана здраво с двете ръце — вятърът бие, а отпред пъпли камион." },
     // 73 ch
     { n: 2, textBg: "Включи късите светлини, ако вали (чл. 70) — минаваш през водния му облак." },
-    // 75 ch
-    { n: 3, textBg: "Не се лъжи от завета зад камиона: това е най-опасната секунда преди порива." },
+    // 74 ch
+    // THE LEE IS NOT SIMULATED, AND THIS STEP WAS SELLING IT — 2026-08-27,
+    // sc-ac-wind-truck-pass:6a076479. The finding is filed as „no crosswind is
+    // depicted anywhere … in a lesson whose whole subject is the gust you take
+    // when you clear the truck's lee", and the DEPICTION half is the render
+    // layer's (routed in the lane report). This half is this file's, it is
+    // sharper, and it was measured in the code rather than inferred:
+    //
+    //   `LessonScene.tsx:2296-2298` — windLateralN = −CROSSWIND_BRIDGE_N,
+    //   windGustAmplitudeN = −CROSSWIND_GUST_AMPLITUDE_N, period
+    //   CROSSWIND_GUST_PERIOD_SEC, all three constant for the whole lesson.
+    //   `VehicleSim.ts:510-518` — the branch adds `windLateralN +
+    //   amplitude·sin(2π·t/period)` to the body EVERY step from t = 0. There is
+    //   no position term, no truck term and no shelter term anywhere in it.
+    //
+    // So the live student is under the full 1200 N from the first frame,
+    // INCLUDING while he sits behind the truck, and the gust peaks on a 5 s
+    // clock that knows nothing about the cab line. This step told him the
+    // opposite — «завет зад камиона» — and step 6 told him the blow would
+    // arrive at a place. tuning.ts:236-243 measures the cost of believing it:
+    // 1200 N drifts a hands-fixed car ≈ 1.0 m in 5 s and ≈ 2.7 m in 10 s, and
+    // POOR_LANE_KEEPING is live here at laneKeepMaxOffsetM 3.25 m. A student
+    // who relaxes his grip on the strength of the old step 3 is convicted by a
+    // wind the briefing promised him he was sheltered from — the founder's
+    // false-failure complaint, authored.
+    //
+    // NOT GUTTED, RETARGETED — the sc-ac-crosswind precedent
+    // (`conditions-sweep161-truth.test.ts` „the two rewritten drills still
+    // TEACH their hazard"). The AC-12 doctrine (a truck IS a wall, its lee ends
+    // at the cab, the second swing is the killer) is true on every real road
+    // and stays whole in `teach.whenBg`/`whyBg` below, and the mistake cards
+    // still narrate the authored ghosts that demonstrate it. What the briefing
+    // now states is what THIS drive delivers.
+    { n: 3, textBg: "Не разчитай на завет зад камиона — тук вятърът натиска през целия участък." },
     // 58 ch
     { n: 4, textBg: "Намали и подай ляв мигач ПРЕДИ да излезеш за изпреварване." },
     // 67 ch
     { n: 5, textBg: "Помни: по-бавно покрай камиона значи по-малко отместване от порива." },
-    // 60 ch
-    { n: 6, textBg: "Очаквай удара в мига, в който носът ти излезе пред кабината." },
+    // 74 ch
+    // WAS „Очаквай удара в мига, в който носът ти излезе пред кабината." — the
+    // same 2026-08-27 measurement as step 3. The gust is a pure sine of period
+    // CROSSWIND_GUST_PERIOD_SEC = 5 s and amplitude 500 N on a 1200 N base
+    // (tuning.ts:250-259), so it breathes between ~0.6× and ~1.4× and NEVER
+    // reverses — „диша, но никога не спира" is that envelope stated in words
+    // the student can act on, and it is what the wheel actually does. The old
+    // line pinned the event to a place the physics does not know about; a
+    // student who braced only there braced once, five seconds off, and held
+    // nothing for the other twenty-five.
+    { n: 6, textBg: "Очаквай порив на всеки няколко секунди — вятърът диша, но никога не спира." },
     // 66 ch
     { n: 7, textBg: "Посрещни го с лека, ПОСТОЯННА корекция към камиона — никога рязко." },
     // 74 ch

@@ -109,7 +109,15 @@ import {
   NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
   NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
 } from "./notifyColumn";
-import { useTapActivation } from "./tapActivation";
+import {
+  tapOwnsPointerType,
+  tapPointWithin,
+  useTapActivation,
+  type TapActivationHandlers,
+  type TapPoint,
+  type TapPointerLike,
+  type TapRect,
+} from "./tapActivation";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -244,6 +252,261 @@ export function foldLinesBelow(
   const step =
     Number.isFinite(lineHeightPx) && lineHeightPx > 0 ? lineHeightPx : FOLD_FALLBACK_LEADING_PX;
   return Math.max(1, Math.round(hidden / step));
+}
+
+/**
+ * Is there still text under this window's fold, and where does the end of it
+ * sit — asked of the LIVE element, at the moment of a tap.
+ *
+ * NOT `peekFold.lines`, AND THE DIFFERENCE IS THE WHOLE POINT OF READING IT
+ * HERE. That number is refreshed by a `ResizeObserver` and by `onScroll`, i.e.
+ * on React's schedule; a card's ACTIVATION may not depend on which of those has
+ * run last, because the failure mode is a tap that dismisses a card the student
+ * can still see unread words on. The arithmetic is `foldLinesBelow`'s, minus
+ * the rounding it does for display: bottom padding joins the scrollable
+ * overflow (that function's own note), so counting it would report a line that
+ * is not there, and `FOLD_SLACK_PX` is the same fractional-line grain.
+ *
+ * Returns the scrollTop that shows the END, or `null` when nothing is hidden.
+ */
+export function readRestScrollTop(el: {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  padBottomPx: number;
+  slackPx?: number;
+}): number | null {
+  const slack = el.slackPx ?? FOLD_SLACK_PX;
+  const hidden = el.scrollHeight - el.clientHeight - el.scrollTop - el.padBottomPx;
+  if (!(hidden > slack)) return null;
+  const end = el.scrollHeight - el.clientHeight;
+  return end > el.scrollTop ? end : null;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   …AND THE ✕ ON THAT CARD MUST STILL CLOSE IT ON THE FIRST PRESS — 2026-08-28.
+
+   THE REGRESSION THE BLOCK ABOVE SHIPPED, stated plainly. On the
+   `cardIsDismissButton` shape the card PAINTS A ✕ (`DismissGlyph`, row 1) and
+   that ✕ is a bare `<span>`: it owns no handler, so every press of it is a
+   press of the card. Once the card's activation became „scroll first, dismiss
+   second", the ✕ stopped closing anything on any card with text under the fold
+   — it scrolled. A control that does not do the thing it is drawn as is a
+   worse defect than the one being repaired, and it lands on A6 itself, which
+   this file quotes: „those pop ups need to be able to be removed when clicked".
+
+   THE SHAPE OF THE FIX, and why it is the region test and not a nested target.
+   A second interactive element inside the card's `<button>` is what this file
+   already refuses one shape over („a card that already holds „Защо" /
+   „Разбрах" cannot nest a button"), it is invalid HTML, React warns about it
+   and a screen reader gets a second focus stop for an action it can already
+   reach. `useTapActivation` also deliberately does not stop propagation, so a
+   nested target would need propagation games on top of the nesting. Asking
+   WHERE THE PRESS LANDED costs none of that: no element, no `role`, no
+   `tabIndex`, no second focus stop, and the accessible name is unchanged. It
+   is also the question `useTapActivation` already asks once (rule 2 in that
+   file: the release is hit-tested against the control's own rect) — this asks
+   it a second time, of a smaller box inside the same control.
+
+   THE ✕ IS 12 px AND THE HIT BOX IS 44. `DismissGlyph` is `h-3 w-3`. Judging
+   the press against those twelve pixels would replace „the ✕ never closes"
+   with „the ✕ closes if you hit it", which on a phone is the same complaint
+   with an alibi. `DISMISS_GLYPH_TAP_PX` is this project's thumb rule — the
+   same 44 the other shape's ✕ chip is sized to, and the same
+   `OVERLAY_PEEK_HEIGHT_PX` every card is floored at — applied to the HIT TEST
+   only, so nothing on the glass moves. The inflated box lies inside a card
+   whose every other pixel merely scrolls, so the cost of being generous here
+   is bounded: a press aimed at the top-right corner of the card closes it,
+   which is exactly what the ✕ drawn in that corner promises.
+
+   WHAT IS DELIBERATELY NOT CHANGED: a press anywhere else on the card still
+   scrolls to the end of the sentence first and dismisses on the next press.
+   That behaviour is the block above's, it is right, and it is why the student
+   cannot delete words he has not seen. Keyboard/assistive activation carries
+   no coordinates and therefore never reads as a ✕ press — it keeps the
+   two-press contract, which costs an AT user nothing, because the whole body
+   is in the accessibility tree regardless of the fold (`showFoldLabel` is
+   `aria-hidden` for that reason).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The ✕'s own address in the DOM.
+ *
+ * NOT a `ref`, and that is the honest part rather than a shortcut: an
+ * attribute is the SAME fact for the code that hit-tests it and for a drive
+ * that photographs it, so the wiring cannot rot behind a ref that renders
+ * nothing. `sim-overlay-dismiss.test.tsx` asserts the attribute is on the
+ * markup of exactly the shape that paints a ✕, which is what makes the
+ * hit-test's lookup a checked claim instead of a hopeful one.
+ */
+export const DISMISS_GLYPH_ATTR = "data-sim-overlay-dismiss-glyph";
+
+/** The thumb rule, applied to the hit test and to nothing that is painted. */
+export const DISMISS_GLYPH_TAP_PX = OVERLAY_PEEK_HEIGHT_PX;
+
+/**
+ * The 12 px glyph's box grown to a 44 px target, centred on the glyph.
+ *
+ * `null` for a box with no area — an element that has not been laid out, or
+ * one collapsing out from under the finger, is not something a student can be
+ * aiming at (`tapPointWithin`'s own rule, and this returns early so that rule
+ * is never handed a negative-width rect to reason about).
+ */
+export function dismissGlyphTapRect(glyph: TapRect | null): TapRect | null {
+  if (glyph === null) return null;
+  const width = glyph.right - glyph.left;
+  const height = glyph.bottom - glyph.top;
+  if (!(width > 0) || !(height > 0)) return null;
+  const padX = Math.max(0, (DISMISS_GLYPH_TAP_PX - width) / 2);
+  const padY = Math.max(0, (DISMISS_GLYPH_TAP_PX - height) / 2);
+  return {
+    left: glyph.left - padX,
+    top: glyph.top - padY,
+    right: glyph.right + padX,
+    bottom: glyph.bottom + padY,
+  };
+}
+
+/** Just enough of an element to ask it where it is. */
+type GlyphRectLike = { getBoundingClientRect: () => TapRect };
+
+/** …and just enough of the card to find the ✕ inside it. */
+export type CardElementLike = {
+  querySelector: (selectors: string) => GlyphRectLike | null;
+};
+
+/**
+ * `TapPointerLike` plus the one thing this file asks of the card that
+ * `tapActivation` does not: find the ✕ inside it. A real
+ * `React.PointerEvent<HTMLButtonElement>` satisfies it structurally, so the
+ * call site spells no React event types and the handler stays drivable from a
+ * node gate with a plain object.
+ */
+type CardPointerLike = TapPointerLike & { currentTarget: CardElementLike };
+
+/**
+ * Did this press land on the ✕?
+ *
+ * `false` for a card that paints no ✕ (the panel shape), for a press with no
+ * coordinates (keyboard, assistive technology, `element.click()`), and for a
+ * glyph that has not been laid out. Every one of those falls through to the
+ * card's ordinary activation, which is the direction that cannot lose a
+ * student a sentence.
+ */
+export function pressOnDismissGlyph(
+  card: CardElementLike | null,
+  point: TapPoint | null,
+): boolean {
+  if (card === null || point === null) return false;
+  const glyph = card.querySelector(`[${DISMISS_GLYPH_ATTR}]`);
+  if (glyph === null) return false;
+  const box = dismissGlyphTapRect(glyph.getBoundingClientRect());
+  return box !== null && tapPointWithin(point, box);
+}
+
+/**
+ * THE CARD'S HANDLER COMPOSITION  EXPORTED, BECAUSE A TRANSCRIPTION OF IT
+ * CANNOT TEST IT. 2026-08-28.
+ *
+ * `cardTapAction` above made the BRANCH testable, and it was not enough. The
+ * first repair of the  passed all eleven of its cases and 729 other hud tests
+ * while the  still would not close on a mouse  and then the test WRITTEN TO
+ * CATCH THAT passed too, with the fix removed, because it transcribed this
+ * composition into the test file instead of importing it. A test that
+ * re-implements the thing it checks proves only that the copy is correct.
+ *
+ * So the composition lives here, as one exported function with no React in it,
+ * and both the component and the gate call THIS.
+ *
+ * WHAT IT HAS TO GET RIGHT, and what the two shipped bugs were:
+ *
+ *   . `pointerdown` RECORDS whether the press landed on the . It is the only
+ *     moment mouse, pen and touch share  a mouse never arms the pointer path
+ *     (`tapOwnsPointerType`), so its press reaches the action through `click`,
+ *     which carries coordinates but no press of ours to hang off. It is also
+ *     the AIM: on touch the release is wherever the thumb rolled to, and a
+ *     student who put a finger on the  meant the .
+ *   . `pointerup` CLEARS the flag ONLY for the devices that activate on it.
+ *     For a mouse the sequence is `pointerdown -> pointerup -> click`, and
+ *     `tapPointerUp` fires nothing; an unconditional clear here ran in between
+ *     and zeroed the flag before the `click` that reads it, so
+ *     `onDismissGlyph` was always false on desktop and the  scrolled. The
+ *     founder's row is specifically about the mouse: �those pop ups need to be
+ *     able to be removed when clicked with the mouse�.
+ *     The clear still exists for a real reason  a press that never becomes an
+ *     activation must not hand a later keyboard `Enter` a  it did not press 
+ *     and for touch and pen the release IS the activation, so by then the flag
+ *     has already been consumed by the action.
+ *   . `pointercancel` clears UNCONDITIONALLY. A cancelled press is not an
+ *     activation on any device, so nothing downstream is owed the flag.
+ *
+ * The spread is what carries the click path through untouched, so the
+ * compatibility-click suppression, the `detail === 0` exemption and every other
+ * guarantee `tapActivation` makes are the SAME function object here, not a
+ * re-implementation. A plain object and not `useMemo`, for the React Compiler
+ * reason given where this is called.
+ */
+export type CardDismissHandlers = Omit<TapActivationHandlers, "onPointerDown"> & {
+  onPointerDown: (event: CardPointerLike) => void;
+};
+
+export function composeCardDismissHandlers(
+  cardPress: TapActivationHandlers,
+  onGlyph: { current: boolean },
+): CardDismissHandlers {
+  return {
+    ...cardPress,
+    // `CardPointerLike`, not `TapPointerLike`, and NOT a cast. This handler is
+    // the one place that needs `currentTarget.querySelector` — it has to find
+    // the ✕ inside the card — so the requirement belongs in the signature. A
+    // cast here would have compiled and then thrown at runtime for any caller
+    // that passed a plain tap event, which is the shape a test is most likely
+    // to hand it.
+    onPointerDown: (event: CardPointerLike) => {
+      onGlyph.current = pressOnDismissGlyph(event.currentTarget, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      cardPress.onPointerDown(event);
+    },
+    onPointerUp: (event: TapPointerLike) => {
+      cardPress.onPointerUp(event);
+      if (tapOwnsPointerType(event.pointerType)) onGlyph.current = false;
+    },
+    onPointerCancel: (event: TapPointerLike) => {
+      cardPress.onPointerCancel(event);
+      onGlyph.current = false;
+    },
+  };
+}
+
+/** What one press of the dismiss-button card does. */
+export type CardTapAction = { kind: "dismiss" } | { kind: "scroll"; top: number };
+
+/**
+ * THE WHOLE BRANCH, AS ARITHMETIC A GATE CAN DRIVE.
+ *
+ * It is exported and the component calls it rather than re-deciding inline,
+ * because the regression this repairs was invisible to a suite that could only
+ * see the markup: 718 hud tests passed while the ✕ scrolled. A rendered ✕ is
+ * not evidence that pressing it closes anything, and this is the function that
+ * makes „it closes" a thing an assertion can hold.
+ */
+export function cardTapAction(press: {
+  onDismissGlyph: boolean;
+  window: {
+    scrollTop: number;
+    scrollHeight: number;
+    clientHeight: number;
+    padBottomPx: number;
+    slackPx?: number;
+  } | null;
+}): CardTapAction {
+  // The ✕ first, and unconditionally: it is drawn as a close control, so it
+  // closes — fold or no fold, measured window or none.
+  if (press.onDismissGlyph) return { kind: "dismiss" };
+  const rest = press.window === null ? null : readRestScrollTop(press.window);
+  return rest === null ? { kind: "dismiss" } : { kind: "scroll", top: rest };
 }
 
 /**
@@ -1380,7 +1643,12 @@ export function SimOverlay({
   const tapWhy = useTapActivation(() => setOpenItem(open ? null : shown));
   const tapAck = useTapActivation(acknowledge);
   const tapDismissChip = useTapActivation(dismiss);
-  const tapDismissCard = useTapActivation(dismiss);
+  // `tapDismissCard` IS NOT IN THIS GROUP ANY MORE and the reason is ordering,
+  // not taste: its action reads the peek's own text window (see the block at
+  // `tapDismissCard`), and that window's ref is made by `useFoldLines` two
+  // hundred lines below. Hooks may be reordered freely as long as the order is
+  // the same on every render, and this one is; a ref reached backwards through
+  // a callback assignment would not be.
   const tapCloseSheet = useTapActivation(() => setOpenItem(null));
   const tapSheetAck = useTapActivation(acknowledge);
   /* ── THE SENTENCE THAT WAS CUT IS ITSELF THE WAY TO THE REST — 2026-08-26.
@@ -1556,6 +1824,140 @@ export function SimOverlay({
   const sheetFold = useFoldLines(`sheet ${open ? "open" : "shut"} ${foldKey}`);
 
   /* ══════════════════════════════════════════════════════════════════════════
+     «↓ ОЩЕ 1 РЕД» ON A CARD WHOSE ONLY TAP DELETES IT — 2026-08-27.
+
+     THE FRAMES ARE IN THIS LANE'S OWN WORK LIST, and they are the same card
+     twice: `w10-1/sc-ov-solid-return__mobile-right/04-t002s.png` and
+     `w10-4/sc-lane-change__mobile-right/04-t115s.png`, iPhone 16 landscape.
+     Both show the ribbon-legend peek reading «Синя линия — колата-сянка ·
+     зелена, стрелката и светлинният стълб — маршрутът и целта, до която» and
+     then, in the tone colour, «↓ ОЩЕ 1 РЕД». The sentence ends «…до която
+     караш». The last word is not on the glass.
+
+     THE ANNOUNCEMENT IS TRUE AND IT HAD NO CONSUMER, which is this corpus's
+     most expensive shape. Trace it in this file rather than take it on trust:
+
+       hasDetail            false — a legend/task/praise line carries no WHY
+       cardIsDismissButton  closable && !hasDetail && !hasAck   → TRUE
+       the control row      `{cardIsDismissButton ? null : …}`  → NOTHING
+                            no «Защо», no «Прочети», no ✕ chip
+       textIsCut            hasDetail && peekFold.lines > 0     → FALSE
+                            so the cut words are not a control either
+       showFoldLabel        peekFold.lines > 0                  → TRUE
+
+     So the card prints a counter, and the ONE activation it owns — the whole
+     card is `<button aria-label="Скрий известието: …">` — destroys the card and
+     with it the sentence. A student who does what the ↓ tells him to do loses
+     the rest of it. The window does scroll, and a deliberate drag inside a
+     44 px box that is also a dismiss button is not an affordance anybody found:
+     `grep ЗАЩО run.log` returns 0 on both mobile legs of that lesson, which is
+     the sweep's way of saying there was never a control there to press.
+
+     THE TAP FINISHES THE SENTENCE, AND THE NEXT TAP REMOVES THE CARD.
+     One rule, stated as a contract because A6 is the other party to it: „those
+     pop ups need to be able to be removed when clicked" is not satisfied by a
+     card that takes an unbounded number of taps to leave, so this is not a page
+     step — the first tap jumps the window to the END, which makes it EXACTLY
+     TWO TAPS on every card, always, and the second one is the plain dismiss
+     this card has had since A6 landed.
+
+     ⚠ CORRECTED 2026-08-28, AND THE CORRECTION IS THE ✕. „Two taps on every
+     card, always" was written as if the card had no close control drawn on it,
+     and it has one: row 1 paints `DismissGlyph` on exactly this shape. As
+     shipped, a press of that ✕ scrolled — the ✕ is a bare `<span>` and every
+     press of it is a press of the card. So the rule above is the rule for the
+     CARD BODY, and the ✕ is one press, always. `cardTapAction` up the file is
+     that branch, and the block above it has the reasoning.
+
+     WHY THE END-JUMP CANNOT SKIP ANYTHING ON THIS SHAPE. The branch is
+     `!hasDetail` by construction: there is no authored body here, only
+     `lineBg`, and the longest one in the shipped corpus is that legend sentence
+     — about five lines in a 180 px column against a window that shows two to
+     three. One jump covers it, and `foldWindowPx`'s TOP snap keeps the lines it
+     lands on whole rather than cutting the first of them through the glyphs.
+
+     WHY IT IS THE CARD'S OWN ACTIVATION AND NOT A NESTED TARGET. The window is
+     inside the card's `<button>`, and `useTapActivation` deliberately does not
+     stop propagation (its four handlers are written for a control that IS the
+     element). A nested tap target would therefore need a wrapper to hold the
+     card's own activation off — and a second interactive region inside a button
+     is exactly the nesting this file already refuses one shape over („a card
+     that already holds „Защо" / „Разбрах" cannot nest a button"). Putting the
+     rule in the card's activation adds no element, no `role`, no `tabIndex` and
+     no second focus stop; the accessible name is unchanged, and a screen reader
+     was never affected by the fold at all — it reads the whole body out of the
+     DOM, which is why `showFoldLabel` is `aria-hidden`.
+
+     THAT REASONING STANDS AND IT WAS NOT THE WHOLE ANSWER: a card that PAINTS
+     a ✕ still owes that ✕ a first press that closes. The 2026-08-28 repair
+     keeps every word of this paragraph — no element, no role, no tabIndex, no
+     nested button — and asks instead WHERE inside the one control the press
+     landed (`pressOnDismissGlyph`).
+
+     THE STATE IS READ FROM THE ELEMENT AT TAP TIME (`readRestScrollTop`), not
+     from `peekFold.lines`. That number is refreshed by a `ResizeObserver` and
+     by `onScroll`, and a tap that DELETES the card may not depend on which of
+     those ran last: read late, the two answers can only differ in the direction
+     that costs the student the words.
+
+     AND THE CONSUMER IS THE NUMBER ON THE CARD. `scrollTo` fires a
+     native `scroll` event, the window is already wired to `peekFold.onScroll`,
+     so `useFoldLines.measure` re-runs — «↓ ОЩЕ 1 РЕД» disappears, the mask
+     re-snaps to the new grid position, and the same tap next time dismisses.
+     ══════════════════════════════════════════════════════════════════════════ */
+  // AN INLINE ARROW AND `scrollTo`, WHICH IS TWO LINT FACTS AND NOT TASTE.
+  // A `useCallback` here makes the React Compiler give up on this component
+  // („Existing memoization could not be preserved"), and the five hooks this
+  // one joins are all inline arrows for the same reason. `scrollTo` rather than
+  // assigning `scrollTop`: an assignment reads to the compiler as modifying a
+  // value it did not create („This value cannot be modified"), and the method
+  // says the same thing to the browser with nothing for it to object to.
+  //
+  // WHERE THE PRESS LANDED, CARRIED FROM THE HANDLER TO THE ACTION IN A REF,
+  // because `useTapActivation` calls the action with no event — by design; its
+  // four handlers are written for a control that IS the element, and this is
+  // the one control on the card that is a REGION of the element instead. The
+  // ref is written and read only inside event handlers, never during render.
+  //
+  // RECORDED AT `pointerdown`, WHICH IS THE ONLY MOMENT BOTH DEVICES SHARE.
+  // A mouse never arms the pointer path at all (`tapOwnsPointerType`), so a
+  // desktop press of the ✕ — the founder's own words are „removed when clicked
+  // with the mouse" — reaches the action through `click`, which carries
+  // coordinates but no press of ours to hang off. `pointerdown` fires for
+  // mouse, pen and touch alike, so one recording serves all three. It is also
+  // the AIM: on touch the release is wherever the thumb rolled to, and a
+  // student who put his finger on the ✕ meant the ✕.
+  //
+  // AND IT IS CONSUMED, NOT LEFT STANDING. The action clears it, and so does
+  // every release path, so a press that never becomes an activation cannot
+  // hand a later keyboard `Enter` a ✕ it did not press.
+  const cardPressOnGlyph = useRef(false);
+  const cardPress = useTapActivation(() => {
+    const onDismissGlyph = cardPressOnGlyph.current;
+    cardPressOnGlyph.current = false;
+    const el = peekFold.ref.current;
+    const padRaw = el === null ? Number.NaN : Number.parseFloat(getComputedStyle(el).paddingBottom);
+    const action = cardTapAction({
+      onDismissGlyph,
+      window:
+        el === null
+          ? null
+          : {
+              scrollTop: el.scrollTop,
+              scrollHeight: el.scrollHeight,
+              clientHeight: el.clientHeight,
+              padBottomPx: Number.isFinite(padRaw) ? padRaw : 0,
+            },
+    });
+    if (action.kind === "scroll" && el !== null) {
+      el.scrollTo({ top: action.top });
+      return;
+    }
+    dismiss();
+  });
+  const tapDismissCard = composeCardDismissHandlers(cardPress, cardPressOnGlyph);
+
+  /* ══════════════════════════════════════════════════════════════════════════
      WHICH MOMENT THE VERDICT IS ABOUT — §2.6 O33's SECOND HALF, 2026-08-25.
 
      THE FRAME (`w10-4/sc-sp-curve__mobile-wrong/04-t193s.png`, iPhone 16
@@ -1694,6 +2096,24 @@ export function SimOverlay({
   // …and when a card holds no OTHER control, the card itself is the button —
   // the `HudToasts` grammar, so the phone and the desktop dismiss the same way.
   const cardIsDismissButton = closable && !hasDetail && !hasAck;
+  /**
+   * …and the same question asked of the card that has NO sheet to send anyone
+   * to: are there words under the fold, on a surface whose only tap used to be
+   * „delete this"?
+   *
+   * PURELY A REPORTING PREDICATE — the behaviour is `tapDismissCard`, which
+   * reads the element itself at tap time for the reason its block gives. This
+   * is what the attribute on the window is painted from, so a drive can
+   * PHOTOGRAPH the state instead of inferring it from a card's silence; the two
+   * can disagree only for the one frame between a resize and its observer, and
+   * an attribute that is one frame late costs nobody a sentence.
+   *
+   * `cardIsDismissButton` and `textIsCut` are mutually exclusive by
+   * construction — one demands `!hasDetail`, the other demands `hasDetail` — so
+   * a card can never be in both states, and the two tap behaviours can never
+   * both be armed.
+   */
+  const plainTextIsCut = cardIsDismissButton && peekFold.lines > 0;
   // There is no `interactive` flag any more, and its absence IS row A6's phone
   // half. It used to read `hasDetail || blocking`, and an ordinary line — a
   // task, a piece of guidance, a „Браво" — matched neither arm, so it rendered
@@ -2005,7 +2425,16 @@ export function SimOverlay({
           </span>
         ) : null}
         {cardIsDismissButton ? (
-          <span className={`${queued > 0 ? "" : "ml-auto"} shrink-0 opacity-70`}>
+          // THE ATTRIBUTE IS THE WIRING AND NOT A LABEL FOR IT. `DISMISS_GLYPH_ATTR`
+          // spelled out — a computed key would hide it from every grep and from the
+          // markup assertion that keeps the two in step. `pressOnDismissGlyph` finds
+          // this box from the card's `currentTarget` and closes the card when a press
+          // lands on it, instead of scrolling the text window; without the attribute
+          // that lookup silently finds nothing and the ✕ goes back to lying.
+          <span
+            data-sim-overlay-dismiss-glyph=""
+            className={`${queued > 0 ? "" : "ml-auto"} shrink-0 opacity-70`}
+          >
             <DismissGlyph />
           </span>
         ) : null}
@@ -2024,6 +2453,15 @@ export function SimOverlay({
         // whole and the window is inert, present means the half sentence on the
         // glass is now itself the way to the whole of it. See `tapCutText`.
         data-sim-overlay-text-cut={textIsCut ? "" : undefined}
+        // …AND THE SAME FACT ABOUT THE CARD THAT HAS NO SHEET TO OPEN, which is
+        // a DIFFERENT state and gets its own attribute rather than a widened
+        // meaning for the one above: that one says „the cut words open the read
+        // sheet" and is read by the suites that way, this one says „a tap on
+        // the card BODY will finish this sentence before it dismisses" — the
+        // ✕ drawn in row 1 closes on the first press either way, which is the
+        // 2026-08-28 correction. A drive can photograph both. See the block at
+        // `tapDismissCard`.
+        data-sim-overlay-text-read={plainTextIsCut ? "" : undefined}
         className={`flex min-h-0 min-w-0 shrink flex-col gap-0.5 overflow-y-auto${
           textIsCut ? " cursor-pointer" : ""
         }`}

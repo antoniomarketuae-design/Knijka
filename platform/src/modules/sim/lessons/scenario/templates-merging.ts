@@ -401,6 +401,41 @@ const LNM_THROUGH_CAR: RearTailgaterSpec = {
  * writes — content/world/ln-merge-v1.json and platform/public/world/
  * ln-merge-v1.json; the sign and the marking instruction 1 promises need the
  * Наредба № 2 furniture the generator does not place yet.
+ *
+ * W15 2026-08-28 — THREE THINGS THE ROUTING NOTE ABOVE GOT WRONG OR LEFT OUT,
+ * measured rather than re-argued.
+ *
+ *  1. THE QUOTED SENTENCE IS NOT IN THIS FILE. The finding's evidence line —
+ *     «Знакът и маркировката казват едно: тази лента свършва след около 180
+ *     метра» — is `traces/scMergeLaneEnd.ts:134`, an annotation on the shadow
+ *     DEMO (the frame's own transport bar reads «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ
+ *     СЯНКАТА 0:03 / 0:30»). No `instructionsBg` step here claims a sign or a
+ *     marking; step 1 says only that the lane ends. So the copy half of this
+ *     row has a second address, and it is the trace script.
+ *
+ *  2. THE SIGN THE GENERATOR WOULD HAVE TO PLACE DOES NOT EXIST YET EITHER, and
+ *     that is a bigger ask than „the generator does not place it". Built
+ *     `buildWorldGeometry(ln-merge-v1)` and read the sign census it returns: 35
+ *     kinds ship — stop, giveWay, roundabout, limit20…limit140, limitEnd,
+ *     noOvertaking, noStopping, noParking, slippery, curve, railGuarded,
+ *     railUnguarded, railCross, barrier, noEntry, oneWay, mandatoryRight,
+ *     mandatoryLeft, children, pedestrianCrossing, priorityRoad, settlement,
+ *     fuel — and NOT ONE of them is a narrowing / lane-drop / merge sign. The
+ *     map builds `markingQuads: 23`, `noEntry: 1`, `oneWay: 1`, `limit50: 2`
+ *     and nothing else. So the ask is TWO files, not one: a `laneEnds` (А«Пътно
+ *     стеснение») member in `world/builders/signs.ts` + its census row, and
+ *     THEN `tools/maps/gen_ln_merge.mjs` (plus the content/ and public/ copies)
+ *     placing it at meta.scenario.taperFromY = 180 with the М-taper paint from
+ *     180 to 240 and `lanes` dropping 2 → 1 past it. Until the first exists the
+ *     second has nothing to place.
+ *
+ *  3. WHAT WAS FIXABLE HERE, AND IT IS THE HALF THAT GRADES. Because the
+ *     carriageway never narrows, drifting back into the dying lane after the
+ *     merge is the natural thing to do — and `sc-mle-finish` was CERTIFYING it
+ *     on both aided rungs (compiled radius 12 at L1 and 10 at L2 against an
+ *     8.125 m lane pitch). The measurement and the repair are on that
+ *     objective. It does not build the taper; it stops the lesson rewarding the
+ *     behaviour the missing taper invites.
  */
 export const SC_MERGE_LANE_END: ScenarioSpec = {
   id: "sc-merge-lane-end",
@@ -444,7 +479,46 @@ export const SC_MERGE_LANE_END: ScenarioSpec = {
     {
       id: "sc-mle-finish",
       titleBg: "Продължи по оставащата лента до края на отсечката",
-      params: { kind: "reachZone", x: LNM_X_THROUGH, y: 270, radiusM: 8 },
+      // W15 — «ОСТАВАЩАТА ЛЕНТА» WAS EARNABLE FROM THE LANE THAT ENDS, on both
+      // aided rungs, and it is the graded half of sc-merge-lane-end:ae6166e2.
+      //
+      // The row is about the world: ln-merge-v1 carries `lanes: 2` over all
+      // 280 m and никакъв taper (see the header — routed, not fixable here). But
+      // the world defect has a consequence that IS this file's, and nothing had
+      // ever measured it. Because the carriageway never actually narrows, the
+      // natural thing for a student to do after merging is to drift back right
+      // into the lane the lesson says has ended — and this gate then told him he
+      // had „continued in the REMAINING lane".
+      //
+      // MEASURED on `compileScenario`, distance from this disc's centre to the
+      // ENDING lane's centre being one 8.125 m pitch:
+      //
+      //     rung   authored 8 → compiled   reaches the dying lane's centre?
+      //     L1              12                      YES  (by 3.88 m)
+      //     L2              10                      YES  (by 1.88 m)
+      //     L3–L5            8                      no   (short by 0.13 m)
+      //
+      // L1 is the rung a beginner opens on and the rung the sweep photographed
+      // («Ниво 1 — Пълна помощ»), so the certificate was wrong exactly where it
+      // is read most and where the world gives the least help. The ladder cannot
+      // see this: `radiusWidenBudget` bounds the widening by the CHAIN's own
+      // separation (34 m here, budget 11.25) and knows nothing about lane pitch.
+      //
+      // 4.5, AND WHY IT IS NOT A COMPLETABILITY HAZARD. Doc 86 B3/B5 is right
+      // that a terminal radius under the 8.125 m pitch usually walls a student —
+      // but that warning is about gates a car has to be AIMED at. This disc is
+      // centred ON the lane the student is being sent up and 4.5 > the lane's
+      // own 4.06 m half-width, so any car travelling that lane sweeps it; the
+      // evaluator latches on the swept disc, not on a single frame. The rungs
+      // compile to 6.75 / 5.63 / 4.5 and every one of them now clears the dying
+      // lane's centre — by 1.38 m at the worst (L1) instead of overlapping it.
+      // The along-approach grace every rung already gets is untouched, so early
+      // is still forgiven; only „finished in the wrong lane" stops counting.
+      //
+      // WHAT THIS IS NOT: it does not build the taper, it does not make the lane
+      // end, and it does not close :ae6166e2. It stops the lesson from
+      // CERTIFYING the behaviour the missing taper invites.
+      params: { kind: "reachZone", x: LNM_X_THROUGH, y: 270, radiusM: 4.5 },
     },
   ],
   rubric: {
@@ -945,6 +1019,41 @@ const MGB_BUS: CutInLeadCarSpec = {
  *      ADR-001 fictional) + its row in VEHICLE_PROFILE_LENGTH_M /
  *      VEHICLE_PROFILE_WIDTH_M; one word changes here once it exists. Nothing
  *      about grading moves: the profile is data + presentation only.
+ *
+ *      W15 2026-08-28 — AND THERE IS A RENDER-ONLY STOPGAP THAT FITS THIS RIG
+ *      ALMOST EXACTLY, which no lane had noticed: `ScenarioSpec.actorLabels`
+ *      (doc 87 B40(a)) exists for precisely this — «a lesson whose SUBJECT is a
+ *      car the student cannot read at the range the lesson asks him to read it
+ *      at». Its renderer (`TrafficLayer.tsx:2343`) shows the caption ONLY while
+ *      the actor is genuinely stationary and within
+ *      `STAGED_ACTOR_LABEL_MAX_DIST_M` = 120 m, and both conditions land on
+ *      this drill as if measured for it: traced through the production runner,
+ *      MGB_BUS stands at y 140.0 with v 0.0 for the first 25–30 s of a 12 км/ч
+ *      approach (≈8 s at 30), and the spawn is 120 m short of it — so the card
+ *      is out of range at the briefing beat, exactly the „meet the instruction
+ *      first, then find the shape" behaviour `stagedActorLabels.ts` argues for,
+ *      and it is up while the student is reading the стоянка and gone the frame
+ *      the rig rolls. It cannot make the drill easier: nothing here grades off
+ *      the rig's identity.
+ *      THE ASK is three lines in two files this template may not touch —
+ *        · `contracts.ts:451` widen the union:
+ *            export type StagedActorLabelKind = "standingOnGreen" | "busOnRoute";
+ *        · `traffic/stagedActorLabels.ts` add the copy, wording taken from this
+ *          template's own instruction 2 and 3 (the `standingOnGreen` rule: the
+ *          card is the lesson's sentence moved to where he is looking), and its
+ *          `lawRef` byte-identical to `teach.lawRef` below — "ЗДвП чл. 67" —
+ *          so ADR-002 holds and no article is invented:
+ *            busOnRoute: { headlineBg: "АВТОБУС ОТ РЕДОВНА ЛИНИЯ",
+ *                          line1Bg: "Спрял на спирката — всеки момент потегля",
+ *                          line2Bg: "В населено място си длъжен да го пропуснеш",
+ *                          lawRef: "ЗДвП чл. 67", accent: "#e8b34a" }
+ *        · and then ONE line lands here, which `validate.ts:165` already
+ *          checks against this template's own staged ids:
+ *            actorLabels: [{ actorId: MGB_BUS.id, kind: "busOnRoute" }],
+ *      It does not make the box van a bus. It stops the drill asking a
+ *      seventeen-year-old to recognise „автобус от редовна линия" — the only
+ *      class of vehicle чл. 67 covers — from an object drawn as cargo traffic,
+ *      which is the part of :8fa6b888 that teaches him the wrong thing.
  *   2. THERE IS NO СПИРКА TO STAND AT. mg-busstop-v1 carries the bay ONLY as
  *      `meta.scenario.busBayY` (130…176) — no shelter, no М-marking, no pole,
  *      and its one `zones` entry is the full-length busLane. Nothing downstream
@@ -981,6 +1090,82 @@ const MGB_BUS: CutInLeadCarSpec = {
  * it — the floor that kept the rig in the бус лента at every taught pace, and
  * the compiled gate that certified the yield before the rig had moved — is
  * fixed above and below, with the geometry re-measured at every rung.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * W15 2026-08-28 — THE СПИРКА ROW IS DEAD; THE „EVENT NEVER HAPPENS" ROW HAS A
+ * CAUSE, AND IT IS NOT THE ONE ANYONE HAD GUESSED.
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * (a) sc-merge-bus-pullout:c17c12de — «No shelter and no bus-stop marking
+ *     appears anywhere on the route … The bay exists in the map only as
+ *     meta.scenario.busBayY, i.e. as a coordinate with no geometry. Unchanged.»
+ *     REFUTED AT HEAD, and the dates are the whole argument: the frame it is
+ *     judged on (`sweep161/…/pc-right/07b-menu.png`, and `04-t038s`) was
+ *     written **2026-08-17**; `busStopSheltersOf` landed 2026-08-23 (a5344aa)
+ *     and `paintBusStopZigzag` on 2026-08-27 (6399a8d). The row is a photograph
+ *     of a build that no longer exists.
+ *
+ *     MEASURED at HEAD, on `buildWorldGeometry(mg-busstop-v1)` + the live
+ *     `heldSceneryFor` path, not read off the source:
+ *       · markingQuads 187 with `meta.scenario.busBayY` present, 164 with the
+ *         key deleted — **23 quads of зигзаг** attributable to the bay and to
+ *         nothing else. There IS a bus-stop marking on this route.
+ *       · `heldSceneryFor("sc-merge-bus-pullout@L1", raw)` returns the shelter
+ *         wall at (19.753, 153), 4.5 × 2.5 × 0.2 m — on the live scene path
+ *         (`lessonWorldRecipe.ts:272` → `LessonScene`).
+ *     What survives is only the sentence this header already wrote at :959 —
+ *     the panel RENDERS as a flat grey box (`ScenarioObstacles.tsx:611
+ *     ObstacleWall`), so it is a landmark and not a навес. That residual keeps
+ *     its costed fix (one `kind:"busStop"` building over the bay in both copies
+ *     of mg-busstop-v1); it is not the same claim as „no marking exists".
+ *
+ * (b) sc-merge-bus-pullout:714bfbca — «the pull-out encounter is never
+ *     presented, yet its objectives tick anyway», photographed as «ЗАДАЧА 2/3
+ *     Нареди се зад автобуса…» over empty asphalt at 6 км/ч. TRUE, and the
+ *     cause is measurable. Driven through the production stack
+ *     (`createTrafficSystem` + `CutInLeadCarRunner` + the COMPILED gate), the
+ *     bus's own position at the instant the player reaches the near edge of
+ *     `sc-mgb-behind-bus`, per constant pace:
+ *
+ *         pace     cut fires at   bus is …                       verdict
+ *          6 км/ч   player y 146   y 437 — 166 m ahead, finished  gone
+ *         12        player y 150   y 152 — 119 m BEHIND him       gone
+ *         20        player y 155   y 368 —  97 m ahead            a dot
+ *         30        player y 162   y 304 —  33 m ahead            correct
+ *         31        player y 163   y 300 —  29 m ahead            correct
+ *         35        player y 166   y 285 —  14 m ahead            correct
+ *
+ *     So the banner is TRUE at the pace the drill teaches (instruction 6's «на
+ *     две секунди» behind a rig cruising 8.5 m/s) and false below ~20 км/ч.
+ *     TWO separate mechanisms put it there, and only the first was known:
+ *       · after `clearAheadM: 45` the runner RESOLVES and stops commanding, and
+ *         the rig then cruises `cutSpeedMps` 8.5 unattended — against a 1.7 m/s
+ *         crawler it opens 6.8 m/s and is off the 400 m map inside a minute;
+ *       · and then IT COMES BACK. At 12 км/ч the trace shows the actor reach
+ *         `finished: true` at y 451 and, five seconds later, reappear at
+ *         y 150.1 with `finished: false` — the traffic system RECYCLES the
+ *         staged agent to the head of its path. The student is shown the bus
+ *         drive away, then a bus at the стоп BEHIND him, and is told to form up
+ *         behind it. That recycle is `traffic/system.ts`, not this file, and it
+ *         is the sharper of the two: a resolved staged encounter should not
+ *         restage itself inside the same drive.
+ *
+ *     ONE THING THE EARLIER ROUTING NOTE ASSUMED AND THE TRACE DISPROVES: the
+ *     rig is NOT dragged out of the bay the moment the player moves. Under
+ *     `matchPlayer` it stands at y 140.0, v 0.0, for the first 25–30 s at
+ *     12 км/ч (≈8 s at 30) — i.e. instruction 2's «на спирката стои автобус» is
+ *     honoured. The premise is staged; it is the SECOND banner that outlives it.
+ *
+ *     THE FIX IS STILL NOT AN INTEGER HERE, and the previous lane's instruction
+ *     stands: `sc-mgb-behind-bus` cannot be made conditional on the encounter
+ *     while `ObjectiveParams` has no way to read a staged outcome. The exact
+ *     ask is a ninth witness demand on `ReachZoneParams` —
+ *     `requireStagedResolved?: string`, the `stagedEventId` key
+ *     `completeManeuver:"emergencyStop"` already takes — read per frame off the
+ *     `ObjectiveContext.stagedOutcomes` the engine ALREADY builds
+ *     (`lessons/engine.ts:1220`), unknown-is-never-a-refusal like its eight
+ *     siblings, and named on `serializeObjectiveParams`'s whitelist
+ *     (`params.ts:207`) or it is dropped on the way to the compiled lesson.
  */
 export const SC_MERGE_BUS_PULLOUT: ScenarioSpec = {
   id: "sc-merge-bus-pullout",
@@ -1429,6 +1614,37 @@ const MFP_STREAM: OncomingStreamSpec = {
  * which is where every other template's visual-only dressing already lives.
  * Nothing about the GRADED geometry moves either way: the тротоар is the
  * district crossing and the Б2 is derived from the service/primary rank pair.
+ *
+ * W15 2026-08-28 — THE ASK, COSTED AND MEASURED, so the next lane does not have
+ * to re-derive the map. Read off the committed `mg-property-v1.json`: the exit
+ * `mgp-e-drive` runs (0,0) → (68,0) as `service` with its outbound lane centred
+ * at y = 4.06; `mgp-b-shop` is the ONE building, x 38…78, y 14…34, 5 m tall;
+ * the graded тротоар is `mgp-x-walk` at x = 34 (a 6 m band, x 31…37) and the
+ * derived Б2 sits at x = 27.73; the spawn is (62, 4.06) facing 270°. So the
+ * clear dressing strip is the north verge y ∈ [8.6, 13.5] (3.9 m clear of the
+ * drive's own 8.125 m kerb, 0.5 m short of the shop's south face) and the whole
+ * open plain south of y = −8.6. Nothing graded lives in either.
+ *
+ *   · THE CHEAPEST BODY THAT READS AS A FORECOURT is the canopy fascia, and it
+ *     is the same one-primitive stopgap `busStopSheltersOf` already ships:
+ *     `{ kind: "wall", x: 52, y: 12, headingDeg: 90, lengthM: 24, heightM: 4.8,
+ *     thicknessM: 0.4 }` — a 24 m soffit band spanning x 40…64 along the north
+ *     verge, at a canopy's real height, standing behind and beside the driver as
+ *     he creeps out and filling his mirrors. Pump islands are the same
+ *     primitive at `lengthM: 5, heightM: 1.4` on y = 10.5, x = 44 and x = 56.
+ *     All `visual`-only — no collider — like every other entry in that table.
+ *
+ *   · AND THE ONE OBJECT THAT ACTUALLY SAYS «БЕНЗИНОСТАНЦИЯ» IS ALREADY BUILT
+ *     AND NEVER PLACED. `SignKind` carries `"fuel"` — Е7 „Бензиностанция"
+ *     (`world/types.ts:526`) — and `WorldProps.tsx:189` already maps it to the
+ *     `sign_service_fuel` model. Grepped `world/builders/props.ts`: nothing
+ *     emits it, on any district; the census returns 0 everywhere. So the Е7 at
+ *     the mouth of this exit costs an emitter, not an asset — and it is the
+ *     sign a Bulgarian driver actually reads a бензиностанция by.
+ *
+ * NEITHER MOVES A GRADED METRE, and that is why they are dressing and not a
+ * repair to this template: the тротоар duty is the district crossing and the
+ * чл. 25 line is the rank pair, both untouched by anything above.
  *
  * SWEEP 161 — „THE CORRECT DRIVE COLLIDES AND FAILS", READ AGAINST THE STEERED
  * RE-DRIVE (.audit-frames/rebase/frames/sc-merge-from-property__pc-right, 2026-

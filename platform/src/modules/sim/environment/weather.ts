@@ -394,6 +394,16 @@
 //      attached to the truck and rising from its roof … absent at 04-t001s and
 //      04-t059s". Opened: `.audit-frames/w10-4/frames/sc-ac-truck-spray__pc-
 //      right/04-t188s.png` carries TWO such columns, at x ≈ 1105 and x ≈ 1310
+//      LANE NOTE 2026-08-27: the w14 re-drive settles this without the column
+//      argument at all. On `.audit-frames/w14/frames/sc-ac-truck-spray__pc-
+//      right/04-t101s.png` (run stamped 2026-08-27T17:09:37Z in that folder’s
+//      `_audit-status.json`) the truck sits mid-frame with its tail-lamp bar
+//      crisp, and the lane dashes, the hard shoulder, the grass verge, the
+//      treeline and the tower blocks BEHIND it are every one of them sharp.
+//      There is no column on the truck in this frame and no curtain across the
+//      carriageway. The round blobs scattered over the glass are
+//      `WindshieldDroplets` — an ego-camera overlay off `useRainIntensity`,
+//      not something the truck emits.
 //      of a 1440-wide shot, and the truck is at x ≈ 848. They are on the
 //      VERGE, not on the vehicle — and the frame prints their name in its own
 //      top-left legend: «стрелка и стълб светлина — завоят и целта по
@@ -404,6 +414,113 @@
 //      perfectly clear on that frame: no plume, no curtain, no visibility loss,
 //      with ИНСТРУКЦИИ step 3 «гумите му вдигат пелена от пръски, в която не се
 //      вижда нищо» legible beside it. The row stands whole and stays routed.
+
+// 5. THE WAVE-7 RE-VERIFICATION — 2026-08-27, EIGHT ROWS, ONE VERDICT EACH.
+//
+//    Eight sweep findings are filed against THIS FILE and every one of them was
+//    re-driven at HEAD and re-judged „still present". They are: sc-ac-crosswind
+//    :a9db1738, sc-ac-bridge-ice:7eb16029, sc-ac-truck-spray:6f13e17b and
+//    :ebaacf94, sc-ac-snow:f1673b60, :cfb2d46d and :0c76a9e9, sc-ac-ice
+//    :86eab7e9 and :5372f176. NOT ONE OF THEM IS FIXABLE FROM THIS STORE, and
+//    that is not a shrug — §1 through §4 already said so, row by row, and the
+//    only thing a fifth wave can add is whether those routings are still TRUE.
+//    They were re-taken rather than re-read. What changed, what did not, and
+//    which frames it was measured on:
+//
+//    THE FRAMES. `.audit-frames/w14/frames/` is the 2026-08-27 re-drive (each
+//    scenario folder carries an `_audit-status.json` stamped 17:09–17:47Z) and
+//    is the freshest evidence in the corpus; `.audit-frames/w13/frames/` is the
+//    round before it and is used wherever a SNOW-vs-FOG or ICE-vs-BRIDGE-ICE
+//    A/B is needed, because w14 did not re-drive sc-ac-fog and a comparison
+//    across two builds is the mistake §1's L-column warning is about.
+//
+//    THE ROAD TERM IS ALIVE AT HEAD AND REPRODUCES TO THE DIGIT (f1673b60,
+//    0c76a9e9). Audit rectangles, `pc-right/03-ready.png`, ac-rain-v1 + DAY in
+//    both lessons, mean sRGB with L709 (the rebase-table formula):
+//
+//                       near (620,500 120×30)      far (830,395 60×14)
+//      snow  w13        95.2/108.0/121.3  L 106.3  137.9/153.0/165.1  L 150.7
+//      snow  w14        95.2/108.0/121.3  L 106.3  137.9/153.2/165.0  L 150.8
+//      fog   w13        76.8/ 87.5/ 98.9  L  86.1  141.5/155.2/166.0  L 153.1
+//
+//    Snow is 23.5% BRIGHTER than fog in the student's own lane and 1.5% apart
+//    from it in the far field — the exact split §1 and §2 describe, two rounds
+//    later, on a re-drive neither of them saw. So `roadSurfaceToParams` and its
+//    StaticWorld readers are doing their whole job, and what is left of both
+//    snow rows is the HAZE (`presets.ts` snowWeather #e8ebef/0.012 against
+//    fogWeather #c9cdd2/0.020, plus SimEnvironment's SNOW_*_DIM/FOG_*_DIM and
+//    SkyDome's SNOW_SKY_WASH/FOG_SKY_WASH) and the FLAKES (`SnowFlakes.tsx`
+//    FLAKE_SIZE 0.028 m). Looked at, not only measured: on a 700×220 crop of
+//    each `03-ready` the snow carriageway is plainly the paler of the two and
+//    carries countable white specks the fog frame does not — but sky, bank and
+//    far field are one grey wall in both, so „a student cannot tell them apart
+//    from the arrival screen" survives as a statement about the HAZE. Neither
+//    file is this one.
+//
+//    2a's OFF-ROAD TERM SHIPPED, AND ITS R0 LOOK IS DONE HERE FOR THE FIRST
+//    TIME (cfb2d46d). `world/textures/snowCover.ts` is wired at HEAD —
+//    `DistrictWorld.tsx:101` writes the uniform from `getSnowIntensity()` and
+//    `WorldProps.tsx:653-654` attaches the hook in `makeSharedMaterials()`. It
+//    is alive: at 8× on a 70×55 crop of the near street tree, the same tree in
+//    the same pose is faintly paler on its UP-facing side in sc-ac-snow than in
+//    sc-ac-fog. It is also nowhere near enough, and the row's own four nouns
+//    say why. `makeSharedMaterials` covers five materials — signBody,
+//    signalHousing, streetSteel, tree, furniture — so of „kerbs, pavements,
+//    guard rail and building faces" only the RAILING (streetSteel) was ever in
+//    scope; kerbs and pavements are StaticWorld's road/terrain materials and
+//    facades are the buildings path, and none of the three has a snow term at
+//    all. Measured on the w13 A/B, same camera, same map, L709:
+//      tree canopy (500,350 24×24)   snow 142.1   fog 156.7
+//      pavement    (400,405 60×10)   snow 112.4   fog 116.5
+//      parked row  (1030,368 80×10)  snow  73.5   fog 103.7
+//    Every off-carriageway surface reads DARKER in the snow lesson than in the
+//    fog one, because at those distances the denser fog bank is what the pixel
+//    is made of. The honest state: the prop half landed and is sub-threshold,
+//    the road/terrain, building and vehicle halves were never started.
+//
+//    THE ICE PAIR IS NOT „NEARLY" IDENTICAL, IT IS IDENTICAL (5372f176, and
+//    86eab7e9's other half). w13 `03-ready`, THREE rectangles, two DIFFERENT
+//    districts (ac-ice-v1 520 m vs ac-bridge-v1 — ac-bridge-v1's own bounds are
+//    minX −28.13 maxX 28.13, maxY 520, so this is not one map wearing two ids):
+//                       near L709   mid (620,400) L709   far L709
+//      sc-ac-ice          117.3          123.2             130.6
+//      sc-ac-bridge-ice   117.5          123.3             130.6
+//    Two-tenths of a level apart on every band. Both author `weather: "dry"`
+//    under DAY, so this is exactly what the pipeline is built to produce, and
+//    no edit in this file could make a black-ice street and a frozen deck look
+//    like different mornings while both are spelled `dry`. Confirmed by eye on
+//    `w14/.../sc-ac-bridge-ice__pc-right/03-ready.png` and `04-t075s.png`:
+//    full-leaf green trees, warm sunlit facades and blue-grey sky under a coach
+//    line that reads «Ясна зимна сутрин около нулата.»
+//
+//    AND 2b's ROUTING IS STILL LITERALLY TRUE, re-read in the tree rather than
+//    trusted: `contracts.ts:276` still types `environment?: { timeOfDay?:
+//    "day"|"dusk"|"night"; rain?; fog?; snow? }` and
+//    `lessons/scenario/types.ts`'s `ConditionAxis` is still
+//    `{ weather?: "dry"|"rain"|"fog"|"snow"; night?: boolean }`. There is no
+//    token between a lesson and this store that can say „winter" (7eb16029).
+//
+//    THE WIND IS LIVE AND UNRENDERED, AND MUST NOT GET A CHANNEL HERE
+//    (a9db1738). Re-read end to end 2026-08-27: `LessonScene.tsx:2296-2298`
+//    passes `windLateralN = −CROSSWIND_BRIDGE_N`, `windGustAmplitudeN =
+//    −CROSSWIND_GUST_AMPLITUDE_N` and `windGustPeriodSec` whenever
+//    `lesson.physics.crosswind` is authored, and `VehicleSim.ts:510-518` adds
+//    `windLateralN + amplitude·sin(2π·t/period)` to the body every step. So the
+//    force is real, constant and position-independent — and on
+//    `w14/.../sc-ac-crosswind__mobile-right/04-t101s.png` nothing in the world
+//    moves for it: static tree blobs, no dust, no debris, no windsock. A fifth
+//    0..1 in this store would have no author (nothing writes
+//    `environment.wind`) and no reader, i.e. the dead predicate this lane
+//    exists to stop shipping. The disturbance has to be shown where it already
+//    exists — the world props and the car's own attitude.
+//
+//    ONE THING THIS ROUND DID CLOSE, and it was in a template, not here: the
+//    lesson that named the wind's phase — sc-ac-wind-truck-pass — was telling
+//    the student he was sheltered behind the truck and that the blow would land
+//    at the cab line. Neither is in the physics above, and POOR_LANE_KEEPING
+//    grades him on the drift that belief produces. Fixed at
+//    `lessons/scenario/templates-conditions2.ts` (instructions 3 and 6, and the
+//    objective); the DEPICTION half stays routed to the render layer.
 
 import { useSyncExternalStore } from "react";
 

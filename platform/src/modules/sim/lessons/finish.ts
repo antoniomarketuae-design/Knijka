@@ -214,10 +214,84 @@
  * a terminal arrival needs three; the third needs one field this lane does not
  * own). `__tests__/terminal-departure.test.ts` drives it on shipped lessons and
  * ratchets the census; `routeDepartedEndingCopy` is the sentence it needs. The
- * ARM LANDED 2026-08-24 (engine.ts + one field in types.ts), at a dwell
- * re-sized 20 → 75 s so the recorded return drive is not refused — see
- * FINISH_DEPARTED_S for the derivation and the arm block below for the two
- * options that were rejected instead.
+ * ARM LANDED AND WAS DISARMED THE SAME DAY (2026-08-24), at a dwell re-sized
+ * 20 → 75 s so the recorded return drive is not refused — see
+ * FINISH_DEPARTED_S for the derivation, the arm block below for the two
+ * options that were rejected instead, and the 2026-08-28 block for why this
+ * sentence used to stop after the first four words.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-28 — WHAT THIS FILE CLAIMS TO SHIP AND WHAT IT ACTUALLY SHIPS.
+ *
+ * The paragraph above read „The ARM LANDED 2026-08-24 (engine.ts + one field in
+ * types.ts)" and stopped there, and a reader who believed it — this lane did,
+ * for the first half of an afternoon — would close the O30 class as done.
+ * `lessons/engine.ts:1665` reads, at HEAD:
+ *
+ *     const departure: ReturnType<typeof terminalDepartureZone> = null;
+ *
+ * The TYPE is imported; the FUNCTION is called on no frame of any lesson. So
+ * `terminalDepartureZone`, `FINISH_DEPARTED_S` and `routeDepartedEndingCopy`
+ * are three exports of this file that no student has ever met, and the
+ * `finishDepartureGate` branch in `engine.ts` is unreachable on every frame of
+ * every drive. That is the same failure this file names two blocks up about the
+ * off-network arm („a routing note that has gone stale is worse than none")
+ * pointing the other way: that note UNDER-claimed a thing that was running,
+ * this one OVER-claimed a thing that is not, which is the more expensive
+ * direction because it retires a defect nobody fixed.
+ *
+ * The re-enable condition is stated at the pin and is unchanged: the region
+ * dwell accumulates WHILE THE CAR IS DRIVING BACK, so it must accrue only while
+ * the car is NOT CLOSING ON THE MARK, and neither the state that would carry
+ * the previous range (`FinishGateState`, types.ts) nor the arm (engine.ts) is
+ * this lane's to write. Nothing here is edited to pretend otherwise.
+ *
+ * AND THE „NEVER ENDS" CLASS IS REFUTED FOR A THIRD TIME, so the numbers live
+ * here rather than in a report the next wave will not find. Six sweep161 rows
+ * were re-filed against this file in wave 7; every one was re-driven at HEAD
+ * (`.audit-frames/w14`, tree 6399a8de6e7c) and none of them is this module's:
+ *
+ *   sc-ac-aquaplane:517af4c5 — „five of seven cannot be finished by driving …
+ *     the pass path exists in exactly one lesson out of seven". THREE of the
+ *     five end BY THEMSELVES at HEAD (`endedNaturally: true · forcedBy: -`):
+ *     sc-ac-ice (ИЗДЪРЖАН · 0 наказателни т. · ★★★), sc-ac-bridge-ice and
+ *     sc-ac-wind-truck-pass. The three still forced hit the HARNESS'S OWN wall
+ *     — «the drive stopped after 210s without the session ending (its whole
+ *     210s budget)» — short of their own terminal marks. Spawn → terminal
+ *     against the witness path each drive actually covered:
+ *         sc-ac-aquaplane       (4.06,15)→(4.06,450)  435 m · drove 360.3 m —  75 m short
+ *         sc-ac-night-overdrive (4.06,15)→(4.06,390)  375 m · drove 316.1 m —  59 m short
+ *         sc-ac-truck-spray     (0,15)   →(0,860)     845 m · drove 364.7 m — 480 m short
+ *     No gate here is anchored where those cars stopped, and none should be:
+ *     they were never driven to the end of the route.
+ *
+ *   sc-ln-decisive-change:8a50a9f9 — „the lesson has no completion condition
+ *     that fires". One fires on EVERY leg: w10-1, w11, w12 and w13 each record
+ *     `ended: true · endedNaturally: true · forcedBy: -` on mobile/right. What
+ *     never credits is objective 2, `sc-lndc-merged` — a 2 m acceptance disc in
+ *     the LEFT lane (4.06) — on an instrument whose own caveat says it steers a
+ *     road CENTRELINE and that „NO LANE-POSITION FINDING MAY BE DRAWN FROM THIS
+ *     DRIVE". Objective 3 is sequential behind it. A template radius and an
+ *     instrument limit, not a missing ending. (The 2026-08-19 row above lists
+ *     this lesson as „mobile forced at 272 s"; that is sweep161 and it is now
+ *     four waves stale.)
+ *
+ *   sc-junction-blind:c5ba8f17 — „the chip keeps demanding the turn while the
+ *     car sits off-map". The sweep161 drive ran 209 s and was forced. At HEAD
+ *     the same lane ends ITSELF at ≈79 s on the CRASH PIN, with the pin's own
+ *     sentence on the glass — «След удара колата остана притисната на място и
+ *     не може да продължи по маршрута — затова урокът приключва тук» — and its
+ *     last drive frame is `04-t074s.png`. The 135 s of off-world driving that
+ *     OFF_NETWORK_STUCK_S was sized against does not occur on this lane any
+ *     more, because the pin fires long before the off-network bar does. The
+ *     derivation stays: it is the only measurement of that class in hand.
+ *
+ * The other three rows (sc-sig-controller-live:bf4c6bab commendations,
+ * sc-vu-pass-clearance:cb312a1b lesson length + stars, sc-jx-giveway-b1:cad64e2d
+ * the one-star floor) name this file as the suspect and it grades nothing —
+ * they are `rules/engine.ts` (`cleanDrivingDistanceM` 250 m against a 96.3 m
+ * route), `rules/` conviction and `scenario/rubric.ts` + `hud/SessionEndScreen`
+ * respectively. Recorded so the next wave routes them instead of re-filing.
  *
  * Pure and deterministic, like every other fold in this module: no clock, no
  * randomness, same state + same tick ⇒ same output.
@@ -887,8 +961,11 @@ export function routeDepartedEndingCopy(examMode: boolean): {
 }
 
 // ---------------------------------------------------------------------------
-// THE ARM LANDED — 2026-08-24, the round the sweep161 findings on this file
-// were routed back to it. The block below used to hold the arm verbatim as a
+// THE ARM LANDED AND WAS DISARMED THE SAME DAY — 2026-08-24, the round the
+// sweep161 findings on this file were routed back to it. READ THE LAST
+// PARAGRAPH OF THIS BLOCK BEFORE THE REST OF IT: everything between here and
+// there is written in the past tense of a thing that ran for one commit and
+// does not run now. The block below used to hold the arm verbatim as a
 // routed work order plus one warning, and the warning was the whole reason it
 // had not landed: at FINISH_LEAVE_S the gate refused the recorded
 // overshoot-and-return drive 41.3 s before the student finished it. That
@@ -926,6 +1003,29 @@ export function routeDepartedEndingCopy(examMode: boolean): {
 // must NOT do is fold this zone into `finishRescueGate` — the two zones are
 // different shapes on the same mark and one gate state cannot hold both, which
 // is the whole reason this is a third zone.
+//
+// ── AND NONE OF THE ABOVE IS RUNNING — verified at HEAD, 2026-08-28 ──────────
+//
+// `lessons/engine.ts:1665` pins `const departure: ReturnType<typeof
+// terminalDepartureZone> = null;`, so the `if (departure !== null)` step below
+// it never executes, `finishDepartureGate` is never written, and the
+// `phase !== "completed" && finishDepartureGate?.reachedAtSec != null` branch is
+// unreachable on every frame of every drive. `terminalDepartureZone`,
+// FINISH_DEPARTED_S and `routeDepartedEndingCopy` are therefore computed by
+// tests and read by no student. The end-to-end test this block credits above is
+// `__tests__/terminal-departure.test.ts` line 539, and its own first line is
+// „SKIPPED 2026-08-24 — THE ARM IS DISARMED, AND THIS TEST IS ITS SPEC."
+//
+// The disarm was correct and is not being revisited here: the region dwell
+// accrues WHILE THE CAR IS DRIVING BACK, so a student who pauses and then takes
+// a long return is refused after the arm and completed before it, which is the
+// false refusal this module exists to avoid. What was wrong is that three
+// paragraphs of this file described the armed build as the shipped one. The
+// re-enable condition, unchanged and stated at the pin: accrue only while the
+// car is NOT CLOSING ON THE MARK. That needs one range field on
+// `FinishGateState` (types.ts) and the two-line unpin in `engine.ts`; neither
+// file is this lane's, and this comment is not a licence to write the predicate
+// here and leave it dead — the zone already is one.
 // ---------------------------------------------------------------------------
 
 interface Point {

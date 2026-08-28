@@ -30,26 +30,53 @@
  * «Пътнотранспортно произшествие». Both the right and the wrong drive end in
  * the same interpenetrated state.
  *
- * THE MECHANISM, READ RATHER THAN GUESSED. `components/sim/NpcColliders.tsx`
- * is the whole of „hittable traffic", and it pools its kinematic bodies over
- * `traffic.vehicles` — the AMBIENT fleet — at :179, :216, :250, :289 and :349.
- * Staged actors are a different collection entirely (`TrafficSystem.staged(id)`
- * / `TrafficSystemStats`, `traffic/types.ts:757` beside `vehicles` at :649), and
- * nothing in that file ever reads it. So every actor a runner stages — the
- * oncoming car here, the braking lead, the cut-in truck, the officer — carries
- * NO rapier collider in the browser, and the player drives through all of them.
+ * ⚠⚠ AND THE MECHANISM THIS HEADER THEN PUBLISHED IS ITSELF FALSE AT HEAD
+ * (re-measured 2026-08-28). It read, in this slot: «`NpcColliders.tsx` pools
+ * its kinematic bodies over `traffic.vehicles` — the AMBIENT fleet. Staged
+ * actors are a different collection entirely and nothing in that file ever
+ * reads it. So every actor a runner stages carries NO rapier collider in the
+ * browser, and the player drives through all of them.» That was a hand-walked
+ * grep, and it was wrong in the half that decides WHERE the row goes:
  *
- * WHAT THAT CHANGES HERE: nothing about this file's behaviour, and everything
- * about why it exists. This sentinel is not a trace-channel backstop that the
- * browser happens to duplicate — it is the ONLY thing in either channel that
- * notices a staged body being occupied. The overlap it reports is real overlap
- * on both platforms.
+ *   · `TrafficSystem.stage()` pushes every staged vehicle's state into
+ *     `this.vehicles` — traffic/system.ts:653, the SAME array — and every
+ *     staged pedestrian into `this.pedestrians` at :679.
+ *   · `NpcColliders.tsx` scans `traffic.vehicles` (:307, :354, :388, :427,
+ *     :497), so a staged actor is shell-eligible from the frame it is staged.
+ *   · That is no longer a grep either: `components/sim/__tests__/
+ *     stagedActorColliders.test.ts` carries a describe block named „staged
+ *     actors ARE in the arrays the shell pool scans" and DRIVES the player
+ *     into staged shells — the braking lead, the oncoming car, the cut-in
+ *     truck, the tram, the officer's capsule — through real rapier. It landed
+ *     in 25c2143, twelve hours after this paragraph was written.
+ *
+ * SO THE ROUTING THAT RESTED ON IT HAS TO MOVE. What survives of the frame is
+ * NOT „staged bodies are ghosts"; it is the SHELL POOL'S BUDGET —
+ * `VEHICLE_SHELL_COUNT` kinematic cuboids rebound every `REASSIGN_INTERVAL_SEC`
+ * over a `VEHICLE_SHELL_RADIUS_M` neighbourhood. sc-ov-narrow stages an
+ * oncoming car AND a stream AND parks a row of cars in a district with ambient
+ * traffic; whether a shell is bound to the car the player is inside of, at the
+ * frame he is inside of it, is a nearest-N churn question and it is
+ * NpcColliders.tsx's. FIRST MEASUREMENT FOR WHOEVER TAKES IT: log the bound
+ * agent ids at the contact frame, not the collider count.
+ *
+ * (Read w14 before re-quoting the sweep161 frame: on the newest leg of
+ * sc-ov-narrow/mobile-wrong the symptom still reproduces — 04-t011s/04-t016s,
+ * 0 км/ч, the windscreen full of the flat grey inside of the oncoming car with
+ * its red flank band, the product's own chip reading «Дистанция · 0 м» — while
+ * sc-ov-return-gap, filed on the SAME sentence, now ends inside a BUILDING
+ * instead (w14 04-t054s/04-t059s, «Удар в неподвижно препятствие»), which is
+ * the static-world class and neither this file's nor NpcColliders'.)
  *
  * NOT FIXED HERE, AND IT CANNOT BE: a sentinel reports, it does not move
- * bodies — the same boundary `collision/index.ts:73–80` states for itself
- * («NO CONTACT RESPONSE. Nothing here moves a body.»). Giving staged actors a
- * body is one loop over the staged cast in `components/sim/NpcColliders.tsx`,
- * which is not this lane's file. ROUTED, with the frame above as its evidence.
+ * bodies — the same boundary `collision/index.ts` states for itself («NO
+ * CONTACT RESPONSE. Nothing here moves a body.»). WHAT DID CHANGE HERE is the
+ * standing of this file: the sentinel is not the only thing that notices a
+ * staged body being occupied any more, so its overlap report and rapier's
+ * `onCollisionEnter` are TWO reporters on one event. They are already reconciled
+ * by name rather than by category (`directorContactCast`, director.ts) — keep
+ * that true, because the moment they invent two names the engine bills one
+ * crash twice.
  *
  * ---------------------------------------------------------------------------
  * B84 — AND THE SECOND TIME, THE WATCH NEVER ARMED AT ALL (2026-08-10).
@@ -145,7 +172,74 @@
  * still the same touch", which is the question the geometry can actually
  * answer, and it emits on every frame rather than one.)
  *
- * Deterministic: no clock, no RNG, no module state.
+ * ---------------------------------------------------------------------------
+ * AND THE THIRD TIME, THE WATCH INVENTED THE CRASH (2026-08-28).
+ *
+ * THE PLAYER TELEPORTS MID-SESSION AND NOTHING TELLS THIS FILE. `VehicleRig`'s
+ * kill-plane rescue is one line — `if (sim.positionY < KILL_PLANE_Y)
+ * sim.reset()` (VehicleRig.tsx:534) — and `VehicleSim.reset()` is a teleport:
+ * `setTranslation(spawnTranslation)` + `setRotation(spawnRotation)` +
+ * `setLinvel(0)`. A car that leaves the carriageway and drops through the
+ * world is put back on the spawn mark, at rest, in ONE FRAME.
+ *
+ * The paired call does not exist on that path. `resetCar` — key R and the touch
+ * sheet's „Рестарт" — correctly pairs `simRef.current.reset()` with
+ * `directorRef.current.reset()` (LessonScene.tsx:1808-1810), and
+ * `director.reset()` calls `sentinel.reset()` FIRST (director.ts:157) for
+ * exactly this reason, in a comment that says so: «Actors TELEPORT back to
+ * their hold poses — the swept probe must forget every remembered pose or it
+ * sweeps across the player on the retry frame.» The kill plane calls
+ * `sim.reset()` ALONE. `sentinel.reset()` has one non-test caller in the tree
+ * and the rescue is not it.
+ *
+ * SO THE PROBE HOLDS THE PRE-FALL POSE AND SWEEPS THE JUMP AS MOTION. It is
+ * the identical crime the probe's own header names in the other direction —
+ * «inventing a crash out of a re-stage is the same crime» — and the arithmetic
+ * that used to make it unreachable is gone: `obb.ts`'s 12 m teleport guard now
+ * only decides whether the interval is swept in ONE call or SUBDIVIDED, and
+ * everything up to `SWEEP_FRAME_TRAVEL_M` (60 m) is treated as real motion.
+ *
+ * MEASURED against this class, one staged car standing on the origin doing
+ * 25 m/s and the oncoming-stream cast verbatim (runners.ts:3814 — floor 5,
+ * `closing: "combined"`, so the ACTOR's speed alone clears the floor while the
+ * player sits at 0 км/ч). The player is CLEAR of the car before the jump and
+ * CLEAR of it after; only the straight line between the two poses crosses it:
+ *
+ *   jump      swept as        «Пътнотранспортно произшествие» billed
+ *   10 m      one call        1     ← the student never touched anything
+ *   12 m      one call        1
+ *   20 m      subdivided      1
+ *   40 m      subdivided      1
+ *   59 m      subdivided      1
+ *   60 m      subdivided      1
+ *   62 m      current pose    0     ← safe, and safe BY ACCIDENT
+ *   200 m     current pose    0
+ *
+ * −10 изпитни точки, ОПАСНА ГРЕШКА, НЕИЗДЪРЖАН, for a car that was never
+ * within four metres of him. That is the founder's own complaint in its worst
+ * direction, and a lesson that convicts a student of an accident he did not
+ * have teaches him nothing except that the instrument lies.
+ *
+ * THE FIX IS NOT A CALLBACK. Asking `VehicleRig` to notify the director is the
+ * B84 mistake a third time: a per-frame duty that a caller can forget has a
+ * per-frame wrong answer available to it, and this one has been forgotten for
+ * as long as the kill plane has existed. The sentinel is ALREADY HANDED
+ * everything it needs to notice the jump by itself — `DirectorInput` carries
+ * `x`, `y`, `speedKmh` and `dtSec` — so it asks the question nobody can decline
+ * to answer: DID THE PLAYER MOVE FURTHER THAN HIS OWN SPEED CAN ACCOUNT FOR?
+ * If he did, the remembered pose is not last frame's; it is the other side of a
+ * jump, and every remembered pose is dropped before a single sweep runs.
+ *
+ * It is deliberately blind to WHY. A kill-plane rescue, a future respawn, a
+ * debug teleport and a dropped frame all present as the same fact, and the
+ * answer is the same for all of them: this interval is not motion, so do not
+ * sweep it. The frame degrades to the exact single-pose test `obb.ts` has
+ * always fallen back to — which reports a REAL overlap at the new pose and
+ * refuses to invent one on the way there.
+ *
+ * Deterministic: no clock, no RNG, no module state. `dtSec` is the director's
+ * own frame interval, handed in with the pose it belongs to — the same input
+ * that decides every other number here, replayed identically by the gates.
  */
 
 import {
@@ -205,8 +299,48 @@ export interface ContactCastMember {
   readonly frontalOnly?: boolean;
 }
 
+/**
+ * How much further than his own speed accounts for the player may move in one
+ * observed interval and still be MOVING rather than JUMPING, m.
+ *
+ * The budget itself is `max(|speed now|, |speed last frame|) × dtSec`, and the
+ * larger of the two endpoints is used because a frame's MEAN speed cannot
+ * exceed its larger endpoint while the speed is monotone — which is every
+ * ordinary frame, accelerating or braking. Compare against the current speed
+ * alone and a hard brake from 90 to 30 km/h in one hitch frame reads as a jump,
+ * which would silently disarm the sweep on the exact frame a crash happens on.
+ *
+ * This slack covers what monotonicity does not:
+ *
+ *   · a frame in which the speed rose and fell again, whose peak exceeds both
+ *     endpoints by at most a·dt/2 and therefore its distance by at most
+ *     a·dt²/8 — 0.23 m at the staged slam decel of 7.5 m/s² across rapier's
+ *     0.5 s frame cap, 0.63 m even at a wholly implausible 20 m/s²;
+ *   · `x`/`y` being the physics pose while `speedKmh` is the sampled scalar
+ *     beside it, so the two may be one integration step apart.
+ *
+ * 2 m is ~3× the worst of those and still far under the shortest jump that can
+ * fabricate anything: crossing a body the player was clear of takes at least
+ * 2 × (`PLAYER_HALF_LENGTH_M` + the other half-extent) — 8.2 m against a car,
+ * 4.8 m against a pedestrian disc. So the guard cannot fire on real motion and
+ * cannot miss a jump that matters, and the gap between the two is wide enough
+ * that neither edge is resting on the last bit of a float.
+ */
+const PLAYER_JUMP_SLACK_M = 2;
+
 export class ContactSentinel {
   private readonly probe = new ContactProbe();
+  /**
+   * Last frame's player pose and speed — the ONLY state this class keeps about
+   * the player, and it exists to answer one question: was this interval motion?
+   * See the header's third section. `hasLastPlayer` is false at session start
+   * and after `reset()`, and a first frame is never judged: there is nothing
+   * remembered to sweep from, so there is nothing to invent.
+   */
+  private lastPlayerX = 0;
+  private lastPlayerY = 0;
+  private lastPlayerKmh = 0;
+  private hasLastPlayer = false;
   /** Event ids in contact this frame (rebuilt per frame; no allocation). */
   private readonly hitOwners = new Set<string>();
   /**
@@ -228,6 +362,10 @@ export class ContactSentinel {
     this.probe.reset();
     this.hitOwners.clear();
     this.openKeys.clear();
+    // …including the player's. An attempt restart teleports HIM too
+    // (`resetCar` pairs `sim.reset()` with this), so the next frame must be
+    // treated as a first frame rather than as a 300 m sprint from the old mark.
+    this.hasLastPlayer = false;
   }
 
   /**
@@ -247,6 +385,32 @@ export class ContactSentinel {
   ): ReadonlySet<string> {
     this.hitOwners.clear();
     if (cast.length === 0) return this.hitOwners;
+    // DID HE MOVE, OR WAS HE MOVED? Answered BEFORE any sweep, off the pose and
+    // the clock the director already hands over, because the one caller that
+    // teleports him without saying so (VehicleRig's kill-plane rescue) has been
+    // silent for as long as it has existed and a notification it can forget is
+    // not a guard. A jump drops every remembered pose, so this frame is judged
+    // on the exact geometry at the new pose alone — the same fallback `obb.ts`
+    // takes for a re-stage — instead of dragging the player through whatever
+    // stood on the line between the two. See the header's third section for the
+    // measurement: 10 m through 60 m each billed one accident that never
+    // happened.
+    if (this.hasLastPlayer) {
+      const movedM = Math.hypot(input.x - this.lastPlayerX, input.y - this.lastPlayerY);
+      const fastestMps =
+        Math.max(Math.abs(input.speedKmh), Math.abs(this.lastPlayerKmh)) / 3.6;
+      const budgetM = fastestMps * Math.max(0, input.dtSec) + PLAYER_JUMP_SLACK_M;
+      if (movedM > budgetM) {
+        this.probe.reset();
+        // He is not inside anything he was inside a frame ago: he is somewhere
+        // else. Every encounter that was open against him ended when he left.
+        this.openKeys.clear();
+      }
+    }
+    this.lastPlayerX = input.x;
+    this.lastPlayerY = input.y;
+    this.lastPlayerKmh = input.speedKmh;
+    this.hasLastPlayer = true;
     const player = playerObb(input.x, input.y, input.headingDeg);
     // SPEED IS A MAGNITUDE HERE, NOT A DIRECTION. The live channel
     // (LessonScene → VehicleSample.speedKmh) hands the director a SIGNED
@@ -262,6 +426,17 @@ export class ContactSentinel {
         // No body in the world = nothing to be inside of. The encounter cannot
         // still be open against an actor that is not there.
         this.openKeys.delete(m.actorId);
+        // …and neither can the POSE MEMORY be, which is the sibling of the
+        // player-jump guard above and the case `ContactProbe.forget` was
+        // written for verbatim («an actor that leaves the world … comes back
+        // reporting −0.070 m of penetration where the two bodies are in fact
+        // 3.680 m apart»). STATED AS LATENT RATHER THAN SOLD AS A FIX: no
+        // production port flips an id from absent back to present today —
+        // `TrafficSystem.stagedById` is never deleted from, so a cast member
+        // that resolves is null only if its own `stage()` failed, permanently.
+        // This closes the gap before a lazily-staged actor opens it, and it is
+        // what makes `forget`'s documented contract true instead of aspirational.
+        this.probe.forget(m.actorId);
         continue;
       }
       const sepM =

@@ -284,6 +284,85 @@
  * fails the moment a forward-only lane run completes a park.
  */
 
+/**
+ * THE TICK THAT SURVIVED THE CRASH — wave 7, 2026-08-28. Two titles, and the
+ * arithmetic that decides whether they may keep their words.
+ *
+ * THE FRAME, opened rather than quoted. `.audit-frames/w10-4/frames/
+ * sc-park-wall__mobile-right/08-debrief-p5.png` carries
+ * «✓ Задача 1: спри рано, в средата на алеята 1:34» one card above
+ * «Грешки (1) · Удар в неподвижно препятствие · ОПАСНА ГРЕШКА ·
+ * −10 изпитни т.». The pc-right leg of the same round is identical (✓ at 1:35,
+ * one опасна, 10 т.). A student who has just been billed a ПТП is told, on
+ * the same screen, that he stopped early in the middle of the aisle.
+ *
+ * WHY THE GATE CANNOT KNOW. `ReachZoneParams` has x, y, radiusM and a cap.
+ * The mark is (0.9, 11.7); the district’s OWN spawn lane centre is x = 4.0625,
+ * i.e. 3.1625 m away; the compiled radius is 5 m at L3/L4/L5 and 7.5 m at L1/L2
+ * (`params.ts widenRadius`, WIDEN-ONLY — no rung ever shrinks it). The lot’s
+ * drawn carriageway is one 8.125 m lane each side of x = 0, so at L1 the
+ * acceptance disc spans x ∈ [−6.6, +8.4]: WIDER THAN THE ROAD. There is no
+ * lateral position a car can hold in this lot that the disc refuses.
+ *
+ * AND THE HALT CAPSULE MAKES IT WORSE, NOT BETTER. `stepReachZone` credits
+ * `graceArmed && halted && isHaltDemand`, and the capsule’s lateral bound is
+ * `radiusM` measured about THE STUDENT’S OWN approach axis (mark − approachFrom),
+ * not about the road. Worked through on lot-wall-v1: a car halted at (4.06, 2.5)
+ * — still in the lane it spawned in, level with the middle of the occupied row,
+ * i.e. inside a parked body — sits at lateral 0.29 m and along −9.7 m against a
+ * −10 m bound, and is CREDITED. §4 of parking3-claim-gates pins the
+ * longitudinal half of this capsule; the lateral half is this note.
+ *
+ * SO THE TITLES LOSE THE WORDS, exactly as five did in the sweep-161 claim-gate
+ * wave and for the same reason — the sentence is the certificate, and no
+ * `params` value moved (parking3-claim-gates §2 pins all ten by value):
+ *   sc-pwl-setup  «спри рано, в средата на алеята»          → the halt only
+ *   sc-pdb-setup  «спри в средата на алеята, покрай гнездото»  → the halt only
+ * They were the only two REVERSE-drill titles borrowing the FORWARD drills’
+ * lateral claim. `templates-parking.ts sc-ppf-setup` earns that claim on this
+ * same mark with radiusM 3.0 — „radius 3.0 EXCLUDES the right-hand lane
+ * (|4.0625 − 0.9| = 3.16 > 3.0)" — and lane15-parking-depth asserts the
+ * exclusion every build. A halt gate on radius 5 does not have it.
+ *
+ * THE DUTY IS NOT DROPPED, IT IS PROMOTED. All four blocked drills keep the
+ * aisle act as briefing step 1 (parking3-claim-gates §3 and
+ * parking3-success-path-and-corridor §3 both go red if it leaves), and each
+ * one’s `objectiveBg` now says outright that it is NOT one of the two ticks and
+ * what does enforce it — the sc-park-night idiom applied to a contact instead
+ * of a lamp. Driving the spawn lane through the row bills `COLLISION`,
+ * `severityClass: "opasna"` (rules/catalog.ts), which is the sheet’s own
+ * ending. THEO-4: the instruction that prevents the fault says why, and now
+ * also says who bills it.
+ *
+ * TWO REPAIRS THIS LANE MAY NOT MAKE, both because the edit lands in a file it
+ * does not own. Written out so they can be applied verbatim:
+ *
+ *   (1) `requireNoContact: true` on the four blocked setup gates. It is the
+ *       term that actually closes the frame above — `objectives.ts`
+ *       `contactOk = params.requireNoContact !== true || noContactHonoured(ctx)`,
+ *       fed by `engine.ts struckABodyInRun` off a billed COLLISION — and on
+ *       these four districts „reached the mark without striking a body" IMPLIES
+ *       „left the curb lane", because lane and row overlap by 2.13–2.53 m for
+ *       the whole length of the row (§2 of the success-path battery). It also
+ *       closes the capsule case above, which a radius cannot.
+ *       BLOCKED BY: `lessons/__tests__/reach-zone-no-contact.test.ts` §2,
+ *       `expect(bound).toEqual(["sc-hazard-obstacle/sc-obs-cleared"])` — a
+ *       deliberate catalogue-wide census that fails the build on a second
+ *       author. That list is the edit.
+ *
+ *   (2) `radiusM: 5 → 3` on the same four gates — the `sc-ppf-setup` value, so
+ *       the guidance ring the student steers to (`scene/guidanceRoute.ts`:
+ *       „what the student sees is what the gate tests") stops covering the lane
+ *       the row stands in. Safe on the replay: the committed shadows pass
+ *       within 0.001–0.004 m of all four marks, so §1 is unaffected.
+ *       BLOCKED BY: `__tests__/parking3-claim-gates.test.ts` §2’s POSES table,
+ *       which pins radiusM 5 by value for all ten drills.
+ *
+ * WHAT THIS NOTE DOES NOT CLAIM. Nothing here makes the four drills passable
+ * for a car that holds its spawn lane. That is `gen_parking_lot.mjs` seating
+ * 5 m of bay depth inside the drawn lane, measured at −2.13…−2.53 m by §2 of
+ * the success-path battery, and it is still not authorable from this file.
+ */
 import type { ScenarioSpec } from "./types";
 import type { ParkingBaySpec } from "../../contracts";
 
@@ -679,7 +758,7 @@ export const SC_PARK_VAN: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "перпендикулярно", "ограничена видимост"],
   titleBg: "Гнездо до бус — заден ход с ограничена видимост",
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция покрай свободното гнездо; после влез на заден ход, като държиш работещо разстояние от буса — той е по-широк от очертанията си и закрива всичко зад себе си.",
+    "Две задачи, в този ред: първо спри в изходната позиция покрай свободното гнездо; после влез на заден ход, като държиш работещо разстояние от буса — той е по-широк от очертанията си и закрива всичко зад себе си. Излизането в средата на алеята не е една от двете задачи — редът стои в лентата, в която тръгваш, и допирът до него се наказва като опасна грешка, а не като пропусната отметка.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-mirrors-blind-spots", "c-safety-space"],
   map: {
@@ -823,7 +902,7 @@ export const SC_PARK_45_REV: ScenarioSpec = {
   tagsBg: ["паркиране", "косо място", "заден ход", "45 градуса"],
   titleBg: "Косо място на заден ход",
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция край косия ред, подминал мястото и успоредно на алеята; после влез на заден ход с точно 45° завъртане — устата на това място гледа назад и напред просто няма как да се влезе.",
+    "Две задачи, в този ред: първо спри в изходната позиция край косия ред, подминал мястото и успоредно на алеята; после влез на заден ход с точно 45° завъртане — устата на това място гледа назад и напред просто няма как да се влезе. Излизането в средата на алеята не е една от двете задачи — косите коли стоят в лентата, в която тръгваш, и допирът до тях се наказва като опасна грешка, а не като пропусната отметка.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-maneuver-principles", "c-mirrors-blind-spots"],
   map: {
@@ -1242,7 +1321,7 @@ export const SC_PARK_WALL: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "гараж", "крайно гнездо", "стена"],
   titleBg: "Крайно гнездо до стената на гаража",
   objectiveBg:
-    "Две задачи, в този ред: първо спри РАНО и близо до средата на алеята, защото стената в края на реда не оставя място за широк замах; после влез на заден ход в последното гнездо, следейки разстоянието до стената.",
+    "Две задачи, в този ред: първо спри РАНО в изходната позиция, защото стената в края на реда не оставя място за широк замах; после влез на заден ход в последното гнездо, следейки разстоянието до стената. Средата на алеята не е една от двете задачи — тези коли стоят в лентата, в която тръгваш, и допирът до тях се наказва като опасна грешка, а не като пропусната отметка.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-maneuver-principles", "c-mirrors-blind-spots"],
   map: {
@@ -1289,7 +1368,20 @@ export const SC_PARK_WALL: ScenarioSpec = {
   success: [
     {
       id: "sc-pwl-setup",
-      titleBg: "Задача 1: спри рано, в средата на алеята",
+      // CLAIM GATE — the lateral half (wave 7, 2026-08-28; the block „THE TICK
+      // THAT SURVIVED THE CRASH" at the top of this file carries the frame and
+      // the arithmetic). It read «спри рано, в средата на алеята» and claimed a
+      // LATERAL position and an EARLY one, and the disc can resolve neither:
+      // the mark is 3.1625 m from the district’s own spawn lane centre
+      // (x = 4.0625) while the compiled radius is 5 m at L3–L5 and 7.5 m at
+      // L1/L2, so at L1 the acceptance is wider than the carriageway. The halt
+      // capsule does not save it either — its lateral bound is `radiusM` about
+      // the STUDENT’S OWN approach axis, so a car halted at (4.06, 2.5), inside
+      // the parked row it never left, sits at lateral 0.29 m / along −9.7 m
+      // against a −10 m bound and is credited. The act itself stays where it is
+      // enforced and gated: briefing step 1 (parking3-claim-gates §3) and now
+      // `objectiveBg`, which names the fault that bills it.
+      titleBg: "Задача 1: спри в изходната позиция край крайното гнездо",
       params: { kind: "reachZone", x: 0.9, y: 11.7, radiusM: 5, maxSpeedKmh: 6 },
     },
     {
@@ -1513,7 +1605,7 @@ export const SC_PARK_DOUBLE: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "тесен коридор", "два реда", "супермаркет"],
   titleBg: "Два реда гнезда — паркиране в тесен коридор",
   objectiveBg:
-    "Две задачи, в този ред: първо спри точно по средата на алеята, защото отсрещният ред оставя под шест метра свободен коридор; после влез на заден ход със замах, който започва от средата — широкият подход тук е удар в чужда кола.",
+    "Две задачи, в този ред: първо спри в изходната позиция покрай гнездото, защото отсрещният ред оставя под шест метра свободен коридор; после влез на заден ход със замах, който започва от средата — широкият подход тук е удар в чужда кола. Средата на алеята не е една от двете задачи — и двата реда стоят в лентите, и допирът до тях се наказва като опасна грешка, а не като пропусната отметка.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-maneuver-principles", "c-safety-space"],
   map: {
@@ -1564,7 +1656,15 @@ export const SC_PARK_DOUBLE: ScenarioSpec = {
   success: [
     {
       id: "sc-pdb-setup",
-      titleBg: "Задача 1: спри в средата на алеята, покрай гнездото",
+      // CLAIM GATE — the same lateral half as `sc-pwl-setup`, and the second and
+      // last reverse-drill title in this file that borrowed the FORWARD drills’
+      // claim. `templates-parking.ts sc-ppf-setup` earns «дръпни се вляво в
+      // алеята» on this same mark with radiusM 3.0 — „radius 3.0 EXCLUDES the
+      // right-hand lane (|4.0625 − 0.9| = 3.16 > 3.0)", asserted every build by
+      // lane15-parking-depth. A halt gate on radius 5 has no such exclusion, so
+      // the title now names only the halt. The corridor itself is briefing steps
+      // 1–3 and `objectiveBg`.
+      titleBg: "Задача 1: спри в изходната позиция между двата реда",
       params: { kind: "reachZone", x: 0.9, y: 6.3, radiusM: 5, maxSpeedKmh: 6 },
     },
     {

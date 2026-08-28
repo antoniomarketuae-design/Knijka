@@ -227,6 +227,23 @@ export class ContactProbe {
    * standing on the centreline that the caller skipped for 12 m of the player's
    * approach comes back reporting −0.070 m of penetration where the two bodies
    * are in fact 3.680 m apart.
+   *
+   * WHO CALLS IT, because "an exported method with no product caller" is how a
+   * guard rots into decoration and the next reader deletes it. Since
+   * 2026-08-28 the one product caller is `orchestrator/contact.ts`'s sentinel,
+   * on the frame `StagedTrafficPort.staged(id)` returns null. That branch is
+   * LATENT on today's tree — `TrafficSystem.stagedById` is never deleted from,
+   * so an id that resolves once resolves forever and one that never resolved
+   * never will — and it is wired anyway, because the alternative is a contract
+   * this comment describes and no code keeps.
+   *
+   * IT IS NOT THE PLAYER'S REMEDY. A PLAYER teleport (VehicleRig's kill-plane
+   * rescue) invalidates every remembered pair at once, not one key, and the
+   * sentinel answers it with `reset()` off a budget it computes from the
+   * director's own `speedKmh`/`dtSec`. The measurement — 10 m through 60 m of
+   * unexplained player jump, each billing one accident that never happened —
+   * is in contact.ts's header, not here, so the two files do not publish one
+   * number twice.
    */
   forget(key: string): void {
     this.prev.delete(key);

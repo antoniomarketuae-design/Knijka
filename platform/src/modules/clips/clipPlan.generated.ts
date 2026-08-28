@@ -354,7 +354,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-lane-control-signal",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-lane-control-signal/mistake-closed-lane.trace.json",
-    "faultTimeSec": 2.13,
+    "faultTimeSec": 3.73,
     "requiredActors": [
       {
         "kind": "vehicle",

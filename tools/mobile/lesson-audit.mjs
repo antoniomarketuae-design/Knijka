@@ -156,6 +156,58 @@
  * died" and "some frames are missing" were both `1`, and no re-drive lane can
  * separate those out of one integer.
  *
+ * ── 2026-08-28 · THE FOOTER CERTIFIED 47 PHOTOGRAPHS OF THE PAYWALL ─────────
+ *
+ * The line at the bottom of this file said, for three and a half minutes of
+ * `.audit-frames/w14/frames/sc-sp-curve__pc-right/`:
+ *
+ *     EVIDENCE: complete — this lane can be judged (exit 0)
+ *
+ * Measured in that folder: 47 PNGs, all 257,753 bytes, all the SAME PICTURE —
+ * «Шофьорският симулатор те чака · Виж пакета — 21,99 € еднократно». 113 speed
+ * samples, every one −1. No gear letter ever read. `camera: null`,
+ * `verdictSurface: "absent"`, `reachedVerdictCard: false`, `everSteered: false`
+ * with the note «the drive has not started». `sc-fo-motorway-gap__pc-wrong` in
+ * w13 is the same folder. Both had signed in — «reused a live session» — and
+ * the session cache validates IDENTITY, not ENTITLEMENT, so the harness sat on
+ * the upsell page and photographed it.
+ *
+ * WHAT IT COST. `wave-c-merge.mjs` refuses to certify a non-zero exit
+ * (lines 250, 281), so this one boolean was the ONLY thing standing between a
+ * dead lane and a judge — and it was
+ *
+ *     const exit = frames.lost || stdoutBroken ? EXIT_EVIDENCE_INCOMPLETE : EXIT_JUDGEABLE;
+ *
+ * which asks whether the FRAMES and the LOG survived and never whether the
+ * DRIVE HAPPENED, while the definition four lines above it read «the drive
+ * happened and every frame it claims exists». The code contradicted its own
+ * comment, and it did so in the reassuring direction: judges were handed
+ * folders whose own log told them to adjudicate a paywall. Every finding filed
+ * off one of those lanes is a finding about a page no student ever drives.
+ *
+ * THE HARD PART IS NOT DETECTING IT — it is not sweeping up two shapes that
+ * look similar and are not:
+ *
+ *   · A DRIVE THAT RAN ITS WHOLE BUDGET AND NEVER REACHED A VERDICT CARD is a
+ *     REAL PRODUCT OUTCOME — the lesson never ends. sc-ln-decisive-change and
+ *     sc-ov-crest-curve did 43 and 42 км/ч, tracked the line, stayed in D, and
+ *     mounted no result screen. Those must stay judgeable and they do: their
+ *     cockpit answered.
+ *   · A LESSON THIS HARNESS CANNOT PHYSICALLY DRIVE. sc-vp-stall starts in N
+ *     with a manual box and this file's entire key vocabulary is
+ *     W/S/A/D/B/Escape — no clutch, no selector key («[ ]  скорости: към P /
+ *     към D» is in the product's own legend and not in this harness). Its top
+ *     speed of 0 км/ч is HONEST, and «re-drive this lane» would be the same
+ *     lie pointing the other way, because a re-drive reproduces it exactly.
+ *     That lane gets its own code (8) whose whole content is DO NOT RE-DRIVE.
+ *
+ * So the drive is now classified from the ledger's own instruments —
+ * `classifyDrive` in tools/audit/verdict-surface.mjs, the same function the
+ * judge side runs, so this file's exit code and the judge's verdict cannot
+ * drift. It condemns only on POSITIVE evidence: two or more cockpit
+ * instruments present and every one of them silent. A ledger that never looked
+ * is never called dead.
+ *
  * NOTHING HERE IS TUNED TO A LESSON. Every handle above is written by
  * LessonScene / SimOverlay / LessonPlayShell / SessionEndScreen for all 161
  * scenarios; there is not one scenario id, objective id or Bulgarian lesson
@@ -165,11 +217,17 @@
  *   node tools/mobile/lesson-audit.mjs <outDir> <scenarioId> <mobile|pc> <right|wrong>
  *
  * EXIT CODE IS ABOUT EVIDENCE, NOT ABOUT THE LESSON. 0 = this run can be
- * judged. Non-zero = it cannot, and re-driving it is the only honest response:
+ * judged. Non-zero = it cannot:
  *   0 judgeable · 1 frames/log lost · 2 never dispatched (bad usage)
  *   3 sign-in refused · 4 the harness crashed (`why` is in the status file)
  *   5 no KNIJKA_BASE — never dispatched, no directory, like 2
  *   6 the target cannot be identified (down, unstamped, or a different build)
+ *   7 THE DRIVE NEVER STARTED — no cockpit instrument ever answered; these
+ *     frames are not of a driving lesson.                        RE-DRIVE.
+ *   8 THIS HARNESS CANNOT PERFORM THIS LESSON — the cockpit was live and the
+ *     car was never in a driving gear.   DO NOT RE-DRIVE; fix the harness.
+ * RE-DRIVING IS NOT THE ANSWER TO ALL OF THEM, and 8 is why that sentence no
+ * longer says it is: on 8 a re-drive reproduces the same non-drive forever.
  * A lesson that fails its own drive still exits 0: that is a finding, not a
  * broken run, and conflating the two is how a re-drive lane wastes a day.
  */
@@ -202,6 +260,13 @@ import { aimFrom, degPerPxAtCentre, scanBand, steerCommand, summariseTracking, T
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
 import { attestTarget, describeTarget, resolveBase, treeIdentity } from "./lib/target.mjs";
+// DID THE DRIVE HAPPEN — the same ladder the judge side runs, imported rather
+// than re-implemented. Pure (node:fs + node:path, no top-level work), so it is
+// as safe up here as target.mjs; the reason it lives in tools/audit is that
+// tools/audit/verdict-surface.mjs is where "one ladder, two consumers, no
+// drift" is already the stated contract, and this harness's exit code and
+// `classifyLeg`'s verdict about the same folder MUST be the same sentence.
+import { classifyDrive, DRIVE_CLASSES } from "../audit/verdict-surface.mjs";
 
 /** The tree whose build this run must be measuring. Derived from this file's
  *  own location, never from cwd: the sweep invokes lanes from platform/, from
@@ -226,6 +291,14 @@ const EXIT_SIGNIN_REFUSED = 3; //  the lane never reached the lesson
 const EXIT_CRASHED = 4; //  the harness itself died — see `phase`/`why` in the status file
 const EXIT_TARGET_UNSET = 5; //  KNIJKA_BASE was not set — nothing was dispatched, as with 2
 const EXIT_TARGET_UNVERIFIED = 6; //  a target was named and it cannot say which build it is
+// ── AND THE TWO THAT ANSWER "DID THE DRIVE HAPPEN?" ────────────────────────
+//
+// The NUMBERS are not written here. They come from `DRIVE_CLASSES`, which the
+// judge side reads too, because the last time a fact about a lane lived in two
+// files with two spellings the two spellings disagreed for a whole wave. This
+// block still NAMES them, which is what "in one place" was ever for.
+const EXIT_DRIVE_NEVER_STARTED = DRIVE_CLASSES["never-started"].exit; // 7 · no cockpit answered — RE-DRIVE
+const EXIT_LESSON_NOT_PERFORMABLE = DRIVE_CLASSES["not-performable"].exit; // 8 · never in gear — DO NOT re-drive
 
 // A missing argument used to produce frames at `undefined/01-arrival.png` and a
 // run that looked like every other. Refuse before the browser costs anything —
@@ -801,11 +874,73 @@ const read = () =>
       // The ONE innerText of the pass, and the play shell rather than the whole
       // document — the debrief lives inside the shell, the nav rail never did.
       body: norm(root.innerText).slice(0, 3000),
+      // ── IS THERE A LESSON HERE AT ALL ────────────────────────────────────
+      // One querySelector in an evaluate that already runs, and it is the
+      // cheapest of the four cockpit instruments: `[data-sim-shell]` is minted
+      // by LessonPlayShell and by nothing else, so its ABSENCE says the
+      // harness is not on a lesson page — which is exactly what 47 photographs
+      // of the paywall were, while the footer called them judgeable. Note the
+      // `root` above falls back to `document.body`, which is why this cannot
+      // be inferred from anything else in this object.
+      shell: document.querySelector("[data-sim-shell]") !== null,
     };
-  }).catch(() => ({ kmh: -1, gear: [], overlay: "?", state: "?", end: false, strings: [], unpainted: [], unpaintedTotal: 0, unpaintedUnnamed: 0, unpaintedOverCap: 0, body: "" }));
+  }).catch(() => ({ kmh: -1, gear: [], overlay: "?", state: "?", end: false, strings: [], unpainted: [], unpaintedTotal: 0, unpaintedUnnamed: 0, unpaintedOverCap: 0, body: "", shell: false }));
+
+/* ── THE COCKPIT CENSUS: DID ANY INSTRUMENT EVER ANSWER? ────────────────────
+ *
+ * Every field here already existed somewhere and none of them could answer the
+ * question, which is the whole shape of this defect. `topSpeed` starts at 0 and
+ * only ever climbs, so a dial reading −1 («not in the DOM») and a dial reading
+ * 0 («the car is stopped») both leave it at 0 — a paywall and a stationary car
+ * were the same number. `guidance.samples` is only pushed in the `roll` phase,
+ * so on every MODE=«wrong» lane it is empty and says nothing either way.
+ * `steering.channel` reads the dial ONCE, at one instant.
+ *
+ * This is the whole-drive witness the three of them add up to and none of them
+ * is: counted on every named beat AND on every drive tick, in both modes, on
+ * every lesson, from 01-arrival onward. It costs two comparisons and an array
+ * membership test per read, and it is what `classifyDrive` reads first.
+ *
+ * `speedReadable` is `kmh >= 0`, NOT `> 0`: a car standing still at a red light
+ * reads 0 off a LIVE dial, and treating that as "no instrument" is the same
+ * conflation one level down. `movingReads` is the `>= 1` question and is asked
+ * separately, because "the dial answered" and "the car moved" are two facts and
+ * this programme has already paid for merging them once.
+ */
+const cockpit = {
+  reads: 0,
+  speedReadable: 0,
+  movingReads: 0,
+  topKmh: -1,
+  gearReads: 0,
+  gears: [],
+  shellReads: 0,
+};
+const cockpitSee = (s) => {
+  cockpit.reads += 1;
+  if (typeof s?.kmh === "number" && s.kmh >= 0) {
+    cockpit.speedReadable += 1;
+    if (s.kmh > cockpit.topKmh) cockpit.topKmh = s.kmh;
+    if (s.kmh >= 1) cockpit.movingReads += 1;
+  }
+  const gears = Array.isArray(s?.gear) ? s.gear : [];
+  if (gears.length) cockpit.gearReads += 1;
+  for (const g of gears) if (g && !cockpit.gears.includes(g)) cockpit.gears.push(g);
+  // `probe()` does not read the shell handle (it is not free at 2 Hz), so this
+  // is `=== true` rather than truthy: an undefined must not be counted as a
+  // sighting and must not be counted as an absence either — `shellReads` is a
+  // count of SIGHTINGS, and `classifyDrive` only ever tests it against zero
+  // when the beats have run, which they always have by `complete`.
+  if (s?.shell === true) cockpit.shellReads += 1;
+};
 
 const beat = async (label, { withShot = true } = {}) => {
   const s = await timed("read", read);
+  // THE CENSUS IS TAKEN HERE, ON EVERY NAMED FRAME, BEFORE ANYTHING ELSE READS
+  // `s`. Every beat from 01-arrival to 08-debrief passes through this function
+  // in both modes, which is precisely the coverage the three older speed
+  // records each lacked. See the block above `cockpit`.
+  cockpitSee(s);
   note(`  [${label}] ${s.kmh} км/ч  gear=${s.gear.length ? s.gear.join("/") : "?"}  card=${s.overlay}/${s.state}${s.end ? "  END-SURFACE" : ""}`);
   s.strings.forEach((t) => note(`      · ${t}`));
   // A DIFFERENT MARK FOR A DIFFERENT FACT. `·` is „a reader of this frame can
@@ -3863,7 +3998,11 @@ if (MODE !== "right") await throttle(true);
 
 // `reverse` from the first driving tick, not only at the end: a lane that dies
 // mid-manoeuvre must still be able to say whether it had reached R.
-saveStatus({ phase: "driving", reverse, steering, guidance });
+// `cockpit` from the first driving tick as well, and for the same reason
+// `reverse` is: a lane that dies mid-drive must still be able to say whether
+// there was ever a car. A `crashed` status that carries the census can be told
+// apart from one that never reached a lesson page; one that does not, cannot.
+saveStatus({ phase: "driving", reverse, steering, guidance, cockpit });
 let budgetMs = DRIVE_BUDGET_MS;
 let budgetSaid = false;
 const medianTick = () => {
@@ -3884,6 +4023,13 @@ while (!ended && Date.now() - t0 < budgetMs) {
   }
   const tickStart = Date.now();
   const p = await timed("probe", probe);
+  // …AND ON EVERY DRIVE TICK. `topSpeed` on the next line is the record this
+  // one exists to correct: it starts at 0 and only climbs, so a dial that is
+  // NOT IN THE DOM (−1) and a car standing still (0) both leave it reading
+  // «top 0 км/ч» — the exact line the paywall lanes printed. The census keeps
+  // the two apart and covers the `flat` phase, where the control loop that
+  // records the other speed history is never invoked at all.
+  cockpitSee(p);
   if (p.kmh > topSpeed) topSpeed = p.kmh;
   if (p.end) { ended = true; break; }
 
@@ -5648,7 +5794,41 @@ note(`DEBRIEF TEXT >>> ${debrief.body.slice(0, 1800)}`);
 // keep writing the truth into the status file, which no abort can rewrite:
 // READ `exit` OUT OF `_audit-status.json`, and treat a process code that
 // disagrees with it as evidence about node, not about the lesson.
-const exit = frames.lost || stdoutBroken ? EXIT_EVIDENCE_INCOMPLETE : EXIT_JUDGEABLE;
+// ── …AND "CAN THIS RUN BE JUDGED?" HAS A PRIOR QUESTION — 2026-08-28 ───────
+//
+// For 356 recorded lanes this line was, in full,
+//
+//     const exit = frames.lost || stdoutBroken ? EXIT_EVIDENCE_INCOMPLETE : EXIT_JUDGEABLE;
+//
+// which asks whether the FRAMES and the LOG survived and NEVER whether the
+// DRIVE HAPPENED — while EXIT_JUDGEABLE is defined at the top of this file as
+// «the drive happened and every frame it claims exists». It answered the second
+// half of its own definition and skipped the first. Two of those 356 lanes are
+// 47 identical photographs of the paywall, and both printed «EVIDENCE: complete
+// — this lane can be judged». See the 2026-08-28 block in the file header.
+//
+// The classification is DERIVED FROM THE LEDGER THIS RUN IS ABOUT TO WRITE, so
+// the footer, the exit code and `_audit-status.json` are three renderings of
+// one object and cannot disagree. It is the same function `classifyLeg` runs
+// over the folder afterwards.
+const drive = classifyDrive({ ...status, cockpit, steering, guidance, reverse, reachedVerdictCard: reached, verdictSurface: facts.verdictSurface ?? null });
+// ORDER, AND WHY IT IS THIS ONE. A lane where the drive never started is the
+// most fundamental failure and re-driving is the answer, so 7 outranks
+// everything. 8 comes NEXT — above the frame ledger — because it is the only
+// code that means DO NOT RE-DRIVE, and letting a lost frame demote it to «1 ·
+// re-drive this lane» would reinstate the exact lie in the other direction that
+// 8 exists to prevent: a re-drive cannot put a car in gear that this harness has
+// no key for, whether or not a screenshot also failed. Nothing is hidden by the
+// ordering — every condition that held is printed in the footer below.
+const exit =
+  drive.class === "never-started"
+    ? EXIT_DRIVE_NEVER_STARTED
+    : drive.class === "not-performable"
+      ? EXIT_LESSON_NOT_PERFORMABLE
+      : frames.lost || stdoutBroken
+        ? EXIT_EVIDENCE_INCOMPLETE
+        : EXIT_JUDGEABLE;
+if (drive.class !== "drove") loud(`${drive.headline.toUpperCase()} — ${drive.why}`);
 if (stdoutBroken) {
   // The one recovery attempt for a transcript that never reached run.log. It
   // shares the disk that just failed, so it is allowed to fail too — but
@@ -5714,11 +5894,48 @@ saveStatus({
   // reading and the comparison.
   targetAtEnd: { head: treeAfter.head, worktree: treeAfter.worktree, dirtyCount: treeAfter.dirtyCount },
   treeMovedDuringRun: treeMoved,
+  // WHETHER THERE WAS EVER A CAR, and the raw census it was decided from. Both,
+  // not just the verdict: `drive.class` is this file's opinion and `cockpit` is
+  // the measurement, and a reader who disagrees with the opinion must be able
+  // to re-derive it without re-driving. That is exactly what could NOT be done
+  // for the 356 lanes already on disk.
+  cockpit,
+  drive,
   exit,
 });
+/* ── THE FOOTER, AND THE THREE CASES A READER MUST TELL APART WITHOUT A PICTURE
+ *
+ * It used to be a two-way ternary — "complete, judgeable" or "INCOMPLETE,
+ * re-drive" — and both of its answers were wrong for a dead lane: it said the
+ * first one. Four states now, and the imperative at the end of each is
+ * different, because that imperative is the only part of this line anybody
+ * acts on:
+ *
+ *   exit 0  complete — judge it
+ *   exit 1  INCOMPLETE — re-drive (the drive happened; some evidence was lost)
+ *   exit 7  THE DRIVE NEVER STARTED — re-drive (there was no car to photograph)
+ *   exit 8  CANNOT BE PERFORMED — DO NOT re-drive; the harness has to change
+ *
+ * `drive.headline` is not spelled out here: it comes from DRIVE_CLASSES, so
+ * this sentence and the `_audit-status.json` field and the judge-side tag are
+ * one string with one owner. A frame loss on a 7 or an 8 is appended rather
+ * than allowed to overwrite the diagnosis, so nothing the old line reported is
+ * lost from this one. */
+const evidenceLost = [frames.lost ? `${frames.lost} frame(s) LOST` : null, stdoutBroken ? "the run log is short" : null]
+  .filter(Boolean)
+  .join(" · ");
 note(
-  `EVIDENCE: ${exit === 0 ? "complete — this lane can be judged" : "INCOMPLETE — re-drive this lane"} ` +
-    `(exit ${exit}; the lesson's own verdict is above and is not what this code is about)`,
+  `EVIDENCE: ${
+    exit === EXIT_JUDGEABLE
+      ? "complete — this lane can be judged"
+      : exit === EXIT_EVIDENCE_INCOMPLETE
+        ? `INCOMPLETE (${evidenceLost}) · RE-DRIVE THIS LANE`
+        : `${drive.headline.toUpperCase()} · ${
+            drive.redrive
+              ? "RE-DRIVE THIS LANE"
+              : "DO NOT RE-DRIVE — a re-drive reproduces this exactly; the harness is what has to change"
+          }${evidenceLost ? ` · and separately ${evidenceLost}` : ""}`
+  } ` + `(exit ${exit}; the lesson's own verdict is above and is not what this code is about)`,
 );
 await browser.close();
 // `process.exitCode`, NOT `process.exit()`. A forced exit can drop whatever is

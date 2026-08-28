@@ -239,6 +239,30 @@ export const SC_LN_TURN_LANE_ARROWS: ScenarioSpec = {
 // LessonScene and the streetlight props, and reported rather than guessed at.
 // What this file OWNS is not certifying an ORDER the evaluator cannot read —
 // see sc-ovn-wait, whose repair stands on that reason and not on this one.
+//
+// W15 2026-08-28 — «THE FRAMES NEVER CONTAIN AN ONCOMING CAR» IS ITSELF WRONG,
+// and this is the last clause of :5085441f that was still standing. The
+// paragraph above reasoned the headlight half from the staging arithmetic
+// instead of looking, and the arithmetic was answering a question about a
+// CONSTANT-SPEED drive while the audit's leg made 27 full stops. Swept all 40
+// `04-t*.png` of `sweep161/sc-ov-night-gap/mobile-right` for warm bright pixels
+// in the road band (the fleet's own `HEAD_COLOR` #fff2cf family: r > 200,
+// g > 185, b > 140, r ≥ g > b, r − b > 25):
+//
+//     04-t059s  46 px   brightest (211,201,173)
+//     04-t065s  156 px  brightest (218,207,177)
+//     04-t177s  952 px  brightest (219,208,178)
+//
+// and t177s read at 1.4× is an oncoming vehicle abreast on the left with its
+// headlight bar plainly lit. So the finding's «the only light in the scene is
+// the ego's own beam» is false on the audit's own sheet, in the one channel the
+// whole drill is graded on. The TAIL half was already disproved above and
+// reproduced independently here on the same two frames (night bar #6d130c /
+// r = 109 against day #320d0a / r = 50 — 2.2× the red, on the same instanced
+// mesh). Of the row's three clauses exactly one survives: the streetlamp heads
+// are black, which is `world/components/WorldProps.tsx`, not this file — and on
+// an unlit extra-urban road, which instruction 1 states this is, dark lamp
+// heads are the correct picture anyway. Reported, not repaired from here.
 // ---------------------------------------------------------------------------
 
 /** ov-oncoming-v1 own (northbound) lane center / road length — pinned by value
@@ -886,6 +910,40 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
 // the engine, so no generator could put a crest here. Full measurement, the two
 // exact worldRim edits and the graded side effect are in
 // `environment/weather.ts` §2c. None of those files is this one.
+//
+// W15 2026-08-28 — THE HALF OF BOTH CREST ROWS THAT WAS ALWAYS THIS FILE'S, and
+// four waves of routing had never touched it. `District` geometry being 2D is
+// re-verified (world/types.ts `geometry: [number, number][]`, no elevation key
+// anywhere on the recipe), so the terrain half stays engine-blocked. What was
+// NOT blocked is what the lesson SAYS about that terrain and about that bend:
+//
+//   :d2368fa3 — `titleBg` read «Забранено изпреварване преди БИЛО и завой» on a
+//     road with no vertical relief, and that string is not decoration: it is the
+//     catalog card, the lesson header on every frame, and the six run.log lines
+//     the judge counted. The header's own rule («copy that describes THIS road
+//     may not claim a slope») had been applied to `instructionsBg` and to the
+//     mistake cards and never to the one sentence that names the lesson. It now
+//     names the geometry the generator built. §1b of lanes2-sweep161.test.ts
+//     keeps чл. 43's crest case alive across the other three law-frame fields.
+//
+//   :d8834e1d — «сляп» was an overclaim in the opposite direction. Re-read off
+//     the committed district: 229 m of visible oncoming road at the В24, 157 m
+//     entering the arc, 141 m at the worst station. The student was being told
+//     he could see nothing while looking down 150 m of road — which teaches him
+//     that this product's warnings are not to be checked. The banner, the two
+//     instructions and the blind-pass card now carry the MEASUREMENT instead of
+//     the adjective, and instruction 4 hands him both terms of the subtraction
+//     (~150 m visible against the ~450 m straight the generator asserts a whole
+//     pass needs). That arithmetic is the only part of this lesson that
+//     transfers to a road he has never driven.
+//
+// NEITHER EDIT MOVES A GRADED METRE, and that was checked rather than assumed:
+// `objectives.ts` fills witness demands in FROM `titleBg` when the template
+// authors none, so a retitle can silently arm or disarm grading. Both changed
+// banners were run through every shipped matcher — `deriveVruWaitDemand`,
+// `deriveYieldDemand`, `deriveLawfulSpeedDemand`, `deriveHaltForVruDemand`,
+// `deriveControllerDemand`, `deriveLampDemand`, `deriveGearDemand` — before and
+// after, and return the same nothing on both.
 // ---------------------------------------------------------------------------
 
 /** ov-crest-v1 pins, denormalized from the committed map by value (the L7 copy
@@ -1012,8 +1070,35 @@ const OVCC_STREAM: OncomingStreamSpec = {
 export const SC_OV_CREST_CURVE: ScenarioSpec = {
   id: "sc-ov-crest-curve",
   family: "lanes",
-  tagsBg: ["изпреварване", "забрана за изпреварване", "знак В24", "сляп завой", "ограничена видимост"],
-  titleBg: "Забранено изпреварване преди било и завой",
+  tagsBg: ["изпреварване", "забрана за изпреварване", "знак В24", "закрит завой", "ограничена видимост"],
+  // W15 — sc-ov-crest-curve:d2368fa3 (critical), the half of that row this file
+  // OWNS. The judge's sentence is the whole argument: «There is no crest
+  // anywhere on the route, while the lesson's own title sells one», and the
+  // run.log carried «преди било» six times on a leg whose terrain has no
+  // vertical relief at all. The header above already ruled that copy describing
+  // THIS road may not claim a slope; a TITLE is the most describing sentence a
+  // lesson has — it is what the catalog card, the lesson header and every one
+  // of those log lines print — so the rule had simply never been applied to it.
+  //
+  // WHY «ограничена видимост» AND NOT ANOTHER WORD FOR THE BEND. It is чл. 43's
+  // own statutory condition, so the title still states the LAW rather than one
+  // instance of it, and it is the one that survives the second crest row
+  // (:d8834e1d): the sight line here is 141–229 m, which is limited, not
+  // absent. A title reading «сляп» would have swapped one overclaim for another.
+  //
+  // ЧЛ. 43's CREST HALF IS NOT LOST, and `lanes2-sweep161.test.ts` §1b is the
+  // wall that says so: it requires «било» AND «изкачване» somewhere across
+  // {titleBg, objectiveBg, teach.whenBg, teach.whyBg}. After this edit
+  // «изкачване» stands in objectiveBg («преди връх на изкачване») and in
+  // teach.whenBg, and «било» in teach.whyBg — the rule keeps both cases, the
+  // road keeps only the one it was built with.
+  //
+  // DEMAND-NEUTRAL, measured rather than assumed: the banner is a live gate
+  // input (`objectives.ts` fills witness demands in from `titleBg` when the
+  // template authors none), so a retitle can arm or disarm grading. Run through
+  // the shipped matchers, both the old string and this one return
+  // vru=false / yield=undefined / lawful=false / halt=false / controller=false.
+  titleBg: "Забранено изпреварване в закрит завой (ограничена видимост)",
   objectiveBg:
     "Не започвай изпреварване там, където пътят се крие — преди връх на изкачване или сляп завой изчакваш, колкото и бавен да е предният.",
   archetypeIds: ["OV-06", "OV-05", "SP-05"],
@@ -1050,8 +1135,17 @@ export const SC_OV_CREST_CURVE: ScenarioSpec = {
     // slope on ov-crest-v1 (see the header) — what hides the road is the arc,
     // so that is what the sentence names now.
     { n: 2, textBg: "Отдалеч се появява знак В24 „Забранено е изпреварването“, а след него знак А1 с табела 40 — напред пътят завива надясно и погледът ти свършва в дъгата." },
-    { n: 3, textBg: "Не започвай нищо. Забраната важи от знака, а не от завоя: маневра, започната „на ръба“, ЗАВЪРШВА вътре в слепия участък." },
-    { n: 4, textBg: "Свали скоростта още на правата — в дъгата дръж около 40 и остани зад камиона, дори да ти се струва, че насреща е чисто. Празното платно, което виждаш, свършва там, където свършва и погледът ти." },
+    { n: 3, textBg: "Не започвай нищо. Забраната важи от знака, а не от завоя: маневра, започната „на ръба“, ЗАВЪРШВА вътре в участъка, където вече не виждаш достатъчно." },
+    // W15 — sc-ov-crest-curve:d8834e1d. The old line ended „Празното платно,
+    // което виждаш, свършва там, където свършва и погледът ти" — true, and
+    // unusable: it tells the student the road is hidden while he is looking
+    // straight down a hundred and fifty metres of it, which is exactly the
+    // contradiction the audit photographed. The two numbers replace the
+    // adjective, and they are the district's own: the sight line measures
+    // 229 m at the В24 and 141–157 m inside the arc, and the legal window after
+    // the bend is the 450 m straight the generator asserts a whole pass fits
+    // into. Subtracting those is the skill; „сляпо е" is not.
+    { n: 4, textBg: "Свали скоростта още на правата — в дъгата дръж около 40 и остани зад камиона, дори да ти се струва, че насреща е чисто. Тук виждаш към 150 метра насрещно платно, а за да минеш този камион ти трябва свободен участък колкото цялата права след завоя — около 450 метра. Виждаш една трета от това, което ти е нужно: колкото и празно да изглежда, останалите две трети просто не са ти показани." },
     { n: 5, textBg: "Изчакай завоя да те изведе на дългата права. Чак когато видиш свободен насрещен участък за ЦЯЛАТА маневра: огледало, ляв мигач, решително изпреварване." },
     { n: 6, textBg: "А ако правата не ти покаже такъв участък — остани зад камиона до края. Това НЕ е провален урок: чл. 42 разрешава изпреварването само при свободна насрещна лента, така че „не сега“ е също толкова правилен отговор, колкото и чистото изпреварване." },
     { n: 7, textBg: "Изпревариш ли, прибери се вдясно с мигач, щом видиш камиона в огледалото, и завърши в своята лента." },
@@ -1059,7 +1153,36 @@ export const SC_OV_CREST_CURVE: ScenarioSpec = {
   success: [
     {
       id: "sc-ovcc-patience",
-      titleBg: "Изчакай зад камиона през целия сляп завой",
+      // W15 — sc-ov-crest-curve:d8834e1d (critical): «the blind section the
+      // lesson grades does not exist — at the bend the road, the oncoming lane
+      // and the truck beyond it are all in full view», filed against this exact
+      // banner («Изчакай зад камиона през целия СЛЯП завой»).
+      //
+      // THE ROW IS HALF TRUE AND THE HALF THAT IS TRUE IS THIS WORD. Measured
+      // off the committed district (sight line from the own lane to the
+      // oncoming bank, first occlusion wins — `lanes2-rebase-actor-truth.test
+      // .ts` §2, re-read here rather than trusted): 229 m at the В24, 157 m
+      // entering the arc, 141 m at the worst station. That is not «сляп». A
+      // student who is told he can see NOTHING, looks up and sees a hundred and
+      // fifty metres of road, learns that the words in this product do not mean
+      // what they say — and the next time a lesson tells him he cannot see, he
+      // will check with his own eyes and drive on. The banner has to survive
+      // being looked at.
+      //
+      // AND THE BAN IS UNTOUCHED, which is why this is a wording repair and not
+      // a grading one: 141–229 m of visible oncoming road against the ~450 m
+      // straight the generator asserts a whole pass of this 57 км/ч truck needs
+      // is чл. 43's condition exactly — ограничена, not нулева, видимост. The
+      // measured figures now go where they teach something: instruction 4 hands
+      // the student the two numbers and lets him do the subtraction, which is
+      // the only form of this lesson that transfers to a road he has never
+      // driven.
+      //
+      // «закрит завой» is the bank's own term for this geometry (q-manevri-013
+      // «в участък с ограничена видимост, например в закрит завой»), so no new
+      // vocabulary is invented here. Demand-neutral: both the old string and
+      // this one return nothing from every shipped `derive*Demand` matcher.
+      titleBg: "Изчакай зад камиона през целия закрит завой",
       // THE drill, in one gate. Radius 4 < the 8.125 m lane pitch, so it is
       // satisfiable ONLY from the OWN lane at the arc's midpoint — an excursion
       // onto the oncoming bank is 8.13 m away and fails it. maxSpeedKmh 46 sits
@@ -1106,16 +1229,17 @@ export const SC_OV_CREST_CURVE: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-ov-crest-curve/mistake-blind-pass.trace.json" },
-      titleBg: "Изпреварване в слепия завой",
+      // W15 — :d8834e1d, same word, same reason as the objective banner above.
+      titleBg: "Изпреварване в закрития завой",
       whatWentWrongBg:
-        "„Камионът пълзи, а насреща е чисто“ — и колата излезе в дъгата. Само че „чисто“ там значи единствено „не виждам“: зад вътрешната страна на завоя пътят продължава, а по него идва кола. Тя се появи, когато маневрата вече беше започнала — измереният прозорец се оказа секунди, а не метри. Точно това забранява чл. 43: не се изпреварва при ограничена видимост, независимо колко бавен е предният и колко празно изглежда платното. Знакът В24 стои 90 метра преди завоя именно защото решението се взема ТАМ, не в дъгата.",
+        "„Камионът пълзи, а насреща е чисто“ — и колата излезе в дъгата. Само че видимото тук е към 150 метра, а маневрата иска към 450: „чисто“ значеше единствено „свърши ми погледът“. Зад вътрешната страна на завоя пътят продължава, а по него идва кола — тя се появи, когато маневрата вече беше започнала, и измереният прозорец се оказа секунди, а не метри. Точно това забранява чл. 43: не се изпреварва при ограничена видимост, независимо колко бавен е предният и колко празно изглежда платното. Знакът В24 стои 90 метра преди завоя именно защото решението се взема ТАМ, не в дъгата.",
       codeRefs: ["OVERTAKE_INSUFFICIENT_GAP"],
     },
     {
       traceRef: { path: "content/traces/sc-ov-crest-curve/mistake-curve-speed.trace.json" },
       titleBg: "Прекалена скорост в дъгата",
       whatWentWrongBg:
-        "Тук никой не изпреварва — водачът просто влезе в обозначения завой с около 54 км/ч при табела 40 под знака А1. Табелата не е препоръка за плахите: тя е скоростта, при която успяваш да спреш в отсечката, която ВИЖДАШ. В сляп завой пред теб може да стои спрял автомобил, паднал клон или насрещен, който реже дъгата — а сцеплението, което харчиш за скоростта, вече не ти достига за спирачката. Намаляването се прави на правата ПРЕДИ завоя; в дъгата кракът стои спокоен (чл. 20, ал. 2).",
+        "Тук никой не изпреварва — водачът просто влезе в обозначения завой с около 54 км/ч при табела 40 под знака А1. Табелата не е препоръка за плахите: тя е скоростта, при която успяваш да спреш в отсечката, която ВИЖДАШ. В закрит завой пред теб може да стои спрял автомобил, паднал клон или насрещен, който реже дъгата — а сцеплението, което харчиш за скоростта, вече не ти достига за спирачката. Намаляването се прави на правата ПРЕДИ завоя; в дъгата кракът стои спокоен (чл. 20, ал. 2).",
       codeRefs: ["SPEED_TOO_FAST_FOR_CURVE"],
     },
   ],

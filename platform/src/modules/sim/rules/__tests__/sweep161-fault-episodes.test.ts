@@ -166,17 +166,25 @@ describe("rail rest — the entry gate the RX-03 case was missing", () => {
 // 3 · the wrong-way flicker
 // ---------------------------------------------------------------------------
 
-/** `wrongWay` true for `onSec`, then false for `offSec`, `cycles` times, at 2 Hz. */
-function flicker(cycles: number, onSec: number, offSec: number): SimTick[] {
+/**
+ * `wrongWay` true for `onSec`, then false for `offSec`, `cycles` times, at 2 Hz.
+ *
+ * `kmh` was added 2026-08-28 and DEFAULTS TO THE 16 IT WAS WRITTEN WITH, so
+ * every call that does not pass it produces byte-identical ticks. It exists
+ * because `WRONG_WAY_ENTRY_TRAVEL_M` made the SPEED of these fixtures load-
+ * bearing: at 16 км/ч a 2-second burst covers 8,9 m, which is inside the mouth
+ * of the street and not an entry into it.
+ */
+function flicker(cycles: number, onSec: number, offSec: number, kmh = 16): SimTick[] {
   const out: SimTick[] = [];
   let t = 0;
   for (let c = 0; c < cycles; c += 1) {
     for (let s = 0; s < onSec * 2; s += 1) {
-      out.push(tick(t, { speedKmh: 16, wrongWay: true }));
+      out.push(tick(t, { speedKmh: kmh, wrongWay: true }));
       t += 0.5;
     }
     for (let s = 0; s < offSec * 2; s += 1) {
-      out.push(tick(t, { speedKmh: 16 }));
+      out.push(tick(t, { speedKmh: kmh }));
       t += 0.5;
     }
   }
@@ -190,17 +198,50 @@ describe("wrong-way — one run, one bill", () => {
   it("a signal that flickers five times over one stretch bills ONCE, not five 10-point опасни", () => {
     // `sc-ac-wind-truck-pass / pc-right` at 13–16 км/ч: five «Движение в обратна
     // посока по еднопосочна улица», 50 наказателни т. on a 9-point sheet.
+    //
+    // Still ONE, and now for two reasons rather than one: the re-arm collapses
+    // the five bills, AND `wrongWayEntry` keeps a single path ledger across the
+    // one-second gaps, so the 30 m this drive actually covers the wrong way is
+    // counted as the one run it is. A ledger that died on every lawful frame
+    // would have made this drive unbillable instead of billable-once, which is
+    // the same acquittal the entry floor's first cut shipped at a new address.
     expect(wrongWayBills(flicker(5, 2, 1))).toBe(1);
   });
 
   it("two genuinely separate runs, with the lawful direction HELD between them, still bill twice", () => {
     // The opposite direction: the re-arm is a hysteresis, not an amnesty. 5 s
     // the right way round is longer than WRONG_WAY_REARM_SEC.
-    expect(wrongWayBills(flicker(2, 2, 5))).toBe(2);
+    //
+    // 2026-08-28 — THE SPEED OF THIS FIXTURE MOVED, and it is one of the two
+    // inputs this wave changed, so it is spelled out. It read
+    //
+    //     expect(wrongWayBills(flicker(2, 2, 5))).toBe(2);
+    //
+    // at the default 16 км/ч, and now reads `flicker(2, 2, 5, 45)` with the
+    // assertion `.toBe(2)` unweakened. At 16 км/ч each of the two bursts is
+    // 2 s = 8,9 m, well under `WRONG_WAY_ENTRY_TRAVEL_M`, so neither burst is
+    // an ENTRY at all and the case would be asserting that two non-offences
+    // bill twice. The subject here is the re-arm, not the floor: to be about
+    // the re-arm, both runs have to be chargeable, and at 45 км/ч each burst
+    // covers 18,8 m. What the old input pinned is asserted immediately below.
+    expect(wrongWayBills(flicker(2, 2, 5, 45))).toBe(2);
+  });
+
+  it("…and two isolated CRAWL bursts of 8,9 m bill nothing — the entry floor", () => {
+    // The 16 км/ч original of the case above, kept as its own assertion. Two
+    // 2-second bursts with 5 s of lawful driving between them: the rearm wipes
+    // the ledger in the gap, so neither burst ever puts 15 m of one-way street
+    // behind the car. This is the drive `WRONG_WAY_ENTRY_TRAVEL_M` exists for
+    // — the crawl in the wide signalled mouth with no В1 on the glass.
+    expect(wrongWayBills(flicker(2, 2, 5))).toBe(0);
   });
 
   it("a single sustained run is unchanged — it still fires on the sustain", () => {
-    const ticks = [0, 1, 2].map((t) => tick(t, { speedKmh: 25, wrongWay: true }));
+    // 2026-08-28 — the drive grew by one second, for the reason set out at the
+    // head of `wrong-way.test.ts`: `[0, 1, 2]` at 25 км/ч is 13,9 m, under the
+    // entry floor, so it describes a car still in the mouth. Same assertion,
+    // on a run that is sustained in path as well as in time (20,8 m).
+    const ticks = [0, 1, 2, 3].map((t) => tick(t, { speedKmh: 25, wrongWay: true }));
     expect(wrongWayBills(ticks)).toBe(1);
   });
 

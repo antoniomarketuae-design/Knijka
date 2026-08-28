@@ -286,6 +286,28 @@ const HOW = [
   "  [NO VERDICT CARD REACHED]  08-debrief.png is whatever was on the glass — on",
   "      two drives in this corpus a live cockpit with an unclicked РЕЗУЛТАТ",
   "      button. Do not read it as a debrief.",
+  // THE TWO TAGS ADDED 2026-08-28, AND THE LEGEND THAT WAS MISSING THEM.
+  // `classifyLeg` began emitting these the same day; this legend did not, so a
+  // judge was told «the bracket says why» and handed a bracket with no entry —
+  // losing, in particular, the DO-NOT-RE-DRIVE instruction on the second one.
+  // A missing legend entry fails in the reassuring direction: an unexplained
+  // tag reads as a minor caveat rather than as «there is no lesson in here».
+  "  [THE DRIVE NEVER STARTED]  no cockpit ever answered. The folder photographs",
+  "      something that is not a driving lesson — on the two known cases, the",
+  "      PAYWALL, with top speed 0 км/ч and the guidance loop reporting NOT-RUN.",
+  "      Judge NOTHING from it. It is not evidence about the product in either",
+  "      direction, and the lane must be RE-DRIVEN. Beware the one ambiguity the",
+  "      instrument cannot resolve: a lesson that crashes into its error boundary",
+  "      leaves the SAME silence as a paywall, so if the frames show a broken",
+  "      PRODUCT page rather than a sign-in wall, say so — that is a finding.",
+  "  [THIS HARNESS CANNOT DRIVE THIS LESSON]  the cockpit was live and the car was",
+  "      never in a driving gear. **DO NOT ASK FOR A RE-DRIVE** — it will return",
+  "      the same silence forever. The known case is sc-vp-stall: the lesson",
+  "      correctly starts in N with a manual box (templates-cockpit.ts sets",
+  "      `start.openingTier: \"advanced\"` ON PURPOSE, so a clutch lesson is not",
+  "      taught on an automatic) and tools/mobile/lesson-audit.mjs has no clutch",
+  "      key and no gear key. Mark such rows UNJUDGED and say that only a harness",
+  "      that can work a clutch will ever settle them.",
   "  [INSTRUMENT: the debrief reader threw] · [NO LEDGER] · [LEDGER DISAGREES WITH",
   "      THE ROW] · [UNRECOGNISED verdictSurface] · [THE HARNESS DIED MID-LANE] ·",
   "      [THE LANE ITSELF SAYS ITS EVIDENCE IS INCOMPLETE]  faults in THIS HARNESS.",

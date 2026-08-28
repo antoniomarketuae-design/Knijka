@@ -161,6 +161,19 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       } else if (deriveHaltForVruDemand(objective.titleBg)) {
         out.requireHaltForVru = true;
       }
+      // «РАЗРЕШЕНАТА СКОРОСТ» IS THE SIGN'S NUMBER (requireLawfulSpeed), same
+      // law again: authored wins, the title fills in. Parsed AFTER the cap so
+      // a gate may carry both — they are two ceilings on one frame and the
+      // stricter of the two decides, which is the honest reading of «мини
+      // участъка с разрешена скорост» on a drill that also caps you below it.
+      if (p.requireLawfulSpeed !== undefined) {
+        if (p.requireLawfulSpeed !== true) {
+          throw new ObjectiveSpecError(objective.id, "reachZone requireLawfulSpeed must be true");
+        }
+        out.requireLawfulSpeed = true;
+      } else if (deriveLawfulSpeedDemand(objective.titleBg)) {
+        out.requireLawfulSpeed = true;
+      }
       // THE WAITED-FOR PERSON, same law: authored wins, the title fills in.
       // No conflict guard is needed — this demand never touches the `capMet`
       // latch (see `ReachZoneWitnessDemands`), so it can share a zone with any
@@ -1085,6 +1098,81 @@ export interface ReachZoneWitnessDemands {
    * person is session-monotone, so the read is pure per frame.
    */
   requireHaltForVru?: true;
+  /**
+   * «РАЗРЕШЕНАТА СКОРОСТ» IS THE SIGN'S NUMBER, NOT THE GATE'S — the ninth
+   * demand, and the first that grades against the LAW the world reports rather
+   * than against a number a template wrote (2026-08-28,
+   * sc-sp-wet-limit-plate:5708fd93).
+   *
+   * WHAT IS BROKEN, read off `w14/frames/sc-sp-wet-limit-plate__pc-wrong`
+   * (`_audit-debrief.json`: verdict ИЗДЪРЖАН, score 1, ended naturally):
+   *
+   *   Задачи от маршрута  ✓ Подмини табелата „при мокра настилка“        0:43
+   *                       ✓ СТИГНИ КРАЯ НА ОТСЕЧКАТА, ЗАДЪРЖАЛ ТАВАНА
+   *                         ОТ НАСТИЛКАТА                               0:52
+   *   Грешки              ✗ Превишена скорост — измерено 58,9 км/ч при
+   *                         ограничение 50 км/ч
+   *
+   * `sc-swp-finish` is `{kind:"reachZone", x:LANE_X, y:330, radiusM:12}` — a
+   * place and nothing else. Its two siblings in the same family both carry the
+   * cap their banner promises (`sc-speed-rain/sc-rn-finish` 46 «още под мокрия
+   * таван», `sc-speed-dangerous/sc-dng-finish` 52 «още под тавана»); this one
+   * simply has none, so the sentence «задържал тавана от настилката» is issued
+   * by arrival alone. A seventeen-year-old doing 9 км/ч over the limit in the
+   * rain is told, by name, that he held the ceiling the surface gave him.
+   *
+   * WHICH NUMBER, AND WHY IT IS NOT INVENTED. There is no number to invent:
+   * `SimTick.maxSpeedKmh` is „the legal speed limit at current position",
+   * authored world data resolved by the runtime from the road itself. The gate
+   * reads the sign the student can see. Nothing here free-recalls a limit, a
+   * fine or an article (ADR-002) — it compares two numbers the tick already
+   * carries.
+   *
+   * THE BAND IS THE RULE ENGINE'S OWN CONVICTION BAND, deliberately, so this
+   * can never refuse a drive the sheet has not already convicted:
+   * `rules/engine.ts speedingBands` grades above `limit + min(limit×0.10, 5)`,
+   * and `REACH_ZONE_CAP_SLACK_KMH` is 5 — identical on every road posted 50 and
+   * above, and LOOSER than the engine below 50. So the population this demand
+   * refuses is a subset of the population already holding a «Превишена скорост»
+   * card with its ЗДвП чл. 21 citation and its «✔ Правилното действие»
+   * corrective. THEO-4 is satisfied the same way `requireYieldClean` and
+   * `requireHaltForVru` satisfy it: the withheld tick removes a contradiction
+   * from a protocol that already explains itself, it does not add a silent one.
+   *
+   * THE CENSUS, over all 361 unique compiled `reachZone` gates in the
+   * catalogue (167 templates × every rung, deduplicated), against the three
+   * phrasings a banner uses to claim the student stayed inside the law —
+   * /разрешена(та) скорост/, /без превишение/, /таван/:
+   *
+   *   sc-sp-curve            sc-spcv-approach  «…с разрешената скорост»   cap 92
+   *   sc-hz-emergency-stop   sc-hzes-approach  «Мини участъка с разреш.»  cap 52
+   *   sc-hz-brake-dont-swerve sc-hzbds-approach «Мини участъка с разреш.» cap 52
+   *   sc-hz-breakdown-pulloff sc-hzbp-approach «Мини участъка с разреш.»  cap 135
+   *   sc-speed-rain          sc-rn-finish      «още под мокрия таван»     cap 46
+   *   sc-speed-dangerous     sc-dng-finish     «още под тавана»           cap 52
+   *   sc-sp-wet-limit-plate  sc-swp-finish     «задържал тавана…»         cap —
+   *   sc-jx-priority-confidence sc-jxpc-approach «без превишение»         cap 57
+   *
+   * Eight gates across eight drills — a population, not the single member that
+   * `requireNoContact`'s census returned and that kept THAT demand
+   * authored-only. Seven of them carry a cap already and this arm is either
+   * vacuous or a mild tightening on those; the eighth carries none and is the
+   * filed row. TWO of the eight are also the ladder walking a gate ABOVE its
+   * own sign — `sc-jxpc-approach` grades at 57 on a road posted 50, because
+   * `widenSpeedCap`'s B58 clamp only fires when the template's map declares
+   * `maxspeedKmh` and this district declares `priorityMaxKmh` instead. That is
+   * `scenario/params.ts`'s row to close and it is reported, not patched from
+   * here; what this demand does is stop the BANNER certifying the overspeed
+   * while it stands.
+   *
+   * AN AT-MARK ARM, so it rides the `capMet` latch beside the cap, the lamps
+   * and the gear: it asks „were you inside the law at the place this banner
+   * names", earned and spent on the same frames and with the same geometry the
+   * cap arm uses. Unknown is never a refusal — a tick whose `maxSpeedKmh` is
+   * absent, zero or not finite (every fixture, rig and hand-built replay)
+   * leaves the demand met.
+   */
+  requireLawfulSpeed?: true;
 }
 
 /**
@@ -1360,6 +1448,62 @@ export function deriveYieldDemand(titleBg: string): ReachZoneYieldDemand | undef
   return "traffic";
 }
 
+/**
+ * The three ways a banner in this catalogue claims the student stayed inside
+ * the LAW — see `ReachZoneWitnessDemands.requireLawfulSpeed` for the census
+ * these were read off and the eight gates they return.
+ *
+ * NARROW ON PURPOSE, and the near-misses are the argument for the shape:
+ *  · «със съобразена за вятъра/дъжда/видимостта скорост» (7 gates) does NOT
+ *    match, and must not. „Appropriate to the conditions" is a claim about a
+ *    speed BELOW the sign that only the template can quantify — grading it
+ *    against the sign would certify a car doing the legal maximum in fog, i.e.
+ *    exactly the mistake those drills exist to teach.
+ *  · «с контролирана скорост» / «бавно» (17 gates) do not match either, for
+ *    the same reason one step further: they name a manner, not a ceiling.
+ *  · «Намали под 58» (`sc-acq-before`) does not match: it names its OWN number
+ *    and the gate already grades that number.
+ * What is left is the family that says «разрешена(та)» — the permitted one —
+ * or names „the ceiling" («тавана») or forbids „exceeding" it («превишение»),
+ * all three of which are the sign and nothing else.
+ *
+ * `таван` is bounded on both sides so it cannot swallow «тавански» or a
+ * compound; `превишение` likewise. The teeth belong in the lane that owns
+ * `__tests__/` — see the report accompanying this change for the rows.
+ */
+const LAWFUL_SPEED_TITLE_PERMITTED = /разрешена(?:та)?\s+скорост/iu;
+const LAWFUL_SPEED_TITLE_CEILING = /(?<![\p{L}])таван(?:а|ът|ите)?(?![\p{L}])/iu;
+const LAWFUL_SPEED_TITLE_NO_EXCESS = /(?<![\p{L}])превишение(?![\p{L}])/iu;
+
+/**
+ * Does this banner promise the student stayed within the posted limit?
+ * `false` for every other gate in the catalogue, and a `false` gate never
+ * consults `tick.maxSpeedKmh` at all — it is bit-identical to shipped.
+ */
+export function deriveLawfulSpeedDemand(titleBg: string): boolean {
+  return (
+    LAWFUL_SPEED_TITLE_PERMITTED.test(titleBg) ||
+    LAWFUL_SPEED_TITLE_CEILING.test(titleBg) ||
+    LAWFUL_SPEED_TITLE_NO_EXCESS.test(titleBg)
+  );
+}
+
+/**
+ * Was the car inside the law on THIS frame? The band is the rule engine's own
+ * conviction band (`speedingBands`: `limit + min(limit×0.10, 5)`) approached
+ * from the loose side, so a refusal here can only ever land on a drive the
+ * sheet already bills for speeding — see the demand's block comment.
+ *
+ * A limit that is absent, zero or not finite is UNKNOWN, and unknown is never a
+ * refusal: every fixture, rig and hand-built replay that omits the field keeps
+ * the answer it has always had.
+ */
+function lawfulSpeedMet(speedKmh: number, tick: SimTick): boolean {
+  const limit = tick.maxSpeedKmh;
+  if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) return true;
+  return speedKmh <= limit + REACH_ZONE_CAP_SLACK_KMH;
+}
+
 function parseLampDemand(objective: LessonObjective, v: unknown): ReachZoneLampDemand {
   if (v === "lit" || v === "low" || v === "high" || v === "fog") return v;
   throw new ObjectiveSpecError(
@@ -1394,7 +1538,15 @@ function parseGearDemand(objective: LessonObjective, v: unknown): ReachZoneGearD
  */
 function hasAtMarkDemand(p: WitnessedReachZoneParams): boolean {
   return (
-    p.maxSpeedKmh !== undefined || p.requireLamps !== undefined || p.requireGear !== undefined
+    p.maxSpeedKmh !== undefined ||
+    p.requireLamps !== undefined ||
+    p.requireGear !== undefined ||
+    // The ninth demand is an at-mark one too, so it is named here for the same
+    // reason the other three are: a zone carrying it may not ALSO carry the
+    // officer's permission, whose whole design note is that one `capMet` latch
+    // cannot hold two moments. The census has no such gate today and the guard
+    // is what keeps it that way.
+    p.requireLawfulSpeed === true
   );
 }
 
@@ -1576,7 +1728,12 @@ function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
     params.maxSpeedKmh !== undefined ||
     params.requireLamps !== undefined ||
     params.requireGear !== undefined ||
-    params.requireControllerProceed === true
+    params.requireControllerProceed === true ||
+    // The ninth demand IS folded in, unlike the five journey demands above:
+    // it is a state of the car at the mark, the latch can both spend it and
+    // re-earn it, and a gate that carries it and nothing else (`sc-swp-finish`)
+    // must start UNMET or the arrival alone would satisfy the contract again.
+    params.requireLawfulSpeed === true
   );
 }
 
@@ -2533,6 +2690,17 @@ function stepReachZone(
   const lampSpent = lampDemand !== undefined && atMark && !lampOk;
   const gearSpent = gearDemand !== undefined && inAcceptance && goingForward;
 
+  // ── «РАЗРЕШЕНАТА СКОРОСТ» — THE SIGN'S NUMBER (requireLawfulSpeed) ────────
+  // The demand's block comment carries the drive, the census and the band.
+  // Geometry, deliberately, is the CAP ARM'S and not the lamps': a speed may
+  // only ever be read at the tick's own position („POSITION IS SWEPT; SPEED IS
+  // NOT"), so this earns where `capArmHere` earns and spends where `capSpent`
+  // spends. It is `speedKmh` — the absolute speed, the C1 fix — against the
+  // limit the world reports for the place the car is standing in.
+  const lawfulDemand = params.requireLawfulSpeed === true;
+  const lawfulOk = !lawfulDemand || lawfulSpeedMet(speedKmh, tick);
+  const lawfulSpent = lawfulDemand && !lawfulOk && (onApproachSide || sweptAcceptance);
+
   // ── THE JOURNEY HALF: the officer's permission (see requireControllerProceed)
   // Read ANYWHERE on the way to the mark rather than at it, because that is
   // where the stop line is. `parseControllerDemand` refuses to let this share a
@@ -2662,10 +2830,16 @@ function stepReachZone(
     (cap === undefined || (!approachBlown && capArmHere)) &&
     (lampDemand === undefined || (lampOk && atMark)) &&
     (gearDemand === undefined || (gearOk && atMark)) &&
-    (!controllerDemand || controllerHere === "proceed");
+    (!controllerDemand || controllerHere === "proceed") &&
+    // The ninth arm, earned on the cap arm's geometry (a point test at the
+    // student's own position) rather than the lamps' swept face — see the
+    // block where `lawfulOk` is computed.
+    (!lawfulDemand || (lawfulOk && (inAcceptance || graceArmed)));
   const capMet = !hasArrivalDemand(params)
     ? true
-    : (st.capMet && !(capSpent || lampSpent || gearSpent || controllerSpent)) || contractEarned;
+    : (st.capMet &&
+        !(capSpent || lampSpent || gearSpent || controllerSpent || lawfulSpent)) ||
+      contractEarned;
   // ── THE WAITED-FOR PERSON (see `ReachZoneWitnessDemands`) ─────────────────
   // A pure per-frame read of the session's staged-outcome record, OUTSIDE the
   // latch: outcomes only ever append, so „the latest dart resolution is a
@@ -2712,7 +2886,92 @@ function stepReachZone(
   // A halt disc four metres short of the child could say where the car came to
   // rest and nothing about whether she was still standing; now it can.
   const haltForVruOk = params.requireHaltForVru !== true || haltForVruHonoured(ctx);
-  const done = reached && capMet && vruOk && contactOk && railOk && yieldOk && haltForVruOk;
+  const arrivalHonoured =
+    reached && capMet && vruOk && contactOk && railOk && yieldOk && haltForVruOk;
+  // ── THE MARK IS WHERE THE BANNER POINTS (round 13, 2026-08-27) ────────────
+  //
+  // WHAT IS BROKEN. `reached` latches on the FIRST swept contact with the
+  // acceptance disc — its near edge — and `done` is read on that same frame.
+  // So on a FLOW cap the whole speed contract is decided one radius short of
+  // the mark, and on an accelerating car the speed that earned the certificate
+  // is not the speed the car carries at the place the banner names. The gates
+  // are wide (the L1 ladder widens every radius), so „one radius short" is
+  // 12–17 m, which at these speeds is a second or more of throttle.
+  //
+  // MEASURED THROUGH THIS EVALUATOR, not inferred. The compiled L1 objectives
+  // were replayed against the audit driver's own speed profile (its `run.log`
+  // positive control, „0 → 44 км/ч in 5 s of throttle", from each district's
+  // real spawn point):
+  //
+  //   gate                        cap  ✓ fires at        speed ON the mark
+  //   sc-junction-left/sc-jleft-approach   35   y −56.9 @ 35.5    39.8 км/ч
+  //   sc-crossing-white-cane/sc-wcn-approach 45  y  48.3 @ 37.3    41.4 км/ч
+  //   sc-hazard-obstacle/sc-obs-approach   48   y  43.1 @ 35.5    41.4 км/ч
+  //   sc-hz-breakdown-pulloff/sc-hzbp-approach 135 y 183.1 @ 85.5  88.3 км/ч
+  //   sc-ac-wind-truck-pass/sc-acw-pass   105   y 325.9 @ 104.8  107   км/ч
+  //
+  // Every one of them banks the tick BEFORE the mark, at a speed the car has
+  // already left behind. `sc-acw-pass` is the shape in one line: the banner is
+  // «Излез в лявата лента до кабината СЪС СЪОБРАЗЕНА ЗА ВЯТЪРА СКОРОСТ», the
+  // gate is 105, the certificate is issued at 104.8 fourteen metres short of
+  // the truck's cab, and the car is doing 107 when it draws level with it.
+  //
+  // SO THE ARRIVAL IS NOT COMPLETE UNTIL THE CAR HAS ACTUALLY REACHED THE
+  // MARK. Everything that can WITHDRAW the certificate — `capSpent`, the lamp,
+  // gear and officer arms, and the five journey demands — keeps running for
+  // those metres, which is the whole change: the contract is now measured over
+  // the disc the author drew instead of over its leading edge.
+  //
+  // AND IT CANNOT BRICK A LESSON, which is the half checked before the half
+  // that refuses. Three independent releases, any one of which ends the hold:
+  //  · PAST THE MARK — `alongMark >= 0` on the student's own approach axis.
+  //    This is the normal exit and it always arrives: a car that entered the
+  //    disc travelling toward the mark crosses `along = 0` by definition.
+  //  · AT REST — a car that has stopped is not accelerating past anything, and
+  //    stopping short of a mark is what `sc-jrhr-approach`, `sc-vuej-approach`
+  //    and every «приближи … с готовност за спиране» drill asks for. Without
+  //    this arm the correct drive on those gates would hang.
+  //  · OUT OF THE DISC — the hold reads `inAcceptance`, the tick's own
+  //    position, so a car that backs out or leaves sideways is released.
+  // `alongMark` is null while the approach axis is unknown (no ring entry yet —
+  // the standing-start exit drills), and null is read as „no hold", because an
+  // unknown must never become a refusal.
+  //
+  // AND ONLY A FLOW CAP. `isFlowCap` excludes every halt demand (cap ≤
+  // REACH_ZONE_HALT_CAP_KMH) for the reason the block at REACH_ZONE_CAP_SLACK_KMH
+  // gives in full: on «Спри точно на маркираната позиция» ARRIVING IN MOTION IS
+  // THE ACT, the shadow reaches the disc at ~22 км/ч and brakes to rest on the
+  // mark, and 166 bot-completion drives died the last time an arm armed on
+  // every cap. A zone with no cap at all is untouched, and so is every
+  // uncapped-but-witnessed zone: the hold asks about a SPEED contract and a
+  // zone that states none has nothing to hold.
+  //
+  // IT CREDITS NOBODY NEW. The hold can only ever delay or withhold a `done`,
+  // never produce one — `arrivalHonoured` is the shipped expression, unchanged,
+  // and this is a conjunction on top of it.
+  //
+  // AND „AT THE MARK" KEEPS THE SAME NEIGHBOURHOOD THE CAPSULE ALREADY USES.
+  // The hold ends `REACH_ZONE_GRACE_M` short of the mark, not at it, and that
+  // is this file's own constant rather than a new one: the grace capsule
+  // already rules that „stopping short of a mark on the same line is stopping
+  // there", and the mark cannot be allowed two different neighbourhoods
+  // depending on which arm is asking. It also keeps the two shipped rescues in
+  // `reach-zone-blown-approach.test.ts` („braked while still ON the mark",
+  // „CREDITS a FRESH approach after a blown one") reading exactly as their
+  // authors wrote them — both end two metres short of a radius-10 gate and
+  // both mean „on it".
+  //
+  // WHAT IS STILL GRADED IS THE PART THAT WAS NOT: the metres from the disc's
+  // leading edge to that neighbourhood — 7 m on a radius-12 gate, 8.75 m on the
+  // white-cane gate, 12 m on the widened L1 motorway gates. That is where an
+  // accelerating car gains the speed the near-edge certificate never saw.
+  const shortOfMark =
+    isFlowCap &&
+    inAcceptance &&
+    !halted &&
+    alongMark !== null &&
+    alongMark < -REACH_ZONE_GRACE_M;
+  const done = arrivalHonoured && !shortOfMark;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
   //
@@ -2757,9 +3016,25 @@ function stepReachZone(
   // instruction that cannot work; `objectiveNotice` now picks the corrective
   // from where the car actually is on the frame the card is composed, which is
   // the half of THEO-4 that says never give advice that will not work.
+  //
+  // …AND IT IS ARMED OFF `arrivalHonoured`, NOT `done` (round 13). The
+  // „the mark is where the banner points" hold above withholds `done` for the
+  // metres between the disc's near edge and the mark, and arming this latch on
+  // the held value would light the card for a student who is INSIDE the
+  // tolerance and about to be credited — «дръж под 45» raised at 47 on a gate
+  // that grades at 45 + REACH_ZONE_CAP_SLACK_KMH. That is a card contradicting
+  // the tick that follows it two frames later. `arrivalHonoured` is the shipped
+  // expression, so the population this card speaks to is byte-identical to
+  // before the hold existed: it fires exactly when the contract is genuinely
+  // unmet, which now includes the frames the hold added — a car over the cap
+  // between the edge and the mark HAS spent `capMet`, so `arrivalHonoured` is
+  // false there too and the explanation arrives while it can still be acted on.
   const overCapNoted =
     st.overCapNoted ||
-    (!done && (inAcceptance || sweptAcceptance) && cap !== undefined && speedKmh > cap);
+    (!arrivalHonoured &&
+      (inAcceptance || sweptAcceptance) &&
+      cap !== undefined &&
+      speedKmh > cap);
 
   const evalState: ObjectiveEvalState = {
     type: "reachZone",

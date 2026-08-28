@@ -619,7 +619,7 @@ green.** Deleting that block would have made the tree green and the row invisibl
   (`node tools/audit/count-agreement.mjs`), corpus gates 14/14 from the repo
   root and from `platform/` — the count no longer depends on cwd.
 - **Of the 680: 476 STILL (atomic, individually fixable) · 200 UNJUDGED
-  (cannot be settled by one drive at 13% determinism) · 4 PARTIAL.**
+  (cannot be settled by one drive at 13% determinism) · 4 PARTIAL.** **[CORRECTED 2026-08-28 — see §15 "A NUMBER THIS DOCUMENT HAS REPEATED FOUR TIMES IS WRONG": 13% is the PASS rate of one lesson, not a determinism rate; the corpus holds only 20 genuinely-distinct repeat drives and cannot support any determinism figure.]**
 - The audit corpus is gitignored ON PURPOSE (drives certify against the
   worktree hash) and is now BACKED UP on the **`ledger/audit`** branch on both
   remotes. After every wave that touches the corpus, run
@@ -679,7 +679,7 @@ green.** Deleting that block would have made the tree green and the row invisibl
    harness (drive N times, judge the RATE — does not exist yet), 37 were never
    exercised, the rest lane-position/no-frame. Recommendation given to the
    founder: accept as known-unmeasurable and ship; build rate mode only if he
-   says so. DO NOT judge them from single drives — 13% determinism, measured.
+   says so. DO NOT judge them from single drives — 13% determinism, measured. **[CORRECTED 2026-08-28 — see §15 "A NUMBER THIS DOCUMENT HAS REPEATED FOUR TIMES IS WRONG": 13% is the PASS rate of one lesson, not a determinism rate; the corpus holds only 20 genuinely-distinct repeat drives and cannot support any determinism figure.]**
 4. **Deferred with cause, needs a DRIVE to land**: the `overlayHoldsDrive`
    wire into LessonPlayShell `paused` — verifier proved it makes compact
    THEO-3 undrivable at 60 s without `blocking:false` at LPS:4240. Wire+flag+
@@ -1095,3 +1095,434 @@ caches ~3.1 GB, Temp ~3.2 GB.
    which correctly declined to fix another lane's file.
 7. Founder batch unchanged: `.audit-frames/wave-scripts/founder-batch.md`. The 29
    first-aid rows at `needs-review` still block BOTH standing vitest reds.
+
+---
+
+## §15 — 2026-08-27 (late): the loop was made to run itself
+
+> §14 covers waves 1–6 and the three instrument faults. This covers w14 — the
+> sixth adjudication — and the answer to the founder's standing complaint about
+> the loop, which was not a complaint about the work.
+
+### State at the time of writing
+
+- **HEAD `d068941`** on `scenario-engine`, on origin AND vps.
+- **1506 ever filed · 1126 closed with evidence · 74% done · 33 retired in w14.**
+- Repair wave 7 (15 lanes) running; wave 8 (8 lanes) built and queued behind it.
+
+### THE FOUNDER'S ACTUAL COMPLAINT, AND WHAT IT WAS ABOUT
+
+> "After this wave is finished auto queue everything required and auto queue next
+> wave aswell, if you cant do it since we try but we never achieve this, send
+> some agents only to watch if things are running until all questions are fixed"
+
+He is right, and the diagnosis is worth writing down precisely, because the
+obvious reading is wrong. **The loop has never failed on the hard parts.** Six
+repair waves, twenty-six-plus lanes, over a hundred agents, zero agent errors.
+It fails *between* the parts — on the steps somebody has to remember:
+
+- `platform/.env`'s `NEXT_PUBLIC_COMMIT_SHA` goes stale after a commit, and every
+  drive of the next sweep exits `EXIT_TARGET_UNVERIFIED`;
+- the second remote does not get the push, because `GIT_SSH_COMMAND` exported for
+  `vps` makes `origin` exit 128;
+- `snapshot-ledger.sh` is not run, and 1,126 closures live in one gitignored
+  directory on one 7200 rpm HDD;
+- and above all: **a turn ends, and the loop waits for a human to type
+  "continue".**
+
+That last one is the whole of it. So three things now exist.
+
+### 1. `tools/audit/wave-cycle.sh` — every mechanical step, one command each
+
+`gate` · `commit <msgfile>` · `preflight` · `sweep` · `merge` · `post` · `status`.
+Each refuses to run if the step before it did not really happen: `commit` will not
+push without a green gate, will not finish without confirming **both** remotes
+hold the sha, restamps `.env` itself, and snapshots the ledger. `post` will not
+`--apply` unless all nine corpus-reading tools report one open list.
+
+Two traps are encoded in it because both have already bitten:
+
+- **`npx tsc` must run FROM `platform/`.** From the repo root npx resolves a
+  different package and exits 1 with *zero* `error TS` lines — a red that is not
+  one, which reads as a real failure and stops a wave.
+- **`grep -oP` silently returns empty on this box** ("supports only unibyte and
+  UTF-8 locales"). The first draft of the gate extracted the vitest failure count
+  with `-P`, got `""`, defaulted it to `0`, and would have **declared a red suite
+  green.** Every extraction is `sed` now. That is the reassuring direction again,
+  which is where every instrument bug on this programme has pointed.
+
+### 2. `tools/audit/loop-watchdog.sh` — it watches, and it repairs nothing
+
+Every 120 s: is anything serving `/api/health`, does it say `db.ok`, does it know
+which build it is, does `platform/.env`'s stamp equal HEAD, is C: above 3 GB. It
+writes `.audit-frames/watchdog.log` and does **nothing else** — no restarts, no
+kills, no git. A watchdog that repairs is a watchdog that can break the run it is
+watching: v1 of the drive supervisor killed every `ms-playwright` process on the
+box and executed its siblings' browsers.
+
+It caught both known faults on its first pass, which is the only reason to
+believe it works.
+
+### 3. A 17-minute heartbeat that re-enters the loop
+
+`CronCreate`, firing the standing order back at me whenever the session is idle.
+This is the piece that was actually missing: the loop now continues without the
+founder typing "continue". **It is session-only** — it is not written to disk and
+it dies when the session does, so a new session must recreate it. Say so out loud
+rather than letting someone assume it persisted.
+
+### W14 — WHAT THE SIXTH ADJUDICATION FOUND
+
+12 judges, then 12 adversarial verifiers. **The verifiers overturned more than
+they upheld**: one pass killed 6 of 10 closures, another all 5 of 5, a third 4 of
+6. Three patterns, all of which will recur:
+
+- **Closed on a branch the row cannot reach.** `sc-sig-controller-live:bf4c6bab`
+  was closed on «Какво се получи добре: чисто каране» — real text, emitted from
+  `debrief.ts:456`'s `summary.mistakes.length === 0` branch. The row is about a
+  drive carrying a dangerous error, which never takes that branch.
+- **Closed on an absence the same run contradicts.** `sc-ov-oncoming-gap:ea19fa97`
+  was closed because its own lane showed no lost keys, while three sibling lanes
+  in the SAME run at the SAME commit printed `lostKeys: 1`. It has now been closed
+  by w12, w13 and w14 and overturned by a verifier each time.
+- **Closed on the wrong surface.** `sc-hz-accident-scene:9925844d` cited a sign
+  «rendered whole» on a frame where the 2D HUD deck covers that quadrant in every
+  beat from t=049 on. A badge hidden by the deck is not a repair.
+
+**And one overturn corrected a premise of mine, which is the more useful lesson.**
+I had `sc-sp-wet-limit-plate` filed as a wet-road grading fault: the engine
+convicting at 58,9 in a 50 «on a wet surface». A verifier read the source:
+`templates-speed2.ts:634` sets `weather: "dry"` on levels 1–2 and adds rain +
+`wetGrip` only at :630-632 on levels 3–5 — *"L1–L2 dry, L3–L5 rain + wetGrip, and
+the contrast IS the lesson"* — and **every sweep so far has driven only the L1 dry
+rung.** Left as filed, that row would have sent a repair lane to make the
+conditions code convict a dry-road driver under a wet-road rule: the founder's own
+standing complaint, manufactured by the audit that exists to prevent it. The row
+has been rewritten in place to the claim that survives — `sc-swp-finish` is a bare
+`reachZone` with no speed cap whose *title* asserts a speed discipline it never
+measures — with the withdrawal stated in its own text.
+
+### TWO NEW FINDINGS, BOTH CRITICAL, BOTH VERIFIED BEFORE FILING
+
+1. **`sc-junction-scan` — the praise channel certifies a manoeuvre that never
+   happened.** «Похвали ✓ Правилно отстъпено предимство 0:55» on a leg whose own
+   `run.log` records «0 full stops · 0 lawful waits honoured (0s) · top 59 км/ч»,
+   verdict НЕИЗДЪРЖАН, 33 наказателни точки, 3 опасни грешки including «Удар в
+   неподвижно препятствие». You cannot yield right of way without ever stopping.
+   **This is not the `sc-ac-wind-truck-pass` row.** That one is about praise not
+   being gated on the verdict; gating on the verdict would not fix this one,
+   because a *clean* drive that never yielded would still collect it. A
+   commendation must require the event it names.
+2. **`sc-follow-brake` — a perfect drive cannot finish the lesson.** Both
+   objectives ticked (`✓ Стигни края на отсечката 4:01`), zero penalty points in
+   every class — and on the same card the instructor writes «Прекъсна урока …
+   преди края» and «Карай го отново и стигни до края, за да получиш оценка». The
+   lesson had nothing left to ask for 17 seconds (last objective 241 s, cut at
+   258 s) and would not end itself. **The НЕЗАВЪРШЕН is not the defect and must
+   not be "repaired" by loosening it** — it follows correctly from an abort. The
+   defect is that the abort was needed.
+
+### AND ONE INSTRUMENT FAULT THAT IS WORSE THAN A PRODUCT FAULT
+
+`.audit-frames/w14/frames/sc-sp-curve__pc-right/` never drove: the debrief text is
+the **paywall page**, top speed 0 км/ч, the speed probe unreadable on all 113
+samples, `verdictSurface: "absent"`, the guidance loop reporting NOT-RUN. And its
+`run.log` ends **`EVIDENCE: complete — this lane can be judged (exit 0)`**.
+
+`lesson-audit.mjs:5651` computes that exit from `frames.lost || stdoutBroken` — it
+asks whether the *frames and the log* survived, never whether the **drive
+happened**, while line 222 documents `EXIT_JUDGEABLE` as "the drive happened and
+every frame it claims exists". The code contradicts its own definition, and judges
+are handed a folder whose own log tells them to adjudicate a photograph of a
+paywall.
+
+**AND HERE IS ITS SIZE, because a fault stated without its size is the thing this
+audit keeps correcting other people for.** Measured across all four rounds
+(`.audit-frames/wave7/dead-lanes.mjs`, output beside it):
+
+| | |
+|---|---|
+| lanes with a status file (w11–w14) | **791** |
+| exit ≠ 0, i.e. already refused | 0 |
+| exit 0 with no verdict card | 6 |
+| …**and** the guidance loop never ran — the dead class | **2** |
+
+The two are `w13 sc-fo-motorway-gap__pc-wrong` and `w14 sc-sp-curve__pc-right`,
+both `verdictSurface: "absent"`, both carrying `03b-frozen.png`. Two lanes in 791,
+not a systemic corruption — and one of them explains a real gap: `verdict-coverage`
+reports `sc-fo-motorway-gap 0/2 judged, 2 missing`, which is two open findings
+still open because their only evidence is a lane that never drove.
+
+**The discriminator is proved, and it is the whole difficulty of the fix.** The
+other **4** exit-0-no-card lanes (`sc-follow-rain-gap__mobile-right`,
+`sc-pk-stop-vs-park__mobile-right`, `sc-ln-decisive-change__mobile-right`,
+`sc-ov-crest-curve__mobile-right`) have `loop DID run` — they are the genuine
+product outcome *"the lesson never ends"* and **must stay judgeable.** Any fix that
+refuses on "no verdict card" alone silently deletes four real defects. Wave 7's
+harness lane owns it, and this table is its acceptance test: 2 flip to refused, 4
+stay judgeable, 785 unaffected.
+
+### THE THIRD INSTRUMENT GAP OF THE SAME SHAPE — and why it was NOT fixed
+
+`sc-vp-stall` is permanently unjudgeable. `templates-cockpit.ts` sets
+`start.openingTier: "advanced"` deliberately (Round 11) so a clutch lesson is not
+taught on an automatic — so the car correctly starts in N with a manual box — and
+`tools/mobile/lesson-audit.mjs` **has no clutch key and no gear key.** Four
+criticals stay UNJUDGED however many times it is re-driven.
+
+**The keys were deliberately not added.** `reverseAssist-audit-harness.test.ts`
+pins the harness's keyboard census precisely to stop keys being added casually,
+and its real claim is *"there is no key that works the GEAR by hand"* — because a
+stray gear key once put a car in R with nobody noticing. `BracketRight` **is** the
+gear key. Driving a manual properly needs a clutch-and-gear *sequence* with its own
+gate, not two keypresses smuggled past a census. That is deliberate work, not an
+integration afterthought.
+
+The pattern across all three is one sentence: **the harness can only test what it
+can do.** It could not fasten a belt, so 194 of 204 drives carried a false −3. It
+cannot steer in wrong-mode, so ~40 rows are unsettleable. It cannot work a clutch,
+so a manual lesson is permanently UNJUDGED.
+
+### THE LAST THREE UNJUDGED ROWS, AND ONE THING DELIBERATELY NOT FILED
+
+Six open findings had **no verdict line at all** — not STILL, not UNJUDGED, just
+never adjudicated by any batch. Three were filed the same day and are STILL by
+construction; the other three were a real coverage hole and are now judged:
+
+- **`sc-ov-crossing-overtake:5125c346` STILL**, and settled from the data rather
+  than the picture — see the new critical below.
+- **`sc-fo-motorway-gap:9c02c245` UNJUDGED.** Its only mobile evidence is a
+  2026-08-24 lane at `ae4a499` whose own log says *"0 trace commands — THIS DRIVE
+  DID NOT STEER"*, top 24 км/ч with 25 full stops **on a road posted 140**, 289.6 m
+  of witness path against an objective disc at (0, 400). The zero credit is
+  arithmetic about the harness. One `mobile-right` lane on current HEAD, in the
+  same round as `pc-right`, settles it.
+- **`sc-fo-motorway-gap:d18105c7` STILL.** On w12 `pc-wrong`: *"✓ Стигни края на
+  отсечката по магистралата 0:50"* printed directly above *"Грешки (4)"* — no
+  seatbelt, «Удар в друго превозно средство −10 ОПАСНА ГРЕШКА», a second collision,
+  НЕИЗДЪРЖАН · 13 наказателни точки — while the careful leg of the same round shows
+  both objectives as «–». The gate is `{reachZone, y:400, r:8, maxSpeedKmh:140}`
+  and 134 км/ч passes under the cap.
+
+**Measured while checking it, across every lane of that lesson in the corpus
+(w10-3, w11, w12, w13 — both platforms, both modes, 9 lanes with a debrief):**
+
+| objective | credited |
+|---|---|
+| «Стигни края на отсечката по магистралата» on a **-wrong** leg | **4 of 4** |
+| …on a **-right** leg | **1 of 5** |
+| «Спри зад спирачещия автомобил» on **any** leg | **0 of 9** |
+
+**The second objective has never been credited by anybody, and I did not file
+it.** It is a `reachZone` at y=790 r=18 cap 8 км/ч, and neither failure to reach
+it is explained by a fault I can prove: the careful lanes crawl (top 17–45 км/ч,
+25+ full stops, 289–354 m of a 790 m target — the harness, not the lesson) and the
+reckless lanes end early on a collision. It is a **known-unmeasured surface**, and
+it stays in this document rather than in the corpus, because filing it would be
+inventing a defect to explain an instrument limit. It needs one drive that
+actually holds motorway speed to the end.
+
+### A NEW CRITICAL: the fiction is on four surfaces, not one
+
+`sc-ov-crossing-overtake` teaches *«ако предният намалява до пътеката, най-вероятно
+пропуска човек, когото ти не виждаш иззад колата му»* — read the car ahead, deduce
+the person you cannot see. Row `5125c346` filed that against the **briefing**. The
+same assertion is made by three more surfaces in `templates-lanes.ts` — the
+instruction (`:538`), `whatWentWrongBg` (`:589`), and `teach.whyBg` (`:603`) — so
+repairing the briefing alone leaves the fault card and the teach panel saying it.
+
+**Both halves of the sentence are unreachable, and the source says so itself:**
+
+- `:618` stages exactly `[OVC_LEAD_CAR]` and nothing else. Family `lanes` is absent
+  from `SCENARIO_FAMILY_TRAFFIC_BASELINE` (`compile.ts:222-228`), the template
+  authors no `traffic`, so it falls to `SCENARIO_DEFAULT_TRAFFIC.pedestrianCount
+  = 0` (`compile.ts:129-131`, comment: *"pedestrianCount stays 0 everywhere"*).
+  `public/world/ov-crossing-v1.json` holds 1 crossing, 1 building, 2 spawnPoints
+  and **no pedestrian array at all**. The engine has a `PedestrianDartOutSpec`;
+  this lesson does not use it.
+- And the antecedent cannot happen either: `OVC_LEAD_CAR.slamAt` is
+  `{ x: 12.19, y: 520 }` on a **320 m** road — `:521`'s own comment reads *"far
+  past the 320 m road — never reached"* — with `:524` setting
+  `minSlamSpeedKmh: 250`, *"the slam tier is authored out of reach"*. **The lead
+  car can never slow at the crossing.**
+
+So the one inference this lesson exists to install is practised on a demonstration
+containing neither half. Instruction 2 does state the legal rule without the
+fiction (*«независимо дали виждаш пешеходец»*), which is why this is a repair and
+not a deletion: either the world gets the walker, or all four surfaces stop
+asserting one.
+
+### A NUMBER THIS DOCUMENT HAS REPEATED FOUR TIMES IS WRONG
+
+**"13% determinism" is a pass rate, not a determinism rate.** It appears at
+§9 (line ~108), §12 (twice, lines ~622 and ~682) and in the founder batch, always
+as *"the harness is ~13% deterministic (measured, not estimated)"*, and it is the
+sole justification for recommending that 163 rows be accepted as unmeasurable.
+
+Its real source: `sc-ln-obstacle-meeting__pc-right`, driven eight times at commit
+`641a4475` (`.audit-frames/det-1` … `det-8`), returning **6× НЕИЗДЪРЖАН · 1×
+ИЗДЪРЖАН · 1× НЕЗАВЪРШЕН**. One pass in eight is 12.5%. That is the ИЗДЪРЖАН rate
+of one lesson. It was written down as a determinism rate and inherited from there.
+
+**And the corpus cannot support any determinism figure at all.** Measured across
+all 78 frame directories and 3,146 attested drives:
+
+| | |
+|---|---|
+| groups that *look* like (lesson, leg, commit) driven more than once | 794 |
+| …that are **byte-identical status files** — one drive copied into both a `fill-*` shard dir and its `w*` round dir by `wave-c-merge --copy` | **787** |
+| **genuinely distinct repeat drives in the whole corpus** | **20, in 7 groups, across 3 lessons** |
+| of those 7 groups: agreed | 6 (all 2-run, all ИЗДЪРЖАН) |
+| differed | 1 — the eight-run lesson above |
+
+**I nearly reported "99.87% verdict-stable" off the 794 before hashing the files.**
+That would have been the same error in the opposite direction, and it is worth
+recording that the reassuring reading was the one that came first.
+
+So the honest statement is: **the harness's determinism has never been measured.**
+One lesson is demonstrably flaky at 6-of-8 modal agreement; three lessons have
+ever been driven twice at one commit.
+
+**The consequence is not small.** The 163 UNJUDGED rows were being attributed to
+*flake*, which would be a founder decision (accept / rate-mode / sample). They are
+mostly blocked by *capability*, which is engineering and needs nobody:
+
+- `-wrong` legs cannot steer — `lesson-audit.mjs:3794` starts them in a `"flat"`
+  phase that has no branch in the tick loop, and `guideTick` runs only under
+  `phase === "roll"`. **0 of 43, by construction.**
+- The harness cannot drive a manual, so `sc-vp-stall` stays unjudgeable.
+- The harness cannot drive a motorway: best speed ever reached on a 140-cap lesson
+  is 45–52 км/ч, and the median `-right` drive makes **17 full stops**.
+
+Founder batch item 4 is rewritten accordingly, and now asks one cheap question
+instead of a three-way ruling: spend ~50 drives (10 lessons × 5 runs at one commit)
+measuring determinism properly before deciding anything about the 163.
+
+
+### NEXT, IN ORDER
+
+1. Wave 7 integrates → full gate → commit → both remotes → `.env` restamp →
+   snapshot. `tools/audit/wave-cycle.sh commit <msgfile>` does all of it.
+2. Wave 8 fires immediately: `.audit-frames/wave8/wave8.js`, 8 lanes over the 82
+   STILL rows wave 7 does not cover. Waves 7 + 8 together attack all 216.
+3. Then a confirm-sweep over the touched lessons, adjudicate, `post`.
+4. Founder batch is unchanged and still his: `.audit-frames/wave-scripts/founder-batch.md`.
+   The 29 first-aid rows at `needs-review` still block BOTH standing vitest reds.
+
+---
+
+## §16 — 2026-08-28: two thirds of the open list was pointing at the wrong file
+
+> This is the most structurally important thing the programme has found. It is
+> not a defect in the product. It is a defect in the ledger, and it explains why
+> fifteen rounds moved the count and not the road.
+
+### The measurement
+
+Wave 7 handed **134 standing STILL findings** to 15 repair lanes batched by
+`suspectFile`, under the ADDRESS RULE — prove a non-test import chain to the
+running `/simulator` page BEFORE editing. Five adversarial verifiers then attacked
+every lane's claims. The result:
+
+**89 of the 134 rows (66%) name a file that cannot contain the defect.**
+50 of those re-routings were upheld by an adversarial verifier in its own words;
+39 rest on a lane's word alone and are tagged `LANE-ONLY` in the table.
+
+Some lanes edited nothing at all, correctly:
+
+| lane | rows | mis-addressed |
+|---|---|---|
+| `faultcard` | 10 | **10** — no file edited |
+| `drivescript` | 10 | **10** — both owned files byte-clean at HEAD |
+| `playshell` | 17 | 12 |
+| `simoverlay` | 13 | 8 |
+| `collision` | 9 | 8 |
+| `weather` | 12 | 7 |
+
+Every lane worked every row; none sampled.
+
+### What that means for every number this programme has reported
+
+"216 STILL findings across 71 files" was never 216 defects sitting in 71 files. A
+lane sent to `FaultCard.tsx` for ten rows that live in `SimOverlay.tsx` cannot
+close one of them however well it works — and it will report, honestly, that the
+symptom still reproduces. **That is the mechanism behind the whole flat stretch of
+this audit.** It is not that the repairs were bad; a large share of them were
+posted to the wrong address.
+
+The table is at `.audit-frames/wave7/reroute.json` and **has been applied to the
+corpus**: 88 of 89 rows now carry the corrected `suspectFile`, with the old value
+preserved in `suspectFileWas` and the reason in `rerouted`. Row counts did not
+move (a re-route changes a field, never the population) and all nine corpus tools
+still agree: **1507 filed · 1126 retired · 381 open**. The distinct-file count
+went from 91 to 116, which is what it looks like when rows come off a handful of
+over-loaded addresses.
+
+**Applying it was not optional, and here is why.** A verifier found that
+`.audit-frames/routing-collision.json` re-routed six rows on 2026-08-19 and the
+re-route was **never propagated into the wave ledger** — so a later wave batched
+those rows by the old address and they cost a lane a second time. A routing table
+nobody reads back is a routing table that was never written.
+
+### THE CORPUS TRAP FOUND WHILE APPLYING IT
+
+`findingId` is **derived, not stored**:
+
+```
+findingId = scenario + ":" + sha1(what + "\0" + frame).slice(0, 8)
+```
+
+`suspectFile` is safely outside that hash, so re-routing 88 rows moved no id and
+orphaned nothing (checked: all 1,126 closures still resolve). **But editing a
+row's `what` REHASHES its id and orphans every verdict and closure keyed to the
+old one.** I edited `sc-sp-wet-limit-plate`'s `what` earlier the same day to
+withdraw a false premise, and got away with it only because that row had no
+verdict line yet. Anyone correcting a finding's text must re-point its verdicts
+and closures, or delete-and-refile deliberately.
+
+### CLUSTERS — one cause, many rows
+
+The re-routing also collapsed the list. These are not "similar" rows; each group
+is **one cause with several symptoms**, and one lane fixing the cause retires the
+group:
+
+| rows | one cause |
+|---|---|
+| **13** | `SimOverlay.tsx`. Two sub-causes: the peek text-window floor (`minHeight: "2.75rem"` at `:2037` + `paddingBottom: TEXT_FADE_PX`) leaves ~34 px, so any two-line title eats the window and the **body gets zero lines**; and the mobile in-drive card that `FaultCard.tsx` provably cannot paint (5 rows were filed against `FaultCard`). |
+| **7** | `buildings.ts buildOne` writes an **open tube** — one full-height quad per footprint edge, no floor, no cap (`:212-216`, the file's only collider writes). Cars end up *inside* buildings rather than stopped against them. |
+| **4** | `GovernorCapMark` (`StatusDashboard.tsx:364`) with `NORMAL_CAP_MARGIN_KMH = 10` (`difficulty.ts:214`): the «РЕЖИМ Нормален ≤N» numeral is always the lesson's own domain + 10 and carries **no road fact** — while being the largest number on the bar and the only one wearing ≤. |
+| **4** | `templates-junctions.ts` — stop and scan are **byte-identical field for field**: same district, same spawn, all three exit gates literally `{x:55, y:-4.06, radiusM:9}`. Three lessons, one drill. |
+| **2** | `LessonScene.tsx:2542` `defaultOpen={!touchOnly && !driveLockedAtMount}` — one expression, two rows, and the last open limb of a third outside this wave. |
+| **2** | `LessonPlayShell.tsx` slot contention: over a 138 s drive that ended in a building, the colour legend took the phone's single overlay slot **seven** times and the objective line **zero**. |
+| **2** each | no winter token in `contracts.ts` · truck spray emitted by the scene store instead of the truck rig · no offence code for the police signal or the red telltale · cyclist clearance measured and never billed · snow-vs-fog authored as a road problem instead of a haze problem. |
+
+### TWO CRITICALS CONFIRMED, RE-ADDRESSED, AND REPAIRED BY NOBODY
+
+Both were verified independently at source, twice:
+
+- **`sc-rx-tram-left:07c63b97`.** `lessons/types.ts:489-494` — `YieldReason` is a
+  closed five-member union (`giveWayLine | stopSign | redLight | pedestrian |
+  roundaboutEntry`) with **no rail member**; `grep -c tram` returns **0** across
+  `lessons/types.ts`, `finish.ts`, `advisor.ts` and `rules/types.ts`. On the one
+  lesson in the catalogue whose subject is ЗДвП чл. 8, ал. 2, a car stopped for a
+  tram is classified `"redLight"` and the product can only ever explain the lamp.
+  **Not ADR-002-blocked** — чл. 8 ал. 2 is retrievable verbatim from
+  `content/law/acts/zdvp.json`.
+- **`sc-pk-move-off:6aa68f53` / `sc-vp-handbrake:20bf57db`, and worse than filed.**
+  `scene/cabin.ts:22` is `MirrorGlanceKind = "left" | "right" | "rear"` — no
+  shoulder member, so a «РАМО» button added to `TouchControls.tsx` would be wired
+  to nothing (the dead-predicate class, arriving in advance). And
+  `observation.ts:65` is `.map((e) => e.tSec)`, which **discards the glance kind**
+  — so a mirror press credits a moment titled «Поглед през ляво рамо в мъртвата
+  зона». **The product currently teaches that a mirror discharges the blind-spot
+  duty.** Separately, `:63` returns `null` without a reverse phase, so move-off
+  drills report «Наблюдение» unmeasured on *every* drive while the debrief tells
+  the student to self-check on an act the interface cannot perform.
+
+### WAVE 8 WAS REBUILT BECAUSE OF ALL THIS
+
+The first wave-8 plan batched 82 rows by the old field. It was discarded. Wave 8
+now covers **all 217 STILL rows in 22 lanes, eleven of them batched by a known
+cause rather than by a filename** — and each such lane is told the cause, told
+that its bar is therefore *higher*, and told to **verify the cause first** because
+it came to it second-hand.

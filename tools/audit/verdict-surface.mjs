@@ -76,12 +76,281 @@
  * that photographed a live cockpit with an unclicked РЕЗУЛТАТ button. A
  * fallback onto it turns "I could not read the ledger" into "the card was
  * reached", which is the reassuring direction again.
+ *
+ * ============================================================================
+ * AND THE QUESTION UNDER ALL OF THEM: DID THE DRIVE HAPPEN? — 2026-08-28
+ * ============================================================================
+ *
+ * Everything above asks what the RESULT SCREEN said. None of it asks whether
+ * there was ever a car. `classifyDrive` below is that question, and it lives
+ * here rather than in the harness for the reason the header already gives: the
+ * harness's own exit code and the judge-side classification must be ONE ladder
+ * or they drift, and the drift is always toward "fine".
+ *
+ * MEASURED on the w14 sweep, `.audit-frames/w14/frames/sc-sp-curve__pc-right/`:
+ * 47 byte-identical PNGs of the PAYWALL («Шофьорският симулатор те чака · Виж
+ * пакета — 21,99 €»), 113 speed samples every one of them −1, no gear letter
+ * ever read, no camera, no result surface — and `run.log` ending
+ *
+ *     EVIDENCE: complete — this lane can be judged (exit 0)
+ *
+ * `sc-fo-motorway-gap__pc-wrong` in w13 is the same folder. Both signed in
+ * («reused a live session»), and the session cache validates IDENTITY, not
+ * ENTITLEMENT, so the harness photographed the upsell page for three and a half
+ * minutes and certified it. Judges were handed those folders.
+ *
+ * THE THIRD CASE IS THE ONE THAT MAKES THIS HARD. `sc-vp-stall` starts in N
+ * with a manual box; the harness's whole key vocabulary is W/S/A/D/B/Escape —
+ * there is no clutch and no selector key (`[`/`]`), so its top speed of 0 км/ч
+ * is HONEST and a re-drive reproduces it exactly. Telling an operator to
+ * re-drive that lane is the same lie pointing the other way. So there are three
+ * classes below, not two, and the middle one says DO NOT RE-DRIVE.
  */
 import fs from "node:fs";
 import path from "node:path";
 
 /** The three words the product can put on the pill, uppercased as the harness records them. */
 export const PILL_WORDS = ["ИЗДЪРЖАН", "НЕИЗДЪРЖАН", "НЕЗАВЪРШЕН"];
+
+/**
+ * The selector positions a car can be driven from.
+ * `platform/src/modules/sim/vehicle/driveline.ts:49` —
+ * `SelectorPosition = "P" | "R" | "N" | "D" | "M"`. P and N are not driving
+ * positions; "M" is a manual box that has been put in gear. Read off the glass
+ * as `[aria-label^="Скоростен лост: "]` (StatusDashboard.tsx:676).
+ */
+export const DRIVING_GEARS = ["D", "R", "M"];
+
+/**
+ * The three answers to "did this drive happen?", with the exit code the harness
+ * must publish for each and the sentence its footer must print.
+ *
+ * `redrive` is the field an operator acts on and it is the whole reason there
+ * are three classes: `null` means the question does not arise, `true` means
+ * photograph this lane again, and `false` means a re-drive will reproduce
+ * exactly this and the harness is what has to change.
+ */
+export const DRIVE_CLASSES = {
+  drove: {
+    exit: 0,
+    redrive: null,
+    headline: "the drive happened",
+    tag: null,
+  },
+  "never-started": {
+    exit: 7,
+    redrive: true,
+    headline: "THE DRIVE NEVER STARTED — this folder photographs something that is not a driving lesson",
+    tag: "THE DRIVE NEVER STARTED",
+  },
+  "not-performable": {
+    exit: 8,
+    redrive: false,
+    headline: "THIS HARNESS CANNOT PERFORM THIS LESSON — the cockpit was live and the car was never in a driving gear",
+    tag: "THIS HARNESS CANNOT DRIVE THIS LESSON",
+  },
+};
+
+const own = (o, k) => o != null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k);
+const list = (v) => (Array.isArray(v) ? v : null);
+
+/**
+ * THE FOUR INDEPENDENT READERS THAT CAN ONLY ANSWER FROM INSIDE A COCKPIT,
+ * each reporting `present` (this ledger's harness looked) and `alive` (it saw
+ * something).
+ *
+ * `present` is load-bearing and is the same discriminator as `surfaceRecorded`
+ * above: a ledger that is SILENT about a reader must never be read as a ledger
+ * that looked and saw nothing. Older drives carry only some of these, and the
+ * whole synthetic corpus in the tests carries none — condemning on silence
+ * would fail every one of them, and would fail them as "dead".
+ *
+ * INDEPENDENT IS THE WORD THAT MATTERS, and the first draft of this function
+ * got it wrong. It counted a dead SPEEDOMETER and a dead CAMERA as two
+ * witnesses when both are fields of `steering.channel` — one probe, read once,
+ * at one instant. Two fields of one reader is one opinion, and a gate that
+ * calls it two would condemn a lane on a single mistimed probe. These four are
+ * genuinely separate: different code paths, different moments, different
+ * elements on the glass.
+ *
+ *   the cockpit census     every named beat + every drive tick, both modes
+ *   the steer-channel probe one deliberate wheel test, once per lane
+ *   the control loop       the guidance sampler, `roll` phase only
+ *   the gear reader        `[aria-label^="Скоростен лост: "]`, every tick
+ */
+function driveReaders(st) {
+  const out = [];
+  const c = st?.cockpit;
+  if (typeof c?.reads === "number") {
+    out.push({
+      name: "the cockpit census",
+      present: true,
+      // Any of its three channels answering is enough: this reader is alive if
+      // ANYTHING in the cabin was on the glass.
+      alive:
+        (typeof c.speedReadable === "number" && c.speedReadable > 0) ||
+        (Array.isArray(c.gears) && c.gears.length > 0) ||
+        (typeof c.shellReads === "number" && c.shellReads > 0),
+    });
+  }
+  const ch = st?.steering?.channel;
+  if (typeof ch?.kmhAtCheck === "number" || own(ch, "camera")) {
+    out.push({
+      name: "the steer-channel probe",
+      present: true,
+      // −1 is the harness's word for «the speedometer is not in the DOM», so
+      // `>= 0` is the test and not `> 0`: a car standing still reads 0 and
+      // that is a LIVE dial.
+      alive:
+        (typeof ch?.kmhAtCheck === "number" && ch.kmhAtCheck >= 0) ||
+        (typeof ch?.camera === "string" && ch.camera.trim().length > 0),
+    });
+  }
+  const samples = list(st?.guidance?.samples);
+  if (samples && samples.length) {
+    out.push({
+      name: "the control loop",
+      present: true,
+      alive: samples.some((s) => typeof s?.kmh === "number" && s.kmh >= 0),
+    });
+  }
+  const gs = list(st?.reverse?.gearSeen);
+  if (gs) out.push({ name: "the gear reader", present: true, alive: gs.length > 0 });
+  return out;
+}
+
+function gearSelector(st) {
+  const fromCockpit = list(st?.cockpit?.gears);
+  const fromReverse = list(st?.reverse?.gearSeen);
+  if (!fromCockpit && !fromReverse) return { present: false, alive: false, seen: [], everDriving: null };
+  const seen = [...new Set([...(fromCockpit ?? []), ...(fromReverse ?? [])].map((g) => String(g).trim().toUpperCase()))];
+  return {
+    present: true,
+    alive: seen.length > 0,
+    seen,
+    everDriving: seen.length ? seen.some((g) => DRIVING_GEARS.includes(g)) : null,
+  };
+}
+
+/** Not a cockpit reader — a result screen proves the lesson RAN even on a
+ *  ledger whose cockpit fields predate this field. "absent" is not a proof of
+ *  anything: it is the debrief reader saying it looked and found no surface. */
+function resultSurface(st) {
+  return {
+    present: own(st, "reachedVerdictCard") || own(st, "verdictSurface"),
+    alive: st?.reachedVerdictCard === true || st?.verdictSurface === "pill" || st?.verdictSurface === "no-pill",
+  };
+}
+
+/**
+ * DID THE CAR EVER MOVE, over the WHOLE drive — not at one instant.
+ *
+ * The one-shot channel probe is deliberately NOT a source here. It reads the
+ * dial once, and "0 км/ч at 12 s" is not "0 км/ч all run"; using it would
+ * condemn any lane whose probe happened to land at a stop line. Only
+ * whole-drive witnesses count: the cockpit census (every named beat and every
+ * drive tick, both modes) and, on ledgers written before it existed, the
+ * control loop's samples.
+ */
+function everMoved(st) {
+  const c = st?.cockpit;
+  if (typeof c?.reads === "number" && typeof c?.speedReadable === "number" && c.speedReadable > 0) {
+    return {
+      known: true,
+      moving: (c.movingReads ?? 0) > 0,
+      top: typeof c.topKmh === "number" ? c.topKmh : null,
+      from: `the cockpit census — ${c.speedReadable} readable reading(s) of ${c.reads}, top ${c.topKmh} км/ч`,
+    };
+  }
+  const readable = (list(st?.guidance?.samples) ?? []).filter((s) => typeof s?.kmh === "number" && s.kmh >= 0);
+  if (readable.length) {
+    const top = Math.max(...readable.map((s) => s.kmh));
+    return {
+      known: true,
+      moving: top >= 1,
+      top,
+      from: `${readable.length} readable control-loop sample(s), top ${top} км/ч`,
+    };
+  }
+  // Every MODE=«wrong» lane takes this branch on a pre-census ledger: the
+  // control loop is never invoked in the `flat` phase, so there is NO
+  // whole-drive speed witness at all. UNKNOWN, and nothing may be built on it.
+  return { known: false, moving: null, top: null, from: null };
+}
+
+/**
+ * Did this drive happen, and if not, which kind of not?
+ *
+ * @param {object} st a parsed `_audit-status.json` (or the object about to be
+ *        written as one — the harness classifies itself with this function, so
+ *        its exit code and its footer cannot disagree with its own ledger).
+ * @returns {{ class: string, exit: number, redrive: boolean|null, headline: string,
+ *             why: string, looked: string[], alive: string[] }}
+ */
+export function classifyDrive(st) {
+  const readers = driveReaders(st);
+  const looked = readers.filter((r) => r.present);
+  const alive = looked.filter((r) => r.alive);
+  const result = resultSurface(st);
+  const gear = gearSelector(st);
+  const moved = everMoved(st);
+  const done = (cls, why) => ({
+    class: cls,
+    exit: DRIVE_CLASSES[cls].exit,
+    redrive: DRIVE_CLASSES[cls].redrive,
+    headline: DRIVE_CLASSES[cls].headline,
+    tag: DRIVE_CLASSES[cls].tag,
+    why,
+    looked: looked.map((r) => r.name),
+    alive: alive.map((r) => r.name),
+  });
+
+  // ── NOTHING IN THE COCKPIT ANSWERED, AND NO RESULT SURFACE EITHER ────────
+  //
+  // TWO INDEPENDENT READERS, not one. One dead reading is a reading that could
+  // have been taken at the wrong moment or by a selector that moved; two
+  // separate readers, at different moments, both present and both silent, with
+  // no result screen, is a page that is not a driving lesson. That is the bar
+  // the two paywall lanes clear by three readers and that no live lane in the
+  // 356-lane w13+w14 corpus comes near.
+  if (looked.length >= 2 && alive.length === 0 && !result.alive) {
+    return done(
+      "never-started",
+      `NOT ONE of ${looked.length} independent cockpit reader(s) — ${looked.map((r) => r.name).join(", ")} — ever answered, and no ` +
+        "result surface mounted. Nothing in this folder is evidence about a driving lesson: the frames are a " +
+        "photograph of whatever page the harness was left on. WHOSE fault that is, is NOT decided here — a paywall " +
+        "on an unentitled session and a lesson that crashed into its error boundary leave the same silence — so read " +
+        "«DEBRIEF TEXT >>>» at the end of run.log and 01-arrival.png before filing anything. RE-DRIVE this lane.",
+    );
+  }
+
+  // ── THE CAR WAS NEVER PUT IN GEAR, AND THIS HARNESS HAS NO KEY THAT COULD ─
+  //
+  // Both halves are required and both must be POSITIVELY known. «Never moved»
+  // alone is a real product finding (sc-vp-readiness and sc-vp-handbrake sit
+  // at 0 км/ч in D — the lesson is refusing to release the car, which is
+  // exactly what a judge should see). It is the SELECTOR still reading P/N at
+  // the end of the drive that says the harness never got as far as asking.
+  if (moved.known && !moved.moving && gear.present && gear.seen.length > 0 && gear.everDriving === false) {
+    return done(
+      "not-performable",
+      `the cockpit was live and the selector NEVER left ${gear.seen.join("/")} — no driving position ` +
+        `(${DRIVING_GEARS.join("/")}) was on the glass at any point, and ${moved.from}. This harness's whole key ` +
+        "vocabulary is W/S/A/D/B/Escape. The controls this car needs are not in it: " +
+        "platform/src/modules/sim/scene/cabin.ts:515 binds gearUp/gearDown/clutch to " +
+        "BracketRight/BracketLeft/KeyZ, and engine/stuckStart.ts:72 records that «Z + ]» is the product's own way " +
+        "out of neutral on a manual — the same instruction the teach card paints on the glass (seen in " +
+        ".audit-frames/w14/frames/sc-vp-stall__pc-right/04-t011s.png, beside a live cluster reading 0 км/ч and N). " +
+        "So the harness could not have put this car in gear, and 0 км/ч here is HONEST rather than a finding about " +
+        "the lesson. DO NOT RE-DRIVE — a " +
+        "re-drive reproduces this exactly. Nothing about DRIVING, objectives, the verdict or the score may be " +
+        "attributed to the product from this lane; its debrief COPY, layout and paint are real and may still be " +
+        "read. To make this lane drivable the harness needs those three keys, not another run.",
+    );
+  }
+
+  return done("drove", `${alive.length} of ${looked.length} independent cockpit reader(s) answered${result.alive ? ", and a result surface mounted" : ""}`);
+}
 
 /**
  * "", "-", null and EVERY «(none …)» form mean "no verdict string".
@@ -121,7 +390,7 @@ export function readLaneLedger(outDir) {
   const file = outDir ? path.join(outDir, "_audit-status.json") : null;
   const miss = (why) => ({
     ok: false, why, surfaceRecorded: false, surface: undefined,
-    reached: null, verdict: null, error: null, phase: null, exit: null, file,
+    reached: null, verdict: null, error: null, phase: null, exit: null, drive: null, file,
   });
   if (!file) return miss("no output directory was recorded for this lane");
   let raw;
@@ -151,6 +420,13 @@ export function readLaneLedger(outDir) {
     // a non-numeric `exit` is not zero.
     phase: typeof st.phase === "string" ? st.phase : null,
     exit: typeof st.exit === "number" ? st.exit : null,
+    // DID THE DRIVE HAPPEN — derived from the ledger's own instrument fields,
+    // NOT from its `exit`. It has to be derived rather than read, because the
+    // 356 lanes already on disk were written by a harness that could not ask
+    // the question and all 356 of them recorded `exit: 0`. Two of those are
+    // 47 photographs of the paywall. A consumer that trusted the recorded
+    // integer would keep handing both to judges until every wave is re-driven.
+    drive: classifyDrive(st),
     file,
   };
 }
@@ -184,7 +460,40 @@ export const LEG_STATES = {
   "unknown-surface": { judgeable: false, about: "instrument", tag: "UNRECOGNISED verdictSurface" },
   died: { judgeable: false, about: "instrument", tag: "THE HARNESS DIED MID-LANE" },
   "evidence-incomplete": { judgeable: false, about: "instrument", tag: "THE LANE ITSELF SAYS ITS EVIDENCE IS INCOMPLETE" },
+  // ── THE TWO STATES THE LADDER COULD NOT SEE UNTIL 2026-08-28 ─────────────
+  //
+  // `about: "unknown"` on the first one is deliberate and is the honest
+  // answer: a paywall on an unentitled session and a lesson page that crashed
+  // into its error boundary leave the SAME silence in this ledger, and one of
+  // those is a product defect. The folder's own DEBRIEF TEXT tells them apart;
+  // this field must not pretend to.
+  "never-started": { judgeable: false, about: "unknown", tag: DRIVE_CLASSES["never-started"].tag },
+  "not-performable": { judgeable: false, about: "instrument", tag: DRIVE_CLASSES["not-performable"].tag },
 };
+
+/**
+ * The one-line sentence a report prints beside a count of each state. It lives
+ * HERE, beside the state, because the copy used to live in a `WHAT` map inside
+ * `wave-c-merge.mjs` keyed by state name — so a state added here printed
+ * `undefined` there, in exactly the run where an operator most needed the
+ * sentence. A consumer should read `LEG_STATES[state].what`.
+ */
+export const LEG_STATE_WHAT = {
+  verdict: "a pill was read off the debrief — judgeable",
+  "not-reached": "the ladder never reached a verdict card — closes nothing",
+  "no-pill": "PRODUCT DEFECT: result screen mounted, NO verdict pill — file it",
+  "no-surface": "PRODUCT DEFECT: no result surface in the DOM — file it",
+  "reader-threw": "INSTRUMENT: the debrief reader threw — says nothing either way",
+  "pre-matcher": "UNKNOWN: drove before verdictSurface existed — «НЕЗАВЪРШЕН» and a pill-less card are indistinguishable here; re-drive",
+  "no-ledger": "INSTRUMENT: no readable _audit-status.json — certifies nothing",
+  disagreement: "INSTRUMENT: the row and the lane ledger disagree — certifies nothing",
+  "unknown-surface": "INSTRUMENT: unrecognised verdictSurface value",
+  died: "INSTRUMENT: the ledger records a phase other than «complete» — a fragment, not an answer",
+  "evidence-incomplete": "INSTRUMENT: the ledger's OWN exit is non-zero — the lane says its evidence is incomplete",
+  "never-started": "UNKNOWN: no cockpit instrument ever answered — these frames are not of a driving lesson. RE-DRIVE",
+  "not-performable": "INSTRUMENT: the car was never in a driving gear and this harness has no gear key — DO NOT re-drive, fix the harness",
+};
+for (const [k, v] of Object.entries(LEG_STATES)) v.what = LEG_STATE_WHAT[k];
 
 /**
  * Classify one re-driven leg.
@@ -238,6 +547,20 @@ export function classifyLeg(row) {
       `THE HARNESS DIED MID-LANE — ${led.file} records phase «${led.phase ?? "(none)"}», not «complete». ` +
         "Whatever is in this folder is a fragment, not an answer, and it certifies nothing",
     );
+  }
+  // ── DID THE DRIVE HAPPEN — ASKED BEFORE `exit`, AND DERIVED, NOT READ ────
+  //
+  // BEFORE, for two reasons that pull the same way. (1) A NEW lane that never
+  // started records exit 7 and a not-performable one records 8; letting the
+  // generic arm below catch them prints «the lane says its evidence is
+  // incomplete … re-drive this lane», which is right for a lost frame, useless
+  // for a paywall and an outright lie for sc-vp-stall, where a re-drive
+  // reproduces the same non-drive forever. (2) Every lane ALREADY ON DISK
+  // records exit 0, including the two that photographed the paywall 47 times,
+  // so an arm that keys off the integer would leave the standing corpus exactly
+  // as wrong as it is today until every wave is driven again.
+  if (led.drive && led.drive.class !== "drove") {
+    return done(led.drive.class, `${led.drive.headline.toUpperCase()} — ${led.drive.why}`);
   }
   if (led.exit !== 0) {
     return done(

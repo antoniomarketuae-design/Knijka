@@ -1887,6 +1887,67 @@ export function tierCellLabelBg(mode: DifficultyMode): string {
   return `Ниво на помощта: ${DIFFICULTY_PRESETS[mode].labelBg} — натисни за ${DIFFICULTY_PRESETS[nextTier(mode)].labelBg}`;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE BEAM VOCABULARY, IN ONE PLACE — sc-ac-highbeam-lead:b0ee7eff and
+   sc-ac-night-lights:ebeb0e44, 2026-08-27.
+
+   TWO SURFACES IN THIS FILE NOW SAY THE BEAM STATE — the flank station (right
+   station 0, once the belt is on) and the ⚙ sheet's cell — and they must not
+   be able to drift apart, which is what a copied ternary always does. The
+   sheet used to carry its own pair of nested ternaries; both are derived here
+   now, from the one `HeadlightSetting` the cabin owns.
+
+   ── WHY THE «OFF» FACE IS «СВЕТЛ» AND NOT «ИЗКЛ» ──────────────────────────
+   `modules/sim/procedures/performedSteps.ts:219` teaches the control BY NAME:
+   „Отвори „Кола“ … и натисни „СВЕТЛ“". So the unlit face is the CLASS (the
+   name the procedure sends the student to look for) and the two lit faces are
+   the STATE — «къси» / «дълги» are the words a Bulgarian learner already has
+   for the two beams, and they appear on no other control on either flank, so
+   the two-flank vocabulary rule (the block above the left flank) holds.
+
+   ── WHY «ДЪЛГИ» IS `warning` AND «КЪСИ» IS NOT — THE WHOLE OF b0ee7eff ─────
+   The row is „this lesson is about switching between long and dipped beam and
+   there is no long-beam indicator anywhere". The face already differed; the
+   INK did not — `active` was `headlights !== "off"`, so «КЪСИ» and «ДЪЛГИ»
+   were painted in the identical accent, on the lesson whose whole subject is
+   telling the two apart. Main beam is the state that hurts SOMEBODY ELSE
+   («иначе я заслепяваш през огледалата ѝ» — the lesson's own briefing), so it
+   gets the one register that is not the accent. It is the only amber ON THE
+   FLANK — the sheet's two other `warning` cells, «АВАР» and «СЪЕД», live
+   behind the ⚙ door and are never on the glass beside it — and `danger` stays
+   the belt's alone (see GlyphButton).
+
+   ── THEO-4: NO BARE STATE ─────────────────────────────────────────────────
+   The label is not „Светлини: дълги". It says what the state DOES and what to
+   do about it, in the reader's own terms — the accessible name AND the title,
+   i.e. the sentence a screen-reader user and a mouse user both get. No article
+   number and no offence code: this is instructor reasoning, not law recall
+   (ADR-002), and the citation for the duty itself already rides on the
+   telltale warning the shell prints (`hud/telltaleWarnings.ts`, «Светлините не
+   са включени», with `VIOLATIONS[code].lawRef`).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The face a student reads: the class while unlit, the state while lit. */
+export function beamFaceBg(setting: HeadlightSetting): string {
+  return setting === "high" ? "ДЪЛГИ" : setting === "low" ? "КЪСИ" : "СВЕТЛ";
+}
+
+/** The accessible name — state, consequence, and the next act. */
+export function beamLabelBg(setting: HeadlightSetting): string {
+  if (setting === "high") {
+    return "Светлини: дълги — виждаш по-далеч, но заслепяваш насрещните и предния през огледалата му. Натисни за изключване; за движение зад кола са късите.";
+  }
+  if (setting === "low") {
+    return "Светлини: къси — режимът, с който се кара зад друга кола и в насрещно движение. Натисни за дълги.";
+  }
+  return "Светлини: изключени — натисни, за да включиш късите, щом се стъмни или видимостта падне.";
+}
+
+/** Amber only on main beam: the state that dazzles somebody else. */
+export function beamTone(setting: HeadlightSetting): "warning" | undefined {
+  return setting === "high" ? "warning" : undefined;
+}
+
 export interface TouchControlsProps {
   /** Shared axis source, already attached to the scene's SimInput. */
   touch: TouchInputSource;
@@ -2512,6 +2573,13 @@ export function TouchControls({
   const cabin = () => cabinRef.current;
 
   const gearLabel = snap?.gearLabel ?? "—";
+  /** The live beam, read once for the two surfaces that draw it — the flank
+   *  station and the ⚙ sheet's cell. Before the first 250 ms cabin poll the
+   *  car is unread; `"off"` is what a fresh scene opens in on every lesson
+   *  except the ones `scene/cabin.ts initialHeadlightsFor` starts lit, and the
+   *  station is not on the glass until the belt is on anyway (below), so the
+   *  fallback is never what a student sees. */
+  const beam: HeadlightSetting = snap?.headlights ?? "off";
   const inReverse = gearLabel === "R";
   // Before the first 250 ms poll the cabin is unread; „automatic" is what a
   // fresh scene opens in (DEFAULT_DIFFICULTY === "normal"), so the default is
@@ -3027,6 +3095,83 @@ export function TouchControls({
           </GlyphButton>
         </ArcStation>
       ) : null}
+      {/* ══ …AND THE SAME BOX IS THE BEAM ONCE THE BELT IS ON ════════════════
+          sc-ac-night-lights:ebeb0e44 („no СВЕТЛИНИ control or indicator
+          anywhere on the mobile glass, on a lesson whose instruction 1 is to
+          turn on the dipped beams") and sc-ac-highbeam-lead:b0ee7eff.
+
+          WHAT THE FRAMES SHOW, and it is why this is not a taste change.
+          `.audit-frames/w14/frames/sc-ac-night-lights__mobile-right/04-t007s
+          .png` and `…/sc-ac-highbeam-lead__mobile-wrong/04-t016s.png`: the
+          phone's whole furniture is «Меню · Изглед · Пауза», «Кола · Клакс ·
+          Мигач · Мигач» and «Л · З · Д ОГЛЕДАЛО» — and RIGHT STATION 0 IS
+          EMPTY for the entire drive, because the w12+ harness fastens the belt
+          in the first seconds. The beam state was nowhere on either frame. The
+          PC leg of the same lesson (`…__pc-right/04-t006s.png`) prints a full
+          ДВИГАТЕЛ · КОЛАН · СВЕТЛИНИ · МЪГЛА · ЧИСТАЧКИ · РЪЧНА · АВАР. strip
+          along the dash. A student on a phone could not see the state of the
+          thing the lesson is about.
+
+          THIS IS NOT A FIFTH STATION AND IT COSTS NO GEOMETRY. That is the
+          whole reason it can land in this file at all. `ARC_STATIONS_RIGHT` is
+          already 4, `FlankGhost` already paints four boxes, and
+          `arcStationRectPx("right", 0)` already reserves this rect — the
+          previous note here argued (correctly) that a FIFTH station does not
+          fit on any profile in `touchArc.test.ts`'s ladder. Nothing here adds
+          one. It fills a box the band has been drawing empty.
+
+          AND IT IS ON THE GLASS ESSENTIALLY ALWAYS, counted rather than hoped.
+          The harness prints the visible control set at every beat; over the
+          five w14 mobile-right legs this lane re-drove — sc-vp-handbrake,
+          sc-ac-night-lights, sc-junction-gap, sc-ov-oncoming-gap,
+          sc-sig-controller-live — 274 of 284 censuses carry NO «⚠Колан», i.e.
+          station 0 is free in 96.5 % of the beats and the belt owns it for
+          exactly two beats a leg, at the start.
+
+          WHY GATING ON THE BELT IS NOT THE 2026-08-17 DOCK DEFECT REBUILT.
+          That defect was that the ONLY door to seven controls disappeared
+          while the belt was off. The ⚙ dock is unconditional and still is
+          (`touchDock.test.tsx` §3 pins it), so the lights keep a door that
+          never closes; this is a SECOND, nearer door plus the state readout,
+          and it appears exactly where the taught order puts it —
+          `procedures/steps.ts` runs seat → mirrors → surroundings → BELT →
+          dashboard → LIGHTS → engine, so the belt is done before the lights
+          step is reached. A student who has not buckled up is being asked for
+          the belt, and the belt owns the box while it is.
+
+          ONE CONTROL PER STATION, AND THE TWO BRANCHES ARE EXCLUSIVE — they
+          are separate blocks rather than one ternary so the belt's own JSX
+          stays the FIRST `<ArcStation index={0} … side="right">` in this file,
+          which is the anchor `touchDock.test.tsx` §3/§3d slice from.
+
+          TAPPABLE, NOT ONLY READABLE, and the same `cycleHeadlights()`
+          (scene/cabin.ts:673) the L key and the cockpit stalk hotspot call —
+          off → къси → дълги → off. A 44 px box on the flank that only reported
+          would be the one control-shaped thing on this screen that answers a
+          thumb with nothing. The interaction cost is the mirrors' own and it
+          teaches the same habit: changing beams is worth lifting off. */}
+      {snap !== null && snap.seatbeltOn ? (
+        <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
+          <GlyphButton
+            labelBg={beamLabelBg(beam)}
+            captionBg={beamFaceBg(beam)}
+            tone={beamTone(beam)}
+            active={beam !== "off"}
+            onClick={() => cabin()?.cycleHeadlights()}
+          >
+            {/* CONSTANT ON PURPOSE. The caption carries the state and the mark
+                carries the class, which is the flank's own grammar one level
+                over (the block above the left flank: „the caption carries the
+                CLASS and the glyph carries the SIDE" — here there is no side,
+                so the two swap roles and the ARGUMENT is preserved: exactly one
+                of the two changes with state, so the control never changes
+                identity under a thumb reaching for it). «≡» is the beam mark
+                and it collides with nothing on either flank — ⇦ ⇨ ⊙ ⚙ ⚠ Д З Л
+                are the eight faces in use. */}
+            ≡
+          </GlyphButton>
+        </ArcStation>
+      ) : null}
       <ArcStation index={1} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Поглед в дясното огледало"
@@ -3138,13 +3283,13 @@ export function TouchControls({
             active={snap?.seatbeltOn ?? false}
             onClick={() => cabin()?.toggleSeatbelt()}
           />
-          {/* ══ THE LIGHTS ARE HERE, AND A BEAM TELLTALE IS NOT THIS FILE'S ══
+          {/* ══ THE LIGHTS ARE HERE — AND SO IS THE TELLTALE NOW ════════════
               2026-08-27, rows sc-ac-night-lights:ebeb0e44 and
               sc-ac-highbeam-lead:b0ee7eff („no СВЕТЛИНИ control or indicator
-              anywhere on the mobile glass"). Half of that is answered right
-              here and half of it cannot be answered in this file at all — the
-              split is written down so the next reader does not edit the wrong
-              one, which is how both rows arrived at THIS file twice.
+              anywhere on the mobile glass"). Both halves are answered in this
+              file now; the reasoning below is kept because two thirds of it is
+              still load-bearing and because the paragraph that WAS wrong is
+              more useful corrected than deleted.
 
               THE CONTROL EXISTS AND IS ONE TAP DEEP. This cell's face is the
               live beam state («СВЕТЛ» / «КЪСИ» / «ДЪЛГИ») and its handler is
@@ -3158,8 +3303,10 @@ export function TouchControls({
               that a log grep for «СВЕТЛИНИ» cannot match a cell whose face is
               «СВЕТЛ» — which is how a present control was read as absent.
 
-              THE TELLTALE DOES NOT EXIST, AND IT IS TWO FILES AWAY. On a phone
-              the beam state is nowhere unless this sheet is open:
+              ⚠ THE PARAGRAPH THAT USED TO STAND HERE — „THE TELLTALE DOES NOT
+              EXIST, AND IT IS TWO FILES AWAY" — WAS TRUE ABOUT THOSE TWO FILES
+              AND WRONG ABOUT THE CONCLUSION IT DREW. Both are still true as
+              facts and both are still worth fixing:
                 · `modules/sim/hud/StatusDashboard.tsx` — the `compact` branch
                   drops „both blinker arrows, the seatbelt, headlight, fog,
                   wiper, parking-brake and hazard telltales" on the stated
@@ -3169,10 +3316,15 @@ export function TouchControls({
                   battery, temp, arrowRight) and NONE of them is a beam lamp;
                   `clusterReadout.ts`'s `ClusterInputs` carries no headlight
                   channel to light one with.
-              So the premise is false and the state falls between the two, and
-              neither file is this one.
+              …so the cabin premise IS false. But „neither file is this one"
+              did not follow: the overlay already reserves a 44 px box that it
+              paints EMPTY on every phone drive from the moment the belt goes
+              on, and a state the student must read belongs in it. The station
+              is at right index 0 (above), it changes no geometry, and it
+              leaves both cabin gaps exactly where they were for whoever owns
+              them.
 
-              WHY IT CANNOT BE SMUGGLED IN HERE EITHER, in the ladder's own
+              WHAT REMAINS TRUE ABOUT WHERE IT COULD NOT GO, in the ladder's own
               numbers (`touchArc.test.ts`'s LADDER). A fifth station makes the
               band `insetB + padH + ARC_LIFT + 44·4 + 44`:
                 iphone16-landscape 852×393  21 + 136 + 0 + 220 = 377 of 393 →
@@ -3181,29 +3333,27 @@ export function TouchControls({
               And a third top-rail WORD wraps the rail onto a second row in
               portrait (~167 px between «Меню» and the column against ~176 px of
               button), past the single row `TOP_RAIL_ROW_CSS` promises to every
-              surface that has to clear this corridor. Right station 0 is free
-              once the belt is on — and gating the lights on the belt is the
-              2026-08-17 dock defect rebuilt: the w11 night-lights drive carries
-              «⚠Колан» in all 78 of its control censuses, so a cell behind it
-              would not have appeared in one frame of the lesson it is for.
-              All three are geometry changes that need the six-profile browser
-              sweep this lane cannot run. */}
+              surface that has to clear this corridor. Both are geometry
+              changes that need the six-profile browser sweep this lane cannot
+              run, and neither was taken.
+
+              …AND THE THIRD OBJECTION, ANSWERED WITH A NEWER SWEEP. It ran:
+              „gating the lights on the belt is the 2026-08-17 dock defect
+              rebuilt — the w11 night-lights drive carries «⚠Колан» in all 78
+              of its control censuses, so a cell behind it would not have
+              appeared in one frame of the lesson it is for." That was a
+              measurement of a HARNESS, not of the product: w11's driver never
+              pressed KeyB, and the w12+ one does (`lesson-audit.mjs`, „KeyB is
+              the binding"). On w14 the belt is on within seconds and right
+              station 0 is empty for the whole of both light lessons — which is
+              the frame this repair was written against. The dock-defect
+              objection still holds for a DOOR and this is not one: the ⚙ dock
+              never closes, so nothing here can make the lights unreachable. */}
           <SheetCell
-            textBg={
-              snap?.headlights === "high"
-                ? "ДЪЛГИ"
-                : snap?.headlights === "low"
-                  ? "КЪСИ"
-                  : "СВЕТЛ"
-            }
-            labelBg={
-              snap?.headlights === "high"
-                ? "Светлини: дълги"
-                : snap?.headlights === "low"
-                  ? "Светлини: къси"
-                  : "Светлини: изключени"
-            }
-            active={(snap?.headlights ?? "off") !== "off"}
+            textBg={beamFaceBg(beam)}
+            labelBg={beamLabelBg(beam)}
+            tone={beamTone(beam)}
+            active={beam !== "off"}
             onClick={() => cabin()?.cycleHeadlights()}
           />
           <SheetCell

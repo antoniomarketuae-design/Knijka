@@ -102,6 +102,13 @@ interface EpisodeState {
    * and are unaffected by it, so their behaviour is byte-identical.
    */
   bills: number;
+  /**
+   * ACCRUED qualifying seconds and the frame they were last credited on —
+   * written ONLY by the steppers' `accrue` arm (see `SPEEDING_SUSTAIN_ACCRUES`)
+   * and therefore always 0 / null for every detector that does not opt in.
+   */
+  qualifiedSec: number;
+  lastQualAt: number | null;
 }
 
 /**
@@ -281,6 +288,26 @@ export interface RuleEngineState {
   snowLights: EpisodeState;
   following: EpisodeState;
   wrongWay: EpisodeState;
+  /**
+   * THE ENTRY THE WRONG-WAY CLAUSE IS ABOUT — see `WRONG_WAY_ENTRY_TRAVEL_M`.
+   *
+   * A LEDGER FOR ONE RUN, not a baseline on one OSM way (2026-08-28 — see the
+   * „WHAT THE FIRST CUT GOT WRONG" section of that constant):
+   *  · `travelM`  — metres covered on the frames the heading was wrong,
+   *                 accrued with the same `min(dt, 2)` clamp as the contact
+   *                 odometer, so a paused sim fabricates none.
+   *  · `heldSec`  — seconds of those same frames, ditto.
+   *  · `lawfulSince` — when the lawful direction started being held, or null
+   *                 while it is not. The ledger dies when that reaches
+   *                 `WRONG_WAY_REARM_SEC`, i.e. exactly when the EPISODE
+   *                 re-arms, and not one lawful frame sooner.
+   *
+   * Null while no run is open. It is deliberately NOT keyed on `tick.edgeId`:
+   * an OSM way boundary is a cartography artefact, not a legal one, and keying
+   * on it made the rule a function of how the map was cut (`rb-mini-v1`'s four
+   * one-way arms are 28.2 m each).
+   */
+  wrongWayEntry: { travelM: number; heldSec: number; lawfulSince: number | null } | null;
   keepRight: EpisodeState;
   crossing: CrossingZoneState | null;
   /**
@@ -511,6 +538,8 @@ const IDLE_EPISODE: EpisodeState = {
   resetSince: null,
   lastEmitAt: null,
   bills: 0,
+  qualifiedSec: 0,
+  lastQualAt: null,
 };
 
 /**
@@ -798,6 +827,122 @@ const ACT_REVERSE_REOPEN_M = ACT_REOPEN_TRAVEL_M;
 const WRONG_WAY_REARM_SEC = 4;
 
 /**
+ * HOW FAR A CAR MUST HAVE DRIVEN INTO THE STREET BEFORE IT CAN BE SAID TO HAVE
+ * ENTERED IT AGAINST THE FLOW, metres — the entry floor for `WRONG_WAY`.
+ *
+ * ── THE CLAUSE, AND THE VERB IN IT ───────────────────────────────────────────
+ * `n38.ts` quotes what this code is charged under: „когато изпитваният
+ * **НАВЛЕЗЕ** срещу движението на пътен възел или път с еднопосочно движение".
+ * The billable act is an ENTRY into a road, and until this constant existed the
+ * reducer asserted it from a heading alone: `runtime/worldRuntime.ts:1961-1964`
+ * requires `edgeRt.edge.oneway` FIRST and only then compares the vehicle's yaw
+ * with the tangent of that edge — the nearest centreline within 30 m — so the
+ * flag is „my yaw opposes the nearest one-way centreline", and a yaw is not an
+ * entry. (The first cut of this block said the runtime „only computes a yaw
+ * against the nearest centreline". It does not; the `oneway` test is there, and
+ * it is why a junction sweep across a TWO-WAY arm cannot raise the flag at all.
+ * What survives the correction is the rest: on a plaza-wide OSM mouth, or while
+ * repositioning beside a one-way kerb, the nearest one-way centreline is metres
+ * away and the yaw against it says nothing about a road the car has entered.)
+ *
+ * ── WHAT IS ON THE GLASS AT HEAD, and it is why this is not the rearm again ──
+ * `.audit-frames/w14/frames/sc-ed-d2-city-run__pc-right/04-t053s.png` (the
+ * `sc-ac-wind-truck-pass:71a28c54` row's third lesson, re-driven at HEAD): the
+ * car is STANDING at **0 км/ч** in a wide signalled mouth, no В1 and no М10
+ * arrow anywhere on the glass, and «ОПАСНА ГРЕШКА −10 изпитни т. · Движение в
+ * обратна посока по еднопосочна улица … сега» is live over it. `WRONG_WAY_
+ * REARM_SEC` above closed the ×5 runaway on that same drive — its `run.log`
+ * bills once now where it billed five times — but one false 10-point опасна on
+ * a 9-point sheet is still an instant НЕИЗДЪРЖАН, and the row it was filed on
+ * is a CONSISTENCY row: the detector and the drawn world disagree.
+ *
+ * ── WHY A PATH FLOOR AND NOT A SPEED FLOOR ───────────────────────────────────
+ * A speed floor would acquit the learner this code exists for. Creeping into a
+ * one-way street at 8 км/ч is the commonest way the offence is actually
+ * committed, and a rule that lets it go teaches the wrong thing at the wrong
+ * moment. A PATH floor convicts him — at 8 км/ч he reaches it in 6,8 s, well
+ * inside the street — while denying the conviction to a car that never went
+ * anywhere. That asymmetry is the whole point: `COLLISION_REOPEN_TRAVEL_M`
+ * above is the same instrument on the same argument („a car that has not moved
+ * cannot have come apart from what it is inside of"), and this is „a car that
+ * has not driven up the street has not entered it".
+ *
+ * ── WHAT THE FIRST CUT GOT WRONG: IT WAS A REVERSE SPEED FLOOR (2026-08-28) ──
+ * The floor shipped keyed on `tick.edgeId` (torn up on every OSM way change)
+ * and ran the two gates IN SERIES — 15 m first, and only THEN the 1,5 s
+ * `wrongWaySustainSec`. Both mistakes point the same way, and the wave-7
+ * verifier measured where: driving the real reducer with `wrongWay` true on
+ * every frame for 60 s and advancing only `edgeId`, bills came out
+ *
+ *      edge m   20 км/ч   30   40   50   80
+ *        ≤ 20      0       0    0    0    0
+ *          25      1       0    0    0    0
+ *        28.2      1       1    0    0    0
+ *          40      1       1    1    1    0
+ *        ≥ 60      1       1    1    1    1
+ *
+ * — the ACQUITTAL PROBABILITY RISING WITH SPEED, which is the exact inversion
+ * of the thing this constant was written to build. The mechanism: with the
+ * ledger dying at the way boundary, both gates had to complete on ONE edge, and
+ * the series form needs `15/v + 1,5` seconds, i.e. `15 + 1,5·v` metres — 23 m
+ * at 20 км/ч but 48 m at 80. On `rb-mini-v1` and `rb-ped-v1` ALL FOUR one-way
+ * arms are 28,2 m, so going the wrong way round a mini-roundabout was billed at
+ * 30 км/ч and never at 40 or 50; `district-v1` has 27 one-way edges under 15 m
+ * and 49 under 30 m, `d2-v1` 12 and 37. The lane could not see it because every
+ * map it checked is long (`ov-oneway-v1` 140 m, `mw-v1` 2600 m).
+ *
+ * BOTH mistakes are fixed here, and neither weakens the floor:
+ *  1. THE LEDGER IS THE RUN, NOT THE WAY. `RuleEngineState.wrongWayEntry`
+ *     accrues metres and seconds over the frames the heading is wrong, wherever
+ *     the map happens to cut them, and dies only when the LAWFUL direction has
+ *     been held for `WRONG_WAY_REARM_SEC`. That last clause matters as much as
+ *     the first: the rearm block above exists because this flag FLICKERS, and a
+ *     flicker that was allowed to fragment the path ledger instead of the bill
+ *     ledger would be the same acquittal with a new address.
+ *  2. THE GATES RUN IN PARALLEL. Both are measured from the same entry, so the
+ *     bill lands at `max(1,5 s, 15/v)` — 2,7 s at 20 км/ч, 1,5 s at 40 and
+ *     above. MONOTONE NON-INCREASING IN SPEED: the faster, more dangerous run
+ *     is now billed first and never later, on a street of any length. (Series
+ *     also acquitted the fast driver on a BOUNDED street — a 40 m one-way taken
+ *     at 80 км/ч is over in 1,8 s against a 2,175 s requirement.)
+ *
+ * ── AND MEASURED AGAINST THE DRIVES ──────────────────────────────────────────
+ * The three crawl legs this row was filed on hold 0–15 км/ч and drop under
+ * `movingSpeedKmh` (5) every few seconds — `sc-ed-d2-city-run/pc-right` samples
+ * 12·3·0·13·3·0·13·3·0·14·3·0 over 175 s. Each sub-5 км/ч stretch is not a
+ * wrong-heading frame at all, so it accrues nothing and, once it outlasts the
+ * 4 s rearm, wipes the ledger: a creep that never puts 15 m of moving
+ * wrong-heading road behind it cannot be billed. (What the ledger DOES now
+ * catch, and the first cut did not, is a genuine 30 m run whose flag blinks
+ * out for a second at a time — see the sweep161 flicker cases.) A REAL run
+ * cannot be acquitted: `traces/scOvOneWay.ts`'s mistakes head the wrong way at
+ * road speed and cover 15 m in 1,1 s at 50 км/ч and 0,54 s at 100, so for them
+ * the 1,5 s sustain is the binding gate and the bill lands exactly when it did
+ * before this constant existed.
+ *
+ * ── WHY FIFTEEN ──────────────────────────────────────────────────────────────
+ * It is a statement about a place, not a tolerance: a driver is IN the street
+ * rather than in the mouth he came from once he has put a junction's width of
+ * it behind him, and the widest mouths in the shipped districts are the d2
+ * boulevard ones. It sits under `ACT_REOPEN_TRAVEL_M` (20 m — „a driver
+ * deliberately going back to try the approach again"), which is right: entering
+ * is less than re-approaching. Module constant and not a `RuleEngineConfig`
+ * field for the same reason as the two above — a lesson that could lower it
+ * could re-buy the false 10.
+ *
+ * ── WHAT THIS IS STILL NOT ───────────────────────────────────────────────────
+ * It does not make the flag true. The world half of the row is open and named:
+ * `world/builders/props.ts:1358` posts В1 only on scenario micro-maps and
+ * deliberately never on the OSM districts („~150 one-way mouths whose REAL
+ * signage the source data never recorded"), so on d2 a student can still be
+ * convicted under a plate the world declines to draw. Closing THAT needs a
+ * disarming world referent on the tick — the doc 86 T1 pattern
+ * (`centreLinePainted` / `laneLinesPainted`), i.e. `rules/types.ts` +
+ * `runtime/worldRuntime.ts` — and is reported, not patched here.
+ */
+const WRONG_WAY_ENTRY_TRAVEL_M = 15;
+
+/**
  * THE STANDING-DUTY RE-GRADE — how long a CONTINUING breach of a one-switch
  * duty may run after the student has been shown it, before it is billed the
  * one time the изпитен лист prices, seconds.
@@ -982,6 +1127,80 @@ const STANDING_DUTY_MAX_BILLS = 2;
  *    not patched.
  */
 const SPEED_REGRADE_SEC = 6;
+
+/**
+ * THE SECOND-DEGREE SPEED BAND COUNTS QUALIFYING SECONDS, NOT CONSECUTIVE ONES
+ * — the `accrue` opt-in the two SPEEDING_OVER_LIMIT episodes pass (w13 ·
+ * `sc-ac-aquaplane:1d56d2ea`).
+ *
+ * ── WHAT WAS PHOTOGRAPHED, AND THEN MEASURED ─────────────────────────────────
+ * `.audit-frames/sweep161/sc-ac-aquaplane/pc-wrong/04-t018s.png` and the w13
+ * re-drive of the same leg: a 90 disc, «РЕЖИМ Нормален ≤100 · знакът важи», the
+ * cluster walking 91 · 93 · 97 км/ч — and the drive reaches its debrief on
+ * «Опасни 1 10 · Основни 0 0 · Второстепенни 2 2 · Общо (допустими 9) 3 12»
+ * with no «Превишена скорост» row anywhere, and no speeding card on any beat of
+ * the `run.log` either, so the reducer produced no such EVENT at all.
+ *
+ * The bands are right — driven through this reducer, a FLAT 97 in a 90 bills at
+ * t = 3,0 and re-grades at 9,0 (`speedingBands`: 90 + min(90×0,10 · 5) = 95).
+ * What silences it is the SHAPE of the drive. `stepSustainedEpisode` demanded
+ * that the condition hold on EVERY frame of the sustain, so one frame under the
+ * graced 95 set `activeSince` back to null and the two-second clock started
+ * over. Measured on the same reducer, an oscillation between 93 and 97 with a
+ * mean of 95 — i.e. a car above the graced limit for half of every second, for
+ * forty seconds — produced ZERO events, against three for the steady 97.
+ *
+ * That is the M-16 unfairness with the sign flipped, and M-16's own fix does
+ * not reach it: `rearmSec` protects the driver who dips under the LIMIT from
+ * being billed twice, and nothing protected the sheet from a driver who dips
+ * under the GRACE and is billed never. The steadier, more honest drive is the
+ * expensive one again.
+ *
+ * ── THE INSTRUMENT IS ALREADY IN THIS FILE ───────────────────────────────────
+ * `stepAccruedEpisode` was written for exactly this, on exactly this sweep, for
+ * the motorway crawl: „that is right for a condition which is genuinely a STATE
+ * (belt off, handbrake on) and wrong for one that describes a STRETCH OF ROAD,
+ * because the worst driving is the least continuous." A speed band is a stretch
+ * of road. The speed codes were left on the consecutive model; this is the same
+ * repair on the same argument, and it is written as an `accrue` flag on the two
+ * existing steppers rather than a third stepper so the rearm/repeat/maxBills
+ * ladder above keeps working underneath it.
+ *
+ * ── WHAT IT CANNOT DO ────────────────────────────────────────────────────────
+ *  · It cannot convict anybody who corrects. `reset` is unchanged and is still
+ *    `speed <= limit`, and a reset ZEROES the ledger — coming back to the
+ *    posted limit still buys a clean slate, so the drive that obeys the sign is
+ *    byte-identical.
+ *  · It loosens no per-frame gate. A frame that does not qualify contributes
+ *    nothing (the clause `stepAccruedEpisode` states verbatim); only the demand
+ *    that qualifying frames be ADJACENT is dropped.
+ *  · It cannot fabricate seconds. The per-frame credit is clamped at 2 s, the
+ *    same clamp the contact odometer and the crawl ledger use and for the same
+ *    reason: every teach card pauses the sim.
+ *  · It is opt-in. The six one-switch duties and WRONG_WAY pass `accrue` false
+ *    and are unchanged — their conditions are states, and for a state a frame
+ *    of falsehood IS the duty being met.
+ *  · It changes no continuous drive at all: with the condition held every
+ *    frame, `qualifiedSec` and `t − activeSince` are the same number.
+ *  · AND IT STOPS AT THE ОПАСНА LINE. `speedingDangerous` deliberately does NOT
+ *    accrue: its one bill is 10 наказателни точки against an allowance of 9, so
+ *    it is the only speed code that fails an exam by itself, and its sustain is
+ *    already the shortest in this file (1 s). A gap-surviving ledger there
+ *    would let a handful of quarter-second blips past +10 km/h, spread over a
+ *    whole lesson, add up to an instant НЕИЗДЪРЖАН — the A12 direction this
+ *    file does not move in. The band beneath it accrues, so the same oscillating
+ *    driver is still marked, at 1 point a rung instead of a failed exam. This
+ *    is the same line `speedingRepeatSec` is already held to at the same
+ *    threshold, and drawn for the same reason.
+ *
+ * ── MEASURED THROUGH THIS REDUCER (0,1 s frames, posted 90) ──────────────────
+ *   93↔97 sine, 40 s:  before 0 events  ·  after 1 bill at 7,2 s + regrade 24,2
+ *   flat 97,     40 s:  3,0 / 9,0 / 23,0 both before and after — byte-identical
+ *   flat 94,    120 s:  0 events before and after (inside the grace, never
+ *                       qualifies — the ledger cannot bill what never qualified)
+ *   97 then 85 at 21 s: 3,0 + 9,0 only; the correction still buys a clean slate
+ */
+const SPEEDING_SUSTAIN_ACCRUES = true;
 
 /**
  * THE SAME RE-GRADE, FOR THE MOTORWAY CRAWL — ACCRUED seconds of qualifying
@@ -1361,6 +1580,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     snowLights: { ...IDLE_EPISODE },
     following: { ...IDLE_EPISODE },
     wrongWay: { ...IDLE_EPISODE },
+    wrongWayEntry: null,
     keepRight: { ...IDLE_EPISODE },
     crossing: null,
     contactEpisodes: {},
@@ -1427,6 +1647,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     snowLights: { ...s.snowLights },
     following: { ...s.following },
     wrongWay: { ...s.wrongWay },
+    wrongWayEntry: s.wrongWayEntry ? { ...s.wrongWayEntry } : null,
     keepRight: { ...s.keepRight },
     crossing: s.crossing ? { ...s.crossing } : null,
     // Shallow by design: an entry is assigned whole at each report and never
@@ -1476,18 +1697,28 @@ function stepEpisode(
   reset: boolean,
   t: number,
   sustainSec: number,
+  accrue = false,
 ): boolean {
   if (reset) {
     e.activeSince = null;
     e.emitted = false;
+    e.qualifiedSec = 0;
+    e.lastQualAt = null;
     return false;
   }
   if (!cond) {
     e.activeSince = null;
+    e.lastQualAt = null;
+    if (!accrue) e.qualifiedSec = 0;
     return false;
   }
   if (e.activeSince === null) e.activeSince = t;
-  if (!e.emitted && t - e.activeSince >= sustainSec) {
+  if (accrue) {
+    e.qualifiedSec += e.lastQualAt === null ? 0 : Math.max(0, Math.min(t - e.lastQualAt, 2));
+    e.lastQualAt = t;
+  }
+  const heldSec = accrue ? e.qualifiedSec : t - e.activeSince;
+  if (!e.emitted && heldSec >= sustainSec) {
     e.emitted = true;
     return true;
   }
@@ -1531,6 +1762,10 @@ function stepEpisode(
  *
  * `maxBills` 0 = no ceiling, which is what the two speeding calls pass, so
  * their behaviour (and every recorded drive's speeding ledger) is unchanged.
+ *
+ * 2026-08-27: the three SPEED-BAND episodes opt into `accrue` — see
+ * `SPEEDING_SUSTAIN_ACCRUES`. Every other caller leaves it false and is
+ * byte-identical.
  */
 function stepSustainedEpisode(
   e: EpisodeState,
@@ -1541,9 +1776,12 @@ function stepSustainedEpisode(
   rearmSec: number,
   repeatSec: number,
   maxBills = 0,
+  accrue = false,
 ): boolean {
   if (reset) {
     e.activeSince = null;
+    e.qualifiedSec = 0;
+    e.lastQualAt = null;
     if (e.resetSince === null) e.resetSince = t;
     if (t - e.resetSince >= rearmSec) {
       e.emitted = false;
@@ -1559,13 +1797,22 @@ function stepSustainedEpisode(
   if (!cond) {
     // Condition false without a reset (e.g. the minor band vacated because the
     // episode ESCALATED into the dangerous band) — the episode is still open,
-    // so the sustain clock restarts but the bill is not re-armed.
+    // so the sustain clock restarts but the bill is not re-armed. Under
+    // `accrue` the LEDGER survives that gap (the clock still stops): the
+    // episode has not been corrected, so the seconds already driven over the
+    // band are not given back. See `SPEEDING_SUSTAIN_ACCRUES`.
     e.activeSince = null;
+    e.lastQualAt = null;
+    if (!accrue) e.qualifiedSec = 0;
     return false;
   }
   if (e.activeSince === null) e.activeSince = t;
+  if (accrue) {
+    e.qualifiedSec += e.lastQualAt === null ? 0 : Math.max(0, Math.min(t - e.lastQualAt, 2));
+    e.lastQualAt = t;
+  }
   if (!e.emitted) {
-    if (t - e.activeSince < sustainSec) return false;
+    if ((accrue ? e.qualifiedSec : t - e.activeSince) < sustainSec) return false;
     e.emitted = true;
     e.lastEmitAt = t;
     e.bills += 1;
@@ -2133,6 +2380,8 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       cfg.speedingMinorSustainSec,
       cfg.speedingRearmSec,
       cfg.speedingRepeatSec,
+      0,
+      SPEEDING_SUSTAIN_ACCRUES,
     )
   ) {
     events.push(makeViolation("SPEEDING_OVER_LIMIT", t, { detail: speedDetail }));
@@ -2159,6 +2408,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       speedReset,
       t,
       cfg.speedingMinorSustainSec + SPEED_REGRADE_SEC,
+      SPEEDING_SUSTAIN_ACCRUES,
     )
   ) {
     events.push({
@@ -2202,6 +2452,14 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       cfg.speedingDangerousSustainSec,
       cfg.speedingRearmSec,
       0,
+      // NOT ACCRUED, and it is a deliberate asymmetry — see the last clause of
+      // `SPEEDING_SUSTAIN_ACCRUES`. This is the one speed code whose single
+      // bill is 10 наказателни точки against an allowance of 9, i.e. an instant
+      // НЕИЗДЪРЖАН, and its sustain is already the shortest in the file (1 s).
+      // A ledger that survives gaps would let four quarter-second blips past
+      // +10, spread over a whole lesson, add up to a failed exam — which is the
+      // A12 direction this file does not move in. The второстепенна band
+      // beneath it accrues and still marks the same driving at 1 point a rung.
     )
   ) {
     events.push(makeViolation("SPEEDING_DANGEROUS", t, { detail: speedDetail }));
@@ -2723,14 +2981,59 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // hold the lawful direction for the re-arm before a second run can be
   // charged, so a heading signal that flickers at crawl speed cannot turn one
   // stretch of road into five 10-point опасни.
-  const goingWrongWay = tick.wrongWay === true && moving && forwardGear;
+  //
+  // …AND THE ENTRY IT IS CHARGED FOR (WRONG_WAY_ENTRY_TRAVEL_M — the frame, the
+  // verb, the arithmetic and the measured grid are all in that block). The
+  // heading opens the run; the PATH is what turns it into „навлезе".
+  //
+  // THE LEDGER IS THE RUN, AND ITS TWO GATES ARE PARALLEL. `wrongWayEntry`
+  // accrues the metres and the seconds of the frames whose heading is wrong —
+  // across OSM way boundaries, because a way boundary is a cartography artefact
+  // (`rb-mini-v1`'s four one-way arms are 28,2 m each). The PATH half dies only
+  // when the lawful direction has been held for the same WRONG_WAY_REARM_SEC
+  // the bill uses; the SUSTAIN half dies on the first lawful frame (see the
+  // `heldSec = 0` below). Both gates are read from that one ledger, so the bill
+  // lands at max(sustain, floor/speed): monotone non-increasing in speed, which
+  // the first cut of this floor was NOT.
+  //
+  // The sustain therefore lives in `goingWrongWay` and the stepper is passed 0:
+  // it still owns the rearm hysteresis, the repeat cadence (none, here) and the
+  // one-run-one-bill ledger, but the „how long" question is answered against
+  // the entry so it cannot be re-asked after the path gate opens.
+  const headingWrongWay = tick.wrongWay === true && moving && forwardGear;
+  if (headingWrongWay) {
+    const entry = (s.wrongWayEntry ??= { travelM: 0, heldSec: 0, lawfulSince: null });
+    entry.lawfulSince = null;
+    // Same `min(dt, 2)` clamp as the contact odometer above, and for the same
+    // reason: every teach card pauses the sim, and a pause must not fabricate
+    // metres or seconds the car never drove.
+    entry.travelM += contactTravelM;
+    entry.heldSec += Math.min(dt, 2);
+  } else if (s.wrongWayEntry !== null) {
+    // THE TWO HALVES OF THE LEDGER DIE ON DIFFERENT CLOCKS, deliberately. The
+    // PATH survives the gap (up to the rearm) because a run does not stop being
+    // one street because the flag blinked; the SUSTAIN does not, because it is
+    // the debounce — it is what stops a flag that snaps to a parallel one-way
+    // centreline for one frame at a time from ever adding up to a 10-point
+    // опасна, however many frames it does it on. So the bill still needs
+    // `wrongWaySustainSec` of UNBROKEN wrong heading, exactly as it did before
+    // any of this, and the floor only ever adds a requirement on top.
+    s.wrongWayEntry.heldSec = 0;
+    if (s.wrongWayEntry.lawfulSince === null) s.wrongWayEntry.lawfulSince = t;
+    if (t - s.wrongWayEntry.lawfulSince >= WRONG_WAY_REARM_SEC) s.wrongWayEntry = null;
+  }
+  const goingWrongWay =
+    headingWrongWay &&
+    s.wrongWayEntry !== null &&
+    s.wrongWayEntry.travelM >= WRONG_WAY_ENTRY_TRAVEL_M &&
+    s.wrongWayEntry.heldSec >= cfg.wrongWaySustainSec;
   if (
     stepSustainedEpisode(
       s.wrongWay,
       goingWrongWay,
-      !goingWrongWay,
+      !headingWrongWay,
       t,
-      cfg.wrongWaySustainSec,
+      0,
       WRONG_WAY_REARM_SEC,
       0,
     )
