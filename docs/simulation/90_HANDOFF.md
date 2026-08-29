@@ -1804,3 +1804,198 @@ the one to keep running: the whole-tree diffstat and the `--ignore-cr-at-eol`
 diffstat are now **identical**. Note also that a one-off `git show HEAD:… | grep -c`
 disagreed with the script on `difficulty.ts` and was the unreliable measurement —
 read the blob as bytes, not through a pipe.
+
+---
+
+## §18 — 2026-08-29: the round that could not have repaired anything, and the 74% that did not survive
+
+**Read this section before running anything.** It ends with the exact state the next
+session inherits and the commands to continue. The numbers below are the honest ones.
+
+### THE LEDGER, IN THE FORM THE FOUNDER REQUIRES
+
+**1,510 ever filed · 1,251 closed with evidence · 83% · 259 open · 12 retired today.**
+
+Never report the raw open count alone. The 259 are three different problems:
+
+| bucket | rows | what it actually needs |
+|---|---|---|
+| confirmed-STILL | **136** (this round) | a REPAIR wave — one is built and queued, see below |
+| UNJUDGED | **72** | a specific drive each; the judges named many of them |
+| PARTIAL | **16** | compound rows; each needs splitting before it can close |
+
+### THE FINDING THAT OUTRANKS THE ROUND
+
+A batch-2 adversarial verifier refused to certify its own batch's closures and gave one
+reason. I verified it independently, then went further:
+
+```
+git diff --stat f91dd1c HEAD -- platform/src     # EMPTY
+git log --oneline f91dd1c..HEAD                  # 9 commits, none product code
+```
+
+**NOT ONE LINE OF PRODUCT CODE HAS CHANGED SINCE REPAIR WAVE 8 (`f91dd1c`).** The w15,
+w16 and w17 sweeps all ran against a byte-identical `platform/src`. Everything between
+them was the audit harness, audit tooling or docs.
+
+That destroys a whole class of closure. Commit `bc7d43f` ("wave 9") changed HOW THE CAR
+IS DRIVEN — it taught the harness to rest every 45 m, hold a pace, and press the
+product's own play button. Measured consequence: `sc-speed-dangerous` pc-right went from
+19 full stops / 133 driving ticks / a collision at w15, to 2 stops / 48 ticks / no
+collision at w17, **on identical product code**. A judge reading "it used to be convicted
+and now it passes" sees a repair. There was no repair. There is a better driver.
+
+This is the dead-predicate class's twin. There, a repair ships a measurement nothing
+reads. Here, a MEASUREMENT CHANGES and is credited to a repair that never happened. Both
+move the ledger without moving the product, and both fail in the reassuring direction.
+
+### SO EVERY CLOSURE WAS ATTACKED, AND 74% DIED
+
+Five adversarial attackers plus an adjudicator re-examined all 35 surviving closures
+against that fact. **9 upheld, 26 overturned.** Combined with the judges' own verifiers,
+the round's arithmetic is:
+
+**56 raw closures claimed → 12 survived. 79% did not.**
+
+Why the 26 failed:
+
+- **15 (58%) credited the harness with a repair.** Worst case: `sc-mw-emergency-lane`,
+  where `_audit-debrief.json` is **byte-identical** at w15 and w17 — the convicted state
+  is verbatim intact and only the drive moved. Also `sc-ov-abort`, closed because "the
+  careful driver is no longer punished" — it finishes because `pace.used=true` is
+  replaying `content/traces/.../shadow-correct.trace.json`; the car is on a tape.
+- **8 — the evidence does not show the quote.** Two cited **a different lesson's frame
+  entirely** (`sc-rx-guarded`'s closure points at `sc-pk-move-off__mobile-right/run.log`).
+  One "the pill is now opaque" was measured: greyscale sd inside the pill 7.70/9.66 at
+  w17 vs 8.44/8.77 at w15 — equally translucent; only the backdrop changed.
+- **3 cited a source change outside the window that matters** — real code, landed in an
+  ancestor of the build the row was filed against, so it cannot explain the change.
+
+**A sub-class worth a permanent gate (5 rows):** a row that a verify pass had ALREADY
+opened was re-closed, on unchanged product code, with no new evidence. Attacker 2's
+proposed mechanical remedy, not yet implemented: *refuse at the gate any CLOSED whose
+immediately-preceding verdict is `correctedBy:"verify"` and whose product tree hash is
+unchanged.* **This is the highest-value tool change available and it is not written yet.**
+
+### THE HARNESS LEARNED THE CLUTCH — 5 rows unblocked (4 critical)
+
+`sc-vp-stall` is the catalogue's only manual lesson: `openingTier: "advanced"`
+(`templates-cockpit.ts:486`) plus `transmissionModeFor` (`driveline.ts:254`) hands it a
+manual box, so it spawns in N — and the harness's entire key vocabulary was
+W/S/A/D/B/Escape. Three sweeps photographed a stationary car and honestly refused to
+judge them (exit 8, "DO NOT RE-DRIVE — the harness is what has to change").
+
+The ledger had already written the spec and named the files. The keys are the product's
+own (`scene/cabin.ts:565-567`: clutch `KeyZ`, gears `BracketRight`/`BracketLeft`) and the
+sequence is the one the product paints on its own glass (`engine/stuckStart.ts`).
+
+It **verifies instead of pressing blind** — reads `gear()` off the driveline's own
+selector and either watches the letter leave N or says loudly it could not. It engages
+only from N (a gear-up in D/M/R would upshift a moving car, and the harness would then
+file its own gesture against the product). The clutch is held THROUGH the throttle,
+because dropping it with no gas is precisely the stall this lesson exists to grade.
+
+Proven before shipping: `manual box: N to M1 on attempt 1`, top 30 km/h, a real
+NEZAVERSHEN verdict — where three sweeps had 0 km/h.
+
+Two pieces of prose were then false and were fixed: the judges' brief told judges this
+lesson could never be driven and to NOT ask for a re-drive. The bracket now explains that
+its meaning **depends on the drive's date** — before 2026-08-29 it means re-drive; after,
+it means the engage failed, which is a harness finding.
+
+### THE RESTORE DRILL FAILED THE FIRST TIME IT WAS EVER RUN
+
+Item 0 of the founder batch, never executed. The dump is fine; the DOCUMENTED RECOVERY
+PATH was not:
+
+```
+pg_restore: error: could not open input file /var/backups/knijka/...dump: Permission denied
+```
+
+`backup-db.sh` does `chmod 700 "$BACKUP_DIR"` because "a dump of a minors' database is not
+world-readable (ADR-004)". The directory is root's; `pg_restore` runs as `postgres`;
+postgres cannot read root's 0700 directory. **The README's own commands could not have
+restored this database.** Corrected to pipe it — root reads the file, postgres receives it
+on stdin. Do NOT loosen the 0700; it protects a minors' database and the pipe costs
+nothing.
+
+Proven, not asserted: 20 tables, `User` = 2 rows, scratch database dropped. It surfaced on
+a Saturday morning with the site up instead of during the incident it was written for.
+Today's dump is also on E: (3 dumps, checksums verified, 0 days old).
+
+### WHAT I GOT WRONG, AND THE ONE ROOT CAUSE UNDER BOTH
+
+**I bypassed `wave-cycle.sh` and hand-rolled the mechanical steps. Twice, it cost real work.**
+
+1. **5 drives lost to `treeMoved`.** I ran `wave-c-post --apply` — which appends to the
+   TRACKED `docs/simulation/88_LESSON_AUDIT.md` — while w17 was still driving. My first
+   diagnosis was wrong and worth recording: I blamed the COMMIT. HEAD was identical at both
+   ends of those drives (`bc7d43f`). It was the **uncommitted write** that moved the
+   worktree hash. The rule is not "don't commit during a sweep", it is **don't touch a
+   tracked file at all** — the hash moves when the file changes, not when it is committed.
+2. **6 more drives lost to `exit=6` (TARGET_UNVERIFIED).** `.env` still carried `bc7d43f`
+   while HEAD was `b7a321c`. I first said "restamped but not restarted"; wrong — nothing
+   restamped it at all. `wave-cycle.sh commit` does that step. I had used `git commit`.
+   I then compounded it by dispatching the re-drive **without the preflight**, which is
+   the exact check for this. The preflight caught it on the second attempt.
+3. The same bypass broke the VPS push (`Permission denied (publickey)`): `core.sshCommand`
+   is pinned repo-locally to the GitHub key with `IdentitiesOnly=yes`, and the VPS needs
+   its flokinet key. `push_both()` in `wave-cycle.sh:134` already knows this.
+
+**USE THE RUNNER. It encodes every step I keep skipping.**
+
+### STATE HANDED OVER
+
+- **Both remotes hold HEAD** (origin GitHub, vps flokinet).
+- **Gate green**: tsc 0 · vitest 16,340 passing · content green · tools 0 failing.
+  **3 standing reds only**: 2 vitest (t-accidents content-bank, l-accidents-first-aid
+  compose — both founder-blocked on the 29 first-aid signatures) + 1 tools-test
+  (deck-captions freeze).
+- **Dev server** on :3000 must attest HEAD before any drive. After ANY commit:
+  restamp `platform/.env` (`NEXT_PUBLIC_COMMIT_SHA`), **restart the server** (it is a
+  build-time constant), then `wave-cycle.sh preflight`.
+- **`.audit-frames/` is gitignored on purpose** — snapshot it with
+  `tools/audit/snapshot-ledger.sh` to the `ledger/audit` branch, which is how the corpus
+  survives an account switch.
+
+### NEXT, IN ORDER
+
+1. **REPAIR WAVE 10 — generated, validated, NOT launched.** Regenerate it from the
+   current ledger rather than trusting a stale artefact:
+
+   ```
+   node tools/audit/make-repair-wave.mjs .audit-frames/repair-wave-10.js 6 8
+   Workflow({ scriptPath: ".audit-frames/repair-wave-10.js" })
+   ```
+
+   `tools/audit/make-repair-wave.mjs` is NEW and is the missing half of this programme:
+   `make-verdicts2.mjs` turns drives into verdicts; nothing turned verdicts back into
+   REPAIRS, so that step was done by hand each round and therefore skipped — which is why
+   the last nine commits contain no product code.
+
+   It selects ONLY rows whose EFFECTIVE verdict is STILL (originals first, corrections
+   last — selecting on raw verdicts would have sent lanes at 44 rows a verifier had already
+   overturned). It refuses PARTIAL (compound: split the row first) and UNJUDGED (nobody
+   could tell). One file per lane, disjoint by construction.
+
+   As generated on 2026-08-29: **174 confirmed-STILL over 82 files**; the wave takes the
+   6 densest-in-critical — `finish.ts` (6/6 crit) · `rules/engine.ts` (8/5) ·
+   `templates-lanes.ts` (6/4) · `templates-parking3.ts` (4/4) · `objectives.ts` (4/4) ·
+   `runtime/surface.ts` (3/3) = **31 rows, 26 critical**.
+
+   Each lane carries the three checks that have each cost a wave: verify the cause
+   (briefs here have been wrong twice), THE ADDRESS RULE (66% of findings name a file that
+   cannot hold the defect), and THE DEAD-PREDICATE TEST (51 of 82 audited repairs shipped
+   code nothing reads). Each gets an adversarial verifier that traces the live import
+   chain itself.
+   **This is the first product code the repo will have seen in nine commits.**
+2. **Implement attacker 2's gate** (above): refuse a CLOSED that re-closes a
+   verify-overturned row on an unchanged product tree. It automates the class that cost
+   this round five rows.
+3. **w18 sweep** — `.audit-frames/w18-lessons.txt` (28 lessons). **Add `sc-vp-stall` back**;
+   the clutch fix makes its 3 UNJUDGED + 1 PARTIAL rows settleable for the first time.
+   Evidence for 4 lessons already exists in `.audit-frames/fill-w17r` — it was NOT merged
+   into w17 because those legs ran at `b7a321c` and the rest of w17 at `bc7d43f`, and
+   `wave-c-merge` correctly refuses to mix builds.
+4. **DO NOT WRITE TO THE TREE WHILE DRIVES OR VERIFIERS MEASURE IT.** Queue integrator
+   edits until they finish. Both of today's losses come from breaking this.
