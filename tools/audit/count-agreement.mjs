@@ -301,6 +301,13 @@ export const RECIPES = {
   // Emits a repair-round workflow, so it is handed to a temp path and never to
   // the real batches directory. Registered the day it was written, because this
   // check refused the round it appeared in — which is the whole point of it.
+  // Emits the repair wave a lane will read days later, so it is handed a temp
+  // path and never .audit-frames/. Registered 2026-08-30, after the check
+  // caught it unregistered — which is exactly what it is for.
+  "make-repair-wave.mjs": (t) => {
+    const out = path.join(t, "repair-wave-probe.js");
+    return { args: [out, "1", "1"], emits: "file", file: out };
+  },
   "make-repair-round.mjs": (t) => {
     const out = path.join(t, "repair-probe.js");
     return { args: ["0", out], emits: "file", file: out };

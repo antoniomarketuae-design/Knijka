@@ -220,7 +220,19 @@ const unknown = [...final.keys()].filter((k) => !byId.has(k));
  */
 const resolveFrame = (p) => {
   if (!p) return null;
-  const tries = [p, String(p).split("\\").join("/"), String(p).split("/").join(path.sep)];
+  // RESOLVE FROM THE REPO ROOT, not merely from the process cwd. A
+  // repo-relative evidenceFrame resolves when you stand in the repo and
+  // vanishes when you stand in platform/ — so the SAME ledger reported a
+  // different open count depending on which directory the command was typed
+  // in, and count-agreement went red only under `cd platform`. Measured three
+  // separate times (2026-08-26, and 24 more rows on 2026-08-30).
+  const fwd = String(p).split("\\").join("/");
+  const tries = [
+    p,
+    fwd,
+    String(p).split("/").join(path.sep),
+    path.resolve(REPO, fwd),
+  ];
   for (const t of tries) {
     try {
       const st = fs.statSync(t);
@@ -425,7 +437,14 @@ const lines = retire.map((r) =>
     // claiming it measured a build it never saw.
     drivenAt: drivenAt,
     postedAt: postedAt,
-    evidenceFrame: r.row.evidenceFrame,
+    // The RESOLVED absolute path, never the raw one. A closure is read by
+    // tools running from several directories and by sessions on other
+    // machines; a relative frame is a retirement whose evidence cannot be
+    // found, which is the one thing this ledger may never contain.
+    evidenceFrame: (() => {
+      const hit = resolveFrame(r.row.evidenceFrame);
+      return hit ? path.resolve(hit).split("\\").join("/") : r.row.evidenceFrame;
+    })(),
     evidenceQuote: r.row.evidenceQuote,
     why: r.row.why,
     correctedBy: r.row.correctedBy || undefined,

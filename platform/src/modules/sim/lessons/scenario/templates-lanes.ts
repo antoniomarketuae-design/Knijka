@@ -473,14 +473,73 @@ export const SC_OV_ONEWAY: ScenarioSpec = {
 
 /**
  * The staged LEAD CAR for sc-ov-crossing-overtake: paces the player's RIGHT
- * lane ~16 m ahead (matchPlayer). Its slam tier is authored out of reach — it
- * is deterministic moving traffic (the car being illegally passed), not a
- * braking drill. The shadow follows it THROUGH the crossing in the right lane
- * (no overtake); the mistake pulls OUT to the left to overtake and then CUTS
- * BACK into the right lane — toward the lead — INSIDE the armed zone. Only the
- * cut-back grades: the OVERTAKING_AT_CROSSING check reads the lead gap at the
- * lane-boundary frame, and a lane change TOWARD the lead's lane keeps it inside
- * the lead-detection corridor at exactly that frame (чл. 119).
+ * lane ~20 m ahead (matchPlayer — the figure moved 16 → 20 in LEDGER T18
+ * below). Its slam tier is authored out of reach — it is deterministic moving
+ * traffic (the car being illegally passed), not a braking drill. The shadow
+ * follows it THROUGH the crossing in the right lane (no overtake); the mistake
+ * pulls OUT to the left to overtake and then CUTS BACK into the right lane —
+ * toward the lead — INSIDE the armed zone. Only the cut-back grades: the
+ * OVERTAKING_AT_CROSSING check reads the lead gap at the lane-boundary frame,
+ * and a lane change TOWARD the lead's lane keeps it inside the lead-detection
+ * corridor at exactly that frame (ЗДвП чл. 43, т. 6).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * WHAT THIS ACTOR CANNOT DO — AND WHY THE COPY NO LONGER SAYS IT DOES.
+ *
+ * Findings 5125c346 / bb61fa08, and the routing note left FOR THIS EXACT SITE
+ * by `world/__tests__/ov-crossing-district.test.ts`, which could not close the
+ * defect in the district it was filed against and wrote down the remedy
+ * instead: „the honest interim is to change the words rather than leave the
+ * student inferring a ghost".
+ *
+ * The lesson used to teach one cue on four surfaces — «ако предният намалява
+ * до пътеката, най-вероятно пропуска човек, когото ти не виждаш иззад колата
+ * му». Three facts, each read out of the code rather than inferred:
+ *
+ *  1. THERE IS NOBODY TO BE HIDDEN. `staged` is [OVC_LEAD_CAR] and nothing
+ *     else. The family `lanes` is absent from SCENARIO_FAMILY_TRAFFIC_BASELINE,
+ *     so the count falls to `SCENARIO_DEFAULT_TRAFFIC.pedestrianCount = 0`
+ *     (compile.ts, whose own comment reads „pedestrianCount stays 0
+ *     everywhere"), and ov-crossing-v1.json carries one crossing, one building,
+ *     two spawn points and no pedestrian array at all. The engine HAS a
+ *     PedestrianDartOutSpec; this lesson does not use it.
+ *  2. THE LEAD CANNOT DECIDE TO YIELD. `slamAt` is 200 m past the end of the
+ *     320 m road and `minSlamSpeedKmh` is 250 — the braking tier is authored
+ *     out of reach ON PURPOSE, and the LEDGER T18 bisection below is why it has
+ *     to stay that way: move this actor and the demos stop grading
+ *     OVERTAKING_AT_CROSSING and nothing else.
+ *  3. AND THE ONE TIME IT DOES SLOW, THE SLOWING CARRIES NO INFORMATION.
+ *     matchPlayer is a rubber band — runners.ts states the law in as many
+ *     words, „target = playerSpeed + 0.55 × (gapM − gap)" — so this car's speed
+ *     is slaved to the player's own throttle. That is why the sweep-161 frame
+ *     shows it standing square on the zebra: the PLAYER was crawling at 7 км/ч
+ *     behind it, on an empty crossing. A student taught to read that as „he is
+ *     letting someone through" is being taught to read a mirror of his own
+ *     right foot — the one inference this staging can never confirm.
+ *
+ * SO THE COPY NOW TEACHES THE REASON THE LAW ITSELF GIVES, which this staging
+ * does honour. ЗДвП чл. 43 bans the overtake „5. пред пешеходна пътека, когато
+ * изпреварваното превозно средство закрива видимостта към пешеходната пътека;
+ * 6. пред и върху сигнализирана пешеходна пътека" — retrieved verbatim from
+ * content/law/acts/zdvp.json (ADR-002), and the same correction rules/
+ * catalog.ts already made on 2026-08-03 when it found чл. 119 „does not ban
+ * overtaking anywhere". Twenty metres of car in your own lane IS т. 5, and
+ * т. 6 needs no pedestrian at all — so both halves of the ban are true of the
+ * world as staged, with nothing left to imagine.
+ *
+ * The stopped-car case survives only in `teach`, cited to чл. 119, ал. 2 (the
+ * duty when going ROUND a car stopped at a crossing). That is the split the
+ * sc-jx-blocked-exit world-truth battery ratified: `instructionsBg`, the
+ * objective titles and `mistakes[].whatWentWrongBg` describe THIS DRIVE and
+ * must be true of it; `objectiveBg` and `teach` may generalise to the real
+ * street. The drive-referring surfaces here now do.
+ *
+ * THE OTHER REPAIR IS STILL OPEN AND IS NOT THIS ONE: stage a second actor — a
+ * pedestrian entering the zebra from the far kerb, timed to be MASKED by the
+ * lead and revealed only as it pulls away. That changes the world and
+ * invalidates all three committed recordings under content/traces/
+ * sc-ov-crossing-overtake/, so it needs a re-record round of its own. Until it
+ * lands, the words match the world rather than the other way round.
  */
 const OVC_LEAD_CAR: BrakingLeadCarSpec = {
   id: "sc-ovc-lead",
@@ -528,14 +587,17 @@ const OVC_LEAD_CAR: BrakingLeadCarSpec = {
 };
 
 /** OV-07 — забрана за изпреварване на и непосредствено преди пешеходна пътека
- *  (ЗДвП чл. 119: на пешеходна пътека и преди нея не се изпреварва). */
+ *  (ЗДвП чл. 43: „…е забранено: … 5. пред пешеходна пътека, когато
+ *  изпреварваното превозно средство закрива видимостта към пешеходната пътека;
+ *  6. пред и върху сигнализирана пешеходна пътека." — retrieved, not recalled;
+ *  чл. 119 is the YIELD duty and bans no overtake, see the OVC_LEAD_CAR note). */
 export const SC_OV_CROSSING_OVERTAKE: ScenarioSpec = {
   id: "sc-ov-crossing-overtake",
   family: "lanes",
   tagsBg: ["ленти", "изпреварване", "пешеходна пътека", "забрана за изпреварване"],
   titleBg: "Изпреварване на пешеходна пътека",
   objectiveBg:
-    "Следвай колата пред теб през зоната на пешеходната пътека, без да я изпреварваш — пред пътека не се изпреварва и не се заобикаля: спрялата или намаляваща кола може да пропуска пешеходец, когото ти не виждаш иззад нея.",
+    "Следвай колата пред теб през зоната на пешеходната пътека, без да я изпреварваш и без да я заобикаляш. Пред и върху сигнализирана пътека изпреварването е забранено безусловно — а докато тази кола е пред теб, тя ти закрива самата пътека и ти нямаш как да видиш дали по нея има някой.",
   archetypeIds: ["OV-07"],
   conceptIds: ["c-crosswalk-yield", "c-overtaking-procedure", "c-general-care-duty"],
   map: {
@@ -553,7 +615,11 @@ export const SC_OV_CROSSING_OVERTAKE: ScenarioSpec = {
     { n: 1, textBg: "Потегли по булеварда в дясната лента — пред теб в твоята лента се движи друга кола." },
     { n: 2, textBg: "Напред има пешеходна пътека. Пред и на пътека изпреварването е забранено — независимо дали виждаш пешеходец." },
     { n: 3, textBg: "Не се престроявай в лявата лента, за да подминеш предния в зоната на пътеката — намали и остани зад него." },
-    { n: 4, textBg: "Ако предният намалява до пътеката, най-вероятно пропуска човек, когото ти не виждаш иззад колата му." },
+    // NOT «ако предният намалява, най-вероятно пропуска човек» — this drill
+    // stages no pedestrian and its lead car is slaved to the player's throttle,
+    // so that cue would be unreadable here. What IS true of this drive, and is
+    // the law's own first reason (чл. 43, т. 5), is the blocked view.
+    { n: 4, textBg: "Помни: предната кола ти закрива самата пътека — изпревариш ли я, влизаш в нея на сляпо." },
     { n: 5, textBg: "Мини пътеката зад предната кола и чак след нея, ако е нужно, изпреварвай на разрешено място." },
   ],
   success: [
@@ -586,23 +652,30 @@ export const SC_OV_CROSSING_OVERTAKE: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-ov-crossing-overtake/mistake-overtake-in-zone.trace.json" },
       titleBg: "Изпреварване в зоната на пътеката",
       whatWentWrongBg:
-        "Колата излезе в лявата лента да изпревари предната и се върна в лентата точно в зоната на пешеходната пътека. Точно там е забранено да изпреварваш и да маневрираш: намаляващата пред теб кола може да пропуска пешеходец, скрит зад нея — престроявайки се на пътеката, влизаш в нея, без да го виждаш. Това е опасна грешка (чл. 119).",
+        "Колата излезе в лявата лента да изпревари предната и се върна в лентата точно в зоната на пешеходната пътека. Точно там маневрата е забранена безусловно: докато си бил зад предната кола, тя ти е закривала самата пътека, така че се престрои върху нея, без да си видял какво има по платното. Това е опасна грешка (ЗДвП чл. 43, т. 5 и т. 6).",
       codeRefs: ["OVERTAKING_AT_CROSSING"],
     },
     {
       traceRef: { path: "content/traces/sc-ov-crossing-overtake/mistake-late-swerve.trace.json" },
       titleBg: "Изпреварване в последния момент",
       whatWentWrongBg:
-        "Водачът изчака до последно и започна изпреварването току пред пътеката — престрои се и се върна в лентата дълбоко в зоната на пешеходната пътека. Изпреварването и заобикалянето на пътека са забранени и опасни по същата причина: не виждаш какво пропуска предният.",
+        "Водачът изчака до последно и започна изпреварването току пред пътеката — престрои се и се върна в лентата дълбоко в зоната на пешеходната пътека. Изпреварването и заобикалянето на пътека са забранени и опасни по същата причина: предната кола ти закрива пътеката до последния метър, а забраната пред и върху сигнализирана пътека не чака да видиш някого.",
       codeRefs: ["OVERTAKING_AT_CROSSING"],
     },
   ],
   teach: {
     whenBg:
       "Пред и на всяка пешеходна пътека — маркирана или на кръстовище. Колкото и бавен да е предният, в зоната на пътеката не го изпреварваш и не го заобикаляш: изчакваш го да я премине.",
+    // ADR-002: both articles below are RETRIEVED from content/law/acts/
+    // zdvp.json, not recalled — and the correction is the one rules/catalog.ts
+    // made for OVERTAKING_AT_CROSSING on 2026-08-03: чл. 119 is the duty to
+    // YIELD to pedestrians and bans no overtake anywhere; the ban is чл. 43.
+    // The third case below is the real street's, cited to чл. 119, ал. 2, and
+    // it is deliberately marked as NOT this drive's — see the OVC_LEAD_CAR
+    // note on why this map cannot show a car yielding to anybody.
     whyBg:
-      "Спрялата или намаляваща пред пътека кола почти винаги пропуска пешеходец. Изпреварвайки я, ти влизаш на пътеката с по-висока скорост, без да виждаш човека иззад нея — точно геометрията на най-тежките катастрофи с пешеходци. Затова законът забранява изпреварването на и непосредствено преди пътека.",
-    lawRef: "ЗДвП чл. 119",
+      "Законът дава две причини да не изпреварваш тук и нито една от тях не иска да си видял пешеходец. Първата е видимостта: изпреварваната кола закрива пътеката, така че влизаш в нея по-бързо и без поглед върху платното — точно геометрията на най-тежките катастрофи с пешеходци. Втората е самата забрана: пред и върху сигнализирана пътека не се изпреварва, без условия. А на улицата има и трети случай, който този урок не разиграва: кола, СПРЯЛА пред пътека, почти винаги пропуска пешеходец — затова, когато я заобикаляш, си длъжен да караш със скорост, която ти позволява да спреш.",
+    lawRef: "ЗДвП чл. 43, т. 5 и т. 6; чл. 119, ал. 2",
     examinerBg:
       "Изпитващият следи поведението ти пред пешеходна пътека: намаляване, готовност за спиране и никакво изпреварване или заобикаляне на движещите се пред теб. Изпреварване в зоната на пътека е опасна грешка.",
   },
@@ -1246,9 +1319,16 @@ const MW_X_CRUISE = 0;
  *  stalled car stands, and the default lane the mw-n-nb-* path resolves to
  *  (sc-fo-motorway-gap shifts −8.13 off it to reach the cruise lane). */
 const MW_X_EMERG = 8.13;
-/** Arc offset of the breakdown along mw-n-nb-start → mw-n-nb-end. The edge
- *  runs (0,0) → (0,1000), so arc = y: 780 is the coordinate the recorder's
- *  `mwBreakdownRects()` has always used. */
+/** Arc offset of the breakdown along mw-n-nb-start → mw-n-nb-end. The edge is
+ *  STRAIGHT — (0,0) → (0,2600) — so arc = y: 780 is the coordinate the
+ *  recorder's `mwBreakdownRects()` has always used.
+ *
+ *  THE „1000 m" IN THIS COMMENT WAS STALE and is corrected here rather than
+ *  left: doc 87 B67 grew mw-v1 from 1000 to 2600 m per carriageway (the posted
+ *  140 was unreachable inside 1000 m), and this file's own `map.params` says
+ *  2600. The arc figure is unaffected — a straight edge's arc metre is a y
+ *  either way — but the SLAM guard below leaned on the old length in words, so
+ *  see the correction there before trusting it. */
 const MWE_BREAKDOWN_Y = 780;
 
 /**
@@ -1268,8 +1348,17 @@ const MWE_BREAKDOWN_Y = 780;
  *    `actor.cruiseSpeedMps: 0` mean every command path it could take —
  *    `commandPace`, and the post-resolution `{type:"cruise"}` with no argument —
  *    resolves to a target speed of 0.
- *  - the slam tier is authored out of the map (y = 1400 on a 1000 m road,
- *    `minSlamSpeedKmh` 250), the same OVC/FD mold every non-braking lead uses.
+ *  - the slam tier is refused by `minSlamSpeedKmh` 250, the same OVC/FD mold
+ *    every non-braking lead uses.
+ *
+ *    CORRECTION, and it matters to whoever edits this next: this line used to
+ *    read „the slam tier is authored out of the map (y = 1400 on a 1000 m
+ *    road)". mw-v1 is 2600 m per carriageway since doc 87 B67 — the figure this
+ *    template's own `map.params` carries — so y = 1400 is ON the road now and
+ *    OFF-MAP is no longer one of the reasons. The 250 km/h floor and
+ *    `armDistM: 0` still are, and they are each sufficient alone; but a future
+ *    lane that reads „it cannot slam, it is off the map" and relaxes one of the
+ *    other two would be relying on a fact that stopped being true.
  *
  * WHY IT IS SAFE FOR THE THREE COMMITTED DRIVES: it stands at x = 8.13 while
  * the shadow runs x = 0 — 8.13 m of lateral separation, far outside both the
@@ -1299,7 +1388,8 @@ const MWE_BREAKDOWN: BrakingLeadCarSpec = {
   armDistM: 0, // never arms — see the header
   paceMode: "scheduledCruise",
   paceSpeedMps: 0,
-  slamAt: { x: MW_X_EMERG, y: 1400 }, // far past the 1000 m segment — never reached
+  slamAt: { x: MW_X_EMERG, y: 1400 }, // ON the 2600 m segment (see the header) —
+  //                                     unreachable via minSlamSpeedKmh/armDistM, not via distance
   slamRadiusM: 2,
   slamDecelMps2: 6,
   minSlamSpeedKmh: 250,

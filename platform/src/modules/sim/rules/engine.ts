@@ -432,6 +432,24 @@ export interface RuleEngineState {
     emitted: boolean;
     onsetKmh: number;
     causeSeen: boolean;
+    /**
+     * Seconds of EMERGENCY-GRADE deceleration credited inside the open window,
+     * and the frame the last credit was made on — the `accrue` discipline of
+     * `stepEpisode`, spelled out here because `harshBrake` is not an
+     * `EpisodeState` and cannot borrow that function's counter.
+     *
+     * They exist because the sustain used to be paid in CONSECUTIVE frames and
+     * `accelMps2` is a noisy quantity at render rates, so the same stop was
+     * convicted on a phone and acquitted on a desktop. The derivation, the
+     * measurement and the two rejected formulations are at the detector.
+     * A qualifying frame is credited with its OWN frame period and never with
+     * the gap before it, and the window's first frame is credited with nothing
+     * — so an isolated spike is worth nothing and a coarse replay bills on the
+     * second qualifying frame exactly as the shipped consecutive-frame sustain
+     * did. Both are zeroed by whatever re-arms or re-anchors the window.
+     */
+    qualifiedSec: number;
+    lastQualAt: number | null;
   };
   /** First-move-off observation check (PK-05; config-gated). */
   moveOff: { restSeen: boolean; done: boolean };
@@ -1360,6 +1378,31 @@ const MOTORWAY_CRAWL_REGRADE_SEC = 6;
 const BUS_LANE_REGRADE_SEC = 6;
 
 /**
+ * THE HARSH-BRAKE LINE IS EXCLUSIVE, AND THE COMPARISON SAYS SO IN A WAY
+ * FLOATING POINT CANNOT OVERRULE (2026-08-29 · `sc-follow-tailgater:f42dce4f`).
+ *
+ * `harshBrakeDecelMps2` is the boundary of „emergency-grade", and its own
+ * config note says a firm 4–5 m/s² stop never fires. A deceleration that merely
+ * EQUALS the boundary is therefore the ambiguous case, and A12 spends an
+ * ambiguity on the acquittal. Left to a bare `>=` the verdict is not decided by
+ * that rule but by rounding: instrumented on the make-way leg of
+ * `orchestrator/__tests__/emergency-approach.test.ts` — whose fixture driver
+ * (`helpers.ts` `PolyDriver.advance`) brakes at a limit of exactly 7 m/s², so
+ * every fixture-driven slow-down in that suite sits precisely on the line —
+ * seventeen consecutive frames all reading `a = -7.0000` had `accelMps2 <= -7`
+ * answer TRUE on six of them and FALSE on eleven.
+ *
+ * RELATIVE, and 1e-9: twelve orders of magnitude above the ~1e-15 relative
+ * drift these sums accumulate, and eleven below any deceleration difference a
+ * car can produce. It can only ever decide the exact tie, and it decides it the
+ * same way every time. It is applied to the SUSTAIN's mean, which is the gate
+ * that bills; the per-frame `harshDecel` reading keeps its shipped comparison,
+ * because there it only chooses whether a frame is credited and the mean has
+ * the last word either way.
+ */
+const HARSH_BRAKE_TIE_TOLERANCE = 1e-9;
+
+/**
  * WRONG_WAY on an АВТОМАГИСТРАЛА — the card names the road the student is on
  * (w10-4, sc-merge-accel-lane:93685d58, 2026-08-25).
  *
@@ -1598,7 +1641,14 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     inLaneSeen: false,
     centerLine: { ...IDLE_EPISODE },
     hesitation: { ...IDLE_EPISODE },
-    harshBrake: { activeSince: null, emitted: false, onsetKmh: 0, causeSeen: false },
+    harshBrake: {
+      activeSince: null,
+      emitted: false,
+      onsetKmh: 0,
+      causeSeen: false,
+      qualifiedSec: 0,
+      lastQualAt: null,
+    },
     moveOff: { restSeen: false, done: false },
     lastHazardEventAt: null,
     standstillGap: { ...IDLE_EPISODE },
@@ -3677,15 +3727,139 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   if (accelMps2 <= -2 && !noBrakeCause) {
     s.harshBrake.causeSeen = true;
   }
-  if (harshDecel && noBrakeCause && !s.harshBrake.causeSeen) {
-    if (s.harshBrake.activeSince === null) {
+  // THE SUSTAIN IS NOT A RUN OF FRAMES — TWO GATES, AND EACH COVERS THE OTHER'S
+  // FAILURE (2026-08-29 · `sc-follow-tailgater:f42dce4f`, „same script,
+  // opposite verdicts by platform").
+  //
+  // WHAT WAS MEASURED. The shipped shape armed on the first frame whose
+  // windowed decel reached `harshBrakeDecelMps2` and set `activeSince = null`
+  // on ANY frame that did not, so the 0.4 s had to be paid in CONSECUTIVE
+  // qualifying frames. The quantity being thresholded is `accelMps2`, whose
+  // residual noise `types.ts` puts at ~0.42 m/s² at 120 fps — `accelWindowSec`
+  // is 0.04 s and is deliberately short, because smoothing is lag and 0.15 s
+  // already silences two authored panic-brake demos. So the reading jitters
+  // across the 7 line, and the number of frames that must ALL land on the
+  // conviction side is the frame rate times 0.4: twelve on a phone, forty-eight
+  // on a desktop. The reducer is pure and carries no platform branch, so a
+  // split can only come from the tick rate — and it does. One honest stop from
+  // 50 км/ч, folded through `reduceTick` at four rates with the same
+  // alternating 0.06 км/ч wobble the M-18 suite calls the driveline's noise
+  // floor (`__tests__/accel-window.test.ts`), graded by the shipped code:
+  //
+  //     decel 7.2 m/s²          20 Hz ·      30 Hz FIRE   60 Hz ·   120 Hz ·
+  //     decel 7.5 m/s²          20 Hz FIRE   30 Hz FIRE   60 Hz FIRE 120 Hz FIRE
+  //     decel 7.5, wobble 0.12  20 Hz ·      30 Hz FIRE   60 Hz ·   120 Hz ·
+  //
+  // A 7.5 m/s² stop is emergency-grade by this file's own definition and it is
+  // held for 1.85 s — four and a half times the sustain — and the desktop
+  // acquits it. That is the row, and it is a REQUIREMENT-ZERO failure before it
+  // is a scoring one: the student who slammed the pedal is told nothing
+  // happened, on the only honest screen in the product.
+  //
+  // GATE 1 — ACCRUED QUALIFYING SECONDS, the `accrue` discipline this file
+  // already applies at `SPEEDING_SUSTAIN_ACCRUES` and `BUS_LANE_REGRADE_SEC`,
+  // for the reason each of them gives: the fault's own shape is not a run of
+  // frames. A frame that does not qualify no longer ZEROES the clock, it just
+  // credits nothing.
+  //
+  // GATE 2 — THE MEAN OVER THE OPEN WINDOW must itself be emergency-grade, and
+  // the window RE-ANCHORS on any frame where neither the instantaneous test nor
+  // the mean holds. A window that has already lost the mean cannot regain it by
+  // growing older, and re-anchoring (rather than closing) is what lets a real
+  // emergency stop that FOLLOWS a long gentle brake inside one pedal
+  // application still be seen.
+  //
+  // WHY BOTH, WHICH IS THE WHOLE POINT — each was built alone first and each
+  // alone was wrong, measured rather than argued:
+  //  · THE ACCRUAL ALONE convicts a 6.99 m/s² stop — one UNDER the line — at
+  //    20/60/120 Hz and not at 30, because half of a jittering sub-threshold
+  //    signal still crosses the line and half of a long stop is plenty of
+  //    credit. That is a fresh false positive AND a fresh platform split, i.e.
+  //    it does not even close the row.
+  //  · THE MEAN ALONE passes the entire A12 battery and makes all four rates
+  //    agree, but it has no answer for a signal whose frames straddle the line
+  //    only because the STOP is long: it would have to be paired with the very
+  //    consecutive-frame rule being removed. It is also the gate that has to
+  //    carry the exact-tie problem — see `HARSH_BRAKE_TIE_TOLERANCE`.
+  // Together: the accrual answers „was this held long enough", without caring
+  // how the frames were cut up; the mean answers „was it actually this hard",
+  // which is the question a sub-threshold stop must fail however long it lasts.
+  //
+  // A12, measured across 20 / 30 / 60 / 120 Hz rather than asserted, with the
+  // wobble at 0, 0.06 and 0.12 км/ч. EVERY row is now unanimous across the four
+  // rates, which is the property the row asks for. Silent everywhere on: 4, 5,
+  // 6.99 and 7.00 m/s² constant stops (including a 4 s one from 90 км/ч), a
+  // 0.25 s-ramped 5 m/s² stop, and a 5 m/s² stop carrying one 7.5 m/s² spike
+  // frame. Convicting everywhere on: 7.01, 7.2, 7.5 and 9 m/s² constant stops,
+  // 7.5 and 9 ramped, and a 9 m/s² emergency stop following two seconds of
+  // 5 m/s² braking inside one pedal application. The boundary is decided by the
+  // rule and not by a rounding mode: 7.00 acquits, 7.01 convicts, at every rate
+  // and every wobble. `__tests__/false-positives.test.ts` is the contract and is
+  // unmoved, and so are the 247 rules/orchestrator/traces files around it.
+  const causelessBraking = accelMps2 <= -2 && noBrakeCause && !s.harshBrake.causeSeen;
+  if (causelessBraking) {
+    const openWindow = s.harshBrake.activeSince;
+    const heldSec = openWindow === null ? 0 : t - openWindow;
+    // The mean only JUDGES a window long enough to average: over a span shorter
+    // than the sustain the jitter has not divided away yet, and testing it
+    // there re-anchored on early noise and threw the accrual away with it —
+    // measured, that alone put 7.2 and 7.5 m/s² stops back to firing on the
+    // phone and not the desktop, i.e. it reopened the row it was fixing.
+    // AND THE LINE IS EXCLUSIVE, WITH A RELATIVE TOLERANCE, BECAUSE OTHERWISE
+    // FLOATING POINT PICKS THE VERDICT. That is measured here, not feared:
+    // `orchestrator/__tests__/helpers.ts` `PolyDriver.advance` brakes at a
+    // limit of 7 m/s², which IS `harshBrakeDecelMps2`, so every fixture-driven
+    // slow-down in that suite decelerates exactly ON the threshold — and
+    // instrumented on the make-way leg of `emergency-approach.test.ts`,
+    // seventeen consecutive frames all reading `a = -7.0000` had
+    // `accelMps2 <= -7` answer TRUE on six of them and FALSE on eleven. A
+    // deceleration that merely EQUALS the line is the ambiguous case, and A12
+    // says an ambiguity is spent on the acquittal; the tolerance is what makes
+    // that answer the same one every time instead of a rounding mode's. It is
+    // relative and 1e-9 — twelve orders of magnitude over the ~1e-15 relative
+    // drift of these sums and eleven under any deceleration a car produces, so
+    // it can only ever decide the exact tie.
+    const meanIsEmergencyGrade =
+      openWindow !== null &&
+      heldSec >= cfg.harshBrakeSustainSec &&
+      (s.harshBrake.onsetKmh - speed) / 3.6 >
+        cfg.harshBrakeDecelMps2 * heldSec * (1 + HARSH_BRAKE_TIE_TOLERANCE);
+    if (openWindow === null || (heldSec >= cfg.harshBrakeSustainSec && !meanIsEmergencyGrade)) {
+      // Open, or re-anchor. `onsetKmh` is the ANCHOR FRAME's own speed and not
+      // `prevSpeedKmh`: both ends of the mean have to be samples this reducer
+      // actually holds, or the span is a guess. The first draft paired
+      // `prevSpeedKmh` with an estimate of the missing leg taken from the
+      // CURRENT `dt`, and `false-positives.test.ts` refused it inside a minute
+      // on „entering a lower-limit zone while already braking down to it" —
+      // 88 → 87 → 57 → 53 on frames of 1 s, 1 s, 0.5 s, where the estimate
+      // understated the span by half and read a lawful 6.3 m/s² deceleration as
+      // 9.4. The cost is that the `harshBrakeMinSpeedKmh` floor now reads the
+      // anchor frame rather than the one before it: one frame (~0.1 км/ч) at
+      // render rates, and at the coarse replay rates the LOWER of the two
+      // readings, which is the acquitting one.
       s.harshBrake.activeSince = t;
-      s.harshBrake.onsetKmh = s.prevSpeedKmh ?? speed;
+      s.harshBrake.onsetKmh = speed;
+      s.harshBrake.qualifiedSec = 0;
+      s.harshBrake.lastQualAt = null;
+    }
+    if (harshDecel) {
+      // EACH QUALIFYING FRAME IS WORTH ITS OWN FRAME AND NEVER THE GAP BEFORE
+      // IT — `min(t - lastQualAt, dt)`. Consecutive frames credit wall time, so
+      // a coarse replay bills on the second qualifying frame exactly as the
+      // shipped consecutive-frame sustain did; a frame standing alone after a
+      // dip credits one frame and not the dip. The first frame of a window
+      // credits nothing, which is what makes an isolated spike worthless.
+      s.harshBrake.qualifiedSec +=
+        s.harshBrake.lastQualAt === null
+          ? 0
+          : Math.max(0, Math.min(t - s.harshBrake.lastQualAt, Math.min(dt, 2)));
+      s.harshBrake.lastQualAt = t;
     }
     if (
       !s.harshBrake.emitted &&
       s.harshBrake.onsetKmh >= cfg.harshBrakeMinSpeedKmh &&
-      t - s.harshBrake.activeSince >= cfg.harshBrakeSustainSec
+      s.harshBrake.qualifiedSec >= cfg.harshBrakeSustainSec &&
+      meanIsEmergencyGrade
     ) {
       s.harshBrake.emitted = true;
       events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
@@ -3695,9 +3869,13 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.harshBrake.activeSince = null;
     s.harshBrake.emitted = false;
     s.harshBrake.causeSeen = false;
+    s.harshBrake.qualifiedSec = 0;
+    s.harshBrake.lastQualAt = null;
   } else {
     // Still braking but a plausible cause exists now — never fire this episode.
     s.harshBrake.activeSince = null;
+    s.harshBrake.qualifiedSec = 0;
+    s.harshBrake.lastQualAt = null;
   }
 
   // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is
