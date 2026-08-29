@@ -193,7 +193,12 @@
  *     sc-ov-crest-curve did 43 and 42 км/ч, tracked the line, stayed in D, and
  *     mounted no result screen. Those must stay judgeable and they do: their
  *     cockpit answered.
- *   · A LESSON THIS HARNESS CANNOT PHYSICALLY DRIVE. sc-vp-stall starts in N
+ *   · A LESSON THIS HARNESS CANNOT PHYSICALLY DRIVE. **RESOLVED 2026-08-29 —
+ *     the three keys were added; see "PUT A MANUAL CAR IN GEAR" below. The
+ *     paragraph that follows is kept because exit 8 still EXISTS and still means
+ *     what it says; what changed is that sc-vp-stall is no longer an example of
+ *     it. A lane that reports 8 today is reporting that the engage FAILED.**
+ *     sc-vp-stall starts in N
  *     with a manual box and this file's entire key vocabulary is
  *     W/S/A/D/B/Escape — no clutch, no selector key («[ ]  скорости: към P /
  *     към D» is in the product's own legend and not in this harness). Its top
@@ -4914,6 +4919,78 @@ async function drainPause() {
   return drained;
 }
 
+// ── PUT A MANUAL CAR IN GEAR ────────────────────────────────────────────────
+//
+// THE KEY VOCABULARY GREW BY THREE ON 2026-08-29, AND THE LEDGER ASKED FOR IT.
+//
+// The file header above still describes the old state — «this file's entire key
+// vocabulary is W/S/A/D/B/Escape … that lane gets its own code (8) whose whole
+// content is DO NOT RE-DRIVE». That was honest and it cost five findings, four
+// of them critical, which no sweep could ever reach: sc-vp-stall is the
+// catalogue's only `openingTier: "advanced"` lesson
+// (lessons/scenario/templates-cockpit.ts:486) and `transmissionModeFor`
+// (vehicle/driveline.ts:254) makes exactly that tier manual. It spawns in N.
+// Three sweeps photographed a car at 0 км/ч and correctly refused to judge them.
+//
+// THE KEYS ARE THE PRODUCT'S OWN, not a guess — scene/cabin.ts:565-567 binds
+// gearUp "BracketRight", gearDown "BracketLeft", clutch "KeyZ" — and the
+// SEQUENCE is the one the product paints on its own glass when it detects this
+// exact situation: engine/stuckStart.ts, «Задръж съединителя и включи първа
+// предавка (Z + ])». Its header records the measurement that Z + ] «walk the
+// gate normally».
+//
+// IT VERIFIES RATHER THAN ASSUMES, and that is the whole difference from the
+// seatbelt press at :1252, which is blind because the belt has no DOM hook. The
+// selector HAS one — `gear()` reads StatusDashboard's aria-label, which is
+// `driveline.selector` verbatim — so this either watches the letter leave N or
+// it says out loud that it could not. A blind press here would produce a drive
+// that reports success while the car sits in neutral, which is the reassuring
+// direction every instrument bug in this audit has failed in.
+const MANUAL_CLUTCH_KEY = "KeyZ";
+const MANUAL_GEAR_UP = "BracketRight";
+const GEAR_ENGAGE_ATTEMPTS = 3;
+
+async function engageManualGear() {
+  const before = await gear();
+  // ONLY N. D/M/R are already driving positions and a `]` there would upshift a
+  // moving car mid-lesson — a fault this harness would then file against the
+  // product, which is how an instrument invents a defect. "(no cluster)" is not
+  // N either: it means nobody could read the selector, and pressing gear keys
+  // at an instrument you cannot see is guessing.
+  if (!before.length || !before.every((g) => g === "N")) return null;
+  for (let attempt = 1; attempt <= GEAR_ENGAGE_ATTEMPTS; attempt++) {
+    await page.keyboard.down(MANUAL_CLUTCH_KEY).catch(() => {});
+    await page.waitForTimeout(250);
+    await page.keyboard.press(MANUAL_GEAR_UP).catch(() => {});
+    await page.waitForTimeout(350);
+    const g = await gear();
+    if (g.length && g.every((x) => x !== "N")) {
+      // THE CLUTCH STAYS DOWN UNTIL THE THROTTLE IS ON. That order is not
+      // stylistic: dropping the clutch with no gas is precisely how a real car
+      // stalls, and «Загасване при потегляне» — stalling on pull-away — is the
+      // one fault this lesson exists to grade. A harness that stalls the car on
+      // its own way in would be filing its own mistake against the product.
+      await throttle(true);
+      await page.waitForTimeout(250);
+      await page.keyboard.up(MANUAL_CLUTCH_KEY).catch(() => {});
+      note(`      (manual box: N → «${gearLine(g)}» on attempt ${attempt}; clutch held through the throttle, per stuckStart.ts's own hint)`);
+      return gearLine(g);
+    }
+    await page.keyboard.up(MANUAL_CLUTCH_KEY).catch(() => {});
+    await page.waitForTimeout(300);
+  }
+  const stuck = gearLine(await gear());
+  loud(
+    `this car is manual and sat in N through ${GEAR_ENGAGE_ATTEMPTS} clutch+gear attempts — the cluster still reads «${stuck}». ` +
+      `The keys pressed were ${MANUAL_CLUTCH_KEY} held + ${MANUAL_GEAR_UP}, which scene/cabin.ts:565-567 binds to clutch and gearUp. ` +
+      `Do not read 0 км/ч below as a product finding until someone has checked those bindings still hold.`,
+  );
+  return null;
+}
+/** What the selector read after the engage attempt — `null` when the car was
+ *  never in N, i.e. an automatic, which is 160 of the 161 lessons. */
+const manualGear = await engageManualGear();
+
 let ended = false;
 let topSpeed = 0;
 let teachDrained = 0;
@@ -6814,7 +6891,7 @@ if (stdoutBroken) {
 }
 note(`ended: ${ended} · endedNaturally: ${endedNaturally} · forcedBy: ${forcedBy ?? "-"}`);
 note(`ladder: ${trail.length} action(s) over ${rungsUsed} step(s)${trail.length ? ` — ${trail.join(" | ")}` : ""}`);
-note(`drive: top ${topSpeed} км/ч · ${stopsMade} full stops · ${waitsHonoured} lawful waits (${waitSeconds}s) · ${teachDrained} pause layers · final ${debrief.kmh} км/ч`);
+note(`drive: top ${topSpeed} км/ч · ${stopsMade} full stops · ${waitsHonoured} lawful waits (${waitSeconds}s) · ${teachDrained} pause layers · final ${debrief.kmh} км/ч${manualGear ? ` · gearbox MANUAL, engaged N → ${manualGear} by the harness` : ""}`);
 note(`briefing chars: ${briefing.length}`);
 if (facts.error) loud(`the debrief reader threw: ${facts.error}`);
 // «(none)» NOW MEANS WHAT IT SAYS. Since the matcher learned «НЕЗАВЪРШЕН» the
