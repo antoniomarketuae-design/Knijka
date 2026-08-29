@@ -234,13 +234,34 @@ compromising it cannot reach the backups.
 
 ### Restore drill (do this once, now, not during an incident)
 
+**RUN FOR THE FIRST TIME 2026-08-29, AND IT FAILED — the commands below are the
+corrected ones.** The drill as originally written ended in
+`pg_restore: error: could not open input file … Permission denied`, and the cause
+is a deliberate decision made two files away: `backup-db.sh` does
+`chmod 700 "$BACKUP_DIR"` because *"a dump of a minors' database is not
+world-readable (ADR-004)"*. The directory is root's; `pg_restore` was running as
+`postgres`; postgres cannot read root's 0700 directory. Nothing was wrong with the
+backup — the RECOVERY PATH was wrong, and the only way to learn that was to run it.
+This is the entire argument for drills: the failure surfaced on a Saturday morning
+with the site up, instead of during the incident it was written for.
+
+So root reads the file and postgres receives it on **stdin**:
+
 ```bash
-createdb knijka_restore_test
-pg_restore --no-owner --no-privileges -d knijka_restore_test <dump>
-psql -d knijka_restore_test -c 'select count(*) from "User";'
-psql -d knijka_restore_test -c 'select count(*) from "Payment";'
-dropdb knijka_restore_test
+DUMP=/var/backups/knijka/<newest>.dump
+sudo -u postgres createdb knijka_restore_test
+cat "$DUMP" | sudo -u postgres pg_restore --no-owner --no-privileges -d knijka_restore_test
+sudo -u postgres psql -d knijka_restore_test -tAc 'select count(*) from "User";'
+sudo -u postgres psql -d knijka_restore_test -tAc "select count(*) from information_schema.tables where table_schema='public';"
+sudo -u postgres dropdb knijka_restore_test
 ```
+
+Do NOT "fix" this by loosening the 0700 — the permission is protecting a minors'
+database and the pipe costs nothing.
+
+MEASURED on `knijka-20260829T031501Z-daily-scheduled.dump` (560,527 bytes): restored
+clean, **20 tables**, `User` = 2 rows, `Payment` = 0. Count the tables as well as the
+rows — a restore that produces an empty schema also returns 0 rows and looks calm.
 
 **Until a dump has been RESTORED, the recovery position is zero — not "backed
 up".** A dump that has never been read back is a belief. `backup-db.sh` proves
