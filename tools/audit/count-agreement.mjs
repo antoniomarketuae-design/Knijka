@@ -304,6 +304,9 @@ export const RECIPES = {
   // Emits the repair wave a lane will read days later, so it is handed a temp
   // path and never .audit-frames/. Registered 2026-08-30, after the check
   // caught it unregistered — which is exactly what it is for.
+  // Writes the sweep work-list, so it is handed a temp --out and never the real
+  // .audit-frames/waveC-redrive.json that a running sweep reads.
+  "build-redrive.mjs": (t) => ({ args: ["--out", path.join(t, "redrive-probe.json")] }),
   "make-repair-wave.mjs": (t) => {
     const out = path.join(t, "repair-wave-probe.js");
     return { args: [out, "1", "1"], emits: "file", file: out };
