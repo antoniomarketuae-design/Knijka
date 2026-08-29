@@ -61,7 +61,57 @@ const REPO = findRepo();
 // WITHOUT writing a partial file to the path phase 2 will really read. A dry run
 // that leaves half the corpus at the real path is how a judge ends up judging
 // 40 lessons and reporting it as all of them.
-const resultsPath = process.env.WAVEC_RESULTS || path.join(REPO, ".audit-frames", "wave-c", "wave-c-results.jsonl");
+/**
+ * THE DEFAULT WAS THE OLDEST ARCHIVE IN THE BUILDING, and it cost a round.
+ *
+ * This defaulted to `.audit-frames/wave-c/wave-c-results.jsonl` — the ORIGINAL
+ * wave-c archive, photographed 2026-08-20 at commit 70d8651b. On 2026-08-30 it
+ * was invoked without WAVEC_RESULTS and eight judges adjudicated 259 findings
+ * against frames NINE DAYS and four sweeps old, while `w17` and `w18` frames
+ * from that same morning sat unread.
+ *
+ * Since 70d8651b, platform/src had moved by 368 files and 69,153 insertions
+ * over 31 commits. A batch-2 verifier caught it and put the cost plainly: nine
+ * rows were declared UNJUDGEABLE for want of run.log and scrolled debrief pages
+ * that had been written that morning. Both statements were true of the archive
+ * and false of the harness.
+ *
+ * So the default is now the FRESHEST merged sweep, and the choice is printed.
+ * A tool whose default is the stalest possible input will keep producing
+ * confident answers about a product that no longer exists.
+ */
+function freshestResults() {
+  const dir = path.join(REPO, ".audit-frames");
+  let best = null;
+  let bestAt = 0;
+  let entries = [];
+  try { entries = fs.readdirSync(dir); } catch { return null; }
+  for (const d of entries) {
+    const f = path.join(dir, d, "wave-c-results.jsonl");
+    if (!fs.existsSync(f)) continue;
+    // A canary or probe directory holds one drive and is not a sweep.
+    let rows = 0;
+    try { rows = fs.readFileSync(f, "utf8").split("\n").filter((l) => l.trim()).length; } catch { continue; }
+    if (rows < 5) continue;
+    let at = 0;
+    try { at = fs.statSync(f).mtimeMs; } catch { continue; }
+    if (at > bestAt) { bestAt = at; best = f; }
+  }
+  return best;
+}
+
+const resultsPath = process.env.WAVEC_RESULTS || freshestResults();
+if (!resultsPath) {
+  console.error("[verdicts] no merged sweep found under .audit-frames — run phase 1 first.");
+  process.exit(2);
+}
+if (!process.env.WAVEC_RESULTS) {
+  const when = (() => {
+    try { return fs.statSync(resultsPath).mtime.toISOString().slice(0, 16).replace("T", " "); } catch { return "?"; }
+  })();
+  console.log("[verdicts] judging against the FRESHEST sweep: " + resultsPath + "   (written " + when + ")");
+  console.log("[verdicts] set WAVEC_RESULTS to override. The old default was the 2026-08-20 archive.");
+}
 if (!fs.existsSync(resultsPath)) {
   console.error("[verdicts] " + resultsPath + " not found — phase 1 has not been merged yet.");
   process.exit(2);

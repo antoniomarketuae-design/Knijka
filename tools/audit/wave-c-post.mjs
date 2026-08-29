@@ -306,6 +306,32 @@ for (const j of broken) {
   else stillOpen.push({ ...j, why: v === "STILL" ? String(r.why || "still reproduces") : String(r.why || "not exercised by the re-drive") });
 }
 
+// EXCLUDED, NOT REFUSED WHOLESALE.
+//
+// The first version exited(1) on the whole run. That is the wrong blast
+// radius: attacker 2 asked to refuse THE CLOSURE, and stopping the round
+// holds every honest closure hostage to a dishonest one — which teaches the
+// next person to bypass the gate, and a gate that gets bypassed protects
+// nothing. Measured 2026-08-30: 13 re-closures blocked 10 retirements that
+// stood on frames photographed the same morning.
+//
+// So the row simply does not retire. It stays OPEN, which is the honest
+// answer and the conservative direction, and it is named here so it can be
+// re-judged: either the premise was false (REFUTED, and prove it) or the
+// defect is still there (STILL). CLOSED is not available to it without a
+// commit that changed platform/src between the two builds.
+const reclosedIds = new Set(reclosed.map((x) => x.id));
+const retireBefore = retire.length;
+for (let k = retire.length - 1; k >= 0; k -= 1) {
+  if (reclosedIds.has(retire[k].finding.findingId)) retire.splice(k, 1);
+}
+if (retireBefore !== retire.length) {
+  console.log(
+    "\nexcluded " + (retireBefore - retire.length) + " re-closure(s) on an unchanged product tree; they stay OPEN and need re-judging:",
+  );
+  for (const x of reclosed.slice(0, 12)) console.log("   " + x.id);
+}
+
 const openIds = new Set(broken.map((j) => j.findingId));
 const downgraded = [...final.entries()].filter(
   ([k, r]) => openIds.has(k) && ["CLOSED", "REFUTED"].includes(String(r.verdict || "").toUpperCase()) && !evidenced(r),
@@ -462,17 +488,6 @@ if (dupes.length) {
     "\nrefusing to apply: " + dupes.length + " retirement(s) are ALREADY in closures.jsonl.\n" +
       "Appending them again would record the same closure twice with a fresh timestamp, in the\n" +
       "one file that says what was retired and on what evidence. First: " + dupes[0].finding.findingId,
-  );
-  process.exit(1);
-}
-if (reclosed.length) {
-  console.error(
-    "\nrefusing to apply: " + reclosed.length + " row(s) were RE-CLOSED after a verifier opened\n" +
-      "them, with NOT ONE LINE of platform/src changed between the two builds. A verdict can\n" +
-      "move on unchanged code because the DRIVER changed — wave 9 turned 19 stops and a\n" +
-      "collision into a clean run on byte-identical product code. Crediting that to a repair\n" +
-      "is how 74% of one round's closures died under attack. Re-open them or cite the commit\n" +
-      "that repaired them. First: " + reclosed[0].id,
   );
   process.exit(1);
 }

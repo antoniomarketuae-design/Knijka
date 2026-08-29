@@ -18,7 +18,9 @@ LOG="$(dirname "$LIST")/f$SH.log"
 STALL_S=1200         # measured: longest real drive is 510s, so 480 killed healthy work (lib/limits.mjs)
 MAX_RESTARTS=12
 cd "$REPO" || exit 1
-count() { wc -l < "$RES" 2>/dev/null | tr -d ' ' || echo 0; }
+# The REDIRECT fails before 2>/dev/null can apply to wc, so an absent results
+# file printed a bash error on every 30 s poll and buried the STALLED/FINAL lines.
+count() { [ -f "$RES" ] && wc -l < "$RES" | tr -d ' ' || echo 0; }
 
 # Kill only ms-playwright processes descended from $1 — never a sibling's, never
 # the founder's Chrome (which is not under an ms-playwright path at all).

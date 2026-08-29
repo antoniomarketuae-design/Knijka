@@ -195,7 +195,12 @@ sweep)
   # just DISCOVERED the real port (3000 that day). Every drive would have hit a
   # closed port and the supervisor would have retried each one twelve times.
   PORT=$(discover_port) || fail "no server answering our /api/health — run preflight first"
-  say "sweep $ROUND: $(wc -l < "$LESSONS") lessons over $SHARDS shard(s), one server on :$PORT"
+  # COUNT THE WAY THE SHARDER COUNTS. The lessons file is ONE comma-separated
+  # line, so wc -l printed "1 lessons" for a 29-lesson sweep — and that number
+  # is what a reader uses to decide whether the dispatch looks right.
+  LESSON_N=$(tr ',' '
+' < "$LESSONS" | grep -c .)
+  say "sweep $ROUND: $LESSON_N lessons over $SHARDS shard(s), one server on :$PORT"
   mkdir -p "$REPO/.audit-frames/$ROUND"
 
   # …AND THE SHARD FILES ARE COMMA-SEPARATED, BECAUSE THAT IS WHAT THE SUPERVISOR
