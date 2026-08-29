@@ -50,6 +50,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { splitParents, corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
+import { buildOfFrame, findReclosures, sweepHeadMap } from "./reclosure.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 function findRepo() {
@@ -258,6 +259,37 @@ const verdictOf = (r) => {
   return v;
 };
 
+// THE RE-CLOSURE GATE. A row a verifier opened may not be re-closed on product
+// code that did not change: a better DRIVER moves verdicts (wave 9 turned 19
+// stops and a collision into a clean run on byte-identical code), and crediting
+// that to a repair is how 74% of one round's closures died under attack.
+//
+// The logic lives in reclosure.mjs and is driven by reclosure.test.mjs. It is a
+// module because THIS file reads the whole corpus at import, so nothing inside
+// it can be tested without running a posting round — which is exactly how the
+// first version of this gate shipped splitting on a literal backslash-n,
+// resolving every sweep to null, and refusing nothing while looking correct.
+const sweepHead = sweepHeadMap(path.join(REPO, ".audit-frames"), {
+  readDir: (d) => fs.readdirSync(d),
+  exists: (f) => fs.existsSync(f),
+  readFile: (f) => fs.readFileSync(f, "utf8"),
+});
+
+const { refused: reclosed, unattributable: reclosedUnknown } = findReclosures(rows, {
+  buildOf: (f) => buildOfFrame(f, sweepHead),
+  productDiff: (a, b) => {
+    if (a === b) return "";
+    try {
+      return execFileSync("git", ["diff", "--shortstat", a, b, "--", "platform/src"], {
+        cwd: REPO, encoding: "utf8",
+      }).trim();
+    } catch {
+      // git could not answer — that is 'I cannot say', never 'they are identical'.
+      return null;
+    }
+  },
+});
+
 const tally = { CLOSED: 0, STILL: 0, PARTIAL: 0, REFUTED: 0, UNJUDGED: 0 };
 const retire = [];
 const stillOpen = [];
@@ -361,6 +393,24 @@ if (superseded.size) {
   for (const [was, now] of superseded) console.log("   " + was + "  ->  " + now);
   console.log("   Their old verdict lines are kept as history and retire nothing on their own.");
 }
+if (reclosed.length) {
+  console.log("");
+  console.log(reclosed.length + " re-closure(s) on an UNCHANGED product tree — these retire nothing:");
+  for (const x of reclosed.slice(0, 12)) {
+    console.log("   " + x.id + "   verifier opened it at " + String(x.a).slice(0, 8) + ", re-closed at " + String(x.b).slice(0, 8) + ", platform/src identical");
+  }
+  if (reclosed.length > 12) console.log("   ... and " + (reclosed.length - 12) + " more");
+}
+if (reclosedUnknown.length) {
+  console.log("");
+  console.log(reclosedUnknown.length + " re-closure(s) after a verify line whose BUILD CANNOT BE NAMED:");
+  console.log("   Reported, not refused — the frame sits in a sweep with no results file, so this is");
+  console.log("   missing provenance rather than bad reasoning, and a false refusal is as bad as a");
+   console.log("   false certificate. Attribute those sweeps and this list empties.");
+  for (const x of reclosedUnknown.slice(0, 10)) {
+    console.log("   " + x.id);
+  }
+}
 if (unknown.length) {
   console.log("\nids cited by a judge that are not in the corpus (first 10):");
   for (const u of unknown.slice(0, 10)) console.log("   " + u);
@@ -412,6 +462,17 @@ if (dupes.length) {
     "\nrefusing to apply: " + dupes.length + " retirement(s) are ALREADY in closures.jsonl.\n" +
       "Appending them again would record the same closure twice with a fresh timestamp, in the\n" +
       "one file that says what was retired and on what evidence. First: " + dupes[0].finding.findingId,
+  );
+  process.exit(1);
+}
+if (reclosed.length) {
+  console.error(
+    "\nrefusing to apply: " + reclosed.length + " row(s) were RE-CLOSED after a verifier opened\n" +
+      "them, with NOT ONE LINE of platform/src changed between the two builds. A verdict can\n" +
+      "move on unchanged code because the DRIVER changed — wave 9 turned 19 stops and a\n" +
+      "collision into a clean run on byte-identical product code. Crediting that to a repair\n" +
+      "is how 74% of one round's closures died under attack. Re-open them or cite the commit\n" +
+      "that repaired them. First: " + reclosed[0].id,
   );
   process.exit(1);
 }
