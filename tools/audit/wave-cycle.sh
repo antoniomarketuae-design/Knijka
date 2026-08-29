@@ -164,8 +164,16 @@ commit)
   git add -A
   git commit -q -F "$MSG" || fail "commit refused (a hook? do not skip it — fix it)"
   say "committed $(git rev-parse --short HEAD)"
-  push_both
+  # STAMP BEFORE PUSHING. The stamp does not depend on any remote, and
+  # push_both calls fail() on a refusal — which used to leave platform/.env
+  # pointing at the PREVIOUS commit while HEAD had moved. That is the exact
+  # state that kills a whole sweep at EXIT_TARGET_UNVERIFIED, and it is worse
+  # than a failed push because a failed push is loud and a stale stamp is not.
+  # Measured 2026-08-30: a transient vps refusal stopped the step here, and the
+  # next sweep would have driven against a server attesting c2f8f7e while HEAD
+  # was 34d7133. Retrying the push is cheap; noticing a stale stamp is not.
   stamp_env
+  push_both
   bash "$REPO/tools/audit/snapshot-ledger.sh" 2>&1 | tail -4
   ;;
 
