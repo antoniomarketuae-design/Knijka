@@ -307,6 +307,9 @@ export const RECIPES = {
   // Writes the sweep work-list, so it is handed a temp --out and never the real
   // .audit-frames/waveC-redrive.json that a running sweep reads.
   "build-redrive.mjs": (t) => ({ args: ["--out", path.join(t, "redrive-probe.json")] }),
+  // Report-only without --apply, so the check runs it exactly as a reader would
+  // and it touches nothing.
+  "apply-reroute.mjs": (t) => ({ args: [] }),
   "make-repair-wave.mjs": (t) => {
     const out = path.join(t, "repair-wave-probe.js");
     return { args: [out, "1", "1"], emits: "file", file: out };

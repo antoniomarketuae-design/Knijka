@@ -188,5 +188,13 @@ describe("no-spoiler captions (sc-zebra-approach:8dda834f class)", () => {
     // cache is cold or a sibling suite competes for the spindle, so this gate
     // failed on TIMEOUT, never on an offender. The whole-corpus scan is the
     // point of the gate; give it room rather than narrowing what it reads.
-  }, 60_000);
+    //
+    // RAISED AGAIN 2026-08-30, same cause one load-level up. Measured: 1.71 s
+    // run alone, 88.3 s inside the full suite at --maxWorkers=2, where the
+    // other workers are competing for the same spindle. 60 s was calibrated
+    // against a lighter suite. It failed the commit gate while passing every
+    // time it was run on its own, and a gate that fails at random teaches
+    // people to re-run until green — which is how a real regression gets
+    // waved through.
+  }, 240_000);
 });

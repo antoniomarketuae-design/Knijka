@@ -134,5 +134,16 @@ describe("§2 — no committed caption narrates terrain the world cannot build",
       offenders,
       `${offenders.length} caption(s) narrate terrain this world has no channel for:\n${offenders.join("\n")}`,
     ).toEqual([]);
-  });
+    //
+    // RAISED 2026-08-30. This walks every committed trace caption, and the repo
+    // lives on a 7,200 rpm HDD. Measured: passes in 1.7 s run alone, TIMED OUT at
+    // 88.3 s inside the full suite at --maxWorkers=2, where the other workers are
+    // competing for the same spindle — against the 60 s global bound in
+    // vitest.config.ts. It failed the commit gate while passing every time it was
+    // run on its own, and a gate that fails at random teaches people to re-run
+    // until green, which is how a real regression gets waved through. The
+    // whole-corpus walk is the point of the gate; give it room rather than
+    // narrowing what it reads. Its sibling no-spoiler-captions.test.ts carries the
+    // same bound for the same reason.
+  }, 240_000);
 });
