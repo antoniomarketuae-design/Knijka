@@ -1999,3 +1999,71 @@ Today's dump is also on E: (3 dumps, checksums verified, 0 days old).
    `wave-c-merge` correctly refuses to mix builds.
 4. **DO NOT WRITE TO THE TREE WHILE DRIVES OR VERIFIERS MEASURE IT.** Queue integrator
    edits until they finish. Both of today's losses come from breaking this.
+
+---
+
+## §19 — 2026-08-30: nearly half of what is left is not a product defect
+
+**Measured across two routing passes, 95 confirmed-STILL rows examined by six
+lanes each with an adversarial verifier:**
+
+| outcome | rows | |
+|---|---:|---|
+| UNOWNED | **43** | **45%** — no product file can repair it |
+| REROUTE | 22 | moved to a file proven able to emit the symptom |
+| KEEP | 20 | correctly addressed already |
+| SPLIT | 10 | two owners, both named |
+
+**Of the 43 UNOWNED, 31 are HARNESS findings** — the drive photographed the
+instrument, not the product. 5 are verdict-shaped and need a rate the harness
+cannot yet produce. 4 were already fixed. 1 is lane-position, which the guidance
+ribbon can never settle in either direction.
+
+### What this means, and it is the most useful thing this programme has measured
+
+The open list has been read as a backlog of product defects. Nearly half of the
+part we have checked is not. Those rows have been entering repair waves that
+could never close them: a lane pointed at a harness artefact can only report
+"misrouted", and it costs a wave to do it. Wave 11 spent six lanes and 28 rows
+producing ZERO executable lines for exactly this reason, and every one of its
+verifiers confirmed the lanes were right to write nothing.
+
+**The product is in better shape than the count says.** That is not a reason to
+relax the ledger — it is a reason to stop spending repair capacity on rows no
+repair can reach.
+
+### The two things that made this visible
+
+1. `findingId` is sha1(scenario + what + frame) — `suspectFile` is NOT in it. So
+   a row can be re-addressed without orphaning a single verdict, closure or
+   correction. Routing is cheap and reversible; nobody had used that.
+2. Repair lanes were already producing the evidence and it was being thrown away.
+   Wave 10 and wave 11 both named true owners with file and line inside reports
+   nothing read afterwards. `tools/audit/apply-reroute.mjs` banks them.
+
+### What the applier refuses, each rule bought by a verifier
+
+- a destination outside `platform/src/` — one pass named
+  `tools/mobile/lesson-audit.mjs` for five rows, which is harness attribution and
+  not a repair address
+- a row whose live verdict is not STILL — five were proposed while UNJUDGED, and
+  only two were self-flagged
+- a destination that does not exist on disk
+
+### Standing state after this pass
+
+- 27 rows re-routed cumulatively; the corpus spans 90+ files where it spanned 82
+- **0 rows now point at `devrig/driveScript.ts`'s dead page** — of its six rows,
+  one found a real owner (`lessons/engine.ts`) and five are UNOWNED. Its only
+  page calls `notFound()` in production; no student could ever have reached it.
+- every counter AGREED; corpus gates 14/14 from the repo root and from platform/
+
+### NEXT
+
+1. **Reclassify the 43 UNOWNED out of the repair queue.** They are not closed and
+   must not be — but they are not repair work and should stop being handed to
+   repair lanes. A `bucket` other than BROKEN, or an explicit `unrepairable`
+   flag, with the reason recorded per row.
+2. Route the remaining ~100 confirmed-STILL rows that neither pass examined.
+3. Then repair waves against what is left, which will finally be product defects
+   at addresses that can hold them.
