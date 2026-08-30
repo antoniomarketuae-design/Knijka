@@ -95,8 +95,19 @@ for (const [id, v] of eff) {
   still.push({ ...j, judgeWhy: String(v.why || ""), judgeFrame: v.evidenceFrame || "" });
 }
 
+// A ROW NOTHING CAN REPAIR MUST NOT ENTER A REPAIR WAVE.
+//
+// Measured across two routing passes: 43 of 95 checked rows (45%) are UNOWNED,
+// and 31 of those are HARNESS findings — the drive photographed the instrument,
+// not the product. They stay OPEN, because they are real and closing them would
+// be the false certificate this ledger exists to refuse. But a lane pointed at a
+// harness artefact can only report 'misrouted', and repair wave 11 burned six
+// lanes and 28 rows proving exactly that. See handoff §19.
+const unrepairableSkipped = still.filter((r) => r.unrepairable).length;
+const repairable = still.filter((r) => !r.unrepairable);
+
 const byFile = new Map();
-for (const j of still) {
+for (const j of repairable) {
   const e = byFile.get(j.suspectFile) || { file: j.suspectFile, rows: [], crit: 0 };
   e.rows.push(j);
   if (j.severity === "critical") e.crit += 1;
@@ -119,8 +130,11 @@ const lanes = ranked.slice(0, MAX_LANES).map((e, i) => ({
 }));
 
 console.log(openListLine(counts));
-console.log(workedLine("open", still));
-console.log("confirmed-STILL rows : " + still.length + "   over " + byFile.size + " file(s)");
+console.log(workedLine("open", repairable));
+if (unrepairableSkipped) {
+  console.log("skipped, unrepairable : " + unrepairableSkipped + "   (open, but no product file can hold them — handoff §19)");
+}
+console.log("confirmed-STILL rows : " + repairable.length + "   over " + byFile.size + " file(s)");
 if (!lanes.length) {
   console.error("[repair] nothing confirmed STILL — run an adjudication first.");
   process.exit(1);

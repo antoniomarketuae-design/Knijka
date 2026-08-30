@@ -103,8 +103,34 @@ for (const [id, p] of live) {
   adopt.push({ id, to, secondary: fwd(p.to2 || "") || null, outcome, from: fwd(p.from || openById.get(id).suspectFile || "") });
 }
 
+/**
+ * UNOWNED ROWS ARE FLAGGED, NOT CLOSED — and the difference is the whole point.
+ *
+ * 43 of 95 routing-checked rows (45%) can be repaired by NO product file: 31
+ * are harness findings where the drive photographed the instrument rather
+ * than the product, 5 are verdict-shaped and need a rate the harness cannot
+ * produce, 1 is lane-position which the guidance ribbon can never settle in
+ * either direction.
+ *
+ * They stay OPEN. They are real things that are wrong, and closing them would
+ * be exactly the false-certificate move this ledger exists to refuse — the
+ * count must not fall because a row was reclassified.
+ *
+ * But they must stop entering repair waves. Repair wave 11 spent six lanes on
+ * 28 rows and shipped ZERO executable lines, and every verifier confirmed the
+ * lanes were right to write nothing: a lane pointed at a harness artefact can
+ * only report 'misrouted', and it costs a whole wave to do it.
+ */
+const unowned = [];
+for (const [id, p] of live) {
+  if (String(p.outcome || "").toUpperCase() !== "UNOWNED") continue;
+  if (!openById.has(id)) continue;
+  unowned.push({ id, why: String(p.why || "").slice(0, 400) });
+}
+
 console.log(workedLine("open", adopt.map((a) => openById.get(a.id))));
 console.log("proposals read      : " + live.size);
+console.log("unrepairable (flag): " + unowned.length + "   (they stay OPEN; they simply stop entering repair waves)");
 console.log("adopted             : " + adopt.length);
 console.log("refused             : " + refused.length);
 for (const [id, why] of refused.slice(0, 14)) console.log("   " + id.padEnd(34) + why);
@@ -129,6 +155,7 @@ if (!adopt.length) {
 
 // ---- write: match rows by findingId, recomputed the same way the reader does
 const byId = new Map(adopt.map((a) => [a.id, a]));
+const unownedById = new Map(unowned.map((u) => [u.id, u]));
 // USE THE READER'S OWN id FUNCTION. A local copy drifted once already in this
 // codebase, and an id derived two ways matches nothing while looking correct.
 const idOf = findingId;
@@ -137,11 +164,17 @@ for (const f of fs.readdirSync(FIND).filter((x) => x.endsWith(".jsonl"))) {
   const p = path.join(FIND, f);
   const lines = fs.readFileSync(p, "utf8").split("\n");
   let n = 0;
+  let m = 0;
   const out = lines.map((l) => {
     if (!l.trim()) return l;
     let j;
     try { j = JSON.parse(l); } catch { return l; }
     if (j.bucket !== "BROKEN") return l;
+    const u = unownedById.get(idOf(j));
+    if (u) {
+      m += 1;
+      return JSON.stringify({ ...j, unrepairable: true, unrepairableWhy: u.why, unrepairableAt: "2026-08-30" });
+    }
     const a = byId.get(idOf(j));
     if (!a) return l;
     n += 1;
@@ -153,10 +186,10 @@ for (const f of fs.readdirSync(FIND).filter((x) => x.endsWith(".jsonl"))) {
       ...(a.secondary ? { rerouteSecondary: a.secondary } : {}),
     });
   });
-  if (n) {
+  if (n || m) {
     fs.copyFileSync(p, p + ".pre-reroute");
     fs.writeFileSync(p, out.join("\n"));
-    console.log("   " + f + ": " + n + " row(s) re-routed");
+    console.log("   " + f + ": " + n + " re-routed, " + m + " flagged unrepairable");
     changed += n;
   }
 }
