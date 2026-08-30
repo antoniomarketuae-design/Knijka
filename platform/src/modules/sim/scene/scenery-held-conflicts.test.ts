@@ -252,7 +252,17 @@ describe("rule 3 — the curb pass keeps off the held dressing", () => {
     // exit drive, 45 m from the boulevard the decoration follows — so this is
     // the map's whole row, not a remainder.
     const MGP_FORECOURT = 33; // sc-merge-from-property   (mg-property-v1)
-    expect(bodies).toBe(417 + HZ_DEBRIS + NM_LNOM + MRS_WORKS_SITE + MGP_FORECOURT);
+    // …and pk-drive-v1 enters the walk for the first time in wave 13, for the
+    // same reason mg-property-v1 did: sc-pk-driveway finally HAS held scenery.
+    // Its copy names стени/огради as the thing not to touch in four separate
+    // places and its headless twin has carried both walls all along, while the
+    // student's world contained none — the asymmetry `pk-junctions2-sweep161-
+    // truth.test.ts` quarantined and pinned the exact rects for. The template
+    // was outside TEMPLATES_WITH_DRESSING entirely (that list is derived from
+    // whether a template has dressing, not hand-written), so this is the map's
+    // whole curb row joining the census, not a re-count of bodies in the 417.
+    const PKD_DRIVEWAY_WALLS = 7; // sc-pk-driveway   (pk-drive-v1)
+    expect(bodies).toBe(417 + HZ_DEBRIS + NM_LNOM + MRS_WORKS_SITE + MGP_FORECOURT + PKD_DRIVEWAY_WALLS);
   }, 120_000);
 
   it("is what removed them — without rule 3 the same drills seat 12 strangers", () => {
@@ -285,6 +295,10 @@ describe("rule 3 — the curb pass keeps off the held dressing", () => {
     }
     expect(perTemplate).toEqual({
       "sc-ov-narrow": 7,
+      // Wave 13: the two driveway walls open one rule-3 circle that reaches a
+      // single parked stranger. One body, and it is the point of rule 3 — a
+      // decoration seated inside the wall the student is told not to touch.
+      "sc-pk-driveway": 1,
       "sc-pe-parked-row-scan": 2,
       "sc-hazard-obstacle": 1,
       "sc-accident-own-conduct": 1,
@@ -295,7 +309,11 @@ describe("rule 3 — the curb pass keeps off the held dressing", () => {
       // rule exists for, and it is removed the same way on both tenants.
       "sc-ln-obstacle-meeting": 5,
     });
-    expect(Object.values(perTemplate).reduce((a, b) => a + b, 0)).toBe(18);
+    // 18 + the one sc-pk-driveway's new walls displace. The headline in this
+    // block's name («12 strangers») is the wave-7 figure and is deliberately
+    // left alone — it names the incident the rule was written for, not a running
+    // total.
+    expect(Object.values(perTemplate).reduce((a, b) => a + b, 0)).toBe(19);
   }, 120_000);
 });
 

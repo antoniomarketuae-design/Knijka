@@ -648,6 +648,107 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   "sc-park-wall": [
     { kind: "wall", x: 5.03, y: 8.6, headingDeg: 90, lengthM: 6.0, heightM: 1.6, thicknessM: 0.4 },
   ],
+
+  // ── THE АЛЕЯ THE STUDENT REVERSED INTO WAS EMPTY AIR (wave 13) ───────────
+  //
+  // «THE ALLEY WALLS THIS LESSON IS BUILT AROUND DO NOT EXIST IN THE WORLD THE
+  // STUDENT DRIVES, SO THE ONE SKILL A REVERSE-INTO-A-GAP EXISTS TO TEACH IS
+  // NEVER MEASURED.» (.audit-frames/w17/frames/sc-pk-driveway__mobile-right/
+  // 02-briefing.png — the card bills the walls TWICE on one screen: «Ако е
+  // тъмно, включи късите светлини: стените на алеята се виждат само на светло»
+  // and «следи стените на алеята в огледалата».)
+  //
+  // The drill promises walls on SIX surfaces — the objective («влез на заден
+  // ход между стените … без да ги докоснеш»), instruction 1's night clause,
+  // instruction 4, the „Контролен поглед към стените" observation moment, both
+  // mistake debriefs and the teach card. Until this entry the only place they
+  // existed was `traces/scPkDriveway.ts drivewayObstacles()`, which
+  // `recordScriptedDrive` arms for the two committed DEMO recordings and for
+  // nothing a student ever drives. So `sc-pkd-park` graded „at rest in the
+  // rect, aligned, via reverse" and the card then told him it had graded
+  // „…without touching the walls": a green tick for the one skill the manoeuvre
+  // exists to teach, pointing the reassuring way. He switched on his
+  // headlights, watched his mirrors for walls, and reversed into empty air.
+  //
+  // PINNED, footprint-for-footprint, to `drivewayObstacles()`'s two rects — the
+  // same L7 law the debris block above obeys: a `wall` collider is
+  // [thicknessM/2, heightM/2, lengthM/2], so thicknessM 0.6 with lengthM 4.0
+  // and 5.0 ARE (halfWidthM 0.3, halfLengthM 2.0) and (0.3, 2.5) doubled. The
+  // poses are TRANSCRIBED, not re-derived: §1c of `lessons/scenario/__tests__/
+  // pk-junctions2-sweep161-truth.test.ts` pins them by value for exactly this
+  // transcription, and that section is a QUARANTINE — it asserts this key is
+  // ABSENT, so it goes red the day these bodies land and must be deleted (or
+  // inverted into a positive pin) rather than silently inherited.
+  //
+  // HITTABLE, on the `sc-park-wall` precedent directly above rather than the
+  // wreck one. A `wall` is untagged, so VehicleRig grades contact as
+  // "staticObject" — which is the rects' own `withWhat`, and the code both
+  // mistake demos already cite («задницата се качи на оградата», «се вряза в
+  // дъното на алеята»). Same code, same rectangles, same drill: not a new
+  // grading path, the authored one finally reaching the person driving. A
+  // `visual: true` body here would be worse than no body at all — it would
+  // paint the walls the copy promises and then let him reverse through them.
+  //
+  // HEIGHT 1.6 m — the `sc-park-wall` number, argued here rather than
+  // inherited. The hero's own bodywork tops out 1.07 m above the road
+  // (WHEEL_RADIUS 0.32 + SUSPENSION_REST_LENGTH 0.3 + the 0.1 m attachment drop
+  // + CHASSIS_HALF_EXTENTS.y 0.35) and the driver's eye sits at 1.20 m
+  // (+ COCKPIT_EYE.y 0.48). Instruction 4 orders him to WATCH THESE IN THE
+  // MIRRORS while he reverses, and a body that does not break the horizon above
+  // his own roofline reads in a door mirror as a kerb rather than as the thing
+  // he must not touch; instruction 1 sends him to the dipped beams to see them
+  // at night, which a knee-high edge would not repay. 1.6 m clears the roof by
+  // 0.53 m and the eye by 0.40 m.
+  //
+  // WHAT IT DOES NOT DISTURB, measured against the drill's own artefacts:
+  //   • the committed traces — the recorder replays against ObstacleRect2D and
+  //     never mounts scene bodies, so all three drives are untouched
+  //     (`traces/__tests__/sc-pk-driveway-traces.test.ts` stays green);
+  //   • the model line — the shadow's reverse arc sweeps its high-y samples at
+  //     LOW x (centre 4.17 at y 47.47) and comes east only as y drops below the
+  //     fence, then rests at x ≈ 10.02 against the back wall's west face at
+  //     10.7. ZERO violations against these very rects is what the trace gate
+  //     already asserts, so the demonstrated-correct drive cannot be convicted
+  //     by the bodies this entry mounts;
+  //   • the graded cell at L3–L5 — `sc-pkd-park` accepts a centre within
+  //     centerTolM 0.5 of x = 8.0 and the body is 2.02 m long each way
+  //     (CHASSIS_HALF_EXTENTS.z), so the eastern tolerance corner reaches
+  //     x = 10.52: 0.18 m of daylight against the back wall;
+  //   • the approach — the fence's west end stands at x = 7.0 and the ego line
+  //     is the right-lane centre 4.06 (flank 4.91): 2.09 m of clearance at
+  //     15 км/ч, and the pull-past pose (3.87, 51.3) is 4 m north of it.
+  //
+  // THE ONE PLACE THE BOX OVERRUNS THE WORLD, stated because it is not free:
+  // at L1/L2 `toleranceScale` widens centerTolM to 0.75/0.625, so the eastern
+  // corner of the ACCEPTED box reaches x = 10.77 / 10.645 while the wall face
+  // is at 10.70. At L1 the last 7 cm of the tolerance is unreachable without
+  // contact — the wall simply stops the car at centre 8.68, which is still
+  // inside the box, so the objective remains completable; what a student cannot
+  // do is claim the last 7 cm by leaning on the masonry, and refusing that is
+  // the lesson («без да ги докоснеш»), not a trap.
+  //
+  // NOT FIXED HERE, and it is the rest of the picture. The fence's west 1.125 m
+  // stands ON the built carriageway (`roadSurface`'s outer vertex is x = 8.125)
+  // because pk-drive-v1 has no dropped kerb across the driveway mouth — the
+  // same map defect `scene/__tests__/lesson-world-bay-clearance.test.ts` §2
+  // already quarantines as „6 of 15 bay stations on the RAISED SIDEWALK".
+  // Shortening the fence to the kerb line HERE would break the painted-rect-
+  // equals-graded-rect law and hand the student a body narrower than the one
+  // the two demos were recorded against — the drill would lie again, more
+  // quietly. The mouth is `tools/maps/gen_pk_driveway.mjs` +
+  // `content/world/pk-drive-v1.json`, and the rect moves in
+  // `traces/scPkDriveway.ts` with it: both together or neither.
+  "sc-pk-driveway": [
+    // North fence along the driveway's north edge, EAST HALF ONLY (length runs
+    // E-W): the clean reverse threads below its south face at y = 47.0 while
+    // still at low x; an over-rotated tail swings up into it — mistake demo 1.
+    { kind: "wall", x: 9.0, y: 47.3, headingDeg: 90, lengthM: 4.0, heightM: 1.6, thicknessM: 0.6 },
+    // The back wall closing the alley at its east end (length runs N-S) — the
+    // «дъно на алеята» a reverse that never stops buries itself in, mistake
+    // demo 2. Its west face at x = 10.7 sits in the 1.5 m gap between the bay's
+    // east edge (10.5) and the garage footprint (12.0).
+    { kind: "wall", x: 11.0, y: 45.0, headingDeg: 0, lengthM: 5.0, heightM: 1.6, thicknessM: 0.6 },
+  ],
 };
 
 // ---------------------------------------------------------------------------

@@ -79,6 +79,45 @@ for (const l of fs.readFileSync(path.join(REPO, ".audit-frames", "wave-c", "verd
 
 const openById = new Map(counts.open.map((f) => [f.findingId, f]));
 
+/**
+ * A MALFORMED DESTINATION IS REFUSED LOUDLY, NOT SILENTLY.
+ *
+ * Measured by the third routing pass: SIX of nine SPLIT lines packed both
+ * owners into `to`, joined by " || " or " + ". The old check asked only
+ * whether the string started with platform/src/, so it dropped every one of
+ * them WITHOUT SAYING SO — and the same malformation had been arriving since
+ * pass 1. A refusal nobody can see is indistinguishable from a row that was
+ * never proposed.
+ *
+ * Now the shape is checked and named. A line carrying two owners in one field
+ * is a SPLIT that was written wrong, and the fix is one edit to that line, not
+ * a lost row.
+ */
+const MULTI = /\s(\|\||\+|,|;| and | or )\s/;
+const looksMalformed = (v) => MULTI.test(String(v || ""));
+
+/**
+ * A TYPE-ONLY FILE PASSES THE CHAIN TEST AND FAILS ITS PURPOSE.
+ *
+ * `lessons/types.ts` is imported everywhere and has 0 runtime-valued exports —
+ * 34 type-only ones, all erased at compile. It is 'live' by any import walk and
+ * cannot emit a symptom, so a row routed there can never be repaired. The third
+ * pass overturned exactly this routing for one row and then let it stand for
+ * another. Warned, not refused: a .d-shaped file can still be the right place
+ * to ADD a term (that is what `wasAboveKmh` needs), and refusing outright would
+ * block a legitimate answer.
+ */
+const typeOnly = (rel) => {
+  try {
+    const src = fs.readFileSync(path.join(REPO, rel), "utf8");
+    const values = src.match(/^export\s+(const|function|class|let|var|async)\s/gm) || [];
+    const types = src.match(/^export\s+(type|interface)\s/gm) || [];
+    return values.length === 0 && types.length > 0;
+  } catch {
+    return false;
+  }
+};
+
 const adopt = [];
 const refused = [];
 for (const [id, p] of live) {
@@ -87,6 +126,10 @@ for (const [id, p] of live) {
 
   const to = fwd(p.to || "");
   if (!to) { refused.push([id, "no destination named"]); continue; }
+  if (looksMalformed(p.to)) {
+    refused.push([id, "TWO OWNERS IN ONE FIELD — write the second in to2: " + String(p.to).slice(0, 70)]);
+    continue;
+  }
   if (!openById.has(id)) { refused.push([id, "not an open finding"]); continue; }
   if (verdictOf.get(id) !== "STILL") {
     refused.push([id, "verdict is " + (verdictOf.get(id) || "(none)") + ", not STILL"]);
@@ -100,7 +143,19 @@ for (const [id, p] of live) {
     refused.push([id, "destination does not exist on disk: " + to]);
     continue;
   }
-  adopt.push({ id, to, secondary: fwd(p.to2 || "") || null, outcome, from: fwd(p.from || openById.get(id).suspectFile || "") });
+  // `to2` was taken with NO validation, so an off-graph secondary was adopted
+  // into rerouteSecondary unchecked — the third pass named one:
+  // tools/maps/gen_pe_zone.mjs, absent from all 509 modules reachable from
+  // /simulator. A second owner is an address like any other.
+  let secondary = fwd(p.to2 || "") || null;
+  if (secondary && (looksMalformed(p.to2) || !secondary.startsWith("platform/src/") || !fs.existsSync(path.join(REPO, secondary)))) {
+    refused.push([id + " (secondary)", "second owner rejected, primary still adopted: " + secondary]);
+    secondary = null;
+  }
+  if (typeOnly(to)) {
+    console.log("   WARNING " + id + " -> " + to + " has no runtime-valued exports; a row cannot be repaired there unless a term is being ADDED");
+  }
+  adopt.push({ id, to, secondary, outcome, from: fwd(p.from || openById.get(id).suspectFile || "") });
 }
 
 /**

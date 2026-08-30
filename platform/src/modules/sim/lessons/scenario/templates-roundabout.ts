@@ -110,6 +110,57 @@
  *     fix — the island centre is what `RoundaboutParams` means by (x, y) — and
  *     it is filed against `scene/guidanceRoute.ts`.
  *
+ * ── 2026-08-30, THE RE-MEASUREMENT: IT IS NOT „ANOTHER LAP", IT IS ONE FIXED
+ *    POINT PICKED BY EDGE ORDER — AND IT IS WHY THE MANEUVER ROW IS
+ *    UNREACHABLE BY GUIDANCE ON BOTH DRILLS ─────────────────────────────────
+ *
+ * Item 2 above has the mechanism right and the destination wrong, and the
+ * difference matters because two closures have now been argued off it.
+ * Re-derived through the shipped path (`compileScenario` → the SHIPPED
+ * `guidanceGoalFor` → `deriveGuidanceRoute`) from the pose the car is ACTUALLY
+ * in when the maneuver row opens, rather than from the spawn:
+ *
+ *   snapToRoad(0, 0) on rb-mini-v1  → edge 0 `rbm-e-ring-se`, s = 2.34 m,
+ *     17.85 m off-road ⇒ the ribbon ends at (2.30, −17.70).
+ *   snapToRoad(0, 0) on rb-2lane-v1 → edge 0 `rb2-e-ring-se`, s = 17.00 m,
+ *     25.78 m off-road ⇒ the ribbon ends at (15.70, −20.40).
+ *
+ * Edge 0 is whichever ring arc the district file happens to list FIRST, so the
+ * destination is a property of JSON order and of nothing the lesson means. On
+ * rb-mini it lands 2.3 m past the south node (hence „the entry mouth" above);
+ * on rb-2lane it lands on the south-east arc, which is no mouth at all. The
+ * ring is one-way, so from anywhere on it the shortest path to that point runs
+ * FORWARD PAST THE DRILL'S OWN EXIT:
+ *
+ *   sc-rb-circulate-priority @L3, car on the `-exit-approach` disc
+ *     (6.16, 16.91) — 20° short of its NORTH exit — gets a 64.4 m ribbon that
+ *     rides past north, west and south and ends at (2.3, −17.7).
+ *   sc-rb-lane-choice @L3, car at the north mouth (0, 21.94) with the THIRD
+ *     (west) exit 90° on — 98.4 m, past west at s ≈ 40, ending at
+ *     (15.7, −20.4).
+ *
+ * So the drill's own guidance forbids the drill's own last objective: a
+ * student who follows the green line circulates instead of exiting, and
+ * «Премини през кръга и го напусни с включен десен мигач» can only be
+ * collected by IGNORING it. That is the audit clause „neither ever reaches the
+ * third exit" (sc-rb-lane-choice:ffdffd55) and the car still inside the ring
+ * at the end screen (sc-rb-circulate-priority:317c79f0) — no sampled leg of
+ * either drill, in any sweep, has ever collected the ring row or the maneuver
+ * row after it.
+ *
+ * STILL NOT THIS FILE'S TO FIX, and the reason is now arithmetic rather than
+ * ownership: `RoundaboutParams` carries one centre and two radii, so no
+ * template here can name its exit ARM to the guidance layer. Appending an
+ * exit-arm reachZone AFTER the maneuver row does not rescue it either —
+ * measured: the BRIGHT leg (`goalS`) is still the 64.4 m lap and only the dim
+ * look-ahead reaches the arm. The address is `scene/guidanceRoute.ts:802`
+ * (`guidanceGoalFor`, `case "roundabout"` — whose own comment „Ribbon to the
+ * ring; no pillar — any exit completes the maneuver" is false twice over: the
+ * ribbon goes to one arbitrary point, and since the `-exit-approach` gates
+ * landed, not any exit completes the drill), together with `:1854`, where
+ * `deriveGuidanceRoute` accepts a target snap 17.85 m off the carriageway with
+ * no distance guard.
+ *
  * WHAT THIS FILE DID FIX IN THAT ROUND: the exit ARM. Every drill's maneuver
  * row was titled with the exit it wanted and the evaluator behind it cannot see
  * one — a south-entry / FIRST-exit drive collected «Излез на СЕВЕРНИЯ изход с

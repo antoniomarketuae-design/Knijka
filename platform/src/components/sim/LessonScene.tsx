@@ -57,6 +57,11 @@ import {
   // governor has clamped the throttle in silence since the first tier shipped).
   governorCapKmh,
   storeDifficulty,
+  // WHICH GEARBOX THE STUDENT WAS HANDED — „Напреднал" is a manual with a
+  // clutch, every other tier an automatic (vehicle/driveline.ts). The key
+  // legend has to know: the same two caps mean different things on the two
+  // boxes, and until 2026-08-30 it described only one of them.
+  transmissionModeFor,
   SNOW_GRIP_FACTOR,
   WET_GRIP_FACTOR,
   type DifficultyMode,
@@ -2542,6 +2547,16 @@ export function ReadyScene({
         defaultOpen={!touchOnly && !driveLockedAtMount}
         topdownAllowed={topdownInCycle}
         reverseAssistEnabled={reverseAssistEnabled}
+        // …AND WHICH CAR THE LEGEND IS DESCRIBING — sc-vp-stall:95754650
+        // (critical). Every other flag on this mount is about the LESSON; this
+        // one is about the CAR, and until it existed the sheet printed
+        // «скорости: към P / към D» on a lesson whose own objective says
+        // «колата тук е с ръчни скорости и съединител». LIVE STATE, not a
+        // lesson constant: `difficulty` is seeded by `lesson.openingTier` and
+        // then moved by the tier picker mid-drive, so a student who switches
+        // to „Напреднал" watches the gear, reverse and clutch rows re-word
+        // themselves on the same render the gearbox changes on.
+        transmission={transmissionModeFor(difficulty)}
         // …AND THE LIFETIME THE DEFAULT ABOVE NEVER HAD. `defaultOpen` decides
         // how the lesson OPENS; nothing decided how it ends, so on every desktop
         // scenario rung the sheet was still open — as ghost type on the
@@ -4342,18 +4357,64 @@ export interface ControlsHelpRow {
  * sweep's own frames are about rows that were WRONG rather than rows that were
  * missing — an orphaned «D» in ghost type over a building, and a gesture row
  * printed on a rung where the gesture does nothing.
+ *
+ * ── AND A THIRD INPUT, BECAUSE THE LEGEND DESCRIBED A CAR THE STUDENT WAS NOT
+ *    DRIVING — sc-vp-stall:95754650 (CRITICAL), re-judged on the attested w18
+ *    re-drive (`w18/frames/sc-vp-stall__pc-right/01-arrival.png`, 63507e2).
+ *
+ *    That lesson ships `openingTier: "advanced"` (templates-cockpit.ts) and
+ *    says so in its own objective: «колата тук е с ръчни скорости и
+ *    съединител». `transmissionModeFor("advanced")` is `"manual"`, and on the
+ *    manual box the gate is P — R — N — M1…M5 (driveline.ts): THERE IS NO D.
+ *    The panel on that frame nevertheless printed «скорости: към P / към D»,
+ *    i.e. it named a selector position the car does not have, on the one
+ *    lesson in the catalogue whose entire subject is the gearbox.
+ *
+ *    THREE ROWS WERE WRONG THERE, NOT ONE, and they are wrong for the same
+ *    reason — every flag this function took was about the LESSON and none was
+ *    about the CAR:
+ *
+ *      gears    «към P / към D» — no D on this box, and `trySelect` refuses
+ *               R and M with the clutch up (`rejectShift("clutch")`), which
+ *               is the refusal the student actually meets when he presses ].
+ *      reverse  «на място: пусни и натисни пак → задна / напред» describes
+ *               `ReverseAssist`, and the scene gates that machine on
+ *               `dl.transmission === "automatic"` (see the assist block in
+ *               RuntimeDriver's frame loop). On „Напреднал" the gesture is
+ *               not merely different — it is not running at all. This is the
+ *               row's own exam clause reproduced one tier over: „a product
+ *               that prints a control it has disabled is refusing an input in
+ *               silence with extra steps." The exam spelling was false here
+ *               too, for a third reason: it walks the student «D → N → R».
+ *      clutch   was reference material behind «Всички клавиши». On a manual
+ *               it is not advanced trivia, it is the only way the car moves —
+ *               so on that box it joins the short list the sheet opens with.
+ *
+ *    The flag DEFAULTS TO `"automatic"` so the eight-combination sweep next
+ *    door keeps describing the box it was written against.
  */
 export function controlsHelpRows({
   topdownAllowed,
   reverseAssistEnabled,
   reverseViewOn,
+  transmission = "automatic",
 }: {
   topdownAllowed: boolean;
   reverseAssistEnabled: boolean;
   /** Live state of the K setting — the row prints it, so the legend never
    *  describes a view the student will not get. */
   reverseViewOn: boolean;
+  /**
+   * The gearbox the tier picker has actually handed over —
+   * `transmissionModeFor(difficulty)`, the same call `VehicleRig` syncs the
+   * driveline with, so the legend cannot disagree with the car. Optional and
+   * `"automatic"` by default: three of the four tiers are automatics, and the
+   * default keeps every existing caller (and every test written before the
+   * manual box was described here) on the sentences they were written for.
+   */
+  transmission?: TransmissionMode;
 }): ControlsHelpRow[] {
+  const manual = transmission === "manual";
   return [
     // FIRST ROW, AND THE FIRST THING READ IN THIS COLUMN — „we read on left".
     // The founder's sentence about this panel is „We should re-work the whole
@@ -4384,34 +4445,82 @@ export function controlsHelpRows({
     // introduces it, in ghost type over a building. U+00A0 binds each letter to
     // its «към»; the row still wraps, it just cannot wrap THERE. Written as the
     // escape and not the literal glyph, so a reader of this file can SEE it.
-    {
-      id: "gears",
-      keys: "[ ]",
-      what: "скорости: към\u00a0P / към\u00a0D",
-      essential: true,
-    },
+    // …AND ON THE MANUAL BOX BOTH HALVES OF THAT SENTENCE ARE FALSE. The gate
+    // there is P — R — N — M1…M5, so «към D» names a position the car does
+    // not have; and `trySelect` refuses R and M with the engine on and the
+    // clutch up, so the press a student makes after reading this row produces
+    // a `shiftRejected: "clutch"` and nothing else. The ladder is printed
+    // whole — it is the answer to „where am I in the gate", which
+    // «към P / към D» never was — and the refusal is named BEFORE he meets
+    // it, because a legend that waits to be disproved by the car is exactly
+    // the THEO-4 failure this panel exists to avoid. The U+00A0 discipline
+    // carries over: «със» is bound to «съединител», the word that carries
+    // the meaning, so this row cannot orphan its tail the way «D» once did.
+    manual
+      ? {
+          id: "gears",
+          keys: "[ ]",
+          what: "скорости: P–R–N–1…5; в предавка само със\u00a0съединител",
+          essential: true,
+        }
+      : {
+          id: "gears",
+          keys: "[ ]",
+          what: "скорости: към\u00a0P / към\u00a0D",
+          essential: true,
+        },
     // NOT „задръж" (hold). Holding the brake is how you stop; it is not how
     // you ask for reverse — see the two laws in engine/reverseAssist.ts. On an
     // exam rung neither the assist nor the pedal swap exists, so the row says
     // what is actually true there: reverse is the lever, and the pedals keep
     // their real meanings. ONE slot, two sentences — see `id` on the interface
     // for why the exam spelling must not borrow the gear row's identity.
-    reverseAssistEnabled
+    // …AND THE MANUAL BOX ANSWERS BEFORE EITHER OF THEM, because on that box
+    // the machine BOTH sentences describe is switched off. The scene gates the
+    // assist on `dl.transmission === "automatic"` (the assist block in
+    // RuntimeDriver's frame loop, three screens down), so on „Напреднал“ the
+    // gesture row is not a different truth — it is a control the product has
+    // disabled, printed as if it worked, which is the row's own exam clause
+    // reproduced one tier over. The exam spelling is false here for a third
+    // reason: it walks the student «D → N → R» down a gate with no D in it.
+    // What IS true on a manual is the real procedure — clutch, then one step
+    // down the gate — and it is the same procedure the exam demands, so one
+    // sentence serves both rungs.
+    manual
       ? {
           id: "reverse",
-          keys: "S / ↓",
-          what: "на място: пусни и натисни пак → задна / напред",
+          keys: "Z + [",
+          what: "заден ход: задръж съединителя и избери\u00a0R",
         }
-      : {
-          id: "reverse",
-          keys: "[ ]",
-          // …and the SEQUENCE is one token, bound the same way. The general
-          // form of the gear row rule found this the moment it was written:
-          // «R)» alone on a line, on every exam rung.
-          what: "на изпит заден ход се избира само с лоста (D\u00a0→\u00a0N\u00a0→\u00a0R)",
-        },
+      : reverseAssistEnabled
+        ? {
+            id: "reverse",
+            keys: "S / ↓",
+            what: "на място: пусни и натисни пак → задна / напред",
+          }
+        : {
+            id: "reverse",
+            keys: "[ ]",
+            // …and the SEQUENCE is one token, bound the same way. The general
+            // form of the gear row rule found this the moment it was written:
+            // «R)» alone on a line, on every exam rung.
+            what: "на изпит заден ход се избира само с лоста (D\u00a0→\u00a0N\u00a0→\u00a0R)",
+          },
     { id: "handbrake", keys: "Space", what: "ръчна спирачка", essential: true },
-    { id: "clutch", keys: "Z", what: "съединител — задръж („Напреднал“)" },
+    // ON THE AUTOMATIC TIERS THIS IS REFERENCE MATERIAL and it says so — the
+    // key exists, it does nothing until you switch tier. ON THE MANUAL BOX IT
+    // IS THE CAR: `hasDriveTraction` and `trySelect` both consult it, and
+    // sc-vp-stall's whole drill is the bite point. A student on that lesson
+    // was being shown a five-row sheet with no clutch on it — the control the
+    // objective names in its first sentence, filed behind «Всички клавиши».
+    manual
+      ? {
+          id: "clutch",
+          keys: "Z",
+          what: "съединител — задръж при потегляне и\u00a0смяна",
+          essential: true,
+        }
+      : { id: "clutch", keys: "Z", what: "съединител — задръж („Напреднал“)" },
     { id: "belt", keys: "B", what: "предпазен колан", essential: true },
     { id: "indicators", keys: ", .", what: "мигач ляво / дясно", essential: true },
     { id: "lights", keys: "L", what: "светлини" },
@@ -4503,6 +4612,7 @@ export function ControlsHelp({
   defaultOpen = true,
   topdownAllowed = true,
   reverseAssistEnabled = true,
+  transmission = "automatic",
   sampleRef,
 }: {
   defaultOpen?: boolean;
@@ -4527,6 +4637,17 @@ export function ControlsHelp({
    * which needed the same population).
    */
   reverseAssistEnabled?: boolean;
+  /**
+   * WHICH GEARBOX THE TIER PICKER HAS HANDED OVER — sc-vp-stall:95754650.
+   *
+   * `transmissionModeFor(difficulty)`, threaded from the scene so the sheet
+   * cannot describe a car the student is not in. It rewrites three rows rather
+   * than hiding any (`controlsHelpRows` carries the reasoning row by row), and
+   * it defaults to `"automatic"` because three of the four tiers are — and
+   * because a default of anything else would silently re-word the panel for
+   * every caller that does not know about the box yet.
+   */
+  transmission?: TransmissionMode;
   /**
    * The per-frame vehicle sample the scene already writes — read for ONE
    * number, `speedKmh`, and only while the sheet is open and the one-time
@@ -4574,7 +4695,12 @@ export function ControlsHelp({
   // (CameraRig owns the key, with G/N) — the row shows its live state so the
   // legend never lies about which way the view will turn.
   const reverseViewOn = useReverseViewEnabled();
-  const rows = controlsHelpRows({ topdownAllowed, reverseAssistEnabled, reverseViewOn });
+  const rows = controlsHelpRows({
+    topdownAllowed,
+    reverseAssistEnabled,
+    reverseViewOn,
+    transmission,
+  });
   const essentials = rows.filter((r) => r.essential);
   const visible = showAll ? rows : essentials;
   const hiddenCount = rows.length - essentials.length;
@@ -4762,9 +4888,27 @@ export function ControlsHelp({
                     diagonally through «двигател: старт / стоп» and «скорости:
                     към P / към D». That is a world-geometry-versus-HUD
                     occlusion, the same class as `sc-turn-left-oncoming:2a784463`
-                    and `sc-ov-keep-right:6751402d`, and it belongs to
-                    `hud/overheadHint.ts` with a projected-bounds probe — not to
-                    an element name. The row stays OPEN on it. */}
+                    and `sc-ov-keep-right:6751402d`. The row stays OPEN on it.
+                    ⚠ AND THE ADDRESS THIS BLOCK GAVE FOR IT WAS WRONG — corrected
+                      2026-08-30 by opening the file it named. `hud/overheadHint.ts`
+                      has nothing to do with overhead WIRES: it is the CAMERA-AID
+                      hint for lessons carrying an overhead (top-down) manoeuvre —
+                      `lessonHasOverheadManeuver`, `cameraAidHintEligible`,
+                      `CameraAidHint.tsx`. A lane sent there would have found no
+                      cable and no projection, which is the wrong-address failure
+                      this programme spends its rounds on. The wires are built in
+                      `modules/sim/world/components/WorldProps.tsx` — the
+                      `UTILITY_WIRE_SAG_M` parabolic-sag ribbon.
+                      AND THE MECHANISM IS THE ALPHA, NOT THE Z-ORDER, measured on
+                      the attested re-drive (`.audit-frames/w17/frames/
+                      sc-ac-night-lights__pc-right/01-arrival.png`, LessonScene.tsx
+                      byte-identical to HEAD): the wires read at roughly a fifth of
+                      their free-sky contrast INSIDE this panel, i.e. they are
+                      behind the shade and the shade is doing exactly what
+                      `PEEK_SCRIM_ALPHA` = 0.8 promises. Closing the clause means
+                      raising a ghost's ground above the published 0.8
+                      (SimOverlay.tsx:883) — a ruling on the 2026-08-03 „no plate"
+                      register, which is a founder's call and not a lane's. */}
                 <p className="text-muted">{row.what}</p>
               </div>
             ))}

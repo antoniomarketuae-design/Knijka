@@ -1166,6 +1166,39 @@ const MGB_BUS: CutInLeadCarSpec = {
  *     (`lessons/engine.ts:1220`), unknown-is-never-a-refusal like its eight
  *     siblings, and named on `serializeObjectiveParams`'s whitelist
  *     (`params.ts:207`) or it is dropped on the way to the compiled lesson.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * W19 2026-08-30 — :8fa6b888 («the only large vehicle on the route is a box
+ * truck») RE-VERIFIED AT HEAD, STILL TRUE, AND STILL NOT REPAIRABLE FROM THIS
+ * FILE. Both seams the two paragraphs above cost out are byte-unchanged:
+ *
+ *   · `traffic/types.ts:139` — `VehicleProfile` is STILL car | van | truck |
+ *     emergency | tram | train | cyclist | childCyclist | animal. No bus. And
+ *     `vehicleFleet.ts:183` still routes `profile: "truck"` to
+ *     TRUCK_MODEL_INDEX — the PROCEDURAL cab-plus-cargo-box rig, 7.5 × 2.4 ×
+ *     3.1 m with no glazing (`TRUCK_DIMENSIONS`, vehicleFleet.ts:168), which
+ *     is precisely the «windowless van body» the sheet photographs.
+ *   · `contracts.ts:524` — `StagedActorLabelKind` is STILL `"standingOnGreen"`
+ *     alone, so the render-only stopgap named above (`actorLabels: [{ actorId:
+ *     MGB_BUS.id, kind: "busOnRoute" }]`) does not type-check yet. Measured
+ *     through `compileScenario` on 2026-08-30: this template compiles
+ *     `actorLabels: null` at L1 and L3 — the caption channel is unused here.
+ *
+ * The REST of that chain was re-checked end to end and is live, so widening the
+ * union plus the copy entry IS the whole job: `compile.ts:1344` copies the
+ * field onto the LessonSpec, `LessonScene.tsx:2392` hands it to `TrafficLayer`,
+ * and `TrafficLayer.tsx:2489-2540` draws whichever kind is named (the only
+ * shipped user is `templates-signals.ts:899`).
+ *
+ * AND THE TWO CHEAP-LOOKING ESCAPES ARE BOTH WORSE, said once so no lane tries
+ * them: re-profiling MGB_BUS to a body the union DOES hold trades one wrong
+ * shape for another (a `van` is smaller than the box, a `tram` is a railed
+ * vehicle on a street with no rails and would teach the wrong article
+ * entirely); and rewording instruction 2 to describe what is on screen is not
+ * honesty but a legal error — чл. 67 covers «автобус от редовна линия» and
+ * NOTHING else, so a drill about a камион at a спирка would be teaching a duty
+ * that does not exist. The copy is right and the body is wrong; the body is the
+ * thing to change, in the two files named above.
  */
 export const SC_MERGE_BUS_PULLOUT: ScenarioSpec = {
   id: "sc-merge-bus-pullout",
@@ -1694,6 +1727,60 @@ const MFP_STREAM: OncomingStreamSpec = {
  * that does NOT fix, stated so it is not claimed: the walker duty itself is
  * still graded only by the rule engine, and the unsteered contact above is
  * still the harness.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * W19 2026-08-30 — :ab353b86 («the correct drive collides and fails — 10
+ * наказателни точки, една опасна грешка, НЕИЗДЪРЖАН») WAS RE-CONFIRMED ON
+ * EVIDENCE OLDER THAN THE PARAGRAPH ABOVE. No code changed for it. Written
+ * down so the next wave does not spend itself on the fourth re-derivation, and
+ * because one sentence up there turned out to be false.
+ *
+ * THE CITATION'S OWN DATE IS THE FIRST ANSWER. The judge cites
+ * `.audit-frames/wave-c/frames/sc-merge-from-property__pc-right/08-debrief
+ * .png`; its `_audit-status.json` reads `target.commit 70d8651…`, `startedAt
+ * 2026-08-20T19:07Z`, `endedNaturally false`, `forcedBy "Прекрати урока"`. That
+ * build is TWO DAYS OLDER than the `rebase` re-drive this header already
+ * dissects and ten days older than HEAD, across which this file alone moved
+ * +709/−52 lines. It is not a second sighting of the row; it is the same row
+ * photographed earlier and read as a re-confirmation.
+ *
+ * THE AUTHORED CORRECT DRIVE DOES NOT COLLIDE, AT HEAD, and that is the claim
+ * the finding actually makes: `traces/__tests__/sc-merge-from-property-traces
+ * .test.ts` replays `shadow-correct` through the production reducer and asserts
+ * `violationCodes(shadow)` is EMPTY — no COLLISION, both duties earned as
+ * commendations. 20 tests, all green on this tree.
+ *
+ * AND THE BOULEVARD THE HARNESS HIT WAS EMPTY OF VEHICLES. Measured through
+ * `compileScenario` on 2026-08-30 at every rung: `traffic.vehicleCount` is 0 on
+ * L1–L5 — family "merging" is absent from `SCENARIO_FAMILY_TRAFFIC_BASELINE`
+ * (compile.ts) and this template authors no `traffic`, and the same was true at
+ * 70d8651. The only other vehicles this drill can hold are MFP_STREAM's three,
+ * and they are not released below `releaseKmh` 15, while both wave-c legs were
+ * photographed under it throughout (pc-right/04-t130s.png 10 км/ч,
+ * mobile-right/04-t029s.png 13, 04-t060s.png 12). So at the moment of contact
+ * there was nothing on that road, staged or ambient: the «сблъсък» can only
+ * have been static scenery, exactly as the `rebase` sheet's «Удар в НЕПОДВИЖНО
+ * препятствие» already said.
+ *
+ * THIS ALSO CORRECTS THE PARAGRAPH ABOVE. Its closing sentence — that the
+ * FAILED_TO_YIELD at 1:30 is «the product working … on a live boulevard the
+ * ambient flow is within 26 m of the node for most of a minute» — cannot be
+ * true of this lesson at either build: there is no ambient flow here to be
+ * within 26 m of anything. Whatever that code was adjudicated against, it was
+ * one of the three staged cars or nothing; the sentence is left standing above
+ * only so the correction is legible next to it.
+ *
+ * WHAT THE HARNESS ACTUALLY DID, PHOTOGRAPHED. `mobile-right/04-t029s.png`
+ * shows the car ON the boulevard heading WEST at 13 км/ч, the west kerb and the
+ * open plain filling the windscreen, and the exit receding in the mirror with
+ * the green route arrow on it. The drive crossed the тротоар, crossed the Б2,
+ * crossed both carriageways and drove off the far side; it never made the right
+ * turn instruction 6 and `sc-mfp-merged` (x 4.06, y 40) both ask for. The
+ * guidance is not what failed — the same frames show the ribbon's arrow
+ * pointing north, and `pc-right` reaches «ЗАДАЧА 3/4 Влей се в лентата» before
+ * it wanders — so what is missing is steering on a TURNING route, which is an
+ * instrument gap in the drive harness and not a field of this spec. A
+ * ScenarioSpec authors geometry, actors and copy; it cannot make a car turn.
  */
 export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
   id: "sc-merge-from-property",

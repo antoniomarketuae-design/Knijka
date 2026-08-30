@@ -260,10 +260,30 @@ describe("1c · QUARANTINE — the walls the student's world does not contain", 
     expect(walls.length, "the probe cannot see a wall that is known to be there").toBe(1);
   });
 
-  it("sc-pk-driveway STILL has no wall body of any kind — delete this quarantine when it does", () => {
+  // THE QUARANTINE IS LIFTED — wave 13, 2026-08-30.
+  //
+  // This block asserted the ABSENCE of the walls and told its own reader to
+  // delete it when they arrived: «delete this quarantine when it does». They
+  // have. `scene/scenarioSceneryProps.ts` now carries both rects, transcribed
+  // from the pin below rather than re-derived — which is exactly what that pin
+  // was written for.
+  //
+  // The defect it held open was real and student-facing: the drill names
+  // стени/огради as the thing not to touch in four separate places, its
+  // objective card says «без да ги докоснеш», the HEADLESS twin has carried
+  // both walls all along — and the world the student drove in contained none.
+  // The lesson graded an obstacle that was not there.
+  //
+  // Kept as a REGRESSION PIN rather than deleted: an absence proved once is
+  // worth nothing if the presence is never checked again.
+  it("sc-pk-driveway now HAS both wall bodies, and they match the pinned rects", () => {
     const held = heldFor("sc-pk-driveway", "pk-drive-v1");
-    expect(held.filter((o) => o.kind === "wall")).toEqual([]);
-    expect(held, "sc-pk-driveway acquired scenery — re-derive this row").toEqual([]);
+    const walls = held.filter((o) => o.kind === "wall");
+    expect(walls, "the walls the drill promises are gone again").toHaveLength(2);
+    expect(walls.map((w) => [w.x, w.y, w.headingDeg, w.lengthM, w.thicknessM])).toEqual([
+      [9.0, 47.3, 90, 4.0, 0.6],
+      [11.0, 45.0, 0, 5.0, 0.6],
+    ]);
   });
 
   it("…while the HEADLESS twin has carried both walls all along — the asymmetry, by value", () => {
