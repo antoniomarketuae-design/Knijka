@@ -453,9 +453,22 @@ describe("scenario-world-referent gate", () => {
     // brakingLeadCar | cutInLeadCar — the same referent its two siblings in the
     // following family carry), not exempted: a lesson with no lead vehicle
     // cannot arm it and the gate must keep saying so.
+    //
+    // 13 → 14 / 59 → 60 (2026-08-30): OFF_CARRIAGEWAY, чл. 15, ал. 1 — the code
+    // for a car that has left the carriageway. It is EXEMPTED, not checked, and
+    // the reason is a different one from the other thirteen: those are facts
+    // about the car or the driver's procedure, this one is about the street but
+    // is a SURFACE query rather than a body the world must contain. A referent
+    // rule for it could only assert „this district has a road", which is true of
+    // all 105 by construction — a check that can never fail is the very thing
+    // this gate exists to prevent. `referents.ts NO_WORLD_REFERENT` carries the
+    // full argument and names what guards it instead
+    // (`runtime/__tests__/off-carriageway-consult.test.ts`: 248 spawns, 117 bay
+    // centres, 57,000 lane/parking-band poses, worst outsideKerbM 0.000 m).
+    // `checked` does NOT move: 46 is unchanged.
     expect(checked.size).toBe(46);
-    expect(NO_WORLD_REFERENT.size).toBe(13);
-    expect(all.length).toBe(59);
+    expect(NO_WORLD_REFERENT.size).toBe(14);
+    expect(all.length).toBe(60);
   });
 
   it("never exceeds doc 86 on the four classes §10 counts to ±0 (T1 90 · T2 31 · T3 9 · T4 83)", () => {

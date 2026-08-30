@@ -548,6 +548,18 @@ export interface RuleEngineState {
    * leaving the lane/span.
    */
   emergencyLane: EpisodeState;
+  /**
+   * Sustained presence OFF the carriageway — `tick.edgeId === null`, the
+   * runtime's own statement that the car is past the kerb (чл. 15, ал. 1).
+   * One bill per excursion; re-arms the moment the car is back on the road,
+   * so a driver who leaves twice is billed twice and a driver who leaves once
+   * and stays out is billed once however long he stays.
+   *
+   * Deliberately NOT gated on motion, unlike every other span episode in this
+   * block: the founder's case is a student who FINISHES a drive standing on
+   * grass, and a `moving` conjunct would acquit exactly that. See the detector.
+   */
+  offCarriageway: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = {
@@ -1378,6 +1390,106 @@ const MOTORWAY_CRAWL_REGRADE_SEC = 6;
 const BUS_LANE_REGRADE_SEC = 6;
 
 /**
+ * SECONDS OFF THE CARRIAGEWAY BEFORE `OFF_CARRIAGEWAY` IS BILLED (чл. 15, ал. 1).
+ *
+ * A MODULE CONSTANT AND NOT A `RuleEngineConfig` FIELD, on the same rule the
+ * other constants in this block follow: every `*SustainSec` in `types.ts` is
+ * there because some drill wants it moved, and no drill has any business
+ * dialling „stay on the road" — there is no lesson for which leaving the
+ * carriageway later is the taught behaviour. A dial nobody may turn is one more
+ * surface to keep in agreement with itself.
+ *
+ * ── FROM BELOW: THE FALSE CONVICTION, AND WHAT IS ALREADY PAID FOR ───────────
+ * The kerb clip this threshold looks like it is guarding was ALREADY SPENT, one
+ * layer down, before this file sees anything. `edgeId` goes null only when the
+ * car's CENTRE is more than `surface.ts OFF_CARRIAGEWAY_BODY_ALLOWANCE_M` =
+ * 0.97 m outside the kerb — 0.85 m of chassis half-width plus the 0.12 m kerb
+ * this engine makes deliberately drivable so a scuff is a thump and not a crash.
+ * The cross-section is measured, on ov-oncoming-v1 at y = 400
+ * (`runtime/__tests__/off-carriageway-consult.test.ts`): two wheels over the
+ * kerb is 0.475 m out and STILL reports its edge; the whole flank past the kerb
+ * is 0.975 m. So a car clipping an apex on a legitimate line never reaches this
+ * detector at all, and the sustain is not what protects it.
+ *
+ * WHAT THE SUSTAIN DOES BUY is the full-flank excursion that is corrected at
+ * once: the centre crosses 0.97 m out and comes straight back, ≈1.9 m of lateral
+ * travel. This file's own premise for what „a brief drift" costs in time is
+ * `laneKeepSustainSec` = 3 s across a 3.5 m lane, i.e. ~1.2 m/s of lateral
+ * correction; 1.9 m at that rate is ~1.6 s. Two seconds clears the corrected
+ * excursion with margin and convicts the one that is not corrected.
+ *
+ * TWO SECONDS IS DELIBERATELY SHORTER THAN `emergencyLaneSustainSec`'s 3 s, and
+ * the ground is the travel measurement above — ALONE. This block used to derive
+ * the difference from law: the лента за принудително спиране has a LAWFUL use
+ * (чл. 58, т. 3 permits the breakdown stop) so its threshold must buy an
+ * innocence this one need not, because „no clause of ЗДвП lets a car travel or
+ * stand on the тротоар or the банкет … neither surface is ever a lawful place
+ * for a car to be". THE SECOND HALF IS FALSE — ЗДвП чл. 94 refutes it twice
+ * over — so the claim is withdrawn rather than softened. Read out of
+ * `content/law/acts/zdvp.json` on 2026-08-30:
+ *   ал. 3: „Допуска се престой и паркиране на моторни превозни средства с
+ *   допустима максимална маса до 2,5 тона върху тротоарите само на определените
+ *   от собствениците на пътя или администрацията места, успоредно на оста на
+ *   пътя, ако откъм страната на сградите остава разстояние най-малко 2 метра за
+ *   преминаване на пешеходци." — a lawful car standing ON the тротоар.
+ *   ал. 1/2: „За престой [паркиране] извън населените места пътните превозни
+ *   средства се спират извън платното за движение. Паркирането на платното за
+ *   движение е забранено." — outside a built-up area the law REQUIRES the car to
+ *   leave the carriageway, and the банкет is where it goes.
+ * WHAT SURVIVES IS TOO NARROW TO SET THIS NUMBER. чл. 15, ал. 1, чл. 15, ал. 5
+ * and § 6, т. 6 are all about ДВИЖЕНИЕ, and this detector deliberately carries
+ * no `moving` conjunct (see the reducer's own note at the OFF_CARRIAGEWAY
+ * block) — it grades exactly the STANDING case чл. 94 can make lawful. A legal
+ * asymmetry that does not cover the detector's own scope cannot be its
+ * threshold's ground, and `railRestSustainSec` being 2 s as well is now a
+ * coincidence of two derivations rather than a shared reason.
+ * SO: 1.9 m of lateral excursion at this file's own ~1.2 m/s drift premise is
+ * ~1.6 s, and 2 s clears it with margin. That sentence is the whole derivation.
+ * AND THE RESIDUAL чл. 94 LEAVES, named because no sustain can close it: a car
+ * lawfully parked in a marked pavement bay, or lawfully pulled off the road
+ * outside a built-up area, is off the carriageway for as long as it likes and
+ * this reducer cannot tell it from an excursion. What keeps that car clean today
+ * is GEOMETRY, not law — all 117 authored parking-bay centres and every kerbside
+ * band of all 105 districts read `carriageway`
+ * (`runtime/__tests__/off-carriageway-consult.test.ts`) — so the day a district
+ * authors a bay outside the kerb or a rural pull-off, this row convicts it and
+ * the fix is a lawful-standing surface in the world, not a longer sustain.
+ * NOT SHORTER STILL: `solidLineCrossSustainSec`'s 0.6 s is an anti-jitter guard
+ * on a boolean that genuinely flickers (a centre dancing on the paint).
+ * `edgeId` does not flicker — it is a containment test against static polygons —
+ * so none of this 2 s is spent on noise, and all of it on the correction.
+ *
+ * ── FROM ABOVE: IT HAS TO REACH THE EXHIBITS ────────────────────────────────
+ * All three are tens of seconds, so any bar under ~10 s closes them and 2 s is
+ * not chosen to make them fire: `sc-ac-truck-spray/mobile-wrong` 04-t102s (145
+ * км/ч across open field, no road in frame), `sc-sp-curve/mobile-wrong` 04-t154s
+ * (96 км/ч on a green plane), `sc-rb-exit-signal/mobile-right` (at REST on the
+ * roundabout island). `sc-junction-blind` pc/right is off the world from
+ * t ≈ 63–74 s to t = 209 s — at least 135 s.
+ *
+ * ── WHAT THIS NUMBER CANNOT DO ──────────────────────────────────────────────
+ * It cannot protect the frame-zero placeholder pose, because that pose is not an
+ * excursion and no threshold distinguishes it from one. MEASURED while writing
+ * this: on 7 of the 105 shipped districts the district ORIGIN — where
+ * `scene/vehicleSample.ts` parks the placeholder until the chassis publishes —
+ * reads `edgeId === null` (d2-v1, district-v1, lc-gantry-v1, rb-2lane-v1,
+ * rb-mini-v1, rb-ped-v1, rb-single-v1). `applyTick` runs this reducer on those
+ * frames unconditionally („the law applies from second zero"), so the guard is a
+ * separate conjunct in the detector below and not a longer sustain here.
+ */
+const OFF_CARRIAGEWAY_SUSTAIN_SEC = 2;
+
+/**
+ * The frame-zero placeholder's motion floor, km/h — the local mirror of
+ * `lessons/engine.ts POSE_MOTION_KMH` (0.5). Duplicated rather than imported
+ * because `rules/` is the leaf module and importing `lessons/` would invert the
+ * dependency the whole module boundary rests on (docs/architecture/05). Kept at
+ * the same value on purpose: two numbers for „the chassis has not published yet"
+ * would rot apart, and this comment is the pin that says they are one claim.
+ */
+const POSE_PLACEHOLDER_KMH = 0.5;
+
+/**
  * THE HARSH-BRAKE LINE IS EXCLUSIVE, AND THE COMPARISON SAYS SO IN A WAY
  * FLOATING POINT CANNOT OVERRULE (2026-08-29 · `sc-follow-tailgater:f42dce4f`).
  *
@@ -1669,6 +1781,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     motorwaySlowRegrade: { ...IDLE_EPISODE },
     motorwayCrawlRegradeSec: 0,
     emergencyLane: { ...IDLE_EPISODE },
+    offCarriageway: { ...IDLE_EPISODE },
   };
 }
 
@@ -1729,6 +1842,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     motorwaySlow: { ...s.motorwaySlow },
     motorwaySlowRegrade: { ...s.motorwaySlowRegrade },
     emergencyLane: { ...s.emergencyLane },
+    offCarriageway: { ...s.offCarriageway },
   };
 }
 
@@ -2129,9 +2243,29 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * and no fault of any class booked; on `sc-rb-exit-signal / mobile-right` the
    * car comes to REST on the roundabout's central island and the sheet books
    * only «Удар в неподвижно препятствие». The collision row's own copy already
-   * says „Излизането от платното е самото произшествие" (catalog.ts:1851) — the
-   * product can NAME the act today, it just cannot charge it unless the car also
-   * hits something on the way out.
+   * says „Излизането от платното е самото произшествие" — the product can NAME
+   * the act today, it just cannot charge it unless the car also hits something
+   * on the way out.
+   *
+   * ── THE CODE LANDED 2026-08-30, AND EVERYTHING ABOVE STILL STANDS ──────────
+   * `OFF_CARRIAGEWAY` now exists — union, catalogue row, Н38 basis (б. „а"),
+   * referent exemption, four censuses and a detector in the span block below,
+   * arming on the `edgeId === null` this paragraph describes. Recorded here
+   * because this file's neighbours have twice been sent to build something that
+   * was already running, and a routing note that outlives its route is worse
+   * than none (`lessons/finish.ts` says the same about its own).
+   *
+   * WHAT DID *NOT* CHANGE, and it is the reason this whole block is kept rather
+   * than deleted: NO span detector was stood down on `edgeId === null`. The
+   * curve advisory, the В27 rest and every other span still grade off the
+   * asphalt exactly as before, for the reasons argued above — the kerb-straddle
+   * band is where the learner behaviour lives, and a blanket acquittal trades a
+   * wrong charge for no charge. The new code is the OTHER half of the ruling in
+   * `runtime/worldRuntime.ts`'s surface-consult header („must still be a
+   * conviction, not a shrug"): the sheet now names the real fault at the kerb
+   * IN ADDITION to whatever else was billed. So `sc-sp-curve:45e7e4fb` is not
+   * closed by this — the card it complains about still fires — but the drive it
+   * photographs is no longer graded as though the car were on the road.
    */
 
   // Frame-to-frame derivatives (A12 tolerance bands). dt of 0 (duplicate
@@ -3370,6 +3504,135 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     )
   ) {
     events.push(makeViolation("EMERGENCY_LANE_DRIVING", t));
+  }
+
+  // Off the carriageway (чл. 15, ал. 1 — „водачът… се движи възможно най-вдясно
+  // ПО ПЛАТНОТО ЗА ДВИЖЕНИЕ"; § 6, т. 3 defines платно за движение and т. 4 its
+  // граница). The arm the „WITHDRAWN 2026-08-26" block at the top of this
+  // function routed and did not build: the runtime has published the signal at
+  // the kerb since that day and nothing consumed it, so a student could drive
+  // 145 км/ч across a field, or come to rest on a roundabout island, and read a
+  // sheet that said nothing at all.
+  //
+  //  · THE POLARITY, and it is the whole difference between a fault detector and
+  //    a machine for failing honest students. `tick.edgeId` is
+  //    `string | null | undefined` and the three are NOT two: a string is „on
+  //    that edge", `null` is „the runtime looked and this car is off the
+  //    carriageway", `undefined` is „THIS TICK SOURCE CANNOT ANSWER" — replays,
+  //    recorded traces, hand-built fixtures, the dev rigs. Only an explicit
+  //    `=== null` may convict. Written as `!tick.edgeId` this line would read
+  //    absent-channel as departure and convict every replay and every fixture in
+  //    the suite of driving in a field — a false conviction on a student who
+  //    never left the road, which this programme has spent whole rounds undoing.
+  //    `lessons/finish.ts stepOffNetwork` guards the identical channel the
+  //    identical way and says so; the two must not drift.
+  //  · THE RESET IS THE POSITIVE FACT, for the same reason: the episode re-arms
+  //    only on `typeof edgeId === "string"` — the runtime SAYING the car is on a
+  //    road — never on „not null".
+  //    WHAT AN `undefined` FRAME ACTUALLY DOES, read off `stepEpisode` rather
+  //    than assumed: it is neither the condition nor the reset, so it lands in
+  //    the `!cond` arm, which clears `activeSince` and leaves `emitted` alone.
+  //    So it cannot convict, and it cannot re-arm a spent excursion for a second
+  //    bill — but it DOES drop the onset, and the 2 s has to be re-earned from
+  //    the next `null` frame. A channel that goes quiet mid-departure therefore
+  //    buys the student time and can never cost him any, which is the direction
+  //    an absent channel must err in and the same answer `stepOffNetwork` gives
+  //    („Absent channel = innocent"). Pinned in
+  //    `__tests__/off-carriageway.test.ts`.
+  //    (This paragraph read „it leaves the episode exactly as it was" until
+  //    2026-08-30. It does not — that is the `reset` arm, and `undefined` is not
+  //    the reset. Corrected before the row shipped, because a comment that
+  //    describes a neighbouring branch is how the next edit picks the wrong one.)
+  //  · NO `moving` CONJUNCT, deliberately, and this is the one place this
+  //    detector parts company with its neighbours above. The founder's case is a
+  //    drive FINISHED standing on grass; every other span code here requires
+  //    motion because its article grades travel, and чл. 15, ал. 1 grades where
+  //    the car is. Requiring motion would acquit the exhibit that prompted it.
+  //  · FRAME-ZERO POSE GUARD, mirroring `lessons/engine.ts` POSE_MOTION_KMH /
+  //    `posedAtSec` (doc 87 B3/B10/B11) rather than importing it — `rules/` is
+  //    the leaf module and may not import `lessons/`. It is NOT belt-and-braces:
+  //    the scene ticks this reducer with a placeholder pose at the district
+  //    ORIGIN before the chassis publishes, `applyTick` runs the rule engine on
+  //    those frames unconditionally („the law applies from second zero"), and on
+  //    7 of the 105 shipped districts that origin is measurably off the
+  //    carriageway — d2-v1, district-v1, lc-gantry-v1, rb-2lane-v1, rb-mini-v1,
+  //    rb-ped-v1, rb-single-v1. Without this conjunct an untouched session on
+  //    district-v1 bills −3 for a car that was never placed: B-NEW-1 exactly,
+  //    the placeholder frame that once ended untouched sessions at ~40 s.
+  //    RESIDUAL, stated rather than hidden: a car genuinely at rest at exactly
+  //    (0, 0) is acquitted too. That is float-exact equality on both coordinates
+  //    and it is the same trade the session engine's own guard already makes.
+  //  · WHAT ACQUITS THE LAWFUL CAR IS GEOMETRY, NOT THIS SUSTAIN, and it is
+  //    measured rather than argued (`runtime/__tests__/off-carriageway-consult
+  //    .test.ts`): all 248 authored spawn points, all 117 authored parking-bay
+  //    centres (the builder draws the bays INTO the aisle ribbon — the deepest,
+  //    lot-par-v1's parallel slot, reads outsideKerbM 0.000) and 57,000 poses
+  //    across every travel lane AND kerbside parking band of all 105 districts
+  //    read `carriageway`, worst outsideKerbM 0.000 m. A perfectly parked car is
+  //    on the carriageway as far as this channel is concerned, so the parking
+  //    curriculum cannot be convicted by this row. That sweep is the acquitting
+  //    proof this detector rests on; it does not enumerate every authored
+  //    objective TARGET, so the first drive audit after this lands should be read
+  //    for false convictions before the row is called settled.
+  //  · ONE ACT, ONE BILL — THE CRASH SWALLOWS THE DEPARTURE IT CAUSES, and this
+  //    is the conjunct the first run of the trace gate demanded. A car that hits
+  //    something and ends up in the verge HAS left the carriageway, and without
+  //    this it is billed 3 for it on top of COLLISION's 10 — one physical event
+  //    charged twice. The collision row's own copy already says they are one
+  //    thing („Излизането от платното е самото произшествие"), `n38.ts` grounds
+  //    this code on the case where no crash happened, and `HARSH_BRAKING_NO_
+  //    CAUSE` defers to COLLISION in the same words. MEASURED on
+  //    `sc-sign-warning/mistake-hold-speed`: departure at t ≈ 21.18 s, impact at
+  //    t = 21.43 s, and this detector fired at t = 23.18 s — the sheet read
+  //    SPEED_TOO_FAST_FOR_CONDITIONS + COLLISION + OFF_CARRIAGEWAY for one slide
+  //    off an icy road.
+  //    THE TEST IS TWO-SIDED ON PURPOSE, because the order is not fixed: there
+  //    the car left the road and THEN hit a body already off it, while a spin
+  //    after a mid-carriageway impact happens the other way round. Both are the
+  //    same event, so what is compared is the episode's ONSET against the last
+  //    contact REPORT, within one sustain either way. Reusing
+  //    OFF_CARRIAGEWAY_SUSTAIN_SEC rather than inventing a second number is the
+  //    claim itself: a departure this reducer cannot separate from an impact by
+  //    more than the window it needs to call a departure real is not a separate
+  //    act. A departure that starts LATER than that — the student recovered,
+  //    drove on, and then left the road — is freely chosen and is billed.
+  //    The gate is on the EMIT, not on the condition, so the episode still spends
+  //    itself and one crash cannot be re-billed frame after frame.
+  //    Read off `contactEpisodes` (every contact REPORT, billed or not) rather
+  //    than off a new latch: a contact that `cameApart` judged part of an
+  //    already-open encounter is still an impact, and still not the driver
+  //    steering into a field.
+  const atPlaceholderPose =
+    tick.position.x === 0 && tick.position.y === 0 && Math.abs(speed) <= POSE_PLACEHOLDER_KMH;
+  // Read BEFORE the step: a firing episode keeps its `activeSince`, but taking
+  // it here also documents that the onset compared below is the one the sustain
+  // was measured from, not whatever the next frame does to it.
+  const departureOnset = s.offCarriageway.activeSince;
+  if (
+    stepEpisode(
+      s.offCarriageway,
+      tick.edgeId === null && !atPlaceholderPose,
+      typeof tick.edgeId === "string",
+      t,
+      OFF_CARRIAGEWAY_SUSTAIN_SEC,
+    )
+  ) {
+    // The crash scan is INSIDE the fire branch, not beside it: `Object.keys`
+    // allocates, this reducer runs on every render frame (~120 Hz), and the
+    // branch is reached at most once per excursion. The value is needed only to
+    // decide whether to push, so computing it every frame would be a per-frame
+    // allocation bought for nothing — the discipline the accel window's own note
+    // spells out two hundred lines up.
+    let lastContactAt: number | null = null;
+    for (const key of Object.keys(s.contactEpisodes)) {
+      const at = s.contactEpisodes[key]!.at;
+      if (lastContactAt === null || at > lastContactAt) lastContactAt = at;
+    }
+    const crashCausedDeparture =
+      lastContactAt !== null &&
+      departureOnset !== null &&
+      Math.abs(departureOnset - lastContactAt) <= OFF_CARRIAGEWAY_SUSTAIN_SEC;
+    if (!crashCausedDeparture) events.push(makeViolation("OFF_CARRIAGEWAY", t));
   }
 
   // -- 4a2. B1a Wave-2 small-rule detectors (doc 72 capability 1). Each rides

@@ -535,6 +535,150 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Извън изпита: глоба 50 лв. по ЗДвП чл. 183, ал. 2 — водач, който „нарушава правилата за разположение на пътно превозно средство върху платното за движение“.",
     realWorldRefs: ["ЗДвП чл. 183, ал. 2, т. 2"],
   },
+  OFF_CARRIAGEWAY: {
+    // THE FAULT THE PRODUCT COULD NAME BUT NOT CHARGE, until this row.
+    // `engine.ts`'s withdrawn-gate block (the „WITHDRAWN 2026-08-26" comment at
+    // the top of `reduceTick`) is the whole derivation and should be read before
+    // this row is touched. The short form: the runtime has published
+    // `edgeId: null` at the kerb since 2026-08-26, three exhibits show a car
+    // driving or resting off the road with an EMPTY sheet — `sc-ac-truck-spray/
+    // mobile-wrong` 04-t102s at 145 км/ч across open field, `sc-sp-curve/
+    // mobile-wrong` 04-t154s at 96 км/ч on a green plane, `sc-rb-exit-signal/
+    // mobile-right` at REST on a roundabout island — and the COLLISION row two
+    // hundred lines down already tells a student „Излизането от платното е самото
+    // произшествие" (see COLLISION_CONTACT_COPY). The product could say the
+    // sentence and could not bill it. It can now.
+    //
+    // THE SAME ARTICLE AS `NOT_KEEPING_RIGHT` DIRECTLY ABOVE, and that is the
+    // argument for the citation rather than a coincidence. чл. 15, ал. 1 is one
+    // sentence with two halves — the car „се движи възможно най-вдясно ПО
+    // ПЛАТНОТО ЗА ДВИЖЕНИЕ". Hogging the left lane breaks the second half and is
+    // billed above; leaving the carriageway breaks the FIRST, which is the half
+    // nothing in this catalogue had ever charged.
+    //
+    // LAW RETRIEVED, NOT RECALLED (ADR-002) — read out of
+    // `content/law/acts/zdvp.json` while writing this row, not carried over from
+    // the routing comment in engine.ts:
+    //   чл. 15, ал. 1: „На пътя водачът на пътно превозно средство се движи
+    //   възможно най-вдясно по платното за движение, а когато пътните ленти са
+    //   очертани с пътна маркировка, използва най-дясната свободна лента."
+    //   § 6, т. 3: „„Платно за движение" е общата широчина на пътните ленти.
+    //   Пътят може да има няколко платна за движение, видимо отделени едно от
+    //   друго."
+    //   § 6, т. 4: „„Граница на платното за движение" е линията, очертана или не
+    //   с пътна маркировка, която отделя платното за движение от другите
+    //   конструктивни елементи на пътното платно - банкет, тротоар, лента за
+    //   принудително спиране и други. Линията, с която се очертава „BUS"-лентата,
+    //   също е граница на платното за движение."
+    //   § 6, т. 6: „„Тротоар" е изградена, оградена или очертана с пътна
+    //   маркировка надлъжна част от пътя, ограничаваща платното за движение и
+    //   предназначена само за движение на пешеходци."
+    //   чл. 94, ал. 1: „За престой извън населените места пътните превозни
+    //   средства се спират извън платното за движение. Когато това е невъзможно,
+    //   спирането за престой се извършва успоредно на оста на пътя, най-вдясно
+    //   на пътното платно."
+    //   чл. 94, ал. 2: „За паркиране извън населените места пътните превозни
+    //   средства се спират извън платното за движение. Паркирането на платното
+    //   за движение е забранено."
+    //   чл. 94, ал. 3: „За престой и паркиране в населените места пътните
+    //   превозни средства се спират възможно най-вдясно на платното за движение
+    //   по посока на движението и успоредно на оста на пътя. Допуска се престой
+    //   и паркиране на моторни превозни средства с допустима максимална маса до
+    //   2,5 тона върху тротоарите само на определените от собствениците на пътя
+    //   или администрацията места, успоредно на оста на пътя, ако откъм страната
+    //   на сградите остава разстояние най-малко 2 метра за преминаване на
+    //   пешеходци."
+    // т. 4 is the one the routing comment did not know it needed: it defines the
+    // BOUNDARY, which is the thing the detector actually measures, so the
+    // citation answers „where exactly?" and not only „what?". Its SECOND sentence
+    // was dropped when this row was first written and is restored above: it is
+    // harmless to this detector — a BUS lane keeps a valid `edgeId`, so this code
+    // cannot fire on one and cannot double-bill beside `BUS_LANE_DRIVING` — but a
+    // quotation is not a place to economise.
+    // чл. 15, ал. 2 does NOT exempt this. Its three cases all pick a LANE („може
+    // да използва за движение най-удобната за него пътна лента"), never a surface
+    // off the carriageway. чл. 15, ал. 5 points the same way from the other side:
+    // the банкет is opened to „мотопеди, велосипеди и други немоторни превозни
+    // средства" and to nothing else, so a car has no licence to TRAVEL there
+    // either. „Travel" is the word that has to be in that sentence, and the next
+    // paragraph is why.
+    //
+    // ЧЛ. 94 IS WHY THE COPY BELOW STATES A BAN *AND* ITS EXCEPTION. The first
+    // draft of this row shipped two uncited absolutes the act refutes:
+    // „тротоарът — само за пешеходци" as a statement about ALL use, and
+    // „тревата и тротоарът не са паркинг" as a universal the student is told to
+    // act on. § 6, т. 6 designates the тротоар for pedestrian ДВИЖЕНИЕ; where a
+    // car may STAND is чл. 94's question, and its answer is neither „anywhere"
+    // nor „never":
+    //   · IN a built-up area — as far right ON the carriageway (ал. 3, first
+    //     sentence), and on the pavement ONLY at places designated by the road
+    //     owner or the administration, ≤ 2,5 t, parallel to the axis, 2 m left
+    //     for pedestrians (ал. 3, second sentence);
+    //   · OUTSIDE a built-up area — the opposite of the in-town rule: the car
+    //     MUST be stopped off the carriageway, and parking on it is forbidden
+    //     outright (ал. 1 and ал. 2).
+    // A row that told a seventeen-year-old „тротоарът не е паркинг" full stop
+    // would be contradicted by the first marked bay on his own street and
+    // inverted the moment he drives out of town — which is precisely how a
+    // virtual instructor loses a student (doc 64 THEO-4), and it is free recall
+    // (ADR-002) inside a row that otherwise retrieves. The idiom is already in
+    // the repo — `templates-parking2.ts:307` states the ban and names the
+    // exception in the same breath — and the copy below follows it.
+    //
+    // NO `realWorldBg`, AND THE BLANK IS A DECISION THIS ROW OWES AN
+    // EXPLANATION FOR — it is the thirteenth deliberate one, not an oversight.
+    //
+    // THE FINE WAS RETRIEVED. чл. 183, ал. 2, т. 2 prices „нарушава правилата за
+    // разположение на пътно превозно средство върху платното за движение" at
+    // 50 лв., and `NOT_KEEPING_RIGHT` — the OTHER half of the same чл. 15, ал. 1
+    // — is already charged exactly there. So the number is not the problem.
+    //
+    // WHY IT IS NOT PRINTED ANYWAY. An authored лв. sentence here lands this code
+    // in `roadConsequenceFor`'s `authored` shape, and `__tests__/offences.ts`
+    // „leaves no catalogued code invisible to every census" refuses that shape by
+    // name: „those rows print a лв. sentence of their own, so the day one appears
+    // somebody has to decide whether it can double, rather than inherit silence."
+    // It caught this row on the first run, and it was right to. чл. 183, ал. 2,
+    // т. 2 @ 50 лв. is ALREADY a shared cluster — `SEPARATE_ACTS` carries
+    // NOT_KEEPING_RIGHT + CROSSED_SOLID_LINE under it — so a third member cannot
+    // be added by writing prose; it needs a structured `ROAD_CONSEQUENCES` entry
+    // (which is what makes the charge comparable at all) plus a ruling in
+    // `offences.ts`. Both are files this change does not own, and the контролни
+    // точки figure a `single` entry requires would have to be cut from Наредба
+    // № Iз-2539 rather than assumed. Silence beats an unchecked price.
+    //
+    // THE RULING THE NEXT LANE INHERITS, so it is not re-derived: SEPARATE, and
+    // it joins the existing NOT_KEEPING_RIGHT + CROSSED_SOLID_LINE entry. One act
+    // cannot produce both — this code arms only on `edgeId === null` (the car is
+    // OFF the carriageway) and NOT_KEEPING_RIGHT arms on holding a left lane,
+    // which requires being ON it; the two conditions are mutually exclusive
+    // frame by frame, which is a stronger separation than that entry's existing
+    // pair has. Two excursions in one drive are two acts, as they are there.
+    //
+    // AND THE PURIST'S OBJECTION, recorded because whoever lands the structured
+    // entry must answer it: т. 2 speaks of position ВЪРХУ платното за движение,
+    // and a car that has left it entirely is arguably no longer върху anything.
+    // No escalation may be claimed either — чл. 179, ал. 2's 300 лв. is
+    // conditioned on „движение с несъобразена скорост", a different act this
+    // detector does not establish, and inventing that link is how the invented
+    // „50 метра" shipped.
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Излизане от платното за движение",
+    explanationBg:
+      "Излезе с колата извън платното за движение — отвъд бордюра, на банкета, тротоара или тревата — и остана там. Платното за движение е общата широчина на пътните ленти (ЗДвП § 6, т. 3) и е мястото, по което се движи автомобилът; границата му е линията, която го отделя от банкета, тротоара и лентата за принудително спиране (§ 6, т. 4). Отвъд тази граница законът пуска други: по банкета се движат мотопеди, велосипеди и немоторни превозни средства, когато няма лента за тях (чл. 15, ал. 5), а тротоарът е предназначен само за движение на пешеходци (§ 6, т. 6). Това са правила за ДВИЖЕНИЕТО — къде е позволено да спреш е отделен въпрос и на него отговаря чл. 94. Там сцеплението е друго, спирачният път е по-дълъг, а пешеходецът зад храста не очаква автомобил.",
+    correctiveBg:
+      "Прибери се на платното веднага, но плавно: не дърпай волана — отпусни газта, изправи колелата и се върни под малък ъгъл, след като си погледнал в огледалото. Трябва ли да спреш — в населено място спираш възможно най-вдясно НА платното, успоредно на оста на пътя (ЗДвП чл. 94, ал. 3); извън населено място правилото е обърнато — там се отбива ИЗВЪН платното, а паркирането на самото платно е забранено (чл. 94, ал. 1 и 2). Тротоарът не е свободен паркинг, но не е и абсолютна забрана: качване върху него се допуска само на определените от собственика на пътя или от администрацията места, за автомобил до 2,5 т, успоредно на оста на пътя и ако откъм сградите остават поне 2 метра за пешеходците (чл. 94, ал. 3) — навсякъде другаде е нарушение. Излезеш ли встрани в завой, причината е преди завоя: намали ПРЕДИ да влезеш в дъгата, не в нея.",
+    lawRef: "ЗДвП чл. 15, ал. 1",
+    // `c-right-side-rule` (which cites чл. 15 itself) is the near miss and is
+    // deliberately not used: a student who has left the road does not need the
+    // keep-right lesson, he needs the one that says what the carriageway IS and
+    // where it ends. That is `c-road-elements` — its own lawRefs are „§ 6 ДР"
+    // and its summary is already the sentence („колата се движи по платното,
+    // пешеходецът по тротоара"). c-right-side-rule `dependsOn` it, so the
+    // recommender still reaches the keep-right beat from here, in that order.
+    conceptId: "c-road-elements",
+  },
   FAILED_TO_YIELD: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,

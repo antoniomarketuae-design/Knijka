@@ -521,6 +521,14 @@ export type ViolationCode =
   | "FOLLOWING_TOO_CLOSE" // основна: tailgating — under the 2-second gap
   | "WRONG_WAY" // опасна: driving against a one-way street
   | "NOT_KEEPING_RIGHT" // второстепенна: hogging a left lane on a multi-lane road
+  // The SAME article as NOT_KEEPING_RIGHT, one step further out. чл. 15, ал. 1
+  // places the car „по платното за движение" and then as far right as it can
+  // be; hogging the left lane breaks the second half, and this breaks the
+  // first. Fed by `SimTick.edgeId === null` — the runtime's own statement that
+  // the car is past the kerb — never by `!edgeId`: `undefined` means the tick
+  // source cannot answer, and reading absence as departure convicts every
+  // replay and every hand-built fixture. See the detector in engine.ts.
+  | "OFF_CARRIAGEWAY" // основна: sustained travel/rest off the carriageway (чл. 15, ал. 1)
   | "FAILED_TO_YIELD" // опасна: entered a priority situation without giving way (Phase 2)
   | "EMERGENCY_NOT_YIELDED" // опасна: failed to make way for a special-regime vehicle (VU-09; prioritySituation "emergency")
   | "PEDESTRIAN_CROSSING_TOO_FAST" // опасна: accident precondition (official list)

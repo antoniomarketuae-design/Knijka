@@ -211,7 +211,7 @@ describe("realWorldBg — every figure is retrieved, never recalled (ADR-002)", 
     expect(unitTextFor("ЗДвП чл. 9999")).toBeNull();
   });
 
-  it("the 13 rows with no street price are the ones we could not retrieve", () => {
+  it("the 14 rows with no street price are the ones we could not retrieve — or could not yet PRICE", () => {
     // PINNED BY NAME so adding a fine is a reviewed act and removing one is
     // visible. Each absence has a reason, written at the row:
     //  - CONTROLLER_SIGNAL_VIOLATED — no penalty article names the регулировчик
@@ -235,6 +235,22 @@ describe("realWorldBg — every figure is retrieved, never recalled (ADR-002)", 
     //    correct and teachable answer.
     //  - DRIVING_TOO_SLOW_FOR_MOTORWAY — чл. 22, ал. 1 bans obstructing at low
     //    speed, but no penalty article names it.
+    //  - OFF_CARRIAGEWAY (2026-08-30) — THE ONE ABSENCE ON THIS LIST THAT IS NOT
+    //    A FAILED RETRIEVAL, which is why the title of this case now says „or
+    //    could not yet PRICE". The article was found: чл. 183, ал. 2, т. 2,
+    //    50 лв., „нарушава правилата за разположение на пътно превозно средство
+    //    върху платното за движение" — the very provision NOT_KEEPING_RIGHT, the
+    //    other half of the same чл. 15, ал. 1, is already charged under. It is
+    //    not printed because that точка is a SHARED cluster (`offences.ts`
+    //    SEPARATE_ACTS already holds NOT_KEEPING_RIGHT + CROSSED_SOLID_LINE
+    //    under it), and `offences.test.ts` „leaves no catalogued code invisible
+    //    to every census" refuses a bare authored лв. sentence for exactly that
+    //    reason — it caught this row on its first run. Joining the cluster needs
+    //    a structured ROAD_CONSEQUENCES entry plus a double-billing ruling in
+    //    two files the lane that added the code does not own. The ruling it
+    //    should inherit is written at the catalogue row: SEPARATE, because this
+    //    code arms only on `edgeId === null` and NOT_KEEPING_RIGHT needs the car
+    //    ON the carriageway, so the two cannot describe one act.
     expect(CODES.filter((c) => VIOLATIONS[c].realWorldBg === undefined)).toEqual([
       "CONTROLLER_SIGNAL_VIOLATED",
       "DRIVING_TOO_SLOW_FOR_MOTORWAY",
@@ -243,6 +259,7 @@ describe("realWorldBg — every figure is retrieved, never recalled (ADR-002)", 
       "HARSH_BRAKING_NO_CAUSE",
       "HESITATION_AT_GREEN",
       "JUNCTION_SCAN_INCOMPLETE",
+      "OFF_CARRIAGEWAY",
       "PEDESTRIAN_CROSSING_TOO_FAST",
       "PREDRIVE_STEP_SKIPPED",
       "PREDRIVE_WRONG_ORDER",

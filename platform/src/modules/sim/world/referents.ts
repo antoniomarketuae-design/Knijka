@@ -15,10 +15,16 @@
  * and asserts a REQUIRED-REFERENT predicate per fault code: if the code can
  * fire on this rung, the world must contain the thing the code is about.
  *
- * 45 codes carry a referent. The other 13 are listed in `NO_WORLD_REFERENT`,
- * so the exemption is a reviewed decision rather than an oversight. 45 + 13 =
- * 58 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
+ * 46 codes carry a referent. The other 14 are listed in `NO_WORLD_REFERENT`,
+ * so the exemption is a reviewed decision rather than an oversight. 46 + 14 =
+ * 60 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
  * itself, so a new code cannot ship unchecked and unexempted.
+ *
+ * (This paragraph read „45 … 13 … 58" until 2026-08-30 and had been wrong since
+ * CLOSING_ON_LEAD_TOO_FAST landed on 2026-08-05: the gate test's own pin was
+ * already 46/13/59 and is what the tree actually enforces. Corrected in the
+ * same pass that adds the fourteenth exemption, because a prose count that
+ * drifts from the asserted one teaches the next reader to trust neither.)
  *
  * PURE + node-safe: no three.js, no DOM, no network. The gate test drives it.
  *
@@ -79,11 +85,34 @@ import {
 export type FaultCode = ViolationCode | CommendationCode;
 
 /**
- * The 13 codes with NO world referent — doc 86 §10. Each is a fact about the
- * CAR or the DRIVER's procedure, not about the street: the world cannot be
- * wrong about a seatbelt. Listed explicitly so the exemption is reviewed.
+ * The 14 codes with NO world referent — doc 86 §10. Thirteen of them are a fact
+ * about the CAR or the DRIVER's procedure, not about the street: the world
+ * cannot be wrong about a seatbelt. Listed explicitly so the exemption is
+ * reviewed.
+ *
+ * `OFF_CARRIAGEWAY` IS THE FOURTEENTH AND IT IS EXEMPT FOR A DIFFERENT REASON,
+ * written out because appending it under the sentence above would have made
+ * that sentence false. It is emphatically about the street — but it is a
+ * SURFACE QUERY, not a body. Every other checked code names a thing the world
+ * must CONTAIN (a Б2, a light, an authored В24 span, a staged cyclist) and the
+ * predicate asks „is it there?"; this code's referent is the carriageway
+ * itself, which every district that has a single drawn edge already has. A
+ * required-referent rule for it could only ever assert „this world has a road",
+ * which is true of all 105 shipped districts by construction and would
+ * therefore be a check that can never fail — the dead-predicate class, in the
+ * one file whose whole job is to stop codes grading what their world lacks.
+ * The honest answer is the exemption plus this paragraph.
+ *
+ * WHAT ACTUALLY GUARDS IT INSTEAD, since „exempt here" must not read as
+ * „unguarded": `runtime/__tests__/off-carriageway-consult.test.ts` proves the
+ * acquitting half directly on the geometry — 248 spawn points, 117 authored
+ * parking-bay centres and 57,000 poses across every travel lane AND kerbside
+ * parking band of all 105 districts, worst `outsideKerbM` 0.000 m. That is a
+ * stronger statement than a referent rule could make: not „the world contains
+ * the thing", but „nowhere a lawful car can stand reads as off it".
  */
 export const NO_WORLD_REFERENT: ReadonlySet<FaultCode> = new Set<FaultCode>([
+  "OFF_CARRIAGEWAY",
   "SEATBELT_OFF_WHILE_MOVING",
   "HANDBRAKE_LEFT_ON",
   "ENGINE_STALLED",
