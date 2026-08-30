@@ -235,6 +235,16 @@ describe("the catalogue census", () => {
     // right-hand lane, and `lane15-parking-depth` asserts that exclusion every
     // build. Reported to the integrator; the row stays open.
     expect(bound).toEqual([
+      // WAVE 12 — and this one is the strongest member of the set, because its
+      // banner names the RELATIONSHIP to the body it must not strike:
+      // «Следвай предната кола с къси светлини». The w17 frame shows that tick
+      // awarded beside «Удар в друго превозно средство −10» — the objective was
+      // certified over a rear-end INTO THE VERY CAR the banner says to follow.
+      // Every term the disc carried was honoured; none of them witnessed the
+      // collision. Measured through applyTick: clean drive -> done, struck
+      // vehicle -> active, both reaching phase=completed so the debrief still
+      // renders.
+      "sc-ac-highbeam-lead/sc-ahl-follow",
       // The founding member — the only one whose banner names the contact.
       "sc-hazard-obstacle/sc-obs-cleared",
       // The four reverse-parking setup halts (wave 8). Ordered as the
@@ -276,6 +286,7 @@ describe("the catalogue census", () => {
     // consumer" class this programme has measured 51 times, so the four new
     // members are driven through `compileScenario` too.
     const CENSUS: ReadonlyArray<readonly [string, string]> = [
+      ["sc-ac-highbeam-lead", "sc-ahl-follow"],
       ["sc-hazard-obstacle", "sc-obs-cleared"],
       ["sc-park-van", "sc-pvn-setup"],
       ["sc-park-45-rev", "sc-p45r-setup"],

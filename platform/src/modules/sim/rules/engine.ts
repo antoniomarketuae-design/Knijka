@@ -2082,6 +2082,56 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * code naming the real fault AT THE KERB — `rules/types.ts` + this file + the
    * violation catalogue + a lawRef the founder signs. That is the fix. A blanket
    * acquittal is not, so `sc-sp-curve:45e7e4fb` stays an OPEN row.
+   *
+   * WAVE 12 — THE TWO THINGS „that is the fix" STILL LEFT UNANSWERED, settled
+   * here so the lane that lands the code inherits them instead of re-deriving
+   * them. This paragraph ships NO predicate, is read by nothing at runtime and
+   * closes no row by itself; it is written because the class has now been filed
+   * four times against three different files — `sc-sp-curve:45e7e4fb` above,
+   * plus `sc-ac-truck-spray:7e53374c` and `sc-rb-exit-signal:7948cdde` on the
+   * w17 re-drive — and each re-filing has so far cost a lane.
+   *
+   *  1. THE ENGINE'S INPUT SIDE IS ALREADY LIVE; there is nothing to build on
+   *     this side but the arm. `runtime/worldRuntime.ts:1992` publishes
+   *     `edgeId: offCarriageway ? null : fix.edgeId`, and that tick reaches this
+   *     reducer every frame on the real route — `LessonScene.tsx:4194`
+   *     `runtime.sample(…)` → `LessonPlayShell.tsx:3966` `applyTick` →
+   *     `lessons/engine.ts:873` `reduceTick`. The signal a conviction needs is
+   *     already ON THE TICK, at the kerb, at 0.97 m. What is absent is only the
+   *     code and its rows. WITH ONE POLARITY TRAP: `edgeId` is
+   *     `string | null | undefined`, and `undefined` means „this tick source
+   *     cannot answer" (replays, fixtures, the dev rigs — see `types.ts`). Only
+   *     an explicit `null` may ever convict. A gate written as `!tick.edgeId`
+   *     turns every hand-built tick in the suite into a driver in a field.
+   *
+   *  2. THE LAWREF IS NO LONGER AN OPEN QUESTION. Retrieved and not recalled
+   *     (ADR-002), out of `content/law/acts/zdvp.json`:
+   *       "ЗДвП чл. 15, ал. 1" — „На пътя водачът на пътно превозно средство се
+   *       движи възможно най-вдясно ПО ПЛАТНОТО ЗА ДВИЖЕНИЕ, а когато пътните
+   *       ленти са очертани с пътна маркировка, използва най-дясната свободна
+   *       лента." The duty names the carriageway itself, so it is the article
+   *       the act breaches; § 6, т. 3 of the same act defines „платно за
+   *       движение", which is what keeps the citation answerable to a
+   *       seventeen-year-old instead of circular. ал. 2 does NOT exempt it — its
+   *       three cases pick a LANE, never a surface off the carriageway. Re-open
+   *       the file rather than trust these words if one of them is load-bearing.
+   *
+   * THE SHAPE OF THE REST IS THE ONE `catalog.ts` ALREADY WORKED OUT for the two
+   * telltale codes („TWO CODES THAT ARE STILL NEEDED AND ARE DELIBERATELY NOT
+   * HERE"): `VIOLATIONS` (catalog.ts:142) and `N38_BASIS` (n38.ts:176) are TOTAL
+   * `Record<ViolationCode, …>`, so a code added to `types.ts` alone will not
+   * compile, and a code added everywhere BUT here has no emitter and is the
+   * dead-predicate class. One change or none of it.
+   *
+   * WHAT THE TWO NEW EXHIBITS ADD over the curve row: they are the case with NO
+   * COLLISION IN IT, which is where the gap actually bites. `sc-ac-truck-spray /
+   * mobile-wrong` 04-t102s is 145 км/ч across open field with no road in frame
+   * and no fault of any class booked; on `sc-rb-exit-signal / mobile-right` the
+   * car comes to REST on the roundabout's central island and the sheet books
+   * only «Удар в неподвижно препятствие». The collision row's own copy already
+   * says „Излизането от платното е самото произшествие" (catalog.ts:1851) — the
+   * product can NAME the act today, it just cannot charge it unless the car also
+   * hits something on the way out.
    */
 
   // Frame-to-frame derivatives (A12 tolerance bands). dt of 0 (duplicate

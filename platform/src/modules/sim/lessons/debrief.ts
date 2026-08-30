@@ -250,6 +250,16 @@ export function buildDebrief(
   const scoredCodes = new Set<string>(summary.mistakes.map((m) => m.code));
   const coached = (context.coachedMistakes ?? []).filter((c) => !scoredCodes.has(c.code));
   /**
+   * HOW MANY TEACH MOMENTS THE STUDENT WILL ACTUALLY SEE, hoisted out of the
+   * „издържан" branch because a SECOND verdict branch now has to consult it.
+   *
+   * Counted by TITLE, because „Учебни моменти" is deduplicated by title
+   * (`coachedLines`) and the queue behind it was measured EIGHT deep on one
+   * drive — a raw row count in a sentence here would name a number that
+   * section never prints, which is the „24 over 10" defect in a smaller frame.
+   */
+  const coachedKinds = new Set(coached.map((c) => c.titleBg)).size;
+  /**
    * THE THIRD RECORD OF „this drive was not clean", HOISTED because THREE
    * sentences below have to consult it and one of them is the headline.
    *
@@ -372,22 +382,10 @@ export function buildDebrief(
      * instead of paraphrasing it.
      */
     const head = `Урокът „${lesson.titleBg}“ е издържан: ${examPointsWordBg(summary.score.totalPoints)} от изпитния лист при допустими 9.`;
-    // Counted by TITLE, because „Учебни моменти" is deduplicated by title
-    // (`coachedLines`) and the queue behind it was measured EIGHT deep on one
-    // drive — a raw row count here would name a number that section never
-    // prints, which is the „24 over 10" defect in a smaller frame.
-    const coachedKinds = new Set(coached.map((c) => c.titleBg)).size;
     const reservations: string[] = [];
     if (summary.score.totalPoints > 0) {
       reservations.push(
         `${examPointsWordBg(summary.score.totalPoints)} вече са в листа, а запасът за целия изпит е 9`,
-      );
-    }
-    if (coachedKinds > 0) {
-      reservations.push(
-        coachedKinds === 1
-          ? "едно нарушение беше показано и този път не влезе в точките"
-          : `${coachedKinds} нарушения бяха показани и този път не влязоха в точките`,
       );
     }
     /**
@@ -425,37 +423,13 @@ export function buildDebrief(
      * sit, and the near-miss section is 1 300 px below them. Two surfaces, one
      * derivation; see that function for the wire gap this side still has.
      */
-    if (closestNearMiss !== null) {
-      reservations.push(
-        nearMisses.length === 1
-          ? `имаше разминаване на косъм — ${nearMissPhraseBg(closestNearMiss)}`
-          : `имаше ${nearMisses.length} разминавания на косъм, най-близкото ${nearMissPhraseBg(closestNearMiss)}`,
-      );
-    }
-    // Each thing pointed at is GUARANTEED to be below: points > 0 implies a
-    // billed row, so the mistakes block prints; `coachedKinds > 0` is the very
-    // condition the teach section prints on; and the near-miss paragraph prints
-    // on exactly `nearMisses.length > 0`. No pointer to a section the student
-    // cannot find.
-    //
-    // DESCRIBED, NOT QUOTED BY HEADING, and that is deliberate rather than
-    // stylistic: a pointer carrying the literal string „Най-важните грешки"
-    // would make this paragraph the FIRST match for it in the document, and the
-    // „gravity before praise" ordering is asserted by `indexOf` on exactly that
-    // string (`debrief-truthfulness.test.ts`). A cross-reference must not be
-    // mistakable for the thing it refers to.
-    //
-    // BUILT FROM THE FLAGS, NOT FROM `reservations.length`. The count keyed the
-    // wording until a THIRD channel joined the list, and „length === 2" then
-    // meant three different pairs — the shape that prints „грешките и учебните
-    // моменти" over a drive that has neither. Each clause is named by the thing
-    // that put it there.
-    const wherePartsBg = [
-      ...(summary.score.totalPoints > 0 ? ["грешките"] : []),
-      ...(coachedKinds > 0 ? ["учебните моменти"] : []),
-      ...(closestNearMiss !== null ? ["разминаванията на косъм"] : []),
-    ];
-    const where = `${joinBg(wherePartsBg)} по-долу`;
+    // The two unscored channels, and the pointer that matches them, both now
+    // come from the shared derivations at the foot of this file — a SECOND
+    // verdict branch (the spotless-sheet line further down) makes the same
+    // claim about the same drive, and two copies of one judgement diverge.
+    // Their headers carry the reasoning that used to sit here.
+    reservations.push(...unscoredReservationsBg(coachedKinds, nearMisses));
+    const where = unscoredPointerBg(summary.score.totalPoints > 0, coachedKinds, closestNearMiss);
     lines.push(
       reservations.length === 0
         ? `${head} Точно това иска да види изпитващият.`
@@ -525,12 +499,62 @@ export function buildDebrief(
    * The arithmetic below is the check, not a mood: !passed with an empty
    * mistake list and a zero total can ONLY be the route half of the AND, so the
    * line can name the real reason without guessing at one.
+   *
+   * ============================================================
+   * …AND „НЕ ЗА КАРАНЕТО" IS A CLAIM ABOUT THE DRIVE, SO IT NEEDS THE SAME
+   * THREE CHANNELS THE „ИЗДЪРЖАН" HEADLINE ABOVE WAS TAUGHT TO READ —
+   * finding `sc-signal-flashing:0d68b149`.
+   *
+   * MEASURED · w17 (commit bc7d43fc) · `sc-signal-flashing` · mobile · wrong
+   * (`.audit-frames/w17/frames/sc-signal-flashing__mobile-wrong/`), one
+   * `section[aria-label="Разбор"]`, verbatim and four lines apart:
+   *
+   *   «По изпитния лист нямаш нито една наказателна точка (0 при допустими 9)
+   *    — оценката е за незавършения маршрут, НЕ ЗА КАРАНЕТО.»
+   *   «Учебни моменти (не влизат в точките): • Превишена скорост»
+   *
+   * The HUD had raised «Превишена скорост» over a cluster reading 59 км/ч
+   * against the lesson's own 50 badge; A12 withheld the charge because it was
+   * a first encounter, which is the whole point of teach-first — and this
+   * sentence then told the seventeen-year-old who drove it that the verdict
+   * has nothing to do with his driving. It is the SAME hole the „издържан"
+   * branch closed twice above (the clean-drive praise was scoped to the sheet,
+   * then the headline was), reappearing in the one verdict branch neither
+   * repair reached. Counted over TODAY's sweep: 140 debriefs captured, 11
+   * print this sentence, and FIVE of those eleven also print „Учебни моменти"
+   * — `sc-jx-giveway-b1__pc-right`, `sc-rb-circulate-priority` on both
+   * platforms, `sc-signal-flashing__mobile-wrong`, `sc-signal-hesitation__
+   * mobile-wrong`.
+   *
+   * NOTHING IS RE-PRICED, and this file may not: A12 owns the withholding
+   * (`scenarios/policy.ts`, `lessons/engine.ts teachMoments`) and the row's
+   * own «still not billed» half belongs there, not here. `passed` is
+   * untouched, the 0 is untouched, the table is untouched. What comes off is
+   * only the clause that DENIES the drive — the true half («0 при допустими
+   * 9», and the verdict is for the unfinished route) is kept word for word,
+   * and the reservation the run itself recorded is named beside it, from the
+   * same derivation the headline uses so the two sentences on one screen can
+   * never diverge.
+   *
+   * A DRIVE WITH NOTHING WITHHELD IS BYTE-IDENTICAL to what shipped —
+   * `debrief-truthfulness.test.ts` pins that sentence whole, and it must keep
+   * passing on a spotless run.
+   * ============================================================
    */
   if (!result.passed && summary.mistakes.length === 0 && summary.score.totalPoints === 0) {
-    const because = result.aborted
-      ? "оценката е за прекъснатия урок, не за карането"
-      : "оценката е за незавършения маршрут, не за карането";
-    lines.push(`По изпитния лист нямаш нито една наказателна точка (0 при допустими 9) — ${because}.`);
+    const forWhat = result.aborted ? "прекъснатия урок" : "незавършения маршрут";
+    // Points are 0 by the guard above, so „грешките" can never be one of the
+    // things pointed at here — the pointer is the teach section and the
+    // near-miss paragraph, and each prints on exactly the flag that named it.
+    const reservations = unscoredReservationsBg(coachedKinds, nearMisses);
+    const sheetBg = "По изпитния лист нямаш нито една наказателна точка (0 при допустими 9)";
+    lines.push(
+      reservations.length === 0
+        ? `${sheetBg} — оценката е за ${forWhat}, не за карането.`
+        : `${sheetBg} — оценката е за ${forWhat}. Но чистият лист не значи чисто каране: ` +
+          `${reservations.join("; ")}. Прочети ` +
+          `${unscoredPointerBg(false, coachedKinds, closestNearMiss)} и повтори урока с тях наум.`,
+    );
   }
 
   // -- failed with the route done, which is the mirror of it ------------------
@@ -1262,10 +1286,88 @@ function coachedLines(coached: ReadonlyArray<{ code: string; titleBg: string }>)
 }
 
 /**
+ * WHAT THE RUN RECORDED ABOUT ITSELF THAT THE EXAM SHEET NEVER PRICED — the
+ * two unscored channels, said once, for every verdict sentence that makes a
+ * claim about the DRIVE rather than about the sheet.
+ *
+ * Lifted out of the „издържан" branch when a SECOND branch turned out to need
+ * it (finding `sc-signal-flashing:0d68b149`: the spotless-sheet line's „не за
+ * карането"). One derivation and not two, for the reason `commendationRiderBg`
+ * gives in so many words — a judgement written twice diverges, and these two
+ * sentences sit on ONE result screen where a reader can hold them side by side.
+ *
+ * The POINTS clause is deliberately NOT here. It belongs to the branch that can
+ * have points: the spotless-sheet caller reaches its line only with a zero
+ * total, so a points reservation there would be a sentence about a figure the
+ * same paragraph has just printed as nought.
+ *
+ * Neither channel is graded and neither is re-graded from here: a teach moment
+ * is A12's withheld charge (`scenarios/policy.ts`) and a near miss is a session
+ * stat by construction (`lessons/types.ts SessionNearMiss`). What the caller
+ * gets is the right to STATE them.
+ */
+function unscoredReservationsBg(
+  coachedKinds: number,
+  nearMisses: ReadonlyArray<SessionNearMiss>,
+): string[] {
+  const out: string[] = [];
+  if (coachedKinds > 0) {
+    out.push(
+      coachedKinds === 1
+        ? "едно нарушение беше показано и този път не влезе в точките"
+        : `${coachedKinds} нарушения бяха показани и този път не влязоха в точките`,
+    );
+  }
+  const closest = nearMissClosest(nearMisses);
+  if (closest !== null) {
+    out.push(
+      nearMisses.length === 1
+        ? `имаше разминаване на косъм — ${nearMissPhraseBg(closest)}`
+        : `имаше ${nearMisses.length} разминавания на косъм, най-близкото ${nearMissPhraseBg(closest)}`,
+    );
+  }
+  return out;
+}
+
+/**
+ * …AND WHERE TO READ THEM — the „…по-долу" pointer, paired to the same flags so
+ * a sentence can never send a student to a section that did not print.
+ *
+ * Each thing pointed at is GUARANTEED to be below: a billed row means the
+ * mistakes block prints; `coachedKinds > 0` is the very condition the teach
+ * section prints on; and the near-miss paragraph prints on exactly
+ * `nearMisses.length > 0`.
+ *
+ * BUILT FROM THE FLAGS, NOT FROM A COUNT. The wording was keyed on
+ * `reservations.length` until a THIRD channel joined the list, and „length ===
+ * 2" then meant three different pairs — the shape that prints „грешките и
+ * учебните моменти" over a drive that has neither. Each clause is named by the
+ * thing that put it there.
+ *
+ * DESCRIBED, NOT QUOTED BY HEADING, and that is deliberate rather than
+ * stylistic: a pointer carrying the literal string „Най-важните грешки" would
+ * make its paragraph the FIRST match for it in the document, and the „gravity
+ * before praise" ordering is asserted by `indexOf` on exactly that string
+ * (`debrief-truthfulness.test.ts`). A cross-reference must not be mistakable
+ * for the thing it refers to.
+ */
+function unscoredPointerBg(
+  hasBilledMistakes: boolean,
+  coachedKinds: number,
+  closestNearMiss: SessionNearMiss | null,
+): string {
+  return `${joinBg([
+    ...(hasBilledMistakes ? ["грешките"] : []),
+    ...(coachedKinds > 0 ? ["учебните моменти"] : []),
+    ...(closestNearMiss !== null ? ["разминаванията на косъм"] : []),
+  ])} по-долу`;
+}
+
+/**
  * „a, b и c" — a Bulgarian list, agreeing, from however many clauses there are.
  *
  * Written because the clause it serves used to be selected by COUNT, and a
- * count cannot tell three channels apart (see the `where` block). Empty in,
+ * count cannot tell three channels apart (see `unscoredPointerBg`). Empty in,
  * empty out: the caller never renders it then.
  */
 function joinBg(parts: readonly string[]): string {

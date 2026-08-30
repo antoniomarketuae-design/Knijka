@@ -483,7 +483,63 @@ export const SC_AC_HIGHBEAM_LEAD: ScenarioSpec = {
     {
       id: "sc-ahl-follow",
       titleBg: "Следвай предната кола с къси светлини",
-      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 45 },
+      // THE BEAM HALF OF THIS BANNER IS GRADED; THE VERB WAS NOT —
+      // sc-ac-highbeam-lead:5b87547e, re-photographed at w17 on
+      // `.audit-frames/w17/frames/sc-ac-highbeam-lead__mobile-wrong/
+      // 08-debrief-p5.png` (2026-08-29, attested bc7d43fc).
+      //
+      // THE LAMP HALF ALREADY CLOSED, and it closed without an edit here:
+      // «къси светлини» is read off THIS TITLE by `objectives.ts
+      // deriveLampDemand` (LAMP_TITLE_LOW), so the disc carries a derived
+      // `requireLamps: "low"` and refuses a car that sweeps it on high beams.
+      // `reach-zone-witness.test.ts:412` pins the derived value and its §3
+      // pins the refusal on the dazzling drive.
+      //
+      // WHAT NO LAMP DEMAND CAN SEE IS «СЛЕДВАЙ». On the frame above this
+      // objective ticks at 1:00 on a run that ends НЕИЗДЪРЖАН at 13
+      // наказателни точки over three faults, the first of them «Несъобразена
+      // дистанция −3 · ОСНОВНА ГРЕШКА», the second a −10 «Удар в друго
+      // превозно средство» — which is `COLLISION_CONTACT_COPY.vehicle`
+      // (rules/catalog.ts), i.e. a billed `COLLISION`. The beams were dipped
+      // at the mark — the derived demand guarantees that much or the tick
+      // could not have fired at all — so every term the disc carried was
+      // honoured while the student rear-ended the very car the banner says he
+      // followed. Following a car by hitting it is not following it, and a
+      // certificate that cannot tell those two apart teaches the opposite of
+      // чл. 23 to the only person who reads it.
+      //
+      // `requireNoContact` is the shipped term for exactly this claim
+      // (`ReachZoneParams`, lessons/types.ts). It is a claim about the JOURNEY,
+      // not a state at the mark: `engine.ts` folds the run's scored ledger into
+      // `struckABodyInRun` and `objectives.ts stepReachZone` spends it as
+      // `contactOk`, OUTSIDE the `capMet` latch — so it sits beside this gate's
+      // cap and its derived lamp demand without the single-frame conjunction
+      // problem `parseControllerDemand` exists to refuse.
+      //
+      // IT CANNOT TRAP ANYONE, which is the half checked before the half that
+      // refuses. The channel is the engine's BILLED collision, never the raw
+      // contact stream — a bumper kiss under the closing-speed floor never
+      // becomes a `ScorableEvent` — so a clean drive is bit-identical to
+      // shipped. And this is objective 1 of 2: `onTerminal` is false, so
+      // `engine.ts`'s `!onTerminal || terminalUnearnable` keeps the finish gate
+      // running and the student who rams the lead car still reaches the debrief
+      // that explains the distance rule to him, instead of having to quit and
+      // forfeit the attempt's XP and calibration.
+      //
+      // NOT PUT ON `sc-ahl-finish`, and that is deliberate. That banner says
+      // «Стигни края на отсечката» and nothing more; withholding it for a
+      // strike would be, in `objectives.ts`'s own words about this exact
+      // string, „a lie about geometry to punish an offence that already has a
+      // grader". A place gate grades place; this one grades what its own verb
+      // put its name to.
+      params: {
+        kind: "reachZone",
+        x: LANE_X,
+        y: 180,
+        radiusM: 10,
+        maxSpeedKmh: 45,
+        requireNoContact: true,
+      },
     },
     {
       id: "sc-ahl-finish",
@@ -1374,10 +1430,55 @@ export const SC_AC_AQUAPLANE: ScenarioSpec = {
   success: [
     {
       id: "sc-acq-before",
-      // The title says the SAME number the params grade (58). It said 60, and
-      // `advisor.ts` titleCapKmh takes the strictest of the two, so the card
-      // read „под 60" at L1 and „под 58" at L3 for one unchanged gate.
-      titleBg: "Намали под 58 ПРЕДИ водата",
+      // The title says the SAME number the params grade (58). It said 60 —
+      // 2 km/h LOOSER than the gate, so at L3/L4 a student who obeyed the
+      // briefing at 59 was refused the objective he had just performed.
+      //
+      // «НАМАЛИ» IS STRUCK, AND THE VERB WAS THE WHOLE OF THE ROW —
+      // sc-ac-aquaplane:1dd96e2c, confirmed at w17 on
+      // `.audit-frames/w17/frames/sc-ac-aquaplane__pc-right/08-debrief-p5.png`
+      // (2026-08-29): the leg ends NATURALLY, returns ИЗДЪРЖАН at 1 наказателна
+      // точка, and ticks this objective on a drive whose TOP SPEED for the whole
+      // session was 57 км/ч against a gate of 58. The car never once exceeded
+      // the threshold, so it never reduced below it — it ARRIVED below it.
+      //
+      // A `reachZone` is handed (params, prev, tick, ctx) and answers a PLACE
+      // and a SPEED. „Below 58 here" is a state; „reduce below 58" is a change,
+      // and no term on `ReachZoneParams` can witness a change — there is a
+      // `maxSpeedKmh` and no `wasAboveKmh`. So the banner was promising a skill
+      // the disc had no instrument for, and every crawler collected a
+      // reduction certificate for a reduction he never made.
+      //
+      // THE GATE IS NOT THE THING THAT IS WRONG, which is why nothing below
+      // this line moves. Cap 58 sits under the 65 км/ч float speed with margin,
+      // so a car that passes here at 58 or less PHYSICALLY CANNOT aquaplane in
+      // the span — the gate protects the student correctly and refuses both
+      // demos (`s4d-surface-patch-bot-completion.test.ts` pins `done === false`
+      // for the 85-in-rain and the „lawful" 72 float). What was wrong is that
+      // the gate's own name over-claimed what it measures, which is the failure
+      // `objectives.ts` states as a law for this whole evaluator: THE GATE
+      // MEASURES WHAT THE BANNER PROMISES, and a promise cannot be written that
+      // nothing enforces. Where the instrument cannot be built in this lane, the
+      // honest route that file prescribes is to retitle so the banner speaks the
+      // measured fact — the same remedy this template already applied to
+      // `sc-aci-mark` when its «…зад закъсалия» pointed at a body no scene draws.
+      //
+      // THE ACT IS NOT LOST. Instruction 5 still reads «Намали ПРЕДИ водата —
+      // под 58 км/ч, още на чистия асфалт» and `teach.whyBg` still carries why;
+      // what is gone is the CERTIFICATE for an act nothing witnessed.
+      //
+      // THE NUMERIC FORM IS UNCHANGED ON PURPOSE — bare „58", no „км/ч".
+      // `advisor.ts` TITLE_CEILING_RX requires the unit, so this title has never
+      // fed `titleCapKmh` and still does not; the card's printed number behaves
+      // exactly as shipped. (The comment that used to stand here claimed the
+      // clamp was already running on this string. It was not — measured against
+      // the regex — and a routing note that is wrong is worse than none.)
+      //
+      // ROUTED, NOT CLOSED: witnessing the REDUCTION needs a new demand — the
+      // gate must remember it saw the car above the threshold before it saw it
+      // below. See the report accompanying this wave for the exact shape; it is
+      // three files, none of them this one.
+      titleBg: "Приближи водата с под 58",
       // Cap 58 sits UNDER the 65 km/h float speed with margin: a car that
       // passes here at 58 or less physically cannot aquaplane in the span.
       // The dry-habit 85+ (and the „lawful" 72) blow this zone.

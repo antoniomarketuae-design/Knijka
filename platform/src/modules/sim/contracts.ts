@@ -322,11 +322,30 @@ export interface LessonSpec {
    *       close neither row.
    *  Then author `winter: true` on the two ice templates and on sc-ac-snow.
    *
-   *  AND ONE HALF OF 5372f176 IS NOT A SEASON PROBLEM AT ALL: „the two ice
-   *  lessons are IDENTICAL" is `world/builders/worldRim.ts:264`, whose mass
-   *  ids (`world-rim-${side}-${i}`) carry no district, so two districts with
-   *  the same bounds get the same belt, mass for mass, height for height,
-   *  facade variant for facade variant. No flag on this line can move that. */
+   *  THE „IDENTICAL STREET" HALF OF 5372f176 IS REPAIRED — RE-MEASURED
+   *  2026-08-30, and recorded here because the paragraph that stood in this
+   *  slot asserted the opposite. It said: „the two ice lessons are IDENTICAL"
+   *  is `worldRim.ts:264`, whose mass ids (`world-rim-${side}-${i}`) carry no
+   *  district. That is FALSE at HEAD. f91dd1c (wave 8) put the district INTO
+   *  the id: `worldRim.ts:267` takes `districtKey = district.meta.district`
+   *  and `:319` builds `world-rim-${districtKey}-${run.side}-${i}`, so the rim
+   *  hash, the run heights and `facadeVariant` now diverge per district. The
+   *  pair runs on TWO maps (`ac-ice-v1` / `ac-bridge-v1`) and the belts are no
+   *  longer one street: on the w15 03-ready frames — captured 12:01, AFTER
+   *  f91dd1c landed at 09:30 the same day, so they already carry the fix —
+   *  identical rectangles read facade 147.2/152.3/156.3 vs 158.9/165.8/172.1
+   *  and the right-hand block 152.6/159.4/164.2 vs 126.9/106.9/92.3.
+   *
+   *  WHAT THE JUDGE MEASURED AS IDENTICAL IS EXACTLY WHAT THE RIM DOES NOT
+   *  DRAW. Its three probes were sky, asphalt and tree canopy; on those same
+   *  frames the sky is 150.8/169.4/191.3 in BOTH to a tenth of a level, and
+   *  green-dominant pixels still cover 0.8–3.4% of the viewport. Sky tone,
+   *  road tone and foliage come from the shared environment preset and the
+   *  world's summer trees — never from the building belt, which is why the
+   *  rim repair moved the facades and left those three probes untouched.
+   *  So 5372f176 no longer has a second cause: BOTH ice rows now reduce to
+   *  the missing season above, and steps 5–6 (the preset grade and the bare
+   *  trees) are the whole of what is left to close either. */
   environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean; fog?: boolean; snow?: boolean };
   /**
    * ADR-006 stage 4a — OPT-IN physics overrides for the LIVE VehicleSim.
@@ -1295,14 +1314,14 @@ export interface TelltaleStimulusSpec extends StagedEventBase {
    *  Checked in the tree 2026-08-28, not assumed: `grep -rn '\.lamp\b'` over
    *  `platform/src` returns two COMMENTS (templates-hazards2.ts:1171,
    *  traces/scHzBreakdownPulloff.ts:73) and no code.
-   *  `TelltaleStimulusRunner` (orchestrator/runners.ts:3704-3745) takes the
+   *  `TelltaleStimulusRunner` (orchestrator/runners.ts:3705-3745) takes the
    *  whole spec and touches `trigger`/`triggerDistM`/`stop`/`stopRadiusM`/
    *  `stopSpeedKmh`/`ignoreBeyondM` only; the channel it raises is the
    *  BOOLEAN `telltaleLit` (`:3710`, `:3743`), the director ORs every runner's
    *  into one bit (`orchestrator/director.ts:113-114`,
    *  `orchestrator/types.ts:138`), `LessonScene.tsx:4226-4228` copies that bit
-   *  to a ref, `VitokCockpit.tsx:1649` assigns it to `tempWarnOn`, and
-   *  `cockpit/clusterReadout.ts:135` turns it into `set(out.temp, "warn")`.
+   *  to a ref, `VitokCockpit.tsx:1694` assigns it to `tempWarnOn`, and
+   *  `cockpit/clusterReadout.ts:194` turns it into `set(out.temp, "warn")`.
    *  One bit, one lamp, one colour. So adding `| "checkEngine"` here alone
    *  changes nothing on screen — it makes a wider dead field.
    *
@@ -1334,8 +1353,8 @@ export interface TelltaleStimulusSpec extends StagedEventBase {
    *    4. `components/sim/LessonScene.tsx:1799/2300/2320/4226-4228` and
    *       `components/sim/VehicleRig.tsx:293/397/695` — a second ref, threaded
    *       exactly like `telltaleLitRef`.
-   *    5. `components/sim/vitok/VitokCockpit.tsx:1649` +
-   *       `modules/sim/cockpit/clusterReadout.ts:32/48/135` — a
+   *    5. `components/sim/vitok/VitokCockpit.tsx:1694` +
+   *       `modules/sim/cockpit/clusterReadout.ts:34/49/194` — a
    *       `cautionWarnOn` input; the engine lamp becomes
    *       `set(out.engine, input.cautionWarnOn || !input.engineOn ?
    *       "caution" : "off", input.cautionWarnOn)` so the staged amber pulses

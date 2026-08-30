@@ -570,10 +570,54 @@ export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
  * announcing a пешеходна пътека is the one piece of furniture a жилищна зона
  * must not carry, and it stood directly against briefing step 3.
  * NOT FIXED HERE — props.ts is another lane's file, and the fix is one line of
- * gating (skip the pass when `crossing.kind === "unmarked"`). REPORTED.
+ * gating. RE-VERIFIED AT HEAD 2026-08-30, because a report is as stale as the
+ * day it was written: props.ts's pass (the „А18 in ADVANCE of an authored
+ * zebra" loop) still reads only `crossing.edgeId`, so the triangles are still
+ * posted. The gate to add is not a new predicate — `builders/constants.
+ * paintsZebra(crossing)` is the one markings.ts already paints by, so
+ * `if (!paintsZebra(crossing)) continue;` makes the SIGN pass and the PAINT
+ * pass answer the same question, which is the bug: they disagreed. REPORTED.
  * What this file could honestly do, it did: step 3 no longer denies the
  * feature, it states чл. 62, т. 1 instead (pe2-sweep161-copy-truth C4 pins
  * both halves against the BUILT world, not against the sentence).
+ *
+ * ⚠ THE MOBILE LEG OF THIS LESSON IS NOT EVIDENCE ABOUT THIS TEMPLATE.
+ * `sc-pe-zone-living__mobile-right` has now been filed twice for „the debrief
+ * says the lesson was not finished" (w15 1aff0847, re-opened on the w17
+ * re-drive). The debrief was telling the truth both times.
+ *
+ * CORRECTED AT INTEGRATION 2026-08-30. This note first read „against a
+ * pc-right leg on the SAME commit that credits all five objectives and returns
+ * ИЗДЪРЖАН". That is true of w15 and FALSE of w17 — the very re-drive that
+ * reopened the row. Measured by the verifier that caught it:
+ *
+ *     leg           commit         tracking            objectives  verdict
+ *     w15 pc-right  32505eb55b4c   TRACKED 96%         5 / 5       ИЗДЪРЖАН 0
+ *     w17 pc-right  bc7d43fc6657   INTERMITTENT 54%    1 / 5       НЕИЗДЪРЖАН 10
+ *
+ * On bc7d43fc6657 the DESKTOP control leg failed identically («Удар в
+ * пешеходец» −10) with near-perfect direction — straightness 0.965 against the
+ * mobile leg's 0.457. So the clean desktop control this note asserted does not
+ * exist at that commit, and citing it inverted the argument: it made a
+ * platform asymmetry out of two legs that both failed.
+ *
+ * SOMETHING CHANGED BETWEEN 32505eb55b4c (all five, tracked, ИЗДЪРЖАН) AND
+ * bc7d43fc6657 (both legs collapse), AND NOBODY HAS LOOKED. That is a live
+ * question, and the sentence as first written concealed it. It is not answered
+ * here because this file cannot answer it — but the next lane must not read
+ * this note and believe the desktop leg is clean. On w17 the mobile car left the carriageway BEFORE the zone entry —
+ * 04-t018s photographs it up on the pavement, nose to the parked row, at
+ * 13 км/ч with the В26 still reading 50 — struck a pedestrian standing there
+ * at t025s and a kerb at t073s, and credited nothing. The harness says so
+ * itself, in the same run.log: „ribbon seen on 23/39 moving samples (59%)"
+ * against its own 85% bar, „witness path 201.1 m net 92 m (straightness
+ * 0.457)", a top speed of 58 км/ч on a 20 км/ч street, and the qualifier
+ * „A missed objective or a departure from the road on this lane may be the
+ * harness's driving and not the product's."
+ * An UNTRACKED drive cannot convict a template of an unreachable objective,
+ * and no radius or speed cap below is answerable for a car that is not on the
+ * road. What the pc/mobile delta IS evidence for is the touch-control lane —
+ * nothing in `ScenarioSpec` steers a car — and it is reported there.
  *
  * THREE HONEST GAPS, all reported, none faked:
  *  1. Д15/Д16 have no SignKind and no GLB (world/types.ts), so the zone has no
@@ -592,6 +636,28 @@ export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
  *     {giveWay 1, priorityRoad 2, limit50 6, limit20 2, limitEnd 1,
  *     pedestrianCrossing 2} — a В26 «20» at y ≈ 126 (the plate the wave-c
  *     04-t044s 6× crop reads) and NO zone plate of any kind.
+ *     RE-DERIVED 2026-08-30 (the row came back a third time, so the report was
+ *     re-measured rather than re-quoted). The verdict is unchanged and the
+ *     COST is smaller than this note implied, so the next lane should have it:
+ *      · THE FACE IS NOT MISSING. content/signs/svg/d15.svg and d16.svg both
+ *        ship, cited in signs.json to Наредба № РД-02-21-1/23.11.2023, прил.
+ *        № 5 — the same law-cited artwork the В26 numerals are rasterised
+ *        from. What is missing is a SignKind and a placement, not a drawing.
+ *      · THE DERIVATION ALREADY HAS ITS PREDICATE. `builders/constants.
+ *        livingZoneCarriageway(edge)` is true for exactly this edge (`zone:
+ *        "residential"`) and it is LIVE — `gradesCrossingDuty` calls it, and
+ *        that call is the whole reason pz-x-1 can be graded with no paint.
+ *     Which is the row's substance stated exactly: the engine already knows
+ *     this street is a жилищна зона at both boundary nodes and shows the
+ *     student nothing, so the clause of чл. 61 that DEFINES the zone —
+ *     „обозначена като такава на входовете и изходите ѝ с пътни знаци" — is
+ *     the one sentence of the article this world cannot say, and the speed
+ *     half of the duty is signed while the zone half is not.
+ *     NOT FIXABLE HERE, and not faked here. A template's ONLY world lever is
+ *     `map.districtId`: `ScenarioSpec.map` carries archetype + params +
+ *     districtId and nothing else, and the params are a MIRROR of
+ *     pe-zone-v1.json `meta.scenario.params` (verified equal 2026-08-30), not
+ *     an input anything regenerates the committed district from. REPORTED.
  *  2. THE EXIT DUTY. чл. 25's „включване в движението — пропускаш всички"
  *     (content bank q-signs-049) has NO adjudicator. The closest shipped one is
  *     the right-hand-rule tracker, which grades the from-the-RIGHT subset — so

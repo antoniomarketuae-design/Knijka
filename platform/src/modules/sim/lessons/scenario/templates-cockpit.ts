@@ -545,7 +545,21 @@ export const SC_VP_STALL: ScenarioSpec = {
     // to read the cockpit with. 74 characters, two shorter than the round-10
     // line, so the fold budget step 2 has to live in did not narrow.
     { n: 1, textBg: "Закопчай колана — тази кола е с ръчни скорости и съединител („Напреднал“)." },
-    { n: 2, textBg: "Съединител докрай („СЪЕД“ / Z), включи първа предавка (]) и дай лек газ." },
+    // …AND THE GEAR STEP NAMES BOTH CONTROLS, THE WAY THE CLUTCH HALF OF THE
+    // SAME SENTENCE ALWAYS HAS. Step 2 said «„СЪЕД“ / Z» for the clutch and
+    // then «(])» alone for the gear — and `]` DOES NOT EXIST ON A PHONE. The
+    // mobile student reads a numbered command naming a key his device has no
+    // way to press, on the one step the whole drill turns on; the shipped
+    // touch cell for that act is «M►» on this tier and «D►» on the automatic
+    // (`TouchControls` gear stepper, and `hud/controlPhrases.ts gearUpWithBg`
+    // says the same thing for every card that renders one). This lesson is
+    // handed over MANUAL by `start.openingTier` above, so «M►» is the label
+    // that is really on the glass on THIS drill and the step can name it flat,
+    // with no branch a static briefing string could not carry anyway. (Glyph
+    // pinned: U+004D U+25BA, the same two codepoints the cell renders.)
+    // 79 characters, inside the 95-character band, and the file's longest step
+    // is unchanged at 83 (§5, __tests__/cockpit-sweep161-truth.test.ts).
+    { n: 2, textBg: "Съединител докрай („СЪЕД“ / Z), включи първа предавка („M►“ / ]) и дай лек газ." },
     { n: 3, textBg: "Отпускай съединителя ПЛАВНО до точката на зацепване и задръж, докато колата тръгне." },
     { n: 4, textBg: "Загасне ли двигателят: съединител докрай, запали отново и повтори спокойно." },
     { n: 5, textBg: "Продължи плавно по отсечката, без нито едно загасване, до края." },
@@ -677,6 +691,72 @@ const VP_POLICE_OFFICER: PoliceStopSpec = {
  * WITHIN-LANE pull-to-the-edge nuance (~1.7 m) is coached by the instructions
  * and the shadow, not zone-graded — a circular reachZone cannot honestly
  * discriminate lateral position inside one lane.
+ *
+ * ── …AND WHY THAT LIMIT CANNOT BE CLOSED BY MOVING NUMBERS IN THIS FILE ─────
+ *    (sc-vp-police-stop:ab262758, re-measured 2026-08-30)
+ *
+ * WHAT THE GATE ACTUALLY ACCEPTS, read out of `compileScenario` rather than
+ * argued, because the AUTHORED radius below is not the graded one:
+ *
+ *      rung     halt gate      accepted lateral band (car centre x)
+ *      L1       radius 4.50     9.40 … 18.40
+ *      L2       radius 3.75    10.15 … 17.65
+ *      L3–L5    radius 3.00    10.90 … 16.90
+ *
+ * The right lane of ln-v1 runs x ∈ [8.13, 16.25] around a centre of 12.19, so
+ * at L1 — «Пълна помощ», the rung the sweep drove and this row was filed from —
+ * the gate accepts 97% of the lane WIDTH: a car resting with its left wheels on
+ * the lane line is inside it. And a cap of 4 км/ч is a HALT demand, so
+ * `stepReachZone` unlocks the REACH_ZONE_GRACE_M capsule on top of the disc and
+ * the same car standing 9.5 m BEFORE the mark — 11.4 m before the officer —
+ * earns «Спри плътно вдясно при полицая», ИЗДЪРЖАН, ★★★. Instruction 4 names
+ * that exact stop as the mistake („не насред платното"): a briefing and a gate
+ * telling one student opposite things.
+ *
+ * THE SEAM OWNS THE ONLY DIAL, and this is the trap for the next lane that
+ * reaches for the obvious fix. `params.ts widenSpeedCap` already carves halt
+ * gates out of the ladder on the SPEED axis („«спри» means спри on every rung")
+ * and the same carve-out was never made on the RADIUS — but authoring
+ * `toleranceScale: 1` on rungs 1 and 2 here (measured: it does put both back to
+ * 3.00) collapses L1 ≡ L2 ≡ L3 into one compiled lesson, and
+ * `__tests__/level-seam.test.ts` S4 refuses that on the founder's own sentence
+ * („L2 L3 L4 L5 They have Nothing More"). On this template the ladder's ONLY
+ * lever is the acceptance radius — no traffic baseline, no per-rung conditions,
+ * no maneuver tolerance — so „stop the aided rung over-accepting" and „make the
+ * three lowest rungs different lessons" are in structural conflict, and the
+ * same conflict would hit all 42 halt gates if `widenRadius` were taught the
+ * carve-out catalogue-wide. Neither half is authorable here; both are named so
+ * the wave that owns `scenario/params.ts` + `level-seam.test.ts` can decide
+ * them together.
+ *
+ * The taught pose and the forbidden one are 1.71 m apart — `PS_STOP.x` 13.9
+ * against the right lane's centre 12.19 — and the car is 1.70 m WIDE
+ * (collision/bodies.ts, CHASSIS_HALF_EXTENTS.x = 0.85). A disc small enough to
+ * refuse the lane centre is therefore narrower than the vehicle it is grading.
+ * Nor can the mark be moved right to buy room: the officer stands ON the
+ * carriageway edge at x = 15.6 (the 2026-07-27 visibility ruling on
+ * `PS_OFFICER` above), so a car pulled any further over drives into him — the
+ * halt point is already as far right as the staging allows. Sized to refuse
+ * the mistake, the gate would refuse the BEST pull-over with it, which is the
+ * doc 86 B3/B5 failure the founder ranks worst.
+ *
+ * `lessons/__tests__/stop-claim-gates.test.ts` measured the same geometry from
+ * the other side and names this row while doing it: „radius 3 (4.5 at L1)
+ * around a mark 1.71 m off the lane centre — it proves the SIDE and cannot
+ * tell a kerbside rest from a mid-lane one."
+ *
+ * WHAT WOULD CLOSE IT, so the row carries an address rather than a shrug: a
+ * LANE-REFERENCED lateral term on `ReachZoneParams` (lessons/types.ts) read by
+ * `stepReachZone` (lessons/objectives.ts) — the shape `requireNoContact` and
+ * `requireRailClear` already established, both of them routed to that file by
+ * a template that could not grade its own title. Measured ACROSS THE DISTRICT'S
+ * LANE AXIS rather than across the student's approach axis (which is what
+ * `inApproachGrace`'s `lateral` uses today, and which tilts with the way he
+ * came in), it would leave the disc generous ALONG the road — where the 5 m
+ * REACH_ZONE_GRACE_M capsule is a founder ruling — while narrowing the
+ * sideways acceptance to the ~1 m this title actually claims. Until that term
+ * exists, the ladder opt-out on the rungs below is the whole of what this file
+ * can honestly do, and the row stays open.
  */
 export const SC_VP_POLICE_STOP: ScenarioSpec = {
   id: "sc-vp-police-stop",
@@ -769,6 +849,12 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
       "Изпитващият (и полицаят) гледа: навременно забелязване на сигнала, огледало и десен мигач, плавно намаляване и спиране плътно вдясно на посоченото място, двигател работещ и изчакване на указания. Рязко спиране в лентата или подминаване на сигнала е грешка.",
   },
   levels: [
+    // NO `toleranceScale` OVERRIDE HERE, AND THE ATTEMPT IS WORTH RECORDING —
+    // see „THE SEAM OWNS THE ONLY DIAL" on the spec's doc comment above. The
+    // aided rungs really do inflate this drill's halt gate (L1 4.50 / L2 3.75
+    // against an authored 3.00), and pinning them back to 1.0 collapses L1, L2
+    // and L3 into one lesson, which `__tests__/level-seam.test.ts` refuses on
+    // the founder's own words. The gate width IS this template's rung ladder.
     { level: 1 },
     { level: 2 },
     { level: 3 },
