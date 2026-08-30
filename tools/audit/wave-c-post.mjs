@@ -275,12 +275,24 @@ const sweepHead = sweepHeadMap(path.join(REPO, ".audit-frames"), {
   readFile: (f) => fs.readFileSync(f, "utf8"),
 });
 
+const fileOfRow = (id) => {
+  const f = byId.get(id);
+  const p2 = f && f.suspectFile ? String(f.suspectFile).split(String.fromCharCode(92)).join("/") : null;
+  return p2 && p2.startsWith("platform/") ? p2 : null;
+};
 const { refused: reclosed, unattributable: reclosedUnknown } = findReclosures(rows, {
   buildOf: (f) => buildOfFrame(f, sweepHead),
-  productDiff: (a, b) => {
+  // The suspectFile of the row being closed, so the gate asks whether THAT
+  // file changed rather than whether anything in platform/src did.
+  fileOf: (id) => {
+    const f = byId.get(id);
+    const p2 = f && f.suspectFile ? String(f.suspectFile).split("\\").join("/") : null;
+    return p2 && p2.startsWith("platform/") ? p2 : null;
+  },
+  productDiff: (a, b, only) => {
     if (a === b) return "";
     try {
-      return execFileSync("git", ["diff", "--shortstat", a, b, "--", "platform/src"], {
+      return execFileSync("git", ["diff", "--shortstat", a, b, "--", only || "platform/src"], {
         cwd: REPO, encoding: "utf8",
       }).trim();
     } catch {
@@ -423,7 +435,7 @@ if (reclosed.length) {
   console.log("");
   console.log(reclosed.length + " re-closure(s) on an UNCHANGED product tree — these retire nothing:");
   for (const x of reclosed.slice(0, 12)) {
-    console.log("   " + x.id + "   verifier opened it at " + String(x.a).slice(0, 8) + ", re-closed at " + String(x.b).slice(0, 8) + ", platform/src identical");
+    console.log("   " + x.id + "   verifier opened it at " + String(x.a).slice(0, 8) + ", re-closed at " + String(x.b).slice(0, 8) + " — " + (fileOfRow(x.id) || "platform/src") + " identical between them");
   }
   if (reclosed.length > 12) console.log("   ... and " + (reclosed.length - 12) + " more");
 }

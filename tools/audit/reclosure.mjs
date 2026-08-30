@@ -105,7 +105,27 @@ export function linesByFinding(rows) {
  *                    certificate. Naming them is what makes attributing those
  *                    sweeps worth an afternoon.
  */
-export function findReclosures(rows, { buildOf, productDiff }) {
+/**
+ * PER-ROW FILE DIFF, NOT A TREE DIFF — tightened 2026-08-30 on a verifier's
+ * finding, and the distinction decides whether this gate works at all.
+ *
+ * The first version asked `git diff a b -- platform/src`. A round that
+ * changed twelve files could then re-close rows whose OWN file is in none of
+ * them: the tree moved, so the gate waved them through. The verifier put it
+ * exactly — the diffstat 'is TRUE, and I verified it, but it was used as a
+ * blanket answer for rows whose own files are in none of those 12'.
+ *
+ * It caught two by hand that this gate had passed: HudToasts.tsx (8b149c07)
+ * and TouchControls.tsx (b0ee7eff) are BYTE-IDENTICAL between the two builds,
+ * and both rows had already been opened by a verifier and were being re-closed
+ * on the strength of somebody else's diff.
+ *
+ * `fileOf(findingId)` supplies the row's own suspectFile. When it cannot
+ * (an unrouted row), the check falls back to the tree — reporting rather than
+ * refusing, because an unknown address is missing provenance and not evidence
+ * that a judge was wrong.
+ */
+export function findReclosures(rows, { buildOf, productDiff, fileOf = null }) {
   const refused = [];
   const unattributable = [];
   for (const [id, list] of linesByFinding(rows)) {
@@ -123,7 +143,9 @@ export function findReclosures(rows, { buildOf, productDiff }) {
       unattributable.push({ id, a, b, prev, last });
       continue;
     }
-    const d = productDiff(a, b);
+    // The row's OWN file first; the tree only when the row has no address.
+    const own = fileOf ? fileOf(id) : null;
+    const d = productDiff(a, b, own || null);
     if (d === "") refused.push({ id, a, b, prev, last });
     // d === null means git could not answer; that is not evidence of a defect,
     // so it joins the reported set rather than the refused one.
