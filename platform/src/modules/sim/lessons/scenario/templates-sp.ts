@@ -312,6 +312,70 @@ export const SC_SPEED_CREEP: ScenarioSpec = {
  * the student is a defect of its own, and its lever is not in this file — a
  * returning actor needs either the lane it left with or a pace the guard can
  * arrest (traffic/staged.ts, FR-B5-RETURN's `rewindTo` / `reentryArc`).
+ *
+ * ── THE STRIKE DID NOT DIE, IT MOVED ONE LANE — re-measured 2026-08-30 ──────
+ *
+ * `e8414c56` came back with a judge's overturn of a w17 closure, and the
+ * overturn is right about the thing it measured: `git diff 32505eb b7a321cd --
+ * platform/src` is EMPTY, so the build that convicted this drive and the build
+ * that passed it are the same product and no closure may rest on the pass. But
+ * the overturn stops one step short, and this is the step. The lane repair
+ * above landed in 6399a8d on 2026-08-27 — BEFORE both of those builds — so w15
+ * was convicted WITH it. It therefore did not make the collision impossible; it
+ * made it conditional on where the student is.
+ *
+ * MEASURED on the current tree, production stack (createWorldRuntime +
+ * createTrafficSystem + director + rule engine, ov-keepright-v1, seed 7,
+ * ambient 0, the shipped `staged` cast), sweeping the player's line laterally
+ * under the sweep's own 12 км/ч stop-go law for 210 s:
+ *
+ *   player centre x     contacts   first
+ *   12.19 … 6.0            0       —                    ← the taught lane
+ *    5.86 … 2.26          43       sc-dng-flow-lead
+ *                                  t = 84.3 s, y = 155.5
+ *    2.0 … 0.0             0       —                    ← the road centreline
+ *
+ * The band is 4.06 ± 1.8 m — two half-widths either side of the OVERTAKING
+ * lane centre, i.e. exactly the pace car's own lane and nothing else. At the
+ * taught 46–48 км/ч and at every steady 20…45 км/ч, in the taught lane, the
+ * sheet is still clean: zero contacts, zero violations (sp-flow-lead-lane
+ * .test.ts §3, green).
+ *
+ * SO THE ROW IS NOT THIS FILE'S ANY MORE, and the two addresses are:
+ *
+ *  1. `traffic/staged.ts` — `reentryArc()` offers the AUTHORED HOLD (arc 70,
+ *     y ≈ 70) to an actor whose player is at y ≈ 155, i.e. it re-admits the car
+ *     ASTERN of him, „under the command it left with". That command is a
+ *     `matchPlayer` band with `followGapM: 400` on a 360 m road, so the band is
+ *     pinned at `maxMatchSpeedMps` in BOTH directions: it orders maximum
+ *     closing speed from behind as readily as in front. The only brake is
+ *     `closesOnPlayer`, which opens at 16 m aiming to stop 6 m short at
+ *     8 m/s² — it can arrest ≈12.6 m/s and the car arrives at 17. The edit is
+ *     one condition in `reentryArc`: it already computes `proj.s` (the player's
+ *     own arc), so a same-road re-entry can be refused unless the candidate arc
+ *     is AHEAD of him, and the actor waits off-scene one more beat instead.
+ *  2. `orchestrator/runners.ts` + the collision rule — a contact in which the
+ *     staged body closed on a stationary-or-slower player FROM ASTERN is billed
+ *     to the player as «Удар в друго превозно средство», 10 наказателни точки,
+ *     опасна грешка, and the debrief explains it as a following-distance
+ *     failure («Между вас е имало точно толкова път, колкото ти е трябвал, за
+ *     да спреш»). That sentence is FALSE of a rear-end from behind, which makes
+ *     it a doc 64 THEO-4 defect on top of the false conviction.
+ *
+ * WHY IT CANNOT BE ANSWERED HERE, spelled out so the next lane does not try:
+ * `extraRightOffsetM` is already one full pitch off his line and the next step
+ * left is ONCOMING; dropping `maxMatchSpeedMps` to the ≈12.6 m/s the guard can
+ * arrest puts „потокът" at 45 км/ч under a 50 limit and deletes the drill
+ * (`objectiveBg`, instruction 2's «над 60», instruction 4's «+10» and both
+ * mistake demos, 58 and 66, all rest on a flow ABOVE the cap); and
+ * `paceMode: "scheduledCruise"` is what §2 of sp-flow-lead-lane.test.ts
+ * deliberately pins AGAINST („the exposure is REAL and still happens").
+ *
+ * ONE MORE THING THE SWEEP CANNOT SEE, measured in the same run: in the TAUGHT
+ * lane the passer above reaches 0.00 m of centre-to-centre separation with the
+ * player and the session books NOTHING — no collision, no near miss, no code.
+ * A car drives clean through a student and the product is silent. Same address
+ * as the routed note above; the number is now 0.00 rather than 0.004.
  */
 const SPD_FLOW_LEAD: BrakingLeadCarSpec = {
   id: "sc-dng-flow-lead",
@@ -1244,6 +1308,29 @@ export const SC_SP_CURVE: ScenarioSpec = {
     // field, and sp-curve-v1's only other spawn (`spc-spawn-exit`, x = 355,
     // y = 385.94) is PAST the curve, so it cannot be used to skip the dressed
     // approach without deleting the 220 m the drill brakes over.
+    //
+    // THE DISPOSITION IS MISROUTED, NOT REFUTED — 2026-08-30, and the word
+    // matters because a judge reopened `sc-sp-curve:6079dfb1` on exactly that
+    // distinction. An earlier pass filed this row REFUTED on the reading that
+    // the frame «shows the opposite»; the judge re-opened the same PNG at 2.6×,
+    // found the block on the LEFT and a nose-to-tail rank of parked cars down
+    // the RIGHT kerb, and observed that REFUTED retires a row as never having
+    // been a defect. It IS a defect: the world contradicts the copy. It is just
+    // not one this file can hold, and the only clause of the finding that is
+    // loose («blocks on BOTH sides») is an overstatement of the near field, not
+    // a false premise. So: no code here, and the address below re-verified
+    // against the CURRENT tree rather than quoted from the block above —
+    //   · `buildWorldGeometry.ts:472` calls `buildWorldRim` unconditionally,
+    //     and `worldRim.ts:180` admits any district whose `meta.mapKind` is a
+    //     string. sp-curve-v1's is `"scenario-street"`, so the belt of
+    //     building masses is still built on this map today.
+    //   · `props.ts:1805` still runs the residential dressing pass for
+    //     `cls === "unclassified"`, and sp-curve-v1's ONE edge (`spc-e-road`,
+    //     maxspeed 90, 687 m) is `unclassified` — so the lamps, the kerbs and
+    //     the parked rank are still authored onto a 90 км/ч rural road.
+    // Neither file is this lane's, and neither reads anything a template can
+    // set. The sentence stays as it is, for the reason given at the top of this
+    // block: naming the road urban would make its own 90 км/ч illegal.
     { n: 1, textBg: "Потегли по извънградския път — тук ограничението е 90 км/ч и правата е свободна." },
     { n: 2, textBg: "Напред следва знак А1 „Опасен завой надясно“ с табела „50“ — препоръчителната скорост за завоя." },
     { n: 3, textBg: "Свали скоростта ПРЕДИ завоя: вдигни газта отрано и спри намаляването около 45–50 км/ч още на правата." },
@@ -1582,7 +1669,43 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
     // claim gate: __tests__/sp-world-claims.test.ts — and it fails the moment
     // any SP briefing names a мантинела again, until a builder exists to draw
     // one (routed: world/builders/props.ts + a district-schema feature).
-    { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч, а двете посоки вървят по отделни платна, разделени с ивица по средата." },
+    //
+    // AND THE TWO LINES HE ACTUALLY READS NOW END ON A FULL STOP — 2026-08-30,
+    // finding sc-mw-discipline:b080a007. On the phone the briefing arrives as
+    // the notify column's PEEK, and on an iPhone 16 sideways that peek is two
+    // line boxes tall: `.audit-frames/wave-c/frames/sc-mw-discipline__mobile-
+    // right/01-arrival.png` shows «Потегли по магистралата —» / «ограничението
+    // е 140 км/ч, а», then «↓ ОЩЕ 20 РЕДА», then ПРОЧЕТИ and РАЗБРАХ side by
+    // side. A seventeen-year-old can dismiss that card having read a clause
+    // that stops on a dangling conjunction.
+    //
+    // THE HEIGHT IS NOT THIS FILE'S and is not touched here: the peek's ceiling
+    // is SimOverlay.tsx's inline `maxHeight` against notifyColumn.ts's
+    // `NOTIFY_COLUMN_MAX_STAGE_FRACTION`, which resolves to 95.75 px on the
+    // 852 × 393 stage this catalogue is shot at — the arithmetic and the route
+    // are already written out in PlayAreaStyles.tsx («the measurable part of
+    // the w12 rows that photograph two lines of a 26-line briefing»). The
+    // mid-WORD half of the filing is likewise already closed elsewhere:
+    // `SimOverlay.foldWindowPx` masks the window to the LINE GRID at both ends,
+    // so a line is whole or absent rather than inked to its waist.
+    //
+    // WHAT IS THIS FILE'S is which words land in those two boxes, and the comma
+    // splice put a conjunction there. Greedy-wrapping at 26 characters — the
+    // width that reproduces the photographed badge EXACTLY (5 steps → 22 lines
+    // → «ОЩЕ 20») — the sentence below now breaks «Потегли по магистралата —» /
+    // «ограничението е 140 км/ч.» and the second box ends the sentence. Same
+    // claims, same 5 steps, same line count, and the sp-world-claims gate's
+    // /отделни платна|раздел/ still matches the half that moved into its own
+    // sentence. This MITIGATES the row; it does not close it — 24 lines are
+    // still behind the fold, and that is the ceiling's to answer.
+    //
+    // MEASURED WHILE HERE, because it is this file's doing: instruction 2 grew
+    // from 98 to 215 characters when finding 3bec2af1 was repaired, so the same
+    // wrap now gives 26 lines and the badge reads «ОЩЕ 24», worse than the 20
+    // in the photograph. The tail «— караш ли 120, тя бавно ти се отдалечава»
+    // is the cheapest 2 lines in the briefing, but it is another lane's
+    // deliberate teaching and is left alone rather than quietly undone.
+    { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч. Двете посоки вървят по отделни платна, разделени с ивица по средата." },
     // THE FLOW IS NOW OUT THE WINDSCREEN (finding sc-mw-discipline:3bec2af1 —
     // see THE FLOW at MWD_FLOW_LEAD). The line used to ask the student to match
     // „потока" on a road with not one other vehicle on it; it now points at the

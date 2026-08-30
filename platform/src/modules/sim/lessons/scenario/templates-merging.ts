@@ -1199,6 +1199,58 @@ const MGB_BUS: CutInLeadCarSpec = {
  * NOTHING else, so a drill about a камион at a спирка would be teaching a duty
  * that does not exist. The copy is right and the body is wrong; the body is the
  * thing to change, in the two files named above.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * W20 2026-08-30 — THE ROW STANDS (re-verified a third time; no code changed
+ * for it here), BUT TWO SENTENCES ABOVE ARE WRONG IN THE DIRECTION THAT COSTS
+ * THE NEXT LANE A WHOLE ROUND. Both corrections are measurements, not readings.
+ *
+ * (1) THE `busOnRoute` STOPGAP COSTED ABOVE IS RED ON ARRIVAL, so it is FOUR
+ *     files and not three. `traffic/__tests__/staged-actor-label.test.ts`
+ *     («ADR-002: cites the rule by NAME and invents no article number») loops
+ *     over EVERY key of `STAGED_ACTOR_LABELS` and asserts of each `lawRef`
+ *     that it does NOT match /чл\.|ал\.|т\.\s*\d/ and that it DOES contain
+ *     "ППЗДвП". The entry costed above — `lawRef: "ЗДвП чл. 67"`, chosen
+ *     precisely because it is byte-identical to this template's own
+ *     `teach.lawRef` — fails BOTH the moment it is added.
+ *     The assertion's own comment gives its reason («content/law/acts holds no
+ *     ППЗДвП, so a чл. here would be unverifiable BY CONSTRUCTION»), and that
+ *     reason is true of `standingOnGreen` alone: ЗДвП IS in the corpus, and
+ *     чл. 67 is retrievable from it (below). The narrowing that keeps ADR-002
+ *     intact is the one the LAST test in that same describe already makes for
+ *     the one shipped kind — a caption's `lawRef` must be the same bytes as its
+ *     owning lesson's `teach.lawRef` — rather than hard-coding one act's name
+ *     for every kind that will ever exist.
+ *
+ * (2) чл. 67 DOES NOT SAY «АВТОБУС», so «чл. 67 covers «автобус от редовна
+ *     линия» and NOTHING else» is not what the act says. RETRIEVED, not
+ *     recalled — `content/law/acts/zdvp.json`, unit `чл. 67`: «Водачът на
+ *     нерелсово пътно превозно средство е длъжен да намали скоростта, а при
+ *     необходимост и да спре, за да позволи на пътните превозни средства от
+ *     РЕДОВНИТЕ ЛИНИИ за обществен превоз на пътници да извършат необходимите
+ *     маневри, свързани с потеглянето им от обозначените спирки.» The class the
+ *     article protects is «ППС от редовна линия» — a тролейбус and a route
+ *     МИКРОБУС are inside it; the word автобус is this drill's, not the law's.
+ *
+ *     THAT MATTERS BECAUSE THE FLEET ALREADY SHIPS ONE. `kargo_m` — the YELLOW
+ *     route minibus GLB (`vehicleFleet.ts:98`, `public/sim/vehicles-v2/
+ *     kargo_m.glb`) — is a GLAZED passenger body with doors, i.e. the exact
+ *     property the sheet says is missing from the windowless cargo box. And no
+ *     `VehicleProfile` reaches it: `modelForVehicle` routes "van" to kargo_v
+ *     and nothing at all to kargo_m, so today it can only surface as a random
+ *     ambient pick (weight 3) and can never be staged on purpose. The cheapest
+ *     body-side fix is therefore NOT a new 12 m rig — it is one union member in
+ *     `traffic/types.ts` routed to `FLEET.indexOf("kargo_m")` in
+ *     `modelForVehicle`, against an asset that already loads.
+ *
+ *     WHAT THAT TRADE COSTS, so it is a decision made once and not a swap made
+ *     quietly: a minibus is ~6 m and this drill's mistake card teaches the 12 m
+ *     corpus («Автобусът е дълъг 12 метра и завива с целия си корпус…
+ *     шофьорът му седи на два метра над земята»). Taking kargo_m buys the right
+ *     VEHICLE CLASS and the glazing and loses the length lesson, and instruction
+ *     2, instruction 3 and that card would each need one word — «микробус от
+ *     редовната линия» — to stay honest; those three lines ARE in this file. A
+ *     purpose-built 12 m bus keeps both halves and costs a rig. Founder's call.
  */
 export const SC_MERGE_BUS_PULLOUT: ScenarioSpec = {
   id: "sc-merge-bus-pullout",
@@ -1781,6 +1833,51 @@ const MFP_STREAM: OncomingStreamSpec = {
  * it wanders — so what is missing is steering on a TURNING route, which is an
  * instrument gap in the drive harness and not a field of this spec. A
  * ScenarioSpec authors geometry, actors and copy; it cannot make a car turn.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * W20 2026-08-30 — :ab353b86 RE-DERIVED ONCE MORE AND THE MECHANISM FINALLY
+ * NAMED. No code changed here for it. The paragraph above ends one file short
+ * of the address, and that missing file is why four rounds have re-derived it.
+ *
+ * THE CITATION'S OWN FILES, read rather than argued:
+ * `.audit-frames/wave-c/frames/sc-merge-from-property__pc-right/
+ * _audit-status.json` → `target.commit 70d8651`, `startedAt 2026-08-20T19:07Z`,
+ * `endedNaturally false`, `forcedBy «Прекрати урока»`, `score 10`. And
+ * `08-debrief.png` prints ONE fault and no other — «Настъпи сблъсък. Това е
+ * ЕДНА опасна грешка: 10 изпитни т.» over «Опасни грешки 1 · Основни 0 ·
+ * Второстепенни 0». So this leg is NOT the `rebase` leg dissected above: it
+ * carries no FAILED_TO_YIELD at all. THE COLLISION IS THE WHOLE ROW.
+ *
+ * AND NOTHING THAT MOVES COULD HAVE BEEN HIT. Re-measured at HEAD: family
+ * `merging` is absent from `SCENARIO_FAMILY_TRAFFIC_BASELINE` and this template
+ * authors no `traffic`, so the compiled ambient count is
+ * `SCENARIO_DEFAULT_TRAFFIC.vehicleCount` = 0 (compile.ts:130); MFP_STREAM's
+ * three are gated at `releaseKmh` 15 and both legs were photographed under it
+ * throughout. What is left is static district geometry — kerb, verge, terrain,
+ * facade.
+ *
+ * WHICH IS A FILE THIS TEMPLATE CANNOT REACH, and it is ONE NUMBER.
+ * `compile.ts:1307` writes `collisionMinKmh: 0` for EVERY scenario lesson, and
+ * `VehicleRig.tsx:667` gates on `impactKmh >= collisionMinKmh` — so a contact
+ * at ANY speed, kerb scuff included, fires `onCollision` and becomes a
+ * terminating ОПАСНА ГРЕШКА worth 10 наказателни точки, while the branch four
+ * lines below it («Sub-threshold contact — a kerb scuff or a bumper nudge…
+ * NOT graded») is unreachable for all 150 templates. A ScenarioSpec has no knob
+ * for it: the field is hardcoded in the compiler and never read off `spec`. So
+ * «the correct drive collides and fails» is not authorable HERE at any rung —
+ * it is one constant shared by the whole catalog, already written up at the
+ * sc-park-bay-exit-rev row of `routing-collision.json`, and collision/index.ts
+ * carries the other half (why a swept body reaches the far side of the wall it
+ * reports touching).
+ *
+ * ONE HONEST LIMIT ON THE GREEN TEST QUOTED ABOVE, so it is not quoted as more
+ * than it is. `traces/__tests__/sc-merge-from-property-traces.test.ts:97`
+ * («violationCodes(shadow) is []» — 20 tests, green on this tree) CANNOT refute
+ * a static-world contact: the recorder SAT-tests the hero footprint against
+ * authored `ObstacleRect2D`s only (traces/recorder.ts — «the headless twin of
+ * the scene's ScenarioObstacles colliders»), and carries no district trimesh,
+ * no kerb and no terrain. It proves the authored line is clean; it says nothing
+ * about the surface beside it.
  */
 export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
   id: "sc-merge-from-property",

@@ -2621,10 +2621,10 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("SPEEDING_OVER_LIMIT", t, { detail: speedDetail }));
   }
   // THE RE-GRADE THE FREE LESSON CONSUMED (SPEED_REGRADE_SEC — the frames and
-  // the whole argument are there). The SAME condition and the SAME reset as the
-  // bill above, on a sustain that is `SPEED_REGRADE_SEC` longer — so it can
-  // only ever fire AFTER that bill has already fired, never instead of it, and
-  // it fires exactly once per continuous overspeed.
+  // the whole argument are there). The SAME condition as the bill above, on a
+  // sustain that is `SPEED_REGRADE_SEC` longer — so it can only ever fire AFTER
+  // that bill has already fired, never instead of it, and it fires exactly once
+  // per continuous overspeed.
   //
   // It is additive on purpose: `stepSustainedEpisode`'s own cadence is left
   // byte-identical, so every bill this reducer produces today it still produces
@@ -2635,11 +2635,59 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // in exam mode, on a repeat offence and under a grade-on-sight policy the
   // ledger does not move at all; it moves only where the single bill was spent
   // on the teach and the student was charged nothing.
+  //
+  // ── ITS RESET IS THE BILL'S RESET, NOT THE RAW ONE (2026-08-30) ────────────
+  // This call passed `speedReset` — `speed <= limit` — so ONE frame at or under
+  // the limit wiped the re-grade's ledger and re-armed it from zero. The bill
+  // it exists to complete does not work that way: it rides
+  // `stepSustainedEpisode` with `speedingRearmSec`, whose own doc says „a dip
+  // back to the limit only re-arms once the driver has genuinely HELD it.
+  // Anything shorter is one continuing offence, not a new one." The two halves
+  // of one offence disagreed about what a correction is, and the disagreement
+  // pointed the wrong way.
+  //
+  // MEASURED THROUGH THIS REDUCER, posted 50, one lesson-length drive:
+  //   59 км/ч steady for 17 s               → bill + re-grade  (1 второстепенна)
+  //   59/49 saw-tooth, 5 s over / 1 s under → the bill ALONE   (0)
+  //   59/49 saw-tooth, 7 s over / 1 s under → the bill ALONE   (0)
+  // The saw-tooth driver spends MORE of the drive above the graced limit and
+  // pays a point LESS, because his one bill is spent by the teach-first free
+  // mini-lesson and nothing ever asks again. That is the M-16 invariant this
+  // file states twice — „sitting over the limit costs monotonically more the
+  // longer it lasts" and, on the опасна band, „sustained is still never cheaper
+  // than oscillating" — inverted, on the code the audit photographs most.
+  // `speedingRepeatSec` cannot cover it: its 20 s cadence is longer than the
+  // drive on most of the catalogue's lessons, which is the sentence
+  // SPEED_REGRADE_SEC was written for in the first place.
+  //
+  // So the re-grade now resets on A CORRECTION THAT COUNTS: at or under the
+  // limit and HELD there for `speedingRearmSec`, this engine's declared unit
+  // for exactly that (the same figure `WRONG_WAY_REARM_SEC` borrows). A shorter
+  // dip leaves the ledger standing — `stepEpisode`'s `!cond` arm keeps
+  // `qualifiedSec` under `accrue`, and credits nothing for the gap itself, so
+  // only seconds genuinely driven over the band ever count. A real correction
+  // still wipes the ledger AND re-arms the episode in full.
+  //
+  // ORDER IS LOAD-BEARING: `resetSince` is maintained by the
+  // `stepSustainedEpisode` call above, off the SAME `speedReset` boolean, and
+  // is null on every frame that is not a reset — so it reads „how long the car
+  // has been continuously at or under the posted limit". The bill must keep
+  // being stepped before the re-grade.
+  //
+  // A12 — NOTHING INNOCENT MOVES. The student who lifts off and stays off for
+  // four seconds is acquitted exactly as before. The ceiling is unchanged at
+  // ONE extra bill per episode (`stepEpisode` emits once), it is
+  // `regrade`-marked, and `lessons/engine.ts` drops it wherever the code was
+  // already charged — so exam mode stays byte-identical.
+  const speedCorrectionHeld =
+    speedReset &&
+    s.speedingMinor.resetSince !== null &&
+    t - s.speedingMinor.resetSince >= cfg.speedingRearmSec;
   if (
     stepEpisode(
       s.speedingMinorRegrade,
       speedingMinorCond,
-      speedReset,
+      speedCorrectionHeld,
       t,
       cfg.speedingMinorSustainSec + SPEED_REGRADE_SEC,
       SPEEDING_SUSTAIN_ACCRUES,

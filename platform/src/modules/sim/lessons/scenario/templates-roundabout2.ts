@@ -128,6 +128,60 @@
  * roundabout2-encounter-clock.test.ts §7 drives it at 2.6 / 3.0 / 4.0 км/ч and
  * is red on the shipped values. Each spec records its own arithmetic.
  *
+ * WAVE C, 2026-08-30 — THE SAME THREE ROWS CAME BACK, AND THE RE-VERIFICATION
+ * READ THE OLDER SET OF FRAMES. Recorded HERE and not only in the ledger, for
+ * the reason world/builders/roundabout.ts gives for doing the same: a
+ * refutation filed somewhere else leaves this file reading as never-opened,
+ * which is how these rows reached a third round unchanged.
+ *
+ *  · «not one of the three tasks is ticked in ANY of the four legs; the lesson
+ *    cannot be passed and cannot distinguish a good student from a bad one» was
+ *    re-confirmed off .audit-frames/wave-c/frames/sc-rb-ped-exit__pc-right.
+ *    That leg ran 2026-08-20T14:42Z against 70d8651b and its
+ *    _audit-status.json carries NO `steering` block at all — the field did not
+ *    exist yet (tools/mobile/lib/guidance.mjs is two days younger). The steered
+ *    legs are the `rebase` set of 2026-08-22 on 70bcd1ba, whose status files do
+ *    carry `steering.channel.state: "live"` with the wheel measured over (pc
+ *    left 70 px ≈5.3° / right −69 px ≈−5.2°; mobile 152 / −150 px, floor 1.4°)
+ *    — 12 and 7 commands, and still straight into the mound. So the frame is
+ *    honest and its −10 is correct; what a frame cannot carry is the SECOND
+ *    clause, which is a claim about THIS TEMPLATE and is false at HEAD. Driven
+ *    through the production stack (createLessonSession → applyTick →
+ *    buildLessonResult → scoreRubric), the committed shadow ticks all three
+ *    objectives, completes, passes, scores 0, raises zero violations and takes
+ *    3★ on EVERY rung L1-L5, and the same drive with the stalk OFF fails
+ *    `sc-rbp-exit` and only that one — roundabout2-title-truth.test.ts, „the
+ *    drill is winnable and discriminating on every rung the ladder compiles".
+ *    Winnable and discriminating, measured rather than argued.
+ *
+ *  · «no lane arrows on the approach» and «the roundabout is a bare grass mound
+ *    with shrubs and buildings behind it» both describe the frames CORRECTLY,
+ *    and neither is authorable from a ScenarioSpec. This file is data: types.ts
+ *    gives it no marking and no scenery field, and compile.ts reads exactly two
+ *    things out of `map` — `districtId` and `params["maxspeedKmh"]` (absent
+ *    here). `map.params` is provenance, mirrored FROM the district file, never
+ *    read INTO the world. Their addresses, so the next round routes them once:
+ *      – Lane arrows are painted from the DISTRICT's own
+ *        `meta.scenario.laneArrows` (markings.ts `paintLaneArrows`), authored
+ *        by the generator; rb-ped-v1 has none, and should not. The vocabulary
+ *        is lane-INTENT — „nearExits" / „farExits", one lane per group of
+ *        exits — and rb-ped-v1's arms are `lanes: 2, oneway: false`, i.e. ONE
+ *        lane each way onto a `lanes: 1` ring, against rb-2lane-v1's `lanes: 4`
+ *        onto a two-lane ring. One lane serves all four exits, so there is no
+ *        assignment to paint; painting one would teach that the exit is chosen
+ *        by paint before the ring rather than by counting exits and indicating,
+ *        which is the opposite of instructions 2, 3 and 5 — and of RB-02.
+ *        roundabout.ts's `buildRingDivider` refuses single-lane rings on the
+ *        same principle („there is no lane boundary to draw"). If it is ever
+ *        wanted anyway: tools/maps/gen_rb_ped.mjs + content/world/rb-ped-v1.json.
+ *      – The mound IS the authored island, deliberately: roundabout.ts's
+ *        `crownRiseM` (0.8-1.6 m of planted crown) and `buildShrub`, with the
+ *        teach in its own header — „you are not supposed to see across a
+ *        roundabout, you are supposed to look where you are going". The
+ *        building behind it is rb-ped-v1's single `rbp-b-cafe` at (−44, −44).
+ *        A scenery row against world/builders/roundabout.ts + props.ts, not a
+ *        grading one, and the drill's own teaching does not wait on it.
+ *
  * Content provenance (doc 76 §9 stage 0 — original items, never listovki):
  * q-predimstvo-032 (завиваш надясно; пешеходец на пътеката на улицата, в която
  * НАВЛИЗАШ — чл. 119: the exact rule, one geometry away),

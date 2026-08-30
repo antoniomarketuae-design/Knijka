@@ -47,24 +47,73 @@ export type HeadlightSetting = "off" | "low" | "high";
  * seventeen-year-old the one habit that gets a cyclist killed on a move-off.
  *
  * ADDING THE MEMBER IS NOT THE FIX ON ITS OWN, AND ALONE IT BREAKS THE BUILD.
- * A fourth kind must arrive together with all of these, in one change:
- *   · `components/sim/CameraRig.tsx:290` — `GLANCE_OFFSETS`, a
- *     `Record<MirrorGlanceKind, {yaw, pitch}>`, and `REAR_VIEW_FOV_DEG`
- *     beside it: both stop compiling the moment a member is added, and a
- *     shoulder look needs a real yaw (past the B-pillar, ~±1.9 rad) rather
- *     than a mirror aspect;
- *   · `modules/sim/engine/glanceView.ts:54` — `GlanceViewMirror`, the
- *     structurally identical twin that must stay assignable, and
- *     `CHASE_GLANCE_ASPECT_RAD` keyed by it;
- *   · `scene/vitok/cabinLook.ts:65` — `CabinLookPoseId`, so the MOUSE can
- *     reach it (founder FR-17/FR-25: „first and upmost it must be with the
- *     mouse"), and `vitok/hotspots.ts:52`;
- *   · `components/sim/TouchControls.tsx` — the «РАМО» station, which that
- *     file has already sized (44 px, ≥60 px of caption room) and declined to
- *     add while this line stops at three;
- *   · `rules/engine.ts:236` `lastGlanceAt: Record<MirrorKind, …>` and :2159 —
- *     without this the glance is a camera trick, not a graded act, and
- *     grading is the whole of the rows above.
+ * MEASURED, not recalled: append `| "shoulder"` to the line below and
+ * `npx tsc --noEmit` from `platform/` goes from green to EIGHTEEN errors in
+ * six files (2026-08-30, restored byte-identical afterwards). The list that
+ * used to stand here was a recollection: it named two files the compiler
+ * never mentions and MISSED FOUR it does, including the only bridge from this
+ * file to the rule engine. What follows is the transcript.
+ *
+ * FIVE UNIONS IN THIS PRODUCT SPELL „left | right | rear" AND ONLY THREE OF
+ * THEM MAY GROW. That distinction IS the design of the change; getting it
+ * wrong is how a shoulder check quietly becomes a fourth mirror.
+ *
+ * GROWS — the ACT the driver performs, and the channels that grade it:
+ *   · `MirrorGlanceKind` — the declaration this block sits on. Trust the NAME,
+ *     not a number: the audit corpus files it as cabin.ts:22 and
+ *     `observation.ts` as :72, and it moves every time this block is edited.
+ *     The `GlanceHold` machine below it is kind-agnostic and needs no change.
+ *   · `rules/types.ts:29` `MirrorKind` — the graded channel, and therefore
+ *     `rules/engine.ts:236` `lastGlanceAt: Record<MirrorKind, …>` plus the
+ *     discharge at :2386-2398 (`s.lastGlanceAt.left` / `.rear` inside the
+ *     `moveOffObservationEnabled` branch). That site was cited here as :2159
+ *     and had MOVED — :2159 is now a withdrawn-gate comment about span
+ *     detectors. Also `procedures/performedSteps.ts:356` and :369, the A2
+ *     observer's `{ kind: "glance"; mirror: MirrorKind }` and its
+ *     `mirrorsGlanced: Set<MirrorKind>`. Without this whole line the glance
+ *     is a camera trick, not a graded act — and grading is the whole of the
+ *     two rows above.
+ *   · `engine/glanceView.ts:57` `GlanceViewMirror` + `CHASE_GLANCE_ASPECT_RAD`
+ *     — the chase orbit. `CameraRig.tsx:963` stops compiling the moment the
+ *     structurally identical twin stops being assignable. A shoulder aspect
+ *     is not the mirrors' ±π/3.
+ *
+ * DOES NOT GROW — these two name MIRROR GLASS, and there is no shoulder
+ * mirror. Widening them is precisely the false certificate this file exists
+ * to refuse; the CALL SITES must instead treat a shoulder hold as „no mirror":
+ *   · `scene/chaseRearView.ts:70` `RearViewSide` (+ `REAR_VIEW_YAW_RAD`:195,
+ *     `REAR_VIEW_FOV_DEG`:204, `rearViewQuadOffset`:280) — the rear-view
+ *     inset quad. `CameraRig.tsx:1185`, `:1198` and `:1250` index it with the
+ *     held glance; a blind spot is out of the side glass, so the inset must
+ *     go dark rather than show a window that cannot see it.
+ *   · `scene/vitok/mirrorAttention.ts:70` `MirrorKind` (glass meshes and
+ *     cadence) — `MirrorRig.tsx:718`, `:732`, `:795` pass `glanceMirror`
+ *     straight in and must map shoulder → null, so no mirror pass renders
+ *     for a look that goes past the B-pillar.
+ *
+ * AND THE HALF THE COMPILER WILL NOT ASK FOR, which is why a lane can ship
+ * the type, watch tsc go green and still close nothing:
+ *   · `components/sim/CameraRig.tsx:290` `GLANCE_OFFSETS` — the first error
+ *     the compiler names and the only place the look becomes VISIBLE: a
+ *     shoulder needs a real yaw past the B-pillar (~±1.9 rad), not a mirror
+ *     aspect;
+ *   · `scene/vehicleSample.ts:98` `out.mirrorGlance = consumeGlanceSample()`
+ *     — the ONLY bridge from this file to the rule engine. Miss it and the
+ *     member exists, the head turns, and nothing is ever graded;
+ *   · `components/sim/LessonScene.tsx:3917` — the per-frame
+ *     `observeControlSignal({ kind: "glance", mirror })` loop, which is what
+ *     makes the look a PRE-DRIVE step rather than a camera move;
+ *   · `components/sim/TouchControls.tsx` — the «РАМО» station, already sized
+ *     there (44 px, ≥60 px of caption room) and deliberately declined while
+ *     this line stops at three; and `scene/vitok/cabinLook.ts:65`
+ *     `CabinLookPoseId` + `vitok/hotspots.ts:52` so the MOUSE can reach it
+ *     (founder FR-17/FR-25: „first and upmost it must be with the mouse").
+ *     Neither of those two breaks tsc — that is the trap;
+ *   · `lessons/scenario/observation.ts:25` — the null that keeps the move-off
+ *     family honestly UNMEASURED „until the shoulder glance ships". It is the
+ *     switch to throw LAST, never before a student can press something;
+ *   · the tests that pin the three: `scene/cabin.test.ts:25` and
+ *     `scene/vitok/mirrorAttention.test.ts` (seven sites).
  * `modules/sim/engine/reverseView.ts:57` states the same gap from its own
  * side: the shoulder check is automatic-on-R only, with no button for a
  * student who wants to look on demand.

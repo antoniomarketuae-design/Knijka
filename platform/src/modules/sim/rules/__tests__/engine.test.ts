@@ -101,11 +101,28 @@ describe("speeding detector", () => {
       frames.push(tick(t++, { speedKmh: 48 })); // dip back under, one frame
     }
     const { events } = drive(frames);
-    // 48 s of oscillation: the opening bill plus the repeat cadence (~1 per
-    // 20 s) — not the twelve the old per-dip re-arm produced.
-    const speeding = codes(events).filter((c) => c === "SPEEDING_OVER_LIMIT");
-    expect(speeding.length).toBeGreaterThanOrEqual(1);
-    expect(speeding.length).toBeLessThanOrEqual(3);
+    // A RE-ARM AND A RE-GRADE ARE NOT THE SAME EVENT, and this row is about the
+    // first (2026-08-30). The assertion used to count both in one bucket, so
+    // when SPEED_REGRADE_SEC's deferred completion started surviving a
+    // one-frame dip — which is the whole point of that repair — this test read
+    // it as a fourth re-arm and failed. It is not one: it is ONE completion of
+    // the SAME episode, it is marked `regrade`, and it fires for the steady
+    // driver too (measured through this reducer, posted 50, 48 s:
+    // saw-tooth t=2 · t=14R · t=22 · t=42, steady t=2 · t=8R · t=22 · t=42 —
+    // four apiece, so «sustained is never cheaper than oscillating» holds).
+    //
+    // Split, the test now says what its name says and is STRICTLY STRONGER
+    // than the old ceiling: no per-dip re-arm, AND at most one deferred
+    // completion, instead of a single number in which either could hide.
+    const speeding = events.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
+    const rearms = speeding.filter((e) => !e.regrade);
+    const regrades = speeding.filter((e) => e.regrade);
+    // The finding, stated: twelve dips must not buy twelve points. What
+    // survives is the opening bill plus the repeat cadence (~1 per 20 s).
+    expect(rearms.length).toBeGreaterThanOrEqual(1);
+    expect(rearms.length).toBeLessThanOrEqual(3);
+    // `stepEpisode` emits once per episode, and a saw-tooth is ONE episode.
+    expect(regrades.length).toBeLessThanOrEqual(1);
   });
 
   it("sustained speeding is never cheaper than oscillating around the limit (M-16)", () => {

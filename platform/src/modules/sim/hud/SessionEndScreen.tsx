@@ -908,6 +908,31 @@ export function SessionEndScreen({
    * the green the same way it was earned the first time.
    */
   const examBilling = useMemo(() => ledgerBilling(summary.mistakes), [summary.mistakes]);
+  /**
+   * WHICH COMMENDATIONS THIS DRIVE'S OWN LEDGER QUALIFIES — asked ONCE, read
+   * twice by the «Похвали» card below: by its heading and by every row.
+   *
+   * The judgement is not made here. `commendationRiderFlags` and
+   * `commendationRiderBg` live in `lessons/debrief.ts` and are the same two
+   * functions the «Разбор» prose asks — the whole reason for the deep import at
+   * the top of this file, and the reason the two post-drive surfaces can never
+   * say different things about one commendation. What this memo adds is only
+   * TIMING: the card can now ask before it prints its heading, instead of
+   * inside the row loop, where the answer arrived too late to gate anything.
+   */
+  const commendationRiders = useMemo(
+    () =>
+      summary.commendations.map((c) =>
+        commendationRiderBg(summary, commendationRiderFlags(summary, c)),
+      ),
+    [summary],
+  );
+  /**
+   * Does ANY praise on this card stand unqualified? A card on which not one
+   * does is not a certificate surface, and its heading stops being painted in
+   * the certificate colour. See the card's own block comment for the drive.
+   */
+  const anyCommendationStands = commendationRiders.some((r) => r === null);
   const markers = useMemo(
     () => [
       ...mistakeMarkers,
@@ -1574,20 +1599,62 @@ export function SessionEndScreen({
           So the rider comes from `lessons/debrief.ts` — the same function, not a
           copy — and the two surfaces can no longer say different things about
           one commendation. The dash that joins it to a debrief bullet is that
-          medium's punctuation; here it is a line of its own. ────────────────── */}
+          medium's punctuation; here it is a line of its own.
+
+          ── 2026-08-30 · THE ROW WAS RE-OPENED, AND THE JUDGE WAS RIGHT ──────
+          The finding asks for a GATE — „the praise channel needs the same gate
+          the objective channel got; a commendation must require the behaviour
+          it names" — and everything above this line is a RIDER. A rider
+          EXPLAINS a certificate; it does not withhold one. Photographed on the
+          same sweep the closure was read from, w17,
+          `frames/sc-ov-crest-curve__mobile-right/_audit-debrief.json`,
+          verbatim: «Похвали ✓ Чисто и спокойно каране 1:06 но само на отделни
+          отсечки от маршрута: в същия урок има и 2 опасни грешки…» — the
+          explanation had arrived, and the green ✓ above it went on certifying a
+          НЕИЗДЪРЖАН · 20-наказателни-точки drive carrying two опасни грешки as
+          clean and calm.
+
+          THE GATE IS THE ONE THIS SCREEN ALREADY OWNS, in the «Задачи от
+          маршрута» card above: those rows issue the filled green ✓ only for
+          `o.done` and give every other row a muted, bordered mark. The MARK
+          IS the certificate there, and it is withheld when the behaviour was
+          not performed. The praise channel now reads exactly the same way —
+          `riderBg === null` (nothing this drive did contradicts the claim)
+          keeps the green ✓ byte for byte, and a row the drive's own fault
+          ledger qualifies gets „(✓)" in `--warning`: the credit is RECORDED,
+          the certificate is not ISSUED. The heading drops the success colour on
+          a card where not one row stands.
+
+          STILL NOT A DELETION, and this is the third time this file has had to
+          say it: the metres were driven, so the row stays, the clock stays, the
+          order stays, the XP booked off the EVENT (`gamification/xp.ts`) is
+          untouched, and the `aria-label` stays — a sweep must never again be
+          able to read a MISSING «Похвали» card as this row's repair, which is
+          what three `sc-ac-wind-*` legs invited when they simply never drove
+          250 m clean. The parenthesis and not the colour alone, because a
+          colour is not a signal a colour-blind student has; and a mark of fixed
+          width, so the two marks leave the titles on one vertical line rather
+          than making „qualified" legible as a four-pixel indent. ───────────── */}
       {summary.commendations.length > 0 ? (
         <section aria-label="Похвали" className="card flex flex-col gap-2 p-5">
-          <h3 className="text-sm font-extrabold text-success">Похвали</h3>
+          <h3
+            className={`text-sm font-extrabold ${
+              anyCommendationStands ? "text-success" : "text-warning"
+            }`}
+          >
+            Похвали
+          </h3>
           <ul className="flex flex-col gap-1">
             {summary.commendations.map((c, i) => {
               const key = `c:${i}`;
               const flash = rowFlash(key);
               // PER ROW, not per title: this card prints every event, and the
               // 0:49 stretch and the 1:11 stretch are the same claim made twice.
-              const riderBg = commendationRiderBg(
-                summary,
-                commendationRiderFlags(summary, c),
-              );
+              const riderBg = commendationRiders[i] ?? null;
+              // THE GATE. Not „is there a rider to print" — that question is
+              // about text. This one is about the MARK: does the behaviour this
+              // row names survive the drive's own ledger?
+              const stands = riderBg === null;
               return (
                 <li
                   key={flash.key}
@@ -1595,15 +1662,25 @@ export function SessionEndScreen({
                   className={`flex flex-col gap-0.5 rounded-lg px-1 text-sm ${flash.className}`}
                 >
                   <div className="flex items-center gap-2">
-                    <span aria-hidden className="text-success">✓</span>
+                    <span
+                      aria-hidden
+                      className={`inline-block w-5 shrink-0 text-center ${
+                        stands ? "text-success" : "text-warning"
+                      }`}
+                    >
+                      {stands ? "✓" : "(✓)"}
+                    </span>
                     <span className="font-semibold">{c.titleBg}</span>
                     <span className="ml-auto text-xs tabular-nums text-muted">{clock(c.t)}</span>
                   </div>
                   {riderBg !== null ? (
                     // `--warning` and not `--danger`: the praise is EARNED and
-                    // stays; what is added is its scope. Indented under the ✓ so
-                    // it reads as this row's qualification and not as a new row.
-                    <p className="pl-6 text-xs font-semibold leading-relaxed text-warning">
+                    // stays; what is added is its scope — the metres are real,
+                    // the certificate above them is what the gate withheld.
+                    // `pl-7` = the mark's `w-5` plus the row's `gap-2`, so the
+                    // sentence starts under the TITLE and not under the mark,
+                    // and reads as this row's qualification, not a new row.
+                    <p className="pl-7 text-xs font-semibold leading-relaxed text-warning">
                       {riderBg}
                     </p>
                   ) : null}

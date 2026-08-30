@@ -236,9 +236,12 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
  * The debrief is real. The drive behind it is not the briefing's line. This
  * drill's second objective is a LEFT turn out of the south stem — instruction
  * 5 «завий наляво и продължи на запад», disc `sc-jblind-cross` at (−50, 4.06)
- * on the west arm — and `tools/mobile/lesson-audit.mjs`'s `right` mode has no
- * steering input at all: its whole keyboard vocabulary is KeyW / KeyS /
- * Escape. So it went north through an equal junction it never yielded at, and
+ * on the west arm — and `tools/mobile/lesson-audit.mjs`'s `right` mode had, AT
+ * THAT REVISION, no steering input at all: its whole keyboard vocabulary was
+ * KeyW / KeyS / Escape. (That clause has since EXPIRED; it is left standing
+ * only because it is what the sweep-161 drive actually was. Do not lean on it
+ * — the w17 block below carries the refutation now.) So it went north through
+ * an equal junction it never yielded at, and
  * `04-t209s.png` shows where it stopped — 3 км/ч, gear D, standing in an empty
  * green field off the network, task 2/2 still asking for the left turn.
  *
@@ -250,6 +253,45 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
  * objective 1 and cannot reach objective 2's disc. The counter-proof rides the
  * same pipeline: mistake-barge still grades FAILED_TO_YIELD and mistake-no-look
  * still grades COLLISION, so the pass is not a suite that stopped grading.
+ *
+ * W17 RE-JUDGEMENT — `sc-junction-blind:dea35510`, re-driven 2026-08-29 at
+ * attested commit bc7d43f and judged STILL. REFUTED AGAIN — same conclusion,
+ * NEW evidence, because the old evidence had rotted. The harness steers now:
+ * `lesson-audit.mjs` holds KeyA/KeyD from a vision loop that reads the
+ * RouteGuidance ribbon off the windscreen (`guidance.wired: true`, 48 scans on
+ * the pc leg), and the shadow tape it follows supplies SPEED only
+ * (`guidance.alignment.note`: „it did not steer, aim or index anything on this
+ * drive"). A refutation resting on „the recorder cannot turn" was one harness
+ * release away from being thrown out whole — which is precisely what happened
+ * here. So pin it to the TRACK, which no harness upgrade can move:
+ *
+ *   `w17/frames/sc-junction-blind__pc-right/_audit-status.json`,
+ *   `guidance.samples` — one row per ~1 s, wz = −y:
+ *     (4.06, −85) → (−1.9, −9) → (−2.3, +5) → (−3.45, +41), then standing
+ *   126 m of northing, 7.5 m of lateral drift end to end, not one metre west.
+ *   The mobile leg is the same shape: (4.06, −83) → (−12.0, +41).
+ *
+ * tj-occluded-v1 is a THREE-node T (`roads.nodes`: W −140, C 0, E +140,
+ * S −130 — THERE IS NO NORTH ARM), so both drives ran off the far side of the
+ * crossbar and died ~40 m out in the field. That is what «Удар в неподвижно
+ * препятствие» names — a бордюр/стълб/ограда charge, explicitly NOT the
+ * priority car the finding says the student crashes into — and what „колата
+ * остана притисната на място" in the debrief describes. Objective 2's disc is
+ * at (−50, +4.06) r 9: the pc leg never came within ~48 m of it, the mobile
+ * leg ~45 m. The give-way charge is earned too — the car rolled into the 18 m
+ * right-hand-rule core at ~10 км/ч WITHOUT EVER STOPPING while the priority
+ * car was visible from the right (`runtime/worldRuntime.ts`
+ * RHR_CORE_RADIUS_M = 18, conviction gated on `speedKmh > RHR_MOVING_KMH`),
+ * then re-accelerated 2 → 14 км/ч across the node. The shadow halts at
+ * y = −19.5, OUTSIDE that core, and holds 8 s. Two different drives; only one
+ * of them is the briefing's.
+ *
+ * And the row is UNSETTLEABLE by the `-right` driver as built, not merely
+ * unproven by it: on both legs the ribbon goes unseen (`seen: false`) from
+ * ~5 m short of the node to the end of the run, so the loop has nothing to
+ * steer to through the turn and holds straight ahead. Whether this lesson's
+ * correct line survives is a question only the §2 shadow replay can answer —
+ * a windscreen-following recorder cannot reach the west arm to ask it.
  */
 
 /**

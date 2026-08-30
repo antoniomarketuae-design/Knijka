@@ -670,6 +670,12 @@ export interface HudSnapshot {
    *  stall) — null until the scene emits the first snapshot. */
   driveline: DrivelineSnapshot | null;
   objectiveTitle: string | null;
+  /**
+   * Whether the route is reachable from where the car is — `null` when it is.
+   * Read by the two surfaces that print the objective, through
+   * `objectiveTitleUnderHold`; nothing grades on it. See `routeHold`.
+   */
+  objectiveHold: RouteHold | null;
   objectiveIndex: number;
   objectiveTotal: number;
   objectiveProgress: number | null;
@@ -842,6 +848,133 @@ export function heldTaskCapKmh(
   return prev.objectiveId === activeObjectiveId ? prev.taskCapKmh : undefined;
 }
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * THE CHIP THAT KEPT DEMANDING A MANOEUVRE THE CAR COULD NO LONGER MAKE
+ * (sc-junction-blind:c5ba8f17, critical, re-judged STILL on the w17 re-drive.)
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * THE FRAME. `w17/frames/sc-junction-blind__pc-right/04-t054s.png`: the
+ * windscreen is one flat dark surface because the car is INSIDE a building
+ * facade, the cluster reads 0 км/ч, «Удар в неподвижно препятствие −10» is on
+ * the glass — and the objective banner still reads «ЗАДАЧА 2/2 · Завий наляво и
+ * излез от кръстовището на запад». It reads that on 04-t042s (on the grass in
+ * front of the facade) and on 04-t048s too, i.e. for the whole stretch between
+ * the collision and the ending. The row's own first filing is quoted verbatim
+ * in `lessons/types.ts` on `offNetworkSinceSec`: «a featureless green plane at
+ * 0 км/ч with the task chip still reading ЗАДАЧА 2/2 · Завий наляво».
+ *
+ * WHAT IS ALREADY BUILT, AND WHY IT IS NOT ENOUGH BY ITSELF. Two folds in
+ * `lessons/finish.ts` already know this state and already END the drive with an
+ * explanation apiece — `stepOffNetwork` (OFF_NETWORK_STUCK_S, 75 s) and the
+ * crash pin (CRASH_PIN_STUCK_S, 10 s of unbroken standstill within
+ * CRASH_PIN_RADIUS_M = 6 m of the impact). Both are the right endings and
+ * neither is fast: 75 s, and 10 s that a car GRINDING against geometry resets
+ * on every frame it twitches — which is precisely the photographed drive
+ * (04-t042s reads 10 км/ч between two zero frames). The whole of that window
+ * is spent under a demand the student cannot obey.
+ *
+ * SO THE BANNER STOPS BEING AN IMPERATIVE BEFORE THE DRIVE STOPS BEING ONE.
+ * Doc 64 THEO-4 forbids a bare verdict; an order issued to someone who cannot
+ * carry it out is the same crime pointing the other way — it teaches the
+ * student that the instruction is noise. The task is NOT retired, because
+ * hiding it would leave the glass with no statement of what the drill is at
+ * all: the sentence is QUALIFIED, so the line says what has to happen first and
+ * then repeats the authored objective word for word.
+ *
+ * THE READING IS THE SESSION'S OWN, NOT A SECOND OPINION. Both clauses are
+ * fields the engine already folds and already ends drives on; nothing here
+ * re-derives „stuck" from speed or position, so the banner and the ending
+ * cannot disagree about whether the car is going anywhere.
+ */
+export type RouteHold = "crashPinned" | "offRoad";
+
+/**
+ * How long a condition must have stood before the banner qualifies its demand.
+ *
+ * DERIVED, NOT CHOSEN. `CRASH_PIN_RADIUS_M` is 6 m and the floor at which this
+ * product says a car is DRIVING is 5 км/ч — the one number `touchHintLifetime`,
+ * `controlsLegendLifetime` and `demoDeckLifetime` all stand their surfaces down
+ * at, and the `movingSpeedKmh` the rule engine grades with. A car that has been
+ * driving AT ALL, even at that floor, covers the pin's radius in
+ * 6 ÷ (5 ÷ 3.6) = 4.32 s. So five seconds after an impact, a car still inside
+ * the radius has not been driving away from what it hit — by the product's own
+ * definition of driving, not by a taste call about how long is long enough.
+ *
+ * It lands FIVE SECONDS BEFORE the crash pin's own 10 s ending in the pure
+ * standstill case, which is the point: a qualification the student never reads
+ * because the drive closes on the same frame is a dead predicate with a nice
+ * comment. The off-road clause takes the same number rather than a second one,
+ * for the reason `demoDeckLifetime` gives for sharing its threshold — three
+ * surfaces that change behaviour at three different moments read as three bugs.
+ */
+export const ROUTE_HOLD_S = 5;
+
+/**
+ * Is the route unreachable from where the car actually is?
+ *
+ * `crashPinned` is the pin STILL ARMED `ROUTE_HOLD_S` after the impact, and it
+ * is deliberately read off `atSec` rather than off `stillSinceSec`. The pin
+ * disarms itself the moment the car leaves CRASH_PIN_RADIUS_M — i.e. exactly
+ * when the demand becomes obeyable again — so this clause is monotone within
+ * one pin: it turns on once and off once, and the grinding car that resets
+ * `stillSinceSec` every second cannot make the banner flicker between an order
+ * and its qualification. (A qualification that blinks is worse than no
+ * qualification: it reads as a broken screen rather than as a condition.)
+ *
+ * WITHIN ONE PIN, and the exception is honest rather than accidental: a NEW
+ * graded collision re-arms `atSec`, and the qualification then waits its five
+ * seconds again. The engine's dedupe requires daylight plus two metres of
+ * travel before it will bill a second impact, so this cannot fire on a car
+ * grinding in place — it fires on a car that moved and hit something else,
+ * which is new information about a different obstacle and is entitled to be
+ * measured from when it happened.
+ *
+ * `offRoad` is `stepOffNetwork`'s own run — reset on every frame the car is
+ * back on a road the world authored, never banked in instalments — so it too
+ * cannot flicker, and it ends the moment the student drives back onto tarmac.
+ *
+ * UNKNOWN IS „NO HOLD", the same direction the three lifetime files take with
+ * an unreadable speed. A missing tick, a non-monotonic stamp and a session that
+ * predates either field all leave the authored sentence exactly as authored;
+ * nothing here may qualify a demand on the strength of an absent measurement.
+ */
+export function routeHold(s: LessonSessionState, lastTick: SimTick | null): RouteHold | null {
+  if (lastTick === null) return null;
+  const pinnedForS =
+    s.crashPin === undefined ? null : lastTick.t - s.crashPin.atSec;
+  if (pinnedForS !== null && pinnedForS >= ROUTE_HOLD_S) return "crashPinned";
+  const offRoadForS =
+    s.offNetworkSinceSec == null ? null : lastTick.t - s.offNetworkSinceSec;
+  if (offRoadForS !== null && offRoadForS >= ROUTE_HOLD_S) return "offRoad";
+  return null;
+}
+
+/**
+ * The banner's sentence under a hold — the authored objective, with the thing
+ * that has to happen first in front of it.
+ *
+ * THE WORDS ARE THE ENGINE'S OWN. «притисната» is the noun `engine.ts` uses in
+ * the ending this state runs into («След удара колата остана притисната на
+ * място»), and «извън пътя» is `offNetworkEndingCopy`'s. The qualification and
+ * the ending it precedes therefore describe one situation in one vocabulary,
+ * instead of the student meeting two different accounts of the same wall.
+ *
+ * No `lawRef` and no article number: neither clause is a claim about Bulgarian
+ * law (ADR-002), it is a statement about where this car physically is.
+ */
+export function objectiveTitleUnderHold(
+  titleBg: string | null,
+  hold: RouteHold | null,
+): string | null {
+  if (titleBg === null || hold === null) return titleBg;
+  const leadBg =
+    hold === "crashPinned"
+      ? "Колата е притисната след удара — измъкни се назад, за да продължиш"
+      : "Колата е извън пътя — върни се на платното, за да продължиш";
+  return `${leadBg}: ${titleBg}`;
+}
+
 export function snapshotOf(
   s: LessonSessionState,
   lastTick: SimTick | null,
@@ -868,6 +1001,16 @@ export function snapshotOf(
     seatbeltOn: lastTick?.seatbeltOn ?? false,
     driveline,
     objectiveTitle: s.phase === "driving" && active ? active.spec.titleBg : null,
+    // …and, BESIDE it rather than folded into it, whether the route is
+    // reachable from where the car actually is. See `routeHold` for the two
+    // session fields this reads; `objectiveTitleUnderHold` is what the two
+    // surfaces that PRINT the objective apply, and the reason the two are
+    // carried separately is `advisorEchoTrim`: that function removes the
+    // advisor's duplicate of this sentence by prefix, so it has to keep seeing
+    // the AUTHORED title. Qualifying the snapshot's own field instead would
+    // silently break the match and put the unqualified demand back on the glass
+    // on a second card, one row under its own qualification.
+    objectiveHold: routeHold(s, lastTick),
     objectiveIndex: s.currentObjectiveIndex + 1,
     objectiveTotal: s.objectives.length,
     objectiveProgress:
@@ -1909,7 +2052,15 @@ export function lessonQueueBinding(s: LessonQueueState): LessonQueueBinding {
   // condition is load-bearing rather than decoration (`advisorTaskFold`): the
   // detail would otherwise be the remainder of a different sentence from the
   // one printed above it, and `itemEchoesLine` cannot see that.
-  const taskLineBg = s.mistakeMode ? s.lessonDescriptionBg : s.snap.objectiveTitle;
+  // …and OUTSIDE the sandbox it is the objective as the student can currently
+  // act on it — `objectiveTitleUnderHold` is a no-op on every drive whose route
+  // is still reachable, and prefixes the condition on the ones where it is not
+  // (sc-junction-blind:c5ba8f17). The phone has no banner, so this line IS the
+  // demand there; a chip that keeps ordering a manoeuvre into a facade is the
+  // bare-verdict crime pointing the other way (doc 64 THEO-4).
+  const taskLineBg = s.mistakeMode
+    ? s.lessonDescriptionBg
+    : objectiveTitleUnderHold(s.snap.objectiveTitle, s.snap.objectiveHold);
 
   // The gate and the fold — one place, and a pure one, so the four conditions
   // can be driven one at a time. It is NOT the gate the roomy `AdvisorCard` is
@@ -3513,6 +3664,58 @@ export function LessonPlayShell({
   const briefing = lesson.briefingBg ?? [];
   const [briefingOpen, setBriefingOpen] = useState(true);
   const closeBriefing = useCallback(() => setBriefingOpen(false), []);
+  /**
+   * ── DOC 91 · §I5(b) AGAIN, ON THE ONE SURFACE THAT STILL HAD NO WAY BACK ──
+   * (sc-lane-change:385c1b28, re-judged STILL on the w17 mobile re-drive.)
+   *
+   * „ANY LINE THE STUDENT CAN SEND AWAY NEEDS A WAY BACK" is written out at
+   * `recallPreDriveOverlay` sixty lines up, as a rule that „outlives this one
+   * card". The briefing was the card it had not reached, and the divergence is
+   * the whole of the row: on a roomy stage the steps fold to a LABELLED pill
+   * («ⓘ Инструкции · 5 стъпки ▸», `data-hud="briefing-folded"`) that is on the
+   * glass for the entire drive and unfolds on one click, while on a phone the
+   * same list is one overlay item whose «Разбрах» calls `closeBriefing` — and
+   * `briefingOpen` had exactly one writer after that, `useState(true)` at mount.
+   *
+   * MEASURED, `w17/frames/sc-lane-change__mobile-right/run.log`: «Инструкции»
+   * appears in the census at 01-arrival and 02-briefing and on NONE of the eight
+   * driving beats, while the pc leg of the same lesson carries the pill on every
+   * one. The seven authored steps — which on this drill carry the whole decision
+   * rule (mirror, then indicator, then the gap) — were unreachable for the rest
+   * of the lesson on the platform the students actually use.
+   *
+   * SO THE MICRO MENU RECALLS THEM, in the grammar «Задача» and «Подготовка»
+   * already use: the sheet is the phone's rail for everything the glass retires,
+   * it PAUSES the scene while it is open (`onOpenChange`), and the row carries
+   * the step count so a recall the student can see the state of is a recall he
+   * will use.
+   *
+   * TWO WRITERS TO UNDO, BECAUSE THERE ARE TWO WAYS OUT. «Разбрах» clears
+   * `briefingOpen`; the ✕ puts the item's id into `dismissedOverlayIds`
+   * (`dismissOverlayItem`) and leaves `briefingOpen` alone. A recall that
+   * cleared one of them would work for one of the two gestures and look broken
+   * after the other, which is the shape of dead-end this rule exists to end.
+   *
+   * …AND THE RECALLED CARD DOES NOT FREEZE A MOVING CAR. `blocking: true` means
+   * „the item holds the drive" (`overlayHoldsDrive`), which is right at arrival
+   * — the drive has not started — and is a hazard mid-lesson: a student at
+   * 50 км/ч asking to re-read step 4 must not have the car taken off him, and a
+   * car frozen in a running lane is a fault the rule engine would then grade him
+   * for. The latch below is what the candidate reads to drop that one property;
+   * everything else about the card — the sheet, the numbering, «Прочети» — is
+   * the same surface it always was.
+   */
+  const [briefingRecalled, setBriefingRecalled] = useState(false);
+  const recallBriefing = useCallback(() => {
+    setBriefingRecalled(true);
+    setBriefingOpen(true);
+    setDismissedOverlayIds((prev) => {
+      if (!prev.has("briefing")) return prev;
+      const next = new Set(prev);
+      next.delete("briefing");
+      return next;
+    });
+  }, []);
 
   // -- A6: DISMISSING THE ADVISOR PROMPT ---------------------------------------
   //
@@ -4179,6 +4382,10 @@ export function LessonPlayShell({
     setAdvisorDismissed(null);
     // I1: a fresh attempt is a fresh prediction — the gate asks again.
     setCalibrationDone(false);
+    // …and the briefing's recall latch belongs to ONE attempt: it exists only
+    // to say „this showing was asked for mid-drive, so it must not hold the
+    // car" (`recallBriefing`), and a retry's first showing is an arrival again.
+    setBriefingRecalled(false);
     setTraceUploaded(false);
     setFlash(null);
     clear();
@@ -5022,7 +5229,13 @@ export function LessonPlayShell({
               // asking for the rest of the sentence, and a control that names
               // the wrong thing is why six waves of truncation went unreported.
               openLabelBg: "Прочети",
-              blocking: true,
+              // FIRST SHOWING ONLY — see `recallBriefing`. At arrival this card
+              // holds the drive, which is the behaviour it shipped with and the
+              // right one: the lesson has not begun and the steps are what it
+              // begins with. A card the student ASKED for mid-drive may not take
+              // the car off him — `overlayHoldsDrive` would stop a moving car in
+              // a running lane, which the rule engine then grades.
+              blocking: !briefingRecalled,
               ackLabelBg: "Разбрах",
               onAck: closeBriefing,
             }
@@ -5452,6 +5665,40 @@ export function LessonPlayShell({
                   ? "Задача"
                   : `Задача ${Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))} от ${snap.objectiveTotal}: ${taskLineBg}`,
                 onSelect: () => setTaskPing((n) => n + 1),
+              },
+            ]
+          : []),
+        // ── «ИНСТРУКЦИИ» · THE STEPS THE PHONE COULD NOT GET BACK TO ─────────
+        // (sc-lane-change:385c1b28 — the derivation and the run.log census are
+        // at `recallBriefing`, which this row is the one caller of.)
+        //
+        // The roomy stage keeps the authored steps a click away for the whole
+        // drive («ⓘ Инструкции · N стъпки ▸»); the phone showed them once and
+        // then had no route back to them at all. This is that route, in the same
+        // recall grammar as the two rows around it — and it carries the step
+        // count for «Подготовка»'s stated reason, that a recall whose state the
+        // student can see is a recall he will use.
+        //
+        // NOT IN THE SANDBOX AND NOT AFTER THE END. `mistakeMode` has no
+        // briefing by construction (the assignment there IS the mistake, which
+        // is why the candidate below carries the same clause), and an ended
+        // session's menu is the two-row exit sheet.
+        //
+        // WHY IT IS PRESENT IN THE EXAM. «Съветник» and «Въпроси» are coaching
+        // and are correctly withheld; this is the drill's own authored briefing,
+        // which every candidate has already been shown at arrival and which
+        // states the task rather than how to pass it. Withholding it would only
+        // grade reading speed at 01-arrival.
+        ...(compact && !ended && !mistakeMode && briefing.length > 0
+          ? [
+              {
+                key: "briefing",
+                labelBg: "Инструкции",
+                valueBg: `${briefing.length} ${briefing.length === 1 ? "стъпка" : "стъпки"}`,
+                ariaLabelBg: `Инструкции за упражнението — ${briefing.length} ${
+                  briefing.length === 1 ? "стъпка" : "стъпки"
+                }`,
+                onSelect: recallBriefing,
               },
             ]
           : []),
@@ -6307,7 +6554,12 @@ export function LessonPlayShell({
             ) : null
           ) : (
             <ObjectiveBanner
-              titleBg={snap.objectiveTitle}
+              // The objective as it can currently be acted on — see
+              // `objectiveTitleUnderHold`. Identical to `snap.objectiveTitle` on
+              // every drive whose route is still reachable; on the ones where it
+              // is not, the condition goes in front of the demand instead of the
+              // demand standing over a car that cannot obey it.
+              titleBg={objectiveTitleUnderHold(snap.objectiveTitle, snap.objectiveHold)}
               index={Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}
               total={snap.objectiveTotal}
               progress={snap.objectiveProgress}

@@ -58,37 +58,59 @@
  * turns 5 of the 7 island-collider tests red. The wall is a closed, indexed,
  * wheel-height-clearing collider on every ring district.
  *
- * BUT THAT ANSWERS A QUESTION THE FINDING DID NOT ASK. „The debrief was honest
- * about the collision" and „the careful drive was failed unfairly" are
- * different claims, and only the second one is a FALSE REFUSAL — the thing this
- * project treats as equal in gravity to a false certificate. So it was measured
- * directly, at the instrument:
+ * ROUND 9'S SECOND ARGUMENT HAS SINCE EXPIRED — READ THIS BEFORE REOPENING.
+ * It closed the „was the careful drive failed unfairly" half by a census: „THE
+ * SWEEP'S DRIVER CANNOT STEER … KeyA / KeyD / ArrowLeft / ArrowRight returns
+ * ZERO", so the car could only travel in a straight line and the −10 was earned
+ * by an instrument, not suffered by a driver. That census was true when it was
+ * taken and is now FALSE: `lesson-audit.mjs` grew a steering channel on
+ * 2026-08-21 (`STEER_KEYS = { left: "KeyA", right: "KeyD" }`, a guidance loop
+ * that reads the ghost ribbon off the windscreen). The w10-4 leg's own
+ * `_audit-status.json` records `steering.wired: true`, `everSteered: true`,
+ * 13 commands (536 ms left / 440 ms right) and `channel.state: "live"`. A
+ * refutation resting on „it cannot turn" would therefore fall the moment anyone
+ * re-ran the census — and the conclusion it was defending is correct. So it is
+ * replaced here by a measurement that does not depend on what the harness can
+ * do, only on where the car ended up.
  *
- *     THE SWEEP'S DRIVER CANNOT STEER. The entire actuation of
- *     tools/mobile/lesson-audit.mjs is `page.keyboard.down/up("KeyW")` and
- *     `…("KeyS")` plus one `press("Escape")`. A census of that harness for
- *     KeyA / KeyD / ArrowLeft / ArrowRight / any steer token returns ZERO.
+ * THE POSITIONAL PROOF (w10-4, 2026-08-24, `sc-roundabout-entry__pc-right`).
+ * `guidance.samples` carries world coordinates per tick, and rb-mini-v1's ring
+ * comes out of `analyzeRoundabouts` above. Radii from the ring centre (0, 0):
  *
- * A car that can only accelerate and brake leaves the south arm and travels in
- * a straight line into the central island — which is exactly the frame. So the
- * „careful drive" was never careful: it drove straight at the island because it
- * was physically incapable of turning, and the −10 is CORRECT. There is no
- * false refusal here, and the island must not be softened to make this drive
- * pass. Both directions therefore hold: the wall stops a car that should be
- * stopped (mutation above), and the drive that was stopped deserved it (census
- * above). The founder's own B16 register entry is the same signature recorded
- * from the other side — „due north with no steering at all".
+ *     island wall face      r = 13.750 m   (`islandRadiusM`, this file)
+ *     carriageway           r = 13.785 … 21.910 m  (17.848 ∓ 4.0625)
+ *     ego t080s             r = 26.43 m    approaching, outside the ring
+ *     ego t085s             r = 20.38 m    ON the circulating carriageway
+ *     ego t087s … t096s     r = 15.79 m    STOPPED, 0 км/ч, 0.11 m of drift in 9 s
+ *
+ * `CHASSIS_HALF_EXTENTS.z` is 2.02 m and the car is pointed at the centre, so
+ * its NOSE rests at 15.787 − 2.02 = 13.767 m against a wall face at 13.750:
+ * **17 mm of clearance**. The car did not drive on the island. It was held
+ * outside it, nose to the concrete, for the last nine seconds of the run — the
+ * island wall doing exactly the job `ISLAND_WALL_RISE_M` exists to do, to
+ * within the width of a finger. The filed premise („the car ends up driving on
+ * the central island") is false by 2.04 m of body centre.
+ *
+ * The frames agree once the geometry is known. t085s is „windscreen full of
+ * grass" because at r = 20.38 the ego is looking at the island from 6.6 m away
+ * and a 0.57 m wall topped by a 0.8–1.6 m planted crown fills a 1.2 m eyeline;
+ * t091s is the same mound at contact range. Neither frame shows the ego ON the
+ * island, and the −10 explains itself in full (`rules/catalog.ts`: „то е било
+ * там през цялото време, а колата е стигнала до него, защото пътят ѝ е излязъл
+ * извън платното" — the departure IS the accident, the impact only its end).
  *
  * The signature is family-wide and file-independent, which is what rules this
  * module out as the cause: all SIX roundabout drills across three template
  * files collided on every leg, while only 24 of 98 pc-right legs collided
  * sweep-wide.
  *
- * ROUTED, NOT TOUCHED — the finding belongs to the harness, not to this
- * builder: `tools/mobile/lesson-audit.mjs` (no lateral input; every roundabout,
- * every T-junction and every turn-based lesson in the corpus is ungradeable
- * until it can steer, and their „collision"/„drove off the map" verdicts should
- * be read as INSTRUMENT OUTPUT until it can).
+ * ROUTED, NOT TOUCHED — nothing here is the defect, and the island must not be
+ * softened to let this drive through. What put the ego off the carriageway is
+ * the harness's LATERAL TRACKING, not its lack of a wheel: the same status file
+ * grades this leg `tracking: intermittent`, and its last two guidance samples
+ * before the impact report `errDeg 31.22` — the loop saw the ribbon 31° to the
+ * right and did not follow it. Until tracking is settled, „collision" and
+ * „drove off the map" verdicts on turn-based lessons are INSTRUMENT OUTPUT.
  * ───────────────────────────────────────────────────────────────────────────
  */
 

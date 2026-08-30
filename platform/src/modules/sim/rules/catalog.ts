@@ -1523,11 +1523,11 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
    * THE TWO LESSONS THAT STILL HAVE NO CODE FOR THEIR OWN SUBJECT.
    *   sc-vp-police-stop  „Спиране по полицейски сигнал"  doc 72 VP-11
    *   sc-vp-telltale     „Контролна лампа в движение"    doc 72 VP-06
-   *   (both in lessons/scenario/templates-cockpit.ts, from :571 and :748)
+   *   (both in lessons/scenario/templates-cockpit.ts, from :762 and :942)
    * Both were authored as COMPLETION DRILLS: the duty is graded ONLY as a
    * curb-side low-speed reachZone objective, and the wrong way through is billed
    * under the nearest available code — the police drill's own mistake demo
-   * carries `codeRefs: ["NOT_KEEPING_RIGHT"]` (templates-cockpit.ts:714), the
+   * carries `codeRefs: ["NOT_KEEPING_RIGHT"]` (templates-cockpit.ts:832), the
    * author reaching for lane discipline because nothing else existed. So a
    * student who drives past the officer, or drives on under a red lamp, and does
    * not crash is not convicted of the thing his lesson is about.
@@ -1586,8 +1586,8 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
    *      bill) is the precedent to copy exactly. Situation keys as authored:
    *      "police-stop-signal" and "warning-lamp".
    *   2. ENGINE ARM — `rules/engine.ts`. Add both keys to MANOEUVRE_SITUATIONS
-   *      (:4482) — neither act happens at a junction, so neither may be
-   *      place-latched — and both arms to the situation→code chain at :4494,
+   *      (:4973) — neither act happens at a junction, so neither may be
+   *      place-latched — and both arms to the situation→code chain at :4984,
    *      beside EMERGENCY_NOT_YIELDED and VULNERABLE_PASS_TOO_CLOSE.
    *   3. THIS FILE — the two `VIOLATIONS` rows (severityClass "osnovna",
    *      points SEVERITY_POINTS.osnovna, the lawRef / realWorldRefs above,
@@ -1601,16 +1601,40 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
    *      `ViolationCode`, so a code with no basis row is a COMPILE ERROR. That is
    *      what caught this attempt. Both rows carry clause „а".
    *   5. WORLD REFERENT — `world/referents.ts`: either a `REFERENT_RULES` entry
-   *      (:1283 — a `stagedActorRule` on the officer actor is the natural one for
-   *      the police drill) or `NO_WORLD_REFERENT` (:86 — the telltale has no world
+   *      (:1312 — a `stagedActorRule` on the officer actor is the natural one for
+   *      the police drill) or `NO_WORLD_REFERENT` (:114 — the telltale has no world
    *      body at all, the lamp being a cockpit channel, so exemption is the honest
    *      answer there). Plus the census pin in
-   *      `world/__tests__/world-referent.gate.test.ts` (:456-458 — checked 46,
-   *      exempt 13, total 59), which moves only with a written reason.
+   *      `world/__tests__/world-referent.gate.test.ts` (:469-471 — checked 46,
+   *      exempt 14, total 60), which moves only with a written reason.
    *   6. THE CATALOGUE CENSUSES — `__tests__/consequences.test.ts` („covers every
    *      violation code"), `naredba-38-classification.test.ts`, `offences.test.ts`
    *      and `catalog-consequences.test.ts` each enumerate VIOLATIONS, each
    *      convicted this attempt, and each must be green before it is done.
+   *
+   * THE PLAN'S ADDRESSES RE-VERIFIED 2026-08-30 @ 527a6c5, AND EIGHT OF ITS
+   * LINE NUMBERS HAD MOVED — the only reason this paragraph exists. A plan is a
+   * routing document, and a routing document decays: `sc-vp-telltale:dcc20e98` and
+   * `sc-vp-police-stop:44cfeff6` were re-confirmed STILL on the w17/wave-c
+   * frames and handed to a lane owning THIS FILE ALONE, i.e. part 3 of six. That
+   * lane cannot land any of it — `VIOLATIONS` is `Record<ViolationCode,
+   * ViolationSpec>` and neither code is in the union, so a row added here is a
+   * compile error before it is a dead predicate — and the one thing it could
+   * check was whether the addresses the NEXT lane will follow still point at the
+   * code. Measured against HEAD, one by one:
+   *   · templates-cockpit.ts  :571/:748/:714  →  :762/:942/:832
+   *   · engine.ts             :4482/:4494     →  :4973/:4984
+   *   · referents.ts          :1283/:86       →  :1312/:114
+   *   · world-referent.gate   :456-458        →  :469-471, AND ITS ARITHMETIC
+   *     CHANGED: 13 exempt / 59 total is now 14 / 60, because `OFF_CARRIAGEWAY`
+   *     landed on 2026-08-30 (56cc3f8) and took the exemption. Whoever adds
+   *     these two codes moves the pin from 14/60, not from 13/59; the old figure
+   *     would have been re-pinned by hand and looked deliberate.
+   * UNMOVED and re-checked rather than assumed: `runners.ts` :2655 / :3705 (both
+   * still emit zero SimTick events — the class docs saying so are still there),
+   * the `emergency` precedent at :2579 praise / :2615 bill, `n38.ts` :176, and
+   * the three classroom consumers below (compose.ts :61/:63, interrupt.ts :152;
+   * resolve.ts is :153 now, one line).
    *
    * THE CLASSROOM HALF THAT WENT WITH THEM — the one thing genuinely lost.
    * `lesson/compose.ts:61 rulesByConcept()` reads `conceptId` off THIS table to

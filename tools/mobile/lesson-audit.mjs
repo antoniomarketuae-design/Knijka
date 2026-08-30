@@ -2561,6 +2561,59 @@ const REVERSE_STAY_RE = /заден ход|назад/u;
 const REVERSE_DEMAND_SEL =
   '[data-hud="objective-banner"], [role="status"][aria-label="Съветник — следващо действие"]';
 
+/**
+ * THE SAME QUESTION, ASKED ON ITS OWN — because something ELEVEN HUNDRED LINES
+ * ABOVE `probe()` has to know the answer, and `probe()` does not exist yet.
+ *
+ * WHY THERE IS A SECOND COPY OF THIS TEST AT ALL. `probe()` folds the demand
+ * into the drive loop's one big `evaluate` on purpose: a second round trip
+ * costs ~2.0 s on the `pc` leg and the loop asks this question twice a second.
+ * That argument is about the LOOP. This helper is called EXACTLY ONCE per run,
+ * before the positive control, so it buys the answer for one round trip on the
+ * whole drive — and the loop's copy is left untouched rather than refactored,
+ * because a shared helper would have to be hoisted above `probe()` and would
+ * put a network hop back inside the hot path to save a duplicated regex.
+ *
+ * IT IS THE SAME PREDICATE, DELIBERATELY: same two named surfaces
+ * (REVERSE_DEMAND_SEL), same purpose-before-act ordering that keeps «заеми
+ * изходната позиция ЗА заден ход» — a gate the car noses into FACING FORWARD —
+ * from being read as a demand for R. If the two ever drift, the drive loop
+ * would arm reverse on a lesson this helper let the harness press forward on,
+ * which is precisely the contradiction it exists to prevent; the shared
+ * sources (`REVERSE_DEMAND_RE.source`, `REVERSE_DEMAND_PURPOSE_RE.source`) are
+ * what make drift impossible without editing the regex both copies read.
+ *
+ * Returns the MATCHED SENTENCE, not a boolean, for the same reason
+ * `lawfulWait` does: the line that refuses to press forward has to be able to
+ * quote the task that refused it.
+ */
+const reverseDemand = () =>
+  page
+    .evaluate(
+      ({ revSel, revSrc, revPurposeSrc }) => {
+        let t = "";
+        for (const el of document.querySelectorAll(revSel)) {
+          t += `${(el.innerText || "").replace(/\s+/g, " ").trim()}\n`;
+        }
+        if (!t.trim()) return null;
+        const act = new RegExp(revSrc, "u");
+        const purpose = new RegExp(revPurposeSrc, "u");
+        if (purpose.test(t) && !act.test(t)) return null;
+        const m = t.match(act);
+        return m ? m[0] : null;
+      },
+      {
+        revSel: REVERSE_DEMAND_SEL,
+        revSrc: REVERSE_DEMAND_RE.source,
+        revPurposeSrc: REVERSE_DEMAND_PURPOSE_RE.source,
+      },
+    )
+    // A banner that is not on the glass yet is NOT "this lesson drives
+    // forward" — but it is also not a demand for R, and the caller's fallback
+    // for `null` is the forward press it has always made. Said here rather
+    // than left to the reader of a bare `.catch(() => null)`.
+    .catch(() => null);
+
 /** THE CLUSTER'S OWN LETTER — P · R · N · D · M2. Empty when no instrument is
  *  on the glass at all, which is a different answer from "D" and is reported
  *  as one. Every painted owner is read, not just the first: StatusDashboard
@@ -3627,15 +3680,131 @@ saveStatus({ steering });
 await timed("demo", runDemo);
 saveStatus({ demo });
 
-// POSITIVE CONTROL — the car must leave zero, or nothing after this is evidence.
-await throttle(true);
-await page.waitForTimeout(5000);
-const moved = (await read()).kmh;
-note(`  POSITIVE CONTROL: ${moved} км/ч after 5 s of throttle`);
-if (moved <= 0) {
-  loud(`CAR DID NOT MOVE — every frame after this is a frozen world, not a drive.`);
-  await beat("03b-frozen");
+/* ── POSITIVE CONTROL — the car must leave zero, or nothing after this is
+ *    evidence. TWO THINGS ABOUT IT ARE NOT DECORATION. BOTH WERE MEASURED AS
+ *    DEFECTS FIRST AND WRITTEN AS RULES SECOND.
+ *
+ * ── 1. IT DOES NOT PRESS FORWARD ON A LESSON WHOSE ONLY EXIT IS BACKWARDS ──
+ *
+ * THE ARM GATE IN THE DRIVE LOOP ALREADY KNOWS THIS. Its own comment says it
+ * in as many words — «the car is parked nose-in and the demand is up from the
+ * first frame, so a check that only runs after a completed roll would drive
+ * the car FORWARD out of a bay whose only exit is backwards before it ever
+ * looked» — and that is why the gate was moved to fire in any phase, on the
+ * first tick. The rule was applied to the loop and NOT to the five seconds of
+ * full forward throttle that run before the loop opens.
+ *
+ * MEASURED, sc-park-bay-exit-rev, whose task 1 is «излез от мястото на заден
+ * ход, с пешеходна скорост» — leave the space IN REVERSE, at walking pace. The
+ * car is nose-in a perpendicular bay; forward is a wall. On every leg of that
+ * lesson in every sweep this corpus holds, and directly in the frame the
+ * harness takes to prove the world is frozen:
+ *
+ *   POSITIVE CONTROL: 0 км/ч after 5 s of throttle
+ *   !! CAR DID NOT MOVE — every frame after this is a frozen world, not a drive.
+ *   [03b-frozen] 0 км/ч gear=D card=teach/peek
+ *       · Учебен момент +1 Удар в неподвижно препятствие
+ *
+ * The lesson is already failed — one dangerous error, 10 наказателни точки,
+ * «прекратява се изпитът» — at `03b-frozen`, BEFORE the drive loop opens,
+ * BEFORE reverse is armed, BEFORE one metre of the manoeuvre is driven. The
+ * debrief then counts exactly ONE dangerous error, and it is this one. That is
+ * the whole of «this lesson has never once been observed working»: the
+ * instrument crashes the car into the obstacle and then photographs the
+ * wreck as a product defect. A finding filed off those frames describes the
+ * harness, and this programme ranks convicting a correct lesson worst of all.
+ *
+ * So the demand is READ FIRST, off the product's own two surfaces, and when
+ * the task asks for R the forward press is not made at all. The measurement is
+ * DEFERRED rather than faked: the drive loop's arm gate reaches R at t≈1 s on
+ * this very lesson, and the `cockpit` census — which counts every read on
+ * every beat and every tick, in both modes — is the whole-drive witness that
+ * answers „was there ever a moving car?" without anyone having to ram a wall
+ * to find out. `classifyDrive` reads that census first.
+ *
+ * ── 2. IT LETS GO THE MOMENT IT HAS ITS ANSWER ─────────────────────────────
+ *
+ * The old press was `throttle(true)` … `waitForTimeout(5000)` … read, AND NO
+ * RELEASE. `throttle()` is a latch — it early-returns when the key is already
+ * where it is asked to be — and the next call on a MODE=«right» lane is the
+ * loop's own `if (MODE !== "right") await throttle(true)`, which does nothing.
+ * So the drive loop opened with the pedal still on the floor from the control,
+ * and `topSpeed`'s FIRST sample was the burst rather than the drive.
+ *
+ * MEASURED on w18, 37 legs: `top` came back EXACTLY EQUAL to the positive
+ * control on eight of them (48/48, 43/43, 41/41, 45/45, 40/40, 39/39, 42/42,
+ * 43/43) — every one a `right` lane, every one a number the drive never
+ * earned. It is not a cosmetic figure: a verifier closed a «this drive crawls»
+ * row by quoting «reaches 43 км/ч», and on that same sc-vu-emergency leg no
+ * photographed beat ever exceeded 31 км/ч while `top` printed 43. An
+ * instrument that reports its own calibration burst as the subject's
+ * achievement can refute any finding about speed, in the reassuring direction,
+ * for ever.
+ *
+ * SO THE PRESS ENDS WHEN IT HAS PROVED WHAT IT EXISTS TO PROVE, and the
+ * threshold is the PRODUCT'S OWN, not a number invented here.
+ * `TOUCH_HINT_MOVING_KMH` and `DEMO_DECK_MOVING_KMH` are both 5 and both
+ * tested as `Math.abs(speedKmh) > 5`: crossing that line is what hides the
+ * first-run touch hint and stands the demonstration deck down. Every frame in
+ * this corpus was taken with those two surfaces in the state a car that had
+ * crossed 5 км/ч puts them in, so a control that stopped SHORT of it would
+ * change the occlusion of the whole sweep. The dial rounds
+ * (`displaySpeedKmh` is `Math.round(Math.abs(v))`), so a displayed 6 is at
+ * least 5.5 and is therefore over the latch with the rounding taken against
+ * us — which is why the release reads 6 and not 5.
+ *
+ * The 5 s stays as the CEILING, unchanged: a car that has not moved by then
+ * has answered the question the other way. */
+const POSITIVE_CONTROL_MS = 5000;
+const POSITIVE_CONTROL_POLL_MS = 250;
+/** Displayed км/ч at or above which the car is PAST the product's own 5 км/ч
+ *  moving latch even after the dial's rounding — see the note above. */
+const POSITIVE_CONTROL_MOVING_KMH = 6;
+
+const exitIsBackwards = await reverseDemand();
+/** What the positive control did, published whole. `deferred` is a real answer
+ *  and a reader must be able to tell it from „the control was never run". */
+const positiveControl = { direction: null, kmh: null, heldMs: null, demandedBy: exitIsBackwards, why: null };
+let moved = 0;
+/** Whether `moved` is a MEASUREMENT. On a deferred lane it is not, and the
+ *  steering overrule below may not read it as one — `0 <= 0` is true and would
+ *  silently convert „we did not ask" into „the world is frozen". */
+let movedKnown = false;
+
+if (exitIsBackwards !== null) {
+  positiveControl.direction = "deferred";
+  positiveControl.why =
+    `the live task asks the car to leave IN REVERSE («${exitIsBackwards}»), so the forward press this control has always ` +
+    `made would be driving into whatever the bay noses onto — that press is the collision, not the measurement`;
+  note(
+    `  POSITIVE CONTROL: DEFERRED — ${positiveControl.why}. The drive loop's arm gate takes R from the first tick, and the ` +
+      `cockpit census (every beat and every tick, both modes) is what answers „was there ever a moving car?" on this lane.`,
+  );
+} else {
+  positiveControl.direction = "forward";
+  const pressedAt = Date.now();
+  await throttle(true);
+  while (Date.now() - pressedAt < POSITIVE_CONTROL_MS) {
+    await page.waitForTimeout(POSITIVE_CONTROL_POLL_MS);
+    moved = (await read()).kmh;
+    if (moved >= POSITIVE_CONTROL_MOVING_KMH) break;
+  }
+  // THE RELEASE IS THE REPAIR. Everything above it only decides how long the
+  // press lasts; this line is what stops the burst bleeding into the drive.
+  await throttle(false);
+  positiveControl.heldMs = Date.now() - pressedAt;
+  positiveControl.kmh = moved;
+  movedKnown = true;
+  note(
+    `  POSITIVE CONTROL: ${moved} км/ч after ${(positiveControl.heldMs / 1000).toFixed(1)} s of throttle` +
+      `${moved >= POSITIVE_CONTROL_MOVING_KMH ? ` (released on the product's own ${POSITIVE_CONTROL_MOVING_KMH} км/ч moving latch — the pedal is UP entering the drive)` : ` (the full ${POSITIVE_CONTROL_MS / 1000} s ceiling; pedal released)`}`,
+  );
+  if (moved <= 0) {
+    loud(`CAR DID NOT MOVE — every frame after this is a frozen world, not a drive.`);
+    await beat("03b-frozen");
+  }
 }
+saveStatus({ positiveControl });
 /* ── AND THE POSITIVE CONTROL GETS TO OVERRULE THE STEERING VERDICT ─────────
  *
  * A SIM THAT IS NOT RUNNING LOOKS EXACTLY LIKE A CHANNEL THAT IS NOT WIRED, and
@@ -3648,13 +3817,34 @@ if (moved <= 0) {
  * the verdict is revisited rather than asserted early. This can only ever move a
  * lane from an accusation to „I do not know", which is the only direction a
  * correction is allowed to run in here.
+ *
+ * ── AND A DEFERRED CONTROL RUNS IT THE SAME WAY, FOR A DIFFERENT REASON ────
+ *
+ * On a lane whose task asks for R the forward press is not made, so `moved` is
+ * an INITIALISER and not a reading. The old test was `moved <= 0`, and `0 <= 0`
+ * is true — a deferred control would have read as „the car did not move" and
+ * this branch would have fired on the strength of a number nobody measured.
+ * That is the same conflation the cockpit census exists to kill one level down.
+ *
+ * So `movedKnown` gates the measured path, and the deferred path gets its own
+ * branch reaching the SAME state by the honest route: the discriminator did not
+ * run, therefore the two explanations cannot be told apart, therefore the
+ * channel is unjudged. Identical destination, different sentence — and the
+ * sentence is what a reader quotes.
  */
-if (moved <= 0 && steering.channel.state === "dead") {
+if (movedKnown && moved <= 0 && steering.channel.state === "dead") {
   steering.channel.overruledBy = "positive-control";
   steering.channel.state = "untested";
   steering.channel.why =
-    `the wheel moved the world less than ${LIVE_MIN_DEG}°, but the car ALSO did not leave 0 км/ч under 5 s of throttle — ` +
+    `the wheel moved the world less than ${LIVE_MIN_DEG}°, but the car ALSO did not leave 0 км/ч under ${POSITIVE_CONTROL_MS / 1000} s of throttle — ` +
     `so this measures a sim that is not running, and the channel is unjudged rather than dead`;
+} else if (!movedKnown && steering.channel.state === "dead") {
+  steering.channel.overruledBy = "positive-control-deferred";
+  steering.channel.state = "untested";
+  steering.channel.why =
+    `the wheel moved the world less than ${LIVE_MIN_DEG}°, and the discriminator that tells „a dead channel" from „a sim that ` +
+    `is not running" DID NOT RUN on this lane — its forward press is withheld where the task asks the car to leave in reverse ` +
+    `(«${positiveControl.demandedBy}»). Two explanations, no measurement between them, so the channel is unjudged rather than dead`;
 }
 {
   const ch = steering.channel;
@@ -4993,6 +5183,24 @@ const manualGear = await engageManualGear();
 
 let ended = false;
 let topSpeed = 0;
+/**
+ * WHAT THE CAR WAS ALREADY DOING WHEN THE LOOP OPENED — the first tick's dial,
+ * kept apart from `topSpeed` because merging the two is exactly how `top`
+ * became unusable as evidence.
+ *
+ * `topSpeed` is «the fastest reading this drive ever took», and a reader
+ * reasonably hears «the fastest this car was driven». Those are the same
+ * sentence ONLY IF the drive starts from rest. The positive control above now
+ * releases its pedal, so this figure should read ~0 on every lane — and that
+ * is the point: it is the WITNESS that the release happened, published on
+ * every run rather than argued for once in a comment. If it ever comes back
+ * large again, the drive report says so on the same line as `top`, and no
+ * verifier can quote the one without meeting the other.
+ *
+ * −1 is „the first tick found no dial at all", which is a third answer and is
+ * printed as one.
+ */
+let enteredLoopKmh = null;
 let teachDrained = 0;
 let waitsHonoured = 0;
 let waitSeconds = 0;
@@ -5131,6 +5339,9 @@ while (!ended && Date.now() - t0 < budgetMs) {
   // the two apart and covers the `flat` phase, where the control loop that
   // records the other speed history is never invoked at all.
   cockpitSee(p);
+  // …and BEFORE `topSpeed` takes it, because the first tick's reading is the
+  // one number in the drive the drive did not earn — see `enteredLoopKmh`.
+  if (enteredLoopKmh === null) enteredLoopKmh = p.kmh;
   if (p.kmh > topSpeed) topSpeed = p.kmh;
   if (p.end) { ended = true; break; }
 
@@ -5875,6 +6086,33 @@ note(
     (refusedReversePress ? ` · refused ${refusedReversePress} standstill brake press${refusedReversePress === 1 ? "" : "es"} (would have selected R)` : "") +
     (lostKeys ? ` · re-asserted the brake ${lostKeys}× after the sim lost the key` : ""),
 );
+/* ── WHAT `top` INHERITED, ON THE SAME BREATH AS `top` ──────────────────────
+ *
+ * A verifier closed a «this drive crawls» row by quoting «reaches 43 км/ч»
+ * from the line above, on a leg whose photographed beats never passed 31 —
+ * because the pedal was still down from the positive control when the loop
+ * took its first sample. The press now releases, so this line should read a
+ * car at or near rest on every lane; it is printed unconditionally anyway,
+ * because the value of a witness is that it also speaks on the day the thing
+ * it witnesses stops being true.
+ *
+ * The threshold for shouting is HALF of `top`: below that the first tick is
+ * ordinary drive data and needs no warning; at or above it, `top` is mostly
+ * inheritance and a reader about to quote it must be stopped. */
+if (enteredLoopKmh !== null) {
+  const inherited = enteredLoopKmh >= 0 && topSpeed > 0 && enteredLoopKmh * 2 >= topSpeed;
+  const line =
+    `  ENTERED THE LOOP AT: ${enteredLoopKmh} км/ч — the first tick's dial, which is speed this drive did NOT earn ` +
+    `(the positive control's press, and its decay). «top ${topSpeed} км/ч» above must be read against it.`;
+  if (inherited) {
+    loud(
+      `${line.trim()} AT OR OVER HALF OF «top», SO «top» IS MOSTLY INHERITANCE: it is not evidence about how fast this ` +
+        `lesson was driven, and no finding about speed — in either direction — may be opened or closed on it.`,
+    );
+  } else {
+    note(line);
+  }
+}
 // ── AND WHOSE BEHAVIOUR THOSE STOPS WERE ───────────────────────────────────
 //
 // The `wrong` leg's rests are the INSTRUMENT'S OWN ACT, and until 2026-08-28
@@ -6891,7 +7129,12 @@ if (stdoutBroken) {
 }
 note(`ended: ${ended} · endedNaturally: ${endedNaturally} · forcedBy: ${forcedBy ?? "-"}`);
 note(`ladder: ${trail.length} action(s) over ${rungsUsed} step(s)${trail.length ? ` — ${trail.join(" | ")}` : ""}`);
-note(`drive: top ${topSpeed} км/ч · ${stopsMade} full stops · ${waitsHonoured} lawful waits (${waitSeconds}s) · ${teachDrained} pause layers · final ${debrief.kmh} км/ч${manualGear ? ` · gearbox MANUAL, engaged N → ${manualGear} by the harness` : ""}`);
+// `entered` rides in the SUMMARY and not only in the drive report, because the
+// summary is the block a verifier reads when it will not read a 1,000-line log
+// — and «top» is the field it quotes. The two travel together or the quote goes
+// back to being unfalsifiable.
+note(`drive: top ${topSpeed} км/ч (entered the loop at ${enteredLoopKmh ?? "?"} км/ч) · ${stopsMade} full stops · ${waitsHonoured} lawful waits (${waitSeconds}s) · ${teachDrained} pause layers · final ${debrief.kmh} км/ч${manualGear ? ` · gearbox MANUAL, engaged N → ${manualGear} by the harness` : ""}`);
+note(`positive control: ${positiveControl.direction}${positiveControl.direction === "forward" ? ` · ${positiveControl.kmh} км/ч after ${(positiveControl.heldMs / 1000).toFixed(1)} s` : ` · ${positiveControl.why}`}`);
 note(`briefing chars: ${briefing.length}`);
 if (facts.error) loud(`the debrief reader threw: ${facts.error}`);
 // «(none)» NOW MEANS WHAT IT SAYS. Since the matcher learned «НЕЗАВЪРШЕН» the
@@ -7285,6 +7528,13 @@ saveStatus({
   // for the 356 lanes already on disk.
   cockpit,
   drive,
+  // …AND WHAT THE DRIVE'S HEADLINE SPEED INHERITED. `topSpeed` is quoted by
+  // verifiers to open and close speed findings, and until the positive control
+  // learned to release its pedal the first tick of a `right` lane sampled the
+  // calibration burst — so `top` and „how fast this lesson was driven" were two
+  // facts wearing one number. This is the second fact, published beside it, on
+  // every run and not only on the runs where it goes wrong.
+  speed: { topKmh: topSpeed, enteredLoopKmh },
   exit,
 });
 /* ── THE FOOTER, AND THE THREE CASES A READER MUST TELL APART WITHOUT A PICTURE

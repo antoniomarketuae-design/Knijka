@@ -51,6 +51,10 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { splitParents, corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 import { buildOfFrame, findReclosures, sweepHeadMap } from "./reclosure.mjs";
+import { commentOnlyChange } from "./comment-blind.mjs";
+
+/** (rev:path) -> source, so one blob is fetched once per posting run. */
+const BLOB_CACHE = new Map();
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 function findRepo() {
@@ -289,12 +293,49 @@ const { refused: reclosed, unattributable: reclosedUnknown } = findReclosures(ro
     const p2 = f && f.suspectFile ? String(f.suspectFile).split("\\").join("/") : null;
     return p2 && p2.startsWith("platform/") ? p2 : null;
   },
+  // AN ESSAY IS NOT A REPAIR (2026-08-30, measured on repair wave 14).
+  //
+  // git counts an added comment as a change, so eight lanes that wrote 495 lines
+  // of prose and zero lines of code into product files would have unlocked every
+  // re-closure addressed to those files — cabin.ts, roundabout.ts, catalog.ts and
+  // five templates-*.ts. That is the dead-predicate class one level up: there a
+  // repair ships a measurement nothing reads, here it ships prose nothing
+  // executes, and the ledger moves either way.
+  //
+  // So when git says a SINGLE file moved, the executable content is compared
+  // directly and a comment-only change is reported as "" — identical — which is
+  // what refuses the closure. The tree-wide fallback keeps asking git: it is the
+  // no-address path, already the looser one, and blob-walking platform/src per
+  // row would cost more than the gate is worth.
   productDiff: (a, b, only) => {
     if (a === b) return "";
     try {
-      return execFileSync("git", ["diff", "--shortstat", a, b, "--", only || "platform/src"], {
+      const stat = execFileSync("git", ["diff", "--shortstat", a, b, "--", only || "platform/src"], {
         cwd: REPO, encoding: "utf8",
       }).trim();
+      if (stat === "" || !only) return stat;
+      // A named file that git says moved: ask whether any CODE moved.
+      const show = (rev) => {
+        // MEMOISED. Rows cluster on files, and a corpus pass asked git for the
+        // same blob dozens of times; on this spinning disk the uncached dry run
+        // did not finish in ten minutes. Same answers, one fetch each.
+        const k = rev + ":" + only;
+        if (BLOB_CACHE.has(k)) return BLOB_CACHE.get(k);
+        let v;
+        try {
+          v = execFileSync("git", ["show", k], {
+            cwd: REPO, encoding: "utf8", maxBuffer: 1 << 28,
+          });
+        } catch {
+          v = null; // absent on one side is a real change, not a comment
+        }
+        BLOB_CACHE.set(k, v);
+        return v;
+      };
+      const A = show(a);
+      const B = show(b);
+      if (A === null || B === null) return stat;
+      return commentOnlyChange(A, B) ? "" : stat;
     } catch {
       // git could not answer — that is 'I cannot say', never 'they are identical'.
       return null;

@@ -30,6 +30,41 @@
  * where they close up (rain + a live stream), because by then the student has
  * met each one alone.
  *
+ * …AND THAT LADDER IS TRUE OF THE FIRST PASS ONLY — sc-jx-equal-left:4274eddb,
+ * measured 2026-08-30 at L1 through the production stack (recordScriptedDrive
+ * over these very `staged` specs), driving the briefing verbatim and varying
+ * only WHERE the student slows and HOW LONG he waits at the pose:
+ *
+ *   slow at y = −34, wait  8 + 11 s   the shadow's own pacing   clean, both proofs
+ *   slow at y = −45, wait 10 + 13 s   FAILED_TO_YIELD at (4.1, −13.9)
+ *   slow at y = −34, wait 15 + 20 s   FAILED_TO_YIELD ×2 + COLLISION at (−2.0, −0.6)
+ *   slow at y = −34, wait 25 + 30 s   clean, both proofs
+ *
+ * A WINDOW, not a slope: the same drive is convicted at 35 s of patience and
+ * absolved at 19 s and at 55 s. THE CAUSE IS NOT IN THIS FILE. Both staged
+ * actors run out of path INSIDE the lesson (260 m of polyline on 130 m arms),
+ * retire, and RE-ENTER at the start of their own path — staged.ts
+ * FR-B5-RETURN / FR-B5-CROSS, which argues the case for that at length and
+ * states the consequence in terms: „the returning car is graded by the
+ * runtime's own give-way adjudication exactly as the first one was". By then
+ * both runners have RESOLVED (the director's ledger for the 15 + 20 s drive
+ * still reads `sc-jxeq-right: true/yielded`), so the second pass arrives with
+ * no choreography at all and the trackers convict the student for a car this
+ * template never staged him against. ~35 s is the round trip on these arms,
+ * which is why the punished band sits exactly there.
+ *
+ * WHAT WAS TRIED HERE AND REFUSED. The only dial in this file that can re-phase
+ * anything is the oncoming's `armDistM` (measured at 65 → 30 → 24): it cures
+ * the „намали отрано" leg (slowing from y = −60, convicted as shipped) and the
+ * 15 + 20 s collision, and leaves the 10 + 13 s conviction byte-identical. That
+ * slides the window instead of closing it, which is the phantom repair this
+ * catalogue keeps buying, so the dials below are UNCHANGED. OWNER: staged.ts's
+ * re-entry branch, which has to refuse while the student is still standing at
+ * the junction the returning actor crosses — he is 19.9 m from the node in
+ * every failing row above, inside BOTH runners' armDistM — or runners.ts, which
+ * could retire a resolved runner's actor rather than leave it to the generic
+ * re-entry. Nothing about the first pass is in question.
+ *
  * Geometry truths (battery: jx-equal-districts.test.ts):
  *   - drawn lane centers sit ±4.0625 m off the road centerline;
  *   - four equal residential arms → ZERO stop lines, jx-n-c uncontrolled at
@@ -52,6 +87,12 @@ export const JUNCTION3_LANE_CENTER_M = 4.0625;
  * OUTSIDE the runtime's 18 m right-hand-rule conviction core (RHR_CORE_RADIUS_M)
  * — hypot(4.0625, 19.5) = 19.92 — so a student waiting here for either car is
  * structurally innocent while both conflicts play out.
+ *
+ * That innocence is a property of STANDING STILL, and of the pass the ladder
+ * choreographs. It ends the moment he moves off, and the header's re-entry
+ * measurement is what happens when he moves off into a SECOND pass nobody
+ * staged: (4.1, −13.9) — 14.5 m from the node, inside the core — is the pose
+ * 5.6 m later, and it is convicted.
  */
 export const JUNCTION3_YIELD_Y = -19.5;
 
@@ -358,7 +399,39 @@ export const SC_JX_EQUAL_LEFT: ScenarioSpec = {
  *   - JU-13 (junction approach speed) is cited as provenance ONLY: doc 72 marks
  *     its approach-envelope detector 🔴 NEW. The positive „равномерно и уверено"
  *     half is graded by the objective gates + SPEEDING_OVER_LIMIT + par time, and
- *     an unnecessary GENTLE stop is honestly not graded today (see notes).
+ *     an unnecessary GENTLE stop is honestly not graded today.
+ *
+ *     …AND „NOT GRADED TODAY" IS THE WHOLE OF sc-jx-priority-confidence:9c987e7b,
+ *     so it gets an owner instead of a shrug. The lesson is NAMED after the
+ *     fault („без излишни спирания") and nothing anywhere reads it. Newest
+ *     sweep leg, `.audit-frames/w17/frames/sc-jx-priority-confidence__pc-right`
+ *     (attested bc7d43f): 85 s against this template's own 40 s par — the
+ *     shadow drives it in 23.5 s — ИЗДЪРЖАН, ★★☆, and the single billed fault
+ *     is a −3 „рязко спиране без причина", which is the OPPOSITE fault (braking
+ *     hard, not dawdling). The earlier version of this line said „(see notes)";
+ *     there are no such notes, and a routing note that names no owner is never
+ *     honoured.
+ *
+ *     WHY IT CANNOT BE AUTHORED HERE. `RubricSpec.parTimeSec` is INFORMATIONAL
+ *     BY DESIGN (types.ts, doc 76 §6: „time pressure is an L5 condition, not a
+ *     rubric penalty"), so 85-against-40 may not fail anything; and no
+ *     ReachZoneParams term or `ReachZoneWitnessDemands` member measures standing
+ *     still (the menu is lamps / gear / controller / VRU / contact / rail /
+ *     yield-clean). A predicate authored here would be one nothing live reads.
+ *
+ *     OWNER, AND THE ANCHOR IT ALREADY HAS: `rules/catalog.ts` + `rules/
+ *     engine.ts`, as the urban sibling of DRIVING_TOO_SLOW_FOR_MOTORWAY — which
+ *     is anchored on ЗДвП чл. 22, ал. 1 („Водачът на пътно превозно средство не
+ *     трябва да се движи без основателна причина с твърде ниска скорост, когато
+ *     по този начин пречи на движението на другите пътни превозни средства"),
+ *     retrieved and agreeing with the content bank at
+ *     q-magistrali-i-izvangradsko-026 (ADR-002: cited, never free-recalled).
+ *     That article needs two elements, and this drill is the one place in the
+ *     catalogue that stages BOTH: „без основателна причина" (the Б2 car is
+ *     immobile — see SC_JX_PRIO_WAITING_CAR: nothing forward is a cause) and
+ *     „пречи на движението на другите" (SC_JX_PRIO_TAILGATER is glued 9 m
+ *     behind him for 30 s). The gate the detector wants is therefore this
+ *     template's own geometry, not a new authored field.
  */
 
 /** The Б2 stop line tj-stop-v1's heuristic derives on the stem, m from tj-n-c.

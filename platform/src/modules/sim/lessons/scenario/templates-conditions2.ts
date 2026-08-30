@@ -254,6 +254,61 @@ export const SC_AC_NIGHT_OVERDRIVE: ScenarioSpec = {
       // intact. The shadow rides ~50 and still passes at all five rungs; that
       // is asserted, not assumed — a tightened gate that failed the lesson's
       // own model line would be the founder's roundabout complaint again.
+      //
+      // ── AND IT IS STILL A CEILING, WHERE THIS ROW ASKS FOR A FLOOR —
+      //    sc-ac-night-overdrive:b9d61410 (critical). ROUTED, NOT FIXED,
+      //    BECAUSE NO TEMPLATE CAN FIX IT ──────────────────────────────────
+      //
+      // The row: the tick is „✓ at 2:45 on a drive that never exceeded 15
+      // км/ч … a speed-appropriate-to-visibility gate that a walking-pace car
+      // satisfies teaches nothing". Re-derived in the CURRENT tree rather than
+      // inherited from the report: `maxSpeedKmh` enters `stepReachZone` as
+      // `speedKmh <= cap` and nothing else, so 0 км/ч satisfies this gate as
+      // completely as the taught 50 does. Note what that makes of the
+      // tightening recorded directly above — 58 → 50 lowers a CEILING, which
+      // is harder for a fast car and no answer whatever to a slow one. It was
+      // never filed as one, and it does not close this row.
+      //
+      // WHY NOT FROM HERE. `ReachZoneParams` (lessons/types.ts:33) carries one
+      // speed term and it is upper-bounded; `minSpeedKmh` exists nowhere in
+      // platform/src as a zone param. Nor can another objective kind stand in:
+      // `driveDistance` counts metres a crawl also covers, and the one floor
+      // this module does ship — `SmoothStopParams.minApproachKmh`, live at
+      // objectives.ts `stepSmoothStop` («!armed && tick.speedKmh >=
+      // minApproachKmh») — is unusable on a recorder-driven drill, for the
+      // reason `templates-pk.ts sc-pk-mark` states in full: the kinematic
+      // recorder brakes at a fixed ~4.6 m/s² and zeroes the last ~2 км/ч in
+      // one frame, a spike no sane `maxDecelMs2` accepts. Authoring one here
+      // would refuse this template's own committed shadow — a false refusal of
+      // a perfect drive, the failure this project ranks worst.
+      //
+      // THE TERM THAT WOULD CLOSE IT, written down so the owning lane does not
+      // derive it a fourth time: `minSpeedKmh?: number` on `ReachZoneParams`,
+      // narrowed beside `maxSpeedKmh` in `parseObjectiveParams` and ANDed into
+      // `contractEarned` in `stepReachZone`, spent by the same `capSpent` rule.
+      // Routed three times already — `templates-junctions.ts:1459` at
+      // `sc-jxgb-roll` („the honest channel is instead a `minSpeedKmh` on
+      // `ReachZoneParams` … read by `stepReachZone` the way `maxSpeedKmh` is"),
+      // `scenario/__tests__/following-claim-gates.test.ts` §12 (the pace-cap
+      // exposure ledger, written to go RED the day a floor lands), and
+      // `sc-follow-cutin:996fd693` before both. With it this gate authors a
+      // floor near 35: clear of any crawl, and a whole L1 grace band under the
+      // «около 50 км/ч» step 2 orders, so no honest drive is refused.
+      //
+      // THE BANNER IS DELIBERATELY LEFT ALONE meanwhile — unlike `sc-obs-
+      // cleared` (templates-hazards.ts) and `sc-jxgb-roll`, both retitled DOWN
+      // while their terms were routed. Those banners claimed something their
+      // params could not see AT ALL. This one is not false — 15 км/ч under a
+      // 40 m beam really is съобразена — it is UNDERDETERMINED, and «със
+      // съобразена … скорост» is the catalogue's own phrase for a capped gate
+      // (`titleBg: "…съобразена…скорост"` returns SEVEN rows across three
+      // `scenario/templates-*.ts` files — conditions, conditions2, sp — this
+      // one among them; and objectives.ts `deriveLawfulSpeedDemand` reasons
+      // about the family by name, deliberately NOT matching it because „a
+      // speed below the sign … only the template can quantify"). Rewording
+      // this row alone would break a shared idiom, tell the student less while
+      // the task sits unticked, and close nothing. An underdetermined claim is
+      // repaired by the missing term, never by a smaller sentence.
       params: { kind: "reachZone", x: LANE_X, y: 250, radiusM: 12, maxSpeedKmh: 50 },
     },
     {
@@ -1264,6 +1319,22 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
   // THE SLICE: the live student's car runs the crosswind force (opt-in, authored
   // — the same whole-map wind sc-ac-crosswind ships). The recorded ghosts are
   // kinematic; their lee-then-gust story is authored (traces/scAcWindTruckPass.ts).
+  //
+  // AND THIS LINE IS THE WHOLE OF THE TEMPLATE'S SAY IN THE WIND, which is the
+  // standing answer to sc-ac-wind-truck-pass:6a076479 („no crosswind is depicted
+  // anywhere — no gust, no dust, no spray, no sway"). The DEPICTION half named
+  // in the step-3 note above is not underspecified here, it is UNREACHABLE from
+  // here — so the address is written down rather than routed a third time
+  // without one: `ScenarioSpec` has no wind field and `ConditionAxis`
+  // (scenario/types.ts:212) is `{weather?: "dry"|"rain"|"fog"|"snow";
+  // night?: boolean}`, so nothing a template can author reaches the renderer as
+  // wind. It does not need to. `LessonScene.tsx:2301-2303` ALREADY holds
+  // `lesson.physics?.crosswind` in hand at the point it hands the force to
+  // `VehicleRig`, so a visual layer gates on the flag that is already there —
+  // the peer pattern is `SimEnvironment.tsx:445/448` (RainStreaks, SnowFlakes),
+  // and `environment/weather.ts` §5 refuses a fifth 0..1 store channel for the
+  // wind precisely because it would have no author and no reader. Owned by the
+  // render lane; nothing here can close it.
   physics: { crosswind: true },
   localeBg: "bg-BG",
 };
