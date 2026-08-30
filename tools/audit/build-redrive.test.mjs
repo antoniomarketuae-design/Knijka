@@ -23,7 +23,7 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 
-import { legOfFrame, redriveSet } from "./build-redrive.mjs";
+import { legOfFrame, redriveSet, legsInProse } from "./build-redrive.mjs";
 
 const BS = String.fromCharCode(92);
 const row = (o) => ({ scenario: "sc-x", severity: "major", frame: "", ...o });
@@ -103,4 +103,73 @@ test("§2 --lessons restricts the set and never invents a lesson that has nothin
 test("§2 rows with no lesson at all are skipped, not crashed on", () => {
   const set = redriveSet([{ severity: "major", frame: "/a/.audit-frames/w17/frames/x__pc-right/1.png" }]);
   assert.equal(set.length, 0);
+});
+
+// -----------------------------------------------------------------------------
+// § 3 — THE PROSE LEG. A cross-leg claim carries ONE frame, and a frame is one
+// leg, so the other half of the sentence lives only in `what`. Nine of the ten
+// verdict lines on sc-turn-left-oncoming:d079e687 say "only the two PC legs of
+// this lesson were re-driven" — the judge was right every time, and the
+// work-list never sent the mobile half.
+// -----------------------------------------------------------------------------
+
+test("§3(a) a row whose prose names a second leg gains it", () => {
+  // The real text and the real frame path from the corpus.
+  const rows = [{
+    scenario: "sc-turn-left-oncoming",
+    severity: "major",
+    frame: ".audit-frames/sweep161/sc-turn-left-oncoming/pc-right/08-debrief.png",
+    what: "Same lesson, same scripted correct drive, different convictions by platform: "
+      + "pc-right records 1 опасна грешка and 10 points, mobile-right records 0 mistakes and 0 points.",
+  }];
+  assert.deepEqual(redriveSet(rows)[0].legs, ["mobile-right", "pc-right"]);
+});
+
+test("§3(b) THE EMPTY GUARD — prose alone may never populate an empty leg list", () => {
+  // [] means "drive all four" downstream. One prose leg would drop three.
+  const rows = [{
+    scenario: "sc-x",
+    severity: "major",
+    frame: "no/leg/in/this/path.png",
+    what: "mobile-right shows it too",
+  }];
+  assert.deepEqual(redriveSet(rows)[0].legs, [], "an all-frameless lesson must keep the all-four fallback");
+});
+
+test("§3(c) prose repeating the frame's own leg is idempotent", () => {
+  const rows = [{
+    scenario: "sc-y", severity: "minor",
+    frame: ".audit-frames/w18/frames/sc-y__pc-wrong/04.png",
+    what: "on pc-wrong the card never appears",
+  }];
+  assert.deepEqual(redriveSet(rows)[0].legs, ["pc-wrong"]);
+});
+
+test("§3(d) a non-leg token adds nothing", () => {
+  const rows = [{
+    scenario: "sc-z", severity: "minor",
+    frame: ".audit-frames/w18/frames/sc-z__pc-right/04.png",
+    what: "desktop-right and bare mobile are not legs",
+  }];
+  assert.deepEqual(redriveSet(rows)[0].legs, ["pc-right"]);
+});
+
+test("§3(e) legsInProse tolerates null, undefined and empty", () => {
+  assert.deepEqual(legsInProse(null), []);
+  assert.deepEqual(legsInProse(undefined), []);
+  assert.deepEqual(legsInProse(""), []);
+});
+
+test("§3(f) the union is a SUPERSET — never smaller than the frame legs alone", () => {
+  const rows = [
+    { scenario: "sc-w", severity: "critical",
+      frame: ".audit-frames/w18/frames/sc-w__pc-right/04.png",
+      what: "pc-right differs from mobile-wrong here" },
+    { scenario: "sc-w", severity: "major",
+      frame: ".audit-frames/sweep161/sc-w/pc-wrong/08.png",
+      what: "no other leg named" },
+  ];
+  const legs = redriveSet(rows)[0].legs;
+  for (const must of ["pc-right", "pc-wrong"]) assert.ok(legs.includes(must), must + " was dropped");
+  assert.ok(legs.includes("mobile-wrong"), "the prose leg was not added");
 });

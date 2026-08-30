@@ -76,11 +76,49 @@ export function legOfFrame(p) {
 }
 
 /**
+ * THE LEGS A FINDING NAMES IN PROSE — not the one its screenshot came from.
+ *
+ * A cross-leg claim is a claim about TWO legs and carries ONE frame, because a
+ * frame is one leg. `legOfFrame` therefore contributes half of it, and the
+ * sweep photographs half of a two-halved sentence. `sc-turn-left-oncoming`'s
+ * row d079e687 — "pc-right records 1 опасна грешка and 10 points, mobile-right
+ * records 0 mistakes and 0 points" — has collected TEN verdict lines, and nine
+ * of them say the same thing: only the two PC legs of this lesson were
+ * re-driven. The judge was right every time; the work-list never sent the
+ * mobile half.
+ *
+ * The other half exists only in `what`, so that is where it is read from.
+ * Substring matching against the same `VALID` set `legOfFrame` uses, so the
+ * four leg literals have one definition.
+ *
+ * DO NOT NORMALISE, TRIM OR REWRITE `what` ANYWHERE. `findingId` is
+ * `scenario + ":" + sha1(what + "\0" + frame)`; one character edited there
+ * orphans every verdict line the row has accumulated. This reads it only.
+ */
+export function legsInProse(what) {
+  const s = String(what ?? "");
+  return [...VALID].filter((leg) => s.includes(leg));
+}
+
+/**
  * lesson -> { total, critical, legs } over the rows given.
  *
  * A lesson whose findings name NO leg gets an empty list, and `wave-c.mjs`
  * reads that as "drive all four" — which is correct and deliberate: the finding
  * could be on any of them, and guessing one is how coverage counts go wrong.
+ *
+ * TWO SETS, AND THE UNION CAN ONLY GROW. `frameLegs` is what a screenshot
+ * proves; `proseLegs` is what the finding's sentence names. The emitted list is
+ * their union — a SUPERSET of what this function returned before, for every
+ * lesson, or empty for both.
+ *
+ * THE EMPTY GUARD IS LOAD-BEARING, and it is the one way this could REDUCE
+ * coverage. If no frame names a leg the list must stay `[]`, because `[]` means
+ * "drive all four" downstream and all four already contains any prose leg —
+ * letting prose populate an otherwise-empty list would turn 4 drives into 1.
+ * Measured 2026-08-30: 0 of 114 open lessons are all-frameless, so the guard is
+ * LATENT, which is exactly when someone tidying deletes it. `build-redrive.test.mjs`
+ * §3(b) goes red if they do.
  */
 export function redriveSet(open, { only = null } = {}) {
   const per = new Map();
@@ -88,18 +126,27 @@ export function redriveSet(open, { only = null } = {}) {
     const lesson = f.scenario || f.lesson;
     if (!lesson) continue;
     if (only && !only.has(lesson)) continue;
-    const cur = per.get(lesson) || { lesson, total: 0, critical: 0, legs: new Set() };
+    const cur = per.get(lesson) || {
+      lesson, total: 0, critical: 0, frameLegs: new Set(), proseLegs: new Set(),
+    };
     cur.total += 1;
     if (String(f.severity).toLowerCase() === "critical") cur.critical += 1;
     const leg = legOfFrame(f.frame);
-    if (leg) cur.legs.add(leg);
+    if (leg) cur.frameLegs.add(leg);
+    for (const L of legsInProse(f.what)) cur.proseLegs.add(L);
     per.set(lesson, cur);
   }
   // Heaviest-in-critical first: the sweep dispatcher interleaves shards, so the
   // expensive lessons spread across drivers instead of piling on shard 0.
   return [...per.values()]
     .sort((a, b) => b.critical - a.critical || b.total - a.total || a.lesson.localeCompare(b.lesson))
-    .map((x) => ({ lesson: x.lesson, total: x.total, critical: x.critical, legs: [...x.legs].sort() }));
+    .map((x) => ({
+      lesson: x.lesson,
+      total: x.total,
+      critical: x.critical,
+      // Union only when a frame named a leg — see THE EMPTY GUARD above.
+      legs: x.frameLegs.size ? [...new Set([...x.frameLegs, ...x.proseLegs])].sort() : [],
+    }));
 }
 
 // ---------------------------------------------------------------------- main
