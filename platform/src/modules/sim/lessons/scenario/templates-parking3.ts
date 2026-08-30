@@ -465,6 +465,110 @@
  * 10 км/ч», and that one is the harness's own launch: the card reads «Отчетена
  * скорост 39,5 км/ч при разрешени 20» at t = 1 s, before the lot.
  */
+/**
+ * THE ROW THAT KEEPS COMING BACK, ANSWERED BY CENSUS — 2026-08-30, against the
+ * w18 re-file of «Задача 2 never ticks, so the lesson cannot be passed»
+ * (sc-park-wall:ab74e4fe, sc-park-zebra:2b3c10b1). The block above already
+ * answered it twice and the answer did not hold, so this is a different KIND of
+ * answer rather than a louder one.
+ *
+ * WHY THE OLD ANSWER STOPPED WORKING. It rests on „the 0-for-N is the DRIVER:
+ * every leg of these four is TRACKING-disqualified by the harness's own log".
+ * At w18 that premise broke. `.audit-frames/w18/frames/sc-park-zebra__mobile-
+ * right/run.log` reads «STEERING: 13 command(s)», the guidance ribbon is seen
+ * on 19 of 21 moving samples (91 %), the steer-channel probe answers LIVE, and
+ * the drive is WANDERED only marginally — median |err| 12.21° against a 12.0°
+ * threshold. A judge reading that leg sees a car that DID steer and still did
+ * not park, and re-opens the row. Correctly: a disqualification argument is
+ * only ever as strong as the worst leg it has to cover, and one good leg ends
+ * it.
+ *
+ * THE MEASUREMENT THAT DOES NOT DEPEND ON ONE DRIVER'S COMPETENCE. Count every
+ * terminal `parkInBay` objective the audit corpus has ever photographed — the
+ * `_audit-debrief.json` sidecar of every lane of every round on disk, `proof`
+ * through `w18` — and ask how many ticked:
+ *
+ *   parkInBay objectives observed   189
+ *   ticked                            0
+ *
+ * across TEN lessons in THREE template files:
+ *
+ *   this file          45-rev 2 · gap-long 23 · gap-short 25 · judge 22
+ *                      left 23 · night 24 · wall 21 · zebra 21
+ *   templates-pk.ts    sc-pk-driveway 25
+ *   templates-exam.ts  sc-ed-poligon-chain 3
+ *
+ * A symptom that is 0-for-N on lessons THIS FILE DOES NOT AUTHOR cannot be
+ * caused by anything this file authors. That is the whole argument, and it
+ * needs no opinion about any drive.
+ *
+ * AND THE DISCRIMINATOR INSIDE THE CENSUS IS `sc-park-gap-long`. Its terminal
+ * carries `entry: "forward"` — no reverse, no R, no gear selection at all —
+ * and it is 23 observations, 0 ticks. So the gate that never ticks is not the
+ * reverse credit, not `usedReverse`, not the bay, not a tolerance and not a
+ * `headingDeg` convention: it is that no drive in this corpus has ever FINISHED
+ * a bay manoeuvre. The instrument explains why in its own sidecar — on the
+ * zebra leg the guidance loop's last sample is t = 37 s and R is armed at
+ * t = 39 s, so 100 % of the manoeuvre is driven open-loop, with the reverse a
+ * blind 38-tick burst and no signal to aim it at a bay.
+ *
+ * AND THE BOX IS STILL A BOX, re-derived on this commit through the production
+ * chain rather than quoted from the block above (`compileScenario` →
+ * `parseObjectiveParams` → `createEvalState` → `stepObjective`, a 3 км/ч
+ * reverse down the bay axis stopped on a rigidly displaced pose):
+ *
+ *   drill   rung   along the bay   across it   yaw
+ *   wall    L1     ±0.75 m         ±0.50 m     ±15°
+ *   wall    L5     ±0.45 m         ±0.35 m     ±8°
+ *   zebra   L1     ±0.75 m         ±0.35 m     ±15°
+ *   zebra   L5     ±0.70 m         ±0.35 m     ±8.5°
+ *
+ * Not one cell is empty, and `parking3-success-path-and-corridor.test.ts` §1
+ * still replays both drills' committed shadows through that same chain and
+ * completes both objectives at all five rungs.
+ *
+ * ── AND THE SCORING ROW ON THE SAME DRILL (sc-park-wall:1edd6ff2) ──
+ *
+ * «The right legs score the same as or worse than the wrong drives» — right 20,
+ * wrong 20. True of the NUMBER and false of the VERDICT, and the sidecars carry
+ * both:
+ *
+ *   w17    mobile-right   20 т.  ★☆☆   задачи  ✓ –
+ *   w15    pc-right       20 т.  ★☆☆   задачи  ✓ –
+ *   fill-1 mobile-wrong   20 т.  ★☆☆   задачи  – –
+ *   fill-1 pc-wrong       20 т.  ★☆☆   задачи  – –
+ *
+ * The route-task list DOES separate them: Задача 1 ticks at 1:11 and 1:21 on
+ * the right legs and on neither wrong leg. What does not separate them is the
+ * exam total, and that is Наредба № 38 rather than a defect — both drives hit
+ * something, ONE опасна грешка is already «директно неиздържан» (чл. 48,
+ * ал. 3), and the sheet does not rank failures. The stars are floored by the
+ * same collision and the card says so in words.
+ *
+ * THE TRUE KERNEL IS UPSTREAM OF THE ARITHMETIC: a leg driven as the CORRECT
+ * one collided at all. Its two faults are both already addressed and neither is
+ * authorable here. «Превишаване с повече от 10 км/ч» is the harness's own
+ * launch — 39.0 км/ч at t = 2 s, 36 m down an approach the district posts at 20
+ * (`meta.defaults.maxspeedUrbanKmh`), before the pace loop takes over at
+ * `pace.alignment.offsetM` 36.2 on the same sidecar. The contact is the
+ * corridor §2 of the success-path battery re-derives every build: lot-wall-v1
+ * seats the parked row's armed body out to x = 2.78 against a spawn-lane centre
+ * of x = 4.06, so a car holding the paint it spawns on is 2.13 m inside a
+ * parked car. That is `tools/maps/gen_parking_lot.mjs`, and this file reports
+ * it rather than patching it.
+ *
+ * WHAT NONE OF THIS CLAIMS, and the reason it is a comment and not an edit: it
+ * does not make the drills tick under the harness, and it is not a repair. The
+ * row is refused AT THIS ADDRESS, not closed at every address. Closing it in
+ * the corpus needs the drive loop given a way to AIM a manoeuvre
+ * (`tools/mobile/lesson-audit.mjs`, whose own run.log already says the only
+ * signal it has is a road CENTRELINE), or `parkInBay` accepted as permanently
+ * UNJUDGED for this instrument the way the clutch drills are. Do not answer it
+ * here by widening a tolerance: §3 of `parking3-sweep161-refutation.test.ts`
+ * goes red the moment a forward-only lane run completes a park, and that red is
+ * the product working.
+ */
+
 import type { ScenarioSpec } from "./types";
 import type { ParkingBaySpec } from "../../contracts";
 

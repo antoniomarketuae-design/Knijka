@@ -356,6 +356,88 @@
  *     продължихме за упражнение, но оценката отразява прекратяване»). Whether
  *     a terminated sheet should also end the DRIVE is an ADR, not a bug.
  *
+ * ---------------------------------------------------------------------------
+ * 2026-08-30, ROUND 15 — THE FIFTH RE-FILING OF THE „NEVER ENDS" CLASS, AND
+ * THE FIRST ONE SETTLED BY RUNNING THE ENGINE INSTEAD OF READING A DRIVE.
+ *
+ * The four blocks above all answer it the same way: re-read the sweep, find
+ * the car nowhere near a gate. That method has a floor it cannot get under,
+ * and this round is the row that sits exactly on it. Every audit leg is a
+ * DRIVE, and a drive force-closed at the harness's 210 s budget cannot say
+ * whether the product would have ended it at 211.
+ *
+ * sc-follow-brake:65b6c074 is the strongest form of the class, because it is
+ * not about a car stranded short of a gate — it is about the BEST drive:
+ * „a drive that completes every objective with a clean sheet cannot finish the
+ * lesson". Filed on w14 (6399a8de) off a debrief that ticks BOTH tasks (1:07,
+ * 4:01) over «Прекъсна урока … преди края» and «Ориентировъчно време — 258 с».
+ *
+ * DRIVEN AT HEAD THROUGH `applyTick` + `buildLessonResult` on the compiled
+ * lesson, with no harness in the frame. sc-follow-brake is all-`reachZone`
+ * (`sc-fb-approach` (4.06, 120) r 12 · `sc-fb-finish` (4.06, 390) r 12), so
+ * the run-out's own exits are the things under test:
+ *
+ *     rung   last task   session ends   exit                 result
+ *     L1      32.3 s      33.6 s        ARRIVED  y = 387.8   passed, 0 т.
+ *     L1      32.3 s      32.4 s        AT REST  y = 374.4   passed, 0 т.
+ *     L3/L5   32.8 s      33.6 s        ARRIVED  y = 387.8   passed, 0 т.
+ *     L3/L5   32.8 s      32.9 s        AT REST  y = 380.0   passed, 0 т.
+ *
+ * `completedAll: true · aborted: false · passed: true` on all six. The ending
+ * is ONE frame away from the last task when he stops on it and 1.3 s away when
+ * he drives on to the mark. The best possible drive is graded, not refused.
+ *
+ * SO WHAT WERE THE ROW'S SEVENTEEN SECONDS? Its own arithmetic — last task at
+ * 241 s, force-close at 258 s — is the run-out RUNNING, not the run-out
+ * missing. ROUTE_RUNOUT_MAX_S is 20; the leg books «0 lawful waits», so B15's
+ * freeze spent none of it; and its last sample is 3 км/ч, above
+ * FINISH_STANDSTILL_KMH, so the AT REST exit had nothing to fire on. The
+ * harness's budget expired INSIDE the product's own backstop with at least
+ * three seconds still to run, and an abort three seconds short of an ending is
+ * not a missing ending.
+ *
+ * THE SAME LANE ALSO CARRIES A POSITIVE CONTROL, and it is worth naming why it
+ * is the weaker of the two proofs. `.audit-frames/w17/frames/
+ * sc-follow-brake__pc-right` drives the same 334 m of route and closes
+ * `ended: true · endedNaturally: true · forcedBy: -` · ИЗДЪРЖАН · 0
+ * наказателни точки · ★★★, both tasks ticked, «Чисто и спокойно каране»
+ * credited. But `git diff 6399a8de HEAD -- lessons/finish.ts lessons/engine.ts`
+ * is EMPTY of non-comment lines, so w17 differs from w14 only in the DRIVER —
+ * which is why a re-drive may not close this row on its own and the six runs
+ * above are what settles it.
+ *
+ * WHAT THIS DOES NOT LICENSE. Nothing about a car that never reaches its
+ * terminal ring: that one is still nowhere near a gate here, and the census
+ * two blocks up is still its answer. And it does not make „forcedBy «Прекрати
+ * урока»" readable as a product fault — it stays a fact about the harness's
+ * budget until someone shows the budget outlived the run-out.
+ *
+ * THE FOUR ROWS FILED HERE ALONGSIDE IT ARE ELSEWHERE, recorded so a sixth
+ * wave routes them instead of re-filing them against this file:
+ *
+ *   sc-junction-stop:4cbe4552 and sc-junction-gap:63e4e93e — „the correct
+ *     drive is convicted, not credited". This module emits no ScorableEvent
+ *     and never has. Both legs END THEMSELVES at HEAD (`endedNaturally: true ·
+ *     forcedBy: -`; jstop at w18/63507e2 on the CRASH PIN with its own sentence
+ *     on the glass, jgap at w17), so the „«Урокът беше прекъснат преди края»"
+ *     half of each row is gone; what is left is convictions — «Удар в
+ *     неподвижно препятствие», «Неспиране на знак Б2», «Непропускане на … с
+ *     предимство» — billed by `rules/engine.ts` + `rules/catalog.ts`, on legs
+ *     that steered with the loop closed 54–59 % of the moving drive.
+ *
+ *   sc-junction-blind:70b1f234 — „once off-map the windscreen renders a
+ *     featureless green plane". Nothing in this file draws a pixel, and the
+ *     row's own words are quoted verbatim in the header of the module that
+ *     answers it: `world/builders/worldRim.ts`, wired live through
+ *     `buildWorldGeometry.ts:472`. Address it there.
+ *
+ *   sc-ln-decisive-change:5c5e69a6 — „the mobile leg runs 272 s against the
+ *     lesson's own 60 s benchmark". At w18 the same leg prints «Ориентировъчно
+ *     време — 83 с при ориентир 60 с» and ends itself. The 272 s was the audit
+ *     program's 12 км/ч cruise, exactly as the 2026-08-19 block says, and a
+ *     session duration cap here would still be the false refusal that block
+ *     refuses.
+ *
  * Pure and deterministic, like every other fold in this module: no clock, no
  * randomness, same state + same tick ⇒ same output.
  */
