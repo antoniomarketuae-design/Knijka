@@ -9400,3 +9400,25 @@ accepted as evidence for any row.
 Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
 its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
 a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-08-31
+
+Every lesson carrying a standing BROKEN finding was re-driven on a still tree at
+`70d8651bcf6e` — the commit the harness itself attested on every drive, not the commit HEAD happened to be on when these verdicts were posted (`b224c7e26ab8`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 20 |
+| REFUTED (finding was never true) | 2 |
+| PARTIAL (some clauses gone, some not) | 1 |
+| STILL (symptom reproduces) | 144 |
+| UNJUDGED (re-drive did not exercise it) | 80 |
+
+**Open list: 247 → 230**, out of 1510 filed across the whole programme (1263 were already retired before this run).  5 CLOSED/REFUTED line(s) arrived without a frame and quote and were downgraded to UNJUDGED — they did not reduce the count.
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
