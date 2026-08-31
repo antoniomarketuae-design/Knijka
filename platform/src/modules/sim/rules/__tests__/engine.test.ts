@@ -114,7 +114,13 @@ describe("speeding detector", () => {
     // Split, the test now says what its name says and is STRICTLY STRONGER
     // than the old ceiling: no per-dip re-arm, AND at most one deferred
     // completion, instead of a single number in which either could hide.
-    const speeding = events.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
+    // Narrow on `kind` first: RuleEvent is ViolationEvent | CommendationEvent and
+    // only the violation half carries `regrade`, so filtering on `code` alone
+    // does not narrow the union and `e.regrade` is a type error.
+    const speeding = events.filter(
+      (e): e is Extract<RuleEvent, { kind: "violation" }> =>
+        e.kind === "violation" && e.code === "SPEEDING_OVER_LIMIT",
+    );
     const rearms = speeding.filter((e) => !e.regrade);
     const regrades = speeding.filter((e) => e.regrade);
     // The finding, stated: twelve dips must not buy twelve points. What

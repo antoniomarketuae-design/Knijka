@@ -292,6 +292,47 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
  * steer to through the turn and holds straight ahead. Whether this lesson's
  * correct line survives is a question only the §2 shadow replay can answer —
  * a windscreen-following recorder cannot reach the west arm to ask it.
+ *
+ * ── THE HALF THE ANSWER ABOVE LEFT OPEN (w18, 2026-08-30) ──────────────────
+ *
+ * The block above answers the PC leg — «Удар в неподвижно препятствие», a
+ * бордюр/стълб charge out in the field, „explicitly NOT the priority car".
+ * That is true of the pc leg and of nothing else, and the judge who re-read
+ * this row did not quote the pc leg. He quoted the MOBILE one, where the
+ * second charge really is a car: «Удар в друго превозно средство» −10. A
+ * refutation with a hole at the exact sentence the next reader will press on
+ * is not a refutation, so — from the same tapes, `mobile-right`:
+ *
+ *   `_audit-debrief.json` bills THREE errors, in this order: «Непропускане…»
+ *   −10 at 1:04, «Удар в друго ППС» −10 at 1:09, and «Удар в неподвижно
+ *   препятствие» at 1:25 «без допълнителни изпитни точки» — the card explains
+ *   itself: „Изпитът вече беше прекратен". Objective 1 ticks at 0:54 and the
+ *   tape first sits inside its r 8 disc at y = −29.2, so `guidance.samples`
+ *   runs ~32 s behind the lesson clock: 1:09 → y ≈ +2, 1:25 → y ≈ +37. The
+ *   tape corroborates the first without the arithmetic — 13 км/ч at y = −1.4
+ *   collapses to 0 км/ч at y = +3.5, which is the WESTBOUND lane centre
+ *   (+4.06), the lane the crossbar's traffic occupies and the only lane a
+ *   northbound car crosses on its way off the end of the road.
+ *
+ * So the mobile drive did hit a car — square in the lane it had been convicted
+ * of not yielding to nine seconds earlier, while driving STRAIGHT NORTH off a
+ * road that ends at y = 0. That is the barge `mistake-barge` and
+ * `mistake-no-look` exist to teach against; the briefing's line yields FIRST
+ * and then turns left, and never stands in that lane while it is occupied.
+ * And the «автомобил — на 0.2 м / 0.5 м» the finding reads as the crash is not
+ * a conviction at all: it sits under «Разминавания на косъм», whose own first
+ * line is «Не се броят като грешки — нищо не се удари».
+ *
+ * WHAT §2 STILL DOES NOT COVER, stated rather than hidden. The replay grades
+ * the STAGED conflict and the authored geometry — `recordScJunction2Drive`
+ * is handed `stagedEvents` and nothing else. The live rung is not so empty:
+ * this template authors no `traffic`, so it inherits the family baseline
+ * (`compile.ts` SCENARIO_FAMILY_TRAFFIC_BASELINE.junction = 5, L1 ladder ×0.5
+ * → 2.5, lifted to SCENARIO_FAMILY_TRAFFIC_FLOOR = 4), and `LessonScene.tsx`
+ * hands that count to `createTrafficSystem` as four COLLIDING bodies. Whether
+ * the briefing's line survives THOSE is not what §2 measured and not what this
+ * row asked — but it is what a re-drive of the correct line would really be
+ * testing, and the next lane to open this lesson should say so out loud.
  */
 
 /**

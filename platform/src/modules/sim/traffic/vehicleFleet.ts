@@ -297,6 +297,22 @@ function buildBoxTruckRig(): ModelRig {
 // per-instance alpha (three has none for InstancedMesh), no shader patch, no
 // particle system, ~10 triangles and ONE draw call, and only when a lesson
 // actually stages a spraying profile.
+//
+// W20 — THAT COMPOUNDING WAS ADVERTISED HERE AND CANCELLED IN THE TEXTURE, and
+// it is worth saying so at the top, because the three properties above were all
+// wired and the row still stood. The slab alpha reaching the framebuffer is
+// SPRAY_SLAB_ALPHA × the alphaMap, and the alphaMap's vertical ramp used to
+// decay with height on top of the slab stagger that already decays with height.
+// The 0.83 was therefore never reached at ANY height: the five-slab curtain
+// peaked at 0.65 and it peaked at 0.31 m — knee height — measuring 0.44 at the
+// tail lamps and 0.12 at 2.00 m, so the plume was a skirt round the wheels and
+// the student read the stop lamps and the road beyond straight through it. It
+// now peaks at 0.79 and peaks at 0.85 m, which is where the sight distance the
+// drill is about is actually bought. The falloff now lives
+// in ONE place — the staggered slab tops — and the ramp holds its crest across
+// each slab's own body (`CREST_UP` in buildSprayAlphaTexture carries the
+// before/after numbers). Nothing else in this section moved: same five quads,
+// same widths, same spacing, same one draw call.
 // ---------------------------------------------------------------------------
 
 /** Profiles that throw a pelena: the tall, heavy, many-wheeled ones the лекция
@@ -396,13 +412,65 @@ export function spraySlabShape(
 }
 
 /** Alpha ramp of one slab, procedurally filled — no canvas, so the fleet stays
- *  importable in a headless test. Dense at the bottom (the water leaves the
- *  road there), thinning upward and feathered at both edges so the quad never
- *  shows a hard rectangle. */
+ *  importable in a headless test. A BODY of mist across the slab's own span,
+ *  feathered at the tarmac, at the crown and at both sides so the quad never
+ *  shows a hard rectangle. It is deliberately NOT a second height falloff —
+ *  see `CREST_UP` below for the measurement that says why. */
 function buildSprayAlphaTexture(): DataTexture {
   const W = 96;
   const H = 96;
   const data = new Uint8Array(W * H * 4);
+  /**
+   * Fraction of a slab's own height the mist holds at full strength before it
+   * begins to thin toward the crown.
+   *
+   * THE CURTAIN'S VERTICAL FALLOFF IS ALREADY CARRIED BY THE SLAB STAGGER.
+   * `spraySlabShape` gives every slab the same bottom (0.05 m) and a top that
+   * grows 1.25 → 3.25 m, so how much curtain stands at a given height IS how
+   * many slabs still reach it: five at the tail lamps, two at 2.6 m, one at the
+   * cargo box's top. That is the whole mechanism the block comment above this
+   * section describes.
+   *
+   * The shipped ramp was `rise = (1 − up)^1.6` — a SECOND falloff, applied to
+   * each slab on top of the stagger. Measured on the shipped constants at k = 5
+   * (the most the emitter can ever switch on, i.e. exactly what the student
+   * meets once he has closed inside SPRAY_NEAR_M at speed), compounded over the
+   * five slabs on the centre-line of a TRUCK_DIMENSIONS rig:
+   *
+   *      0.30 m 0.64 · 0.95 m (lampY) 0.44 · 1.50 m 0.26 · 2.00 m 0.12 ·
+   *      2.60 m 0.03 · 3.10 m (box top) 0.001
+   *
+   * — against the 0.83 this section's own header advertises. Every slab spent
+   * its density in the first half-metre off the road, so the „пелена" was a
+   * skirt around the wheels: the stop lamps stayed legible through it (0.44 is
+   * not „не разчитай да видиш … стоповете му"), and the road BEYOND the truck —
+   * the sight distance briefing 3 and 4 are about, which from a 1.2 m cockpit
+   * eye reads out at roughly 0.8–2.0 m of curtain height — was 88 % clear. That
+   * is the w20 row: a plume that renders and costs no visibility. Closing the
+   * gap could not settle it either, because closing only walks k from 4 to 5.
+   *
+   * Holding the crest instead, same rig, same k = 5, same heights:
+   *
+   *      0.74 · 0.78 · 0.67 · 0.47 · 0.14 · 0.006
+   *
+   * — opaque where he is trying to look, and still transparent at the box top,
+   * so he never LOSES the truck. That distinction is the header's, and it is
+   * the one the render was failing in the wrong direction.
+   *
+   * AND BRIEFING 9 („колкото по-близо си, толкова по-малко виждаш") now has a
+   * gradient to meet. At 2.00 m, where the road beyond the truck reads out, the
+   * curtain walks with k — which is what `sprayDensity`'s near term buys as the
+   * gap closes — 0.04 → 0.25 → 0.47 for k = 3 → 4 → 5. Before, the same walk
+   * was 0.01 → 0.05 → 0.12: closing the gap bought him nothing he could see, so
+   * the instruction was a slogan. k = 1 is still only a haze (0.30 at its
+   * strongest), so a light shower behind a slow rig has not become a wall.
+   *
+   * Both rows measured by rasterising THIS function and compounding it through
+   * `spraySlabShape` on the green channel three's alphaMap samples — not
+   * modelled. Nothing in the geometry moved: same five quads, same widths, same
+   * backM spacing, same single draw call.
+   */
+  const CREST_UP = 0.55;
   // Deterministic value noise — road spray is dust, not an airbrush gradient,
   // and a perfectly smooth ramp is what made the first render read as three
   // nested rectangles instead of one cloud (looked at, 65 км/ч, 58.7 m gap).
@@ -425,12 +493,14 @@ function buildSprayAlphaTexture(): DataTexture {
     // DataTexture keeps flipY = false, so row 0 is v = 0 — the BOTTOM of the
     // quad, i.e. the tarmac. `up` therefore runs 0 (road) → 1 (top of slab).
     const up = y / (H - 1);
-    // Thick where the water leaves the road, thinning upward…
-    const rise = Math.pow(1 - up, 1.6);
-    // …but not a hard cut AT the road: the last 12 % fades in, so the slab
-    // never draws a straight line across the tarmac.
+    // Full strength through the body of the slab, then thinning to nothing at
+    // the crown — a cloud that ENDS, not a cloud that was never there. The
+    // crown fade is what keeps the stagger from drawing five stacked lids.
+    const crest = up > CREST_UP ? smooth((1 - up) / (1 - CREST_UP)) : 1;
+    // …and not a hard cut AT the road either: the first 12 % fades in, so the
+    // slab never draws a straight line across the tarmac.
     const foot = up < 0.12 ? smooth(up / 0.12) : 1;
-    const vertical = rise * foot;
+    const vertical = crest * foot;
     for (let x = 0; x < W; x++) {
       const u = (x / (W - 1)) * 2 - 1; // −1..1 across the slab
       // cos falloff, not 1 − u²: it reaches zero with zero SLOPE, which is what

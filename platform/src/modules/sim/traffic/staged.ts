@@ -487,6 +487,24 @@ export interface StagedVehicleAgent {
    *  measured only for an actor that has come back round — every actor with
    *  `returns === 0` keeps it at Infinity and does no work at all. */
   playerPathDist: number;
+  /**
+   * FR-B5-FACING: the student's last unit travel direction observed while he
+   * was ABOVE the stopped bar, and the pose the next delta is measured from.
+   * (0, 0) = never seen moving, which is the „say nothing" value every guard
+   * below treats as „unknown".
+   *
+   * Carried per-agent rather than read from `StagedEnv`, for the same reason
+   * `playerPathDist` is: `StagedEnv` publishes a position and a speed and no
+   * heading (system.ts owns that struct, and a field there is a different
+   * lane's edit), so the only heading available here is the one this file
+   * differentiates for itself. Four numbers and six flops a frame, no
+   * allocation, and no projection — the trend that costs a `projectOntoPolyline`
+   * is `playerPathDist`, above, and this deliberately is not one.
+   */
+  playerDirX: number;
+  playerDirY: number;
+  playerLastX: number;
+  playerLastY: number;
 }
 
 export interface StagedPedestrianAgent {
@@ -630,6 +648,7 @@ function reentryClearAt(
   env: StagedEnv,
   arc: number,
   projS: number,
+  projDist: number,
 ): boolean {
   // The pose at `arc`. `lat` and `exitM` are both zeroed by the rewind, so the
   // sampled point IS that pose — one sample, no allocation.
@@ -653,7 +672,90 @@ function reentryClearAt(
   // (FR-B5-CROSS) and it is an ADDITION: the along-path test says nothing about
   // how many metres away the pose actually is when the path bends back on
   // itself, or when the student is not travelling along it at all.
-  return Math.hypot(ex - env.playerX, ey - env.playerY) >= RETURN_CLEAR_M;
+  if (Math.hypot(ex - env.playerX, ey - env.playerY) < RETURN_CLEAR_M) return false;
+  // (1b) FR-B5-FACING (2026-08-30, sc-jx-equal-left:4274eddb) — …AND NEITHER
+  //      HALF OF (1) IS A CLEARANCE WHEN THE ACTOR IS COMING THE OTHER WAY.
+  //
+  //      Guard (1) states its property in words: „on a road he is driving the
+  //      re-entry always happens behind him, never in front of him". That
+  //      derivation is sound for the actors its own justification names — the
+  //      лепка, `sc-lndc-target`, `sc-mrg-mainline` — because each of them
+  //      travels the student's road IN HIS DIRECTION, so his arc and the
+  //      actor's grow together and „he is RETURN_CLEAR_M further along my path"
+  //      really does mean „he has driven past this pose already".
+  //
+  //      For an actor travelling the SAME ROAD AGAINST HIM the identical
+  //      inequality guarantees the opposite, and does so the harder it is
+  //      satisfied: the car materialises RETURN_CLEAR_M of carriageway IN FRONT
+  //      of him and then drives every one of those metres AT him. The
+  //      straight-line floor added by FR-B5-CROSS says the same thing twice —
+  //      144.7 m is a long way away and it is a long way away DEAD AHEAD.
+  //
+  //      MEASURED, sc-jx-equal-left at L1 through the production stack
+  //      (`compileScenario` + `createTrafficSystem` + `createScenarioDirector`),
+  //      driving the briefing verbatim and then holding the shadow's own yield
+  //      pose (4.0625, −19.5) — 19.92 m from the node, the pose
+  //      `JUNCTION3_YIELD_Y` is authored to make structurally innocent:
+  //
+  //        `sc-jxeq-oncoming` retires and RE-ENTERS SEVEN TIMES in 210 s, every
+  //        ~28 s, each time at its authored hold (−4.1, 125.0) — the opposing
+  //        lane of the student's OWN arm, 144.7 m directly up the road he is
+  //        facing — and drives south through the junction he is stopped in.
+  //        Both runners resolved long before, so every one of those passes is
+  //        an unscripted car the template never staged him against.
+  //
+  //      templates-junctions3.ts measured what that does to the drive and named
+  //      this branch as its owner: at 15 + 20 s of patience the correct drive
+  //      takes FAILED_TO_YIELD ×2 and a COLLISION at (−2.0, −0.6) — x ≈ −2 is
+  //      the ONCOMING lane at the node, i.e. this actor, met head-on by a
+  //      student executing the left turn the lesson exists to teach. It is a
+  //      WINDOW, not a slope (clean at 19 s and at 55 s of waiting, convicted at
+  //      35), because ~35 s is this actor's round trip on these 130 m arms.
+  //
+  //      THE THREE CONJUNCTS, and none of them is a new number:
+  //
+  //       · `projDist < ON_ACTORS_ROAD_M` — he is ON my road rather than
+  //         crossing it. That is the classification this file already measured
+  //         and already draws (see the constant), and it is what keeps the
+  //         clause off every give-way and priority drill FR-B5-CROSS exists
+  //         for: `sc-jxgb-conflict` 36.06 m, `sc-edpr-right` 39.90 m and this
+  //         template's own `sc-jxeq-right` 23.6 m are all CROSSING actors, all
+  //         still return, and their boulevards keep producing cars. A car from
+  //         the right is priority traffic and yielding to it is the lesson; a
+  //         car coming down your own lane at you while you sit at the junction
+  //         is not traffic, it is the windscreen pop guard (1) forbids.
+  //       · the dot product — his last travel direction against the actor's
+  //         direction WHERE THE TWO WOULD MEET (sampled at his projection, not
+  //         at the re-entry pose, because on a bending path those differ and it
+  //         is the meeting that matters). (0, 0) = never observed moving = say
+  //         nothing and allow, so a suite that never moves its player is
+  //         byte-identical.
+  //       · `HOLD_LIT_SPEED_MPS` — he is STOPPED. This is what keeps the clause
+  //         off the oncoming stream of an overtaking drill, where a car coming
+  //         the other way is the entire exercise: a MOVING student meets it in
+  //         the far lane and passes it, which is traffic. A student at rest on
+  //         a carriageway is at rest for one reason — he is at a junction — and
+  //         he will still be exactly there when the car arrives, so the
+  //         clearance guard (1) computed is spent on road the actor drives and
+  //         he does not. The bar is the file's own stopped bar, the one the
+  //         ambient fleet lights its brake lamps at.
+  //
+  //      WHAT IT COSTS: this actor stands off-scene at EXIT_CLEAR_M past the end
+  //      of its path — never in a live lane, which is what FR-B5-EXIT bought —
+  //      until he moves off, and it comes back the moment he does. The junction
+  //      is NOT left dead while he waits: `sc-jxeq-right` is unaffected and
+  //      keeps crossing it every ~28 s.
+  if (
+    env.playerSpeedMps <= HOLD_LIT_SPEED_MPS &&
+    projDist < ON_ACTORS_ROAD_M &&
+    projS > arc &&
+    (agent.playerDirX !== 0 || agent.playerDirY !== 0)
+  ) {
+    // `ex`/`ey` are read out above, so the shared scratch is free to re-use.
+    sampleLane(agent.path, projS, 0, samp);
+    if (samp.dirX * agent.playerDirX + samp.dirY * agent.playerDirY < 0) return false;
+  }
+  return true;
 }
 
 /**
@@ -714,8 +816,12 @@ function reentryArc(agent: StagedVehicleAgent, env: StagedEnv): number {
         env.playerY,
       )
     : { s: Infinity, dist: Infinity };
-  if (reentryClearAt(agent, env, agent.holdS, proj.s)) return agent.holdS;
-  if (proj.dist > ON_ACTORS_ROAD_M && agent.holdS > 0 && reentryClearAt(agent, env, 0, proj.s)) {
+  if (reentryClearAt(agent, env, agent.holdS, proj.s, proj.dist)) return agent.holdS;
+  if (
+    proj.dist > ON_ACTORS_ROAD_M &&
+    agent.holdS > 0 &&
+    reentryClearAt(agent, env, 0, proj.s, proj.dist)
+  ) {
     return 0;
   }
   return -1;
@@ -804,6 +910,10 @@ export function createStagedVehicle(
     exitSpeed: 0,
     returns: 0,
     playerPathDist: Infinity,
+    playerDirX: 0,
+    playerDirY: 0,
+    playerLastX: NaN,
+    playerLastY: NaN,
   };
   publishVehicle(agent);
   return agent;
@@ -948,6 +1058,40 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   const cmd = agent.command;
   const accel = spec.accelMps2 ?? DEFAULT_ACCEL_MPS2;
   const decel = spec.decelMps2 ?? DEFAULT_DECEL_MPS2;
+
+  // 0) FR-B5-FACING — which way is the student pointing? Differentiated here
+  //    because `StagedEnv` carries no heading (see the agent's own field), and
+  //    LATCHED: the answer is needed at the moment the re-entry branch asks,
+  //    and that moment is precisely one at which he is standing still. Only a
+  //    delta taken while he was ABOVE the stopped bar is trusted, so creep and
+  //    float never rewrite the direction he actually arrived on.
+  //
+  //    Reads nothing and decides nothing on its own — `reentryClearAt` (1b) is
+  //    the only consumer, and for every actor it never refuses this is dead
+  //    weight of four numbers and six flops.
+  if (env.hasPlayer) {
+    if (
+      env.playerSpeedMps > HOLD_LIT_SPEED_MPS &&
+      !Number.isNaN(agent.playerLastX)
+    ) {
+      const dx = env.playerX - agent.playerLastX;
+      const dy = env.playerY - agent.playerLastY;
+      const m = Math.hypot(dx, dy);
+      if (m > 1e-4) {
+        agent.playerDirX = dx / m;
+        agent.playerDirY = dy / m;
+      }
+    }
+    agent.playerLastX = env.playerX;
+    agent.playerLastY = env.playerY;
+  } else {
+    // …and a player who LEAVES invalidates the anchor, not the answer. Without
+    // this the first frame he comes back differences his new pose against a
+    // pose from before he went away — a teleport — and a teleport normalises to
+    // a unit vector as happily as a metre of driving does. The latched
+    // direction survives; only the baseline is dropped.
+    agent.playerLastX = NaN;
+  }
 
   // 1) Target speed from the active command.
   let target = 0;

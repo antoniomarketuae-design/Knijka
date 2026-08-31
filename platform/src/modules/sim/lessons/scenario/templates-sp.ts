@@ -1692,20 +1692,61 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
     // WHAT IS THIS FILE'S is which words land in those two boxes, and the comma
     // splice put a conjunction there. Greedy-wrapping at 26 characters — the
     // width that reproduces the photographed badge EXACTLY (5 steps → 22 lines
-    // → «ОЩЕ 20») — the sentence below now breaks «Потегли по магистралата —» /
-    // «ограничението е 140 км/ч.» and the second box ends the sentence. Same
-    // claims, same 5 steps, same line count, and the sp-world-claims gate's
-    // /отделни платна|раздел/ still matches the half that moved into its own
-    // sentence. This MITIGATES the row; it does not close it — 24 lines are
-    // still behind the fold, and that is the ceiling's to answer.
+    // → «ОЩЕ 20») — the line below breaks «Потегли и дръж ДЯСНАТА» / «лента с
+    // 120–130 км/ч.» and the second box ENDS THE SENTENCE. Nothing is inked to
+    // its waist and nothing dangles on a conjunction.
     //
-    // MEASURED WHILE HERE, because it is this file's doing: instruction 2 grew
-    // from 98 to 215 characters when finding 3bec2af1 was repaired, so the same
-    // wrap now gives 26 lines and the badge reads «ОЩЕ 24», worse than the 20
-    // in the photograph. The tail «— караш ли 120, тя бавно ти се отдалечава»
-    // is the cheapest 2 lines in the briefing, but it is another lane's
-    // deliberate teaching and is left alone rather than quietly undone.
-    { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч. Двете посоки вървят по отделни платна, разделени с ивица по средата." },
+    // ── AND THE LENGTH OF THAT ONE SENTENCE DECIDES WHETHER THE OTHER FOUR
+    //    EXIST AT ALL — measured 2026-08-30, the second half of b080a007 ──────
+    //
+    // The peek is not the card's only surface, and on the other one this step
+    // was doing something worse than stopping mid-clause. `LessonPlayShell`
+    // (5263 / 5284) splits a compiled briefing in two — step 1 is THE LINE
+    // (`briefingLineBg`), steps 2..n are THE BODY (`briefingBodyBg`) — and the
+    // two share ONE scroll window whose height the LINE eats FIRST. The
+    // conversion from authored characters to visible ones was measured on real
+    // devices and is written out in __tests__/briefing-card-budget.test.ts:
+    //
+    //      LINE chars │ BODY chars still above the fold (worse profile)
+    //      ───────────┼────────────────────────────────────────────────
+    //          ≤ 42   │      110
+    //          ≤ 52   │       96
+    //          ≤ 76   │       90
+    //          ≤ 96   │       68
+    //           > 96  │        0   ← a line this long DELETES the body
+    //
+    // This step was 120 characters, so all 502 characters of body behind it
+    // measured ZERO visible characters on both iPhone 16 profiles — including
+    // step 3, which is the keep-right rule the engine grades as
+    // NOT_KEEPING_RIGHT, and step 4, which is the floor it grades as
+    // DRIVING_TOO_SLOW_FOR_MOTORWAY. The lesson graded two faults it described
+    // nowhere a phone could show them, which is exactly the sc-zebra-approach
+    // defect that gate exists for; templates-sp.ts is simply not one of the
+    // five files it owns, so the suite went green over it. `briefingLineBg`'s
+    // own note measures the same slope from the other end — a THREE-character
+    // ordinal prefix moved 12 rungs of 663 to zero body.
+    //
+    // SO THE LINE IS NOW THE DRILL AND NOT THE SCENERY. At 44 characters it
+    // sits in the 96-character band, the body is visible again, and the two
+    // boxes the phone certainly renders carry the LANE and the BAND this lesson
+    // actually grades instead of a posted ceiling it does not grade at all
+    // (there is no speeding demo here — the two mistakes are the left-lane hog
+    // and the crawl). The ceiling and the median move to step 5, which was 47
+    // characters of „hold it to the end" and no teaching whatever. What that
+    // move must not break, and does not: sp-world-claims'
+    // /отделни платна|раздел/ now matches in step 5; the settle-band pin in
+    // sp-mw-flow-visible §4 reads the FIRST step containing «установи … км/ч»,
+    // which is still step 2's «около 120–130 км/ч»; and the crawl-floor gate
+    // still sees «под 50 км/ч» in step 4 and in no other step.
+    //
+    // STILL NOT CLOSED, and still not this file's. 25 wrapped lines remain
+    // behind the fold because the peek's ceiling is the one routed above. And
+    // instruction 2 is 218 characters — over twice the band — so the 96
+    // characters this repair buys back all land inside ONE step instead of
+    // showing two whole ones. Its tail is another lane's deliberate teaching
+    // (3bec2af1) and is left alone rather than quietly undone; shortening it is
+    // the next increment of this row, not this lane's to take.
+    { n: 1, textBg: "Потегли и дръж ДЯСНАТА лента с 120–130 км/ч." },
     // THE FLOW IS NOW OUT THE WINDSCREEN (finding sc-mw-discipline:3bec2af1 —
     // see THE FLOW at MWD_FLOW_LEAD). The line used to ask the student to match
     // „потока" on a road with not one other vehicle on it; it now points at the
@@ -1714,7 +1755,13 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
     { n: 2, textBg: "Погледни колата в лявата лента напред — тя се движи с потока, около 130 км/ч. Ускорявай уверено и се установи около 120–130 км/ч: на магистрала се кара със скоростта на потока — караш ли 120, тя бавно ти се отдалечава." },
     { n: 3, textBg: "Дръж ДЯСНАТА лента за движение: лявата е само за изпреварване, а аварийната вдясно не е лента за движение изобщо." },
     { n: 4, textBg: "Не пълзи: трайно движение далеч под потока (под 50 км/ч без причина) прави от колата ти подвижно препятствие." },
-    { n: 5, textBg: "Задръж скоростта и лентата до края на участъка." },
+    // THE SETTING, MOVED HERE OFF THE LINE (see the budget table at step 1).
+    // Both claims are the ones step 1 used to carry, word for word where the
+    // gate reads them: the posted АМ ceiling mw-v1 really signs, and the median
+    // it really authors (meta.scenario.params.medianM = 6, carriageways 30.37 m
+    // apart). They belong at the END because neither is graded here — a student
+    // who reads only the first line has lost nothing he is judged on.
+    { n: 5, textBg: "Задръж лентата и скоростта до края — таванът е 140 км/ч, а посоките вървят по отделни платна." },
   ],
   success: [
     {

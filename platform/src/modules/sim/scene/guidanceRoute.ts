@@ -7,8 +7,9 @@
  * Per-lesson derivation model (specs stay DATA-only, nothing added to them):
  *  - reachZone / passSignal   → shortest legal on-road path to the target
  *                               point + a light-pillar marker there.
- *  - roundabout maneuver      → shortest path toward the island center
- *                               (ribbon only — any exit completes it).
+ *  - roundabout maneuver      → the road AHEAD through the ring, cut at the
+ *                               next mouth (ribbon only; guidance is never
+ *                               told which exit — see ROUNDABOUT RIBBONS).
  *  - parkInBay maneuver       → shortest path to lesson.parkingBay + marker.
  *  - driveDistance            → no target exists, so guide "ahead": follow the
  *                               road from the current pose, choosing the
@@ -73,6 +74,15 @@
  *     The walk is now trimmed to the distance it was asked for, and trimmed
  *     again at the place the NEXT objective happens when that place is on the
  *     same corridor — so the ribbon ends where the task ends.
+ *  4. A ribbon never runs PAST the thing it is drawing (audit rows
+ *     sc-rb-lane-choice:ffdffd55 / sc-rb-circulate-priority:317c79f0,
+ *     2026-08-31). A roundabout goal is the island CENTRE, 17.85–25.78 m off
+ *     any carriageway, and the shortest path to its snap rode 98.4 m past the
+ *     drill's own third exit to a point chosen by district-JSON edge order.
+ *     The ring leg is now cut at the next mouth — and guidance says nothing
+ *     about WHICH exit, because `RoundaboutParams` cannot tell it. The whole
+ *     measurement, and the two drills that need opposite answers from the same
+ *     geometry, are in ROUNDABOUT RIBBONS below `walkAheadRaw`.
  */
 
 import { parseObjectiveParams, type LessonSpec } from "@/modules/sim/lessons";
@@ -292,6 +302,15 @@ export interface GuidancePointGoal {
   labelBg: string;
   /** The stop line this marker was resolved against, when it was one. */
   stopLineId?: string;
+  /**
+   * ROUNDABOUT ONLY. The radius, about (x, y), at which the maneuver counts as
+   * LEFT (`RoundaboutParams.exitRadiusM`). Its presence is what tells the route
+   * derivation that (x, y) is an ISLAND — a place the student drives AROUND and
+   * out of, never TO — so the ribbon is built by the ring rule below rather
+   * than by a shortest path to a point that is not on any carriageway. Nothing
+   * in the marker vocabulary reads it: `marker` is false for this goal.
+   */
+  leaveRadiusM?: number;
 }
 
 export type GuidanceGoal = GuidancePointGoal | { kind: "ahead"; meters: number };
@@ -301,7 +320,15 @@ export type GuidanceGoal = GuidancePointGoal | { kind: "ahead"; meters: number }
  *  derived from the driver's own pose. Lane alignment may only follow the
  *  former; see `alignRawToGoalLane`. `GuidancePointGoal` satisfies this. */
 export type RouteTarget =
-  | { kind: "point"; x: number; y: number; shape?: MarkerShape }
+  | {
+      kind: "point";
+      x: number;
+      y: number;
+      shape?: MarkerShape;
+      /** See `GuidancePointGoal.leaveRadiusM` — set ⇒ (x, y) is a roundabout
+       *  island, and `ringRouteRaw` owns the derivation. */
+      leaveRadiusM?: number;
+    }
   | { kind: "ahead"; meters: number };
 
 /**
@@ -800,7 +827,13 @@ export function guidanceGoalFor(
     case "completeManeuver":
       switch (params.maneuver) {
         case "roundabout":
-          // Ribbon to the ring; no pillar — any exit completes the maneuver.
+          // Ribbon only, no pillar — there is nothing at (x, y) to stand on:
+          // it is the ISLAND CENTRE, and `leaveRadiusM` is what says so to the
+          // route derivation (see ROUNDABOUT RIBBONS below `walkAheadRaw`).
+          // The old comment here read „any exit completes the maneuver", which
+          // is true of THIS objective and was then used to justify routing to
+          // the centre — and a centre 17.85–25.78 m off the carriageway snaps
+          // to whichever ring arc the district file lists FIRST.
           return {
             kind: "point",
             x: params.x,
@@ -810,6 +843,7 @@ export function guidanceGoalFor(
             shape: { kind: "zone", radiusM: params.enterRadiusM },
             acceptRadiusM: params.enterRadiusM,
             labelBg: "Влез в кръговото",
+            leaveRadiusM: params.exitRadiusM,
           };
         case "parkInBay":
           return lesson.parkingBay
@@ -1306,6 +1340,186 @@ function walkAheadRaw(
     sFrom = forward ? 0 : e.totalLen;
   }
   return raw.points.length >= 2 ? raw : null;
+}
+
+// ---------------------------------------------------------------------------
+// ROUNDABOUT RIBBONS (audit rows sc-rb-lane-choice:ffdffd55 /
+// sc-rb-circulate-priority:317c79f0, re-measured 2026-08-31)
+//
+// THE FRAME. On `sc-rb-lane-choice` the drill's own words are «Твоят изход е
+// ТРЕТИЯТ (западният)», and the audit clause is „neither ever reaches the third
+// exit". Derived through the shipped path (`guidanceGoalFor` →
+// `deriveGuidanceRoute`) from the pose the maneuver row actually opens in —
+// the north mouth, (0, 21.94), because the objective before it is a 3.5 m disc
+// there — the green ribbon came back 98.4 m long and ENDED AT (15.70, −20.40),
+// on the south-east ring arc. It rode past the west mouth at s ≈ 40. A student
+// following the line labelled «маршрутът до целта» circulates instead of
+// exiting, so «Премини през кръга и го напусни» could only be collected by
+// IGNORING the guidance. Same shape on `sc-rb-circulate-priority`: 64.4 m from
+// 20° short of its NORTH exit, ending at (2.30, −17.70).
+//
+// THE CAUSE, measured. A `completeManeuver: roundabout` goal is the ISLAND
+// CENTRE, and `snapToRoad(0, 0)` is 17.85 m off the carriageway on rb-mini-v1
+// and 25.78 m off it on rb-2lane-v1 — every ring sample is equidistant from the
+// centre, so the winner is decided by the `d2 < bestD2` scan order, i.e. by
+// whichever ring arc the district JSON lists FIRST (`rbm-e-ring-se` @ s = 2.34,
+// `rb2-e-ring-se` @ s = 17.00). The ring is one-way, so the shortest path to
+// that arbitrary point runs FORWARD PAST THE DRILL'S OWN EXIT. The destination
+// was a property of file order and of nothing the lesson meant.
+//
+// WHAT GUIDANCE MAY HONESTLY DRAW, and what it may not. It may not draw an
+// EXIT: `RoundaboutParams` carries one centre and two radii, so the exit arm is
+// not expressible, and the two shipped shapes need OPPOSITE answers from the
+// same geometry — `sc-rb-lane-choice` opens its maneuver row standing ON the
+// north mouth it must PASS, while `sc-rb-circulate-priority` opens 20° short of
+// the north mouth it must TAKE. Both are ~0–6 m from a mouth. No rule over
+// (centre, enterRadiusM, exitRadiusM, pose) separates them; picking „the next
+// exit" would have traded this defect for its mirror image on the very drill
+// the row is about. So the ribbon names no exit. It runs to the NEXT MOUTH and
+// stops there — the place where the decision is made and where the drill's own
+// instruction («излез на третия изход») takes over. Two consequences worth
+// stating plainly rather than discovering:
+//   · lane-choice's ribbon becomes 40.8 m, north mouth → WEST mouth: the third
+//     exit, and it can no longer run past it.
+//   · when the car is already within a couple of metres of the next mouth the
+//     leg is shorter than `MIN_ROUTE_LEN_M` and `finalizeRoute` drops it, so
+//     the ribbon stands down. That is the smoothStop precedent — nothing true
+//     is left to say — and it is the honest half of not knowing the exit.
+// The real repair is to let the objective NAME its exit; that lives in
+// `lessons/types.ts` (`RoundaboutParams`) and the templates, not here.
+//
+// The one case where the ribbon may leave the ring is when the CAR already
+// has: once the walk is outside `exitRadiusM`, the maneuver is complete by the
+// evaluator's own test, so the leg ends there (`sc-rb-ped-exit` opens its row
+// 8 m up its exit arm and gets a 7.5 m ribbon out of the roundabout, where the
+// old shortest-path-to-the-island pointed it 65 m BACKWARDS into the ring).
+// ---------------------------------------------------------------------------
+
+/**
+ * A junction node nearer than this along the leg is the mouth the nose is
+ * already in, not the next one — and `walkAheadRaw` emits a joint at s ≈ 0
+ * whenever the pose snaps onto an edge END, which is exactly where a car
+ * sitting on a mouth snaps. Small enough that no mouth a student could still
+ * act on is skipped.
+ */
+const RING_MOUTH_SKIP_M = 1.5;
+/**
+ * How far the ring walk may run while looking for the next mouth. One lap of
+ * the widest shipped ring (rb-2lane-v1: 187.3 m on the outer lane) with room
+ * for the leg that reaches it; the walk is cut long before this in practice.
+ */
+const RING_WALK_MAX_M = 260;
+
+/** Cumulative arclength per point of a raw route (index-aligned). */
+function rawArcLengths(raw: RawRoute): number[] {
+  const s: number[] = new Array(raw.points.length);
+  s[0] = 0;
+  for (let i = 1; i < raw.points.length; i++) {
+    s[i] =
+      s[i - 1] +
+      Math.hypot(
+        raw.points[i][0] - raw.points[i - 1][0],
+        raw.points[i][1] - raw.points[i - 1][1],
+      );
+  }
+  return s;
+}
+
+/**
+ * The leg for a `completeManeuver: roundabout` objective — see the block above.
+ *
+ * INSIDE the ring the leg is the road AHEAD (`walkAheadRaw`, which on a oneway
+ * ring can only travel the legal way round and always prefers the ring to a
+ * 90° arm, so it never invents an exit). OUTSIDE it, the leg is still the
+ * shortest path toward the island — that part was never wrong, an approach can
+ * only reach the ring through its own mouth — and the cut below is what makes
+ * the arbitrary snap harmless.
+ *
+ * Then it is CUT, at the first of:
+ *   (a) the sample where the leg is outside `leaveRadiusM` having been inside
+ *       `enterRadiusM` — the evaluator's own completion test, so this is the
+ *       maneuver ending rather than a guess; and
+ *   (b) the first junction node at least `RING_MOUTH_SKIP_M` ahead that stands
+ *       within `enterRadiusM` of the island — the next MOUTH. The radius test
+ *       is what keeps a 458 m city approach (`l3-roundabout` from spawn-3) from
+ *       being chopped at the first side street it passes: only nodes that are
+ *       part of the roundabout qualify.
+ */
+function ringRouteRaw(
+  graph: RouteGraph,
+  snap: RoadSnap,
+  start: { x: number; y: number; headingDeg: number },
+  cx: number,
+  cy: number,
+  enterRadiusM: number,
+  leaveRadiusM: number,
+): RawRoute | null {
+  const inside = Math.hypot(start.x - cx, start.y - cy) <= enterRadiusM;
+  let raw: RawRoute | null;
+  if (inside) {
+    raw = walkAheadRaw(graph, snap, start.headingDeg, RING_WALK_MAX_M);
+  } else {
+    const islandSnap = snapToRoad(graph, cx, cy);
+    raw = islandSnap ? shortestPathRaw(graph, snap, islandSnap) : null;
+  }
+  if (!raw || raw.points.length < 2) return null;
+
+  const s = rawArcLengths(raw);
+
+  // (a) the completion point. `armed` starts true when the car is already in
+  // the ring, so a leg that only ever drives AWAY from a roundabout it never
+  // entered cannot be cut at „you have left" — it never arrived.
+  //
+  // The crossing is solved ALONG the segment, not read off a vertex. An arm
+  // edge is authored as its two endpoints (`rbp-e-arm-n` runs (0, 18) → (0,
+  // 108) with nothing between), so a vertex scan first saw „outside" 82 m out
+  // at the end of the street and drew the whole arm — `sc-rb-ped-exit`, the
+  // one drill that opens this row already committed to its exit.
+  let cutOut = Infinity;
+  let armed = inside;
+  for (let i = 0; i < raw.points.length; i++) {
+    const d = Math.hypot(raw.points[i][0] - cx, raw.points[i][1] - cy);
+    if (!armed && d <= enterRadiusM) armed = true;
+    if (!armed) continue;
+    if (d > leaveRadiusM) {
+      cutOut = s[i];
+      break;
+    }
+    if (i + 1 >= raw.points.length) break;
+    const dNext = Math.hypot(raw.points[i + 1][0] - cx, raw.points[i + 1][1] - cy);
+    if (dNext <= leaveRadiusM) continue;
+    // |A + t(B − A) − C| = leaveRadiusM, smallest root in (0, 1].
+    const ax = raw.points[i][0] - cx;
+    const ay = raw.points[i][1] - cy;
+    const bx = raw.points[i + 1][0] - raw.points[i][0];
+    const by = raw.points[i + 1][1] - raw.points[i][1];
+    const qa = bx * bx + by * by;
+    const qb = ax * bx + ay * by;
+    const qc = ax * ax + ay * ay - leaveRadiusM * leaveRadiusM;
+    const disc = qb * qb - qa * qc;
+    // d ≤ R < dNext guarantees a real root; the guard is for qa ≈ 0 only.
+    const t = qa > EPS && disc >= 0 ? (-qb + Math.sqrt(disc)) / qa : 1;
+    cutOut = s[i] + clamp(t, 0, 1) * Math.hypot(bx, by);
+    break;
+  }
+
+  // (b) the next mouth.
+  let cutMouth = Infinity;
+  for (const j of raw.jointIdx) {
+    if (j <= 0 || j >= raw.points.length) continue;
+    if (s[j] < RING_MOUTH_SKIP_M) continue;
+    if (Math.hypot(raw.points[j][0] - cx, raw.points[j][1] - cy) > enterRadiusM) continue;
+    cutMouth = s[j];
+    break;
+  }
+
+  const cut = Math.min(cutOut, cutMouth);
+  if (Number.isFinite(cut)) return trimRawTo(raw, cut);
+  // Neither a mouth nor a completion inside the leg. A ring walk with no node
+  // on it would otherwise be drawn as a full lap — the defect this block
+  // exists to stop — so it stands down; an APPROACH is left exactly as it was
+  // derived, which is the behaviour every district but a malformed one gets.
+  return inside ? null : raw;
 }
 
 // ---------------------------------------------------------------------------
@@ -1807,6 +2021,16 @@ function lookaheadPoints(
   const out: { x: number; y: number }[] = [];
   for (const t of list) {
     if (t.kind !== "point") break;
+    // …and a ROUNDABOUT ISLAND ends it for the same reason an "ahead" does:
+    // there is no coordinate to route to. A chain leg is a plain
+    // `shortestPathRaw` to (x, y), so letting the island through drew the very
+    // lap this file's ROUNDABOUT RIBBONS block exists to stop — one objective
+    // early and in the dim look-ahead colour. On `sc-rb-lane-choice` the
+    // objective BEFORE the maneuver is the north mouth, so its look-ahead leg
+    // was the same ride past the west exit — measured 95.7 m of dim ribbon on
+    // a 191.9 m route — drawn while the student was still being told to pass
+    // the first two exits.
+    if (t.leaveRadiusM !== undefined) break;
     out.push({ x: t.x, y: t.y });
     if (out.length >= LOOKAHEAD_MAX_LEGS) break;
   }
@@ -1850,6 +2074,11 @@ export function deriveGuidanceRoute(
       }
     }
     if (raw && raw.points.length < 2) raw = null;
+  } else if (goal.leaveRadiusM !== undefined) {
+    // A roundabout island is not a destination — see ROUNDABOUT RIBBONS.
+    const enterRadiusM =
+      goal.shape?.kind === "zone" ? goal.shape.radiusM : goal.leaveRadiusM;
+    raw = ringRouteRaw(graph, snap, start, goal.x, goal.y, enterRadiusM, goal.leaveRadiusM);
   } else {
     const targetSnap = snapToRoad(graph, goal.x, goal.y);
     raw = targetSnap ? shortestPathRaw(graph, snap, targetSnap) : null;
@@ -1862,8 +2091,13 @@ export function deriveGuidanceRoute(
   let budget = opts?.lookaheadMaxM ?? LOOKAHEAD_MAX_M;
   let acc = raw;
   let splitIdx: number | undefined;
+  // A ring goal's coordinates are the ISLAND, not the place this leg ends, so
+  // a look-ahead leg must continue from where the ribbon actually stopped —
+  // the same rule the "ahead" corridor already gets. (No shipped roundabout
+  // objective has a successor today; it is written this way so that authoring
+  // one cannot resurrect a leg drawn from the middle of the island.)
   let from =
-    goal.kind === "point"
+    goal.kind === "point" && goal.leaveRadiusM === undefined
       ? { x: goal.x, y: goal.y }
       : { x: raw.points[raw.points.length - 1][0], y: raw.points[raw.points.length - 1][1] };
   for (const next of chain) {
@@ -1896,8 +2130,12 @@ export function deriveGuidanceRoute(
   // that would point it wherever the student already is, which on a keep-right
   // drill means endorsing the lane he was told to leave: guidance following
   // instead of leading, the same defect inverted. A `zone` goal's coordinates
-  // are authored by the template, so they are the lane it means.
-  if (goal.kind === "point" && goal.shape?.kind !== "gate") {
+  // are authored by the template, so they are the lane it means. A RING zone is
+  // the exception among zones: its centre is the island, which is no lane at
+  // all. The `LANE_ALIGN_MAX_M` bound already refused it (the ribbon rides
+  // 17.85–25.78 m from the centre, an order of magnitude past two lane
+  // pitches), so this is a statement of intent rather than a behaviour change.
+  if (goal.kind === "point" && goal.shape?.kind !== "gate" && goal.leaveRadiusM === undefined) {
     splitIdx = alignRawToGoalLane(acc, goal.x, goal.y, splitIdx).splitIdx;
   }
   return finalizeRoute(acc, splitIdx);

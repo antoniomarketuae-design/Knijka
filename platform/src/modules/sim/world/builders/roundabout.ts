@@ -1224,12 +1224,53 @@ function buildIsland(
   for (let i = 0; i < ISLAND_SEGMENTS; i++) {
     const a = stations[i]!;
     const b = stations[i + 1]!;
-    // The disc's interior is to the LEFT of travel round the ring of stations
-    // (stations run counter-clockwise in district space), so the kerb face —
-    // which must look OUTWARD, away from the island — is wound (b0, a0, a1, b1).
-    sidewalks.quad(b.cb, a.cb, a.ct, b.ct); // vertical kerb face, faces the road
-    sidewalks.quad(b.ct, a.ct, a.xt, b.xt); // 45° chamfer (catches the low sun)
-    sidewalks.quad(b.xt, a.xt, a.ri, b.ri); // concrete rim, flat, faces up
+    // WINDING — REVERSED, AND THE COMMENT THAT STOOD HERE WAS THE BUG.
+    //
+    // It read: „The disc's interior is to the LEFT of travel round the ring of
+    // stations (stations run counter-clockwise in district space), so the kerb
+    // face — which must look OUTWARD, away from the island — is wound
+    // (b0, a0, a1, b1)." Every clause of that is true and the conclusion is
+    // still backwards, because it reasons in DISTRICT space about a buffer that
+    // lives in WORLD space: `toWorld` maps district y → world −z, which flips
+    // handedness, so a quad wound to face outward on the district plane leaves
+    // the accumulator facing INWARD in the scene. mesh.ts says as much in its
+    // own header — „a triangle wound counter-clockwise in district space
+    // (positive signed area) comes out front-facing UP (+Y)".
+    //
+    // MEASURED on the shipped geometry rather than argued, geometric normal
+    // n = (b−a) × (c−a) per triangle, on every district that draws a ring
+    // (rb-mini-v1, rb-ped-v1, rb-2lane-v1, rb-single-v1, district-v1 — all five
+    // identical):
+    //
+    //     island vertical kerb face     192 tris     0 outward   192 INWARD
+    //     island concrete rim           192 tris     0 up        192 DOWN
+    //     island planted crown         1256 tris  1256 up          0   ← right
+    //     terrain                     20784 tris 20784 up          0   ← control
+    //     road surface                  264 tris   264 up          0   ← control
+    //     street pavement tops (roads.ts, same accumulator)  568 up   ← control
+    //
+    // The crown twenty lines below is wound the other way and comes out right;
+    // the three controls settle the convention beyond argument. StaticWorld
+    // renders `geometries.sidewalks` with a plain `<meshStandardMaterial>` and
+    // that file sets no `side` anywhere, so the material is THREE.FrontSide and
+    // all 576 of the island's concrete triangles were BACK-FACING — culled,
+    // invisible, on every roundabout in the product.
+    //
+    // THAT IS THE FINDING, in the ledger's own words (sc-rb-ped-exit:841c6252,
+    // „the roundabout itself is a bare grass mound … no kerb detail"): from the
+    // give-way line the student saw grass meeting asphalt with nothing between
+    // them. The island was never flat and never unbuilt — it was drawn back to
+    // front. Its AUTHORED vertex normals point correctly outward and up, which
+    // is exactly why eleven passes over this file read the normals, found them
+    // right, and moved on.
+    //
+    // Nothing else moves: not one vertex position changes, so `islandRadiusM`,
+    // the 4.1 m of ring clearance and every committed trace are untouched, and
+    // `colliders.sidewalks` is a Rapier trimesh — a soup with no inside — so
+    // the wall a car cannot mount is the wall it already was.
+    sidewalks.quad(a.cb, b.cb, b.ct, a.ct); // vertical kerb face, faces the road
+    sidewalks.quad(a.ct, b.ct, b.xt, a.xt); // 45° chamfer (catches the low sun)
+    sidewalks.quad(a.xt, b.xt, b.ri, a.ri); // concrete rim, flat, faces up
   }
 
   // -- planted crown ---------------------------------------------------------

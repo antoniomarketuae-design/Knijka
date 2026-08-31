@@ -154,6 +154,22 @@
  *    drill is winnable and discriminating on every rung the ladder compiles".
  *    Winnable and discriminating, measured rather than argued.
  *
+ *    …AND THAT PROOF WAS TOO NARROW — WAVE 11, 2026-08-30. It drove ONE line,
+ *    the committed shadow, which circulates at 12 км/ч; so „winnable" was
+ *    established for the shadow's PACE and for no other. Swept across the pace
+ *    instead — same production path, same taught line, right stalk on, same
+ *    stop in the pocket, only the ring speed varied — the row's own sentence
+ *    turns out to be TRUE of a real student: a car circulating at the number
+ *    rb-ped-v1 posts on its own ring (30 км/ч) collected NOT ONE of the three
+ *    tasks, and so did one at 22 км/ч on the graded rungs, because
+ *    `sc-rbp-past-east` shipped a 20 км/ч cap and objectives are SEQUENTIAL —
+ *    the gate missed by 2 км/ч also means the pocket and the exit are never
+ *    evaluated. The table and the repair (cap ⇒ `RING_SPEED_KMH`, the sign on
+ *    that carriageway) are at that row. So this bullet's verdict splits: the
+ *    FRAMES are still a steering-less harness in the island and close nothing,
+ *    and the second clause was not a false claim about this template — it was
+ *    a true one this file's own proof was too narrow to see.
+ *
  *  · «no lane arrows on the approach» and «the roundabout is a bare grass mound
  *    with shrubs and buildings behind it» both describe the frames CORRECTLY,
  *    and neither is authorable from a ScenarioSpec. This file is data: types.ts
@@ -204,6 +220,16 @@ const RING_R = 18;
  *  r ∈ [13.94, 22.06], the two edges world/__tests__/rb-ped-district.test.ts
  *  pins as RING_INNER/RING_OUTER_EDGE_M. */
 const RING_LANE_HALF_M = 4.06;
+/**
+ * THE SIGN ON THE CIRCULATORY CARRIAGEWAY, and from wave 11 the number the
+ * east gate grades against — one constant so the two can never drift apart.
+ *
+ * rb-ped-v1's four ring edges (`rbp-e-ring-se/en/nw/ws`) each carry
+ * `maxspeed: 30`, mirrored into `map.params.ringSpeedKmh` below and painted in
+ * the world by `postedLimitAt`. The arms are posted 40 and are a different
+ * road; nothing here may be derived from them.
+ */
+const RING_SPEED_KMH = 30;
 /**
  * The ring point halfway between the exit that is SKIPPED (east, ring angle 0°)
  * and the exit that is TAKEN (north, 90°) — 12.73, 12.73, i.e. 13.78 m of chord
@@ -600,7 +626,7 @@ export const SC_RB_PED_EXIT: ScenarioSpec = {
       armLengthM: 90,
       entryArm: "south",
       crossingOffsetM: 12,
-      ringSpeedKmh: 30,
+      ringSpeedKmh: RING_SPEED_KMH,
       armSpeedKmh: 40,
     },
     districtId: "rb-ped-v1",
@@ -672,15 +698,85 @@ export const SC_RB_PED_EXIT: ScenarioSpec = {
       // lane there, and the mouth clearance above survives the widening with
       // 3.6° to spare, which is the property the test asserts per rung.)
       //
-      // maxSpeedKmh 20 is unchanged: the ring's own envelope on R = 18 (a
-      // brisker circulation trips the turn detector — see the trace script's
-      // window arithmetic), not a slow-down demand.
+      // ── …AND THE CAP GRADED AN ACT THE TITLE DOES NOT NAME — wave 11 ─────
+      //
+      // The two paragraphs above are the mirror-image crime: a gate that
+      // credits the act its own title forbids. This is the OTHER direction,
+      // and it is the one the sweep kept filing. It shipped as
+      // `maxSpeedKmh: 20` on a ring the same template posts at 30, justified
+      // here as „the ring's own envelope on R = 18 (a brisker circulation
+      // trips the turn detector)" — an argument about the TRACE RECORDER's
+      // window arithmetic, not about the sentence «Подмини първия изход и
+      // остани в кръга». Speed is not in that sentence. The student is graded
+      // on a clause his task chip never states.
+      //
+      // WHAT IT COST, driven through the production stack (compileScenario →
+      // createLessonSession → applyTick → buildLessonResult) on the taught
+      // line, one ring pace per run, everything else identical and correct —
+      // right stalk on, stop at (4.1, 27.0), pedestrian cleared:
+      //
+      //   ring pace │ L1 (cap 25) │ L3 (cap 20)      three tasks: east/pocket/exit
+      //   ──────────┼─────────────┼──────────────────────────────────────────
+      //     12 км/ч │  ✓ ✓ ✓ pass │  ✓ ✓ ✓ pass
+      //     20 км/ч │  ✓ ✓ ✓ pass │  ✓ ✓ ✓ pass
+      //     22 км/ч │  ✓ ✓ ✓ pass │  ✗ ✗ ✗ FAIL
+      //     26 км/ч │  ✗ ✗ ✗ FAIL │  ✗ ✗ ✗ FAIL
+      //     30 км/ч │  ✗ ✗ ✗ FAIL │  ✗ ✗ ✗ FAIL   ← the posted limit
+      //
+      // A student circulating at the number on the sign collected NOTHING —
+      // not one of the three, because objectives are SEQUENTIAL (engine.ts
+      // evaluates only `objectives[currentObjectiveIndex]`), so the gate he
+      // misses by 2 км/ч also means the pocket and the exit are never asked
+      // about. That is the audit row filed against this drill, word for word:
+      // „not one of the three tasks is ticked … the lesson cannot be passed
+      // and cannot distinguish a good student from a bad one." The frames the
+      // row was filed on photograph a steering-less harness in the island
+      // (see the header), but the sentence is TRUE of a real student, and it
+      // was true here.
+      //
+      // AND HE WAS NOT REFUSED IN WORDS. `RouteGuidance.capLineBg` does paint
+      // «не по-бързо от 20 км/ч» on the plaque, so the demand is not silent —
+      // but the ROAD is painted 30 by `postedLimitAt` from the same map, and
+      // doc-86 T8's whole subject is a student who obeys the number the world
+      // gives him and fails. Two numbers on one carriageway is that defect
+      // with an extra step.
+      //
+      // SO THE CAP IS THE SIGN. `RING_SPEED_KMH` is rb-ped-v1's own ring
+      // maxspeed, which makes this arm say something the title CAN carry: you
+      // may not be speeding in the ring at the moment you pass the first exit.
+      // A lawful circulation ticks it at every rung; the 49 км/ч drive the row
+      // compares against does not (`capArmHere` needs ≤ cap, and > cap + 5
+      // additionally latches `approachCap: "blown"`, objectives.ts).
+      //
+      // THE SLOW-DOWN TEACH IS NOT LOST, it moves to where it is provable.
+      // Nothing about this drill wants a 20 км/ч ring for its own sake; it
+      // wants a car that can STOP IN THE POCKET, and `sc-rbp-pocket` below
+      // grades exactly that at 6 км/ч with `acceptBeforeMarkM: -4`. The
+      // physics survives the move: gate (45°) → north mouth is 45° of arc =
+      // 14.1 m, plus ~4 m to the pocket centre ⇒ ~18 m, against 8.33 m/s ×
+      // 1 s of reaction + 8.33²/(2 × 3) = 8.3 + 11.6 = 19.9 m. So 30 км/ч
+      // here is a stop that has to be STARTED here — which is the lesson —
+      // and a student who does not start it misses the pocket, hits
+      // PEDESTRIAN_NOT_YIELDED, and is TOLD SO in the debrief. A billed,
+      // explained failure on the act that matters beats a silent blank sheet
+      // on an act nobody stated (doc 64 THEO-4).
+      //
+      // THE LADDER: `widenSpeedCap(30, 1.5)` compiles L1/L2 to 35 — this
+      // lesson declares no `map.params["maxspeedKmh"]`, so compile.ts hands
+      // the ladder no posted limit to clamp against. That is the standing
+      // beginner grace and it is one direction only: the plaque still prints
+      // `min(gate, posted)` = 30, so the number the world shows is never above
+      // the sign, and a learner 4 км/ч over is billed by the rule engine
+      // rather than blanked by the sheet. (`b58-gate-never-over-posted.test.ts`
+      // censuses `map.params["maxspeedKmh"]`; adding one here would declare a
+      // single lesson-wide limit across a ring posted 30 and arms posted 40,
+      // which is false of this map — so it stays absent, deliberately.)
       params: {
         kind: "reachZone",
         x: MID_ARC_X,
         y: MID_ARC_Y,
         radiusM: RING_LANE_HALF_M,
-        maxSpeedKmh: 20,
+        maxSpeedKmh: RING_SPEED_KMH,
       },
     },
     {

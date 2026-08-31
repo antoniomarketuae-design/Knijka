@@ -2252,6 +2252,66 @@ export const DEBRIEF_FADE_MASK_CSS = `linear-gradient(to bottom, #000 calc(100% 
 export const DEBRIEF_TALLEST_LINE_PX = 22.75;
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHEN THE 16:9 BOX STOPS BEING A WINDSCREEN AND BECOMES A PAGE.
+ *
+ * THE ROW. `sc-follow-distance:b9eb146a` — „roughly 200 px of empty page sits
+ * below the scroll container, i.e. the scroller is shorter than the window it
+ * lives in" — re-judged STILL on the w17 re-drive WITH THE GEOMETRY ATTACHED:
+ * `[data-hud="end-screen"]` measured `clientHeight` 622 against `scrollHeight`
+ * 1496 in a 900 px window. Eight hundred and seventy-four pixels of the
+ * instructor's explanation folded into six hundred and twenty-two, and under
+ * the card ~195 px of bare page doing nothing. The verifier's own conclusion is
+ * the THEO-4 one: „the «превърти» affordance has to teach what the layout
+ * should have made obvious".
+ *
+ * WHERE THE 622 COMES FROM, BECAUSE IT IS NOT A BUG IN THE DEBRIEF. The
+ * letterboxed stage is `aspect-video` under a MAX-width (`playMaxWidthPx`), so
+ * it is width-driven on every window whose column is narrower than its height
+ * allows: at 1440 × 900 the dashboard column measures ~1105 px and
+ * 1105 × 9/16 = 621.6. The end scrim is `absolute inset-0` INSIDE that box, so
+ * the debrief inherits the windscreen's aspect — and the ~195 px the row
+ * measured is height `playMaxWidthPx` had already found and the 16:9 contract
+ * then declined to spend.
+ *
+ * AND THAT CONTRACT IS ABOUT A CAMERA, NOT ABOUT A BOX. `playArea.ts` states
+ * why 16:9 „is not negotiable" in one sentence, and every word of it is about
+ * what the road looks like: CameraRig holds the cockpit's hFOV constant and
+ * derives vFOV from the live aspect, so a squarer frame drags the headliner in.
+ * On the debrief there is no camera in this rectangle. `OVERLAY_SCRIM_CLASS`
+ * paints `bg-background` at alpha 1 over the whole of it — deliberately, so
+ * that „at alpha 1 the canvas underneath is fully OCCLUDED" — and the scene is
+ * paused behind it. The aspect is buying the student nothing there while
+ * charging him a fifth of his window to read the one surface in this product
+ * that quotes a lawRef.
+ *
+ * SO THE BOX GROWS FOR THE READING AND SHRINKS BACK FOR THE ROAD. `min-height`
+ * and not a swapped class: `aspect-ratio` computes a height and the min/max
+ * clamps then apply to it, so the box is exactly `max(width × 9/16, this)` —
+ * a window with nothing spare returns the identical rectangle, which is what
+ * makes this safe on the height-limited layouts the row was never about.
+ *
+ * THE HEIGHT IS RECOVERED FROM THE MEASUREMENT ALREADY TAKEN, NOT MEASURED
+ * AGAIN. `playMaxWidthPx(h)` is `round(max(h, PLAY_MIN_HEIGHT_PX) × PLAY_ASPECT)`,
+ * so dividing its answer by PLAY_ASPECT returns that height to within the
+ * rounding — one `getBoundingClientRect` pass, one effect, two readings of it.
+ * A second measurement would be a second thing to keep in step with the first,
+ * and two views of one box drifting apart is the failure this file has already
+ * paid for elsewhere.
+ *
+ * NO MEASUREMENT YET (server render, first paint) FALLS BACK TO THE MAX-WIDTH'S
+ * OWN `calc()` WITH THE ASPECT DIVIDED OUT, so the two halves of the same style
+ * object cannot disagree about how much room there is before the observer runs.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function debriefStageMinHeightCss(maxWidthPx: number | null): string {
+  if (maxWidthPx === null || !Number.isFinite(maxWidthPx)) {
+    return `calc(100dvh - ${PLAY_CHROME_FALLBACK_PX}px)`;
+  }
+  return `${Math.round(maxWidthPx / PLAY_ASPECT)}px`;
+}
+
+/**
  * How much of the CURRENT window the toast column keeps when its „покажи"
  * control pages down, px.
  *
@@ -6251,6 +6311,29 @@ export function LessonPlayShell({
                   playMaxWidth !== null
                     ? `${playMaxWidth}px`
                     : `calc((100dvh - ${PLAY_CHROME_FALLBACK_PX}px) * ${PLAY_ASPECT})`,
+                // ── AND THE DEBRIEF IS ALLOWED THE HEIGHT THE ROAD IS NOT ────
+                // `sc-follow-distance:b9eb146a`. The measured 622 / 1496 / 900,
+                // where the 622 comes from and why the cockpit-camera contract
+                // does not reach this one state are all at
+                // `debriefStageMinHeightCss`; what is decided HERE is the gate.
+                //
+                // GATED ON THE SCRIM, NOT ON `ended`, and the difference is the
+                // whole safety of the change. What frees the aspect is that an
+                // OPAQUE box covering this entire rectangle is on top of the
+                // canvas — `debriefOpen && result`, the same pair, evaluated the
+                // same way, that mounts `[data-hud="end-scrim"]` at the bottom
+                // of this component. An ended session whose student has closed
+                // the debrief is looking at the road again, and it keeps its
+                // windscreen; so does every frame of every drive.
+                //
+                // THE IMMERSIVE ARM NEEDS NOTHING: there the stage is
+                // `min-h-0 flex-1` in a viewport-height column and the debrief
+                // already has the whole screen. This row is a letterbox row,
+                // which is why it was filed on a pc lane.
+                minHeight:
+                  debriefOpen && result !== null
+                    ? debriefStageMinHeightCss(playMaxWidth)
+                    : undefined,
               }
         }
       >

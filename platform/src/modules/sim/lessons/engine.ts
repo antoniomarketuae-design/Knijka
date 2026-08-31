@@ -2067,13 +2067,102 @@ export function abortSession(prev: LessonSessionState, tSec: number): LessonSess
 export function buildLessonResult(state: LessonSessionState): LessonResult {
   const summary = buildSessionSummary(state.events);
 
-  const objectives: ObjectiveOutcome[] = state.objectives.map((o) => ({
-    id: o.spec.id,
-    titleBg: o.spec.titleBg,
-    done: o.status === "done",
-    completedAtSec: o.completedAtSec,
-    ...(o.detail !== undefined ? { detail: o.detail } : {}),
-  }));
+  /**
+   * …AND THE SAME REFUSAL FROM THE OTHER SIDE OF THE STRIKE — the half the
+   * per-frame demand cannot reach (`sc-hz-emergency-stop:42c93d49`, re-judged
+   * on the attested w17 re-drive).
+   *
+   * WHAT IS BROKEN, driven through `applyTick` at HEAD rather than read off a
+   * summary. `sc-hz-emergency-stop` L3, the authored halt disc `{x:4.06,
+   * y:146, radiusM:4, maxSpeedKmh:6}`: brake to rest on the mark, hold it,
+   * then move off into the child eight seconds later. One `LessonResult`:
+   *
+   *   ✓ Спри преди детето — с пълна спирачка, в лентата        0:11
+   *   Грешки  ✗ Удар в пешеходец  (COLLISION · pedestrian)     0:21
+   *
+   * — the sheet the founder photographed, with the tick at 1:28 and the strike
+   * at 1:36. `requireHaltForVru` and `requireVruUntouched` both declare
+   * themselves SESSION-MONOTONE («a struck person is session-monotone by
+   * construction, so the gate is closed for good» — objectives.ts), but they
+   * are read inside `stepReachZone`, and the engine never re-steps a completed
+   * objective. So the demand covers only the ordering where the strike is
+   * already on the ledger when the disc is crossed, and the w13 frames it was
+   * cut from happen to be that ordering. Its own docblock says so in as many
+   * words: „a strike that comes afterwards cannot touch it".
+   *
+   * TWO ORDERINGS OF ONE DRIVE MAY NOT GRADE DIFFERENTLY. That docblock also
+   * answers the objection that used to keep this title out of the census — „the
+   * certificate was true when issued … the strike came on the move-off" — with
+   * the right answer: the ordering is A FACT ABOUT ONE RECORDED DRIVE AND NOT A
+   * PROPERTY OF THE DRILL. Today a student who hits the child one frame BEFORE
+   * the disc loses the tick and finishes on 1★, and one who hits her eight
+   * seconds AFTER keeps it and finishes on ★★ (`scenario/rubric.ts` — stars
+   * fall out of `completedAll`). Same drill, same child, same −10; the star
+   * decided by which side of the mark the collision landed on. That is the
+   * inconsistency this closes, and it closes it in the ONE place that sees the
+   * whole run at once.
+   *
+   * IN THE FOLD, NOT IN THE LOOP — deliberately, and it is the whole safety of
+   * the change. Demoting the objective mid-drive would move `currentIndex`
+   * backwards and strand the chain: the run-out would never arm and the student
+   * who ran the child down could reach the −10 «Удар в пешеходец» card that
+   * teaches him чл. 48, ал. 3 only by quitting. That trap is exactly what
+   * `personContactVoidsObjective` and the `terminalUnearnable` arm above were
+   * written to avoid, and this must not re-introduce it one lane over. The
+   * chain still advanced when it advanced; only the CERTIFICATE is withdrawn,
+   * at the moment the sheet is written.
+   *
+   * IT CANNOT COST ANYONE A PASS, the same guarantee the per-frame demand
+   * carries: `COLLISION` with a person is опасна and terminating (Наредба № 38,
+   * ЗДвП чл. 48, ал. 3), so `summary.passed` is already false on every drive
+   * this can touch — measured on the repro above, `{passed:false,
+   * summary.passed:false}` before and after. What it removes is the
+   * CONTRADICTION between two halves of one sheet, never a verdict.
+   *
+   * AND IT IS NOT A BARE VERDICT (THEO-4) for the reason objectives.ts states
+   * for the prospective half: the same sheet is holding the −10 «Удар в
+   * пешеходец» card with its catalogue explanation, its «✔ Правилното
+   * действие» corrective and its law refs, and «Разбор» repeats all three. The
+   * one sentence still missing is the row's OWN — «спря, и след това потегли
+   * срещу нея» — and it cannot be written from here: `ObjectiveDetail` is a
+   * closed union in lessons/types.ts and `objectiveDetailText` lives in
+   * hud/SessionEndScreen.tsx. Reported to the integrator rather than reached
+   * for. The A10 measurement that IS already there rides through untouched:
+   * «Реакция: 0.68 с — отличен» beside a withdrawn tick is the true and useful
+   * split — the reflex was good, the drive still ended on the child.
+   *
+   * ONLY THE TWO PERSON DEMANDS. `requireNoContact` is wider (a vehicle or a
+   * static obstacle is a body, and a drill may forbid touching one without
+   * making any claim about a human being let through) and `requireYieldClean`
+   * is WINDOWED — a student who barged the first junction and gave way properly
+   * at the second told the truth about the second, and a run-wide read here
+   * would call him a liar. Both keep their per-frame semantics exactly as
+   * shipped.
+   *
+   * A DRIVE THAT HITS NOBODY IS BIT-IDENTICAL TO SHIPPED: `struckAPerson` is
+   * false, both predicates short-circuit on their own first conjunct, and every
+   * field below is the expression it was.
+   */
+  const struckAPerson = state.events.some(isPersonContact);
+
+  const objectives: ObjectiveOutcome[] = state.objectives.map((o) => {
+    const revoked =
+      personHaltVoidsObjective(o.params, struckAPerson) ||
+      personContactVoidsObjective(o.params, struckAPerson);
+    return {
+      id: o.spec.id,
+      titleBg: o.spec.titleBg,
+      done: o.status === "done" && !revoked,
+      // The clock is the certificate's other half — «✓ … 1:28» is one claim,
+      // not two — so a withdrawn tick may not leave its timestamp standing.
+      // `SessionEndScreen` only prints it under `o.done` today, and `wire.ts
+      // reconcileObjectiveOutcomes` already nulls it on `!done`; this keeps the
+      // three surfaces saying one thing instead of relying on two of them to
+      // hide the third's leftover.
+      completedAtSec: revoked ? null : o.completedAtSec,
+      ...(o.detail !== undefined ? { detail: o.detail } : {}),
+    };
+  });
 
   const completedAll = objectives.every((o) => o.done);
   const aborted = state.phase === "aborted";

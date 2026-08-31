@@ -4303,6 +4303,46 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.curveSpeed,
     s.motorwaySlow,
     s.emergencyLane,
+    // 2026-08-30 (`sc-ac-truck-spray:7e53374c`, critical). The newest episode in
+    // this file was the only one never added to this list, and the omission is
+    // not cosmetic: `OFF_CARRIAGEWAY` bills ONCE per excursion, so from the
+    // frame after the bill a car that is still in the field was indistinguishable
+    // here from a car on the road. MEASURED through this reducer — 145 км/ч,
+    // `edgeId: null` throughout, 40 s, which is the row's own exhibit
+    // (`.audit-frames/w17/…/sc-ac-truck-spray__mobile-wrong/04-t102s.png`, „145
+    // км/ч across open green field with no road anywhere in frame"):
+    //   before  OFF_CARRIAGEWAY, then SIX × CLEAN_DRIVING
+    //   after   OFF_CARRIAGEWAY, then none until the wheels are back on a road
+    // One every 250 m of grass. At a lawful 60 км/ч over the same field it was
+    // three. The conviction landed and the engine then congratulated the student
+    // for the very metres it had just convicted him for, which is worse than the
+    // silence this code was added to end: «Какво се получи добре: • Чисто и
+    // спокойно каране» is read off the debrief as credit, and a student told to
+    // hold that level is being taught to hold a field at motorway speed.
+    //
+    // TWO THINGS IT DELIBERATELY DOES NOT DO, both because they would move A12's
+    // acquitting direction. (1) It is added to THIS gate only, never to
+    // `breachAwaitingSustain`: that list is for states unlawful at every instant,
+    // and `OFF_CARRIAGEWAY_SUSTAIN_SEC`'s own derivation says the 2 s is bought
+    // by the full-flank excursion that is CORRECTED at once — so a second of this
+    // condition can still be a correction in progress, and deferring a payout
+    // through it would withhold credit from a drive that never bills. Measured:
+    // a 1,5 s excursion inside a 60 s drive earns the same four commendations
+    // before and after. (2) It clears the instant the runtime reports an edge
+    // again — `stepEpisode`'s `reset` arm (`typeof tick.edgeId === "string"`)
+    // nulls `emitted`, so recovering onto the road resumes the streak on the next
+    // moving frame rather than ending it.
+    //
+    // THE ONE PLACE `emitted` IS NOT „billed", WRITTEN DOWN RATHER THAN GLOSSED:
+    // the crash-swallow gate inside the detector's own fire branch (`crashCaused
+    // Departure`) suppresses the EMIT and not the episode — it is deliberately on
+    // the push so one crash cannot be re-billed frame after frame — so a
+    // departure inside one sustain of an impact sets `emitted` with
+    // no violation pushed. Praise is already off for the terminating case
+    // (`s.terminated`), and the non-terminating one is a car that has just hit
+    // something and is now in the verge — not a car earning a commendation. It is
+    // an inclusion, not an oversight.
+    s.offCarriageway,
   ] as const;
   /**
    * GATE 1 — BILLED AND NOT YET CORRECTED. The shipped meaning („fired-and-

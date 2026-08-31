@@ -105,6 +105,26 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         radiusM: p.radiusM,
       };
       if (num(p.maxSpeedKmh)) out.maxSpeedKmh = p.maxSpeedKmh;
+      // THE LOWER EDGE OF THE SAME CONTRACT (`minSpeedKmh` — the eleventh
+      // demand; its block comment carries the drive, the three routing notes
+      // that asked for it and the two edits it is still waiting on).
+      //
+      // PARSED HERE, BESIDE THE CEILING, AND NOT AT THE END WITH THE OTHERS —
+      // the placement is the whole of its conflict guard, exactly as it is for
+      // `requireCockpitReady` four screens down. This is an AT-MARK demand, so
+      // `hasAtMarkDemand` must be able to see it on `out` when
+      // `parseControllerDemand` reads it below; the lawful-speed arm is parsed
+      // after that call and is therefore invisible to the guard, a hole its own
+      // comment names and this one does not join.
+      //
+      // AUTHORED ONLY — there is no `deriveSpeedFloorDemand` and there may not
+      // be one. A banner can promise a KIND of thing; it cannot promise a
+      // number, and the matcher that once manufactured a demand for this very
+      // gate out of these very words was reverted (see the `requireLamps` block
+      // below). Absent is „no floor", which is every gate in the catalogue.
+      if (p.minSpeedKmh !== undefined) {
+        out.minSpeedKmh = parseSpeedFloor(objective, p.minSpeedKmh, out);
+      }
       // THE ARRIVAL CONTRACT'S TWO STATE DEMANDS (see the block comment on
       // `WitnessedReachZoneParams`). AUTHORED WINS, TITLE FILLS IN: a template
       // that states the demand outright gets exactly what it asked for; one
@@ -1293,6 +1313,113 @@ export interface ReachZoneWitnessDemands {
    * in the wave report.
    */
   requireCockpitReady?: true;
+  /**
+   * THE SPEED CONTRACT FINALLY HAS A LOWER EDGE — the eleventh demand, and the
+   * only one of the eleven that is not a new CHANNEL but a missing HALF of a
+   * channel this evaluator has read since B4 (sc-ac-night-overdrive:b9d61410,
+   * critical; also sc-follow-cutin:996fd693 and sc-jxgb-roll).
+   *
+   * THE FRAME. «✓ Мини неосветения участък със съобразена за видимостта
+   * скорост 2:45» on a drive that never exceeded 15 км/ч. A gate named for a
+   * speed CHOSEN FOR THE VISIBILITY, satisfied at walking pace.
+   *
+   * RE-DERIVED THROUGH THE PRODUCTION EVALUATOR AT HEAD rather than inherited
+   * from the report, because a report is as stale as the day it was written.
+   * `compileScenario(SC_AC_NIGHT_OVERDRIVE, 1)` → `sc-acno-adapted` parses to
+   * `{ x: 4.06, y: 250, radiusM: 17, maxSpeedKmh: 55 }` (L3–L5: r 12, cap 50),
+   * and a tick stream down the lane through the disc ticks `done` at 50 км/ч,
+   * at 15 км/ч AND at 3 км/ч. `maxSpeedKmh` enters `stepReachZone` as
+   * `speedKmh <= cap` and nothing else, so 0 км/ч satisfies every capped gate
+   * in the catalogue as completely as the taught speed does.
+   *
+   * WHY THE CAP TIGHTENING DID NOT CLOSE IT, stated so no later round reads the
+   * git history as a closure: `templates-conditions2.ts` records this gate
+   * moving 58 → 50, and a CEILING moved down is harder for a fast car and no
+   * answer whatever to a slow one. The two changes are orthogonal.
+   *
+   * ── IT IS INERT AS SHIPPED, AND THAT IS SAID FIRST ───────────────────────
+   *
+   * NO TEMPLATE AUTHORS THIS KEY TODAY. Every gate in the catalogue parses
+   * `minSpeedKmh: undefined`, `floorOk` is `true` on every frame, `floorSpent`
+   * is `false` on every frame, and `hasArrivalDemand`/`hasAtMarkDemand` answer
+   * exactly what they answered before — so this arm credits and refuses nobody
+   * and the whole catalogue is bit-identical to shipped. It is the enabling
+   * half of a three-file repair, landed in the only file that can hold it
+   * (`ReachZoneParams` lives in lessons/types.ts), and the row it was cut for
+   * stays OPEN until the other two land. It is a term, not a closure.
+   *
+   * THE ORDER THE OTHER TWO MUST LAND IN, and this is a THEO-4 constraint
+   * rather than a preference — read it before authoring the key anywhere:
+   *
+   *  1. `lessons/engine.ts objectiveNotice` needs an arm that says «мина
+   *     твърде бавно» — what the gate wants, what was measured, what to do.
+   *     Without it a floor refusal is SILENT: the composer's cap card is gated
+   *     on `speedKmh > cap`, its state card branches on
+   *     `reachZoneStateRefusal(...).kind === "lamps"` and returns the GEAR card
+   *     for anything else, and returning a new kind through that function would
+   *     tell a crawling student his lever was in D. So this demand is
+   *     deliberately absent from `reachZoneStateRefusal` (see its docblock),
+   *     which leaves the composer returning `null` — a missing card, never a
+   *     false one.
+   *  2. ONLY THEN the template authors the number.
+   *
+   * AND UNLIKE `requireCockpitReady`, WHICH DID LAND SPLIT, there is no loud
+   * grader standing in meanwhile. That demand was safe to split because
+   * `SEATBELT_OFF_WHILE_MOVING` and `HANDBRAKE_LEFT_ON` both fire at the moment
+   * of the fault; the catalogue's only slow-driving law is
+   * `DRIVING_TOO_SLOW_FOR_MOTORWAY` (второстепенна, ЗДвП чл. 22, ал. 1), and
+   * `sc-ac-night-overdrive` runs on `ov-oncoming-v1`, an extra-urban 1+1 —
+   * never a motorway, so it cannot fire there. Authoring a floor ahead of the
+   * card would swap a false ✓ for a task that simply never ticks, which is the
+   * exact regression `reachZoneStateRefusal` exists to have ended.
+   *
+   * ── WHY THE NUMBER MAY NOT BE DERIVED FROM THE BANNER ────────────────────
+   *
+   * Every other demand in this interface is „authored wins, the title fills
+   * in", and this one deliberately is not. A banner can promise a KIND of thing
+   * — lit lamps, reverse, an officer's permission — and a matcher can read that
+   * promise honestly. It cannot promise 35 км/ч. `deriveLawfulSpeedDemand`
+   * already reasons about this family by name and refuses to match «съобразена
+   * … скорост» for exactly that reason: „a speed below the sign … only the
+   * template can quantify". And the fallthrough that DID manufacture a demand
+   * for this very gate from these very words was reverted on 2026-08-28 by two
+   * adversarial verifiers (see `parseObjectiveParams`' `requireLamps` block).
+   * Deriving a floor here would be that revert undone with a number in it.
+   *
+   * NOR MAY IT BE DERIVED FROM THE CAP. A floor at `REACH_ZONE_HALT_CAP_KMH`
+   * on every FLOW cap — „a gate whose own classification says arriving in
+   * motion is the act may not credit a car at rest" — is the one derivation
+   * that invents nothing, and it is still refused: it does not reach this row
+   * (15 км/ч clears any such floor), and `scenario/__tests__/
+   * following-claim-gates.test.ts` §12 pins all five flow-capped following
+   * gates as crediting the stopped car and asserts `refused` is empty, so a
+   * blanket floor turns another lane's ledger red for a row it does not close.
+   *
+   * ── THE SHAPE, once authored ──────────────────────────────────────────────
+   *
+   * AN AT-MARK ARM on the CAP's geometry, not the lamps': a speed may only ever
+   * be read at the tick's own position („POSITION IS SWEPT; SPEED IS NOT"), so
+   * it earns where `capArmHere` earns and spends where `capSpent` spends. It is
+   * the cap's mirror in every respect, including the slack: earned at
+   * `speedKmh >= floor`, spent only below `floor - REACH_ZONE_CAP_SLACK_KMH`,
+   * so the same dead band the ceiling leaves for speedometer and physics wobble
+   * is left under the floor. EARNED WIDE, SPENT NARROW, in the direction this
+   * whole file spends its slack.
+   *
+   * AND IT MAY NOT TRAP ANYONE, which is the half to check before the half that
+   * refuses. It rides the same `capMet` latch, so a student who crawls onto the
+   * mark and then picks the speed up while still on it re-earns the tick on the
+   * next frame — the same rescue the 29 lamp/gear gates depend on. The parse
+   * refuses a band narrower than that wobble outright (`parseSpeedFloor`), so a
+   * gate nobody can drive cannot reach a student in the first place.
+   *
+   * NOT LADDERED, and a template author has to know it: `scenario/params.ts
+   * widenSpeedCap` raises the CEILING for the beginner rungs and knows nothing
+   * of this key, so the floor is the same at L1 as at L5 and the band is
+   * therefore WIDEST for the beginner — the right direction, but it means the
+   * authored number must be comfortable at the rung with the least help.
+   */
+  minSpeedKmh?: number;
 }
 
 /**
@@ -1736,6 +1863,48 @@ function parseGearDemand(objective: LessonObjective, v: unknown): ReachZoneGearD
 }
 
 /**
+ * A BAND NOBODY CAN DRIVE IS REFUSED AT THE PARSE, not discovered by a student
+ * — the same law `parseControllerDemand` states one screen down, and for the
+ * same reason: a gate that can never be completed is the founder's worst
+ * failure mode wearing the opposite mask, and it fails SILENTLY.
+ *
+ * `parseObjectiveParams` runs at compile/session start and every template in
+ * the catalogue is parsed by the catalogue-integrity sweep, so a throw here is
+ * a red build rather than a bricked lesson.
+ *
+ * THE MINIMUM BAND IS `REACH_ZONE_CAP_SLACK_KMH`, which is not a number chosen
+ * here: it is the rule engine's own `speedingGraceMaxKmh`, and the constant's
+ * docblock states what it stands for — „speedometer/physics slack". A window
+ * narrower than the wobble it is measured through is not a speed a student can
+ * hold; it is a coin toss with a certificate attached. The measured driveline
+ * wobble is 0.06–0.12 км/ч, so 5 clears it by forty times, and this is the
+ * floor's half of the symmetry the arm in `stepReachZone` completes.
+ *
+ * A FLOOR WITH NO CEILING IS ALLOWED. «Не пълзи през участъка» is a real claim
+ * and needs no upper edge to be honest; the band is then [floor, ∞) and there
+ * is nothing to check it against.
+ */
+function parseSpeedFloor(
+  objective: LessonObjective,
+  v: unknown,
+  p: WitnessedReachZoneParams,
+): number {
+  if (!num(v) || v <= 0) {
+    throw new ObjectiveSpecError(objective.id, "reachZone minSpeedKmh must be a number > 0");
+  }
+  const cap = p.maxSpeedKmh;
+  if (cap !== undefined && cap - v < REACH_ZONE_CAP_SLACK_KMH) {
+    throw new ObjectiveSpecError(
+      objective.id,
+      `reachZone minSpeedKmh ${v} leaves less than ${REACH_ZONE_CAP_SLACK_KMH} км/ч under ` +
+        `maxSpeedKmh ${cap} — a band narrower than the speedometer slack is not drivable ` +
+        "(see parseSpeedFloor)",
+    );
+  }
+  return v;
+}
+
+/**
  * ONE LATCH CANNOT HOLD TWO INDEPENDENTLY-EARNED HALVES, and this throws rather
  * than quietly producing a gate nobody can complete.
  *
@@ -1767,7 +1936,12 @@ function hasAtMarkDemand(p: WitnessedReachZoneParams): boolean {
     p.requireLawfulSpeed === true ||
     // The tenth, and an at-mark state exactly like the lamps: the belt and the
     // handbrake are read on the frame the disc is swept.
-    p.requireCockpitReady === true
+    p.requireCockpitReady === true ||
+    // The eleventh, and the most at-mark of the eleven: it is the CAP's own
+    // arm read from the other side, on the cap's own geometry. A zone carrying
+    // a floor may no more share the officer's permission than one carrying a
+    // ceiling can — one `capMet` latch, two moments.
+    p.minSpeedKmh !== undefined
   );
 }
 
@@ -1959,7 +2133,12 @@ function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
     // car at the mark, the latch spends and re-earns it, and a future gate
     // carrying it without a cap must start UNMET rather than being handed the
     // contract by the arrival.
-    params.requireCockpitReady === true
+    params.requireCockpitReady === true ||
+    // The eleventh, folded in for the third time for the same reason — and
+    // here it is not hypothetical: «Не пълзи през участъка» is a whole claim,
+    // so a gate may carry a floor and no ceiling, and such a gate must start
+    // UNMET or the arrival alone would hand it the contract.
+    params.minSpeedKmh !== undefined
   );
 }
 
@@ -2239,6 +2418,19 @@ export type ReachZoneStateRefusal =
  * student who is stopped mid-shunt with the lever already on R would be a false
  * statement about the cockpit, and a false card is worse than a missing one.
  * The pause resolves itself the moment he moves; the forward arrival does not.
+ *
+ * NEITHER THE COCKPIT DEMAND NOR THE SPEED FLOOR IS REPORTED HERE, and both
+ * omissions are the same one fact about the caller rather than an oversight in
+ * this function. `lessons/engine.ts objectiveNotice` branches on
+ * `refusal.kind === "lamps"` and returns the GEAR card for anything else, so a
+ * third or fourth kind coming out of here would tell a beltless student — or a
+ * crawling one — that his lever was in D. Returning `null` costs the student a
+ * card; returning a new kind costs him a true one. Until that composer grows an
+ * arm per kind, this function reports only the two it was cut for. The floor's
+ * own block comment (`ReachZoneWitnessDemands.minSpeedKmh`) makes that arm the
+ * FIRST of the two edits that must land before any template authors a floor,
+ * because unlike the cockpit's belt and handbrake a crawl on an extra-urban
+ * road has no rule-engine grader standing in meanwhile.
  */
 export function reachZoneStateRefusal(
   params: ObjectiveParams,
@@ -2881,6 +3073,33 @@ function stepReachZone(
   const overCapNow = cap !== undefined && speedKmh > cap + REACH_ZONE_CAP_SLACK_KMH;
   const capSpent = overCapNow && (onApproachSide || sweptAcceptance);
 
+  // ── AND THE SAME CONTRACT READ FROM UNDERNEATH (`minSpeedKmh`) ───────────
+  // The eleventh demand — its block comment on `ReachZoneWitnessDemands`
+  // carries the drive, why the number may not be derived, and the two edits it
+  // is still waiting on. NO TEMPLATE AUTHORS IT TODAY, so `floor` is undefined
+  // on every gate in the catalogue and both lines below are constants: the
+  // whole catalogue is bit-identical to shipped.
+  //
+  // THE CAP'S MIRROR IN EVERY RESPECT, deliberately, so there is one speed
+  // contract with two edges rather than two contracts:
+  //  · the SAME geometry — a point test at the tick's own position
+  //    (`onApproachSide || sweptAcceptance` to spend, `inAcceptance ||
+  //    graceArmed` to earn), because „POSITION IS SWEPT; SPEED IS NOT";
+  //  · the SAME slack, on the other side — earned at `>= floor`, spent only
+  //    below `floor - REACH_ZONE_CAP_SLACK_KMH`, so the dead band the ceiling
+  //    leaves for speedometer and physics wobble is left under the floor too;
+  //  · the SAME latch, so crawling onto the mark and then picking the speed up
+  //    while still on it re-earns the tick on the next frame.
+  //
+  // WHAT IT DELIBERATELY DOES NOT TOUCH IS `approachCap`. That state answers
+  // „was the CEILING thrown away before arrival" and feeds `overCapNoted` and
+  // the coach card that says «Намали СЕГА»; a car that arrives too SLOWLY has
+  // not blown its approach in that sense and must not be told it did. The two
+  // edges share the latch and not the diagnosis.
+  const floor = params.minSpeedKmh;
+  const underFloorNow = floor !== undefined && speedKmh < floor - REACH_ZONE_CAP_SLACK_KMH;
+  const floorSpent = underFloorNow && (onApproachSide || sweptAcceptance);
+
   // ── THE STATE HALF OF THE ARRIVAL CONTRACT (2026-08-19) ──────────────────
   // See `ReachZoneWitnessDemands` above for the five drills and the frame.
   //
@@ -3065,6 +3284,12 @@ function stepReachZone(
   // the honest one for a contract read on a single frame.)
   const contractEarned =
     (cap === undefined || (!approachBlown && capArmHere)) &&
+    // The eleventh arm, on the cap arm's geometry and for the cap arm's reason
+    // (a speed is read at the tick's own position, never over a segment). It
+    // is a separate conjunct rather than a term folded into `capArmHere`
+    // because `capArmHere` also decides `approachCap`, and being too slow is
+    // not a blown approach — see the block where `floorSpent` is computed.
+    (floor === undefined || (speedKmh >= floor && (inAcceptance || graceArmed))) &&
     (lampDemand === undefined || (lampOk && atMark)) &&
     (gearDemand === undefined || (gearOk && atMark)) &&
     // The tenth arm, on the lamps' geometry (`atMark` — the swept face or the
@@ -3081,6 +3306,7 @@ function stepReachZone(
     : (st.capMet &&
         !(
           capSpent ||
+          floorSpent ||
           lampSpent ||
           gearSpent ||
           cockpitSpent ||
