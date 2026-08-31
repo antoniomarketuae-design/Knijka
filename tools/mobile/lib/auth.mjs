@@ -109,6 +109,39 @@ import { join } from "node:path";
 export const LOGIN_NAV_TIMEOUT_MS = 180_000;
 
 /**
+ * THE CLICK BUDGET — the one timeout in this file nobody ever raised.
+ *
+ * MEASURED 2026-08-31, and it cost SIX refused canaries before it was found.
+ * The mobile leg runs WebKit at DEVICES["iphone16-landscape"] = 852x393. In a
+ * 393 px-tall viewport the login form does not fit:
+ *
+ *   #email                bottom 315   on screen
+ *   #password             bottom 399   BELOW THE FOLD
+ *   button[type=submit]   bottom 459   BELOW THE FOLD, elementFromPoint null
+ *
+ * So a sign-in is three scroll-and-stabilise cycles, not three clicks. Each
+ * costs seconds in WebKit on this disk — the submit click alone measured 6.2 s
+ * on a QUIET box and 9.8 s on a cold WebKit process — while every click was
+ * inheriting Playwright's 30 s DEFAULT, next to a navigation budget already
+ * raised to 180 s and a warm budget at 420 s. Under any load the third scroll
+ * ran out, and the drive reported «sign-in refused» for a login the server was
+ * perfectly willing to grant: a direct POST to
+ * /api/auth/callback/credentials returned 302 with authjs.session-token in
+ * 0.82 s, on the same box, at the same minute.
+ *
+ * THIS CANNOT MAKE A BROKEN PRODUCT PASS. It buys time for a scroll. It
+ * asserts nothing, skips no wait, and does NOT force the click — forcing is
+ * what once fired at a button React had not hydrated, so that no POST reached
+ * the server at all (see the fillCredentials header). A login that is really
+ * broken still fails; it just fails after a longer wait.
+ *
+ * THE 393 px FOLD IS ALSO A PRODUCT FINDING and is filed separately: a student
+ * holding a phone sideways cannot see the password field or the submit button
+ * without scrolling.
+ */
+export const LOGIN_CLICK_TIMEOUT_MS = Number(process.env.KNIJKA_LOGIN_CLICK_TIMEOUT_MS || 90_000);
+
+/**
  * THE TOTAL A SINGLE NAVIGATION MAY SPEND, ACROSS EVERY RETRY.
  *
  * WITHOUT THIS THE RETRY LADDER MULTIPLIES OUT TO HOURS, and it did. Counted
@@ -701,7 +734,7 @@ async function signInThroughForm(page, credentials, baseUrl, step, watch) {
     // declares a fresh, healthy submit rate-limited.
     step("submitting and waiting for the session cookie");
     watch.clear();
-    await page.click('button[type="submit"]');
+    await page.click('button[type="submit"]', { timeout: LOGIN_CLICK_TIMEOUT_MS });
     const outcome = await waitForSessionCookie(page, watch);
     if (outcome.ok) return;
 
@@ -841,7 +874,9 @@ async function fillCredentials(page, credentials, attempts = 10) {
       ["#password", credentials.password],
     ]) {
       const field = page.locator(selector);
-      await field.click();
+      // Below the fold on a 393 px-tall landscape phone, so this is a SCROLL
+      // and a stability wait, not a click. See LOGIN_CLICK_TIMEOUT_MS.
+      await field.click({ timeout: LOGIN_CLICK_TIMEOUT_MS });
       await field.press("Meta+A").catch(() => {});
       await field.press("Control+A").catch(() => {});
       await field.press("Delete").catch(() => {});
