@@ -185,13 +185,56 @@ export interface EnvironmentPreset {
    * here.
    *
    * WHAT THIS CHANGE DOES NOT FIX, so the next reader does not re-derive it:
-   * the pavements, kerbs, verges and parked cars still carry no snow (only
-   * `world/textures/snowCover.ts`'s five prop materials and the carriageway
-   * do), and thinning the veil UNCOVERS that — a snowed road beside bare
-   * concrete. Measured on the same w14 frame: road L106.3 against pavement
-   * L112.4. Routed to the world module, where the previous lane's own R0
-   * criterion („the road must read paler than the concrete pavement") was
-   * already recorded as unreachable from the road multiply.
+   * the CARRIAGEWAY is the surface still missing its snow, and since repair
+   * wave 8 it is the ONLY one. This paragraph used to say the opposite — „the
+   * pavements, kerbs, verges and parked cars still carry no snow … a snowed
+   * road beside bare concrete", w14: road L106.3 against pavement L112.4 —
+   * and that sentence went stale the day `StaticWorld.tsx` spread
+   * `GROUND_SNOW` over the terrain and the sidewalks. It is corrected here
+   * rather than deleted because it did not merely age: `sc-ac-snow:f1673b60`
+   * was routed to THIS FILE on the strength of it, and a stale note that
+   * addresses an audit row is a defect in a file whose comments are its
+   * interface.
+   *
+   * RE-MEASURED 2026-08-31, same lesson, same drive, same rectangles, on the
+   * SETTLED frame (`03-ready.png`) of w14 (`6399a8d`, before wave 8) against
+   * w21 (`b224c7e`, after it), mean sRGB L709:
+   *      carriageway (880,435 60×20)   124.5 → 122.9   (−1.3 %)
+   *      pavement    (968,396 44×10)   158.0 → 169.3   (+7.2 %)
+   * The pavement moved and the road did not, so the gap the old sentence
+   * blamed on bare concrete is now the REVERSE gap — white pavement beside a
+   * grey road, 1.38× apart — and the veil retune above did not cause it (the
+   * carriageway is within 1.3 % of its pre-retune value; the veil moved the
+   * far field, which is what it was aimed at).
+   *
+   * NOTHING IN THIS FILE CAN CLOSE THAT GAP, which is the part worth writing
+   * down: every lever here — sun, hemisphere, exposure, veil colour, veil
+   * density — lights the road and the pavement EQUALLY, so any of them moves
+   * both and the ratio survives. The asymmetry is in HOW the two surfaces
+   * take their snow. `world/textures/snowCover.ts` MIXES the ground materials
+   * toward `SNOW_COVER_COLOR` at `SNOW_COVER_MAX` 0.85 per fragment, which
+   * erases the dark texture underneath; the carriageway takes a neutral
+   * MULTIPLY (`StaticWorld.tsx`'s `roadTint` = `wet.darken × ROAD_ALBEDO_TINT`),
+   * which scales the asphalt map and therefore AMPLIFIES its variance — the
+   * wheel-track wear and gutter grime baked into the road's vertex colours go
+   * blotchy well before the surface goes white — where a mix compresses that
+   * variance toward the snow colour, which is what lying snow physically does:
+   * it covers. Reaching the pavement's neighbourhood from the multiply side
+   * wants `SNOW_ROAD_BRIGHTEN ≈ 2.7` (0.72 × 2.7 × a ~0.28 asphalt texel,
+   * inferred from the frame above, ≈ 0.55 against the pavement's ~0.75) — past
+   * the `< 2` bound `weather.test.ts` pins, and it would ship the blotch. So
+   * the remaining address is a per-fragment snow mix on the ASPHALT material,
+   * capped below the pavement's 0.85 because a carriageway is trodden, and it
+   * is not a constant in this file.
+   *
+   * AND DO NOT RE-CONVICT IT OFF AN `01-arrival` FRAME. In the w21 sweep that
+   * capture lands before the ground materials settle (`usePbrSet` resolves the
+   * asphalt/concrete/grass sets asynchronously and `StaticWorld` renders the
+   * canvas fallback until they arrive), so the near carriageway photographs
+   * ~30 % dark — sweep-wide, on dry lessons too. Ground band (700,390 400×110),
+   * arrival vs ready: w21 sc-ac-snow 89.5 vs 125.8 and sc-ac-ice 84.9 vs 123.5,
+   * where the same pair in w17 reads 125.3 vs 125.5 and 123.5 vs 123.8. A
+   * finding measured on that frame is measuring the loader, not the weather.
    */
   snowWeather: FogSpec;
   /**

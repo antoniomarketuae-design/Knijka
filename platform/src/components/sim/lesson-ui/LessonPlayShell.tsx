@@ -2417,15 +2417,75 @@ export function briefingStandsDown(speedKmh: number): boolean {
   return Math.abs(speedKmh) > TOUCH_HINT_MOVING_KMH;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * …AND THE FOLD HAS TO OUTLIVE THE CARD, BECAUSE A TEACH MOMENT UNMOUNTS IT
+ * (sc-junction-rhr:486cad54, major, re-judged STILL on the w21 re-drive.)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `briefingStandsDown` above is right and it works — every driving beat of
+ * every roomy w21 drive carries the pill and not the panel. What it could not
+ * survive is the card being TAKEN AWAY and PUT BACK, and this mount is behind
+ * `activeQuiz === null && teachQueue.length === 0` (see the notify column):
+ * a teach moment or a micro-quiz unmounts `BriefingCard` outright so the modal
+ * owns the glass. React then discards `folded` and `foldedOnceRef` with it, and
+ * «Разбрах» remounts a FRESH card — expanded, full height, latch unspent.
+ *
+ * THE CENSUS SAYS IT IN THREE LINES. `w21/frames/sc-vu-cyclist-hook__pc-right/
+ * run.log`, a drive that has been under way since t=000s:
+ *
+ *   [04-t107s] 11 км/ч · … ⓘ Инструкции · 5 стъпки ▸        ← folded, correct
+ *              (cleared a pause layer «teach-moment-title» via «Разбрах»)
+ *   [04-t112s]  0 км/ч · … Инструкции▾✕1.Движи се спокойно в дясната л…
+ *
+ * — the five-step panel is back over the right third of the windscreen, 112 s
+ * into a lesson about a cyclist coming up the RIGHT, and it stays there until
+ * the car next passes 5 км/ч. `sc-vu-emergency-junction__pc-right` is the same
+ * three lines at 04-t053s. Those two beats are the ONLY driving-leg beats in
+ * the whole w21 pc corpus where the expanded panel is on the glass; every other
+ * one is `sc-vp-stall`, whose car never moved at all (POSITIVE CONTROL 0 км/ч),
+ * so nothing was ever folded there and nothing came back.
+ *
+ * THAT IS THE ROW, WITH A MECHANISM. sc-junction-rhr:486cad54 says «the
+ * ИНСТРУКЦИИ panel is pinned over the right third — exactly the side the
+ * priority vehicle arrives from», and a right-hand-priority drill is a drill
+ * where the student STOPS at the give-way line and where a fault — i.e. a teach
+ * moment — is likeliest. Dismissing that teach moment is precisely the gesture
+ * that re-opens the panel over the side he has just been told to look at, at
+ * 0 км/ч, where the speed rule cannot fold it again until he moves off.
+ *
+ * SO THE FOLD IS REMEMBERED BY THE THING THAT OUTLIVES THE MOUNT — the shell,
+ * which owns the mount condition in the first place. `foldedAtMount` and
+ * `foldLatchedAtMount` seed the two pieces of state this card has always had,
+ * `onFoldChange` reports every move of them back up, and BOTH are optional so a
+ * caller that does not care (the popup rig, a future rung) gets exactly the
+ * behaviour that shipped: `useState(false)`, `useRef(false)`.
+ *
+ * BOTH HALVES ARE CARRIED AND NOT JUST THE FOLD, because they answer different
+ * questions and the pair is what the „once, and never against the student"
+ * paragraph is made of. Carrying `folded` alone would put a student who had
+ * deliberately UNFOLDED the panel mid-drive back under an auto-fold on his next
+ * move, i.e. the rule firing twice — the crime that paragraph forbids, arriving
+ * through the back door a teach moment holds open.
+ */
 export function BriefingCard({
   steps,
   onClose,
   speedKmh,
+  foldedAtMount,
+  foldLatchedAtMount,
+  onFoldChange,
 }: {
   steps: ReadonlyArray<{ n: number; textBg: string }>;
   onClose: () => void;
   /** The cluster's own reading — see `briefingStandsDown`. */
   speedKmh: number;
+  /** The fold as the shell remembers it across an unmount. Default: expanded. */
+  foldedAtMount?: boolean;
+  /** Whether the once-per-lesson auto-fold has already been spent. */
+  foldLatchedAtMount?: boolean;
+  /** Reports both halves up so the shell's memory cannot drift from the card. */
+  onFoldChange?: (state: { folded: boolean; latched: boolean }) => void;
 }) {
   // ── HOW MANY STEPS ARE BELOW THE FOLD RIGHT NOW ────────────────────────────
   //
@@ -2446,17 +2506,21 @@ export function BriefingCard({
   /** The list's own `scrollTop`, mirrored so the control row can render off it.
    *  See the note beside its write in `measure`. */
   const [scrollTopPx, setScrollTopPx] = useState(0);
-  /** The lifetime — the frame and the ruling are at `briefingStandsDown`. */
-  const [folded, setFolded] = useState(false);
+  /** The lifetime — the frame and the ruling are at `briefingStandsDown`; the
+   *  seed is the header's own block, and it is why a teach moment no longer
+   *  hands the student back a panel he had already folded. */
+  const [folded, setFolded] = useState(foldedAtMount ?? false);
   /** Fired at most once per mounted card, and never again after the student has
-   *  opened the chip: see the „once, and never against the student" paragraph. */
-  const foldedOnceRef = useRef(false);
+   *  opened the chip: see the „once, and never against the student" paragraph.
+   *  Seeded for the same reason `folded` is — an unmount is not an answer. */
+  const foldedOnceRef = useRef(foldLatchedAtMount ?? false);
   useEffect(() => {
     if (foldedOnceRef.current) return;
     if (!briefingStandsDown(speedKmh)) return;
     foldedOnceRef.current = true;
     setFolded(true);
-  }, [speedKmh]);
+    onFoldChange?.({ folded: true, latched: true });
+  }, [speedKmh, onFoldChange]);
   const unfold = useCallback(() => {
     // The latch stays set. A student who asks for the steps back while driving
     // has answered the question the rule above is guessing at, and the panel is
@@ -2464,11 +2528,13 @@ export function BriefingCard({
     // glass back, and the header's own fold control if he wants it recoverably.
     foldedOnceRef.current = true;
     setFolded(false);
-  }, []);
+    onFoldChange?.({ folded: false, latched: true });
+  }, [onFoldChange]);
   const fold = useCallback(() => {
     foldedOnceRef.current = true;
     setFolded(true);
-  }, []);
+    onFoldChange?.({ folded: true, latched: true });
+  }, [onFoldChange]);
   /**
    * ── THE CUT IS ON THE LINE GRID NOW, WHICH IS THE ROUTED HALF ─────────────
    * The paragraph at the `<ol>` ends „Both rows stay open on the snap", and
@@ -3724,6 +3790,29 @@ export function LessonPlayShell({
   const briefing = lesson.briefingBg ?? [];
   const [briefingOpen, setBriefingOpen] = useState(true);
   const closeBriefing = useCallback(() => setBriefingOpen(false), []);
+  /**
+   * THE BRIEFING'S FOLD, HELD WHERE IT CANNOT BE UNMOUNTED — the derivation,
+   * the two census beats and the row it closes are all in `BriefingCard`'s own
+   * header. Short version: this shell's mount condition takes the card away
+   * whenever a teach moment or a micro-quiz owns the glass, and React takes the
+   * card's `folded`/`foldedOnceRef` with it, so «Разбрах» used to put the
+   * five-step panel back over the windscreen mid-drive.
+   *
+   * It lives BESIDE `briefingOpen` rather than inside it because the two are
+   * different questions with different exits: `briefingOpen` is the ✕ («I have
+   * read this, be rid of it», one-way until `recallBriefing`), this is the ▾/▸
+   * («give me the road for a moment»). Folding one into the other would make
+   * the ✕ recoverable or the fold permanent, and both of those are rows this
+   * card has already been filed under.
+   *
+   * `useState` and not a ref, deliberately: the card is seeded from it at every
+   * mount, so a value React does not re-render on would be read stale on the
+   * remount this exists to fix.
+   */
+  const [briefingFold, setBriefingFold] = useState<{ folded: boolean; latched: boolean }>({
+    folded: false,
+    latched: false,
+  });
   /**
    * ── DOC 91 · §I5(b) AGAIN, ON THE ONE SURFACE THAT STILL HAD NO WAY BACK ──
    * (sc-lane-change:385c1b28, re-judged STILL on the w17 mobile re-drive.)
@@ -6690,6 +6779,16 @@ export function LessonPlayShell({
               // cannot drift from the grader's. `briefingStandsDown` carries the
               // frame and the ruling.
               speedKmh={snap.speedKmh}
+              // …AND THE MEMORY THE SPEED RULE CANNOT KEEP FOR ITSELF. This
+              // mount is behind `activeQuiz === null && teachQueue.length === 0`
+              // four lines up, so a teach moment unmounts the card and «Разбрах»
+              // builds a new one. Seeding both halves from the shell is what
+              // stops that remount handing the student an expanded panel over
+              // the road he is already driving on — `BriefingCard`'s header has
+              // the two census beats that photographed it.
+              foldedAtMount={briefingFold.folded}
+              foldLatchedAtMount={briefingFold.latched}
+              onFoldChange={setBriefingFold}
             />
           ) : null}
 

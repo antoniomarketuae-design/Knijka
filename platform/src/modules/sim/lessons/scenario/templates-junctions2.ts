@@ -333,6 +333,67 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
  * the briefing's line survives THOSE is not what §2 measured and not what this
  * row asked — but it is what a re-drive of the correct line would really be
  * testing, and the next lane to open this lesson should say so out loud.
+ *
+ * ── W21 (2026-08-31) · THE OPEN HALF, DRIVEN — AND THE ROW IS CONFIRMED ────
+ *
+ * Said out loud, because it is not the answer the three blocks above expect:
+ * THE MODEL LINE DOES NOT SURVIVE THE LIVE RUNG'S TRAFFIC. Every refutation
+ * on this row — sweep 161, w17, w18 — is true only at `vehicleCount: 0`, and
+ * that is a configuration no student has ever played.
+ *
+ * MEASURED through the production session (`compileScenario` →
+ * `createLessonSession` → `applyTick` every frame), driving the shadow's own
+ * geometry — approach at 20 км/ч, creep to (4.06, −19.5) at 9, hold 8 s on the
+ * brake, then the R = 18 quarter-arc left turn out to the west arm — and
+ * handing `recordScriptedDrive` the count the RUNG COMPILES TO instead of the
+ * recorder's default 0:
+ *
+ *   sc-junction-blind  L1 n=4 · L3 n=5 · L5 n=6  → convicted on 11 of 20 seeds
+ *   sc-junction-rhr    L1 n=4 · L3 n=5 · L5 n=8  → convicted on  6 of 20 (L5 7)
+ *   both of them with the ambient agents removed → convicted on  0 of 20
+ *
+ * The conviction is the finding's sentence verbatim — «Непропускане на пътно
+ * превозно средство с предимство», опасна, 10 наказателни точки, НЕИЗДЪРЖАН.
+ * On L1 seed 7 it fires at t = 31.12 s at (4.06, −16.4) doing 13.3 км/ч: 1.7 s
+ * after the car pulls away from a COMPLETED eight-second yield, against a
+ * conflict that does not exist on the same seed with the ambient bodies gone
+ * (an ambient car down the crossbar, or the staged one held up by one — the
+ * control cannot tell them apart and does not need to). Wait 4 s and the line
+ * passes; wait the 8 s the demo waits and it fails; wait 14 s or 20 s and it
+ * passes again. And the card then explains to a student who did wait that he
+ * did not — a false «правилното действие», which is requirement-zero's own
+ * crime rather than a scoring quibble.
+ *
+ * WHY IT IS NOT REPAIRED IN THIS FILE, measured rather than deferred:
+ *
+ *  · IT IS NOT THIS TEMPLATE'S DEFECT. `sc-junction-rhr` (templates-junctions
+ *    .ts, tj-rhr-v1, no occluding building anywhere) fails the same line the
+ *    same way at roughly half the rate. The corner building makes it worse; it
+ *    does not make it. A repair here closes one row and leaves the family up.
+ *  · THE TEMPLATE-LEVEL LEVER IS A TRAP, not merely insufficient. Authoring
+ *    `traffic: { vehicleCount: n }` on the spec would silence it — and
+ *    `traffic/__tests__/ambient-presence.test.ts` builds its SUBJECTS as „has
+ *    a family baseline AND `t.traffic === undefined`", so the key does not turn
+ *    that gate red, it DELETES this drill from it. That is the same opt-out
+ *    wave 8 unwound for `sc-junction-scan` (templates-junctions.ts, the B28
+ *    block), and it would trade the founder's dead-street row for this one.
+ *  · NOTHING IN THE SUITE COULD SEE IT. `recordScriptedDrive` defaults
+ *    `vehicleCount: 0` (traces/recorder.ts) and the junction recorders pass
+ *    none — `recordScJunction2Drive` takes `Pick<…, "onTick">` and nothing
+ *    else — so §2 above, the sc-ju2 trace gate and every committed ghost
+ *    certify the model line on an empty street. The product has never measured
+ *    its own model answer against the traffic it ships with the lesson.
+ *
+ * THE THREE ADDRESSES, for the lanes that own them. (1) `runtime/worldRuntime
+ * .ts` §4b: `rightConflictQuery` is PRIORITY_CONFLICT_RADIUS_M = 26 m of pure
+ * geometry — no occlusion, no conflicting-course test — so any ambient body on
+ * the crossbar is a priority conflict the moment the wheels turn. (2) `traffic
+ * /system.ts` + the orchestrator: hold ambient agents out of the graded node's
+ * conflict window while a STAGED encounter owns it, which is the only reading
+ * under which „пропусни идващия отдясно" and „the street is alive" are both
+ * true. (3) Whichever gate certifies a shadow: replay it at the rung's
+ * compiled count, not at 0 — otherwise the next round refutes this row for the
+ * fourth time on the same empty street, exactly as the last three did.
  */
 
 /**

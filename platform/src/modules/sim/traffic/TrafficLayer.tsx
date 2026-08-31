@@ -1192,6 +1192,67 @@ export function bubbleWhollyVisible(
   return true;
 }
 
+/**
+ * NDC y of the HIGHEST corner of the card's top edge — i.e. the topmost pixel
+ * the caption actually occupies. Returns −Infinity when the card is behind the
+ * eye (nothing of it is on the glass, so nothing of it is on the HUD either).
+ *
+ * WHY THIS EXISTS. The HUD gate below used to project the world point
+ * `(ox, cy + halfH, oz)` — the card's centre pushed up along WORLD +Y — and
+ * treat that as the card's top. The card is BILLBOARDED: its up axis is the
+ * CAMERA's up column, not the world's. `CameraRig` pitches the cockpit camera
+ * `COCKPIT_PITCH_BASE` = 4° down (plus `COCKPIT_PITCH_GAIN` nose-dive) and
+ * rolls it on every corner (`INERTIA_SCALE.roll`), so the world-up point is a
+ * corner the card does not have, and under roll the two real top corners are
+ * not even level with each other — hence the max of the pair.
+ *
+ * HOW BIG THE ERROR IS, stated honestly because the first draft of this note
+ * guessed and was wrong by an order of magnitude: on the shipped lens (hFOV
+ * 75.4° → vFOV 39.25° at the audited 2556 × 1179, eye 1.20 m, pitch 4°) the
+ * world-up point reads 0.004–0.010 NDC HIGH across 55 → 8 m — 2 to 6 device px
+ * of 1179, always in the direction that hides the caption. On its own that
+ * flips exactly one sampled case (3° of roll at 20 m). It is kept because this
+ * strip is a HARD DELETE and the margins on it are single-digit pixels — the
+ * miss at 20 m below is 2.3 cm of world height — so a gate that measures a
+ * point the card does not occupy is a gate nobody can reason about. It is not
+ * itself the repair; the drop budget under `KEEP IT OFF THE CONTROLS` is.
+ *
+ * `tmp` is caller-owned (the frame-loop zero-allocation law); the corner
+ * construction is `bubbleWhollyVisible`'s, so the two predicates can never
+ * disagree about where the card is.
+ */
+export function bubbleTopNdcY(
+  camera: BubbleCamera,
+  cx: number,
+  cy: number,
+  cz: number,
+  halfW: number,
+  halfH: number,
+  tmp: Vector3,
+): number {
+  const e = camera.matrixWorld.elements;
+  const rx = e[0] * halfW;
+  const ry = e[1] * halfW;
+  const rz = e[2] * halfW;
+  const ux = e[4] * halfH;
+  const uy = e[5] * halfH;
+  const uz = e[6] * halfH;
+  let top = -Infinity;
+  // Indexed, not `for … of [-1, 1]`: this runs up to three times a frame and an
+  // array literal in the loop head is an allocation the frame budget does not
+  // have. Same reason `bubbleWhollyVisible` walks its four corners by bit.
+  for (let k = 0; k < 2; k++) {
+    const sr = k === 0 ? -1 : 1;
+    tmp.set(cx + sr * rx + ux, cy + sr * ry + uy, cz + sr * rz + uz);
+    tmp.applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix);
+    // Behind the eye: the perspective divide has already flipped the sign, so a
+    // y read off it is not a screen position and must not be compared to one.
+    if (tmp.z <= -1 || tmp.z >= 1) continue;
+    if (tmp.y > top) top = tmp.y;
+  }
+  return top;
+}
+
 /** |cos| between the officer's facing and the direction to the camera above
  *  which the student is seeing him ANFAS (chest or back). Two thresholds =
  *  hysteresis, so the caption cannot flicker while he turns at a phase flip.
@@ -1218,6 +1279,24 @@ const BUBBLE_ANFAS_EXIT = 0.45;
  * the card fits in the VIEWPORT. This card fits the viewport perfectly. It is
  * whole, it is legible, and it is lying across a button. The two failures are
  * different questions and the earlier lane answered only one of them.
+ *
+ * THE FRACTION IS NOT WHAT WENT WRONG WITH IT (2026-08-31, sc-sig-controller-
+ * postures:ef0e821c). 0.13 is still the measurement above. What went wrong is
+ * that this strip is a HARD DELETE — a card that cannot clear it is not drawn
+ * at all — and nothing measured what that cost. Swept on the shipped lens at
+ * the audited phone aspect, the caption was suppressed from ≈21 m all the way
+ * in, i.e. straight through `SIGNAL_SETBACK_M` = 17.5 m, which is this drill's
+ * own stop line and the range at which it grades «разчети позата». The лекция
+ * asked the student to read a posture and showed him no explanation at the
+ * moment of the decision — a bare verdict, which doc 64 THEO-4 calls a defect
+ * in itself.
+ *
+ * The margins involved are single-digit pixels: at 20 m the drop budget missed
+ * clearing the strip by 2.3 cm of world height, ≈2 device px of 1179. That is
+ * why `bubbleTopNdcY` now measures the corners the renderer actually draws
+ * instead of a world-up point, and why the budget below counts the pointer tail
+ * it had been spending as if it were ink. Anything that changes how the card is
+ * placed or shaped must re-derive both.
  */
 export const HUD_TOP_RESERVED_FRAC = 0.13;
 
@@ -1269,6 +1348,20 @@ export const BUBBLE_LINE_PX = {
  */
 export const BUBBLE_MIN_FONT_SCALE = 0.62;
 
+/**
+ * Height of the speech pointer at the bottom of the card, px of the
+ * BUBBLE_TEX_H-tall canvas — the strip below the card BODY.
+ *
+ * Hoisted out of the painter (where it was a bare local `tail = 34`) because
+ * the frame loop now has to know it too: the tail is 80 px of the 1024 px width
+ * and empty canvas either side of that, so the bottom `BUBBLE_TAIL_PX / TEX_H`
+ * of the plane is not ink and may descend past the officer's shoulders without
+ * covering anything the student is being asked to read. See the drop budget
+ * under `KEEP IT OFF THE CONTROLS`. One source, both readers — the same rule
+ * `BUBBLE_LINE_PX` is exported under.
+ */
+export const BUBBLE_TAIL_PX = 34;
+
 function bubbleLine(
   g: CanvasRenderingContext2D,
   text: string,
@@ -1301,7 +1394,7 @@ export function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbl
   if (!g) return;
   const W = c.width;
   const H = c.height;
-  const tail = 34; // pointer height, reserved at the bottom
+  const tail = (BUBBLE_TAIL_PX * H) / BUBBLE_TEX_H; // pointer, reserved at the bottom
   const bodyH = H - tail;
   const r = 34;
   g.clearRect(0, 0, W, H);
@@ -2437,25 +2530,74 @@ export function TrafficLayer({
           // is the teaching and the pill is only a button. The budget it may
           // spend is bounded by the officer himself: his SHOULDERS are the
           // posture (`officerArmTarget` swings the arms about them), so the
-          // card's lower edge may descend to his shoulder line and no further.
-          // Past that the card would bury the very gesture it captions, and a
-          // hidden card is honest where a card over the arms is not.
+          // card's INK may descend to his shoulder line and no further. Past
+          // that the card would bury the very gesture it captions, and a hidden
+          // card is honest where a card over the arms is not.
+          //
+          // THE TAIL IS NOT INK (sc-sig-controller-postures:ef0e821c). This
+          // budget used to stop the PLANE's lower edge at the shoulder, and the
+          // plane's bottom `BUBBLE_TAIL_PX / BUBBLE_TEX_H` is the speech
+          // pointer: 80 px of 1024 wide, transparent either side of it, drawn
+          // to touch the head it captions. Spending it as if it were a line of
+          // text cost the drill the range it grades in. MEASURED on the shipped
+          // lens at the audited 2556 × 1179, officer dead ahead, pitch 4°: the
+          // strip needs 0.66 m of drop at 20 m, 0.73 m at 17.5 m and 0.79 m at
+          // 15 m, against a plane-edge budget of 0.640 m — misses of 2.3 cm,
+          // 9 cm and 16 cm, i.e. 2, 8 and 17 device px of 1179, each of which
+          // deleted the caption outright. Counting the tail adds 0.1196·s m
+          // (0.21 m at 20 m) and, swept, carries the card from 20 m down to
+          // ≈14 m at its FULL authored size — through `SIGNAL_SETBACK_M` =
+          // 17.5 m, the stop line at which «разчети позата» is graded. Nearer
+          // than that it is hidden again, which is where the лекция's own
+          // argument under `bubbleWhollyVisible` says a hidden card is honest.
+          // The result is checked on three officer offsets (0, +2, −4.06 m) and
+          // holds on all three; the caption's screen position barely moves with
+          // his lateral offset, so this is not one favourable geometry.
+          //
+          // What it does NOT fix, said plainly so the next reader does not
+          // think it did: under nose-dive the same sweep is still black at
+          // EVERY range. At pitch 6° (4° base + the ≈2° `COCKPIT_PITCH_GAIN`
+          // produces under a full-pedal stop — the very thing this drill
+          // teaches) the card needs 1.47 m of drop at 27 m and no budget
+          // reaches that. It cannot be solved here: the card is ≈23 % of the
+          // viewport's height and the strip claims 13 % of it, so a caption
+          // this size, mounted above a head, and a reserved top band are three
+          // constraints that do not all fit on a phone. Resolving it means
+          // moving one of them — the play shell's reserved area
+          // (`LessonPlayShell`) or the caption's medium — and that is an
+          // integrator decision, not a renderer one. It is NOT papered over
+          // with a close-range shrink: the arithmetic under `bubbleScale` shows
+          // that would put the body lines below their legibility floor, which
+          // is the other half of the very row this note is filed under.
           const shoulderY = PED_SHOULDER_Y * scratch.pedHeight[bubbleOwner];
-          const dropBudget = Math.max(0, headY + BUBBLE_GAP_M - shoulderY);
-          scratch.v3.set(ox, cy + halfH, oz).project(frame.camera);
-          let hudClear = scratch.v3.y <= HUD_TOP_NDC;
+          const tailM = (BUBBLE_TAIL_PX / BUBBLE_TEX_H) * BUBBLE_H_M * s;
+          const dropBudget = Math.max(0, headY + BUBBLE_GAP_M + tailM - shoulderY);
+          const halfW = (BUBBLE_W_M * s) / 2;
+          // The card's REAL top corner, not its centre pushed up along world
+          // +Y — see `bubbleTopNdcY`. The old approximation over-read the top
+          // by 0.069 NDC on the shipped 4°-down cockpit lens and deleted this
+          // caption from ≈21 m in, past the drill's own 17.5 m stop line.
+          let above = bubbleTopNdcY(frame.camera, ox, cy, oz, halfW, halfH, scratch.v3);
+          let hudClear = above <= HUD_TOP_NDC;
           if (!hudClear && dropBudget > 0) {
-            const above = scratch.v3.y;
             // One metre lower, to read the local NDC slope. The perspective
             // divide makes this non-linear, so the result is a first guess that
             // the re-projection below either accepts or refuses — never a
             // number anything is asserted on.
-            scratch.v3.set(ox, cy + halfH - 1, oz).project(frame.camera);
-            const perM = above - scratch.v3.y;
+            const lower = bubbleTopNdcY(
+              frame.camera,
+              ox,
+              cy - 1,
+              oz,
+              halfW,
+              halfH,
+              scratch.v3,
+            );
+            const perM = above - lower;
             if (perM > 1e-4) {
               cy -= Math.min(dropBudget, (above - HUD_TOP_NDC) / perM);
-              scratch.v3.set(ox, cy + halfH, oz).project(frame.camera);
-              hudClear = scratch.v3.y <= HUD_TOP_NDC;
+              above = bubbleTopNdcY(frame.camera, ox, cy, oz, halfW, halfH, scratch.v3);
+              hudClear = above <= HUD_TOP_NDC;
             }
           }
 
@@ -2471,7 +2613,7 @@ export function TrafficLayer({
             ox,
             cy,
             oz,
-            (BUBBLE_W_M * s) / 2,
+            halfW,
             halfH,
             scratch.bubbleWhole,
             scratch.v3,

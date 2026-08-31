@@ -206,6 +206,15 @@ const JUNCTION_CONTEXT_RADIUS_M = 80;
 // instead of 75 s later, needs `rules/types.ts` + `rules/engine.ts` + the
 // violation catalogue and is routed in the report accompanying this change.
 //
+// ── THAT REPLACEMENT LANDED, AND `wrongWay` IS NOW THE ONE EXCEPTION ────────
+// 2026-08-31. `OFF_CARRIAGEWAY` exists (catalog + Н38 basis + the detector in
+// `rules/engine.ts`, arming on the very `edgeId === null` this block ships), so
+// the premise of the paragraph above — „a wrong charge or NO charge" — is no
+// longer the choice on offer off the asphalt. `wrongWay` is carved out at the
+// `const wrongWay` line below, with the measurements; everything else in the
+// list stands exactly as written, because for the others the paragraph is still
+// true. Read the two together: the ruling did not reverse, its premise expired.
+//
 // COST, measured on this box:
 //   resolve  105 shipped districts in 320 ms total — median 0.4 ms, every
 //            scenario micro-map ≤ 15 ms, and only the two OSM districts are
@@ -1958,8 +1967,56 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
       const edgeRt = fix.edgeIdx >= 0 ? index.edgeRt(fix.edgeIdx) : null;
       const maxSpeedKmh = edgeRt ? edgeRt.edge.maxspeed : defaultLimit;
+      // WRONG WAY IS A CLAIM ABOUT A ROAD, SO IT STANDS DOWN WHERE THE WORLD
+      // DRAWS NO ROAD (sc-ac-wind-truck-pass:71a28c54 — „the detector and the
+      // drawn world disagree everywhere it fires"). The one channel carved out
+      // of the surface-consult header's „WHAT DELIBERATELY DOES NOT CHANGE",
+      // and the carve-out is narrow on purpose: `!offCarriageway` is FALSE
+      // wherever `surfaceAt` reports the car within OFF_CARRIAGEWAY_M of drawn
+      // asphalt, so nothing on a carriageway can be acquitted by this line.
+      //
+      // WHAT THE TICK USED TO SAY IN ONE BREATH. `edgeId` above is already
+      // `null` past the kerb — the contract's own words, „this car is nowhere" —
+      // and this expression published `wrongWay: true` on the SAME tick, off the
+      // same lane fix, because the fix survives the kerb out to the locator's
+      // 30 m lock radius. MEASURED on `mw-v1` (the row's own wind lesson), car
+      // heading due north, i.e. the lawful northbound direction:
+      //   · x = −15,5 … −17,0 — the 6 m MEDIAN between the two carriageways,
+      //     `under: "verge"`, 1,18–2,68 m past both kerbs — `edgeId: null` and
+      //     `wrongWay: true` together, because the nearest centreline happens to
+      //     be the SOUTHBOUND one.
+      //   · the crosswind trajectory itself (spawn `mw-spawn-approach`, blown
+      //     left at 0,6 m/s while driving 60 км/ч): x = −43,6 → −60,5, twenty-
+      //     eight seconds and up to 17,9 m past the far kerb, `edgeId: null` and
+      //     `wrongWay: true` on every frame until the lock falls away 30 m out.
+      // THROUGH THE REAL REDUCER, a car driving north at 50 км/ч along x = −46 —
+      // 3,44 m past the southbound kerb, never on any asphalt at any instant of
+      // the run — was billed WRONG_WAY at t = 1,6 s: a 10-point ОПАСНА, an
+      // instant НЕИЗДЪРЖАН on a 9-point sheet, for driving on grass. THEO-4
+      // (doc 64) is what makes that a defect rather than a scoring nit: the card
+      // explains «Движеше се срещу посоката на ПЛАТНОТО на автомагистрала» to a
+      // seventeen-year-old who can see there is no платно under him, and an
+      // explanation the student can refute out of the windscreen teaches him to
+      // stop reading them.
+      //
+      // AND THE LAW NAMES THE SAME BOUNDARY (retrieved, not recalled — ADR-002,
+      // `content/law/acts/zdvp.json`, the same two quotations `catalog.ts`
+      // already carries for OFF_CARRIAGEWAY). Н38 прил. № 5, т. 10, б. „в" bills
+      // the driver who „навлезе срещу движението на пътен възел или ПЪТ С
+      // ЕДНОПОСОЧНО ДВИЖЕНИЕ" — an entry into a road; § 6, т. 4 defines
+      // „граница на платното за движение" as the line „която отделя платното за
+      // движение от другите конструктивни елементи на пътното платно - банкет,
+      // тротоар, лента за принудително спиране и други". Past that line there is
+      // no платно, so there is no посока на платното to breach.
+      //
+      // NOT AN AMNESTY, because the act is charged — by the code written for it.
+      // The same verge run bills OFF_CARRIAGEWAY at t = 2,2 s, and the same
+      // crosswind drift still bills WRONG_WAY at t = 51,2 s, x = −30,8,
+      // `under: "carriageway"` — on the OPPOSING asphalt, which is the drive
+      // this conviction exists for and the one frame of it that shows a road.
+      // What this line removes is only the bill the runtime itself contradicts.
       const wrongWay =
-        edgeRt !== null && edgeRt.edge.oneway
+        edgeRt !== null && edgeRt.edge.oneway && !offCarriageway
           ? isWrongWay(true, index.tangentAt(fix.edgeIdx, fix.sM), v.headingDeg)
           : false;
 

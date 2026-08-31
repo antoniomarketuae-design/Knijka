@@ -313,6 +313,17 @@ function buildBoxTruckRig(): ModelRig {
 // each slab's own body (`CREST_UP` in buildSprayAlphaTexture carries the
 // before/after numbers). Nothing else in this section moved: same five quads,
 // same widths, same spacing, same one draw call.
+//
+// W21 — AND THE THIRD PROPERTY WAS THE GEOMETRY. W20 fixed how MUCH alpha the
+// curtain carries and left WHERE it stands alone, so the fixed density was
+// spent inside a box 2.7 m wide and 2.2 m tall standing behind a body 2.4 m
+// wide and 3.1 m tall: the plume never crossed the emitter's own outline, and
+// at the 59 m this drill pins the student at it read as a white panel bolted
+// to the trailer rather than as water. The `spraySlabShape` fan now stands
+// proud of the body sideways and reaches the roofline instead of the waist at
+// the k the drill actually reaches; the four W20 numbers quoted above are
+// superseded by the tables in that function's docblock, because they were
+// measured on the old fan. Still five quads, still one draw call.
 // ---------------------------------------------------------------------------
 
 /** Profiles that throw a pelena: the tall, heavy, many-wheeled ones the лекция
@@ -391,17 +402,108 @@ export function sprayActiveSlabs(density: number): number {
  *
  * The plume LIFTS and FANS as it drifts back — that is what makes it read as
  * thrown water rather than a poster: slab 0 is a low sheet just off the rear
- * tyres, slab 4 is as tall as the cargo box (3.1 m) and more than twice the
- * body's width. `backM` is measured behind `rig.rearZ`, so a longer rig pushes
- * its own curtain further back automatically.
+ * tyres, slab 4 stands taller than the cargo box and better than three times
+ * the body's width. `backM` is measured behind `rig.rearZ`, so a longer rig
+ * pushes its own curtain further back automatically.
+ *
+ * WIDTH SCALES WITH THE RIG, HEIGHT DOES NOT, and that split is a claim about
+ * water rather than a convenience: the sheet is thrown by the TYRES, so how
+ * wide it starts is the emitter's own track (`halfWidthM`, the only rig
+ * measurement this function is handed); how HIGH it climbs is set by the road
+ * film and the speed, which are properties of the storm and not of the van.
+ * The measured kit also refuses width as a stand-in for height: the three
+ * spraying profiles run 2.40 × 3.10 (truck), 2.10 × 2.50 (emergency) and
+ * 2.30 × 2.29 (kargo_v, read off the shipped GLB's own POSITION accessors),
+ * i.e. width:height ratios of 1.29, 1.19 and 1.00. A width-scaled fan would
+ * track none of that — it would hand the van, the SHORTEST of the three, very
+ * nearly the tallest curtain, for no reason in the world or in the weather.
+ *
+ * W21 — WHY THE CURTAIN WAS RENDERING AND `:ebaacf94` STILL STOOD. Measured on
+ * `.audit-frames/w21/frames/sc-ac-truck-spray__pc-right/04-t050s.png`, the
+ * frame the verifier re-cited, read out pixel by pixel down x = 806 (the
+ * truck's centre-line at its pinned 59 m): the plume IS on the glass — the
+ * trailer's flat 84-luminance rear face ramps smoothly to the 177 of the rain
+ * haze between y = 382 and y = 360 — but that ramp is 2.7 m wide and 2.2 m
+ * tall (down to the frame's own noise floor, which sits under the 0.10 the
+ * envelope table below uses) behind a body 2.4 m wide and 3.1 m tall. It did
+ * not meaningfully cross the emitter's own outline at any point, at any k the
+ * drill can reach. So from the cockpit it did not read as water at all: the
+ * verifier wrote it down as „a crisp grey silhouette with a WHITE LOWER PANEL"
+ * and concluded there was no plume. He was describing the render correctly. A
+ * curtain that never leaves the silhouette of the thing throwing it is a paint
+ * job, not пелена.
+ *
+ * AND „IT WILL LOOK RIGHT WHEN HE CLOSES IN" IS NOT AVAILABLE HERE, because
+ * the drill pins the gap and then GRADES him for holding it: ACTS_SPRAY_TRUCK
+ * paces at `paceAheadM: 64` (≈59.9 m bumper) on `cruiseSpeedMps: 18`, and the
+ * second success gate is „стигни края на отсечката, БЕЗ да си влизал в
+ * пелената". At rain 1.0 that is `sprayDensity` 0.645 → `sprayActiveSlabs` 3,
+ * for the whole drive. Slab 2 IS the crown of the curtain this lesson is
+ * about, so slab 2 is the slab that has to do the work.
+ *
+ * MEASURED, by compounding this function through the alphaMap's green channel
+ * — the same rasterise-and-compound rig that produced `CREST_UP`'s numbers —
+ * on the centre-line of a TRUCK_DIMENSIONS emitter at k = 3, i.e. at exactly
+ * the gap the student is graded for keeping:
+ *
+ *          0.95 m (lamps)  1.50 m  2.00 m (road beyond)  2.60 m  3.10 m (roof)
+ *   was        0.603        0.325        0.037            0.000     0.000
+ *   now        0.609        0.583        0.440            0.194     0.031
+ *
+ * and the VISIBLE envelope (where the compounded curtain still carries 0.10,
+ * against a 2.40 × 3.10 body):
+ *
+ *                 crown          half-width at 1.20 m
+ *   k = 1 (haze)  1.04 → 1.57 m   0.00 → 1.04 m
+ *   k = 3 (drill) 1.86 → 2.86 m   1.41 → 1.92 m
+ *   k = 5 (in it) 2.69 → 4.16 m   2.00 → 2.68 m
+ *
+ * The tail lamps were already being taken; nothing there needed touching. Two
+ * things moved. 2.00 m — the height a 1.2 m cockpit eye reads the road BEYOND
+ * the truck out at, which is the whole of briefing 4 („нито пътя пред него") —
+ * went from 4 % to 44 %. And at 1.20 m the curtain now stands 0.72 m PROUD of
+ * a body whose half-width is 1.20 m, where it used to stand 0.21 m proud: on
+ * the cited frame the trailer is 25 px across, so that is an overhang of ~7 px
+ * per side instead of ~2 — the difference between a cloud and a painted panel,
+ * and the whole of what the verifier was reacting to.
+ *
+ * WHY THE CROWN DELIBERATELY STOPS UNDER THE ROOF (2.86 m against 3.10 m) —
+ * i.e. why this did not simply keep growing until it towered. Above the
+ * roofline the background is the rain haze, and the curtain IS rain haze: on
+ * the cited frame the sky reads 173 and the plume reads 177, so height spent
+ * above the trailer buys nothing a student can see while costing the one
+ * invariant this section's header sets. Everything below the roofline is read
+ * against the dark trailer (84) and the wet tarmac (110), which is where a
+ * white curtain actually has contrast — so the fan is spent there and
+ * sideways, over the markings. The truck is still never lost: the roof reads
+ * 0.031 at k = 3, and 0.468 at k = 5 — inside SPRAY_NEAR_M, where he has
+ * already failed the „без да си влизал в пелената" gate and briefing 9 is
+ * being demonstrated on him — against 0.609 and 0.776 at the lamps.
+ *
+ * KNOWN AND NOT FIXED HERE, so the next lane does not re-derive it: the
+ * curtain is an UNLIT `MeshBasicMaterial` at 0xdfe6ea in a scene the sun never
+ * reaches, so it renders brighter than the overcast sky it is supposed to be
+ * made of (measured on the same frame: plume core 193, sky 173, the truck's
+ * own off-white 0xd7d5cf cargo box only 84). That is why what does show reads
+ * as a lit panel rather than as mist. Re-toning it is a `buildSprayCurtain`
+ * change and it cannot be settled from the numbers — it has to be looked at on
+ * a fresh sweep frame (doc 66 R0), which is a round this lane does not have.
  */
 export function spraySlabShape(
   i: number,
   halfWidthM: number,
 ): { backM: number; widthM: number; heightM: number; centerY: number } {
   const backM = 0.9 + i * 1.35;
-  const widthM = halfWidthM * 2 * (1.15 + 0.3 * i);
-  const topM = 1.25 + 0.5 * i;
+  // 1.45 → 3.25 track widths: on the truck slab 0 now stands 0.54 m proud of
+  // the body on each side (it used to start 0.18 m proud — inside the rig's
+  // own anti-aliasing at 59 m) and slab 4 reaches 2.70 m proud, most of the
+  // neighbouring lane.
+  const widthM = halfWidthM * 2 * (1.45 + 0.45 * i);
+  // 1.90 → 5.02 m of quad, which the alphaMap's crest fade turns into a
+  // VISIBLE crown of 1.57 / 2.86 / 4.16 m at k = 1 / 3 / 5. The shipped fan
+  // (1.25 → 3.25) put the k = 3 crown at 1.86 m — knee-to-chest on a 3.1 m
+  // trailer, which is why it could only ever read as part of the truck.
+  const topM = 1.90 + 0.78 * i;
   const bottomM = 0.05;
   return {
     backM,
@@ -426,10 +528,18 @@ function buildSprayAlphaTexture(): DataTexture {
    *
    * THE CURTAIN'S VERTICAL FALLOFF IS ALREADY CARRIED BY THE SLAB STAGGER.
    * `spraySlabShape` gives every slab the same bottom (0.05 m) and a top that
-   * grows 1.25 → 3.25 m, so how much curtain stands at a given height IS how
-   * many slabs still reach it: five at the tail lamps, two at 2.6 m, one at the
-   * cargo box's top. That is the whole mechanism the block comment above this
-   * section describes.
+   * grows 1.90 → 5.02 m, so how much curtain stands at a given height IS how
+   * many slabs still reach it: five at the tail lamps, four at 2.6 m, three at
+   * the cargo box's top. That is the whole mechanism the block comment above
+   * this section describes.
+   *
+   * W21 RE-STATED THAT FAN (it was 1.25 → 3.25 when the numbers below were
+   * taken), so every k = 5 figure in this docblock is a w20 reading on the w20
+   * geometry: correct as the record of WHY the ramp holds its crest, superseded
+   * as a description of what the curtain now measures. The live tables are in
+   * `spraySlabShape`. Nothing about CREST_UP itself changed, and none of the
+   * reasoning below depends on the fan's absolute heights — only on there
+   * being a stagger to carry the falloff.
    *
    * The shipped ramp was `rise = (1 − up)^1.6` — a SECOND falloff, applied to
    * each slab on top of the stagger. Measured on the shipped constants at k = 5

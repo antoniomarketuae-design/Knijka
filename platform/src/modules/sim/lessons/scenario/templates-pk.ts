@@ -179,51 +179,95 @@ export const SC_PK_SMOOTH_STOP: ScenarioSpec = {
 // ---------------------------------------------------------------------------
 
 /*
- * SWEEP 161 — THE FINDING IS REFUTED, AND THE WALLS ABOVE ARE A LIE. Both
- * halves are measured in `__tests__/pk-junctions2-sweep161-truth.test.ts`.
+ * THE „CONVICTED RIGHT DRIVE" ROW — REFUTED TWICE, ON DIFFERENT GROUND EACH
+ * TIME. §1/§2 are measured in `__tests__/pk-junctions2-sweep161-truth.test.ts`;
+ * §3 is read off the w21 sweep's own instruments, and it exists because half of
+ * §1's original reasoning had expired by the time the row came back.
  *
  * 1. THE FINDING (BROKEN, critical): „the RIGHT drive is convicted — 20
  *    наказателни точки, НЕИЗДЪРЖАН, Опасни грешки 2. A student who drives the
  *    model line is failed for a crash the lesson itself walked him into"
  *    (`sweep161/sc-pk-driveway/pc-right/08-debrief.png`).
  *
- *    That drive was never the model line. Task 2's own chip reads «Премести
- *    лоста на R и паркирай на заден ход» (`04-t056s.png`) and the cluster reads
- *    D in every frame; `tools/mobile/lesson-audit.mjs`'s `right` mode is a
- *    forward-only control law whose entire keyboard vocabulary is KeyW / KeyS /
- *    Escape — it cannot select reverse. §1a drives the committed shadow through
- *    the production session and gets zero violations, both tasks ticked and
- *    ИЗДЪРЖАН on all five rungs; the same pipeline still convicts both mistake
- *    demos with COLLISION. The harness's law, re-authored in the recorder's
- *    vocabulary, earns task 1 and leaves `sc-pkd-park` undone — which is
- *    exactly the right column the sweep photographed.
+ *    That drive was never the model line. §1a drives the committed shadow
+ *    through the production session and gets zero violations, both tasks ticked
+ *    and ИЗДЪРЖАН on all five rungs; the same pipeline still convicts both
+ *    mistake demos with COLLISION. A control law that cannot aim the reverse
+ *    swing earns task 1 and leaves `sc-pkd-park` undone — which is exactly the
+ *    right column the sweep photographed.
  *
- * 2. WHAT WAS UNDERNEATH IT, AND IS REAL. This drill promises walls in six
- *    places — the objective («влез на заден ход МЕЖДУ СТЕНИТЕ … без да ги
+ *    ONE SENTENCE OF THIS PARAGRAPH IS RETIRED, and it is named here rather
+ *    than quietly deleted because it is the sentence a re-reader would lean on.
+ *    Sweep 161 refuted the row partly on „`tools/mobile/lesson-audit.mjs`'s
+ *    `right` mode is a forward-only control law whose entire keyboard
+ *    vocabulary is KeyW / KeyS / Escape — it cannot select reverse". That was
+ *    true of the harness of the day and is FALSE of the harness in w21, which
+ *    demands reverse off the objective text, arms R on the first deliberate
+ *    press, reads the cluster D → R and drives 89 (pc) / 105 (mobile) ticks in
+ *    it. An instrument gap is not a permanent property of an instrument, and a
+ *    refutation that rests on one has a shelf life. §3 is the ground that does
+ *    not.
+ *
+ * 2. WHAT WAS UNDERNEATH IT, AND WAS REAL — SETTLED wave 13, kept here because
+ *    it is why this drill has colliders at all. This drill promises walls in
+ *    six places — the objective («влез на заден ход МЕЖДУ СТЕНИТЕ … без да ги
  *    докоснеш»), instruction 4, instruction 1's night clause, both mistake
  *    debriefs, the teach card — and the header line directly above calls them
- *    „the collision hazard". THE STUDENT'S WORLD HAS NONE OF THEM. The north
- *    fence and the back wall live only in `traces/scPkDriveway.ts
- *    drivewayObstacles()`, which is handed to `recordScriptedDrive` and
- *    therefore grades the two committed DEMO recordings and nothing else.
- *    `scene/lessonWorldRecipe.ts` builds the live scene from the district plus
- *    `scenarioSceneryProps.ts heldSceneryFor`, and this template is in neither:
- *    HELD_SCENERY has no `sc-pk-driveway` key, and `pk-drive-v1.json` holds one
- *    body, `pkd-b-garage`, 1.5 m east of the bay and (per
- *    `scene/__tests__/lesson-world-bay-clearance.test.ts`) with no solid
- *    collider anyway. So the drill measures „at rest in the rect, aligned, via
- *    reverse" and TELLS the student it measured „without touching the walls" —
- *    a green tick for the one skill a reverse-into-a-gap exists to teach.
+ *    „the collision hazard". THE STUDENT'S WORLD HAD NONE OF THEM: the north
+ *    fence and the back wall lived only in `traces/scPkDriveway.ts
+ *    drivewayObstacles()`, which `recordScriptedDrive` arms for the two
+ *    committed DEMO recordings and for nothing a student ever drove. So the
+ *    drill measured „at rest in the rect, aligned, via reverse" and TOLD the
+ *    student it had measured „without touching the walls" — a green tick for
+ *    the one skill a reverse-into-a-gap exists to teach.
  *
- *    NOT FIXABLE FROM HERE, and deliberately not papered over by deleting the
- *    promise: §1b fails if the copy stops billing the walls, so the debt cannot
- *    be settled by making the lesson quieter. `sc-park-wall` is the precedent
- *    done right (a `kind: "wall"` HELD_SCENERY body with a real cuboid collider,
- *    paired value-for-value with its headless twin); this template has the twin
- *    and not the body. The two entries owed to
- *    `scene/scenarioSceneryProps.ts` are pinned by value in §1c, which is
- *    written as a QUARANTINE — it FAILS the day the bodies land, so the
- *    exemption must be deleted rather than silently inherited.
+ *    `scene/scenarioSceneryProps.ts` now carries both rects, transcribed from
+ *    the §1c pin rather than re-derived, on the `sc-park-wall` precedent (a
+ *    `kind: "wall"` body with a real cuboid collider, paired value-for-value
+ *    with its headless twin). §1c was written as a QUARANTINE that would fail
+ *    the day the bodies landed; they landed, and it was inverted into a
+ *    regression pin instead of deleted — an absence proved once is worth
+ *    nothing if the presence is never checked again.
+ *
+ * 3. W21 CAME BACK WITH THE SAME HEADLINE AND A HARNESS THAT CAN REVERSE —
+ *    „still convicted on both platforms, both legs genuinely steered"
+ *    (`.audit-frames/w21/frames/sc-pk-driveway__pc-right/08-debrief-p1.png`;
+ *    the charge is now ONE опасна грешка, 10 т., «Удар в неподвижно
+ *    препятствие»). Steering and a gear lever are not the model line, and this
+ *    time the sweep's own instruments say so, in its own `_audit-status.json`:
+ *
+ *      · the ribbon the loop steers by is a road CENTRELINE, not a lane
+ *        (`guidance.caveat`: „NO LANE-POSITION FINDING … MAY BE DRAWN FROM
+ *        THIS DRIVE"), and this drill is graded on a bay 8 m off that line;
+ *      · `guidance.tracking.verdict` reads «intermittent» on pc (median 11.3°,
+ *        2.1 s of 5.8 s moving past the 12° off-line threshold) and «wandered»
+ *        on mobile (median 20.4°, worst 43.0°) — whose own verdictWhy is „no
+ *        finding about where the car ended up may be attributed to the product
+ *        without accounting for that";
+ *      · the odometer read 109.2 m on pc and 194 m on mobile against a 44 m
+ *        authored route — 248 % and 441 %. The model line stops at (3.87,
+ *        51.3) and reverses ~7 m; these drives kept going;
+ *      · in REVERSE they touched 14 (pc) and 22 (mobile) км/ч, on a task whose
+ *        instruction 4 says «пешеходна скорост»;
+ *      · and the product said so on the glass, in Bulgarian, BEFORE the impact:
+ *        «Колата е извън пътя — върни се на платното, за да продължиш» from
+ *        t = 54 s (pc) / t ≈ 67 s (mobile), then «Колата е притисната след
+ *        удара». The lesson did not walk anyone into a crash; it spent the last
+ *        minute of both drives asking for the carriageway back.
+ *
+ *    AND THE POSE WITNESS DOES NOT COVER THE IMPACT. `guidance.witness` is
+ *    `window.__camProbe`, sampled only while the forward guidance loop runs —
+ *    13 samples, last at t = 12 s. The debrief timestamps the collision at
+ *    1:48 of a 118 s drive. Ninety-five seconds of that drive carry no position
+ *    evidence of any kind, so no claim about WHERE the car was when it hit
+ *    something can be sourced from this run at all.
+ *
+ *    WHAT IS STILL OWED, and it is an instrument debt, not a product one: the
+ *    `right` lane can now select R but has no bay-relative aim in reverse — the
+ *    ribbon is read off the windscreen and means nothing once the car is going
+ *    backwards. Until it has one, `sc-pkd-park` is UNJUDGEABLE from a sweep,
+ *    and „Задача 2 never ticks" is a fact about the harness. The drivable
+ *    proof that it ticks is §1a, on all five rungs.
  */
 
 /** The driveway bay (content/world/pk-drive-v1.json east kerb at y = 45) —

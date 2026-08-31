@@ -111,6 +111,77 @@
  * before the impact report `errDeg 31.22` — the loop saw the ribbon 31° to the
  * right and did not follow it. Until tracking is settled, „collision" and
  * „drove off the map" verdicts on turn-based lessons are INSTRUMENT OUTPUT.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * WAVE 12, 2026-08-31 — THE SAME TWO ROWS BACK, AND WHAT IS LEFT OF EACH AFTER
+ * ITS OWN JUDGE'S CORRECTION. Filed here for the reason the block above gives:
+ * a refutation kept anywhere else leaves this file reading as never-opened,
+ * and both rows arrived again citing FRAMES rather than code.
+ *
+ * sc-roundabout-entry:4ab693eb — THE ESCALATION IS WITHDRAWN BY ITS OWN JUDGE.
+ * Round 10 quoted `w10-4/…/pc-right/04-t080s.png` as „the ego is already ON the
+ * grass … with the teal guidance ribbon running forward ACROSS the island".
+ * Re-zoomed, that frame shows the ego on ASPHALT, the ribbon lying on the
+ * carriageway and TERMINATING at the grass edge. So „the product routes the
+ * careful student onto the island" is off the table, and the judge says it in
+ * as many words — the ego's departure from the road cannot be attributed to the
+ * product from that sweep, and `pc-right` is graded `tracking: intermittent`.
+ * That agrees with the positional proof above; it does not replace it.
+ *
+ * Re-verified at THIS commit rather than trusted: `ISLAND_WALL_RISE_M` is still
+ * 0.45 (0.57 m of face off the asphalt), the wall's vertices still go into the
+ * `sidewalks` accumulator that `colliders.sidewalks` is built from, and
+ * `builders/__tests__/island-wall-is-a-collider.test.ts` +
+ * `world/__tests__/roundabout-island.test.ts` are 33 green. Nothing in this
+ * module moved and nothing here is the defect.
+ *
+ * WHAT SURVIVES THE ROW IS NOT GEOMETRY AND IS NOT IN THIS FILE — it is the six
+ * seconds the judge describes: „ОПАСНА ГРЕШКА −10 ИЗПИТНИ Т. · Удар в
+ * неподвижно препятствие" is billed while the coaching feed goes on praising
+ * the entry and instructing the exit signal, with no carriageway in view. A −10
+ * the instruction card talks over is a bare verdict wearing a conversation,
+ * i.e. a THEO-4 defect, and its address is the coaching feed: `lessons/
+ * advisor.ts` and the „ИНСТРУКЦИИ" card in `components/sim/lesson-ui/
+ * LessonPlayShell.tsx`. Not the HUD queue — `hud/overlayQueue.ts` already ranks
+ * `violation` 80 over `hint` 60, so the panel that stayed serene is the one
+ * OUTSIDE that queue. Routed, not touched.
+ *
+ * sc-rb-ped-exit:841c6252 — „the roundabout itself is a bare grass mound with
+ * shrubs and buildings behind it". The description is ACCURATE and it is
+ * `buildIsland`'s own output, so for once the address is right; the word that
+ * is wrong is „bare". Measured on rb-ped-v1 (island 13.94 m, `rimInner` 12.84,
+ * `crownRiseM` 1.25): 0.57 m of planter wall, a crown reaching 1.82 m above the
+ * asphalt, and five 1.9 m shrubs on a 7.06 m ring topping out at 3.0 m. From
+ * the give-way line at r ≈ 25 m with the eye at 1.2 m that is ~6° of
+ * windscreen — which is exactly what `.audit-frames/w21/frames/
+ * sc-rb-ped-exit__mobile-right/04-t029s.png` photographs. The mound is not
+ * missing; it IS the measurement `crownRiseM` exists for, and softening or
+ * decorating it would be the „photographs well from a camera the student never
+ * sits in" trap that docstring was written to stop.
+ *
+ * WHAT THE ISLAND IS ACTUALLY MISSING IS A SIGN, AND IT CANNOT BE DRAWN HERE.
+ * A Bulgarian central island carries Г9 „Преминаване отдясно на знака" facing
+ * each entry: `content/signs/signs.json`'s own `sign-g9` states „обикновено е
+ * поставен на остров, ремонтен участък или препятствие по средата на пътя",
+ * cited to `Наредба № РД-02-21-1/23.11.2023, знак Г9` — retrieved from the
+ * content bank, never free-recalled (ADR-002). That plate is what makes an
+ * island read as a ROUNDABOUT island rather than a lawn, and it teaches a sign
+ * already in the exam bank at the one geometry it exists for. This module emits
+ * MESHES; signs are placed by `builders/props.ts` from a `SignKind`. The chain,
+ * written down so the next round routes it once instead of re-photographing it:
+ *   – `world/types.ts` `SignKind` — add `"passRight"` (Г9);
+ *   – `components/signFaces.ts` `SignFaceArt` — add `"g9"`
+ *     (`content/signs/svg/g9.svg` already ships);
+ *   – `components/WorldProps.tsx` — `passRight: "sign_roundabout"` in
+ *     `SIGN_GLB` (Г2/Г3 already ride that round blue plate) and
+ *     `passRight: { art: "g9" }` in `SIGN_FACE_OVERRIDE`;
+ *   – `builders/props.ts` — one plate per mouth at `islandRadiusM` on the
+ *     mouth bearing, yawed to face the approach. The poses come from this
+ *     module's exported `RoundaboutRing.mouths` + `islandRadiusM`, which
+ *     `buildWorldGeometry.ts` already holds when it calls `buildProps`.
+ * Exporting a pose helper from here ahead of that consumer would be a function
+ * nothing calls — which is not a repair, it is a comment that type-checks. So
+ * nothing is exported and nothing is drawn until props.ts can place it.
  * ───────────────────────────────────────────────────────────────────────────
  */
 
