@@ -219,6 +219,16 @@ export interface ScenarioTraffic {
   vehicleCount?: number;
   pedestrianCount?: number;
   anchorRadiusM?: number;
+  /**
+   * Stations along the template's OWN route, past the spawn — for a scenario
+   * that travels far enough that „near the spawn" stops meaning „near the
+   * driver". Compiles straight through to `LessonSpec.traffic.anchorPath`,
+   * which is where the reasoning and the measurement live.
+   *
+   * It is a PLACE list, not a difficulty dial, so the level ladder leaves it
+   * alone: a corridor is the same corridor at L1 and at L5.
+   */
+  anchorPath?: readonly { x: number; y: number }[];
 }
 
 // ---------------------------------------------------------------------------

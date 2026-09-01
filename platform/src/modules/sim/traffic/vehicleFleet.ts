@@ -160,6 +160,10 @@ export const TRAIN_MODEL_INDEX = FLEET.length + 5;
  *  carriageway). Mirrors CYCLIST_MODEL_INDEX: no InstancedMesh unless an
  *  "animal"-profile actor exists — same cost discipline as the tram/cyclist. */
 export const ANIMAL_MODEL_INDEX = FLEET.length + 6;
+/** Model slot of the procedural CITY BUS rig (doc 72 §15 VU-11 „Автобусът
+ *  потегля от спирката", ЗДвП чл. 67) — after the animal. Same cost
+ *  discipline: no InstancedMesh unless a "bus"-profile actor exists. */
+export const BUS_MODEL_INDEX = FLEET.length + 7;
 const VAN_MODEL_INDEX = FLEET.indexOf("kargo_v");
 
 /** Box-truck body plan, meters (fictional): ~7.5 × 2.4 × 3.1 — longer, wider
@@ -181,6 +185,7 @@ export const TRUCK_DIMENSIONS = {
  */
 export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">): number {
   if (v.profile === "truck") return TRUCK_MODEL_INDEX;
+  if (v.profile === "bus") return BUS_MODEL_INDEX;
   if (v.profile === "emergency") return EMERGENCY_MODEL_INDEX;
   if (v.profile === "tram") return TRAM_MODEL_INDEX;
   if (v.profile === "train") return TRAIN_MODEL_INDEX;
@@ -193,6 +198,7 @@ export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">):
 
 /** Mesh-name base for a model slot (procedural slots are past FLEET). */
 function modelName(m: number): string {
+  if (m === BUS_MODEL_INDEX) return "bus";
   if (m === EMERGENCY_MODEL_INDEX) return "emergency";
   if (m === TRAM_MODEL_INDEX) return "tram";
   if (m === TRAIN_MODEL_INDEX) return "train";
@@ -255,6 +261,176 @@ function buildBoxTruckRig(): ModelRig {
       new Vector3(-track, wheelRadiusM, frontAxleZ), // FR
       new Vector3(track, wheelRadiusM, rearAxleZ), // RL
       new Vector3(-track, wheelRadiusM, rearAxleZ), // RR
+    ],
+    wheelRadius: wheelRadiusM,
+    rearZ: -halfLength,
+    frontZ: halfLength,
+    halfWidth: widthM / 2,
+    halfLength,
+    lampY: 0.95,
+    headY: 0.85,
+  };
+}
+
+/**
+ * City-bus body plan, meters (fictional livery, ADR-001 — no real operator's
+ * insignia, no route number that names a real line).
+ *
+ * EVERY NUMBER IS THE LESSON'S, not a taste. `sc-merge-bus-pullout` teaches
+ * ЗДвП чл. 67 out loud in two places and both are dimensions:
+ *   · instruction 5 / the forcing-past mistake card — «Автобусът е дълъг 12
+ *     метра и завива с целия си корпус: докато носът му е още в спирката,
+ *     задницата му вече е в твоята лента» → lengthM 12;
+ *   · the same card — «Шофьорът му седи на два метра над земята и има мъртва
+ *     зона точно там, откъдето ти реши да се промъкнеш» → the cab glazing is
+ *     built around a 2.0 m eye line (`driverEyeM`), so the rig the student
+ *     looks at is the rig the sentence describes.
+ * Until this rig existed the drill borrowed TRUCK_DIMENSIONS — a 7.5 m
+ * WINDOWLESS cargo box. That is not a smaller bus, it is a different vehicle
+ * class: чл. 67 is owed to a ППС от редовна линия and to nothing else, so a
+ * student who reads „камион" off the body has been shown a road on which the
+ * duty he is being graded against does not exist.
+ */
+export const BUS_DIMENSIONS = {
+  lengthM: 12,
+  widthM: 2.55,
+  bodyHeightM: 3.05,
+  /** Underfloor clearance — the skirt band below the passenger saloon. */
+  skirtM: 0.42,
+  wheelRadiusM: 0.5,
+  /** Driver's eye line above the tarmac, m — the mistake card's «два метра». */
+  driverEyeM: 2.0,
+  /** Front-axle / rear-axle centres from the body centre, m (long wheelbase,
+   *  which is why the tail swings: the rear overhang is 12/2 − 4.4 = 1.6 m). */
+  frontAxleZM: 4.0,
+  rearAxleZM: -4.4,
+} as const;
+
+/**
+ * The procedural CITY BUS ModelRig (doc 72 §15 VU-11, ЗДвП чл. 67 — the
+ * bus-pull-out actor). Three merged material groups, one draw each:
+ *
+ *   1. PAINT — a single 12 m saloon box in a fictional municipal amber.
+ *   2. GLASS/DARK — the cue the audit sheet says was missing: a continuous
+ *      window band down BOTH flanks at seated-passenger height, a full-height
+ *      windscreen and rear screen, two CURB-SIDE door leaves (a bus at a
+ *      спирка is a vehicle with its doors on the pavement side), a roof strip
+ *      and an underfloor skirt. A bus is glazed; a lorry is not, and that one
+ *      difference is the whole of what a student has to read at 130 m.
+ *   3. ACCENT — the ROUTE BOARD, front and rear. Legally this is the load-
+ *      bearing detail rather than decoration: чл. 67 protects a vehicle „от
+ *      редовните линии", and the destination board is the visible mark of a
+ *      scheduled route. It is a blank lit panel — no digits, so no real Sofia
+ *      line is depicted (ADR-001).
+ *
+ * Ground-relative like the GLB kit (Y = 0 = tarmac, nose +Z); shared fleet
+ * wheels scaled to the 0.5 m hubs. All geometry + materials are OWNED
+ * (disposed by disposeTrafficFleet via ownedMaterials/bodyGeometry).
+ */
+function buildCityBusRig(): ModelRig {
+  const { lengthM, widthM, bodyHeightM, skirtM, wheelRadiusM, driverEyeM, frontAxleZM, rearAxleZM } =
+    BUS_DIMENSIONS;
+  const halfLength = lengthM / 2;
+  const paintMat = new MeshStandardMaterial({
+    color: 0xd8a12a, // fictional municipal amber (ADR-001 — no real livery)
+    metalness: 0.2,
+    roughness: 0.45,
+    envMapIntensity: 1.35,
+  });
+  paintMat.name = "bus_paint";
+  const accentMat = new MeshStandardMaterial({
+    color: 0xf6efd8, // the lit route board — blank, no digits (ADR-001)
+    metalness: 0.05,
+    roughness: 0.6,
+  });
+  accentMat.name = "bus_accent";
+  const glassMat = new MeshStandardMaterial({
+    color: 0x1b2026, // near-black glazing: windows, screens, doors, skirt, roof
+    metalness: 0.45,
+    roughness: 0.35,
+  });
+  glassMat.name = "bus_glass";
+
+  // -- paint: one saloon box above the skirt --------------------------------
+  const bodyH = bodyHeightM - skirtM;
+  const paintMerged = new BoxGeometry(widthM, bodyH, lengthM);
+  paintMerged.translate(0, skirtM + bodyH / 2, 0);
+
+  // -- accent: route boards, front and rear, above the screens --------------
+  const boardW = widthM - 0.9;
+  const boardFront = new BoxGeometry(boardW, 0.3, 0.06);
+  boardFront.translate(0, bodyHeightM - 0.3, halfLength + 0.01);
+  const boardRear = new BoxGeometry(boardW, 0.26, 0.06);
+  boardRear.translate(0, bodyHeightM - 0.32, -halfLength - 0.01);
+  const accentParts = [boardFront, boardRear];
+  const accentMerged = mergeGeometries(accentParts, false) ?? boardFront;
+  if (accentMerged !== boardFront) for (const g of accentParts) g.dispose();
+
+  // -- glass/dark kit -------------------------------------------------------
+  const flankX = widthM / 2 - 0.01; // flush to the flank, protrudes ~0.02 m
+  // Saloon window band: seated-passenger height, both flanks, stopping short
+  // of the nose so the windscreen reads as a separate pane.
+  const winY = 1.95;
+  const winH = 0.9;
+  const winLen = lengthM - 3.2;
+  const winZ = -0.6; // biased back — the cab occupies the front 1.6 m
+  const darkParts: BufferGeometry[] = [];
+  for (const sx of [flankX, -flankX]) {
+    const w = new BoxGeometry(0.06, winH, winLen);
+    w.translate(sx, winY, winZ);
+    darkParts.push(w);
+  }
+  // The CAB: a deep windscreen whose lower edge sits below the driver's eye
+  // line and whose upper edge sits above it, so «шофьорът седи на два метра
+  // над земята» is a thing you can see rather than only read.
+  const screenH = 1.3;
+  const screenF = new BoxGeometry(widthM - 0.22, screenH, 0.06);
+  screenF.translate(0, driverEyeM + 0.15, halfLength - 0.02);
+  darkParts.push(screenF);
+  // Rear screen — smaller, and the face the student actually follows.
+  const screenR = new BoxGeometry(widthM - 0.5, 0.85, 0.06);
+  screenR.translate(0, winY + 0.05, -halfLength + 0.02);
+  darkParts.push(screenR);
+  // Two CURB-SIDE door leaves (−X = the vehicle's right = the pavement at a
+  // спирка): full height from the skirt to the window head.
+  const doorTop = winY + winH / 2;
+  const doorH = doorTop - skirtM;
+  for (const doorZ of [halfLength - 2.1, -0.9]) {
+    const d = new BoxGeometry(0.07, doorH, 1.15);
+    d.translate(-flankX, skirtM + doorH / 2, doorZ);
+    darkParts.push(d);
+  }
+  // Roof equipment strip + the underfloor skirt band (dark bottom contrast).
+  const roof = new BoxGeometry(widthM - 0.7, 0.14, lengthM - 2.2);
+  roof.translate(0, bodyHeightM + 0.07, 0);
+  darkParts.push(roof);
+  const skirtBox = new BoxGeometry(widthM - 0.12, skirtM, lengthM - 0.5);
+  skirtBox.translate(0, skirtM / 2, 0);
+  darkParts.push(skirtBox);
+  const darkMerged = mergeGeometries(darkParts, false) ?? darkParts[0];
+  if (darkMerged !== darkParts[0]) for (const g of darkParts) g.dispose();
+
+  const bodyGeometry =
+    mergeGeometries([paintMerged, accentMerged, darkMerged], true) ?? paintMerged;
+  if (bodyGeometry !== paintMerged) {
+    paintMerged.dispose();
+    accentMerged.dispose();
+    darkMerged.dispose();
+  }
+
+  const track = widthM / 2 - 0.22;
+  return {
+    bodyGeometry,
+    bodyMaterials:
+      bodyGeometry.groups.length === 3 ? [paintMat, accentMat, glassMat] : [paintMat],
+    ownedMaterials: [paintMat, accentMat, glassMat],
+    paint: null, // no palette tint — the amber livery IS the profile's identity
+    customWheel: null, // shared fleet wheel, scaled to the 0.5 m hubs
+    wheelOffsets: [
+      new Vector3(track, wheelRadiusM, frontAxleZM), // FL (+X = left)
+      new Vector3(-track, wheelRadiusM, frontAxleZM), // FR
+      new Vector3(track, wheelRadiusM, rearAxleZM), // RL
+      new Vector3(-track, wheelRadiusM, rearAxleZM), // RR
     ],
     wheelRadius: wheelRadiusM,
     rearZ: -halfLength,
@@ -2090,6 +2266,9 @@ export function buildTrafficFleet(
   // HZ profile slot: the procedural quadruped animal rig (ANIMAL_MODEL_INDEX)
   // — no InstancedMesh unless an "animal"-profile actor exists.
   rigs.push(buildAnimalRig());
+  // VU-11 profile slot: the procedural 12 m CITY BUS rig (BUS_MODEL_INDEX) —
+  // same cost discipline: no InstancedMesh unless a "bus"-profile actor exists.
+  rigs.push(buildCityBusRig());
   const sharedWheel = extractSharedWheel(scenes[0]);
   const nVeh = vehicles.length;
   const color = new Color();

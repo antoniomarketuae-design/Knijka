@@ -108,13 +108,20 @@ export const SC_PK_CROSSING_BAN: ScenarioSpec = {
     {
       id: "sc-pkx-past-junction",
       titleBg: "Подмини кръстовището, без да спираш в забранената зона",
-      // A progress checkpoint on the clear road between the two ban groups.
-      params: { kind: "reachZone", x: PKX_LANE, y: 200, radiusM: 6 },
+      // A progress checkpoint on the clear road between the two ban groups —
+      // and, since sc-pk-rail-ban:84bce2a3, a gate that also reads the ban-zone
+      // conviction its own banner claims did not happen (objectives.ts
+      // `requireRestClean`). BOTH gates of this drill carry the key, in road
+      // order: the chain is sequential, so a rest at the junction stops it here
+      // and the zebra gate below is never stepped — which is what keeps a
+      // run-wide read from ever withdrawing the zebra certificate for a fault
+      // seventy-five metres behind it.
+      params: { kind: "reachZone", x: PKX_LANE, y: 200, radiusM: 6, requireRestClean: "banZone" },
     },
     {
       id: "sc-pkx-past-zebra",
       titleBg: "Премини пешеходната пътека, без да спираш пред нея",
-      params: { kind: "reachZone", x: PKX_LANE, y: 275, radiusM: 6 },
+      params: { kind: "reachZone", x: PKX_LANE, y: 275, radiusM: 6, requireRestClean: "banZone" },
     },
     {
       id: "sc-pkx-legal-stop",
@@ -268,8 +275,16 @@ export const SC_PK_BUSSTOP_BAN: ScenarioSpec = {
     {
       id: "sc-pkbs-past-zone",
       titleBg: "Подмини цялата зона на спирката, без да спираш в нея",
-      // A checkpoint on the clear road past the pocket's end (y = 210).
-      params: { kind: "reachZone", x: PKBS_LANE, y: 225, radiusM: 6 },
+      // A checkpoint on the clear road past the pocket's end (y = 210) — plus
+      // the ban-zone conviction the banner claims did not happen
+      // (objectives.ts `requireRestClean`, the sc-pk-rail-ban:84bce2a3 census).
+      params: {
+        kind: "reachZone",
+        x: PKBS_LANE,
+        y: 225,
+        radiusM: 6,
+        requireRestClean: "banZone",
+      },
     },
     {
       id: "sc-pkbs-legal-stop",
@@ -453,8 +468,19 @@ export const SC_PK_STOP_VS_PARK: ScenarioSpec = {
     {
       id: "sc-pkb2-past-ban",
       titleBg: "Премини участъка под В27, без да спираш в него",
-      // A progress checkpoint on the clear road past the В27 span's end (290).
-      params: { kind: "reachZone", x: PKB2_LANE, y: 305, radiusM: 6 },
+      // A progress checkpoint on the clear road past the В27 span's end (290) —
+      // plus the ban-zone conviction the banner claims did not happen
+      // (objectives.ts `requireRestClean`, the sc-pk-rail-ban:84bce2a3 census).
+      // The В28 drop-off gate ABOVE stays a bare disc on purpose: a стоп under
+      // В28 is lawful (чл. 93), the detector never bills it, and the demand may
+      // only ever read a fault the protocol has already printed.
+      params: {
+        kind: "reachZone",
+        x: PKB2_LANE,
+        y: 305,
+        radiusM: 6,
+        requireRestClean: "banZone",
+      },
     },
     {
       id: "sc-pkb2-legal-park",
@@ -693,8 +719,18 @@ export const SC_PK_DOUBLE_PARK: ScenarioSpec = {
     {
       id: "sc-pkd-past-row",
       titleBg: "Подмини цялата паркирана редица, без да спираш до нея",
-      // A checkpoint on the clear road past the row's end (y = 210).
-      params: { kind: "reachZone", x: PKD_LANE, y: 225, radiusM: 6 },
+      // A checkpoint on the clear road past the row's end (y = 210) — plus the
+      // second-line conviction the banner claims did not happen (objectives.ts
+      // `requireRestClean`, the sc-pk-rail-ban:84bce2a3 census). Here the ban is
+      // placed by the other cars rather than by a sign, and the detector grades
+      // it under the same code, so the same read applies unchanged.
+      params: {
+        kind: "reachZone",
+        x: PKD_LANE,
+        y: 225,
+        radiusM: 6,
+        requireRestClean: "banZone",
+      },
     },
     {
       id: "sc-pkd-legal-park",
@@ -1458,14 +1494,32 @@ export const SC_PK_RAIL_BAN: ScenarioSpec = {
       // A checkpoint past the far rail. It cannot be reached by anyone who is
       // still on the band, and the ONLY lawful way to it is a transit — the
       // guarded-open crossing asks no stop (чл. 52), and stopping on it grades.
-      params: { kind: "reachZone", x: PKR_LANE, y: 230, radiusM: 6 },
+      //
+      // …AND „ON THE WAY THERE" IS NOW GRADED TOO. A disc past the band proves
+      // ARRIVAL and nothing else, so this drill's own ❌ demo
+      // („Спиране върху самата прелезна ивица", a 6 s rest at y = 203) collected
+      // the sentence «без да спираш върху релсите» on the same sheet that bills
+      // it the 10-point опасна — measured through `applyTick` at L1 and L3
+      // before `requireRestClean` existed. `railBand` reads exactly the
+      // "stopped-on-track" arm of RAIL_CROSSING_VIOLATION, so a rest fifty
+      // metres short of the rails (the OTHER demo, and the other code) cannot
+      // withdraw this certificate.
+      params: { kind: "reachZone", x: PKR_LANE, y: 230, radiusM: 6, requireRestClean: "railBand" },
     },
     {
       id: "sc-pkr-past-zone",
       titleBg: "Подмини цялата забранена зона, без престой в нея",
       // The clear road past the run-out ban's end (y = 256): the far side of the
       // whole чл. 98 stretch, where „вече може" finally becomes true.
-      params: { kind: "reachZone", x: PKR_LANE, y: 275, radiusM: 6 },
+      //
+      // THE FILED ROW (sc-pk-rail-ban:84bce2a3, critical): «✗ Спиране в
+      // забранена зона −3 изпитни т. в 1:11» and «✓ Подмини цялата забранена
+      // зона, БЕЗ ПРЕСТОЙ В НЕЯ 1:19» on one debrief, eight seconds apart. The
+      // measurement existed the whole time — the credit just never read it.
+      // `banZone` covers BOTH чл. 98 spans, before the rails and after, because
+      // that is what «цялата» says; the demand is run-wide rather than windowed
+      // for exactly that reason (objectives.ts carries the argument).
+      params: { kind: "reachZone", x: PKR_LANE, y: 275, radiusM: 6, requireRestClean: "banZone" },
     },
     {
       id: "sc-pkr-legal-stop",

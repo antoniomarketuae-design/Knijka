@@ -109,6 +109,12 @@ const GUARD_LATERAL_M = 3.0;
 const CROSS_WATCH_M = 60;
 /** Guard aims to stop this far short of the player, m. */
 const GUARD_STOP_SHORT_M = 6;
+/**
+ * The guard's approach law: target speed = this × (metres past the standoff).
+ * Named because the widened window below is its inverse — the distance at
+ * which an actor doing `v` first meets its own braking profile is `v / gain`.
+ */
+const GUARD_APPROACH_GAIN = 0.8;
 /** matchPlayer proportional gain: m/s of speed delta per meter of gap error. */
 const MATCH_GAIN = 0.55;
 /**
@@ -448,6 +454,8 @@ interface MutableView {
   finished: boolean;
   indicator: VehicleIndicator;
   lateralOffsetM: number;
+  /** FR-B5-RETURN re-entry count — see StagedActorView.returns. */
+  returns: number;
 }
 
 export interface StagedVehicleAgent {
@@ -539,9 +547,26 @@ export interface StagedEnv {
    * Empty array = the pre-change behaviour, bit-identical.
    */
   ambient: readonly TrafficVehicleState[];
+  /**
+   * The OTHER STAGED actors' published states, read only by the return-lap
+   * clamp (step 3c). Absent = the pre-change behaviour, bit-identical, which is
+   * what every caller that never sets it gets.
+   *
+   * WHY IT IS NOT SIMPLY APPENDED TO `ambient`. That array is read by step 2b's
+   * corridor guard on EVERY run, and staged actors are authored against each
+   * other on purpose — a stream's column, the лепка overtaking the лидер, the
+   * staged collisions. Making them brake for one another during a scripted
+   * encounter is a re-choreographed lesson. This list is consulted only where
+   * `returns > 0` already gates.
+   */
+  staged?: readonly TrafficVehicleState[];
 }
 
 const samp = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
+
+/** Shared empty list for `env.staged` when a caller never sets it — the clamp
+ *  in step 3c allocates nothing on the per-frame path. */
+const EMPTY_BODIES: readonly TrafficVehicleState[] = [];
 
 /**
  * Hold arcs onto the path. BOTH bounds are load-bearing and NEITHER is
@@ -578,10 +603,21 @@ function clampArc(path: StagedPath, s: number): number {
  * create an overlap the previous pose did not already have.
  */
 function closesOnAmbient(agent: StagedVehicleAgent, env: StagedEnv, step: number): boolean {
+  return closesOnBodies(agent, env.ambient, step);
+}
+
+/** The body of `closesOnAmbient`, over any list of published vehicle states —
+ *  `env.staged` reuses it verbatim (step 3c) rather than owning a second copy
+ *  of the same separation arithmetic. */
+function closesOnBodies(
+  agent: StagedVehicleAgent,
+  bodies: readonly TrafficVehicleState[],
+  step: number,
+): boolean {
   const nx = agent.state.x + agent.state.dirX * step;
   const ny = agent.state.y + agent.state.dirY * step;
-  for (let i = 0; i < env.ambient.length; i++) {
-    const a = env.ambient[i];
+  for (let i = 0; i < bodies.length; i++) {
+    const a = bodies[i];
     if (a === agent.state) continue;
     const sep = vehicleHalfLengthM(agent.spec.profile) + vehicleHalfLengthM(a.profile) + 0.5;
     const dAfter = Math.hypot(a.x - nx, a.y - ny);
@@ -627,6 +663,59 @@ function closesOnAmbient(agent: StagedVehicleAgent, env: StagedEnv, step: number
  */
 function playerGuarded(agent: StagedVehicleAgent): boolean {
   return agent.returns > 0 || (agent.spec.playerGuard ?? true);
+}
+
+/**
+ * FR-B5-REACH (2026-08-31, sc-follow-tailgater:41a625d1) — A 16 m WINDOW IS
+ * NOT A GUARD FOR A CAR DOING 61 КМ/Ч.
+ *
+ * Steps 2 and 2a both open at a FIXED `GUARD_AHEAD_M` and then aim at the
+ * linear profile `GUARD_APPROACH_GAIN × (along − GUARD_STOP_SHORT_M)`, braking
+ * at `HOLD_DECEL_MPS2`. A stopping distance is quadratic in speed and that
+ * window is a constant, so the guard has a top speed above which it cannot
+ * work at all — and every actor over it drives through the student instead of
+ * stopping short of him. From `along` = 16 m at `HOLD_DECEL_MPS2` = 8 m/s²
+ * the actor comes to rest at `16 − v²/16`:
+ *
+ *   v = 8 m/s   rest at  12.0 m   ← clear
+ *   v = 11 m/s  rest at   8.4 m   ← clear (the `sc-ftg-lead` case: it does
+ *                                   stop, and the probe measures 6.00 m)
+ *   v = 14 m/s  rest at   3.8 m   ← INSIDE him (nose-to-tail touch is 4.07 m)
+ *   v = 17 m/s  rest at  −2.1 m   ← never stops; it passes through his centre
+ *
+ * MEASURED on `sc-follow-tailgater` at L1 through the production stack
+ * (`compileScenario` + `createTrafficSystem` + `createScenarioDirector`),
+ * driving the lesson's own taught response — 30 км/ч up the right lane to the
+ * `sc-ftg-finish` zone, then standing there as the card asks:
+ *
+ *   `sc-ftg-tail` closes to 0.01 m OF HIS CENTRE at t = 58.3 s, and again on
+ *   every one of its ~35 s laps for the rest of the lesson.
+ *
+ * The лепка leaves its scripted pass under `cruise` at `passSpeedMps` 17 m/s,
+ * runs out of road, retires and RE-ENTERS (FR-B5-RETURN) still carrying that
+ * command — and 17 m/s is the fourth row of the table. That is a car driven
+ * through a stationary, correct student by an unscripted return run, which is
+ * the exact thing step 2a's own gate says may never happen: „an unscripted car
+ * may never be the one that hits him".
+ *
+ * SO THE WINDOW BECOMES THE ACTOR'S OWN REACH: it opens where the braking
+ * profile first falls below the speed the actor is actually doing, which is
+ * that profile read backwards (`v / gain + stopShort`). The profile, the gain,
+ * the standoff and the brake cap are all untouched; only the moment the guard
+ * starts looking moves, and it moves ONLY when 16 m is too short.
+ *
+ * GATED ON `returns > 0`, the same line `playerGuarded` and step 2a already
+ * draw. Below 8 m/s the widened window is smaller than `GUARD_AHEAD_M` and the
+ * `max` returns the old constant, so most actors would be unaffected anyway —
+ * but a first run is an encounter the orchestrator TIMED and the rule engine is
+ * grading, and an authored car that starts easing 11 m earlier than it used to
+ * is a re-choreographed lesson. Every scripted encounter keeps the exact
+ * geometry it was authored against; the unscripted laps nobody timed get a
+ * guard that can actually finish.
+ */
+function guardWindowM(agent: StagedVehicleAgent): number {
+  if (agent.returns === 0) return GUARD_AHEAD_M;
+  return Math.max(GUARD_AHEAD_M, agent.speed / GUARD_APPROACH_GAIN + GUARD_STOP_SHORT_M);
 }
 
 function closesOnPlayer(agent: StagedVehicleAgent, env: StagedEnv, step: number): boolean {
@@ -894,6 +983,7 @@ export function createStagedVehicle(
       finished: false,
       indicator: "off",
       lateralOffsetM: 0,
+      returns: 0,
     },
     command: { type: "hold", speedMps: 0, gapM: 0, maxSpeedMps: 0, decelMps2: 0 },
     holdS,
@@ -957,10 +1047,12 @@ export function createStagedPedestrian(
       pathLengthM: path.length,
       nodeS: path.nodeS,
       finished: false,
-      // Pedestrians have no indicator / lateral channel — the view fields
-      // exist only so one MutableView shape backs both actor kinds.
+      // Pedestrians have no indicator / lateral channel and never re-enter —
+      // the view fields exist only so one MutableView shape backs both actor
+      // kinds.
       indicator: "off",
       lateralOffsetM: 0,
+      returns: 0,
     },
     walking: false,
     s: 0,
@@ -1139,8 +1231,8 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
     const relY = env.playerY - agent.state.y;
     const along = relX * agent.state.dirX + relY * agent.state.dirY;
     const lateral = Math.abs(relX * agent.state.dirY - relY * agent.state.dirX);
-    if (along > 0 && along < GUARD_AHEAD_M && lateral < GUARD_LATERAL_M) {
-      const guardTarget = Math.max(0, (along - GUARD_STOP_SHORT_M) * 0.8);
+    if (along > 0 && along < guardWindowM(agent) && lateral < GUARD_LATERAL_M) {
+      const guardTarget = Math.max(0, (along - GUARD_STOP_SHORT_M) * GUARD_APPROACH_GAIN);
       if (guardTarget < target) {
         target = guardTarget;
         brakeCap = HOLD_DECEL_MPS2;
@@ -1211,9 +1303,9 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       closing &&
       proj.dist < CROSS_WATCH_M &&
       ahead > 0 &&
-      ahead < GUARD_AHEAD_M
+      ahead < guardWindowM(agent)
     ) {
-      const guardTarget = Math.max(0, (ahead - GUARD_STOP_SHORT_M) * 0.8);
+      const guardTarget = Math.max(0, (ahead - GUARD_STOP_SHORT_M) * GUARD_APPROACH_GAIN);
       if (guardTarget < target) {
         target = guardTarget;
         brakeCap = HOLD_DECEL_MPS2;
@@ -1276,6 +1368,43 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   //     create an overlap) and lets a boxed-in actor drive out.
   if (env.ambient.length > 0 && agent.s > sBefore) {
     if (closesOnAmbient(agent, env, agent.s - sBefore)) {
+      agent.s = sBefore;
+      agent.speed = 0;
+    }
+  }
+
+  // 3c) …AND THE SAME HARD REFUSAL AGAINST THE STUDENT, on the RETURN LAPS.
+  //
+  //     The retirement branch below already answers to `closesOnPlayer`; the
+  //     on-path advance answered to nothing but the SOFT guard in step 2, and a
+  //     soft guard is a target speed — it can be overshot, and FR-B5-REACH
+  //     above is the measurement of it being overshot by 6 m. The widened
+  //     window closes that for every speed the profile can still stop from
+  //     (≤ 20 m/s at `HOLD_DECEL_MPS2`); this closes it for the rest, and for
+  //     the case no window sized off the ACTOR's speed can see — a student
+  //     moving toward the actor, whose closing speed is not the actor's own.
+  //
+  //     Same clamp, same standoff and the same FR-B5-FREEZE discipline as the
+  //     ambient half three lines up: refuse only a CLOSING step, so an actor
+  //     already inside the standoff can still drive out of it and nothing can
+  //     be frozen for good.
+  //
+  //     `returns > 0` for the reason `guardWindowM` states: a first run is an
+  //     encounter the orchestrator timed, and the staged collisions are
+  //     authored to reach the player. An unscripted lap is not, and may not.
+  //
+  //     …AND AGAINST THE OTHER STAGED BODIES, for the residue the player half
+  //     creates rather than removes. Two actors that both queue behind one
+  //     stopped student aim at the SAME standoff, so the second one comes to
+  //     rest inside the first — measured on `sc-follow-tailgater`: `sc-ftg-lead`
+  //     and `sc-ftg-tail` both at rest at y = 338.2, one car in the other, in
+  //     the student's mirror for 140 s. Before this repair the лепка drove
+  //     through the лидер as well as through him, so the overlap is older than
+  //     the clamp; standing still is simply the version that photographs.
+  if (agent.returns > 0 && agent.s > sBefore) {
+    const step = agent.s - sBefore;
+    const others = env.staged ?? EMPTY_BODIES;
+    if (closesOnPlayer(agent, env, step) || closesOnBodies(agent, others, step)) {
       agent.s = sBefore;
       agent.speed = 0;
     }
@@ -1422,6 +1551,7 @@ function publishVehicle(agent: StagedVehicleAgent): void {
   view.finished = agent.finished;
   view.indicator = agent.indicator;
   view.lateralOffsetM = agent.lat;
+  view.returns = agent.returns;
 }
 
 function setPedOnRoad(

@@ -56,7 +56,7 @@
  * is the founder's own complaint, so a briefing is not rewritten because a
  * frame looked empty:
  *
- *   rb-mini-v1    { giveWay: 4, roundabout: 4, limit40: 4 }
+ *   rb-mini-v1    { giveWay: 4, roundabout: 4, limit40: 4, passRight: 4 }
  *     „No such sign, no give-way line" — there are FOUR Б1 posts, four Г12
  *     plates, and markings.ts paints the М7 line + М18 triangles on the same
  *     approaches. sc-roundabout-entry's instructions 1 and 3 are correct and
@@ -310,7 +310,16 @@ describe("§0 the sign census the fixes were measured against", () => {
     "mw-exit-v1": { limit140: 3, noEntry: 3, curve: 1 },
     "mw-v1": { limit140: 2, noEntry: 2 },
     "ov-oncoming-v1": { limit90: 2 },
-    "rb-mini-v1": { giveWay: 4, roundabout: 4, limit40: 4 },
+    // passRight (Г9) joined the census in repair wave 17, and it is a REPAIR,
+    // not drift. The central island carried nothing a driver may read: Б1 and
+    // Г12 stand out at the mouth, so from the give-way line the obstacle they
+    // are talking about was a bare lawn — photographed at
+    // .audit-frames/sweep161/sc-rb-ped-exit/mobile-right/04-t001s.png. A
+    // Bulgarian central island carries Г9 «Преминаване отдясно на знака»
+    // facing each entry; four mouths, four plates. Retrieved from
+    // content/signs/signs.json (Наредба № РД-02-21-1/23.11.2023, знак Г9),
+    // never recalled — ADR-002.
+    "rb-mini-v1": { giveWay: 4, roundabout: 4, limit40: 4, passRight: 4 },
     "pk-rail-v1": { limit50: 3, noStopping: 2, railGuarded: 1, railCross: 1, barrier: 1 },
   };
   for (const [id, want] of Object.entries(EXPECTED)) {

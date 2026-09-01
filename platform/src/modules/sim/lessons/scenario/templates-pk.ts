@@ -479,8 +479,13 @@ export const SC_PK_BAN_STOP: ScenarioSpec = {
     {
       id: "sc-pkb-through",
       titleBg: "Премини през зоната В27, без да спираш",
-      // A mid-zone progress checkpoint the non-stop transit passes through.
-      params: { kind: "reachZone", x: PKB_LANE, y: 130, radiusM: 6 },
+      // A mid-zone progress checkpoint the non-stop transit passes through —
+      // plus the ban-zone conviction the banner claims did not happen
+      // (objectives.ts `requireRestClean`, the sc-pk-rail-ban:84bce2a3 census).
+      // The disc sits INSIDE the span, so the claim it certifies is the stretch
+      // driven so far, and a rest past it lands after the tick was honestly
+      // earned — a completed objective is never re-stepped.
+      params: { kind: "reachZone", x: PKB_LANE, y: 130, radiusM: 6, requireRestClean: "banZone" },
     },
     {
       id: "sc-pkb-legal-stop",

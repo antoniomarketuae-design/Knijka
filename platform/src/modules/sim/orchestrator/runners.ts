@@ -40,7 +40,7 @@ import type {
 import type { ContactCastMember } from "./contact";
 import type { SimTickEvent } from "../rules";
 import type { Rng } from "../traffic/rng";
-import type { VehicleProfile } from "../traffic/types";
+import type { StagedActorView, VehicleProfile } from "../traffic/types";
 import type {
   DirectorInput,
   SignalDirectorPort,
@@ -749,6 +749,12 @@ export class PriorityFromRightRunner implements EventRunner {
    *  back: a standing driver's ETA is infinite by construction, so re-holding
    *  on it would restore the exact deadlock that rule exists to end. */
   private stoppedRelease = false;
+  /** FR-B5-RECHOREOGRAPH: the actor's `returns` count as of the last frame —
+   *  see `reArmOnReturn`. */
+  private seenReturns = 0;
+  /** FR-B5-RECHOREOGRAPH: a return is armed but held until the student has
+   *  left this junction's arm, so the car is never released AT him. */
+  private awaitApproach = false;
 
   /** The crossing car, solid from its hold pose short of the box onward. */
   readonly contactCast: readonly ContactCastMember[];
@@ -786,19 +792,42 @@ export class PriorityFromRightRunner implements EventRunner {
     this.stoppedForSec = 0;
     this.stoppedRelease = false;
     this.contacted = false;
+    this.seenReturns = traffic.staged(s.id)?.returns ?? 0;
+    this.awaitApproach = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
     const s = this.spec;
-    if (this.phase === "resolved") return null;
     const actor = traffic.staged(s.id);
     if (!actor) return null;
+    this.reArmOnReturn(traffic, actor);
+    if (this.phase === "resolved") return null;
     const d = dist(input.x, input.y, s.junction.x, s.junction.y);
     const carArc = actor.s - actor.nodeS[s.junctionNodeIndex]; // <0 before node
     const playerLineDist = Math.max(0, d - s.lineDistM);
 
     if (this.phase === "armed") {
-      if (d > s.armDistM) return null;
+      if (d > s.armDistM) {
+        if (this.awaitApproach) {
+          // He has left this junction, so the held return may stage a fresh
+          // encounter from here on — and it goes back to ordinary flow rather
+          // than standing where it was pinned, which would be the FR-B5-EXIT
+          // defect wearing a different pose.
+          this.awaitApproach = false;
+          traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.actor.cruiseSpeedMps });
+        }
+        return null;
+      }
+      if (this.awaitApproach) {
+        // `oneCrossingPerApproach`: a returned car may not be released at a
+        // student who is ALREADY at the junction. Every release path below aims
+        // the car to arrive WHEN HE DOES, and he is already here — so it is
+        // pinned instead, which makes it stationary and therefore below
+        // `CONFLICT_MIN_SPEED_MPS`: no priority claim, nobody convicted, until
+        // he has left the arm and can approach afresh.
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: 0 });
+        return null;
+      }
       const carDist = -carArc;
       // COMMIT strictly on genuine player proximity to their own line —
       // straight-line ETA lies badly on L-shaped approaches (the player may
@@ -944,6 +973,86 @@ export class PriorityFromRightRunner implements EventRunner {
       return this.resolve(input, true, this.sawYield ? "yielded" : "clear");
     }
     return null;
+  }
+
+  /**
+   * FR-B5-RECHOREOGRAPH (2026-08-31, sc-jx-equal-left:4274eddb) — A CAR THAT
+   * COMES BACK ROUND IS A NEW ENCOUNTER, AND THIS RUNNER OWNS ENCOUNTERS.
+   *
+   * `step` returned early on `resolved`, so the last command this runner ever
+   * issued — `cruise` at `clearSpeedMps`, the sprint authored at the
+   * `carArc > 6` line to get the car OUT of the 26 m conflict radius — became
+   * the actor's permanent cruise. FR-B5-RETURN (traffic/staged.ts) then
+   * re-entered it at its authored hold and drove the whole path again under
+   * that escape command, with no witness gate, no approach sync and no teach
+   * card: the runtime's right-hand-rule tracker adjudicated a car the template
+   * never staged the student against.
+   *
+   * MEASURED on sc-jx-equal-left at L1 through the production stack
+   * (`recordScriptedDrive` over the template's own `staged` specs), driving the
+   * briefing verbatim and varying only WHERE the student slows and HOW LONG he
+   * waits — 3 slow-from points x 7 wait lengths:
+   *
+   *   as shipped          6 of 21 pacings billed опасна FAILED_TO_YIELD
+   *   re-entry disabled   0 of 21   ← the returning actor is the whole cause
+   *
+   * and the six sat in two bands ~28 s apart, which is that actor's round trip
+   * on 130 m arms: a phase lottery, not a slope, so no dial in the template can
+   * close it (`armDistM` 65 → 30 → 24 moved the band and never removed it —
+   * templates-junctions3.ts).
+   *
+   * DELETING THE RETURN IS NOT THE FIX, and was measured too: that actor's path
+   * ends on the WEST arm, so refusing re-entry parks a car in the lane the
+   * student's own left turn exits into — the FR-B5-EXIT defect, which is why
+   * the return exists at all. So the first half of the repair is that the
+   * second pass gets the choreography the first one had: the runner re-arms,
+   * the actor goes back to its authored cruise, and the armed branch's sync
+   * walks it to its hold short of the box instead of driving it through.
+   *
+   * RE-CHOREOGRAPHY ALONE MOVED THE BAND AND DID NOT CLOSE IT (measured: 5 of
+   * 21, the same two-band shape) — because the stopped-witness release aims the
+   * car at a student who is standing there, and on a RETURN he is standing
+   * there having already finished the wait the briefing asked for. What closes
+   * it is `awaitApproach`: the car is held, stationary, until he has left
+   * `armDistM` and can approach afresh. With both, 21 of 21 — and 33 of 33 over
+   * waits out to 110 s.
+   *
+   * ALL OF IT IS OPT-IN, on `PriorityFromRightSpec.oneCrossingPerApproach`
+   * (contracts.ts sets out the two designs this reconciles), and that is
+   * MEASURED rather than cautious. Applied unconditionally it degrades the two
+   * drills FR-B5-CROSS exists for, because their students stand near the
+   * junction for the whole lesson and a re-armed runner then holds the car at
+   * its own hold instead of letting it drive: `sc-edpr-right` fell from a road
+   * with traffic on it to 67.9 m of travel across the battery's 75 s window
+   * (bar: 200), and with the hold on top, to 0.0 m. `staged-cross-return.test.ts`
+   * §1 is the gate on that and goes red if this is ever made unconditional.
+   *
+   * REQUIREMENT-ZERO: a return that is allowed to cross resolves through the
+   * same `StagedEventOutcome` channel as the first pass (LessonScene
+   * `onStagedOutcome` → `applyStagedOutcome`), so it is explained by the spec's
+   * authored card rather than arriving as a bare −10.
+   */
+  private reArmOnReturn(traffic: StagedTrafficPort, actor: StagedActorView): void {
+    const returns = actor.returns ?? 0;
+    if (returns <= this.seenReturns) return;
+    this.seenReturns = returns;
+    // OPT-IN, and the measurement below says why: a spec that has not declared
+    // a ladder keeps FR-B5-CROSS's behaviour byte-for-byte.
+    if (this.spec.oneCrossingPerApproach !== true) return;
+    if (this.phase !== "resolved") return;
+    this.phase = "armed";
+    this.sawYield = false;
+    this.stoppedForSec = 0;
+    this.stoppedRelease = false;
+    this.awaitApproach = true;
+    // Ordinary flow at the AUTHORED cruise, not the `clearSpeedMps` escape it
+    // retired on. The armed branch below re-takes it the moment the player is
+    // inside `armDistM`; out there it is just traffic on its own road, which is
+    // what a return is.
+    traffic.stagedCommand(this.spec.id, {
+      type: "cruise",
+      speedMps: this.spec.actor.cruiseSpeedMps,
+    });
   }
 
   private resolve(

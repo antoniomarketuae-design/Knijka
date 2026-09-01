@@ -501,6 +501,10 @@ export function buildWorldGeometry(
   const props = buildProps(district, network, buildings.aabbs, {
     treeDensity: options.treeDensity ?? 1,
     seed: options.seed ?? DEFAULT_SEED,
+    // …and the rings resolved above, so the Г9 island plates stand on the SAME
+    // island `buildRoundabouts` draws below rather than on a second derivation
+    // of it (props.ts, the Г9 pass).
+    rings,
   });
   // Lesson-authored painted bays (L7) by default — the same curriculum-drives-
   // the-world pattern as the L2 stop-sign placement. Pass [] for a bare build.

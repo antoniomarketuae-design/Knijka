@@ -72,6 +72,7 @@ import {
   COCKPIT_FOV_MAX,
   COCKPIT_HFOV_RAD,
 } from "@/modules/sim/vehicle/tuning";
+import type { CutInLeadCarSpec } from "../../contracts";
 import { CutInLeadCarRunner, PedestrianDartOutRunner } from "../../orchestrator/runners";
 import type { DirectorInput } from "../../orchestrator/types";
 import {
@@ -150,6 +151,33 @@ const A_PILLAR_HALF_DEG = 24.3;
  * for a car level with his door. Widening the lens is NOT one of the options —
  * the third test below measures why.
  *
+ * 2026-09-01 — TWO OF THOSE THREE ARE NOW CLOSED, and closed as WRONG rather
+ * than as done. Recorded here because the next lane will otherwise re-derive
+ * them, and one of them would take the лекция with it:
+ *
+ *  · `paceAheadM`. To reach the 20° visible cone the escort would have to ride
+ *    ~22.3 m ahead. That is not «почти наравно с вратата ти», and it is not the
+ *    drill: `teach.whyBg` argues that the neighbouring lane is unknown BECAUSE
+ *    «точно съседната лента е мястото, където живее мъртвата ти зона». A car
+ *    you can see through the windscreen is not in a blind spot, so a student
+ *    who could see it would be learning the opposite lesson — and the
+ *    blind-swerve demo, whose whole grade is a COLLISION with this body at
+ *    y ≈ 180, would find an empty lane and stop grading it. The row is a
+ *    property of the SUBJECT here, not a defect in its staging.
+ *  · `actorLabels`. Structurally unavailable: this layer's B40(a) caption skips
+ *    any actor whose `|speedMps| > STAGED_ACTOR_LABEL_STILL_MPS` (see the block
+ *    at the caption's own site). The escort is moving whenever it matters, so
+ *    an entry would be a dead predicate — a repair that ships a measurement
+ *    nothing reads, which is the failure mode this project keeps buying.
+ *
+ * WHAT DID LAND (`templates-hazards2.ts`, `minCutSpeedKmh` 25 → 5) is the OTHER
+ * half of the same finding, and it does not touch this row: the escort was
+ * never RELEASED on a crawling drive, so it was off the glass before the reveal
+ * — which this row is about and which is correct — AND off the glass after it,
+ * standing still beside a stopped student under instruction 6 telling him to
+ * watch it go by, which was not. The second test below is that repair's own
+ * before/after. The row stays open at its measured excess.
+ *
  * AND THE ONE THE REPO ALREADY BUILT (verifier's addition — this is the first
  * thing the next lane should read). `CutInLeadCarRunner.paceGapM()` already
  * solves this problem for a different actor: it rides a pacing actor at
@@ -195,6 +223,14 @@ function offAxisDeg(
 const DT = 1 / 30;
 const PLAYER_LANE_X = 4.06; // both maps' meta.scenario lanePlayerX
 const SPAWN_Y = 15; // both maps' meta.scenario spawnY
+/**
+ * hz-debris-v1 `meta.scenario.revealY` — where the debris arms and the
+ * brake-or-swerve choice is made. Everything before it is „the approach", the
+ * window instruction 2 speaks about; everything after is instruction 6's.
+ */
+const DEBRIS_REVEAL_Y = 160;
+/** The escort's floor as it was SHIPPED WHEN THE SWEEP RAN. */
+const SHIPPED_BEFORE_CUT_KMH = 25;
 
 /** The runner's `out` parameter — typed off the runner itself; nothing here
  *  reads it, but a runner that starts emitting a different event shape should
@@ -211,6 +247,21 @@ interface Approach {
   firstOnGlassSec: number;
   /** tSec the brake went down (−1 = never braked on this leg). */
   brakeAtSec: number;
+  /**
+   * THE SAME THREE, RESTRICTED TO THE APPROACH — the road before the reveal.
+   *
+   * Added 2026-09-01 with the `minCutSpeedKmh` 25 → 5 repair, and the split is
+   * the point rather than an accounting convenience. The ledger row below is a
+   * claim about the window instruction 2 covers («Погледни вляво … Запомни я»),
+   * which ends when the debris appears at `DEBRIS_REVEAL_Y`; instruction 6
+   * («Гледай колата отляво как си минава по своята лента») is a claim about the
+   * window AFTER it, and the two want opposite answers. Measuring both under
+   * one counter meant that closing the second would have looked like breaking
+   * the first — which is exactly what happened the day the floor came down.
+   */
+  approachFrames: number;
+  approachOnGlassFrames: number;
+  approachMinOffAxisDeg: number;
 }
 
 /**
@@ -219,14 +270,19 @@ interface Approach {
  * 9.0 m/s² the live car actually produces — BRAKE_FORCE_N / CHASSIS_MASS, the
  * figure the template's own `ruleConfig` note derives.
  */
-function driveEscort(topMps: number, rngValue: number, brakeAtY: number | null): Approach {
+function driveEscort(
+  topMps: number,
+  rngValue: number,
+  brakeAtY: number | null,
+  spec: CutInLeadCarSpec = SC_HZ_BRAKE_DONT_SWERVE_ESCORT,
+): Approach {
   const traffic = createTrafficSystem(loadDistrict("hz-debris-v1"), {
     anchor: { x: PLAYER_LANE_X, y: SPAWN_Y },
     anchorRadiusM: 400,
     vehicleCount: 0,
     pedestrianCount: 0,
   });
-  const runner = new CutInLeadCarRunner(SC_HZ_BRAKE_DONT_SWERVE_ESCORT);
+  const runner = new CutInLeadCarRunner(spec);
   runner.stage(traffic, () => rngValue, true);
 
   const r: Approach = {
@@ -235,6 +291,9 @@ function driveEscort(topMps: number, rngValue: number, brakeAtY: number | null):
     framesTotal: 0,
     firstOnGlassSec: -1,
     brakeAtSec: -1,
+    approachFrames: 0,
+    approachOnGlassFrames: 0,
+    approachMinOffAxisDeg: Infinity,
   };
   let py = SPAWN_Y;
   let mps = 0;
@@ -262,7 +321,7 @@ function driveEscort(topMps: number, rngValue: number, brakeAtY: number | null):
       playerSpeedKmh: mps * 3.6,
       playerHeadingDeg: 0,
     });
-    const actor = traffic.staged(SC_HZ_BRAKE_DONT_SWERVE_ESCORT.id);
+    const actor = traffic.staged(spec.id);
     if (!actor) continue;
     // The escort's path is 300 m long; once it runs off the end the staged
     // channel re-enters it at the hold pose, and a body 160 m BEHIND the
@@ -275,12 +334,29 @@ function driveEscort(topMps: number, rngValue: number, brakeAtY: number | null):
       r.onGlassFrames++;
       if (r.firstOnGlassSec < 0) r.firstOnGlassSec = tSec;
     }
+    if (py < DEBRIS_REVEAL_Y) {
+      r.approachFrames++;
+      if (ang < r.approachMinOffAxisDeg) r.approachMinOffAxisDeg = ang;
+      if (ang <= HALF_GLASS_DEG) r.approachOnGlassFrames++;
+    }
   }
   return r;
 }
 
+/**
+ * The child leg measures the same quantities MINUS the reveal split. Her drill
+ * has no reveal — she is on the glass from the first metre, which is the whole
+ * verdict on finding B — and instruction 2's «Погледни вляво» is not hers, so
+ * fabricating approach counters for her would be a number in the reassuring
+ * direction with nothing behind it.
+ */
+type ChildApproach = Omit<
+  Approach,
+  "approachFrames" | "approachOnGlassFrames" | "approachMinOffAxisDeg"
+> & { onGlassSec: number };
+
 /** The sibling drill's child, driven the same way — the other direction. */
-function driveChild(topMps: number): Approach & { onGlassSec: number } {
+function driveChild(topMps: number): ChildApproach {
   const traffic = createTrafficSystem(loadDistrict("hz-obstacle-v1"), {
     anchor: { x: PLAYER_LANE_X, y: SPAWN_Y },
     anchorRadiusM: 400,
@@ -360,14 +436,64 @@ describe("sc-hz-brake-dont-swerve — «Погледни вляво … се д�
     // 14 km/h is the harness crawl the sweep161 frames were shot at; 22 is a
     // cautious real seventeen-year-old; 13.89 m/s is the drill's own authored
     // 50. The finding must not depend on which one you pick — and it does not.
+    //
+    // WINDOWED AT THE REVEAL, 2026-09-01, and the window is the claim rather
+    // than a softening of it. This assertion is about the road instruction 2
+    // speaks over — «Погледни вляво … Запомни я», which is spent by the time
+    // the debris arms. It used to run the counter over the WHOLE drive because,
+    // with `minCutSpeedKmh: 25`, no crawling drive ever released the escort and
+    // the two windows had the same answer. They no longer do: at 14 and 22 км/ч
+    // the escort is now released at the reveal and comes onto the glass for the
+    // rest of the lesson, which is the repair, and is asserted as such in the
+    // test below. Nothing here is relaxed — the same paces, the same lens, the
+    // same „zero frames" — only the window is now the one the sentence names.
     for (const topMps of [3.9, 6.0, 13.89]) {
       const r = driveEscort(topMps, 0.5, null);
-      expect(r.framesTotal, `${(topMps * 3.6).toFixed(0)} km/h produced no samples`).toBeGreaterThan(300);
+      // The „did this drive actually happen" guard. 200 frames is 6.7 s at the
+      // 30 Hz step, and the SHORTEST approach window on offer is the 50 км/ч
+      // one — 145 m of road at 13.89 m/s ≈ 10.5 s, minus the opening seconds
+      // where the escort is still behind the player and skipped: 277 frames,
+      // measured. The crawls run four to eight times longer.
       expect(
-        r.onGlassFrames,
-        `${(topMps * 3.6).toFixed(0)} km/h: the escort reached the glass`,
+        r.approachFrames,
+        `${(topMps * 3.6).toFixed(0)} km/h produced no approach samples`,
+      ).toBeGreaterThan(200);
+      expect(
+        r.approachOnGlassFrames,
+        `${(topMps * 3.6).toFixed(0)} km/h: the escort reached the glass before the reveal`,
       ).toBe(0);
-      expect(r.minOffAxisDeg).toBeGreaterThan(HALF_GLASS_DEG);
+      expect(r.approachMinOffAxisDeg).toBeGreaterThan(HALF_GLASS_DEG);
+    }
+  });
+
+  it("…and AFTER the reveal it goes past IN FRONT of him — which 25 км/ч of floor used to forbid", () => {
+    // THE REPAIR, measured against its own refutation (`:8a5ed5b4`).
+    //
+    // The escort's „cut" is a pure RELEASE (`cutShiftM: 0`) and it was gated
+    // behind `minCutSpeedKmh: 25`. The audited drives ran 10–15 км/ч, so it
+    // never fired: the escort stayed on the rubber band beside the door for the
+    // whole lesson and then stopped dead next to the stopped student, under
+    // instruction 6 telling him to watch it drive by. That is what the frames
+    // photographed as „the left lane is visibly, completely empty".
+    const before: CutInLeadCarSpec = {
+      ...SC_HZ_BRAKE_DONT_SWERVE_ESCORT,
+      minCutSpeedKmh: SHIPPED_BEFORE_CUT_KMH,
+    };
+    expect(SC_HZ_BRAKE_DONT_SWERVE_ESCORT.minCutSpeedKmh).toBeLessThan(SHIPPED_BEFORE_CUT_KMH);
+    for (const topMps of [3.9, 6.0]) {
+      const kmh = (topMps * 3.6).toFixed(0);
+      const shipped = driveEscort(topMps, 0.5, null);
+      const old = driveEscort(topMps, 0.5, null, before);
+      // The refutation arm: at 25 the car never once reached the glass, at any
+      // moment of the drive — approach or after.
+      expect(old.onGlassFrames, `${kmh} km/h at the old floor`).toBe(0);
+      // …and now it does, for seconds rather than frames, all of them after
+      // the reveal (the assertion above pins the approach half at zero).
+      expect(shipped.onGlassFrames, `${kmh} km/h at the shipped floor`).toBeGreaterThan(30 * 5);
+      expect(shipped.minOffAxisDeg).toBeLessThan(HALF_GLASS_DEG);
+      // And it is INSIDE the A-pillar too — the cone a seated driver actually
+      // looks through, not merely inside the frustum.
+      expect(shipped.minOffAxisDeg).toBeLessThan(A_PILLAR_HALF_DEG);
     }
   });
 

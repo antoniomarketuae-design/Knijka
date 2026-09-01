@@ -33,6 +33,7 @@ import {
 import { SimHaptics, type SimInput } from "@/modules/sim/engine";
 import type { VehicleSample } from "@/modules/sim/contracts";
 import { surfacePatchGripAt, type SurfaceGripPatch } from "@/modules/sim/runtime";
+import { setWindSway } from "@/modules/sim/world";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
 import type { SimAudio } from "@/modules/sim/scene/simAudio";
 import { updateVehicleSample } from "@/modules/sim/scene/vehicleSample";
@@ -469,6 +470,11 @@ export function VehicleRig({
     simRef.current = sim;
     return () => {
       if (simRef.current === sim) simRef.current = null;
+      // The wind uniform is a module singleton that outlives this scene: a
+      // crosswind lesson followed by a calm one would otherwise leave the next
+      // street's canopies leaning at the last gust. Same class of bug
+      // `primeWeather` closes for the weather channels.
+      setWindSway(0);
       sim.dispose();
     };
   }, [
@@ -532,6 +538,16 @@ export function VehicleRig({
     const sim = simRef.current;
     if (!sim) return;
     if (sim.positionY < KILL_PLANE_Y) sim.reset();
+
+    // AC-12 DEPICTION (sweep161 sc-ac-crosswind:e0b9507e — „wind is never
+    // depicted in any form"). The crosswind has pushed this chassis since the
+    // slice shipped and the world never moved for it, so a student had no cue
+    // for „щом поривът отслабне" other than the car already having moved. The
+    // street-tree canopies now lean on the SAME newtons, read straight off the
+    // sim's own gust clock rather than recomputed on the render clock (which
+    // drifts out of phase, the whole point). 0 N on every calm lesson, and
+    // `setWindSway` maps 0 to an exact shader identity.
+    setWindSway(sim.windLateralNow);
 
     const cabin = cabinRef.current;
     const input = inputRef.current?.read() ?? null;

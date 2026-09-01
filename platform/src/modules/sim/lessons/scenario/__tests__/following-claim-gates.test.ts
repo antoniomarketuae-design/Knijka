@@ -976,11 +976,17 @@ describe("a harder rung adds to the world and never deletes from it", () => {
  * the car is over `cap + REACH_ZONE_CAP_SLACK_KMH` on the approach — so the
  * barge really does spend the latch — but the latch is then RE-EARNED the
  * moment the car is slow enough inside the disc, and 0 км/ч is slow enough.
- * There is no floor anywhere in `ReachZoneParams`; `minSpeedKmh` does not
- * exist in `lessons/types.ts` at all.
  *
- * SO THIS FILE CANNOT FIX IT. Every remedy available to a TEMPLATE is a
- * different sentence in the title, and the sweep in §1 already made these
+ * THE FLOOR NOW EXISTS AND THIS FAMILY HAS NOT ADOPTED IT (2026-09-01).
+ * `minSpeedKmh` landed on `ReachZoneParams` for sc-ac-night-overdrive
+ * :b9d61410 and is authored on exactly one gate, one family over — so the
+ * exposure measured below is still the shipped behaviour of these five, and
+ * this ledger still measures rather than describes. What changed is that the
+ * remedy is now a number these rows can author rather than a term somebody has
+ * to build first; the last paragraph is the standing instruction.
+ *
+ * SO THIS FILE STILL CANNOT FIX IT ALONE. Every remedy available to a TEMPLATE
+ * is a different sentence in the title, and the sweep in §1 already made these
  * titles claim no more than a place and a pace. What is left is that the pace
  * itself is only half-measured, and that lives one module up.
  *

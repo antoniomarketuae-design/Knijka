@@ -518,6 +518,28 @@ export type ViolationCode =
   | "FOG_LIGHTS_OFF_IN_FOG" // второстепенна: dense fog without front fog lamps (AC-03, чл. 74)
   | "POOR_LANE_KEEPING" // второстепенна: sustained off-centre / straddling positioning
   | "SPEED_TOO_FAST_FOR_CONDITIONS" // второстепенна: within the limit but imprudent for rain/night
+  // THE OTHER SIDE OF THE SAME ENVELOPE (audit sc-vu-emergency-junction:853790f7).
+  // Every speed code in this file graded the FAST half only. A reference drive
+  // held 10–11 км/ч for over two minutes on a street posted 40 and booked
+  // nothing, while the flat-out leg of the same lesson was billed once a tick —
+  // so „пълзи и минаваш" was an unbeaten strategy across the whole lesson set.
+  // The duty is ЗДвП чл. 22, ал. 1 („без основателна причина с твърде ниска
+  // скорост… пречи"); there is NO statutory minimum, so the floor is derived
+  // from the POSTED limit and the code is второстепенна, exactly like its
+  // motorway sibling. See the detector in engine.ts for every acquittal.
+  | "DRIVING_TOO_SLOW_IN_TOWN" // второстепенна: sustained causeless crawl far under the posted limit on a through road (чл. 22, ал. 1)
+  // THE LIMIT CASE OF THE SAME ENVELOPE — audit sc-jx-priority-confidence:9c987e7b.
+  // Both crawl codes above require `moving` (v > movingSpeedKmh): a car at REST
+  // is descoped by construction, and `townReset` zeroes the crawl ledger the
+  // moment the driver recovers, so a stop-drive-stop-drive pass books nothing at
+  // all. On the lesson NAMED „без излишни спирания" the credited drive stood
+  // still for most of 88 s on an open priority road with a car glued to its
+  // bumper and read «Второстепенни 0 0 · ★★★». A stop is not a slow speed and
+  // needs its own duty: ЗДвП чл. 24, ал. 2 — before slowing significantly the
+  // driver must satisfy himself he will not endanger the others and will not
+  // „затрудни излишно тяхното движение". Config-gated OFF (needlessStopEnabled),
+  // armed per lesson: see the detector in engine.ts for every acquittal.
+  | "STOPPED_WITHOUT_CAUSE" // второстепенна: held at a standstill in a live lane on an open through road with nothing to stop for (чл. 24, ал. 2)
   | "FOLLOWING_TOO_CLOSE" // основна: tailgating — under the 2-second gap
   | "WRONG_WAY" // опасна: driving against a one-way street
   | "NOT_KEEPING_RIGHT" // второстепенна: hogging a left lane on a multi-lane road
@@ -1387,6 +1409,84 @@ export interface RuleEngineConfig {
    *  only by genuine recovery (back at/над the flow floor). */
   motorwaySlowSustainSec: number;
 
+  // -- THE TOWN HALF OF THE SPEED ENVELOPE (DRIVING_TOO_SLOW_IN_TOWN) --------
+  /**
+   * Master switch for the town-crawl detector. ON by default: the fault it
+   * grades — a car held at walking pace on a through street — is available on
+   * every ordinary district, and shipping it OFF would be the dead-predicate
+   * class the whole audit exists to stop.
+   */
+  townCrawlEnabled: boolean;
+  /**
+   * The POSTED limit at or above which a road counts as a through road for
+   * this detector, km/h.
+   *
+   * WHY A POSTED-LIMIT GATE AND NOT A LESSON LIST. Under 40 the plate itself
+   * says „this is a calmed place": every parking map in the corpus is posted
+   * 20 (all fourteen `lot-*`), the полигон is 20/30, `pk-drive-v1` and
+   * `sp-zone30-v1` are 30. Crawling there is not a fault, it is the exercise —
+   * and a Зона 30 is signed precisely so that people go slowly. So the arming
+   * condition and the duty are the same road by construction: чл. 22, ал. 1
+   * forbids obstructing OTHER traffic, and a 20 km/h aisle has none to obstruct.
+   */
+  townCrawlMinPostedKmh: number;
+  /**
+   * The crawl floor as a fraction of the posted limit — a PRODUCT threshold,
+   * not a statutory one (Bulgaria has no general minimum speed; see the
+   * catalogue row). Below `min(limit × this, townCrawlFloorCapKmh)` a steady,
+   * causeless car is a mobile obstacle. At 0.3 that is 12 км/ч on a road posted
+   * 40 and 15 on one posted 50 — walking-to-jogging pace, well under anything a
+   * cautious learner cruises at, and it is NEVER shown to the student as a legal
+   * limit (the copy states the rule and the article, and no guessed number).
+   */
+  townCrawlFractionOfLimit: number;
+  /** Absolute cap on that floor, km/h — so a 90 km/h out-of-town road does not
+   *  inherit a 27 km/h floor it has no urban flow to justify. */
+  townCrawlFloorCapKmh: number;
+  /** A junction, stop line or pedestrian ahead within this distance (m) is a
+   *  REASON to be slow — чл. 22, ал. 1 forbids the crawl „без основателна
+   *  причина", so a stated reason acquits before the clock ever runs. */
+  townCrawlClearAheadM: number;
+  /** Seconds of qualifying crawl (accrued, not consecutive) before the bill.
+   *  Far longer than the motorway's 4 s: town driving is legitimately full of
+   *  short slow stretches, and only a held, causeless crawl is the fault. */
+  townCrawlSustainSec: number;
+
+  // -- THE STOP THAT HAD NO REASON (STOPPED_WITHOUT_CAUSE) -------------------
+  /**
+   * Master switch for the needless-stop detector — OFF by default, armed per
+   * lesson through `ScenarioSpec.ruleConfig` (the `junctionScanObservationEnabled`
+   * / `followRainAwareEnabled` discipline), NOT the townCrawl "on everywhere"
+   * one.
+   *
+   * WHY THE TWO SPEED-ENVELOPE CODES SHIP ON AND THIS SHIPS OFF, since the
+   * difference is the whole risk calculus here. A crawl has ONE innocent shape
+   * (I am going slowly because something up the road says so) and the acquittal
+   * list below covers it. A STOP has dozens, and most of them are the curriculum
+   * itself: the stop-mark drills halt on a painted mark, the parking family
+   * halts in a bay, `sc-vp-police-stop` halts at the kerb, the pre-drive
+   * procedure is performed at a standstill, and dozens of lessons end at rest on
+   * their last objective. The rules module cannot see an objective, so it cannot
+   * tell „arrived" from „froze" — and a detector that convicts a student for
+   * finishing the exercise is worse than no detector at all. Armed per lesson,
+   * the author states that on THIS route, standing still is never the task.
+   */
+  needlessStopEnabled: boolean;
+  /**
+   * Seconds a causeless standstill must be HELD (consecutive — one stop is one
+   * act) before STOPPED_WITHOUT_CAUSE fires. One bill per stop; driving on
+   * re-arms it, so a driver who stops needlessly twice is billed twice.
+   *
+   * Sized against the neighbours rather than picked: `hesitationSustainSec` is
+   * 5 s for a freeze at a GREEN light — where a signal is actively telling the
+   * driver to go — and `banZoneStopRestSec` is 4 s. Six is longer than both,
+   * because here nothing at all is instructing the driver, and it is 3× the
+   * longest authored rest in this template's own committed traces (the
+   * phantom-brake demo pauses 2.0 s, the shadow 1.5 s at the end of the route),
+   * so neither drive changes shape.
+   */
+  needlessStopSustainSec: number;
+
   /**
    * Чл. 58, т. 4 „да се движи… в лентата за принудително спиране" — seconds of
    * sustained DRIVING in the emergency lane before EMERGENCY_LANE_DRIVING
@@ -1658,6 +1758,20 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   motorwaySlowSteadyMeanWindowSec: 1,
   motorwaySlowQueueGapM: 60,
   motorwaySlowSustainSec: 4,
+  // The town half. Every number is an authored detection threshold, not a
+  // statutory one — see the interface notes for what each one buys.
+  townCrawlEnabled: true,
+  townCrawlMinPostedKmh: 40, // under 40 the plate itself says „calmed place"
+  townCrawlFractionOfLimit: 0.3, // 12 км/ч on a 40 road, 15 on a 50
+  townCrawlFloorCapKmh: 15,
+  // NOTE there is deliberately no queue-gap figure: any vehicle ahead in the
+  // player's own corridor acquits at any distance, because чл. 22, ал. 1 is
+  // about obstructing OTHERS and the car that obstructs is the one in front.
+  // The argument in full is at the detector in engine.ts.
+  townCrawlClearAheadM: 25,
+  townCrawlSustainSec: 20,
+  needlessStopEnabled: false, // armed per lesson — see the field's own note
+  needlessStopSustainSec: 6,
   // 3 s: an accidental clip of the lane edge can never hold it; the shortest
   // deliberate undertake does (≈ 90+ m at motorway speed).
   emergencyLaneSustainSec: 3,

@@ -32,6 +32,47 @@ export const DEFAULT_ROUTE_OPTIONS: RouteOptions = {
   minLoopM: 150,
 };
 
+/**
+ * Where loop seeds are drawn from.
+ *
+ * ONE POINT IS NOT ENOUGH FOR A LESSON THAT TRAVELS (2026-09-01,
+ * `sc-ed-d2-priority-run:76d2e929` — „a priority lesson with ZERO moving
+ * traffic … the right drive burned 90 s of «lawful waits» standing still for a
+ * car that never comes").
+ *
+ * Routes are built ONCE, at construction, from lanes near `{x, y}` — the
+ * player's spawn — and every agent then orbits its loop forever. On a micro-map
+ * that is the whole world and the anchor is invisible. On a 927 m exam cut of
+ * real Лозенец it is a defect with a shape: measured over the committed
+ * shadow drive of `sc-ed-d2-priority-run` (150 s, spawn → Златовръх), with the
+ * anchor at the spawn and six cars, the nearest ambient vehicle went
+ *
+ *   t=0 s   13 m …  t=50 s   90 m │ t=60 s  223 m … t=150 s  630 m
+ *
+ * — a busy first minute, and then a street that empties out and never refills,
+ * because the student drives 900 m away from the only place cars were ever
+ * seeded. Raising the COUNT does not answer it (the far end is out of radius at
+ * any density) and raising the RADIUS answers it worse (the pool then spreads
+ * over the whole 21.7 km cut and the corridor gets thinner, not fuller).
+ *
+ * So `alongPath` names the rest of the lesson's own route. Each station gets
+ * its own pool, and the routes are dealt across the stations evenly, so a
+ * corridor with three loops in it puts one near the start, one in the middle
+ * and one at the finish rather than three at the kerb the student left.
+ *
+ * `alongPath` absent (or empty) ⇒ ONE station ⇒ the pool, the rng draw order
+ * and therefore every route are bit-identical to before. Every caller that does
+ * not opt in — the recorder, the clip feeds, ~50 fixtures, all 105 districts —
+ * is untouched by construction.
+ */
+export interface RoutePreference {
+  x: number;
+  y: number;
+  radiusM: number;
+  /** Further stations along the lesson's route, in route order. */
+  alongPath?: readonly { x: number; y: number }[];
+}
+
 export function buildRoutes(
   graph: LaneGraph,
   count: number,
@@ -39,31 +80,64 @@ export function buildRoutes(
   opts: RouteOptions = DEFAULT_ROUTE_OPTIONS,
   /** Prefer loop seeds whose start point is near here (keeps traffic where the
    *  driver is). Falls back to the nearest lanes if too few are in radius. */
-  preferNear?: { x: number; y: number; radiusM: number },
+  preferNear?: RoutePreference,
 ): TrafficRoute[] {
-  let pool = [...graph.loopLanes].sort((a, b) => a - b);
-  if (pool.length === 0) return [];
+  const all = [...graph.loopLanes].sort((a, b) => a - b);
+  if (all.length === 0) return [];
 
-  if (preferNear) {
-    const { x, y, radiusM } = preferNear;
+  // One seed pool per station — `[anchor, ...alongPath]`, or the whole graph
+  // when nobody said where the driver is going to be.
+  const radiusM = preferNear ? preferNear.radiusM : 0;
+  const stations = preferNear
+    ? [{ x: preferNear.x, y: preferNear.y }, ...(preferNear.alongPath ?? [])]
+    : [];
+  // Each station serves its share of the loops, so the „enough nearby seeds"
+  // bar is measured against what THIS station is being asked for. With one
+  // station that share is `count` and the arithmetic below is the original.
+  const perStation = Math.ceil(count / Math.max(1, stations.length));
+  const pools: number[][] = [];
+  for (const station of stations) {
     const d2 = (li: number) => {
       const lane = graph.lanes[li];
-      const dx = lane.px[0] - x;
-      const dy = lane.py[0] - y;
+      const dx = lane.px[0] - station.x;
+      const dy = lane.py[0] - station.y;
       return dx * dx + dy * dy;
     };
-    const byDist = [...pool].sort((a, b) => d2(a) - d2(b));
+    const byDist = [...all].sort((a, b) => d2(a) - d2(b));
     const inRadius = byDist.filter((li) => d2(li) <= radiusM * radiusM);
-    // Enough nearby seeds → use them; otherwise take the nearest handful so
-    // traffic still clusters toward the anchor rather than scattering.
-    pool = inRadius.length >= Math.max(6, count * 2)
-      ? inRadius
-      : byDist.slice(0, Math.max(12, count * 3));
+    if (stations.length === 1) {
+      // Enough nearby seeds → use them; otherwise take the nearest handful so
+      // traffic still clusters toward the anchor rather than scattering.
+      pools.push(
+        inRadius.length >= Math.max(6, perStation * 2)
+          ? inRadius
+          : byDist.slice(0, Math.max(12, perStation * 3)),
+      );
+      continue;
+    }
+    // A CORRIDOR STATION DRAWS FROM ITS NEAREST LANES, NOT FROM ITS WHOLE DISC.
+    // The single-anchor rule above picks uniformly out of everything inside the
+    // radius, which is right when that disc IS the lesson; along a 900 m
+    // corridor it hands each station a 300 m-wide lottery and the four stations
+    // end up drawing from largely the same lanes. Measured on
+    // sc-ed-d2-priority-run with 8 cars, that left the last 40 s of the drive
+    // with nothing inside 160 m — the same empty street, moved. `inRadius` is a
+    // PREFIX of `byDist` (same order, filtered by distance), so this is simply
+    // „the nearest few, and never past the radius unless the station is
+    // genuinely lane-poor".
+    pools.push(
+      (inRadius.length >= 4 ? inRadius : byDist).slice(0, Math.max(8, perStation * 3)),
+    );
   }
+  if (pools.length === 0) pools.push(all);
   const routes: TrafficRoute[] = [];
   const usedStartNodes = new Set<string>();
 
   for (let r = 0; r < count; r++) {
+    // Deal the loops ACROSS the corridor rather than round-robin: with fewer
+    // loops than stations, `r % pools.length` would crowd the first few and
+    // leave the finish empty — which is the defect this exists to end.
+    const pool = pools[Math.min(pools.length - 1, Math.floor((r * pools.length) / count))];
     let route: TrafficRoute | null = null;
     for (let attempt = 0; attempt < 8 && !route; attempt++) {
       // Prefer start lanes at nodes no other route starts from.

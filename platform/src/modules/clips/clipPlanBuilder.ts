@@ -224,6 +224,11 @@ const PROFILE_BG: Readonly<Record<string, string>> = {
   car: "Автомобил",
   van: "Ван",
   truck: "Камион",
+  // VU-11 / ЗДвП чл. 67. Without this row a "bus"-profile actor falls back to
+  // „Автомобил", which is the same defect the rig fixed wearing a different
+  // hat: the whole duty is owed to a ППС от редовна линия, so the clip card
+  // has to name one.
+  bus: "Автобус",
   emergency: "Автомобил със специален режим",
   tram: "Трамвай",
   cyclist: "Велосипедист",

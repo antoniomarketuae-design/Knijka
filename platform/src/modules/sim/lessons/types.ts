@@ -38,6 +38,27 @@ export interface ReachZoneParams {
   /** When set, the zone only completes at/below this speed (km/h). */
   maxSpeedKmh?: number;
   /**
+   * THE SAME SPEED CONTRACT, READ FROM UNDERNEATH — the authoring half of the
+   * eleventh arrival demand (sc-ac-night-overdrive:b9d61410, critical).
+   *
+   * A ceiling alone is satisfied by a car at walking pace, so «Мини участъка
+   * със съобразена за видимостта скорост» ticked green at 15 км/ч. When set,
+   * the zone completes only at/above this speed too, and the band is
+   * [minSpeedKmh, maxSpeedKmh].
+   *
+   * The full design note — the geometry it borrows from the cap, the slack it
+   * mirrors, why the number may NOT be derived from the banner, and the
+   * anti-trap re-earn — lives on `ReachZoneWitnessDemands.minSpeedKmh`
+   * (objectives.ts), which is where the evaluator reads it.
+   *
+   * NOT LADDERED (`scenario/params.ts serializeObjectiveParams` carries it
+   * through untouched while `widenSpeedCap` raises the ceiling), so the band is
+   * WIDEST at L1 and the authored number must be comfortable at the rung with
+   * the most help. `parseSpeedFloor` refuses a band narrower than
+   * REACH_ZONE_CAP_SLACK_KMH outright, so a gate nobody can drive cannot ship.
+   */
+  minSpeedKmh?: number;
+  /**
    * B18 residual / FR-24 (founder: „the green circle that is stating where the
    * car to stop is actually putted AFTER the stop marked line on the road …
    * I have to stop BEFORE the line not after it").
@@ -167,7 +188,64 @@ export interface ReachZoneParams {
    * the census.
    */
   requireRailClear?: true;
+  /**
+   * THE CAR DID NOT REST WHERE THE BANNER SAYS IT DID NOT — sc-pk-rail-ban:
+   * 84bce2a3 (critical), and the third term this file's own templates route
+   * here rather than invent an instrument for.
+   *
+   * WHAT WAS ACTUALLY WRONG, off `w16/frames/sc-pk-rail-ban__mobile-wrong`.
+   * One debrief, eight seconds apart:
+   *
+   *   Грешки              ✗ Спиране в забранена зона −3 изпитни т.
+   *                         ОСНОВНА ГРЕШКА                        в 1:11
+   *   Задачи от маршрута  ✓ Подмини цялата забранена зона, БЕЗ
+   *                         ПРЕСТОЙ В НЕЯ                            1:19
+   *
+   * The product convicts the student of resting inside the чл. 98 zone and
+   * then certifies, on the same screen, that he passed that zone without
+   * resting. `sc-pkr-past-zone` is `{kind:"reachZone", x:4.06, y:275,
+   * radiusM:6}` — a disc 19 m past the zone's end. Arrival was the whole
+   * certificate, and «без престой в нея» was a sentence nothing measured.
+   *
+   * THE MEASUREMENT ALREADY EXISTS; ONLY THE READ WAS MISSING. Nothing new
+   * observes anything here — `rules/engine.ts` bills `ILLEGAL_STOP_IN_BAN_ZONE`
+   * (основна) for a rest inside an authored no-stopping span (`tick.noStopZone`) and
+   * `RAIL_CROSSING_VIOLATION` detail `"stopped-on-track"` (опасна) for a rest
+   * between the rails, both with their catalogue explanation, their «✔
+   * Правилното действие» corrective and their law refs. This term makes the
+   * credit read the conviction the same protocol has already written, exactly
+   * as `requireNoContact` reads the collision and `requireRailClear` reads the
+   * barred entry.
+   *
+   * WHICH LEDGER ROW FALSIFIES WHICH BANNER — `banZone` reads
+   * ILLEGAL_STOP_IN_BAN_ZONE, `railBand` reads RAIL_CROSSING_VIOLATION detail
+   * "stopped-on-track". SPLIT, NOT POOLED, on the rule `ReachZoneYieldDemand`
+   * states in full: on this very drill the two acts are six metres and two
+   * severity classes apart, and «Премини коловоза … без да спираш ВЪРХУ
+   * РЕЛСИТЕ» is not falsified by a rest fifty metres short of them. A pooled
+   * kind would withdraw a certificate for something it never claimed.
+   *
+   * A CLAIM ABOUT THE JOURNEY, so it is read per frame off the run's own
+   * ledger and stays outside the `capMet` latch — the shape of the fourth,
+   * fifth and sixth demands. The full design note (why the read is run-wide
+   * rather than windowed, the census, the shown-but-not-charged half and the
+   * two false-refusal risks that were checked before it shipped) lives on
+   * `ReachZoneWitnessDemands.requireRestClean` in objectives.ts, which is where
+   * the evaluator reads it.
+   */
+  requireRestClean?: ReachZoneRestDemand;
 }
+
+/**
+ * Which forbidden stretch a «без престой / без да спираш» banner is about.
+ *
+ * Declared here rather than in objectives.ts because this is the AUTHORED half
+ * — templates write the key into `ScenarioObjectiveSpec.params`, which is this
+ * union's `ReachZoneParams` — and objectives.ts already imports from this file
+ * (the reverse edge would be a cycle). `ReachZoneYieldDemand`, whose key is
+ * parsed but never authored, lives the other way round.
+ */
+export type ReachZoneRestDemand = "banZone" | "railBand";
 
 /**
  * Vehicle crossed a stop line of the given control type near a district node.

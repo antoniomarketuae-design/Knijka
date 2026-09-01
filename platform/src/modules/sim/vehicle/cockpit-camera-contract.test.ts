@@ -60,6 +60,11 @@ import {
   COCKPIT_PITCH_BASE,
   cockpitVFovForAspect,
 } from "./tuning";
+import { BEZEL_W, FACE_W } from "@/modules/sim/cockpit";
+import {
+  COCKPIT_CLUSTER_LEFT_PCT,
+  DECK_ROOMY_CLUSTER_GUTTER_PX,
+} from "@/modules/sim/hud";
 
 // --- Landmarks (see provenance above) ---------------------------------------
 const LANDMARKS = {
@@ -73,6 +78,25 @@ const LANDMARKS = {
   wheelTop: { x: 0.34, y: 0.484, z: 0.431 },
   /** Instrument-cluster screen centre (GLB screen_cluster, v2: −2.5 cm). */
   cluster: { x: 0.34, y: 0.399, z: 0.7106 },
+  /**
+   * The binnacle's OUTBOARD (car-left) edge — the left edge of the painted
+   * instrument as the driver sees it, and therefore the lane no HUD panel may
+   * cross. +X is car-left and the camera looks along +Z through FLIP_Y, so this
+   * point projects to the LEFT of the cluster centre on screen.
+   *
+   * Half-width provenance, from the two files that build the thing:
+   *   CLUSTER_FACE_W_M = 0.285 m   (`components/sim/vitok/VitokCockpit.tsx`,
+   *     module-private — the face sized so the whole binnacle lands on the
+   *     authored 0.30 × 0.15 m `screen_cluster` quad)
+   *   the bezel stands proud of the face by BEZEL_W per side of a FACE_W-wide
+   *     design plate (`modules/sim/cockpit/clusterLayout.ts`), so the outer
+   *     housing is that much wider than the face.
+   */
+  clusterLeftEdge: {
+    x: 0.34 + (0.285 / 2) * (1 + (2 * BEZEL_W) / FACE_W),
+    y: 0.399,
+    z: 0.7106,
+  },
   /** Interior rear-view mirror glass centre (GLB hotspot_mirror_rear) — RAISED
    *  to a small header-mounted housing in the 2026-07-11 black-mass fix (was
    *  (0, 0.687, 0.575), the eye-level block that the v2 camera dropped into the
@@ -200,6 +224,51 @@ describe("frame composition bands at 16:9 (founder contract: world ≥65%)", () 
   it("instrument cluster is readable inside the interior band", () => {
     expect(f.cluster.y).toBeGreaterThan(0.1);
     expect(f.cluster.y).toBeLessThan(f.cowl.y);
+  });
+
+  // ── THE HUD MAY NOT PARK ON THE INSTRUMENT — sc-ln-obstacle-meeting:db54b249.
+  //
+  // The demonstration deck's roomy-open width is capped by a PERCENTAGE lane
+  // (`COCKPIT_CLUSTER_LEFT_PCT`, modules/sim/hud/notifyColumn.ts) so its right
+  // edge stops short of the binnacle. That percentage is a projection of THIS
+  // camera, and the instrument is inside the canvas — no DOM probe can see it,
+  // so nothing else would notice a retune sliding the two into each other. This
+  // file already declares itself the contract for exactly that: "any future
+  // camera tune must keep this green or CONSCIOUSLY change the bands here".
+  it("the HUD's cluster lane is the binnacle's own projected left edge", () => {
+    expect(f.clusterLeftEdge.x * 100).toBeCloseTo(COCKPIT_CLUSTER_LEFT_PCT, 2);
+    // Left of the centre it belongs to, and left of the wheel rim it sits behind.
+    expect(f.clusterLeftEdge.x).toBeLessThan(f.cluster.x);
+    expect(f.clusterLeftEdge.x).toBeLessThan(f.wheelTop.x);
+  });
+
+  // WHY A PERCENTAGE OF THE STAGE IS LEGITIMATE AT ALL: doc 71 §4.9 holds the
+  // ~75.4° HORIZONTAL FOV constant across window shapes, so the x-projection of
+  // anything in the cabin does not move with the window. The lane is a fraction
+  // of the stage width and stays true on every desktop shape ABOVE the vFOV
+  // clamp; below it (`COCKPIT_FOV_MAX`, aspect ≲1.454) the hFOV shrinks and the
+  // binnacle spreads outward, which is the documented floor on that constant.
+  it("holds the cluster lane on every stage shape above the vFOV clamp", () => {
+    for (const aspect of [3, 2.4, 1.92, COCKPIT_ASPECT_REF, 1.6, 1.46]) {
+      const edge = frameFraction(buildCockpitCamera(aspect), LANDMARKS.clusterLeftEdge);
+      expect(edge.x * 100).toBeCloseTo(COCKPIT_CLUSTER_LEFT_PCT, 2);
+    }
+    // …and it really does move once the clamp bites, so the caveat on the
+    // constant is a measured limit and not a hedge.
+    const squareish = frameFraction(buildCockpitCamera(1.1), LANDMARKS.clusterLeftEdge);
+    expect(squareish.x * 100).toBeLessThan(COCKPIT_CLUSTER_LEFT_PCT - 1);
+  });
+
+  // The gutter is a real gap and not a rounding artefact: 8 px of a 1166 px
+  // stage — the width of the 1440 × 900 lesson frame this row was filed on — is
+  // 0.69 % of the lane, so the deck's right edge lands clear of the binnacle
+  // rather than tangent to it.
+  it("keeps a visible gutter between the deck's right edge and the binnacle", () => {
+    const stageWidthPx = 1166;
+    const laneLeftPx = (COCKPIT_CLUSTER_LEFT_PCT / 100) * stageWidthPx;
+    const deckRightPx = laneLeftPx - DECK_ROOMY_CLUSTER_GUTTER_PX;
+    expect(laneLeftPx - deckRightPx).toBe(DECK_ROOMY_CLUSTER_GUTTER_PX);
+    expect(deckRightPx).toBeLessThan(f.clusterLeftEdge.x * stageWidthPx);
   });
 
   it("glass-top / header edge is at ≥0.97 — out of frame at rest", () => {

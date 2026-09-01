@@ -44,6 +44,11 @@ export type { QualityPreset } from "./components/quality";
 // read the same ruling the texture loaders do.
 export { TEXTURE_BUDGETS, groundMapsOf, facadeMapsOf } from "./textures/textureBudget";
 export type { TextureBudget, GroundMapsMode } from "./textures/textureBudget";
+// AC-12's depiction channel (sweep161 sc-ac-crosswind:e0b9507e). The WRITER is
+// outside this module — `components/sim/VehicleRig` owns the only thing that
+// knows the live gust phase, `VehicleSim.windLateralNow` — so the setter is
+// public while the shader hook stays internal to the prop materials.
+export { setWindSway, getWindSway, WIND_SWAY_MAX_M } from "./textures/windSway";
 
 export { assertDistrict } from "./types";
 export type {

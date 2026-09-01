@@ -152,8 +152,25 @@ describe("the detectors DO fire on the drives the sweep called silent", () => {
      * not the untagged case — but a future district can be, silently, and this
      * pins the dependency rather than leaving it to be rediscovered from a
      * screenshot.
+     *
+     * EXPECTATION CORRECTED 2026-09-01 (audit sc-vu-emergency-junction:853790f7),
+     * AND THE CLAIM IT MAKES IS NOW STRONGER, NOT WEAKER. This case used to read
+     * „bills nothing", and it was right about the motorway rule and wrong about
+     * the drive: thirteen km/h held for forty seconds on an open road is the
+     * fault ЗДвП чл. 22, ал. 1 describes, and until today NOTHING in the engine
+     * graded the slow half of the envelope. `DRIVING_TOO_SLOW_IN_TOWN` does, so
+     * the assertion now says both halves of what this test was always for — the
+     * MOTORWAY code stays map-fed and silent on an untagged edge (the original
+     * point, asserted directly instead of via an empty list), and the drive is
+     * no longer ungraded. Widening the motorway rule to cover this would be the
+     * bug this case exists to prevent; the two lines below go red if anyone does.
      */
-    expect(violations(drive(held(40, { speedKmh: 13, maxSpeedKmh: 130 })).events)).toEqual([]);
+    const seen = violations(drive(held(40, { speedKmh: 13, maxSpeedKmh: 130 })).events);
+    expect(seen.map(([code]) => code)).not.toContain("DRIVING_TOO_SLOW_FOR_MOTORWAY");
+    expect(seen).toEqual([
+      ["DRIVING_TOO_SLOW_IN_TOWN", 20],
+      ["DRIVING_TOO_SLOW_IN_TOWN", 30],
+    ]);
   });
 
   it("the lawful side of both bands stays innocent", () => {

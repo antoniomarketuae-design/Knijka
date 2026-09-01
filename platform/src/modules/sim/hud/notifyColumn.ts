@@ -795,6 +795,92 @@ export const NOTIFY_COLUMN_DECK_RESERVE_PX = 248;
  */
 export const DECK_ROOMY_OPEN_LEFT_CSS = `calc(0.75rem + env(safe-area-inset-left, 0px))`;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE LEFT CORRIDOR IS NOT EMPTY EITHER: THE SPEEDOMETER IS IN IT.
+   `sc-ln-obstacle-meeting:db54b249`, sweep 161, `pc-right/04-t066s.png`.
+
+   Every lane in this file so far has arbitrated the deck against another DOM
+   panel — the map toggle, the notification column, the keyboard legend, the
+   ribbon legend. The 0.4 road law above was written the same way: it asks where
+   the ROAD's centre band is and reserves it. Nothing had ever asked where the
+   CAR's own instrument is, because the instrument is not a DOM node — it is
+   `screen_cluster`, geometry painted inside the canvas
+   (`components/sim/cockpit/InstrumentCluster.tsx` portalled onto the interior
+   GLB), so every overlap probe in `tools/mobile` — all of which resolve an
+   owner with `closest([data-hud])` — reads straight through it. FOURTH time in
+   this file's history that a surface went unmeasured because it had no name;
+   the other three are recorded above.
+
+   WHERE IT IS, and it is DERIVED, not chosen. The binnacle's left edge is a
+   projection of the shipped cockpit camera, and `cockpit-camera-contract.test.
+   ts` — the file that owns that camera — asserts this number against it, so a
+   pitch or FOV retune cannot silently move the instrument under this panel:
+
+     eye (0.24, 0.71, −0.255) · vFOV 47 @ 16:9 · pitch −4°   (vehicle/tuning.ts)
+     binnacle half-width = CLUSTER_FACE_W_M/2 · (1 + 2·BEZEL_W/FACE_W)
+                         = 0.1425 · 1.0625 = 0.151406 m       (cockpit/*)
+     → left edge at fx 0.33490 of the stage width
+
+   IT IS THE SAME NUMBER ON EVERY DESKTOP, which is what makes a percentage
+   lane legitimate here: doc 71 §4.9 holds the ~75.4° HORIZONTAL FOV constant
+   across window shapes (`cockpitVFovForAspect`), so the projection is invariant
+   in x. Computed at aspects 3.0 / 2.4 / 1.92 / 16:9 / 1.6 it is 0.33490 to five
+   places at every one, and the lesson stage is `aspect-video` — exactly 16:9,
+   letterboxed by `LessonPlayShell` — so the standard play area is dead centre
+   of that band.
+
+   THE COLLISION IT CLOSES. Deck right edge = 12 + min(416, 40 % − 12); binnacle
+   left = 0.3349 · W. On the 1440 × 900 frame the row was filed on (stage 1166 ×
+   656) that is 428 against 390.5 — **37.5 px of panel over the dial**, and the
+   dial is the half of the cluster that is under it: `clusterLayout.ts` puts
+   DIAL_CX at −164 of a 512-wide face, i.e. the dial owns the face's LEFT panel,
+   and `dialAngleRad` starts 0 km/h at 225° and sweeps 270° clockwise — so the
+   arc from 0 to ≈70 km/h, its numerals and the needle at every learner speed
+   all sit inside the covered band. That dial was pushed left and lifted for the
+   stated reason that „the 0–40 km/h ticks — the ones a learner actually drives
+   on" must clear the steering-wheel rim; they cleared the rim and went under a
+   scrub bar instead. The exact digits and the gear letter live in the face's
+   RIGHT panel and were never covered, which is why the row reads „minor".
+
+   IT IS NOT A STATE THE STAND-DOWN ALREADY HANDLES. `demoDeckLifetime.ts` now
+   parks the replay at 0:00 and collapses the deck above 5 km/h, so the filed
+   frame (11 км/ч, playhead 0:48) cannot recur — but the deck opens by DEFAULT
+   on a roomy stage, and the frames it opens on are the ones where the student
+   is stationary, reading the briefing, with the cluster reading 0 км/ч under
+   the panel. `03-ready.png` of the same drive is that frame.
+
+   WHY THE DECK YIELDS AND NOT THE INSTRUMENT: the same arbitration this file
+   has run four times. The instrument is the CAR; it cannot be moved, capped or
+   scrolled, and „yes currently can read the speedometer" is the founder's own
+   acceptance line on the cockpit camera. The deck is furniture and it is the
+   newcomer to this corridor (2026-08-10 moved it here).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The instrument binnacle's LEFT edge as a percentage of the stage width — the
+ * lane no HUD panel may cross on a roomy stage. Provenance and the invariance
+ * argument are in the block above; `cockpit-camera-contract.test.ts` re-derives
+ * it from the shipped camera constants and fails if the two drift.
+ *
+ * ⚠ IT IS THE hFOV-HOLD VALUE, and that band has a floor. Below aspect ≈1.454
+ * `cockpitVFovForAspect` clamps at `COCKPIT_FOV_MAX` (56) and the hFOV starts
+ * shrinking instead, which spreads the binnacle outward: fx 0.3286 at 1.40,
+ * 0.2600 at 1.00. This lane under-reserves there. It is left at the hold value
+ * deliberately — the lesson stage is `aspect-video`, so the only way to reach
+ * the clamp is the immersive arm on a near-square window, and reserving for
+ * aspect 1.0 would cut the deck to ~90 px on every normal desktop to protect a
+ * shape nobody drives in. The 0.4 road law is what still governs there.
+ */
+export const COCKPIT_CLUSTER_LEFT_PCT = 33.49;
+
+/**
+ * …and the gap the deck keeps off it. 8 px is this HUD's gutter everywhere it
+ * separates two boxes (`DECK_ROOMY_LEGEND_GUTTER_PX`,
+ * `NOTIFY_COLUMN_MIRROR_GUTTER_PX`), and it also absorbs the panel's own
+ * `shadow-glow-sm`, which paints outside its border box.
+ */
+export const DECK_ROOMY_CLUSTER_GUTTER_PX = 8;
+
 /**
  * ROOMY, OPEN: wide enough that the transport stops wrapping.
  *
@@ -809,12 +895,15 @@ export const DECK_ROOMY_OPEN_LEFT_CSS = `calc(0.75rem + env(safe-area-inset-left
  * and same reason as `DECK_COMPACT_OPEN_WIDTH_CSS` in landscape.
  *
  * `min()` because a roomy stage starts at 641 px (`COMPACT_MAX_WIDTH_PX`), and
- * 416 px of deck on a 641 px stage is two thirds of the picture. 40 % is the
- * mirror of the column's own contract — `NOTIFY_COLUMN_MIN_LEFT_FRACTION` says
- * a RIGHT panel may not come left of 0.6, so a LEFT panel may not come right of
- * 0.4 — which keeps the road's centre band clear on any width.
+ * 416 px of deck on a 641 px stage is two thirds of the picture. The second
+ * term used to be 40 % — the mirror of the column's own contract
+ * (`NOTIFY_COLUMN_MIN_LEFT_FRACTION` says a RIGHT panel may not come left of
+ * 0.6, so a LEFT panel may not come right of 0.4), which keeps the ROAD's
+ * centre band clear on any width. It is now the cluster lane below, which is
+ * strictly tighter than 0.4 on every stage — so the road law still holds, by
+ * construction, and is no longer the binding one.
  */
-export const DECK_ROOMY_OPEN_WIDTH_CSS = `min(26rem, calc(40% - 0.75rem))`;
+export const DECK_ROOMY_OPEN_WIDTH_CSS = `min(26rem, calc(${COCKPIT_CLUSTER_LEFT_PCT}% - 0.75rem - env(safe-area-inset-left, 0px) - ${DECK_ROOMY_CLUSTER_GUTTER_PX}px))`;
 
 /**
  * ROOMY: the teach card's box, px — a CONSTANT, for the reason the touch one is.
@@ -880,8 +969,32 @@ export const DECK_ROOMY_CAPTION_HEIGHT_PX = 138;
  * information, scrolls, and is hidden on every phone. Measured after each
  * change at 1264 × 619: the legend still lays out with its expander pinned, the
  * ribbon legend still lands on stage, and not one binding is lost.
+ *
+ * ── AND IT PAYS FOR THE CLUSTER LANE — `sc-ln-obstacle-meeting:db54b249`.
+ *
+ * `DECK_ROOMY_OPEN_WIDTH_CSS` now stops at the binnacle instead of at 40 %, so
+ * on the 1166 px stage the deck is 370 px rather than 416 — under the 26 rem
+ * knee that width constant's own table measured. `DECK_ROOMY_TRANSPORT_WRAP_PX`
+ * is what a wrapped row costs (135 → 175 at 22 rem, the same table), and it is
+ * added here for ONE reason: this constant is the deck's `max-height`, and the
+ * caption is the flex child that gives when it binds. Without the extra row the
+ * cap would shrink the caption box below the 138 px that
+ * `tools/mobile/deck-captions.mjs` measured as the tallest authored annotation
+ * in the bank — i.e. it would start clipping authored prose (THEO-4) to buy
+ * room for a transport that had grown a line.
+ *
+ * IT IS SIZED FOR THE WORSE OF THE TWO OUTCOMES, deliberately. 370 px sits
+ * between the two measured points (352 wraps, 416 does not) and no browser has
+ * been put on it, so the row may still lay out on one line. If it does, this
+ * reserve is 40 px generous and the cost is 40 px of the keyboard legend's cap
+ * — the surface this block already names as the payer, which scrolls, keeps its
+ * expander pinned and is not rendered on a phone at all. If it wraps, the cap
+ * fits it exactly and no caption is clipped. Over-reserving costs scroll;
+ * under-reserving costs the sentence, and the sentence is the product.
  */
-export const DECK_ROOMY_OPEN_HEIGHT_PX = 135 + 6 + DECK_ROOMY_CAPTION_HEIGHT_PX;
+export const DECK_ROOMY_TRANSPORT_WRAP_PX = 40;
+export const DECK_ROOMY_OPEN_HEIGHT_PX =
+  135 + DECK_ROOMY_TRANSPORT_WRAP_PX + 6 + DECK_ROOMY_CAPTION_HEIGHT_PX;
 
 /**
  * …and what the keyboard legend keeps above it. 8 px is this HUD's gutter

@@ -30,8 +30,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRef } from "react";
 import { describe, expect, it } from "vitest";
 import type { ScenarioTrace, TraceClock } from "@/modules/sim/traces";
+import { DECK_ROOMY_CAPTION_HEIGHT_PX } from "@/modules/sim/hud";
 import { TraceTimeline } from "../TraceTimeline";
-import { DEMO_DECK_MOVING_KMH, demoDeckStandsDown } from "../demoDeckLifetime";
+import {
+  DEMO_DECK_MOVING_KMH,
+  demoDeckNarrates,
+  demoDeckStandsDown,
+} from "../demoDeckLifetime";
 
 const CAPTION_BG = "Спряхме плътно вдясно, извън платното за движение.";
 
@@ -57,10 +62,16 @@ function traceWithCaption(): ScenarioTrace {
   };
 }
 
-function render(standDown: boolean): string {
+function render(standDown: boolean, awaitsAudience = false): string {
   const clockRef = createRef<TraceClock>() as React.RefObject<TraceClock>;
   return renderToStaticMarkup(
-    <TraceTimeline trace={traceWithCaption()} clockRef={clockRef} compact standDown={standDown} />,
+    <TraceTimeline
+      trace={traceWithCaption()}
+      clockRef={clockRef}
+      compact
+      standDown={standDown}
+      awaitsAudience={awaitsAudience}
+    />,
   );
 }
 
@@ -92,9 +103,18 @@ function captionBoxInner(html: string): string {
 }
 
 describe("the demonstration's caption stands down when the student drives", () => {
-  it("is on the glass while the student has not started — the demo is the point", () => {
+  it("is on the glass on an engaged deck — standing down is not never showing it", () => {
     // The guard rail for the fix: standing the deck down must not be a way of
     // never showing the demonstration at all.
+    //
+    // ── THE TITLE OF THIS CASE USED TO SAY „while the student has not started"
+    // AND THAT IS NO LONGER WHAT IT HOLDS (2026-09-01, sc-ov-keep-right:
+    // 6751402d). It never tested that: `awaitsAudience` defaults to false, so
+    // what this row proves is that a deck WITH an audience — the Scenario
+    // Studio, the dev clip routes, and a lesson deck after ▶ — still captions.
+    // A lesson's own deck opens awaiting one; that is the block below, and
+    // leaving this title standing would have been a passing test vouching for
+    // behaviour the product had stopped having.
     expect(captionBoxInner(render(false))).toContain(CAPTION_BG);
   });
 
@@ -190,5 +210,93 @@ describe("what counts as the student having started", () => {
     // instrumentation is broken, where the student needs it most.
     expect(demoDeckStandsDown(Number.NaN)).toBe(false);
     expect(demoDeckStandsDown(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+});
+
+/**
+ * =============================================================================
+ * …AND THE VOICE WAITS FOR THE AUDIENCE AT THE OTHER END OF THE SAME LIFETIME
+ * — sc-ov-keep-right:6751402d (major), 2026-09-01.
+ * =============================================================================
+ *
+ * `demoDeckAtRest` parked the CLOCK at 0:00 and left the CAPTION printing, and
+ * the stand-down block at the top of `demoDeckLifetime.ts` had already written
+ * down why those are two facts: „the deck must both stop the clock AND stop
+ * rendering the caption; either alone leaves a frame like these." `tSec = 0` is
+ * inside the window of every annotation authored at 0, so the parked deck
+ * printed the demonstration's first sentence in a solid card over the middle of
+ * the windscreen from the lesson's first frame.
+ *
+ * THE FRAME IS ON THE CURRENT BUILD, not on the one the row was filed against:
+ * `.audit-frames/w21/frames/sc-ov-keep-right__pc-right/01-arrival.png` — 0 км/ч,
+ * «ЗАДАЧА 1/2» unstarted, transport reading «0:00 / 0:33» with ▶ unpressed, and
+ * «Започваш в ЛЯВАТА лента — мястото ти не е тук…» on the carriageway.
+ *
+ * The rows below hold both directions, because „no caption ever" would answer
+ * the finding by deleting the demonstration.
+ */
+describe("a demonstration nobody has asked for does not caption", () => {
+  it("is silent at rest on a deck that awaits its audience", () => {
+    expect(captionBoxInner(render(false, true))).not.toContain(CAPTION_BG);
+    // …and the transport is untouched, so the way to the demonstration is the
+    // control it always was. Deleting the deck is not this fix.
+    expect(render(false, true)).toContain('data-hud="deck-caption"');
+    // A state-independent transport control — the ▶/⏸ label depends on the
+    // clock mirror's seed and would be asserting about the seed, not the deck.
+    expect(render(false, true)).toContain('aria-label="Предишна стъпка"');
+  });
+
+  it("the caption box keeps its fixed height, so no control moves", () => {
+    // `DECK_ROOMY_CAPTION_HEIGHT_PX` is the reason the deck's buttons never
+    // shift as captions come and go, and `tools/mobile/deck-captions.mjs`
+    // measures the bank against exactly that box. An empty box is still the box.
+    expect(render(false, true)).toContain(`${DECK_ROOMY_CAPTION_HEIGHT_PX / 16}rem`);
+  });
+
+  it("standing down still wins over an engaged deck", () => {
+    // The two halves are one function on purpose (`demoDeckNarrates`): a deck
+    // the student engaged before setting off must still go quiet once they are
+    // driving, which is the sc-hz-breakdown-pulloff frame this file opens with.
+    expect(captionBoxInner(render(true, true))).not.toContain(CAPTION_BG);
+    expect(captionBoxInner(render(true, false))).not.toContain(CAPTION_BG);
+  });
+});
+
+describe("demoDeckNarrates · who is allowed to speak", () => {
+  it("needs an audience AND a student who is not driving", () => {
+    expect(demoDeckNarrates({ engaged: true, standDown: false })).toBe(true);
+    expect(demoDeckNarrates({ engaged: false, standDown: false })).toBe(false);
+    expect(demoDeckNarrates({ engaged: true, standDown: true })).toBe(false);
+    expect(demoDeckNarrates({ engaged: false, standDown: true })).toBe(false);
+  });
+});
+
+describe("the LESSON's deck is the mount that awaits an audience", () => {
+  // The dead-predicate guard, and the one this programme has paid for most
+  // often: a rule nothing calls. Same source walk as the block above, for the
+  // same reason — `LessonScene.tsx`'s import closure cannot load here.
+  const SCENE = readFileSync(
+    path.join(process.cwd(), "src", "components", "sim", "LessonScene.tsx"),
+    "utf-8",
+  )
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("//"))
+    .join("\n");
+
+  it("hands `awaitsAudience` to the deck it mounts over the windscreen", () => {
+    const from = SCENE.indexOf("<TraceTimeline");
+    expect(from).toBeGreaterThan(0);
+    const mount = SCENE.slice(from, SCENE.indexOf("/>", from));
+    // The self-check first: this is the deck fed by the parked aid clock, and
+    // not the Scenario Studio's.
+    expect(mount).toContain("standDown={stoodDown}");
+    expect(mount).toContain("awaitsAudience");
+  });
+
+  it("…and that deck's clock really is the parked one", () => {
+    // Without this the prop would be true of a deck whose clock ran from mount,
+    // and the caption would simply come back one poll later.
+    expect(SCENE).toContain("demoDeckAtRest(createTraceClock())");
+    expect(SCENE).toContain("clockRef={aidClockRef}");
   });
 });

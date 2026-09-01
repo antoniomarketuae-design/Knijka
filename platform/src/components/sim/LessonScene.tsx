@@ -779,6 +779,16 @@ export default function LessonScene(props: LessonSceneProps) {
           {
             anchor: { x: anchorPose.x, y: -anchorPose.z },
             anchorRadiusM: trafficSpec?.anchorRadiusM ?? DEFAULT_LESSON_TRAFFIC.anchorRadiusM,
+            // …AND THE REST OF THE ROAD THE STUDENT IS ABOUT TO DRIVE.
+            //
+            // The anchor above is the SPAWN, and loops are seeded once. On a
+            // micro-map that is the whole world; on a 927 m exam cut of Лозенец
+            // it means the ambient cars stay at the kerb the student left, so
+            // the drill's own „пропусни движещите се по пътя с предимство"
+            // plays out on an empty street (sc-ed-d2-priority-run:76d2e929).
+            // A lesson that travels names its corridor and the loops are dealt
+            // along it. Absent ⇒ unchanged.
+            anchorPath: trafficSpec?.anchorPath,
             vehicleCount: trafficSpec?.vehicleCount ?? DEFAULT_LESSON_TRAFFIC.vehicleCount,
             pedestrianCount:
               trafficSpec?.pedestrianCount ?? DEFAULT_LESSON_TRAFFIC.pedestrianCount,
@@ -3688,6 +3698,15 @@ function DemoDeck({
           touch={compact}
           leading={compact ? toggle : null}
           standDown={stoodDown}
+          // …AND THE SAME LIFETIME AT THE OTHER END. `aidClockRef` is created by
+          // `demoDeckAtRest(createTraceClock())` — parked at 0:00, not playing —
+          // and `tSec = 0` is inside the window of every annotation authored at
+          // 0, so this deck captioned a demonstration nobody had started, in a
+          // solid card over the middle of the windscreen, from the lesson's
+          // first frame (`w21/…/sc-ov-keep-right__pc-right/01-arrival.png`).
+          // The clock waited for its audience; the voice did not.
+          // `demoDeckNarrates` in `demoDeckLifetime.ts` carries the frame.
+          awaitsAudience
         />
       ) : null}
     </div>

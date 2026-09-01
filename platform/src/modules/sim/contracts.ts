@@ -225,6 +225,18 @@ export interface LessonSpec {
     pedestrianCount?: number;
     anchorRadiusM?: number;
     /**
+     * THE REST OF THE ROUTE, for a lesson that travels — stations in route
+     * order, past the spawn the scene anchors on.
+     *
+     * Ambient loops are built once, near the spawn, and a lesson that drives
+     * 900 m away from it therefore runs its second half down an empty street
+     * (`sc-ed-d2-priority-run:76d2e929`). Naming the corridor deals those loops
+     * along it instead. See `traffic/routes.ts` for the measurement.
+     *
+     * Absent ⇒ one station ⇒ every route is exactly what it was.
+     */
+    anchorPath?: readonly { x: number; y: number }[];
+    /**
      * Ambient PAVEMENT walkers — people on the footway who never step onto the
      * carriageway, so they arm no crossing duty and change no grading (the
      * „SIDEWALK-ONLY WALKERS" block in `traffic/pedestrians.ts` carries the
@@ -710,7 +722,11 @@ export interface StagedActorPathSpec {
   colorIndex?: number;
   /**
    * Vehicle size/type profile (doc 72 §9 FO-06 „Зад камион"): "truck" renders
-   * the box-truck rig, "van" the panel van, "emergency" (doc 72 §15 N9,
+   * the box-truck rig, "van" the panel van, "bus" (doc 72 §15 VU-11, ЗДвП
+   * чл. 67) the 12 m GLAZED city-bus rig with a route board — author it for
+   * every спирка / редовна линия drill, because the duty чл. 67 creates is
+   * owed to a scheduled-route vehicle and a windowless cargo box does not
+   * announce one, "emergency" (doc 72 §15 N9,
    * VU-09) the white special-regime rig with the blue light bar, "tram"
    * (doc 72 §12 RX-04/RX-05, ADR-006 stage 3b) the articulated two-segment
    * tram rig — a tram actor is path-locked like every staged vehicle; its
@@ -730,6 +746,7 @@ export interface StagedActorPathSpec {
     | "car"
     | "van"
     | "truck"
+    | "bus"
     | "emergency"
     | "tram"
     | "train"
@@ -970,6 +987,44 @@ export interface PriorityFromRightSpec extends StagedEventBase {
    * lesson happens is not a design.
    */
   witnessArm?: { etaSec: number; nearLineM: number; stoppedNearM?: number };
+  /**
+   * ONE CROSSING PER APPROACH — the ladder rung, authored (FR-B5-RECHOREOGRAPH,
+   * runners.ts; sc-jx-equal-left:4274eddb).
+   *
+   * FR-B5-RETURN (traffic/staged.ts) sends a retired actor back to the start of
+   * its own path so a priority road keeps producing cars, and FR-B5-CROSS
+   * measured why that matters: without it `sc-jxgb-conflict` crossed ONCE and
+   * then stood still for 150 s of a 210 s lesson, teaching a student who waits
+   * that waiting is free. Two of this catalogue's drills are built on exactly
+   * that — the boulevard is the lesson, and every car it produces is one more
+   * gap to judge.
+   *
+   * The other design is a LADDER: a template that stages a fixed set of
+   * conflicts and spaces them so the student meets ONE teach card at a time,
+   * then declares the junction clear («чак когато и двете са преминали и пътят
+   * е чист» — sc-jx-equal-left instruction 5). An unscripted third car
+   * contradicts the instruction the student was given, and the runtime's
+   * trackers grade it exactly as if the template had staged it: measured over
+   * 3 slow-from points x 7 wait lengths of that briefing, 6 of 21 pacings were
+   * billed опасна FAILED_TO_YIELD, in two bands one actor round trip apart.
+   * FR-B5-RETURN's own guard 2 already refuses a second run for the one hazard
+   * whose ladder it could see (`railPath`, the RX train — „a second train
+   * crossing a level crossing the lesson has just declared clear would convict
+   * a student who did exactly as told"). This is that sentence, made authorable
+   * for a car instead of inferred from riding a rail.
+   *
+   * TRUE = after this encounter has resolved, a returning actor is held short
+   * of the box — stationary, so it is below `CONFLICT_MIN_SPEED_MPS`, makes no
+   * priority claim and can convict nobody — until the player has left
+   * `armDistM` and can approach the junction afresh, at which point it is a
+   * fully choreographed encounter again. It is NOT „the car disappears": the
+   * actor still returns rather than parking at the far end of its road, which
+   * is the FR-B5-EXIT defect this must not reintroduce.
+   *
+   * ABSENT/false = FR-B5-CROSS's behaviour, unchanged and byte-identical: the
+   * road keeps producing cars for as long as the student is there.
+   */
+  oneCrossingPerApproach?: boolean;
 }
 
 /** A lead car matches the player's speed at a fixed gap, then brake-slams at

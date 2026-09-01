@@ -282,15 +282,25 @@ describe("wave-2 bot completion — sc-pk-busstop-ban at L3", () => {
     );
   });
 
-  it("teach-first, not punish: having been taught, the recovered drive still completes", () => {
+  it("teach-first, not punish: the card is free — and the bus-stop gate is not fooled by it", () => {
     // Both demos stop illegally, get the card, drive on and park at the legal
-    // bay — so they complete and pass with a clean sheet. That is the design
+    // bay — so they finish the route with a CLEAN SHEET. That is the design
     // (doc 76 §0: mistakes are DEMONSTRATED, never scored), and it is why the
     // §9 code assert lives on the trace gate, where the recorder's own engine
     // grades every encounter: traces/__tests__/sc-pk-busstop-ban-traces.
     const { result: r } = liveDemo("mistake-stop-on-pocket");
-    expect(r.completedAll).toBe(true);
+    // TEACH-FIRST IS A CLAIM ABOUT POINTS — «Учебни моменти (НЕ ВЛИЗАТ В
+    // ТОЧКИТЕ)», the debrief's own heading. Untouched.
     expect(r.score).toBe(0);
+    // EXPECTATION CHANGED 2026-08-30 (sc-pk-rail-ban:84bce2a3) — this read
+    // `true`. `sc-pkbs-past-zone` reads «Подмини цялата зона на спирката, БЕЗ
+    // ДА СПИРАШ В НЕЯ» and was a bare disc past the pocket, so the demo that
+    // parked IN the pocket collected that sentence as a ✓ on the same debrief
+    // that lists «Спиране в забранена зона» among the teach moments.
+    // `requireRestClean: "banZone"` makes the credit read the fault the student
+    // has already been shown. Nothing is re-priced: the card is free, the sheet
+    // is 0, and the badge is НЕЗАВЪРШЕН, not НЕИЗДЪРЖАН.
+    expect(r.completedAll).toBe(false);
   });
 
   it("compiles at every authored rung; L4 is the exam rung, and no rung touches physics", () => {

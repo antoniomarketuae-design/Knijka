@@ -266,6 +266,10 @@ interface WorldCensus {
   streetlights: number;
   /** Wire-carrying columns; they arrive with the lamps on a scenario map. */
   utilityPoles: number;
+  /** Street trees `props.ts` plants along the verges. RULE 5's prop: they are
+   *  the only thing in this world that MOVES for the wind (windSway.ts), so a
+   *  briefing may point at them only where they exist. */
+  trees: number;
 }
 
 const DISTRICT_IDS = [...new Set(SCENARIO_TEMPLATES_CONDITIONS.map((s) => s.map.districtId))].sort();
@@ -281,6 +285,7 @@ const CENSUS = new Map<string, WorldCensus>(
         signs,
         streetlights: geometry.streetlights.length,
         utilityPoles: geometry.utilityPoles.length,
+        trees: geometry.trees.length,
       },
     ];
   }),
@@ -291,6 +296,9 @@ const censusOf = (districtId: string): WorldCensus => {
   if (!c) throw new Error(`no census for ${districtId}`);
   return c;
 };
+
+/** RULE 5's reader: how many street trees the BUILT district plants. */
+const treeCountOf = (districtId: string): number => censusOf(districtId).trees;
 
 // ---------------------------------------------------------------------------
 // RULE 1a — a gate may not license the speed the street forbids
@@ -1001,5 +1009,81 @@ describe("no authored copy names a key the reader may not have", () => {
     const step1 = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.id === "sc-ac-fog")!
       .instructionsBg[0].textBg;
     expect(step1).toContain("фаровете за мъгла");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RULE 5 — A CUE MAY BE NAMED ONLY IF THE WORLD ACTUALLY GIVES IT
+//
+// The other half of `sc-ac-crosswind:e0b9507e`. Rules 2 and 3 struck the
+// bridge, the exposed span and the lorry out of the briefing; what the audit
+// also photographed, and what no copy rule could reach, was that „wind is
+// never depicted in any form: no swaying trees, no drifting debris, no leaning
+// vehicles". `physics.crosswind` had been pushing the live chassis since the
+// AC-12 slice shipped and NOTHING in the world moved for it.
+//
+// That is now closed in the renderer — `world/textures/windSway.ts` leans the
+// street-tree canopies on `VehicleSim.windLateralNow`, the same newtons the
+// chassis takes — and the briefing has been given the sentence that cue makes
+// honest: step 6 tells the student to read the gust off the treetops instead
+// of asking him to notice „щом поривът отслабне" through a screen.
+//
+// So this rule is rules 2 and 3 pointed the other way. Those refuse a claim
+// the world cannot keep; this one refuses a claim the world would keep only by
+// accident: naming a cue is legal only where the lesson AUTHORS the physics
+// that animates it and the district PLANTS the prop that carries it. A copy
+// wave that pastes step 6 into a calm lesson, or a renderer wave that unhooks
+// the canopy bend, both land here — which is the only reason the sentence is
+// allowed to exist at all.
+// ---------------------------------------------------------------------------
+
+/** Reading the wind off the canopies — the cue AC-12's step 6 now names. */
+const TREETOP_CUE_RE = /корон[\p{L}]*\s+на\s+дървет/iu;
+
+describe("sweep161 · a wind cue is named only where the wind moves something", () => {
+  it("no drill points at the treetops unless its own physics bends them", () => {
+    const claims: string[] = [];
+    for (const spec of SCENARIO_TEMPLATES_CONDITIONS) {
+      for (const line of driverCopy(spec)) {
+        if (!TREETOP_CUE_RE.test(line)) continue;
+        if (spec.physics?.crosswind !== true) {
+          claims.push(`${spec.id} reads the wind off the trees with no physics.crosswind: «${line.slice(0, 64)}…»`);
+        }
+        if (treeCountOf(spec.map.districtId) === 0) {
+          claims.push(`${spec.id} reads the wind off the trees on ${spec.map.districtId}, which plants none`);
+        }
+      }
+    }
+    expect(claims).toEqual([]);
+  });
+
+  it("sc-ac-crosswind DOES carry the cue — the repair is not deletable in silence", () => {
+    const wind = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.id === "sc-ac-crosswind")!;
+    expect(wind.physics?.crosswind).toBe(true);
+    expect(wind.instructionsBg.some((s) => TREETOP_CUE_RE.test(s.textBg))).toBe(true);
+    // …on a street that plants 40 of them, both verges, all 360 m.
+    expect(treeCountOf(wind.map.districtId)).toBeGreaterThan(20);
+    // The cue is useless unless it is tied to the act it enables: the same
+    // step must still say what to DO when the gust eases (release, smoothly).
+    const step = wind.instructionsBg.find((s) => TREETOP_CUE_RE.test(s.textBg))!;
+    expect(step.textBg).toMatch(/отпусни/iu);
+    expect(step.textBg).toMatch(/плавно/iu);
+  });
+
+  it("the rule has teeth — the same sentence is refused on a calm lesson", () => {
+    const shipped = "Чети порива по короните на дърветата — отслабне ли, отпусни плавно корекцията.";
+    expect(TREETOP_CUE_RE.test(shipped)).toBe(true);
+    // Every OTHER drill in the family is calm, so the sentence would be a
+    // promise of motion nothing delivers — and the corpus authors
+    // physics.crosswind exactly twice, so this predicate genuinely refuses.
+    const calm = SCENARIO_TEMPLATES_CONDITIONS.filter((s) => s.physics?.crosswind !== true);
+    expect(calm.length).toBeGreaterThanOrEqual(7);
+    for (const spec of calm) {
+      expect(driverCopy(spec).some((l) => TREETOP_CUE_RE.test(l)), spec.id).toBe(false);
+    }
+    // …and the regex is not a rubber stamp: the family's other foliage words
+    // are not a wind cue and must not be caught.
+    expect(TREETOP_CUE_RE.test("краят на гора")).toBe(false);
+    expect(TREETOP_CUE_RE.test("Намали сега, преди първия порив.")).toBe(false);
   });
 });

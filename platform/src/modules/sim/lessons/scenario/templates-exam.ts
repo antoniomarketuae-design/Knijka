@@ -558,9 +558,61 @@ export const SC_ED_D2_PRIORITY_RUN: ScenarioSpec = {
   // погледна" is an ungraded pass. compileScenario propagates this to the live
   // LessonSpec.ruleConfig; the recorder enables the same flag for the traces.
   ruleConfig: { junctionScanObservationEnabled: true },
+  /**
+   * A PRIORITY LESSON NEEDS TRAFFIC TO GIVE PRIORITY TO
+   * (`sc-ed-d2-priority-run:76d2e929`, critical — „a priority lesson with ZERO
+   * moving traffic … the right drive burned 90 s of «lawful waits» standing
+   * still for a car that never comes", frame `pc-right/04-t073s.png`).
+   *
+   * WHAT WAS WRONG, in two numbers. `exam-drills` is not in
+   * `SCENARIO_FAMILY_TRAFFIC_BASELINE` and this template authored no `traffic`,
+   * so L1–L4 compiled to `vehicleCount: 0` — the only cars in a three-minute
+   * exam segment were the two staged actors, and both arm late (the oncoming
+   * first comes within 80 m at t ≈ 80 s, the right-hand car at t ≈ 130 s). At
+   * the audited t = 73 s the nearest vehicle in the world was 146 m away. So
+   * step 3's «огледай наляво-надясно-наляво» and the advisor's «сега пропусни
+   * движещите се по пътя с предимство» (`lessons/advisor.ts`) were both spoken
+   * over an empty бул. „Пейо К. Яворов".
+   *
+   * AND WHY A COUNT ALONE DOES NOT FIX IT. Ambient loops are seeded ONCE,
+   * around the spawn. Measured over the committed shadow drive (150 s, spawn →
+   * Златовръх, 927 m) with the shipped point-anchor, the nearest ambient car
+   * per 10 s ran 13 · 51 · 90 · 90 · 69 · 91 m and then 227 · 367 · 480 · 589 ·
+   * 696 · 749 · 805 · 859 · 874 · 917 — a busy first minute and then a street
+   * the student leaves behind. That is why the earlier probe read this drill as
+   * „100% empty at 4 cars AND at 12": it is not a density problem.
+   *
+   * `anchorPath` is the answer (`traffic/routes.ts`): the three later objective
+   * marks, verbatim from `success[]` above, so the loops are dealt ALONG the
+   * corridor. Re-measured the same way, 8 cars now give an ambient vehicle
+   * within 120 m for 98.4% of the drive and a MOVING one for 88.7%, with the
+   * closest approach over the whole run 5.6 m — busy, not jammed.
+   *
+   * EIGHT IS A FLOOR, NOT A TASTE. The §7 ladder would take a baseline of 8
+   * down to 4 at L1 and 6 at L2, and both were measured on this corridor: at 4
+   * the street is dead from t = 60 s (which is the audited frame), at 6 it is
+   * dead from t = 115 s. The same argument the family baseline's own FLOOR
+   * makes — „«quieter at L1» cannot be allowed to mean «delete the thing being
+   * taught»" — so L1 and L2 pin the number the drill needs to be a drill.
+   */
+  traffic: {
+    vehicleCount: 8,
+    // The corridor, in route order: the Б2 stop line is 42 m from the spawn and
+    // would be a second station on the same kerb, so the anchor covers it and
+    // these three carry the rest — signal + right turn, the left turn onto
+    // Златовръх, the equal junction. Copied from `success[]`, not re-derived.
+    anchorPath: [
+      { x: -516.35, y: -128.17 },
+      { x: -671.26, y: 33.98 },
+      { x: -735.77, y: -214.49 },
+    ],
+  },
   levels: [
-    { level: 1 },
-    { level: 2 },
+    // L1/L2 hold the floor: see the `traffic` block — the ladder's ×0.5 and
+    // ×0.75 empty the corridor's second half, and an empty corridor is the
+    // defect, not an aid.
+    { level: 1, traffic: { vehicleCount: 8 } },
+    { level: 2, traffic: { vehicleCount: 8 } },
     { level: 3 },
     // L4: изпитни условия — студен старт по протокола.
     { level: 4, vehicleStart: "cold" },
@@ -568,10 +620,13 @@ export const SC_ED_D2_PRIORITY_RUN: ScenarioSpec = {
     // трите възела има и коли, които никой не е поставял.
     // NO physics.wetGrip: the authored ghost envelope is dry-tuned (ADR-006
     // stage 4a — only a template that AUTHORS the field gets reduced grip).
+    // The count is 10 rather than the old 8 because 8 is now the base every
+    // rung carries: L5 must still ADD a street, and MIN_PERCEPTIBLE_VEHICLE_RISE
+    // (lessons/difficulty.ts) puts the smallest rise anyone measured at 2.
     {
       level: 5,
       conditions: { weather: "rain" },
-      traffic: { vehicleCount: 8, pedestrianCount: 3, anchorRadiusM: 350 },
+      traffic: { vehicleCount: 10, pedestrianCount: 3, anchorRadiusM: 350 },
     },
   ],
   // Route order: the left turn resolves 267 m before the equal junction arms.

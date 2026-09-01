@@ -144,6 +144,8 @@ const CONFIG_GATED: ReadonlyArray<readonly [FaultCode, keyof RuleEngineConfig]> 
   ["CLOSING_ON_LEAD_TOO_FAST", "leadClosingEnabled"],
   ["ILLEGAL_STOP_IN_BAN_ZONE", "banZoneStopEnabled"],
   ["DRIVING_TOO_SLOW_FOR_MOTORWAY", "motorwayMinSpeedEnabled"],
+  ["DRIVING_TOO_SLOW_IN_TOWN", "townCrawlEnabled"],
+  ["STOPPED_WITHOUT_CAUSE", "needlessStopEnabled"],
 ];
 
 /**
@@ -1495,6 +1497,56 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
       return notMw.length === 0 && f.routeEdgeIds.size > 0
         ? ok(`all ${f.routeEdgeIds.size} route edges are motorway`)
         : inert(`${notMw.length}/${f.routeEdgeIds.size} route edges are NOT motorway`);
+    },
+  },
+  DRIVING_TOO_SLOW_IN_TOWN: {
+    requires: "at least one NON-motorway route edge posted at or above the through-road floor",
+    fixIn: "the template's map choice (a 20/30 aisle is a calmed place, not a through road)",
+    evidence: ["roadNetwork"],
+    check(f) {
+      // The mirror image of the motorway rule, and it can genuinely fail: on
+      // mw-v1 every edge is motorway (the sibling code grades there instead),
+      // and on the fourteen `lot-*` aisles, `poligon-v1`, `pk-drive-v1` and
+      // `sp-zone30-v1` every plate is posted 20 or 30 — a place signed slow on
+      // purpose, where crawling is the exercise. Either way this detector must
+      // be reported INERT rather than silently counted as armed.
+      const floor = DEFAULT_RULE_CONFIG.townCrawlMinPostedKmh;
+      const through = [...f.routeEdgeIds].filter((id) => {
+        const rt = f.world.index.edgeRtById(id);
+        if (!rt || (rt.edge.class as string) === "motorway" || rt.edge.motorway === true) {
+          return false;
+        }
+        const kmh = f.world.maxspeedByEdge.get(id);
+        return kmh !== undefined && kmh >= floor;
+      });
+      return through.length > 0
+        ? ok(`through-road route edges (non-motorway, posted >= ${floor}) = ${through.length}`)
+        : inert(`no route edge is a non-motorway road posted >= ${floor}`);
+    },
+  },
+  STOPPED_WITHOUT_CAUSE: {
+    requires: "at least one NON-motorway route edge posted at or above the through-road floor",
+    fixIn: "the template's map choice (a 20/30 aisle is a calmed place, not a through road)",
+    evidence: ["roadNetwork"],
+    check(f) {
+      // The SAME world fact as the town crawl above, because it is the same
+      // arming gate (`townThroughRoad` in engine.ts, reused rather than
+      // restated): чл. 24, ал. 2's „затрудни излишно тяхното движение" needs a
+      // road with movement to hinder. A `lot-*` aisle posted 20 has none, and a
+      // motorway is the sibling family's road — on either, this detector is
+      // INERT and must be reported so rather than counted as armed.
+      const floor = DEFAULT_RULE_CONFIG.townCrawlMinPostedKmh;
+      const through = [...f.routeEdgeIds].filter((id) => {
+        const rt = f.world.index.edgeRtById(id);
+        if (!rt || (rt.edge.class as string) === "motorway" || rt.edge.motorway === true) {
+          return false;
+        }
+        const kmh = f.world.maxspeedByEdge.get(id);
+        return kmh !== undefined && kmh >= floor;
+      });
+      return through.length > 0
+        ? ok(`through-road route edges (non-motorway, posted >= ${floor}) = ${through.length}`)
+        : inert(`no route edge is a non-motorway road posted >= ${floor}`);
     },
   },
   WRONG_WAY: {

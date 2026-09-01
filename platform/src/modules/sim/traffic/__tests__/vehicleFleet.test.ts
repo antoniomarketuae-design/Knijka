@@ -26,6 +26,8 @@ import {
   BOXY_MAX_INSTANCES_LOW,
   buildAnimalRig,
   buildTrafficFleet,
+  BUS_DIMENSIONS,
+  BUS_MODEL_INDEX,
   carPaintMaterial,
   carPaintStandardMaterial,
   CHILD_CYCLIST_MODEL_INDEX,
@@ -699,6 +701,74 @@ describe("hero clearcoat paint", () => {
     const fleet = buildTrafficFleet(makeScenes(), [vehicle(1)], []);
     const suv = fleet.models[BOXY_INDEX].rig;
     expect(suv.bodyMaterials.some((m) => m instanceof MeshPhysicalMaterial)).toBe(true);
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+});
+
+describe("procedural CITY BUS rig (doc 72 §15 VU-11 — the чл. 67 pull-out actor)", () => {
+  it("modelForVehicle: the bus profile has its own slot, one past the animal", () => {
+    expect(modelForVehicle({ id: 9, profile: "bus" })).toBe(BUS_MODEL_INDEX);
+    expect(BUS_MODEL_INDEX).toBe(FLEET.length + 7);
+    // And the profile-less default is still byte-identical to the fleet pick.
+    for (let id = 0; id < 100; id++) expect(modelForVehicle({ id })).toBe(assignModel(id));
+  });
+
+  it("builds a 12 m GLAZED body — not the windowless box truck it replaced", () => {
+    const bus: TrafficVehicleState = { ...vehicle(9), profile: "bus" };
+    const fleet = buildTrafficFleet(makeScenes(), [bus, vehicle(10)]);
+    expect(fleet.assign[0]).toBe(BUS_MODEL_INDEX);
+    expect(fleet.assign[1]).toBe(assignModel(10)); // ambient neighbour untouched
+    const model = fleet.models[BUS_MODEL_INDEX];
+    expect(model.count).toBe(1);
+    expect(model.mesh).not.toBeNull();
+    expect(model.mesh?.name).toBe("traffic-body-bus");
+    const rig = model.rig;
+    // THE DEFECT THIS RIG CLOSES (:8fa6b888): the drill's only large vehicle
+    // was TRUCK_DIMENSIONS — 7.5 m, and a cargo box with no glass at all.
+    expect(rig.halfLength).toBeCloseTo(BUS_DIMENSIONS.lengthM / 2);
+    expect(rig.halfLength).toBeGreaterThan(TRUCK_DIMENSIONS.lengthM / 2);
+    expect(rig.halfWidth).toBeCloseTo(BUS_DIMENSIONS.widthM / 2);
+    // The lesson's own copy: «Автобусът е дълъг 12 метра».
+    expect(BUS_DIMENSIONS.lengthM).toBe(12);
+    // …and «шофьорът му седи на два метра над земята» — the windscreen has to
+    // straddle that eye line or the sentence describes a rig nobody can see.
+    expect(BUS_DIMENSIONS.driverEyeM).toBe(2);
+    expect(BUS_DIMENSIONS.bodyHeightM).toBeGreaterThan(BUS_DIMENSIONS.driverEyeM);
+    // THREE merged material groups: amber paint + the route board + the
+    // glazing/dark kit. The glass group is the whole point — a bus is glazed
+    // and a lorry is not, and that is what a student reads at 130 m.
+    expect(rig.bodyGeometry.groups.length).toBe(3);
+    expect(rig.bodyMaterials.length).toBe(3);
+    expect(rig.bodyMaterials.map((m) => m.name).sort()).toEqual([
+      "bus_accent",
+      "bus_glass",
+      "bus_paint",
+    ]);
+    expect(rig.ownedMaterials.length).toBe(3);
+    // …and the GEOMETRY is really there, not just the declared half-extents:
+    // 12 m of body nose-to-tail, a roof above 3 m, and each of the three
+    // groups carrying actual triangles (an empty glass group would render as
+    // the same blank prism the sheet photographed).
+    rig.bodyGeometry.computeBoundingBox();
+    const bb = rig.bodyGeometry.boundingBox!;
+    expect(bb.max.z - bb.min.z).toBeGreaterThanOrEqual(BUS_DIMENSIONS.lengthM);
+    expect(bb.max.z - bb.min.z).toBeLessThan(BUS_DIMENSIONS.lengthM + 0.2);
+    expect(bb.max.x - bb.min.x).toBeGreaterThanOrEqual(BUS_DIMENSIONS.widthM);
+    expect(bb.min.y).toBeCloseTo(0, 6); // ground-relative like the GLB kit
+    expect(bb.max.y).toBeGreaterThan(3);
+    for (const g of rig.bodyGeometry.groups) expect(g.count).toBeGreaterThan(0);
+    expect(rig.paint).toBeNull(); // no palette tint — the livery IS the profile
+    expect(rig.customWheel).toBeNull(); // shared wheel, scaled to the 0.5 m hubs
+    expect(fleet.wheelScale[0]).toBeCloseTo(BUS_DIMENSIONS.wheelRadiusM / 0.32);
+    // The truck slot it used to borrow now stays free.
+    expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull();
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("costs nothing when no bus actor exists (no InstancedMesh)", () => {
+    const fleet = buildTrafficFleet(makeScenes(), [vehicle(3)]);
+    expect(fleet.models[BUS_MODEL_INDEX].count).toBe(0);
+    expect(fleet.models[BUS_MODEL_INDEX].mesh).toBeNull();
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 });

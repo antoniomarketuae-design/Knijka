@@ -103,6 +103,11 @@ import { terminusEnds } from "./terminus";
 import { authoredBusStopSpanY, authoredStopSideSign } from "./markings";
 import { buildZoneSigns, scenarioSignScale } from "./zoneSigns";
 import { SCENARIO_SIGN_SCALE } from "./constants";
+import {
+  ISLAND_KERB_BAND_M,
+  ISLAND_WALL_TOP_Y,
+  type RoundaboutRing,
+} from "./roundabout";
 
 /** A median barrier needs a run long enough to BE one; below this the pair is
  *  a junction throat, not a divided carriageway. Same floor the pavement
@@ -485,7 +490,15 @@ export function buildProps(
   district: District,
   network: RoadNetwork,
   buildingAabbs: [number, number, number, number][],
-  options: { treeDensity: number; seed: number },
+  options: {
+    treeDensity: number;
+    seed: number;
+    /** Roundabouts already resolved by `analyzeRoundabouts` — the Г9 island
+     *  pass needs `islandRadiusM` + `mouths`, and re-deriving them here would
+     *  be a second answer to a question the geometry pass has already settled.
+     *  Absent = no rings, which is what a caller building props alone means. */
+    rings?: readonly RoundaboutRing[];
+  },
 ): PropBuildResult {
   const rng = mulberry32(options.seed);
   const trafficLights: TrafficLightPlacement[] = [];
@@ -866,10 +879,16 @@ export function buildProps(
     yaw: number,
     kind: SignKind,
     extra: { speedKmh?: number } = {},
+    /** Height the POST is based at. Every roadside plate stands on the asphalt
+     *  plane; the one exception is the Г9 on a roundabout island, whose ground
+     *  is the island's concrete rim 0.57 m above it (roundabout.ts
+     *  ISLAND_WALL_TOP_Y). Basing that one at ROAD_Y would bury half its pole
+     *  in the planter wall. */
+    baseY: number = ROAD_Y,
   ): boolean => {
     if (postAnchors.some((q) => dist(q, p) < MIN_POST_SEPARATION_M)) return false;
     postAnchors.push(p);
-    signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...extra, ...lessonSized });
+    signs.push({ kind, position: toWorld(p[0], p[1], baseY), yaw, ...extra, ...lessonSized });
     return true;
   };
 
@@ -1462,6 +1481,51 @@ export function buildProps(
         const p = add(point, mul(perpRight(travel), host.eb.halfWidth + 0.8));
         pushSignAt(p, yawFromFacing(mul(travel, -1)), "children");
       }
+    }
+  }
+
+  // -- Г9 „Преминаване отдясно на знака" on the roundabout central island -------
+  // sc-rb-ped-exit:841c6252 — „the roundabout itself is a bare grass mound with
+  // shrubs and buildings behind it". The mound is not the defect: it is the
+  // measurement `roundabout.crownRiseM` exists for (a flat island is invisible
+  // from the seat, which is why it was given bulk). What the island carried was
+  // nothing a driver may READ. Every legal statement about the roundabout stood
+  // out at the mouth — Б1 + Г12 on their own posts — and the thing they were
+  // talking about was, from the give-way line, a lawn.
+  //
+  // A Bulgarian central island carries Г9 facing each entry. That is retrieved,
+  // not remembered: content/signs/signs.json `sign-g9` „Преминаване отдясно на
+  // знака" reads „обикновено е поставен на остров, ремонтен участък или
+  // препятствие по средата на пътя", cited to Наредба № РД-02-21-1/23.11.2023,
+  // знак Г9 (ADR-002 — retrieval + citation, never free recall). It is also the
+  // sign that ANSWERS the island: it states which side of the obstacle to take,
+  // so the mound stops being scenery and becomes the instruction „go right
+  // around this" — the same thing the лесон is grading.
+  //
+  // DERIVED, never authored: one plate per mouth traffic can ENTER through, on
+  // the island's own concrete rim, facing back up the arm. No new GLB (it rides
+  // the Г2/Г3/Г12 disc) and no new district field — the poses come entirely
+  // from the rings buildWorldGeometry already resolved.
+  for (const ring of options.rings ?? []) {
+    const r = ring.islandRadiusM;
+    if (r === null) continue;
+    // The flat concrete band buildIsland lays between the wall chamfer and the
+    // planting, derived the same way there — a post on the crown would lean out
+    // of a cosine dome, and one at `r` would overhang the carriageway.
+    const rimInner = Math.max(0.5, r - ISLAND_KERB_BAND_M);
+    const rPlate = (rimInner + r) / 2;
+    for (const mouth of ring.mouths) {
+      // An exit-only spoke gets nothing: the plate would face a driver who is
+      // already leaving, i.e. signage no one can read.
+      const node = network.nodes.get(mouth.nodeId);
+      if (!node?.approaches.some((ap) => ap.edgeId === mouth.armEdgeId && ap.incoming)) continue;
+      const p: Vec2 = [
+        ring.centre[0] + Math.cos(mouth.bearing) * rPlate,
+        ring.centre[1] + Math.sin(mouth.bearing) * rPlate,
+      ];
+      // `mouth.dir` runs away from the ring along the arm — i.e. straight at the
+      // driver approaching down it, which is where the face has to point.
+      pushSignAt(p, yawFromFacing(mouth.dir), "passRight", {}, ISLAND_WALL_TOP_Y);
     }
   }
 

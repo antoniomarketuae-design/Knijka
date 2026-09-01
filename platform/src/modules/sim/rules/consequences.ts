@@ -1684,6 +1684,29 @@ const D_NOT_TOO_SLOW = DUTY(
   "ЗДвП чл. 22, ал. 1",
   "Водачът на пътно превозно средство не трябва да се движи без основателна причина с твърде ниска скорост, когато по този начин пречи на движението на другите пътни превозни средства.",
 );
+/**
+ * The half of чл. 22 a student can actually DO something about, and the reason
+ * DRIVING_TOO_SLOW_IN_TOWN is teachable rather than a scolding: the law never
+ * orders him to drive faster than he can manage — it orders him to let the
+ * queue he created go past. Same unit as `D_NOT_TOO_SLOW`, next alinea.
+ */
+const D_LET_QUEUE_PAST = DUTY(
+  "чл. 22",
+  "ЗДвП чл. 22, ал. 2",
+  "Водач на пътно превозно средство, което се движи с ниска скорост и поради това причинява създаването на колона от пътни превозни средства, трябва да ги пропусне при първа възможност.",
+);
+/**
+ * The duty behind STOPPED_WITHOUT_CAUSE, and the reason that row does NOT reuse
+ * `D_NOT_TOO_SLOW`: чл. 22 speaks of a driver who „се движи", and the act this
+ * prices is a car that has stopped. чл. 24, ал. 2 is the article about the
+ * deceleration itself, and „затрудни излишно тяхното движение" is the wording a
+ * учебен разбор can hand a student unchanged.
+ */
+const D_NO_NEEDLESS_HINDRANCE = DUTY(
+  "чл. 24",
+  "ЗДвП чл. 24, ал. 2",
+  "Преди да намали значително скоростта на движение на управляваното от него пътно превозно средство, водачът е длъжен да се убеди, че няма да създаде опасност за останалите участници в движението и че няма да затрудни излишно тяхното движение.",
+);
 const D_FOLLOWING_DISTANCE = DUTY(
   "чл. 23",
   "ЗДвП чл. 23, ал. 1",
@@ -2059,6 +2082,35 @@ const MANOEUVRE_AND_JUDGEMENT_ROADS: Partial<Record<ViolationCode, RoadConsequen
     duties: [D_NOT_TOO_SLOW, D_MOTORWAY_VEHICLE],
     headlineBg:
       "Обща задължителна минимална скорост в България НЯМА. 70 km/h в чл. 55, ал. 1 е изискване към КОНСТРУКЦИЯТА на автомобила, не към скоростта, с която караш. Забраненото е друго — „без основателна причина с твърде ниска скорост“, когато пречиш (чл. 22, ал. 1) — и за него законът не предвижда отделно наказание. Остава остатъчната клауза чл. 185, назована тук без число: тя се прилага само за нарушения, „за което не е предвидено друго наказание“, а това е твърдение за целия закон, не извлечена сума.",
+    controlPoints: CP_NONE_NO_OFFENCE,
+    branches: [],
+  },
+  DRIVING_TOO_SLOW_IN_TOWN: {
+    // The town half of the same чл. 22 answer, and the same honest ending: the
+    // duty is retrieved, and NO penalty article names it. The difference from
+    // the motorway row is ал. 2 — on a street the queue behind you is the whole
+    // mechanism, and the law states what to do about it in words a learner can
+    // follow. Nothing is priced here because nothing in ЗДвП prices it.
+    kind: "conditional",
+    offenceBg: "движение без основателна причина с твърде ниска скорост, с което се пречи на другите",
+    duties: [D_NOT_TOO_SLOW, D_LET_QUEUE_PAST],
+    headlineBg:
+      "Задължителна минимална скорост в България НЯМА и глоба точно за „караш бавно“ също няма. Забраненото е друго и е формулирано през последиците: движение „без основателна причина с твърде ниска скорост“, когато пречиш на останалите (чл. 22, ал. 1). Затова цената на това не се плаща на гише — плаща се от колоната зад теб, в изпреварването, което някой ще предприеме на неподходящо място. Задължението, което законът все пак ти вменява изрично, е по ал. 2: щом заради теб се е събрала колона, пропусни я при първа възможност.",
+    controlPoints: CP_NONE_NO_OFFENCE,
+    branches: [],
+  },
+  STOPPED_WITHOUT_CAUSE: {
+    // The third row of the same honest family, and the same ending: the duty is
+    // retrieved and NO penalty article names it. ЗДвП prices неправилно спиране
+    // where a SIGN forbids it (В27 — that is ILLEGAL_STOP_IN_BAN_ZONE's row);
+    // it prices nothing for stopping where stopping is merely pointless. So the
+    // card says what the street actually charges — the car behind you — instead
+    // of borrowing a figure from an article about a different act.
+    kind: "conditional",
+    offenceBg: "спиране в лентата за движение без причина, с което се затруднява движението на другите",
+    duties: [D_NO_NEEDLESS_HINDRANCE],
+    headlineBg:
+      "Глоба точно за „спрях без причина“ в ЗДвП няма — санкция носи спирането там, където знак или маркировка го забраняват, а тук такъв няма. Задължението обаче е изрично и е формулирано през другите: преди да намалиш значително скоростта, трябва да се убедиш, че „няма да създадеш опасност за останалите участници в движението и че няма да затрудниш излишно тяхното движение“ (чл. 24, ал. 2). Затова цената на това се плаща не на гише, а от колата зад теб — и се плаща наведнъж, ако водачът ѝ е гледал напред една секунда по-късно от теб.",
     controlPoints: CP_NONE_NO_OFFENCE,
     branches: [],
   },

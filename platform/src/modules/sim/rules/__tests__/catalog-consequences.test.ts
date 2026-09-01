@@ -211,7 +211,7 @@ describe("realWorldBg — every figure is retrieved, never recalled (ADR-002)", 
     expect(unitTextFor("ЗДвП чл. 9999")).toBeNull();
   });
 
-  it("the 14 rows with no street price are the ones we could not retrieve — or could not yet PRICE", () => {
+  it("the 16 rows with no street price are the ones we could not retrieve — or could not yet PRICE", () => {
     // PINNED BY NAME so adding a fine is a reviewed act and removing one is
     // visible. Each absence has a reason, written at the row:
     //  - CONTROLLER_SIGNAL_VIOLATED — no penalty article names the регулировчик
@@ -235,6 +235,23 @@ describe("realWorldBg — every figure is retrieved, never recalled (ADR-002)", 
     //    correct and teachable answer.
     //  - DRIVING_TOO_SLOW_FOR_MOTORWAY — чл. 22, ал. 1 bans obstructing at low
     //    speed, but no penalty article names it.
+    //  - DRIVING_TOO_SLOW_IN_TOWN (2026-09-01) — 14 → 15, and it is the SAME
+    //    absence as the row above, on the town half of the same envelope: the
+    //    duty was retrieved (чл. 22, ал. 1 and ал. 2, both quoted in the
+    //    structured `ROAD_CONSEQUENCES` entry), and ЗДвП still prices nothing
+    //    for it. The row is `conditional` with an empty `branches`, exactly like
+    //    its sibling, so the honest answer reaches the student as a sentence
+    //    („цената се плаща от колоната зад теб") rather than as a лв. figure
+    //    nobody could cut out of an act.
+    //  - STOPPED_WITHOUT_CAUSE (2026-09-01) — 15 → 16, and the THIRD absence of
+    //    the same family, one step further down the envelope: the duty was
+    //    retrieved (чл. 24, ал. 2, quoted verbatim in the structured
+    //    `ROAD_CONSEQUENCES` entry) and ЗДвП prices nothing for it. It prices
+    //    stopping where a SIGN forbids it — В27, which is
+    //    ILLEGAL_STOP_IN_BAN_ZONE's own row and its own act — and nothing at all
+    //    for stopping where stopping is merely pointless. Borrowing the В27
+    //    figure would charge one code with another code's offence, which is the
+    //    exact conflation the 2026-08-09 sweep that built this file removed.
     //  - OFF_CARRIAGEWAY (2026-08-30) — THE ONE ABSENCE ON THIS LIST THAT IS NOT
     //    A FAILED RETRIEVAL, which is why the title of this case now says „or
     //    could not yet PRICE". The article was found: чл. 183, ал. 2, т. 2,
@@ -254,6 +271,7 @@ describe("realWorldBg — every figure is retrieved, never recalled (ADR-002)", 
     expect(CODES.filter((c) => VIOLATIONS[c].realWorldBg === undefined)).toEqual([
       "CONTROLLER_SIGNAL_VIOLATED",
       "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+      "DRIVING_TOO_SLOW_IN_TOWN",
       "ENGINE_STALLED",
       "HANDBRAKE_LEFT_ON",
       "HARSH_BRAKING_NO_CAUSE",
@@ -264,6 +282,7 @@ describe("realWorldBg — every figure is retrieved, never recalled (ADR-002)", 
       "PREDRIVE_STEP_SKIPPED",
       "PREDRIVE_WRONG_ORDER",
       "STANDSTILL_GAP_TOO_CLOSE",
+      "STOPPED_WITHOUT_CAUSE",
       "STOP_LINE_OVERSHOOT",
       "TURN_WITHOUT_OBSERVATION",
     ]);

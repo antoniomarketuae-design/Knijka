@@ -30,40 +30,41 @@
  * where they close up (rain + a live stream), because by then the student has
  * met each one alone.
  *
- * …AND THAT LADDER IS TRUE OF THE FIRST PASS ONLY — sc-jx-equal-left:4274eddb,
- * measured 2026-08-30 at L1 through the production stack (recordScriptedDrive
- * over these very `staged` specs), driving the briefing verbatim and varying
- * only WHERE the student slows and HOW LONG he waits at the pose:
+ * …AND THE LADDER USED TO BE TRUE OF THE FIRST PASS ONLY —
+ * sc-jx-equal-left:4274eddb. Both staged actors run out of path INSIDE the
+ * lesson (260 m of polyline on 130 m arms), retire, and RE-ENTER at the start
+ * of their own path (staged.ts FR-B5-RETURN / FR-B5-CROSS). By then both
+ * runners have RESOLVED, so the second pass used to arrive with no
+ * choreography at all and the trackers convicted the student for a car this
+ * template never staged him against.
  *
- *   slow at y = −34, wait  8 + 11 s   the shadow's own pacing   clean, both proofs
- *   slow at y = −45, wait 10 + 13 s   FAILED_TO_YIELD at (4.1, −13.9)
- *   slow at y = −34, wait 15 + 20 s   FAILED_TO_YIELD ×2 + COLLISION at (−2.0, −0.6)
- *   slow at y = −34, wait 25 + 30 s   clean, both proofs
+ * MEASURED at L1 through the production stack (recordScriptedDrive over these
+ * very `staged` specs), driving the briefing verbatim and varying only WHERE
+ * the student slows and HOW LONG he waits at the pose — 3 slow-from points x 7
+ * wait lengths:
  *
- * A WINDOW, not a slope: the same drive is convicted at 35 s of patience and
- * absolved at 19 s and at 55 s. THE CAUSE IS NOT IN THIS FILE. Both staged
- * actors run out of path INSIDE the lesson (260 m of polyline on 130 m arms),
- * retire, and RE-ENTER at the start of their own path — staged.ts
- * FR-B5-RETURN / FR-B5-CROSS, which argues the case for that at length and
- * states the consequence in terms: „the returning car is graded by the
- * runtime's own give-way adjudication exactly as the first one was". By then
- * both runners have RESOLVED (the director's ledger for the 15 + 20 s drive
- * still reads `sc-jxeq-right: true/yielded`), so the second pass arrives with
- * no choreography at all and the trackers convict the student for a car this
- * template never staged him against. ~35 s is the round trip on these arms,
- * which is why the punished band sits exactly there.
+ *   as shipped 2026-08-30   6 of 21 pacings billed опасна FAILED_TO_YIELD
+ *                           (the 15 + 20 s row also took a COLLISION at
+ *                           (−2.0, −0.6), cured since by staged.ts
+ *                           FR-B5-FACING for the ONCOMING actor)
+ *   re-entry disabled       0 of 21 — the returning actor is the whole cause
+ *   with the repair below   0 of 21, and 0 of 33 out to 110 s of waiting
  *
- * WHAT WAS TRIED HERE AND REFUSED. The only dial in this file that can re-phase
- * anything is the oncoming's `armDistM` (measured at 65 → 30 → 24): it cures
- * the „намали отрано" leg (slowing from y = −60, convicted as shipped) and the
- * 15 + 20 s collision, and leaves the 10 + 13 s conviction byte-identical. That
- * slides the window instead of closing it, which is the phantom repair this
- * catalogue keeps buying, so the dials below are UNCHANGED. OWNER: staged.ts's
- * re-entry branch, which has to refuse while the student is still standing at
- * the junction the returning actor crosses — he is 19.9 m from the node in
- * every failing row above, inside BOTH runners' armDistM — or runners.ts, which
- * could retire a resolved runner's actor rather than leave it to the generic
- * re-entry. Nothing about the first pass is in question.
+ * A WINDOW, not a slope: the six sat in two bands ~28 s apart, which is
+ * `sc-jxeq-right`'s round trip on these arms. That is why no dial in this file
+ * can close it — the oncoming's `armDistM` (measured at 65 → 30 → 24) cures the
+ * „намали отрано" leg and the collision and leaves the 10 + 13 s conviction
+ * byte-identical, i.e. it slides the window, which is the phantom repair this
+ * catalogue keeps buying. The dials below are therefore UNCHANGED.
+ *
+ * THE REPAIR IS `oneCrossingPerApproach` ON `SC_JX_EQUAL_RIGHT_CONFLICT` (see
+ * it below, and contracts.ts for why it is authored rather than inferred),
+ * with FR-B5-RECHOREOGRAPH in runners.ts as the mechanism: a resolved runner
+ * whose actor comes back round re-arms instead of leaving it running the
+ * `clearSpeedMps` escape command for ever, and on a laddered spec it holds the
+ * car short of the box — stationary, so it claims no priority and convicts
+ * nobody — until the student has left the junction. Nothing about the first
+ * pass is in question, and FR-B5-CROSS's two boulevard drills are untouched.
  *
  * Geometry truths (battery: jx-equal-districts.test.ts):
  *   - drawn lane centers sit ±4.0625 m off the road centerline;
@@ -133,6 +134,15 @@ export const SC_JX_EQUAL_RIGHT_CONFLICT: PriorityFromRightSpec = {
   // pure 22 m distance gate and a student driving the taught «приближи бавно»
   // arrived at an empty junction — the encounter the lesson exists for.
   witnessArm: { etaSec: 8, nearLineM: 6 },
+  // …AND THE LADDER IS AUTHORED TOO (4274eddb — see the header block and
+  // contracts.ts). This template stages a FIXED pair of conflicts and spaces
+  // them so the student meets one card at a time, then instruction 5 declares
+  // the junction clear. A third, unscripted crossing contradicts the sentence
+  // he was given and is graded as if the template had staged it, so this actor
+  // does not cross again until he has left the junction and can approach it
+  // afresh. It still RETURNS — parking it at the end of its path would stand a
+  // car in the westbound lane his own left turn exits into (FR-B5-EXIT).
+  oneCrossingPerApproach: true,
 };
 
 /**
@@ -398,40 +408,16 @@ export const SC_JX_EQUAL_LEFT: ScenarioSpec = {
  *   - COLLISION — the L5 нахлуващ.
  *   - JU-13 (junction approach speed) is cited as provenance ONLY: doc 72 marks
  *     its approach-envelope detector 🔴 NEW. The positive „равномерно и уверено"
- *     half is graded by the objective gates + SPEEDING_OVER_LIMIT + par time, and
- *     an unnecessary GENTLE stop is honestly not graded today.
- *
- *     …AND „NOT GRADED TODAY" IS THE WHOLE OF sc-jx-priority-confidence:9c987e7b,
- *     so it gets an owner instead of a shrug. The lesson is NAMED after the
- *     fault („без излишни спирания") and nothing anywhere reads it. Newest
- *     sweep leg, `.audit-frames/w17/frames/sc-jx-priority-confidence__pc-right`
- *     (attested bc7d43f): 85 s against this template's own 40 s par — the
- *     shadow drives it in 23.5 s — ИЗДЪРЖАН, ★★☆, and the single billed fault
- *     is a −3 „рязко спиране без причина", which is the OPPOSITE fault (braking
- *     hard, not dawdling). The earlier version of this line said „(see notes)";
- *     there are no such notes, and a routing note that names no owner is never
- *     honoured.
- *
- *     WHY IT CANNOT BE AUTHORED HERE. `RubricSpec.parTimeSec` is INFORMATIONAL
- *     BY DESIGN (types.ts, doc 76 §6: „time pressure is an L5 condition, not a
- *     rubric penalty"), so 85-against-40 may not fail anything; and no
- *     ReachZoneParams term or `ReachZoneWitnessDemands` member measures standing
- *     still (the menu is lamps / gear / controller / VRU / contact / rail /
- *     yield-clean). A predicate authored here would be one nothing live reads.
- *
- *     OWNER, AND THE ANCHOR IT ALREADY HAS: `rules/catalog.ts` + `rules/
- *     engine.ts`, as the urban sibling of DRIVING_TOO_SLOW_FOR_MOTORWAY — which
- *     is anchored on ЗДвП чл. 22, ал. 1 („Водачът на пътно превозно средство не
- *     трябва да се движи без основателна причина с твърде ниска скорост, когато
- *     по този начин пречи на движението на другите пътни превозни средства"),
- *     retrieved and agreeing with the content bank at
- *     q-magistrali-i-izvangradsko-026 (ADR-002: cited, never free-recalled).
- *     That article needs two elements, and this drill is the one place in the
- *     catalogue that stages BOTH: „без основателна причина" (the Б2 car is
- *     immobile — see SC_JX_PRIO_WAITING_CAR: nothing forward is a cause) and
- *     „пречи на движението на другите" (SC_JX_PRIO_TAILGATER is glued 9 m
- *     behind him for 30 s). The gate the detector wants is therefore this
- *     template's own geometry, not a new authored field.
+ *     half is graded by the objective gates + SPEEDING_OVER_LIMIT + par time.
+ *   - STOPPED_WITHOUT_CAUSE (чл. 24, ал. 2) — the fault the lesson is NAMED
+ *     after, and until 2026-09-01 the one thing nothing anywhere read. Armed by
+ *     this template's own `ruleConfig` (see the spec below); the detector, its
+ *     acquittals and the audit that produced it live in `rules/engine.ts`.
+ *     This drill is the one place in the catalogue that stages BOTH elements
+ *     the article needs — „без причина" (the Б2 car is immobile: see
+ *     SC_JX_PRIO_WAITING_CAR, nothing forward is ever a cause here) and
+ *     „затрудни излишно тяхното движение" (SC_JX_PRIO_TAILGATER is glued 9 m
+ *     behind him for 30 s) — which is why it is the template that arms it.
  */
 
 /** The Б2 stop line tj-stop-v1's heuristic derives on the stem, m from tj-n-c.
@@ -648,6 +634,25 @@ export const SC_JX_PRIORITY_CONFIDENCE: ScenarioSpec = {
     },
   ],
   rubric: { parTimeSec: 40 },
+  /**
+   * THE LESSON'S TITLE, MADE GRADEABLE (audit sc-jx-priority-confidence:9c987e7b).
+   *
+   * `STOPPED_WITHOUT_CAUSE` ships OFF everywhere (rules/types.ts says why: the
+   * rules module cannot see an objective, so on a stop-mark, parking or
+   * pull-over drill it would convict a student for finishing the exercise).
+   * Arming it is therefore an AUTHOR'S STATEMENT ABOUT THIS ROUTE, and this
+   * route can carry it: both success objectives are `reachZone`s with no stop
+   * demand, the priority arm has no line of its own (the single derived Б2 sits
+   * on the stem — TJ_STOP_B2_LINE_M), the staged waiter is immobile off to the
+   * side and the staged лепка is BEHIND, so `leadGapFor` has nothing to report
+   * ahead. On this map, standing still is never the task — which is exactly
+   * what the лепка 9 m behind is staged to make expensive.
+   *
+   * Set on the TEMPLATE, not on a rung, deliberately: the fault is the same
+   * fault at L1 and at L5, and doc 86 D7's per-rung `ruleConfig` is for
+   * detectors a lower rung has not taught yet. This one is the lesson.
+   */
+  ruleConfig: { needlessStopEnabled: true },
   shadow: { path: "content/traces/sc-jx-priority-confidence/shadow-correct.trace.json" },
   mistakes: [
     {

@@ -91,6 +91,7 @@ import {
   parseScenarioLessonId,
   parseStoredAdvisorSetting,
   resolveScenarioNextSteps,
+  routeHoldForSession,
   scenarioById,
   scoreRubric,
   serializeAdvisorSetting,
@@ -107,6 +108,7 @@ import {
   type NearMissEvent,
   type QuizFrequency,
   type QuizTriggerState,
+  type RouteHold,
   type RubricObservationInput,
   type RubricScore,
   type ScenarioLevel,
@@ -887,68 +889,24 @@ export function heldTaskCapKmh(
  * re-derives „stuck" from speed or position, so the banner and the ending
  * cannot disagree about whether the car is going anywhere.
  */
-export type RouteHold = "crashPinned" | "offRoad";
 
 /**
- * How long a condition must have stood before the banner qualifies its demand.
+ * THE PREDICATE AND ITS NUMBER NOW LIVE IN `lessons/advisor.ts`
+ * (`routeHoldForSession` / `ROUTE_HOLD_S` / `type RouteHold`, re-exported from
+ * the module barrel and imported at the top of this file).
  *
- * DERIVED, NOT CHOSEN. `CRASH_PIN_RADIUS_M` is 6 m and the floor at which this
- * product says a car is DRIVING is 5 км/ч — the one number `touchHintLifetime`,
- * `controlsLegendLifetime` and `demoDeckLifetime` all stand their surfaces down
- * at, and the `movingSpeedKmh` the rule engine grades with. A car that has been
- * driving AT ALL, even at that floor, covers the pin's radius in
- * 6 ÷ (5 ÷ 3.6) = 4.32 s. So five seconds after an impact, a car still inside
- * the radius has not been driving away from what it hit — by the product's own
- * definition of driving, not by a taste call about how long is long enough.
+ * WHY THEY MOVED — sc-roundabout-entry:4ab693eb. This block qualified the two
+ * surfaces that PRINT the objective and left the third one, the coach's own
+ * card, ordering «Излез от кръговото с десен мигач» at a windscreen full of
+ * grass. The card is built inside `advisorPromptForSession`, one module down,
+ * so either the number was duplicated there or the reading was. It is the same
+ * reason the derivation gives for the off-road clause sharing the crash pin's
+ * five seconds: surfaces that change at different moments read as bugs.
  *
- * It lands FIVE SECONDS BEFORE the crash pin's own 10 s ending in the pure
- * standstill case, which is the point: a qualification the student never reads
- * because the drive closes on the same frame is a dead predicate with a nice
- * comment. The off-road clause takes the same number rather than a second one,
- * for the reason `demoDeckLifetime` gives for sharing its threshold — three
- * surfaces that change behaviour at three different moments read as three bugs.
+ * `objectiveTitleUnderHold` below stays here — it is this file's own copy for
+ * this file's own two surfaces, and it is authored AGAINST the coach card
+ * (`routeHoldAdvisorPrompt`) so the pair never says one thing twice.
  */
-export const ROUTE_HOLD_S = 5;
-
-/**
- * Is the route unreachable from where the car actually is?
- *
- * `crashPinned` is the pin STILL ARMED `ROUTE_HOLD_S` after the impact, and it
- * is deliberately read off `atSec` rather than off `stillSinceSec`. The pin
- * disarms itself the moment the car leaves CRASH_PIN_RADIUS_M — i.e. exactly
- * when the demand becomes obeyable again — so this clause is monotone within
- * one pin: it turns on once and off once, and the grinding car that resets
- * `stillSinceSec` every second cannot make the banner flicker between an order
- * and its qualification. (A qualification that blinks is worse than no
- * qualification: it reads as a broken screen rather than as a condition.)
- *
- * WITHIN ONE PIN, and the exception is honest rather than accidental: a NEW
- * graded collision re-arms `atSec`, and the qualification then waits its five
- * seconds again. The engine's dedupe requires daylight plus two metres of
- * travel before it will bill a second impact, so this cannot fire on a car
- * grinding in place — it fires on a car that moved and hit something else,
- * which is new information about a different obstacle and is entitled to be
- * measured from when it happened.
- *
- * `offRoad` is `stepOffNetwork`'s own run — reset on every frame the car is
- * back on a road the world authored, never banked in instalments — so it too
- * cannot flicker, and it ends the moment the student drives back onto tarmac.
- *
- * UNKNOWN IS „NO HOLD", the same direction the three lifetime files take with
- * an unreadable speed. A missing tick, a non-monotonic stamp and a session that
- * predates either field all leave the authored sentence exactly as authored;
- * nothing here may qualify a demand on the strength of an absent measurement.
- */
-export function routeHold(s: LessonSessionState, lastTick: SimTick | null): RouteHold | null {
-  if (lastTick === null) return null;
-  const pinnedForS =
-    s.crashPin === undefined ? null : lastTick.t - s.crashPin.atSec;
-  if (pinnedForS !== null && pinnedForS >= ROUTE_HOLD_S) return "crashPinned";
-  const offRoadForS =
-    s.offNetworkSinceSec == null ? null : lastTick.t - s.offNetworkSinceSec;
-  if (offRoadForS !== null && offRoadForS >= ROUTE_HOLD_S) return "offRoad";
-  return null;
-}
 
 /**
  * The banner's sentence under a hold — the authored objective, with the thing
@@ -1010,7 +968,7 @@ export function snapshotOf(
     // the AUTHORED title. Qualifying the snapshot's own field instead would
     // silently break the match and put the unqualified demand back on the glass
     // on a second card, one row under its own qualification.
-    objectiveHold: routeHold(s, lastTick),
+    objectiveHold: routeHoldForSession(s),
     objectiveIndex: s.currentObjectiveIndex + 1,
     objectiveTotal: s.objectives.length,
     objectiveProgress:

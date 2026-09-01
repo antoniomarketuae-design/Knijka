@@ -235,15 +235,28 @@ describe("wave-1 bot completion — sc-pk-crossing-ban at L3", () => {
     );
   });
 
-  it("teach-first, not punish: having been taught, the recovered drive still completes", () => {
+  it("teach-first, not punish: the card is free — and the ban gate is not fooled by it", () => {
     // Both demos stop illegally, get the card, drive on and park at the legal
-    // bay — so they complete and pass with a clean sheet. That is the design
+    // bay — so they finish the route with a CLEAN SHEET. That is the design
     // (doc 76 §0: mistakes are DEMONSTRATED, never scored), and it is why the
     // §9 code assert lives on the trace gate, where the recorder's own engine
     // grades every encounter: traces/__tests__/sc-pk-crossing-ban-traces.
     const { result } = liveDemo("mistake-stop-before-junction");
-    expect(result.completedAll).toBe(true);
+    // TEACH-FIRST IS A CLAIM ABOUT POINTS, and this is the assert that carries
+    // it. The debrief's own heading says so in words: «Учебни моменти (НЕ
+    // ВЛИЗАТ В ТОЧКИТЕ)». Untouched.
     expect(result.score).toBe(0);
+    // EXPECTATION CHANGED 2026-08-30 (sc-pk-rail-ban:84bce2a3) — this read
+    // `true`, and that was the objective-title defect in this drill's colours.
+    // `sc-pkx-past-junction` reads «Подмини кръстовището, БЕЗ ДА СПИРАШ В
+    // ЗАБРАНЕНАТА ЗОНА» and was a bare disc, so the demo that rested in the
+    // чл. 98 corner collected that exact sentence as a ✓ on the same debrief
+    // that lists «Спиране в забранена зона» under the teach-moments heading.
+    // `requireRestClean: "banZone"` makes the credit read what the student was
+    // already told. The card stays free, the sheet stays 0, and the verdict
+    // card badges this НЕЗАВЪРШЕН rather than НЕИЗДЪРЖАН — «НЕИЗДЪРЖАН IS A
+    // FINDING OF THE ИЗПИТЕН ЛИСТ and of nothing else» (SessionEndScreen.tsx).
+    expect(result.completedAll).toBe(false);
   });
 });
 

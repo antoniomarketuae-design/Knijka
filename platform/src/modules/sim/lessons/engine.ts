@@ -55,6 +55,7 @@ import {
   personHaltVoidsObjective,
   railBarredVoidsObjective,
   reachZoneStateRefusal,
+  restFaultVoidsObjective,
   stepObjective,
   yieldFailedVoidsObjective,
   type ObjectiveContext,
@@ -620,6 +621,69 @@ function objectiveNotice(
       };
     }
   }
+  // ── AND THE SPEED CONTRACT'S OTHER EDGE FINALLY SPEAKS TOO ────────────────
+  //    (sc-ac-night-overdrive:b9d61410, critical — the floor's own design note
+  //    is on `objectives.ts ReachZoneWitnessDemands.minSpeedKmh`.)
+  //
+  // THE FRAME. «✓ Мини неосветения участък със съобразена за видимостта
+  // скорост 2:45» on a drive that never exceeded 15 км/ч. The gate now carries
+  // a floor, so that drive is refused — and THIS CARD IS WHY THE REFUSAL IS
+  // ALLOWED TO EXIST. The floor's docblock names it as edit 1 of 2 and forbids
+  // authoring the number before it: without a card, a floor refusal is SILENT
+  // (the cap card above is gated on `speedKmh > cap`, and the state card
+  // branches on `reachZoneStateRefusal(...).kind === "lamps"` and would tell a
+  // crawling student his lever was in D). A task that silently never ticks is
+  // the bare verdict doc 64 THEO-4 forbids — it would swap a false ✓ for a
+  // false nothing, which is not a repair.
+  //
+  // MUTUALLY EXCLUSIVE WITH BOTH CARDS ABOVE BY CONSTRUCTION. The cap card
+  // needs `speedKmh > cap` and `parseSpeedFloor` refuses a band under
+  // REACH_ZONE_CAP_SLACK_KMH, so a frame cannot be under the floor and over the
+  // ceiling at once; the state card returns before this one whenever it has a
+  // refusal to report, which is the same ordering the cap card's own comment
+  // argues for — the fault that ALSO has a grader is reported first, and a
+  // crawl has no grader at all (`DRIVING_TOO_SLOW_FOR_MOTORWAY` cannot fire on
+  // an extra-urban 1+1).
+  //
+  // ON THE ARRIVAL FRAME AND NO NEW STATE: `before.reached` is false exactly
+  // once per run, the same discriminator the two cards above use, and
+  // `ObjectiveEvalState.reachZone` is not extended.
+  if (
+    params.kind === "reachZone" &&
+    after.type === "reachZone" &&
+    (before.type !== "reachZone" || !before.reached) &&
+    after.reached &&
+    !after.capMet &&
+    params.minSpeedKmh !== undefined &&
+    Math.abs(tick.speedKmh) < params.minSpeedKmh
+  ) {
+    // The AUTHORED number, printed raw and without a `shownObjectiveCapKmh`
+    // twin: the ladder does not touch the floor (`scenario/params.ts`), so
+    // there is only ever one figure for it and the two-numbers-for-one-task
+    // split that card had to fix cannot arise here.
+    const wantedKmh = Math.round(params.minSpeedKmh);
+    const measuredKmh = Math.round(Math.abs(tick.speedKmh));
+    const dM = Math.hypot(tick.position.x - params.x, tick.position.y - params.y);
+    const stillAtTheMark = dM <= params.radiusM + REACH_ZONE_GRACE_M;
+    return {
+      kind: "lesson",
+      titleBg: "Мина точката твърде бавно",
+      // THEO-4 — what was observed, what the task wants, WHY that is the
+      // dangerous half, and what to do about it. The „why" is the whole point
+      // of the drill: пълзенето не е решение на задачата «съобразена скорост»,
+      // а нейното избягване — беглецът от преценката не се учи да я прави.
+      explanationBg:
+        `Задачата иска да минеш тук с поне ${wantedKmh} км/ч, а мина с ${measuredKmh} км/ч. ` +
+        "„Съобразена скорост“ не значи „възможно най-бавно“: тя е най-високата скорост, от която " +
+        "спираш в осветеното пред теб. Пълзенето не решава тази преценка, а я заобикаля — а " +
+        "в същото време бавната кола в тъмното сама става пречка за движението: задните я виждат " +
+        "късно и я задминават там, където не бива. " +
+        (stillAtTheMark
+          ? "Ускори СЕГА, докато си върху точката — задачата се отчита на следващия кадър, ако си в границите. Ако я подминеш така, остава неизпълнена, но урокът продължава и разборът я показва накрая."
+          : "Точката е вече зад теб, затова задачата остава неизпълнена: скоростта се избира ПРЕДИ участъка. Урокът продължава и разборът я показва накрая."),
+      lawRef: "ЗДвП чл. 5",
+    };
+  }
   if (
     params.kind === "completeManeuver" &&
     params.maneuver === "roundabout" &&
@@ -707,6 +771,65 @@ function isBarredRailEntry(e: ScorableEvent): boolean {
     e.kind === "violation" &&
     e.code === "RAIL_CROSSING_VIOLATION" &&
     e.detail === "entered-barred"
+  );
+}
+
+/**
+ * Rested inside a no-stopping span — the ledger row
+ * `ReachZoneParams.requireRestClean: "banZone"` consults (objectives.ts carries
+ * the frame, the census and the two false-refusal checks).
+ *
+ * IT READS THE BILL, NOT THE TRACKER, exactly like the three predicates above:
+ * `rules/engine.ts` only reaches `ILLEGAL_STOP_IN_BAN_ZONE` for a rest that has
+ * already survived its innocence set — a lead within `banZoneStopQueueGapM`, a
+ * stop line, a signal — so what arrives here is never a student obeying
+ * traffic, and it is a fault the protocol prints with its ЗДвП чл. 6, т. 1
+ * citation, its explanation and its «✔ Правилното действие» corrective.
+ */
+function isBanZoneRest(e: ScorableEvent): boolean {
+  return e.kind === "violation" && e.code === "ILLEGAL_STOP_IN_BAN_ZONE";
+}
+
+/**
+ * …AND THE SAME FAULT AS THE COACH RECORDED IT — the half no sibling demand
+ * needs, and the reason this one does.
+ *
+ * `isBanZoneRest`'s three neighbours all read опасна codes, which the
+ * teach-first coach never hands over as a free mini-lesson. This one is
+ * основна, so the FIRST offence in a training drive is SHOWN and deliberately
+ * NOT CHARGED: it lands on `LessonSessionState.coachedMistakes` instead of
+ * `events`, and both channels reach the debrief the student reads (that field
+ * exists precisely so the sheet stops describing only the ledger). Measured on
+ * this drill's own ❌ demo — `mistake-stop-before-crossing` at L1 books zero
+ * scored events and one coached `ILLEGAL_STOP_IN_BAN_ZONE` at 0:26 — so a
+ * ledger-only read would have left the demo certifying itself.
+ *
+ * `CoachedMistake.code` is a plain string (future codes pass through), so this
+ * is a string compare rather than a narrowed union; the SCORED half above is
+ * typed against the real `ViolationCode`, which is what makes a rename fail the
+ * build instead of quietly emptying the gate.
+ */
+function isCoachedBanZoneRest(m: CoachedMistake): boolean {
+  return m.code === "ILLEGAL_STOP_IN_BAN_ZONE";
+}
+
+/**
+ * Came to rest between the rails — the ledger row
+ * `ReachZoneParams.requireRestClean: "railBand"` consults.
+ *
+ * The `detail` narrowing is the whole point, exactly as for `isBarredRailEntry`
+ * one screen up and for the same reason: `RAIL_CROSSING_VIOLATION` also carries
+ * "no-stop" and "entered-barred", each a real fault with its own copy and its
+ * own article (ЗДвП чл. 51, ал. 3 and чл. 52 against this arm's чл. 53, ал. 2),
+ * and neither is a claim about standing still on the band. No coached half here
+ * and none is possible: an опасна is always graded, and `CoachedMistake` carries
+ * no `detail` to narrow by.
+ */
+function isRailBandRest(e: ScorableEvent): boolean {
+  return (
+    e.kind === "violation" &&
+    e.code === "RAIL_CROSSING_VIOLATION" &&
+    e.detail === "stopped-on-track"
   );
 }
 
@@ -1159,6 +1282,35 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           .filter(isYieldFault)
           .map((e) => ({ code: e.code as YieldFaultCode, tSec: e.t }))
       : NO_YIELD_FAULTS;
+  // …AND THE REST INSIDE THE FORBIDDEN STRETCH, for
+  // `ReachZoneParams.requireRestClean` (objectives.ts carries the frame: one
+  // debrief printing «✗ Спиране в забранена зона −3 в 1:11» over «✓ Подмини
+  // цялата забранена зона, БЕЗ ПРЕСТОЙ В НЕЯ 1:19»). Both halves of the scored
+  // ledger for the reason the three blocks above give — a car billed on the
+  // frame it also crosses the waypoint must not be certified by a ledger one
+  // frame stale.
+  //
+  // PLUS THE SHOWN-BUT-NOT-CHARGED HALF, which is this fact's own and not a
+  // widening of its neighbours': `ILLEGAL_STOP_IN_BAN_ZONE` is основна, so the
+  // teach-first coach gives the FIRST one away as a free mini-lesson and records
+  // it on `coachedMistakes` rather than `events` (see `isCoachedBanZoneRest`).
+  // The student is shown the card and the debrief prints the row, so the
+  // contradiction is on his screen either way.
+  //
+  // …EXCEPT IN A THEO-3 SANDBOX, and that exemption is the point of the mode.
+  // `mistakeExperience` sessions run learn-only: the wrong action IS the
+  // assignment, nothing scores, nothing terminates, and every raised code lands
+  // on the coached channel by design. Reading it there would let a drill whose
+  // instruction is „сега спри на забраненото място" refuse the student for
+  // doing what he was told. The SCORED halves stay live in that mode because
+  // they are empty in it.
+  const banZoneRestCoached =
+    mistakeXp === undefined &&
+    (coachedPrev.some(isCoachedBanZoneRest) || coachedNew.some(isCoachedBanZoneRest));
+  const restedInBanZoneInRun =
+    prev.events.some(isBanZoneRest) || scoredEvents.some(isBanZoneRest) || banZoneRestCoached;
+  const restedOnRailBandInRun =
+    prev.events.some(isRailBandRest) || scoredEvents.some(isRailBandRest);
 
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
@@ -1222,6 +1374,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(struckAPersonInRun ? { struckAPersonInRun: true } : {}),
         ...(struckABodyInRun ? { struckABodyInRun: true } : {}),
         ...(enteredRailBarredInRun ? { enteredRailBarredInRun: true } : {}),
+        ...(restedInBanZoneInRun ? { restedInBanZoneInRun: true } : {}),
+        ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
         ...(activeSince !== null ? { objectiveActiveSinceSec: activeSince } : {}),
       };
@@ -1595,7 +1749,19 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           // it can make. It is wired anyway, because the yield term one line up
           // is the record of what happens when that assumption is left implicit
           // and a template later moves the claim onto the last rung.
-          personHaltVoidsObjective(params[currentIndex], struckAPersonInRun));
+          personHaltVoidsObjective(params[currentIndex], struckAPersonInRun) ||
+          // The rest term (`requireRestClean`) is monotone in exactly the same
+          // way, and like the arm above it no census member is terminal at HEAD
+          // (every one of the eight is 1-of-2, 1-of-3 or 2-of-3 — its docblock
+          // lists them), so `!onTerminal` already covers every refusal it can
+          // make. Wired anyway for the reason the yield term two lines up is the
+          // record of: six of those eight drills end on a «спри на разрешеното
+          // място» gate that a later wave could fold into the pass-the-zone one,
+          // and that must not reopen the trap silently.
+          restFaultVoidsObjective(params[currentIndex], {
+            ...(restedInBanZoneInRun ? { restedInBanZoneInRun: true } : {}),
+            ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
+          }));
       if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {

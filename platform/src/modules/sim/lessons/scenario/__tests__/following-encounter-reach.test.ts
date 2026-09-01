@@ -263,12 +263,23 @@ describe("sc-follow-brake: the lesson's own event reaches the learner it is writ
     // a silent drill for an unavoidable collision — a false failure, which this
     // family has already been burned by once. Measured: rest with 18.4 m of
     // bumper gap in hand and an empty rule log.
+    //
+    // EXPECTATION CORRECTED 2026-09-01 (audit sc-vu-emergency-junction:853790f7).
+    // „An empty rule log" is no longer the right statement of this case, and the
+    // reason is a real product change, not a widened band: the reacting crawler
+    // spends the first stretch of this drive holding 11 км/ч down a street
+    // posted 50 with NOTHING ahead of him — the lead is staged later — and
+    // `DRIVING_TOO_SLOW_IN_TOWN` now grades that (ЗДвП чл. 22, ал. 1). What this
+    // case is FOR is untouched and is asserted below directly instead of through
+    // an empty array: the reaction succeeds, the gap is kept, and no collision
+    // or following fault is billed. If the floor ever did trap him, COLLISION
+    // appears in that list and this goes red exactly as it always would have.
     const drive = driveBrake({ kmh: 11, stopAtY: 205 });
     const outcome = only(drive.outcomes);
     expect(outcome?.detail).toBe("stoppedInTime");
     expect(outcome?.success).toBe(true);
     expect(outcome!.stopGapM!).toBeGreaterThan(10);
-    expect(violationCodes(drive)).toEqual([]);
+    expect([...new Set(violationCodes(drive))]).toEqual(["DRIVING_TOO_SLOW_IN_TOWN"]);
   });
 
   it("…and reaches the STOP-START crawl the audit photographed, not only a steady one", () => {

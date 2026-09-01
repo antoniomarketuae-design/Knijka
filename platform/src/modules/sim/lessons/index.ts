@@ -130,6 +130,14 @@ export {
   observeGlancePingsTick,
   parseStoredAdvisorSetting,
   resetGlancePings,
+  // The route hold (sc-roundabout-entry:4ab693eb) — the coach's own reading of
+  // „the demand cannot be obeyed from here". On the barrel because
+  // `LessonPlayShell` qualifies the objective banner and the phone task line
+  // from the SAME predicate and the same number: three surfaces that changed at
+  // three different moments would read as three bugs.
+  ROUTE_HOLD_S,
+  routeHoldAdvisorPrompt,
+  routeHoldForSession,
   serializeAdvisorSetting,
   // O51 — the figure this objective already put on the glass. On the barrel
   // because the WORLD plaque (`components/sim/RouteGuidance.capLineBg`) is the
@@ -140,6 +148,7 @@ export {
   type AdvisorPrompt,
   type GlancePingPhase,
   type GlancePingsState,
+  type RouteHold,
 } from "./advisor";
 
 // B15-VOICE — the instructor's voice for a lawful wait (requirement zero, doc

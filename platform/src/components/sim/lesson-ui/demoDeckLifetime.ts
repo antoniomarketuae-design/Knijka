@@ -126,3 +126,65 @@ export function demoDeckAtRest<T extends { tSec: number; playing: boolean }>(clo
   clock.tSec = 0;
   return clock;
 }
+
+/**
+ * ── …AND THE VOICE HAS TO WAIT FOR THE AUDIENCE TOO, NOT JUST THE PLAYHEAD ──
+ * (sc-ov-keep-right:6751402d, major — the arrival screen with five surfaces on
+ * it at once. Re-measured against the w21 corpus on 2026-09-01.)
+ *
+ * `demoDeckAtRest` above parks the CLOCK: the deck opens at 0:00, paused, and
+ * the student presses ▶. It did not park the CAPTION, and the block two
+ * screens up already states why those are two facts and not one —
+ *
+ *   „`activeAnnotationIndex` clears a caption `windowSec` after it fires — but
+ *    only while the playhead MOVES. A clock stopped inside that window pins its
+ *    caption on the glass … So the deck must both stop the clock AND stop
+ *    rendering the caption; either alone leaves a frame like these."
+ *
+ * — and `tSec = 0` is inside the window of every annotation authored at 0. So
+ * the ruling closed the moving half of its own sentence and shipped the
+ * stationary half: a demonstration that is NOT PLAYING, has never been played,
+ * and reads «0:00 / 0:33» on its own transport, prints a sentence in a solid
+ * `bg-background/85` card in the middle of the windscreen from the first frame
+ * of the lesson.
+ *
+ * THE FRAME, ON THE CURRENT BUILD — `.audit-frames/w21/frames/
+ * sc-ov-keep-right__pc-right/01-arrival.png` (b224c7e, and `platform/src` is
+ * byte-identical to it at this commit for both files this rule touches):
+ * 0 км/ч, gear D, «ЗАДАЧА 1/2» unstarted, the deck standing at «0:00 / 0:33»
+ * with ▶ unpressed — and «Започваш в ЛЯВАТА лента — мястото ти не е тук…» in a
+ * ~415 × 70 px card at the centre-left of the glass, over the carriageway.
+ * `run.log`'s own [01-arrival] listing carries it inside the deck's text.
+ *
+ * WHY THAT CARD IS THE WORST OF THE FIVE SURFACES ON THAT SCREEN, AND THE ONLY
+ * ONE THIS LANE MAY TAKE. The other four are in corners or are settled:
+ * the «ЗАДАЧА» banner and the ИНСТРУКЦИИ steps are the authored TEACHING and
+ * `briefingStandsDown` has already ruled that a standstill keeps them; the
+ * advisor's echo of the task was closed by `advisorEchoTrim`; and the «⌨
+ * Клавиши» default is stated in `LessonScene.tsx` as „the founder's question,
+ * not a lane's" and is pinned as source text by a test this lane does not own.
+ * This card is the only one of the five that stands ON THE ROAD rather than in
+ * a corner, and `deckCaptionVoice.test.tsx` measured what that costs: a judge
+ * whose whole job was reading the frame took the demonstration's sentence for
+ * the instructor speaking about the student's own car, „and there is nothing in
+ * the frame that could have told them otherwise". At 0:00, with nothing
+ * playing, there is even less: the deck is not visibly narrating anything.
+ *
+ * NOTHING IS TAKEN AWAY, and this is the same sentence `demoDeckAtRest` ends
+ * on. `tSec = 0` is inside the first annotation's window, so the caption is on
+ * the glass on the very frame the student presses ▶ — it is deferred to the
+ * gesture that asks for it, not removed. The bank is untouched, the card's
+ * fixed `DECK_ROOMY_CAPTION_HEIGHT_PX` box is untouched (so no control moves
+ * and `tools/mobile/deck-captions.mjs` still measures the same 138 px), the
+ * annotation ticks keep their sentences as `aria-label`, and the transport is
+ * exactly where it was.
+ *
+ * ONE FUNCTION FOR BOTH HALVES OF THE VOICE, deliberately. `standDown` (the
+ * student is driving) and `engaged` (the student has asked) are different
+ * questions, and a caption that consulted them in two places is how one of
+ * them ends up being answered and the other forgotten — which is precisely how
+ * the stationary half of the sentence quoted above went missing.
+ */
+export function demoDeckNarrates(state: { engaged: boolean; standDown: boolean }): boolean {
+  return state.engaged && !state.standDown;
+}

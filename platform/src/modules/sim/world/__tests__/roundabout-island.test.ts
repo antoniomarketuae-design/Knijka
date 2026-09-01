@@ -623,6 +623,113 @@ describe("FR-22 — the OUTER boundary is a circle too", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Г9 — the island's own SIGN
+// ---------------------------------------------------------------------------
+//
+// sc-rb-ped-exit:841c6252, filed off a cockpit frame: „the roundabout itself is
+// a bare grass mound with shrubs and buildings behind it." The mound is not the
+// defect — it is the measurement `crownRiseM` exists for, and the tests above
+// pin its bulk deliberately. The defect is that the mound carried NOTHING a
+// driver may read. Б1 and Г12 stand out at the mouth; the thing they are
+// talking about was, from the give-way line, a lawn.
+//
+// A Bulgarian central island carries Г9 „Преминаване отдясно на знака" facing
+// each entry — content/signs/signs.json `sign-g9`: „обикновено е поставен на
+// остров, ремонтен участък или препятствие по средата на пътя", cited to
+// Наредба № РД-02-21-1/23.11.2023, знак Г9.
+describe("the island carries Г9 — it is an obstacle with an instruction on it", () => {
+  it("every DRAWN island signs every entry, and the refused one signs nothing", () => {
+    for (const id of RING_DISTRICTS) {
+      const rings = ringsOf(readDistrict(id));
+      const drawn = rings.filter((r) => r.islandRadiusM !== null);
+      const network = analyzeNetwork(readDistrict(id));
+      // How many mouths traffic can actually enter through — the pass signs
+      // entries, never exits, so this is the number to expect.
+      let entries = 0;
+      for (const ring of drawn) {
+        for (const m of ring.mouths) {
+          const node = network.nodes.get(m.nodeId);
+          if (node?.approaches.some((ap) => ap.edgeId === m.armEdgeId && ap.incoming)) entries++;
+        }
+      }
+      const plates = worldOf(id).signs.filter((s) => s.kind === "passRight");
+      expect(plates.length, `${id}: Г9 count`).toBe(entries);
+      // d2-v1's island is refused (see above), so it must get NO Г9: a plate
+      // with no island under it stands in live carriageway telling a driver to
+      // pass right of nothing.
+      if (drawn.length === 0) expect(plates.length, `${id}: refused island`).toBe(0);
+    }
+    // …and the corpus really does exercise the positive case.
+    expect(worldOf("rb-ped-v1").signs.filter((s) => s.kind === "passRight").length).toBe(4);
+  });
+
+  it("each plate stands ON the island's concrete rim, not on the crown or in the lane", () => {
+    // buildIsland lays a flat band from `islandRadiusM − ISLAND_KERB_BAND_M` to
+    // `islandRadiusM` at the planter-wall top; inside that the earth domes away.
+    // A post outside the band overhangs the circulating lane, a post inside it
+    // leans out of a cosine surface.
+    const ISLAND_KERB_BAND_M = 1.1;
+    const ISLAND_WALL_TOP_Y = SIDEWALK_TOP_Y + 0.45;
+    for (const id of RING_DISTRICTS) {
+      const rings = ringsOf(readDistrict(id));
+      for (const s of worldOf(id).signs) {
+        if (s.kind !== "passRight") continue;
+        const p: [number, number] = [s.position[0], -s.position[2]];
+        const ring = rings.find(
+          (r) =>
+            r.islandRadiusM !== null &&
+            Math.hypot(p[0] - r.centre[0], p[1] - r.centre[1]) <= r.islandRadiusM,
+        );
+        expect(ring, `${id}: a Г9 that belongs to no drawn island`).toBeDefined();
+        const r = ring!.islandRadiusM!;
+        const d = Math.hypot(p[0] - ring!.centre[0], p[1] - ring!.centre[1]);
+        expect(d, `${id}: Г9 inboard of the rim band`).toBeGreaterThan(r - ISLAND_KERB_BAND_M);
+        expect(d, `${id}: Г9 overhanging the carriageway`).toBeLessThan(r);
+        expect(s.position[1], `${id}: Г9 based off the rim top`).toBeCloseTo(ISLAND_WALL_TOP_Y, 6);
+      }
+    }
+  });
+
+  it("each plate FACES the driver approaching down its own arm", () => {
+    // `yawFromFacing(f) = atan2(f.x, -f.y)`, so the face normal recovered from a
+    // placement is `[sin yaw, −cos yaw]` (the same inversion sign-truth.test.ts
+    // uses). It must point back up the arm — a plate on the island turned any
+    // other way is signage nobody can read, which is what a mound of grass
+    // already was.
+    for (const id of RING_DISTRICTS) {
+      const rings = ringsOf(readDistrict(id));
+      for (const s of worldOf(id).signs) {
+        if (s.kind !== "passRight") continue;
+        const p: [number, number] = [s.position[0], -s.position[2]];
+        const facing: [number, number] = [Math.sin(s.yaw), -Math.cos(s.yaw)];
+        const ring = rings.find(
+          (r) =>
+            r.islandRadiusM !== null &&
+            Math.hypot(p[0] - r.centre[0], p[1] - r.centre[1]) <= r.islandRadiusM,
+        )!;
+        // The mouth this plate sits in front of: nearest by bearing.
+        const bearing = Math.atan2(p[1] - ring.centre[1], p[0] - ring.centre[0]);
+        let best: (typeof ring.mouths)[number] | null = null;
+        let bestGap = Infinity;
+        for (const m of ring.mouths) {
+          const gap = Math.abs(Math.atan2(Math.sin(m.bearing - bearing), Math.cos(m.bearing - bearing)));
+          if (gap < bestGap) {
+            bestGap = gap;
+            best = m;
+          }
+        }
+        expect(best, `${id}: Г9 in front of no mouth`).not.toBeNull();
+        expect(bestGap, `${id}: Г9 not aligned with its mouth`).toBeLessThan(0.05);
+        // `mouth.dir` runs away from the ring, i.e. straight at the approaching
+        // driver. Dot ≈ 1 means the face is pointing the same way.
+        const dot = facing[0] * best!.dir[0] + facing[1] * best!.dir[1];
+        expect(dot, `${id}: Г9 facing away from its approach`).toBeGreaterThan(0.99);
+      }
+    }
+  });
+});
+
 describe("nothing else moved", () => {
   it("a roundabout-free district builds byte-identical geometry", () => {
     const world = worldOf("tj-stop-v1");

@@ -161,19 +161,44 @@ describe("wave-7 bot completion — sc-pk-rail-ban at L3", () => {
     expect(l3.taught).toContain("ILLEGAL_STOP_IN_BAN_ZONE");
     expect(l3.scored).not.toContain("ILLEGAL_STOP_IN_BAN_ZONE");
     expect(l3.r.score).toBe(0);
-    expect(l3.r.completedAll).toBe(true); // the route was never the problem
+    // EXPECTATION CHANGED 2026-08-30 — sc-pk-rail-ban:84bce2a3, critical, and
+    // this line is where the defect had been written down as a design. It read
+    // `true` with the comment „the route was never the problem", which is true
+    // of the ROUTE and false of the TASK: `sc-pkr-past-zone` does not say
+    // «стигни точката отвъд зоната», it says «Подмини цялата забранена зона,
+    // БЕЗ ПРЕСТОЙ В НЕЯ». That is a discipline claim, and w16 photographed the
+    // product making it — «✓ … 1:19» — eight seconds after convicting the same
+    // drive of «Спиране в забранена зона −3 изпитни т. в 1:11».
+    //
+    // WHAT DID **NOT** CHANGE, and it is the whole of teach-first: the score is
+    // still 0 (asserted one line up), the card is still free, and the
+    // ИЗПИТЕН ЛИСТ is untouched. The verdict card badges a clean sheet with an
+    // unfinished task НЕЗАВЪРШЕН, never НЕИЗДЪРЖАН — SessionEndScreen.tsx
+    // carries that distinction in so many words. The drill simply stopped
+    // certifying the one discipline it exists to teach on a drive that failed
+    // it. Gate: lessons/__tests__/rest-clean-gate.test.ts.
+    expect(l3.r.completedAll).toBe(false);
     // …and at the EXAM rung the coach stops teaching and starts billing the
     // identical drive. Both halves of teach-first-then-grade on one recording.
     const l4 = replay("mistake-stop-before-crossing", 4);
     expect(l4.taught).toEqual([]);
     expect(l4.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     // The OFFICIAL truth, not a wish: one основна is 3 of the 9-point budget
-    // (Наредба-38, rules/scoring.ts) — this sheet is still PASSED, and the cost
-    // lands on the rubric instead. A drill that claimed one short stop fails the
-    // exam would be teaching a law that does not exist.
+    // (Наредба-38, rules/scoring.ts) — the SHEET is still passed, and that is
+    // the assert below. A drill that claimed one short stop fails the exam
+    // would be teaching a law that does not exist, and nothing here does: the
+    // sheet's own verdict (`l4.r.summary.passed`) is untouched at every rung.
     expect(l4.r.score).toBe(3);
-    expect(l4.r.passed).toBe(true);
-    expect(l4.r.completedAll).toBe(true);
+    expect(l4.r.summary.passed).toBe(true);
+    // EXPECTATION CHANGED 2026-08-30, same row and same reason as L3 — plus the
+    // consequence stated out loud, because `LessonResult.passed` is
+    // `summary.passed && completedAll && !aborted` (engine.ts): the LESSON is
+    // no longer credited on a drive that rested in the zone. The sheet still
+    // says 3 of 9 and still says издържан; the lesson says the task «подмини
+    // цялата забранена зона, без престой в нея» was not performed, which is the
+    // one sentence the whole template exists to be able to say.
+    expect(l4.r.completedAll).toBe(false);
+    expect(l4.r.passed).toBe(false);
     expect(scoreRubric(l4.r, SC_PK_RAIL_BAN.rubric!).stars).toBeLessThanOrEqual(2);
   });
 
@@ -185,8 +210,7 @@ describe("wave-7 bot completion — sc-pk-rail-ban at L3", () => {
     //  - опасна ⇒ SCORED with a non-blocking toast, never a teach-pause modal
     //    (a dangerous code must never pop a card mid-crossing) — so the A9 teach
     //    channel is EMPTY even at L3, where its neighbour got a free lesson;
-    //  - 10 points ⇒ the sheet fails on the spot, while completedAll stays TRUE:
-    //    he drove the whole route, cleared every gate, parked legally.
+    //  - 10 points ⇒ the sheet fails on the spot.
     // Six metres of geography, three faults' worth of difference. If these two
     // demos ever graded the same code, this template would have no subject.
     const l3 = replay("mistake-stop-on-rails", 3);
@@ -195,7 +219,23 @@ describe("wave-7 bot completion — sc-pk-rail-ban at L3", () => {
     expect(l3.scored).not.toContain("ILLEGAL_STOP_IN_BAN_ZONE"); // no ban span reaches the band
     expect(l3.r.score).toBe(10);
     expect(l3.r.passed).toBe(false);
-    expect(l3.r.completedAll).toBe(true); // the route was perfect; the six metres were not
+    // EXPECTATION CHANGED 2026-08-30 — sc-pk-rail-ban:84bce2a3, the OTHER
+    // direction of the same row, and the one the finding's own note warns not
+    // to leave half-repaired. This read `true` with the comment „the route was
+    // perfect; the six metres were not". The route was; the TASK was not:
+    // `sc-pkr-cross` reads «Премини коловоза на едно движение, БЕЗ ДА СПИРАШ
+    // ВЪРХУ РЕЛСИТЕ», and this drive stood still between the rails for six
+    // seconds. Measured through `applyTick` at HEAD before the demand existed:
+    // events [RAIL_CROSSING_VIOLATION/stopped-on-track @0:30], sc-pkr-cross
+    // DONE — a −10 опасна and a certificate that it never happened, on one
+    // sheet. `requireRestClean: "railBand"` reads exactly the "stopped-on-track"
+    // arm, so the OTHER demo (a rest fifty metres short, in the ban span)
+    // cannot touch this gate — §2 of rest-clean-gate.test.ts pins that split.
+    //
+    // The chain is sequential, so the two gates behind this one no longer open
+    // either; the drive still ends by itself (the stalled-chain finish gate),
+    // which rest-clean-gate.test.ts §1 asserts as its own row.
+    expect(l3.r.completedAll).toBe(false);
     expect(scoreRubric(l3.r, SC_PK_RAIL_BAN.rubric!).stars).toBe(1);
   });
 

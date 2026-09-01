@@ -468,7 +468,65 @@ export const SC_HZ_BRAKE_DONT_SWERVE_ESCORT: CutInLeadCarSpec = {
   // from here the escort stops pacing and drives its own clear lane.
   cutAt: { x: DEBRIS_LANE_ESCORT_X, y: 162 },
   cutRadiusM: 4,
-  minCutSpeedKmh: 25, // the 50 km/h approach clears it — the release fires
+  // SWEEP 161 (:8a5ed5b4) — WAS 25, AND 25 IS WHY THE AUDIT SAW AN EMPTY LANE.
+  //
+  // The photographed drill: at 05-stopped the coach says «Виж я колата отляво —
+  // мина си по своята лента» over a left lane the auditor called „visibly,
+  // completely empty", and the same at t094. The escort was NOT missing. It was
+  // pinned where `paceAheadM: 1` asks it to be — beside the door, one drawn
+  // lane pitch (8.125 m) over, which traffic/__tests__/staged-subject-on-the-
+  // glass.test.ts measures from the shipped cockpit eye at 66.1° against a
+  // 37.70° half-windscreen. A car level with your door is not visible through
+  // a windscreen; that is the лекция's own subject («точно съседната лента е
+  // мястото, където живее мъртвата ти зона») and it is not the defect. The
+  // defect is that it never stopped being beside the door.
+  //
+  // MEASURED on hz-debris-v1 through `createTrafficSystem` + the production
+  // `CutInLeadCarRunner` (the probe that became
+  // __tests__/hazards2-escort-release.test.ts) — a drive that accelerates,
+  // holds a pace, and stops on the drill's own mark at y = 184. „clear" is the
+  // gap up the road at the instant the player comes to rest, i.e. the frame the
+  // coach's «виж я колата отляво» plays over:
+  //
+  //     50 км/ч  25 → released, resolves „yielded" @ t 19.1 s; clear 12.8 m at
+  //                   13.9 m/s. 5 → the same numbers to six decimals.
+  //     15 км/ч  25 → NO release, EVER, and no outcome at all; the escort is at
+  //                   rest 2.8 m from the door and still there 6 s later.
+  //               5 → released @ t 35.1 s (its own y = 159.9, the reveal);
+  //                   clear 52.0 m at 13.9 m/s, 135.7 m six seconds later.
+  //     12 км/ч  25 → NO release; at rest 2.4 m from the door, 0.0 m/s.
+  //               5 → released @ t 43.4 s; clear 71.4 m at 13.9 m/s.
+  //
+  // The audited drives ran 10–15 км/ч (log.txt: „POSITIVE CONTROL: 15 км/ч
+  // after 5 s of throttle"), so 25 locked this drill out of the one event it is
+  // built on, and left the student with the exact absurdity the `cutShiftM: 0`
+  // note above says the release exists to prevent: a car stopped dead alongside
+  // him, for debris that was never in its lane, while instruction 6 tells him
+  // to watch it go by. And a car standing 2.4 m from the door is off the glass
+  // in EVERY frame, which is why the row reads „the left lane is completely
+  // empty": staged-subject-on-the-glass.test.ts drives both floors through the
+  // shipped lens and counts 0 on-glass frames at 25, and seconds of them at 5,
+  // inside the A-pillar cone rather than merely inside the frustum.
+  //
+  // WHY 5. The „cut" here is a RELEASE, not a lane theft: `cutShiftM` is ZERO,
+  // nothing is taken from anybody, and a speed floor on a release grades
+  // nothing — it only decides whether the neighbour ever drives on. So the
+  // honest floor is the one no moving drive can miss: the runner will not even
+  // command the pace below `input.speedKmh > 4`, and 5 is the smallest whole
+  // number above that. Verbatim the sc-mgb-bus 18 → 5 reasoning
+  // (templates-merging.ts) and the VUCC_CHILD floor (templates-vru2.ts).
+  //
+  // TRACE-NEUTRAL, measured not assumed: all three committed recordings
+  // approach at the posted 50, so 25 was never the binding condition on any of
+  // them — the geometry was, and the geometry is untouched. The gate's own
+  // „approachSpeedKmh > 45" assertion still holds.
+  //
+  // WHAT THIS DOES NOT FIX, named rather than implied: a student who comes to a
+  // full stop BEFORE the escort's own arc reaches `cutAt` still parks it beside
+  // himself — the pace is a rubber band and no floor can fire a geometry gate
+  // that never becomes true. That is the same residue templates-merging.ts
+  // records, and it needs a release MODE on CutInLeadCarSpec, not a number here.
+  minCutSpeedKmh: 5,
   cutShiftM: 0, // ZERO LATERAL: the escort never enters the player's lane
   cutRampSec: 1.5,
   cutSpeedMps: 13.89, // ~50 km/h locked cruise — it sails past the braking player

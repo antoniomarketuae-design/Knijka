@@ -36,6 +36,7 @@ import type {
   PassSignalParams,
   ReactionBand,
   ReachZoneParams,
+  ReachZoneRestDemand,
   ThreePointTurnParams,
 } from "./types";
 
@@ -284,6 +285,19 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
           throw new ObjectiveSpecError(objective.id, "reachZone requireNoContact must be true");
         }
         out.requireNoContact = true;
+      }
+      // THE REST THE BANNER SAYS DID NOT HAPPEN (ReachZoneParams
+      // .requireRestClean — lessons/types.ts carries the frame, and
+      // `ReachZoneWitnessDemands.requireRestClean` the census, the two codes
+      // and the two false-refusal checks). AUTHORED ONLY, like the contact
+      // term above it and unlike the four title-filled demands: this arm can
+      // decide whether a route counts as driven, and the fallthrough that once
+      // manufactured a demand out of a banner's words was reverted by two
+      // adversarial verifiers (see the `requireLamps` block above). The other
+      // direction is held by `rest-clean-gate.test.ts`, which fails the build
+      // when a title claims the discipline and the key is missing.
+      if (p.requireRestClean !== undefined) {
+        out.requireRestClean = parseRestDemand(objective, p.requireRestClean);
       }
       // THE YIELD THE BANNER SAYS HAPPENED (see `ReachZoneWitnessDemands.
       // requireYieldClean` for the drive, the census and the window). AUTHORED
@@ -610,6 +624,46 @@ export interface ObjectiveContext {
    * leaves the demand met, exactly like the four fields above it.
    */
   yieldFaults?: readonly YieldFaultRecord[];
+  /**
+   * Has this drive been told, anywhere, that it rested inside a чл. 98 / В27
+   * no-stopping span — `ILLEGAL_STOP_IN_BAN_ZONE`, the основна the catalogue cites
+   * to ЗДвП чл. 6, т. 1 (the duty to obey the sign)?
+   * The one fact `ReachZoneParams.requireRestClean: "banZone"` consults.
+   *
+   * „TOLD", NOT „CHARGED", AND THAT IS THE ONE PLACE THIS FIELD DEPARTS FROM
+   * ITS FOUR NEIGHBOURS. Every other ledger fact on this context is опасна and
+   * therefore always billed; this one is основна, so `lessons/engine.ts`'s
+   * teach-first coach hands the FIRST offence to the student as a free
+   * mini-lesson and records it on `LessonSessionState.coachedMistakes` instead
+   * of `events`. Both halves reach the debrief the student reads (that channel
+   * exists precisely so the sheet stops mistaking the ledger for the drive),
+   * so both halves falsify a «без престой» banner. Measured on this drill's own
+   * ❌ demo: `mistake-stop-before-crossing` at L1 books ZERO scored events and
+   * one coached `ILLEGAL_STOP_IN_BAN_ZONE` at 0:26 — a ledger-only read would
+   * have left the demo certifying itself.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+   * (the rigs, the fixtures, `EMPTY_CONTEXT`) omits it and behaves exactly as
+   * shipped.
+   */
+  restedInBanZoneInRun?: boolean;
+  /**
+   * Has this drive been billed for coming to rest between the rails —
+   * `RAIL_CROSSING_VIOLATION` detail `"stopped-on-track"`, the 10-point
+   * terminating опасна the catalogue cites to ЗДвП чл. 53, ал. 2? The one fact
+   * `ReachZoneParams.requireRestClean: "railBand"` consults.
+   *
+   * THE SCORED LEDGER ALONE, unlike the field above, and the asymmetry is not
+   * an oversight: an опасна is never handed over as a free mini-lesson (the
+   * coach grades every dangerous and terminating code on sight), so the two
+   * channels coincide here — and `CoachedMistake` carries no `detail`, so a
+   * coached read could not tell this arm of `RAIL_CROSSING_VIOLATION` from
+   * "entered-barred" or "no-stop" and would refuse a banner for an offence it
+   * never spoke about.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes".
+   */
+  restedOnRailBandInRun?: boolean;
   /**
    * When the objective being stepped BECAME the active one, in session seconds.
    * The chain is strictly sequential, so this is the moment its predecessor
@@ -1046,6 +1100,148 @@ export interface ReachZoneWitnessDemands {
    */
   requireRailClear?: true;
   /**
+   * THE CAR DID NOT REST WHERE THE BANNER SAYS IT DID NOT — the twelfth demand
+   * (2026-08-30, sc-pk-rail-ban:84bce2a3, critical), and the OBJECTIVE-TITLE
+   * CLASS arriving from the other side.
+   *
+   * THE FRAME, off `w16/frames/sc-pk-rail-ban__mobile-wrong` (31 frames,
+   * EVIDENCE complete, ended naturally). One debrief, eight seconds apart:
+   *
+   *   Грешки              ✗ Спиране в забранена зона −3 изпитни т.
+   *                         ОСНОВНА ГРЕШКА                        в 1:11
+   *   Задачи от маршрута  ✓ Подмини цялата забранена зона, БЕЗ
+   *                         ПРЕСТОЙ В НЕЯ                            1:19
+   *
+   * A conviction and a credit for the mutually exclusive act, on one screen, to
+   * a seventeen-year-old — and the one he will believe is the one that flatters
+   * him. WHO STOPPED THE CAR DOES NOT MATTER TO THIS ROW: the harness's own log
+   * warns that its wrong lane rests every 45 m, and the defect is that the
+   * product graded the rest and then certified it away, whatever produced it.
+   *
+   * HOW IT DIFFERS FROM THE KNOWN SHAPE. `sc-swp-finish` (the ninth demand)
+   * ticks «задържал тавана от настилката» for merely arriving — a discipline
+   * NOTHING measured. Here the discipline IS measured, by the rule engine,
+   * eight seconds earlier, in the drive's own fault ledger; the objective
+   * simply did not consult it. So the repair is not instrumentation. It is
+   * making the credit read the conviction that already exists.
+   *
+   * ── WHAT IT READS ────────────────────────────────────────────────────────
+   *
+   * `banZone` → `ILLEGAL_STOP_IN_BAN_ZONE` (основна; catalogue lawRef ЗДвП
+   * чл. 6, т. 1 — the duty to obey В27 — plus the ordinance that places the
+   * sign). `railBand` → `RAIL_CROSSING_VIOLATION` detail `"stopped-on-track"`
+   * (опасна and terminating; catalogue lawRef ЗДвП чл. 53, ал. 2). Both are
+   * bills the protocol already prints, with their explanation, their «✔
+   * Правилното действие» corrective and their law refs — the same „read the
+   * bill, not the tracker" rule `railClearHonoured` argues in full.
+   *
+   * SPLIT, NOT POOLED, on the law `ReachZoneYieldDemand` states: on THIS drill
+   * the two acts are six metres and two severity classes apart (the чл. 98
+   * spans stop at the near rail and resume at the far one; the six metres
+   * between them are the band), and «Премини коловоза … БЕЗ ДА СПИРАШ ВЪРХУ
+   * РЕЛСИТЕ» is not falsified by a rest fifty metres short of them. Pooling
+   * would withdraw a certificate for something it never claimed, which is the
+   * false refusal this file ranks with a false certificate.
+   *
+   * RUN-WIDE, NOT WINDOWED, and that is the one place it departs from the
+   * seventh demand. The banner says «подмини ЦЯЛАТА забранена зона» and this
+   * drill's forbidden stretch straddles the previous objective's completion —
+   * the чл. 98 ban runs 50 m BEFORE the rails and 50 m after, while
+   * `sc-pkr-cross` completes between them. A window bounded by the predecessor
+   * would leave the approach half of «цялата» unmeasured by any gate in the
+   * chain, because the predecessor's own banner speaks only of the rails.
+   *
+   * AND RUN-WIDE CANNOT MISFIRE ON THIS CENSUS, which is the half checked
+   * first. The chain is strictly sequential, so a run-wide refusal can only
+   * ever reach the gate that is ACTIVE when the fault is billed or one after
+   * it — and every later gate in these drills is unreachable while an earlier
+   * one is refused. The one drill with TWO forbidden groups
+   * (`sc-pk-crossing-ban`: the junction, then the zebra) carries the demand on
+   * BOTH gates in road order, so a junction rest stops the chain at the
+   * junction gate and the zebra gate is never stepped, let alone refused for a
+   * fault seventy-five metres behind it.
+   *
+   * ── THE CENSUS ───────────────────────────────────────────────────────────
+   *
+   * Every objective title in `templates-*.ts` + `specs.ts` that claims the
+   * student did not stop somewhere (/без престой/, /без да спираш/, /без
+   * спиране/). Seven gates across six drills, and every one of them was a bare
+   * disc before this demand:
+   *
+   *   sc-pk-crossing-ban  sc-pkx-past-junction «…без да спираш в забранената
+   *                                             зона»                banZone
+   *   sc-pk-crossing-ban  sc-pkx-past-zebra    «…без да спираш пред нея»
+   *                                                                  banZone
+   *   sc-pk-busstop-ban   sc-pkbs-past-zone    «…без да спираш в нея» banZone
+   *   sc-pk-stop-vs-park  sc-pkb2-past-ban     «…без да спираш в него»banZone
+   *   sc-pk-double-park   sc-pkd-past-row      «…без да спираш до нея» banZone
+   *   sc-pk-ban-stop      sc-pkb-through       «…без да спираш»       banZone
+   *   sc-pk-rail-ban      sc-pkr-past-zone     «…без престой в нея»   banZone
+   *   sc-pk-rail-ban      sc-pkr-cross         «…без да спираш върху
+   *                                             релсите»            railBand
+   *
+   * The two remaining matches are `mistakes[].titleBg` rows, which
+   * `parseObjectiveParams` is never handed. AUTHORED ONLY, no title matcher:
+   * the fallthrough that once manufactured a demand out of a banner's words
+   * was reverted on 2026-08-28 by two adversarial verifiers (see the
+   * `requireLamps` block in `parseObjectiveParams`), and a demand that decides
+   * whether a route counts as driven is not the place to reopen that route.
+   *
+   * ── THE TWO FALSE-REFUSAL RISKS, CHECKED BEFORE IT SHIPPED ───────────────
+   *
+   *  1. A LAWFUL WAIT INSIDE A BAN SPAN. `ILLEGAL_STOP_IN_BAN_ZONE` is already
+   *     queue-innocent and signal-innocent (`rules/engine.ts` acquits a rest
+   *     with a lead within `banZoneStopQueueGapM`, a stop line or a signal in
+   *     context), so what reaches this demand is never a student obeying
+   *     traffic. The ONE hole is the template's own: a wait at a LOWERED
+   *     barrier inside a ban span is lawful and the detector cannot see it —
+   *     `SC_PK_RAIL_BAN`'s header names that capability need by hand and keeps
+   *     its barrier timetable outside the drill window so the case cannot
+   *     arise. This demand inherits the detector's innocence set exactly and
+   *     widens nothing; the day `tick.railBarred` joins that set, this arm
+   *     improves with it and needs no edit.
+   *  2. A REFUSAL MUST NOT DOUBLE AS A TRAP. Every census gate is non-terminal
+   *     (2 of 3, 1 of 2, 1 of 3 …), so `lessons/engine.ts`'s `!onTerminal` arm
+   *     already lets a refused drive reach its debrief by the stalled-chain
+   *     gate. `restFaultVoidsObjective` is wired into `terminalUnearnable`
+   *     anyway, for the reason `personHaltVoidsObjective` records: the seventh
+   *     demand's two gates happened to be last, and a repair that removes a
+   *     false certificate by creating a drive that cannot end has repaired
+   *     nothing.
+   *
+   * ── WHAT IT COSTS, SAID PLAINLY ──────────────────────────────────────────
+   *
+   * UNLIKE THE FIVE ARMS ABOVE IT, THIS ONE CAN CHANGE A VERDICT. Those all
+   * read опасна rows, and one опасна is «директно неиздържан» on its own, so
+   * every drive they refuse was already failed before the objective was asked.
+   * `ILLEGAL_STOP_IN_BAN_ZONE` is основна: −3 on a sheet that allows 9, so a
+   * single rest in the zone passes the sheet today. Withholding the tick leaves
+   * the route unfinished, and an unfinished route is not a pass.
+   *
+   * THAT IS THE CORRECT ANSWER, not a side effect. The whole subject of these
+   * six drills is choosing WHERE to stop — «изборът на място Е изпитът», in the
+   * examiner copy of five of them. A student who rested inside the forbidden
+   * stretch has not performed the drill, and the sheet saying otherwise is the
+   * reason the founder's north-star test exists. Nothing here re-grades the
+   * law: the −3 is exactly the −3 it always was.
+   *
+   * IT CANNOT REFUSE A CLEAN DRIVE. The channel is the billed (or coached)
+   * fault, never a raw rest: a car that stops nowhere forbidden is bit-identical
+   * to shipped, and so is every gate that does not author the key.
+   *
+   * NOT A SILENT VERDICT (THEO-4), and the check is the one
+   * `requireCockpitReady` records: a demand may land without its own
+   * `objectiveNotice` card only when a loud grader already fires AT THE MOMENT
+   * of the fault. Both codes do, and both are teach-first — at L1 «Пълна помощ»
+   * the rest FREEZES the sim into a mini-lesson card carrying the catalogue's
+   * explanation and its corrective. The withheld tick removes a contradiction
+   * from a protocol that already explains itself; it does not add a new one.
+   *
+   * Outside the `capMet` latch, like the fourth, fifth, sixth, seventh and
+   * eighth: both facts are session-monotone, so the read is pure per frame.
+   */
+  requireRestClean?: ReachZoneRestDemand;
+  /**
    * THE YIELD THE BANNER SAYS HAPPENED — the seventh demand, and the first one
    * whose refusal is bounded by a WINDOW rather than by the whole run
    * (2026-08-27, sc-signal-flashing:fe1889f5).
@@ -1337,41 +1533,41 @@ export interface ReachZoneWitnessDemands {
    * moving 58 → 50, and a CEILING moved down is harder for a fast car and no
    * answer whatever to a slow one. The two changes are orthogonal.
    *
-   * ── IT IS INERT AS SHIPPED, AND THAT IS SAID FIRST ───────────────────────
+   * ── IT IS LIVE ON EXACTLY ONE GATE, AND THAT IS SAID FIRST ───────────────
    *
-   * NO TEMPLATE AUTHORS THIS KEY TODAY. Every gate in the catalogue parses
-   * `minSpeedKmh: undefined`, `floorOk` is `true` on every frame, `floorSpent`
-   * is `false` on every frame, and `hasArrivalDemand`/`hasAtMarkDemand` answer
-   * exactly what they answered before — so this arm credits and refuses nobody
-   * and the whole catalogue is bit-identical to shipped. It is the enabling
-   * half of a three-file repair, landed in the only file that can hold it
-   * (`ReachZoneParams` lives in lessons/types.ts), and the row it was cut for
-   * stays OPEN until the other two land. It is a term, not a closure.
+   * `sc-ac-night-overdrive/sc-acno-adapted` authors `minSpeedKmh: 35` against a
+   * cap of 50 (55 at L1). EVERY OTHER GATE IN THE CATALOGUE still parses
+   * `minSpeedKmh: undefined` — `floorOk` true on every frame, `floorSpent`
+   * false on every frame, `hasArrivalDemand`/`hasAtMarkDemand` answering
+   * exactly what they answered before — so the rest of the catalogue is
+   * bit-identical to shipped and `reach-zone-speed-floor.test.ts` §5 sweeps
+   * that rather than asserting it here.
    *
-   * THE ORDER THE OTHER TWO MUST LAND IN, and this is a THEO-4 constraint
-   * rather than a preference — read it before authoring the key anywhere:
+   * THE ORDER IT HAD TO LAND IN, kept as the record of why the term shipped a
+   * wave before the number and as the constraint on the NEXT gate to adopt it,
+   * because it is THEO-4 and not a preference:
    *
-   *  1. `lessons/engine.ts objectiveNotice` needs an arm that says «мина
+   *  1. `lessons/engine.ts objectiveNotice` needed an arm that says «мина
    *     твърде бавно» — what the gate wants, what was measured, what to do.
    *     Without it a floor refusal is SILENT: the composer's cap card is gated
    *     on `speedKmh > cap`, its state card branches on
    *     `reachZoneStateRefusal(...).kind === "lamps"` and returns the GEAR card
    *     for anything else, and returning a new kind through that function would
-   *     tell a crawling student his lever was in D. So this demand is
-   *     deliberately absent from `reachZoneStateRefusal` (see its docblock),
-   *     which leaves the composer returning `null` — a missing card, never a
-   *     false one.
-   *  2. ONLY THEN the template authors the number.
+   *     tell a crawling student his lever was in D. So this demand is still
+   *     deliberately absent from `reachZoneStateRefusal` (see its docblock) and
+   *     the card is its own branch below the two that function feeds.
+   *  2. ONLY THEN the template authored the number. That card is now shipped,
+   *     which is what makes step 2 legal here and on any gate that follows.
    *
-   * AND UNLIKE `requireCockpitReady`, WHICH DID LAND SPLIT, there is no loud
-   * grader standing in meanwhile. That demand was safe to split because
-   * `SEATBELT_OFF_WHILE_MOVING` and `HANDBRAKE_LEFT_ON` both fire at the moment
-   * of the fault; the catalogue's only slow-driving law is
+   * AND UNLIKE `requireCockpitReady`, WHICH DID LAND SPLIT, no loud grader
+   * could stand in for the card meanwhile. That demand was safe to split
+   * because `SEATBELT_OFF_WHILE_MOVING` and `HANDBRAKE_LEFT_ON` both fire at
+   * the moment of the fault; the catalogue's only slow-driving law is
    * `DRIVING_TOO_SLOW_FOR_MOTORWAY` (второстепенна, ЗДвП чл. 22, ал. 1), and
    * `sc-ac-night-overdrive` runs on `ov-oncoming-v1`, an extra-urban 1+1 —
-   * never a motorway, so it cannot fire there. Authoring a floor ahead of the
-   * card would swap a false ✓ for a task that simply never ticks, which is the
-   * exact regression `reachZoneStateRefusal` exists to have ended.
+   * never a motorway, so it cannot fire there. A floor authored ahead of the
+   * card would have swapped a false ✓ for a task that simply never ticks, which
+   * is the exact regression `reachZoneStateRefusal` exists to have ended.
    *
    * ── WHY THE NUMBER MAY NOT BE DERIVED FROM THE BANNER ────────────────────
    *
@@ -1995,6 +2191,15 @@ function parseYieldDemand(objective: LessonObjective, v: unknown): ReachZoneYiel
   );
 }
 
+/** The rest demand's authored value — see `ReachZoneWitnessDemands.requireRestClean`. */
+function parseRestDemand(objective: LessonObjective, v: unknown): ReachZoneRestDemand {
+  if (v === "banZone" || v === "railBand") return v;
+  throw new ObjectiveSpecError(
+    objective.id,
+    'reachZone requireRestClean must be "banZone" | "railBand"',
+  );
+}
+
 /**
  * Is the lamp demand honoured on THIS frame? „fog" is the чл. 74 pairing — the
  * fog lamps are an ADDITION to the dipped beams, never a substitute for them,
@@ -2092,6 +2297,27 @@ function railClearHonoured(ctx: ObjectiveContext): boolean {
 }
 
 /**
+ * Did the drive rest in the stretch this banner says it drove past without
+ * resting? (see `ReachZoneWitnessDemands.requireRestClean` for the frame, the
+ * census, the split and the two false-refusal checks.)
+ *
+ * ONE `switch`, TWO FACTS, AND NO POOLING: `banZone` answers only for the
+ * основна `ILLEGAL_STOP_IN_BAN_ZONE`, `railBand` only for the опасна
+ * `RAIL_CROSSING_VIOLATION` detail "stopped-on-track". On `sc-pk-rail-ban` the
+ * two acts are six metres apart and a banner about one may not be withdrawn for
+ * the other — the law `ReachZoneYieldDemand` states for its own split.
+ *
+ * `true` IS THE ONLY REFUSING VALUE, the polarity every arm in this file ships
+ * with: `undefined` is „the caller cannot answer" (every fixture, rig, replay
+ * and `EMPTY_CONTEXT`), and unknown must never become a refusal.
+ */
+function restCleanHonoured(demand: ReachZoneRestDemand, ctx: ObjectiveContext): boolean {
+  return demand === "banZone"
+    ? ctx.restedInBanZoneInRun !== true
+    : ctx.restedOnRailBandInRun !== true;
+}
+
+/**
  * Was the halt the banner promises still a halt FOR a living person? Reads the
  * one fact `vruWaitHonoured` reads first and for the identical reason — a
  * struck person is session-monotone and outranks everything — but it does NOT
@@ -2114,7 +2340,8 @@ function haltForVruHonoured(ctx: ObjectiveContext): boolean {
 /** True when the demands a reachZone makes are met by the whole zone contract. */
 function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
   // `requireVruUntouched`, `requireNoContact`, `requireRailClear`,
-  // `requireYieldClean` and `requireHaltForVru` are deliberately absent: none
+  // `requireYieldClean`, `requireHaltForVru` and `requireRestClean` are
+  // deliberately absent: none
   // of them rides the `capMet` latch (every one of those facts is
   // session-monotone, or monotone within its window, so none needs eval-state
   // memory), and folding any of them in would flip `capMet`'s initial value on
@@ -2309,6 +2536,37 @@ export function railBarredVoidsObjective(
 ): boolean {
   if (!enteredRailBarredInRun || params.kind !== "reachZone") return false;
   return (params as WitnessedReachZoneParams).requireRailClear === true;
+}
+
+/**
+ * …AND THE SAME QUESTION FOR THE REST (`requireRestClean`), asked BEFORE it is
+ * needed rather than after — the discipline `personHaltVoidsObjective` records
+ * one demand earlier.
+ *
+ * NO CENSUS MEMBER IS TERMINAL AT HEAD: `sc-pkr-cross` is 1 of 3,
+ * `sc-pkr-past-zone` 2 of 3, `sc-pkx-past-junction` 1 of 3, `sc-pkx-past-zebra`
+ * 2 of 3, `sc-pkbs-past-zone` 1 of 2, `sc-pkb2-past-ban` 2 of 3,
+ * `sc-pkd-past-row` 1 of 2, `sc-pkb-through` 1 of 2. So `engine.ts`'s
+ * `!onTerminal` arm already lets every refused drive reach its debrief by the
+ * stalled-chain gate and this predicate is inert today. It is wired anyway,
+ * because `yieldFailedVoidsObjective` is the record of what happens when that
+ * assumption is left implicit: BOTH of its gates happened to be last, and
+ * without the arm the repair would have swapped a false certificate for a drive
+ * that cannot end. Six of these eight drills end on a «спри на разрешеното
+ * място» gate that a later wave could well fold into the pass-the-zone one.
+ *
+ * Takes the context rather than a boolean because the answer depends on WHICH
+ * stretch the banner claimed, and only the evaluator that owns the split should
+ * be deciding that.
+ */
+export function restFaultVoidsObjective(
+  params: ObjectiveParams,
+  ctx: Pick<ObjectiveContext, "restedInBanZoneInRun" | "restedOnRailBandInRun">,
+): boolean {
+  if (params.kind !== "reachZone") return false;
+  const demand = (params as WitnessedReachZoneParams).requireRestClean;
+  if (demand === undefined) return false;
+  return !restCleanHonoured(demand, { ...EMPTY_CONTEXT, ...ctx });
 }
 
 /**
@@ -3075,10 +3333,10 @@ function stepReachZone(
 
   // ── AND THE SAME CONTRACT READ FROM UNDERNEATH (`minSpeedKmh`) ───────────
   // The eleventh demand — its block comment on `ReachZoneWitnessDemands`
-  // carries the drive, why the number may not be derived, and the two edits it
-  // is still waiting on. NO TEMPLATE AUTHORS IT TODAY, so `floor` is undefined
-  // on every gate in the catalogue and both lines below are constants: the
-  // whole catalogue is bit-identical to shipped.
+  // carries the drive and why the number may not be derived. ONE GATE AUTHORS
+  // IT (`sc-acno-adapted`, floor 35); on every other gate in the catalogue
+  // `floor` is undefined and both lines below are constants, so the rest of the
+  // library is bit-identical to shipped.
   //
   // THE CAP'S MIRROR IN EVERY RESPECT, deliberately, so there is one speed
   // contract with two edges rather than two contracts:
@@ -3360,8 +3618,21 @@ function stepReachZone(
   // A halt disc four metres short of the child could say where the car came to
   // rest and nothing about whether she was still standing; now it can.
   const haltForVruOk = params.requireHaltForVru !== true || haltForVruHonoured(ctx);
+  // ── THE REST THE BANNER SAYS DID NOT HAPPEN (requireRestClean) ────────────
+  // Sixth arm of the same shape and the sixth outside the `capMet` latch. The
+  // frame it closes is one debrief of one drive: `w16/…/sc-pk-rail-ban__
+  // mobile-wrong` prints «✗ Спиране в забранена зона −3 изпитни т. в 1:11» over
+  // «✓ Подмини цялата забранена зона, БЕЗ ПРЕСТОЙ В НЕЯ 1:19». A disc 19 m past
+  // the zone could say the car got there and nothing about whether it stood
+  // still on the way; now it can. Run-wide rather than windowed because
+  // «цялата зона» straddles the previous objective's completion — the demand's
+  // own docblock carries that argument and the seven-gate census. A zone whose
+  // banner claims no such discipline never consults this and is bit-identical
+  // to shipped.
+  const restOk =
+    params.requireRestClean === undefined || restCleanHonoured(params.requireRestClean, ctx);
   const arrivalHonoured =
-    reached && capMet && vruOk && contactOk && railOk && yieldOk && haltForVruOk;
+    reached && capMet && vruOk && contactOk && railOk && yieldOk && haltForVruOk && restOk;
   // ── THE MARK IS WHERE THE BANNER POINTS (round 13, 2026-08-27) ────────────
   //
   // WHAT IS BROKEN. `reached` latches on the FIRST swept contact with the

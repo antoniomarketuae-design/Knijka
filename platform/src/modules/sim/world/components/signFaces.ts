@@ -56,8 +56,17 @@ const FACE_PX = 512;
  *  both source SVGs open with
  *  `<circle cx="100" cy="100" r="88" fill="#0057a8" stroke="#c1121f"
  *  stroke-width="20" data-plate="true"/>` and differ only in the face — В27
- *  carries two diagonals (the X), В28 one. */
-export type SignFaceArt = "v26" | "v33" | "d4" | "g2" | "g3" | "a19" | "v28";
+ *  carries two diagonals (the X), В28 one.
+ *
+ *  `g9` (Г9 „Преминаване отдясно на знака") is the third rider on that same
+ *  round blue plate, and here too the plate is a byte match with g2/g3/g12:
+ *  `<circle cx="100" cy="100" r="90" fill="#0057a8" data-plate="true"/>` plus
+ *  the white ring `r=84 stroke-width=5`. Only the arrow's `rotate()` differs
+ *  (Г2 90°, Г9 135° — the oblique „take it on this side" arrow). It is the
+ *  plate the roundabout CENTRAL ISLAND carries facing each entry; before it
+ *  the island was a mound of grass with no legal statement on it at all
+ *  (sc-rb-ped-exit). */
+export type SignFaceArt = "v26" | "v33" | "d4" | "g2" | "g3" | "a19" | "v28" | "g9";
 
 const svgSource = new Map<SignFaceArt, Promise<string | null>>();
 
@@ -131,7 +140,7 @@ function withNumeral(svg: string, numeral: number): string | null {
  *  copy of an attribute makes the document unparseable, `<img>` then fails to
  *  decode it, the face comes back null and the caller drops the whole KIND —
  *  i.e. a lesson that narrates a sign the world never builds (the O39/O40
- *  shape). All seven shipped faces are viewBox-only today, so this guards the
+ *  shape). All eight shipped faces are viewBox-only today, so this guards the
  *  next byte-copy out of content/signs/svg, not a live break. */
 function withIntrinsicSize(svg: string, px: number): string {
   return svg.replace(/<svg\b[^>]*>/, (rootTag) =>

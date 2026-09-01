@@ -748,14 +748,17 @@ ${TOUCH_BAND_CSS_VARS}
            more than DECK_ROOMY_OPEN_HEIGHT_PX. One constant governs both, so a
            reserve and the thing it reserves for cannot disagree.
 
-           It is inert at the sizes measured — the deck IS 199 px at 1264 × 619
-           and at 1440 × 900, because the caption box is fixed and the transport
-           lays out on one line. It bites only on a narrow ROOMY stage (641 px is
-           the smallest, COMPACT_MAX_WIDTH_PX), where 40 % of the width drops the
-           deck below the 26 rem knee and the transport wraps to two lines again.
-           There the CAPTION gives way — it is the „min-h-0” scrolling child, the
-           same piece TraceTimeline's touch branch already designates — instead
-           of the transport row being pushed up through the ribbon legend. */
+           IT NO LONGER BITES ONLY ON A NARROW STAGE. Until
+           sc-ln-obstacle-meeting:db54b249 the second term of the width was 40 %,
+           which held the deck at the 26 rem knee on any stage over ~1070 px and
+           dropped it below only at the bottom of the roomy range. The width is
+           now capped by COCKPIT_CLUSTER_LEFT_PCT — the projected left edge of
+           the instrument binnacle, which the deck was standing on — so an
+           ordinary 1440 × 900 window lays this out at 370 px and the transport
+           may wrap there too. That is why DECK_ROOMY_OPEN_HEIGHT_PX carries a
+           wrapped row: when this cap binds, the child that gives is the CAPTION
+           („min-h-0", the same piece TraceTimeline's touch branch designates),
+           and a clamped caption is clipped authored prose. */
         max-height: ${DECK_ROOMY_OPEN_HEIGHT_PX}px;
       }
 

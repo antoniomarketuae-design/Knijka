@@ -255,61 +255,46 @@ export const SC_AC_NIGHT_OVERDRIVE: ScenarioSpec = {
       // is asserted, not assumed — a tightened gate that failed the lesson's
       // own model line would be the founder's roundabout complaint again.
       //
-      // ── AND IT IS STILL A CEILING, WHERE THIS ROW ASKS FOR A FLOOR —
-      //    sc-ac-night-overdrive:b9d61410 (critical). ROUTED, NOT FIXED,
-      //    BECAUSE NO TEMPLATE CAN FIX IT ──────────────────────────────────
+      // ── AND IT NOW HAS A FLOOR AS WELL AS A CEILING —
+      //    sc-ac-night-overdrive:b9d61410 (critical), CLOSED HERE ────────────
       //
-      // The row: the tick is „✓ at 2:45 on a drive that never exceeded 15
-      // км/ч … a speed-appropriate-to-visibility gate that a walking-pace car
-      // satisfies teaches nothing". Re-derived in the CURRENT tree rather than
-      // inherited from the report: `maxSpeedKmh` enters `stepReachZone` as
-      // `speedKmh <= cap` and nothing else, so 0 км/ч satisfies this gate as
-      // completely as the taught 50 does. Note what that makes of the
-      // tightening recorded directly above — 58 → 50 lowers a CEILING, which
-      // is harder for a fast car and no answer whatever to a slow one. It was
-      // never filed as one, and it does not close this row.
+      // The row: „✓ at 2:45 on a drive that never exceeded 15 км/ч … a
+      // speed-appropriate-to-visibility gate that a walking-pace car satisfies
+      // teaches nothing". It is NOT closed by the tightening recorded directly
+      // above: 58 → 50 lowers a CEILING, which is harder for a fast car and no
+      // answer whatever to a slow one. `maxSpeedKmh` entered `stepReachZone` as
+      // `speedKmh <= cap` and nothing else, so 0 км/ч satisfied this gate as
+      // completely as the taught 50 did.
       //
-      // WHY NOT FROM HERE. `ReachZoneParams` (lessons/types.ts:33) carries one
-      // speed term and it is upper-bounded; `minSpeedKmh` exists nowhere in
-      // platform/src as a zone param. Nor can another objective kind stand in:
-      // `driveDistance` counts metres a crawl also covers, and the one floor
-      // this module does ship — `SmoothStopParams.minApproachKmh`, live at
-      // objectives.ts `stepSmoothStop` («!armed && tick.speedKmh >=
-      // minApproachKmh») — is unusable on a recorder-driven drill, for the
-      // reason `templates-pk.ts sc-pk-mark` states in full: the kinematic
-      // recorder brakes at a fixed ~4.6 m/s² and zeroes the last ~2 км/ч in
-      // one frame, a spike no sane `maxDecelMs2` accepts. Authoring one here
-      // would refuse this template's own committed shadow — a false refusal of
-      // a perfect drive, the failure this project ranks worst.
+      // `minSpeedKmh` is the missing half of that ONE contract — authored here,
+      // parsed by `parseObjectiveParams`, carried onto the compiled objective by
+      // `serializeObjectiveParams` and ANDed into `contractEarned`. The full
+      // design note lives on `objectives.ts ReachZoneWitnessDemands.minSpeedKmh`;
+      // the two things a template author needs from it are that it is NOT
+      // laddered (so the number must be comfortable at every rung) and that it
+      // may not be derived from the banner — only a template can quantify
+      // «съобразена».
       //
-      // THE TERM THAT WOULD CLOSE IT, written down so the owning lane does not
-      // derive it a fourth time: `minSpeedKmh?: number` on `ReachZoneParams`,
-      // narrowed beside `maxSpeedKmh` in `parseObjectiveParams` and ANDed into
-      // `contractEarned` in `stepReachZone`, spent by the same `capSpent` rule.
-      // Routed three times already — `templates-junctions.ts:1459` at
-      // `sc-jxgb-roll` („the honest channel is instead a `minSpeedKmh` on
-      // `ReachZoneParams` … read by `stepReachZone` the way `maxSpeedKmh` is"),
-      // `scenario/__tests__/following-claim-gates.test.ts` §12 (the pace-cap
-      // exposure ledger, written to go RED the day a floor lands), and
-      // `sc-follow-cutin:996fd693` before both. With it this gate authors a
-      // floor near 35: clear of any crawl, and a whole L1 grace band under the
-      // «около 50 км/ч» step 2 orders, so no honest drive is refused.
+      // WHY 35. Step 2 of the briefing orders «стабилизирай около 50 км/ч» and
+      // the committed shadow rides 49.9 км/ч across this disc, so 35 leaves the
+      // lesson's own model line 15 км/ч of margin on top of the
+      // REACH_ZONE_CAP_SLACK_KMH dead band beneath it — replayed through the
+      // full pipeline at all five rungs by §6 of `scenario/__tests__/
+      // lane-world-claims.test.ts` rather than assumed. And it is clear of the
+      // crawl the frame photographed: 15 км/ч is now refused, with a card.
       //
-      // THE BANNER IS DELIBERATELY LEFT ALONE meanwhile — unlike `sc-obs-
-      // cleared` (templates-hazards.ts) and `sc-jxgb-roll`, both retitled DOWN
-      // while their terms were routed. Those banners claimed something their
-      // params could not see AT ALL. This one is not false — 15 км/ч under a
-      // 40 m beam really is съобразена — it is UNDERDETERMINED, and «със
-      // съобразена … скорост» is the catalogue's own phrase for a capped gate
-      // (`titleBg: "…съобразена…скорост"` returns SEVEN rows across three
-      // `scenario/templates-*.ts` files — conditions, conditions2, sp — this
-      // one among them; and objectives.ts `deriveLawfulSpeedDemand` reasons
-      // about the family by name, deliberately NOT matching it because „a
-      // speed below the sign … only the template can quantify"). Rewording
-      // this row alone would break a shared idiom, tell the student less while
-      // the task sits unticked, and close nothing. An underdetermined claim is
-      // repaired by the missing term, never by a smaller sentence.
-      params: { kind: "reachZone", x: LANE_X, y: 250, radiusM: 12, maxSpeedKmh: 50 },
+      // THE BAND IS WIDEST WHERE THE HELP IS. `widenSpeedCap` lifts the ceiling
+      // to 55 at L1 while the floor stays 35, so the beginner drives [35, 55]
+      // and the expert [35, 50] — the ladder still forgives in the direction it
+      // is meant to.
+      //
+      // THE BANNER IS DELIBERATELY LEFT ALONE, and it is now honest rather than
+      // UNDERDETERMINED. «Съобразена … скорост» is the catalogue's own
+      // phrase for a capped gate (seven rows across three `templates-*.ts`
+      // files) and `deriveLawfulSpeedDemand` reasons about the family by name,
+      // so rewording this row alone would break a shared idiom. An
+      // underdetermined claim is repaired by the missing term, and this is it.
+      params: { kind: "reachZone", x: LANE_X, y: 250, radiusM: 12, minSpeedKmh: 35, maxSpeedKmh: 50 },
     },
     {
       id: "sc-acno-mark",

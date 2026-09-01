@@ -265,12 +265,27 @@ describe("B16 — the ring's outer edge is drawn as a circle", () => {
     // counts it unconditionally because a ceiling that only holds by day is not
     // a ceiling. All six of these districts have streetlights, which is why the
     // delta is uniform; a map with none is byte-identical.
+    //
+    // Г9 WAVE — five of the six rose by exactly TWO, and none of that rise is
+    // the ring either. `props.ts` now posts Г9 „Преминаване отдясно на знака"
+    // on the central island facing each entry (sc-rb-ped-exit: the island was a
+    // mound of grass carrying no legal statement at all), and `drawSlots.ts`
+    // charges 2 slots per SIGN KIND present — plate + face — regardless of how
+    // many placements that kind has. So the cost is per district, not per post:
+    // rb-single's four plates cost the same two slots as district-v1's two.
+    //
+    // **d2-v1 is unchanged at 71, and that is the load-bearing entry in this
+    // table.** Its interior is not free, so `analyzeRoundabouts` refuses the
+    // island (asserted two tests above) — and a refused island gets no Г9,
+    // because the pass is gated on `islandRadiusM !== null` rather than on the
+    // ring registration. A Г9 with no island under it is a plate standing in
+    // live carriageway telling a driver to pass right of nothing.
     const expected: Record<string, number> = {
-      "rb-mini-v1": 49,
-      "rb-ped-v1": 51,
-      "rb-2lane-v1": 49,
-      "rb-single-v1": 49,
-      "district-v1": 64,
+      "rb-mini-v1": 51,
+      "rb-ped-v1": 53,
+      "rb-2lane-v1": 51,
+      "rb-single-v1": 51,
+      "district-v1": 66,
       "d2-v1": 71,
     };
     const actual: Record<string, number> = {};

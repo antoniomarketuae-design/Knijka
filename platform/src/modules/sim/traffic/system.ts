@@ -351,7 +351,21 @@ class TrafficSystemImpl implements TrafficSystem {
     // --- Vehicles: a few loops, agents spread around each loop. When an
     // anchor is set, seed loops near it (and keep them shorter) so cars stay
     // where the driver is rather than orbiting the far side of the district.
-    const routeCount = Math.max(1, Math.ceil(cfg.vehicleCount / 2));
+    //
+    // A CORRIDOR GETS ONE LOOP PER CAR. Two cars sharing a loop is fine around
+    // a single anchor — whatever the loop wanders off to do, it does it where
+    // the driver is standing. Spread over four stations it stops being fine:
+    // each station then owns ONE loop, that loop spends most of its lap
+    // somewhere else, and which somewhere is a coin toss on the lesson seed.
+    // Measured on sc-ed-d2-priority-run over its committed shadow drive, four
+    // shared loops left the longest stretch with no ambient car inside 150 m at
+    // 0 s on one rung and 21 s on another; one loop per car it is 0 s on three
+    // rungs and 17 s at the worst — against 89 s for the same eight cars
+    // without a corridor. Gated on `anchorPath`, so nothing without one moves.
+    const routeCount =
+      (cfg.anchorPath?.length ?? 0) > 0
+        ? Math.max(1, cfg.vehicleCount)
+        : Math.max(1, Math.ceil(cfg.vehicleCount / 2));
     this.routes = buildRoutes(
       this.graph,
       routeCount,
@@ -360,7 +374,15 @@ class TrafficSystemImpl implements TrafficSystem {
         ? { minWalkM: 200, maxWalkM: 480, minLoopM: 150 }
         : DEFAULT_ROUTE_OPTIONS,
       cfg.anchor
-        ? { x: cfg.anchor.x, y: cfg.anchor.y, radiusM: cfg.anchorRadiusM ?? 260 }
+        ? {
+            x: cfg.anchor.x,
+            y: cfg.anchor.y,
+            radiusM: cfg.anchorRadiusM ?? 260,
+            // …and the rest of the lesson's route, when it has one. Undefined
+            // for every caller that does not author a corridor, which keeps
+            // their routes bit-identical (routes.ts `RoutePreference`).
+            alongPath: cfg.anchorPath,
+          }
         : undefined,
     );
     if (this.routes.length > 0) {
@@ -525,6 +547,12 @@ class TrafficSystemImpl implements TrafficSystem {
       // FR-27, the mirror half: scripted actors see ambient cars. The array is
       // the ambient agents' own state objects (staged states are NOT in it).
       ambient: this.ambientStates,
+      // FR-B5-REACH: …and, on their UNSCRIPTED return laps only, each other.
+      // Held by reference like the array above, so an actor staged later is
+      // seen from the frame it arrives on. Read by staged.ts step 3c and by
+      // nothing else — see the `staged` field's doc for why it is not merged
+      // into `ambient`.
+      staged: this.stagedStates,
     };
 
     // Publish initial poses (dt = 0 moves nothing, only samples polylines).

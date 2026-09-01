@@ -5,9 +5,13 @@ import {
   deckCompactOpenWidthPx,
   deckTouchRowMinWidthPx,
   notifyColumnWidthPx,
+  COCKPIT_CLUSTER_LEFT_PCT,
   DECK_COMPACT_COLUMN_RESERVE_PX,
   DECK_ROOMY_CAPTION_HEIGHT_PX,
+  DECK_ROOMY_CLUSTER_GUTTER_PX,
   DECK_ROOMY_OPEN_HEIGHT_PX,
+  DECK_ROOMY_OPEN_WIDTH_CSS,
+  DECK_ROOMY_TRANSPORT_WRAP_PX,
   DECK_TOUCH_CAPTION_HEIGHT_PORTRAIT_PX,
   DECK_TOUCH_CAPTION_HEIGHT_PX,
   DECK_TOUCH_CAPTION_ROAD_MAX_PX,
@@ -376,16 +380,58 @@ describe("the open deck fits the phone it is opened on", () => {
       // a production WebKit run, so 138 is the measured tallest and the sweep
       // reports 0 / 1811 there.
       expect(DECK_ROOMY_CAPTION_HEIGHT_PX).toBe(138);
-      expect(DECK_ROOMY_OPEN_HEIGHT_PX).toBe(279);
+      // 279 UNTIL sc-ln-obstacle-meeting:db54b249. The cluster lane took the
+      // deck under the 26 rem knee, so the reserve now carries one wrapped
+      // transport row (DECK_ROOMY_TRANSPORT_WRAP_PX) — sized for the worse of
+      // the two outcomes on purpose, because the flex child that gives when
+      // this cap binds is the CAPTION, and clipping it clips authored prose.
+      // The expectation moved because the product legitimately changed; the
+      // guarantee it exists to protect — 138 px of caption is never clamped —
+      // is asserted below and is strictly stronger than it was.
+      expect(DECK_ROOMY_TRANSPORT_WRAP_PX).toBe(40);
+      expect(DECK_ROOMY_OPEN_HEIGHT_PX).toBe(319);
       const measuredPanel = 104.5; // WebKit, 1264 × 619, transport on one line
       expect(DECK_ROOMY_CAPTION_HEIGHT_PX + 6 + measuredPanel).toBeLessThanOrEqual(
         DECK_ROOMY_OPEN_HEIGHT_PX,
       );
+      // …and with the row on TWO lines, which is what a lane-width deck may
+      // lay out. This is the assertion the number above exists for.
+      expect(
+        DECK_ROOMY_CAPTION_HEIGHT_PX + 6 + measuredPanel + DECK_ROOMY_TRANSPORT_WRAP_PX,
+      ).toBeLessThanOrEqual(DECK_ROOMY_OPEN_HEIGHT_PX);
       // The 60 px comes out of the keyboard legend's cap, and that cap must
       // stay a usable panel on the window the sweep measures (1264 × 619):
       //   619 − ROOMY_HUD_FLOOR 108 − deck − ribbon lane 47 − gutter 8 − 12
       const legendCap = 619 - 108 - DECK_ROOMY_OPEN_HEIGHT_PX - 47 - 8 - 12;
       expect(legendCap).toBeGreaterThan(120);
+    });
+
+    it("stops the open deck short of the instrument binnacle", () => {
+      // sc-ln-obstacle-meeting:db54b249 — the deck's right edge against the
+      // lane, swept across the roomy width ladder. `env(safe-area-inset-left)`
+      // is 0 on every desktop, so the CSS reduces to the arithmetic here; the
+      // camera side of the same contract (that the lane IS the binnacle) is
+      // asserted in modules/sim/vehicle/cockpit-camera-contract.test.ts.
+      expect(DECK_ROOMY_OPEN_WIDTH_CSS).toBe(
+        `min(26rem, calc(${COCKPIT_CLUSTER_LEFT_PCT}% - 0.75rem - env(safe-area-inset-left, 0px) - ${DECK_ROOMY_CLUSTER_GUTTER_PX}px))`,
+      );
+      for (const stageWidth of [642, 800, 1000, 1166, 1248, 1400, 1600, 1920]) {
+        const width = Math.min(
+          416,
+          (COCKPIT_CLUSTER_LEFT_PCT / 100) * stageWidth - 12 - DECK_ROOMY_CLUSTER_GUTTER_PX,
+        );
+        const rightEdge = 12 + width;
+        const binnacleLeft = (COCKPIT_CLUSTER_LEFT_PCT / 100) * stageWidth;
+        expect(rightEdge).toBeLessThanOrEqual(binnacleLeft - DECK_ROOMY_CLUSTER_GUTTER_PX);
+      }
+      // The rule this replaced — 40 % of the stage — put the deck ON the dial
+      // at the width the row was filed at (1440 × 900 → a 1166 px stage):
+      //   12 + min(416, 0.4·1166 − 12) = 428  vs  binnacle left 390.5
+      const oldRightEdge = 12 + Math.min(416, 0.4 * 1166 - 12);
+      expect(oldRightEdge).toBeGreaterThan((COCKPIT_CLUSTER_LEFT_PCT / 100) * 1166);
+      // …and it is strictly tighter than that road law everywhere, so the
+      // contract the 40 % encoded still holds without being restated.
+      expect(COCKPIT_CLUSTER_LEFT_PCT / 100).toBeLessThan(1 - NOTIFY_COLUMN_MIN_LEFT_FRACTION);
     });
   });
 

@@ -119,7 +119,13 @@ export interface TrafficDistrict {
  * two-segment articulated tram rig (~14 m, pantograph hint) — a tram is a
  * PATH-LOCKED staged vehicle like every other actor; its "track" IS its
  * authored polyline (street-running rails share the traffic lane — no
- * separate rail physics exists, honestly); "train" (RX-02/RX-01 „жп прелез")
+ * separate rail physics exists, honestly); "bus" (doc 72 §15 VU-11 „Автобусът
+ * потегля от спирката", ЗДвП чл. 67) renders the procedural CITY BUS rig — a
+ * 12 m GLAZED passenger body with a route board and curb-side doors, which is
+ * the whole point of its existence: чл. 67 is a duty owed to a ППС ОТ РЕДОВНА
+ * ЛИНИЯ and nothing else, so a student who cannot tell a bus from a lorry at a
+ * спирка cannot know the duty is armed. The box-truck rig is a windowless
+ * cargo body and was standing in for it; "train" (RX-02/RX-01 „жп прелез")
  * renders the procedural MULTI-UNIT train rig (a locomotive + 2 cars, ~34 m)
  * that CROSSES the carriageway on an authored PERPENDICULAR rail polyline
  * (StagedVehicleSpec.railPath) over the rendered rail deck — same path-locked
@@ -130,16 +136,19 @@ export interface TrafficDistrict {
  * every query are untouched), it just no longer wears a car body. All
  * liveries fictional (ADR-001 — no real insignia). Absent = "car" = the
  * pre-profile deterministic fleet
- * pick, byte-identical. HONEST LIMIT: every rule-engine proximity query
- * (leadGapMeters, conflictNear, …) stays POINT-BASED around the vehicle
- * center with one fixed car-length constant, and the A11 physics shells stay
- * car-sized — the profile changes NO grading/collision geometry (a 14 m tram
- * grades and collides as its center point; the copy carries the length).
+ * pick, byte-identical. HONEST LIMIT, corrected: the conflict/right-of-way
+ * queries are still POINT-BASED around the vehicle center, but the LENGTH is
+ * no longer cosmetic — since audit O31 the two tables below size the exact-OBB
+ * contact box (collision/bodies.ts) and the kinematic shell rapier binds, and
+ * `system.ts bumperSubtrahendM` subtracts the actor's own half-length from
+ * every lead gap. So authoring a profile is a GRADING act: a 12 m bus really
+ * does put its rear bumper 2.25 m closer than the 7.5 m box truck did.
  */
 export type VehicleProfile =
   | "car"
   | "van"
   | "truck"
+  | "bus"
   | "emergency"
   | "tram"
   | "train"
@@ -200,6 +209,12 @@ export const VEHICLE_PROFILE_LENGTH_M: Readonly<Record<VehicleProfile, number>> 
   car: 4.1,
   van: 5.2,
   truck: 7.5,
+  // 12 m is not a taste: it is the number sc-merge-bus-pullout's own copy
+  // teaches out loud («Автобусът е дълъг 12 метра и завива с целия си корпус»)
+  // and the standard rigid city-bus length BUS_DIMENSIONS is modelled at. It
+  // was 7.5 while the drill borrowed the box-truck rig, i.e. the lesson said
+  // twelve and the grader believed seven and a half.
+  bus: 12,
   emergency: 5.6,
   tram: 14,
   train: 34.4,
@@ -235,6 +250,7 @@ export const VEHICLE_PROFILE_WIDTH_M: Readonly<Record<VehicleProfile, number>> =
   car: 1.84,
   van: 1.98,
   truck: 2.4,
+  bus: 2.55, // BUS_DIMENSIONS.widthM — wider than the box truck's 2.4
   emergency: 2.1,
   tram: 2.3,
   train: 3.9,
@@ -402,6 +418,18 @@ export interface TrafficConfig {
   anchor?: { x: number; y: number };
   /** Seed routes + pedestrians within this radius of `anchor`, meters. */
   anchorRadiusM?: number;
+  /**
+   * FURTHER anchor stations along the lesson's own route, in route order — for
+   * a lesson that TRAVELS, where one point cannot describe where the driver
+   * will be. Vehicle loops are dealt evenly across `[anchor, ...anchorPath]`
+   * instead of all being seeded at the spawn; see the `RoutePreference` block
+   * in `routes.ts` for the measurement that made this necessary.
+   *
+   * Absent (every caller but the live lesson scene) ⇒ one station ⇒ routes are
+   * bit-identical to before. Pedestrians ignore it: they are anchored on
+   * crossings and pavements, which the corridor does not re-sort.
+   */
+  anchorPath?: readonly { x: number; y: number }[];
 
   // Vehicle behavior (IDM-lite)
   /** Gentle acceleration, m/s^2. */
@@ -653,6 +681,16 @@ export interface StagedActorView {
    * same fake-port reason.
    */
   readonly lateralOffsetM?: number;
+  /**
+   * How many times FR-B5-RETURN has sent this actor back to the start of its
+   * own path (0 = still on the run its runner staged). Published so a RUNNER
+   * can tell an unscripted second pass from the one it choreographed: the
+   * re-entry is a traffic-layer decision the orchestrator otherwise cannot
+   * observe, and a resolved runner would keep its LAST command on a car that
+   * is about to drive the whole encounter again. Optional for the same
+   * fake-port reason as the two fields above; absent reads as 0.
+   */
+  readonly returns?: number;
 }
 
 // ---------------------------------------------------------------------------

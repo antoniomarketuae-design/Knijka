@@ -276,9 +276,24 @@ describe("wave-4 bot completion — sc-pk-double-park at L3", () => {
     });
     expect(taught).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
-    // It still drives on and parks legally, so the drill itself completes: the
-    // fault was the rest, not the route — the card is the lesson, not a fail.
-    expect(buildLessonResult(s).completedAll).toBe(true);
+    // TEACH-FIRST IS ABOUT POINTS, AND IT STILL IS: the sheet charges nothing,
+    // and this assert is the one that says so.
+    const r = buildLessonResult(s);
+    expect(r.score).toBe(0);
+    // EXPECTATION CHANGED 2026-08-30 — `completedAll` was `true` here, and it
+    // was the objective-title defect (sc-pk-rail-ban:84bce2a3) in this drill's
+    // own colours. `sc-pkd-past-row` reads «Подмини цялата паркирана редица,
+    // БЕЗ ДА СПИРАШ ДО НЕЯ», and it was a bare disc past the row: the drive that
+    // stopped on the second line collected that exact sentence as a ✓ on the
+    // same debrief that prints «Учебни моменти (не влизат в точките): •
+    // Спиране в забранена зона». One screen, two statements, one of them false.
+    // `requireRestClean: "banZone"` (objectives.ts) now makes the credit read
+    // what the protocol already told him. Nothing here is re-priced — the card
+    // is still free, the score is still 0, and the verdict card badges this run
+    // НЕЗАВЪРШЕН rather than НЕИЗДЪРЖАН (SessionEndScreen.tsx: „НЕИЗДЪРЖАН IS A
+    // FINDING OF THE ИЗПИТЕН ЛИСТ and of nothing else"). What changed is that
+    // the drill stops certifying a discipline the same drive just failed.
+    expect(r.completedAll).toBe(false);
   });
 
   it("counter-proof: the squeeze demo's COLLISION is SCORED, never a modal", () => {

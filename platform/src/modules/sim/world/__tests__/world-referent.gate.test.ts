@@ -466,9 +466,32 @@ describe("scenario-world-referent gate", () => {
     // (`runtime/__tests__/off-carriageway-consult.test.ts`: 248 spawns, 117 bay
     // centres, 57,000 lane/parking-band poses, worst outsideKerbM 0.000 m).
     // `checked` does NOT move: 46 is unchanged.
-    expect(checked.size).toBe(46);
+    //
+    // 46 → 47 / 60 → 61 (2026-09-01, audit sc-vu-emergency-junction:853790f7):
+    // DRIVING_TOO_SLOW_IN_TOWN, the town half of the speed envelope. Until it
+    // landed the engine graded only the FAST side — a reference drive held
+    // 10–11 км/ч for over two minutes on a street posted 40 and booked nothing,
+    // while the flat-out leg of the same lesson was billed once a tick. It is
+    // CHECKED, not exempted, and the check is the mirror of its motorway
+    // sibling's: „at least one non-motorway route edge posted >= 40". That can
+    // really fail — mw-v1 is motorway end to end, and the fourteen `lot-*`
+    // aisles, `poligon-v1`, `pk-drive-v1` and `sp-zone30-v1` are posted 20/30,
+    // which is a place signed slow on purpose. `NO_WORLD_REFERENT` does NOT
+    // move: 14 is unchanged.
+    //
+    // 47 → 48 / 61 → 62 (2026-09-01, audit sc-jx-priority-confidence:9c987e7b):
+    // STOPPED_WITHOUT_CAUSE, чл. 24, ал. 2 — the limit case of the same
+    // envelope. Both crawl codes require the car to be MOVING, so the one thing
+    // neither could see was a car that had stopped; on the lesson NAMED „без
+    // излишни спирания" the credited drive stood still through most of 88 s
+    // against a 40 s par and read «Второстепенни 0 0 · ★★★». It is CHECKED, and
+    // on the SAME world fact as the town crawl (it shares that detector's
+    // arming gate): a `lot-*` aisle posted 20 has no movement to hinder and a
+    // motorway is the sibling family's road, so on either the row is INERT
+    // rather than silently armed. `NO_WORLD_REFERENT` does NOT move: 14 again.
+    expect(checked.size).toBe(48);
     expect(NO_WORLD_REFERENT.size).toBe(14);
-    expect(all.length).toBe(60);
+    expect(all.length).toBe(62);
   });
 
   it("never exceeds doc 86 on the four classes §10 counts to ±0 (T1 90 · T2 31 · T3 9 · T4 83)", () => {

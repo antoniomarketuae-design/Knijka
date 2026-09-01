@@ -1150,9 +1150,18 @@ export const SC_AC_SNOW: ScenarioSpec = {
  *  - DELIBERATELY NOT coupled to any weather tag: conditions stay "dry"
  *    (clear sky, full grip — wind is force, not friction), and no rain/fog/
  *    snow lesson acquires wind. Only this template AUTHORS the flag.
- *  - HONEST VISUAL SCOPE (stated, not hidden): no windsock/foliage assets and
- *    no per-zone exposure model ship in this slice — the live wind blows over
- *    the WHOLE map, evenly, from the first metre to the last.
+ *  - THE WIND IS NOW VISIBLE, and that is the second half of the sweep161 row
+ *    („wind is never depicted in any form: no swaying trees, no drifting
+ *    debris, no leaning vehicles"). The 40 street trees fo-follow-v1 plants
+ *    down both verges lean and breathe on the SAME newtons the chassis is
+ *    being pushed with — `VehicleSim.windLateralNow` → `VehicleRig` →
+ *    `sim/world` `setWindSway` → the canopy bend in `world/textures/
+ *    windSway.ts`. One number, so the picture and the force cannot disagree,
+ *    and step 6 below can finally tell the student WHERE to read the gust.
+ *  - HONEST VISUAL SCOPE, STILL STATED: no windsock asset, no drifting debris
+ *    and no per-zone exposure model ship in this slice — the live wind blows
+ *    over the WHOLE map, evenly, from the first metre to the last, and the
+ *    canopies bend by that one even amount everywhere.
  *
  * THE COPY MAY ONLY NARRATE THAT — sweep161, severity critical. This template
  * used to describe an exposed span („на моста", „открития участък", y ≈ 150–265)
@@ -1162,9 +1171,13 @@ export const SC_AC_SNOW: ScenarioSpec = {
  * with six-storey blocks, street trees and a kerbside row of parked cars on
  * BOTH sides for all 360 m. `content/world/fo-follow-v1.json` carries no
  * `zones` array at all, so there is no span to be exposed on and nothing marks
- * one; there is no bridge, no lorry, and wind is depicted nowhere — no swaying
- * tree, no drifting debris, no leaning vehicle. The founder's words: „the world
- * does not contain what the briefing promises."
+ * one; there is no bridge and no lorry. The founder's words: „the world does
+ * not contain what the briefing promises."
+ *
+ * The same row's other half — „wind is depicted nowhere: no swaying tree, no
+ * drifting debris, no leaning vehicle" — is closed by the canopy bend above,
+ * so this street now shows the one thing the briefing promises. It still has
+ * no bridge and no lorry, and the copy still may not claim either.
  *
  * So the copy below narrates the wind that is REAL — steady, everywhere, with
  * the deterministic gusts of `vehicle/crosswind.test.ts` — and nothing else.
@@ -1215,8 +1228,14 @@ export const SC_AC_CROSSWIND: ScenarioSpec = {
     { n: 4, textBg: "Помни: колкото по-бавно караш, толкова по-малко те мести поривът." },
     // 73 ch
     { n: 5, textBg: "Посрещни с лека, ПОСТОЯННА корекция надясно порива, който те бута наляво." },
-    // 63 ch
-    { n: 6, textBg: "Отпусни корекцията плавно, щом поривът отслабне — вятърът диша." },
+    // 78 ch — the ONE step that names a thing to LOOK AT, and it may only say
+    // this because the canopies genuinely bend on the live gust now (the
+    // docblock's depiction bullet). Before that, „щом поривът отслабне" was an
+    // instruction with no cue: on a screen there is no seat and no wheel
+    // weight, so the student could only learn the gust had eased AFTER the car
+    // had already moved — which is the reflex («вторият замах») step 7 exists
+    // to prevent. The trees give him the cue before the push.
+    { n: 6, textBg: "Чети порива по короните на дърветата — отслабне ли, отпусни плавно корекцията." },
     // 69 ch
     { n: 7, textBg: "Пази се от рязката „втора корекция“ — тя изхвърля колата към бордюра." },
     // 70 ch
@@ -1255,13 +1274,13 @@ export const SC_AC_CROSSWIND: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-ac-crosswind/mistake-overcorrect.trace.json" },
       titleBg: "Свръхкорекцията — вторият замах",
       whatWentWrongBg:
-        "Поривът премести колата наляво — а водачът дръпна волана рязко надясно и я изхвърли чак до бордюра, лъкатушейки през половината платно. Свръхкорекцията е по-опасна от самия порив: срещу вятър се стои с меки, постоянни корекции, никога с резки движения.",
+        "Поривът премести колата наляво — а водачът дръпна волана рязко надясно и я изхвърли чак до бордюра, лъкатушейки през половината платно. Свръхкорекцията е по-опасна от самия порив: срещу вятър се стои с меки, постоянни корекции, никога с резки движения. Короните на дърветата по улицата казват кога поривът отслабва — щом се изправят, корекцията се ОТПУСКА плавно; обърнеш ли волана рязко в този момент, самата корекция изхвърля колата на другата страна.",
       codeRefs: ["POOR_LANE_KEEPING"],
     },
   ],
   teach: {
     whenBg:
-      "Навсякъде, където заслонът внезапно изчезва: мостове, отвори между сгради, краят на гора, изходът от тунел — и в мига, в който подминеш изпреварван камион и излезеш от завета му. Предупредителният знак за страничен вятър и ръкавът-ветропоказател са сигнал да намалиш и да стегнеш хвата ОЩЕ ПРЕДИ порива.",
+      "Навсякъде, където заслонът внезапно изчезва: мостове, отвори между сгради, краят на гора, изходът от тунел — и в мига, в който подминеш изпреварван камион и излезеш от завета му. Предупредителният знак за страничен вятър и ръкавът-ветропоказател са сигнал да намалиш и да стегнеш хвата ОЩЕ ПРЕДИ порива. А безплатният ветропоказател е насреща по цялата улица: короните на дърветата. Колкото по-силно се превиват и колкото по-рязко се изправят, толкова по-силно диша вятърът — четеш ги през стъклото и стягаш хвата ПРЕДИ да те бутне, вместо да разбираш за порива по това, че колата вече се е преместила.",
     whyBg:
       "Поривът бута колата с постоянна сила встрани — при висока скорост изминаваш повече метри, докато реагираш, и дрейфът те изнася към осевата линия. Още по-опасен е рефлексът „рязко срещу вятъра“: когато поривът внезапно отслабне, рязко завъртяният волан сам изхвърля колата на другата страна — вторият замах е причината за повечето катастрофи при вятър. Затова законът връзва скоростта и с атмосферните условия (чл. 20, ал. 2): по-бавно, здрав хват, меки корекции.",
     lawRef: "ЗДвП чл. 20, ал. 2",

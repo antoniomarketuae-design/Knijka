@@ -101,6 +101,7 @@ import {
   LENS_R_M,
 } from "./signalLensLook";
 import { snowCoverOnBeforeCompile, snowCoverProgramCacheKey } from "../textures/snowCover";
+import { windSwayOnBeforeCompile, windSwayProgramCacheKey } from "../textures/windSway";
 import {
   drawWorldLabel,
   WORLD_LABEL_GAP_M,
@@ -177,6 +178,11 @@ const SIGN_GLB: Record<SignKind, string> = {
   // pixel-identical to the Г2 in his theory question.
   mandatoryRight: "sign_roundabout", // Г2 — g2.svg face
   mandatoryLeft: "sign_roundabout", // Г3 — g3.svg face
+  // Г9 rides the SAME disc for the same reason (identical plate circles in the
+  // source art). It is the one plate that stands ON an obstacle rather than
+  // beside the road: builders/props.ts posts it on the roundabout island's
+  // concrete rim, facing each entry.
+  passRight: "sign_roundabout", // Г9 — g9.svg face
   // А19 „Деца" rides the А18 body: identical warning-triangle plate in the
   // source art, only the pictogram differs (a19.svg face). Founder item 61 —
   // a училищна зона must carry the sign that states WHY its limit is 30.
@@ -211,6 +217,7 @@ const SIGN_FACE_OVERRIDE: Partial<Record<SignKind, { art: SignFaceArt; numeral?:
   oneWay: { art: "d4" },
   mandatoryRight: { art: "g2" },
   mandatoryLeft: { art: "g3" },
+  passRight: { art: "g9" },
   children: { art: "a19" },
   noParking: { art: "v28" },
 };
@@ -654,13 +661,39 @@ function makeSharedMaterials(): PropAssets["materials"] {
     m.customProgramCacheKey = snowCoverProgramCacheKey;
     return m;
   };
-  return {
+  const materials = {
     signBody: std(0.5, 0.5, 1.4), // galvanised poles/brackets catch the sky
     signalHousing: std(0.3, 0.55, 1.3),
     streetSteel: std(0.45, 0.5, 1.3),
     tree: std(0.0, 0.9, 1.0),
     furniture: std(0.3, 0.6, 1.2),
   };
+
+  // WIND THAT CAN BE SEEN — sweep161 `sc-ac-crosswind:e0b9507e`, critical:
+  // „wind is never depicted in any form: no swaying trees, no drifting debris,
+  // no leaning vehicles". `physics.crosswind` has pushed the live chassis since
+  // AC-12 shipped and nothing in the world ever moved for it. The canopies do
+  // now, on the sim's own gust phase — see `textures/windSway.ts`.
+  //
+  // THE TREE MATERIAL ONLY, and that is the whole scope on purpose: a bending
+  // sign plate or a rippling signal visor would be a worse picture than a still
+  // one, and they are the surfaces the rule engine grades the student on. Same
+  // line `snowCover.ts` draws for sign faces and lenses.
+  //
+  // Composed rather than assigned: three allows ONE `onBeforeCompile` per
+  // material, so the snow hook and the wind hook are chained by hand and the
+  // cache key is the pair. They share only `#include <common>` and a string
+  // `.replace` leaves that include in place, so neither can starve the other
+  // of its anchor (proved in `snowCover.test.ts` for the ground pair and in
+  // `windSway.test.ts` for this one).
+  materials.tree.onBeforeCompile = (shader) => {
+    snowCoverOnBeforeCompile(shader);
+    windSwayOnBeforeCompile(shader);
+  };
+  materials.tree.customProgramCacheKey = () =>
+    `${snowCoverProgramCacheKey()}|${windSwayProgramCacheKey()}`;
+
+  return materials;
 }
 
 async function buildPropAssets(): Promise<PropAssets> {

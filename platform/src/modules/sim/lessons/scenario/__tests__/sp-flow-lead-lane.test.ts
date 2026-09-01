@@ -240,10 +240,26 @@ describe("§2 the exposure this repair is about is REAL and still happens", () =
 });
 
 describe("§3 …and the student is never billed for it", () => {
-  it("the sweep's stop-go law books no contact and no violation", () => {
+  it("the sweep's stop-go law books no contact, and only the crawl it really is", () => {
+    /**
+     * EXPECTATION CORRECTED 2026-09-01 (audit sc-vu-emergency-junction:853790f7),
+     * AND THIS CASE IS WHERE THAT FINDING LIVES. §3 is about the PACE CAR: it
+     * laps a slow student, comes back at his bumper, and none of that may be
+     * billed to him — that claim is unchanged and is the `contacts` line plus
+     * the absence of every contact/following code below.
+     *
+     * What was never true is the second half of the old assertion. `STOP_GO` is
+     * the audit sweep's own cautious bot — 12 км/ч, roll 4 s, stop 3 s — held
+     * for 210 s down a boulevard with nothing in the student's lane, and „books
+     * no violation" was the DEFECT, not a property worth protecting: the engine
+     * graded only the fast half of the speed envelope, so „пълзи и минаваш" was
+     * an unbeaten strategy on every town lesson. `DRIVING_TOO_SLOW_IN_TOWN`
+     * grades it now (ЗДвП чл. 22, ал. 1), and pinning it here by name means the
+     * day anything ELSE starts billing this drive, this line says which code.
+     */
     const leg = drive(STOP_GO, 210);
     expect(leg.contacts).toEqual([]);
-    expect(leg.violationCodes).toEqual([]);
+    expect(leg.violationCodes).toEqual(["DRIVING_TOO_SLOW_IN_TOWN"]);
   });
 
   it("the taught 46–48 км/ч drive books no contact and no violation", () => {

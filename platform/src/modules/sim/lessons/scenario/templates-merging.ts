@@ -825,9 +825,11 @@ const MGB_BAY_TO_Y = 176; // …and the bus swings out of it here
 const MGB_END_Y = 400;
 
 /**
- * THE BUS: the shipped cutInLeadCar actor with the box rig (`profile: "truck"`
- * — the only large-vehicle rig that exists; ADR-001 fictional), dwelling in the
- * бус лента at the спирка and gliding out into the player's lane.
+ * THE BUS: the shipped cutInLeadCar actor on the 12 m city-bus rig
+ * (`profile: "bus"`, vehicleFleet BUS_DIMENSIONS; ADR-001 fictional livery,
+ * blank route board), dwelling in the бус лента at the спирка and gliding out
+ * into the player's lane. It rode the box-truck rig until W22 — see the
+ * `profile` line below and the W22 stamp at the end of this file's header.
  *
  * WHY IT DWELLS WITHOUT A DWELL COMMAND: the runner issues one matchPlayer with
  * gapM = paceAheadM, whose target is `playerSpeed + 0.55 × (paceAheadM − gap)`
@@ -952,7 +954,14 @@ const MGB_BUS: CutInLeadCarSpec = {
     cruiseSpeedMps: 9,
     extraRightOffsetM: 0, // the graph's curb lane IS the бус лента
     colorIndex: 4,
-    profile: "truck", // the box rig — the largest actor the fleet has
+    // W22: was "truck" — the procedural WINDOWLESS 7.5 m cargo box, borrowed
+    // because it was the largest body the fleet had. `:8fa6b888` photographed
+    // the consequence: the only large vehicle on a чл. 67 drill was a lorry.
+    // "bus" is now a real profile (traffic/types.ts) on a 12 m GLAZED rig with
+    // a route board (vehicleFleet.ts BUS_DIMENSIONS), which is both halves of
+    // what this drill needs — the CLASS the article protects (ППС от редовна
+    // линия) and the LENGTH its own copy teaches.
+    profile: "bus",
   },
   paceAheadM: 30,
   maxMatchSpeedMps: 11, // ~40 km/h: a city bus rolling out, never a sports car
@@ -1251,6 +1260,27 @@ const MGB_BUS: CutInLeadCarSpec = {
  *     2, instruction 3 and that card would each need one word — «микробус от
  *     редовната линия» — to stay honest; those three lines ARE in this file. A
  *     purpose-built 12 m bus keeps both halves and costs a rig. Founder's call.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * W22 2026-08-31 — :8fa6b888 IS CLOSED, the expensive way (the rig), because
+ * the cheap way loses the half of the lesson the copy is built on. Landed:
+ * `VehicleProfile` gains "bus" (traffic/types.ts) with a 12 × 2.55 row in BOTH
+ * dimension tables; `BUS_DIMENSIONS` + `buildCityBusRig` (vehicleFleet.ts) —
+ * three material groups, a window band down both flanks, a windscreen that
+ * straddles the 2.0 m eye line the mistake card names, curb-side doors and a
+ * BLANK route board (ADR-001: no digits, so no real line is depicted);
+ * `StagedActorPathSpec.profile` gains "bus" (contracts.ts); `PROFILE_BG` gains
+ * «Автобус» (clips/clipPlanBuilder.ts) — without that row the clip card falls
+ * back to «Автомобил», and clipPlan.generated.ts had been shipping «Камион,
+ * който се вклинява отпред» for this very drill.
+ *
+ * NOT COSMETIC, and this is the part to re-measure before touching it again:
+ * both dimension tables are LIVE grading inputs (`system.ts bumperSubtrahendM`,
+ * `collision/bodies.ts actorObb`, `NpcColliders npcShellHalfExtents`), so the
+ * actor's rear bumper moved 2.25 m closer than the box truck's. The three
+ * committed traces still grade EXACTLY their authored codes with no re-record —
+ * the shadow still earns zero violations at the tighter geometry — but the ease
+ * script has less margin than it did.
  */
 export const SC_MERGE_BUS_PULLOUT: ScenarioSpec = {
   id: "sc-merge-bus-pullout",

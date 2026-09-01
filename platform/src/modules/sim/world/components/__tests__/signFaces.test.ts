@@ -29,7 +29,7 @@
  *     mutation case below);
  *  2. intrinsic sizing can no longer emit a duplicate attribute, which would
  *     take a KIND off the map rather than merely mis-state it;
- *  3. the seven shipped faces still satisfy the preconditions the swap demands;
+ *  3. the eight shipped faces still satisfy the preconditions the swap demands;
  *  4. every sign GLB still carries exactly one `face_*` primitive, in front of
  *     and covering its plate — the premise „only its face texture is swapped"
  *     rests on, and the thing that would actually produce the blank plate the
@@ -52,7 +52,7 @@ const SIGN_DIR = path.join(PLATFORM, "public/sim/signs");
 const CONTENT_SVG_DIR = path.resolve(PLATFORM, "../content/signs/svg");
 
 /** Every art the module can be asked for (mirrors the SignFaceArt union). */
-const ARTS: SignFaceArt[] = ["v26", "v33", "d4", "g2", "g3", "a19", "v28"];
+const ARTS: SignFaceArt[] = ["v26", "v33", "d4", "g2", "g3", "a19", "v28", "g9"];
 /** The two that carry a substitutable numeral (WorldProps SIGN_FACE_OVERRIDE
  *  posts v26 at 20…140; v33's numerals are per-placement, so unbounded). */
 const NUMERAL_ARTS: SignFaceArt[] = ["v26", "v33"];
@@ -191,7 +191,7 @@ describe("withIntrinsicSize", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. The seven shipped faces still satisfy what the swap demands
+// 3. The eight shipped faces still satisfy what the swap demands
 // ---------------------------------------------------------------------------
 
 describe("the shipped face artwork", () => {

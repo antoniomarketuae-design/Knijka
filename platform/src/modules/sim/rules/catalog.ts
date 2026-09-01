@@ -1357,6 +1357,84 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 22, ал. 1; чл. 55, ал. 1",
     conceptId: "c-motorway-rules",
   },
+  DRIVING_TOO_SLOW_IN_TOWN: {
+    // THE ROW THE ENVELOPE WAS MISSING (audit sc-vu-emergency-junction:853790f7,
+    // 2026-09-01). Its motorway sibling above has existed since the SP-10 slice;
+    // what did not exist was the town half, so a car held at 10–11 км/ч for two
+    // minutes on a street posted 40 booked nothing at all while the flat-out
+    // leg of the same lesson was billed once a tick.
+    //
+    // LAW: the SAME retrieval as the sibling, and чл. 22 is NOT a motorway
+    // article — it sits in Глава втора, Раздел IV („Скорост на движение"), the
+    // same раздел as чл. 21's table of limits:
+    //
+    //   ЗДвП чл. 22, ал. 1: „Водачът на пътно превозно средство не трябва да се
+    //   движи без основателна причина с твърде ниска скорост, когато по този
+    //   начин пречи на движението на другите пътни превозни средства."
+    //   ЗДвП чл. 22, ал. 2: „Водач на пътно превозно средство, което се движи с
+    //   ниска скорост и поради това причинява създаването на колона от пътни
+    //   превозни средства, трябва да ги пропусне при първа възможност."
+    //
+    // ал. 2 is quoted in the copy because it is the half a student can act on:
+    // the law does not order him to go faster than he can manage, it orders him
+    // to LET THE QUEUE PAST. That is the taught behaviour, and it is why this
+    // row is второстепенна rather than основна — по Наредба № 38, б. „б" the
+    // deed is a правилно, но неточно действие от недостатъчен опит (n38.ts).
+    //
+    // NO FIGURE IS INVENTED. Bulgaria has no general minimum speed; the
+    // detector's floor is derived from the POSTED plate (engine.ts
+    // `townCrawlFractionOfLimit`) and appears nowhere in this copy. The one
+    // number below — «30–40 км/ч в зона 50» — is a driving instruction about
+    // the flow, not a claim about the law, and it is written as such.
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Движение с необосновано ниска скорост",
+    explanationBg:
+      "Пълзеше дълго време далеч под скоростта на движението по улица, на която нищо не те задържаше — нямаше кола отпред, пешеходец, кръстовище или лоши условия. Задължителна минимална скорост няма, но законът забранява движение без основателна причина с твърде ниска скорост, когато с това пречиш на другите (ЗДвП чл. 22, ал. 1). Опасното не е бавното само по себе си, а какво предизвиква то у останалите: зад теб се събира колона, някой губи търпение и предприема изпреварване там, където не е място за него — до тротоар, до спирка, до пешеходна пътека. Твоята предпазливост става чужд риск. Затова чл. 22, ал. 2 добавя изричното задължение: щом заради теб се е образувала колона, пропусни я при първа възможност.",
+    correctiveBg:
+      "Ако нищо не те спира, върви със скоростта на потока — в зона 50 това обикновено са 30–40 км/ч. Ако още не се чувстваш готов за това темпо, не се влачи в потока: отбий вдясно на първото безопасно място, пусни колоната да мине и продължи спокойно зад нея.",
+    lawRef: "ЗДвП чл. 22, ал. 1",
+    conceptId: "c-speed-limits",
+  },
+  STOPPED_WITHOUT_CAUSE: {
+    // THE LIMIT CASE OF THE TWO ROWS ABOVE (audit sc-jx-priority-confidence:
+    // 9c987e7b). Both crawl detectors require the car to be MOVING, so the one
+    // thing neither of them can see is a car that has stopped. On the lesson
+    // titled „По пътя с предимство — без излишни спирания" that blind spot was
+    // the whole lesson: the credited drive stood still through most of 88 s on
+    // an open priority arm and booked «Второстепенни 0 0».
+    //
+    // LAW, and it is NOT the чл. 22 the crawl rows cite. чл. 22, ал. 1 governs a
+    // driver who „се движи… с твърде ниска скорост"; this car is not moving.
+    // Retrieved instead (`content/law/acts/zdvp.json`, чл. 24):
+    //
+    //   ал. 1: „Водачът на пътно превозно средство не трябва да намалява
+    //   скоростта рязко, освен ако това е необходимо за предотвратяване на
+    //   пътнотранспортно произшествие."
+    //   ал. 2: „Преди да намали значително скоростта на движение на управляваното
+    //   от него пътно превозно средство, водачът е длъжен да се убеди, че няма да
+    //   създаде опасност за останалите участници в движението и че няма да
+    //   затрудни излишно тяхното движение."
+    //
+    // ал. 2 is the row's rule: „затрудни излишно тяхното движение" is the
+    // lesson's „излишни спирания" in the act's own words, and it is the half a
+    // student can act on — the duty is to LOOK BEHIND before shedding speed, not
+    // to never slow down. ал. 1 is cited nowhere here on purpose: the ABRUPT
+    // half is HARSH_BRAKING_NO_CAUSE's row, and this detector convicts a car
+    // that is already still, however gently it got there.
+    //
+    // второстепенна, б. „б" (n38.ts): stopping is a правилно действие performed
+    // where it was not called for, which is the clause's own definition.
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Спиране без причина на открит път",
+    explanationBg:
+      "Спря и остана на място в активна лента, а пред теб нямаше нищо — нито кола, нито пешеходец, нито кръстовище, светофар или знак, който да те задължава. Спирането без причина не е предпазливост: то е единственото нещо на пътя, което другите не могат да предвидят. Зад теб хората четат скоростта ти, не мислите ти — затова законът иска обратното: преди да намалиш значително скоростта, „водачът е длъжен да се убеди, че няма да създаде опасност за останалите участници в движението и че няма да затрудни излишно тяхното движение“ (ЗДвП чл. 24, ал. 2). Когато си на път с предимство, спирането е двойно по-скъпо: кръстовището работи само защото този с предимството минава, а колата зад теб очаква точно това.",
+    correctiveBg:
+      "Ако нищо не те спира, не спирай — премини равномерно. Готовността се показва с крак над спирачката и по-ранно вдигане на газта, не с престой в лентата. А ако наистина трябва да спреш (лошо ти е, объркал си пътя), първо погледни в огледалото, отбий вдясно на място, където не пречиш, и чак тогава спри.",
+    lawRef: "ЗДвП чл. 24, ал. 2",
+    conceptId: "c-sudden-braking-slow-driving",
+  },
   EMERGENCY_LANE_DRIVING: {
     // Doc 72 SP-10-adjacent motorway discipline. POINT CORRECTED 2026-08-03:
     // this cited чл. 58, т. 3, which is the STOPPING permission („да спира в

@@ -159,29 +159,24 @@
  * decorating it would be the „photographs well from a camera the student never
  * sits in" trap that docstring was written to stop.
  *
- * WHAT THE ISLAND IS ACTUALLY MISSING IS A SIGN, AND IT CANNOT BE DRAWN HERE.
+ * WHAT THE ISLAND WAS ACTUALLY MISSING IS A SIGN, AND IT IS NOT DRAWN HERE.
  * A Bulgarian central island carries Г9 „Преминаване отдясно на знака" facing
  * each entry: `content/signs/signs.json`'s own `sign-g9` states „обикновено е
  * поставен на остров, ремонтен участък или препятствие по средата на пътя",
  * cited to `Наредба № РД-02-21-1/23.11.2023, знак Г9` — retrieved from the
  * content bank, never free-recalled (ADR-002). That plate is what makes an
  * island read as a ROUNDABOUT island rather than a lawn, and it teaches a sign
- * already in the exam bank at the one geometry it exists for. This module emits
- * MESHES; signs are placed by `builders/props.ts` from a `SignKind`. The chain,
- * written down so the next round routes it once instead of re-photographing it:
- *   – `world/types.ts` `SignKind` — add `"passRight"` (Г9);
- *   – `components/signFaces.ts` `SignFaceArt` — add `"g9"`
- *     (`content/signs/svg/g9.svg` already ships);
- *   – `components/WorldProps.tsx` — `passRight: "sign_roundabout"` in
- *     `SIGN_GLB` (Г2/Г3 already ride that round blue plate) and
- *     `passRight: { art: "g9" }` in `SIGN_FACE_OVERRIDE`;
- *   – `builders/props.ts` — one plate per mouth at `islandRadiusM` on the
- *     mouth bearing, yawed to face the approach. The poses come from this
- *     module's exported `RoundaboutRing.mouths` + `islandRadiusM`, which
- *     `buildWorldGeometry.ts` already holds when it calls `buildProps`.
- * Exporting a pose helper from here ahead of that consumer would be a function
- * nothing calls — which is not a repair, it is a comment that type-checks. So
- * nothing is exported and nothing is drawn until props.ts can place it.
+ * already in the exam bank at the one geometry it exists for.
+ *
+ * LANDED (this wave). This module emits MESHES; signs are placed by
+ * `builders/props.ts` from a `SignKind`, so the plate lives there and only two
+ * things were added here for it to stand on: `ISLAND_WALL_TOP_Y` is exported
+ * (the rim a post has to be based on) and `RingMouth.nodeId` is carried (so the
+ * pass can ask the network which mouths traffic actually ENTERS by). The pose
+ * itself — `islandRadiusM − ISLAND_KERB_BAND_M/2` on the mouth bearing, yawed
+ * along `mouth.dir` to face the approach — is computed in props.ts against the
+ * `RoundaboutRing[]` `buildWorldGeometry.ts` already holds when it calls
+ * `buildProps`. Nothing is exported from here that props.ts does not read.
  * ───────────────────────────────────────────────────────────────────────────
  */
 
@@ -658,6 +653,7 @@ function ringMouths(
         halfAngleCw: halfCw,
         halfAngleCcw: halfCcw,
         armEdgeId: ap.edgeId,
+        nodeId: node.id,
         node: node.pos,
         dir: u,
         normal: n,
@@ -726,6 +722,11 @@ export interface RingMouth {
   halfAngleCcw: number;
   /** The arm's edge id — so a test can name the mouth it is standing in. */
   armEdgeId: string;
+  /** Id of the node where the arm meets the ring. Carried so a consumer can ask
+   *  the network whether traffic actually ENTERS here (`Approach.incoming`)
+   *  instead of re-deriving it from `node` by proximity — the Г9 island pass in
+   *  builders/props.ts signs entries, not exits. */
+  nodeId: string;
   /** The node where the arm meets the ring. */
   node: Vec2;
   /** Unit direction along the arm, AWAY from the ring. */
@@ -1206,8 +1207,10 @@ function crownRiseM(islandRadiusM: number): number {
 export const ISLAND_WALL_RISE_M = 0.45;
 
 /** Top of the island's planter wall — the height its rim, its chamfer and the
- *  foot of its planting all sit at. */
-const ISLAND_WALL_TOP_Y = SIDEWALK_TOP_Y + ISLAND_WALL_RISE_M;
+ *  foot of its planting all sit at. Exported because anything STANDING on the
+ *  island (the Г9 plates builders/props.ts posts on the rim) has to be based
+ *  here or its post hangs in the air / is swallowed by the wall. */
+export const ISLAND_WALL_TOP_Y = SIDEWALK_TOP_Y + ISLAND_WALL_RISE_M;
 
 /** Planting height at radius `r` on an island of rim radius `rim` — a raised
  *  cosine, so the crown meets the concrete rim tangentially (no crease).

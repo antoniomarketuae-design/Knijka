@@ -26,6 +26,7 @@ import {
   DECK_TOUCH_CAPTION_VAR,
   useTapActivation,
 } from "@/modules/sim/hud";
+import { demoDeckNarrates } from "./demoDeckLifetime";
 
 const POLL_MS = 100;
 const SPEEDS = [0.25, 0.5, 1] as const;
@@ -204,6 +205,26 @@ export interface TraceTimelineProps {
    * over their drive unasked.
    */
   standDown?: boolean;
+  /**
+   * The OTHER half of the same voice — see `demoDeckNarrates` in
+   * `demoDeckLifetime.ts` for the frame and the ruling.
+   *
+   * `standDown` silences a demonstration the student has driven away from.
+   * This silences one they have never asked for: a lesson's aid deck opens with
+   * its clock parked at 0:00 (`demoDeckAtRest`), and `tSec = 0` is inside the
+   * window of every annotation authored at 0, so the caption card was on the
+   * glass from the lesson's first frame with nothing playing behind it.
+   *
+   * DEFAULT `false`, i.e. every existing caller renders exactly what it always
+   * did. The Scenario Studio and the dev clip routes drive `createTraceClock()`
+   * themselves and their deck IS the thing the student came for; only the deck
+   * mounted over a lesson's windscreen has an audience to wait for.
+   *
+   * Read at mount only. It is a literal at the one call site that passes it,
+   * and the student's own first transport gesture — ▶, a scrub, a tick, ⏮/⏭ —
+   * is what lifts it.
+   */
+  awaitsAudience?: boolean;
   /** Deck label, e.g. „Демонстрация — сянка" (default per trace kind). */
   titleBg?: string;
   /** Compact deck (~40 % smaller controls) — founder ruling 2026-07-17: the
@@ -259,6 +280,7 @@ export function TraceTimeline({
   touch = false,
   leading = null,
   standDown = false,
+  awaitsAudience = false,
 }: TraceTimelineProps) {
   const duration = Math.max(trace.meta.durationSec, 0.001);
   // Size grammar: one place per control class, so compact stays consistent.
@@ -272,6 +294,17 @@ export function TraceTimeline({
   const tickHalfPx = (compact ? TICK_WIDTH_PX.compact : TICK_WIDTH_PX.roomy) / 2;
 
   const [snap, setSnap] = useState({ t: 0, playing: true, speed: 1, looping: false });
+  /**
+   * Has this demonstration been ASKED FOR yet? See `awaitsAudience` above.
+   *
+   * A one-way latch and not a condition, for the reason every lifetime in this
+   * corridor gives: a student who pauses the replay to look at the frame it is
+   * standing on must keep the sentence that frame is about, and a rule written
+   * as „is it moving right now" would take it away the instant they pressed ⏸.
+   * `standDown` is the only thing that silences an engaged deck, and it is a
+   * latch too.
+   */
+  const [engaged, setEngaged] = useState(!awaitsAudience);
   const barRef = useRef<HTMLDivElement>(null);
   const scrubbing = useRef(false);
 
@@ -299,15 +332,24 @@ export function TraceTimeline({
   }, [clockRef]);
 
   const activeIdx = activeAnnotationIndex(annotations, snap.t);
-  // `standDown` wins over the window: see the prop's note. A paused playhead
+  // WHO IS ALLOWED TO SPEAK, in one place — `demoDeckNarrates`, whose header
+  // carries both frames. `standDown` wins over the window (a paused playhead
   // inside `windowSec` never clears on its own, so this is the only thing
-  // between the student and a first-person sentence about somebody else's
-  // drive printed over their own.
-  const active = !standDown && activeIdx >= 0 ? annotations[activeIdx] : null;
+  // between the student and a first-person sentence about somebody else's drive
+  // printed over their own); `engaged` wins over the window at the other end,
+  // where a deck parked at 0:00 by `demoDeckAtRest` was captioning a
+  // demonstration nobody had started.
+  const active =
+    demoDeckNarrates({ engaged, standDown }) && activeIdx >= 0 ? annotations[activeIdx] : null;
 
   const seek = (tSec: number) => {
     const clock = clockRef.current;
     if (!clock) return;
+    // A scrub, a tick, ⏮/⏭ — every one of them is the student asking for this
+    // demonstration as plainly as ▶ does, and after any of them the playhead is
+    // somewhere they chose. Set here rather than at each call site so a
+    // transport control added later cannot forget it.
+    setEngaged(true);
     clock.tSec = Math.max(0, Math.min(duration, tSec));
     setSnap((s) => ({ ...s, t: clock.tSec }));
   };
@@ -323,6 +365,10 @@ export function TraceTimeline({
   const togglePlay = () => {
     const clock = clockRef.current;
     if (!clock) return;
+    // ▶ is the gesture `demoDeckAtRest` names — „the deck opens parked at 0:00
+    // and the student presses ▶". From here the demonstration has an audience
+    // and may caption; ⏸ does not take that back (see `engaged`).
+    setEngaged(true);
     // Restart from the top when resuming at the very end.
     if (!clock.playing && clock.tSec >= duration - 0.01) clock.tSec = 0;
     clock.playing = !clock.playing;

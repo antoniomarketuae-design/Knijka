@@ -417,7 +417,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "requiredActors": [
       {
         "kind": "vehicle",
-        "label": "Камион, който се вклинява отпред"
+        "label": "Автобус, който се вклинява отпред"
       }
     ],
     "governingControl": {

@@ -209,6 +209,19 @@ export function serializeObjectiveParams(
       if (p.maxSpeedKmh !== undefined) {
         params.maxSpeedKmh = widenSpeedCap(p.maxSpeedKmh, toleranceScale, postedLimitKmh);
       }
+      // THE LOWER EDGE OF THE SAME CONTRACT, and it is on the whitelist for the
+      // reason the block below states in full: a term the evaluator reads is
+      // still a term the product never sees until its name appears here.
+      //
+      // NOT LADDERED, unlike the ceiling one line up, and that asymmetry is the
+      // design. The ladder forgives PRECISION, and the forgiving direction for
+      // a speed band is „wider": `widenSpeedCap` lifts the ceiling at L1/L2
+      // while the floor stays put, so the beginner's band is the widest one and
+      // the expert's the tightest. `parseObjectiveParams parseSpeedFloor` still
+      // refuses a band narrower than REACH_ZONE_CAP_SLACK_KMH, measured at the
+      // TIGHTEST rung (validate.ts round-trips at toleranceScale 1), so no rung
+      // can be handed a gate it cannot drive.
+      if (p.minSpeedKmh !== undefined) params.minSpeedKmh = p.minSpeedKmh;
       // B18/FR-24 — carried through untouched by the ladder, and that IS the
       // point: the widening above stretches the acceptance backwards down the
       // approach at L1/L2 and this flag stops it stretching forwards over the
@@ -243,6 +256,15 @@ export function serializeObjectiveParams(
       // that forgave them would teach the opposite of the lesson it belongs to.
       if (p.requireNoContact === true) params.requireNoContact = true;
       if (p.requireRailClear === true) params.requireRailClear = true;
+      // …AND THE THIRD AUTHORED WITNESS TERM, on this whitelist for exactly the
+      // reason the block above measured on `requireRailClear`: parsed, read and
+      // gated at template level, a key that is not named HERE never reaches the
+      // session the student plays. NOT LADDERED either, and for the same reason
+      // as its two neighbours — the aid ladder forgives PRECISION, and „did you
+      // stand still inside the forbidden stretch" has the same answer at L1 as
+      // at L5. A rung that forgave it would forgive the whole subject of the
+      // drill.
+      if (p.requireRestClean !== undefined) params.requireRestClean = p.requireRestClean;
       return { kind: "reachZone", params };
     }
     case "passSignal": {

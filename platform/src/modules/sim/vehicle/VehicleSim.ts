@@ -510,13 +510,7 @@ export class VehicleSim {
     // so calm sessions never touch this branch — bit-identity preserved.
     if (this.windActive) {
       this.windClockSec += dt;
-      let windN = this.windLateralN;
-      if (this.windGustAmplitudeN !== 0) {
-        windN +=
-          this.windGustAmplitudeN *
-          Math.sin((2 * Math.PI * this.windClockSec) / this.windGustPeriodSec);
-      }
-      this.body.addForce({ x: windN, y: 0, z: 0 }, true);
+      this.body.addForce({ x: this.currentWindN(), y: 0, z: 0 }, true);
     }
 
     // --- Body-roll coupling (see tuning.ts: rapier suppresses roll torque) --
@@ -661,6 +655,42 @@ export class VehicleSim {
     } catch {
       // World may already be tearing down (route leave) — nothing to release.
     }
+  }
+
+  /**
+   * The crosswind term for the CURRENT clock reading — constant + gust sine,
+   * newtons along world +X. Extracted from `step()` (which is still its only
+   * caller inside the integrator) so that the number the chassis is pushed
+   * with and the number the WORLD is drawn with cannot be two numbers.
+   * `windActive` is false on every default construction, so calm sessions
+   * return the literal 0 without touching the sine.
+   */
+  private currentWindN(): number {
+    if (!this.windActive) return 0;
+    let windN = this.windLateralN;
+    if (this.windGustAmplitudeN !== 0) {
+      windN +=
+        this.windGustAmplitudeN *
+        Math.sin((2 * Math.PI * this.windClockSec) / this.windGustPeriodSec);
+    }
+    return windN;
+  }
+
+  /**
+   * Lateral wind force acting on the chassis right now (N, world +X; negative
+   * blows west), 0 when the lesson authors no crosswind.
+   *
+   * THE DEPICTION CHANNEL (sweep161 `sc-ac-crosswind:e0b9507e` — „wind is
+   * never depicted in any form"). `VehicleRig` reads this every render frame
+   * and hands it to `sim/world`'s `setWindSway`, which leans the street-tree
+   * canopies by the same amount, in the same direction, on the same gust
+   * phase. Read rather than recomputed on a render clock on purpose: the sim
+   * advances its wind clock by FIXED_DT per physics step and `reset()` rewinds
+   * it, so a second clock would drift out of phase with the force exactly
+   * where the lesson asks the student to read the gust.
+   */
+  get windLateralNow(): number {
+    return this.currentWindN();
   }
 
   /** Signed speed in km/h (+ forward). Use this for HUD and engine lookup. */

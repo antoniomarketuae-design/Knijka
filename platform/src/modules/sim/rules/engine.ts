@@ -50,6 +50,11 @@
  *    than wall seconds, so a student who answers the card by accelerating —
  *    which by construction stops the frames qualifying — never meets the second
  *    bill; one who keeps crawling steadily does. Same `regrade`, same drop.
+ *  - AND THE EXCURSION OFF THE CARRIAGEWAY (OFF_CARRIAGEWAY_REGRADE_SEC). Its
+ *    single bill per excursion was spent on the teach card, so a student who
+ *    drove off the road and never came back reached his debrief charged NOTHING
+ *    for it while the HUD had named the offence. Eight continuous seconds off
+ *    the asphalt bills once more; steering back zeroes both clocks.
  *  - Both pedestrian-crossing violations can fire on one crossing (approach
  *    too fast, then still failing to yield) — they are distinct mistakes and
  *    each deserves immediate feedback. Any опасна already fails the session.
@@ -542,6 +547,38 @@ export interface RuleEngineState {
   motorwaySlowRegrade: EpisodeState;
   /** The re-grade episode's own accrued ledger (see `motorwayCrawlSec`). */
   motorwayCrawlRegradeSec: number;
+  // -- THE TOWN HALF OF THE SPEED ENVELOPE (DRIVING_TOO_SLOW_IN_TOWN) --------
+  /**
+   * Sustained causeless crawl far under the POSTED limit on a through road.
+   * One bill per episode; re-arms only on genuine recovery (back at/above the
+   * floor) or on leaving the through road (a plate under
+   * `townCrawlMinPostedKmh`, or a motorway, where the sibling code grades).
+   */
+  townCrawl: EpisodeState;
+  /** Seconds of crawl ACCRUED inside the currently-open town episode — see
+   *  `stepAccruedEpisode`; a stop-start crawl is the fault's own shape. */
+  townCrawlSec: number;
+  /** THE SECOND BILL of one continuous town crawl — same condition, same
+   *  reset, sustain `TOWN_CRAWL_REGRADE_SEC` longer, so it can only ever fire
+   *  AFTER the first and exactly once. See `MOTORWAY_CRAWL_REGRADE_SEC` for
+   *  the argument: without it the single bill is spent on the teach card and a
+   *  two-minute crawl costs the student nothing. */
+  townCrawlRegrade: EpisodeState;
+  /** The re-grade episode's own accrued ledger (see `townCrawlSec`). */
+  townCrawlRegradeSec: number;
+  // -- THE STOP THAT HAD NO REASON (STOPPED_WITHOUT_CAUSE) -------------------
+  /**
+   * A standstill HELD in a live lane on an open through road with nothing to
+   * stop for. Consecutive, not accrued: one stop is one act, and driving on
+   * (v > movingSpeedKmh) re-arms it, so two needless stops cost two bills.
+   */
+  needlessStop: EpisodeState;
+  /** THE SECOND BILL of one long needless stop — same condition, same reset,
+   *  sustain `NEEDLESS_STOP_REGRADE_SEC` longer, so it can only ever fire
+   *  AFTER the first and exactly once. Same argument as the two crawl
+   *  re-grades: the first bill is spent on the teach-first card, and without
+   *  this a single 60-second freeze costs the student nothing. */
+  needlessStopRegrade: EpisodeState;
   /**
    * Sustained DRIVING in the лента за принудително спиране (laneId 0 inside
    * an authored emergencyLane span). One bill per excursion; re-arms on
@@ -560,6 +597,13 @@ export interface RuleEngineState {
    * grass, and a `moving` conjunct would acquit exactly that. See the detector.
    */
   offCarriageway: EpisodeState;
+  /**
+   * The SAME excursion, `OFF_CARRIAGEWAY_REGRADE_SEC` later — the second bill
+   * that exists only to reach the charge the teach-first free lesson consumed.
+   * Same condition, same reset, strictly larger sustain, so it can only ever
+   * fire AFTER the bill above and never instead of it.
+   */
+  offCarriagewayRegrade: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = {
@@ -1315,6 +1359,38 @@ const SPEEDING_SUSTAIN_ACCRUES = true;
 const MOTORWAY_CRAWL_REGRADE_SEC = 6;
 
 /**
+ * THE SAME TWO DEFECTS, IN TOWN — seconds of qualifying crawl after the first
+ * bill before the breach is re-graded (DRIVING_TOO_SLOW_IN_TOWN).
+ *
+ * Scaled to the town sustain the way 6 is scaled to the motorway's 4: the
+ * second bill lands after roughly half as long again as the first, so a crawl
+ * that ends shortly after the teach card is charged once and a crawl the
+ * student simply keeps up is charged twice. Longer in absolute terms than the
+ * motorway's 6 for the same reason `townCrawlSustainSec` is longer than 4.
+ */
+const TOWN_CRAWL_REGRADE_SEC = 10;
+
+/**
+ * THE SAME DEFECT ONE MORE TIME, FOR A CAR THAT IS NOT MOVING AT ALL — seconds
+ * of held causeless standstill AFTER the first bill before the breach is
+ * re-graded (STOPPED_WITHOUT_CAUSE).
+ *
+ * The two crawl re-grades above exist because `policyForViolation` hands the
+ * FIRST bill of a второстепенна to the teach-first free mini-lesson, so a single
+ * episode reaches the debrief priced at zero. A needless stop has exactly the
+ * same shape and the same hole: a student who stops once and simply stays
+ * stopped commits one act, is taught once, and is charged nothing for it. Six
+ * seconds — the sustain again, so the second bill lands at twice the first, the
+ * same „half as long again or more" scaling the siblings use.
+ *
+ * It CANNOT produce a third bill: it is a second episode object with a strictly
+ * larger threshold, zeroed by the same recovery (driving on) that re-arms the
+ * first — and a driver who genuinely drives on and then freezes again has
+ * committed a SECOND act, which bills unmarked through the first episode.
+ */
+const NEEDLESS_STOP_REGRADE_SEC = 6;
+
+/**
  * THE SAME TWO DEFECTS, ON THE BUS LANE — seconds of qualifying travel after
  * the first bill before the breach is re-graded (w13 · lane „rules",
  * sc-ov-bus-lane:b309af77, 2026-08-27).
@@ -1478,6 +1554,62 @@ const BUS_LANE_REGRADE_SEC = 6;
  * separate conjunct in the detector below and not a longer sustain here.
  */
 const OFF_CARRIAGEWAY_SUSTAIN_SEC = 2;
+
+/**
+ * SECONDS STILL OFF THE CARRIAGEWAY, AFTER THE FIRST BILL, BEFORE THE BREACH IS
+ * RE-GRADED (`sc-ov-oncoming-gap:83420a40`, critical — „no off-route stop, no
+ * reset, NO PENALTY").
+ *
+ * ── THE DEFECT, MEASURED THROUGH THE SHIPPED STACK ──────────────────────────
+ * The stop landed (`lessons/finish.ts` ends the drive 75 s off the network) and
+ * the code landed (`OFF_CARRIAGEWAY`, above). The PENALTY did not. Driven
+ * through the real `createWorldRuntime` on the row's own district
+ * (ov-oncoming-v1) and the real `applyTick` on the compiled `sc-ov-oncoming-gap`
+ * — car over the kerb at t = 10,5 s at 97 км/ч and never back:
+ *   reducer  OFF_CARRIAGEWAY at t = 12,5 s — fired, once, exactly as designed
+ *   debrief  «Второстепенни 5», all five SPEEDING_OVER_LIMIT; ИЗДЪРЖАН;
+ *            OFF_CARRIAGEWAY present only in `coachedMistakes`, worth 0 points
+ * `severityClass: "osnovna"` ⇒ `policyForViolation` returns undefined ⇒
+ * teach-first-then-grade ⇒ the FIRST bill is taught, not charged — and this
+ * detector bills ONCE per excursion, so a student who leaves the road and stays
+ * off it is never asked a second time and pays nothing for it. That is verbatim
+ * `STANDING_DUTY_REGRADE_SEC`'s defect, verbatim `MOTORWAY_CRAWL_REGRADE_SEC`'s
+ * and verbatim `BUS_LANE_REGRADE_SEC`'s, so it takes their answer: a second
+ * episode object with a strictly larger threshold, marked `regrade`, which
+ * `lessons/engine.ts` (`applyTick`, the `alreadyCharged` guard) DROPS wherever
+ * the code has already been charged. EXAM MODE IS BYTE-IDENTICAL to today —
+ * `coach.ts` scores unconditionally there, so the first bill IS the charge and
+ * the re-grade is dropped before it can double it (the guard `__tests__/
+ * exam-mode.test.ts` already pins for the standing-duty family). In training it
+ * moves the ledger in exactly one place: the excursion whose only bill was spent
+ * on the free lesson. A SECOND excursion in the same drive is unchanged too —
+ * its own bill grades on the prior encounter and its re-grade is dropped, so two
+ * departures still cost two acts and never four.
+ *
+ * ── THE NUMBER ──────────────────────────────────────────────────────────────
+ * 6 s, the same as the crawl's and the bus lane's, but it is NOT inherited: it
+ * is 1,5 × this code's own 2 s window (the family's rule ⇒ 3 s) PLUS the ~1,6 s
+ * of lateral travel the sustain's own derivation measures for getting the centre
+ * back inside the kerb (1,9 m at this file's ~1,2 m/s drift premise), plus the
+ * remainder as reaction margin. The corrective here is a STEERING recovery, not
+ * a lifted pedal, so it is the slowest answer in the family and gets the widest
+ * gap: eight continuous seconds off the asphalt before the second bill.
+ * A student who answers the card the way `correctiveBg` asks — ease off, wheels
+ * straight, back on at a shallow angle — trips the reset (`edgeId` is a string
+ * again) and zeroes BOTH episodes, so this bill can never reach him.
+ * And it must reach the drives that were photographed: they are all tens of
+ * seconds off the road (this row's own frame is at t = 146 s), so eight is spent
+ * many times over.
+ *
+ * ── WHAT IT DELIBERATELY DOES NOT TOUCH ─────────────────────────────────────
+ *  · The detector's gates. The placeholder-pose guard, the reset and the
+ *    crash-swallow are the SAME predicates, evaluated once and shared — a
+ *    departure a collision caused is still one act and is still not billed
+ *    twice, at either threshold.
+ *  · The praise gates. They read `s.offCarriageway`, which is already `emitted`
+ *    from the first bill; a second episode there would be redundant.
+ */
+const OFF_CARRIAGEWAY_REGRADE_SEC = 6;
 
 /**
  * The frame-zero placeholder's motion floor, km/h — the local mirror of
@@ -1780,8 +1912,15 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     motorwayCrawlSec: 0,
     motorwaySlowRegrade: { ...IDLE_EPISODE },
     motorwayCrawlRegradeSec: 0,
+    townCrawl: { ...IDLE_EPISODE },
+    townCrawlSec: 0,
+    townCrawlRegrade: { ...IDLE_EPISODE },
+    townCrawlRegradeSec: 0,
+    needlessStop: { ...IDLE_EPISODE },
+    needlessStopRegrade: { ...IDLE_EPISODE },
     emergencyLane: { ...IDLE_EPISODE },
     offCarriageway: { ...IDLE_EPISODE },
+    offCarriagewayRegrade: { ...IDLE_EPISODE },
   };
 }
 
@@ -1841,8 +1980,13 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     curveSpeed: { ...s.curveSpeed },
     motorwaySlow: { ...s.motorwaySlow },
     motorwaySlowRegrade: { ...s.motorwaySlowRegrade },
+    townCrawl: { ...s.townCrawl },
+    townCrawlRegrade: { ...s.townCrawlRegrade },
+    needlessStop: { ...s.needlessStop },
+    needlessStopRegrade: { ...s.needlessStopRegrade },
     emergencyLane: { ...s.emergencyLane },
     offCarriageway: { ...s.offCarriageway },
+    offCarriagewayRegrade: { ...s.offCarriagewayRegrade },
   };
 }
 
@@ -2011,6 +2155,36 @@ function stepSustainedEpisode(
  */
 function standingDutyBill(ep: EpisodeState, v: ViolationEvent): ViolationEvent {
   return ep.bills > 1 ? { ...v, regrade: true } : v;
+}
+
+/**
+ * ONE ACT, ONE BILL — the crash swallows the departure it caused.
+ *
+ * Module scope rather than a closure inside `reduceTick` so it costs nothing on
+ * the ~120 Hz path: it is CALLED only from inside the two `OFF_CARRIAGEWAY` fire
+ * branches (at most twice per excursion), and a per-frame closure allocation
+ * would be exactly the cost the branch placement exists to avoid.
+ *
+ * The comparison is the episode's ONSET against the LAST contact report, within
+ * one sustain either way, because the order is not fixed: a car can leave the
+ * road and then strike a body already off it, or spin off after a mid-carriageway
+ * impact. Shared by the bill and its re-grade so a crash-caused departure cannot
+ * be acquitted at 2 s and then charged at 8 s.
+ */
+function crashCausedDeparture(
+  contactEpisodes: Record<string, ContactEpisode>,
+  departureOnset: number | null,
+): boolean {
+  if (departureOnset === null) return false;
+  let lastContactAt: number | null = null;
+  for (const key of Object.keys(contactEpisodes)) {
+    const at = contactEpisodes[key]!.at;
+    if (lastContactAt === null || at > lastContactAt) lastContactAt = at;
+  }
+  return (
+    lastContactAt !== null &&
+    Math.abs(departureOnset - lastContactAt) <= OFF_CARRIAGEWAY_SUSTAIN_SEC
+  );
 }
 
 /**
@@ -3520,6 +3694,218 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push({ ...makeViolation("DRIVING_TOO_SLOW_FOR_MOTORWAY", t), regrade: true });
   }
 
+  // -- THE OTHER SIDE OF THE SPEED ENVELOPE, IN TOWN -------------------------
+  // (DRIVING_TOO_SLOW_IN_TOWN — audit sc-vu-emergency-junction:853790f7.)
+  //
+  // WHAT WAS MEASURED. The reference „correct" leg of `sc-vu-emergency-junction`
+  // held 10–11 км/ч for well over two minutes on a street posted 40, and the
+  // whole rule engine said nothing: every speed code above grades the FAST half
+  // of the envelope, `DRIVING_TOO_SLOW_FOR_MOTORWAY` is gated on
+  // `tick.motorway === true` (see its own block, twenty lines up), and no other
+  // detector reads the low end at all. The flat-out leg of the SAME lesson was
+  // billed once a tick. One side of the envelope graded is not an envelope, and
+  // „crawl and you pass" was an unbeaten strategy across every town lesson.
+  //
+  // THE DUTY, RETRIEVED (ADR-002 — the same article the motorway sibling stands
+  // on, and it is not motorway-specific): ЗДвП чл. 22, ал. 1 — „Водачът на
+  // пътно превозно средство не трябва да се движи без основателна причина с
+  // твърде ниска скорост, когато по този начин пречи на движението на другите
+  // пътни превозни средства." There is NO general minimum speed in Bulgarian
+  // law, so the floor below is a DETECTION threshold derived from the posted
+  // limit, never presented to the student as a number he broke — the catalogue
+  // row states the rule and the article and no invented figure.
+  //
+  // «БЕЗ ОСНОВАТЕЛНА ПРИЧИНА» IS THE HALF THAT NEEDS THE WORK, and it is why
+  // this block is mostly acquittals. Every gate below is a REASON the law
+  // already accepts, and each one disarms the clock before it ever starts:
+  //  · a plate under `townCrawlMinPostedKmh` — a parking aisle, полигон or
+  //    Зона 30 is signed slow on purpose (all fourteen `lot-*` maps are posted
+  //    20, `poligon-v1` 20/30, `pk-drive-v1` and `sp-zone30-v1` 30), so the
+  //    manoeuvre drills are structurally out, not listed out;
+  //  · a motorway — its own code grades that, and one act gets one bill;
+  //  · ANY vehicle ahead in the player's own corridor, at ANY distance, and
+  //    this one is a legal reading rather than a threshold. чл. 22, ал. 1
+  //    forbids the crawl that „пречи на движението на ДРУГИТЕ" — the car that
+  //    holds a road up is the one at the FRONT of it. With a body ahead in my
+  //    own lane I am not the head of the queue and I am not what anybody is
+  //    stuck behind, whatever my speedometer says. So there is deliberately NO
+  //    metre figure here: `traffic.leadGapFor` already answers „is there a
+  //    vehicle ahead in my corridor" and that is the whole question. It costs a
+  //    false NEGATIVE (the learner dawdling behind a car 200 m up the road goes
+  //    free) and buys the acquittal of every following drill in the corpus,
+  //    which is the direction A12 sends every doubt in this file;
+  //  · a junction, stop line or pedestrian inside `townCrawlClearAheadM` — the
+  //    approach IS the reason, and a learner who slows for one is doing it
+  //    right;
+  //  · a pedestrian-crossing zone the reducer already tracks (`s.crossing`), a
+  //    rail crossing, a signed curve advisory, a narrow two-way meeting;
+  //  · night, rain, fog or snow — чл. 20, ал. 2 orders the driver to fit the
+  //    speed to the conditions, so a crawl in weather is obedience, not a fault
+  //    (`sc-pe-night-unlit` ships «mistake-city-speed» for exactly this);
+  //  · a calmed `zone` tag, a recent hazard, reverse gear, a standstill and a
+  //    stall — the same exemptions the motorway crawl carries.
+  // What is left when all of them are false is a car cruising steadily at
+  // walking pace down an open through street with nothing in front of it. That
+  // is the fault, and it is the only thing this convicts.
+  const townFloorKmh = Math.min(limit * cfg.townCrawlFractionOfLimit, cfg.townCrawlFloorCapKmh);
+  const townReasonAhead =
+    leadGapM !== null ||
+    (tick.nextJunctionM !== undefined && tick.nextJunctionM <= cfg.townCrawlClearAheadM) ||
+    (tick.nextStopLineM !== undefined && tick.nextStopLineM <= cfg.townCrawlClearAheadM) ||
+    (tick.vruAheadM !== undefined && tick.vruAheadM <= cfg.townCrawlClearAheadM) ||
+    s.crossing !== null ||
+    tick.railCrossing !== undefined ||
+    tick.curveAdvisoryKmh !== undefined ||
+    tick.narrowTwoWay === true;
+  const townConditionsExcuse =
+    tick.isNight || tick.rain === true || tick.fog === true || tick.snow === true;
+  const townThroughRoad =
+    limit >= cfg.townCrawlMinPostedKmh && tick.motorway !== true && tick.zone === undefined;
+  const townCrawlCond =
+    cfg.townCrawlEnabled &&
+    townThroughRoad &&
+    moving &&
+    speed < townFloorKmh &&
+    // The SAME steadiness test the motorway crawl uses, and for the same
+    // reason: a move-off, a merge and a brake toward a stop all read far above
+    // the band, so only a HELD crawl accrues.
+    steadyForCrawl &&
+    !townReasonAhead &&
+    !townConditionsExcuse &&
+    tick.stalled !== true &&
+    !tick.handbrakeOn &&
+    (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec) &&
+    forwardGear;
+  // Re-armed by genuine recovery (back at/above the floor) or by leaving the
+  // through road entirely — the motorway block's reset, one road over.
+  const townReset = !townThroughRoad || speed >= townFloorKmh;
+  const townStep = stepAccruedEpisode(
+    s.townCrawl,
+    s.townCrawlSec,
+    townCrawlCond,
+    townReset,
+    t,
+    dt,
+    cfg.townCrawlSustainSec,
+  );
+  s.townCrawlSec = townStep.accruedSec;
+  if (townStep.fired) {
+    events.push(makeViolation("DRIVING_TOO_SLOW_IN_TOWN", t));
+  }
+  const townRegrade = stepAccruedEpisode(
+    s.townCrawlRegrade,
+    s.townCrawlRegradeSec,
+    townCrawlCond,
+    townReset,
+    t,
+    dt,
+    cfg.townCrawlSustainSec + TOWN_CRAWL_REGRADE_SEC,
+  );
+  s.townCrawlRegradeSec = townRegrade.accruedSec;
+  if (townRegrade.fired) {
+    events.push({ ...makeViolation("DRIVING_TOO_SLOW_IN_TOWN", t), regrade: true });
+  }
+
+  // -- THE LIMIT CASE OF THE SAME ENVELOPE: THE STOP THAT HAD NO REASON -----
+  // (STOPPED_WITHOUT_CAUSE — audit sc-jx-priority-confidence:9c987e7b.)
+  //
+  // WHAT WAS MEASURED. `sc-jx-priority-confidence` is titled „По пътя с
+  // предимство — без излишни спирания" and its objective is one sentence: cross
+  // the junction „равномерно и уверено… но не спирай без причина". The credited
+  // drive of `.audit-frames/w21/frames/sc-jx-priority-confidence__pc-right`
+  // (attested b224c7e) covered 187 m of an open priority arm in 88 s against
+  // this template's own 40 s par, standing still for most of it with a car
+  // glued 9 m behind — and reached «Второстепенни 0 · 0», ИЗДЪРЖАН, ★★★, +100
+  // XP and a commendation. The behaviour the lesson is NAMED after was not
+  // graded leniently; it was not looked at.
+  //
+  // WHY NEITHER CRAWL CODE ABOVE CATCHES IT, read off their own gates rather
+  // than assumed. Both carry `moving` (v > `movingSpeedKmh` = 5), so a car at
+  // REST contributes nothing to either ledger — the standstill is descoped by
+  // construction. And `townReset` zeroes the town ledger the moment the driver
+  // recovers to the floor, so the stop-drive-stop-drive shape this defect
+  // actually has (that drive touched 44 км/ч twice) resets the clock before the
+  // 20 s can accrue. Both are correct: a driver who reaches 44 км/ч is not
+  // crawling. He is STOPPING, which is a different act and needs its own duty.
+  //
+  // THE DUTY, RETRIEVED (ADR-002 — `content/law/acts/zdvp.json`, чл. 24):
+  // ал. 2 — „Преди да намали значително скоростта на движение на управляваното
+  // от него пътно превозно средство, водачът е длъжен да се убеди, че няма да
+  // създаде опасност за останалите участници в движението и че няма да затрудни
+  // излишно тяхното движение." Not чл. 22, ал. 1: that one governs a driver who
+  // „се движи… с твърде ниска скорост", and this car is not moving at all. чл. 24
+  // is the article about the DECELERATION itself, and „затрудни излишно" is the
+  // lesson's „излишни спирания" in the act's own words.
+  //
+  // «БЕЗ ПРИЧИНА» IS AGAIN THE HALF THAT NEEDS THE WORK, so this block is mostly
+  // acquittals — and it reuses the town crawl's list verbatim (`townReasonAhead`,
+  // `townThroughRoad`) rather than restating it, because the question „is there
+  // anything up this road to be slow for" has exactly one right answer and two
+  // copies of it would drift. On top of that list:
+  //  · a forbidding LIGHT anywhere in the watch window, not merely inside the
+  //    25 m clear band — waiting out a red 60 m back in a queue is the most
+  //    ordinary lawful stop there is (the `banZoneControl` reading, mirrored);
+  //  · an authored В27 span — a rest there is ILLEGAL_STOP_IN_BAN_ZONE's act,
+  //    and one act gets one bill;
+  //  · fog and snow, where чл. 20, ал. 2's „да бъдат в състояние да спрат пред
+  //    всяко предвидимо препятствие" can genuinely bottom out at a halt. RAIN
+  //    and NIGHT are deliberately NOT excuses here although the crawl code
+  //    accepts both: they are reasons to go SLOWER, and standing still in a live
+  //    lane is not a slower speed — on the rung this detector is armed for (L5,
+  //    rain, with the лепка behind) it is the more dangerous thing, not the safer
+  //    one;
+  //  · a stall (ENGINE_STALLED owns it — charging the restart seconds again
+  //    here would bill one mechanical event twice), reverse/neutral, and any
+  //    hazard-shaped event inside the harsh-brake cooldown;
+  //  · `s.moveOff.done` — THE SESSION HAS ACTUALLY DRIVEN. Every drive opens at
+  //    rest while the student reads the briefing card, and without this the
+  //    reducer would bill a car that has never been touched. It is the same
+  //    latch `MOVE_OFF_WITHOUT_OBSERVATION` reads, set the first frame the car
+  //    passes `movingSpeedKmh`.
+  // What is left is a car held at a dead stop, in gear, in a live lane of an
+  // open through road, with nothing ahead of it and no signal, no crossing, no
+  // person, no weather and no hazard to answer for it.
+  const needlessStopSignal =
+    tick.nextStopLineControl === "trafficLight" &&
+    tick.nextStopLineState !== undefined &&
+    tick.nextStopLineState !== "green";
+  const needlessStopReason =
+    townReasonAhead ||
+    needlessStopSignal ||
+    tick.noStopZone === true ||
+    tick.fog === true ||
+    tick.snow === true;
+  const needlessStop =
+    cfg.needlessStopEnabled &&
+    townThroughRoad &&
+    s.moveOff.done &&
+    speed <= cfg.fullStopMaxSpeedKmh &&
+    forwardGear &&
+    tick.stalled !== true &&
+    !needlessStopReason &&
+    (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec);
+  // Re-armed by driving on, or by leaving the through road — one bill per stop,
+  // and a driver who stops needlessly twice is billed twice because those are
+  // two acts. (Consecutive, not accrued: unlike a crawl, a stop is one event
+  // with a beginning and an end.)
+  const needlessStopReset = !townThroughRoad || speed > cfg.movingSpeedKmh;
+  if (
+    stepEpisode(s.needlessStop, needlessStop, needlessStopReset, t, cfg.needlessStopSustainSec)
+  ) {
+    events.push(makeViolation("STOPPED_WITHOUT_CAUSE", t));
+  }
+  if (
+    stepEpisode(
+      s.needlessStopRegrade,
+      needlessStop,
+      needlessStopReset,
+      t,
+      cfg.needlessStopSustainSec + NEEDLESS_STOP_REGRADE_SEC,
+    )
+  ) {
+    events.push({ ...makeViolation("STOPPED_WITHOUT_CAUSE", t), regrade: true });
+  }
+
   // Emergency-lane driving (чл. 58, т. 4 „да се движи… в лентата за принудително
   // спиране"; т. 3 is the STOPPING permission — MOTORWAY-SEGMENT slice): sustained
   // travel in the CURB lane of an authored emergencyLane span
@@ -3656,31 +4042,47 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // it here also documents that the onset compared below is the one the sustain
   // was measured from, not whatever the next frame does to it.
   const departureOnset = s.offCarriageway.activeSince;
+  // Evaluated ONCE and shared by both thresholds: the re-grade below is the same
+  // breach, so it must not be able to drift apart from the bill on the predicate
+  // that decides whether the car is off the road at all.
+  const offCarriagewayNow = tick.edgeId === null && !atPlaceholderPose;
+  const backOnCarriageway = typeof tick.edgeId === "string";
   if (
     stepEpisode(
       s.offCarriageway,
-      tick.edgeId === null && !atPlaceholderPose,
-      typeof tick.edgeId === "string",
+      offCarriagewayNow,
+      backOnCarriageway,
       t,
       OFF_CARRIAGEWAY_SUSTAIN_SEC,
-    )
-  ) {
+    ) &&
     // The crash scan is INSIDE the fire branch, not beside it: `Object.keys`
     // allocates, this reducer runs on every render frame (~120 Hz), and the
     // branch is reached at most once per excursion. The value is needed only to
     // decide whether to push, so computing it every frame would be a per-frame
     // allocation bought for nothing — the discipline the accel window's own note
     // spells out two hundred lines up.
-    let lastContactAt: number | null = null;
-    for (const key of Object.keys(s.contactEpisodes)) {
-      const at = s.contactEpisodes[key]!.at;
-      if (lastContactAt === null || at > lastContactAt) lastContactAt = at;
-    }
-    const crashCausedDeparture =
-      lastContactAt !== null &&
-      departureOnset !== null &&
-      Math.abs(departureOnset - lastContactAt) <= OFF_CARRIAGEWAY_SUSTAIN_SEC;
-    if (!crashCausedDeparture) events.push(makeViolation("OFF_CARRIAGEWAY", t));
+    !crashCausedDeparture(s.contactEpisodes, departureOnset)
+  ) {
+    events.push(makeViolation("OFF_CARRIAGEWAY", t));
+  }
+  // THE RE-GRADE THE FREE LESSON CONSUMED (`OFF_CARRIAGEWAY_REGRADE_SEC` — its
+  // block is the whole derivation). Same condition, same reset, same crash
+  // swallow, on a sustain that is strictly larger, so it can only ever fire
+  // AFTER the bill above and exactly once per excursion. `regrade: true` is a
+  // FACT about the event — „this is the same breach again" — and
+  // `lessons/engine.ts` drops it wherever the code was already charged, so a
+  // continuous excursion can never cost twice.
+  if (
+    stepEpisode(
+      s.offCarriagewayRegrade,
+      offCarriagewayNow,
+      backOnCarriageway,
+      t,
+      OFF_CARRIAGEWAY_SUSTAIN_SEC + OFF_CARRIAGEWAY_REGRADE_SEC,
+    ) &&
+    !crashCausedDeparture(s.contactEpisodes, departureOnset)
+  ) {
+    events.push({ ...makeViolation("OFF_CARRIAGEWAY", t), regrade: true });
   }
 
   // -- 4a2. B1a Wave-2 small-rule detectors (doc 72 capability 1). Each rides
@@ -4305,9 +4707,11 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.emergencyLane,
     // 2026-08-30 (`sc-ac-truck-spray:7e53374c`, critical). The newest episode in
     // this file was the only one never added to this list, and the omission is
-    // not cosmetic: `OFF_CARRIAGEWAY` bills ONCE per excursion, so from the
-    // frame after the bill a car that is still in the field was indistinguishable
-    // here from a car on the road. MEASURED through this reducer — 145 км/ч,
+    // not cosmetic: `OFF_CARRIAGEWAY` bills a FINITE number of times per
+    // excursion (one, until `OFF_CARRIAGEWAY_REGRADE_SEC` added the second), so
+    // from the frame after the last bill a car that is still in the field was
+    // indistinguishable here from a car on the road. MEASURED through this
+    // reducer — 145 км/ч,
     // `edgeId: null` throughout, 40 s, which is the row's own exhibit
     // (`.audit-frames/w17/…/sc-ac-truck-spray__mobile-wrong/04-t102s.png`, „145
     // км/ч across open green field with no road anywhere in frame"):

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   ANIMAL_DIMENSIONS,
   BICYCLE_DIMENSIONS,
+  BUS_DIMENSIONS,
   CHILD_CYCLIST_SCALE,
   EMERGENCY_DIMENSIONS,
   TRAIN_DIMENSIONS,
@@ -91,6 +92,7 @@ describe("the NPC car box agrees with the body that actually collides", () => {
 describe("every profile's width comes off its own rig", () => {
   it("matches vehicleFleet's authored dimensions", () => {
     expect(VEHICLE_PROFILE_WIDTH_M.truck).toBe(TRUCK_DIMENSIONS.widthM);
+    expect(VEHICLE_PROFILE_WIDTH_M.bus).toBe(BUS_DIMENSIONS.widthM);
     expect(VEHICLE_PROFILE_WIDTH_M.emergency).toBe(EMERGENCY_DIMENSIONS.widthM);
     expect(VEHICLE_PROFILE_WIDTH_M.tram).toBe(TRAM_DIMENSIONS.widthM);
     expect(VEHICLE_PROFILE_WIDTH_M.train).toBe(TRAIN_DIMENSIONS.widthM);
@@ -104,6 +106,7 @@ describe("every profile's width comes off its own rig", () => {
 
   it("and the length table still matches the rigs it claims to mirror", () => {
     expect(VEHICLE_PROFILE_LENGTH_M.truck).toBe(TRUCK_DIMENSIONS.lengthM);
+    expect(VEHICLE_PROFILE_LENGTH_M.bus).toBe(BUS_DIMENSIONS.lengthM);
     expect(VEHICLE_PROFILE_LENGTH_M.emergency).toBe(EMERGENCY_DIMENSIONS.lengthM);
     expect(VEHICLE_PROFILE_LENGTH_M.tram).toBe(TRAM_DIMENSIONS.lengthM);
     expect(VEHICLE_PROFILE_LENGTH_M.train).toBeCloseTo(TRAIN_LENGTH_M, 6);
@@ -129,6 +132,19 @@ describe("actorObb — per-actor dimensions, not one global constant", () => {
     expect(truck.halfWidthM).toBe(TRUCK_DIMENSIONS.widthM / 2);
     expect(truck.halfLengthM).toBeGreaterThan(car.halfLengthM);
     expect(truck.halfWidthM).toBeGreaterThan(car.halfWidthM);
+  });
+
+  it("a BUS is graded as a bus and not as the box truck it used to borrow", () => {
+    // sc-merge-bus-pullout staged its чл. 67 actor on the TRUCK rig until W22,
+    // so the grader believed 7.5 m of metal while the lesson's own copy taught
+    // twelve. The two are 2.25 m apart on every lead gap behind it — and this
+    // drill's second objective is «нареди се зад автобуса», i.e. that gap is
+    // exactly what it scores.
+    const bus = actorObb(pose, "bus");
+    const truck = actorObb(pose, "truck");
+    expect(bus.halfLengthM).toBe(BUS_DIMENSIONS.lengthM / 2);
+    expect(bus.halfWidthM).toBe(BUS_DIMENSIONS.widthM / 2);
+    expect(bus.halfLengthM - truck.halfLengthM).toBeCloseTo(2.25, 9);
   });
 
   it("an absent profile is a car (every pre-profile spec, unchanged)", () => {

@@ -619,6 +619,12 @@ function rungTraffic(spec: ScenarioSpec, rung: LevelSpec) {
   const laddered = (baseline: number | undefined, fallback: number) =>
     baseline === undefined ? fallback : Math.max(0, Math.round(baseline * trafficScale));
   const authoredVehicles = spec.traffic?.vehicleCount;
+  // The corridor is geometry, not density: it never ladders, and a rung may
+  // only replace it wholesale (no rung does today). The key is OMITTED, not set
+  // to undefined, when nobody authored one — `compile.test.ts`'s golden
+  // snapshot is a byte-for-byte contract over the compiled LessonSpec, and an
+  // own property holding `undefined` is a change to it.
+  const anchorPath = rung.traffic?.anchorPath ?? spec.traffic?.anchorPath;
   const familyVehicles = SCENARIO_FAMILY_TRAFFIC_BASELINE[spec.family];
   // An AUTHORED count ladders freely; a FAMILY baseline ladders between the
   // measured floor and the measured ceiling (see the baseline's doc block).
@@ -645,6 +651,7 @@ function rungTraffic(spec: ScenarioSpec, rung: LevelSpec) {
       rung.traffic?.anchorRadiusM ??
       spec.traffic?.anchorRadiusM ??
       SCENARIO_DEFAULT_TRAFFIC.anchorRadiusM,
+    ...(anchorPath === undefined ? {} : { anchorPath }),
   };
 }
 

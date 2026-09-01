@@ -547,6 +547,29 @@ export function advisorPromptForObjective(
       // tolerance alone (spokenCapKmh).
       const shown = spokenCapKmh(params.maxSpeedKmh, titleBg, postedLimitKmh, authoredCapKmh);
       if (shown === undefined) return { textBg: titleBg, keys: [] };
+      // ── AND THE BAND'S LOWER EDGE, WHERE A GATE AUTHORS ONE ────────────────
+      //
+      // A gate may not refuse a number the student was never told, and since
+      // `minSpeedKmh` landed (sc-ac-night-overdrive:b9d61410) one gate can. The
+      // floor is authored, not laddered and not derived, so unlike the ceiling
+      // it has exactly one figure and needs no `spokenCapKmh` twin.
+      //
+      // THE CAP TAIL KEEPS THE END OF THE SENTENCE, and that placement is load-
+      // bearing rather than stylistic: `LessonPlayShell taskCapKmhFromPrompt`
+      // recovers the cockpit strip's «задачата иска ≤N» with a regex ANCHORED
+      // at the end of this string, and `taskCapThread.test.ts` additionally
+      // requires the LAST «N км/ч» run in the whole card to be that same
+      // figure. Appending the floor would have silenced the strip on the one
+      // gate that carries one.
+      //
+      // MEASURED, not estimated, because the sibling assertion in
+      // `advisor-authored-cap.test.ts` says the next clause added here has to
+      // re-measure: the catalogue's longest card is 94 ch against a 95 ch phone
+      // band, and the only card this clause touches goes 80 → 92.
+      const floor = params.minSpeedKmh;
+      if (floor !== undefined && floor < shown) {
+        return { textBg: `${titleBg} — не под ${floor} и дръж под ${shown} км/ч`, keys: [] };
+      }
       return { textBg: `${titleBg} — дръж под ${shown} км/ч`, keys: [] };
     }
 
@@ -668,6 +691,101 @@ function heldWaitSec(s: LessonSessionState, wait: YieldWaitState): number | unde
   return Number.isFinite(held) && held >= 0 ? held : undefined;
 }
 
+// ---------------------------------------------------------------------------
+// THE ROUTE HOLD — the coach may not order a manoeuvre the car cannot make
+// ---------------------------------------------------------------------------
+
+/** Why the route is unreachable from where the car actually is. */
+export type RouteHold = "crashPinned" | "offRoad";
+
+/**
+ * How long a condition must have stood before the coach stops issuing the
+ * objective. MOVED HERE from `LessonPlayShell` (it was the component's private
+ * number and is now the module's, because the banner and the advisor card have
+ * to change on the same frame or they read as two different screens).
+ *
+ * DERIVED, NOT CHOSEN. `CRASH_PIN_RADIUS_M` is 6 m and the floor at which this
+ * product says a car is DRIVING is 5 км/ч. A car that has been driving at all,
+ * even at that floor, covers the pin's radius in 6 ÷ (5 ÷ 3.6) = 4.32 s — so
+ * five seconds after an impact, a car still inside the radius has not been
+ * driving away from what it hit. It lands five seconds BEFORE the crash pin's
+ * own 10 s ending in the pure-standstill case, so the qualification is read
+ * rather than skipped, and the off-road clause takes the same number rather
+ * than inventing a second one.
+ */
+export const ROUTE_HOLD_S = 5;
+
+/**
+ * Is the route unreachable from where the car actually is?
+ *
+ * Both clauses are fields the engine already folds and already ends drives on
+ * (`finish.ts` — the crash pin and `stepOffNetwork`); nothing here re-derives
+ * „stuck" from speed or position, so the coach and the ending cannot disagree.
+ * `crashPin` is read off `atSec` and `offNetworkSinceSec` is reset on every
+ * frame back on tarmac, so neither clause can flicker between an order and its
+ * qualification — and an absent field is „no hold", never a hold on the
+ * strength of a measurement that was not taken.
+ */
+export function routeHoldForSession(s: LessonSessionState): RouteHold | null {
+  const t = s.lastT;
+  if (!Number.isFinite(t)) return null;
+  const pinnedForS = s.crashPin === undefined ? null : t - s.crashPin.atSec;
+  if (pinnedForS !== null && pinnedForS >= ROUTE_HOLD_S) return "crashPinned";
+  const offRoadForS = s.offNetworkSinceSec == null ? null : t - s.offNetworkSinceSec;
+  if (offRoadForS !== null && offRoadForS >= ROUTE_HOLD_S) return "offRoad";
+  return null;
+}
+
+/**
+ * WHAT THE COACH SAYS WHILE THE ROUTE IS OUT OF REACH — sc-roundabout-entry:
+ * 4ab693eb (critical), `.audit-frames/sweep161/sc-roundabout-entry/pc-right/
+ * 04-t141s.png`: the whole windscreen is the roundabout's grass island and a
+ * hedge at point-blank range, the cluster reads 0 км/ч, and this card reads
+ * «Излез от кръговото с десен мигач». There is no ring under the car to leave.
+ *
+ * THE BANNER WAS ALREADY FIXED AND THE CARD WAS NOT (sc-junction-blind:
+ * c5ba8f17 qualified `objectiveTitleUnderHold`, which the two surfaces that
+ * PRINT the objective apply). The advisor is the third surface and the one
+ * whose entire contract is „what do I do NOW", so it was left issuing the one
+ * instruction the student physically cannot carry out — the bare-verdict crime
+ * pointing the other way (doc 64 THEO-4): an order given to someone who cannot
+ * obey it teaches him that the instruction is noise.
+ *
+ * IT MAY NOT RESTATE THE BANNER. That line is «Колата е извън пътя — върни се
+ * на платното, за да продължиш: <задачата>» — the condition and the demand.
+ * What no surface says is HOW to get back and WHY the verge is different, and
+ * that is exactly the half `advisorEchoTrim` would have kept if the shell could
+ * have derived it (it cannot; only this module knows the act).
+ *
+ * BOTH CLAUSES ARE RETRIEVED, NOT RECALLED (ADR-002). The off-road act is the
+ * opening of `VIOLATIONS.OFF_CARRIAGEWAY.correctiveBg` verbatim and its reason
+ * is that row's own explanationBg („Там сцеплението е друго, спирачният път е
+ * по-дълъг"); `advisor-route-hold.test.ts` asserts both against the catalogue
+ * so the coach and the toast that bills him cannot drift. No article number is
+ * printed: neither card makes a claim about Bulgarian law, they state where
+ * this car physically is and how it gets out — and the лв./чл. half is already
+ * on the glass in the OFF_CARRIAGEWAY fault card.
+ *
+ * CHIPS. The off-road card carries none: which way the road lies depends on
+ * where the car is and this module cannot read it — the same withdrawal
+ * `yieldWaitAdvisorPrompt` and `controllerWaitAdvisorPrompt` already make, and
+ * the honesty rule at the top of this file („a prompt may only promise a key
+ * that really performs the step"). The pinned card carries „[", the key that
+ * really walks the selector toward R — the chip `advisorPromptForObjective`
+ * already gives the reverse park.
+ */
+const ROUTE_HOLD_CARD_BG: Record<RouteHold, string> = {
+  crashPinned:
+    "Съвсем леко назад с прави колела, после огледай и чак тогава напред — газта напред само притиска колата още по-навътре в удареното.",
+  offRoad:
+    "Не дърпай волана — отпусни газта, изправи колелата и се върни под малък ъгъл: извън платното сцеплението е друго и спирачният път е по-дълъг.",
+};
+
+/** The card the coach shows instead of an unobeyable objective. */
+export function routeHoldAdvisorPrompt(hold: RouteHold): AdvisorPrompt {
+  return { textBg: ROUTE_HOLD_CARD_BG[hold], keys: hold === "crashPinned" ? ["["] : [] };
+}
+
 /**
  * The advisor's single entry point: the NEXT expected action for a live
  * session, or null when there is nothing to advise (exam mode, ended
@@ -686,6 +804,16 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
   }
 
   if (s.phase !== "driving") return null;
+
+  // THE ROUTE HOLD OUTRANKS EVERY CARD BELOW, including the live-yield rank
+  // that outranks the objective. B15-VOICE's card is a REASSURANCE („Чакаш
+  // правилно"), and `yieldReasonAt`'s roundabout clause is reachable from an
+  // island 14 m off the ring centreline — so without this line the coach could
+  // praise a car parked on the grass for standing still. A car that is off the
+  // carriageway or pinned in what it just hit is not waiting for anything; the
+  // answer to „what am I supposed to be doing" is the recovery.
+  const hold = routeHoldForSession(s);
+  if (hold !== null) return routeHoldAdvisorPrompt(hold);
 
   if (s.currentObjectiveIndex >= s.objectives.length) {
     // Nothing left to advise — but a live yield is still worth a card, because

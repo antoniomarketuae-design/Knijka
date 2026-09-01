@@ -512,6 +512,15 @@ export type SignKind =
   //    place it, so a forced-straight arm places NOTHING rather than guess.
   | "mandatoryRight" // Г2
   | "mandatoryLeft" // Г3
+  // -- Г9 „Преминаване отдясно на знака" — the plate that stands ON an obstacle
+  //    in the middle of the road and tells the driver which side to take it.
+  //    Its one derived home in this world is the ROUNDABOUT CENTRAL ISLAND:
+  //    content/signs/signs.json `sign-g9` states „обикновено е поставен на
+  //    остров, ремонтен участък или препятствие по средата на пътя" (cited to
+  //    Наредба № РД-02-21-1/23.11.2023, знак Г9). Without it the island is a
+  //    mound of grass a student has no legal reason to read as a roundabout —
+  //    the sc-rb-ped-exit frame. Rides the same round blue plate as Г2/Г3/Г12.
+  | "passRight" // Г9
   // -- previously orphaned kit faces (doc 86 D5): finished GLBs that shipped
   //    with no SignKind, so nothing could ever place them.
   // -- А19 „Деца": the warning triangle a school frontage MUST carry. Same
@@ -561,6 +570,7 @@ export const SIGN_KINDS: readonly SignKind[] = [
   "oneWay",
   "mandatoryRight",
   "mandatoryLeft",
+  "passRight",
   "children",
   "pedestrianCrossing",
   "priorityRoad",
