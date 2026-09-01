@@ -48,7 +48,7 @@ import {
   type Object3D,
 } from "three";
 import {
-  ENVIRONMENT_PRESETS,
+  environmentPreset,
   FOG_HEMISPHERE_DIM,
   FOG_SUN_DIM,
   FOG_TOPDOWN_MAX_OPTICAL,
@@ -78,6 +78,7 @@ import { GroundBackdrop } from "./GroundBackdrop";
 import { SkyDome } from "./SkyDome";
 import { RainStreaks } from "./RainStreaks";
 import { SnowFlakes } from "./SnowFlakes";
+import { WindDust } from "./WindDust";
 
 export interface SimEnvironmentProps {
   timeOfDay: TimeOfDay;
@@ -92,6 +93,21 @@ export interface SimEnvironmentProps {
    *  remain world-module asset work. Additive; absent/false = the shipped
    *  behavior. */
   snow?: boolean;
+  /**
+   * WINTER — the SEASON, not a weather and not a fourth time of day (see
+   * `presets.ts`'s `winterGrade` for why it may not widen `TimeOfDay`). Grades
+   * the whole rig cold: a pale blue-white key at 0.78 of its summer level with
+   * the key:fill ratio preserved, a cold-grey ground bounce instead of the warm
+   * facade one, a milkier zenith over a snow-lit Vitosha, a thicker pale haze
+   * and a quarter-stop less exposure. Composes with rain/fog/snow — every
+   * weather dim below multiplies THIS preset. Additive; absent/false = the
+   * shipped behavior, value-for-value.
+   *
+   * This is the LIGHT half of the season only. The FOLIAGE half is
+   * `DistrictWorld`'s `winter` prop; both are driven from the one
+   * `LessonSpec.environment.winter` flag by `LessonScene`.
+   */
+  winter?: boolean;
   /** V3's skyline gate (doc 82 §3.2) — forwarded verbatim to the sky dome.
    *  `false` damps the Vitosha ridge uniform to 0, for the enclosed maps that
    *  have no far horizon to put it on. Scenes that mount a district decide
@@ -99,6 +115,23 @@ export interface SimEnvironmentProps {
    *  (./skyline). Omitted = on, because a missing skyline is the „flat-earth
    *  test level" tell doc 82 §1.2 named. */
   skyline?: boolean;
+  /**
+   * CROSSWIND DEPICTION (doc 72 AC-12) — a per-frame reader of the LIVE
+   * lateral wind force on the student's chassis, newtons along world +X
+   * (`VehicleSim.windLateralNow`). Pass it and the wind-drift layer mounts
+   * (dust and chaff streaming across the carriageway, breathing on the gust's
+   * own phase); omit it — every lesson that authors no `physics.crosswind` —
+   * and nothing new renders.
+   *
+   * A READER, NOT A NUMBER, and not a weather flag either. The wind is
+   * PHYSICS: `weather.ts` §5 refuses it a 0..1 weather channel because nothing
+   * would author one, and a value passed as a prop would be re-rendered at
+   * React rate against a force that moves at physics rate. So the layer reads
+   * the same `currentWindN()` the chassis is pushed with, the frame it is
+   * pushed with it — the one-number law `world/textures/windSway.ts` set for
+   * the canopy lean.
+   */
+  readWindLateralN?: () => number;
   /** Explicit quality level; omit to follow the quality store ("auto"). */
   quality?: QualityLevel;
 }
@@ -140,13 +173,21 @@ export function SimEnvironment({
   rain,
   fog = false,
   snow = false,
+  winter = false,
   skyline = true,
+  readWindLateralN,
   quality,
 }: SimEnvironmentProps) {
   const store = useQuality();
   const level = quality ?? store.level;
   const qp = QUALITY_PRESETS[level];
-  const preset = ENVIRONMENT_PRESETS[timeOfDay];
+  // The season grades the hour: `environmentPreset` returns the shipped
+  // ENVIRONMENT_PRESETS row untouched when `winter` is false, so every lesson
+  // that authors no season renders the same rig it always did. Memoised
+  // because the winter branch ALLOCATES a graded preset, and `goal` below is
+  // keyed on this object's identity — without it every quantized weather
+  // re-render would rebuild five THREE.Colors on a winter lesson.
+  const preset = useMemo(() => environmentPreset(timeOfDay, winter), [timeOfDay, winter]);
 
   const gl = useThree((s) => s.gl);
 
@@ -405,7 +446,7 @@ export function SimEnvironment({
 
   return (
     <>
-      <SkyDome timeOfDay={timeOfDay} skyline={skyline} />
+      <SkyDome timeOfDay={timeOfDay} winter={winter} skyline={skyline} />
       {/* …and the GROUND half of the same horizon. Ungated on purpose: the
           `skyline` flag asks whether the scene has somewhere to hang Vitosha,
           while this asks whether the world continues past the edge of the map —
@@ -446,6 +487,20 @@ export function SimEnvironment({
       )}
       {snowVisible && qp.snowParticles > 0 && (
         <SnowFlakes count={qp.snowParticles} timeOfDay={timeOfDay} />
+      )}
+      {/* WIND YOU CAN SEE IN FRONT OF YOU (sc-ac-wind-truck-pass:6a076479).
+          The canopy lean (world/textures/windSway.ts) closed the wind on
+          tree-dressed streets; a магистрала carries no street dressing, so on
+          mw-v1 every one of its 128 trees stands 22–51 m off the carriageway on
+          one side while the student's eyes are on the truck ahead. The air is
+          the channel that is in the forward view on every map — and it is
+          driven by the same newtons, not a second clock. */}
+      {readWindLateralN !== undefined && qp.windParticles > 0 && (
+        <WindDust
+          count={qp.windParticles}
+          timeOfDay={timeOfDay}
+          readLateralN={readWindLateralN}
+        />
       )}
       {qp.postprocessing && (
         // The chain lives in ./SimComposer (its own chunk). It still carries

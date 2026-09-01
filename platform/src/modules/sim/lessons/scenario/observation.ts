@@ -22,29 +22,24 @@
  * (scoreRubric renders "не се измерва", never a silent 0), exactly the
  * doc 76 §6 honesty rule.
  *
- * DO NOT LIFT THAT NULL FOR THE MOVE-OFF FAMILY UNTIL A SHOULDER CONTROL
- * EXISTS. It is tempting: 12 of the 27 templates that author observation
- * moments are not parking drills (rubric.ts), so on those the debrief prints
- * „Няма измерване …" on every drive of every student, on the one card in the
- * product that grades оглеждане. A move-off window model is easy — the phase
- * boundary is the first sample that moves, exactly as `reverseStart` is the
- * first with `gear < 0`.
+ * THE MOVE-OFF FAMILY IS STILL UNMEASURED HERE, AND THE REASON HAS CHANGED —
+ * READ THIS BEFORE OPENING THE WINDOW. The bar this note used to set was „not
+ * until a shoulder control exists", because `SC_VP_HANDBRAKE`
+ * (templates-cockpit2.ts) authors „Поглед през ляво рамо в мъртвата зона" and
+ * the only kind that could ever have reached it was `glance-left`, the LEFT
+ * DOOR MIRROR — so a move-off window would have printed that moment ✓ for a
+ * student who pressed a mirror, on the drill whose whole subject it is.
  *
- * It would make the product WORSE, and here is the arithmetic. `SC_VP_HANDBRAKE`
- * (templates-cockpit2.ts:136-137) authors two moments: „Поглед в огледалото,
- * преди колата да тръгне" and „Поглед през ляво рамо в мъртвата зона". The
- * cabin has no blind-spot glance to give — `MirrorGlanceKind` (scene/cabin.ts:72,
- * the audit corpus knows it as :22) is „left" | „right" | „rear" and stops
- * there, and every camera pose, touch
- * station and rule-engine channel downstream is keyed to those three. So the
- * only kind that can reach the second moment is `glance-left`, the LEFT DOOR
- * MIRROR. Open the window and the mapper starts printing „Поглед през ляво
- * рамо в мъртвата зона ✓" for a student who pressed the mirror — the exact
- * false certificate the side rule below was written to retire, re-issued at
- * the other end of the file, on the drill whose whole subject it is. An
- * honest „не се измерва" that names the moments and tells the student what
- * the examiner watches (rubric.ts) beats a green tick for an act the
- * interface cannot receive. The null stays until the shoulder glance ships.
+ * THAT BAR IS NOW MET. `MirrorGlanceKind` carries `"shoulder"` (2026-09-01)
+ * with controls on every input path, traces record `glance-shoulder`, and
+ * `momentRequiresShoulder` below refuses a mirror for exactly those titles —
+ * so the objection this note was written for is gone. What is NOT built is the
+ * move-off window model itself: the phase boundary (the first sample that
+ * moves, as `reverseStart` is the first with `gear < 0`), its own windows and
+ * the evidence for them. Until that lands, 12 of the 27 templates that author
+ * observation moments keep printing „Няма измерване …", which is honest and
+ * not free — it is a blank on the one card in the product that grades
+ * оглеждане. ROUTED, not claimed closed.
  *
  * Those windows OVERLAP at both of the middle's edges, and one glance may
  * satisfy only one moment, so the mapper assigns in a fixed order rather than
@@ -123,11 +118,60 @@ type GlanceSide = "left" | "right";
 
 /** Read the side out of a `TraceEventKind` — substring rather than equality so
  *  a future compound kind („glance-shoulder-left") is read correctly by a
- *  mapper nobody remembered to update. */
+ *  mapper nobody remembered to update.
+ *
+ *  `glance-shoulder` IS a left-sided look and must be read as one: the product
+ *  models exactly one shoulder check, over the LEFT shoulder (scene/cabin.ts
+ *  `MirrorGlanceKind`, and `CameraRig.GLANCE_OFFSETS.shoulder` turns the head
+ *  that way). Falling through to null here would have refused a student who
+ *  performed the real act on a moment titled „…през ЛЯВО рамо" — the mirror
+ *  image of the defect this whole block exists to stop. */
 function glanceSideOfKind(kind: string): GlanceSide | null {
+  if (kind === "glance-shoulder") return "left";
   if (kind.includes("left")) return "left";
   if (kind.includes("right")) return "right";
   return null;
+}
+
+/**
+ * …AND A MOMENT THAT NAMES THE SHOULDER OR THE BLIND SPOT TAKES ONLY THE
+ * SHOULDER CHECK — 2026-09-01, the other half of the rule above.
+ *
+ * The side rule closed „the INTERIOR mirror ticked a left-shoulder check". It
+ * could not close „the LEFT DOOR MIRROR ticks a left-shoulder check", because
+ * a left glance and a left shoulder check were the same event: there was no
+ * shoulder member and no control that could produce one. There is now (key O ·
+ * the «Рамо» hold button · the «Рамо» rail button), so a moment authored as
+ * „Поглед през ляво рамо в мъртвата зона" (SC_VP_HANDBRAKE) or „Огледало и
+ * през ЛЯВО РАМО преди изнасянето" (SC_PARK_PARALLEL_EXIT) is satisfied by the
+ * act it names and by nothing else. The blind spot is by definition the part
+ * no mirror shows; a ✓ for a mirror there teaches the one habit that kills a
+ * cyclist on a move-off.
+ *
+ * A title naming a mirror AS WELL („Огледало и през ЛЯВО РАМО") still requires
+ * the shoulder, and that is the strict reading on purpose: one glance may
+ * satisfy only one moment, so the moment must be scored on the harder half —
+ * the half the student can otherwise skip without the sheet noticing.
+ *
+ * AND IT IS THE **LEFT** SHOULDER ONLY, WHICH IS NOT A DETAIL. The product
+ * models exactly one shoulder check and it is the left one (scene/cabin.ts;
+ * `GLANCE_OFFSETS.shoulder` turns the head that way). The over-the-RIGHT-
+ * shoulder look a reverse park needs is a different act, performed by the
+ * reversing POV automatically on selector R (engine/reverseView.ts
+ * `COCKPIT_SHOULDER_YAW`), with no on-demand control of its own. So a moment
+ * like „Огледала и рамо преди включване на задна" (SC_PARK_PERP_REV) — рамо,
+ * no side — is NOT read as a demand for the left-shoulder control: requiring
+ * it there would refuse eleven parking drills for skipping an act that is not
+ * the one they name. The demand fires on „мъртва зона" (the product's blind
+ * spot IS the left one) or on „рамо" spelled with a LEFT side word, which is
+ * exactly how the move-off family authors it.
+ */
+const SHOULDER_TARGET_RE = /рамо/iu;
+const BLIND_SPOT_RE = /мъртва\s+зона/iu;
+
+function momentRequiresShoulder(titleBg: string): boolean {
+  if (BLIND_SPOT_RE.test(titleBg)) return true;
+  return SHOULDER_TARGET_RE.test(titleBg) && requiredSideOfMoment(titleBg) === "left";
 }
 
 /** The nouns a glance CONTROL addresses. Without one of these a side word in
@@ -182,9 +226,16 @@ export function parkingObservationFromTrace(
 
   const glances = trace.events
     .filter((e) => e.kind.startsWith("glance-"))
-    .map((e) => ({ tSec: e.tSec, side: glanceSideOfKind(e.kind) }));
+    .map((e) => ({
+      tSec: e.tSec,
+      side: glanceSideOfKind(e.kind),
+      isShoulder: e.kind === "glance-shoulder",
+    }));
   /** The side each moment names, resolved once (see the block above). */
   const needSides = moments.map((m) => requiredSideOfMoment(m.titleBg));
+  /** …and which of them name the SHOULDER or the blind spot, which only the
+   *  shoulder check can satisfy (see `momentRequiresShoulder`). */
+  const needShoulder = moments.map((m) => momentRequiresShoulder(m.titleBg));
 
   // ONE GLANCE MAY SATISFY ONLY ONE MOMENT (doc 76 §6 honesty rule).
   //
@@ -315,6 +366,7 @@ export function parkingObservationFromTrace(
     toSec: number,
     prefer: "earliest" | "latest",
     needSide: GlanceSide | null,
+    needShoulderCheck: boolean,
   ): boolean => {
     const from = prefer === "latest" ? glances.length - 1 : 0;
     const step = prefer === "latest" ? -1 : 1;
@@ -322,6 +374,7 @@ export function parkingObservationFromTrace(
       if (spent.has(g)) continue;
       const glance = glances[g];
       if (needSide !== null && glance.side !== needSide) continue;
+      if (needShoulderCheck && !glance.isShoulder) continue;
       if (glance.tSec >= fromSec && glance.tSec <= toSec) {
         spent.add(g);
         return true;
@@ -340,6 +393,7 @@ export function parkingObservationFromTrace(
       Number.POSITIVE_INFINITY,
       "latest",
       needSides[lastIndex],
+      needShoulder[lastIndex],
     );
   }
   filled[0] = takeGlance(
@@ -347,11 +401,12 @@ export function parkingObservationFromTrace(
     reverseStart + BEGIN_GRACE_SEC,
     "earliest",
     needSides[0],
+    needShoulder[0],
   );
   // Middle moments run backwards so a later one gets the later look — the same
   // temporal correspondence the moments are authored in.
   for (let i = (hasLastMoment ? lastIndex - 1 : lastIndex); i >= 1; i--) {
-    filled[i] = takeGlance(reverseStart, reverseEnd, "latest", needSides[i]);
+    filled[i] = takeGlance(reverseStart, reverseEnd, "latest", needSides[i], needShoulder[i]);
   }
   // Reported in AUTHORED order — the rubric renders the moment titles in the
   // order the template wrote them, and `glances` is already sorted by tSec.

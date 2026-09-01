@@ -120,11 +120,98 @@ export const SNOW_COVER_FACING_HI = 0.85;
 /** Snow is the mattest surface a street ever has — no gloss survives it. */
 export const SNOW_COVER_ROUGHNESS = 0.95;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WINTER DORMANCY — THE SECOND SEASONAL TERM, AND WHY IT LIVES IN THIS FILE.
+ *
+ * `sc-ac-ice:5372f176` / `sc-ac-bridge-ice:7eb16029` (critical): the two black-
+ * ice lessons open on «Ясна студена сутрин … около нулата» and render full-leaf
+ * green canopies over a green verge. `environment/presets.ts`'s `winterGrade`
+ * is the LIGHT half of the repair; a cold key over summer foliage still
+ * photographs as July, so this is the FOLIAGE half.
+ *
+ * IT IS THE SAME HOOK, NOT A THIRD ONE, for a reason that is checked rather
+ * than preferred: this hook is already attached to exactly the surfaces a
+ * season has to reach — the five shared prop materials (`tree` among them) and
+ * every GROUND material (`StaticWorld`'s `GROUND_SNOW`: terrain verge, paved
+ * courtyards, roundabout planting, sidewalks). A separate hook would have to be
+ * CHAINED at those three composition sites, and `snowCover.test.ts`'s routing
+ * guard pins the literal `onBeforeCompile = snowCoverOnBeforeCompile` /
+ * `customProgramCacheKey = snowCoverProgramCacheKey` assignments there — the
+ * chain would turn the guard that stops this being a dead predicate red.
+ *
+ * KEYED ON THE FRAGMENT'S OWN GREENNESS, not on a per-material flag, and that
+ * is what keeps it honest: a bare branch, a dead verge and a dry roundabout bed
+ * are the SAME surface change, while galvanised steel, concrete, asphalt and
+ * every kerb are neutral (g / (r+g+b) ≈ 1/3) and come out untouched. The
+ * surfaces the rule engine grades on are doubly safe: sign FACES carry their
+ * own `faceMaterial` and signal LENSES their own `MeshBasicMaterial`, and
+ * neither is hooked at all — a green lamp stays exactly as green in the ice
+ * lesson as in the dry one.
+ *
+ * ORDER: dormancy runs BEFORE the snow mix. A tree loses its leaves and THEN
+ * snow lies on it, never the other way round.
+ *
+ * FREE OUTSIDE A WINTER LESSON on the same identity `uSnowCover` has:
+ * `uWinterCover` is 0 unless a lesson authored `environment.winter`, and GLSL
+ * `mix(x, y, 0.0)` is `x * 1.0 + y * 0.0` — bit-identical, not close.
+ *
+ * WHAT IS NOT DONE, so the next reader does not re-derive it: the canopy keeps
+ * its SILHOUETTE. Removing leaves is geometry — a bare-branch GLB in
+ * `public/sim/veg` and a `TreeKind` to select it — and that is asset work this
+ * lane cannot author. A dormant brown canopy of the summer shape is what a
+ * street tree in Sofia actually looks like from a car at 30 km/h in a
+ * fortnight of freezing fog; it is not a leafless winter tree in April light.
+ * The R0 look is OWED and has not been taken.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The albedo dormant vegetation is graded toward — dry straw-brown, the colour
+ * of a Sofia verge and a bare linden crown in January. Used as a HUE only: the
+ * shader normalises it to unit luminance and multiplies the fragment's own
+ * brightness through it, so the canopy keeps its light-and-shade instead of
+ * flattening into a decal (the mistake `SNOW_COVER_COLOR` records for a
+ * whole-material tint on a tree).
+ */
+export const WINTER_DORMANT_COLOR = 0x6e6455;
+/** How much darker dormant vegetation sits than the summer foliage it replaces
+ *  under the same light — bare wood reflects less than a leaf. */
+export const WINTER_DORMANT_VALUE = 0.82;
+/**
+ * The greenness window, in `g / (r + g + b)` of the LINEAR albedo. Neutral grey
+ * is 0.333, so `LO` sits just above it and nothing achromatic can be caught.
+ * Measured on this project's own assets rather than guessed: the canvas verge
+ * (`canvasTextures.makeGrassTexture` base #77875c) lands at 0.454 and the baked
+ * tree-canopy vertex colour around 0.67 — so a verge browns most of the way and
+ * a canopy fully, which is the right ordering (grass dies back, a crown goes
+ * bare).
+ */
+export const WINTER_GREEN_LO = 0.36;
+export const WINTER_GREEN_HI = 0.5;
+/** Ceiling on the dormancy mix. NOT 1.0: Sofia streets carry conifers and the
+ *  odd evergreen hedge, and a street where literally nothing is green reads as
+ *  a colour-graded photograph rather than as winter. */
+export const WINTER_COVER_MAX = 0.9;
+
+/** sRGB→linear + unit-luminance normalisation of `WINTER_DORMANT_COLOR`,
+ *  scaled by `WINTER_DORMANT_VALUE`. Exported so the test can assert the
+ *  tint really is luminance-neutral rather than trusting the arithmetic. */
+export function winterDormantTint(): THREE.Vector3 {
+  // THREE.Color's constructor runs the sRGB→working-space conversion, which is
+  // the space `diffuseColor` is in by the time the fragment splice sees it.
+  const c = new THREE.Color(WINTER_DORMANT_COLOR);
+  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  const k = (WINTER_DORMANT_VALUE / lum) as number;
+  return new THREE.Vector3(c.r * k, c.g * k, c.b * k);
+}
+
 let uniforms: {
   uSnowCover: { value: number };
   uSnowColor: { value: THREE.Color };
   uSnowFacing: { value: THREE.Vector2 };
   uSnowRoughness: { value: number };
+  uWinterCover: { value: number };
+  uWinterTint: { value: THREE.Vector3 };
+  uWinterGreen: { value: THREE.Vector2 };
 } | null = null;
 
 /**
@@ -141,6 +228,9 @@ function getSnowCoverUniforms() {
       uSnowColor: { value: new THREE.Color(SNOW_COVER_COLOR) },
       uSnowFacing: { value: new THREE.Vector2(SNOW_COVER_FACING_LO, SNOW_COVER_FACING_HI) },
       uSnowRoughness: { value: SNOW_COVER_ROUGHNESS },
+      uWinterCover: { value: 0 },
+      uWinterTint: { value: winterDormantTint() },
+      uWinterGreen: { value: new THREE.Vector2(WINTER_GREEN_LO, WINTER_GREEN_HI) },
     };
   }
   return uniforms;
@@ -164,11 +254,38 @@ export function getSnowCover(): number {
   return getSnowCoverUniforms().uSnowCover.value;
 }
 
+/**
+ * THE WINTER WRITER. `DistrictWorld` calls this once per frame beside
+ * `setSnowCover`, with 1 when the lesson authored `environment.winter` and 0
+ * otherwise; nothing else writes it. Per FRAME rather than on mount for the
+ * reason the snow channel is: the uniform set is module-level and outlives any
+ * one scene, so a scene that only wrote it on mount would hand the NEXT lesson
+ * the previous one's season.
+ *
+ * `WINTER_COVER_MAX` is applied here, not at the call site — the one place
+ * that knows how bare a winter street gets is this file.
+ */
+export function setWinterCover(winter01: number): void {
+  const w = winter01 < 0 ? 0 : winter01 > 1 ? 1 : winter01;
+  getSnowCoverUniforms().uWinterCover.value = w * WINTER_COVER_MAX;
+}
+
+/** Current cap-scaled dormancy, for tests and for the driver's assertions. */
+export function getWinterCover(): number {
+  return getSnowCoverUniforms().uWinterCover.value;
+}
+
 /** The line the fragment stage emits — exported so the test pins the exact
  *  operation (a `mix`, at cover, toward the snow colour) rather than merely
  *  „something was injected". */
 export const SNOW_COVER_FRAGMENT_ANCHOR =
   "diffuseColor.rgb = mix( diffuseColor.rgb, uSnowColor, snowCoverAmount );";
+
+/** The dormancy line, exported for the same reason as the snow one: the test
+ *  pins the exact operation (a `mix`, at the dormancy amount, toward the
+ *  luminance-preserving dormant hue) rather than „something was injected". */
+export const WINTER_DORMANCY_FRAGMENT_ANCHOR =
+  "diffuseColor.rgb = mix( diffuseColor.rgb, winterDormantColor, winterDormancyAmount );";
 
 /**
  * onBeforeCompile hook — attach together with `snowCoverProgramCacheKey` so
@@ -185,6 +302,9 @@ export function snowCoverOnBeforeCompile(
   shader.uniforms.uSnowColor = u.uSnowColor;
   shader.uniforms.uSnowFacing = u.uSnowFacing;
   shader.uniforms.uSnowRoughness = u.uSnowRoughness;
+  shader.uniforms.uWinterCover = u.uWinterCover;
+  shader.uniforms.uWinterTint = u.uWinterTint;
+  shader.uniforms.uWinterGreen = u.uWinterGreen;
 
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", "#include <common>\nvarying float vSnowUp;")
@@ -199,13 +319,23 @@ export function snowCoverOnBeforeCompile(
   shader.fragmentShader = shader.fragmentShader
     .replace(
       "#include <common>",
-      "#include <common>\nuniform float uSnowCover;\nuniform vec3 uSnowColor;\nuniform vec2 uSnowFacing;\nuniform float uSnowRoughness;\nvarying float vSnowUp;",
+      "#include <common>\nuniform float uSnowCover;\nuniform vec3 uSnowColor;\nuniform vec2 uSnowFacing;\nuniform float uSnowRoughness;\nuniform float uWinterCover;\nuniform vec3 uWinterTint;\nuniform vec2 uWinterGreen;\nvarying float vSnowUp;",
     )
     .replace(
       // AFTER color_fragment: the prop materials are vertexColors:true and a
       // mix does not commute with the vColor multiply.
+      //
+      // WINTER FIRST, SNOW SECOND: leaves fall, then snow lies on what is left.
+      // The dormancy weight is the fragment's own greenness, so foliage and
+      // verge brown off while steel, concrete and asphalt (g/sum ≈ 1/3, below
+      // uWinterGreen.x) are untouched; the mix preserves luminance so a canopy
+      // keeps its shading instead of flattening into a decal.
       "#include <color_fragment>",
       `#include <color_fragment>
+      float winterGreenFraction = diffuseColor.g / max( diffuseColor.r + diffuseColor.g + diffuseColor.b, 1e-4 );
+      float winterDormancyAmount = uWinterCover * smoothstep( uWinterGreen.x, uWinterGreen.y, winterGreenFraction );
+      vec3 winterDormantColor = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) * uWinterTint;
+      ${WINTER_DORMANCY_FRAGMENT_ANCHOR}
       float snowCoverAmount = uSnowCover * smoothstep( uSnowFacing.x, uSnowFacing.y, vSnowUp );
       ${SNOW_COVER_FRAGMENT_ANCHOR}`,
     )
@@ -223,5 +353,8 @@ export function snowCoverOnBeforeCompile(
 }
 
 /** Stable cache key: every snow-hooked material shares one program per
- *  built-in-parameter combination (three still keys on defines). */
-export const snowCoverProgramCacheKey = (): string => "prop-snow-cover-v1";
+ *  built-in-parameter combination (three still keys on defines). Bumped to v2
+ *  when the winter dormancy term was added — a cached v1 program carries
+ *  neither the uniforms nor the splice, so the key has to move with the
+ *  source or a warm page could hand a hooked material the old program. */
+export const snowCoverProgramCacheKey = (): string => "prop-seasonal-cover-v2";

@@ -215,12 +215,18 @@ export const SC_PK_MOVE_OFF: ScenarioSpec = {
     { n: 1, textBg: "Закопчай колана — таблото свети „КОЛАН“, докато не го направиш." },
     { n: 2, textBg: "Колата е спряла в дясната лента. Потеглянето от място е маневра — започва с оглеждане." },
     { n: 3, textBg: "Погледни в лявото огледало и прецени идва ли кола или колоездач отзад." },
-    // The shoulder check STAYS, and stays unfaked: `MirrorGlanceKind` is
-    // „left" | „right" | „rear" and there is no blind-spot station to tap
-    // (scene/cabin.ts; the ruling and its gate are in
-    // components/sim/__tests__/touchFlankNaming.test.tsx §4). The procedure a
-    // driver must own is mirror AND shoulder; shrinking the briefing to the
-    // half the cockpit can measure would teach the wrong habit for good.
+    // THE SHOULDER CHECK IS PERFORMABLE NOW — 2026-09-01, sc-pk-move-off:
+    // 6aa68f53. This step stood here unbacked for three waves: the note that
+    // used to sit on it said „`MirrorGlanceKind` is „left" | „right" | „rear"
+    // and there is no blind-spot station to tap", i.e. the briefing commanded
+    // an act the interface could not receive and the engine then graded it on
+    // a MIRROR. `scene/cabin.ts` now carries `"shoulder"` with a control on
+    // every input path (key O · the «Рамо» hold button in
+    // lesson-ui/GlanceEdgePings.tsx · the «Рамо» rail button in
+    // components/sim/TouchControls.tsx — both flanks are geometrically full,
+    // the arithmetic is at that button), and `rules/engine.ts` §1b wants a
+    // mirror AND this before the wheels turn. The wording is unchanged because
+    // it was never the wrong sentence — the product was the wrong shape.
     { n: 4, textBg: "Хвърли поглед и през ЛЯВОТО рамо — в мъртвата зона, която огледалото не показва." },
     { n: 5, textBg: "Чак когато е чисто: мигач при нужда, потегли плавно и карай центрирано под ограничението." },
   ],

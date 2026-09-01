@@ -68,6 +68,17 @@
 import type { CabinLookPoseId } from "./cabinLook";
 
 export type MirrorKind = "rear" | "left" | "right";
+/**
+ * What the driver is LOOKING AT this frame — which is not always a mirror.
+ * `shoulder` is the blind-spot check (scene/cabin.ts `MirrorGlanceKind`): the
+ * head goes past the B-pillar and out the left rear quarter, where no glass on
+ * this car is in frame. It is admitted here rather than being filtered by every
+ * caller so the invariant cannot be lost at a call site — the equality below
+ * simply never matches a `MirrorKind`, so a shoulder check schedules no mirror
+ * pass and marks no glass attended. Widening `MirrorKind` itself would instead
+ * have rendered a door mirror as ATTENDED for a look that never reached it.
+ */
+export type HeldLook = MirrorKind | "shoulder";
 export type MirrorQuality = "low" | "medium" | "high";
 
 export const MIRROR_KINDS: readonly MirrorKind[] = ["rear", "left", "right"];
@@ -174,7 +185,7 @@ export function doorLookPose(kind: "left" | "right"): CabinLookPoseId {
  */
 export function mirrorIsAttended(
   kind: MirrorKind,
-  glanceMirror: MirrorKind | null,
+  glanceMirror: HeldLook | null,
   glanceStrength: number,
   lookPose: CabinLookPoseId,
 ): boolean {
@@ -204,7 +215,7 @@ export const MIRROR_BIT: Record<MirrorKind, number> = { rear: 1, left: 2, right:
 export function selectMirrorPass(
   frame: number,
   preset: MirrorQuality,
-  glanceMirror: MirrorKind | null,
+  glanceMirror: HeldLook | null,
   glanceStrength: number,
   lookPose: CabinLookPoseId,
   unprimedMask: number,

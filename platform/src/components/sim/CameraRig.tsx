@@ -53,6 +53,7 @@ import {
   CHASE_REVERSE_ORBIT_RAD,
   COCKPIT_SHOULDER_PITCH,
   COCKPIT_SHOULDER_YAW,
+  SHOULDER_GLANCE_ORBIT_RAD,
   type SimTelemetry,
 } from "@/modules/sim/engine";
 import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin";
@@ -82,6 +83,7 @@ import {
   REAR_VIEW_TARGET_HEIGHT,
   REAR_VIEW_TARGET_WIDTH,
   REAR_VIEW_YAW_RAD,
+  type RearViewSide,
 } from "@/modules/sim/scene/chaseRearView";
 import {
   doorMirrorQuadHalfSize,
@@ -291,6 +293,14 @@ const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> =
   left: { yaw: 0.67, pitch: -0.15 },
   right: { yaw: -0.93, pitch: -0.09 },
   rear: { yaw: -0.28, pitch: 0.06 },
+  // THE BLIND SPOT IS THE ONE ENTRY THAT AIMS AT NO GLASS. The three above are
+  // atan2 toward a mirror; this one is a HEAD, and its angles are the reversing
+  // POV's own shoulder check mirrored to the left — `SHOULDER_GLANCE_ORBIT_RAD`
+  // is `-COCKPIT_SHOULDER_YAW` (+1.85 rad ≈ 106°, the neck's real limit,
+  // derived in engine/reverseView.ts) and the pitch is that pose's verbatim.
+  // Past the B-pillar, out the left rear quarter, where a cyclist coming up the
+  // kerb side is invisible in every mirror on the car.
+  shoulder: { yaw: SHOULDER_GLANCE_ORBIT_RAD, pitch: COCKPIT_SHOULDER_PITCH },
 };
 
 /**
@@ -953,10 +963,13 @@ export function CameraRig({
       // the cockpit's shoulder check, and never a path through the car.
       //
       // CHASE GLANCES (doc 62 #44 tailgater / #7 #13 "make the button real"):
-      // a held Q/E/F adds its own orbit share on the SAME axis —
+      // a held Q/E/F/O adds its own orbit share on the SAME axis —
       // engine/glanceView.ts decides how much (reverse swing keeps priority;
       // REAR aims at the identical over-the-boot aspect, so F reveals a close
-      // tailgater; sides show the glanced quarter). Grading is untouched —
+      // tailgater; sides show the glanced quarter; O swings past the mirror's
+      // quarter to SHOULDER_GLANCE_ORBIT_RAD, which is where the blind spot
+      // is and the only payoff that press can honestly have here — the mirror
+      // inset deliberately stays shut for it). Grading is untouched —
       // the mirrorGlance sample latched on the press, exactly as before.
       const orbitRad =
         swing * CHASE_REVERSE_ORBIT_RAD +
@@ -1156,9 +1169,17 @@ export function CameraRig({
     // continuous instrument leaning toward the glass, not two widgets.
     // -----------------------------------------------------------------------
     const rv = rearView;
-    const heldSide = glanceS > 0 ? (cabin?.glanceMirror ?? null) : null;
-    const rvSide: MirrorGlanceKind | null =
-      mode === "chase" ? (heldSide ?? "rear") : null;
+    // A SHOULDER CHECK OPENS NO WINDOW. `RearViewSide` names mirror GLASS
+    // (scene/chaseRearView.ts) and there is no shoulder mirror — the blind spot
+    // is by definition what the glass misses — so a held shoulder resolves to
+    // "no side held": the inset stays the idle interior mirror it always is
+    // when nothing is held, and the payoff for the press is the chase ORBIT
+    // (engine/glanceView.ts), which swings the camera into that quarter. A
+    // window that grew and yawed on this press would be showing the student the
+    // one view that cannot contain the thing he is checking for.
+    const glanced = glanceS > 0 ? (cabin?.glanceMirror ?? null) : null;
+    const heldSide: RearViewSide | null = glanced === "shoulder" ? null : glanced;
+    const rvSide: RearViewSide | null = mode === "chase" ? (heldSide ?? "rear") : null;
     if (rvSide === null) {
       rv.glass.visible = false;
       rv.bezel.visible = false;

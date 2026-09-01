@@ -101,7 +101,11 @@ export function scEdReverseLineShadowScript(): DriveScript {
       },
       // Both glances inside the detector's 7 s lookback of the pull-away below.
       { kind: "glance", mirror: "rear" },
-      { kind: "glance", mirror: "left" },
+      // One frame-producing beat between them: the recorder carries a SINGLE
+      // pending glance sample, so two glance steps drained back to back would
+      // land only the last one on the tick stream.
+      { kind: "pause", sec: 0.4, brake: true },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "pause", sec: 0.4, brake: true },
       {
         kind: "annotation",
@@ -147,7 +151,13 @@ export function scEdReverseLineMistakeCurbScript(): DriveScript {
         textBg: "Грешката: заден ход без да следиш докъде стига колата — задницата тръгва към бордюра.",
       },
       // The оглед before the move-off is done right — the fault must not be two.
+      // „Done right" is BOTH halves since 2026-09-01: the detector wants a
+      // mirror behind you and the shoulder check, so a demo that performed only
+      // the mirror would silently bill MOVE_OFF_WITHOUT_OBSERVATION beside the
+      // curb contact and teach two things on one card.
       { kind: "glance", mirror: "rear" },
+      { kind: "pause", sec: 0.4, brake: true },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "pause", sec: 0.4, brake: true },
       { kind: "drive", points: [[START_X, Y], [-126, Y], [FWD_X, Y]], targetKmh: MOVEOFF_KMH, stopAtEnd: true },
       { kind: "pause", sec: 0.6, brake: true },

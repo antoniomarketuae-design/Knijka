@@ -20,105 +20,70 @@ import { SCENARIO_TEMPLATES, scenarioById } from "@/modules/sim/lessons";
 export type IndicatorSetting = "off" | "left" | "right";
 export type HeadlightSetting = "off" | "low" | "high";
 /**
- * THE THREE GLANCES THE CAR CAN PERFORM — AND THE FOURTH IT CANNOT.
+ * THE FOUR LOOKS THE CAR CAN PERFORM — three mirrors and one blind spot.
  *
- * There is no SHOULDER member, and this line is the reason five graded rows
- * across the catalogue cannot be closed. Read this before adding one.
+ * `shoulder` is the over-the-LEFT-shoulder check, and it is deliberately NOT a
+ * fourth mirror: it is the wedge that begins where the left door mirror's
+ * field ends and stops short of the interior mirror's, in which a cyclist
+ * coming up the kerb side is invisible in every piece of glass on the car.
+ * That is the definition of a blind spot, and it is why the member had to
+ * exist before `sc-pk-move-off` step 4 («Хвърли поглед и през ЛЯВОТО рамо»)
+ * and `sc-vp-handbrake`'s rubric moment could be performed at all.
  *
- * WHAT THE PRODUCT ASKS FOR. `sc-pk-move-off` briefing step 4 reads «Хвърли
- * поглед и през ЛЯВОТО рамо — в мъртвата зона, която огледалото не показва»
- * (templates-cockpit.ts:224); `sc-vp-handbrake` step 3 says the same
- * (templates-cockpit2.ts:109) and then authors it as a RUBRIC MOMENT,
- * „Поглед през ляво рамо в мъртвата зона" (:137). Neither platform has a
- * control that answers it — the ten painted mobile stations are Изглед,
- * Пауза, two Мигач, Клакс, Кола, Колан and three Огледало; the key list is
- * Q / E / F, the three members below. The student is told to do something
- * the interface cannot accept, and then graded on it.
- *
- * WHAT THE PRODUCT DOES INSTEAD, WHICH IS WORSE THAN NOTHING. Because the
- * fourth kind does not exist, the LEFT DOOR MIRROR has been made to stand in
- * for the blind spot in three places: `scVpHandbrake.ts:81` records
- * `{ kind: "glance", mirror: "left" }` under the comment „mirror + shoulder";
- * `rules/engine.ts:2159-2163` discharges MOVE_OFF_WITHOUT_OBSERVATION (an
- * основна fault) on `lastGlanceAt.left ?? lastGlanceAt.rear`; and until it was
- * fixed, `lessons/scenario/observation.ts` credited a shoulder moment from a
- * glance of any kind. The mirror cannot see the blind spot — that is the
- * definition of the blind spot — so every one of those teaches a
+ * WHAT THIS MEMBER REPLACED, so it is never quietly rebuilt: for three waves
+ * the LEFT DOOR MIRROR stood in for the blind spot in three places — the
+ * shadow trace of this very drill recorded `{kind:"glance", mirror:"rear"}`
+ * under the annotation „И през рамо"; `scVpHandbrake.ts` recorded
+ * `mirror:"left"` under the comment „mirror + shoulder"; and
+ * `rules/engine.ts` discharged MOVE_OFF_WITHOUT_OBSERVATION (an основна) on a
+ * mirror alone. A mirror cannot see the blind spot, so each of those taught a
  * seventeen-year-old the one habit that gets a cyclist killed on a move-off.
  *
- * ADDING THE MEMBER IS NOT THE FIX ON ITS OWN, AND ALONE IT BREAKS THE BUILD.
- * MEASURED, not recalled: append `| "shoulder"` to the line below and
- * `npx tsc --noEmit` from `platform/` goes from green to EIGHTEEN errors in
- * six files (2026-08-30, restored byte-identical afterwards). The list that
- * used to stand here was a recollection: it named two files the compiler
- * never mentions and MISSED FOUR it does, including the only bridge from this
- * file to the rule engine. What follows is the transcript.
+ * ── FIVE UNIONS SPELL „left | right | rear" AND ONLY THREE OF THEM GREW ─────
+ * Getting that split wrong is how a shoulder check quietly becomes a fourth
+ * mirror, so it is recorded here as the shape of the change:
  *
- * FIVE UNIONS IN THIS PRODUCT SPELL „left | right | rear" AND ONLY THREE OF
- * THEM MAY GROW. That distinction IS the design of the change; getting it
- * wrong is how a shoulder check quietly becomes a fourth mirror.
+ * GREW — the ACT and the channels that grade it:
+ *   · `MirrorGlanceKind` (this line). The `GlanceHold` machine below is
+ *     kind-agnostic and needed nothing.
+ *   · `rules/types.ts` `GlanceKind` = `MirrorKind | "shoulder"` — the graded
+ *     channel, and with it `rules/engine.ts` `lastGlanceAt` and the
+ *     `moveOffObservationEnabled` discharge, which now wants a mirror AND the
+ *     shoulder (the procedure its own catalogue row has always described).
+ *     `MirrorKind` itself did NOT grow: it names glass.
+ *   · `engine/glanceView.ts` `GlanceViewMirror` + `CHASE_GLANCE_ASPECT_RAD` —
+ *     the chase orbit, so the look has an information payoff in that POV too.
+ *     The shoulder aspect is `SHOULDER_GLANCE_ORBIT_RAD`, not the mirrors' ±π/3.
  *
- * GROWS — the ACT the driver performs, and the channels that grade it:
- *   · `MirrorGlanceKind` — the declaration this block sits on. Trust the NAME,
- *     not a number: the audit corpus files it as cabin.ts:22 and
- *     `observation.ts` as :72, and it moves every time this block is edited.
- *     The `GlanceHold` machine below it is kind-agnostic and needs no change.
- *   · `rules/types.ts:29` `MirrorKind` — the graded channel, and therefore
- *     `rules/engine.ts:236` `lastGlanceAt: Record<MirrorKind, …>` plus the
- *     discharge at :2386-2398 (`s.lastGlanceAt.left` / `.rear` inside the
- *     `moveOffObservationEnabled` branch). That site was cited here as :2159
- *     and had MOVED — :2159 is now a withdrawn-gate comment about span
- *     detectors. Also `procedures/performedSteps.ts:356` and :369, the A2
- *     observer's `{ kind: "glance"; mirror: MirrorKind }` and its
- *     `mirrorsGlanced: Set<MirrorKind>`. Without this whole line the glance
- *     is a camera trick, not a graded act — and grading is the whole of the
- *     two rows above.
- *   · `engine/glanceView.ts:57` `GlanceViewMirror` + `CHASE_GLANCE_ASPECT_RAD`
- *     — the chase orbit. `CameraRig.tsx:963` stops compiling the moment the
- *     structurally identical twin stops being assignable. A shoulder aspect
- *     is not the mirrors' ±π/3.
+ * DID NOT GROW — these name MIRROR GLASS, and there is no shoulder mirror.
+ * Their call sites map a held shoulder to „no mirror" instead:
+ *   · `scene/chaseRearView.ts` `RearViewSide` — the rear-view inset quad.
+ *     `CameraRig.tsx` treats a shoulder hold as no held side, so the inset
+ *     stays the idle interior mirror rather than opening a window that cannot
+ *     see the spot being checked.
+ *   · `scene/vitok/mirrorAttention.ts` `MirrorKind` (glass meshes + cadence) —
+ *     `MirrorRig.tsx` maps shoulder → null, so no mirror pass renders for a
+ *     look that goes past the B-pillar.
+ *   · `procedures/performedSteps.ts` `mirrorsGlanced` — a shoulder check is
+ *     not one of the three mirrors the „Настройка на огледалата" step counts.
  *
- * DOES NOT GROW — these two name MIRROR GLASS, and there is no shoulder
- * mirror. Widening them is precisely the false certificate this file exists
- * to refuse; the CALL SITES must instead treat a shoulder hold as „no mirror":
- *   · `scene/chaseRearView.ts:70` `RearViewSide` (+ `REAR_VIEW_YAW_RAD`:195,
- *     `REAR_VIEW_FOV_DEG`:204, `rearViewQuadOffset`:280) — the rear-view
- *     inset quad. `CameraRig.tsx:1185`, `:1198` and `:1250` index it with the
- *     held glance; a blind spot is out of the side glass, so the inset must
- *     go dark rather than show a window that cannot see it.
- *   · `scene/vitok/mirrorAttention.ts:70` `MirrorKind` (glass meshes and
- *     cadence) — `MirrorRig.tsx:718`, `:732`, `:795` pass `glanceMirror`
- *     straight in and must map shoulder → null, so no mirror pass renders
- *     for a look that goes past the B-pillar.
- *
- * AND THE HALF THE COMPILER WILL NOT ASK FOR, which is why a lane can ship
- * the type, watch tsc go green and still close nothing:
- *   · `components/sim/CameraRig.tsx:290` `GLANCE_OFFSETS` — the first error
- *     the compiler names and the only place the look becomes VISIBLE: a
- *     shoulder needs a real yaw past the B-pillar (~±1.9 rad), not a mirror
- *     aspect;
- *   · `scene/vehicleSample.ts:98` `out.mirrorGlance = consumeGlanceSample()`
- *     — the ONLY bridge from this file to the rule engine. Miss it and the
- *     member exists, the head turns, and nothing is ever graded;
- *   · `components/sim/LessonScene.tsx:3917` — the per-frame
- *     `observeControlSignal({ kind: "glance", mirror })` loop, which is what
- *     makes the look a PRE-DRIVE step rather than a camera move;
- *   · `components/sim/TouchControls.tsx` — the «РАМО» station, already sized
- *     there (44 px, ≥60 px of caption room) and deliberately declined while
- *     this line stops at three; and `scene/vitok/cabinLook.ts:65`
- *     `CabinLookPoseId` + `vitok/hotspots.ts:52` so the MOUSE can reach it
- *     (founder FR-17/FR-25: „first and upmost it must be with the mouse").
- *     Neither of those two breaks tsc — that is the trap;
- *   · `lessons/scenario/observation.ts:25` — the null that keeps the move-off
- *     family honestly UNMEASURED „until the shoulder glance ships". It is the
- *     switch to throw LAST, never before a student can press something;
- *   · the tests that pin the three: `scene/cabin.test.ts:25` and
- *     `scene/vitok/mirrorAttention.test.ts` (seven sites).
- * `modules/sim/engine/reverseView.ts:57` states the same gap from its own
- * side: the shoulder check is automatic-on-R only, with no button for a
- * student who wants to look on demand.
+ * AND THE HALF THE COMPILER DOES NOT ASK FOR, which is where a lane can ship
+ * the type, watch tsc go green and still close nothing. All four are wired:
+ *   · `CameraRig.tsx` `GLANCE_OFFSETS` — the only place the look becomes
+ *     VISIBLE in the cockpit (a real yaw past the B-pillar);
+ *   · `scene/vehicleSample.ts` — the one bridge from this file to the rule
+ *     engine (it carries `consumeGlanceSample()` unchanged now that
+ *     `VehicleSample.mirrorGlance` admits the member);
+ *   · `components/sim/LessonScene.tsx` — the per-frame
+ *     `observeControlSignal({kind:"glance", mirror})` loop;
+ *   · the CONTROLS. Keyboard `CABIN_KEYS.glanceShoulder` (O — every left-hand
+ *     key was already bound, see that constant); mouse, the hold cluster in
+ *     `lesson-ui/GlanceEdgePings.tsx`; touch, the «Рамо» rail button in
+ *     `components/sim/TouchControls.tsx` (both flanks are geometrically full —
+ *     a fifth arc station lands at y = −12 px on the narrowest landscape stage
+ *     in the ladder, so the rail is where it can exist).
  */
-export type MirrorGlanceKind = "left" | "right" | "rear";
+export type MirrorGlanceKind = "left" | "right" | "rear" | "shoulder";
 
 /** Indicator blink period (s): 600 ms full cycle => 300 ms on / 300 ms off. */
 export const BLINK_PERIOD_S = 0.6;
@@ -580,6 +545,16 @@ export class GlanceHold {
  * Single place that defines the cabin key bindings (KeyboardEvent.code, so
  * they are keyboard-layout independent). Q/E/R was the design sketch for the
  * glances, but R is already "reset" (engine/input.ts) — rear glance sits on F.
+ *
+ * THE SHOULDER CHECK IS ON **O**, AND THE LETTER IS WHAT WAS LEFT. The obvious
+ * home was the left hand beside Q/E/F, and there is none: a census of every
+ * `"Key…"` literal in the tree (`grep -rho '"Key[A-Z]"'`) returns A B C D E F
+ * G H I J K L M N P Q R S T V W X Z, so the whole left-hand block — Q W E R T
+ * A S D F G Z X C V — was already spoken for (G is the top-down zoom in
+ * CameraRig, T the wipers, V the fog lamps, Z the clutch). U, O and Y were the
+ * only free letters. O reads as «Оглеждане през рамо», sits beside K (the
+ * reversing POV) on the hand that carries the other head-movement key, and
+ * collides with nothing.
  */
 export const CABIN_KEYS = {
   indicatorLeft: "Comma",
@@ -589,6 +564,7 @@ export const CABIN_KEYS = {
   glanceLeft: "KeyQ",
   glanceRight: "KeyE",
   glanceRear: "KeyF",
+  glanceShoulder: "KeyO",
   nightPreview: "KeyN",
   muteAudio: "KeyM",
 } as const;
@@ -596,7 +572,7 @@ export const CABIN_KEYS = {
 /**
  * A1 driveline key bindings — chosen against the FULL existing map (WASD/
  * arrows drive, Space, C camera, R reset, Esc pause, X fullscreen, ,/. L B
- * Q/E/F N M cabin) so nothing collides:
+ * Q/E/F/O N M cabin) so nothing collides:
  *
  *  - I  = ignition (E is the right-mirror glance; W/S are pedals),
  *  - Space = stateful parking-brake TOGGLE — it replaces the old momentary
@@ -623,7 +599,7 @@ export const DRIVELINE_KEYS = {
 export interface CabinCallbacks {
   /** B — seatbelt buckled/unbuckled (audio plays the click). */
   onSeatbeltToggle?: (on: boolean) => void;
-  /** Q/E/F — a mirror glance started (camera + rule-engine sample react). */
+  /** Q/E/F/O — a glance started (camera + rule-engine sample react). */
   onGlance?: (mirror: MirrorGlanceKind) => void;
   /** M — mute toggle request (audio layer owns the actual state). */
   onToggleMute?: () => void;
@@ -649,7 +625,7 @@ export class CabinControls {
    *  builder and (A2) the procedure machine all read from here. */
   readonly driveline: DrivelineState;
 
-  /** Hold-to-glance state (keys Q/E/F down/up, hotspot pointer down/up). */
+  /** Hold-to-glance state (keys Q/E/F/O down/up, hotspot pointer down/up). */
   private readonly glances = new GlanceHold();
 
   private clock = 0;
@@ -801,7 +777,7 @@ export class CabinControls {
     this.callbacks.onParkingBrakeToggle?.(this.driveline.parkingBrakeOn);
   }
 
-  /** Mirror glance HOLD begin (key down Q/E/F / hotspot pointer down) — the
+  /** Glance HOLD begin (key down Q/E/F/O / hotspot pointer down) — the
    *  GRADED path: latches the one-frame sample for the rule engine ONCE per
    *  hold (on press) and turns the head toward the mirror until the matching
    *  glanceEnd(). */
@@ -865,6 +841,9 @@ export class CabinControls {
       case CABIN_KEYS.glanceRear:
         this.glanceStart("rear");
         break;
+      case CABIN_KEYS.glanceShoulder:
+        this.glanceStart("shoulder");
+        break;
       case CABIN_KEYS.nightPreview:
         this.nightPreview = !this.nightPreview;
         break;
@@ -911,6 +890,7 @@ export class CabinControls {
     if (e.code === CABIN_KEYS.glanceLeft) this.glanceEnd("left");
     if (e.code === CABIN_KEYS.glanceRight) this.glanceEnd("right");
     if (e.code === CABIN_KEYS.glanceRear) this.glanceEnd("rear");
+    if (e.code === CABIN_KEYS.glanceShoulder) this.glanceEnd("shoulder");
   };
 
   /** Focus loss must never leave a held control stuck down. */

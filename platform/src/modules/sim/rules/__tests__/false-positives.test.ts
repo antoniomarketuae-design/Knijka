@@ -27,7 +27,7 @@ function expectInnocent(events: RuleEvent[]): void {
   );
 }
 
-const glance = (mirror: "left" | "right" | "rear"): SimTickEvent => ({
+const glance = (mirror: "left" | "right" | "rear" | "shoulder"): SimTickEvent => ({
   kind: "mirrorGlance",
   mirror,
 });
@@ -782,8 +782,51 @@ describe("FP battery — move-off observation (enabled per-lesson)", () => {
   // ENABLED mode safe for every innocent move-off shape.
   const enabled = { moveOffObservationEnabled: true } as const;
 
-  it("mirror checked two seconds before pulling away", () => {
-    // Innocent: the taught ritual — glance left, then go.
+  // ── EXPECTATION CHANGED 2026-09-01, AND THE PRODUCT IS WHAT CHANGED ───────
+  // Both of these used to hand the detector ONE mirror and assert innocence,
+  // because until this wave that was all the observation a student could
+  // perform: `MirrorGlanceKind` was „left | right | rear" and no control on
+  // either platform could produce a shoulder check. The cabin now has one, so
+  // the ritual the detector accepts is the ritual the product has always
+  // TAUGHT — catalog.ts's own correctiveBg („поглед в лявото огледало и към
+  // мъртвата зона") and the tutorial's final-mirror-check howBg („…после
+  // КРАТЪК поглед през рамо наляво — мъртвата зона не се вижда в никое
+  // огледало"). The mirror-alone shapes are now the CONVICTION cases below;
+  // these two keep their innocence claim by performing the whole ritual.
+  it("mirror then shoulder, two seconds before pulling away", () => {
+    // Innocent: the taught ritual — glance left, check the blind spot, then go.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 0 }),
+        tick(1, { speedKmh: 0, events: [glance("left")] }),
+        tick(2, { speedKmh: 0, events: [glance("shoulder")] }),
+        tick(3, { speedKmh: 8 }),
+        tick(4, { speedKmh: 20 }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+
+  it("interior (rear) mirror plus the shoulder check before moving off", () => {
+    // Innocent: checking behind through the rear-view is a valid mirror half —
+    // the detector never demanded the LEFT door mirror specifically.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 0 }),
+        tick(1, { speedKmh: 0, events: [glance("rear")] }),
+        tick(2, { speedKmh: 0, events: [glance("shoulder")] }),
+        tick(3, { speedKmh: 10 }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+
+  it("CONVICTS a mirror-only pull-away — the blind spot is not in any mirror", () => {
+    // The counter-proof for the two above, and the whole of PK-05's teaching:
+    // a driver who checked the mirror and not the blind spot has looked at
+    // everything except the wedge a cyclist coming up the kerb side is in.
     const { events } = drive(
       [
         tick(0, { speedKmh: 0 }),
@@ -793,20 +836,19 @@ describe("FP battery — move-off observation (enabled per-lesson)", () => {
       ],
       enabled,
     );
-    expectInnocent(events);
+    expect(events.map((e) => e.code)).toContain("MOVE_OFF_WITHOUT_OBSERVATION");
   });
 
-  it("interior (rear) mirror check before moving off", () => {
-    // Innocent: checking behind through the rear-view counts as observation.
+  it("CONVICTS a shoulder-only pull-away — the ritual is both halves", () => {
     const { events } = drive(
       [
         tick(0, { speedKmh: 0 }),
-        tick(2, { speedKmh: 0, events: [glance("rear")] }),
+        tick(1, { speedKmh: 0, events: [glance("shoulder")] }),
         tick(3, { speedKmh: 10 }),
       ],
       enabled,
     );
-    expectInnocent(events);
+    expect(events.map((e) => e.code)).toContain("MOVE_OFF_WITHOUT_OBSERVATION");
   });
 
   it("first motion is a reverse bay exit (maneuver domain, not a move-off)", () => {

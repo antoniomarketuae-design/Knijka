@@ -2895,6 +2895,69 @@ export function TouchControls({
           onToggleCamera={onToggleCamera}
           topdownAidRef={topdownAidRef}
         />
+        {/* ══ «РАМО» — THE BLIND-SPOT CHECK, AND WHY IT IS IN THIS RAIL ══════
+            sc-pk-move-off:6aa68f53 (critical) and sc-vp-handbrake:20bf57db:
+            „There is no shoulder-check control of any kind on either platform,
+            so the graded blind-spot step cannot be performed." That was true —
+            `MirrorGlanceKind` stopped at three mirrors — and it is the half of
+            those rows the block above the right flank declined and routed. The
+            capability now exists (scene/cabin.ts `"shoulder"`, graded by
+            MOVE_OFF_WITHOUT_OBSERVATION in rules/engine.ts §1b, which since
+            2026-09-01 wants a mirror AND this), so this is a control wired to a
+            live consumer and not a fifth face on a dead one.
+
+            IT IS NOT AN ARC STATION BECAUSE THERE IS NO ARC STATION LEFT, and
+            that is arithmetic rather than taste. `arcStationRectPx` puts the
+            top box at `y = height − (padH + arcLift + ARC_PITCH_PX·(n−1)) − 44`;
+            at the narrowest landscape stage in `touchArc.test.ts`'s ladder
+            (360 px tall, arcLift 0) a FIFTH right station lands at
+            360 − (152 + 4·44) − 44 = **−12 px**, i.e. off the top edge, and a
+            fifth LEFT one at +4 px, inside «Меню на урока»'s own 8–52 px box —
+            the exact collision the ⚙ dock's note records paying for. Both
+            flanks are full at four.
+
+            AND THE RAIL'S ADMISSION RULE IS SATISFIED, not bent. The corner
+            block above admits only controls that „are never time-critical",
+            because a rail button costs a regrip (54.9–70.4 mm landscape). The
+            product grades a shoulder check in exactly one place — the move-off
+            ritual, `moveOffObservationEnabled`, which by construction runs
+            while the car is AT REST (the detector arms on `restSeen` and fires
+            on the first metre of motion). Belt, mirror, shoulder, мигач, go:
+            every one of those is pressed standing still. A regrip costs the
+            student nothing there, and the button is on the glass permanently,
+            because looking over your shoulder is never unavailable in a real
+            car either.
+
+            A WORD AND NOT A GLYPH: the flank's grammar is „caption = class,
+            glyph = side", and this control has no side of a mirror to name —
+            «Рамо» is the class and the whole of it. It shares no face with
+            Д/З/Л, which is the point: a letter here would read as a fourth
+            mirror, and the blind spot is defined by being the place no mirror
+            reaches. `glance("shoulder")` is the TAP path (`cabin.glance`,
+            self-releasing after GLANCE_TAP_HOLD_S) — the same one the three
+            mirror stations use and the one `glanceStations.test.ts` pins;
+            `glanceStart` here would leave the head turned for ever.
+
+            AND IT GOES **BEFORE** «Пауза», WHICH IS THE ONE THING TO PRESERVE
+            IF THIS ROW IS EVER EDITED. The rail is `flex-wrap` inside
+            `topRailBandPx`, which the ladder guarantees is at least three
+            44 px cells wide — comfortable in landscape (≈ 456 px on the
+            Samsung gesture-bar profile) and tight upright, where the band is
+            ~168 px and these faces are wider than the 44 px minimum. So a
+            third button CAN fold the row in portrait, and the order decides
+            which control folds: last-in-row wraps, so «Пауза» takes it. That
+            is the right one to move — this block's own admission rule says the
+            rail holds controls that may cost a regrip, and Пауза is also on
+            Esc and inside the ⚙ menu, while the shoulder check is a graded act
+            with a seven-second lookback. NOT MEASURED ON A DEVICE: the wrap is
+            arithmetic from the band width, not a photograph. If it matters,
+            `tools/mobile/wave12-flanks.mjs` is the instrument that reads this
+            rail's real boxes on the six-profile ladder. */}
+        <RailButton
+          wordBg="Рамо"
+          labelBg="Поглед през ляво рамо в мъртвата зона"
+          onClick={() => cabin()?.glance("shoulder")}
+        />
         <RailButton wordBg="Пауза" labelBg="Пауза" onClick={onPause} />
       </div>
 
@@ -2932,30 +2995,23 @@ export function TouchControls({
           screen reader, and the glyph is the sighted student's — a mirror button
           that merely SAID «оглед» would be claiming the whole procedure, and the
           procedure is mirror AND a look over the shoulder into the blind spot.
-          There is no shoulder-check station to claim: `MirrorGlanceKind` is
-          `"left" | "right" | "rear"` and stops there (scene/cabin.ts), which is
-          the other half of those two rows and is not this file's to close.
 
-          AND THE ADDRESS, so the third lane to be sent here stops at the door.
-          sc-pk-move-off:6aa68f53 (critical) and sc-vp-handbrake:20bf57db both
-          name this file. A station is 20 lines of JSX; the capability it would
-          have to call does not exist anywhere in the product, so a «РАМО» cell
-          added here would be a button wired to nothing — the dead-predicate
-          class, filed as a repair. What has to move first, in order:
-            · `modules/sim/scene/cabin.ts:22` — `MirrorGlanceKind`, and the
-              `GlanceState` machine at :422 that starts/ends/updates one;
-            · `components/sim/CameraRig.tsx:290` — `GLANCE_OFFSETS`, a
-              `Record<MirrorGlanceKind, …>`, so a new kind must be given a yaw
-              and a pitch or the camera cannot perform the look;
-            · `modules/sim/engine/glanceView.ts:54` — the structurally identical
-              twin that must stay assignable;
-            · the A2 procedure observer, which is what makes the glance GRADED
-              rather than a camera trick — and grading is the whole of both rows
-              („the graded blind-spot step cannot be performed").
-          `modules/sim/engine/reverseView.ts:57` already states the same gap
-          from the other side: „a student who wants to look over his shoulder on
-          demand has no button for it — the shoulder check is automatic-on-R
-          only". Two files now say it; neither of them is this one.
+          THAT SECOND HALF NOW EXISTS, AND IT IS NOT ON THIS FLANK. This block
+          used to end „there is no shoulder-check station to claim:
+          `MirrorGlanceKind` is `"left" | "right" | "rear"` and stops there",
+          and it routed sc-pk-move-off:6aa68f53 and sc-vp-handbrake:20bf57db to
+          `scene/cabin.ts` on the ground that a «РАМО» cell here would be a
+          button wired to nothing. The capability landed 2026-09-01 — cabin.ts
+          grew `"shoulder"`, `rules/engine.ts` §1b grades it as half of
+          MOVE_OFF_WITHOUT_OBSERVATION, and the camera performs it — so the cell
+          is no longer dead. It went to the TOP RAIL rather than here for a
+          reason that is arithmetic: `arcStationRectPx` puts a fifth right
+          station at `360 − (152 + 4·44) − 44 = −12 px` on the narrowest
+          landscape stage in the ladder, and a fifth left one inside «Меню на
+          урока»'s box. Both flanks are full at four; the rail is where the
+          control could exist, and its own admission rule is met because the
+          only shoulder check this product grades is performed AT REST. The
+          measurement and the rest of the argument are at that button.
 
           WIDTH, MEASURED RATHER THAN HOPED. A station is `TOUCH_MIN_PX` = 44 px
           and `FLANK_LANE_PX` = 8 + 44 + 8 keeps a further 8 px clear on each

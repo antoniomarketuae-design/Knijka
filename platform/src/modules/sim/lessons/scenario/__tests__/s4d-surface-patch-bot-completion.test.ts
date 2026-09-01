@@ -24,10 +24,12 @@
  *    authored physics.wetGrip compiles to LessonSpec.physics at every level
  *    (the wet precedent) — the waterPatch itself NEVER appears on the
  *    LessonSpec: it is district data (the map is the second opt-in);
- *  - sc-ac-ice: NO environment and NO physics compile AT ALL — the first
- *    template whose entire hazard arrives through the district's icePatch
- *    span (resolveSurfaceGripPatches is the seam; pinned here against the
- *    committed map).
+ *  - sc-ac-ice: NO WEATHER and NO physics compile at all — the first template
+ *    whose entire hazard arrives through the district's icePatch span
+ *    (resolveSurfaceGripPatches is the seam; pinned here against the committed
+ *    map). Its environment carries the SEASON and only the season
+ *    (`{ winter: true }`, sc-ac-ice:5372f176): a render axis that grades the
+ *    light cold and the foliage dormant, arms no envelope and touches no grip.
  */
 
 import { readFileSync } from "node:fs";
@@ -100,10 +102,23 @@ describe("surface-patch slice — the compile propagation laws", () => {
     }
   });
 
-  it("sc-ac-ice compiles NO environment and NO physics at ANY level — the map data is the whole hazard", () => {
+  // WAS: „compiles NO environment … at ANY level", and the expectation moved
+  // rather than weakened. What this case exists to pin is that NO WEATHER and
+  // NO PHYSICS ride the compile — the map's icePatch span is the whole hazard.
+  // `winter` is neither: it is the SEASON (sc-ac-ice:5372f176 — the lesson
+  // briefed «Ясна студена сутрин … около нулата» and rendered a full-leaf
+  // summer day), it drives only the light grade and the foliage, and it arms no
+  // conditions envelope. So the three flags that could have changed the drill
+  // are asserted ABSENT one by one, which is a stricter statement than the
+  // blanket `toBeUndefined()` it replaces: that one would have gone green again
+  // if the whole environment key were dropped, and this one would not.
+  it("sc-ac-ice compiles the SEASON and nothing else at ANY level — no weather, no physics; the map data is the whole hazard", () => {
     for (const l of SC_AC_ICE.levels) {
       const lesson = compileScenario(SC_AC_ICE, l.level as ScenarioLevel);
-      expect(lesson.environment, `L${l.level}`).toBeUndefined();
+      expect(lesson.environment, `L${l.level}`).toEqual({ winter: true });
+      expect(lesson.environment?.rain, `L${l.level}`).toBeUndefined();
+      expect(lesson.environment?.fog, `L${l.level}`).toBeUndefined();
+      expect(lesson.environment?.snow, `L${l.level}`).toBeUndefined();
       expect(lesson.physics, `L${l.level}`).toBeUndefined();
     }
   });
@@ -126,7 +141,9 @@ describe("surface-patch slice — the compile propagation laws", () => {
     expect(aqua?.environment).toEqual({ rain: true });
     expect(aqua?.physics).toEqual({ wetGrip: true });
     const ice = scenarioLessonById("sc-ac-ice@L3");
-    expect(ice?.environment).toBeUndefined();
+    // The season survives the id round-trip too — it is authored on the
+    // template, so the wire resolver recompiles it exactly like the weather.
+    expect(ice?.environment).toEqual({ winter: true });
     expect(ice?.physics).toBeUndefined();
   });
 });

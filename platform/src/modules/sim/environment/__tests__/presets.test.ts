@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ENVIRONMENT_PRESETS, sunDirection, type TimeOfDay } from "../presets";
+import {
+  ENVIRONMENT_PRESETS,
+  environmentPreset,
+  mixHex,
+  sunDirection,
+  winterGrade,
+  type TimeOfDay,
+} from "../presets";
 
 const TIMES: TimeOfDay[] = ["day", "dusk", "night"];
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -146,5 +153,133 @@ describe("ENVIRONMENT_PRESETS", () => {
     expect(ENVIRONMENT_PRESETS.dusk.sky.sunDiscDeg).toBeGreaterThan(
       ENVIRONMENT_PRESETS.day.sky.sunDiscDeg,
     );
+  });
+});
+
+/**
+ * THE SEASON — sc-ac-ice:5372f176 / sc-ac-bridge-ice:7eb16029 (critical).
+ *
+ * Both black-ice lessons open on «Ясна студена сутрин … около нулата» and both
+ * rendered the same high-summer afternoon: measured 2026-08-28 across their two
+ * DIFFERENT districts, sky 153.8/170.8/191.6 in both, facade 137.6/148.5/161.7
+ * vs 137.5/148.5/161.6, canopy 73.4/97.4/75.5 vs 73.8/97.7/75.6. `winterGrade`
+ * is the LIGHT half of the repair (the foliage half is
+ * `world/textures/snowCover.ts`).
+ *
+ * These cases pin the PROPERTIES the grade has to keep, not the hexes it
+ * happens to produce — a taste change should be free, a regression should not.
+ */
+describe("winterGrade — the season, over any hour", () => {
+  const luma = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16);
+    return 0.2126 * ((n >> 16) & 0xff) + 0.7152 * ((n >> 8) & 0xff) + 0.0722 * (n & 0xff);
+  };
+  const blueMinusRed = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16);
+    return (n & 0xff) - ((n >> 16) & 0xff);
+  };
+
+  it("is a total function over every time of day, and every colour stays a hex", () => {
+    for (const t of TIMES) {
+      const w = winterGrade(ENVIRONMENT_PRESETS[t]);
+      for (const hex of [
+        w.sky.zenith,
+        w.sky.horizon,
+        w.sky.sunTint,
+        w.sky.cloudColor,
+        w.sky.ridgeColor,
+        w.light.sun.color,
+        w.light.hemisphere.skyColor,
+        w.light.hemisphere.groundColor,
+        w.fog.color,
+      ]) {
+        expect(hex, `${t}: ${hex}`).toMatch(HEX);
+      }
+      // The hour survives the season: winter is orthogonal to time of day, and
+      // spelling it as a fourth TimeOfDay is exactly what the contract forbids.
+      expect(w.timeOfDay).toBe(t);
+      expect(w.light.sun.elevationDeg).toBe(ENVIRONMENT_PRESETS[t].light.sun.elevationDeg);
+      expect(w.light.sun.azimuthDeg).toBe(ENVIRONMENT_PRESETS[t].light.sun.azimuthDeg);
+    }
+  });
+
+  it("keeps doc 71's 3.5:1 key:fill ratio — a clear cold morning is CONTRASTY", () => {
+    // The founder-ratified invariant behind the day rig. Both halves are scaled
+    // by the same factor precisely so the grade cannot re-introduce the
+    // "washed out" overcast look doc 71 §4.1 removed.
+    const day = ENVIRONMENT_PRESETS.day;
+    const w = winterGrade(day);
+    expect(w.light.sun.intensity / w.light.hemisphere.intensity).toBeCloseTo(
+      day.light.sun.intensity / day.light.hemisphere.intensity,
+      6,
+    );
+    expect(w.light.sun.intensity / w.light.hemisphere.intensity).toBeGreaterThan(3.5);
+    // …and it IS a dimmer light, or nothing on the road would change tone.
+    expect(w.light.sun.intensity).toBeLessThan(day.light.sun.intensity);
+    expect(w.exposure).toBeLessThan(day.exposure);
+  });
+
+  it("kills the warm ground bounce — the term that lit those facades July", () => {
+    const day = ENVIRONMENT_PRESETS.day;
+    const w = winterGrade(day);
+    // Summer bounces warm brown off dry earth (#4d4740, red-dominant); frozen
+    // ground and dead grass bounce cold grey. The SIGN is the assertion.
+    expect(blueMinusRed(day.light.hemisphere.groundColor)).toBeLessThan(0);
+    expect(blueMinusRed(w.light.hemisphere.groundColor)).toBeGreaterThan(0);
+    // The key goes cold too — a warm key over a cold fill is a sunset, not a
+    // winter morning.
+    expect(blueMinusRed(w.light.sun.color)).toBeGreaterThan(
+      blueMinusRed(day.light.sun.color),
+    );
+  });
+
+  it("changes the SKY, which is 35–45 % of every frame and half the audit row", () => {
+    for (const t of TIMES) {
+      const p = ENVIRONMENT_PRESETS[t];
+      const w = winterGrade(p);
+      // Paler, milkier zenith: the summer #3f76c4 is exactly what the judge
+      // photographed as identical across two districts.
+      expect(luma(w.sky.zenith), t).toBeGreaterThan(luma(p.sky.zenith));
+      expect(w.sky.zenith, t).not.toBe(p.sky.zenith);
+      // More deck, never a closed lid (the sun disc still has to read).
+      expect(w.sky.cloudCover, t).toBeGreaterThan(p.sky.cloudCover);
+      expect(w.sky.cloudCover, t).toBeLessThanOrEqual(0.9);
+      // Vitosha wears snow from ~1400 m in winter: the ONE element that gets
+      // brighter, and the cheapest "this is winter" cue on a Sofia street.
+      expect(luma(w.sky.ridgeColor), t).toBeGreaterThan(luma(p.sky.ridgeColor));
+      // Colder, thicker clear-air haze — still above the 0.002552 floor
+      // groundBackdrop.test.ts pins for the backdrop disc's own rim.
+      expect(w.fog.density, t).toBeGreaterThan(p.fog.density);
+      expect(w.fog.density, t).toBeGreaterThan(0.002552);
+    }
+  });
+
+  it("passes the WEATHER veils through untouched — winter is not a fifth weather", () => {
+    for (const t of TIMES) {
+      const p = ENVIRONMENT_PRESETS[t];
+      const w = winterGrade(p);
+      expect(w.rainFog, t).toEqual(p.rainFog);
+      expect(w.fogWeather, t).toEqual(p.fogWeather);
+      expect(w.snowWeather, t).toEqual(p.snowWeather);
+    }
+  });
+
+  it("environmentPreset is the identity when no season is authored", () => {
+    // The property that makes this free for every other lesson in the corpus:
+    // the un-wintered branch returns the SAME OBJECT, so nothing downstream
+    // re-derives, re-allocates or drifts.
+    for (const t of TIMES) {
+      expect(environmentPreset(t)).toBe(ENVIRONMENT_PRESETS[t]);
+      expect(environmentPreset(t, false)).toBe(ENVIRONMENT_PRESETS[t]);
+      expect(environmentPreset(t, true)).toEqual(winterGrade(ENVIRONMENT_PRESETS[t]));
+    }
+  });
+
+  it("mixHex is a real blend and clamps its parameter", () => {
+    expect(mixHex("#000000", "#ffffff", 0)).toBe("#000000");
+    expect(mixHex("#000000", "#ffffff", 1)).toBe("#ffffff");
+    expect(mixHex("#000000", "#ffffff", 0.5)).toBe("#808080");
+    expect(mixHex("#000000", "#ffffff", -3)).toBe("#000000");
+    expect(mixHex("#000000", "#ffffff", 9)).toBe("#ffffff");
   });
 });

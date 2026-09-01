@@ -26,7 +26,7 @@ import {
   type ShaderMaterial,
   type ShaderMaterialParameters,
 } from "three";
-import { ENVIRONMENT_PRESETS, sunDirection, type TimeOfDay } from "./presets";
+import { environmentPreset, sunDirection, type TimeOfDay } from "./presets";
 import {
   cloudCoverGoal,
   cloudDensityGoal,
@@ -89,10 +89,17 @@ function dampColor(cur: Color, goal: Color, lambda: number, dt: number): void {
 
 export function SkyDome({
   timeOfDay,
+  winter = false,
   radius = SKY_DOME_RADIUS_M,
   skyline = true,
 }: {
   timeOfDay: TimeOfDay;
+  /** WINTER season (presets.ts `winterGrade`) — a paler, milkier zenith, a
+   *  cold horizon band, more cloud deck and a snow-lit Vitosha ridge. Without
+   *  it a winter lesson's dome stays the summer #3f76c4 blue whatever the
+   *  light rig does, which is half of the sc-ac-ice audit row. Default false =
+   *  the shipped sky, value-for-value. */
+  winter?: boolean;
   radius?: number;
   /** V3's gate. The Vitosha ridge belongs on every Sofia street map; the
    *  enclosed poligon and parking-lot maps have no far horizon to put it on,
@@ -157,7 +164,7 @@ export function SkyDome({
 
   // Goal values re-derived only when the preset changes.
   const goal = useMemo(() => {
-    const p = ENVIRONMENT_PRESETS[timeOfDay];
+    const p = environmentPreset(timeOfDay, winter);
     const s = sunDirection(p.light.sun);
     return {
       zenith: new Color(p.sky.zenith),
@@ -178,7 +185,7 @@ export function SkyDome({
       cloudDensity: p.sky.cloudDensity,
       ridgeStrength: p.sky.ridgeStrength,
     };
-  }, [timeOfDay]);
+  }, [timeOfDay, winter]);
 
   useFrame((state, delta) => {
     if (groupRef.current) groupRef.current.position.copy(state.camera.position);

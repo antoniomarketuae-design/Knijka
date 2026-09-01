@@ -516,3 +516,168 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     exposure: 0.95,
   },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WINTER — THE SEASON, NOT A FOURTH TIME OF DAY AND NOT A WEATHER.
+//
+// sc-ac-ice („Черен лед") and sc-ac-bridge-ice („Мостът замръзва пръв") both
+// open on «Ясна студена сутрин … около нулата» and both rendered the same
+// high-summer afternoon this file's `day` preset describes: warm #fff3e0 key,
+// warm brown ground bounce, #3f76c4 zenith. Measured 2026-08-28 across the two
+// lessons' own `03-ready` frames (two DIFFERENT districts): sky
+// 153.8/170.8/191.6 in both, facade 137.6/148.5/161.7 vs 137.5/148.5/161.6,
+// canopy 73.4/97.4/75.5 vs 73.8/97.7/75.6. That is the audit row
+// sc-ac-ice:5372f176 / sc-ac-bridge-ice:7eb16029.
+//
+// A GRADE, NOT A FOURTH PRESET, and the reason is the one `contracts.ts` gives
+// for not spelling winter as a `TimeOfDay`: `TimeOfDay` is `Record`-keyed at
+// `RainStreaks.tsx` and `SnowFlakes.tsx`, so widening that union turns an
+// authoring change into a compile error in two render files — and a winter
+// DUSK is a lesson someone will want. Season is orthogonal to hour, so it is
+// a pure function OVER a preset and every time of day gets its winter for free.
+//
+// WHAT IS DELIBERATELY NOT CHANGED: the sun's ELEVATION. A Sofia winter noon
+// really does run ~24°, but this file already carries the measurement that
+// says a low sun here is a rendering defect, not realism — at 22° a 20 m
+// building throws ~50 m across a ~16 m carriageway, every street sits wholly
+// in the shade of its own west building line, and the frame reads as „no
+// directional light at all" (the founder's „there are NO CAST SHADOWS
+// anywhere"). 41° was measured as still not enough. So winter is carried by
+// COLOUR and LEVEL, which is also the honest read of a clear morning at 0 °C:
+// a winter street is pale and blue, not dark. The key:fill RATIO — doc 71's
+// 3.5:1 invariant — is preserved exactly, because a clear cold morning is a
+// CONTRASTY light; both halves are scaled by the same factor.
+//
+// `rainFog`, `fogWeather` and `snowWeather` are passed through untouched: the
+// two lessons that author winter author no weather at all, and a graded veil
+// nothing renders would be a value with no consumer.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Key + fill scale under winter. Applied to BOTH so doc 71's 3.5:1 key:fill
+ *  ratio survives the grade (day lands 1.44 : 0.39 = 3.7:1, unchanged). */
+export const WINTER_LIGHT_SCALE = 0.78;
+/** Tone-mapping exposure scale — a quarter-stop under the same sky. */
+export const WINTER_EXPOSURE_SCALE = 0.95;
+/** The cold white a winter key light is graded toward, and how far. */
+export const WINTER_KEY_TINT = "#e6eefc";
+export const WINTER_KEY_MIX = 0.75;
+/** The hemisphere SKY fill: paler, colder, higher-albedo winter dome. */
+export const WINTER_SKY_FILL_TINT = "#cddff5";
+export const WINTER_SKY_FILL_MIX = 0.5;
+/** The hemisphere GROUND bounce — THE warm-facade term. Frozen ground and
+ *  dead grass bounce cold grey; the summer presets bounce warm brown
+ *  (#4d4740), and that single colour is most of why the ice frames read July
+ *  on every vertical surface in shot. */
+export const WINTER_GROUND_BOUNCE_TINT = "#586470";
+export const WINTER_GROUND_BOUNCE_MIX = 0.8;
+/** Sky dome: a paler, milkier blue overhead and a cooler horizon band. */
+export const WINTER_ZENITH_TINT = "#9fbcda";
+export const WINTER_ZENITH_MIX = 0.55;
+export const WINTER_HORIZON_TINT = "#e9eff6";
+export const WINTER_HORIZON_MIX = 0.6;
+/** Extra cloud deck (clamped at 0.9 — a fully covered dome loses the sun
+ *  disc the low-sun read depends on). */
+export const WINTER_CLOUD_COVER_ADD = 0.18;
+export const WINTER_CLOUD_COVER_MAX = 0.9;
+export const WINTER_CLOUD_TINT = "#e6ecf4";
+export const WINTER_CLOUD_MIX = 0.5;
+/** Vitosha wears snow from about 1400 m up from December — the ridge is the
+ *  one element of this grade that gets BRIGHTER, and it is the cheapest
+ *  „this is winter" cue on any Sofia street with a horizon. */
+export const WINTER_RIDGE_TINT = "#dfe8f2";
+export const WINTER_RIDGE_MIX = 0.55;
+/** Cold air holds less water but scatters harder at a low sun: the clear-day
+ *  haze goes pale-blue and thickens by a third (day 0.0026 → 0.0035, still far
+ *  above the 0.002552 floor groundBackdrop.test.ts pins). */
+export const WINTER_HAZE_TINT = "#dbe6f0";
+export const WINTER_HAZE_MIX = 0.6;
+export const WINTER_HAZE_DENSITY_SCALE = 1.35;
+/** A low winter sun sits in more air: a wider, softer glow around the disc. */
+export const WINTER_SUN_GLOW_SCALE = 1.2;
+
+/** `#rrggbb` → [0..255, 0..255, 0..255]. Local, because this module keeps its
+ *  no-three.js promise (vitest runs it in plain Node). */
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  return `#${((1 << 24) | (clamp(r) << 16) | (clamp(g) << 8) | clamp(b)).toString(16).slice(1)}`;
+}
+
+/**
+ * Blend two `#rrggbb` targets in sRGB. sRGB and not linear on purpose: every
+ * value in this file is an ART TARGET the React layer converts to
+ * THREE.Color, and the presets beside it were picked by eye in the same space
+ * — a linear mix here would grade toward a colour no one chose.
+ */
+export function mixHex(from: string, to: string, t: number): string {
+  const k = t < 0 ? 0 : t > 1 ? 1 : t;
+  const [r1, g1, b1] = hexToRgb(from);
+  const [r2, g2, b2] = hexToRgb(to);
+  return rgbToHex(r1 + (r2 - r1) * k, g1 + (g2 - g1) * k, b1 + (b2 - b1) * k);
+}
+
+/**
+ * The WINTER grade of any time-of-day preset. Pure and total: same input,
+ * same output, no three.js, no module state — `presets.test.ts` exercises it
+ * in plain Node the way it exercises `sunDirection`.
+ *
+ * READ BY: `SimEnvironment` (light rig, fog, exposure) and `SkyDome` (dome
+ * gradient, clouds, ridge), both gated on the `winter` prop `LessonScene`
+ * forwards from `LessonSpec.environment.winter`. It is the LIGHT half of the
+ * season; the FOLIAGE half is `world/textures/snowCover.ts`'s dormancy term,
+ * driven by `DistrictWorld`. Neither closes the audit row alone: a winter
+ * light grade under full-leaf green canopies still photographs as July.
+ */
+export function winterGrade(preset: EnvironmentPreset): EnvironmentPreset {
+  return {
+    ...preset,
+    sky: {
+      ...preset.sky,
+      zenith: mixHex(preset.sky.zenith, WINTER_ZENITH_TINT, WINTER_ZENITH_MIX),
+      horizon: mixHex(preset.sky.horizon, WINTER_HORIZON_TINT, WINTER_HORIZON_MIX),
+      sunTint: mixHex(preset.sky.sunTint, WINTER_KEY_TINT, WINTER_KEY_MIX),
+      sunGlowIntensity: preset.sky.sunGlowIntensity * WINTER_SUN_GLOW_SCALE,
+      cloudCover: Math.min(
+        WINTER_CLOUD_COVER_MAX,
+        preset.sky.cloudCover + WINTER_CLOUD_COVER_ADD,
+      ),
+      cloudColor: mixHex(preset.sky.cloudColor, WINTER_CLOUD_TINT, WINTER_CLOUD_MIX),
+      ridgeColor: mixHex(preset.sky.ridgeColor, WINTER_RIDGE_TINT, WINTER_RIDGE_MIX),
+    },
+    light: {
+      sun: {
+        ...preset.light.sun,
+        color: mixHex(preset.light.sun.color, WINTER_KEY_TINT, WINTER_KEY_MIX),
+        intensity: preset.light.sun.intensity * WINTER_LIGHT_SCALE,
+      },
+      hemisphere: {
+        skyColor: mixHex(
+          preset.light.hemisphere.skyColor,
+          WINTER_SKY_FILL_TINT,
+          WINTER_SKY_FILL_MIX,
+        ),
+        groundColor: mixHex(
+          preset.light.hemisphere.groundColor,
+          WINTER_GROUND_BOUNCE_TINT,
+          WINTER_GROUND_BOUNCE_MIX,
+        ),
+        intensity: preset.light.hemisphere.intensity * WINTER_LIGHT_SCALE,
+      },
+    },
+    fog: {
+      color: mixHex(preset.fog.color, WINTER_HAZE_TINT, WINTER_HAZE_MIX),
+      density: preset.fog.density * WINTER_HAZE_DENSITY_SCALE,
+    },
+    exposure: preset.exposure * WINTER_EXPOSURE_SCALE,
+  };
+}
+
+/** The preset a scene actually renders: the time of day, graded by season. */
+export function environmentPreset(timeOfDay: TimeOfDay, winter = false): EnvironmentPreset {
+  const base = ENVIRONMENT_PRESETS[timeOfDay];
+  return winter ? winterGrade(base) : base;
+}

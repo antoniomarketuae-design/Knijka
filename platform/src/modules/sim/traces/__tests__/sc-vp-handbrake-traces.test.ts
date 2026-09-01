@@ -56,9 +56,14 @@ describe("sc-vp-handbrake — the shadow gate (doc 76 §5)", () => {
 
   it("runs the whole checklist: lever down, mirror AND shoulder at rest, then a legal centered drive", () => {
     const kinds = shadow.trace.events.map((e) => e.kind);
-    // The checklist's last step — both glances, before the wheels turn.
+    // The checklist's last step — both halves, before the wheels turn.
+    // EXPECTATION CHANGED 2026-09-01, AND THE PRODUCT IS WHAT CHANGED: this
+    // asserted `glance-rear` for the shoulder half because the cabin had no
+    // shoulder check and the script recorded a second MIRROR under the comment
+    // „mirror + shoulder". `MirrorGlanceKind` now carries `"shoulder"`, the
+    // script performs it, and MOVE_OFF_WITHOUT_OBSERVATION requires it.
     expect(kinds).toContain("glance-left");
-    expect(kinds).toContain("glance-rear");
+    expect(kinds).toContain("glance-shoulder");
     // Drives the whole street centered and under the posted 50.
     const maxKmh = Math.max(...shadow.trace.samples.map((s) => Math.abs(s.speedKmh)));
     expect(maxKmh).toBeLessThan(50);
@@ -81,7 +86,10 @@ describe("sc-vp-handbrake — mistake demos grade their exact codes (doc 76 §9 
     expect(codes).not.toContain("POOR_LANE_KEEPING");
     const kinds = drive.trace.events.map((e) => e.kind);
     expect(kinds).toContain("glance-left");
-    expect(kinds).toContain("glance-rear");
+    // …and the shoulder, for the same reason as the shadow above: the demo's
+    // isolation claim („ONE fault, the lever") only holds if the observation it
+    // performs is the WHOLE observation the detector now asks for.
+    expect(kinds).toContain("glance-shoulder");
   });
 
   it("„Без оглед“: exactly MOVE_OFF_WITHOUT_OBSERVATION — the lever is genuinely down", () => {

@@ -202,18 +202,27 @@ describe("§3 the caption fits the lane it was measured against", () => {
 describe("§4 the fix that would have been a lie", () => {
   it("no glance button claims the whole procedure", () => {
     // «ОГЛЕД» is the briefing's own word for the act — and the act is «огледало
-    // И поглед през ЛЯВОТО рамо» (sc-vp-handbrake, step 3). This button
-    // performs the first half; `MirrorGlanceKind` (scene/cabin.ts) has no
-    // member for the second. A caption naming the whole thing would teach a
-    // student that one tap discharged a duty the engine cannot even measure.
+    // И поглед през ЛЯВОТО рамо» (sc-vp-handbrake, step 3). These three buttons
+    // perform the FIRST half only, and a caption naming the whole thing would
+    // teach a student that one tap on a mirror discharged the blind spot too.
+    // THE SECOND HALF NOW EXISTS AND THIS RULE OUTLIVED IT: `MirrorGlanceKind`
+    // gained `"shoulder"` on 2026-09-01, and the control that performs it is
+    // the «Рамо» TOP-RAIL button (both flanks are full at four stations — the
+    // arithmetic is at that button in TouchControls.tsx). So the rule stands
+    // for a stronger reason than „the engine cannot measure it": it can, it is
+    // half of MOVE_OFF_WITHOUT_OBSERVATION, and it has its own control — which
+    // is exactly why a MIRROR may not go on claiming it.
     const OVERCLAIMS = ["ОГЛЕД", "РАМО", "МЪРТВА ЗОНА", "СЛЯПА ЗОНА", "ОБСТАНОВКА"];
     for (const s of GLANCES) expect(OVERCLAIMS).not.toContain(s.caption);
   });
 
   it("…and there are exactly three of them, because there are three mirrors", () => {
-    // If a blind-spot station ever lands it needs a `MirrorGlanceKind` member,
-    // a camera pose and a rule-engine sample first. Until then a fourth button
-    // here would be a control that grades nothing.
+    // Three MIRRORS, three mirror stations — and the blind-spot check is not a
+    // fourth mirror, so it is not a fourth station here even now that it has a
+    // member, a camera pose, a rule-engine sample and controls on every input
+    // path. It could not be one anyway: `arcStationRectPx` puts a fifth right
+    // station at −12 px on the narrowest landscape stage in the ladder. It is
+    // the «Рамо» button in the top rail.
     expect(GLANCES.map((s) => s.label).sort()).toEqual([
       "Поглед в дясното огледало",
       "Поглед в лявото огледало",

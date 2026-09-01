@@ -19,6 +19,18 @@
  */
 
 export { SimEnvironment, type SimEnvironmentProps } from "./SimEnvironment";
+// The AC-12 wind depiction. `SimEnvironment` mounts the layer itself (pass it
+// `readWindLateralN`); the force→look mapping and its constants are exported
+// because they are the contract the physics is drawn against — doc 05: a helper
+// missing from this barrel does not exist, which is how the snow term once sat
+// in the tree moving no pixel.
+export {
+  windDriftLook,
+  WIND_DRIFT_REFERENCE_N,
+  WIND_DRIFT_SPEED_AT_REFERENCE_MPS,
+  WIND_DRIFT_MAX_OPACITY,
+  type WindDriftLook,
+} from "./windDrift";
 export { WindshieldDroplets } from "./WindshieldDroplets";
 // The A4 mirror rig shrinks the (scale-invariant) sky dome into its short
 // mirror frustum during RTT passes — name lookup only, no component export.
@@ -39,6 +51,11 @@ export { SIM_TONE_MAPPING, TONE_MAPPING_THREE } from "./toneMapping";
 
 export {
   ENVIRONMENT_PRESETS,
+  // The SEASON grade (sc-ac-ice / sc-ac-bridge-ice): a pure function over a
+  // time-of-day preset, so a winter dusk costs nothing and `TimeOfDay` stays
+  // three members wide.
+  environmentPreset,
+  winterGrade,
   sunDirection,
   RAIN_SUN_DIM,
   RAIN_HEMISPHERE_DIM,

@@ -52,10 +52,19 @@ describe("sc-pk-move-off — the shadow gate (doc 76 §5)", () => {
     expect(commendationCodes(shadow)).toContain("CLEAN_DRIVING");
   });
 
-  it("observes before moving off (a left AND a shoulder/rear glance while at rest)", () => {
+  it("observes before moving off (the left mirror AND the shoulder, while at rest)", () => {
     const kinds = shadow.trace.events.map((e) => e.kind);
+    // EXPECTATION CHANGED 2026-09-01, AND THE PRODUCT IS WHAT CHANGED. This
+    // asserted `glance-rear` while its own title and the script's annotation
+    // both said „през рамо": the cabin had no shoulder check, so the INTERIOR
+    // MIRROR stood in for the blind spot in the authoritative demonstration of
+    // the drill that exists to convict exactly that substitution.
+    // `MirrorGlanceKind` grew `"shoulder"` (scene/cabin.ts) with controls on
+    // both platforms, the script performs the real act, and
+    // MOVE_OFF_WITHOUT_OBSERVATION now wants a mirror AND this — so the
+    // recording finally carries the event the sentence always claimed.
     expect(kinds).toContain("glance-left");
-    expect(kinds).toContain("glance-rear");
+    expect(kinds).toContain("glance-shoulder");
     // Drives the whole street centered and legal.
     const maxKmh = Math.max(...shadow.trace.samples.map((s) => Math.abs(s.speedKmh)));
     expect(maxKmh).toBeLessThan(50);

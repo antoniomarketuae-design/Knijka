@@ -120,6 +120,7 @@ import {
   mirrorIsAttended,
   mirrorKindsFor,
   selectMirrorPass,
+  type HeldLook,
   type MirrorKind,
 } from "@/modules/sim/scene/vitok/mirrorAttention";
 import { getCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
@@ -677,7 +678,12 @@ export function MirrorRig({
     // answer the same question from the same values or they can disagree
     // about whether a door mirror is being looked through.
     const cabin = cabinRef?.current ?? null;
-    const glanceMirror = cabin?.glanceMirror ?? null;
+    // `HeldLook`, not `MirrorKind`: the held look may be the SHOULDER check,
+    // which is not glass. `mirrorAttention` owns that rule (its `HeldLook`
+    // docblock) and answers „no mirror attended" for it, so no pass is
+    // scheduled and no door glass is marked live for a look that goes past the
+    // B-pillar and never reaches a mirror at all.
+    const glanceMirror: HeldLook | null = cabin?.glanceMirror ?? null;
     const glanceStrength = cabin?.glanceStrength() ?? 0;
     const lookPose = getCabinLook();
 

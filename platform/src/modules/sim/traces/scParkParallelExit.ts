@@ -120,8 +120,18 @@ export function scParkParallelExitShadowScript(): DriveScript {
         textBg:
           "Сега огледало, ЛЯВ мигач и поглед през лявото рамо. Потеглянето от място е маневра — започва с оглед, не с волан (чл. 25).",
       },
+      // Mirror THEN the blind spot, one frame-producing beat apart — the
+      // recorder carries a single pending glance sample, so two glance steps
+      // drained back to back land only the last one on the tick stream. The
+      // second step used to be `mirror: "rear"` under an annotation that says
+      // „поглед през лявото рамо": the INTERIOR MIRROR was standing in for the
+      // blind spot on the drill's own correct demonstration, exactly as it was
+      // in sc-pk-move-off. `MirrorGlanceKind` carries `"shoulder"` since
+      // 2026-09-01 and `observation.ts` refuses a mirror for a moment titled
+      // „Огледало и през ЛЯВО РАМО…", so this is now the act it claims.
       { kind: "glance", mirror: "left" },
-      { kind: "glance", mirror: "rear" },
+      { kind: "pause", sec: 0.4, brake: true },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "indicator", setting: "left" },
       { kind: "pause", sec: 0.8, brake: true },
       {

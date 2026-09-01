@@ -219,7 +219,7 @@ export type DriveStep =
     }
   | { kind: "pause"; sec: number; brake?: boolean }
   | { kind: "indicator"; setting: TraceIndicator }
-  | { kind: "glance"; mirror: "left" | "right" | "rear" }
+  | { kind: "glance"; mirror: "left" | "right" | "rear" | "shoulder" }
   | { kind: "annotation"; textBg: string }
   /**
    * S1 mistake-demo seam: an AUTHORED consequence at the current clock — the
@@ -562,7 +562,7 @@ export function recordScriptedDrive(
   let t = 0;
   let frame = 0;
   let indicator: TraceIndicator = "off";
-  let pendingGlance: "left" | "right" | "rear" | null = null;
+  let pendingGlance: "left" | "right" | "rear" | "shoulder" | null = null;
   let pose = { x: 0, y: 0, headingDeg: 0 };
   let prevHeading: number | null = null;
   let speedMps = 0;

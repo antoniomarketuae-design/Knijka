@@ -891,7 +891,13 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
   // data (the deck's icePatch span), never a weather tag. Consequence, stated
   // plainly: the rule engine sees an ordinary dry 50-street and arms NO
   // conditions envelope (see the header) — the ice speaks only through physics.
-  conditions: { weather: "dry" },
+  //
+  // `winter: true` is the SEASON, and it is what makes «При температури около
+  // нулата …» a picture instead of a caption (sc-ac-bridge-ice:7eb16029 /
+  // sc-ac-ice:5372f176: both ice lessons rendered the same full-leaf summer
+  // morning). A render axis ONLY — no grip, no envelope, no weather tag; the
+  // sentence above is unchanged by it.
+  conditions: { weather: "dry", winter: true },
   // NO ruleConfig: every code this drill grades is shipped default-on.
   // NO physics: base grip stays 1 and ONLY the deck span reduces it — the
   // sc-ac-ice precedent (the pure map-data grip contract).

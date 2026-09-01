@@ -402,6 +402,12 @@ export function CaptureScene({
   const rain = lesson.environment?.rain ?? false;
   const fog = lesson.environment?.fog ?? false;
   const snow = lesson.environment?.snow ?? false;
+  // The SEASON, for the same R5 parity reason as everything above it: the two
+  // black-ice drills render winter now, and a mistake clip that re-enacts one
+  // of them under a summer sky is exactly the „the clip and the drill disagree"
+  // failure this component exists to prevent. Render-only — it feeds no tick
+  // channel, which is why it is absent from the `env` block above.
+  const winter = lesson.environment?.winter ?? false;
 
   const isCockpit = view === "cockpit";
   const viewFov = isCockpit ? cockpitVFovForAspect(CAPTURE_W / CAPTURE_H) : CHASE_FOV;
@@ -477,6 +483,7 @@ export function CaptureScene({
           rain={rain}
           fog={fog}
           snow={snow}
+          winter={winter}
           skyline={mapKindHasSkyline(core.district.meta.mapKind)}
           quality={level}
         />
@@ -495,6 +502,7 @@ export function CaptureScene({
               prebuilt={core.geometry}
               quality={level}
               night={isNight}
+              winter={winter}
               getSignalPhase={(id, bearing) => core.runtime.signalLampState(id, bearing)}
               getRailBarrierDown={(x, y) => core.runtime.railBarrierDownAt(x, y)}
               signSvgBaseUrl={null}

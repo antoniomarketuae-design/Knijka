@@ -1143,8 +1143,13 @@ export function compileScenario(
   // floor (see l5LadderFloorApplies). Every other rung reads exactly what it
   // authors, so 164 of 167 templates compile bit-identically.
   const conditions = effectiveConditions(spec, rung);
+  // `winter` joins the guard as a SEASON, not a fifth weather: it composes
+  // with every branch below (a winter night compiles both), it is what the two
+  // black-ice templates were missing while correctly authoring `weather: "dry"`
+  // about their surface, and it implies no physics and no conditions envelope.
   const environment: LessonSpec["environment"] | undefined =
     conditions.night ||
+    conditions.winter ||
     conditions.weather === "rain" ||
     conditions.weather === "fog" ||
     conditions.weather === "snow"
@@ -1153,6 +1158,7 @@ export function compileScenario(
           ...(conditions.weather === "rain" ? { rain: true } : {}),
           ...(conditions.weather === "fog" ? { fog: true } : {}),
           ...(conditions.weather === "snow" ? { snow: true } : {}),
+          ...(conditions.winter ? { winter: true } : {}),
         }
       : undefined;
 

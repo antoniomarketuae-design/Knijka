@@ -604,11 +604,20 @@ export class DrivelineState {
         movedTo = target;
         this.emit({ kind: "selectorChanged", selector: target, manualGear: this.manualGear });
       } else if (this.selector === "N" && this.tierNeutralFromD) {
-        // Undo our own D → N: the round trip must hand the car back exactly
-        // as it was found. NOT announced — putting something back where it was
-        // found is the one move that needs no explanation.
+        // Undo our own D → N: the round trip hands the car back exactly as it
+        // was found — and it is STILL A MOVE THE STUDENT DID NOT MAKE
+        // (sc-vp-stall:95df9139). This branch was silent on the reasoning that
+        // putting something back needs no explanation, which held only while
+        // the D → N had been his own tier click. Since `openingTier` shipped,
+        // the FIRST frame of a manual drill performs it before he touches
+        // anything: on sc-vp-stall D is a position he has never seen, and one
+        // tap on „Нормален" drops him into it with the clutch, first gear and
+        // the загасване the drill grades all gone, in silence. Reporting the
+        // move is this class's job; whether it is worth a sentence is the
+        // cockpit's (LessonPlayShell `transmissionSwitchHint`).
         this.selector = "D";
         this.tierNeutralFromD = false;
+        movedTo = "D";
         this.emit({ kind: "selectorChanged", selector: "D", manualGear: this.manualGear });
       }
     } else if (this.selector === "D") {

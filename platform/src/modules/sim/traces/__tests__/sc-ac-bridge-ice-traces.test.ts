@@ -269,9 +269,22 @@ describe("sc-ac-bridge-ice — mistake demos grade their exact codes (doc 76 §9
     // future edit makes either reachable the drill has quietly changed meaning.
     // (1) A clear dry morning arms NO conditions envelope: the engine composes
     // conditionFactor from rain/fog/snow/night ONLY, all absent here. The
-    // invisible ice under a blue sky is the doc-72 surprise — a weather tag
+    // invisible ice under a clear sky is the doc-72 surprise — a weather tag
     // would delete it. So the map's own defaults are what the drives run on.
-    expect(SC_AC_BRIDGE_ICE.conditions).toEqual({ weather: "dry" });
+    //
+    // `winter: true` joined this line and does NOT weaken the claim, which is
+    // why the assertion still names the whole object rather than loosening to a
+    // property check. The season is a RENDER axis: `rungConditions` never hands
+    // it to the engine, `conditionFactor` composes from rain/fog/snow/night
+    // only, and none of those four is authored here — so the envelope this case
+    // is about is still exactly the map's own defaults. What changed is that the
+    // «Ясна студена сутрин» in the briefing is now also what the student SEES
+    // (sc-ac-bridge-ice:7eb16029 / sc-ac-ice:5372f176 — both ice lessons
+    // photographed a full-leaf summer morning). The line below re-states the
+    // engine-facing half of the claim directly, so a future season that DID
+    // reach the envelope would still turn this red.
+    expect(SC_AC_BRIDGE_ICE.conditions).toEqual({ weather: "dry", winter: true });
+    expect(SC_AC_BRIDGE_ICE.conditions?.night).toBeUndefined();
     expect(SC_AC_BRIDGE_ICE.ruleConfig).toBeUndefined();
     expect(SC_AC_BRIDGE_ICE.physics).toBeUndefined(); // base grip 1; ONLY the span bites
     // (2) HARSH_BRAKING_NO_CAUSE needs ≤ −7 m/s². The authored on-ice envelope

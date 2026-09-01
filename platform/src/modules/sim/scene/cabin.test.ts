@@ -10,7 +10,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GLANCE_EASE_S, GLANCE_REFRESH_S, GLANCE_TAP_HOLD_S, GlanceHold } from "./cabin";
+import {
+  GLANCE_EASE_S,
+  GLANCE_REFRESH_S,
+  GLANCE_TAP_HOLD_S,
+  GlanceHold,
+  type MirrorGlanceKind,
+} from "./cabin";
 
 /** Advance in render-ish frames (like CabinControls.update does). */
 function tick(g: GlanceHold, seconds: number, step = 1 / 60): void {
@@ -18,8 +24,8 @@ function tick(g: GlanceHold, seconds: number, step = 1 / 60): void {
 }
 
 /** Advance like tick() but collect the graded refresh latches update() emits. */
-function tickCollect(g: GlanceHold, seconds: number, step = 1 / 60): Array<"left" | "right" | "rear"> {
-  const out: Array<"left" | "right" | "rear"> = [];
+function tickCollect(g: GlanceHold, seconds: number, step = 1 / 60): MirrorGlanceKind[] {
+  const out: MirrorGlanceKind[] = [];
   for (let t = 0; t < seconds; t += step) {
     const m = g.update(step);
     if (m) out.push(m);

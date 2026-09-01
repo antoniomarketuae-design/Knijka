@@ -149,11 +149,13 @@ import {
   type StuckStartReason,
 } from "@/modules/sim/engine";
 import { worldEdgeWarning } from "@/modules/sim/runtime";
-import type {
-  DrivelineRejection,
-  DrivelineSnapshot,
-  SelectorPosition,
-  TransmissionMode,
+import {
+  DEFAULT_DIFFICULTY,
+  transmissionModeFor,
+  type DrivelineRejection,
+  type DrivelineSnapshot,
+  type SelectorPosition,
+  type TransmissionMode,
 } from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
 import {
@@ -529,10 +531,32 @@ export function stuckStartHint(
  * characters, under the 34 measured as safe for two lines on both portrait
  * profiles.
  */
+/**
+ * …AND WHAT THE *LESSON* JUST LOST — sc-vp-stall:95df9139 (critical).
+ *
+ * `lessonBox` is the gearbox the LESSON opens on (`LessonSpec.openingTier`
+ * through `transmissionModeFor`), not the one the car is in. It matters in
+ * exactly one direction: a drill handed over as a manual, whose student has
+ * just switched to an automatic. The car sentence below is true either way —
+ * "предавките се сменят сами и съединител няма" — but on that drill the clutch
+ * was the SUBJECT, and `Driveline.update` gates the stall behind
+ * `transmission === "manual"`, so from this tap onward the engine cannot stall
+ * at all: the fault the lesson exists to teach can no longer be committed,
+ * felt or corrected. THEO-4 owes him that reason, not just the state.
+ *
+ * It names no control. This card only fires because he has just tapped the
+ * tier cell himself, so the way back is already under his finger — and the
+ * cell reads „НАПР" on a phone and „Напреднал" on the glass, a divergence a
+ * single sentence would have to lie about.
+ */
+const LESSON_LOST_ITS_GEARBOX_BG =
+  " Но това упражнение е писано за ръчната кутия: стъпките му искат съединител и първа предавка, а без съединител двигателят изобщо не може да загасне — грешката, заради която урокът съществува, вече нито може да се допусне, нито да се поправи. Смени нивото обратно, ако искаш колата, за която са написани стъпките.";
+
 export function transmissionSwitchHint(
   transmission: TransmissionMode,
   movedSelectorTo: SelectorPosition,
   input: HintInput,
+  lessonBox: TransmissionMode,
 ): { titleBg: string; explanationBg: string } {
   if (transmission === "manual") {
     // THE CARD THE WHOLE TIER OPENS WITH, so it is the one that had to stop
@@ -555,24 +579,25 @@ export function transmissionSwitchHint(
           ),
         };
   }
-  // Back to an automatic. The round trip (our own D → N undone) never reaches
-  // here — the driveline reports no move for it — so this is the M → D/N case:
-  // the box the student was working by hand is now working itself.
-  return movedSelectorTo === "D"
-    ? {
-        titleBg: "Скоростният лост е на D",
-        explanationBg: withSheetLocatorBg(
-          input,
-          `Върна се на автоматична кутия: предавките се сменят сами и съединител няма. Просто натисни газта, за да тръгнеш напред. За движение назад спри напълно, вдигни крак от спирачката и я натисни отново — или мини на R ${gearDownWithBg(input)}.`,
-        ),
-      }
-    : {
-        titleBg: "Скоростният лост е на N",
-        explanationBg: withSheetLocatorBg(
-          input,
-          `Върна се на автоматична кутия, а двигателят е угаснал, затова лостът е на неутрална — оттам стартерът може да запали. ${capBg(starterActBg(input))}, после премести лоста на D ${gearUpWithBg(input, "automatic")} и потегли.`,
-        ),
-      };
+  // Back to an automatic: M → D/N, and — since the D → N undo stopped being
+  // silent (vehicle/driveline.ts, sc-vp-stall:95df9139) — the round trip too.
+  // The box the student was working by hand is now working itself.
+  const carBg =
+    movedSelectorTo === "D"
+      ? `Върна се на автоматична кутия: предавките се сменят сами и съединител няма. Просто натисни газта, за да тръгнеш напред. За движение назад спри напълно, вдигни крак от спирачката и я натисни отново — или мини на R ${gearDownWithBg(input)}.`
+      : `Върна се на автоматична кутия, а двигателят е угаснал, затова лостът е на неутрална — оттам стартерът може да запали. ${capBg(starterActBg(input))}, после премести лоста на D ${gearUpWithBg(input, "automatic")} и потегли.`;
+  const lessonWasManual = lessonBox === "manual";
+  return {
+    titleBg: lessonWasManual
+      ? "Този урок е с ръчна кутия"
+      : movedSelectorTo === "D"
+        ? "Скоростният лост е на D"
+        : "Скоростният лост е на N",
+    explanationBg: withSheetLocatorBg(
+      input,
+      lessonWasManual ? `${carBg}${LESSON_LOST_ITS_GEARBOX_BG}` : carBg,
+    ),
+  };
 }
 
 // -- Minimap visibility (founder review 2026-07-28) ---------------------------
@@ -4142,15 +4167,26 @@ export function LessonPlayShell({
   // …and the one that is not a refusal at all: the tier pill moved the
   // student's own gear lever (see transmissionSwitchHint). No rate limit and
   // none needed — the driveline reports a move only when the lever really
-  // moved, which takes a deliberate click on the pill, and the round trip that
-  // puts a lever back where it was found reports nothing.
+  // moved, which takes a deliberate click on the pill.
+  //
+  // The FOURTH argument is the gearbox this LESSON opens on, and it is what
+  // lets the card say more than „the car changed" on a drill whose whole
+  // subject is the clutch (sc-vp-stall:95df9139). Derived, not stored: the
+  // same `lesson.openingTier ?? DEFAULT_DIFFICULTY` the scene seeds the tier
+  // state with, through the same `transmissionModeFor` the rig reads every
+  // frame — so a lesson that declares no tier resolves to "automatic" and the
+  // card is byte-identical to the one that shipped before this existed.
+  const lessonBox = useMemo(
+    () => transmissionModeFor(lesson.openingTier ?? DEFAULT_DIFFICULTY),
+    [lesson.openingTier],
+  );
   const handleTransmissionChanged = useCallback(
     (transmission: TransmissionMode, movedSelectorTo: SelectorPosition) => {
       if (finalizedRef.current) return;
-      const hint = transmissionSwitchHint(transmission, movedSelectorTo, hintInput);
+      const hint = transmissionSwitchHint(transmission, movedSelectorTo, hintInput, lessonBox);
       push([{ kind: "lesson", titleBg: hint.titleBg, explanationBg: hint.explanationBg }]);
     },
-    [hintInput, push],
+    [hintInput, lessonBox, push],
   );
 
   // THE PEDALS THAT LEFT THE SCREEN — lesson-ui/MousePedals.tsx.

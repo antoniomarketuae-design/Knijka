@@ -26,6 +26,7 @@ const EVENT_KINDS: readonly TraceEventKind[] = [
   "glance-left",
   "glance-right",
   "glance-rear",
+  "glance-shoulder",
   "signal-on",
   "signal-off",
   "driveline",

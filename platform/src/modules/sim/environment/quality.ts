@@ -43,6 +43,20 @@ export interface QualityPreset {
    *  budget tier-for-tier. */
   snowParticles: number;
   /**
+   * Instanced WIND-DRIFT mote count (0 = the drift layer is disabled at this
+   * level). Third member of the same GPU family as rain and snow — static
+   * seeds, one draw call — but paid on a different trigger: rain/snow are
+   * weather tags, this one is the AC-12 `physics.crosswind` opt-in, which the
+   * corpus authors twice (sc-ac-crosswind, sc-ac-wind-truck-pass). Every other
+   * lesson never mounts the layer and pays nothing.
+   *
+   * SMALLER THAN THE RAIN COUNTS ON PURPOSE. A rain field has to read as a
+   * curtain; blown dust reads as sparse chaff, and thinning it is what keeps
+   * the road paint and the truck legible through it (the WIND_DRIFT_MAX_OPACITY
+   * reasoning in ./windDrift).
+   */
+  windParticles: number;
+  /**
    * Whether the EffectComposer is mounted at all. When true it owns the final
    * image: N8AO + SMAA + ACES ToneMapping (+ bloom/color-grade at high). When
    * false the renderer draws directly with its own ACES and canvas MSAA.
@@ -122,6 +136,12 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     // before). med/high keep their authored densities.
     rainParticles: 260,
     snowParticles: 260,
+    // The same WEATHER-FLOOR argument as the two rows above, applied to the
+    // wind: a phone sent to `low` on «Страничен вятър след камиона» must not be
+    // shown a still, windless motorway in a lesson whose entire subject is the
+    // gust. One instanced draw, 280 mote triangles, paid only on the two
+    // lessons that author `physics.crosswind`.
+    windParticles: 140,
     postprocessing: false,
     aoEnabled: false,
     aoHalfRes: true,
@@ -150,6 +170,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     shadowRadiusM: 55,
     rainParticles: 800,
     snowParticles: 800,
+    windParticles: 330,
     postprocessing: true,
     aoEnabled: true,
     aoHalfRes: true,
@@ -175,6 +196,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     shadowRadiusM: 75,
     rainParticles: 1400,
     snowParticles: 1400,
+    windParticles: 540,
     postprocessing: true,
     aoEnabled: true,
     aoHalfRes: true,

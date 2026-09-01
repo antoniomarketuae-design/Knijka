@@ -27,6 +27,20 @@ export interface Vec2 {
 }
 
 export type MirrorKind = "left" | "right" | "rear";
+/**
+ * THE GRADED LOOK CHANNEL — the three mirrors plus the one look that is not a
+ * mirror at all.
+ *
+ * `shoulder` is the over-the-LEFT-shoulder check into the blind spot: the
+ * wedge that starts where the door mirror's field ends and stops short of the
+ * interior mirror's, in which a cyclist coming up the kerb side is invisible
+ * in EVERY piece of glass on the car. It is a separate member and not a fourth
+ * mirror for exactly that reason — see `scene/cabin.ts` `MirrorGlanceKind`,
+ * which owns the act, and note that every consumer here that means MIRROR
+ * GLASS (`scanStopCreditSec`, the A2 observer's `mirrorsGlanced`) must EXCLUDE
+ * shoulder rather than widen to it.
+ */
+export type GlanceKind = MirrorKind | "shoulder";
 export type IndicatorState = "off" | "left" | "right";
 export type HeadlightState = "off" | "low" | "high";
 export type TurnDirection = "left" | "right";
@@ -157,8 +171,10 @@ export type SimTickEvent =
       withWhat: "vehicle" | "pedestrian" | "cyclist" | "staticObject";
       actorId?: string;
     }
-  /** Player looked at a mirror (gaze/hover/click — input layer decides). */
-  | { kind: "mirrorGlance"; mirror: MirrorKind }
+  /** Player looked at a mirror — or over his shoulder into the blind spot
+   *  (`mirror: "shoulder"`, which is NOT glass; see `GlanceKind`). Gaze /
+   *  hover / click / key: the input layer decides. */
+  | { kind: "mirrorGlance"; mirror: GlanceKind }
   /**
    * RESERVED for v2 (right-of-way detectors): the engine adjudicates a
    * priority situation (right-hand rule, left turn vs oncoming, roundabout
@@ -1019,8 +1035,11 @@ export interface RuleEngineConfig {
    * opt in per-lesson via config override.
    */
   moveOffObservationEnabled: boolean;
-  /** Mirror glance (left or rear) must fall within this window before the
-   * session's FIRST move-off from rest. */
+  /** The observation — a mirror (left or rear) AND the over-the-shoulder
+   * blind-spot check — must fall within this window before the session's FIRST
+   * move-off from rest. BOTH, since 2026-09-01: see the discharge in engine.ts
+   * §1b for why a mirror alone used to be enough and why that was the fault the
+   * lesson exists to teach, dressed as a pass. */
   moveOffLookbackSec: number;
 
   /** Vehicle-center distance to a red-controlled stop line at rest at/under

@@ -1754,7 +1754,14 @@ export const SC_AC_ICE: ScenarioSpec = {
   // own data (icePatch span), never a weather tag. NO physics flag either:
   // the base grip stays 1 and ONLY the span reduces it (the first pure
   // map-data grip template).
-  conditions: { weather: "dry" },
+  //
+  // `winter: true` is the SEASON that sentence always claimed and the render
+  // never had (sc-ac-ice:5372f176, critical: this drill photographed as a dry
+  // summer day — blue sky, warm facades, full-leaf green trees — under a
+  // briefing that says «Ясна студена сутрин … около нулата»). It grades the
+  // light cold and browns off the foliage; it changes NO grip, NO envelope and
+  // NO weather render, so „dry" above still means exactly what it meant.
+  conditions: { weather: "dry", winter: true },
   localeBg: "bg-BG",
 };
 

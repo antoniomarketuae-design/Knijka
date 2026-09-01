@@ -743,9 +743,24 @@ describe("5 · RED MEANS „CLOSING ON SOMETHING CLOSE“ — both halves", () =
       .filter((d) => d.startsWith("sc-park-"))
       .sort();
     expect(onDisk).toEqual(PARKING_FAMILY.map(([id]) => id).slice().sort());
-    expect(samples).toBe(36367);
-    expect(badgeUp).toBe(4350);
+    // 36 367 → 36 375 on 2026-09-01: `sc-park-parallel-exit`'s shadow gained
+    // ONE authored beat — a 0.4 s `pause` between the mirror and the shoulder
+    // check at the move-off, which the recorder needs because it carries a
+    // single pending glance sample and two glance steps drained back to back
+    // land only the last one. 0.4 s at the recorder's 20 Hz is exactly the 8
+    // samples this census gained; nothing else in the corpus moved. The
+    // recording changed because the DRILL changed: `MirrorGlanceKind` grew
+    // `"shoulder"`, so „Огледало и през ЛЯВО РАМО преди изнасянето" is now
+    // performed instead of being mimed with the interior mirror.
+    expect(samples).toBe(36375);
+    // …and the badge is up for all eight of them (4 350 → 4 358): the beat is
+    // a braked pause in the parallel slot with the car behind still inside the
+    // cue's range, so the badge state does not change — only its duration.
+    expect(badgeUp).toBe(4358);
     // MEASURED: red went 82 → 2,296 frames, all of them reversing inside 4 m.
+    // UNCHANGED by the eight new samples, and that is the check on the story
+    // above rather than a coincidence: those samples are `speedKmh: 0` under a
+    // held brake, and `danger` requires `rearCueClosing(speedKmh)`.
     expect(red).toBe(2296);
     // The two that must be zero, and they are the whole honesty argument.
     //

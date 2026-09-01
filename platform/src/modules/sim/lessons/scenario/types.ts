@@ -212,6 +212,23 @@ export interface ScenarioObjectiveSpec {
 export interface ConditionAxis {
   weather?: "dry" | "rain" | "fog" | "snow";
   night?: boolean;
+  /**
+   * THE SEASON, and the reason it is not a fifth `weather`: the vocabulary
+   * above describes what is falling on the SURFACE, and „dry" is exactly what
+   * the two black-ice templates need to keep saying about theirs — black ice
+   * is invisible and a dry-looking street IS the lesson. What they were
+   * missing is the time of YEAR: both open on «Ясна студена сутрин … около
+   * нулата» and both rendered a full-leaf summer afternoon (sc-ac-ice:5372f176
+   * / sc-ac-bridge-ice:7eb16029, critical). Orthogonal to `night` too, so a
+   * winter dusk costs nothing.
+   *
+   * Compiles to `LessonSpec.environment.winter`; renders as a cold light grade
+   * (environment/presets.ts `winterGrade`) plus dormant foliage
+   * (world/textures/snowCover.ts). Touches no physics and arms no conditions
+   * envelope — the same discipline that keeps `weather: "rain"` from implying
+   * `physics.wetGrip`.
+   */
+  winter?: boolean;
 }
 
 /** Ambient-traffic sizing override (compiles to LessonSpec.traffic). */

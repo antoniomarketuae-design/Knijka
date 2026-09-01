@@ -229,12 +229,75 @@ describe("manual mode (behind the difficulty toggle)", () => {
     });
   });
 
-  it("A4: putting a lever back where it was found is reported as NO move", () => {
+  // EXPECTATION FLIPPED 2026-09-01 — sc-vp-stall:95df9139. This row used to
+  // assert the undo was reported as NO move ("putting a lever back where it
+  // was found needs no explanation"), and that reasoning held only while the
+  // D → N had been the STUDENT's own tier click. `ScenarioStartSpec.
+  // openingTier` now performs it on the first frame of a manual drill, so on
+  // sc-vp-stall D is a position the student has never seen and the undo drops
+  // him into it — no clutch, no first gear, and `update()`'s stall gate
+  // (`transmission === "manual"`) shut — in silence. The event is a STATE
+  // channel; suppressing it was a voice decision that belonged to the cockpit,
+  // which is where it now lives (LessonPlayShell `transmissionSwitchHint`).
+  it("A4: the lever the undo moves is reported too — the cockpit decides if it speaks", () => {
     const { d, events } = rig("ready");
     d.update(1 / 60, { ...STILL, transmission: "manual" }); // D → N (ours)
     d.update(1 / 60, { ...STILL, transmission: "automatic" }); // …undone
     expect(d.selector).toBe("D");
-    expect(events.at(-1)).toEqual({ kind: "transmissionChanged", transmission: "automatic" });
+    expect(events.at(-1)).toEqual({
+      kind: "transmissionChanged",
+      transmission: "automatic",
+      movedSelectorTo: "D",
+    });
+    // …and the round trip still HANDS THE CAR BACK unchanged, which is the
+    // half doc 87 A4 bought and this change must not spend.
+    expect(d.engineOn).toBe(true);
+    expect(hasDriveTraction(d.physicsInput)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // sc-vp-stall:95df9139 — THE DRILL'S OWN FAULT, END TO END.
+  //
+  // The sweep-161 finding is „the engine never stalls in any sampled frame of
+  // any of the four lanes". `openingTier` fixed the opening; this pins the two
+  // halves that decide whether the event can happen AT ALL on a live drive.
+  // -------------------------------------------------------------------------
+  it("sc-vp-stall: the handed-over manual car CAN stall on the student's own drive", () => {
+    const { d } = rig("ready"); // scene/cabin.ts constructs exactly this
+    expect(d.selector).toBe("D");
+    // Frame 1: LessonScene syncs the tier seeded by `lesson.openingTier`.
+    d.update(1 / 60, { ...STILL, transmission: "manual" });
+    expect({ selector: d.selector, transmission: d.transmission }).toEqual({
+      selector: "N",
+      transmission: "manual",
+    });
+    // Briefing step 2: clutch down, first gear.
+    d.setClutch(true);
+    expect(d.gearUp()).toBe(true);
+    expect(d.gearLabel).toBe("M1");
+    // …and step 3 done wrong: the clutch dumped with no throttle.
+    d.setClutch(false);
+    tick(d, STALL_GRACE_S * 2, { ...STILL, transmission: "manual" });
+    expect({ stalled: d.stalled, engineOn: d.engineOn }).toEqual({
+      stalled: true,
+      engineOn: false,
+    });
+  });
+
+  it("sc-vp-stall: …and it CANNOT once the tier pill hands the automatic back", () => {
+    const { d } = rig("ready");
+    d.update(1 / 60, { ...STILL, transmission: "manual" });
+    d.setClutch(true);
+    d.gearUp(); // M1
+    d.setClutch(false);
+    // The student taps „Нормален" before the grace window closes.
+    d.update(1 / 60, { ...STILL, transmission: "automatic" });
+    expect(d.selector).toBe("D");
+    tick(d, STALL_GRACE_S * 4, { ...STILL, transmission: "automatic" });
+    // The fault the lesson exists to teach is now unreachable — which is why
+    // the cockpit owes him a sentence about it.
+    expect(d.stalled).toBe(false);
+    expect(d.engineOn).toBe(true);
   });
 
   it("A4: a tier switch that moves nothing reports nothing", () => {

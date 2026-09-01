@@ -845,8 +845,14 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
     titleBg: "Потегляне без оглеждане",
+    // THE EXPLANATION NAMES BOTH HALVES, because since 2026-09-01 the detector
+    // grades both (rules/engine.ts §1b: a mirror AND the shoulder check). It
+    // used to say „огледалата" alone while `correctiveBg` below already said
+    // „и към мъртвата зона" — so a student who mirrored, skipped the blind spot
+    // and was convicted read a verdict that did not describe what he had done.
+    // No new law is claimed: the lawRef is the same retrieved ЗДвП чл. 25, ал. 1.
     explanationBg:
-      "Потегли от място, без да провериш огледалата непосредствено преди тръгване. Точно в този момент отзад може да приближава кола, колоездач или мотор — потеглянето е маневра и изисква оглеждане.",
+      "Потегли от място, без да направиш пълния оглед непосредствено преди тръгване: огледало И поглед през лявото рамо. Точно в този момент отзад може да приближава кола, колоездач или мотор — а мъртвата зона зад лявото рамо не се вижда в НИТО едно огледало. Потеглянето е маневра и изисква и двете.",
     correctiveBg:
       "Преди да потеглиш: поглед в лявото огледало и към мъртвата зона, мигач и чак тогава тръгвай. Проверката е последното действие преди колелата да се завъртят, не преди половин минута.",
     // чл. 25, ал. 1 names this maneuver: „да излезе от реда на паркираните

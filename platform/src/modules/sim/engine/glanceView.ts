@@ -47,14 +47,17 @@
 
 import {
   CHASE_REVERSE_ORBIT_RAD,
+  COCKPIT_SHOULDER_YAW,
   reverseSwingEnvelope,
   type ReverseViewMode,
 } from "./reverseView";
 
 /** Structurally identical to (and assignable from) cabin's MirrorGlanceKind —
  *  declared here so the module never imports a type out of the component
- *  layer (the ReverseViewMode pattern). */
-export type GlanceViewMirror = "left" | "right" | "rear";
+ *  layer (the ReverseViewMode pattern). `shoulder` is the blind-spot look and
+ *  NOT a mirror; it is here because it is an ACT the camera must perform, and
+ *  it gets an aspect of its own below. */
+export type GlanceViewMirror = "left" | "right" | "rear" | "shoulder";
 
 /**
  * Side-glance orbit depth, rad. π/3 (60°): deep enough that traffic on the
@@ -67,7 +70,27 @@ export type GlanceViewMirror = "left" | "right" | "rear";
 export const CHASE_GLANCE_SIDE_ORBIT_RAD = Math.PI / 3;
 
 /**
- * Full-hold aspect per mirror (rad about +Y). REAR deliberately IS the
+ * OVER-THE-LEFT-SHOULDER aspect, rad about +Y — the ONE definition of "looking
+ * into the left blind spot", shared by the chase orbit below and by the
+ * cockpit head turn (`CameraRig.GLANCE_OFFSETS.shoulder` imports it), the same
+ * one-aspect discipline REAR keeps with the reversing POV.
+ *
+ * IT IS NOT A NEW NUMBER. It is `COCKPIT_SHOULDER_YAW` mirrored: reverseView.ts
+ * already derives −1.85 rad (≈ −106°) as the RIGHT-shoulder check the reversing
+ * POV performs, and states why it stops there — „beyond ~90–110° a driver's
+ * head stops and the TORSO does the rest, which the cockpit camera (a head at
+ * COCKPIT_EYE, not a body) cannot model". A left shoulder check is the same
+ * head on the same neck, so it is the same magnitude with the sign flipped
+ * (positive = toward car-LEFT, the convention the chase reverse orbit pins).
+ * Read against this file's other two aspects it also lands where the blind
+ * spot is: past the door mirror's quarter (CHASE_GLANCE_SIDE_ORBIT_RAD, π/3)
+ * and short of the over-the-boot aspect (CHASE_REVERSE_ORBIT_RAD, π) — the
+ * wedge no glass on the car can show. TUNE IT IN reverseView.ts, once.
+ */
+export const SHOULDER_GLANCE_ORBIT_RAD = -COCKPIT_SHOULDER_YAW;
+
+/**
+ * Full-hold aspect per look (rad about +Y). REAR deliberately IS the
  * reverse-view aspect — one definition of "looking over the boot" across the
  * whole reverse/glance family, which is also what lets the reverse-priority
  * blend hold that aspect through handovers without a dip.
@@ -76,6 +99,7 @@ export const CHASE_GLANCE_ASPECT_RAD: Record<GlanceViewMirror, number> = {
   left: CHASE_GLANCE_SIDE_ORBIT_RAD,
   right: -CHASE_GLANCE_SIDE_ORBIT_RAD,
   rear: CHASE_REVERSE_ORBIT_RAD,
+  shoulder: SHOULDER_GLANCE_ORBIT_RAD,
 };
 
 /**

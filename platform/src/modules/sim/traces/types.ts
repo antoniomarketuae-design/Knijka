@@ -51,6 +51,10 @@ export type TraceEventKind =
   | "glance-left"
   | "glance-right"
   | "glance-rear"
+  /** The blind-spot check over the LEFT shoulder — a look, not a mirror
+   *  (rules/types.ts `GlanceKind`). Added 2026-09-01 with the control that
+   *  performs it; older traces simply never carry one. */
+  | "glance-shoulder"
   | "signal-on"
   | "signal-off"
   | "driveline"

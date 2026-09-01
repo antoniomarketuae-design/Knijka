@@ -97,6 +97,48 @@ describe("curve-advisory overspeed detector", () => {
     expect(seen).toContain("SPEEDING_DANGEROUS");
   });
 
+  /**
+   * `sc-sp-curve:45e7e4fb` (critical) — „a Несъобразена скорост в завой card
+   * fires there — the engine is scoring a corner the car is not on".
+   *
+   * The gate is ONE-SIDED and the three cases below are the whole claim: the
+   * asphalt gates the ARM, never the FIRE. `edgeId === null` is the runtime's
+   * surface-consulted „past the kerb" (worldRuntime's OFF_CARRIAGEWAY_M);
+   * `undefined` is „this source cannot answer" and must change nothing.
+   */
+  describe("the asphalt gates the arm, not the fire (sc-sp-curve:45e7e4fb)", () => {
+    const inField = (t: number, speedKmh: number) =>
+      inCurve(t, speedKmh, { edgeId: null, position: { x: 120, y: 240 } });
+    const onRoad = (t: number, speedKmh: number) =>
+      inCurve(t, speedKmh, { edgeId: "e-curve", position: { x: 120, y: 240 } });
+
+    it("a fresh episode cannot arm off the carriageway — no bend is under the car", () => {
+      const ticks: ReturnType<typeof tick>[] = [];
+      for (let t = 0; t <= 6; t += 0.5) ticks.push(inField(t, 96));
+      const seen = codes(drive(ticks).events);
+      expect(seen).not.toContain("SPEED_TOO_FAST_FOR_CURVE");
+      // NOT an amnesty: the departure itself is still charged (чл. 15, ал. 1).
+      expect(seen).toContain("OFF_CARRIAGEWAY");
+    });
+
+    it("an episode armed ON the asphalt still fires after the car runs wide (the fault's own result)", () => {
+      const ticks = [
+        onRoad(0, 70),
+        onRoad(0.5, 70),
+        // Runs wide out of the bend BEFORE the 1.5 s sustain elapses:
+        inField(1, 70),
+        inField(1.5, 70),
+        inField(2, 70),
+      ];
+      expect(codes(drive(ticks).events)).toContain("SPEED_TOO_FAST_FOR_CURVE");
+    });
+
+    it("an absent edgeId channel changes nothing (replays, fixtures, the dev rigs)", () => {
+      const ticks = [0, 0.5, 1, 1.5, 2, 2.5].map((t) => inCurve(t, 70));
+      expect(codes(drive(ticks).events)).toContain("SPEED_TOO_FAST_FOR_CURVE");
+    });
+  });
+
   it("grades основна (3 т.) with the чл. 20 ал. 2 basis and the speed-adaptation concept", () => {
     const ticks = [0, 0.5, 1, 1.5, 2, 2.5].map((t) => inCurve(t, 70));
     const ev = drive(ticks).events.find(

@@ -74,7 +74,7 @@ import { encodeSpeedMeasurement } from "./consequences";
 import {
   DEFAULT_RULE_CONFIG,
   type LaneArrow,
-  type MirrorKind,
+  type GlanceKind,
   type RuleEngineConfig,
   type RuleEvent,
   type SimTick,
@@ -238,7 +238,10 @@ export interface RuleEngineState {
    */
   lastLaneArrow: { arrow: LaneArrow; t: number } | null;
   lastIndicatorOnAt: Record<TurnDirection, number | null>;
-  lastGlanceAt: Record<MirrorKind, number | null>;
+  /** Keyed by `GlanceKind`, i.e. the three mirrors AND the blind-spot check —
+   *  they are different acts and the move-off discharge needs to tell them
+   *  apart. Only the two SIDE members feed `scanStopCreditSec`. */
+  lastGlanceAt: Record<GlanceKind, number | null>;
   /**
    * JU-23 wait-freeze ledger (founder R3 #13, doc 62): seconds spent
    * effectively STOPPED (speed < movingSpeedKmh) since each SIDE's last
@@ -1850,7 +1853,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     overtakePullOutAt: null,
     lastLaneArrow: null,
     lastIndicatorOnAt: { left: null, right: null },
-    lastGlanceAt: { left: null, right: null, rear: null },
+    lastGlanceAt: { left: null, right: null, rear: null, shoulder: null },
     scanStopCreditSec: { left: 0, right: 0 },
     stop: { stoppedSince: null, lastQualifyingStopAt: null },
     speedingMinor: { ...IDLE_EPISODE },
@@ -2437,9 +2440,18 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * wrong charge for no charge. The new code is the OTHER half of the ruling in
    * `runtime/worldRuntime.ts`'s surface-consult header („must still be a
    * conviction, not a shrug"): the sheet now names the real fault at the kerb
-   * IN ADDITION to whatever else was billed. So `sc-sp-curve:45e7e4fb` is not
-   * closed by this — the card it complains about still fires — but the drive it
-   * photographs is no longer graded as though the car were on the road.
+   * IN ADDITION to whatever else was billed.
+   *
+   * ── 2026-09-01, THE ONE CONJUNCT THE ARGUMENT ABOVE DOES LICENSE ───────────
+   * The two objections are both about the FIRE (acquitting the fault at the
+   * instant it produces its result; re-arming the sustain on the way back).
+   * Neither is about the ARM. The curve advisory now carries a one-sided
+   * conjunct that reads `edgeId` ONLY to refuse a FRESH episode off the asphalt
+   * — an episode already open keeps running past the kerb and still fires there
+   * — which is what `sc-sp-curve:45e7e4fb` actually photographs: a re-arm two
+   * minutes into a field, off a lane fix that survives the kerb to the 30 m
+   * lock ring. Its derivation is at the detector. NOTHING ELSE moved: В27 and
+   * every other span detector still arm off the asphalt exactly as before.
    */
 
   // Frame-to-frame derivatives (A12 tolerance bands). dt of 0 (duplicate
@@ -2528,7 +2540,11 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   for (const e of tick.events) {
     if (e.kind === "mirrorGlance") {
       s.lastGlanceAt[e.mirror] = t;
-      if (e.mirror !== "rear") s.scanStopCreditSec[e.mirror] = 0;
+      // The JU-23 wait-freeze ledger is a LEFT/RIGHT scan credit, so only
+      // those two members may reset it. `rear` never did; `shoulder` must not
+      // either — the blind-spot check is a look behind the B-pillar, not the
+      // ляво-дясно scan across a junction mouth that this credit measures.
+      if (e.mirror === "left" || e.mirror === "right") s.scanStopCreditSec[e.mirror] = 0;
     }
     // Hazard ledger (A12): anything hazard-shaped in the recent past makes a
     // hard brake explainable — the causeless-harsh-brake detector stands down.
@@ -2552,24 +2568,48 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   // -- 1b. move-off observation (PK-05, DVSA top-5) — the session's FIRST
-  // move-off from an observed rest must carry a fresh mirror glance (left or
-  // rear) within the lookback. Config-gated OFF by default (see types.ts:
-  // curb exits are indistinguishable from queue move-offs with current
-  // telemetry, and the A12 innocent-drive contract pulls away unglanced).
-  // A session that starts already in motion, or whose first motion is a
-  // reverse maneuver, is never graded (conservative).
+  // move-off from an observed rest must carry the WHOLE observation within the
+  // lookback: a mirror behind you (left door or interior) AND the check over
+  // your shoulder into the blind spot. Config-gated OFF by default (see
+  // types.ts: curb exits are indistinguishable from queue move-offs with
+  // current telemetry, and the A12 innocent-drive contract pulls away
+  // unglanced). A session that starts already in motion, or whose first motion
+  // is a reverse maneuver, is never graded (conservative).
+  //
+  // BOTH HALVES, SINCE 2026-09-01 — AND THE MIRROR ALONE WAS THE TAUGHT FAULT.
+  // This read `left || rear` for as long as it existed, because until this wave
+  // the cabin had no fourth look to ask for: `MirrorGlanceKind` was
+  // „left | right | rear" and no key, button or hotspot on either platform
+  // could perform a shoulder check. So the drill that exists to teach „огледало
+  // И през рамо" cleared a student who did half of it, and the half it accepted
+  // is the one that cannot see the thing that kills — the blind spot is by
+  // definition what the glass misses.
+  //
+  // NOTHING NEW IS CLAIMED BY TIGHTENING IT. The product has said BOTH all
+  // along, in the two authored texts this code is graded against:
+  // `catalog.ts` MOVE_OFF_WITHOUT_OBSERVATION.correctiveBg — „поглед в лявото
+  // огледало и към мъртвата зона" — and `procedures/tutorial.ts`
+  // final-mirror-check, whose gradedByCode IS this code and whose howBg reads
+  // „Поглед в лявото огледало, поглед във вътрешното, после КРАТЪК поглед през
+  // рамо наляво — мъртвата зона не се вижда в никое огледало." The detector was
+  // the only part of the product that disagreed. The lawRef is untouched
+  // (ЗДвП чл. 25, ал. 1, retrieved, not restated).
   if (!s.moveOff.done) {
     if (speed <= cfg.fullStopMaxSpeedKmh) {
       s.moveOff.restSeen = true;
     } else if (speed > cfg.movingSpeedKmh) {
       s.moveOff.done = true;
       if (cfg.moveOffObservationEnabled && s.moveOff.restSeen && forwardGear) {
-        const left = s.lastGlanceAt.left;
-        const rear = s.lastGlanceAt.rear;
-        const observed =
-          (left !== null && t - left <= cfg.moveOffLookbackSec) ||
-          (rear !== null && t - rear <= cfg.moveOffLookbackSec);
-        if (!observed) events.push(makeViolation("MOVE_OFF_WITHOUT_OBSERVATION", t));
+        const fresh = (at: number | null): boolean =>
+          at !== null && t - at <= cfg.moveOffLookbackSec;
+        // The mirror half: left door OR interior. RIGHT is deliberately absent
+        // — a kerb-side look is not the move-off observation, which is what the
+        // «Поглед само към бордюра» demo of this drill exists to show.
+        const mirrored = fresh(s.lastGlanceAt.left) || fresh(s.lastGlanceAt.rear);
+        const shouldered = fresh(s.lastGlanceAt.shoulder);
+        if (!mirrored || !shouldered) {
+          events.push(makeViolation("MOVE_OFF_WITHOUT_OBSERVATION", t));
+        }
       }
     }
   }
@@ -3233,15 +3273,51 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   //    overshoot corrected within the sustain never bills; reverse
   //    maneuvering is exempt. Reset re-arms only after genuine correction
   //    (at/under the advisory) or after leaving the span — one bill per act.
-  //  - NOT gated on «is there asphalt under the car»: see the withdrawn-gate
-  //    note at the top of reduceTick. Running WIDE onto the verge is this
-  //    fault's own consequence, and `edgeId` nulls one metre past the kerb.
+  //  - THE ASPHALT GATES THE ARM, NOT THE FIRE (`sc-sp-curve:45e7e4fb`,
+  //    critical — „a Несъобразена скорост в завой card fires there — the
+  //    engine is scoring a corner the car is not on"). The withdrawn-gate note
+  //    at the top of reduceTick refuses a BLANKET `edgeId !== null` conjunct
+  //    for two reasons, and both are about the FIRE: running wide onto the
+  //    verge is this fault's own result, so a blanket gate acquits the fault at
+  //    the instant it produces it; and because leaving the span is also the
+  //    reset, an oscillating driver could clear the bend unbilled. Neither
+  //    reason touches the ARM. So the conjunct is one-sided:
+  //
+  //      an episode already open keeps running off the asphalt and still fires
+  //      there;  a FRESH episode may not begin on a tick the runtime says is
+  //      past the kerb.
+  //
+  //    That is exactly what the photographed drive needs. `.audit-frames/
+  //    sweep161/sc-sp-curve/mobile-wrong` is two minutes of open field — the
+  //    car left the road around t = 24 s and the card lands again at t = 129 s,
+  //    which can only be a re-arm: the lane fix survives the kerb out to the
+  //    locator's 30 m lock ring, so a car circling a field beside a bend keeps
+  //    re-entering the span by ARCLENGTH and re-earning a 1,5 s sustain it
+  //    serves entirely off the road. The bend that bill names is not under him,
+  //    and a card a seventeen-year-old can refute out of his own windscreen
+  //    teaches him to stop reading them (THEO-4, doc 64) — the same argument
+  //    `runtime/worldRuntime.ts` already accepted for `wrongWay`, and the same
+  //    boundary the act draws: § 6, т. 4 defines „граница на платното за
+  //    движение" as the line separating платното from банкет/тротоар (ЗДвП,
+  //    `content/law/acts/zdvp.json` — retrieved, ADR-002). Past it there is no
+  //    завой to enter too fast.
+  //    NOT AN AMNESTY: the departure itself is charged by OFF_CARRIAGEWAY
+  //    (чл. 15, ал. 1) in the block below, on the very same `edgeId === null`.
+  //    POLARITY: `edgeId` is `string | null | undefined` and `undefined` means
+  //    „this tick source cannot answer" (replays, fixtures, the dev rigs), so
+  //    only an explicit `null` may block an arm — written `!== null`, never
+  //    `Boolean(edgeId)`, or every hand-built tick in the suite becomes a
+  //    driver in a field.
   const advisoryKmh = tick.curveAdvisoryKmh;
+  // Read BEFORE `stepEpisode` mutates it: this is last frame's onset, i.e.
+  // „was this episode already open when the car was still on a road".
+  const curveEpisodeOpen = s.curveSpeed.activeSince !== null;
   const curveOverspeed =
     advisoryKmh !== undefined &&
     moving &&
     forwardGear &&
-    speed > advisoryKmh + cfg.curveSpeedGraceKmh;
+    speed > advisoryKmh + cfg.curveSpeedGraceKmh &&
+    (curveEpisodeOpen || tick.edgeId !== null);
   if (
     stepEpisode(
       s.curveSpeed,

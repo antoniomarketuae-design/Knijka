@@ -83,6 +83,7 @@ export {
   CHASE_GLANCE_SIDE_ORBIT_RAD,
   CHASE_GLANCE_ASPECT_RAD,
   CHASE_GLANCE_LOCK_RATE_RADS,
+  SHOULDER_GLANCE_ORBIT_RAD,
 } from "./glanceView";
 export type { GlanceViewMirror } from "./glanceView";
 

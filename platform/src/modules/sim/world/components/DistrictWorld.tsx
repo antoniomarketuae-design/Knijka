@@ -24,7 +24,7 @@ import { useFrame } from "@react-three/fiber";
 import { getSnowIntensity } from "@/modules/sim/environment";
 import type { SignalLampState } from "../../contracts";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
-import { setSnowCover } from "../textures/snowCover";
+import { setSnowCover, setWinterCover } from "../textures/snowCover";
 import type { BuildWorldOptions, District, WorldGeometry, WorldQuality } from "../types";
 import { QUALITY_PRESETS } from "./quality";
 import { StaticWorld } from "./StaticWorld";
@@ -39,6 +39,18 @@ export interface DistrictWorldProps {
   quality?: WorldQuality;
   /** Night mode: lit windows + streetlight glow. Default false. */
   night?: boolean;
+  /**
+   * WINTER — the SEASON, wired from `LessonSpec.environment.winter`. Browns off
+   * the foliage this world draws: tree canopies, the grass verge, the paved
+   * courtyards' planting and the roundabout beds (the shared seasonal shader
+   * hook in `textures/snowCover.ts`, keyed on each fragment's own greenness, so
+   * steel, concrete, asphalt, sign faces and signal lenses are all untouched).
+   * The LIGHT half of the same season is `environment/presets.ts`'s
+   * `winterGrade`, applied by `SimEnvironment` — the two are driven off the one
+   * `environment.winter` flag so they can never disagree. Default false = the
+   * bytes this world rendered before (`mix(x, y, 0.0)` is an exact identity).
+   */
+  winter?: boolean;
   /** Lamp state per signal head — wire to WorldRuntime.signalLampState
    *  (mode- and approach-aware). Default: all green. */
   getSignalPhase?: (signalNodeId: string, approachBearingDeg: number) => SignalLampState;
@@ -64,6 +76,7 @@ export function DistrictWorld({
   district,
   quality = "med",
   night = false,
+  winter = false,
   getSignalPhase,
   getRailBarrierDown,
   signSvgBaseUrl = "/content/signs/svg",
@@ -97,8 +110,15 @@ export function DistrictWorld({
   // and StaticWorld's road mapping already read, so the accumulation on the
   // props, the flakes in the air, the haze and the brightened carriageway all
   // ramp on one channel and can never drift apart.
+  //
+  // The SEASON rides the same writer, one line below the weather, and per frame
+  // for the same reason even though a season never ramps: the uniform set is
+  // module-level and outlives any one scene, so a mount-time write would hand
+  // the NEXT lesson this one's winter. A constant float store per frame costs
+  // nothing and cannot go stale.
   useFrame(() => {
     setSnowCover(getSnowIntensity());
+    setWinterCover(winter ? 1 : 0);
   });
 
   return (

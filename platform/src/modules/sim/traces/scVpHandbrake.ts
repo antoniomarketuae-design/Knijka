@@ -83,7 +83,7 @@ export function scVpHandbrakeShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Чек-листът не свършва на таблото: последната стъпка е огледът." },
       { kind: "glance", mirror: "left" },
       { kind: "pause", sec: 0.4, brake: true },
-      { kind: "glance", mirror: "rear" },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "annotation", textBg: "Чисто е отзад и отляво — чак сега потегляме." },
       { kind: "drive", points: RUN, targetKmh: 40 },
       { kind: "pause", sec: 1.5, brake: true },
@@ -110,7 +110,7 @@ export function scVpHandbrakeMistakeHandbrakeOnScript(): DriveScript {
       { kind: "annotation", textBg: "Червената лампа на таблото свети — но никой не поглежда натам." },
       { kind: "glance", mirror: "left" },
       { kind: "pause", sec: 0.4, brake: true },
-      { kind: "glance", mirror: "rear" },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "drive", points: RUN, targetKmh: 40 },
       { kind: "pause", sec: 1.5, brake: true },
       {

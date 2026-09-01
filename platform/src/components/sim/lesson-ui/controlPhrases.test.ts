@@ -204,19 +204,30 @@ for (const box of BOXES) {
     });
   }
   for (const to of SELECTORS[box]) {
-    CASES.push({
-      id: `tierSwitch/${to}/${box}`,
-      box,
-      by: (i) => transmissionSwitchHint(box, to, i).explanationBg,
-    });
+    // …AND THE GEARBOX THE LESSON ITSELF OPENED ON (sc-vp-stall:95df9139).
+    // `transmissionSwitchHint` gained a fourth axis, so the corpus gains it
+    // too — a new dimension left out of the cross-product is exactly the
+    // "sampled few" this file was written against. All four combinations are
+    // reachable: `LessonSpec.openingTier` is authored on sc-vp-stall and
+    // absent (→ automatic) on the other 166 templates, and a student can move
+    // the tier either way on either kind of lesson.
+    for (const lessonBox of BOXES) {
+      CASES.push({
+        id: `tierSwitch/${to}/${box}/lesson-${lessonBox}`,
+        box,
+        by: (i) => transmissionSwitchHint(box, to, i, lessonBox).explanationBg,
+      });
+    }
   }
 }
 
 describe("the hint corpus is the whole reachable cross-product, not a sample", () => {
   it("covers every hint the shell can emit", () => {
-    // manual   1 start + 3 reasons × 4 selectors + 5 stuck + 4 tier = 22
-    // automatic 1 start + 2 reasons × 4 selectors + 5 stuck + 4 tier = 18
-    expect(CASES).toHaveLength(40);
+    // manual   1 start + 3 reasons × 4 selectors + 5 stuck + 4 tier × 2 lesson = 26
+    // automatic 1 start + 2 reasons × 4 selectors + 5 stuck + 4 tier × 2 lesson = 22
+    // Was 40 before the lesson-gearbox axis; the extra 8 are the tier cases
+    // re-run for a lesson whose own car is a manual.
+    expect(CASES).toHaveLength(48);
     expect(new Set(CASES.map((c) => c.id)).size).toBe(CASES.length);
   });
 });
@@ -278,12 +289,54 @@ describe("the key names survive for the reader who has keys", () => {
 
   it("«Напреднал»'s opening card still teaches „Z + ]“ to a keyboard", () => {
     // The single worst string in the audit, both halves of it.
-    const kb = transmissionSwitchHint("manual", "N", "keyboard").explanationBg;
+    const kb = transmissionSwitchHint("manual", "N", "keyboard", "manual").explanationBg;
     expect(kb).toContain("съединителя (Z)");
     expect(kb).toContain("с клавиш ]");
-    const touch = transmissionSwitchHint("manual", "N", "touch").explanationBg;
+    const touch = transmissionSwitchHint("manual", "N", "touch", "manual").explanationBg;
     expect(touch).toContain("задръж „СЪЕД“");
     expect(touch).toContain("включи първа с „M►“");
+  });
+});
+
+// ── the drill that loses its own gearbox — sc-vp-stall:95df9139 ─────────────
+
+describe("a manual drill says what the tier pill just took away", () => {
+  // The residual half of the finding. `start.openingTier` fixed the OPENING
+  // (the car arrives manual and the stall is reachable); nothing covered the
+  // student who taps „Нормален" afterwards. `Driveline.update` gates the stall
+  // behind `transmission === "manual"`, so from that tap on the engine cannot
+  // stall — the fault the lesson exists to teach stops existing, silently.
+  const THE_LOSS_BG = "без съединител двигателят изобщо не може да загасне";
+
+  it.each(["D", "N"] as const)("returning to an automatic in %s explains the cost", (to) => {
+    for (const input of INPUTS) {
+      const manualLesson = transmissionSwitchHint("automatic", to, input, "manual");
+      expect(manualLesson.explanationBg).toContain(THE_LOSS_BG);
+      expect(manualLesson.titleBg).toBe("Този урок е с ръчна кутия");
+      // …and it is not a bare state change: the WHY and the way back are both
+      // in the card (THEO-4).
+      expect(manualLesson.explanationBg).toContain("Смени нивото обратно");
+
+      // The negative control — every other lesson's card is untouched, which
+      // is what makes this an addition rather than a rewrite of 166 rungs.
+      const normalLesson = transmissionSwitchHint("automatic", to, input, "automatic");
+      expect(normalLesson.explanationBg).not.toContain(THE_LOSS_BG);
+      expect(normalLesson.titleBg).toBe(to === "D" ? "Скоростният лост е на D" : "Скоростният лост е на N");
+      // The car half is shared verbatim; the drill clause is appended to it.
+      expect(manualLesson.explanationBg.startsWith(
+        normalLesson.explanationBg.replace(TOUCH_SHEET_LOCATOR_BG, ""),
+      )).toBe(true);
+    }
+  });
+
+  it("…and switching INTO the manual is unchanged — he is getting the car back", () => {
+    for (const to of ["N", "M"] as const) {
+      for (const input of INPUTS) {
+        expect(transmissionSwitchHint("manual", to, input, "manual")).toEqual(
+          transmissionSwitchHint("manual", to, input, "automatic"),
+        );
+      }
+    }
   });
 });
 
@@ -362,6 +415,25 @@ describe("aria — a label that was true when written and is false now", () => {
     expect(touch).toContain("„ДВИГ“");
     expect(touch).toContain("„СЪЕД“");
     expect(touch).toContain("„Кола“");
+  });
+
+  it("the lesson's own gearbox reaches the card, or the sentence is dead code", () => {
+    // sc-vp-stall:95df9139. `transmissionSwitchHint` can now say what the DRILL
+    // lost, and a hint function that is correct but called with the wrong
+    // fourth argument is the dead predicate this project keeps measuring. Two
+    // links, both greppable: the shell derives the lesson's box the way the
+    // scene seeds the tier, and hands that value to the hint.
+    expect(SHELL_SRC).toContain(
+      "transmissionModeFor(lesson.openingTier ?? DEFAULT_DIFFICULTY)",
+    );
+    expect(SHELL_SRC).toContain(
+      "transmissionSwitchHint(transmission, movedSelectorTo, hintInput, lessonBox)",
+    );
+    // …and the scene really does forward the event that triggers it, only for
+    // a lever the switch moved.
+    expect(SCENE_SRC).toContain(
+      'event.kind === "transmissionChanged" && event.movedSelectorTo !== undefined',
+    );
   });
 
   it("…and the shell actually passes the input to the cluster, both mounts", () => {

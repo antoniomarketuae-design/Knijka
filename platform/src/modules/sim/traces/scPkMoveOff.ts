@@ -21,8 +21,8 @@
  *     all → grades EXACTLY MOVE_OFF_WITHOUT_OBSERVATION;
  *   - „Само към бордюра": glances only RIGHT (toward the curb, away from the
  *     traffic that can hit you) before moving off → EXACTLY
- *     MOVE_OFF_WITHOUT_OBSERVATION (the detector wants a left OR rear glance —
- *     a curb-side look is not the move-off observation).
+ *     MOVE_OFF_WITHOUT_OBSERVATION (the detector wants a mirror behind you —
+ *     left OR rear — AND the shoulder check; a curb-side look is neither).
  *
  * Geometry pinned to content/world/vp-ready-v1.json: the street runs south →
  * north on x = 0, right-lane center x = 4.06, length 360 m, spawn
@@ -66,7 +66,12 @@ export function scPkMoveOffShadowScript(): DriveScript {
       { kind: "glance", mirror: "left" },
       { kind: "pause", sec: 0.4, brake: true },
       { kind: "annotation", textBg: "И през рамо — мъртвата зона зад лявото рамо крие приближаваща кола или колоездач." },
-      { kind: "glance", mirror: "rear" },
+      // …AND THIS STEP USED TO BE `mirror: "rear"`. The annotation above it has
+      // always said „през рамо" while the recording performed the INTERIOR
+      // MIRROR, because until 2026-09-01 the cabin had no shoulder check to
+      // record: the authoritative demonstration of this drill demonstrated the
+      // very substitution the drill exists to convict. It is the real act now.
+      { kind: "glance", mirror: "shoulder" },
       { kind: "annotation", textBg: "Чисто е — потегляме плавно и се нареждаме в дясната лента." },
       { kind: "drive", points: RUN, targetKmh: 40 },
       { kind: "pause", sec: 1.5, brake: true },

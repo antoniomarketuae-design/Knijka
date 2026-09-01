@@ -19,17 +19,25 @@
 import fs, { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ShaderChunk, ShaderLib } from "three";
+import { Color, ShaderChunk, ShaderLib } from "three";
 import {
   getSnowCover,
+  getWinterCover,
   setSnowCover,
+  setWinterCover,
   snowCoverOnBeforeCompile,
   snowCoverProgramCacheKey,
+  winterDormantTint,
   SNOW_COVER_COLOR,
   SNOW_COVER_FACING_HI,
   SNOW_COVER_FACING_LO,
   SNOW_COVER_FRAGMENT_ANCHOR,
   SNOW_COVER_MAX,
+  WINTER_COVER_MAX,
+  WINTER_DORMANCY_FRAGMENT_ANCHOR,
+  WINTER_DORMANT_VALUE,
+  WINTER_GREEN_HI,
+  WINTER_GREEN_LO,
 } from "../textures/snowCover";
 import { macroOnBeforeCompile } from "../textures/macroVariation";
 
@@ -118,9 +126,11 @@ describe("snowCoverOnBeforeCompile (snow lying on props)", () => {
     expect(decl).toBeLessThan(shader.fragmentShader.indexOf("metalnessFactor = mix("));
   });
 
-  it("is an exact identity at zero snow — the property that makes it free for 149 lessons", () => {
+  it("is an exact identity at zero snow AND zero winter — the property that makes it free for 148 lessons", () => {
     setSnowCover(0);
+    setWinterCover(0);
     expect(getSnowCover()).toBe(0);
+    expect(getWinterCover()).toBe(0);
     const shader = compileStub();
     snowCoverOnBeforeCompile(shader as never);
     // Every term is `mix(existing, snowValue, snowCoverAmount)`, and
@@ -132,15 +142,86 @@ describe("snowCoverOnBeforeCompile (snow lying on props)", () => {
     expect(shader.fragmentShader).toContain(
       "float snowCoverAmount = uSnowCover * smoothstep( uSnowFacing.x, uSnowFacing.y, vSnowUp );",
     );
+    // …and the same shape for the winter dormancy term: a product with its own
+    // uniform, so at uWinterCover === 0 it is 0 for every fragment whatever the
+    // albedo.
+    expect(shader.fragmentShader).toContain(
+      "float winterDormancyAmount = uWinterCover * smoothstep( uWinterGreen.x, uWinterGreen.y, winterGreenFraction );",
+    );
+    // EVERY write this hook makes — not merely the first one of each kind, which
+    // is what this loop used to check. It was `.find()`, and a second injected
+    // term (the winter mix, spliced ahead of the snow one) would have slipped
+    // past it in either direction. `.filter()` closes that: every assignment the
+    // hook introduces must be a mix at an amount that is a product with a
+    // uniform, which is the property the identity claim actually rests on.
     for (const term of ["diffuseColor.rgb =", "roughnessFactor =", "metalnessFactor ="]) {
-      const line = shader.fragmentShader
+      const lines = shader.fragmentShader
         .split("\n")
         .map((l) => l.trim())
-        .find((l) => l.startsWith(term));
-      expect(line, `${term} must be a mix at snowCoverAmount`).toMatch(
-        /mix\( .*, .*, snowCoverAmount \);$/,
-      );
+        .filter((l) => l.startsWith(term));
+      expect(lines.length, `${term} must be written by the hook`).toBeGreaterThan(0);
+      for (const line of lines) {
+        expect(line, `${term} must be a mix at a zero-when-off amount`).toMatch(
+          /mix\( .*, .*, (snowCoverAmount|winterDormancyAmount) \);$/,
+        );
+      }
     }
+    // The two writes to diffuseColor are ordered leaves-then-snow: a tree goes
+    // bare and THEN snow lies on it.
+    expect(shader.fragmentShader.indexOf(WINTER_DORMANCY_FRAGMENT_ANCHOR)).toBeLessThan(
+      shader.fragmentShader.indexOf(SNOW_COVER_FRAGMENT_ANCHOR),
+    );
+  });
+
+  it("browns off foliage and nothing else — the greenness window excludes every neutral surface", () => {
+    // The window is in `g / (r + g + b)` of the LINEAR albedo. Neutral grey —
+    // asphalt, concrete, kerbs, galvanised steel, a sign plate — is exactly 1/3
+    // whatever its brightness, and the low edge sits above it, so the season
+    // cannot touch a single surface the rule engine grades on.
+    expect(WINTER_GREEN_LO).toBeGreaterThan(1 / 3);
+    expect(WINTER_GREEN_HI).toBeGreaterThan(WINTER_GREEN_LO);
+
+    const greenFraction = (hex: number) => {
+      const c = new Color(hex); // sRGB → the working space diffuseColor is in
+      return c.g / (c.r + c.g + c.b);
+    };
+    // This project's own verge (canvasTextures.makeGrassTexture base) and a
+    // representative baked canopy green: both inside the window, the canopy
+    // fully saturated — grass dies back, a crown goes bare.
+    expect(greenFraction(0x77875c)).toBeGreaterThan(WINTER_GREEN_LO);
+    expect(greenFraction(0x5eab52)).toBeGreaterThan(WINTER_GREEN_HI);
+    // …and the neutrals stay out, with room to spare.
+    for (const neutral of [0x4a4a4a, 0x9aa0a6, 0xffffff, 0x2b2b2b]) {
+      expect(greenFraction(neutral), neutral.toString(16)).toBeLessThan(WINTER_GREEN_LO);
+    }
+  });
+
+  it("the dormant tint is luminance-neutral, so a canopy keeps its shading", () => {
+    // The shader multiplies the fragment's OWN luminance through this tint. If
+    // the tint were not normalised to unit luminance the term would double as a
+    // brightness change and a winter canopy would go flat — the failure
+    // SNOW_COVER_COLOR records for a whole-material tint on a tree.
+    const t = winterDormantTint();
+    const lum = 0.2126 * t.x + 0.7152 * t.y + 0.0722 * t.z;
+    expect(lum).toBeCloseTo(WINTER_DORMANT_VALUE, 5);
+    // Warm: dormant vegetation is straw-brown, never a cold grey (that is the
+    // SNOW colour's job, and the two must not converge).
+    expect(t.x).toBeGreaterThan(t.z);
+  });
+
+  it("caps the dormancy and clamps its input", () => {
+    setWinterCover(1);
+    expect(getWinterCover()).toBeCloseTo(WINTER_COVER_MAX);
+    setWinterCover(0.5);
+    expect(getWinterCover()).toBeCloseTo(WINTER_COVER_MAX / 2);
+    setWinterCover(4);
+    expect(getWinterCover()).toBeCloseTo(WINTER_COVER_MAX);
+    setWinterCover(-1);
+    expect(getWinterCover()).toBe(0);
+    // Never total: Sofia streets carry conifers, and a street where literally
+    // nothing is green reads as a colour grade rather than as winter.
+    expect(WINTER_COVER_MAX).toBeLessThan(1);
+    setWinterCover(0);
   });
 
   it("caps the cover and clamps its input", () => {
@@ -204,6 +285,13 @@ const attachesCacheKey = (factory: string) =>
   /customProgramCacheKey\s*=\s*snowCoverProgramCacheKey/.test(factory);
 const writesUniform = (src: string) =>
   /useFrame\(\s*\(\)\s*=>\s*\{[\s\S]{0,200}?setSnowCover\(\s*getSnowIntensity\(\)\s*\)/.test(src);
+/** The SEASON's writer — same shape, same reason: a uniform nobody writes is a
+ *  correct number that changes no pixel, and this one has to be written every
+ *  frame because the uniform set outlives the scene that set it. */
+const writesWinterUniform = (src: string) =>
+  /useFrame\(\s*\(\)\s*=>\s*\{[\s\S]{0,300}?setWinterCover\(\s*winter\s*\?\s*1\s*:\s*0\s*\)/.test(
+    src,
+  );
 
 describe("routing: the hook reaches the shipped materials and something writes it", () => {
   it("every shared prop material is built by the one hooked factory", () => {
@@ -230,6 +318,30 @@ describe("routing: the hook reaches the shipped materials and something writes i
     expect(src).toContain("getSnowIntensity");
   });
 
+  it("DistrictWorld writes the SEASON uniform every frame, from a prop a lesson can author", () => {
+    const src = readComponent("DistrictWorld.tsx");
+    expect(writesWinterUniform(src)).toBe(true);
+    // The prop exists and is defaulted OFF, so every lesson that authors no
+    // season renders exactly the bytes it rendered before.
+    expect(src).toMatch(/winter\?:\s*boolean/);
+    expect(src).toMatch(/winter\s*=\s*false/);
+  });
+
+  it("the SEASON reaches DistrictWorld from a lesson — LessonScene is the one wire", () => {
+    // The half of this repair that is not in the world module: without this
+    // line the uniform is written every frame with a value no lesson can ever
+    // set, which is the dead-predicate shape stated at the head of this block.
+    const scene = readFileSync(
+      path.resolve(__dirname, "../../../../components/sim/LessonScene.tsx"),
+      "utf8",
+    );
+    expect(scene).toContain("lesson.environment?.winter");
+    // Both readers, from the ONE flag: the light grade and the foliage. A
+    // winter light rig over full-leaf green canopies still photographs as July.
+    expect(scene).toMatch(/<SimEnvironment[\s\S]{0,400}?winter=\{winter\}/);
+    expect(scene).toMatch(/<DistrictWorld[\s\S]{0,400}?winter=\{winter\}/);
+  });
+
   it("cutting either leg out of the REAL source turns the guard red", () => {
     const factory = sharedMaterialFactory(readComponent("WorldProps.tsx"));
     expect(
@@ -246,6 +358,12 @@ describe("routing: the hook reaches the shipped materials and something writes i
     // A setSnowCover call that is NOT inside a per-frame loop is also dead —
     // the uniform would freeze at whatever the channel read on mount.
     expect(writesUniform(districtSrc.replace(/useFrame\(/g, "useEffect("))).toBe(false);
+
+    // Same two cuts for the season.
+    expect(
+      writesWinterUniform(districtSrc.replace(/setWinterCover\(\s*winter\s*\?\s*1\s*:\s*0\s*\)/, "")),
+    ).toBe(false);
+    expect(writesWinterUniform(districtSrc.replace(/useFrame\(/g, "useEffect("))).toBe(false);
   });
 });
 

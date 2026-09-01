@@ -38,7 +38,7 @@
  */
 
 import type { DrivelineEvent, DrivelinePhysicsInput } from "../vehicle";
-import type { MirrorKind } from "../rules/types";
+import type { GlanceKind, MirrorKind } from "../rules/types";
 import type { PreDriveStepId } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -353,7 +353,7 @@ export type PreDriveControlSignal =
   | { kind: "seatbelt"; on: boolean }
   | { kind: "headlights"; setting: "off" | "low" | "high" }
   | { kind: "indicator"; setting: "off" | "left" | "right" }
-  | { kind: "glance"; mirror: MirrorKind }
+  | { kind: "glance"; mirror: GlanceKind }
   | { kind: "brakePressed" }
   /** Throttle pressed while `readyToMoveOff` — the caller checks readiness. */
   | { kind: "moveOffAttempt" };
@@ -418,6 +418,14 @@ export function observeControlSignal(
       return signal.setting === "left" ? emit("signal") : null;
     case "glance": {
       if (!tracker.emitted.has("adjust-mirrors")) {
+        // „Настройка на огледалата" is satisfied by covering the three MIRRORS.
+        // A shoulder check is not one of them — it is a look past the B-pillar
+        // at a spot no glass shows — so it may not stand in for a mirror the
+        // student never touched. It still performs `final-mirror-check` once
+        // the mirrors are done, because that step is authored as „Провери
+        // огледалата И МЪРТВАТА ЗОНА непосредствено преди потегляне"
+        // (procedures/steps.ts) and the blind spot is half of what it names.
+        if (signal.mirror === "shoulder") return null;
         tracker.mirrorsGlanced.add(signal.mirror);
         return tracker.mirrorsGlanced.size === 3 ? emit("adjust-mirrors") : null;
       }

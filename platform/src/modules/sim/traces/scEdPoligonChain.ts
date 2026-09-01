@@ -123,7 +123,11 @@ export function scEdPoligonChainShadowScript(): DriveScript {
       },
       // Both glances inside the move-off detector's 7 s lookback.
       { kind: "glance", mirror: "rear" },
-      { kind: "glance", mirror: "left" },
+      // One frame-producing beat between them: the recorder carries a SINGLE
+      // pending glance sample, so two glance steps drained back to back would
+      // land only the last one on the tick stream.
+      { kind: "pause", sec: 0.4, brake: true },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "pause", sec: 0.4, brake: true },
       {
         kind: "annotation",
@@ -259,7 +263,11 @@ export function scEdPoligonChainMistakeConeScript(): DriveScript {
       },
       // The оглед before the move-off is done right — the fault must not be two.
       { kind: "glance", mirror: "rear" },
-      { kind: "glance", mirror: "left" },
+      // One frame-producing beat between them: the recorder carries a SINGLE
+      // pending glance sample, so two glance steps drained back to back would
+      // land only the last one on the tick stream.
+      { kind: "pause", sec: 0.4, brake: true },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "pause", sec: 0.4, brake: true },
       {
         kind: "drive",
@@ -301,7 +309,11 @@ export function scEdPoligonChainMistakeStallScript(): DriveScript {
         textBg: "Грешката: под напрежението на изпита съединителят се отпуска рязко на маневрата — двигателят гасне.",
       },
       { kind: "glance", mirror: "rear" },
-      { kind: "glance", mirror: "left" },
+      // One frame-producing beat between them: the recorder carries a SINGLE
+      // pending glance sample, so two glance steps drained back to back would
+      // land only the last one on the tick stream.
+      { kind: "pause", sec: 0.4, brake: true },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "pause", sec: 0.4, brake: true },
       {
         kind: "drive",

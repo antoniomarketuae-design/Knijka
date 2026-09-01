@@ -10,9 +10,11 @@
  * for it survives the advisor being switched off (A11 — see `pingsActive`);
  * each side's cue fades into a ✓ the moment that side's GRADED glance
  * registers on the tick stream. On non-touch devices a subtle hold-to-glance
- * button cluster (left/rear/right) renders too — the SAME CabinControls
- * channel the Q/E/F keys drive, so the graded act (and the cabin head-turn)
- * is identical; touch devices already carry the TouchControls mirror row.
+ * button cluster (the three mirrors, plus «Рамо» — the blind-spot check, which
+ * is not a mirror and is why it is not a letter) renders too — the SAME
+ * CabinControls channel the Q/E/F/O keys drive, so the graded act (and the
+ * cabin head-turn) is identical; touch devices already carry the TouchControls
+ * mirror row, and their «Рамо» is the rail button in that file.
  *
  * Perf grammar: the tick observer registers into LessonScene's additive tap
  * ref and mutates pure state in place (advisor.ts observeGlancePingsTick —
@@ -111,7 +113,7 @@ export function GlanceEdgePings({
   // This used to be `eligible && advisorOn`. „Съветник" defaults OFF from
   // curriculum order 3 and scenario L3 up (defaultAdvisorEnabled), so from Урок
   // 3 «Кръговото движение» — the lesson whose entire subject is giving way —
-  // both edge pings AND the Q/E/F cluster vanished, while the mirror glance
+  // both edge pings AND the Q/E/F/O cluster vanished, while the mirror glance
   // went on being graded exactly as before. The student was marked on an act
   // whose only on-screen prompt had been removed, on the lesson that exists to
   // teach it. That is an unfair assessment and it trains the opposite of the
@@ -171,7 +173,7 @@ export function GlanceEdgePings({
           on a non-touch device these three ARE the mouse route to a graded act
           — the founder's whole contract is that the cabin is worked with the
           mouse, and with the advisor off the only remaining way to glance was
-          to already know the Q/E/F keys. Touch devices are unaffected: they
+          to already know the Q/E/F/O keys. Touch devices are unaffected: they
           never render this cluster, they use TouchControls' own mirror row. */}
       {buttonsPossible ? (
         <div
@@ -183,7 +185,7 @@ export function GlanceEdgePings({
           data-hud="glance-buttons"
           className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5"
           role="group"
-          aria-label="Поглед в огледалата"
+          aria-label="Оглеждане: огледала и мъртва зона"
         >
           <GlanceHoldButton
             cabinRef={cabinRef}
@@ -205,6 +207,22 @@ export function GlanceEdgePings({
             labelBg="Поглед в дясното огледало — задръж"
             sideBg="Д"
             keyHint="E"
+          />
+          {/* …AND THE FOURTH LOOK, WHICH IS NOT A MIRROR. The blind spot is by
+              definition what none of the three to its left can show, so it gets
+              its own face («Рамо», not a letter) and stands at the end of the
+              row rather than inside it. It is the mouse route to a GRADED act:
+              MOVE_OFF_WITHOUT_OBSERVATION wants a mirror AND this before the
+              wheels turn (rules/engine.ts §1b), and until it shipped the only
+              honest thing a student could do with «Хвърли поглед и през ЛЯВОТО
+              рамо» was ignore it. Same `glanceStart`/`glanceEnd` hold as the
+              three mirrors — one graded path for key, mouse and touch. */}
+          <GlanceHoldButton
+            cabinRef={cabinRef}
+            mirror="shoulder"
+            labelBg="Поглед през ляво рамо в мъртвата зона — задръж"
+            sideBg="Рамо"
+            keyHint="O"
           />
         </div>
       ) : null}
@@ -264,7 +282,7 @@ function PingChip({
 }
 
 /**
- * Hold-to-glance button: pointer down starts the SAME graded hold the Q/E/F
+ * Hold-to-glance button: pointer down starts the SAME graded hold the Q/E/F/O
  * keys drive (CabinControls.glanceStart — latches once per hold), any release
  * path ends it. Subtle by design — discoverability, not alarm.
  */
@@ -305,9 +323,14 @@ function GlanceHoldButton({
       onContextMenu={(e) => e.preventDefault()}
       className="pointer-events-auto flex touch-none select-none flex-col items-center gap-0.5 rounded-xl border border-border bg-background/50 px-2 py-1.5 text-muted opacity-80 backdrop-blur transition hover:opacity-100 hover:text-foreground active:border-accent active:bg-accent/20 active:text-foreground motion-reduce:transition-none"
     >
+      {/* `min-w-7` + `px-1` rather than a fixed `w-7`: the three mirror faces
+          are one letter and stay exactly 28 px wide (their content is well
+          under the minimum), while «Рамо» — the blind spot, which cannot be a
+          letter because it is not a side of a mirror — grows the box instead of
+          spilling out of it. */}
       <span
         aria-hidden
-        className="flex h-5 w-7 items-center justify-center rounded-[4px] border border-current text-[11px] font-extrabold"
+        className="flex h-5 min-w-7 items-center justify-center whitespace-nowrap rounded-[4px] border border-current px-1 text-[11px] font-extrabold"
       >
         {sideBg}
       </span>

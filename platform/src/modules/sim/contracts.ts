@@ -40,7 +40,9 @@ export interface VehicleSample {
   seatbeltOn: boolean;
   handbrakeOn: boolean;
   gear: number;
-  mirrorGlance: "left" | "right" | "rear" | null; // set on the frame a glance key is pressed
+  /** Set on the frame a glance is latched. `"shoulder"` is the blind-spot
+   *  check — a look, not a mirror (rules/types.ts `GlanceKind`). */
+  mirrorGlance: "left" | "right" | "rear" | "shoulder" | null;
   /**
    * B1a (doc 72 VP-04): the driveline's latched stall flag (DrivelineState
    * .stalled — set by a stall, cleared by the next successful restart).
@@ -299,40 +301,23 @@ export interface LessonSpec {
    *  vs 73.8/97.7/75.6, near road L117.3 vs L117.5. Two lessons, one summer
    *  morning, to within a third of a level on every band.
    *
-   *  WHY NO WINTER FLAG IS ADDED HERE BY THE LANE THAT WROTE THIS NOTE. A
-   *  boolean on this line is inert on its own: nothing between it and the
-   *  render rig would read it, and this corpus has measured 51 of 82 audited
-   *  repairs shipping exactly that — a correct value with no consumer. The
-   *  chain is six edits in five files and only this one is in the weather
-   *  lane's ownership, so the flag is specified here and landed together with
-   *  its readers, or not at all:
-   *    1. THIS line — `winter?: boolean` beside rain/fog/snow. It is a SEASON,
-   *       orthogonal to `timeOfDay`, and must not be spelled as a fourth
-   *       time-of-day: `TimeOfDay` is `Record`-keyed at `RainStreaks.tsx:33`
-   *       and `SnowFlakes.tsx:46`, so widening that union turns an authoring
-   *       change into a compile error in two render files — and a winter DUSK
-   *       is a lesson someone will want.
-   *    2. `lessons/scenario/types.ts` `ConditionAxis` — `winter?: boolean`.
-   *       The authoring vocabulary is `weather?: "dry"|"rain"|"fog"|"snow"`
-   *       and none of those four is a season; „dry" is what the ice pair
-   *       needs to keep saying about the SURFACE.
-   *    3. `lessons/scenario/compile.ts:1140-1148` — the one site that folds
-   *       ConditionAxis into this field. Add `winter` to the guard and one
-   *       more spread line.
-   *    4. `components/sim/LessonScene.tsx:1469-1477` + `:2190` — read it
-   *       beside `timeOfDay`/`rain`/`fog`/`snow` and pass `winter={winter}`
-   *       into `<SimEnvironment>`; that component already forwards its rig to
-   *       `SkyDome`.
-   *    5. `environment/SimEnvironment.tsx` — accept the prop and grade the
-   *       preset through a pure `winterGrade(preset)` exported from
-   *       `environment/presets.ts`: cold low key, blue-shifted hemisphere, no
-   *       warm facade bounce. The grade is data and belongs in presets; the
-   *       selection is a prop and belongs in the component.
-   *    6. The world module — bare trees and grey verges. This is the half a
-   *       student actually sees: a winter light grade under full-leaf green
-   *       canopies still photographs as July, so shipping 1-5 alone would
-   *       close neither row.
-   *  Then author `winter: true` on the two ice templates and on sc-ac-snow.
+   *  THAT MEASUREMENT IS THE BEFORE. The season now exists — `winter` below —
+   *  and it landed as one chain rather than as a boolean with no reader, which
+   *  is the failure mode this corpus has measured 51 times in 82 repairs:
+   *  `ConditionAxis.winter` (lessons/scenario/types.ts) → `compileScenario`'s
+   *  environment fold → `LessonScene` → `SimEnvironment` + `SkyDome`
+   *  (`winterGrade`, the LIGHT half) and `DistrictWorld` (the seasonal
+   *  dormancy uniform, the FOLIAGE half), with `winter: true` authored on both
+   *  ice templates. The AFTER has not been photographed: no drive was taken at
+   *  this commit, so the R0 look is owed and the re-drive that settles it is
+   *  the same `pc-right/03-ready.png` pair the numbers above come from.
+   *
+   *  sc-ac-snow was DELIBERATELY left un-wintered. The plan that stood here
+   *  named it as a third template to flag, but its picture is already carried
+   *  by the snow haze, the snowed carriageway and the prop snow cover, its
+   *  compiled environment is pinned by four tests, and stacking a second
+   *  seasonal grade under falling snow is a look that needs its own R0 rather
+   *  than a same-lane guess.
    *
    *  THE „IDENTICAL STREET" HALF OF 5372f176 IS REPAIRED — RE-MEASURED
    *  2026-08-30, and recorded here because the paragraph that stood in this
@@ -355,10 +340,41 @@ export interface LessonSpec {
    *  road tone and foliage come from the shared environment preset and the
    *  world's summer trees — never from the building belt, which is why the
    *  rim repair moved the facades and left those three probes untouched.
-   *  So 5372f176 no longer has a second cause: BOTH ice rows now reduce to
-   *  the missing season above, and steps 5–6 (the preset grade and the bare
-   *  trees) are the whole of what is left to close either. */
-  environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean; fog?: boolean; snow?: boolean };
+   *  So 5372f176 never had a second cause: BOTH ice rows reduced to the
+   *  missing season, which is what `winter` below is. */
+  environment?: {
+    timeOfDay?: "day" | "dusk" | "night";
+    rain?: boolean;
+    fog?: boolean;
+    snow?: boolean;
+    /**
+     * THE SEASON. Orthogonal to `timeOfDay` and to every weather flag above:
+     * a lesson may be a winter night, or winter with snow falling, or — as the
+     * two ice lessons are — a clear, dry, winter morning. Spelled here rather
+     * than as a fourth `TimeOfDay` because that union is `Record`-keyed in
+     * `RainStreaks.tsx` and `SnowFlakes.tsx`.
+     *
+     * WHAT IT ACTUALLY MOVES, both halves shipped together so this is not a
+     * value with no consumer:
+     *  · LIGHT — `SimEnvironment` grades the preset through `winterGrade`
+     *    (environment/presets.ts): pale blue-white key at 0.78 of summer with
+     *    doc 71's 3.5:1 key:fill ratio preserved, cold-grey ground bounce in
+     *    place of the warm facade one, thicker pale haze, a quarter-stop less
+     *    exposure — and `SkyDome` takes the same grade, so the dome goes milky
+     *    over a snow-lit Vitosha instead of staying #3f76c4 summer blue.
+     *  · FOLIAGE — `DistrictWorld` browns off the canopies and the verge
+     *    (world/textures/snowCover.ts's dormancy term, weighted by each
+     *    fragment's own greenness, so steel, concrete, asphalt, sign faces and
+     *    signal lenses are all untouched and stay exactly as legible).
+     * Neither half closes the row alone: a winter light grade under full-leaf
+     * green canopies still photographs as July.
+     *
+     * It does NOT touch grip. Winter physics stays the explicit `physics`
+     * opt-in below and the district's own icePatch data — the same discipline
+     * that keeps `rain` from implying `wetGrip`.
+     */
+    winter?: boolean;
+  };
   /**
    * ADR-006 stage 4a — OPT-IN physics overrides for the LIVE VehicleSim.
    * `wetGrip: true` runs the hero car at tuning.WET_GRIP_FACTOR (0.7): tyre μ

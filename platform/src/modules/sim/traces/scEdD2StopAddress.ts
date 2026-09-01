@@ -241,7 +241,7 @@ export function scEdD2StopAddressShadowScript(route: ReadonlyArray<Pt>): DriveSc
       // (moveOffLookbackSec) of the pull-away below: mirror THEN shoulder.
       { kind: "glance", mirror: "rear" },
       { kind: "pause", sec: 0.4, brake: true },
-      { kind: "glance", mirror: "left" },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "annotation", textBg: "Огледало и поглед през лявото рамо — и чак сега мигач наляво." },
       { kind: "indicator", setting: "left" },
       { kind: "pause", sec: 0.6, brake: true },
@@ -306,7 +306,7 @@ export function scEdD2StopAddressMistakeDiveScript(route: ReadonlyArray<Pt>): Dr
       // The pull-away is exemplary — the fault must not be two faults.
       { kind: "glance", mirror: "rear" },
       { kind: "pause", sec: 0.4, brake: true },
-      { kind: "glance", mirror: "left" },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "indicator", setting: "left" },
       { kind: "pause", sec: 0.6, brake: true },
       {

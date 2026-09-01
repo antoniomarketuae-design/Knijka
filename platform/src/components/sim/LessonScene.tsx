@@ -1489,6 +1489,15 @@ export function ReadyScene({
   // SNOW weather (doc 72 AC-08): the lighter cold haze + tick.snow — the
   // same seam as fog; the snow-grip PHYSICS rides lesson.physics, never this.
   const snowWeather = lesson.environment?.snow ?? false;
+  // WINTER — the SEASON (sc-ac-ice / sc-ac-bridge-ice). One flag, two readers,
+  // and it has to be both or neither: <SimEnvironment> grades the light rig and
+  // the sky dome cold (presets.ts winterGrade) while <DistrictWorld> browns off
+  // the canopies and the verge. A cold key over full-leaf green trees still
+  // photographs as July, which is the whole of what those two rows convicted.
+  // NOT a weather and NOT a time of day: it feeds no tick channel, arms no
+  // conditions envelope and touches no grip — the ice is the district's own
+  // icePatch data, exactly as those templates author it.
+  const winter = lesson.environment?.winter ?? false;
   const isNight = timeOfDay === "night";
   // The FOLLOWING-GAP badge's thresholds, taken from the LESSON'S OWN rule
   // config so the gauge and the grader can never print different numbers —
@@ -2126,6 +2135,16 @@ export function ReadyScene({
   // sim/collision geometry the director's sentinel grades with, using the
   // sentinel's OWN cast ids — see the block above ReadyScene for the
   // measurements, and for what an unnamed report means.
+  // AC-12 — the wind's DEPICTION channel (sc-ac-wind-truck-pass:6a076479,
+  // sc-ac-crosswind:e0b9507e). The same `currentWindN()` the chassis is being
+  // pushed with below (windLateralN/windGustAmplitudeN/windGustPeriodSec) is
+  // what the air is drawn with, read per FRAME out of the live sim rather than
+  // recomputed on a render clock: `VehicleSim` advances its wind clock by
+  // FIXED_DT per physics step and `reset()` rewinds it, so a second clock would
+  // drift out of phase exactly where the lesson asks the student to read the
+  // gust. Identity-stable so the environment never remounts its mote field.
+  const readWindLateralN = useCallback(() => simRef.current?.windLateralNow ?? 0, []);
+
   const handleCollision = useCallback(
     (_impactKmh: number, withWhat: CollisionWithWhat) => {
       const sample = sampleRef.current;
@@ -2206,7 +2225,13 @@ export function ReadyScene({
           rain={rain}
           fog={fogWeather}
           snow={snowWeather}
+          winter={winter}
           skyline={mapKindHasSkyline(district.meta.mapKind)}
+          // The AC-12 opt-in, read from the AUTHORED physics field only — the
+          // same law the grip/wind props below obey. Absent on every lesson
+          // that authors no crosswind, so the drift layer is not mounted and
+          // no calm scene renders a mote.
+          readWindLateralN={lesson.physics?.crosswind ? readWindLateralN : undefined}
           quality={level}
         />
         {/* HDRI image-based lighting — real sky reflections/ambient for PBR
@@ -2250,6 +2275,7 @@ export function ReadyScene({
               prebuilt={geometry}
               quality={level}
               night={isNight}
+              winter={winter}
               getSignalPhase={getSignalPhase}
               getRailBarrierDown={getRailBarrierDown}
               signSvgBaseUrl={null}
@@ -4551,6 +4577,18 @@ export function controlsHelpRows({
       id: "mirrors",
       keys: "Q E F",
       what: "огледала — задръж (ляво / дясно / назад)",
+      essential: true,
+    },
+    // THE BLIND SPOT IS ITS OWN ROW, not a fourth letter on the mirrors' row,
+    // and the separation is the teaching: the whole point of the check is that
+    // no mirror shows it. Marked `essential` because it is a GRADED act —
+    // MOVE_OFF_WITHOUT_OBSERVATION (основна) wants it beside the mirror before
+    // the wheels turn — and a graded act filed behind «Всички клавиши» is the
+    // defect the clutch row one screen up already records.
+    {
+      id: "blind-spot",
+      keys: "O",
+      what: "поглед през ляво рамо — мъртвата зона (задръж)",
       essential: true,
     },
     {

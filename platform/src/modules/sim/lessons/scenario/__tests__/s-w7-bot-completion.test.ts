@@ -588,10 +588,18 @@ describe("wave-7 bot completion — sc-ac-bridge-ice at L3", () => {
   });
 
   it("L5 adds the dark and re-tunes NOTHING — the night factor ships at 1", () => {
-    // A clear dry morning compiles to NO environment at all: dry + day is the
-    // engine's zero, which is precisely why nothing arms a conditions envelope
-    // on the base rungs (see the template header).
-    expect(lesson.environment).toBeUndefined();
+    // A clear dry WINTER morning: dry + day is still the engine's zero — which
+    // is precisely why nothing arms a conditions envelope on the base rungs
+    // (see the template header) — and the season rides beside it as a render
+    // axis. WAS `toBeUndefined()`; the expectation moved because the product
+    // legitimately changed (sc-ac-bridge-ice:7eb16029 — the lesson briefed
+    // «При температури около нулата …» and photographed a full-leaf summer
+    // day). The assertion is not weakened: it now names the exact environment
+    // AND re-states the three weather flags this case is really about.
+    expect(lesson.environment).toEqual({ winter: true });
+    expect(lesson.environment?.rain).toBeUndefined();
+    expect(lesson.environment?.fog).toBeUndefined();
+    expect(lesson.environment?.snow).toBeUndefined();
     // The rung is a RENDER axis only: compileScenario spreads it over the
     // template's conditions, so weather stays "dry" (contributing no key) and
     // night is added. The result carries timeOfDay and NOTHING else — no rain,
@@ -603,7 +611,10 @@ describe("wave-7 bot completion — sc-ac-bridge-ice at L3", () => {
     // void opening are far harder to read — so the anticipation has to come from
     // the thermometer and the А15 post instead of the skyline.
     const l5 = compileScenario(SC_AC_BRIDGE_ICE, 5);
-    expect(l5.environment).toEqual({ timeOfDay: "night" });
+    // timeOfDay from the rung, winter from the template — the season is
+    // orthogonal to the hour, so an L5 that adds the dark keeps the winter it
+    // inherited. Still no rain/fog/snow: the envelope is unchanged.
+    expect(l5.environment).toEqual({ timeOfDay: "night", winter: true });
     expect(l5.ruleConfig).toBeUndefined();
     expect(l5.physics).toBeUndefined();
     // The graded contract does not change with the light — only the difficulty
