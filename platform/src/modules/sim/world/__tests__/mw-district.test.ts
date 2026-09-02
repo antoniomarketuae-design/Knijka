@@ -468,12 +468,16 @@ describe("mw-v1: the divided carriageway the finding says is missing", () => {
  * no motorway sign, no gantry, no distance boards. It does not read as a
  * магистрала.»
  *
- * Of the four objects it names, the barrier is the one the kit can draw
- * honestly — Д5, the gantry and the distance boards are faces `SIGN_KINDS` does
- * not hold, and this module's law is to place nothing rather than guess a face.
- * It is also the one that is a DRIVING fact rather than a label: a barrier is
- * why the oncoming direction may be treated as gone, why there is no turning
- * round, and why a stop is only ever to the right.
+ * Of the four objects it names, the barrier was the one the kit could draw
+ * honestly at the time — the gantry and the distance boards are still faces
+ * `SIGN_KINDS` does not hold, and this module's law is to place nothing rather
+ * than guess a face. It is also the one that is a DRIVING fact rather than a
+ * label: a barrier is why the oncoming direction may be treated as gone, why
+ * there is no turning round, and why a stop is only ever to the right.
+ *
+ * Д5 IS NO LONGER ON THAT LIST — see the block at the bottom of this file. The
+ * face shipped all along in `content/signs/svg/d5.svg`; what was missing was a
+ * `SignKind` to place it with.
  */
 describe("mw-v1 — the motorway has a median barrier between its carriageways", () => {
   const district = assertDistrict(loadRaw("mw-v1"));
@@ -525,5 +529,80 @@ describe("mw-v1 — the motorway has a median barrier between its carriageways",
       },
     };
     expect(buildWorldGeometry(oneWay, { seed: 7 }).stats.medianBarriers).toBe(0);
+  });
+});
+
+/**
+ * sc-ac-truck-spray:c042440d — „no motorway signage anywhere on the route the
+ * briefing calls a motorway".
+ *
+ * MEASURED on the built world before the repair: mw-v1 produced FOUR signs —
+ * two В26 «140» and two В1 — and stated „магистрала" nowhere, while its own
+ * instruction 2 reads «магистралата е с ограничение 140» and the mw traces
+ * narrate «Автомагистрала, ограничение 140» out loud. ЗДвП чл. 55, ал. 1 makes
+ * the plate constitutive, not decorative: the motorway rules apply „на път,
+ * обозначен като автомагистрала … СЪС СЪОТВЕТНИЯ ПЪТЕН ЗНАК".
+ *
+ * The pass lives at the bottom of `builders/props.ts` (deliberately last, so no
+ * existing post moves); this is its gate.
+ */
+describe("Д5 (Автомагистрала) — the motorway now says so", () => {
+  const world = buildWorldGeometry(assertDistrict(loadRaw("mw-v1")), { seed: 7 });
+  const plates = world.signs.filter((s) => s.kind === "motorwayStart");
+
+  it("posts one plate per carriageway, on the right-hand verge, facing the driver", () => {
+    expect(plates).toHaveLength(2);
+    expect(world.stats.signs.motorwayStart).toBe(2);
+
+    // Northbound (x = 0, travel +y): right of travel is +x, and the plate
+    // stands clear of the 12.19 m ribbon — never on the emergency lane.
+    const nb = plates.find((p) => Math.abs(p.yaw) < 1e-6);
+    expect(nb, "a plate facing the northbound driver").toBeDefined();
+    expect(nb!.position[0]).toBeGreaterThan(12.19);
+    // Southbound (x = -30.37, travel -y): right of travel is -x.
+    const sb = plates.find((p) => Math.abs(Math.abs(p.yaw) - Math.PI) < 1e-6);
+    expect(sb, "a plate facing the southbound driver").toBeDefined();
+    expect(sb!.position[0]).toBeLessThan(-30.37 - 12.19);
+  });
+
+  it("stands where the driver can read it: ahead of his spawn and before the В26", () => {
+    // The one placement a student actually drives past. `mw-spawn-approach` is
+    // at y = 15; doc 86 T5 is the defect of a plate behind the driver's head.
+    const nbY = -plates.find((p) => Math.abs(p.yaw) < 1e-6)!.position[2];
+    expect(nbY).toBeGreaterThan(15 + 3);
+    // …and it is read FIRST: „this is a motorway", then „140".
+    const limitY = -world.signs
+      .filter((s) => s.kind === "limit140" && Math.abs(s.yaw) < 1e-6)
+      .map((s) => s.position[2])
+      .sort((a, b) => b - a)[0]!;
+    expect(nbY).toBeLessThan(limitY);
+    // Two posts, not one silhouette (sign-post-distinct's bar with headroom).
+    const d5 = plates.find((p) => Math.abs(p.yaw) < 1e-6)!;
+    const v26 = world.signs.find(
+      (s) => s.kind === "limit140" && Math.abs(s.yaw) < 1e-6 && -s.position[2] === limitY,
+    )!;
+    expect(Math.hypot(d5.position[0] - v26.position[0], d5.position[2] - v26.position[2]))
+      .toBeGreaterThan(1.2);
+  });
+
+  it("ADDITIVE: a district with no motorway carriageway posts none", () => {
+    for (const id of ["zb-v1", "pk-busstop-v1", "hz-roadworks-v1", "district-v1"]) {
+      expect(
+        buildWorldGeometry(assertDistrict(loadRaw(id)), { seed: 7 }).stats.signs.motorwayStart,
+        id,
+      ).toBe(0);
+    }
+  });
+
+  it("NON-VACUITY: drop the motorway tag and class, and the plate goes with it", () => {
+    const raw = assertDistrict(loadRaw("mw-v1"));
+    const plain: District = {
+      ...raw,
+      roads: {
+        ...raw.roads,
+        edges: raw.roads.edges.map((e) => ({ ...e, motorway: false, class: "primary" })),
+      },
+    };
+    expect(buildWorldGeometry(plain, { seed: 7 }).stats.signs.motorwayStart).toBe(0);
   });
 });

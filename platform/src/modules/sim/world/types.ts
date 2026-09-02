@@ -532,6 +532,34 @@ export type SignKind =
   | "pedestrianCrossing" // А18 „Пешеходна пътека" (warning, ahead of a zebra)
   | "priorityRoad" // Б3 „Път с предимство" (the жълт ромб on the major arm)
   | "settlement" // Д11 „Начало на населено място"
+  // -- Д15 „Начало на жилищна зона" / Д16 „Край на жилищната зона".
+  //    ЗДвП чл. 61 DEFINES the жилищна зона as „обозначена като такава на
+  //    входовете и изходите й с пътни знаци" — the plate is not decoration
+  //    here, it is the constitutive fact the special rules of чл. 62 hang on.
+  //    Until now the zone existed only as an edge tag (`zone: "residential"`,
+  //    read by builders/constants.livingZoneCarriageway and through it by the
+  //    graded crossing duty), so the one street in the corpus whose whole
+  //    lesson is the zone changed the student's duties with nothing in the
+  //    windscreen to announce it. content/signs/svg/d15.svg + d16.svg ship
+  //    already (signs.json sign-d15 / sign-d16, cited to Наредба
+  //    № РД-02-21-1/23.11.2023, прил. № 5); both ride the Д4 body, whose plate
+  //    rect is a byte match with theirs — the Г2/Г3-on-the-Г12-plate precedent.
+  | "livingZoneStart" // Д15
+  | "livingZoneEnd" // Д16
+  // -- Д5 „Автомагистрала". Same constitutive shape as Д15/Д16 one comment up,
+  //    and the article says so in the same words: ЗДвП чл. 55, ал. 1 opens „На
+  //    път, обозначен като автомагистрала или скоростен път СЪС СЪОТВЕТНИЯ
+  //    ПЪТЕН ЗНАК, е разрешено движението само на моторни превозни средства …",
+  //    and чл. 21, ал. 1's 140 km/h column is headed „Автомагистрала". So the
+  //    140 the reducer grades and the bans the lesson teaches both hang on a
+  //    plate the world did not have: mw-v1 built four signs (two В26 «140», two
+  //    В1) and stated „магистрала" nowhere, while its briefings say the word.
+  //    content/signs/svg/d5.svg ships already (signs.json sign-d5, cited to
+  //    Наредба № РД-02-21-1/23.11.2023, прил. № 5, знак Д5); it rides the Д4
+  //    body, whose plate rect is a byte match with it — only the fill differs
+  //    (motorway green #00703c vs info blue #0057a8), and the fill travels in
+  //    the rasterised face.
+  | "motorwayStart" // Д5
   | "fuel"; // Е7 „Бензиностанция"
 
 /**
@@ -575,6 +603,9 @@ export const SIGN_KINDS: readonly SignKind[] = [
   "pedestrianCrossing",
   "priorityRoad",
   "settlement",
+  "livingZoneStart",
+  "livingZoneEnd",
+  "motorwayStart",
   "fuel",
 ];
 

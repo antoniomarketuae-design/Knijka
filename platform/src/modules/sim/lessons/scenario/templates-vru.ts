@@ -1391,10 +1391,29 @@ export const SC_VU_PASS_CLEARANCE: ScenarioSpec = {
       // The CLEARANCE half is graded where it can be measured: the runtime's
       // vulnerable-pass tracker, which after the VUP_CYCLIST_X correction above
       // convicts VULNERABLE_PASS_TOO_CLOSE on the un-shifted line and awards
-      // YIELDED_TO_PRIORITY on the taught one. Params untouched — `done` is
-      // bit-identical.
+      // YIELDED_TO_PRIORITY on the taught one.
+      //
+      // …AND THE SPEED HALF IS THIS ROW'S AFTER ALL (260b13fd, critical —
+      // sweep161 `pc-wrong/04-t017s.png`: В26 disc 50, cluster 59 км/ч, and the
+      // banner ALREADY advanced to «ЗАДАЧА 2/2», i.e. the overtake accepted).
+      // The retitle above made this row stop claiming what it cannot see; it
+      // left the row claiming nothing a 59 км/ч drive could fail. ЗДвП чл. 42,
+      // ал. 2, т. 3 asks the overtaking driver to be sure he can do it «като се
+      // движи с БЕЗОПАСНА СКОРОСТ» (content/law/acts/zdvp.json), which is the
+      // same reduction `teach.examinerBg` below names and instruction 4 spells
+      // out — and it is a fact ONE SimTick carries, unlike the rider's arc.
+      // 46 км/ч, on the arithmetic in vu-pass-clearance-arrival-speed.test.ts:
+      // the committed shadow tops out at 44.88 over its WHOLE length, so the
+      // taught line clears the gate by 1.1 км/ч at L3–L5 and by 3.1 at L1/L2
+      // (`widenSpeedCap` → 48 there, half the headroom under the sign), while
+      // the governor's 58–59 clears it at no rung. NOT 50: a cap at the sign
+      // only restates В26, which rules/engine.ts already bills. NOT 45: the
+      // lesson's own demonstration would sit 0.12 км/ч inside its own gate.
+      // The refusal explains itself — `lessons/engine.ts objectiveNotice`
+      // fires «Задачата иска да си тук с не повече от 46 км/ч …» and
+      // `RouteGuidance.capLineBg` paints the number on the approach.
       titleBg: "Прибери се в лентата и продължи по улицата",
-      params: { kind: "reachZone", x: VUP_LANE_X, y: 210, radiusM: 9 },
+      params: { kind: "reachZone", x: VUP_LANE_X, y: 210, radiusM: 9, maxSpeedKmh: 46 },
     },
     {
       id: "sc-vup-finish",

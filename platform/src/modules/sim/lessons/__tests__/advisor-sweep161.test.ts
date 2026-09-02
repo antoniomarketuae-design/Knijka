@@ -478,10 +478,17 @@ describe("sweep161 part D — the card stops publishing the grader's tolerance a
     // 50 км/ч». The coach was not silenced to make a census look better, which is
     // the exact trade part D was landed to undo, and the delta between the two
     // halves is still zero.
+    //
+    // RE-BASELINED 958 → 963 on 2026-09-02 (sc-vu-pass-clearance:260b13fd, the
+    // «ЗАДАЧА 2/2 at 59 км/ч past a cyclist» critical): `sc-vu-pass-clearance/
+    // sc-vup-pass` gained an authored `maxSpeedKmh: 46` on a street posted 50,
+    // so its five rungs join this census. SPOKEN ROSE WITH THE TOTAL AGAIN,
+    // 963 of 963 — all five read «Прибери се в лентата и продължи по улицата —
+    // дръж под 46 км/ч», the authored figure at every rung.
     const all = everyCappedCard();
     const spoken = all.filter((c) => c.textBg.includes("дръж под"));
-    expect(all.length).toBe(958);
-    expect(spoken.length).toBe(958);
+    expect(all.length).toBe(963);
+    expect(spoken.length).toBe(963);
     expect(all.length - spoken.length).toBe(0);
   });
 });

@@ -837,7 +837,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-vp-telltale-red",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-vp-telltale-red/mistake-drive-on.trace.json",
-    "faultTimeSec": 20.08,
+    "faultTimeSec": 23.68,
     "requiredActors": [],
     "governingControl": {
       "kind": "none",

@@ -239,7 +239,7 @@ describe(`${ID} through the world runtime`, () => {
       vehicleCount: 0,
       pedestrianCount: 0,
     });
-    rt.setRightConflictQuery((jx, jy, px, py, h, r) => traffic.conflictFromRight(jx, jy, px, py, h, r));
+    rt.setRightConflictQuery((jx, jy, px, py, h, r, s) => traffic.conflictFromRight(jx, jy, px, py, h, r, s));
     const staged = traffic.stage({
       kind: "vehicle",
       id: "jx-probe-right",

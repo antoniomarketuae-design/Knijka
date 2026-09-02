@@ -47,6 +47,8 @@ import {
   CLASS_RANK,
   isMotorwayCarriageway,
   LINDEN_BOULEVARD_COUNT,
+  livingZoneCarriageway,
+  paintsZebra,
   PARK_TREE_GRID_M,
   RAILING_CROSSING_CLEAR_M,
   RAILING_FROM_KERB_M,
@@ -344,11 +346,52 @@ const JUNCTION_LIMIT_REPEAT_MIN_ROOM_M = 24;
 /** A В26 at a mid-route limit change stands just past the transition node, so
  *  the first metre it governs is the first metre it is visible on. */
 const TRANSITION_POST_ALONG_M = 6;
+/**
+ * Where a Д15/Д16 zone plate stands, measured from the junction-trimmed cut
+ * into the zone. Ten metres, not two, because the limit-transition pass above
+ * already posts a В26 at the same boundary: measured on pe-zone-v1 the В26 «20»
+ * lands at y = 126 and this puts the Д15 at y = 133.03 — two readable posts in
+ * sequence rather than one silhouette. (MIN_POST_SEPARATION_M would have
+ * accepted 0.97 m and produced exactly that silhouette.)
+ *
+ * These are DRAWN metres on a world exaggerated by PERCEPTUAL_ROAD_SCALE (2.5),
+ * so the Д15 that lands 13 m past pe-zone-v1's tag boundary stands ~5 real
+ * metres past it, and the Д16 that ends up ~38 m before the exit mouth stands
+ * ~15 real metres before it — both ordinary Bulgarian stations, not a plate
+ * adrift from the thing it names.
+ */
+const LIVING_ZONE_POST_ALONG_M = 10;
+/** Zone plates use the same curb offset as every other roadside post here. */
+const ZONE_PLATE_LATERAL_M = 0.8;
+/** Two posts closer than this read as one silhouette from the approach, so the
+ *  zone plate steps deeper into the zone rather than share a station. */
+const ZONE_PLATE_READABLE_M = 5;
+/** …by this much per try, at most this many times (then it takes the base
+ *  station and lets pushSignAt's hard floor decide). */
+const ZONE_PLATE_NUDGE_STEP_M = 4;
+const ZONE_PLATE_NUDGE_TRIES = 3;
 /** The В33 „край на забраната" that accompanies a limit RISE gets its own
  *  post, set back like the Г12 does behind its Б1 (never two plates on one
  *  pole — sign-post-distinct.test.ts). */
 const TRANSITION_END_BACK_M = 4.5;
 const TRANSITION_END_OUT_M = 1.2;
+
+/**
+ * How far BEFORE the carriageway's entry В26 the Д5 „Автомагистрала" stands,
+ * and how much further off the kerb, so the pair reads as two posts in the
+ * order a driver needs them: „this is a motorway" first, „140" second.
+ *
+ * The stagger is the В33-behind-В26 pair's own (TRANSITION_END_BACK/OUT above),
+ * reused rather than re-invented — same problem, same 4.66 m of ground between
+ * the two models, comfortably past MIN_POST_SEPARATION_M and past the 5 m
+ * one-silhouette bar ZONE_PLATE_READABLE_M names, once the lateral offset is
+ * counted. Riding the entry station means the Д5 inherits the doc-86-T5 spawn
+ * relocation for free: on mw-v1 the В26 sits at 45 m because the spawn is at
+ * 15, so the Д5 lands at 40.5 m — 25 m ahead of the student's own bumper, not
+ * behind his head.
+ */
+const MOTORWAY_PLATE_AHEAD_OF_LIMIT_M = 4.5;
+const MOTORWAY_PLATE_OUT_M = 1.2;
 
 /** Road classes that are never a „one-way street" in the Д4 sense, however
  *  the one-way tag reads: a motorway/trunk carriageway is signed Д5/Д6. */
@@ -1262,6 +1305,76 @@ export function buildProps(
     }
   }
 
+  // -- Д15 / Д16 AT EVERY ЖИЛИЩНА-ЗОНА BOUNDARY --------------------------------
+  // ЗДвП чл. 61 does not describe the plate, it DEFINES the zone by it:
+  // „Жилищната зона е … територия …, която е обозначена като такава на входовете
+  // и изходите й с пътни знаци и където действат специални правила за
+  // движение." Until this pass the zone existed only as the edge tag
+  // `zone: "residential"` / `class: "living_street"` — read by
+  // `livingZoneCarriageway`, and through it by `gradesCrossingDuty`, which is
+  // what lets pe-zone-v1's deliberately UNPAINTED crossing arm the чл. 119 yield
+  // at all. So the one street in the corpus whose entire lesson is the zone
+  // changed the student's duties (20 km/h, pedestrians own the carriageway, give
+  // way to everything on the way out) behind an invisible trigger, while its own
+  // teach card promised him „синия правоъгълен знак Д15 … до знака Д16".
+  //
+  // A BOUNDARY is a node where a living-zone carriageway meets at least one arm
+  // that is not one; two zone spans meeting are INSIDE the zone and get nothing.
+  // Both plates stand ON THE ZONE EDGE at that boundary, each on the right-hand
+  // kerb of the driver it addresses — so they land on opposite kerbs and a
+  // boundary reads Д15 entering / Д16 leaving, which is what a real one does.
+  // Ungated (no `lessonScale` test) because the tag is not an OSM artefact here:
+  // a way tagged living_street IS, by чл. 61, a signed one — but measured over
+  // the whole corpus only pe-zone-v1 carries such an edge, so every other
+  // district still builds byte-identically.
+  for (const eb of network.edges) {
+    if (!livingZoneCarriageway(eb.edge)) continue;
+    for (const nodeId of [eb.edge.from, eb.edge.to]) {
+      const info = network.nodes.get(nodeId);
+      if (!info) continue;
+      const others = info.approaches.filter((a) => a.edgeId !== eb.edge.id);
+      if (!others.some((a) => !livingZoneCarriageway(a.edge))) continue;
+      const ap = info.approaches.find((a) => a.edgeId === eb.edge.id);
+      if (!ap) continue;
+      // `ap.cut` is the junction-trimmed cross-section, so the post is clear of
+      // the mouth at the degree-3 exit (setback 24.13 m there) as well as at the
+      // degree-2 entry seam (3.03 m) — one station, both shapes.
+      const into = ap.dir; // away from the node, i.e. INTO the zone
+      const out = mul(into, -1);
+      // Step deeper into the zone until BOTH kerbs are a readable distance from
+      // every post already placed. MIN_POST_SEPARATION_M (0.75 m) is the
+      // anti-z-fighting floor, not a legibility bar: at the base station the
+      // Д15 on pe-zone-v1's exit boundary landed 2.0 m from the В26 «20» that
+      // the junction-repeat pass had already put on that kerb facing the same
+      // driver, which is one silhouette, not two signs. Same nudge discipline as
+      // zoneSigns.ts (ZONE_POST_NUDGE_STEP_M); deterministic, and it gives up
+      // rather than walking a plate away from the boundary it names.
+      let station = add(ap.cut, mul(into, LIVING_ZONE_POST_ALONG_M));
+      for (let tries = 0; tries < ZONE_PLATE_NUDGE_TRIES; tries++) {
+        const kerbs = [
+          add(station, mul(perpRight(into), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
+          add(station, mul(perpRight(out), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
+        ];
+        if (!postAnchors.some((q) => kerbs.some((k) => dist(q, k) < ZONE_PLATE_READABLE_M))) break;
+        station = add(station, mul(into, ZONE_PLATE_NUDGE_STEP_M));
+      }
+      if (ap.outgoing) {
+        pushSignAt(
+          add(station, mul(perpRight(into), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
+          yawFromFacing(out),
+          "livingZoneStart",
+        );
+      }
+      if (ap.incoming) {
+        pushSignAt(
+          add(station, mul(perpRight(out), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
+          yawFromFacing(into),
+          "livingZoneEnd",
+        );
+      }
+    }
+  }
+
   // -- Д4 „Еднопосочно движение" at the LEGAL mouth of a one-way arm ------------
   // The В1 pass above closes the mouth a driver may not enter; Д4 is its twin
   // and the founder named it directly (item 47 — „the blue one way sign is
@@ -1316,6 +1429,21 @@ export function buildProps(
   if (lessonScale !== undefined) {
     for (const crossing of district.crossings) {
       if (!crossing.edgeId) continue;
+      // …but only where there IS a пешеходна пътека to warn of. This loop read
+      // `crossing.edgeId` and never `crossing.kind`, while markings.ts paints
+      // by `paintsZebra` — so the two passes answered different questions about
+      // the same node, and pe-zone-v1's deliberately `unmarked` pz-x-1 earned a
+      // warning triangle per direction over bare asphalt. §1 т. 53 ДР ЗДвП: a
+      // пешеходна пътека is a part of the carriageway обозначена с маркировка
+      // или знаци, so an А18 with no пътека behind it does not warn of anything
+      // — and inside a жилищна зона it teaches the opposite of чл. 62, т. 1,
+      // which grants the pedestrian the WHOLE width precisely because there is
+      // no пътека to confine him to. Asking the painter's own predicate is the
+      // fix, not a new one: the sign pass and the paint pass now agree.
+      // Measured over the corpus: the only district this changes is pe-zone-v1
+      // (the two OSM cuts that carry `unmarked` nodes are not scenario maps and
+      // never reach this loop) — 2 posts removed, none added.
+      if (!paintsZebra(crossing)) continue;
       const eb = network.edgeById.get(crossing.edgeId);
       if (!eb) continue;
       const g = eb.edge.geometry as Vec2[];
@@ -1527,6 +1655,63 @@ export function buildProps(
       // driver approaching down it, which is where the face has to point.
       pushSignAt(p, yawFromFacing(mouth.dir), "passRight", {}, ISLAND_WALL_TOP_Y);
     }
+  }
+
+  // -- Д5 „Автомагистрала" at the head of every motorway carriageway ------------
+  // sc-ac-truck-spray:c042440d — „no motorway signage anywhere on the route the
+  // briefing calls a motorway". MEASURED on the built world before the fix:
+  // mw-v1 produced FOUR signs — two В26 «140» and two В1 — and stated the word
+  // „магистрала" nowhere, while its own step 2 reads «магистралата е с
+  // ограничение 140» and sc-mw-discipline / sc-mw-min-speed narrate
+  // «Автомагистрала, ограничение 140» out loud.
+  //
+  // THE PLATE IS CONSTITUTIVE, not decoration — the Д15/Д16 argument one pass
+  // up, and the article says it in the same construction. ЗДвП чл. 55, ал. 1:
+  // „На път, обозначен като автомагистрала или скоростен път СЪС СЪОТВЕТНИЯ
+  // ПЪТЕН ЗНАК, е разрешено движението само на моторни превозни средства …
+  // Движението на … пешеходци … е забранено." чл. 21, ал. 1's 140 km/h column
+  // is headed „Автомагистрала". So the number the reducer grades and the bans
+  // MOTORWAY_* codes teach both hang on a sign that was not in the windscreen.
+  // (Retrieved from content/law/acts/zdvp.json + content/signs/signs.json
+  // `sign-d5`, cited to Наредба № РД-02-21-1/23.11.2023, прил. № 5, знак Д5 —
+  // ADR-002: retrieval and citation, never free recall.)
+  //
+  // DERIVED, never authored, and deliberately the LAST sign pass in this file:
+  // every placement above claims its ground first, so no existing post moves by
+  // one millimetre and only the Д5 can be refused. It rides the same boundary
+  // dead-end the entry В26 uses (`entryStationFromNode`), which is where a
+  // driver ENTERS this map's motorway — 6 approaches over the whole corpus
+  // (mw-v1, mw-entry-v1, mw-exit-v1, two carriageways each). Every other
+  // district has no motorway boundary dead-end and builds byte-identically.
+  //
+  // WHAT IT DOES NOT DO, said rather than left implied: `mw-exit-v1`'s ramp is
+  // a `motorway_link` in other corpora and would be signed Д6/Д7 at its end,
+  // not Д5 — `isMotorwayCarriageway` would accept a link, so the link classes
+  // are excluded here. And the finding's other half — an overhead gantry — is
+  // authored district data (`meta.scenario.laneGantry`, lc-gantry-v1), not a
+  // sign kind, and a gantry is not what makes a road a motorway.
+  for (const nodeId of network.deadEnds) {
+    const pos = nodePos.get(nodeId);
+    if (!pos || !nearBoundary(pos)) continue;
+    const ap = network.nodes.get(nodeId)?.approaches[0];
+    if (!ap) continue;
+    // Entering traffic flows AWAY from the boundary node (the entry pass's own
+    // gate): a plate facing traffic that cannot legally exist is scenery.
+    if (ap.edge.oneway && ap.edge.to === nodeId) continue;
+    if (!isMotorwayCarriageway(ap.edge) || ap.edge.class.endsWith("_link")) continue;
+    const g = ap.edge.geometry as Vec2[];
+    const len = polylineLength(g);
+    const sFromNode = entryStationFromNode(ap.edge, nodeId, len);
+    if (sFromNode === null) continue;
+    const sPlate = Math.max(1, sFromNode - MOTORWAY_PLATE_AHEAD_OF_LIMIT_M);
+    const s = ap.edge.from === nodeId ? sPlate : len - sPlate;
+    const { point, tangent } = pointAlong(g, s);
+    const travel = ap.edge.from === nodeId ? tangent : mul(tangent, -1); // into district
+    pushSignAt(
+      add(point, mul(perpRight(travel), ap.halfWidth + 0.8 + MOTORWAY_PLATE_OUT_M)),
+      yawFromFacing(mul(travel, -1)),
+      "motorwayStart",
+    );
   }
 
   // -- streetlights along arterials --------------------------------------------

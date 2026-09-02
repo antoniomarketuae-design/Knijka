@@ -176,10 +176,14 @@ export interface EventRunner {
    */
   readonly contactCast: readonly ContactCastMember[];
   /** N11 cockpit-lamp channel (telltaleStimulus only): true while the staged
-   *  dashboard warning telltale is lit — the director ORs it into its own
+   *  RED dashboard warning telltale is lit — the director ORs it into its own
    *  `telltaleLit` scene seam (the hazardActive twin; the cluster and the
    *  L1/L2 HUD cue read it). Absent on every other runner. */
   readonly telltaleLit?: boolean;
+  /** The AMBER twin of `telltaleLit` (lamp "checkEngine"). Separate channel
+   *  and not a colour field, because the scene seam is a per-lamp boolean the
+   *  cluster reads per frame: red lights `temp`, amber lights `engine`. */
+  readonly telltaleCautionLit?: boolean;
   /** (Re)stage the actor + redraw per-attempt jitters. `firstTime` stages the
    *  actor into the traffic system; later calls reset it to its hold pose. */
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void;
@@ -588,6 +592,60 @@ const PRIORITY_COMMIT_PLAYER_M = 22;
  * runtime's PRIORITY_CONFLICT_RADIUS_M so a stopped-then-proceeding player
  * can never cross into a stale conflict. */
 const PRIORITY_CLEAR_ARC_M = 30;
+/**
+ * THE COMMENDATION MUST REQUIRE THE EVENT IT NAMES — `sc-junction-scan:d9c8e516`
+ * (critical), frame `.audit-frames/w14/frames/sc-junction-scan__mobile-wrong/
+ * 08-debrief-p7.png`: «Похвали ✓ Правилно отстъпено предимство 0:55» on a drive
+ * whose own ledger reads «0 full stops · 0 lawful waits honoured (0s)», top
+ * speed 59 км/ч, and which the same scroll convicts of 3 опасни грешки — the
+ * worst «Удар в неподвижно препятствие» — for 33 наказателни точки against a
+ * limit of 9. `run.log:239` / `:320` / `:322`.
+ *
+ * NOT the sc-ac-wind-truck-pass clause (praise not gated on the VERDICT), and
+ * gating on the verdict would not have fixed it: a clean drive that never
+ * yielded would still have collected it. The falsehood is that `sawYield` —
+ * one frame under 8 км/ч, anywhere inside `playerLineDist <= 14`, with the
+ * actor anywhere in `|carArc| <= 26` — is not the act «отстъпено предимство»
+ * names. It is true of a car that has been STOPPED BY AN IMPACT at the mouth,
+ * and true of a crawl through the box BEHIND a car that has already gone.
+ *
+ * So the praise (and only the praise — `sawYield` still labels the OUTCOME, so
+ * every committed trace's `detail` stays byte-identical) now needs the yield's
+ * three own facts: seconds spent at a wait speed, spent for a priority car that
+ * had NOT YET CLEARED the junction, and not produced by a crash.
+ *
+ * ── MADE PRECISE, 2026-09-02 (sc-junction-gap / sc-junction-left shadows) ──
+ *
+ * The clause first shipped as «the wait must be spent while `carArc < 0`», and
+ * its own test file recorded the belief that this «can only ever WITHHOLD
+ * praise, never award it» — true, and that is exactly the harm: it withheld the
+ * card from two AUTHORED-CORRECT drives. Measured by replaying both shadows
+ * through the production stack (runtime + traffic + director + rules) and
+ * summing the wait frames (`playerLineDist <= 14`, `speedKmh <= 8`):
+ *
+ *                        while carArc < 0    while the car is in the conflict
+ *   sc-junction-gap  ……………… 0.40 s  ✗ card         4.75 s   ✓ card
+ *   sc-junction-left ……………… 0.33 s  ✗ card         4.70 s   ✓ card
+ *
+ * Both students hold a FULL STOP 1.8 m short of the Б2 line for ~6.5 s. The
+ * choreography (`leadSec: -3.5` + the S2 witness gate) releases the priority car
+ * so that it reaches the node at the very instant they finish braking, so ~92%
+ * of an honest wait is spent with the car BETWEEN the node and clear — the half
+ * `carArc < 0` throws away.
+ *
+ * The fix keeps all three exclusions and narrows none of the honesty: the wait
+ * clock is ARMED only while the car still has the node to cross (so the crawl
+ * through the box behind a departed car can never start it), and once armed it
+ * runs for as long as the car is still short of PRIORITY_CLEAR_ARC_M — the same
+ * constant this runner already uses to decide the encounter is over. A wait that
+ * breaks (he drives off, or leaves the line window) disarms it, so nothing can
+ * be topped up after the car has gone.
+ */
+const YIELD_PRAISE_WAIT_KMH = 8;
+/** …for at least this long, s. At 8 км/ч a car covers 2.2 m/s: a full second
+ *  below it while a priority vehicle is still closing is a wait, not the
+ *  single-frame dip a hard brake or a bump produces. */
+const YIELD_PRAISE_WAIT_SEC = 1;
 /** Witness-gate ETA floor, m/s — low on purpose (unlike the sync's 3 m/s
  * floor): a stopped/creeping student must read as NOT arriving, so the held
  * car keeps waiting for them instead of crossing an empty box (doc 62 S2). */
@@ -742,6 +800,17 @@ export class PriorityFromRightRunner implements EventRunner {
 
   private leadSec = 0;
   private sawYield = false;
+  /** Seconds waited at a yield speed for a priority car that had not yet
+   *  cleared the junction — the commendation's own evidence
+   *  (YIELD_PRAISE_WAIT_SEC). */
+  private yieldWaitSec = 0;
+  /** Whether the current wait STARTED while the car still had the node to
+   *  cross. Only such a wait may bank seconds (YIELD_PRAISE_WAIT_SEC's
+   *  «MADE PRECISE» block); it disarms the moment the wait breaks. */
+  private yieldWaitArmed = false;
+  /** An impact inside this junction's arm while the encounter was live. Being
+   *  stopped by a crash is not giving way (YIELD_PRAISE_WAIT_SEC's block). */
+  private impacted = false;
   /** Continuous seconds the player has been stationary inside the commit
    *  distance — the stopped-witness release (see WITNESS_STOPPED_HOLD_SEC). */
   private stoppedForSec = 0;
@@ -789,6 +858,9 @@ export class PriorityFromRightRunner implements EventRunner {
     this.phase = "armed";
     this.outcome = null;
     this.sawYield = false;
+    this.yieldWaitSec = 0;
+    this.yieldWaitArmed = false;
+    this.impacted = false;
     this.stoppedForSec = 0;
     this.stoppedRelease = false;
     this.contacted = false;
@@ -805,6 +877,13 @@ export class PriorityFromRightRunner implements EventRunner {
     const d = dist(input.x, input.y, s.junction.x, s.junction.y);
     const carArc = actor.s - actor.nodeS[s.junctionNodeIndex]; // <0 before node
     const playerLineDist = Math.max(0, d - s.lineDistM);
+    // An impact is not a yield (see YIELD_PRAISE_WAIT_SEC). Scoped to this
+    // junction's arm and to a live encounter, so a scrape 200 m up the road —
+    // or one on a later junction after this one resolved — cannot mute a wait
+    // the student really made.
+    if (d <= s.armDistM && input.tickEvents.some((e) => e.kind === "collision")) {
+      this.impacted = true;
+    }
 
     if (this.phase === "armed") {
       if (d > s.armDistM) {
@@ -936,6 +1015,21 @@ export class PriorityFromRightRunner implements EventRunner {
     if (playerLineDist <= 14 && input.speedKmh <= 8 && Math.abs(carArc) <= 26) {
       this.sawYield = true;
     }
+    // …and the commendation's own, stricter evidence: the wait has to have been
+    // STARTED for a car that still had the node to cross — a crawl BEHIND a car
+    // that has already gone reads identically, in `Math.abs(carArc) <= 26`
+    // above, to a wait in front of one that has not — and it counts for as long
+    // as that car has not CLEARED (PRIORITY_CLEAR_ARC_M, this runner's own
+    // definition of the encounter being over). See the measurement at
+    // YIELD_PRAISE_WAIT_SEC: on both Б2 shadows ~92% of an honest 4.7 s wait is
+    // spent with the priority car between the node and clear.
+    const inYieldPose = playerLineDist <= 14 && input.speedKmh <= YIELD_PRAISE_WAIT_KMH;
+    if (!inYieldPose) {
+      this.yieldWaitArmed = false;
+    } else {
+      if (carArc < 0 && -carArc <= PRIORITY_CLEAR_ARC_M) this.yieldWaitArmed = true;
+      if (this.yieldWaitArmed && carArc < PRIORITY_CLEAR_ARC_M) this.yieldWaitSec += input.dtSec;
+    }
     // Contact in the box — the geometry and the billing live in the director's
     // ContactSentinel now (contact.ts); retiring on the give-way violation
     // below can no longer switch the watch off (B81).
@@ -963,7 +1057,12 @@ export class PriorityFromRightRunner implements EventRunner {
       }
     }
     if (carArc > PRIORITY_CLEAR_ARC_M) {
-      if (this.sawYield && (s.junctionControl ?? "stopLine") === "stopLine") {
+      if (
+        this.sawYield &&
+        (s.junctionControl ?? "stopLine") === "stopLine" &&
+        this.yieldWaitSec >= YIELD_PRAISE_WAIT_SEC &&
+        !this.impacted
+      ) {
         // The runtime emits yielded-commendations only for RHR/roundabout
         // trackers — the stop-line give-way case is ours to commend, with the
         // same existing vocabulary the reducer already grades.
@@ -1042,6 +1141,9 @@ export class PriorityFromRightRunner implements EventRunner {
     if (this.phase !== "resolved") return;
     this.phase = "armed";
     this.sawYield = false;
+    this.yieldWaitSec = 0;
+    this.yieldWaitArmed = false;
+    this.impacted = false;
     this.stoppedForSec = 0;
     this.stoppedRelease = false;
     this.awaitApproach = true;
@@ -3792,17 +3894,28 @@ export class RearTailgaterRunner implements EventRunner {
 //     лампа по време на движение", ЗДвП чл. 20 / чл. 139, library
 //     ev-warning-light). STIMULUS + MEASUREMENT ONLY (the policeStop
 //     discipline): NO actor is staged — at the authored trigger the runner
-//     lights the director's cockpit-lamp channel (`telltaleLit`, the
-//     hazardActive-style scene seam: the cluster's red temperature lamp +
-//     the L1/L2 HUD cue) and records the outcome — "yielded" for a compliant
-//     curb-side rest (reactionTimeSec = stimulus→first-brake respondedSec),
-//     "passedWithoutStopping" for driving on ignoreBeyondM past the lamp —
-//     but emits ZERO SimTick events: no violation can ever grade from this
-//     runner (A12). The graded duty lives in the scenario's curb-side
-//     low-speed reachZone objective (sc-vp-police-stop stop-mark pattern);
-//     the panic-slam mistake grades through the SHIPPED
-//     HARSH_BRAKING_NO_CAUSE (a dashboard lamp is not a forward cause in the
-//     harsh-brake ledger — the honest read: red lamp = PLANNED pull-over).
+//     lights the cockpit-lamp channel the spec NAMES (`telltaleLit` for the
+//     red temperature lamp, `telltaleCautionLit` for the amber check-engine
+//     one — the hazardActive-style scene seam, plus the L1/L2 HUD cue) and
+//     records the outcome: "yielded" for a compliant curb-side rest
+//     (reactionTimeSec = stimulus→first-brake respondedSec),
+//     "passedWithoutStopping" for driving on ignoreBeyondM past a RED lamp,
+//     "clear" for calmly carrying on past an AMBER one (its taught response).
+//
+//     THE RED LEG ALSO GRADES, since 2026-09-02: it resolves BOTH ways in the
+//     existing `prioritySituation` vocabulary ("warning-lamp" → the основна
+//     WARNING_LAMP_IGNORED on the drive-on, the yield praise on the pull-over)
+//     — the `emergency` runner's shape exactly. A12 forbids convicting an
+//     UNMODELLED duty; this one is modelled to the metre by the spec's own
+//     trigger/halt contract, and leaving it silent is what let a student
+//     mis-triage a red lamp and be recorded as faultless. The AMBER leg still
+//     emits nothing: carrying on IS the taught answer, so there is nothing to
+//     charge and nothing to praise, and the scenario's rolling checkpoint
+//     objective already grades it. Completion is still graded by the
+//     scenario's curb-side low-speed reachZone objective; the panic-slam
+//     mistake still grades through the SHIPPED HARSH_BRAKING_NO_CAUSE (a
+//     dashboard lamp is not a forward cause in the harsh-brake ledger — the
+//     honest read: red lamp = PLANNED pull-over, never an emergency stop).
 //     The lamp stays LIT through and after resolution (a real coolant fault
 //     does not clear because you stopped); reset() re-arms it dark.
 // ---------------------------------------------------------------------------
@@ -3815,14 +3928,25 @@ export class TelltaleStimulusRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
-  /** The cockpit-lamp channel the director ORs into `telltaleLit`. */
+  /** The RED cockpit-lamp channel the director ORs into `telltaleLit` — lit
+   *  only by a spec whose `lamp` is "temperature". */
   telltaleLit = false;
+  /** The AMBER twin ("checkEngine"). One runner raises exactly one of the
+   *  two: the lamp the spec NAMES, which is what makes the red-vs-amber
+   *  triage readable off the cluster instead of only off the briefing. */
+  telltaleCautionLit = false;
   contacted = false;
 
   private approachSpeedKmh = 0;
   private readonly timer = new ReactionTimer();
 
   constructor(readonly spec: TelltaleStimulusSpec) {}
+
+  /** Raise (or lower) the channel this spec's lamp owns. */
+  private setLamp(lit: boolean): void {
+    if (this.spec.lamp === "checkEngine") this.telltaleCautionLit = lit;
+    else this.telltaleLit = lit;
+  }
 
   /** No actor: the stimulus is a dashboard lamp. Nothing to hit. */
   readonly contactCast: readonly ContactCastMember[] = [];
@@ -3832,12 +3956,12 @@ export class TelltaleStimulusRunner implements EventRunner {
     // (the policeStop no-jitter discipline) — nothing about it varies.
     this.phase = "armed";
     this.outcome = null;
-    this.telltaleLit = false;
+    this.setLamp(false);
     this.approachSpeedKmh = 0;
     this.timer.reset();
   }
 
-  step(_traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+  step(_traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
     const s = this.spec;
     // The lamp stays lit after resolution — only reset() clears it.
     if (this.phase === "resolved") return null;
@@ -3849,7 +3973,7 @@ export class TelltaleStimulusRunner implements EventRunner {
       // can never reach the stop zone unlit).
       const passed = aheadOfPlayerM(input, s.trigger.x, s.trigger.y) < -1;
       if ((d <= s.triggerDistM || passed) && input.speedKmh >= TELLTALE_MOVING_KMH) {
-        this.telltaleLit = true;
+        this.setLamp(true);
         this.timer.arm(input.tSec);
         this.approachSpeedKmh = input.speedKmh;
         this.phase = "triggered";
@@ -3859,13 +3983,38 @@ export class TelltaleStimulusRunner implements EventRunner {
 
     // triggered — measure the response. Outcome only, NO events (class doc).
     this.timer.sample(input);
+    // THE COLOUR IS THE DUTY. An AMBER lamp asks for no manoeuvre at all
+    // („внимателно, до сервиз" — doc-65 ev-warning-light), so it authors no
+    // halt contract and the compliant answer is simply to carry on: once the
+    // cue is ignoreBeyondM behind, the encounter resolved without a conflict.
+    // The taught behaviour is still GRADED — by the scenario's own rolling
+    // checkpoint objective — this record only says the cue was shown and met.
+    if (s.lamp === "checkEngine") {
+      if (aheadOfPlayerM(input, s.trigger.x, s.trigger.y) < -s.ignoreBeyondM) {
+        return this.resolve(input, true, "clear");
+      }
+      return null;
+    }
+    // THE RED LAMP NOW GRADES, in the existing `prioritySituation` vocabulary
+    // (the `emergency` precedent verbatim) — 2026-09-02,
+    // sc-vp-telltale-red:c172d48b. A12 said an UNMODELLED duty must not
+    // convict, and until this line the duty was unmodelled: the runner
+    // measured „drove on past the lamp" exactly and told nobody, so a student
+    // who mis-triaged a red lamp as a yellow one and got away with it read as
+    // faultless, and the only thing his sheet could name was whatever he
+    // happened to hit. The duty is modelled — one authored trigger, one
+    // authored halt contract, one resolution per drive — so it may say so.
+    // The compliant leg is praised in the same breath (THEO-4: a drill that
+    // can only convict teaches half a rule).
     if (
       input.speedKmh <= s.stopSpeedKmh &&
       dist(input.x, input.y, s.stop.x, s.stop.y) <= s.stopRadiusM
     ) {
+      out.push({ kind: "prioritySituation", situation: "warning-lamp", violated: false, yielded: true });
       return this.resolve(input, true, "yielded");
     }
     if (aheadOfPlayerM(input, s.trigger.x, s.trigger.y) < -s.ignoreBeyondM) {
+      out.push({ kind: "prioritySituation", situation: "warning-lamp", violated: true });
       return this.resolve(input, false, "passedWithoutStopping");
     }
     return null;

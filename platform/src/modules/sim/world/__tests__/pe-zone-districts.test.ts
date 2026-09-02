@@ -190,6 +190,59 @@ describe(`${ID} through the world builder`, () => {
     expect(world.stats.signs.giveWay).toBe(1);
   });
 
+  it("SIGNS THE ZONE ITSELF: Д15 at each entry, Д16 at each exit", () => {
+    // ЗДвП чл. 61 does not merely permit the plate, it DEFINES the зона by it —
+    // „обозначена като такава на входовете и изходите й с пътни знаци". Until
+    // 2026-09-02 this street had none: the зона existed only as the edge tag
+    // `zone: "residential"`, which `livingZoneCarriageway` reads and
+    // `gradesCrossingDuty` grades off, so a 20 km/h cap and a pedestrian
+    // priority the whole lesson is about were enforced by an invisible trigger
+    // — while the template's own teach card promised the student „синия
+    // правоъгълен знак Д15 … до знака Д16".
+    //
+    // Two boundaries × two directions of travel: at each, the plate that
+    // addresses the driver stands on HIS right-hand kerb and faces him, so the
+    // northbound student reads Д15 entering and Д16 leaving, both on the east
+    // kerb (x = +8.93 = halfWidth 8.125 + 0.8), and the two plates that address
+    // the southbound driver stand opposite. This is the world half of
+    // sc-pe-zone-living:e4d04a70.
+    const plates = world.signs.filter(
+      (s) => s.kind === "livingZoneStart" || s.kind === "livingZoneEnd",
+    );
+    expect(plates.length).toBe(4);
+    expect(world.stats.signs.livingZoneStart).toBe(2);
+    expect(world.stats.signs.livingZoneEnd).toBe(2);
+    // Every plate stands ON THE ZONE, between its two boundary nodes — never on
+    // the ordinary street either side, which would sign the wrong road.
+    for (const p of plates) {
+      const y = -p.position[2];
+      expect(y, `${p.kind} @ y=${y}`).toBeGreaterThan(ZONE_ENTRY_Y);
+      expect(y, `${p.kind} @ y=${y}`).toBeLessThan(ZONE_EXIT_Y);
+      expect(Math.abs(Math.abs(p.position[0]) - CURB_X_EAST)).toBeLessThan(1);
+    }
+    // The pair the NORTHBOUND student (the shipped spawn) actually reads: both
+    // on his right, Д15 first, Д16 last, and neither on the wrong side of the
+    // crossing he must stop at.
+    const east = plates
+      .filter((p) => p.position[0] > 0)
+      .sort((a, b) => -a.position[2] - -b.position[2]);
+    expect(east.map((p) => p.kind)).toEqual(["livingZoneStart", "livingZoneEnd"]);
+    expect(-east[0].position[2]).toBeLessThan(CROSSING_Y);
+    expect(-east[1].position[2]).toBeGreaterThan(CROSSING_Y);
+  });
+
+  it("warns of NO пешеходна пътека — an А18 inside the zone would deny чл. 62", () => {
+    // The other half of the same row. props.ts posts А18 „Пешеходна пътека" in
+    // advance of an authored crossing on every scenario map, and it used to
+    // iterate `district.crossings` without reading `crossing.kind` — so pz-x-1,
+    // authored `unmarked` precisely because чл. 62, т. 1 hands the pedestrian
+    // the WHOLE carriageway here, earned a warning triangle per direction over
+    // bare asphalt. §1 т. 53 ДР ЗДвП: no marking and no sign, no пътека. The
+    // loop now asks `paintsZebra`, the painter's own predicate, so paint and
+    // post can no longer disagree about the same node.
+    expect(world.stats.signs.pedestrianCrossing).toBe(0);
+  });
+
   it("produces no NaN/infinite coordinates in any buffer or placement", () => {
     const buffers = [
       world.roadSurface,

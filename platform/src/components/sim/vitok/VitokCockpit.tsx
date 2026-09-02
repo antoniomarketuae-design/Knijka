@@ -1561,13 +1561,16 @@ export function VitokCockpit({
   inputRef,
   cabinRef,
   telltaleLitRef,
+  telltaleCautionLitRef,
 }: {
   simRef: RefObject<VehicleSim | null>;
   inputRef: RefObject<SimInput | null>;
   cabinRef: RefObject<CabinControls | null>;
-  /** N11 (VP-06): director→cluster warning-lamp channel (render-free ref —
+  /** N11 (VP-06): director→cluster RED warning-lamp channel (render-free ref —
    *  the hazardActiveRef pattern). Absent = the lamp never lights. */
   telltaleLitRef?: RefObject<boolean>;
+  /** N11 (VP-06): the AMBER twin — lights the check-engine lamp instead. */
+  telltaleCautionLitRef?: RefObject<boolean>;
 }) {
   const { enabled: cockpitView } = useContext(CockpitInteractionContext);
   const camera = useThree((s) => s.camera);
@@ -1690,13 +1693,16 @@ export function VitokCockpit({
       out.indicatorLeftLit = (blink && cabin?.indicator === "left") || hazardBlink;
       out.indicatorRightLit = (blink && cabin?.indicator === "right") || hazardBlink;
       // N11 (VP-06): the staged cockpit stimulus — a director-lit red
-      // temperature telltale (LessonScene copies director.telltaleLit here).
+      // temperature telltale (LessonScene copies director.telltaleLit here)
+      // and its AMBER twin on the check-engine lamp, which is the half that
+      // makes the red/amber triage readable off the glass.
       out.tempWarnOn = telltaleLitRef?.current ?? false;
+      out.cautionWarnOn = telltaleCautionLitRef?.current ?? false;
       // Last, so the seed wins over the sampled value — and only over these
       // display channels. Nothing upstream of the cluster is written.
       applyClusterDevSeed(clusterDevSeed, out);
     },
-    [simRef, cabinRef, inputRef, telltaleLitRef, clusterDevSeed],
+    [simRef, cabinRef, inputRef, telltaleLitRef, telltaleCautionLitRef, clusterDevSeed],
   );
 
   /** Last value written to the ambient strip — so the switch touches the

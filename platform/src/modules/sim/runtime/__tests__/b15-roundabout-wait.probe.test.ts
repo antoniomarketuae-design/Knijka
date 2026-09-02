@@ -88,8 +88,8 @@ function drive(stopY: number, waitSec: number, totalSec: number): Run {
   runtime.setPedestrianQuery((id) => traffic.pedestrianOnCrossing(id));
   runtime.setJunctionConflictQuery((x, y, r, b) => traffic.conflictNear(x, y, r, b));
   runtime.setOncomingQuery((px, py, h, r) => traffic.oncomingNear(px, py, h, r));
-  runtime.setRightConflictQuery((jx, jy, px, py, h, r) =>
-    traffic.conflictFromRight(jx, jy, px, py, h, r),
+  runtime.setRightConflictQuery((jx, jy, px, py, h, r, s) =>
+    traffic.conflictFromRight(jx, jy, px, py, h, r, s),
   );
   runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
     traffic.circulatingConflict(cx, cy, px, py, h, r),

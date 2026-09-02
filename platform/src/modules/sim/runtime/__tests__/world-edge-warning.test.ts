@@ -85,14 +85,82 @@ describe("the rim trigger", () => {
   });
 });
 
+/**
+ * A SWEEP FAULT MUST NOT BE READ AS A DEAD PREDICATE.
+ *
+ * Measured 2026-09-02, on wave 20. This gate was reported red as
+ * «worldEdgeClearanceM has a consumer outside its own module» on a tree where
+ * the consumer was there the whole time: `runtime/worldRuntime.ts:2202` calls
+ * `worldEdgeClearanceM(district, v.position.x, v.position.y)`, it is entry 678
+ * of the 955 files this sweep reads, and on a tree byte-identical to the one
+ * the gate measured (only six files under `src` changed afterwards, none of
+ * them naming worldEdge) this file passes 4 runs of 4 and the whole runtime
+ * suite is green — 37 files, 560 tests. Wave 20 did not unwire the measure; it
+ * DEEPENED it, adding `worldEdgeIsWalled` alongside it on the same tick.
+ *
+ * The assertion below is about wiring. The sweep is not: it reads 955 files off
+ * a worktree several agents write to at once, and `statSync`/`readFileSync`
+ * throw ENOENT/EPERM/EBUSY for the instant a file is being replaced. That throw
+ * surfaces as whichever `it` was mid-read — as an accusation of dead code,
+ * against code that is alive. This gate's own docblock argues that an
+ * instrument failing in the ALARMING direction is the cheap kind; it is cheap
+ * only when it says what it means, and this one did not. It cost a full
+ * investigation to refute.
+ *
+ * So: a transient is retried, and a fault that outlives the retries is thrown
+ * in its OWN words. This cannot hide the defect the file exists for — a
+ * consumer that is genuinely deleted never appears in `readdirSync`, so it
+ * never enters `sources`, matches nothing, and the assertion goes red exactly
+ * as before. The retry can only ever move a red from the wrong reason to the
+ * right one.
+ */
+function sleepMs(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/** ENOENT/EPERM/EBUSY on a shared worktree = someone else is mid-write. */
+function transient(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | null)?.code;
+  return code === "ENOENT" || code === "EPERM" || code === "EBUSY";
+}
+
+function retrying<T>(what: string, file: string, fn: () => T): T {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return fn();
+    } catch (err) {
+      if (attempt >= 10 || !transient(err)) {
+        throw new Error(
+          `world-edge wiring gate: could not ${what} ${file} ` +
+            `(${(err as NodeJS.ErrnoException | null)?.code ?? String(err)}). ` +
+            `This is an I/O fault in the SWEEP, not a missing consumer — do not ` +
+            `read it as a dead predicate.`,
+          { cause: err },
+        );
+      }
+      sleepMs(2);
+    }
+  }
+}
+
 /** Every product .ts/.tsx under src, excluding tests. */
 function productSources(): string[] {
   const root = path.resolve(__dirname, "../../../..");
   const out: string[] = [];
   (function walk(d: string) {
-    for (const n of readdirSync(d)) {
+    for (const n of retrying("list", d, () => readdirSync(d))) {
       const p = path.join(d, n);
-      if (statSync(p).isDirectory()) {
+      // A name from readdir that is gone by the time we stat it was deleted
+      // under us: it is genuinely not in the tree, so it is not a consumer, and
+      // skipping it is the truthful answer rather than a crash.
+      let isDir: boolean;
+      try {
+        isDir = retrying("stat", p, () => statSync(p)).isDirectory();
+      } catch (err) {
+        if ((err as Error & { cause?: NodeJS.ErrnoException }).cause?.code === "ENOENT") continue;
+        throw err;
+      }
+      if (isDir) {
         if (n === "node_modules" || n === "__tests__") continue;
         walk(p);
       } else if (/\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n)) {
@@ -105,7 +173,7 @@ function productSources(): string[] {
 
 /** Source with comments stripped — a symbol named only in prose is not a use. */
 function code(file: string): string {
-  return readFileSync(file, "utf-8")
+  return retrying("read", file, () => readFileSync(file, "utf-8"))
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/^[ \t]*\/\/.*$/gm, " ");
 }

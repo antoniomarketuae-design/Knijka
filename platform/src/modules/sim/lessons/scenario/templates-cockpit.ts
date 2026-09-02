@@ -1018,8 +1018,11 @@ export const SC_VP_TELLTALE: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-vp-telltale/mistake-ignore.trace.json" },
       titleBg: "Игнорирана лампа",
       whatWentWrongBg:
-        "Червената лампа светна — а водачът само натисна газта: „ще стигна до вкъщи“. Прегряващ двигател не се лекува с бързане: няколко километра с червена лампа значат скъсан двигател насред пътя. А ускоряването „за да стигнеш“ прати колата и над ограничението (чл. 21). Червена лампа = спри безопасно сега.",
-      codeRefs: ["SPEEDING_OVER_LIMIT"],
+        "Червената лампа светна — а водачът само натисна газта: „ще стигна до вкъщи“. Прегряващ двигател не се лекува с бързане: няколко километра с червена лампа значат скъсан двигател насред пътя. Законът е категоричен — при неизправност в движение водачът е ДЛЪЖЕН да спре (чл. 101, ал. 1). А ускоряването „за да стигнеш“ прати колата и над ограничението (чл. 21). Червена лампа = спри безопасно сега.",
+      // WARNING_LAMP_IGNORED landed 2026-09-02 (sc-vp-telltale-red:c172d48b):
+      // the demo named „Игнорирана лампа" finally convicts the ignored lamp
+      // instead of only the hurry that came with it.
+      codeRefs: ["WARNING_LAMP_IGNORED", "SPEEDING_OVER_LIMIT"],
     },
     {
       traceRef: { path: "content/traces/sc-vp-telltale/mistake-panic-stop.trace.json" },

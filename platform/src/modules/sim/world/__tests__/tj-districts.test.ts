@@ -274,7 +274,7 @@ for (const id of ["tj-rhr-v1", "tj-stop-v1"] as const) {
           vehicleCount: 0,
           pedestrianCount: 0,
         });
-        rt.setRightConflictQuery((jx, jy, px, py, h, r) => traffic.conflictFromRight(jx, jy, px, py, h, r));
+        rt.setRightConflictQuery((jx, jy, px, py, h, r, s) => traffic.conflictFromRight(jx, jy, px, py, h, r, s));
         const staged = traffic.stage({
           kind: "vehicle",
           id: "tj-probe-car",

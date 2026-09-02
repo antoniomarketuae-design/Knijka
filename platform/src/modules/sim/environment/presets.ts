@@ -227,6 +227,18 @@ export interface EnvironmentPreset {
    * capped below the pavement's 0.85 because a carriageway is trodden, and it
    * is not a constant in this file.
    *
+   * THAT MIX SHIPPED 2026-09-02 and this paragraph is now a ROUTING, not a
+   * request — kept whole because it is the derivation the constant was set
+   * from, and re-deriving it is the cost this file keeps paying. It is
+   * `snowCover.ts`'s `SNOW_ROAD_COVER_MAX` (0.40, off the same 0.28 texel and
+   * the same 0.75 pavement worked here) spent by `roadSurface.ts` after
+   * `<color_fragment>`, patch-modulated so the road reads as drifted and
+   * trodden rather than as a paler grey. The ceiling is the MARKINGS, not the
+   * pavement: 0.42 is where the brightest drift meets the grimiest stripe of
+   * `markingWear.ts`'s grime octave, and `weather.ts`'s R0 criterion needs the
+   * paint to stay the brightest thing in the carriageway. Its own R0 look is
+   * still owed — and per the paragraph below, it must be taken on `03-ready`.
+   *
    * AND DO NOT RE-CONVICT IT OFF AN `01-arrival` FRAME. In the w21 sweep that
    * capture lands before the ground materials settle (`usePbrSet` resolves the
    * asphalt/concrete/grass sets asynchronously and `StaticWorld` renders the

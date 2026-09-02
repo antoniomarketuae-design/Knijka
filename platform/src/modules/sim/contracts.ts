@@ -1357,9 +1357,10 @@ export interface PoliceStopSpec extends StagedEventBase {
 /**
  * N11 cockpit-stimuli (doc 72 §3 VP-06 „Контролна лампа по време на движение",
  * ЗДвП чл. 20 / чл. 139; library ev-warning-light — doc 65's only drivable
- * vehicle-knowledge action): a RED warning telltale lights on the dashboard
- * mid-drive; the duty is to notice it and pull over safely — not to panic-slam
- * in-lane and not to drive on for kilometers.
+ * vehicle-knowledge action): a warning telltale lights on the dashboard
+ * mid-drive and its COLOUR is the protocol — RED = pull over safely now (not a
+ * panic-slam in-lane, and not another kilometre), AMBER = carry on calmly to a
+ * garage.
  *
  * STIMULUS + MEASUREMENT ONLY (the policeStop discipline): the runner stages
  * NO actor — it flips the director's cockpit-lamp channel (`telltaleLit`, the
@@ -1376,74 +1377,45 @@ export interface PoliceStopSpec extends StagedEventBase {
  * channels only), and that is the honest read: the lamp asks for a PLANNED
  * pull-over, never an emergency stop.
  */
-export interface TelltaleStimulusSpec extends StagedEventBase {
+interface TelltaleStimulusBase extends StagedEventBase {
   kind: "telltaleStimulus";
-  /** Which lamp lights. v1: the red engine-temperature telltale (ЗДвП чл. 20
-   *  doctrine: red = спри безопасно сега).
-   *
-   *  READ THIS BEFORE WIDENING THE UNION — THE FIELD IS NOT READ BY ANYTHING.
-   *  Checked in the tree 2026-08-28, not assumed: `grep -rn '\.lamp\b'` over
-   *  `platform/src` returns two COMMENTS (templates-hazards2.ts:1171,
-   *  traces/scHzBreakdownPulloff.ts:73) and no code.
-   *  `TelltaleStimulusRunner` (orchestrator/runners.ts:3705-3745) takes the
-   *  whole spec and touches `trigger`/`triggerDistM`/`stop`/`stopRadiusM`/
-   *  `stopSpeedKmh`/`ignoreBeyondM` only; the channel it raises is the
-   *  BOOLEAN `telltaleLit` (`:3710`, `:3743`), the director ORs every runner's
-   *  into one bit (`orchestrator/director.ts:113-114`,
-   *  `orchestrator/types.ts:138`), `LessonScene.tsx:4226-4228` copies that bit
-   *  to a ref, `VitokCockpit.tsx:1694` assigns it to `tempWarnOn`, and
-   *  `cockpit/clusterReadout.ts:194` turns it into `set(out.temp, "warn")`.
-   *  One bit, one lamp, one colour. So adding `| "checkEngine"` here alone
-   *  changes nothing on screen — it makes a wider dead field.
-   *
-   *  THAT SINGLE COLOUR IS THE ADDRESS OF sc-vp-telltale-red:775b58cc
-   *  (critical). SC_VP_TELLTALE_RED's whole subject is the TRIAGE — «цветът на
-   *  лампата решава какво правиш», amber = carry on calmly to a garage, red =
-   *  pull over now — and its own template docblock already records the
-   *  „HONEST LIMIT" that the amber half is narrative only. Looked at, not
-   *  only read: on `.audit-frames/w10-4/frames/sc-vp-telltale-red__mobile-
-   *  right/04-t106s.png`, crop (1150,950 400×220) at 5×, the two lit lamps are
-   *  the same salmon-red and nothing on the cluster is amber. A student cannot
-   *  practise a discrimination the instrument cannot express.
-   *
-   *  THE PAINTER IS NOT THE PROBLEM — `clusterReadout.ts` already has the
-   *  amber class (`LampTone` „caution", used by `out.engine` while the engine
-   *  is not turning) and `InstrumentCluster` paints it. The missing link is a
-   *  SECOND stimulus channel, and it is six edits in five files, none of them
-   *  in the weather lane's ownership:
-   *    1. THIS union — `lamp: "temperature" | "checkEngine"`, and START READING
-   *       IT in the runner. Only the union widens here; no new spec kind is
-   *       needed, because a template that wants both cues simply stages TWO
-   *       `telltaleStimulus` events on one route (the amber earlier, the red
-   *       at the existing trigger).
-   *    2. `orchestrator/runners.ts:3710/3743` — raise the channel the spec
-   *       NAMES: keep `telltaleLit` for `"temperature"`, add
-   *       `telltaleCautionLit` for `"checkEngine"`.
-   *    3. `orchestrator/director.ts:113-114` + `orchestrator/types.ts:138` —
-   *       OR the second channel the same way, as a second getter.
-   *    4. `components/sim/LessonScene.tsx:1799/2300/2320/4226-4228` and
-   *       `components/sim/VehicleRig.tsx:293/397/695` — a second ref, threaded
-   *       exactly like `telltaleLitRef`.
-   *    5. `components/sim/vitok/VitokCockpit.tsx:1694` +
-   *       `modules/sim/cockpit/clusterReadout.ts:34/49/194` — a
-   *       `cautionWarnOn` input; the engine lamp becomes
-   *       `set(out.engine, input.cautionWarnOn || !input.engineOn ?
-   *       "caution" : "off", input.cautionWarnOn)` so the staged amber pulses
-   *       and the cold-engine amber keeps its steady behaviour.
-   *    6. `lessons/scenario/templates-cockpit2.ts:213-236` — stage the amber
-   *       event ahead of the „continue-smoothly" checkpoint and retire the
-   *       „HONEST LIMIT" paragraph.
-   *  ADR-002: this needs NO new offence code and NO new article. The duty is
-   *  the one the template already cites (ЗДвП чл. 20 / чл. 139, doc-65
-   *  ev-warning-light), the runner emits zero SimTick events either way, and
-   *  the grading stays the two existing objectives. It is a STIMULUS change
-   *  only. */
-  lamp: "temperature";
   /** The lamp lights when the player first comes within `triggerDistM` of
    *  this point while moving (or has already passed it — the backstop, so a
    *  crawling player can never reach the stop zone unlit). */
   trigger: { x: number; y: number };
   triggerDistM: number;
+  /** Trigger point this far behind the player (player-frame arc) = the cue is
+   *  spent. On a RED lamp with no compliant stop that is the IGNORE (outcome
+   *  "passedWithoutStopping"); on an AMBER one it is the taught carry-on
+   *  (outcome "clear"). Author a red one comfortably BEYOND its stop zone so a
+   *  compliant pull-over always resolves first. */
+  ignoreBeyondM: number;
+}
+
+/**
+ * THE LAMP CHANNEL, AND IT IS READ — two bits, two lamps, two colours.
+ * `TelltaleStimulusRunner` raises the channel the spec NAMES:
+ * `telltaleLit` for "temperature", `telltaleCautionLit` for "checkEngine".
+ * The director ORs each across its runners (`orchestrator/director.ts`),
+ * `LessonScene` copies both into render-free refs, `VitokCockpit` assigns
+ * them to `tempWarnOn` / `cautionWarnOn`, and `cockpit/clusterReadout.ts`
+ * turns them into `out.temp` "warn" (red) and `out.engine` "caution" (amber).
+ *
+ * THE COLOUR IS THE DUTY (doc-65 ev-warning-light; ЗДвП чл. 20 / чл. 139):
+ * RED = спри безопасно СЕГА, so a red cue authors a curb-side halt contract
+ * and the runner measures the rest against it. AMBER = внимателно, до сервиз,
+ * без аварийно спиране — it asks for no manoeuvre, so it authors no halt
+ * contract at all. That is why these are a UNION and not one interface with
+ * optional fields: an amber cue cannot author a stop it does not demand, and
+ * a red one cannot omit the halt point its whole grading rests on.
+ *
+ * A lesson that teaches the TRIAGE stages BOTH on one route — the amber
+ * earlier, the red later (SC_VP_TELLTALE_RED). Until 2026-09-02 it could not:
+ * the channel was a single boolean, so the one discriminating cue the lesson
+ * is built on never appeared on the glass (sc-vp-telltale-red:775b58cc).
+ */
+export interface TelltaleStopSpec extends TelltaleStimulusBase {
+  lamp: "temperature";
   /** Curb-side halt point the compliant driver rests at (mirrors the
    *  scenario's graded stop-zone objective — single truth by value). */
   stop: { x: number; y: number };
@@ -1451,12 +1423,14 @@ export interface TelltaleStimulusSpec extends StagedEventBase {
   stopRadiusM: number;
   /** …at/below this speed = responded (outcome "yielded"), km/h. */
   stopSpeedKmh: number;
-  /** Trigger point this far behind the player (player-frame arc) without a
-   *  compliant stop = the lamp was ignored (outcome only, no grading), m.
-   *  Author it comfortably BEYOND the stop zone so a compliant pull-over
-   *  always resolves first. */
-  ignoreBeyondM: number;
 }
+
+/** The AMBER half of the same stimulus — see the docblock above. */
+export interface TelltaleCautionSpec extends TelltaleStimulusBase {
+  lamp: "checkEngine";
+}
+
+export type TelltaleStimulusSpec = TelltaleStopSpec | TelltaleCautionSpec;
 
 /**
  * ADR-006 stage 1d (doc 72 §3 JU-18 — „Регулировчик на кръстовището", ЗДвП

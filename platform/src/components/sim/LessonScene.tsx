@@ -1822,6 +1822,11 @@ export function ReadyScene({
   // flips the L1/L2 HUD cue state below (state changes only on edges).
   const telltaleLitRef = useRef(false);
   const [telltaleCueOn, setTelltaleCueOn] = useState(false);
+  // …and its AMBER twin (lamp "checkEngine"): the OTHER half of the VP-06
+  // triage. Its own ref and its own cue, because the two colours ask for
+  // opposite things and a lesson stages both on one route.
+  const telltaleCautionLitRef = useRef(false);
+  const [telltaleCautionCueOn, setTelltaleCautionCueOn] = useState(false);
   // #24 wiper visual channel: VehicleRig writes the live blade sweep +
   // wiped-arc clearing level per frame; WindshieldDroplets reads it (render-
   // free ref, the hazardActiveRef pattern).
@@ -2337,8 +2342,10 @@ export function ReadyScene({
                 windLateralN={lesson.physics?.crosswind ? -CROSSWIND_BRIDGE_N : 0}
                 windGustAmplitudeN={lesson.physics?.crosswind ? -CROSSWIND_GUST_AMPLITUDE_N : 0}
                 windGustPeriodSec={lesson.physics?.crosswind ? CROSSWIND_GUST_PERIOD_SEC : 0}
-                // N11 (VP-06): director→cluster warning-lamp channel.
+                // N11 (VP-06): director→cluster warning-lamp channels (red +
+                // amber — the triage needs both to be visible).
                 telltaleLitRef={telltaleLitRef}
+                telltaleCautionLitRef={telltaleCautionLitRef}
               />
             </CockpitInteractionContext.Provider>
             {/* S1: precise hittable parked cars from the lot's occupancy —
@@ -2359,7 +2366,9 @@ export function ReadyScene({
               director={director}
               hazardActiveRef={hazardActiveRef}
               telltaleLitRef={telltaleLitRef}
+              telltaleCautionLitRef={telltaleCautionLitRef}
               onTelltale={setTelltaleCueOn}
+              onTelltaleCaution={setTelltaleCautionCueOn}
               sampleRef={sampleRef}
               simRef={simRef}
               inputRef={inputRef}
@@ -2686,6 +2695,22 @@ export function ReadyScene({
         >
           <div className="rounded-full border border-danger/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-danger shadow-glow-sm backdrop-blur">
             Контролна лампа: температура! Спри спокойно вдясно
+          </div>
+        </div>
+      ) : null}
+
+      {/* …and the AMBER cue, which teaches the OPPOSITE action. Same aid gate
+          and the same `data-hud` name (row C1's column), because it is the
+          same chip in the other colour — a student who sees one line for both
+          lamps has not learned the triage. Rendered only while the red one is
+          dark: once red is lit it owns the glass. */}
+      {telltaleCautionCueOn && !telltaleCueOn && aids?.pathRibbon ? (
+        <div
+          data-hud="telltale-cue"
+          className="pointer-events-none absolute left-1/2 top-24 z-10 -translate-x-1/2"
+        >
+          <div className="rounded-full border border-warning/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-warning shadow-glow-sm backdrop-blur">
+            Жълта лампа: двигател — продължи плавно до сервиз
           </div>
         </div>
       ) : null}
@@ -3747,7 +3772,9 @@ function RuntimeDriver({
   director,
   hazardActiveRef,
   telltaleLitRef,
+  telltaleCautionLitRef,
   onTelltale,
+  onTelltaleCaution,
   sampleRef,
   simRef,
   inputRef,
@@ -3791,8 +3818,13 @@ function RuntimeDriver({
   /** N11 (VP-06) → VitokCockpit: the staged dashboard lamp is lit while true
    *  (the hazardActiveRef twin for the cockpit cluster). */
   telltaleLitRef: React.RefObject<boolean>;
+  /** N11 (VP-06) → VitokCockpit: the AMBER twin ("checkEngine"). */
+  telltaleCautionLitRef: React.RefObject<boolean>;
   /** Edge callback for the L1/L2 HUD cue (state flips only on lamp edges). */
   onTelltale?: (on: boolean) => void;
+  /** The amber lamp's own edge callback — its cue teaches the OPPOSITE
+   *  response, so it can never share the red one's line. */
+  onTelltaleCaution?: (on: boolean) => void;
   sampleRef: React.RefObject<VehicleSample>;
   /** S0-View: live steer angle for the attempt recorder (visual channel). */
   simRef: React.RefObject<VehicleSim | null>;
@@ -4291,7 +4323,19 @@ function RuntimeDriver({
           recorder?.addEvent(
             "annotation",
             tRef.current,
-            "Светна контролна лампа — температура на двигателя.",
+            "Светна ЧЕРВЕНА контролна лампа — температура на двигателя. Спри спокойно вдясно.",
+          );
+        }
+      }
+      const cautionLit = director.telltaleCautionLit;
+      if (cautionLit !== telltaleCautionLitRef.current) {
+        telltaleCautionLitRef.current = cautionLit;
+        onTelltaleCaution?.(cautionLit);
+        if (cautionLit) {
+          recorder?.addEvent(
+            "annotation",
+            tRef.current,
+            "Светна ЖЪЛТА контролна лампа — двигател. Жълто значи „внимателно, до сервиз“ — продължи плавно.",
           );
         }
       }

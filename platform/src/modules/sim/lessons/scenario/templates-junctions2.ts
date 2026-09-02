@@ -474,6 +474,25 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
  * gate instead of turning it red; and `recordScJunction2Drive`
  * (traces/scJunctions2.ts) still takes `Pick<…, "onTick">`, so every gate that
  * certifies this shadow still certifies it at 0.
+ *
+ * ── W23 (2026-09-02) · ADDRESS (1) IS BUILT, AND THE COUNTS ARE RE-MEASURED ─
+ *
+ * `traffic/system.ts conflictFromRightFor` now asks ARRIVAL instead of
+ * presence: it drops a vehicle that will be more than CONFLICT_CLEARED_M past
+ * the node by the time the student reaches it, one that arrives more than
+ * RIGHT_ARRIVAL_LATE_SEC after he is clear of it, and one already departing and
+ * clear. `worldRuntime` §4b feeds it his own speed for the CONVICTION and keeps
+ * the presence answer for the COMMENDATION, so a student who waits is still
+ * credited for waiting. Same method as w21/w22, same rungs, today's tree:
+ *
+ *   sc-junction-blind  L1 n=4 · L3 n=5 · L5 n=6  →  2 / 1 / 0 of 20 seeds
+ *   (was 10 / 11 / 11; still 0 / 0 / 0 at vehicleCount 0)
+ *
+ * The two that remain are the tight ones — a car 15 m out closing at 4.8 m/s,
+ * arriving 1.9 s after he crosses, inside the engine's own
+ * LEFT_TURN_CONVICT_GAP_SEC band — and they are convictions this product should
+ * make. The rest of w21's paragraph stands: no count is authored here, and
+ * `recordScJunction2Drive` still certifies the shadow at 0.
  */
 
 /**

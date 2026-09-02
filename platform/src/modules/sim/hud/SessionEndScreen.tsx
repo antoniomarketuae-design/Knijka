@@ -682,6 +682,22 @@ export function objectiveDetailText(detail: ObjectiveDetail | undefined): string
       if (detail.redMetVia === null) return RED_MET_UNRECORDED_BG;
       return RED_MET_TEXT_BG[detail.redMetVia];
     }
+    case "oncomingGap": {
+      // THE NUMBER THE BRIEFING ASKED HIM TO COUNT (sc-turn-left-oncoming:
+      // 7974670c). The runtime bills only the ≤ 2 s cut, so between that and
+      // the taught norm the student used to hear nothing at all — including
+      // when he judged it WELL, which is the half worth saying out loud.
+      // THEO-4: never the bare figure — the short line says what the seconds
+      // are for.
+      const norm = detail.normSec.toFixed(0);
+      if (detail.acceptedGapSec === null) {
+        return "Интервал: при започването на завоя нямаше насрещен — лентата беше чиста.";
+      }
+      const g = detail.acceptedGapSec.toFixed(1);
+      return detail.acceptedGapSec >= detail.normSec
+        ? `Интервал: зави при ${g} с — над нормата от ${norm} секунди, точно така се преценява.`
+        : `Интервал: зави при ${g} с — под нормата от ${norm} секунди. Левият завой отнема 2–3 с от насрещната лента, затова под ${norm} се чака.`;
+    }
     case "roundabout":
       return detail.exitSignaled ? "Излезе от кръговото с десен мигач" : null;
     case "threePointTurn": {

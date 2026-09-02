@@ -234,6 +234,19 @@ export interface ReachZoneParams {
    * the evaluator reads it.
    */
   requireRestClean?: ReachZoneRestDemand;
+  /**
+   * REPORT THE ONCOMING GAP HE TURNED INTO, against this drill's taught norm,
+   * in seconds — the authored half of the only key here that refuses nothing.
+   * `done` is bit-identical with it and without it; what it adds is the
+   * `ObjectiveDetail` («oncomingGap») the debrief prints on the row.
+   *
+   * The full design note — the two places the product already measured this and
+   * never read either, why the norm is authored rather than taken from a
+   * runtime constant, and why the 2–4 s band is the one that mattered — lives
+   * on `ReachZoneWitnessDemands.reportOncomingGapSec` in objectives.ts, which
+   * is where the evaluator reads it.
+   */
+  reportOncomingGapSec?: number;
 }
 
 /**
@@ -969,6 +982,23 @@ export type ObjectiveDetail =
        * both signatures rather than guessing one.
        */
       redMetVia: RedMetVia | null;
+    }
+  | {
+      /**
+       * N1 (doc 72 JU-10): the gap the student actually turned into, in the
+       * unit his briefing counts in. `OncomingLeftTurnRunner` has measured
+       * `acceptedGapSec` since A8 and no surface ever read it, so the one drill
+       * whose whole subject is „прецени интервала в СЕКУНДИ" never told the
+       * student what his interval was. The runtime convicts only the ≤ 2 s cut;
+       * between that and the taught 4 s norm nothing was said at all.
+       */
+      kind: "oncomingGap";
+      /** Tightest gap the student turned into, s — how long the nearest
+       *  oncoming still needed to reach the junction at his commit. null = none
+       *  was inbound then (he waited them out, or the road was clear). */
+      acceptedGapSec: number | null;
+      /** The taught norm it is read against, s (authored on the gate). */
+      normSec: number;
     }
   | { kind: "roundabout"; entered: boolean; exitSignaled: boolean }
   | {

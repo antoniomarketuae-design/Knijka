@@ -131,7 +131,12 @@ export function scVpTelltaleRedMistakeDriveOnScript(): DriveScript {
         kind: "annotation",
         textBg: "Червеното не търпи „още малко“: маслото/температурата вече убиват двигателя в движение.",
       },
-      { kind: "drive", points: [[RIGHT, 175], [RIGHT, 230]], targetKmh: 45, stopAtEnd: false },
+      // …and FAR ENOUGH that the ignore is actually adjudicated. The stimulus
+      // resolves once its trigger is `ignoreBeyondM` (100 m) behind, i.e. at
+      // y ≈ 275; the demo used to turn back into the roadside at y = 230, so
+      // the one code its own title names could never fire and the card was left
+      // convicting the crash alone (sc-vp-telltale-red:c172d48b).
+      { kind: "drive", points: [[RIGHT, 175], [RIGHT, 285]], targetKmh: 45, stopAtEnd: false },
       {
         kind: "annotation",
         textBg: "Двигателят блокира на скорост — колата поднася и удря това, което е пред нея.",

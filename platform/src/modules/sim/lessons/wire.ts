@@ -460,6 +460,15 @@ function parseWireObjectiveDetail(value: unknown): ObjectiveDetail | null {
         redMetVia: (via ?? null) as RedMetVia | null,
       };
     }
+    case "oncomingGap": {
+      const acceptedGapSec = numOrNull(d.acceptedGapSec, 0, 3600);
+      if (acceptedGapSec === "bad") return null;
+      // The norm is authored, so a payload without a usable one carries no
+      // standard to read the seconds against — drop the row rather than print
+      // a figure beside an invented bar.
+      if (!isFiniteNum(d.normSec) || d.normSec <= 0 || d.normSec > 3600) return null;
+      return { kind: "oncomingGap", acceptedGapSec, normSec: d.normSec };
+    }
     case "roundabout": {
       if (typeof d.entered !== "boolean" || typeof d.exitSignaled !== "boolean") return null;
       return { kind: "roundabout", entered: d.entered, exitSignaled: d.exitSignaled };

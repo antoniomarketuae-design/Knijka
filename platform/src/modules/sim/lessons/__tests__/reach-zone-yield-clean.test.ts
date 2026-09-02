@@ -208,7 +208,7 @@ describe("the two vocabularies agree — the instrument before the census", () =
 });
 
 describe("the catalogue census", () => {
-  it("binds exactly the seven rows whose banner certifies a yield", () => {
+  it("binds exactly the eight rows whose banner certifies a yield", () => {
     const bound: string[] = [];
     for (const spec of SCENARIO_TEMPLATES) {
       for (const o of spec.success) {
@@ -268,9 +268,35 @@ describe("the catalogue census", () => {
     // `engine.ts`: the comment there still reads „BOTH gates that carry it" and
     // names sc-sflash-cross / sc-sdead-cross — it is three now, and that comment
     // is stale. Reported; not edited from this file.
+    //
+    // ── RE-BASELINED 7 → 8, 2026-09-02 (sc-turn-left-oncoming:7974670c) ──
+    //
+    // THE EXPECTATION MOVED BECAUSE THE PRODUCT DID, and the instrument did
+    // not: `deriveYieldDemand` and its three regexes are byte-identical, so the
+    // eighth entry is the shipped matcher reading a sentence that did not exist
+    // before. `sc-ltap-turn`'s banner was «Завърши левия завой и излез от
+    // кръстовището на юг» — a place and a compass arm — on a drill whose entire
+    // subject is the oncoming interval; it now reads «…НА ЮГ, СЛЕД КАТО
+    // ПРОПУСНЕШ НАСРЕЩНИТЕ». `:traffic` is the right kind: «насрещните» are
+    // vehicles, and the drill's cut-gap demo cites FAILED_TO_YIELD in
+    // `codeRefs` — the ledger row `traffic` consults.
+    //
+    // REDEEMABLE on the two conditions `junctions-title-truth.test.ts` checks,
+    // which is why the title is allowed back after the title-truth wave removed
+    // it: the drill stages the conflict it names (SC_LTAP_TIGHT_EVENT, 1.4 s)
+    // and the refusal is reachable rather than a predicate nothing can trip.
+    // The positive half — „he really did wait" — is still not witnessed, and
+    // this row is no exception to that.
+    //
+    // NOT A TRAP, checked because `sc-ltap-turn` is 2 of 2: `engine.ts` folds
+    // `yieldFailedVoidsObjective` into `terminalUnearnable` BY PARAMS, so the
+    // finish gate arms and the student reaches the −10 card instead of having
+    // to quit. (That comment in engine.ts still says „BOTH gates" — it is four
+    // now. Still reported, still not edited from this file.)
     expect(bound.sort()).toEqual(
       [
         "sc-junction-scan/sc-jscan-exit:traffic",
+        "sc-turn-left-oncoming/sc-ltap-turn:traffic",
         "sc-jx-giveway-b1/sc-jxgb-yield:traffic",
         "sc-merge-bus-pullout/sc-mgb-ease:traffic",
         "sc-merge-from-property/sc-mfp-walk-yield:pedestrian",

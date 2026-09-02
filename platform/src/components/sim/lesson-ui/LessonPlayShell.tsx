@@ -130,6 +130,10 @@ import {
   type PreDriveStepId,
 } from "@/modules/sim/procedures";
 import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/cabinLook";
+// The bottom strip's own resolution of the three ceilings — see
+// `advisorCapEchoesStrip`. Same function `hud/StatusDashboard.GovernorCapMark`
+// calls, so the card cannot disagree with the bar about which number binds.
+import { readSpeedContract } from "@/modules/sim/scene/lessonSpeedContract";
 
 /** How long the completed pre-drive checklist stays on screen after the
  *  thirteenth step rolls the car away — see the state that uses it. */
@@ -873,6 +877,75 @@ export function heldTaskCapKmh(
   if (spoken !== undefined) return spoken;
   if (activeObjectiveId === null || prev === null) return undefined;
   return prev.objectiveId === activeObjectiveId ? prev.taskCapKmh : undefined;
+}
+
+/**
+ * ── O51 residual (3) — THE CAP IS ON TWO SURFACES NOW, SO THE CARD DROPS IT ─
+ * (sc-signal-hesitation:826bc3d5, major, re-judged STILL on the w10-4 frames.)
+ *
+ * `advisorEchoTrim` below removes the advisor card's duplicate of the OBJECTIVE
+ * TITLE and keeps the cap, and its reason is written out there: „the cap is the
+ * coachable half — it is the number the student is being graded against and IT
+ * APPEARS NOWHERE ELSE ON THE GLASS". That last clause expired. Round 11 threaded
+ * `taskCapKmh` into `hud/StatusDashboard.GovernorCapMark`, and the bottom strip
+ * has printed the same figure, labelled and ranked, ever since.
+ *
+ * MEASURED · `w10-4/frames/sc-signal-hesitation__pc-right/05-stopped.png`, and
+ * the run.log census of the same drive carries it on five consecutive beats:
+ *
+ *   notify column   «Задача 1/2 · Приближи зеленото кръстовище с готовност»
+ *                   [bordered card, own ✕]  «дръж под 35 км/ч»
+ *   bottom strip    «50 · РЕЖИМ Нормален ≤60 · знакът важи · задачата иска ≤35»
+ *
+ * — one number, two surfaces, two phrasings, and the row says the consolidation
+ * „is not finished while a second task-speed chip renders elsewhere on the
+ * glass". The card's own rule already decides this case: „a panel whose entire
+ * content is a sentence already on screen is not a quieter duplicate, it is a
+ * duplicate."
+ *
+ * IT IS NOT AN UNCONDITIONAL SUPPRESSION, AND THE TWO EXCEPTIONS ARE THE POINT.
+ * `GovernorCapMark` prints nothing at all without a governor („Напреднал" —
+ * `governorCapKmh` returns null), and `readSpeedContract` refuses to make a task
+ * cap AT OR ABOVE the posted limit the binding number (B58: slack is not an
+ * instruction). In both readings the strip is silent, so suppressing the card
+ * would delete the only statement of the drill's demand and fail a student for a
+ * number nothing on the screen ever named — the false refusal this file weighs
+ * the same as a false certificate. So the strip's own resolution is asked, with
+ * the strip's own inputs, and the card stands down only where the strip speaks.
+ *
+ * THE FIGURES MUST BE THE SAME FIGURE, not merely both present: `taskCapKmh` is
+ * the HELD number the shell publishes to the bar (`heldTaskCapKmh` above), and
+ * it can outlive the sentence that produced it by design. Comparing them here is
+ * what makes „the card was hidden while the strip showed a different number"
+ * impossible rather than unlikely.
+ */
+const CAP_ONLY_RX = /^дръж под (\d+(?:[.,]\d+)?) км\/ч$/u;
+
+export function advisorCapEchoesStrip(
+  advisorTextBg: string | null,
+  taskCapKmh: number | undefined,
+  limitKmh: number,
+  governorCapKmh: number | null,
+): boolean {
+  if (advisorTextBg === null || taskCapKmh === undefined) return false;
+  // No governor → `GovernorCapMark` returns null and the strip prints no speed
+  // clause at all. The card is then the only carrier and it keeps the glass.
+  if (governorCapKmh === null) return false;
+  const m = CAP_ONLY_RX.exec(advisorTextBg.trim().replace(/\s+/gu, " "));
+  if (m === null) return false;
+  const spoken = Number(m[1].replace(",", "."));
+  if (!Number.isFinite(spoken) || spoken <= 0) return false;
+  if (Math.round(spoken) !== Math.round(taskCapKmh)) return false;
+  const reading = readSpeedContract({
+    postedKmh: limitKmh,
+    taskCapKmh,
+    modeCapKmh: governorCapKmh,
+  });
+  return (
+    reading.binding === "task" &&
+    reading.bindingKmh !== undefined &&
+    Math.round(reading.bindingKmh) === Math.round(spoken)
+  );
 }
 
 /**
@@ -2401,6 +2474,42 @@ export function briefingStandsDown(speedKmh: number): boolean {
 }
 
 /**
+ * …AND THE SAME RULE ON THE PHONE, WHERE THERE IS NO CARD TO HOLD IT
+ * (sc-signal-hesitation:f5ffccf3 — the row, the census and the three quarters
+ * of it that other waves already closed are at the effect that calls this).
+ *
+ * `briefingStandsDown` lives inside `BriefingCard`, and `BriefingCard` is the
+ * ROOMY mount. The compact leg feeds the same authored steps through the overlay
+ * rail instead, so the desktop's lifetime simply did not exist there: the item
+ * stayed a candidate for the whole drive and returned to the rail every time a
+ * higher-priority toast expired.
+ *
+ * A FUNCTION AND NOT THREE LINES IN THE EFFECT, for the reason `advisorEchoTrim`
+ * gives at its own header — this suite runs in `node`, the shell cannot be
+ * rendered, and the only thing a test can hold is an export. `null` means „leave
+ * the memory alone", which is the overwhelmingly common answer and the one an
+ * effect must not turn into a write.
+ *
+ * THE THREE REFUSALS ARE THE RULE, NOT GUARDS AROUND IT:
+ *   · roomy is not this leg's business — the card owns its own fold there, and a
+ *     second writer would be two readings of one state;
+ *   · a SPENT latch is never re-armed — „once, and never against the student":
+ *     a student who recalled the steps at 40 км/ч keeps them;
+ *   · and a car that is not moving keeps its briefing, because the whole point
+ *     of the surface is the standstill before the drive.
+ */
+export function compactBriefingFold(
+  compact: boolean,
+  fold: { folded: boolean; latched: boolean },
+  speedKmh: number,
+): { folded: boolean; latched: boolean } | null {
+  if (!compact) return null;
+  if (fold.latched) return null;
+  if (!briefingStandsDown(speedKmh)) return null;
+  return { folded: true, latched: true };
+}
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * …AND THE FOLD HAS TO OUTLIVE THE CARD, BECAUSE A TEACH MOMENT UNMOUNTS IT
  * (sc-junction-rhr:486cad54, major, re-judged STILL on the w21 re-drive.)
@@ -3449,7 +3558,17 @@ export function LessonPlayShell({
    * that gets ignored.
    */
   const worldEdgeArmedRef = useRef(true);
-  const [worldEdgeNear, setWorldEdgeNear] = useState(false);
+  /**
+   * `null` = no card. Otherwise WHICH edge he is approaching, because the two
+   * are different sights and the card used to describe only one of them: on the
+   * 103 authored micro-maps `world/builders/worldRim.ts` has belted the rim with
+   * a solid, collidable row of buildings since 2026-08-27 ("walled"), while the
+   * two Sofia OSM extracts still end in bare ground ("open"). The card said
+   * «няма нито път, нито сграда» on both, i.e. contradicted the windscreen on
+   * 103 of 105 maps — `sc-jx-equal-left:29a8ae1a` is a car that ended its lesson
+   * parked against one of those walls.
+   */
+  const [worldEdgeNear, setWorldEdgeNear] = useState<null | "walled" | "open">(null);
   // A1: latest driveline snapshot from the scene (a few Hz) — ref-resident,
   // folded into the HUD snapshot by the regular poll below.
   const drivelineRef = useRef<DrivelineSnapshot | null>(null);
@@ -3841,6 +3960,12 @@ export function LessonPlayShell({
   const recallBriefing = useCallback(() => {
     setBriefingRecalled(true);
     setBriefingOpen(true);
+    // …AND THE STAND-DOWN LATCH IS SPENT BY THE ASK. Same sentence the roomy
+    // card's `unfold` writes: a student who asks for the steps back while the
+    // car is moving has answered the question the speed rule is guessing at, so
+    // the rule may not take them off him again. `latched: true` is what stops
+    // the poll below re-folding the card on the student's next metre.
+    setBriefingFold({ folded: false, latched: true });
     setDismissedOverlayIds((prev) => {
       if (!prev.has("briefing")) return prev;
       const next = new Set(prev);
@@ -3848,6 +3973,42 @@ export function LessonPlayShell({
       return next;
     });
   }, []);
+
+  /**
+   * ── THE PHONE'S HALF OF THE SAME LIFETIME (sc-signal-hesitation:f5ffccf3) ──
+   *
+   * The row says the briefing „is a blocking modal on mobile and a persistent
+   * side panel on PC" — one lesson, two behaviours. Three quarters of that has
+   * been closed since it was filed: the numbering agrees (`briefingLineOrdinal`),
+   * the phone has a route back to the steps (`recallBriefing`), and `blocking`
+   * turns out to hold nothing at all — `overlayHoldsDrive` has no consumer, so
+   * neither platform freezes the car for it (`hud/overlayQueue.ts` says so in as
+   * many words).
+   *
+   * WHAT WAS LEFT IS THE LIFETIME, AND ONLY THE ROOMY LEG HAD ONE.
+   * `briefingStandsDown` folds the desktop panel to a labelled pill the first
+   * time the car is genuinely moving; the compact item had no such rule, so on a
+   * phone the seven authored steps stay a candidate for the whole drive and
+   * return to the rail every time a toast's TTL lapses — the census in
+   * `hud/overlayQueue.ts` («the instructions card is still open 13 seconds into
+   * the drive», «identical panel 105 seconds later») is that mechanism measured
+   * on three lessons.
+   *
+   * ONE RULE, TWO SURFACES. The predicate is the roomy card's own, the memory is
+   * the roomy card's own (`briefingFold`, which the compact leg never wrote
+   * because `BriefingCard` is not mounted there), and „once, and never against
+   * the student" is inherited whole: the latch fires at most once, `recallBriefing`
+   * spends it, and the МЕНЮ row that recalls the steps carries their count and is
+   * present for the entire drive. The phone's rail retires the card the way the
+   * desktop's column folds the panel — it moves, it does not disappear.
+   *
+   * IT IS WRITTEN FROM THE HUD POLL AND NOT FROM AN EFFECT OF ITS OWN. A
+   * `setState` in an effect body is a cascading render and this repo's lint says
+   * so; the poll is a timer callback that already runs at exactly the cadence
+   * this rule needs, already holds the cluster's own speed, and already carries
+   * a second guarded mirror beside it (`governorCapKmh`). The
+   * `compactBriefingFold(` call there is the whole of the writer.
+   */
 
   // -- A6: DISMISSING THE ADVISOR PROMPT ---------------------------------------
   //
@@ -3879,6 +4040,20 @@ export function LessonPlayShell({
         ? null
         : advisorEchoTrim(snap.advisorPrompt.textBg, snap.objectiveTitle),
     [snap.advisorPrompt, snap.objectiveTitle],
+  );
+
+  /** The difficulty governor as the bottom strip has it — see the mirror in the
+   *  HUD poll and `advisorCapEchoesStrip` for what reads it. `null` is both
+   *  „Напреднал" and „no scene has written a status yet", and both mean the same
+   *  thing to the only consumer: the bar is not printing a ceiling. */
+  const [governorCapKmh, setGovernorCapKmh] = useState<number | null>(null);
+  /** True while the advisor card would say nothing but a speed the consolidated
+   *  strip is already printing, labelled and ranked (O51 residual 3). */
+  const advisorCapIsDuplicate = advisorCapEchoesStrip(
+    advisorTextBg,
+    snap.taskCapKmh,
+    snap.limitKmh,
+    governorCapKmh,
   );
 
   // Armed cabin faults, sampled at the status bar's own cadence. Only the
@@ -4322,7 +4497,9 @@ export function LessonPlayShell({
       if (tick.worldEdgeClearanceM !== undefined) {
         const rim = worldEdgeWarning(tick.worldEdgeClearanceM, worldEdgeArmedRef.current);
         worldEdgeArmedRef.current = rim.armed;
-        if (rim.speak) setWorldEdgeNear(true);
+        // Absent `worldEdgeIsWalled` is UNKNOWN, and unknown takes the weaker
+        // claim: never tell a student there is a wall this tick cannot see.
+        if (rim.speak) setWorldEdgeNear(tick.worldEdgeIsWalled === true ? "walled" : "open");
       }
 
       // THEO-3: the targeted wrong action fired — pause into the consequence
@@ -4495,9 +4672,28 @@ export function LessonPlayShell({
   useEffect(() => {
     const id = window.setInterval(() => {
       setSnap(hudPollUpdate(sessionRef.current, lastTickRef.current, drivelineRef.current));
+      // …AND THE ONE FIELD OF THE BAR'S STATE THE SHELL HAS TO SHARE (O51
+      // residual 3). `StatusDashboard` polls `dashboardStatusRef` itself and
+      // keeps the reading private; the advisor card's stand-down has to know
+      // whether that bar is printing the task cap, and `governorCapKmh` is the
+      // half of that question the shell cannot derive (`snap.limitKmh` and
+      // `snap.taskCapKmh` are its own). Mirrored HERE rather than in a second
+      // interval — the `warnings` precedent one screen up — and guarded by
+      // equality, so an unchanged cap costs no render.
+      const cap = dashboardStatusRef.current?.governorCapKmh ?? null;
+      setGovernorCapKmh((prev) => (prev === cap ? prev : cap));
+      // …AND THE PHONE'S BRIEFING LIFETIME, for the reasons at the docblock
+      // beside `recallBriefing`. The speed is `snapshotOf`'s own expression
+      // rather than `snap.speedKmh`, so the rail's idea of „he is driving now"
+      // is the cluster's reading and cannot be one poll stale; the functional
+      // updater is what lets this live in a `[compact]` interval without a
+      // stale `briefingFold` closed over it. `?? prev` on the overwhelmingly
+      // common answer — no write, no render.
+      const speedKmh = lastTickRef.current?.speedKmh ?? 0;
+      setBriefingFold((prev) => compactBriefingFold(compact, prev, speedKmh) ?? prev);
     }, HUD_POLL_MS);
     return () => window.clearInterval(id);
-  }, []);
+  }, [compact]);
 
   // -- manual endings --------------------------------------------------------------
   const ended = result !== null;
@@ -4529,6 +4725,13 @@ export function LessonPlayShell({
     // to say „this showing was asked for mid-drive, so it must not hold the
     // car" (`recallBriefing`), and a retry's first showing is an arrival again.
     setBriefingRecalled(false);
+    // …AND THE FOLD LATCH BELONGS TO ONE ATTEMPT FOR THE SAME REASON. It was
+    // never reset, which on the roomy leg handed a retry its briefing already
+    // folded — the previous run's answer to a question this run has not been
+    // asked. With the compact leg now reading the same memory it would have hidden
+    // the steps from t = 0 on every retry, so the omission had to be corrected
+    // before that read could be trusted.
+    setBriefingFold({ folded: false, latched: false });
     setTraceUploaded(false);
     setFlash(null);
     clear();
@@ -5265,19 +5468,34 @@ export function LessonPlayShell({
         // It cannot fire on the taught route: WORLD_EDGE_WARN_M is 35 m against
         // a 60 m minimum margin, so the car is at least 25 m beyond the last
         // road on the tightest map in the product before this speaks.
-        worldEdgeNear && !ended
+        //
+        // AND IT HAS TO NAME WHAT IS ACTUALLY OUT THERE. This card is the only
+        // sentence the product ever says about the edge, and until now it said
+        // «няма нито път, нито сграда — теренът просто свършва» on every map —
+        // written before `world/builders/worldRim.ts` belted 103 of the 105
+        // with a solid row of frontage. A student who drives on now meets that
+        // wall, is stopped by it, and is billed ПТП for the impact like any
+        // other сблъсък; being told the terrain merely stops is an explanation
+        // his own windscreen refutes, which is the one thing THEO-4 forbids.
+        worldEdgeNear !== null && !ended
           ? {
               id: "world-edge",
               kind: "hint" as const,
               tone: "warn" as const,
               lineBg: "Наближаваш края на учебната зона",
               detailBg:
-                "Оттук нататък няма нито път, нито сграда — теренът просто свършва. " +
-                "Това не е част от упражнението и нищо отвъд ръба не се оценява. " +
-                "Върни се към синята линия и продължи по маршрута на урока.",
+                worldEdgeNear === "walled"
+                  ? "Учебната зона свършва тук: отпред е плътен ред сгради — това е ръбът " +
+                    "на картата, а не улица, и не се минава. Нищо отвъд маршрута не се " +
+                    "оценява, но удар в тези сгради се брои за пътнотранспортно " +
+                    "произшествие като всеки друг сблъсък. Спри, върни се към синята " +
+                    "линия и продължи по маршрута на урока."
+                  : "Оттук нататък няма нито път, нито сграда — теренът просто свършва. " +
+                    "Това не е част от упражнението и нищо отвъд ръба не се оценява. " +
+                    "Върни се към синята линия и продължи по маршрута на урока.",
               blocking: false,
               ackLabelBg: "Разбрах",
-              onAck: () => setWorldEdgeNear(false),
+              onAck: () => setWorldEdgeNear(null),
             }
           : null,
 
@@ -5332,7 +5550,10 @@ export function LessonPlayShell({
         // template is in that case — the step-count histogram over all 167 is
         // {4:5, 5:118, 6:30, 7:12, 8:2} — but a curriculum LessonSpec may be,
         // and a sheet that opens onto nothing is worse than no sheet.
-        briefingOpen && briefing.length > 0 && !mistakeMode && !ended
+        // `!briefingFold.folded` is the phone's half of the roomy panel's own
+        // lifetime — the docblock beside `recallBriefing` carries the row, the
+        // census and the „once, and never against the student" inheritance.
+        briefingOpen && !briefingFold.folded && briefing.length > 0 && !mistakeMode && !ended
           ? {
               id: "briefing",
               kind: "hint" as const,
@@ -6741,6 +6962,12 @@ export function LessonPlayShell({
           snap.advisorPrompt !== null &&
           // …and it has something the banner above it is not already saying.
           advisorTextBg !== null &&
+          // …nor the bottom strip: a card whose whole content is the task speed
+          // the bar already prints as «задачата иска ≤N» is the second surface
+          // sc-signal-hesitation:826bc3d5 was filed on. `advisorCapEchoesStrip`
+          // carries the frame and the two readings where the bar is silent and
+          // this card must therefore keep the glass.
+          !advisorCapIsDuplicate &&
           snap.advisorPrompt.textBg !== advisorDismissed ? (
             <AdvisorCard
               // The TRIMMED sentence; `keys` and everything else ride along

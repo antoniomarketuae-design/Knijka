@@ -65,6 +65,10 @@ import type { District as WorldDistrict } from "../world/types";
 // The PAINTER'S OWN gate, imported rather than mirrored — see
 // `worldStatesOneWayStreets` below for why the detector has to ask it.
 import { scenarioSignScale } from "../world/builders/zoneSigns";
+// THE BELT'S OWN gate, imported for the same reason as the painter's above: the
+// card the shell raises at the rim has to describe the world the builder
+// actually built, not a world it was written against.
+import { districtHasWorldRimBelt } from "../world/builders/worldRim";
 
 /** A stop line can re-fire only after this long (jitter at the line must not
  * spam RED_LIGHT_CROSSED; a genuine re-approach takes longer anyway). */
@@ -758,7 +762,16 @@ export type OncomingQuery = (
   radiusM: number,
 ) => boolean | OncomingConflict | null;
 
-/** Is there a vehicle approaching from the player's right near a junction? */
+/**
+ * Is there a vehicle approaching from the player's right near a junction?
+ *
+ * `playerSpeedKmh` is the student's own approach speed, and it is what lets the
+ * answer be about a MEETING rather than mere presence: a wiring that forwards
+ * it drops vehicles that clear the node before he arrives, or arrive long after
+ * he is through. A wiring that ignores it (the parameter is optional, so a
+ * six-argument lambda still type-checks) gets the presence-only answer — see
+ * `traffic/system.ts conflictFromRightFor` clause (6).
+ */
 export type RightConflictQuery = (
   jx: number,
   jy: number,
@@ -766,6 +779,7 @@ export type RightConflictQuery = (
   py: number,
   headingDeg: number,
   radiusM: number,
+  playerSpeedKmh?: number,
 ) => boolean;
 
 /** Is a vehicle already circulating a roundabout (approaching entry from the left)? */
@@ -974,6 +988,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
    *  read through the painter's own gate; no builder is run (see
    *  `worldStatesOneWayStreets`). */
   const oneWayStreetsStated = worldStatesOneWayStreets(district);
+  /** Whether the end of this world is a WALL (the rim belt / an authored
+   *  streetwall) or the bare edge of the ground — a property of the document
+   *  too, resolved once here beside the one-way gate. See the field's note in
+   *  rules/types.ts for the sentence that was wrong without it. */
+  const worldEdgeIsWalled = districtHasWorldRimBelt(district);
 
   // THE SURFACE CONSULT (see the header block). Lazy: a runtime that is never
   // sampled — the content tools, the catalogue tests — pays nothing, and a
@@ -1813,7 +1832,22 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           rhrSlowed = false;
           rhrCondSince = null;
         }
-        const rightConflict = rightConflictQuery(
+        // TWO QUESTIONS, NOT ONE — and they were being answered by one call.
+        //
+        // «Did I see a car coming from the right, and did I slow for it?» is a
+        // question about PRESENCE, and it is what earns «Правилно отстъпено
+        // предимство» on leaving the junction. «Did I pull out in front of one?»
+        // is a question about a MEETING. Asking presence for both is what
+        // convicted the model line of `sc-junction-blind` on 10-11 of 20 ambient
+        // seeds — for cars 23 m gone before he arrived, or 16-22 s away crawling
+        // (the measurement is at `conflictFromRightFor`). Asking the meeting for
+        // both would be the mirror mistake: a student who correctly waits out a
+        // car that then clears would stop being credited for waiting.
+        //
+        // So: the commendation channel keeps the presence answer, byte for byte
+        // what it always got; the conviction clock and the verdict read the
+        // arrival-aware one, which can only ever be a subset of it.
+        const rightPresence = rightConflictQuery(
           nearestIx.x,
           nearestIx.y,
           v.position.x,
@@ -1821,8 +1855,22 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           v.headingDeg,
           PRIORITY_CONFLICT_RADIUS_M,
         );
-        if (rightConflict) {
+        const rightConflict =
+          rightPresence &&
+          rightConflictQuery(
+            nearestIx.x,
+            nearestIx.y,
+            v.position.x,
+            v.position.y,
+            v.headingDeg,
+            PRIORITY_CONFLICT_RADIUS_M,
+            Math.abs(v.speedKmh),
+          );
+        if (rightPresence) {
           rhrConflictSeen = true;
+          if (v.speedKmh <= RHR_YIELD_KMH) rhrSlowed = true;
+        }
+        if (rightConflict) {
           // B15's staleness, in the tracker it was NOT fixed in. The identical
           // repair shipped one block below for `rbCondSince` (see §4c) and its
           // twin was left here, where the same driver meets the same sentence
@@ -1842,7 +1890,6 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           // bank time the verdict would refuse to act on.
           if (v.speedKmh <= RHR_MOVING_KMH) rhrCondSince = null;
           else if (rhrCondSince === null) rhrCondSince = tSec; // conflict became visible
-          if (v.speedKmh <= RHR_YIELD_KMH) rhrSlowed = true;
         } else {
           rhrCondSince = null;
         }
@@ -2153,6 +2200,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         // up. Four max() and one hypot() on numbers already in hand; the
         // district is captured once at construction.
         worldEdgeClearanceM: worldEdgeClearanceM(district, v.position.x, v.position.y),
+        worldEdgeIsWalled,
         laneId: fix.laneId,
         laneCount: edgeRt ? edgeRt.lanesPerDir : 1,
         // C1: the segment laneId is numbered against — the reducer only

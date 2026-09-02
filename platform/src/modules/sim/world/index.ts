@@ -35,7 +35,11 @@ export { DistrictWorld } from "./components/DistrictWorld";
 export type { DistrictWorldProps } from "./components/DistrictWorld";
 export { LaneSignalGantry, laneGantryOf } from "./components/LaneSignalGantry";
 export type { LaneGantrySpec } from "./components/LaneSignalGantry";
-export { WorldColliders } from "./components/WorldColliders";
+export {
+  WorldColliders,
+  DISTRICT_SURFACE_USER_DATA,
+  isDistrictSurfaceUserData,
+} from "./components/WorldColliders";
 export { OsmAttribution } from "./components/OsmAttribution";
 export { QUALITY_PRESETS } from "./components/quality";
 export type { QualityPreset } from "./components/quality";

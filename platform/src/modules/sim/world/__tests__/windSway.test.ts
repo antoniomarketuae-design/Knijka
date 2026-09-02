@@ -272,7 +272,17 @@ describe("routing: the bend reaches the shipped canopies and something drives it
 
   it("VehicleRig writes the uniform every render frame from the sim's own gust", () => {
     expect(rigWritesUniform(RIG_SRC)).toBe(true);
-    expect(RIG_SRC).toContain('import { setWindSway } from "@/modules/sim/world";');
+    // MATCHED AS A NAMED IMPORT, NOT AS A WHOLE LINE — 2026-09-02. The
+    // assertion is „VehicleRig reaches setWindSway through the world BARREL and
+    // not through a deep path" (the module-boundary rule, docs/architecture/05).
+    // It was written as the exact shipped line, so it went red the first time
+    // the rig co-imported a second symbol from that same barrel
+    // (`isDistrictSurfaceUserData`, the collision-threshold lane) — a change
+    // that cannot violate the rule it guards. The specifier is still pinned;
+    // only the „and nothing else in the braces" accident is dropped.
+    expect(RIG_SRC).toMatch(
+      /import \{[^}]*\bsetWindSway\b[^}]*\} from "@\/modules\/sim\/world";/,
+    );
     // …and parks the trees on unmount: the uniform is a module singleton that
     // outlives the scene, so a crosswind lesson followed by a calm one would
     // otherwise leave the next street leaning.

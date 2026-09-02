@@ -142,6 +142,39 @@ interface RunSpec {
 }
 
 /**
+ * Is the end of THIS district's world a WALL — something the student can see
+ * from anywhere and is stopped by — or the bare edge of the ground?
+ *
+ * `buildWorldRim`'s own gate, hoisted rather than re-derived, so that the
+ * sentence a virtual instructor puts on the glass when the rim warning fires
+ * (LessonPlayShell, through `SimTick.worldEdgeIsWalled`) is decided by the SAME
+ * rule this geometry is built from. That card was written before the belt
+ * existed and still says «няма нито път, нито сграда — теренът просто
+ * свършва» — on the 103 belted maps the exact opposite of what fills the
+ * windscreen. `runtime/district.ts` routed that as an open defect when the belt
+ * landed; `sc-jx-equal-left:29a8ae1a` is the frame of it.
+ *
+ * TRUE also where a run stands down behind an authored streetwall: it yields
+ * there precisely because a building already IS the edge, so the student's
+ * answer is unchanged. FALSE only for the two OSM extracts (`district-v1`,
+ * `d2-v1`), which declare no `mapKind` and where the ground genuinely does just
+ * stop, and for a degenerate box, which builds nothing at all.
+ */
+export function districtHasWorldRimBelt(district: {
+  meta: {
+    mapKind?: unknown;
+    boundsLocalMeters: { minX: number; minY: number; maxX: number; maxY: number };
+  };
+}): boolean {
+  if (typeof district.meta.mapKind !== "string") return false;
+  const b = district.meta.boundsLocalMeters;
+  return (
+    Math.max(b.minX, b.maxX) - Math.min(b.minX, b.maxX) > 1 &&
+    Math.max(b.minY, b.maxY) - Math.min(b.minY, b.maxY) > 1
+  );
+}
+
+/**
  * The belt for one district, as synthetic footprints for `buildBuildings`'
  * `extraVolumes` pass — in a stable order (n, s, e, w; each run low → high).
  *
@@ -177,7 +210,10 @@ export function buildWorldRim(
   // ground, and no frame in the w11 sweep is on either map. A city edge is a
   // second question (a river, a ring road, a treeline — not a wall) and it is
   // not answered here.
-  if (typeof district.meta.mapKind !== "string") return [];
+  //
+  // …and the degenerate-box refusal below rides with it, so the predicate and
+  // the builder can never disagree about which maps have a wall at the end.
+  if (!districtHasWorldRimBelt(district)) return [];
 
   const b = district.meta.boundsLocalMeters;
   // Normalised for the reason `districtWorldEdge` normalises: `parseDistrict`
@@ -187,7 +223,6 @@ export function buildWorldRim(
   const maxX = Math.max(b.minX, b.maxX);
   const minY = Math.min(b.minY, b.maxY);
   const maxY = Math.max(b.minY, b.maxY);
-  if (!(maxX - minX > 1) || !(maxY - minY > 1)) return [];
 
   const IN = WORLD_RIM_INNER_M;
   const OUT = WORLD_RIM_OUTER_M;

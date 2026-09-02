@@ -12,20 +12,32 @@ import {
   NOTIFY_COLUMN_MIN_LEFT_FRACTION,
 } from "../notifyColumn";
 import { notifyColumnFloorPx } from "../../../../components/sim/TouchControls";
+import { projectCockpitPoint } from "../../scene/vitok/cabinLook";
 
 /**
- * The cockpit horizon, as a fraction of the canvas — `cabinLook.test.ts`'s own
- * assertion (`at([0.24, 0.71, 1e6]).y ≈ 0.58`), quoted so the derivation of
- * `HAZARD_BAND_TOP_FRACTION` can be re-run here rather than trusted.
+ * The cockpit horizon, as a fraction of the canvas MEASURED FROM ITS TOP — the
+ * space every length in `notifyColumn.ts` is written in.
+ *
+ * It is DERIVED here, not typed, because the number that used to stand in this
+ * slot was typed and was in the other convention: `cabinLook.test.ts` asserts
+ * `at([0.24, 0.71, 1e6]).y ≈ 0.58`, but `projectCockpitPoint` returns NDC (y up
+ * from the bottom — `hotspotScreenRect` flips it with `top: 1 - topFromBottom`,
+ * and `vehicle/tuning.ts`'s landmark table says „fractions from bottom-left").
+ * Read as a top-down fraction, 0.58 put the hazards 0.16 of the frame below
+ * where they are — on the road, where a sign face cannot be — and the assertion
+ * below was green on it for a fortnight (`sc-ov-oncoming-gap:5de3bffb`).
+ * Deriving it through the shipped projection is what stops that recurring.
  *
  * It lived in `notifyColumn.ts` as an `export const` until 2026-08-26 and this
- * file was its only reader — not in the barrel, not read by any layout, and no
- * CSS length derived from it. A number a shipped module publishes reads as a
- * number that module USES; this one is a sanity datum for the row below, so it
- * sits with the row. (Deleting it instead would have cost the one assertion that
- * notices if the hazard band is ever raised into the sky.)
+ * file is still its only reader — not in the barrel, not read by any layout,
+ * and no CSS length derived from it.
  */
-const COCKPIT_HORIZON_FRACTION = 0.58;
+const horizonFractionAt = (aspect: number): number =>
+  1 - projectCockpitPoint([0.24, 0.71, 1e6], "forward", aspect).y;
+/** The landscape phone — the tighter of the shapes the app serves, so the one
+ *  a single ceiling has to clear. (16:9 puts it at 0.420: a wider vFOV pushes
+ *  the horizon DOWN the frame, so the desktop is the slack case.) */
+const COCKPIT_HORIZON_FRACTION = horizonFractionAt(852 / 393);
 
 /**
  * =============================================================================
@@ -83,16 +95,24 @@ const TOP_PX = 8;
    projection `cabinLook.test.ts` already asserts).
    ─────────────────────────────────────────────────────────────────────────── */
 describe("row 1 · the peek is bounded by the sky, not only by the control band", () => {
-  it("keeps a tenth of the frame between the card's floor and the hazard band", () => {
-    // The same margin and the same grammar as `HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION`
-    // („0.55 leaves a tenth of the frame of clearance" under a hotspot at 0.65).
-    expect(HAZARD_BAND_TOP_FRACTION - NOTIFY_COLUMN_MAX_STAGE_FRACTION).toBeGreaterThanOrEqual(0.1);
-    // …and the hazard band is below the horizon's own line, or the derivation
-    // it comes from is describing the sky.
-    expect(HAZARD_BAND_TOP_FRACTION).toBeLessThan(COCKPIT_HORIZON_FRACTION);
+  it("keeps the peek's floor out of the road — i.e. at or above the horizon", () => {
+    // EXPECTATION CHANGED 2026-09-02 (`sc-ov-oncoming-gap:5de3bffb`). This used
+    // to read „a tenth of the frame below HAZARD_BAND_TOP_FRACTION", which was
+    // an arithmetic relation between two constants and could not notice that
+    // both sat below the horizon. The rule the founder actually wrote — „it
+    // sits exactly over the RIGHT-HAND PAVEMENT" — is about the ROAD, and the
+    // road begins at the horizon, so that is what is asserted now.
+    expect(COCKPIT_HORIZON_FRACTION).toBeCloseTo(0.402, 3);
+    expect(horizonFractionAt(16 / 9)).toBeCloseTo(0.42, 3);
+    expect(NOTIFY_COLUMN_MAX_STAGE_FRACTION).toBeLessThanOrEqual(COCKPIT_HORIZON_FRACTION);
+    // …and the first-run touch hint's ceiling is DELIBERATELY past it: its own
+    // constant carries the measurement (124.5 px of content against an 84.7 px
+    // horizon-true corridor) and the lifetime that pays for it. Pinned so the
+    // exemption stays a stated one rather than becoming the rule again.
+    expect(HAZARD_BAND_TOP_FRACTION).toBeGreaterThan(COCKPIT_HORIZON_FRACTION);
   });
 
-  it("LANDSCAPE: 192 px of card becomes 161, and the floor leaves 0.509 → 0.430", () => {
+  it("LANDSCAPE: 192 px of card becomes 149, and the floor leaves 0.509 → 0.400", () => {
     const bandBudget = IPHONE_L.height - notifyColumnFloorPx(IPHONE_L) - TOP_PX;
     // The pre-fix cap, read back off the shipped constants rather than quoted:
     // this is the 192 px the probe measured, and if the band ever moves this
@@ -100,9 +120,11 @@ describe("row 1 · the peek is bounded by the sky, not only by the control band"
     expect(bandBudget).toBe(192);
 
     const capped = notifyColumnMaxHeightPx(IPHONE_L.height, notifyColumnFloorPx(IPHONE_L), TOP_PX);
-    expect(Math.round(capped)).toBe(161);
+    // 161 until 2026-09-02, when the ceiling was corrected from 0.43 (0.53 less
+    // a margin, both mis-derived) to 0.40 — the cockpit horizon, rounded down.
+    expect(Math.round(capped)).toBe(149);
     // The card's floor as a fraction of the stage — the number his letter is
-    // actually about. 200/393 = 0.509 before, 169/393 = 0.430 after.
+    // actually about. 200/393 = 0.509 before, 157/393 = 0.400 after.
     expect((TOP_PX + capped) / IPHONE_L.height).toBeLessThanOrEqual(
       NOTIFY_COLUMN_MAX_STAGE_FRACTION + 0.001,
     );
@@ -116,14 +138,15 @@ describe("row 1 · the peek is bounded by the sky, not only by the control band"
     const after = w * notifyColumnMaxHeightPx(IPHONE_L.height, notifyColumnFloorPx(IPHONE_L), TOP_PX);
     const stage = IPHONE_L.width * IPHONE_L.height;
     expect(before / stage).toBeCloseTo(0.1032, 4);
-    expect(after / stage).toBeCloseTo(0.0865, 4);
+    // 0.0865 at the old 0.43 ceiling; 0.0802 since it became the horizon.
+    expect(after / stage).toBeCloseTo(0.0802, 4);
   });
 
   it("PORTRAIT is untouched — the band is still the tighter of the two budgets", () => {
     const floor = notifyColumnFloorPx(IPHONE_P);
     const band = IPHONE_P.height - floor - TOP_PX;
     expect(notifyColumnMaxHeightPx(IPHONE_P.height, floor, TOP_PX)).toBe(band);
-    // 0.43 × 852 = 366 px, which is larger than what the band leaves, so the
+    // 0.40 × 852 = 341 px, which is larger than what the band leaves, so the
     // `min()` picks the band and not one pixel of the upright layout moves.
     expect(IPHONE_P.height * NOTIFY_COLUMN_MAX_STAGE_FRACTION - TOP_PX).toBeGreaterThan(band);
   });

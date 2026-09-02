@@ -14,7 +14,7 @@
  * the run that must NOT get the new line.
  */
 import { describe, expect, it } from "vitest";
-import { makeViolation, type ScorableEvent } from "../../rules";
+import { makeViolation, VIOLATIONS, type ScorableEvent } from "../../rules";
 import { buildDebrief } from "../debrief";
 import { applyTick, buildLessonResult, createLessonSession, finishSession } from "../engine";
 import { lessonById } from "../specs";
@@ -210,8 +210,13 @@ describe("debrief — the verdict names the опасна it failed for (sc-rx-gu
    */
   it("names the act in the criteria clause, not only in the mistakes block", () => {
     const d = buildDebrief(l2, unfinishedResult([makeViolation("FAILED_TO_YIELD", 12)]));
+    // The title is read off the catalogue rather than retyped: this test's
+    // subject is „the criteria clause NAMES the act", not which words the act
+    // is named with — and the literal spelling went stale on 2026-09-02 when
+    // `FAILED_TO_YIELD.titleBg` was shortened so the phone peek could finish
+    // it (sc-merge-from-property:6715b581; the reasoning is on the row).
     expect(d.text).toContain(
-      "допусната е опасна грешка: «Непропускане на пътно превозно средство с предимство»",
+      `допусната е опасна грешка: «${VIOLATIONS.FAILED_TO_YIELD.titleBg}»`,
     );
   });
 

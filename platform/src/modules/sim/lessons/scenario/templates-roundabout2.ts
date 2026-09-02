@@ -896,15 +896,15 @@ export const SC_RB_PED_EXIT: ScenarioSpec = {
       //     refused on every rung, by 1.47 m at the graded ones and 0.27 m on
       //     the aided one.
       //
-      // WHAT IS LEFT, and it is not this file's to close. The capsule is
-      // radius + 5 m long against a pocket 7.94 m deep, so its worst-case reach
-      // behind the mark on a TILTED approach is √(r² + (r + 1)²) — 4.16 m at
-      // the graded rungs, but 5.84 m once L1 multiplies the radius by 1.5,
-      // which is 1.5 m inside the ring band. No authored radius closes that
-      // without also refusing a car that stopped correctly two metres off the
-      // lane centre (driven, both directions, in the same file). The remainder
-      // is an objectives.ts row: the grace capsule cannot see the kerb it is
-      // reaching over.
+      // …AND THE L1 REMAINDER IS CLOSED — 2026-09-02, in objectives.ts. It was
+      // reported here as „no authored radius closes it": the grace was applied
+      // as a BOX radius + 5 m long at every lateral offset, so a tilted approach
+      // reached √(r² + (r + 1)²) = 5.84 m behind the mark at L1 against 4.32 m
+      // of pocket, and a car parked in the ring band collected this rung.
+      // `stepReachZone` now sweeps the disc it always documented, so the room
+      // behind the boundary is the grace plus the disc's own half-chord —
+      // identical on the axis, the grace alone at the rim. Driven at every rung
+      // in roundabout2-title-truth.test.ts.
       params: {
         kind: "reachZone",
         x: X_ARM_LANE,

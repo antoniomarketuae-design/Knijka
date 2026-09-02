@@ -489,9 +489,21 @@ describe("scenario-world-referent gate", () => {
     // arming gate): a `lot-*` aisle posted 20 has no movement to hinder and a
     // motorway is the sibling family's road, so on either the row is INERT
     // rather than silently armed. `NO_WORLD_REFERENT` does NOT move: 14 again.
+    //
+    // 48 → 48 / 62 → 63 (2026-09-02, audit sc-vp-telltale-red:c172d48b):
+    // WARNING_LAMP_IGNORED, ЗДвП чл. 101, ал. 1 — the основна for driving on
+    // past a RED dashboard telltale instead of pulling over. It is EXEMPTED,
+    // and for the plainest of the fourteen reasons rather than for
+    // OFF_CARRIAGEWAY's: the referent is a `telltaleStimulus` staged on the
+    // LESSON, a cockpit channel with no world body, so no district can be
+    // wrong about it and a rule here could only restate the staging. What
+    // arms it instead is structural and much tighter than a config flag —
+    // only a scenario that STAGES a red telltale can ever produce the
+    // situation key, which is three lessons in the whole corpus. `checked`
+    // does NOT move: 48 is unchanged.
     expect(checked.size).toBe(48);
-    expect(NO_WORLD_REFERENT.size).toBe(14);
-    expect(all.length).toBe(62);
+    expect(NO_WORLD_REFERENT.size).toBe(15);
+    expect(all.length).toBe(63);
   });
 
   it("never exceeds doc 86 on the four classes §10 counts to ±0 (T1 90 · T2 31 · T3 9 · T4 83)", () => {

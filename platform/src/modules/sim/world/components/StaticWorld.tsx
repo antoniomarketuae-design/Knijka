@@ -112,7 +112,11 @@ const MACRO_VARIATION = {
  *   · the ROAD keeps `ROAD_SURFACE` and its own snow response — `weather.ts`'s
  *     `roadSurfaceToParams` brightens the carriageway by SNOW_ROAD_BRIGHTEN,
  *     which is the physically right answer for a flat, trodden, ploughed
- *     surface and would be double-applied if the hook went here too;
+ *     surface and would be double-applied if the hook went here too. Since
+ *     `sc-ac-snow:f1673b60` the road ALSO carries a per-fragment mix — but its
+ *     own, inside `roadSurface.ts`, at `SNOW_ROAD_COVER_MAX` 0.40 rather than
+ *     this spread's 0.85, and with no normal-facing term because a carriageway
+ *     is flat. Still not this hook, and for the same reason;
  *   · the MARKINGS keep `PAINT_WEAR`. Burying the paint under snow is the one
  *     thing this must not do: the same discipline snowCover.ts states for sign
  *     faces and signal lenses — „a picture that buries the thing the student is

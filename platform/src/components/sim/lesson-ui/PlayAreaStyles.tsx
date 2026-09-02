@@ -923,8 +923,8 @@ ${TOUCH_BAND_CSS_VARS}
          is exactly the half-landed swap sim-overlay-mirror-lane.test.ts exists
          to prevent, sitting in a rule no test reads because no pixel depends
          on it; the day anyone moves the ceiling back out of the inline style
-         it would put the card's floor at 0.596 of the stage, through a hazard
-         band that starts at 0.53. The floor was already the same length on
+         it would put the card's floor at 0.565 of the stage, past the hazard
+         band's 0.53 and far past the cockpit horizon at 0.402. The floor was already the same length on
          both sides — sim-overlay-mirror-lane.test.ts pins
          SIM_OVERLAY_COLUMN_FLOOR_CSS to notifyColumnFloorCss() — so the top
          was the only term that disagreed, and it is the term the swap moved.
@@ -935,18 +935,18 @@ ${TOUCH_BAND_CSS_VARS}
          the BAND term is the binding one and it is exact:
 
            393 × NOTIFY_COLUMN_MAX_STAGE_FRACTION − 73.24
-             = 168.99 − 73.24 = 95.75 px
+             = 157.20 − 73.24 = 83.96 px
 
          and SimOverlay's own resolved table says the same from the other end
-         („852 × 393  top 8 → 73.23   ceiling 161 → 95.76").
+         („852 × 393  top 8 → 73.23   ceiling 149 → 83.96").
 
-         95.75 px — against touchArc.test.ts's own MEASURED_WORST_CARD_PX of
+         83.96 px — against touchArc.test.ts's own MEASURED_WORST_CARD_PX of
          106.3, the height that file calls „the floor the column's own cap may
          never fall under … a cap below this clips an authored sentence". That
          guard still certifies the whole ladder because it computes
          height − floor − 8 (the abandoned datum) and never applies the band
          term at all — its own assertion for this profile is 192. So the guard
-         reads 192 where the product ships 95.75, and it is the guard that is
+         reads 192 where the product ships 83.96, and it is the guard that is
          stale, not the ceiling that is arbitrary. This is the measurable part
          of the w12 rows that photograph two lines of a 26-line briefing under
          «↓ ОЩЕ N РЕДА» (sc-mw-discipline, sc-sp-limit-end, sc-ac-snow,
@@ -954,7 +954,7 @@ ${TOUCH_BAND_CSS_VARS}
 
          IT IS NOT FIXABLE FROM THIS FILE, and the shape of the wrong fix is
          worth naming: the shipped ceiling is SimOverlay.tsx's inline
-         maxHeight and the 0.43 is notifyColumn.ts's, so the only lever here
+         maxHeight and the 0.40 is notifyColumn.ts's, so the only lever here
          would be an !important override — which would also widen the column
          for the toast column and the task row, and THOSE are on the glass
          while the student drives. That is the distinction
@@ -1705,19 +1705,19 @@ ${TOUCH_BAND_CSS_VARS}
          AND THE CEILING HAD TO MOVE WITH THE TOP — the half of the 2026-08-17
          swap that was left half-landed once already. A max-height is measured
          from the box's own top edge, so moving only the top would drop this
-         card's floor from 0.43 of the stage to 0.596, through the hazard band,
+         card's floor from 0.40 of the stage to 0.565, through the hazard band,
          and it would have been reported as „the mirror is fixed".
 
-         WHY THE HINT'S CEILING IS THE BAND ITSELF AND NOT THE PEEK'S 0.43. Fed
+         WHY THE HINT'S CEILING IS THE BAND ITSELF AND NOT THE PEEK'S 0.40. Fed
          the peek's fraction from the new top, this card's budget on the
-         founder's own handset is 95.8 px against the 124.5 px it measures on
+         founder's own handset is 84.0 px against the 124.5 px it measures on
          the frame above — and this card CLIPS what it cannot hold (overflow:
          hidden on the bare rule; its words live in an overflow-y-auto
          scroller inside a pointer-events-none parent, so no thumb can scroll
          them back). That is not a fold, it is a deletion of two lines of the
-         founder's own reverse-gear sentence. The peek pays the tenth-of-a-frame
-         margin because it is on the glass WHILE THE STUDENT DRIVES; this card
-         cannot be — touchHintLifetime.ts stands it down the first time the
+         founder's own reverse-gear sentence. The peek stops at the cockpit horizon
+         because it is on the glass WHILE THE STUDENT DRIVES and may not stand on
+         the road; this card cannot be — touchHintLifetime.ts stands it down the first time the
          car reaches 5 км/ч and its census reads it painted at 03-ready in 174
          of 174 runs and at no 04- frame in any of them. So it is bounded by
          HAZARD_BAND_TOP_FRACTION — it may not ENTER the band — and does not
@@ -1729,14 +1729,14 @@ ${TOUCH_BAND_CSS_VARS}
          band, that binds. Printed from the module's own resolvers rather than
          read off the arithmetic above:
 
-           stage      top     floor   ceiling  card    was (0.43)  clipped now
-           852 × 393  73.24   193     126.76   124.5   95.75       0.0 px
-           780 × 360  67.76   172     120.24   124.5   87.04       4.3 px
-           780 × 340  64.44   172     103.56   124.5   81.76      20.9 px
+           stage      top     floor   ceiling  card    was (0.40)  clipped now
+           852 × 393  73.24   193     126.76   124.5   83.96       0.0 px
+           780 × 360  67.76   172     120.24   124.5   76.24       4.3 px
+           780 × 340  64.44   172     103.56   124.5   71.56      20.9 px
 
          So on the handset this whole catalogue was photographed on the card
          keeps every line it had AND leaves the mirror; the peek's own fraction
-         would have deleted 28.7 px of it. On a 340 px stage there are only
+         would have deleted 40.5 px of it. On a 340 px stage there are only
          103.56 px between the mirror's lane and the thumb pads and the card
          wants 124.5, so something must give: this rule gives the tail of the
          reverse-gear sentence rather than the instrument, and says so instead

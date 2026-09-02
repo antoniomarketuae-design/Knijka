@@ -192,6 +192,17 @@ const SIGN_GLB: Record<SignKind, string> = {
   pedestrianCrossing: "sign_pedestrian", // А18
   priorityRoad: "sign_priority_road", // Б3 (the жълт ромб)
   settlement: "sign_settlement", // Д11
+  // Д15/Д16 ride the Д4 body for the same reason Г2/Г3 ride the Г12 disc, and
+  // here the plate is a byte match: d4.svg, d15.svg and d16.svg all open with
+  // `<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8"
+  // data-plate="true"/>`. No new GLB.
+  livingZoneStart: "sign_service_fuel", // Д15 — d15.svg face
+  livingZoneEnd: "sign_service_fuel", // Д16 — d16.svg face
+  // Д5 is the sixth rider on the same square plate: d5.svg opens with the
+  // byte-identical `<rect x="8" y="8" width="184" height="184" rx="18"…>` and
+  // differs only in its fill (motorway green), which travels in the face
+  // texture. No new GLB.
+  motorwayStart: "sign_service_fuel", // Д5 — d5.svg face
   fuel: "sign_service_fuel", // Е7
 };
 
@@ -220,6 +231,9 @@ const SIGN_FACE_OVERRIDE: Partial<Record<SignKind, { art: SignFaceArt; numeral?:
   passRight: { art: "g9" },
   children: { art: "a19" },
   noParking: { art: "v28" },
+  livingZoneStart: { art: "d15" },
+  livingZoneEnd: { art: "d16" },
+  motorwayStart: { art: "d5" },
 };
 /** В33 numerals are per-placement, so its faces are built on demand (below). */
 const LIMIT_END_ART: SignFaceArt = "v33";

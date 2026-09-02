@@ -318,7 +318,7 @@ describe("B58 — the advisor card never says a number the sign forbids", () => 
     expect(p.textBg).not.toContain("52");
   });
 
-  it("the survey PARSED what it judged — 283 cards with a number, 224 without, 0 it could not read", () => {
+  it("the survey PARSED what it judged — 283 cards with a number, 229 without, 0 it could not read", () => {
     // THE GUARD AGAINST THE INSTRUMENT, and the reason the counts are spelt out
     // rather than left as `> 0`. If the suffix wording drifts, every card lands
     // in UNPARSED and this test names it; if the source test in advisor.ts is
@@ -354,7 +354,18 @@ describe("B58 — the advisor card never says a number the sign forbids", () => 
     // census whose title contradicts its own assertion is the exact rot this file
     // was written to stop. Old name, for the ledger: „the survey PARSED what it
     // judged — 278 cards with a number, 224 without, 0 it could not read".
-    expect(cards.length).toBe(507);
+    //
+    // RE-MEASURED 2026-09-02 (sc-vu-pass-clearance:260b13fd), 507 → 512, and
+    // the +5 lands entirely in „silent" again, 224 → 229, with-number unmoved
+    // at 283. Same mechanism as the paragraph above: `sc-vup-pass` gained an
+    // authored `maxSpeedKmh: 46` under a sign posted 50, this survey withholds
+    // the authored cap on purpose, and «Прибери се в лентата и продължи по
+    // улицата» names no number of its own — so with nothing to read the card
+    // falls silent HERE while the five-argument card the product actually shows
+    // speaks «дръж под 46 км/ч» (pinned in advisor-authored-cap and
+    // advisor-sweep161). A silent card prints no figure and so cannot say a
+    // number the sign forbids: `overPostedOffenders` is still empty.
+    expect(cards.length).toBe(512);
     expect(unreadableCards(cards)).toEqual([]);
     const withNumber = cards.filter((c) => c.reading.kind === "number");
     const silent = cards.filter((c) => c.reading.kind === "silent");
@@ -367,7 +378,7 @@ describe("B58 — the advisor card never says a number the sign forbids", () => 
     // between the two populations except that one objective, and the total is
     // unchanged, which is what makes this a restatement and not a relaxation.
     expect(withNumber.length).toBe(283);
-    expect(silent.length).toBe(224);
+    expect(silent.length).toBe(229);
     // Both populations must stay non-trivial for the file to mean anything: a
     // catalog of only-silent cards proves nothing about numbers, and one with
     // no silent cards would mean the source test stopped biting.

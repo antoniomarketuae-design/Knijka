@@ -43,9 +43,17 @@ import type { ScenarioSpec } from "../types";
  * fix will come from.
  */
 
-/** Lamps a briefing may name, and the Bulgarian a student would read for each. */
+/** Lamps a briefing may name, and the Bulgarian a student would read for each.
+ *
+ *  `checkEngine` joined on 2026-09-02 with the second lamp channel
+ *  (sc-vp-telltale-red:775b58cc): the cluster's amber check-engine lamp is what
+ *  a staged `lamp: "checkEngine"` now lights, and the word a Bulgarian student
+ *  reads for it is the COLOUR — «жълта лампа» — because the colour is the
+ *  protocol this family teaches. The gate is unchanged in shape: a lamp with no
+ *  entry here still fails loudly. */
 const LAMP_WORDS: Record<string, RegExp> = {
   temperature: /температура/i,
+  checkEngine: /жълт/i,
 };
 
 /** Lamps the product cannot stage today. Naming one is the defect above. */

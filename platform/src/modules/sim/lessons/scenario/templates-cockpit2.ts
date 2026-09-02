@@ -52,7 +52,7 @@
  * circular reachZone cannot honestly discriminate a cockpit channel.
  */
 
-import type { TelltaleStimulusSpec } from "../../contracts";
+import type { TelltaleCautionSpec, TelltaleStimulusSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 import { l5Night, l5Wet } from "./complications";
 
@@ -202,6 +202,14 @@ const TTR_RIGHT = 12.19;
  *  well after the amber cue and the "continue-smoothly" checkpoint. */
 const TTR_TRIGGER = { x: TTR_RIGHT, y: 175 };
 const TTR_TRIGGER_DIST_M = 8;
+/** The AMBER stimulus: the check-engine telltale (ЗДвП чл. 139 doctrine:
+ *  жълто = внимателно, до сервиз) lights well BEFORE the red one and before
+ *  the „continue-smoothly" checkpoint at y = 110, so the two cues are met in
+ *  the taught order and the student sees both colours on one drive. */
+const TTR_AMBER_TRIGGER = { x: TTR_RIGHT, y: 60 };
+/** …and it is spent 40 m later (y ≈ 100), i.e. BEFORE the amber checkpoint and
+ *  long before the red trigger: the outcomes read amber-then-red, in order. */
+const TTR_AMBER_SPENT_M = 40;
 /** The curb-side halt point for the RED lamp (right edge of the right lane,
  *  curb x = 16.25 — the sc-vp-police-stop pull-over geometry), ~80 m of
  *  planning room after the lamp. */
@@ -234,6 +242,28 @@ const VP_TELLTALE_RED_LAMP: TelltaleStimulusSpec = {
 };
 
 /**
+ * The AMBER half of the same triage (lamp "checkEngine"): the cluster's
+ * check-engine lamp lights in the cluster's „caution" tone at y = 60 and STAYS
+ * lit, so when the red one joins it at y = 175 the two colours are on the glass
+ * together — which is the only way «цветът на лампата решава какво правиш» can
+ * be practised rather than merely read.
+ *
+ * It authors NO halt contract, because the taught response to amber is to keep
+ * rolling: the runner resolves it "clear" once it is spent, and the graded
+ * verdict is the `sc-vptr-amber` rolling checkpoint below (a panic-stop for the
+ * amber never reaches it, which is exactly the wrong reflex this lesson names).
+ */
+const VP_TELLTALE_RED_AMBER: TelltaleCautionSpec = {
+  id: "sc-vptr-amber-lamp",
+  kind: "telltaleStimulus",
+  libraryEventId: "ev-warning-light",
+  lamp: "checkEngine",
+  trigger: TTR_AMBER_TRIGGER,
+  triggerDistM: TTR_TRIGGER_DIST_M,
+  ignoreBeyondM: TTR_AMBER_SPENT_M,
+};
+
+/**
  * VP-06 — цветът на контролната лампа решава протокола (ЗДвП чл. 20: водачът
  * контролира ППС; чл. 139: движение само с технически изправно ППС. Doc-65
  * ev-warning-light doctrine: ЧЕРВЕНА лампа = спри безопасно СЕГА и гаси
@@ -262,13 +292,17 @@ const VP_TELLTALE_RED_LAMP: TelltaleStimulusSpec = {
  *     the runner emits zero events — so the honest read stands: a red lamp asks
  *     for a PLANNED pull-over, never an emergency stop).
  *
- * HONEST LIMIT (documented like sc-vp-handbrake's drag note): the engine's
- * telltaleStimulus renders ONE lamp channel (temperature, red). The AMBER lamp
- * is the authored NARRATIVE cue — the instructions, the shadow annotation and
- * the "continue-smoothly" objective carry it; the RED lamp is the one engine
- * stimulus. Nothing is faked to hide that: the objectives grade only what the
- * car actually did (drove on past the amber checkpoint; rested at the red curb
- * zone), and the shipped detectors grade the two wrong ways.
+ * BOTH LAMPS ARE NOW ENGINE STIMULI (2026-09-02, sc-vp-telltale-red:775b58cc).
+ * Until then `telltaleStimulus` carried ONE boolean channel, so the amber half
+ * was narrative only — the briefing promised a colour the cluster could not
+ * show, and «цветът на лампата решава какво правиш» was unpractisable on the
+ * one lesson built on it. The channel now names its lamp (contracts.ts
+ * TelltaleStopSpec / TelltaleCautionSpec), so this template stages TWO cues on
+ * one route: the amber check-engine lamp at y = 60 and the red temperature
+ * lamp at y = 175, both lit together from then on. Nothing else is faked: the
+ * objectives still grade only what the car did (drove on past the amber
+ * checkpoint; rested at the red curb zone), and the shipped detectors still
+ * grade the two wrong ways.
  */
 export const SC_VP_TELLTALE_RED: ScenarioSpec = {
   id: "sc-vp-telltale-red",
@@ -295,7 +329,7 @@ export const SC_VP_TELLTALE_RED: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Светне ли ЖЪЛТА лампа: това е „внимание, до сервиз“. Не спирай аварийно — продължи плавно и спокойно.",
+        "Светне ли ЖЪЛТА лампа (тази за двигателя): това е „внимание, до сервиз“. Не спирай аварийно — продължи плавно и спокойно.",
     },
     {
       n: 3,
@@ -365,7 +399,11 @@ export const SC_VP_TELLTALE_RED: ScenarioSpec = {
       titleBg: "Каране нататък с червената лампа",
       whatWentWrongBg:
         "Червената лампа светна — а водачът натисна газта: „още малко до вкъщи“. Червено значи СПРИ СЕГА, не „внимателно до сервиз“ (това е жълтото). Прегряващ двигател или спаднало налягане на маслото убива мотора в движение за минути — и когато двигателят блокира на скорост, колата поднася и удря това, което е пред нея. Червена лампа = плавно спиране плътно вдясно и изгасен двигател, веднага.",
-      codeRefs: ["COLLISION"],
+      // TWO codes, in the order the drive earns them: the mis-triage itself
+      // (WARNING_LAMP_IGNORED — ЗДвП чл. 101, ал. 1 „длъжен е да спре"), then
+      // where ignoring it leads. Until 2026-09-02 only the second existed, so
+      // the card convicted the crash and never the decision that caused it.
+      codeRefs: ["WARNING_LAMP_IGNORED", "COLLISION"],
     },
     {
       traceRef: { path: "content/traces/sc-vp-telltale-red/mistake-panic-lane.trace.json" },
@@ -393,7 +431,8 @@ export const SC_VP_TELLTALE_RED: ScenarioSpec = {
     // the delta AND the instructor's line that explains it, authored together.
     l5Night(),
   ],
-  staged: [VP_TELLTALE_RED_LAMP],
+  // Authored in the order the driver meets them: amber first, then red.
+  staged: [VP_TELLTALE_RED_AMBER, VP_TELLTALE_RED_LAMP],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

@@ -682,7 +682,31 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
   FAILED_TO_YIELD: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,
-    titleBg: "Непропускане на пътно превозно средство с предимство",
+    // SHORTENED 2026-09-02 (sc-merge-from-property:6715b581) — from
+    // «Непропускане на пътно превозно средство с предимство», 51 characters.
+    //
+    // THE PEEK CANNOT FINISH A THREE-LINE TITLE, and it is the surface a
+    // seventeen-year-old meets this row on. `hud/SimOverlay.tsx` states the
+    // arithmetic at its own `textWindowStyle`: the phone's text window is
+    // floored at 44 px (2.75rem, and `hud-off-the-road.test.ts`'s hazard-band
+    // gate caps that floor at 45.76 px, an eighth of a line of headroom), a
+    // title line box is 13.75 px and the body's first line needs 15.125 — so
+    // «a THREE-line title consumes 41.25 of 44» and the explanation gets
+    // nothing. Its closing sentence names this file: „The remedy … is an
+    // AUTHORING one: a `lineBg` short enough for the peek to finish."
+    //
+    // PHOTOGRAPHED: `.audit-frames/w10-3/frames/sc-merge-from-property__mobile-
+    // right/04-t024s.png` — «Непропускане на пътно / превозно средство с»,
+    // faded off mid-phrase, «↓ ОЩЕ 10 РЕДА», ZERO body lines. The words the
+    // fold ate were «с предимство», i.e. the operative half of the offence.
+    //
+    // NOTHING IS LOST AND ONE LINE IS WON. At two title lines the body's own
+    // first sentence — «Не пропусна превозно средство, което имаше предимство»
+    // — reaches the glass, which says both the party and the duty the long
+    // title was saying alone and unreadably. The family prefix («Непропускане
+    // на пешеходец», «Непропускане на автомобил със специален режим») is kept,
+    // `explanationBg`, `correctiveBg` and the citations below are untouched.
+    titleBg: "Непропускане на предимство",
     explanationBg:
       "Не пропусна превозно средство, което имаше предимство. На кръстовище без светофар пропускаш идващите отдясно; при знак „Пропусни движението“ — всички по главния път. Предимството се отстъпва, не се взема.",
     correctiveBg:
@@ -1586,10 +1610,45 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     ],
     conceptId: "c-cyclists",
   },
+  WARNING_LAMP_IGNORED: {
+    // N11 / doc 72 VP-06. LANDED 2026-09-02 (sc-vp-telltale-red:c172d48b) as
+    // the SIX-PART change the note below specifies — emitter first. The
+    // audit's sentence was the whole case: „a student who treats a red lamp as
+    // a yellow one and keeps driving without crashing would be recorded as
+    // faultless", and the only thing his debrief could name was a collision he
+    // happened to have on the way.
+    //
+    // Н38 GROUNDING: б. „а" (основна, 3 т.), never б. „в". See `n38.ts`.
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Продължаване с червена контролна лампа",
+    explanationBg:
+      "Червената контролна лампа светна в движение — а колата продължи нататък. Червеното не значи „до сервиза“, а „спри безопасно СЕГА“: прегрят двигател, спаднало налягане на маслото или отказала спирачна система стават опасни за минути, а не за километри. Продължиш ли, рискуваш двигателят да блокира или спирачките да откажат точно в движение — тогава колата вече не се управлява.",
+    correctiveBg:
+      "Щом светне ЧЕРВЕНА лампа: огледало, десен мигач, плавно намаляване и спиране плътно вдясно, после гаси двигателя. Жълтата лампа е другата половина на правилото — тя значи „внимателно, до сервиз“ и не иска аварийно спиране.",
+    // RETRIEVED, not recalled (ADR-002): `content/law/acts/zdvp.json`, unit
+    // „чл. 101", ал. 1 — „При възникване по време на движение на повреда или
+    // неизправност в пътно превозно средство, която застрашава безопасността на
+    // движението, водачът е длъжен да спре и да вземе мерки за нейното
+    // отстраняване." The duty is literally „спри", which is what the red lamp
+    // asks and what this code convicts the absence of. ал. 2 („може да
+    // придвижи… до място за отстраняване") is the AMBER case and ал. 3
+    // withdraws even that при опасни неизправности — one article carrying the
+    // whole red/amber triage the lesson teaches.
+    lawRef: "ЗДвП чл. 101, ал. 1",
+    realWorldBg:
+      "Извън изпита това е управление на технически неизправно ППС: глоба по ЗДвП чл. 179, ал. 6 — 50 лв. при незначителни, 200 лв. при значителни и 500 лв. при опасни неизправности. А ако повредата стане причина за произшествие, чл. 179, ал. 2 добавя глоба в размер 300 лв.",
+    realWorldRefs: ["ЗДвП чл. 179, ал. 6", "ЗДвП чл. 179, ал. 2"],
+    conceptId: "c-technical-condition",
+  },
   /*
    * -------------------------------------------------------------------------
-   * TWO CODES THAT ARE STILL NEEDED AND ARE DELIBERATELY NOT HERE
-   * (added w8, backed out 2026-08-28 — the retrieval survives, the rows did not)
+   * ONE CODE THAT IS STILL NEEDED AND IS DELIBERATELY NOT HERE
+   * (w8 added two, backed both out 2026-08-28 — the retrieval survives. The
+   *  TELLTALE half landed 2026-09-02 as `WARNING_LAMP_IGNORED` above, by
+   *  following the six-part list below to the letter; the POLICE half is still
+   *  open and its plan is still good. Read this as a worked example now, not
+   *  only as a plan.)
    * -------------------------------------------------------------------------
    *
    * WHAT WAS REMOVED AND WHY. Wave 8 added `POLICE_STOP_SIGNAL_IGNORED` and
@@ -1604,11 +1663,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
    * around: an open row with a good address beats a fault code no student can
    * ever meet.
    *
-   * THE TWO LESSONS THAT STILL HAVE NO CODE FOR THEIR OWN SUBJECT.
+   * THE LESSON THAT STILL HAS NO CODE FOR ITS OWN SUBJECT.
    *   sc-vp-police-stop  „Спиране по полицейски сигнал"  doc 72 VP-11
-   *   sc-vp-telltale     „Контролна лампа в движение"    doc 72 VP-06
-   *   (both in lessons/scenario/templates-cockpit.ts, from :762 and :942)
-   * Both were authored as COMPLETION DRILLS: the duty is graded ONLY as a
+   *   (lessons/scenario/templates-cockpit.ts, from :762)
+   * It was authored as a COMPLETION DRILL: the duty is graded ONLY as a
    * curb-side low-speed reachZone objective, and the wrong way through is billed
    * under the nearest available code — the police drill's own mistake demo
    * carries `codeRefs: ["NOT_KEEPING_RIGHT"]` (templates-cockpit.ts:832), the
@@ -1633,16 +1691,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
    *     глоба 200 лв. for a driver who „откаже да изпълни нареждане на органите
    *     за контрол и регулиране на движението".
    *
-   *   WARNING_LAMP_IGNORED → lawRef "ЗДвП чл. 101, ал. 1"
-   *     „При възникване по време на движение на повреда или неизправност в пътно
-   *     превозно средство, която застрашава безопасността на движението, водачът
-   *     е длъжен да спре и да вземе мерки за нейното отстраняване." The duty is
-   *     literally „спри" — exactly what the red lamp asks and what the drill
-   *     grades. ал. 2 („може да придвижи… до място за отстраняване") is the AMBER
-   *     case and ал. 3 withdraws even that „при… опасни неизправности", so the one
-   *     article carries the red/amber triage doc-65 ev-warning-light teaches.
-   *     realWorldRefs → "ЗДвП чл. 179, ал. 6" — 50 / 200 / 500 лв. by
-   *     незначителни / значителни / опасни неизправности.
+   *   WARNING_LAMP_IGNORED → SHIPPED 2026-09-02; the retrieval and the reasoning
+   *     now live on the row itself, above. Re-verified against
+   *     `content/law/acts/zdvp.json` before it landed rather than copied from
+   *     here, which is what the paragraph above asks of every reader.
    *
    *   НАРЕДБА № 38 GROUNDING FOR BOTH: б. „а" (основна, SEVERITY_POINTS.osnovna),
    *   NOT б. „в". The 10-point list is a CLOSED enumeration of six cases and
@@ -1919,6 +1971,14 @@ export const YIELD_PRAISE_SITUATION_COPY: Record<
   "narrow-meeting": {
     titleBg: "Правилно разминаване в стеснението",
     conceptId: "c-priority-concept",
+  },
+  // N11 (VP-06): the compliant answer to a RED telltale. It has to be praised
+  // in the same breath the ignore is charged, or the drill can only convict —
+  // and the pooled sentence ends «…безопасността на кръстовище», which is false
+  // on an empty street where the only other party is the car itself.
+  "warning-lamp": {
+    titleBg: "Правилна реакция на червена контролна лампа",
+    conceptId: "c-technical-condition",
   },
 };
 

@@ -4,13 +4,22 @@
  * / чл. 139, library ev-warning-light). Site: the same 352 m two-way
  * residential east arm the police-stop suite uses (e519275131.0), mid-block.
  *
- * The runner is STIMULUS + MEASUREMENT ONLY (contracts.ts): it stages NO
- * actor — at the authored trigger it lights the director's cockpit-lamp
- * channel (`telltaleLit`) and records the outcome — "yielded" for a compliant
- * curb-side rest (reactionTimeSec = stimulus→first-brake respondedSec),
- * "passedWithoutStopping" for driving on — but emits ZERO SimTick events.
- * The A12 battery here proves the hard bias: NEITHER side can ever grade a
- * violation from this runner; the graded duty lives in scenario objectives.
+ * The runner stages NO actor — at the authored trigger it lights the
+ * director's cockpit-lamp channel (`telltaleLit` for a red lamp) and records
+ * the outcome: "yielded" for a compliant curb-side rest (reactionTimeSec =
+ * stimulus→first-brake respondedSec), "passedWithoutStopping" for driving on.
+ *
+ * IT ALSO GRADES, SINCE 2026-09-02 (sc-vp-telltale-red:c172d48b), and this
+ * suite's A12 battery was rewritten with it rather than around it. A12 forbids
+ * convicting an UNMODELLED duty; this duty is modelled to the metre by the
+ * spec's own trigger and halt contract, and while the runner stayed silent a
+ * student who mis-triaged a red lamp as a yellow one and did not crash was
+ * recorded as faultless. So the red leg resolves BOTH ways in the existing
+ * `prioritySituation` vocabulary — "warning-lamp" → the основна
+ * WARNING_LAMP_IGNORED on the drive-on, the yield praise on the pull-over —
+ * exactly once per attempt. What the battery below now proves is the shape
+ * that matters: ONE bill per adjudication, none before it, and none from the
+ * compliant leg.
  */
 
 import { describe, expect, it } from "vitest";
@@ -72,6 +81,48 @@ describe("telltaleStimulus (integration)", () => {
     // Lit mid-drive at the authored point, not at spawn.
     expect(driver.s).toBeGreaterThan(80);
     expect(driver.s).toBeLessThan(120);
+    // …and it is the RED channel specifically: the amber one stays dark, which
+    // is the half that had no channel at all before 2026-09-02.
+    expect(stack.director.telltaleCautionLit).toBe(false);
+  });
+
+  it("an AMBER cue lights the OTHER channel and demands no stop — it resolves 'clear' by carrying on", () => {
+    // sc-vp-telltale-red:775b58cc. The lesson's whole subject is «цветът на
+    // лампата решава какво правиш», and one boolean channel could only ever
+    // show a student one colour. A `checkEngine` spec authors NO halt contract
+    // (contracts.ts makes that unrepresentable) because the taught response to
+    // amber is to keep rolling calmly to a garage.
+    const red = telltaleSpec();
+    const amber: TelltaleStimulusSpec = {
+      id: "t-telltale-amber",
+      kind: "telltaleStimulus",
+      lamp: "checkEngine",
+      trigger: red.trigger,
+      triggerDistM: red.triggerDistM,
+      ignoreBeyondM: 40,
+    };
+    const stack = makeStack([amber]);
+    expect(stack.director.telltaleCautionLit).toBe(false);
+    const driver = new PolyDriver(offsetRight(edgeGeometry(), LANE_OFFSET), 20);
+    for (let i = 0; i < 30 * 30 && !stack.director.telltaleCautionLit; i++) {
+      stepFrame(stack, driver.advance(DT, 10));
+    }
+    expect(stack.director.telltaleCautionLit).toBe(true);
+    // The RED channel never rises for it — two lamps, not one repainted.
+    expect(stack.director.telltaleLit).toBe(false);
+    // Carrying on IS the compliant answer, so it resolves successfully…
+    for (let i = 0; i < 60 * 30 && stack.outcomes.length === 0; i++) {
+      stepFrame(stack, driver.advance(DT, 10));
+      if (driver.s >= driver.length) break;
+    }
+    expect(stack.outcomes).toHaveLength(1);
+    expect(stack.outcomes[0]).toMatchObject({ success: true, detail: "clear" });
+    // …and it charges nothing and praises nothing: there is no manoeuvre to
+    // grade, and the scenario's own rolling checkpoint objective grades the
+    // driving. The amber lamp stays lit afterwards, like the red one.
+    expect(violationCodes(stack.ruleEvents)).toEqual([]);
+    expect(commendationCodes(stack.ruleEvents)).toEqual([]);
+    expect(stack.director.telltaleCautionLit).toBe(true);
   });
 
   it("compliant: pulling over and resting at the halt point resolves 'yielded' with a measured respondedSec — zero rule events", () => {
@@ -100,10 +151,13 @@ describe("telltaleStimulus (integration)", () => {
     expect(stack.outcomes[0].approachSpeedKmh).toBeGreaterThan(5);
     // The lamp STAYS lit after resolution (a real fault does not clear).
     expect(stack.director.telltaleLit).toBe(true);
+    // The compliant leg convicts NOTHING and is PRAISED — THEO-4: a drill that
+    // can only convict teaches half a rule.
     expect(violationCodes(stack.ruleEvents)).toEqual([]);
+    expect(commendationCodes(stack.ruleEvents)).toEqual(["YIELDED_TO_PRIORITY"]);
   });
 
-  it("A12 both ways: ignoring the lamp records 'passedWithoutStopping' and grades NOTHING", () => {
+  it("ignoring the lamp records 'passedWithoutStopping' and grades WARNING_LAMP_IGNORED — once", () => {
     const stack = makeStack([telltaleSpec()]);
     const path = offsetRight(edgeGeometry(), LANE_OFFSET);
     const driver = new PolyDriver(path, 20);
@@ -113,12 +167,22 @@ describe("telltaleStimulus (integration)", () => {
     }
     expect(stack.outcomes).toHaveLength(1);
     expect(stack.outcomes[0]).toMatchObject({ success: false, detail: "passedWithoutStopping" });
-    // The hard A12 guarantee: the runner emitted NO SimTick vocabulary at all
-    // — no violation, no commendation, nothing for the reducer to grade.
-    expect(violationCodes(stack.ruleEvents)).toEqual([]);
+    // The ignore is now BILLED, and billed exactly once: the "warning-lamp"
+    // prioritySituation is emitted on the resolving frame and on no other, so
+    // the drive that ignored one lamp carries one основна and not a per-frame
+    // stream of them (the reducer's ACT_REOPEN discipline is not even reached).
+    expect(violationCodes(stack.ruleEvents)).toEqual(["WARNING_LAMP_IGNORED"]);
     expect(commendationCodes(stack.ruleEvents)).toEqual([]);
+    const priorityEvents = stack.ticks.flatMap((tick) =>
+      tick.events.filter((e) => e.kind === "prioritySituation"),
+    );
+    expect(priorityEvents).toEqual([
+      { kind: "prioritySituation", situation: "warning-lamp", violated: true },
+    ]);
+    // Still nothing physical: the runner stages no actor, so it can never
+    // manufacture a contact.
     for (const tick of stack.ticks) {
-      expect(tick.events.filter((e) => e.kind === "prioritySituation" || e.kind === "collision")).toEqual([]);
+      expect(tick.events.filter((e) => e.kind === "collision")).toEqual([]);
     }
   });
 
@@ -146,7 +210,14 @@ describe("telltaleStimulus (integration)", () => {
       if (driver.s >= driver.length) break;
     }
     expect(stack.outcomes).toHaveLength(2);
-    expect(violationCodes(stack.ruleEvents)).toEqual([]);
+    // ONE bill per adjudication — which is the claim in this test's own title,
+    // and it is only checkable now that the runner bills at all. Two ignored
+    // lamps across two attempts, two основни; the five seconds of driving on
+    // past the first resolution added none.
+    expect(violationCodes(stack.ruleEvents)).toEqual([
+      "WARNING_LAMP_IGNORED",
+      "WARNING_LAMP_IGNORED",
+    ]);
   });
 
   it("same seed + same driving = identical outcomes (deterministic staging)", () => {

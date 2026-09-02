@@ -1717,6 +1717,12 @@ const D_CHECK_BEFORE_MANOEUVRE = DUTY(
   "ЗДвП чл. 25, ал. 1",
   "преди да започне маневрата, трябва да се убеди, че няма да създаде опасност за участниците в движението, които се движат след него, преди него или минават покрай него",
 );
+/** ЗДвП чл. 101, ал. 1 — the duty a lit RED telltale puts on the driver. */
+const D_STOP_ON_FAULT = DUTY(
+  "чл. 101",
+  "ЗДвП чл. 101, ал. 1",
+  "При възникване по време на движение на повреда или неизправност в пътно превозно средство, която застрашава безопасността на движението, водачът е длъжен да спре и да вземе мерки за нейното отстраняване.",
+);
 const D_SIGNAL = DUTY(
   "чл. 28",
   "ЗДвП чл. 28, ал. 1",
@@ -2227,6 +2233,40 @@ const MANOEUVRE_AND_JUDGEMENT_ROADS: Partial<Record<ViolationCode, RoadConsequen
  * guess, badly, in exactly the direction the founder guessed.
  */
 export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> = {
+  /**
+   * N11 / VP-06 — 2026-09-02, with the code itself (sc-vp-telltale-red:c172d48b).
+   *
+   * `conditional` WITH EMPTY BRANCHES, the DRIVING_TOO_SLOW_IN_TOWN shape, and
+   * the reason is a retrieval result rather than a preference: ЗДвП чл. 179,
+   * ал. 6 DOES price this — but it writes its three figures IN WORDS
+   * („петдесет лева“, „двеста лева“, „петстотин лева“), and this file's own
+   * grounding rule is that a `fine` is honest only when its quoted sentence
+   * states „N лв.". A ConditionalPenalty built on ал. 6 could not carry a
+   * quote that proves its own number, so the scale is told as the act tells
+   * it — in words, in the headline — instead of being re-typed as digits
+   * nobody could cut back out of the act.
+   *
+   * THE LICENCE ANSWER IS GROUNDED, AND IT IS THE DEARER HALF: Наредба № Iz-2539
+   * чл. 6, ал. 1, т. 10 lists this offence explicitly at ten points „при
+   * констатирани опасни неизправности" — and a RED telltale is the dangerous
+   * class by the law's own logic (чл. 101, ал. 3 withdraws even the „drive it
+   * to a garage" permission of ал. 2 exactly there). The condition travels
+   * inside the quoted точка, so the card cannot show the ten without it.
+   */
+  WARNING_LAMP_IGNORED: {
+    kind: "conditional",
+    offenceBg: "управление на технически неизправно пътно превозно средство",
+    duties: [D_STOP_ON_FAULT],
+    headlineBg:
+      "Законът не оставя избор: при неизправност, която застрашава безопасността, водачът е ДЛЪЖЕН да спре (чл. 101, ал. 1) — карането нататък „до вкъщи“ вече е управление на технически неизправно ППС. ЗДвП чл. 179, ал. 6 го наказва с глоба, чийто размер се степенува от акта с думи — петдесет лева при незначителни, двеста при значителни и петстотин при опасни неизправности, — а самата класификация се прави по наредбата по чл. 147, ал. 1, не от водача на пътя. Червената лампа е точно опасната степен: затова чл. 101, ал. 3 отнема дори правото по ал. 2 да се придвижиш на собствен ход до сервиз.",
+    controlPoints: CP(
+      "т. 10",
+      10,
+      "за управление на технически неизправно пътно превозно средство при констатирани опасни неизправности (чл. 179, ал. 6, т. 3 от ЗДвП) - 10 контролни точки",
+      "Десетте падат при ОПАСНИ неизправности — условието е в самата точка. При незначителна или значителна неизправност глоба има, а книжката остава непокътната.",
+    ),
+    branches: [],
+  },
   SPEEDING_DANGEROUS: {
     kind: "ladder",
     offenceBg: "превишаване на разрешената максимална скорост",

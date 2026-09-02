@@ -455,6 +455,62 @@ describe("reachZone", () => {
   });
 });
 
+/**
+ * THE HALT GRACE IS THE SWEPT DISC, NOT ITS BOUNDING BOX
+ * (sc-rb-ped-exit:5f1217f9, 2026-09-02).
+ *
+ * `stepReachZone` documents its grace as „a CAPSULE stretched back down the
+ * approach", and its length — `radiusM + REACH_ZONE_GRACE_M` — is the swept
+ * disc's reach ON THE AXIS. That length was applied at every lateral offset out
+ * to `radiusM`, i.e. the region was the axis-aligned BOX around the capsule,
+ * whose far corner stands √(radiusM² + (radiusM + GRACE)²) from the mark —
+ * 12.04 m on the radius-4 gate below, three times the authored disc.
+ *
+ * It was not academic: on `sc-rbp-pocket` the corner reached 5.84 m behind the
+ * mark at L1 against a pocket with 4.32 m of room, so a car parked in the
+ * roundabout's circulatory carriageway collected «Спри в джоба между кръга и
+ * пътеката» (driven at every rung in
+ * `scenario/__tests__/roundabout2-title-truth.test.ts`).
+ *
+ * The two directions are pinned here on ONE approach axis, so nothing but the
+ * lateral offset differs between them.
+ */
+describe("reachZone halt grace — the capsule, not its bounding box", () => {
+  const halt = parsed("reachZone", { x: 0, y: 0, radiusM: 4, maxSpeedKmh: 6 });
+  /** Down the axis from far out, entering the grace ring (r = 9) on the way. */
+  const APPROACH = [
+    makeTick({ t: 0, position: { x: 0, y: -40 }, speedKmh: 25 }),
+    makeTick({ t: 1, position: { x: 0, y: -12 }, speedKmh: 20 }),
+    makeTick({ t: 2, position: { x: 0, y: -8.5 }, speedKmh: 10 }),
+  ];
+  const stopAt = (x: number, y: number) =>
+    run(halt, [...APPROACH, makeTick({ t: 3, position: { x, y }, speedKmh: 0 })]).done;
+
+  it("still credits a stop 6 m short ON the approach axis", () => {
+    // along −6, lateral 0 ⇒ the back bound is the grace plus the disc's full
+    // radius, −9, exactly as it has always been. Unchanged by the repair.
+    expect(stopAt(0, -6)).toBe(true);
+  });
+
+  it("…and at the far end of the axis, 9 m short", () => {
+    expect(stopAt(0, -8.9)).toBe(true);
+  });
+
+  it("refuses the same 6 m at the RIM, where the disc has no depth left", () => {
+    // along −6, lateral 4 = radiusM: 7.21 m from a 4 m mark, sideways, and the
+    // box credited it. At the rim the room behind the boundary is the grace
+    // alone (−5), so −6 is outside it.
+    expect(stopAt(4, -6)).toBe(false);
+  });
+
+  it("the boundary moves with the half-chord, not in one step", () => {
+    // At lateral 2 the half-chord is √(16 − 4) = 3.46, so the back bound is
+    // −8.46: a stop at −8 is in, one at −8.9 (still inside the box) is out.
+    expect(stopAt(2, -8)).toBe(true);
+    expect(stopAt(2, -8.9)).toBe(false);
+  });
+});
+
 describe("passSignal", () => {
   const params = parsed("passSignal", {
     nodeId: "n1805512602",

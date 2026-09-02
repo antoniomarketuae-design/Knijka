@@ -93,29 +93,53 @@ export const NOTIFY_COLUMN_MIN_LEFT_FRACTION = 0.6;
      about is worse than a card that is merely large."
 
    WHERE THE HAZARD IS, IN FRAME COORDINATES, AND IT IS DERIVED RATHER THAN
-   EYEBALLED. `cabinLook.test.ts` already asserts the cockpit projection: a
-   point at infinity lands at y = 0.58 of the canvas, so that is the HORIZON.
-   The cockpit holds a ~75.4° horizontal FOV (cabinLook), which at the 2.168
-   aspect of a landscape iPhone is 39.2° vertically. An object of height h above
-   the 1.2 m eye point, at distance d, therefore lands
-   `0.58 − atan(h/d) / 39.2°` of the way down the frame:
+   EYEBALLED — CORRECTED 2026-09-02 (`sc-ov-oncoming-gap:5de3bffb`, „the
+   collapsed instruction panel still covers the world speed sign").
 
-     a 2.2 m sign face   at 30 m → 0.531   ·  at 15 m → 0.483  ·  at 8 m → 0.398
-     a 1.75 m pedestrian at 30 m → 0.556   ·  at 15 m → 0.531
+   THE TABLE THAT STOOD HERE READ THE HORIZON IN THE WRONG DIRECTION. It quoted
+   `cabinLook.test.ts`'s „a point at infinity lands at y = 0.58" and then spent
+   0.58 as a fraction measured DOWN from the top. It is not: `projectCockpitPoint`
+   returns NDC (y grows UP, 0 at the bottom — `hotspotScreenRect` flips it with
+   `top: 1 - topFromBottom`, and `vehicle/tuning.ts`'s own landmark table says
+   „fractions from bottom-left"). The cockpit horizon is therefore at **0.402**
+   of the stage from the TOP, and every landmark in the old table was ~0.16 too
+   far down — it placed the hazards on the ROAD, which is the one place a sign
+   face and a head can never be.
 
-   So everything the student is being TAUGHT to look at on this rung enters the
-   frame at or below **0.53**, and it enters there at the distance where it can
-   still be acted on (27 m is reaction plus braking at the 50 km/h limit).
+   RE-MEASURED THROUGH THE SHIPPED PROJECTION (`projectCockpitPoint`, pose
+   "forward", aspect 852/393 ⇒ vFOV 39.248°; a 0.6 m face centred 2.2 m above
+   the road at the right kerb, 3.44 m right of the eye), as CSS fractions from
+   the top and with the face's own x:
 
-   0.43 IS THAT LINE WITH A TENTH OF THE FRAME OF CLEARANCE — the same grammar
-   and the same margin `HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION` uses one file over
-   („0.55 leaves a tenth of the frame of clearance" below a hotspot at 0.65).
-   It is a CEILING and not a height: it is applied with `min()` against the
-   control band's own budget, so whichever is tighter wins.
+     sign face   8 m  0.178 → 0.282  x 0.79   · 15 m  0.281 → 0.337  x 0.657
+                20 m  0.311 → 0.353  x 0.618  · 30 m  0.341 → 0.369  x 0.579
+     ped. head  15 m  0.351          x 0.638  · 30 m  0.376          x 0.570
+     horizon    0.402 — below it is the ROAD, the kerb and the markings.
+
+   SO THE TWO AXES ANSWER DIFFERENT HALVES, and only the y half is a keep-out
+   this column can honour. A hazard FACE lives at 0.18–0.39, i.e. ABOVE this
+   column's own top (0.166 of the stage + gutter, the mirror lane below), so no
+   ceiling a 393 px phone can hold clears it and pretending otherwise is what
+   the old number did. What clears it is x: at the ≥27 m where the cap still has
+   to be READ (reaction plus braking at the 50 km/h limit) the sign is at 0.58,
+   LEFT of this column's 0.635 edge; it slides under the card only inside ~18 m,
+   after the distance it had to be acted on. That, and `GHOST_SURFACES` — the
+   compact card paints no panel and no scrim, measured on the row's own frame at
+   4–7 % of veil on the world beneath it — is why the overlap is survivable.
+
+   0.40 IS THE HORIZON, ROUNDED DOWN SO THE BOUND FAILS SAFE. The „tenth of the
+   frame of clearance" the old note claimed is withdrawn with the table it came
+   from: a margin below a band that lies entirely ABOVE this column buys nothing.
+   What the ceiling still does is the founder's own sentence — it keeps the card
+   off the ROAD. It is a CEILING and not a height: it is applied with `min()`
+   against the control band's own budget, so whichever is tighter wins, and the
+   card's own chrome (86 px of chip, fold line, «ПРОЧЕТИ» row and padding) can
+   still carry its floor a pixel or two past the horizon on the narrowest phone.
+   That residue belongs to the chrome, not to this number.
 
    WHAT IT COSTS, STATED, because it is paid in authored Bulgarian. At
-   852 × 393 the column goes 192 → 161 px and the peek's text window 116 → ~71,
-   i.e. about eight visible lines down to about five. That is only acceptable
+   852 × 393 the column goes 192 → 149 px and the peek's text window 116 → ~59,
+   i.e. about eight visible lines down to about four. That is only acceptable
    because the other half of this row ships with it: the fold is no longer a
    silent 10 px fade — `SimOverlay` counts the lines below it and prints
    «↓ още N реда» beside «ПРОЧЕТИ», which opens the whole authored text with the
@@ -124,27 +148,42 @@ export const NOTIFY_COLUMN_MIN_LEFT_FRACTION = 0.6;
    the glass saying so — including the founder's own «…дали да стъпи.», whose
    missing four words are what row 2 of his letter is about.
 
-   PORTRAIT IS UNTOUCHED BY CONSTRUCTION: 0.43 × 852 = 366 px is larger than the
-   control band's own cap there (330), so the `min()` picks the band and not
-   one pixel moves.
+   PORTRAIT IS UNTOUCHED BY CONSTRUCTION: 0.40 × 852 = 341 px is still larger
+   than the control band's own cap there (330), so the `min()` picks the band
+   and not one pixel of the upright layout moves.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* The cockpit horizon (0.58 of the canvas, `cabinLook.test.ts`'s own assertion)
-   was published from here as `COCKPIT_HORIZON_FRACTION` until 2026-08-26. It is
-   a datum for the derivation above, not a length this module applies — nothing
-   read it but `__tests__/hud-off-the-road.test.ts`, it was never in the barrel,
-   and no CSS string was ever derived from it. It now lives beside the assertion
-   that uses it, so this file publishes only numbers it spends. */
+/* The cockpit horizon was published from here as `COCKPIT_HORIZON_FRACTION`
+   until 2026-08-26, as 0.58 — which is `cabinLook`'s NDC value, not a fraction
+   of this stage. In the CSS space every length in this file is written in it is
+   **0.402**, and reading it in the other direction is what mis-described both
+   constants below for a fortnight and mis-placed one of them (the peek's
+   ceiling, 0.43 → 0.40). The datum now lives beside the assertion
+   that spends it (`__tests__/hud-off-the-road.test.ts`), re-derived there
+   through `projectCockpitPoint` rather than typed, so the convention cannot be
+   lost again. */
 
 /**
- * The top of the band a hazard is projected into, as a fraction of the stage.
- * See the derivation above: a 2.2 m sign at 30 m and a pedestrian at 15 m both
- * land at 0.53, and 30/15 m is where they still have to be noticed.
+ * The FIRST-RUN TOUCH HINT's ceiling, as a fraction of the stage — the one
+ * surface that spends this number (`PlayAreaStyles`, `[data-hud="touch-hint"]`;
+ * the peek pays the tighter one below).
+ *
+ * 0.53 IS KEPT AND IT IS NOT THE HAZARD BAND. With the horizon read correctly
+ * (0.402, above) this line is 0.13 of the frame ONTO THE ROAD, and the reason
+ * it stays there is measured, not conceded: the hint's own content needs
+ * 124.5 px, its top is the mirror lane's 73.2 px, and the corridor left above
+ * the horizon is 84.7 px — so a horizon-true ceiling would clip 40 px of the
+ * control tutorial inside an `overflow: hidden`, `pointer-events-none` box that
+ * no thumb can scroll (`mirror-lane-corridor.test.ts` pins both numbers). What
+ * makes that survivable is the hint's LIFETIME and not its box: it is first-run
+ * only and stands down the first time the car passes 5 km/h
+ * (`lesson-ui/touchHintLifetime.ts`), i.e. it is never on the glass while the
+ * student is driving at the road it covers.
  */
 export const HAZARD_BAND_TOP_FRACTION = 0.53;
 
-/** …and the ceiling the peek keeps above it. A tenth of the frame of clearance. */
-export const NOTIFY_COLUMN_MAX_STAGE_FRACTION = 0.43;
+/** …and the ceiling the peek keeps above it, rounded down so it fails safe. */
+export const NOTIFY_COLUMN_MAX_STAGE_FRACTION = 0.4;
 
 /* ═══════════════════════════════════════════════════════════════════════════
    …AND THE THIRD RULE: THE MIRROR IS AN INSTRUMENT — 2026-08-17, the catalogue
@@ -388,7 +427,7 @@ export function notifyColumnMirrorLanePx(
    In the zebra frame the line at the cut — rendered half-height at ~50 %
    opacity, across the face of the pedestrian-crossing sign it is about — is
    instruction 3, the stop rule the lesson GRADES. The mirror lane makes that
-   frame worse: 161 px of column becomes 95.8, so the cut moves UP.
+   frame worse: 149 px of column becomes 84.0, so the cut moves UP.
 
    THIS IS NOT AN ARGUMENT FOR GIVING THE MIRROR BACK. Both surfaces are
    load-bearing and the two rows are not each other's price — the fold is deep
@@ -400,18 +439,18 @@ export function notifyColumnMirrorLanePx(
    handed the five numbers instead of re-deriving them from the catalogue.
 
    WHAT THE COMPACT SWAP COSTS, STATED BEFORE IT IS MADE, at 852 × 393:
-     top 8 → 73.2 · the `min()` of the two budgets goes 161 → 95.8 px
+     top 8 → 73.2 · the `min()` of the two budgets goes 149 → 84.0 px
    and at 780 × 360:
-     top 8 → 67.8 · 147 → 87.0 px.
+     top 8 → 67.8 · 136 → 76.2 px.
    That is about five of the peek's eleven visible lines, and it is the same
    trade `NOTIFY_COLUMN_MAX_STAGE_FRACTION` already made in the other
    direction: the words are not deleted, they join the fold that already prints
    «↓ още N реда» beside «ПРОЧЕТИ». It is also NOT a clipped control — the
    compact column sets no `overflow`, and the card's «ПРОЧЕТИ» row is a
    `shrink-0` sibling of a `min-h-0` scroller, so a card whose chrome needs
-   more than 95.8 px paints past the ceiling rather than losing its buttons:
-   worst case its floor lands at 0.46 of the stage against a hazard band that
-   starts at 0.53.
+   more than 84.0 px paints past the ceiling rather than losing its buttons:
+   worst case its floor lands at 0.405 (852 × 393) / 0.427 (780 × 360) of the
+   stage, i.e. the chrome and not the ceiling is what still reaches the road.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /**

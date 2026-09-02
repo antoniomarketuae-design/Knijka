@@ -148,10 +148,11 @@ export const CABIN_RAIL_ROW_Y: readonly number[] = [1, -29];
  * Светлини · Мъгла · Чистачки · Ръчна · Авар. (read straight off
  * `w13/frames/sc-hz-breakdown-pulloff__pc-wrong/run.log`'s own HUD dump) and no
  * temperature row at all, and the turn arrows are repeated at cockpit scale by
- * the «МИГАЧ» rail controls the student is already pressing. It is also the
- * only lamp the DIRECTOR can light (`TelltaleStimulusSpec.lamp` is the
- * single-value union "temperature", contracts.ts), which makes it the entire
- * stimulus of three lessons — sc-hz-breakdown-pulloff (critical: «на таблото
+ * the «МИГАЧ» rail controls the student is already pressing. It is the RED lamp
+ * the DIRECTOR lights (`TelltaleStopSpec`, contracts.ts — since 2026-09-02 the
+ * channel also carries an AMBER twin on `engine`, which sits in the same
+ * clears-on-both row), and it is the entire red stimulus of three lessons —
+ * sc-hz-breakdown-pulloff (critical: «на таблото
  * светва червената контролна лампа … Червено значи: спри безопасно сега»),
  * sc-vp-telltale and sc-vp-telltale-red. And the halo is not decoration: this
  * file's own header says a 28-unit cell is enough to read PRESENCE and COLOUR

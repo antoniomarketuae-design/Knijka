@@ -363,18 +363,26 @@ describe("driven: the two stops the pocket rung must refuse", () => {
   }
 
   /**
-   * THE RESIDUAL, stated rather than hidden. The halt grace is a capsule
-   * radius + REACH_ZONE_GRACE_M (5 m) long — against a pocket 7.94 m deep — so
-   * on a tilted approach the worst-case reach behind the mark is
-   * √(r² + (r + 1)²): 4.16 m at the graded rungs (clear of the ring) but 5.84 m
-   * once L1 multiplies the radius by 1.5, which is 1.5 m inside the band. No
-   * authored radius closes that without also refusing a car that stopped
-   * correctly but 2 m off the lane centre, so the L1/L2 remainder is reported
-   * as an objectives.ts row (the capsule cannot see the kerb it is reaching
-   * over) rather than papered over here.
+   * THE RESIDUAL THAT USED TO BE EXCLUDED HERE, and is now driven on every
+   * rung (sc-rb-ped-exit:5f1217f9, 2026-09-02). This loop ran at L3-L5 only,
+   * with a note reporting the aided rungs as an unclosed objectives.ts row:
+   * the halt grace was applied as a BOX radius + REACH_ZONE_GRACE_M (5 m) long
+   * at every lateral offset out to the radius, so on a tilted approach its far
+   * corner reached √(r² + (r + 1)²) behind the mark — 4.16 m at the graded
+   * rungs, clear of the ring, but 5.84 m once L1 multiplies the radius by 1.5,
+   * which is 1.5 m INSIDE the circulatory carriageway. Measured through this
+   * very drive at HEAD before the repair: L1 returned `done` for a car parked
+   * at (4.06, 20.6), r = 21.0 from the island.
+   *
+   * No authored radius could close it (the corner condition r ≤ 3.32 fails for
+   * every L1 radius that still credits a correct stop 2 m off the lane centre),
+   * because the box was never the region `stepReachZone` documents. It is now
+   * the swept disc it always said it was — the room behind the acceptance
+   * boundary is the grace plus the disc's own half-chord — which is identical
+   * on the axis and narrows to the grace alone at the rim.
    */
-  for (const level of [3, 4, 5] as const) {
-    it(`…off the taught line too, at the graded rungs @L${level}`, () => {
+  for (const level of LEVELS) {
+    it(`…off the taught line too, on every rung @L${level}`, () => {
       const s = driveToPocketThen(level, WIDE_BLEND, [X_ARM_LANE, 20.6]);
       expect(statusOf(s, "sc-rbp-pocket")).not.toBe("done");
     });

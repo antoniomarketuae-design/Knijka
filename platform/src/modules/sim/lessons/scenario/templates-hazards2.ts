@@ -604,7 +604,7 @@ export const SC_HZ_BRAKE_DONT_SWERVE: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Погледни вляво: в съседната лента, почти наравно с вратата ти, се движи кола. Запомни я — тя е причината днешният урок да не е „завърти волана“.",
+        "Вляво, в съседната лента и почти наравно с вратата ти, се движи кола. През предното стъкло няма да я видиш — точно там е мъртвата ти зона. Погледни я през лявото си рамо с бутона „Рамо“ и я запомни: тя е причината днешният урок да не е „завърти волана“.",
     },
     {
       n: 3,
@@ -1225,15 +1225,16 @@ export const SC_HZ_BREAKDOWN_PULLOFF: ScenarioSpec = {
     // and «двигателят отказва»; what the student actually sees is
     // «Контролна лампа: температура! Спри спокойно вдясно» (LessonScene.tsx:2292).
     //
-    // FIXED IN THIS DIRECTION ON PURPOSE. The other direction — stage the oil
-    // lamp instead — is not one line: `TelltaleStimulusSpec.lamp` is the
-    // single-value union "temperature" (contracts.ts:1203), `director.telltaleLit`
-    // is a BOOLEAN, and `cabinTelltaleRail.ts` maps that one boolean into
-    // `tempWarnOn`. Widening it to a lamp id runs through contracts, the runner,
-    // LessonScene, the cabin rail and the dev capture scene — five files on the
-    // render path — for one lesson. THE CLUSTER CAN ALREADY DRAW IT
-    // (`LAMP_KEYS` in cockpit/clusterLayout.ts:303 lists "oil"), so that fix is
-    // cheap in pixels and expensive in plumbing; it is recorded, not skipped.
+    // FIXED IN THIS DIRECTION ON PURPOSE, and the plumbing argument that made
+    // it the cheap direction has since been PAID — by another lesson, for
+    // another reason (sc-vp-telltale-red:775b58cc, 2026-09-02). The channel is
+    // no longer one boolean: `TelltaleStimulusSpec` is a union whose `lamp`
+    // picks a real cluster channel ("temperature" → red `temp`, "checkEngine" →
+    // amber `engine`). An OIL variant is now a much smaller change than the
+    // five-file one described here — one union member, one runner branch, one
+    // `clusterReadout` line — but it is still a change, and `LAMP_KEYS` already
+    // lists "oil", so it stays recorded rather than done in passing by a lane
+    // that does not own this lesson.
     //
     // The duty is unchanged either way, which is why the copy may move: doc 72
     // §3 VP-06 and the ЗДвП чл. 20 doctrine quoted at the spec are «red = спри
@@ -1337,7 +1338,11 @@ export const SC_HZ_BREAKDOWN_PULLOFF: ScenarioSpec = {
       titleBg: "Каране по аварийната лента до изхода",
       whatWentWrongBg:
         "Двигателят отказа — и вместо да спре, водачът се настани в аварийната лента и я подкара като „своя“ до следващия изход. Аварийната лента не е байпас: тя е коридорът на линейката и мястото, където вече стои друга аварирала кола с хора около нея. Движението по лентата за принудително спиране е забранено (чл. 58, т. 4) — при повреда се СПИРА в нея максимално вдясно (т. 3 позволява точно това), но не се пътува по нея.",
-      codeRefs: ["EMERGENCY_LANE_DRIVING"],
+      // TWO acts, two laws: the driver ignored the red lamp instead of stopping
+      // (чл. 101, ал. 1 — WARNING_LAMP_IGNORED, landed 2026-09-02) AND used the
+      // hard shoulder as a bypass (чл. 58, т. 4). The second was the only one
+      // the catalogue could name until the telltale runner began grading.
+      codeRefs: ["WARNING_LAMP_IGNORED", "EMERGENCY_LANE_DRIVING"],
     },
     {
       traceRef: { path: "content/traces/sc-hz-breakdown-pulloff/mistake-lane-stop.trace.json" },

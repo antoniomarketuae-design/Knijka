@@ -262,6 +262,29 @@ const OWN_ROAD_HALF_W_M = LANE_WIDTH_M;
  */
 const CONFLICT_CLEARED_M = OWN_ROAD_HALF_W_M + VEHICLE_LENGTH_M / 2;
 /**
+ * RIGHT-HAND-RULE ARRIVAL WINDOW, s — how long after the student reaches the
+ * conflict point a vehicle may still arrive and count as his to give way to.
+ *
+ * Not chosen freely: it is the engine's OWN conviction band for the identical
+ * physics, one adjudicator over. `worldRuntime.LEFT_TURN_CONVICT_GAP_SEC` (2.0)
+ * says a gap of two seconds or less means „the priority driver physically
+ * cannot avoid braking for the turner" — which is exactly what чл. 50's duty
+ * forbids — while 2–3 s is unsafe-but-legal and by founder ruling NEVER graded.
+ * The quantity compared here is the same one: `vehicleTta − playerTta`, the
+ * separation between the two arrivals at the shared point.
+ *
+ * Deliberately the CONVICT band and not the 4.0 s „clean" norm: the wider
+ * number would acquit inside the band the engine already refuses to call safe,
+ * and this clause is allowed to remove only convictions the product cannot
+ * defend. It is the strictest value that still repairs the measured row.
+ *
+ * The number is duplicated rather than imported because `traffic/` sits BELOW
+ * `runtime/` in the dependency order (the runtime injects its queries into this
+ * module, never the reverse). `right-conflict.test.ts` asserts the identity
+ * against the runtime's exported constant, so the two cannot drift in silence.
+ */
+export const RIGHT_ARRIVAL_LATE_SEC = 2.0;
+/**
  * ROUNDABOUT REACH, m — how near a circulating car must actually be to the
  * DRIVER before it is a car he owes way to (doc 87 B15).
  *
@@ -794,8 +817,18 @@ class TrafficSystemImpl implements TrafficSystem {
     py: number,
     headingDeg: number,
     radiusM: number,
+    playerSpeedKmh?: number,
   ): boolean {
-    return conflictFromRightFor(this.vehicles, jx, jy, px, py, headingDeg, radiusM);
+    return conflictFromRightFor(
+      this.vehicles,
+      jx,
+      jy,
+      px,
+      py,
+      headingDeg,
+      radiusM,
+      playerSpeedKmh,
+    );
   }
 
   circulatingConflict(
@@ -961,7 +994,63 @@ export function circulatingConflictFor(
   return false;
 }
 
-/** Pure "vehicle approaching from the player's right near a junction" test. */
+/**
+ * Pure "vehicle approaching from the player's right near a junction" test.
+ *
+ * THE QUESTION IT USED NOT TO ASK: WILL THE TWO OF US MEET.
+ *
+ * Until now this predicate tested presence and nothing else — inside `radiusM`
+ * of the node, `speedMps ≥ 1`, on the player's right, bearing off his own. It
+ * never asked whether the vehicle had CLEARED the conflict point, nor whether
+ * it would still be there when the student arrived. Its sibling
+ * `conflictNearFor` was given the first of those in doc 87 B5 („it said that I
+ * didnt let the traffic cars to pass, when in Fact I let everybody pass") and
+ * this one was left behind.
+ *
+ * MEASURED on `sc-junction-blind` (the row that sent this here), driving the
+ * lesson's OWN model line — creep to (4.06, −19.5), eight seconds on the brake,
+ * then the authored left turn — through `compileScenario` → `createLessonSession`
+ * → `applyTick` at the ambient count each rung actually compiles to:
+ *
+ *   L1 n=4 → 10/20 seeds · L3 n=5 → 11/20 · L5 n=6 → 11/20, every one of them
+ *   FAILED_TO_YIELD, «опасна», НЕИЗДЪРЖАН — and 0/20 on all three with the
+ *   ambient bodies removed.
+ *
+ * The convicting vehicle, dumped at the conviction frame, is never one the
+ * student obstructs. Two shapes, both of them "we are never in the box
+ * together":
+ *
+ *   · seed 0/1/5/9/…: a car 6–16 m from the node closing at 6.5–10.7 m/s —
+ *     ~1.2 s from the node, while the student is 15.4 m back needing ~3.5 s.
+ *     It is 23 m GONE by the time he arrives. He is billed for the car he just
+ *     spent eight seconds letting through.
+ *   · seed 7/11/18/…: a car 20–24 m out crawling at 1.1–1.5 m/s — 16 to 22
+ *     SECONDS from the node — while the student is already inside the junction
+ *     and leaving it.
+ *
+ * So the clauses below, both of which can only ever REMOVE a conviction:
+ *
+ *  (5) DEPARTING AND CLEAR. A vehicle whose heading carries it away from the
+ *      node and which is already CONFLICT_CLEARED_M past it has left the
+ *      conflict point — `conflictNearFor`'s clause (2), verbatim, on the twin
+ *      it was never applied to. Below that distance a car straddling the mouth
+ *      still counts.
+ *  (6) ARRIVAL, NOT PRESENCE. When the caller supplies the student's own
+ *      approach speed, both arrivals at the node are compared. The vehicle is
+ *      NOT a conflict when it will be more than CONFLICT_CLEARED_M past the
+ *      node by the time he gets there (it clears first), nor when its own
+ *      along-path run to the node ends more than RIGHT_ARRIVAL_LATE_SEC after
+ *      he is CLEAR of the point (he is through first).
+ *      Callers that pass no speed — every legacy 6-argument wiring — keep the
+ *      old presence-only behaviour exactly.
+ *
+ * Requirement-zero (doc 64 THEO-4) is why this is not a scoring quibble: the
+ * card that followed the conviction printed «✔ Правилното действие: … потегли
+ * само когато никой не приближава» to a student who had crept, looked and
+ * stood eight seconds on the brake. A verdict whose explanation describes a
+ * different drive than the one the student drove is the thing this product
+ * exists not to do.
+ */
 export function conflictFromRightFor(
   vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
   jx: number,
@@ -970,21 +1059,72 @@ export function conflictFromRightFor(
   py: number,
   headingDeg: number,
   radiusM: number,
+  playerSpeedKmh?: number,
 ): boolean {
   const rad = (headingDeg * Math.PI) / 180;
   // Player's right vector = forward (sinH,cosH) rotated 90° clockwise = (cosH,-sinH).
   const rx = Math.cos(rad);
   const ry = -Math.sin(rad);
   const r2 = radiusM * radiusM;
+  // The student's own occupancy of the conflict point: he REACHES it at
+  // `playerTtaSec` and is CLEAR of it CONFLICT_CLEARED_M later — his own tail
+  // off the carriageway he crossed, the same length that decides when a
+  // vehicle has cleared. Both are Infinity when he is standing or creeping
+  // below the floor a VEHICLE needs to make a priority claim, which stands the
+  // whole clause down rather than acquitting on an ETA that is known to lie
+  // for slow approaches (the witness gate's own lesson, doc 62 S2).
+  const playerMps = ((playerSpeedKmh ?? 0) * 1000) / 3600;
+  const playerNodeDistM = Math.hypot(px - jx, py - jy);
+  const playerTtaSec =
+    playerMps >= CONFLICT_MIN_SPEED_MPS ? playerNodeDistM / playerMps : Infinity;
+  const playerClearSec =
+    playerMps >= CONFLICT_MIN_SPEED_MPS
+      ? (playerNodeDistM + CONFLICT_CLEARED_M) / playerMps
+      : Infinity;
   for (const v of vehicles) {
     const jdx = v.x - jx;
     const jdy = v.y - jy;
-    if (jdx * jdx + jdy * jdy > r2) continue; // not near the junction
+    const jd2 = jdx * jdx + jdy * jdy;
+    if (jd2 > r2) continue; // not near the junction
     if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue;
     if ((v.x - px) * rx + (v.y - py) * ry < RIGHT_MIN_M) continue; // not on the right
     const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
     const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
     if (delta < CONFLICT_SAME_DIR_DEG) continue; // same-direction → not a conflict
+    // How much of its own path the vehicle still has to run before it draws
+    // level with the node (>0 = still coming, <0 = already past), and the rate
+    // at which its straight-line distance to the node is shrinking.
+    const jd = Math.sqrt(jd2);
+    const alongToNodeM = -(jdx * v.dirX + jdy * v.dirY);
+    const closingMps = jd > 0 ? alongToNodeM * (v.speedMps / jd) : v.speedMps;
+    // (5) Already past and gone.
+    if (closingMps <= 0) {
+      if (jd > CONFLICT_CLEARED_M) continue;
+      return true;
+    }
+    // (6) Still coming — but does it still matter when HE gets there?
+    if (playerTtaSec !== Infinity) {
+      // Where it will be, relative to the node, at the moment he reaches it:
+      // >0 still short of it, <0 that many metres past it. Straight-line, like
+      // clause (5) and like `conflictNearFor`'s own cleared test, so a path
+      // that passes the node at an OFFSET (a cycle track 8 m off the mouth)
+      // never reads as "gone" merely because it is abeam.
+      const arcAtHisArrivalM = jd - closingMps * playerTtaSec;
+      if (arcAtHisArrivalM < -CONFLICT_CLEARED_M) continue; // clears before he arrives
+      // …and the other end: it arrives so long after he is CLEAR of the point
+      // that he never made it change speed.
+      //
+      // Two things this line is measured against, and both were learned the
+      // hard way on the way in. `playerClearSec` rather than his arrival,
+      // because a driver at the mouth has a tiny time-to-node and several
+      // seconds of crossing still ahead of him. And the vehicle's time is its
+      // ALONG-PATH run to the node, not `jd / closingMps`: for a rider on a
+      // track that passes the mouth 8 m to the side, the closing rate collapses
+      // toward zero exactly when it is nearest, and the straight-line form
+      // reports it as minutes away — which acquitted `sc-vu-bikelane-turn`'s
+      // right-hook demo one frame before it drove into the rider.
+      if (alongToNodeM / v.speedMps > playerClearSec + RIGHT_ARRIVAL_LATE_SEC) continue;
+    }
     return true;
   }
   return false;

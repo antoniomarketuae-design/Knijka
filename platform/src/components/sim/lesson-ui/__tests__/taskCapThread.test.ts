@@ -50,6 +50,7 @@ import {
 } from "@/modules/sim/lessons";
 import { GovernorCapMark } from "@/modules/sim/hud/StatusDashboard";
 import {
+  advisorCapEchoesStrip,
   advisorTaskFold,
   heldTaskCapKmh,
   hudPollUpdate,
@@ -199,7 +200,14 @@ describe("the number the bar publishes is the number the student was told", () =
     // The reader holds on all five — each publishes 50 against a gate of 50, so
     // the bar is not blank on the new rung and it does not out-ask the gate by a
     // single km/h (the direction that would refuse an obedient student).
-    expect(capped.length).toBe(958);
+    // RE-BASELINED AGAIN 958 → 963 on 2026-09-02 (sc-vu-pass-clearance:
+    // 260b13fd): the five rungs of `sc-vu-pass-clearance/sc-vup-pass`, newly
+    // authored `maxSpeedKmh: 46` on a street posted 50 — the drill whose sweep
+    // frame carried «ЗАДАЧА 2/2» at 59 км/ч past a cyclist. The reader holds on
+    // all five: each publishes the authored 46 against a gate of 46 (L3–L5) or
+    // 48 (L1/L2), so the bar is never blank on the new rung and never out-asks
+    // its own gate.
+    expect(capped.length).toBe(963);
     const silent = capped.filter((c) => taskCapKmhFromPrompt(prompt(c.textBg)) === undefined);
     expect(silent).toEqual([]);
   });
@@ -601,5 +609,117 @@ describe("the bar prints the advisor's own figure, not a reading of its own", ()
     // The gate is there — 45, the widened figure — and nothing publishes it.
     expect(capped.maxSpeedKmh).toBeGreaterThan(0);
     expect(snapshotOf(exam, null).taskCapKmh).toBeUndefined();
+  });
+});
+
+/**
+ * =============================================================================
+ * O51 RESIDUAL (3) — THE CAP WAS ON TWO SURFACES AT ONCE.
+ * (sc-signal-hesitation:826bc3d5, major, re-judged STILL on the w10-4 frames.)
+ * =============================================================================
+ *
+ * `w10-4/frames/sc-signal-hesitation__pc-right/05-stopped.png`, and its own
+ * run.log carries the same reading on five consecutive beats:
+ *
+ *   notify column   «Задача 1/2 · Приближи зеленото кръстовище с готовност»
+ *                   then a bordered card with its own ✕: «дръж под 35 км/ч»
+ *   bottom strip    «50 · РЕЖИМ Нормален ≤60 · знакът важи · задачата иска ≤35»
+ *
+ * The blocks above are the thread that PUT the figure on the strip. This is the
+ * other end of it: once the strip carries the number, labelled and ranked, a
+ * card whose entire content is that same number is the second disjoint surface
+ * the row was filed on — and `advisorEchoTrim`'s own rule («a panel whose entire
+ * content is a sentence already on screen is not a quieter duplicate, it is a
+ * duplicate») already decides it.
+ *
+ * DRIVEN, NOT GREPPED, on both halves: the predicate is asked, and the bar is
+ * RENDERED with the same three numbers, so „the card stood down while the strip
+ * said nothing" cannot pass here.
+ * =============================================================================
+ */
+const markOf = (
+  taskCapKmh: number | undefined,
+  capKmh: number | null,
+  limitKmh: number,
+) =>
+  renderToStaticMarkup(
+    createElement(GovernorCapMark, {
+      capKmh,
+      limitKmh,
+      taskCapKmh,
+      speedKmh: 20,
+      tierBg: "Нормален",
+      size: "roomy" as const,
+    }),
+  );
+
+describe("the advisor card stands down only where the strip speaks", () => {
+  it("the filed reading: 50 posted · 60 mode · 35 task — bar prints it, card drops it", () => {
+    expect(markOf(35, 60, 50)).toContain("задачата иска ≤35");
+    expect(advisorCapEchoesStrip("дръж под 35 км/ч", 35, 50, 60)).toBe(true);
+  });
+
+  it("Напреднал has no governor, so the bar is silent and the card keeps the glass", () => {
+    // `governorCapKmh("advanced")` is null and `GovernorCapMark` returns null on
+    // it. Suppressing the card here would delete the only statement of the
+    // drill's demand — a student failed for a number nothing named.
+    expect(markOf(35, null, 50)).toBe("");
+    expect(advisorCapEchoesStrip("дръж под 35 км/ч", 35, 50, null)).toBe(false);
+  });
+
+  it("B58 slack: a task cap at or above the sign never binds, so the card stays", () => {
+    // `readSpeedContract` attributes a tie to the LAW and refuses to make a cap
+    // above the limit `binding` at all, so the bar prints no «задачата иска»
+    // clause on either. Both directions, because the tie is the easy one to miss.
+    expect(markOf(50, 60, 50)).not.toContain("задачата иска");
+    expect(advisorCapEchoesStrip("дръж под 50 км/ч", 50, 50, 60)).toBe(false);
+    expect(markOf(55, 60, 50)).not.toContain("задачата иска");
+    expect(advisorCapEchoesStrip("дръж под 55 км/ч", 55, 50, 60)).toBe(false);
+  });
+
+  it("only a card that says NOTHING ELSE is a duplicate", () => {
+    // The trim leaves the cap alone on a `reachZone`; on every other prompt it
+    // leaves a real sentence, and that sentence is not on the strip. A prefix
+    // match would have swallowed the coaching with the number.
+    expect(
+      advisorCapEchoesStrip("Изчакай пешеходеца — дръж под 35 км/ч", 35, 50, 60),
+    ).toBe(false);
+    expect(advisorCapEchoesStrip("Спри на стоп-линията", 35, 50, 60)).toBe(false);
+    expect(advisorCapEchoesStrip(null, 35, 50, 60)).toBe(false);
+  });
+
+  it("the two figures must be ONE figure, or the card is not a duplicate of it", () => {
+    // `taskCapKmh` is the HELD number the shell publishes to the bar
+    // (`heldTaskCapKmh`), and it can outlive the sentence that produced it. If
+    // the strip is showing 40 while the card says 35, hiding the card removes a
+    // number the student is graded on and leaves one he is not.
+    expect(advisorCapEchoesStrip("дръж под 35 км/ч", 40, 50, 60)).toBe(false);
+    expect(advisorCapEchoesStrip("дръж под 35 км/ч", undefined, 50, 60)).toBe(false);
+  });
+
+  it("the shell WIRES it into the roomy mount and nowhere else", () => {
+    // The dead-predicate half. A pure predicate no render consults is the defect
+    // class this programme measured at 51 of 82 repairs, and every case above
+    // stays green when the mount ignores it.
+    // Code only — a source assertion that cannot tell code from the paragraph
+    // describing it is not a guard, it is a ban on writing the reason down
+    // (`briefingOverflow.test.tsx`'s wording, and this lane's rule).
+    const SHELL = SHELL_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(SHELL).toContain("const advisorCapIsDuplicate = advisorCapEchoesStrip(");
+    // …fed the bar's own three inputs, not a re-derivation of them…
+    const call = SHELL.slice(SHELL.indexOf("const advisorCapIsDuplicate ="));
+    const args = call.slice(0, call.indexOf(");"));
+    expect(args).toContain("advisorTextBg");
+    expect(args).toContain("snap.taskCapKmh");
+    expect(args).toContain("snap.limitKmh");
+    expect(args).toContain("governorCapKmh");
+    // …and read by the mount condition, negated.
+    expect(SHELL).toContain("!advisorCapIsDuplicate &&");
+    // The governor is the one input the shell cannot derive; it is mirrored off
+    // the same ref the bar polls, in the poll that already runs.
+    expect(SHELL).toContain(
+      "const cap = dashboardStatusRef.current?.governorCapKmh ?? null;",
+    );
+    expect(SHELL).toContain("setGovernorCapKmh((prev) => (prev === cap ? prev : cap));");
   });
 });

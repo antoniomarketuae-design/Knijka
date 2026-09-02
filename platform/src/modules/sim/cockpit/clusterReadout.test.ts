@@ -259,6 +259,23 @@ describe("telltale bank", () => {
     expect(bank({ ...nominal(), tempWarnOn: false }).temp.tone).toBe("off");
   });
 
+  it("THE STAGED AMBER TELLTALE (VP-06 triage): a mid-drive caution cue lights the check-engine lamp", () => {
+    // sc-vp-telltale-red:775b58cc. This lamp is the cluster's ONLY „caution"
+    // tone, and until the director could raise it mid-drive it was amber only
+    // while the engine was OFF — so a MOVING car never showed one, and the
+    // lesson whose whole subject is «цветът на лампата решава какво правиш»
+    // could be read but not practised. The engine is ON in `nominal()`, which
+    // is exactly the state the old law painted "off".
+    const lamps = bank({ ...nominal(), cautionWarnOn: true });
+    expect(lamps.engine.tone).toBe("caution");
+    expect(lamps.engine.pulse).toBe(true);
+    // Two colours at once is the point of the drill: the amber cue does not
+    // borrow the red lamp, and the red one is still free to join it.
+    expect(lamps.temp.tone).toBe("off");
+    expect(bank({ ...nominal(), cautionWarnOn: true, tempWarnOn: true }).temp.tone).toBe("warn");
+    expect(bank({ ...nominal(), cautionWarnOn: false }).engine.tone).toBe("off");
+  });
+
   it("turn arrows follow the cabin's own blink clock and are never re-pulsed", () => {
     // The lamp level for THIS frame already comes from the real 600 ms relay;
     // a second pulse here would beat against it and read as a fault.

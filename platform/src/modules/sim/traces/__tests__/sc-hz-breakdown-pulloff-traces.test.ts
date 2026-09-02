@@ -86,7 +86,7 @@ describe("sc-hz-breakdown-pulloff — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-hz-breakdown-pulloff — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Каране по аварийната лента“: exactly EMERGENCY_LANE_DRIVING, once — never a lane-change code", () => {
+  it("„Каране по аварийната лента“: exactly EMERGENCY_LANE_DRIVING (once) + the ignored red lamp — never a lane-change code", () => {
     const drive = drives.get("mistake-shoulder-drive")!;
     const codes = violationCodes(drive);
     expect([...new Set(codes)].sort()).toEqual(

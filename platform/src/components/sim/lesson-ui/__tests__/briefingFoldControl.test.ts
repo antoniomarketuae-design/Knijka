@@ -49,7 +49,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { briefingStandsDown } from "../LessonPlayShell";
+import { briefingStandsDown, compactBriefingFold } from "../LessonPlayShell";
 import { TOUCH_HINT_MOVING_KMH } from "../touchHintLifetime";
 
 const SHELL = readFileSync(resolve(__dirname, "../LessonPlayShell.tsx"), "utf8");
@@ -235,5 +235,93 @@ describe("the card folds instead of blanking the kerb — and folds RECOVERABLY"
     const effect = CARD.slice(CARD.indexOf("new ResizeObserver(measure)"));
     expect(effect.slice(0, effect.indexOf(");") + 2)).toBeTruthy();
     expect(CARD).toContain("}, [measure, steps, folded]);");
+  });
+});
+
+/**
+ * =============================================================================
+ * …AND THE PHONE HAD NO LIFETIME AT ALL — sc-signal-hesitation:f5ffccf3.
+ * =============================================================================
+ *
+ * The row: „The same briefing is a blocking modal on mobile and a persistent
+ * side panel on PC." Three quarters of it closed elsewhere — the numbering
+ * agrees (`briefingLineOrdinal`), the phone got a route back (`recallBriefing`),
+ * and `blocking` holds nothing on either platform (`overlayHoldsDrive` has no
+ * production consumer; only this suite's sibling in `hud/__tests__` calls it).
+ *
+ * What was left is the half `briefingStandsDown` above only ever fixed on ONE
+ * leg: the roomy panel folds to a labelled pill the first time the car moves,
+ * and the compact item — the same authored steps in the overlay rail — had no
+ * such rule, so it stayed a candidate for the whole drive and came back every
+ * time a higher-priority toast expired (`hud/overlayQueue.ts` records that
+ * mechanism on three lessons).
+ * =============================================================================
+ */
+describe("compactBriefingFold · one lifetime, two surfaces", () => {
+  const FRESH = { folded: false, latched: false } as const;
+
+  it("stands the phone's briefing down at the SAME floor the panel folds at", () => {
+    expect(compactBriefingFold(true, FRESH, TOUCH_HINT_MOVING_KMH)).toBeNull();
+    expect(compactBriefingFold(true, FRESH, TOUCH_HINT_MOVING_KMH + 0.1)).toEqual({
+      folded: true,
+      latched: true,
+    });
+    // Reversing is driving and an unreadable speed is not — inherited from
+    // `briefingStandsDown` rather than re-decided, which is what these two pin.
+    expect(compactBriefingFold(true, FRESH, -12)).toEqual({ folded: true, latched: true });
+    expect(compactBriefingFold(true, FRESH, Number.NaN)).toBeNull();
+  });
+
+  it("the standstill keeps the steps — arrival and 03-ready are 0 км/ч", () => {
+    expect(compactBriefingFold(true, FRESH, 0)).toBeNull();
+  });
+
+  it("roomy is refused outright: the card owns its own fold there", () => {
+    // Two writers to one piece of state is the drift this whole lane exists to
+    // stop. `BriefingCard` reports its fold up through `onFoldChange`; a second
+    // opinion computed in the shell would race it.
+    expect(compactBriefingFold(false, FRESH, 40)).toBeNull();
+  });
+
+  it("never fires twice, and never against a student who has answered it", () => {
+    // The same sentence as the roomy latch: a student who recalled the steps
+    // mid-drive keeps them for the rest of the lesson.
+    expect(compactBriefingFold(true, { folded: false, latched: true }, 40)).toBeNull();
+    expect(compactBriefingFold(true, { folded: true, latched: true }, 40)).toBeNull();
+  });
+
+  it("the shell WIRES it — the effect writes, the candidate reads, the recall spends", () => {
+    // Every one of these is a place the repair could have shipped a value
+    // nothing reads, which is the defect class this programme measured at 51 of
+    // 82 repairs. The predicate above is pure and green either way.
+    // The writer is the HUD poll, not an effect of its own — a `setState` in an
+    // effect body is a cascading render and this repo's lint rejects it. It is
+    // handed the CLUSTER's speed, which is the property `BriefingCard`'s own
+    // header makes load-bearing: the panel's idea of „he is driving now" may not
+    // drift from the grader's.
+    const writeAt = CODE.indexOf("setBriefingFold((prev) => compactBriefingFold(");
+    expect(writeAt, "the compact fold writer moved — re-anchor").toBeGreaterThan(-1);
+    expect(CODE.slice(writeAt, writeAt + 200)).toContain("compact, prev, speedKmh) ?? prev");
+    const pollAt = CODE.lastIndexOf("const speedKmh = lastTickRef.current?.speedKmh ?? 0;", writeAt);
+    expect(pollAt, "the fold no longer reads the cluster's own speed").toBeGreaterThan(-1);
+    // …the rail's candidate is gated on the memory the poll just wrote…
+    expect(CODE).toContain(
+      "briefingOpen && !briefingFold.folded && briefing.length > 0 && !mistakeMode && !ended",
+    );
+    // …the recall spends the latch, so the ask is not undone on the next metre.
+    // Anchored on two single-line landmarks, never on a multi-line literal: this
+    // worktree is CRLF and a `\n` in a needle silently matches nothing, which
+    // would make every assertion below it pass over an empty slice.
+    const recallAt = CODE.indexOf("const recallBriefing =");
+    expect(recallAt, "recallBriefing moved — re-anchor").toBeGreaterThan(-1);
+    const recall = CODE.slice(recallAt, CODE.indexOf("setDismissedOverlayIds", recallAt));
+    expect(recall).toContain("setBriefingFold({ folded: false, latched: true });");
+    // …and a retry is an arrival again, for the fold exactly as for the recall.
+    // Without this a second attempt started with the steps already hidden.
+    const retryAt = CODE.indexOf("setBriefingRecalled(false);");
+    expect(retryAt, "the retry reset moved — re-anchor").toBeGreaterThan(-1);
+    expect(CODE.slice(retryAt, retryAt + 400)).toContain(
+      "setBriefingFold({ folded: false, latched: false });",
+    );
   });
 });

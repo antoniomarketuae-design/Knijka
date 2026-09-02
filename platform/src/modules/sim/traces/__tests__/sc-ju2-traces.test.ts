@@ -89,6 +89,14 @@ const blind = new Map<ScJunction2TraceName, DriveWithTicks>(
 describe("sc-junction-gap — the shadow gate (doc 76 §5)", () => {
   const shadow = gap.get("shadow-correct")!;
 
+  // ALSO THE PIN for the give-way praise's wait clock (runners.ts
+  // YIELD_PRAISE_WAIT_SEC). The clause first shipped counting only seconds
+  // spent while the priority car was still SHORT of the node, and this drive
+  // banks 0.40 s of those against 4.75 s of honest wait: `leadSec: -3.5` plus
+  // the S2 witness gate put the car on the node at the instant he finished
+  // braking, so ~92% of his stop is spent with the car between the node and
+  // clear. If YIELDED_TO_PRIORITY ever disappears from here again, that clock —
+  // not the shadow — is what to look at.
   it("replays with ZERO violations and earns BOTH the full-stop and give-way-yield proofs", () => {
     expect(violationCodes(shadow.drive)).toEqual([]);
     expect(commendationCodes(shadow.drive)).toContain("FULL_STOP_AT_STOP_SIGN");

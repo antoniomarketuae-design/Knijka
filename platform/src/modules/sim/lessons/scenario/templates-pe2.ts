@@ -569,16 +569,12 @@ export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
  * TRIANGLE PER DIRECTION — measured, 2 on this district. A warning plate
  * announcing a пешеходна пътека is the one piece of furniture a жилищна зона
  * must not carry, and it stood directly against briefing step 3.
- * NOT FIXED HERE — props.ts is another lane's file, and the fix is one line of
- * gating. RE-VERIFIED AT HEAD 2026-08-30, because a report is as stale as the
- * day it was written: props.ts's pass (the „А18 in ADVANCE of an authored
- * zebra" loop) still reads only `crossing.edgeId`, so the triangles are still
- * posted. The gate to add is not a new predicate — `builders/constants.
- * paintsZebra(crossing)` is the one markings.ts already paints by, so
- * `if (!paintsZebra(crossing)) continue;` makes the SIGN pass and the PAINT
- * pass answer the same question, which is the bug: they disagreed. REPORTED.
- * What this file could honestly do, it did: step 3 no longer denies the
- * feature, it states чл. 62, т. 1 instead (pe2-sweep161-copy-truth C4 pins
+ * FIXED 2026-09-02 (this note read „NOT FIXED HERE … REPORTED" until then, and
+ * named the one-line gate): props.ts's „А18 in ADVANCE of an authored zebra"
+ * loop now opens with `if (!paintsZebra(crossing)) continue;`, so the SIGN pass
+ * and the PAINT pass answer the same question and pe-zone-v1 posts ZERO А18.
+ * What this file could honestly do it had already done: step 3 no longer denies
+ * the feature, it states чл. 62, т. 1 instead (pe2-sweep161-copy-truth C4 pins
  * both halves against the BUILT world, not against the sentence).
  *
  * ⚠ THE MOBILE LEG OF THIS LESSON IS NOT EVIDENCE ABOUT THIS TEMPLATE.
@@ -619,46 +615,24 @@ export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
  * road. What the pc/mobile delta IS evidence for is the touch-control lane —
  * nothing in `ScenarioSpec` steers a car — and it is reported there.
  *
- * THREE HONEST GAPS, all reported, none faked:
- *  1. Д15/Д16 have no SignKind and no GLB (world/types.ts), so the zone has no
- *     plate — its visual anchors are the residential blocks, the В26-50
- *     boundary posts and the Б1 the ranks put on the exit (below). Render-only:
- *     grading reads `maxspeed` and the crossing, never a sign placement (the
- *     call gen_pe_school.mjs made for А19).
- *     ⚠ CODES, because the wave-c note for this row asked for „the Д17 plate":
- *     content/signs/signs.json is the law-cited catalogue and it says
- *     Д15 = „Начало на жилищна зона", Д16 = „Край на жилищната зона",
- *     Д17 = „ПЕШЕХОДНА ПЪТЕКА". Д17 is the crossing plate, not the zone plate —
- *     writing it into this template's copy would put the wrong sign on the
- *     exam sheet. The zone plates this scene lacks are Д15 and Д16, and every
- *     Д-code in this file already matches signs.json.
- *     MEASURED (buildWorldGeometry, seed 7): pe-zone-v1 posts
- *     {giveWay 1, priorityRoad 2, limit50 6, limit20 2, limitEnd 1,
- *     pedestrianCrossing 2} — a В26 «20» at y ≈ 126 (the plate the wave-c
- *     04-t044s 6× crop reads) and NO zone plate of any kind.
- *     RE-DERIVED 2026-08-30 (the row came back a third time, so the report was
- *     re-measured rather than re-quoted). The verdict is unchanged and the
- *     COST is smaller than this note implied, so the next lane should have it:
- *      · THE FACE IS NOT MISSING. content/signs/svg/d15.svg and d16.svg both
- *        ship, cited in signs.json to Наредба № РД-02-21-1/23.11.2023, прил.
- *        № 5 — the same law-cited artwork the В26 numerals are rasterised
- *        from. What is missing is a SignKind and a placement, not a drawing.
- *      · THE DERIVATION ALREADY HAS ITS PREDICATE. `builders/constants.
- *        livingZoneCarriageway(edge)` is true for exactly this edge (`zone:
- *        "residential"`) and it is LIVE — `gradesCrossingDuty` calls it, and
- *        that call is the whole reason pz-x-1 can be graded with no paint.
- *     Which is the row's substance stated exactly: the engine already knows
- *     this street is a жилищна зона at both boundary nodes and shows the
- *     student nothing, so the clause of чл. 61 that DEFINES the zone —
- *     „обозначена като такава на входовете и изходите ѝ с пътни знаци" — is
- *     the one sentence of the article this world cannot say, and the speed
- *     half of the duty is signed while the zone half is not.
- *     NOT FIXABLE HERE, and not faked here. A template's ONLY world lever is
- *     `map.districtId`: `ScenarioSpec.map` carries archetype + params +
- *     districtId and nothing else, and the params are a MIRROR of
- *     pe-zone-v1.json `meta.scenario.params` (verified equal 2026-08-30), not
- *     an input anything regenerates the committed district from. REPORTED.
- *  2. THE EXIT DUTY. чл. 25's „включване в движението — пропускаш всички"
+ * TWO HONEST GAPS, both reported, neither faked. (There were THREE. The first
+ * was „Д15/Д16 have no SignKind and no GLB, so the zone has no plate", carried
+ * from the first draft through three re-derivations and marked NOT FIXABLE
+ * HERE — correctly, since a template's only world lever is `map.districtId`.
+ * It was fixable one directory over, and it is CLOSED as of 2026-09-02:
+ * `world/types.ts` now has `livingZoneStart`/`livingZoneEnd`, both riding the
+ * Д4 square blue plate whose rect is a byte match with theirs, faced from the
+ * already-shipped content/signs/svg/d15.svg + d16.svg — the artwork signs.json
+ * cites to Наредба № РД-02-21-1/23.11.2023, прил. № 5 — and props.ts derives a
+ * post per boundary per direction from the predicate the note itself named,
+ * `livingZoneCarriageway`. pe-zone-v1 now posts {livingZoneStart 2,
+ * livingZoneEnd 2, pedestrianCrossing 0}, so the clause of чл. 61 that DEFINES
+ * the zone is finally a thing in the windscreen instead of a tag. The CODES
+ * warning that note carried still stands and is why the fix is Д15/Д16:
+ * signs.json says Д17 = „Пешеходна пътека", so the row's own „missing Д17" is
+ * the wrong plate — writing it here would put the crossing sign on a street
+ * whose whole lesson is that it has no crossing.)
+ *  1. THE EXIT DUTY. чл. 25's „включване в движението — пропускаш всички"
  *     (content bank q-signs-049) has NO adjudicator. The closest shipped one is
  *     the right-hand-rule tracker, which grades the from-the-RIGHT subset — so
  *     the map joins the ordinary street from the EAST (a northbound driver's
@@ -669,7 +643,7 @@ export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
  *     so stoplines.ts derives zero graded lines there (battery-asserted). The
  *     full duty is taught (instructions + teach card) and gated by the
  *     sc-pzl-exit objective — never by a detector that does not model it (A12).
- *  3. THE HORN. „Клаксон и провиране" names a horn the sim has no channel for
+ *  2. THE HORN. „Клаксон и провиране" names a horn the sim has no channel for
  *     (no VehicleSample field, no detector). The demo's graded fault is the one
  *     that IS modelled and IS the law: driving past people on the road
  *     (чл. 119/62–63). The horn lives in the copy, where it belongs — it is the

@@ -397,9 +397,12 @@ describe("wave 8 — the ground carries the snow term too", () => {
   });
 
   it("…and NOT onto the asphalt or the paint", () => {
-    // The carriageway has its own snow response (weather.ts SNOW_ROAD_BRIGHTEN)
-    // and the markings must never be buried — this file's own rule for sign
-    // faces and signal lenses, applied to the paint the student is graded on.
+    // The carriageway has its own snow response (weather.ts SNOW_ROAD_BRIGHTEN
+    // plus, since f1673b60, `roadSurface.ts`'s own mix at SNOW_ROAD_COVER_MAX —
+    // a LOWER cap on a flat surface, not this normal-facing one, and gated in
+    // `roadSurface.test.ts`) and the markings must never be buried — this
+    // file's own rule for sign faces and signal lenses, applied to the paint
+    // the student is graded on.
     const roadBlock = STATIC_WORLD_SRC.slice(
       STATIC_WORLD_SRC.indexOf("{/* Road ribbons:"),
       STATIC_WORLD_SRC.indexOf("{/* Batched road decals"),

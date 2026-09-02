@@ -77,7 +77,7 @@ describe("sc-vp-telltale — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-vp-telltale — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Игнорирана лампа“: exactly SPEEDING_OVER_LIMIT; the ignored lamp itself convicts NOTHING", () => {
+  it("„Игнорирана лампа“: exactly WARNING_LAMP_IGNORED + SPEEDING_OVER_LIMIT — the lamp now convicts too", () => {
     const drive = drives.get("mistake-ignore")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_VP_TELLTALE.mistakes[0].codeRefs].sort());
@@ -85,8 +85,11 @@ describe("sc-vp-telltale — mistake demos grade their exact codes (doc 76 §9 s
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
     expect(codes).not.toContain("NOT_KEEPING_RIGHT");
     expect(codes).not.toContain("HARSH_BRAKING_NO_CAUSE");
-    // The ignored lamp is measurement + failed completion, never a code
-    // (the A12 law — the telltale runner emits no events).
+    // The ignored lamp WAS only measurement + failed completion until
+    // 2026-09-02 (sc-vp-telltale-red:c172d48b). A12 forbids convicting an
+    // unmodelled duty, and this one is modelled to the metre by the spec's own
+    // trigger/halt contract — so the resolution below now also emits the
+    // "warning-lamp" prioritySituation that earns the основна above.
     expect(drive.outcomes).toHaveLength(1);
     expect(drive.outcomes[0]).toMatchObject({ success: false, detail: "passedWithoutStopping" });
     const last = drive.trace.samples[drive.trace.samples.length - 1];

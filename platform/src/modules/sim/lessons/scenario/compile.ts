@@ -1332,22 +1332,17 @@ export function compileScenario(
     // bills «Удар в неподвижно препятствие −10 изпитни т.» at 04-t101s with
     // the car reading 0 км/ч in REVERSE, standing still since 04-t084s.
     //
-    // AND IT CANNOT BE REPAIRED BY THIS NUMBER, which is why the row keeps
-    // arriving at this file. The acceptance test is „a 2 km/h bay touch must
-    // still convict, a kerb mount must not", and that is a distinction between
-    // BODIES, not between speeds: one scalar per lesson cannot carry it.
-    // Raising it here would also stop grading a 5 km/h roll into the тротоар
-    // walker sc-merge-from-property is entirely about. The two files that CAN
-    // carry it, measured 2026-09-02:
-    //   · `ScenarioObstacles.tsx` tags only the parked-VEHICLE bodies
-    //     (`userData={r.tag}` — npcCollider/kind/npcId). The cone, pole, wall,
-    //     pillar, forecourt and worker `RigidBody`s mount untagged, so today
-    //     an authored cone is indistinguishable from the district's trimesh.
-    //   · `VehicleRig.tsx` reads that tag one line ABOVE the gate
-    //     (`readNpcColliderUserData`) and then ignores it when choosing the
-    //     threshold.
-    // Tag the rest, then gate a TAGGED contact at this lesson's number and an
-    // UNTAGGED one at `COLLISION_MIN_KMH`, and both directions hold at once.
+    // AND IT WAS NOT REPAIRED BY THIS NUMBER — 0 is still right here, and the
+    // fix landed in the two files that can tell the BODIES apart (2026-09-02,
+    // :ab353b86). „A 2 km/h bay touch must still convict, a kerb mount must
+    // not" is a distinction between bodies, not between speeds, so one scalar
+    // per lesson could never carry it: raising it here would also stop grading
+    // the 5 km/h roll into the тротоар walker sc-merge-from-property is about.
+    // `world/components/WorldColliders` now mounts the district's DRIVE-OVER
+    // surface (ground + kerb/pavement trimesh) as its own tagged body, and
+    // `VehicleRig`'s `onCollisionEnter` judges that one class at
+    // `COLLISION_MIN_KMH` while every authored obstacle, NPC shell and the
+    // building trimesh keep the number below.
     collisionMinKmh: 0,
     ...(environment ? { environment } : {}),
     ...(parkingBay ? { parkingBay } : {}),

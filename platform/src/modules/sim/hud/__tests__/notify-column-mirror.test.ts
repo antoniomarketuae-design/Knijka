@@ -235,27 +235,34 @@ describe("the COMPACT datum stays put, and the column gets its own top", () => {
   });
 
   it("what the swap costs, and that what is left is still a card", () => {
-    // The peek shrinks because the corridor between the mirror and the hazard
-    // band IS this narrow — 0.166 → 0.43 of the stage — and the words are not
-    // deleted: the fold already prints «↓ още N реда» beside «ПРОЧЕТИ».
+    // The peek shrinks because the corridor between the mirror and the ROAD IS
+    // this narrow — 0.166 → 0.40 of the stage, the second number being the
+    // cockpit horizon since 2026-09-02 — and the words are not deleted: the
+    // fold already prints «↓ още N реда» beside «ПРОЧЕТИ».
     const iphone = { width: 852, height: 393, insetBottom: 21 };
     const android = { width: 780, height: 360, insetBottom: 0 };
     const before = (s: typeof iphone): number => notifyColumnMaxHeightPx(s.height, notifyColumnFloorPx(s), 8);
     const after = (s: typeof iphone): number =>
       notifyColumnMaxHeightPx(s.height, notifyColumnFloorPx(s), notifyColumnTopPx(s, true));
-    expect(Math.round(before(iphone))).toBe(161);
-    expect(after(iphone)).toBeCloseTo(95.75, 1);
-    expect(Math.round(before(android))).toBe(147);
-    expect(after(android)).toBeCloseTo(87.04, 1);
+    // EXPECTATIONS CHANGED 2026-09-02 (`sc-ov-oncoming-gap:5de3bffb`): the
+    // column's ceiling moved 0.43 → 0.40 when the horizon it was derived from
+    // was found to have been read in the wrong direction. 161/95.75/147/87.04
+    // were that ceiling's numbers.
+    expect(Math.round(before(iphone))).toBe(149);
+    expect(after(iphone)).toBeCloseTo(83.96, 1);
+    expect(Math.round(before(android))).toBe(136);
+    expect(after(android)).toBeCloseTo(76.24, 1);
     // …and a peek is still a peek: 44 px is the pill's own minimum, and the
     // card paints past the ceiling rather than clipping «ПРОЧЕТИ» (the compact
-    // column sets no `overflow`), so the floor lands at 0.46 of the stage
-    // against a hazard band that starts at 0.53.
+    // column sets no `overflow`). What that costs is now the honest residue of
+    // this row: the CHROME, not the ceiling, is what still reaches the road —
+    // 0.405 on the iPhone and 0.427 on the Android against a horizon at 0.402,
+    // i.e. one to nine pixels, and no ceiling can take them back.
     for (const s of [iphone, android]) {
       expect(after(s)).toBeGreaterThan(OVERLAY_PEEK_HEIGHT_PX);
       const chrome = 14 + 12 + 44 + 16; // chip · fold line · «ПРОЧЕТИ» row · padding
       const worstFloor = (notifyColumnTopPx(s, true) + Math.max(after(s), chrome)) / s.height;
-      expect(worstFloor).toBeLessThan(0.53);
+      expect(worstFloor).toBeLessThan(0.43);
     }
   });
 });

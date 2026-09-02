@@ -311,6 +311,20 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         const yielded = deriveYieldDemand(objective.titleBg);
         if (yielded !== undefined) out.requireYieldClean = yielded;
       }
+      // THE ONCOMING-GAP REPORT (see `ReachZoneWitnessDemands.
+      // reportOncomingGapSec`). Authored only — a norm cannot be read off a
+      // banner, and a wrong one would print a false standard rather than
+      // withhold a tick. The only rejected value is one that could never be
+      // met or never be missed.
+      if (p.reportOncomingGapSec !== undefined) {
+        if (!num(p.reportOncomingGapSec) || p.reportOncomingGapSec <= 0) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "reachZone reportOncomingGapSec must be a number > 0",
+          );
+        }
+        out.reportOncomingGapSec = p.reportOncomingGapSec;
+      }
       // SIGNED (FR-24): + = the mark sits past the paint, − = the paint is
       // ahead of the mark. The only rejected value is one that would empty the
       // acceptance disc — a cut deeper than the radius leaves nowhere legal to
@@ -1314,6 +1328,31 @@ export interface ReachZoneWitnessDemands {
    * leaves the demand met, so every such caller is bit-identical to shipped.
    */
   requireYieldClean?: ReachZoneYieldDemand;
+  /**
+   * REPORT THE GAP HE TURNED INTO, against the norm this drill teaches, s.
+   *
+   * NOT A DEMAND — the only key here that cannot refuse anything. `done` is
+   * bit-identical with it and without it; what it adds is an `ObjectiveDetail`
+   * («oncomingGap») on the objective row, i.e. a MEASUREMENT the debrief prints.
+   *
+   * WHY IT EXISTS (sc-turn-left-oncoming:7974670c, critical). The JU-10 drill's
+   * briefing counts in seconds — «Прецени интервала в СЕКУНДИ: насрещен на
+   * по-малко от 4 секунди означава чакане» — and the product already measures
+   * exactly that twice: `prioritySituation.gapSec` (rules/types.ts) and
+   * `StagedEventOutcome.acceptedGapSec`, whose own contract promises „< 3 s lets
+   * the scenario rubric coach it". Neither had a consumer anywhere outside the
+   * tests. So the runtime convicted the ≤ 2 s cut with a −10 card and said
+   * NOTHING about the 2–4 s turn — legal, under the taught norm, and the exact
+   * band the lesson exists to move — and a student who judged well was never
+   * told his number either.
+   *
+   * THE NORM IS AUTHORED, NOT RECALLED, and deliberately so: it is the drill's
+   * own published figure (its briefing, its `teach.whyBg` and its objectiveBg
+   * all say four seconds), so the row cannot drift from the sentence the student
+   * read. Nothing here reads a runtime constant, which also keeps this evaluator
+   * free of a dependency on `runtime/`.
+   */
+  reportOncomingGapSec?: number;
   /**
    * «СПРИ ПРЕД ЧОВЕКА» — the eighth demand, and the first that is not a NEW
    * question but the fourth one's OTHER banner family (2026-08-27,
@@ -2451,6 +2490,36 @@ function yieldCleanHonoured(demand: ReachZoneYieldDemand, ctx: ObjectiveContext)
   return true;
 }
 
+/**
+ * The tightest gap the student turned into on this run's oncoming-left-turn
+ * encounters (see `ReachZoneWitnessDemands.reportOncomingGapSec`).
+ *
+ *   `undefined` — no such encounter has RESOLVED yet, so nothing is known and
+ *                 the gate emits no detail at all. Every fixture, rig and
+ *                 replay lands here, which is why they stay bit-identical.
+ *   `null`      — encounters resolved, none had an oncoming still inbound at
+ *                 the commit: he waited them out, or the lane was clear.
+ *   a number    — seconds the NEAREST oncoming still needed to reach the
+ *                 junction when he turned.
+ *
+ * THE MINIMUM, not the last: a JU-10 site stages a tight car and a follow car
+ * (SC_LTAP_TIGHT_EVENT / SC_LTAP_FOLLOW_EVENT), both watch the same
+ * `turnStarted`, and the gap that decides whether the manoeuvre was safe is the
+ * closest one — the car you have to be clear of, not the one behind it.
+ */
+function acceptedOncomingGapSec(ctx: ObjectiveContext): number | null | undefined {
+  let seen = false;
+  let tightest: number | null = null;
+  for (const o of ctx.stagedOutcomes) {
+    if (o.kind !== "oncomingLeftTurn") continue;
+    seen = true;
+    const g = o.acceptedGapSec;
+    if (g === undefined) continue;
+    if (tightest === null || g < tightest) tightest = g;
+  }
+  return seen ? tightest : undefined;
+}
+
 function vruWaitHonoured(ctx: ObjectiveContext): boolean {
   // A struck person outranks the encounter record in both directions: it
   // refuses a run the dart never armed for, and it refuses one whose LAST dart
@@ -3260,10 +3329,30 @@ function stepReachZone(
       // its length (radius + grace) and slides so its far end is the paint —
       // so a negative cut buys forgiveness ahead of the mark without inventing
       // any extra room behind it.
+      // …AND IT IS THE CAPSULE, NOT ITS BOUNDING BOX (sc-rb-ped-exit:5f1217f9).
+      // The length `radiusM + REACH_ZONE_GRACE_M` is the swept disc's reach ON
+      // THE AXIS — the disc's own radius plus the grace — but it was applied at
+      // every offset out to `radiusM`, which is the axis-aligned BOX around the
+      // capsule this block documents. Its far corner stands
+      // √(radiusM² + (radiusM + GRACE − cut)²) from the mark: 5.84 m on
+      // sc-rbp-pocket's L1 rung, against a pocket with 4.32 m of room behind
+      // the mark, so a car parked in the circulatory carriageway — the fault
+      // that template's instruction 4, teach text and examiner note all name —
+      // collected «Спри в джоба между кръга и пътеката».
+      //
+      // Sweeping the disc instead of boxing it gives the far end its radius
+      // back: the room behind the acceptance boundary is the grace plus the
+      // disc's own half-chord at this offset. Identical to shipped on the axis
+      // (half-chord = radiusM), and it narrows to the grace alone at the rim —
+      // strictly a SUBSET, so this can refuse a corner and can credit nobody
+      // the box did not already credit.
+      const backOfDisc = Math.sqrt(
+        Math.max(0, params.radiusM * params.radiusM - lateral * lateral),
+      );
       inApproachGrace =
         lateral <= params.radiusM &&
         along <= -cut &&
-        along >= -(cut + params.radiusM + REACH_ZONE_GRACE_M);
+        along >= -(cut + REACH_ZONE_GRACE_M) - backOfDisc;
       // Only a waypoint that DECLARED a paint boundary refuses the far side.
       // Everywhere else `inZone` is the whole acceptance, exactly as shipped —
       // a plain reachZone is a place you get to, from any direction.
@@ -3791,12 +3880,22 @@ function stepReachZone(
     everOutside,
     ...(approachCap !== undefined ? { approachCap } : {}),
   };
+  // THE MEASUREMENT THIS GATE REPORTS (`reportOncomingGapSec`). Never a
+  // refusal: `done` above is computed without it. Emitted only once an
+  // encounter has actually resolved, so a gate on a drill that stages none —
+  // and every fixture, rig and replay — carries no detail at all, exactly as
+  // it did before.
+  const gapNormSec = params.reportOncomingGapSec;
+  const acceptedGapSec = gapNormSec === undefined ? undefined : acceptedOncomingGapSec(ctx);
   return {
     done,
     // Half progress once the place is reached but the speed contract is not
     // yet met — the banner stops looking inert while the student slows down.
     progress: done ? 1 : reached ? 0.5 : 0,
     evalState,
+    ...(gapNormSec !== undefined && acceptedGapSec !== undefined
+      ? { detail: { kind: "oncomingGap" as const, acceptedGapSec, normSec: gapNormSec } }
+      : {}),
   };
 }
 

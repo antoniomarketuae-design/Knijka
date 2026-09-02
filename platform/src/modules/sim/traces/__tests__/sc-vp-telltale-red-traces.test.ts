@@ -72,8 +72,22 @@ describe("sc-vp-telltale-red — the shadow gate (doc 76 §5)", () => {
     expect(Math.hypot(last.x - STOP.x, last.y - STOP.y)).toBeLessThan(STOP.radiusM);
     expect(last.x).toBeGreaterThan(13); // pulled RIGHT of the lane center (12.19)
     expect(Math.abs(last.speedKmh)).toBeLessThan(1); // fully stopped
-    expect(shadow.outcomes).toHaveLength(1);
+    // TWO staged cues since 2026-09-02 (sc-vp-telltale-red:775b58cc — the lamp
+    // channel now names its colour), met in the order the lesson teaches: the
+    // AMBER check-engine lamp is shown and carried past ("clear"), then the RED
+    // temperature lamp is stopped for ("yielded"). Order is the assertion, not
+    // an accident: red-before-amber would be a different lesson.
+    expect(shadow.outcomes.map((o) => o.eventId)).toEqual([
+      "sc-vptr-amber-lamp",
+      "sc-vptr-lamp",
+    ]);
     expect(shadow.outcomes[0]).toMatchObject({
+      eventId: "sc-vptr-amber-lamp",
+      kind: "telltaleStimulus",
+      success: true,
+      detail: "clear",
+    });
+    expect(shadow.outcomes[1]).toMatchObject({
       eventId: "sc-vptr-lamp",
       kind: "telltaleStimulus",
       success: true,
@@ -95,9 +109,21 @@ describe("sc-vp-telltale-red — mistake demos grade their exact codes (doc 76 �
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
     expect(codes).not.toContain("HARSH_BRAKING_NO_CAUSE");
     expect(codes).not.toContain("NOT_KEEPING_RIGHT");
-    // The telltale runner emits no SimTick vocabulary — the crash ended the
-    // drive before the trigger fell ignoreBeyondM behind, so nothing resolved.
-    expect(drive.outcomes).toEqual([]);
+    // BOTH cues resolve, and the pair IS the lesson: the amber one was met and
+    // correctly carried past ("clear"), the red one was met and driven past
+    // ("passedWithoutStopping"). That second resolution is what now emits the
+    // "warning-lamp" prioritySituation and earns the основна above — before
+    // 2026-09-02 the demo turned back into the roadside at y = 230, so the red
+    // encounter never resolved and the card convicted only the crash.
+    expect(drive.outcomes.map((o) => o.eventId)).toEqual([
+      "sc-vptr-amber-lamp",
+      "sc-vptr-lamp",
+    ]);
+    expect(drive.outcomes[0]).toMatchObject({ success: true, detail: "clear" });
+    expect(drive.outcomes[1]).toMatchObject({
+      success: false,
+      detail: "passedWithoutStopping",
+    });
     const last = drive.trace.samples[drive.trace.samples.length - 1];
     expect(Math.hypot(last.x - STOP.x, last.y - STOP.y)).toBeGreaterThan(STOP.radiusM); // never reached the halt point
   });
@@ -109,10 +135,12 @@ describe("sc-vp-telltale-red — mistake demos grade their exact codes (doc 76 �
     expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
     expect(codes).not.toContain("COLLISION");
-    // Stopped in the traffic lane, short of the halt point: the trigger never
-    // falls ignoreBeyondM behind, so the encounter stays UNRESOLVED (no outcome)
-    // and the stop zone stays unreached (the sc-vp-telltale panic precedent).
-    expect(drive.outcomes).toEqual([]);
+    // Stopped in the traffic lane, short of the halt point: the RED trigger
+    // never falls ignoreBeyondM behind, so THAT encounter stays UNRESOLVED and
+    // its stop zone stays unreached (the sc-vp-telltale panic precedent). The
+    // amber cue upstream was carried past normally before the panic.
+    expect(drive.outcomes.filter((o) => o.eventId === "sc-vptr-lamp")).toEqual([]);
+    expect(drive.outcomes.map((o) => o.eventId)).toEqual(["sc-vptr-amber-lamp"]);
     const last = drive.trace.samples[drive.trace.samples.length - 1];
     expect(Math.abs(last.speedKmh)).toBeLessThan(1);
     expect(Math.abs(last.x - 12.19)).toBeLessThan(0.5); // mid-lane, never eased right

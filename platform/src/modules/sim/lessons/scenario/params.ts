@@ -265,6 +265,16 @@ export function serializeObjectiveParams(
       // at L5. A rung that forgave it would forgive the whole subject of the
       // drill.
       if (p.requireRestClean !== undefined) params.requireRestClean = p.requireRestClean;
+      // …AND THE ONE TERM HERE THAT REFUSES NOTHING (`reportOncomingGapSec`).
+      // It is on this whitelist for the same measured reason as its three
+      // neighbours — a key not named here never reaches the session — and NOT
+      // laddered for a reason of its own: it is not a tolerance but the NORM
+      // the drill's own briefing prints. A rung that quietly relaxed „four
+      // seconds" would put a different standard on the debrief from the one in
+      // the instructions the same student just read.
+      if (p.reportOncomingGapSec !== undefined) {
+        params.reportOncomingGapSec = p.reportOncomingGapSec;
+      }
       return { kind: "reachZone", params };
     }
     case "passSignal": {

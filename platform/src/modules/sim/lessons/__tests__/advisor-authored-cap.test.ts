@@ -253,8 +253,19 @@ describe("the instrument, before anything it measures", () => {
     // „a gate is never widened above the posted limit" holds at every rung with
     // no grace to strip. Cross-checked: all 9 sc-pk-move-off trace tests still
     // pass, so the new gate refuses no drive the sheet would pass.
+    //
+    // RE-BASELINED AGAIN 2026-09-02 (sc-vu-pass-clearance:260b13fd, critical),
+    // 958 → 963, and it is the same ratchet turning once more in the same
+    // direction. The sweep frame `sweep161/sc-vu-pass-clearance/pc-wrong/
+    // 04-t017s.png` is `sc-pk-move-off`'s twin: В26 disc 50, cluster 59 км/ч,
+    // and the objective banner already advanced to «ЗАДАЧА 2/2» — the overtake
+    // of a CYCLIST accepted at the governor's ceiling, on a drill whose
+    // instruction 4 says «Подмини го спокойно, без да ускоряваш рязко до него».
+    // `sc-vup-pass` now authors 46 (the street posts 50; the lesson's own
+    // committed correct demo tops out at 44.88), so the five new rows are that
+    // objective's five rungs and nothing else moved.
     const cards = everyCappedCard();
-    expect(cards.length).toBe(958);
+    expect(cards.length).toBe(963);
     expect(new Set(cards.map((c) => c.lessonId)).size).toBeGreaterThan(100);
   });
 
@@ -284,7 +295,7 @@ describe("the instrument, before anything it measures", () => {
 // ---------------------------------------------------------------------------
 
 describe("no capped objective grades against a number the card does not state", () => {
-  it("all 958 capped cards speak a number", () => {
+  it("all 963 capped cards speak a number", () => {
     const silent = everyCappedCard()
       .filter((c) => c.spoken === undefined)
       .map((c) => `${c.lessonId} ${c.objectiveId}: cap=${c.cap} :: ${c.titleBg}`);
@@ -306,10 +317,18 @@ describe("no capped objective grades against a number the card does not state", 
     // by one card. The spoken count rises with the total and that is the half
     // that matters here — all five read «… — дръж под 50 км/ч», so no card was
     // silenced to make a number fit.
-    expect(cards.length).toBe(958);
+    //
+    // RE-BASELINED AGAIN 2026-09-02 (sc-vu-pass-clearance:260b13fd) — the same
+    // shape one drill over: the five new rows are `sc-vup-pass`'s five rungs at
+    // cap 46 (L3–L5) / 48 (L1–L2, the ladder's half-headroom), so they land
+    // WHOLLY above the halt band, 649 → 654, and the halt band does not move by
+    // one card. All five read «… — дръж под 46 км/ч» (the spoken figure is the
+    // AUTHORED one at every rung, `spokenCapKmh`'s closing `Math.min`), so the
+    // spoken count rises with the total and nothing was silenced.
+    expect(cards.length).toBe(963);
     expect(halt.length).toBe(309);
-    expect(aboveHalt.length).toBe(649);
-    expect(cards.filter((c) => c.spoken !== undefined).length).toBe(958);
+    expect(aboveHalt.length).toBe(654);
+    expect(cards.filter((c) => c.spoken !== undefined).length).toBe(963);
   });
 
   it("and the number spoken belongs to somebody — sign, title, halt band or the author's own cap", () => {
@@ -520,7 +539,17 @@ describe("the exhibits", () => {
     // Restated, not relaxed: it is still an exact figure, still measured the
     // old way, and it still goes red the moment a briefing or a title gains or
     // loses a «N км/ч».
-    expect(statedAboveGate).toBe(122);
+    //
+    // RE-MEASURED 2026-09-02 (sc-vu-pass-clearance:260b13fd): 122 → 126, and
+    // the delta is FOUR where the total gained FIVE, which is the only part
+    // worth writing down. `sc-vup-pass` gained a cap under the sign, so on the
+    // rungs whose only stated surface is the street's own 50 the old rule reads
+    // „stated above the gate" — L1/L2 (gate 48) and L3/L4 (gate 46). L5 is not
+    // in the class: that rung's compiled briefing carries a «20 км/ч» of its
+    // own (the L5 complication), and 20 is not above 46. Same benign shape as
+    // the six above — the number over the gate is the SIGN, and source 4 speaks
+    // 46 at every rung, at or under the gate every time.
+    expect(statedAboveGate).toBe(126);
   });
 
   it("and the six the 2026-08-25 clamp added are named, with what the student is shown", () => {

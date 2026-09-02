@@ -31,10 +31,15 @@
  *                      (props.ts places А18 for every authored crossing on a
  *                      scenario map and never consults `crossing.kind`, so the
  *                      deliberately `unmarked` pz-x-1 gets a triangle anyway).
- *                      The world half is props.ts — reported, not this lane's
- *                      file. The copy half is: чл. 62 grants the pedestrian the
+ *                      The copy half is: чл. 62 grants the pedestrian the
  *                      WHOLE carriageway, it does not abolish crossings, so the
  *                      absolute was never the law either.
+ *                      THE WORLD HALF LANDED 2026-09-02 (it read „reported, not
+ *                      this lane's file" until then): the А18 loop now asks
+ *                      `paintsZebra`, so pe-zone-v1 posts none — and the зона it
+ *                      never stated is stated, Д15 at each entry and Д16 at each
+ *                      exit (ЗДвП чл. 61). C4's two measurements moved with it;
+ *                      see the comments at each expectation.
  *   C5  PHANTOM PLATE  sc-pe-night-unlit — briefing step 2 read «Знакът
  *                      разрешава 50» on pe-dart-v1, a district whose built sign
  *                      set is {pedestrianCrossing 1, noOvertaking 1}: ZERO speed
@@ -344,7 +349,7 @@ describe("C4 — the жилищна-зона briefing denied a crossing the worl
     "Вътре няма пешеходни пътеки и никой не е длъжен да върви по тротоара — цялото платно е на хората. " +
     "Хора върху платното тук не нарушават нищо: ти си гостът.";
 
-  it("THE MEASUREMENT: pe-zone-v1 posts А18 „Пешеходна пътека“ inside the zone", () => {
+  it("THE MEASUREMENT: pe-zone-v1 now shows the ZONE and no пешеходна пътека", () => {
     const by = signsBuiltFor(ZONE_DISTRICT);
     // The PAINT half of the design held, and this also settles the wave-c
     // wording: that note says the zone „contains a marked zebra", and it does
@@ -352,15 +357,28 @@ describe("C4 — the жилищна-зона briefing denied a crossing the worl
     // (04-t102s) shows bare asphalt, and the count here is zero. What the frame
     // really shows is the TRIANGLE, which is the half below.
     expect(by.__zebraPaint, "painted zebras on pe-zone-v1").toBe(0);
-    // …and the sign half did not. props.ts iterates `district.crossings` and
-    // never reads `crossing.kind`, so the deliberately unmarked pz-x-1 earns a
-    // warning triangle per direction. THIS is the world-side row (reported —
-    // props.ts is not this lane's file). If it is ever fixed this expectation
-    // reds: that is the signal that the absolute may be stated again.
+    // THE EXPECTATION FLIPPED, AND THIS COMMENT IS WHY (it read
+    // `.toBeGreaterThan(0)` until 2026-09-02, with a note saying „if it is ever
+    // fixed this expectation reds: that is the signal"). It was fixed. props.ts
+    // iterated `district.crossings` and never read `crossing.kind`, so the
+    // deliberately `unmarked` pz-x-1 earned an А18 per direction over bare
+    // asphalt; the А18 loop now asks `paintsZebra(crossing)` — the painter's own
+    // predicate — so the sign pass and the paint pass answer the same question.
+    // Measured over the whole corpus, pe-zone-v1 is the only district that
+    // changes: the two OSM cuts carrying `unmarked` nodes are not scenario maps
+    // and never reach that loop.
     expect(
       by.pedestrianCrossing ?? 0,
-      "А18 posts inside the жилищна зона — the plate step 3 used to deny",
-    ).toBeGreaterThan(0);
+      "А18 posts inside the жилищна зона — none, there is no пътека to warn of",
+    ).toBe(0);
+    // …and the zone is not merely un-contradicted, it is now STATED. ЗДвП чл. 61
+    // defines a жилищна зона as one „обозначена като такава на входовете и
+    // изходите й с пътни знаци", and until this wave the street carried no such
+    // plate at all — the зона changed the student's duties behind an invisible
+    // trigger while the teach card promised him „синия правоъгълен знак Д15 …
+    // до знака Д16". One Д15 and one Д16 per boundary, per direction of travel.
+    expect(by.livingZoneStart ?? 0, "Д15 „Начало на жилищна зона“").toBe(2);
+    expect(by.livingZoneEnd ?? 0, "Д16 „Край на жилищната зона“").toBe(2);
   });
 
   it("the matcher has teeth: it catches the retired step and spares the replacement", () => {
@@ -373,14 +391,33 @@ describe("C4 — the жилищна-зона briefing denied a crossing the worl
     expect(/пътека/iu.test(shipped.textBg)).toBe(true);
   });
 
-  it("NOT VACUOUS: the retired step, run through the same predicate, is an offender", () => {
-    const fixture: ScenarioSpec = {
+  it("NOT VACUOUS: the retired step is still an offender on a street that HAS a пътека", () => {
+    // This fixture used to run on pe-zone-v1, where the world contradicted the
+    // sentence because props.ts posted А18 over an unmarked crossing. That is
+    // repaired, so «Вътре няма пешеходни пътеки» is no longer false of THAT
+    // street — and a test that went on asserting it was would be pinning the
+    // defect in place. What has to survive is the PREDICATE's teeth, so the
+    // fixture moves to a district that really does build one: pe-dart-v1's
+    // pe-x-1 is `marked`, so it carries both the paint and its А18.
+    const elsewhere: ScenarioSpec = {
+      ...SC_PE_ZONE_LIVING,
+      map: { ...SC_PE_ZONE_LIVING.map, districtId: "pe-dart-v1" },
+      instructionsBg: [{ n: 3, textBg: RETIRED_STEP3 }],
+    };
+    expect(crossingSignsBuilt("pe-dart-v1")).toBeGreaterThan(0);
+    expect(
+      offendersOf([elsewhere], (t) => DENIES_CROSSING.test(t), (d) => crossingSignsBuilt(d) > 0),
+    ).toHaveLength(1);
+    // …and on the repaired zone street the SAME sentence is now spared, which is
+    // the repair stated as a measurement rather than as a claim.
+    const onZone: ScenarioSpec = {
       ...SC_PE_ZONE_LIVING,
       instructionsBg: [{ n: 3, textBg: RETIRED_STEP3 }],
     };
+    expect(crossingSignsBuilt(ZONE_DISTRICT)).toBe(0);
     expect(
-      offendersOf([fixture], (t) => DENIES_CROSSING.test(t), (d) => crossingSignsBuilt(d) > 0),
-    ).toHaveLength(1);
+      offendersOf([onZone], (t) => DENIES_CROSSING.test(t), (d) => crossingSignsBuilt(d) > 0),
+    ).toEqual([]);
   });
 
   it("the census: no PE2 briefing step denies a crossing its own district builds", () => {

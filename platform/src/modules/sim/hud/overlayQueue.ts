@@ -566,9 +566,9 @@ export function hasWhy(item: SimOverlayItem): boolean {
  * NOT a reading-speed number and not a layout number — a RATIO floor, and it is
  * set from the frames rather than chosen. The four cut frames above hide 3, 8,
  * 15, 15 and 39 lines behind a peek showing between one and three; the shipped
- * budget at 852 × 393 is 161 px of column, and after the mirror lane
+ * budget at 852 × 393 is 149 px of column, and after the mirror lane
  * (`NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN`, adopted by `SimOverlay` in a later
- * round) it is 95.8 px — about five of the peek's eleven landscape lines gone,
+ * round) it is 84.0 px — about six of the peek's eleven landscape lines gone,
  * which makes every number above WORSE, not better. So the floor is stated as
  * „the majority of the explanation, or all of it", i.e. the fold may hide less
  * than it shows.

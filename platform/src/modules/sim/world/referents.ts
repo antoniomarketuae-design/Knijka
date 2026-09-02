@@ -15,10 +15,12 @@
  * and asserts a REQUIRED-REFERENT predicate per fault code: if the code can
  * fire on this rung, the world must contain the thing the code is about.
  *
- * 46 codes carry a referent. The other 14 are listed in `NO_WORLD_REFERENT`,
- * so the exemption is a reviewed decision rather than an oversight. 46 + 14 =
- * 60 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
- * itself, so a new code cannot ship unchecked and unexempted.
+ * 48 codes carry a referent. The other 15 are listed in `NO_WORLD_REFERENT`,
+ * so the exemption is a reviewed decision rather than an oversight. 48 + 15 =
+ * 63 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
+ * itself, so a new code cannot ship unchecked and unexempted. (The pin the tree
+ * ENFORCES lives in `world/__tests__/world-referent.gate.test.ts`; this
+ * paragraph tracks it and is not a second source of truth.)
  *
  * (This paragraph read „45 … 13 … 58" until 2026-08-30 and had been wrong since
  * CLOSING_ON_LEAD_TOO_FAST landed on 2026-08-05: the gate test's own pin was
@@ -85,7 +87,7 @@ import {
 export type FaultCode = ViolationCode | CommendationCode;
 
 /**
- * The 14 codes with NO world referent — doc 86 §10. Thirteen of them are a fact
+ * The 15 codes with NO world referent — doc 86 §10. Fourteen of them are a fact
  * about the CAR or the DRIVER's procedure, not about the street: the world
  * cannot be wrong about a seatbelt. Listed explicitly so the exemption is
  * reviewed.
@@ -126,6 +128,13 @@ export const NO_WORLD_REFERENT: ReadonlySet<FaultCode> = new Set<FaultCode>([
   "TURN_WITHOUT_INDICATOR",
   "SAFE_LANE_CHANGE",
   "CLEAN_DRIVING",
+  // The fifteenth, and it belongs to the FIRST group above rather than to
+  // OFF_CARRIAGEWAY's special case: a warning lamp is a fact about the CAR.
+  // Its referent is a staged `telltaleStimulus` on the lesson — a cockpit
+  // channel with no world body at all — so no district can be wrong about it,
+  // and a required-referent rule could only assert that the lesson stages what
+  // it stages.
+  "WARNING_LAMP_IGNORED",
 ]);
 
 /**

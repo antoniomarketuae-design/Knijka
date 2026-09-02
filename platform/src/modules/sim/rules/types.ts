@@ -258,6 +258,27 @@ export interface SimTick {
    */
   worldEdgeClearanceM?: number;
   /**
+   * Is that edge a WALL on this map, or the bare end of the ground?
+   *
+   * `world/builders/worldRim.districtHasWorldRimBelt` — true on the 103
+   * authored micro-maps, which since 2026-08-27 are belted with a contiguous,
+   * collidable row of building masses just inside the rim; false on the two
+   * Sofia OSM extracts, where the terrain really does simply stop.
+   *
+   * IT EXISTS BECAUSE A SENTENCE WAS WRONG. The rim card is the only thing the
+   * product ever says about what is out there, and it said «няма нито път, нито
+   * сграда — теренът просто свършва» on every map — telling the student the
+   * opposite of the wall in his windscreen (`sc-jx-equal-left:29a8ae1a`, whose
+   * frame is a car parked nose-first against a rim mass). A virtual instructor
+   * that contradicts the glass is worse than a silent one (THEO-4), so the
+   * copy branches on this.
+   *
+   * OPTIONAL and ungraded, exactly like `worldEdgeClearanceM` beside it. Absent
+   * means UNKNOWN — the consumer must fall back to the weaker claim, never
+   * assert a wall it cannot see.
+   */
+  worldEdgeIsWalled?: boolean;
+  /**
    * Mandatory direction glyph painted in the vehicle's OWN lane (М10 lane-
    * intent arrows — audit M-17). Authored world data (`meta.scenario
    * .laneArrows`, resolved by worldRuntime from the committed lane fix), never
@@ -608,6 +629,8 @@ export type ViolationCode =
   | "OVERTAKE_RETURN_TOO_EARLY" // основна: returned to the own bank under ~1 s in front of the overtaken vehicle — the brake-forcing cut back (OV-09; чл. 42 — връщане вдясно без засичане; runtime overtake-return tracker)
   // VRU-INTERACTION pack slice 1 (doc 72 VU-02 — the lateral-clearance duty)
   | "VULNERABLE_PASS_TOO_CLOSE" // основна: passed a same-direction cyclist with under ~1.2 m of air (чл. 42 достатъчна странична дистанция; the 1.2–1.5 m band stays a taught grace — runtime vulnerable-pass tracker)
+  // N11 cockpit stimuli (doc 72 VP-06 — the red/amber telltale triage)
+  | "WARNING_LAMP_IGNORED" // основна: drove on past a RED dashboard warning lamp instead of pulling over (ЗДвП чл. 139, ал. 1, т. 1; orchestrator telltale runner — structurally armed only where a red telltale is STAGED)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)

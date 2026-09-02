@@ -32,6 +32,9 @@ export interface ClusterInputs {
   indicatorRightLit: boolean;
   /** N11 (VP-06): the director-staged red warning telltale. */
   tempWarnOn: boolean;
+  /** N11 (VP-06): the director-staged AMBER warning telltale — the other half
+   *  of the red/amber triage, on the check-engine lamp. */
+  cautionWarnOn: boolean;
 }
 
 export function createClusterInputs(): ClusterInputs {
@@ -47,6 +50,7 @@ export function createClusterInputs(): ClusterInputs {
     indicatorLeftLit: false,
     indicatorRightLit: false,
     tempWarnOn: false,
+    cautionWarnOn: false,
   };
 }
 
@@ -188,7 +192,18 @@ export function lampBank(input: ClusterInputs, out: LampBank): LampBank {
   set(out.brake, input.parkingBrakeOn ? "warn" : "off", false);
   // Amber check-engine while the engine is not turning; pulsing once it has
   // STALLED, because a stall is something that just happened to the driver.
-  set(out.engine, input.engineOn ? "off" : "caution", input.stalled);
+  //
+  // …AND WHILE A STAGED AMBER CUE IS RAISED (2026-09-02,
+  // sc-vp-telltale-red:775b58cc). This lamp is the cluster's ONLY „caution"
+  // tone, so before the director could raise it mid-drive no amber existed
+  // anywhere on the glass — and „цветът на лампата решава какво правиш" is
+  // unlearnable when only one colour can appear. It pulses like the staged red
+  // one does: a lit lamp that is the LESSON must not be missable.
+  set(
+    out.engine,
+    input.cautionWarnOn || !input.engineOn ? "caution" : "off",
+    input.cautionWarnOn || input.stalled,
+  );
   set(out.oil, input.engineOn ? "off" : "warn", false);
   set(out.battery, input.engineOn ? "off" : "warn", false);
   set(out.temp, input.tempWarnOn ? "warn" : "off", input.tempWarnOn);

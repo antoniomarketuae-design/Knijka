@@ -77,6 +77,70 @@ import * as THREE from "three";
 export const SNOW_COVER_MAX = 0.85;
 
 /**
+ * THE CARRIAGEWAY'S OWN CAP — the second cover channel, and the one address
+ * `sc-ac-snow:f1673b60` still had open („the carriageway renders as bare grey
+ * asphalt … while instruction 1 tells the student «пътят е заснежен»").
+ *
+ * WHY A SECOND NUMBER RATHER THAN THE ONE ABOVE. `presets.ts`'s `snowWeather`
+ * block worked out, against w14/w21 frames, why nothing in the LIGHT rig can
+ * close that row: „every lever there — sun, hemisphere, exposure, veil colour,
+ * veil density — lights the road and the pavement EQUALLY, so any of them
+ * moves both and the ratio survives." The asymmetry is in HOW the two surfaces
+ * take their snow. The pavement is a GROUND material and takes `SNOW_COVER_MAX`
+ * as a per-fragment MIX, which compresses the concrete's variance toward the
+ * snow colour — what lying snow physically does, it covers. The carriageway
+ * takes a whole-material MULTIPLY instead (`weather.ts`'s SNOW_ROAD_BRIGHTEN
+ * 1.8 × `roadSurface.ts`'s ROAD_ALBEDO_TINT 0.72), which SCALES the asphalt map
+ * and therefore AMPLIFIES its variance — the baked wheel-track wear and gutter
+ * grime go blotchy well before the surface goes white. That same block names
+ * the remedy in one line: „a per-fragment snow mix on the ASPHALT material,
+ * capped below the pavement's 0.85 because a carriageway is trodden". This is
+ * that cap; `roadSurface.ts` is the splice that spends it.
+ *
+ * WHY 0.40, AND WHY IT IS A CEILING RATHER THAN A TASTE. Worked in the linear
+ * working space, which is the space `diffuseColor` is in at the splice, off
+ * numbers those files already hold:
+ *   · the snowed road TODAY ≈ ROAD_ALBEDO_TINT 0.72 × SNOW_ROAD_BRIGHTEN 1.8
+ *     × a ~0.28 asphalt texel ≈ 0.363 (presets.ts inferred that texel off the
+ *     w21 frame, which is why it is the one used here);
+ *   · `SNOW_COVER_COLOR` #e8ebef, relative luminance ≈ 0.83;
+ *   · the snowed PAVEMENT ≈ 0.75 (presets.ts, same block);
+ *   · the MARKINGS, #e9e7df ≈ 0.80 — but `markingWear.ts` then multiplies its
+ *     grime octave in at `mix(1 − PAINT_WEAR_STRENGTH, 1, noise)`, so the paint
+ *     runs 0.56 (grimiest patch) … 0.68 (mean) … 0.80 (cleanest).
+ * At the patch weight `roadSurface.ts` applies (mean 0.70 of this cap, peak
+ * 1.00) the carriageway lands at 0.363 + 0.280 × (0.83 − 0.363) ≈ 0.49 mean,
+ * running 0.44 in the trodden bands to 0.55 in the drifts. Three orderings
+ * hold, and each is a rule some file already argued for:
+ *   · BELOW THE PAVEMENT (0.55 peak < 0.75) — a carriageway is trodden and
+ *     ploughed; presets.ts's „capped below the pavement's 0.85" is this.
+ *   · BELOW THE PAINT, AND THIS IS WHAT SETS THE NUMBER. `weather.ts`'s R0
+ *     criterion is „the lane markings must still be the brightest thing in the
+ *     carriageway", and StaticWorld keeps PAINT off the snow term entirely to
+ *     protect it — the rule engine grades lane keeping and stop lines off those
+ *     stripes. The binding case is the brightest DRIFT meeting the grimiest
+ *     paint patch, and it solves to a cover of (0.56 − 0.363) / (0.83 − 0.363)
+ *     = 0.42. So 0.42 is a hard ceiling and 0.40 is it with a margin. The
+ *     margin is thin because the physics is: snow and road paint are within a
+ *     few percent of each other in life, which is exactly why a snowed road is
+ *     hard to read and why this term is capped instead of being 0.85.
+ *   · A DUSTED ROAD, NOT A WHITE SHEET — the round-2 wet retune shipped a white
+ *     sheet and the founder caught it twice; `SNOW_COVER_COLOR`'s own block
+ *     records that as the one failure a unit test cannot catch. At 0.40 the
+ *     asphalt's own value is still 60 % of every fragment.
+ *
+ * THE R0 LOOK IS OWED AND HAS NOT BEEN TAKEN — this lane may not start a
+ * server. The frame that settles it is `sc-ac-snow` `pc-right/03-ready.png`
+ * re-driven at this commit (NOT `01-arrival`: presets.ts measured that capture
+ * landing before `usePbrSet` resolves the ground materials, ~30 % dark
+ * sweep-wide, on dry lessons too — a finding taken there is measuring the
+ * loader). Two criteria: the carriageway must read as snow lying unevenly on
+ * tarmac rather than as a paler grey, and the dashed lane line must still be
+ * plainly the brightest thing in it.
+ */
+export const SNOW_ROAD_COVER_MAX = 0.4;
+
+/**
  * The snow albedo. This is the DAY preset's own `snowWeather.color`
  * (`environment/presets.ts:300`), reused deliberately rather than picked:
  * the haze in the far field, the sky wash and the hemisphere ground bounce are
@@ -206,6 +270,7 @@ export function winterDormantTint(): THREE.Vector3 {
 
 let uniforms: {
   uSnowCover: { value: number };
+  uSnowRoad: { value: number };
   uSnowColor: { value: THREE.Color };
   uSnowFacing: { value: THREE.Vector2 };
   uSnowRoughness: { value: number };
@@ -225,6 +290,7 @@ function getSnowCoverUniforms() {
   if (!uniforms) {
     uniforms = {
       uSnowCover: { value: 0 },
+      uSnowRoad: { value: 0 },
       uSnowColor: { value: new THREE.Color(SNOW_COVER_COLOR) },
       uSnowFacing: { value: new THREE.Vector2(SNOW_COVER_FACING_LO, SNOW_COVER_FACING_HI) },
       uSnowRoughness: { value: SNOW_COVER_ROUGHNESS },
@@ -246,12 +312,45 @@ function getSnowCoverUniforms() {
  */
 export function setSnowCover(snowIntensity01: number): void {
   const s = snowIntensity01 < 0 ? 0 : snowIntensity01 > 1 ? 1 : snowIntensity01;
-  getSnowCoverUniforms().uSnowCover.value = s * SNOW_COVER_MAX;
+  const u = getSnowCoverUniforms();
+  u.uSnowCover.value = s * SNOW_COVER_MAX;
+  // ONE WRITER FOR BOTH CHANNELS, deliberately. The carriageway's cover is the
+  // same weather, taken at a lower cap because a road is trodden — splitting it
+  // into a second per-frame setter would be two channels that must agree with
+  // nothing making them, and the first frame either forgot would show a snowed
+  // pavement beside a bare road, which is the exact picture this closes.
+  u.uSnowRoad.value = s * SNOW_ROAD_COVER_MAX;
 }
 
 /** Current cap-scaled cover, for tests and for the driver's own assertions. */
 export function getSnowCover(): number {
   return getSnowCoverUniforms().uSnowCover.value;
+}
+
+/** Current cap-scaled CARRIAGEWAY cover — same driver, road cap. */
+export function getSnowRoadCover(): number {
+  return getSnowCoverUniforms().uSnowRoad.value;
+}
+
+/**
+ * Bind the carriageway's snow channel onto an asphalt program.
+ *
+ * `roadSurface.ts` calls this from its own `onBeforeCompile` rather than
+ * chaining `snowCoverOnBeforeCompile`: that hook is a NORMAL-FACING mix at the
+ * off-road cap and the road already carries `roadSurfaceToParams`' multiply, so
+ * chaining it would double-apply and paint the carriageway at the pavement's
+ * 0.85 (`StaticWorld`'s GROUND_SNOW block says so in writing, and
+ * `snowCover.test.ts`'s routing guard asserts the asphalt block never takes the
+ * ground spread). What the road needs from this file is the two things this
+ * file owns — the cap-scaled channel and the shared snow albedo — so those are
+ * what travel, by REFERENCE: three hands `onBeforeCompile` the uniform objects,
+ * so `setSnowCover` above reaches every compiled asphalt program without a
+ * second per-frame write.
+ */
+export function bindSnowRoadUniforms(shader: THREE.WebGLProgramParametersWithUniforms): void {
+  const u = getSnowCoverUniforms();
+  shader.uniforms.uSnowRoad = u.uSnowRoad;
+  shader.uniforms.uSnowColor = u.uSnowColor;
 }
 
 /**

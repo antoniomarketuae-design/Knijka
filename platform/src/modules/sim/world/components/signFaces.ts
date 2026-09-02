@@ -65,8 +65,41 @@ const FACE_PX = 512;
  *  (Г2 90°, Г9 135° — the oblique „take it on this side" arrow). It is the
  *  plate the roundabout CENTRAL ISLAND carries facing each entry; before it
  *  the island was a mound of grass with no legal statement on it at all
- *  (sc-rb-ped-exit). */
-export type SignFaceArt = "v26" | "v33" | "d4" | "g2" | "g3" | "a19" | "v28" | "g9";
+ *  (sc-rb-ped-exit).
+ *
+ *  `d15` / `d16` (Д15 „Начало на жилищна зона" / Д16 „Край на жилищната зона")
+ *  are the fourth and fifth riders on the Д4 square blue plate, and here the
+ *  plate is a byte match too: all three source SVGs open with
+ *  `<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8"
+ *  data-plate="true"/>` and differ only in the pictogram (Д4 an arrow, Д15 the
+ *  house/pedestrian/car group, Д16 the same group struck through). ЗДвП чл. 61
+ *  makes this plate constitutive rather than decorative — a жилищна зона IS
+ *  „обозначена като такава на входовете и изходите й с пътни знаци" — so the
+ *  living-zone street in the corpus was changing the student's duties with
+ *  nothing in his windscreen to announce it. Neither art carries a `<text>`
+ *  node, so `withNumeral` refuses them, which is correct: they state no
+ *  number. */
+/*  `d5` (Д5 „Автомагистрала") is the sixth rider on that same Д4 square plate,
+ *  and the rect is a byte match again — `<rect x="8" y="8" width="184"
+ *  height="184" rx="18" data-plate="true"/>` — differing only in `fill`
+ *  (#00703c motorway green vs #0057a8 info blue), which travels inside the
+ *  rasterised face and so needs no second GLB. ЗДвП чл. 55, ал. 1 makes this
+ *  plate constitutive rather than decorative in exactly the way чл. 61 does for
+ *  Д15: the motorway rules apply on a road „обозначен като автомагистрала …
+ *  СЪС СЪОТВЕТНИЯ ПЪТЕН ЗНАК". It carries no `<text>` node, so `withNumeral`
+ *  refuses it — correct, it states no number. */
+export type SignFaceArt =
+  | "v26"
+  | "v33"
+  | "d4"
+  | "g2"
+  | "g3"
+  | "a19"
+  | "v28"
+  | "g9"
+  | "d15"
+  | "d16"
+  | "d5";
 
 const svgSource = new Map<SignFaceArt, Promise<string | null>>();
 

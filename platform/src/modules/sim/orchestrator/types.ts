@@ -128,7 +128,7 @@ export interface ScenarioDirector {
   /** True while the lesson's HazardStimulusSpec visual should animate (L5). */
   readonly hazardActive: boolean;
   /**
-   * N11 cockpit-lamp channel (telltaleStimulus): true while a staged
+   * N11 cockpit-lamp channel (telltaleStimulus): true while a staged RED
    * dashboard warning telltale is lit — the hazardActive twin for the
    * COCKPIT: LessonScene copies it into a render-free ref each frame; the
    * Виток cluster lights its red temperature lamp and the L1/L2 HUD shows
@@ -136,6 +136,13 @@ export interface ScenarioDirector {
    * does not clear because you stopped); reset() re-arms it dark.
    */
   readonly telltaleLit: boolean;
+  /**
+   * The AMBER twin of `telltaleLit` (lamp "checkEngine"): «внимателно — до
+   * сервиз, без аварийно спиране». Its own channel because the two colours
+   * mean OPPOSITE things and a lesson may stage both on one route — one
+   * boolean could only ever show a student one of them.
+   */
+  readonly telltaleCautionLit: boolean;
   /** 0-based attempt counter (increments on reset()). */
   readonly attempt: number;
   /** All outcomes resolved so far this attempt, in order. */

@@ -783,22 +783,52 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
     },
     {
       id: "sc-ltap-turn",
-      titleBg: "Завърши левия завой и излез от кръстовището на юг",
-      // TITLE-TRUTH WAVE (see sc-jrhr-cross for the full argument). It read
-      // «Завърши левия завой на юг, ПРОПУСНАЛ НАСРЕЩНИТЕ» — a yield the tick
-      // cannot see: SimTick carries no oncoming actor's priority and no
-      // gap-judgment outcome, so the disc credited the 1.5-second cut and the
-      // 4-second wait identically. The cut is graded where it is actually
-      // measured: the runtime's left-turn tracker fires FAILED_TO_YIELD (the
-      // mistake-cut-gap demo below), and steps 3–5 + `teach.examinerBg` teach
-      // the interval in words.
+      // THE SKILL THE BRIEFING NAMES, NOW ACTUALLY EXERCISED —
+      // `sc-turn-left-oncoming:7974670c` (critical), frame `.audit-frames/
+      // sweep161/sc-turn-left-oncoming/pc-right/04-t043s.png`.
       //
+      // The title-truth wave stripped «ПРОПУСНАЛ НАСРЕЩНИТЕ» from this chip in
+      // 2026-08 on a reason it stated plainly: a reachZone tick could witness
+      // NOTHING about another road user, so the disc credited the 1.5-second
+      // cut and the four-second wait identically. That left the drill's two
+      // gates measuring a place and a compass arm — arrive slowly, then be
+      // 50 m south — while the interval the whole lesson is about decided
+      // nothing. `requireYieldClean` landed 2026-08-27 and that reason has
+      // expired, exactly as it expired for `sc-jscan-exit`: the sentence arms
+      // the demand through `deriveYieldDemand`, and `stepReachZone` reads the
+      // run's billed FAILED_TO_YIELD ledger from the moment this objective went
+      // active — i.e. from the approach gate, so only the cut at THIS junction
+      // can refuse it. The claim is redeemable on the two conditions
+      // `junctions-title-truth.test.ts` checks: the drill stages the conflict
+      // it names (SC_LTAP_TIGHT_EVENT at 1.4 s), and its own cut-gap demo cites
+      // FAILED_TO_YIELD by name, so the refusal is reachable rather than a
+      // predicate no drive can trip.
+      //
+      // NOT A TRAP, and it needed checking because this gate is 2 of 2:
+      // `engine.ts` folds `yieldFailedVoidsObjective` into `terminalUnearnable`
+      // BY PARAMS, so the finish gate still arms — the objective keeps its
+      // honest `active` status and the student reaches the −10 «Непропускане на
+      // пътно превозно средство с предимство» card instead of having to quit.
+      //
+      // …AND THE SECONDS ARE FINALLY SPOKEN (`reportOncomingGapSec`). The
+      // runtime convicts only the ≤ 2 s cut (LEFT_TURN_CONVICT_GAP_SEC), so the
+      // 2–4 s turn — legal, under the norm every surface of this drill teaches,
+      // and the exact band the lesson exists to move — was graded nowhere and
+      // said nowhere. 4 is this template's own published figure (instruction 5,
+      // `objectiveBg`, `teach.whyBg`), not a recalled constant.
+      titleBg: "Завърши левия завой на юг, след като пропуснеш насрещните",
       // South-arm southbound lane center, 50 m down sx-v1's 120 m south arm,
       // past the junction area. From the east spawn (105, 4.06) heading west,
       // only the completed left turn reaches it — «левия завой» and «на юг»
-      // are both measured. Params untouched, `done` bit-identical, no THEO-4
-      // card owed.
-      params: { kind: "reachZone", x: -4.06, y: -50, radiusM: 9 },
+      // are both measured. The disc itself is untouched: a drive that gives way
+      // has a bit-identical `done` and no committed trace moves.
+      params: {
+        kind: "reachZone",
+        x: -4.06,
+        y: -50,
+        radiusM: 9,
+        reportOncomingGapSec: 4,
+      },
     },
   ],
   rubric: { parTimeSec: 60 },

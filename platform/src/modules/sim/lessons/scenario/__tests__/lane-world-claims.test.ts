@@ -38,15 +38,17 @@
  *     eight speed-limit posts. Narrowed to the true and sharper claim: no
  *     PRIORITY sign, no signal.
  *
- *   mw-exit-v1    { limit140: 3, noEntry: 3, curve: 1 }
+ *   mw-exit-v1    { limit140: 3, noEntry: 3, curve: 1, motorwayStart: 2 }
  *     sc-merge-motorway-exit promised „500 – 300 – 100 м" boards (no distance
  *     SignKind exists at all) and „знакът А1 с табела „60"" (the А1 is posted;
  *     its В26 plate is withheld — this ramp is one of the three curves
  *     zoneSigns.ts leaves А1-only for want of `CURVE_PLATE_MIN_ROOM_M`).
+ *     `motorwayStart` joined in repair wave 20 — see §0.
  *
- *   mw-v1         { limit140: 2, noEntry: 2 }
+ *   mw-v1         { limit140: 2, noEntry: 2, motorwayStart: 2 }
  *     sc-ac-wind-truck-pass threw the car „към мантинелата" four times on the
  *     map whose мантинела was already struck out of sc-mw-discipline.
+ *     `motorwayStart` joined in repair wave 20 — see §0.
  *
  *   ov-oncoming-v1 { limit90: 2 }, edge class `tertiary`
  *     sc-ac-night-overdrive opened „по този път няма нито една лампа" on the
@@ -307,8 +309,26 @@ describe("§0 the sign census the fixes were measured against", () => {
     "ac-bridge-v1": { limit50: 2, slippery: 1 },
     "mv-uturn-v1": { stop: 1, priorityRoad: 2, limit50: 5, limit30: 2 },
     "jx-equal-v1": { limit40: 8 },
-    "mw-exit-v1": { limit140: 3, noEntry: 3, curve: 1 },
-    "mw-v1": { limit140: 2, noEntry: 2 },
+    // motorwayStart (Д5) joined the census in repair wave 20, and it is a
+    // REPAIR, not drift. Finding sc-ac-truck-spray:c042440d — „no motorway
+    // signage anywhere on the route the briefing calls a motorway". MEASURED on
+    // the built world before the fix: mw-v1 produced FOUR signs — two В26 «140»
+    // and two В1 — and said „магистрала" nowhere, while its own instruction 2
+    // reads «магистралата е с ограничение 140». The plate is CONSTITUTIVE, not
+    // decoration: ЗДвП чл. 55, ал. 1 grants the motorway regime „на път,
+    // обозначен като автомагистрала или скоростен път СЪС СЪОТВЕТНИЯ ПЪТЕН
+    // ЗНАК" — retrieved from content/law/acts/zdvp.json, and the plate itself
+    // from content/signs/signs.json `sign-d5` (Наредба № РД-02-21-1/23.11.2023,
+    // прил. № 5, знак Д5), never recalled — ADR-002.
+    // WHERE: one plate per CARRIAGEWAY, at the boundary dead-end a driver
+    // enters through. Re-measured over all 105 district files 2026-09-02, and
+    // exactly three carry any: mw-v1 2 (mw-e-nb, mw-e-sb), mw-exit-v1 2
+    // (mwx-e-nb-*, mwx-e-sb) and mw-entry-v1 2 — no other district moved by one
+    // sign. mw-exit-v1's ramp `mwx-e-ramp` is a `secondary_link` and gets
+    // NOTHING: a link is signed Д6/Д7 at its end, not Д5. The builder pass and
+    // its own gates are world/builders/props.ts + world/__tests__/mw-district.test.ts.
+    "mw-exit-v1": { limit140: 3, noEntry: 3, curve: 1, motorwayStart: 2 },
+    "mw-v1": { limit140: 2, noEntry: 2, motorwayStart: 2 },
     "ov-oncoming-v1": { limit90: 2 },
     // passRight (Г9) joined the census in repair wave 17, and it is a REPAIR,
     // not drift. The central island carried nothing a driver may read: Б1 and

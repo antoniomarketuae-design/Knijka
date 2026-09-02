@@ -72,10 +72,13 @@ import {
   COCKPIT_FOV_MAX,
   COCKPIT_HFOV_RAD,
 } from "@/modules/sim/vehicle/tuning";
+import { SHOULDER_GLANCE_ORBIT_RAD } from "@/modules/sim/engine";
+import { CABIN_LOOK_POSES } from "@/modules/sim/scene/vitok/cabinLook";
 import type { CutInLeadCarSpec } from "../../contracts";
 import { CutInLeadCarRunner, PedestrianDartOutRunner } from "../../orchestrator/runners";
 import type { DirectorInput } from "../../orchestrator/types";
 import {
+  SC_HZ_BRAKE_DONT_SWERVE,
   SC_HZ_BRAKE_DONT_SWERVE_ESCORT,
   SC_HZ_EMERGENCY_STOP_DART,
 } from "../../lessons/scenario/templates-hazards2";
@@ -132,16 +135,39 @@ const EYE_LATERAL_M = COCKPIT_DEP.x - COCKPIT_CAM_OFFSET.inboard;
 const A_PILLAR_HALF_DEG = 24.3;
 
 /**
+ * THE HEAD THE STUDENT CAN TURN, in the same degrees-off-the-nose frame as
+ * every other angle here. `SHOULDER_GLANCE_ORBIT_RAD` (engine/glanceView) is
+ * what `CameraRig.GLANCE_OFFSETS.shoulder` yaws the cockpit by for the graded
+ * over-the-LEFT-shoulder check — the neck's real limit, ≈ 106° — so the glass
+ * that pose commands runs `SHOULDER_GLANCE_DEG ± HALF_GLASS_DEG`. Derived from
+ * the shipped constant, never typed in, for the same reason HALF_GLASS_DEG is.
+ */
+const SHOULDER_GLANCE_DEG = Math.abs((SHOULDER_GLANCE_ORBIT_RAD * 180) / Math.PI);
+
+/** …and the LEFT DOOR MIRROR's head turn, `CABIN_LOOK_POSES.mirrorLeft.yaw`,
+ *  which that table's own header pins as `GLANCE_OFFSETS.left` verbatim. */
+const MIRROR_LEFT_GLANCE_DEG = Math.abs((CABIN_LOOK_POSES.mirrorLeft.yaw * 180) / Math.PI);
+
+/**
  * THE LEDGER. Staged actors a lesson's own instructions tell the student to
  * LOOK AT, which are outside the windscreen for the whole window that
  * instruction covers. The value is the EXCESS in degrees: how far beyond the
  * edge of the glass the actor sits at its most favourable moment.
  *
  * `sc-hzbds-escort` — `templates-hazards2.SC_HZ_BRAKE_DONT_SWERVE_ESCORT`.
- * Instruction 2 of the drill: «Погледни вляво: в съседната лента, почти наравно
- * с вратата ти, се движи кола. Запомни я — тя е причината днешният урок да не е
- * „завърти волана“.» The car is authored at `paceAheadM: 1` in a lane
- * `extraRightOffsetM: −8.125` over, which is 66.1° off the driver's axis.
+ * The car is authored at `paceAheadM: 1` in a lane `extraRightOffsetM: −8.125`
+ * over, which is 66.1° off the driver's axis.
+ *
+ * THE ROW SURVIVES ITS OWN REPAIR, and the distinction is the whole reason it
+ * is not deleted (2026-09-02). The excess is a claim about the WINDSCREEN and
+ * the windscreen has not moved: the escort is still 28.4° outside it for every
+ * frame of the approach, at every pace. What changed is that instruction 2 no
+ * longer asks for a look through it. It read «Погледни вляво … Запомни я» — an
+ * order whose only honest answer on this screen was „you cannot" — and now
+ * routes the student to the graded over-the-shoulder check («Рамо»), which the
+ * block below this file's escort tests measures at > 90 % of the approach.
+ * So the geometry is admitted debt and the INSTRUCTION is no longer part of it;
+ * delete the row when the car reaches the glass, not when the copy is mended.
  *
  * TO CLOSE THE ROW (all of these are outside this lane's file ownership and are
  * named in the agent report): give the escort a `paceAheadM` that puts it in
@@ -151,9 +177,17 @@ const A_PILLAR_HALF_DEG = 24.3;
  * for a car level with his door. Widening the lens is NOT one of the options —
  * the third test below measures why.
  *
- * 2026-09-01 — TWO OF THOSE THREE ARE NOW CLOSED, and closed as WRONG rather
- * than as done. Recorded here because the next lane will otherwise re-derive
- * them, and one of them would take the лекция with it:
+ * 2026-09-02 — THE THIRD ONE IS THE ONE THAT LANDED. It cost no geometry: the
+ * product already ships the look a real driver uses for a car level with his
+ * door (`MirrorGlanceKind` „shoulder", graded by MOVE_OFF_WITHOUT_OBSERVATION,
+ * painted «Рамо» on the desktop cluster and the touch rail alike), and nothing
+ * had ever pointed instruction 2 at it. Measured, not assumed — the escort sits
+ * inside that pose's glass for > 90 % of the approach and inside the left DOOR
+ * MIRROR's for under 20 %, which is why the copy names the shoulder and not «Л».
+ *
+ * 2026-09-01 — THE OTHER TWO ARE CLOSED AS WRONG rather than as done. Recorded
+ * here because the next lane will otherwise re-derive them, and one of them
+ * would take the лекция with it:
  *
  *  · `paceAheadM`. To reach the 20° visible cone the escort would have to ride
  *    ~22.3 m ahead. That is not «почти наравно с вратата ти», and it is not the
@@ -262,6 +296,17 @@ interface Approach {
   approachFrames: number;
   approachOnGlassFrames: number;
   approachMinOffAxisDeg: number;
+  /**
+   * …and the same approach counted against the head the student can actually
+   * TURN — the shipped over-the-left-shoulder glance, `SHOULDER_GLANCE_ORBIT_RAD`.
+   * The forward counter above answers „is it on the windscreen"; this one
+   * answers „is it anywhere the product lets him look", which is the question
+   * the ledger's third closing option asks and which nothing measured until now.
+   */
+  approachShoulderFrames: number;
+  /** The same, for the LEFT DOOR MIRROR glance — the control the copy did NOT
+   *  name, kept so that choosing «Рамо» is a measurement and not a preference. */
+  approachMirrorLeftFrames: number;
 }
 
 /**
@@ -294,6 +339,8 @@ function driveEscort(
     approachFrames: 0,
     approachOnGlassFrames: 0,
     approachMinOffAxisDeg: Infinity,
+    approachShoulderFrames: 0,
+    approachMirrorLeftFrames: 0,
   };
   let py = SPAWN_Y;
   let mps = 0;
@@ -338,6 +385,8 @@ function driveEscort(
       r.approachFrames++;
       if (ang < r.approachMinOffAxisDeg) r.approachMinOffAxisDeg = ang;
       if (ang <= HALF_GLASS_DEG) r.approachOnGlassFrames++;
+      if (Math.abs(ang - SHOULDER_GLANCE_DEG) <= HALF_GLASS_DEG) r.approachShoulderFrames++;
+      if (Math.abs(ang - MIRROR_LEFT_GLANCE_DEG) <= HALF_GLASS_DEG) r.approachMirrorLeftFrames++;
     }
   }
   return r;
@@ -352,7 +401,11 @@ function driveEscort(
  */
 type ChildApproach = Omit<
   Approach,
-  "approachFrames" | "approachOnGlassFrames" | "approachMinOffAxisDeg"
+  | "approachFrames"
+  | "approachOnGlassFrames"
+  | "approachMinOffAxisDeg"
+  | "approachShoulderFrames"
+  | "approachMirrorLeftFrames"
 > & { onGlassSec: number };
 
 /** The sibling drill's child, driven the same way — the other direction. */
@@ -573,6 +626,99 @@ describe("sc-hz-brake-dont-swerve — «Погледни вляво … се д�
     expect(widestHalfDeg).toBeGreaterThan(HALF_GLASS_DEG); // the widen is real
     const r = driveEscort(13.89, 0.5, null);
     expect(r.minOffAxisDeg).toBeGreaterThan(widestHalfDeg);
+  });
+});
+
+/**
+ * THE LEDGER'S THIRD OPTION, TAKEN — „or surface it through the mirror/blind-spot
+ * channel a real driver uses for a car level with his door".
+ *
+ * The other two were closed as WRONG above: `paceAheadM` would have to ride the
+ * escort ~22 m ahead, which is not «почти наравно с вратата ти» and would teach
+ * the opposite of `teach.whyBg`; `actorLabels` is skipped for a moving actor and
+ * would be a dead predicate. This one costs no geometry at all, because the
+ * product already ships the look: `MirrorGlanceKind` „shoulder", the graded
+ * over-the-left-shoulder check, on the glass as «Рамо» on BOTH surfaces.
+ *
+ * So instruction 2 stopped saying «Погледни вляво» — an instruction whose only
+ * honest answer on this screen was „you cannot" — and now names that control.
+ * These four arms are what stop that sentence from being a promise nobody
+ * measured: the channel it names must be the one that works, the two it does
+ * not name must be the ones that do not, and the face must exist.
+ */
+describe("sc-hz-brake-dont-swerve — the look instruction 2 now asks for is a look the product has", () => {
+  const APPROACH_PACES = [13.89, 6.1, 3.9]; // the authored 50, and the crawls the sweep drove
+
+  it("the over-the-shoulder glance holds the escort for essentially the whole approach", () => {
+    for (const mps of APPROACH_PACES) {
+      const r = driveEscort(mps, 0.5, null);
+      // A real window, not two frames: the shortest of the three legs is the
+      // 50 km/h one at 277 frames of DT = 1/30 s, i.e. > 9 s of approach.
+      expect(r.approachFrames, `pace ${mps}`).toBeGreaterThan(200);
+      // Not „it appears once": the blind-spot pose commands the escort for the
+      // overwhelming majority of the window instruction 2 covers, so a student
+      // who looks at any point during the approach finds it there.
+      expect(r.approachShoulderFrames / r.approachFrames, `pace ${mps}`).toBeGreaterThan(0.9);
+    }
+  });
+
+  it("…while the windscreen holds it for NONE of it — which is why the copy had to change", () => {
+    for (const mps of APPROACH_PACES) {
+      const r = driveEscort(mps, 0.5, null);
+      expect(r.approachOnGlassFrames, `pace ${mps}`).toBe(0);
+    }
+  });
+
+  it("…and the LEFT DOOR MIRROR would not have done — «Рамо» is measured, not chosen", () => {
+    // The refutation arm. Naming «Л» instead would have been a plausible repair
+    // and a wrong one: the mirror's head turn (≈ 38°) reaches the escort only in
+    // the first instants, before `matchPlayer` pins it abreast, and then loses
+    // it. A car level with the door is past the door mirror's quarter — which is
+    // the definition of the blind spot the лекция is about.
+    for (const mps of APPROACH_PACES) {
+      const r = driveEscort(mps, 0.5, null);
+      const mirror = r.approachMirrorLeftFrames / r.approachFrames;
+      const shoulder = r.approachShoulderFrames / r.approachFrames;
+      expect(mirror, `pace ${mps}`).toBeLessThan(0.2);
+      expect(shoulder, `pace ${mps}`).toBeGreaterThan(mirror * 4);
+    }
+  });
+
+  it("instruction 2 names that control, and no longer commands a look through the glass", () => {
+    const step2 = SC_HZ_BRAKE_DONT_SWERVE.instructionsBg.find((s) => s.n === 2);
+    expect(step2, "instruction 2 is gone").toBeDefined();
+    expect(step2!.textBg).toContain("Рамо");
+    expect(step2!.textBg).toContain("рамо");
+    // The bare imperative the ledger row was filed against. It asked for a look
+    // the forward view cannot deliver and named nothing the student could press.
+    expect(step2!.textBg).not.toContain("Погледни вляво");
+    // THEO-4: the sentence says WHY the windscreen is empty there, so the look
+    // is taught rather than merely ordered.
+    expect(step2!.textBg).toContain("мъртвата ти зона");
+    // And it stays device-neutral — `controlPhrases.test.ts`'s rule, applied to
+    // a string that is shown to a phone and a PC alike.
+    for (const token of ["клавиш", "мишк", "щракн"]) {
+      expect(step2!.textBg).not.toContain(token);
+    }
+  });
+
+  it("…and «Рамо» is a face that is really on the glass, on both surfaces", () => {
+    // The `controlPhrases.test.ts` discipline: copy may only name a control the
+    // shipped layer actually paints, so a rename fails here and not on a
+    // student's screen. Desktop = the GlanceEdgePings hold-cluster; touch = the
+    // TouchControls top rail.
+    const desktop = fs.readFileSync(
+      path.join(process.cwd(), "src/components/sim/lesson-ui/GlanceEdgePings.tsx"),
+      "utf8",
+    );
+    const touch = fs.readFileSync(
+      path.join(process.cwd(), "src/components/sim/TouchControls.tsx"),
+      "utf8",
+    );
+    expect(desktop).toContain('sideBg="Рамо"');
+    expect(desktop).toContain('mirror="shoulder"');
+    expect(touch).toContain('wordBg="Рамо"');
+    expect(touch).toContain('glance("shoulder")');
   });
 });
 

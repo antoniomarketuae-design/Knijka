@@ -33,7 +33,7 @@ import {
 import { SimHaptics, type SimInput } from "@/modules/sim/engine";
 import type { VehicleSample } from "@/modules/sim/contracts";
 import { surfacePatchGripAt, type SurfaceGripPatch } from "@/modules/sim/runtime";
-import { setWindSway } from "@/modules/sim/world";
+import { isDistrictSurfaceUserData, setWindSway } from "@/modules/sim/world";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
 import type { SimAudio } from "@/modules/sim/scene/simAudio";
 import { updateVehicleSample } from "@/modules/sim/scene/vehicleSample";
@@ -79,6 +79,38 @@ export interface VehicleSpawn {
  *  parked car or cone IS the graded mistake in a parking task, while the
  *  street nudge-tolerance stays 10 everywhere else. */
 export const COLLISION_MIN_KMH = 10;
+
+/**
+ * WHICH THRESHOLD A CONTACT IS JUDGED AT, given the body rapier struck and the
+ * lesson's own `collisionMinKmh` — sc-merge-from-property:ab353b86, 2026-09-02.
+ *
+ * `compileScenario` writes 0 for all 150 scenario templates, so before this the
+ * gate was `impactKmh >= 0` — ALWAYS true — and a 3 km/h kerb mount on the way
+ * out of a property was billed as a ПТП: 10 наказателни точки, опасна грешка,
+ * НЕИЗДЪРЖАН, exam terminated (Наредба № 38, чл. 48, ал. 3). The `else` branch
+ * VehicleRig has always carried for „a kerb scuff or a bumper nudge" was
+ * unreachable for the entire catalogue.
+ *
+ * The acceptance test is „a 2 km/h bay touch must still convict, a kerb mount
+ * must not", which is a distinction between BODIES and not between speeds — so
+ * it is decided here, off the body, and not by moving one scalar per lesson.
+ * The district's DRIVE-OVER surface (ground plane + kerb/pavement trimesh,
+ * tagged by `world/components/WorldColliders`) is the one class a car reaches
+ * by leaving the carriageway rather than by hitting something, and leaving the
+ * carriageway already has its own graded code (`OFF_CARRIAGEWAY`, основна, 3 т.
+ * — ЗДвП чл. 15, ал. 1). Everything else keeps the lesson's number: NPC shells,
+ * parked cars, cones, poles, walls, forecourt columns and pumps, and the
+ * district's BUILDING trimesh, which stays a separate untagged body precisely
+ * so a facade is never let off.
+ *
+ * `max` and not a swap: a lesson that ever passes a threshold ABOVE the street
+ * default keeps it, and a street lesson that omits the prop is unchanged.
+ */
+export function gradedContactMinKmh(otherUserData: unknown, collisionMinKmh: number): number {
+  return isDistrictSurfaceUserData(otherUserData)
+    ? Math.max(collisionMinKmh, COLLISION_MIN_KMH)
+    : collisionMinKmh;
+}
 
 /** Stable empty default for gripPatches — a shared frozen constant so the
  *  prop is value-stable across renders and the patch branch below never runs
@@ -292,6 +324,7 @@ export function VehicleRig({
   engineBraking = false,
   roadRoughness = 0,
   telltaleLitRef,
+  telltaleCautionLitRef,
 }: {
   simRef: RefObject<VehicleSim | null>;
   chassisGroupRef: RefObject<Group | null>;
@@ -396,6 +429,8 @@ export function VehicleRig({
    *  VitokCockpit (the hazardActiveRef pattern — render-free ref, read per
    *  frame). Absent = the temperature telltale never lights. */
   telltaleLitRef?: RefObject<boolean>;
+  /** The AMBER twin — lights the check-engine lamp instead (same pattern). */
+  telltaleCautionLitRef?: RefObject<boolean>;
 }) {
   const { world } = useRapier();
   const bodyRef = useRef<RapierRigidBody>(null);
@@ -680,7 +715,9 @@ export function VehicleRig({
             ? Math.hypot(pv.x - ov.x, pv.y - ov.y, pv.z - ov.z) * 3.6
             : Math.abs(simRef.current?.speedKmh ?? 0);
         audioRef.current?.thump(Math.min(1, impactKmh / 50 + 0.15));
-        if (impactKmh >= collisionMinKmh) {
+        // The body decides the threshold, not the lesson alone — see
+        // `gradedContactMinKmh`.
+        if (impactKmh >= gradedContactMinKmh(payload.other.rigidBody?.userData, collisionMinKmh)) {
           onCollision?.(impactKmh, tag?.kind ?? "staticObject");
           // F5: the graded-collision pattern, redundant with the thump above
           // and with the terminating „опасна" verdict on screen.
@@ -709,6 +746,7 @@ export function VehicleRig({
           inputRef={inputRef}
           cabinRef={cabinRef}
           telltaleLitRef={telltaleLitRef}
+          telltaleCautionLitRef={telltaleCautionLitRef}
         />
 
         {/* NIGHT/RAIN headlight throw — real SpotLight pools on the road,

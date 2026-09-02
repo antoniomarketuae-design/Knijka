@@ -5538,11 +5538,16 @@ function handleTickEvent(
       // Five riders are five acts however close together they are riding, and
       // `prioritySituation` carries no body id for the reducer to key on — so
       // it does not pretend to have one.
+      // …and "warning-lamp" (N11/VP-06) joins them for a third reason of the
+      // same shape: it is not adjudicated against a place OR a body but against
+      // the CAR ITSELF, and its runner resolves exactly once per drive, so a
+      // place-latch could only ever suppress a bill that cannot repeat.
       const MANOEUVRE_SITUATIONS = new Set([
         "emergency",
         "overtake-oncoming",
         "overtake-return",
         "vulnerable-pass",
+        "warning-lamp",
       ]);
       const placeAct = MANOEUVRE_SITUATIONS.has(e.situation)
         ? null
@@ -5557,7 +5562,12 @@ function handleTickEvent(
                 ? "OVERTAKE_RETURN_TOO_EARLY"
                 : e.situation === "vulnerable-pass"
                   ? "VULNERABLE_PASS_TOO_CLOSE"
-                  : "FAILED_TO_YIELD",
+                  : // N11 (VP-06): the telltale runner's own duty — ЗДвП чл.
+                    // 101, ал. 1 („длъжен е да спре"), which is neither a
+                    // junction priority nor a manoeuvre.
+                    e.situation === "warning-lamp"
+                    ? "WARNING_LAMP_IGNORED"
+                    : "FAILED_TO_YIELD",
           t,
           { detail: e.situation },
         );

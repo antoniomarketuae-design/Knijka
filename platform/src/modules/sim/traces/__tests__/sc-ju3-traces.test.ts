@@ -45,6 +45,10 @@ const drives = new Map<ScJunctionLeftTraceName, RecordedDrive>(
 describe("sc-junction-left — the shadow gate (doc 76 §5)", () => {
   const shadow = drives.get("shadow-correct")!;
 
+  // ALSO THE PIN for the give-way praise's wait clock (runners.ts
+  // YIELD_PRAISE_WAIT_SEC) — the sc-ju2 note applies verbatim, same map, same
+  // timing: 0.33 s of this drive's wait is spent with the priority car still
+  // short of the node, 4.70 s with it between the node and clear.
   it("replays with ZERO violations and earns the yield commendations", () => {
     expect(violationCodes(shadow)).toEqual([]);
     const cs = commendationCodes(shadow);

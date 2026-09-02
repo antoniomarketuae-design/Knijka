@@ -773,6 +773,12 @@ export interface TrafficSystem {
    * True when a moving vehicle near the junction (jx,jy) is on the player's
    * RIGHT and not travelling the player's own direction — used to grade the
    * give-way-to-the-right rule at uncontrolled junctions. District space.
+   *
+   * `playerSpeedKmh` (optional) turns presence into ARRIVAL: with it the
+   * predicate compares the two arrivals at the node and drops a vehicle that
+   * clears before the student gets there or arrives long after he is through.
+   * Omit it and the answer is the legacy presence-only one, unchanged — see
+   * `conflictFromRightFor` for the measurement that added the clause.
    */
   conflictFromRight(
     jx: number,
@@ -781,6 +787,7 @@ export interface TrafficSystem {
     py: number,
     headingDeg: number,
     radiusM: number,
+    playerSpeedKmh?: number,
   ): boolean;
   /**
    * True when a moving vehicle already circulating a roundabout (centre cx,cy,
