@@ -261,6 +261,27 @@ import { captureFrame, createFrameLedger } from "./lib/frames.mjs";
 // side of it lives in `guideTick` below.
 import { decodePng } from "./lib/png.mjs";
 import { aimFrom, degPerPxAtCentre, scanBand, steerCommand, summariseTracking, TUNE } from "./lib/guidance.mjs";
+// THE BRAKE THAT HAS A REASON — same contract as guidance.mjs above: the
+// control law is pure and lives in the lib, the page side (`hazardRead`, and
+// the fold in the roll phase) lives here. `hazard.mjs`'s header carries the
+// proof obligation for why an instrument that makes the harness drive better
+// cannot make a broken product pass; the short version is that its neutral
+// command is the identity on both fold points, so a build that publishes
+// nothing gets the pre-change metronome tick for tick.
+import {
+  countHazardEpisode,
+  createHazardBooks,
+  finishHazardBooks,
+  GLANCE_NO_LABEL,
+  hazardCommand,
+  hazardLine,
+  hazardPaceProvenance,
+  hazardPaceRow,
+  HAZARD_COOLDOWN_MS,
+  NEUTRAL as HAZARD_NEUTRAL,
+  observeHazardTick,
+  parseHazard,
+} from "./lib/hazard.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -4694,6 +4715,16 @@ const FLAT_REST_GIVEUP_MS = 15_000;
  * guarantee, and a «Непропускане на пешеходец» on a pace drive has to be read
  * against `pace.targets` before it is filed against the product.
  *
+ * AND THAT ARRAY HAS TWO AUTHORS, WHICH IT NOW ADMITS. The hazard loop's
+ * approach cap folds into the same target this stage computes, so a 6 км/ч row
+ * could be the tape's or the harness's and the field name said „authored"
+ * either way — on the one surface a verifier is told to consult before filing a
+ * pedestrian fault. Every row therefore carries `pacedKmh` (what THIS stage
+ * asked for), `kmh` (what the car was actually asked for) and `hazardCapKmh`
+ * (non-null ⇒ `src:"hazard-cap"`, the hazard loop lowered it). A verifier sent
+ * here by the sentence above reads `pacedKmh`; see `hazardPaceRow` in
+ * `lib/hazard.mjs`, and the PACE PROVENANCE line in the report.
+ *
  * ── THE INDEX IS AN ODOMETER, AND IT IS APPROXIMATE ────────────────────────
  *
  * The tape is indexed in metres and the metres come from integrating the
@@ -4750,7 +4781,20 @@ const pace = {
   odoM: 0,
   rolls: 0,
   capHits: 0,
-  /** every CHANGE of target, with the metre it happened at */
+  /** …of which this many ran their clock cap WITH A HAZARD CAP IN FORCE for
+   *  part of the roll. Split out because `capHits`'s own diagnostic claims the
+   *  roll's length is „this box's and not this road's", and on these rolls that
+   *  sentence is FALSE: the length is the HARNESS's caution at a scan chip.
+   *  Conflating the two would file a box-speed finding against a hazard cap. */
+  capHitsHazard: 0,
+  /** every CHANGE of target OR OF ITS PROVENANCE, with the metre it happened
+   *  at. Each row is `{tSec, odoM, kmh, pacedKmh, hazardCapKmh, src}`:
+   *  `kmh` is what the car was asked for, `pacedKmh` what the PACE LAW alone
+   *  asked for, and a non-null `hazardCapKmh` (src:"hazard-cap") means THIS
+   *  HARNESS lowered the row, not the authored tape. See `hazardPaceRow` — the
+   *  three-field shape exists because this array is what a verifier is told to
+   *  read before filing a pedestrian fault, and it used to have two authors
+   *  and one name. */
   targets: [],
   alignment: null,
 };
@@ -4902,6 +4946,27 @@ const paceRollCapMs = (target) =>
 const LAWFUL_WAIT_RE =
   /Чакаш правилно|пълното спиране е задължително|Защо чакаш|Чакането Е маневрата/;
 
+/* ── THE TWO FORWARD HAZARD CHIPS ──────────────────────────────────────────
+ *
+ * A census of every `data-hud` value in `platform/src` returns 44 names. These
+ * are the only two that are FORWARD, LIVE WHILE MOVING and IN THE DOM.
+ *
+ * `glance-ping` — `GlanceEdgePings.tsx:253`, `role="status"`, armed
+ * `GLANCE_PING_APPROACH_M`=45 m before a stop line whose control is
+ * `stopSign || giveWay` at `speedKmh >= 3`. TRAFFIC LIGHTS NEVER ARM IT; the
+ * product's own doc comment (`advisor.ts:1660`) says so.
+ *
+ * `follow-gap` — `FollowGapCue.tsx:142`, the live gap to a LEAD VEHICLE
+ * measured against the grader's own `safeGapM`. `leadGapMeters` reads
+ * `traffic.vehicles` only, so a pedestrian is not in it.
+ *
+ * NEITHER COVERS SIGNALS OR PEDESTRIANS, and the product publishes no third
+ * chip that does — see `HAZARD_NOTE` in lib/hazard.mjs, which every lane
+ * prints for exactly this reason.
+ */
+const HAZARD_GLANCE_SEL = '[data-hud="glance-ping"]';
+const HAZARD_FOLLOW_SEL = '[data-hud="follow-gap"]';
+
 // EVERY SURFACE THAT FREEZES THE WORLD, ON BOTH DEVICE CLASSES.
 //
 // THE DEFECT THIS SELECTOR EXISTS FOR, caught by this harness's own loud line
@@ -4949,7 +5014,16 @@ const PAUSE_VISIBLE =
 const probe = () =>
   page
     .evaluate(
-      ({ waitSrc, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, gearSel }) => {
+      // EVERY KEY OF THE ARGUMENT OBJECT BELOW MUST APPEAR HERE, and
+      // `__tests__/hazard.test.mjs` pins that as a set equality. The first cut
+      // of the hazard channel passed `hazGlanceSel`/`hazFollowSel` in and
+      // forgot to destructure them: the page then threw «hazGlanceSel is not
+      // defined» on EVERY tick, the field's own try/catch turned that into
+      // `ok:false`, and the whole instrument was 100% blind on every lane
+      // while printing a tidy blind line nobody had a reason to open. It
+      // degraded toward the OLD DRIVE, exactly as the module promises, which
+      // is why it was survivable — and it is also why nothing went red.
+      ({ waitSrc, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark }) => {
         const sp = document.querySelector('[aria-label^="Скорост "]');
         const paused = [...document.querySelectorAll(pauseSel)].find((e) => {
           const r = e.getBoundingClientRect();
@@ -5030,9 +5104,80 @@ const probe = () =>
             }
             return seen;
           })(),
+          /* ── THE TWO HAZARD CHIPS, ON THE SAME ROUND TRIP ────────────────
+           *
+           * FOLDED IN HERE FOR THE REASON `reverseWant` states above: a second
+           * `evaluate` costs 2.0 s median on the `pc` leg, which at 2 Hz is a
+           * third of every tick spent asking a question. This adds two
+           * `querySelectorAll` calls and no `innerText`, so it is the cheap
+           * half of an already-paid trip.
+           *
+           * BOTH ARE PRODUCTION SURFACES A STUDENT IS LOOKING AT — `role=
+           * "status"` elements mounted unconditionally in `LessonScene.tsx`
+           * (`FollowGapCue` :2623, `GlanceEdgePings` :2697), no `NODE_ENV`
+           * gate in either file. Deliberately NOT `window.__driveRig` (dev
+           * route, `notFound()` under production) or `window.__camProbe`
+           * (`process.env.NODE_ENV !== "production"`), and deliberately no new
+           * test id added to the product — a harness that has to change the
+           * product to see it is measuring itself.
+           *
+           * `ok:false` IS A REAL ANSWER AND IT IS NOT „CLEAR". The try/catch is
+           * scoped to THIS field so a throw in here degrades the hazard channel
+           * to blind rather than taking the whole probe down with it — and
+           * blind is counted and printed, never coerced to „nothing armed".
+           */
+          hazard: (() => {
+            try {
+              const glance = [];
+              for (const el of document.querySelectorAll(hazGlanceSel)) {
+                const l = el.getAttribute("aria-label");
+                // A PING CHIP THAT IS ON THE GLASS WITH NO READABLE LABEL IS
+                // NOT AN ABSENT CHIP — the identical trap the follow-gap path
+                // below already closed, arriving from the array side. This
+                // used to be `if (…) glance.push(…)`, which DELETED such a
+                // chip: `parseHazard` then computed `armed:false,
+                // pending:false` from an empty list, the command fell to
+                // NEUTRAL, and the books recorded a clean sighting of an empty
+                // road on a tick where the product was warning the student
+                // about an approach. Reassuring direction, silent, no counter.
+                // The marker is a non-empty string matching neither glance
+                // regex, so it lands in the unparsed branch: counted, ARMED,
+                // and printed as UNREADABLE on the HAZARD line. It deliberately
+                // does NOT cap the approach — an unreadable chip is not a
+                // PENDING one, and blind must not brake.
+                glance.push(typeof l === "string" && l.trim() !== "" ? l.trim() : hazGlanceMark);
+              }
+              // The BADGE carries `data-hud`; the `role="status"` node with the
+              // label is its child (see FollowGapBadge). Read the label off
+              // either, so a future reshuffle of that pair cannot silently
+              // return „no lead car".
+              let follow = null;
+              const fg = document.querySelector(hazFollowSel);
+              if (fg) {
+                const owner = fg.getAttribute("aria-label") !== null ? fg : fg.querySelector("[aria-label]");
+                const l = owner ? owner.getAttribute("aria-label") : null;
+                // A follow-gap badge that is on the glass with NO readable
+                // label is not an absent badge. Returning "" would make
+                // `parseHazard` read it as „no lead car" — the reassuring
+                // direction, which is the direction every instrument bug in
+                // this programme has failed in. The marker is a non-empty
+                // string that cannot match FOLLOW_RE, so it lands in the
+                // present-but-unparseable branch and gets braked for.
+                follow = typeof l === "string" && l.trim() !== "" ? l.trim() : "(badge on the glass, no aria-label)";
+              }
+              return { ok: true, why: null, glance, follow };
+            } catch (e) {
+              return { ok: false, why: `the hazard chips threw: ${String(e && e.message ? e.message : e)}` };
+            }
+          })(),
         };
       },
       {
+        hazGlanceSel: HAZARD_GLANCE_SEL,
+        hazFollowSel: HAZARD_FOLLOW_SEL,
+        // Handed in rather than written twice: the string the page pushes and
+        // the string `parseHazard` and its test expect must not drift.
+        hazGlanceMark: GLANCE_NO_LABEL,
         waitSrc: LAWFUL_WAIT_RE.source,
         pauseSel: PAUSE_SEL,
         revSrc: REVERSE_DEMAND_RE.source,
@@ -5042,7 +5187,22 @@ const probe = () =>
         gearSel: GEAR_SEL,
       },
     )
-    .catch(() => ({ kmh: -1, overlay: "?", pause: null, end: false, lawfulWait: null, reverseWant: null, reverseStay: null, gear: [] }));
+    .catch((e) => ({
+      kmh: -1,
+      overlay: "?",
+      pause: null,
+      end: false,
+      lawfulWait: null,
+      reverseWant: null,
+      reverseStay: null,
+      gear: [],
+      // THE WHOLE PROBE FELL OVER, so the hazard channel saw nothing — and
+      // „saw nothing" here means BLIND, not clear. The old fallback said
+      // `lawfulWait: null`, which for that field is indistinguishable from a
+      // successful read of a car with no yield line; this field refuses to be
+      // ambiguous in the same way.
+      hazard: { ok: false, why: `the whole probe evaluate rejected: ${String(e && e.message ? e.message : e)}` },
+    }));
 
 /**
  * DRAIN THE QUEUE, DO NOT TAP ONCE.
@@ -5214,6 +5374,10 @@ let lastShot = 0;
 let shotBackoffSaid = false;
 let phaseTicks = 0;
 let rollM = 0;
+/** Milliseconds of THE CURRENT ROLL that were spent under a hazard speed cap.
+ *  Zeroed with `rollM`. It exists only so the clock-cap diagnostic below cannot
+ *  blame the box for metres the hazard loop took away. */
+let rollHazardCapMs = 0;
 /** Metres the `wrong` leg has run flat out since its last rest. */
 let flatM = 0;
 /** When that rest was BOOKED — which is not when the phase began, because the
@@ -5247,6 +5411,25 @@ let lastTickAt = Date.now();
  */
 let paceLastAt = Date.now();
 let restLogged = false;
+/* ── THE HAZARD CHANNEL'S STATE ────────────────────────────────────────────
+ *
+ * ACTIVE ON THE `right` LEG ONLY, and that is a safety rule and not a scoping
+ * convenience. The `wrong` leg exists to prove the grader fires; a harness
+ * that braked for hazards there would suppress the very faults that are its
+ * whole purpose — the one place where „drives better" and „tests less" are the
+ * same act. `finishHazardBooks` records `state:"off"` with that reason so the
+ * lane cannot be read as „saw nothing".
+ */
+const hazardBooks = createHazardBooks(MODE === "right", MODE);
+/** When the CURRENT continuous hazard hold began (ms epoch), or null. Feeds
+ *  `holdMs` — the anti-standstill ceiling's only input. */
+let hazardHoldAt = null;
+/** Until when follow-gap braking stays suppressed after an overrun. */
+let hazardCoolUntil = 0;
+/** The class the previous tick acted on, so an episode is counted on the RISING
+ *  EDGE. A brake held for twenty ticks is one act of braking; a counter that
+ *  says twenty flatters the loop, and this line is the audit surface. */
+let hazardPrevCls = null;
 let drivingTicks = 0;
 const tickMs = [];
 let shotStopped = false, shotWaited = false;
@@ -5774,18 +5957,117 @@ while (!ended && Date.now() - t0 < budgetMs) {
        * no-tape lane now aims about 1.8 км/ч lower than it used to. That is
        * the direction the overshoot argument points and it is under a km/h of
        * cruise; it is not zero. */
-      const target = paceTarget(paceOdoM, p.kmh);
-      const lift = paceLift(target);
-      if (pace.targets.length === 0 || pace.targets[pace.targets.length - 1].kmh !== Math.round(target)) {
-        pace.targets.push({
-          tSec: Math.round((now - t0) / 1000),
-          odoM: Math.round(paceOdoM),
-          kmh: Math.round(target),
-        });
+      const paced = paceTarget(paceOdoM, p.kmh);
+      /* ── THE BRAKE THAT HAS A REASON ────────────────────────────────────
+       *
+       * Everything above this line is the metronome: hold 12 км/ч, stop every
+       * 15 m, repeat. It brakes for a SPEED CAP and a CLOCK, and for nothing
+       * that is on the road. The two lines below are the whole of the world
+       * input, and `lib/hazard.mjs` carries the reasoning; three things are
+       * repeated here because this is the call site a reader lands on.
+       *
+       * 1. THE FOLD IS THE SAFETY ARGUMENT. `capKmh` enters through `min` and
+       *    `brake` through `||`, and both are IDENTITIES at the neutral
+       *    command. Every path in `hazardCommand` that cannot see an armed
+       *    instrument — nothing on the glass, a malformed payload, a thrown
+       *    evaluate, a cooling overrun — returns that neutral command. So on a
+       *    build that publishes no chips this is the pre-change drive, tick for
+       *    tick, and the lane books exactly the faults it booked before.
+       *    THE ONLY THING THAT CAN CHANGE A DRIVE HERE IS THE PRODUCT
+       *    PUBLISHING AN INSTRUMENT: a regression that removes the chip removes
+       *    the braking with it. Degradation runs toward the old behaviour and
+       *    never toward safety, which is what stops this from being a change
+       *    that certifies a broken product.
+       *
+       * 2. IT IS AN INPUT, NOT A JUDGEMENT. Nothing here touches a verdict, a
+       *    fault, a score or `platform/src/modules/sim/rules`. The product
+       *    grades what it always graded; this only stops the HARNESS causing a
+       *    fault the student — who is looking at these same two chips — would
+       *    not have caused.
+       *
+       * 3. IT CANNOT WIN BY STANDING STILL. A car that never moves books no
+       *    collision. Every hold has `HAZARD_HOLD_MAX_MS`; at the ceiling the
+       *    command comes back `overrun`, the loop says so at full volume and
+       *    rolls on, and a cooldown stops the next tick re-braking on the same
+       *    unmoving obstacle.
+       */
+      // `phase` starts at "roll" only when MODE === "right" (see its
+      // initialiser), so `hazardBooks.active` is true on every tick that
+      // reaches this line. The guard is kept because that coupling lives 500
+      // lines away and a future `flat` leg routed through `roll` must not
+      // silently acquire a hazard brake; `NEUTRAL` is the same command the
+      // blind and clear paths return, so the fold below is unchanged.
+      const hzReading = parseHazard(p.hazard);
+      const hz = hazardBooks.active
+        ? hazardCommand(hzReading, {
+            kmh: p.kmh,
+            holdMs: hazardHoldAt === null ? 0 : now - hazardHoldAt,
+            cooling: now < hazardCoolUntil,
+          })
+        : HAZARD_NEUTRAL;
+      if (hazardBooks.active) {
+        observeHazardTick(hazardBooks, hzReading, hz, now - lastTickAt);
+        const acting = hz.brake || hz.capKmh !== null;
+        if (acting && hazardPrevCls !== hz.cls) {
+          countHazardEpisode(hazardBooks, hz.cls, hz.brake ? "brake" : "cap");
+          note(`      HAZARD ${hz.cls}: ${hz.reason}`);
+        }
+        hazardPrevCls = acting ? hz.cls : null;
+        hazardHoldAt = hz.brake ? (hazardHoldAt ?? now) : null;
+        if (hz.overrun) {
+          hazardHoldAt = null;
+          hazardCoolUntil = now + HAZARD_COOLDOWN_MS;
+          loud(
+            `a hazard brake gave up: ${hz.reason}. The car is rolling on WITH THE HAZARD STILL ON THE GLASS, because a ` +
+              "clean sheet bought by standing still is not a clean sheet — whatever the product books from here is earned.",
+          );
+        }
+        // BLINDNESS IS ANNOUNCED THE FIRST TIME, not only totalled at the end.
+        if (hz.blind && hazardBooks.blind === 1) {
+          loud(
+            `the hazard chips could not be read («${hz.reason}») — this tick the drive is BLIND to the two instruments ` +
+              "it has, and it is driving on rather than assuming the road is clear. The HAZARD line below counts them all.",
+          );
+        }
+        // …AND SO IS A CHIP THAT WAS ON THE GLASS AND COULD NOT BE READ, which
+        // is a THIRD state and not either of the other two. It is not blind —
+        // the probe worked — and it is emphatically not clear. Announced once,
+        // for the same reason blindness is: a number at the foot of a report is
+        // read by whoever reads the foot of the report.
+        if (hzReading.ok === true && hzReading.glance !== null && hzReading.glance.unparsed > 0 && hazardBooks.seen.glanceUnparsed === 1) {
+          loud(
+            `a [data-hud="glance-ping"] chip is ON THE GLASS and this loop cannot read it («${String(hzReading.glance.firstUnparsed).slice(0, 80)}») — ` +
+              "it is counted as ARMED and never as an empty road, but it does NOT cap the approach, because an " +
+              "unreadable chip is not a pending one. If this is the product's own copy having changed, the HAZARD " +
+              "line's UNREADABLE count is the finding.",
+          );
+        }
       }
+      // `capKmh` folds by `min`, and `null` is the identity — see (1) above.
+      const target = Math.min(paced, hz.capKmh ?? Number.POSITIVE_INFINITY);
+      const lift = paceLift(target);
+      /* ── AND THE ROW SAYS WHO ASKED FOR IT ───────────────────────────────
+       * `pace` is published as „the authored shadow's speed-by-distance
+       * profile" and the drive report SENDS A VERIFIER HERE before they file
+       * «Непропускане на пешеходец» against the product. This line writes into
+       * that array, so a 6 км/ч row invented by HAZARD_APPROACH_KMH used to be
+       * indistinguishable from a 6 км/ч row the tape asked for — the harness
+       * co-signing the tape's name on its own caution. `hazardPaceRow` records
+       * all three numbers and marks the rows the hazard loop lowered; nothing
+       * about the DRIVE changes, only what the row admits about itself. */
+      const row = hazardPaceRow(pace.targets[pace.targets.length - 1], {
+        tSec: (now - t0) / 1000,
+        odoM: paceOdoM,
+        pacedKmh: paced,
+        capKmh: hz.capKmh,
+      });
+      if (row !== null) pace.targets.push(row);
       await timed("pedals", async () => {
-        await brake(p.kmh > target + BRAKE_CAP_OVER_KMH, p.kmh);
-        await throttle(p.kmh >= 0 && p.kmh < target - lift);
+        // `hz.brake` folds by `||`, and `false` is the identity — see (1).
+        // `brake()`'s own standstill refusal still applies on top, so the
+        // hazard channel cannot select R by pressing S at rest (LAW 1).
+        await brake(hz.brake || p.kmh > target + BRAKE_CAP_OVER_KMH, p.kmh);
+        await throttle(!hz.brake && p.kmh >= 0 && p.kmh < target - lift);
       });
       // ── AND THE WHEEL, ON THE SAME TICK AS THE PEDALS ────────────────────
       // Only in the roll phase, and only forward: the stop phase is braking to
@@ -5796,6 +6078,9 @@ while (!ended && Date.now() - t0 < budgetMs) {
       drivingTicks++;
       phaseTicks++;
       rollM += (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
+      // Same interval, same under-count as `rollM` (see THE ODOMETER GETS ITS
+      // OWN CLOCK) — deliberately, because the two are compared to each other.
+      if (hz.capKmh !== null) rollHazardCapMs += now - lastTickAt;
       /* ── THE BOUND IS METRES; THE CLOCK IS THE SAFETY CAP ────────────────
        * Which is what ROLL_DISTANCE_M's own comment always claimed and what,
        * measured, was never true: at CRUISE_KMH a car leaving a standstill
@@ -5809,13 +6094,41 @@ while (!ended && Date.now() - t0 < budgetMs) {
       if ((rollM >= lookM || cappedOut) && phaseTicks >= 1) {
         if (cappedOut && rollM < lookM) {
           pace.capHits += 1;
+          /* ── AND WHOSE CLOCK IT WAS ────────────────────────────────────────
+           * „its length is this box's and not this road's" is a CAUSAL claim,
+           * and on a roll the hazard loop capped to HAZARD_APPROACH_KMH it is
+           * simply false: the roll came up short because the harness slowed
+           * down for a scan chip, not because the box is slow. Saying it
+           * anyway would file a box-speed finding against a hazard cap, so the
+           * two are counted apart and the sentence names which one happened. */
+          if (rollHazardCapMs > 0) pace.capHitsHazard += 1;
           loud(
             `a roll ran its ${Math.round(capMs / 1000)}s safety cap having covered ${rollM.toFixed(1)} m of the ` +
-              `${lookM.toFixed(0)} m it was aimed at (target ${Math.round(target)} км/ч, dial ${p.kmh} км/ч) — THAT roll ` +
-              `was bounded by the clock, so its length is this box's and not this road's.`,
+              `${lookM.toFixed(0)} m it was aimed at (target ${Math.round(target)} км/ч, dial ${p.kmh} км/ч) — ` +
+              (rollHazardCapMs > 0
+                ? `and ${(rollHazardCapMs / 1000).toFixed(1)}s of THAT roll ran under a HAZARD CAP, so its length is ` +
+                  `THIS HARNESS being cautious at a chip on the glass. It is not evidence about this box and it is not ` +
+                  `evidence about this road.`
+                : `THAT roll was bounded by the clock, so its length is this box's and not this road's.`),
           );
         }
         pace.rolls += 1;
+        // THE HAZARD HOLD ENDS WITH THE PHASE. The stop phase's brake is the
+        // metronome's, not the hazard channel's; billing those seconds to the
+        // hold would run `HAZARD_HOLD_MAX_MS` down during an ordinary cadence
+        // stop and manufacture an overrun that never happened. The hazard
+        // re-arms on the first roll tick if the chip is still up.
+        //
+        // IT SITS ABOVE `guideLeaveRoll()` AND MUST STAY THERE. Both are pure
+        // assignments and neither is read by the wheel, but
+        // `__tests__/guidance-wiring.test.mjs` §C pins `await guideLeaveRoll();`
+        // as the statement IMMEDIATELY before `phase = "stop"` — because a
+        // confirmed turn landing on the last roll tick would otherwise hold
+        // full lock through the whole stop, and nothing scans again after this
+        // line. Putting these two between them broke that gate, silently, in
+        // the first cut of this instrument.
+        hazardHoldAt = null;
+        hazardPrevCls = null;
         // THE WHEEL COMES BACK TO CENTRE BEFORE THE PHASE DOES — see
         // `guideLeaveRoll`. Nothing past this line ever scans again, so a
         // sustained turn left down here turns the car for the whole stop.
@@ -5824,6 +6137,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
         phaseAt = now;
         phaseTicks = 0;
         rollM = 0;
+        rollHazardCapMs = 0;
         waitStartedAt = null;
         restLogged = false;
       }
@@ -6086,6 +6400,33 @@ note(
     (refusedReversePress ? ` · refused ${refusedReversePress} standstill brake press${refusedReversePress === 1 ? "" : "es"} (would have selected R)` : "") +
     (lostKeys ? ` · re-asserted the brake ${lostKeys}× after the sim lost the key` : ""),
 );
+/* ── WHAT THE BRAKE LOOP SAW AND DID ───────────────────────────────────────
+ *
+ * PRINTED ON EVERY LANE, AND ALL THREE LINES ARE UNCONDITIONAL. A capability
+ * nobody can audit is one nobody can trust, and the audit surface is these
+ * sentences: how many times it braked, for what, how long it was blind, and —
+ * the one that stops the other two being misread — what it is permanently
+ * unable to see.
+ *
+ * The third line is `steering.note`'s precedent and exists for the identical
+ * failure: silence read as sufficiency. A green HAZARD line on a red-light or
+ * pedestrian lesson does not mean the car handled the hazard; it means this
+ * loop has never been able to see one, because the product publishes no
+ * instrument for it. Nobody may close a stopping finding on this line without
+ * reading the sentence under it.
+ */
+finishHazardBooks(hazardBooks);
+note(hazardLine(hazardBooks));
+note(`          ${hazardBooks.why}`);
+note(`          ${hazardBooks.note}`);
+if (hazardBooks.state === "blind") {
+  loud(
+    "THE HAZARD CHANNEL WAS BLIND ON THIS DRIVE: " +
+      `${hazardBooks.why} A drive that could not read its own instruments did not decide the road was clear — it never ` +
+      "looked. No stopping finding may be opened OR closed on this lane.",
+  );
+}
+saveStatus({ hazard: hazardBooks });
 /* ── WHAT `top` INHERITED, ON THE SAME BREATH AS `top` ──────────────────────
  *
  * A verifier closed a «this drive crawls» row by quoting «reaches 43 км/ч»
@@ -6165,22 +6506,33 @@ if (MODE === "right") {
         `of it are two different amounts of road and are not two samples of the same drive.`,
     );
   } else {
-    const kk = pace.targets.map((r) => r.kmh);
+    // THE SPAN IS THE PACE LAW'S OWN, NOT THE COMMANDED ONE. Reading `kmh`
+    // here would let a HAZARD_APPROACH_KMH cap masquerade as the bottom of the
+    // authored profile — the same false attribution the row shape closed, one
+    // level up in the report that most readers actually read.
+    const kk = pace.targets.map((r) => r.pacedKmh);
     const span = kk.length ? `${Math.min(...kk)}–${Math.max(...kk)} км/ч` : "never set (the roll phase was never entered)";
     note(
       `  PACE: ${paceTape.path} — ${paceTape.totalM} m of authored route in ${paceTape.durationSec ?? "?"} s, top ` +
         `${paceTape.topKmh} км/ч, ${paceTape.stops} authored rest(s). This drive's odometer read ${pace.odoM} m ` +
-        `(${Math.round((pace.odoM / paceTape.totalM) * 100)}% of that route) over ${pace.rolls} roll(s), target ${span}` +
+        `(${Math.round((pace.odoM / paceTape.totalM) * 100)}% of that route) over ${pace.rolls} roll(s), authored target ${span}` +
         (pace.capHits
-          ? ` · ${pace.capHits} roll(s) ended on the CLOCK and not on the metres — those are the box's length, not the road's`
+          ? ` · ${pace.capHits} roll(s) ended on the CLOCK and not on the metres` +
+            (pace.capHitsHazard
+              ? ` — and ${pace.capHitsHazard} of those ran under a HAZARD CAP, so THAT length is this harness's caution, ` +
+                `not this box's clock`
+              : " — those are the box's length, not the road's")
           : " · every roll ended on its METRES, not on the clock"),
     );
+    note(`        PACE PROVENANCE: ${hazardPaceProvenance(pace.targets)}`);
     note(
       `        THE LOOK CADENCE IS NO LONGER BLANKET, and a reader must know it. At or below ${CRUISE_KMH} км/ч it is ` +
         `${ROLL_DISTANCE_M} m exactly as it has always been; above it the car holds ${LOOK_EVERY_S.toFixed(1)}s of cruising ` +
         `between two rests, which on a fast stretch is over a hundred metres. What catches a crossing there is the TAPE ` +
         `slowing down and not the cadence — so «Непропускане на пешеходец» on this lane has to be read against ` +
-        `pace.targets in _audit-status.json before it is filed against the product.`,
+        `pace.targets in _audit-status.json before it is filed against the product. READ pacedKmh, NOT kmh: rows ` +
+        `marked src:"hazard-cap" were lowered by THIS HARNESS's hazard loop at a chip on the glass and are not the ` +
+        `authored drive slowing down. The PACE PROVENANCE line above says how many of them there were.`,
     );
     /* ── THE TWO FAULTS A FAST LANE EARNS THAT A CRAWLING ONE COULD NOT ─────
      *
