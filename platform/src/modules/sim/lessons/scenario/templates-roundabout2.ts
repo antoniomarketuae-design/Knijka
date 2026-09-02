@@ -170,6 +170,58 @@
  *    and the second clause was not a false claim about this template — it was
  *    a true one this file's own proof was too narrow to see.
  *
+ *    …AND A FOURTH TIME, WAVE 22, 2026-09-02 — WHICH IS WHY THE MEASUREMENT
+ *    IS HERE AND NOT ONLY IN THE LEDGER. The judge cited
+ *    .audit-frames/w22/frames/sc-rb-ped-exit__mobile-right/08-debrief-p5.png
+ *    (three tasks uncredited, НЕИЗДЪРЖАН, now 20 т.). The frame is honest and
+ *    the sheet is CORRECT FOR THAT DRIVE, and this time the leg's own status
+ *    file says so without inference — the wheel is no longer the excuse, the
+ *    driving is:
+ *      · steering.channel «live», 18 commands (2200 ms left / 1560 ms right),
+ *        and the tracking verdict is «intermittent» — 7.96 s of the 16.08 s
+ *        moving spent beyond 12° of error, median 11.5°;
+ *      · the witness track (`window.__camProbe`) leaves the south arm, creeps
+ *        to r = 21.46 — INSIDE the circulatory carriageway, whose outer edge is
+ *        22.06 — against the staged circulator, and is billed «Непропускане на
+ *        ППС с предимство» at 0:54; it then cuts to the island kerb (13.94) and
+ *        is billed «Удар в неподвижно препятствие» at 1:07;
+ *      · it comes to rest at (15.23, 0.30): ring angle 1.1°, r = 15.23. The
+ *        gate is at 45°, so the car stopped 43.9° — 13.8 m of arc — short of
+ *        the first thing this drill grades, having never left the east mouth's
+ *        own wedge. Three unticked tasks is the correct sheet for a car that
+ *        performed none of the three acts, and two ОПАСНИ ГРЕШКИ is the correct
+ *        bill for how it stopped performing them.
+ *    AND THE CLAIM «in ANY of the four legs» IS FALSE OF THE CORPUS IT WAS
+ *    FILED AGAINST, which is the cheapest refutation available and went four
+ *    rounds unnoticed: .audit-frames/w15/frames/sc-rb-ped-exit__mobile-right's
+ *    debrief photographs «Подмини първия изход и остани в кръга ✓ 1:12» with
+ *    the other two open at 10 т. The live product has ticked this drill's first
+ *    task for the harness itself.
+ *
+ *    THE WAVE-11 TABLE, RE-DRIVEN AT HEAD, because it lives in this comment and
+ *    in no test — `roundabout2-title-truth.test.ts` drives every line at
+ *    12 км/ч, so the cap could be re-tightened to 20 with every gate green.
+ *    Same production path (compileScenario → createLessonSession → applyTick),
+ *    taught line, right stalk, stop at (4.1, 27.0), one ring pace per run:
+ *      L3-L5 (cap 30) ✓✓✓ at 12/20/22/26/29/30 · nothing from 31 up
+ *      L1-L2 (cap 35) ✓✓✓ at 12…35            · nothing from 36 up
+ *    So the sentence «a car circulating at the number on the sign collects
+ *    NOTHING» is no longer true of this template, and the 49 км/ч drive the row
+ *    compares against still collects nothing — which is the discrimination the
+ *    row said was absent, measured in both directions.
+ *
+ *    AND THE STRIP BETWEEN THE GATE AND THE BILL IS NOT SILENT, which is the
+ *    half a cap change can quietly break and the half doc 64 THEO-4 actually
+ *    cares about. The rule engine bills SPEEDING_OVER_LIMIT above
+ *    limit + min(10 %, `speedingGraceMaxKmh` 5) = 33 on this ring, so 31-33 is
+ *    refused by the gate with no violation to explain it. Measured on the same
+ *    path: at 31 and at 33 the engine composes the `overCapNoted` card
+ *    «Стигна точката, но твърде бързо · Задачата иска да си тук с не повече от
+ *    30 км/ч, а стигна дотук с 31 км/ч — затова още не се отчита. Намали СЕГА,
+ *    докато си върху точката», and at 34 the same drive additionally carries
+ *    «Превишена скорост … при разрешени 30 км/ч». There is no rung and no pace
+ *    at which this drill withholds a tick without saying why.
+ *
  *  · «no lane arrows on the approach» and «the roundabout is a bare grass mound
  *    with shrubs and buildings behind it» both describe the frames CORRECTLY,
  *    and neither is authorable from a ScenarioSpec. This file is data: types.ts

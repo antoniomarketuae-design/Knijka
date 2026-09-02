@@ -177,6 +177,85 @@
  * along `mouth.dir` to face the approach — is computed in props.ts against the
  * `RoundaboutRing[]` `buildWorldGeometry.ts` already holds when it calls
  * `buildProps`. Nothing is exported from here that props.ts does not read.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * WAVE 22, 2026-09-02 — THE SAME TWO ROWS A THIRTEENTH TIME, ANSWERED FROM THE
+ * NEW SWEEP RATHER THAN FROM THE OLD ANSWER. The block above replied to frames
+ * out of `w10-4`; both rows now cite `w22`, recorded 2026-09-01 at commit
+ * 1de9ebe against an attested, clean server (`target.attested: true`,
+ * `dirtyCount: 0`). So the reply is redone against the current evidence and the
+ * current source, and every number below is printed off THIS commit's
+ * `analyzeRoundabouts` rather than copied — which is worth doing, because the
+ * block above quotes rb-ped's island as 13.94 m and it is 13.7499 m, the same
+ * as rb-mini's. Nothing in this module moved.
+ *
+ * sc-roundabout-entry:4ab693eb — THE PREMISE IS STILL FALSE, NOW BY THE SWEEP
+ * THAT REFILED IT. `w22/…/sc-roundabout-entry__pc-right` leaves the ego at
+ * world (1.78, 15.66). The ring centre is (0, 0) — `lessons/finish.ts` holds
+ * the same pair for this scenario — so r = 15.761 m against an island wall face
+ * at 13.7499 m. Nose at 15.761 − 2.02 (`CHASSIS_HALF_EXTENTS.z`) = 13.741 m:
+ * the car is stopped TOUCHING the wall with its body centre 2.01 m OUTSIDE the
+ * island, exactly as in w10-4 and to within a centimetre of the same radius.
+ * It is not driving on the island in this sweep either, and the wall is why.
+ *
+ * WHAT IT DID INSTEAD IS THE INSTRUMENT — measured this time, not asserted.
+ * The same status file's camera witness records 77 m of path for 76.5 m of
+ * displacement, `straightness 0.993`, from (4.06, 92.12) to (1.78, 15.66): the
+ * drive went down the south approach in a straight line and into the island's
+ * near face, and never began to circulate at all. `guidance.tracking` grades
+ * the leg `intermittent` (`offLineFrac 0.393`, worst 22.19°) — and the ribbon
+ * it failed to follow is on the ROAD, not on the grass: cropped out of
+ * `04-t060s.png` at 3x, the teal band lies on asphalt and stops short of the
+ * kerb. That is the correction this row's own judge made to round 10, and the
+ * frame at THIS commit still shows it.
+ *
+ * The THEO-4 half — the coaching feed serene for ~6 s while „ОПАСНА ГРЕШКА −10"
+ * is billed — CANNOT be re-measured from this sweep: the w22 leg writes no
+ * drive frame between t060s and the end card, so the impact is unphotographed.
+ * The wave 12 routing therefore stands unchanged and unrefreshed: `lessons/
+ * advisor.ts` + the „ИНСТРУКЦИИ" card in `components/sim/lesson-ui/
+ * LessonPlayShell.tsx`. What the end card does say is in `_audit-debrief.json`
+ * and it explains itself in full — деяние, наредба, чл. 48 ал. 3, глоба,
+ * контролни точки and „✔ Правилното действие" — so the defect, if it is still
+ * live, is the six seconds of silence and not the verdict.
+ *
+ * sc-rb-ped-exit:841c6252 — „no kerb ring, no island signage" IS PHOTOGRAPHED
+ * IN THE FRAME THE ROW CITES, and the shipped camera predicts it to 3 px. Read
+ * as pixels instead of at a glance, column x = 1300 of
+ * `w22/…/sc-rb-ped-exit__mobile-right/04-t030s.png` (2556 × 1179) runs: grass
+ * (49, 56, 23) down to y = 502, a lit concrete edge at y = 503 (123, 121, 118),
+ * then the wall face shading into the asphalt plateau (~87, flat for the next
+ * 250 px) by y ≈ 540.
+ *
+ * FORWARD-PREDICTED FROM THE CAMERA rather than eyeballed, so the band cannot
+ * be waved away as a paint seam. The ego's own pose puts it at (−1.09, 45.43)
+ * at t = 30 s — 45.44 m from the centre, so 31.69 m from the island's near
+ * edge. `vehicle/tuning.ts`: eye 1.20 m, `COCKPIT_PITCH_BASE` −4°, and
+ * `cockpitVFovForAspect` holds hFOV 75.4°, so at the frame's aspect 2.168 the
+ * vFOV is 39.23° and the focal length is (1179/2)/tan(19.61°) = 1653.6 px. The
+ * wall foot (ROAD_Y 0.02) sits atan(1.18/31.69) = 2.133° below the horizon and
+ * its top (`ISLAND_WALL_TOP_Y` 0.59) 1.103°, which through that projection puts
+ * the face at y = 505.8 … 535.6: **29.8 px of concrete**. Measured, 503 … 540.
+ * Both edges land within 3 px of the prediction — the kerb ring is there, drawn
+ * to size, in the very frame that reports it missing. It reads as grey concrete
+ * beside grey asphalt at 32 m, which is what a kerb looks like at 32 m.
+ *
+ * And the island IS signed. The same frame carries a Г9 disc on its post facing
+ * the approach, with the blank GREY BACK of a second plate beside it — one per
+ * mouth traffic can enter by, posted by `props.ts` on the concrete rim, based
+ * at the `ISLAND_WALL_TOP_Y` this module exports for precisely that. So two of
+ * the judge's four nouns are false at this commit. The two that survive — „no
+ * planting scheme, no street furniture" — are decoration, and this module goes
+ * on refusing them for the reason `crownRiseM` is written down at length: a
+ * monument photographs well from a camera the student never sits in, and there
+ * is nothing on it for a driver to act on. The one thing on an island a driver
+ * must READ is the Г9, and it is standing there.
+ *
+ * BOTH ROWS: REFUTED, NO CODE. Verified green while refuting, not assumed:
+ * `world/__tests__/roundabout-island.test.ts`,
+ * `world/__tests__/roundabout-ring-edge-line.test.ts` and
+ * `builders/__tests__/island-wall-is-a-collider.test.ts` are 48 passing at this
+ * commit, and `ISLAND_WALL_RISE_M` is still 0.45 (`ISLAND_WALL_TOP_Y` 0.59).
  * ───────────────────────────────────────────────────────────────────────────
  */
 

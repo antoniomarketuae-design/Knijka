@@ -68,6 +68,7 @@ import {
   Color,
   CylinderGeometry,
   DynamicDrawUsage,
+  LinearFilter,
   Object3D,
   type Matrix4,
   Quaternion,
@@ -1433,18 +1434,43 @@ export function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbl
   // ~60 px of nothing. The gaps tighten from 68/78/66/70 to an even
   // 66/64/64/62/64 and every type size is untouched, so nothing that was
   // legible in a shipped frame got smaller.
+  //
+  // THE BODY LINES CARRY THEIR CONTRAST IN THEIR STEMS, not in their size
+  // (sc-sig-controller-postures:ef0e821c). Measured on the current tree's own
+  // frame (`.audit-frames/w22/.../04-t042s.png`, native 2556 × 1179): the
+  // headline lands ≈47 device px of cap height and the five body lines
+  // ≈16–17 px — ≈5.5 CSS px on a 3× phone. At that height a line's stems are
+  // ~2 device px, so WEIGHT is the only lever left that is not the ink box,
+  // and the ink box is at its clamp (the widths below). Regular → Bold is
+  // roughly twice the stem ink for the same cap height; on a card that is a
+  // teaching surface rather than chrome, that is the trade to make.
+  //
+  // WHICH LINES MOVE AND WHICH DO NOT, from the same frame's measurement of
+  // each line's ink against the 936 px box: headline 88.1 %, poseBg 100.3 %,
+  // goBg 76.7 %, stopBg 76.9 %, priorityBg 93.4 %, lawRef 91.0 %. A heavier
+  // face is ≈3–5 % wider in Cyrillic, and `bubbleLine` answers overflow by
+  // SHRINKING — so on a line already at the clamp a bolder weight buys stem
+  // width by spending cap height, which is a net loss. `poseBg` is that line
+  // and it is left at 600; everything else has the room and takes it.
+  //
+  // `lawRef` also moves colour. It is the smallest line on the card AND the
+  // dimmest: #8ea3bd on the near-black body is ≈8.2:1 where every other line
+  // sits at 14–17:1, and it is the one line ADR-002 will not let the лекция do
+  // without — the citation is how the card proves it retrieved the rule rather
+  // than recalled it. #b9c9de keeps the same cool-grey slot (the colours are a
+  // learnable layout, per the note above) at ≈13:1.
   g.fillStyle = copy.accent;
   bubbleLine(g, copy.headlineBg, 700, BUBBLE_LINE_PX.headline, 120, W);
   g.fillStyle = "#dbe5f2";
   bubbleLine(g, copy.poseBg, 600, BUBBLE_LINE_PX.pose, 186, W);
   g.fillStyle = "#9ff0c4";
-  bubbleLine(g, copy.goBg, 500, BUBBLE_LINE_PX.go, 250, W);
+  bubbleLine(g, copy.goBg, 700, BUBBLE_LINE_PX.go, 250, W);
   g.fillStyle = "#ffc9c2";
-  bubbleLine(g, copy.stopBg, 500, BUBBLE_LINE_PX.stop, 314, W);
+  bubbleLine(g, copy.stopBg, 700, BUBBLE_LINE_PX.stop, 314, W);
   g.fillStyle = copy.accent;
-  bubbleLine(g, copy.priorityBg, 600, BUBBLE_LINE_PX.priority, 376, W);
-  g.fillStyle = "#8ea3bd";
-  bubbleLine(g, copy.lawRef, 500, BUBBLE_LINE_PX.law, 440, W);
+  bubbleLine(g, copy.priorityBg, 700, BUBBLE_LINE_PX.priority, 376, W);
+  g.fillStyle = "#b9c9de";
+  bubbleLine(g, copy.lawRef, 700, BUBBLE_LINE_PX.law, 440, W);
 }
 
 /** Structural slice of the runtime's JU-18 read model (module boundary: the
@@ -1592,7 +1618,49 @@ export function TrafficLayer({
     const c = document.createElement("canvas");
     c.width = BUBBLE_TEX_W;
     c.height = BUBBLE_TEX_H;
-    return new CanvasTexture(c);
+    const t = new CanvasTexture(c);
+    // NO MIP CHAIN — the card was being delivered at HALF the resolution the
+    // painter draws it at (sc-sig-controller-postures:ef0e821c, the „blurs to
+    // unreadable mush even at 600 % zoom" half).
+    //
+    // MEASURED on `.audit-frames/w22/.../sc-sig-controller-postures__mobile-
+    // right/04-t042s.png` — a drive of the CURRENT tree, at native 2556 × 1179:
+    // the card's accent border spans x 783 → 1311, i.e. 528 device px, for a
+    // BUBBLE_TEX_W = 1024 canvas. That is 1.94 texels per pixel, so GL's LOD is
+    // log2(1.94) = 0.96 and `LinearMipmapLinearFilter` — three's DEFAULT for a
+    // CanvasTexture, which is what this used to be — samples 96 % mip 1. Mip 1
+    // is a 512 × 270 box average: a 46 px body line is reduced to 23 px of
+    // rasterisation BEFORE it reaches the glass, and is then reconstructed at
+    // ≈1:1. The auditor photographed the result and called it mush; he was
+    // looking at a half-resolution image of type that is already only ≈17 px of
+    // cap height (the bands measure 24–28 px tall incl. descenders on that same
+    // frame, against 47 px for the headline).
+    //
+    // WHY THE MIP CHAIN CANNOT EARN ITS KEEP HERE, which is what makes this
+    // safe rather than a taste call: `bubbleScale` PINS the card's apparent
+    // size from BUBBLE_REF_DIST_M outwards, so the texel:pixel ratio is a
+    // constant 1.94 at EVERY range in the band, and inside the reference
+    // distance the card is MAGNIFIED, not minified. There is no distance at
+    // which a lower mip is the right sample — the ratio never grows. A single
+    // bilinear tap on the full-resolution canvas is strictly more of the
+    // painter's ink than a pre-averaged mip, it costs a third less VRAM, and
+    // the residual risk (sub-pixel crawl at 1.94× minification, the reason
+    // mipmaps exist at all) is bounded by the same pin: a billboard whose
+    // screen size never changes shimmers only under translation, and 528 px of
+    // card translating a few pixels a second does not read as aliasing.
+    //
+    // WHAT THIS DOES NOT FIX, said plainly: it makes the shipped type sharp, it
+    // does NOT make it bigger, and ≈17 px of cap height on a 3× phone is ≈5.6
+    // CSS px — small however crisp it is. The size lever is the card's INK BOX
+    // (`BUBBLE_PAD_X`, `BUBBLE_TEX_W`), and it is measured and blocked: on that
+    // same frame `poseBg` already paints 939 texture px into a 936 px box —
+    // it is at the shrink clamp — so `BUBBLE_LINE_PX` cannot be raised without
+    // widening the card, and the card cannot be widened without moving four
+    // assertions in `__tests__/controller-bubble.test.ts` that are calibrated
+    // to the 1024 px canvas. That is a second lane's edit, not this one's.
+    t.generateMipmaps = false;
+    t.minFilter = LinearFilter;
+    return t;
   }, []);
   useEffect(() => () => bubbleTex.dispose(), [bubbleTex]);
   // B40(a) — the staged-actor caption. One billboarded plane: no lesson in the

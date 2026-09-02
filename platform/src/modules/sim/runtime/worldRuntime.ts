@@ -62,6 +62,9 @@ import {
   type SurfaceFix,
 } from "./surface";
 import type { District as WorldDistrict } from "../world/types";
+// The PAINTER'S OWN gate, imported rather than mirrored — see
+// `worldStatesOneWayStreets` below for why the detector has to ask it.
+import { scenarioSignScale } from "../world/builders/zoneSigns";
 
 /** A stop line can re-fire only after this long (jitter at the line must not
  * spam RED_LIGHT_CROSSED; a genuine re-approach takes longer anyway). */
@@ -262,6 +265,109 @@ export function comfortableStopPossible(distToLineM: number, speedKmh: number): 
 
 /** Heading opposes the one-way's flow by more than this → wrong way. */
 const WRONG_WAY_ANGLE_DEG = 120;
+
+/**
+ * DOES THE DRAWN WORLD STATE THIS DISTRICT'S ONE-WAY STREETS AT ALL?
+ * (sc-ac-wind-truck-pass:71a28c54 — „the detector and the drawn world disagree
+ * everywhere it fires".)
+ *
+ * THE ROW, AND WHY THE `offCarriageway` CARVE-OUT BELOW DID NOT CLOSE IT. That
+ * line retired the bill on GRASS, and it was right to. But the row is a
+ * CONSISTENCY row naming four lessons, and the two reproductions that survived
+ * the w22 sweep are both on `d2-v1`, on drawn asphalt, where a carve-out keyed
+ * on the kerb cannot reach: `sc-ed-d2-city-run / mobile-right` (run.log l.560,
+ * −10 т., repeated in the debrief at l.1311) and `sc-ed-d2-priority-run /
+ * pc-right` (l.614) — the second of them a MODEL drive convicted a 10-point
+ * ОПАСНА, which on a 9-point sheet is an instant НЕИЗДЪРЖАН.
+ *
+ * MEASURED AT HEAD on the committed documents, by running the world builder
+ * headlessly (`analyzeNetwork` + `buildProps`) over every district that has a
+ * one-way street edge and counting the plates it actually posts:
+ *
+ *   district        one-way street edges   В1 / Д4 / Г2 / Г3 posted
+ *   d2-v1                            125   0    0    0    0
+ *   district-v1                      126   0    0    0    0
+ *   the other nine (all scenario-*)   27   ≥ 1 В1 each; six also post a Д4
+ *
+ * and neither OSM district authors `meta.scenario.laneArrows`, so `laneArrows.ts`
+ * resolves no М10 glyph there either. Driving 40 of d2-v1's one-way edges
+ * against the flow at HEAD raises `wrongWay` on 40 of 40, on essentially every
+ * tick, with `edgeId` non-null throughout. So on those two maps the runtime
+ * fails a student for disobeying a statement the world never makes: no sign, no
+ * arrow, nothing on the glass. That is the row, verbatim.
+ *
+ * THE WORLD'S SILENCE IS DELIBERATE AND IS NOT A BUG. `props.ts` gates its В1,
+ * Д4 and Г2/Г3 passes on `scenarioSignScale` and says why in terms: „the OSM
+ * city districts carry ~150 one-way mouths whose REAL signage the source data
+ * never recorded, so posting there would trade a missing sign for an invented
+ * one." Two producers, one fact, and only one of them held its tongue — the
+ * audit C-4 shape exactly (`__tests__/priority-sign-agreement.test.ts`).
+ *
+ * SO THE DETECTOR ASKS THE PAINTER'S OWN QUESTION. This is the identical
+ * `scenarioSignScale` call `props.ts:519` makes, imported rather than mirrored,
+ * so the two cannot drift apart on the GATE. They could still drift if props
+ * ever gained an UNgated one-way pass; the net for that is an agreement test in
+ * the shape of C-4's, and it is routed with this change rather than written by
+ * this lane.
+ *
+ * THEO-4 (doc 64) IS WHY THIS IS A DEFECT AND NOT A SCORING NIT. The card
+ * explains «Движеше се срещу платното на еднопосочна улица» to a seventeen-year-
+ * old who can look up and see no В1, no Д4 and no arrow anywhere on the street.
+ * An explanation the student can refute out of the windscreen teaches him to
+ * stop reading them — the identical argument the `offCarriageway` carve-out
+ * below is built on, applied to the same code on the other side of the kerb.
+ *
+ * AND THE LAW NAMES THE SAME BOUNDARY (retrieved, not recalled — ADR-002; the
+ * quotation `catalog.ts`/`n38.ts` already carry): Н38 прил. № 5, т. 10, б. „в"
+ * bills the driver who „навлезе срещу движението на пътен възел или ПЪТ С
+ * ЕДНОПОСОЧНО ДВИЖЕНИЕ". A street the world signs neither В1 nor Д4 nor an
+ * arrow on has not been stated to be such a път to the person driving it.
+ *
+ * WHAT THIS COSTS, NAMED RATHER THAN HIDDEN, because an acquittal is a change
+ * too. On `district-v1` and `d2-v1` a genuine wrong-way run up a one-way STREET
+ * now bills nothing under this code — 251 edges of Sofia. Roughly half of them
+ * (51/125 and 71/126, measured with props' own anti-parallel-twin test at 20 m)
+ * are one carriageway of a DIVIDED road, where the median and the head-on
+ * traffic DO state the direction even though no plate does, so the acquittal is
+ * wider than the evidence that licenses it. That is the price of the two
+ * producers agreeing at all, and the way to buy it back is to POST the plates,
+ * not to grade harder: `oneway=yes` IS the source data's record of a real В1/Д4,
+ * unlike the turn restrictions Г2/Г3 would need, so the props gate is arguably
+ * over-broad for those two kinds. Routed to the props lane; not this file's.
+ *
+ * AND IF THAT LANE DOES UNGATE В1/Д4, COME BACK TO THIS FUNCTION — it reads the
+ * GATE, not the placements, so it would go on acquitting a district that had
+ * just started posting plates. That is the one direction this predicate can rot
+ * in, it rots in the ACQUITTING direction, and it is written here rather than
+ * hoped about: the fix is one line (ask `buildProps` for the district's plates,
+ * as `surface.ts` already asks the road builders for its asphalt) and it costs
+ * 60 ms on d2-v1, which is why it is not paid for a boolean today.
+ *
+ * ROUNDABOUT RINGS ARE EXCLUDED FROM THE STAND-DOWN, and the exclusion is
+ * measured rather than defensive. `network.onewayNoEntryArms` and the Д4 pass
+ * both skip `roundabout` edges by construction, so „this district posts no
+ * one-way plate" says nothing whatever about a ring — and both OSM districts DO
+ * sign theirs: one ring each, carrying 4 (d2-v1) and 2 (district-v1) Г12
+ * «Кръгово движение» plates at its mouths, 49.3 m and 33.7 m from the centre.
+ * A student sent the wrong way round a Sofia roundabout was told which way it
+ * turns, so he keeps the conviction: those 12 + 6 ring edges still grade.
+ *
+ * A MOTORWAY CARVE-OUT WAS CONSIDERED AND DELIBERATELY NOT WRITTEN. Neither OSM
+ * district has a single `motorway` edge (measured: 0 and 0), so it would have
+ * been a branch no drive in the product can reach; and mw-v1, mw-entry-v1 and
+ * mw-exit-v1 are scenario maps that post В1 at their mouths and pass this gate
+ * on their own. The wrong way up an автомагистрала stays a conviction.
+ *
+ * WHAT DELIBERATELY DOES NOT CHANGE: `tick.oneway`. It is surface CONTEXT, and
+ * `rules/engine.ts` arms the CROSSED_SOLID_LINE family on `tick.oneway === false`
+ * — flipping it here would arm the осева detectors on one-way streets, which is
+ * the „fix that takes something away" this programme has already shipped once.
+ */
+function worldStatesOneWayStreets(district: District): boolean {
+  // `parseDistrict` returns the raw document unchanged, so this IS the
+  // builder's own input — the same cast `drivableSurface()` makes below.
+  return scenarioSignScale(district as unknown as WorldDistrict) !== undefined;
+}
 
 /**
  * RAIL PACK slice 1 (ADR-006 stage 3a — doc 72 RX-01/RX-02/RX-03): how far
@@ -863,6 +969,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   const turns = new TurnDetector();
   const locator = new Locator(index);
   const defaultLimit = district.meta.defaults?.maxspeedUrbanKmh ?? BG_URBAN_DEFAULT_KMH;
+  /** Whether the drawn world states this map's one-way STREETS — a property of
+   *  the document, so it is resolved once here rather than per tick. One field
+   *  read through the painter's own gate; no builder is run (see
+   *  `worldStatesOneWayStreets`). */
+  const oneWayStreetsStated = worldStatesOneWayStreets(district);
 
   // THE SURFACE CONSULT (see the header block). Lazy: a runtime that is never
   // sampled — the content tools, the catalogue tests — pays nothing, and a
@@ -2015,8 +2126,18 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // `under: "carriageway"` — on the OPPOSING asphalt, which is the drive
       // this conviction exists for and the one frame of it that shows a road.
       // What this line removes is only the bill the runtime itself contradicts.
+      //
+      // …AND IT STANDS DOWN AGAIN WHERE THE WORLD DRAWS NO ONE-WAY EITHER, which
+      // is the same row's other half and the half the kerb carve-out above could
+      // not reach: both surviving w22 reproductions are on `d2-v1`, on asphalt,
+      // on one of the 125 one-way edges that map posts not a single В1, Д4, Г2,
+      // Г3 or М10 arrow for. The measurement, the law, the named cost and the
+      // roundabout exception are all at `worldStatesOneWayStreets` above.
       const wrongWay =
-        edgeRt !== null && edgeRt.edge.oneway && !offCarriageway
+        edgeRt !== null &&
+        edgeRt.edge.oneway &&
+        !offCarriageway &&
+        (oneWayStreetsStated || edgeRt.edge.roundabout)
           ? isWrongWay(true, index.tangentAt(fix.edgeIdx, fix.sM), v.headingDeg)
           : false;
 

@@ -315,6 +315,11 @@ export const SC_SPEED_CREEP: ScenarioSpec = {
  *
  * ── THE STRIKE DID NOT DIE, IT MOVED ONE LANE — re-measured 2026-08-30 ──────
  *
+ * HISTORY. Everything from here to the next rule is the picture as it stood on
+ * 2026-08-30. Its routed address 1 was repaired on 2026-09-01 and the strike
+ * band below no longer exists — the closing measurement is the last section of
+ * this block. Read that before acting on any number in this one.
+ *
  * `e8414c56` came back with a judge's overturn of a w17 closure, and the
  * overturn is right about the thing it measured: `git diff 32505eb b7a321cd --
  * platform/src` is EMPTY, so the build that convicted this drive and the build
@@ -371,11 +376,58 @@ export const SC_SPEED_CREEP: ScenarioSpec = {
  * `paceMode: "scheduledCruise"` is what §2 of sp-flow-lead-lane.test.ts
  * deliberately pins AGAINST („the exposure is REAL and still happens").
  *
- * ONE MORE THING THE SWEEP CANNOT SEE, measured in the same run: in the TAUGHT
- * lane the passer above reaches 0.00 m of centre-to-centre separation with the
- * player and the session books NOTHING — no collision, no near miss, no code.
- * A car drives clean through a student and the product is silent. Same address
- * as the routed note above; the number is now 0.00 rather than 0.004.
+ * ── THE ROUTE WAS RIGHT AND THE REPAIR LANDED — closed 2026-09-02 ───────────
+ *
+ * Routed address 1 was answered by wave 17 (d0ca244, 2026-09-01) — one day
+ * after the sweep above, which is why that sweep still saw the band. It is not
+ * the `reentryArc` edit this file proposed; `traffic/staged.ts` solved the same
+ * problem one layer down and better, by making the GUARD able to finish rather
+ * than by refusing the re-entry:
+ *
+ *   - `guardWindowM()` — on RETURN LAPS ONLY (`returns > 0`) the guard stops
+ *     opening at a fixed 16 m and opens at the actor's own stopping reach,
+ *     `speed / GUARD_APPROACH_GAIN + GUARD_STOP_SHORT_M`. For this car that is
+ *     17 / 0.8 + 6 ≈ 27 m, which is precisely the „it can arrest 12.6 m/s and
+ *     the car arrives at 17" arithmetic above, inverted and paid;
+ *   - step 3c — the same refusal measured BY ARC rather than in the actor's
+ *     heading frame, so a student who is astern of it on its own road is seen
+ *     at all. Gated on `returns > 0` for the reason this file gave: the FIRST
+ *     run is the encounter the orchestrator timed and the engine is grading.
+ *
+ * RE-MEASURED 2026-09-02, same rig as the 2026-08-30 sweep (production stack,
+ * ov-keepright-v1, seed 7, ambient 0, the shipped `staged` cast), player line
+ * swept laterally across the whole carriageway to the finish objective, under
+ * four control laws — the sweep's 12 км/ч stop-go, the taught 47, steady 30,
+ * steady 20:
+ *
+ *   player centre x   contacts   lead min separation   nearest astern
+ *   12.19 (taught)       0        8.13 m … 54.21 m       0.07 m … 228 m
+ *    5.86 … 2.26         0        6.42 m … 12.89 m       6.42 m … 12.76 m
+ *    0.0                 0        6.01 m …  6.00 m       4.42 m …  4.44 m
+ *
+ * Zero contacts EVERYWHERE, on all four laws — the 43-contact band at
+ * 5.86…2.26 is gone. And it is gone because the body is held off, not because
+ * the billing was silenced: in that band the pace car's closest approach is now
+ * 6.42 m, i.e. `GUARD_STOP_SHORT_M` (6) plus one tick of travel, where it used
+ * to be 0 across 44 overlap frames. That is the guard arriving in time, which
+ * is the one outcome that could not be faked by a harness change — the judge's
+ * standing objection to the w17 closure („not one line of the simulator moved")
+ * does not reach this one: `git diff --stat b7a321cd 1de9ebe -- platform/src`
+ * is 147 files and 14,356 insertions, and `staged.ts` is one of them.
+ * Corroborated end-to-end by the w22 sweep on that build: `sc-speed-dangerous
+ * __pc-right` returns ИЗДЪРЖАН, 0 опасни грешки, both route objectives ticked.
+ *
+ * WHAT THE SAME RUN SAYS IS STILL OPEN, and it is smaller than this file used
+ * to claim. The passer still drives THROUGH a body with nothing booked — no
+ * collision, no near miss, no code — but only when the student is himself
+ * sitting in the OVERTAKING lane it passes into: min separation 0.04 m at
+ * x = 4.06, against 8.13 m (taught pace) and 6.42 m (stop-go) in the taught
+ * lane. The earlier note's „0.00 m in the TAUGHT lane" is therefore withdrawn
+ * as measured — it was true of the pre-wave-17 tree and is not true now. The
+ * remaining defect is real (a car may not pass through anybody), its address is
+ * still `RearTailgaterRunner`'s empty cast in `orchestrator/runners.ts` plus
+ * the re-entry, and it is still not this file's: nothing authorable on
+ * `SPD_FLOW_PASSER` decides whether two overlapping bodies are noticed.
  */
 const SPD_FLOW_LEAD: BrakingLeadCarSpec = {
   id: "sc-dng-flow-lead",

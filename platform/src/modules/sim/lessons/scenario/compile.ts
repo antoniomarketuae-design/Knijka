@@ -1315,8 +1315,39 @@ export function compileScenario(
     objectives,
     // S1 (doc 76 §0 low-speed fidelity): scenario micro-lessons grade ANY
     // contact — a 2 km/h bumper touch on a parked car IS the mistake being
-    // taught. Street lessons keep VehicleRig's 10 km/h nudge tolerance by
-    // omitting the field.
+    // taught.
+    //
+    // THE SENTENCE THAT USED TO CLOSE THIS BLOCK — „Street lessons keep
+    // VehicleRig's 10 km/h nudge tolerance by omitting the field" — DESCRIBED
+    // A CARVE-OUT THIS CODE HAS NEVER HAD, and it has now sent five waves to
+    // the wrong file. compileScenario never omits it: the line below writes 0
+    // for all 150 templates, street drills included; LessonScene.tsx hands it
+    // to VehicleRig's `collisionMinKmh` prop and VehicleRig gates on
+    // `impactKmh >= collisionMinKmh`. At 0 that predicate is ALWAYS true, so
+    // every rapier `onCollisionEnter` on the chassis — kerb, verge, terrain,
+    // facade — becomes a terminating ОПАСНА ГРЕШКА, and the sub-threshold
+    // branch beside it („a kerb scuff or a bumper nudge. NOT graded") is
+    // unreachable for the whole catalogue. Photographed on a RIGHT drive:
+    // `.audit-frames/w22/frames/sc-merge-from-property__mobile-right/run.log`
+    // bills «Удар в неподвижно препятствие −10 изпитни т.» at 04-t101s with
+    // the car reading 0 км/ч in REVERSE, standing still since 04-t084s.
+    //
+    // AND IT CANNOT BE REPAIRED BY THIS NUMBER, which is why the row keeps
+    // arriving at this file. The acceptance test is „a 2 km/h bay touch must
+    // still convict, a kerb mount must not", and that is a distinction between
+    // BODIES, not between speeds: one scalar per lesson cannot carry it.
+    // Raising it here would also stop grading a 5 km/h roll into the тротоар
+    // walker sc-merge-from-property is entirely about. The two files that CAN
+    // carry it, measured 2026-09-02:
+    //   · `ScenarioObstacles.tsx` tags only the parked-VEHICLE bodies
+    //     (`userData={r.tag}` — npcCollider/kind/npcId). The cone, pole, wall,
+    //     pillar, forecourt and worker `RigidBody`s mount untagged, so today
+    //     an authored cone is indistinguishable from the district's trimesh.
+    //   · `VehicleRig.tsx` reads that tag one line ABOVE the gate
+    //     (`readNpcColliderUserData`) and then ignores it when choosing the
+    //     threshold.
+    // Tag the rest, then gate a TAGGED contact at this lesson's number and an
+    // UNTAGGED one at `COLLISION_MIN_KMH`, and both directions hold at once.
     collisionMinKmh: 0,
     ...(environment ? { environment } : {}),
     ...(parkingBay ? { parkingBay } : {}),

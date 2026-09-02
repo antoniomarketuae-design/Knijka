@@ -394,6 +394,86 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
  * true. (3) Whichever gate certifies a shadow: replay it at the rung's
  * compiled count, not at 0 — otherwise the next round refutes this row for the
  * fourth time on the same empty street, exactly as the last three did.
+ *
+ * ── W22 (2026-09-02) · RE-MEASURED, AND ONE CORRECTION TO THE BLOCK ABOVE ──
+ *
+ * The row came back with a split judgement — «mobile-right now passes cleanly,
+ * pc-right is still convicted 23 points with 2 dangerous errors led by failure
+ * to yield» — so both halves were driven again against the CURRENT tree. The
+ * confirmed half is real and reproduces. The cited frame is not evidence for
+ * it, and w21's own explanation of it is wrong in a way that would misdirect
+ * the repair.
+ *
+ * THE FRAME THE JUDGE QUOTED, opened. `w22/frames/sc-junction-blind__pc-right/
+ * _audit-debrief.json` bills THREE errors, in this order: «Непропускане на
+ * пътно превозно средство с предимство» −10 at 1:54, «Излизане от платното за
+ * движение» −3 at 2:17, «Удар в неподвижно препятствие» −10 at 2:23. The
+ * finding's own sentence — «Пътнотранспортно произшествие … crashes into the
+ * priority car» — appears nowhere; the second dangerous error is the бордюр /
+ * стълб / ограда charge, and the error immediately before it says why. The
+ * track agrees: `guidance.samples` (78 rows, wz = −y) runs (4.06, −113.9) →
+ * (−2.45, −0.4) at 24 км/ч → standing at (−1.4, +40.3). tj-occluded-v1 still
+ * has NO north arm (`roads.nodes`: W −140, C 0, E +140, S −130 — re-read, not
+ * inherited), so the leg crossed the crossbar and died 40 m out in the field,
+ * 63 m from objective 2's disc at (−50, 4.06) r 9. Third wave running, same
+ * shape: the windscreen-following driver never turns. The mobile leg is the
+ * counter-sample — ИЗДЪРЖАН, 0 наказателни точки, ★★★, both objectives at 0:46
+ * and 1:27, «Похвали ✓ Правилно отстъпено предимство 1:28» — which is what the
+ * SAME lesson does when the drive is the briefing's.
+ *
+ * THE CONFIRMED HALF REPRODUCES, on today's tree, same method as w21 (the
+ * shadow's geometry through `compileScenario` → `createLessonSession` →
+ * `applyTick`, handed the count the rung compiles to):
+ *
+ *   sc-junction-blind  L1 n=4 · L3 n=5 · L5 n=6  → 11 / 11 / 11 of 20 seeds
+ *   the same three rungs at vehicleCount 0       →  0 /  0 /  0 of 20
+ *   sc-junction-rhr    L1 n=4 · L3 n=5 · L5 n=8  →  6 /  6 /  7 of 20
+ *
+ * every conviction FAILED_TO_YIELD. The family half of w21 holds by
+ * measurement and not by argument: a template that hosts no occluding building
+ * at all, in another file, on another district, fails the same line at better
+ * than half this rate. The address is still not here.
+ *
+ * THE CORRECTION, and it changes what the owning lane should build. W21 wrote:
+ * „Wait 4 s and the line passes; wait the 8 s the demo waits and it fails;
+ * wait 14 s or 20 s and it passes again." That is true of seed 7 and of
+ * nothing wider. Swept across the same 20 seeds at L1 n = 4, holding the brake
+ * at the shadow's own yield point (4.06, −19.5) for 0 / 2 / 4 / 6 / 8 / 10 /
+ * 14 / 20 s, the convictions are 13 / 5 / 8 / 13 / 11 / 7 / 5 / 6 out of 20.
+ * There is no wait length that clears the line, and waiting LONGER is neither
+ * better nor worse — seeds 10, 11, 13, 15, 16 and 18 convict at almost every
+ * one of them. So the sentence to hand the lane that owns the predicate is not
+ * „the release timing is a few seconds out"; it is „the predicate never reads
+ * the student's yield at all". A repair aimed at the clock passes seed 7 and
+ * changes nothing a student would feel.
+ *
+ * WHICH PREDICATE, by name, so the fix lands the first time. The live binding
+ * is `scene/lessonWorldRecipe.ts` `wireTrafficQueries` →
+ * `setRightConflictQuery` → `traffic/system.ts conflictFromRightFor`, and that
+ * function asks exactly four questions: within `radiusM` of the NODE, moving
+ * above CONFLICT_MIN_SPEED_MPS, on the player's right past RIGHT_MIN_M, and
+ * bearing at least CONFLICT_SAME_DIR_DEG off his own. It never asks whether
+ * the vehicle has CLEARED the conflict point. Its sibling `conflictNearFor`
+ * was given that clause in doc 87 B5 („it said that I didnt let the traffic
+ * cars to pass, when in Fact I let everybody pass") and the right-hand-rule
+ * twin was left behind — which is the same shape of asymmetry, and the same
+ * founder sentence, one adjudicator over.
+ *
+ * WHY THIS IS A REQUIREMENT-ZERO ROW AND NOT A SCORING ONE (doc 64 THEO-4).
+ * The card that follows the conviction prints «✔ Правилното действие:
+ * … потегли само когато никой не приближава» — to a student who did precisely
+ * that, having crept, looked and stood eight seconds on the brake. A verdict
+ * that is merely harsh is a tuning argument; a verdict whose explanation
+ * describes a different drive than the one the student drove is the crime this
+ * product exists to not commit.
+ *
+ * NOTHING IN THIS FILE WAS CHANGED FOR IT — and the reasons are w21's two,
+ * both re-verified rather than inherited: `traffic/__tests__/ambient-presence
+ * .test.ts:209` still builds SUBJECTS as „a family baseline AND `t.traffic ===
+ * undefined`", so authoring a count here DELETES this drill from the dead-street
+ * gate instead of turning it red; and `recordScJunction2Drive`
+ * (traces/scJunctions2.ts) still takes `Pick<…, "onTick">`, so every gate that
+ * certifies this shadow still certifies it at 0.
  */
 
 /**

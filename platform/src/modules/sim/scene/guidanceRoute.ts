@@ -1383,10 +1383,69 @@ function walkAheadRaw(
 //     exit, and it can no longer run past it.
 //   · when the car is already within a couple of metres of the next mouth the
 //     leg is shorter than `MIN_ROUTE_LEN_M` and `finalizeRoute` drops it, so
-//     the ribbon stands down. That is the smoothStop precedent — nothing true
-//     is left to say — and it is the honest half of not knowing the exit.
+//     the ribbon stands down. That was called „the honest half of not knowing
+//     the exit". IT WAS NOT HONEST, IT WAS THE ROW AGAIN — see the next block.
 // The real repair is to let the objective NAME its exit; that lives in
 // `lessons/types.ts` (`RoundaboutParams`) and the templates, not here.
+//
+// ── 2026-09-02: THE STAND-DOWN IS WHERE THE ROW WENT, NOT WHERE IT ENDED ───
+//
+// The paragraph above shipped the cut and then conceded the stand-down in one
+// clause, as if it were rare. It is not rare — it is the DEFAULT, and it is
+// the same row. Every maneuver row on this shelf is handed over by the disc of
+// the objective before it, and on all six drills that disc is authored ON a
+// mouth (`sc-rb-lane-choice` (0, 21.94), `sc-rb-circulate-priority` and
+// `sc-rb-busy-gap` (6.16, 16.91), `sc-rb-exit-signal` (−16.91, 6.16)). The row
+// opens the instant the car ENTERS that disc, i.e. one radius BEFORE its
+// centre — and one radius before a mouth is exactly the band between
+// RING_MOUTH_SKIP_M (1.5 m, where the snap artifact stops) and
+// MIN_ROUTE_LEN_M (6 m, where a ribbon starts existing). Cut at the mouth,
+// then dropped for being too short: nothing on the asphalt at all.
+//
+// MEASURED on the shipped rung, sweeping the handover disc (37 poses each,
+// `deriveGuidanceRoute` through `guidanceGoalFor`, L1/L3/L5):
+//
+//   sc-rb-lane-choice        14/37 poses NULL at L3, 15/37 at L1
+//   sc-rb-exit-signal        18/37 at L3, 12/37 at L1
+//   sc-rb-circulate-priority 18/37 at L3, 12/37 at L1
+//   sc-rb-busy-gap           18/37 at L3, 12/37 at L1
+//   sc-rb-ped-exit            4/37 at L3   ·  sc-roundabout-entry 0/37 at L3
+//
+// And on the CORRECT line of `sc-rb-lane-choice` it is not a probability at
+// all. Walking the inner lane (r = 21.94) into the (0, 21.94) disc: the car
+// enters it at φ ≈ 171°, and from φ 171 through φ 177 — the whole leading two
+// thirds — the leg is NULL. The ribbon only appears from φ ≈ 178, inside
+// 0.8 m of the centre. So on the drill whose entire subject is WHICH EXIT to
+// take, the moment «Премини през кръга и го напусни» went live was the moment
+// the green line went out. That is the row's own second clause — „neither ever
+// reaches the third exit" — with a mechanism in this file: the student was
+// shown nothing to reach it BY.
+//
+// THE FIX, and its bound. A mouth under `MIN_ROUTE_LEN_M` away is undrawable,
+// so it is the mouth the car is standing in, and the cut moves to the one
+// after it (RING_MOUTH_UNDRAWABLE, in `ringRouteRaw`). AT MOST ONE mouth is
+// ever skipped, which is what keeps this from re-opening the defect the block
+// exists to close: the leg can never exceed `MIN_ROUTE_LEN_M` plus ONE mouth
+// spacing — 6 + 40.72 = 46.7 m on rb-2lane, 6 + 28.2 = 34.2 m on rb-mini —
+// against centreline laps of 162.9 m and 112.8 m. It still ends AT a mouth, it
+// still names no exit, and `sc-rb-lane-choice`'s leg now measures 36.5–44.5 m
+// over the whole handover disc (41.1 m from its centre), every one of them
+// ending at (−26.00, 0.00) — the WEST mouth, the third exit — where before it
+// was drawn from a 0.8 m island of poses and was nothing everywhere else.
+// Re-measured over the same 37 poses: NULLs 14 → 0 on `sc-rb-lane-choice` at
+// every rung, 18 → 1 on the three rb-mini drills, and `sc-rb-ped-exit` and
+// `sc-roundabout-entry` byte-identical (their cuts are (a), not (b)).
+//
+// THE CONSEQUENCE, stated rather than left to be found. On a drill whose own
+// exit IS the near mouth — `sc-rb-circulate-priority` leaves at NORTH and its
+// handover disc stands 20° short of it — a pose 1.5–6 m before that node now
+// draws 30–34 m of ring to the WEST mouth instead of drawing nothing. That is
+// still the ring, and the ribbon has never named an exit, but it is worth
+// being clear that the trade is „a true statement about the ring" against
+// „nothing at all", not against „a ribbon to your exit". The live path is not
+// in that band — the leg is derived ONCE, when the row opens, and the car
+// enters that disc ≈10.3 m before the node, well outside it — so this is the
+// bound on the change rather than a description of it.
 //
 // The one case where the ribbon may leave the ring is when the CAR already
 // has: once the walk is outside `exitRadiusM`, the maneuver is complete by the
@@ -1401,6 +1460,15 @@ function walkAheadRaw(
  * whenever the pose snaps onto an edge END, which is exactly where a car
  * sitting on a mouth snaps. Small enough that no mouth a student could still
  * act on is skipped.
+ *
+ * IT IS NOT, BY ITSELF, „the mouth the nose is already in" (row
+ * sc-rb-lane-choice:ffdffd55, re-measured 2026-09-02). 1.5 m is where the
+ * SNAP artifact stops; `MIN_ROUTE_LEN_M` (6 m) is where a ribbon starts
+ * existing, and everything between the two was cut at a mouth and then dropped
+ * by `finalizeRoute` — no ribbon at all. That band is not an edge case on this
+ * shelf: every maneuver row in the catalogue is handed over by a disc authored
+ * ON a mouth, so the pose the row opens in lands in it by construction. So the
+ * second half of the sentence lives at RING_MOUTH_UNDRAWABLE, in the loop.
  */
 const RING_MOUTH_SKIP_M = 1.5;
 /**
@@ -1440,10 +1508,13 @@ function rawArcLengths(raw: RawRoute): number[] {
  *       `enterRadiusM` — the evaluator's own completion test, so this is the
  *       maneuver ending rather than a guess; and
  *   (b) the first junction node at least `RING_MOUTH_SKIP_M` ahead that stands
- *       within `enterRadiusM` of the island — the next MOUTH. The radius test
- *       is what keeps a 458 m city approach (`l3-roundabout` from spawn-3) from
- *       being chopped at the first side street it passes: only nodes that are
- *       part of the roundabout qualify.
+ *       within `enterRadiusM` of the island — the next MOUTH — unless the leg
+ *       to it is under `MIN_ROUTE_LEN_M`, i.e. too short to be drawn at all, in
+ *       which case it is the mouth the car is STANDING IN and the one after it
+ *       is taken instead (RING_MOUTH_UNDRAWABLE; at most one is ever skipped).
+ *       The radius test is what keeps a 458 m city approach (`l3-roundabout`
+ *       from spawn-3) from being chopped at the first side street it passes:
+ *       only nodes that are part of the roundabout qualify.
  */
 function ringRouteRaw(
   graph: RouteGraph,
@@ -1503,15 +1574,25 @@ function ringRouteRaw(
     break;
   }
 
-  // (b) the next mouth.
-  let cutMouth = Infinity;
+  // (b) the next mouth. TWO are collected, not one, because the first can be
+  // the mouth the car is STANDING IN rather than the one it is heading for —
+  // see RING_MOUTH_UNDRAWABLE below the loop.
+  const mouths: number[] = [];
   for (const j of raw.jointIdx) {
     if (j <= 0 || j >= raw.points.length) continue;
     if (s[j] < RING_MOUTH_SKIP_M) continue;
     if (Math.hypot(raw.points[j][0] - cx, raw.points[j][1] - cy) > enterRadiusM) continue;
-    cutMouth = s[j];
-    break;
+    mouths.push(s[j]);
+    if (mouths.length >= 2) break;
   }
+  // RING_MOUTH_UNDRAWABLE. A mouth so close that the leg to it could not be
+  // DRAWN is not a decision the student can still act on — it is the mouth he
+  // is already standing in, and the sentence RING_MOUTH_SKIP_M states was
+  // simply calibrated to the wrong length. So the cut moves to the mouth after
+  // it, and the ribbon says the one thing that is still true from here: the
+  // ring goes on, and your next decision point is there.
+  const cutMouth =
+    mouths.length > 1 && mouths[0] < MIN_ROUTE_LEN_M ? mouths[1] : (mouths[0] ?? Infinity);
 
   const cut = Math.min(cutOut, cutMouth);
   if (Number.isFinite(cut)) return trimRawTo(raw, cut);
