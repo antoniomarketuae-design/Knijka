@@ -88,7 +88,16 @@ export function scOvCrossingOvertakeMistakeInZoneScript(): DriveScript {
       { kind: "annotation", textBg: "Изпреварване и връщане в зоната на пътеката — може да пропуска пешеходец." },
       { kind: "drive", points: [[X_RIGHT, 224], [X_RIGHT, 290]], targetKmh: 28 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Пред пътека не се изпреварва — това е опасна грешка (чл. 119)." },
+      // CITATION CORRECTED 2026-09-02, and it is the SECOND half of a fix that
+      // only landed in one file. rules/catalog.ts:1070 records the first half on
+      // 2026-08-03: «this cited чл. 119, which is the duty to YIELD to
+      // pedestrians — it does not ban overtaking anywhere. The ban is чл. 43».
+      // That file now carries lawRef «ЗДвП чл. 43, т. 5 и т. 6; чл. 119, ал. 2»
+      // while THIS demo — the one the student actually watches — still named
+      // чл. 119 on its own. ADR-002 is not only about free recall; a citation
+      // corrected in the rule and left wrong in the teaching material tells the
+      // student the wrong article just as effectively.
+      { kind: "annotation", textBg: "Пред пътека не се изпреварва — това е опасна грешка (чл. 43, т. 5 и т. 6)." },
     ],
   };
 }
