@@ -116,9 +116,16 @@ export const PROBE = () => {
     // THE QUESTION THE WHOLE ROW IS ABOUT: does anything on the glass SAY there
     // is more? A fold the student cannot detect is indistinguishable from a
     // finished list, which is what makes it worse than a visible truncation.
-    announced: [...sheet.querySelectorAll("[data-sim-overlay-sheet-fold]")].map((e) =>
-      (e.textContent || "").trim(),
-    ),
+    //
+    // BOTH SELECTORS, because the count MOVES. On a blocking briefing sheet
+    // SimOverlay's `ackCarriesSheetFold` suppresses the header row and prints
+    // the count on the «Разбрах» button instead (`data-sim-overlay-ack-fold`),
+    // which is every `02-briefing` frame this probe is pointed at — so asking
+    // only for the header row reported `announced: []`, i.e. this file's own
+    // pre-fix signature, on a sheet that is announcing at the cut.
+    announced: [
+      ...sheet.querySelectorAll("[data-sim-overlay-sheet-fold],[data-sim-overlay-ack-fold]"),
+    ].map((e) => (e.textContent || "").trim()),
   };
 };
 
