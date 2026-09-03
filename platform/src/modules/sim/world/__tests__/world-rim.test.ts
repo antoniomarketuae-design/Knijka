@@ -409,7 +409,7 @@ describe("§2 the horizon is closed — no direction out of a spawn reaches the 
    * THE SAME QUESTION OVER THE WHOLE CATALOGUE, cheaply.
    *
    * The nine batteries above read the DRAWN mesh, which costs a full
-   * `buildWorldGeometry` each — 103 of those is not a unit test. This one fires
+   * `buildWorldGeometry` each — 104 of those is not a unit test. This one fires
    * the same 72 rays against the rim rings and the authored footprints ONLY:
    * no terminus closure, no lot enclosure, no roundabout island, none of the
    * other masses a real build stands in the way. Every one of those can only
@@ -419,7 +419,7 @@ describe("§2 the horizon is closed — no direction out of a spawn reaches the 
    * It is what lets „the world has an edge" be said about the product rather
    * than about nine maps.
    */
-  it("103 authored micro-maps: no ray from an authored pose reaches the void", () => {
+  it("104 authored micro-maps: no ray from an authored pose reaches the void", () => {
     const open: string[] = [];
     let checked = 0;
     for (const id of allIds()) {
@@ -452,7 +452,10 @@ describe("§2 the horizon is closed — no direction out of a spawn reaches the 
         }
       }
     }
-    expect(checked).toBe(103);
+    // 104 since `sc-junction-scan:28e782ab` committed tj-scan-v1 — the JU-23
+    // scan drill's own Б2 T, so it stops sharing tj-stop-v1 with the JU-03 stop
+    // drill. Its three spawns are swept here like every other map's.
+    expect(checked).toBe(104);
     expect(open).toEqual([]);
   }, BUDGET_MS);
 });

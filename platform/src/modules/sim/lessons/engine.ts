@@ -35,6 +35,7 @@ import {
   parseSpeedMeasurement,
   reduceTick,
   type RuleEngineConfig,
+  type RuleEngineState,
   type RuleEvent,
   type ScorableEvent,
   type SimTick,
@@ -912,6 +913,28 @@ function isYieldFault(e: ScorableEvent): e is ViolationEvent {
 /** Shared empty ledger — see the read below for why the clean frame gets one. */
 const NO_YIELD_FAULTS: readonly YieldFaultRecord[] = [];
 
+/**
+ * Does the rule engine, RIGHT NOW, hold a full stop it would accept at a Б2 —
+ * the fact `ReachZoneParams.requireFullStop` consults (objectives.ts carries
+ * the sheet and the argument).
+ *
+ * THIS IS THE ENGINE'S OWN PREDICATE, character for character: `engine.ts`'s
+ * `stopLineCrossed` branch decides FULL_STOP_AT_STOP_SIGN vs
+ * STOP_SIGN_NO_FULL_STOP with `last !== null && t - last <= cfg.stopRecencySec`
+ * over the same `stop.lastQualifyingStopAt`, which itself is „≤
+ * `fullStopMaxSpeedKmh` for ≥ `fullStopMinDurationSec`". Reading it here rather
+ * than re-deriving a standstill from `tick.speedKmh` is the whole repair: two
+ * implementations of «пълно спиране» is how one sheet came to print a tick and
+ * a −10 for the same act.
+ *
+ * Read off the POST-tick state, so the frame a stop becomes qualifying is the
+ * frame the certificate may be issued on.
+ */
+function qualifyingStopCurrent(rules: RuleEngineState, t: number): boolean {
+  const last = rules.stop.lastQualifyingStopAt;
+  return last !== null && t - last <= rules.config.stopRecencySec;
+}
+
 /** Map rule-engine output onto the HUD event contract (toasts). */
 function toHudEvents(events: ReadonlyArray<RuleEvent>): HudEvent[] {
   return events.map((e) =>
@@ -1321,6 +1344,19 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           .filter(isYieldFault)
           .map((e) => ({ code: e.code as YieldFaultCode, tSec: e.t }))
       : NO_YIELD_FAULTS;
+  // …AND THE FULL STOP THE ENGINE WOULD ACCEPT AT A Б2 RIGHT NOW, for
+  // `ReachZoneParams.requireFullStop` (objectives.ts carries the sheet: one
+  // protocol printing «✓ Спри напълно на Б2 на изхода 1:16» over «✗ Неспиране
+  // на знак Б2 „Спри!" −10 изпитни т. ОПАСНА ГРЕШКА»).
+  //
+  // A POSITIVE FACT AND NOT A LEDGER, unlike its four neighbours above, and the
+  // difference is forced by the ORDER the contradiction is printed in: the
+  // certificate is issued the moment the car is slow inside the disc, which is
+  // metres BEFORE it reaches the paint, so the bill always lands after the tick
+  // and no after-the-fact read could ever withdraw it. The tick has to be
+  // refused at the moment it would be granted, against the same predicate the
+  // line itself will be judged by.
+  const fullStopHeld = qualifyingStopCurrent(rules, tick.t);
   // …AND THE REST INSIDE THE FORBIDDEN STRETCH, for
   // `ReachZoneParams.requireRestClean` (objectives.ts carries the frame: one
   // debrief printing «✗ Спиране в забранена зона −3 в 1:11» over «✓ Подмини
@@ -1434,6 +1470,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
         ...(crossedSolidLineInRun ? { crossedSolidLineInRun: true } : {}),
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
+        qualifyingStopCurrent: fullStopHeld,
         ...(activeSince !== null ? { objectiveActiveSinceSec: activeSince } : {}),
       };
       const before = evalStates[currentIndex];

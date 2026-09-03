@@ -168,11 +168,33 @@ describe("sc-merge-accel-lane — mistake demos grade their exact codes (doc 76 
     }
   });
 
-  it("the staged mainline car is pressure scenery: it never grades anything (doc 72 FO-07)", () => {
-    // Its only footprint is the outcome channel — never a SimTick event.
+  it("every staged actor here is pressure scenery: none of them grades anything (doc 72 FO-07)", () => {
+    // Their only footprint is the outcome channel — never a SimTick event.
+    //
+    // THE EXPECTATION WIDENED WITH THE DRILL, and it is the same expectation.
+    // It used to read `toBe("rearTailgater")`, which was a statement about the
+    // drill having exactly ONE staged actor rather than about grading — and
+    // the template now stages a second, `MWE_ONCOMING_FLOW`, the six-car
+    // column on the НАСРЕЩНО bank that answers sc-merge-accel-lane:09e6d6f4
+    // („at arrival the world is a plain two-lane strip through open grass
+    // fields"). Both runners are learn-only: `RearTailgaterRunner` and
+    // `OncomingStreamRunner` emit ZERO SimTick events bar a contact, so what
+    // this test is FOR — that not one point on this drill comes from an actor
+    // instead of from the student's own channel — is now asserted of both, and
+    // of anything a later wave stages. The violation ledgers above are the
+    // other half of it and are unchanged: the demos still grade exactly
+    // HARSH_BRAKING_NO_CAUSE and LANE_CHANGE_WITHOUT_MIRROR_CHECK + COLLISION,
+    // and the shadow still replays with none.
+    const LEARN_ONLY = new Set(["rearTailgater", "oncomingStream"]);
     for (const name of NAMES) {
       const drive = drives.get(name)!;
-      for (const o of drive.outcomes) expect(o.kind, name).toBe("rearTailgater");
+      for (const o of drive.outcomes) expect(LEARN_ONLY, `${name}/${o.kind}`).toContain(o.kind);
+      // …and no outcome may claim the student failed something an actor did:
+      // a learn-only runner that reported a failure would be grading by the
+      // back door, which is exactly what FO-07 forbids.
+      for (const o of drive.outcomes) {
+        expect(o.detail, `${name}/${o.kind}`).not.toBe("violation");
+      }
     }
   });
 });

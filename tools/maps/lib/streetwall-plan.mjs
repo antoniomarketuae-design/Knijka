@@ -133,6 +133,13 @@ export const TARGETS = [
   { id: "ov-narrow-v1", style: "compact", cfg: STREET, why: "narrow-street overtaking — 3 templates" },
   { id: "tj-rhr-v1", style: "compact", cfg: JUNCTION, why: "right-hand-rule T — 2 templates" },
   { id: "tj-emerge-v1", style: "compact", cfg: JUNCTION, why: "emerging onto a priority road — 2 templates" },
+  // sc-junction-scan:28e782ab — the JU-23 scan drill's own Б2 T. It shares
+  // tj-stop-v1's EDGE IDS (every tj map does), and this pass keys its jitter on
+  // the edge id, so an identical-armed clone would have been handed the
+  // identical wall — the sameness the row exists to close. Its arms are 130/110
+  // against tj-stop-v1's 150/120, so the slots land elsewhere and the street
+  // reads as its own place.
+  { id: "tj-scan-v1", style: "compact", cfg: JUNCTION, why: "the ляво-дясно-ляво scan drill's own Б2 T — 1 template" },
   { id: "wb-boulevard-v1", style: "compact", cfg: STREET, why: "wide boulevard — 2 templates" },
   { id: "vu-pass-v1", style: "compact", cfg: STREET, why: "passing a vulnerable user — 2 templates" },
   { id: "sp-rain-v1", style: "compact", cfg: STREET, why: "speed in rain — 2 templates" },

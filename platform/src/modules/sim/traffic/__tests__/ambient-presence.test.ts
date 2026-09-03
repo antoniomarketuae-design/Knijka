@@ -220,8 +220,9 @@ const SUBJECTS = (SCENARIO_TEMPLATES as ScenarioSpec[]).filter(
  * worth the next lane's time and neither yet proven:
  *
  *  1. The probe parks the player in the carriageway 30 m short of the node for
- *     a full minute. On the OTHER `tj-stop-v1` spawns (`sc-junction-stop`,
- *     `sc-junction-scan`) the same district measures 52% stopped, so the pose,
+ *     a full minute. On the OTHER `tj-stop-v1` spawn (`sc-junction-stop`) and
+ *     on its twin `tj-scan-v1` (`sc-junction-scan`) the maps measure 52%
+ *     stopped, so the pose,
  *     not the map, is what backs the district up — a standing car absorbs the
  *     ambient agents into a queue behind it and the street dies. If that is the
  *     mechanism it is a REAL finding about live play, not a probe artefact:

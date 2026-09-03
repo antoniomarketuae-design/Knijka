@@ -49,7 +49,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ROOMY_HUD_FLOOR_PX } from "../immersive";
+import { MINIMAP_TOGGLE_SIZE_PX, ROOMY_HUD_FLOOR_PX } from "../immersive";
 import {
   isToastArrival,
   LEGEND_ANNOUNCE_MS,
@@ -125,6 +125,26 @@ describe("notifyColumnCapPx · the cap follows the column's own top", () => {
       const shippedBottom = s.top + (s.height - ROOMY_HUD_FLOOR_PX - 56);
       expect(shippedBottom, `${s.id}: the shipped cap was already clear`).toBeGreaterThan(
         s.height - ROOMY_HUD_FLOOR_PX,
+      );
+    }
+  });
+
+  it("…and above the 🗺 toggle, which stands ON the band rather than in it", () => {
+    // sc-ac-highbeam-lead:8b149c07 filed TWO symptoms on one frame
+    // (`sweep161/sc-ac-highbeam-lead/pc-wrong/04-t018s.png`): the −10 ОПАСНА
+    // ГРЕШКА card cut mid-sentence, AND „the round mirror button painted on top
+    // of the card's lower right corner". That button is `data-hud=
+    // "minimap-column"`'s 🗺 toggle, whose bottom is `--sim-hud-floor`, so it
+    // occupies the 40 px ABOVE the floor line the case above stops at — i.e.
+    // that case passes with the toggle entirely under the card. The clearance
+    // is real but unstated: it exists only because the column's band gutter
+    // (56) happens to exceed MINIMAP_TOGGLE_SIZE_PX (40), and those two numbers
+    // live in two files. MUTATION, watched to fail: a gutter of 20 puts the
+    // column's bottom at 491 against the toggle's top at 471 and turns this red.
+    for (const s of DESKTOP_STAGES) {
+      const bottom = s.top + notifyColumnCapPx(s.height, s.top);
+      expect(bottom, `${s.id}: the column reaches the map toggle`).toBeLessThanOrEqual(
+        s.height - ROOMY_HUD_FLOOR_PX - MINIMAP_TOGGLE_SIZE_PX,
       );
     }
   });

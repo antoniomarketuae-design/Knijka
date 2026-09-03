@@ -1,0 +1,440 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "tj-scan",
+  "label": "Учебно Т-кръстовище със знак Б2 „Спри!“ — оглеждане ляво-дясно-ляво (сценарий JU-23)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_ju_junctions2.mjs",
+  "boundsLocalMeters": {
+   "minX": -130,
+   "minY": -110,
+   "maxX": 130,
+   "maxY": 0
+  },
+  "attribution": {
+   "text": "Учебно Т-образно кръстовище — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.37,
+   "nodes": 4,
+   "edges": 3,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "t-junction",
+   "params": {
+    "control": "stop",
+    "priorityArmM": 130,
+    "minorArmM": 110,
+    "lanes": 2,
+    "priorityMaxKmh": 50,
+    "minorMaxKmh": 40
+   },
+   "junctionNodeId": "tj-n-c",
+   "expectedControl": "stopSignOnMinor"
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "tj-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "tj-n-e",
+    "x": 130,
+    "y": 0
+   },
+   {
+    "id": "tj-n-s",
+    "x": 0,
+    "y": -110
+   },
+   {
+    "id": "tj-n-w",
+    "x": -130,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "tj-e-w",
+    "from": "tj-n-w",
+    "to": "tj-n-c",
+    "class": "primary",
+    "name": "Главна улица — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      -130,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "parkingSide": "left"
+   },
+   {
+    "id": "tj-e-e",
+    "from": "tj-n-c",
+    "to": "tj-n-e",
+    "class": "primary",
+    "name": "Главна улица — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      130,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "tj-e-s",
+    "from": "tj-n-s",
+    "to": "tj-n-c",
+    "class": "residential",
+    "name": "Странична улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 110,
+    "geometry": [
+     [
+      0,
+      -110
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "parkingBand": true
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "tj-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "tj-b-corner",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -40,
+     -40
+    ],
+    [
+     -26,
+     -40
+    ],
+    [
+     -26,
+     -26
+    ],
+    [
+     -40,
+     -26
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-w-r0",
+   "height": 27.2,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     -122.68,
+     -22.11
+    ],
+    [
+     -100.32,
+     -22.11
+    ],
+    [
+     -100.32,
+     -41.67
+    ],
+    [
+     -122.68,
+     -41.67
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-w-r1",
+   "height": 20.4,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     -90.79,
+     -22.78
+    ],
+    [
+     -70.21,
+     -22.78
+    ],
+    [
+     -70.21,
+     -40.56
+    ],
+    [
+     -90.79,
+     -40.56
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-w-l0",
+   "height": 27.2,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     -124.33,
+     22
+    ],
+    [
+     -98.67,
+     22
+    ],
+    [
+     -98.67,
+     41.86
+    ],
+    [
+     -124.33,
+     41.86
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-w-l1",
+   "height": 20.4,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     -92.44,
+     22.67
+    ],
+    [
+     -68.56,
+     22.67
+    ],
+    [
+     -68.56,
+     40.74
+    ],
+    [
+     -92.44,
+     40.74
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-e-r2",
+   "height": 20.4,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     66.66,
+     -22.42
+    ],
+    [
+     94.34,
+     -22.42
+    ],
+    [
+     94.34,
+     -40.27
+    ],
+    [
+     66.66,
+     -40.27
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-e-r3",
+   "height": 17,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     98.55,
+     -20.09
+    ],
+    [
+     124.45,
+     -20.09
+    ],
+    [
+     124.45,
+     -36.15
+    ],
+    [
+     98.55,
+     -36.15
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-e-l2",
+   "height": 13.6,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     68.68,
+     20.9
+    ],
+    [
+     92.32,
+     20.9
+    ],
+    [
+     92.32,
+     43.78
+    ],
+    [
+     68.68,
+     43.78
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-e-l3",
+   "height": 34,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     100.57,
+     21.57
+    ],
+    [
+     122.43,
+     21.57
+    ],
+    [
+     122.43,
+     42.66
+    ],
+    [
+     100.57,
+     42.66
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-s-r0",
+   "height": 17,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     20.04,
+     -96.44
+    ],
+    [
+     20.04,
+     -75.56
+    ],
+    [
+     41.13,
+     -75.56
+    ],
+    [
+     41.13,
+     -96.44
+    ]
+   ]
+  },
+  {
+   "id": "sw-tj-e-s-l0",
+   "height": 20.4,
+   "heightSource": "levels",
+   "footprint": [
+    [
+     -21.06,
+     -98.27
+    ],
+    [
+     -21.06,
+     -73.73
+    ],
+    [
+     -41.99,
+     -73.73
+    ],
+    [
+     -41.99,
+     -98.27
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "tj-spawn-south",
+   "x": 4.06,
+   "y": -95,
+   "heading": 0,
+   "edgeId": "tj-e-s",
+   "name": "Странична улица — подход към кръстовището"
+  },
+  {
+   "id": "tj-spawn-east",
+   "x": 115,
+   "y": 4.06,
+   "heading": 270,
+   "edgeId": "tj-e-e",
+   "name": "Главна улица — подход от изток"
+  },
+  {
+   "id": "tj-spawn-west",
+   "x": -115,
+   "y": -4.06,
+   "heading": 90,
+   "edgeId": "tj-e-w",
+   "name": "Главна улица — подход от запад"
+  }
+ ]
+}

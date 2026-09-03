@@ -259,6 +259,29 @@ export interface ReachZoneParams {
    */
   requireSolidLineClean?: true;
   /**
+   * «СПРИ НАПЪЛНО» MEANS THE STOP THE LAW MEANS — sc-merge-from-property:
+   * ab353b86, and the fifth term this file's own templates route here.
+   *
+   * WHAT IT MEANS. `true` = this waypoint may be ticked only on a frame where
+   * the rule engine is holding a full stop it would accept at a Б2 — ≤
+   * `fullStopMaxSpeedKmh` for ≥ `fullStopMinDurationSec`, within
+   * `stopRecencySec` (rules/types.ts). Absent = no such claim, which is every
+   * other gate in the catalogue.
+   *
+   * WHY A CAP COULD NEVER CARRY IT. A halt gate states a SPEED
+   * (`maxSpeedKmh`); the law states a speed AND a dwell AND a recency, and no
+   * single number on this side can express the other two. So a banner promising
+   * «спри НАПЪЛНО» and a −10 saying he did not could be printed on one sheet,
+   * and were.
+   *
+   * The full design note — the protocol it closes, the measured order that
+   * rules out an after-the-fact ledger read, and the checks that it cannot
+   * refuse a drive which actually stopped — lives on
+   * `ReachZoneWitnessDemands.requireFullStop` in objectives.ts, which is where
+   * the evaluator reads it.
+   */
+  requireFullStop?: true;
+  /**
    * REPORT THE ONCOMING GAP HE TURNED INTO, against this drill's taught norm,
    * in seconds — the authored half of the only key here that refuses nothing.
    * `done` is bit-identical with it and without it; what it adds is the

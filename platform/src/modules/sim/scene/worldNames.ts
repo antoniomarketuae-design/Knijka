@@ -101,6 +101,11 @@ export const WORLD_NAME_BG: Record<string, string> = {
   "tj-emerge-v1": "Т-кръстовището с кола по главния",
   "tj-occluded-v1": "Т-кръстовището с ограничена видимост",
   "tj-rhr-v1": "Т-кръстовището с предимство отдясно",
+  // Added by repair wave 22: sc-junction-scan («Един поглед не стига», JU-23)
+  // used to reuse the sc-junction-stop map and gained its own for finding
+  // sc-junction-scan:28e782ab. The drill is the ляво-дясно-ляво observation
+  // sweep at a Б2 line, so the name says what the student is there to do.
+  "tj-scan-v1": "Т-кръстовището за оглеждане преди Б2",
   "tj-stop-v1": "Т-кръстовището със знак Б2",
   "vp-ready-v1": "улицата за подготовка преди тръгване",
   "vu-cyclist-v1": "Т-кръстовището с велосипедиста",

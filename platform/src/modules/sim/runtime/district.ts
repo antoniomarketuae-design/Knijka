@@ -399,7 +399,8 @@ export const BG_URBAN_DEFAULT_KMH = 50;
 //
 // A learner therefore reaches the end of the authored world 60–78 m past the
 // last road on EVERY map in the product. `tj-rhr-v1` (sc-junction-rhr) and
-// `tj-stop-v1` (sc-junction-stop, sc-junction-scan) are the cheapest example:
+// `tj-stop-v1` (sc-junction-stop) and `tj-scan-v1` (sc-junction-scan) are the
+// cheapest example:
 // their T-junction node `tj-n-c` sits at (0, 0) and the box's `maxY` IS 0, so
 // the graded junction is 60 m from the rim, in the direction a student who does
 // not turn drives.

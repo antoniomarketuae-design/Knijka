@@ -22,6 +22,11 @@ export { analyzeNetwork } from "./builders/network";
 // the ring's own metrics. Public because the dev scene-still route draws the
 // SAME islands the sim does — one derivation, never two that drift.
 export { analyzeRoundabouts } from "./builders/roundabout";
+// …and the two island heights/widths a CONSUMER has to reason about: the kerb
+// band the wall stands on, and the top it reaches. Public since
+// sc-roundabout-entry:4ab693eb — `components/sim` has to be able to say which
+// half of the sidewalk collider is the island wall.
+export { ISLAND_KERB_BAND_M, ISLAND_WALL_TOP_Y } from "./builders/roundabout";
 export type { RoundaboutRing } from "./builders/roundabout";
 export {
   LANE_WIDTH_M,
@@ -38,8 +43,11 @@ export type { LaneGantrySpec } from "./components/LaneSignalGantry";
 export {
   WorldColliders,
   DISTRICT_SURFACE_USER_DATA,
+  DRIVE_OVER_MAX_Y,
   isDistrictSurfaceUserData,
+  splitDriveOverSurface,
 } from "./components/WorldColliders";
+export type { DriveOverSplit } from "./components/WorldColliders";
 export { OsmAttribution } from "./components/OsmAttribution";
 export { QUALITY_PRESETS } from "./components/quality";
 export type { QualityPreset } from "./components/quality";

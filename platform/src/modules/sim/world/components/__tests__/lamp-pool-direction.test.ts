@@ -582,3 +582,68 @@ describe("§4 on the shipped maps, the pool lands on the carriageway side", () =
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// §5 — the disc is DRAWN, and only after dark
+//
+// §0–§4 decide WHERE the disc is, and every one of them passes on a disc that
+// is never handed to the renderer: they read `geo.translate` out of the source
+// and the placements out of the builder, and neither knows whether the mesh
+// reaches the scene graph. Delete the one line that mounts it and this file
+// stays green with the road in the dark — which is the shape of defect this
+// corpus keeps re-finding, and the reason sc-ov-night-gap:5085441f («every
+// street lamp along the road is dark») could not be settled from the tree.
+//
+// MEASURED BEFORE IT WAS GATED, off the audit's own sheets, because a gate
+// written from reasoning alone is what left §4 certifying a 2.2 m reach.
+// `01-arrival` of sweep w23 (ce94032, reach 2.2) against w24 (15c4b29, reach
+// 7.96) — same district, same spawn, so the frames differ only by the lamps:
+// 13,323 pixels brighten inside the road band, and the DELTA carries the
+// authored lamp's own colour, peaking at (+63, +56, +47) = 1 : 0.889 : 0.746
+// against LAMP_POOL_COLOR's 1 : 0.886 : 0.729. The pools are drawn and they
+// are warm. What follows holds each link of that chain.
+// ---------------------------------------------------------------------------
+
+/** Source text with every run of whitespace collapsed, so the assertions below
+ *  survive a reformat and still fail on a deletion. */
+const squeeze = (s: string): string => s.replace(/\s+/g, " ");
+
+/** The `useMemo` that builds the ground pool, sliced on balanced parens. */
+const POOL_MEMO = callsTo("useMemo", SOURCE).find((c) => c.includes("streetlight-pools"));
+/** The `useMemo` that builds the emissive lens over it. */
+const GLOW_MEMO = callsTo("useMemo", SOURCE).find((c) => c.includes("streetlight-glow"));
+
+describe("§5 the pool reaches the screen, and only at night", () => {
+  it("found both streetlight memos", () => {
+    // Same vacuum guard as §0: an undefined `find` and an agreeing parse are
+    // indistinguishable once you start asserting on the slice.
+    expect(POOL_MEMO, "the pool useMemo").toBeDefined();
+    expect(GLOW_MEMO, "the glow useMemo").toBeDefined();
+  });
+
+  it("the mesh is MOUNTED — the link §0-§4 cannot see", () => {
+    expect(squeeze(SOURCE)).toContain("object={pool.mesh}");
+  });
+
+  it("it is built only when `night` is true, so the day render pays nothing", () => {
+    expect(squeeze(POOL_MEMO!)).toContain("if (!night || lights.length === 0) return null;");
+  });
+
+  it("the disc ADDS light instead of painting a plate on the road", () => {
+    const memo = squeeze(POOL_MEMO!);
+    expect(memo).toContain("blending: THREE.AdditiveBlending");
+    expect(memo).toContain("depthWrite: false");
+    expect(memo).toContain("opacity: LAMP_POOL_OPACITY");
+    // A zero-opacity disc is still built, still costs its draw call, and is
+    // invisible — the pixel version of "shipped a measurement nothing reads".
+    expect(evalNumeric("LAMP_POOL_OPACITY")).toBeGreaterThan(0);
+    expect(evalNumeric("LAMP_POOL_OPACITY")).toBeLessThanOrEqual(1);
+  });
+
+  it("the lens above it is emissive after dark and dark by day", () => {
+    const glow = squeeze(GLOW_MEMO!);
+    const gated = /emissiveIntensity: night \? ([\d.]+) : 0/.exec(glow);
+    expect(gated, `no night-gated emissiveIntensity in the glow memo: ${glow}`).not.toBeNull();
+    expect(Number(gated![1])).toBeGreaterThan(0);
+  });
+});

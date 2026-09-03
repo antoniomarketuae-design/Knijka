@@ -651,8 +651,15 @@ describe("wave-1 bot completion — sc-merge-accel-lane at L3", () => {
     // reduces the live car's grip.
     expect(l5.physics).toBeUndefined();
     // The staged mainline car rides every rung — there is always a car to merge
-    // in front of.
-    expect(l5.stagedEvents?.map((e) => e.kind)).toEqual(["rearTailgater"]);
+    // in front of — and so does the НАСРЕЩНО column beside it. The second entry
+    // is `MWE_ONCOMING_FLOW`, six cars at 33 m/s on `mwe-e-sb`, added for
+    // sc-merge-accel-lane:09e6d6f4 („at arrival the world is a plain two-lane
+    // strip through open grass fields"): `createTrafficSystem` spawns ZERO
+    // ambient vehicles on mw-entry-v1 at any count, because its five one-way
+    // dead-end strips close no loop, so the only way this магистрала carries
+    // traffic at all is a staged one. Both are learn-only (doc 72 FO-07) and
+    // the trace battery asserts neither grades anything.
+    expect(l5.stagedEvents?.map((e) => e.kind)).toEqual(["rearTailgater", "oncomingStream"]);
   });
 });
 

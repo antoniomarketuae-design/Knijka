@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useState, type RefObject } from "react";
+import { PEEK_SCRIM_FEATHER_PX, peekScrimBackgroundCss } from "@/modules/sim/hud";
 import {
   audioPromptState,
   audioPromptTextBg,
@@ -99,9 +100,49 @@ export function AudioLessonPrompt({
     >
       <div
         role="status"
-        className="flex items-center gap-2.5 rounded-xl border bg-background/90 px-3 py-2 text-xs shadow-glow-sm backdrop-blur"
+        // `relative isolate` is the shade's geometry, not tidiness: the child
+        // below is `absolute; inset: 0; z-index: -1`, so `relative` makes THIS
+        // box its containing block (and the source of `borderRadius: inherit`)
+        // and `isolate` opens the stacking context that keeps a negative
+        // z-index inside the card instead of behind the whole stage.
+        className="relative isolate flex items-center gap-2.5 rounded-xl border bg-background/90 px-3 py-2 text-xs shadow-glow-sm backdrop-blur"
         style={{ borderColor: "var(--border-strong)" }}
       >
+        {/* ── THE GROUND THIS CARD ASKS FOR AND NEVER GETS — sc-ac-snow:55ddf562.
+            `bg-background/90 backdrop-blur shadow-glow-sm` above is dead:
+            `[data-hud="audio-prompt"]` is its own entry on `GHOST_SURFACES`, and
+            the UNPANEL sweep hands every un-inked child of a ghost
+            `background-color: transparent`, `background-image: none`,
+            `backdrop-filter: none` and `box-shadow: none`, all `!important`.
+            Photographed at 15c4b29,
+            `.audit-frames/w24/frames/sc-ac-snow__mobile-right/04-t013s.png`:
+            the whole sentence is white type over a tower-block facade, with lit
+            windows and a green canopy reading through the middle of it.
+
+            The remedy is the register's own opt-out, not a cancellation rule —
+            the SAME published gradient the peek card, the touch hint and the
+            keyboard legend take, so a re-skin moves one number for all four.
+            NO VERTICAL MASK: `rounded-xl border` means the hairline IS the
+            edge, exactly the `controls-help` case. The horizontal feather is
+            the card's own `px-3` (12 px = `PEEK_SCRIM_FEATHER_PX.right`) and
+            symmetric because this card is centred — both ramps live inside the
+            padding, so no glyph ever stands on a partial ground. */}
+        <div
+          data-hud="audio-prompt-scrim"
+          data-hud-ink=""
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: -1,
+            pointerEvents: "none",
+            borderRadius: "inherit",
+            backgroundImage: peekScrimBackgroundCss({
+              left: PEEK_SCRIM_FEATHER_PX.right,
+              right: PEEK_SCRIM_FEATHER_PX.right,
+            }),
+          }}
+        />
         <MutedSpeakerIcon />
         <span className="flex-1 leading-snug">{text}</span>
         <button

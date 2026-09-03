@@ -584,6 +584,12 @@ describe("the bar prints the advisor's own figure, not a reading of its own", ()
       examMode: false,
       mistakeMode: false,
       ended: false,
+      // No governor ⇒ the consolidated strip prints no speed clause, so the O51
+      // residual cannot fire and this block still measures the COACHING gate
+      // alone. The block below measures the residual with the bar speaking.
+      taskCapKmh: snap.taskCapKmh,
+      limitKmh: snap.limitKmh,
+      governorCapKmh: null,
     };
     // THE CARD is gated — one reading, in `advisorTaskFold`, for both surfaces.
     expect(advisorTaskFold({ ...gate, advisorOn: true }).taskDetailBg).toBe("дръж под 40 км/ч");
@@ -721,5 +727,100 @@ describe("the advisor card stands down only where the strip speaks", () => {
       "const cap = dashboardStatusRef.current?.governorCapKmh ?? null;",
     );
     expect(SHELL).toContain("setGovernorCapKmh((prev) => (prev === cap ? prev : cap));");
+  });
+});
+
+/**
+ * =============================================================================
+ * O51 RESIDUAL (3), THE PHONE'S HALF — THE SAME NUMBER, ON THE SAME TWO
+ * SURFACES, ON THE LEG THE ROOMY GATE CANNOT REACH.
+ * (sc-signal-hesitation:826bc3d5, major, re-judged STILL on the w24 re-drive.)
+ * =============================================================================
+ *
+ * The block above closed the DESKTOP leg: `advisorCapIsDuplicate` gates the
+ * `AdvisorCard` mount, and `w24/frames/sc-signal-hesitation__pc-right/run.log`
+ * is that fix photographed — every beat reads «Задача 1/2 · Приближи зеленото
+ * кръстовище с готовност ⓘ Инструкции · 7 стъпки ▸» where the w10-4 census of
+ * the same drive read «… ✕дръж под 35 км/ч Инструкции✕1.Тръгни…».
+ *
+ * THE PHONE HAS NO CARD, so nothing there was gated. The compact leg folds the
+ * same coaching into the TASK ROW as its detail (`foldAdvisorIntoTask` →
+ * `taskOverlayRow`), and the consolidated strip is mounted under it in both
+ * shapes. `w24/frames/sc-signal-hesitation__mobile-wrong/run.log`, ONE beat
+ * (04-t027s), both surfaces, on the build that already carried the desktop fix
+ * (`serving 15c4b2905975`):
+ *
+ *   rail    «Задача 1/2Приближи зеленото кръстовище с готовност
+ *            дръж под 35 км/чЗащо»
+ *   strip   «D42км/ч50РежимНормален ≤60· знакът важи, не режимът
+ *            · задачата иска ≤35 — по-строгото важи»
+ *
+ * — one number, two surfaces, two phrasings, which is the row verbatim.
+ *
+ * ONE PREDICATE AND NOT A SECOND READING: `advisorTaskFold` asks the SAME
+ * `advisorCapEchoesStrip` the roomy mount asks, with the SAME three inputs, so
+ * the two legs cannot drift into disagreeing about which number the bar is
+ * carrying. The two exceptions are inherited whole and are re-driven below,
+ * because they are the readings where dropping the detail would leave a student
+ * graded against a figure no surface on the phone ever named.
+ * =============================================================================
+ */
+describe("O51 residual (3) — the phone's task row stands down only where the strip speaks", () => {
+  /** The filed reading: 50 posted · 60 mode · 35 task, on a phone. */
+  const gateAt = (governorCapKmh: number | null, taskCapKmh: number | undefined, capBg: string) => ({
+    advisorPrompt: { textBg: `Приближи зеленото кръстовище с готовност — ${capBg}`, keys: [] },
+    objectiveTitleBg: "Приближи зеленото кръстовище с готовност",
+    advisorOn: true,
+    examMode: false,
+    mistakeMode: false,
+    ended: false,
+    taskCapKmh,
+    limitKmh: 50,
+    governorCapKmh,
+  });
+
+  it("the filed reading: the bar prints «задачата иска ≤35», so the task row drops it", () => {
+    // The bar is RENDERED with the same three numbers rather than assumed — the
+    // half that makes „the row stood down while the strip said nothing"
+    // impossible instead of unlikely.
+    expect(markOf(35, 60, 50)).toContain("задачата иска ≤35");
+    expect(advisorTaskFold(gateAt(60, 35, "дръж под 35 км/ч")).taskDetailBg).toBeNull();
+  });
+
+  it("Напреднал has no governor: the bar is silent, so the task row keeps the coaching", () => {
+    // `GovernorCapMark` returns null without a cap, so the phone's ONLY
+    // statement of the drill's demand is this detail. Removing it would fail a
+    // student for a number nothing on his screen named — the false refusal this
+    // thread weighs the same as a false certificate.
+    expect(markOf(35, null, 50)).toBe("");
+    expect(advisorTaskFold(gateAt(null, 35, "дръж под 35 км/ч")).taskDetailBg).toBe(
+      "дръж под 35 км/ч",
+    );
+  });
+
+  it("B58 slack: a cap at or above the sign never binds, so the row keeps it", () => {
+    expect(markOf(50, 60, 50)).not.toContain("задачата иска");
+    expect(advisorTaskFold(gateAt(60, 50, "дръж под 50 км/ч")).taskDetailBg).toBe(
+      "дръж под 50 км/ч",
+    );
+  });
+
+  it("only a detail that says NOTHING ELSE goes — real coaching is never swallowed", () => {
+    // `advisorEchoTrim` leaves a whole sentence on every prompt that is not a
+    // bare `reachZone` cap, and that sentence is on no other surface.
+    const gate = {
+      ...gateAt(60, 35, "дръж под 35 км/ч"),
+      advisorPrompt: {
+        textBg: "Приближи зеленото кръстовище с готовност — изчакай пешеходеца, дръж под 35 км/ч",
+        keys: [],
+      },
+    };
+    expect(advisorTaskFold(gate).taskDetailBg).toBe("изчакай пешеходеца, дръж под 35 км/ч");
+  });
+
+  it("the two figures must be ONE figure — a held cap of 40 does not hide a card saying 35", () => {
+    expect(advisorTaskFold(gateAt(60, 40, "дръж под 35 км/ч")).taskDetailBg).toBe(
+      "дръж под 35 км/ч",
+    );
   });
 });

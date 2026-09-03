@@ -294,6 +294,46 @@ export interface SimTick {
   handbrakeOn: boolean;
   /** -1 = reverse, 0 = neutral, 1.. = forward gears. */
   gear: number;
+  /**
+   * FUNCTIONAL accelerator, 0..1 — the value the physics is actually being
+   * given (post gate, post reverse remap; `VehicleInput.throttle`).
+   *
+   * THE ONE THING THE GRADER COULD NOT SEE. `PARKING_BRAKE_FORCE_N` (13 000 N
+   * across the rear axle, against a 4 800 N peak engine force) does not make
+   * the car DRAG — it makes the car STOP: eight seconds of full throttle
+   * against the lever reached 0.32 км/ч on the drive rig, while
+   * `HANDBRAKE_LEFT_ON` needs `speed > movingSpeedKmh` = 5. So on the lesson
+   * TITLED „Потегляне с вдигната ръчна" the named fault could not be booked
+   * from a standstill at all, and its debrief read «чисто каране без нито едно
+   * нарушение» (sc-vp-handbrake:1f2f7463). Speed alone cannot tell a student
+   * who is ASKING the car to move from one sitting still with his hands in his
+   * lap; the pedal can.
+   *
+   * OPTIONAL, and absence is INNOCENCE. Every recorded trace, every replay and
+   * every hand-built fixture omits it (`traces/recorder.ts` builds its
+   * `VehicleSample` without one), so the only detector that reads it —
+   * the config-gated standstill arm of `HANDBRAKE_LEFT_ON` — can never fire
+   * there and every shipped shadow stays byte-identically clean.
+   */
+  throttlePedal?: number;
+  /**
+   * Is the engine RUNNING (`DrivelineState.engineOn`)?
+   *
+   * WHICH BLOCKER AM I BILLING? `engine/stuckStart.ts stuckStartReason` names
+   * the ONE thing standing between the pedal and the road, in the order a
+   * driver has to clear them: engine off → selector in P → selector in N →
+   * parking brake. The cockpit speaks that answer aloud. A grader that books
+   * the LEVER while the cockpit is saying «запали двигателя» charges a student
+   * for a fault he was never told about and narrates a cause that is not the
+   * one holding the car — which is the whole defect the standstill arm exists
+   * to stop making. So that arm reads this channel and `gear` and convicts only
+   * where the brake really is the blocker: engine running, a gear engaged.
+   *
+   * OPTIONAL, and absence ACQUITS. Traces, replays and fixtures omit it (they
+   * omit `throttlePedal` too, so the arm is already unreachable there), and a
+   * rig that cannot say what the ignition is doing cannot be allowed to guess.
+   */
+  engineOn?: boolean;
   /** Engine RPM (optional — v1 detectors do not use it). */
   rpm?: number;
   /** True when the world is in night conditions (engine decides from time-of-day). */
@@ -802,6 +842,35 @@ export interface RuleEngineConfig {
   seatbeltSustainSec: number;
   handbrakeSustainSec: number;
   headlightsSustainSec: number;
+
+  /**
+   * THE SAME LEVER, FROM A STANDSTILL — the other half of `HANDBRAKE_LEFT_ON`
+   * (sc-vp-handbrake:1f2f7463, critical).
+   *
+   * The shipped arm needs `moving` (> `movingSpeedKmh`), and the parking brake
+   * in this product HOLDS rather than drags (see `SimTick.throttlePedal`), so
+   * a student who floors the pedal without releasing the lever commits the
+   * lesson's own named fault and reaches the debrief with an empty изпитен
+   * лист. This arm books it on the ACT the student actually performs: the
+   * accelerator asked for, and held against, an engaged parking brake.
+   *
+   * SHIPPED FLAGGED OFF, the `moveOffObservationEnabled` precedent, for the
+   * same A12 reason: 130 exam rungs and 31 whole templates hand over a COLD
+   * car (engine off, selector P, brake on), and arming a standstill offence
+   * across all of them by default would grade the cockpit on lessons that
+   * never asked the student to think about it. Drills that TEACH the release
+   * opt in per lesson through `ScenarioSpec.ruleConfig`.
+   */
+  handbrakeMoveOffEnabled: boolean;
+  /**
+   * Continuous seconds of pedal against the engaged lever before the first
+   * bill. Deliberately LONGER than `STUCK_START_HINT_S` (1.2 s), the moment
+   * `engine/stuckStart.ts` makes the cockpit say «Ръчната спирачка е вдигната
+   * — колата е задържана»: the student is TOLD what is wrong, and only a
+   * pedal still held more than a second later is an act rather than a
+   * misunderstanding. Teach first, then grade (doc 64 THEO-4).
+   */
+  handbrakeMoveOffSustainSec: number;
 
   /**
    * Indicator must have been on (in the right direction) within this window
@@ -1585,6 +1654,10 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   seatbeltSustainSec: 1,
   handbrakeSustainSec: 1.5,
   headlightsSustainSec: 2,
+
+  // OFF by default — see the field. `sc-vp-handbrake` opts in.
+  handbrakeMoveOffEnabled: false,
+  handbrakeMoveOffSustainSec: 2.5,
 
   // REGISTER B21 — founder: „he must press almost at the same time few buttons
   // … just a second." Both windows are widened, and the reason is the same in

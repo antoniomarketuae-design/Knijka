@@ -11,8 +11,13 @@
  *     derives ZERO stop lines and tj-n-c is an UNCONTROLLED right-hand-rule
  *     junction (the JU-17 host). Its lone building sits in the SE quadrant,
  *     walling off the driver's view of the car coming from the RIGHT.
+ *   - tj-scan-v1    — control "stop", the JU-23 host (sc-junction-scan, the
+ *     ляво-дясно-ляво drill). Added for `sc-junction-scan:28e782ab`: the scan
+ *     drill used to declare tj-stop-v1, the JU-03 stop drill's map, so the two
+ *     were one street under two titles. Its own arms (130 m / 110 m) put the
+ *     streetwall pass's slots elsewhere, so it reads as its own place.
  *
- * Both files must satisfy the FULL engine contract every district drives
+ * All three files must satisfy the FULL engine contract every district drives
  * through: world builder (ribbons, colliders, props), runtime (control
  * derivation, speed zones, clean ticks) and traffic (lane graph, empty-config
  * legality, staged actors for the scenario director).
@@ -53,7 +58,7 @@ const sample = (x: number, y: number, headingDeg: number, speedKmh: number): Veh
 });
 
 interface Case {
-  id: "tj-emerge-v1" | "tj-occluded-v1";
+  id: "tj-emerge-v1" | "tj-occluded-v1" | "tj-scan-v1";
   isStop: boolean;
   priorityArmM: number;
   minorArmM: number;
@@ -66,7 +71,28 @@ interface Case {
 const CASES: Case[] = [
   { id: "tj-emerge-v1", isStop: true, priorityArmM: 160, minorArmM: 100, priorityMaxKmh: 50, minorMaxKmh: 40, stopLineSM: 72.275 },
   { id: "tj-occluded-v1", isStop: false, priorityArmM: 140, minorArmM: 130, priorityMaxKmh: 40, minorMaxKmh: 40, stopLineSM: 0 },
+  { id: "tj-scan-v1", isStop: true, priorityArmM: 130, minorArmM: 110, priorityMaxKmh: 50, minorMaxKmh: 40, stopLineSM: 82.275 },
 ];
+
+/**
+ * THE Б2 LINE IS THE ONE THING THAT MAY NOT MOVE BETWEEN THE THREE Б2 T-MAPS —
+ * `sc-junction-scan:28e782ab`. That row is closed by giving the JU-23 scan
+ * drill its own junction (tj-scan-v1: 130 m / 110 m arms, its own frontage)
+ * instead of sharing tj-stop-v1 with the JU-03 stop drill. The DERIVED stop
+ * line has to stay at 27.725 m from the node all the same, because the drill's
+ * three gates and its three committed traces are pinned to it — so the arms
+ * moved and the line did not, and this asserts exactly that rather than
+ * trusting it. (`stopLineSM` above is measured along the stem from tj-n-s, so
+ * the invariant is minorArmM − s.)
+ */
+const DERIVED_STOP_LINE_M = 27.725;
+describe("the three Б2 T-junctions derive the SAME stop-line distance", () => {
+  for (const c of CASES.filter((x) => x.isStop)) {
+    it(`${c.id}: ${c.minorArmM} m stem − ${c.stopLineSM} m = ${DERIVED_STOP_LINE_M} m from the node`, () => {
+      expect(c.minorArmM - c.stopLineSM).toBeCloseTo(DERIVED_STOP_LINE_M, 3);
+    });
+  }
+});
 
 for (const c of CASES) {
   const { id, isStop } = c;

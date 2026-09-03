@@ -21,8 +21,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { PERCEPTUAL_ROAD_SCALE } from "../../contracts";
+import { compileScenario } from "../../lessons";
+import { SC_ED_D2_CITY_RUN } from "../../lessons/scenario/templates-exam";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
 import { DistrictIndex } from "../../runtime/spatial";
+import {
+  buildRouteGraph,
+  deriveGuidanceRoute,
+  guidanceGoalFor,
+  stopLinesForGuidance,
+  type RouteDistrictLike,
+} from "../../scene/guidanceRoute";
 import { assertDistrict, type District } from "../types";
 
 function loadD2Raw(): unknown {
@@ -206,6 +215,66 @@ describe("d2-v1 carries the sc-ed-d2-city-run exam segment (бул. Драган
       expect(hit.laneId, `${id} lane`).toBe(0);
       expect(Math.abs(hit.laneOffsetM), `${id} lane offset`).toBeLessThan(1.5);
       expect(runtime.speedLimitAt({ x, y }), `${id} limit`).toBe(50);
+    }
+  });
+
+  it("the GUIDANCE RIBBON never leaves the eight authored legs", () => {
+    // The gates above are four points; this is the line BETWEEN them — the
+    // teal ribbon RouteGuidance.tsx paints from `deriveGuidanceRoute` and the
+    // lesson tells the student to follow. Nothing asserted where it runs, so
+    // „the route puts the car onto a pedestrian plaza" (sweep161
+    // sc-ed-d2-city-run:a0bdad4b, filed off a frame of the car stopped on the
+    // paved apron by cluster 1) could neither be confirmed nor refuted from
+    // the tree. It is refutable now, and it is false: every 2.5 m sample of
+    // all four legs, on all five rungs, locates onto one of the LEGS above.
+    //
+    // d2-v1 cannot even express the failure it was accused of — its 283 edges
+    // carry seven classes (service, residential, unclassified, tertiary,
+    // primary_link, secondary, primary) and not one footway or pedestrian
+    // area, so there is no plaza in the graph for a route to be planned down.
+    // What the frame shows is a car that left the ribbon, not a ribbon that
+    // left the road.
+    const graph = buildRouteGraph(district as unknown as RouteDistrictLike);
+    const stopLines = stopLinesForGuidance(district);
+    const legIds = new Set(LEGS.map(([id]) => id));
+    const spawn = SC_ED_D2_CITY_RUN.start!;
+    for (const { level } of SC_ED_D2_CITY_RUN.levels) {
+      const lesson = compileScenario(SC_ED_D2_CITY_RUN, level);
+      let from = {
+        x: spawn.position!.x,
+        y: spawn.position!.y,
+        headingDeg: spawn.headingDeg!,
+      };
+      const strayed: string[] = [];
+      let samples = 0;
+      let lengthM = 0;
+      for (let i = 0; i < lesson.objectives.length; i++) {
+        const goal = guidanceGoalFor(lesson, i, { stopLines, from });
+        expect(goal?.kind, `L${level} ${lesson.objectives[i].id} goal`).toBe("point");
+        if (goal?.kind !== "point") continue;
+        const route = deriveGuidanceRoute(graph, from, goal, {});
+        expect(route, `L${level} ${lesson.objectives[i].id} route`).toBeTruthy();
+        lengthM += route!.totalLen;
+        for (let k = 0; k < route!.count; k++) {
+          const x = route!.pts[2 * k];
+          const y = route!.pts[2 * k + 1];
+          const hit = runtime.locate({ x, y });
+          samples++;
+          if (hit.edgeId === null || !legIds.has(hit.edgeId)) {
+            strayed.push(
+              `${lesson.objectives[i].id} s=${route!.arc[k].toFixed(0)}m ` +
+                `(${x.toFixed(1)}, ${y.toFixed(1)}) → ${hit.edgeId ?? "OFF THE ROAD"}`,
+            );
+          }
+        }
+        from = { x: goal.x, y: goal.y, headingDeg: from.headingDeg };
+      }
+      expect(strayed, `L${level} ribbon samples off бул. Драган Цанков`).toEqual([]);
+      // 394 samples at the 2.5 m densification step, and the four legs sum to
+      // the same ~971 m the trace gate proves for the shadow's drive line —
+      // i.e. the student's ribbon and the demonstration are one segment.
+      expect(samples, `L${level} ribbon samples`).toBe(394);
+      expect(lengthM, `L${level} ribbon length`).toBeCloseTo(971, 0);
     }
   });
 });

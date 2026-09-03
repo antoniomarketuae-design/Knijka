@@ -25,6 +25,8 @@ export function createVehicleSample(): VehicleSample {
     mirrorGlance: null,
     stalled: false,
     fogLightsOn: false,
+    throttlePedal: 0,
+    engineOn: false,
   };
 }
 
@@ -102,4 +104,16 @@ export function updateVehicleSample(
   // FOG unlock (doc 72 AC-03): the driveline's fog-lamp state (V key /
   // cockpit hotspot) — graded only when the lesson's world is in fog.
   out.fogLightsOn = cabin.driveline.fogLightsOn;
+  // THE ACCELERATOR THE GRADER COULD NOT SEE (sc-vp-handbrake:1f2f7463). The
+  // FUNCTIONAL value — this is the gated, reverse-remapped input the physics
+  // is actually being given, so a pedal zeroed by the pre-drive lock reads 0
+  // here too and the standstill handbrake arm cannot fire during the
+  // procedure. `rules/types.ts SimTick.throttlePedal` carries the reason.
+  out.throttlePedal = input?.throttle ?? 0;
+  // …AND WHETHER THE ENGINE IS EVEN RUNNING. The pedal alone cannot say what is
+  // holding the car: on a COLD hand-over (`vehicleStart: "cold"`, this drill's
+  // L4) the lever is up AND the engine is off, and `engine/stuckStart.ts`
+  // answers «запали двигателя», not «свали ръчната». The standstill handbrake
+  // arm reads this so it can only ever bill the blocker the cockpit named.
+  out.engineOn = cabin.driveline.engineOn;
 }

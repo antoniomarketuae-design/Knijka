@@ -69,7 +69,12 @@
  *    drives must NEVER produce a violation.
  */
 
-import { makeCommendation, makeViolation, WRONG_WAY_ROAD_MOTORWAY } from "./catalog";
+import {
+  HANDBRAKE_ACT_MOVE_OFF_ATTEMPT,
+  makeCommendation,
+  makeViolation,
+  WRONG_WAY_ROAD_MOTORWAY,
+} from "./catalog";
 import { encodeSpeedMeasurement } from "./consequences";
 import {
   DEFAULT_RULE_CONFIG,
@@ -279,6 +284,11 @@ export interface RuleEngineState {
   speedingDangerous: EpisodeState;
   seatbelt: EpisodeState;
   handbrake: EpisodeState;
+  /** The SAME lever, asked to move the car from a standstill — the pedal-held
+   *  arm below `handbrake` (config-gated, `handbrakeMoveOffEnabled`). Its own
+   *  episode because the two never overlap and must not share a clock: one
+   *  needs `moving`, the other needs `!moving`. */
+  handbrakeMoveOff: EpisodeState;
   headlights: EpisodeState;
   laneKeeping: EpisodeState;
   conditionsSpeed: EpisodeState;
@@ -1105,6 +1115,16 @@ const STANDING_DUTY_REGRADE_SEC = 10;
 const STANDING_DUTY_MAX_BILLS = 2;
 
 /**
+ * Functional accelerator above which the pedal counts as PRESSED, for the
+ * standstill handbrake arm. Deliberately the same 0.1 as
+ * `engine/stuckStart.ts STUCK_START_PEDAL_ON` and `REVERSE_ASSIST_PEDAL_ON` —
+ * one definition of „a foot is on it" in this product. Restated rather than
+ * imported so `rules/` keeps importing nothing from `engine/` (module
+ * boundaries, doc 05); if one moves, both move.
+ */
+const HANDBRAKE_MOVE_OFF_PEDAL_ON = 0.1;
+
+/**
  * THE SAME RE-GRADE, FOR THE TWO SECOND-DEGREE **SPEED** CODES — seconds of
  * driving after the first bill (w11 · lane „grade-blind-to-speed", 2026-08-26).
  *
@@ -1861,6 +1881,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     speedingDangerous: { ...IDLE_EPISODE },
     seatbelt: { ...IDLE_EPISODE },
     handbrake: { ...IDLE_EPISODE },
+    handbrakeMoveOff: { ...IDLE_EPISODE },
     headlights: { ...IDLE_EPISODE },
     laneKeeping: { ...IDLE_EPISODE },
     conditionsSpeed: { ...IDLE_EPISODE },
@@ -1943,6 +1964,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     speedingDangerous: { ...s.speedingDangerous },
     seatbelt: { ...s.seatbelt },
     handbrake: { ...s.handbrake },
+    handbrakeMoveOff: { ...s.handbrakeMoveOff },
     headlights: { ...s.headlights },
     laneKeeping: { ...s.laneKeeping },
     conditionsSpeed: { ...s.conditionsSpeed },
@@ -2998,6 +3020,58 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     )
   ) {
     events.push(standingDutyBill(s.handbrake, makeViolation("HANDBRAKE_LEFT_ON", t)));
+  }
+  // …AND THE SAME LEVER FROM A STANDSTILL — the half the arm above cannot
+  // reach (sc-vp-handbrake:1f2f7463, critical).
+  //
+  // The arm above needs `moving`. `PARKING_BRAKE_FORCE_N` (13 000 N against a
+  // 4 800 N peak engine force) means a car whose lever was never released is
+  // never moving: eight seconds of floored throttle reached 0.32 км/ч on the
+  // drive rig, a fifteenth of `movingSpeedKmh`. So on the lesson TITLED
+  // „Потегляне с вдигната ръчна" the named fault was unbookable, and the
+  // debrief of a drive that never left the mark read «чисто каране без нито
+  // едно нарушение · Второстепенни 0 0».
+  //
+  // The discriminator is the PEDAL, not the speedometer: a stationary car with
+  // the lever up and no foot on the accelerator is a student who has not
+  // started yet and must never be convicted, while one holding the throttle is
+  // asking the car to move. `tick.throttlePedal` is absent on every trace,
+  // replay and fixture (see its field note), so absence acquits.
+  //
+  // The two arms are DISJOINT by construction (`moving` / `!moving`) and keep
+  // separate episodes, so a student cannot be billed twice for one lever, and
+  // `handbrakeMoveOffSustainSec` (2.5 s) sits after `STUCK_START_HINT_S`
+  // (1.2 s) so the cockpit has already told him what is holding the car.
+  if (
+    cfg.handbrakeMoveOffEnabled &&
+    stepSustainedEpisode(
+      s.handbrakeMoveOff,
+      tick.handbrakeOn &&
+        !moving &&
+        (tick.throttlePedal ?? 0) > HANDBRAKE_MOVE_OFF_PEDAL_ON &&
+        // …AND THE LEVER MUST BE THE BLOCKER. `stuckStartReason` clears them in
+        // order — engine off, P, N, then the parking brake — and the cockpit
+        // says which one it is. On the COLD hand-over this very drill uses at
+        // L4 (engine off, selector P, lever up) it says «запали двигателя»,
+        // so a handbrake bill there would charge a fault nobody named and
+        // narrate a cause the windscreen contradicts. Both channels acquit
+        // when absent, and both are the SAME question the cockpit answered.
+        tick.engineOn === true &&
+        tick.gear !== 0,
+      !tick.handbrakeOn,
+      t,
+      cfg.handbrakeMoveOffSustainSec,
+      0,
+      STANDING_DUTY_REGRADE_SEC,
+      STANDING_DUTY_MAX_BILLS,
+    )
+  ) {
+    events.push(
+      standingDutyBill(
+        s.handbrakeMoveOff,
+        makeViolation("HANDBRAKE_LEFT_ON", t, { detail: HANDBRAKE_ACT_MOVE_OFF_ATTEMPT }),
+      ),
+    );
   }
   // The one derivation of the low-beam duty (see `lowBeamDuty`): the three arms
   // below — night here, rain and snowfall further down — read it instead of

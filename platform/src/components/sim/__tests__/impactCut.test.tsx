@@ -43,11 +43,22 @@ describe("the gate is the street's own crash threshold", () => {
     expect(IMPACT_MIN_KMH).toBe(COLLISION_MIN_KMH);
   });
 
-  it("a nudge under it is not a crash — the parking family's cone kiss", () => {
-    // sc-park-* pass `collisionMinKmh: 0` so ANY touch GRADES. It must not also
-    // throw a student mid-manoeuvre out of the seat he is manoeuvring from.
-    expect(impactFlashes(2)).toBe(false);
-    expect(impactCutView("cockpit", 2, false)).toBeNull();
+  /**
+   * EXPECTATION CHANGED — `sc-turn-left-oncoming:e91c1e01`. This cell used to
+   * read `impactFlashes(2) === false` / `impactCutView("cockpit", 2, false)
+   * === null`, on the reasoning „a nudge under the street tolerance is not a
+   * crash". That reasoning was measured and is wrong about who reaches here:
+   * `compile.ts:1346` writes `collisionMinKmh: 0` for ALL 150 scenario
+   * templates, so a 2 км/ч contact with an NPC shell on a STREET drill is
+   * already a billed ПТП — опасна, −10, изпитът прекратен — and this floor
+   * silenced the picture of it. The kerb case the old cell was really
+   * protecting never gets here at all: `gradedContactMinKmh` re-raises the
+   * district drive-over surface to 10 inside VehicleRig. The bay carve-out is
+   * kept below, addressed at the drill instead of at the speed.
+   */
+  it("a graded contact is SHOWN however slow it was — VehicleRig already judged", () => {
+    expect(impactFlashes(2)).toBe(true);
+    expect(impactCutView("cockpit", 2, false)).toBe("chase");
   });
 
   it("…and a real crash is", () => {
@@ -58,6 +69,30 @@ describe("the gate is the street's own crash threshold", () => {
   it("a garbage impact speed never fires anything", () => {
     expect(impactFlashes(Number.NaN)).toBe(false);
     expect(impactFlashes(Number.POSITIVE_INFINITY)).toBe(false);
+    expect(impactCutView("cockpit", Number.NaN, false)).toBeNull();
+  });
+});
+
+describe("the bay carve-out — the student parking keeps his seat", () => {
+  it("a manoeuvring-speed touch in a graded bay does not take the view", () => {
+    // sc-park-* are driven at 2–4 км/ч and IMPACT_RELEASE_KMH is 5, so a cut
+    // here would hold for the rest of the manoeuvre.
+    expect(impactCutView("cockpit", 2, false, true)).toBeNull();
+    expect(impactCutView("cockpit", IMPACT_MIN_KMH - 0.1, false, true)).toBeNull();
+  });
+
+  it("but the flash still marks it — a −10 ПТП is never invisible", () => {
+    expect(impactFlashes(2)).toBe(true);
+  });
+
+  it("and a REAL crash in a bay still cuts", () => {
+    expect(impactCutView("cockpit", IMPACT_MIN_KMH, false, true)).toBe("chase");
+    expect(impactCutView("cockpit", 30, false, true)).toBe("chase");
+  });
+
+  it("the carve-out is off unless the drill asks for it", () => {
+    // Default `false`: every street lesson, which is the whole finding.
+    expect(impactCutView("cockpit", 4, false)).toBe("chase");
   });
 });
 
@@ -127,6 +162,13 @@ describe("the live consumer — LessonScene, on the one graded-contact callback"
     expect(LESSON_SCENE).toContain("<ImpactCut");
     expect(LESSON_SCENE).toContain("handleRef={impactCutRef}");
     expect(LESSON_SCENE).toContain("applyCameraMode={applyCameraMode}");
+  });
+
+  it("and tells it which drills are manoeuvred, off the spec's own bay", () => {
+    // e91c1e01: without this the carve-out defaults off everywhere, which is
+    // right for the street and wrong for the bay — and a prop nobody passes is
+    // the dead predicate this programme keeps shipping.
+    expect(LESSON_SCENE).toContain("manoeuvring={lesson.parkingBay !== undefined}");
   });
 
   it("through the scene's ONE writer for the view, so nothing can drift", () => {

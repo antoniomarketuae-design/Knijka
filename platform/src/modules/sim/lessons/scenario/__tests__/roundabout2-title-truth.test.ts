@@ -169,11 +169,14 @@ const TAKE_EAST_EXIT: ReadonlyArray<readonly [number, number, number]> = [
 ];
 
 /** Past the east mouth, round the north-east arc, out to the pocket. */
-function stayOnRing(r: number): ReadonlyArray<readonly [number, number, number]> {
+function stayOnRing(
+  r: number,
+  paceKmh = 12,
+): ReadonlyArray<readonly [number, number, number]> {
   const arc: Array<readonly [number, number, number]> = [];
   for (let deg = -10; deg <= 100; deg += 5) {
     const p = ringPoint(deg, r);
-    arc.push([p.x, p.y, 12]);
+    arc.push([p.x, p.y, paceKmh]);
   }
   return arc;
 }
@@ -547,5 +550,145 @@ describe("the drill is winnable and discriminating on every rung the ladder comp
       "the ring was driven and the pocket was used, but the exit was never announced — " +
         "«Излез на северния изход с включен десен мигач» may not tick for a silent departure",
     ).not.toBe("done");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. THE CAP IS THE SIGN — the one variable every suite above holds fixed
+// ---------------------------------------------------------------------------
+
+/**
+ * Every drive in this file circulates at 12 км/ч, and so does the authored
+ * shadow §4 replays — 18 км/ч under the number rb-ped-v1 paints on its own
+ * circulatory carriageway. So the mechanism sweep 161 actually describes was
+ * never driven here: `sc-rbp-past-east` shipped `maxSpeedKmh: 20` on a ring
+ * posted 30, objectives are SEQUENTIAL (engine.ts evaluates only
+ * `objectives[currentObjectiveIndex]`), and a student who drove the sign
+ * therefore lost the pocket and the exit as well — three blank tasks bought
+ * with one over-cap arc, which is the row's sentence word for word.
+ *
+ * de7c968 made the cap `RING_SPEED_KMH` and no test held it there. This suite
+ * does, off the DISTRICT rather than off the template, so the two can never
+ * drift apart silently: the gate may not grade stricter than the road instructs.
+ */
+
+/** rb-ped-v1's own posted ring limit, read off the committed district. */
+const POSTED_RING_KMH: number = (() => {
+  const d = JSON.parse(
+    readFileSync(path.join(REPO_ROOT, "content", "world", "rb-ped-v1.json"), "utf-8"),
+  ) as { roads: { edges: Array<{ roundabout?: boolean; maxspeed?: number }> } };
+  const posted = [
+    ...new Set(d.roads.edges.filter((e) => e.roundabout === true).map((e) => e.maxspeed)),
+  ];
+  if (posted.length !== 1 || typeof posted[0] !== "number") {
+    throw new Error(`rb-ped-v1 ring maxspeed is not one number: ${JSON.stringify(posted)}`);
+  }
+  return posted[0];
+})();
+
+/** The taught departure: peel off the ring, stop in the pocket, wait, away. */
+const EXIT_TO_NORTH: ReadonlyArray<readonly [number, number, number]> = [
+  [7.9, 18.0, 12],
+  [6.4, 20.7, 10],
+  [4.9, 23.7, 8],
+  [4.1, 27.0, 4],
+  [4.1, 27.0, 0],
+  [4.1, 27.0, 0],
+  [X_ARM_LANE, 31, 8],
+  [X_ARM_LANE, 36, 12],
+  [X_ARM_LANE, 44, 14],
+];
+
+const RUNG_IDS = ["sc-rbp-past-east", "sc-rbp-pocket", "sc-rbp-exit"] as const;
+
+/**
+ * The whole taught route at ONE ring pace, through the production path, keeping
+ * the coaching cards the student was actually shown — the refusal has to be
+ * explained as well as made (doc 64 THEO-4), and `engine.ts objectiveNotice`
+ * is what says it.
+ */
+function drivePaced(
+  level: ScenarioLevel,
+  paceKmh: number,
+): { ticks: string; passed: boolean; capCards: string[] } {
+  let s = createLessonSession(compileScenario(SC_RB_PED_EXIT, level));
+  const capCards: string[] = [];
+  let t = 0;
+  const step = (
+    x: number,
+    y: number,
+    speedKmh: number,
+    indicator?: "right" | "off",
+  ): void => {
+    const r = applyTick(
+      s,
+      makeTick({ t: t++, position: { x, y }, speedKmh, ...(indicator ? { indicator } : {}) }),
+    );
+    s = r.state;
+    for (const e of r.hudEvents) {
+      const card = e as { titleBg?: string; explanationBg?: string };
+      // The over-cap card engine.ts composes off `objectives.ts overCapNoted`.
+      if (card.titleBg === "Стигна точката, но твърде бързо") {
+        capCards.push(card.explanationBg ?? "");
+      }
+    }
+  };
+  for (const [x, y, v] of APPROACH) step(x, y, v);
+  for (const [x, y, v] of stayOnRing(RING_R, paceKmh)) step(x, y, v);
+  for (const [x, y, v] of EXIT_TO_NORTH) step(x, y, v, "right");
+  step(X_ARM_LANE, 52, 14, "off");
+  const result = buildLessonResult(s);
+  return {
+    ticks: RUNG_IDS.map((id) =>
+      result.objectives.find((o) => o.id === id)!.done ? "1" : "0",
+    ).join(""),
+    passed: result.passed,
+    capCards,
+  };
+}
+
+/** Only the cards about the RING gate — the pocket's own 6 км/ч cap is a
+ *  different demand and speaks with a different number. */
+const ringCapCards = (cards: readonly string[]): string[] =>
+  cards.filter((c) => c.includes(`не повече от ${POSTED_RING_KMH} км/ч`));
+
+describe("the ring gate may not grade stricter than the road it is drawn on", () => {
+  for (const level of LEVELS) {
+    it(`sc-rb-ped-exit @L${level}: the drive AT the posted ${POSTED_RING_KMH} км/ч ticks all three`, () => {
+      const g = gate(compileScenario(SC_RB_PED_EXIT, level), "sc-rbp-past-east");
+      expect(
+        g.maxSpeedKmh,
+        `the gate grades at ${g.maxSpeedKmh} км/ч on a ring rb-ped-v1 posts at ` +
+          `${POSTED_RING_KMH}. A student who drives the sign then misses this rung — and ` +
+          `because objectives are sequential he is never asked about the pocket or the ` +
+          `exit either, which is a blank sheet bought with one lawful arc.`,
+      ).toBeGreaterThanOrEqual(POSTED_RING_KMH);
+
+      const r = drivePaced(level, POSTED_RING_KMH);
+      expect(r.ticks, `L${level}: past-east/pocket/exit at the posted pace`).toBe("111");
+      expect(r.passed, `L${level}`).toBe(true);
+      expect(
+        ringCapCards(r.capCards),
+        "a lawful circulation may not be told it arrived too fast",
+      ).toEqual([]);
+    });
+  }
+
+  for (const level of LEVELS) {
+    it(`…and the 49 км/ч drive down the SAME line collects none of them @L${level}`, () => {
+      const r = drivePaced(level, 49);
+      expect(r.ticks, `L${level}`).toBe("000");
+      expect(r.passed, `L${level}`).toBe(false);
+    });
+  }
+
+  it("…and that refusal is explained rather than silent (doc 64 THEO-4)", () => {
+    // The row's charge is that the careful drive and the 49 км/ч one end up
+    // indistinguishable. They do not: one passes, and the other is TOLD which
+    // number it had to be under and which number it arrived with.
+    const cards = ringCapCards(drivePaced(3, 49).capCards);
+    expect(cards.length).toBeGreaterThan(0);
+    expect(cards[0]).toContain(`не повече от ${POSTED_RING_KMH} км/ч`);
+    expect(cards[0]).toContain("49 км/ч");
   });
 });

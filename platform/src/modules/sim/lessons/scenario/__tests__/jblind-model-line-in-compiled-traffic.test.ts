@@ -61,8 +61,19 @@ const DISTRICT: unknown = JSON.parse(
 /** The seed sweep w21/w22/w23 measured on, fixed so the numbers are comparable. */
 const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1);
 
-/** Today's measurement, per rung. A ratchet: lower it, never raise it. */
-const MAX_CONVICTED_SEEDS: Record<number, number> = { 1: 3, 2: 3, 3: 1, 4: 1, 5: 0 };
+/**
+ * Today's measurement, per rung. A ratchet: lower it, never raise it.
+ *
+ * W25 lowered it from 3/3/1/1/0. `worldRuntime` §4b no longer arms the
+ * right-hand-rule conviction clock against a conflict that is BORN while the
+ * student is already inside the junction core, when he entered it at the yield
+ * floor with the way clear — measured on the two seeds that carried it (6 and
+ * 7: clear at the y = −17.5 entry, conflict first visible at y = −14.2 / −10.8,
+ * billed at y = −10.2 / −6.9, mid-turn). Seed 13 is NOT that shape and still
+ * convicts: its car appears 0.7 s after he releases the brake, while he is
+ * still outside the core at 5 км/ч and stopping is still available to him.
+ */
+const MAX_CONVICTED_SEEDS: Record<number, number> = { 1: 1, 2: 1, 3: 0, 4: 0, 5: 0 };
 
 /** The band the same sweep sat in BEFORE wave 20's arrival clauses. A run that
  *  reaches it again is the regression this file exists to catch. */

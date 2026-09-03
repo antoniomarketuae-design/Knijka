@@ -129,8 +129,19 @@ export function hzBrakeDontSwerveObstacles(): ObstacleRect2D[] {
 export function scHzBrakeDontSwerveShadowScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Две ленти в една посока, 50 км/ч. Ние сме в дясната — а в лявата, почти наравно с вратата ни, се движи кола." },
+      // THE CAPTION SWEEP 161 PHOTOGRAPHED OVER AN EMPTY LANE (:8a5ed5b4,
+      // 04-t094s). It asserted a car and named neither why the glass was empty
+      // nor which look finds one: the escort rides ~66–79° off the driver's
+      // axis against a 37.7° half-windscreen, measured every pace, in
+      // traffic/__tests__/staged-subject-on-the-glass.test.ts. Instruction 2
+      // was routed to the graded over-the-shoulder check in wave 17; this
+      // caption — the surface the row was actually filed on — was not, and
+      // said the bare thing the finding quotes. It now carries the WHY
+      // (THEO-4) and names the same look, and the ghost performs огледало →
+      // рамо in that order, which is the лекция's own.
+      { kind: "annotation", textBg: "Две ленти в една посока, 50 км/ч. Ние сме в дясната. В лявата, наравно с вратата ни, се движи кола — през стъклото няма да я видиш, там е мъртвата зона. Затова се гледа през рамо." },
       { kind: "glance", mirror: "rear" },
+      { kind: "glance", mirror: "shoulder" },
       // The lawful approach — 50 exactly, held to the reveal so the escort's
       // release arms at its authored trigger speed.
       { kind: "drive", points: [[LANE_X, 15], [LANE_X, 100], [LANE_X, REVEAL_Y]], targetKmh: CRUISE_KMH, stopAtEnd: false },

@@ -1,5 +1,5 @@
 /**
- * Trace gate — „Един поглед не стига" (sc-junction-scan on tj-stop-v1, doc 72
+ * Trace gate — „Един поглед не стига" (sc-junction-scan on tj-scan-v1, doc 72
  * JU-23), doc 76 §5/§9 stages 3+5. The junction-scan detector ships config-OFF;
  * the recorder enables it via ruleConfig (the per-lesson drill opt-in), so the
  * gate replays with the drill ON:
@@ -42,7 +42,7 @@ function commendationCodes(d: RecordedDrive): string[] {
   return d.ruleEvents.filter((e) => e.kind === "commendation").map((e) => e.code);
 }
 
-const district = loadDistrict("tj-stop-v1");
+const district = loadDistrict(SC_JUNCTION_SCAN.map.districtId);
 const drives = new Map<ScJunctionScanTraceName, RecordedDrive>(
   NAMES.map((n) => [n, recordScJunctionScanDrive(district, n)]),
 );
@@ -67,6 +67,13 @@ describe("sc-junction-scan — the shadow gate (doc 76 §5)", () => {
     expect(outcome, "the staged conflict never resolved — the car was not met").toBeDefined();
     expect(outcome!.success).toBe(true);
     expect(outcome!.detail).toBe("yielded");
+    // …AND THE CARD, which `detail` cannot stand in for — `sc-junction-scan:
+    // d9c8e516`. `detail` rides the loose `sawYield` latch (one frame under
+    // 8 км/ч); the commendation needs the ACT (YIELD_PRAISE_WAIT_SEC in
+    // orchestrator/runners.ts: a banked second of wait for a car that had not
+    // cleared, no impact). Asserted apart, or this drill's gate cannot tell the
+    // drive that waited from the one that dipped — in either direction.
+    expect(commendationCodes(shadow)).toContain("YIELDED_TO_PRIORITY");
   });
 });
 

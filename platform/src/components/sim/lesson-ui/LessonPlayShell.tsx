@@ -1829,6 +1829,13 @@ export interface AdvisorTaskGate {
   /** THEO-3 „направи грешката" sandbox. */
   mistakeMode: boolean;
   ended: boolean;
+  /** The objective's own demand — `snap.taskCapKmh`, the HELD number. */
+  taskCapKmh: number | undefined;
+  /** The В26 disc — `snap.limitKmh`. */
+  limitKmh: number;
+  /** The governor as the bottom strip has it; `null` = the bar prints no
+   *  ceiling, and the coaching is then the only carrier. */
+  governorCapKmh: number | null;
 }
 
 export function advisorTaskFold(gate: AdvisorTaskGate): {
@@ -1837,10 +1844,45 @@ export function advisorTaskFold(gate: AdvisorTaskGate): {
 } {
   const mayCoach =
     gate.advisorOn && !gate.examMode && !gate.mistakeMode && !gate.ended;
-  return foldAdvisorIntoTask(
+  const fold = foldAdvisorIntoTask(
     mayCoach ? (gate.advisorPrompt?.textBg ?? null) : null,
     gate.objectiveTitleBg,
   );
+  // ── O51 residual (3), THE PHONE'S HALF ─────────────────────────────────────
+  // `advisorCapEchoesStrip` above gates the ROOMY `AdvisorCard`, and that closed
+  // the desktop leg only. On a phone there is no card: the same sentence rides
+  // the TASK ROW as its detail (`taskOverlayRow`), and the consolidated strip is
+  // mounted underneath it either way. MEASURED · `w24/frames/
+  // sc-signal-hesitation__mobile-wrong/run.log` @ 04-t027s, one beat, both
+  // surfaces:
+  //     rail   «Задача 1/2 Приближи зеленото кръстовище с готовност
+  //             дръж под 35 км/ч  Защо»
+  //     strip  «D 42 км/ч 50 Режим Нормален ≤60 · знакът важи, не режимът
+  //             · задачата иска ≤35 — по-строгото важи»
+  // — the same 35, twice, in two phrasings, which is sc-signal-hesitation:
+  // 826bc3d5 verbatim on the leg the desktop fix could not reach.
+  //
+  // ONE PREDICATE, NOT A SECOND READING: the two exceptions it carries (no
+  // governor ⇒ the bar prints no speed clause at all; a task cap at or above the
+  // posted limit ⇒ B58 refuses to make it the binding number) are exactly the
+  // readings where dropping this detail would delete the only statement of the
+  // drill's demand. Both keep the coaching here for the same reason they keep
+  // the card there.
+  if (
+    advisorCapEchoesStrip(
+      fold.taskDetailBg,
+      gate.taskCapKmh,
+      gate.limitKmh,
+      gate.governorCapKmh,
+    )
+  ) {
+    // `advisorSpeaks` rides along untouched rather than being re-asserted here:
+    // a non-null `taskDetailBg` is already the `advisorSpeaks === false` arm of
+    // `foldAdvisorIntoTask`, and pinning it would be a second reading of a gate
+    // this file spends a screen keeping single.
+    return { ...fold, taskDetailBg: null };
+  }
+  return fold;
 }
 
 /**
@@ -2089,6 +2131,14 @@ export interface LessonQueueState {
   taskPing: number;
   /** `lesson.descriptionBg` — the sandbox's own line, see `taskLineBg` below. */
   lessonDescriptionBg: string;
+  /**
+   * The governor as the consolidated strip has it — the shell's own mirror of
+   * `dashboardStatus.governorCapKmh`, and the ONLY input of the O51 residual
+   * that is not already on `snap` (the other two, `taskCapKmh` and `limitKmh`,
+   * are read off it below). `null` is „the bar is printing no ceiling", which is
+   * the reading where the coaching keeps the glass. See `advisorTaskFold`.
+   */
+  governorCapKmh: number | null;
 }
 
 export interface LessonQueueBinding {
@@ -2129,6 +2179,9 @@ export function lessonQueueBinding(s: LessonQueueState): LessonQueueBinding {
     examMode: s.examMode,
     mistakeMode: s.mistakeMode,
     ended: s.ended,
+    taskCapKmh: s.snap.taskCapKmh,
+    limitKmh: s.snap.limitKmh,
+    governorCapKmh: s.governorCapKmh,
   });
 
   const taskKey = taskAnnounceKey({
@@ -4961,6 +5014,7 @@ export function LessonPlayShell({
     compact,
     taskPing,
     lessonDescriptionBg: lesson.descriptionBg,
+    governorCapKmh,
   });
   const taskLineBg = queue.taskLineBg;
   /**

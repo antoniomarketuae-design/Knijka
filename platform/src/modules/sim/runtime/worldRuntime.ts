@@ -1230,6 +1230,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let rhrFired = false;
   let rhrConflictSeen = false; // a right-conflict was observed this visit
   let rhrSlowed = false; // driver slowed to yield speed while that conflict held
+  /**
+   * COMMITMENT (see §4b's "entered clear" block). `rhrApproachYielded` is set
+   * the moment the driver is inside the observation zone, still OUTSIDE the
+   * core, at or below the yield floor — he came in prepared to stop.
+   * `rhrEnteredCore` latches his first moving tick inside the core, and
+   * `rhrEnteredClear` records whether that commitment was made with the way
+   * genuinely clear. Reset with the rest of the visit state.
+   */
+  let rhrApproachYielded = false;
+  let rhrEnteredCore = false;
+  let rhrEnteredClear = false;
   let rbNode: string | null = null; // roundabout currently being approached
   let rbFired = false;
   let rbConflictSeen = false; // circulating traffic observed this approach
@@ -1831,6 +1842,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           rhrConflictSeen = false;
           rhrSlowed = false;
           rhrCondSince = null;
+          rhrApproachYielded = false;
+          rhrEnteredCore = false;
+          rhrEnteredClear = false;
         }
         // TWO QUESTIONS, NOT ONE — and they were being answered by one call.
         //
@@ -1870,7 +1884,60 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           rhrConflictSeen = true;
           if (v.speedKmh <= RHR_YIELD_KMH) rhrSlowed = true;
         }
-        if (rightConflict) {
+        const dx = nearestIx.x - v.position.x;
+        const dy = nearestIx.y - v.position.y;
+        const inCore = dx * dx + dy * dy <= RHR_CORE_RADIUS_M * RHR_CORE_RADIUS_M;
+        // ── COMMITMENT: A DUTY THAT ATTACHES ON APPROACH CANNOT BE BILLED
+        //    AGAINST A CAR THAT ARRIVES AFTER YOU ARE IN THE BOX ────────────
+        //
+        // `sc-junction-blind:dea35510` („the lesson's own CORRECT line is not
+        // survivable"), measured on the shipped model line — creep to
+        // (4.06, −19.5), eight seconds on the brake, then the authored left
+        // turn — replayed at the ambient count each rung compiles to. Three of
+        // twenty L1 seeds still convicted, and the tick log says why:
+        //
+        //   seed 6  enters the core at t=30.75, y=−17.5, conf=0 — the way is
+        //           CLEAR. A conflict first appears at t=31.62, y=−14.2, and
+        //           he is billed «Непропускане» 0.9 s later at y=−10.2.
+        //   seed 7  same shape: clear at entry, conflict born at y=−10.8 with
+        //           the car already turning, billed at y=−6.9 — mid-junction.
+        //
+        // He is inside the junction, past the point where stopping is the safe
+        // act, and the card then prints «✔ потегли само когато никой не
+        // приближава» to a student who did exactly that. Requirement-zero (doc
+        // 64 THEO-4) is the reason this is a defect and not a tuning argument.
+        //
+        // So the clock may not START once he is committed — but ONLY when the
+        // commitment was itself lawful, which is two facts and not one:
+        //
+        //   · he came in prepared to stop (`rhrApproachYielded`: at or below
+        //     RHR_YIELD_KMH inside the observation zone while still outside the
+        //     core — the same floor the commendation channel already calls
+        //     „yielding"), and
+        //   · the way was clear at the instant he committed (no `rightConflict`
+        //     on the first moving tick inside the core).
+        //
+        // BOTH HALVES ARE LOAD-BEARING, and the same tick log is what proves
+        // it. `mistake-barge` is convicted in EXACTLY the shape acquitted
+        // above — it enters the core at t=17.63 with conf=0 and meets the car
+        // at y=−11.6 — so an immunity resting on „he was already inside" alone
+        // would acquit the barge and delete this lesson's own counter-example.
+        // What separates them is the approach: the barge holds 20-22 км/ч from
+        // 40 m out and never drops to the yield floor, so it never earns the
+        // first half. Nor does a driver who pulls out in front of a car he can
+        // already see: that conflict arms the clock BEFORE the core, and
+        // `rhrEnteredClear` is false at his commitment tick (seed 13, the one
+        // seed of twenty that still convicts here — the car appears 0.7 s after
+        // he releases the brake, while he is still outside the core at 5 км/ч
+        // and stopping is still the right answer).
+        if (!inCore) {
+          if (Math.abs(v.speedKmh) <= RHR_YIELD_KMH) rhrApproachYielded = true;
+        } else if (!rhrEnteredCore && v.speedKmh > RHR_MOVING_KMH) {
+          rhrEnteredCore = true;
+          rhrEnteredClear = rhrApproachYielded && !rightConflict;
+        }
+        const rhrCommittedClear = rhrEnteredCore && rhrEnteredClear;
+        if (rightConflict && !rhrCommittedClear) {
           // B15's staleness, in the tracker it was NOT fixed in. The identical
           // repair shipped one block below for `rbCondSince` (see §4c) and its
           // twin was left here, where the same driver meets the same sentence
@@ -1893,9 +1960,6 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         } else {
           rhrCondSince = null;
         }
-        const dx = nearestIx.x - v.position.x;
-        const dy = nearestIx.y - v.position.y;
-        const inCore = dx * dx + dy * dy <= RHR_CORE_RADIUS_M * RHR_CORE_RADIUS_M;
         // C1: convict only when the conflict has been VISIBLE for at least
         // the reaction window (measured from the conflict's onset — staged
         // "late" arrivals can be born with the driver already at the core)
@@ -1931,6 +1995,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         rhrConflictSeen = false;
         rhrSlowed = false;
         rhrCondSince = null;
+        rhrApproachYielded = false;
+        rhrEnteredCore = false;
+        rhrEnteredClear = false;
       }
 
       // 4c. Roundabout entry: entering the ring (heading inward, at speed) while
@@ -2243,6 +2310,13 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // vruAheadMeters` for the frames.
       if (Number.isFinite(vruAheadM)) tick.vruAheadM = vruAheadM;
       if (v.fogLightsOn !== undefined) tick.fogLightsOn = v.fogLightsOn;
+      // THE PEDAL (SimTick.throttlePedal) — the same additive seam: published
+      // only by a rig that HAS an accelerator channel, so every recorded trace
+      // and every hand-built sample leaves the tick exactly as it shipped.
+      if (v.throttlePedal !== undefined) tick.throttlePedal = v.throttlePedal;
+      // …and the IGNITION, on the same seam and for the same detector: the
+      // parking brake is only a blocker on a car whose engine is running.
+      if (v.engineOn !== undefined) tick.engineOn = v.engineOn;
       // B1a additive world context (doc 72 capabilities 1 + N3): flows onto
       // the tick exactly the way maxSpeedKmh does — from the resolved edge.
       if (v.stalled !== undefined) tick.stalled = v.stalled;

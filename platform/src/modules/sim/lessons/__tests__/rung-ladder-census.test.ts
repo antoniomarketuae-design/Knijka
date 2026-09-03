@@ -246,10 +246,11 @@ describe("the census, held", () => {
     // its scope note as a real open row measuring cross 13 % / 1 pass per
     // minute at L1, below its own MIN_PASSAGES_PER_MIN of 2, and excluded only
     // because it hand-authored a count. It no longer does: that suite now
-    // COLLECTS `sc-junction-scan@L1 (tj-stop-v1): the crossing arm is not dead`
-    // and it passes (verified 2026-08-28, 24 passed). Compiled traffic is now
-    // 4 / 4 / 5 / 5 / 6 — byte-identical to `sc-junction-stop`, its sibling on
-    // the same district and the same spawn.
+    // COLLECTS `sc-junction-scan@L1: the crossing arm is not dead` (on tj-scan-v1
+    // since `sc-junction-scan:28e782ab`) and it passes (verified 2026-08-28, 24
+    // passed). Compiled traffic is now 4 / 4 / 5 / 5 / 6 — byte-identical to
+    // `sc-junction-stop`, which was its sibling on the same district and spawn
+    // until that row gave this drill its own Б2 T.
     //
     // WHAT IT COST, NOT HIDDEN: L4 → L5 for this template went 4→6 to 5→6, so
     // it joins `L5_PLUS_ONE_CAR_ONLY` beside the sibling that was already on

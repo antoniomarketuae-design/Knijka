@@ -109,6 +109,20 @@ That address list is a HINT and is often WRONG — measured on this corpus, two 
 
 THE RULES, IN THE ORDER THAT MATTERS:
 
+0. THE HARNESS IS NOT THE PRODUCT, and this is the rule that cost the most.
+   Measured on the w24 round: 8 of 13 proposed closures were overturned, and the
+   commonest reason was a row declared ALREADY-FIXED because a symptom stopped
+   appearing — when what had changed was the DRIVER, not the code.
+   sc-ov-crest-curve was closed because 27 full stops became 1; sweep161s own log
+   says those 27 stops were «refused 11 standstill brake presses · re-asserted the
+   brake 6x after the sim lost the key», i.e. a broken harness fighting the sim,
+   and the harness has since gained a pace tape. The lessons real defect — no
+   objective can fire — is unchanged at 0 of 3.
+   SO: before you write ALREADY-FIXED, use git log -S or diff the OWNING file
+   between the build the row was filed against and HEAD, and NAME the commit that
+   repaired it. If no product commit touched it, the row is not fixed — say what
+   changed in the harness instead, and leave the row open.
+
 1. VERIFY EACH CAUSE IN CURRENT SOURCE BEFORE EDITING. These rows were filed against older builds and many waves have run since. If a row is ALREADY FIXED, say so with the evidence and change nothing for it. If it was never a defect, say REFUTED and prove it. Both are valuable outcomes — a wave that always finds something to change is inventing work.
 
 2. LAND CODE OR LAND NOTHING. Never write an essay into a source file. A previous wave produced 265 lines of comment and zero code across four files; that is worse than an empty diff, because a comment makes git report the file as changed and unlocks the audit's re-closure gate. Analysis goes in your REPORT.

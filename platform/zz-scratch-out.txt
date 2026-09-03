@@ -1,0 +1,16 @@
+keys=roadSurface,junctionSurface,sidewalks,markings,parkingLanes,roadDecals,waterDecals,railTracks,terrain,terrainPaved,roundaboutIslands,buildingWalls,buildingRoofs,buildingInstances,trafficLights,signs,streetlights,trees,billboards,utilityPoles,railings,medianBarriers,busStops,parkingKits,schools,terminusClosures,colliders,attribution,stats
+buildingWalls len=4
+buildingInstances len=0
+trafficLights len=0
+signs len=2
+streetlights len=32
+trees len=101
+billboards len=0
+utilityPoles len=25
+railings len=83
+medianBarriers len=0
+busStops len=0
+parkingKits len=0
+schools len=0
+terminusClosures len=4
+streetlights=[{"position":[16.025,0.13999999999999999,-14],"yaw":-1.5707963267948966},{"position":[-16.025,0.13999999999999999,-42],"yaw":1.5707963267948966},{"position":[16.025,0.13999999999999999,-70],"yaw":-1.5707963267948966},{"position":[-16.025,0.13999999999999999,-98],"yaw":1.5707963267948966}]

@@ -204,6 +204,13 @@ const GATE_OPEN: AdvisorTaskGate = {
   examMode: false,
   mistakeMode: false,
   ended: false,
+  // The O51-residual inputs, in the reading where the predicate CANNOT fire:
+  // no governor means the consolidated strip prints no speed clause at all, so
+  // the coaching is the only carrier and every assertion below is the shipped
+  // behaviour unchanged. §2.5 drives the reading where it does fire.
+  taskCapKmh: undefined,
+  limitKmh: 50,
+  governorCapKmh: null,
 };
 
 /**
@@ -351,6 +358,9 @@ function state(over: Partial<LessonQueueState> = {}): LessonQueueState {
     compact: true,
     taskPing: 0,
     lessonDescriptionBg: MISTAKE_DESCRIPTION,
+    // `null` = the bar prints no ceiling, which is the pre-O51 reading: the fold
+    // is byte-identical to what shipped and every block below is unmoved.
+    governorCapKmh: null,
     ...over,
   };
 }
@@ -661,6 +671,12 @@ const BINDING_ARG: Record<string, string> = {
   compact: "compact",
   taskPing: "taskPing",
   lessonDescriptionBg: "lesson.descriptionBg",
+  // O51 residual (3), the phone's half — the one input of
+  // `advisorCapEchoesStrip` that is not already on `snap`. Pinned here for the
+  // same reason as its eight neighbours: `governorCapKmh: null` type-checks,
+  // satisfies every substring written over this file, and silently restores the
+  // second task-speed surface on every phone.
+  governorCapKmh: "governorCapKmh",
 };
 
 /** The four React facts, and nothing else may join them. */
@@ -681,6 +697,7 @@ const PIN: Record<string, string> = {
   compact: "true",
   taskPing: "0",
   lessonDescriptionBg: '""',
+  governorCapKmh: "null",
   advisorFresh: "true",
   praiseFresh: "false",
   taskFresh: "true",
@@ -692,7 +709,7 @@ const bindingArg = (src: string) =>
 const rowsCall = (src: string) => callSitesOf(src, ["advisorTaskRows"])[0] ?? null;
 
 describe("the component hands the binding its own live state, and nothing else", () => {
-  it("one call, inside the shell, with exactly the shell's eight state values", () => {
+  it("one call, inside the shell, with exactly the shell's nine state values", () => {
     const calls = callSitesOf(SHELL_SRC, ["lessonQueueBinding"]);
     expect(calls).toHaveLength(1);
     expect(calls[0].enclosing).toBe("LessonPlayShell");
@@ -834,5 +851,60 @@ describe("MUTATION — the reader rejects each pin the substring accepted", () =
     // …and the reader really does read THIS file, not an empty string.
     expect(SHELL_SRC.length).toBeGreaterThan(100_000);
     expect(bindingArg(SHELL_SRC)).toEqual(BINDING_ARG);
+  });
+});
+
+/**
+ * ── §2.5 · O51 RESIDUAL (3), THE PHONE'S HALF, THROUGH THE WHOLE WIRE ───────
+ * (sc-signal-hesitation:826bc3d5, major, re-judged STILL on the w24 re-drive.)
+ *
+ * The desktop leg was gated at the `AdvisorCard` mount and the phone was left
+ * carrying the same figure on the same glass: no card exists there, so the
+ * coaching rides the TASK ROW as its detail and the consolidated strip is under
+ * it either way. `w24/frames/sc-signal-hesitation__mobile-wrong/run.log` at
+ * 04-t027s, on the build that ALREADY carried the desktop fix — rail «Задача
+ * 1/2 … дръж под 35 км/ч Защо», strip «… · задачата иска ≤35 — по-строгото
+ * важи». `taskCapThread.test.ts` owns the predicate and its two exceptions;
+ * these two drive the WIRE — the binding, the announce key and the row the
+ * phone paints — because a decision the binding never asks for is the dead
+ * predicate this programme measured at 51 of 82 repairs.
+ *
+ * `governorCapKmh: null` is the default in `state()`, i.e. every block above is
+ * the shipped behaviour untouched, and the residual is only ever asked about on
+ * a stage where the bar is genuinely printing a ceiling.
+ */
+describe("§2.5 the phone's task row drops a detail the strip is already printing", () => {
+  it("with a governor above the sign, the duplicate detail never reaches the row", () => {
+    const quiet = shell({ governorCapKmh: 60 });
+    // The zebra rung's cap is 40 against a 50 street, so `readSpeedContract`
+    // makes the TASK the binding number and `GovernorCapMark` prints it.
+    expect(state().snap.taskCapKmh).toBe(40);
+    expect(quiet.binding.fold.taskDetailBg).toBeNull();
+    const taskRow = quiet.rows[1];
+    expect(taskRow?.kind).toBe("task");
+    expect(taskRow?.detailBg ?? null).toBeNull();
+    // …and the ROW ITSELF is untouched: the objective, its counter and its line
+    // are exactly what they were. Only the second copy of the speed is gone.
+    expect(taskRow?.lineBg).toBe(ZEBRA_TITLE);
+  });
+
+  it("the announce key follows it, so no card re-announces a line that did not change", () => {
+    // `taskAnnounceKey` carries the detail (a coaching change under an unchanged
+    // objective must re-announce). Suppressing the detail without the key would
+    // leave the phone re-announcing the task every time the cap sentence moved
+    // behind a row that no longer shows it.
+    expect(lessonQueueBinding(state({ governorCapKmh: 60 })).taskKey).not.toBe(
+      lessonQueueBinding(state()).taskKey,
+    );
+    expect(lessonQueueBinding(state({ governorCapKmh: 60 })).taskKey).toContain(ZEBRA_TITLE);
+  });
+
+  it("no governor: the strip prints no ceiling and the phone keeps its only copy", () => {
+    // The negative control, and the reason this is not an unconditional
+    // suppression: on „Напреднал" the bar draws no mark at all, so this detail
+    // is the only place the drill's demand is stated on a phone.
+    const loud = shell({ governorCapKmh: null });
+    expect(loud.binding.fold.taskDetailBg).toBe("дръж под 40 км/ч");
+    expect(loud.rows[1]?.detailBg).toBe("дръж под 40 км/ч");
   });
 });

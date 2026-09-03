@@ -44,7 +44,11 @@
  *   §5  the matchers have teeth: each is run against the exact string this
  *       lane replaced and against a neighbour it must not convict;
  *   §6  a `passSignal` chip may not certify an interval it cannot witness —
- *       added 2026-08-25 with the last Б2 pair (see the block there).
+ *       added 2026-08-25 with the last Б2 pair (see the block there);
+ *   §7  the three Б2 drills stand on three different STREETS, not three
+ *       different sentences — the clause §1/§2 structurally cannot answer
+ *       (`sc-junction-scan:28e782ab`; the block there says why the manoeuvre
+ *       axis was exhausted and the world had to move instead).
  *
  * SCOPE, stated so the silences are deliberate. `sc-junction-gap` and
  * `sc-junction-left` BOTH live in templates-junctions2.ts (SC_JUNCTION_GAP at
@@ -775,3 +779,86 @@ describe("§6 a passSignal chip claims only what its gate can witness", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// §7 — three names, three streets
+// ---------------------------------------------------------------------------
+
+/**
+ * THE CLAUSE THE CHIPS COULD NOT ANSWER — `sc-junction-scan:28e782ab` (major),
+ * re-verified 2026-08-26 with openReason=still-present: „Every one of the three
+ * still opens on «знака Б2» and grades a stop-line crossing at the same
+ * junction; ONLY THE WORDING of the objectives was separated, not the world or
+ * the manoeuvre."
+ *
+ * §1 and §2 above answered the wording and can never answer this: a chip is not
+ * a street. The MANOEUVRE axis is exhausted and it is worth writing down so the
+ * next lane does not spend a wave rediscovering it — a T-junction stem has
+ * exactly TWO exits, and both are taken. Right/east is `sc-junction-stop` and
+ * `sc-junction-gap`; left across the priority road is `sc-junction-left`
+ * (templates-junctions2.ts, its own subject). Turning the scan drill left would
+ * have traded one duplicate for another.
+ *
+ * So the WORLD answers it. `sc-junction-gap` already stood on tj-emerge-v1;
+ * `sc-junction-scan` now stands on tj-scan-v1 (130 m / 110 m arms, spawn
+ * y = −95, its own streetwall frontage — the pass keys its jitter on the edge
+ * id every tj map shares, so different ARMS are what buy a different street).
+ * That leaves tj-stop-v1 to the drill it was built for.
+ *
+ * WHAT THIS DOES NOT ASSERT, deliberately: that the three STOP LINES differ.
+ * The Б2 line is DERIVED from the priority road's half-width — 27.725 m from
+ * the node on all three — and it may not move without invalidating each drill's
+ * gates and its committed traces. `tj-junctions2-districts.test.ts` pins that
+ * it did not. A stop line at another distance would not be a different lesson;
+ * a different street is.
+ */
+describe("§7 the three Б2 junction drills do not share a junction", () => {
+  const B2_TRIO = ["sc-junction-stop", "sc-junction-scan", "sc-junction-gap"] as const;
+
+  it("each names a district of its own, and each district is committed", () => {
+    const seen = new Map<string, string>();
+    for (const id of B2_TRIO) {
+      const districtId = specOf(id).map.districtId;
+      const twin = seen.get(districtId);
+      expect(twin, `${id} drives ${twin}'s street (${districtId})`).toBeUndefined();
+      seen.set(districtId, id);
+      // …and it is a real map, not a name: the same Б2 control the drill grades.
+      expect(expectedControlOf(districtId), districtId).toBe("stopSignOnMinor");
+    }
+    expect(seen.size).toBe(B2_TRIO.length);
+  });
+
+  it("and the spawn they start from is not the same pose either", () => {
+    // The finding says „the same approach" as well as „the same junction", and
+    // the two drills that shared tj-stop-v1 also shared `tj-spawn-south` on it —
+    // the same 105 m of stem. Every tj map names its spawns identically, so the
+    // id proves nothing; the POSE does, and it moves with the stem length.
+    const poses = B2_TRIO.map((id) => {
+      const spec = specOf(id);
+      const p = spawnOf(spec.map.districtId, spec.start.spawnPointId!);
+      return `${id} ${p.x},${p.y}`;
+    });
+    const coords = poses.map((p) => p.split(" ")[1]!);
+    expect(new Set(coords).size, `two drills open at the same pose:\n${poses.join("\n")}`).toBe(
+      B2_TRIO.length,
+    );
+  });
+});
+
+/** The authored spawn pose of one district, read off the committed file. */
+function spawnOf(districtId: string, spawnPointId: string): { x: number; y: number } {
+  const candidates = [
+    path.join(process.cwd(), "content", "world", `${districtId}.json`),
+    path.resolve(process.cwd(), "..", "content", "world", `${districtId}.json`),
+  ];
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue;
+    const d = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      spawnPoints?: Array<{ id: string; x: number; y: number }>;
+    };
+    const s = (d.spawnPoints ?? []).find((p) => p.id === spawnPointId);
+    if (!s) throw new Error(`${districtId} has no spawn ${spawnPointId}`);
+    return { x: s.x, y: s.y };
+  }
+  throw new Error(`district ${districtId}.json not found`);
+}

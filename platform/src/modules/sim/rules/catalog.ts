@@ -2302,6 +2302,43 @@ export const FAILED_TO_YIELD_SITUATION_COPY: Record<
 };
 
 /**
+ * HANDBRAKE_LEFT_ON from a STANDSTILL — sc-vp-handbrake:1f2f7463, critical.
+ *
+ * THE POOLED ROW MAY NOT SPEAK FOR THIS ACT, and that is the whole reason the
+ * act needs a key. «Потегли с вдигната ръчна спирачка. Колата се влачи…»
+ * asserts two things about the drive: that the car moved off, and that it is
+ * dragging. Neither is true of the act the standstill arm grades —
+ * `PARKING_BRAKE_FORCE_N` (13 000 N) HOLDS this car, so the student who never
+ * released the lever is stationary at 0.32 км/ч with the pedal on the floor.
+ * A card that describes a drag the windscreen does not show is the tense
+ * defect the telltale rows beside this file already collected once; the
+ * discrimination is the same mechanism (`detail` → `actCopy`) that
+ * RAIL_CROSSING_ACT_COPY and FAILED_TO_YIELD_SITUATION_COPY ride, and it
+ * crosses to the server's `rebuildRuleEvents` on the same wire key.
+ *
+ * `lawRef` IS DELIBERATELY ABSENT so the pooled ЗДвП чл. 20, ал. 1 stands: the
+ * duty broken is identical (the driver must control the vehicle continuously),
+ * only the act differs. ADR-002 — no citation is written here that the
+ * catalogue did not already carry.
+ *
+ * THE TITLE IS THE LESSON'S OWN (`SC_VP_HANDBRAKE.titleBg`, 26 characters
+ * against the pooled row's 34), which is what the phone's peek window can
+ * finish — the SimOverlay arithmetic the roundabout row above states.
+ */
+export const HANDBRAKE_ACT_MOVE_OFF_ATTEMPT = "moveOffAttempt";
+
+export const HANDBRAKE_ACT_COPY: Record<
+  string,
+  { titleBg: string; explanationBg: string }
+> = {
+  [HANDBRAKE_ACT_MOVE_OFF_ATTEMPT]: {
+    titleBg: "Потегляне с вдигната ръчна",
+    explanationBg:
+      "Даде газ, без да свалиш ръчната спирачка — затова колата не тръгва: ръчната държи задните колела. В истинска кола тя не те спира, а се влачи: задните спирачки работят непрекъснато, прегряват и губят ефективност точно преди първото сериозно спиране, а ти няма да разбереш, докато не ти потрябват. Затова редът е един и същ всеки път — ръчната долу докрай, контролната лампа на таблото угасва, и чак тогава газта. Свети ли още лампата, ръчната не е долу.",
+  },
+};
+
+/**
  * The per-act tables, keyed by the code that owns each. A registry rather than a
  * chain of `if (code === …)`: the next code that grades more than one act adds a
  * row here and `makeViolation` picks it up for every producer at once.
@@ -2313,6 +2350,7 @@ const PER_ACT_COPY: Partial<
   COLLISION: COLLISION_CONTACT_COPY,
   WRONG_WAY: WRONG_WAY_ROAD_COPY,
   FAILED_TO_YIELD: FAILED_TO_YIELD_SITUATION_COPY,
+  HANDBRAKE_LEFT_ON: HANDBRAKE_ACT_COPY,
 };
 
 /**

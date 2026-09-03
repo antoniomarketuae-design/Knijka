@@ -40,6 +40,7 @@ import {
   routeHoldForSession,
 } from "../advisor";
 import { applyTick, createLessonSession } from "../engine";
+import { ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG } from "../objectives";
 import { compileScenario } from "../scenario/compile";
 import { SC_ROUNDABOUT_ENTRY } from "../scenario/templates-flow";
 import type { LessonSessionState } from "../types";
@@ -68,10 +69,32 @@ function step(
 }
 
 /**
- * A car that has done the drill's first rung and is circulating on the ring —
- * i.e. the state the photographed drive was in one second before it left the
- * asphalt. `entered` has latched (d ≤ enterRadiusM 24), so the coach is saying
- * the ring-exit sentence, correctly.
+ * A point on rb-mini's circulatory carriageway at azimuth `phiDeg` about the
+ * island, in `stepRoundabout`'s own convention (south mouth 0°, east 90°,
+ * counter-clockwise = the direction Bulgarian traffic circulates). r = 20 m is
+ * mid-band: the drivable ring is 18 ± 4.06.
+ */
+function ring(phiDeg: number, r = 20): { x: number; y: number } {
+  const rad = (phiDeg * Math.PI) / 180;
+  return { x: r * Math.sin(rad), y: -r * Math.cos(rad) };
+}
+
+/**
+ * A car that has done the drill's first rung and has GONE ROUND — 58.5° of
+ * measured arc about the island, from the south mouth to φ = 70°, i.e. the
+ * state the photographed drive was in one second before it left the asphalt if
+ * it had actually circulated. `entered` has latched (d ≤ enterRadiusM 24) AND
+ * the passage is real, so the coach is saying the ring-exit sentence,
+ * correctly.
+ *
+ * THE ARC IS PART OF THE FIXTURE, not decoration (sc-roundabout-entry:4ab693eb,
+ * second pass). This helper used to stop at (4.06, −20) — one tick inside the
+ * entry circle with 0° of arc behind it — and assert the exit card there. That
+ * car has crossed the give-way line and nothing else, and the card it was
+ * asserted to receive is the same one the frame photographs against the island.
+ * `advisorPromptForObjective` now gates the sentence on the same passage
+ * `stepRoundabout` demands before it will credit an exit, so the fixture has to
+ * be the drive its own docstring always claimed it was.
  */
 function onTheRing(): { state: LessonSessionState; t: number } {
   let s = createLessonSession(LESSON);
@@ -82,7 +105,14 @@ function onTheRing(): { state: LessonSessionState; t: number } {
   // …the give-way approach zone (x 4.06, y −34, r 9, ≤ 25 км/ч).
   s = step(s, 1.5, LANE_X, -36, 8, { edgeId: "rbm-e-arm-s" });
   s = step(s, 2.0, LANE_X, -20, 10, { edgeId: RING_EDGE });
-  return { state: s, t: 2.0 };
+  // …and round it, counter-clockwise, past the first (east) mouth.
+  let t = 2.0;
+  for (const phi of [30, 50, 70]) {
+    t += 0.5;
+    const p = ring(phi);
+    s = step(s, t, p.x, p.y, 15, { edgeId: RING_EDGE });
+  }
+  return { state: s, t };
 }
 
 describe("the drill the frame was shot on, driven to the moment before the excursion", () => {
@@ -92,19 +122,27 @@ describe("the drill the frame was shot on, driven to the moment before the excur
     expect(state.currentObjectiveIndex, "the ring objective must be active").toBe(1);
     expect(state.objectives[1]?.spec.id).toBe("sc-rb-ring");
     expect(state.evalStates[1]).toMatchObject({ type: "roundabout", entered: true });
-    // The sentence in the frame — and on the ring it is the right one.
+    const arc = state.evalStates[1];
+    expect(arc?.type === "roundabout" ? Math.abs(arc.traversalArcDeg ?? 0) : 0).toBeGreaterThan(
+      ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG,
+    );
+    // The sentence in the frame — and after a real passage it is the right one.
     expect(advisorPromptForSession(state)?.textBg).toBe(RING_CARD_BG);
     expect(routeHoldForSession(state)).toBeNull();
   });
 });
 
 describe("on the central island the coach stops ordering the ring exit", () => {
-  /** Roll onto the island (r ≈ 8.5 m, inside the kerb) and sit there. */
+  /** Roll onto the island (r = 8.5 m, inside the kerb) and sit there. The
+   *  point is where a car leaving the ring at φ = 70° lands, so the excursion
+   *  does not silently unwind the arc it has already travelled. */
+  const ISLAND = ring(70, 8.5);
+
   function ontoTheIsland(sec: number): LessonSessionState {
     const { state, t } = onTheRing();
     let s = state;
     for (let i = 1; i * 0.5 <= sec; i++) {
-      s = step(s, t + i * 0.5, 3, -8, 3, { edgeId: null });
+      s = step(s, t + i * 0.5, ISLAND.x, ISLAND.y, 3, { edgeId: null });
     }
     return s;
   }
@@ -136,7 +174,8 @@ describe("on the central island the coach stops ordering the ring exit", () => {
     // student who is told nothing for the rest of the drive.
     let s = ontoTheIsland(ROUTE_HOLD_S + 1);
     expect(routeHoldForSession(s)).toBe("offRoad");
-    s = step(s, s.lastT + 0.5, LANE_X, -20, 10, { edgeId: RING_EDGE });
+    const back = ring(70);
+    s = step(s, s.lastT + 0.5, back.x, back.y, 10, { edgeId: RING_EDGE });
     expect(routeHoldForSession(s)).toBeNull();
     expect(advisorPromptForSession(s)?.textBg).toBe(RING_CARD_BG);
   });
@@ -145,11 +184,12 @@ describe("on the central island the coach stops ordering the ring exit", () => {
 describe("pinned in what he just hit — the same silence, the other clause", () => {
   function pinned(sec: number): LessonSessionState {
     const { state, t } = onTheRing();
+    const island = ring(70, 8.5);
     let s = applyTick(
       state,
       makeTick({
         t: t + 0.5,
-        position: { x: 3, y: -8 },
+        position: { x: island.x, y: island.y },
         speedKmh: 6,
         edgeId: null,
         events: [{ kind: "collision", withWhat: "staticObject" }],
@@ -157,7 +197,7 @@ describe("pinned in what he just hit — the same silence, the other clause", ()
     ).state;
     expect(s.crashPin, "the collision must arm the pin").toBeDefined();
     for (let i = 1; i * 0.5 <= sec; i++) {
-      s = step(s, t + 0.5 + i * 0.5, 3, -8, 0, { edgeId: null });
+      s = step(s, t + 0.5 + i * 0.5, island.x, island.y, 0, { edgeId: null });
     }
     return s;
   }
@@ -248,5 +288,102 @@ describe("the copy — retrieved, explained, and not a second copy of the banner
     }
     expect(routeHoldForSession(s)).toBe("offRoad");
     expect(advisorPromptForSession(s)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE CARD MAY NOT ORDER AN EXIT THE EVALUATOR WOULD REFUSE TO COUNT
+// ---------------------------------------------------------------------------
+//
+// The route hold above answers the frame five seconds late, and only because
+// the car had left the carriageway. What put the sentence on the glass in the
+// first place is upstream of both: `advisorPromptForObjective` keyed the ring
+// phase on `entered` alone, and `stepRoundabout` latches that at
+// d ≤ enterRadiusM — 24 m on rb-mini, against a drivable band that ends at
+// 22.06. So the card was already saying «Излез от кръговото с десен мигач» to a
+// car sitting AT the give-way line, and went on saying it while that car drove
+// the 20 m straight across the middle into the island (9° of arc, measured).
+//
+// The gate is now the same passage the objective itself demands before it will
+// tick an exit, so the coach cannot promise a manoeuvre the grader would void.
+
+describe("the frame's drive — straight at the island, no passage — is never told to exit", () => {
+  /** The photographed line: over the give-way line and on into the middle,
+   *  which sweeps almost no arc about the island. */
+  function straightAtTheIsland(): LessonSessionState {
+    let s = createLessonSession(LESSON);
+    s = step(s, 0, LANE_X, -93, 0);
+    s = step(s, 0.5, LANE_X, -60, 15, { edgeId: "rbm-e-arm-s" });
+    s = step(s, 1.0, LANE_X, -40, 12, { edgeId: "rbm-e-arm-s" });
+    s = step(s, 1.5, LANE_X, -36, 8, { edgeId: "rbm-e-arm-s" });
+    return s;
+  }
+
+  it("at the give-way line `entered` has latched — and the exit card has not", () => {
+    // d = 20.4 on rb-mini's enterRadiusM of 24: inside the latch, still one
+    // tick into the ring, nothing travelled.
+    const s = step(straightAtTheIsland(), 2.0, LANE_X, -20, 10, { edgeId: RING_EDGE });
+    expect(s.evalStates[1]).toMatchObject({ type: "roundabout", entered: true });
+    expect(advisorPromptForSession(s)?.textBg).not.toBe(RING_CARD_BG);
+  });
+
+  it("and it is still not said with the car nose-deep in the grass (the frame)", () => {
+    // Before ROUTE_HOLD_S matures, so this is the advisor's own reading and not
+    // the off-road hold answering for it.
+    let s = step(straightAtTheIsland(), 2.0, LANE_X, -20, 10, { edgeId: RING_EDGE });
+    s = step(s, 2.5, 3, -8, 5, { edgeId: null });
+    s = step(s, 3.0, 2, -6, 0, { edgeId: null });
+    expect(routeHoldForSession(s), "the hold has not matured — this is the card's own gate").toBeNull();
+    const arc = s.evalStates[1];
+    expect(arc?.type === "roundabout" ? Math.abs(arc.traversalArcDeg ?? 0) : 999).toBeLessThan(
+      ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG,
+    );
+    expect(advisorPromptForSession(s)?.textBg).not.toBe(RING_CARD_BG);
+  });
+
+  it("a ring the objective never watched approach still gets the sentence at once", () => {
+    // Four of the five shipped roundabout rungs are handed a car already on the
+    // ring (roundabout-traversal.test.ts's census), where `traversalArcDeg` is
+    // null — „unmeasurable, do not ask". Gating on arc there would silence the
+    // coach for a whole traversal he did drive.
+    const said = advisorPromptForObjective(
+      "t",
+      { kind: "completeManeuver", maneuver: "roundabout", x: 0, y: 0, enterRadiusM: 24, exitRadiusM: 34 },
+      {
+        type: "roundabout",
+        entered: true,
+        exitSignaled: false,
+        ringSignalArcDeg: null,
+        prevAzimuthDeg: 10,
+        traversalArcDeg: null,
+        insideAzimuthDeg: 10,
+        voidedExits: 0,
+      },
+    );
+    expect(said.textBg).toBe(RING_CARD_BG);
+    expect(said.keys).toEqual(["."]);
+  });
+
+  it("the invariant: whenever the card says «излез», obeying it is credited", () => {
+    // The one property worth having. Drive the whole drill under a right stalk
+    // from the first frame the card appears, and the objective ticks — so the
+    // sentence is never an order the grader is about to void.
+    const { state, t } = onTheRing();
+    expect(advisorPromptForSession(state)?.textBg).toBe(RING_CARD_BG);
+    let s = state;
+    let tt = t;
+    // …round to the north mouth and out of it, right stalk lit, as the card says.
+    for (const phi of [110, 150, 175]) {
+      tt += 0.5;
+      const p = ring(phi);
+      s = step(s, tt, p.x, p.y, 15, { edgeId: RING_EDGE, indicator: "right" });
+    }
+    for (const y of [26, 36]) {
+      tt += 0.5;
+      s = step(s, tt, LANE_X, y, 20, { edgeId: "rbm-e-arm-n", indicator: "right" });
+    }
+    expect(s.objectives[1]?.status, "the exit the card ordered is the exit that counts").toBe(
+      "done",
+    );
   });
 });

@@ -58,6 +58,23 @@ export interface VehicleSample {
    * callers stay byte-identically innocent.
    */
   fogLightsOn?: boolean;
+  /**
+   * FUNCTIONAL accelerator 0..1 (`VehicleInput.throttle` — post gate, post
+   * reverse remap). Additive; absent = the rig has no pedal channel, which is
+   * what the trace recorder and every fixture say. Read by exactly one
+   * detector, the config-gated standstill arm of HANDBRAKE_LEFT_ON, and it can
+   * only ever CONVICT a car that is stationary with the parking brake engaged
+   * — see `rules/types.ts SimTick.throttlePedal`.
+   */
+  throttlePedal?: number;
+  /**
+   * Is the engine RUNNING (`DrivelineState.engineOn`)? Additive; absent = the
+   * rig has no ignition channel. Read by exactly one detector — the standstill
+   * arm of HANDBRAKE_LEFT_ON, which may only convict when the parking brake is
+   * the thing actually holding the car, and on a cold car it is not (see
+   * `rules/types.ts SimTick.engineOn`).
+   */
+  engineOn?: boolean;
 }
 
 /** Traffic-signal runtime state, per signal node id from district-v1.json. */

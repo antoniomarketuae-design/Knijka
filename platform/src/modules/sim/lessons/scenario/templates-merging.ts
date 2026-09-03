@@ -103,6 +103,85 @@ const MWE_MAINLINE_CAR: RearTailgaterSpec = {
 };
 
 /**
+ * THE НАСРЕЩНО ПЛАТНО, WITH TRAFFIC ON IT — sc-merge-accel-lane:09e6d6f4,
+ * „at arrival the world is a plain two-lane strip through open grass fields".
+ *
+ * MOST OF THAT ROW IS REFUTED BY THE MAP and one half of it is this actor. The
+ * ramp is real (`mwe-e-ramp`, the student spawns 20 m up it and it has carried
+ * a Д5 since wave 21), the acceleration lane is real (`mwe-e-nb-accel`, and
+ * markings.ts paints it: the wide М2 seam that bounds the аварийна лента runs
+ * over the approach and the main segment and OPENS for exactly those 200 m),
+ * and the median carries 156 panels of ограничителна система. What the map has
+ * none of is A MOVING CAR, and an empty motorway is what reads as a strip of
+ * asphalt through a field.
+ *
+ * AND NO DIAL COULD PUT ONE THERE — measured, not assumed.
+ * `ScenarioSpec.traffic` is the product's own answer to „the empty world"
+ * (doc 86 L12), and on this map it is DEAD: `createTrafficSystem` on
+ * mw-entry-v1 spawns **0** ambient vehicles at vehicleCount 0, 2, 4, 6, 8 and
+ * 12 alike, because `buildLaneGraph` reports `loopLanes` = 1 of 5 lanes — the
+ * largest strongly connected component of five one-way dead-end strips is a
+ * single lane, and `buildRoutes` closes no loop through it. Authoring
+ * `traffic: { vehicleCount: n }` here would have shipped a number nothing
+ * reads. So the flow has to be STAGED, and the staged vocabulary already has
+ * the actor for it: `oncomingStream` is „N cars on a path with authored
+ * spacing, released at a player speed" (this file's own note at MFP_STREAM —
+ * „nothing about the runner assumes head-on"), and it is PURE CHOREOGRAPHY
+ * under the learn-only policy (doc 72 FO-07): the runner emits ZERO SimTick
+ * events bar a contact, so not one grade on this drill moves.
+ *
+ * WHY THE НАСРЕЩНО BANK AND NOT THE ONE HE MERGES INTO. `mwe-e-sb` is 30.37 m
+ * away across a 6 m median that is now physically closed by the barrier run, so
+ * these six bodies cannot be reached, cannot be hit and cannot interact with
+ * the mainline car above — the drill's own graded channel (the lane-change
+ * indicator/mirror pair and the causeless slam) is untouched, and so is every
+ * committed trace: `ScenarioTrace` serializes `meta`, player `samples` and
+ * `events`, and staged actors appear in none of the three. It is also the bank
+ * that is IN THE WINDSCREEN at arrival: from the ramp spawn (35.56, 139.5) on
+ * bearing 347.18°, all six bodies stand within 16° of the driver's eye line at
+ * 137–823 m, which is precisely the „open grass field" the row photographed.
+ *
+ * THE LANE IS THE RIGHT TRAVEL LANE, NOT THE SHOULDER. `buildLaneGraph` rides
+ * a one-way edge's CURB lane, and on this bank the curb lane carries
+ * `mwe-z-emerg-sb` over its whole length — it is the аварийна лента. So the
+ * same `extraRightOffsetM` correction the mainline car uses moves the column
+ * one lane pitch off it, onto the southbound centreline (x ≈ −30.37, laneId 1).
+ * A drill that teaches «там не се кара» may not stage six cars doing it.
+ */
+const MWE_ONCOMING_FLOW: OncomingStreamSpec = {
+  id: "sc-mrg-oncoming",
+  kind: "oncomingStream",
+  actor: {
+    pathNodes: ["mwe-n-sb-start", "mwe-n-sb-end"],
+    // 700 m of arc down a 960 m bank puts the head at y = 260 — the nose —
+    // and the tail at the far end, so the column is spread ACROSS the
+    // windscreen from the first frame instead of arriving as one clump.
+    // MEASURED from the ramp spawn on bearing 347.18°: the six bodies stand at
+    // −15.9°, −1.4°, +3.5°, +5.9°, +7.3° and +8.2° off the driver's eye line,
+    // at 137, 269, 406, 545, 684 and 823 m. Not one is BESIDE him, and that is
+    // the reason the head is at 700 and not deeper: every staged actor releases
+    // through the standard 2.6 m/s² ramp and needs ~13 s to reach 33 m/s, so a
+    // car released close enough to read would be seen crawling on a магистрала.
+    // At 137 m that ramp is not legible, and by the time the head is near the
+    // student it is at flow speed.
+    hold: { nodeIndex: 0, offsetM: 700 },
+    cruiseSpeedMps: 33, // ~119 km/h — motorway flow, well under the posted 140
+    extraRightOffsetM: -MWE_X_CURB, // off the аварийна лента, into laneId 1
+    colorIndex: 0,
+  },
+  count: 6,
+  // CUMULATIVE arcs behind the head (the runner reads gapsM[i-1] as car i's own
+  // offset from car 0 — see MFP_STREAM's note on the pair that got this wrong):
+  // a 140 m headway, ≈ 4.2 s at 33 m/s, which is what a real АМ column looks
+  // like. 700 − 700 = 0 puts the tail exactly on the path start and no car is
+  // clamped off it (the runner's own stream-collapse guard).
+  gapsM: [140, 280, 420, 560, 700],
+  // Released the moment the world runs: the point of this actor is what the
+  // student sees BEFORE he touches anything, so it may not wait on his speed.
+  releaseKmh: 0,
+};
+
+/**
  * OV-15 / SP-10 — включване в магистрала през лентата за ускоряване (ЗДвП
  * чл. 56: „Водач, който навлиза на автомагистрала или скоростен път, е длъжен
  * да пропусне движещите се по тях пътни превозни средства"; чл. 25: маневрата
@@ -231,7 +310,7 @@ export const SC_MERGE_ACCEL_LANE: ScenarioSpec = {
     // braking distance.
     { level: 5, conditions: { weather: "rain" } },
   ],
-  staged: [MWE_MAINLINE_CAR],
+  staged: [MWE_MAINLINE_CAR, MWE_ONCOMING_FLOW],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -2075,6 +2154,35 @@ export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
       // FR-24: „on the derived line's own metre" held at the authored radius,
       // but the L1 ladder widens 3 → 4.25, so the disc admitted a pose 2.98 m
       // past the Б2 the title says to stop AT. The cut ends it at the paint.
+      //
+      // W25 2026-09-03 — AND „НАПЪЛНО" WAS STILL A CLAIM THE DISC COULD NOT
+      // MAKE. `.audit-frames/w24/frames/sc-merge-from-property__mobile-right/
+      // run.log` (HEAD 15c4b29, driven today, EVIDENCE complete) prints, on one
+      // protocol: «✓ Спри напълно на Б2 на изхода 1:16», «✗ Неспиране на знак
+      // Б2 „Спри!" −10 изпитни т. ОПАСНА ГРЕШКА», and NO
+      // `FULL_STOP_AT_STOP_SIGN` among its commendations. The route task
+      // certified the full stop the rule engine had just billed him ten points
+      // for not making — the sc-sflash-cross crime, on the other duty.
+      //
+      // THE NUMBER COULD NOT CLOSE IT, which is why this is a term and not a
+      // retune. A cap states a SPEED; the engine's qualifying stop is
+      // `fullStopMaxSpeedKmh` 1 held `fullStopMinDurationSec` 0.5 s and spent
+      // within `stopRecencySec` 6 s of the line (rules/types.ts). 3 → 1 would
+      // still leave the dwell and the recency unstated, and this drive DID
+      // touch 1 км/ч (`04-t055s`) before accelerating away over the paint at
+      // `04-t061s`/`04-t066s`. Nor could an after-the-fact read of the fault
+      // ledger: measured through `applyTick`, the tick on this gate is granted
+      // at x 32.0 — the disc's leading edge — and the Б2 violation is billed at
+      // x 27.5, so there is no fault yet at the moment the certificate is
+      // issued. `requireFullStop` asks the grader that owns «пълно спиране»
+      // the question ON that frame, so the two channels cannot disagree.
+      //
+      // IT REFUSES NEITHER RECORDING: `shadow-correct` and
+      // `mistake-signal-and-go` both come to REST (0.000 км/ч at x 29.04)
+      // inside this disc, and `s-w5-bot-completion` already asserts the live
+      // session commends `FULL_STOP_AT_STOP_SIGN` and bills no
+      // `STOP_SIGN_NO_FULL_STOP` on the taught drive. What it refuses is the
+      // roll — and the roll is what the −10 on that sheet is for.
       params: {
         kind: "reachZone",
         x: 29,
@@ -2082,6 +2190,7 @@ export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
         radiusM: 3,
         maxSpeedKmh: 3,
         acceptBeforeMarkM: -1.275,
+        requireFullStop: true,
       },
     },
     {

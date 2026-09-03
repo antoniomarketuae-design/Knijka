@@ -247,9 +247,14 @@ export const L5_PLUS_ONE_CAR_ONLY: readonly string[] = [
   "sc-junction-stop",
   // JOINED 2026-08-28, wave 8, and it is the least surprising addition this list
   // could take: `sc-junction-scan` is the sibling directly above it. The
-  // junction-triplet lane established that stop and scan are BYTE-IDENTICAL field
-  // for field — same district `tj-stop-v1`, same spawn, and all three exit gates
-  // literally `{x:55, y:-4.06, radiusM:9}`. Editing that template moved scan's
+  // junction-triplet lane established that stop and scan were BYTE-IDENTICAL
+  // field for field — same district `tj-stop-v1`, same spawn, and all three exit
+  // gates literally `{x:55, y:-4.06, radiusM:9}`. Two of those three have since
+  // moved: `sc-junction-scan:28e782ab` gave scan its own map, `tj-scan-v1`
+  // (130 m / 110 m arms, spawn y = −95). The GATES did not move — they are
+  // junction-relative — and neither did this row, because the ambient ladder it
+  // records reads the family baseline, not the arms. Editing that template moved
+  // scan's
   // L4->L5 step to the same shape stop's already had, so the two now describe the
   // same rung, which is what they always were.
   //

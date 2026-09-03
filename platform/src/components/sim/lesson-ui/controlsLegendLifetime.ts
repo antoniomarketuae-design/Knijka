@@ -2,10 +2,12 @@
  * WHEN THE KEYBOARD LEGEND STOPS BEING A REFERENCE AND STARTS BEING A BLIND.
  *
  * THE DEFECT (catalogue sweep 2026-08-17, three PC frames of one cause).
- * `[data-hud="controls-help"]` — the «⌨ Клавиши · за напреднали» sheet — is
+ * `[data-hud="controls-help"]` — the «⌨ Клавиши · за напреднали» sheet — was
  * mounted `open` on every desktop lesson that does not open with the pre-drive
- * procedure (`LessonScene`: `defaultOpen={!touchOnly && !driveLockedAtMount}`)
- * and, until this file, had exactly ONE exit: the student clicking the pill.
+ * procedure and, until this file, had exactly ONE exit: the student clicking
+ * the pill. (The BIRTH has since flipped too — `LessonScene` now mounts it
+ * `defaultOpen={false}`, so the sheet opens as its pill everywhere; the block
+ * at that mount carries the evidence. This file still owns the END.)
  * It is also a GHOST surface (`GHOST_SURFACES` in `PlayAreaStyles`), i.e. its
  * `bg-background/80` is stripped to `transparent !important` and what is left is
  * bare type printed straight onto the street. So on every frame the sweep took

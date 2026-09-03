@@ -169,6 +169,49 @@ describe("sc-hz-brake-dont-swerve — the shadow gate (doc 76 §5)", () => {
     expect(annotations.length).toBeGreaterThanOrEqual(4);
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);
   });
+
+  it("…and its OPENING caption no longer points at the windscreen (sweep161 :8a5ed5b4)", () => {
+    // THE SURFACE THE ROW WAS FILED ON. Both frames it cites are this deck —
+    // 04-t094s is caption 1 at 0:00 — and it read «Ние сме в дясната — а в
+    // лявата, почти наравно с вратата ни, се движи кола»: an assertion about a
+    // car with no account of why the glass in front of the student is empty and
+    // no look named that would find it. `staged-subject-on-the-glass.test.ts`
+    // measures the escort at ~66–79° off the driver's axis against a 37.70°
+    // half-windscreen, at every pace, so that sentence could not be obeyed
+    // through the glass at all. Instruction 2 was routed to the graded
+    // over-the-shoulder check in wave 17; the deck's own copy was not.
+    //
+    // Consumer: `lesson-ui/TraceTimeline.tsx` renders this string as the deck
+    // caption and as the annotation tick's `aria-label`.
+    const opening = shadow.trace.events.filter((e) => e.kind === "annotation")[0];
+    expect(opening).toBeDefined();
+    // The car and where it is — unchanged, it is the лекция's premise.
+    expect(opening.textBg).toContain("вратата ни");
+    // THE WHY, doc 64 THEO-4: the windscreen is empty for a reason, and the
+    // reason IS the lesson.
+    expect(opening.textBg).toContain("мъртвата зона");
+    expect(opening.textBg).toContain("стъкло");
+    // …and the look that does reach it, named the way instruction 2 names it.
+    expect(opening.textBg).toContain("рамо");
+    // The bare sentence the row quotes must not come back.
+    expect(opening.textBg).not.toContain("почти наравно с вратата ни, се движи кола.");
+  });
+
+  it("…and the ghost PERFORMS that look, огледало → рамо, where the caption says it", () => {
+    // A caption that names a check the demonstration never makes is the same
+    // defect one layer up. The shadow's opening beat now records both, in the
+    // order чл. 25 puts them in.
+    const kinds = shadow.trace.events.map((e) => e.kind);
+    expect(kinds).toContain("glance-rear");
+    expect(kinds).toContain("glance-shoulder");
+    expect(kinds.indexOf("glance-rear")).toBeLessThan(kinds.indexOf("glance-shoulder"));
+    // The teeth: the blind-swerve demo does NOT carry it, so the shoulder check
+    // is a property of the CORRECT drive and not of the recorder's vocabulary —
+    // the same pairing the glance-left assertion below uses.
+    expect(drives.get("mistake-blind-swerve")!.trace.events.map((e) => e.kind)).not.toContain(
+      "glance-shoulder",
+    );
+  });
 });
 
 describe("sc-hz-brake-dont-swerve — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {

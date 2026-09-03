@@ -1598,11 +1598,6 @@ export function ReadyScene({
    *  for the whole ~18 s the briefing covers the card, and that is precisely
    *  the stretch that must not be charged to the student's attention. */
   const hintRef = useRef<HTMLDivElement | null>(null);
-  /** Was this lesson opened INSIDE the pre-drive procedure? Captured once, at
-   *  mount, because it decides a DEFAULT (the collapsed key legend) and a
-   *  default must not flip halfway through a session. */
-  const [driveLockedAtMount] = useState(() => driveLocked);
-
   // Auto-reverse assist (founder 2026-07-17: „стрелката надолу не кара
   // назад"): the pure timing machine (engine/reverseAssist.ts) plus the flag
   // that marks assist-driven selector steps, so the driveline subscription
@@ -2563,52 +2558,49 @@ export function ReadyScene({
         sampleRef={sampleRef}
         cameraModeRef={cameraModeRef}
         applyCameraMode={applyCameraMode}
+        // sc-turn-left-oncoming:e91c1e01 — the bay carve-out, said as the thing
+        // it is. A graded bay IS the manoeuvring drill (`compile.ts` writes
+        // `parkingBay` from the parking objective's own rect); everywhere else
+        // a graded contact is a street crash however slow it was, and must be
+        // seen. See the GATE note in ImpactCut.tsx.
+        manoeuvring={lesson.parkingBay !== undefined}
       />
 
-      {/* Controls legend — collapsible, top-left of the canvas (clear of the
-          bottom cards + minimap). Collapsed by default on touch-only devices
-          (the keys are real but secondary there) AND on any lesson that opens
-          with the pre-drive procedure: the founder's row is literally „the
-          „Клавиши" legend [must not be] opening over the tutorial card by
-          default". It shares the top-left slot with the checklist and the step
-          card, and on a keyboard-first legend the first thing a mouse-first
-          lesson shows is a wall of key caps. One click still opens it.
+      {/* Controls legend — top-left of the canvas, and it now OPENS AS ITS
+          PILL. The «⌨ Клавиши · за напреднали ▸» button is always on the glass;
+          one click still unfolds the whole sheet, and `controlsLegendLifetime`
+          still folds it back once the car is genuinely moving.
 
-          ── ⏸ THE BIRTH IS FILED AGAIN AND IT IS NOT FIXED HERE — sweep w6,
-             2026-08-27, sc-junction-rhr:96062896 („the «Клавиши · за напреднали»
-             panel is expanded by default when the student arrives"), repeated
-             on sc-ac-truck-spray, sc-vp-readiness and sc-pk-move-off. The row
-             is REAL and it reproduces: `w13/sc-junction-rhr__pc-right/
-             01-arrival.png` has the sheet open before the student has touched
-             anything, and `03-ready.png` still does. It is also, exactly, what
-             the expression below is written to produce, so it is a DECISION and
-             not a bug — and it is not one this lane may take:
+          ── WHY THE DEFAULT FLIPPED (sc-junction-blind:f02ac308, and the
+             fourteen rows of the same sentence before it). Two earlier lanes
+             left this open as „the founder's question, not a lane's", on a
+             founder-facing reason stated on the component itself:
+             „collapsing it outright would hide the keyboard from a first-time
+             student who has no other way to discover the controls." That
+             sentence is no longer true of this screen, and the evidence is
+             retrieved rather than argued:
 
-               · the default's reason is founder-facing and stated on the
-                 component („collapsing it outright would hide the keyboard from
-                 a first-time student who has no other way to discover the
-                 controls"). Whether it still holds now that the collapsed state
-                 is a LABELLED pill — «⌨ Клавиши · за напреднали ▸», one click,
-                 always on the glass — is the founder's question, not a lane's;
-               · the expression below is pinned as SOURCE TEXT by
-                 `__tests__/controlsLegendLifetime.test.ts` („the founder-facing
-                 default is untouched"), a file this lane does not own, so
-                 narrowing it here lands a red suite in someone else's file;
-               · the obvious narrowing — a device-wide „seen" flag, the shape
-                 the touch hint next door already has — was explicitly REJECTED
-                 for this panel by the lane that gave it a lifetime, in that
-                 same test: „There is no device-wide «seen» flag for a piece of
-                 per-lesson furniture."
+               · the cockpit control strip PRINTS the key caps under the
+                 controls themselves — «СПИРАЧКА S», «ГАЗ W», «Л Q / З F / Д E»
+                 — visible in the very frame this row was filed on
+                 (`.audit-frames/w10-1/frames/sc-junction-blind__pc-right/
+                 03-ready.png`), so the keyboard is discoverable with the sheet
+                 shut;
+               · the collapsed state is a LABELLED pill, not a mystery glyph;
+               · doc 87 B7's owner line names „`LessonScene.tsx` (ControlsHelp
+                 default …)" for the founder's own „the «Клавиши» legend still
+                 opens by default over the tutorial card", and doc 88 carries
+                 the same complaint on fifteen lessons — sc-junction-blind,
+                 sc-junction-rhr, sc-jx-giveway-b1, sc-follow-distance,
+                 sc-ac-aquaplane, sc-speed-transition among them.
 
-             So the row stays open, with the three artefacts that would have to
-             move together named. What DID land is the lifetime
-             (`controlsLegendLifetime.ts`): the sheet folds to its pill once the
-             car is genuinely moving, so the occlusion is bounded to the
-             standstill the student reads the briefing in — which is precisely
-             the window sc-junction-rhr's own step 3 („първо наляво, после
-             НАДЯСНО") needs the glass for. */}
+             On the filed frame the open sheet is ghost type over the sky AND
+             it is drawn across the guidance ribbon's own legend, so two text
+             layers overlap on the world before the student has touched
+             anything. `touchOnly` / `driveLockedAtMount` are gone from the
+             expression because the sheet no longer opens itself anywhere. */}
       <ControlsHelp
-        defaultOpen={!touchOnly && !driveLockedAtMount}
+        defaultOpen={false}
         topdownAllowed={topdownInCycle}
         reverseAssistEnabled={reverseAssistEnabled}
         // …AND WHICH CAR THE LEGEND IS DESCRIBING — sc-vp-stall:95754650

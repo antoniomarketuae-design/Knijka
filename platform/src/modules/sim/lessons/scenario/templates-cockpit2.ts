@@ -45,11 +45,20 @@
  * HONEST LIMIT (documented like sc-vp-police-stop's within-lane note): the
  * handbrake DRAG is narrative, not simulated — the trace recorder's movement
  * model is the C1 kinematic core, not physics (doc 76 trap 3), so a
- * handbrake-on drive covers the street exactly like a clean one. Nothing is
- * faked to hide that: the objectives below grade ROUTE COMPLETION only, the
- * telltale is the authored CUE, and the shipped HANDBRAKE_LEFT_ON detector (1.5
- * s of motion with the channel raised) is the sole grader of the fault. A
- * circular reachZone cannot honestly discriminate a cockpit channel.
+ * handbrake-on RECORDING covers the street exactly like a clean one. Nothing is
+ * faked to hide that: the objectives below grade ROUTE COMPLETION only and the
+ * telltale is the authored CUE. A circular reachZone cannot honestly
+ * discriminate a cockpit channel.
+ *
+ * WHAT GRADES THE FAULT IN A LIVE SESSION, and why it took two arms. The
+ * shipped HANDBRAKE_LEFT_ON needs 1.5 s of MOTION with the channel raised —
+ * which is what the recordings above do, and what a student who yanks the
+ * lever at speed does. It is unreachable the other way round: in the live car
+ * `PARKING_BRAKE_FORCE_N` HOLDS (0.32 км/ч against a floored pedal), so the
+ * student who simply never released the lever moved nothing and was billed
+ * nothing (`sc-vp-handbrake:1f2f7463`). The standstill arm — pedal held 2.5 s
+ * against an engaged lever, `ruleConfig.handbrakeMoveOffEnabled` below — books
+ * exactly that act, with its own card that does NOT claim the car dragged.
  */
 
 import type { TelltaleCautionSpec, TelltaleStimulusSpec } from "../../contracts";
@@ -183,7 +192,14 @@ export const SC_VP_HANDBRAKE: ScenarioSpec = {
   // see rules/types.ts moveOffObservationEnabled). compileScenario propagates
   // this to the LessonSpec; the recorder passes the same override for the §9
   // assert. The handbrake detector needs no gate: it ships default-ON.
-  ruleConfig: { moveOffObservationEnabled: true },
+  // …and the LEVER's own detector, whose standstill arm ships OFF for the same
+  // A12 reason (rules/types.ts handbrakeMoveOffEnabled — 130 exam rungs hand
+  // over a cold car and never asked the student to think about the cockpit).
+  // Without it this drill's named failure was free: the parking brake HOLDS
+  // the car, HANDBRAKE_LEFT_ON needs `moving`, and a student who floored the
+  // pedal without releasing the lever reached his debrief on «Второстепенни
+  // 0 0 · чисто каране» (sc-vp-handbrake:1f2f7463).
+  ruleConfig: { moveOffObservationEnabled: true, handbrakeMoveOffEnabled: true },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

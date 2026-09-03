@@ -330,6 +330,23 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         const yielded = deriveYieldDemand(objective.titleBg);
         if (yielded !== undefined) out.requireYieldClean = yielded;
       }
+      // «СПРИ НАПЪЛНО» MEANS THE STOP THE LAW MEANS (see
+      // `ReachZoneWitnessDemands.requireFullStop` for the protocol, the
+      // measured tick/bill order and the false-refusal checks).
+      //
+      // AUTHORED ONLY, and deliberately so: «спри» opens dozens of banners in
+      // this catalogue — «Спри пред тротоара», «Спри в джоба», «Спри преди
+      // детето» — and only the ones standing on a Б2 line mean the ЗДвП чл. 50
+      // full stop. A title matcher would put a standstill demand on gates whose
+      // whole subject is stopping SHORT of something while still rolling, which
+      // is the false refusal `ReachZoneYieldDemand`'s own split exists to
+      // prevent.
+      if (p.requireFullStop !== undefined) {
+        if (p.requireFullStop !== true) {
+          throw new ObjectiveSpecError(objective.id, "reachZone requireFullStop must be true");
+        }
+        out.requireFullStop = true;
+      }
       // THE ONCOMING-GAP REPORT (see `ReachZoneWitnessDemands.
       // reportOncomingGapSec`). Authored only — a norm cannot be read off a
       // banner, and a wrong one would print a false standard rather than
@@ -657,6 +674,22 @@ export interface ObjectiveContext {
    * leaves the demand met, exactly like the four fields above it.
    */
   yieldFaults?: readonly YieldFaultRecord[];
+  /**
+   * Does the rule engine hold, ON THIS FRAME, a full stop it would accept at a
+   * Б2 — the one fact `ReachZoneParams.requireFullStop` consults.
+   *
+   * Filled in by `lessons/engine.ts qualifyingStopCurrent` off the POST-tick
+   * rule state, and it is that engine's own predicate rather than a second
+   * derivation of it: `stop.lastQualifyingStopAt` (≤ `fullStopMaxSpeedKmh` held
+   * for ≥ `fullStopMinDurationSec`) within `stopRecencySec`. Two
+   * implementations of «пълно спиране» is exactly how one protocol came to
+   * print a tick and a −10 for the same act.
+   *
+   * OPTIONAL, and absent means „unknown", never „no" — it leaves the demand
+   * met, exactly like the ledger fields above it, so every fixture, rig and
+   * hand-built replay is bit-identical to shipped.
+   */
+  qualifyingStopCurrent?: boolean;
   /**
    * Has this drive been told, anywhere, that it rested inside a чл. 98 / В27
    * no-stopping span — `ILLEGAL_STOP_IN_BAN_ZONE`, the основна the catalogue cites
@@ -1466,6 +1499,73 @@ export interface ReachZoneWitnessDemands {
    * leaves the demand met, so every such caller is bit-identical to shipped.
    */
   requireYieldClean?: ReachZoneYieldDemand;
+  /**
+   * «СПРИ НАПЪЛНО» MEANS THE STOP THE LAW MEANS — sc-merge-from-property:
+   * ab353b86, and the same crime as the arm above it on a different duty.
+   *
+   * WHAT IS BROKEN, read off `.audit-frames/w24/frames/
+   * sc-merge-from-property__mobile-right/run.log` (target HEAD 15c4b29, driven
+   * 2026-09-03, 37 frames, 0 LOST, EVIDENCE complete). One protocol, two
+   * channels, opposite verdicts:
+   *
+   *   Задачи от маршрута  ✓ Спри пред тротоара и пропусни пешеходеца   0:46
+   *                       ✓ СПРИ НАПЪЛНО НА Б2 НА ИЗХОДА              1:16
+   *   Грешки (3)          ✗ НЕСПИРАНЕ НА ЗНАК Б2 „СПРИ!" −10 изпитни т.
+   *                         ОПАСНА ГРЕШКА
+   *   Похвали (1)         ★ Правилно пропускане на пешеходец
+   *                         — and NO `FULL_STOP_AT_STOP_SIGN` beside it.
+   *
+   * The route task certifies the full stop the rule engine bills him ten points
+   * for not making, and the tick is the half printed on the glass while he is
+   * still driving. Its own frames carry the shape: `04-t050s` 3 км/ч,
+   * `04-t055s` 1 км/ч with the praise card up, `04-t061s` 11, `04-t066s` 22
+   * with the −10 card up.
+   *
+   * WHY A NUMBER COULD NOT CLOSE IT. `sc-mfp-stop-line` is a halt disc at
+   * `maxSpeedKmh: 3`; a qualifying stop is `fullStopMaxSpeedKmh` 1 held for
+   * `fullStopMinDurationSec` 0.5 s and spent within `stopRecencySec` 6 s of the
+   * line (rules/types.ts). A cap states a SPEED and can state neither the
+   * duration nor the recency — 3 → 1 would still have certified the drive
+   * above, which touched 1 км/ч and then accelerated over the paint.
+   *
+   * AND WHY IT IS NOT A LEDGER READ EITHER, unlike the four journey demands
+   * above it. `reached` latches on the swept acceptance, so on this gate the
+   * certificate is issued at the disc's leading edge — four metres BEFORE the
+   * paint — and the bill lands after it. Measured through `applyTick`: on the
+   * 2.5 км/ч roll the tick was granted at x 32.0 and the Б2 violation billed at
+   * x 27.5. An after-the-fact read of the fault ledger could never withdraw it,
+   * because there is no fault yet. The tick has to be refused at the moment it
+   * would be granted, against the very predicate the line will be judged by.
+   *
+   * SO IT READS THE ENGINE'S OWN ANSWER, not a second derivation of it: `true`
+   * = this waypoint may be ticked only on a frame where
+   * `ObjectiveContext.qualifyingStopCurrent` is not `false`, which
+   * `lessons/engine.ts` fills in from `RuleEngineState.stop` with the same
+   * expression the `stopLineCrossed` branch uses one screen away. The two
+   * channels cannot disagree because there is now one channel.
+   *
+   * IT CANNOT REFUSE A DRIVE THAT ACTUALLY STOPPED, which is the bar every arm
+   * in this file is held to. `lastQualifyingStopAt` is refreshed on every frame
+   * the car is still at rest, and the recency window is 6 s of MOVING time
+   * after it pulls away — so a student who halts short of the disc and creeps
+   * in keeps the certificate, and one who halts inside it has it on the frame
+   * he stops. Both committed recordings of this drill come to rest at 0.000
+   * км/ч at x 29.04, in the middle of the disc.
+   *
+   * AT THE FRAME, OUTSIDE THE `capMet` LATCH — the arrival contract is a
+   * conjunction and this is one more term in it; the cap keeps its own latch
+   * and its own spend rules, untouched. UNKNOWN IS NEVER A REFUSAL: a context
+   * that cannot answer (`undefined` — every fixture, rig and replay, and
+   * `EMPTY_CONTEXT`) leaves the demand met, so every such caller is
+   * bit-identical to shipped.
+   *
+   * IT IS NOT A SILENT VERDICT (THEO-4). A student held at this gate is being
+   * held by the ONE task banner he is reading («Спри напълно на Б2 на изхода»)
+   * plus, the moment he crosses the paint, the rule engine's own −10 card with
+   * the catalogue's explanation and its «✔ Правилното действие» corrective.
+   * This removes a contradiction from a protocol that already explains itself.
+   */
+  requireFullStop?: true;
   /**
    * REPORT THE GAP HE TURNED INTO, against the norm this drill teaches, s.
    *
@@ -2640,6 +2740,19 @@ function yieldCleanHonoured(demand: ReachZoneYieldDemand, ctx: ObjectiveContext)
     if (f.tSec >= since && codes.includes(f.code)) return false;
   }
   return true;
+}
+
+/**
+ * Would the rule engine call this frame a full stop at a Б2? (see
+ * `ReachZoneWitnessDemands.requireFullStop` for the protocol this closes and
+ * why the answer is imported rather than re-derived here.)
+ *
+ * `undefined` is „the caller cannot answer" — every fixture, rig and replay,
+ * and `EMPTY_CONTEXT` — and unknown must never become a refusal, the polarity
+ * every witness fact on this context ships with.
+ */
+function fullStopHonoured(ctx: ObjectiveContext): boolean {
+  return ctx.qualifyingStopCurrent !== false;
 }
 
 /**
@@ -3913,6 +4026,19 @@ function stepReachZone(
   // authors the key sits behind an objective the span cannot precede.
   const solidLineOk =
     params.requireSolidLineClean !== true || solidLineCleanHonoured(ctx);
+  // ── «СПРИ НАПЪЛНО» MEANS THE STOP THE LAW MEANS (requireFullStop) ─────────
+  // Eighth arm of the arrival conjunction, and the first that is a POSITIVE
+  // per-frame fact rather than a ledger read — because on a stop-line gate the
+  // certificate is issued at the disc's leading edge and the bill lands metres
+  // later, so nothing after the fact could withdraw it (the measurement is in
+  // the demand's own docblock). See it for the protocol this closes: «✓ Спри
+  // напълно на Б2 на изхода 1:16» printed beside «✗ Неспиране на знак Б2
+  // „Спри!" −10 изпитни т. ОПАСНА ГРЕШКА» with no FULL_STOP_AT_STOP_SIGN on the
+  // sheet. A halt disc could say the car was SLOW where the line is and nothing
+  // about whether it ever stood still; now it asks the grader that owns the
+  // question. A zone that does not author the key never consults it and is
+  // bit-identical to shipped.
+  const stopOk = params.requireFullStop !== true || fullStopHonoured(ctx);
   const arrivalHonoured =
     reached &&
     capMet &&
@@ -3922,7 +4048,8 @@ function stepReachZone(
     yieldOk &&
     haltForVruOk &&
     restOk &&
-    solidLineOk;
+    solidLineOk &&
+    stopOk;
   // ── THE MARK IS WHERE THE BANNER POINTS (round 13, 2026-08-27) ────────────
   //
   // WHAT IS BROKEN. `reached` latches on the FIRST swept contact with the

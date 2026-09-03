@@ -10,7 +10,7 @@
  *    promise a key that really performs the step;
  *  - driving prompts derive from the ACTIVE objective's typed params (and,
  *    where it sharpens the hint, the objective's live eval state — e.g. the
- *    roundabout's entered → „exit with right indicator" phase). Where no
+ *    roundabout's traversed → „exit with right indicator" phase). Where no
  *    clean control mapping exists the prompt falls back to the objective's
  *    own authored titleBg — the advisor NEVER invents instructions (ADR-002:
  *    authored copy only, no free-form guidance).
@@ -26,6 +26,9 @@ import {
   type PreDriveStepId,
 } from "../procedures";
 import { VIOLATIONS, type SimTick, type ViolationCode } from "../rules";
+// The arc the ring objective demands before it will credit an exit — imported
+// rather than mirrored so the card and the grade cannot drift apart.
+import { ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG } from "./objectives";
 import { parseScenarioLessonId } from "./scenario";
 // Deep, not through the `./scenario` barrel: the barrel line belongs in
 // scenario/index.ts, a file this lane does not own. The value import above
@@ -523,7 +526,7 @@ export function controllerWaitAdvisorPrompt(): AdvisorPrompt {
 /**
  * Prompt for the ACTIVE driving objective. `evalState` (when the caller has
  * it) sharpens phase-dependent maneuvers — currently the roundabout, whose
- * exit-indicator hint only makes sense once the ring has been entered.
+ * exit-indicator hint only makes sense once the ring has been gone ROUND.
  * `postedLimitKmh` is the street's own limit — see shownCapKmh (B58).
  * `authoredCapKmh` is the template's own `maxSpeedKmh` before the rung's grace
  * was folded in — source 4 on spokenCapKmh, and the reason no capped card is
@@ -663,8 +666,24 @@ export function advisorPromptForObjective(
                 keys: ["["],
               };
         case "roundabout": {
-          const entered = evalState?.type === "roundabout" && evalState.entered;
-          return entered
+          // The card may only order the manoeuvre the evaluator would CREDIT.
+          // `entered` alone will not do it: `stepRoundabout` latches it at
+          // d ≤ enterRadiusM, authored 6–11 m OUTSIDE the circulatory
+          // carriageway, so it is true at the give-way line and true of a car
+          // stopped against the central island — which is what
+          // sc-roundabout-entry:4ab693eb photographs (9° of arc behind it, a
+          // windscreen full of grass, «Излез от кръговото с десен мигач»).
+          // The passage is the same test `stepRoundabout` applies before it
+          // ticks the exit, read from the state it already publishes: a null
+          // arc means the objective never watched the approach and was handed
+          // a car already on the ring, where the exit sentence is right.
+          const rb = evalState?.type === "roundabout" ? evalState : null;
+          const traversed =
+            rb !== null &&
+            rb.entered &&
+            (rb.traversalArcDeg === null ||
+              Math.abs(rb.traversalArcDeg) >= ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG);
+          return traversed
             ? { textBg: "Излез от кръговото с десен мигач", keys: ["."] }
             : { textBg: titleBg, keys: [] };
         }

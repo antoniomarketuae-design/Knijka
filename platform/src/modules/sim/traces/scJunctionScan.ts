@@ -1,7 +1,7 @@
 /**
  * sc-junction-scan — the authored drives (doc 76 §5/§9): ONE correct shadow +
  * TWO mistake demos for „Един поглед не стига" (JU-23 — the ляво-дясно-ляво scan
- * before a Б2 stop line) on the committed tj-stop-v1 district. The junction-scan
+ * before a Б2 stop line) on the committed tj-scan-v1 district. The junction-scan
  * detector ships config-OFF (types.ts: the A12 whole-commute crosses a Б2
  * unglanced by default), so this DRILL enables it via the recorder's ruleConfig
  * override — exactly the per-lesson opt-in the config comment describes.
@@ -25,10 +25,13 @@
  *     the same pair (one look is not the Л-Д-Л scan, and the car it missed is
  *     the one the SECOND left glance exists for).
  *
- * Geometry pinned to content/world/tj-stop-v1.json: the minor (stem) approach
- * on x = 0 with the Б2 line at y = −27.725, right-lane center x = 4.0625, spawn
- * tj-spawn-south (4.06, −105) heading north; the drive stops before the line and
- * turns right onto the east priority arm (the sc-junction-stop path).
+ * Geometry pinned to content/world/tj-scan-v1.json — this drill's OWN Б2 T
+ * since `sc-junction-scan:28e782ab` (it used to share tj-stop-v1 with the JU-03
+ * stop drill; see the `map` block in templates-junctions.ts). The stem approach
+ * is on x = 0 with the Б2 line at y = −27.725 — the derived line does not move
+ * between the Б2 T-maps — right-lane center x = 4.0625, spawn tj-spawn-south
+ * (4.06, −95) on the 110 m stem; the drive stops before the line and turns
+ * right onto the east priority arm.
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -42,7 +45,7 @@ import {
 
 export const SC_JUNCTION_SCAN_ID = "sc-junction-scan";
 
-/** Right-lane center of tj-stop-v1's drawn lane. */
+/** Right-lane center of tj-scan-v1's drawn lane (every tj map draws the same). */
 const LANE = 4.0625;
 
 /** Arc polyline: center (cx, cy), radius r, param a0→a1 deg (8 segments). */
@@ -70,7 +73,7 @@ export function scJunctionScanShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Напред е знак Б2 „Спри!“ — спираш напълно и оглеждаш наляво-надясно-наляво." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -95], [LANE, -45]], targetKmh: 25 },
       { kind: "annotation", textBg: "Десен мигач и плавно към стоп-линията." },
       { kind: "indicator", setting: "right" },
       { kind: "drive", points: [[LANE, -45], [LANE, -29.2]], targetKmh: 12 },
@@ -119,7 +122,7 @@ export function scJunctionScanMistakeNoScanScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешка: спира напълно на Б2, но потегля БЕЗ да се огледа." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -95], [LANE, -45]], targetKmh: 25 },
       { kind: "indicator", setting: "right" },
       { kind: "drive", points: [[LANE, -45], [LANE, -29.2]], targetKmh: 12 },
       { kind: "annotation", textBg: "Спира докрай — но потегля, без да погледне нито наляво, нито надясно." },
@@ -142,7 +145,7 @@ export function scJunctionScanMistakeSingleGlanceScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешка: поглежда само веднъж наляво и потегля — един поглед не стига." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -95], [LANE, -45]], targetKmh: 25 },
       { kind: "indicator", setting: "right" },
       { kind: "drive", points: [[LANE, -45], [LANE, -29.2]], targetKmh: 12 },
       { kind: "annotation", textBg: "Един поглед наляво — но не и надясно, откъдето идват колите с предимство." },
@@ -170,7 +173,7 @@ const SCRIPTS: Record<ScJunctionScanTraceName, { kind: "shadow" | "mistake"; scr
 };
 
 /**
- * Record one of the three drives against a loaded tj-stop-v1 document — the
+ * Record one of the three drives against a loaded tj-scan-v1 document — the
  * junction-scan drill ENABLED via ruleConfig (the config-gated detector's
  * per-lesson opt-in), ambient traffic zero. Deterministic: same district →
  * same trace (rule config does not affect the serialized trace bytes).

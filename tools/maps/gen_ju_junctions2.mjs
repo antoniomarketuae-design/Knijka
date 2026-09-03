@@ -12,7 +12,7 @@
  * approach side that matters (JU-17). Contract battery:
  * platform/src/modules/sim/world/__tests__/tj-junctions2-districts.test.ts.
  *
- * Two committed instances:
+ * Three committed instances:
  *
  *  - tj-emerge-v1  — control "stop" (Б2 on the stem, PRIMARY priority road).
  *    Host of JU-04 „Спрях, но потеглих в дупка, която я няма": a priority car
@@ -29,6 +29,14 @@
  *    (east) — the creep-and-peek scenario. World dressing only; the RHR
  *    tracker never reads it (doc 72 JU-17: "world dressing, zero grading
  *    change").
+ *
+ *  - tj-scan-v1    — control "stop", the JU-23 host („Един поглед не стига",
+ *    sc-junction-scan). Added for `sc-junction-scan:28e782ab`: that drill
+ *    declared tj-stop-v1, the JU-03 stop drill's map, with the same spawn and
+ *    the same three gate coordinates, so the audit read the Б2 junction family
+ *    as „three names, one lesson". Same derivation again, its own arms
+ *    (130 m / 110 m), plus two per-edge tags the T6 sightline and FR-21 gates
+ *    chose rather than taste — see the instance.
  *
  * Deterministic: same params → byte-identical JSON. No randomness, no OSM.
  * Run:  node tools/maps/gen_ju_junctions2.mjs
@@ -66,6 +74,7 @@ function polylineLength(pts) {
  *   priorityMaxKmh: number,      // maxspeed on the W–E road
  *   minorMaxKmh: number,         // maxspeed on the stem
  *   buildingFootprints: Array<{ id: string, footprint: number[][] }>, // corner props
+ *   edgeTags?: Record<string, object>,  // extra district-v1 edge fields, per edge id
  * }} params
  */
 export function buildJunction2District(params) {
@@ -80,6 +89,7 @@ export function buildJunction2District(params) {
     priorityMaxKmh,
     minorMaxKmh,
     buildingFootprints,
+    edgeTags,
   } = params;
 
   // -- Parameter validation (actionable — the assembly line runs unattended).
@@ -132,6 +142,7 @@ export function buildJunction2District(params) {
       maxspeedSource: "tag",
       length: polylineLength(geometry),
       geometry,
+      ...(edgeTags?.[id] ?? {}),
     };
   };
 
@@ -384,6 +395,64 @@ const INSTANCES = [
     buildingFootprints: [
       { id: "tj-b-corner", footprint: [[-40, -40], [-26, -40], [-26, -26], [-40, -26]] },
     ],
+  },
+  {
+    // JU-23 host: Б2 „Спри!" on the stem — the ляво-дясно-ляво scan drill's own
+    // junction (sc-junction-scan, templates-junctions.ts).
+    //
+    // WHY A THIRD Б2 T AND NOT tj-stop-v1 — row `sc-junction-scan:28e782ab`
+    // (major): „The three lessons are the same Б2 junction with the same
+    // approach and the same stop line — three names, one lesson." Measured at
+    // the time: sc-junction-stop and sc-junction-scan declared the SAME
+    // districtId (tj-stop-v1), the SAME spawn and the same three gate
+    // coordinates, so the two drills were one street under two titles and the
+    // earlier waves could only move the SENTENCES. sc-junction-gap already
+    // stands on its own map (tj-emerge-v1, above); this gives the scan drill
+    // the same courtesy — its own arms (130 m / 110 m, so the streetwall pass
+    // slots a frontage of its own) and its own approach length.
+    //
+    // The stop line does NOT move and must not: it is derived from the priority
+    // road's half-width (27.725 m from the node, `JUNCTION_STOP_LINE_M`), and
+    // the drill's three gates plus its three committed traces are pinned to it.
+    // The SW anchor footprint is gen_t_junction's default, verbatim, so its
+    // carriageway/sidewalk clearances are the shipped ones rather than new.
+    districtId: "tj-scan-v1",
+    label: "Учебно Т-кръстовище със знак Б2 „Спри!“ — оглеждане ляво-дясно-ляво (сценарий JU-23)",
+    control: "stop",
+    priorityArmM: 130,
+    minorArmM: 110,
+    lanes: 2,
+    priorityMaxKmh: 50,
+    minorMaxKmh: 40,
+    buildingFootprints: [
+      { id: "tj-b-corner", footprint: [[-40, -40], [-26, -40], [-26, -26], [-40, -26]] },
+    ],
+    // THE PARKED ROW ON THE WEST ARM STANDS ON THE FAR KERB, and it is the T6
+    // sightline gate that decided which one (`traffic/__tests__/
+    // scenery-sightline.test.ts` — „the graded yield pose can SEE the staged
+    // conflict actor", floor 2 m). On the default `right` kerb the procedural
+    // row sits in the priority road's SOUTH band at y ≈ −10, which is the strip
+    // the sight ray from this drill's stop line (2.49, −27.61) to its conflict
+    // car (y = −4.06, closing from the west) passes over: measured 1.65 m of
+    // clearance, i.e. the car the student is graded on yielding to was behind a
+    // parked car. `parkingSide` moves WHICH kerb the row fills and nothing else
+    // — the band is drawn on both sides either way, so no kerb, collider,
+    // pavement, frontage or lane centre moves (world/types.ts) — so the row
+    // goes north and the second look left has something to see.
+    //
+    // …AND THE STEM CARRIES A REAL PARKING BAND, which is founder item FR-21
+    // rather than a dressing choice: `PARKING_LANE_CLASSES` grants the 4 m
+    // curbside band to arterial classes only, while the procedural curb pass
+    // parks along `residential` too, so a residential stem with no band seats
+    // every body 2 m PAST its kerb — in the middle of the pavement, at road
+    // level („he goes trough a car which is standing on the sidewalk"). Nine
+    // bodies did exactly that here. Every other tj map carries the same debt as
+    // a FOOTWAY_BUDGET row (tj-stop-v1 11, tj-occluded-v1 33, tj-rhr-v1 36);
+    // this one is new, so it is built without it instead of budgeted for it.
+    edgeTags: {
+      "tj-e-w": { parkingSide: "left" },
+      "tj-e-s": { parkingBand: true },
+    },
   },
   {
     // JU-17 host: equal residential roads (right-hand rule) + a SE corner

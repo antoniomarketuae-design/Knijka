@@ -271,6 +271,14 @@ export function serializeObjectiveParams(
       // L5, and sc-ov-solid-return's whole subject IS that line. A rung that
       // forgave it would teach the opposite of the lesson it belongs to.
       if (p.requireSolidLineClean === true) params.requireSolidLineClean = true;
+      // …AND THE FIFTH (`requireFullStop`), on this whitelist for the identical
+      // measured reason and NOT laddered for a sharper one than its neighbours':
+      // the aid ladder cannot forgive this even in principle. «Спри напълно» is
+      // the Б2's own demand — «на СТОП се спира напълно ВИНАГИ, дори пътят да
+      // изглежда празен» (catalog.ts) — so a rung that let a beginner's rolling
+      // stop keep the tick would teach exactly the thing the sign forbids, and
+      // would do it while the same sheet bills him ten points for it.
+      if (p.requireFullStop === true) params.requireFullStop = true;
       // …AND THE ONE TERM HERE THAT REFUSES NOTHING (`reportOncomingGapSec`).
       // It is on this whitelist for the same measured reason as its three
       // neighbours — a key not named here never reaches the session — and NOT

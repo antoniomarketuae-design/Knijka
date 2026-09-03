@@ -2,7 +2,8 @@
  * Scenario templates — the JUNCTION/SIGNALS family (S2-B breadth wave).
  * DATA ONLY, the templates.ts law: coordinates are denormalized from the
  * committed district files (content/world/tj-rhr-v1.json, tj-stop-v1.json,
- * sx-v1.json — tools/maps/gen_t_junction.mjs + gen_signal_x.mjs) so nothing
+ * tj-scan-v1.json, sx-v1.json — tools/maps/gen_t_junction.mjs +
+ * gen_ju_junctions2.mjs + gen_signal_x.mjs) so nothing
  * loads world JSON at runtime; the templates-junctions test asserts every
  * pinned value against the generated files.
  *
@@ -351,8 +352,10 @@ export const SC_JUNCTION_STOP: ScenarioSpec = {
       // Б2 с контролирана скорост» was the task-1 chip of FOUR drills
       // (sc-junction-stop / -scan / -gap / -left) and «Завий надясно и излез от
       // кръстовището на изток» the task-3 chip of three. sc-junction-stop and
-      // sc-junction-scan share tj-stop-v1, the same spawn and the same three
-      // gate coordinates, so the chips were the only place left where the
+      // sc-junction-scan then shared tj-stop-v1, the same spawn and the same
+      // three gate coordinates (scan has had its own map, tj-scan-v1, since
+      // `sc-junction-scan:28e782ab`), so the chips were the only place left
+      // where the
       // student could have been told which drill he is in — and they said the
       // same thing.
       //
@@ -882,10 +885,11 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
 };
 
 // ---------------------------------------------------------------------------
-// sc-junction-scan — „Един поглед не стига" (JU-23) on tj-stop-v1: the
+// sc-junction-scan — „Един поглед не стига" (JU-23) on tj-scan-v1: the
 // ляво-дясно-ляво observation drill at a Б2 line. Rides the config-gated
 // JUNCTION_SCAN_INCOMPLETE detector (enabled per-lesson via the recorder's
-// ruleConfig; see rules/types.ts). Reuses the sc-junction-stop map + path.
+// ruleConfig; see rules/types.ts). It used to reuse the sc-junction-stop map;
+// it has its own since `sc-junction-scan:28e782ab` (the `map` block below).
 // ---------------------------------------------------------------------------
 
 /**
@@ -909,7 +913,7 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
  * is for, and the reason the ritual is ляво-дясно-ЛЯВО rather than a single
  * sweep. A car from the right would cross the far lane and never touch him.
  *
- * junctionControl "stopLine": tj-stop-v1 derives a real Б2 line at the stem
+ * junctionControl "stopLine": tj-scan-v1 derives a real Б2 line at the stem
  * mouth (27.725 m — primary priority road, so the arterial mouth), so the
  * runtime's give-way adjudication grades the crossing and the runner commends
  * the wait. leadSec −3.2 puts the car at the node ~3.2 s after the player's
@@ -924,7 +928,8 @@ export const SC_JUNCTION_SCAN_CONFLICT: PriorityFromRightSpec = {
   junctionControl: "stopLine",
   actor: {
     // The priority road, west → east: the near (eastbound) lane the right turn
-    // merges into. tj-stop-v1 nodes, pinned by the tj-districts battery.
+    // merges into. tj-scan-v1 nodes (every tj map shares the ids), pinned by
+    // the tj-junctions2-districts battery.
     pathNodes: ["tj-n-w", "tj-n-c", "tj-n-e"],
     hold: { nodeIndex: 1, offsetM: -95 }, // 95 m west of the junction
     cruiseSpeedMps: 8,
@@ -932,8 +937,9 @@ export const SC_JUNCTION_SCAN_CONFLICT: PriorityFromRightSpec = {
   junctionNodeIndex: 1,
   armDistM: 70,
   leadSec: -3.2,
-  // tj-stop-v1's Б2 line: primary half-width 12.125 + arterial corner 15 +
-  // 0.6 paint inset (= JUNCTION_STOP_LINE_M above; battery tj-districts).
+  // tj-scan-v1's Б2 line: primary half-width 12.125 + arterial corner 15 +
+  // 0.6 paint inset (= JUNCTION_STOP_LINE_M above) — the same derivation, and
+  // the same NUMBER, on all three Б2 T-maps (tj-junctions2-districts asserts it).
   lineDistM: JUNCTION_STOP_LINE_M,
   clearSpeedMps: 11.5,
   // L7: the release waits for the student to actually be at the line, so the
@@ -955,16 +961,50 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
   conceptIds: ["c-give-way-stop-behavior", "c-mirrors-blind-spots", "c-junction-approach"],
   map: {
     archetype: "t-junction",
-    // Reuses the committed tj-stop-v1 map (its meta.scenario.params, for provenance).
+    /**
+     * ITS OWN JUNCTION — `sc-junction-scan:28e782ab` (major): „The three lessons
+     * are the same Б2 junction with the same approach and the same stop line —
+     * three names, one lesson." The 2026-08-26 re-verification is exact about
+     * what the earlier waves had and had not moved: „only the wording of the
+     * objectives was separated, not the world or the manoeuvre."
+     *
+     * The manoeuvre axis is exhausted and that is not an excuse but a fact worth
+     * writing down: a T-junction stem has exactly TWO exits, and both are taken
+     * by siblings — right/east by `sc-junction-stop` and `sc-junction-gap`, left
+     * across the priority road by `sc-junction-left` (templates-junctions2.ts).
+     * Turning this drill left would have traded one duplicate for another.
+     *
+     * So the WORLD moved. `sc-junction-gap` already stands on its own committed
+     * map (tj-emerge-v1, 160/100); this drill stood on tj-stop-v1 — the JU-03
+     * stop drill's map — with the same spawn and the same three gate
+     * coordinates, i.e. one street under two titles. tj-scan-v1 is generated by
+     * the same generator as tj-emerge-v1 with its own arms (130 m / 110 m), so
+     * the streetwall pass — whose jitter keys on the EDGE ID every tj map shares
+     * — slots a frontage of its own: 1 of its 11 footprints is also tj-stop-v1's
+     * (the SW anchor, kept verbatim so its clearances are the shipped ones). Two
+     * per-edge tags came from gates rather than taste: the west arm's parked row
+     * stands on the FAR kerb because the T6 sightline gate measured 1.65 m of
+     * clearance from this drill's stop line to its own conflict car on the near
+     * one, and the stem carries a real parking band so its nine bodies stand at a
+     * kerb instead of on the pavement (FR-21). Both in gen_ju_junctions2.mjs.
+     *
+     * WHAT DELIBERATELY DID NOT MOVE, and why the row does not ask it to: the
+     * derived Б2 line stays 27.725 m from the node (`JUNCTION_STOP_LINE_M`) —
+     * `tj-junctions2-districts.test.ts` asserts that across all three Б2 T-maps.
+     * It cannot move without invalidating this drill's three gates and its three
+     * committed traces, and a stop line at a different distance would not be a
+     * different LESSON anyway. The approach did move: the stem is 110 m, so the
+     * spawn sits at y = −95 rather than tj-stop-v1's −105.
+     */
     params: {
       control: "stop",
-      priorityArmM: 150,
-      minorArmM: 120,
+      priorityArmM: 130,
+      minorArmM: 110,
       lanes: 2,
       priorityMaxKmh: 50,
       minorMaxKmh: 40,
     },
-    districtId: "tj-stop-v1",
+    districtId: "tj-scan-v1",
   },
   start: {
     spawnPointId: "tj-spawn-south",
@@ -1011,10 +1051,13 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
        * `sc-junction-stop:5d3cc55e` · `sc-junction-scan:e6834882` ·
        * `sc-junction-scan:28e782ab` · `sc-junction-gap:c437f449`.
        *
-       * VERIFIED AT HEAD, not taken from the brief. `SC_JUNCTION_STOP` (:302)
-       * and this template (:918) declare the same `districtId` (tj-stop-v1),
-       * the same `spawnPointId` (tj-spawn-south) and the same three gate
-       * params, field for field:
+       * VERIFIED AT THE TIME (wave 8), and HALF OF IT IS NO LONGER TRUE — the
+       * `map` block above moved this drill onto tj-scan-v1, so the two no
+       * longer share a district or a spawn. What still holds, and is what this
+       * chip answers, is the third clause: `SC_JUNCTION_STOP` (:302) and this
+       * template declare the same three gate params, field for field, because
+       * they are derived from the junction node and the Б2 line rather than
+       * from the map's arms:
        *     approach {reachZone 4.06, −45, r8, cap 30}
        *     line     {passSignal tj-n-c, 0, 0, r45, stopSign}
        *     exit     {reachZone 55, −4.06, r9}
@@ -1082,7 +1125,7 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
        * prove neither priority nor the ляво-дясно-ляво scan this drill is
        * about. Both things the disc really proves are still named — the завой
        * is «десния» and the arm is «на изток». East-arm eastbound lane center,
-       * 55 m out on tj-stop-v1's 150 m east arm, reachable only through the
+       * 55 m out on tj-scan-v1's 130 m east arm, reachable only through the
        * completed right turn. The scan stays graded by the config-gated
        * JUNCTION_SCAN_INCOMPLETE detector (ruleConfig below) and the stop by
        * sc-jscan-line. PARAMS UNTOUCHED — the demand rides the sentence, so a
@@ -1162,11 +1205,14 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
   //
   // Dropping the key hands the drill to the junction family's own baseline, so
   // the lesson whose SUBJECT is the car you did not see stops being the
-  // quietest junction in the family. Its sibling `SC_JUNCTION_STOP` stands on
-  // the same district and the same spawn with no `traffic` key and clears that
-  // gate today, which is what makes 4 / 4 / 5 / 5 / 6 a measurement here rather
-  // than a hope — and re-running that suite after the change, `sc-junction-scan
-  // @L1 (tj-stop-v1): the crossing arm is not dead` now passes beside it. The
+  // quietest junction in the family. Its sibling `SC_JUNCTION_STOP` stood on
+  // the same district and the same spawn (it no longer does — see `map` above)
+  // with no `traffic` key and cleared that gate, which is what made
+  // 4 / 4 / 5 / 5 / 6 a measurement here rather than a hope — and re-running
+  // that suite after the change, `sc-junction-scan @L1: the crossing arm is not
+  // dead` passed beside it. tj-scan-v1 carries the same lane graph (3 two-way
+  // edges → 6 directed lanes; tj-junctions2-districts) on shorter arms, so the
+  // family baseline lands the same counts on it. The
   // trace recorder reads `staged` only (traces/scJunctionScan.ts:188) and
   // ambient agents never enter a recording, so every committed ghost stays
   // byte-identical.

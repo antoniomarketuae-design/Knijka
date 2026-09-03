@@ -1826,17 +1826,74 @@ export const LANE_ALIGN_MIN_M = 0.35;
 /** Ease-in / ease-out distance for the shift, m. Longer than a lane change so
  *  the ribbon reads as „move over and stay there", not as a late swerve. */
 export const LANE_ALIGN_RAMP_M = 40;
+/** Two waypoints whose lateral offsets differ by less than this are in the SAME
+ *  lane, so the ribbon between them must not leave it — see THE RIBBON MUST NOT
+ *  INVENT A LANE CHANGE below. Half a lane pitch: a real change is a whole one. */
+export const LANE_ALIGN_SAME_LANE_M = LANE_WIDTH_M / 2;
+
+// ---------------------------------------------------------------------------
+// THE RIBBON MUST NOT INVENT A LANE CHANGE (sc-follow-tailgater:41a625d1)
+//
+// The alignment above brought the ribbon INTO the goal's lane. Two of its edges
+// then took the student straight back out of it, and on a single-edge district
+// — `ln-v1`, `ov-keepright-v1`, every `scenario-street` map — the centreline it
+// returns to is the middle of the whole carriageway, i.e. the line between the
+// two directions.
+//
+// MEASURED on `sc-follow-tailgater` / ln-v1 (right lane x = 12.19, goals at
+// y = 200 and y = 340, car spawned at (12.19, 15)), before this block:
+//   objective 0 active   y=15 x=0.00 · y=53 x=11.61 · y=63…193 x=12.19 ·
+//                        y=213 x=8.35 · y=241…340 x=0.00
+//   objective 1 active   y=205 x=0.00 · y=243 x=11.61 · y=253…340 x=12.19
+// Three fabricated 12,19 m lane crossings on a 400 m lesson whose instruction 7
+// is «Дръж десния край на лентата»: out of the lane at the start, out of it
+// again past waypoint 1, back into it when waypoint 2 goes live. The rule engine
+// then convicts the student for following the line the product drew for him —
+// `.audit-frames/w24/frames/sc-follow-tailgater__pc-right` books «Смяна на лента
+// без проверка в огледалото» ×2, «Смяна на лента без мигач» and «Неустойчиво
+// движение в лентата» at 1:44/1:49/1:49/2:07, 10 наказателни точки, НЕИЗДЪРЖАН,
+// on the leg a student is told to imitate.
+//
+// TWO EDGES, EACH THE SAME MISTAKE — treating a lane as a property of the last
+// forty metres rather than of the leg:
+//  1. THE EASE-IN STARTED FROM THE CENTRELINE, NOT FROM THE DRIVER. `legStartS`
+//     is the last junction before the goal, so on a district with no junction it
+//     is the ribbon's own first sample — the driver's pose snapped onto the
+//     centreline. The ramp therefore opened 12,19 m to the left of a car already
+//     sitting in the goal's lane. It now opens at the driver's OWN measured
+//     offset, clamped into [0, the goal's], so it can start under his wheels but
+//     never further from the goal's lane than the goal's lane itself: guidance
+//     still LEADS (a keep-right drill from the left lane eases across exactly as
+//     before, from 4,06 instead of from 0), it just stops dragging him out of a
+//     lane he is correctly in first. Seeded only where the ramp opens at the
+//     ribbon's start; after a junction the driver is far behind and irrelevant,
+//     so every map with one is byte-identical.
+//  2. THE DECAY RAN EVEN WHEN THE NEXT WAYPOINT WAS IN THE SAME LANE. The decay
+//     exists so look-ahead legs rejoin the centreline they were derived on —
+//     true when the ribbon is going somewhere else, false when objective n+1 is
+//     the same lane of the same street. The offset is now HELD to the look-ahead
+//     waypoint whenever that waypoint is within `LANE_ALIGN_SAME_LANE_M` of the
+//     active one AND no junction lies between them; past it the decay is
+//     unchanged. The junction clause keeps the „confined to the final leg" bound
+//     intact — the shift still never crosses a joint.
+// ---------------------------------------------------------------------------
 
 /**
  * Slide the route sideways into the goal's own lane over the final leg.
  * Mutates `raw.points` in place and returns the signed offset applied (0 when
  * the goal is on the centreline or too far off-road to be a lane).
+ *
+ * `start` is the driver's pose (seeds the ease-in) and `next` the first
+ * look-ahead waypoint (holds the lane between two waypoints in one lane); both
+ * optional, and absent both this is the behaviour that shipped.
  */
 function alignRawToGoalLane(
   raw: RawRoute,
   goalX: number,
   goalY: number,
   splitIdx?: number,
+  start?: { x: number; y: number },
+  next?: { x: number; y: number },
 ): { offset: number; splitIdx: number | undefined } {
   if (raw.points.length < 2) return { offset: 0, splitIdx };
   // A shortest path over a single edge comes back as TWO points, and
@@ -1880,15 +1937,58 @@ function alignRawToGoalLane(
   }
   const rampIn = Math.min(LANE_ALIGN_RAMP_M, Math.max(EPS, hit.s - legStartS));
 
+  // (1) Where the ease-in OPENS, as a fraction of the goal's own offset. Only
+  // when the ramp opens at the ribbon's first sample is the driver the thing
+  // standing there; clamped into [0, 1] so the ribbon can start under his
+  // wheels but never further out than the lane it is leading him to.
+  let w0 = 0;
+  if (start && legStartS <= EPS) {
+    const b0 = pts[Math.min(pts.length - 1, 1)];
+    const l0 = Math.hypot(b0[0] - pts[0][0], b0[1] - pts[0][1]);
+    if (l0 > EPS) {
+      const startOffset =
+        (start.x - pts[0][0]) * ((b0[1] - pts[0][1]) / l0) +
+        (start.y - pts[0][1]) * (-(b0[0] - pts[0][0]) / l0);
+      w0 = Math.max(0, Math.min(1, startOffset / offset));
+    }
+  }
+
+  // (2) How far past the goal the lane is HELD: to the look-ahead waypoint when
+  // that waypoint is in the same lane and no junction separates them, else to
+  // the goal itself (the decay that shipped).
+  let holdToS = hit.s;
+  if (next) {
+    const nextHit = nearestOnRaw(raw, next.x, next.y);
+    if (nextHit.s > hit.s + EPS && nextHit.latM <= LANE_ALIGN_MAX_M) {
+      let ni = 0;
+      for (let i = 1; i < pts.length; i++) {
+        if (Math.abs(s[i] - nextHit.s) < Math.abs(s[ni] - nextHit.s)) ni = i;
+      }
+      const na = pts[Math.max(0, ni - 1)];
+      const nb = pts[Math.min(pts.length - 1, ni + 1)];
+      const nlen = Math.hypot(nb[0] - na[0], nb[1] - na[1]);
+      const jointBetween = raw.jointIdx.some(
+        (j) => j < pts.length && s[j] > hit.s + EPS && s[j] < nextHit.s - EPS,
+      );
+      if (nlen > EPS && !jointBetween) {
+        const nextOffset =
+          (next.x - pts[ni][0]) * ((nb[1] - na[1]) / nlen) +
+          (next.y - pts[ni][1]) * (-(nb[0] - na[0]) / nlen);
+        if (Math.abs(nextOffset - offset) <= LANE_ALIGN_SAME_LANE_M) holdToS = nextHit.s;
+      }
+    }
+  }
+
   // Normals come from a SNAPSHOT: writing pts[i] and then reading pts[i-1] as
   // a neighbour would feed each shift into the next point's tangent and bend
   // the ribbon progressively off the road.
   const src = pts.map((p) => [p[0], p[1]] as [number, number]);
   for (let i = 0; i < pts.length; i++) {
     let w: number;
-    if (s[i] <= legStartS) w = 0;
-    else if (s[i] < hit.s) w = Math.min(1, (s[i] - legStartS) / rampIn);
-    else w = Math.max(0, 1 - (s[i] - hit.s) / LANE_ALIGN_RAMP_M);
+    if (s[i] < legStartS) w = w0;
+    else if (s[i] < hit.s) w = w0 + (1 - w0) * Math.min(1, (s[i] - legStartS) / rampIn);
+    else if (s[i] <= holdToS) w = 1;
+    else w = Math.max(0, 1 - (s[i] - holdToS) / LANE_ALIGN_RAMP_M);
     if (w <= 0) continue;
     // Local normal, so the shift follows the road rather than a fixed compass
     // direction — the same reason the gate bar uses the edge's own tangent.
@@ -2217,7 +2317,23 @@ export function deriveGuidanceRoute(
   // 17.85–25.78 m from the centre, an order of magnitude past two lane
   // pitches), so this is a statement of intent rather than a behaviour change.
   if (goal.kind === "point" && goal.shape?.kind !== "gate" && goal.leaveRadiusM === undefined) {
-    splitIdx = alignRawToGoalLane(acc, goal.x, goal.y, splitIdx).splitIdx;
+    // The two inputs the shift needs to stop inventing a lane change — see THE
+    // RIBBON MUST NOT INVENT A LANE CHANGE. The look-ahead waypoint counts only
+    // when its leg was actually appended (`acc !== raw`) and it is an AUTHORED
+    // target: a gate's coordinates are the driver's own offset, so holding the
+    // lane to one would follow him rather than lead him, exactly as above.
+    const firstAhead = Array.isArray(opts?.lookahead)
+      ? opts.lookahead[0]
+      : ((opts?.lookahead ?? undefined) as RouteTarget | undefined);
+    const nextInLane =
+      acc !== raw &&
+      firstAhead !== undefined &&
+      firstAhead.kind === "point" &&
+      firstAhead.shape?.kind !== "gate" &&
+      firstAhead.leaveRadiusM === undefined
+        ? { x: firstAhead.x, y: firstAhead.y }
+        : undefined;
+    splitIdx = alignRawToGoalLane(acc, goal.x, goal.y, splitIdx, start, nextInLane).splitIdx;
   }
   return finalizeRoute(acc, splitIdx);
 }

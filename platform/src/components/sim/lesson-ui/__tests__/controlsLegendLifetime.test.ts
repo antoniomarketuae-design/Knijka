@@ -113,10 +113,19 @@ describe("LessonScene binds the legend's exit, and binds it ONE WAY", () => {
     );
     expect(mount.length).toBeGreaterThan(0);
     expect(mount).toContain("sampleRef={sampleRef}");
-    // …and the founder-facing default is untouched: a lesson still OPENS with
-    // the sheet on a mouse device that is not in the pre-drive procedure. This
-    // fix ends the panel's life; it does not change its birth.
-    expect(mount).toContain("defaultOpen={!touchOnly && !driveLockedAtMount}");
+    // THE EXPECTATION MOVED, AND HERE IS WHY. It used to pin
+    // `defaultOpen={!touchOnly && !driveLockedAtMount}` as „the founder-facing
+    // default is untouched". The product changed: the sheet no longer opens
+    // itself on ANY device, because the reason the open default existed —
+    // „a first-time student … has no other way to discover the controls" —
+    // stopped being true of this screen. The cockpit control strip prints the
+    // key caps under the controls themselves (СПИРАЧКА S · ГАЗ W · Л Q/З F/Д E,
+    // legible in the very frame the row was filed on) and the collapsed state
+    // is a labelled «⌨ Клавиши · за напреднали ▸» pill. Doc 88 carries the
+    // „expanded by default" row on fifteen lessons; doc 87 B7 names this exact
+    // mount as its owner. The LIFETIME below is unchanged — this file's subject
+    // is still that the panel has an end as well as a beginning.
+    expect(mount).toContain("defaultOpen={false}");
   });
 
   it("the poll reads the vehicle sample's speed through the shared predicate", () => {

@@ -678,3 +678,126 @@ describe("UNPANEL — the touch hint has ground too, and it is the SAME ground",
     expect(shadeSrc).not.toContain("MaskImage");
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE FOURTH SURFACE, WHICH PRINTS THE ONLY SENTENCE ON THE SCREEN THAT
+   IS ABOUT WHY THE LESSON NEEDS SOUND — sc-ac-snow:55ddf562.
+
+   The filing says „the in-drive ИНСТРУКЦИИ panel is plateless — the buildings
+   behind it read through the text" and names `SimOverlay.tsx`. LOOKED AT, at
+   HEAD-1 (15c4b29): the card in
+   `.audit-frames/w24/frames/sc-ac-snow__mobile-right/04-t013s.png` is not the
+   peek — the peek got its ground in e9bf33c — it is
+   `[data-hud="audio-prompt"]`, «Звукът е част от урока…» with its «Разбрах»,
+   and the whole sentence is white type over a tower-block facade with lit
+   windows and a green canopy reading through it. Same defect, sibling
+   component, and the reason it was missed twice: `AudioLessonPrompt.tsx`
+   asks for `bg-background/90 backdrop-blur shadow-glow-sm` in good faith and
+   the sweep has been deleting all three since the card joined GHOST_SURFACES.
+
+   The card is only ON the glass at all on a phone (the roomy stage hands the
+   corner to the notify column), and a phone is where facades are behind it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe("UNPANEL — the audio prompt has ground too, and it is the SAME ground", () => {
+  const prompt = readFileSync(
+    join(__dirname, "..", "..", "AudioLessonPrompt.tsx"),
+    "utf8",
+  );
+  /** The card's own element, from its `data-hud` name to its ack label. */
+  const CARD = prompt.slice(
+    prompt.indexOf('data-hud="audio-prompt"'),
+    prompt.indexOf("{AUDIO_PROMPT_DISMISS_BG}"),
+  );
+  /** …and the same slice with the prose taken out — the trap this file already
+   *  fell into once: an assertion that cannot tell code from the paragraph
+   *  describing it is a ban on writing the reason down. */
+  const CARD_CODE = CARD.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  it("the card carries a shade, and the shade carries the exemption", () => {
+    expect(CARD_CODE).toContain('data-hud="audio-prompt-scrim"');
+    const shadeAt = CARD_CODE.indexOf('data-hud="audio-prompt-scrim"');
+    expect(
+      CARD_CODE.slice(shadeAt, shadeAt + 200),
+      "the audio-prompt shade lost data-hud-ink — the sweep strips it and the " +
+        "filed frame comes back exactly as it was",
+    ).toContain('data-hud-ink=""');
+  });
+
+  it("…and the shade survives the sweep when the tree is actually run", () => {
+    // `[data-hud="audio-prompt"]` is its own entry on GHOST_SURFACES, so the
+    // ghost root here is the attribute and not `.hud-ghost`.
+    const s = el("div", { attrs: { "data-sim-stage": "" } });
+    const ghost = el("div", { attrs: { "data-hud": "audio-prompt" }, parent: s });
+    const cardEl = el("div", { attrs: { role: "status" }, parent: ghost });
+    const shadeEl = el("div", {
+      attrs: { "data-hud": "audio-prompt-scrim", "data-hud-ink": "" },
+      parent: cardEl,
+    });
+    expect(SWEEP, "the UNPANEL sweep moved — re-anchor this file").not.toBeNull();
+    // The shade keeps its ground — two levels down, which is what
+    // `:not([data-hud-ink] *)` also has to be right about…
+    expect(stripped(shadeEl, SWEEP!.selector)).toBe(false);
+    // …the card itself still loses the fill it asks for, so the register the
+    // founder signed off is unchanged and the ground arrives as ink…
+    expect(stripped(cardEl, SWEEP!.selector)).toBe(true);
+    // …and MUTATION: with the exemption gone the shade goes with it.
+    expect(stripped(shadeEl, SWEEP_WITHOUT_INK_EXEMPTION())).toBe(true);
+  });
+
+  it("the ground is the PUBLISHED one — no fifth copy of the gradient", () => {
+    expect(CARD_CODE).toContain("peekScrimBackgroundCss(");
+    expect(CARD_CODE).not.toContain("linear-gradient");
+    // The BARREL, not this file's import line: a cross-module name that only
+    // the consumer is asked about is not gated at all (doc 05 — modules talk
+    // through `index.ts`).
+    const barrel = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "modules", "sim", "hud", "index.ts"),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(barrel).toContain("peekScrimBackgroundCss,");
+    expect(barrel).toContain("PEEK_SCRIM_FEATHER_PX,");
+    // The feather is the card's own `px-3`, read off the published table
+    // rather than typed as a 12 that agrees with nothing.
+    expect(CARD_CODE).toContain("PEEK_SCRIM_FEATHER_PX.right");
+    expect(CARD_CODE).not.toMatch(/left:\s*\d/);
+  });
+
+  it("the card is the shade's stacking context AND its containing block", () => {
+    // Read off the class STRING and asserted to be code — the prose above this
+    // className quotes `relative`, `isolate` and `borderRadius: inherit`
+    // deliberately, and the touch hint's case records what happens when an
+    // assertion cannot tell the two apart.
+    const shadeAt = prompt.indexOf('data-hud="audio-prompt-scrim"');
+    expect(shadeAt, "the audio-prompt shade is gone — re-anchor").toBeGreaterThan(-1);
+    const classAt = prompt.lastIndexOf('className="', shadeAt);
+    expect(classAt, "no className between the card and its shade — re-anchor").toBeGreaterThan(-1);
+    const hostClass = prompt.slice(
+      classAt,
+      prompt.indexOf('"', classAt + 'className="'.length) + 1,
+    );
+    expect(hostClass).not.toContain("//");
+    expect(
+      hostClass,
+      "the audio-prompt shade's host lost `relative` — `inset: 0` now resolves " +
+        "against `[data-hud=\"audio-prompt\"]` and `borderRadius: inherit` " +
+        "inherits from a box with no radius: square corners past a rounded card",
+    ).toContain("relative");
+    expect(
+      hostClass,
+      "the audio-prompt shade's host lost `isolate` — a `position: relative` " +
+        "box at `z-index: auto` opens no stacking context, so the `z-index: -1` " +
+        "shade keeps searching upwards and paints behind the stage",
+    ).toContain("isolate");
+
+    // …and the edge that stands in for the vertical feather this surface
+    // deliberately does not take — the `controls-help` case, verbatim: the
+    // hairline and the radius ARE the edge, so there is nothing for a ramp to
+    // soften, and a 16 px bottom ramp would run under the «Разбрах» row. If
+    // the border ever goes, `peekScrimMaskCss` has to arrive in the same commit.
+    expect(hostClass).toContain("rounded-xl");
+    expect(hostClass).toContain("border");
+    const shadeSrc = prompt.slice(shadeAt, prompt.indexOf("/>", shadeAt) + 2);
+    expect(shadeSrc).toContain('borderRadius: "inherit"');
+    expect(shadeSrc).not.toContain("MaskImage");
+  });
+});
