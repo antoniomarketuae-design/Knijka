@@ -271,6 +271,16 @@ export function serializeObjectiveParams(
       // L5, and sc-ov-solid-return's whole subject IS that line. A rung that
       // forgave it would teach the opposite of the lesson it belongs to.
       if (p.requireSolidLineClean === true) params.requireSolidLineClean = true;
+      // …AND THE SIXTH (`requireSpeedClean`), on this whitelist for the identical
+      // measured reason — and it was measured AGAIN here rather than assumed: the
+      // key was authored on `sc-swp-finish`, parsed by `parseObjectiveParams`,
+      // read by `stepReachZone` and voided by `speedFaultVoidsObjective`, and the
+      // drill's two ❌ demonstrations still collected the certificate through
+      // `compileScenario → applyTick`. It reached the session on the line below
+      // and not before. NOT LADDERED for its neighbours' reason: „did you go over
+      // the ceiling the road gave you" has the same answer at L1 as at L5, and
+      // this drill's whole subject IS that ceiling.
+      if (p.requireSpeedClean === true) params.requireSpeedClean = true;
       // …AND THE FIFTH (`requireFullStop`), on this whitelist for the identical
       // measured reason and NOT laddered for a sharper one than its neighbours':
       // the aid ladder cannot forgive this even in principle. «Спри напълно» is

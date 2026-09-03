@@ -69,6 +69,110 @@ export interface PredictionInput {
 export const MAX_PREDICTED_POINTS = 30;
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHEN THE ANSWER DOES NOT FIT IN THE QUESTION (sc-junction-rhr:c6d88f3f).
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * THE FRAME. `sweep161/sc-junction-rhr/pc-right/07-end.png` — the gate asks
+ * «Цяло число от 0 до 30», and the sibling drive photographed in the same
+ * chunk (`sweep161/sc-junction-stop/pc-wrong/drive.log:1200`) ends
+ * «VERDICT: НЕИЗДЪРЖАН · SCORE: 394 наказателни точки». Both numbers are the
+ * SAME unit — the ceiling above is a cap on the FIELD, not on the protocol,
+ * and `store.record` copies `SimSession.score` in whole.
+ *
+ * STILL LIVE AT HEAD, MEASURED RATHER THAN ASSUMED: of the 151 drives in
+ * `.audit-frames/w25` that reached a score, 7 scored above 30 (max 53) —
+ * sc-turn-left-oncoming 43, sc-ed-poligon-chain 53, sc-junction-gap 40 …
+ * The runaway totals are smaller than they were; the ceiling is unchanged.
+ *
+ * WHAT IT DID TO THE STUDENT, WHICH IS WORSE THAN THE MISMATCH. `predicted −
+ * actual` is only a reading of self-knowledge when the truth was SAYABLE. Past
+ * the cap it is not: the largest number the form accepts is still below the
+ * protocol, so EVERY such student — including one who knew perfectly well he
+ * had wrecked the drive and typed the maximum he was allowed — scored a large
+ * negative error, was classified `overconfident`, and was told «Оцени се
+ * по-високо, отколкото беше». The product bounded the answer and then convicted
+ * him of the bound. That is a bare verdict, and a false one (doc 64 THEO-4).
+ *
+ * WHY NOT SIMPLY RAISE THE CEILING. The paragraph above it is right: past ~30
+ * a typed number stops being a belief about the drive. A field that accepts 400
+ * measures typing, not judgement. So the cap stays and the MECHANIC learns to
+ * say when it could not contain the answer — which is also the only branch that
+ * can be honest about a scale the student never saw.
+ *
+ * Total-order note: this is a PREDICATE and a copy pair, deliberately not a
+ * fourth `CalibrationVerdict`. The verdict type keys two exhaustive `Record`s
+ * (title + body) and three counters in `summarizeCalibration`; a fourth member
+ * would silently mis-bucket in the `else` branch there and force every consumer
+ * to grow a case for a state that is not a judgement at all.
+ */
+export function isBeyondPredictableScale(actualPoints: number): boolean {
+  return Number.isFinite(actualPoints) && actualPoints > MAX_PREDICTED_POINTS;
+}
+
+/**
+ * The headline for that case. NOT a verdict — it names the question's limit,
+ * because the student's judgement was never measured here.
+ */
+export const CALIBRATION_BEYOND_SCALE_TITLE_BG =
+  "Въпросът не можеше да побере това каране";
+
+/**
+ * …and the WHY, which requirement-zero makes non-optional: a screen that
+ * withholds a verdict must say what it is withholding and what the number in
+ * front of the student means instead.
+ *
+ * BOTH NUMBERS ARE NAMED and neither is typed twice — the cap comes from the
+ * constant the field is built from, the total from the protocol. No class
+ * tariff appears here on purpose: this file imports nothing (see the header),
+ * so a „10 изпитни т." written in it would be a hand-copied scale, which is
+ * exactly how the over-claim in `scales.ts` reached four surfaces. The gate
+ * renders `EXAM_POINTS_SHORT_NOTE_BG` beside this text and that constant is
+ * sourced.
+ */
+export function calibrationBeyondScaleBodyBg(actualPoints: number): string {
+  return (
+    `Полето приема най-много ${MAX_PREDICTED_POINTS} наказателни точки, а протоколът за това ` +
+    `каране е ${actualPoints}. Дори най-високото число, което изобщо можеше да напишеш, е под ` +
+    "истината — затова разликата по-долу измерва тавана на въпроса, а не твоята преценка, и " +
+    "това каране не влиза в тенденцията ти. Самото число обаче казва нещо: толкова точки не се " +
+    "събират от разсеяност, а от повтаряне на една и съща тежка грешка. Отвори разбора и виж " +
+    "ПЪРВАТА от тях — изпитът свършва там, а всичко след нея е същата грешка още веднъж."
+  );
+}
+
+/**
+ * The one place that decides what the reveal says.
+ *
+ * Both the server action and the trend page used to read
+ * `CALIBRATION_VERDICT_TITLE_BG[classifyCalibration(record)]` directly, i.e.
+ * two copies of a rule with no branch in it. One function, so the ceiling case
+ * cannot be honest on one surface and a conviction on the other.
+ */
+export interface CalibrationRevealCopy {
+  /** The protocol went past what the form would let the student say. */
+  beyondScale: boolean;
+  titleBg: string;
+  bodyBg: string;
+}
+
+export function calibrationRevealCopy(record: CalibrationRecord): CalibrationRevealCopy {
+  if (isBeyondPredictableScale(record.actualPoints)) {
+    return {
+      beyondScale: true,
+      titleBg: CALIBRATION_BEYOND_SCALE_TITLE_BG,
+      bodyBg: calibrationBeyondScaleBodyBg(record.actualPoints),
+    };
+  }
+  const verdict = classifyCalibration(record);
+  return {
+    beyondScale: false,
+    titleBg: CALIBRATION_VERDICT_TITLE_BG[verdict],
+    bodyBg: CALIBRATION_VERDICT_BODY_BG[verdict],
+  };
+}
+
+/**
  * Validate a client-sent prediction. Returns null for anything that is not a
  * whole, in-range point count — the caller answers INVALID_INPUT rather than
  * storing a number it had to guess at.
@@ -149,6 +253,13 @@ export interface CalibrationPoint {
   error: number;
   verdict: CalibrationVerdict;
   verdictAgreed: boolean;
+  /**
+   * The protocol scored past `MAX_PREDICTED_POINTS`, so `error` is the form's
+   * ceiling and not this student's judgement — see `isBeyondPredictableScale`.
+   * The row is still LISTED (it is evidence of a drive that happened) and is
+   * kept out of every aggregate below.
+   */
+  beyondScale: boolean;
 }
 
 export interface CalibrationSummary {
@@ -165,7 +276,16 @@ export interface CalibrationSummary {
   overconfidentCount: number;
   accurateCount: number;
   underconfidentCount: number;
-  /** Share of drives whose pass/fail call was right (0..1); null when empty. */
+  /**
+   * Drives whose protocol went past the form's ceiling. They are excluded from
+   * `meanError`, `meanAbsError`, the three verdict counts and the trend — one
+   * −364 in the mean is not a habit, it is an artefact of the question — and
+   * counted here so the screen can say so instead of losing them silently.
+   */
+  beyondScaleCount: number;
+  /** Share of drives whose pass/fail call was right (0..1); null when empty.
+   *  Beyond-scale drives DO count here: «издържан / неиздържан» is a claim the
+   *  student could always make truthfully, whatever the total turned out to be. */
   verdictAgreementRate: number | null;
   /**
    * Is the student getting better at reading their own driving? Compares the
@@ -200,6 +320,7 @@ export function summarizeCalibration(
     error: calibrationError(r),
     verdict: classifyCalibration(r),
     verdictAgreed: verdictAgrees(r),
+    beyondScale: isBeyondPredictableScale(r.actualPoints),
   }));
 
   const n = points.length;
@@ -211,26 +332,38 @@ export function summarizeCalibration(
   let overconfidentCount = 0;
   let accurateCount = 0;
   let underconfidentCount = 0;
+  /** The drives whose point error is a reading of judgement at all. */
+  const graded: CalibrationPoint[] = [];
   for (const p of points) {
+    // The pass/fail call is answerable on every drive, so it is counted on
+    // every drive; the point error is not (see `beyondScaleCount`).
+    if (p.verdictAgreed) agreed++;
+    if (p.beyondScale) continue;
+    graded.push(p);
     errorSum += p.error;
     absSum += Math.abs(p.error);
-    if (p.verdictAgreed) agreed++;
     if (p.verdict === "overconfident") overconfidentCount++;
     else if (p.verdict === "accurate") accurateCount++;
     else underconfidentCount++;
   }
+  const g = graded.length;
 
   return {
     points,
     sampleCount: n,
-    samplesUntilTrend: Math.max(0, CALIBRATION_MIN_SAMPLES - n),
-    meanError: empty ? null : errorSum / n,
-    meanAbsError: empty ? null : absSum / n,
+    // Counted in GRADED records, because that is what the trend is drawn
+    // through: promising a trend at three records and then withholding one
+    // because two of them were off the scale is the screen contradicting
+    // itself, which is the shape this whole repair is about.
+    samplesUntilTrend: Math.max(0, CALIBRATION_MIN_SAMPLES - g),
+    meanError: g === 0 ? null : errorSum / g,
+    meanAbsError: g === 0 ? null : absSum / g,
     overconfidentCount,
     accurateCount,
     underconfidentCount,
+    beyondScaleCount: n - g,
     verdictAgreementRate: empty ? null : agreed / n,
-    trend: computeTrend(points),
+    trend: computeTrend(graded),
   };
 }
 

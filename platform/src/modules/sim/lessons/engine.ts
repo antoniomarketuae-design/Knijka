@@ -58,6 +58,7 @@ import {
   reachZoneStateRefusal,
   restFaultVoidsObjective,
   solidLineFaultVoidsObjective,
+  speedFaultVoidsObjective,
   stepObjective,
   yieldFailedVoidsObjective,
   type ObjectiveContext,
@@ -914,6 +915,68 @@ function isYieldFault(e: ScorableEvent): e is ViolationEvent {
 const NO_YIELD_FAULTS: readonly YieldFaultRecord[] = [];
 
 /**
+ * The three convictions that falsify a «задържах тавана» banner — the fact
+ * `ReachZoneParams.requireSpeedClean` consults (objectives.ts carries the two
+ * demonstration drives and why the set is exactly these three).
+ *
+ * THE SET IS THE CLAIM. „The ceiling" a Bulgarian road hands a driver is two
+ * numbers, not one: the sign's (`SPEEDING_OVER_LIMIT` and its опасна upper band
+ * `SPEEDING_DANGEROUS`) and the one the surface leaves of it
+ * (`SPEED_TOO_FAST_FOR_CONDITIONS`). A banner naming the ceiling THE SURFACE
+ * gave is answered by both, which is why neither alone would do: on a dry rung
+ * the second never fires and the first is the whole ceiling; in the rain the
+ * first stays silent at 49 км/ч while the second convicts, and 49 in the rain
+ * is the mistake the plate exists to teach. `SPEED_TOO_FAST_FOR_CURVE`,
+ * `PEDESTRIAN_CROSSING_TOO_FAST` and `CLOSING_ON_LEAD_TOO_FAST` are ceilings a
+ * particular OBJECT imposes — a bend, a zebra, the car ahead — not the one the
+ * carriageway itself carries, so they are out.
+ *
+ * TYPED AGAINST THE REAL UNION, for `YIELD_FAULT_CODES`'s reason one screen up:
+ * this `Set<ViolationCode>` is where the demand's vocabulary and the rule
+ * engine's are made to agree — a rename in `rules/types.ts` fails the build
+ * here instead of quietly emptying the gate.
+ *
+ * IT READS THE BILL, NOT THE SPEEDOMETER, like every ledger predicate in this
+ * block: what reaches it is a conviction the protocol already prints with its
+ * copy, its «✔ Правилното действие» corrective and its ЗДвП refs (чл. 21, ал. 1
+ * for the sign; чл. 20, ал. 2 for the surface), so the withheld certificate is
+ * never the student's first news of the failure.
+ *
+ * AND IT CAN COST A PASS, unlike the yield set and exactly like the ban-zone
+ * rest and the solid line: these three are второстепенна/опасна rather than
+ * uniformly опасна, so a drive this refuses may have been passing. That is the
+ * demand's point rather than a side effect — the one gate that authors it is
+ * the finish of the drill whose entire subject is the ceiling, and a lesson
+ * that hands out «задържал тавана от настилката» to a student it has just
+ * convicted of exceeding it has taught him the opposite of its own topic.
+ */
+const SPEED_FAULT_CODES: ReadonlySet<ViolationEvent["code"]> = new Set<ViolationEvent["code"]>([
+  "SPEEDING_OVER_LIMIT",
+  "SPEEDING_DANGEROUS",
+  "SPEED_TOO_FAST_FOR_CONDITIONS",
+]);
+
+function isSpeedFault(e: ScorableEvent): e is ViolationEvent {
+  return e.kind === "violation" && SPEED_FAULT_CODES.has(e.code);
+}
+
+/**
+ * …AND THE SHOWN-BUT-NOT-CHARGED HALF, which this fact needs for the reason
+ * `isCoachedBanZoneRest` needs it and one degree more urgently: two of the
+ * three codes are второстепенна, so on a training rung the FIRST occurrence is
+ * given away as a free mini-lesson and lands on `coachedMistakes` rather than
+ * `events`. A ledger-only read would let the very drive the plate exists to
+ * teach against certify itself.
+ *
+ * `CoachedMistake.code` is a plain string, so this is a string compare; the
+ * SCORED half above is typed against the real `ViolationCode`, which is what
+ * makes a rename fail the build.
+ */
+function isCoachedSpeedFault(m: CoachedMistake): boolean {
+  return SPEED_FAULT_CODES.has(m.code as ViolationEvent["code"]);
+}
+
+/**
  * Does the rule engine, RIGHT NOW, hold a full stop it would accept at a Б2 —
  * the fact `ReachZoneParams.requireFullStop` consults (objectives.ts carries
  * the sheet and the argument).
@@ -1344,6 +1407,31 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           .filter(isYieldFault)
           .map((e) => ({ code: e.code as YieldFaultCode, tSec: e.t }))
       : NO_YIELD_FAULTS;
+  // …AND THE CEILING THE ROAD GAVE, EXCEEDED ANYWHERE, for
+  // `ReachZoneParams.requireSpeedClean` (objectives.ts carries the two demos:
+  // one sheet printing «✓ Стигни края на отсечката, задържал тавана от
+  // настилката» over «✗ Превишена скорост», another over «✗ Несъобразена с
+  // условията скорост» at 49,9 км/ч in the rain — the exact mistake the plate
+  // exists to teach). Both halves of the scored ledger for the reason the four
+  // blocks above give, PLUS the shown-but-not-charged half on the ban-zone
+  // rest's argument (see `isCoachedSpeedFault`): two of the three codes are
+  // второстепенна, so on a training rung the first one is coached rather than
+  // billed and a ledger-only read would let this drill's own ❌ demonstrations
+  // certify themselves. RUN-WIDE rather than windowed, like the ban-zone rest
+  // and the solid line: the banner claims «отсечката» and the copy says «по
+  // цялата отсечка», a stretch that straddles the previous objective's
+  // completion because the plate gate sits mid-street.
+  //
+  // …EXCEPT IN A THEO-3 SANDBOX, the same exemption and the same reason as the
+  // two coached reads below: in `mistakeExperience` the wrong act IS the
+  // assignment, and refusing the student for performing it would be the drill
+  // punishing its own instruction. The SCORED halves stay live there because
+  // they are empty in that mode.
+  const overTheCeilingCoached =
+    mistakeXp === undefined &&
+    (coachedPrev.some(isCoachedSpeedFault) || coachedNew.some(isCoachedSpeedFault));
+  const overTheCeilingInRun =
+    prev.events.some(isSpeedFault) || scoredEvents.some(isSpeedFault) || overTheCeilingCoached;
   // …AND THE FULL STOP THE ENGINE WOULD ACCEPT AT A Б2 RIGHT NOW, for
   // `ReachZoneParams.requireFullStop` (objectives.ts carries the sheet: one
   // protocol printing «✓ Спри напълно на Б2 на изхода 1:16» over «✗ Неспиране
@@ -1470,6 +1558,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
         ...(crossedSolidLineInRun ? { crossedSolidLineInRun: true } : {}),
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
+        ...(overTheCeilingInRun ? { overTheCeilingInRun: true } : {}),
         qualifyingStopCurrent: fullStopHeld,
         ...(activeSince !== null ? { objectiveActiveSinceSec: activeSince } : {}),
       };
@@ -1840,6 +1929,15 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
               ? { objectiveActiveSinceSec: terminalActiveSince }
               : {}),
           }) ||
+          // The ceiling term (`requireSpeedClean`) is session-monotone like the
+          // contact one, and its ONE gate at HEAD — `sc-swp-finish`, the finish
+          // of `sc-sp-wet-limit-plate` — is 2 of 2. So this arm is load-bearing
+          // rather than defensive: without it the repair that stops the drill
+          // certifying a ceiling the student blew through would have replaced a
+          // false certificate with a drive that cannot end, and the чл. 21 /
+          // чл. 20, ал. 2 cards it exists to teach would be reachable only by
+          // quitting.
+          speedFaultVoidsObjective(params[currentIndex], overTheCeilingInRun) ||
           // «Спри пред човека» (`requireHaltForVru`) is monotone in exactly the
           // same way. No census member is terminal at HEAD (sc-hzes-stop 2/3,
           // sc-pnu-halt 2/3, sc-mfp-walk-yield first of its chain), so the arm

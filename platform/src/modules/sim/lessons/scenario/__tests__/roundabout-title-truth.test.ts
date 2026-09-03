@@ -193,9 +193,21 @@ describe("the three rewritten rows kept their gates byte-for-byte", () => {
       { kind: "reachZone", x: 4.06, y: -26, radiusM: 3, maxSpeedKmh: 6 },
     ],
     [
+      // EXPECTATION MOVED 2026-09-04 (row sc-rb-busy-gap:5ee56710), and it is
+      // the GATE that moved, not this pin's meaning. The table records that the
+      // D3 TITLE rewrite changed no geometry; this is a later, separate repair
+      // with its own reason — a disc centred ON the east node is the one place
+      // a car TAKING the first exit must drive through, so «без да излизаш от
+      // кръга» certified the bail-out it forbids (and at L1 the ladder widened
+      // it to 9 m, reaching 27 m against the drill's own `enterRadiusM` of 24).
+      // It now stands 20° further round the ring, where the east arm cannot
+      // reach it. The template block carries the arithmetic and
+      // rbg-east-gate-containment.test.ts holds it on every rung.
+      // sc-rbc-past-east above is the same shape on sc-rb-circulate-priority
+      // and is deliberately UNTOUCHED here — different lesson, different lane.
       "sc-rb-busy-gap",
       "sc-rbg-past-east",
-      { kind: "reachZone", x: 18, y: 0, radiusM: 6, maxSpeedKmh: 20 },
+      { kind: "reachZone", x: 16.91, y: 6.16, radiusM: 4, maxSpeedKmh: 20 },
     ],
   ];
 

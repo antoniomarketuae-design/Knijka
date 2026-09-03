@@ -28,6 +28,7 @@ import { recordScPkDoubleParkDrive } from "../../../traces/scPkDoublePark";
 import { recordScRbLaneChoiceDrive } from "../../../traces/scRbLaneChoice";
 import { recordScVpHandbrakeDrive } from "../../../traces/scVpHandbrake";
 import { recordScVuCyclistGroupDrive } from "../../../traces/scVuCyclistGroup";
+import { VIOLATIONS } from "../../../rules/catalog";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import { compileScenario } from "../compile";
@@ -474,7 +475,13 @@ describe("wave-4 bot completion — sc-vu-cyclist-group at L3", () => {
     // which is the intended pedagogy; the code-truth channel for §9 is the
     // recorder's own grader on the trace gate, where it convicts.
     expect(codes).not.toContain("VULNERABLE_PASS_TOO_CLOSE");
-    expect(toasts).toContain("Изпреварване на велосипедист без странична дистанция");
+    // The title is read off the catalogue rather than retyped: this assertion's
+    // subject is „the toast NAMES the act", not which words the act is named
+    // with — and the literal spelling went stale on 2026-09-04 when
+    // `VULNERABLE_PASS_TOO_CLOSE.titleBg` was shortened so the phone peek could
+    // finish it (sc-merge-from-property:6715b581; the reasoning is on the row
+    // and in `rules/__tests__/violation-title-fits-peek.test.ts`).
+    expect(toasts).toContain(VIOLATIONS.VULNERABLE_PASS_TOO_CLOSE.titleBg);
     const r = buildLessonResult(s);
     expect(r.passed).toBe(false);
     // The half-maneuver's arithmetic, and the reason sc-vug-wide sits at y 190

@@ -225,8 +225,21 @@ for (const p of planned) {
       `exit=${res.status} verdict=${s.verdict ?? "-"} score=${s.score ?? "-"} ` +
       `frames=${s.frames ?? "-"}${s.lost && s.lost !== "0" ? ` LOST=${s.lost}` : ""}` +
       // The channel, on the console line and not only in the row: a dispatcher
-      // reading this scroll is the reader who routes the finding.
+      // reading this scroll is the reader who routes the finding. `pad=` is the
+      // other half (sc-speed-creep:dff70553) — whether the drivetrain pad was
+      // reached at all, and whether it still owned the finger after the hold.
+      // «unreached» is the state that forbids addressing a row to a touch file;
+      // «DROPPED» is the brake-drop family's own question, answered.
       ` in=${s.inputChannel ?? "?"}/touch=${s.touchEvents ?? "?"}` +
+      ` pad=${
+        s.touchProbe === null
+          ? "?"
+          : s.touchProbe !== "actuated"
+            ? "unreached"
+            : s.touchProbeHold === "survived"
+              ? "held"
+              : "DROPPED"
+      }` +
       (s.treeMoved ? "  !! TREE MOVED — certifies nothing" : "") +
       (timedOut ? "  !! KILLED at the drive timeout — re-drive it" : ""),
   );

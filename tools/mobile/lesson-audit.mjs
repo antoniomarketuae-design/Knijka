@@ -285,6 +285,7 @@ import {
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
+import { probeTouchPads, touchProbeLine } from "./lib/touch-probe.mjs";
 import { attestTarget, describeTarget, resolveBase, treeIdentity } from "./lib/target.mjs";
 // DID THE DRIVE HAPPEN — the same ladder the judge side runs, imported rather
 // than re-implemented. Pure (node:fs + node:path, no top-level work), so it is
@@ -1289,19 +1290,27 @@ await page.waitForTimeout(400);
  * BY A KEYBOARD, and the 83-of-122 lost-brake rate that family was drawn from
  * is a keystroke dropped in the WebKit iPhone context, not a thumb pad.
  *
- * The counters are measured in the helpers rather than claimed here, and
- * `touchEvents` stays 0 by construction — `__tests__/wave-c-summary.test.mjs`
- * §6 censuses this file for touch actuation, so the day a touch channel is
- * added the attestation goes red instead of quietly lying. */
+ * The counters are measured in the helpers rather than claimed here.
+ * `channel` is the DRIVE's channel and stays "keyboard": the pedals and the
+ * wheel below are still `page.keyboard`, and nothing in this file makes a
+ * touch move the car. What DID change is that the lane no longer ends without
+ * ever having touched the component — `lib/touch-probe.mjs` actuates the
+ * drivetrain pad once the drive is over and raises `touchEvents` where it
+ * dispatches. `__tests__/wave-c-summary.test.mjs` §6 censuses both halves of
+ * that: the drive must still be keyed, and the actuation must still be
+ * counted, so neither can drift into a line that lies about the other. */
 const inputChannel = {
   channel: "keyboard",
   keys: { throttle: "KeyW", brake: "KeyS", left: "KeyA", right: "KeyD" },
   /** Pedal + steer key events actually dispatched by this drive. */
   driveKeyEvents: 0,
-  /** Touch events dispatched by this drive. Zero, and §6 keeps it zero. */
+  /** Touch events dispatched by this lane. Raised only by the post-drive pad
+   *  probe — no touch drives the car, which is what `channel` above says. */
   touchEvents: 0,
   /** Was the touch overlay even on the page? Measured at the summary. */
   overlayMounted: null,
+  /** What the pad did when it was actually pressed. See `touch-probe.mjs`. */
+  touchProbe: null,
 };
 
 // ── THE PEDALS ─────────────────────────────────────────────────────────────
@@ -6446,17 +6455,40 @@ note(
 inputChannel.overlayMounted = await page
   .evaluate(() => document.querySelector('[data-hud="touch-controls"]') !== null)
   .catch(() => null);
+/* ── …AND THEN IT ACTUALLY PRESSES THE PAD ─────────────────────────────────
+ *
+ * The other half of `sc-speed-creep:dff70553`. Stating that no touch was sent
+ * made the mis-attribution VISIBLE; it did not make the surface reachable, and
+ * seven verdicts in a row said so in the same words — „it needs a harness
+ * change to close". This is the change: one synthetic finger, on the real pad
+ * node, pressed on the pad's own dead centre so it cannot command the car
+ * (`lib/touch-probe.mjs` carries the safety argument and the readback).
+ *
+ * HERE, AFTER THE DRIVE, ON PURPOSE. The scripted drive above is unchanged and
+ * stays comparable with every earlier sweep; nothing the probe does can reach
+ * a verdict that has already been taken. What it answers is the question the
+ * brake-drop family actually asks — does a held drivetrain pad still own its
+ * pointer half a second later — through the surface those rows name. */
+const touchProbe = await probeTouchPads(page);
+inputChannel.touchEvents = touchProbe.events;
+inputChannel.touchProbe = touchProbe;
 note(
   `  INPUT: ${inputChannel.channel} · ${inputChannel.driveKeyEvents} pedal/steer key events · ` +
     `${inputChannel.touchEvents} touch events dispatched · touch overlay ` +
     `${inputChannel.overlayMounted === null ? "unreadable" : inputChannel.overlayMounted ? "mounted" : "absent"}`,
 );
-if (PLATFORM !== "pc" && inputChannel.touchEvents === 0) {
+note(touchProbeLine(touchProbe));
+if (PLATFORM !== "pc" && inputChannel.channel === "keyboard") {
   loud(
-    "NO TOUCH WAS DISPATCHED ON THIS LANE: every pedal and every steer was a page.keyboard event, so this is a " +
+    "NO TOUCH DROVE THIS LANE: every pedal and every steer was a page.keyboard event, so this is a " +
       "phone-sized viewport driven by a KEYBOARD, not a phone driven by a thumb. TouchControls.tsx was " +
-      `${inputChannel.overlayMounted === false ? "not even mounted" : "mounted and never actuated"} — no finding from ` +
-      "this drive may name it, or any touch control, as its suspect.",
+      `${
+        inputChannel.overlayMounted === false
+          ? "not even mounted"
+          : touchProbe.actuated
+            ? "actuated only by the TOUCH PROBE line above, after the drive had ended"
+            : "mounted and never actuated"
+      } — no finding about how the CAR was controlled may name it, or any touch control, as its suspect.`,
   );
 }
 saveStatus({ inputChannel });

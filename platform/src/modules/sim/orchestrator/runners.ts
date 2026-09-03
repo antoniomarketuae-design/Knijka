@@ -646,6 +646,41 @@ const YIELD_PRAISE_WAIT_KMH = 8;
  *  below it while a priority vehicle is still closing is a wait, not the
  *  single-frame dip a hard brake or a bump produces. */
 const YIELD_PRAISE_WAIT_SEC = 1;
+/**
+ * …AND SPENT SHORT OF THE LINE, FACING THE JUNCTION — `sc-junction-scan:d9c8e516`
+ * again, re-measured 2026-09-04 on the w25 re-drive of the row's own lesson at
+ * tree bf4a516, i.e. AFTER the clock above shipped. The mobile leg the row was
+ * filed on is clean now (`.audit-frames/w25/frames/sc-junction-scan__mobile-
+ * wrong/run.log:472` — «COMMENDATIONS (0)»), and the PC leg is not:
+ * `…__pc-wrong/run.log:390` still prints «★ ✓ Правилно отстъпено предимство
+ * 0:40» beside the product's own «Неспиране на знак Б2 „Спри!“» and «Непълно
+ * оглеждане при знак Б2» — two convictions that say, in the product's voice,
+ * that he crossed the paint without stopping and without looking.
+ *
+ * Reproduced through the production stack on tj-scan-v1 (the test beside this
+ * file): barge over the Б2 line at 57 км/ч, come to rest 8 m PAST the node, and
+ * the card is awarded while the car he cut in front of crosses behind him —
+ * SPEEDING_DANGEROUS, STOP_SIGN_NO_FULL_STOP, JUNCTION_SCAN_INCOMPLETE,
+ * COLLISION and YIELDED_TO_PRIORITY on one sheet, the w25 fault list code for
+ * code.
+ *
+ * The mechanism is one `Math.abs` wearing a different hat: `playerLineDist` is
+ * `Math.max(0, d − lineDistM)`, which throws the SIGN away, so „14 m short of
+ * the paint" and „14 m past the node on the far arm" are the same number. A
+ * yield is a decision taken BEFORE you enter, so the wait clock now also needs
+ * the two facts that distinguish them, both read off the pose the runner
+ * already has: the student is still at or short of the line (a nose over the
+ * paint is still a wait made AT it — hence the 2 m, and the window stays
+ * generous outward), and he is pointed at the junction he is giving way at.
+ * Neither can withhold the card from an honest wait: the Б2 shadows hold their
+ * stop 1.8 m short of the line facing the mouth (dot ≈ 1).
+ */
+const YIELD_PRAISE_LINE_OVERRUN_M = 2;
+/** …and „pointed at it": cos of the angle between his heading and the bearing
+ *  to the junction node. 0.3 ≈ 72°, deliberately loose — a curved approach arm
+ *  must never cost a student the card, and everything this clause exists to
+ *  catch (stopped past the node, or on the exit arm) is at cos < 0. */
+const YIELD_PRAISE_FACING_MIN = 0.3;
 /** Witness-gate ETA floor, m/s — low on purpose (unlike the sync's 3 m/s
  * floor): a stopped/creeping student must read as NOT arriving, so the held
  * car keeps waiting for them instead of crossing an empty box (doc 62 S2). */
@@ -1023,7 +1058,22 @@ export class PriorityFromRightRunner implements EventRunner {
     // definition of the encounter being over). See the measurement at
     // YIELD_PRAISE_WAIT_SEC: on both Б2 shadows ~92% of an honest 4.7 s wait is
     // spent with the priority car between the node and clear.
-    const inYieldPose = playerLineDist <= 14 && input.speedKmh <= YIELD_PRAISE_WAIT_KMH;
+    // …and it has to be a wait taken SHORT OF the line, facing the junction —
+    // `playerLineDist` cannot tell that from a standstill past the node or on
+    // the exit arm (YIELD_PRAISE_LINE_OVERRUN_M's block).
+    const toJx = s.junction.x - input.x;
+    const toJy = s.junction.y - input.y;
+    const toJLen = Math.hypot(toJx, toJy);
+    const headingRad = (input.headingDeg * Math.PI) / 180;
+    const facingJunction =
+      toJLen > 0 &&
+      (toJx * Math.sin(headingRad) + toJy * Math.cos(headingRad)) / toJLen >=
+        YIELD_PRAISE_FACING_MIN;
+    const inYieldPose =
+      playerLineDist <= 14 &&
+      input.speedKmh <= YIELD_PRAISE_WAIT_KMH &&
+      d >= s.lineDistM - YIELD_PRAISE_LINE_OVERRUN_M &&
+      facingJunction;
     if (!inYieldPose) {
       this.yieldWaitArmed = false;
     } else {
@@ -2643,6 +2693,38 @@ const EM_STOPPED_KMH = 3;
 const EM_KEEP_RIGHT_TOL_M = 0.4;
 /** Conviction needs the player above yieldSlowKmh by this margin, km/h. */
 const EM_SPEED_MARGIN_KMH = 2;
+/**
+ * The slow half of «made way» is a DROP, not a level, km/h.
+ *
+ * DEFECT 7 (templates-vru.ts, EM_APPROACH.yieldSlowKmh), measured on sweep161
+ * and re-measured through the production stack: `slowedKeepingRight` asked the
+ * ABSOLUTE question „is this car at or under `yieldSlowKmh`", and a car that
+ * had never been over it answered yes on the first armed frame and kept the
+ * latch forever. A drive held at a flat 10 км/ч in the right lane — no brake,
+ * no indicator, no shift — came back with a bare
+ * ["commendation:YIELDED_TO_PRIORITY"], which is the «✓ Правилно отстъпено
+ * предимство» the sweep photographed at 0:06 (pc) / 0:14 (mobile) on a leg that
+ * did nothing about the ambulance at all.
+ *
+ * LOWERING `yieldSlowKmh` CANNOT FIX IT and would start refusing the student
+ * who lawfully slows to 30 — чл. 91 is satisfied by slowing OR pulling right,
+ * and a false refusal teaches the wrong thing exactly as hard as a false
+ * certificate (the ruling already recorded at sc-vue-made-way). So the level
+ * stays where it is and a MEASURED deceleration is required beside it: «made
+ * way» now means the driver did something.
+ *
+ * 5 and not 12 (what a car at the posted 50 must shed to reach 38): the credit
+ * has to survive a student who was already travelling under the limit and
+ * lifts off — 39 → 33 is a real response and is paid. It is above the ripple a
+ * car holding a target speed shows against the tier governor, which is the only
+ * thing it has to clear to stop paying a car that never changed pace.
+ *
+ * It CANNOT create a false conviction: the window-expiry branch below tests the
+ * player's speed independently (and more strictly, `yieldSlowKmh +
+ * EM_SPEED_MARGIN_KMH`), so a car that is refused the credit here and is not at
+ * speed resolves "clear" — no commendation, no violation.
+ */
+const EM_YIELD_DROP_KMH = 5;
 /** Guard-stopped actor pinned behind a drifted-left player this long = the
  *  block stands even at low speed (nose-to-tail stalemate they caused), s. */
 const EM_BLOCK_CONVICT_SEC = 3;
@@ -2661,6 +2743,16 @@ export class EmergencyApproachRunner implements EventRunner {
   private blockSince: number | null = null;
   private sawYield = false;
   private approachSpeedKmh = 0;
+  // The pace the player was holding while the ambulance ran him down — the
+  // baseline `EM_YIELD_DROP_KMH` is measured DOWN FROM. Peak since RELEASE and
+  // not since the duty armed, because a student who reads the mirror early
+  // starts shedding speed BEFORE the runner notices the EV is closing: on the
+  // authored make-way drive the duty arms at ~9.4 s, a second into a
+  // deceleration that began at ~8.3 s, so an arm-instant baseline would price
+  // his response at the 1.8 км/ч he had left to give. `approachSpeedKmh` above
+  // stays the arm-instant reading — it is the outcome's payload, not this
+  // judgement, and the two questions are not the same one.
+  private peakSinceReleaseKmh = 0;
   // Signed lateral drift since duty-arm, ACCUMULATED in the vehicle frame
   // (+ = right). Incremental — each frame adds the position delta projected
   // on the mid-heading right axis, so forward travel along a CURVING road
@@ -2712,6 +2804,7 @@ export class EmergencyApproachRunner implements EventRunner {
     this.blockSince = null;
     this.sawYield = false;
     this.approachSpeedKmh = 0;
+    this.peakSinceReleaseKmh = 0;
     this.shiftRightM = 0;
     this.contacted = false;
   }
@@ -2748,6 +2841,8 @@ export class EmergencyApproachRunner implements EventRunner {
     }
 
     // triggered — the actor is running.
+    // The make-way baseline runs from here, before the duty arms: see the field.
+    if (input.speedKmh > this.peakSinceReleaseKmh) this.peakSinceReleaseKmh = input.speedKmh;
     if (this.dutyArmedAt === null) {
       const closing = actor.speedMps * 3.6 > input.speedKmh + EM_CLOSING_MIN_KMH;
       if (behindM > EM_STILL_BEHIND_M && behindM <= s.armBehindM && closing) {
@@ -2773,8 +2868,13 @@ export class EmergencyApproachRunner implements EventRunner {
     // Yield watch — latched permanently once observed during the approach.
     const rightShift = this.shiftRightM;
     if (this.dutyArmedAt !== null) {
+      // A LEVEL *and* A DROP — see EM_YIELD_DROP_KMH. The level is чл. 91's
+      // („slow enough that the corridor is releasable"); the drop is what makes
+      // it an ACT rather than a coincidence of the pace he was already at.
       const slowedKeepingRight =
-        input.speedKmh <= s.yieldSlowKmh && rightShift >= -EM_KEEP_RIGHT_TOL_M;
+        input.speedKmh <= s.yieldSlowKmh &&
+        this.peakSinceReleaseKmh - input.speedKmh >= EM_YIELD_DROP_KMH &&
+        rightShift >= -EM_KEEP_RIGHT_TOL_M;
       if (
         rightShift >= s.yieldShiftM ||
         slowedKeepingRight ||

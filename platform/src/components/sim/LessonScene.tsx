@@ -820,6 +820,7 @@ export default function LessonScene(props: LessonSceneProps) {
               ambientSidewalkBudget(
                 raw as Parameters<typeof createTrafficSystem>[0],
                 DEFAULT_TRAFFIC_CONFIG.footwaylessRoadClasses,
+                DEFAULT_TRAFFIC_CONFIG.laneWidthM,
               ),
           },
         );

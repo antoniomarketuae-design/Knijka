@@ -108,6 +108,14 @@
  *       step 3 makes six falsifiable geometric claims about the staged sleeper,
  *       and four of the six were unpinned anywhere in the repo (see §6's own
  *       docblock for the two that were, and how loosely).
+ *
+ *   §7  sc-signal-flashing — «although it ran 59 км/ч in a posted 50 … still not
+ *       billed» (critical, 0d68b149). The blindness is GONE and named by commit
+ *       (ba51c50's coached producer, c317a68's SPEED_REGRADE_SEC); what is left
+ *       is teach-first's ONE free first encounter, which the debrief now
+ *       discloses instead of praising. §7 measures that whole chain — including
+ *       the reason the re-grade cannot land HERE: it fires at ≈14,9 s and this
+ *       drill's route ends at ≈12,6 s.
  */
 
 import { readFileSync } from "node:fs";
@@ -123,6 +131,7 @@ import { createScenarioDirector } from "../../../orchestrator";
 import { createTrafficSystem, DEFAULT_TRAFFIC_CONFIG } from "../../../traffic";
 import type { TrafficDistrict } from "../../../traffic/types";
 import { recordScriptedDrive, type DriveScript } from "../../../traces/recorder";
+import { buildDebrief } from "../../debrief";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { compileScenario } from "../compile";
 import {
@@ -376,6 +385,11 @@ interface DriveOutcome {
   score: number;
   passed: boolean;
   objectivesDone: boolean[];
+  /** Codes SHOWN and deliberately not charged — the teach-first channel (§7). */
+  coachedCodes: string[];
+  /** The instructor debrief the student actually reads, built the way the
+   *  server action builds it (`result` + the coached channel). §7 reads it. */
+  debriefText: string;
   /** Every trafficLight stop-line crossing, with the controller permission. */
   crossings: Array<{ tSec: number; controller?: "halt" | "proceed" }>;
 }
@@ -417,6 +431,10 @@ function drive(
     score: result.score,
     passed: result.passed,
     objectivesDone: result.objectives.map((o) => o.done),
+    coachedCodes: (result.coachedMistakes ?? []).map((c) => c.code),
+    debriefText: buildDebrief(lesson, result, {
+      ...(result.coachedMistakes !== undefined ? { coachedMistakes: result.coachedMistakes } : {}),
+    }).text,
     crossings,
   };
 }
@@ -942,5 +960,93 @@ describe("§6 sc-signal-hesitation — briefing step 3 points at a car that is t
     // «в насрещната лента» and «с ЛИЦЕ към теб» both false.
     expect(hisOwnLane.pose.x).toBeCloseTo(LANE, 2);
     expect(hisOwnLane.pose.dirY).toBeGreaterThan(0.99);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §7 — sc-signal-flashing: what happened to «59 км/ч in a posted 50»
+// ---------------------------------------------------------------------------
+
+/**
+ * THE FINDING (`sc-signal-flashing:0d68b149`, critical, filed at
+ * `mobile-wrong/04-t012s.png` + that leg's `audit.log`): the drive held 59 км/ч
+ * under a 50 badge, the glass raised «Превишена скорост», and the sheet read
+ * «SCORE: 0 наказателни точки · MISTAKES (0)» under an instructor line that
+ * said, verbatim, «чисто каране без нито едно нарушение — задръж това ниво».
+ *
+ * TWO PRODUCT COMMITS MOVED IT, both after the sweep (frames 2026-08-17, tree
+ * c7e8ca3), and this section is the measurement rather than the claim:
+ *
+ *   ba51c50  the coached channel got a PRODUCER and two live call sites, so a
+ *            shown-but-uncharged fault is no longer indistinguishable from a
+ *            clean drive — `lessons/engine.ts recordCoached`.
+ *   c317a68  `rules/engine.ts SPEED_REGRADE_SEC` — absent at c317a68^ — bills a
+ *            CONTINUING overspeed a second time six driving seconds after the
+ *            card, the bill the teach-first free mini-lesson had consumed.
+ *
+ * AND THE RESIDUAL IS RECORDED HERE RATHER THAN CLAIMED CLOSED. On THIS drill
+ * the re-grade is emitted and cannot land: the reducer raises it at ≈14,9 s and
+ * the ROUTE ENDS at ≈12,6 s («Край на маршрута», measured below), because
+ * sxf-v1's drivable run is 145 m and 145 m at 59 км/ч is shorter than the
+ * re-grade clock. So a training leg still reaches its debrief at 0 — as the
+ * ONE free first encounter teach-first grants per code per session, which the
+ * debrief now says out loud, and which `lessons/__tests__/exam-mode.test.ts`
+ * («TRAINING: … TEACHES once and then CHARGES once») pins on a drive long
+ * enough to contain the window. §3 is the same shape on the sibling drill.
+ *
+ * The day any of that changes — a shorter re-grade, a longer route, a different
+ * teach-first policy, a debrief that praises again — one of these goes red.
+ */
+describe("§7 sc-signal-flashing — the 59-in-a-50 the audit filmed, at HEAD", () => {
+  // Straight through and never off the throttle: the audit's own wrong leg,
+  // driven far enough north that the drive outlives the route rather than the
+  // script (a script that brakes at the end CLOSES the episode by itself).
+  const out = drive(SC_SIGNAL_FLASHING, recklessScript([[LANE, 124]]));
+
+  it("THE FINDING, reproduced: the training leg still bills nothing", () => {
+    expect(out.sessionCodes).toEqual([]);
+    expect(out.score).toBe(0);
+  });
+
+  it("…and the reason is the ROUTE, not a blind grader: the re-grade fires after the end", () => {
+    const speeding = out.engineCodes.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
+    // The bill the teach spends, then the c317a68 re-grade — emitted, marked.
+    expect(speeding.map((e) => e.regrade)).toEqual([false, true]);
+    expect(out.endedAtSec).not.toBeNull();
+    // The engine convicts before the route ends; the re-grade arrives after it.
+    expect(speeding[0].tSec).toBeLessThan(out.endedAtSec!);
+    expect(speeding[1].tSec).toBeGreaterThan(out.endedAtSec!);
+  });
+
+  it("the fault is on the RECORD, so the drive can no longer read as a clean one", () => {
+    // ba51c50's producer, on the live path: without it `coachedMistakes` is
+    // empty here and every sentence below is composed from the same evidence a
+    // genuinely clean drive produces.
+    expect(out.coachedCodes).toContain("SPEEDING_OVER_LIMIT");
+  });
+
+  it("THE SENTENCE THE FRAME CARRIED IS GONE, and the debrief names the fault instead", () => {
+    // «чисто каране без нито едно нарушение — задръж това ниво» is the exact
+    // string the audit's machine summary printed over this drive.
+    expect(out.debriefText).not.toContain("чисто каране без нито едно нарушение");
+    // What it says instead: the sheet is clean, the DRIVING was not, and the
+    // fault is listed with its corrective (THEO-4 — never a bare verdict).
+    expect(out.debriefText).toContain("чистият лист не значи чисто каране");
+    expect(out.debriefText).toContain("Учебни моменти");
+    expect(out.debriefText).toContain("Превишена скорост");
+  });
+
+  it("…and the false-refusal direction: a clean drive is still praised, invitation and all", () => {
+    // The pair. A channel that silenced the praise for everybody would be the
+    // same defect wearing the other sign.
+    const clean = drive(SC_SIGNAL_FLASHING, carefulScript([[LANE, 0], [LANE, 30], [LANE, 48]]));
+    expect(clean.sessionCodes).toEqual([]);
+    // NOTHING was shown-and-not-charged, so no disclosure is owed…
+    expect(clean.coachedCodes).toEqual([]);
+    // …and the drive is praised on its own merits (this one earns the yield
+    // commendation, which is why the fallback «чисто каране» line is not the
+    // string to look for — the block is).
+    expect(clean.debriefText).toContain("Какво се получи добре:");
+    expect(clean.debriefText).not.toContain("чистият лист не значи чисто каране");
   });
 });

@@ -1599,7 +1599,18 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // the ~1.25 m body allowance (runtime VULNERABLE_PASS_* constants).
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
-    titleBg: "Изпреварване на велосипедист без странична дистанция",
+    // SHORTENED 2026-09-04 (sc-merge-from-property:6715b581 — the same peek
+    // budget that shortened FAILED_TO_YIELD above) from «Изпреварване на
+    // велосипедист без странична дистанция», 52 characters. That was the LAST
+    // row in the catalogue that still wraps to THREE title lines on the phone
+    // peek, i.e. 41.25 px of a 44 px window, which leaves the authored WHY zero
+    // lines — the defect that row was filed for, one offence over.
+    // `violation-title-fits-peek.test.ts` carries the arithmetic and now gates
+    // it. The head is doc 72 VU-02's own name for the act („Тясно изпреварване
+    // на колело"), not an invention, and «странична дистанция» is not lost: it
+    // is the explanation's first sentence, which is the line that now reaches
+    // the glass in its place.
+    titleBg: "Тясно изпреварване на велосипедист",
     explanationBg:
       "Мина покрай велосипедиста почти без странично разстояние. Законът изисква ДОСТАТЪЧНА странична дистанция — учи се около 1,5 метра въздух: велосипедистът няма ламарина около себе си и може всеки миг да се отклони заради дупка, шахта или порив на вятъра. На половин метър всяко негово клатушкане е сблъсък.",
     correctiveBg:

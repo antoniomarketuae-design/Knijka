@@ -53,8 +53,14 @@
  * =============================================================================
  */
 
+import nodeFs from "node:fs";
+import nodePath from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import type { PriorityFromRightSpec } from "../../contracts";
+import type { PriorityFromRightSpec, StagedEventSpec } from "../../contracts";
+import { SC_JUNCTION_SCAN } from "../../lessons/scenario/templates-junctions";
+import { recordScriptedDrive, type RecordedDrive } from "../../traces/recorder";
+import { recordScJunctionScanDrive } from "../../traces/scJunctionScan";
 import { lessonById } from "../../lessons/specs";
 import {
   commendationCodes,
@@ -162,5 +168,114 @@ describe("the yield commendation requires the wait it names", () => {
       true,
     );
     expect(commendationCodes(stack.ruleEvents)).not.toContain("YIELDED_TO_PRIORITY");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// …AND THE WAIT HAS TO BE MADE SHORT OF THE LINE — the same row, re-measured
+// on the w25 re-drive at tree bf4a516 (2026-09-04).
+// ---------------------------------------------------------------------------
+
+/**
+ * THE ROW SURVIVED ITS OWN REPAIR ON THE OTHER PLATFORM LEG, and the two logs
+ * say so side by side. `.audit-frames/w25/frames/sc-junction-scan__mobile-wrong/
+ * run.log:472` — the leg the finding was filed on — now reads «COMMENDATIONS
+ * (0)»; `…__pc-wrong/run.log:390` still reads «★ ✓ Правилно отстъпено
+ * предимство 0:40», on a drive the SAME sheet convicts of «Неспиране на знак Б2
+ * „Спри!“» and «Непълно оглеждане при знак Б2» (`:MISTAKES`). Those two are the
+ * product's own voice, not the harness ledger: it says he crossed the paint
+ * without stopping and without looking, and then commends his giving way.
+ *
+ * Replayed here through the production stack on the drill's own district — the
+ * fault set below is the w25 PC leg's, code for code. The wait he banked was
+ * spent standing 8 m PAST the node, after cutting in front of the car he is
+ * being praised for. `playerLineDist` is `Math.max(0, d − lineDistM)` and
+ * cannot tell that pose from a stop at the paint; the pose test now also asks
+ * whether he is at/short of the line and pointed at the junction.
+ *
+ * The positive control is in the same block on purpose: the drill's own
+ * committed shadow — a full stop 1.8 m short of the line and a real wait — must
+ * still collect the card, or this gate would be passing by muting the channel.
+ */
+describe("the yield commendation requires a wait made short of the line", () => {
+  const REPO_ROOT = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), "../../../../../..");
+  const scanDistrict = JSON.parse(
+    nodeFs.readFileSync(nodePath.join(REPO_ROOT, "content", "world", "tj-scan-v1.json"), "utf-8"),
+  ) as unknown;
+  const LANE = 4.0625; // tj-scan-v1's drawn right-lane centre
+  const scanStaged = [...(SC_JUNCTION_SCAN.staged ?? [])] as StagedEventSpec[];
+
+  const codesOf = (d: RecordedDrive, kind: "violation" | "commendation") =>
+    d.ruleEvents.filter((e) => e.kind === kind).map((e) => e.code);
+
+  it("barging over the Б2 line and resting PAST the node earns no card", () => {
+    const drive = recordScriptedDrive(
+      scanDistrict,
+      {
+        steps: [
+          // 57 км/ч from the spawn, straight over the paint at y = −27.725 and
+          // on across the priority road — no stop, no glance — then pinned on
+          // the far kerb while the car he cut in front of crosses behind him.
+          { kind: "drive", points: [[LANE, -95], [LANE, 8]], targetKmh: 57 },
+          { kind: "pause", sec: 14, brake: true },
+          { kind: "collision", withWhat: "staticObject" },
+          { kind: "pause", sec: 8, brake: true },
+        ],
+      },
+      {
+        scenarioId: "sc-junction-scan",
+        kind: "mistake",
+        seed: 7,
+        stagedEvents: scanStaged,
+        ruleConfig: { junctionScanObservationEnabled: true },
+      },
+    );
+    // The w25 PC leg's own fault set — the fixture is the finding, not a shape
+    // invented to fail.
+    const violations = codesOf(drive, "violation");
+    expect(violations).toContain("SPEEDING_DANGEROUS");
+    expect(violations).toContain("STOP_SIGN_NO_FULL_STOP");
+    expect(violations).toContain("JUNCTION_SCAN_INCOMPLETE");
+    expect(violations).toContain("COLLISION");
+    expect(codesOf(drive, "commendation")).not.toContain("YIELDED_TO_PRIORITY");
+    // SCOPE: the OUTCOME is deliberately untouched — `sawYield` still labels it,
+    // so every committed trace's `detail` stays byte-identical (the file header).
+    expect(drive.outcomes.map((o) => o.detail)).toEqual(["yielded"]);
+  });
+
+  it("resting on the EXIT arm after the turn earns no card either", () => {
+    // The same falsehood without the crash: the turn is completed, he stops
+    // 20 m east of the node, and the priority car goes by behind him.
+    const arc: Array<[number, number]> = [];
+    for (let k = 1; k <= 8; k++) {
+      const a = ((180 - (90 * k) / 8) * Math.PI) / 180;
+      arc.push([24.0625 + 20 * Math.cos(a), -24.0625 + 20 * Math.sin(a)]);
+    }
+    const drive = recordScriptedDrive(
+      scanDistrict,
+      {
+        steps: [
+          { kind: "drive", points: [[LANE, -95], [LANE, -24.06], ...arc, [20, -LANE]], targetKmh: 57 },
+          { kind: "pause", sec: 14, brake: true },
+          { kind: "drive", points: [[20, -LANE], [58, -LANE]], targetKmh: 25 },
+          { kind: "pause", sec: 3, brake: true },
+        ],
+      },
+      {
+        scenarioId: "sc-junction-scan",
+        kind: "mistake",
+        seed: 7,
+        stagedEvents: scanStaged,
+        ruleConfig: { junctionScanObservationEnabled: true },
+      },
+    );
+    expect(codesOf(drive, "violation")).toContain("STOP_SIGN_NO_FULL_STOP");
+    expect(codesOf(drive, "commendation")).not.toContain("YIELDED_TO_PRIORITY");
+  });
+
+  it("the drill's own shadow — stopped short of the line — still earns it", () => {
+    const shadow = recordScJunctionScanDrive(scanDistrict, "shadow-correct");
+    expect(codesOf(shadow, "violation")).toEqual([]);
+    expect(codesOf(shadow, "commendation")).toContain("YIELDED_TO_PRIORITY");
   });
 });

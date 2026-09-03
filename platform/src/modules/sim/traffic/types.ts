@@ -55,6 +55,13 @@ export interface DistrictEdge {
   /** Curbside parking-band opt-in, mirrored from world/types (the curb pass
    *  reads it through `parkingOptedOut`). */
   parkingBand?: boolean;
+  /**
+   * АВТОМАГИСТРАЛА, mirrored from world/types — the typed flag the world pass
+   * grades on (`world/builders/constants.isMotorwayCarriageway`), NOT the class
+   * name: mw-exit-v1's carriageways are `class: "primary"` with this true. It
+   * was absent here, so `footwaylessEdgeIds` could not ask it.
+   */
+  motorway?: boolean;
 }
 
 export interface DistrictIntersection {

@@ -58,7 +58,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DRIVE_SUMMARY_RE, INPUT_ATTESTATION, INPUT_GUARDS, parseSummary } from "../lib/summary.mjs";
+import { DRIVE_SUMMARY_RE, INPUT_ATTESTATION, INPUT_GUARDS, TOUCH_PROBE, parseSummary } from "../lib/summary.mjs";
+import { readbackVerdict, touchProbeLine } from "../lib/touch-probe.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOOLS_MOBILE = path.resolve(HERE, "..");
@@ -377,30 +378,75 @@ describe("§6 the drive states which channel drove it", () => {
       assert.ok(EMITTER.includes("touch overlay "), "re-point INPUT_ATTESTATION.touchOverlay");
       // …and the sentence a dispatcher acts on, which is the whole repair.
       assert.ok(
-        EMITTER.includes("no finding from "),
+        EMITTER.includes("no finding about how the CAR"),
         "the mobile lane no longer says that no finding may name TouchControls.tsx",
       );
       assert.ok(EMITTER.includes("const inputChannel = {"), "the attestation record is gone");
     });
 
-    it("…and the claim it makes about itself is TRUE: this harness actuates no touch", () => {
-      // `touchEvents: 0` is a statement about this source file. If a future
-      // wave gives the drive a real thumb channel — which it should — the
-      // counter has to be incremented where the touch is sent and this census
-      // updated to match. Failing here is that instruction, not an objection.
-      const forbidden = [
+    it("…and the claim it makes about itself is TRUE: no touch DRIVES the car", () => {
+      // THIS CENSUS CHANGED WHEN THE CAPABILITY LANDED, and the old wording is
+      // kept here because the swap is the point. It used to read „this harness
+      // actuates no touch" and forbade `dispatchTouchEvent` / `touchscreen` /
+      // `tap()` outright, so that `touchEvents: 0` could not outlive its truth.
+      // `lesson-audit.mjs` now actuates the drivetrain pad after the drive
+      // (`lib/touch-probe.mjs`), which is `sc-speed-creep:dff70553`'s own
+      // closure condition — seven verdicts asked for exactly it — so the
+      // forbidden list would now be forbidding the repair.
+      //
+      // WHAT REPLACES IT IS THE CLAIM THAT IS STILL MADE: `channel: "keyboard"`
+      // says a KEY moved the car, and that has to stay checkable. The pedals
+      // and the wheel are asserted to still be `page.keyboard`, and the touch
+      // dispatch is asserted to live in the probe module and NOT in the drive
+      // loop — because the day a thumb drives the car, `channel` is the field
+      // that must change, and a census that only counted dispatches would have
+      // let it stay „keyboard" while a touch pushed the pedal.
+      assert.ok(EMITTER.includes('page.keyboard[on ? "down" : "up"]("KeyW")'), "the throttle is no longer a key");
+      assert.ok(EMITTER.includes('page.keyboard[on ? "down" : "up"]("KeyS")'), "the brake is no longer a key");
+      assert.ok(EMITTER.includes('channel: "keyboard"'), "the drive channel is no longer attested as the keyboard");
+      const driveLoop = EMITTER.slice(0, EMITTER.indexOf("const touchProbe = await probeTouchPads"));
+      assert.ok(driveLoop.length > 0, "the probe call is gone from lesson-audit.mjs");
+      for (const [re, what] of [
         [/dispatchTouchEvent/, "CDP Input.dispatchTouchEvent"],
         [/\.\s*touchscreen\s*\./, "page.touchscreen.*"],
         [/\.\s*tap\s*\(/, "locator.tap()"],
-      ];
-      for (const [re, what] of forbidden) {
+      ]) {
         assert.equal(
-          re.test(EMITTER),
+          re.test(driveLoop),
           false,
-          `lesson-audit.mjs now actuates touch via ${what}, but its INPUT line still reports «0 touch events dispatched». ` +
-            "Count the dispatch into inputChannel.touchEvents and update this census.",
+          `a touch is actuated via ${what} BEFORE the drive ends, but the INPUT line still attests «keyboard». ` +
+            "A touch that moves the car changes the channel; re-attest it and update this census.",
         );
       }
+    });
+
+    it("the probe's count is the one the INPUT line prints — not a second, hopeful number", () => {
+      // The dead-predicate shape, in the attestation: a probe that dispatches
+      // four events while `inputChannel.touchEvents` stays a literal 0 would
+      // print „0 touch events dispatched" over a lane that had touched the pad.
+      assert.ok(
+        EMITTER.includes("inputChannel.touchEvents = touchProbe.events"),
+        "the INPUT line's touch count no longer comes from the probe that dispatched them",
+      );
+      assert.ok(EMITTER.includes("note(touchProbeLine(touchProbe))"), "the TOUCH PROBE line is no longer printed");
+    });
+
+    it("§6f the probe dispatches a TOUCH pointer and counts every one it sends", () => {
+      const PROBE = readFileSync(path.join(TOOLS_MOBILE, "lib", "touch-probe.mjs"), "utf8");
+      assert.ok(PROBE.includes('pointerType: "touch"'), "the probe no longer claims to be a finger");
+      assert.ok(PROBE.includes("new PointerEvent("), "the probe no longer dispatches a pointer event");
+      // Every dispatch raises the counter, because they share one function.
+      const sends = [...PROBE.matchAll(/^\s*send\("(pointer\w+)"/gm)].map((m) => m[1]);
+      for (const edge of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) {
+        assert.ok(sends.includes(edge), `the probe never sends ${edge} — the pad's release edges need all four`);
+      }
+      assert.ok(PROBE.includes("events += 1;"), "the probe dispatches without counting");
+      // Dead centre is the safety argument; a probe that pressed off-centre
+      // would command the car AFTER the drive and before the verdict is read.
+      assert.ok(
+        PROBE.includes("box.left + box.width / 2") && PROBE.includes("box.top + box.height / 2"),
+        "the probe no longer presses the pad's dead centre, so it can now command the car",
+      );
     });
 
     it("the counter is incremented where the keys are actually sent", () => {
@@ -427,6 +473,17 @@ describe("§6 the drive states which channel drove it", () => {
       assert.ok(WAVE_C.includes("s.touchEvents"), "the console line no longer prints the touch count");
       assert.ok(WAVE_C.includes("touchEvents"), "wave-c.mjs no longer documents the column");
     });
+
+    it("…and so does the pad verdict, which is what routes a touch finding", () => {
+      // The whole point of the row: a dispatcher must be able to see, without
+      // opening an 84 KB log, whether the surface a finding names was reached.
+      const keys = Object.keys(parseSummary(WITH_PROBE));
+      for (const k of ["touchProbe", "touchProbeEvents", "touchProbeHold", "touchProbeRelease"]) {
+        assert.ok(keys.includes(k), `parseSummary no longer returns ${k}`);
+      }
+      assert.ok(WAVE_C.includes("s.touchProbe"), "the console line no longer prints whether the pad was reached");
+      assert.ok(WAVE_C.includes("unreached"), "the scroll no longer names the state that forbids a touch address");
+    });
   });
 
   it("the reader's regexes are exported so a judge can re-scan a transcript raw", () => {
@@ -434,5 +491,147 @@ describe("§6 the drive states which channel drove it", () => {
     // trusting the parser it is checking.
     assert.equal(INPUT_ATTESTATION.touchEvents.exec(WITH_INPUT)[1], "0");
     assert.equal(INPUT_ATTESTATION.channel.exec(WITH_INPUT)[1], "keyboard");
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §7 — THE PAD WAS ACTUALLY PRESSED (`sc-speed-creep:dff70553`, the other half)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * §6 made the lane STATE that it sent no touch. That is what w24 and w25 both
+ * credited and both refused to close on, in the same words: „the harness gap
+ * itself (0 touch events) is exactly as the row describes it". So the pad is
+ * now pressed, and this block defends the two things a press is worth nothing
+ * without — that the result reaches the ledger, and that „it answered" is a
+ * MEASUREMENT and not a default.
+ *
+ * The judge (`readbackVerdict`) is separated from the browser on purpose: the
+ * in-page half needs WebKit and a running sim, and everything that DECIDES
+ * what the readback meant runs here, on the same fixtures a reader can check
+ * by eye. */
+
+/** The emitter's own template, both branches. */
+const WITH_PROBE =
+  "  INPUT: keyboard · 214 pedal/steer key events · 4 touch events dispatched · touch overlay mounted\n" +
+  "  TOUCH PROBE: actuated · 4 touch events dispatched · hold survived · release clean — pressed dead centre";
+const PROBE_DROPPED =
+  "  TOUCH PROBE: actuated · 4 touch events dispatched · hold did NOT survive · release NOT observed — let go";
+const PROBE_UNREACHED =
+  "  TOUCH PROBE: NOT actuated · 0 touch events dispatched · hold did NOT survive · release NOT observed — no overlay";
+
+describe("§7 what the drivetrain pad did when it was pressed", () => {
+  it("lifts all four fields off the emitter's line", () => {
+    const s = parseSummary(WITH_PROBE);
+    assert.equal(s.touchProbe, "actuated");
+    assert.equal(s.touchProbeEvents, 4);
+    assert.equal(s.touchProbeHold, "survived");
+    assert.equal(s.touchProbeRelease, "clean");
+  });
+
+  it("…and the drop and the unreached branches, which are the two that matter", () => {
+    const dropped = parseSummary(PROBE_DROPPED);
+    assert.equal(dropped.touchProbe, "actuated");
+    assert.equal(dropped.touchProbeHold, "did NOT survive");
+    const unreached = parseSummary(PROBE_UNREACHED);
+    assert.equal(unreached.touchProbe, "NOT actuated");
+    assert.equal(unreached.touchProbeEvents, 0);
+  });
+
+  it("a transcript with no TOUCH PROBE line measured NOTHING — null, never «NOT actuated»", () => {
+    // The §2/§6b argument again: a lane that died before the probe ran did not
+    // establish that the pad is unreachable, and reporting that it did would
+    // send the next dispatcher to re-address five rows off a crash.
+    const s = parseSummary(BOTH_CLAUSES);
+    assert.equal(s.touchProbe, null);
+    assert.equal(s.touchProbeEvents, null);
+    assert.equal(s.touchProbeHold, null);
+    assert.equal(s.touchProbeRelease, null);
+  });
+
+  it("THE TWO «touch events dispatched» CLAUSES DO NOT READ EACH OTHER", () => {
+    // The regression this file exists to prevent, in its newest shape: two
+    // lines now carry that wording, and an unanchored regex would return
+    // whichever the emitter printed first. A drive with 0 touch on the INPUT
+    // line and 4 on the probe line must report exactly that pair.
+    const mixed =
+      "  INPUT: keyboard · 12 pedal/steer key events · 0 touch events dispatched · touch overlay absent\n" +
+      "  TOUCH PROBE: NOT actuated · 4 touch events dispatched · hold did NOT survive · release NOT observed — x";
+    const s = parseSummary(mixed);
+    assert.equal(s.touchEvents, 0);
+    assert.equal(s.touchProbeEvents, 4);
+  });
+
+  describe("§7b the judge, with no browser in it", () => {
+    const seatedKnob = { transition: "none", transform: "translateY(0.0px)", valueNow: "0" };
+    const restKnob = { transition: "", transform: "", valueNow: "0" };
+    const releasedKnob = { transition: "transform 140ms ease-out, border-color 140ms linear", transform: "translateY(0px)" };
+
+    it("reads a clean press as actuated, held and released", () => {
+      const v = readbackVerdict({
+        ok: true,
+        events: 4,
+        atRest: restKnob,
+        onPress: seatedKnob,
+        afterHold: seatedKnob,
+        onRelease: releasedKnob,
+      });
+      assert.deepEqual([v.actuated, v.held, v.released, v.events], [true, true, true, 4]);
+    });
+
+    it("a pad that let go mid-hold is ACTUATED and NOT held — the brake-drop shape itself", () => {
+      const v = readbackVerdict({
+        ok: true,
+        events: 4,
+        atRest: restKnob,
+        onPress: seatedKnob,
+        afterHold: restKnob,
+        onRelease: releasedKnob,
+      });
+      assert.equal(v.actuated, true);
+      assert.equal(v.held, false);
+      assert.match(v.why, /brake-drop shape/);
+    });
+
+    it("a pad that never seated its knob is NOT actuated, whatever was dispatched", () => {
+      // The reassuring direction, refused: four events left the harness and
+      // the component did not answer, which is not the same as a live pad.
+      const v = readbackVerdict({
+        ok: true,
+        events: 4,
+        atRest: restKnob,
+        onPress: restKnob,
+        afterHold: restKnob,
+        onRelease: restKnob,
+      });
+      assert.equal(v.actuated, false);
+      assert.equal(v.held, false);
+    });
+
+    it("a refusal keeps its sentence, and never becomes a verdict about the product", () => {
+      const v = readbackVerdict({ ok: false, why: "the touch overlay is not on the page", events: 0 });
+      assert.equal(v.actuated, false);
+      assert.equal(v.why, "the touch overlay is not on the page");
+      assert.equal(readbackVerdict(null).actuated, false);
+      assert.equal(readbackVerdict(undefined).events, 0);
+    });
+  });
+
+  it("§7c the emitter and the reader are ONE PAIR — the line is built, then parsed", () => {
+    // §3's argument for the newest clause: nothing but this makes
+    // `touchProbeLine` and `TOUCH_PROBE` agree, and a reworded clause would
+    // turn every future lane's pad column into a silent null.
+    for (const raw of [
+      { ok: true, events: 4, onPress: { transition: "none", transform: "translateY(0.0px)" }, afterHold: { transition: "none", transform: "translateY(0.0px)" }, onRelease: { transition: "transform 140ms ease-out" } },
+      { ok: true, events: 4, onPress: { transition: "", transform: "" }, afterHold: { transition: "", transform: "" }, onRelease: { transition: "" } },
+      { ok: false, why: "the touch overlay is not on the page", events: 0 },
+    ]) {
+      const v = readbackVerdict(raw);
+      const s = parseSummary(touchProbeLine(v));
+      assert.equal(s.touchProbe, v.actuated ? "actuated" : "NOT actuated");
+      assert.equal(s.touchProbeEvents, v.events);
+      assert.equal(s.touchProbeHold, v.held ? "survived" : "did NOT survive");
+      assert.equal(s.touchProbeRelease, v.released ? "clean" : "NOT observed");
+    }
+    assert.equal(TOUCH_PROBE.actuated.exec(WITH_PROBE)[1], "actuated");
   });
 });

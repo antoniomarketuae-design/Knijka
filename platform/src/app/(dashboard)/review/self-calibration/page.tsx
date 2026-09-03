@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/modules/auth";
 import {
+  CALIBRATION_BEYOND_SCALE_TITLE_BG,
   CALIBRATION_MIN_SAMPLES,
   CALIBRATION_TREND_BG,
   CALIBRATION_VERDICT_TITLE_BG,
+  MAX_PREDICTED_POINTS,
   formatCalibrationError,
   summarizeCalibration,
   type CalibrationPoint,
@@ -131,6 +133,21 @@ function SummaryCard({ summary }: { summary: CalibrationSummary }) {
         )}
       </p>
 
+      {/* THE EXCLUSION SAYS ITSELF. `summarizeCalibration` keeps drives whose
+          protocol went past the gate's ceiling out of the two means and the
+          trend, and a silent exclusion is the same crime as a false verdict:
+          the tiles would be computed over fewer records than the counter above
+          them prints, with nothing on screen to say why. */}
+      {summary.beyondScaleCount > 0 ? (
+        <p className="text-xs leading-relaxed text-muted">
+          {summary.beyondScaleCount === 1 ? "Едно каране е" : `${summary.beyondScaleCount} карания са`}{" "}
+          извън скалата на въпроса — протоколът им мина над {MAX_PREDICTED_POINTS}{" "}
+          наказателни точки, а полето приема най-много толкова, така че разликата там
+          е таван, не преценка. Стоят в списъка, но не влизат в средните стойности
+          и в тенденцията.
+        </p>
+      ) : null}
+
       <p className="text-xs leading-relaxed text-muted">
         Не позна ли се?{" "}
         <Link href="/review/my-drive" className="font-semibold text-accent">
@@ -160,7 +177,16 @@ function TrendChart({ points }: { points: CalibrationPoint[] }) {
   const W = 640;
   const H = 180;
   const PAD = 18;
-  const maxAbs = Math.max(1, ...points.map((p) => Math.abs(p.error)));
+  // ── SCALED ON THE DRIVES THE CHART IS ABOUT ───────────────────────────────
+  // A beyond-scale drive's `error` is the distance from the form's ceiling to
+  // the protocol, not a judgement (`calibration.ts:isBeyondPredictableScale`),
+  // and one of them at −364 flattens every honest bar in the series to a
+  // hairline. Those drives keep their bar — they happened — but they are drawn
+  // at full height in the muted tone and take no part in the scale.
+  const maxAbs = Math.max(
+    1,
+    ...points.filter((p) => !p.beyondScale).map((p) => Math.abs(p.error)),
+  );
   const midY = H / 2;
   const usable = midY - PAD;
   const slot = (W - 2 * PAD) / Math.max(points.length, 1);
@@ -187,7 +213,9 @@ function TrendChart({ points }: { points: CalibrationPoint[] }) {
           />
           {points.map((p, i) => {
             const cx = PAD + slot * (i + 0.5);
-            const h = (Math.abs(p.error) / maxAbs) * usable;
+            const h = p.beyondScale
+              ? usable
+              : Math.min((Math.abs(p.error) / maxAbs) * usable, usable);
             const optimistic = p.error < 0;
             return (
               <rect
@@ -198,11 +226,15 @@ function TrendChart({ points }: { points: CalibrationPoint[] }) {
                 height={Math.max(h, 1)}
                 rx={2}
                 fill={
-                  p.verdict === "accurate"
-                    ? "var(--success)"
-                    : optimistic
-                      ? "var(--danger)"
-                      : "var(--warning)"
+                  // Muted, not red: the student was not flattering himself, the
+                  // question was smaller than the protocol.
+                  p.beyondScale
+                    ? "var(--border-strong)"
+                    : p.verdict === "accurate"
+                      ? "var(--success)"
+                      : optimistic
+                        ? "var(--danger)"
+                        : "var(--warning)"
                 }
               />
             );
@@ -242,8 +274,15 @@ function HistoryTable({ points }: { points: CalibrationPoint[] }) {
                   <span className="ml-2 font-normal text-xs text-muted">
                     {DAY_FORMAT.format(p.recordedAt)}
                   </span>
+                  {/* The verdict wording is withheld on a drive whose protocol
+                      went past what the gate would let the student type — the
+                      same branch the gate itself takes, from the same module,
+                      so the two screens cannot say different things about one
+                      record. */}
                   <span className="block text-xs font-normal text-muted">
-                    {CALIBRATION_VERDICT_TITLE_BG[p.verdict]}
+                    {p.beyondScale
+                      ? CALIBRATION_BEYOND_SCALE_TITLE_BG
+                      : CALIBRATION_VERDICT_TITLE_BG[p.verdict]}
                     {p.verdictAgreed ? "" : " · сгреши и присъдата"}
                   </span>
                 </th>

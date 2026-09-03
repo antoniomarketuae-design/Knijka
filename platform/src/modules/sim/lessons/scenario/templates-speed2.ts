@@ -508,11 +508,16 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
  *     graced limit the conditions episode stands down BY BAND — speed > graced
  *     clears its accumulator — so it never double-bills).
  * Both detectors read only tick.maxSpeedKmh + tick.rain, so NO ruleConfig — the
- * LIVE student session grades the same two faults. Success gates are POSITION-
- * only (no maxSpeedKmh cap) on purpose: a speed cap is template-wide, so it
- * would fail a LAWFUL dry 50 drive on L1–L2 and break the very contrast the
- * template teaches; the wet ceiling is carried by the conditions detector
- * (teach-first coaching), not by an objective gate.
+ * LIVE student session grades the same two faults. NO `maxSpeedKmh` CAP on
+ * either gate, and that stays deliberate: a cap is one template-wide number, so
+ * it would fail a LAWFUL dry 50 drive on L1–L2 and break the very contrast the
+ * template teaches. What the finish gate carries instead is `requireSpeedClean`
+ * (d9fd3821) — not a number of its own but a read of the convictions the rule
+ * engine has already billed, which is rung-aware for free: on a dry rung only
+ * the sign's 50 can be exceeded, in the rain the conditions envelope can be too.
+ * The wet ceiling is still TAUGHT by the conditions detector (teach-first
+ * coaching); the gate only stops the banner certifying it was held when it was
+ * not.
  */
 export const SC_SP_WET_LIMIT_PLATE: ScenarioSpec = {
   id: "sc-sp-wet-limit-plate",
@@ -591,7 +596,20 @@ export const SC_SP_WET_LIMIT_PLATE: ScenarioSpec = {
       // ceiling nobody was ever under. It says the same thing the steps say
       // now: hold whatever ceiling the SURFACE gave you.
       titleBg: "Стигни края на отсечката, задържал тавана от настилката",
-      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+      // `sc-sp-wet-limit-plate:d9fd3821`, critical. The banner is a claim about
+      // the ОТСЕЧКА («задържал», and instruction 6 says it in full); the gate
+      // was a disc. The title-derived `requireLawfulSpeed` that landed in b211041
+      // answers «законен ли си ТУК» and cannot answer «задържа ли го дотук» — a
+      // speed is read at the tick's own position, never over a segment. Measured
+      // on this lesson's OWN committed demos at L3: `mistake-over-limit-in-wet`
+      // holds 56,9 км/ч for ~230 m, brakes to rest ON the disc and collected the
+      // certificate above its own «✗ Превишена скорост»; `mistake-dry-speed-in
+      // -wet` collected it at 49,9 км/ч in the rain above «✗ Несъобразена с
+      // условията скорост» — the exact mistake the plate exists to teach.
+      // `requireSpeedClean` is the stretch-shaped half: it reads the convictions
+      // the sheet has ALREADY billed (or coached) inside this gate's own window,
+      // so it can never disagree with the protocol the student is reading.
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12, requireSpeedClean: true },
     },
   ],
   rubric: { parTimeSec: 72 },

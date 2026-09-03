@@ -117,6 +117,7 @@ export { DEFAULT_TRAFFIC_CONFIG } from "./types";
 // the crossing-anchoring measurement behind it are in `pedestrians.ts`.
 export {
   ambientSidewalkBudget,
+  footwaylessEdgeIds,
   SIDEWALK_BUDGET_MAX,
   SIDEWALK_METRES_PER_WALKER,
   SIDEWALK_MIN_EDGE_M,

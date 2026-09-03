@@ -26,11 +26,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { obbSeparationM } from "../../collision";
+import { compileScenario } from "../../lessons/scenario/compile";
+import { SC_PARK_WALL } from "../../lessons/scenario/templates-parking3";
+import { parkDepthObstacles } from "../../traces/scParkDepth";
+import { CHASSIS_HALF_EXTENTS } from "../../vehicle/tuning";
 import {
   LANE_ALIGN_MAX_M,
   LANE_ALIGN_RAMP_M,
   buildRouteGraph,
   deriveGuidanceRoute,
+  guidanceGoalFor,
   snapToRoad,
   type DerivedRoute,
   type RouteDistrictLike,
@@ -189,6 +195,92 @@ describe("§4 BOUND — an off-road target is not a lane", () => {
     for (let i = 0; i < route.count; i++) {
       expect(Math.abs(route.pts[i * 2]), `sample ${i}`).toBeLessThan(0.05);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §4b — the same bound, on the ten drills §4 was written FOR.
+//
+// §4 above states the rule in the vocabulary of a distance and then tests it at
+// LANE_ALIGN_MAX_M + 5 = 21.25 m. No parking bay this product ships is anywhere
+// near that: the perpendicular rows sit 4.80–5.03 m off their aisle centreline
+// and the parallel ones 6.28 m, so every one of them passed the distance test
+// as „a lane" and had the ribbon slid onto it. On sc-park-wall that ribbon ran
+// from the halt mark straight through the garage end wall.
+//
+// This section is the same claim as §4, made against the product's own bays and
+// the product's own collision geometry. It is the case the distance form of the
+// bound could not express.
+// ---------------------------------------------------------------------------
+
+describe("§4b BOUND — a parking bay is off-road BY KIND, not by distance (sc-park-wall:2bf89308)", () => {
+  const lesson = compileScenario(SC_PARK_WALL, 3);
+  const wallDistrict = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, "../../../../../public/world/lot-wall-v1.json"), "utf8"),
+  );
+  /** Where the drill's own reference drive is standing when „Задача 2" goes
+   *  live: the last forward sample of `shadow-correct.trace.json`. */
+  const HALT = { x: 0.9, y: 11.66, headingDeg: 0 };
+  const bayGoal = guidanceGoalFor(lesson, 1, { stopLines: [], from: HALT })!;
+
+  it("PREMISE — the bay is well inside the distance bound, so §4 can never fire on it", () => {
+    expect(bayGoal.kind).toBe("point");
+    if (bayGoal.kind !== "point") return;
+    // lot-wall-v1's row is at x = 5.03; the aisle centreline is x = 0.
+    expect(Math.abs(bayGoal.x)).toBeLessThan(LANE_ALIGN_MAX_M);
+    expect(bayGoal.offRoad).toBe(true);
+  });
+
+  it("the «Паркирай тук» ribbon clears every body the drill arms", () => {
+    const graph = buildRouteGraph(wallDistrict as RouteDistrictLike);
+    const route = deriveGuidanceRoute(graph, HALT, bayGoal)!;
+    expect(route).not.toBeNull();
+    const obstacles = parkDepthObstacles(wallDistrict, "sc-park-wall");
+    let worst = Infinity;
+    let where = "";
+    for (let i = 0; i < route.count; i++) {
+      const x = route.pts[i * 2];
+      const y = route.pts[i * 2 + 1];
+      const px = i > 0 ? route.pts[(i - 1) * 2] : x;
+      const py = i > 0 ? route.pts[(i - 1) * 2 + 1] : y;
+      const headingDeg = (Math.atan2(x - px, y - py) * 180) / Math.PI;
+      for (const o of obstacles) {
+        const sep = obbSeparationM(
+          {
+            x,
+            y,
+            headingDeg,
+            halfWidthM: CHASSIS_HALF_EXTENTS.x,
+            halfLengthM: CHASSIS_HALF_EXTENTS.z,
+          },
+          {
+            x: o.x,
+            y: o.y,
+            headingDeg: o.headingDeg,
+            halfWidthM: o.halfWidthM,
+            halfLengthM: o.halfLengthM,
+          },
+        );
+        if (sep < worst) {
+          worst = sep;
+          where = `(${x.toFixed(2)}, ${y.toFixed(2)}) vs ${String(o.withWhat)}`;
+        }
+      }
+    }
+    // Was −1.346 m at (2.27, 9.61) — 1.35 m INSIDE the garage end wall, which
+    // grades `staticObject` and bills «Пътнотранспортно произшествие · ОПАСНА
+    // ГРЕШКА · −10 изпитни т.» on the leg the student is told to imitate.
+    expect(worst, `the ribbon is inside a body at ${where}`).toBeGreaterThan(0);
+  });
+
+  it("and nothing about WHERE to park is lost — the marker still stands on the bay", () => {
+    // The bound's whole premise: the ribbon stays on the tarmac BECAUSE the
+    // marker shows the off-road target. If that stopped being true, refusing
+    // the alignment would take the destination away instead of the lie.
+    if (bayGoal.kind !== "point") throw new Error("bay goal is not a point");
+    expect(bayGoal.marker).toBe(true);
+    expect(bayGoal.labelBg).toBe("Паркирай тук");
+    expect([bayGoal.x, bayGoal.y]).toEqual([lesson.parkingBay!.x, lesson.parkingBay!.y]);
   });
 });
 

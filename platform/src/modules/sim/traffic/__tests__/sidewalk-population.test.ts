@@ -43,8 +43,10 @@ import { describe, expect, it } from "vitest";
 import {
   ambientSidewalkBudget,
   buildPedSidewalkRoute,
+  footwaylessEdgeIds,
   pedCarriagewayHalfM,
   SIDEWALK_BUDGET_MAX,
+  SIDEWALK_MIN_EDGE_M,
 } from "../pedestrians";
 import { mulberry32 } from "../rng";
 import { createTrafficSystem } from "../system";
@@ -98,7 +100,7 @@ describe("the empty pavement — why raising pedestrianCount could not have work
 describe("ambientSidewalkBudget", () => {
   it("gives every one of the four filed maps somebody to put on the pavement", () => {
     for (const id of NO_CROSSING_MAPS) {
-      const n = ambientSidewalkBudget(district(id), FOOTWAYLESS);
+      const n = ambientSidewalkBudget(district(id), FOOTWAYLESS, LANE_W);
       expect(n, id).toBeGreaterThan(0);
       expect(n, id).toBeLessThanOrEqual(SIDEWALK_BUDGET_MAX);
     }
@@ -107,7 +109,55 @@ describe("ambientSidewalkBudget", () => {
   it("puts NOBODY on a motorway — mw-v1 is `motorway` end to end", () => {
     const mw = district("mw-v1");
     expect(mw.roads.edges.every((e) => e.class === "motorway")).toBe(true);
-    expect(ambientSidewalkBudget(mw, FOOTWAYLESS)).toBe(0);
+    expect(ambientSidewalkBudget(mw, FOOTWAYLESS, LANE_W)).toBe(0);
+  });
+
+  // …AND THE TWO MAPS THAT PROVE mw-v1 WAS THE EASY CASE — the class list is a
+  // NAME, and neither of the other two motorway districts says the name where it
+  // counts. MEASURED on the committed bank before the fix:
+  //
+  //   mw-entry-v1  carriageways `class: "motorway"`, so the only walkable edge
+  //                left was `mwe-e-ramp` — a 143.6 m `secondary_link` — and the
+  //                budget put 2 people on the verge of the on-ramp the student
+  //                spawns 20 m up (sc-merge-accel-lane:09e6d6f4's arrival frame,
+  //                .audit-frames/w25/frames/sc-merge-accel-lane__mobile-right/).
+  //   mw-exit-v1   carriageways `class: "primary"` with `motorway: true`, which
+  //                a class list cannot see at all: all five edges walkable,
+  //                2 696 m of them, budget 12 — a dozen pedestrians on a road
+  //                the same frame posts at «140».
+  //
+  // ЗДвП чл. 55, ал. 1: on a road signed автомагистрала „движението на пешеходци
+  // … е забранено" (content/law/acts/zdvp.json — ADR-002).
+  it("…and on the two motorway maps the class NAME misses: the tag, and the ramp", () => {
+    const entry = district("mw-entry-v1");
+    // Non-vacuity: the ramp really is a walkable class and really is long
+    // enough, so a 0 here is the predicate and not an accident of the map.
+    const ramp = entry.roads.edges.find((e) => e.id === "mwe-e-ramp");
+    expect(ramp).toBeDefined();
+    expect(FOOTWAYLESS).not.toContain(ramp!.class);
+    expect(ramp!.length).toBeGreaterThan(SIDEWALK_MIN_EDGE_M);
+    expect(ambientSidewalkBudget(entry, FOOTWAYLESS, LANE_W)).toBe(0);
+
+    const exit = district("mw-exit-v1");
+    const tagged = exit.roads.edges.filter((e) => e.motorway === true);
+    expect(tagged.length).toBeGreaterThan(0);
+    expect(tagged.every((e) => !FOOTWAYLESS.includes(e.class))).toBe(true);
+    expect(ambientSidewalkBudget(exit, FOOTWAYLESS, LANE_W)).toBe(0);
+  });
+
+  it("subtracts motorway ground and NOTHING else on an ordinary street", () => {
+    // None of the four filed maps has a motorway carriageway, so the predicate
+    // must fall through to the class list edge for edge — a repair that empties
+    // a residential pavement would be the four filed rows, back.
+    for (const id of NO_CROSSING_MAPS) {
+      const d = district(id);
+      const banned = [...footwaylessEdgeIds(d.roads.edges, FOOTWAYLESS, LANE_W)].sort();
+      const byClass = d.roads.edges
+        .filter((e) => FOOTWAYLESS.includes(e.class))
+        .map((e) => e.id)
+        .sort();
+      expect(banned, id).toEqual(byClass);
+    }
   });
 });
 
@@ -168,7 +218,7 @@ describe("the system, driven", () => {
     seed: 7,
     vehicleCount: 0,
     pedestrianCount: 0,
-    sidewalkPedestrianCount: ambientSidewalkBudget(d, FOOTWAYLESS),
+    sidewalkPedestrianCount: ambientSidewalkBudget(d, FOOTWAYLESS, LANE_W),
   });
 
   it("populates the four filed maps that were empty in every frame", () => {

@@ -242,6 +242,9 @@ describe("guidanceGoalFor (shipped lessons)", () => {
     // The gate is „centre within centerTolM of the bay centre" — the ring is
     // that half-metre, not a decorative 1.85 m. The bay rect itself is painted
     // into the world (lessonWorldRecipe paintBays), so the two read together.
+    // `offRoad` is new (sc-park-wall:2bf89308): a bay is not a lane, so the
+    // ribbon may not be slid onto it — the marker this test pins is what shows
+    // the destination. See the OFF-ROAD TARGETS bound at `alignRawToGoalLane`.
     const goal = guidanceGoalFor(byId("l7-parking"), 1);
     expect(goal).toEqual({
       kind: "point",
@@ -252,6 +255,7 @@ describe("guidanceGoalFor (shipped lessons)", () => {
       shape: { kind: "zone", radiusM: 0.5 },
       acceptRadiusM: 0.5,
       labelBg: "Паркирай тук",
+      offRoad: true,
     });
   });
 

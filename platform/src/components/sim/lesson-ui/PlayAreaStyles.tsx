@@ -1055,9 +1055,45 @@ ${TOUCH_BAND_CSS_VARS}
         display: flex;
         justify-content: flex-end;
       }
+      /* …AND SIDEWAYS THEY PAY THE THROTTLE BAND'S FLANK LANE, WHICH THIS RULE
+         DID NOT — 2026-09-04, sc-vu-emergency:011b0e98 (major, and filed twice
+         more: sc-maneuver-uturn's own row is the same pixels).
+
+         The rule above gives these two chips the notification column's x and
+         justify-content: flex-end, so the pill's right edge IS
+         NOTIFY_COLUMN_RIGHT_CSS. Sideways that resolves to 12 + a 59 px notch
+         inset = 71 px off the right edge — and the right flank's mirror-glance
+         stations start at ARC_EDGE_PX + the same inset = 67 and run 44 px in,
+         i.e. 67 → 111. The two lanes overlap by 40 px, every frame, on every
+         landscape phone. MEASURED on this row's own frame,
+         w10-2/frames/sc-vu-emergency__mobile-right/04-t105s.png (iPhone 16
+         landscape, 852 × 393 at dpr 3): the "Следвай синята линия" pill's right
+         border lands at 2 342 of 2 556 device px — 71 CSS px off the edge, to
+         the pixel — cutting the «Л» while «линия» composites through
+         «ОГЛЕДАЛО». Neither string is readable, on a lesson (чл. 91) whose
+         instruction 2 is «поглеждай периодично в огледалото».
+
+         THE LANE IS NOT NEW AND NEITHER IS THE ARRANGEMENT. --sim-flank-lane
+         (TouchControls' TOUCH_BAND_CSS_VARS) is 0 upright and 60 px sideways,
+         and the right: +lane / width: −lane pair below is byte-for-byte the
+         one [data-hud="touch-hint"] already ships and hud-off-the-road
+         .test.ts already pins. These two chips were simply never on that list —
+         the same way [data-hud="audio-prompt"] was not on the MIRROR list
+         until 2026-08-24. A variable and not a number, for the reason written
+         at FLANK_LANE_VAR: the column's own declarations are inline styles and
+         only a variable crosses that cascade.
+
+         WHAT IT COSTS: 60 px of an already-narrow pill. At 852 × 393 the chip
+         measures 171 CSS px against the 240 the compact column gives it, so it
+         still lays out on one line inside the 180 that is left; the telltale
+         cue, which is a 48-character sentence, takes one more wrap and keeps
+         every word (> div { max-width: 100% } below already wraps it). A
+         third line of a „pull over now" warning is a cheaper failure than a
+         warning drawn through the control it is warning about. */
       [data-sim-compact="on"] [data-hud="follow-hint"],
       [data-sim-compact="on"] [data-hud="telltale-cue"] {
-        width: ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT};
+        right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_VAR});
+        width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR});
       }
       /* A pill in a 240 px column wraps rather than running off it — the
          hud-card-fit rule, applied to the two elements that never had it. */

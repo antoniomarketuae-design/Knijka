@@ -81,10 +81,46 @@ export const INPUT_GUARDS = {
 export const INPUT_ATTESTATION = {
   /** «  INPUT: keyboard · 214 pedal/steer key events · …» */
   channel: /^\s*INPUT:\s*(\S+)\s*·/m,
-  driveKeyEvents: /·\s*(\d+)\s*pedal\/steer key events/,
-  touchEvents: /·\s*(\d+)\s*touch events dispatched/,
+  // ANCHORED TO THE `INPUT:` LINE, and that is not tidiness. Since
+  // `TOUCH PROBE:` prints its own «N touch events dispatched» clause directly
+  // underneath, a floating `/·\s*(\d+)\s*touch events dispatched/` reads
+  // whichever line the emitter happens to print first — i.e. the ledger's
+  // channel column would silently follow the transcript's ORDER. Each regex
+  // now names the line it belongs to.
+  driveKeyEvents: /^\s*INPUT:[^\n]*·\s*(\d+)\s*pedal\/steer key events/m,
+  touchEvents: /^\s*INPUT:[^\n]*·\s*(\d+)\s*touch events dispatched/m,
   /** «… · touch overlay mounted» — mounted | absent | unreadable */
-  touchOverlay: /·\s*touch overlay\s+(mounted|absent|unreadable)/,
+  touchOverlay: /^\s*INPUT:[^\n]*·\s*touch overlay\s+(mounted|absent|unreadable)/m,
+};
+
+/**
+ * WHAT HAPPENED WHEN THE HARNESS ACTUALLY PRESSED THE PAD — the closing half
+ * of `sc-speed-creep:dff70553`.
+ *
+ * The attestation above could only ever report a NEGATIVE: this lane sent no
+ * touch. Seven verdicts (w11–w14, w23–w25) upheld the row on exactly that,
+ * every one of them saying it „needs a harness change to close", because a
+ * column reading `touchEvents: 0` still leaves `TouchControls.tsx` a surface
+ * no drive in the corpus has ever reached. `lesson-audit.mjs` now actuates the
+ * drivetrain pad once the drive is over (`lib/touch-probe.mjs`), and this is
+ * what carries the result into `wave-c-results.jsonl`.
+ *
+ * FOUR FIELDS, NOT ONE, BECAUSE THEY FAIL SEPARATELY. „the pad answered"
+ * (actuated), „and still owned the finger half a second later" (hold — the
+ * brake-drop question itself), „and let go on the way out" (release), and how
+ * many events it cost. A single boolean would collapse a pad that dropped its
+ * ownership mid-hold into a pad that was never reached, and those are the two
+ * halves of the family this row is about.
+ *
+ * ABSENCE IS NULL. A lane that died before the probe ran states nothing, and
+ * „not actuated" is a measurement, not a default.
+ */
+export const TOUCH_PROBE = {
+  /** «  TOUCH PROBE: actuated · 4 touch events dispatched · hold survived · release clean — …» */
+  actuated: /^\s*TOUCH PROBE:\s*(actuated|NOT actuated)\s*·/m,
+  events: /^\s*TOUCH PROBE:[^\n]*·\s*(\d+)\s*touch events dispatched/m,
+  hold: /^\s*TOUCH PROBE:[^\n]*·\s*hold\s+(survived|did NOT survive)/m,
+  release: /^\s*TOUCH PROBE:[^\n]*·\s*release\s+(clean|NOT observed)/m,
 };
 
 /** Pull the machine summary the harness prints, which is the judgeable surface. */
@@ -125,5 +161,11 @@ export function parseSummary(stdout) {
     driveKeyEvents: num(INPUT_ATTESTATION.driveKeyEvents),
     touchEvents: num(INPUT_ATTESTATION.touchEvents),
     touchOverlay: grab(INPUT_ATTESTATION.touchOverlay),
+    // The pad actuation. Same rule: a lane that printed no TOUCH PROBE line
+    // measured nothing, and null is what that is.
+    touchProbe: grab(TOUCH_PROBE.actuated),
+    touchProbeEvents: num(TOUCH_PROBE.events),
+    touchProbeHold: grab(TOUCH_PROBE.hold),
+    touchProbeRelease: grab(TOUCH_PROBE.release),
   };
 }

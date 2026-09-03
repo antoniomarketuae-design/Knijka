@@ -286,6 +286,19 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         }
         out.requireNoContact = true;
       }
+      // THE CEILING HELD OVER THE WHOLE STRETCH (see `ReachZoneWitnessDemands
+      // .requireSpeedClean` for the two demonstration drives it closes, the
+      // window, and why it is not the ninth demand). AUTHORED ONLY, like the
+      // contact and rest terms and unlike the four title-filled ones: the
+      // /таван/ census that `requireLawfulSpeed` published lists eight gates
+      // across eight drills, so a fallthrough here would hand a
+      // certificate-voiding term to seven templates nobody measured.
+      if (p.requireSpeedClean !== undefined) {
+        if (p.requireSpeedClean !== true) {
+          throw new ObjectiveSpecError(objective.id, "reachZone requireSpeedClean must be true");
+        }
+        out.requireSpeedClean = true;
+      }
       // THE REST THE BANNER SAYS DID NOT HAPPEN (ReachZoneParams
       // .requireRestClean — lessons/types.ts carries the frame, and
       // `ReachZoneWitnessDemands.requireRestClean` the census, the two codes
@@ -674,6 +687,27 @@ export interface ObjectiveContext {
    * leaves the demand met, exactly like the four fields above it.
    */
   yieldFaults?: readonly YieldFaultRecord[];
+  /**
+   * Has this drive been told, anywhere, that it went over the ceiling the road
+   * gave it — `SPEEDING_OVER_LIMIT` / `SPEEDING_DANGEROUS` (ЗДвП чл. 21, ал. 1,
+   * the sign's number) or `SPEED_TOO_FAST_FOR_CONDITIONS` (чл. 20, ал. 2, what
+   * the surface leaves of it)? The one fact `ReachZoneParams.requireSpeedClean`
+   * consults.
+   *
+   * „TOLD", NOT „CHARGED", for `restedInBanZoneInRun`'s reason and one degree
+   * more urgently: two of the three codes are второстепенна, so on a training
+   * rung the teach-first coach gives the FIRST one away as a free mini-lesson
+   * and records it on `LessonSessionState.coachedMistakes` instead of `events`.
+   * Both halves reach the debrief the student reads, so both halves falsify a
+   * «задържал тавана» banner — and a ledger-only read would have let this
+   * drill's own ❌ demonstrations certify themselves (measured: at L4 the
+   * conviction is scored, at L1/L3/L5 it is coached).
+   *
+   * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+   * (the rigs, the fixtures, `EMPTY_CONTEXT`) omits it and behaves exactly as
+   * shipped.
+   */
+  overTheCeilingInRun?: boolean;
   /**
    * Does the rule engine hold, ON THIS FRAME, a full stop it would accept at a
    * Б2 — the one fact `ReachZoneParams.requireFullStop` consults.
@@ -1723,6 +1757,69 @@ export interface ReachZoneWitnessDemands {
    */
   requireLawfulSpeed?: true;
   /**
+   * «ЗАДЪРЖАЛ ТАВАНА» IS A CLAIM ABOUT A STRETCH, NOT ABOUT A FRAME — the
+   * twelfth demand, and the half `requireLawfulSpeed` structurally cannot make
+   * (2026-09-04, `sc-sp-wet-limit-plate:d9fd3821`).
+   *
+   * WHAT IS STILL BROKEN AFTER THE NINTH DEMAND. `requireLawfulSpeed` is an
+   * AT-MARK arm by construction — „a speed is read at the tick's own position,
+   * never over a segment" — so it answers «беше ли законен ТУК». `sc-swp-finish`
+   * says «Стигни края на отсечката, ЗАДЪРЖАЛ тавана от настилката»: a perfective
+   * participle over the whole отсечка, and instruction 6 spells it out («Задръж
+   * тавана … до края на отсечката»). Measured through this evaluator at HEAD on
+   * the lesson's OWN committed demonstrations (`content/traces/
+   * sc-sp-wet-limit-plate/mistake-*.trace.json`, driven through `compileScenario
+   * (L3) → applyTick`): the over-limit demo holds 56,9 км/ч for ~230 m of a
+   * 320 m street, brakes to rest on the disc, and collects «✓ Стигни края на
+   * отсечката, задържал тавана от настилката» directly above its own «✗
+   * Превишена скорост». The dry-speed demo is the sharper one and it is the
+   * lesson's whole subject: 49,9 км/ч in the rain — lawful by the sign, over
+   * what the surface leaves — earns the same certificate above «✗ Несъобразена
+   * с условията скорост». At the mark both cars are slow, so the ninth demand
+   * is honestly silent; the banner is about the stretch behind them.
+   *
+   * A PROTOCOL READ, NOT A SECOND SPEEDOMETER, and that is the whole design:
+   * this consults `ObjectiveContext.overTheCeilingInRun` — the convictions the
+   * rule engine has already billed or coached and the debrief already prints,
+   * cites and corrects. So it cannot refuse a drive the protocol has not already
+   * spoken about (the law this file states everywhere), it cannot disagree with
+   * the sheet about what „over the ceiling" means, and THEO-4 is satisfied the
+   * way `requireYieldClean` and `requireSolidLineClean` satisfy it: the withheld
+   * tick removes a contradiction from a protocol that already explains itself —
+   * `SPEEDING_OVER_LIMIT` (ЗДвП чл. 21, ал. 1) and
+   * `SPEED_TOO_FAST_FOR_CONDITIONS` (чл. 20, ал. 2) each ship their own
+   * `explanationBg` and `correctiveBg` in `rules/catalog.ts`.
+   *
+   * IT IS RUN-WIDE, like `requireRestClean` and `requireSolidLineClean` and
+   * unlike the two windowed terms, for that demand's own reason: the banner
+   * claims «отсечката» and instruction 4 says «задръж под 40 ПО ЦЯЛАТА ОТСЕЧКА»
+   * — a stretch that STRADDLES the previous objective's completion, because the
+   * plate gate sits at y=180 in the middle of a 360 m street. MEASURED, not
+   * assumed: a first cut of this arm was windowed at `objectiveActiveSinceSec`
+   * and refused nothing at all, because both demo drives take their overspeed on
+   * the run-up to the plate and are slowing by the time the window opens.
+   *
+   * OUTSIDE THE `capMet` LATCH, with `requireNoContact` and the other journey
+   * terms: the fact is session-monotone, so it needs no eval-state memory and
+   * cannot flicker, and it may therefore share a zone with any at-mark demand —
+   * `sc-swp-finish` carries the ninth demand beside it.
+   *
+   * AUTHORED ONLY, and for the reason the contact term states: the four
+   * title-filled demands were censused over the whole catalogue first. The
+   * ceiling census that `requireLawfulSpeed` published returns eight gates, and
+   * seven of them are другите lanes' drills; filling this in from /таван/ would
+   * hand a certificate-voiding term to seven templates nobody measured. The
+   * key is written where it is meant.
+   *
+   * AND IT IS TERMINAL ON ITS ONE GATE, so `speedFaultVoidsObjective` is not
+   * optional here — it is `yieldFailedVoidsObjective`'s lesson applied before it
+   * cost anything: `sc-swp-finish` is 2 of 2, and without the strand-cutting arm
+   * the repair would have swapped a false certificate for a drive that cannot
+   * end. The objective keeps its honest `active` status, the run finishes, the
+   * protocol prints and the certificate is refused.
+   */
+  requireSpeedClean?: true;
+  /**
    * «С ГОТОВ КОКПИТ» — the belt fastened and the handbrake down, for a gate
    * whose own banner puts its name to them (round 14, 2026-08-28).
    *
@@ -2743,6 +2840,19 @@ function yieldCleanHonoured(demand: ReachZoneYieldDemand, ctx: ObjectiveContext)
 }
 
 /**
+ * Was the ceiling the banner says was held ever reported as exceeded? (see
+ * `ReachZoneWitnessDemands.requireSpeedClean` for the two drives this closes,
+ * the three codes and why the read is run-wide.)
+ *
+ * `true` is the only refusing value: `undefined` is „the caller cannot answer"
+ * (every fixture, rig and replay), and unknown must never become a refusal —
+ * the polarity every witness fact on this context ships with.
+ */
+function speedCleanHonoured(ctx: ObjectiveContext): boolean {
+  return ctx.overTheCeilingInRun !== true;
+}
+
+/**
  * Would the rule engine call this frame a full stop at a Б2? (see
  * `ReachZoneWitnessDemands.requireFullStop` for the protocol this closes and
  * why the answer is imported rather than re-derived here.)
@@ -2965,6 +3075,32 @@ export function yieldFailedVoidsObjective(
   const demand = (params as WitnessedReachZoneParams).requireYieldClean;
   if (demand === undefined) return false;
   return !yieldCleanHonoured(demand, { ...EMPTY_CONTEXT, ...ctx });
+}
+
+/**
+ * …AND THE SAME QUESTION FOR THE CEILING (`requireSpeedClean`), where — like
+ * the yield term above and unlike the four inert ones — it is NOT optional:
+ * `sc-swp-finish` is the LAST objective of `sc-sp-wet-limit-plate` (2 of 2), so
+ * without this arm the repair that stops the drill certifying a ceiling the
+ * student blew through would replace it with a drive that cannot end, and the
+ * student would reach the чл. 21 / чл. 20, ал. 2 cards that teach him only by
+ * quitting — forfeiting the attempt's XP and its calibration for having been
+ * shown the fault the lesson exists to show him.
+ *
+ * ONE REFUSAL, NEVER A TRAP: the objective keeps its honest `active` status and
+ * `buildLessonResult` still reports finished-and-failed, so the certificate is
+ * withheld and only the strand goes.
+ *
+ * Takes the boolean rather than the context, like `contactVoidsObjective` and
+ * `railBarredVoidsObjective` and unlike the two windowed terms: the fact is
+ * run-wide, so there is nothing for the caller to get wrong.
+ */
+export function speedFaultVoidsObjective(
+  params: ObjectiveParams,
+  overTheCeilingInRun: boolean,
+): boolean {
+  if (!overTheCeilingInRun || params.kind !== "reachZone") return false;
+  return (params as WitnessedReachZoneParams).requireSpeedClean === true;
 }
 
 /**
@@ -4039,6 +4175,13 @@ function stepReachZone(
   // question. A zone that does not author the key never consults it and is
   // bit-identical to shipped.
   const stopOk = params.requireFullStop !== true || fullStopHonoured(ctx);
+  // ── THE CEILING THE BANNER SAYS WAS HELD (requireSpeedClean) ──────────────
+  // Ninth arm of the journey half and the ninth outside the `capMet` latch —
+  // the stretch-shaped half of the ceiling claim, where `requireLawfulSpeed` is
+  // the frame-shaped one. Windowed like `yieldOk`, because «отсечката» is the
+  // stretch this gate opened on. A zone whose banner claims no such discipline
+  // never consults this and is bit-identical to shipped.
+  const speedCleanOk = params.requireSpeedClean !== true || speedCleanHonoured(ctx);
   const arrivalHonoured =
     reached &&
     capMet &&
@@ -4049,7 +4192,8 @@ function stepReachZone(
     haltForVruOk &&
     restOk &&
     solidLineOk &&
-    stopOk;
+    stopOk &&
+    speedCleanOk;
   // ── THE MARK IS WHERE THE BANNER POINTS (round 13, 2026-08-27) ────────────
   //
   // WHAT IS BROKEN. `reached` latches on the FIRST swept contact with the

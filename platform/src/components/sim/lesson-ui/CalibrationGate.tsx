@@ -41,6 +41,7 @@ import {
   CALIBRATION_PENDING_TITLE_BG,
   MAX_PREDICTED_POINTS,
   formatCalibrationError,
+  isBeyondPredictableScale,
   type CalibrationVerdict,
 } from "@/modules/learning/calibration";
 import {
@@ -116,7 +117,20 @@ function CalibrationFields({
         <span id="sim-calibration-hint" className="text-[11px] text-muted">
           Цяло число от 0 до {MAX_PREDICTED_POINTS}. Опасна грешка ={" "}
           {examPointsForClassBg("opasna")}, основна = {examPointsForClassBg("osnovna")},
-          второстепенна = {examPointsForClassBg("vtorostepenna")} ({EXAM_SCALE_SOURCE_BG}).
+          второстепенна = {examPointsForClassBg("vtorostepenna")} ({EXAM_SCALE_SOURCE_BG}).{" "}
+          {/* THE CAP IS ON THE FIELD, NOT ON THE PROTOCOL, and saying so is the
+              half of sc-junction-rhr:c6d88f3f that belongs on the ASKING screen.
+              A student read «от 0 до 30» as the range of the thing being
+              measured; the engine scored 394 on a sibling drive in the same
+              chunk, and 7 of 151 drives in the newest sweep are still over 30.
+              Naming the limit as a limit on the ANSWER leaks nothing about this
+              drive — it is a property of the input box — and it is what keeps
+              the number the student meets next from looking like a broken
+              scale. The withheld-verdict branch is at
+              `calibration.ts:isBeyondPredictableScale`. */}
+          Таванът е на полето, не на изпита: едно каране може да събере и повече
+          от {MAX_PREDICTED_POINTS} — тогава вместо преценка ти казваме точно
+          това.
         </span>
       </label>
 
@@ -280,7 +294,16 @@ export function CalibrationGate({
   };
 
   if (reveal !== null) {
-    const tone = VERDICT_TONE[reveal.verdict];
+    // ── THE TONE FOLLOWS THE COPY, AND PAST THE CEILING THERE IS NO VERDICT ──
+    // Derived from the number already on this screen rather than carried as a
+    // new field: `app/dev/popup-rig` builds a `CalibrationReveal` literal by
+    // hand, and a required prop would only teach the rig to invent one (the
+    // ruling `HudToast.raisedAtMs` writes down). The server has already sent the
+    // matching wording via `calibrationRevealCopy`; what this decides is
+    // whether the headline is painted in the overconfidence RED, and it must
+    // not be — the student was not overconfident, the question was too small.
+    const beyondScale = isBeyondPredictableScale(reveal.actualPoints);
+    const tone = beyondScale ? "var(--muted)" : VERDICT_TONE[reveal.verdict];
     return (
       <section
         aria-labelledby="sim-calibration-title"
@@ -331,8 +354,13 @@ export function CalibrationGate({
 
         <p className="text-sm leading-relaxed">{reveal.bodyBg}</p>
 
+        {/* …AND THE ROW UNDERNEATH STOPS CALLING IT „преценка". Past the
+            ceiling the number is the distance from the biggest answer the form
+            accepts to the protocol, which is a fact about the form. The
+            pass/fail clause survives in both branches, because «издържан /
+            неиздържан» is a call the student could always make truthfully. */}
         <p className="text-xs font-semibold text-muted">
-          Разлика в преценката:{" "}
+          {beyondScale ? "Разлика до тавана на въпроса: " : "Разлика в преценката: "}
           <span className="font-mono font-black tabular-nums" style={{ color: tone }}>
             {formatCalibrationError(reveal.errorPoints)}
           </span>

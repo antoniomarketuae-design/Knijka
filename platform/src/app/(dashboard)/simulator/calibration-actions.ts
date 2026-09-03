@@ -22,9 +22,8 @@
 
 import { getSessionUser } from "@/modules/auth";
 import {
-  CALIBRATION_VERDICT_BODY_BG,
-  CALIBRATION_VERDICT_TITLE_BG,
   calibrationError,
+  calibrationRevealCopy,
   classifyCalibration,
   parsePredictionInput,
   verdictAgrees,
@@ -106,7 +105,16 @@ export async function recordSelfPredictionAction(
   if (result.record === undefined) return { ok: false, code: "UNAVAILABLE" };
 
   const record = result.record;
+  // ONE decision point for the copy, and it is not this layer's. Past
+  // `MAX_PREDICTED_POINTS` the protocol is a number the form would not have let
+  // the student type, so `predicted − actual` is the ceiling rather than his
+  // judgement and `calibrationRevealCopy` withholds the verdict wording instead
+  // of calling him overconfident for a bound the product imposed
+  // (sc-junction-rhr:c6d88f3f — the block at `isBeyondPredictableScale`).
+  // `verdict` still travels: the trend page and this drive's own tone read it,
+  // and it stays the raw classification of what was stored.
   const verdict = classifyCalibration(record);
+  const copy = calibrationRevealCopy(record);
   return {
     ok: true,
     firstAnswer: result.status === "recorded",
@@ -117,7 +125,7 @@ export async function recordSelfPredictionAction(
     errorPoints: calibrationError(record),
     verdict,
     verdictAgreed: verdictAgrees(record),
-    titleBg: CALIBRATION_VERDICT_TITLE_BG[verdict],
-    bodyBg: CALIBRATION_VERDICT_BODY_BG[verdict],
+    titleBg: copy.titleBg,
+    bodyBg: copy.bodyBg,
   };
 }

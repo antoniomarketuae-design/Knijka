@@ -19,6 +19,7 @@
  */
 
 import type { SignalPhase } from "../contracts";
+import { isMotorwayCarriageway } from "../world/builders/constants";
 import { edgeParkingWidthM } from "../world/builders/network";
 import { offsetPolyline, projectOntoPolyline, sampleLane, type LaneGraph } from "./graph";
 import { rngRange, type Rng } from "./rng";
@@ -404,14 +405,79 @@ export function buildPedSidewalkRoute(
 export const SIDEWALK_METRES_PER_WALKER = 90;
 export const SIDEWALK_BUDGET_MAX = 12;
 
+/**
+ * How far past a motorway carriageway's kerb a link's terminal point may lie
+ * and still be its ramp. One metre of slack over `pedCarriagewayHalfM`: a nose
+ * is authored ON the carriageway (mw-entry-v1's is 8.13 m inside a 12.19 m half
+ * width), and a road that merely passes nearby is metres further out.
+ */
+const RAMP_JOIN_SLACK_M = 1.0;
+
+/**
+ * The edges no pavement walker may be seeded on — the class list, PLUS the two
+ * shapes a class list cannot see.
+ *
+ * `footwaylessRoadClasses` asks the class NAME, and `world/builders/network.ts`
+ * already had to stop doing that once (sc-merge-motorway-exit:22f793e2): of the
+ * three committed motorway maps only mw-v1 and mw-entry-v1 tag their
+ * carriageways `class: "motorway"` — mw-exit-v1's are `class: "primary"` with
+ * `motorway: true`. And neither list nor tag catches the ВРЪЗКА that feeds one:
+ * `mwe-e-ramp` is a 143.6 m `secondary_link` and was, until this predicate, the
+ * ONLY walkable edge on mw-entry-v1, so both of that map's ambient walkers stood
+ * on the verge of the on-ramp the student spawns 20 m up. MEASURED on the
+ * committed bank, budget before → after: mw-entry-v1 2 → 0, mw-exit-v1 12 → 0,
+ * and not one of the other 103 districts moves by a walker.
+ *
+ * ЗДвП чл. 55, ал. 1: on a road signed автомагистрала „движението на пешеходци
+ * … е забранено" (retrieved from content/law/acts/zdvp.json — ADR-002, never
+ * free recall). Since repair wave 21 the ramp carries the Д5 that puts it inside
+ * that regime, so a walker there is the world contradicting the plate it posts.
+ *
+ * The ramp test is the one `world/builders/props.ts` already uses to decide
+ * which link earns a Д5 — a terminal point inside the carriageway's own half
+ * width — so the plate pass and this pass cannot disagree about what a ramp is.
+ */
+export function footwaylessEdgeIds(
+  edges: readonly DistrictEdge[],
+  footwaylessRoadClasses: readonly string[],
+  laneWidthM: number,
+): Set<string> {
+  const byClass = new Set(footwaylessRoadClasses);
+  const out = new Set<string>();
+  const carriageways: Array<{ line: ReturnType<typeof offsetPolyline>; kerbM: number }> = [];
+  for (const e of edges) {
+    const motorway = isMotorwayCarriageway(e);
+    if (byClass.has(e.class) || motorway) out.add(e.id);
+    if (motorway && e.geometry.length >= 2) {
+      carriageways.push({
+        line: offsetPolyline(e.geometry, 0),
+        kerbM: pedCarriagewayHalfM(e, laneWidthM) + RAMP_JOIN_SLACK_M,
+      });
+    }
+  }
+  if (carriageways.length === 0) return out;
+  for (const e of edges) {
+    if (out.has(e.id) || !e.class.endsWith("_link") || e.geometry.length < 2) continue;
+    const ends = [e.geometry[0], e.geometry[e.geometry.length - 1]];
+    const joins = carriageways.some((c) =>
+      ends.some(
+        ([x, y]) => projectOntoPolyline(c.line.px, c.line.py, c.line.cum, x, y).dist <= c.kerbM,
+      ),
+    );
+    if (joins) out.add(e.id);
+  }
+  return out;
+}
+
 export function ambientSidewalkBudget(
   district: { roads: { edges: readonly DistrictEdge[] } },
   footwaylessRoadClasses: readonly string[],
+  laneWidthM: number,
 ): number {
-  const footwayless = new Set(footwaylessRoadClasses);
+  const footwayless = footwaylessEdgeIds(district.roads.edges, footwaylessRoadClasses, laneWidthM);
   let walkableM = 0;
   for (const e of district.roads.edges) {
-    if (footwayless.has(e.class)) continue;
+    if (footwayless.has(e.id)) continue;
     if (e.geometry.length < 2 || e.length < SIDEWALK_MIN_EDGE_M) continue;
     walkableM += e.length;
   }

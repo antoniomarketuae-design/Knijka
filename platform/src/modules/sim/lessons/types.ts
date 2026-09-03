@@ -282,6 +282,36 @@ export interface ReachZoneParams {
    */
   requireFullStop?: true;
   /**
+   * THE CEILING THE ROAD GAVE WAS HELD OVER THE STRETCH THE BANNER NAMES —
+   * sc-sp-wet-limit-plate:d9fd3821 (critical), and the sixth term this file's
+   * own templates route here rather than invent an instrument for.
+   *
+   * WHAT IT MEANS. `true` = this waypoint is thrown away by a run that has been
+   * convicted of exceeding the road's own ceiling — `SPEEDING_OVER_LIMIT` /
+   * `SPEEDING_DANGEROUS` (ЗДвП чл. 21, ал. 1, the sign's number) or
+   * `SPEED_TOO_FAST_FOR_CONDITIONS` (чл. 20, ал. 2, what the surface leaves of
+   * it) — whether the sheet CHARGED it or the teach-first coach gave the first
+   * one away as a card. Absent = no such claim, which is every other gate in
+   * the catalogue.
+   *
+   * WHY A CAP COULD NEVER CARRY IT, and why the at-mark demand cannot either.
+   * `maxSpeedKmh` is ONE template-wide number, so on a drill whose whole point
+   * is that the lawful ceiling CHANGES with the weather it would fail the
+   * lawful dry drive; and the title-derived `requireLawfulSpeed` reads the
+   * speed at the tick's own position, which answers «законен ли си тук» and not
+   * «задържа ли го дотук». This is the stretch-shaped reading, and it is a read
+   * of the protocol rather than a second speedometer.
+   *
+   * A CLAIM ABOUT THE JOURNEY, so it is read per frame off the run's own ledger
+   * and stays outside the `capMet` latch — the shape of the journey demands
+   * above it. The full design note (the two demonstration drives it closes, why
+   * the read is run-wide, the coached half and the strand-cutting arm that
+   * keeps a refusal from becoming a trap) lives on
+   * `ReachZoneWitnessDemands.requireSpeedClean` in objectives.ts, which is where
+   * the evaluator reads it.
+   */
+  requireSpeedClean?: true;
+  /**
    * REPORT THE ONCOMING GAP HE TURNED INTO, against this drill's taught norm,
    * in seconds — the authored half of the only key here that refuses nothing.
    * `done` is bit-identical with it and without it; what it adds is the

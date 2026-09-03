@@ -963,6 +963,15 @@ const RB_GAP_THIRD: RoundaboutEntrySpec = {
 };
 
 /**
+ * How far PAST the east mouth `sc-rbg-past-east` stands, in degrees of ring.
+ * The mirror of EXIT_APPROACH_LEAD_DEG (which stands the same distance BEFORE
+ * an exit) and the same number for the same reason: 20° is 6.3 m of arc on
+ * rb-mini, far enough that the east arm cannot reach it and short enough that
+ * the containment ceiling (R + 1.5 × radius ≤ enterRadiusM) still holds.
+ */
+const RBG_PAST_EAST_TRAIL_DEG = 20;
+
+/**
  * RB-01 read one level deeper than the live entry template. sc-roundabout-entry
  * answers „кой е с предимство" with ONE circulator: wait, then go. This one
  * assumes that answer and asks the question the exam and the street actually
@@ -1059,13 +1068,43 @@ export const SC_RB_BUSY_GAP: ScenarioSpec = {
       // round. WHICH gap is graded, and severely — FAILED_TO_YIELD + COLLISION
       // on the short-gap demo — it is just not graded by this disc. Same D3
       // remedy as sc-rbc-past-east: name the mouth and the ring, claim nothing
-      // about the other car. Params byte-identical.
+      // about the other car.
       titleBg: "Подмини първия изход (изток), без да излизаш от кръга",
-      // The east mouth on the ring centerline (rb-mini-v1: R = 18 around
-      // (0, 0); the east node sits at (18, 0)). maxSpeedKmh 20 is the ring's
+      // A point on the ring centerline (rb-mini-v1: R = 18 around (0, 0)), one
+      // short arc PAST the east node at (18, 0). maxSpeedKmh 20 is the ring's
       // own envelope (a faster circulation on R = 18 trips the turn detector —
       // see the trace script's window arithmetic), not a slow-down demand.
-      params: { kind: "reachZone", x: RING_R, y: 0, radiusM: 6, maxSpeedKmh: 20 },
+      //
+      // MOVED OFF THE MOUTH AND ONTO THE RING, 2026-09-04 (row
+      // sc-rb-busy-gap:5ee56710). The second clause of the title —
+      // «без да излизаш от кръга» — was the half nothing read, for the same
+      // reason the ordinal came off the maneuver row: a disc centred ON the
+      // east node is the one place a car TAKING the first exit must drive
+      // through. Measured on the shipped rung, with the drill's own boundary of
+      // «в кръга» (the maneuver's `enterRadiusM`, 24): at (18, 0) the L1 ladder
+      // widened the disc to 9 m (`params.ts widenRadius`, ×1.5), so it reached
+      // 27 m from the island and a car 6 m OUT of the east arm still collected
+      // it — and even at the authored 6 the bail-out collected it at the mouth
+      // itself. The remedy is the one this file already ships one exit later
+      // (EXIT_APPROACH_LEAD_DEG): stand the gate on the RING, past the mouth,
+      // where only a car still circulating can be.
+      //   · a car leaving by the east arm, keeping right (y = −4.06), never
+      //     comes closer than 10.3 m — refused on every rung;
+      //   · a car still on the ring is collected on every rung: the ring's
+      //     drivable half-width is 4.06 m (`edgeTravelHalfWidth`, one
+      //     `roundabout` lane at LANE_WIDTH_M 8.125), so a car with its full
+      //     width on the carriageway sits at most 3.2 m off the centerline
+      //     against an authored 4, and the committed shadow passes this point
+      //     at 0.04 m and 9.5 km/h;
+      //   · containment holds where it did not before — R + compiled radius is
+      //     24 / 23 / 22 at L1 / L2 / L3-L5, never past `enterRadiusM`.
+      // Held on every rung by rbg-east-gate-containment.test.ts.
+      params: {
+        kind: "reachZone",
+        ...ringPoint(90 + RBG_PAST_EAST_TRAIL_DEG, RING_R),
+        radiusM: 4,
+        maxSpeedKmh: 20,
+      },
     },
     {
       id: "sc-rbg-exit-approach",

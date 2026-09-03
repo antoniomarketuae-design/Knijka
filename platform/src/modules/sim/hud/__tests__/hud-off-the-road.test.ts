@@ -621,3 +621,90 @@ describe("row 5 · the pad marks are in the HUD's own register", () => {
     );
   });
 });
+
+/* ───────────────────────────────────────────────────────────────────────────
+   ROW 6 — „THE ROUTE PILL IS PRINTED THROUGH «Л ОГЛЕДАЛО»."
+   sc-vu-emergency:011b0e98 (major), 2026-09-04.
+
+   THE SAME LANE ROW 3 ABOVE GAVE THE FIRST-RUN HINT, ON THE TWO CHIPS THAT
+   WERE NEVER ON THAT LIST. Row C1 (`PlayAreaStyles`) moved «Следвай синята
+   линия» and the telltale cue out of the middle of the road into the right
+   corridor by giving them `right: NOTIFY_COLUMN_RIGHT_CSS` and
+   `justify-content: flex-end` — so the PILL'S RIGHT EDGE IS THAT LENGTH. It
+   resolves sideways to 12 px + a 59 px notch inset = 71 px off the edge, and
+   the right flank's mirror-glance stations start at ARC_EDGE_PX (8) + the same
+   inset = 67 and run TOUCH_MIN_PX (44) inward: 67 → 111. 40 px of overlap,
+   every frame, on every landscape phone.
+
+   MEASURED on the row's own frame, `w10-2/frames/sc-vu-emergency__mobile-right/
+   04-t105s.png` (iPhone 16 landscape, 852 × 393 at dpr 3):
+
+     the pill's right border   x 2 342 of 2 556 device px = 71.3 CSS off the
+                               edge — NOTIFY_COLUMN_RIGHT_CSS to the pixel
+     «Л ОГЛЕДАЛО»              x 2 234 → 2 355 device = 67 → 107 CSS off the
+                               edge, i.e. station 0 of the right flank
+
+   The border cuts the «Л» and «линия» composites through «ОГЛЕДАЛО»; both are
+   ghost surfaces, so neither hides the other and neither is readable. The
+   lesson it was photographed on is чл. 91, whose instruction 2 is «поглеждай
+   периодично в огледалото за обратно виждане» — the drill is the glance, and
+   the HUD was drawn across the control that performs it.
+
+   WHY A SOURCE PIN: the header at the top of this file. These are CSS rules
+   inside a template literal, the one thing here that can rot into a no-op with
+   no type error and no failing render.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+describe("row 6 · the route pill and the telltale cue clear the throttle band's flank", () => {
+  /** The compact arm of the row-C1 corridor rule, on its own. */
+  const compactChipRule = (): string => {
+    const at = CSS.search(
+      /\n\s*\[data-sim-compact="on"\] \[data-hud="follow-hint"\],\n\s*\[data-sim-compact="on"\] \[data-hud="telltale-cue"\] \{/,
+    );
+    expect(at, "the compact follow-hint/telltale-cue rule").toBeGreaterThan(-1);
+    const from = CSS.slice(at);
+    // The rule's OWN closing brace, i.e. one on a line of its own — `indexOf`
+    // on a bare "}" finds the one that closes `${NOTIFY_COLUMN_RIGHT_CSS}`.
+    return from.slice(0, from.search(/\n\s*\}/));
+  };
+
+  it("pays the lane out of its right edge AND its width, in the corridor's settled idiom", () => {
+    const rule = compactChipRule();
+    // Byte-for-byte what `[data-hud="touch-hint"]` already ships (row 3 above)
+    // — a variable and not a number, because the column's own declarations are
+    // inline styles and only a variable crosses that cascade (FLANK_LANE_VAR).
+    expect(rule).toContain("right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_VAR});");
+    expect(rule).toContain("width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR});");
+    // …and NOT the bare width it shipped, which is the whole defect: a right
+    // edge left on the column's datum while the stations stand at 67.
+    expect(rule).not.toMatch(/width: \$\{NOTIFY_COLUMN_WIDTH_CSS_COMPACT\};/);
+  });
+
+  it("the arithmetic clears station 0 rather than merely moving", () => {
+    // Landscape: the lane is 60 (ARC_EDGE_PX 8 + TOUCH_MIN_PX 44 + an 8 px gap
+    // wide enough to read as a gap) and the notch inset is a real 59 px.
+    const FLANK_LANE = 60;
+    const NOTCH = 59;
+    const stationNearEdge = 8 + NOTCH; // 67 — where «Л ОГЛЕДАЛО» starts
+    const stationFarEdge = stationNearEdge + 44; // 111 — where it ends
+    const pillRightWas = NOTIFY_COLUMN_GUTTER_PX + NOTCH; // 71 — the frame's own reading
+    const pillRightNow = pillRightWas + FLANK_LANE;
+    // What was photographed.
+    expect(pillRightWas).toBeLessThan(stationFarEdge);
+    // What ships: past the far edge of the station, not just past its near one.
+    expect(pillRightNow).toBeGreaterThan(stationFarEdge);
+    // And the pill still lays out on ONE line in what is left: it measures
+    // 171 CSS px on the row's own frame (20 mono glyphs at 12 px plus `px-3.5`
+    // twice) against the compact column's 240 less the lane.
+    expect(notifyColumnWidthPx(IPHONE_L.width, true) - FLANK_LANE).toBeGreaterThan(171);
+  });
+
+  it("upright nothing moves — the lane is 0 there and the chip keeps its width", () => {
+    // `TOUCH_BAND_CSS_VARS` declares `--sim-flank-lane: 0rem` upright (the
+    // column is only min(15rem, 36vw) = 141 px there and 141 − 60 is not a
+    // card; it buys its separation with height instead). Both calc()s collapse
+    // to what they were, so this repair cannot cost the portrait layout.
+    expect(TOUCH).toContain("--sim-flank-lane: ${rem(FLANK_LANE_PORTRAIT_PX)};");
+    expect(TOUCH).toContain("const FLANK_LANE_PORTRAIT_PX = 0;");
+  });
+});

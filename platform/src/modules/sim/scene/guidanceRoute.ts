@@ -311,6 +311,14 @@ export interface GuidancePointGoal {
    * in the marker vocabulary reads it: `marker` is false for this goal.
    */
   leaveRadiusM?: number;
+  /**
+   * Set ⇒ (x, y) is NOT a lane. A parking bay is a place the student LEAVES
+   * the carriageway for, and what stands between the aisle and it — the row he
+   * is parking beside, the wall that closes it — is exactly what the drill is
+   * about. Lane alignment must therefore refuse it and let the marker show the
+   * destination; see the OFF-ROAD TARGETS bound at `alignRawToGoalLane`.
+   */
+  offRoad?: boolean;
 }
 
 export type GuidanceGoal = GuidancePointGoal | { kind: "ahead"; meters: number };
@@ -328,6 +336,9 @@ export type RouteTarget =
       /** See `GuidancePointGoal.leaveRadiusM` — set ⇒ (x, y) is a roundabout
        *  island, and `ringRouteRaw` owns the derivation. */
       leaveRadiusM?: number;
+      /** See `GuidancePointGoal.offRoad` — set ⇒ (x, y) is a parking bay or a
+       *  driveway, not a lane, so the ribbon stays on the tarmac. */
+      offRoad?: boolean;
     }
   | { kind: "ahead"; meters: number };
 
@@ -858,6 +869,9 @@ export function guidanceGoalFor(
                 shape: { kind: "zone", radiusM: params.centerTolM },
                 acceptRadiusM: params.centerTolM,
                 labelBg: "Паркирай тук",
+                // A bay is off the carriageway by design — see the OFF-ROAD
+                // TARGETS bound at `alignRawToGoalLane`.
+                offRoad: true,
               }
             : null;
         case "emergencyStop":
@@ -1161,6 +1175,33 @@ function appendPiece(raw: RawRoute, pts: [number, number][]): void {
     if (last && Math.abs(last[0] - p[0]) < EPS && Math.abs(last[1] - p[1]) < EPS) continue;
     raw.points.push(p);
   }
+}
+
+/**
+ * Two raw legs end-to-end, `b` starting where `a` stops. The shared point is
+ * kept once and `b`'s joint indices are rebased onto the joined array — a
+ * joint left pointing at `b`'s own indexing would name the wrong vertex, and
+ * `ringRouteRaw` cuts the ribbon at exactly those vertices.
+ */
+function joinRaw(a: RawRoute, b: RawRoute): RawRoute {
+  if (b.points.length === 0) return a;
+  const points = a.points.slice();
+  const jointIdx = a.jointIdx.slice();
+  const tail = points[points.length - 1];
+  const head = b.points[0];
+  const shared =
+    tail !== undefined &&
+    Math.abs(tail[0] - head[0]) < EPS &&
+    Math.abs(tail[1] - head[1]) < EPS;
+  const base = shared ? points.length - 1 : points.length;
+  for (let k = shared ? 1 : 0; k < b.points.length; k++) points.push(b.points[k]);
+  for (const j of b.jointIdx) {
+    const at = base + j;
+    if (at <= 0 || at >= points.length) continue;
+    if (jointIdx[jointIdx.length - 1] === at) continue;
+    jointIdx.push(at);
+  }
+  return { points, jointIdx };
 }
 
 /**
@@ -1498,20 +1539,22 @@ function rawArcLengths(raw: RawRoute): number[] {
  *
  * INSIDE the ring the leg is the road AHEAD (`walkAheadRaw`, which on a oneway
  * ring can only travel the legal way round and always prefers the ring to a
- * 90° arm, so it never invents an exit). OUTSIDE it, the leg is still the
- * shortest path toward the island — that part was never wrong, an approach can
- * only reach the ring through its own mouth — and the cut below is what makes
- * the arbitrary snap harmless.
+ * 90° arm, so it never invents an exit). OUTSIDE it, the leg is the shortest
+ * path toward the island — that part was never wrong, an approach can only
+ * reach the ring through its own mouth — CARRIED ON round the ring by the same
+ * walk (RING_APPROACH_CARRY), and the cut below is what makes the arbitrary
+ * snap harmless.
  *
  * Then it is CUT, at the first of:
  *   (a) the sample where the leg is outside `leaveRadiusM` having been inside
  *       `enterRadiusM` — the evaluator's own completion test, so this is the
  *       maneuver ending rather than a guess; and
  *   (b) the first junction node at least `RING_MOUTH_SKIP_M` ahead that stands
- *       within `enterRadiusM` of the island — the next MOUTH — unless the leg
- *       to it is under `MIN_ROUTE_LEN_M`, i.e. too short to be drawn at all, in
- *       which case it is the mouth the car is STANDING IN and the one after it
- *       is taken instead (RING_MOUTH_UNDRAWABLE; at most one is ever skipped).
+ *       within `enterRadiusM` of the island — the next MOUTH — skipping the
+ *       one the car has not passed yet: the mouth it is STANDING IN when the
+ *       leg to it is under `MIN_ROUTE_LEN_M` (RING_MOUTH_UNDRAWABLE), or the
+ *       mouth it is driving INTO when it is still outside the ring
+ *       (RING_ENTRY_MOUTH). At most one is ever skipped for either reason.
  *       The radius test is what keeps a 458 m city approach (`l3-roundabout`
  *       from spawn-3) from being chopped at the first side street it passes:
  *       only nodes that are part of the roundabout qualify.
@@ -1532,6 +1575,21 @@ function ringRouteRaw(
   } else {
     const islandSnap = snapToRoad(graph, cx, cy);
     raw = islandSnap ? shortestPathRaw(graph, snap, islandSnap) : null;
+    // RING_APPROACH_CARRY. The shortest path to the island snap stops the
+    // moment it touches the ring, so on an APPROACH the leg was the arm and
+    // nothing else. Carry it on round the ring the legal way, from the snap
+    // the path just reached — the cut below is what decides where it stops.
+    if (raw && islandSnap) {
+      const e = graph.edges[islandSnap.edgeIdx];
+      const [tx, ty] = tangentOnEdge(e, islandSnap.sM);
+      const onward = walkAheadRaw(
+        graph,
+        islandSnap,
+        (Math.atan2(tx, ty) * 180) / Math.PI,
+        RING_WALK_MAX_M,
+      );
+      if (onward) raw = joinRaw(raw, onward);
+    }
   }
   if (!raw || raw.points.length < 2) return null;
 
@@ -1574,25 +1632,35 @@ function ringRouteRaw(
     break;
   }
 
-  // (b) the next mouth. TWO are collected, not one, because the first can be
-  // the mouth the car is STANDING IN rather than the one it is heading for —
-  // see RING_MOUTH_UNDRAWABLE below the loop.
+  // (b) the next mouth. THREE are collected, not one, because the first can be
+  // the mouth the car is STANDING IN — or, on an approach, the mouth it is
+  // driving INTO. See RING_MOUTH_UNDRAWABLE and RING_ENTRY_MOUTH below.
   const mouths: number[] = [];
   for (const j of raw.jointIdx) {
     if (j <= 0 || j >= raw.points.length) continue;
     if (s[j] < RING_MOUTH_SKIP_M) continue;
     if (Math.hypot(raw.points[j][0] - cx, raw.points[j][1] - cy) > enterRadiusM) continue;
     mouths.push(s[j]);
-    if (mouths.length >= 2) break;
+    if (mouths.length >= 3) break;
   }
+  // RING_ENTRY_MOUTH. A car OUTSIDE the ring has not made its entry yet, so
+  // the first mouth on its leg is its OWN — not a decision point but the place
+  // the maneuver BEGINS. Cutting there deleted the whole maneuver from the
+  // ribbon and left a straight line ending on the island's kerb.
+  //
   // RING_MOUTH_UNDRAWABLE. A mouth so close that the leg to it could not be
   // DRAWN is not a decision the student can still act on — it is the mouth he
   // is already standing in, and the sentence RING_MOUTH_SKIP_M states was
   // simply calibrated to the wrong length. So the cut moves to the mouth after
   // it, and the ribbon says the one thing that is still true from here: the
   // ring goes on, and your next decision point is there.
-  const cutMouth =
-    mouths.length > 1 && mouths[0] < MIN_ROUTE_LEN_M ? mouths[1] : (mouths[0] ?? Infinity);
+  //
+  // Where the carry found no further mouth the cut falls back to the last one
+  // there is, so a ring this walk cannot get round is drawn exactly as before
+  // rather than as a full lap.
+  let mi = inside ? 0 : 1;
+  if (mouths.length > mi + 1 && mouths[mi]! < MIN_ROUTE_LEN_M) mi++;
+  const cutMouth = mouths[mi] ?? mouths[mouths.length - 1] ?? Infinity;
 
   const cut = Math.min(cutOut, cutMouth);
   if (Number.isFinite(cut)) return trimRawTo(raw, cut);
@@ -1806,10 +1874,29 @@ function nearestOnRaw(raw: RawRoute, x: number, y: number): { s: number; latM: n
 //    it crossed. It therefore eases in after the last junction before the
 //    goal, never across one.
 //  - BOUNDED BY THE WIDEST REAL CARRIAGEWAY. An objective further out than
-//    LANE_ALIGN_MAX_M is not in a lane: `parkInBay` bays and driveway targets
-//    sit off the road by design, and the marker is what shows those. Beyond
-//    the bound the route is left exactly as it was — the ribbon stays on the
-//    tarmac and does not drive the student into a kerb.
+//    LANE_ALIGN_MAX_M is not in a lane, and beyond the bound the route is left
+//    exactly as it was — the ribbon stays on the tarmac and does not drive the
+//    student into a kerb.
+//  - OFF-ROAD TARGETS, BY KIND AND NOT BY DISTANCE (sc-park-wall:2bf89308).
+//    The bound above used to be the whole of this rule and it named the case
+//    it was meant to catch — „`parkInBay` bays and driveway targets sit off
+//    the road by design, and the marker is what shows those". It caught none
+//    of them: LANE_ALIGN_MAX_M is 16.25 m and every bay this product ships
+//    sits 4.80–6.28 m off its aisle centreline, so the distance test passed
+//    them all through as lanes. MEASURED on sc-park-wall / lot-wall-v1: when
+//    „Задача 2: паркирай на заден ход в крайното гнездо" goes live the ribbon
+//    is slid from the aisle onto the bay centre (5.03, 5.4), and the line it
+//    draws from the halt mark (0.9, 11.7) runs 1.346 m INSIDE the garage end
+//    wall's collider (`scenarioSceneryProps` „sc-park-wall", x ∈ [2.03, 8.03],
+//    y ∈ [8.4, 8.8], graded `staticObject`). The student is shown a green
+//    ribbon — the legend calls it «маршрутът до целта» — through 1.6 m of
+//    masonry, and the sheet then books «Пътнотранспортно произшествие · ОПАСНА
+//    ГРЕШКА · −10 изпитни т.» for taking it. A bay is now refused because it
+//    IS a bay (`GuidancePointGoal.offRoad`), which is a property of the goal
+//    rather than of how far away it happens to be; the marker pillar, its
+//    acceptance ring and «Паркирай тук» still stand on the bay, so nothing
+//    about where to go is lost — only the invitation to drive there in a
+//    straight line through whatever is in the way.
 //  - EASED, NOT SNAPPED. A step change would read as a swerve. It ramps in
 //    over LANE_ALIGN_RAMP_M and decays again past the goal so the look-ahead
 //    legs rejoin the centreline they were derived on.
@@ -2316,7 +2403,12 @@ export function deriveGuidanceRoute(
   // all. The `LANE_ALIGN_MAX_M` bound already refused it (the ribbon rides
   // 17.85–25.78 m from the centre, an order of magnitude past two lane
   // pitches), so this is a statement of intent rather than a behaviour change.
-  if (goal.kind === "point" && goal.shape?.kind !== "gate" && goal.leaveRadiusM === undefined) {
+  if (
+    goal.kind === "point" &&
+    goal.shape?.kind !== "gate" &&
+    goal.leaveRadiusM === undefined &&
+    goal.offRoad !== true
+  ) {
     // The two inputs the shift needs to stop inventing a lane change — see THE
     // RIBBON MUST NOT INVENT A LANE CHANGE. The look-ahead waypoint counts only
     // when its leg was actually appended (`acc !== raw`) and it is an AUTHORED
@@ -2330,7 +2422,8 @@ export function deriveGuidanceRoute(
       firstAhead !== undefined &&
       firstAhead.kind === "point" &&
       firstAhead.shape?.kind !== "gate" &&
-      firstAhead.leaveRadiusM === undefined
+      firstAhead.leaveRadiusM === undefined &&
+      firstAhead.offRoad !== true
         ? { x: firstAhead.x, y: firstAhead.y }
         : undefined;
     splitIdx = alignRawToGoalLane(acc, goal.x, goal.y, splitIdx, start, nextInLane).splitIdx;

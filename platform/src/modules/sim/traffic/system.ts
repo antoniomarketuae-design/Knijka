@@ -40,6 +40,7 @@ import {
   buildPedRoute,
   buildPedSidewalkRoute,
   createPedestrianAgent,
+  footwaylessEdgeIds,
   SIDEWALK_MIN_EDGE_M,
   updatePedestrian,
   type PedestrianAgent,
@@ -489,9 +490,15 @@ class TrafficSystemImpl implements TrafficSystem {
     // `worldLabel` bubbles hang off, and two agents sharing one id is a defect
     // that only shows up as a mislabelled person.
     if (cfg.sidewalkPedestrianCount > 0) {
-      const footwayless = new Set(cfg.footwaylessRoadClasses);
+      // The SAME predicate the budget is sized from — a count that says 2 and a
+      // filter that still offers a motorway ramp is how the ramp got populated.
+      const footwayless = footwaylessEdgeIds(
+        district.roads.edges,
+        cfg.footwaylessRoadClasses,
+        cfg.laneWidthM,
+      );
       const walkable = district.roads.edges.filter(
-        (e) => !footwayless.has(e.class) && e.geometry.length >= 2 && e.length >= SIDEWALK_MIN_EDGE_M,
+        (e) => !footwayless.has(e.id) && e.geometry.length >= 2 && e.length >= SIDEWALK_MIN_EDGE_M,
       );
       if (cfg.anchor) {
         // Nearest edge midpoint first — people where the driver is, the same

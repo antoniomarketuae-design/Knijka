@@ -336,15 +336,26 @@ function makeLnStack(events: StagedEventSpec[]): Stack {
  * `mode: "makeWay"` is the same line driven by a student who does the чл. 91
  * thing once the boulevard is under him: eases to the yield pace and holds the
  * right edge (`yieldSlowKmh` 38 and `yieldShiftM` 0.8 — this does both).
+ *
+ * `mode: "liftOff"` isolates the SLOW half, and it is the case
+ * `EM_YIELD_DROP_KMH` (orchestrator/runners.ts) had to be chosen against. The
+ * student is ALREADY under the make-way level when the duty arms — 10.5 m/s =
+ * 37.8 км/ч against `yieldSlowKmh` 38, i.e. the exact shape that used to be a
+ * free certificate — and then genuinely lifts off to 8.5 m/s (30.6 км/ч, a
+ * 7.2 км/ч drop). He never moves laterally and never indicates, so the
+ * `yieldShiftM` branch cannot rescue him: if the drop threshold is ever raised
+ * past what a lawfully-slow student can give, this goes red rather than the
+ * repair quietly turning into a false refusal.
  */
-function driveEmergency(mode: "ignore" | "makeWay"): {
+function driveEmergency(mode: "ignore" | "makeWay" | "liftOff"): {
   ruleEvents: Stack["ruleEvents"];
 } {
   const stack = makeLnStack([...(SC_VU_EMERGENCY.staged ?? [])] as StagedEventSpec[]);
   let y = 15;
   let v = 0;
   for (let i = 0; i < 40 * 30 && y < 358; i++) {
-    const targetMps = mode === "ignore" ? 16.4 : y > 80 ? 8.3 : 13.3;
+    const targetMps =
+      mode === "ignore" ? 16.4 : mode === "liftOff" ? (y > 80 ? 8.5 : 10.5) : y > 80 ? 8.3 : 13.3;
     if (v < targetMps) v = Math.min(targetMps, v + PLAYER_ACCEL_MPS2 * DT);
     else v = Math.max(targetMps, v - PLAYER_DECEL_MPS2 * DT);
     y += v * DT;
@@ -380,6 +391,19 @@ describe("sc-vu-emergency: the make-way commendation has to be earned", () => {
     // it. If this goes red the fix above has turned a false pass into a false
     // refusal, which teaches the wrong thing exactly as hard.
     const { ruleEvents } = driveEmergency("makeWay");
+    expect(codesOf(ruleEvents, "commendation")).toContain("YIELDED_TO_PRIORITY");
+    expect(codesOf(ruleEvents, "violation")).not.toContain("EMERGENCY_NOT_YIELDED");
+  });
+
+  it("the lawfully-slow student who lifts off keeps the credit — no lateral move", () => {
+    // THE THIRD DIRECTION, added with `EM_YIELD_DROP_KMH` (DEFECT 7). The
+    // repair that stopped paying the 10 км/ч crawl had to keep paying THIS
+    // drive, which is under `yieldSlowKmh` before the duty ever arms and does
+    // nothing but slow down. The `yieldShiftM` branch is deliberately unusable
+    // here (x is constant), so this test can only be green through the slow
+    // half — it is the mutation guard on the drop threshold from below, the way
+    // the crawl in `vru-staged-encounter-reach.test.ts` is the guard from above.
+    const { ruleEvents } = driveEmergency("liftOff");
     expect(codesOf(ruleEvents, "commendation")).toContain("YIELDED_TO_PRIORITY");
     expect(codesOf(ruleEvents, "violation")).not.toContain("EMERGENCY_NOT_YIELDED");
   });

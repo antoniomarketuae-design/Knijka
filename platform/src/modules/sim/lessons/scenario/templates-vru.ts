@@ -192,7 +192,12 @@
  *     demos are about — see VU_EV_CROSSING (with the arm/hold ladder).
  *     STILL OPEN (needs traces/scVuEmergencyJunction.ts retimed + re-recorded).
  *  7. sc-vu-emergency commends a car that merely never got going — see
- *     EM_APPROACH. STILL OPEN (runner).
+ *     EM_APPROACH. CLOSED 2026-09-04 in the runner, where the note said it had
+ *     to be: `EM_YIELD_DROP_KMH` (orchestrator/runners.ts) makes the slow half
+ *     a measured DROP from the pace held while the ambulance closed, so the
+ *     level `yieldSlowKmh` keeps its meaning and the crawl stops being a free
+ *     certificate. Both directions and the lawfully-slow lift-off in
+ *     vru-title-truth-and-encounter.test.ts §3.
  *  8. sc-vu-pass-clearance's hold has never held — see VU_PASS_CYCLIST.
  *     CLOSED 2026-08-22, and the sentence that used to stand here — „NOT ONE of
  *     them can be closed inside this file" — was wrong about this one. It rested
@@ -644,6 +649,13 @@ const EM_APPROACH: EmergencyApproachSpec = {
   //   margin, or the existing `yieldShiftM` lateral move), so „made way" means
   //   the driver did something. Leave this at 38: it is the level a genuine
   //   yielder has to reach, and it is correct.
+  //   ✅ LANDED 2026-09-04 as `EM_YIELD_DROP_KMH` (5 км/ч), with ONE correction
+  //   to the prescription above: the baseline is the peak held since the
+  //   ambulance was RELEASED, not the speed at the arm. On the authored
+  //   make-way drive the duty arms a second INTO the deceleration, so an
+  //   arm-instant baseline would have priced a student's whole чл. 91 response
+  //   at the 1.8 км/ч he still had left to give. This number is untouched, as
+  //   the paragraph above instructs.
   yieldSlowKmh: 38, // ~12 under the posted 50
   passAheadM: 18,
   clearSpeedMps: 21,

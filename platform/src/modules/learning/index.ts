@@ -68,6 +68,7 @@ export type { SimSeverity } from "./store";
 // trend page deep-import `@/modules/learning/calibrationStore`.
 export {
   ACCURATE_BAND_POINTS,
+  CALIBRATION_BEYOND_SCALE_TITLE_BG,
   CALIBRATION_MIN_SAMPLES,
   CALIBRATION_PENDING_BODY_BG,
   CALIBRATION_PENDING_TITLE_BG,
@@ -75,9 +76,12 @@ export {
   CALIBRATION_VERDICT_BODY_BG,
   CALIBRATION_VERDICT_TITLE_BG,
   MAX_PREDICTED_POINTS,
+  calibrationBeyondScaleBodyBg,
   calibrationError,
+  calibrationRevealCopy,
   classifyCalibration,
   formatCalibrationError,
+  isBeyondPredictableScale,
   isResultScreenHeld,
   parsePredictionInput,
   summarizeCalibration,
@@ -86,6 +90,7 @@ export {
 export type {
   CalibrationPoint,
   CalibrationRecord,
+  CalibrationRevealCopy,
   CalibrationSummary,
   CalibrationVerdict,
   GateSequenceState,

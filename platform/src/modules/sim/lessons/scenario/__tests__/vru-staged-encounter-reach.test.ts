@@ -522,19 +522,32 @@ describe("sc-vu-emergency: the чл. 91 commendation — must stay true", () => 
   });
 });
 
-describe("sc-vu-emergency: the slow car that did nothing — TRIPWIRE: red is the goal", () => {
-  it("a car held at 10 км/ч, never braking, never shifting, is commended for making way", () => {
-    // «✓ Правилно отстъпено предимство» at 0:06 (pc) / 0:14 (mobile) on both
-    // careful legs of the sweep. `slowedKeepingRight` asks an absolute
-    // question and a car that was never fast answers yes forever — see
-    // DEFECT 7 at EM_APPROACH for why lowering yieldSlowKmh is the wrong cure.
-    //
-    // WHEN THE RUNNER REPAIR LANDS (latch the slow half on a measured DROP
-    // after the arm), this becomes:
-    //     expect(leg.commendations).not.toContain("YIELDED_TO_PRIORITY");
-    //     expect(leg.violations).toContain("EMERGENCY_NOT_YIELDED");
+describe("sc-vu-emergency: the slow car that did nothing — the tripwire has fired", () => {
+  // DEFECT 7 IS CLOSED (EM_YIELD_DROP_KMH, orchestrator/runners.ts). This was
+  // the characterisation pin, and it went red the day the repair landed, which
+  // is what it was for. What replaces it is the property, not the old symptom
+  // inverted.
+  //
+  // ONE HALF OF THE REPLACEMENT THE PIN NAMED IS WITHDRAWN, AND THE MEASUREMENT
+  // IS WHY. It read „…and `expect(leg.violations).toContain('EMERGENCY_NOT_
+  // YIELDED')`". Measured here after the repair the crawl comes back with
+  // NEITHER code, and that is the correct answer rather than a shortfall: this
+  // car is in the RIGHT lane (x = 12.19) and the ambulance's чл. 91 corridor is
+  // the LEFT one (x = 4.06), so nothing was ever obstructed — the EV passes and
+  // the runner resolves "clear". The conviction branch tests the player's speed
+  // independently and more strictly (`yieldSlowKmh + EM_SPEED_MARGIN_KMH`), and
+  // convicting a car that is not at speed and not in the corridor would be the
+  // false refusal the DEFECT 7 note forbids in the same breath as the false
+  // certificate. The lesson still tells this student the truth: he never
+  // completed «Отдръпни се вдясно и пропусни линейката», so the debrief prints
+  // the unmet objective instead of praise he did not earn.
+  it("is no longer commended for making way", () => {
     const leg = emergencyLeg(CRAWL_MPS);
-    expect(leg.commendations).toContain("YIELDED_TO_PRIORITY");
+    expect(leg.commendations).not.toContain("YIELDED_TO_PRIORITY");
+  });
+
+  it("…and is not falsely convicted either — it obstructed nothing", () => {
+    const leg = emergencyLeg(CRAWL_MPS);
     expect(leg.violations).not.toContain("EMERGENCY_NOT_YIELDED");
   });
 });
