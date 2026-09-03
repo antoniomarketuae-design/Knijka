@@ -823,10 +823,16 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
     // The officer outranks the lamp on the run-out too — the route ends north
     // of sc-sig-controller-live's junction, so a hold there is the same
     // junction with the objectives spent.
-    return trailing.reason === "redLight" &&
-      lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))
-      ? controllerWaitAdvisorPrompt()
-      : yieldWaitAdvisorPrompt(trailing.reason, heldWaitSec(s, trailing));
+    if (trailing.reason === "redLight") {
+      if (lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))) {
+        return controllerWaitAdvisorPrompt();
+      }
+      // …and the rails outrank the lamp's second clause on the run-out too:
+      // sc-rx-tram-left's route ends 50 m south of the junction the tram
+      // crosses, so a hold there is the same junction with the chain spent.
+      if (lessonYieldsToRailVehicle(s.lesson)) return railPriorityWaitAdvisorPrompt();
+    }
+    return yieldWaitAdvisorPrompt(trailing.reason, heldWaitSec(s, trailing));
   }
   const active = s.objectives[s.currentObjectiveIndex];
 
@@ -861,6 +867,14 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
   if (waiting !== undefined && waiting.holding && waiting.reason !== null) {
     if (waiting.reason === "redLight" && lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))) {
       return controllerWaitAdvisorPrompt();
+    }
+    // RX-05 (sc-rx-tram-left:07c63b97): the lamp keeps its authority here — the
+    // red is real — but not its unconditional «Тръгваш на зелено», because the
+    // same green releases the tram this turn crosses (ЗДвП чл. 8, ал. 2). The
+    // officer is asked first: a junction with both would be the officer's, and
+    // his card already refuses to say «Тръгваш на зелено» at all.
+    if (waiting.reason === "redLight" && lessonYieldsToRailVehicle(s.lesson)) {
+      return railPriorityWaitAdvisorPrompt();
     }
     return yieldWaitAdvisorPrompt(waiting.reason, heldWaitSec(s, waiting));
   }
@@ -1335,6 +1349,140 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// RX-05 — WHERE THE RAILS RUN IN THE CARRIAGEWAY, GREEN IS NOT THE LAST WORD
+//
+// MEASURED, sc-rx-tram-left:07c63b97 (critical), `.audit-frames/w10-4/frames/
+// sc-rx-tram-left__mobile-right/06-waited.png` + run.log 168–260. The drill's
+// whole subject is the tram — briefing 3 «Насреща се задава трамвай. Той има
+// предимство независимо от посоката си», briefing 4 «трамваят трябва да
+// премине ИЗЦЯЛО». What the student was actually told for the entire wait was:
+//
+//   t=37 s  card    «Чакаш правилно на червено. Тръгваш на зелено …»
+//   t=44 s  НАУЧИ   «Защо чакаш: червен сигнал»
+//   t=56 s  НАУЧИ   «Изчака сигнала и тръгна чисто … без отчетено нарушение
+//                    на сигнала»
+//
+// Three surfaces, one lamp, and no tram anywhere. That is requirement zero
+// (doc 64 THEO-4) failing on the one lesson it matters most on, and the
+// generic clause is worse than silent here: «Тръгваш на зелено» IS the fatal
+// misreading this drill exists to break. ЗДвП чл. 8, ал. 2 (retrieved,
+// content/law/acts/zdvp.json units[7]) says the opposite in as many words —
+// „Когато на дадено място от пътя ЕДНОВРЕМЕННО е разрешено преминаването на
+// нерелсови и релсови пътни превозни средства, водачът на нерелсовото … е
+// длъжен да пропусне релсовото … независимо от неговото местоположение и
+// посока на движение." Simultaneously permitted IS green for both.
+//
+// SAME DOCTRINE AS THE OFFICER, ONE DIFFERENCE. `lessonStagesController`
+// displaces the lamp card because the lamp decides nothing there. Here it
+// decides plenty — the red is real and stopping for it is right — so the card
+// is not replaced by a different duty, it is CORRECTED: the wait keeps its
+// approval and the green loses its unconditional half.
+// ---------------------------------------------------------------------------
+
+/**
+ * Does this lesson turn LEFT across a rail vehicle that outranks the lamp?
+ *
+ * Read off `conceptIds`, not off authored prose. The officer had no structured
+ * marker and had to be read out of the copy; this duty has one, and it is the
+ * same id the content bank cites чл. 8, ал. 2 against
+ * (`lesson/clearanceCitations.ts` `c-tram-priority` → „ЗДвП чл. 8, ал. 2 ·
+ * ЗДвП чл. 48"). A substring test on «трамвай»/«релси» would additionally
+ * catch every ЖП-прелез drill — sc-rxd-train, sc-rx-crossing — whose duty is
+ * чл. 51–53 and for whom „the tram goes first" is not the sentence owed.
+ *
+ * BOTH ids are required because both clauses of the copy have to be true. The
+ * card names an ONCOMING tram and a LEFT TURN, which is `c-left-turn-oncoming`
+ * (чл. 37, ал. 1); the priority claim is `c-tram-priority` (чл. 8, ал. 2).
+ * Measured over the compiled catalogue exactly one template carries the pair —
+ * sc-rx-tram-left — and the two tram-STOP drills (sc-rx-tram-island,
+ * sc-rx-tram-stop-doors) carry only the first and keep every card they had.
+ * They could not reach this branch in any case: both are authored
+ * `signalized: "no"`, so no `redLight` reason can arise on them at all.
+ * `advisor-rail-priority-wait.test.ts` pins that census.
+ *
+ * AN OFFICER'S JUNCTION IS NOT ONE OF THESE, and the exclusion is not tidiness.
+ * The CARD asks `lessonStagesController` first, so a junction with both would
+ * take the officer's card either way — but `stepYieldVoice` has no officer
+ * branch at all (see `redLight`'s `settledBg` note), which is precisely why the
+ * generic lamp copy carries чл. 6, т. 2's exception in every one of its stages.
+ * Swapping that copy out on a lesson that stages an officer would DELETE the
+ * exception from the teach channel, so a lesson whose own authored copy names
+ * him keeps the copy that names him back. No shipped template does both.
+ */
+export function lessonYieldsToRailVehicle(lesson: LessonSpec): boolean {
+  const ids = lesson.conceptIds;
+  if (!ids.includes("c-tram-priority") || !ids.includes("c-left-turn-oncoming")) return false;
+  if (CONTROLLER_RX.test(lesson.titleBg)) return false;
+  return lesson.briefingBg?.some((step) => CONTROLLER_RX.test(step.textBg)) !== true;
+}
+
+/**
+ * RETRIEVED, never recalled (ADR-002). Both articles are read out of
+ * content/law/acts/zdvp.json and both are already the template's own authored
+ * `teach.lawRef` («ЗДвП чл. 8, ал. 2 и чл. 37»), so the line spoken during the
+ * wait cites what the drill's own teach card cites.
+ *
+ *   чл. 8, ал. 2 — the rail vehicle goes first wherever passage is permitted
+ *                  to both, „независимо от неговото местоположение и посока".
+ *   чл. 37, ал. 1 — the left turn yields to the oncoming stream.
+ */
+const LAW_RAIL_PRIORITY = "ЗДвП чл. 8, ал. 2; чл. 37, ал. 1";
+
+/**
+ * WHAT THE INSTRUCTOR SAYS WHILE THE STUDENT IS STOPPED AT A RED WITH RAILS
+ * AHEAD — the same three stages, with the tram put back into all of them.
+ *
+ * WHAT IT MAY NOT SAY, and this is the half that took the most cutting: it may
+ * not congratulate him for having yielded to the tram. Nothing this module is
+ * handed can see the tram — `stepYieldVoice` gets a reason, a speed and the
+ * graded codes, and `SimTick` carries no channel for another actor's position
+ * (the same withdrawal `controllerWaitAdvisorPrompt` makes about the officer's
+ * posture and the pedestrian copy makes about where the car stopped). On the
+ * measured drive the red released him at t≈48 s and the tram had not passed
+ * yet: a verdict reading «Пропусна трамвая» would have been false on the very
+ * frame it was printed. So the verdict stage says what IS true — the signal
+ * released him, and the tram duty is still in front of him.
+ */
+const RAIL_PRIORITY_RED_COPY: YieldVoiceCopy = {
+  cardBg:
+    "Чакаш правилно на червено. Зеленото пуска и трамвая насреща, а той минава пръв: изчакай го да отмине изцяло и чак тогава завивай.",
+  // No long-wait card, exactly as `redLight`: this wait ends when a lamp turns
+  // and a tram clears, neither of which a second card may hint him past.
+  namedTitleBg: "Защо чакаш: червен сигнал и релси в платното",
+  namedBg:
+    "Спрял си пред стоп-линията и на червено това е правилното: спира се напълно ПРЕД линията. Но зеленото тук не е разрешение да завиеш — когато на дадено място едновременно е разрешено преминаването на нерелсови и релсови пътни превозни средства, водачът на нерелсовото е длъжен да пропусне релсовото независимо от местоположението и посоката му. Насрещният трамвай минава пръв, а левият завой пресича трасето му: изчакай го да премине изцяло и чак тогава завивай.",
+  settledTitleBg: "Чакането Е маневрата — трамваят минава пръв",
+  settledBg: (sec) =>
+    `${sec} секунди на червено са просто цикълът на светофара, не грешка — тези секунди се изваждат от ориентировъчното време на урока. Използвай ги, за да решиш едно предварително: зеленото ще пусне и трамвая срещу теб. Той спира в пъти по-дълго от кола и не може да те заобиколи — релсите не завиват — затова първо минава той, а ти завиваш след него.`,
+  verdictTitleBg: "Сигналът те пусна — трамваят не",
+  verdictBg: (sec) =>
+    `Изчака ${sec} с и премина на разрешаващ сигнал — без отчетено нарушение на сигнала. Дотук стига зеленото: то не решава кой минава пръв през релсите. Насрещният трамвай се пропуска независимо от посоката му, така че преди да завиеш наляво изчакай трасето да е чисто по цялата му дължина.`,
+  lawRef: LAW_RAIL_PRIORITY,
+};
+
+/** The live-wait card at a red the rails do not release. */
+export function railPriorityWaitAdvisorPrompt(): AdvisorPrompt {
+  // No key chips, for the reason `yieldWaitAdvisorPrompt` gives: neither
+  // „carry on waiting" nor „watch the tram" is a control this car has.
+  return { textBg: RAIL_PRIORITY_RED_COPY.cardBg, keys: [] };
+}
+
+/**
+ * The copy one wait speaks with. `railPriority` is a property of the LESSON
+ * and therefore constant for a session, so the verdict stage may read it at
+ * verdict time instead of banking it in `YieldVoiceState`.
+ *
+ * Only `redLight` is corrected. A pedestrian, a Б1 or a roundabout on the same
+ * drill is exactly what its own card says it is — the same scoping the officer
+ * displacement uses, and for the same reason.
+ */
+function yieldVoiceCopyFor(reason: YieldReason, railPriority: boolean): YieldVoiceCopy {
+  return railPriority && reason === "redLight"
+    ? RAIL_PRIORITY_RED_COPY
+    : YIELD_VOICE_COPY[reason];
+}
+
 /**
  * The card line for a live wait — constant per reason, by design (rule 1), with
  * the ONE documented transition at YIELD_CARD_LONG_WAIT_S.
@@ -1412,6 +1560,16 @@ export interface YieldVoiceInput {
   wait: YieldWaitState;
   /** Codes GRADED on this frame — the engine's own rule output, read only. */
   violations: readonly ViolationCode[];
+  /**
+   * Does this LESSON turn left across a rail vehicle (`lessonYieldsToRailVehicle`)?
+   *
+   * The card and this channel had to learn it together or they read as two
+   * different screens: sc-rx-tram-left:07c63b97 photographed the card saying
+   * one thing while «Защо чакаш: червен сигнал» said another five seconds
+   * later. Optional so every existing caller and test double is unchanged, and
+   * absent means „no" — the generic copy, byte-identical.
+   */
+  railPriority?: boolean;
 }
 
 /** What the voice produced this frame. `notices` is empty on almost all of them. */
@@ -1448,6 +1606,7 @@ export function stepYieldVoice(
   input: YieldVoiceInput,
 ): YieldVoiceStep {
   const { t, wait, violations } = input;
+  const railPriority = input.railPriority === true;
   const base = prev ?? createYieldVoice();
   const notices: HudEvent[] = [];
   const moving = Math.abs(input.speedKmh) > YIELD_VOICE_STANDSTILL_KMH;
@@ -1474,7 +1633,7 @@ export function stepYieldVoice(
       if (moving) pending = { ...pending, wentAtSec: t };
       else if (t - (endedAtSec ?? t) > YIELD_VOICE_DEPART_GRACE_S) pending = null;
     } else if (t - pending.wentAtSec >= YIELD_VOICE_VERDICT_S) {
-      const copy = YIELD_VOICE_COPY[pending.reason];
+      const copy = yieldVoiceCopyFor(pending.reason, railPriority);
       notices.push(
         say(copy, copy.verdictTitleBg, copy.verdictBg(Math.max(1, Math.round(pending.waitedSec)))),
       );
@@ -1517,7 +1676,7 @@ export function stepYieldVoice(
     endedAtSec = null;
 
     const heldSec = t - sinceSec;
-    const copy = YIELD_VOICE_COPY[wait.reason];
+    const copy = yieldVoiceCopyFor(wait.reason, railPriority);
     if (spoken < 1 && heldSec >= YIELD_VOICE_NAME_S) {
       notices.push(say(copy, copy.namedTitleBg, copy.namedBg));
       spoken = 1;

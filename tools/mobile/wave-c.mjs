@@ -38,9 +38,14 @@
  *
  * OUTPUT
  *   <out>/wave-c-results.jsonl — one row per drive: lesson, leg, exit, verdict,
- *   score, stars, frames, lost, endedNaturally, forcedBy, attested commit, and
- *   the two INPUT guards — lostKeys, refusedReversePress — that say whether the
- *   drive's own pedals arrived (lib/summary.mjs; sc-speed-creep:84ba5dbf).
+ *   score, stars, frames, lost, endedNaturally, forcedBy, attested commit, the
+ *   two INPUT guards — lostKeys, refusedReversePress — that say whether the
+ *   drive's own pedals arrived (lib/summary.mjs; sc-speed-creep:84ba5dbf), and
+ *   the CHANNEL those pedals arrived on — inputChannel, driveKeyEvents,
+ *   touchEvents, touchOverlay (sc-speed-creep:dff70553). `touchEvents: 0` on a
+ *   mobile row is the fact that refuses a finding addressed to
+ *   TouchControls.tsx: this harness drives a phone-sized viewport with a
+ *   KEYBOARD, so no drive it takes can exercise a thumb pad.
  *   Append-only, so an interrupted run resumes without losing what it measured.
  *   <out>/frames/<lesson>__<leg>/run.log — the whole transcript, kept.
  */
@@ -219,6 +224,9 @@ for (const p of planned) {
     `[${String(ran).padStart(3)}/${planned.length}] ${p.lesson} ${p.leg} ` +
       `exit=${res.status} verdict=${s.verdict ?? "-"} score=${s.score ?? "-"} ` +
       `frames=${s.frames ?? "-"}${s.lost && s.lost !== "0" ? ` LOST=${s.lost}` : ""}` +
+      // The channel, on the console line and not only in the row: a dispatcher
+      // reading this scroll is the reader who routes the finding.
+      ` in=${s.inputChannel ?? "?"}/touch=${s.touchEvents ?? "?"}` +
       (s.treeMoved ? "  !! TREE MOVED — certifies nothing" : "") +
       (timedOut ? "  !! KILLED at the drive timeout — re-drive it" : ""),
   );

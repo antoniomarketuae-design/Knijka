@@ -394,12 +394,21 @@ export function scJunction2TraceNames(templateId: ScJunction2TemplateId): ScJunc
  * Record one S3 batch-4 drive against ITS loaded district document — staged
  * events from the template (the same set compiled lessons run). Deterministic:
  * same district → same trace (seed 7, the house recording seed).
+ *
+ * `vehicleCount` / `pedestrianCount` / `seed` exist so a GATE can replay the
+ * committed shadow at the density the RUNG COMPILES TO instead of the
+ * recorder's default 0 (`sc-junction-blind:dea35510`, w21-w23). Every shipped
+ * recording still omits them, so the committed traces are byte-identical: the
+ * defaults below are the house recording law and the keys are opt-in.
  */
 export function recordScJunction2Drive(
   districtRaw: unknown,
   templateId: ScJunction2TemplateId,
   name: ScJunction2TraceName,
-  extra?: Pick<RecordScriptedDriveOptions, "onTick">,
+  extra?: Pick<
+    RecordScriptedDriveOptions,
+    "onTick" | "seed" | "vehicleCount" | "pedestrianCount"
+  >,
 ): RecordedDrive {
   const template = SC_JUNCTION2_RECORDINGS[templateId];
   const rec = template.drives[name];
@@ -407,9 +416,11 @@ export function recordScJunction2Drive(
   return recordScriptedDrive(districtRaw, rec.script(), {
     scenarioId: templateId,
     kind: rec.kind,
-    seed: 7,
+    seed: extra?.seed ?? 7,
     stagedEvents: template.stagedEvents,
     collisionMinKmh: 0,
+    ...(extra?.vehicleCount === undefined ? {} : { vehicleCount: extra.vehicleCount }),
+    ...(extra?.pedestrianCount === undefined ? {} : { pedestrianCount: extra.pedestrianCount }),
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });
 }

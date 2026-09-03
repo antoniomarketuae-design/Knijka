@@ -310,6 +310,15 @@ export const RECIPES = {
   // Report-only without --apply, so the check runs it exactly as a reader would
   // and it touches nothing.
   "apply-reroute.mjs": (t) => ({ args: [] }),
+  // The lesson-grouped wave generator (2026-09-03) — the shape that took wave
+  // output from 71 lines to 3,090. Registered the day it moved into the repo,
+  // because this check refused the round it appeared in, which is exactly what
+  // it is for. One argument, the output path; it honours an absolute one so
+  // this probe never touches the .audit-frames work-list a sweep may be reading.
+  "make-lesson-wave.mjs": (t) => {
+    const out = path.join(t, "lesson-wave-probe.js");
+    return { args: [out], emits: "file", file: out };
+  },
   "make-repair-wave.mjs": (t) => {
     const out = path.join(t, "repair-wave-probe.js");
     return { args: [out, "1", "1"], emits: "file", file: out };

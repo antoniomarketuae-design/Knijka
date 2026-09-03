@@ -709,8 +709,15 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     titleBg: "Непропускане на предимство",
     explanationBg:
       "Не пропусна превозно средство, което имаше предимство. На кръстовище без светофар пропускаш идващите отдясно; при знак „Пропусни движението“ — всички по главния път. Предимството се отстъпва, не се взема.",
+    // CORRECTIVE WIDENED TO THE RING, 2026-09-03 (sc-roundabout-entry). It is
+    // read BY CODE at display time with no event in hand — the COLLISION row's
+    // constraint, and the same „not a licence to give ONE situation's answer"
+    // that made that row walk all four bodies. It said „огледай дясно", and at
+    // a roundabout the priority traffic is on the LEFT: the one arm it did not
+    // walk was the one where its instruction is the classic fatal error. The
+    // junction answer is untouched; the ring arm is added beside it.
     correctiveBg:
-      "Приближавай кръстовището с готовност за пълно спиране: свали скоростта, огледай дясно (или главния път при Б1) и потегли само когато никой не приближава.",
+      "Приближавай кръстовището с готовност за пълно спиране: свали скоростта, огледай дясно (или главния път при Б1) и потегли само когато никой не приближава. На кръгово гледаш НАЛЯВО — движещите се в кръга идват оттам и имат предимство; влизаш само в реален интервал.",
     // CITATION WIDENED 2026-08-09. This cited чл. 47 alone, which is the
     // APPROACH-SPEED duty („да се движи с такава скорост, че при необходимост да
     // може да спре и да пропусне") — the rule you break by arriving too fast,
@@ -2226,6 +2233,75 @@ export const WRONG_WAY_ROAD_COPY: Record<
 };
 
 /**
+ * FAILED_TO_YIELD at a ROUNDABOUT — sc-roundabout-entry, 2026-09-03.
+ *
+ * THE DEFECT IS ALREADY WRITTEN DOWN IN THIS PRODUCT'S OWN SOURCE, by the wave
+ * that fixed the other half of it. `runtime/worldRuntime.ts`, at the guard that
+ * keeps the right-hand-rule tracker off a ring mouth: „The card even printed
+ * the wrong law back at him: «На кръстовище без светофар пропускаш идващите
+ * отдясно.»" That sentence is this row's pooled `explanationBg`, and it is
+ * still what a roundabout conviction prints. The DETECTOR was corrected; the
+ * CARD was routed and never touched.
+ *
+ * PHOTOGRAPHED AT HEAD, `.audit-frames/w23/frames/sc-roundabout-entry__
+ * mobile-right/04-t041s.png`: «⚠ −10 ИЗПИТНИ Т. · Непропускане на предимство ·
+ * Не пропусна превозно средство, което имаше предимство. На…», i.e. the two
+ * lines the peek can finish are the true half, and the first thing under the
+ * fold is the rule for the wrong kind of junction. The same lesson's own
+ * instruction step 2 reads «Гледай наляво — движещите се в кръга имат
+ * предимство» (`scenario/templates-flow.ts`), so the student is taught LEFT in
+ * the briefing and told RIGHT by the card that costs him ten points. THEO-4
+ * forbids a bare verdict; a verdict that explains itself with the opposite rule
+ * is that failure with a costume on.
+ *
+ * THE DISCRIMINATOR WAS ALREADY ON THE WIRE — `engine.ts`'s `prioritySituation`
+ * case bills `{ detail: e.situation }`, and `worldRuntime` §4c emits
+ * `situation: "roundabout"` for an ENTERING driver only (`inward >=
+ * ROUNDABOUT_INWARD_MIN && !onRing`), never for one already circulating. So
+ * this is copy keyed on a shipped field, the mechanism RAIL_CROSSING_ACT_COPY,
+ * COLLISION_CONTACT_COPY and WRONG_WAY_ROAD_COPY already use, and it crosses to
+ * the server's `rebuildRuleEvents` through `detail` like they do.
+ *
+ * RETRIEVED, NOT RECALLED (ADR-002). ЗДвП чл. 50, ал. 1 verbatim from
+ * `content/law/acts/zdvp.json`: „На кръстовище, на което единият от пътищата е
+ * сигнализиран като път с предимство, водачите на пътни превозни средства от
+ * другите пътища са длъжни да пропуснат пътните превозни средства, които се
+ * движат по пътя с предимство." чл. 48 is quoted for what it is — the
+ * EQUAL-junction rule — from the same file. The Б3 step is stated NUMBERLESS,
+ * exactly as this lesson's own `teach.lawRef` states it: Наредба
+ * № РД-02-21-1/23.11.2023 is not in the repo, and the frozen rule for that is
+ * „names an article we cannot resolve — drop the number".
+ *
+ * `lawRef` NARROWS RATHER THAN ADDS, which is the RAIL row's discipline: the
+ * pooled citation lists чл. 47, чл. 48 and чл. 50, ал. 1 because it is read by
+ * code with no event in hand, and an event that knows the act names the one
+ * article the act breaks. Here that is чл. 50, ал. 1 — and чл. 48, the article
+ * the pooled sentence leads with, is precisely the one this act does NOT break.
+ * Byte-identical to what the lesson's own barge-entry mistake card cites.
+ *
+ * THE TITLE IS SHORTER THAN THE POOLED ONE ON PURPOSE (22 characters against
+ * 26), and it is the same string `SC_ROUNDABOUT_ENTRY.mistakes[0].titleBg`
+ * already uses for this act. `hud/SimOverlay.tsx` states the arithmetic this
+ * obeys — the phone's peek floors its text window at 44 px, a title line box is
+ * 13.75 and the body's first line needs 15.125 — so a longer title would have
+ * bought the correct rule by deleting a line of it, which is the other row this
+ * lane is answering (`sc-roundabout-entry:fe081cf1`, „the body text is cut").
+ */
+export const FAILED_TO_YIELD_SITUATION_ROUNDABOUT = "roundabout";
+
+export const FAILED_TO_YIELD_SITUATION_COPY: Record<
+  string,
+  { titleBg: string; explanationBg: string; lawRef: string }
+> = {
+  [FAILED_TO_YIELD_SITUATION_ROUNDABOUT]: {
+    titleBg: "Влизане без пропускане",
+    explanationBg:
+      "Влезе в кръга пред кола, която вече се движеше в него. Тя има предимство и идва ОТЛЯВО, защото в кръговото се обикаля обратно на часовниковата стрелка. На входа на кръгово кръстовище знакът „Път с предимство“ не се поставя (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), затова там стои Б1 „Пропусни движението“ или Б2 „Спри!“ — ти си на пътя без предимство, а ЗДвП чл. 50, ал. 1 задължава водачите от другите пътища да пропуснат движещите се по пътя с предимство, и тук този път е самият кръг. „Пропусни идващите отдясно“ е чл. 48 и важи за кръстовище на равнозначни пътища — на кръгово не се прилага. Затова гледаш наляво, изчакваш реален интервал и чак тогава влизаш.",
+    lawRef: "ЗДвП чл. 50, ал. 1",
+  },
+};
+
+/**
  * The per-act tables, keyed by the code that owns each. A registry rather than a
  * chain of `if (code === …)`: the next code that grades more than one act adds a
  * row here and `makeViolation` picks it up for every producer at once.
@@ -2236,6 +2312,7 @@ const PER_ACT_COPY: Partial<
   RAIL_CROSSING_VIOLATION: RAIL_CROSSING_ACT_COPY,
   COLLISION: COLLISION_CONTACT_COPY,
   WRONG_WAY: WRONG_WAY_ROAD_COPY,
+  FAILED_TO_YIELD: FAILED_TO_YIELD_SITUATION_COPY,
 };
 
 /**

@@ -59,6 +59,34 @@ export const INPUT_GUARDS = {
     /refused\s+(\d+)\s+standstill brake press(?:es)?\s+\(would have selected R\)/,
 };
 
+/**
+ * WHICH CHANNEL DROVE THE CAR — `sc-speed-creep:dff70553`.
+ *
+ * The row that closes here: „the brake-drop family is mis-named — the harness
+ * never dispatches a touch, so it cannot exercise TouchControls.tsx, the
+ * suspect file all five rows name." The harness now states its channel on
+ * every lane (`lesson-audit.mjs`, the INPUT line beside DRIVE:), and this is
+ * what carries it into `wave-c-results.jsonl`, where routing is decided.
+ *
+ * WITHOUT THE COLUMN THE ATTESTATION IS UNREACHABLE. It is one line in an
+ * ~84 KB transcript that only a reader who already suspects the answer would
+ * grep for — which is exactly how five criticals came to name a file no drive
+ * had touched. A dispatcher reading the ledger can now see `touchEvents: 0`
+ * beside every mobile row and refuse the address without opening a log.
+ *
+ * ABSENCE IS NULL, NEVER "keyboard". A drive that died before its summary
+ * stated no channel; answering „keyboard" there would be this module inventing
+ * an attestation the harness never made, in the reassuring direction.
+ */
+export const INPUT_ATTESTATION = {
+  /** «  INPUT: keyboard · 214 pedal/steer key events · …» */
+  channel: /^\s*INPUT:\s*(\S+)\s*·/m,
+  driveKeyEvents: /·\s*(\d+)\s*pedal\/steer key events/,
+  touchEvents: /·\s*(\d+)\s*touch events dispatched/,
+  /** «… · touch overlay mounted» — mounted | absent | unreadable */
+  touchOverlay: /·\s*touch overlay\s+(mounted|absent|unreadable)/,
+};
+
 /** Pull the machine summary the harness prints, which is the judgeable surface. */
 export function parseSummary(stdout) {
   const grab = (re) => {
@@ -70,6 +98,13 @@ export function parseSummary(stdout) {
     const m = re.exec(stdout);
     if (m) return Number(m[1]);
     return drove ? 0 : null;
+  };
+  /** A count the emitter prints UNCONDITIONALLY: present means the number,
+   *  absent means nobody looked. Never `drove ? 0 : null` — that reading
+   *  belongs to the two clauses that are appended only when non-zero. */
+  const num = (re) => {
+    const m = re.exec(stdout);
+    return m ? Number(m[1]) : null;
   };
   return {
     verdict: grab(/VERDICT:\s*(.+?)\s*·/),
@@ -84,5 +119,11 @@ export function parseSummary(stdout) {
     // null = the drive never printed a summary, so neither counter was taken.
     lostKeys: guard(INPUT_GUARDS.lostKeys),
     refusedReversePress: guard(INPUT_GUARDS.refusedReversePress),
+    // The channel attestation. Every field is null when the harness did not
+    // print the INPUT line — an unstated channel, not a defaulted one.
+    inputChannel: grab(INPUT_ATTESTATION.channel),
+    driveKeyEvents: num(INPUT_ATTESTATION.driveKeyEvents),
+    touchEvents: num(INPUT_ATTESTATION.touchEvents),
+    touchOverlay: grab(INPUT_ATTESTATION.touchOverlay),
   };
 }

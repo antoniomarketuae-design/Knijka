@@ -214,6 +214,7 @@ import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/ca
 import { SimAudio } from "@/modules/sim/scene/simAudio";
 import { AudioLessonPrompt } from "./AudioLessonPrompt";
 import { CameraRig, type CameraMode, type TopdownAidHandle } from "./CameraRig";
+import { ImpactCut, type ImpactCutHandle } from "./ImpactCut";
 import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
 import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "@/modules/sim/scene/vehicleSample";
@@ -1530,6 +1531,8 @@ export function ReadyScene({
   const cabinRef = useRef<CabinControls | null>(null);
   const audioRef = useRef<SimAudio | null>(null);
   const sampleRef = useRef<VehicleSample>(createVehicleSample());
+  /** The crash response (flash + exterior cut) — filled by `ImpactCut`. */
+  const impactCutRef = useRef<ImpactCutHandle | null>(null);
   const [cockpit, setCockpit] = useState(true);
   // Difficulty: EVERY SCENE OPENS AT DEFAULT_DIFFICULTY ("normal" since the
   // 2026-07-19 founder ruling — beginner's 40 km/h governor made speeding
@@ -2151,8 +2154,12 @@ export function ReadyScene({
   const readWindLateralN = useCallback(() => simRef.current?.windLateralNow ?? 0, []);
 
   const handleCollision = useCallback(
-    (_impactKmh: number, withWhat: CollisionWithWhat) => {
+    (impactKmh: number, withWhat: CollisionWithWhat) => {
       const sample = sampleRef.current;
+      // f0023997: the crash has to be VISIBLE. Presentation only — it reads no
+      // grading state and writes none, so a refused cut can never change a
+      // verdict (`ImpactCut`'s header carries the measurement).
+      impactCutRef.current?.impact(impactKmh);
       runtime.pushCollision(
         withWhat,
         nameLiveContact(
@@ -2545,6 +2552,18 @@ export function ReadyScene({
         ) : null}
         {cockpit && rain ? <WindshieldDroplets wiperRef={wiperVisualRef} /> : null}
       </Canvas>
+
+      {/* The crash response (sweep161 f0023997: „no impact effect … just a
+          blank orange wall with the coach still talking over it"). Isolated
+          additive block in the RearProximityCue/FollowGapCue shape: it renders
+          nothing until a graded contact lands, reads only `sampleRef` to know
+          when to give the view back, and touches no grading path. */}
+      <ImpactCut
+        handleRef={impactCutRef}
+        sampleRef={sampleRef}
+        cameraModeRef={cameraModeRef}
+        applyCameraMode={applyCameraMode}
+      />
 
       {/* Controls legend — collapsible, top-left of the canvas (clear of the
           bottom cards + minimap). Collapsed by default on touch-only devices

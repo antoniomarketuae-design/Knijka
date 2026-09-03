@@ -50,6 +50,15 @@ export {
    */
   WRONG_WAY_ROAD_COPY,
   WRONG_WAY_ROAD_MOTORWAY,
+  /**
+   * FAILED_TO_YIELD's ROUNDABOUT act, and the `detail` key that selects it.
+   * Same reason as the two rows above: a surface that groups faults must be
+   * gated against the table the engine and `rebuildRuleEvents` build from, not
+   * against a copy of the sentence. See catalog.ts for the frame (a ring
+   * conviction explained with the right-hand rule).
+   */
+  FAILED_TO_YIELD_SITUATION_COPY,
+  FAILED_TO_YIELD_SITUATION_ROUNDABOUT,
   makeCommendation,
   makeViolation,
   type CommendationSpec,

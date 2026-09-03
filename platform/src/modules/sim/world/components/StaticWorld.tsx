@@ -45,6 +45,8 @@ import {
 import { usePbrSet } from "../textures/pbrTextures";
 import {
   ROAD_ALBEDO_TINT,
+  roadDecalSnowOnBeforeCompile,
+  roadDecalSnowProgramCacheKey,
   roadSurfaceOnBeforeCompile,
   roadSurfaceProgramCacheKey,
 } from "../textures/roadSurface";
@@ -117,6 +119,11 @@ const MACRO_VARIATION = {
  *     own, inside `roadSurface.ts`, at `SNOW_ROAD_COVER_MAX` 0.40 rather than
  *     this spread's 0.85, and with no normal-facing term because a carriageway
  *     is flat. Still not this hook, and for the same reason;
+ *   · the ROAD DECALS take `ROAD_DECAL_SNOW` — that same carriageway mix and
+ *     nothing else, because a crack is wear IN the road and takes the road's
+ *     snow. Not this spread (a decal is flat, and it would take the pavement's
+ *     0.85) and not `ROAD_SURFACE` (which detiles `map`, and their map is an
+ *     atlas). See the constant below;
  *   · the MARKINGS keep `PAINT_WEAR`. Burying the paint under snow is the one
  *     thing this must not do: the same discipline snowCover.ts states for sign
  *     faces and signal lenses — „a picture that buries the thing the student is
@@ -165,6 +172,22 @@ const GROUND_SNOW = {
 const ROAD_SURFACE = {
   onBeforeCompile: roadSurfaceOnBeforeCompile,
   customProgramCacheKey: roadSurfaceProgramCacheKey,
+} as const;
+
+/**
+ * Spread onto the ROAD DECALS material only: the carriageway's snow cover, and
+ * nothing else from the asphalt pass. Cracks, patches, oil and manholes are
+ * wear IN the carriageway, so they take its snow — without this they kept only
+ * `decalTint`'s multiply while the asphalt around them gained a mix, and the
+ * mix that closed `sc-ac-snow:f1673b60` for the road turned each decal into a
+ * hole of bare tarmac punched through it (w23 04-t016s: L89.4 in a road at
+ * L148.7). `roadSurface.ts`'s `roadDecalSnowOnBeforeCompile` says why it is not
+ * the asphalt hook — that one detiles `map`, and this material's map is the
+ * decal atlas.
+ */
+const ROAD_DECAL_SNOW = {
+  onBeforeCompile: roadDecalSnowOnBeforeCompile,
+  customProgramCacheKey: roadDecalSnowProgramCacheKey,
 } as const;
 
 /**
@@ -600,6 +623,7 @@ export function StaticWorld({
       geometries.roadDecals.getAttribute("position").count > 0 ? (
         <mesh geometry={geometries.roadDecals} receiveShadow={receive} renderOrder={1}>
           <meshStandardMaterial
+            {...ROAD_DECAL_SNOW}
             map={textures.decals}
             transparent
             depthWrite={false}

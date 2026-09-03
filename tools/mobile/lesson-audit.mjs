@@ -1278,6 +1278,32 @@ await beat("03-ready");
 await page.keyboard.press("KeyB").catch(() => {});
 await page.waitForTimeout(400);
 
+/* ── WHICH CHANNEL DROVE THE CAR — ATTESTED, NOT ASSUMED ───────────────────
+ *
+ * `sc-speed-creep:dff70553`: five criticals in the brake-drop family name
+ * `TouchControls.tsx` as their suspect, and no drive this harness has ever
+ * taken could have actuated it. Every pedal and every steer below is a
+ * `page.keyboard` event; this file actuates no touch surface at all — no CDP
+ * touch dispatch, no Playwright touch API (the sibling wave scripts wave6/7/8
+ * do; this one does not). So a `mobile` leg is a PHONE-SIZED VIEWPORT DRIVEN
+ * BY A KEYBOARD, and the 83-of-122 lost-brake rate that family was drawn from
+ * is a keystroke dropped in the WebKit iPhone context, not a thumb pad.
+ *
+ * The counters are measured in the helpers rather than claimed here, and
+ * `touchEvents` stays 0 by construction — `__tests__/wave-c-summary.test.mjs`
+ * §6 censuses this file for touch actuation, so the day a touch channel is
+ * added the attestation goes red instead of quietly lying. */
+const inputChannel = {
+  channel: "keyboard",
+  keys: { throttle: "KeyW", brake: "KeyS", left: "KeyA", right: "KeyD" },
+  /** Pedal + steer key events actually dispatched by this drive. */
+  driveKeyEvents: 0,
+  /** Touch events dispatched by this drive. Zero, and §6 keeps it zero. */
+  touchEvents: 0,
+  /** Was the touch overlay even on the page? Measured at the summary. */
+  overlayMounted: null,
+};
+
 // ── THE PEDALS ─────────────────────────────────────────────────────────────
 //
 // Held as STATE, not as bare key events, for one reason that has already put a
@@ -1292,6 +1318,7 @@ let holdW = false, holdS = false;
 const throttle = async (on) => {
   if (on === holdW) return;
   await page.keyboard[on ? "down" : "up"]("KeyW").catch(() => {});
+  inputChannel.driveKeyEvents += 1;
   holdW = on;
 };
 let refusedReversePress = 0;
@@ -1358,6 +1385,7 @@ const brake = async (on, kmh = null) => {
   }
   if (on) sPresses.push({ at: Date.now(), kmhAtIssue: kmh, via: "brake" });
   await page.keyboard[on ? "down" : "up"]("KeyS").catch(() => {});
+  inputChannel.driveKeyEvents += 1;
   holdS = on;
 };
 
@@ -1517,6 +1545,7 @@ const steer = async (dir, kmh = null, by = "trace") => {
     // so there is no instant in which both keys are down and the car is being
     // told to go straight while the harness believes it is turning.
     await page.keyboard.up(STEER_KEYS[steerHeld]).catch(() => {});
+    inputChannel.driveKeyEvents += 1;
     // …AND THE TIME IS BANKED TO WHOEVER PRESSED, NOT TO WHOEVER RELEASED.
     // `steerHeldBy` is carried from the press for exactly this: the liveness
     // check releases through `steer(null)`, and billing that release to the
@@ -1529,6 +1558,7 @@ const steer = async (dir, kmh = null, by = "trace") => {
   }
   if (dir !== null) {
     await page.keyboard.down(STEER_KEYS[dir]).catch(() => {});
+    inputChannel.driveKeyEvents += 1;
     steerHeld = dir;
     steerSince = Date.now();
     steerHeldBy = by;
@@ -2746,6 +2776,7 @@ const sChannel = async (on) => {
    * construction, so the reader is told exactly that and no number is kept. */
   if (on) sPresses.push({ at: Date.now(), via: "sChannel" });
   await page.keyboard[on ? "down" : "up"]("KeyS").catch(() => {});
+  inputChannel.driveKeyEvents += 1;
   holdS = on;
   if (on) standstillPresses += 1;
 };
@@ -5563,6 +5594,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
     // re-applies the pedals from a known state on the next tick.
     await page.keyboard.up("KeyW").catch(() => {});
     await page.keyboard.up("KeyS").catch(() => {});
+    inputChannel.driveKeyEvents += 2;
     holdW = false;
     holdS = false;
     // …AND THE WHEEL, for the same reason and by the same argument. A steer key
@@ -5574,6 +5606,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
     await steerRelease("pause drain");
     await page.keyboard.up(STEER_KEYS.left).catch(() => {});
     await page.keyboard.up(STEER_KEYS.right).catch(() => {});
+    inputChannel.driveKeyEvents += 2;
     if (drained === 0) {
       // A LAYER THAT VANISHES BETWEEN THE PROBE AND THE DRAIN IS NOT A FAILURE,
       // AND THE FIRST VERSION OF THIS LINE TREATED IT AS ONE — SILENTLY. It was
@@ -6154,6 +6187,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
       if (holdS && p.kmh > 1 && prevKmh >= 0 && p.kmh > prevKmh + 2) {
         loud(`the brake is held and the car went ${prevKmh} -> ${p.kmh} км/ч — the sim never got the key; re-asserting it.`);
         await page.keyboard.up("KeyS").catch(() => {});
+        inputChannel.driveKeyEvents += 1;
         holdS = false;
         lostKeys += 1;
       }
@@ -6306,6 +6340,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
       if (holdS && p.kmh > 1 && prevKmh >= 0 && p.kmh > prevKmh + 2) {
         loud(`the brake is held and the car went ${prevKmh} -> ${p.kmh} км/ч — the sim never got the key; re-asserting it.`);
         await page.keyboard.up("KeyS").catch(() => {});
+        inputChannel.driveKeyEvents += 1;
         holdS = false;
         lostKeys += 1;
       }
@@ -6400,6 +6435,31 @@ note(
     (refusedReversePress ? ` · refused ${refusedReversePress} standstill brake press${refusedReversePress === 1 ? "" : "es"} (would have selected R)` : "") +
     (lostKeys ? ` · re-asserted the brake ${lostKeys}× after the sim lost the key` : ""),
 );
+/* ── WHAT DROVE THE CAR, PRINTED ON EVERY LANE ─────────────────────────────
+ *
+ * Unconditional for the reason the hazard line below is: a channel nobody
+ * states is a channel every reader assumes. `sc-speed-creep:dff70553` is what
+ * an assumption costs — five criticals filed against `TouchControls.tsx` off
+ * drives that dispatched no touch at all. The overlay is measured rather than
+ * asserted so „it was never actuated" cannot be confused with „it was not
+ * there"; a page that has already died reports null and says so. */
+inputChannel.overlayMounted = await page
+  .evaluate(() => document.querySelector('[data-hud="touch-controls"]') !== null)
+  .catch(() => null);
+note(
+  `  INPUT: ${inputChannel.channel} · ${inputChannel.driveKeyEvents} pedal/steer key events · ` +
+    `${inputChannel.touchEvents} touch events dispatched · touch overlay ` +
+    `${inputChannel.overlayMounted === null ? "unreadable" : inputChannel.overlayMounted ? "mounted" : "absent"}`,
+);
+if (PLATFORM !== "pc" && inputChannel.touchEvents === 0) {
+  loud(
+    "NO TOUCH WAS DISPATCHED ON THIS LANE: every pedal and every steer was a page.keyboard event, so this is a " +
+      "phone-sized viewport driven by a KEYBOARD, not a phone driven by a thumb. TouchControls.tsx was " +
+      `${inputChannel.overlayMounted === false ? "not even mounted" : "mounted and never actuated"} — no finding from ` +
+      "this drive may name it, or any touch control, as its suspect.",
+  );
+}
+saveStatus({ inputChannel });
 /* ── WHAT THE BRAKE LOOP SAW AND DID ───────────────────────────────────────
  *
  * PRINTED ON EVERY LANE, AND ALL THREE LINES ARE UNCONDITIONAL. A capability

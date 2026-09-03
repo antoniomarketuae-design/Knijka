@@ -32,6 +32,8 @@ import {
   ROAD_TAP_MIX_MAX,
   ROAD_TAP_ROTATION_RAD,
   ROAD_TAP_TILE_M,
+  roadDecalSnowOnBeforeCompile,
+  roadDecalSnowProgramCacheKey,
   roadSurfaceOnBeforeCompile,
   roadSurfaceProgramCacheKey,
 } from "../textures/roadSurface";
@@ -389,5 +391,117 @@ describe("sc-ac-snow:f1673b60 — the carriageway takes its snow", () => {
   it("compiles as a NEW program — a cached v1 has neither uniform nor splice", () => {
     expect(roadSurfaceProgramCacheKey()).not.toBe("road-surface-v1");
     expect(roadSurfaceProgramCacheKey()).not.toBe(macroProgramCacheKey());
+  });
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * …AND ON THE THINGS DRAWN ON IT — the residue of the same row.
+ *
+ * The mix above lifted the asphalt and left the decals drawn on it taking only
+ * `decalTint`'s multiply, which cannot lift a near-black texel. Measured on
+ * `.audit-frames/w23/frames/sc-ac-snow__pc-right/04-t016s.png` at HEAD: the
+ * decal at (600,416) L89.4 against the snowed road beside it at (600,424)
+ * L148.7 — a hole of bare tarmac punched through the snow, which is
+ * `sc-ac-snow:f1673b60`'s own sentence about the surface the fix just left
+ * behind. Every assertion here fails without `roadDecalSnowOnBeforeCompile`.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("snow covers the road decals too", () => {
+  /** Relative luminance in the linear working space three converts hexes to. */
+  const lum = (hex: number): number => {
+    const c = new Color(hex);
+    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  };
+
+  it("mixes toward the snow albedo after <color_fragment>, off a world-XZ varying", () => {
+    const shader = compileStub();
+    roadDecalSnowOnBeforeCompile(shader as never);
+    // World XZ, computed the same way the macro hook and the paint hook compute
+    // theirs, so the drift field is CONTINUOUS from the asphalt onto the decal.
+    expect(shader.vertexShader).toContain("vDecalXZ = (modelMatrix * vec4( position, 1.0 )).xz;");
+    const colorAt = shader.fragmentShader.indexOf("#include <color_fragment>");
+    const mixAt = shader.fragmentShader.indexOf(ROAD_SNOW_FRAGMENT_ANCHOR);
+    expect(colorAt).toBeGreaterThanOrEqual(0);
+    expect(mixAt).toBeGreaterThan(colorAt);
+    // The SAME drift expression the asphalt runs — one definition, two callers.
+    expect(shader.fragmentShader).toContain("vDecalXZ * uRoadSnowScale");
+    expect(shader.fragmentShader).toContain(
+      "float roadSnowAmount = uSnowRoad * mix( uRoadSnowFloor, 1.0, roadSnowPatch );",
+    );
+  });
+
+  it("is NOT the asphalt hook — that one detiles a map this material atlases", () => {
+    const shader = compileStub();
+    roadDecalSnowOnBeforeCompile(shader as never);
+    // A rotated second tap of the DECAL ATLAS cross-fades one decal into
+    // another; the asphalt's detile and UDN detail must stay off this material.
+    expect(shader.fragmentShader).not.toContain("roadTapB");
+    expect(shader.fragmentShader).not.toContain("roadDetailN");
+    // …and the 80 m ground macro stays off it too, or the decals would move in
+    // DRY scenes, which this change may not do.
+    expect(shader.fragmentShader).not.toContain(MACRO_HOOK_FRAGMENT_ANCHOR);
+    expect(roadDecalSnowProgramCacheKey()).not.toBe(roadSurfaceProgramCacheKey());
+    expect(roadDecalSnowProgramCacheKey()).not.toBe(macroProgramCacheKey());
+  });
+
+  it("shares the carriageway's channel, field and cap — no second number", () => {
+    const road = compileStub();
+    const decal = compileStub();
+    roadSurfaceOnBeforeCompile(road as never);
+    roadDecalSnowOnBeforeCompile(decal as never);
+    // By reference: `DistrictWorld`'s one `setSnowCover` per frame reaches both,
+    // so a decal can never render a different snowfall from the road under it.
+    expect(decal.uniforms.uSnowRoad).toBe(road.uniforms.uSnowRoad);
+    expect(decal.uniforms.uSnowColor).toBe(road.uniforms.uSnowColor);
+    expect(decal.uniforms.uRoadTap).toBe(road.uniforms.uRoadTap);
+    expect(decal.uniforms.uRoadSnowScale?.value).toBeCloseTo(1 / ROAD_SNOW_PATCH_TILE_M);
+    expect(decal.uniforms.uRoadSnowFloor?.value).toBeCloseTo(ROAD_SNOW_PATCH_FLOOR);
+    setSnowCover(1);
+    expect(decal.uniforms.uSnowRoad?.value).toBe(SNOW_ROAD_COVER_MAX);
+    setSnowCover(0);
+    expect(getSnowRoadCover()).toBe(0);
+  });
+
+  it("costs nothing on the 149 lessons that author no snow", () => {
+    const shader = compileStub();
+    roadDecalSnowOnBeforeCompile(shader as never);
+    const guardAt = shader.fragmentShader.indexOf("if ( uSnowRoad > 0.0 )");
+    expect(guardAt).toBeGreaterThanOrEqual(0);
+    expect(shader.fragmentShader.indexOf(ROAD_SNOW_FRAGMENT_ANCHOR)).toBeGreaterThan(guardAt);
+  });
+
+  it("softens the decal without burying it — a smudge under snow, not a hole in it", () => {
+    // Linear working space, the space `diffuseColor` is in at the splice.
+    // A dark decal texel through `decalTint` (= decalWet.darken × the road tint,
+    // carrying SNOW_ROAD_BRIGHTEN like the asphalt's own multiply does).
+    const decalBare = ROAD_ALBEDO_TINT * SNOW_ROAD_BRIGHTEN * 0.06;
+    const roadBare = ROAD_ALBEDO_TINT * SNOW_ROAD_BRIGHTEN * 0.28;
+    const snow = lum(SNOW_COVER_COLOR);
+    const meanWeight = SNOW_ROAD_COVER_MAX * ((ROAD_SNOW_PATCH_FLOOR + 1) / 2);
+    const decalMean = decalBare + meanWeight * (snow - decalBare);
+    const roadMean = roadBare + meanWeight * (snow - roadBare);
+    // It has to MOVE, or the row's „bare grey asphalt" survives inside every
+    // crack and manhole while the surface around them reads snowed.
+    expect(decalMean / decalBare).toBeGreaterThan(2);
+    // …and it must still read as a mark IN the road, not vanish: a decal that
+    // reached the road's own value would delete the wear the map exists to draw.
+    expect(decalMean).toBeLessThan(roadMean);
+    // Nothing is graded off a decal (the engine reads district data, never
+    // pixels), so unlike the markings there is no legibility floor to hold —
+    // the only bound is that snow may not brighten it PAST the surface it
+    // sits in, which is `StaticWorld`'s own rule for decals in the dry.
+    expect(decalMean).toBeLessThan(snow);
+  });
+
+  it("StaticWorld spreads it on the decals mesh and nowhere else", () => {
+    expect(STATIC_WORLD_SRC.match(/\{\.\.\.ROAD_DECAL_SNOW\}/g)?.length).toBe(1);
+    const decalBlock = STATIC_WORLD_SRC.slice(
+      STATIC_WORLD_SRC.indexOf("{/* Batched road decals"),
+      STATIC_WORLD_SRC.indexOf("{/* Standing-water sheets"),
+    );
+    expect(decalBlock).toContain("{...ROAD_DECAL_SNOW}");
+    // The atlas is still what it draws — the spread adds the cover, not a map.
+    expect(decalBlock).toContain("map={textures.decals}");
   });
 });

@@ -190,6 +190,30 @@ export const ROAD_SNOW_PATCH_FLOOR = 0.4;
 export const ROAD_SNOW_FRAGMENT_ANCHOR =
   "diffuseColor.rgb = mix( diffuseColor.rgb, uSnowColor, roadSnowAmount );";
 
+/**
+ * The drift block, as ONE definition spent by two materials.
+ *
+ * The asphalt reads it off `vGroundMacroXZ` (the macro hook's varying) and the
+ * ROAD DECALS off `vDecalXZ` (this file's own, below). Both are
+ * `(modelMatrix * position).xz`, so the two sample the identical field at the
+ * identical world scale and a drift that crosses the carriageway crosses the
+ * manhole in it — which is the whole reason the decals could not simply take a
+ * second field of their own.
+ */
+export function roadSnowFragmentBlock(xzVarying: string): string {
+  return `if ( uSnowRoad > 0.0 ) {
+        float roadSnowPatch = texture2D( uRoadTap, ${xzVarying} * uRoadSnowScale ).r;
+        float roadSnowAmount = uSnowRoad * mix( uRoadSnowFloor, 1.0, roadSnowPatch );
+        ${ROAD_SNOW_FRAGMENT_ANCHOR}
+      }`;
+}
+
+/** The three uniform declarations the drift block needs, plus the two the snow
+ *  channel travels in. One string, so the asphalt and the decal programs cannot
+ *  declare different sets. */
+const SNOW_UNIFORM_DECLS =
+  "uniform sampler2D uRoadTap;\nuniform float uRoadSnowScale;\nuniform float uRoadSnowFloor;\nuniform float uSnowRoad;\nuniform vec3 uSnowColor;";
+
 const TAP_COS = Math.cos(ROAD_TAP_ROTATION_RAD).toFixed(6);
 const TAP_SIN = Math.sin(ROAD_TAP_ROTATION_RAD).toFixed(6);
 
@@ -257,7 +281,7 @@ export function roadSurfaceOnBeforeCompile(
   shader.fragmentShader = shader.fragmentShader
     .replace(
       "#include <common>",
-      "#include <common>\nuniform sampler2D uRoadTap;\nuniform float uRoadTapScale;\nuniform float uRoadTapMixMax;\nuniform float uRoadDetailScale;\nuniform float uRoadDetailStrength;\nuniform float uRoadFineScale;\nuniform float uRoadFineStrength;\nuniform float uRoadSnowScale;\nuniform float uRoadSnowFloor;\nuniform float uSnowRoad;\nuniform vec3 uSnowColor;",
+      `#include <common>\nuniform float uRoadTapScale;\nuniform float uRoadTapMixMax;\nuniform float uRoadDetailScale;\nuniform float uRoadDetailStrength;\nuniform float uRoadFineScale;\nuniform float uRoadFineStrength;\n${SNOW_UNIFORM_DECLS}`,
     )
     // Anchored on the macro hook's OWN emitted line (not on a three chunk) so
     // the detile lands after `diffuseColor` already carries the map and the
@@ -309,11 +333,7 @@ export function roadSurfaceOnBeforeCompile(
     .replace(
       "#include <color_fragment>",
       `#include <color_fragment>
-      if ( uSnowRoad > 0.0 ) {
-        float roadSnowPatch = texture2D( uRoadTap, vGroundMacroXZ * uRoadSnowScale ).r;
-        float roadSnowAmount = uSnowRoad * mix( uRoadSnowFloor, 1.0, roadSnowPatch );
-        ${ROAD_SNOW_FRAGMENT_ANCHOR}
-      }`,
+      ${roadSnowFragmentBlock("vGroundMacroXZ")}`,
     )
     // UDN detail normal. `normal` here is already tbn * base mapN, so adding
     // the detail's tangent-space XY through the same tbn columns is the UDN
@@ -337,3 +357,73 @@ export function roadSurfaceOnBeforeCompile(
  *  old program and the fix would change no pixel. Same reason
  *  `snowCoverProgramCacheKey` moved to v2 for the winter term. */
 export const roadSurfaceProgramCacheKey = (): string => "road-surface-v2";
+
+/**
+ * SNOW ON THE ROAD DECALS — the residue the carriageway mix left behind.
+ *
+ * `sc-ac-snow:f1673b60` said „the carriageway renders as bare grey asphalt".
+ * The mix above answered the asphalt and left the cracks, patches, oil stains
+ * and manholes drawn ON that asphalt taking only the whole-material multiply
+ * (`StaticWorld`'s `decalTint` = `decalWet.darken × ROAD_ALBEDO_TINT`, which
+ * carries `SNOW_ROAD_BRIGHTEN` and nothing else). Since a multiply cannot lift
+ * a near-black texel and a mix does, the mix widened the gap it did not close:
+ * MEASURED on `.audit-frames/w23/frames/sc-ac-snow__pc-right/04-t016s.png`, the
+ * decal at (600,416) reads L89.4 against the snowed road beside it at L148.7 —
+ * a hard black hole punched through the snow, i.e. bare tarmac, in the exact
+ * words of the row.
+ *
+ * SAME FIELD, SAME CAP, SAME WRITER, and each of those is the point:
+ *  · the same `uRoadTap` at the same `uRoadSnowScale` off a world-XZ varying,
+ *    so the drift runs CONTINUOUSLY from the asphalt across the decal instead
+ *    of the decal carrying a second weather of its own;
+ *  · the same `uSnowRoad` — a decal is a wear mark IN the carriageway and takes
+ *    the carriageway's snow, so `SNOW_ROAD_COVER_MAX` stays the only number;
+ *  · the same per-frame writer (`DistrictWorld` → `setSnowCover`), by reference.
+ *
+ * NOTHING IS GRADED OFF A DECAL — the rule engine reads district data, never
+ * rendered pixels — so unlike the markings next door there is no legibility
+ * floor to protect here, and at the road's own 0.40 cap a dark decal still
+ * lands well under the snowed road: it becomes a smudge under snow rather than
+ * a hole in it, which is what a covered oil stain looks like.
+ *
+ * FREE OUTSIDE A SNOW LESSON for the asphalt's reasons, unchanged: uniform
+ * control flow on `uSnowRoad`, and `mix(x, y, 0.0)` is bit-identical to x.
+ *
+ * NOT the asphalt hook: that one detiles `map`, and this material's map is the
+ * decal ATLAS — a rotated second tap would cross-fade one decal into another.
+ */
+export function roadDecalSnowOnBeforeCompile(
+  shader: THREE.WebGLProgramParametersWithUniforms,
+): void {
+  const u = getRoadUniforms();
+  shader.uniforms.uRoadTap = u.uRoadTap;
+  shader.uniforms.uRoadSnowScale = u.uRoadSnowScale;
+  shader.uniforms.uRoadSnowFloor = u.uRoadSnowFloor;
+  bindSnowRoadUniforms(shader);
+
+  // Its own varying rather than the macro hook's: attaching MACRO_VARIATION
+  // here would put the 80 m ground brightness variation on the decals in DRY
+  // scenes too, and this change may not move one pixel outside a snow lesson.
+  shader.vertexShader = shader.vertexShader
+    .replace("#include <common>", "#include <common>\nvarying vec2 vDecalXZ;")
+    .replace(
+      "#include <worldpos_vertex>",
+      "#include <worldpos_vertex>\n\tvDecalXZ = (modelMatrix * vec4( position, 1.0 )).xz;",
+    );
+
+  shader.fragmentShader = shader.fragmentShader
+    .replace("#include <common>", `#include <common>\n${SNOW_UNIFORM_DECLS}\nvarying vec2 vDecalXZ;`)
+    // After `<color_fragment>` for the asphalt's reason: covering is the last
+    // thing that happens to a road surface, and the map has already landed.
+    .replace(
+      "#include <color_fragment>",
+      `#include <color_fragment>
+      ${roadSnowFragmentBlock("vDecalXZ")}`,
+    );
+}
+
+/** Stable cache key — the decals' own program. Distinct from the asphalt's
+ *  (this one carries no detile and no detail normal) and from the plain macro
+ *  program, so three cannot hand this material a program compiled without the
+ *  splice. */
+export const roadDecalSnowProgramCacheKey = (): string => "road-decal-snow-v1";

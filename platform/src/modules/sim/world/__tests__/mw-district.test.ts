@@ -606,3 +606,77 @@ describe("Д5 (Автомагистрала) — the motorway now says so", () =
     expect(buildWorldGeometry(plain, { seed: 7 }).stats.signs.motorwayStart).toBe(0);
   });
 });
+
+/**
+ * sc-merge-accel-lane:09e6d6f4 — „at arrival … no ramp and no acceleration
+ * lane … while the briefing says «Потегли по рампата»".
+ *
+ * The ramp and the acceleration lane are both in mw-entry-v1 (`mwe-e-ramp`,
+ * `mwe-e-nb-accel`; the merge-districts battery pins their geometry). What the
+ * arrival frame had none of is the WORD: the carriageway pass above signs the
+ * map boundary a driver enters through, and the ramp driver passes no such
+ * boundary — mw-entry-v1's two carriageway plates stand at y ≈ 9.5 and
+ * y ≈ 950.5, on ground this lesson never drives, one of them facing away.
+ *
+ * ЗДвП чл. 55, ал. 1 makes it constitutive, not decorative: the motorway regime
+ * exists „на път, обозначен като автомагистрала … СЪС СЪОТВЕТНИЯ ПЪТЕН ЗНАК",
+ * and every rule this lesson teaches — the чл. 21 140 column, the чл. 56 duty
+ * to let the flow through, the аварийна лента past the taper — hangs on it.
+ */
+describe("Д5 on the вход — the ramp says what it leads to", () => {
+  const world = buildWorldGeometry(assertDistrict(loadRaw("mw-entry-v1")), { seed: 7 });
+  const plates = world.signs.filter((s) => s.kind === "motorwayStart");
+  /** mw-entry-v1 meta.scenario: the ramp runs (40, 120) → (8.13, 260). */
+  const RAMP_SPAWN_Y = 139.5;
+  const NOSE_Y = 260;
+
+  it("posts one on the ramp, ahead of the spawn, before the nose, facing the driver", () => {
+    // Two carriageway plates (unchanged) plus the ramp's.
+    expect(plates).toHaveLength(3);
+    // The two carriageway plates run due north / due south (yaw 0 and ±π); the
+    // ramp's is the only one skewed, because the ramp is.
+    const onRamp = plates.filter((p) => Math.abs(p.yaw) > 0.05 && Math.abs(p.yaw) < Math.PI - 0.05);
+    expect(onRamp, "exactly one plate on the ramp").toHaveLength(1);
+    const d5 = onRamp[0]!;
+    const y = -d5.position[2];
+    // Ahead of the student's own bumper (doc 86 T5) and clear of the nose, so
+    // it is read BEFORE the merge rather than during it.
+    expect(y).toBeGreaterThan(RAMP_SPAWN_Y);
+    expect(y).toBeLessThan(NOSE_Y - 20);
+    // Right of the ramp's travel (which runs up and to the LEFT), off the
+    // ribbon: the ramp centre at this station is x ≈ 15.9 with a 4.06 m half
+    // width, so a post at 21.8 stands on the verge, not in the lane.
+    expect(d5.position[0]).toBeGreaterThan(15.9 + 4.06);
+    // Facing back down the ramp: the ramp's bearing is 347.18°, so a plate
+    // facing its driver is yawed ~ +0.22 rad, not 0 (the carriageway plates).
+    expect(d5.yaw).toBeGreaterThan(0.1);
+  });
+
+  it("EXIT ramps get none: mw-exit-v1 keeps its two carriageway plates", () => {
+    const exitWorld = buildWorldGeometry(assertDistrict(loadRaw("mw-exit-v1")), { seed: 7 });
+    expect(exitWorld.stats.signs.motorwayStart).toBe(2);
+    // `mwx-e-ramp` is the same class and the same one-way link shape; the only
+    // difference is which END touches the carriageway, and that is the whole
+    // test. Its far end is 123.8 m clear, so no plate may stand on it.
+    const rampPlates = exitWorld.signs.filter(
+      (s) => s.kind === "motorwayStart" && s.position[0] > 20,
+    );
+    expect(rampPlates).toHaveLength(0);
+  });
+
+  it("NON-VACUITY: pull the nose off the carriageway and the ramp plate goes", () => {
+    const raw = assertDistrict(loadRaw("mw-entry-v1"));
+    const detached: District = {
+      ...raw,
+      roads: {
+        ...raw.roads,
+        edges: raw.roads.edges.map((e) =>
+          e.id === "mwe-e-ramp"
+            ? { ...e, geometry: (e.geometry as [number, number][]).map(([x, y]) => [x + 60, y]) }
+            : e,
+        ),
+      },
+    };
+    expect(buildWorldGeometry(detached, { seed: 7 }).stats.signs.motorwayStart).toBe(2);
+  });
+});

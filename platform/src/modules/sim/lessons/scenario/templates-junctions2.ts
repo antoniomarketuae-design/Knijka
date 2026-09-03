@@ -493,6 +493,18 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
  * LEFT_TURN_CONVICT_GAP_SEC band — and they are convictions this product should
  * make. The rest of w21's paragraph stands: no count is authored here, and
  * `recordScJunction2Drive` still certifies the shadow at 0.
+ *
+ * ── W24 (2026-09-03) · ADDRESS (3) IS BUILT — the clause above has expired ──
+ *
+ * `recordScJunction2Drive` now takes `vehicleCount` / `pedestrianCount` / `seed`
+ * (every shipped recording still omits them, so the committed traces are
+ * byte-identical), and `__tests__/jblind-model-line-in-compiled-traffic.test.ts`
+ * drives the committed shadow through the production session at
+ * `lesson.traffic.vehicleCount` over the same 20-seed sweep, on all five rungs,
+ * as a RATCHET — with the two mistake tapes replayed at the same counts so the
+ * bar cannot be cleared by blunting `conflictFromRightFor`. Re-measured there:
+ * 3 / 3 / 1 / 1 / 0 of 20 (L1…L5), 0 of 20 at vehicleCount 0. This lesson's
+ * model answer is no longer certified on an empty street.
  */
 
 /**

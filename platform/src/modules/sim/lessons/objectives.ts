@@ -299,6 +299,25 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       if (p.requireRestClean !== undefined) {
         out.requireRestClean = parseRestDemand(objective, p.requireRestClean);
       }
+      // THE М1 THE BANNER SAYS WAS NOT CROSSED (ReachZoneParams
+      // .requireSolidLineClean — lessons/types.ts carries the frame and
+      // `ReachZoneWitnessDemands.requireSolidLineClean` the drive, the census,
+      // the coached half and the two false-refusal checks). AUTHORED ONLY, for
+      // the reason the rest term above it gives: this arm decides whether a
+      // route counts as driven, and the one-member census
+      // («в своята лента» is a phrase forty catalogue banners share, almost
+      // none of them about a solid осева) is a guess wearing a census's
+      // clothes rather than a population. `solid-line-clean-gate.test.ts` holds
+      // both directions.
+      if (p.requireSolidLineClean !== undefined) {
+        if (p.requireSolidLineClean !== true) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "reachZone requireSolidLineClean must be true",
+          );
+        }
+        out.requireSolidLineClean = true;
+      }
       // THE YIELD THE BANNER SAYS HAPPENED (see `ReachZoneWitnessDemands.
       // requireYieldClean` for the drive, the census and the window). AUTHORED
       // WINS, TITLE FILLS IN — the same law the lamp, gear, officer and
@@ -678,6 +697,24 @@ export interface ObjectiveContext {
    * OPTIONAL, and absent means „unknown", never „yes".
    */
   restedOnRailBandInRun?: boolean;
+  /**
+   * Has this drive been told, anywhere, that it crossed a непрекъсната осева —
+   * `CROSSED_SOLID_LINE`, the основна the catalogue titles «Пресичане на
+   * непрекъсната осева линия»? The one fact
+   * `ReachZoneParams.requireSolidLineClean` consults.
+   *
+   * „TOLD", NOT „CHARGED", exactly like `restedInBanZoneInRun` and for the same
+   * reason: the code is основна, so the teach-first coach hands the FIRST one
+   * over as a free mini-lesson on `LessonSessionState.coachedMistakes` instead
+   * of `events`. On the drive this demand was written for, that IS the whole
+   * ledger — scored [] and coached [CROSSED_SOLID_LINE] at both L1 and L3 — so
+   * a scored-only read would refuse nothing outside exam mode.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+   * (the rigs, the fixtures, `EMPTY_CONTEXT`) omits it and behaves exactly as
+   * shipped.
+   */
+  crossedSolidLineInRun?: boolean;
   /**
    * When the objective being stepped BECAME the active one, in session seconds.
    * The chain is strictly sequential, so this is the moment its predecessor
@@ -1255,6 +1292,107 @@ export interface ReachZoneWitnessDemands {
    * eighth: both facts are session-monotone, so the read is pure per frame.
    */
   requireRestClean?: ReachZoneRestDemand;
+  /**
+   * THE CAR STAYED ON ITS OWN SIDE OF THE М1 THE BANNER NAMES — the thirteenth
+   * demand (sc-ov-solid-return:b542b84e, critical).
+   *
+   * WHAT IS BROKEN, re-derived through the production pipeline at HEAD on
+   * 2026-09-03 rather than inherited from the report. `SC_OV_SOLID_RETURN`'s
+   * own instruction 7 tells the student that DECLINING the overtake is a full
+   * performance («маневра без изход не се прави, а решението „не сега“ е самото
+   * умение»), so a drive that trails the crawler through the whole М2 window
+   * legitimately ticks `sc-ovsr-pass` (lane-agnostic since ledger B8) and
+   * `sc-ovsr-home` (it never left its lane). Then it loses patience INSIDE the
+   * М1 span and overtakes there. Driven through
+   * `compileScenario → createLessonSession → applyTick`:
+   *
+   *   L1  coached [CROSSED_SOLID_LINE]  scored []  sc-ovsr-finish ✓ @0:45
+   *   L3  coached [CROSSED_SOLID_LINE]  scored []  sc-ovsr-finish ✓ @0:45
+   *
+   *   → completedAll TRUE, passed TRUE, score 0.
+   *
+   * The lesson is called „Прибери се преди плътната линия"; the gate is titled
+   * «Премини участъка с непрекъсната линия В СВОЯТА ЛЕНТА»; and it was PASSED
+   * by the drive that crossed that very line. `sc-ovsr-finish` is
+   * `{kind:"reachZone", x:4.06, y:560, radiusM:5}` — a disc 60 m PAST the end
+   * of the М1 span, so it can say where the car came out and nothing about
+   * which half of the carriageway it spent the span on. Arrival was the whole
+   * certificate.
+   *
+   * THE MEASUREMENT ALREADY EXISTS; ONLY THE READ WAS MISSING — the shape of
+   * the four journey demands above. `rules/engine.ts` bills `CROSSED_SOLID_LINE`
+   * for a sustained excursion across an authored М1 span, and the catalogue row
+   * carries its explanation, its «✔ Правилното действие» corrective and its
+   * ППЗДвП/ЗДвП refs. Nothing new observes anything; the credit now reads the
+   * conviction the same protocol has already written.
+   *
+   * IT READS THE COACHED HALF TOO, and here that is not an optimisation but the
+   * whole demand: `CROSSED_SOLID_LINE` is основна (3) since the 2026-08-09
+   * Наредба № 38 grounding pass, so at every TRAINING rung the teach-first coach
+   * hands the first offence over as a free mini-lesson on
+   * `LessonSessionState.coachedMistakes` and the ledger stays empty — which is
+   * exactly what the two measurements above show. A ledger-only read would have
+   * refused nothing at all outside exam mode. The same asymmetry
+   * `requireRestClean` documents one demand up, and the same
+   * `mistakeExperience` exemption: in a THEO-3 sandbox the wrong act IS the
+   * assignment.
+   *
+   * NOT POOLED WITH `CENTER_LINE_TOUCHED`, on the split law
+   * `ReachZoneYieldDemand` states: touching the осева and crossing into the
+   * opposing half are two acts, two codes and two prices, and a certificate may
+   * not be withdrawn for something the banner never claimed.
+   *
+   * ── THE CENSUS ───────────────────────────────────────────────────────────
+   *
+   * ONE gate, and AUTHORED ONLY — no title matcher, on the rule the
+   * `requireLamps` block records: the fallthrough that manufactured a demand
+   * out of a banner's words was reverted on 2026-08-28 by two adversarial
+   * verifiers, and an arm that decides whether a route counts as driven is not
+   * the place to reopen that route.
+   *
+   *   sc-ov-solid-return  sc-ovsr-finish  «Премини участъка с непрекъсната
+   *                                        линия в своята лента»
+   *
+   * ── THE TWO FALSE-REFUSAL RISKS, CHECKED BEFORE IT SHIPPED ───────────────
+   *
+   *  1. IT CANNOT REFUSE A CORRECT DRIVE. The channel is the billed (or
+   *     coached) conviction, never a raw bank flip: `worldRuntime` arms the
+   *     detector only on an authored М1 span and only past
+   *     `solidLineCrossSustainSec`, so a car that stays on its own side is
+   *     bit-identical to shipped — the drill's own `shadow-correct` demo
+   *     overtakes across 75 m of М2 and carries neither channel. Every gate
+   *     that does not author the key never consults this.
+   *  2. A REFUSAL MUST NOT DOUBLE AS A TRAP, and here the check is not
+   *     hypothetical: `sc-ovsr-finish` IS the terminal gate (3 of 3), so
+   *     without the void arm the refused drive would never advance
+   *     `currentIndex`, the run-out would never arm, and the student would
+   *     reach the card that teaches him М1 only by quitting — forfeiting the
+   *     attempt's XP and its calibration. `solidLineFaultVoidsObjective` is
+   *     wired into `lessons/engine.ts`'s `terminalUnearnable` for exactly the
+   *     reason `yieldFailedVoidsObjective` records. The certificate is still
+   *     withheld (the objective keeps its honest `active` status and
+   *     `buildLessonResult` reports finished-and-failed); only the strand goes.
+   *
+   * WHAT IT COSTS, SAID PLAINLY: like `requireRestClean` and unlike the опасна
+   * arms, this one CAN change a verdict — a single crossing is −3 on a sheet
+   * that allows 9, so today the drive above passes. Withholding the tick leaves
+   * the route unfinished, and an unfinished route is not a pass. That is the
+   * correct answer and not a side effect: the whole subject of this drill is
+   * the marking as a clock, and a sheet that certifies «премини … в своята
+   * лента» to the driver who crossed it is the reason the north-star test
+   * exists. Nothing here re-grades the law — the −3 is exactly the −3 it was.
+   *
+   * NOT A SILENT VERDICT (THEO-4): the withheld tick never arrives alone. The
+   * same drive is holding the rule engine's own `CROSSED_SOLID_LINE` card —
+   * raised AT the crossing, with the catalogue's explanation («…М1 не се
+   * застъпва и не се пресича…») and its corrective — and the debrief repeats it
+   * with its law refs. This demand removes a contradiction from a protocol that
+   * already explains itself; it introduces no new unexplained one.
+   *
+   * Outside the `capMet` latch, like the four journey demands above it: the
+   * fact is session-monotone, so the read is pure per frame.
+   */
+  requireSolidLineClean?: true;
   /**
    * THE YIELD THE BANNER SAYS HAPPENED — the seventh demand, and the first one
    * whose refusal is bounded by a WINDOW rather than by the whole run
@@ -2357,6 +2495,19 @@ function restCleanHonoured(demand: ReachZoneRestDemand, ctx: ObjectiveContext): 
 }
 
 /**
+ * Did the drive stay on its own side of the М1 this banner says it did? (see
+ * `ReachZoneWitnessDemands.requireSolidLineClean` for the drive, the census,
+ * the coached half and the two false-refusal checks.)
+ *
+ * `true` IS THE ONLY REFUSING VALUE, the polarity every arm in this file ships
+ * with: `undefined` is „the caller cannot answer" (every fixture, rig, replay
+ * and `EMPTY_CONTEXT`), and unknown must never become a refusal.
+ */
+function solidLineCleanHonoured(ctx: ObjectiveContext): boolean {
+  return ctx.crossedSolidLineInRun !== true;
+}
+
+/**
  * Was the halt the banner promises still a halt FOR a living person? Reads the
  * one fact `vruWaitHonoured` reads first and for the identical reason — a
  * struck person is session-monotone and outranks everything — but it does NOT
@@ -2379,7 +2530,8 @@ function haltForVruHonoured(ctx: ObjectiveContext): boolean {
 /** True when the demands a reachZone makes are met by the whole zone contract. */
 function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
   // `requireVruUntouched`, `requireNoContact`, `requireRailClear`,
-  // `requireYieldClean`, `requireHaltForVru` and `requireRestClean` are
+  // `requireYieldClean`, `requireHaltForVru`, `requireRestClean` and
+  // `requireSolidLineClean` are
   // deliberately absent: none
   // of them rides the `capMet` latch (every one of those facts is
   // session-monotone, or monotone within its window, so none needs eval-state
@@ -2636,6 +2788,34 @@ export function restFaultVoidsObjective(
   const demand = (params as WitnessedReachZoneParams).requireRestClean;
   if (demand === undefined) return false;
   return !restCleanHonoured(demand, { ...EMPTY_CONTEXT, ...ctx });
+}
+
+/**
+ * …AND THE SAME QUESTION FOR THE М1 (`requireSolidLineClean`), which is the one
+ * where it is NOT optional and NOT hypothetical.
+ *
+ * `sc-ovsr-finish` is the TERMINAL gate of its drill (3 of 3), so without this
+ * arm `lessons/engine.ts` would never advance `currentIndex`, the run-out would
+ * never arm, and the student who crossed the solid line could reach the card
+ * that teaches him М1 only by quitting — forfeiting the attempt's XP and its
+ * calibration. That is the exact trap `yieldFailedVoidsObjective` records, and
+ * a repair that removes a false certificate by creating a drive that cannot end
+ * has repaired nothing.
+ *
+ * ONE REFUSAL, NEVER A TRAP: the objective keeps its honest `active` status and
+ * `buildLessonResult` still reports finished-and-failed, so the certificate is
+ * withheld and only the strand goes.
+ *
+ * Kept separate from its five neighbours rather than merged, on the rule they
+ * all state: each demand reads a different fact, and a caller that knows only
+ * one of them must be able to ask only that one.
+ */
+export function solidLineFaultVoidsObjective(
+  params: ObjectiveParams,
+  crossedSolidLineInRun: boolean,
+): boolean {
+  if (!crossedSolidLineInRun || params.kind !== "reachZone") return false;
+  return (params as WitnessedReachZoneParams).requireSolidLineClean === true;
 }
 
 /**
@@ -3720,8 +3900,29 @@ function stepReachZone(
   // to shipped.
   const restOk =
     params.requireRestClean === undefined || restCleanHonoured(params.requireRestClean, ctx);
+  // ── THE М1 THE BANNER SAYS WAS NOT CROSSED (requireSolidLineClean) ────────
+  // Seventh arm of the same shape and the seventh outside the `capMet` latch.
+  // The drive it closes is one drill's own advertised alternative: decline the
+  // overtake in the М2 window (which `SC_OV_SOLID_RETURN` instruction 7 calls a
+  // full performance), then cross the М1 to take it inside the span — coached
+  // «Пресичане на непрекъсната осева линия» and «✓ Премини участъка с
+  // непрекъсната линия В СВОЯТА ЛЕНТА 0:45» on one sheet, `passed: true`. A
+  // disc 60 m past the end of the span could say the car got out and nothing
+  // about which half of the carriageway it drove through; now it can. Run-wide
+  // rather than windowed: the fact is session-monotone and the one gate that
+  // authors the key sits behind an objective the span cannot precede.
+  const solidLineOk =
+    params.requireSolidLineClean !== true || solidLineCleanHonoured(ctx);
   const arrivalHonoured =
-    reached && capMet && vruOk && contactOk && railOk && yieldOk && haltForVruOk && restOk;
+    reached &&
+    capMet &&
+    vruOk &&
+    contactOk &&
+    railOk &&
+    yieldOk &&
+    haltForVruOk &&
+    restOk &&
+    solidLineOk;
   // ── THE MARK IS WHERE THE BANNER POINTS (round 13, 2026-08-27) ────────────
   //
   // WHAT IS BROKEN. `reached` latches on the FIRST swept contact with the

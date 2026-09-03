@@ -393,6 +393,26 @@ const TRANSITION_END_OUT_M = 1.2;
 const MOTORWAY_PLATE_AHEAD_OF_LIMIT_M = 4.5;
 const MOTORWAY_PLATE_OUT_M = 1.2;
 
+/**
+ * How far BEFORE the nose the Д5 „Автомагистрала" stands on an ENTRY RAMP.
+ *
+ * The pass above signs a carriageway at the boundary a driver enters through,
+ * which is the only door mw-v1 has. A вход has a second one — the ramp — and a
+ * driver who comes in that way never passes the carriageway's plate at all
+ * (mw-entry-v1: the northbound Д5 is at y ≈ 40, the ramp joins at y = 260,
+ * facing the other way). So on the one lesson whose whole subject is entering
+ * a магистрала the word „автомагистрала" was in the briefing and nowhere in
+ * the windscreen — finding `sc-merge-accel-lane:09e6d6f4`.
+ *
+ * 35 m is MOUTH_SIGN_READER_BACK_M's number and its reason: it is how far back
+ * a plate must stand from the thing it announces for the plate to be read
+ * BEFORE the manoeuvre is committed. Here the thing announced is the nose. On
+ * mw-entry-v1's 143.6 m ramp that puts it at s ≈ 108.6 — 88 m ahead of the
+ * ramp spawn (s ≈ 20.0) and 58 m past the entry В26 «90», so the pair is read
+ * in the order a driver needs it: „90 on this връзка", then „магистрала".
+ */
+const MOTORWAY_PLATE_BEFORE_RAMP_NOSE_M = 35;
+
 /** Road classes that are never a „one-way street" in the Д4 sense, however
  *  the one-way tag reads: a motorway/trunk carriageway is signed Д5/Д6. */
 const ONEWAY_STREET_EXCLUDED_CLASSES = new Set([
@@ -1710,6 +1730,77 @@ export function buildProps(
     pushSignAt(
       add(point, mul(perpRight(travel), ap.halfWidth + 0.8 + MOTORWAY_PLATE_OUT_M)),
       yawFromFacing(mul(travel, -1)),
+      "motorwayStart",
+    );
+  }
+
+  // -- …and Д5 on the ENTRY RAMP that joins one --------------------------------
+  // sc-merge-accel-lane:09e6d6f4 — „at arrival the world is a plain two-lane
+  // strip through open grass fields — no ramp and no acceleration lane — while
+  // the briefing says «Потегли по рампата»".
+  //
+  // HALF OF THAT IS REFUTED BY THE MAP and half of it is this pass. The ramp is
+  // real (`mwe-e-ramp`, a 143.6 m one-lane secondary_link the student spawns
+  // 20 m up) and so is the acceleration lane (`mwe-e-nb-accel`, the 200 m curb
+  // lane that carries no emergencyLane span). What the arrival frame has none
+  // of is the WORD: the pass above signs a carriageway at the map boundary a
+  // driver enters through, and a driver who enters by ramp passes no such
+  // boundary. mw-entry-v1's two plates therefore both stand on ground this
+  // lesson never drives.
+  //
+  // THE PLATE IS CONSTITUTIVE HERE FOR THE SAME REASON IT IS THERE, and the
+  // article is blunter about the ramp than about the carriageway. ЗДвП чл. 55,
+  // ал. 1: „На път, обозначен като автомагистрала или скоростен път СЪС
+  // СЪОТВЕТНИЯ ПЪТЕН ЗНАК, е разрешено движението само на моторни превозни
+  // средства…", and чл. 60 repeats the construction. The regime the student is
+  // about to enter — the 140 column of чл. 21, ал. 1, the чл. 56 duty to let
+  // the flow through, the аварийна лента past the taper — hangs on a sign he
+  // was never shown. (Retrieved from content/law/acts/zdvp.json; the plate from
+  // content/signs/signs.json `sign-d5`, „Начало на автомагистрала", cited to
+  // Наредба № РД-02-21-1/23.11.2023, прил. № 5, знак Д5 — ADR-002: retrieval
+  // and citation, never free recall.)
+  //
+  // ENTRY, NOT EXIT — the one distinction the pass above could not draw and the
+  // reason it excluded links wholesale. A ramp that ENDS on a motorway
+  // carriageway is a вход and its driver is about to be governed by чл. 55; a
+  // ramp that BEGINS on one is an изход, whose driver is LEAVING the regime and
+  // whose plate would be Д6 «Край на автомагистралата». Both shapes are in the
+  // corpus and they differ only in which end of the link touches the
+  // carriageway: `mwe-e-ramp` runs (40, 120) → (8.13, 260) with the nose 8.13 m
+  // off the northbound centreline (inside its 12.19 m half-width); mw-exit-v1's
+  // `mwx-e-ramp` runs the other way, from (8.13, 800) out to (123.78, 1019.21),
+  // 123.8 m clear at its end. So the test is the END POINT's distance to a
+  // motorway carriageway, and it separates them by construction rather than by
+  // district id.
+  //
+  // A `motorway_link` is deliberately NOT signed: it is already motorway by
+  // `isMotorwayCarriageway`, so the road it joins is not a beginning for it.
+  const motorwayRibbons = network.edges.filter(
+    (o) => o.line !== null && isMotorwayCarriageway(o.edge),
+  );
+  for (const eb of network.edges) {
+    const edge = eb.edge;
+    if (!eb.line || !edge.oneway) continue;
+    if (!edge.class.endsWith("_link") || isMotorwayCarriageway(edge)) continue;
+    const g = edge.geometry as Vec2[];
+    const nose = g[g.length - 1] as Vec2;
+    const joinsMotorway = motorwayRibbons.some(
+      (o) => projectOntoPolyline(o.edge.geometry as Vec2[], nose).distance <= o.halfWidth,
+    );
+    if (!joinsMotorway) continue;
+    const len = polylineLength(g);
+    const s = len - MOTORWAY_PLATE_BEFORE_RAMP_NOSE_M;
+    // Doc 86 T5, on this pass too: a plate the student starts level with or
+    // past is worth nothing, and an honest blank beats a post behind his head.
+    if (s < 1) continue;
+    const spawnsAhead = spawnsByEdge.get(edge.id) ?? [];
+    if (spawnsAhead.some((sp) => sp.dirSign === 1 && sp.s + ENTRY_POST_MIN_AHEAD_OF_SPAWN_M > s)) {
+      continue;
+    }
+    const { point, tangent } = pointAlong(g, s);
+    pushSignAt(
+      add(point, mul(perpRight(tangent), eb.halfWidth + 0.8 + MOTORWAY_PLATE_OUT_M)),
+      yawFromFacing(mul(tangent, -1)),
       "motorwayStart",
     );
   }

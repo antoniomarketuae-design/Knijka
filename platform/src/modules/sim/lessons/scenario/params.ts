@@ -265,6 +265,12 @@ export function serializeObjectiveParams(
       // at L5. A rung that forgave it would forgive the whole subject of the
       // drill.
       if (p.requireRestClean !== undefined) params.requireRestClean = p.requireRestClean;
+      // …AND THE FOURTH (`requireSolidLineClean`), on this whitelist for the
+      // identical measured reason and NOT laddered for the identical one:
+      // „did you cross the непрекъсната осева" has the same answer at L1 as at
+      // L5, and sc-ov-solid-return's whole subject IS that line. A rung that
+      // forgave it would teach the opposite of the lesson it belongs to.
+      if (p.requireSolidLineClean === true) params.requireSolidLineClean = true;
       // …AND THE ONE TERM HERE THAT REFUSES NOTHING (`reportOncomingGapSec`).
       // It is on this whitelist for the same measured reason as its three
       // neighbours — a key not named here never reaches the session — and NOT

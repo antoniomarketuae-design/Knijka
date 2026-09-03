@@ -1500,7 +1500,20 @@ export const SC_OV_SOLID_RETURN: ScenarioSpec = {
     {
       id: "sc-ovsr-finish",
       titleBg: "Премини участъка с непрекъсната линия в своята лента",
-      params: { kind: "reachZone", x: OVS2_OWN, y: 560, radiusM: 5 },
+      // THE BANNER'S SECOND HALF, MEASURED (sc-ov-solid-return:b542b84e,
+      // critical — objectives.ts `requireSolidLineClean` carries the drive and
+      // the census). This disc sits at y = 560, sixty metres PAST the end of
+      // the М1 span, so on its own it says the car came out of the section and
+      // nothing about which half of the carriageway it drove through. The gap
+      // is reachable on the path this template itself advertises: instruction 7
+      // makes DECLINING the overtake a full performance, so a driver who trails
+      // the crawler ticks sc-ovsr-pass and sc-ovsr-home honestly, then loses
+      // patience inside the span — coached «Пресичане на непрекъсната осева
+      // линия» and «✓ Премини участъка … в своята лента» on one sheet, passed.
+      // The key makes the credit read the conviction the same protocol already
+      // wrote. It is the terminal gate, so the refusal is also wired into
+      // engine.ts's `terminalUnearnable` and cannot strand the drive.
+      params: { kind: "reachZone", x: OVS2_OWN, y: 560, radiusM: 5, requireSolidLineClean: true },
     },
   ],
   rubric: { parTimeSec: 85 },

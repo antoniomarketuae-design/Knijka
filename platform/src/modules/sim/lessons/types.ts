@@ -235,6 +235,30 @@ export interface ReachZoneParams {
    */
   requireRestClean?: ReachZoneRestDemand;
   /**
+   * THE CAR WAS ON ITS OWN SIDE OF THE М1 THE BANNER NAMES —
+   * sc-ov-solid-return:b542b84e (critical), and the fourth term this file's
+   * own templates route here rather than invent an instrument for.
+   *
+   * WHAT IT MEANS. `true` = this waypoint is thrown away by a run that has been
+   * convicted of `CROSSED_SOLID_LINE` — the основна the catalogue titles
+   * «Пресичане на непрекъсната осева линия» — whether the sheet CHARGED it or
+   * the teach-first coach gave the first one away as a card. Absent = no such
+   * claim, which is every other gate in the catalogue.
+   *
+   * NOT POOLED WITH `CENTER_LINE_TOUCHED`, on the split rule
+   * `ReachZoneRestDemand` states: touching the paint and crossing to the other
+   * half of the carriageway are two acts with two codes and two prices, and a
+   * banner about the second may not be withdrawn for the first.
+   *
+   * A CLAIM ABOUT THE JOURNEY, so it is read per frame off the run's own ledger
+   * and stays outside the `capMet` latch — the shape of the four journey
+   * demands above it. The full design note (the drive it closes, the census,
+   * the coached half and the false-refusal checks) lives on
+   * `ReachZoneWitnessDemands.requireSolidLineClean` in objectives.ts, which is
+   * where the evaluator reads it.
+   */
+  requireSolidLineClean?: true;
+  /**
    * REPORT THE ONCOMING GAP HE TURNED INTO, against this drill's taught norm,
    * in seconds — the authored half of the only key here that refuses nothing.
    * `done` is bit-identical with it and without it; what it adds is the

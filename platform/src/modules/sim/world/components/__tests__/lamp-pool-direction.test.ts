@@ -38,10 +38,21 @@
  *      measurement worse, or the measurement is not direction-sensitive and
  *      §4 proves nothing.
  *
+ * W24 — AND THE SIDE WAS ONLY HALF THE QUESTION. §4 as first written asked
+ * „is the pool nearer its road than its column", which any positive offset
+ * satisfies, so it certified a 2.2 m reach that never left the footway: the
+ * column stands `halfWidth + SIDEWALK_WIDTH_M + 0.4` back, and on the drill's
+ * own map (ov-oncoming-v1) that put the disc's centre 1.7 m OUTSIDE the kerb
+ * with its rim stopping 5.8 m short of the lane the student drives. §3's
+ * second gate and §4's footway gate below state the claim the comment in
+ * WorldProps.tsx always made — the pool is on the CARRIAGEWAY — and both fail
+ * on the shipped 2.2.
+ *
  * STILL OWED A LOOK (doc 66 R0). Geometry that reasons correctly can render
  * wrong — the disc is additive, depth-write-off and drawn at y = 0.05, and none
  * of that is decided here. This file says the light is pooled on the correct
- * SIDE; only a night frame says it looks like a street lamp.
+ * SIDE and the correct SURFACE; only a night frame says it looks like a street
+ * lamp.
  */
 
 import { readFileSync } from "node:fs";
@@ -49,6 +60,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildWorldGeometry } from "../../builders/buildWorldGeometry";
+import { LANE_WIDTH_M, SIDEWALK_WIDTH_M } from "../../builders/constants";
 import { assertDistrict, type District } from "../../types";
 
 const WORLD_PROPS = join(
@@ -429,6 +441,25 @@ describe("§3 the pool is offset ALONG the arm, not away from it", () => {
     expect(dot).toBeGreaterThan(0);
   });
 
+  it("THE SECOND GATE: the reach clears the pavement the column stands behind", () => {
+    // The sign was only half the question, and this is the half wave 8 missed.
+    // `props.ts` does NOT stand the column on the kerb — it stands it at
+    // `halfWidth + SIDEWALK_WIDTH_M + 0.4`, i.e. a whole pavement plus a verge
+    // BEHIND it. So an offset the length of the model's own arm points the
+    // right way and still lands the disc's bright core on the footway: 2.2 m
+    // shipped exactly that, and §4 below passed it, because „nearer the road
+    // than the column" is true of any positive number at all.
+    //
+    // Written against SIDEWALK_WIDTH_M rather than against a float, so a
+    // re-scaled road cross-section has to satisfy the claim instead of
+    // invalidating the gate.
+    const reach = Math.hypot(POOL_TRANSLATE.x, POOL_TRANSLATE.z);
+    expect(reach).toBeGreaterThan(SIDEWALK_WIDTH_M);
+    // …and far enough past the kerb that the bright half falls on the kerbside
+    // lane and not on the kerb itself. Half a lane is the authored target.
+    expect(reach).toBeGreaterThan(SIDEWALK_WIDTH_M + LANE_WIDTH_M / 2);
+  });
+
   it("and it is offset essentially straight down the arm", () => {
     // A pool square to the arm would be on the road too, by luck of the disc's
     // radius, and would still be wrong. Cross product ~ 0 relative to the
@@ -503,6 +534,30 @@ describe("§4 on the shipped maps, the pool lands on the carriageway side", () =
         if (!(poolD < colD)) worse.push(`${colD.toFixed(2)} -> ${poolD.toFixed(2)}`);
       }
       expect(worse, `${worse.length}/${lamps.length} pools moved AWAY from the road`).toEqual([]);
+    });
+
+    it(`${id}: every pool centre clears the footway and lands on the carriageway`, () => {
+      // The row's surviving clause, measured instead of argued. The column
+      // stands `SIDEWALK_WIDTH_M + 0.4` outside the kerb, so a centre that is
+      // less than a pavement's width nearer the centreline than its column is
+      // still on the footway however right its direction is — the state that
+      // shipped from wave 8 and left ov-oncoming-v1's lamps throwing 5.8 m
+      // short of the lane the student drives.
+      const onFootway: string[] = [];
+      for (const lamp of lamps) {
+        const [ox, oz] = rotY(lamp.yaw, POOL_TRANSLATE.x, POOL_TRANSLATE.z);
+        const colD = distanceToRoad(district, lamp.position[0], -lamp.position[2]);
+        const poolD = distanceToRoad(
+          district,
+          lamp.position[0] + ox,
+          -(lamp.position[2] + oz),
+        );
+        if (!(poolD < colD - SIDEWALK_WIDTH_M)) onFootway.push(`${colD.toFixed(2)} -> ${poolD.toFixed(2)}`);
+      }
+      expect(
+        onFootway,
+        `${onFootway.length}/${lamps.length} pools never cleared the pavement`,
+      ).toEqual([]);
     });
 
     it(`${id}: and the opposite sign measurably moves them away — the control`, () => {

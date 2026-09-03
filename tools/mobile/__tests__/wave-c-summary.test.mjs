@@ -58,7 +58,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DRIVE_SUMMARY_RE, INPUT_GUARDS, parseSummary } from "../lib/summary.mjs";
+import { DRIVE_SUMMARY_RE, INPUT_ATTESTATION, INPUT_GUARDS, parseSummary } from "../lib/summary.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOOLS_MOBILE = path.resolve(HERE, "..");
@@ -287,5 +287,152 @@ describe("§5 the corpus, when this disk carries it", () => {
       withRefusal > 100,
       `only ${withRefusal} of ${logs.length} transcripts carry a refusal line`,
     );
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §6 — WHICH CHANNEL DROVE THE CAR (`sc-speed-creep:dff70553`)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * The row, quoted: „the brake-drop family is mis-named — the harness never
+ * dispatches a touch, so it cannot exercise TouchControls.tsx, the suspect
+ * file all five rows name." It is the naming half of the same family §1–§5
+ * repaired the counting half of: the 83-of-122 lost-brake rate that gave the
+ * family its force was measured on drives that sent KeyW and KeyS, so the
+ * defect it points at cannot live in a thumb pad.
+ *
+ * §6a THE READER lifts the channel off the emitter's line.
+ * §6b ABSENCE IS NULL. A drive that never printed the line stated no channel;
+ *     answering „keyboard" there would invent an attestation, which is the
+ *     same reassuring direction §2 refuses for the two counters.
+ * §6c THE EMITTER AND THE READER ARE ONE PAIR — §3's argument, new clause.
+ * §6d THE ATTESTATION MAY NOT OUTLIVE ITS TRUTH. `touchEvents: 0` is a claim
+ *     about the harness's own source, so the source is censused: the day this
+ *     file gains a touch channel the claim stops being true, and this goes RED
+ *     rather than letting a drive that DID touch report that it did not.
+ *     Adding the capability is welcome; shipping it under this line is not. */
+
+// Synthesised from the emitter's own template, not lifted from a transcript —
+// the line is newer than every run.log on this disk. §6c and §6d are what keep
+// that honest: they read the emitter's source, so a drift in either direction
+// goes red here rather than in a wave six hours long.
+const WITH_INPUT =
+  "  INPUT: keyboard · 214 pedal/steer key events · 0 touch events dispatched · touch overlay mounted";
+
+describe("§6 the drive states which channel drove it", () => {
+  it("lifts the channel, both counts and the overlay state", () => {
+    const s = parseSummary(WITH_INPUT);
+    assert.equal(s.inputChannel, "keyboard");
+    assert.equal(s.driveKeyEvents, 214);
+    assert.equal(s.touchEvents, 0);
+    assert.equal(s.touchOverlay, "mounted");
+  });
+
+  it("reads the other two overlay states the emitter can print", () => {
+    assert.equal(
+      parseSummary("  INPUT: keyboard · 3 pedal/steer key events · 0 touch events dispatched · touch overlay absent")
+        .touchOverlay,
+      "absent",
+    );
+    assert.equal(
+      parseSummary("  INPUT: keyboard · 3 pedal/steer key events · 0 touch events dispatched · touch overlay unreadable")
+        .touchOverlay,
+      "unreadable",
+    );
+  });
+
+  it("counts are NUMBERS, so a ledger can filter on touchEvents === 0", () => {
+    const s = parseSummary(WITH_INPUT);
+    assert.equal(typeof s.driveKeyEvents, "number");
+    assert.equal(typeof s.touchEvents, "number");
+  });
+
+  it("a drive that printed no INPUT line stated NO channel — null, never «keyboard» and never 0", () => {
+    // MUTATION that proves it: give `num()`/`grab()` a 0/"keyboard" default and
+    // this goes green while every case above stays green — which is how a
+    // crashed lane would come to certify that it drove with a keyboard.
+    const dead = parseSummary(NEITHER);
+    assert.equal(dead.inputChannel, null);
+    assert.equal(dead.driveKeyEvents, null);
+    assert.equal(dead.touchEvents, null);
+    assert.equal(dead.touchOverlay, null);
+  });
+
+  it("…and the DRIVE line alone does not conjure one", () => {
+    // The two are separate emissions. A transcript carrying one and not the
+    // other must report exactly that, or a reader cannot tell an old drive
+    // (pre-attestation) from a new one that lost its channel.
+    const s = parseSummary(BOTH_CLAUSES);
+    assert.equal(s.lostKeys, 2);
+    assert.equal(s.inputChannel, null);
+  });
+
+  describe("§6c/§6d the emitter, read out of the harness source", () => {
+    const EMITTER = readFileSync(path.join(TOOLS_MOBILE, "lesson-audit.mjs"), "utf8");
+
+    it("lesson-audit.mjs still prints the clauses these regexes key on", () => {
+      assert.ok(EMITTER.includes("INPUT: ${inputChannel.channel}"), "the INPUT line is gone");
+      assert.ok(EMITTER.includes(" pedal/steer key events"), "re-point INPUT_ATTESTATION.driveKeyEvents");
+      assert.ok(EMITTER.includes(" touch events dispatched"), "re-point INPUT_ATTESTATION.touchEvents");
+      assert.ok(EMITTER.includes("touch overlay "), "re-point INPUT_ATTESTATION.touchOverlay");
+      // …and the sentence a dispatcher acts on, which is the whole repair.
+      assert.ok(
+        EMITTER.includes("no finding from "),
+        "the mobile lane no longer says that no finding may name TouchControls.tsx",
+      );
+      assert.ok(EMITTER.includes("const inputChannel = {"), "the attestation record is gone");
+    });
+
+    it("…and the claim it makes about itself is TRUE: this harness actuates no touch", () => {
+      // `touchEvents: 0` is a statement about this source file. If a future
+      // wave gives the drive a real thumb channel — which it should — the
+      // counter has to be incremented where the touch is sent and this census
+      // updated to match. Failing here is that instruction, not an objection.
+      const forbidden = [
+        [/dispatchTouchEvent/, "CDP Input.dispatchTouchEvent"],
+        [/\.\s*touchscreen\s*\./, "page.touchscreen.*"],
+        [/\.\s*tap\s*\(/, "locator.tap()"],
+      ];
+      for (const [re, what] of forbidden) {
+        assert.equal(
+          re.test(EMITTER),
+          false,
+          `lesson-audit.mjs now actuates touch via ${what}, but its INPUT line still reports «0 touch events dispatched». ` +
+            "Count the dispatch into inputChannel.touchEvents and update this census.",
+        );
+      }
+    });
+
+    it("the counter is incremented where the keys are actually sent", () => {
+      // A count that is declared and never raised reports 0 for a drive that
+      // sent 200 keys — the dead-predicate shape, in the attestation itself.
+      const raises = [...EMITTER.matchAll(/inputChannel\.driveKeyEvents \+= \d+;/g)];
+      assert.ok(
+        raises.length >= 6,
+        `only ${raises.length} site(s) raise driveKeyEvents — the pedal, steer, drain and re-assert paths all send keys`,
+      );
+    });
+  });
+
+  describe("§6e the wire", () => {
+    const WAVE_C = readFileSync(path.join(TOOLS_MOBILE, "wave-c.mjs"), "utf8");
+
+    it("the channel reaches the ledger row and the console line", () => {
+      // `...s` (asserted in §4) carries the fields; this pins that the row's
+      // documented contract and the scroll a dispatcher reads both name them.
+      const keys = Object.keys(parseSummary(WITH_INPUT));
+      for (const k of ["inputChannel", "driveKeyEvents", "touchEvents", "touchOverlay"]) {
+        assert.ok(keys.includes(k), `parseSummary no longer returns ${k}`);
+      }
+      assert.ok(WAVE_C.includes("s.touchEvents"), "the console line no longer prints the touch count");
+      assert.ok(WAVE_C.includes("touchEvents"), "wave-c.mjs no longer documents the column");
+    });
+  });
+
+  it("the reader's regexes are exported so a judge can re-scan a transcript raw", () => {
+    // §5's precedent: the corpus scan re-runs the regexes itself rather than
+    // trusting the parser it is checking.
+    assert.equal(INPUT_ATTESTATION.touchEvents.exec(WITH_INPUT)[1], "0");
+    assert.equal(INPUT_ATTESTATION.channel.exec(WITH_INPUT)[1], "keyboard");
   });
 });

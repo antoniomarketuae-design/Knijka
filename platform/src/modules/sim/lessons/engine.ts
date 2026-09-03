@@ -56,13 +56,14 @@ import {
   railBarredVoidsObjective,
   reachZoneStateRefusal,
   restFaultVoidsObjective,
+  solidLineFaultVoidsObjective,
   stepObjective,
   yieldFailedVoidsObjective,
   type ObjectiveContext,
   type YieldFaultCode,
   type YieldFaultRecord,
 } from "./objectives";
-import { shownObjectiveCapKmh, stepYieldVoice } from "./advisor";
+import { lessonYieldsToRailVehicle, shownObjectiveCapKmh, stepYieldVoice } from "./advisor";
 import { foldTrainingScore, type PenaltyEscalation } from "./escalation";
 import { examTerminationFor } from "./exam";
 import {
@@ -814,6 +815,44 @@ function isCoachedBanZoneRest(m: CoachedMistake): boolean {
 }
 
 /**
+ * Crossed a непрекъсната осева — the ledger row
+ * `ReachZoneParams.requireSolidLineClean` consults (objectives.ts carries the
+ * drive, the census and the two false-refusal checks).
+ *
+ * IT READS THE BILL, NOT THE TRACKER, exactly like its four neighbours:
+ * `worldRuntime` arms this detector only on an authored М1 span and only past
+ * `solidLineCrossSustainSec` (the paint-flicker guard), so what arrives here is
+ * a conviction the protocol already prints — with the catalogue's explanation,
+ * its «✔ Правилното действие» corrective and its ППЗДвП/ЗДвП refs — and never a
+ * raw bank flip.
+ */
+function isSolidLineCross(e: ScorableEvent): boolean {
+  return e.kind === "violation" && e.code === "CROSSED_SOLID_LINE";
+}
+
+/**
+ * …AND THE SAME FAULT AS THE COACH RECORDED IT — the half that carries this
+ * demand in every TRAINING drive, and the reason it is not optional.
+ *
+ * `CROSSED_SOLID_LINE` is основна since the 2026-08-09 Наредба № 38 grounding
+ * pass, so the teach-first coach hands the FIRST offence over as a free
+ * mini-lesson on `LessonSessionState.coachedMistakes` and the sheet stays
+ * empty. Measured on the drive this demand was written for — decline the
+ * overtake in the М2 window, then take it inside the М1 span — scored is `[]`
+ * and coached is `[CROSSED_SOLID_LINE]` at BOTH L1 and L3, so a ledger-only
+ * read would have refused nothing outside exam mode. The same asymmetry
+ * `isCoachedBanZoneRest` documents one screen up.
+ *
+ * `CoachedMistake.code` is a plain string (future codes pass through), so this
+ * is a string compare; the SCORED half above is typed against the real
+ * `ViolationCode`, which is what makes a rename fail the build instead of
+ * quietly emptying the gate.
+ */
+function isCoachedSolidLineCross(m: CoachedMistake): boolean {
+  return m.code === "CROSSED_SOLID_LINE";
+}
+
+/**
  * Came to rest between the rails — the ledger row
  * `ReachZoneParams.requireRestClean: "railBand"` consults.
  *
@@ -1311,6 +1350,23 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     prev.events.some(isBanZoneRest) || scoredEvents.some(isBanZoneRest) || banZoneRestCoached;
   const restedOnRailBandInRun =
     prev.events.some(isRailBandRest) || scoredEvents.some(isRailBandRest);
+  // …AND THE CROSSING OF A НЕПРЕКЪСНАТА ОСЕВА, for
+  // `ReachZoneParams.requireSolidLineClean` (objectives.ts carries the frame:
+  // one sheet printing «✓ Премини участъка с непрекъсната линия В СВОЯТА ЛЕНТА
+  // 0:45» over a coached «Пресичане на непрекъсната осева линия», with
+  // `passed: true`). Both halves of the scored ledger for the reason the four
+  // blocks above give, PLUS the shown-but-not-charged half on the same argument
+  // as the ban-zone rest one line up — the code is основна, so in every
+  // training drive the first crossing lands on the coached channel and the
+  // sheet stays empty. The `mistakeExperience` exemption is the same one and
+  // for the same reason: in a THEO-3 sandbox the wrong act IS the assignment.
+  const solidLineCrossCoached =
+    mistakeXp === undefined &&
+    (coachedPrev.some(isCoachedSolidLineCross) || coachedNew.some(isCoachedSolidLineCross));
+  const crossedSolidLineInRun =
+    prev.events.some(isSolidLineCross) ||
+    scoredEvents.some(isSolidLineCross) ||
+    solidLineCrossCoached;
 
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
@@ -1376,6 +1432,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(enteredRailBarredInRun ? { enteredRailBarredInRun: true } : {}),
         ...(restedInBanZoneInRun ? { restedInBanZoneInRun: true } : {}),
         ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
+        ...(crossedSolidLineInRun ? { crossedSolidLineInRun: true } : {}),
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
         ...(activeSince !== null ? { objectiveActiveSinceSec: activeSince } : {}),
       };
@@ -1602,6 +1659,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       speedKmh: tick.speedKmh,
       wait: yieldWait,
       violations: scoredEvents.filter((e) => e.kind === "violation").map((e) => e.code),
+      // RX-05 (sc-rx-tram-left:07c63b97) — the same lesson-level fact the
+      // advisor card reads, so the card and this teach channel cannot say two
+      // different things about one wait. Pure copy selection; nothing graded.
+      railPriority: lessonYieldsToRailVehicle(prev.lesson),
     });
     yieldVoice = voice.state;
     for (const n of voice.notices) hudEvents.push(n);
@@ -1761,7 +1822,14 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           restFaultVoidsObjective(params[currentIndex], {
             ...(restedInBanZoneInRun ? { restedInBanZoneInRun: true } : {}),
             ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
-          }));
+          }) ||
+          // The М1 term (`requireSolidLineClean`) is monotone in the same way —
+          // and it is the second arm here where wiring is NOT optional: its one
+          // census member, `sc-ovsr-finish`, IS the last objective of its drill
+          // (3 of 3). Without this the refusal would strand the chain, the
+          // run-out would never arm, and the student who crossed the solid line
+          // could reach the card that teaches him М1 only by quitting.
+          solidLineFaultVoidsObjective(params[currentIndex], crossedSolidLineInRun));
       if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {

@@ -1964,10 +1964,27 @@ function RailBarriers({
  *  isolated spots; small enough that the road between them is still dark,
  *  which is what the drill's «тъмно е» has to stay true of. */
 const LAMP_POOL_DIAMETER_M = 16;
-/** How far along the lamp's own arm the pool's centre sits, m — over the
- *  carriageway rather than over the column, because that is where the arm
- *  reaches and where a lamp actually throws. */
-const LAMP_POOL_ARM_REACH_M = 2.2;
+/**
+ * How far from the COLUMN, along the arm, the pool's centre sits, m.
+ *
+ * THE COLUMN IS NOT AT THE KERB, and 2.2 m was measured as if it were. `props.ts`
+ * stands it at `halfWidth + SIDEWALK_WIDTH_M + 0.4` — 3.9 m BEHIND the kerb — so
+ * an offset the length of the model's own arm (`lamp_lit` centroid x ≈ 1.02 m)
+ * never reaches the road. Measured on the drill's own map (ov-oncoming-v1, 32
+ * lamps): column 16.025 m from the centreline, kerb at 12.125, own-lane centre
+ * 4.06. A 2.2 m reach centred the disc at 13.825 — 1.7 m out on the FOOTWAY,
+ * with its 8 m rim stopping 5.8 m short of the lane the student drives. Wave 8
+ * put the pool on the right SIDE of the column and left it on the wrong SURFACE,
+ * which is why sc-ov-night-gap:5085441f («every street lamp along the road is
+ * dark … the only light in the scene is the ego's own beam») kept standing.
+ *
+ * So the reach is the pavement the column stands behind, its verge, and half a
+ * lane further: 3.5 + 0.4 + LANE_WIDTH_M / 2 (4.0625). The centre lands on the
+ * carriageway edge and the bright half of the disc falls on the kerbside lane;
+ * at a 28–32 m lamp pitch against a 16 m disc the road BETWEEN lamps is still
+ * dark, which is what «тъмно е и си извън града» has to stay true of.
+ */
+const LAMP_POOL_ARM_REACH_M = 7.96;
 /** Clearance over the placement's own base, m — and the base is the foot of the
  *  COLUMN, which stands on the pavement at `SIDEWALK_TOP_Y` (ROAD_Y 0.02 +
  *  CURB_HEIGHT_M 0.12 = 0.14). This read „only has to be off the pavement
