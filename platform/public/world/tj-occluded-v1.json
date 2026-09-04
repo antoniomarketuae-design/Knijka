@@ -27,7 +27,7 @@
    "nodes": 4,
    "edges": 3,
    "intersections": 1,
-   "crossings": 0,
+   "crossings": 3,
    "buildings": 1,
    "spawnPoints": 3
   },
@@ -152,7 +152,32 @@
    "signalized": false
   }
  ],
- "crossings": [],
+ "crossings": [
+  {
+   "id": "tjo-x-s",
+   "x": 0,
+   "y": -14,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "tj-e-s"
+  },
+  {
+   "id": "tjo-x-w",
+   "x": -14,
+   "y": 0,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "tj-e-w"
+  },
+  {
+   "id": "tjo-x-e",
+   "x": 14,
+   "y": 0,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "tj-e-e"
+  }
+ ],
  "roundabouts": [],
  "buildings": [
   {

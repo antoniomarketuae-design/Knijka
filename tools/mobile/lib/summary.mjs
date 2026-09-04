@@ -121,6 +121,21 @@ export const TOUCH_PROBE = {
   events: /^\s*TOUCH PROBE:[^\n]*·\s*(\d+)\s*touch events dispatched/m,
   hold: /^\s*TOUCH PROBE:[^\n]*·\s*hold\s+(survived|did NOT survive)/m,
   release: /^\s*TOUCH PROBE:[^\n]*·\s*release\s+(clean|NOT observed)/m,
+  /**
+   * WHICH INSTANT THE THREE FLAGS ABOVE DESCRIBE — «… · taken before the
+   * drive, on the untouched car — …».
+   *
+   * Not decoration. The first build of the probe ran only after the drive,
+   * where `TouchControls` is inert BY DESIGN (`hidden={physicsPaused}`), so
+   * every lane in the corpus reported «NOT actuated» for a reason that says
+   * nothing about the component. A dispatcher who cannot see WHEN a reading
+   * was taken cannot tell „the pad refused a live press" from „the pad was
+   * behind the end card", and those route to opposite places.
+   *
+   * Null on every transcript written before the probe learned to say it, which
+   * is the honest answer for a reading whose instant was never stated.
+   */
+  when: /^\s*TOUCH PROBE:[^\n]*·\s*taken\s+([^\n—]+?)\s*(?:—|$)/m,
 };
 
 /** Pull the machine summary the harness prints, which is the judgeable surface. */
@@ -167,5 +182,6 @@ export function parseSummary(stdout) {
     touchProbeEvents: num(TOUCH_PROBE.events),
     touchProbeHold: grab(TOUCH_PROBE.hold),
     touchProbeRelease: grab(TOUCH_PROBE.release),
+    touchProbeWhen: grab(TOUCH_PROBE.when),
   };
 }

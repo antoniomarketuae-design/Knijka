@@ -136,3 +136,68 @@ describe("the JU-10 lesson stages oncoming traffic at all", () => {
     expect(Math.max(...gaps), "no actor leaves a takeable gap").toBeGreaterThanOrEqual(4);
   });
 });
+
+// ---------------------------------------------------------------------------
+// RX-05 (sc-rx-tram-left:07c63b97) — IS THE ONCOMING A РЕЛСОВО ППС?
+//
+// ЗДвП чл. 8, ал. 2 makes a tram a different duty, not a bigger car: where
+// passage is permitted to both at once, the non-rail driver lets it through
+// „независимо от неговото местоположение и посока на движение" — there is no
+// gap he may take instead. This probe is where that question can first be
+// answered, because it is the only place the actor's `profile` and the
+// junction geometry are in the same hand.
+// ---------------------------------------------------------------------------
+
+const tram = (x: number, y: number, dirX: number, dirY: number, speedMps = 10.5) => ({
+  ...veh(x, y, dirX, dirY, speedMps),
+  profile: "tram" as const,
+});
+
+describe("oncomingApproachFor — the rail flag", () => {
+  it("marks an oncoming TRAM, and reports the same distance and gap as a car", () => {
+    const a = oncomingApproachFor([tram(0, 21, 0, -1)], 0, 0, 0, 36);
+    expect(a).not.toBeNull();
+    expect(a!.rail).toBe(true);
+    expect(a!.distM).toBeCloseTo(21, 6);
+    expect(a!.closingMps).toBeCloseTo(10.5, 6);
+  });
+
+  it("a TRAIN in the carriageway is rail too", () => {
+    const t = { ...veh(0, 18, 0, -1), profile: "train" as const };
+    expect(oncomingApproachFor([t], 0, 0, 0, 36)!.rail).toBe(true);
+  });
+
+  it("…and every other body publishes the pre-rail shape, byte-identically", () => {
+    // The direction that keeps this additive: a car, a bus and a lorry must
+    // leave the returned object exactly as it shipped — `rail` ABSENT, not
+    // false — so no consumer of this query can change behaviour on them.
+    for (const profile of ["car", "bus", "truck", "van", "emergency"] as const) {
+      const a = oncomingApproachFor([{ ...veh(0, 21, 0, -1), profile }], 0, 0, 0, 36);
+      expect(a, profile).not.toBeNull();
+      expect(Object.hasOwn(a!, "rail"), profile).toBe(false);
+    }
+    // An ambient agent, which has no profile at all.
+    expect(Object.hasOwn(oncomingApproachFor([veh(0, 21, 0, -1)], 0, 0, 0, 36)!, "rail")).toBe(
+      false,
+    );
+  });
+
+  it("a tram that is NOT oncoming is not returned at all", () => {
+    // The halted tram at a stop island (sc-rx-tram-island / sc-rx-tram-stop-
+    // doors) is a prop with cruise 0, and a crossing train at a жп прелез runs
+    // perpendicular. Neither may arm a „пропусни трамвая" wait, and the two
+    // filters that keep them out are the ones this query already had.
+    expect(oncomingApproachFor([tram(0, 15, 0, -1, 0)], 0, 0, 0, 36)).toBeNull(); // halted
+    expect(oncomingApproachFor([tram(0, 15, 1, 0)], 0, 0, 0, 36)).toBeNull(); // crossing
+    expect(oncomingApproachFor([tram(0, -15, 0, -1)], 0, 0, 0, 36)).toBeNull(); // behind
+  });
+
+  it("the most urgent oncoming wins, and the flag follows THAT body", () => {
+    // A car nearer than the tram: the answer is the car, and it must not
+    // inherit the tram's duty. Gap 10/8 = 1.25 s vs the tram's 30/10.5 = 2.9 s.
+    const both = [tram(0, 30, 0, -1), veh(0, 10, 0, -1)];
+    const a = oncomingApproachFor(both, 0, 0, 0, 36);
+    expect(a!.distM).toBeCloseTo(10, 6);
+    expect(Object.hasOwn(a!, "rail")).toBe(false);
+  });
+});

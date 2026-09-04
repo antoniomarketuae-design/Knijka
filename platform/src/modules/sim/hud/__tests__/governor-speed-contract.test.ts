@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { GovernorCapMark } from "../StatusDashboard";
 import { readSpeedContract } from "../../scene/lessonSpeedContract";
+import { governorIsEasing } from "../../vehicle";
 
 /**
  * =============================================================================
@@ -72,9 +73,23 @@ describe("the drill's own cap reaches the bar when it is the number that binds",
     // The number the student is actually graded on is now on the same bar as
     // the two that are not.
     expect(html).toContain("задачата иска ≤40");
-    // …and the other two are untouched: the sign still wins over the governor.
-    expect(html).toContain("Нормален ≤60");
-    expect(html).toContain("знакът важи");
+    // …and the precedence rides with it INSIDE THE CHIP, on the glass and not
+    // only on `title` (the same words are in `explainBg`, so the anchor is the
+    // chip's own handle rather than a bare substring of the markup).
+    expect(html).toMatch(/governor-task-binds[\s\S]*?по-строгото важи/);
+    // ── AND THE THIRD NUMERAL IS GONE (sc-sig-controller-postures:e245bd5c) ──
+    // This block used to end „the other two are untouched", asserting «Нормален
+    // ≤60» and «знакът важи» on the same markup. That was the reading the three
+    // COUNT rows were filed against: three speed figures at once, of which the
+    // governor is the only one that can neither convict nor acquit. At 20 км/ч
+    // under a 60 cap it is easing nothing and it blocks no 40 km/h gate, so it
+    // leaves and the strip states the two numbers that actually bill.
+    expect(html).not.toContain("Нормален ≤60");
+    expect(html).not.toContain("знакът важи");
+    // …but the explanation is not what left: the element's accessible name
+    // still carries all three ceilings and the precedence between them.
+    expect(html).toContain("Знакът е 50 — това е законът.");
+    expect(html).toContain("РЕЖИМ ≤60 е таван на колата, не разрешение.");
   });
 
   it("SAYS NOTHING when the drill is slack — B58, inherited whole", () => {
@@ -83,14 +98,19 @@ describe("the drill's own cap reaches the bar when it is the number that binds",
     // printed „задачата иска ≤60" beside a 50 sign would be the world
     // instructing the fault it is about to bill — B58 verbatim, on a new
     // surface.
-    const slack = mark({ capKmh: 60, limitKmh: 50, taskCapKmh: 60 });
+    // The governor is at 40 here, i.e. AT OR UNDER the sign, so it is the
+    // operative ceiling and stays on the bar — which is what makes it a usable
+    // negative control after the count repair. (At 60 the mark would be empty
+    // for a reason that has nothing to do with B58, and a `not.toContain` on an
+    // empty string proves nothing; that is the trap this pair now avoids.)
+    const slack = mark({ capKmh: 40, limitKmh: 50, taskCapKmh: 60 });
     expect(slack).not.toContain("задачата иска");
     // Negative control: the mark rendered at all, so the `not` above is not
     // passing on an empty string.
-    expect(slack).toContain("Нормален ≤60");
+    expect(slack).toContain("Нормален ≤40");
 
     // A tie is the law's, never the drill's — `readSpeedContract`'s own rule.
-    expect(mark({ capKmh: 60, limitKmh: 50, taskCapKmh: 50 })).not.toContain("задачата иска");
+    expect(mark({ capKmh: 40, limitKmh: 50, taskCapKmh: 50 })).not.toContain("задачата иска");
   });
 
   it("is ABSENT on every mount that ships today, byte for byte", () => {
@@ -102,6 +122,13 @@ describe("the drill's own cap reaches the bar when it is the number that binds",
       mark({ capKmh: 60, limitKmh: 50, taskCapKmh: undefined }),
     );
     expect(mark({ capKmh: 60, limitKmh: 50 })).not.toContain("задачата иска");
+    // …on a pair that RENDERS, so the equality above is not two empty strings
+    // agreeing with each other. (The 60-against-50 pair is empty since the count
+    // repair — see the sweep below — which is exactly the vacuity this guards.)
+    expect(mark({ capKmh: 40, limitKmh: 50 })).toBe(
+      mark({ capKmh: 40, limitKmh: 50, taskCapKmh: undefined }),
+    );
+    expect(mark({ capKmh: 40, limitKmh: 50 })).toContain("Нормален ≤40");
   });
 
   it("MUTATION — the clause is driven by the resolver, not by a literal", () => {
@@ -128,24 +155,42 @@ describe("the sign-wins clause is no longer a second copy of the rule", () => {
   const GRID = [0, 0.4, 1, 19.6, 20, 30, 40, 49.5, 50, 60, 90, 140, 150];
 
   it("agrees with `readSpeedContract` on every pair, including the ugly ones", () => {
+    // ── THE RULE GAINED ITS SECOND TERM (sc-sig-controller-postures:e245bd5c) ─
+    // It used to be `includes("знакът важи") === modeAboveLaw` alone. The count
+    // repair says a governor ABOVE the sign leaves the bar entirely unless it is
+    // actually easing the throttle — so the clause that names what that numeral
+    // loses to renders only where the numeral itself does. Both terms come from
+    // shipped exports (`readSpeedContract`, `governorIsEasing`); neither is
+    // restated here, which is what this sweep exists to guarantee.
+    const SPEED = 20;
     let sawClause = false;
     let sawNoClause = false;
+    let sawSpeakingAboveLaw = false;
     for (const limitKmh of GRID) {
       for (const capKmh of GRID) {
         if (capKmh <= 0) continue; // no cap is a separate case, asserted below
-        const expected = readSpeedContract({
+        const { modeAboveLaw } = readSpeedContract({
           postedKmh: limitKmh,
           modeCapKmh: capKmh,
-        }).modeAboveLaw;
-        const html = mark({ capKmh, limitKmh });
+        });
+        const speaks = governorIsEasing(capKmh, SPEED) || !modeAboveLaw;
+        const expected = modeAboveLaw && speaks;
+        const html = mark({ capKmh, limitKmh, speedKmh: SPEED });
         expect(html.includes("знакът важи")).toBe(expected);
+        // …and the numeral it qualifies obeys the same predicate, so the bar
+        // can never carry one without the other.
+        expect(html.includes(`Нормален ≤${Math.round(capKmh)}`)).toBe(speaks);
         if (expected) sawClause = true;
         else sawNoClause = true;
+        if (modeAboveLaw && speaks) sawSpeakingAboveLaw = true;
       }
     }
     // The sweep must have exercised BOTH answers, or „they agree" is vacuous.
     expect(sawClause).toBe(true);
     expect(sawNoClause).toBe(true);
+    // …and it must have found at least one governor that is above the sign AND
+    // speaking, or the new term would be passing by never being true.
+    expect(sawSpeakingAboveLaw).toBe(true);
   });
 
   it("MUTATION — a road with NO posted limit no longer claims a sign wins", () => {

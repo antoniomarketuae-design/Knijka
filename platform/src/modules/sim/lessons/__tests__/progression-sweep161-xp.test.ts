@@ -170,6 +170,86 @@ describe("1 · the two debrief chips differ by the first-pass milestone and by n
 });
 
 // ---------------------------------------------------------------------------
+// §1b — THE SAME FINDING, FILED AGAIN, WITH THE PLATFORMS THE OTHER WAY ROUND
+//
+// `sc-sig-controller-postures:f7e046c4` (w13, major) carries the identical
+// sentence — „a perfect drive is worth +150 XP on mobile and +100 XP on pc" —
+// against `.audit-frames/sweep161/sc-sig-controller-postures/{mobile,pc}-right/
+// 08-debrief.png`. Both frames were opened. They read:
+//
+//   mobile-right  «Езикът на регулировчика · Ниво 1 — Пълна помощ · резултат»
+//                 0 наказателни точки · ИЗДЪРЖАН · +100 XP
+//   pc-right      the same title, the same 0, the same ИЗДЪРЖАН, ★★★ · +150 XP
+//
+// i.e. the row's own text has the two platforms the wrong way round, and the
+// numbers it names are on the OPPOSITE screens from `sc-pk-ban-stop`'s. That is
+// the refutation in its strongest form: if the platform were the variable, the
+// same pair of numbers could not land on the same pair of platforms swapped.
+// The frames' mtimes say which leg spent the one-time milestone here, exactly
+// as they did there — pc-right's debrief was written 2026-08-18 00:05:42.035
+// and mobile-right's 00:05:54.935, so on THIS lesson the desktop leg finished
+// first and banked it, and the phone was the repeat.
+//
+// Nothing below re-derives the arithmetic §1 already walked; it asserts that
+// the enumeration is symmetric under the swap, which is the only claim §1 does
+// not already make.
+// ---------------------------------------------------------------------------
+describe("1b · the same two numbers, on the opposite platforms, one lesson over", () => {
+  /** What `sc-sig-controller-postures/mobile-right/08-debrief.png` reads. */
+  const POSTURES_MOBILE_XP = 100;
+  /** …and `pc-right/08-debrief.png`, on the identical 0 / ИЗДЪРЖАН result. */
+  const POSTURES_PC_XP = 150;
+
+  it("is the SAME pair of chips as sc-pk-ban-stop, with the screens exchanged", () => {
+    expect(new Set([POSTURES_MOBILE_XP, POSTURES_PC_XP])).toEqual(new Set([MOBILE_XP, PC_XP]));
+    expect(POSTURES_MOBILE_XP).toBe(PC_XP);
+    expect(POSTURES_PC_XP).toBe(MOBILE_XP);
+  });
+
+  it("so the award cannot be a function of the platform — it has no such input", () => {
+    // `xpForEvent` is handed no device, viewport or user-agent, and the whole
+    // shape of the award is enumerated in §1. The only term that separates the
+    // two chips is `firstPass`, and it separates them the same way on whichever
+    // screen happens to have driven the lesson first.
+    const base = {
+      type: "sim_lesson",
+      score: 0,
+      lessonId: "sc-sig-controller-postures@L1",
+      cleanDrives: 0,
+    } as const;
+    expect(xpForEvent({ ...base, passed: true, firstPass: true })).toBe(POSTURES_PC_XP);
+    expect(xpForEvent({ ...base, passed: true, firstPass: false })).toBe(POSTURES_MOBILE_XP);
+  });
+
+  it("and the lesson id is not an input either — both drills pay identically", () => {
+    // The last thing the row could mean is that the two templates pay
+    // differently. They do not: the award reads `passed`, `firstPass` and
+    // `cleanDrives`, and the id only rides along for the ledger.
+    for (const firstPass of [true, false]) {
+      expect(
+        xpForEvent({
+          type: "sim_lesson",
+          passed: true,
+          score: 0,
+          lessonId: "sc-sig-controller-postures@L1",
+          firstPass,
+          cleanDrives: 0,
+        }),
+      ).toBe(
+        xpForEvent({
+          type: "sim_lesson",
+          passed: true,
+          score: 0,
+          lessonId: "sc-pk-ban-stop@L1",
+          firstPass,
+          cleanDrives: 0,
+        }),
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // §2 — the lock-out that was in this file
 // ---------------------------------------------------------------------------
 

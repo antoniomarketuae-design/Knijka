@@ -5,6 +5,14 @@
  * ramp (neutral > 8 m, amber < 8, red < 4 while moving), the 1 m exit
  * hysteresis, and the identity-stability that lets the badge's setState bail
  * out at the 5 Hz poll rate.
+ *
+ * THE `toEqual` ROWS GAINED `kind: "vehicle"` ON 2026-09-04, because the CUE
+ * gained the field: the badge now names the body it is about, and every call in
+ * this file omits the kind and therefore takes `stepRearCue`'s own default —
+ * the car sentence this file has always been about. Nothing here was loosened;
+ * each of those rows still enumerates the WHOLE snapshot, which is why they
+ * went red rather than passing quietly. The cyclist branch is asserted in
+ * `rear-cyclist-behind.test.ts`.
  */
 
 import { describe, expect, it } from "vitest";
@@ -28,9 +36,9 @@ describe("stepRearCue — honesty contract (no vehicle = no badge)", () => {
   it("Infinity DROPS a visible badge immediately — it can never linger", () => {
     // Every visible state, every level: the vehicle leaving kills the badge.
     const states: RearCue[] = [
-      { level: "info", meters: 12 },
-      { level: "warn", meters: 6 },
-      { level: "danger", meters: 3 },
+      { level: "info", meters: 12, kind: "vehicle" },
+      { level: "warn", meters: 6, kind: "vehicle" },
+      { level: "danger", meters: 3, kind: "vehicle" },
     ];
     for (const prev of states) {
       expect(stepRearCue(prev, Infinity, 0)).toBeNull();
@@ -40,7 +48,7 @@ describe("stepRearCue — honesty contract (no vehicle = no badge)", () => {
 
   it("NaN (a malformed read) is treated as no vehicle, not as a badge", () => {
     expect(stepRearCue(null, NaN, 30)).toBeNull();
-    expect(stepRearCue({ level: "warn", meters: 6 }, NaN, 30)).toBeNull();
+    expect(stepRearCue({ level: "warn", meters: 6, kind: "vehicle" }, NaN, 30)).toBeNull();
   });
 });
 
@@ -51,14 +59,14 @@ describe("stepRearCue — range + hysteresis", () => {
   });
 
   it("raises at the 15 m edge", () => {
-    expect(stepRearCue(null, REAR_CUE_RANGE_M, 30)).toEqual({ level: "info", meters: 15 });
+    expect(stepRearCue(null, REAR_CUE_RANGE_M, 30)).toEqual({ level: "info", meters: 15, kind: "vehicle" });
   });
 
   it("a raised badge survives to 16 m (exit hysteresis), then drops", () => {
     const up = stepRearCue(null, 14.8, 30);
     expect(up).not.toBeNull();
     // 15.5 m would NOT raise a fresh badge, but keeps a raised one up.
-    expect(stepRearCue(up, 15.5, 30)).toEqual({ level: "info", meters: 16 });
+    expect(stepRearCue(up, 15.5, 30)).toEqual({ level: "info", meters: 16, kind: "vehicle" });
     expect(stepRearCue(null, 15.5, 30)).toBeNull();
     // Past the exit edge it drops.
     expect(stepRearCue(up, REAR_CUE_EXIT_M + 0.1, 30)).toBeNull();
@@ -96,15 +104,15 @@ describe("stepRearCue — render stability + label", () => {
 
   it("returns a fresh snapshot on a meter or level edge", () => {
     const a = stepRearCue(null, 10.2, 30);
-    expect(stepRearCue(a, 8.6, 30)).toEqual({ level: "info", meters: 9 });
-    expect(stepRearCue(a, 6.0, 30)).toEqual({ level: "warn", meters: 6 });
+    expect(stepRearCue(a, 8.6, 30)).toEqual({ level: "info", meters: 9, kind: "vehicle" });
+    expect(stepRearCue(a, 6.0, 30)).toEqual({ level: "warn", meters: 6, kind: "vehicle" });
   });
 
   it("display meters never go negative (overlap clamps to 0)", () => {
-    expect(stepRearCue(null, 0, 30)).toEqual({ level: "danger", meters: 0 });
+    expect(stepRearCue(null, 0, 30)).toEqual({ level: "danger", meters: 0, kind: "vehicle" });
   });
 
   it("labels in Bulgarian with whole meters", () => {
-    expect(rearCueLabelBg({ level: "warn", meters: 6 })).toBe("Кола отзад · 6 м");
+    expect(rearCueLabelBg({ level: "warn", meters: 6, kind: "vehicle" })).toBe("Кола отзад · 6 м");
   });
 });

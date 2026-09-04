@@ -276,7 +276,13 @@ export {
 // PROX: rear-proximity badge — the universal rear-awareness fallback cue.
 export { RearProximityCue } from "./RearProximityCue";
 export type { RearCuePose, RearGapSource } from "./RearProximityCue";
-export { rearCueLabelBg, stepRearCue, type RearCue, type RearCueLevel } from "./rearProximity";
+export {
+  rearCueLabelBg,
+  stepRearCue,
+  type RearCue,
+  type RearCueKind,
+  type RearCueLevel,
+} from "./rearProximity";
 // …and its FRONT twin — the following-gap readout the lessons that teach the
 // two-second rule were grading against and never showing (sc-fo-motorway-gap).
 export { FollowGapBadge, FollowGapCue } from "./FollowGapCue";

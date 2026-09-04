@@ -290,6 +290,38 @@ export interface SimOverlayItem {
   /** Leading chip: „ЗАДАЧА 2/3", „−2 т.", „Изпит". */
   chipBg?: string | null;
   /**
+   * ── THE CLASS OF THE FAULT, WHICH THE PHONE PRINTED NOWHERE ───────────────
+   *   `sc-junction-gap:4c2e452f` — „The fault class is not readable on the
+   *   collision card." Verified on `.audit-frames/w26/frames/
+   *   sc-junction-gap__mobile-wrong/04-t012s.png` (tree 8b9d135): the card
+   *   carries «⚠ −10 ИЗПИТНИ Т.», a «+3» badge, the title and one body line,
+   *   and NOTHING on it — nor in the sheet «ЗАЩО» opens — says «опасна».
+   *
+   * IT IS THE ROOMY LEG'S OWN FIRST ROW. `HudToasts.ToastCard` prints
+   * `SEVERITY_META[severity].label` on the left of a violation card and the
+   * mark on the right; the compact re-map in `LessonPlayShell` carried only
+   * the mark, so the class was a DESKTOP-ONLY fact. `SessionEndScreen`'s
+   * `FaultCard` prints «опасна грешка · наказателни точки по изпитния лист ·
+   * Наредба № 38 …» on every row of the debrief — so the phone was the one
+   * surface where the student meets a verdict he cannot classify, which is a
+   * THEO-4 breach and not a layout preference: приложение № 5, т. 10 prices a
+   * fault BY ITS CLASS, and „10" is that class only to a reader who already
+   * knows the tariff.
+   *
+   * THE WORD ONLY, AND NEVER THE MARK. `N38_CLASS_LABEL_BG` („опасна" /
+   * „основна" / „второстепенна") is the same token `examMarkFor().classBg`
+   * hands the debrief, retrieved from the ingested наредба and never spelled
+   * here. The point figure keeps its own chip: measured on that frame the
+   * chip's ink runs device 1687→1947 (CSS 562.3→649.0, i.e. 86.7 px) with
+   * 46 px of lane left before the «+3» badge, so the two CANNOT share one
+   * unbreakable string — the surface renders them as two spans and lets THIS
+   * one be the half that gives. See `SimOverlay`'s row 1.
+   *
+   * Absent on every item that is not a graded fault. A hint, a task line and a
+   * «Браво» have no class, and inventing one would be a verdict.
+   */
+  markClassBg?: string | null;
+  /**
    * THEO-4: the authored, law-cited explanation. One tap away, never gone.
    * Absent only for items that have no WHY to give (a commendation, a legend).
    */

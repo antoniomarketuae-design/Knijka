@@ -77,6 +77,7 @@ import {
   type CyclistApproach,
   type DistrictEdge,
   type OncomingApproach,
+  type RearBodyBehind,
   type StagedActorSpec,
   type StagedActorView,
   type StagedCommand,
@@ -769,9 +770,38 @@ class TrafficSystemImpl implements TrafficSystem {
    * a fact about the student's mirror.
    */
   rearGapMeters(px: number, py: number, headingDeg: number): number {
-    const moving = rearGapFor(this.vehicles, px, py, headingDeg);
+    return this.rearBodyBehind(px, py, headingDeg)?.gapM ?? Infinity;
+  }
+
+  /**
+   * …AND WHAT KIND OF BODY THAT NUMBER IS ABOUT (sc-vu-cyclist-hook, 2026-09-04).
+   *
+   * `rearGapMeters` above now DELEGATES here rather than sweeping again, so the
+   * metres on the badge and the noun beside them are one fact. The tie goes to
+   * the parked body exactly as the old `moving < parked` expression decided it,
+   * so no shipped distance moves by a float.
+   *
+   * The kind is `vehicleCollisionKind` — the SAME A11 marker `NpcColliders`
+   * tags the rapier shell with and the contact naming bills «Удар във
+   * велосипедист» from. There is no second definition of „is this a cyclist" in
+   * the product and this does not add one.
+   *
+   * The STATIC half is „vehicle" and that is not a shrug: `staticBodies` is the
+   * occupied parking bays plus the scene's held vehicle scenery
+   * (`LessonScene.rearStaticBodiesFrom`), which `RearProximityCue.tsx`'s header
+   * records as deliberately vehicles-only — a wall is kept out of this channel
+   * precisely so the badge cannot say something false about it.
+   */
+  rearBodyBehind(px: number, py: number, headingDeg: number): RearBodyBehind | null {
+    const moving = rearNearestFor(this.vehicles, px, py, headingDeg);
     const parked = rearStaticGapFor(this.staticBodies, px, py, headingDeg);
-    return moving < parked ? moving : parked;
+    if (moving !== null && moving.gapM < parked) {
+      return {
+        gapM: moving.gapM,
+        kind: this.vehicleCollisionKind(this.vehicles[moving.index].id),
+      };
+    }
+    return Number.isFinite(parked) ? { gapM: parked, kind: "vehicle" } : null;
   }
 
   /**
@@ -1145,7 +1175,16 @@ export function conflictFromRightFor(
  * grade. Null when the way is clear.
  */
 export function oncomingApproachFor(
-  vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
+  vehicles: readonly {
+    x: number;
+    y: number;
+    dirX: number;
+    dirY: number;
+    speedMps: number;
+    /** Read ONLY to answer «релсово ли е» (OncomingApproach.rail). Absent =
+     *  "car" on every ambient agent and on every legacy caller's fixture. */
+    profile?: VehicleProfile;
+  }[],
   px: number,
   py: number,
   headingDeg: number,
@@ -1175,6 +1214,9 @@ export function oncomingApproachFor(
     if (tta < bestTta || (best === null && tta === Infinity)) {
       bestTta = tta;
       best = { distM, closingMps, speedMps: v.speedMps };
+      // Additive, and only in the true direction: a car publishes the exact
+      // pre-rail shape (`rail` absent), so no existing consumer sees a change.
+      if (v.profile === "tram" || v.profile === "train") best.rail = true;
     }
   }
   return best;
@@ -1300,6 +1342,56 @@ export function leadGapFor(
 }
 
 /**
+ * The nearest body BEHIND the player, as an INDEX into the swept array plus the
+ * gap — the one sweep `rearGapFor` and `rearBodyBehind` both read.
+ *
+ * WHY THE INDEX AND NOT JUST THE NUMBER (sc-vu-cyclist-hook, 2026-09-04). The
+ * badge this feeds prints «Кола отзад · X м» — *a car* behind — and
+ * `RearProximityCue.tsx`'s own header already refuses to feed it a wall for
+ * exactly that reason („«Кола отзад · 1 м» about a concrete wall is the badge
+ * stating something false"). The moving half never got that care: `this.vehicles`
+ * holds the STAGED actors too, and a v1 cyclist is a narrow curb-riding vehicle
+ * agent in that same array. On `sc-vu-cyclist-hook` — ambient traffic 0, no
+ * bays, no held scenery — the staged rider is the ONLY body the sweep can ever
+ * return, and the badge called it a car; `.audit-frames/sweep161/
+ * sc-vu-cyclist-hook/mobile-right/04-t184s.png` photographs «Кола отзад · 12 м»
+ * in a district that contains no car at all. In the one lesson about the right
+ * hook, that is the product pointing a student's mirror at the wrong hazard.
+ *
+ * ONE SWEEP, NOT TWO. `rearGapFor` is this function with the index dropped, so
+ * the number the badge shows and the kind it names can never come from two
+ * different passes — the „one body, two arrays, two answers" failure
+ * `collision/bodies.ts` records twice.
+ */
+export function rearNearestFor(
+  vehicles: readonly { x: number; y: number; profile?: VehicleProfile }[],
+  px: number,
+  py: number,
+  headingDeg: number,
+): { index: number; gapM: number } | null {
+  const rad = (headingDeg * Math.PI) / 180;
+  const fx = Math.sin(rad); // forward x (0° = north = +y)
+  const fy = Math.cos(rad); // forward y
+  let best = Infinity;
+  let bestIndex = -1;
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    const rx = v.x - px;
+    const ry = v.y - py;
+    const fwd = rx * fx + ry * fy;
+    if (fwd >= 0) continue; // not behind
+    const lat = Math.abs(rx * -fy + ry * fx); // perpendicular offset
+    if (lat > LEAD_CORRIDOR_M) continue; // not in my lane/path
+    const gap = -fwd - bumperSubtrahendM(v.profile);
+    if (gap < best) {
+      best = gap;
+      bestIndex = i;
+    }
+  }
+  return bestIndex < 0 ? null : { index: bestIndex, gapM: Math.max(0, best) };
+}
+
+/**
  * Pure gap-to-nearest-vehicle-BEHIND helper — leadGapFor with the forward test
  * flipped (same corridor, same bumper constant). HUD-ONLY channel (the PROX
  * rear-proximity cue reads it at ~5 Hz); no rule-engine detector consumes it,
@@ -1312,21 +1404,7 @@ export function rearGapFor(
   py: number,
   headingDeg: number,
 ): number {
-  const rad = (headingDeg * Math.PI) / 180;
-  const fx = Math.sin(rad); // forward x (0° = north = +y)
-  const fy = Math.cos(rad); // forward y
-  let best = Infinity;
-  for (const v of vehicles) {
-    const rx = v.x - px;
-    const ry = v.y - py;
-    const fwd = rx * fx + ry * fy;
-    if (fwd >= 0) continue; // not behind
-    const lat = Math.abs(rx * -fy + ry * fx); // perpendicular offset
-    if (lat > LEAD_CORRIDOR_M) continue; // not in my lane/path
-    const gap = -fwd - bumperSubtrahendM(v.profile);
-    if (gap < best) best = gap;
-  }
-  return best === Infinity ? Infinity : Math.max(0, best);
+  return rearNearestFor(vehicles, px, py, headingDeg)?.gapM ?? Infinity;
 }
 
 // ---------------------------------------------------------------------------

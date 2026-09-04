@@ -727,17 +727,18 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   // do is claim the last 7 cm by leaning on the masonry, and refusing that is
   // the lesson («без да ги докоснеш»), not a trap.
   //
-  // NOT FIXED HERE, and it is the rest of the picture. The fence's west 1.125 m
-  // stands ON the built carriageway (`roadSurface`'s outer vertex is x = 8.125)
-  // because pk-drive-v1 has no dropped kerb across the driveway mouth — the
-  // same map defect `scene/__tests__/lesson-world-bay-clearance.test.ts` §2
-  // already quarantines as „6 of 15 bay stations on the RAISED SIDEWALK".
-  // Shortening the fence to the kerb line HERE would break the painted-rect-
-  // equals-graded-rect law and hand the student a body narrower than the one
-  // the two demos were recorded against — the drill would lie again, more
-  // quietly. The mouth is `tools/maps/gen_pk_driveway.mjs` +
-  // `content/world/pk-drive-v1.json`, and the rect moves in
-  // `traces/scPkDriveway.ts` with it: both together or neither.
+  // THE GROUND UNDER THEM — SETTLED WHERE THIS BLOCK SAID IT WOULD BE. The
+  // fence's west 1.125 m stands past `roadSurface`'s outer vertex (x = 8.125)
+  // and used to stand on a 12 cm kerb, because pk-drive-v1 had no dropped kerb
+  // across the driveway mouth — the map defect
+  // `scene/__tests__/lesson-world-bay-clearance.test.ts` §2 quarantined as
+  // „6 of 15 bay stations on the RAISED SIDEWALK". Shortening the fence HERE
+  // would have broken the painted-rect-equals-graded-rect law and handed the
+  // student a body narrower than the one the two demos were recorded against.
+  // The repair went where this block named it: `gen_pk_driveway.mjs` now
+  // declares a 6 m `meta.scenario.drivewayMouths` span and `world/builders/
+  // roads.ts` ramps the kerb down to ROAD_Y across it. These rects are
+  // UNCHANGED — the apron is under them, not through them.
   "sc-pk-driveway": [
     // North fence along the driveway's north edge, EAST HALF ONLY (length runs
     // E-W): the clean reverse threads below its south face at y = 47.0 while

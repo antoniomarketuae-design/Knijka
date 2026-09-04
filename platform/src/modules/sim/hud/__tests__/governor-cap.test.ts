@@ -250,14 +250,39 @@ describe("the governor cap cannot be read as a permission", () => {
     // opened with „Режимът „Нормален“ пуска…", so it passed on the old bare
     // mark too. A guard that green-lights the defect it was written for is
     // worse than no guard, and it took reverting the component to notice.
-    const html = mark(60, 50);
+    //
+    // ── THE CAP MOVED FROM 60 TO 40 (sc-sig-controller-postures:e245bd5c) ────
+    // Not a weakening — a MOVE to the state where there is a numeral to label.
+    // Since the count repair, a governor sitting ABOVE the sign and easing
+    // nothing prints no numeral at all, so „the word beside the number" has no
+    // number to be beside and the old 60-against-50 pair asserted nothing. At
+    // or under the sign the governor IS the operative ceiling, it is on the
+    // bar, and this is exactly where the register word has to earn its place.
+    // The 60-against-50 reading is still asserted below, in both directions.
+    const html = mark(40, 50);
     expect(html).toContain('data-hud="governor-register"');
     expect(html).toMatch(/data-hud="governor-register"[^>]*>\s*Режим\s*</);
   });
 
-  it("says the sign wins when the mode ceiling is ABOVE the posted limit", () => {
-    // The founder's own frame: cap 60, sign 50.
-    expect(mark(60, 50)).toContain("знакът важи");
+  it("says the sign wins when the mode ceiling is ABOVE the posted limit — and it is speaking", () => {
+    // The founder's own frame: cap 60, sign 50, and the throttle being eased
+    // (`GOVERNOR_BAND_KMH` is 6, so 57 км/ч is inside the band under a 60 cap).
+    // That is the state his complaint came from — pressing harder and going no
+    // faster — and it is the one where the clause has something to correct.
+    expect(mark(60, 50, 57)).toContain("знакът важи");
+  });
+
+  it("…and the whole mark leaves the bar when that ceiling can neither bill nor ease", () => {
+    // sc-sig-controller-postures:e245bd5c · sc-crossing-child-ball:b2be3466 ·
+    // sc-rb-lane-choice:ff5f8190 — „THREE different speed figures are on screen
+    // SIMULTANEOUSLY". A governor above the sign, not easing and blocking no
+    // drill, is the one of the three that can neither convict nor acquit, so it
+    // is the one that leaves. Nothing teachable goes with it: the В26 disc
+    // beside this mark still states the law, and on the drills the rows were
+    // filed from a task cap IS present, so the element stays up and its
+    // `aria-label` still names all three ceilings and the precedence (that is
+    // the `mark({ taskCapKmh })` case in `governor-speed-contract.test.ts`).
+    expect(mark(60, 50, 20)).toBe("");
   });
 
   it("…and says nothing of the kind when the ceiling is at or under the sign", () => {
@@ -273,7 +298,13 @@ describe("the governor cap cannot be read as a permission", () => {
   });
 
   it("still prints whose ceiling it is, and still vanishes when there is none", () => {
-    expect(mark(60, 50)).toContain("Нормален ≤60");
+    // 40-against-50 for the same reason as the register test above: this is the
+    // pair where the governor is the operative ceiling and therefore on the
+    // bar. The 60-against-50 numeral is asserted in BOTH directions by the two
+    // tests above (present while easing, absent while it can neither bill nor
+    // ease), so nothing that shipped stopped being checked.
+    expect(mark(40, 50)).toContain("Нормален ≤40");
+    expect(mark(60, 50, 57)).toContain("Нормален ≤60");
     expect(mark(null, 50)).toBe(""); // „Напреднал" — no cap, no mark
   });
 

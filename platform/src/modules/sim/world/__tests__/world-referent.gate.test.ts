@@ -501,9 +501,37 @@ describe("scenario-world-referent gate", () => {
     // only a scenario that STAGES a red telltale can ever produce the
     // situation key, which is three lessons in the whole corpus. `checked`
     // does NOT move: 48 is unchanged.
-    expect(checked.size).toBe(48);
+    //
+    // 48 → 49 / 63 → 64 (2026-09-04, audit sc-sig-controller-live:bf4c6bab):
+    // CONTROLLER_SIGNAL_OBEYED, the PRAISE half of CONTROLLER_SIGNAL_VIOLATED
+    // — ЗДвП чл. 7, ал. 1, credited for crossing on the регулировчик's
+    // permission while the lamp forbids it. Until it landed the reducer's
+    // controller arm could only convict, so the три drills built on чл. 7 had
+    // no reachable commendation at all and a flawless run of one printed
+    // «COMMENDATIONS (0)». It is CHECKED, and on the SAME rule the violation
+    // carries (`controllerActorRule`) rather than a second one: convicting a
+    // student for ignoring an officer and crediting one for obeying him make
+    // the identical demand of the world — a staged trafficController within
+    // 25 m of a graded stop line. Every lesson without one is therefore INERT
+    // on both codes, exactly as it already was on the violation.
+    // `NO_WORLD_REFERENT` does NOT move: 15 is unchanged.
+    //
+    // 49 → 50 / 64 → 65 (2026-09-04, audit sc-vp-police-stop:44cfeff6):
+    // POLICE_STOP_SIGNAL_IGNORED, ЗДвП чл. 103 — the основна for driving past a
+    // контролен орган's stop signal instead of pulling over. Until it landed the
+    // drill's own ❌ demo billed NOT_KEEPING_RIGHT, lane discipline standing in
+    // for the duty, and a student who ignored the officer without crashing was
+    // recorded as faultless. It is CHECKED and NOT exempted, which is where it
+    // parts company with its telltale twin four paragraphs up: a warning lamp is
+    // a cockpit channel with no world body, while the officer is a staged
+    // pedestrian posed "stopSignal" that a district either contains or does not
+    // — and the 2026-07-27 ruling on `PS_OFFICER` (the figure was buried in the
+    // curb-parked row and invisible) is exactly why that difference is worth
+    // gating. `stagedActorRule(["policeStop"])`, so every lesson without an
+    // officer is INERT on it. `NO_WORLD_REFERENT` does NOT move: 15 again.
+    expect(checked.size).toBe(50);
     expect(NO_WORLD_REFERENT.size).toBe(15);
-    expect(all.length).toBe(63);
+    expect(all.length).toBe(65);
   });
 
   it("never exceeds doc 86 on the four classes §10 counts to ±0 (T1 90 · T2 31 · T3 9 · T4 83)", () => {

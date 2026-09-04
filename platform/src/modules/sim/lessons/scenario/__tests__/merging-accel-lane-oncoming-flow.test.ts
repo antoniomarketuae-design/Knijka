@@ -21,7 +21,16 @@
  * through) and `buildRoutes` therefore returns nothing. Authoring a count here
  * would have shipped a number no consumer reads — the dead-predicate failure
  * this project has paid for 51 times. So the flow is STAGED, and this file is
- * the gate on it: `MWE_ONCOMING_FLOW`, six cars on `mwe-e-sb`.
+ * the gate on it: `MWE_ONCOMING_FLOW`, a column on `mwe-e-sb`.
+ *
+ * AND THE FIRST VERSION OF THIS GATE COMMITTED THE SAME FAILURE ONE LEVEL UP
+ * (2026-09-04). It asked „are ≥ 4 cars in the windscreen" and never „does the
+ * renderer draw them": the six-car / 140 m authoring it certified stood at 137,
+ * 269, 406, 545, 684 and 823 m from the arrival pose, and `LessonScene` runs
+ * lesson traffic at `SCENARIO_TRAFFIC_DRAW_DISTANCE_M` = 420 m, past which
+ * `TrafficLayer` writes a zero-scale matrix. Three of the six cars staged for
+ * an EMPTY-WORLD finding were therefore invisible on every frame of the
+ * arrival. Suite 3 now reads that constant.
  *
  * THE STACK IS REAL (the merging-route-vs-staged mold): the committed
  * content/world district through `createTrafficSystem` with ambient zeroed, and
@@ -47,7 +56,7 @@ import type { DirectorInput } from "../../../orchestrator/types";
 import type { SimTickEvent } from "../../../rules";
 import { createTrafficSystem } from "../../../traffic/system";
 import { buildLaneGraph } from "../../../traffic/graph";
-import type { TrafficDistrict } from "../../../traffic/types";
+import { SCENARIO_TRAFFIC_DRAW_DISTANCE_M, type TrafficDistrict } from "../../../traffic/types";
 import { SC_MERGE_ACCEL_LANE } from "../templates-merging";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -69,9 +78,18 @@ function district(id: string): TrafficDistrict {
   ) as TrafficDistrict;
 }
 
-/** The staged column, read off the template so a deletion cannot go unnoticed. */
+/**
+ * The НАСРЕЩНО column, read off the template so a deletion cannot go unnoticed.
+ *
+ * BY ID, NOT BY KIND, since 2026-09-04: the template now stages a SECOND
+ * `oncomingStream` — `MWE_MAINLINE_FLOW`, the two cars in the northbound
+ * overtaking lane — and a `find` on the kind would silently start measuring
+ * whichever one the array happens to list first. This file is about the bank
+ * across the median; `merging-accel-lane-mainline-flow.test.ts` is about the
+ * other one.
+ */
 function stream(): OncomingStreamSpec {
-  const found = (SC_MERGE_ACCEL_LANE.staged ?? []).find((s) => s.kind === "oncomingStream");
+  const found = (SC_MERGE_ACCEL_LANE.staged ?? []).find((s) => s.id === "sc-mrg-oncoming");
   if (!found) {
     throw new Error(
       "SC_MERGE_ACCEL_LANE stages no oncomingStream — the магистрала is empty again " +
@@ -193,6 +211,46 @@ describe("the arrival frame the row was filed on", () => {
       inFrame,
       "the column is not where the student is looking at arrival — which is the whole finding",
     ).toBeGreaterThanOrEqual(4);
+  });
+
+  it("keeps the column inside the radius the lesson actually RENDERS traffic at", () => {
+    // THE ASSERTION THIS FILE WAS MISSING, and the one the row was reopened on.
+    // The suite above counts BODIES in the windscreen; `LessonScene` hands
+    // `TrafficLayer` a cull radius (`SCENARIO_TRAFFIC_DRAW_DISTANCE_M`) and the
+    // layer writes a ZERO-SCALE matrix to every car past it. Those two facts
+    // never met, so the first authoring of `MWE_ONCOMING_FLOW` — six cars on a
+    // uniform 140 m headway — stood at 137, 269, 406, 545, 684 and 823 m and
+    // put THREE bodies where the student can never see them, while this file
+    // certified all six. A repair that is invisible on the glass is not a
+    // repair; the finding it closes is about the glass.
+    //
+    // NOT „every car": the deepest one is the reserve the recycle probe below
+    // needs, and a column short enough to draw is also short enough to run out.
+    // The floor is five of six — one more than the ±20° suite asks for, and two
+    // more than the authoring this replaces could manage.
+    //
+    // Read off the renderer's own constant rather than a literal 420, so a
+    // future draw-distance change reddens the AUTHORING instead of quietly
+    // deleting cars from an „empty world" fix.
+    const { tr } = armed();
+    const spec = stream();
+    const drawn: number[] = [];
+    for (let i = 0; i < spec.count; i++) {
+      const car = tr.staged(`${spec.id}-${i}`)!;
+      const d = Math.hypot(car.x - SPAWN.x, car.y - SPAWN.y);
+      if (d <= SCENARIO_TRAFFIC_DRAW_DISTANCE_M) drawn.push(i);
+    }
+    expect(
+      drawn.length,
+      `only ${drawn.length} of ${spec.count} staged cars stand inside the ` +
+        `${SCENARIO_TRAFFIC_DRAW_DISTANCE_M} m cull at the arrival pose — the rest are ` +
+        "staged, swept, gated and never drawn",
+    ).toBeGreaterThanOrEqual(5);
+    // …and the ones that ARE drawn must be the near end of the column, not a
+    // scatter with holes in it: a reserve belongs at the tail.
+    expect(drawn, "the drawn cars are not the head of the column").toEqual(
+      drawn.map((_, k) => k),
+    );
   });
 
   it("is already RELEASED and travelling before the student touches anything", () => {

@@ -215,7 +215,7 @@
  *     skew clamp markings.ts keeps private, the 1/cos span widening, the refuge
  *     island's kerbed gap and the staggered half's walk along the street.
  * The catalogue now grades
- * 4,252 of the corpus's 10,993 marking quads — 38.68%, up from one in 6.7. It
+ * 4,285 of the corpus's 11,026 marking quads — 38.86%, up from one in 6.7. It
  * is 84% of the DISTRICTS and 39% of the PAINT because the 17 still outside are
  * the biggest maps in the corpus. They are attributed one by one, as before: 6
  * painted numerals, 5 roundabout rings, 3 arrow maps, 2 bus-lane legends, 1
@@ -2718,7 +2718,7 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
  * a feature: the district simply leaves the domain and says so.
  *
  * 88 districts of 105 — and
- * 4,252 of the corpus's 10,993 marking quads — 38.68%, which is the number that
+ * 4,285 of the corpus's 11,026 marking quads — 38.86%, which is the number that
  * matters, because a district is not a unit of paint. This block was titled
  * „every quad the world paints is a quad the world was authored to paint" while
  * it graded one quad in 6.7. It is now titled what it does, and the fraction is
@@ -3717,12 +3717,19 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
       districts: corpus.length,
       booked: booked(corpus),
       triangles: bookedTriangles(corpus),
-    }).toEqual({ districts: 106, booked: 11101, triangles: 108 });
+      // +33 over the previous 11,101, and the same +33 in the domain below:
+      // `sc-junction-blind:76e3924c` — the зебра loop had nothing to paint at
+      // tj-occluded-v1's junction because the generator authored no crossings.
+      // Three пътеки (stem, west arm, east arm) now book 11 bars each, and the
+      // catalogue licences every one of them: the per-district census in this
+      // same block passes unchanged, which is what says the new paint is
+      // authored paint and not drift.
+    }).toEqual({ districts: 106, booked: 11134, triangles: 108 });
     expect({
       districts: domain.length,
       booked: booked(domain),
       triangles: bookedTriangles(domain),
-    }).toEqual({ districts: 89, booked: 4266, triangles: 14 });
+    }).toEqual({ districts: 89, booked: 4299, triangles: 14 });
     // The mesh, and the booking it is supposed to equal. 59% of the denominator
     // below still sits in the 14 excluded districts — they are the biggest maps
     // in the corpus, which is why 87% of the DISTRICTS is only 41% of the PAINT
@@ -3730,10 +3737,12 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
     // place the reach is checked against geometry rather than against a counter.
     const corpusMesh = meshQuads(corpus);
     const domainMesh = meshQuads(domain);
-    expect(corpusMesh).toBe(booked(corpus) - bookedTriangles(corpus)); // 10,993
-    expect(domainMesh).toBe(booked(domain) - bookedTriangles(domain)); //  4,252
+    expect(corpusMesh).toBe(booked(corpus) - bookedTriangles(corpus)); // 11,026
+    expect(domainMesh).toBe(booked(domain) - bookedTriangles(domain)); //  4,285
     const share = ((domainMesh / corpusMesh) * 100).toFixed(2);
-    expect(share).toBe("38.68");
+    // 38.68 → 38.86: tj-occluded-v1's three new пътеки are inside the domain,
+    // so the reach grew slightly faster than the corpus did.
+    expect(share).toBe("38.86");
     // „NOT CLAIMED IN A COMMENT" IS NOW ITSELF A CHECK. The line this replaces
     // — `expect(share.toFixed(1)).toBe("14.8")` — could not fail: with both
     // totals pinned exactly two lines above it, the ratio was arithmetic, and

@@ -160,8 +160,10 @@ import {
 import { createWorldRuntime, type SurfaceGripPatch } from "@/modules/sim/runtime";
 import {
   ambientSidewalkBudget,
+  controllerCaptionDetailForLevel,
   createTrafficSystem,
   DEFAULT_TRAFFIC_CONFIG,
+  SCENARIO_TRAFFIC_DRAW_DISTANCE_M,
   TrafficLayer,
   type TrafficDistrict,
   type VehicleProfile,
@@ -1511,6 +1513,15 @@ export function ReadyScene({
     [lesson.ruleConfig, rain],
   );
   const level = toLevel(quality);
+  // HOW MUCH OF THE РЕГУЛИРОВЧИК'S CAPTION THIS RUNG GETS — the §7 aid ladder
+  // reaching the gesture card (`traffic/controllerGestures.ts` carries the
+  // derivation and the two sweep-161 rows that forced it). Memoised on the id
+  // alone: it is mount-constant, and TrafficLayer repaints the canvas when it
+  // changes, so handing it a fresh parse each render would be work for nothing.
+  const controllerCaption = useMemo(
+    () => controllerCaptionDetailForLevel(parseScenarioLessonId(lesson.id)?.level),
+    [lesson.id],
+  );
   const spawn = useMemo(() => spawnPose(lesson, spawnPoints), [lesson, spawnPoints]);
   // A7: district-space spawn pose — the start of the FIRST guidance route
   // (before the physics sample goes live). Inverse of the spawnPose mapping.
@@ -2429,7 +2440,7 @@ export function ReadyScene({
                 scenario director owns hazardActiveRef (A5's prepared seam). */}
             <TrafficLayer
               system={traffic}
-              maxDrawDistanceM={420}
+              maxDrawDistanceM={SCENARIO_TRAFFIC_DRAW_DISTANCE_M}
               night={isNight}
               // world `District` ⊇ `TrafficDistrict` (only differs on a field
               // TrafficLayer doesn't read — crossings.edgeId nullability).
@@ -2455,6 +2466,18 @@ export function ReadyScene({
               // adjudication uses — so the posture turns exactly when the
               // grading flips (render-only; inert without a posted controller).
               controllerFigure={runtime}
+              // …and how much of his CAPTION this rung gets. Sweep 161 filed
+              // two rows on that card at L1 — `sc-sig-controller-postures`
+              // :ef0e821c („five lines of tiny multi-coloured text, unreadable
+              // at native phone size") and :3936550e („the billboard states the
+              // answer outright, removing the reading-the-posture exercise the
+              // task asks for") — and they are one repair, because the only
+              // lever that makes this type bigger is fewer lines. The §7 ladder
+              // decides how many: «Пълна помощ» keeps the founder's six-line
+              // card, «Частична помощ» names the pose and lets the student
+              // apply the rule, and the two rungs above that read the man.
+              // Curriculum lessons parse to no rung and get "full".
+              controllerCaption={controllerCaption}
             />
             {/* THE CAMERA LIVES INSIDE <Physics>, AND THAT IS THE FIX FOR THE
                 BACK-SEAT POV (doc 87 B67 — „no instrument cluster in frame at
@@ -2686,7 +2709,64 @@ export function ReadyScene({
           data-hud="follow-hint"
           className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2"
         >
-          <div className="rounded-full border border-accent/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-accent shadow-glow-sm backdrop-blur">
+          {/* ── THE ROUTE PILL HAD NO GROUND EITHER — sc-ac-crosswind:4607edf0,
+              major: „The objective chip and the route pill have no opaque
+              plate — world geometry reads straight through their text."
+
+              The objective chip's half of that row closed at 2706813
+              (`ObjectiveScrim`). This half survived because the pill LOOKS
+              like it has a plate and does not: `bg-background/85` +
+              `backdrop-blur` are written right here, and
+              `[data-hud="follow-hint"]` is on PlayAreaStyles' `GHOST_SURFACES`
+              list, so the UNPANEL sweep answers with `background-color:
+              transparent !important; background-image: none !important;
+              backdrop-filter: none !important` and what ships is an accent
+              ring around bare world. The two frames the row was filed on show
+              it over six-storey facades and over the sky.
+
+              THE RECIPE IS THE PUBLISHED ONE, TAKEN NOT RE-DECIDED — the same
+              `peekScrimBackgroundCss` the objective banner, the touch hint,
+              the keyboard legend and the audio prompt all stand on, and
+              `data-hud-ink` is what exempts it from the sweep that erased the
+              class-based fill above (`unpanelInkExemption.test.ts` holds that
+              contract, mutation-proved). `inset: 0` and not SimOverlay's
+              negative bleed: this pill is `-translate-x-1/2` inside a stage
+              that clips, and every prior repair met the same wall.
+
+              AND NO VERTICAL MASK, for the reason the keyboard legend and the
+              audio prompt both state at their own shades: this chip HAS an
+              edge — a hairline `border-accent/60` and a full radius — so there
+              is no hard 80 %-alpha band for a ramp to soften, and a 16 px
+              bottom ramp under a 27 px pill would run through the only line of
+              text it has. `borderRadius: "inherit"` is what keeps the shade
+              inside that border instead of painting its shoulders outside it.
+              If the border ever goes, `peekScrimMaskCss` arrives in the same
+              commit.
+
+              THE FEATHER IS THE PUBLISHED `.right`, 12 px, ON BOTH SIDES —
+              the audio prompt's choice, made for this exact reason: the
+              invariant is `feather[side] <= padding[side]` (the card's padding
+              IS the shade's overhang once the bleed is unavailable), this pill
+              is `px-3.5` = 14 px, and the published `.left` of 26 would put
+              the first four characters of the sentence on a ground still
+              ramping 0 → 0.8. */}
+          <div className="relative isolate rounded-full border border-accent/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-accent shadow-glow-sm backdrop-blur">
+            <div
+              data-hud="follow-hint-scrim"
+              data-hud-ink=""
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "inherit",
+                zIndex: -1,
+                pointerEvents: "none",
+                backgroundImage: peekScrimBackgroundCss({
+                  left: PEEK_SCRIM_FEATHER_PX.right,
+                  right: PEEK_SCRIM_FEATHER_PX.right,
+                }),
+              }}
+            />
             Следвай синята линия
           </div>
         </div>

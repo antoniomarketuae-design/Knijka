@@ -214,6 +214,8 @@ describe("sc-follow-tailgater · the authored brake-check is TOLD, by name", () 
       engine: drive.ruleEvents.filter((e) => e.kind === "violation").map((e) => e.code),
       billed: session.events.filter((e) => e.kind === "violation").map((e) => (e as { code: string }).code),
       coached: (result.coachedMistakes ?? []).map((c) => c.code),
+      objectives: result.objectives.map((o) => [o.id, o.done] as const),
+      passed: result.passed,
       text: buildDebrief(lesson, result, { coachedMistakes: result.coachedMistakes }).text,
     };
   })();
@@ -228,6 +230,32 @@ describe("sc-follow-tailgater · the authored brake-check is TOLD, by name", () 
     // debrief has to say so out loud, which is the next assertion.
     expect(brake.billed).toEqual([]);
     expect(brake.coached).toContain("HARSH_BRAKING_NO_CAUSE");
+  });
+
+  /**
+   * THE OTHER HALF THE FRAME PHOTOGRAPHED, AND THE ONE STILL OPEN AT w26
+   * (`requireBrakingClean` — lessons/types.ts carries the design note).
+   *
+   * The row says the лесson's authored brake check „produced no fault at all".
+   * The teach-first ruling answers the SHEET half of that and is not a defect
+   * (the assertion above). It says nothing about the CERTIFICATE, and measured
+   * before this repair the certificate was worse than empty: «✓ Успокой
+   * темпото», «✓ Стигни края на отсечката», «Урокът е издържан» — awarded to the
+   * drive that performed the one act instructions 3 and 6 forbid, and awarded
+   * BECAUSE of it, since a car stamped to a standstill reads better against a
+   * 36 км/ч cap than one easing off. The demo of the mistake certified itself.
+   */
+  it("…and the calm-pace certificate is WITHHELD: a brake check is not a calmed pace", () => {
+    expect(brake.objectives).toEqual([
+      ["sc-ftg-ease", false],
+      ["sc-ftg-finish", false],
+    ]);
+    expect(brake.passed).toBe(false);
+    // The refusal is not a trap: the route is unfinished, so the debrief says
+    // WHICH tasks are open rather than printing a green verdict over a slam.
+    expect(brake.text).toContain("не е завършен");
+    expect(brake.text).toContain("«Успокой темпото»");
+    expect(brake.text).not.toContain("е издържан");
   });
 
   it("…so the debrief prints it under «Учебни моменти», never as a clean drive", () => {
@@ -247,5 +275,19 @@ describe("sc-follow-tailgater · A12: the correct drive is still acquitted", () 
     expect(out.billed).toEqual([]);
     expect(out.result.summary.score.totalPoints).toBe(0);
     expect(out.result.objectives.map((o) => o.done)).toEqual([true, true]);
+  });
+
+  /**
+   * THE FALSE-REFUSAL CHECK FOR `requireBrakingClean`, and it is not a
+   * restatement of the assertion above: the shadow brakes to a standstill TWICE
+   * (`scFollowTailgaterShadowScript` — a 1,5 s braked pause at the finish, and
+   * the deceleration from 42 to 28 км/ч mid-street), so if the new demand read
+   * raw deceleration instead of the conviction it would refuse the drive the
+   * drill exists to teach. It reads the conviction, and there is none.
+   */
+  it("…and the new brake demand refuses nothing on it — no conviction, no refusal", () => {
+    expect(out.engine.some((e) => e.code === "HARSH_BRAKING_NO_CAUSE")).toBe(false);
+    expect((out.result.coachedMistakes ?? []).map((c) => c.code)).toEqual([]);
+    expect(out.result.passed).toBe(true);
   });
 });

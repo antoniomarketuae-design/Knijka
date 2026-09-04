@@ -58,8 +58,16 @@ const LOOK_AND_GO: Readonly<Record<string, string>> = {
 const LOOK_AND_GO_REASONS = Object.keys(LOOK_AND_GO) as YieldReason[];
 /** Every „go now" the copy above may use — the corpus the two below may not. */
 const GO_NOW_PHRASES = [...new Set(Object.values(LOOK_AND_GO))];
-/** The duties something OUTSIDE the car ends — these must never get one. */
-const DECLARED_ELSEWHERE: readonly YieldReason[] = ["redLight", "pedestrian"];
+/**
+ * The duties something OUTSIDE the car ends — these must never get one.
+ *
+ * `railVehicle` joined them with the RX-05 repair (sc-rx-tram-left:07c63b97),
+ * and it is the row this list exists for: what ends that wait is fourteen
+ * metres of tram clearing the rails, so a second card reading „огледай и
+ * тръгвай" would be this product hinting a seventeen-year-old across a live
+ * tram track. `yieldCardCopyCoversLongWait` must keep saying no for it.
+ */
+const DECLARED_ELSEWHERE: readonly YieldReason[] = ["redLight", "pedestrian", "railVehicle"];
 /** Every reason the card can carry — the corpus §4 measures the column over. */
 const ALL_REASONS: readonly YieldReason[] = [...LOOK_AND_GO_REASONS, ...DECLARED_ELSEWHERE];
 

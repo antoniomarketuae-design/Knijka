@@ -28,6 +28,7 @@ import {
   COCKPIT_EYE,
   COCKPIT_FOV_MAX,
   cockpitVFovForAspect,
+  cockpitLatAccelMs2,
   COCKPIT_LEAN_LATERAL,
   COCKPIT_LEAN_LONGITUDINAL,
   COCKPIT_ROLL_GAIN,
@@ -998,12 +999,28 @@ export function CameraRig({
       cam.lookAt(lookSmooth);
     } else {
       // --- G-force head motion (immersion; doc 63 §2). Estimate lateral G
-      // kinematically (a = v²·tan(steer)/L) and longitudinal G from the speed
-      // delta, then heavily damp — never feed raw per-frame values. -----------
+      // kinematically (a = v²·tan(steer)/L), ADD whatever is pushing the car
+      // sideways that the steering does not explain, and take longitudinal G
+      // from the speed delta; then heavily damp — never feed raw per-frame
+      // values.
+      //
+      // THE SECOND TERM IS THE REPAIR OF sc-ac-crosswind:a9db1738 („nothing in
+      // the cockpit reports a lateral disturbance"). The estimate alone is a
+      // function of the DRIVER'S OWN INPUT, so a crosswind — a lateral force by
+      // definition unexplained by the steering — moved this head by exactly
+      // zero on the one lesson built around it. `cockpitLean.ts` carries the
+      // reasoning and the magnitudes; `VehicleSim.windLatAccelMs2` returns the
+      // literal 0 on every lesson that authors no wind, so every other cockpit
+      // is unchanged. -------------------------------------------------------
       const lean = leanRef.current;
       const vMps = (sim?.speedKmh ?? 0) / 3.6;
       const steer = sim?.steerRad ?? 0;
-      const latAccel = (vMps * vMps * Math.tan(steer)) / ESTIMATE_WHEELBASE;
+      const latAccel = cockpitLatAccelMs2({
+        speedMps: vMps,
+        steerRad: steer,
+        wheelbaseM: ESTIMATE_WHEELBASE,
+        disturbanceMs2: sim?.windLatAccelMs2 ?? 0,
+      });
       const longAccel = (vMps - lean.prevSpeedMps) / Math.max(delta, 1e-3);
       lean.prevSpeedMps = vMps;
       const latGTarget = clampAbs(latAccel / 9.81, 1.2);

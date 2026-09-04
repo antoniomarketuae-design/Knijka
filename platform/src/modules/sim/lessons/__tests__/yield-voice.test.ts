@@ -387,6 +387,10 @@ describe("B15-VOICE — the copy", () => {
     "redLight",
     "pedestrian",
     "roundaboutEntry",
+    // RX-05 (sc-rx-tram-left:07c63b97) — the sixth duty: an oncoming RAIL
+    // vehicle closing on the junction. Listed here so its copy is measured by
+    // the same properties as the five, not merely added beside them.
+    "railVehicle",
   ];
 
   /** Run one full episode for a reason and collect everything it says. */
@@ -472,7 +476,14 @@ describe("B15-VOICE — the copy", () => {
     // STOP_SIGN_NO_FULL_STOP row still carries a numbered Наредба article
     // („чл. 60, ал. 1") that the same clearance rule forbids. That is a shipped
     // GRADED citation and belongs to the law lane, not to a fix for silence.
-    for (const reason of ["giveWayLine", "redLight", "roundaboutEntry"] as YieldReason[]) {
+    for (const reason of [
+      "giveWayLine",
+      "redLight",
+      "roundaboutEntry",
+      // RX-05: `LAW_RAIL_PRIORITY` is authored in advisor.ts too (ЗДвП чл. 8,
+      // ал. 2; чл. 37, ал. 1 — both retrieved from content/law/acts/zdvp.json).
+      "railVehicle",
+    ] as YieldReason[]) {
       for (const line of episode(reason)) {
         for (const ref of line.lawRef?.match(/Наредба[^;]*/g) ?? []) {
           expect(ref, `${reason}: ${line.lawRef}`).not.toMatch(/чл\.\s*\d/);

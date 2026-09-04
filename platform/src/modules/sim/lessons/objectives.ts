@@ -331,6 +331,24 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         }
         out.requireSolidLineClean = true;
       }
+      // THE BRAKE THE BANNER SAYS WAS NOT USED AS A WEAPON (ReachZoneParams
+      // .requireBrakingClean — lessons/types.ts carries the frame, the drive,
+      // the census and the false-refusal check; the field is declared THERE
+      // rather than on `ReachZoneWitnessDemands`, which that interface's own
+      // header asks for whenever a lane may touch lessons/types.ts). AUTHORED
+      // ONLY, for the reason the М1 term above it gives: this arm decides
+      // whether a route counts as driven, and
+      // «успокой темпото» is a phrase many catalogue banners share, almost none
+      // of them about a punishing brake.
+      if (p.requireBrakingClean !== undefined) {
+        if (p.requireBrakingClean !== true) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "reachZone requireBrakingClean must be true",
+          );
+        }
+        out.requireBrakingClean = true;
+      }
       // THE YIELD THE BANNER SAYS HAPPENED (see `ReachZoneWitnessDemands.
       // requireYieldClean` for the drive, the census and the window). AUTHORED
       // WINS, TITLE FILLS IN — the same law the lamp, gear, officer and
@@ -383,6 +401,20 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       // stop-line-grading.test.ts fails the build for it.
       if (num(p.acceptBeforeMarkM) && p.acceptBeforeMarkM <= p.radiusM) {
         out.acceptBeforeMarkM = p.acceptBeforeMarkM;
+      }
+      // «ПЛЪТНО ВДЯСНО» — the lane-referenced lateral demand (see the term's
+      // block comment on `ReachZoneParams.requireKerbwardM`). Authored only: a
+      // title cannot state a distance. Rejected outright when it is wider than
+      // the locator can ever report (LANE_WIDTH_M / 2 = 4.0625 m, clamped in
+      // runtime/locator.ts), because such a gate could never be completed.
+      if (p.requireKerbwardM !== undefined) {
+        if (!num(p.requireKerbwardM) || p.requireKerbwardM <= 0 || p.requireKerbwardM > MAX_LANE_OFFSET_M) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            `reachZone requireKerbwardM must be a number in (0, ${MAX_LANE_OFFSET_M}]`,
+          );
+        }
+        out.requireKerbwardM = p.requireKerbwardM;
       }
       return out;
     }
@@ -783,6 +815,25 @@ export interface ObjectiveContext {
    */
   crossedSolidLineInRun?: boolean;
   /**
+   * Has this drive been told, anywhere, that it braked hard with nothing in
+   * front of it — `HARSH_BRAKING_NO_CAUSE`, the основна the catalogue titles
+   * «Рязко спиране без причина» and cites to ЗДвП чл. 20, ал. 1? The one fact
+   * `ReachZoneParams.requireBrakingClean` consults.
+   *
+   * „TOLD", NOT „CHARGED", exactly like `crossedSolidLineInRun` and
+   * `restedInBanZoneInRun` and for the same reason: the code is основна, so the
+   * teach-first coach hands the FIRST one over as a free mini-lesson on
+   * `LessonSessionState.coachedMistakes` instead of `events`. On the drive this
+   * demand was written for that IS the whole ledger — scored `[]` and coached
+   * `[HARSH_BRAKING_NO_CAUSE]` at L1 — so a scored-only read would refuse
+   * nothing outside exam mode.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+   * (the rigs, the fixtures, `EMPTY_CONTEXT`) omits it and behaves exactly as
+   * shipped.
+   */
+  harshBrakeNoCauseInRun?: boolean;
+  /**
    * When the objective being stepped BECAME the active one, in session seconds.
    * The chain is strictly sequential, so this is the moment its predecessor
    * completed (0 for the first). It is the lower bound of the window
@@ -873,6 +924,24 @@ const STOPPED_SPEED_KMH = 1;
  * progression/correctness split documented at the top of this file.
  */
 export const REACH_ZONE_GRACE_M = 5;
+
+/**
+ * The largest |laneOffsetM| the locator can EVER report, m — the authoring
+ * bound for `requireKerbwardM` and nothing else.
+ *
+ * `runtime/locator.ts computeLane` clamps the lateral distance before taking
+ * the offset (`d = Math.max(0, Math.min(lanesPerDir * W, d))`, both branches),
+ * so the magnitude can never exceed half a lane: LANE_WIDTH_M / 2 = 3.25 ×
+ * PERCEPTUAL_ROAD_SCALE / 2 = 4.0625. A gate authored past that could not be
+ * completed by any car on any road, which is why `parseObjectiveParams` throws
+ * on one rather than shipping an unreachable certificate.
+ *
+ * Duplicated by value rather than imported: `lessons/` has no edge to
+ * `runtime/` today and one demand's validation bound is not a reason to open
+ * one. `police-stop-kerbside-gate.test.ts` pins the number against the
+ * locator's own constant so the two cannot drift.
+ */
+export const MAX_LANE_OFFSET_M = 4.0625;
 
 /**
  * A WAYPOINT IS CROSSED, NOT SAMPLED — 2026-08-16, measured on staging.
@@ -2419,6 +2488,29 @@ function lawfulSpeedMet(speedKmh: number, tick: SimTick): boolean {
   return speedKmh <= limit + REACH_ZONE_CAP_SLACK_KMH;
 }
 
+/**
+ * Is the car sitting `demandM` metres or more toward the KERB of its own lane
+ * on this frame? (see `ReachZoneParams.requireKerbwardM` for the design).
+ *
+ * `laneOffsetM` is signed + = LEFT of the direction of travel, so „kerb-ward"
+ * is the negative side on either bank — `runtime/locator.ts computeLane`
+ * mirrors both banks onto that one convention deliberately, which is what lets
+ * one authored number mean the same thing on a northbound and a southbound
+ * street.
+ *
+ * UNKNOWN IS NEVER A REFUSAL, and here that guard is load-bearing rather than
+ * ceremonial: `locator.applyFix(null)` sets `laneOffsetM = 0` for a car OFF the
+ * network, which is numerically identical to a car parked dead on the lane
+ * centre. `edgeId` is the flag that tells the two apart — `null` off-network,
+ * the segment id on it — and a tick that carries no `edgeId` at all (every
+ * fixture and hand-built replay) cannot answer either, so both are read as
+ * „cannot say" and the demand stands aside.
+ */
+function kerbwardMet(demandM: number, tick: SimTick): boolean {
+  if (typeof tick.edgeId !== "string" || tick.edgeId.length === 0) return true;
+  return tick.laneOffsetM <= -demandM;
+}
+
 function parseLampDemand(objective: LessonObjective, v: unknown): ReachZoneLampDemand {
   if (v === "lit" || v === "low" || v === "high" || v === "fog") return v;
   throw new ObjectiveSpecError(
@@ -2705,6 +2797,19 @@ function solidLineCleanHonoured(ctx: ObjectiveContext): boolean {
 }
 
 /**
+ * Was the calm pace this banner certifies EASED into, or stamped in with the
+ * brake? (see `ReachZoneParams.requireBrakingClean` in lessons/types.ts for the
+ * frame, the drive, the census and the false-refusal check.)
+ *
+ * `true` IS THE ONLY REFUSING VALUE, the polarity every arm in this file ships
+ * with: `undefined` is „the caller cannot answer" (every fixture, rig, replay
+ * and `EMPTY_CONTEXT`), and unknown must never become a refusal.
+ */
+function brakingCleanHonoured(ctx: ObjectiveContext): boolean {
+  return ctx.harshBrakeNoCauseInRun !== true;
+}
+
+/**
  * Was the halt the banner promises still a halt FOR a living person? Reads the
  * one fact `vruWaitHonoured` reads first and for the identical reason — a
  * struck person is session-monotone and outranks everything — but it does NOT
@@ -2753,7 +2858,13 @@ function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
     // here it is not hypothetical: «Не пълзи през участъка» is a whole claim,
     // so a gate may carry a floor and no ceiling, and such a gate must start
     // UNMET or the arrival alone would hand it the contract.
-    params.minSpeedKmh !== undefined
+    params.minSpeedKmh !== undefined ||
+    // The twelfth, folded in for the fourth time for the same reason: WHERE IN
+    // THE LANE the car is standing is a state at the mark, the latch spends and
+    // re-earns it (drive out of the roadway and the tick comes back), and a
+    // gate carrying the lateral demand without a cap must start UNMET rather
+    // than be handed the contract by the arrival alone.
+    params.requireKerbwardM !== undefined
   );
 }
 
@@ -3042,6 +3153,30 @@ export function solidLineFaultVoidsObjective(
 }
 
 /**
+ * …AND THE SAME QUESTION FOR THE PUNISHING BRAKE (`requireBrakingClean`).
+ *
+ * The one census member — `sc-ftg-ease` — is 1 of 2 rather than terminal, so
+ * `!onTerminal` already covers every refusal this can make today and the arm is
+ * inert. It is wired anyway, for the reason `personHaltVoidsObjective` records
+ * one screen down and the yield term two screens up is the standing evidence
+ * for: a later wave that folds this drill's calm-pace claim into its finish gate
+ * would otherwise reopen the trap silently, and the student who brake-checked
+ * could reach the чл. 20, ал. 1 card only by quitting — forfeiting the
+ * attempt's XP and its calibration.
+ *
+ * Kept separate from its neighbours rather than merged, on the rule they all
+ * state: each demand reads a different fact, and a caller that knows only one of
+ * them must be able to ask only that one.
+ */
+export function brakingFaultVoidsObjective(
+  params: ObjectiveParams,
+  harshBrakeNoCauseInRun: boolean,
+): boolean {
+  if (!harshBrakeNoCauseInRun || params.kind !== "reachZone") return false;
+  return (params as WitnessedReachZoneParams).requireBrakingClean === true;
+}
+
+/**
  * …AND THE SAME QUESTION FOR THE YIELD, WHICH IS THE ONE THAT WOULD OTHERWISE
  * HAVE SHIPPED A NEW DEFECT WITH THE FIX.
  *
@@ -3133,7 +3268,11 @@ export function personHaltVoidsObjective(
 /** Which half of the arrival contract's STATE demand is being refused. */
 export type ReachZoneStateRefusal =
   | { kind: "lamps"; demand: ReachZoneLampDemand }
-  | { kind: "gear" };
+  | { kind: "gear" }
+  // The third kind, added with its own arm in `objectiveNotice` and never
+  // before it — see this type's own function below for why a kind without an
+  // arm tells a beltless student his lever is in D.
+  | { kind: "kerbward"; demandM: number };
 
 /**
  * WHY THE STATE HALF OF THE ARRIVAL CONTRACT IS REFUSING ON THIS FRAME — the
@@ -3198,6 +3337,16 @@ export function reachZoneStateRefusal(
     return { kind: "lamps", demand: p.requireLamps };
   }
   if (p.requireGear !== undefined && tick.gear >= 0) return { kind: "gear" };
+  // «ПЛЪТНО ВДЯСНО» (requireKerbwardM). Reported LAST because it is the only
+  // one of the three that can be true of a car doing everything else right, and
+  // the cockpit faults above have a rule-engine grader standing beside them
+  // while this one has none — a withheld tick is the whole of what the student
+  // would otherwise be told, which is the bare verdict THEO-4 forbids.
+  // `kerbwardMet` owns the „unknown never refuses" rule, so a tick with no lane
+  // fix produces no card either.
+  if (p.requireKerbwardM !== undefined && !kerbwardMet(p.requireKerbwardM, tick)) {
+    return { kind: "kerbward", demandM: p.requireKerbwardM };
+  }
   return null;
 }
 
@@ -3933,6 +4082,18 @@ function stepReachZone(
   const lawfulOk = !lawfulDemand || lawfulSpeedMet(speedKmh, tick);
   const lawfulSpent = lawfulDemand && !lawfulOk && (onApproachSide || sweptAcceptance);
 
+  // ── «ПЛЪТНО ВДЯСНО» — WHERE IN THE LANE (requireKerbwardM) ────────────────
+  // The demand's block comment on `ReachZoneParams` carries the drive, the
+  // arithmetic and why a disc cannot express it. Geometry is the CAP ARM'S,
+  // deliberately: a lane offset is read at the tick's own position, never over
+  // a swept segment, because a segment says where the car went and nothing
+  // about which part of the lane it was in at each point of it. A zone that
+  // does not author the key never consults this and is bit-identical to
+  // shipped.
+  const kerbDemand = params.requireKerbwardM;
+  const kerbOk = kerbDemand === undefined || kerbwardMet(kerbDemand, tick);
+  const kerbSpent = kerbDemand !== undefined && !kerbOk && (onApproachSide || sweptAcceptance);
+
   // ── THE JOURNEY HALF: the officer's permission (see requireControllerProceed)
   // Read ANYWHERE on the way to the mark rather than at it, because that is
   // where the stop line is. `parseControllerDemand` refuses to let this share a
@@ -4076,7 +4237,10 @@ function stepReachZone(
     // The ninth arm, earned on the cap arm's geometry (a point test at the
     // student's own position) rather than the lamps' swept face — see the
     // block where `lawfulOk` is computed.
-    (!lawfulDemand || (lawfulOk && (inAcceptance || graceArmed)));
+    (!lawfulDemand || (lawfulOk && (inAcceptance || graceArmed))) &&
+    // The twelfth arm, on the ninth's geometry and for its reason: a lane
+    // offset, like a speed, is a fact about the tick's own position.
+    (kerbDemand === undefined || (kerbOk && (inAcceptance || graceArmed)));
   const capMet = !hasArrivalDemand(params)
     ? true
     : (st.capMet &&
@@ -4087,7 +4251,8 @@ function stepReachZone(
           gearSpent ||
           cockpitSpent ||
           controllerSpent ||
-          lawfulSpent
+          lawfulSpent ||
+          kerbSpent
         )) ||
       contractEarned;
   // ── THE WAITED-FOR PERSON (see `ReachZoneWitnessDemands`) ─────────────────
@@ -4182,6 +4347,16 @@ function stepReachZone(
   // stretch this gate opened on. A zone whose banner claims no such discipline
   // never consults this and is bit-identical to shipped.
   const speedCleanOk = params.requireSpeedClean !== true || speedCleanHonoured(ctx);
+  // ── THE BRAKE THE BANNER SAYS WAS NOT USED AS A WEAPON (requireBrakingClean)
+  // Tenth arm of the journey half and the tenth outside the `capMet` latch. The
+  // drive it closes is this drill's own authored ❌ demonstration: slam the
+  // brakes at the tailgater on an empty street, coached «Рязко спиране без
+  // причина» at 0:17 — and «✓ Успокой темпото» ticked, sheet empty, «Урокът е
+  // издържан». A speed cap could say the car was slow on the mark and nothing
+  // about which pedal made it slow; now it can. Run-wide rather than windowed:
+  // the fact is session-monotone, and `done` latches, so a slam AFTER the tick
+  // can never withdraw a certificate the student had already performed.
+  const brakingCleanOk = params.requireBrakingClean !== true || brakingCleanHonoured(ctx);
   const arrivalHonoured =
     reached &&
     capMet &&
@@ -4193,7 +4368,8 @@ function stepReachZone(
     restOk &&
     solidLineOk &&
     stopOk &&
-    speedCleanOk;
+    speedCleanOk &&
+    brakingCleanOk;
   // ── THE MARK IS WHERE THE BANNER POINTS (round 13, 2026-08-27) ────────────
   //
   // WHAT IS BROKEN. `reached` latches on the FIRST swept contact with the

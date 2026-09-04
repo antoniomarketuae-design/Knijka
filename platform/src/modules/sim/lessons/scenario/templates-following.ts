@@ -1808,9 +1808,30 @@ export const SC_FOLLOW_TAILGATER: ScenarioSpec = {
        * The forward distance keeps its teaching in instructions 4–5 and its
        * evidence on the leadGap telemetry; what it does not keep is a green tick
        * that certified it.
+       *
+       * AND THE OTHER HALF OF THE TITLE FINALLY HAS A GRADER TOO
+       * (`sc-follow-tailgater:63c0c28c`, critical). The clause above says «a cap
+       * cannot see a brake check» and then lets the brake-check demo keep the
+       * tick anyway — because a car standing still because its driver stamped on
+       * the pedal reads BETTER on a speedometer than one easing off. Measured
+       * through `compileScenario → applyTick → buildLessonResult`, the drill's
+       * OWN `mistake-brake-check` scored `[]`, coached `[HARSH_BRAKING_NO_CAUSE]`
+       * at 16,7 s, both route tasks ✓, «Урокът е издържан». The demonstration of
+       * the one act instructions 3 and 6 forbid was certifying itself.
+       * `requireBrakingClean` (lessons/types.ts) reads that conviction — charged
+       * OR coached, since основна means the first one is a free mini-lesson —
+       * and withholds the tick. The основна is untouched and still free; what
+       * goes is the green tick beside it.
        */
       titleBg: "Успокой темпото",
-      params: { kind: "reachZone", x: CUT_RIGHT, y: 200, radiusM: 10, maxSpeedKmh: 36 },
+      params: {
+        kind: "reachZone",
+        x: CUT_RIGHT,
+        y: 200,
+        radiusM: 10,
+        maxSpeedKmh: 36,
+        requireBrakingClean: true,
+      },
     },
     {
       id: "sc-ftg-finish",

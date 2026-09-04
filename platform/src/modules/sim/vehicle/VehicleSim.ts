@@ -259,6 +259,10 @@ export class VehicleSim {
   /** Third scratch — the grip channel needs the car's forward axis while
    *  tmpV still holds the measured acceleration vector. */
   private readonly tmpV3: Vec3 = { x: 0, y: 0, z: 0 };
+  /** Fourth scratch, owned by `windLatAccelMs2` ALONE. That getter is read
+   *  from the RENDER loop, not from `step()`, so it may never borrow a
+   *  scratch the integrator is mid-way through using. */
+  private readonly tmpV4: Vec3 = { x: 0, y: 0, z: 0 };
 
   /**
    * @param world The rapier world (raw `World` — from `useRapier()` in R3F).
@@ -691,6 +695,44 @@ export class VehicleSim {
    */
   get windLateralNow(): number {
     return this.currentWindN();
+  }
+
+  /**
+   * The same gust, in the frame the DRIVER sits in: car-local lateral
+   * acceleration imposed by the crosswind right now (m/s², + = toward the
+   * car's left). 0 on every lesson that authors no wind.
+   *
+   * WHY THIS EXISTS — `sc-ac-crosswind:a9db1738`, major: „there is no wind
+   * force visible in the car's attitude … nothing in the cockpit reports a
+   * lateral disturbance." The cockpit's G-force head motion is the one channel
+   * that reports sideways force to the student, and `CameraRig` estimated its
+   * input KINEMATICALLY — `a = v²·tan(steer)/L`, i.e. purely from the driver's
+   * own steering. A crosswind is by definition a lateral acceleration that the
+   * steering does NOT explain, so on the lesson built around it that estimate
+   * returned exactly 0 for the whole drive: the head sat dead level while the
+   * chassis was being shoved a metre downwind every five seconds
+   * (`crosswind.test.ts`'s measured band). `cockpitLean.ts` adds this term to
+   * that estimate and `CameraRig` reads the sum.
+   *
+   * NEWTONS → METRES PER SECOND SQUARED BY THE CAR'S OWN MASS, and the same
+   * `currentWindN()` the chassis is pushed with — the „one number" law
+   * `windLateralNow` states. `T.CHASSIS_MASS` is what `chassisMassProperties()`
+   * gives the rigid body, so this is the acceleration rapier is actually
+   * imparting, not a second guess at it.
+   *
+   * WORLD +X → CAR-LOCAL LEFT by projection onto the car's own left axis, the
+   * identical convention `applyRollCoupling` measures `aLat` in: a car driving
+   * along the wind axis feels nothing lateral and a car crossing it takes the
+   * whole shove, which is the difference the lesson teaches.
+   *
+   * PURE READ — no force, no impulse, no clock advance (F1's law). `windActive`
+   * is false on every default construction, so a calm session returns the
+   * literal 0 without touching rapier at all and the camera is bit-identical.
+   */
+  get windLatAccelMs2(): number {
+    if (!this.windActive) return 0;
+    const left = rotateInto(this.body.rotation(), 1, 0, 0, this.tmpV4);
+    return (this.currentWindN() * left.x) / T.CHASSIS_MASS;
   }
 
   /** Signed speed in km/h (+ forward). Use this for HUD and engine lookup. */

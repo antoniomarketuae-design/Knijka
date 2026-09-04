@@ -39,7 +39,15 @@
     "drivewayY": 45
    },
    "lanesPerDirection": 1,
-   "laneCenterRightM": 4.06
+   "laneCenterRightM": 4.06,
+   "drivewayMouths": [
+    {
+     "edgeId": "pkd-e-street",
+     "x": 10,
+     "y": 45,
+     "widthM": 6
+    }
+   ]
   }
  },
  "roads": {

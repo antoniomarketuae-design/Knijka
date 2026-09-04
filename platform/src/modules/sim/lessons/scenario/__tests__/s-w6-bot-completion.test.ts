@@ -26,6 +26,7 @@ import { recordScMergeMotorwayExitDrive } from "../../../traces/scMergeMotorwayE
 import { recordScMvUturnBanDrive } from "../../../traces/scMvUturnBan";
 import { recordScRbPedExitDrive } from "../../../traces/scRbPedExit";
 import { recordScSigControllerLiveDrive } from "../../../traces/scSigControllerLive";
+import { commendationRiderBg, commendationRiderFlags } from "../../debrief";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import { compileScenario } from "../compile";
@@ -85,6 +86,30 @@ describe("wave-6 bot completion — sc-sig-controller-live at L3", () => {
     const codes = session.events.filter((e) => e.kind === "violation").map((e) => e.code);
     expect(codes).not.toContain("RED_LIGHT_CROSSED");
     expect(codes).not.toContain("CONTROLLER_SIGNAL_VIOLATED");
+  });
+
+  it("…and the sheet CREDITS it — the drill can praise, not only convict", () => {
+    // audit sc-sig-controller-live:bf4c6bab. Before this the reducer's
+    // controller arm had one branch, `halt` → опасна, so the flawless drive
+    // above reached its debrief with «COMMENDATIONS (0): (none credited)» and
+    // the лесson's own act — going on the officer's permission against a red
+    // lamp — was worth exactly nothing on the screen. CLEAN_DRIVING could not
+    // stand in: it needs 250 m and this route is ~150 m end to end.
+    const praise = result.summary.commendations;
+    expect(praise.map((c) => c.code)).toContain("CONTROLLER_SIGNAL_OBEYED");
+    const c = praise.find((p) => p.code === "CONTROLLER_SIGNAL_OBEYED")!;
+    expect(c.titleBg).toBe("Правилно изпълнен сигнал на регулировчика");
+    // THEO-4: the credit names the reason, and it is the same crossing the
+    // route task was ticked for — one act, two surfaces, one clock.
+    expect(c.explanationBg).toContain("регулировчика");
+    expect(c.t).toBeCloseTo(result.objectives.find((o) => o.id === "sc-sctl-cross")!.completedAtSec!, 1);
+    // Nothing qualifies it on THIS drive (no опасна, no shared concept billed),
+    // so the result screen issues the plain green ✓ rather than „(✓)".
+    expect(commendationRiderFlags(result.summary, c)).toEqual({
+      contradicted: false,
+      unclean: false,
+    });
+    expect(commendationRiderBg(result.summary, commendationRiderFlags(result.summary, c))).toBeNull();
   });
 
   it("carries the officer into the live lesson — the authority is staged, not narrated", () => {
@@ -161,6 +186,13 @@ describe("wave-6 bot completion — sc-sig-controller-live at L3", () => {
     expect(graded.lesson).toEqual(scenarioLessonById("sc-sig-controller-live@L3"));
     expect(graded.result.passed).toBe(true);
     expect(graded.result.score).toBe(0);
+    // The debrief is built TWICE — the result screen's «Похвали» off the
+    // client's own events, the «Разбор» prose off this rebuild — and a
+    // divergence there is not a second opinion, it is the opinion
+    // (`lessons/wire.ts`). The чл. 7 credit must survive the wire.
+    expect(graded.result.summary.commendations.map((c) => c.code)).toContain(
+      "CONTROLLER_SIGNAL_OBEYED",
+    );
   });
 
   it("counter-proof: waiting for green is SCORED 10 (опасна, never a modal) — and the чл. 7 crossing is NOT certified", () => {

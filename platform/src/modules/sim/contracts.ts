@@ -1340,21 +1340,41 @@ export interface EmergencyApproachSpec extends StagedEventBase {
 
 /**
  * ADR-006 stage 1c (doc 72 §3 VP-11 — „Спиране по полицейски сигнал",
- * Наредба-38 / ЗДвП чл. 170): a uniformed OFFICER FIGURE stands at the curb
+ * Наредба-38 / ЗДвП чл. 103): a uniformed OFFICER FIGURE stands at the curb
  * signalling THE PLAYER to stop (a staged pedestrian actor that never walks —
  * pose "stopSignal" renders the raised arm + hi-vis vest, ADR-001 fictional).
  *
- * SCENERY + MEASUREMENT ONLY — deliberately NOT an adjudicator: the runner
- * stages the figure and records an outcome ("yielded" when the player rests
- * at the curb-side halt point, "passedWithoutStopping" when the officer falls
- * `passBeyondM` behind without a compliant stop), but emits ZERO SimTick
- * events, so NO violation can ever grade from it (the A12 bias — an
- * unmodelled duty must not convict). The graded contract lives entirely in
- * the scenario's EXISTING objectives (a low-speed curb-side reachZone = the
- * pull-over-and-stop completion, the sc-pk-smooth-stop stop-mark pattern).
+ * MEASUREMENT ALWAYS; ADJUDICATION ONLY WHERE `bindingUnderArt103` SAYS SO.
+ * The runner stages the figure and records an outcome ("yielded" when the
+ * player rests at the curb-side halt point, "passedWithoutStopping" when the
+ * officer falls `passBeyondM` behind without a compliant stop). Completion is
+ * still the scenario's own low-speed curb-side reachZone objective (the
+ * sc-pk-smooth-stop stop-mark pattern) on every template; the charge is opt-in
+ * per spec, because this figure serves TWO different people — see the flag.
  */
 export interface PoliceStopSpec extends StagedEventBase {
   kind: "policeStop";
+  /**
+   * Is this figure a контролен орган, so that driving past its signal is the
+   * ЗДвП чл. 103 offence? (sc-vp-police-stop:44cfeff6, 2026-09-04.)
+   *
+   * WHY IT IS OPT-IN AND NOT THE DEFAULT. This staged kind renders one pose
+   * and serves two different roles: `sc-vp-police-stop` stands a UNIFORMED
+   * OFFICER on the carriageway edge, and `sc-pe-school-patrol` reuses the same
+   * pose for a SCHOOL CROSSING WARDEN with a стоп-палка. чл. 103 binds the
+   * driver to „сигнал за спиране от КОНТРОЛНИТЕ ОРГАНИ", and a school warden is
+   * not one — that template grades the same act through чл. 119 and the child
+   * group on the zebra it is protecting, which is both the honest law and a
+   * heavier one. Billing чл. 103 there would name the wrong article for the
+   * wrong body; so absent means „measured, not charged", exactly as it was for
+   * every policeStop spec before this flag existed.
+   *
+   * When true, `PoliceStopRunner` resolves the encounter in the existing
+   * `prioritySituation` vocabulary ("police-stop-signal") — the основна
+   * POLICE_STOP_SIGNAL_IGNORED on the drive-past, the yield praise on the
+   * compliant halt.
+   */
+  bindingUnderArt103?: true;
   /** Officer's standing point (sidewalk, clear of the roadway), district space. */
   officer: { x: number; y: number };
   /** Unit facing direction (toward the roadway) — the figure's pose heading. */
@@ -1367,7 +1387,8 @@ export interface PoliceStopSpec extends StagedEventBase {
   /** …at/below this speed = complied (outcome "yielded"), km/h. */
   stopSpeedKmh: number;
   /** Officer this far behind the player (player-frame arc) without a
-   *  compliant stop = the signal was ignored (outcome only, no grading), m. */
+   *  compliant stop = the signal was ignored (graded only under
+   *  `bindingUnderArt103`; an outcome either way), m. */
   passBeyondM: number;
 }
 

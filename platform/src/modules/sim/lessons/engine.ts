@@ -49,6 +49,7 @@ import {
 } from "../procedures";
 import {
   REACH_ZONE_GRACE_M,
+  brakingFaultVoidsObjective,
   contactVoidsObjective,
   createEvalState,
   parseObjectiveParams,
@@ -478,6 +479,22 @@ function objectiveNotice(
       blownApproach || !stillAtTheMark
         ? "— това е над допустимото и задачата остава неизпълнена. Намаляване след маркера вече не се отчита: измерва се самото приближаване, а то вече се случи с тази скорост. Намалявай по-рано — още преди маркера. Урокът продължава и разборът показва задачата накрая."
         : "— затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.";
+    // ── AND IF THE SPEED IS NOT THE ONLY THING MISSING, SAY SO HERE ─────────
+    // (sc-vp-police-stop:ab262758, with the `requireKerbwardM` demand.)
+    //
+    // «Намали СЕГА, докато си върху точката» promises the tick on the next
+    // frame, and on a gate that also demands a lateral pose that promise is
+    // false: the student obeys the card, comes to rest mid-lane, and NOTHING
+    // HAPPENS — which is the founder's own B4 sentence at the head of this
+    // function, re-created by the very demand meant to teach him. The card
+    // below the cap branch cannot cover it either: it fires on the ARRIVAL
+    // frame under the cap, and this student arrived over it, so by the time he
+    // is stopped `before.reached` is long true. One clause here closes the gap
+    // with no new eval state.
+    const alsoKerbward =
+      reachZoneStateRefusal(params, tick)?.kind === "kerbward" && stillAtTheMark && !blownApproach
+        ? " И още нещо: колата стои към средата на лентата, а задачата иска да си притиснат до десния ѝ край — отдръпни се надясно, докато намаляваш."
+        : "";
     return {
       kind: "lesson",
       titleBg: "Стигна точката, но твърде бързо",
@@ -525,7 +542,7 @@ function objectiveNotice(
       // «тази скорост» two clauses down still resolves in both forms: it is
       // the speed the card just printed, which is the speed that would carry
       // him past the mark if he keeps it.
-      explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, ${measuredBg} ${tailBg}`,
+      explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, ${measuredBg} ${tailBg}${alsoKerbward}`,
     };
   }
   // ── THE OTHER HALF OF THE ARRIVAL CONTRACT FINALLY SPEAKS (round 12,
@@ -610,6 +627,32 @@ function objectiveNotice(
               ? "Нагласи ги СЕГА, докато си върху точката — задачата се отчита на следващия кадър. Ако я подминеш така, остава неизпълнена, но урокът продължава и разборът я показва накрая."
               : "Подмина точката така, затова задачата остава неизпълнена: светлините се нагласят ПРЕДИ участъка, не в него. Урокът продължава и разборът показва задачата накрая."),
           lawRef: refusal.demand === "fog" ? "ЗДвП чл. 74" : "ЗДвП чл. 70",
+        };
+      }
+      if (refusal.kind === "kerbward") {
+        // «ПЛЪТНО ВДЯСНО» — the arm that had to land with the demand, not after
+        // it (sc-vp-police-stop:ab262758). Without it the new lateral gate is a
+        // SILENT refusal, and the founder's own B4/B5 complaint at the head of
+        // this function is exactly that shape: «I am stopping on top of the
+        // green cyrcle and nothing happens». The marker is still drawn as the
+        // full disc (scene/guidanceRoute.ts knows nothing about this term), so
+        // a student who halts on its left half is standing on green paint with
+        // no tick — this card is what makes that legible.
+        //
+        // WHAT IS OBSERVED, in the tick's own signed convention: + is LEFT of
+        // travel, so a car short of the demand is somewhere between the lane
+        // centre and the kerb-side band the task wants. The number is not
+        // printed: `laneOffsetM` is measured on a carriageway whose lanes are
+        // PERCEPTUAL_ROAD_SCALE times wider than a real one, so a figure in
+        // metres would teach a distance the road does not have.
+        return {
+          kind: "lesson",
+          titleBg: "Спря, но не плътно вдясно",
+          explanationBg:
+            "Задачата иска колата да е ПРИТИСНАТА към десния край на лентата, а сега стои към средата ѝ. " +
+            (stillAtTheMark
+              ? "Отдръпни се още надясно, докато си на точката — задачата се отчита на следващия кадър. Спряла кола насред платното изненадва движещия се зад теб и е предпоставка за удар отзад."
+              : "Мястото е вече зад теб, затова задачата остава неизпълнена: към десния край се отдръпва ПРЕДИ спирането, не след него. Урокът продължава и разборът показва задачата накрая."),
         };
       }
       return {
@@ -852,6 +895,43 @@ function isSolidLineCross(e: ScorableEvent): boolean {
  */
 function isCoachedSolidLineCross(m: CoachedMistake): boolean {
   return m.code === "CROSSED_SOLID_LINE";
+}
+
+/**
+ * Braked hard with nothing in front — the ledger row
+ * `ReachZoneParams.requireBrakingClean` consults (lessons/types.ts carries the
+ * frame, the drive and the census).
+ *
+ * IT READS THE BILL, NOT THE ACCELEROMETER, exactly like its neighbours: the
+ * detector convicts only after excluding every visible forward cause (and a car
+ * BEHIND is structurally not one — `leadGap` looks forward), so what arrives
+ * here is a conviction the protocol already prints, with the catalogue's
+ * explanation, its «✔ Правилното действие» corrective and its ЗДвП чл. 20,
+ * ал. 1.
+ */
+function isHarshBrakeNoCause(e: ScorableEvent): boolean {
+  return e.kind === "violation" && e.code === "HARSH_BRAKING_NO_CAUSE";
+}
+
+/**
+ * …AND THE SAME FAULT AS THE COACH RECORDED IT — the half that carries this
+ * demand in every TRAINING drive, and the reason it is not optional.
+ *
+ * `HARSH_BRAKING_NO_CAUSE` is основна (catalog.ts), so the teach-first coach
+ * hands the FIRST offence over as a free mini-lesson on
+ * `LessonSessionState.coachedMistakes` and the sheet stays empty. Measured on
+ * the drive this demand was written for — `sc-follow-tailgater`'s own
+ * `mistake-brake-check` at L1 — scored is `[]` and coached is
+ * `[HARSH_BRAKING_NO_CAUSE]`, so a ledger-only read would have refused nothing
+ * outside exam mode and the demo would have gone on certifying itself.
+ *
+ * `CoachedMistake.code` is a plain string (future codes pass through), so this
+ * is a string compare; the SCORED half above is typed against the real
+ * `ViolationCode`, which is what makes a rename fail the build instead of
+ * quietly emptying the gate.
+ */
+function isCoachedHarshBrakeNoCause(m: CoachedMistake): boolean {
+  return m.code === "HARSH_BRAKING_NO_CAUSE";
 }
 
 /**
@@ -1491,6 +1571,24 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     prev.events.some(isSolidLineCross) ||
     scoredEvents.some(isSolidLineCross) ||
     solidLineCrossCoached;
+  // …AND THE PUNISHING BRAKE, for `ReachZoneParams.requireBrakingClean`
+  // (lessons/types.ts carries the frame: one sheet printing «✓ Успокой темпото»
+  // and «Урокът е издържан» over a coached «Рязко спиране без причина», on the
+  // drill's OWN ❌ demonstration of the mistake it exists to prevent). Both
+  // halves of the scored ledger for the reason the blocks above give, PLUS the
+  // shown-but-not-charged half on the same argument as the solid line one
+  // screen up — the code is основна, so in every training drive the first slam
+  // lands on the coached channel and the sheet stays empty. The
+  // `mistakeExperience` exemption is the same one and for the same reason: in a
+  // THEO-3 sandbox the wrong act IS the assignment.
+  const harshBrakeCoached =
+    mistakeXp === undefined &&
+    (coachedPrev.some(isCoachedHarshBrakeNoCause) ||
+      coachedNew.some(isCoachedHarshBrakeNoCause));
+  const harshBrakeNoCauseInRun =
+    prev.events.some(isHarshBrakeNoCause) ||
+    scoredEvents.some(isHarshBrakeNoCause) ||
+    harshBrakeCoached;
 
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
@@ -1557,6 +1655,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(restedInBanZoneInRun ? { restedInBanZoneInRun: true } : {}),
         ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
         ...(crossedSolidLineInRun ? { crossedSolidLineInRun: true } : {}),
+        ...(harshBrakeNoCauseInRun ? { harshBrakeNoCauseInRun: true } : {}),
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
         ...(overTheCeilingInRun ? { overTheCeilingInRun: true } : {}),
         qualifyingStopCurrent: fullStopHeld,
@@ -1964,7 +2063,14 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           // (3 of 3). Without this the refusal would strand the chain, the
           // run-out would never arm, and the student who crossed the solid line
           // could reach the card that teaches him М1 only by quitting.
-          solidLineFaultVoidsObjective(params[currentIndex], crossedSolidLineInRun));
+          solidLineFaultVoidsObjective(params[currentIndex], crossedSolidLineInRun) ||
+          // The punishing-brake term (`requireBrakingClean`) is monotone in the
+          // same way. Its one census member, `sc-ftg-ease`, is 1 of 2, so the
+          // arm is inert today and `!onTerminal` already covers every refusal it
+          // can make — wired anyway for the reason the yield term above is the
+          // standing record of: a later wave that moves the calm-pace claim onto
+          // the finish gate must not reopen the trap silently.
+          brakingFaultVoidsObjective(params[currentIndex], harshBrakeNoCauseInRun));
       if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {

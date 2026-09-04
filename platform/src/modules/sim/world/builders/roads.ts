@@ -37,8 +37,11 @@ import {
   dist,
   mul,
   norm,
+  perpRight,
+  pointAlong,
   polylineFrames,
   polylineLength,
+  projectOntoPolyline,
   sub,
   trimPolyline,
   type Vec2,
@@ -336,10 +339,12 @@ const SQRT1_2 = Math.SQRT1_2;
  */
 function buildSidewalkStrip(
   acc: MeshAccumulator,
-  line: Vec2[],
+  rawLine: Vec2[],
   halfWidth: number,
   side: 1 | -1,
+  dropped: DroppedKerbSpan | null = null,
 ): void {
+  const line = dropped ? insertStations(rawLine, droppedKerbStations(dropped)) : rawLine;
   const frames = polylineFrames(line);
   // Per-row indices:
   // [curbBottom, curbTop, chamferBottom, chamferTop, walkInner, walkOuter, skirtTop, skirtBottom]
@@ -365,7 +370,12 @@ function buildSidewalkStrip(
       outUnit[1] * SQRT1_2,
     ];
     const v = along * SIDEWALK_UV_SCALE;
-    const chamferY = SIDEWALK_TOP_Y - CURB_CHAMFER_M;
+    // The kerb's top at THIS station — full height everywhere except across a
+    // declared driveway mouth, where it ramps down to the asphalt (see
+    // `DroppedKerbSpan`). When it reaches ROAD_Y the curb face and its chamfer
+    // collapse to zero-area quads, which the surface index already drops.
+    const topY = dropped ? droppedKerbTopY(along, dropped) : SIDEWALK_TOP_Y;
+    const chamferY = topY - Math.min(CURB_CHAMFER_M, topY - ROAD_Y);
     const foot: [number, number, number] = [CURB_FOOT_TINT, CURB_FOOT_TINT, CURB_FOOT_TINT];
     const skirtTint: [number, number, number] = [
       SIDEWALK_SKIRT_TINT,
@@ -376,15 +386,10 @@ function buildSidewalkStrip(
     const cb = acc.vertex(toWorld(pCurb[0], pCurb[1], ROAD_Y), nToRoad, [0, v], foot);
     const ct = acc.vertex(toWorld(pCurb[0], pCurb[1], chamferY), nToRoad, [0.07, v]);
     const xb = acc.vertex(toWorld(pCurb[0], pCurb[1], chamferY), nChamfer, [0.08, v]);
-    const xt = acc.vertex(toWorld(pCurbIn[0], pCurbIn[1], SIDEWALK_TOP_Y), nChamfer, [0.1, v]);
-    const wi = acc.vertex(toWorld(pCurbIn[0], pCurbIn[1], SIDEWALK_TOP_Y), UP, [0.1, v]);
-    const wo = acc.vertex(toWorld(pOuter[0], pOuter[1], SIDEWALK_TOP_Y), UP, [0.9, v]);
-    const st = acc.vertex(
-      toWorld(pOuter[0], pOuter[1], SIDEWALK_TOP_Y),
-      nOutward,
-      [0.92, v],
-      skirtTint,
-    );
+    const xt = acc.vertex(toWorld(pCurbIn[0], pCurbIn[1], topY), nChamfer, [0.1, v]);
+    const wi = acc.vertex(toWorld(pCurbIn[0], pCurbIn[1], topY), UP, [0.1, v]);
+    const wo = acc.vertex(toWorld(pOuter[0], pOuter[1], topY), UP, [0.9, v]);
+    const st = acc.vertex(toWorld(pOuter[0], pOuter[1], topY), nOutward, [0.92, v], skirtTint);
     const sb = acc.vertex(toWorld(pSkirt[0], pSkirt[1], 0), nOutward, [1, v], skirtTint);
 
     if (prev) {
@@ -560,15 +565,162 @@ const LOT_AISLE_CLASS = "service";
 const EMPTY_EDGE_IDS: ReadonlySet<string> = new Set<string>();
 
 // ---------------------------------------------------------------------------
+// The dropped kerb a driveway mouth has
+// ---------------------------------------------------------------------------
+
+/**
+ * THE ОТБИВКА — a break in the raised kerb where a driveway meets the street.
+ *
+ * WHY IT EXISTS. `scene/__tests__/lesson-world-bay-clearance.test.ts` §2
+ * measures, off the shipped meshes, that `sc-pk-driveway`'s graded bay stands
+ * 9 of 15 stations on the carriageway and 6 on the RAISED SIDEWALK: the outer
+ * 2.375 m of the rect a student is ordered to reverse into is a 12 cm kerb he
+ * has to climb with an axle, and the white U marking that rect is drawn at
+ * MARKING_Y = 0.032 m under a pavement whose top is 0.14 m — so the cell he is
+ * graded against is 40 % invisible. Both that file and
+ * `scene/scenarioSceneryProps.ts` name the same repair and the same owner:
+ * „opening a dropped kerb across the driveway mouth is
+ * tools/maps/gen_pk_driveway.mjs + the world document".
+ *
+ * WHAT IT DOES. The strip is not cut — it is RAMPED. Across the declared mouth
+ * the walkway top comes down to `ROAD_Y`, with `DRIVEWAY_KERB_RAMP_M` of slope
+ * at each end, so the mesh stays one watertight shell (no open end caps to see
+ * from the driving seat, no change to the strip count) and the collider the
+ * wheels meet becomes a 1:5 ramp instead of a step. The paint then stands 12 mm
+ * PROUD of the ground under it, which is the L7 „painted rect = graded rect"
+ * law finally holding on the glass and not only in the data.
+ *
+ * WHAT IT DOES NOT DO. It books no fault and moves no grading. `edgeId` goes
+ * null on the CENTRE crossing `surface.ts OFF_CARRIAGEWAY_BODY_ALLOWANCE_M`
+ * past the kerb, and `outsideKerbM` is measured to the nearest drawn ASPHALT —
+ * neither reads the pavement's height. Strictly additive elsewhere too: a
+ * district that declares no mouth builds byte-identically (104 of 105 do).
+ */
+export interface DrivewayMouth {
+  /** The edge whose kerb is dropped. */
+  edgeId: string;
+  /** A point in district space INSIDE the driveway — its side of the
+   *  centreline is the side the kerb is dropped on. */
+  x: number;
+  y: number;
+  /** Clear width of the dropped span along the street, m. */
+  widthM: number;
+}
+
+/**
+ * Ramp length at each end of a dropped span, m. A 0.12 m `CURB_HEIGHT_M` over
+ * 0.6 m is 1:5 — shallower than the 12 cm step the same wheel meets today, and
+ * short enough that a 6 m mouth keeps 4.8 m of flat apron between its ramps.
+ */
+export const DRIVEWAY_KERB_RAMP_M = 0.6;
+
+interface DroppedKerbSpan {
+  /** Arc length along the walk line where the flat apron starts / ends. */
+  s0: number;
+  s1: number;
+  rampM: number;
+}
+
+const NO_MOUTHS: readonly DrivewayMouth[] = [];
+
+/** Driveway mouths declared by the district document (`meta.scenario`). */
+export function drivewayMouthsOf(district: District | undefined): readonly DrivewayMouth[] {
+  if (!district) return NO_MOUTHS;
+  // DistrictMeta is an open record, so this arrives typed `unknown` — the same
+  // read `lotAisleKerbEdgeIds` above and `zoneSigns.ts` do.
+  const scenario = district.meta.scenario;
+  if (typeof scenario !== "object" || scenario === null) return NO_MOUTHS;
+  const raw = (scenario as { drivewayMouths?: unknown }).drivewayMouths;
+  if (!Array.isArray(raw)) return NO_MOUTHS;
+  const out: DrivewayMouth[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const { edgeId, x, y, widthM } = entry as Record<string, unknown>;
+    if (typeof edgeId !== "string" || edgeId === "") continue;
+    if (typeof x !== "number" || !Number.isFinite(x)) continue;
+    if (typeof y !== "number" || !Number.isFinite(y)) continue;
+    if (typeof widthM !== "number" || !(widthM > 0)) continue;
+    out.push({ edgeId, x, y, widthM });
+  }
+  return out.length > 0 ? out : NO_MOUTHS;
+}
+
+/** The span this edge's pavement gives up on `side`, or null. */
+function droppedKerbSpanFor(
+  mouths: readonly DrivewayMouth[],
+  edgeId: string,
+  walkLine: readonly Vec2[],
+  side: 1 | -1,
+): DroppedKerbSpan | null {
+  for (const mouth of mouths) {
+    if (mouth.edgeId !== edgeId) continue;
+    const at = projectOntoPolyline(walkLine, [mouth.x, mouth.y]);
+    const right = perpRight(at.tangent);
+    const toMouth = sub([mouth.x, mouth.y], at.point);
+    const lateral = right[0] * toMouth[0] + right[1] * toMouth[1];
+    // A mouth ON the centreline names no side and is ignored rather than
+    // guessed at — the generator's own post-check is where that is caught.
+    if (lateral === 0 || Math.sign(lateral) !== side) continue;
+    return { s0: at.s - mouth.widthM / 2, s1: at.s + mouth.widthM / 2, rampM: DRIVEWAY_KERB_RAMP_M };
+  }
+  return null;
+}
+
+/** The four arc lengths the strip needs a vertex at to ramp cleanly. */
+function droppedKerbStations(span: DroppedKerbSpan): number[] {
+  return [span.s0 - span.rampM, span.s0, span.s1, span.s1 + span.rampM];
+}
+
+/** Kerb-top height at `along`: ROAD_Y across the apron, ramped either side. */
+function droppedKerbTopY(along: number, span: DroppedKerbSpan): number {
+  if (along >= span.s0 && along <= span.s1) return ROAD_Y;
+  const gap = along < span.s0 ? span.s0 - along : along - span.s1;
+  if (gap >= span.rampM) return SIDEWALK_TOP_Y;
+  return ROAD_Y + (SIDEWALK_TOP_Y - ROAD_Y) * (gap / span.rampM);
+}
+
+/** `line` with extra vertices at the given arc lengths (order preserved). */
+function insertStations(line: readonly Vec2[], stations: readonly number[]): Vec2[] {
+  const total = polylineLength(line);
+  const wanted = [...new Set(stations)]
+    .filter((s) => s > 1e-6 && s < total - 1e-6)
+    .sort((a, b) => a - b);
+  const out: Vec2[] = [[...(line[0] as Vec2)] as Vec2];
+  if (wanted.length === 0) {
+    for (let i = 1; i < line.length; i++) out.push([...(line[i] as Vec2)] as Vec2);
+    return out;
+  }
+  let acc = 0;
+  let k = 0;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1] as Vec2;
+    const b = line[i] as Vec2;
+    const seg = dist(a, b);
+    while (k < wanted.length && (wanted[k] as number) <= acc + seg) {
+      const p = pointAlong(line, wanted[k] as number).point;
+      if (dist(out[out.length - 1] as Vec2, p) > 1e-6) out.push(p);
+      k++;
+    }
+    if (dist(out[out.length - 1] as Vec2, b) > 1e-6) out.push([...b] as Vec2);
+    acc += seg;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
 /**
- * `district` is optional and carries exactly one decision: whether an edge that
- * no class set kerbs is nonetheless a CAR PARK's roadway (`lotAisleKerbEdgeIds`
- * above). Omitting it reproduces the pre-2026-08-27 build byte for byte, which
- * is what keeps a caller that has no district honest rather than silently
- * different. The two shipped callers — `buildWorldGeometry` and
+ * `district` is optional and carries two decisions, both of them opt-in and
+ * both of them named by the document: whether an edge that no class set kerbs
+ * is nonetheless a CAR PARK's roadway (`lotAisleKerbEdgeIds`), and where a
+ * DRIVEWAY MOUTH drops the kerb (`drivewayMouthsOf`). Omitting it reproduces
+ * the build before either pass byte for byte on every district that declares
+ * neither, which is what keeps a caller that has no district honest rather than
+ * silently different — `__tests__/lot-aisle-has-a-kerb.test.ts` §3 names the
+ * districts that do move and fails on any that moves without asking. The two
+ * shipped callers — `buildWorldGeometry` and
  * `runtime/surface.resolveDistrictDrivableSurface` — both pass it, and
  * `drivable-surface.test.ts`'s 105-district census agreement is what fails if
  * one of them ever stops.
@@ -579,6 +731,7 @@ export function buildRoads(
   district?: District,
 ): RoadBuildResult {
   const kerbedEdgeIds = lotAisleKerbEdgeIds(district);
+  const drivewayMouths = drivewayMouthsOf(district);
   // Registered ring edge → its roundabout, so the outer kerb below is built
   // against the ring it actually belongs to (a district may hold several).
   const ringByEdgeId = new Map<string, RoundaboutRing>();
@@ -674,7 +827,13 @@ export function buildRoads(
         // asphalt, which is what put ambient traffic on the pavement.
         for (const side of [1, -1] as const) {
           if (isBareVergeSide(eb.bareVerge, side)) continue;
-          buildSidewalkStrip(sidewalks, walkLine, eb.halfWidth, side);
+          buildSidewalkStrip(
+            sidewalks,
+            walkLine,
+            eb.halfWidth,
+            side,
+            droppedKerbSpanFor(drivewayMouths, eb.edge.id, walkLine, side),
+          );
           sidewalkStripCount++;
         }
       }

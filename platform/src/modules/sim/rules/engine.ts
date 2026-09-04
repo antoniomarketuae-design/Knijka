@@ -5139,6 +5139,26 @@ function handleTickEvent(
         // photographed, the latch is one call away and the key is "signal-line".
         if (e.controller !== undefined) {
           if (e.controller === "halt") out.push(makeViolation("CONTROLLER_SIGNAL_VIOLATED", t));
+          // …and the compliant half is CREDITED, which until now it was not:
+          // this arm could only convict, so the ONE act the регулировчик
+          // lessons exist to teach — going on his permission while your own
+          // lamp forbids it (ЗДвП чл. 7, ал. 1) — reached the debrief as
+          // silence. Measured on sc-sig-controller-live/mobile-right: route
+          // objectives ticked, «COMMENDATIONS (0): (none credited)», and the
+          // only feedback a seventeen-year-old got was a fail and a 10-point
+          // row. CLEAN_DRIVING cannot cover it either — that needs 250 m and
+          // this drill's whole route is ~150 m — so a PERFECT drive of it
+          // earned nothing at all. THEO-4 (doc 64) with the sign reversed.
+          //
+          // The gate is the FORBIDDING LAMP, and it is the same one the
+          // objective already uses (`lessons/objectives.ts` requireRedMet:
+          // forbidding lightState + controller "proceed"), so the praise card
+          // and the route task can never disagree about what happened. On a
+          // green lamp the officer and the lamp agree and nothing hard was
+          // done — crossing there is ordinary driving and stays uncredited.
+          else if (e.lightState === "red" || e.lightState === "redYellow") {
+            out.push(makeCommendation("CONTROLLER_SIGNAL_OBEYED", t));
+          }
           break;
         }
         if (e.lightState === "red") out.push(makeViolation("RED_LIGHT_CROSSED", t));
@@ -5616,12 +5636,18 @@ function handleTickEvent(
       // same shape: it is not adjudicated against a place OR a body but against
       // the CAR ITSELF, and its runner resolves exactly once per drive, so a
       // place-latch could only ever suppress a bill that cannot repeat.
+      // …and "police-stop-signal" (VP-11) for a fourth reason of the same
+      // family: it is adjudicated against ONE staged officer, its runner
+      // resolves exactly once per drive, and the act is a duty owed to a person
+      // rather than a right owed at a place — so a place-latch could only ever
+      // suppress a bill that cannot repeat.
       const MANOEUVRE_SITUATIONS = new Set([
         "emergency",
         "overtake-oncoming",
         "overtake-return",
         "vulnerable-pass",
         "warning-lamp",
+        "police-stop-signal",
       ]);
       const placeAct = MANOEUVRE_SITUATIONS.has(e.situation)
         ? null
@@ -5641,7 +5667,13 @@ function handleTickEvent(
                     // junction priority nor a manoeuvre.
                     e.situation === "warning-lamp"
                     ? "WARNING_LAMP_IGNORED"
-                    : "FAILED_TO_YIELD",
+                    : // VP-11: the police-stop runner's own duty — ЗДвП чл. 103
+                      // („длъжен е да спре плавно в най-дясната част на
+                      // платното"), which is neither a junction priority nor a
+                      // manoeuvre.
+                      e.situation === "police-stop-signal"
+                      ? "POLICE_STOP_SIGNAL_IGNORED"
+                      : "FAILED_TO_YIELD",
           t,
           { detail: e.situation },
         );

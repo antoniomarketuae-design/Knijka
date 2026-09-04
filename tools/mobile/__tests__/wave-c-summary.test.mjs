@@ -59,7 +59,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DRIVE_SUMMARY_RE, INPUT_ATTESTATION, INPUT_GUARDS, TOUCH_PROBE, parseSummary } from "../lib/summary.mjs";
-import { readbackVerdict, touchProbeLine } from "../lib/touch-probe.mjs";
+import {
+  PROBE_AFTER_DRIVE,
+  PROBE_BEFORE_DRIVE,
+  mergeProbes,
+  readbackVerdict,
+  touchProbeLine,
+} from "../lib/touch-probe.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOOLS_MOBILE = path.resolve(HERE, "..");
@@ -397,24 +403,35 @@ describe("§6 the drive states which channel drove it", () => {
       // WHAT REPLACES IT IS THE CLAIM THAT IS STILL MADE: `channel: "keyboard"`
       // says a KEY moved the car, and that has to stay checkable. The pedals
       // and the wheel are asserted to still be `page.keyboard`, and the touch
-      // dispatch is asserted to live in the probe module and NOT in the drive
-      // loop — because the day a thumb drives the car, `channel` is the field
-      // that must change, and a census that only counted dispatches would have
-      // let it stay „keyboard" while a touch pushed the pedal.
+      // dispatch is asserted to live in the probe module and NOT in
+      // `lesson-audit.mjs` — because the day a thumb drives the car, `channel`
+      // is the field that must change, and a census that only counted
+      // dispatches would have let it stay „keyboard" while a touch pushed the
+      // pedal.
+      //
+      // THE CENSUS'S SCOPE WIDENED WITH THE PROBE'S MOVE, and widening is the
+      // only direction it was allowed to go. It used to run over the slice
+      // BEFORE the probe call, because the probe was the last thing the lane
+      // did; the probe is now also taken before the drive (§7d), so „before
+      // the probe" no longer means „before the car moved" and the boundary has
+      // stopped being one. It therefore runs over the WHOLE file: this harness
+      // owns no touch dispatch of its own at any instant, and every touch it
+      // sends goes through `lib/touch-probe.mjs`, which presses dead centre and
+      // cannot command the car. Measured at the time of the change: all three
+      // patterns absent from the entire file, so nothing was relaxed to fit.
       assert.ok(EMITTER.includes('page.keyboard[on ? "down" : "up"]("KeyW")'), "the throttle is no longer a key");
       assert.ok(EMITTER.includes('page.keyboard[on ? "down" : "up"]("KeyS")'), "the brake is no longer a key");
       assert.ok(EMITTER.includes('channel: "keyboard"'), "the drive channel is no longer attested as the keyboard");
-      const driveLoop = EMITTER.slice(0, EMITTER.indexOf("const touchProbe = await probeTouchPads"));
-      assert.ok(driveLoop.length > 0, "the probe call is gone from lesson-audit.mjs");
+      assert.ok(EMITTER.includes("probeTouchPads(page)"), "the probe call is gone from lesson-audit.mjs");
       for (const [re, what] of [
         [/dispatchTouchEvent/, "CDP Input.dispatchTouchEvent"],
         [/\.\s*touchscreen\s*\./, "page.touchscreen.*"],
         [/\.\s*tap\s*\(/, "locator.tap()"],
       ]) {
         assert.equal(
-          re.test(driveLoop),
+          re.test(EMITTER),
           false,
-          `a touch is actuated via ${what} BEFORE the drive ends, but the INPUT line still attests «keyboard». ` +
+          `a touch is actuated via ${what} inside lesson-audit.mjs, but the INPUT line still attests «keyboard». ` +
             "A touch that moves the car changes the channel; re-attest it and update this census.",
         );
       }
@@ -633,5 +650,113 @@ describe("§7 what the drivetrain pad did when it was pressed", () => {
       assert.equal(s.touchProbeRelease, v.released ? "clean" : "NOT observed");
     }
     assert.equal(TOUCH_PROBE.actuated.exec(WITH_PROBE)[1], "actuated");
+  });
+
+  /* ═════════════════════════════════════════════════════════════════════════
+   * §7d — WHEN THE PRESS IS TAKEN, WHICH IS THE HALF THAT SHIPPED DEAD
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * §7 above defends what the probe REPORTS. It could not defend that the
+   * probe ever gets an answer, and it did not: the first build was called once,
+   * after the drive, and refused on every lane that ran it. Measured at the
+   * commit that shipped it —
+   * `.audit-frames/canary-8b9d135-232028/frames/sc-park-wall__mobile-right/run.log`:
+   *
+   *   TOUCH PROBE: NOT actuated · 0 touch events dispatched · … — the touch
+   *   overlay is mounted but inert — a press here is refused by design
+   *
+   * The cause is product code behaving correctly. `LessonScene.tsx` renders
+   * `<TouchControls hidden={physicsPaused}>`; `TouchControls.tsx` stamps
+   * `data-sim-touch-inert="on"` whenever `!visible`; a drive ENDS with the end
+   * card up and the physics paused. So the call site could not reach the pad
+   * at the only instant it ever ran at, and `touchProbe: "NOT actuated"`
+   * carried exactly the information `touchEvents: 0` already carried.
+   *
+   * These are the two guards that keep the repair from being reverted by
+   * accident: the press has to happen while the car is UNTOUCHED (where the
+   * ladder is finished, the world is running and no pedal has been pressed),
+   * and the reading a lane reports has to name the instant it came from. */
+  describe("§7d the press is taken while the overlay can still be live", () => {
+    const EMITTER = readFileSync(path.join(TOOLS_MOBILE, "lesson-audit.mjs"), "utf8");
+
+    it("the probe runs on the untouched car, BEFORE the first pedal key", () => {
+      const pre = EMITTER.indexOf("const touchProbeBefore = await timed(\"touchpad\"");
+      const steer = EMITTER.indexOf('await timed("steer", steerLiveness)');
+      const post = EMITTER.indexOf("const touchProbe = mergeProbes(touchProbeBefore");
+      assert.ok(pre > 0, "the pre-drive touch probe is gone — the lane can no longer reach the pad at all");
+      assert.ok(steer > 0, "the untouched-car landmark moved; re-anchor this guard on it");
+      assert.ok(post > 0, "the post-drive reading is no longer merged with the pre-drive one");
+      // The landmark's own argument: this is the LAST instant at which the car
+      // is untouched. A probe after it presses a pad on a moving car.
+      assert.ok(pre < steer, "the touch probe now runs after the wheel has been turned");
+      assert.ok(pre < post, "the two readings are out of order");
+    });
+
+    it("both readings reach the ledger through ONE count and ONE line", () => {
+      // The dead-predicate shape, guarded: a second probe whose events never
+      // reach `inputChannel.touchEvents` would print „0 touch events
+      // dispatched" over a lane that had pressed the pad twice.
+      assert.ok(
+        EMITTER.includes("inputChannel.touchEvents = touchProbe.events"),
+        "the INPUT line's touch count no longer comes from the merged probe",
+      );
+      assert.ok(EMITTER.includes("note(touchProbeLine(touchProbe))"), "the TOUCH PROBE line is no longer printed");
+    });
+
+    it("mergeProbes sums what both pressed and reports the one that ANSWERED", () => {
+      const live = { actuated: true, held: true, released: true, events: 4, why: "live" };
+      const inert = { actuated: false, held: false, released: false, events: 0, why: "inert by design" };
+      const merged = mergeProbes(inert, live);
+      assert.equal(merged.actuated, true);
+      assert.equal(merged.events, 4);
+      assert.equal(merged.when, PROBE_AFTER_DRIVE);
+      const other = mergeProbes(live, inert);
+      assert.equal(other.when, PROBE_BEFORE_DRIVE);
+      assert.equal(other.events, 4);
+    });
+
+    it("…and when NEITHER answered it reports the FIRST reading, not the tidier one", () => {
+      // „It was live and said no" is a finding about TouchControls.tsx; „it was
+      // inert under the end card" is doc 91 §I3 working. Reporting the second
+      // over the first would file the design as the defect.
+      const liveRefusal = { actuated: false, held: false, released: false, events: 4, why: "the pad refused a live press" };
+      const byDesign = { actuated: false, held: false, released: false, events: 0, why: "mounted but inert" };
+      const merged = mergeProbes(liveRefusal, byDesign);
+      assert.equal(merged.why, "the pad refused a live press");
+      assert.equal(merged.when, PROBE_BEFORE_DRIVE);
+      assert.equal(merged.events, 4);
+      // A lane that died before either reading states nothing at all.
+      assert.equal(mergeProbes(null, null).when, null);
+      assert.equal(mergeProbes(null, null).actuated, false);
+      assert.equal(mergeProbes(null, null).events, 0);
+    });
+
+    it("the instant survives the emitter → reader → ledger round trip", () => {
+      const line = touchProbeLine({ ...mergeProbes({ actuated: true, held: true, released: true, events: 4, why: "ok" }, null) });
+      const s = parseSummary(line);
+      assert.equal(s.touchProbeWhen, PROBE_BEFORE_DRIVE);
+      assert.equal(s.touchProbe, "actuated");
+      assert.equal(s.touchProbeEvents, 4);
+      assert.equal(s.touchProbeHold, "survived");
+      assert.equal(s.touchProbeRelease, "clean");
+    });
+
+    it("a transcript that never named an instant reports null, never a guess", () => {
+      // Every run.log written before this clause existed was a post-drive
+      // reading; defaulting `touchProbeWhen` to that would let the corpus
+      // certify an instant nobody attested. §2/§6b/§7's rule, third time.
+      assert.equal(parseSummary(WITH_PROBE).touchProbeWhen, null);
+      assert.equal(parseSummary(PROBE_UNREACHED).touchProbeWhen, null);
+      assert.equal(parseSummary(BOTH_CLAUSES).touchProbeWhen, null);
+    });
+
+    it("the instant reaches the scroll a dispatcher actually reads", () => {
+      const WAVE_C = readFileSync(path.join(TOOLS_MOBILE, "wave-c.mjs"), "utf8");
+      assert.ok(
+        Object.keys(parseSummary(WITH_PROBE)).includes("touchProbeWhen"),
+        "parseSummary no longer returns touchProbeWhen",
+      );
+      assert.ok(WAVE_C.includes("s.touchProbeWhen"), "the console line no longer says WHEN the pad was pressed");
+    });
   });
 });

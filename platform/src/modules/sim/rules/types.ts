@@ -382,6 +382,31 @@ export interface SimTick {
    * heading and speed, which this number does not carry.
    */
   vruAheadM?: number;
+  /**
+   * Seconds until an ONCOMING RAIL VEHICLE reaches the junction ahead — a tram
+   * (or a street-running train) in the carriageway the car is about to turn
+   * across, measured `distM / closingMps` by the N1 left-turn probe
+   * (`worldRuntime`, LEFT_TURN_ONCOMING_RADIUS_M). Absent = the reporter cannot
+   * answer OR there is no rail vehicle making an arrival claim; NEVER „the
+   * track is clear" — every recorded trace, every fixture and every legacy
+   * boolean wiring omits it.
+   *
+   * THE WAIT NOTHING COULD SEE. `sc-rx-tram-left:07c63b97` (critical): on the
+   * lesson whose entire subject is «трамваят трябва да премине ИЗЦЯЛО», the
+   * only wait the product could NAME was the red lamp, because `yieldReasonAt`
+   * reads this tick and this tick carried no channel for another actor's
+   * priority. The moment the lamp released him — the decisive moment of the
+   * drill, with the tram still coming — the coach dropped the wait card and
+   * went back to pointing at the waypoint 50 m past the rails. The number was
+   * already being computed one file away and thrown out.
+   *
+   * MEASUREMENT ONLY, and it can only ACQUIT (the polarity `vruAheadM` sets
+   * above). No rule reads it and none may: чл. 37, ал. 1's conviction is the
+   * N1 tracker's and stays exactly where it is. What reads it is
+   * `lessons/finish.ts yieldReasonAt`, which turns it into a lawful wait the
+   * instructor can explain (ЗДвП чл. 8, ал. 2).
+   */
+  oncomingRailGapSec?: number;
   /** True when driving against the flow of a one-way street (runtime-computed). */
   wrongWay?: boolean;
   // -- B1a Wave-1 world context (doc 72 capabilities 1 + N3). ALL optional and
@@ -671,6 +696,8 @@ export type ViolationCode =
   | "VULNERABLE_PASS_TOO_CLOSE" // основна: passed a same-direction cyclist with under ~1.2 m of air (чл. 42 достатъчна странична дистанция; the 1.2–1.5 m band stays a taught grace — runtime vulnerable-pass tracker)
   // N11 cockpit stimuli (doc 72 VP-06 — the red/amber telltale triage)
   | "WARNING_LAMP_IGNORED" // основна: drove on past a RED dashboard warning lamp instead of pulling over (ЗДвП чл. 139, ал. 1, т. 1; orchestrator telltale runner — structurally armed only where a red telltale is STAGED)
+  // VP-11 (doc 72 §3 — спиране по полицейски сигнал), the telltale's twin
+  | "POLICE_STOP_SIGNAL_IGNORED" // основна: drove past a контролен орган's stop signal instead of pulling over and halting (ЗДвП чл. 103; orchestrator policeStop runner — structurally armed only where an officer is STAGED)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -681,6 +708,7 @@ export type CommendationCode =
   | "SAFE_LANE_CHANGE" // mirror glance + indicator both done
   | "PEDESTRIAN_YIELDED"
   | "YIELDED_TO_PRIORITY" // gave way correctly at a priority situation
+  | "CONTROLLER_SIGNAL_OBEYED" // crossed on the регулировчик's permission against a forbidding lamp (ЗДвП чл. 7, ал. 1)
   | "CLEAN_DRIVING" // sustained violation-free driving (positive reinforcement)
   | "PREDRIVE_PERFECT";
 

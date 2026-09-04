@@ -66,12 +66,23 @@ interface Case {
   minorMaxKmh: number;
   /** Derived Б2 line s along the stem (minorArmM − 27.725), stop variant. */
   stopLineSM: number;
+  /**
+   * Пешеходни пътеки the instance authors — and therefore the зебри the world
+   * builder must PAINT and the crossing lanes the traffic graph must know.
+   *
+   * It was a hard-coded 0 in three places, which was true of all three maps and
+   * is the reason `sc-junction-blind:76e3924c` („the junction paints no
+   * pedestrian crossing") could stand: `markings.ts` paints every crossing a
+   * district declares and this generator declared none. Pinned per case rather
+   * than relaxed — the two Б2 maps still assert exactly zero.
+   */
+  crossings: number;
 }
 
 const CASES: Case[] = [
-  { id: "tj-emerge-v1", isStop: true, priorityArmM: 160, minorArmM: 100, priorityMaxKmh: 50, minorMaxKmh: 40, stopLineSM: 72.275 },
-  { id: "tj-occluded-v1", isStop: false, priorityArmM: 140, minorArmM: 130, priorityMaxKmh: 40, minorMaxKmh: 40, stopLineSM: 0 },
-  { id: "tj-scan-v1", isStop: true, priorityArmM: 130, minorArmM: 110, priorityMaxKmh: 50, minorMaxKmh: 40, stopLineSM: 82.275 },
+  { id: "tj-emerge-v1", isStop: true, priorityArmM: 160, minorArmM: 100, priorityMaxKmh: 50, minorMaxKmh: 40, stopLineSM: 72.275, crossings: 0 },
+  { id: "tj-occluded-v1", isStop: false, priorityArmM: 140, minorArmM: 130, priorityMaxKmh: 40, minorMaxKmh: 40, stopLineSM: 0, crossings: 3 },
+  { id: "tj-scan-v1", isStop: true, priorityArmM: 130, minorArmM: 110, priorityMaxKmh: 50, minorMaxKmh: 40, stopLineSM: 82.275, crossings: 0 },
 ];
 
 /**
@@ -112,7 +123,7 @@ for (const c of CASES) {
       expect(district.roads.edges.length).toBe(3);
       expect(district.intersections.length).toBe(1);
       expect(district.intersections[0]).toMatchObject({ id: "tj-n-c", degree: 3, signalized: false });
-      expect(district.crossings.length).toBe(0);
+      expect(district.crossings.length).toBe(c.crossings);
       expect(district.roundabouts.length).toBe(0);
       expect(district.spawnPoints.map((s) => s.id).sort()).toEqual([
         "tj-spawn-east",
@@ -133,7 +144,9 @@ for (const c of CASES) {
         : "control none: no signs of priority anywhere (equal junction = right-hand rule)",
       () => {
         expect(world.trafficLights.length).toBe(0);
-        expect(world.stats.zebraCrossings).toBe(0);
+        // The paint, not the priority: an equal junction still has пътеки, and
+        // a зебра is not a sign of priority. Signals stay 0 on all three.
+        expect(world.stats.zebraCrossings).toBe(c.crossings);
         if (isStop) {
           expect(world.stats.signs.stop).toBe(1);
           expect(world.stats.signs.giveWay).toBe(0);
@@ -355,7 +368,8 @@ for (const c of CASES) {
       });
       expect(graph.lanes.length).toBe(6);
       expect(graph.loopLanes.size).toBe(6);
-      expect(graph.crossingLanes.size).toBe(0);
+      // Keyed by crossing id (graph.ts:270), so one entry per authored пътека.
+      expect(graph.crossingLanes.size).toBe(c.crossings);
       expect(graph.junctionRadiusM.get("tj-n-c")).toBeGreaterThan(0);
     });
 

@@ -109,7 +109,14 @@ export type {
   ParkedClearZoneLike,
   TrafficLayerProps,
 } from "./TrafficLayer";
-export { DEFAULT_TRAFFIC_CONFIG } from "./types";
+// The §7 aid ladder reaching the регулировчик's gesture card: L1 gets the
+// six-line answer the founder asked for, L2 gets the POSE named and nothing
+// else, L3/L4 read the man. `LessonScene` is the one caller — it holds the
+// compiled lesson id, which is where the rung is (`controllerGestures.ts`
+// carries the derivation and the two rows that forced it).
+export { controllerCaptionDetailForLevel } from "./controllerGestures";
+export type { ControllerCaptionDetail } from "./controllerGestures";
+export { DEFAULT_TRAFFIC_CONFIG, SCENARIO_TRAFFIC_DRAW_DISTANCE_M } from "./types";
 // AMBIENT PAVEMENT POPULATION — how many walkers a district's own kerb length
 // supports. Published because the LIVE scene is the only caller that may ask
 // for them (`TrafficConfig.sidewalkPedestrianCount` defaults to 0 so recorded

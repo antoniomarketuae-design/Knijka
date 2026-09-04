@@ -113,6 +113,7 @@ import {
   BUBBLE_SIDE_PROFILE,
   CONTROLLER_BUBBLES,
   type ControllerBubbleCopy,
+  type ControllerCaptionDetail,
 } from "./controllerGestures";
 import type {
   DistrictEdge,
@@ -1328,6 +1329,44 @@ export const BUBBLE_LINE_PX = {
 } as const;
 
 /**
+ * The `"posture"` card's own type scale — two lines instead of six, and the
+ * whole of `sc-sig-controller-postures:ef0e821c`'s repair.
+ *
+ * WHY THESE NUMBERS. Cap height on this billboard is the plane's height shared
+ * out among the line slots, and the plane's height is fixed by the windscreen
+ * (see `BUBBLE_H_M`). Measured on `.audit-frames/w22/…/04-t042s.png` at native
+ * 2556 × 1179: the card spans 528 device px, i.e. 279 px tall, so one texture
+ * px is 279/540 = 0.516 device px of the phone. The six-line card's 44–46 px
+ * body lines therefore land at ≈17 device px of cap — ≈5.5 CSS px on a 3× phone,
+ * which is the „tiny … unreadable at native phone size" the row is filed on.
+ * `name` at 84 px lands at ≈33 device px of cap, ≈11 CSS px: the same order as
+ * the headline the auditor could read, on the line that now carries the whole
+ * teaching.
+ *
+ * `law` keeps a size of its own rather than borrowing `BUBBLE_LINE_PX.law`,
+ * because on a two-line card it is half the ink on the plane and 38 px would
+ * read as a footnote to nothing. ADR-002 — it is the citation, and it stays.
+ */
+export const BUBBLE_POSTURE_LINE_PX = {
+  name: 84,
+  law: 46,
+} as const;
+
+/**
+ * The `"posture"` card is drawn in ONE neutral ink, and that is a rule rather
+ * than a palette choice (`sc-sig-controller-postures:3936550e`).
+ *
+ * The six-line card's accent is `copy.accent` — green for «минавай», red for
+ * «спри», amber for «внимание». A colour-coded border IS the verdict: a student
+ * who never reads a glyph still knows from 60 m whether to go, which is the
+ * exercise the row says the billboard removes. So the rung that exists to make
+ * him read the man gets a card that tells him only WHICH POSTURE he is looking
+ * at, in an ink that answers nothing.
+ */
+const BUBBLE_POSTURE_INK = "#dbe5f2";
+const BUBBLE_POSTURE_BORDER = "#7f93ad";
+
+/**
  * Paint one centred line, SHRUNK TO FIT (doc 87 B41).
  *
  * Every line here was a bare `fillText` — centred, no wrap, no measurement —
@@ -1390,11 +1429,19 @@ function bubbleLine(
  *  `__tests__/controller-bubble.test.ts`, which drives it against a recording
  *  2D context — the painter is the thing that can overflow, so the painter is
  *  the thing the gate has to hold. */
-export function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbleCopy): void {
+export function drawControllerBubble(
+  c: HTMLCanvasElement,
+  copy: ControllerBubbleCopy,
+  /** How much of the card this rung gets — see `controllerGestures.ts`.
+   *  `"full"` is the shipped six-line card and the default, so every mount that
+   *  does not ask paints byte-identically to what it painted before. */
+  detail: ControllerCaptionDetail = "full",
+): void {
   const g = c.getContext("2d");
   if (!g) return;
   const W = c.width;
   const H = c.height;
+  const posture = detail === "posture";
   const tail = (BUBBLE_TAIL_PX * H) / BUBBLE_TEX_H; // pointer, reserved at the bottom
   const bodyH = H - tail;
   const r = 34;
@@ -1419,11 +1466,28 @@ export function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbl
   g.fillStyle = "rgba(9,14,25,0.97)";
   g.fill();
   g.lineWidth = 7;
-  g.strokeStyle = copy.accent;
+  g.strokeStyle = posture ? BUBBLE_POSTURE_BORDER : copy.accent;
   g.stroke();
 
   g.textAlign = "center";
   g.textBaseline = "alphabetic";
+
+  // ── THE „ЧАСТИЧНА ПОМОЩ" CARD: WHICH POSTURE, AND NOTHING ELSE ───────────
+  // Two lines in the space six used, so the type that carries the teaching is
+  // ≈2× the cap height the auditor photographed, and the answer he was handed
+  // for free is his to work out. The baselines spend the card body (506 px of
+  // the 540 px canvas, `BUBBLE_TAIL_PX` reserved at the foot) rather than
+  // leaving the old six-line rhythm's gaps behind: 250 puts the name on the
+  // optical centre of the body, 430 sits the citation on the same last line the
+  // six-line card uses, so the two layouts share a foot and the card does not
+  // appear to change shape between rungs.
+  if (posture) {
+    g.fillStyle = BUBBLE_POSTURE_INK;
+    bubbleLine(g, copy.postureNameBg, 700, BUBBLE_POSTURE_LINE_PX.name, 250, W);
+    g.fillStyle = "#b9c9de";
+    bubbleLine(g, copy.lawRef, 700, BUBBLE_POSTURE_LINE_PX.law, 430, W);
+    return;
+  }
   // The six answers, each in its own colour so the SLOT is learnable: a student
   // who has read one bubble knows where „who goes" lives on the next one.
   // Green = movement, red = the halt, WHITE-ON-ACCENT = whose priority it is —
@@ -1552,6 +1616,17 @@ export interface TrafficLayerProps {
    */
   controllerFigure?: ControllerFigureRead | null;
   /**
+   * HOW MUCH OF THE OFFICER'S CAPTION THIS RUNG GETS — the §7 aid ladder
+   * reaching the gesture bubble (`controllerGestures.ts` carries the ladder and
+   * the two rows that forced it: `sc-sig-controller-postures:ef0e821c` and
+   * `:3936550e`).
+   *
+   * Absent = `"full"`, the six-line card exactly as it shipped, so the
+   * clip-capture rig and every headless mount are byte-identical. `LessonScene`
+   * reads the rung off the compiled lesson id and passes the rest.
+   */
+  controllerCaption?: ControllerCaptionDetail;
+  /**
    * Doc 87 B40(a) — captions anchored to a staged actor (`LessonSpec.actorLabels`).
    *
    * Render-only and honesty-gated: a caption is drawn only while its actor is
@@ -1579,6 +1654,7 @@ export function TrafficLayer({
   clearcoat = true,
   dropHeavyFleetModels = false,
   controllerFigure = null,
+  controllerCaption = "full",
   actorLabels = null,
 }: TrafficLayerProps) {
   const nVeh = system.vehicles.length;
@@ -1830,6 +1906,16 @@ export function TrafficLayer({
     ctx: TrafficUpdateContext;
   }
   const scratchRef = useRef<Scratch | null>(null);
+  // The painted canvas is cached against the POSTURE (`scratch.bubblePosture`),
+  // so a rung that changes the DETAIL without changing the pose would keep the
+  // stale card. The rung is mount-constant in the shipped shell, which is
+  // exactly why this is cheap insurance rather than dead code: the dev rigs
+  // flip it live, and a cache keyed on half its inputs is the class of defect
+  // this module has been burned by (the two hand-kept screen-owner lists).
+  useEffect(() => {
+    const s = scratchRef.current;
+    if (s) s.bubblePosture = -1;
+  }, [controllerCaption]);
 
   // Bound once per runtime — the frame loop must not allocate closures.
   const boundSignalPhase = useMemo(
@@ -2561,7 +2647,10 @@ export function TrafficLayer({
       // this whole block is a single boolean for the other ~150 scenarios.
       const bubble = bubbleRef.current;
       if (bubble) {
-        if (bubbleOwner < 0 || bubblePosture < 0) {
+        // `"off"` is the §7 ladder's top two rungs (`controllerGestures.ts`):
+        // «Самостоятелно» and «Изпитни условия» read the man, not a caption.
+        // Tested first so the whole block below is one comparison there.
+        if (controllerCaption === "off" || bubbleOwner < 0 || bubblePosture < 0) {
           bubble.visible = false;
         } else {
           const owner = system.pedestrians[bubbleOwner];
@@ -2570,6 +2659,7 @@ export function TrafficLayer({
             drawControllerBubble(
               bubbleTex.image as HTMLCanvasElement,
               CONTROLLER_BUBBLES[bubblePosture],
+              controllerCaption,
             );
             bubbleTex.needsUpdate = true;
           }

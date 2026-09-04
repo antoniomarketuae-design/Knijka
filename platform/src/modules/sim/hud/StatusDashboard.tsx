@@ -497,6 +497,35 @@ export function GovernorCapMark({
   const taskBinds = reading.binding === "task" && reading.bindingKmh !== undefined;
   const bindingKmh = taskBinds ? Math.round(reading.bindingKmh as number) : null;
   /**
+   * ── WHEN THE GOVERNOR MAY STAND ON THE GLASS AT ALL ───────────────────────
+   * sc-sig-controller-postures:e245bd5c · sc-crossing-child-ball:b2be3466 ·
+   * sc-rb-lane-choice:ff5f8190 — three rows, one sentence: „THREE different
+   * speed figures are on screen SIMULTANEOUSLY".
+   *
+   * Every answer before this one was a VOCABULARY answer — name the third
+   * number, name the loser, name the precedence — and each of them put more
+   * glyphs on the strip the rows are counting. `lessonSpeedContract.ts` routed
+   * this edit here by name and settled which figure may leave: `SpeedAuthority`
+   * has no `"mode"` member because a governor cap is a ceiling on the THROTTLE,
+   * so it can neither be exceeded nor be obeyed. It is the one number on this
+   * bar that cannot bill, and on the audited frames it is also the LARGEST —
+   * the hierarchy in the grader, exactly inverted.
+   *
+   * IT STILL EARNS THE BAR IN THREE STATES, and the same three the SENTENCE
+   * already applies (`readSpeedContract`'s governor clause renders „only where
+   * it can be MISREAD"):
+   *   · it is easing the throttle RIGHT NOW — a student flooring it into a
+   *     ceiling has to be told it is the mode and not a broken engine
+   *     (doc 86 B7, founder item L17/5);
+   *   · it BLOCKS the number the drill needs (`modeBlocksBinding`);
+   *   · it is at or under the sign, where it IS the operative ceiling.
+   * Outside those three it is furniture, and the strip loses a numeral.
+   *
+   * THE EXPLANATION LOSES NOTHING: `explainBg` below is untouched, so the
+   * `aria-label`/`title` still states all three ceilings and the precedence.
+   */
+  const modeSpeaks = easing || reading.modeBlocksBinding || !reading.modeAboveLaw;
+  /**
    * ── THE ACCESSIBLE NAME ASSERTED THE PRECEDENCE THE GLASS JUST FIXED ──────
    * Wave 8, the other half of `sc-signal-response:a1989c9a`.
    *
@@ -522,6 +551,12 @@ export function GovernorCapMark({
           taskBinds ? "." : " — знакът до скоростта е ограничението."
         }`
   }${reading.lineBg === "" ? "" : ` ${reading.lineBg}`}`;
+  // Nothing left to print: the governor cannot bill here (see `modeSpeaks`)
+  // and no drill cap is stricter than the disc. An empty labelled span is not
+  // "no furniture" — a screen reader still announces it and the flex gap still
+  // spends a pixel — so the mark leaves the bar the same way it does with no
+  // cap at all. The В26 disc beside it is untouched and still states the law.
+  if (!modeSpeaks && bindingKmh === null) return null;
   return (
     <span
       data-hud="governor-cap"
@@ -535,68 +570,80 @@ export function GovernorCapMark({
         opacity: easing ? 1 : 0.9,
       }}
     >
-      {/* The register word. Muted and letter-spaced like every other caption in
-          this file, but NEVER hidden — a caption that disappears on the phone
-          would leave the phone reading exactly the string the founder read. */}
-      <span
-        data-hud="governor-register"
-        className="text-[7px] font-bold uppercase tracking-widest opacity-80 md:text-[8px]"
-      >
-        Режим
-      </span>
-      {/* ── THE MODE NUMERAL IS DEMOTED WHEN IT OUTRANKS NOTHING ────────────
-          Wave 8, rows `sc-sp-wet-limit-plate:dabfa37c` („the largest number on
-          the bar — and the one carrying the ≤ — is above the law") and
-          `sc-mw-discipline:d58e1b61` (disc 140, this numeral ≤150).
+      {/* THE GOVERNOR'S OWN THREE ELEMENTS — the register word, the numeral and
+          the sign-wins clause — stand or leave TOGETHER, under `modeSpeaks`.
+          Together, because they are one statement: the word names the register
+          the numeral belongs to, and the clause says what that numeral loses
+          to. Keeping any one of them without the others would leave the strip
+          saying half a sentence about a ceiling that cannot bill. */}
+      {modeSpeaks ? (
+        <>
+          {/* The register word. Muted and letter-spaced like every other caption
+              in this file, and — whenever the numeral beside it is on the bar at
+              all — never suppressed on its own: a caption that vanishes under
+              its own number would leave the phone reading exactly the bare
+              string the founder read. */}
+          <span
+            data-hud="governor-register"
+            className="text-[7px] font-bold uppercase tracking-widest opacity-80 md:text-[8px]"
+          >
+            Режим
+          </span>
+          {/* ── THE MODE NUMERAL IS DEMOTED WHEN IT OUTRANKS NOTHING ────────────
+              Wave 8, rows `sc-sp-wet-limit-plate:dabfa37c` („the largest number on
+              the bar — and the one carrying the ≤ — is above the law") and
+              `sc-mw-discipline:d58e1b61` (disc 140, this numeral ≤150).
 
-          The numeral is `governorCapKmh` — the loaded MAP's fastest legal edge
-          plus `NORMAL_CAP_MARGIN_KMH` (vehicle/difficulty.ts:214, applied :282,
-          floored at NORMAL_CAP_FLOOR_KMH). It is therefore a fact about the car
-          and about the whole district, never about the road under the wheels,
-          and when it sits above the posted disc it is the one number on the bar
-          that can neither convict nor acquit. It was nevertheless drawn in the
-          bar's `font-bold`, i.e. in the same weight as the two numbers that DO
-          bill — so the hierarchy on the glass was the exact inverse of the
-          hierarchy in the grader.
+              The numeral is `governorCapKmh` — the loaded MAP's fastest legal edge
+              plus `NORMAL_CAP_MARGIN_KMH` (vehicle/difficulty.ts:214, applied :282,
+              floored at NORMAL_CAP_FLOOR_KMH). It is therefore a fact about the car
+              and about the whole district, never about the road under the wheels,
+              and when it sits above the posted disc it is the one number on the bar
+              that can neither convict nor acquit. It was nevertheless drawn in the
+              bar's `font-bold`, i.e. in the same weight as the two numbers that DO
+              bill — so the hierarchy on the glass was the exact inverse of the
+              hierarchy in the grader.
 
-          WEIGHT AND NOT OPACITY, deliberately: at `text-[9px]` over bright
-          tarmac the `hud-ghost` shadow is tuned for this alpha, and fading the
-          glyphs would buy the hierarchy with legibility. Dropping to
-          `font-normal` beside a `font-black` В26 disc and a `font-bold` amber
-          task chip puts the eye where the billing is.
+              WEIGHT AND NOT OPACITY, deliberately: at `text-[9px]` over bright
+              tarmac the `hud-ghost` shadow is tuned for this alpha, and fading the
+              glyphs would buy the hierarchy with legibility. Dropping to
+              `font-normal` beside a `font-black` В26 disc and a `font-bold` amber
+              task chip puts the eye where the billing is.
 
-          AND ONLY WHEN IT OUTRANKS NOTHING. At or under the sign the governor
-          IS the operative ceiling — that is the tier doing its job — so it
-          keeps the bar's weight. One predicate, `reading.modeAboveLaw`, the
-          same one the clause below renders from. */}
-      <span
-        data-hud="governor-mode-cap"
-        className={reading.modeAboveLaw ? "font-normal" : undefined}
-      >
-        {nameBg} ≤{cap}
-      </span>
-      {overLimit ? (
-        /* ── „ЗНАКЪТ ВАЖИ" NAMED THE WINNER AND NEVER THE LOSER ─────────────
-           Wave 8, `sc-merge-roadworks-shift:9eab5ce5`. On that briefing frame
-           (`w10-1/frames/sc-merge-roadworks-shift__mobile-wrong/02-briefing`)
-           instruction 2 reads „Временната сигнализация отменя постоянната …
-           тук ограничението в участъка е 30, а не 50" — and six pixels under
-           it the bar said «50 · РЕЖИМ Нормален ≤60 · знакът важи». The clause
-           MEANS „the sign beats the mode"; a student who has just been told
-           that temporary signage overrides permanent reads it as „the 50 you
-           can see is the sign that applies", which is the one sentence that
-           frame must not say. (The world is right: `hz-roadworks-v1` publishes
-           maxspeed 30 on `hzr-e-works` and the disc follows the edge — the car
-           is simply still 216 m short of the taper.)
+              AND ONLY WHEN IT OUTRANKS NOTHING. At or under the sign the governor
+              IS the operative ceiling — that is the tier doing its job — so it
+              keeps the bar's weight. One predicate, `reading.modeAboveLaw`, the
+              same one the clause below renders from. */}
+          <span
+            data-hud="governor-mode-cap"
+            className={reading.modeAboveLaw ? "font-normal" : undefined}
+          >
+            {nameBg} ≤{cap}
+          </span>
+          {overLimit ? (
+            /* ── „ЗНАКЪТ ВАЖИ" NAMED THE WINNER AND NEVER THE LOSER ─────────────
+               Wave 8, `sc-merge-roadworks-shift:9eab5ce5`. On that briefing frame
+               (`w10-1/frames/sc-merge-roadworks-shift__mobile-wrong/02-briefing`)
+               instruction 2 reads „Временната сигнализация отменя постоянната …
+               тук ограничението в участъка е 30, а не 50" — and six pixels under
+               it the bar said «50 · РЕЖИМ Нормален ≤60 · знакът важи». The clause
+               MEANS „the sign beats the mode"; a student who has just been told
+               that temporary signage overrides permanent reads it as „the 50 you
+               can see is the sign that applies", which is the one sentence that
+               frame must not say. (The world is right: `hz-roadworks-v1` publishes
+               maxspeed 30 on `hzr-e-works` and the disc follows the edge — the car
+               is simply still 216 m short of the taper.)
 
-           Naming the loser costs twelve characters and removes the reading:
-           the clause is now unambiguously about the REGISTER contrast this
-           mark exists for, and says nothing about which sign. It also closes
-           the row's other half — «знакът важи» was itself a bare verdict
-           (THEO-4), true and unexplained; „not the mode" is the explanation. */
-        <span data-hud="governor-sign-wins" className="font-bold opacity-90">
-          · знакът важи, не режимът
-        </span>
+               Naming the loser costs twelve characters and removes the reading:
+               the clause is now unambiguously about the REGISTER contrast this
+               mark exists for, and says nothing about which sign. It also closes
+               the row's other half — «знакът важи» was itself a bare verdict
+               (THEO-4), true and unexplained; „not the mode" is the explanation. */
+            <span data-hud="governor-sign-wins" className="font-bold opacity-90">
+              · знакът важи, не режимът
+            </span>
+          ) : null}
+        </>
       ) : null}
       {/* THE NUMBER THE STUDENT IS ACTUALLY BILLED AGAINST, when it is neither
           of the two already on this bar.

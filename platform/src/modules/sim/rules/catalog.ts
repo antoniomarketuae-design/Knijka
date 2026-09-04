@@ -1659,14 +1659,51 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     realWorldRefs: ["ЗДвП чл. 179, ал. 6", "ЗДвП чл. 179, ал. 2"],
     conceptId: "c-technical-condition",
   },
+  POLICE_STOP_SIGNAL_IGNORED: {
+    // doc 72 VP-11. LANDED 2026-09-04 (sc-vp-police-stop:44cfeff6) as the
+    // SIX-PART change the note below specifies — emitter first, exactly as the
+    // telltale twin above did on 2026-09-02. The audit's sentence was the whole
+    // case: the wrong lane „is convicted for causing a collision, not for
+    // disobeying the officer's stop signal … so a student who ignores the
+    // officer without crashing would not be caught".
+    //
+    // Н38 GROUNDING: б. „а" (основна, 3 т.), never б. „в". See `n38.ts` — a
+    // контролен орган with a стоп-палка is not the „регулировчик" of the
+    // ten-point list's case 1, which is about a junction being directed.
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Подминаване на полицейски сигнал",
+    explanationBg:
+      "Униформен служител подаде сигнал за спиране — а колата подмина. Разпореждането не е покана: законът задължава водача да спре ПЛАВНО в най-дясната част на платното и да изчака указанията. Подминаването е опасно и само по себе си — служителят стои на платното и разчита, че ще спреш, а често спира точно заради нещо напред, което ти още не виждаш.",
+    correctiveBg:
+      "Видиш ли вдигната ръка или стоп-палка: огледало, десен мигач, плавно намаляване отрано и спиране плътно вдясно при служителя — двигателят работи, ръцете на волана, изчакваш указанията. Не се спира рязко насред платното и не се подминава „за да не се разправям“.",
+    // RETRIEVED, not recalled (ADR-002): `content/law/acts/zdvp.json`, unit
+    // „чл. 103" — „При подаден сигнал за спиране от контролните органи водачът
+    // на пътно превозно средство е длъжен да спре плавно в най-дясната част на
+    // платното за движение или на посоченото от представителя на службата за
+    // контрол място и да изпълнява неговите указания." One sentence carrying
+    // the whole VP-11 procedure: плавно, най-вдясно, изчакай указанията.
+    // NOT чл. 170, ал. 3 — that defines the SIGNAL and is the OFFICER's duty,
+    // so it belongs in a provenance note and never in this slot.
+    lawRef: "ЗДвП чл. 103",
+    realWorldBg:
+      "Извън изпита това е отказ да изпълниш нареждане на органите за контрол: ЗДвП чл. 175, ал. 1, т. 4 — лишаване от право да управляваш за срок три месеца И глоба 200 лв. При повторно нарушение ал. 2 качва на срок 6 месеца и глоба 400 лв. Наказанието се налага с акт, не с фиш — лишаването изключва фиша.",
+    realWorldRefs: ["ЗДвП чл. 175, ал. 1, т. 4", "ЗДвП чл. 175, ал. 2"],
+    conceptId: "c-police-interaction",
+  },
   /*
    * -------------------------------------------------------------------------
-   * ONE CODE THAT IS STILL NEEDED AND IS DELIBERATELY NOT HERE
-   * (w8 added two, backed both out 2026-08-28 — the retrieval survives. The
-   *  TELLTALE half landed 2026-09-02 as `WARNING_LAMP_IGNORED` above, by
-   *  following the six-part list below to the letter; the POLICE half is still
-   *  open and its plan is still good. Read this as a worked example now, not
-   *  only as a plan.)
+   * THE CODE THIS NOTE ASKED FOR HAS LANDED — kept as the worked example
+   * (2026-09-04). Both halves are now shipped rows above:
+   * `WARNING_LAMP_IGNORED` (2026-09-02) and `POLICE_STOP_SIGNAL_IGNORED`
+   * (2026-09-04), each by following the six-part list below to the letter. The
+   * list stays because it is the only written record of what a fault code costs
+   * across this tree, and the next code that needs one will need all six parts
+   * too.
+   * -------------------------------------------------------------------------
+   * (w8 added two, backed both out 2026-08-28 — the retrieval survived the
+   *  revert and both halves have since been landed off it. Read the whole of
+   *  what follows as a worked example, not as a plan.)
    * -------------------------------------------------------------------------
    *
    * WHAT WAS REMOVED AND WHY. Wave 8 added `POLICE_STOP_SIGNAL_IGNORED` and
@@ -1681,33 +1718,31 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
    * around: an open row with a good address beats a fault code no student can
    * ever meet.
    *
-   * THE LESSON THAT STILL HAS NO CODE FOR ITS OWN SUBJECT.
+   * THE LESSON THAT HAD NO CODE FOR ITS OWN SUBJECT — CLOSED 2026-09-04.
    *   sc-vp-police-stop  „Спиране по полицейски сигнал"  doc 72 VP-11
-   *   (lessons/scenario/templates-cockpit.ts, from :762)
-   * It was authored as a COMPLETION DRILL: the duty is graded ONLY as a
-   * curb-side low-speed reachZone objective, and the wrong way through is billed
-   * under the nearest available code — the police drill's own mistake demo
-   * carries `codeRefs: ["NOT_KEEPING_RIGHT"]` (templates-cockpit.ts:832), the
-   * author reaching for lane discipline because nothing else existed. So a
-   * student who drives past the officer, or drives on under a red lamp, and does
-   * not crash is not convicted of the thing his lesson is about.
+   *   (lessons/scenario/templates-cockpit.ts)
+   * It was authored as a COMPLETION DRILL: the duty was graded ONLY as a
+   * curb-side low-speed reachZone objective, and the wrong way through was
+   * billed under the nearest available code — the police drill's own mistake
+   * demo carried `codeRefs: ["NOT_KEEPING_RIGHT"]`, the author reaching for
+   * lane discipline because nothing else existed. So a student who drove past
+   * the officer, or drove on under a red lamp, and did not crash was not
+   * convicted of the thing his lesson is about. Both now are.
    *
    * THE LAW — RETRIEVED, NOT RECALLED (ADR-002). Both articles were read out of
    * `content/law/acts/zdvp.json`. Whoever lands the codes inherits the retrieval,
    * but re-opens that file rather than trusting this comment if a word of the
    * quoted text is load-bearing.
    *
-   *   POLICE_STOP_SIGNAL_IGNORED → lawRef "ЗДвП чл. 103"
-   *     The DRIVER's duty in one sentence: „При подаден сигнал за спиране от
-   *     контролните органи водачът… е длъжен да спре плавно в най-дясната част
-   *     на платното за движение… и да изпълнява неговите указания" — which is
-   *     also, word for word, the procedure VP-11 teaches (плавно, най-вдясно,
-   *     изчакай указанията).
-   *     NOT чл. 170, ал. 3: that defines the SIGNAL and is the OFFICER's duty, so
-   *     it belongs in a provenance note and never in the `lawRef` slot.
-   *     realWorldRefs → "ЗДвП чл. 175, ал. 1, т. 4" — лишаване за три месеца и
-   *     глоба 200 лв. for a driver who „откаже да изпълни нареждане на органите
-   *     за контрол и регулиране на движението".
+   *   POLICE_STOP_SIGNAL_IGNORED → SHIPPED 2026-09-04; the retrieval and the
+   *     reasoning now live on the row itself, above. Re-verified against
+   *     `content/law/acts/zdvp.json` before it landed — чл. 103 whole and
+   *     чл. 175, ал. 1 + т. 4 — rather than copied from here, which is what the
+   *     paragraph above asks of every reader. Two things the re-read confirmed
+   *     and the plan had right: чл. 103 IS word for word the procedure VP-11
+   *     teaches (плавно, най-вдясно, изчакай указанията), and чл. 170, ал. 3 is
+   *     the OFFICER's duty — the signal's definition — so it stays out of the
+   *     `lawRef` slot and out of `realWorldRefs`.
    *
    *   WARNING_LAMP_IGNORED → SHIPPED 2026-09-02; the retrieval and the reasoning
    *     now live on the row itself, above. Re-verified against
@@ -1766,6 +1801,15 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
    *      and `catalog-consequences.test.ts` each enumerate VIOLATIONS, each
    *      convicted this attempt, and each must be green before it is done.
    *
+   *   ALL SIX, TWICE. `WARNING_LAMP_IGNORED` walked the list on 2026-09-02 and
+   *   `POLICE_STOP_SIGNAL_IGNORED` on 2026-09-04. The police half took part 5's
+   *   FIRST branch — `stagedActorRule(["policeStop"], …)` — because unlike the
+   *   lamp the officer IS a world body, so a district that stages no officer
+   *   must read INERT rather than exempt; and it needed one part the list does
+   *   not name, `rules/consequences.ts`, without which `offences.test.ts`
+   *   („leaves no catalogued code invisible to every census") refuses a bare
+   *   authored лв. sentence. Call that part 7 for the next code.
+   *
    * THE PLAN'S ADDRESSES RE-VERIFIED 2026-08-30 @ 527a6c5, AND EIGHT OF ITS
    * LINE NUMBERS HAD MOVED — the only reason this paragraph exists. A plan is a
    * routing document, and a routing document decays: `sc-vp-telltale:dcc20e98` and
@@ -1794,9 +1838,12 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
    * `lesson/compose.ts:61 rulesByConcept()` reads `conceptId` off THIS table to
    * answer „while I am teaching c-…, which graded fault is this, what does it
    * cost, and what was the right action?". `c-police-interaction` and
-   * `c-technical-condition` exist in content/concepts.json and
-   * content/sections.json with no catalogue row, so those two lesson beats teach
-   * with no rule opinion at all. It could NOT be kept on its own: `VIOLATIONS` is
+   * `c-technical-condition` existed in content/concepts.json and
+   * content/sections.json with no catalogue row, so those two lesson beats
+   * taught with no rule opinion at all. BOTH ARE CLOSED NOW — the two rows
+   * above carry those exact `conceptId`s, which is the „side effect" the last
+   * sentence of this paragraph promised. It could NOT be kept on its own:
+   * `VIOLATIONS` is
    * `Record<ViolationCode, ViolationSpec>`, so a row needs a real code, and every
    * consumer keys off `VIOLATIONS` and nothing else (compose.ts:63,
    * lesson/resolve.ts:152, lesson/interrupt.ts:152) — a parallel table would have
@@ -1874,6 +1921,17 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
     titleBg: "Правилно отстъпено предимство",
     explanationBg: "Пропусна превозното средство с предимство и продължи, когато беше безопасно. Точно така се пази безопасността на кръстовище.",
     conceptId: "c-priority-concept",
+  },
+  // The praise half of CONTROLLER_SIGNAL_VIOLATED. It shares that row's
+  // `conceptId`, which is not decoration: `lessons/debrief.ts
+  // commendationRiderFlags` qualifies a commendation whose concept the SAME
+  // drive was also billed for, so a run that obeyed the officer at one line and
+  // ignored him at the next gets „(✓)" and the rider, never a clean certificate.
+  CONTROLLER_SIGNAL_OBEYED: {
+    titleBg: "Правилно изпълнен сигнал на регулировчика",
+    explanationBg:
+      "Премина по разрешението на регулировчика, макар лампата да забраняваше — и това е правилното изпълнение, не нарушение. При несъответствие между него и светофара важи неговият сигнал: той вижда цялото кръстовище и вече е пуснал напречните посоки, така че чакането на „своето“ зелено е онова, което вкарва колата в тях.",
+    conceptId: "c-signal-hierarchy",
   },
   CLEAN_DRIVING: {
     titleBg: "Чисто и спокойно каране",
@@ -1997,6 +2055,24 @@ export const YIELD_PRAISE_SITUATION_COPY: Record<
   "warning-lamp": {
     titleBg: "Правилна реакция на червена контролна лампа",
     conceptId: "c-technical-condition",
+  },
+  // VP-11: the compliant answer to a стоп-палка. Same reason as the row above
+  // it — the pooled sentence ends «…безопасността на кръстовище», and this
+  // encounter has no junction in it at all: it is a duty owed to a person
+  // standing at the kerb of a straight boulevard (ЗДвП чл. 103).
+  //
+  // NO «ПРАВИЛНО», AND THAT IS THE CARE THIS ROW NEEDS. The runner earns this
+  // praise for a halt within `stopRadiusM` of the mark, which on
+  // sc-vp-police-stop is a 3 m disc around a point 1.71 m off the lane centre —
+  // so a car stopped MID-LANE earns it too, and that is precisely the pose the
+  // same drive's route task «Спри плътно вдясно при полицая» now refuses
+  // (`requireKerbwardM`, sc-vp-police-stop:ab262758). A title claiming the stop
+  // was performed CORRECTLY would contradict the unticked task a few
+  // centimetres down the same screen. So the title states what was measured —
+  // he stopped for the signal — and the route row keeps the half about where.
+  "police-stop-signal": {
+    titleBg: "Спиране по сигнала на полицая",
+    conceptId: "c-police-interaction",
   },
 };
 

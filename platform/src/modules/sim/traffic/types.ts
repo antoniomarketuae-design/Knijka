@@ -337,6 +337,18 @@ export interface OncomingApproach {
   closingMps: number;
   /** The vehicle's own speed, m/s (>= the moving-conflict floor). */
   speedMps: number;
+  /**
+   * Is that most-urgent oncoming a RELSOVO ППС — a tram or a train sharing the
+   * carriageway (`profile` "tram" / "train")?
+   *
+   * ЗДвП чл. 8, ал. 2 makes this a different DUTY, not a heavier version of the
+   * same one: where passage is permitted to both at once, the non-rail driver
+   * lets the rail vehicle through „независимо от неговото местоположение и
+   * посока на движение" — there is no gap he may take instead. Absent/false =
+   * an ordinary vehicle, and every consumer that does not ask keeps the
+   * behaviour it shipped with.
+   */
+  rail?: boolean;
 }
 
 /**
@@ -471,6 +483,29 @@ export interface TrafficConfig {
   /** Unsignalized gate: keep-out radius around a moving player, meters. */
   pedPlayerGapM: number;
 }
+
+/**
+ * The cull radius a SCENARIO lesson runs its traffic at, metres — the number
+ * `LessonScene` hands `TrafficLayer` as `maxDrawDistanceM`.
+ *
+ * WHY IT IS A NAMED CONSTANT AND NOT A LITERAL AT THE CALL SITE. Past this
+ * radius `TrafficLayer` writes a ZERO-SCALE matrix: the car is still in
+ * `system.vehicles`, still swept by the contact sentinel and still readable by
+ * every unit test that asks for a pose — it is simply not on the glass. So a
+ * staged column can be authored, gated and shipped with a third of it
+ * invisible, which is what happened to `MWE_ONCOMING_FLOW`
+ * (sc-merge-accel-lane:09e6d6f4): three of its six cars stood 545–823 m from
+ * the arrival pose of a lesson whose finding was „the world is empty". The
+ * gate counted BODIES, the renderer counted METRES, and nothing compared the
+ * two.
+ *
+ * IT LIVES IN types.ts, NOT BESIDE THE PROP IT FEEDS, for one reason: the
+ * authoring gate that has to read it (`merging-accel-lane-oncoming-flow
+ * .test.ts`) is a pure-logic suite, and importing `TrafficLayer.tsx` to reach a
+ * number would drag three.js and R3F into it. A constant only helps if the
+ * places that must agree can afford to import it.
+ */
+export const SCENARIO_TRAFFIC_DRAW_DISTANCE_M = 420;
 
 export const DEFAULT_TRAFFIC_CONFIG: TrafficConfig = {
   seed: 1,
@@ -711,6 +746,21 @@ export interface TrafficSystemStats {
   laneCount: number;
 }
 
+/**
+ * What is behind the player, for the PROX badge: the bumper gap AND the kind of
+ * body it belongs to.
+ *
+ * The kind vocabulary is `vehicleCollisionKind`'s, deliberately and exactly —
+ * the A11 marker the rapier shell is tagged with and the contact naming bills
+ * from. A second opinion about „is that a cyclist" is the defect shape
+ * `collision/bodies.ts` records twice; there is one answer and this reuses it.
+ */
+export interface RearBodyBehind {
+  /** Bumper-to-bumper metres, never negative — `rearGapMeters`' own number. */
+  readonly gapM: number;
+  readonly kind: "vehicle" | "cyclist";
+}
+
 export interface TrafficSystem {
   /**
    * Advance all agents. Call ONCE per render frame, after WorldRuntime.update
@@ -740,6 +790,25 @@ export interface TrafficSystem {
    * pose in district space; headingDeg 0 = north, clockwise.
    */
   rearGapMeters(px: number, py: number, headingDeg: number): number;
+  /**
+   * The same read, WITH the kind of body it is about — and `rearGapMeters` is
+   * now derived from this one, so the two can never disagree.
+   *
+   * The PROX badge's copy is a sentence about a CAR («Кола отзад · X м»), and
+   * `hud/RearProximityCue.tsx` keeps a wall out of the static half for exactly
+   * that reason. The MOVING half never had the same care: staged actors live in
+   * the same array as ambient cars, and a v1 cyclist IS a narrow curb-riding
+   * staged vehicle agent. On `sc-vu-cyclist-hook` (ambient traffic 0, no bays,
+   * no held scenery) the rider is the only body this query can return, and the
+   * badge named him a car — in the one lesson whose whole subject is not
+   * turning right across him.
+   *
+   * `null` = nothing behind, i.e. exactly the Infinity `rearGapMeters` reports;
+   * the cue's honesty contract (no body ⇒ no badge) is unchanged. HUD-only,
+   * like `rearGapMeters`: no rule-engine detector reads it, so it grades
+   * nothing.
+   */
+  rearBodyBehind(px: number, py: number, headingDeg: number): RearBodyBehind | null;
   /**
    * O62: hand `rearGapMeters` the STATIC bodies the scene actually mounted, as
    * oriented boxes in district space — the held scenery and hittable obstacles

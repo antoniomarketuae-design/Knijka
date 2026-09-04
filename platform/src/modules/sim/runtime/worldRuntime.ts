@@ -742,6 +742,15 @@ export type JunctionConflictQuery = (
 export interface OncomingConflict {
   distM: number;
   closingMps: number;
+  /**
+   * Is it a RAIL vehicle (tram/train in the carriageway)? Structurally the
+   * traffic module's `OncomingApproach.rail`. Read ONLY to publish
+   * `SimTick.oncomingRailGapSec` — the N1 adjudication below is identical for
+   * a tram and a car, because чл. 37, ал. 1 already convicts the cut; what
+   * changes is what the INSTRUCTOR may say while the student is standing there
+   * (ЗДвП чл. 8, ал. 2 — a rail vehicle is let through, not gapped past).
+   */
+  rail?: boolean;
 }
 
 /**
@@ -1691,6 +1700,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       prevYieldSpeedKmh = v.speedKmh;
       prevYieldT = tSec;
 
+      // RX-05 (sc-rx-tram-left:07c63b97) — the tracker's own probe, published.
+      // The N1 block below already measures, every frame, how many seconds the
+      // oncoming is from this junction; it then throws that number away unless
+      // the player COMMITS a turn. So a student standing at the mouth while a
+      // tram bears down on him was, to every surface outside this file, a car
+      // stopped in front of nothing: `yieldReasonAt` had no clause that could
+      // see it and the wait was not a wait. Set only when the most urgent
+      // oncoming is a RAIL vehicle making a real arrival claim — absent on
+      // every other frame in the product, so no existing drive changes shape.
+      let oncomingRailGapSec: number | undefined;
+
       // 4a'. N1 left-turn-across-path tracker (doc 72 JU-10). Runs at EVERY
       // junction (signalized or not — the чл. 37 oncoming duty is universal);
       // constants & bands documented at LEFT_TURN_CONVICT_GAP_SEC.
@@ -1721,6 +1741,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           if (probe.closingMps >= LEFT_TURN_MIN_CLOSING_MPS) {
             present = true;
             gapSec = probe.distM / probe.closingMps;
+            // The rail half of the same measurement. The legacy boolean wiring
+            // cannot answer „релсово ли е" at all, so it publishes nothing —
+            // absence stays UNKNOWN everywhere, never „no tram".
+            if (probe.rail === true) oncomingRailGapSec = gapSec;
           }
         } else if (probe === true) {
           present = true;
@@ -2300,6 +2324,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // (doc 72 AC-08 winter grip) is the same seam again.
       if (fog) tick.fog = true;
       if (snow) tick.snow = true;
+      // RX-05 — the oncoming RAIL vehicle's arrival gap (see the local above),
+      // on the same additive seam: absent on every frame that has no tram
+      // bearing down on the junction, which is every frame of every other
+      // lesson in the catalogue.
+      if (oncomingRailGapSec !== undefined) tick.oncomingRailGapSec = oncomingRailGapSec;
       // THE PERSON IN THE PATH (`SimTick.vruAheadM`) — additive, and published
       // ONLY when a body was actually measured, so every drive, trace and
       // fixture that has no staged pedestrian grades byte-identically to
@@ -2375,7 +2404,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // М10 lane-intent arrow of the lane the car is actually in (M-17) —
       // resolved from the committed fix like every other authored span, and
       // set only when a readable glyph governs this lane (absent = innocent).
-      if (fix.edgeIdx >= 0) {
+      // `!offCarriageway` for the same reason the two paint flags above are
+      // cleared and the emergencyLane/busLane flags below are withheld: an
+      // arrow is PAINT ON A LANE, and past the kerb the world draws neither.
+      // Absent = innocent, so this can only ever acquit.
+      if (fix.edgeIdx >= 0 && !offCarriageway) {
         const arrow = laneArrowAt(
           laneArrowsByEdge.get(fix.edgeIdx),
           fix.sM,
@@ -2451,8 +2484,24 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
                 // span is the лента за принудително спиране — the busLaneRight
                 // seam, mirrored (the flag names the LANE's legality; the
                 // reducer's laneId gate decides the fault).
-                tick.emergencyLaneRight = true;
-              } else tick.busLaneRight = true;
+                //
+                // …AND A LANE-IDENTITY CLAIM STANDS DOWN WHERE THE WORLD DRAWS
+                // NO LANE — the second channel carved out of the surface
+                // consult, on the same predicate and for the same reason
+                // wrongWay was (sc-ac-truck-spray:7e53374c). This block is gated
+                // on the locator's 30 m LOCK RADIUS while `edgeId` and the paint
+                // flags are measured at the KERB, so on mw-v1
+                // `emergencyLaneRight` was published 17.8 m past both kerbs, and
+                // a car 17.44 m into the grass was billed OFF_CARRIAGEWAY at
+                // t = 2 s and then EMERGENCY_LANE_DRIVING — 10 точки, ОПАСНА —
+                // at t = 3 s, for a refuge lane it was seventeen metres from.
+                // ONE-SIDED: both flags only RAISE a required lane index or arm
+                // a fault, so withholding them can acquit and never convict, and
+                // on the asphalt `offCarriageway` is false and this is
+                // byte-identical. Measurements + both directions:
+                // `__tests__/off-carriageway-lane-identity.test.ts`.
+                if (!offCarriageway) tick.emergencyLaneRight = true;
+              } else if (!offCarriageway) tick.busLaneRight = true;
             }
           }
         }

@@ -2498,9 +2498,54 @@ export function SimOverlay({
           short — see THE TEXT WINDOW above. */}
       <div className="flex min-w-0 shrink-0 items-center gap-1.5">
         <ToneGlyph tone={shown.tone} frozen={frozen} />
+        {/* ══ THE CLASS OF THE FAULT — sc-junction-gap:4c2e452f, and the tone
+               colour was doing this job on its own ════════════════════════════
+            `overlayQueue.ts markClassBg` carries the frames, the roomy leg's
+            own first row and why приложение № 5, т. 10 makes this the verdict
+            rather than a decoration. What lives HERE is the width, because the
+            width is the reason this is two spans and not one string.
+
+            MEASURED on `.audit-frames/w26/frames/sc-junction-gap__mobile-wrong
+            /04-t012s.png` (iPhone 16 landscape, dpr 3, tree 8b9d135), by
+            scanning row 1's band for danger-red ink:
+
+              ⚠ glyph     device 1626–1661   CSS 542.0–553.7
+              «−10»       device 1687–1737   CSS 562.3–579.0
+              «ИЗПИТНИ»   device 1764–1892   CSS 588.0–630.7  → 6.1 px / caps
+              «Т.»        device 1919–1947   CSS 639.7–649.0
+              the «+3» badge starts at ≈ CSS 695; the card's inner right edge
+              is ≈ CSS 718.
+
+            So the mark is 86.7 CSS px and the lane after it is 46 px with a
+            queue badge up and 69 without. «ОПАСНА» is 36.6, «ОСНОВНА» 42.7 and
+            «ВТОРОСТЕПЕННА» 79.3 — i.e. the pair fits on the common card and
+            the longest class cannot fit beside a queue badge on the narrowest
+            one. ONE `truncate`d string would then have eaten the mark from the
+            right, which is the founder's own «−10 т.» misreading with the
+            qualifier removed (`rules/scales.ts` exists because of it).
+
+            THEREFORE THE MARK IS `shrink-0` AND THE CLASS IS THE HALF THAT
+            GIVES. A clipped «ВТОРОСТЕПЕ…» still names the class; a clipped
+            «−10 ИЗПИТНИ…» names a scale the student then has to guess, and the
+            guess everyone makes is контролни точки. The separator rides with
+            the mark so a truncating class can never end on a dangling «·». */}
+        {shown.markClassBg ? (
+          <span
+            data-sim-overlay-mark-class=""
+            className="min-w-0 shrink truncate text-[10px] font-black uppercase tracking-wider"
+          >
+            {shown.markClassBg}
+          </span>
+        ) : null}
         {shown.chipBg ? (
-          <span className="min-w-0 truncate text-[10px] font-black uppercase tracking-wider">
-            {shown.chipBg}
+          <span
+            className={
+              shown.markClassBg
+                ? "shrink-0 whitespace-nowrap text-[10px] font-black uppercase tracking-wider"
+                : "min-w-0 truncate text-[10px] font-black uppercase tracking-wider"
+            }
+          >
+            {shown.markClassBg ? `· ${shown.chipBg}` : shown.chipBg}
           </span>
         ) : null}
         {queued > 0 ? (
@@ -3036,7 +3081,13 @@ export function SimOverlay({
             style={{ minHeight: `${minHeight}px`, color }}
             role={blocking ? "alertdialog" : "status"}
             aria-live={blocking ? "assertive" : "polite"}
-            aria-label={`${shown.chipBg ? `${shown.chipBg} — ` : ""}${shown.lineBg}`}
+            // The class rides in the accessible name for the same reason it is
+            // on the glass: a screen-reader user meets the mark and the line and
+            // would otherwise have no way at all to hear which class of fault
+            // this is — the tone colour is the only other carrier and it is not
+            // announced. `markClassBg` is absent on everything that is not a
+            // graded fault, so nothing else's name changes.
+            aria-label={`${shown.markClassBg ? `${shown.markClassBg} — ` : ""}${shown.chipBg ? `${shown.chipBg} — ` : ""}${shown.lineBg}`}
           >
             {cardBody}
           </div>
@@ -3131,11 +3182,25 @@ export function SimOverlay({
               <span style={{ color }}>
                 <ToneGlyph tone={shown.tone} frozen={false} />
               </span>
+              {/* …AND THE CLASS COMES WITH IT ONTO THIS SURFACE TOO. The peek
+                  is 179 CSS px wide and had to ration the pair; this header is
+                  `max-w-2xl` with a `flex-1 truncate` chip, so the sheet a
+                  student opens FOR the reasoning has no excuse for printing the
+                  mark without the class приложение № 5, т. 10 prices it by. */}
               <span
+                // A HANDLE, BECAUSE THE STRING STOPPED BEING ONE. `sim-overlay-
+                // fold.test.ts` pinned the fold counter's PLACE in this header
+                // by locating the chip's source expression verbatim, so the
+                // first copy edit here broke a test that is about position and
+                // not about copy. The attribute is what a probe — and that
+                // test — can hold on to across a rewrite of what the chip says.
+                data-sim-overlay-sheet-chip=""
                 className="min-w-0 flex-1 truncate text-[10px] font-black uppercase tracking-wider"
                 style={{ color }}
               >
-                {shown.chipBg ?? ""}
+                {shown.markClassBg
+                  ? `${shown.markClassBg}${shown.chipBg ? ` · ${shown.chipBg}` : ""}`
+                  : (shown.chipBg ?? "")}
               </span>
               {/* ── THE SHEET'S FOLD, IN WORDS AND WITH A NUMBER — 2026-08-17.
                      The counterpart of row 2c on the peek. It lands in the

@@ -55,10 +55,78 @@
  *  `ControllerPosture` union in lessons/scenario/templates-signals.ts. */
 export type ControllerBubblePosture = "sideProfile" | "chestOrBack" | "armRaised";
 
+/**
+ * HOW MUCH OF THE CARD THIS RUNG GETS — the §7 aid ladder applied to the one
+ * surface that was never on it (sweep161 `sc-sig-controller-postures:3936550e`,
+ * „the billboard states the answer outright, removing the reading-the-posture
+ * exercise the task asks for", and `:ef0e821c`, „five lines of tiny
+ * multi-coloured text, unreadable at native phone size").
+ *
+ * THE TWO ROWS ARE ONE REPAIR AND THE GEOMETRY FORCES IT. Cap height on this
+ * card is the plane's height divided by the number of line slots, and the plane
+ * cannot get taller: its top must stay inside the windscreen at the range the
+ * drill grades, which is what `bubbleScale`/`BUBBLE_H_M` in `TrafficLayer.tsx`
+ * already measure (h = 1.9 m clips at ≈11.7 m; h = 2.4 m clips at ≈17.0 m,
+ * which is the stop line itself). Width buys no cap height, and every body line
+ * is at or near the shrink clamp already. So the ONLY lever that makes this
+ * type bigger is FEWER LINES — which is exactly what the other row asks for.
+ *
+ * AND THE FOUNDER'S ASK IS NOT NARROWED, which is the reason this is a ladder
+ * and not a deletion. Item 20, twice: „each position the traffic officers shows
+ * on top of his head some bubble must appear stating what exactly he is
+ * pointing, who is he letting go, whos turn its to pass." That is `"full"`, and
+ * `"full"` is what L1 gets — the rung whose own name is «Пълна помощ»
+ * (`scenario/types.ts` SCENARIO_LEVEL_NAMES_BG). The rungs that promise LESS
+ * help now deliver less of it:
+ *
+ *   L1 «Пълна помощ»      `"full"`     six lines — the answer, as authored.
+ *   L2 «Частична помощ»   `"posture"`  the POSE, named and legible; the rule is
+ *                                      the student's to apply. Partial help is
+ *                                      exactly this split — the product does
+ *                                      the perception, he does the law.
+ *   L3 «Самостоятелно»    `"off"`      no card. He reads the man.
+ *   L4 «Изпитни условия»  `"off"`      an examiner does not caption the officer.
+ *
+ * DEFAULT `"full"` on every mount that does not ask (the clip-capture rig, the
+ * curriculum lessons, any headless test), so nothing that shipped changes.
+ */
+export type ControllerCaptionDetail = "full" | "posture" | "off";
+
+/**
+ * The rung's caption detail. `level` is the scenario rung (1..5); anything
+ * absent or out of range is `"full"` — a lesson that cannot say which rung it
+ * is gets the помощ, never the exam.
+ */
+export function controllerCaptionDetailForLevel(
+  level: number | null | undefined,
+): ControllerCaptionDetail {
+  if (typeof level !== "number" || !Number.isFinite(level)) return "full";
+  if (level <= 1) return "full";
+  if (level === 2) return "posture";
+  return "off";
+}
+
 export interface ControllerBubbleCopy {
   posture: ControllerBubblePosture;
   /** The verdict for the driver reading it, in two or three words. */
   headlineBg: string;
+  /**
+   * WHAT HE IS DOING, not what you should do — the whole card at `"posture"`
+   * detail, and the line the reading exercise is built on.
+   *
+   * It is a NAME and not a sentence on purpose: two words at 84 px of a 540 px
+   * canvas is ≈11 CSS px of cap height on a 3× phone, against the ≈5.5 px the
+   * six-line card's body lines measure (`TrafficLayer.tsx`, the mip-chain
+   * block). `poseBg` cannot be enlarged into that slot — at 44 px it already
+   * paints 939 texture px into a 936 px ink box, i.e. it is AT the shrink clamp
+   * — which is why this is its own field rather than a reuse.
+   *
+   * The words are the law's own vocabulary, retrieved from the ППЗДвП text
+   * quoted verbatim in `lessons/scenario/templates-signals.ts`
+   * (`CONTROLLER_GESTURES`) and from this template's `objectiveBg`
+   * («страничен профил … гърди или гръб … вдигната ръка»), never invented here.
+   */
+  postureNameBg: string;
   /** What the student is physically looking at. */
   poseBg: string;
   /** Who may go. */
@@ -89,6 +157,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
   {
     posture: "sideProfile",
     headlineBg: "МИНАВАШ ТИ",
+    postureNameBg: "СТРАНИЧЕН ПРОФИЛ",
     /**
      * THE ARMS THE CAPTION NAMED WERE NEVER THE ARMS ON SCREEN (sweep161,
      * `sc-signal-controller/mobile-right/04-t076s.png`).
@@ -136,6 +205,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
   {
     posture: "chestOrBack",
     headlineBg: "СПРИ",
+    postureNameBg: "ГЪРДИ ИЛИ ГРЪБ",
     poseBg: "Обърнат е с ГЪРДИ или ГРЪБ към теб",
     goBg: "Минава: напречното направление",
     stopBg: "Спираш: ти, преди стоп-линията",
@@ -146,6 +216,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
   {
     posture: "armRaised",
     headlineBg: "ВНИМАНИЕ",
+    postureNameBg: "ВДИГНАТА РЪКА",
     poseBg: "Ръката му е ВДИГНАТА нагоре",
     goBg: "Минава: никой — това не е „тръгвай“",
     stopBg: "Спират: всички посоки — сменя фазите",

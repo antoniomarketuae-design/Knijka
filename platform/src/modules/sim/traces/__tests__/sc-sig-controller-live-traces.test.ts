@@ -78,6 +78,10 @@ function violationCodes(drive: RecordedDrive): string[] {
   return drive.ruleEvents.filter((e) => e.kind === "violation").map((e) => e.code);
 }
 
+function commendationCodes(drive: RecordedDrive): string[] {
+  return drive.ruleEvents.filter((e) => e.kind === "commendation").map((e) => e.code);
+}
+
 const drives = new Map<ScSigControllerLiveTraceName, ProbedDrive>(
   scSigControllerLiveTraceNames().map((n) => [n, record(n)]),
 );
@@ -115,6 +119,22 @@ describe("sc-sig-controller-live — the shadow gate (doc 76 §5)", () => {
     ]) {
       expect(codes).not.toContain(c);
     }
+  });
+
+  it("AND IS CREDITED FOR IT — the арм that only convicted now praises too", () => {
+    // audit sc-sig-controller-live:bf4c6bab. Zero violations was never the same
+    // thing as feedback: this drive is the лесson performed perfectly and its
+    // sheet read «COMMENDATIONS (0): (none credited)», because the reducer's
+    // controller branch had a `halt` arm and nothing else. The credit is ONE
+    // per crossing, at the crossing, and it is the crossing this file already
+    // probes for red+proceed two asserts up.
+    expect(commendationCodes(shadow.drive)).toEqual(["CONTROLLER_SIGNAL_OBEYED"]);
+    const praise = shadow.drive.ruleEvents.find((e) => e.kind === "commendation")!;
+    expect(praise.t).toBeCloseTo(shadow.crossingTimes[0], 1);
+    // CLEAN_DRIVING is NOT the thing that was missing and must not be what
+    // arrives: it needs 250 m of violation-free travel and this route is
+    // ~150 m, so without the чл. 7 credit a flawless run stays empty.
+    expect(commendationCodes(shadow.drive)).not.toContain("CLEAN_DRIVING");
   });
 
   it("resolves the staged controller as 'clear' — WAVED THROUGH, not yielded to", () => {
@@ -168,6 +188,13 @@ describe("sc-sig-controller-live — mistakes grade EXACTLY the controller code 
       expect(codes).not.toContain("HESITATION_AT_GREEN");
       expect(codes).not.toContain("STOP_LINE_OVERSHOOT");
       expect(codes).not.toContain("HARSH_BRAKING_NO_CAUSE");
+    });
+
+    it(`${name}: and it is NOT praised — the credit tracks the act, not the lesson`, () => {
+      // The praise arm (bf4c6bab) must never become „you were in the чл. 7
+      // drill, here is a ✓". Both demos cross this line; one on a green lamp,
+      // one on a red; both on the officer's HALT — so neither may be credited.
+      expect(commendationCodes(probed.drive)).not.toContain("CONTROLLER_SIGNAL_OBEYED");
     });
   }
 

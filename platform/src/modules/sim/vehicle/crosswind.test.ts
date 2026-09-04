@@ -290,3 +290,101 @@ describe("crosswind (AC-12) — gust determinism", () => {
     TEST_TIMEOUT,
   );
 });
+
+// ---------------------------------------------------------------------------
+// 4. THE COCKPIT READ CHANNEL — sc-ac-crosswind:a9db1738, „nothing in the
+//    cockpit reports a lateral disturbance".
+//
+//    The camera's head-lean input was the kinematic bicycle estimate ALONE
+//    (a = v²·tan(steer)/L), which is a function of the driver's own steering,
+//    so a crosswind moved the student's head by exactly zero on the one lesson
+//    built around it. `windLatAccelMs2` is the newtons the chassis is being
+//    pushed with, in the frame the driver sits in; `cockpitLatAccelMs2` sums
+//    the two and `CameraRig` reads the sum.
+//
+//    F1's law applies: this is a PURE READ. No force, no impulse, no clock —
+//    polling it must leave the trajectory bit-identical, which is asserted
+//    below rather than asserted in prose.
+// ---------------------------------------------------------------------------
+
+describe("crosswind (AC-12) — the cockpit lateral read channel", () => {
+  it("is exactly 0 on the calm car — every non-wind cockpit is unchanged", () => {
+    const calm = makeNorthRig();
+    for (let i = 0; i < 60; i++) step(calm, { ...IDLE_INPUT, throttle: 0.5 });
+    expect(calm.sim.windLatAccelMs2).toBe(0);
+    freeRig(calm);
+  });
+
+  it("is the shipped force over the shipped mass, toward the car's left", () => {
+    // NORTH_SPAWN faces world +Z, so the car's left axis IS world +X and the
+    // whole of a +X wind is lateral: a = F / m, positive (pushed left).
+    const rig = makeNorthRig({ windLateralN: T.CROSSWIND_BRIDGE_N });
+    for (let i = 0; i < 30; i++) step(rig, IDLE_INPUT);
+    const expected = T.CROSSWIND_BRIDGE_N / T.CHASSIS_MASS;
+    expect(rig.sim.windLatAccelMs2).toBeGreaterThan(expected * 0.9);
+    expect(rig.sim.windLatAccelMs2).toBeLessThan(expected * 1.1);
+    // …and it is a real fraction of gravity, not a rounding artefact: the
+    // magnitude the student's head is leaned by (≈0.10 g).
+    expect(Math.abs(rig.sim.windLatAccelMs2) / 9.81).toBeGreaterThan(0.05);
+    freeRig(rig);
+  });
+
+  it("carries the SIGN of the wind — a westerly leans the head the other way", () => {
+    const east = makeNorthRig({ windLateralN: T.CROSSWIND_BRIDGE_N });
+    const west = makeNorthRig({ windLateralN: -T.CROSSWIND_BRIDGE_N });
+    for (let i = 0; i < 30; i++) {
+      step(east, IDLE_INPUT);
+      step(west, IDLE_INPUT);
+    }
+    expect(east.sim.windLatAccelMs2).toBeGreaterThan(0);
+    expect(west.sim.windLatAccelMs2).toBeLessThan(0);
+    freeRig(east);
+    freeRig(west);
+  });
+
+  it("BREATHES on the gust — the easing step 6 tells the student to read", () => {
+    // The whole point of the channel for THIS lesson: the lean must swell and
+    // ease with the gust, because the ease is the cue to release the
+    // correction (briefing step 6) and its absence is the „втора корекция"
+    // step 7 warns about. Sampled over one full period.
+    const rig = makeNorthRig({
+      windLateralN: T.CROSSWIND_BRIDGE_N,
+      windGust: {
+        periodSec: T.CROSSWIND_GUST_PERIOD_SEC,
+        amplitudeN: T.CROSSWIND_GUST_AMPLITUDE_N,
+      },
+    });
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i < Math.round(60 * T.CROSSWIND_GUST_PERIOD_SEC); i++) {
+      step(rig, IDLE_INPUT);
+      const a = rig.sim.windLatAccelMs2;
+      lo = Math.min(lo, a);
+      hi = Math.max(hi, a);
+    }
+    // Peak-to-trough is the gust envelope over the mass, within sampling.
+    const swing = (2 * T.CROSSWIND_GUST_AMPLITUDE_N) / T.CHASSIS_MASS;
+    expect(hi - lo).toBeGreaterThan(swing * 0.9);
+    // …and it never flips direction mid-lesson (the amplitude < base law).
+    expect(lo).toBeGreaterThan(0);
+    freeRig(rig);
+  });
+
+  it("MUTATION — polling it every step leaves the trajectory bit-identical", () => {
+    // F1's proof shape: a read channel that moved the car would be a physics
+    // change smuggled in as an instrument.
+    const polled = makeNorthRig({ windLateralN: T.CROSSWIND_BRIDGE_N });
+    const quiet = makeNorthRig({ windLateralN: T.CROSSWIND_BRIDGE_N });
+    for (let i = 0; i < 60 * 3; i++) {
+      const input = { ...IDLE_INPUT, throttle: 0.5 };
+      step(polled, input);
+      void polled.sim.windLatAccelMs2;
+      void polled.sim.windLatAccelMs2;
+      step(quiet, input);
+      expect(polled.sim.debugState().position).toEqual(quiet.sim.debugState().position);
+      expect(polled.sim.debugState().rotation).toEqual(quiet.sim.debugState().rotation);
+    }
+    freeRig(polled);
+    freeRig(quiet);
+  }, TEST_TIMEOUT);
+});

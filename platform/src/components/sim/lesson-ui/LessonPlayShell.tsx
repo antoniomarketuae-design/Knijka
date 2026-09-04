@@ -143,6 +143,7 @@ import {
   EXAM_POINTS_SHORT_NOTE_BG,
   examMarkCitationBg,
   minusPointsBg,
+  N38_CLASS_LABEL_BG,
   pointsBg,
   VIOLATIONS,
   type SimTick,
@@ -5435,6 +5436,19 @@ export function LessonPlayShell({
                   kind: "violation",
                   tone: t.event.severity === "vtorostepenna" ? "warn" : "danger",
                   chipBg: minusPointsBg("exam", t.event.points),
+                  // ── THE CLASS, WHICH THIS RE-MAP HAS ALWAYS DROPPED ────────
+                  //    `sc-junction-gap:4c2e452f`. `HudToasts.ToastCard` prints
+                  //    the class label on the left of every roomy violation card
+                  //    and the mark on the right; this line built the mark alone,
+                  //    so on a phone the class survived only as a TONE — and the
+                  //    tone above collapses опасна and основна into one „danger",
+                  //    so two classes with two different tariffs arrived
+                  //    indistinguishable. `.audit-frames/w26/frames/
+                  //    sc-junction-gap__mobile-wrong/04-t012s.png` is that card.
+                  //    Retrieved from the наредба's own label table, never typed
+                  //    here — the same token `examMarkFor().classBg` hands the
+                  //    debrief's FaultCard (ADR-002).
+                  markClassBg: N38_CLASS_LABEL_BG[t.event.severity],
                   lineBg: t.event.titleBg,
                   detailBg: t.event.explanationBg,
                   lawRef: t.event.lawRef ?? null,

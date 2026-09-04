@@ -17,6 +17,8 @@
  * article must be RETRIEVED from the authored bank, never recalled. If someone
  * edits the citation on one side, this fails.
  */
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CONTROLLER_GESTURES } from "@/modules/sim/lessons/scenario/templates-signals";
 import { SCENARIO_TEMPLATES } from "@/modules/sim/lessons/scenario/templates";
@@ -25,16 +27,30 @@ import {
   BUBBLE_CHEST_OR_BACK,
   BUBBLE_SIDE_PROFILE,
   CONTROLLER_BUBBLES,
+  controllerCaptionDetailForLevel,
 } from "../controllerGestures";
 import {
+  BUBBLE_LINE_PX,
   BUBBLE_MIN_FONT_SCALE,
   BUBBLE_PAD_X,
+  BUBBLE_POSTURE_LINE_PX,
+  BUBBLE_TAIL_PX,
   BUBBLE_TEX_H,
   BUBBLE_TEX_W,
   OFC_ARM_OUT_RAD,
   drawControllerBubble,
   officerArmTarget,
 } from "../TrafficLayer";
+
+/** The renderer's own source — the `"off"` rung is spent in the frame loop, and
+ *  a frame loop is the one thing this file cannot drive. Newlines normalised so
+ *  an anchor cannot slice the wrong half on a CRLF checkout. */
+const LAYER_SRC = fs
+  .readFileSync(
+    path.join(process.cwd(), "src", "modules", "sim", "traffic", "TrafficLayer.tsx"),
+    "utf8",
+  )
+  .replace(/\r\n/g, "\n");
 
 describe("controller bubble copy (B42)", () => {
   it("carries exactly the three authored postures, in the authored order", () => {
@@ -324,8 +340,13 @@ interface PaintedLine {
  *  that keeps the ink inside here keeps it inside on the shipped font. */
 const EM_PER_CHAR = 0.62;
 
-function recordingCanvas(): { canvas: HTMLCanvasElement; lines: PaintedLine[] } {
+function recordingCanvas(): {
+  canvas: HTMLCanvasElement;
+  lines: PaintedLine[];
+  strokes: string[];
+} {
   const lines: PaintedLine[] = [];
+  const strokes: string[] = [];
   let sizePx = 10;
   const ctx = {
     // `font` is the only channel the painter uses to change the size.
@@ -362,14 +383,18 @@ function recordingCanvas(): { canvas: HTMLCanvasElement; lines: PaintedLine[] } 
     lineTo: () => undefined,
     quadraticCurveTo: () => undefined,
     fill: () => undefined,
-    stroke: () => undefined,
+    // The BORDER is recorded because on this card it is content, not chrome:
+    // green/red/amber around the frame IS the verdict at 60 m, which is half of
+    // `sc-sig-controller-postures:3936550e`. A test that only read the glyphs
+    // would pass a „posture" card that still answered in colour.
+    stroke: () => strokes.push(String(ctx.strokeStyle)),
   };
   const canvas = {
     width: BUBBLE_TEX_W,
     height: BUBBLE_TEX_H,
     getContext: () => ctx,
   } as unknown as HTMLCanvasElement;
-  return { canvas, lines };
+  return { canvas, lines, strokes };
 }
 
 describe("the bubble PAINTER clamps its own ink (B41)", () => {
@@ -472,5 +497,170 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
     );
     const unclamped = longest.lawRef.length * EM_PER_CHAR * 38;
     expect(unclamped).toBeGreaterThan(INK_BUDGET);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE §7 LADDER REACHES THE CARD — sweep 161,
+// `sc-sig-controller-postures:ef0e821c` + `:3936550e`, both filed on the SAME
+// L1 frame (`mobile-right/04-t064s.png`).
+//
+//   ef0e821c  „The controller's speech billboard is five lines of tiny
+//              multi-coloured text, unreadable at native phone size."
+//   3936550e  „The billboard states the answer outright, removing the
+//              reading-the-posture exercise the task asks for."
+//
+// THEY ARE ONE REPAIR BECAUSE THE GEOMETRY LEAVES ONE LEVER. Cap height here is
+// the plane's height divided by the number of line slots; the plane cannot grow
+// (its top must clear the windscreen at the range the drill grades — the
+// `BUBBLE_H_M` measurement), and width buys no cap height. Fewer lines is the
+// whole of the size lever, and fewer lines is what the other row asks for.
+//
+// The founder's own ask (item 20 — „what exactly he is pointing, who is he
+// letting go, whos turn its to pass") is NOT narrowed: it is what `"full"`
+// paints, and `"full"` is L1 «Пълна помощ». The rungs whose names promise less
+// help now deliver less of it.
+// ---------------------------------------------------------------------------
+describe("how much of the card a rung gets (§7 ladder)", () => {
+  it("maps the authored rungs onto the three details", () => {
+    // The names are `SCENARIO_LEVEL_NAMES_BG`: 1 «Пълна помощ», 2 «Частична
+    // помощ», 3 «Самостоятелно», 4 «Изпитни условия», 5 «Усложнени».
+    expect(controllerCaptionDetailForLevel(1)).toBe("full");
+    expect(controllerCaptionDetailForLevel(2)).toBe("posture");
+    expect(controllerCaptionDetailForLevel(3)).toBe("off");
+    expect(controllerCaptionDetailForLevel(4)).toBe("off");
+    expect(controllerCaptionDetailForLevel(5)).toBe("off");
+  });
+
+  it("a mount that cannot say which rung it is gets the помощ, never the exam", () => {
+    // Curriculum lessons, the clip-capture rig and every headless test parse to
+    // no rung. Defaulting to "off" there would silently delete the founder's
+    // card from surfaces nobody audited; defaulting to "full" reproduces what
+    // shipped, which is the only safe direction for an unknown caller.
+    for (const unknown of [undefined, null, Number.NaN]) {
+      expect(controllerCaptionDetailForLevel(unknown)).toBe("full");
+    }
+  });
+
+  it("the frame loop is what spends `off` — the card is not merely blank", () => {
+    // A painter that drew nothing would still leave a transparent 3.6 x 1.9 m
+    // plane between the student and the officer he is being told to read, and
+    // would still cost the texture upload. The gate is in the render block, and
+    // `drawControllerBubble` is never reached on those rungs.
+    expect(LAYER_SRC).toContain(
+      'if (controllerCaption === "off" || bubbleOwner < 0 || bubblePosture < 0) {',
+    );
+    // …and the detail actually reaches the painter, or `"posture"` would paint
+    // the six-line card while every assertion below passed on a direct call.
+    expect(LAYER_SRC).toMatch(
+      /drawControllerBubble\(\s*bubbleTex\.image[\s\S]{0,200}?controllerCaption,/,
+    );
+  });
+});
+
+describe("the «Частична помощ» card names the POSE and answers nothing", () => {
+  const VERDICT_FIELDS = ["headlineBg", "goBg", "stopBg", "priorityBg"] as const;
+
+  it("paints exactly two lines — the posture and the law", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "posture");
+      expect(lines.map((l) => l.text), b.posture).toEqual([b.postureNameBg, b.lawRef]);
+    }
+  });
+
+  it("says none of the four answers the full card gives away (3936550e)", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "posture");
+      const painted = lines.map((l) => l.text).join(" | ");
+      for (const field of VERDICT_FIELDS) {
+        expect(painted, `${b.posture}.${field}`).not.toContain(b[field]);
+      }
+      // NON-VACUITY: the same four ARE on the full card, so the `not`s above
+      // are refusing something that genuinely exists rather than passing on a
+      // set of empty strings.
+      const full = recordingCanvas();
+      drawControllerBubble(full.canvas, b, "full");
+      const fullPainted = full.lines.map((l) => l.text).join(" | ");
+      for (const field of VERDICT_FIELDS) {
+        expect(fullPainted, `${b.posture}.${field}`).toContain(b[field]);
+      }
+    }
+  });
+
+  it("…and does not answer in COLOUR either — the border drops the accent", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const posture = recordingCanvas();
+      drawControllerBubble(posture.canvas, b, "posture");
+      expect(posture.strokes, b.posture).not.toContain(b.accent);
+      // The full card still frames itself in the verdict's colour: that is the
+      // aid L1 is FOR, and dropping it there would be the narrowing this ladder
+      // exists to avoid.
+      const full = recordingCanvas();
+      drawControllerBubble(full.canvas, b, "full");
+      expect(full.strokes, b.posture).toContain(b.accent);
+    }
+  });
+
+  it("the teaching line is ~2x the cap height the auditor photographed (ef0e821c)", () => {
+    // The frame's own arithmetic: the card spans 528 device px on a native
+    // 2556 x 1179 phone frame, i.e. 279 px tall, so one texture px is 0.516
+    // device px. The six-line card's body runs 44–46 px → ≈17 device px of cap
+    // → ≈5.5 CSS px at 3x. This asserts the RATIO rather than the constants, so
+    // it keeps its meaning if the canvas is ever resized.
+    const fullBodyMax = Math.max(
+      BUBBLE_LINE_PX.pose,
+      BUBBLE_LINE_PX.go,
+      BUBBLE_LINE_PX.stop,
+      BUBBLE_LINE_PX.priority,
+    );
+    expect(BUBBLE_POSTURE_LINE_PX.name / fullBodyMax).toBeGreaterThanOrEqual(1.8);
+    // …and it is not bought back by the shrink clamp: every posture name is
+    // painted at the AUTHORED size on the unforgiving 0.62 em/char stub, so on
+    // the shipped face (≈0.5–0.6 em) it cannot be shrinking either.
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "posture");
+      expect(lines[0].sizePx, b.posture).toBe(BUBBLE_POSTURE_LINE_PX.name);
+    }
+  });
+
+  it("both lines stay inside the card body and inside its ink box", () => {
+    const INK = BUBBLE_TEX_W - 2 * BUBBLE_PAD_X;
+    const bodyH = BUBBLE_TEX_H - BUBBLE_TAIL_PX;
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "posture");
+      for (const l of lines) {
+        expect(l.width, `${b.posture} ${l.text}`).toBeLessThanOrEqual(INK);
+        expect(l.y, `${b.posture} ${l.text}`).toBeLessThan(bodyH);
+        expect(l.y - l.sizePx, `${b.posture} ${l.text}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("ADR-002 — the citation survives the cut", () => {
+    // The two-line card drops four lines of teaching; the one line it may never
+    // drop is the retrieved article, because that is how the лекция proves it
+    // looked the rule up instead of recalling it. Equality against the authored
+    // gesture bank is asserted at the top of this file; this is only that the
+    // shorter card still PRINTS it.
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "posture");
+      expect(lines.at(-1)?.text, b.posture).toBe(b.lawRef);
+    }
+  });
+
+  it("`full` is byte-identical to what shipped — the default and the explicit", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const implicit = recordingCanvas();
+      drawControllerBubble(implicit.canvas, b);
+      const explicit = recordingCanvas();
+      drawControllerBubble(explicit.canvas, b, "full");
+      expect(implicit.lines, b.posture).toEqual(explicit.lines);
+      expect(implicit.lines).toHaveLength(6);
+    }
   });
 });

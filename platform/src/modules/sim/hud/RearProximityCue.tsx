@@ -175,31 +175,71 @@
  * 0.40 m behind. „Кола отзад · 4 м" with a van forty centimetres away is worse
  * than nothing, because a student reads it and keeps going.
  *
- * ── WHAT IS STILL NOT COVERED, stated because silence here reads as „clear" ─
+ * ── THE CYCLIST HALF OF THAT LIMIT — CLOSED 2026-09-04 ─────────────────────
  *
- * A BODY THAT IS NOT A CAR CANNOT BE REPORTED AT ALL, and the limit is this
- * component's own copy rather than the source. `rearCueLabelBg` has one
- * sentence — „Кола отзад · X м", *a car* behind — so `rearStaticBodiesFrom`
- * deliberately feeds only vehicles. One wall exists in the product
- * (`sc-park-wall`'s garage end wall, an exact cuboid collider a student can
- * hit) and it is not fed, because „Кола отзад · 1 м" about a concrete wall is
- * the badge stating something false, which is the failure this whole channel
- * exists to prevent. Closing it needs a gap query that carries the body KIND
- * and a second, human-signed Bulgarian string; those must land in the same
- * change. Not urgent on the evidence: measured across all three recorded drives
- * of `sc-park-wall`, the wall is in the rear corridor on 0 samples — the drive
+ * WHAT THIS BLOCK USED TO SAY, and it was only half true: „A BODY THAT IS NOT A
+ * CAR CANNOT BE REPORTED AT ALL … `rearStaticBodiesFrom` deliberately feeds only
+ * vehicles." That care went into the STATIC half. The MOVING half never had it:
+ * `rearGapFor` sweeps `this.vehicles`, and a v1 cyclist is a narrow curb-riding
+ * STAGED VEHICLE AGENT sitting in that very array (audit C3), so the badge
+ * reported riders all along — under a car's sentence and a car's glyph.
+ *
+ * MEASURED, on the row's own frame. `.audit-frames/sweep161/
+ * sc-vu-cyclist-hook/mobile-right/04-t184s.png` shows «Кола отзад · 12 м» on
+ * `vu-cyclist-v1`, a map with ONE building, no parking bays and no held
+ * scenery, in a lesson that runs ambient traffic 0 (`SC_VU_CYCLIST_HOOK`
+ * authors no `traffic`). The only body the query can return there is the staged
+ * rider — `extraRightOffsetM 2.6` against `LEAD_CORRIDOR_M` 4.0, squarely
+ * inside the corridor — and «Кола отзад» sent the student to the mirror looking
+ * for the wrong hazard in the one rung about not turning right across him.
+ *
+ * WHAT LANDED, as the old text prescribed and in one change: a gap query that
+ * carries the body KIND (`TrafficSystem.rearBodyBehind`, from which
+ * `rearGapMeters` is now derived so the number and the noun are one sweep) and
+ * a second authored Bulgarian string («Велосипедист отзад · X м») with its own
+ * glyph. The kind is `vehicleCollisionKind`'s — the same A11 marker the rapier
+ * shell is tagged with and «Удар във велосипедист» is billed from, not a second
+ * opinion.
+ *
+ * ── AND WHAT IS STILL NOT COVERED, because silence here reads as „clear" ────
+ *
+ * A WALL STILL CANNOT BE REPORTED. One exists in the product (`sc-park-wall`'s
+ * garage end wall, an exact cuboid collider a student can hit) and
+ * `rearStaticBodiesFrom` still does not feed it, because „Кола отзад · 1 м"
+ * about concrete is the badge stating something false. Closing that needs a
+ * third string and a static kind on `RearBodyBehind`; the seam is now there for
+ * it. Not urgent on the evidence: measured across all three recorded drives of
+ * `sc-park-wall`, the wall is in the rear corridor on 0 samples — the drive
  * filed as „reverses into the wall" never reverses at all and ends nose-first
  * against it («Предницата опря в стената в края на реда»).
  */
 
 import { useEffect, useState, type RefObject } from "react";
-import { rearCueLabelBg, stepRearCue, type RearCue, type RearCueLevel } from "./rearProximity";
+import {
+  rearCueLabelBg,
+  stepRearCue,
+  type RearCue,
+  type RearCueKind,
+  type RearCueLevel,
+} from "./rearProximity";
 
 const POLL_MS = 200; // ~5 Hz — well under one human glance of latency
 
-/** Structural slice of the traffic system (no cross-module type import). */
+/**
+ * Structural slice of the traffic system (no cross-module type import).
+ *
+ * `rearBodyBehind` and NOT `rearGapMeters`, since 2026-09-04: the badge's
+ * sentence names a KIND of body, so the read that feeds it has to carry one.
+ * `TrafficSystemImpl.rearGapMeters` is now derived from this same call, so the
+ * two surfaces cannot drift — see the block at „WHAT IS STILL NOT COVERED"
+ * below, which this closes for the moving half.
+ */
 export interface RearGapSource {
-  rearGapMeters(px: number, py: number, headingDeg: number): number;
+  rearBodyBehind(
+    px: number,
+    py: number,
+    headingDeg: number,
+  ): { gapM: number; kind: RearCueKind } | null;
 }
 
 /** Structural slice of the scene's per-frame VehicleSample ref. */
@@ -242,6 +282,31 @@ function RearCarIcon({ level }: { level: RearCueLevel }) {
   );
 }
 
+/**
+ * …and the RIDER's glyph, because a car drawn over the word «велосипедист» is
+ * the same false claim the label just stopped making, in the one channel a
+ * driver reads faster than text. Rear view, matching the car glyph's framing:
+ * two wheels, the rear triangle between them, the bar and the rider's head.
+ */
+function RearCyclistIcon({ level }: { level: RearCueLevel }) {
+  const lamp = level === "info" ? "currentColor" : "var(--danger)";
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" aria-hidden>
+      <circle cx="6" cy="17" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="18" cy="17" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M6 17 L11 9 L18 17 M11 9 H15"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="5" r="2" fill={lamp} />
+    </svg>
+  );
+}
+
 export function RearProximityCue({
   traffic,
   sampleRef,
@@ -264,8 +329,12 @@ export function RearProximityCue({
     const id = window.setInterval(() => {
       const s = sampleRef.current;
       if (!s) return;
-      const gapM = traffic.rearGapMeters(s.position.x, s.position.y, s.headingDeg);
-      setCue((prev) => stepRearCue(prev, gapM, s.speedKmh));
+      const behind = traffic.rearBodyBehind(s.position.x, s.position.y, s.headingDeg);
+      // Nothing behind stays Infinity, which `stepRearCue` maps to null in every
+      // state — the honesty contract this file opens on, unmoved.
+      setCue((prev) =>
+        stepRearCue(prev, behind?.gapM ?? Infinity, s.speedKmh, behind?.kind ?? "vehicle"),
+      );
     }, POLL_MS);
     return () => window.clearInterval(id);
   }, [traffic, sampleRef, hidden]);
@@ -319,7 +388,11 @@ export function RearProximityBadge({ cue }: { cue: RearCue }) {
           transition: "color 200ms linear, border-color 200ms linear",
         }}
       >
-        <RearCarIcon level={cue.level} />
+        {cue.kind === "cyclist" ? (
+          <RearCyclistIcon level={cue.level} />
+        ) : (
+          <RearCarIcon level={cue.level} />
+        )}
         {label}
       </div>
     </div>

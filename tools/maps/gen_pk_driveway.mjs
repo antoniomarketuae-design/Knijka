@@ -189,6 +189,31 @@ export function buildPkDriveway(params) {
         params: { lengthM, maxspeedKmh, drivewayY },
         lanesPerDirection: 1,
         laneCenterRightM: laneCenterM,
+        // THE DROPPED KERB ACROSS THE DRIVEWAY MOUTH (the отбивка).
+        //
+        // Until this field the map had a driveway in its NAME, in its objective
+        // and in six lines of its copy, and an unbroken 12 cm kerb where the
+        // mouth should be. Measured on the built meshes by
+        // `scene/__tests__/lesson-world-bay-clearance.test.ts` §2: 6 of the
+        // graded bay's 15 stations stood on the RAISED SIDEWALK, and the white
+        // U marking that rect was drawn at 0.032 m under a pavement top of
+        // 0.14 m — so the outer 2.375 m of the cell the student is graded on
+        // was both a step to climb and invisible.
+        //
+        // `builders/roads.ts` (`DrivewayMouth`) ramps the kerb down to the
+        // asphalt across this span instead of cutting the strip, so the mesh
+        // stays one shell and the wheels meet a 1:5 slope.
+        //
+        // WIDTH 6 m: the graded bay is 2.7 m wide and the hero is 1.70 m across
+        // its chassis, so 6 m leaves 1.65 m of dropped kerb on each side of the
+        // bay band — enough that the tail sweeping through the mouth on a 90°
+        // reverse never crosses a raised edge. THE POINT is authored INSIDE the
+        // driveway (east of the kerb at halfRoadM = 8.125) because the builder
+        // reads which SIDE of the centreline it lies on; the post-check below
+        // refuses a point that names no side.
+        drivewayMouths: [
+          { edgeId: "pkd-e-street", x: 10, y: drivewayY, widthM: 6 },
+        ],
       },
     },
     roads: {
@@ -224,6 +249,15 @@ export function buildPkDriveway(params) {
     if (distToStreet(s.x, s.y) > halfRoadM) post.push(`${s.id}: not on the carriageway`);
   }
   if (laneCenterM <= 0 || laneCenterM >= halfRoadM) post.push(`right-lane center ${laneCenterM} outside the northbound bank`);
+  for (const m of district.meta.scenario.drivewayMouths) {
+    if (!EDGES.some((e) => e.id === m.edgeId)) post.push(`driveway mouth: unknown edgeId ${m.edgeId}`);
+    // Off the centreline (it names the side) and off the carriageway (a mouth
+    // inside the asphalt is not a kerb break), and its span inside the street.
+    if (Math.abs(m.x) <= halfRoadM) post.push(`driveway mouth x ${m.x} is not past the kerb (${halfRoadM})`);
+    if (!(m.widthM > 0 && m.y - m.widthM / 2 > 0 && m.y + m.widthM / 2 < lengthM)) {
+      post.push(`driveway mouth span ${m.widthM} m at y ${m.y} does not fit the street`);
+    }
+  }
   if (!Number.isFinite(bounds.minX) || bounds.maxX <= bounds.minX || bounds.maxY <= bounds.minY) {
     post.push("degenerate bounds");
   }

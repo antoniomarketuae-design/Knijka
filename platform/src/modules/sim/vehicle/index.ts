@@ -35,6 +35,11 @@ export {
   GRIP_UTILISATION_MAX,
 } from "./gripSignal";
 
+// The cockpit head-lean's lateral input — the kinematic corner estimate PLUS
+// whatever else is pushing the car sideways (sc-ac-crosswind:a9db1738).
+export { cockpitLatAccelMs2 } from "./cockpitLean";
+export type { CockpitLeanInput } from "./cockpitLean";
+
 // doc 82 §4.2 F2 — deterministic road-surface excitation (opt-in).
 export {
   roadNoiseAt,

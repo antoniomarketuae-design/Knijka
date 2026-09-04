@@ -15,9 +15,9 @@
  * and asserts a REQUIRED-REFERENT predicate per fault code: if the code can
  * fire on this rung, the world must contain the thing the code is about.
  *
- * 48 codes carry a referent. The other 15 are listed in `NO_WORLD_REFERENT`,
- * so the exemption is a reviewed decision rather than an oversight. 48 + 15 =
- * 63 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
+ * 50 codes carry a referent. The other 15 are listed in `NO_WORLD_REFERENT`,
+ * so the exemption is a reviewed decision rather than an oversight. 50 + 15 =
+ * 65 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
  * itself, so a new code cannot ship unchecked and unexempted. (The pin the tree
  * ENFORCES lives in `world/__tests__/world-referent.gate.test.ts`; this
  * paragraph tracks it and is not a second source of truth.)
@@ -1365,30 +1365,12 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   HESITATION_AT_GREEN: signalHeadRule(),
 
   // -- the регулировчик ------------------------------------------------------
-  CONTROLLER_SIGNAL_VIOLATED: {
-    requires: "a staged trafficController actor within 25 m of a graded stop line",
-    fixIn: "templates-signals*.ts officer pose (Lane 9)",
-    evidence: ["stagedActors", "stopLinePaint"],
-    check(f) {
-      const officers = f.staged.filter((s) => s.kind === "trafficController");
-      if (officers.length === 0) return inert("no staged trafficController actor");
-      if (f.routeStopLines.length === 0) return inert("staged officer, but no graded stop line on the route");
-      let best = Infinity;
-      for (const o of officers) {
-        const spec = o as unknown as { officer?: { x: number; y: number } };
-        const at = spec.officer;
-        if (!at) continue;
-        for (const l of f.routeStopLines) {
-          const [lx, ly] = f.world.index.pointAt(l.edgeIdx, l.sM);
-          best = Math.min(best, dist2(at, { x: lx, y: ly }));
-        }
-      }
-      if (!Number.isFinite(best)) return ok("staged officer (pose not published on the spec)");
-      return best <= 25
-        ? ok(`officer ${best.toFixed(1)} m from the graded line`)
-        : lie(`officer ${best.toFixed(1)} m from the graded line (> 25 m — unreadable at that range)`);
-    },
-  },
+  // Both halves of one act, so both take the same rule — the pattern
+  // FULL_STOP_AT_STOP_SIGN and PEDESTRIAN_YIELDED already follow: the world
+  // must contain a readable officer before the engine may either convict a
+  // student for ignoring him or credit one for obeying him.
+  CONTROLLER_SIGNAL_VIOLATED: controllerActorRule(),
+  CONTROLLER_SIGNAL_OBEYED: controllerActorRule(),
 
   // -- pedestrians -----------------------------------------------------------
   PEDESTRIAN_NOT_YIELDED: crossingRule(),
@@ -1582,6 +1564,13 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
     "a vehicle with priority",
   ),
   EMERGENCY_NOT_YIELDED: stagedActorRule(["emergencyApproach"], "a special-regime vehicle"),
+  // VP-11 (ЗДвП чл. 103). Unlike its telltale twin — a cockpit channel with no
+  // world body, which is why WARNING_LAMP_IGNORED sits in NO_WORLD_REFERENT —
+  // the officer IS a body: a staged pedestrian posed "stopSignal" at the kerb.
+  // A district that stages none must therefore read INERT here rather than be
+  // exempt, and the 2026-07-27 visibility ruling on `PS_OFFICER` is the reason
+  // that distinction earns its keep: the figure has been invisible once already.
+  POLICE_STOP_SIGNAL_IGNORED: stagedActorRule(["policeStop"], "an officer signalling a stop"),
   VULNERABLE_PASS_TOO_CLOSE: stagedActorRule(["cyclistRightHook"], "a cyclist to pass"),
   COLLISION: stagedActorRule(
     [
@@ -1676,6 +1665,33 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
     },
   },
 };
+
+function controllerActorRule(): ReferentRule {
+  return {
+    requires: "a staged trafficController actor within 25 m of a graded stop line",
+    fixIn: "templates-signals*.ts officer pose (Lane 9)",
+    evidence: ["stagedActors", "stopLinePaint"],
+    check(f) {
+      const officers = f.staged.filter((s) => s.kind === "trafficController");
+      if (officers.length === 0) return inert("no staged trafficController actor");
+      if (f.routeStopLines.length === 0) return inert("staged officer, but no graded stop line on the route");
+      let best = Infinity;
+      for (const o of officers) {
+        const spec = o as unknown as { officer?: { x: number; y: number } };
+        const at = spec.officer;
+        if (!at) continue;
+        for (const l of f.routeStopLines) {
+          const [lx, ly] = f.world.index.pointAt(l.edgeIdx, l.sM);
+          best = Math.min(best, dist2(at, { x: lx, y: ly }));
+        }
+      }
+      if (!Number.isFinite(best)) return ok("staged officer (pose not published on the spec)");
+      return best <= 25
+        ? ok(`officer ${best.toFixed(1)} m from the graded line`)
+        : lie(`officer ${best.toFixed(1)} m from the graded line (> 25 m — unreadable at that range)`);
+    },
+  };
+}
 
 function stopLineRule(): ReferentRule {
   return {

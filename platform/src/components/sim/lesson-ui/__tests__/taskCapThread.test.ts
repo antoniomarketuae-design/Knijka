@@ -310,11 +310,21 @@ describe("MEASURED ON THE GLASS — the bar moves because of this thread", () =>
     expect(shown).toBe(40);
     expect(mark(shown)).toContain("задачата иска ≤40");
     expect(mark(undefined)).not.toContain("задачата иска");
-    // …and the two numbers that were already there are untouched, so this is an
-    // addition and not a substitution.
+    // ── WHAT „AN ADDITION, NOT A SUBSTITUTION" NOW MEANS ────────────────────
+    // Until 2026-09-04 this loop demanded «Нормален ≤60» and «знакът важи» on
+    // BOTH sides — the governor numeral held constant while the chip arrived.
+    // The count repair (sc-sig-controller-postures:e245bd5c ·
+    // sc-crossing-child-ball:b2be3466 · sc-rb-lane-choice:ff5f8190) takes a
+    // governor that can neither bill nor ease off the strip, and this reference
+    // figure — cap 60 over a 50 disc at 20 км/ч — is exactly that governor. So
+    // the constant is its TREATMENT rather than its glyphs, and the thread's
+    // effect on the glass is now the strongest form of the original claim:
+    // without it the bar states nothing at all, with it the bar states the one
+    // number the student is billed against.
+    expect(mark(undefined)).toBe("");
     for (const html of [mark(shown), mark(undefined)]) {
-      expect(html).toContain("Нормален ≤60");
-      expect(html).toContain("знакът важи");
+      expect(html).not.toContain("Нормален ≤60");
+      expect(html).not.toContain("знакът важи");
     }
   });
 });

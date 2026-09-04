@@ -1,15 +1,29 @@
 /**
  * ADR-006 stage 1c integration — policeStop against the REAL district (doc 72
- * VP-11 „Спиране по полицейски сигнал", ЗДвП чл. 170). Site: the same 352 m
+ * VP-11 „Спиране по полицейски сигнал", ЗДвП чл. 103). Site: the same 352 m
  * two-way residential east arm the emergency-approach suite uses
  * (e519275131.0), mid-block — far from any junction machinery.
  *
- * The runner is SCENERY + MEASUREMENT ONLY (contracts.ts): it stages the
- * standing officer figure (a staged pedestrian, pose "stopSignal", never
- * walked) and records the outcome — "yielded" for a compliant curb-side rest,
- * "passedWithoutStopping" for driving on — but emits ZERO SimTick events.
- * The A12 battery here proves the hard bias: NEITHER side can ever grade a
- * violation from this runner; the graded duty lives in scenario objectives.
+ * The runner stages the standing officer figure (a staged pedestrian, pose
+ * "stopSignal", never walked) and records the outcome — "yielded" for a
+ * compliant curb-side rest, "passedWithoutStopping" for driving on.
+ *
+ * ── THIS FILE'S CONTRACT CHANGED ON 2026-09-04 (sc-vp-police-stop:44cfeff6) ──
+ * It used to assert that the runner emits ZERO SimTick events, and titled that
+ * „the hard A12 guarantee". The audit showed what the guarantee cost: on the
+ * drill whose entire subject is обеying a stop signal, the only thing a pass-by
+ * could be convicted of was whatever the student happened to hit — „a student
+ * who ignores the officer without crashing would not be caught". A12 forbids
+ * convicting an UNMODELLED duty, and this duty is modelled to the metre by the
+ * spec's own halt contract and `passBeyondM`; so the expectations below now
+ * assert the adjudication instead of its absence, in both directions and with
+ * the once-per-attempt bound the old file could not even state. The telltale
+ * twin (`telltale-stimulus.test.ts`) made the same move on 2026-09-02 and is
+ * the shape copied here.
+ *
+ * What has NOT changed and is still asserted: the runner stages no vehicle, so
+ * it can never manufacture a contact, and the graded COMPLETION still lives in
+ * the scenario's curb-side reachZone objective.
  */
 
 import { describe, expect, it } from "vitest";
@@ -60,7 +74,18 @@ function policeSpec(): PoliceStopSpec {
     stopRadiusM: 3,
     stopSpeedKmh: 4,
     passBeyondM: 25,
+    // A uniformed officer, so his signal binds under чл. 103 — the flag
+    // `sc-vp-police-stop` authors and `sc-pe-school-patrol`'s warden does not
+    // (see contracts.ts `bindingUnderArt103`). `wardenSpec()` below is the
+    // other half of that pair and asserts the silence.
+    bindingUnderArt103: true,
   };
+}
+
+/** The SAME staged kind without the чл. 103 flag — a school crossing warden. */
+function wardenSpec(): PoliceStopSpec {
+  const { bindingUnderArt103: _drop, ...rest } = policeSpec();
+  return { ...rest, id: "t-warden" };
 }
 
 describe("policeStop (integration)", () => {
@@ -96,10 +121,13 @@ describe("policeStop (integration)", () => {
       success: true,
       detail: "yielded",
     });
+    // The compliant leg convicts NOTHING and is PRAISED — THEO-4: a drill that
+    // can only convict teaches half a rule.
     expect(violationCodes(stack.ruleEvents)).toEqual([]);
+    expect(commendationCodes(stack.ruleEvents)).toEqual(["YIELDED_TO_PRIORITY"]);
   });
 
-  it("A12 both ways: ignoring the signal records 'passedWithoutStopping' and grades NOTHING", () => {
+  it("ignoring the signal records 'passedWithoutStopping' and grades POLICE_STOP_SIGNAL_IGNORED — once", () => {
     const stack = makeStack([policeSpec()]);
     const path = offsetRight(edgeGeometry(), LANE_OFFSET);
     const driver = new PolyDriver(path, 20);
@@ -109,12 +137,22 @@ describe("policeStop (integration)", () => {
     }
     expect(stack.outcomes).toHaveLength(1);
     expect(stack.outcomes[0]).toMatchObject({ success: false, detail: "passedWithoutStopping" });
-    // The hard A12 guarantee: the runner emitted NO SimTick vocabulary at all
-    // — no violation, no commendation, nothing for the reducer to grade.
-    expect(violationCodes(stack.ruleEvents)).toEqual([]);
+    // The pass-by is now BILLED, and billed exactly once: the
+    // "police-stop-signal" prioritySituation is emitted on the resolving frame
+    // and on no other, so the drive that ignored one officer carries one
+    // основна and not a per-frame stream of them.
+    expect(violationCodes(stack.ruleEvents)).toEqual(["POLICE_STOP_SIGNAL_IGNORED"]);
     expect(commendationCodes(stack.ruleEvents)).toEqual([]);
+    const priorityEvents = stack.ticks.flatMap((tick) =>
+      tick.events.filter((e) => e.kind === "prioritySituation"),
+    );
+    expect(priorityEvents).toEqual([
+      { kind: "prioritySituation", situation: "police-stop-signal", violated: true },
+    ]);
+    // Still nothing physical: the runner stages a standing figure and no
+    // vehicle, so it can never manufacture a contact.
     for (const tick of stack.ticks) {
-      expect(tick.events.filter((e) => e.kind === "prioritySituation" || e.kind === "collision")).toEqual([]);
+      expect(tick.events.filter((e) => e.kind === "collision")).toEqual([]);
     }
   });
 
@@ -140,7 +178,40 @@ describe("policeStop (integration)", () => {
       if (driver.s >= driver.length) break;
     }
     expect(stack.outcomes).toHaveLength(2);
-    expect(violationCodes(stack.ruleEvents)).toEqual([]);
+    // ONE bill per adjudication — which is this test's own title, and it is
+    // only checkable now that the runner bills at all. Two ignored signals
+    // across two attempts, two основни; the five seconds of driving on past the
+    // first resolution added none.
+    expect(violationCodes(stack.ruleEvents)).toEqual([
+      "POLICE_STOP_SIGNAL_IGNORED",
+      "POLICE_STOP_SIGNAL_IGNORED",
+    ]);
+  });
+
+  it("the SAME pose without the чл. 103 flag measures and charges nothing", () => {
+    // The half that keeps `sc-pe-school-patrol` byte-identical: its warden
+    // holds the identical paddle pose, and driving past her is чл. 119's
+    // offence — graded by the children on the zebra, not by this runner. Both
+    // legs are asserted, because a flag that silenced the praise and not the
+    // charge (or the reverse) would be worse than no flag.
+    for (const [label, drive] of [
+      ["ignored", (d: PolyDriver) => d.advance(DT, 11)],
+      ["complied", (d: PolyDriver) => d.advance(DT, d.s >= 95 ? 0 : 9)],
+    ] as const) {
+      const stack = makeStack([wardenSpec()]);
+      const path = offsetRight(edgeGeometry(), label === "ignored" ? LANE_OFFSET : LANE_OFFSET + 1.6);
+      const driver = new PolyDriver(path, 20);
+      for (let i = 0; i < 60 * 30 && stack.outcomes.length === 0; i++) {
+        stepFrame(stack, drive(driver));
+        if (driver.s >= driver.length) break;
+      }
+      expect(stack.outcomes, label).toHaveLength(1);
+      expect(violationCodes(stack.ruleEvents), label).toEqual([]);
+      expect(commendationCodes(stack.ruleEvents), label).toEqual([]);
+      for (const tick of stack.ticks) {
+        expect(tick.events.filter((e) => e.kind === "prioritySituation")).toEqual([]);
+      }
+    }
   });
 
   it("same seed + same driving = identical outcomes (deterministic staging)", () => {

@@ -312,6 +312,63 @@ export interface ReachZoneParams {
    */
   requireSpeedClean?: true;
   /**
+   * «УСПОКОЙ ТЕМПОТО» IS NOT «НАБИЙ СПИРАЧКИТЕ» — sc-follow-tailgater:63c0c28c
+   * (critical), and the seventh term this file's own templates route here.
+   *
+   * WHAT IT MEANS. `true` = this waypoint is thrown away by a run that has been
+   * told it braked hard with nothing in front of it — `HARSH_BRAKING_NO_CAUSE`,
+   * the основна the catalogue titles «Рязко спиране без причина» and cites to
+   * ЗДвП чл. 20, ал. 1 — whether the sheet CHARGED it or the teach-first coach
+   * gave the first one away as a card. Absent = no such claim, which is every
+   * other gate in the catalogue.
+   *
+   * WHY A CAP COULD NEVER CARRY IT. `maxSpeedKmh` reads the speedometer, and a
+   * car standing still because its driver stamped on the brake reads BETTER on
+   * that instrument than one easing off. Measured on this drill's own authored
+   * ❌ demo (`mistake-brake-check`, driven through `compileScenario → applyTick
+   * → buildLessonResult`): the slam at 16,7 s, both route tasks ticked, sheet
+   * empty, «Урокът е издържан». The tick was earned BY the mistake.
+   *
+   * THE CENSUS IS ONE GATE, AND AUTHORED ONLY — no title matcher, on the rule
+   * `ReachZoneWitnessDemands.requireLamps` records (the fallthrough that
+   * manufactured a demand out of a banner's words was reverted by two
+   * adversarial verifiers, and an arm that decides whether a route counts as
+   * driven is not the place to reopen it):
+   *
+   *   sc-follow-tailgater  sc-ftg-ease  «Успокой темпото»
+   *
+   * IT CANNOT REFUSE A CORRECT DRIVE. The channel is the conviction, never a
+   * raw deceleration sample: the detector convicts only after excluding every
+   * visible forward cause, and a rear car is structurally not one (`leadGap`
+   * looks forward). The drill's own `shadow-correct` demo brakes to a halt
+   * twice and raises nothing at all — measured, scored `[]` and coached `[]`.
+   * Every gate that does not author the key never consults this.
+   *
+   * WHAT IT COSTS, SAID PLAINLY: like `requireSolidLineClean`, this one CAN
+   * change a verdict. Withholding the tick leaves the route unfinished, and an
+   * unfinished route is not a pass — which is the correct answer and not a side
+   * effect, because the whole subject of this drill is that the brake is not a
+   * teaching tool, and a sheet that certifies «успокой темпото» to the driver
+   * who calmed it by stamping on the pedal is the reason the north-star test
+   * exists. Nothing here re-grades the law: the основна is exactly the основна
+   * it was, and the teach-first free first encounter is untouched.
+   *
+   * NOT A SILENT VERDICT (THEO-4): the withheld tick never arrives alone. The
+   * same drive is holding the rule engine's own «Рязко спиране без причина»
+   * card — raised AT the slam, with the catalogue's explanation («…изненадва
+   * движещите се зад теб и е предпоставка за удар отзад…»), its «✔ Правилното
+   * действие» corrective and its чл. 20, ал. 1 — and the debrief repeats it
+   * under «Учебни моменти». This demand removes a contradiction from a protocol
+   * that already explains itself; it introduces no new unexplained one.
+   *
+   * A CLAIM ABOUT THE JOURNEY, so it is read per frame off the run's own ledger
+   * and stays outside the `capMet` latch — the shape of the journey demands
+   * above it. `brakingFaultVoidsObjective` (objectives.ts) is wired into
+   * `lessons/engine.ts`'s `terminalUnearnable` so a refusal can never become a
+   * drive that cannot end, exactly as the М1 term is.
+   */
+  requireBrakingClean?: true;
+  /**
    * REPORT THE ONCOMING GAP HE TURNED INTO, against this drill's taught norm,
    * in seconds — the authored half of the only key here that refuses nothing.
    * `done` is bit-identical with it and without it; what it adds is the
@@ -324,6 +381,56 @@ export interface ReachZoneParams {
    * is where the evaluator reads it.
    */
   reportOncomingGapSec?: number;
+  /**
+   * «ПЛЪТНО ВДЯСНО» IS A PLACE INSIDE THE LANE, NOT A SIDE OF IT —
+   * sc-vp-police-stop:ab262758, and the eighth term this file's own templates
+   * routed here rather than invent an instrument for.
+   *
+   * WHAT IT MEANS. The car must sit at least this many metres KERB-WARD of its
+   * own lane's centre — `tick.laneOffsetM <= -requireKerbwardM`, the tick's own
+   * signed lane-referenced offset (+ = left of travel, `runtime/locator.ts
+   * computeLane`). Absent = no lateral claim, which is every other gate in the
+   * catalogue. Read at the tick's own position on the cap arm's geometry, and
+   * inside the `capMet` latch, because it is half of one arrival pose: «спри
+   * плътно вдясно» is a single act, not a stop and a separate parking job.
+   *
+   * WHY A DISC COULD NEVER CARRY IT, which is the argument this template spent
+   * a wave writing down before the term existed. `sc-vpps-stop` is a radius-3
+   * disc (4.50 at L1, 3.75 at L2 — `params.ts widenRadius`) around a mark
+   * 1.71 m kerb-ward of the right-lane centre, so at the aided rung it accepts
+   * 97 % of the lane WIDTH: a car resting on the lane centre — the one thing
+   * instruction 4 names as the mistake («не насред платното») — was ticked
+   * «Спри плътно вдясно при полицая», ИЗДЪРЖАН, ★★★, 0 errors. Shrinking the
+   * disc cannot fix it in either direction: the taught pose and the forbidden
+   * one are 1.71 m apart while the car is 1.70 m WIDE, so a circle small enough
+   * to refuse the centre is narrower than the vehicle it grades, and the mark
+   * cannot move further right because the officer stands on the carriageway
+   * edge 1.7 m beyond it. A CIRCLE HAS ONE RADIUS; the road has two axes.
+   *
+   * ACROSS THE LANE, NOT ACROSS THE APPROACH. `inApproachGrace`'s own `lateral`
+   * is measured on the axis the student came in on, which tilts with his line;
+   * `laneOffsetM` is measured against the carriageway the officer is standing
+   * beside. That is why this reads a tick channel instead of reusing the
+   * capsule's geometry — and it leaves the capsule's generosity ALONG the road
+   * (REACH_ZONE_GRACE_M, a founder ruling) exactly as it was: stopping four
+   * metres early is still stopping here, done sooner.
+   *
+   * NOT LADDERED (`params.ts serializeObjectiveParams` carries it through
+   * untouched). This is deliberate and it is what lets the aided rungs keep
+   * their only dial: the ladder still widens the RADIUS, so L1/L2/L3 remain
+   * three different lessons along the road (`__tests__/level-seam.test.ts` S4),
+   * while the sideways demand — „did you pull over or stop in the roadway" —
+   * has the same answer at L1 as at L5.
+   *
+   * UNKNOWN NEVER REFUSES. `runtime/locator.ts applyFix(null)` zeroes
+   * `laneOffsetM` when the car is off the road network and `worldRuntime`
+   * reports `edgeId: null` on the same frame, so a zero there means „no fix",
+   * not „dead centre". The evaluator therefore consults this only while
+   * `tick.edgeId` is a real segment id; fixtures and replays that carry no
+   * `edgeId` at all are treated the same way. `objectives.ts kerbwardMet` is
+   * where that is spelled out.
+   */
+  requireKerbwardM?: number;
 }
 
 /**
@@ -659,7 +766,24 @@ export type YieldReason =
   | "stopSign"
   | "redLight"
   | "pedestrian"
-  | "roundaboutEntry";
+  | "roundaboutEntry"
+  /**
+   * A РЕЛСОВО ППС — an oncoming tram in the carriageway — is closing on the
+   * junction this car is about to turn left across (`SimTick
+   * .oncomingRailGapSec`). ЗДвП чл. 8, ал. 2: where passage is permitted to
+   * both at once, the non-rail driver lets it through независимо от посоката
+   * му, so unlike every reason above this one is not ended by a lamp, a line
+   * or a look — it ends when the rails are clear.
+   *
+   * WHY IT IS ITS OWN MEMBER and not `redLight` with different copy (which is
+   * what shipped first, and is only half of `sc-rx-tram-left:07c63b97`). The
+   * red is a DIFFERENT wait that happens to precede this one: it ends when the
+   * lamp turns, and on the measured drive it turned while the tram was still
+   * coming. A student standing on GREEN for the tram had no reason at all —
+   * the hold was not a hold, the seconds were not credited, and the coach went
+   * back to pointing at the waypoint past the rails.
+   */
+  | "railVehicle";
 
 /**
  * B15-VOICE (2026-08-05) — per-session memory of what the instructor has

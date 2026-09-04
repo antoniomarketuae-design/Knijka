@@ -58,6 +58,7 @@ import type { ScenarioSpec } from "./types";
 /** mw-entry-v1 northbound lane centers (meta.scenario — the L7 copy truth). */
 const MWE_X_CURB = 8.13; // laneId 0 — the acceleration lane between nose and taper
 const MWE_X_CRUISE = 0; // laneId 1 — the merge target (mainline right travel lane)
+const MWE_X_LEFT = -8.12; // laneId 2 — the northbound OVERTAKING lane (meta.scenario.laneLeftX)
 /** mw-entry-v1 story arclengths in district y (meta.scenario). */
 const MWE_NOSE_Y = 260; // the acceleration lane begins (ramp nose)
 const MWE_TAPER_Y = 460; // …and tapers out here — the curb lane becomes аварийна
@@ -132,38 +133,62 @@ const MWE_MAINLINE_CAR: RearTailgaterSpec = {
  *
  * WHY THE НАСРЕЩНО BANK AND NOT THE ONE HE MERGES INTO. `mwe-e-sb` is 30.37 m
  * away across a 6 m median that is now physically closed by the barrier run, so
- * these six bodies cannot be reached, cannot be hit and cannot interact with
- * the mainline car above — the drill's own graded channel (the lane-change
+ * these bodies cannot be reached, cannot be hit and cannot interact with the
+ * mainline car above — the drill's own graded channel (the lane-change
  * indicator/mirror pair and the causeless slam) is untouched, and so is every
  * committed trace: `ScenarioTrace` serializes `meta`, player `samples` and
  * `events`, and staged actors appear in none of the three. It is also the bank
  * that is IN THE WINDSCREEN at arrival: from the ramp spawn (35.56, 139.5) on
- * bearing 347.18°, all six bodies stand within 16° of the driver's eye line at
- * 137–823 m, which is precisely the „open grass field" the row photographed.
+ * bearing 347.18°, every body stands within 16° of the driver's eye line.
+ *
+ * …AND HALF THE COLUMN USED TO BE DELETED BEFORE IT REACHED THE GLASS —
+ * measured 2026-09-04 through the production `createTrafficSystem` +
+ * `createScenarioDirector`, which is the correction this block owes the row it
+ * cites. The first authoring of this actor was six cars on a 140 m headway, a
+ * 700 m string down a 960 m bank, standing at 137, 269, 406, 545, 684 and
+ * 823 m from the arrival pose. `LessonScene` renders lesson traffic at
+ * `SCENARIO_TRAFFIC_DRAW_DISTANCE_M` (420 m) and `TrafficLayer` writes a
+ * ZERO-SCALE matrix to everything beyond it, so cars 4, 5 and 6 were never on
+ * the glass on any frame of the arrival — three staged bodies, gated by a test
+ * that counted bodies and never metres, repairing an „empty world" finding with
+ * cars the student cannot see. That is the dead-predicate failure this project
+ * has paid for 51 times, in the one place it is hardest to notice: the
+ * measurement was true, the consumer just did not read it.
+ *
+ * SO THE COLUMN IS NOW DENSE INSIDE THE CULL AND THE HEAD IS UNMOVED. Five of
+ * the six cars stand at 137, 202, 269, 337 and 406 m — re-measured on the same
+ * probe — on a 70 m headway, 2.1 s at 33 m/s, above the two-second rule the
+ * theory bank teaches; all five are inside the radius the renderer draws and
+ * all five within 16° of the eye line. The sixth stays at 823 m as the RESERVE
+ * that keeps the bank alive once the student is far enough up the road that the
+ * first five are behind him — a column that is short enough to draw is also
+ * short enough to run out, and suite 3's recycle probe measures exactly that.
+ * The head stays at arc 700 for the reason the note below it gives, so the
+ * „passes him at ~90 km/h off a standing release" beat is unchanged; what
+ * changed is that three bodies moved from arithmetic in a test onto the glass.
  *
  * THE LANE IS THE RIGHT TRAVEL LANE, NOT THE SHOULDER. `buildLaneGraph` rides
  * a one-way edge's CURB lane, and on this bank the curb lane carries
  * `mwe-z-emerg-sb` over its whole length — it is the аварийна лента. So the
  * same `extraRightOffsetM` correction the mainline car uses moves the column
  * one lane pitch off it, onto the southbound centreline (x ≈ −30.37, laneId 1).
- * A drill that teaches «там не се кара» may not stage six cars doing it.
+ * A drill that teaches «там не се кара» may not stage a column doing it.
  */
 const MWE_ONCOMING_FLOW: OncomingStreamSpec = {
   id: "sc-mrg-oncoming",
   kind: "oncomingStream",
   actor: {
     pathNodes: ["mwe-n-sb-start", "mwe-n-sb-end"],
-    // 700 m of arc down a 960 m bank puts the head at y = 260 — the nose —
-    // and the tail at the far end, so the column is spread ACROSS the
-    // windscreen from the first frame instead of arriving as one clump.
-    // MEASURED from the ramp spawn on bearing 347.18°: the six bodies stand at
-    // −15.9°, −1.4°, +3.5°, +5.9°, +7.3° and +8.2° off the driver's eye line,
-    // at 137, 269, 406, 545, 684 and 823 m. Not one is BESIDE him, and that is
-    // the reason the head is at 700 and not deeper: every staged actor releases
-    // through the standard 2.6 m/s² ramp and needs ~13 s to reach 33 m/s, so a
-    // car released close enough to read would be seen crawling on a магистрала.
-    // At 137 m that ramp is not legible, and by the time the head is near the
-    // student it is at flow speed.
+    // 700 m of arc down a 960 m bank puts the head at y = 260 — the nose — so
+    // the column is spread ACROSS the windscreen from the first frame instead
+    // of arriving as one clump. MEASURED from the ramp spawn on bearing
+    // 347.18°: the head stands at −15.9° off the driver's eye line, 137 m out.
+    // Not one car is BESIDE him, and that is the reason the head is at 700 and
+    // not deeper: every staged actor releases through the standard 2.6 m/s²
+    // ramp and needs ~13 s to reach 33 m/s, so a car released close enough to
+    // read would be seen crawling on a магистрала. At 137 m that ramp is not
+    // legible, and by the time the head is near the student it is at flow
+    // speed (it covers the 120 m to his own latitude in ~9.6 s, ~90 km/h).
     hold: { nodeIndex: 0, offsetM: 700 },
     cruiseSpeedMps: 33, // ~119 km/h — motorway flow, well under the posted 140
     extraRightOffsetM: -MWE_X_CURB, // off the аварийна лента, into laneId 1
@@ -171,13 +196,93 @@ const MWE_ONCOMING_FLOW: OncomingStreamSpec = {
   },
   count: 6,
   // CUMULATIVE arcs behind the head (the runner reads gapsM[i-1] as car i's own
-  // offset from car 0 — see MFP_STREAM's note on the pair that got this wrong):
-  // a 140 m headway, ≈ 4.2 s at 33 m/s, which is what a real АМ column looks
-  // like. 700 − 700 = 0 puts the tail exactly on the path start and no car is
+  // offset from car 0 — see MFP_STREAM's note on the pair that got this wrong).
+  //
+  // FOUR CARS ON A 70 m HEADWAY BEHIND THE HEAD (≈ 2.1 s at 33 m/s, above the
+  // two-second rule), THEN THE REST OF THE BANK. That shape is deliberate and
+  // it is the repair: 70 m puts cars 2–5 at 202, 269, 337 and 406 m from the
+  // arrival pose, i.e. INSIDE the 420 m the renderer draws, where the previous
+  // uniform 140 m string put three of its six at 545–823 m and had them culled
+  // to a zero-scale matrix on every frame of the arrival (the block above).
+  //
+  // THE SIXTH IS THE RESERVE AND IT STAYS AT 700, exactly where it was. A
+  // column that ends 400 m out also ENDS 400 m out: once the student is 300 m
+  // up the ramp the whole of it is behind him and the bank is dead for the rest
+  // of a 55 s par time. Suite 3's recycle probe is what measures that, and it
+  // is why the last gap is 420 m of arc and not 70 — a real АМ column is not
+  // uniform, and this one is now dense where the student is looking and long
+  // where he will be looking later.
+  //
+  // 700 − 700 = 0 puts the reserve exactly on the path start and no car is
   // clamped off it (the runner's own stream-collapse guard).
-  gapsM: [140, 280, 420, 560, 700],
+  gapsM: [70, 140, 210, 280, 700],
   // Released the moment the world runs: the point of this actor is what the
   // student sees BEFORE he touches anything, so it may not wait on his speed.
+  releaseKmh: 0,
+};
+
+/**
+ * …AND TRAFFIC ON THE МАГИСТРАЛА HE IS BEING SENT INTO — the other half of
+ * sc-merge-accel-lane:09e6d6f4, and the half the насрещно column above cannot
+ * reach.
+ *
+ * THE COLUMN ACROSS THE MEDIAN IS THE RIGHT ANSWER TO „open grass fields" AND
+ * THE WRONG ONE TO THIS DRILL. Measured at the arrival pose through the
+ * production `createTrafficSystem` + `createScenarioDirector`: `mwe-e-sb` is
+ * 66 m off the ramp spawn laterally, so its nearest body subtends 22.5 px of a
+ * 2556 px phone frame — about 3.5 CSS pixels — and the rest less. It fills the
+ * horizon; it cannot BE the flow. And the flow is what this drill grades
+ * against: instruction 3 is «гледай в лявото огледало: къде е пролуката между
+ * колиТЕ по магистралата и с каква скорост идват те», and until now the
+ * northbound carriageway carried exactly one car — `MWE_MAINLINE_CAR`, which
+ * holds dormant at (0, 30), i.e. 99 m BEHIND the driver at arrival (its own
+ * recipe: a rear-approach pace car cannot also be in the windscreen). A drill
+ * whose task is „find the gap between the cars" was staged on a road with no
+ * cars in front of the student at all.
+ *
+ * TWO CARS IN THE OVERTAKING LANE, AND THE LANE IS THE WHOLE SAFETY ARGUMENT —
+ * the `MWD_FLOW_LEAD` precedent (templates-sp.ts, sc-mw-discipline:3bec2af1,
+ * the same finding one lesson over) applied here. The taught route is curb lane
+ * → cruise lane; `MWE_X_LEFT` is the lane BEYOND the one he merges into, so
+ * every authored leg — the shadow, the stop-at-the-end demo and the blind-merge
+ * demo — stays one full lane pitch clear of these bodies, and the drill's own
+ * graded channel is untouched. `oncomingStream` is the kind and not
+ * `brakingLeadCar` for two reasons: this file's own note that „nothing about
+ * the runner assumes head-on", and the trace battery's LEARN_ONLY set, which
+ * exists precisely so no staged actor on this drill can grade — a
+ * `brakingLeadCar` carries a slam tier that CAN.
+ *
+ * WHY THEY LOOK LIKE FLOW AND NOT LIKE A HAZARD. They stand 92 m and 205 m
+ * ahead at −15.7° and +0.5° off the eye line — 34 px and 15 px, i.e. legible
+ * bodies rather than the specks across the median — with 120 m between them,
+ * 3.6 s at 33 m/s: an honest пролука, which is the thing the student is asked
+ * to look for. `releaseKmh: 0` starts them with the world, so they pull AWAY
+ * from a stationary student instead of bearing down on him, and the runner
+ * recycles them at the end of the bank (staged.ts FR-B5-RETURN) — which on a
+ * ONE-WAY path re-enters them at y = 220/340, i.e. behind a student who has
+ * already merged. The road therefore stays alive for the whole 55 s par time
+ * without a body ever appearing beside him.
+ */
+const MWE_MAINLINE_FLOW: OncomingStreamSpec = {
+  id: "sc-mrg-flow",
+  kind: "oncomingStream",
+  actor: {
+    pathNodes: ["mwe-n-nb-start", "mwe-n-nose", "mwe-n-taper", "mwe-n-nb-end"],
+    // Arc 340 = district y 340, inside the acceleration segment: the head is
+    // level with the metres the student is about to use, which is where a car
+    // he must judge belongs.
+    hold: { nodeIndex: 0, offsetM: 340 },
+    cruiseSpeedMps: 33, // the same flow speed as the насрещно bank
+    // The graph rides this edge's CURB lane (x ≈ +8.13, and over the approach
+    // and main segments that lane is the аварийна). Two pitches left of it is
+    // the OVERTAKING lane — one beyond the lane he merges into.
+    extraRightOffsetM: MWE_X_LEFT - MWE_X_CURB,
+    colorIndex: 3,
+  },
+  count: 2,
+  // 120 m ≈ 3.6 s at 33 m/s — the пролука instruction 3 sends him looking for,
+  // and it puts car 1 at y = 220, still 92 m ahead of the ramp spawn.
+  gapsM: [120],
   releaseKmh: 0,
 };
 
@@ -310,7 +415,7 @@ export const SC_MERGE_ACCEL_LANE: ScenarioSpec = {
     // braking distance.
     { level: 5, conditions: { weather: "rain" } },
   ],
-  staged: [MWE_MAINLINE_CAR, MWE_ONCOMING_FLOW],
+  staged: [MWE_MAINLINE_CAR, MWE_ONCOMING_FLOW, MWE_MAINLINE_FLOW],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

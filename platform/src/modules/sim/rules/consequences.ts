@@ -1723,6 +1723,16 @@ const D_STOP_ON_FAULT = DUTY(
   "ЗДвП чл. 101, ал. 1",
   "При възникване по време на движение на повреда или неизправност в пътно превозно средство, която застрашава безопасността на движението, водачът е длъжен да спре и да вземе мерки за нейното отстраняване.",
 );
+/**
+ * ЗДвП чл. 103 — the duty a стоп-палка puts on the driver, and the whole VP-11
+ * procedure in one sentence (плавно · най-вдясно · изчакай указанията). NOT
+ * чл. 170, ал. 3, which describes how the OFFICER must give the signal.
+ */
+const D_STOP_ON_POLICE_SIGNAL = DUTY(
+  "чл. 103",
+  "ЗДвП чл. 103",
+  "При подаден сигнал за спиране от контролните органи водачът на пътно превозно средство е длъжен да спре плавно в най-дясната част на платното за движение или на посоченото от представителя на службата за контрол място и да изпълнява неговите указания.",
+);
 const D_SIGNAL = DUTY(
   "чл. 28",
   "ЗДвП чл. 28, ал. 1",
@@ -2266,6 +2276,45 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
       "Десетте падат при ОПАСНИ неизправности — условието е в самата точка. При незначителна или значителна неизправност глоба има, а книжката остава непокътната.",
     ),
     branches: [],
+  },
+  /**
+   * VP-11 (sc-vp-police-stop:44cfeff6), landed 2026-09-04 beside its telltale
+   * twin above — and the shape is the OTHER one, because the retrieval came out
+   * differently. The lamp's price is graded по тежест and had to be told in
+   * words; this one the act states outright and ungated: чл. 175, ал. 1 opens
+   * „Наказва се с лишаване… за срок три месеца и с глоба 200 лв. водач, който:"
+   * and т. 4 is „откаже да изпълни нареждане на органите за контрол и
+   * регулиране на движението". Nothing conditions it — no ПТП, no непосредствена
+   * опасност — so a `conditional` row with an empty `branches` would have hidden
+   * a figure the student is owed.
+   *
+   * AND IT IS THE DEAREST ROW IN THE MANOEUVRE FAMILY, which is the part worth
+   * a seventeen-year-old's attention: three months without the licence for an
+   * offence the exam sheet prices at three points. `instrumentsForBan` turns the
+   * лишаване into „акт" on its own — a фиш cannot carry one (чл. 186, ал. 1).
+   */
+  POLICE_STOP_SIGNAL_IGNORED: {
+    kind: "single",
+    offenceBg: "отказ да изпълниш нареждане на органите за контрол",
+    offenceQuote: {
+      actFile: "zdvp.json",
+      unitRef: "чл. 175",
+      citationBg: "ЗДвП чл. 175, ал. 1, т. 4",
+      quoteBg: "откаже да изпълни нареждане на органите за контрол и регулиране на движението;",
+    },
+    duties: [D_STOP_ON_POLICE_SIGNAL],
+    fine: fine(200, "лишаване от право да управлява моторно превозно средство за срок три месеца", {
+      actFile: "zdvp.json",
+      unitRef: "чл. 175",
+      citationBg: "ЗДвП чл. 175, ал. 1, т. 4",
+      quoteBg:
+        "Наказва се с лишаване от право да управлява моторно превозно средство за срок три месеца и с глоба 200 лв. водач, който:",
+    }),
+    controlPoints: notListed(
+      "Чл. 175, ал. 1, т. 4 (отказ да изпълниш нареждане) не е сред нарушенията по чл. 6, ал. 1 — а списъкът е изчерпателен. От целия чл. 175 наредбата взима само т. 1 (табели с регистрационен номер — 8 к.т.) и ал. 3 (нерегистрирано ППС — 10 к.т.). Тук книжката страда по друг начин: не с точки, а с три месеца лишаване.",
+    ),
+    noteBg:
+      "Три месеца без книжка е повече, отколкото струват 200 лв. — и точно затова подминаването „за да не се разправям“ е най-скъпият възможен изход от една проверка. Спреш ли и изпълниш указанията, самата проверка не е нарушение и не струва нищо.",
   },
   SPEEDING_DANGEROUS: {
     kind: "ladder",

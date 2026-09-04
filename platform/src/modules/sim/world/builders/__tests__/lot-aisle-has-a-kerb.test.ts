@@ -39,7 +39,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildWorldGeometry } from "../buildWorldGeometry";
-import { buildRoads, lotAisleKerbEdgeIds } from "../roads";
+import { buildRoads, drivewayMouthsOf, lotAisleKerbEdgeIds } from "../roads";
 import { analyzeNetwork } from "../network";
 import { analyzeRoundabouts } from "../roundabout";
 import { LANE_WIDTH_M, SIDEWALK_TOP_Y } from "../constants";
@@ -210,15 +210,33 @@ describe("§3 nothing outside the car parks moves", () => {
   });
 
   it("buildRoads with no district is the pre-pass build, everywhere", () => {
+    // TWO decisions ride on the `district` argument now, not one: the lot
+    // aisle's kerb (§1–§2 above) and a DRIVEWAY MOUTH — the dropped kerb
+    // `roads.ts DrivewayMouth` ramps across a declared span so a driveway is an
+    // apron and not a 12 cm step (`scene/__tests__/lesson-world-bay-clearance
+    // .test.ts` §2 is the measurement that asked for it). The additivity claim
+    // this test defends is unchanged in kind: whatever the argument buys must
+    // be confined to the districts that ASK for it, by name.
+    const moved: string[] = [];
     for (const { id, district } of ALL) {
       const network = analyzeNetwork(district);
       const rings = analyzeRoundabouts(district, network);
       const bare = buildRoads(network, rings);
       const given = buildRoads(network, rings, district);
       if (district.meta.mapKind === "scenario-lot") continue;
+      // A ramped mouth adds STATIONS to a strip and never a strip: the
+      // pavement is lowered across the mouth, not cut, so the shell stays
+      // watertight and this count cannot move on any district.
       expect(given.sidewalkStripCount, id).toBe(bare.sidewalkStripCount);
-      expect(given.sidewalks.positionsView.length, id).toBe(bare.sidewalks.positionsView.length);
+      if (given.sidewalks.positionsView.length !== bare.sidewalks.positionsView.length) {
+        moved.push(id);
+        expect(drivewayMouthsOf(district).length, `${id} moved without asking`).toBeGreaterThan(0);
+      } else {
+        expect(drivewayMouthsOf(district).length, `${id} asked and did not move`).toBe(0);
+      }
     }
+    // Named, not counted: a new mouth is a deliberate act and shows up here.
+    expect(moved.sort()).toEqual(["pk-drive-v1"]);
   });
 
   it("the predicate declines a district it was not given", () => {

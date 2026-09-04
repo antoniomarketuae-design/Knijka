@@ -175,7 +175,16 @@ describe("the sheet carries the affordances the peek has had since 2026-08-14", 
     // it between the chip and the ✕ says both things at once — it is in the
     // header (so the section still has three children and the scroller keeps
     // every pixel it had) and it is not floating loose in the dialog.
-    const chip = SHEET_CODE.indexOf("{shown.chipBg ?? \"\"}");
+    // ── THE ANCHOR IS THE ELEMENT'S HANDLE, NOT ITS COPY — 2026-09-04.
+    //    It read `{shown.chipBg ?? ""}` verbatim, i.e. it located this row by
+    //    the exact expression the chip printed. `sc-junction-gap:4c2e452f` gave
+    //    the sheet's chip the fault's CLASS beside its mark, so the expression
+    //    changed and this case failed on a rewrite of a STRING while every
+    //    claim it makes — the counter is in the header, after the chip, before
+    //    the ✕, outside the scroller — stayed exactly as true. The expectation
+    //    is re-pointed at `data-sim-overlay-sheet-chip`, which is what the chip
+    //    IS rather than what it happens to say today.
+    const chip = SHEET_CODE.indexOf("data-sim-overlay-sheet-chip");
     const foldRow = SHEET_CODE.indexOf("data-sim-overlay-sheet-fold");
     const closeX = SHEET_CODE.indexOf('aria-label="Затвори"');
     const scroller = SHEET_CODE.indexOf("data-sim-overlay-sheet-text");

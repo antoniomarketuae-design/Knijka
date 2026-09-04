@@ -399,19 +399,14 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-merge-accel-lane/mistake-stop-at-end.trace.json",
     "faultTimeSec": 14.5,
-    "requiredActors": [
-      {
-        "kind": "vehicle",
-        "label": "Насрещен поток автомобили"
-      }
-    ],
+    "requiredActors": [],
     "governingControl": {
       "kind": "none",
       "label": "Няма"
     },
     "view": "exterior",
-    "camera": "chase",
-    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Отзад има само сценичен натиск (лепка), а изискваният участник е ОТПРЕД — преследваща камера (chase), за да остане изискваният участник в кадър"
+    "camera": "rearAware",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), който държи и призрака, и приближаващия отзад в рамката"
   },
   {
     "id": "sc-merge-bus-pullout__m0",

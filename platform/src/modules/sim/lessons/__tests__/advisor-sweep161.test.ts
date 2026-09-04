@@ -597,6 +597,10 @@ describe("sweep161 — «Чакането Е маневрата» stops meaning 
     "redLight",
     "pedestrian",
     "roundaboutEntry",
+    // RX-05 (sc-rx-tram-left:07c63b97) — the sixth duty: an oncoming RAIL
+    // vehicle closing on the junction. Listed here so its copy is measured by
+    // the same properties as the five, not merely added beside them.
+    "railVehicle",
   ];
   const settled = (r: YieldReason) => narrate(r, YIELD_VOICE_SETTLE_S + 1)[1];
 

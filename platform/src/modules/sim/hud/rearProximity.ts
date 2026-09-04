@@ -5,10 +5,13 @@
  * quality preset gets for free).
  *
  * HONESTY CONTRACT (doc 62 #39/#48 — false warnings burned the founder's
- * trust): the cue exists ONLY while traffic.rearGapMeters() reports a REAL
- * vehicle in the corridor behind (a finite gap). Infinity — the no-vehicle
+ * trust): the cue exists ONLY while traffic.rearBodyBehind() reports a REAL
+ * body in the corridor behind (a finite gap). Infinity — the nothing-behind
  * report — maps to null in EVERY state, including mid-display: the badge can
- * never linger and never guess.
+ * never linger and never guess. Since 2026-09-04 that contract also covers the
+ * NOUN: the read carries the body's kind and `rearCueLabelBg` has one authored
+ * sentence per kind, because „Кола отзад" over a bicycle is the badge stating
+ * something false just as surely as a badge that lingers.
  *
  * Severity ramp (spec): neutral above 8 m, amber under 8 m, red under 4 m —
  * and the red band additionally asks whether red is RELEVANT. 1 m of exit
@@ -95,6 +98,12 @@ export const REAR_CUE_REVERSING_KMH = -0.8;
 export type RearCueLevel = "info" | "warn" | "danger";
 
 /**
+ * WHAT the body behind is — the vocabulary `traffic.rearBodyBehind` reports,
+ * which is `vehicleCollisionKind`'s and nothing new.
+ */
+export type RearCueKind = "vehicle" | "cyclist";
+
+/**
  * Is the gap behind the player CLOSING — i.e. is red relevant at all?
  *
  * The RELEVANCE half of the severity decision (see O61 in the header); the
@@ -120,6 +129,13 @@ export interface RearCue {
   level: RearCueLevel;
   /** Whole display meters (rounded, never negative). */
   meters: number;
+  /**
+   * The kind of body the metres are about — see `rearCueLabelBg`. Defaults to
+   * "vehicle" when the caller cannot say, which is the label this badge has
+   * always printed; the ONE production caller passes it, and it is the read the
+   * traffic system now hands down whole (`rearBodyBehind`).
+   */
+  kind: RearCueKind;
 }
 
 /**
@@ -131,6 +147,7 @@ export function stepRearCue(
   prev: RearCue | null,
   gapM: number,
   speedKmh: number,
+  kind: RearCueKind = "vehicle",
 ): RearCue | null {
   // The honesty contract: no vehicle reported ⇒ no badge, from ANY state.
   if (!Number.isFinite(gapM)) return null;
@@ -143,11 +160,38 @@ export function stepRearCue(
         ? "warn"
         : "info";
   const meters = Math.max(0, Math.round(gapM));
-  if (prev !== null && prev.level === level && prev.meters === meters) return prev;
-  return { level, meters };
+  // The identity bail-out has to include the KIND, or a rider who rolls in
+  // behind a car at the same rounded distance keeps the car's sentence.
+  if (prev !== null && prev.level === level && prev.meters === meters && prev.kind === kind) {
+    return prev;
+  }
+  return { level, meters, kind };
 }
 
-/** Badge copy (BG). */
+/**
+ * Badge copy (BG) — and there is one sentence PER KIND, because the sentence is
+ * a claim about what is back there.
+ *
+ * THE FRAME. `.audit-frames/sweep161/sc-vu-cyclist-hook/mobile-right/
+ * 04-t184s.png` prints «Кола отзад · 12 м» on a map that contains no car:
+ * `sc-vu-cyclist-hook` runs ambient traffic 0, `vu-cyclist-v1` authors no
+ * parking bays and the lesson mounts no held scenery, so the ONLY body
+ * `rearGapMeters` can ever return there is the staged cyclist —
+ * `extraRightOffsetM 2.6` against a 4.0 m rear corridor, i.e. squarely inside
+ * it. This file's own header opens on the honesty contract that „false warnings
+ * burned the founder's trust", and `RearProximityCue.tsx` keeps a concrete wall
+ * out of this channel rather than say something false about it. The moving half
+ * was saying something false about the one road user the lesson exists to
+ * teach.
+ *
+ * AND ON THIS LESSON IT IS THE WORST POSSIBLE WORD. «Кола отзад» sends a
+ * student to the mirror looking for a car; what is actually there is the rider
+ * he is about to turn right across — the right hook, ЗДвП чл. 25, ал. 1, the
+ * manoeuvre the whole rung is about. A cue that names the wrong hazard is worse
+ * than no cue, which is the ruling this channel already carries twice.
+ */
 export function rearCueLabelBg(cue: RearCue): string {
-  return `Кола отзад · ${cue.meters} м`;
+  return cue.kind === "cyclist"
+    ? `Велосипедист отзад · ${cue.meters} м`
+    : `Кола отзад · ${cue.meters} м`;
 }

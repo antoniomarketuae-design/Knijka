@@ -162,12 +162,20 @@
  * above the disc, drill reachable) the bar becomes two numbers, both of which
  * bill, and the rows close on the count they were filed on.
  *
- * WHY IT IS NOT DONE HERE. `hud/StatusDashboard.tsx` is not this lane's file
- * and a second lane was editing it in the same wave. Every input the predicate
- * needs is already on `SpeedContractReading` and already read by that
- * component, so nothing was added here to carry it: a field no caller reads is
- * the defect class this programme measured at 51 of 82 repairs, and adding one
- * to route a comment would be that defect committed on purpose.
+ * ── LANDED 2026-09-04, IN `GovernorCapMark`, EXACTLY AS ROUTED ─────────────
+ *
+ * `modeSpeaks` is now the predicate above `StatusDashboard.GovernorCapMark`'s
+ * return, and the `governor-register` / `governor-mode-cap` / sign-wins trio
+ * renders under it; with no task chip either, the mark leaves the bar rather
+ * than standing there empty. Nothing was added to this file to carry it — every
+ * input the branch reads (`modeAboveLaw`, `modeBlocksBinding`) was already on
+ * `SpeedContractReading` and already read by that component.
+ *
+ * On the three filed frames the strip goes from three figures to two, both of
+ * which bill, and `explainBg` still names all three ceilings and the precedence
+ * to the accessibility tree. `hud/__tests__/governor-speed-contract.test.ts`
+ * sweeps the predicate against `readSpeedContract` × `governorIsEasing` over
+ * the whole grid, in both directions.
  */
 
 import type { District } from "@/modules/sim/world";

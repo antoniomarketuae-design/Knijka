@@ -42,10 +42,14 @@
  *   two INPUT guards — lostKeys, refusedReversePress — that say whether the
  *   drive's own pedals arrived (lib/summary.mjs; sc-speed-creep:84ba5dbf), and
  *   the CHANNEL those pedals arrived on — inputChannel, driveKeyEvents,
- *   touchEvents, touchOverlay (sc-speed-creep:dff70553). `touchEvents: 0` on a
- *   mobile row is the fact that refuses a finding addressed to
- *   TouchControls.tsx: this harness drives a phone-sized viewport with a
- *   KEYBOARD, so no drive it takes can exercise a thumb pad.
+ *   touchEvents, touchOverlay (sc-speed-creep:dff70553). `driveKeyEvents` with
+ *   `inputChannel: keyboard` is the fact that refuses a finding addressed to
+ *   TouchControls.tsx AS THE THING THAT DROVE: this harness drives a
+ *   phone-sized viewport with a KEYBOARD, so no drive it takes can exercise a
+ *   thumb pad. What the pad did when it was pressed on its own is the separate
+ *   touchProbe* group, and touchProbeWhen names the instant that press was
+ *   taken at — a reading taken under the end card can only ever say
+ *   «unreached», because the overlay is inert there by design.
  *   Append-only, so an interrupted run resumes without losing what it measured.
  *   <out>/frames/<lesson>__<leg>/run.log — the whole transcript, kept.
  */
@@ -240,6 +244,12 @@ for (const p of planned) {
               ? "held"
               : "DROPPED"
       }` +
+      // WHICH PRESS THOSE THREE WORDS DESCRIBE. The probe is taken twice —
+      // once on the untouched car with the overlay live, once under the end
+      // card where `TouchControls` is inert BY DESIGN — and «unreached» means
+      // opposite things at the two instants. Every reading before this column
+      // existed was the post-drive one, i.e. the refusal the product promises.
+      (s.touchProbeWhen ? `@${s.touchProbeWhen.split(",")[0]}` : "") +
       (s.treeMoved ? "  !! TREE MOVED — certifies nothing" : "") +
       (timedOut ? "  !! KILLED at the drive timeout — re-drive it" : ""),
   );

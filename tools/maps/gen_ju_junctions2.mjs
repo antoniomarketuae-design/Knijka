@@ -75,6 +75,7 @@ function polylineLength(pts) {
  *   minorMaxKmh: number,         // maxspeed on the stem
  *   buildingFootprints: Array<{ id: string, footprint: number[][] }>, // corner props
  *   edgeTags?: Record<string, object>,  // extra district-v1 edge fields, per edge id
+ *   crossings?: Array<{ id: string, x: number, y: number, edgeId: string }>, // пешеходни пътеки
  * }} params
  */
 export function buildJunction2District(params) {
@@ -90,6 +91,7 @@ export function buildJunction2District(params) {
     minorMaxKmh,
     buildingFootprints,
     edgeTags,
+    crossings,
   } = params;
 
   // -- Parameter validation (actionable — the assembly line runs unattended).
@@ -155,7 +157,22 @@ export function buildJunction2District(params) {
   const INTERSECTIONS = [
     { id: "tj-n-c", x: 0, y: 0, degree: 3, signalized: false },
   ];
-  const CROSSINGS = [];
+  // ПЕШЕХОДНИ ПЪТЕКИ. This generator shipped with `const CROSSINGS = []` and no
+  // knob, which is `sc-junction-blind:76e3924c` — „the junction paints no
+  // pedestrian crossing" — filed against `world/builders/markings.ts`, which
+  // paints every crossing a district authors and had none to paint. Absent ⇒
+  // the empty array this always produced, so tj-emerge-v1 and tj-scan-v1 stay
+  // byte-identical. `kind: "marked"` because a designated пешеходна пътека in a
+  // Bulgarian city carries М8.1 by Наредба № 2 (see `builders/constants.ts`
+  // paintsZebra); `signalized: false` because these junctions derive no signals.
+  const CROSSINGS = (crossings ?? []).map((c) => ({
+    id: c.id,
+    x: r2(c.x),
+    y: r2(c.y),
+    kind: "marked",
+    signalized: false,
+    edgeId: c.edgeId,
+  }));
   const ROUNDABOUTS = [];
 
   const BUILDINGS = buildingFootprints.map((b) => ({
@@ -325,6 +342,17 @@ export function buildJunction2District(params) {
     else if (Math.abs(distToEdge(host, s.x, s.y) - curbLaneOffsetM(host.lanes, host.oneway)) > 1)
       post.push(`${s.id}: not in its edge's curb lane`);
   }
+  // A пътека must sit ON its host edge's centreline (markings.ts projects it
+  // there and paints the bars across the full width from the projection), and
+  // OUTSIDE the junction mouth — a zebra drawn inside the box is neither legal
+  // nor readable. `junctionRadiusM` is the runtime's own mouth; 12 m is the
+  // conservative floor this generator's 8.125 m half-width roads produce.
+  for (const c of CROSSINGS) {
+    const host = EDGES.find((e) => e.id === c.edgeId);
+    if (!host) post.push(`${c.id}: unknown edgeId ${c.edgeId}`);
+    else if (distToEdge(host, c.x, c.y) > 0.01) post.push(`${c.id}: not on its edge's centreline`);
+    if (Math.hypot(c.x, c.y) < 12) post.push(`${c.id}: inside the junction mouth`);
+  }
   // Control derivation preconditions (mirrors runtime/stoplines.ts ranks).
   const RANK = { primary: 5, secondary: 4, tertiary: 3, unclassified: 2, residential: 2, service: 1 };
   const ranks = EDGES.map((e) => RANK[e.class] ?? 2);
@@ -471,9 +499,39 @@ const INSTANCES = [
     buildingFootprints: [
       { id: "tj-b-occluder", footprint: [[20, -46], [46, -46], [46, -20], [20, -20]] },
     ],
+    // `sc-junction-blind:76e3924c` (major) — „The junction paints no pedestrian
+    // crossing", filed against `world/builders/markings.ts` and true of the
+    // DISTRICT: this generator had no crossings knob, so the зебра loop at
+    // markings.ts:1445 iterated an empty array and the box read as bare asphalt
+    // in `w26/frames/sc-junction-blind__mobile-right/04-t061s.png`. A Bulgarian
+    // urban T-junction of two 40 km/h residential streets carries a пътека on
+    // every arm, and this is the drill whose whole subject is „you cannot see —
+    // so assume": a student who cannot read where the junction begins cannot
+    // read where the people will be either.
+    //
+    // 14 m out on each arm — past the mouth the runtime derives (junctionRadiusM
+    // ≈ 8 m here) and short of the 18 m right-hand-rule core, so the paint marks
+    // the junction's edge without moving anything the lesson grades. The stem
+    // one also sits 5.5 m clear of the shadow's own yield point (4.06, −19.5).
+    // Zero pedestrians compile onto this lesson (`compile.ts`: pedestrianCount
+    // stays 0 outside the pedestrian families), so the armed crossing zone has
+    // nobody to convict him over — the paint is what changes, not the verdict,
+    // and `jblind-model-line-in-compiled-traffic.test.ts` is the ratchet that
+    // says so.
+    crossings: [
+      { id: "tjo-x-s", x: 0, y: -14, edgeId: "tj-e-s" },
+      { id: "tjo-x-w", x: -14, y: 0, edgeId: "tj-e-w" },
+      { id: "tjo-x-e", x: 14, y: 0, edgeId: "tj-e-e" },
+    ],
   },
 ];
 
+// NOT IDEMPOTENT AGAINST THE SHIPPED FILES. `gen_streetwall.mjs` runs AFTER this
+// one and enriches tj-emerge-v1 and tj-scan-v1 in place, so a bare re-run writes
+// them back out without their streetwall: measured here as 529 lines of JSON and
+// 23 frontages deleted from two districts this run was not even asked to change.
+// Re-run that pass, or check the two out again, whenever this file is executed.
+// (tj-occluded-v1 carries only its own occluder, so it round-trips clean.)
 for (const params of INSTANCES) {
   const district = buildJunction2District(params);
   const out = JSON.stringify(district, null, 1) + "\n";

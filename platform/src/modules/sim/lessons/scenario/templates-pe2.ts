@@ -24,11 +24,15 @@
  * THE TWO-ACTOR SPLIT (the honest design — read before editing):
  *  - the PATROL WARDEN is a `policeStop` staged spec: the shipped stopSignal
  *    pose (raised arm + hi-vis vest, ADR-001 fictional) standing at the curb.
- *    That runner is SCENERY + MEASUREMENT ONLY by contract — it emits ZERO
- *    SimTick events, so the paddle can never itself convict (the A12 bias: an
- *    unmodelled duty must not grade). Its outcome channel records „yielded"
- *    when the driver rests at the halt point, „passedWithoutStopping" when the
- *    raised paddle is driven past — the debrief's proof, not the grade.
+ *    She is MEASUREMENT ONLY here and deliberately does NOT author
+ *    `bindingUnderArt103` (contracts.ts) — the flag that lets that runner
+ *    adjudicate a stop signal, added 2026-09-04 for sc-vp-police-stop. ЗДвП
+ *    чл. 103 binds the driver to a signal from the КОНТРОЛНИТЕ ОРГАНИ and a
+ *    school warden is not one, so the paddle still cannot itself convict and
+ *    this template's grading is byte-identical to what it always was. Her
+ *    outcome channel records „yielded" when the driver rests at the halt point,
+ *    „passedWithoutStopping" when the raised paddle is driven past — the
+ *    debrief's proof, not the grade.
  *  - the CHILD GROUP is a `pedestrianDartOut` at pes-x-1: the LAW's duty
  *    (чл. 119 — пропусни стъпилите на пътеката) and the whole graded contract.
  *    Driving past the raised paddle therefore grades PEDESTRIAN_NOT_YIELDED

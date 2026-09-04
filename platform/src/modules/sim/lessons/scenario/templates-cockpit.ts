@@ -642,10 +642,11 @@ const PS_LEFT = 4.06;
  * driver reacted to him. He now stands ON the carriageway edge, ~1.7 m off the
  * halt point, which is where an officer with a стоп-палка actually stands and
  * which puts him clear of the parked row and squarely in the chase frame.
- * VISUAL ONLY: PoliceStopRunner reads `officer` for the figure's standing path
- * and for the „passed him by passBeyondM" OUTCOME; the runner emits no SimTick
- * events at all, so nothing here can grade (A12). The graded contract is `stop`
- * + the curb-side reachZone objective, both untouched.
+ * PoliceStopRunner reads `officer` for the figure's standing path AND for the
+ * „passed him by passBeyondM" resolution — which since 2026-09-04 carries a
+ * charge as well as an outcome (`bindingUnderArt103` below), so this point is
+ * no longer visual only: move it and you move where чл. 103 is adjudicated.
+ * Completion is still `stop` + the curb-side reachZone objective.
  */
 const PS_OFFICER = { x: 15.6, y: 208 };
 /** The curb-side halt point: right edge of the right lane, just short of the
@@ -653,16 +654,23 @@ const PS_OFFICER = { x: 15.6, y: 208 };
 const PS_STOP = { x: 13.9, y: 206 };
 const PS_STOP_RADIUS_M = 3;
 const PS_STOP_SPEED_KMH = 4;
+/**
+ * How far kerb-ward of the lane centre the car must sit for «плътно вдясно» to
+ * be true, m (`ReachZoneParams.requireKerbwardM`). The lane centre is 12.19,
+ * the taught halt point 13.9 and the kerb 16.25, so 1.0 puts the boundary at
+ * x = 13.19 — a metre clear of the pose the briefing forbids and 0.71 m of
+ * slack under the pose it teaches.
+ */
+const PS_STOP_KERBWARD_M = 1.0;
 
 /**
- * The staged OFFICER FIGURE on ln-v1 (kind "policeStop" — scenery +
- * measurement only, see contracts.ts): stands at the curb at y = 210 facing
- * the roadway (west), right arm raised — the стоп-сигнал pose, hi-vis vest,
- * fictional per ADR-001. The runner emits ZERO SimTick events: the graded
- * duty lives entirely in this template's objectives (the curb-side low-speed
- * reachZone below = the pull-over-and-stop completion), so no new violation
- * code exists to false-fire (A12). The outcome channel records "yielded" /
- * "passedWithoutStopping" for the debrief.
+ * The staged OFFICER FIGURE on ln-v1 (kind "policeStop", see contracts.ts):
+ * stands at the carriageway edge facing the roadway (west), right arm raised —
+ * the стоп-сигнал pose, hi-vis vest, fictional per ADR-001. COMPLETION is this
+ * template's own objectives (the curb-side low-speed reachZone below = the
+ * pull-over-and-stop duty); the REFUSAL is чл. 103's and grades from the runner
+ * since 2026-09-04 (`bindingUnderArt103`). The outcome channel still records
+ * "yielded" / "passedWithoutStopping" for the debrief.
  */
 const VP_POLICE_OFFICER: PoliceStopSpec = {
   id: "sc-vpps-officer",
@@ -674,6 +682,12 @@ const VP_POLICE_OFFICER: PoliceStopSpec = {
   stopRadiusM: PS_STOP_RADIUS_M,
   stopSpeedKmh: PS_STOP_SPEED_KMH,
   passBeyondM: 25,
+  // This figure IS a контролен орган — a uniformed officer with a стоп-палка —
+  // so his signal binds under ЗДвП чл. 103 and the runner may adjudicate it
+  // (sc-vp-police-stop:44cfeff6). `sc-pe-school-patrol` reuses the same staged
+  // kind for a school warden and deliberately does NOT author this: her act is
+  // чл. 119's, graded through the children on the zebra.
+  bindingUnderArt103: true,
 };
 
 /**
@@ -684,85 +698,79 @@ const VP_POLICE_OFFICER: PoliceStopSpec = {
  *
  * COMPLETION DRILL (the stage-1c mandate): graded through EXISTING objective
  * kinds only — a low-speed curb-side reachZone (the sc-pk-smooth-stop
- * stop-mark pattern) IS the pull-over-and-stop duty; no new violation code.
- * The mistake demos grade shipped codes that honestly fit each wrong way:
+ * stop-mark pattern) IS the pull-over-and-stop duty.
  *   - „Подминаване на сигнала" — swerves LEFT around the officer and drives
- *     on: the left-lane hog grades NOT_KEEPING_RIGHT (чл. 15) and the drill
- *     never completes (the stop zone stays unreached — capped outcome);
+ *     on: since 2026-09-04 the act itself grades, POLICE_STOP_SIGNAL_IGNORED
+ *     (ЗДвП чл. 103), beside the left-lane hog's NOT_KEEPING_RIGHT (чл. 15),
+ *     and the drill still never completes (the stop zone stays unreached);
  *   - „Паника в лентата" — the doc-72 mistake verbatim (panic-brake in-lane
  *     instead of pulling right): the ≥ 8 m/s² slam on an empty street grades
  *     HARSH_BRAKING_NO_CAUSE, and the early mid-lane rest never reaches the
  *     stop zone either.
- * HONEST LIMIT (documented like sc-pk-smooth-stop's smoothness note): the
- * WITHIN-LANE pull-to-the-edge nuance (~1.7 m) is coached by the instructions
- * and the shadow, not zone-graded — a circular reachZone cannot honestly
- * discriminate lateral position inside one lane.
  *
- * ── …AND WHY THAT LIMIT CANNOT BE CLOSED BY MOVING NUMBERS IN THIS FILE ─────
- *    (sc-vp-police-stop:ab262758, re-measured 2026-08-30)
+ * ── THE LESSON'S OWN SUBJECT IS GRADED (sc-vp-police-stop:44cfeff6) ─────────
+ * This template used to say „no new violation code" and mean it: the runner
+ * emitted nothing, so the ONLY thing a pass-by could be convicted of was
+ * whatever the student happened to hit. The audit put it exactly — the wrong
+ * lane „is convicted for causing a collision, not for disobeying the officer's
+ * stop signal … so a student who ignores the officer without crashing would not
+ * be caught". `PoliceStopRunner` now resolves both ways in the existing
+ * `prioritySituation` vocabulary ("police-stop-signal"), which is the six-part
+ * change `rules/catalog.ts` specifies and the telltale twin walked first.
+ * A12 is not bent: the duty is modelled to the metre by this template's own
+ * halt contract and `passBeyondM`, and it resolves once per drive.
+ * ── THE WITHIN-LANE POSE IS NOW GRADED (sc-vp-police-stop:ab262758) ────────
+ *    landed 2026-09-04; filed 2026-08-18, re-measured 2026-08-30
  *
- * WHAT THE GATE ACTUALLY ACCEPTS, read out of `compileScenario` rather than
- * argued, because the AUTHORED radius below is not the graded one:
+ * WHAT WAS BROKEN, off the frame it was filed on
+ * (`.audit-frames/sweep161/sc-vp-police-stop/mobile-right`, whose own
+ * `audit.log` prints «✓ Спри плътно вдясно при полицая 2:28 · ИЗДЪРЖАН · 0
+ * наказателни точки · 3 от 3 звезди»): the halt gate was a disc, and a disc has
+ * one radius. Read out of `compileScenario` rather than argued —
  *
  *      rung     halt gate      accepted lateral band (car centre x)
  *      L1       radius 4.50     9.40 … 18.40
  *      L2       radius 3.75    10.15 … 17.65
  *      L3–L5    radius 3.00    10.90 … 16.90
  *
- * The right lane of ln-v1 runs x ∈ [8.13, 16.25] around a centre of 12.19, so
- * at L1 — «Пълна помощ», the rung the sweep drove and this row was filed from —
- * the gate accepts 97% of the lane WIDTH: a car resting with its left wheels on
- * the lane line is inside it. And a cap of 4 км/ч is a HALT demand, so
- * `stepReachZone` unlocks the REACH_ZONE_GRACE_M capsule on top of the disc and
- * the same car standing 9.5 m BEFORE the mark — 11.4 m before the officer —
- * earns «Спри плътно вдясно при полицая», ИЗДЪРЖАН, ★★★. Instruction 4 names
- * that exact stop as the mistake („не насред платното"): a briefing and a gate
- * telling one student opposite things.
+ * — against a right lane running x ∈ [8.13, 16.25] about a centre of 12.19.
+ * At L1, the rung the sweep drove, that is 97 % of the lane WIDTH: a car at
+ * rest ON THE LANE CENTRE was inside it, and instruction 4 names that exact
+ * pose as the mistake („не насред платното"). A briefing and a gate telling one
+ * student opposite things.
  *
- * THE SEAM OWNS THE ONLY DIAL, and this is the trap for the next lane that
- * reaches for the obvious fix. `params.ts widenSpeedCap` already carves halt
- * gates out of the ladder on the SPEED axis („«спри» means спри on every rung")
- * and the same carve-out was never made on the RADIUS — but authoring
- * `toleranceScale: 1` on rungs 1 and 2 here (measured: it does put both back to
- * 3.00) collapses L1 ≡ L2 ≡ L3 into one compiled lesson, and
- * `__tests__/level-seam.test.ts` S4 refuses that on the founder's own sentence
- * („L2 L3 L4 L5 They have Nothing More"). On this template the ladder's ONLY
- * lever is the acceptance radius — no traffic baseline, no per-rung conditions,
- * no maneuver tolerance — so „stop the aided rung over-accepting" and „make the
- * three lowest rungs different lessons" are in structural conflict, and the
- * same conflict would hit all 42 halt gates if `widenRadius` were taught the
- * carve-out catalogue-wide. Neither half is authorable here; both are named so
- * the wave that owns `scenario/params.ts` + `level-seam.test.ts` can decide
- * them together.
+ * WHY NO NUMBER IN THIS FILE COULD FIX IT. The taught pose and the forbidden
+ * one are 1.71 m apart (`PS_STOP.x` 13.9 against the centre 12.19) and the car
+ * is 1.70 m WIDE (collision/bodies.ts, CHASSIS_HALF_EXTENTS.x = 0.85), so a
+ * circle small enough to refuse the centre is narrower than the vehicle it
+ * grades; and the mark cannot move right to buy room, because PS_OFFICER stands
+ * ON the carriageway edge at x = 15.6 (the 2026-07-27 visibility ruling above).
+ * Pinning `toleranceScale` on the aided rungs instead collapses L1 ≡ L2 ≡ L3
+ * into one compiled lesson, which `__tests__/level-seam.test.ts` S4 refuses on
+ * the founder's own sentence („L2 L3 L4 L5 They have Nothing More") — on this
+ * template the acceptance radius IS the rung ladder.
  *
- * The taught pose and the forbidden one are 1.71 m apart — `PS_STOP.x` 13.9
- * against the right lane's centre 12.19 — and the car is 1.70 m WIDE
- * (collision/bodies.ts, CHASSIS_HALF_EXTENTS.x = 0.85). A disc small enough to
- * refuse the lane centre is therefore narrower than the vehicle it is grading.
- * Nor can the mark be moved right to buy room: the officer stands ON the
- * carriageway edge at x = 15.6 (the 2026-07-27 visibility ruling on
- * `PS_OFFICER` above), so a car pulled any further over drives into him — the
- * halt point is already as far right as the staging allows. Sized to refuse
- * the mistake, the gate would refuse the BEST pull-over with it, which is the
- * doc 86 B3/B5 failure the founder ranks worst.
+ * SO THE SECOND AXIS IS AUTHORED. `requireKerbwardM: 1.0` on `sc-vpps-stop`
+ * (the term's design note lives on `ReachZoneParams` in lessons/types.ts, the
+ * evaluator arm in `stepReachZone`) reads `tick.laneOffsetM` — the locator's
+ * own signed lane-referenced offset, measured across the CARRIAGEWAY rather
+ * than across the student's approach — so the tick can only be earned from the
+ * kerb-side half of the lane. Measured through
+ * `recordScVpPoliceStopDrive → applyTick` (`__tests__/police-stop-kerbside-
+ * gate.test.ts`): the shadow rests at −1.71 m and keeps its certificate with
+ * 0.71 m to spare, while the panic slam rests at −0.004 m — dead centre — and
+ * cannot earn it at any rung. The term is NOT laddered (`scenario/params.ts`),
+ * which is precisely what leaves the radius ladder free to go on separating
+ * L1/L2/L3 ALONG the road while the sideways demand stays the same on every
+ * rung.
  *
- * `lessons/__tests__/stop-claim-gates.test.ts` measured the same geometry from
- * the other side and names this row while doing it: „radius 3 (4.5 at L1)
- * around a mark 1.71 m off the lane centre — it proves the SIDE and cannot
- * tell a kerbside rest from a mid-lane one."
- *
- * WHAT WOULD CLOSE IT, so the row carries an address rather than a shrug: a
- * LANE-REFERENCED lateral term on `ReachZoneParams` (lessons/types.ts) read by
- * `stepReachZone` (lessons/objectives.ts) — the shape `requireNoContact` and
- * `requireRailClear` already established, both of them routed to that file by
- * a template that could not grade its own title. Measured ACROSS THE DISTRICT'S
- * LANE AXIS rather than across the student's approach axis (which is what
- * `inApproachGrace`'s `lateral` uses today, and which tilts with the way he
- * came in), it would leave the disc generous ALONG the road — where the 5 m
- * REACH_ZONE_GRACE_M capsule is a founder ruling — while narrowing the
- * sideways acceptance to the ~1 m this title actually claims. Until that term
- * exists, the ladder opt-out on the rungs below is the whole of what this file
- * can honestly do, and the row stays open.
+ * WHAT IS DELIBERATELY UNTOUCHED: the grace capsule's generosity along the
+ * approach (REACH_ZONE_GRACE_M — a founder ruling: stopping four metres early
+ * is stopping here, done sooner). A student who pulls hard right and halts a
+ * few metres short of the officer still passes, and should. `lessons/__tests__/
+ * stop-claim-gates.test.ts` still records the SIBLING rows that carry «плътно»
+ * on the same geometry without the term — `sc-vp-telltale/sc-vptt-stop` and
+ * `sc-vp-telltale-red` — which belong to another lesson's lane.
  */
 export const SC_VP_POLICE_STOP: ScenarioSpec = {
   id: "sc-vp-police-stop",
@@ -819,6 +827,14 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
         y: PS_STOP.y,
         radiusM: PS_STOP_RADIUS_M,
         maxSpeedKmh: PS_STOP_SPEED_KMH,
+        // «ПЛЪТНО» — the half of this title a disc could not grade, and the
+        // whole of sc-vp-police-stop:ab262758. 1.0 m kerb-ward of the lane
+        // centre, not 1.71 (the mark's own offset): the boundary has to leave
+        // a student who lands the taught pose room to be imperfect, and the
+        // founder ranks refusing a correct pull-over as the worse failure. It
+        // still refuses the filed frame by a full metre. See the spec's doc
+        // comment above for the measurement and the ladder argument.
+        requireKerbwardM: PS_STOP_KERBWARD_M,
       },
     },
   ],
@@ -834,8 +850,24 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-vp-police-stop/mistake-drive-past.trace.json" },
       titleBg: "Подминаване на сигнала",
       whatWentWrongBg:
-        "Водачът видя сигнала, измести се в лявата лента и просто отмина полицая. Разпореждането за спиране е задължително (чл. 170) — неизпълнението му е сериозно нарушение с глоба и книжка на масата. А оставането в лявата лента при свободна дясна е и „висене“ в лентата за изпреварване (чл. 15).",
-      codeRefs: ["NOT_KEEPING_RIGHT"],
+        "Водачът видя сигнала, измести се в лявата лента и просто отмина полицая. При подаден сигнал за спиране водачът е ДЛЪЖЕН да спре плавно в най-дясната част на платното и да изчака указанията (чл. 103) — подминаването е отказ да изпълниш нареждане на органите за контрол и струва три месеца без книжка. А оставането в лявата лента при свободна дясна е и „висене“ в лентата за изпреварване (чл. 15).",
+      // Two acts, two codes, two lessons — the stage-2b rule. The pass-by is
+      // чл. 103's own offence and grades from the runner; the left-lane hog is
+      // чл. 15 and grades from the keep-right tracker. Before 2026-09-04 only
+      // the second existed and had to stand in for both.
+      //
+      // WHY THIS CARD SAYS чл. 103 WHILE THE BRIEFING ABOVE SAYS чл. 170, and
+      // both are right: чл. 170 is the article about the CHECK — who exercises
+      // control, how the signal is given (ал. 3), what the officer must show
+      // (ал. 6) — and it is what the objective and the recorded demo
+      // annotations cite. The DRIVER's own obligation, and therefore the
+      // offence this code convicts, is чл. 103: „длъжен е да спре плавно в
+      // най-дясната част на платното… и да изпълнява неговите указания". The
+      // briefing copy is left as recorded (the committed traces narrate the
+      // same чл. 170 line, and a half-swap would put two citations for one act
+      // on one screen); unifying them is a re-recording job, noted rather than
+      // half-done.
+      codeRefs: ["POLICE_STOP_SIGNAL_IGNORED", "NOT_KEEPING_RIGHT"],
     },
     {
       traceRef: { path: "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json" },

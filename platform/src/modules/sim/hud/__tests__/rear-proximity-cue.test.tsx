@@ -56,9 +56,15 @@ import {
   type StageBox,
 } from "../../../../components/sim/TouchControls";
 
-/** The badge markup for a given cue — what actually reaches the glass. */
-function badgeMarkup(cue: RearCue): string {
-  return renderToStaticMarkup(<RearProximityBadge cue={cue} />);
+/**
+ * The badge markup for a given cue — what actually reaches the glass.
+ *
+ * `kind` defaults to "vehicle" so the rows below still read as the distance and
+ * severity assertions they are; the cue's own default is the same word, and the
+ * kind's two branches are asserted in `rear-cyclist-behind.test.ts`.
+ */
+function badgeMarkup(cue: Omit<RearCue, "kind"> & { kind?: RearCue["kind"] }): string {
+  return renderToStaticMarkup(<RearProximityBadge cue={{ kind: "vehicle", ...cue }} />);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -331,13 +337,29 @@ describe("the thumb band · the model must first reproduce a frame read by eye",
 // 4 · BOTH DIRECTIONS OF THE WARNING — THE ROW THE PARKING FAMILY RIDES ON
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * The shipped sweep, wrapped as the read the component polls since 2026-09-04.
+ *
+ * `rearGapFor` is UNCHANGED and is still exactly what these rows exercise: every
+ * one of them is about the DISTANCE half, so the kind is "vehicle" — precisely
+ * what `TrafficSystemImpl.rearBodyBehind` reports for an ambient car. Infinity
+ * still maps to `null`, which is the honesty contract's own mapping. The kind
+ * half has its own file (`rear-cyclist-behind.test.ts`).
+ */
+function carsBehind(
+  vehicles: readonly { x: number; y: number }[],
+  px: number,
+  py: number,
+  headingDeg: number,
+): { gapM: number; kind: "vehicle" } | null {
+  const gapM = rearGapFor(vehicles, px, py, headingDeg);
+  return Number.isFinite(gapM) ? { gapM, kind: "vehicle" } : null;
+}
+
 /** Drive the component's own fold the way its 5 Hz poll does. */
 function poll(source: RearGapSource, pose: RearCuePose, prev: RearCue | null): RearCue | null {
-  return stepRearCue(
-    prev,
-    source.rearGapMeters(pose.position.x, pose.position.y, pose.headingDeg),
-    pose.speedKmh,
-  );
+  const behind = source.rearBodyBehind(pose.position.x, pose.position.y, pose.headingDeg);
+  return stepRearCue(prev, behind?.gapM ?? Infinity, pose.speedKmh, behind?.kind ?? "vehicle");
 }
 
 /** A student reversing due north at parking speed. */
@@ -350,7 +372,7 @@ describe("a reversing student who IS close to something is warned", () => {
     // gap is bumper-to-bumper and smaller than the centre distance — which is
     // the honest number for a student to read while reversing.
     const source: RearGapSource = {
-      rearGapMeters: (px, py, h) => rearGapFor([{ x: 0, y: -1.2 }], px, py, h),
+      rearBodyBehind: (px, py, h) => carsBehind([{ x: 0, y: -1.2 }], px, py, h),
     };
     const cue = poll(source, REVERSING, null);
     expect(cue).not.toBeNull();
@@ -384,7 +406,7 @@ describe("a reversing student who IS close to something is warned", () => {
         // seating the body at −(d + 4.1) makes the REPORTED bumper gap exactly
         // d — the ramp is walked in the units the student reads, not in centre
         // distances the badge never shows.
-        rearGapMeters: (px, py, h) => rearGapFor([{ x: 0, y: -(d + 4.1) }], px, py, h),
+        rearBodyBehind: (px, py, h) => carsBehind([{ x: 0, y: -(d + 4.1) }], px, py, h),
       };
       prev = poll(source, REVERSING, prev);
       expect(prev, `silent at ${d} m behind`).not.toBeNull();
@@ -399,9 +421,9 @@ describe("a reversing student who is NOT close to anything is not warned", () =>
     // The false-certificate direction's mirror: a badge that lingers after the
     // road behind clears teaches a student to distrust the one rear instrument
     // they have, and the next real warning is furniture.
-    const empty: RearGapSource = { rearGapMeters: (px, py, h) => rearGapFor([], px, py, h) };
+    const empty: RearGapSource = { rearBodyBehind: (px, py, h) => carsBehind([], px, py, h) };
     expect(poll(empty, REVERSING, null)).toBeNull();
-    expect(poll(empty, REVERSING, { level: "danger", meters: 1 })).toBeNull();
+    expect(poll(empty, REVERSING, { level: "danger", meters: 1, kind: "vehicle" })).toBeNull();
     // MUTATION: make rearGapFor return 0 instead of Infinity for „nothing
     // found" and both fail — which is the shape of every false-warning bug.
   });
@@ -410,11 +432,11 @@ describe("a reversing student who is NOT close to anything is not warned", () =>
     // Two ways a rear cue can lie in the reassuring-looking direction by firing
     // when it should not, both of which would train a student to ignore it.
     const ahead: RearGapSource = {
-      rearGapMeters: (px, py, h) => rearGapFor([{ x: 0, y: +8 }], px, py, h),
+      rearBodyBehind: (px, py, h) => carsBehind([{ x: 0, y: +8 }], px, py, h),
     };
     expect(poll(ahead, REVERSING, null)).toBeNull();
     const nextLane: RearGapSource = {
-      rearGapMeters: (px, py, h) => rearGapFor([{ x: 8.1, y: -3 }], px, py, h),
+      rearBodyBehind: (px, py, h) => carsBehind([{ x: 8.1, y: -3 }], px, py, h),
     };
     expect(poll(nextLane, REVERSING, null)).toBeNull();
   });
@@ -457,12 +479,12 @@ describe("a reversing student who is NOT close to anything is not warned", () =>
     // source reports, and the seam is what decides whether a student is warned.
     const NEIGHBOUR = { x: 0, y: -0.8 };
     const asVehicle: RearGapSource = {
-      rearGapMeters: (px, py, h) => rearGapFor([NEIGHBOUR], px, py, h),
+      rearBodyBehind: (px, py, h) => carsBehind([NEIGHBOUR], px, py, h),
     };
     const asObstacle: RearGapSource = {
       // What the parking family actually hands it: the bay occupant exists in
       // the world and in the collider pool, and in NO vehicle array.
-      rearGapMeters: (px, py, h) => rearGapFor([], px, py, h),
+      rearBodyBehind: (px, py, h) => carsBehind([], px, py, h),
     };
     expect(poll(asVehicle, REVERSING, null), "a vehicle 0.8 m behind").not.toBeNull();
     expect(poll(asObstacle, REVERSING, null), "the SAME body as an obstacle").toBeNull();
@@ -523,7 +545,7 @@ describe("O61 · the level a student is shown is the level that was computed", (
     const source: RearGapSource = {
       // 0.1157 m of bumper gap: the body centre 4.2157 m back, less the 4.1 m
       // `bumperSubtrahendM` eats.
-      rearGapMeters: (px, py, h) => rearGapFor([{ x: 0, y: -4.2157 }], px, py, h),
+      rearBodyBehind: (px, py, h) => carsBehind([{ x: 0, y: -4.2157 }], px, py, h),
     };
     const pose: RearCuePose = { position: { x: 0, y: 0 }, headingDeg: 0, speedKmh: -3.828 };
     const cue = poll(source, pose, null);
@@ -540,7 +562,7 @@ describe("O61 · the level a student is shown is the level that was computed", (
     expect(badgeMarkup(forward!)).not.toContain("border-color:var(--danger)");
     // …and so is reversing at the same speed with six metres of air.
     const roomy: RearGapSource = {
-      rearGapMeters: (px, py, h) => rearGapFor([{ x: 0, y: -10.1 }], px, py, h),
+      rearBodyBehind: (px, py, h) => carsBehind([{ x: 0, y: -10.1 }], px, py, h),
     };
     const clear = poll(roomy, pose, null);
     expect(clear!.level).toBe("warn");

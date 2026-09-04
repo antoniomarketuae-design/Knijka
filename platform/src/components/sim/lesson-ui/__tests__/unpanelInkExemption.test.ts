@@ -801,3 +801,131 @@ describe("UNPANEL — the audio prompt has ground too, and it is the SAME ground
     expect(shadeSrc).not.toContain("MaskImage");
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE FIFTH, WHICH IS THE SMALLEST AND IS UP THE LONGEST —
+   sc-ac-crosswind:4607edf0, major: „The objective chip and the route pill have
+   no opaque plate — world geometry reads straight through their text."
+
+   The objective chip's half of that row closed at 2706813 (`ObjectiveScrim` in
+   `hud/ObjectiveBanner.tsx`). The ROUTE PILL's half survived it, and survived
+   because it is the shape the note above `GHOST_SURFACES` warns about running
+   backwards: «Следвай синята линия» asks for `bg-background/85 shadow-glow-sm
+   backdrop-blur` in its own class list, in good faith, and every one of those
+   three declarations has been dead since `[data-hud="follow-hint"]` joined
+   GHOST_SURFACES. What shipped is an accent ring around bare world.
+
+   Read off the two filed frames (`.audit-frames/sweep161/sc-ac-crosswind/
+   pc-right/04-t121s.png` and `04-t191s.png`, 1440 × 900): the pill's cyan
+   glyphs stand on six-storey block facades on one and on the sky on the other,
+   and on both they composite with the objective banner's own line behind them.
+
+   THE PILL IS ALSO THE ONE AID THAT IS UP FOR THE WHOLE OF EVERY L1 DRIVE, so
+   it is the surface a student spends the most seconds failing to read.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe("UNPANEL — the route pill has ground too, and it is the SAME ground", () => {
+  const scene = readFileSync(join(__dirname, "..", "..", "LessonScene.tsx"), "utf8");
+  /** The chip's own element, from its `data-hud` name to its sentence.
+   *  The end anchor is searched FROM the start one: the sentence is also
+   *  quoted in a tuning comment 2 400 lines higher up, and anchoring on the
+   *  file's first occurrence yields an empty slice that every `toContain`
+   *  below then fails on — which is how this case was written the first time. */
+  const CARD = (() => {
+    const at = scene.indexOf('data-hud="follow-hint"');
+    const end = scene.indexOf("Следвай синята линия", at);
+    if (at < 0 || end < at) {
+      throw new Error("the route pill's anchors moved in LessonScene.tsx — re-anchor this suite");
+    }
+    return scene.slice(at, end);
+  })();
+  /** …and the same slice with the prose taken out — the trap this file already
+   *  fell into once: an assertion that cannot tell code from the paragraph
+   *  describing it is a ban on writing the reason down. */
+  const CARD_CODE = CARD.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  it("the pill carries a shade, and the shade carries the exemption", () => {
+    expect(CARD_CODE).toContain('data-hud="follow-hint-scrim"');
+    const shadeAt = CARD_CODE.indexOf('data-hud="follow-hint-scrim"');
+    expect(
+      CARD_CODE.slice(shadeAt, shadeAt + 200),
+      "the route pill's shade lost data-hud-ink — the sweep strips it and the " +
+        "two filed frames come back exactly as they were",
+    ).toContain('data-hud-ink=""');
+  });
+
+  it("…and the shade survives the sweep when the tree is actually run", () => {
+    // `[data-hud="follow-hint"]` is its own entry on GHOST_SURFACES, so the
+    // ghost root here is the attribute and not `.hud-ghost`; the shade sits
+    // two levels down, which is what `:not([data-hud-ink] *)` also has to be
+    // right about.
+    const s = el("div", { attrs: { "data-sim-stage": "" } });
+    const ghost = el("div", { attrs: { "data-hud": "follow-hint" }, parent: s });
+    const pill = el("div", { parent: ghost });
+    const shadeEl = el("div", {
+      attrs: { "data-hud": "follow-hint-scrim", "data-hud-ink": "" },
+      parent: pill,
+    });
+    expect(SWEEP, "the UNPANEL sweep moved — re-anchor this file").not.toBeNull();
+    // The shade keeps its ground…
+    expect(stripped(shadeEl, SWEEP!.selector)).toBe(false);
+    // …the pill itself still loses the fill its class list asks for, so the
+    // register the founder signed off is unchanged and the ground arrives as
+    // ink rather than as a panel…
+    expect(stripped(pill, SWEEP!.selector)).toBe(true);
+    // …and MUTATION: with the exemption gone the shade goes with it, i.e. this
+    // repair becomes a diff that changes no pixel.
+    expect(stripped(shadeEl, SWEEP_WITHOUT_INK_EXEMPTION())).toBe(true);
+  });
+
+  it("the ground is the PUBLISHED one — no sixth copy of the gradient", () => {
+    expect(CARD_CODE).toContain("peekScrimBackgroundCss(");
+    expect(CARD_CODE).not.toContain("linear-gradient");
+    // The feather is read off the published table, and it is `.right` on BOTH
+    // sides: `px-3.5` is 14 px and the published `.left` is 26, which would
+    // stand the first characters of the sentence on a ramp. The invariant is
+    // `feather[side] <= padding[side]`.
+    expect(CARD_CODE).toContain("PEEK_SCRIM_FEATHER_PX.right");
+    expect(CARD_CODE).not.toMatch(/left:\s*\d/);
+    // The BARREL, not this file's import line (doc 05 — modules talk through
+    // `index.ts`).
+    const barrel = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "modules", "sim", "hud", "index.ts"),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(barrel).toContain("peekScrimBackgroundCss,");
+    expect(barrel).toContain("PEEK_SCRIM_FEATHER_PX,");
+  });
+
+  it("the pill is the shade's stacking context AND its containing block", () => {
+    // Read off the class STRING and asserted to be code — the prose above this
+    // className quotes `borderRadius: inherit` and the border deliberately.
+    const shadeAt = scene.indexOf('data-hud="follow-hint-scrim"');
+    expect(shadeAt, "the route pill's shade is gone — re-anchor").toBeGreaterThan(-1);
+    const classAt = scene.lastIndexOf('className="', shadeAt);
+    expect(classAt, "no className between the pill and its shade — re-anchor").toBeGreaterThan(-1);
+    const hostClass = scene.slice(classAt, scene.indexOf('"', classAt + 'className="'.length) + 1);
+    expect(hostClass).not.toContain("//");
+    expect(
+      hostClass,
+      "the route pill's shade lost `relative` — `inset: 0` now resolves against " +
+        '[data-hud="follow-hint"], the un-padded positioning wrapper, and ' +
+        "`borderRadius: inherit` inherits from a box with no radius",
+    ).toContain("relative");
+    expect(
+      hostClass,
+      "the route pill's shade lost `isolate` — a `position: relative` box at " +
+        "`z-index: auto` opens no stacking context, so the `z-index: -1` shade " +
+        "keeps searching upwards and paints behind the stage: no ground at all",
+    ).toContain("isolate");
+
+    // …and the edge that stands in for the vertical feather this surface
+    // deliberately does not take — the `controls-help` and `audio-prompt`
+    // cases, verbatim. If the border or the radius ever goes, `peekScrimMaskCss`
+    // arrives in the same commit.
+    expect(hostClass).toContain("rounded-full");
+    expect(hostClass).toContain("border-accent/60");
+    const shadeSrc = scene.slice(shadeAt, scene.indexOf("/>", shadeAt) + 2);
+    expect(shadeSrc).toContain('borderRadius: "inherit"');
+    expect(shadeSrc).not.toContain("MaskImage");
+  });
+});

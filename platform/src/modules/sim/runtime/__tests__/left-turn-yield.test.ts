@@ -199,3 +199,59 @@ describe("left-turn-across-path adjudication (JU-10)", () => {
     expect(priorityOf(ticks).filter((e) => "violated" in e && e.violated)).toHaveLength(0);
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   RX-05 (sc-rx-tram-left:07c63b97) — THE PROBE'S OWN NUMBER, PUBLISHED
+
+   Everything above adjudicates a COMMIT: the gap is measured every frame and
+   then discarded unless the player turns. That is why a student standing at
+   the mouth while a tram bore down on him was, to `lessons/finish.ts
+   yieldReasonAt`, a car stopped in front of nothing — the measurement existed
+   and never left this file. `SimTick.oncomingRailGapSec` is the same number,
+   published on the frames a RAIL vehicle is making the claim, and it changes
+   no verdict here: чл. 37, ал. 1's conviction stays exactly where it was.
+   ────────────────────────────────────────────────────────────────────────── */
+
+const TRAM_CLOSING: OncomingConflict = { distM: 21, closingMps: 10.5, rail: true }; // 2 s
+
+describe("the oncoming rail vehicle's arrival gap reaches the tick", () => {
+  it("publishes the gap in seconds while a tram is closing on the junction", () => {
+    const rt = createWorldRuntime(loadDistrict());
+    rt.setOncomingQuery(() => TRAM_CLOSING);
+    // A WAITING driver: no sweep, so nothing is adjudicated — which is the
+    // whole case. The channel has to exist before the commit, not at it.
+    const ticks = run(rt, frames(approach(24), 0));
+    const gaps = ticks.map((t) => t.oncomingRailGapSec).filter((g) => g !== undefined);
+    expect(gaps.length).toBeGreaterThan(0);
+    for (const g of gaps) expect(g).toBeCloseTo(2, 6);
+    // …and the grading channel is untouched: he never turned.
+    expect(priorityOf(ticks)).toHaveLength(0);
+  });
+
+  it("says NOTHING for an ordinary oncoming car — absence is the default", () => {
+    const rt = createWorldRuntime(loadDistrict());
+    rt.setOncomingQuery(() => TIGHT); // same geometry, no `rail`
+    const ticks = run(rt, frames(approach(24), 0));
+    for (const t of ticks) expect(Object.hasOwn(t, "oncomingRailGapSec")).toBe(false);
+  });
+
+  it("says nothing on an empty road, or through a legacy boolean wiring", () => {
+    // The boolean form cannot answer „релсово ли е", so it must publish
+    // UNKNOWN rather than guess — absence is never „the track is clear".
+    for (const q of [undefined, () => true] as const) {
+      const rt = createWorldRuntime(loadDistrict());
+      if (q !== undefined) rt.setOncomingQuery(q);
+      const ticks = run(rt, frames(approach(24), 0));
+      for (const t of ticks) expect(t.oncomingRailGapSec).toBeUndefined();
+    }
+  });
+
+  it("a tram too slow to make an arrival claim publishes nothing", () => {
+    // The closing floor (LEFT_TURN_MIN_CLOSING_MPS) is what keeps a tram
+    // standing at its own stop from arming a wait that would never end.
+    const rt = createWorldRuntime(loadDistrict());
+    rt.setOncomingQuery(() => ({ distM: 14, closingMps: 0.2, rail: true }));
+    const ticks = run(rt, frames(approach(24), 0));
+    for (const t of ticks) expect(t.oncomingRailGapSec).toBeUndefined();
+  });
+});

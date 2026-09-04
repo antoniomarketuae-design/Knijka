@@ -43,6 +43,36 @@
  *  touch, so a readback can never confuse the two. */
 export const TOUCH_PROBE_POINTER_ID = 4242;
 
+/**
+ * THE TWO INSTANTS, AND WHY THE PROBE HAS TO KNOW WHICH ONE IT IS AT.
+ *
+ * The first build of this file was called ONCE, after the drive, and it
+ * refused on every lane it ever ran on. Measured at the commit that shipped it
+ * (`.audit-frames/canary-8b9d135-232028/frames/sc-park-wall__mobile-right/run.log`):
+ *
+ *   TOUCH PROBE: NOT actuated · 0 touch events dispatched · … — the touch
+ *   overlay is mounted but inert — a press here is refused by design
+ *
+ * That refusal is correct and the cause is in the product, working as
+ * designed: `LessonScene.tsx` renders `<TouchControls hidden={physicsPaused}>`
+ * and `TouchControls.tsx` stamps `data-sim-touch-inert="on"` whenever
+ * `!visible`. A drive ends because the session ended, i.e. with the end card
+ * up and the physics paused — so the one moment the old call site could never
+ * reach the pad was the moment it always ran at. The capability shipped dead
+ * and `touchProbe: "NOT actuated"` carried exactly as much information as the
+ * `touchEvents: 0` column already did.
+ *
+ * So the reading that can actuate is taken at the LAST INSTANT OF THE DRIVE AT
+ * WHICH THE CAR IS UNTOUCHED — the landmark `steerLiveness` already uses: the
+ * ladder is finished, the world is running (`physicsPaused` false, overlay
+ * live) and no pedal has been pressed. The post-drive reading is kept because
+ * it answers a different question — whether the pads went inert under the end
+ * card, which is doc 91 §I3's own promise — and `mergeProbes` reports the one
+ * that reached the component.
+ */
+export const PROBE_BEFORE_DRIVE = "before the drive, on the untouched car";
+export const PROBE_AFTER_DRIVE = "after the drive, under the end card";
+
 /** How long the finger stays down. Long enough that a pad which drops its
  *  ownership on a timer or a re-render has dropped it before the second read. */
 export const TOUCH_PROBE_HOLD_MS = 500;
@@ -166,13 +196,47 @@ export function readbackVerdict(raw) {
   return { actuated, held, released, events, why };
 }
 
+/**
+ * PICK THE READING THAT REACHED THE COMPONENT, AND SUM WHAT BOTH SENT.
+ *
+ * No browser in it, for the reason `readbackVerdict` has none: which instant
+ * a lane is entitled to report is a judgement, and a judgement that needs
+ * WebKit to check is a judgement nobody checks.
+ *
+ * THE COUNT IS THE SUM AND THE VERDICT IS NOT. `events` is „how many touches
+ * did this lane dispatch", which is what the INPUT line attests, and both
+ * readings dispatched into the same page. `actuated`/`held`/`released` belong
+ * to ONE press and may never be blended: a pad that answered before the drive
+ * and refused under the end card did both, and `when` says which press the
+ * three flags describe. An unreached pair reports the FIRST reading, because
+ * „it was live and said no" is the finding, and „it was inert under the card"
+ * is the design.
+ */
+export function mergeProbes(pre, post) {
+  const readings = [
+    [PROBE_BEFORE_DRIVE, pre],
+    [PROBE_AFTER_DRIVE, post],
+  ].filter(([, v]) => v && typeof v === "object");
+  if (readings.length === 0) return { ...readbackVerdict(null), when: null };
+  const events = readings.reduce((n, [, v]) => n + (Number.isFinite(v.events) ? v.events : 0), 0);
+  const [when, chosen] = readings.find(([, v]) => v.actuated) ?? readings[0];
+  return { ...chosen, events, when };
+}
+
 /** One unconditional transcript line. Unconditional for the reason every other
  *  line in the attestation is: a capability nobody prints is a capability every
- *  reader assumes. */
+ *  reader assumes.
+ *
+ *  `taken …` sits BEFORE the em dash so every clause regex in `summary.mjs`
+ *  keeps the line it is anchored to; the trailing sentence stays the free
+ *  text. Omitted entirely for a single reading, so an older transcript and a
+ *  probe that was never merged read exactly as they always did. */
 export function touchProbeLine(v) {
   return (
     `  TOUCH PROBE: ${v.actuated ? "actuated" : "NOT actuated"} · ${v.events} touch events dispatched · ` +
-    `hold ${v.held ? "survived" : "did NOT survive"} · release ${v.released ? "clean" : "NOT observed"} — ${v.why}`
+    `hold ${v.held ? "survived" : "did NOT survive"} · release ${v.released ? "clean" : "NOT observed"}` +
+    (v.when ? ` · taken ${v.when}` : "") +
+    ` — ${v.why}`
   );
 }
 

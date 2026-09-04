@@ -1182,6 +1182,24 @@ const LAW_ROUNDABOUT = "ЗДвП чл. 50, ал. 1; Наредба № РД-02-2
  */
 const LAW_RED_LIGHT = `${VIOLATIONS.RED_LIGHT_CROSSED.lawRef}; ЗДвП чл. 50а; ${VIOLATIONS.CONTROLLER_SIGNAL_VIOLATED.lawRef}`;
 
+/**
+ * RETRIEVED, never recalled (ADR-002). Both articles are read out of
+ * content/law/acts/zdvp.json and both are already the template's own authored
+ * `teach.lawRef` («ЗДвП чл. 8, ал. 2 и чл. 37»), so the line spoken during the
+ * wait cites what the drill's own teach card cites.
+ *
+ *   чл. 8, ал. 2 — the rail vehicle goes first wherever passage is permitted
+ *                  to both, „независимо от неговото местоположение и посока".
+ *   чл. 37, ал. 1 — the left turn yields to the oncoming stream.
+ *
+ * Declared HERE rather than beside the RX-05 block below it once served, because
+ * `YIELD_VOICE_COPY.railVehicle` reads it at module-init time and the record is
+ * built first — a const in the lower block would be in its own temporal dead
+ * zone. One spelling of the citation, read by both the corrected red-light copy
+ * and the rail wait's own.
+ */
+const LAW_RAIL_PRIORITY = "ЗДвП чл. 8, ал. 2; чл. 37, ал. 1";
+
 interface YieldVoiceCopy {
   /** The advisor card, CONSTANT for the whole wait (see rule 1 above). */
   cardBg: string;
@@ -1366,6 +1384,35 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
       `Изчака ${sec} с и потегли — без отчетено нарушение спрямо пешеходец. Това е грешката с най-тежка цена в целия списък, и ти я избегна по правилния начин: спиране, изчакване докрай, чак после газ.`,
     lawRef: VIOLATIONS.PEDESTRIAN_NOT_YIELDED.lawRef,
   },
+  // RX-05 (sc-rx-tram-left:07c63b97) — THE WAIT THE PRODUCT COULD NOT NAME.
+  //
+  // The red-light row above is corrected copy for a wait at a LAMP on a lesson
+  // that has rails; this row is the wait for the RAIL VEHICLE ITSELF, and it is
+  // the one the drill is made of. It arms off `SimTick.oncomingRailGapSec`, so
+  // it can only be spoken while a tram really is inside four seconds of the
+  // junction — which is why, alone among the six, its verdict may say he let it
+  // through: the hold existed BECAUSE the tram was making an arrival claim and
+  // it ended when the claim did.
+  //
+  // NO `longCardBg`, and it is the same refusal `redLight` and `pedestrian`
+  // make: this wait is ended by something outside the car — 14 metres of tram
+  // clearing the rails — and there is no number of seconds after which
+  // «огледай и тръгвай» becomes true of it. Second-guessing a tram is the
+  // fatal misjudgement the whole lesson exists to break.
+  railVehicle: {
+    cardBg:
+      "Чакаш правилно — трамваят минава пръв. Изчакай го да премине ИЗЦЯЛО и чак тогава завивай: той не може да те заобиколи.",
+    namedTitleBg: "Защо чакаш: релсовото возило минава пръв",
+    namedBg:
+      "Спрял си правилно. Когато на дадено място едновременно е разрешено преминаването на нерелсови и релсови пътни превозни средства, водачът на нерелсовото е длъжен да пропусне релсовото — независимо от неговото местоположение и посока на движение. Тук към това се добавя и левият завой: завиващият пропуска насрещно движещите се. Затова чакането не е учтивост, а задължение, и трамваят не се „премерва“ като кола: спирачният му път е в пъти по-дълъг, а релсите не завиват — той няма как да те заобиколи, дори да иска. Изчакай целите му 14 метра да минат покрай устието и чак тогава завивай.",
+    settledTitleBg: "Чакането Е маневрата — релсите минават първи",
+    settledBg: (sec) =>
+      `${sec} секунди пред трасето са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока. Не търси интервал: пред релсово возило интервал не се взема, то се пропуска. Използвай секундите, за да видиш докъде стига задната му част и има ли втори трамвай зад него.`,
+    verdictTitleBg: "Пропусна релсовото возило",
+    verdictBg: (sec) =>
+      `Изчака ${sec} с и завъртя чак след като трасето беше чисто — без отчетено нарушение на предимството. Точно това е разликата, която прави този завой опасен на живо: пред кола можеш да прецениш интервал, пред трамвай не се преценява, а се чака. Запази го и когато бързаш.`,
+    lawRef: LAW_RAIL_PRIORITY,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -1435,18 +1482,6 @@ export function lessonYieldsToRailVehicle(lesson: LessonSpec): boolean {
   if (CONTROLLER_RX.test(lesson.titleBg)) return false;
   return lesson.briefingBg?.some((step) => CONTROLLER_RX.test(step.textBg)) !== true;
 }
-
-/**
- * RETRIEVED, never recalled (ADR-002). Both articles are read out of
- * content/law/acts/zdvp.json and both are already the template's own authored
- * `teach.lawRef` («ЗДвП чл. 8, ал. 2 и чл. 37»), so the line spoken during the
- * wait cites what the drill's own teach card cites.
- *
- *   чл. 8, ал. 2 — the rail vehicle goes first wherever passage is permitted
- *                  to both, „независимо от неговото местоположение и посока".
- *   чл. 37, ал. 1 — the left turn yields to the oncoming stream.
- */
-const LAW_RAIL_PRIORITY = "ЗДвП чл. 8, ал. 2; чл. 37, ал. 1";
 
 /**
  * WHAT THE INSTRUCTOR SAYS WHILE THE STUDENT IS STOPPED AT A RED WITH RAILS

@@ -285,7 +285,7 @@ import {
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
-import { probeTouchPads, touchProbeLine } from "./lib/touch-probe.mjs";
+import { mergeProbes, probeTouchPads, touchProbeLine } from "./lib/touch-probe.mjs";
 import { attestTarget, describeTarget, resolveBase, treeIdentity } from "./lib/target.mjs";
 // DID THE DRIVE HAPPEN — the same ladder the judge side runs, imported rather
 // than re-implemented. Pure (node:fs + node:path, no top-level work), so it is
@@ -3715,6 +3715,32 @@ async function runDemo() {
     );
   }
 }
+/* ── THE PAD IS PRESSED HERE, FOR THE SAME REASON THE WHEEL IS TURNED HERE ──
+ *
+ * `sc-speed-creep:dff70553`. The probe used to be taken only after the drive,
+ * and it refused on every lane that has ever run it: `TouchControls` stamps
+ * `data-sim-touch-inert="on"` whenever `hidden` (`LessonScene` passes
+ * `physicsPaused`), and a drive ends WITH THE END CARD UP. Measured at the
+ * commit that shipped the probe —
+ * `.audit-frames/canary-8b9d135-232028/frames/sc-park-wall__mobile-right/run.log`:
+ * «NOT actuated · 0 touch events dispatched … mounted but inert — a press here
+ * is refused by design, not by a defect». A capability that answers „I could
+ * not look" on 100 % of lanes is the gap the row describes, not its closure.
+ *
+ * THIS INSTANT IS THE ONE WHERE IT CAN LOOK, and the block below is already
+ * the argument for it — the ladder is finished, the world is running, the car
+ * is on the spawn mark at 0 км/ч. The same transcript proves the world half:
+ * `STEER CHANNEL: LIVE … the world answered — left 152 px, right -151 px`,
+ * taken at this line on that lane, i.e. the physics was NOT paused here.
+ *
+ * BEFORE THE WHEEL AND NOT AFTER IT, because `steerLiveness` steers on
+ * KeyA/KeyD and a driving key is what `TouchControls` treats as a keyboard
+ * takeover. The press itself is on the pad's own dead centre, whose
+ * `driveApply` branch is `releaseThrottle(); releaseBrake();` against two
+ * pedals nothing is holding — it cannot command the car, and the drive that
+ * follows is the drive that would have happened anyway. */
+const touchProbeBefore = await timed("touchpad", () => probeTouchPads(page));
+
 /* ── AN ORDINARY LANE MAY NOT BE QUIET ABOUT A DEAD WHEEL — round 3 ─────────
  *
  * HERE — before the positive control, and NOT inside the drive loop — because
@@ -6464,12 +6490,15 @@ inputChannel.overlayMounted = await page
  * node, pressed on the pad's own dead centre so it cannot command the car
  * (`lib/touch-probe.mjs` carries the safety argument and the readback).
  *
- * HERE, AFTER THE DRIVE, ON PURPOSE. The scripted drive above is unchanged and
- * stays comparable with every earlier sweep; nothing the probe does can reach
- * a verdict that has already been taken. What it answers is the question the
- * brake-drop family actually asks — does a held drivetrain pad still own its
- * pointer half a second later — through the surface those rows name. */
-const touchProbe = await probeTouchPads(page);
+ * TAKEN TWICE, AND THE SECOND READING IS THIS ONE. The pre-drive press (block
+ * at `touchProbeBefore`) is the only one that can actuate, because the overlay
+ * is inert under the end card by design. This one is kept anyway: it is the
+ * measurement of that design — doc 91 §I3 promises the pads go inert and stay
+ * MOUNTED while a card is up, and a lane that found them hit-testable here
+ * would be photographing a student's thumb still driving under the debrief.
+ * `mergeProbes` sums what both dispatched and reports the press that reached
+ * the component, naming the instant it came from. */
+const touchProbe = mergeProbes(touchProbeBefore, await probeTouchPads(page));
 inputChannel.touchEvents = touchProbe.events;
 inputChannel.touchProbe = touchProbe;
 note(

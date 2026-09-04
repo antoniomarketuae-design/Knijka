@@ -385,6 +385,63 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
       break;
     }
   }
+  // …AND THE SAME ANY-ANGLE GUARANTEE FOR THE PLAYER, who had only the corridor
+  // clamp above. `sc-junction-blind:dea35510` (« … still crashes into the
+  // priority car»): the corridor clamp asks `along > 0 && lateral < …`, i.e. „is
+  // he ahead of me IN MY OWN LANE", which is exactly the question that cannot see
+  // a car STANDING IN THE JUNCTION BOX while this agent turns through it — the
+  // case the staged clause above was written for, on the one body it was never
+  // applied to.
+  //
+  // MEASURED on tj-occluded-v1 with the player parked motionless at the pose the
+  // w26 mobile-right leg actually stood at, (−1.14, −6.47), 90 s per run:
+  // ambient cars reached 2.67–2.74 m of CENTRES on seeds 3, 4, 6 and 7 at every
+  // compiled count (n = 4/5/6) — two 4.1 m cars interpenetrating by ~1.4 m. The
+  // student was then billed «Удар в друго превозно средство» −10 ОПАСНА,
+  // НЕИЗДЪРЖАН, under a card reading «Между вас е имало точно толкова път,
+  // колкото ти е трябвал, за да спреш» — a braking-distance explanation handed to
+  // a car sitting at 0 км/ч. Requirement-zero (doc 64 THEO-4) is why that is a
+  // defect and not a scoring quibble.
+  //
+  // AND THE STEP IT HAS TO CATCH IS NOT A SMOOTH ONE, which is why this looks up
+  // the pose it will PUBLISH instead of extrapolating along `dirX/dirY` the way
+  // the staged clause can afford to. Traced on seed 4, published poses at 1/30 s:
+  // the agent runs the stem to (4.06, −0.42) heading north and the NEXT pose is
+  // (0.12, −4.06) heading east — 5.36 m of travel in a step worth 0.55 m, because
+  // the lane graph trims both lanes back from the node and `s` carries the
+  // remainder straight into the next one. Nothing crosses the box; the pose hops
+  // it. A straight-line extrapolation therefore reports the car as moving AWAY
+  // on the last frame before it lands on top of him, and only the lane-walked
+  // pose sees the landing.
+  //
+  // Same closing-only shape as FR-B5-FREEZE above, so it can neither deadlock nor
+  // acquit: the step is refused ONLY when it would leave the two bodies closer
+  // than they already are, so a student who drives into traffic still closes the
+  // gap himself and is still billed for it, and a frozen agent moves again the
+  // moment he clears. The radius is the corridor clamp's own separation less its
+  // margin (4.80 m vs 5.10 m of centres), which keeps this backstop inside the
+  // range that clamp already refuses in-lane and well under the 8.12 m between
+  // opposing lane centres, so a car merely passing him never trips it.
+  if (env.hasPlayer && agent.s > sBefore) {
+    let ls = agent.s;
+    let lpos = agent.routePos;
+    let lhint = agent.segHint;
+    let lcur = lane(env, agent, 0);
+    for (let hops = 0; ls >= lcur.length && hops < 8; hops++) {
+      ls -= lcur.length;
+      lpos = (lpos + 1) % agent.route.laneIndices.length;
+      lhint = 0;
+      lcur = env.graph.lanes[agent.route.laneIndices[lpos]];
+    }
+    sampleLane(lcur, ls, lhint, samp);
+    const sep = 2 * HALF_LEN + 0.5;
+    const dAfter = Math.hypot(env.playerX - samp.x, env.playerY - samp.y);
+    const dBefore = Math.hypot(env.playerX - agent.state.x, env.playerY - agent.state.y);
+    if (dAfter < sep && dAfter < dBefore) {
+      agent.s = sBefore;
+      agent.speed = 0;
+    }
+  }
   // Same guarantee vs the leader agent (leader treated at its pre-move pose).
   if (leaderDs < Infinity) {
     const gapNow = leaderDs - (agent.s - sBefore) - VEHICLE_LENGTH_M;

@@ -91,14 +91,19 @@
  * glass. Both numbers are asserted in the quarantine below, not just written
  * here.
  *
- * NOT FIXABLE HERE, AND THE OWNERS ARE NAMED RATHER THAN IMPLIED. Moving the
- * bay is `lessons/scenario/templates-pk.ts` (`PK_DRIVE_TARGET_BAY`, pinned
+ * THE OWNERS WERE NAMED RATHER THAN IMPLIED, AND ONE OF THEM ANSWERED. Moving
+ * the bay is `lessons/scenario/templates-pk.ts` (`PK_DRIVE_TARGET_BAY`, pinned
  * value-for-value against `traces/scPkDriveway.ts PK_DRIVE_TARGET_BAY`, so both
  * move together or neither does); moving the garage or opening a dropped kerb
  * across the driveway mouth is `tools/maps/gen_pk_driveway.mjs` +
- * `public/world/pk-drive-v1.json`. This section's job is to make either repair
- * VERIFIABLE and to make the defect impossible to inherit silently: the
- * quarantine below pins 9 and 6 by value and fails the day either number moves.
+ * `public/world/pk-drive-v1.json`. The MOUTH is the half that landed:
+ * `meta.scenario.drivewayMouths` declares a 6 m span and `world/builders/
+ * roads.ts` ramps the pavement down to ROAD_Y across it, so the six off-road
+ * stations now stand on an apron 12 mm UNDER the paint instead of 108 mm over
+ * it. The station split is deliberately unchanged — the strip is ramped, not
+ * cut — so the quarantine below keeps its 9 and 6 and gains the HEIGHT, which
+ * is the number that separates a driveway from a step. The 1.5 m garage
+ * clearance of §1 is untouched and still quarantined.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -108,7 +113,7 @@ import { describe, expect, it } from "vitest";
 import { compileScenario, SCENARIO_TEMPLATES } from "../../lessons/scenario";
 import type { ScenarioLevel } from "../../lessons/scenario";
 import { buildLessonWorldCore } from "../lessonWorldRecipe";
-import type { MeshData } from "../../world";
+import { ROAD_Y, SIDEWALK_TOP_Y, type MeshData } from "../../world";
 
 /**
  * Floor for the gap between a graded bay and any building footprint. Chosen
@@ -327,6 +332,43 @@ function overMesh(mesh: MeshData, px: number, py: number): boolean {
   return false;
 }
 
+/**
+ * The HEIGHT this mesh stands at over (px, py), m — the tallest containing
+ * triangle, barycentrically interpolated, or null where nothing covers it.
+ *
+ * `overMesh` answers „is there pavement here", which stopped being the whole
+ * question when a driveway mouth could drop its kerb: the strip still covers
+ * the mouth, at road level. A station that is 12 cm up is a step an axle has to
+ * climb and paint it hides; the same station at ROAD_Y is an apron.
+ */
+function meshTopAt(mesh: MeshData, px: number, py: number): number | null {
+  const p = mesh.positions;
+  const ix = mesh.indices;
+  let top: number | null = null;
+  for (let t = 0; t + 2 < ix.length; t += 3) {
+    const a = ix[t] * 3;
+    const b = ix[t + 1] * 3;
+    const c = ix[t + 2] * 3;
+    const ax = p[a];
+    const ay = -p[a + 2];
+    const bx = p[b];
+    const by = -p[b + 2];
+    const cx = p[c];
+    const cy = -p[c + 2];
+    if (px < Math.min(ax, bx, cx) || px > Math.max(ax, bx, cx)) continue;
+    if (py < Math.min(ay, by, cy) || py > Math.max(ay, by, cy)) continue;
+    const area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
+    if (Math.abs(area) < 1e-9) continue; // a collapsed kerb face carries no top
+    const w0 = ((bx - px) * (cy - py) - (cx - px) * (by - py)) / area;
+    const w1 = ((cx - px) * (ay - py) - (ax - px) * (cy - py)) / area;
+    const w2 = 1 - w0 - w1;
+    if (w0 < -1e-9 || w1 < -1e-9 || w2 < -1e-9) continue;
+    const h = w0 * p[a + 1] + w1 * p[b + 1] + w2 * p[c + 1];
+    if (top === null || h > top) top = h;
+  }
+  return top;
+}
+
 interface GroundRow {
   templateId: string;
   districtId: string;
@@ -345,6 +387,9 @@ interface GroundRow {
   paintReachM: number;
   /** Height that paint is drawn at, m (markings is co-planar with the road). */
   paintTopM: number;
+  /** Tallest pavement standing under a bay station, m — 0 where none does.
+   *  ROAD_Y means a dropped kerb: an apron, not a step. */
+  walkTopUnderBayM: number;
   /** Every spawn point the district authors, and whether it is on asphalt. */
   spawnsOnCarriageway: number;
   spawnCount: number;
@@ -378,10 +423,13 @@ const GROUND: GroundRow[] = (() => {
     let carriageway = 0;
     let walk = 0;
     let elsewhere = 0;
+    let walkTop = 0;
     for (const [x, y] of bayStations(bay)) {
       if (onRoad(x, y)) carriageway++;
-      else if (overMesh(sidewalks, x, y)) walk++;
-      else elsewhere++;
+      else if (overMesh(sidewalks, x, y)) {
+        walk++;
+        walkTop = Math.max(walkTop, meshTopAt(sidewalks, x, y) ?? 0);
+      } else elsewhere++;
     }
 
     let edge = 0;
@@ -423,6 +471,7 @@ const GROUND: GroundRow[] = (() => {
       bayReachM: reach,
       paintReachM: paintReach,
       paintTopM: paintTop,
+      walkTopUnderBayM: walkTop,
       spawnsOnCarriageway: core.spawnPoints.filter((s) => onRoad(s.x, s.y)).length,
       spawnCount: core.spawnPoints.length,
       offMapReadsOn: onRoad(b.maxX + 1000, b.maxY + 1000),
@@ -498,16 +547,55 @@ describe("the graded bay stands on ground a car can be driven onto", () => {
       GROUND_QUARANTINE.pastTheKerbM,
       3,
     );
-    // AND THE HALF OF IT THE STUDENT CANNOT SEE. The white U really is drawn
-    // out past the kerb line — `markings` reaches x = 10.63 here — and it is
-    // drawn at road level (0.032 m) while the ground under that span is the
-    // pavement top, ROAD_Y + CURB_HEIGHT_M = 0.14 m. So the outer 2.375 m of
-    // the graded cell is painted roughly 0.11 m BELOW the sidewalk covering
-    // it. Pinned because the header claims it; a claim in a comment with no
-    // assertion under it is how this repo shipped a false central claim with
-    // all eight of its tests green.
+    // AND THE HALF OF IT THE STUDENT COULD NOT SEE — NOW THE MOUTH IS OPEN.
+    //
+    // The white U really is drawn out past the kerb line (`markings` reaches
+    // x = 10.63 here) at road level, 0.032 m. Until the driveway mouth existed
+    // the ground under that span was the pavement top, ROAD_Y + CURB_HEIGHT_M
+    // = 0.14 m, so the outer 2.375 m of the graded cell was painted 0.11 m
+    // BELOW the sidewalk covering it and the student was measured against a
+    // cell he could see 60 % of. `gen_pk_driveway.mjs` now declares a 6 m
+    // `drivewayMouths` span and `builders/roads.ts` ramps the kerb down to
+    // ROAD_Y across it, so the six off-road stations stand on an APRON.
+    //
+    // The station count is unchanged ON PURPOSE: the strip is ramped, not cut,
+    // so the pavement still covers the mouth and `onSidewalk` still reads 6.
+    // The height is the assertion that separates the two worlds — a repair
+    // that leaves this at 0.14 has drawn a driveway and kept the step.
     expect(row.paintReachM).toBeGreaterThan(row.carriagewayEdgeM);
     expect(row.paintTopM).toBeLessThan(0.12);
+    expect(row.walkTopUnderBayM, "the driveway mouth is still a 12 cm step").toBeCloseTo(
+      ROAD_Y,
+      3,
+    );
+    expect(
+      row.paintTopM,
+      "the graded rect is painted under the ground it stands on",
+    ).toBeGreaterThan(row.walkTopUnderBayM);
+  });
+
+  it("the dropped kerb is local to the mouth — the rest of the street keeps its 12 cm", () => {
+    // The tautology this closes: a `meshTopAt` that always returned ROAD_Y, or
+    // a ramp applied to the whole strip, would pass the row above and would
+    // have deleted the pavement of a residential street. Sampled on the SAME
+    // mesh, on the same side, 20 m north and south of the driveway.
+    const spec = SCENARIO_TEMPLATES.find((s) => s.id === GROUND_QUARANTINE.templateId)!;
+    const lesson = compileScenario(spec, spec.levels[0].level as ScenarioLevel);
+    const raw: unknown = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname, `../../../../../public/world/${lesson.world!.districtId}.json`),
+        "utf8",
+      ),
+    );
+    const { sidewalks } = buildLessonWorldCore(lesson, raw).geometry;
+    const bay = lesson.parkingBay as Bay;
+    const x = 9.5; // between the kerb line (8.125) and the pavement's outer edge
+    for (const dy of [-20, 20]) {
+      expect(meshTopAt(sidewalks, x, bay.y + dy), `pavement at y ${bay.y + dy}`).toBeCloseTo(
+        SIDEWALK_TOP_Y,
+        3,
+      );
+    }
   });
 
   it("the healthy population is not merely inside the kerb, it is clear of it", () => {

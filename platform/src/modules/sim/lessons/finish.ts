@@ -1925,6 +1925,21 @@ export const YIELD_ROUNDABOUT_APPROACH_M = 20;
 export const YIELD_WAIT_MAX_S = 180;
 
 /**
+ * How near an oncoming RAIL vehicle has to be, in seconds of its own arrival,
+ * for standing still to be a wait FOR IT (`SimTick.oncomingRailGapSec`).
+ *
+ * Four seconds, and the number is borrowed rather than invented: it is
+ * `LEFT_TURN_GAP_SAFE_SEC` — doc 72 JU-10's own textbook norm, the gap at or
+ * beyond which a left turn across an oncoming vehicle is clean. Inside it the
+ * turn is the taught mistake, so a car standing still there is doing the
+ * lesson. Using the same threshold both ways is the point: the frames on which
+ * the coach says «изчакай трамвая» are exactly the frames on which going would
+ * have been the fault, so the card and the grader can never disagree about
+ * whether there was anything to wait for.
+ */
+export const YIELD_RAIL_GAP_SEC = 4.0;
+
+/**
  * Why this frame is a lawful wait — for the instructor's voice, tests and
  * telemetry, never for grading. The union itself moved to `./types` when
  * `YieldWaitState` started carrying one (B15-VOICE); re-exported here so every
@@ -2027,6 +2042,23 @@ export function yieldReasonAt(
 
   // 4. A pedestrian on a crossing this car is in the approach zone of.
   if (pedestrianCrossingIds.length > 0) return "pedestrian";
+
+  // 4a. An oncoming RELSOVO ППС closing on the junction ahead (ЗДвП чл. 8,
+  // ал. 2). LAST of the „something is in front of you" clauses on purpose: a
+  // red lamp and a person on a zebra are duties the car is stopped AT, and the
+  // copy for both opens with where he stopped, which the tram card cannot say.
+  //
+  // This is the clause `sc-rx-tram-left:07c63b97` was filed for. Before it, the
+  // only wait this drill could produce was clause 3's — the red — so the whole
+  // green half of the manoeuvre, which is the manoeuvre, registered as a car
+  // stopped in front of nothing: no hold, no seconds credited against par, and
+  // an advisor card that had fallen back to the waypoint on the far side of
+  // the rails. Absent field = unknown = no hold, exactly as before, on every
+  // trace and every lesson that stages no tram.
+  const railGapSec = tick.oncomingRailGapSec;
+  if (railGapSec !== undefined && railGapSec >= 0 && railGapSec <= YIELD_RAIL_GAP_SEC) {
+    return "railVehicle";
+  }
 
   // 5. A ring this route has NOT finished yet, with the car stopped within one
   // approach of it. The annulus is deliberately symmetric — it is not worth

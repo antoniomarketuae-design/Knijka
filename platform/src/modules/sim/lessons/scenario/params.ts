@@ -281,6 +281,14 @@ export function serializeObjectiveParams(
       // the ceiling the road gave you" has the same answer at L1 as at L5, and
       // this drill's whole subject IS that ceiling.
       if (p.requireSpeedClean === true) params.requireSpeedClean = true;
+      // …AND THE SEVENTH (`requireBrakingClean`), on this whitelist for the
+      // identical measured reason — a key that is not named HERE is parsed,
+      // typed and evaluated and still never reaches the session the student
+      // plays, which is exactly how `requireSpeedClean` shipped inert once
+      // already. NOT LADDERED for its neighbours' reason: „did you answer the
+      // car behind you with the brake pedal" has the same answer at L1 as at
+      // L5, and sc-follow-tailgater's whole subject IS that answer.
+      if (p.requireBrakingClean === true) params.requireBrakingClean = true;
       // …AND THE FIFTH (`requireFullStop`), on this whitelist for the identical
       // measured reason and NOT laddered for a sharper one than its neighbours':
       // the aid ladder cannot forgive this even in principle. «Спри напълно» is
@@ -299,6 +307,20 @@ export function serializeObjectiveParams(
       if (p.reportOncomingGapSec !== undefined) {
         params.reportOncomingGapSec = p.reportOncomingGapSec;
       }
+      // …AND THE EIGHTH (`requireKerbwardM`), on this whitelist for the same
+      // measured reason as every key above it — a term parsed and evaluated but
+      // not NAMED here never reaches the session the student plays.
+      //
+      // NOT LADDERED, and on this template that is the whole point rather than
+      // a footnote. The ladder's only dial on `sc-vpps-stop` is the radius
+      // (`widenRadius`: 3.00 → 4.50 at L1), so laddering the lateral demand too
+      // would re-open at L1 exactly the acceptance this term closes — while
+      // pinning the RADIUS instead would collapse L1 ≡ L2 ≡ L3 into one lesson,
+      // which `__tests__/level-seam.test.ts` S4 refuses. Splitting the two axes
+      // is what lets the aided rungs stay genuinely more forgiving ALONG the
+      // road while „did you pull over, or did you stop in the roadway" keeps the
+      // same answer at L1 as at L5.
+      if (p.requireKerbwardM !== undefined) params.requireKerbwardM = p.requireKerbwardM;
       return { kind: "reachZone", params };
     }
     case "passSignal": {

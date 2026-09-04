@@ -2950,13 +2950,26 @@ export class EmergencyApproachRunner implements EventRunner {
 
 // ---------------------------------------------------------------------------
 // 10. Police stop (ADR-006 stage 1c — doc 72 §3 VP-11 „Спиране по полицейски
-//     сигнал", Наредба-38 / ЗДвП чл. 170). SCENERY + MEASUREMENT ONLY: the
-//     runner stages the officer FIGURE (a staged pedestrian that never walks —
-//     pose "stopSignal" renders the raised arm + hi-vis vest, ADR-001) and
-//     records the outcome, but emits ZERO SimTick events — no violation can
-//     ever grade from this runner (the A12 bias: an unmodelled duty must not
-//     convict; the graded contract is the scenario's low-speed curb-side
-//     reachZone objective, the sc-pk-smooth-stop stop-mark pattern).
+//     сигнал", Наредба-38 / ЗДвП чл. 103). The runner stages the officer
+//     FIGURE (a staged pedestrian that never walks — pose "stopSignal" renders
+//     the raised arm + hi-vis vest, ADR-001) and records the outcome.
+//
+//     AND SINCE 2026-09-04 IT ALSO GRADES, in the existing `prioritySituation`
+//     vocabulary ("police-stop-signal" → the основна POLICE_STOP_SIGNAL_IGNORED
+//     on the drive-past, the yield praise on the compliant halt) — the shape
+//     the telltale runner below took on 2026-09-02 and the `emergency` runner
+//     established before it. The row that asked for it
+//     (sc-vp-police-stop:44cfeff6) put the case in one sentence: the wrong lane
+//     was convicted for causing a COLLISION, not for disobeying the officer,
+//     „so a student who ignores the officer without crashing would not be
+//     caught". A12 forbids convicting an UNMODELLED duty; this one is modelled
+//     to the metre by the spec's own `stop`/`stopRadiusM`/`stopSpeedKmh` halt
+//     contract and its `passBeyondM`, resolves exactly once per drive, and
+//     leaving it silent is what made the drill's own mistake demo reach for
+//     NOT_KEEPING_RIGHT — lane discipline standing in for чл. 103 because
+//     nothing else existed. Completion is still graded by the scenario's
+//     curb-side low-speed reachZone objective; the panic-slam mistake still
+//     grades through the shipped HARSH_BRAKING_NO_CAUSE.
 // ---------------------------------------------------------------------------
 
 /** Short standing path for the officer figure (buildStagedPedPath needs a
@@ -2972,13 +2985,13 @@ export class PoliceStopRunner implements EventRunner {
   constructor(readonly spec: PoliceStopSpec) {}
 
   /**
-   * NO CAST BY POLICY, not by oversight: this runner emits ZERO SimTick
-   * events, ever (see the block comment above) — an unmodelled duty must not
-   * convict (A12), and the officer really is off the carriageway. Measured on
-   * both shipped posts rather than assumed: templates-cockpit stands him at
-   * x = 15.6 with the graded halt point at x = 13.9 (the right lane's right
-   * edge), and templates-pe2 stands him at the kerb x. If that policy is ever
-   * revisited, this is where the disc goes.
+   * NO CAST BY POLICY, not by oversight, and the policy that changed in 2026-09
+   * is the GRADING one, not this one: the officer really is off the carriageway
+   * and a car that reaches him has already been convicted of leaving it.
+   * Measured on both shipped posts rather than assumed: templates-cockpit
+   * stands him at x = 15.6 with the graded halt point at x = 13.9, and
+   * templates-pe2 stands him at the kerb x. If that policy is ever revisited,
+   * this is where the disc goes.
    */
   readonly contactCast: readonly ContactCastMember[] = [];
 
@@ -3010,20 +3023,43 @@ export class PoliceStopRunner implements EventRunner {
     this.outcome = null;
   }
 
-  step(_traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+  step(_traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
     const s = this.spec;
     if (this.phase === "resolved") return null;
+    // WHOSE SIGNAL IS IT? Only a контролен орган's binds under чл. 103 — the
+    // same pose also stands in for `sc-pe-school-patrol`'s school warden, whose
+    // act is чл. 119's and is graded by the child group on the zebra. The flag
+    // is authored per spec (contracts.ts `bindingUnderArt103`) and absent means
+    // MEASURED, NOT CHARGED, which is what every policeStop spec did before it.
+    const grades = s.bindingUnderArt103 === true;
     // Complied: at rest (≤ stopSpeedKmh) inside the halt zone — the same
     // radius/speed contract the scenario's stop objective grades (by value).
+    // The praise rides the same channel as the charge, and in the same breath
+    // (THEO-4: a drill that can only convict teaches half a rule).
     if (
       input.speedKmh <= s.stopSpeedKmh &&
       dist(input.x, input.y, s.stop.x, s.stop.y) <= s.stopRadiusM
     ) {
+      if (grades) {
+        out.push({
+          kind: "prioritySituation",
+          situation: "police-stop-signal",
+          violated: false,
+          yielded: true,
+        });
+      }
       return this.resolve(input, true, "yielded");
     }
-    // Ignored: the officer fell passBeyondM behind without a compliant stop.
-    // Outcome only — NO event is emitted, nothing grades (see class doc).
+    // Ignored: the officer fell passBeyondM behind without a compliant stop —
+    // ЗДвП чл. 103, the driver's own duty („длъжен е да спре плавно в
+    // най-дясната част на платното за движение… и да изпълнява неговите
+    // указания"). Until 2026-09-04 this branch recorded the outcome and told
+    // nobody, so the ONLY thing the sheet could name was whatever the student
+    // happened to hit on the way past.
     if (aheadOfPlayerM(input, s.officer.x, s.officer.y) < -s.passBeyondM) {
+      if (grades) {
+        out.push({ kind: "prioritySituation", situation: "police-stop-signal", violated: true });
+      }
       return this.resolve(input, false, "passedWithoutStopping");
     }
     return null;
