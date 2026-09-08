@@ -197,6 +197,30 @@ describe("sc-hz-brake-dont-swerve — the shadow gate (doc 76 §5)", () => {
     expect(opening.textBg).not.toContain("почти наравно с вратата ни, се движи кола.");
   });
 
+  it("…and the 05-stopped caption stops ordering a look through an empty windscreen", () => {
+    // THE OTHER FRAME THE ROW CITES (:8a5ed5b4, `05-stopped.png`), and the one
+    // wave 17 left behind. It read «Виж я колата отляво — мина си по своята
+    // лента …» — an imperative about the world the STUDENT is in, on a deck
+    // that loops from the first second of the session, while his own escort is
+    // still beside his door and nothing has passed anybody. Same shape as the
+    // scFollowDistance defect `deckCaptionVoice.test.tsx` documents: a claim
+    // about the GHOST read as a claim about the student's car.
+    const annotations = shadow.trace.events.filter((e) => e.kind === "annotation");
+    const passBy = annotations.find((a) => (a.textBg ?? "").includes("по своята лента"));
+    expect(passBy, "the pass-by caption is gone").toBeDefined();
+    // It says WHOSE drive it is describing…
+    expect(passBy!.textBg).toContain("демонстрацията");
+    // …keeps the лекция's own claim…
+    expect(passBy!.textBg).toContain("щяхме да сме В нея");
+    // …and names the look that finds the neighbour in the student's own world,
+    // the same one caption 1 and instruction 2 name (THEO-4: the sentence says
+    // why the glass is empty instead of blaming the student for not seeing).
+    expect(passBy!.textBg).toContain("рамо");
+    expect(passBy!.textBg).toContain("стъклото");
+    // The bare imperative the row quotes must not come back.
+    expect(passBy!.textBg).not.toContain("Виж я колата отляво");
+  });
+
   it("…and the ghost PERFORMS that look, огледало → рамо, where the caption says it", () => {
     // A caption that names a check the demonstration never makes is the same
     // defect one layer up. The shadow's opening beat now records both, in the

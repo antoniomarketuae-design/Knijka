@@ -372,6 +372,10 @@ export function serializeObjectiveParams(
               y: p.y,
               enterRadiusM: p.enterRadiusM,
               exitRadiusM: p.exitRadiusM,
+              // Guidance-only, and geometry like the radii above — the ladder
+              // never moves it. Absent stays absent, so every template that
+              // does not name an exit serializes byte-identically.
+              ...(p.exit !== undefined ? { exit: { ...p.exit } } : {}),
             },
           };
         case "parkInBay":

@@ -457,7 +457,24 @@ export const SC_HZ_BRAKE_DONT_SWERVE_ESCORT: CutInLeadCarSpec = {
     pathNodes: ["hzd-n-start", "hzd-n-end"],
     // Dormant just ahead-left of the spawn; matchPlayer takes over on the
     // player's first movement and pins it abreast for the whole approach.
-    hold: { nodeIndex: 0, offsetM: 18 },
+    //
+    // SWEEP 161 (:8a5ed5b4), SECOND HALF — 18 WAS OUTSIDE THE ACTOR'S OWN
+    // STATION BAND, AND OUTSIDE THE LOOK INSTRUCTION 2 ORDERS. `stage()` seeds
+    // `paceAheadM = paceAheadM + (rng()·2 − 1)`, i.e. a 0–2 m band about the
+    // spawn at y = 15, so a hold at y = 18 parked the escort 1 m in FRONT of
+    // its own band. Measured from the shipped cockpit eye (spawn 15, aft 0.495,
+    // inboard-lean 0.24) that pose is 66.09° off the driver's axis, and the
+    // over-the-shoulder frame «Рамо» commands is 68.29–143.70° — so for the
+    // whole time the student is STATIONARY (arrival, the instruction card, the
+    // looping demonstration) the one look instruction 2 names had the car's
+    // centre 2.2° outside its edge, with only the tail corner clipping in.
+    // 17 = spawn 15 + paceAheadM 1 + the jitter's +1 half-width: the top of the
+    // band, so the escort now only ever settles BACK into the station it was
+    // staged at the front of, and at rest it reads 72.44° — 4.15° inside that
+    // frame. Nothing about the moving drill moves: on-glass frames before the
+    // reveal stay 0 at 14 / 22 / 50 км/ч, the release still fires at the same
+    // instant and the same 3.03° pass-by follows it (measured, both holds).
+    hold: { nodeIndex: 0, offsetM: 17 },
     cruiseSpeedMps: 13.89, // 50 km/h — the posted limit; it is not speeding either
     extraRightOffsetM: -DEBRIS_LANE_SHIFT, // the LEFT lane (x ≈ −4.06)
     colorIndex: 2,

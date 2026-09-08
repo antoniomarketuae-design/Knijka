@@ -225,9 +225,33 @@ const MIRROR_LEFT_GLANCE_DEG = Math.abs((CABIN_LOOK_POSES.mirrorLeft.yaw * 180) 
  * 37.70° frustum (≈ 10.5 m to touch the edge, ≈ 14 m for dwell) still leaves the
  * escort at ~28° — inside the frustum, still behind the A-pillar. The repo's own
  * frame-measured answer is ~22 m.
+ *
+ * ── 2026-09-08: THE ROW GREW, 28.4 → 34.75, AND THE GROWTH IS THE REPAIR ───
+ * „Shrink-only" was written to stop a row quietly ceasing to be true, and this
+ * movement is the opposite of that: the number got BIGGER because the escort
+ * moved 1 m NEARER the door, which is the direction the лекция's own sentence
+ * («почти наравно с вратата ти») and its own named look both require.
+ *
+ * 28.4 was never the drill's authored geometry. It was measured at the HOLD
+ * pose — `hold.offsetM: 18`, i.e. 3.5 m in front of the cockpit eye — and this
+ * file's own `predicted` line says what the drill authors instead:
+ * atan2(laneShift − eyeLateral, paceAheadM + eyeAft) = 79.25°, an excess of
+ * 41.5. The hold was also 1 m outside the actor's OWN station band (`stage()`
+ * seeds `paceAheadM + (rng·2 − 1)`, a 0–2 m band), so the escort was staged in
+ * front of the only place it can ride.
+ *
+ * WHAT THAT COST THE STUDENT, and it is the second half of `:8a5ed5b4`. At
+ * 66.09° the escort's CENTRE sat 2.2° outside the over-the-shoulder frame
+ * (68.29–143.70°) — the one look instruction 2 and both deck captions name —
+ * for the whole time he is STATIONARY: arrival, the instruction card, and every
+ * lap of the looping demonstration, which is exactly when he is free to press
+ * «Рамо» and exactly the frames the row was filed on. `hold` 18 → 17 (the top
+ * of the station band) puts it at 72.44°, 4.15° inside that frame, and the
+ * approach it is admitted for is untouched: 0 on-glass frames before the reveal
+ * at 14 / 22 / 50 км/ч, the same release, the same 3.03° pass-by after it.
  */
 const OFF_GLASS_LEDGER: Record<string, number> = {
-  "sc-hzbds-escort": 28.4,
+  "sc-hzbds-escort": 34.75,
 };
 
 function loadDistrict(id: string): TrafficDistrict {
@@ -272,6 +296,12 @@ const SHIPPED_BEFORE_CUT_KMH = 25;
 type SimTickEventLike = Parameters<CutInLeadCarRunner["step"]>[2][number];
 
 interface Approach {
+  /**
+   * The actor's off-axis angle AT ITS HOLD POSE, before the player has moved —
+   * the window the drive counters below cannot see and the frames the row was
+   * filed on all sit in (arrival, the instruction card, the looping deck).
+   */
+  restOffAxisDeg: number;
   /** Smallest off-axis angle the actor ever reached, degrees. */
   minOffAxisDeg: number;
   /** Frames the actor spent inside the windscreen. */
@@ -329,8 +359,13 @@ function driveEscort(
   });
   const runner = new CutInLeadCarRunner(spec);
   runner.stage(traffic, () => rngValue, true);
+  const held = traffic.staged(spec.id);
 
   const r: Approach = {
+    restOffAxisDeg:
+      held === null || held === undefined
+        ? Number.NaN
+        : offAxisDeg(PLAYER_LANE_X, SPAWN_Y, -1, held.x, held.y),
     minOffAxisDeg: Infinity,
     onGlassFrames: 0,
     framesTotal: 0,
@@ -397,10 +432,13 @@ function driveEscort(
  * has no reveal — she is on the glass from the first metre, which is the whole
  * verdict on finding B — and instruction 2's «Погледни вляво» is not hers, so
  * fabricating approach counters for her would be a number in the reassuring
- * direction with nothing behind it.
+ * direction with nothing behind it. `restOffAxisDeg` is dropped for the same
+ * reason: she has no rubber band to hold her anywhere, so her „hold pose" IS
+ * her authored kerb pose and the drive counters already answer for it.
  */
 type ChildApproach = Omit<
   Approach,
+  | "restOffAxisDeg"
   | "approachFrames"
   | "approachOnGlassFrames"
   | "approachMinOffAxisDeg"
@@ -648,6 +686,37 @@ describe("sc-hz-brake-dont-swerve — «Погледни вляво … се д�
  */
 describe("sc-hz-brake-dont-swerve — the look instruction 2 now asks for is a look the product has", () => {
   const APPROACH_PACES = [13.89, 6.1, 3.9]; // the authored 50, and the crawls the sweep drove
+
+  it("…and it holds it BEFORE HE MOVES, which is when he is free to press it", () => {
+    // `:8a5ed5b4`, the half wave 17 did not reach. Every frame the row cites is
+    // a STATIONARY one — 01-arrival, the instruction card, 05-stopped, and the
+    // deck loops its captions from second one — so the window that decides
+    // whether «Погледни я … с бутона „Рамо“» is an honest instruction is the
+    // hold pose, which every counter in this file measured over a MOVING drive
+    // and therefore never saw.
+    //
+    // At `hold.offsetM: 18` the escort's centre read 66.09°, i.e. 2.2° OUTSIDE
+    // the shoulder frame's near edge: the student did as he was told and got a
+    // clipped tail corner at the extreme edge of the glass. 17 — the top of the
+    // runner's own 0–2 m station band — reads 72.44°.
+    const rest = driveEscort(13.89, 0.5, null).restOffAxisDeg;
+    expect(Number.isFinite(rest), "the escort never staged").toBe(true);
+    expect(rest).toBeGreaterThan(SHOULDER_GLANCE_DEG - HALF_GLASS_DEG);
+    expect(rest).toBeLessThan(SHOULDER_GLANCE_DEG + HALF_GLASS_DEG);
+    // A margin, not a coin-flip on the frame edge: the pose the row was filed
+    // against is the one that sits within a couple of degrees of it.
+    expect(rest - (SHOULDER_GLANCE_DEG - HALF_GLASS_DEG)).toBeGreaterThan(3);
+    // The refutation arm — the shipped-before hold, driven through the same
+    // stack, must go back to failing the same claim.
+    const before = driveEscort(13.89, 0.5, null, {
+      ...SC_HZ_BRAKE_DONT_SWERVE_ESCORT,
+      actor: { ...SC_HZ_BRAKE_DONT_SWERVE_ESCORT.actor, hold: { nodeIndex: 0, offsetM: 18 } },
+    }).restOffAxisDeg;
+    expect(before).toBeLessThan(SHOULDER_GLANCE_DEG - HALF_GLASS_DEG);
+    // …and it is still not on the WINDSCREEN at rest, which is the лекция's
+    // subject and must not be repaired away by accident.
+    expect(rest).toBeGreaterThan(HALF_GLASS_DEG);
+  });
 
   it("the over-the-shoulder glance holds the escort for essentially the whole approach", () => {
     for (const mps of APPROACH_PACES) {

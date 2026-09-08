@@ -1662,6 +1662,57 @@ export function scrollRemainingPx(
   return left <= SCROLL_REMAINING_SLACK_PX ? 0 : Math.round(left);
 }
 
+/** One landmark section of the debrief, in the scroller's own content px. */
+export type EndSectionBox = { labelBg: string; topPx: number; bottomPx: number };
+
+/**
+ * WHAT IS ACTUALLY BELOW THE DEBRIEF'S FOLD — sc-roundabout-entry:fe081cf1.
+ *
+ * The pill above this said one hard-coded sentence, «превърти за оценката по
+ * задачи», and its own comment defended it: „It says WHAT is below, not just
+ * that something is." It did not: it said the same thing at every scroll
+ * position of every debrief. MEASURED at HEAD (`.audit-frames/w28/frames/
+ * sc-roundabout-entry__mobile-right/_audit-debrief.json`, commit 6363677,
+ * attested, `dirtyCount: 0`) — «Задачи от маршрута» is 1443 → 1559 and the
+ * frame `08-debrief-p6.png` is taken at scrollTop 1567, i.e. the student is
+ * ALREADY PAST the section the pill is sending him down for. What is really
+ * under the cut there is the rest of «Грешки» (1575 → 2994) — the authored,
+ * law-cited explanation of the fault he was just charged for — and then
+ * «Разбор» (3010 → 4824). A cue that names the wrong thing is worse than a
+ * bare one: it tells a student he has read the part he has not.
+ *
+ * Sections in document order. The one the cut RUNS THROUGH wins over the one
+ * that starts below it, because the nearer answer to „what am I scrolling to"
+ * is the sentence that was severed, not the next heading.
+ */
+export function endFoldNextSection(
+  sections: readonly EndSectionBox[],
+  foldPx: number,
+): { labelBg: string; continues: boolean } | null {
+  for (const s of sections) {
+    if (s.topPx <= foldPx && s.bottomPx > foldPx) return { labelBg: s.labelBg, continues: true };
+  }
+  for (const s of sections) {
+    if (s.topPx > foldPx) return { labelBg: s.labelBg, continues: false };
+  }
+  return null;
+}
+
+/**
+ * The pill's sentence. It names the section by the label the section itself
+ * carries (`aria-label`, `hud/SessionEndScreen.tsx`), so the cue and the
+ * heading the student lands on cannot drift apart and no second copy of either
+ * is authored here. The unnamed arm is the honest fallback for a debrief whose
+ * landmarks have not been laid out yet — it still says the reading continues,
+ * which is the whole reason `scrollRemainingPx` exists.
+ */
+export function endFoldLabelBg(next: { labelBg: string; continues: boolean } | null): string {
+  if (next === null) return "↓ Разборът продължава — превърти надолу";
+  return next.continues
+    ? `↓ „${next.labelBg}“ продължава — превърти надолу`
+    : `↓ Следва „${next.labelBg}“ — превърти надолу`;
+}
+
 /**
  * THE ADVISOR MAY NOT RE-READ THE TASK CHIP ALOUD — 2026-08-17.
  *
@@ -5451,6 +5502,10 @@ export function LessonPlayShell({
                   markClassBg: N38_CLASS_LABEL_BG[t.event.severity],
                   lineBg: t.event.titleBg,
                   detailBg: t.event.explanationBg,
+                  // The summary the peek can finish (sc-pk-driveway:fa602d10);
+                  // detailBg above stays whole and is what «ЗАЩО» opens. See
+                  // hud/overlayQueue.ts overlayPeekBodyBg.
+                  peekBg: t.event.peekBg ?? null,
                   lawRef: t.event.lawRef ?? null,
                   raisedAtMs: t.raisedAtMs,
                 };
@@ -5789,10 +5844,36 @@ export function LessonPlayShell({
   // value, so a boolean re-renders exactly twice per debrief: when the fold
   // appears and when the student reaches the end.
   const [endHasMore, setEndHasMore] = useState(false);
+  // …and WHICH section is under the cut, which the boolean above cannot carry.
+  // A string, not a boolean, and that is affordable for the reason the note
+  // above gives in reverse: it changes once per section boundary, not once per
+  // scroll event, and React bails out on an identical value in between. The
+  // section walk runs only when there IS a fold — with nothing below, the pill
+  // is not rendered and the reading would be spent on nobody.
+  const [endFoldBg, setEndFoldBg] = useState(() => endFoldLabelBg(null));
   const measureEndScroll = useCallback(() => {
     const el = endScrollRef.current;
     if (el === null) return;
     setEndHasMore(scrollRemainingPx(el.scrollTop, el.clientHeight, el.scrollHeight) > 0);
+    // Asked twice rather than hoisted: `shellClipAffordances.test.ts` pins the
+    // setter's line verbatim, and a pure subtraction is cheaper than the risk
+    // of that mutation gate reading a hoisted variable instead of the call.
+    if (scrollRemainingPx(el.scrollTop, el.clientHeight, el.scrollHeight) <= 0) return;
+    // Content coordinates, the way `SimOverlay`'s fold builds its rows: rects
+    // against the scroller's own rect plus `scrollTop`, so a section's box is
+    // in the same space as the cut. `aria-label` is the landmark contract
+    // `SessionEndScreen` already ships; the result card uses `aria-labelledby`
+    // and is deliberately not a candidate — it is always the first thing read.
+    const box = el.getBoundingClientRect();
+    const sections: EndSectionBox[] = [];
+    for (const node of Array.from(el.querySelectorAll("section[aria-label]"))) {
+      const labelBg = node.getAttribute("aria-label");
+      if (labelBg === null || labelBg.trim() === "") continue;
+      const rect = node.getBoundingClientRect();
+      const topPx = rect.top - box.top + el.scrollTop;
+      sections.push({ labelBg, topPx, bottomPx: topPx + rect.height });
+    }
+    setEndFoldBg(endFoldLabelBg(endFoldNextSection(sections, el.scrollTop + el.clientHeight)));
   }, []);
   useEffect(() => {
     if (!debriefOpen) return;
@@ -7348,6 +7429,12 @@ export function LessonPlayShell({
                 // mount only says which number the task is asking for. See
                 // `taskCapKmhFromPrompt` for why it is not `maxSpeedKmh`.
                 taskCapKmh={snap.taskCapKmh}
+                // `sc-ac-truck-spray:7e53374c` — the В26 disc kept stating the
+                // limit of a road the car had left (145 км/ч across open field,
+                // 140 still on the bar). The predicate is the banner's own, so
+                // the two surfaces arm on the same frame; see
+                // `OffCarriagewayMark`.
+                offCarriageway={snap.objectiveHold === "offRoad"}
                 rejectFlashKey={gearRejectFlash}
                 compact
                 // The stall telltale's accessible name was „рестартирай
@@ -7363,6 +7450,10 @@ export function LessonPlayShell({
                 // O51 — the roomy twin of the compact mount above. Both, or the
                 // phone and the desktop grade against different visible numbers.
                 taskCapKmh={snap.taskCapKmh}
+                // …and the same for the off-carriageway qualifier, for the same
+                // reason: one of the two mounts carrying it would leave the
+                // desktop and the phone disagreeing about what the disc means.
+                offCarriageway={snap.objectiveHold === "offRoad"}
                 rejectFlashKey={gearRejectFlash}
                 input={hintInput}
               />
@@ -8011,11 +8102,12 @@ export function LessonPlayShell({
               chrome, and this same sweep filed the phone's «↓ ОЩЕ N РЕДА»
               badge twice for sitting on the sentence it was counting.
 
-              It says WHAT is below, not just that something is: on both
-              filed frames the hidden part is the per-objective breakdown —
-              the only place the student can see which skills were credited
-              and which were not — so naming it is the difference between a
-              scroll hint and a reason to scroll.
+              It says WHAT is below, not just that something is — and until
+              2026-09-08 it said so with a CONSTANT («превърти за оценката по
+              задачи») that was right on the two frames it was written from and
+              wrong everywhere else. `endFoldNextSection` has the measurement
+              that retired it; the sentence is now read off the section under
+              the cut.
 
               IT SAT ON THE SENTENCE TOO, WHICH IS WHY IT MOVED. It was
               `sticky bottom-0` inside the scroller and was photographed
@@ -8035,7 +8127,7 @@ export function LessonPlayShell({
               className="pointer-events-none flex shrink-0 justify-center px-4 pb-2 text-[10px] font-black uppercase tracking-wider text-muted"
             >
               <span className="rounded-full border border-border bg-background px-3 py-1">
-                ↓ Разборът продължава — превърти за оценката по задачи
+                {endFoldBg}
               </span>
             </p>
           ) : null}

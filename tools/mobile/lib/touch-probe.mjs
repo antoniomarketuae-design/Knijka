@@ -15,14 +15,16 @@
 // IS available is the pointer events the component actually listens to, so
 // this dispatches those, on the real pad node, with `pointerType: "touch"`.
 //
-// AND IT PRESSES DEAD CENTRE, WHICH IS THE WHOLE SAFETY ARGUMENT. The
-// drivetrain pad's axis is absolute about its own box — `seatDriveCentre` reads
-// the box at the start of every gesture and „dead centre is exactly 0 km/h" —
-// so a press on the geometric centre runs `driveApply` down its neutral branch,
-// whose entire body is `releaseThrottle(); releaseBrake();`. It CANNOT command
-// the car. It can only actuate the ownership machinery — claim, capture,
-// publish, the four release edges — which is the machinery the brake-drop
-// family is about.
+// AND IT PRESSES INSIDE THE NEUTRAL BAND, WHICH IS THE WHOLE SAFETY ARGUMENT.
+// The drivetrain pad's axis is absolute about its own box — `seatDriveCentre`
+// reads the box at the start of every gesture — and the middle 44 px of that
+// box command nothing at all: `driveAxisFromPadY` subtracts
+// `TOUCH_DRIVE_NEUTRAL_HALF_PX` (22) and returns a hard 0 for anything closer
+// than that to the centre, so `driveApply` runs down its neutral branch, whose
+// entire body is `releaseThrottle(); releaseBrake();`. It CANNOT command the
+// car. It can only actuate the ownership machinery — claim, capture, publish,
+// the four release edges — which is the machinery the brake-drop family is
+// about. `TOUCH_PROBE_OFFSET_PX` carries why it is 11 px and not 0.
 //
 // WHAT IT READS BACK, AND WHY NOT THE ARIA. At neutral the pad publishes the
 // same `aria-valuenow=0` / centre sentence it already carries at rest, so the
@@ -31,9 +33,10 @@
 // tested for: `parkKnobs` runs on every hide and leaves
 // `transition: "none"; transform: "translateY(0px)"` behind, so a knob that has
 // only survived the briefing card already looks pressed. What no hide can forge
-// is the DECIMAL: `driveApply` writes `t.toFixed(1)`, i.e. `translateY(0.0px)`
-// at dead centre, against the integer `translateY(0px)` every park and every
-// release writes. See `DRIVE_APPLY_TRANSFORM`.
+// is a knob that is NOT AT HOME: `parkKnobs` and `onDriveEnd` are the only
+// other writers of that transform and both write exactly `translateY(0px)`, so
+// any non-zero offset on it is `driveApply`'s own signature. See
+// `DRIVE_APPLY_TRANSFORM`.
 //
 // IT FAILS TOWARDS „I COULD NOT PROVE IT". Every refusal below returns a
 // sentence naming what was missing. A probe that cannot find the overlay says
@@ -80,6 +83,41 @@ export const PROBE_AFTER_DRIVE = "after the drive, under the end card";
  *  ownership on a timer or a re-render has dropped it before the second read. */
 export const TOUCH_PROBE_HOLD_MS = 500;
 
+/**
+ * HOW FAR BELOW THE PAD'S CENTRE THE FINGER LANDS, px — AND WHY IT IS NOT 0.
+ *
+ * The first two builds pressed the geometric centre and asked the knob for a
+ * DECIMAL, because `driveApply` writes `translateY(${t.toFixed(1)}px)` while
+ * every park writes the integer `translateY(0px)`. That decimal does not
+ * survive the round trip. CSSOM re-serialises a length to its shortest form,
+ * so the browser gives the property back with the zeros gone — measured in the
+ * harness's own WebKit, the engine the phone lane launches:
+ *
+ *   el.style.transform = `translateY(${(0).toFixed(1)}px)` -> "translateY(0px)"
+ *   el.style.transform = `translateY(${(-12.34).toFixed(1)}px)` -> "translateY(-12.3px)"
+ *
+ * At dead centre `t` is 0, so the fingerprint the readback looked for could
+ * never appear THERE — the probe was structurally incapable of reporting
+ * „actuated", on any build, in any browser, however healthy the component. It
+ * reported the pad unreached on 100 % of lanes and printed „this lane still
+ * has not exercised the component" while its own release clause said `clean`,
+ * which only an owner-gated `onDriveEnd` can write.
+ *
+ * Moving the press off centre restores an observable position without
+ * touching the safety argument: 11 px is HALF the product's own neutral
+ * half-band (`TOUCH_DRIVE_NEUTRAL_HALF_PX` = 22, modules/sim/engine/touch.ts),
+ * so `driveAxisFromPadY` still returns a hard 0 and the pedals are still only
+ * released, never commanded — while `driveApply` writes
+ * `translateY(${((11 / 66) * 30).toFixed(1)}px)` = `translateY(5px)`, a
+ * position no park and no release can leave behind.
+ *
+ * The bound is not decoration: `wave-c-summary.test.mjs` §6f reads
+ * `TOUCH_DRIVE_NEUTRAL_HALF_PX` out of the product and fails if this offset
+ * ever stops being comfortably inside it, so a shrunk dead zone reddens a test
+ * instead of quietly giving the probe a throttle.
+ */
+export const TOUCH_PROBE_OFFSET_PX = 11;
+
 /** Hard ceiling on the whole in-page call. A dead page must cost one line in
  *  the transcript, not a killed lane. */
 export const TOUCH_PROBE_TIMEOUT_MS = 5000;
@@ -90,7 +128,7 @@ export const TOUCH_PROBE_TIMEOUT_MS = 5000;
  * it reports what the DOM said, and `readbackVerdict` below — which needs no
  * browser and is unit-tested — decides what that means.
  */
-export async function actuateDrivePad({ pointerId, holdMs }) {
+export async function actuateDrivePad({ pointerId, holdMs, offsetPx }) {
   const fail = (why) => ({ ok: false, why, events: 0 });
   const root = document.querySelector('[data-hud="touch-controls"]');
   if (!root) return fail("the touch overlay is not on the page");
@@ -102,15 +140,24 @@ export async function actuateDrivePad({ pointerId, holdMs }) {
   const drive = pads.find((p) => p.getAttribute("aria-orientation") === "vertical");
   if (!drive) return fail(`no vertical (drivetrain) pad among ${pads.length} slider(s) in the overlay`);
   const box = drive.getBoundingClientRect();
-  if (box.width < 8 || box.height < 8) {
-    return fail(`the drivetrain pad measures ${Math.round(box.width)}×${Math.round(box.height)} px`);
+  // Tall enough that the offset press lands INSIDE the pad. A box that cannot
+  // hold the offset is refused rather than pressed at centre, because a centre
+  // press is the reading that cannot answer (see `TOUCH_PROBE_OFFSET_PX`) and
+  // silently degrading to it is the reassuring direction.
+  if (box.width < 8 || box.height < 2 * offsetPx + 8) {
+    return fail(
+      `the drivetrain pad measures ${Math.round(box.width)}×${Math.round(box.height)} px, ` +
+        `too small to take a press ${offsetPx} px off its centre`,
+    );
   }
   // The knob is the pad's only descendant carrying an inline border-color.
   const knob = drive.querySelector('div[style*="border-color"]');
   if (!knob) return fail("the drivetrain pad has no knob to read the press back from");
 
   const x = box.left + box.width / 2;
-  const y = box.top + box.height / 2;
+  // Inside the neutral band, and off its centre — the header's safety argument
+  // and `TOUCH_PROBE_OFFSET_PX`'s measurement, in one line.
+  const y = box.top + box.height / 2 + offsetPx;
   let events = 0;
   const send = (type, buttons) => {
     drive.dispatchEvent(
@@ -176,25 +223,34 @@ export async function actuateDrivePad({ pointerId, holdMs }) {
  * refused the claim outright, and would have certified `TouchControls.tsx` as
  * reachable off a knob nobody touched.
  *
- * The decimal is what separates them. `driveApply` writes
- * `translateY(${t.toFixed(1)}px)` — always one decimal place, including at dead
- * centre, where it is `translateY(0.0px)`; `parkKnobs` and `onDriveEnd` both
- * write the integer `translateY(0px)`. So this pattern is the component's own
- * fingerprint, and nothing but a claimed press leaves it.
+ * `/^translateY\(-?\d+\.\d+px\)$/` was not it either, and it failed the OTHER
+ * way — see `TOUCH_PROBE_OFFSET_PX`: the decimal it required is erased by
+ * CSSOM serialisation at exactly the position the probe pressed, so it
+ * answered „NOT actuated" on every lane ever run, whatever the component did.
+ *
+ * THE POSITION IS WHAT SEPARATES THEM, and it needs no decimal. `driveApply`
+ * is the only writer that can leave this knob anywhere but home: `parkKnobs`
+ * and `onDriveEnd` both write the literal `translateY(0px)`. So a non-zero
+ * offset is the component's own fingerprint, it survives the round trip
+ * unchanged, and no hide can forge it.
  */
-export const DRIVE_APPLY_TRANSFORM = /^translateY\(-?\d+\.\d+px\)$/;
+export const DRIVE_APPLY_TRANSFORM = /^translateY\((-?\d+(?:\.\d+)?)px\)$/;
 
-/** Did the knob take up the imperative styling only a press can give it? */
+/** Did the knob take up the imperative styling only a press can give it —
+ *  the live-gesture transition AND a position away from home? */
 function seated(s) {
-  return !!s && s.transition === "none" && DRIVE_APPLY_TRANSFORM.test((s.transform || "").trim());
+  if (!s || s.transition !== "none") return false;
+  const m = DRIVE_APPLY_TRANSFORM.exec((s.transform || "").trim());
+  return !!m && Number(m[1]) !== 0;
 }
 
-/** The styling a HIDE leaves behind — press-shaped, and not a press. Asked of
- *  the ON-PRESS reading, so a refusal can say WHICH of the two ways a knob can
- *  fail to answer this was: it never moved at all, or it is sitting in the form
- *  `parkKnobs` wrote and `driveApply` did not. */
+/** The styling a HIDE leaves behind — press-shaped, and not a press: the knob
+ *  is AT HOME under a transition only a live gesture suppresses. Asked of the
+ *  ON-PRESS reading, so a refusal can say WHICH of the two ways a knob can fail
+ *  to answer this was: it never moved at all, or it is sitting in the exact
+ *  form `parkKnobs` wrote and `driveApply` did not. */
 function parkedStyling(s) {
-  return !!s && s.transition === "none" && /^translateY\(-?\d+px\)$/.test((s.transform || "").trim());
+  return !!s && s.transition === "none" && (s.transform || "").trim() === "translateY(0px)";
 }
 
 /**
@@ -214,11 +270,26 @@ export function readbackVerdict(raw) {
   const held = actuated && seated(raw.afterHold);
   const released = /^transform 140ms/.test((raw.onRelease && raw.onRelease.transition) || "");
   let why;
-  if (!actuated) {
+  if (!actuated && released) {
+    // THE ONE SENTENCE THIS FILE MAY NEVER SAY WHILE THE RELEASE EDGE FIRED.
+    // `onDriveEnd` is the only writer of `transform 140ms` on the drivetrain
+    // knob and its first line is `if (!drivePad.release(e.pointerId)) return;`
+    // — so this transition exists only for a pointer the pad OWNED, which only
+    // `drivePad.claim()` inside `onDriveDown` (or the `adoptable()` door) can
+    // grant, and both of those call `driveBegin` on the way through. The
+    // component therefore answered, and „this lane still has not exercised the
+    // component" is the claim that mis-addressed sc-speed-creep:dff70553 in the
+    // first place. What is missing is the POSITION, not the reach.
+    why =
+      "the pad CLAIMED and RELEASED this pointer — onDriveEnd's release edge only fires for a pointer the " +
+      "pad owned, so TouchControls.tsx was exercised — but its knob never showed a displaced position, so " +
+      "how far driveApply drove the pedals could not be read on this lane";
+  } else if (!actuated) {
     why = parkedStyling(raw.onPress)
-      ? "the pad took the pointer event and its knob still carries only the PARKED styling a hide leaves " +
-        "(translateY(0px), no decimal) — driveApply never ran, so TouchControls.onDriveDown refused the claim " +
-        "or never fired, and this lane still has not exercised the component"
+      ? "the pad took the pointer event and its knob is still in the PARKED position a hide leaves " +
+        "(translateY(0px), unmoved) under a gesture transition — driveApply never ran, so " +
+        "TouchControls.onDriveDown refused the claim or never fired, and this lane still has not " +
+        "exercised the component"
       : "the pad took the pointer event and did NOT seat its knob — TouchControls.onDriveDown either " +
         "refused the claim or never ran, so this lane still has not exercised the component";
   } else if (!held) {
@@ -226,7 +297,9 @@ export function readbackVerdict(raw) {
   } else if (!released) {
     why = "the pad answered and held, but its release edge did not fire — the knob never went back to its transition";
   } else {
-    why = "pressed dead centre (commands nothing), held, released cleanly — the drivetrain pad is live on this build";
+    why =
+      "pressed inside the neutral band (commands nothing), held, released cleanly — the drivetrain pad is " +
+      "live on this build";
   }
   return { actuated, held, released, events, why };
 }
@@ -283,10 +356,11 @@ export function touchProbeLine(v) {
 export async function probeTouchPads(page, opts = {}) {
   const holdMs = opts.holdMs ?? TOUCH_PROBE_HOLD_MS;
   const timeoutMs = opts.timeoutMs ?? TOUCH_PROBE_TIMEOUT_MS;
+  const offsetPx = opts.offsetPx ?? TOUCH_PROBE_OFFSET_PX;
   let timer = null;
   try {
     const raw = await Promise.race([
-      page.evaluate(actuateDrivePad, { pointerId: TOUCH_PROBE_POINTER_ID, holdMs }),
+      page.evaluate(actuateDrivePad, { pointerId: TOUCH_PROBE_POINTER_ID, holdMs, offsetPx }),
       new Promise((resolve) => {
         timer = setTimeout(
           () => resolve({ ok: false, why: `the in-page actuation did not return within ${timeoutMs} ms`, events: 0 }),

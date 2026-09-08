@@ -98,6 +98,7 @@ import {
   overlayMomentBg,
   OVERLAY_MOMENT_TICK_MS,
   OVERLAY_PEEK_HEIGHT_PX,
+  overlayPeekBodyBg,
   whyIsReachable,
   type SimOverlayItem,
   type SimOverlayTone,
@@ -1803,8 +1804,12 @@ export function SimOverlay({
      ══════════════════════════════════════════════════════════════════════════ */
   // The identity of what is being SAID, not the object: the poll hands this
   // component a new item object six times a second with the same words in it.
+  // …THE PEEK'S OWN TEXT INCLUDED, because row 2b prints `overlayPeekBodyBg`
+  // and not `detailBg` since sc-pk-driveway:fa602d10 — two items sharing one
+  // paragraph and carrying two different summaries would otherwise be ONE key,
+  // and the fold would be counted against the row the previous card painted.
   const foldKey =
-    shown === null ? "" : `${shown.id} ${shown.lineBg} ${shown.detailBg ?? ""}`;
+    shown === null ? "" : `${shown.id} ${shown.lineBg} ${shown.detailBg ?? ""} ${shown.peekBg ?? ""}`;
   const peekFold = useFoldLines(`peek ${foldKey}`);
   // …and the ground's own measurement, keyed on the same identity: a new item
   // is a new row set, and the row set is what decides how far the card paints
@@ -2071,6 +2076,11 @@ export function SimOverlay({
   const hasDetail =
     (typeof shown.detailBg === "string" && shown.detailBg.trim().length > 0) ||
     shown.hasRichDetail === true;
+  // WHAT ROW 2b PRINTS — the authored summary where the copy has one, the whole
+  // explanation where it does not (sc-pk-driveway:fa602d10). `hasDetail`
+  // deliberately still reads `detailBg`: the ЗАЩО chip opens the FULL text and
+  // must not disappear because the peek found something shorter to print.
+  const peekBodyBg = overlayPeekBodyBg(shown);
   const hasAck = typeof shown.onAck === "function";
   // A6: the ✕ exists for everything the student is allowed to send away, which
   // is everything that is not holding the drive still…
@@ -2745,12 +2755,12 @@ export function SimOverlay({
             back to the reading face. This is an authored sentence, so it is a
             paragraph — the same split every other authored line in this HUD
             already relies on. */}
-        {shown.detailBg ? (
+        {peekBodyBg ? (
           <p
             data-sim-overlay-body=""
             className="min-w-0 shrink-0 whitespace-pre-line break-words text-[11px] font-semibold leading-snug text-muted"
           >
-            {shown.detailBg}
+            {peekBodyBg}
           </p>
         ) : null}
       </div>

@@ -255,8 +255,21 @@ describe("nothing the mark already promised was spent to buy this", () => {
   });
 
   it("both variants are still told the posted limit, and now the task cap too", () => {
-    expect(SRC.match(/limitKmh=\{limitKmh\}/g) ?? []).toHaveLength(2);
-    expect(SRC.match(/taskCapKmh=\{taskCapKmh\}/g) ?? []).toHaveLength(2);
+    // EXPECTATION REPAIRED 2026-09-08 (`sc-ac-truck-spray:7e53374c`), the same
+    // repair `governor-cap.test.ts` makes to its twin of this line and for the
+    // same reason: this was a FILE-WIDE count of `limitKmh={limitKmh}` pinned at
+    // 2, and the В26 disc gained a second consumer of that prop —
+    // `OffCarriagewayMark`, the qualifier that names whose road the numeral
+    // belongs to while the runtime reports no carriageway under the car. The
+    // sentence this test is named after is about THE MARK's two mounts, so it is
+    // measured on them; a count over the whole file was equally satisfied by two
+    // passes to anything else in it.
+    const mounts = [...SRC.matchAll(/<GovernorCapMark[\s\S]*?\/>/g)].map((m) => m[0]);
+    expect(mounts).toHaveLength(2);
+    for (const mount of mounts) {
+      expect(mount).toContain("limitKmh={limitKmh}");
+      expect(mount).toContain("taskCapKmh={taskCapKmh}");
+    }
   });
 });
 
@@ -287,11 +300,22 @@ describe("…and the shell HAS now threaded it — O51, round 11", () => {
      * catalogue through the shell's own reader and renders `GovernorCapMark` on
      * both sides of the boundary.
      *
-     * ⚠ THE WINDOW IS THE SELF-CHECK. `[\s\S]{0,900}?` is lazy up to the first
+     * ⚠ THE WINDOW IS THE SELF-CHECK. `[\s\S]{0,1600}?` is lazy up to the first
      * `/>`, so a mount that outgrows it stops matching and the length assertion
      * below fails — which is exactly how this block first went red (the compact
      * mount grew past 600 characters of comment). It cannot silently match
      * fewer mounts than exist.
+     *
+     * WIDENED 2026-09-08, 900 → 1600, by the tripwire firing exactly as designed
+     * (`sc-ac-truck-spray:7e53374c`): the compact mount took the
+     * `offCarriageway={snap.objectiveHold === "offRoad"}` prop and the five
+     * comment lines that route it, and outgrew 900. The bound is the only thing
+     * that moved — `toHaveLength(2)` and both `toContain`s are unchanged, so
+     * nothing this block asserts got easier. `taskCapThread.test.ts` reads the
+     * same two mounts as a TREE (`callSiteShape.ts`), which is the form that
+     * needs no bound at all and also catches a prop pinned rather than deleted;
+     * this window is kept beside it as the cross-file routing tripwire §7 B-R10
+     * blessed, not as the primary reading.
      */
     const shell = fs
       .readFileSync(
@@ -306,7 +330,7 @@ describe("…and the shell HAS now threaded it — O51, round 11", () => {
         "utf8",
       )
       .replace(/\r\n/g, "\n");
-    const mounts = [...shell.matchAll(/<StatusDashboard[\s\S]{0,900}?\/>/g)].map((m) => m[0]);
+    const mounts = [...shell.matchAll(/<StatusDashboard[\s\S]{0,1600}?\/>/g)].map((m) => m[0]);
     expect(mounts).toHaveLength(2);
     for (const mount of mounts) {
       expect(mount).toContain("limitKmh={snap.limitKmh}");

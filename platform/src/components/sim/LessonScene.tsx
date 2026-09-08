@@ -64,6 +64,11 @@ import {
   transmissionModeFor,
   SNOW_GRIP_FACTOR,
   WET_GRIP_FACTOR,
+  // AC-12: the «втори замах» read — the observable trigger instruction 7 of
+  // sc-ac-crosswind warns about (vehicle/secondSwing.ts). Inert without the
+  // authored wind, and it grades nothing.
+  createSecondSwingState,
+  stepSecondSwing,
   type DifficultyMode,
   type DrivelineEvent,
   type DrivelineRejection,
@@ -1837,6 +1842,13 @@ export function ReadyScene({
   // opposite things and a lesson stages both on one route.
   const telltaleCautionLitRef = useRef(false);
   const [telltaleCautionCueOn, setTelltaleCautionCueOn] = useState(false);
+  // AC-12 «вторият замах» — the same edge-callback shape as the two lamps
+  // above, on the one lesson family that authors a crosswind. RuntimeDriver
+  // steps `vehicle/secondSwing.ts` per frame and flips this on the CUE level;
+  // the chip below reads it. False for the whole session on every calm lesson,
+  // because the detector's own wind gate is `windLatAccelMs2`, which is 0
+  // there — no per-lesson branch is needed here and none is written.
+  const [windSwingCueOn, setWindSwingCueOn] = useState(false);
   // #24 wiper visual channel: VehicleRig writes the live blade sweep +
   // wiped-arc clearing level per frame; WindshieldDroplets reads it (render-
   // free ref, the hazardActiveRef pattern).
@@ -2383,6 +2395,13 @@ export function ReadyScene({
               telltaleCautionLitRef={telltaleCautionLitRef}
               onTelltale={setTelltaleCueOn}
               onTelltaleCaution={setTelltaleCautionCueOn}
+              // AC-12: the «втори замах» cue's edge callback. Never gated on
+              // an aid tier — this is not „notice the instrument" help, it is
+              // the explanation of a mistake the student has just made, and
+              // THEO-4 owes him that at every level. It IS gated on exam mode,
+              // on the advisor's own rule: a training aid is not part of the
+              // car, and naming the fault mid-assessment coaches the candidate.
+              onSecondSwing={lesson.examMode === true ? undefined : setWindSwingCueOn}
               sampleRef={sampleRef}
               simRef={simRef}
               inputRef={inputRef}
@@ -2704,7 +2723,14 @@ export function ReadyScene({
           `data-hud` because `top-16` is inside the chase view's rear-view
           mirror band (rows B74/B76) — PlayAreaStyles steps it below the glass,
           the same way it steps the objective stack. */}
-      {followHintOn && aids?.followHints ? (
+      {/* `!windSwingCueOn` is the C1 corridor's own rank discipline, applied to
+          the pair that now shares this lane. The touch hint states the rule at
+          its own site — „One surface in the corridor, always" — and it is a
+          rank, not a coin toss: «Следвай синята линия» is standing guidance the
+          student can act on at any time in the next minute, and the AC-12 swing
+          line names a mistake he made half a second ago and has four seconds to
+          read. The guidance chip comes back the moment the line clears. */}
+      {followHintOn && aids?.followHints && !windSwingCueOn ? (
         <div
           data-hud="follow-hint"
           className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2"
@@ -2768,6 +2794,43 @@ export function ReadyScene({
               }}
             />
             Следвай синята линия
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── AC-12 «ВТОРИЯТ ЗАМАХ» — sc-ac-crosswind:a9db1738's last clause.
+          „The briefing's «втора корекция» warning has no observable trigger."
+          `vehicle/secondSwing.ts` watches for the movement instruction 7 names
+          — an upwind correction held, then whipped through centre to the
+          downwind side — and this is where the student is told what he just
+          did and why it is worse than the gust was.
+
+          THE SENTENCE IS THE TEMPLATE'S OWN. Instruction 7 reads «Пази се от
+          рязката „втора корекция“ — тя изхвърля колата към бордюра», and the
+          mistake demo's `whatWentWrongBg` says the same in the past tense. The
+          chip repeats that vocabulary rather than inventing a second one, so
+          the warning and the consequence are recognisably one lesson, and it
+          adds the WHY doc 64 THEO-4 requires of every verdict this product
+          gives: the wind and the correction ended up pushing the same way. It
+          cites no article, because it decides nothing that a law grades — the
+          drift's own consequence is still CENTER_LINE_TOUCHED /
+          POOR_LANE_KEEPING with their catalogue citations, untouched.
+
+          NO `data-hud-ink` AND NO SCRIM — the plate is real. This chip is
+          deliberately NOT on `PlayAreaStyles.GHOST_SURFACES`, exactly like its
+          `telltale-cue` neighbour below and unlike `follow-hint` above: the
+          UNPANEL sweep never reaches it, so `bg-background/85 backdrop-blur`
+          is what ships. `data-hud` it does carry, because C1 owns this
+          corridor's geometry and an unnamed panel stays stranded dead centre
+          over the road (the telltale cue's own note, one block down). ────── */}
+      {windSwingCueOn && !telltaleCueOn ? (
+        <div
+          data-hud="wind-swing-cue"
+          className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2"
+        >
+          <div className="rounded-2xl border border-danger/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-danger shadow-glow-sm backdrop-blur">
+            Втори замах! Отпускай корекцията плавно — рязко назад изхвърля
+            колата към бордюра.
           </div>
         </div>
       ) : null}
@@ -3867,6 +3930,7 @@ function RuntimeDriver({
   telltaleCautionLitRef,
   onTelltale,
   onTelltaleCaution,
+  onSecondSwing,
   sampleRef,
   simRef,
   inputRef,
@@ -3917,6 +3981,12 @@ function RuntimeDriver({
   /** The amber lamp's own edge callback — its cue teaches the OPPOSITE
    *  response, so it can never share the red one's line. */
   onTelltaleCaution?: (on: boolean) => void;
+  /**
+   * AC-12 «вторият замах» — the cue LEVEL, on the same edge-callback contract
+   * as the two lamps (state flips only when the level changes). Absent = the
+   * detector is never stepped, which is the exam-mode gate.
+   */
+  onSecondSwing?: (on: boolean) => void;
   sampleRef: React.RefObject<VehicleSample>;
   /** S0-View: live steer angle for the attempt recorder (visual channel). */
   simRef: React.RefObject<VehicleSim | null>;
@@ -4013,6 +4083,12 @@ function RuntimeDriver({
   const prevLockedRef = useRef(false);
   // S0-View attempt recorder: last indicator setting → signal-on/off edges.
   const recIndicatorRef = useRef<"off" | "left" | "right">("off");
+  // AC-12 «вторият замах»: the detector's own per-drive state plus the last
+  // level we published, so the setState fires on edges only — the telltale
+  // channel's contract, for the same reason (a per-frame setState is a
+  // re-render per frame).
+  const swingRef = useRef(createSecondSwingState());
+  const swingCueRef = useRef(false);
 
   useFrame((_, delta) => {
     // QW10: consume the throttle-while-locked latch every frame (so attempts
@@ -4435,6 +4511,51 @@ function RuntimeDriver({
         for (const o of staged.outcomes) onStagedOutcome(o);
       }
     }
+
+    // ── AC-12: «ВТОРИЯТ ЗАМАХ», WATCHED WHILE HE MAKES IT ────────────────────
+    //
+    // sc-ac-crosswind:a9db1738's surviving clause — „the briefing's «втора
+    // корекция» warning has no observable trigger". Instruction 7 of that
+    // lesson warns about the reflex snap back through centre and, until this
+    // block, nothing in the product could tell that it had happened: the lane
+    // detectors grade where the car ENDS UP, seconds later, and say nothing
+    // about the movement that put it there.
+    //
+    // OUTSIDE the `if (director)` above deliberately — this lesson stages no
+    // actors and has no director, so anything written in there would never run
+    // on the one lesson the row is about.
+    //
+    // IT GRADES NOTHING (`vehicle/secondSwing.ts`'s own law): no event joins
+    // `tick.events`, no verdict moves, no point is deducted. What it decides is
+    // whether the coaching line is on the glass and whether the student's own
+    // attempt replay carries the explanation at the moment it belongs to.
+    // Stepped only when a consumer exists, which is the exam-mode gate.
+    if (onSecondSwing) {
+      const swing = stepSecondSwing(
+        swingRef.current,
+        {
+          tSec: tRef.current,
+          steerRad: simRef.current?.steerRad ?? 0,
+          speedKmh: sample.speedKmh,
+          // 0 on every lesson that authors no `physics.crosswind` — the gate
+          // is the authored physics itself, never a lesson-id branch.
+          windLatAccelMs2: simRef.current?.windLatAccelMs2 ?? 0,
+        },
+        dt,
+      );
+      if (swing.cue !== swingCueRef.current) {
+        swingCueRef.current = swing.cue;
+        onSecondSwing(swing.cue);
+      }
+      if (swing.fired) {
+        recorder?.addEvent(
+          "annotation",
+          tRef.current,
+          "Втори замах: воланът се върна рязко срещу порива, който вече бе отслабнал — вятърът и корекцията избутаха колата в една и съща посока.",
+        );
+      }
+    }
+
     onTick(tick);
 
     // S0-View attempt recording (doc 76 §5): the ring recorder decimates the

@@ -316,11 +316,24 @@ export interface ReachZoneParams {
    * (critical), and the seventh term this file's own templates route here.
    *
    * WHAT IT MEANS. `true` = this waypoint is thrown away by a run that has been
-   * told it braked hard with nothing in front of it — `HARSH_BRAKING_NO_CAUSE`,
-   * the основна the catalogue titles «Рязко спиране без причина» and cites to
-   * ЗДвП чл. 20, ал. 1 — whether the sheet CHARGED it or the teach-first coach
-   * gave the first one away as a card. Absent = no such claim, which is every
-   * other gate in the catalogue.
+   * told it used the brake as its answer — whether the sheet CHARGED it or the
+   * teach-first coach gave the first one away as a card. Absent = no such
+   * claim, which is every other gate in the catalogue. TWO convictions carry
+   * it, one act at two intensities:
+   *
+   *   `HARSH_BRAKING_NO_CAUSE`  основна · «Рязко спиране без причина» ·
+   *                             ЗДвП чл. 20, ал. 1
+   *   `STOPPED_WITHOUT_CAUSE`   второстепенна · «Спиране без причина на открит
+   *                             път» · ЗДвП чл. 24, ал. 2
+   *
+   * THE SECOND ONE IS THE HEAVIER FAULT AND WAS THE LAST TO BE READ — the
+   * residue of this same row, measured at `e08d917`. The dead stop was armed on
+   * this template by wave 25 and IS billed (5 второстепенни on the audit's own
+   * wrong leg), but the certificate survived the sheet: «✓ Успокой темпото»,
+   * «Урокът е издържан» over five convictions for standing still in a live lane
+   * with the лепка five metres off the bumper. A cap cannot refuse that by
+   * construction — 0 км/ч is the best reading a speedometer can give it — which
+   * is the argument below, exactly, applied to the act that reaches it hardest.
    *
    * WHY A CAP COULD NEVER CARRY IT. `maxSpeedKmh` reads the speedometer, and a
    * car standing still because its driver stamped on the brake reads BETTER on
@@ -342,7 +355,12 @@ export interface ReachZoneParams {
    * visible forward cause, and a rear car is structurally not one (`leadGap`
    * looks forward). The drill's own `shadow-correct` demo brakes to a halt
    * twice and raises nothing at all — measured, scored `[]` and coached `[]`.
-   * Every gate that does not author the key never consults this.
+   * The stop arm has the same property from the other end: it ships DISARMED
+   * (`needlessStopEnabled`, two templates arm it) and, armed, still needs a
+   * held standstill in a live lane with no signal, queue, crossing, person,
+   * weather or hazard to answer for it — the same route driven with 3 s rests
+   * instead of 8 s is acquitted and keeps its tick, measured. Every gate that
+   * does not author the key never consults this.
    *
    * WHAT IT COSTS, SAID PLAINLY: like `requireSolidLineClean`, this one CAN
    * change a verdict. Withholding the tick leaves the route unfinished, and an
@@ -358,7 +376,9 @@ export interface ReachZoneParams {
    * card — raised AT the slam, with the catalogue's explanation («…изненадва
    * движещите се зад теб и е предпоставка за удар отзад…»), its «✔ Правилното
    * действие» corrective and its чл. 20, ал. 1 — and the debrief repeats it
-   * under «Учебни моменти». This demand removes a contradiction from a protocol
+   * under «Учебни моменти». The stop arm arrives with its own card and its own
+   * row on the изпитен лист («Спиране без причина на открит път», чл. 24, ал. 2)
+   * for the same reason. This demand removes a contradiction from a protocol
    * that already explains itself; it introduces no new unexplained one.
    *
    * A CLAIM ABOUT THE JOURNEY, so it is read per frame off the run's own ledger
@@ -576,6 +596,15 @@ export interface RoundaboutParams {
   enterRadiusM: number;
   /** Beyond this radius (after entering) counts as "exited". */
   exitRadiusM: number;
+  /**
+   * GUIDANCE ONLY — a point on the arm this objective's route leaves by, far
+   * enough out that it is past `exitRadiusM`. Nothing grades it: `stepRoundabout`
+   * still credits ANY signalled departure, so authoring it can never refuse a
+   * drive. What it does is let the ribbon NAME the exit (`scene/guidanceRoute.ts`
+   * `ringRouteRaw`), which without it stops dead on the ring at a mouth —
+   * measured on `sc-rb-busy-gap`, whose title row promises the SECOND exit.
+   */
+  exit?: { x: number; y: number };
 }
 
 /**

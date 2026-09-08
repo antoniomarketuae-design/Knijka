@@ -3735,8 +3735,8 @@ async function runDemo() {
  *
  * BEFORE THE WHEEL AND NOT AFTER IT, because `steerLiveness` steers on
  * KeyA/KeyD and a driving key is what `TouchControls` treats as a keyboard
- * takeover. The press itself is on the pad's own dead centre, whose
- * `driveApply` branch is `releaseThrottle(); releaseBrake();` against two
+ * takeover. The press itself lands inside the pad's own 44 px neutral band,
+ * whose `driveApply` branch is `releaseThrottle(); releaseBrake();` against two
  * pedals nothing is holding — it cannot command the car, and the drive that
  * follows is the drive that would have happened anyway. */
 const touchProbeBefore = await timed("touchpad", () => probeTouchPads(page));
@@ -6487,7 +6487,7 @@ inputChannel.overlayMounted = await page
  * made the mis-attribution VISIBLE; it did not make the surface reachable, and
  * seven verdicts in a row said so in the same words — „it needs a harness
  * change to close". This is the change: one synthetic finger, on the real pad
- * node, pressed on the pad's own dead centre so it cannot command the car
+ * node, pressed inside the pad's own neutral band so it cannot command the car
  * (`lib/touch-probe.mjs` carries the safety argument and the readback).
  *
  * TAKEN TWICE, AND THE SECOND READING IS THIS ONE. The pre-drive press (block

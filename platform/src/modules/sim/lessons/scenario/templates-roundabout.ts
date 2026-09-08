@@ -1131,6 +1131,21 @@ export const SC_RB_BUSY_GAP: ScenarioSpec = {
       // enterRadiusM 24 (was 21) — R3 #6 family-wide geometry fix: the
       // drivable band reaches 22.06, so 21 could never latch `entered` on a
       // keep-right line. Traces replay identically (see sc-rb-ring).
+      // THE EXIT IS NAMED, 2026-09-08 (row sc-rb-busy-gap:5ee56710 — „leaving
+      // at the second exit never ticks in any leg"). Grading is untouched; what
+      // the name buys is the RIBBON. Measured through `guidanceGoalFor` →
+      // `deriveGuidanceRoute` over the whole handover disc, before:
+      //   φ 140–160  the leg was 6.2–12.4 m and ENDED at (0, 18) — the north
+      //              mouth, on the ring — while the maneuver is not graded
+      //              complete until r > 34, so the last 22 m, the exit itself,
+      //              had no guidance at all;
+      //   φ 165–178  the leg was 28.6–32.3 m of ring running PAST north to the
+      //              WEST mouth (RING_MOUTH_UNDRAWABLE), i.e. on L1 «Пълна
+      //              помощ», where the HUD says «Следвай синята линия», the
+      //              line pointed the student past his own exit to the third.
+      // (0, 40) is the north arm's centreline 22 m out — 6 m beyond
+      // `exitRadiusM`, so the ribbon plainly crosses the circle the objective
+      // completes on. Held by rbg-exit-ribbon.test.ts.
       params: {
         kind: "completeManeuver",
         maneuver: "roundabout",
@@ -1138,6 +1153,7 @@ export const SC_RB_BUSY_GAP: ScenarioSpec = {
         y: 0,
         enterRadiusM: 24,
         exitRadiusM: 34,
+        exit: { x: 0, y: 40 },
       },
     },
   ],

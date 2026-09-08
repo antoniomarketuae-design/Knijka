@@ -691,10 +691,101 @@ export function GovernorCapMark({
   );
 }
 
+/**
+ * ── THE DISC KEPT STATING A ROAD THE CAR HAD LEFT ──────────────────────────
+ * `sc-ac-truck-spray:7e53374c` (critical), `.audit-frames/sweep161/
+ * sc-ac-truck-spray/mobile-wrong/04-t102s.png`: «145 км/ч across open green
+ * field with no road anywhere in frame … keeps the 140 limit chip on screen».
+ *
+ * THE OTHER TWO THIRDS OF THAT ROW ARE CLOSED AND THIS THIRD WAS NOT. The
+ * off-road STATE landed (`rules/catalog.ts OFF_CARRIAGEWAY` + its detector,
+ * 56cc3f8; `lessons/finish.ts stepOffNetwork`; `lessons/advisor.ts`
+ * `routeHoldForSession`), and the sky artefact was the windshield pane
+ * (`components/sim/VehicleRig.tsx`). Re-measured at HEAD on this lesson's own
+ * district — mw-v1, compiled `sc-ac-truck-spray@L1`, driven through the real
+ * `createWorldRuntime` + `applyTick`, off the kerb at t = 10 s at 145 км/ч:
+ *   t = 12,0 s  `edgeId: null`      — the runtime says there is no road here
+ *   t = 16,0 s  `routeHold "offRoad"` — the banner and the coach card arm
+ *   t = 18,5 s  OFF_CARRIAGEWAY      — taught, then charged (3 т. основна)
+ *   every frame to x = 1 973 m       — `tick.maxSpeedKmh` STILL 140
+ * so `snap.limitKmh` is 140 two kilometres into open country and this bar
+ * painted it exactly as it paints a motorway.
+ *
+ * WHY THE NUMBER MAY NOT BE TOUCHED, and it is the reason this is a MARK and
+ * not a change to the disc. `runtime/worldRuntime.ts` holds `maxSpeedKmh` off
+ * the asphalt on purpose („Silencing them would trade a wrong charge for NO
+ * charge"), so the figure is still the one a speeding bill is measured
+ * against. Blanking or dimming the disc would move A12's acquitting direction
+ * and put the glass at odds with the grader.
+ *
+ * SO THE BAR SAYS THE ONE THING ONLY THE BAR CAN SAY. The banner already
+ * carries the condition and the act («Колата е извън пътя — върни се на
+ * платното…», `objectiveTitleUnderHold`) and the coach card carries the
+ * technique, and `routeHoldAdvisorPrompt`'s own rule is that a second surface
+ * may not restate a first. What no surface says is what the 140 IS while the
+ * car is on grass: the limit of the carriageway it left. This bar is the only
+ * surface that carries that numeral, so it is the only one that can qualify
+ * it — the `GovernorCapMark` argument one function up, applied to the disc
+ * instead of to the mode.
+ *
+ * NO ARTICLE NUMBER AND NO `lawRef` (ADR-002): like `objectiveTitleUnderHold`,
+ * neither line here is a claim about Bulgarian law — they state where this car
+ * is and which road the sign belongs to. The offence's own citation is already
+ * on the glass, in the OFF_CARRIAGEWAY fault card.
+ */
+export function OffCarriagewayMark({
+  limitKmh,
+  size,
+}: {
+  /** The number the В26 disc beside this mark is showing, so the two can never
+   *  disagree about which figure is being qualified. */
+  limitKmh: number;
+  /** Type scale: the phone readout runs one step below the roomy bar. */
+  size: "compact" | "roomy";
+}) {
+  const limit = Math.max(1, Math.round(limitKmh));
+  const explainBg = `Колата е извън платното за движение. Знакът ${limit} км/ч е на платното — не на терена, по който се движи колата сега.`;
+  return (
+    <span
+      data-hud="off-carriageway"
+      aria-label={explainBg}
+      title={explainBg}
+      className={`flex shrink-0 items-baseline gap-1 whitespace-nowrap font-bold leading-none ${
+        size === "compact" ? "text-[9px]" : "text-[10px]"
+      }`}
+      style={{ color: "var(--warning)" }}
+    >
+      {/* The state, in the register every other caption on this bar uses. It is
+          the half that changes what the disc MEANS, so it is the half both
+          variants print. */}
+      <span
+        data-hud="off-carriageway-state"
+        className="text-[7px] font-bold uppercase tracking-widest opacity-90 md:text-[8px]"
+      >
+        Извън платното
+      </span>
+      {/* …and the clause that says why the disc is still there — «него» is the
+          платно named one span left. ROOMY ONLY, and that is a width budget
+          rather than a drift: the compact bar is a single non-wrapping row that
+          already carries the selector, the speed, the unit, the disc and the
+          governor's own three elements, and the phone dock centres it between
+          two thumb pads. The sentence is not lost on the phone — `explainBg`
+          above is the accessible name AND the title on BOTH variants, which is
+          the same split `CAPTION` makes below `sm` throughout this file. */}
+      {size === "roomy" ? (
+        <span data-hud="off-carriageway-clause" className="opacity-90">
+          · знакът е на него
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function StatusDashboard({
   statusRef,
   limitKmh,
   taskCapKmh,
+  offCarriageway = false,
   rejectFlashKey = 0,
   compact = false,
   input = "keyboard",
@@ -732,6 +823,22 @@ export function StatusDashboard({
   taskCapKmh?: number;
   /** Current legal limit (tick-derived, the shell's 150 ms snapshot). */
   limitKmh: number;
+  /**
+   * IS THE RUNTIME SAYING THERE IS NO ROAD UNDER THE CAR? (`sc-ac-truck-spray:
+   * 7e53374c` — see `OffCarriagewayMark` for the frame and the measurement.)
+   *
+   * Read off `snap.objectiveHold === "offRoad"` at both mounts, which is
+   * `lessons/advisor.ts routeHoldForSession` — the SAME predicate and the same
+   * `ROUTE_HOLD_S` the objective banner and the coach card arm on, so the three
+   * surfaces change together. A separate clock here would make the bar and the
+   * banner disagree about the moment, which is the drift that block warns about
+   * in its own words („surfaces that change at different moments read as
+   * bugs").
+   *
+   * Defaults to `false`, so every headless, legacy and test mount renders byte
+   * for byte what it rendered before this prop existed.
+   */
+  offCarriageway?: boolean;
   /** Increments on every REJECTED shift — the gear letter flashes red once
    *  (founder bug 2026-07-10: refusals must never be silent). */
   rejectFlashKey?: number;
@@ -879,6 +986,11 @@ export function StatusDashboard({
         >
           {limit}
         </span>
+        {/* …and, with NO divider between them, what that disc is while the car
+            is off the carriageway. No divider because the two are one
+            statement: the numeral and the road it belongs to. See
+            OffCarriagewayMark. */}
+        {offCarriageway ? <OffCarriagewayMark limitKmh={limitKmh} size="compact" /> : null}
         {/* THE RULE BETWEEN THE LAW AND THE MODE. The disc above is a В26 sign;
             everything after this hairline is a property of the car. On the
             phone these two sat 6 px apart and read as one sentence — see
@@ -990,6 +1102,11 @@ export function StatusDashboard({
         >
           {limit}
         </span>
+        {/* …and the roomy twin of the off-carriageway qualifier, for the reason
+            the note below gives about the governor: the compact/roomy pair has
+            drifted apart once already. This one carries the clause as well as
+            the state — see OffCarriagewayMark for why the phone does not. */}
+        {offCarriageway ? <OffCarriagewayMark limitKmh={limitKmh} size="roomy" /> : null}
         {/* …and the same rule and the same mark on the roomy bar. Both variants
             or neither: the compact/roomy pair has drifted apart once already
             (row C7 — the camera handle was on one of them and not the other, so

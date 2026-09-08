@@ -40,6 +40,12 @@ export {
 export { cockpitLatAccelMs2 } from "./cockpitLean";
 export type { CockpitLeanInput } from "./cockpitLean";
 
+// The «втори замах» read — the observable trigger sc-ac-crosswind's instruction
+// 7 warns about and nothing could see (sc-ac-crosswind:a9db1738). A read, not a
+// rule: it moves no verdict and is inert on every lesson without authored wind.
+export { createSecondSwingState, stepSecondSwing, SECOND_SWING } from "./secondSwing";
+export type { SecondSwingRead, SecondSwingSample, SecondSwingState } from "./secondSwing";
+
 // doc 82 §4.2 F2 — deterministic road-surface excitation (opt-in).
 export {
   roadNoiseAt,

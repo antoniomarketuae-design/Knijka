@@ -341,7 +341,23 @@ describe("the governor cap cannot be read as a permission", () => {
 
   it("the mark is told the posted limit by both variants", () => {
     // Without this the conditional above silently becomes dead code.
-    const passes = SRC.match(/limitKmh=\{limitKmh\}/g) ?? [];
-    expect(passes).toHaveLength(2); // compact + roomy
+    //
+    // EXPECTATION REPAIRED 2026-09-08 (`sc-ac-truck-spray:7e53374c`). This was a
+    // FILE-WIDE count of `limitKmh={limitKmh}` pinned at 2, and the disc gained
+    // a second consumer of that same prop — `OffCarriagewayMark`, the qualifier
+    // that says whose road the В26 numeral belongs to while the runtime reports
+    // no carriageway under the car — so the count read 4 and this went red on a
+    // change it was never about. The claim is „THE MARK is told the limit, in
+    // both variants", so it is now measured on the mark's own two mounts. That
+    // is strictly stronger than the count it replaces: the old form was equally
+    // satisfied by two passes to any other element in the file, which is exactly
+    // the hole the new mark walked through.
+    const mounts = [COMPACT, ROOMY].map((variant) => {
+      const at = variant.indexOf("<GovernorCapMark");
+      expect(at, "GovernorCapMark must be mounted in this variant").toBeGreaterThan(-1);
+      return variant.slice(at, variant.indexOf("/>", at));
+    });
+    expect(mounts).toHaveLength(2); // compact + roomy
+    for (const mount of mounts) expect(mount).toContain("limitKmh={limitKmh}");
   });
 });

@@ -332,6 +332,101 @@ describe("§2 the live path grades the interval instead of only the geography", 
 });
 
 // ---------------------------------------------------------------------------
+// 2b · The encounter that resolves AFTER the gate ticks — the drill's own
+//      correct drive, and the frame the row was filed on
+// ---------------------------------------------------------------------------
+
+/**
+ * THE ORDER THE JU-10 SITE ACTUALLY DELIVERS. Two cars are staged. The TIGHT
+ * one (1.4 s) is the car the student waits out; by the moment he commits it is
+ * already PAST the node, so `OncomingLeftTurnRunner` records no figure for it
+ * (`carArc < -0.5` is the condition) and resolves it EMPTY on that same frame.
+ * The FOLLOW car is the one holding the interval he actually judged — the ~6 s
+ * the template authors — and it does not resolve until its own car is 40 m
+ * clear of the node (LTAP_CLEAR_ARC_M), about ten seconds later. The student
+ * needs roughly that long to cover the 50 m to the terminal disc, and the
+ * brisker (and still lawful) his exit, the more certainly he beats it.
+ *
+ * `applyTick` steps only the CURRENT objective, so the row used to be frozen on
+ * whatever was known when the gate ticked: on this drive, the tight car's
+ * silence. `applyStagedOutcome` re-derives it (engine.ts) — report-only, and
+ * only for the one gate that authors the norm.
+ */
+describe("§2b the number survives arriving after the gate has ticked", () => {
+  /** The whole route driven clean, then the outcomes the runners publish later
+   *  — the real order, the inverse of `driveTurn`'s. */
+  function driveThenResolve(outcomes: readonly StagedEventOutcome[]): LessonSessionState {
+    let s = driveTurn(null);
+    for (const o of outcomes) s = applyStagedOutcome(s, o);
+    return s;
+  }
+
+  it("the follow car's measurement reaches the row it belongs to", () => {
+    const s = driveThenResolve([ltapOutcome("sc-ltap-follow", 6.2)]);
+    const r = buildLessonResult(s);
+    // The gate is untouched by the late evidence — this repair adds a sentence,
+    // it never re-opens a certificate.
+    expect(r.objectives.map((o) => o.done)).toEqual([true, true]);
+    expect(r.objectives[1].detail).toEqual({
+      kind: "oncomingGap",
+      acceptedGapSec: 6.2,
+      normSec: 4,
+      ending: "measured",
+    });
+  });
+
+  it("«лентата беше чиста» is corrected by the car that was in it", () => {
+    // The exact sequence of the correct drive, and the sentence w27's two legs
+    // printed at head 85495fd: the tight car resolves empty BEFORE the gate
+    // ticks, the follow car's 6.2 s lands after it.
+    const early = driveTurn(null, [ltapOutcome("sc-ltap-tight", undefined, "clear", true)]);
+    expect((early.objectives[1].detail as { ending: string }).ending).toBe("clear");
+
+    const late = applyStagedOutcome(early, ltapOutcome("sc-ltap-follow", 6.2));
+    const r = buildLessonResult(late);
+    expect(r.objectives[1].detail).toEqual({
+      kind: "oncomingGap",
+      acceptedGapSec: 6.2,
+      normSec: 4,
+      ending: "measured",
+    });
+  });
+
+  it("a head-on that lands late still outranks the figure that landed early", () => {
+    const early = driveTurn(null, [ltapOutcome("sc-ltap-follow", 6.2)]);
+    const late = applyStagedOutcome(
+      early,
+      ltapOutcome("sc-ltap-tight", undefined, "collision", false),
+    );
+    expect((buildLessonResult(late).objectives[1].detail as { ending: string }).ending).toBe(
+      "collision",
+    );
+  });
+
+  it("the approach gate never acquires a row, however late the evidence is", () => {
+    const s = driveThenResolve([ltapOutcome("sc-ltap-tight", 1.6)]);
+    expect(buildLessonResult(s).objectives[0].detail).toBeUndefined();
+  });
+
+  it("an outcome of another kind rewrites nothing — the rows keep their identity", () => {
+    // The narrowness of the re-derivation, measured rather than asserted: every
+    // objective in the product that authors no norm must come back as the SAME
+    // object, so no unrelated encounter can churn the session state.
+    const before = driveTurn(null);
+    const after = applyStagedOutcome(before, {
+      eventId: "some-dart",
+      kind: "pedestrianDartOut",
+      success: true,
+      detail: "clear",
+      tSec: 41,
+    });
+    expect(after.objectives[0]).toBe(before.objectives[0]);
+    expect(after.objectives[1]).toBe(before.objectives[1]);
+    expect(after.stagedOutcomes).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 3 · The sentence the student actually reads
 // ---------------------------------------------------------------------------
 

@@ -312,6 +312,14 @@ export interface GuidancePointGoal {
    */
   leaveRadiusM?: number;
   /**
+   * ROUNDABOUT ONLY. A point on the arm the objective leaves by
+   * (`RoundaboutParams.exit`). Present ⇒ the ring walk is cut at THAT mouth
+   * and carried out through it, so the ribbon ends where the maneuver is
+   * graded complete instead of on the ring. Absent ⇒ the ribbon stops at the
+   * next mouth, exactly as before.
+   */
+  exitPoint?: { x: number; y: number };
+  /**
    * Set ⇒ (x, y) is NOT a lane. A parking bay is a place the student LEAVES
    * the carriageway for, and what stands between the aisle and it — the row he
    * is parking beside, the wall that closes it — is exactly what the drill is
@@ -336,6 +344,8 @@ export type RouteTarget =
       /** See `GuidancePointGoal.leaveRadiusM` — set ⇒ (x, y) is a roundabout
        *  island, and `ringRouteRaw` owns the derivation. */
       leaveRadiusM?: number;
+      /** See `GuidancePointGoal.exitPoint` — the arm the ring walk leaves by. */
+      exitPoint?: { x: number; y: number };
       /** See `GuidancePointGoal.offRoad` — set ⇒ (x, y) is a parking bay or a
        *  driveway, not a lane, so the ribbon stays on the tarmac. */
       offRoad?: boolean;
@@ -855,6 +865,8 @@ export function guidanceGoalFor(
             acceptRadiusM: params.enterRadiusM,
             labelBg: "Влез в кръговото",
             leaveRadiusM: params.exitRadiusM,
+            // The exit the template NAMES, when it names one. See `exitPoint`.
+            ...(params.exit !== undefined ? { exitPoint: { ...params.exit } } : {}),
           };
         case "parkInBay":
           return lesson.parkingBay
@@ -1513,6 +1525,13 @@ function walkAheadRaw(
  */
 const RING_MOUTH_SKIP_M = 1.5;
 /**
+ * How near a ring sample must pass a named exit's mouth node to BE it. The
+ * mouth is a graph node and therefore an exact vertex of both the ring edge and
+ * the arm edge, so this is slack against float error and district authoring,
+ * not a search radius: the next mouth on any shipped ring is 28.2 m away.
+ */
+const RING_EXIT_MOUTH_SNAP_M = 1;
+/**
  * How far the ring walk may run while looking for the next mouth. One lap of
  * the widest shipped ring (rb-2lane-v1: 187.3 m on the outer lane) with room
  * for the leg that reaches it; the walk is cut long before this in practice.
@@ -1532,6 +1551,36 @@ function rawArcLengths(raw: RawRoute): number[] {
       );
   }
   return s;
+}
+
+/**
+ * The arm a NAMED exit leaves by: the edge the authored point sits on, the end
+ * of that edge which stands inside the ring (its mouth), and the slice between
+ * the two. Null when the point is not on an arm of THIS island, which is the
+ * only way the caller can be wrong — and then the ribbon simply behaves as it
+ * did before the exit was named.
+ */
+function exitArmRaw(
+  graph: RouteGraph,
+  cx: number,
+  cy: number,
+  enterRadiusM: number,
+  exitPoint: { x: number; y: number },
+): { mouth: [number, number]; raw: RawRoute } | null {
+  const snap = snapToRoad(graph, exitPoint.x, exitPoint.y);
+  if (!snap) return null;
+  const e = graph.edges[snap.edgeIdx];
+  const head: [number, number] = [e.pts[0], e.pts[1]];
+  const tail: [number, number] = [e.pts[e.pts.length - 2], e.pts[e.pts.length - 1]];
+  const useHead =
+    Math.hypot(head[0] - cx, head[1] - cy) <= Math.hypot(tail[0] - cx, tail[1] - cy);
+  const mouth = useHead ? head : tail;
+  if (Math.hypot(mouth[0] - cx, mouth[1] - cy) > enterRadiusM) return null;
+  // The slice is authored mouth → point, whichever way the edge is stored, so
+  // the ribbon always runs OUTWARD. `jointIdx: [0]` puts a junction on the
+  // mouth itself: leaving a ring is a turn, and the chevron belongs on it.
+  const pts = slicePolyline(e, useHead ? 0 : e.totalLen, snap.sM);
+  return pts.length >= 2 ? { mouth, raw: { points: pts, jointIdx: [0] } } : null;
 }
 
 /**
@@ -1567,6 +1616,7 @@ function ringRouteRaw(
   cy: number,
   enterRadiusM: number,
   leaveRadiusM: number,
+  exitPoint?: { x: number; y: number },
 ): RawRoute | null {
   const inside = Math.hypot(start.x - cx, start.y - cy) <= enterRadiusM;
   let raw: RawRoute | null;
@@ -1658,6 +1708,31 @@ function ringRouteRaw(
   // Where the carry found no further mouth the cut falls back to the last one
   // there is, so a ring this walk cannot get round is drawn exactly as before
   // rather than as a full lap.
+  // (c) THE NAMED EXIT, when the objective named one. It replaces (b) rather
+  // than joining it: the leg no longer ENDS at a mouth, it turns out through
+  // one, so neither RING_MOUTH_UNDRAWABLE (a mouth too close to draw a leg TO
+  // is still an exit you can drive out of) nor RING_MOUTH_SKIP_M applies. The
+  // entry mouth is still skipped on an approach — a car outside the ring has
+  // not made its entry, and the arm it comes in by is not the arm it leaves by
+  // even when they are the same arm one lap apart.
+  const arm = exitPoint ? exitArmRaw(graph, cx, cy, enterRadiusM, exitPoint) : null;
+  if (arm) {
+    let seen = 0;
+    for (const j of raw.jointIdx) {
+      if (j <= 0 || j >= raw.points.length) continue;
+      if (Math.hypot(raw.points[j][0] - cx, raw.points[j][1] - cy) > enterRadiusM) continue;
+      seen++;
+      if (!inside && seen === 1) continue;
+      const off = Math.hypot(raw.points[j][0] - arm.mouth[0], raw.points[j][1] - arm.mouth[1]);
+      if (off > RING_EXIT_MOUTH_SNAP_M) continue;
+      if (s[j] > cutOut) break; // the leg had already left the ring — (a) wins
+      return joinRaw(trimRawTo(raw, s[j]), arm.raw);
+    }
+    // No such mouth on this walk (a malformed district, or an exit named on
+    // another island): fall through to the unnamed behaviour rather than
+    // standing the ribbon down.
+  }
+
   let mi = inside ? 0 : 1;
   if (mouths.length > mi + 1 && mouths[mi]! < MIN_ROUTE_LEN_M) mi++;
   const cutMouth = mouths[mi] ?? mouths[mouths.length - 1] ?? Infinity;
@@ -2346,7 +2421,16 @@ export function deriveGuidanceRoute(
     // A roundabout island is not a destination — see ROUNDABOUT RIBBONS.
     const enterRadiusM =
       goal.shape?.kind === "zone" ? goal.shape.radiusM : goal.leaveRadiusM;
-    raw = ringRouteRaw(graph, snap, start, goal.x, goal.y, enterRadiusM, goal.leaveRadiusM);
+    raw = ringRouteRaw(
+      graph,
+      snap,
+      start,
+      goal.x,
+      goal.y,
+      enterRadiusM,
+      goal.leaveRadiusM,
+      goal.exitPoint,
+    );
   } else {
     const targetSnap = snapToRoad(graph, goal.x, goal.y);
     raw = targetSnap ? shortestPathRaw(graph, snap, targetSnap) : null;

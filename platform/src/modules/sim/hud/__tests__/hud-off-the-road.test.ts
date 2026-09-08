@@ -656,10 +656,20 @@ describe("row 5 · the pad marks are in the HUD's own register", () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 describe("row 6 · the route pill and the telltale cue clear the throttle band's flank", () => {
-  /** The compact arm of the row-C1 corridor rule, on its own. */
+  /** The compact arm of the row-C1 corridor rule, on its own.
+   *
+   *  THE SELECTOR LIST IS OPEN-ENDED AS OF 2026-09-08 — sc-ac-crosswind's
+   *  «втори замах» cue (`[data-hud="wind-swing-cue"]`) joined this corridor and
+   *  therefore this rule, and a pattern that demanded EXACTLY the two 2026-09-04
+   *  names turned red for a surface that had correctly been given the lane. What
+   *  this row is about is the DECLARATIONS — a right edge and a width that both
+   *  pay `FLANK_LANE_VAR` — and those are asserted below, unchanged and on the
+   *  same rule. So the pin still names both original chips and still requires
+   *  them to be in the same rule; it simply allows further `[data-sim-compact]`
+   *  chips to be listed after them, which is the only way this corridor grows. */
   const compactChipRule = (): string => {
     const at = CSS.search(
-      /\n\s*\[data-sim-compact="on"\] \[data-hud="follow-hint"\],\n\s*\[data-sim-compact="on"\] \[data-hud="telltale-cue"\] \{/,
+      /\n\s*\[data-sim-compact="on"\] \[data-hud="follow-hint"\],\n\s*\[data-sim-compact="on"\] \[data-hud="telltale-cue"\](,\n\s*\[data-sim-compact="on"\] \[data-hud="[a-z-]+"\])* \{/,
     );
     expect(at, "the compact follow-hint/telltale-cue rule").toBeGreaterThan(-1);
     const from = CSS.slice(at);

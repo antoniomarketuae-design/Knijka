@@ -63,6 +63,7 @@ import {
   DRIVE_APPLY_TRANSFORM,
   PROBE_AFTER_DRIVE,
   PROBE_BEFORE_DRIVE,
+  TOUCH_PROBE_OFFSET_PX,
   mergeProbes,
   readbackVerdict,
   touchProbeLine,
@@ -417,8 +418,8 @@ describe("§6 the drive states which channel drove it", () => {
       // the probe" no longer means „before the car moved" and the boundary has
       // stopped being one. It therefore runs over the WHOLE file: this harness
       // owns no touch dispatch of its own at any instant, and every touch it
-      // sends goes through `lib/touch-probe.mjs`, which presses dead centre and
-      // cannot command the car. Measured at the time of the change: all three
+      // sends goes through `lib/touch-probe.mjs`, which presses inside the
+      // neutral band and cannot command the car. Measured at the change: all three
       // patterns absent from the entire file, so nothing was relaxed to fit.
       assert.ok(EMITTER.includes('page.keyboard[on ? "down" : "up"]("KeyW")'), "the throttle is no longer a key");
       assert.ok(EMITTER.includes('page.keyboard[on ? "down" : "up"]("KeyS")'), "the brake is no longer a key");
@@ -459,11 +460,15 @@ describe("§6 the drive states which channel drove it", () => {
         assert.ok(sends.includes(edge), `the probe never sends ${edge} — the pad's release edges need all four`);
       }
       assert.ok(PROBE.includes("events += 1;"), "the probe dispatches without counting");
-      // Dead centre is the safety argument; a probe that pressed off-centre
-      // would command the car AFTER the drive and before the verdict is read.
+      // The NEUTRAL BAND is the safety argument, and §7f checks the number
+      // against the product's own constant. Here: the press is still derived
+      // from the pad's measured centre plus the bounded offset, so it cannot
+      // wander to a coordinate nothing checks.
       assert.ok(
-        PROBE.includes("box.left + box.width / 2") && PROBE.includes("box.top + box.height / 2"),
-        "the probe no longer presses the pad's dead centre, so it can now command the car",
+        PROBE.includes("box.left + box.width / 2") &&
+          PROBE.includes("box.top + box.height / 2 + offsetPx"),
+        "the probe's press is no longer the pad's own centre plus the bounded offset, so nothing now " +
+          "guarantees it lands where the pedals are only released",
       );
     });
 
@@ -580,7 +585,17 @@ describe("§7 what the drivetrain pad did when it was pressed", () => {
   });
 
   describe("§7b the judge, with no browser in it", () => {
-    const seatedKnob = { transition: "none", transform: "translateY(0.0px)", valueNow: "0" };
+    // THE VALUE A BROWSER ACTUALLY HANDS BACK. This fixture used to read
+    // `translateY(0.0px)`, which is what `driveApply` WRITES and not what the
+    // DOM returns: CSSOM re-serialises a length to its shortest form, so the
+    // decimal is gone by the time the probe reads the property. Measured in
+    // the harness's own WebKit — `translateY(${(0).toFixed(1)}px)` reads back
+    // `translateY(0px)`, `(-12.34).toFixed(1)` reads back `translateY(-12.3px)`
+    // — which is why the probe now presses OFF centre (`TOUCH_PROBE_OFFSET_PX`)
+    // and looks for a displaced position instead of a decimal. A fixture that
+    // states a string the product cannot produce is a green test over a probe
+    // that answered «NOT actuated» on 100 % of lanes.
+    const seatedKnob = { transition: "none", transform: "translateY(5px)", valueNow: "0" };
     const restKnob = { transition: "", transform: "", valueNow: "0" };
     const releasedKnob = { transition: "transform 140ms ease-out, border-color 140ms linear", transform: "translateY(0px)" };
 
@@ -639,7 +654,7 @@ describe("§7 what the drivetrain pad did when it was pressed", () => {
     // `touchProbeLine` and `TOUCH_PROBE` agree, and a reworded clause would
     // turn every future lane's pad column into a silent null.
     for (const raw of [
-      { ok: true, events: 4, onPress: { transition: "none", transform: "translateY(0.0px)" }, afterHold: { transition: "none", transform: "translateY(0.0px)" }, onRelease: { transition: "transform 140ms ease-out" } },
+      { ok: true, events: 4, onPress: { transition: "none", transform: "translateY(5px)" }, afterHold: { transition: "none", transform: "translateY(5px)" }, onRelease: { transition: "transform 140ms ease-out" } },
       { ok: true, events: 4, onPress: { transition: "", transform: "" }, afterHold: { transition: "", transform: "" }, onRelease: { transition: "" } },
       { ok: false, why: "the touch overlay is not on the page", events: 0 },
     ]) {
@@ -775,13 +790,34 @@ describe("§7 what the drivetrain pad did when it was pressed", () => {
    * this file exists for would have closed on an instrument believed about its
    * own reach for the second time.
    *
-   * The separator is the decimal `driveApply` writes and no hide can forge. */
+   * The separator was the decimal `driveApply` writes — and THAT SEPARATOR DID
+   * NOT EXIST. CSSOM hands the property back in its shortest form, so at the
+   * centre the probe pressed, `translateY(0.0px)` reads back as the very
+   * `translateY(0px)` a park leaves; the guard below was green on a fixture the
+   * DOM can never produce while the probe answered «NOT actuated» on every lane
+   * it had ever run. The separator is now the POSITION: the probe presses
+   * `TOUCH_PROBE_OFFSET_PX` inside the neutral band, where the pedals are still
+   * only released, and `driveApply` is the one writer that can leave this knob
+   * anywhere but home. */
   describe("§7e the parked styling a hide leaves is not an actuation", () => {
-    /** `parkKnobs` and `onDriveEnd`: the integer form. */
+    /** `parkKnobs` and `onDriveEnd`: the knob at home. */
     const PARKED = { transition: "none", transform: "translateY(0px)" };
-    /** `driveApply` at dead centre: `t.toFixed(1)`. */
-    const PRESSED = { transition: "none", transform: "translateY(0.0px)" };
+    /** `driveApply` at the offset press, as the DOM gives it back. */
+    const PRESSED = { transition: "none", transform: "translateY(5px)" };
     const RELEASED = { transition: "transform 140ms ease-out, border-color 140ms linear", transform: "translateY(0px)" };
+
+    /** The predicate as its only consumer asks it — through `readbackVerdict`,
+     *  not through a copy of the regex, so a `seated()` that stopped consulting
+     *  `DRIVE_APPLY_TRANSFORM` cannot pass this by leaving the export behind. */
+    const seatedByPredicate = (transform) =>
+      readbackVerdict({
+        ok: true,
+        events: 4,
+        atRest: PARKED,
+        onPress: { transition: "none", transform },
+        afterHold: { transition: "none", transform },
+        onRelease: { transition: "" },
+      }).actuated;
 
     it("a pad that refused the claim under a parked knob reads NOT actuated", () => {
       const v = readbackVerdict({ ok: true, events: 4, atRest: PARKED, onPress: PARKED, afterHold: PARKED, onRelease: PARKED });
@@ -806,23 +842,72 @@ describe("§7 what the drivetrain pad did when it was pressed", () => {
 
     it("the two writes the predicate separates are still the two the component makes", () => {
       // The dead-predicate guard: this discriminator is a reading of product
-      // source, so a `toFixed` that became `Math.round` would turn every future
-      // pad column into a silent «unreached» with nothing to say why.
+      // source, so a knob position that stopped tracking the finger would turn
+      // every future pad column into a silent «unreached» with nothing to say
+      // why.
       const TC = readFileSync(
         path.join(REPO, "platform", "src", "components", "sim", "TouchControls.tsx"),
         "utf8",
       );
       assert.ok(
-        TC.includes("translateY(${t.toFixed(1)}px)"),
-        "driveApply no longer writes a one-decimal translateY — the probe's press signature is gone; re-derive it",
+        TC.includes("knob.style.transform = `translateY(${t.toFixed(1)}px)`"),
+        "driveApply no longer drives the knob's transform from the finger — the probe's press signature is " +
+          "gone; re-derive it",
       );
       assert.ok(
         TC.includes('transform = "translateY(0px)"'),
-        "parkKnobs/onDriveEnd no longer write the integer form the press is told apart from",
+        "parkKnobs/onDriveEnd no longer park the knob at home, which is what a press is told apart from",
       );
-      assert.equal(DRIVE_APPLY_TRANSFORM.test("translateY(0.0px)"), true);
-      assert.equal(DRIVE_APPLY_TRANSFORM.test("translateY(-42.0px)"), true);
-      assert.equal(DRIVE_APPLY_TRANSFORM.test("translateY(0px)"), false);
+      // A DISPLACED knob is the signature; home is not, IN EITHER SPELLING.
+      // `translateY(0.0px)` is listed explicitly because it is what the old
+      // predicate REQUIRED: readmitting it re-arms a probe that can only ever
+      // answer «NOT actuated», since that string never reaches a reader.
+      assert.equal(DRIVE_APPLY_TRANSFORM.test("translateY(5px)"), true);
+      assert.equal(DRIVE_APPLY_TRANSFORM.test("translateY(-12.3px)"), true);
+      assert.equal(seatedByPredicate("translateY(0px)"), false);
+      assert.equal(seatedByPredicate("translateY(0.0px)"), false);
+      assert.equal(seatedByPredicate("translateY(5px)"), true);
+    });
+
+    it("§7f the press lands INSIDE the product's own neutral band — it may never command the car", () => {
+      // The safety argument, checked against the product rather than asserted.
+      // `driveAxisFromPadY` subtracts TOUCH_DRIVE_NEUTRAL_HALF_PX and returns a
+      // hard 0 below it, so a press that far off centre releases both pedals
+      // and commands nothing. A shrunk dead zone must redden THIS, not hand a
+      // post-ladder probe a throttle on a live car.
+      const ENGINE = readFileSync(
+        path.join(REPO, "platform", "src", "modules", "sim", "engine", "touch.ts"),
+        "utf8",
+      );
+      const m = /export const TOUCH_DRIVE_NEUTRAL_HALF_PX = (\d+);/.exec(ENGINE);
+      assert.ok(m, "TOUCH_DRIVE_NEUTRAL_HALF_PX is gone from engine/touch.ts — re-derive the probe's offset");
+      const neutralHalf = Number(m[1]);
+      assert.ok(
+        TOUCH_PROBE_OFFSET_PX > 0,
+        "the probe is back on dead centre, where driveApply's write is indistinguishable from a park",
+      );
+      assert.ok(
+        TOUCH_PROBE_OFFSET_PX * 2 <= neutralHalf,
+        `the probe presses ${TOUCH_PROBE_OFFSET_PX} px off centre against a ${neutralHalf} px neutral half-band ` +
+          "— that is no longer a comfortable margin, and a probe that commands the pedals is a probe that " +
+          "changes the drive it is measuring",
+      );
+    });
+
+    it("§7g a release edge that fired is never reported as «has not exercised the component»", () => {
+      // sc-speed-creep:dff70553's own mis-routing, guarded. `onDriveEnd` writes
+      // `transform 140ms` only after `drivePad.release(e.pointerId)` returns
+      // true, which needs a claim this pointer made — so the component answered,
+      // whatever the knob position could or could not be read as.
+      const v = readbackVerdict({ ok: true, events: 4, atRest: PARKED, onPress: PARKED, afterHold: PARKED, onRelease: RELEASED });
+      assert.equal(v.actuated, false);
+      assert.equal(v.released, true);
+      assert.doesNotMatch(
+        v.why,
+        /has not exercised the component/,
+        "the probe still tells a dispatcher the pad was unreached while its own release edge proves a claim",
+      );
+      assert.match(v.why, /CLAIMED and RELEASED/);
     });
 
     it("the loud attestation names the instant the probe reported, not a literal", () => {

@@ -1824,7 +1824,20 @@ export interface NearMissStats {
 export type HudEvent =
   /** A graded mistake. Carries the catalog's authored WHY (explanationBg) +
    * law citation — the toast must teach at the moment of the error (QW7). */
-  | { kind: "violation"; titleBg: string; explanationBg: string; points: number; severity: "opasna" | "osnovna" | "vtorostepenna"; lawRef?: string }
+  /**
+   * `peekBg` — THE SHORT WHY THE PHONE CARD'S BODY ROW CAN FINISH.
+   *
+   * `sc-pk-driveway:fa602d10`: on a phone the −10 card printed two lines of a
+   * 340-character explanation, cut mid-clause, with «ЗАЩО ↓11» beside it. The
+   * remedy `hud/overlayQueue.ts` prescribes is a summary the peek can finish
+   * with the whole paragraph one tap away, and this is the channel it travels
+   * on. Retrieved from the catalogue by (code, detail) — `rules/catalog.ts`
+   * `violationPeekBg` — never authored at the emission site.
+   *
+   * Absent means „print `explanationBg`", i.e. the behaviour of every card
+   * before this field existed.
+   */
+  | { kind: "violation"; titleBg: string; explanationBg: string; peekBg?: string; points: number; severity: "opasna" | "osnovna" | "vtorostepenna"; lawRef?: string }
   | { kind: "commendation"; titleBg: string }
   /** A first, teachable encounter — coached, not scored (teach-first-then-grade). */
   | { kind: "lesson"; titleBg: string; explanationBg: string; lawRef?: string }

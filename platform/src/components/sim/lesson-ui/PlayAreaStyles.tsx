@@ -1046,7 +1046,8 @@ ${TOUCH_BAND_CSS_VARS}
          raises both still reads top to bottom.
          ══════════════════════════════════════════════════════════════════ */
       [data-hud="follow-hint"],
-      [data-hud="telltale-cue"] {
+      [data-hud="telltale-cue"],
+      [data-hud="wind-swing-cue"] {
         left: auto;
         right: ${NOTIFY_COLUMN_RIGHT_CSS};
         width: ${NOTIFY_COLUMN_WIDTH_CSS_ROOMY};
@@ -1091,14 +1092,30 @@ ${TOUCH_BAND_CSS_VARS}
          third line of a „pull over now" warning is a cheaper failure than a
          warning drawn through the control it is warning about. */
       [data-sim-compact="on"] [data-hud="follow-hint"],
-      [data-sim-compact="on"] [data-hud="telltale-cue"] {
+      [data-sim-compact="on"] [data-hud="telltale-cue"],
+      [data-sim-compact="on"] [data-hud="wind-swing-cue"] {
         right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_VAR});
         width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR});
       }
       /* A pill in a 240 px column wraps rather than running off it — the
-         hud-card-fit rule, applied to the two elements that never had it. */
+         hud-card-fit rule, applied to the two elements that never had it.
+
+         THE THIRD NAME IS AC-12's «втори замах» CUE (2026-09-08,
+         sc-ac-crosswind:a9db1738). It joins on the same terms and for the same
+         reason as the two above, and it takes the follow chip's own "top-16"
+         rather than a fourth vertical slot: "LessonScene" renders the two
+         mutually exclusively ("followHintOn && … && !windSwingCueOn"), which is
+         the corridor's stated „one surface, always" rule rather than a fourth
+         absolutely-positioned lane 12 px from its neighbour — the collision
+         shape "ObjectiveBanner"'s own header records this pair falling into.
+
+         NO BACKTICKS IN THIS COMMENT, and that is not style: this whole
+         stylesheet is a JS template literal, so one backtick ends it and the
+         file stops being TypeScript (the rest of this file's comments quote
+         with "…" for the same reason). */
       [data-hud="follow-hint"] > div,
-      [data-hud="telltale-cue"] > div {
+      [data-hud="telltale-cue"] > div,
+      [data-hud="wind-swing-cue"] > div {
         max-width: 100%;
         text-align: right;
       }
@@ -1128,6 +1145,7 @@ ${TOUCH_BAND_CSS_VARS}
          ------------------------------------------------------------------ */
       [data-hud="controls-help"],
       [data-hud="follow-hint"],
+      [data-hud="wind-swing-cue"],
       [data-hud="notify-column"] {
         transition: top 180ms ease-out;
       }
@@ -1137,6 +1155,7 @@ ${TOUCH_BAND_CSS_VARS}
       @media (prefers-reduced-motion: reduce) {
         [data-hud="controls-help"],
         [data-hud="follow-hint"],
+        [data-hud="wind-swing-cue"],
         [data-hud="notify-column"],
         [data-hud="difficulty"] {
           transition: none;
@@ -1149,7 +1168,12 @@ ${TOUCH_BAND_CSS_VARS}
          used to push the objective stack down by --sim-mirror-h is gone with
          the stack, and the column keeps its own top. The „follow the blue
          line" chip is still centred and still steps. */
-      html[data-sim-camera="chase"] [data-hud="follow-hint"] {
+      /* The AC-12 swing cue stands in the follow chip's own slot (they are
+         rendered mutually exclusively), so it inherits the same duty: at
+         "top-16" it is inside the chase mirror's band, and a coaching line
+         drawn over the rear window is rows B74/B76 all over again. */
+      html[data-sim-camera="chase"] [data-hud="follow-hint"],
+      html[data-sim-camera="chase"] [data-hud="wind-swing-cue"] {
         top: calc(4rem + var(--sim-mirror-h, 0px));
       }
 
@@ -1162,7 +1186,8 @@ ${TOUCH_BAND_CSS_VARS}
       html[data-sim-glance="left"] [data-hud="controls-help"] {
         top: calc(0.75rem + var(--sim-glance-h, 0px));
       }
-      html[data-sim-glance="rear"] [data-hud="follow-hint"] {
+      html[data-sim-glance="rear"] [data-hud="follow-hint"],
+      html[data-sim-glance="rear"] [data-hud="wind-swing-cue"] {
         top: calc(4rem + var(--sim-glance-h, 0px));
       }
       /* !important because the column's own top is an INLINE style (both the
@@ -1431,11 +1456,13 @@ ${TOUCH_BAND_CSS_VARS}
          so „one surface in the band" has to include them or the band is two
          surfaces deep again the moment a lesson raises an aid. */
       [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="follow-hint"],
-      [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="telltale-cue"] {
+      [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="telltale-cue"],
+      [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="wind-swing-cue"] {
         display: none;
       }
       [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="follow-hint"],
-      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="telltale-cue"] {
+      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="telltale-cue"],
+      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="wind-swing-cue"] {
         display: none;
       }
       /* Rank 4 — the tier picker — used to be two more selectors here, standing

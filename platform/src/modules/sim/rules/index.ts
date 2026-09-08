@@ -61,6 +61,15 @@ export {
   FAILED_TO_YIELD_SITUATION_ROUNDABOUT,
   makeCommendation,
   makeViolation,
+  /**
+   * THE PEEK'S SUMMARY, act-then-pool — `sc-pk-driveway:fa602d10`. The phone
+   * fault card has a 44–84 px text window and the authored explanations run to
+   * 750 characters, so the body was arriving cut mid-clause with «ЗАЩО ↓11»
+   * beside it. `lessons/engine.ts` reads this when it builds the HUD toast; a
+   * code with no summary authored returns null and the card prints the full
+   * explanation exactly as before.
+   */
+  violationPeekBg,
   type CommendationSpec,
   type ViolationSpec,
 } from "./catalog";

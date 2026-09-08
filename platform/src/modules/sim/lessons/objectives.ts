@@ -38,6 +38,7 @@ import type {
   ReactionBand,
   ReachZoneParams,
   ReachZoneRestDemand,
+  RoundaboutParams,
   ThreePointTurnParams,
 } from "./types";
 
@@ -547,7 +548,7 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
             "roundabout needs x, y, 0 < enterRadiusM < exitRadiusM",
           );
         }
-        return {
+        const roundabout: RoundaboutParams = {
           kind: "completeManeuver",
           maneuver: "roundabout",
           x: p.x,
@@ -555,6 +556,25 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
           enterRadiusM: p.enterRadiusM,
           exitRadiusM: p.exitRadiusM,
         };
+        // The named exit (guidance only — see RoundaboutParams.exit). Absent
+        // stays byte-identical; present must be a real point OUTSIDE the ring,
+        // because a ribbon carried to a point inside it would end on the
+        // island instead of on the arm.
+        if (p.exit !== undefined) {
+          const e = p.exit as { x?: unknown; y?: unknown };
+          if (
+            !num(e.x) ||
+            !num(e.y) ||
+            Math.hypot(e.x - p.x, e.y - p.y) <= p.exitRadiusM
+          ) {
+            throw new ObjectiveSpecError(
+              objective.id,
+              "roundabout exit must be { x, y } further than exitRadiusM from the island",
+            );
+          }
+          roundabout.exit = { x: e.x, y: e.y };
+        }
+        return roundabout;
       }
       if (p.maneuver === "threePointTurn") {
         // Corridor-locked (the parkInBay pattern): the ~180° reversal must land
@@ -888,6 +908,24 @@ export interface ObjectiveContext {
    * shipped.
    */
   harshBrakeNoCauseInRun?: boolean;
+  /**
+   * Has this drive been told, anywhere, that it was held at a dead stop with
+   * nothing to stop for — `STOPPED_WITHOUT_CAUSE`, the второстепенна the
+   * catalogue titles «Спиране без причина на открит път» and cites to ЗДвП
+   * чл. 24, ал. 2? The SECOND fact `ReachZoneParams.requireBrakingClean`
+   * consults, and the heavier of the two.
+   *
+   * „TOLD", NOT „CHARGED", for the same reason as its neighbour above, with one
+   * difference stated so it is not mistaken for a copy: this code is
+   * второстепенна, so the sheet is NOT empty in a training drive — only the
+   * FIRST rest is the free mini-lesson. The coached half is still read, because
+   * one dead stop in front of a лепка is already not a calmed pace.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+   * (the rigs, the fixtures, `EMPTY_CONTEXT`) omits it and behaves exactly as
+   * shipped.
+   */
+  stoppedWithoutCauseInRun?: boolean;
   /**
    * When the objective being stepped BECAME the active one, in session seconds.
    * The chain is strictly sequential, so this is the moment its predecessor
@@ -2938,14 +2976,20 @@ function solidLineCleanHonoured(ctx: ObjectiveContext): boolean {
 /**
  * Was the calm pace this banner certifies EASED into, or stamped in with the
  * brake? (see `ReachZoneParams.requireBrakingClean` in lessons/types.ts for the
- * frame, the drive, the census and the false-refusal check.)
+ * frame, the drive, the census and the false-refusal checks.)
  *
- * `true` IS THE ONLY REFUSING VALUE, the polarity every arm in this file ships
- * with: `undefined` is „the caller cannot answer" (every fixture, rig, replay
- * and `EMPTY_CONTEXT`), and unknown must never become a refusal.
+ * TWO CONVICTIONS, ONE ACT AT TWO INTENSITIES: the slam
+ * (`HARSH_BRAKING_NO_CAUSE`) and the dead stop (`STOPPED_WITHOUT_CAUSE`). The
+ * second was added because the cap this demand backs reads BEST at 0 км/ч, so
+ * the heavier fault was the one that kept the tick — see
+ * `stoppedWithoutCauseInRun` above for the measured drive.
+ *
+ * `true` IS THE ONLY REFUSING VALUE ON EITHER, the polarity every arm in this
+ * file ships with: `undefined` is „the caller cannot answer" (every fixture,
+ * rig, replay and `EMPTY_CONTEXT`), and unknown must never become a refusal.
  */
 function brakingCleanHonoured(ctx: ObjectiveContext): boolean {
-  return ctx.harshBrakeNoCauseInRun !== true;
+  return ctx.harshBrakeNoCauseInRun !== true && ctx.stoppedWithoutCauseInRun !== true;
 }
 
 /**
@@ -3157,7 +3201,7 @@ function fullStopHonoured(ctx: ObjectiveContext): boolean {
  * consumers must read it as „not measured", never as a clean run.
  */
 function oncomingGapReport(
-  ctx: ObjectiveContext,
+  stagedOutcomes: readonly StagedEventOutcome[],
 ): { acceptedGapSec: number | null; ending: OncomingGapEnding | null } | undefined {
   let seen = false;
   let tightest: number | null = null;
@@ -3166,7 +3210,7 @@ function oncomingGapReport(
   let released = false;
   let anyCommitted = false;
   let commitKnown = false;
-  for (const o of ctx.stagedOutcomes) {
+  for (const o of stagedOutcomes) {
     if (o.kind !== "oncomingLeftTurn") continue;
     seen = true;
     if (o.detail === "collision") collided = true;
@@ -3199,6 +3243,60 @@ function oncomingGapReport(
               ? "noTurn"
               : null;
   return { acceptedGapSec: tightest, ending };
+}
+
+/**
+ * The gap row for ONE gate, from the outcomes known so far — `undefined` for
+ * every gate that authors no norm and for every run where no encounter has
+ * resolved yet.
+ *
+ * ── WHY THIS IS A FUNCTION AND NOT A LINE INSIDE `stepReachZone` ───────────
+ * `sc-turn-left-oncoming:7974670c`, and it is the half the measurement waves
+ * could not reach from inside a tick. An objective row is written by the tick
+ * that steps it, and `applyTick` steps only the CURRENT objective: once
+ * `sc-ltap-turn` ticks, `currentIndex` moves past it and its `detail` is
+ * frozen at whatever was known on that frame.
+ *
+ * On the drill's own textbook drive that frame is too early, by design rather
+ * than by accident. The JU-10 site stages two cars: the TIGHT one (1.4 s) the
+ * student waits out, and the FOLLOW one he then turns in front of at the ~6 s
+ * the template authors. The tight runner resolves at the commit — and by then
+ * its car is PAST the node, so `carArc > 0` and it records no figure at all;
+ * the follow runner is the one holding the number, and it does not resolve
+ * until its own car is 40 m clear (LTAP_CLEAR_ARC_M), roughly ten seconds
+ * after the commit, while the student needs about nine to cover the 50 m to
+ * the south disc.
+ *
+ * So the correct drive ticked the gate, froze the row on the tight car's
+ * empty resolution, and printed «при започването на завоя нямаше насрещен —
+ * лентата беше чиста» about a student who had just judged a real interval
+ * well. That is the sentence `.audit-frames/w27/frames/
+ * sc-turn-left-oncoming__pc-right` and its mobile twin actually printed at
+ * head 85495fd. Wave 25 separated the four drives that shared it; what it
+ * could not change is that the FIGURE arrives after the only frame allowed to
+ * record it.
+ *
+ * `applyStagedOutcome` now re-derives this row when a later outcome lands
+ * (engine.ts), which is why the derivation lives here rather than inline. It
+ * is report-only in both callers — `done`, `progress` and every latch are
+ * computed without it — so no drive changes verdict and every gate that
+ * authors no `reportOncomingGapSec` is byte-identical.
+ */
+export function oncomingGapDetail(
+  params: ObjectiveParams,
+  stagedOutcomes: readonly StagedEventOutcome[],
+): ObjectiveDetail | undefined {
+  if (params.kind !== "reachZone") return undefined;
+  const normSec = (params as WitnessedReachZoneParams).reportOncomingGapSec;
+  if (normSec === undefined) return undefined;
+  const report = oncomingGapReport(stagedOutcomes);
+  if (report === undefined) return undefined;
+  return {
+    kind: "oncomingGap",
+    acceptedGapSec: report.acceptedGapSec,
+    normSec,
+    ending: report.ending,
+  };
 }
 
 function vruWaitHonoured(ctx: ObjectiveContext): boolean {
@@ -3365,9 +3463,15 @@ export function solidLineFaultVoidsObjective(
  */
 export function brakingFaultVoidsObjective(
   params: ObjectiveParams,
-  harshBrakeNoCauseInRun: boolean,
+  facts: Pick<ObjectiveContext, "harshBrakeNoCauseInRun" | "stoppedWithoutCauseInRun">,
 ): boolean {
-  if (!harshBrakeNoCauseInRun || params.kind !== "reachZone") return false;
+  // The same two convictions `brakingCleanHonoured` reads, and it takes the
+  // facts as an object for the reason `restFaultVoidsObjective` does: a second
+  // fact must not silently widen a positional boolean at the call site.
+  if (facts.harshBrakeNoCauseInRun !== true && facts.stoppedWithoutCauseInRun !== true) {
+    return false;
+  }
+  if (params.kind !== "reachZone") return false;
   return (params as WitnessedReachZoneParams).requireBrakingClean === true;
 }
 
@@ -4672,7 +4776,9 @@ function stepReachZone(
   // brakes at the tailgater on an empty street, coached «Рязко спиране без
   // причина» at 0:17 — and «✓ Успокой темпото» ticked, sheet empty, «Урокът е
   // издържан». A speed cap could say the car was slow on the mark and nothing
-  // about which pedal made it slow; now it can. Run-wide rather than windowed:
+  // about which pedal made it slow; now it can — for the slam AND for the dead
+  // stop, which is the same act at the intensity the cap rewards most.
+  // Run-wide rather than windowed:
   // the fact is session-monotone, and `done` latches, so a slam AFTER the tick
   // can never withdraw a certificate the student had already performed.
   const brakingCleanOk = params.requireBrakingClean !== true || brakingCleanHonoured(ctx);
@@ -4852,25 +4958,18 @@ function stepReachZone(
   // refusal: `done` above is computed without it. Emitted only once an
   // encounter has actually resolved, so a gate on a drill that stages none —
   // and every fixture, rig and replay — carries no detail at all, exactly as
-  // it did before.
-  const gapNormSec = params.reportOncomingGapSec;
-  const gapReport = gapNormSec === undefined ? undefined : oncomingGapReport(ctx);
+  // it did before. The derivation is `oncomingGapDetail` because the row has a
+  // second author: an encounter that resolves AFTER this gate ticks (the
+  // follow car, on the drill's own correct drive) is folded in by
+  // `applyStagedOutcome` through the same function.
+  const gapDetail = oncomingGapDetail(params, ctx.stagedOutcomes);
   return {
     done,
     // Half progress once the place is reached but the speed contract is not
     // yet met — the banner stops looking inert while the student slows down.
     progress: done ? 1 : reached ? 0.5 : 0,
     evalState,
-    ...(gapNormSec !== undefined && gapReport !== undefined
-      ? {
-          detail: {
-            kind: "oncomingGap" as const,
-            acceptedGapSec: gapReport.acceptedGapSec,
-            normSec: gapNormSec,
-            ending: gapReport.ending,
-          },
-        }
-      : {}),
+    ...(gapDetail !== undefined ? { detail: gapDetail } : {}),
   };
 }
 

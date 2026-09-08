@@ -155,8 +155,28 @@ export function scHzBrakeDontSwerveShadowScript(): DriveScript {
       // the tarmac the reflex wanted was never empty. (It is released at the
       // reveal and needs ~4 s to clear the runner's 60 m resolve window, which
       // this hold covers — the gate asserts the resolution.)
-      { kind: "annotation", textBg: "Виж я колата отляво — мина си по своята лента, без изобщо да разбере. Ако бяхме свили, щяхме да сме В нея." },
+      // THE CAPTION THE ROW ACTUALLY QUOTES AT 05-stopped (:8a5ed5b4), and the
+      // one wave 17 left behind while it mended caption 1. It read «Виж я
+      // колата отляво — мина си по своята лента …»: an IMPERATIVE about the
+      // world the student is sitting in, played over a deck that loops from the
+      // first second of the session. His own escort has not passed anything —
+      // it is still beside his door, 72° off his axis — so the sentence sent
+      // him to a windscreen that is empty by construction, which is the
+      // scFollowDistance defect `deckCaptionVoice.test.tsx` documents: a claim
+      // about the GHOST read as a claim about the student's car. It now speaks
+      // as the demonstration, keeps the лекция's own phrase, and names the look
+      // that does find the neighbour in his world — the same «рамо» caption 1
+      // and instruction 2 name, which `templates-hazards2`' 18 → 17 hold makes
+      // true at rest as well as under way.
+      { kind: "annotation", textBg: "В демонстрацията колата отляво си мина по своята лента — ако бяхме свили, щяхме да сме В нея. През стъклото тя не се вижда и сега: съседната лента се проверява през рамо, и то ПРЕДИ волана." },
+      // …and the ghost PERFORMS the look the caption above now names, in the
+      // лекция's own order (огледало → рамо, чл. 25). The left mirror stays —
+      // it is the paired control the gate's blind-swerve assertion leans on,
+      // and it is the first half of the real check — but a caption that names
+      // «рамо» over a demonstration that never turns its head is the same
+      // defect one layer up, which is what caption 1 was repaired for.
       { kind: "glance", mirror: "left" },
+      { kind: "glance", mirror: "shoulder" },
       { kind: "pause", sec: 3, brake: true },
       { kind: "annotation", textBg: "Колата стои, воланът е прав, ти си жив и с избор. Дотук задачата е решена — заобикалянето е следващият, отделен ход: пак с оглед и на скорост на пешеходец." },
     ],

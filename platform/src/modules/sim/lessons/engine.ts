@@ -35,6 +35,7 @@ import {
   parseSpeedMeasurement,
   reduceTick,
   settleUnpaidSpeedingTeach,
+  violationPeekBg,
   type RuleEngineConfig,
   type RuleEngineState,
   type RuleEvent,
@@ -53,6 +54,7 @@ import {
   brakingFaultVoidsObjective,
   contactVoidsObjective,
   createEvalState,
+  oncomingGapDetail,
   parseObjectiveParams,
   personContactVoidsObjective,
   personHaltVoidsObjective,
@@ -93,6 +95,7 @@ import type {
   LessonPhase,
   LessonResult,
   LessonSessionState,
+  ObjectiveDetail,
   ObjectiveEvalState,
   ObjectiveParams,
   ObjectiveProgress,
@@ -975,6 +978,47 @@ function isCoachedHarshBrakeNoCause(m: CoachedMistake): boolean {
 }
 
 /**
+ * Held at a dead stop with nothing to stop for — the SECOND ledger row
+ * `ReachZoneParams.requireBrakingClean` consults (lessons/types.ts carries the
+ * frame and the census).
+ *
+ * WHY THE DEMAND READS TWO CODES AND NOT ONE. The slam and the standstill are
+ * the same act at two intensities, and the cap the demand backs (`maxSpeedKmh`)
+ * reads BEST at 0 км/ч — so on the one drill that authors this term, the
+ * heavier fault was the one that kept the certificate. Measured at `e08d917`
+ * through `compileScenario → applyTick → buildLessonResult`, on the audit's own
+ * wrong leg (`sc-follow-tailgater:63c0c28c`, 45 m sprints with 8 s rests):
+ * scored `[STOPPED_WITHOUT_CAUSE ×5]`, 5 наказателни точки — and «✓ Успокой
+ * темпото», «✓ Стигни края на отсечката», «Урокът е издържан».
+ *
+ * IT READS THE BILL, NOT THE SPEEDOMETER, exactly like its neighbours: the
+ * detector ships disarmed and, armed, convicts only a car held in a live lane
+ * of an open through road with no signal, crossing, person, weather, hazard or
+ * queue to answer for it, so what arrives here is a conviction the protocol
+ * already prints with the catalogue's explanation and its ЗДвП чл. 24, ал. 2.
+ */
+function isNeedlessStop(e: ScorableEvent): boolean {
+  return e.kind === "violation" && e.code === "STOPPED_WITHOUT_CAUSE";
+}
+
+/**
+ * …AND THE SAME FAULT AS THE COACH RECORDED IT. `STOPPED_WITHOUT_CAUSE` is
+ * второстепенна rather than основна, so unlike its neighbours the sheet is NOT
+ * empty in a training drive — the second rest onward is charged. The coached
+ * half still has to be read, because the FIRST rest is the free mini-lesson and
+ * a student who stopped dead once in front of a лепка has not calmed the pace
+ * either; without it a single-stop drive would keep the tick.
+ *
+ * `CoachedMistake.code` is a plain string (future codes pass through), so this
+ * is a string compare; the SCORED half above is typed against the real
+ * `ViolationCode`, which is what makes a rename fail the build instead of
+ * quietly emptying the gate.
+ */
+function isCoachedNeedlessStop(m: CoachedMistake): boolean {
+  return m.code === "STOPPED_WITHOUT_CAUSE";
+}
+
+/**
  * Came to rest between the rails — the ledger row
  * `ReachZoneParams.requireRestClean: "railBand"` consults.
  *
@@ -1118,20 +1162,28 @@ function qualifyingStopCurrent(rules: RuleEngineState, t: number): boolean {
   return last !== null && t - last <= rules.config.stopRecencySec;
 }
 
-/** Map rule-engine output onto the HUD event contract (toasts). */
+/**
+ * Map rule-engine output onto the HUD event contract (toasts).
+ *
+ * `peekBg` rides the ACT, not the code (`violationPeekBg` — `e.detail` selects
+ * the struck body), and is omitted rather than nulled when the catalogue has
+ * none: `HudEvent`'s own contract reads absence as „print `explanationBg`", and
+ * a present-but-empty string would blank the card's only sentence.
+ */
 function toHudEvents(events: ReadonlyArray<RuleEvent>): HudEvent[] {
-  return events.map((e) =>
-    e.kind === "violation"
-      ? {
-          kind: "violation" as const,
-          titleBg: e.titleBg,
-          explanationBg: e.explanationBg,
-          points: e.points,
-          severity: e.severityClass,
-          lawRef: e.lawRef,
-        }
-      : { kind: "commendation" as const, titleBg: e.titleBg },
-  );
+  return events.map((e) => {
+    if (e.kind !== "violation") return { kind: "commendation" as const, titleBg: e.titleBg };
+    const peekBg = violationPeekBg(e.code, e.detail);
+    return {
+      kind: "violation" as const,
+      titleBg: e.titleBg,
+      explanationBg: e.explanationBg,
+      points: e.points,
+      severity: e.severityClass,
+      lawRef: e.lawRef,
+      ...(peekBg === null ? {} : { peekBg }),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1346,6 +1398,13 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       tick,
       withFollowingGapDetail(e, tick, prev.rules.config),
     );
+    // …AND THE ONE-LINE VERSION OF IT, for the phone card's body row
+    // (`sc-pk-driveway:fa602d10`). Keyed on the ACT (`e.detail`), so the four
+    // COLLISION bodies each get their own; `null` for every code with no
+    // summary authored, which leaves that card exactly as it was. The measured
+    // suffixes above are deliberately NOT folded in: a summary is the WHY, and
+    // the readout belongs with the paragraph the sheet prints whole.
+    const peekBg = violationPeekBg(e.code, e.detail);
     const step = coachStep(
       encounters,
       {
@@ -1377,6 +1436,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         points: e.points,
         severity: e.severityClass,
         lawRef: e.lawRef,
+        ...(peekBg === null ? {} : { peekBg }),
       });
       scoredEvents.push(e);
       // S1 pauseOnError: the scored violation ADDITIONALLY pauses with the
@@ -1665,6 +1725,17 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     prev.events.some(isHarshBrakeNoCause) ||
     scoredEvents.some(isHarshBrakeNoCause) ||
     harshBrakeCoached;
+  // …AND THE DEAD STOP, the second half of the same demand
+  // (`sc-follow-tailgater:63c0c28c`). Both channels for the reason the block
+  // above gives, and the `mistakeExperience` exemption is the same one: in a
+  // THEO-3 sandbox the wrong act IS the assignment.
+  const needlessStopCoached =
+    mistakeXp === undefined &&
+    (coachedPrev.some(isCoachedNeedlessStop) || coachedNew.some(isCoachedNeedlessStop));
+  const stoppedWithoutCauseInRun =
+    prev.events.some(isNeedlessStop) ||
+    scoredEvents.some(isNeedlessStop) ||
+    needlessStopCoached;
 
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
@@ -1732,6 +1803,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
         ...(crossedSolidLineInRun ? { crossedSolidLineInRun: true } : {}),
         ...(harshBrakeNoCauseInRun ? { harshBrakeNoCauseInRun: true } : {}),
+        ...(stoppedWithoutCauseInRun ? { stoppedWithoutCauseInRun: true } : {}),
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
         ...(overTheCeilingInRun ? { overTheCeilingInRun: true } : {}),
         qualifyingStopCurrent: fullStopHeld,
@@ -2147,7 +2219,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           // can make — wired anyway for the reason the yield term above is the
           // standing record of: a later wave that moves the calm-pace claim onto
           // the finish gate must not reopen the trap silently.
-          brakingFaultVoidsObjective(params[currentIndex], harshBrakeNoCauseInRun));
+          brakingFaultVoidsObjective(params[currentIndex], {
+            ...(harshBrakeNoCauseInRun ? { harshBrakeNoCauseInRun: true } : {}),
+            ...(stoppedWithoutCauseInRun ? { stoppedWithoutCauseInRun: true } : {}),
+          }));
       if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {
@@ -2612,7 +2687,49 @@ export function applyStagedOutcome(
   prev: LessonSessionState,
   outcome: StagedEventOutcome,
 ): LessonSessionState {
-  return { ...prev, stagedOutcomes: [...(prev.stagedOutcomes ?? []), outcome] };
+  const stagedOutcomes = [...(prev.stagedOutcomes ?? []), outcome];
+  // ── AND THE ROW THE NEW EVIDENCE BELONGS TO (sc-turn-left-oncoming:7974670c)
+  // A gate's `detail` is written by the tick that steps it, and `applyTick`
+  // steps only the CURRENT objective — so a measurement that arrives after the
+  // gate ticks used to be unreachable. On the ONE gate in the catalogue that
+  // authors `reportOncomingGapSec` that is not an edge case but the drill's own
+  // correct drive: the tight car resolves empty at the commit (it is already
+  // past the node) and the follow car — the one holding the ~6 s the student
+  // actually judged — resolves about ten seconds later, while he needs about
+  // nine to reach the terminal disc. The row therefore froze on «лентата беше
+  // чиста», which is what w27's two legs printed at head 85495fd.
+  //
+  // Report-only, and narrow by construction: `oncomingGapDetail` returns
+  // `undefined` for every params shape that authors no norm, so every other
+  // objective in the product keeps the object it already had (identity
+  // included — the map returns the same row unless a detail actually changes).
+  // No status, no `done`, no latch and no score is touched here.
+  let objectives = prev.objectives;
+  let changed = false;
+  const refreshed = objectives.map((o) => {
+    const detail = oncomingGapDetail(o.params, stagedOutcomes);
+    if (detail === undefined || sameOncomingGapDetail(o.detail, detail)) return o;
+    changed = true;
+    return { ...o, detail };
+  });
+  if (changed) objectives = refreshed;
+  return { ...prev, stagedOutcomes, objectives };
+}
+
+/** Would re-deriving the gap row rewrite it? Keeps `applyStagedOutcome` from
+ *  handing back a new objective array on every unrelated encounter. */
+function sameOncomingGapDetail(
+  prev: ObjectiveDetail | undefined,
+  next: ObjectiveDetail,
+): boolean {
+  if (prev === undefined || prev.kind !== "oncomingGap" || next.kind !== "oncomingGap") {
+    return false;
+  }
+  return (
+    prev.acceptedGapSec === next.acceptedGapSec &&
+    prev.normSec === next.normSec &&
+    prev.ending === next.ending
+  );
 }
 
 // ---------------------------------------------------------------------------

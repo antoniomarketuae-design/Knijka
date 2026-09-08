@@ -94,6 +94,41 @@ export interface ViolationSpec {
   titleBg: string;
   explanationBg: string;
   /**
+   * THE WHY THE PEEK CAN FINISH — `sc-pk-driveway:fa602d10`, and the remedy
+   * `hud/overlayQueue.ts` has been naming for three rounds without a channel to
+   * land it in: „the peek prints a SUMMARY it can finish and the sheet holds
+   * the rest, which is the arrangement `briefingLineBg`/`briefingBodyBg`
+   * already impose on the briefing and which NOTHING imposes on a violation
+   * card."
+   *
+   * THE FRAME (`.audit-frames/w28/frames/sc-pk-driveway__mobile-wrong/
+   * 04-t013s.png`): «ОПАСНА −10 ИЗПИТНИ Т. · Удар в неподвижно препятствие ·
+   * „Удари неподвижен предмет —" · ЗАЩО ↓11». Two lines of body, cut mid-clause
+   * at a dash, and eleven lines of the WHY of the worst thing in the lesson
+   * behind a tap. Filed at «↓ ОЩЕ 6 РЕДА» and now worse, because the per-body
+   * `COLLISION_CONTACT_COPY` split made the explanation longer while the phone
+   * window stayed 44–84 px.
+   *
+   * IT IS A SECOND STRING, NOT A SHORTER `explanationBg`. Nothing is deleted:
+   * `SimOverlay`'s sheet still prints the whole authored paragraph, the debrief
+   * FaultCard still prints it, and `whyIsReachable` still measures the peek. The
+   * ONLY surface that reads this is the phone card's body row.
+   *
+   * THE BUDGET IS TWO BODY LINE BOXES, and it is derived, not chosen —
+   * `__tests__/violation-peek-summary.test.ts` re-cuts it off the same
+   * `textWindowStyle` floor that `violation-title-fits-peek.test.ts` uses for
+   * the title: window 44 px, a two-line title spends 27.5, a body line box is
+   * 15.125 px. Two lines is what `WHY_REACHABLE_MIN_VISIBLE_FRACTION` (0.5)
+   * clears even in the floor case, where only one of them is visible.
+   *
+   * OPTIONAL, and absent means „print the authored explanation", i.e. exactly
+   * today's behaviour. A row without one is not a defect the moment this field
+   * exists — it is a row whose explanation nobody has yet had to shorten for a
+   * phone. ADR-002: this slot carries NO citation and no figure; it is plain
+   * Bulgarian, and every article stays in `explanationBg`/`lawRef`.
+   */
+  peekBg?: string;
+  /**
    * A15: the corrective action — one instructive line answering "какво
    * трябваше да направя?". Concrete and procedural (numbers, order of
    * actions), not a restatement of the rule; the explanation says WHY, this
@@ -667,6 +702,19 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     titleBg: "Излизане от платното за движение",
     explanationBg:
       "Излезе с колата извън платното за движение — отвъд бордюра, на банкета, тротоара или тревата — и остана там. Платното за движение е общата широчина на пътните ленти (ЗДвП § 6, т. 3) и е мястото, по което се движи автомобилът; границата му е линията, която го отделя от банкета, тротоара и лентата за принудително спиране (§ 6, т. 4). Отвъд тази граница законът пуска други: по банкета се движат мотопеди, велосипеди и немоторни превозни средства, когато няма лента за тях (чл. 15, ал. 5), а тротоарът е предназначен само за движение на пешеходци (§ 6, т. 6). Това са правила за ДВИЖЕНИЕТО — къде е позволено да спреш е отделен въпрос и на него отговаря чл. 94. Там сцеплението е друго, спирачният път е по-дълъг, а пешеходецът зад храста не очаква автомобил.",
+    // 750 characters — the longest explanation in this catalogue, and on the
+    // phone card it is 11+ folded lines. The visible one now carries the
+    // consequence rather than the definition of «платно за движение»; the
+    // definition and all four citations stay one tap away, unchanged.
+    //
+    // ONE LINE, NOT TWO — sc-junction-gap:9d7f5535, 2026-09-08. This title
+    // («Излизане от платното за движение») wraps to TWO line boxes, and
+    // `violation-title-fits-peek.test.ts` now does the same arithmetic for the
+    // summary that it already did for the title: 44 px window − 2 × 13.75 px
+    // leaves 16.5 px, i.e. ONE body line. The 41-character version was cut at
+    // «Там спираш по-трудно и» on the very drive this row was filed from
+    // (w28 sc-junction-gap mobile-wrong raises this code twice).
+    peekBg: "Там никой не те очаква.",
     correctiveBg:
       "Прибери се на платното веднага, но плавно: не дърпай волана — отпусни газта, изправи колелата и се върни под малък ъгъл, след като си погледнал в огледалото. Трябва ли да спреш — в населено място спираш възможно най-вдясно НА платното, успоредно на оста на пътя (ЗДвП чл. 94, ал. 3); извън населено място правилото е обърнато — там се отбива ИЗВЪН платното, а паркирането на самото платно е забранено (чл. 94, ал. 1 и 2). Тротоарът не е свободен паркинг, но не е и абсолютна забрана: качване върху него се допуска само на определените от собственика на пътя или от администрацията места, за автомобил до 2,5 т, успоредно на оста на пътя и ако откъм сградите остават поне 2 метра за пешеходците (чл. 94, ал. 3) — навсякъде другаде е нарушение. Излезеш ли встрани в завой, причината е преди завоя: намали ПРЕДИ да влезеш в дъгата, не в нея.",
     lawRef: "ЗДвП чл. 15, ал. 1",
@@ -821,6 +869,14 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // control-neutral row that code reads with no event in hand.
     explanationBg:
       "Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от натрупани дребни пропуски. В симулатора продължаваме, за да се учиш, но сесията се оценява като прекратена.",
+    // The pooled peek — used only when the contact channel could not say WHAT
+    // was struck (`makeViolation` with no `detail`). The four bodies each carry
+    // their own below; this one may therefore name no body at all.
+    //
+    // …AND IT FITS THE ONE LINE «Пътнотранспортно произшествие» LEAVES —
+    // sc-junction-gap:9d7f5535. Two title line boxes of 13.75 px leave 16.5 px
+    // of the 44 px window, one body line; the 39-character version needed two.
+    peekBg: "Спирачният път не стигна.",
     // THE CORRECTIVE HAD TO WALK ALL FOUR BODIES TOO (2026-08-23). The split
     // below gave each struck body its own title and explanation, and this slot
     // was left as it was with a note calling that „the honest limit of a
@@ -2255,27 +2311,41 @@ export const RAIL_CROSSING_ACT_COPY: Record<
  */
 export const COLLISION_CONTACT_COPY: Record<
   "vehicle" | "pedestrian" | "cyclist" | "staticObject",
-  { titleBg: string; explanationBg: string }
+  // `peekBg` is REQUIRED here and optional on `ViolationSpec`: this table is
+  // four rows and every one of them is the −10 card a student meets mid-drive
+  // on a phone, which is the exact surface `sc-pk-driveway:fa602d10` was filed
+  // against. A fifth body added without one would reintroduce the mid-clause
+  // cut, and `tsc` says so before a sweep photographs it.
+  { titleBg: string; explanationBg: string; peekBg: string }
 > = {
   vehicle: {
     titleBg: "Удар в друго превозно средство",
     explanationBg:
       "Удари друго превозно средство. Между вас е имало точно толкова път, колкото ти е трябвал, за да спреш — и е бил по-малко. Скоростта и дистанцията се избират ПРЕДИ конфликтната точка: щом другата кола е вече в спирачния ти път, воланът и спирачката не решават нищо.",
+    // One line: «Удар в друго превозно средство» wraps to two title boxes.
+    peekBg: "Дистанцията не стигна.",
   },
   pedestrian: {
     titleBg: "Удар в пешеходец",
     explanationBg:
       "Удари човек. Това е най-тежкият изход на пътя и няма лека негова версия — пешеходецът няма нито ламарина, нито колан, нито въздушна възглавница, а при 50 км/ч ударът е почти сигурна тежка травма. Затова към пешеходците се кара с готовност да спреш, преди да си сигурен, че те са те видели, а не след това.",
+    peekBg: "Човекът няма ламарина и колан.",
   },
   cyclist: {
     titleBg: "Удар във велосипедист",
     explanationBg:
       "Удари велосипедист. Колелото е тясно, тихо и по-бавно, отколкото изглежда, и се движи там, където най-често не се гледа — вдясно, в мъртвата зона и малко преди кръстовището. Разминаването с колоездач иска странична дистанция и намаляване, не изчакване той да се отдръпне.",
+    peekBg: "Колелото е тясно и тихо — лесно се пропуска.",
   },
   staticObject: {
     titleBg: "Удар в неподвижно препятствие",
     explanationBg:
       "Удари неподвижен предмет — стълб, дърво, ограда, сграда или бордюр. Неподвижното препятствие не се появява внезапно и не може да сгреши: то е било там през цялото време, а колата е стигнала до него, защото пътят ѝ е излязъл извън платното за движение. Излизането от платното е самото произшествие, а ударът е само краят му.",
+    // One line: «Удар в неподвижно препятствие» wraps to two title boxes. The
+    // 41-character version was photographed cut at «Препятствието беше там
+    // през» — sc-junction-gap:9d7f5535, the footway crash this row was filed
+    // from. The clause it keeps is the explanation's own first one.
+    peekBg: "Не се появи внезапно.",
   },
 };
 
@@ -2459,7 +2529,10 @@ export const HANDBRAKE_ACT_COPY: Record<
  * reintroduces the photographed defect on a row whose pooled title passes.
  */
 export const PER_ACT_COPY: Partial<
-  Record<ViolationCode, Record<string, { titleBg: string; explanationBg: string; lawRef?: string }>>
+  Record<
+    ViolationCode,
+    Record<string, { titleBg: string; explanationBg: string; lawRef?: string; peekBg?: string }>
+  >
 > = {
   RAIL_CROSSING_VIOLATION: RAIL_CROSSING_ACT_COPY,
   COLLISION: COLLISION_CONTACT_COPY,
@@ -2483,9 +2556,29 @@ export const PER_ACT_COPY: Partial<
 export function actCopy(
   code: ViolationCode,
   detail: string | undefined,
-): { titleBg: string; explanationBg: string; lawRef?: string } | null {
+): { titleBg: string; explanationBg: string; lawRef?: string; peekBg?: string } | null {
   if (detail === undefined) return null;
   return PER_ACT_COPY[code]?.[detail] ?? null;
+}
+
+/**
+ * THE PEEK'S SUMMARY FOR ONE EVENT — `ViolationSpec.peekBg`'s reader.
+ *
+ * The same act-then-pool order `makeViolation` uses for the title and the
+ * explanation, so a struck pedestrian cannot get the wall's summary. Returns
+ * `null` where no summary is authored, and `null` is not a hole: the phone card
+ * then prints the full `explanationBg`, which is what every card did before this
+ * field existed.
+ *
+ * IT IS A FUNCTION AND NOT A FIELD ON THE EVENT, deliberately. `ViolationEvent`
+ * is what `wire.ts` serialises and what the server re-derives the sheet from; a
+ * fourth display string riding it would have to survive that trip for no gain,
+ * because the ONE consumer (`lessons/engine.ts` building the HUD toast) already
+ * holds `code` and `detail` in hand. The COLLISION row's own note two hundred
+ * lines up asks for exactly this shape.
+ */
+export function violationPeekBg(code: ViolationCode, detail: string | undefined): string | null {
+  return actCopy(code, detail)?.peekBg ?? VIOLATIONS[code].peekBg ?? null;
 }
 
 // ---------------------------------------------------------------------------

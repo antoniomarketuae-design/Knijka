@@ -287,6 +287,10 @@ describe("sc-follow-tailgater · A12: the correct drive is still acquitted", () 
    */
   it("…and the new brake demand refuses nothing on it — no conviction, no refusal", () => {
     expect(out.engine.some((e) => e.code === "HARSH_BRAKING_NO_CAUSE")).toBe(false);
+    // The stop arm of the same demand, on the same shadow and for the same
+    // reason: the halts are short and the road ahead is open, so the reducer
+    // convicts nothing and the demand has nothing to read.
+    expect(out.engine.some((e) => e.code === "STOPPED_WITHOUT_CAUSE")).toBe(false);
     expect((out.result.coachedMistakes ?? []).map((c) => c.code)).toEqual([]);
     expect(out.result.passed).toBe(true);
   });
@@ -378,10 +382,61 @@ describe("sc-follow-tailgater · the careless rest reaches the изпитен л
     expect(out.debriefText).not.toContain("чисто каране без нито едно нарушение");
   });
 
+  /**
+   * THE CERTIFICATE HALF, AND IT OUTLIVED THE SHEET HALF BY A WHOLE WAVE.
+   *
+   * Wave 25 armed `STOPPED_WITHOUT_CAUSE` here and taught the reducer's lead
+   * exemption the difference between a queue and a cruiser leaving, so this leg
+   * стопped escaping the изпитен лист — and w28 re-drove it at `6363677` to say
+   * so: «2 наказателни точки», two named второстепенни
+   * (`.audit-frames/w28/frames/sc-follow-tailgater__pc-wrong`). The SAME frame
+   * also reads «ИЗДЪРЖАН · ✓ Успокой темпото 1:09 · ✓ Стигни края на отсечката».
+   *
+   * Measured here at `e08d917` before this repair: scored
+   * `[STOPPED_WITHOUT_CAUSE ×5]`, 5 наказателни точки — and both route tasks ✓,
+   * `passed: true`, «Урокът е издържан». The drill whose instructions 3, 4 and 6
+   * say the answer to a лепка is the throttle and never the brake was
+   * certifying «успокой темпото» to a driver who calmed it by standing dead in a
+   * live lane with the лепка five metres off the bumper, FIVE times.
+   *
+   * `requireBrakingClean` existed and did not reach it: it read only
+   * `HARSH_BRAKING_NO_CAUSE`. Its own design note argues that a speed cap reads
+   * BETTER on a car stamped to a standstill than on one easing off — which is
+   * exactly what a dead stop is, at the intensity the cap rewards most. So the
+   * demand now reads both convictions (lessons/objectives.ts
+   * `brakingCleanHonoured`, fed by `lessons/engine.ts stoppedWithoutCauseInRun`).
+   */
+  it("…and the «Успокой темпото» certificate is WITHHELD from the leg it convicted", () => {
+    expect(out.result.objectives.map((o) => [o.id, o.done] as const)).toEqual([
+      ["sc-ftg-ease", false],
+      ["sc-ftg-finish", false],
+    ]);
+    expect(out.result.passed).toBe(false);
+    // The refusal is not a trap and not a bare verdict: the debrief says the
+    // lesson is unfinished and names the task that is still open, beside the
+    // priced row and its чл. 24, ал. 2 asserted two tests up.
+    expect(out.debriefText).toContain("не е завършен");
+    expect(out.debriefText).toContain("«Успокой темпото»");
+    expect(out.debriefText).not.toContain("е издържан");
+  });
+
+  it("…and the sheet is UNCHANGED by the refusal — the drive still grades to the end", () => {
+    // A withheld tick must not shorten the gradeable window and quietly take
+    // convictions off the лист with it: five rests, five bills, same as before.
+    expect(out.billed.filter((e) => e.code === "STOPPED_WITHOUT_CAUSE").length).toBe(5);
+  });
+
   it("A12 — a brief halt is not a parked car: the same route, shorter rests, acquitted", () => {
     const brief = driveThroughSession(BRIEF_RESTS);
     expect(brief.billed).toEqual([]);
     expect((brief.result.coachedMistakes ?? []).map((c) => c.code)).toEqual([]);
     expect(brief.result.summary.score.totalPoints).toBe(0);
+    // …AND THE WIDENED DEMAND REFUSES NOTHING ON IT. Same route, same eight
+    // halts, rests of 3 s instead of 8 s: no conviction, so no refusal. This is
+    // the false-refusal check for the stop arm, and it is the one that matters —
+    // the arm reads a conviction, never a speed sample, so the boundary that
+    // decides the tick is `needlessStopSustainSec` and nothing else.
+    expect(brief.result.objectives.map((o) => o.done)).toEqual([true, true]);
+    expect(brief.result.passed).toBe(true);
   });
 });

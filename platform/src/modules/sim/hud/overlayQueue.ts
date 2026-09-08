@@ -326,6 +326,28 @@ export interface SimOverlayItem {
    * Absent only for items that have no WHY to give (a commendation, a legend).
    */
   detailBg?: string | null;
+  /**
+   * ── THE SUMMARY THE PEEK CAN FINISH — `sc-pk-driveway:fa602d10` ────────────
+   *
+   * `WHY_REACHABLE_MIN_VISIBLE_FRACTION`'s own header has prescribed this for
+   * three rounds and had nowhere to land it: „A CARD THAT FAILS THIS IS NOT
+   * BROKEN COPY — it is copy on the wrong surface. The remedy is never to
+   * delete the explanation: it is that the peek prints a SUMMARY it can finish
+   * and the sheet holds the rest, which is the arrangement `briefingLineBg` /
+   * `briefingBodyBg` below already impose on the briefing and which nothing
+   * imposes on a violation card." This is that arrangement for a violation
+   * card, and it is the same split: LINE, SUMMARY, then the whole paragraph.
+   *
+   * WHAT IT DOES NOT DO. It does not shorten `detailBg` and it does not touch
+   * the sheet: «ЗАЩО» still opens the full authored text with its citations,
+   * and the debrief's FaultCard is not on this path at all. The ONE surface
+   * that reads it is `SimOverlay`'s row 2b, through `overlayPeekBodyBg`.
+   *
+   * Absent/null means „print `detailBg`", which is what every card did before
+   * this field existed — so nothing regresses on a card whose producer never
+   * sets it.
+   */
+  peekBg?: string | null;
   lawRef?: string | null;
   /**
    * The item holds the drive frozen until it is acknowledged. Exactly the
@@ -637,6 +659,29 @@ export const WHY_REACHABLE_MIN_VISIBLE_FRACTION = 0.5;
  * it is showing has not shown that the explanation arrived, and the direction
  * that costs a student is the one that assumes it did.
  */
+/**
+ * WHAT THE PEEK'S BODY ROW PRINTS — the summary when one is authored, the whole
+ * explanation when none is (`sc-pk-driveway:fa602d10`).
+ *
+ * A FUNCTION AND NOT AN EXPRESSION IN THE COMPONENT, for the reason this file's
+ * briefing block gives about `briefingLineBg`: „It was a one-line expression
+ * inside a 4 000-line component, which is exactly why six waves of measurement
+ * walked past it: there was nothing to assert against." This one is asserted
+ * against by `rules/__tests__/violation-peek-summary.test.ts`.
+ *
+ * `whyIsReachable` KEEPS ITS MEANING and is deliberately not routed through
+ * here. It answers „did the sentence ON THE CARD arrive whole", measured off
+ * the rendered row — so a card printing a summary it finishes is reachable, and
+ * a card printing a 750-character paragraph two lines at a time still is not.
+ * The predicate does not become quieter; the copy on that surface becomes
+ * finishable.
+ */
+export function overlayPeekBodyBg(item: SimOverlayItem): string | null {
+  const peek = item.peekBg;
+  if (typeof peek === "string" && peek.trim().length > 0) return peek;
+  return item.detailBg ?? null;
+}
+
 export function whyIsReachable(
   item: SimOverlayItem,
   lines: { visibleLines: number; detailLines: number },
