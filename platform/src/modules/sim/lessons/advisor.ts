@@ -1200,6 +1200,22 @@ const LAW_RED_LIGHT = `${VIOLATIONS.RED_LIGHT_CROSSED.lawRef}; ЗДвП чл. 50
  */
 const LAW_RAIL_PRIORITY = "ЗДвП чл. 8, ал. 2; чл. 37, ал. 1";
 
+/**
+ * RETRIEVED, never recalled (ADR-002) — content/law/acts/zdvp.json, the unit
+ * whose `ref` is „чл. 37": «При завиване наляво за навлизане в друг път
+ * водачът на завиващото нерелсово пътно превозно средство е длъжен да пропусне
+ * насрещно движещите се пътни превозни средства.» It is also
+ * `SC_TURN_LEFT_ONCOMING.teach.lawRef`, so the line spoken during the wait
+ * cites what the drill's own teach card cites.
+ *
+ * Alone, and deliberately: the FAILED_TO_YIELD catalogue row cites чл. 47,
+ * чл. 48 and чл. 50, ал. 1 — the approach-speed and priority-road family of the
+ * junction, not the left-turn duty. Copying that row's citation onto this wait
+ * would cite the wrong article at the one moment the student is doing the right
+ * thing.
+ */
+const LAW_LEFT_TURN_ONCOMING = "ЗДвП чл. 37, ал. 1";
+
 interface YieldVoiceCopy {
   /** The advisor card, CONSTANT for the whole wait (see rule 1 above). */
   cardBg: string;
@@ -1295,22 +1311,57 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     lawRef: LAW_GIVE_WAY,
   },
   stopSign: {
+    /*
+     * THE CARD MAY NOT CERTIFY THE ACT THE ENGINE IS ABOUT TO BILL — 2026-09-08,
+     * sc-merge-from-property:ab353b86.
+     *
+     * These four strings used to open «пълното спиране е задължително — и е
+     * НАПРАВЕНО», «Спирането по Б2 е направено», «Спрял си правилно» and
+     * «Пълното спиране е ИЗПЪЛНЕНО». Every one of them states a GRADED fact,
+     * and this module cannot see it: `advisorPromptForSession` and
+     * `stepYieldVoice` are handed a reason and a speed, never a pose — the same
+     * limitation the `pedestrian` row above already withdrew its praise for
+     * («praising a position it cannot measure is the half that was wrong»), and
+     * the one finish.ts states about the red-light copy. The reason itself
+     * arms anywhere within `YIELD_STOP_LINE_REACH_M` = 26 m of the line, so the
+     * card can be — and on this drill is — printed from a standstill that is
+     * still metres SHORT of the paint.
+     *
+     * PHOTOGRAPHED, both surfaces, on the lesson whose route stops the student
+     * twice: `.audit-frames/w27/frames/sc-merge-from-property__pc-right`
+     * (04-t021s, 04-t027s) and `…__mobile-right/run.log:246` print «Знак Б2:
+     * пълното спиране е задължително — и е направено» while the car stands
+     * short of the derived Б2 at x = 27.73 — and the same protocol's «Грешки»
+     * list then bills «Неспиране на знак Б2 „Спри!“ −10 изпитни т. ОПАСНА
+     * ГРЕШКА». The product told a seventeen-year-old the mandatory stop was
+     * behind him and then failed him for not making it; `longCardBg`'s «тръгвай
+     * сега» was, from that pose, an instruction to commit the very offence.
+     *
+     * WHAT REPLACES THEM is the rule catalog's own retrieved corrective for
+     * that code — «Спри ДОКРАЙ на линията — колелата неподвижни, брой наум до
+     * 3, огледай ляво-дясно-ляво и чак тогава потегли» (VIOLATIONS
+     * .STOP_SIGN_NO_FULL_STOP.correctiveBg) — so the coach and the grader now
+     * say the same words about the same act, and the card teaches WHERE the
+     * stop is discharged instead of asserting that it has been. Nothing here
+     * grades and no timing moves.
+     */
     cardBg:
-      "Знак Б2: пълното спиране е задължително — и е направено. Сега пропусни движещите се по пътя с предимство.",
-    // The first half of the Б2 duty is DONE by the time this card can appear —
-    // the wheels have been still for half a minute. What is left is the second
-    // half, and it ends when the road is clear, not when a clock says so.
+      "Знак Б2 иска две неща: пълно спиране ДО самата линия, с неподвижни колела, и чак тогава — да пропуснеш движещите се по пътя с предимство.",
+    // The half-minute of standstill this card waits for says the wheels are
+    // still; it does not say WHERE. So the second card names the two steps in
+    // order instead of ticking the first one off — and «тръгвай сега» is the
+    // last of them, not the first.
     longCardBg:
-      "Чакането стана дълго. Спирането по Б2 е направено — остава да пропуснеш: огледай пак и ако е чисто, тръгвай сега.",
+      "Чакането стана дълго. Ако още не си спрял ДО линията — спри там докрай, после огледай пак ляво–дясно–ляво и щом е чисто, тръгвай сега.",
     namedTitleBg: "Защо чакаш: знак Б2 „Спри! Пропусни движението!“",
     namedBg:
-      "Спрял си правилно, и точно тук пълното спиране е задължително — на Б2 се спира докрай ВИНАГИ, дори пътят да изглежда празен. Колелата неподвижни, брой наум до три, огледай ляво–дясно–ляво. Спирането обаче е само първата половина: знакът иска и да ПРОПУСНЕШ движещите се по пътя с предимство, така че тръгваш чак когато никой не приближава.",
+      "Правилно е да чакаш тук. На Б2 се спира докрай ВИНАГИ, дори пътят да изглежда празен — „почти спрях“ не съществува нито в закона, нито на изпита. Мястото на това спиране е ДО самата линия: спреш ли по-рано — за пешеходец на тротоара или зад чужда кола — това не е спирането по знака и то се прави още веднъж, на линията, с неподвижни колела и брой наум до три. Спирането обаче е само първата половина: знакът иска и да ПРОПУСНЕШ движещите се по пътя с предимство, така че тръгваш чак когато никой не приближава.",
     settledTitleBg: "Чакането Е маневрата — знак Б2",
     settledBg: (sec) =>
-      `${sec} секунди на стоп-линията са правилни. Пълното спиране е изпълнено — това, което тече сега, е втората половина на задължението: пропускането. Тези секунди не се броят в ориентировъчното време на урока, така че изчакай спокойно да мине всичко, което има предимство.`,
-    verdictTitleBg: "Спря докрай и пропусна",
+      `${sec} секунди пред Б2 са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока, така че изчакай спокойно да мине всичко, което има предимство. Използвай ги и за проверката, която изпитващият прави отделно: стоят ли колелата неподвижни ДО самата линия. Спрял си по-назад — за пешеходец или зад друга кола — стигни до линията и спри там пак, преди да пропускаш.`,
+    verdictTitleBg: "Изчака и потегли по предимството",
     verdictBg: (sec) =>
-      `Спря напълно, изчака ${sec} с и потегли — без отчетено нарушение на предимството. На истинския изпит двете половини се проверяват поотделно: първо колелата неподвижни на линията, после пропускането. Ти направи и двете.`,
+      `Изчака ${sec} с и потегли — без отчетено нарушение на предимството. Това е втората половина на Б2. Първата се проверява отделно и на друго място: колелата неподвижни ДО самата линия, преди да тръгнеш. На истинския изпит двете се отбелязват поотделно, затова и тук чистото пропускане не покрива спирането.`,
     lawRef: VIOLATIONS.STOP_SIGN_NO_FULL_STOP.lawRef,
   },
   redLight: {
@@ -1412,6 +1463,46 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     verdictBg: (sec) =>
       `Изчака ${sec} с и завъртя чак след като трасето беше чисто — без отчетено нарушение на предимството. Точно това е разликата, която прави този завой опасен на живо: пред кола можеш да прецениш интервал, пред трамвай не се преценява, а се чака. Запази го и когато бързаш.`,
     lawRef: LAW_RAIL_PRIORITY,
+  },
+  // sc-turn-left-oncoming:7974670c — THE SECONDS THE BRIEFING ASKS HIM TO COUNT.
+  //
+  // The row above is the wait for a RAIL vehicle; this is the wait for the
+  // ordinary oncoming CAR, and it is the one `sc-turn-left-oncoming` is made
+  // of. Its junction is signalized, so until now the only wait it could name
+  // was `redLight` — and the red is a DIFFERENT wait that merely precedes this
+  // one. It ends when the lamp turns; the oncoming is still coming. From that
+  // frame on, the student counting the interval exactly as briefed («Прецени
+  // интервала в СЕКУНДИ: насрещен на по-малко от 4 секунди означава чакане»)
+  // had no reason at all: no hold, no seconds credited against par, and the
+  // coach back on the waypoint 50 m past the car he was letting through.
+  //
+  // WHY IT COUNTS SECONDS WHERE THE TRAM FORBIDS IT. The rail copy says «пред
+  // релсово возило интервал не се взема, то се пропуска» — true, and the exact
+  // opposite of the skill here. чл. 37, ал. 1 is discharged by an interval, and
+  // the whole lesson is the size of that interval, so every stage of this copy
+  // names the number the drill teaches (4 s — its own instruction 5,
+  // `objectiveBg` and `teach.whyBg`, and the same figure the gate reports
+  // against via `reportOncomingGapSec`).
+  //
+  // NO `longCardBg`, on the same refusal `redLight`, `pedestrian` and
+  // `railVehicle` make. What ends this wait is a car passing the mouth, not a
+  // look the student has failed to take; a second card reading «огледай и
+  // тръгвай сега» after half a minute would be this product hinting a
+  // seventeen-year-old into a left turn across live oncoming traffic — which is
+  // the single fatal misjudgement the drill exists to break.
+  oncomingVehicle: {
+    cardBg:
+      "Чакаш правилно — насрещните минават първи. Брой секундите до най-близкия: под 4 секунди не се тръгва, а се чака.",
+    namedTitleBg: "Защо чакаш: завиващият наляво пропуска",
+    namedBg:
+      "Спрял си правилно. При завиване наляво за навлизане в друг път водачът на завиващото нерелсово пътно превозно средство е длъжен да пропусне насрещно движещите се пътни превозни средства. Зеленото отваря кръстовището, но не отменя това задължение — предимството остава на насрещните. Затова интервалът се мери в СЕКУНДИ, а не „на око“: самият ляв завой отнема 2–3 секунди от насрещната лента, така че под 4 секунди резервът ти е нула. Ударът при отнет ляв завой е страничен, в незащитената врата.",
+    settledTitleBg: "Чакането Е маневрата — насрещните минават първи",
+    settledBg: (sec) =>
+      `${sec} секунди пред устието са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока. Използвай ги, за да броиш: докато най-близкият насрещен е на по-малко от 4 секунди, тръгването не е преценка, а отнето предимство. Гледай и колата зад него — интервалът се взема след нея, не пред нея.`,
+    verdictTitleBg: "Пропусна насрещните",
+    verdictBg: (sec) =>
+      `Изчака ${sec} с и зави чак когато интервалът стигна — без отчетено нарушение на предимството. Точно това мери този урок: не „ще успея“, а колко секунди има до насрещния, преброени преди волана. Запази го и когато отзад те чакат.`,
+    lawRef: LAW_LEFT_TURN_ONCOMING,
   },
 };
 

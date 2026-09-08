@@ -673,6 +673,17 @@ describe("sweep161 · the conditions drills narrate the world they are staged on
  *    lamp every ~32 m. Reading the JSON would have cleared this line; building
  *    the world convicts it.
  *
+ *    [THE WORLD MOVED UNDER THIS BULLET — 2026-09-08, repair wave 25.]
+ *    `builders/constants.isExtraUrbanCarriageway` (row sc-sp-curve:6079dfb1,
+ *    ЗДвП чл. 21 ал. 1) now asks the AUTHORED POSTING instead of the class, and
+ *    `props.dressesAsStreet` withdraws the lamp/pole/parapet kit from the five
+ *    committed 90-roads — ac-aqua-v1 among them. Re-measured on this tree: the
+ *    map that carried 16 columns and 15 poles above now builds **0 and 0**, and
+ *    the district really is what its briefing once said. The paragraph above is
+ *    kept as the record of what the ban could not see, not as a description of
+ *    HEAD; the teeth tests below carry the new measurement and the control that
+ *    recovers the old numbers from the same builder.
+ *
  *  · TOO TIGHT — the А15. See the CENSUS block near the top of this file: the
  *    plate is POSTED on ac-ice-v1 (y = 150, 60 m before the icePatch at 210)
  *    and on ac-aqua-v1 (y = 180, before the waterPatch at 240), and the flat
@@ -704,6 +715,11 @@ const WORLD_CLAIMS: readonly WorldClaim[] = [
     // its `maxspeed` tag says. So the claim is carried only by an UNLIT road —
     // and the day a genuinely rural district is generated (props.ts plants no
     // column on it) this starts crediting it with no edit here.
+    //
+    // THAT DAY WAS 2026-09-08 and this line is unedited, as promised: wave 25's
+    // `isExtraUrbanCarriageway` stopped dressing the authored 90-roads, so
+    // ac-aqua-v1 now answers TRUE here. The predicate did not change; the world
+    // it interrogates did. See the teeth test for the measurement.
     re: /извън\s+града|извънградск/iu,
     carriedBy: (id) => censusOf(id).streetlights === 0,
     how: "a district whose built world has no streetlight columns (props.ts SCENARIO_LIT_CLASSES)",
@@ -719,6 +735,30 @@ const WORLD_CLAIMS: readonly WorldClaim[] = [
   },
 ];
 
+/**
+ * THE SWEEP ITSELF, as a function — so a teeth test can put a known-bad line
+ * through the CODE THE CORPUS GOES THROUGH instead of through a hand-assembled
+ * echo of it. An echo is how a rule keeps its teeth in the tripwire and loses
+ * them in the sweep: the two drift the first time one of them is edited.
+ */
+function unanswerableClaims(
+  specId: string,
+  districtId: string,
+  lines: readonly string[],
+): string[] {
+  const out: string[] = [];
+  for (const line of lines) {
+    for (const claim of WORLD_CLAIMS) {
+      if (claim.re.test(line) && !claim.carriedBy(districtId)) {
+        out.push(
+          `${specId} on ${districtId} claims ${claim.noun}: «${line.slice(0, 64)}…» — needs ${claim.how}`,
+        );
+      }
+    }
+  }
+  return out;
+}
+
 describe("sweep161 · a conditions claim is answered by the district it is staged on", () => {
   it("surveys the whole family's districts (a census over nothing proves nothing)", () => {
     expect(DISTRICT_IDS.length).toBeGreaterThanOrEqual(5);
@@ -726,18 +766,9 @@ describe("sweep161 · a conditions claim is answered by the district it is stage
   });
 
   it("no driver-facing line makes a claim its own district cannot answer for", () => {
-    const claims: string[] = [];
-    for (const spec of SCENARIO_TEMPLATES_CONDITIONS) {
-      for (const line of driverCopy(spec)) {
-        for (const claim of WORLD_CLAIMS) {
-          if (claim.re.test(line) && !claim.carriedBy(spec.map.districtId)) {
-            claims.push(
-              `${spec.id} on ${spec.map.districtId} claims ${claim.noun}: «${line.slice(0, 64)}…» — needs ${claim.how}`,
-            );
-          }
-        }
-      }
-    }
+    const claims = SCENARIO_TEMPLATES_CONDITIONS.flatMap((spec) =>
+      unanswerableClaims(spec.id, spec.map.districtId, driverCopy(spec)),
+    );
     expect(claims).toEqual([]);
   });
 
@@ -753,9 +784,52 @@ describe("sweep161 · a conditions claim is answered by the district it is stage
     ];
     const locale = WORLD_CLAIMS.find((c) => c.noun === LOCALE_CLAIM)!;
     for (const line of SHIPPED) expect(locale.re.test(line), line).toBe(true);
-    // …on the map they shipped on, which is lit, so the claim is refused…
-    expect(locale.carriedBy("ac-aqua-v1")).toBe(false);
-    // …and neither line is still in the file.
+
+    // WHERE THEY ARE CAUGHT MOVED ON 2026-09-08, AND THE MOVE IS THE POINT.
+    //
+    // This assertion used to read `locale.carriedBy("ac-aqua-v1") === false`:
+    // the map these lines shipped on was dressed as a lit Sofia street (16 lamp
+    // columns, 15 wire poles — the twin test below still recovers both), so
+    // «на извънградския път» was a promise the windscreen broke. Repair wave 25
+    // (`builders/constants.isExtraUrbanCarriageway`, row sc-sp-curve:6079dfb1,
+    // ЗДвП чл. 21 ал. 1) made `props.dressesAsStreet` ask the AUTHORED POSTING
+    // rather than the class, and ac-aqua-v1 — `unclassified`, `maxspeed: 90`,
+    // `maxspeedSource: "tag"` — now builds with no column on it at all. THE
+    // WORLD WAS FIXED, NOT THE RULE: the predicate is the one written above,
+    // unedited, and its own comment named this day in advance.
+    //
+    // So the tripwire is re-pointed at a LIVE known-bad configuration rather
+    // than deleted, and the new one is not invented. The other four districts
+    // this family runs on are `residential`/50 with 11 lamp columns each, and
+    // EIGHT OF THE NINE conditions lessons are staged on them; the same
+    // sentence there is the same defect the audit photographed.
+    const litHosts = DISTRICT_IDS.filter((id) => censusOf(id).streetlights > 0);
+    expect(litHosts).toEqual(["ac-ice-v1", "ac-night-v1", "ac-rain-v1", "fo-follow-v1"]);
+    for (const id of litHosts) expect(locale.carriedBy(id), id).toBe(false);
+
+    // …and the known-bad example is fed through the SWEEP's own function on a
+    // real spec, so this cannot pass while the sweep is broken: the host's own
+    // copy is clean, and splicing the two shipped lines into it produces
+    // exactly two locale complaints.
+    const host = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.map.districtId === "ac-rain-v1")!;
+    expect(unanswerableClaims(host.id, host.map.districtId, driverCopy(host))).toEqual([]);
+    const caught = unanswerableClaims(host.id, host.map.districtId, [
+      ...driverCopy(host),
+      ...SHIPPED,
+    ]);
+    expect(caught).toHaveLength(SHIPPED.length);
+    for (const msg of caught) expect(msg).toContain(LOCALE_CLAIM);
+
+    // …and the OTHER answer, so the predicate is not a constant `false` and the
+    // refusals above mean something: on the one map in the family props.ts
+    // leaves undressed, the claim is now carried.
+    expect(locale.carriedBy("ac-aqua-v1")).toBe(true);
+
+    // …and neither line is still in the file. The strike stands on its own
+    // terms — the rewrite names what the POSTED plate says, which is true on
+    // any map — and re-authoring the locale wording on ac-aqua-v1 is a COPY
+    // decision for whoever owns `templates-conditions.ts`, deliberately not
+    // smuggled in here on the back of a world change.
     const all = SCENARIO_TEMPLATES_CONDITIONS.flatMap((s) => driverCopy(s));
     for (const line of SHIPPED) expect(all).not.toContain(line);
     // The replacement says only what the posted plate says, and passes.
@@ -765,22 +839,57 @@ describe("sweep161 · a conditions claim is answered by the district it is stage
   });
 
   it("…and the lit-street measurement it rests on is the built world, not the tag", () => {
-    // The numbers that convict ac-aqua-v1. If props.ts ever stops dressing a
-    // scenario micro-map, THIS goes red first and tells the next lane the
-    // locale rule's premise has moved — instead of a sweep passing silently.
+    // THE NUMBERS MOVED ON 2026-09-08. THE PROPERTY DID NOT.
+    //
+    // This test pinned ac-aqua-v1 at 16 lamp columns and 15 wire poles — the
+    // dressing that convicted «на извънградския път» — with the note that if
+    // props.ts ever stopped dressing a scenario micro-map, THIS would go red
+    // first and tell the next lane the locale rule's premise had moved instead
+    // of letting a sweep pass silently. It went red, on exactly that cause
+    // (repair wave 25's `isExtraUrbanCarriageway`), and it is doing its job.
+    //
+    // The expectation is therefore RE-MEASURED, not relaxed — and the old
+    // numbers are not deleted, they are RECOVERED below from the same builder.
     const aqua = censusOf("ac-aqua-v1");
-    expect(aqua.streetlights).toBe(16);
-    expect(aqua.utilityPoles).toBe(15);
-    // …and its own document says the opposite, which is exactly why the
-    // document may not be the witness.
+    expect(aqua.streetlights).toBe(0);
+    expect(aqua.utilityPoles).toBe(0);
+
+    // WHY THE DOCUMENT STILL MAY NOT BE THE WITNESS — the demonstration is
+    // inverted, not lost. `class: "unclassified"` is a LIT class in the
+    // catalogue (`constants.SCENARIO_LIT_CLASSES` = the arterials + residential
+    // + unclassified + living_street), so a rule that read the class off the
+    // JSON — the shape the first sweep161 wave reached for — would call this
+    // map a lit street TODAY and be wrong by sixteen columns, having been wrong
+    // in the opposite direction yesterday. Only the builder knows.
     const doc = rawDistrict("ac-aqua-v1") as {
-      roads: { edges: { class: string; maxspeed: number }[] };
+      roads: { edges: { class: string; maxspeed: number; maxspeedSource: string }[] };
     };
     expect(doc.roads.edges[0]!.class).toBe("unclassified");
     expect(doc.roads.edges[0]!.maxspeed).toBe(90);
-    // Every district this family runs on is lit, so no lesson here may claim to
-    // be outside the built-up area today and the sweep above is not vacuous.
-    for (const id of DISTRICT_IDS) expect(censusOf(id).streetlights).toBeGreaterThan(0);
+    expect(doc.roads.edges[0]!.maxspeedSource).toBe("tag");
+
+    // THE CONTROL, and the reason the two zeros above are a measurement rather
+    // than a number typed to match: the SAME document with only its posting
+    // demoted to a class default — `maxspeedSource` feeds no geometry, so
+    // nothing else can move — is dressed by the SAME builder with exactly the
+    // 16 lamps and 15 poles this test pinned before wave 25. So the census is
+    // computed by props.ts and copied from no field; the zeros are that one
+    // predicate's doing; and the historical numbers are still on the record.
+    const demoted = JSON.parse(JSON.stringify(doc)) as typeof doc;
+    for (const e of demoted.roads.edges) e.maxspeedSource = "default";
+    const asStreet = buildWorldGeometry(assertDistrict(demoted));
+    expect(asStreet.streetlights.length).toBe(16);
+    expect(asStreet.utilityPoles.length).toBe(15);
+
+    // …and the family now spans BOTH answers, which is a STRONGER non-vacuity
+    // than the line this replaces («every district here is lit», which made the
+    // locale rule a constant refusal that happened to be right). One district
+    // carries the extra-urban claim, four refuse it, so the sweep above
+    // discriminates instead of agreeing with itself.
+    expect(DISTRICT_IDS.filter((id) => censusOf(id).streetlights === 0)).toEqual(["ac-aqua-v1"]);
+    const lit = DISTRICT_IDS.filter((id) => censusOf(id).streetlights > 0);
+    expect(lit).toHaveLength(4);
+    for (const id of lit) expect(censusOf(id).streetlights, id).toBe(11);
   });
 
   it("the А15 rule has teeth — posted on two maps, refused on the other three", () => {

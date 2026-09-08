@@ -212,9 +212,19 @@
  * `sc-park-wall`, the wall is in the rear corridor on 0 samples — the drive
  * filed as „reverses into the wall" never reverses at all and ends nose-first
  * against it («Предницата опря в стената в края на реда»).
+ *
+ * ── AND WHAT THE BOX SAYS WHEN THERE IS HONESTLY NOTHING BEHIND ────────────
+ *
+ * sc-ed-reverse-line:e05f2cee — „no rear proximity read-out on screen at any
+ * point of the reverse manoeuvre". The drill reverses 25 m on an EMPTY полигон,
+ * so the silence above is this file working; what was missing is the other
+ * quantity the lesson grades («Спри плавно след около 25 метра»). This
+ * component now also folds the reverse ODOMETER (`reverseTravel.ts`) and prints
+ * «Заден ход · X м» in the same box whenever there is no body to report — one
+ * name, one floor, one sentence at a time, the proximity warning always first.
  */
 
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   rearCueLabelBg,
   stepRearCue,
@@ -222,6 +232,14 @@ import {
   type RearCueKind,
   type RearCueLevel,
 } from "./rearProximity";
+import {
+  rearChannelBadge,
+  reverseRunAriaBg,
+  reverseRunLabelBg,
+  reverseRunMeters,
+  stepReverseRun,
+  type ReverseRun,
+} from "./reverseTravel";
 
 const POLL_MS = 200; // ~5 Hz — well under one human glance of latency
 
@@ -319,6 +337,10 @@ export function RearProximityCue({
   hidden?: boolean;
 }) {
   const [cue, setCue] = useState<RearCue | null>(null);
+  // The reverse odometer's own state: the run lives in a ref (it integrates at
+  // the poll rate and must not re-render anything), the whole metres in state.
+  const runRef = useRef<ReverseRun | null>(null);
+  const [reverseM, setReverseM] = useState<number | null>(null);
 
   // Poll only while visible. No state write on the hidden edge (lint: no
   // setState in effect bodies) — `hidden` gates the RENDER below instead,
@@ -335,12 +357,25 @@ export function RearProximityCue({
       setCue((prev) =>
         stepRearCue(prev, behind?.gapM ?? Infinity, s.speedKmh, behind?.kind ?? "vehicle"),
       );
+      runRef.current = stepReverseRun(runRef.current, s.position.x, s.position.y, s.speedKmh);
+      // A primitive, so React's own bail-out keeps the "re-render on a real
+      // edge only" grammar the cue above gets from `stepRearCue`'s identity.
+      setReverseM(reverseRunMeters(runRef.current));
     }, POLL_MS);
     return () => window.clearInterval(id);
   }, [traffic, sampleRef, hidden]);
 
-  if (hidden || cue === null) return null;
-  return <RearProximityBadge cue={cue} />;
+  // ONE box, two sentences, and the order is the safety order: a real body
+  // behind always outranks the odometer, so the student can never read metres
+  // he has driven as metres of air. `rearChannelBadge` holds that priority as
+  // a pure function so a test can pin it — see `reverseTravel.ts`.
+  const badge = rearChannelBadge(cue, reverseM);
+  if (hidden || badge === null) return null;
+  return badge.kind === "proximity" ? (
+    <RearProximityBadge cue={badge.cue} />
+  ) : (
+    <ReverseTravelBadge meters={badge.meters} />
+  );
 }
 
 /**
@@ -394,6 +429,57 @@ export function RearProximityBadge({ cue }: { cue: RearCue }) {
           <RearCarIcon level={cue.level} />
         )}
         {label}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * …AND THE SAME BOX WHEN THERE IS NOTHING BEHIND TO REPORT — the reverse
+ * odometer, «Заден ход · 12 м» (sc-ed-reverse-line:e05f2cee).
+ *
+ * It stands in the rear channel and carries the rear channel's NAME on purpose.
+ * `PlayAreaStyles` arbitrates this lane with
+ * `:not(:has([data-hud="rear-proximity"])) [data-hud="follow-gap"]`, so a
+ * second name here would drop «Дистанция · 34 м» onto this exact floor and put
+ * two centred chips in one row — the collision that rule exists to prevent.
+ * Only one of the two sentences is ever mounted (see the render above), so one
+ * name is also simply true.
+ *
+ * A DIMENSION GLYPH and not a car: the number is a length the student has
+ * driven, and the car glyph beside it means „a body is there".
+ */
+function ReverseDistanceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" aria-hidden>
+      <path
+        d="M12 4 V20 M8.5 16.5 L12 20 L15.5 16.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M6 4 H18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The odometer badge, as a PURE surface — the split note above applies. */
+export function ReverseTravelBadge({ meters }: { meters: number }) {
+  return (
+    <div
+      data-hud="rear-proximity"
+      className="pointer-events-none absolute bottom-[6.75rem] left-1/2 z-10 -translate-x-1/2"
+    >
+      <div
+        role="status"
+        aria-label={reverseRunAriaBg(meters)}
+        className="hud-ghost flex select-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold tabular-nums"
+        style={{ borderColor: "var(--border-strong)", color: "var(--foreground)" }}
+      >
+        <ReverseDistanceIcon />
+        {reverseRunLabelBg(meters)}
       </div>
     </div>
   );

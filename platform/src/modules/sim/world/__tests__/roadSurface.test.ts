@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Color, ShaderLib } from "three";
 import {
+  getMacroNoiseTexture,
   MACRO_HOOK_FRAGMENT_ANCHOR,
   macroOnBeforeCompile,
   macroProgramCacheKey,
@@ -28,6 +29,8 @@ import {
   ROAD_FINE_TILE_M,
   ROAD_SNOW_FRAGMENT_ANCHOR,
   ROAD_SNOW_PATCH_FLOOR,
+  ROAD_SNOW_PATCH_HI,
+  ROAD_SNOW_PATCH_LO,
   ROAD_SNOW_PATCH_TILE_M,
   ROAD_TAP_MIX_MAX,
   ROAD_TAP_ROTATION_RAD,
@@ -503,5 +506,136 @@ describe("snow covers the road decals too", () => {
     expect(decalBlock).toContain("{...ROAD_DECAL_SNOW}");
     // The atlas is still what it draws — the spread adds the cover, not a map.
     expect(decalBlock).toContain("map={textures.decals}");
+  });
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * THE DRIFT'S CONTRAST WINDOW — the R0 look `SNOW_ROAD_COVER_MAX` and
+ * `ROAD_SNOW_PATCH_FLOOR` both left owed, taken on the shipped sweeps.
+ *
+ * The mix answered „bare grey asphalt" (w21 122.9 → w27 149.3 on the audit's
+ * own carriageway rectangle, `pc-right/03-ready.png`) and did NOT answer the
+ * second half of the same criterion — „snow lying unevenly on tarmac rather
+ * than a paler grey". The reason is arithmetic and it is checkable here without
+ * a browser: `mix(floor, 1, patch)` is worth its stated 0.16 … 0.40 only if
+ * `patch` spends 0 … 1, and the shared field is a four-octave fBm SUM, so it
+ * spends about a third of that. These tests recompute the distribution from the
+ * SHIPPED generator, so the window can never again describe a field the shaders
+ * do not sample.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("the snow drift spends the range its cap was derived against", () => {
+  /** The shipped field's own samples, 0..1, exactly as `texture2D().r` sees
+   *  them (RedFormat / UnsignedByte, NoColorSpace — so byte / 255). */
+  const field = (() => {
+    const data = getMacroNoiseTexture().image.data as Uint8Array;
+    return Array.from(data, (b) => b / 255).sort((a, b) => a - b);
+  })();
+  const q = (p: number): number => field[Math.min(field.length - 1, Math.floor(p * field.length))]!;
+  const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+  /** GLSL `smoothstep`, to the letter. */
+  const smoothstep = (a: number, b: number, x: number): number => {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  /** What the fragment stage does with a patch weight, at full snowfall. */
+  const cover = (patch: number): number =>
+    SNOW_ROAD_COVER_MAX * (ROAD_SNOW_PATCH_FLOOR + (1 - ROAD_SNOW_PATCH_FLOOR) * patch);
+
+  it("the window IS the field's own deciles — derived, not picked", () => {
+    // Two places, because a window that drifts off the field it describes is
+    // exactly the failure this block exists to close. `makeMacroNoiseTexture`
+    // takes no per-session seed, so these are stable bytes, not a snapshot.
+    expect(ROAD_SNOW_PATCH_LO).toBeCloseTo(q(0.1), 2);
+    expect(ROAD_SNOW_PATCH_HI).toBeCloseTo(q(0.9), 2);
+    expect(ROAD_SNOW_PATCH_LO).toBeLessThan(ROAD_SNOW_PATCH_HI);
+  });
+
+  it("the RAW field cannot deliver the spread the derivation promised", () => {
+    // This is the defect, stated as arithmetic: 90 % of the carriageway sat
+    // inside a cover band roughly two thirds of the intended one, so the drift
+    // was there and could not be seen.
+    const rawSpread = cover(q(0.95)) - cover(q(0.05));
+    const designed = cover(1) - cover(0);
+    expect(rawSpread / designed).toBeLessThan(0.7);
+    // …and its own endpoints are never reached by anything but a few texels,
+    // which is why the cap looked spent and was not.
+    expect(q(0.95)).toBeLessThan(0.9);
+    expect(q(0.05)).toBeGreaterThan(0.15);
+  });
+
+  it("…and the remapped one does, without moving the cap or the mean", () => {
+    const remapped = field.map((x) => smoothstep(ROAD_SNOW_PATCH_LO, ROAD_SNOW_PATCH_HI, x));
+    const sorted = [...remapped].sort((a, b) => a - b);
+    const rq = (p: number): number => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]!;
+    // The designed range, actually spent: the trodden floor and the full cap.
+    expect(cover(rq(0.05))).toBeCloseTo(cover(0), 3);
+    expect(cover(rq(0.95))).toBeCloseTo(SNOW_ROAD_COVER_MAX, 3);
+    // THE CAP IS UNMOVED — every ordering snowCover.ts rules on is stated on
+    // this number, and reaching it is what its derivation always assumed.
+    expect(Math.max(...remapped)).toBeLessThanOrEqual(1);
+    expect(cover(1)).toBeCloseTo(SNOW_ROAD_COVER_MAX, 6);
+    // THE MEAN IS UNMOVED — `(FLOOR + 1) / 2` above is the mean weight the cap
+    // was derived against, and it assumes E[patch] = 0.5. The remap moves the
+    // field's mean TOWARD that assumption (0.527 → 0.507), not away from it.
+    const before = Math.abs(mean(field) - 0.5);
+    const after = Math.abs(mean(remapped) - 0.5);
+    expect(after).toBeLessThan(before);
+    expect(cover(mean(remapped))).toBeCloseTo(cover(mean(field)), 2);
+    // …and the contrast that reads goes up by half again, which is the whole
+    // point: a flat lift is the same grey road one shade paler.
+    const sd = (xs: number[]): number => {
+      const m = mean(xs);
+      return Math.sqrt(mean(xs.map((x) => (x - m) * (x - m))));
+    };
+    expect(sd(remapped) / sd(field)).toBeGreaterThan(1.5);
+  });
+
+  it("both materials sample it through the SAME window, by reference", () => {
+    const asphalt = compileStub();
+    const decal = compileStub();
+    roadSurfaceOnBeforeCompile(asphalt as never);
+    roadDecalSnowOnBeforeCompile(decal as never);
+    for (const name of ["uRoadTap", "uRoadSnowScale", "uRoadSnowFloor", "uRoadSnowLo", "uRoadSnowHi"]) {
+      expect(asphalt.uniforms[name], `${name} is not bound on the asphalt`).toBeDefined();
+      // Identity, not equality: a drift that crosses the carriageway has to
+      // cross the manhole in it, and two copies of a number cannot promise that.
+      expect(decal.uniforms[name]).toBe(asphalt.uniforms[name]);
+    }
+    expect(asphalt.uniforms.uRoadSnowLo?.value).toBeCloseTo(ROAD_SNOW_PATCH_LO);
+    expect(asphalt.uniforms.uRoadSnowHi?.value).toBeCloseTo(ROAD_SNOW_PATCH_HI);
+  });
+
+  it("the splice remaps BEFORE it weighs, on both hooks", () => {
+    for (const [hook, varying] of [
+      [roadSurfaceOnBeforeCompile, "vGroundMacroXZ"],
+      [roadDecalSnowOnBeforeCompile, "vDecalXZ"],
+    ] as const) {
+      const shader = compileStub();
+      hook(shader as never);
+      // Whitespace-folded: this repo's worktree is CRLF and its tree is LF, so
+      // a source-pinned assertion that spells a newline is asserting which
+      // machine checked out the file.
+      const folded = shader.fragmentShader.replace(/\s+/g, " ");
+      expect(folded).toContain(
+        `smoothstep( uRoadSnowLo, uRoadSnowHi, texture2D( uRoadTap, ${varying} * uRoadSnowScale ).r )`,
+      );
+      // The weighing line is untouched — the fix is the INPUT to it, so the
+      // cap and the floor keep their published meaning.
+      expect(shader.fragmentShader).toContain(
+        "float roadSnowAmount = uSnowRoad * mix( uRoadSnowFloor, 1.0, roadSnowPatch );",
+      );
+      // …still behind the uniform branch: a dry lesson pays for none of it.
+      const guardAt = shader.fragmentShader.indexOf("if ( uSnowRoad > 0.0 )");
+      expect(guardAt).toBeGreaterThanOrEqual(0);
+      expect(shader.fragmentShader.indexOf("smoothstep( uRoadSnowLo")).toBeGreaterThan(guardAt);
+    }
+  });
+
+  it("compiles as NEW programs — a cached one has neither uniform nor smoothstep", () => {
+    expect(roadSurfaceProgramCacheKey()).not.toBe("road-surface-v2");
+    expect(roadDecalSnowProgramCacheKey()).not.toBe("road-decal-snow-v1");
+    expect(roadDecalSnowProgramCacheKey()).not.toBe(roadSurfaceProgramCacheKey());
   });
 });

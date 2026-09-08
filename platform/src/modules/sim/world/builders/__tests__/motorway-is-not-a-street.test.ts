@@ -119,12 +119,33 @@ function dressing(district: District) {
  * changes nothing at all, because the class rule alone was already correct on
  * those two maps. The defect only ever showed on the map that spelled it the
  * other way.
+ *
+ * ── AND THE POSTING IS NEUTRALISED IN BOTH ARMS — 2026-09-08, and this is an
+ *    INSTRUMENT repair, not a relaxation. A SECOND suppressor of the same kit
+ *    landed with `sc-sp-curve:6079dfb1`: `constants.isExtraUrbanCarriageway`
+ *    withdraws the street dressing from any carriageway a map POSTS at the
+ *    категория В extra-urban ceiling (ЗДвП чл. 21, ал. 1 — 50 in a built-up
+ *    area, 90 outside one), and a магистрала posts 140. So the control below —
+ *    „the flag off, therefore a street" — stopped being a street, and the file
+ *    began reporting `the control map has no lamps to remove` on all three
+ *    maps: a control that suppresses the thing it is the control FOR.
+ *
+ *    Both arms get `maxspeedSource: "default"` so the A/B still differs by THE
+ *    FLAG AND NOTHING ELSE, which is this helper's whole claim. Nothing else
+ *    moves: the source field feeds no geometry — `edgeHalfWidth`, the parking
+ *    band and the runtime's own limit all read `maxspeed`, which is untouched.
+ *
+ *    The interaction itself is defence in depth and is asserted on its own in
+ *    `extra-urban-is-not-a-street.test.ts`: on the SHIPPED maps a mis-typed
+ *    class can no longer dress a 140 км/ч carriageway as a Sofia side street
+ *    even if someone forgets the flag.
  */
 function asArterialTagged(district: District, keepFlag: boolean): District {
   const clone = JSON.parse(JSON.stringify(district)) as District;
   for (const e of clone.roads.edges) {
     if (!isMotorwayCarriageway(e)) continue;
     (e as { class: string }).class = "primary";
+    (e as { maxspeedSource: string }).maxspeedSource = "default";
     if (keepFlag) (e as { motorway?: boolean }).motorway = true;
     else delete (e as { motorway?: boolean }).motorway;
   }

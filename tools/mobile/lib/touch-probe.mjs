@@ -26,11 +26,14 @@
 //
 // WHAT IT READS BACK, AND WHY NOT THE ARIA. At neutral the pad publishes the
 // same `aria-valuenow=0` / centre sentence it already carries at rest, so the
-// accessibility tree cannot tell a press from no press. The KNOB can: at rest
-// its only inline style is `border-color`, `driveBegin` sets
-// `transition: "none"` and `driveApply` writes `transform: translateY(0.0px)`,
-// and `onDriveEnd` swaps the transition for `transform 140ms …`. Three states,
-// all imperative, none of them present before the first press.
+// accessibility tree cannot tell a press from no press. The KNOB can — but NOT
+// by the mere presence of the imperative styling, which is what the first build
+// tested for: `parkKnobs` runs on every hide and leaves
+// `transition: "none"; transform: "translateY(0px)"` behind, so a knob that has
+// only survived the briefing card already looks pressed. What no hide can forge
+// is the DECIMAL: `driveApply` writes `t.toFixed(1)`, i.e. `translateY(0.0px)`
+// at dead centre, against the integer `translateY(0px)` every park and every
+// release writes. See `DRIVE_APPLY_TRANSFORM`.
 //
 // IT FAILS TOWARDS „I COULD NOT PROVE IT". Every refusal below returns a
 // sentence naming what was missing. A probe that cannot find the overlay says
@@ -160,9 +163,38 @@ export async function actuateDrivePad({ pointerId, holdMs }) {
   return result;
 }
 
+/**
+ * THE SIGNATURE OF A WRITE ONLY `driveApply` MAKES.
+ *
+ * `/^translateY\(/` was NOT that signature, and the gap is the reassuring
+ * direction this whole file exists to refuse. `TouchControls.parkKnobs` runs on
+ * every hide — briefing card, teach card, consequence, end card — and leaves
+ * the drivetrain knob at exactly `transition: "none"; transform:
+ * "translateY(0px)"`. The pre-drive probe fires AFTER the ladder, i.e. after at
+ * least one card has been dismissed, so the knob it reads is already parked in
+ * press-shaped styling: the loose test answered „actuated" for a pad that had
+ * refused the claim outright, and would have certified `TouchControls.tsx` as
+ * reachable off a knob nobody touched.
+ *
+ * The decimal is what separates them. `driveApply` writes
+ * `translateY(${t.toFixed(1)}px)` — always one decimal place, including at dead
+ * centre, where it is `translateY(0.0px)`; `parkKnobs` and `onDriveEnd` both
+ * write the integer `translateY(0px)`. So this pattern is the component's own
+ * fingerprint, and nothing but a claimed press leaves it.
+ */
+export const DRIVE_APPLY_TRANSFORM = /^translateY\(-?\d+\.\d+px\)$/;
+
 /** Did the knob take up the imperative styling only a press can give it? */
 function seated(s) {
-  return !!s && s.transition === "none" && /^translateY\(/.test(s.transform || "");
+  return !!s && s.transition === "none" && DRIVE_APPLY_TRANSFORM.test((s.transform || "").trim());
+}
+
+/** The styling a HIDE leaves behind — press-shaped, and not a press. Asked of
+ *  the ON-PRESS reading, so a refusal can say WHICH of the two ways a knob can
+ *  fail to answer this was: it never moved at all, or it is sitting in the form
+ *  `parkKnobs` wrote and `driveApply` did not. */
+function parkedStyling(s) {
+  return !!s && s.transition === "none" && /^translateY\(-?\d+px\)$/.test((s.transform || "").trim());
 }
 
 /**
@@ -183,9 +215,12 @@ export function readbackVerdict(raw) {
   const released = /^transform 140ms/.test((raw.onRelease && raw.onRelease.transition) || "");
   let why;
   if (!actuated) {
-    why =
-      "the pad took the pointer event and did NOT seat its knob — TouchControls.onDriveDown either " +
-      "refused the claim or never ran, so this lane still has not exercised the component";
+    why = parkedStyling(raw.onPress)
+      ? "the pad took the pointer event and its knob still carries only the PARKED styling a hide leaves " +
+        "(translateY(0px), no decimal) — driveApply never ran, so TouchControls.onDriveDown refused the claim " +
+        "or never fired, and this lane still has not exercised the component"
+      : "the pad took the pointer event and did NOT seat its knob — TouchControls.onDriveDown either " +
+        "refused the claim or never ran, so this lane still has not exercised the component";
   } else if (!held) {
     why = `the pad answered the press and had LET GO ${TOUCH_PROBE_HOLD_MS} ms later — this is the brake-drop shape, on the touch surface`;
   } else if (!released) {

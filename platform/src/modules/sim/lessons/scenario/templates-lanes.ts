@@ -1399,6 +1399,169 @@ const MWE_BREAKDOWN: BrakingLeadCarSpec = {
 };
 
 /**
+ * mw-v1 OVERTAKING-lane centre (meta.scenario.laneLeftX — the L7 copy truth).
+ * `mw-district.test.ts` and the motorway batteries pin the map's own value.
+ */
+const MW_X_LEFT = -8.12;
+
+/**
+ * The flow's pace, m/s — 36.0, i.e. ~129.6 км/ч, and it is a CEILING rather
+ * than a taste: `sim/collision/__tests__/index.test.ts` budgets the contact
+ * sweep against the fastest authored `cruiseSpeedMps` in the catalogue and 36
+ * is that number (`FASTEST_ACTOR_MPS`). Authoring above it spends real
+ * collision-sweep headroom on scenery. The same constant is authored at
+ * `MWD_FLOW_LEAD` in templates-sp.ts for the sibling drill on this same map;
+ * it is restated rather than imported because these template files are data
+ * modules that do not import one another.
+ */
+const MWE_FLOW_MPS = 36;
+
+/** The southbound flow's pace, m/s — ~118.8 км/ч, lawful under the posted 140
+ *  and under the sweep ceiling above. */
+const MWE_ONCOMING_MPS = 33;
+
+/**
+ * 2600 M OF МАГИСТРАЛА CARRYING ONE CAR — the row, and why the answer is
+ * STAGED and can never be ambient.
+ *
+ * THE FINDING (sc-mw-emergency-lane:63336390, major; frame
+ * `.audit-frames/sweep161/sc-mw-emergency-lane/mobile-right/01-arrival.png`):
+ * „2600 m of motorway carrying exactly one vehicle — the staged broken-down
+ * car. No other traffic in either direction across 67 mobile and 74 pc frames
+ * … It does not read as a магистрала."
+ *
+ * Three of the clauses it files were closed by earlier waves and are NOT
+ * re-fixed here: the median barrier (429 continuous panels down x = −15.185,
+ * `builders/props.ts` MOTORWAY MEDIAN BARRIER, wave 8 / f91dd1c) and the Д5
+ * «Автомагистрала» plate on each carriageway (`builders/props.ts`, wave 20 /
+ * b8b1ce4), both gated by `world/__tests__/mw-district.test.ts`. What was left
+ * standing is the sentence that opens the row: the road is EMPTY.
+ *
+ * WHY `traffic.vehicleCount` CANNOT ANSWER IT — measured on this map, not
+ * assumed. `buildRoutes` seeds every ambient agent on a CLOSED loop drawn from
+ * the lane graph's largest SCC, and mw-v1 is two DISJOINT one-way edges
+ * (mw-e-nb (0,0)→(0,2600), mw-e-sb (−30.37,2600)→(−30.37,0)) with four
+ * distinct nodes and no connector: the SCC is a single lane, `tryBuildLoop`'s
+ * closing BFS can never get home, and `buildRoutes` returns an EMPTY array.
+ * Measured through `buildLaneGraph` + `buildRoutes` on the committed district:
+ *
+ *     vehicleCount  1  2  3  4  5  6  7  8   →  routes 0 0 0 0 0 0 0 0
+ *
+ * So authoring a count here would have shipped a number nothing reads — the
+ * dead-predicate failure this repair programme keeps paying for. The flow has
+ * to be STAGED, which is also what `MWD_FLOW_LEAD` (templates-sp.ts) concluded
+ * for the sibling lesson on this same map, and what `sp-mw-flow-visible.test.ts`
+ * measures through the production stack.
+ *
+ * THE TWO NORTHBOUND CARS RIDE THE OVERTAKING LANE, one lane pitch off the
+ * student's line, and are always FASTER than every leg this lesson ships (36
+ * m/s against the shadow's 110 км/ч = 30.6 m/s and the undertake demo's 105).
+ * That pair of facts is the whole safety argument, and it is the one
+ * templates-sp.ts had to learn twice: a `brakingLeadCar` publishes a
+ * `contactCast` billed to the PLAYER, so a solid body that can be reached from
+ * behind is a rear-end charged to the victim. Here the gap only ever opens, in
+ * every lane, on every rung — and unlike the sibling drill, no leg of this
+ * lesson ever puts the student in the left lane at all (both mistake demos
+ * leave to the RIGHT, into the emergency lane at x = 8.13, which is 16.25 m
+ * from these cars).
+ *
+ * `armDistM` is authored ABOVE each car's own hold distance on purpose: under
+ * `scheduledCruise` a lead waits at its hold until the player closes to that
+ * distance, and any smaller number leaves a car STANDING STILL in the
+ * overtaking lane of a motorway. A stopped car in the fast lane is an
+ * emergency, not потокът. Both roll from the first frame he moves.
+ *
+ * Slam tier authored out of reach (slamAt past the 2600 m road, minSlamSpeedKmh
+ * 250, proximityFallbackM 0.3): deterministic moving traffic, never a braking
+ * drill, and the runner therefore emits no SimTickEvent and resolves no
+ * outcome — grading is untouched.
+ */
+function mweFlowLead(id: string, holdM: number, armDistM: number): BrakingLeadCarSpec {
+  return {
+    id,
+    kind: "brakingLeadCar",
+    actor: {
+      pathNodes: ["mw-n-nb-start", "mw-n-nb-end"],
+      hold: { nodeIndex: 0, offsetM: holdM },
+      cruiseSpeedMps: MWE_FLOW_MPS,
+      // The OVERTAKING lane, x ≈ −8.12 — measured from the EMERGENCY lane an
+      // unoffset actor actually lands in on this edge (MW_X_EMERG), not from
+      // the cruise lane the student drives. Guessing that datum is what put the
+      // sibling drill's flow car on the student's own line.
+      extraRightOffsetM: MW_X_LEFT - MW_X_EMERG,
+      colorIndex: 5,
+    },
+    // Under `scheduledCruise` this is only the release distance's fallback; the
+    // authored `armDistM` is what releases. Kept motorway-plausible so a future
+    // switch back to the band would not silently pin the actor at max speed.
+    followGapM: 90,
+    maxMatchSpeedMps: MWE_FLOW_MPS,
+    paceMode: "scheduledCruise",
+    paceSpeedMps: MWE_FLOW_MPS,
+    armDistM,
+    slamAt: { x: MW_X_LEFT, y: 4000 }, // far past the 2600 m road — never reached
+    slamRadiusM: 2,
+    slamDecelMps2: 6,
+    minSlamSpeedKmh: 250, // …the slam tier is authored out of reach…
+    proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
+    triggersHazard: false,
+    resumeAfterSec: 3,
+  };
+}
+
+/** The near flow car: 135 m up the overtaking lane at the spawn, released on
+ *  the first frame he moves (135 < 320). */
+const MWE_FLOW_NEAR = mweFlowLead("sc-mwe-flow-near", 150, 320);
+/** …and the one it is filing behind, 405 m up. Its release distance clears its
+ *  own hold for the same reason: it must roll, not stand. */
+const MWE_FLOW_FAR = mweFlowLead("sc-mwe-flow-far", 420, 600);
+
+/**
+ * THE OTHER CARRIAGEWAY — the row's «no other traffic in EITHER direction».
+ *
+ * `oncomingStream` is the purpose-built kind for a column on the opposite bank
+ * and it is PURE CHOREOGRAPHY: the runner emits ZERO SimTick events except a
+ * contact collision, so nothing here can grade. Nothing here can be TOUCHED
+ * either — these cars ride x = −30.37, i.e. 30.37 m from the student's line and
+ * on the far side of the median barrier props.ts now builds, which is well past
+ * both the 6 m `playerGuard` corridor and every contact envelope. The runtime's
+ * overtake-corridor tracker (the one consumer that reads staged bodies through
+ * `oncomingNear`) is gated on `tick.opposingBank === true`, which a divided
+ * one-way carriageway never publishes, and mw-v1 has no intersection at all, so
+ * the left-turn oncoming tracker never runs either.
+ *
+ * THE LANE MATTERS AND IS THE ONE THING A GUESS WOULD GET WRONG. An unoffset
+ * actor on the southbound path lands at x = −38.50 — the SOUTHBOUND EMERGENCY
+ * LANE. A lesson whose entire subject is that nobody drives in the лента за
+ * принудително спиране cannot show four cars streaming down one. One lane pitch
+ * left (−MW_X_EMERG) puts them on the sb cruise lane at x = −30.37.
+ *
+ * SPACING IS AUTHORED FROM THE MEETING, not from taste. Arc runs 2600 − y on
+ * this path, the column closes at ~60 m/s (33 oncoming + ~27 of his own
+ * average), so the head at arc 2285 (y = 315) meets him about 5 s in and the
+ * 480 m gaps put the rest at roughly 13 s, 21 s and 29 s — a car crossing the
+ * windscreen about every eight seconds for the whole graded route, which is
+ * what a магистрала looks like and what 141 empty frames did not.
+ */
+const MWE_ONCOMING_STREAM: OncomingStreamSpec = {
+  id: "sc-mwe-oncoming",
+  kind: "oncomingStream",
+  actor: {
+    pathNodes: ["mw-n-sb-start", "mw-n-sb-end"], // southbound = the other bank
+    hold: { nodeIndex: 0, offsetM: 2285 }, // arc = 2600 − y ⇒ y = 315
+    cruiseSpeedMps: MWE_ONCOMING_MPS,
+    extraRightOffsetM: -MW_X_EMERG, // sb CRUISE lane (x = −30.37), not its shoulder
+    colorIndex: 1,
+  },
+  count: 4,
+  // Behind the head along travel ⇒ y = 795 / 1275 / 1755. Every one of them is
+  // inside the head's own hold arc, so the stream-collapse guard in
+  // `OncomingStreamRunner.stage` cannot fire.
+  gapsM: [480, 960, 1440],
+  releaseKmh: 3, // rolls the moment he moves off
+};
+
+/**
  * Чл. 58, т. 4 — движение по лентата за принудително спиране е забранено
  * (освен при принудително спиране). The taught norm: the lane stays FREE —
  * for ambulances, fire crews and broken-down cars; undertaking or
@@ -1560,7 +1723,10 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
     // the delta AND the instructor's line that explains it, authored together.
     l5Wet(),
   ],
-  staged: [MWE_BREAKDOWN], // ledger T15 — the car the copy has always narrated
+  // ledger T15 — the car the copy has always narrated — plus the flow the road
+  // never had (see the block above `mweFlowLead`): two northbound cars in the
+  // OVERTAKING lane and a four-car column on the other carriageway.
+  staged: [MWE_BREAKDOWN, MWE_FLOW_NEAR, MWE_FLOW_FAR, MWE_ONCOMING_STREAM],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

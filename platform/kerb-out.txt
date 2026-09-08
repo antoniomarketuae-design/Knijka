@@ -1,0 +1,29 @@
+sc-vp-telltale-red shadow-correct L1 sc-vptr-red-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-telltale-red shadow-correct L3 sc-vptr-red-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-telltale-red shadow-correct L5 sc-vptr-red-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-telltale-red mistake-drive-on L1 sc-vptr-red-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale-red mistake-drive-on L3 sc-vptr-red-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale-red mistake-drive-on L5 sc-vptr-red-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale-red mistake-panic-lane L1 sc-vptr-red-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale-red mistake-panic-lane L3 sc-vptr-red-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale-red mistake-panic-lane L5 sc-vptr-red-stop=---- offAtRest=-0.002 minOff=-0.002
+
+sc-vp-telltale shadow-correct L1 sc-vptt-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-telltale shadow-correct L3 sc-vptt-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-telltale shadow-correct L5 sc-vptt-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-telltale mistake-ignore L1 sc-vptt-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale mistake-ignore L3 sc-vptt-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale mistake-ignore L5 sc-vptt-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale mistake-panic-stop L1 sc-vptt-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale mistake-panic-stop L3 sc-vptt-stop=---- offAtRest=-0.002 minOff=-0.002
+sc-vp-telltale mistake-panic-stop L5 sc-vptt-stop=---- offAtRest=-0.002 minOff=-0.002
+
+sc-vp-police-stop shadow-correct L1 sc-vpps-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-police-stop shadow-correct L3 sc-vpps-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-police-stop shadow-correct L5 sc-vpps-stop=DONE offAtRest=-1.712 minOff=-1.712
+sc-vp-police-stop mistake-panic-stop L1 sc-vpps-stop=---- offAtRest=-0.004 minOff=-0.562
+sc-vp-police-stop mistake-panic-stop L3 sc-vpps-stop=---- offAtRest=-0.004 minOff=-0.562
+sc-vp-police-stop mistake-panic-stop L5 sc-vpps-stop=---- offAtRest=-0.004 minOff=-0.562
+sc-vp-police-stop mistake-drive-past L1 sc-vpps-stop=---- offAtRest=0.003 minOff=-3.695
+sc-vp-police-stop mistake-drive-past L3 sc-vpps-stop=---- offAtRest=0.003 minOff=-3.695
+sc-vp-police-stop mistake-drive-past L5 sc-vpps-stop=---- offAtRest=0.003 minOff=-3.695

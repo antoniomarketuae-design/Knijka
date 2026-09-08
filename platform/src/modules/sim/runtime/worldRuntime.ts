@@ -1710,6 +1710,15 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // oncoming is a RAIL vehicle making a real arrival claim — absent on
       // every other frame in the product, so no existing drive changes shape.
       let oncomingRailGapSec: number | undefined;
+      // …AND THE CAR HALF OF THE SAME NUMBER (`sc-turn-left-oncoming:7974670c`).
+      // RX-05 published this measurement for RAIL vehicles only, because that
+      // was the drill it was filed on. `sc-turn-left-oncoming` is the drill
+      // whose whole subject is the interval to an ordinary oncoming CAR, and
+      // for it the paragraph above still described the shipped behaviour word
+      // for word: measured every frame, thrown away unless the player commits.
+      // Both are set from the SAME `gapSec` in the same branch below, so they
+      // are mutually exclusive and neither can be mistaken for the other.
+      let oncomingVehicleGapSec: number | undefined;
 
       // 4a'. N1 left-turn-across-path tracker (doc 72 JU-10). Runs at EVERY
       // junction (signalized or not — the чл. 37 oncoming duty is universal);
@@ -1745,6 +1754,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             // cannot answer „релсово ли е" at all, so it publishes nothing —
             // absence stays UNKNOWN everywhere, never „no tram".
             if (probe.rail === true) oncomingRailGapSec = gapSec;
+            else oncomingVehicleGapSec = gapSec;
           }
         } else if (probe === true) {
           present = true;
@@ -2329,6 +2339,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // bearing down on the junction, which is every frame of every other
       // lesson in the catalogue.
       if (oncomingRailGapSec !== undefined) tick.oncomingRailGapSec = oncomingRailGapSec;
+      // The car half of the same seam (sc-turn-left-oncoming:7974670c): absent
+      // on every frame with no oncoming vehicle making an arrival claim, which
+      // is every frame of every drill that stages none.
+      if (oncomingVehicleGapSec !== undefined) {
+        tick.oncomingVehicleGapSec = oncomingVehicleGapSec;
+      }
       // THE PERSON IN THE PATH (`SimTick.vruAheadM`) — additive, and published
       // ONLY when a body was actually measured, so every drive, trace and
       // fixture that has no staged pedestrian grades byte-identically to

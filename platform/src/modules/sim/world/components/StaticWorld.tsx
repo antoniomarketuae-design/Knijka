@@ -427,7 +427,11 @@ export function StaticWorld({
   // land white-on-white — and «не спирай върху маркировката», stop lines and
   // lane discipline are all graded off markings the student has to be able to
   // SEE. Real snow covers paint rather than tinting it, so the honest model is
-  // occlusion, which is asset work, not a factor here.
+  // occlusion — which this paragraph called asset work and which turned out to
+  // be four lines in `markingWear.ts`, the one material in the scene that
+  // already writes `diffuseColor.a`. It ships as `PAINT_SNOW_DRIFT_LO/HI`
+  // (the second clause of `sc-ac-snow:f1673b60`) and it is still not a factor
+  // here: an alpha term leaves every surviving fragment at the value below.
   const paintWet = useMemo(
     () => wetnessToRoadParams(wetness, { dryRoughness: 0.85, wetRoughness: 0.4, wetDarken: 0.78 }),
     [wetness],

@@ -113,10 +113,21 @@ const BODY_HALF_W = 0.95;
  * frontage validator still passes — the kerb moves out 4 m, so buildings move
  * with it. If the street genuinely has no kerbside parking, say
  * `parkingBand: false` instead and the row goes to zero that way.
+ *
+ * ── THREE ROWS DELETED BY THE RATCHET, 2026-09-08 (247 bodies: ov-crest-v1
+ *    107, sp-curve-v1 80, ac-aqua-v1 60). They went to zero for a THIRD
+ *    reason, which is neither of the two above and is the law rather than the
+ *    kerb: `TrafficLayer.computeParkedCars` now refuses an извънградски път
+ *    outright — ЗДвП чл. 94, ал. 2 („Паркирането на платното за движение е
+ *    забранено" outside a built-up area), retrieved in that pass's own note.
+ *    All three are `Учебен извънградски път` maps posted 90; the rank was
+ *    illegal there before it was ever on a pavement.
+ *    `world/builders/constants.isExtraUrbanCarriageway` is the predicate;
+ *    sc-sp-curve:6079dfb1 is the row that measured it.
  */
 const FOOTWAY_BUDGET: Record<string, number> = {
-  "ov-crest-v1": 107, "d2-v1": 106, "poligon-v1": 91, "sp-signs-v1": 84,
-  "district-v1": 80, "sp-curve-v1": 80, "ac-aqua-v1": 60,
+  "d2-v1": 106, "poligon-v1": 91, "sp-signs-v1": 84,
+  "district-v1": 80,
   "ac-bridge-v1": 60, "jx-equal-v1": 46,
   "ac-ice-v1": 41, "ac-night-v1": 41, "ac-rain-v1": 41,
   "ov-oneway-v1": 41, "pk-banx-v1": 41,

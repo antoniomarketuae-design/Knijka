@@ -253,7 +253,13 @@ export {
   type PointScaleId,
 } from "./scales";
 
-export { createRuleEngine, reduceTick, type ReduceResult, type RuleEngineState } from "./engine";
+export {
+  createRuleEngine,
+  reduceTick,
+  settleUnpaidSpeedingTeach,
+  type ReduceResult,
+  type RuleEngineState,
+} from "./engine";
 
 export {
   PASS_MAX_OSNOVNI_POINTS,

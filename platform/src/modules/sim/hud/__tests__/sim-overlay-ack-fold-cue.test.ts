@@ -106,3 +106,79 @@ describe("the sheet's «Разбрах» carries the fold count (sc-merge-accel-
     expect(ackButton).toContain("aria-hidden");
   });
 });
+
+/**
+ * …AND THE CONTROL THAT ADMITS THE FOLD MUST NOT DELETE IT — 2026-09-04.
+ *
+ * The block above gates the CUE and that is all it ever gated. `tapSheetAck`
+ * was `useTapActivation(acknowledge)`: one press ended the briefing whatever
+ * «↓ ОЩЕ 2 РЕДА» said two pixels to the right of the label. So the row's own
+ * words — „and the rest is hidden" — were still true of the sheet at
+ * `w27/…/sc-merge-accel-lane__mobile-right/02-briefing.png`: the two lines the
+ * button counted were «…лента — там не се кара», and pressing the button the
+ * student is told to press was the one action that guaranteed he never read
+ * them. A measurement wired to a label and not to a behaviour is this corpus's
+ * dead-predicate class wearing a different coat.
+ *
+ * The peek has carried the answer since 2026-08-26 and this suite already
+ * drives it end-to-end (`sim-overlay-dismiss.test.tsx`, the `cardTapAction`
+ * block): scroll to the end first, acknowledge on the next press. What is
+ * asserted here is the WIRING — that the sheet's acknowledgement calls that
+ * same exported branch against its OWN window — because the arithmetic is
+ * already gated and cannot be gated twice, and because jsdom has no layout
+ * engine, so a rendered press of this button reports `scrollHeight === 0` and
+ * would take the dismiss branch no matter what the component did.
+ */
+describe("the sheet's «Разбрах» reveals before it ends (sc-merge-accel-lane:b75b356e)", () => {
+  /** The handler's body, comments already stripped by `CODE`. */
+  const HANDLER = CODE.slice(
+    CODE.indexOf("const tapSheetAck = useTapActivation("),
+    CODE.indexOf("const tapSheetAck = useTapActivation(") + 900,
+  );
+
+  it("no longer acknowledges unconditionally", () => {
+    // The exact shape this repair replaces. Pinned as an absence because it is
+    // a one-line revert away, and the revert is silent: the button keeps its
+    // label, its cue and its markup, and only the student loses the sentence.
+    expect(CODE).not.toMatch(/const\s+tapSheetAck\s*=\s*useTapActivation\(\s*acknowledge\s*\)/);
+  });
+
+  it("reads the SHEET's own text window, not the peek's and not a stale count", () => {
+    // `sheetFold.ref`, at tap time: `sheetFold.lines` is refreshed by a
+    // `ResizeObserver` and by `onScroll`, and a tap that ends the briefing may
+    // not depend on which of them ran last.
+    expect(HANDLER).toContain("sheetFold.ref.current");
+    expect(HANDLER).not.toContain("peekFold");
+    expect(HANDLER).toContain("scrollHeight: el.scrollHeight");
+    expect(HANDLER).toContain("padBottomPx");
+  });
+
+  it("routes through the exported branch instead of re-deciding inline", () => {
+    // Re-deciding here is exactly how the ✕-scrolls regression survived 729
+    // green tests: the arithmetic was right and the component did not call it.
+    expect(HANDLER).toContain("cardTapAction({");
+    // This button paints no ✕ — it IS the acknowledgement — so the glyph half
+    // of the branch is answered here and not left to a coordinate that never
+    // arrives.
+    expect(HANDLER).toMatch(/onDismissGlyph:\s*false/);
+  });
+
+  it("scrolls FIRST and only then acknowledges", () => {
+    const scroll = HANDLER.indexOf("el.scrollTo({ top: action.top })");
+    const ack = HANDLER.indexOf("acknowledge();");
+    expect(scroll, "the scroll branch is gone").toBeGreaterThan(-1);
+    expect(ack, "the button no longer acknowledges at all").toBeGreaterThan(-1);
+    expect(scroll).toBeLessThan(ack);
+    // …and the scroll branch RETURNS, so one press can never do both.
+    expect(HANDLER.slice(scroll, ack)).toContain("return;");
+  });
+
+  it("leaves the ✕ and the keyboard as one-press exits", () => {
+    // A blocking sheet with no single-press way out is a worse defect than the
+    // fold. The ✕ closes the sheet outright, and Space/Enter still acknowledges
+    // — assistive technology reads the whole body out of the DOM regardless of
+    // scroll position, which is why the cue is `aria-hidden` in the first place.
+    expect(CODE).toMatch(/const\s+tapCloseSheet\s*=\s*useTapActivation\(\(\)\s*=>\s*setOpenItem\(null\)\)/);
+    expect(CODE).toMatch(/if\s*\(blocking\)\s*acknowledge\(\);/);
+  });
+});

@@ -1840,6 +1840,27 @@ export const SC_FOLLOW_TAILGATER: ScenarioSpec = {
     },
   ],
   rubric: { parTimeSec: 85 },
+  /**
+   * THE DEAD STOP THE LESSON IS ABOUT (`sc-follow-tailgater:63c0c28c`).
+   *
+   * `STOPPED_WITHOUT_CAUSE` ships OFF everywhere (rules/types.ts says why), so
+   * arming it is an author's statement about THIS route — and this route is the
+   * one that most needs it. Instructions 3, 4 and 6 say the answer to a лепка is
+   * the throttle and never the brake; standing still in a live lane with a car
+   * five metres off the bumper is the worst act the drill has, and it was the
+   * one act nothing graded. Measured on the audit's own wrong leg re-driven at
+   * `85495fd` (`.audit-frames/w27/frames/sc-follow-tailgater__pc-wrong`): eight
+   * careless rests of 8 s each, «0 наказателни точки · ИЗДЪРЖАН · ★★★» and the
+   * commendation «Чисто и спокойно каране».
+   *
+   * The route can carry it: both objectives are `reachZone`s with no stop
+   * demand, ln-v1 has no line, signal or crossing of its own, and the FRONT
+   * lead is a constant cruiser that drives AWAY — which is why the reducer's
+   * lead exemption had to learn the difference between a queue and a car
+   * leaving (engine.ts `leadQueueAhead`). On the template, not a rung: the
+   * fault is the same fault at L1 and at L5.
+   */
+  ruleConfig: { needlessStopEnabled: true },
   shadow: { path: "content/traces/sc-follow-tailgater/shadow-correct.trace.json" },
   mistakes: [
     {

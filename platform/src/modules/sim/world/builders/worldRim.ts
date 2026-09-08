@@ -70,6 +70,7 @@ import {
   TERMINUS_CLOSE_MIN_HEIGHT_M,
   TERMINUS_CLOSE_ROAD_CLEAR_M,
   TERRAIN_MARGIN_M,
+  isExtraUrbanCarriageway,
   isMotorwayCarriageway,
   WORLD_RIM_BANK_HEIGHT_M,
   WORLD_RIM_HEIGHT_STEPS,
@@ -325,12 +326,22 @@ export function buildWorldRim(
   // runs into a street, and its 9 lamps / 25 parapet panels in the furniture
   // budget say the street is dressed), so only the pure motorway segments move.
   //
-  // NOT DONE, and named rather than guessed at: the RURAL half. ov-crest-v1's
-  // «Учебен извънградски път» is `unclassified`, which dresses as a street
-  // everywhere else in this module, so widening the test to it would re-dress
-  // every residential micro-map in the catalogue on the same line. That needs a
-  // per-district „rural" term the documents do not carry yet.
-  const urbanRim = network.edges.some((eb) => eb.line && !isMotorwayCarriageway(eb.edge));
+  // ── 2026-09-08 — AND THE RURAL HALF, WHICH THIS BLOCK LEFT OPEN ──────────
+  //
+  // The paragraph here used to read „NOT DONE … ov-crest-v1's «Учебен
+  // извънградски път» is `unclassified`, which dresses as a street everywhere
+  // else in this module, so widening the test to it would re-dress every
+  // residential micro-map … that needs a per-district „rural" term the
+  // documents do not carry yet." The term was there all along: the POSTED
+  // LIMIT. `constants.isExtraUrbanCarriageway` carries the measurement and the
+  // retrieved ЗДвП чл. 21, ал. 1 table; the short version is that категория В
+  // is capped at 50 in a built-up area and 90 outside one, so a carriageway a
+  // map AUTHORS at 90 is not a street. sc-sp-curve:6079dfb1 is the row — «you
+  // are setting off on the OUT-OF-TOWN road at 90 км/ч, but … five-storey
+  // apartment blocks on both sides».
+  const urbanRim = network.edges.some(
+    (eb) => eb.line && !isMotorwayCarriageway(eb.edge) && !isExtraUrbanCarriageway(eb.edge),
+  );
   // Everything already standing on the map. The belt's OWN masses are
   // deliberately never added to this list, and that is the difference between a
   // belt and a picket fence: adjacent masses SHARE AN EDGE by construction, so

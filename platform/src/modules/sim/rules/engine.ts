@@ -2316,6 +2316,80 @@ export function speedingBands(
 }
 
 /**
+ * THE RE-GRADE FOR A DRIVE THAT ENDS BEFORE THE RE-GRADE CLOCK DOES — the
+ * fourth and last member of the family `SPEED_REGRADE_SEC` opens, and the
+ * residual `signals-sweep161.test.ts` §7 recorded rather than closed
+ * (`sc-signal-flashing:0d68b149`, critical).
+ *
+ * ── WHAT IS LEFT AFTER THE FIRST THREE REPAIRS ───────────────────────────────
+ * `SPEED_REGRADE_SEC` bills a CONTINUING overspeed a second time six accrued
+ * driving seconds after the card, because the first bill is spent by the
+ * founder-approved teach-first free mini-lesson (`scenarios/policy.ts` A12).
+ * That reaches every drive with six seconds left in it. It cannot reach a drive
+ * that ENDS first, and short lessons are not a corner case — MEASURED on
+ * `sc-signal-flashing` through the production recorder + a real session
+ * (`signals-sweep161.test.ts` §7): the reducer bills at ≈8,9 s, raises the
+ * re-grade at ≈14,9 s, and the route completes at ≈12,6 s, because sxf-v1's
+ * drivable run is 145 m and 145 m at 59 км/ч is shorter than the clock. So the
+ * audit's own frame — `.audit-frames/sweep161/sc-signal-flashing/mobile-wrong/
+ * 04-t012s.png`, «Превишена скорост» over a cluster reading 59 км/ч under a 50
+ * badge — reached its debrief on «0 наказателни точки · Второстепенни 0 0».
+ * On a lesson this short „one warning, then grade" still reduces to „never
+ * grade", which is the sentence all three earlier blocks were written against.
+ *
+ * ── WHAT THIS SETTLES, AND WHAT IT CANNOT TOUCH ──────────────────────────────
+ * The last tick of the drive is the last moment anything can ask, so it asks:
+ * the student was SHOWN this fault (`speedingMinor.emitted` — the bill the
+ * teach consumed) and was STILL COMMITTING IT when the drive ended
+ * (`speedingMinorRegrade.activeSince !== null`, re-checked against the tick in
+ * hand so the function is honest when called standalone). It is one
+ * второстепенна point, `regrade`-marked exactly like the six-second bill, so
+ * `lessons/engine.ts` drops it wherever the code was ALREADY charged — exam
+ * mode, a repeat offence, a grade-on-sight policy — and the ledger there stays
+ * byte-identical.
+ *
+ * A12 — NOTHING INNOCENT MOVES, and the guard is the episode itself. ONE frame
+ * at or under the posted limit runs `stepEpisode`'s reset arm and clears
+ * `activeSince`, `emitted` and the accrued ledger, so a student who lifts off
+ * at any point in the remaining seconds is acquitted exactly as before; so is
+ * a student who was never billed in the first place (nothing was withheld from
+ * him, so there is nothing to settle); so is one whose re-grade already landed
+ * (`speedingMinorRegrade.emitted`). What is left is a driver who was told, in
+ * the moment, with the catalogue's explanation and its «✔ Правилното действие»,
+ * and who was over the graced limit on the chequered flag.
+ *
+ * WHY NO EXTRA GRACE PERIOD HERE. The six seconds are time to correct DURING a
+ * drive that continues; granting them to a drive that has ENDED is not mercy,
+ * it is an acquittal, and any threshold measured in seconds simply re-opens the
+ * hole for the next lesson one second shorter. The опасна band is untouched
+ * (`speedingDangerous` always grades on its first bill — there is no withheld
+ * charge to settle), and so is every other code: the six one-switch duties and
+ * the motorway crawl have their own clocks and their own measurements, and
+ * moving them belongs to whatever row measures them.
+ */
+export function settleUnpaidSpeedingTeach(
+  state: RuleEngineState,
+  tick: SimTick,
+): ViolationEvent | null {
+  // He was never billed → nothing was withheld → nothing to settle.
+  if (!state.speedingMinor.emitted) return null;
+  // The six-second re-grade already landed; this would be a third bill.
+  if (state.speedingMinorRegrade.emitted) return null;
+  // The episode is closed — he corrected, and the reset already acquitted him.
+  if (state.speedingMinorRegrade.activeSince === null) return null;
+  const limit = tick.maxSpeedKmh;
+  const speed = Math.abs(tick.speedKmh);
+  const bands = speedingBands(limit, state.config);
+  if (!(speed > bands.gradedAbove && speed <= bands.dangerousAbove)) return null;
+  return {
+    ...makeViolation("SPEEDING_OVER_LIMIT", tick.t, {
+      detail: encodeSpeedMeasurement(speed, limit),
+    }),
+    regrade: true,
+  };
+}
+
+/**
  * Advance the rolling speed window and return its ANCHOR — the oldest sample
  * still spanning `windowSec` (the newest sample that has fallen out of the
  * window is KEPT as the anchor, so the measured span is at least the window
@@ -3898,8 +3972,11 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // walking pace down an open through street with nothing in front of it. That
   // is the fault, and it is the only thing this convicts.
   const townFloorKmh = Math.min(limit * cfg.townCrawlFractionOfLimit, cfg.townCrawlFloorCapKmh);
-  const townReasonAhead =
-    leadGapM !== null ||
+  // Split ONLY so the standstill code below can ask a narrower question of the
+  // lead arm (see `needlessStopReason`). `townReasonAhead` is the same
+  // disjunction, in the same order, and the crawl reads it unchanged.
+  const townLeadAhead = leadGapM !== null;
+  const townReasonAheadExceptLead =
     (tick.nextJunctionM !== undefined && tick.nextJunctionM <= cfg.townCrawlClearAheadM) ||
     (tick.nextStopLineM !== undefined && tick.nextStopLineM <= cfg.townCrawlClearAheadM) ||
     (tick.vruAheadM !== undefined && tick.vruAheadM <= cfg.townCrawlClearAheadM) ||
@@ -3907,6 +3984,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     tick.railCrossing !== undefined ||
     tick.curveAdvisoryKmh !== undefined ||
     tick.narrowTwoWay === true;
+  const townReasonAhead = townLeadAhead || townReasonAheadExceptLead;
   const townConditionsExcuse =
     tick.isNight || tick.rain === true || tick.fog === true || tick.snow === true;
   const townThroughRoad =
@@ -4019,8 +4097,26 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     tick.nextStopLineControl === "trafficLight" &&
     tick.nextStopLineState !== undefined &&
     tick.nextStopLineState !== "green";
+  // A CAR 140 m UP THE ROAD IS NOT WHY I AM PARKED
+  // (sc-follow-tailgater:63c0c28c). The list above is the CRAWL's, and its lead
+  // arm carries the crawl's legal reading — „with a body ahead in my own lane I
+  // am not the head of the queue", deliberately at ANY distance. That is right
+  // for a car that is MOVING and wrong for one that is not: a driver at a dead
+  // stop with 140 m of empty road in front of him is exactly what the traffic
+  // behind is stuck behind, whatever sits at the far end of it. Inherited whole
+  // it made the code unfireable wherever a lesson stages a lead at all —
+  // measured on `sc-follow-tailgater`, whose cruiser holds the player's own
+  // lane for the first 94 s of every drive.
+  // So the STANDSTILL asks the narrower question, in the band this same block
+  // already calls „the approach IS the reason" for a junction, a stop line or a
+  // pedestrian: a body within `townCrawlClearAheadM` ahead is a queue and
+  // excuses the rest exactly as before; beyond it the road is open and the stop
+  // answers to nothing. The moving-car reading above is untouched — the crawl
+  // still reads `townReasonAhead` whole, at any distance.
+  const leadQueueAhead = leadGapM !== null && leadGapM <= cfg.townCrawlClearAheadM;
   const needlessStopReason =
-    townReasonAhead ||
+    leadQueueAhead ||
+    townReasonAheadExceptLead ||
     needlessStopSignal ||
     tick.noStopZone === true ||
     tick.fog === true ||

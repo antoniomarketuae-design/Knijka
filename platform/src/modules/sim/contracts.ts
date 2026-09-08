@@ -1776,6 +1776,17 @@ export interface StagedEventOutcome {
    * inbound at commit (waited it out / clear road).
    */
   acceptedGapSec?: number;
+  /**
+   * oncomingLeftTurn: did the player BEGIN the left turn at this junction while
+   * the encounter was live (`turnStarted`, direction left, inside the commit
+   * radius)? Absent on every other kind and on pre-2026-09-04 payloads.
+   *
+   * The runner has always known this and no consumer could ask, so "clear"
+   * with no `acceptedGapSec` covered two opposite drives: a turn taken into a
+   * genuinely empty lane, and a student who never turned at all. The debrief
+   * printed the first sentence for both.
+   */
+  committed?: boolean;
 }
 
 // ---------------------------------------------------------------------------

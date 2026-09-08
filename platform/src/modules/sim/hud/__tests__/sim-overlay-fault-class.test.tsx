@@ -39,9 +39,10 @@
  *      renders it, for all three classes;
  *   2. BOTH DIRECTIONS — an item with no class prints none. Inventing a class
  *      on a «Браво» or a task line is the same crime as dropping one;
- *   3. the MARK SURVIVES the narrow lane — the class is the `truncate`d half
- *      and the mark is `shrink-0`, because a mark clipped from the right is
- *      the founder's own «−10 т.» misreading with the qualifier removed;
+ *   3. NEITHER HALF is cut in the narrow lane — they share a `flex-wrap` box,
+ *      because the first answer („the class is the half that truncates") left
+ *      the class at 10.7 px of ink on the shipped phone, i.e. one letter and an
+ *      ellipsis. See the block over that test for the re-measurement;
  *   4. the vocabulary is RETRIEVED (ADR-002) — the token the phone prints is
  *      the token the debrief's `examMarkFor().classBg` prints, so the two
  *      surfaces cannot drift and neither one spells the наредба's words;
@@ -138,38 +139,68 @@ describe("the mounted card, not the field", () => {
 
 describe("the narrow lane — which half gives when the row runs out of room", () => {
   /*
-   * MEASURED on the frame in this file's header, by scanning row 1's band for
-   * danger-red ink (`.audit-frames/w26/frames/sc-junction-gap__mobile-wrong/
-   * 04-t012s.png`, dpr 3):
+   * THE FIRST ANSWER HERE WAS „THE CLASS TRUNCATES", AND ON THE PHONE THAT
+   * TRUNCATED IT TO ONE LETTER. The row was re-opened on the frames of its own
+   * repair: `.audit-frames/w27/frames/sc-junction-gap__mobile-wrong/04-t012s.png`
+   * (tree 85495fd — the first sweep that carries this field), same phone, same
+   * dpr 3, same red-ink scan of row 1's band:
    *
-   *   ⚠ glyph    device 1626–1661   CSS 542.0–553.7
-   *   «−10»      device 1687–1737   CSS 562.3–579.0
-   *   «ИЗПИТНИ»  device 1764–1892   CSS 588.0–630.7   → 6.1 CSS px per capital
-   *   «Т.»       device 1919–1947   CSS 639.7–649.0
+   *   ⚠ glyph    device 1627–1660   CSS 542.3–553.3
+   *   the class  device 1686–1718   CSS 562.0–572.7   ← 10.7 px: «О» + «…»
+   *   «·»        device 1761–1766   CSS 587.0–588.7
+   *   «−10»      device 1798–1848   CSS 599.3–616.0
+   *   «ИЗПИТНИ»  device 1875–2003   CSS 625.0–667.7   → 6.1 CSS px per capital
+   *   «Т.»       device 2030–2058   CSS 676.7–686.0
    *
-   * The mark is 86.7 CSS px; the lane after it is ~46 px with a queue badge up
-   * and ~69 px without. «ОПАСНА» is 36.6, «ОСНОВНА» 42.7, «ВТОРОСТЕПЕННА» 79.3
-   * — so the longest class cannot fit beside a «+3» on the narrowest phone, and
-   * ONE `truncate`d string would have eaten the mark from the right.
+   * The old paragraph's «lane after the mark is ~46 px» was measured between
+   * the mark's right edge and the «+3» badge — a lane the class never occupies,
+   * because it is laid out BEFORE the mark. What it really gets is 176 − 14
+   * (glyph) − 18 (three gaps) − 99 (the mark WITH its separator, not 86.7) − 23
+   * (badge) ≈ 22 px, against the 36.6 «ОПАСНА» needs. So the field was mounted,
+   * fed, asserted — and the card still named no class.
+   *
+   * THE PAIR NOW WRAPS INSTEAD. One `flex-wrap` box holds both: it is one line
+   * whenever they fit (156 px of lane against 131 on every card with no queue
+   * badge) and two when they do not, so NEITHER half is ever cut. The separator
+   * goes with the change and not as tidying — riding with the mark, it would
+   * open the second line, and a middot starting a line reads as a bullet. The
+   * roomy card has always separated the two with space alone (`ToastCard`'s
+   * `justify-between`), so this also removes a divergence.
    */
-  it("the class truncates and the mark never does", () => {
+  it("the pair wraps, and neither the class nor the mark is ever cut", () => {
     const html = peekMarkup(violationItem("vtorostepenna", "−1 изпитна т."), 3);
     // …past the handle's own value: `data-sim-overlay-mark-class=""` ends in
     // the four characters `class=""`, and a slice that began at the handle read
     // THAT as the element's class list and passed on an empty string.
     const handle = 'data-sim-overlay-mark-class=""';
+    const before = html.slice(0, html.indexOf(handle));
     const classSpan = html.slice(html.indexOf(handle) + handle.length);
     const classClasses = /class="([^"]*)"/.exec(classSpan)?.[1] ?? "";
+    // `max-w-full` and not `min-w-0`: inside a wrap box the class is its own
+    // line's only item, so the bound that matters is the box's width. It keeps
+    // `truncate` for the one case the wrap cannot answer — a class longer than
+    // the whole column — which no member of the наредба's table is.
     expect(classClasses).toContain("truncate");
-    expect(classClasses).toContain("min-w-0");
+    expect(classClasses).toContain("max-w-full");
 
-    // …and the chip that follows it is the one that may not give. Walked from
+    // THE WRAP BOX IS THE REPAIR, so it is asserted and not assumed. It is the
+    // `<span` immediately enclosing the class span, i.e. the second-to-last one
+    // opened before the handle.
+    const classOpen = before.lastIndexOf("<span");
+    const groupOpen = before.lastIndexOf("<span", classOpen - 1);
+    const groupClasses = /class="([^"]*)"/.exec(before.slice(groupOpen, classOpen))?.[1] ?? "";
+    expect(groupClasses).toContain("flex-wrap");
+
+    // …and the chip inside it is still the one that may not give. Walked from
     // the class span's own close rather than searched for by its text: the
     // mark's string also appears in the card's `aria-label`, and a search that
     // found THAT read the wrapper's class list and asserted nothing.
     const afterClass = classSpan.slice(classSpan.indexOf("</span>"));
     const markSpan = afterClass.slice(afterClass.indexOf("<span"));
-    expect(markSpan).toContain("· −1 изпитна т.");
+    expect(markSpan).toContain("−1 изпитна т.");
+    // The separator is gone WITH the wrap, and a returning «·» would land at
+    // the head of the wrapped line.
+    expect(markSpan).not.toContain("· −1");
     const markClasses = /class="([^"]*)"/.exec(markSpan)?.[1] ?? "";
     expect(markClasses).toContain("shrink-0");
     expect(markClasses).toContain("whitespace-nowrap");

@@ -283,6 +283,16 @@ export {
   type RearCueKind,
   type RearCueLevel,
 } from "./rearProximity";
+// …and the SECOND sentence of that same box: the reverse odometer the drills
+// graded in metres and never showed (sc-ed-reverse-line:e05f2cee).
+export { ReverseTravelBadge } from "./RearProximityCue";
+export {
+  rearChannelBadge,
+  reverseRunLabelBg,
+  reverseRunMeters,
+  stepReverseRun,
+  type ReverseRun,
+} from "./reverseTravel";
 // …and its FRONT twin — the following-gap readout the lessons that teach the
 // two-second rule were grading against and never showing (sc-fo-motorway-gap).
 export { FollowGapBadge, FollowGapCue } from "./FollowGapCue";

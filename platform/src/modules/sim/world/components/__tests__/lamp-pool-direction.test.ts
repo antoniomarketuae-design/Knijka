@@ -499,13 +499,29 @@ function distanceToRoad(district: District, px: number, py: number): number {
 }
 
 /**
- * `ov-oncoming-v1` is the drill's own map — the night gap is graded on it. The
- * other two are the residential scenario maps `props.ts` names when it explains
- * why `SCENARIO_LIT_CLASSES` exists at all, so the row is exercised on both
- * pitches (arterial and жилищна) and on curved geometry, not just the straight
- * corridor where any sign convention looks symmetric.
+ * `pe-bus-v1` carries the ARTERIAL pitch and the curved geometry; the other two
+ * are the residential scenario maps `props.ts` names when it explains why
+ * `SCENARIO_LIT_CLASSES` exists at all, so the row is exercised on both pitches
+ * (arterial and жилищна) and on a bend, not just the straight corridor where
+ * any sign convention looks symmetric.
+ *
+ * ── THE ARTERIAL SUBJECT CHANGED — 2026-09-08, and it changed because the
+ *    OTHER map stopped being lit, on purpose. It used to be `ov-oncoming-v1`,
+ *    „the drill's own map — the night gap is graded on it", and that map now
+ *    builds ZERO streetlights: `constants.isExtraUrbanCarriageway` withdrew the
+ *    Sofia dressing kit from the five извънградски пътища
+ *    (sc-sp-curve:6079dfb1).
+ *
+ *    WHICH IS WHAT THAT DRILL ASKED FOR, and it is worth stating rather than
+ *    quietly swapping a name: `templates-conditions2.ts` authors the night rung
+ *    on this exact map and its header reads „the AC-01 beat … played on the
+ *    same UNLIT road" and „unlit segment, lows throw ~50 m; stopping from 70
+ *    needs more". The whole archetype is that the beam, not the sign, is the
+ *    real limit — and 32 street lamps down a 900 m rural road contradicted the
+ *    briefing they were lit under. §3 above is where the pool's DIRECTION is
+ *    proved; §4 only needs a lit map to prove it on the ground, and this is one.
  */
-const DISTRICTS = ["ov-oncoming-v1", "sp-creep-v1", "sp-zone30-v1"] as const;
+const DISTRICTS = ["pe-bus-v1", "sp-creep-v1", "sp-zone30-v1"] as const;
 
 describe("§4 on the shipped maps, the pool lands on the carriageway side", () => {
   for (const id of DISTRICTS) {

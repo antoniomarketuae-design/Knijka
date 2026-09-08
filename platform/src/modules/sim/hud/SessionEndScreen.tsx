@@ -689,14 +689,41 @@ export function objectiveDetailText(detail: ObjectiveDetail | undefined): string
       // when he judged it WELL, which is the half worth saying out loud.
       // THEO-4: never the bare figure — the short line says what the seconds
       // are for.
+      // …AND THE SENTENCE HAD TO SURVIVE THE MEASUREMENT (2026-09-04, the same
+      // finding). «Лентата беше чиста» was printed for every run that recorded
+      // no figure — including the one that recorded none because the student
+      // DROVE INTO the oncoming car. `.audit-frames/w27/frames/
+      // sc-turn-left-oncoming__pc-right` and its mobile twin, both at head
+      // 85495fd: this line beside «Удар в друго превозно средство −10». The
+      // ending now says which drive it was; see `OncomingGapEnding`.
       const norm = detail.normSec.toFixed(0);
+      const whyFour = `Левият завой отнема 2–3 с от насрещната лента, затова под ${norm} секунди се чака.`;
+      if (detail.ending === "collision") {
+        return detail.acceptedGapSec === null
+          ? `Интервал: не беше преценен — стигна до удар с насрещния автомобил. Точно това мери този урок: колко секунди има до насрещния, преди да тръгнеш. ${whyFour}`
+          : `Интервал: зави при ${detail.acceptedGapSec.toFixed(1)} с — и точно този интервал свърши с удар. ${whyFour}`;
+      }
       if (detail.acceptedGapSec === null) {
-        return "Интервал: при започването на завоя нямаше насрещен — лентата беше чиста.";
+        switch (detail.ending) {
+          case "cut":
+            return `Интервал: тръгна пред насрещния, без да го изчакаш — секундите не стигнаха. ${whyFour}`;
+          case "notEncountered":
+            return "Интервал: насрещен така и не се появи в това каране, затова интервал не е мерен — преценката остава за следващия опит.";
+          case "noTurn":
+            return "Интервал: завоят не беше започнат, затова няма какво да се премери — интервалът се преценява в момента, в който тръгваш през насрещната лента.";
+          case "clear":
+            return "Интервал: при започването на завоя нямаше насрещен — лентата беше чиста.";
+          default:
+            // Pre-2026-09-04 payloads carry the figure but not the drive. The
+            // one sentence true of all six endings, and never a claim about a
+            // lane this row cannot see.
+            return "Интервал: не е записан за това каране.";
+        }
       }
       const g = detail.acceptedGapSec.toFixed(1);
       return detail.acceptedGapSec >= detail.normSec
         ? `Интервал: зави при ${g} с — над нормата от ${norm} секунди, точно така се преценява.`
-        : `Интервал: зави при ${g} с — под нормата от ${norm} секунди. Левият завой отнема 2–3 с от насрещната лента, затова под ${norm} се чака.`;
+        : `Интервал: зави при ${g} с — под нормата от ${norm} секунди. ${whyFour}`;
     }
     case "roundabout":
       return detail.exitSignaled ? "Излезе от кръговото с десен мигач" : null;

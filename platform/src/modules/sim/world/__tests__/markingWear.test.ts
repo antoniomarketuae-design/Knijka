@@ -26,11 +26,21 @@ import {
   PAINT_ALPHA_TEST,
   PAINT_EDGE_BAND,
   PAINT_NORMAL_SCALE,
+  PAINT_SNOW_DRIFT_HI,
+  PAINT_SNOW_DRIFT_LO,
+  PAINT_SNOW_FRAGMENT_ANCHOR,
   PAINT_WEAR_STRENGTH,
   PAINT_WEAR_TILE_M,
 } from "../textures/markingWear";
 import { ROAD_TILE_SPAN_M } from "../textures/groundScale";
-import { macroProgramCacheKey } from "../textures/macroVariation";
+import { getMacroNoiseTexture, macroProgramCacheKey } from "../textures/macroVariation";
+import {
+  ROAD_SNOW_PATCH_HI,
+  ROAD_SNOW_PATCH_LO,
+  ROAD_SNOW_PATCH_TILE_M,
+  roadSurfaceOnBeforeCompile,
+} from "../textures/roadSurface";
+import { getSnowPaintCover, setSnowCover } from "../textures/snowCover";
 
 const STATIC_WORLD_SRC = readFileSync(
   fileURLToPath(new URL("../components/StaticWorld.tsx", import.meta.url)),
@@ -160,5 +170,131 @@ describe("markingWearOnBeforeCompile", () => {
     markingWearOnBeforeCompile(a as never);
     markingWearOnBeforeCompile(b as never);
     expect(a.uniforms.uPaintWear).toBe(b.uniforms.uPaintWear);
+  });
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * SNOW LYING OVER THE PAINT — the second clause of `sc-ac-snow:f1673b60`
+ * („bare grey asphalt WITH CLEAN UNBROKEN WHITE EDGE AND LANE MARKINGS").
+ *
+ * `roadSurface.ts`'s drift mix closed the asphalt half; the stripe was left
+ * untouched by every snow term in the tree, so the lesson whose instruction 1
+ * reads «пътят е заснежен» drew a razor-clean line down a white road. What is
+ * pinned here is the three things that make the fix a repair rather than a
+ * second weather: the operation is ALPHA and never colour, the drift is the
+ * SAME drift the road beside it carries, and the window is the shipped field's
+ * own quantiles rather than a taste.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("the markings take the carriageway's snow — as occlusion, not as tint", () => {
+  /** The shipped field's samples, 0..1, exactly as `texture2D().r` sees them. */
+  const field = Array.from(getMacroNoiseTexture().image.data as Uint8Array, (b) => b / 255);
+  const sorted = [...field].sort((a, b) => a - b);
+  const q = (p: number): number => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]!;
+  /** GLSL `smoothstep`, to the letter. */
+  const smoothstep = (a: number, b: number, x: number): number => {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+
+  it("the window IS the field's own quantiles — derived, not picked", () => {
+    expect(PAINT_SNOW_DRIFT_LO).toBeCloseTo(q(0.6), 2);
+    expect(PAINT_SNOW_DRIFT_HI).toBeCloseTo(q(0.95), 2);
+    expect(PAINT_SNOW_DRIFT_LO).toBeLessThan(PAINT_SNOW_DRIFT_HI);
+    // It is DEEPER into the field than the carriageway's, and that ordering is
+    // the physics: the asphalt asks „how white", the stripe asks „buried or
+    // not", and only the deepest drifts bury one.
+    expect(PAINT_SNOW_DRIFT_LO).toBeGreaterThan(ROAD_SNOW_PATCH_LO);
+    expect(PAINT_SNOW_DRIFT_HI).toBeGreaterThan(ROAD_SNOW_PATCH_HI);
+  });
+
+  it("buries a fifth of the stripe — enough to break it, not enough to lose it", () => {
+    // The stripe's BODY (`paintEdge` = 1, so alpha is 1 before snow), at full
+    // snowfall (`uSnowPaint` = 1). alphaTest discards below PAINT_ALPHA_TEST.
+    const buried =
+      field.filter((x) => 1 - smoothstep(PAINT_SNOW_DRIFT_LO, PAINT_SNOW_DRIFT_HI, x) < PAINT_ALPHA_TEST)
+        .length / field.length;
+    // Below the lower bound the row's own word survives — a stripe that loses
+    // only its fringe is still an unbroken line. Above the upper one the line
+    // stops being followable, and lane discipline is a skill the picture would
+    // have taken away.
+    expect(buried).toBeGreaterThan(0.12);
+    expect(buried).toBeLessThan(0.25);
+  });
+
+  it("the stripe goes exactly where the road beside it is whitest", () => {
+    // The continuity claim, as arithmetic rather than as a sentence: over the
+    // texels that bury the paint, the CARRIAGEWAY's own drift weight is at its
+    // cap. A stripe that vanished where the road was bare would be a second
+    // weather, which is the failure `roadSurface.ts` rules out for the decals.
+    const buriedRoadPatch = field
+      .filter((x) => 1 - smoothstep(PAINT_SNOW_DRIFT_LO, PAINT_SNOW_DRIFT_HI, x) < PAINT_ALPHA_TEST)
+      .map((x) => smoothstep(ROAD_SNOW_PATCH_LO, ROAD_SNOW_PATCH_HI, x));
+    expect(buriedRoadPatch.length).toBeGreaterThan(0);
+    expect(Math.min(...buriedRoadPatch)).toBeGreaterThan(0.9);
+  });
+
+  it("the operation is ALPHA — the surviving paint keeps the value it had", () => {
+    const shader = compileStub();
+    markingWearOnBeforeCompile(shader as never);
+    expect(shader.fragmentShader).toContain(PAINT_SNOW_FRAGMENT_ANCHOR);
+    // The anchor may never touch `diffuseColor.rgb`: brightening the stripe is
+    // exactly what StaticWorld's `paintWet` block forbids, because it lands
+    // white-on-white and takes away the cue the rule engine grades.
+    expect(PAINT_SNOW_FRAGMENT_ANCHOR).toContain("diffuseColor.a *=");
+    expect(PAINT_SNOW_FRAGMENT_ANCHOR).not.toContain("diffuseColor.rgb");
+    expect(PAINT_SNOW_FRAGMENT_ANCHOR).not.toContain("uSnowColor");
+    // …and it runs after the erosion, so a fragment already at the fringe is
+    // not resurrected by an ordering accident.
+    const erode = shader.fragmentShader.indexOf("diffuseColor.a *= mix( paintWear, 1.0, paintEdge )");
+    expect(shader.fragmentShader.indexOf(PAINT_SNOW_FRAGMENT_ANCHOR)).toBeGreaterThan(erode);
+  });
+
+  it("samples the SAME field at the SAME scale as the asphalt's own drift", () => {
+    const paint = compileStub();
+    const asphalt = compileStub();
+    markingWearOnBeforeCompile(paint as never);
+    roadSurfaceOnBeforeCompile(asphalt as never);
+    // One upload — the paint's wear texture IS the drift field the road reads.
+    expect(paint.uniforms.uPaintWear!.value).toBe(asphalt.uniforms.uRoadTap!.value);
+    // …at the road's metres-per-tile, not the paint's 3.2 m wear scale, or the
+    // drift on the stripe is a different drift from the one around it.
+    expect(paint.uniforms.uPaintSnowScale!.value).toBe(asphalt.uniforms.uRoadSnowScale!.value);
+    expect(paint.uniforms.uPaintSnowScale!.value).toBeCloseTo(1 / ROAD_SNOW_PATCH_TILE_M);
+    expect(paint.uniforms.uPaintSnowScale!.value).not.toBeCloseTo(1 / PAINT_WEAR_TILE_M);
+    expect(paint.uniforms.uPaintSnowLo!.value).toBeCloseTo(PAINT_SNOW_DRIFT_LO);
+    expect(paint.uniforms.uPaintSnowHi!.value).toBeCloseTo(PAINT_SNOW_DRIFT_HI);
+  });
+
+  it("the channel is the shared one, by reference, and its writer already ticks", () => {
+    const shader = compileStub();
+    markingWearOnBeforeCompile(shader as never);
+    // A uniform nobody writes computes nothing. `DistrictWorld` calls
+    // `setSnowCover` every frame; this is the same object it writes into.
+    setSnowCover(1);
+    expect((shader.uniforms.uSnowPaint!.value as number)).toBe(getSnowPaintCover());
+    expect(shader.uniforms.uSnowPaint!.value).toBe(1);
+    // FREE OUTSIDE A SNOW LESSON, and bit-identical rather than merely close:
+    // `a *= 1.0 - 0.0 * patch` is `a * 1.0`.
+    setSnowCover(0);
+    expect(shader.uniforms.uSnowPaint!.value).toBe(0);
+  });
+
+  it("the program cache key moved — a v1 program would keep a clean line", () => {
+    expect(markingWearProgramCacheKey()).toBe("marking-wear-v2");
+  });
+
+  it("routing: the hook reaches the shipped markings mesh and nothing else", () => {
+    // A hook nobody attaches computes a perfectly correct number that changes
+    // no pixel — the measured failure mode of this audit. `PAINT_WEAR` is the
+    // spread that carries it, and it belongs to exactly one mesh.
+    expect(STATIC_WORLD_SRC.match(/\{\.\.\.PAINT_WEAR\}/g)?.length).toBe(1);
+    const markingsMesh = STATIC_WORLD_SRC.slice(
+      STATIC_WORLD_SRC.indexOf("<mesh geometry={geometries.markings}"),
+      STATIC_WORLD_SRC.indexOf("{/* Railway level-crossing"),
+    );
+    expect(markingsMesh).toContain("{...PAINT_WEAR}");
+    expect(markingsMesh).toContain("alphaTest={PAINT_ALPHA_TEST}");
   });
 });

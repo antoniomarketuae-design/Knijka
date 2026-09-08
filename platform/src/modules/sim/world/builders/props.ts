@@ -45,6 +45,7 @@ import {
   BUS_STOP_MIN_SEPARATION_M,
   BUS_STOP_SHELTER_DEPTH_M,
   CLASS_RANK,
+  isExtraUrbanCarriageway,
   isMotorwayCarriageway,
   LINDEN_BOULEVARD_COUNT,
   livingZoneCarriageway,
@@ -1844,8 +1845,28 @@ export function buildProps(
   // helper below is the version that survives a new pass being added — which
   // is the failure that put a cypress row and lamp columns on the one lesson
   // about leaving a магистрала. One definition, asked by every pass.
-  const dressesAsStreet = (edge: { class: string; motorway?: boolean }): boolean =>
-    litClasses.has(edge.class) && !isMotorwayCarriageway(edge);
+  //
+  // …AND NOT IF IT IS AN ИЗВЪНГРАДСКИ ПЪТ EITHER (2026-09-08, sc-sp-curve:6079dfb1
+  // — «you are setting off on the OUT-OF-TOWN road at 90 км/ч, but … street
+  // lighting»). Same shape as the motorway exception one line up and the same
+  // safety property — this predicate can only ever REMOVE scenery — but keyed
+  // on the posted limit instead of the flag, because a rural road is
+  // `unclassified`/`tertiary` like every side street in the catalogue and only
+  // its authored 90 says otherwise. `constants.isExtraUrbanCarriageway` carries
+  // the retrieved чл. 21, ал. 1 table and the five-edge census.
+  //
+  // The same row's «kerbs and pavements» is NOT answered here and is not
+  // smuggled in beside it: the sidewalk is `edgeHalfWidth` geometry that every
+  // lane-keeping rule is graded against, so withdrawing it is a re-drive, not a
+  // patch — `isMotorwayCarriageway`'s own docstring draws that line and this
+  // pass keeps it.
+  const dressesAsStreet = (edge: {
+    class: string;
+    motorway?: boolean;
+    maxspeed?: number;
+    maxspeedSource?: "tag" | "default" | string;
+  }): boolean =>
+    litClasses.has(edge.class) && !isMotorwayCarriageway(edge) && !isExtraUrbanCarriageway(edge);
 
   // Bucketed footprint lookup, hoisted above the dressing passes so poles and
   // parapets can ask the same question the tree passes ask. Bucketed, not

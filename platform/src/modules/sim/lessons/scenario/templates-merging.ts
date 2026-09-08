@@ -2103,6 +2103,23 @@ const MFP_STREAM: OncomingStreamSpec = {
  * carries the other half (why a swept body reaches the far side of the wall it
  * reports touching).
  *
+ * ── W28 2026-09-04: THE PARAGRAPH ABOVE NAMES A CAUSE THAT IS NOW FIXED, and
+ * a stale cause is what makes a row get re-derived. `collisionMinKmh: 0` still
+ * reaches every scenario lesson out of `compile.ts`, but it is no longer the
+ * gate: commit b8b1ce4 („fix(sim): wave 20", 2026-09-02) added
+ * `gradedContactMinKmh` to `VehicleRig.tsx` and the DRIVE-OVER tag it reads to
+ * `world/components/WorldColliders`, so a contact with the district's ground /
+ * kerb / pavement body is judged at `COLLISION_MIN_KMH` (10) again and only
+ * hittable things — NPC shells, cones, posts, pumps, facades — keep the
+ * lesson's zero. The sweep-161 pc leg quoted at the top of this block (top
+ * speed 15 км/ч, 12 full stops, one pooled «Пътнотранспортно произшествие») is
+ * exactly the class that fix forgives. What still reproduces at HEAD is a
+ * DIFFERENT contact: `.audit-frames/w27/frames/…__pc-right` bills «Удар в
+ * неподвижно препятствие» at 16 км/ч against a facade, with «Излизане от
+ * платното» beside it, on a leg whose own instrument header reads „TRACKING:
+ * INTERMITTENT · 71 % … a departure from the road on this lane may be the
+ * harness's driving". Do not re-derive the constant; measure the body.
+ *
  * ONE HONEST LIMIT ON THE GREEN TEST QUOTED ABOVE, so it is not quoted as more
  * than it is. `traces/__tests__/sc-merge-from-property-traces.test.ts:97`
  * («violationCodes(shadow) is []» — 20 tests, green on this tree) CANNOT refute

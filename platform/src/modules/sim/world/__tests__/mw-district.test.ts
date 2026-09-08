@@ -680,3 +680,128 @@ describe("Д5 on the вход — the ramp says what it leads to", () => {
     expect(buildWorldGeometry(detached, { seed: 7 }).stats.signs.motorwayStart).toBe(2);
   });
 });
+
+/**
+ * …AND THE OTHER HALF OF THE SAME ROW — sc-merge-accel-lane:09e6d6f4, „no ramp
+ * and NO ACCELERATION LANE, while the briefing says «Потегли по рампата и
+ * набирай скорост още по нея»".
+ *
+ * THE LANE IS PAINTED AND UNTIL THIS BLOCK NOTHING SAID SO. mw-entry-v1 builds
+ * the acceleration lane out of an ABSENCE: the northbound curb lane carries an
+ * `emergencyLane` zone over the approach (0–260) and over the main segment
+ * (460–960) and none over the 200 m between, so markings.ts draws the wide
+ * continuous seam that bounds an аварийна лента up to the nose, an ordinary
+ * broken lane line for exactly those 200 m, and the wide seam again past the
+ * taper. That is the whole of what the student is shown, and its only record
+ * was a paragraph in `lessons/scenario/templates-merging.ts`. A widened
+ * `EDGE_LINE_CLASSES`, one more authored zone span, or a change to the
+ * seam-boundary index would erase the lane from the world and every test in
+ * this repository would stay green — the difference between absence and proof
+ * this corpus has already paid for six times over.
+ *
+ * WHY IT IS THE MEANING AND NOT A DECORATION. The 200 m of broken line is the
+ * only thing on the map that says «това е лента, в която се кара» where 60 m
+ * earlier and 500 m later the same metres say «това е аварийната лента»
+ * (ЗДвП чл. 58, т. 3 — the ban this map's `emergencyLane` spans grade). The
+ * briefing's item 2 promises those metres by name and item 6 warns that they
+ * end; a student who is taught to use the lane and shown no lane is being
+ * marked against paint he cannot see.
+ *
+ * Frame of reference: world +X is district +X, world −Z is district +Y (the
+ * Д5 block above reads `-position[2]` for the same reason).
+ */
+describe("the acceleration lane is PAINTED — a 200 m break in the аварийна seam", () => {
+  /** mw-entry-v1 meta.scenario: curb-lane boundary, nose, taper. */
+  const SEAM_X = 4.065; // -halfWidth + 2 * LANE_WIDTH_M, the laneId 0/1 boundary
+  const NOSE_Y = 260;
+  const TAPER_Y = 460;
+
+  interface Stripe {
+    x: number;
+    y0: number;
+    y1: number;
+    widthM: number;
+  }
+
+  /** Every painted quad on the northbound curb-lane boundary, low y first. */
+  function seamStripes(geo: WorldGeometry): Stripe[] {
+    const p = geo.markings.positions;
+    const out: Stripe[] = [];
+    for (let i = 0; i + 11 < p.length; i += 12) {
+      let xMin = Infinity;
+      let xMax = -Infinity;
+      let yMin = Infinity;
+      let yMax = -Infinity;
+      for (let v = 0; v < 4; v++) {
+        const x = p[i + v * 3]!;
+        const y = -p[i + v * 3 + 2]!;
+        if (x < xMin) xMin = x;
+        if (x > xMax) xMax = x;
+        if (y < yMin) yMin = y;
+        if (y > yMax) yMax = y;
+      }
+      const x = (xMin + xMax) / 2;
+      if (Math.abs(x - SEAM_X) > 1) continue;
+      out.push({ x, y0: yMin, y1: yMax, widthM: xMax - xMin });
+    }
+    return out.sort((a, b) => a.y0 - b.y0);
+  }
+
+  const stripes = seamStripes(buildWorldGeometry(assertDistrict(loadRaw("mw-entry-v1")), { seed: 7 }));
+  const runs = stripes.filter((s) => s.y1 - s.y0 > 50);
+  const dashes = stripes.filter((s) => s.y1 - s.y0 <= 50);
+
+  it("paints the wide аварийна seam up to the nose and again past the taper", () => {
+    expect(runs, "two continuous runs, one each side of the acceleration lane").toHaveLength(2);
+    const [approach, main] = runs as [Stripe, Stripe];
+    // Both stop/start within a lane's length of the authored station — the
+    // painted line is the junction-trimmed centreline, inset 0.8 m at each end.
+    expect(approach.y0).toBeLessThan(5);
+    expect(approach.y1).toBeGreaterThan(NOSE_Y - 10);
+    expect(approach.y1).toBeLessThanOrEqual(NOSE_Y);
+    expect(main.y0).toBeGreaterThanOrEqual(TAPER_Y);
+    expect(main.y0).toBeLessThan(TAPER_Y + 10);
+    expect(main.y1).toBeGreaterThan(950);
+  });
+
+  it("breaks into an ordinary lane line for the whole 200 m in between", () => {
+    expect(dashes.length, "the acceleration lane's inner boundary is dashed").toBeGreaterThanOrEqual(12);
+    for (const d of dashes) {
+      expect(d.y0).toBeGreaterThanOrEqual(NOSE_Y);
+      expect(d.y1).toBeLessThanOrEqual(TAPER_Y);
+    }
+    // The break spans the segment rather than decorating one end of it: the
+    // first dash is inside the first quarter and the last inside the last.
+    expect(dashes[0]!.y0).toBeLessThan(NOSE_Y + 50);
+    expect(dashes[dashes.length - 1]!.y1).toBeGreaterThan(TAPER_Y - 50);
+  });
+
+  it("and the two lines READ differently — the seam is the wider paint", () => {
+    // A break that is the same 0.25 m line as the divider beside it teaches
+    // nothing; the аварийна лента is bounded by the wide continuous line
+    // (Наредба № 2 — `EMERGENCY_LANE_SEAM_WIDTH_M`), the travel lane by the
+    // ordinary one, and that contrast is what makes the 200 m read as a lane.
+    const dashW = Math.max(...dashes.map((d) => d.widthM));
+    for (const r of runs) expect(r.widthM).toBeGreaterThan(dashW * 1.5);
+  });
+
+  it("NON-VACUITY: zone the accel segment as аварийна and the lane disappears", () => {
+    const raw = assertDistrict(loadRaw("mw-entry-v1"));
+    const closed: District = {
+      ...raw,
+      zones: [
+        ...(raw.zones ?? []),
+        {
+          id: "probe-emerg-accel",
+          kind: "emergencyLane",
+          edgeId: "mwe-e-nb-accel",
+          fromM: 0,
+          toM: 200,
+          signRef: "М2",
+        },
+      ],
+    };
+    const after = seamStripes(buildWorldGeometry(closed, { seed: 7 }));
+    expect(after.filter((s) => s.y1 - s.y0 <= 50), "no dashes left between nose and taper").toHaveLength(0);
+  });
+});

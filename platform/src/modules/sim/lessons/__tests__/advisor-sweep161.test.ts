@@ -601,6 +601,11 @@ describe("sweep161 — «Чакането Е маневрата» stops meaning 
     // vehicle closing on the junction. Listed here so its copy is measured by
     // the same properties as the five, not merely added beside them.
     "railVehicle",
+    // sc-turn-left-oncoming:7974670c — the seventh duty: an oncoming NON-rail
+    // vehicle. It heads its own card for the same reason the other six do, and
+    // its heading is the one this sweep's own frame (04-t043s.png) was filed
+    // about: that drill used to raise a heading belonging to a different wait.
+    "oncomingVehicle",
   ];
   const settled = (r: YieldReason) => narrate(r, YIELD_VOICE_SETTLE_S + 1)[1];
 

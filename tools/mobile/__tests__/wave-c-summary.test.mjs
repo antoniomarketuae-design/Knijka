@@ -60,6 +60,7 @@ import { fileURLToPath } from "node:url";
 
 import { DRIVE_SUMMARY_RE, INPUT_ATTESTATION, INPUT_GUARDS, TOUCH_PROBE, parseSummary } from "../lib/summary.mjs";
 import {
+  DRIVE_APPLY_TRANSFORM,
   PROBE_AFTER_DRIVE,
   PROBE_BEFORE_DRIVE,
   mergeProbes,
@@ -757,6 +758,92 @@ describe("§7 what the drivetrain pad did when it was pressed", () => {
         "parseSummary no longer returns touchProbeWhen",
       );
       assert.ok(WAVE_C.includes("s.touchProbeWhen"), "the console line no longer says WHEN the pad was pressed");
+    });
+  });
+
+  /* ═════════════════════════════════════════════════════════════════════════
+   * §7e — A PARKED KNOB IS NOT A PRESS
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * §7d moved the reading to the instant where the pad CAN answer. That bought
+   * a second failure nobody looked for: at that instant the knob is not blank.
+   * `TouchControls.parkKnobs` runs on every hide — and the pre-drive probe
+   * fires after the ladder, i.e. after the briefing card has been dismissed —
+   * leaving `transition: "none"; transform: "translateY(0px)"`, which is
+   * exactly what the first `seated()` accepted as proof of a press. A pad that
+   * refused the claim outright would have been reported ACTUATED, and the row
+   * this file exists for would have closed on an instrument believed about its
+   * own reach for the second time.
+   *
+   * The separator is the decimal `driveApply` writes and no hide can forge. */
+  describe("§7e the parked styling a hide leaves is not an actuation", () => {
+    /** `parkKnobs` and `onDriveEnd`: the integer form. */
+    const PARKED = { transition: "none", transform: "translateY(0px)" };
+    /** `driveApply` at dead centre: `t.toFixed(1)`. */
+    const PRESSED = { transition: "none", transform: "translateY(0.0px)" };
+    const RELEASED = { transition: "transform 140ms ease-out, border-color 140ms linear", transform: "translateY(0px)" };
+
+    it("a pad that refused the claim under a parked knob reads NOT actuated", () => {
+      const v = readbackVerdict({ ok: true, events: 4, atRest: PARKED, onPress: PARKED, afterHold: PARKED, onRelease: PARKED });
+      assert.equal(v.actuated, false);
+      assert.equal(v.held, false);
+      assert.match(v.why, /PARKED/);
+    });
+
+    it("…and driveApply's own write still reads as one, off the same parked rest state", () => {
+      const v = readbackVerdict({ ok: true, events: 4, atRest: PARKED, onPress: PRESSED, afterHold: PRESSED, onRelease: RELEASED });
+      assert.deepEqual([v.actuated, v.held, v.released], [true, true, true]);
+    });
+
+    it("a pad that let go mid-hold back to the parked form is ACTUATED and NOT held", () => {
+      // The brake-drop shape itself, now that the drop's resting place and the
+      // press look alike to the loose test.
+      const v = readbackVerdict({ ok: true, events: 4, atRest: PARKED, onPress: PRESSED, afterHold: PARKED, onRelease: RELEASED });
+      assert.equal(v.actuated, true);
+      assert.equal(v.held, false);
+      assert.match(v.why, /brake-drop shape/);
+    });
+
+    it("the two writes the predicate separates are still the two the component makes", () => {
+      // The dead-predicate guard: this discriminator is a reading of product
+      // source, so a `toFixed` that became `Math.round` would turn every future
+      // pad column into a silent «unreached» with nothing to say why.
+      const TC = readFileSync(
+        path.join(REPO, "platform", "src", "components", "sim", "TouchControls.tsx"),
+        "utf8",
+      );
+      assert.ok(
+        TC.includes("translateY(${t.toFixed(1)}px)"),
+        "driveApply no longer writes a one-decimal translateY — the probe's press signature is gone; re-derive it",
+      );
+      assert.ok(
+        TC.includes('transform = "translateY(0px)"'),
+        "parkKnobs/onDriveEnd no longer write the integer form the press is told apart from",
+      );
+      assert.equal(DRIVE_APPLY_TRANSFORM.test("translateY(0.0px)"), true);
+      assert.equal(DRIVE_APPLY_TRANSFORM.test("translateY(-42.0px)"), true);
+      assert.equal(DRIVE_APPLY_TRANSFORM.test("translateY(0px)"), false);
+    });
+
+    it("the loud attestation names the instant the probe reported, not a literal", () => {
+      // The same line said «actuated … taken before the drive» and «after the
+      // drive had ended» two lines apart, at 85495fd, run.log:886/887.
+      const EMITTER = readFileSync(path.join(TOOLS_MOBILE, "lesson-audit.mjs"), "utf8");
+      assert.equal(
+        // The literal as it was EMITTED, not as the comment above it quotes.
+        EMITTER.includes('"actuated only by the TOUCH PROBE line above, after the drive had ended"'),
+        false,
+        "the NO TOUCH DROVE THIS LANE line hardcodes an instant again — read touchProbe.when",
+      );
+      assert.match(
+        EMITTER,
+        /taken \$\{\s*touchProbe\.when \?\?/,
+        "the attestation no longer prints the instant the probe reported",
+      );
+      assert.ok(
+        EMITTER.includes("touchProbe.when === PROBE_BEFORE_DRIVE"),
+        "the attestation no longer distinguishes a live pre-drive answer from a press under the end card",
+      );
     });
   });
 });

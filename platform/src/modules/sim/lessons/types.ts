@@ -783,7 +783,29 @@ export type YieldReason =
    * the hold was not a hold, the seconds were not credited, and the coach went
    * back to pointing at the waypoint past the rails.
    */
-  | "railVehicle";
+  | "railVehicle"
+  /**
+   * AN ONCOMING NERELSOVO ППС closing on the junction this car is about to turn
+   * LEFT across (`SimTick.oncomingVehicleGapSec`), on a route whose own gate
+   * declares the norm to judge it against (`ReachZoneParams
+   * .reportOncomingGapSec`). ЗДвП чл. 37, ал. 1: «водачът на завиващото
+   * нерелсово пътно превозно средство е длъжен да пропусне насрещно движещите
+   * се пътни превозни средства».
+   *
+   * WHY IT IS ITS OWN MEMBER — `sc-turn-left-oncoming:7974670c` (critical),
+   * and it is `railVehicle`'s argument one lane over. The drill briefs «Прецени
+   * интервала в СЕКУНДИ» and its junction is signalized, so the only wait it
+   * could ever name was `redLight` — a wait that ends when the lamp turns. The
+   * lamp turns while the oncoming is still coming; from that moment the student
+   * doing exactly what he was taught had NO reason at all, so the hold was not
+   * a hold, the seconds were not credited against par, and the coach went back
+   * to pointing at a waypoint 50 m past the car he was letting through.
+   *
+   * Unlike the tram, this wait ENDS IN AN INTERVAL rather than in a clearance —
+   * which is precisely the skill, and why its copy counts seconds where the
+   * tram's copy forbids counting them.
+   */
+  | "oncomingVehicle";
 
 /**
  * B15-VOICE (2026-08-05) — per-session memory of what the instructor has
@@ -984,6 +1006,43 @@ export type ObjectiveEvalState =
        * omits it and behaves exactly as shipped.
        */
       approachCap?: "honoured" | "blown";
+      /**
+       * THE HALT THIS GATE ASKED FOR CANNOT BE PERFORMED BY THIS REST — the
+       * reciprocal of `approachCap: "blown"`, for the caps `approachCap`
+       * deliberately refuses to arm on (w29, 2026-09-08).
+       *
+       * `approachCap` defends ONE direction: a car too FAST at a mark it only
+       * passed through. Its own block says why it may never arm on a halt cap —
+       * „on «Спри точно на маркираната позиция» ARRIVING IN MOTION IS THE ACT",
+       * which is exactly right and is exactly what left the OTHER direction
+       * undefended. A halt cap is satisfied by `speedKmh <= cap` at the mark,
+       * and 0 км/ч satisfies every cap in the catalogue, so «спри тук» was
+       * earned by any standstill inside the disc — including one the student
+       * had no part in.
+       *
+       *   „impact" — the standstill the credit would be issued off is the one
+       *              `LessonSessionState.crashPin` is holding: the car is
+       *              motionless where it crashed. The wheels stopped; the
+       *              driver did not stop them.
+       *
+       * ONE REASON, AND THE UNION IS DELIBERATE RATHER THAN LEFTOVER: a second
+       * „passed" reason (the car left the mark behind having never slowed for
+       * it) was built and withdrawn on measurement — `stepReachZone` carries
+       * the drive that refuted it and `__tests__/terminal-departure.test.ts` is
+       * the committed ruling. The type stays a union so the next reason lands
+       * beside this one instead of replacing it.
+       *
+       * CLEARED BY A GENUINE FRESH APPROACH, the same escape hatch and the same
+       * ring-entry edge (with the same dot ≤ 0 direction guard) that clears
+       * `approachCap` — self-correction is the one thing a drill must never
+       * punish. Drive off what you hit, come at the mark again and stop on it,
+       * and the tick is earned exactly as it always was.
+       *
+       * OPTIONAL, and absent means „not voided": every hand-built eval state
+       * (the rigs, the fixtures, every replay recorded before this field
+       * existed) omits it and behaves exactly as shipped.
+       */
+      haltVoided?: "impact";
     }
   | {
       type: "passSignal";
@@ -1142,6 +1201,37 @@ export type ReactionBand = "otlichen" | "dobur" | "baven";
 export type RedMetVia = "waitedOutGreen" | "controllerProceed";
 
 /**
+ * HOW THIS RUN'S ONCOMING-LEFT-TURN ENCOUNTERS ENDED — the companion to
+ * `acceptedGapSec`, and for the same reason `RedMetVia` is the companion to
+ * `redMetHere`: one sentence used to serve four opposite drives.
+ *
+ *  · "measured"      — a figure was recorded at the commit; the seconds speak
+ *    for themselves and the row prints them against the norm;
+ *  · "collision"     — he reached the oncoming car instead of a gap. Outranks
+ *    a figure: an impact is the account, whether or not seconds were taken;
+ *  · "cut"           — the runtime billed the cut (FAILED_TO_YIELD) but
+ *    published no `gapSec` with it, so there is a verdict and no number;
+ *  · "notEncountered" — the actor was never released, so nothing was measured
+ *    and nothing may be claimed (`StagedEventOutcome.detail` says so in its
+ *    own contract);
+ *  · "clear"         — he BEGAN the turn and no oncoming was inbound: the one
+ *    reading „лентата беше чиста" is true of;
+ *  · "noTurn"        — the encounter dissolved without him ever turning, so
+ *    there was no «започване на завоя» to describe.
+ *
+ * `sc-turn-left-oncoming:7974670c`: without this, the „nothing inbound"
+ * sentence was printed on drives that ended in a head-on with the very car it
+ * said was not there.
+ */
+export type OncomingGapEnding =
+  | "measured"
+  | "collision"
+  | "cut"
+  | "notEncountered"
+  | "clear"
+  | "noTurn";
+
+/**
  * Structured per-objective measurements the evaluators surface alongside
  * done/progress (A10). Additive: only the hardened evaluators emit one; the
  * engine mirrors it onto ObjectiveProgress and buildLessonResult copies it
@@ -1195,11 +1285,19 @@ export type ObjectiveDetail =
        */
       kind: "oncomingGap";
       /** Tightest gap the student turned into, s — how long the nearest
-       *  oncoming still needed to reach the junction at his commit. null = none
-       *  was inbound then (he waited them out, or the road was clear). */
+       *  oncoming still needed to reach the junction at his commit. null = no
+       *  figure was recorded, and `ending` says which of the four drives that
+       *  was. */
       acceptedGapSec: number | null;
       /** The taught norm it is read against, s (authored on the gate). */
       normSec: number;
+      /**
+       * How the encounters ended — see `OncomingGapEnding`. Null on payloads
+       * written before 2026-09-04, which recorded the figure but not the
+       * drive; the debrief then falls back to the sentence that is true of
+       * every one of them rather than guessing which it was.
+       */
+      ending: OncomingGapEnding | null;
     }
   | { kind: "roundabout"; entered: boolean; exitSignaled: boolean }
   | {

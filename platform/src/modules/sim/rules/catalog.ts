@@ -2036,8 +2036,29 @@ export const YIELD_PRAISE_SITUATION_COPY: Record<
   string,
   { titleBg: string; conceptId?: string }
 > = {
+  // SHORTENED 2026-09-04 (sc-merge-from-property:6715b581 — the third row this
+  // peek budget has taken, and the first that was not in `VIOLATIONS`) from
+  // «Правилно пропуснат автомобил със специален режим», 47 characters, which
+  // wraps to THREE lines in the phone's 44 px text window. A commendation
+  // carries no body to lose — `explanationBg` has no renderer anywhere in the
+  // product, as the docblock above records — so what a third line costs here is
+  // the title itself: the student reads «Правилно пропуснат / автомобил със
+  // специален» and the word that says what he did right is under the fold,
+  // behind «↓ ОЩЕ 1 РЕД». That is the photographed defect with the sign
+  // reversed. `violation-title-fits-peek.test.ts` now walks this table and the
+  // per-act registry beside it, so an override can no longer bypass the budget
+  // its pooled row is held to.
+  //
+  // THE HEAD IS `EMERGENCY_NOT_YIELDED`'s OWN, minus the negation: that row is
+  // «Непропускане на автомобил със специален режим» and fits in two lines, so
+  // the pair now reads as one family. «Правилно» is what goes, not «със
+  // специален режим» — the legal term is the half that says WHICH act was
+  // praised, and it is the only thing separating this card from the pooled
+  // junction yield the whole table exists to split. The card is already marked
+  // as praise by its own ✓ chip, and `police-stop-signal` below sets the
+  // precedent for a praise title that states what was measured.
   emergency: {
-    titleBg: "Правилно пропуснат автомобил със специален режим",
+    titleBg: "Пропуснат автомобил със специален режим",
     conceptId: "c-emergency-priority",
   },
   "vulnerable-pass": {
@@ -2429,8 +2450,15 @@ export const HANDBRAKE_ACT_COPY: Record<
  * The per-act tables, keyed by the code that owns each. A registry rather than a
  * chain of `if (code === …)`: the next code that grades more than one act adds a
  * row here and `makeViolation` picks it up for every producer at once.
+ *
+ * EXPORTED FOR THE PEEK BUDGET (sc-merge-from-property:6715b581). Every
+ * `titleBg` in these tables REPLACES the pooled row's on the phone card —
+ * `makeViolation` stamps it onto the event and `hud/SimOverlay.tsx` renders it
+ * as `lineBg` — so the two-line rule `violation-title-fits-peek.test.ts` holds
+ * `VIOLATIONS` to has to be total over this registry as well, or an override
+ * reintroduces the photographed defect on a row whose pooled title passes.
  */
-const PER_ACT_COPY: Partial<
+export const PER_ACT_COPY: Partial<
   Record<ViolationCode, Record<string, { titleBg: string; explanationBg: string; lawRef?: string }>>
 > = {
   RAIL_CROSSING_VIOLATION: RAIL_CROSSING_ACT_COPY,

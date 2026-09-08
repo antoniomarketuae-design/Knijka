@@ -116,9 +116,38 @@ describe("needless-stop detector (STOPPED_WITHOUT_CAUSE)", () => {
     expect(codes(drive(STAND(0, 120), ARMED).events)).not.toContain(CODE);
   });
 
-  it("ANY vehicle ahead in the corridor acquits, near OR far — a queue is a reason", () => {
+  it("a vehicle ahead INSIDE the clear window acquits — a queue is a reason", () => {
+    const near = DEFAULT_RULE_CONFIG.townCrawlClearAheadM - 1;
     expect(codes(drive(rollThenFreeze(60, { leadGapM: 6 }), ARMED).events)).not.toContain(CODE);
-    expect(codes(drive(rollThenFreeze(60, { leadGapM: 120 }), ARMED).events)).not.toContain(CODE);
+    expect(codes(drive(rollThenFreeze(60, { leadGapM: near }), ARMED).events)).not.toContain(CODE);
+  });
+
+  /**
+   * THE EXPECTATION THAT MOVED, AND WHY (`sc-follow-tailgater:63c0c28c`).
+   *
+   * This case read «near OR far», at ANY distance, inherited whole from the
+   * CRAWL's lead arm — whose own note argues it deliberately: „with a body ahead
+   * in my own lane I am not the head of the queue". That is a statement about a
+   * car that is MOVING, and it is still exactly the crawl's rule (nothing in
+   * `townReasonAhead` changed). It is not true of a car at a DEAD STOP: a driver
+   * parked in a live lane with 140 m of empty road in front of him IS what the
+   * traffic behind him is stuck behind, whatever sits at the far end of it.
+   *
+   * Inherited whole it also made the code unfireable on any lesson that stages a
+   * lead at all — measured on `sc-follow-tailgater`, whose constant cruiser holds
+   * the player's own lane for the first 94 s of every drive, so the eight careless
+   * 8 s rests of `.audit-frames/w27/frames/sc-follow-tailgater__pc-wrong` produced
+   * nothing at all and the sheet read «0 наказателни точки · ИЗДЪРЖАН».
+   *
+   * So the standstill asks the narrower question, in the band this same block
+   * already calls „the approach IS the reason" for a junction, a stop line and a
+   * pedestrian. Nothing here is relaxed: the acquittal above keeps every queue,
+   * and this adds a conviction the file did not have.
+   */
+  it("…but one BEYOND that window does not — an open road ahead is not a reason", () => {
+    const far = DEFAULT_RULE_CONFIG.townCrawlClearAheadM + 1;
+    expect(codes(drive(rollThenFreeze(60, { leadGapM: far }), ARMED).events)).toContain(CODE);
+    expect(codes(drive(rollThenFreeze(60, { leadGapM: 120 }), ARMED).events)).toContain(CODE);
   });
 
   it("a junction, a stop line or a person inside the clear window acquits", () => {

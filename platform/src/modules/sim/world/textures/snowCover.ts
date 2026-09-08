@@ -184,6 +184,7 @@ export const SNOW_COVER_FACING_HI = 0.85;
 /** Snow is the mattest surface a street ever has — no gloss survives it. */
 export const SNOW_COVER_ROUGHNESS = 0.95;
 
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * WINTER DORMANCY — THE SECOND SEASONAL TERM, AND WHY IT LIVES IN THIS FILE.
  *
@@ -271,6 +272,7 @@ export function winterDormantTint(): THREE.Vector3 {
 let uniforms: {
   uSnowCover: { value: number };
   uSnowRoad: { value: number };
+  uSnowPaint: { value: number };
   uSnowColor: { value: THREE.Color };
   uSnowFacing: { value: THREE.Vector2 };
   uSnowRoughness: { value: number };
@@ -291,6 +293,7 @@ function getSnowCoverUniforms() {
     uniforms = {
       uSnowCover: { value: 0 },
       uSnowRoad: { value: 0 },
+      uSnowPaint: { value: 0 },
       uSnowColor: { value: new THREE.Color(SNOW_COVER_COLOR) },
       uSnowFacing: { value: new THREE.Vector2(SNOW_COVER_FACING_LO, SNOW_COVER_FACING_HI) },
       uSnowRoughness: { value: SNOW_COVER_ROUGHNESS },
@@ -320,6 +323,9 @@ export function setSnowCover(snowIntensity01: number): void {
   // nothing making them, and the first frame either forgot would show a snowed
   // pavement beside a bare road, which is the exact picture this closes.
   u.uSnowRoad.value = s * SNOW_ROAD_COVER_MAX;
+  // THE THIRD CHANNEL, same writer for the same reason — and the only one that
+  // carries no cap, because it is not a mix. See `getSnowPaintCover` below.
+  u.uSnowPaint.value = s;
 }
 
 /** Current cap-scaled cover, for tests and for the driver's own assertions. */
@@ -330,6 +336,51 @@ export function getSnowCover(): number {
 /** Current cap-scaled CARRIAGEWAY cover — same driver, road cap. */
 export function getSnowRoadCover(): number {
   return getSnowCoverUniforms().uSnowRoad.value;
+}
+
+/**
+ * THE MARKINGS' CHANNEL — the second clause of `sc-ac-snow:f1673b60`, and the
+ * only one of the three that is not a MIX, which is why it carries no cap.
+ *
+ * The row reads „the carriageway renders as bare grey asphalt WITH CLEAN
+ * UNBROKEN WHITE EDGE AND LANE MARKINGS". `SNOW_ROAD_COVER_MAX` answered the
+ * asphalt; it cannot answer the paint, and `StaticWorld`'s `paintWet` block
+ * says why in writing: „Brightening the markings by the same factor would
+ * close the contrast between them and land white-on-white — and «не спирай
+ * върху маркировката», stop lines and lane discipline are all graded off
+ * markings the student has to be able to SEE. Real snow covers paint rather
+ * than tinting it, so the honest model is occlusion." That block routed
+ * occlusion to „asset work"; it is not — `markingWear.ts` is already the one
+ * material in the scene that writes `diffuseColor.a`, so the model it named is
+ * four lines inside a hook that exists.
+ *
+ * OCCLUSION IS AN ALPHA TERM, and that is what makes it safe where a tint was
+ * not: the paint that survives keeps the exact value it had, so the criterion
+ * `SNOW_ROAD_COVER_MAX` and `roadSurface.ts` both end on — „the dashed lane
+ * line must still be plainly the brightest thing in the carriageway" — holds by
+ * construction and not by a margin. What changes is how much of the stripe is
+ * THERE, which is the picture the row convicted, and the safety content: on
+ * snow the line is not a thing you can steer by, which is exactly why this
+ * drill's speed and following distance are what they are.
+ *
+ * NO CAP, DELIBERATELY. A drift deep enough to bury asphalt leaves nothing of a
+ * 0.3 mm film showing, so the depth at which paint goes is not a fraction of
+ * the weather — it is a THRESHOLD on the drift, and the threshold lives with
+ * the drift, in `markingWear.ts`'s `PAINT_SNOW_DRIFT_LO/HI`. This channel is
+ * the raw clamped snowfall, written by the writer above so a frame can never
+ * photograph buried paint beside a bare road, or the reverse.
+ */
+export function getSnowPaintCover(): number {
+  return getSnowCoverUniforms().uSnowPaint.value;
+}
+
+/**
+ * Bind the markings' occlusion channel onto the paint program. Narrow on
+ * purpose: the paint takes NO snow albedo — a tint is the thing this must not
+ * do — so `uSnowColor` deliberately does not travel with it.
+ */
+export function bindSnowPaintUniforms(shader: THREE.WebGLProgramParametersWithUniforms): void {
+  shader.uniforms.uSnowPaint = getSnowCoverUniforms().uSnowPaint;
 }
 
 /**

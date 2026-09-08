@@ -291,3 +291,97 @@ describe("sc-follow-tailgater · A12: the correct drive is still acquitted", () 
     expect(out.result.passed).toBe(true);
   });
 });
+
+/**
+ * THE OTHER HALF OF «THE WRONG DRIVE ESCAPES ENTIRELY», RE-PHOTOGRAPHED AT HEAD
+ * (`sc-follow-tailgater:63c0c28c`, the same row, w28).
+ *
+ * The speeding half above is repaired and the frames prove it. The row's own
+ * headline — «0 наказателни точки, 0 опасни, 0 основни, 0 второстепенни» — was
+ * NOT, and w27 re-drove the wrong leg at `85495fd` to say so:
+ * `.audit-frames/w27/frames/sc-follow-tailgater__pc-wrong` reads «top 58 км/ч ·
+ * 3 full stops», «WRONG-LEG RESTS: 3 careless full stops, each held 8s
+ * (FLAT_REST_EVERY_M = 45 m)» — and «ИЗДЪРЖАН · 0 наказателни точки · 3 от 3
+ * звезди» under «★ ✓ Чисто и спокойно каране».
+ *
+ * THE SPEEDING SILENCE THERE IS THE DRIVER, NOT THE CODE, and it is stated so it
+ * cannot be mistaken for a defect: that leg rests every 45 m, so it crosses the
+ * graced 55 only in the last fraction of each 45 m sprint and never holds it for
+ * `speedingMinorSustainSec`. The bill above fires on a HELD 59 and this drive
+ * never held one.
+ *
+ * THE STANDSTILL IS THE PRODUCT. On the one drill whose instructions 3, 4 and 6
+ * say the answer to a лепка is the throttle and never the brake, coming to a
+ * dead stop in the live lane with a car five metres off the bumper was the one
+ * act nothing graded — because `STOPPED_WITHOUT_CAUSE` ships disarmed and,
+ * armed, could not have fired anyway: its reason list inherits the CRAWL's lead
+ * arm, which acquits at ANY distance, and this drill stages a constant cruiser
+ * in the player's own lane for the first 94 s of every drive. Both halves are
+ * repaired — `ruleConfig` here, `leadQueueAhead` in rules/engine.ts — and the
+ * boundary that moved is pinned in `rules/__tests__/needless-stop.test.ts`.
+ */
+const CARELESS_RESTS: DriveScript = {
+  steps: (() => {
+    const steps: DriveScript["steps"] = [];
+    for (let y = 15; y < 345; y += 45) {
+      steps.push({ kind: "drive", points: [[RIGHT, y], [RIGHT, Math.min(y + 45, 345)]], targetKmh: 58 });
+      steps.push({ kind: "pause", sec: 8, brake: true });
+    }
+    return steps;
+  })(),
+};
+
+/** The same route driven with rests too short to be a parked car. */
+const BRIEF_RESTS: DriveScript = {
+  steps: (() => {
+    const steps: DriveScript["steps"] = [];
+    for (let y = 15; y < 345; y += 45) {
+      steps.push({ kind: "drive", points: [[RIGHT, y], [RIGHT, Math.min(y + 45, 345)]], targetKmh: 58 });
+      steps.push({ kind: "pause", sec: 3, brake: true });
+    }
+    return steps;
+  })(),
+};
+
+describe("sc-follow-tailgater · the careless rest reaches the изпитен лист", () => {
+  it("the drill ARMS the code, at every rung — it ships disarmed everywhere else", () => {
+    expect(SC_FOLLOW_TAILGATER.ruleConfig?.needlessStopEnabled).toBe(true);
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      expect(compileScenario(SC_FOLLOW_TAILGATER, level).ruleConfig?.needlessStopEnabled, `L${level}`).toBe(true);
+    }
+  });
+
+  const out = driveThroughSession(CARELESS_RESTS);
+
+  it("the FIRST rest is the free mini-lesson, and the ones after it are charged", () => {
+    // Teach-first is untouched: one card, then the sheet. Each rest is its own
+    // act (`needlessStopReset` re-arms on driving off), which is why repeats bill
+    // where one continuing overspeed needed the re-grade.
+    expect((out.result.coachedMistakes ?? []).map((c) => c.code)).toEqual(["STOPPED_WITHOUT_CAUSE"]);
+    expect(out.billed.map((e) => e.code)).toContain("STOPPED_WITHOUT_CAUSE");
+    expect(out.billed.length).toBeGreaterThan(1);
+    const coachedAt = (out.result.coachedMistakes ?? [])[0]!.t;
+    expect(out.billed[0]!.t).toBeGreaterThan(coachedAt);
+  });
+
+  it("…so the sheet is no longer «0 наказателни точки» on the leg the row named", () => {
+    const s = out.result.summary.score;
+    expect(s.vtorostepenniCount).toBeGreaterThan(0);
+    expect(s.totalPoints).toBe(s.vtorostepenniCount);
+    expect(s.opasniCount).toBe(0);
+  });
+
+  it("…and the debrief names it, prices it and cites the duty (never a bare verdict)", () => {
+    expect(out.debriefText).toContain("Спиране без причина");
+    expect(out.debriefText).toContain("ЗДвП чл. 24, ал. 2");
+    // The frame's own sentence about this drive, and it must not survive.
+    expect(out.debriefText).not.toContain("чисто каране без нито едно нарушение");
+  });
+
+  it("A12 — a brief halt is not a parked car: the same route, shorter rests, acquitted", () => {
+    const brief = driveThroughSession(BRIEF_RESTS);
+    expect(brief.billed).toEqual([]);
+    expect((brief.result.coachedMistakes ?? []).map((c) => c.code)).toEqual([]);
+    expect(brief.result.summary.score.totalPoints).toBe(0);
+  });
+});

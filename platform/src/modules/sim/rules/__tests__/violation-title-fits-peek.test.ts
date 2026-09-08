@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { COMMENDATIONS, VIOLATIONS } from "../catalog";
+import {
+  COMMENDATIONS,
+  PER_ACT_COPY,
+  VIOLATIONS,
+  YIELD_PRAISE_SITUATION_COPY,
+} from "../catalog";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    „A TITLE THAT FILLS THE PEEK LEAVES THE AUTHORED WHY NOTHING."
@@ -148,5 +153,66 @@ describe("the peek card's title budget", () => {
         .map(([code]) => `${code} @${perLine}`);
       expect(over).toEqual([]);
     }
+  });
+
+  /**
+   * ── THE OVERRIDE CHANNEL, w28 2026-09-04 ─────────────────────────────────
+   *
+   * THE TWO CASES ABOVE WALKED THE POOLED ROWS AND STOPPED THERE, and a pooled
+   * row is not what a student necessarily reads. `makeViolation` resolves
+   * `overrides?.titleBg ?? act?.titleBg ?? spec.titleBg` and `makeCommendation`
+   * does the same off `YIELD_PRAISE_SITUATION_COPY`, so on every event that
+   * carries a `detail` (or a `situation`) the string on the glass comes out of
+   * one of these tables and never touches the row the gate was checking. The
+   * budget is a property of the WINDOW, so it has to be total over every string
+   * that can reach it.
+   *
+   * IT WAS NOT ACADEMIC: `YIELD_PRAISE_SITUATION_COPY.emergency` shipped at 47
+   * characters — «Правилно пропуснат / автомобил със специален / режим», three
+   * line boxes — while `COMMENDATIONS.YIELDED_TO_PRIORITY`, the row it
+   * overrides, is 29 and passed. That is the photographed defect reached
+   * through a side door, and this case is the door.
+   *
+   * WHAT IS NOT WALKED HERE, stated so the hole is named rather than implied:
+   * `JUNCTION_SCAN_COPY` and `SNOW_LIGHTS_COPY` ride the same `overrides`
+   * channel from `rules/engine.ts` and are module-private there. Both were
+   * measured at this budget when this case was written — 2 lines each
+   * («Непълно оглеждане при знак / Б1», «Движение в снеговалеж без /
+   * светлини») — and neither is reachable from this file without exporting a
+   * const out of the reducer. `PER_ACT_COPY`, which this case does walk, is
+   * where that table's own docblock says the next act table goes — so it is
+   * the registry the growth arrives through.
+   */
+  it("no per-act or per-situation OVERRIDE title needs a third line either", () => {
+    const over: string[] = [];
+    for (const [code, table] of Object.entries(PER_ACT_COPY)) {
+      for (const [detail, copy] of Object.entries(table ?? {})) {
+        const lines = wrap(copy.titleBg);
+        if (lines.length > 2) {
+          over.push(`${code}/${detail} (${copy.titleBg.length} chars): ${lines.join(" / ")}`);
+        }
+      }
+    }
+    for (const [situation, copy] of Object.entries(YIELD_PRAISE_SITUATION_COPY)) {
+      const lines = wrap(copy.titleBg);
+      if (lines.length > 2) {
+        over.push(
+          `YIELDED_TO_PRIORITY/${situation} (${copy.titleBg.length} chars): ${lines.join(" / ")}`,
+        );
+      }
+    }
+    expect(over).toEqual([]);
+  });
+
+  /**
+   * THE STRING THIS LANE CUT, kept as a case for the reason the two above it
+   * are kept: so the gate is anchored to the defect and not only to today's
+   * corpus.
+   */
+  it("refuses the praise title the override channel was shipping and accepts its repair", () => {
+    expect(wrap("Правилно пропуснат автомобил със специален режим")).toHaveLength(3);
+    expect(wrap(YIELD_PRAISE_SITUATION_COPY.emergency.titleBg).length).toBeLessThanOrEqual(2);
+    // …and it did not lose the half that says WHICH act was praised.
+    expect(YIELD_PRAISE_SITUATION_COPY.emergency.titleBg).toContain("специален режим");
   });
 });

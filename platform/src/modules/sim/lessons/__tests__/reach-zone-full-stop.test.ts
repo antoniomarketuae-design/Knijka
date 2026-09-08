@@ -291,6 +291,41 @@ describe("the live path: applyTick stops issuing the certificate the sheet contr
     expect(r.completedAll).toBe(false);
   });
 
+  /**
+   * THE w27 DRIVE — the half the first cut of this demand did not close.
+   *
+   * `.audit-frames/w27/frames/sc-merge-from-property__pc-right/run.log` (HEAD
+   * 85495fd, EVIDENCE complete), after `requireFullStop` had shipped:
+   *
+   *   04-t059s   6 км/ч  «Стигна точката, но твърде бързо … затова още не се
+   *                       отчита»                       ← in the disc, over the cap
+   *   04-t065s  10 км/ч  «✗ Неспиране на знак Б2 „Спри!" −10 изпитни т.»
+   *   04-t070s   0 км/ч  at rest at the junction mouth, past the paint
+   *   протокол           «✓ Спри напълно на Б2 на изхода 2:30»
+   *
+   * `reached` and `capMet` both latch, so by 04-t070s the arrival conjunction
+   * was one term short — and that term was a per-frame read of a TRANSIENT
+   * fact with no geometry on it. A standstill twenty metres past the sign
+   * supplied it, and the protocol certified the stop it had just fined him ten
+   * points for not making. The demand now carries `capArmHere`'s own
+   * `inAcceptance || graceArmed`, so the question is asked AT the mark.
+   */
+  it("REFUSED: a standstill made twenty metres PAST the paint buys no certificate", () => {
+    const s = driveTheExit(20);
+    const r = buildLessonResult(s);
+    // The car really did come to rest, and the rule engine really does hold a
+    // qualifying stop by the end of the stream — this is not a drive that
+    // never stood still.
+    expect(s.events.some((e) => e.kind === "violation" && e.code === "STOP_SIGN_NO_FULL_STOP")).toBe(
+      true,
+    );
+    // …and the stop it made was not at the Б2, so the banner that names the Б2
+    // stays unticked. Before the geometry, this was `true`.
+    expect(r.objectives[1].done).toBe(false);
+    // The тротоар gate ahead of it is untouched, so the refusal is local.
+    expect(r.objectives[0].done).toBe(true);
+  });
+
   it("the withheld gate is not the terminal one, so no drive is stranded by it", () => {
     // sc-mfp-stop-line is 2 of 4 on the shipped drill, so this refusal can
     // never leave a student unable to reach the protocol the way a finish gate

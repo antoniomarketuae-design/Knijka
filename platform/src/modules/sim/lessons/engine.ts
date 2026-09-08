@@ -34,6 +34,7 @@ import {
   isScorableEvent,
   parseSpeedMeasurement,
   reduceTick,
+  settleUnpaidSpeedingTeach,
   type RuleEngineConfig,
   type RuleEngineState,
   type RuleEvent,
@@ -543,6 +544,45 @@ function objectiveNotice(
       // the speed the card just printed, which is the speed that would carry
       // him past the mark if he keeps it.
       explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, ${measuredBg} ${tailBg}${alsoKerbward}`,
+    };
+  }
+  // ── AND WHEN THE STANDSTILL IS THE CRASH'S, SAY SO (w29, 2026-09-08 —
+  //    `objectives.ts haltVoided` carries the mechanism) ─────────────────────
+  //
+  // `haltVoided` is the first refusal in this evaluator that can withdraw a
+  // tick a student USED TO GET, so it is the one that owes him a sentence. Doc
+  // 64 THEO-4, ratified: never a bare withheld tick — what was observed, what
+  // the task wants, what to do instead. Without this card the student sees a
+  // car standing exactly on the green circle and a task that simply never
+  // ticks, which is the founder's own «стоя върху точката и нищо не става» in
+  // its worst form: the one where he is right that he is stopped.
+  //
+  // ONE CARD, ON THE LATCHING FRAME, AND THE LATCH IS THE STATE — no new
+  // bookkeeping: `haltVoided` is undefined before and set after, exactly once
+  // per approach, and a genuine fresh approach clears it, so a student who
+  // drives off the wreck and crashes into it again is told again. That is the
+  // shape the cap card has had since round 12 and it is deliberate.
+  //
+  // AFTER THE CAP CARD, so that on a frame where both could fire the student is
+  // told the fault that also has a grader before the consequence of it. In
+  // practice they cannot share a frame: `overCapNoted` needs `speedKmh > cap`
+  // and this needs the car motionless.
+  if (
+    params.kind === "reachZone" &&
+    after.type === "reachZone" &&
+    after.haltVoided !== undefined &&
+    (before.type !== "reachZone" || before.haltVoided === undefined)
+  ) {
+    // NO «върни се и опитай пак», for the cap card's own reason: this composer
+    // cannot know whether the road behind the student allows it, and an
+    // instruction that cannot be followed is the second half of THEO-4. The
+    // corrective is the one the lesson actually teaches — brake earlier and
+    // harder, in your own lane, instead of steering round.
+    return {
+      kind: "lesson",
+      titleBg: "Колата спря от удара, а не от спирачката",
+      explanationBg:
+        "Колата стои неподвижно на маркера, защото удари това пред себе си — а задачата иска ТИ да я спреш там. Ударът не се брои за спиране: точката се дава за спиране със спирачката, преди препятствието и в своята лента. Затова задачата остава неизпълнена, въпреки че колата стои на място. Спирай по-рано и по-твърдо — спирането право в своята лента е по-безопасно от завиването встрани.",
     };
   }
   // ── THE OTHER HALF OF THE ARRIVAL CONTRACT FINALLY SPEAKS (round 12,
@@ -1525,6 +1565,42 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // refused at the moment it would be granted, against the same predicate the
   // line itself will be judged by.
   const fullStopHeld = qualifyingStopCurrent(rules, tick.t);
+  // …AND WHETHER THAT STANDSTILL IS THE CAR'S OWN CRASH, for
+  // `ObjectiveContext.restIsCrashPinned` (objectives.ts carries the sheet: one
+  // protocol printing «✓ Спри преди препятствието — с пълна спирачка» over
+  // «Удар в неподвижно превозно средство −10», because the gate's disc reaches
+  // past the debris and the wreck came to rest inside it).
+  //
+  // THE DRIVE'S OWN MACHINERY, ASKED RATHER THAN RE-DERIVED — the same pin
+  // `finish.ts CRASH_PIN_STUCK_S` closes a stuck session down with. `crashPin`
+  // is armed only by a TERMINATING violation, dropped the moment the car
+  // clears `CRASH_PIN_RADIUS_M`, and its `stillSinceSec` is null unless the car
+  // is motionless (magnitude-signed since P2, so reversing out of the wreck is
+  // not „standing still") and is not lawfully waiting (B15's freeze). So this
+  // is true exactly while the car sits in its own crash, and false again the
+  // instant he drives out of it.
+  //
+  // THE PIN FROM `prev`, THE STANDSTILL FROM THIS TICK — and that split is a
+  // measurement, not a preference. `crashPin.stillSinceSec` is written BELOW
+  // the objective loop, so reading it whole would be one frame stale, and one
+  // frame is the entire exposure: a bare halt cap needs no dwell at all, so
+  // `capMet` latches on the FIRST motionless frame after the impact, which is
+  // exactly the frame `stillSinceSec` is still null on. Measured through
+  // `applyTick` on the sc-hz-brake-dont-swerve stream in
+  // `halt-credit-names-an-act.test.ts`: pin armed at t = 10.0, `stillSinceSec`
+  // = 10.1, and the shipped evaluator banked `capMet: true` + `approachCap:
+  // "honoured"` at t = 10.1. The pin's ARMING is not stale (it happens on the
+  // collision frame, which is always before the car has stopped), so the pin is
+  // read from `prev` and the standstill it is holding is read here, from the
+  // tick in hand — the same two questions `engine.ts` asks below, in the same
+  // order, with the same magnitude-signed speed test (P2: reverse reads
+  // negative, and backing out of a wreck is not standing still).
+  const crashPinPrev = prev.crashPin;
+  const restIsCrashPinned =
+    crashPinPrev !== undefined &&
+    Math.abs(tick.speedKmh) <= FINISH_STANDSTILL_KMH &&
+    Math.hypot(tick.position.x - crashPinPrev.x, tick.position.y - crashPinPrev.y) <=
+      CRASH_PIN_RADIUS_M;
   // …AND THE REST INSIDE THE FORBIDDEN STRETCH, for
   // `ReachZoneParams.requireRestClean` (objectives.ts carries the frame: one
   // debrief printing «✗ Спиране в забранена зона −3 в 1:11» over «✓ Подмини
@@ -1659,6 +1735,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
         ...(overTheCeilingInRun ? { overTheCeilingInRun: true } : {}),
         qualifyingStopCurrent: fullStopHeld,
+        ...(restIsCrashPinned ? { restIsCrashPinned: true } : {}),
         ...(activeSince !== null ? { objectiveActiveSinceSec: activeSince } : {}),
       };
       const before = evalStates[currentIndex];
@@ -2400,6 +2477,62 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       examTermination = trip;
       phase = "completed";
       endedAtSec = tick.t;
+    }
+  }
+
+  /**
+   * THE LAST TICK IS THE LAST MOMENT ANYTHING CAN ASK — the withheld speeding
+   * charge, settled on the frame the drive ends (finding
+   * `sc-signal-flashing:0d68b149`; `rules/engine.ts settleUnpaidSpeedingTeach`
+   * carries the measurement and the A12 argument).
+   *
+   * It runs HERE, after every arm above that can set `phase`, and before the
+   * A15 position pass, so a settled bill is placed on the map like any other
+   * and the coach's counters stay coherent. `alreadyCharged` is the same guard
+   * the six-second re-grade passes through at the top of this function, so exam
+   * mode and repeat offences are byte-identical: the settlement exists ONLY to
+   * reach the charge the free mini-lesson consumed.
+   *
+   * The coach is asked rather than bypassed. This is the SECOND encounter of a
+   * code it has already taught, so `resolveEncounter` grades it — but routing
+   * it through `coachStep` is what keeps the escalation ladder and the
+   * encounter counters describing what actually happened, and it is what makes
+   * a future policy change move this bill too instead of leaving one hard-coded
+   * charge behind. No HUD event: the drive is over on this frame and the column
+   * is gone — the debrief's «Грешки» row carries the catalogue's explanation
+   * and its «✔ Правилното действие» (THEO-4), and the card was already shown in
+   * the moment it happened.
+   */
+  // `prev.phase !== "completed"` was here to mean "the drive ends on THIS
+  // frame, not a later one" — but applyTick opens with
+  //     if (prev.phase === "completed" || prev.phase === "aborted") return …
+  // so prev.phase is already narrowed to "preDrive" | "driving" everywhere
+  // below it. The conjunct could never be false, and TS2367 said so. Dropping
+  // it changes no behaviour; the early return is what enforces the intent, and
+  // `phase === "completed"` alone is the edge this block wants.
+  if (phase === "completed") {
+    const settled = settleUnpaidSpeedingTeach(rules, tick);
+    if (settled !== null && !alreadyCharged(settled.code)) {
+      const step = coachStep(
+        encounters,
+        {
+          code: settled.code,
+          severityClass: settled.severityClass,
+          terminateSession: settled.terminateSession,
+          detail: settled.detail,
+        },
+        coachOpts,
+      );
+      encounters = step.encounters;
+      if (step.decision.scored) {
+        scoredEvents.push(settled);
+        if (step.decision.penaltyMultiplier > 1) {
+          escalations = [
+            ...escalations,
+            { code: settled.code, t: settled.t, multiplier: step.decision.penaltyMultiplier },
+          ];
+        }
+      }
     }
   }
 

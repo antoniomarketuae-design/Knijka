@@ -30,9 +30,18 @@
  * §3 takes the printed sentence out of `objectiveDetailText`, the function
  * `SessionEndScreen.tsx:1485` renders under the objective row.
  *
+ * AND THE THIRD HALF, 2026-09-04 — the measurement landed and then said the
+ * wrong thing. `null` meant „no figure was recorded" and the debrief rendered
+ * it as „no car was there": w27's pc-right and mobile-right legs at head
+ * 85495fd both print «Интервал: при започването на завоя нямаше насрещен —
+ * лентата беше чиста.» on a protocol booking «Удар в друго превозно средство
+ * −10». `OncomingGapEnding` separates the four drives that shared that
+ * sentence; §2 and §3 below hold each to its own account.
+ *
  * THE MUTATIONS THAT MUST TURN THESE RED: drop `reportOncomingGapSec` from the
  * whitelist in `scenario/params.ts`; drop the detail from `stepReachZone`'s
- * return; put the old placeless banner back on `sc-ltap-turn`.
+ * return; put the old placeless banner back on `sc-ltap-turn`; collapse any
+ * `ending` back into the „чиста лента" branch.
  */
 
 import { describe, expect, it } from "vitest";
@@ -41,7 +50,7 @@ import type { SimTick } from "../../../rules";
 import { objectiveDetailText } from "../../../hud/SessionEndScreen";
 import { applyStagedOutcome, applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { parseObjectiveParams, type WitnessedReachZoneParams } from "../../objectives";
-import type { LessonSessionState } from "../../types";
+import type { LessonSessionState, OncomingGapEnding } from "../../types";
 import { makeTick } from "../../__tests__/fixtures";
 import { compileScenario } from "../compile";
 import { SC_TURN_LEFT_ONCOMING } from "../templates-junctions";
@@ -131,14 +140,22 @@ function turnLesson(): LessonSpec {
 }
 
 /** One oncoming-left-turn resolution as the orchestrator hands it to the shell
- *  (`LessonScene.onStagedOutcome` → `applyStagedOutcome`). */
-function ltapOutcome(eventId: string, acceptedGapSec: number | undefined): StagedEventOutcome {
+ *  (`LessonScene.onStagedOutcome` → `applyStagedOutcome`). `detail` and
+ *  `committed` are the runner's own two channels — the ones that separate a
+ *  turn into an empty lane from a head-on with the car that was in it. */
+function ltapOutcome(
+  eventId: string,
+  acceptedGapSec: number | undefined,
+  detail: StagedEventOutcome["detail"] = "clear",
+  committed = true,
+): StagedEventOutcome {
   return {
     eventId,
     kind: "oncomingLeftTurn",
-    success: acceptedGapSec === undefined || acceptedGapSec >= 4,
-    detail: "clear",
+    success: detail !== "collision" && detail !== "violation",
+    detail,
     tSec: 40,
+    committed,
     ...(acceptedGapSec !== undefined ? { acceptedGapSec } : {}),
   };
 }
@@ -227,6 +244,7 @@ describe("§2 the live path grades the interval instead of only the geography", 
       kind: "oncomingGap",
       acceptedGapSec: 1.6,
       normSec: 4,
+      ending: "measured",
     });
   });
 
@@ -238,7 +256,61 @@ describe("§2 the live path grades the interval instead of only the geography", 
       kind: "oncomingGap",
       acceptedGapSec: null,
       normSec: 4,
+      ending: "clear",
     });
+  });
+
+  // ── THE FOUR DRIVES THAT USED TO SHARE ONE SENTENCE ───────────────────────
+  // `.audit-frames/w27/frames/sc-turn-left-oncoming__pc-right` (and its mobile
+  // twin) at head 85495fd: «Интервал: при започването на завоя нямаше насрещен
+  // — лентата беше чиста.» printed on the objective row of a protocol whose
+  // faults are «Преминаване на червен сигнал −10» and «Удар в друго превозно
+  // средство −10». Null meant „no figure", and „no figure" was rendered as
+  // „no car".
+
+  it("A HEAD-ON IS NOT A CLEAR LANE: the collision outranks every other ending", () => {
+    const r = buildLessonResult(
+      driveTurn(null, [ltapOutcome("sc-ltap-tight", undefined, "collision", false)]),
+    );
+    expect(r.objectives[1].detail).toEqual({
+      kind: "oncomingGap",
+      acceptedGapSec: null,
+      normSec: 4,
+      ending: "collision",
+    });
+  });
+
+  it("a collision outranks a measured figure from the other staged car", () => {
+    // The follow car resolved clean at 6.2 s; the tight one was hit. The row
+    // may not lead with the good number.
+    const r = buildLessonResult(
+      driveTurn(null, [
+        ltapOutcome("sc-ltap-follow", 6.2),
+        ltapOutcome("sc-ltap-tight", undefined, "collision", false),
+      ]),
+    );
+    expect((r.objectives[1].detail as { ending: string }).ending).toBe("collision");
+  });
+
+  it("a billed cut with no published gapSec says the cut, not „чиста лента“", () => {
+    const r = buildLessonResult(
+      driveTurn(null, [ltapOutcome("sc-ltap-tight", undefined, "violation", true)]),
+    );
+    expect((r.objectives[1].detail as { ending: string }).ending).toBe("cut");
+  });
+
+  it("an actor that was never released is NOT MEASURED — its own contract says so", () => {
+    const r = buildLessonResult(
+      driveTurn(null, [ltapOutcome("sc-ltap-tight", undefined, "notEncountered", false)]),
+    );
+    expect((r.objectives[1].detail as { ending: string }).ending).toBe("notEncountered");
+  });
+
+  it("no turn was ever begun ⇒ there is no «започване на завоя» to describe", () => {
+    const r = buildLessonResult(
+      driveTurn(null, [ltapOutcome("sc-ltap-tight", undefined, "clear", false)]),
+    );
+    expect((r.objectives[1].detail as { ending: string }).ending).toBe("noTurn");
   });
 
   it("no encounter resolved ⇒ no detail at all, and the approach never carries one", () => {
@@ -264,8 +336,11 @@ describe("§2 the live path grades the interval instead of only the geography", 
 // ---------------------------------------------------------------------------
 
 describe("§3 the debrief row says the number and what it is for (THEO-4)", () => {
-  const line = (acceptedGapSec: number | null): string =>
-    objectiveDetailText({ kind: "oncomingGap", acceptedGapSec, normSec: 4 }) ?? "";
+  const line = (
+    acceptedGapSec: number | null,
+    ending: OncomingGapEnding | null = acceptedGapSec === null ? "clear" : "measured",
+  ): string =>
+    objectiveDetailText({ kind: "oncomingGap", acceptedGapSec, normSec: 4, ending }) ?? "";
 
   it("under the norm: the figure, the norm, and WHY four seconds", () => {
     const text = line(1.6);
@@ -286,8 +361,48 @@ describe("§3 the debrief row says the number and what it is for (THEO-4)", () =
   });
 
   it("nothing inbound: it says that, and does not print a phantom interval", () => {
-    const text = line(null);
+    const text = line(null, "clear");
     expect(text).toContain("нямаше насрещен");
     expect(text).not.toMatch(/\d+[.,]\d/);
+  });
+
+  // ── THE SENTENCE MAY NOT SURVIVE THE DRIVE THAT CONTRADICTS IT ────────────
+
+  it("after a head-on, the row says the impact — never that the lane was clear", () => {
+    const text = line(null, "collision");
+    expect(text).toContain("удар");
+    expect(text).not.toContain("чиста");
+    expect(text).not.toContain("нямаше насрещен");
+    // THEO-4: the reason is on the same line, not a bare verdict.
+    expect(text).toContain("2–3");
+  });
+
+  it("a measured gap that ended in a head-on keeps the number AND the impact", () => {
+    const text = line(1.3, "collision");
+    expect(text).toContain("1.3");
+    expect(text).toContain("удар");
+  });
+
+  it("a billed cut, a never-released actor and a turn never begun each say their own thing", () => {
+    const cut = line(null, "cut");
+    expect(cut).toContain("без да го изчакаш");
+    expect(cut).not.toContain("чиста");
+
+    const none = line(null, "notEncountered");
+    expect(none).toContain("не се появи");
+    expect(none).not.toContain("чиста");
+
+    const noTurn = line(null, "noTurn");
+    expect(noTurn).toContain("завоят не беше започнат".slice(0, 6));
+    expect(noTurn).not.toContain("чиста");
+  });
+
+  it("a pre-2026-09-04 payload states no lane it cannot see", () => {
+    // `ending: null` is what `wire.ts` decodes an older stored result to. The
+    // fallback may be vague; it may not be false.
+    const text = line(null, null);
+    expect(text).not.toContain("чиста");
+    expect(text).not.toContain("нямаше насрещен");
+    expect(text.length).toBeGreaterThan(0);
   });
 });

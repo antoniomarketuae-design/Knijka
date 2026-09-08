@@ -490,13 +490,25 @@ describe("§2 (cont.) sc-sdead-cross IS reachable — by a drive that turns left
 describe("§3 sc-signal-hesitation — the acquittal is the coach's, not the lesson's", () => {
   const out = drive(SC_SIGNAL_HESITATION, recklessScript([[LANE, 140]]));
 
-  it("THE FINDING, reproduced: 0 наказателни точки and not one billed mistake", () => {
+  /**
+   * WAS «THE FINDING, reproduced: 0 наказателни точки and not one billed
+   * mistake» — the acquittal this section was written to record. IT IS GONE,
+   * and the expectation moves with the product rather than being loosened:
+   * `rules/engine.ts settleUnpaidSpeedingTeach` is the LESSON-END owner the
+   * fourth test in this block filed («an episode still open when the route runs
+   * out was never corrected»), and it now settles the withheld charge on the
+   * frame the drive ends. The rest of the assertions are untouched and still
+   * green, so what changed is exactly one thing: the sheet.
+   */
+  it("THE FINDING IS CLOSED: the 59-in-a-50 now reaches the sheet at one второстепенна", () => {
     // «НЕИЗДЪРЖАН · SCORE: 0 наказателни точки · mistakes=0 · top 59 км/ч»
-    // (mobile-wrong/08-debrief.png), headless.
-    expect(out.sessionCodes).toEqual([]);
-    expect(out.score).toBe(0);
+    // (mobile-wrong/08-debrief.png) is no longer what this drive produces.
+    expect(out.sessionCodes).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(out.score).toBe(1);
     expect(out.passed).toBe(false);
-    // …and the only reason it is НЕИЗДЪРЖАН at all is the unfinished route.
+    // …and the route half of the verdict is unchanged: nothing here fabricates
+    // progress, and one второстепенна point is far under the allowance of 9, so
+    // the fail is still the unfinished route's and not this bill's.
     expect(out.objectivesDone).toEqual([false, false]);
   });
 
@@ -510,17 +522,26 @@ describe("§3 sc-signal-hesitation — the acquittal is the coach's, not the les
     expect(out.engineCodes[0].regrade).toBe(false);
   });
 
-  it("THE CAUSE, and it is not in this file: второстепенна warns once before it grades", () => {
+  it("THE CAUSE, and it is not in this file: второстепенна warns once, then the END settles it", () => {
     // scenarios/policy.ts via coach.ts — „второстепенна warns once before
-    // grading regardless of mapping". One episode in a 13 s drive is therefore
-    // a teach card and nothing else, and `session.events` (what the debrief
-    // and the score read) never sees it. Nothing a template authors changes
-    // that: it is severity-class policy, shared by all 167 drills.
+    // grading regardless of mapping". That is untouched and still the reason
+    // the FIRST bill (t ≈ 8.9 s, asserted above) never reaches the sheet.
+    // Nothing a template authors changes it: it is severity-class policy,
+    // shared by all 167 drills.
     //
-    // THE PIN THAT MATTERS: the gap between the two lists. The day the coach,
-    // the policy or the debrief changes, this goes red and is re-read rather
-    // than staying quietly true.
-    expect(out.sessionCodes.length).toBe(0);
+    // WHAT CHANGED IS THE SECOND ASK, not the first. The warning is still free;
+    // the drive then ended with the student still over the graced limit and
+    // never corrected, and `settleUnpaidSpeedingTeach` charges that once —
+    // through `coachStep`, which grades a SECOND encounter of a code it has
+    // already taught. So the gap between the two lists is now one bill wide
+    // instead of two, and both lists are read below.
+    expect(out.sessionCodes.length).toBe(1);
+    // The reducer raised TWO bills on this drive — the teach's, and the
+    // six-second re-grade that lands after the end (both asserted below) — and
+    // the session charged ONE, which is the settlement's. A drive cannot pay
+    // twice: `settleUnpaidSpeedingTeach` is `regrade`-marked and
+    // `lessons/engine.ts` drops it wherever the code was already charged.
+    expect(out.engineCodes.filter((e) => e.code === "SPEEDING_OVER_LIMIT").length).toBe(2);
   });
 
   it("…and the w11 re-grade is emitted but arrives AFTER this lesson has ended", () => {
@@ -540,21 +561,31 @@ describe("§3 sc-signal-hesitation — the acquittal is the coach's, not the les
      *
      * THIS DRIVE IS THE COUNTER-CASE, and it is recorded rather than papered
      * over: the reducer emits the re-grade at ≈14.9 s, and this session has
-     * already ENDED at ≈12.6 s — the route ran out — so nothing reaches the
-     * sheet and `sessionCodes` above is still empty. A drive whose whole
-     * gradeable window after the card is under six seconds is still free.
+     * already ENDED at ≈12.6 s — the route ran out — so THAT bill still never
+     * reaches the sheet, and the two assertions below keep saying so.
      *
      * DO NOT ANSWER THIS BY SHORTENING SPEED_REGRADE_SEC: at ~3 s the re-grade
      * stops being „he was told and kept doing it" and becomes grade-on-sight,
      * which is the founder-ratified teach-first ruling, not a bug. The honest
      * owner is the LESSON END — an episode still open when the route runs out
-     * was never corrected, and `lessons/engine.ts buildLessonResult` is where
-     * that can be seen. Filed, not patched here.
+     * was never corrected.
+     *
+     * THAT IS THE OWNER THE REPAIR TOOK. `rules/engine.ts
+     * settleUnpaidSpeedingTeach` reads exactly that state on the frame the
+     * drive ends and `lessons/engine.ts applyTick` charges it once. It is
+     * `applyTick` and not `buildLessonResult` as filed, for one reason worth
+     * recording: the result builder has no tick and no coach, so a bill placed
+     * there could not be positioned on the mistake map, could not go through
+     * `coachStep`, and could not be dropped by the `alreadyCharged` guard that
+     * keeps exam mode byte-identical. The last live tick has all three.
      */
     const speeding = out.engineCodes.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
     expect(speeding.map((e) => e.regrade)).toEqual([false, true]);
     expect(out.endedAtSec).not.toBeNull();
     expect(speeding[1].tSec).toBeGreaterThan(out.endedAtSec!);
+    // …and the charge the sheet now carries is stamped at the END, not at
+    // either reducer bill: it is the settlement, and it is the only one.
+    expect(out.sessionCodes).toEqual(["SPEEDING_OVER_LIMIT"]);
   });
 
   it("…and the drill's own code cannot cover for it: hesitation needs a standstill", () => {
@@ -984,15 +1015,24 @@ describe("§6 sc-signal-hesitation — briefing step 3 points at a car that is t
  *            CONTINUING overspeed a second time six driving seconds after the
  *            card, the bill the teach-first free mini-lesson had consumed.
  *
- * AND THE RESIDUAL IS RECORDED HERE RATHER THAN CLAIMED CLOSED. On THIS drill
- * the re-grade is emitted and cannot land: the reducer raises it at ≈14,9 s and
- * the ROUTE ENDS at ≈12,6 s («Край на маршрута», measured below), because
- * sxf-v1's drivable run is 145 m and 145 m at 59 км/ч is shorter than the
- * re-grade clock. So a training leg still reaches its debrief at 0 — as the
- * ONE free first encounter teach-first grants per code per session, which the
- * debrief now says out loud, and which `lessons/__tests__/exam-mode.test.ts`
- * («TRAINING: … TEACHES once and then CHARGES once») pins on a drive long
- * enough to contain the window. §3 is the same shape on the sibling drill.
+ * THE RESIDUAL THIS SECTION RECORDED IS NOW SPENT, and by a third commit:
+ *
+ *   settleUnpaidSpeedingTeach  `rules/engine.ts` — the withheld charge, settled
+ *            on the frame the drive ENDS, because on this drill the six-second
+ *            re-grade is emitted and cannot land: the reducer raises it at
+ *            ≈14,9 s and the ROUTE ENDS at ≈12,6 s («Край на маршрута»,
+ *            measured below), sxf-v1's drivable run being 145 m and 145 m at
+ *            59 км/ч shorter than the clock. The teach's ONE free encounter is
+ *            untouched — what is no longer free is a breach the student was
+ *            shown and was STILL committing when the chequered flag fell.
+ *
+ * So this leg now reaches its debrief at ONE второстепенна point, listed with
+ * the catalogue's explanation, its «✔ Правилното действие» and its чл. 182 rung
+ * — and the disclosure sentence that stood in for the charge steps aside,
+ * because a fault that is IN the points does not belong in «Учебни моменти».
+ * §3 is the same shape on the sibling drill, and
+ * `lessons/__tests__/exam-mode.test.ts` («TRAINING: … TEACHES once and then
+ * CHARGES once») still pins the long-drive path.
  *
  * The day any of that changes — a shorter re-grade, a longer route, a different
  * teach-first policy, a debrief that praises again — one of these goes red.
@@ -1003,12 +1043,18 @@ describe("§7 sc-signal-flashing — the 59-in-a-50 the audit filmed, at HEAD", 
   // script (a script that brakes at the end CLOSES the episode by itself).
   const out = drive(SC_SIGNAL_FLASHING, recklessScript([[LANE, 124]]));
 
-  it("THE FINDING, reproduced: the training leg still bills nothing", () => {
-    expect(out.sessionCodes).toEqual([]);
-    expect(out.score).toBe(0);
+  it("THE FINDING IS CLOSED: the training leg bills the 59-in-a-50 once", () => {
+    // WAS `toEqual([])` / `toBe(0)` — the acquittal the audit photographed.
+    // The expectation moves because the product did: the settlement charges the
+    // breach the student was shown and never corrected, at the last tick there
+    // is. One второстепенна point — the smallest the изпитен лист has, and far
+    // under the allowance of 9, so it convicts the driving without deciding the
+    // verdict (the unfinished route still does that).
+    expect(out.sessionCodes).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(out.score).toBe(1);
   });
 
-  it("…and the reason is the ROUTE, not a blind grader: the re-grade fires after the end", () => {
+  it("…and the reason it took a SETTLEMENT: the re-grade fires after the end", () => {
     const speeding = out.engineCodes.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
     // The bill the teach spends, then the c317a68 re-grade — emitted, marked.
     expect(speeding.map((e) => e.regrade)).toEqual([false, true]);
@@ -1019,21 +1065,27 @@ describe("§7 sc-signal-flashing — the 59-in-a-50 the audit filmed, at HEAD", 
   });
 
   it("the fault is on the RECORD, so the drive can no longer read as a clean one", () => {
-    // ba51c50's producer, on the live path: without it `coachedMistakes` is
-    // empty here and every sentence below is composed from the same evidence a
-    // genuinely clean drive produces.
+    // ba51c50's producer, on the live path: the card was SHOWN in the moment
+    // and the run recorded that it was, which is what the settlement then
+    // charges. Both channels still carry it — the coached record is the
+    // evidence the student was taught before he was billed.
     expect(out.coachedCodes).toContain("SPEEDING_OVER_LIMIT");
   });
 
-  it("THE SENTENCE THE FRAME CARRIED IS GONE, and the debrief names the fault instead", () => {
+  it("THE SENTENCE THE FRAME CARRIED IS GONE, and the debrief bills the fault instead", () => {
     // «чисто каране без нито едно нарушение — задръж това ниво» is the exact
     // string the audit's machine summary printed over this drive.
     expect(out.debriefText).not.toContain("чисто каране без нито едно нарушение");
-    // What it says instead: the sheet is clean, the DRIVING was not, and the
-    // fault is listed with its corrective (THEO-4 — never a bare verdict).
-    expect(out.debriefText).toContain("чистият лист не значи чисто каране");
-    expect(out.debriefText).toContain("Учебни моменти");
+    // What it says instead: the fault is a BILLED row on the изпитен лист, with
+    // the catalogue's «✔ Правилното действие» and the чл. 182 rung derived from
+    // the student's own measured speed (THEO-4 — never a bare verdict).
+    expect(out.debriefText).toContain("Най-важните грешки");
     expect(out.debriefText).toContain("Превишена скорост");
+    expect(out.debriefText).toContain("Правилното действие");
+    // …and the disclosure that stood in for the charge steps aside, because a
+    // fault that IS in the points is not «показано и не влезе в точките».
+    expect(out.debriefText).not.toContain("чистият лист не значи чисто каране");
+    expect(out.debriefText).not.toContain("Учебни моменти");
   });
 
   it("…and the false-refusal direction: a clean drive is still praised, invitation and all", () => {

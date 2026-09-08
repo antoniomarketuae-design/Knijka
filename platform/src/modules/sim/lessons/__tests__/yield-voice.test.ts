@@ -391,6 +391,11 @@ describe("B15-VOICE — the copy", () => {
     // vehicle closing on the junction. Listed here so its copy is measured by
     // the same properties as the five, not merely added beside them.
     "railVehicle",
+    // sc-turn-left-oncoming:7974670c — the seventh duty: an oncoming NON-rail
+    // vehicle closing on a junction whose route still has a gate declaring the
+    // interval norm. Listed for the same reason as the sixth — measured by the
+    // same properties, not merely added beside them.
+    "oncomingVehicle",
   ];
 
   /** Run one full episode for a reason and collect everything it says. */
@@ -483,6 +488,9 @@ describe("B15-VOICE — the copy", () => {
       // RX-05: `LAW_RAIL_PRIORITY` is authored in advisor.ts too (ЗДвП чл. 8,
       // ал. 2; чл. 37, ал. 1 — both retrieved from content/law/acts/zdvp.json).
       "railVehicle",
+      // sc-turn-left-oncoming:7974670c: `LAW_LEFT_TURN_ONCOMING` is ЗДвП чл. 37,
+      // ал. 1 alone, retrieved from the same act file.
+      "oncomingVehicle",
     ] as YieldReason[]) {
       for (const line of episode(reason)) {
         for (const ref of line.lawRef?.match(/Наредба[^;]*/g) ?? []) {

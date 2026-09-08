@@ -85,6 +85,7 @@ import {
   type SignalPhase,
 } from "../contracts";
 import { edgeTravelHalfWidth, isMotorwayEdge, nodeOpenRadiusM } from "../world/builders/network";
+import { isExtraUrbanCarriageway } from "../world/builders/constants";
 // B40(a) — the EXTRACTED world-label channel (doc 87 B35). This layer keeps its
 // own painter for the B42 officer bubble on purpose (that row is closed and
 // photographed; moving it would put it back at risk for nothing the founder can
@@ -889,6 +890,24 @@ export function computeParkedCars(
     //    carries the three-district table and why the flag is asked instead of
     //    the class. No body on any non-motorway district moves.
     if (isMotorwayEdge(edge)) continue;
+    // ── …AND NOBODY PARKS ON THE CARRIAGEWAY ИЗВЪН НАСЕЛЕНО МЯСТО EITHER.
+    //    RETRIEVED, not recalled — `content/law/acts/zdvp.json`, ЗДвП чл. 94,
+    //    ал. 2: «За паркиране извън населените места пътните превозни средства
+    //    се спират ИЗВЪН платното за движение. Паркирането на платното за
+    //    движение е ЗАБРАНЕНО.» A continuous kerbside rank down an извънградски
+    //    път is therefore not merely the wrong scenery — it is a row of cars
+    //    breaking a law this product teaches, in the windscreen of the lesson
+    //    that teaches it.
+    //
+    //    sc-sp-curve:6079dfb1 (major) named it beside the blocks and the lamps:
+    //    «Instruction 1 says you are setting off on the OUT-OF-TOWN road at 90
+    //    км/ч, but … a continuous rank of parked cars.» The five rural maps are
+    //    `unclassified`/`tertiary`, all three of which are in PARK_CLASSES, so
+    //    the class could never have told them from a side street; the AUTHORED
+    //    90 posting can (`world/builders/constants.isExtraUrbanCarriageway`,
+    //    which carries the чл. 21, ал. 1 table and the five-edge census).
+    //    Placement only — no body on any city, exam or полигон district moves.
+    if (isExtraUrbanCarriageway(edge)) continue;
     if (parkingOptedOut(edge)) continue; // FR-21: this street parks nobody
     const geo = edge.geometry;
     if (!geo || geo.length < 2) continue;

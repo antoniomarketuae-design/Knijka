@@ -407,6 +407,34 @@ export interface SimTick {
    * instructor can explain (ЗДвП чл. 8, ал. 2).
    */
   oncomingRailGapSec?: number;
+  /**
+   * Seconds until the most urgent oncoming NON-RAIL vehicle reaches the
+   * junction ahead — the same `distM / closingMps` the N1 left-turn probe
+   * computes for `oncomingRailGapSec` above, published on the frames it used to
+   * throw away. The two channels are DISJOINT by construction (one probe, one
+   * `rail` flag, one branch), so a tram can never be reported as a car and the
+   * tram's copy can never be displaced by a car's. Absent = the reporter
+   * cannot answer OR nothing is making an arrival claim; NEVER „the oncoming
+   * lane is clear" — every recorded trace, every fixture and every legacy
+   * boolean wiring omits it.
+   *
+   * THE SECONDS THE BRIEFING ASKS HIM TO COUNT (`sc-turn-left-oncoming:
+   * 7974670c`, critical). `sc-turn-left-oncoming` briefs «Прецени интервала в
+   * СЕКУНДИ: насрещен на по-малко от 4 секунди означава чакане» and then, for
+   * the whole of the wait that IS the manoeuvre, said nothing: the number was
+   * computed every frame one file away and discarded unless the student
+   * COMMITTED a turn, so a car standing at the mouth letting the oncoming
+   * through was — to `yieldReasonAt`, to the advisor and to the par clock — a
+   * car stopped in front of nothing. This is the `oncomingRailGapSec` repair
+   * (RX-05) applied to the vehicle the same drill is actually built around.
+   *
+   * MEASUREMENT ONLY, and it can only ACQUIT (the polarity `vruAheadM` sets
+   * above). No rule reads it and none may: чл. 37, ал. 1's conviction is the
+   * N1 tracker's and stays exactly where it is. What reads it is
+   * `lessons/finish.ts yieldReasonAt`, which turns it into a lawful wait the
+   * instructor can name and the rubric can credit.
+   */
+  oncomingVehicleGapSec?: number;
   /** True when driving against the flow of a one-way street (runtime-computed). */
   wrongWay?: boolean;
   // -- B1a Wave-1 world context (doc 72 capabilities 1 + N3). ALL optional and

@@ -2029,6 +2029,30 @@ export function yieldReasonAt(
   // for „stopped in the junction" to be said with.
   const lineM = tick.nextStopLineM;
   if (lineM !== undefined && lineM <= YIELD_STOP_LINE_REACH_M) {
+    // A PERSON ON THE PAINT OUTRANKS AN UNSIGNALIZED LINE BEYOND HER —
+    // 2026-09-08, sc-merge-from-property:ab353b86.
+    //
+    // This clause reaches 26 m AHEAD, so on any drill whose crossing sits
+    // outside its Б1/Б2 it swallowed clause 4 whole: the тротоар the student
+    // is stopped at (`mgp-x-walk`, x = 34) is 6.27 m outside that map's
+    // derived Б2 (x = 27.73), so for the entire pedestrian wait the coach
+    // narrated the SIGN — and, until the copy beside it was corrected, told
+    // him the sign's full stop was already behind him. He is not waiting for
+    // the line; he is waiting for the woman crossing his bonnet, and that is
+    // the duty his own route task («Спри пред тротоара и пропусни пешеходеца»)
+    // is grading at that instant.
+    //
+    // ONLY THE UNSIGNALIZED CONTROLS. A red lamp is what legally holds a car
+    // at the line whatever else is in front of it, and its copy is the one the
+    // signal drills' tests pin; it keeps precedence. Nothing here grades:
+    // `holding` is true either way, so the finish-gate freeze, `yieldWaitSec`
+    // and every downstream number are bit-identical — what changes is which of
+    // two already-authored, already-cited cards is spoken. And the pedestrian
+    // row carries no `longCardBg` (`yieldCardCopyCoversLongWait`), so a long
+    // hold here can no longer resolve to a «тръгвай сега» across a crossing.
+    const unsignalizedLine =
+      tick.nextStopLineControl === "giveWay" || tick.nextStopLineControl === "stopSign";
+    if (unsignalizedLine && pedestrianCrossingIds.length > 0) return "pedestrian";
     if (tick.nextStopLineControl === "giveWay") return "giveWayLine";
     if (tick.nextStopLineControl === "stopSign") return "stopSign";
     if (
@@ -2058,6 +2082,36 @@ export function yieldReasonAt(
   const railGapSec = tick.oncomingRailGapSec;
   if (railGapSec !== undefined && railGapSec >= 0 && railGapSec <= YIELD_RAIL_GAP_SEC) {
     return "railVehicle";
+  }
+
+  // 4b. An oncoming NERELSOVO ППС closing on the junction this car still has to
+  // turn left across (ЗДвП чл. 37, ал. 1) — clause 4a's argument for the car
+  // the same manoeuvre is usually made against. This is the clause
+  // `sc-turn-left-oncoming:7974670c` was filed for: on the drill that briefs
+  // «Прецени интервала в СЕКУНДИ», the wait that IS the manoeuvre produced no
+  // reason at all from the moment its green lamp released clause 3.
+  //
+  // THE THRESHOLD IS AUTHORED, NOT ASSUMED, and that is also the SCOPE. Unlike
+  // the rail clause — a tram is a duty wherever one exists — an oncoming car
+  // is at every junction in the catalogue, and a hold armed on presence alone
+  // would freeze the finish gates for any student who happened to stop with
+  // traffic coming the other way. So it arms only where a gate the route has
+  // NOT yet completed publishes the norm it grades the interval against
+  // (`reportOncomingGapSec`), i.e. where a template has said in its own params
+  // that judging this interval is the exercise. One gate in the shipped
+  // catalogue authors it; every other lesson is byte-identical to before.
+  //
+  // The window closes with the gate, not with the junction: `currentIndex`
+  // onward is „still to do" (the chain is strictly sequential), so once the
+  // left turn is ticked the oncoming lane is somebody else's problem again.
+  const oncomingGapSec = tick.oncomingVehicleGapSec;
+  if (oncomingGapSec !== undefined && oncomingGapSec >= 0) {
+    for (let i = Math.max(0, ctx.currentIndex); i < ctx.params.length; i++) {
+      const p = ctx.params[i];
+      if (p.kind !== "reachZone") continue;
+      const normSec = p.reportOncomingGapSec;
+      if (normSec !== undefined && oncomingGapSec <= normSec) return "oncomingVehicle";
+    }
   }
 
   // 5. A ring this route has NOT finished yet, with the car stopped within one

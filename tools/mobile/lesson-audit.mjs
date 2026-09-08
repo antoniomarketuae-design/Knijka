@@ -285,7 +285,7 @@ import {
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
-import { mergeProbes, probeTouchPads, touchProbeLine } from "./lib/touch-probe.mjs";
+import { PROBE_BEFORE_DRIVE, mergeProbes, probeTouchPads, touchProbeLine } from "./lib/touch-probe.mjs";
 import { attestTarget, describeTarget, resolveBase, treeIdentity } from "./lib/target.mjs";
 // DID THE DRIVE HAPPEN — the same ladder the judge side runs, imported rather
 // than re-implemented. Pure (node:fs + node:path, no top-level work), so it is
@@ -6508,6 +6508,18 @@ note(
 );
 note(touchProbeLine(touchProbe));
 if (PLATFORM !== "pc" && inputChannel.channel === "keyboard") {
+  /* THE INSTANT IS READ OFF THE PROBE, NEVER ASSERTED. This sentence used to
+   * end „after the drive had ended" as a literal, written when the probe ran
+   * only there. It has been taken twice since, and `mergeProbes` reports the
+   * reading that ANSWERED — so on every lane whose pad went live before the
+   * drive, the loudest line in the transcript contradicted the TOUCH PROBE
+   * line printed directly above it, and did so in the direction that keeps a
+   * touch row unaddressable: „it was only ever pressed while inert" reads as
+   * „the probe proved nothing". Measured at 85495fd,
+   * `.audit-frames/canary-85495fd-134111/frames/sc-park-wall__mobile-right/run.log:886`
+   * — «actuated … taken before the drive, on the untouched car» on line 886,
+   * «after the drive had ended» on line 887. */
+  const answeredLive = touchProbe.actuated && touchProbe.when === PROBE_BEFORE_DRIVE;
   loud(
     "NO TOUCH DROVE THIS LANE: every pedal and every steer was a page.keyboard event, so this is a " +
       "phone-sized viewport driven by a KEYBOARD, not a phone driven by a thumb. TouchControls.tsx was " +
@@ -6515,9 +6527,15 @@ if (PLATFORM !== "pc" && inputChannel.channel === "keyboard") {
         inputChannel.overlayMounted === false
           ? "not even mounted"
           : touchProbe.actuated
-            ? "actuated only by the TOUCH PROBE line above, after the drive had ended"
+            ? `actuated only by the TOUCH PROBE line above, taken ${
+                touchProbe.when ?? "at an instant this build did not state"
+              }`
             : "mounted and never actuated"
-      } — no finding about how the CAR was controlled may name it, or any touch control, as its suspect.`,
+      } — no finding about how the CAR was controlled may name it, or any touch control, as its suspect.` +
+      (answeredLive
+        ? " THE PAD ITSELF DID ANSWER a live press at that instant, so a finding about the pad's own claim, " +
+          "hold or release edges MAY name TouchControls.tsx — read the TOUCH PROBE line for that one, not this one."
+        : ""),
   );
 }
 saveStatus({ inputChannel });

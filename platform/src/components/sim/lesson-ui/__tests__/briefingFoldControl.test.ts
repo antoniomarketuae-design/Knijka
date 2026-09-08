@@ -236,6 +236,45 @@ describe("the card folds instead of blanking the kerb — and folds RECOVERABLY"
     expect(effect.slice(0, effect.indexOf(");") + 2)).toBeTruthy();
     expect(CARD).toContain("}, [measure, steps, folded]);");
   });
+
+  it("…and the fold OUTLIVES the card, because a teach moment unmounts it", () => {
+    // sc-junction-rhr:486cad54 — „the ИНСТРУКЦИИ panel is pinned over the right
+    // third, exactly the side the priority vehicle arrives from". The speed
+    // rule above folds it on the approach; what it could not survive is the
+    // card being TAKEN AWAY and PUT BACK. The roomy mount sits behind
+    // `activeQuiz === null && teachQueue.length === 0`, so a teach moment — the
+    // likeliest event in a give-way drill — unmounts `BriefingCard`, React
+    // discards `folded` and `foldedOnceRef` with it, and «Разбрах» remounts a
+    // FRESH expanded panel at 0 км/ч over the side the student was just told to
+    // look at, where the speed rule cannot fold it again until he moves off.
+    //
+    // The repair is three props and a piece of shell state, i.e. four places a
+    // refactor can drop the wire while every pure case in this file stays
+    // green — the 51-of-82 defect class. Each half is pinned here.
+    expect(CODE).toContain(
+      "const [briefingFold, setBriefingFold] = useState<{ folded: boolean; latched: boolean }>({",
+    );
+    const mountAt = CODE.indexOf("<BriefingCard");
+    expect(mountAt, "the roomy mount moved — re-anchor").toBeGreaterThan(-1);
+    const mount = CODE.slice(mountAt, CODE.indexOf("/>", mountAt));
+    // BOTH halves are carried, not just the fold: seeding `folded` alone would
+    // put a student who had deliberately UNFOLDED the panel back under the
+    // auto-fold on his next metre — the rule firing twice, which is the crime
+    // „once, and never against the student" forbids.
+    expect(mount).toContain("foldedAtMount={briefingFold.folded}");
+    expect(mount).toContain("foldLatchedAtMount={briefingFold.latched}");
+    expect(mount).toContain("onFoldChange={setBriefingFold}");
+    // …and the card SEEDS its state from them rather than merely accepting
+    // them, which is the difference between a repair and a prop nothing reads.
+    const cardAt = CODE.indexOf("export function BriefingCard({");
+    const seed = CODE.slice(cardAt, CODE.indexOf("const measure", cardAt));
+    expect(seed).toContain("useState(foldedAtMount ?? false)");
+    expect(seed).toContain("useRef(foldLatchedAtMount ?? false)");
+    // …and every move of the fold is reported back up, or the shell's memory
+    // drifts from the card the moment the student touches either control.
+    expect(CARD).toContain("onFoldChange?.({ folded: true, latched: true });");
+    expect(CARD).toContain("onFoldChange?.({ folded: false, latched: true });");
+  });
 });
 
 /**

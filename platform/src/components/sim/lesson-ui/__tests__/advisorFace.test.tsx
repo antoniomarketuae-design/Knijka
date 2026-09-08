@@ -102,6 +102,10 @@ const YIELD_REASONS: readonly YieldReason[] = [
   "stopSign",
   "redLight",
   "pedestrian",
+  // sc-turn-left-oncoming:7974670c — the oncoming-vehicle wait. Added here
+  // because this face is where its card is actually read, and a card that does
+  // not fit the phone column is a card the student never finishes.
+  "oncomingVehicle",
 ];
 
 describe("the wrapper is checked before it is believed", () => {

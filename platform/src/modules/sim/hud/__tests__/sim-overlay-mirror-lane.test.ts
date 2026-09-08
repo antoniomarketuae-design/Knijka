@@ -204,7 +204,13 @@ describe("what the pair resolves to, and what each half alone would do", () => {
     // 64.44 + 86 = 150.4 px = 0.443 of the stage. The invariant is therefore
     // about the FLOOR, not about the ceiling, and the hazard band is what it
     // has to clear.
-    const CHROME_PX = 14 + 12 + 44 + 16;
+    // chip row · fold row · the wrapped class line · the 44 px control row ·
+    // the text window's own floor. The third term is new: on a card that is
+    // BOTH classed and queued the class and the mark no longer fit one lane
+    // (sc-junction-gap:4c2e452f — the class was rendering as «О…»), so row 1's
+    // `flex-wrap` box takes a second 12.5 px line. It is the worst case and it
+    // is modelled as one, which is the only thing this constant is for.
+    const CHROME_PX = 14 + 12 + 12 + 44 + 16;
     for (const p of PHONES) {
       const top = notifyColumnTopPx(p, true);
       const ceiling = notifyColumnMaxHeightPx(p.height, notifyColumnFloorPx(p), top);

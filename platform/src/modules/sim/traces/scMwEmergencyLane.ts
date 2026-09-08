@@ -1,11 +1,22 @@
 /**
  * sc-mw-emergency-lane — the authored drives (doc 76 §5/§9): ONE correct
  * shadow + TWO mistake demos for „Аварийната лента" (ЗДвП чл. 58, т. 3 — the
- * motorway emergency-lane ban) on the committed mw-v1 district. No lane
- * actors, ambient traffic ZERO (seed 7): the ONLY hazard is a BROKEN-DOWN car
- * standing ON the emergency lane, staged as a recorder obstacle rect (the
- * sc-hazard-obstacle pattern — trace/demo data, NOT map data; the live map
- * hosts only the road).
+ * motorway emergency-lane ban) on the committed mw-v1 district. Ambient
+ * traffic ZERO (seed 7) — and it is zero by ARITHMETIC as well as by the
+ * harness law on this map: mw-v1's two carriageways are disjoint one-way edges,
+ * so the lane graph has no closed loop and `buildRoutes` returns none at any
+ * count (measured, `lessons/scenario/__tests__/mw-emergency-lane-flow-visible
+ * .test.ts` §1). The ONLY hazard is a BROKEN-DOWN car standing ON the emergency
+ * lane, staged as a recorder obstacle rect (the sc-hazard-obstacle pattern —
+ * trace/demo data, NOT map data; the live map hosts only the road).
+ *
+ * NOT „no lane actors" ANY MORE, and the sentence above used to say that. The
+ * template's `staged` list — which this recorder passes through verbatim, see
+ * the bottom of this file — now also carries the FLOW the road never had: two
+ * cars in the northbound overtaking lane and a four-car column on the other
+ * carriageway (sc-mw-emergency-lane:63336390). None of them can be reached from
+ * any of the three scripts below and none of them grades; the trace gate and
+ * the flow gate both measure that rather than asserting it.
  *
  * The trace gate replays exactly these through the production stack:
  *   - shadow: ZERO violations + CLEAN_DRIVING — cruises the RIGHT travel

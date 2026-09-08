@@ -66,8 +66,21 @@ const GO_NOW_PHRASES = [...new Set(Object.values(LOOK_AND_GO))];
  * metres of tram clearing the rails, so a second card reading „огледай и
  * тръгвай" would be this product hinting a seventeen-year-old across a live
  * tram track. `yieldCardCopyCoversLongWait` must keep saying no for it.
+ *
+ * `oncomingVehicle` joined them with `sc-turn-left-oncoming:7974670c`, and it
+ * is the row that most looks like it belongs on the other list — the driver
+ * DOES read the end of this wait for himself, in seconds. He may not be hinted
+ * into it: what he is reading is a stream of oncoming cars, so a card saying
+ * „огледай и тръгвай сега" at half a minute is a nudge into the left turn
+ * across live traffic that the whole drill exists to break. The seconds are
+ * taught in `settledBg`, where they are a rule, not a cue to go.
  */
-const DECLARED_ELSEWHERE: readonly YieldReason[] = ["redLight", "pedestrian", "railVehicle"];
+const DECLARED_ELSEWHERE: readonly YieldReason[] = [
+  "redLight",
+  "pedestrian",
+  "railVehicle",
+  "oncomingVehicle",
+];
 /** Every reason the card can carry — the corpus §4 measures the column over. */
 const ALL_REASONS: readonly YieldReason[] = [...LOOK_AND_GO_REASONS, ...DECLARED_ELSEWHERE];
 

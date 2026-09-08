@@ -2215,6 +2215,10 @@ export class OncomingLeftTurnRunner implements EventRunner {
     this.phase = "resolved";
     this.outcome = outcomeOf(this.spec, input, success, detail, {
       ...(this.acceptedGapSec !== undefined ? { acceptedGapSec: this.acceptedGapSec } : {}),
+      // Whether he ever began the turn — the fact that separates «turned into a
+      // clear lane» from «never turned», which without it read identically to
+      // every consumer (see StagedEventOutcome.committed).
+      committed: this.committed,
     });
     return this.outcome;
   }

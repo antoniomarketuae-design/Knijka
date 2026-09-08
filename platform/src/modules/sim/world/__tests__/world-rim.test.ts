@@ -46,6 +46,7 @@ import { describe, expect, it } from "vitest";
 import { districtWorldEdge, parseDistrict, type DistrictBounds } from "../../runtime/district";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import {
+  isExtraUrbanCarriageway,
   isMotorwayCarriageway,
   TERMINUS_CLOSE_MAX_HEIGHT_M,
   TERMINUS_CLOSE_MIN_HEIGHT_M,
@@ -291,7 +292,14 @@ describe("§1 the rim's guards hold on every committed district", () => {
     // buildings in the first place.
     for (const id of ids) {
       const d = loadDistrict(id);
-      const urban = d.roads.edges.some((e) => !isMotorwayCarriageway(e));
+      // 2026-09-08 — and a THIRD kind of not-a-city-edge: an извънградски път.
+      // sc-sp-curve:6079dfb1 photographed «five-storey apartment blocks on both
+      // sides» on a road whose briefing sets off at 90 км/ч.
+      // `constants.isExtraUrbanCarriageway` carries the ЗДвП чл. 21, ал. 1 table
+      // this reads and the five-edge census.
+      const urban = d.roads.edges.some(
+        (e) => !isMotorwayCarriageway(e) && !isExtraUrbanCarriageway(e),
+      );
       for (const m of rimOf(d)) {
         expect(m.heightSource, `${id}/${m.id}`).toBe("height");
         if (urban) {
@@ -304,7 +312,7 @@ describe("§1 the rim's guards hold on every committed district", () => {
     }
   });
 
-  it("the bank fires on the motorway segments and NOWHERE else in the catalogue", () => {
+  it("the bank fires on the motorway and rural segments and NOWHERE else", () => {
     // Which maps took the bank is a fact worth naming rather than a side
     // effect: a rule that started flattening the rim of ordinary streets would
     // undo the „the world simply runs out" repair this builder exists for, and
@@ -313,13 +321,30 @@ describe("§1 the rim's guards hold on every committed district", () => {
       const masses = rimOf(loadDistrict(id));
       return masses.length > 0 && masses.every((m) => m.height === WORLD_RIM_BANK_HEIGHT_M);
     });
-    // mw-entry-v1 and mw-exit-v1 are deliberately NOT here, and measured rather
-    // than assumed: BOTH author an ordinary street carriageway beside their
-    // ramp (an entry ramp comes FROM somewhere and an exit ramp goes TO
-    // somewhere), so their rims stay city edges. That is the control that keeps
-    // this from being „every map with the word motorway in it" — only mw-v1 is
-    // 2.6 km of pure магистрала with nothing else on it.
-    expect(banked.sort()).toEqual(["mw-v1"]);
+    // THE EXPECTATION MOVED ON 2026-09-08, and it moved because the product did.
+    // It used to read `["mw-v1"]`, above a paragraph that said the rural half
+    // was not done — ov-crest-v1's «Учебен извънградски път» is `unclassified`,
+    // so no class test could separate it from a side street.
+    // `constants.isExtraUrbanCarriageway` separates it by the POSTED LIMIT
+    // instead (ЗДвП чл. 21, ал. 1: категория В is capped at 50 in a built-up
+    // area, 90 outside one), and the five maps that join the list here are the
+    // five open roads — no junction, no zebra — that POST 90; four of them also
+    // say «Учебен извънградски/извънграден път» in `meta.label` and ov-solid2-v1
+    // says «Учебен път». `builders/__tests__/extra-urban-is-not-a-street.test.ts`
+    // holds that census; sc-sp-curve:6079dfb1 is the row.
+    //
+    // mw-entry-v1 and mw-exit-v1 are STILL deliberately not here, and that is
+    // now the control on two rules rather than one: their ramps inherit 90 as a
+    // class DEFAULT (`maxspeedSource: "default"`), not as an authored posting,
+    // so neither the motorway rule nor the rural one claims them.
+    expect(banked.sort()).toEqual([
+      "ac-aqua-v1",
+      "mw-v1",
+      "ov-crest-v1",
+      "ov-oncoming-v1",
+      "ov-solid2-v1",
+      "sp-curve-v1",
+    ]);
   });
 
   it("the bank still CLOSES the world — it is lower, not absent", () => {

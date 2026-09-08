@@ -718,6 +718,71 @@ export function isMotorwayCarriageway(edge: { class: string; motorway?: boolean 
 }
 
 /**
+ * Category В ceiling ИЗВЪН НАСЕЛЕНО МЯСТО, km/h. RETRIEVED, not recalled:
+ * `content/law/acts/zdvp.json`, ЗДвП чл. 21, ал. 1 — the table reads
+ * «Категория В · Населено място 50 · Извън населено място 90». Ал. 2 says a
+ * DIFFERENT value is signalled by a sign, which is how a boulevard is posted
+ * 60/70 inside a town; nothing inside a built-up area is ever posted 90.
+ */
+export const BG_EXTRA_URBAN_CATEGORY_B_KMH = 90;
+
+/**
+ * IS THIS CARRIAGEWAY OUTSIDE A BUILT-UP AREA — an извънградски път rather than
+ * a Sofia street?
+ *
+ * `class` cannot answer it. The five rural micro-maps in the catalogue are
+ * tagged `unclassified` (sp-curve-v1, ov-crest-v1, ac-aqua-v1) or `tertiary`
+ * (ov-oncoming-v1, ov-solid2-v1), and 25 of the 106 committed districts carry
+ * one of those two classes on an ordinary street — so every dressing pass that
+ * asked the class put a Sofia street on the rural five.
+ *
+ * `sc-sp-curve:6079dfb1` (major) is what that costs, and it is a TEACHING
+ * defect, not a cosmetic one: «Instruction 1 says you are setting off on the
+ * OUT-OF-TOWN road at 90 км/ч, but 01-arrival, 03-ready, 05-stopped and every
+ * frame up to about t=060s show a dense urban street: five-storey apartment
+ * blocks on both sides, street lighting, kerbs and pavements, and a continuous
+ * rank of parked cars.» A student who believes the windscreen over the briefing
+ * has been taught that 90 км/ч is a city speed, which is the exact inversion of
+ * чл. 21.
+ *
+ * THE POSTED LIMIT ANSWERS IT, and it is the one term every one of those maps
+ * already carries. `maxspeedSource === "tag"` is required so this reads only
+ * what a map AUTHORED: `mwe-e-ramp` / `mwx-e-ramp` inherit 90 as a class
+ * DEFAULT (they are ramps off a 140 магистрала, not open road), and both of
+ * those districts keep their city rim and their street dressing because an
+ * entry ramp comes from somewhere and an exit ramp goes to somewhere — the
+ * control `world-rim.test.ts` has always held.
+ *
+ * MEASURED over all 106 committed documents. Exactly five NON-MOTORWAY edges
+ * satisfy it — `spc-e-road`, `ovc-e-road`, `ovg-e-road`, `ovs2-e-road`,
+ * `ac-aqua-e-street` — on the five open-road districts (no junction, no zebra)
+ * whose `meta.label` opens «Учебен …път». Nothing on a city, exam or полигон
+ * map moves. It ALSO answers true for the 10 магистрала carriageways posted 140
+ * (a motorway is извън населено място too), which costs nothing: every consumer
+ * asks `isMotorwayCarriageway` beside it and those maps were already handled by
+ * that rule. The one thing it buys there is defence in depth — a carriageway
+ * mis-typed `primary` can no longer take the Sofia side-street kit at 140 even
+ * if a map forgets the flag, which is the mw-exit-v1 defect exactly.
+ *
+ * LIKE `isMotorwayCarriageway`, IT MAY ONLY EVER REMOVE SCENERY. Sidewalks, the
+ * parking band and the paint still go by class, because those move
+ * `edgeHalfWidth` and therefore the drivable geometry every lane-keeping rule is
+ * graded against — so no drive this catalogue credits today can be refused
+ * tomorrow because of this predicate.
+ */
+export function isExtraUrbanCarriageway(edge: {
+  class: string;
+  maxspeed?: number;
+  maxspeedSource?: "tag" | "default" | string;
+}): boolean {
+  return (
+    edge.maxspeedSource === "tag" &&
+    typeof edge.maxspeed === "number" &&
+    edge.maxspeed >= BG_EXTRA_URBAN_CATEGORY_B_KMH
+  );
+}
+
+/**
  * Classes whose carriageway gets the SOLID EDGE LINE (М1 „очертаваща края на
  * платното за движение").
  *

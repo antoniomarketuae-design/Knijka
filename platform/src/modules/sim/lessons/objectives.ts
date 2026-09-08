@@ -31,6 +31,7 @@ import type {
   ObjectiveDetail,
   ObjectiveEvalState,
   ObjectiveParams,
+  OncomingGapEnding,
   ParkAlignment,
   ParkInBayParams,
   PassSignalParams,
@@ -365,17 +366,36 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       // `ReachZoneWitnessDemands.requireFullStop` for the protocol, the
       // measured tick/bill order and the false-refusal checks).
       //
-      // AUTHORED ONLY, and deliberately so: «спри» opens dozens of banners in
-      // this catalogue — «Спри пред тротоара», «Спри в джоба», «Спри преди
-      // детето» — and only the ones standing on a Б2 line mean the ЗДвП чл. 50
-      // full stop. A title matcher would put a standstill demand on gates whose
-      // whole subject is stopping SHORT of something while still rolling, which
-      // is the false refusal `ReachZoneYieldDemand`'s own split exists to
-      // prevent.
+      // AUTHORED WINS, THE TITLE FILLS IN — the law the four demands above are
+      // parsed under, arrived at here on 2026-09-04 (w28) after the key shipped
+      // authored-only the day before.
+      //
+      // THE ORIGINAL REFUSAL WAS OF A DIFFERENT MATCHER. It read: „«спри» opens
+      // dozens of banners in this catalogue … and only the ones standing on a
+      // Б2 line mean the ЗДвП чл. 50 full stop. A title matcher would put a
+      // standstill demand on gates whose whole subject is stopping SHORT of
+      // something while still rolling." Every word of that is true of a matcher
+      // on the VERB, and `deriveFullStopDemand` does not match the verb — it
+      // matches «напълно» / «пълна спирачка», the adverb that turns «спри» from
+      // a place into a standstill. «Спри пред тротоара» is untouched; «Спри
+      // НАПЪЛНО преди зебрата» is not. Sixty-three gates versus seven, and the
+      // seven are censused by hand in the matcher's own docblock.
+      //
+      // WHY IT COULD NOT STAY AUTHORED-ONLY. Six of the seven banners that
+      // promise the law's stop asked only for a NUMBER, and a number cannot
+      // state the dwell or the recency the law also demands — so «Спри напълно
+      // вдясно при червената лампа» was earned by a car resting on the mark for
+      // any reason at all, including the drive ending there. Leaving the key
+      // authored-only did not make those six safe, it made them silent: the one
+      // gate an author remembered was correct and the other six went on
+      // certifying an act nobody witnessed. A demand that must be remembered
+      // per-gate is a demand that will be forgotten on gate eight.
       if (p.requireFullStop !== undefined) {
         if (p.requireFullStop !== true) {
           throw new ObjectiveSpecError(objective.id, "reachZone requireFullStop must be true");
         }
+        out.requireFullStop = true;
+      } else if (deriveFullStopDemand(objective.titleBg)) {
         out.requireFullStop = true;
       }
       // THE ONCOMING-GAP REPORT (see `ReachZoneWitnessDemands.
@@ -756,6 +776,41 @@ export interface ObjectiveContext {
    * hand-built replay is bit-identical to shipped.
    */
   qualifyingStopCurrent?: boolean;
+  /**
+   * …AND IS THAT STANDSTILL THE CAR'S OWN CRASH? The provenance half of the
+   * fact above, and the answer to the one question every speed predicate in
+   * this file is unable to ask (w29, 2026-09-08).
+   *
+   * WHY A SECOND FIELD RATHER THAN A NARROWER FIRST ONE. `qualifyingStopCurrent`
+   * is the RULE ENGINE'S predicate, forwarded verbatim so that «пълно спиране»
+   * has one implementation and the sheet cannot print a ✓ and a −10 for one
+   * act. Narrowing it here would fork it again. So the engine's answer is left
+   * alone and the provenance is carried beside it: `stop.lastQualifyingStopAt`
+   * is „≤ `fullStopMaxSpeedKmh` held for ≥ `fullStopMinDurationSec`", a REST
+   * with no author — a car that spawned motionless, a car whose engine seized,
+   * and a car wrapped around a bollard all satisfy it identically.
+   *
+   * `true` means the standstill under the wheels right now is the one
+   * `LessonSessionState.crashPin` is holding: a terminating collision was
+   * billed, the car has not left the spot (`CRASH_PIN_RADIUS_M`) and it is
+   * motionless there. That is the drive's OWN machinery — the same pin
+   * `finish.ts CRASH_PIN_STUCK_S` uses to close a stuck session down — saying
+   * this rest is the impact's, not the driver's.
+   *
+   * THE PIN IS ONE FRAME OLD AND THE STANDSTILL IS NOT, and `lessons/engine.ts`
+   * carries the measurement that forced the split: a bare halt cap needs no
+   * dwell, so `capMet` latches on the FIRST motionless frame after the impact —
+   * which is precisely the frame the pin's own `stillSinceSec` has not been
+   * written on yet. The pin's ARMING is never stale (it happens on the
+   * collision frame, always before the car has come to rest), so the arming is
+   * read from the previous state and the rest it holds is read from the tick in
+   * hand.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes" — unknown may never
+   * become a refusal, the polarity every witness fact on this context ships
+   * with, so every fixture, rig and hand-built replay is bit-identical.
+   */
+  restIsCrashPinned?: boolean;
   /**
    * Has this drive been told, anywhere, that it rested inside a чл. 98 / В27
    * no-stopping span — `ILLEGAL_STOP_IN_BAN_ZONE`, the основна the catalogue cites
@@ -1657,7 +1712,18 @@ export interface ReachZoneWitnessDemands {
    *
    * AT THE FRAME, OUTSIDE THE `capMet` LATCH — the arrival contract is a
    * conjunction and this is one more term in it; the cap keeps its own latch
-   * and its own spend rules, untouched. UNKNOWN IS NEVER A REFUSAL: a context
+   * and its own spend rules, untouched.
+   *
+   * AND AT THE MARK (w28) — the term carries `capArmHere`'s own geometry,
+   * `inAcceptance || graceArmed`, because „outside the latch" alone left it
+   * satisfiable ANYWHERE. `reached` and `capMet` both latch, so a car that
+   * swept the disc under the cap and rolled on needed only one more true
+   * frame, and a standstill twenty metres past the paint supplied it —
+   * `.audit-frames/w27/frames/sc-merge-from-property__pc-right` printed the
+   * tick and the −10 on one protocol again, at HEAD, after this demand
+   * shipped. See `stepReachZone` for the drive frame by frame.
+   *
+   * UNKNOWN IS NEVER A REFUSAL: a context
    * that cannot answer (`undefined` — every fixture, rig and replay, and
    * `EMPTY_CONTEXT`) leaves the demand met, so every such caller is
    * bit-identical to shipped.
@@ -2373,6 +2439,79 @@ export function deriveHaltForVruDemand(titleBg: string): boolean {
 }
 
 /**
+ * «НАПЪЛНО» / «С ПЪЛНА СПИРАЧКА» — the banner does not say the car was SLOW
+ * here, it says the wheels STOPPED. The matcher that fills in `requireFullStop`
+ * (w28, 2026-09-04).
+ *
+ * ── WHY THIS EXISTS, AND WHY THE FILE PREVIOUSLY REFUSED IT ────────────────
+ *
+ * `requireFullStop` shipped AUTHORED-ONLY on 2026-09-03 with a stated reason,
+ * which is quoted here rather than paraphrased because it is still correct:
+ * „«спри» opens dozens of banners in this catalogue — «Спри пред тротоара»,
+ * «Спри в джоба», «Спри преди детето» — and only the ones standing on a Б2 line
+ * mean the ЗДвП чл. 50 full stop. A title matcher would put a standstill demand
+ * on gates whose whole subject is stopping SHORT of something while still
+ * rolling."
+ *
+ * THAT ARGUMENT IS ABOUT «СПРИ», AND THIS MATCHER DOES NOT READ «СПРИ». It
+ * reads the ADVERB. «Спри пред тротоара» promises a place; «Спри НАПЪЛНО преди
+ * зебрата» promises a place AND that the car stood still when it got there, and
+ * there is no reading of «напълно» under which a rolling car has honoured it.
+ * The word is the claim, so the word — not the verb it modifies — is what is
+ * matched. `spri`-wide would be 63 gates; this is 7.
+ *
+ * ── THE CENSUS (every `titleBg:` in `scenario/templates-*.ts`, 2026-09-04) ──
+ *
+ * SEVEN reachZone banners contain «напълно» or «пълна спирачка». All seven are
+ * census members — the population is unanimous, which is why the matcher is the
+ * word itself and carries no exception list:
+ *
+ *   cap 1  sc-rx-unguarded/sc-rxu-stop      «Спри напълно на стоп-линията преди релсите»
+ *   cap 3  sc-merge-from-property/…stop-line «Спри напълно на Б2 на изхода»   ← authored
+ *   cap 3  sc-ed-d2-priority-run/sc-edpr-b2 «Спри напълно на стоп-линията на знак Б2»
+ *   cap 4  sc-vp-telltale-red/…red-stop     «Спри напълно вдясно при червената лампа»
+ *   cap 6  sc-crossing-white-cane/sc-wcn-halt «Спри НАПЪЛНО преди зебрата — …»
+ *   cap 6  sc-hz-emergency-stop/sc-hzes-stop «Спри преди детето — с пълна спирачка, …»
+ *   cap 6  sc-hz-brake-dont-swerve/…-stop    «Спри преди препятствието — с пълна спирачка, …»
+ *
+ * ZERO false positives over all 362 reachZone rows: no title matches without
+ * containing one of the two phrases. The count is pinned in
+ * `__tests__/reach-zone-full-stop.test.ts` in BOTH directions, so a matcher that
+ * quietly stopped matching fails the build instead of emptying the census.
+ *
+ * WHAT IS DELIBERATELY OUT OF REACH, listed so the next census starts from the
+ * answer rather than re-deriving it:
+ *
+ *  · TEN `completeManeuver` banners say «… и спри напълно» («Задача 2:
+ *    паркирай на заден ход … и спри напълно» and its nine siblings). They can
+ *    never reach this matcher — it is called only from the `reachZone` branch
+ *    of `parseObjectiveParams` — and they need nothing from it: `stepParkInBay`
+ *    already requires `stopped && heldFor >= holdSec`, a HELD standstill, which
+ *    is a strictly stronger witness than the one this demand asks for.
+ *  · FOUR `passSignal` banners say «Премини стоп-линията след пълно спиране»
+ *    (sc-junction-stop, -scan, -gap, -left). Same reason — a different kind,
+ *    parsed elsewhere — and they have their own stop witness with its own
+ *    residual, closed separately in `stepPassSignal`.
+ *
+ * ── AND IT REFUSES NO DRIVE THAT ACTUALLY STOPS ────────────────────────────
+ *
+ * MEASURED, not reasoned, over the committed recordings of all six newly-bound
+ * gates at rungs 1/3/5 (`reach-zone-full-stop.test.ts` §5 replays them through
+ * `applyTick`, the entry point `LessonPlayShell.tsx` itself calls): every
+ * `shadow-correct` earns every objective it earned before this matcher existed,
+ * and each of the twelve mistake demos keeps the verdict it had. The demand is
+ * the rule engine's own qualifying stop, and `fullStopHonoured` reads
+ * `undefined` as MET, so every fixture, rig and hand-built replay is unchanged.
+ */
+const FULL_STOP_TITLE =
+  /(?<![\p{L}])(?:напълно|пълна\s+спирачка)(?![\p{L}])/iu;
+
+/** True when the banner claims the wheels actually stopped, not merely slowed. */
+export function deriveFullStopDemand(titleBg: string): boolean {
+  return FULL_STOP_TITLE.test(titleBg);
+}
+
+/**
  * «ПРОПУСНИ / ПРОПУСНЕШ» — the banner states outright that another road user
  * was let through. CENSUSED over every `titleBg:` in `scenario/templates-*.ts`
  * (2026-08-27) rather than guessed, exactly like the officer and the
@@ -2978,32 +3117,88 @@ function fullStopHonoured(ctx: ObjectiveContext): boolean {
 
 /**
  * The tightest gap the student turned into on this run's oncoming-left-turn
- * encounters (see `ReachZoneWitnessDemands.reportOncomingGapSec`).
+ * encounters, AND HOW THOSE ENCOUNTERS ACTUALLY ENDED (see
+ * `ReachZoneWitnessDemands.reportOncomingGapSec`).
  *
  *   `undefined` — no such encounter has RESOLVED yet, so nothing is known and
  *                 the gate emits no detail at all. Every fixture, rig and
  *                 replay lands here, which is why they stay bit-identical.
- *   `null`      — encounters resolved, none had an oncoming still inbound at
- *                 the commit: he waited them out, or the lane was clear.
- *   a number    — seconds the NEAREST oncoming still needed to reach the
- *                 junction when he turned.
+ *   otherwise   — `acceptedGapSec` (seconds the NEAREST oncoming still needed
+ *                 to reach the junction when he turned, or `null` when no
+ *                 figure was measured) plus the `ending` that says which drive
+ *                 the figure — or its absence — came from.
  *
  * THE MINIMUM, not the last: a JU-10 site stages a tight car and a follow car
  * (SC_LTAP_TIGHT_EVENT / SC_LTAP_FOLLOW_EVENT), both watch the same
  * `turnStarted`, and the gap that decides whether the manoeuvre was safe is the
  * closest one — the car you have to be clear of, not the one behind it.
+ *
+ * ── WHY `null` ALONE WAS A FALSE CERTIFICATE (sc-turn-left-oncoming:7974670c)
+ * `null` used to mean, in the debrief's own words, «при започването на завоя
+ * нямаше насрещен — лентата беше чиста». Four different drives reached it:
+ *
+ *   1. he committed into a genuinely empty lane — the one the sentence is true
+ *      of;
+ *   2. he never began the turn at all, so there was no «започване на завоя»;
+ *   3. the runtime billed him for cutting in, but published no `gapSec` with
+ *      the conviction, so no figure was recorded;
+ *   4. he DROVE INTO the oncoming car — `detail: "collision"`.
+ *
+ * (4) is not a hypothetical. `.audit-frames/w27/frames/
+ * sc-turn-left-oncoming__pc-right/_audit-debrief.json` and its mobile twin,
+ * both at head 85495fd, print «Завърши левия завой на юг, след като пропуснеш
+ * насрещните · Интервал: при започването на завоя нямаше насрещен — лентата
+ * беше чиста.» on a protocol whose faults are «Преминаване на червен сигнал
+ * −10» and «Удар в друго превозно средство −10». The one sentence this drill
+ * produces about its own subject told a student the lane had been clear on the
+ * run where he hit the car that was in it.
+ *
+ * `notEncountered` is folded in for the reason its own contract states —
+ * consumers must read it as „not measured", never as a clean run.
  */
-function acceptedOncomingGapSec(ctx: ObjectiveContext): number | null | undefined {
+function oncomingGapReport(
+  ctx: ObjectiveContext,
+): { acceptedGapSec: number | null; ending: OncomingGapEnding | null } | undefined {
   let seen = false;
   let tightest: number | null = null;
+  let collided = false;
+  let cut = false;
+  let released = false;
+  let anyCommitted = false;
+  let commitKnown = false;
   for (const o of ctx.stagedOutcomes) {
     if (o.kind !== "oncomingLeftTurn") continue;
     seen = true;
+    if (o.detail === "collision") collided = true;
+    if (o.detail === "violation") cut = true;
+    if (o.detail !== "notEncountered") released = true;
+    if (o.committed !== undefined) commitKnown = true;
+    if (o.committed === true) anyCommitted = true;
     const g = o.acceptedGapSec;
     if (g === undefined) continue;
     if (tightest === null || g < tightest) tightest = g;
   }
-  return seen ? tightest : undefined;
+  if (!seen) return undefined;
+  // Order matters and it is the order of gravity: an impact outranks a figure,
+  // a figure outranks a conviction with no figure, and „лентата беше чиста" is
+  // claimed LAST and only when the runner positively reports a turn. An
+  // outcome that carries no `committed` at all is „unknown", and unknown emits
+  // `null` — the neutral sentence — rather than picking one of two opposite
+  // accounts of the same drive.
+  const ending: OncomingGapEnding | null = collided
+    ? "collision"
+    : tightest !== null
+      ? "measured"
+      : cut
+        ? "cut"
+        : !released
+          ? "notEncountered"
+          : anyCommitted
+            ? "clear"
+            : commitKnown
+              ? "noTurn"
+              : null;
+  return { acceptedGapSec: tightest, ending };
 }
 
 function vruWaitHonoured(ctx: ObjectiveContext): boolean {
@@ -4193,7 +4388,85 @@ function stepReachZone(
   // cap needed a word of its own, and `honoured` is it. The two values are
   // mutually exclusive per frame (≤ cap versus > cap + slack), so they share
   // one field.
-  const capArmHere = cap !== undefined && speedKmh <= cap && (inAcceptance || graceArmed);
+  // ── AND THE SAME CONTRACT READ FROM THE OTHER END (w29, 2026-09-08) ──────
+  //
+  // WHAT WAS BROKEN, and it is the block below's own blind spot rather than a
+  // new one. `approachBlown` refuses a car that went through the mark too FAST,
+  // and it refuses to arm on a halt cap at all — „on «Спри точно на
+  // маркираната позиция» ARRIVING IN MOTION IS THE ACT", which is correct and
+  // is measured (the first cut armed on every cap and broke 166 correct
+  // drives). What nothing in this evaluator ever asked is the reciprocal
+  // question: a halt cap is `speedKmh <= cap` read at a point, 0 км/ч satisfies
+  // every cap in the catalogue, and NOTHING HERE ASKS WHY THE NUMBER IS SMALL.
+  //
+  // The file states its own asymmetry three times — „POSITION IS SWEPT; SPEED
+  // IS NOT … letting it satisfy the speed cap would credit «I slowed down at
+  // the mark» to a car that slid through the mark at 30 and came to rest five
+  // metres past it". Read what that concedes: it is a rule about WHERE a speed
+  // may be read, written to stop a fast car being credited, and it has no
+  // counterpart in the other direction. „The car is stationary at this place
+  // for a reason that has nothing to do with driving" was never defended, and
+  // the frame-zero guards (`posedAtSec`, `everOutside`) that DO defend it are
+  // all first-frame guards. „A drive that has not begun cannot end" has no
+  // sentence saying „a rest that ends the drive did not perform it".
+  //
+  // WHAT A REST CAN BE THAT IS NOT AN ACT, and the answer is exactly one thing
+  // once the file's existing guards are subtracted. A car at rest on a halt
+  // mark either drove there and stopped — which IS the act, at whatever hour it
+  // happened — or it was STOPPED by something. „Never moved at all" is already
+  // guarded (`posedAtSec` at frame zero, `everOutside` for the grace capsule);
+  // „stopped somewhere else" is already guarded (the point geometry above, and
+  // `beyondMark` for a gate with paint). What was left is the impact:
+  //
+  //  · „impact" — see `ObjectiveContext.restIsCrashPinned`. The car is
+  //    motionless where it crashed; `sc-hz-brake-dont-swerve`'s stop mark is
+  //    y 184 r 4 and the debris centre is y 190, so a car that plows into it
+  //    rests with its centre INSIDE the disc and the crash IS the qualifying
+  //    stop the rule engine reports — «✓ Спри преди препятствието — с пълна
+  //    спирачка» printed above «Удар в неподвижно препятствие −10». The wheels
+  //    stopped; the driver did not stop them.
+  //
+  // ── AND THE SECOND REASON WAS BUILT, MEASURED AND WITHDRAWN ───────────────
+  //
+  // A „passed" reason was written alongside it: the car went through the halt
+  // gate and LEFT it (past the disc plus its grace ring) having never once been
+  // at or under the cap there, so a rest that drifts back onto the mark
+  // afterwards would no longer re-issue the certificate. The motivation was
+  // real — `finish.ts routeEndMark` IS the terminal objective's own (x, y), and
+  // `terminalRescueZone` closes a stalled drive after twelve seconds of
+  // standstill at that same point, so the rescue gate's precondition is the
+  // arrival contract's sufficient condition.
+  //
+  // IT IS NOT LANDED, because this repo already has a committed ruling against
+  // it and that ruling is right. `__tests__/terminal-departure.test.ts` drives
+  // „out 200 m through the terminal gate at 40, back, onto the mark under the
+  // 6 км/ч cap" and requires BOTH objectives done — it is the exhibit written
+  // when a previous arm produced a false refusal on that very drive. The arm
+  // above turned it red. A student who overshoots a stop mark, comes back and
+  // stops on it HAS stopped on it; refusing him is the failure the founder
+  // ranks worst, and it would also have refused every `requireGear: reverse`
+  // exit gate, whose normal manoeuvre re-enters the ring backwards. „He got
+  // there late" is not „he never got there", and this evaluator has no channel
+  // that can tell a late arrival from a dead one.
+  //
+  // ONLY HALT CAPS, for the mirror of the reason `approachBlown` takes only
+  // flow caps: on a flow cap the banner asks the car to BE somewhere at a
+  // speed, and a standstill is one lawful way to be there (a queue, a lawful
+  // wait, a give-way). On a halt cap the standstill IS the graded act, which is
+  // the whole of why its provenance has to be named.
+  //
+  // IT CANNOT TRAP ANYONE, and that half is checked before the half that
+  // refuses. `st.capMet` — the latch as of the PREVIOUS frame — suppresses it
+  // entirely, so a student who stopped on the mark keeps his tick whatever he
+  // hits afterwards; and `freshApproach` clears it on the same ring-entry edge
+  // that clears `approachCap`, so driving off the wreck and coming at the mark
+  // again earns the tick exactly as before.
+  const capArmGeo = cap !== undefined && speedKmh <= cap && (inAcceptance || graceArmed);
+  const haltVoidedCarried = freshApproach ? undefined : st.haltVoided;
+  const restIsTheCrash = isHaltDemand && !st.capMet && capArmGeo && ctx.restIsCrashPinned === true;
+  const haltVoided: "impact" | undefined =
+    haltVoidedCarried ?? (restIsTheCrash ? "impact" : undefined);
+  const capArmHere = capArmGeo && haltVoided === undefined;
   const pastMark = alongMark !== null && alongMark >= 0;
   const isFlowCap = cap !== undefined && cap > REACH_ZONE_HALT_CAP_KMH;
   const carried = freshApproach ? undefined : st.approachCap;
@@ -4339,7 +4612,53 @@ function stepReachZone(
   // about whether it ever stood still; now it asks the grader that owns the
   // question. A zone that does not author the key never consults it and is
   // bit-identical to shipped.
-  const stopOk = params.requireFullStop !== true || fullStopHonoured(ctx);
+  //
+  // …AND IT IS ASKED AT THE MARK, w28 2026-09-04 (sc-merge-from-property:
+  // ab353b86). The paragraph above says the tick „has to be refused at the
+  // moment it would be granted"; without the geometry below it was refused at
+  // that moment and GRANTED AT THE NEXT ONE THAT HAPPENED TO SUIT. `reached`
+  // and `capMet` both latch, so once the car had swept the disc under the cap
+  // the arrival conjunction was one term short — and that term is a per-frame
+  // read of a TRANSIENT fact, satisfiable anywhere on the map at any later
+  // second. `.audit-frames/w27/frames/sc-merge-from-property__pc-right/run.log`
+  // (HEAD 85495fd, EVIDENCE complete) is the drive: «Стигна точката, но твърде
+  // бързо … 6 км/ч» at 04-t059s, «✗ Неспиране на знак Б2 „Спри!" −10 изпитни
+  // т. ОПАСНА ГРЕШКА» at 04-t065s, the car at REST twenty-odd metres past the
+  // paint at 04-t070s — and «✓ Спри напълно на Б2 на изхода» on the protocol.
+  // The certificate was issued off a standstill at the junction mouth that had
+  // nothing to do with the sign, on the same sheet as the ten points for not
+  // making it.
+  //
+  // `inAcceptance || graceArmed` is `capArmHere`'s own geometry and
+  // `lawfulOk`'s, for their reason: a standstill, like a speed, is a fact about
+  // the tick's OWN position, so it is read there and not over a swept segment.
+  // It refuses nobody who performs the act — a car that comes to rest at the
+  // line satisfies both halves on the same frame (`shadow-correct` rests at
+  // x 29.04, inside this disc) — and the whole of what it withdraws is a stop
+  // made somewhere else.
+  //
+  // …AND THE STANDSTILL'S AUTHOR IS ASKED ONE SCREEN UP, NOT HERE (w29
+  // 2026-09-08). The rule engine's answer is „≤ `fullStopMaxSpeedKmh` held ≥
+  // `fullStopMinDurationSec` within `stopRecencySec`", which is a REST and says
+  // nothing about its author — a car wrapped around what it hit satisfies it
+  // exactly as a car that braked does. That is `haltVoided: "impact"`, and it
+  // is enforced on `capArmHere`, which covers all seven gates the banner
+  // derives `requireFullStop` onto (every one of them carries a halt cap).
+  //
+  // AND IT IS DELIBERATELY NOT RESTATED HERE, because the two terms are NOT
+  // interchangeable and the difference is a false refusal. `haltVoided` is
+  // suppressed by `st.capMet`; a bare `ctx.restIsCrashPinned !== true` conjunct
+  // on this line is not, and it therefore also refuses the student who came to
+  // rest correctly ON the mark and was then hit from behind while standing
+  // there — his contract latched on his first motionless frame, his 0.5 s of
+  // dwell had not finished, and a crash he did not cause would take the task
+  // away. The residual, named rather than hidden: an «Спри напълно» gate with
+  // NO cap would have no `capArmHere` to carry the veto, so this term must be
+  // re-derived (guarded on the arrival, not on the frame) before the first such
+  // gate is authored. `reach-zone-full-stop-derived.test.ts`'s census is what
+  // notices one arriving.
+  const stopOk =
+    params.requireFullStop !== true || (fullStopHonoured(ctx) && (inAcceptance || graceArmed));
   // ── THE CEILING THE BANNER SAYS WAS HELD (requireSpeedClean) ──────────────
   // Ninth arm of the journey half and the ninth outside the `capMet` latch —
   // the stretch-shaped half of the ceiling claim, where `requireLawfulSpeed` is
@@ -4527,6 +4846,7 @@ function stepReachZone(
     prevPos: here,
     everOutside,
     ...(approachCap !== undefined ? { approachCap } : {}),
+    ...(haltVoided !== undefined ? { haltVoided } : {}),
   };
   // THE MEASUREMENT THIS GATE REPORTS (`reportOncomingGapSec`). Never a
   // refusal: `done` above is computed without it. Emitted only once an
@@ -4534,15 +4854,22 @@ function stepReachZone(
   // and every fixture, rig and replay — carries no detail at all, exactly as
   // it did before.
   const gapNormSec = params.reportOncomingGapSec;
-  const acceptedGapSec = gapNormSec === undefined ? undefined : acceptedOncomingGapSec(ctx);
+  const gapReport = gapNormSec === undefined ? undefined : oncomingGapReport(ctx);
   return {
     done,
     // Half progress once the place is reached but the speed contract is not
     // yet met — the banner stops looking inert while the student slows down.
     progress: done ? 1 : reached ? 0.5 : 0,
     evalState,
-    ...(gapNormSec !== undefined && acceptedGapSec !== undefined
-      ? { detail: { kind: "oncomingGap" as const, acceptedGapSec, normSec: gapNormSec } }
+    ...(gapNormSec !== undefined && gapReport !== undefined
+      ? {
+          detail: {
+            kind: "oncomingGap" as const,
+            acceptedGapSec: gapReport.acceptedGapSec,
+            normSec: gapNormSec,
+            ending: gapReport.ending,
+          },
+        }
       : {}),
   };
 }
@@ -4690,12 +5017,18 @@ function isForbiddingLamp(lightState: string | undefined): boolean {
  * is not trapped: stop anywhere on this approach and cross again and it
  * completes, on any of the shipped rungs, at any rung width.
  *
- * THE RESIDUAL, named rather than hidden: the memory is scoped to the APPROACH,
- * not to the last six seconds, so a stop made early on the approach and gone
- * stale by the rule engine's `stopRecencySec` (6) still certifies here while the
- * engine convicts. That is a narrower disagreement than the one being closed and
- * it needs a stop-TIME in the eval state to fix; `ObjectiveEvalState` lives in
- * lessons/types.ts, another lane's file.
+ * THE RESIDUAL, named rather than hidden — AND CLOSED, w28 2026-09-04. It read:
+ * „the memory is scoped to the APPROACH, not to the last six seconds, so a stop
+ * made early on the approach and gone stale by the rule engine's
+ * `stopRecencySec` (6) still certifies here while the engine convicts … it
+ * needs a stop-TIME in the eval state to fix; `ObjectiveEvalState` lives in
+ * lessons/types.ts, another lane's file."
+ *
+ * It needed neither the field nor the other lane's file. The stop-TIME was
+ * already on `ObjectiveContext` as `qualifyingStopCurrent` — the engine's own
+ * recency test, forwarded every frame — so the Б2 arm below now asks the grader
+ * that owns «пълно спиране» rather than keeping a second opinion of its own.
+ * The block on that arm carries the argument, the queue case and the polarity.
  */
 function stepPassSignal(
   params: PassSignalParams,
@@ -4751,8 +5084,20 @@ function stepPassSignal(
     tick.nextStopLineM <= PASS_SIGNAL_QUEUE_REACH_M;
   // Approach-scoped stop memory: leaving the approach forgets the stop, so a
   // halt elsewhere can never certify this junction's red — nor, now, its Б2.
+  //
+  // …AND A CRASH IS NOT A HALT (w29, 2026-09-08). `halted` is
+  // `speedKmh <= STOPPED_SPEED_KMH` — one frame, no dwell, no author — so a car
+  // motionless where it hit something latched „he stopped on this approach" for
+  // the remaining 105 m of it. That is the same rest the reachZone side refuses
+  // as `haltVoided: "impact"`, met here by the same fact
+  // (`ObjectiveContext.restIsCrashPinned`) and refused for the same reason: the
+  // wheels stopped and the driver did not stop them. Unknown is never a refusal
+  // (absent ⇒ every fixture, rig and replay latches exactly as shipped), and
+  // the memory is not a trap either — drive off what you hit, stop properly on
+  // this approach, and the latch is available again.
   const stoppedInZoneVisit = onApproach
-    ? prev.stoppedInZoneVisit || (halted && (inZone || queuedAtRed || queuedAtStopSign))
+    ? prev.stoppedInZoneVisit ||
+      (halted && ctx.restIsCrashPinned !== true && (inZone || queuedAtRed || queuedAtStopSign))
     : false;
   let redMet = prev.redMet;
   // WHICH signature certified the red, latched with it. The debrief renders a
@@ -4778,7 +5123,47 @@ function stepPassSignal(
       // withdrawn afterwards, and a stop made PAST the junction — still inside
       // the 60 m approach reach — cannot retroactively buy a crossing that is
       // already behind the car.)
-      if (params.control !== "stopSign" || stoppedInZoneVisit) crossed = true;
+      // ── THE RESIDUAL THIS FILE NAMED AGAINST ITSELF, CLOSED (w28 2026-09-04)
+      //
+      // The docblock above used to end: „THE RESIDUAL, named rather than
+      // hidden: the memory is scoped to the APPROACH, not to the last six
+      // seconds, so a stop made early on the approach and gone stale by the
+      // rule engine's stopRecencySec (6) still certifies here while the engine
+      // convicts. That is a narrower disagreement than the one being closed and
+      // it needs a stop-TIME in the eval state to fix; ObjectiveEvalState lives
+      // in lessons/types.ts, another lane's file."
+      //
+      // IT NEEDED NO FIELD AND NO OTHER LANE'S FILE. `stoppedInZoneVisit`
+      // answers „did he stand still ON THIS APPROACH" — 105 m of it
+      // (`radiusM` 45 + `PASS_SIGNAL_QUEUE_REACH_M` 60) — and that is the half
+      // worth keeping, because the tail of a queue is where a student who
+      // arrives late is SUPPOSED to be. What it cannot answer is „is that stop
+      // still the one the law is asking about", and the answer was already on
+      // the context: `ObjectiveContext.qualifyingStopCurrent`, forwarded every
+      // frame by `lessons/engine.ts` off the POST-tick rule state, is the
+      // engine's OWN test — `stop.lastQualifyingStopAt` within
+      // `stopRecencySec` — and it is the very expression the `stopLineCrossed`
+      // branch of `rules/engine.ts` uses on this same frame to choose between
+      // FULL_STOP_AT_STOP_SIGN and STOP_SIGN_NO_FULL_STOP.
+      //
+      // SO THE TWO CHANNELS NOW AGREE BY CONSTRUCTION, which is the whole
+      // repair and is the same move `requireFullStop` made on the reachZone
+      // side: asking the grader that owns «пълно спиране» instead of deriving a
+      // second standstill from `tick.speedKmh`. Two implementations of one
+      // legal term is how a sheet came to print a ✓ and a −10 for one act.
+      //
+      // THE QUEUE IS NOT COST. A student who does it right behind four cars
+      // stops, creeps, and stops AGAIN at the line, and every one of those
+      // standstills refreshes `lastQualifyingStopAt`. What is refused is the
+      // drive that stopped ONCE, far back, and then rolled to the paint without
+      // stopping again — and the engine bills that drive ten points on this
+      // exact frame, so a tick here would contradict the sheet, not the driver.
+      //
+      // AND UNKNOWN IS STILL NEVER A REFUSAL: `fullStopHonoured` reads a
+      // missing field as MET, so every fixture, rig and hand-built replay —
+      // and `EMPTY_CONTEXT` — is bit-identical to shipped.
+      if (params.control !== "stopSign" || (stoppedInZoneVisit && fullStopHonoured(ctx)))
+        crossed = true;
       if (params.control === "trafficLight") {
         // A red a регулировчик waved you through IS met: you encountered a
         // forbidding lamp and dealt with it the way чл. 7 says to. This is the

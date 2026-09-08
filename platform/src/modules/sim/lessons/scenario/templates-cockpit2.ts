@@ -400,6 +400,25 @@ export const SC_VP_TELLTALE_RED: ScenarioSpec = {
         y: TTR_STOP.y,
         radiusM: TTR_STOP_RADIUS_M,
         maxSpeedKmh: TTR_STOP_SPEED_KMH,
+        // «ВДЯСНО» — THE SECOND DEBT SC_VP_POLICE_STOP RECORDED, PAID (w28
+        // 2026-09-04). Same paragraph, same lane, same numbers as
+        // `sc-vptt-stop` above: x 13.9 in the ln-v1 right lane about a centre
+        // of 12.19, radius 3, cap 4, so the 1.0 m bound is reused verbatim and
+        // its measurement (taught pose −1.71 m, 0.71 m of slack; lane centre
+        // 0.00 m refused at every rung) transfers with it.
+        //
+        // AND IT IS THE HALF THE COMMENT ABOVE SAYS A DISC CANNOT GRADE. That
+        // block refused to tighten the RADIUS — rightly: „a 1.5 m bullseye
+        // would fail students who pulled over correctly", and the radius is
+        // single truth with VP_TELLTALE_RED_LAMP's halt contract. This is not
+        // the radius. `requireKerbwardM` reads `tick.laneOffsetM`, the
+        // locator's own lane-referenced offset measured ACROSS the carriageway,
+        // so it grades the side the title claims without moving one centimetre
+        // of the disc the runner and the committed traces are pinned to. The
+        // sentence that block ends on — „the title claims the side, not the
+        // centimetres" — is exactly what this term now witnesses; it was true
+        // and it was ungraded.
+        requireKerbwardM: 1.0,
       },
     },
   ],

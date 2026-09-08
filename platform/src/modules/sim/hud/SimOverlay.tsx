@@ -1649,8 +1649,10 @@ export function SimOverlay({
   // hundred lines below. Hooks may be reordered freely as long as the order is
   // the same on every render, and this one is; a ref reached backwards through
   // a callback assignment would not be.
+  //
+  // `tapSheetAck` LEFT THIS GROUP FOR THE SAME REASON, one row later — see the
+  // block at `tapSheetAck` for what its action now reads.
   const tapCloseSheet = useTapActivation(() => setOpenItem(null));
-  const tapSheetAck = useTapActivation(acknowledge);
   /* ── THE SENTENCE THAT WAS CUT IS ITSELF THE WAY TO THE REST — 2026-08-26.
      The overflow-clip lane, eight phone rows, one shape: «Удари човек. Това е
      най-» and then «↓ ОЩЕ 11 РЕДА» (sc-hz-emergency-stop/mobile-right/
@@ -1956,6 +1958,62 @@ export function SimOverlay({
     dismiss();
   });
   const tapDismissCard = composeCardDismissHandlers(cardPress, cardPressOnGlyph);
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     THE BUTTON THAT ADMITS THE FOLD MAY NOT ALSO DELETE IT — 2026-09-04,
+     sc-merge-accel-lane:b75b356e, „the briefing overlay clips its last line
+     behind the «Разбрах» button — item 6 breaks at «вече е аварийната» and THE
+     REST IS HIDDEN".
+
+     TWO COMMITS ANSWERED THE PICTURE AND NEITHER ANSWERED THE SENTENCE.
+     `foldMaskCss` (2f5ce8f) stopped the cut falling through a row of glyphs;
+     `ackCarriesSheetFold` (f91dd1c) moved «↓ още N реда» onto this button, „the
+     one control that ENDS the reading" — its own words. In `w27/…/sc-merge-
+     accel-lane__mobile-right/02-briefing.png` the button reads «Разбрах ↓ ОЩЕ
+     2 РЕДА» and those two lines are still «…лента — там не се кара», the
+     hard-shoulder warning. Until this commit the control that ANNOUNCED them
+     also threw them away on its first press (`useTapActivation(acknowledge)`,
+     no window read): a measurement wired to a LABEL and not to a BEHAVIOUR,
+     which is this project's own failure class. The peek states the rule this
+     borrows: „the student cannot delete words he has not seen."
+
+     `cardTapAction` is the exported, gated branch, called with
+     `onDismissGlyph: false` — this button paints no ✕, it IS the
+     acknowledgement — so one press scrolls to the end while text is hidden and
+     the next acknowledges. `scrollTo` fires a native `scroll` and the window is
+     already wired to `sheetFold.onScroll`, so the cue reaches zero on the same
+     press that reveals the words, and a reader already at the end gets
+     `readRestScrollTop === null`, i.e. the old behaviour exactly.
+
+     NOTHING LOSES ITS FIRST-PRESS EXIT: the ✕ (`tapCloseSheet`), Escape, and
+     the Space/Enter path all still act on one press — assistive technology
+     reads the whole body out of the DOM regardless of scroll position, which is
+     why the cue is `aria-hidden` and why a second press would cost an AT user
+     nothing but a press. Read from the ELEMENT at tap time, not from
+     `sheetFold.lines`: that number is refreshed by a `ResizeObserver` and by
+     `onScroll`, and a tap that ends the briefing may not depend on which ran.
+     ══════════════════════════════════════════════════════════════════════════ */
+  const tapSheetAck = useTapActivation(() => {
+    const el = sheetFold.ref.current;
+    const padRaw = el === null ? Number.NaN : Number.parseFloat(getComputedStyle(el).paddingBottom);
+    const action = cardTapAction({
+      onDismissGlyph: false,
+      window:
+        el === null
+          ? null
+          : {
+              scrollTop: el.scrollTop,
+              scrollHeight: el.scrollHeight,
+              clientHeight: el.clientHeight,
+              padBottomPx: Number.isFinite(padRaw) ? padRaw : 0,
+            },
+    });
+    if (action.kind === "scroll" && el !== null) {
+      el.scrollTo({ top: action.top });
+      return;
+    }
+    acknowledge();
+  });
 
   /* ══════════════════════════════════════════════════════════════════════════
      WHICH MOMENT THE VERDICT IS ABOUT — §2.6 O33's SECOND HALF, 2026-08-25.
@@ -2524,28 +2582,65 @@ export function SimOverlay({
             right, which is the founder's own «−10 т.» misreading with the
             qualifier removed (`rules/scales.ts` exists because of it).
 
-            THEREFORE THE MARK IS `shrink-0` AND THE CLASS IS THE HALF THAT
-            GIVES. A clipped «ВТОРОСТЕПЕ…» still names the class; a clipped
-            «−10 ИЗПИТНИ…» names a scale the student then has to guess, and the
-            guess everyone makes is контролни точки. The separator rides with
-            the mark so a truncating class can never end on a dangling «·». */}
+            THE MARK IS THEREFORE `shrink-0`. A clipped «ВТОРОСТЕПЕ…» still
+            names the class; a clipped «−10 ИЗПИТНИ…» names a scale the student
+            then has to guess, and the guess everyone makes is контролни точки.
+
+            ── …AND THE CLASS THEN TRUNCATED TO ONE LETTER. THE LANE ABOVE WAS
+               MEASURED IN THE WRONG PLACE — sc-junction-gap:4c2e452f, re-opened
+               on the frames of its own repair.
+
+            The «46 px with a queue badge up» is the gap between the mark's
+            RIGHT edge and the badge. The class is not laid out there: it comes
+            BEFORE the mark, so what it actually gets is the row minus the
+            glyph, minus three gaps, minus a `shrink-0` mark, minus the badge.
+            Re-scanned on `.audit-frames/w27/frames/sc-junction-gap__mobile-
+            wrong/04-t012s.png` (the first sweep carrying this field, tree
+            85495fd, same phone, same dpr, same red-ink scan):
+
+              ⚠ glyph     device 1627–1660   CSS 542.3–553.3
+              the class   device 1686–1718   CSS 562.0–572.7  ← 10.7 px of ink
+              «·»         device 1761–1766   CSS 587.0–588.7
+              «−10»       device 1798–1848   CSS 599.3–616.0
+              «ИЗПИТНИ»   device 1875–2003   CSS 625.0–667.7
+              «Т.»        device 2030–2058   CSS 676.7–686.0
+
+            10.7 px is «О» and an ellipsis. The mark with its separator is 99
+            px, not 86.7, and 176 − 14 (glyph) − 18 (three gaps) − 99 − 23
+            (badge) leaves the class ~22 px against the 36.6 «ОПАСНА» needs.
+            The field was mounted, fed and asserted, and the card still named
+            no class — a repair that shipped a DOM node instead of a word.
+
+            SO THE PAIR WRAPS INSTEAD OF THE CLASS TRUNCATING. They share one
+            `flex-wrap` box: when both fit — every card without a «+N» badge,
+            156 px against 131 — the row is what it was; when they do not, the
+            mark takes a second line whole rather than the class shrinking to a
+            letter. Neither half is ever clipped and the cost is one 12.5 px
+            line, and only on a card that is BOTH classed and queued.
+
+            THE «·» GOES WITH IT, and that is the wrap's requirement and not a
+            taste: a separator that rides with the mark leads the second line
+            when the mark moves, and a middot opening a line reads as a bullet.
+            The gap does the joining, which is what the ROOMY card has always
+            done — `HudToasts.ToastCard` puts the class and the mark at the two
+            ends of a `justify-between` row with no separator between them. */}
         {shown.markClassBg ? (
-          <span
-            data-sim-overlay-mark-class=""
-            className="min-w-0 shrink truncate text-[10px] font-black uppercase tracking-wider"
-          >
-            {shown.markClassBg}
+          <span className="flex min-w-0 shrink flex-wrap items-center gap-x-2 gap-y-0 leading-tight">
+            <span
+              data-sim-overlay-mark-class=""
+              className="max-w-full shrink-0 truncate text-[10px] font-black uppercase tracking-wider"
+            >
+              {shown.markClassBg}
+            </span>
+            {shown.chipBg ? (
+              <span className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase tracking-wider">
+                {shown.chipBg}
+              </span>
+            ) : null}
           </span>
-        ) : null}
-        {shown.chipBg ? (
-          <span
-            className={
-              shown.markClassBg
-                ? "shrink-0 whitespace-nowrap text-[10px] font-black uppercase tracking-wider"
-                : "min-w-0 truncate text-[10px] font-black uppercase tracking-wider"
-            }
-          >
-            {shown.markClassBg ? `· ${shown.chipBg}` : shown.chipBg}
+        ) : shown.chipBg ? (
+          <span className="min-w-0 truncate text-[10px] font-black uppercase tracking-wider">
+            {shown.chipBg}
           </span>
         ) : null}
         {queued > 0 ? (

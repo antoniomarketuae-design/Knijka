@@ -60,7 +60,14 @@ describe("rule-event wire round-trip", () => {
    */
   it("a retitled praise survives the round-trip — the client and the server agree", () => {
     const client = makeCommendation("YIELDED_TO_PRIORITY", 33, "emergency");
-    expect(client.titleBg).toBe("Правилно пропуснат автомобил със специален режим");
+    // RETITLED 2026-09-04 (sc-merge-from-property:6715b581): the string above
+    // was 47 characters and wrapped to a THIRD line in the phone peek's 44 px
+    // window, so the word that says what the student did right sat under the
+    // fold. `rules/__tests__/violation-title-fits-peek.test.ts` now walks this
+    // table. The EXPECTATION moves because the product string moved; what this
+    // case is about — that the retitle survives the round-trip and the two
+    // halves of the end screen agree — is asserted below and is untouched.
+    expect(client.titleBg).toBe("Пропуснат автомобил със специален режим");
     expect(client.conceptId).toBe("c-emergency-priority");
 
     const wire = serializeRuleEvents([client]);

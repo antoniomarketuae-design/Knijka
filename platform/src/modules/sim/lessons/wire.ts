@@ -49,6 +49,7 @@ import type {
   LessonResult,
   ObjectiveDetail,
   ObjectiveOutcome,
+  OncomingGapEnding,
   RedMetVia,
   SessionNearMiss,
 } from "./types";
@@ -467,7 +468,29 @@ function parseWireObjectiveDetail(value: unknown): ObjectiveDetail | null {
       // standard to read the seconds against — drop the row rather than print
       // a figure beside an invented bar.
       if (!isFiniteNum(d.normSec) || d.normSec <= 0 || d.normSec > 3600) return null;
-      return { kind: "oncomingGap", acceptedGapSec, normSec: d.normSec };
+      // `ending` is ADDITIVE (2026-09-04), on the `redMetVia` precedent above:
+      // payloads written before it omit it and decode to null, which the
+      // debrief renders as the sentence true of every ending rather than
+      // inventing one. Absent is legal; a value outside the union is not.
+      const end = d.ending;
+      if (
+        end !== undefined &&
+        end !== null &&
+        end !== "measured" &&
+        end !== "collision" &&
+        end !== "cut" &&
+        end !== "notEncountered" &&
+        end !== "clear" &&
+        end !== "noTurn"
+      ) {
+        return null;
+      }
+      return {
+        kind: "oncomingGap",
+        acceptedGapSec,
+        normSec: d.normSec,
+        ending: (end ?? null) as OncomingGapEnding | null,
+      };
     }
     case "roundabout": {
       if (typeof d.entered !== "boolean" || typeof d.exitSignaled !== "boolean") return null;

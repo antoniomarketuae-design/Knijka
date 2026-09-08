@@ -161,6 +161,10 @@ export const ROAD_FINE_STRENGTH = 0.1;
  * unevenness in at the metre scale a driver reads a road at, and it is what
  * makes the surface read as snow ON tarmac rather than as tarmac tinted.
  *
+ * …AND MODULATING IT BY THE RAW FIELD DID NOT DO THAT — see
+ * `ROAD_SNOW_PATCH_LO` below for the R0 look that caught it and the remap that
+ * gives this paragraph back its meaning.
+ *
  * THE SCALE, 6 m, sits deliberately between the two octaves already on this
  * material — the 14 m detile and the 2.6 m fine break — so the three do not
  * beat against each other and the drifts are longer than a car and shorter than
@@ -176,9 +180,82 @@ export const ROAD_SNOW_PATCH_TILE_M = 6;
  * `sc-ac-snow:f1673b60` convicted. At 0.4 the mean weight is `mix(0.4, 1, 0.5)`
  * = 0.70 of the cap, which is the number `SNOW_ROAD_COVER_MAX`'s derivation is
  * worked against, and the spread it leaves (0.44 … 0.55 linear against a bare
- * 0.36) is wide enough to read as drifts rather than as dither.
+ * 0.36) is wide enough to read as drifts rather than as dither — PROVIDED the
+ * patch weight actually spends 0 … 1, which until `ROAD_SNOW_PATCH_LO` below it
+ * did not.
  */
 export const ROAD_SNOW_PATCH_FLOOR = 0.4;
+
+/**
+ * THE DRIFT'S CONTRAST WINDOW — and the R0 look that made it necessary.
+ *
+ * `SNOW_ROAD_COVER_MAX`'s block and `ROAD_SNOW_PATCH_FLOOR` above both end with
+ * an R0 look OWED and never taken („this lane may not start a server"), and
+ * both name the same acceptance criterion: „the carriageway must read as snow
+ * lying unevenly on tarmac rather than as a paler grey". THAT LOOK HAS NOW BEEN
+ * TAKEN — on the shipped sweeps rather than on a dev server, which is what R0
+ * asks for (a photograph of the shipped build with the shipped value in it):
+ * `.audit-frames/w21` (`b224c7e`, before the mix) against `.audit-frames/w27`
+ * (`85495fd`, at HEAD), `sc-ac-snow/pc-right/03-ready.png`, the settled frame
+ * presets.ts insists on. Mean sRGB L709, saturation-filtered so the green
+ * guidance ribbon and the blue shadow path cannot enter the band:
+ *
+ *   carriageway (880,435 60×20)      w21 122.9  →  w27 149.3   (+21 %)
+ *   near band   (600,402 400×40)     w21 122.5  →  w27 139.6   (+14 %)
+ *   …its coefficient of variation    w21  0.108 →  w27  0.077
+ *   row profile down the lane, w27, y 404…520: it wanders 134.9 … 146.1,
+ *   where the same rows at w21 fall almost monotonically 131 → 105
+ *
+ * So the FIRST criterion („no longer bare grey asphalt") passes and the mix is
+ * doing its job. The SECOND — uneven, not merely paler — does not: the drift
+ * is alive but its whole amplitude on screen is ±4 % peak-to-peak, and a 3×
+ * crop of the near carriageway reads as one smooth pale surface.
+ *
+ * WHY, AND IT IS ARITHMETIC RATHER THAN TASTE. The block above spends the patch
+ * as `mix(floor, 1, patch)`, which is worth its stated 0.16 … 0.40 only if
+ * `patch` spends 0 … 1. It does not. `macroVariation.ts` builds the shared field
+ * as a four-octave fBm SUM normalised over the whole 256² tile, so the sum is
+ * near-Gaussian and the endpoints are reached at a handful of texels. Measured
+ * on the shipped generator (deterministic — `makeMacroNoiseTexture` takes no
+ * seed from the session, and the test recomputes this from the real texture):
+ *
+ *   mean 0.527   sd 0.203   p5 0.204   p10 0.251   p90 0.800   p95 0.843
+ *
+ * i.e. 90 % of the carriageway sits inside a cover of 0.209 … 0.362 against the
+ * 0.16 … 0.40 the derivation promised — 64 % of the intended swing, and the
+ * missing third is the half that reads.
+ *
+ * THE REMAP IS THE FIX, AND IT MOVES NO RULED BOUND. `smoothstep(LO, HI, patch)`
+ * over the field's own deciles stretches that middle band back across 0 … 1:
+ *
+ *   cover mean  0.2865 → 0.2816   (the `(FLOOR + 1) / 2` the cap was derived
+ *                                  against assumes E[patch] = 0.5; the remap
+ *                                  moves the field's mean 0.527 → 0.507, i.e.
+ *                                  TOWARD that assumption, not away from it)
+ *   cover sd    0.0488 → 0.0890   (+82 %)
+ *   cover p5…p95 0.209 … 0.362 → 0.160 … 0.400 — the designed range, spent
+ *
+ * Every ordering `SNOW_ROAD_COVER_MAX` rules on is stated on the CAP (0.40) and
+ * on the MEAN, and neither moves: the peak was always allowed to reach 0.40 —
+ * „the brightest DRIFT meeting the grimiest paint … solves to 0.42, so 0.42 is
+ * a hard ceiling and 0.40 is it with a margin" — it simply never got there. The
+ * clamped tails are the physical shape as well as the cheap one: a wheel track
+ * is uniformly scrubbed and a drift is uniformly covered.
+ *
+ * DERIVED, NOT PICKED: these are the field's p10 and p90 rounded to two places.
+ * `roadSurface.test.ts` recomputes both from `getMacroNoiseTexture()` and fails
+ * if the generator ever drifts away from them, so the window cannot silently
+ * go back to describing a distribution the shaders do not sample.
+ *
+ * ITS OWN R0 LOOK IS OWED — and it is the same frame: re-drive `sc-ac-snow`
+ * and take `pc-right/03-ready.png` (NOT `01-arrival`, which photographs the
+ * ground loader). The criterion is unchanged: drifts and trodden bands at the
+ * metre scale, and the dashed lane line still plainly the brightest thing in
+ * the carriageway.
+ */
+export const ROAD_SNOW_PATCH_LO = 0.25;
+/** The upper decile of the same field — see `ROAD_SNOW_PATCH_LO`. */
+export const ROAD_SNOW_PATCH_HI = 0.8;
 
 /**
  * The line the fragment stage emits — exported so the test pins the exact
@@ -202,17 +279,19 @@ export const ROAD_SNOW_FRAGMENT_ANCHOR =
  */
 export function roadSnowFragmentBlock(xzVarying: string): string {
   return `if ( uSnowRoad > 0.0 ) {
-        float roadSnowPatch = texture2D( uRoadTap, ${xzVarying} * uRoadSnowScale ).r;
+        float roadSnowPatch = smoothstep( uRoadSnowLo, uRoadSnowHi,
+          texture2D( uRoadTap, ${xzVarying} * uRoadSnowScale ).r );
         float roadSnowAmount = uSnowRoad * mix( uRoadSnowFloor, 1.0, roadSnowPatch );
         ${ROAD_SNOW_FRAGMENT_ANCHOR}
       }`;
 }
 
-/** The three uniform declarations the drift block needs, plus the two the snow
- *  channel travels in. One string, so the asphalt and the decal programs cannot
- *  declare different sets. */
+/** The five uniform declarations the drift block needs — field, scale, floor
+ *  and the two ends of its contrast window — plus the two the snow channel
+ *  travels in. One string, so the asphalt and the decal programs cannot declare
+ *  different sets. */
 const SNOW_UNIFORM_DECLS =
-  "uniform sampler2D uRoadTap;\nuniform float uRoadSnowScale;\nuniform float uRoadSnowFloor;\nuniform float uSnowRoad;\nuniform vec3 uSnowColor;";
+  "uniform sampler2D uRoadTap;\nuniform float uRoadSnowScale;\nuniform float uRoadSnowFloor;\nuniform float uRoadSnowLo;\nuniform float uRoadSnowHi;\nuniform float uSnowRoad;\nuniform vec3 uSnowColor;";
 
 const TAP_COS = Math.cos(ROAD_TAP_ROTATION_RAD).toFixed(6);
 const TAP_SIN = Math.sin(ROAD_TAP_ROTATION_RAD).toFixed(6);
@@ -230,6 +309,8 @@ let roadUniforms: {
   uRoadFineStrength: { value: number };
   uRoadSnowScale: { value: number };
   uRoadSnowFloor: { value: number };
+  uRoadSnowLo: { value: number };
+  uRoadSnowHi: { value: number };
 } | null = null;
 
 function getRoadUniforms() {
@@ -246,9 +327,29 @@ function getRoadUniforms() {
       uRoadFineStrength: { value: ROAD_FINE_STRENGTH },
       uRoadSnowScale: { value: 1 / ROAD_SNOW_PATCH_TILE_M },
       uRoadSnowFloor: { value: ROAD_SNOW_PATCH_FLOOR },
+      uRoadSnowLo: { value: ROAD_SNOW_PATCH_LO },
+      uRoadSnowHi: { value: ROAD_SNOW_PATCH_HI },
     };
   }
   return roadUniforms;
+}
+
+/**
+ * The drift field and the channel it travels in, bound by REFERENCE — one
+ * definition for the asphalt and the decals, because the two must sample the
+ * identical field at the identical scale through the identical window or a
+ * drift that crosses the carriageway stops at the manhole in it.
+ */
+function bindRoadSnowFieldUniforms(shader: THREE.WebGLProgramParametersWithUniforms): void {
+  const u = getRoadUniforms();
+  shader.uniforms.uRoadTap = u.uRoadTap;
+  shader.uniforms.uRoadSnowScale = u.uRoadSnowScale;
+  shader.uniforms.uRoadSnowFloor = u.uRoadSnowFloor;
+  shader.uniforms.uRoadSnowLo = u.uRoadSnowLo;
+  shader.uniforms.uRoadSnowHi = u.uRoadSnowHi;
+  // `uSnowRoad` + `uSnowColor`, from the one file that owns how white snow gets
+  // and the one writer DistrictWorld already ticks each frame.
+  bindSnowRoadUniforms(shader);
 }
 
 /**
@@ -272,11 +373,8 @@ export function roadSurfaceOnBeforeCompile(
   shader.uniforms.uRoadDetailStrength = u.uRoadDetailStrength;
   shader.uniforms.uRoadFineScale = u.uRoadFineScale;
   shader.uniforms.uRoadFineStrength = u.uRoadFineStrength;
-  shader.uniforms.uRoadSnowScale = u.uRoadSnowScale;
-  shader.uniforms.uRoadSnowFloor = u.uRoadSnowFloor;
-  // `uSnowRoad` + `uSnowColor`, by reference, from the one file that owns how
-  // white snow gets and the one writer DistrictWorld already ticks each frame.
-  bindSnowRoadUniforms(shader);
+  // The drift field, its window and the snow channel — see the binder.
+  bindRoadSnowFieldUniforms(shader);
 
   shader.fragmentShader = shader.fragmentShader
     .replace(
@@ -355,8 +453,11 @@ export function roadSurfaceOnBeforeCompile(
  *  v2 when the carriageway snow mix landed: a cached v1 program carries neither
  *  `uSnowRoad` nor the splice, so a warm page would hand a hooked material the
  *  old program and the fix would change no pixel. Same reason
- *  `snowCoverProgramCacheKey` moved to v2 for the winter term. */
-export const roadSurfaceProgramCacheKey = (): string => "road-surface-v2";
+ *  `snowCoverProgramCacheKey` moved to v2 for the winter term — and the same
+ *  reason it is at v3 now that the drift carries its contrast window: a cached
+ *  v2 program declares neither `uRoadSnowLo` nor `uRoadSnowHi` and was compiled
+ *  without the smoothstep, so the uniforms would be set and nothing would move. */
+export const roadSurfaceProgramCacheKey = (): string => "road-surface-v3";
 
 /**
  * SNOW ON THE ROAD DECALS — the residue the carriageway mix left behind.
@@ -395,11 +496,7 @@ export const roadSurfaceProgramCacheKey = (): string => "road-surface-v2";
 export function roadDecalSnowOnBeforeCompile(
   shader: THREE.WebGLProgramParametersWithUniforms,
 ): void {
-  const u = getRoadUniforms();
-  shader.uniforms.uRoadTap = u.uRoadTap;
-  shader.uniforms.uRoadSnowScale = u.uRoadSnowScale;
-  shader.uniforms.uRoadSnowFloor = u.uRoadSnowFloor;
-  bindSnowRoadUniforms(shader);
+  bindRoadSnowFieldUniforms(shader);
 
   // Its own varying rather than the macro hook's: attaching MACRO_VARIATION
   // here would put the 80 m ground brightness variation on the decals in DRY
@@ -425,5 +522,7 @@ export function roadDecalSnowOnBeforeCompile(
 /** Stable cache key — the decals' own program. Distinct from the asphalt's
  *  (this one carries no detile and no detail normal) and from the plain macro
  *  program, so three cannot hand this material a program compiled without the
- *  splice. */
-export const roadDecalSnowProgramCacheKey = (): string => "road-decal-snow-v1";
+ *  splice — and v2 for the asphalt's reason: v1 was compiled before the drift's
+ *  contrast window existed, and a decal on the old program would carry a
+ *  different weather from the road it is a wear mark in. */
+export const roadDecalSnowProgramCacheKey = (): string => "road-decal-snow-v2";

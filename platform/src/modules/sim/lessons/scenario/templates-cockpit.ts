@@ -1035,6 +1035,27 @@ export const SC_VP_TELLTALE: ScenarioSpec = {
         y: TT_STOP.y,
         radiusM: TT_STOP_RADIUS_M,
         maxSpeedKmh: TT_STOP_SPEED_KMH,
+        // «ПЛЪТНО» — THE DEBT SC_VP_POLICE_STOP RECORDED, PAID (w28 2026-09-04).
+        //
+        // That template's docblock closed the identical hole on `sc-vpps-stop`
+        // and named the two rows it could not reach from its own file: „the
+        // SIBLING rows that carry «плътно» on the same geometry without the
+        // term — `sc-vp-telltale/sc-vptt-stop` and `sc-vp-telltale-red` — which
+        // belong to another lesson's lane." This is that lane.
+        //
+        // THE GEOMETRY IS NOT MERELY SIMILAR, IT IS THE SAME NUMBERS. Both
+        // gates sit at x 13.9 in the ln-v1 right lane about a centre of 12.19
+        // (TT_RIGHT ≡ PS_RIGHT), at radius 3 and cap 4. So the constant is
+        // reused rather than re-derived: 1.0 m kerb-ward of the lane centre,
+        // not the mark's own 1.71, because the bound has to leave a student who
+        // lands the taught pose room to be imperfect — the founder ranks
+        // refusing a correct pull-over as the worse failure. The taught pose is
+        // −1.71 m, so it keeps 0.71 m of slack, and a car resting on the lane
+        // centre (0.00 m) — the pose instruction 4 names as the mistake — can
+        // never earn it at any rung. NOT laddered (scenario/params.ts), which
+        // leaves the radius ladder free to go on separating the rungs ALONG the
+        // road while the sideways demand reads the same on every one.
+        requireKerbwardM: 1.0,
       },
     },
   ],
