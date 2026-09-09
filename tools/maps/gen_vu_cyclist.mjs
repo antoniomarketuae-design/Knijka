@@ -96,6 +96,18 @@ export function buildVuCyclistDistrict(params) {
       lanesSource: "tag",
       maxspeed,
       maxspeedSource: "tag",
+      // FR-21: this street parks nobody. `residential` carries no drawn band,
+      // so TrafficLayer's procedural row seated all 27 of its bodies at
+      // travelHalf + 2.0 = 10.125 m — the middle of the 8.125–11.625 m footway,
+      // sunk 0.12 m into it. On THIS map that is the founder's own sentence
+      // („I cant see the car coming on the right because of the cars that have
+      // stopped on the side walk"): the drill is a right hook across a rider
+      // who is cruising the kerb line, so a ghost rank standing between the
+      // driver and that kerb hides the one road user the lesson exists to
+      // teach. `parkingBand: true` is refused because it moves the kerb out
+      // 4 m and the staged rider — lane centre + extraRightOffsetM 2.6, i.e.
+      // 6.66 m out — stops being „покрай бордюра" at all.
+      parkingBand: false,
       length: polylineLength(geometry),
       geometry,
     };

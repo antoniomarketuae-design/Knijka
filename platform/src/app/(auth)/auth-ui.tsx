@@ -21,9 +21,14 @@ export function AuthHeading({
   lead?: ReactNode;
 }) {
   return (
-    <header className="mb-6 short:mb-3">
-      <p className="hud-label">{eyebrow}</p>
-      <h1 className="mt-1.5 font-display text-2xl font-black tracking-tight short:text-xl">
+    <header className="mb-6 short:mb-2">
+      {/* The eyebrow goes the same way as the lead below, and for a weaker
+          reason than the lead had: it is a caption, not a sentence. On a
+          landscape phone the heading is reduced to its <h1> — which is why the
+          title's top margin, whose whole job was to clear this line, goes with
+          it (`short:mt-0`) rather than becoming 6px of dead space. */}
+      <p className="hud-label short:sr-only">{eyebrow}</p>
+      <h1 className="mt-1.5 font-display text-2xl font-black tracking-tight short:mt-0 short:text-xl">
         {title}
       </h1>
       {/* `short:sr-only` and NOT `short:hidden`: on a phone held sideways the

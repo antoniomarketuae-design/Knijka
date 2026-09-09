@@ -208,8 +208,20 @@ export function buildPeZoneDistrict(params) {
     edge("pz-e-approach", "pz-n-start", "pz-n-entry", "tertiary", approachKmh, "Улица преди жилищната зона"),
     // The zone: its OWN maxspeed is the grading surface; `zone` is the additive
     // legality tag (doc 72 N3) — the reduced limit lives in maxspeed.
+    //
+    // `parkingBand: false` — FR-21, and here it is the LESSON that decides it.
+    // `residential` carries no drawn band, so TrafficLayer's procedural row was
+    // seating 11 bodies at travelHalf + 2.0 = 10.125 m, i.e. in the middle of
+    // the 8.125–11.625 m footway, sunk 0.12 m into it. On this map that is the
+    // one image sc-pe-zone-living cannot afford: чл. 62 gives the pedestrian
+    // the WHOLE carriageway and the pavement, and the drill's own frames were
+    // read as „kerbside parking bays" on a boulevard. The other answer
+    // (`parkingBand: true`) is refused on purpose — it widens this edge's kerb
+    // from 8.125 to 12.125 and erases the СТЕСНЕНИЕ instruction 2 names, the
+    // one geometric fact that separates the zone from its tertiary approach.
     edge("pz-e-zone", "pz-n-entry", "pz-n-exit", "residential", zoneKmh, "Жилищна зона", {
       zone: "residential",
+      parkingBand: false,
     }),
     edge("pz-e-out", "pz-n-exit", "pz-n-end", "tertiary", approachKmh, "Улицата извън зоната"),
     edge("pz-e-cross", "pz-n-exit", "pz-n-e", "tertiary", approachKmh, "Напречна улица — движението, което пропускаш"),
@@ -251,17 +263,56 @@ export function buildPeZoneDistrict(params) {
     },
   ];
 
-  // -- Residential blocks flanking the zone (the зона's visual anchor, since
-  // Д15 has no sign asset). Clear of the carriageway, of the dart's walk-out
-  // end and of the cross street — enforced below.
+  // -- Residential blocks flanking the zone (the зона's visual anchor). Clear of
+  // the carriageway, of the dart's walk-out end and of the cross street —
+  // enforced below.
+  //
+  // (This header used to end „since Д15 has no sign asset". That clause expired
+  // on 2026-09-02: world/types.ts gained livingZoneStart/livingZoneEnd and
+  // props.ts derives a post per boundary per direction, so this map now posts
+  // Д15 x2 / Д16 x2. The blocks are no longer the ONLY thing saying „жилищна
+  // зона" — they are what makes the plate believable.)
+  //
+  // ── THE HEIGHT AND THE FACADE — sc-pe-zone-living:37bbb618, „the drive
+  //    happens on a wide multi-lane boulevard with … office-scale towers".
+  //    Two changes, and they are ONE repair: the first alone is invisible and
+  //    the second alone makes the street worse.
+  //
+  // 1. `heightSource: "levels"`, WAS `"default"`. These five authored
+  //    `height: 12` beside `heightSource: "default"`, and
+  //    cityBuildings.resolveBuildingHeightM reads „default" as NO DATA and
+  //    substitutes a 15–25 m jitter hashed off the id. MEASURED on the shipped
+  //    function, the four-storey блокове this file believes it authors were
+  //    built at 19.67 / 16.49 / 21.68 / 22.95 / 15.54 m — up to EIGHT storeys,
+  //    on a street whose whole lesson is that it is somebody's front garden.
+  //    That is scene/lessonWorldRecipe.ts §(b)'s contract mismatch, the one it
+  //    measured on `pkd-b-garage` (authored 4 m, built 18.27) and called „the
+  //    first thing to fix on this row": 222 buildings across ~30 generators
+  //    state a height the renderer throws away. Fixed here for this map, which
+  //    is the owner §(b) names; `"levels"` is the sp-b-school precedent
+  //    (gen_sp_speed.mjs) for an authored storey count.
+  //
+  // 2. `kind: "residential"`, and it is REQUIRED BY 1. `facadeVariant` skews
+  //    to the панелен блок (`bay_grid`) only at `height >= 15` — „Студентски
+  //    град is panelka country" — so the substituted heights were the only
+  //    reason these five were on it. At the honest 12 m all five fall back to
+  //    `hash % FACADE_VARIANTS`, and the lottery deals pz-b-west-approach and
+  //    pz-b-east-fault `bay_curtain` (the bronze GLASS CURTAIN WALL) and
+  //    pz-b-east `bay_strip` — the ribbon-window system builders/buildings.ts
+  //    reserves for a SCHOOL precisely because „a school must not read as one
+  //    more жилищен блок". So honest heights WITHOUT the kind would have put
+  //    two office towers on the жилищна зона. The kind pins all five to
+  //    `bay_grid` while leaving the per-building TINT hash alone, so they
+  //    still weather apart. Nothing in grading reads buildings[].kind.
   const BUILDINGS = [
     // Approach blocks flanking BOTH curbs BEFORE the entry — so the drive INTO
     // the zone reads as entering a built-up quarter (the sc-speed-creep town
     // context the founder R0 asks for; grading never reads buildings).
     {
       id: "pz-b-west-approach",
+      kind: "residential",
       height: 12,
-      heightSource: "default",
+      heightSource: "levels",
       footprint: [
         [-36, r2(approachM - 62)],
         [-20, r2(approachM - 62)],
@@ -271,8 +322,9 @@ export function buildPeZoneDistrict(params) {
     },
     {
       id: "pz-b-east-approach",
+      kind: "residential",
       height: 12,
-      heightSource: "default",
+      heightSource: "levels",
       footprint: [
         [20, r2(approachM - 58)],
         [36, r2(approachM - 58)],
@@ -282,8 +334,9 @@ export function buildPeZoneDistrict(params) {
     },
     {
       id: "pz-b-west",
+      kind: "residential",
       height: 12,
-      heightSource: "default",
+      heightSource: "levels",
       footprint: [
         [-36, r2(approachM + 15)],
         [-20, r2(approachM + 15)],
@@ -296,8 +349,9 @@ export function buildPeZoneDistrict(params) {
     // empty east verge (the R0 „looks like a normal street" defect).
     {
       id: "pz-b-east-fault",
+      kind: "residential",
       height: 12,
-      heightSource: "default",
+      heightSource: "levels",
       footprint: [
         [20, r2(approachM + 8)],
         [36, r2(approachM + 8)],
@@ -307,8 +361,9 @@ export function buildPeZoneDistrict(params) {
     },
     {
       id: "pz-b-east",
+      kind: "residential",
       height: 12,
-      heightSource: "default",
+      heightSource: "levels",
       footprint: [
         [20, r2(crossingY + 10)],
         [36, r2(crossingY + 10)],

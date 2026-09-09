@@ -80,6 +80,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "parkingBand": false,
     "length": 130,
     "geometry": [
      [
@@ -104,6 +105,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "parkingBand": false,
     "length": 130,
     "geometry": [
      [
@@ -128,6 +130,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "parkingBand": false,
     "length": 90,
     "geometry": [
      [

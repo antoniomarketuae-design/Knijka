@@ -269,6 +269,36 @@ export interface RuleEngineState {
     stoppedSince: number | null;
     /** Last moment a QUALIFYING full stop (long enough) was still in effect. */
     lastQualifyingStopAt: number | null;
+    /**
+     * SECONDS OF DRIVING since that stop — the clock `stopRecencySec` is
+     * actually asking about, and the one the two consumers below read.
+     *
+     * WHY A WALL CLOCK WAS THE WRONG ONE — sc-merge-from-property:ab353b86,
+     * measured at HEAD ad9a4bf on `.audit-frames/w31/frames/
+     * sc-merge-from-property__pc-right/run.log` (EVIDENCE complete, and the
+     * mobile leg says the same). The car comes to a genuine standstill at the
+     * Б2 from 04-t022s to 04-t033s — eleven seconds of 0 км/ч, enough for the
+     * route task «Спри напълно на Б2 на изхода» to tick off it — then creeps
+     * away and crosses the paint at 04-t044s. `t - lastQualifyingStopAt` is
+     * then over nine seconds, `stopRecencySec` is six, and the sheet prints
+     * «✗ Неспиране на знак Б2 „Спри!“ −10 изпитни т. ОПАСНА ГРЕШКА» beside the
+     * ✓ it had just issued for the same act. Twenty points and НЕИЗДЪРЖАН for
+     * a drive whose only sin was waiting at a STOP sign.
+     *
+     * AND IT IS THE ANTI-SAFETY DIRECTION, which is why it is a root-cause fix
+     * and not a tolerance. Б2 means stop AND give way (ЗДвП чл. 47): the wait
+     * is the second half of the duty, and a clock that expires DURING it bills
+     * the student for performing it. What the rule is for — „the stop was made
+     * at this line, not a hundred metres back" — is a question about ground
+     * covered, and ground covered is what this counts: time at rest no longer
+     * ages a stop, moving time ages it exactly as before. At any speed the
+     * window is the same distance it always was (6 s at 50 км/ч ≈ 83 m), so no
+     * stop that used to be refused for being too far back is now accepted.
+     *
+     * The pattern is `scanStopCreditSec`'s, one field up, for its reason in its
+     * own words: „the world they scanned was not moving past them."
+     */
+    movingSinceStopSec: number;
   };
   speedingMinor: EpisodeState;
   /**
@@ -1875,7 +1905,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     lastIndicatorOnAt: { left: null, right: null },
     lastGlanceAt: { left: null, right: null, rear: null, shoulder: null },
     scanStopCreditSec: { left: 0, right: 0 },
-    stop: { stoppedSince: null, lastQualifyingStopAt: null },
+    stop: { stoppedSince: null, lastQualifyingStopAt: null, movingSinceStopSec: 0 },
     speedingMinor: { ...IDLE_EPISODE },
     speedingMinorRegrade: { ...IDLE_EPISODE },
     speedingDangerous: { ...IDLE_EPISODE },
@@ -2658,9 +2688,14 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     if (s.stop.stoppedSince === null) s.stop.stoppedSince = t;
     if (t - s.stop.stoppedSince >= cfg.fullStopMinDurationSec) {
       s.stop.lastQualifyingStopAt = t; // still stopped => stop is "current"
+      // …and the driving clock restarts with it. Standing still does not age a
+      // stop — see `RuleEngineState.stop.movingSinceStopSec` for the drive this
+      // closes and why the wall clock was billing the wait itself.
+      s.stop.movingSinceStopSec = 0;
     }
   } else {
     s.stop.stoppedSince = null;
+    if (s.stop.lastQualifyingStopAt !== null) s.stop.movingSinceStopSec += dt;
   }
 
   // -- 1b. move-off observation (PK-05, DVSA top-5) — the session's FIRST
@@ -4551,7 +4586,12 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
         events.push(makeViolation("RAIL_CROSSING_VIOLATION", t, { detail: "entered-barred" }));
       } else if (tick.railGuarded !== true) {
         const last = s.stop.lastQualifyingStopAt;
-        const stopped = last !== null && t - last <= cfg.stopRecencySec;
+        // DRIVING seconds, not wall-clock ones — the Б2 ledger discipline this
+        // case says it follows, including the repair (see
+        // `RuleEngineState.stop.movingSinceStopSec`). It matters more here than
+        // there: чл. 51 has the driver stop AND look and listen at an unguarded
+        // crossing, and a train is not a six-second wait.
+        const stopped = last !== null && s.stop.movingSinceStopSec <= cfg.stopRecencySec;
         if (!stopped) {
           events.push(makeViolation("RAIL_CROSSING_VIOLATION", t, { detail: "no-stop" }));
         }
@@ -4950,6 +4990,17 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.railRest,
     s.curveSpeed,
     s.motorwaySlow,
+    // THE TOWN HALF OF THE SAME ENVELOPE (`sc-vu-emergency-junction:853790f7`).
+    // `DRIVING_TOO_SLOW_IN_TOWN` landed with its motorway twin one line up
+    // already on this list, and was never added to it. MEASURED through this
+    // reducer, 10,5 км/ч held on a street posted 40 for 150 s: bill at 23 s,
+    // re-grade at 33 s — and then CLEAN_DRIVING at 118,8 s, minted from the
+    // metres of the very crawl still standing convicted. „Drive at walking pace
+    // forever" was not merely unpunished, it was commended. Same contract as
+    // every row here: `emitted` means he was already billed, `activeSince`
+    // means he is still doing it, and `townReset` (back at or above the floor)
+    // clears both, so a student who picks the pace up earns again at once.
+    s.townCrawl,
     s.emergencyLane,
     // 2026-08-30 (`sc-ac-truck-spray:7e53374c`, critical). The newest episode in
     // this file was the only one never added to this list, and the omission is
@@ -5315,7 +5366,12 @@ function handleTickEvent(
       // grade follows the full-stop grade (order preserved for existing gates) —
       // it is a DISTINCT fault (a rolling stop can also skip the scan).
       const last = s.stop.lastQualifyingStopAt;
-      const stopped = last !== null && t - last <= cfg.stopRecencySec;
+      // DRIVING seconds since the stop, not wall-clock ones: Б2 is stop AND
+      // give way (ЗДвП чл. 47), and the wait for the gap is the second half of
+      // the duty — a clock that ran during it billed the student ten points for
+      // performing it. `RuleEngineState.stop.movingSinceStopSec` carries the
+      // measured drive and why the distance the window stands for is unchanged.
+      const stopped = last !== null && s.stop.movingSinceStopSec <= cfg.stopRecencySec;
       billAct(
         s,
         tick,

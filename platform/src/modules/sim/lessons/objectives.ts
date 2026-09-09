@@ -797,6 +797,45 @@ export interface ObjectiveContext {
    */
   qualifyingStopCurrent?: boolean;
   /**
+   * …AND HAS THE ENGINE ALREADY BILLED HIM FOR NOT MAKING IT? Every
+   * `STOP_SIGN_NO_FULL_STOP` in the run so far, with the session second it was
+   * billed on — the second half of `ReachZoneParams.requireFullStop`, and the
+   * one that closes the protocol the demand was built for.
+   *
+   * WHY THE FIRST HALF WAS NOT ENOUGH, measured at HEAD ad9a4bf on
+   * `.audit-frames/w31/frames/sc-merge-from-property__pc-right/run.log`
+   * (EVIDENCE complete, both platforms). `qualifyingStopCurrent` is the rule
+   * engine's own recency read — „a stop it would accept, made within
+   * `stopRecencySec` (6 s)" — and it says NOTHING about WHERE that stop was
+   * made. `inAcceptance || graceArmed` constrains where the CAR is on the frame
+   * the certificate is issued, not where it STOOD STILL. On that drive the two
+   * are different places: the car rests 0 км/ч from 04-t022s to 04-t033s
+   * serving the PREVIOUS gate («Спри пред тротоара и пропусни пешеходеца»),
+   * pulls away at 04-t038s still approach-side of the Б2 and still carrying a
+   * six-second-fresh qualifying stop, banks «✓ Спри напълно на Б2 на изхода» on
+   * that — and is billed «✗ Неспиране на знак Б2 „Спри!“ −10 изпитни т. ОПАСНА
+   * ГРЕШКА» at 04-t044s for the roll that follows. One sheet, both lines, on PC
+   * and on mobile.
+   *
+   * SO THE CHANNEL THAT OWNS «ПЪЛНО СПИРАНЕ» IS ASKED BOTH OF ITS QUESTIONS,
+   * not one: did a qualifying stop exist, AND did this same grader convict him
+   * of failing to make it at the sign this gate is about. Two answers from one
+   * implementation, which is the whole reason the demand imports the engine's
+   * predicate instead of re-deriving it.
+   *
+   * WINDOWED, like `yieldFaults` and unlike the run-wide ledger fields, and the
+   * window is what makes it safe on the other six gates `deriveFullStopDemand`
+   * arms: those banners are about a red lamp, a handbrake or a barrier, and a
+   * Б2 roll billed before their objective opened is not about them. Monotone
+   * within the window — the ledger only grows — so `done` latching cannot be
+   * withdrawn by a later bill, exactly as the yield term behaves.
+   *
+   * OPTIONAL, and absent means „unknown", never „none was billed": every
+   * fixture, rig, replay and `EMPTY_CONTEXT` omits it and stays bit-identical
+   * to shipped, the polarity every witness fact on this context ships with.
+   */
+  stopSignRollFaultsSec?: readonly number[];
+  /**
    * …AND IS THAT STANDSTILL THE CAR'S OWN CRASH? The provenance half of the
    * fact above, and the answer to the one question every speed predicate in
    * this file is unable to ask (w29, 2026-09-08).
@@ -3160,6 +3199,31 @@ function fullStopHonoured(ctx: ObjectiveContext): boolean {
 }
 
 /**
+ * …and has the SAME grader already convicted him of not making it, since this
+ * gate opened? (see `ObjectiveContext.stopSignRollFaultsSec` for the drive, the
+ * mechanism and why the window is what keeps the other six gates untouched.)
+ *
+ * The window rule is `yieldCleanHonoured`'s, verbatim and for its reason: a
+ * conviction billed BEFORE this objective opened belongs to an earlier gate,
+ * and the ledger the engine hands over is the ledger as it stands on the frame
+ * being stepped, so „so far" is the whole of it.
+ *
+ * `undefined` and the empty ledger are both „nothing to refuse on", and an
+ * unknown window (`objectiveActiveSinceSec` absent — every fixture and rig)
+ * leaves the demand met: unknown must never become a refusal.
+ */
+function stopSignRollClean(ctx: ObjectiveContext): boolean {
+  const bills = ctx.stopSignRollFaultsSec;
+  if (bills === undefined || bills.length === 0) return true;
+  const since = ctx.objectiveActiveSinceSec;
+  if (since === undefined) return true;
+  for (const tSec of bills) {
+    if (tSec >= since) return false;
+  }
+  return true;
+}
+
+/**
  * The tightest gap the student turned into on this run's oncoming-left-turn
  * encounters, AND HOW THOSE ENCOUNTERS ACTUALLY ENDED (see
  * `ReachZoneWitnessDemands.reportOncomingGapSec`).
@@ -3509,6 +3573,33 @@ export function yieldFailedVoidsObjective(
   const demand = (params as WitnessedReachZoneParams).requireYieldClean;
   if (demand === undefined) return false;
   return !yieldCleanHonoured(demand, { ...EMPTY_CONTEXT, ...ctx });
+}
+
+/**
+ * …AND THE SAME QUESTION FOR THE Б2 ROLL (`requireFullStop`'s ledger half).
+ *
+ * WHY THIS ARM HAD TO ARRIVE WITH THE TERM. `requireFullStop`'s first half is a
+ * TRANSIENT read — `qualifyingStopCurrent` can become true on any later frame —
+ * so it could never strand a chain and needed no arm. `stopSignRollClean` is
+ * MONOTONE within its window: once the roll is billed, no later frame can
+ * un-bill it, and a derived gate that is the LAST objective of its drill would
+ * hold the chain at `currentIndex` for ever. That is the sc-swp-finish shape,
+ * and it is the one this file has already been burned by twice — a repair that
+ * removes a false certificate and hands back a drive that cannot end, so the
+ * student reaches the card that teaches him only by quitting.
+ *
+ * ONE REFUSAL, NEVER A TRAP, exactly like its five neighbours: the objective
+ * keeps its honest `active` status and `buildLessonResult` still reports
+ * finished-and-failed, so the certificate stays withheld and only the strand
+ * goes.
+ */
+export function stopSignRollVoidsObjective(
+  params: ObjectiveParams,
+  ctx: Pick<ObjectiveContext, "stopSignRollFaultsSec" | "objectiveActiveSinceSec">,
+): boolean {
+  if (params.kind !== "reachZone") return false;
+  if ((params as WitnessedReachZoneParams).requireFullStop !== true) return false;
+  return !stopSignRollClean({ ...EMPTY_CONTEXT, ...ctx });
 }
 
 /**
@@ -4762,7 +4853,8 @@ function stepReachZone(
   // gate is authored. `reach-zone-full-stop-derived.test.ts`'s census is what
   // notices one arriving.
   const stopOk =
-    params.requireFullStop !== true || (fullStopHonoured(ctx) && (inAcceptance || graceArmed));
+    params.requireFullStop !== true ||
+    (fullStopHonoured(ctx) && (inAcceptance || graceArmed) && stopSignRollClean(ctx));
   // ── THE CEILING THE BANNER SAYS WAS HELD (requireSpeedClean) ──────────────
   // Ninth arm of the journey half and the ninth outside the `capMet` latch —
   // the stretch-shaped half of the ceiling claim, where `requireLawfulSpeed` is

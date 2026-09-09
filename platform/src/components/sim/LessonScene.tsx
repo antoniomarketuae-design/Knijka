@@ -2552,6 +2552,9 @@ export function ReadyScene({
             activeObjectiveIndex={activeObjectiveIndex}
             sampleRef={sampleRef}
             spawnStart={guidanceSpawnStart}
+            // The world's own plates, so the coach panel can stand down for one
+            // that is drawn through its title (sc-zebra-approach:2c75cf8f).
+            worldSigns={geometry.signs}
           />
         ) : null}
         {/* S0-View ?ghost=demo: the Shadow Car (translucent ghost + blue path

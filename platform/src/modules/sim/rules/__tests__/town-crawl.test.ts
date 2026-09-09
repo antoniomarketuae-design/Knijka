@@ -225,4 +225,30 @@ describe("town crawl detector (DRIVING_TOO_SLOW_IN_TOWN)", () => {
     expect(tooSlow).toContain(CODE);
     expect(tooSlow).not.toContain("SPEEDING_DANGEROUS");
   });
+
+  it("stops the convicted crawl from EARNING «Чисто и спокойно каране» while it is still going on", () => {
+    // The detector landed with its motorway twin already on the CLEAN_DRIVING
+    // gate (engine.ts EPISODES) and was never added to it, so the crawl was
+    // billed twice and then commended for the very metres it stood convicted
+    // on — a commendation is read off the debrief as credit («Какво се получи
+    // добре»), so „walking pace forever" ended the lesson with praise.
+    // MEASURED through this reducer at 10 км/ч on a street posted 40:
+    //   before  bill 20 s · re-grade 30 s · then CLEAN_DRIVING
+    //   after   bill 20 s · re-grade 30 s · and nothing else, ever
+    const held = drive(cruise(0, 160, { speedKmh: 10, maxSpeedKmh: 40 })).events;
+    expect(codes(held).filter((c) => c === CODE)).toHaveLength(2);
+    expect(codes(held)).not.toContain("CLEAN_DRIVING");
+  });
+
+  it("…and gives the praise straight back to a student who picks the pace up (A12)", () => {
+    // townReset is „at or above the floor", so recovery clears emitted on
+    // the frame it happens and the streak resumes — withholding credit a
+    // student earned is the direction this file does not move in.
+    const recovered = drive([
+      ...cruise(0, 40, { speedKmh: 10, maxSpeedKmh: 40 }),
+      ...cruise(41, 160, { speedKmh: 30, maxSpeedKmh: 40 }),
+    ]).events;
+    expect(codes(recovered)).toContain(CODE);
+    expect(codes(recovered)).toContain("CLEAN_DRIVING");
+  });
 });

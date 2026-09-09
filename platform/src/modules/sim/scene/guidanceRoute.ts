@@ -723,6 +723,198 @@ export function markerSignOffset(dirX: number, dirY: number): { x: number; y: nu
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * …AND A CLEARANCE IN METRES IS A CLEARANCE AT ONE DISTANCE ONLY.
+ *
+ * `sc-zebra-approach:2c75cf8f` (major) was the row `MARKER_SIGN_LATERAL_M`
+ * above was widened for, and it survived that repair and eleven judgements
+ * after it — w11…w31, every one of them on a fresh frame. Measured off the
+ * newest of them
+ * (`.audit-frames/w31/frames/sc-zebra-approach__mobile-right/04-t033s.png`,
+ * cropped 4× and read against the cockpit's own projection: vFOV 39.25° at
+ * 2556 × 1179, −4° pitch, eye ≈ 1.2 m):
+ *
+ *     the coach panel   69 px tall for 1.67 m of card   →  **40 m** away
+ *     the А18 triangle  73 px wide for a 1.35 m plate   →  **30.6 m** away
+ *
+ * The plate is at 0.76 × the panel's range, and THAT is the whole defect. The
+ * offset above buys 1.80 m of ground between the two posts; but what the eye
+ * sees is an ANGLE, and at their two ranges
+ *
+ *     the sign      4.8625 m / 30.6 m = 0.159 rad
+ *     the panel     6.6625 m / 40.0 m = 0.167 rad
+ *
+ * — the same bearing to within half a degree, so the plate lands dead on the
+ * panel's centred title. The wave-8 arithmetic („14 % across the panel") is
+ * exactly right and describes a sign STANDING BESIDE THE PANEL; the occluder
+ * that actually bisects it is a different sign, further up the same kerb.
+ *
+ * NO STATIC PLACEMENT CAN FIX THIS, and that is arithmetic rather than
+ * defeatism. A sign at range d and the panel at D share a bearing whenever
+ * d/D = s/p, i.e. for every panel offset p there is a d < D that collides.
+ * Sliding OUTBOARD needs p > 2.5 + D(s + h)/d = 9.8 m at the measured 0.76 —
+ * 13.9 m from the centreline, inside the building line. Sliding INBOARD needs
+ * p < 3.4 m, which is the chip back over the student's own lane, the defect
+ * the post was moved off in the first place. RAISING it needs the panel's
+ * lower edge 5.5 m up: „a dark billboard floating at BUILDING HEIGHT", in the
+ * founder's own words about the version before this one.
+ *
+ * SO THE PANEL YIELDS, and the road's sign is what it yields to. That order is
+ * not a preference: `sc-zebra-approach:f9ae6962` — «the А18 sign itself is
+ * unreadable at the moment the student needs it» — was retired on a frame
+ * whose quote reads „А18 …triangle drawn in front of the coach label, red
+ * border and pedestrian glyph intact and legible". A student who cannot read
+ * the road's own signs is the failure this whole product exists to prevent;
+ * a student who cannot read a caption that repeats what the objective banner
+ * is already saying in HUD type has lost nothing.
+ *
+ * AND WITHHOLDING IT IS THIS PANEL'S OWN ESTABLISHED ANSWER, not a new one.
+ * `RouteGuidance.MIN_LEGIBLE_SIGN_ALPHA` already takes the whole sign away —
+ * panel and post — wherever it would be „a veil" rather than a sign, on the
+ * argument that „nothing readable is lost, only the veil over the road". A
+ * panel with a red triangle through its title is that same object: not
+ * information, and a wash over the one plate the student must read.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/** A world sign post, in the shape `world/builders` emits and `WorldProps`
+ *  renders — structural on purpose, so this scene module states what it needs
+ *  instead of importing a world type (docs/architecture/05). */
+export interface WorldSignLike {
+  /** Three-space, y at the post's base (`ROAD_Y` for every roadside plate). */
+  readonly position: readonly [number, number, number];
+  /** Rotation about +Y; +Z is the face's outward side. */
+  readonly yaw: number;
+  /** `SCENARIO_SIGN_SCALE` on a scenario map, absent (⇒ 1) on the city maps. */
+  readonly scale?: number;
+}
+
+/**
+ * HOW HIGH A ROADSIDE PLATE'S FACE STANDS, in metres on an UNSCALED placement.
+ *
+ * Read off the same w31 crop as the arithmetic above rather than guessed. The
+ * А18's face measures 73 × 66 px at 30.6 m — 1.35 × 1.22 m on a placement
+ * `props.ts` stamps at `SCENARIO_SIGN_SCALE` = 1.5, i.e. the 0.90 m plate the
+ * Bulgarian small-format warning triangle actually is, which is what fixes the
+ * range in the first place. Its face spans 2.25 → 3.45 m above the asphalt in
+ * that frame, so 1.50 → 2.30 m unscaled.
+ *
+ * VERTICALLY THIS CAN ONLY EVER AGREE with the panel, which occupies 2.07 →
+ * 3.74 m: every plausible plate overlaps that. It is written out anyway,
+ * because the case it exists to refuse is the one nobody would notice — a
+ * ground-level Г-series plate, or any future low mount, silently costing the
+ * student his caption for standing UNDER it.
+ */
+export const WORLD_SIGN_FACE_BOTTOM_M = 1.5;
+export const WORLD_SIGN_FACE_TOP_M = 2.3;
+
+/**
+ * THE STRIP OF THE PANEL THAT IS WORTH WITHHOLDING IT FOR — half-width, m.
+ *
+ * A plate touching the panel's outer margin is not this row: it is exactly the
+ * state `MARKER_SIGN_LATERAL_M` was widened to produce, and
+ * `guidance-marker-sign.test.ts` asserts it as „the plate lands on the panel's
+ * inboard margin rather than on its centred text", `acrossPanel < 0.2`. Taking
+ * the caption away for THAT would spend the whole offset repair to buy nothing.
+ *
+ * So the yield keys on the same 0.2 margin the gate already holds, restated as
+ * an angle at the eye instead of a fraction at one distance — which is the
+ * entire lesson of this block. The central 60 % of a 5.0 m panel is ±1.5 m,
+ * and the test carries the two numbers side by side so they cannot drift.
+ */
+export const MARKER_SIGN_INK_HALF_W_M = MARKER_SIGN_PANEL_W_M * 0.3;
+
+/**
+ * How much of its own face a plate must be showing the student before it is
+ * allowed to cost him the caption. `|n · v|` — 1 face-on, 0 edge-on — so 0.5 is
+ * 60° off the normal, past which the plate is a stripe and the post under it an
+ * 8 cm pole. A sign the student is meant to READ is by construction turned at
+ * him, so this only ever excludes the far side's plates and the ones a junction
+ * has toed in for a different approach.
+ */
+export const WORLD_SIGN_MIN_FACE_FRACTION = 0.5;
+
+/**
+ * Beyond this bearing off the panel's own, a sign cannot be over it at any
+ * range this marker is drawn at (the panel's half-angle is `atan(2.5 / D)`,
+ * ≤ 6.8° over the whole 21 → 68 m band it exists in). A cheap gate so a city
+ * map's several hundred posts cost a multiply each and not a trig call.
+ */
+const SIGN_COVER_BEARING_GATE = 0.6;
+
+function overlaps(a: readonly [number, number], b: readonly [number, number]): boolean {
+  return a[0] < b[1] && b[0] < a[1];
+}
+
+/**
+ * Is a road sign drawn THROUGH the coach panel from this eye?
+ *
+ * Pure angles about the eye, so it needs no camera, no field of view and no
+ * viewport: whether two objects land on the same pixels is decided by the rays
+ * to them and nothing else. That is also why it is testable in plain node,
+ * which is the point — the row it closes was upheld eleven times off
+ * photographs because there was no other way to ask the question.
+ *
+ * `panel` is the CENTRE of the billboard, three-space. Only signs strictly
+ * between the eye and the panel can cover it; one standing beside or behind it
+ * loses the depth test to the panel and is the case the lateral offset above
+ * already handles.
+ */
+export function markerSignIsCovered(
+  eye: { x: number; y: number; z: number },
+  panel: { x: number; y: number; z: number },
+  signs: readonly WorldSignLike[],
+): boolean {
+  if (signs.length === 0) return false;
+  const fx = panel.x - eye.x;
+  const fz = panel.z - eye.z;
+  const D = Math.hypot(fx, fz);
+  if (!Number.isFinite(D) || D < EPS) return false;
+  const ux = fx / D;
+  const uz = fz / D;
+  // Right of the view direction, the same convention `markerSignOffset` slides
+  // the post on — so a positive lateral is the kerb side the post stands on.
+  const rx = uz;
+  const rz = -ux;
+  // The eye→panel axis IS the panel's bearing, so its ink column is centred on
+  // zero and this is a half-angle rather than a span.
+  const inkHalfAngle = Math.atan2(MARKER_SIGN_INK_HALF_W_M, D);
+  const panelV: [number, number] = [
+    Math.atan2(MARKER_SIGN_PANEL_Y - MARKER_SIGN_PANEL_H_M / 2 - eye.y, D),
+    Math.atan2(MARKER_SIGN_PANEL_Y + MARKER_SIGN_PANEL_H_M / 2 - eye.y, D),
+  ];
+  for (const s of signs) {
+    const dx = s.position[0] - eye.x;
+    const dz = s.position[2] - eye.z;
+    const forward = dx * ux + dz * uz;
+    // In front of the eye and IN FRONT OF THE PANEL. A sign level with the
+    // panel or past it cannot occlude it.
+    if (!(forward > EPS) || forward >= D) continue;
+    const lateral = dx * rx + dz * rz;
+    if (Math.abs(lateral) > SIGN_COVER_BEARING_GATE * forward) continue;
+    const dist = Math.hypot(dx, dz);
+    if (dist < EPS) continue;
+    // Where the PLATE'S OWN CENTRE lands across the panel — wave 8's criterion,
+    // and the reason a plate grazing the margin still leaves the caption up.
+    if (Math.abs(Math.atan2(lateral, forward)) >= inkHalfAngle) continue;
+    const scale = Number.isFinite(s.scale) && (s.scale as number) > 0 ? (s.scale as number) : 1;
+    // The plate is flat, so it presents its full width only face-on. `yaw`
+    // points +Z out of the face, and the apparent half-width of a plane seen
+    // from `v` is `half × |n · v|`. A plate turned edge-on to the student
+    // covers nothing and may not cost him the caption.
+    const nDotV = Math.abs((Math.sin(s.yaw) * dx + Math.cos(s.yaw) * dz) / dist);
+    if (nDotV < WORLD_SIGN_MIN_FACE_FRACTION) continue;
+    const baseY = s.position[1];
+    const signV: [number, number] = [
+      Math.atan2(baseY + WORLD_SIGN_FACE_BOTTOM_M * scale - eye.y, forward),
+      Math.atan2(baseY + WORLD_SIGN_FACE_TOP_M * scale - eye.y, forward),
+    ];
+    if (overlaps(panelV, signV)) return true;
+  }
+  return false;
+}
+
+/**
  * The direction the student approaches the goal on, read off the derived route
  * a few metres back from the marker. Falls back to the gate's own normal for a
  * bar across a stop line, and to null when neither is available.

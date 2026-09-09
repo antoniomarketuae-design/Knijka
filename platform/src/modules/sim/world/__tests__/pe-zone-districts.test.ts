@@ -38,6 +38,8 @@ import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
+import { facadeTint, facadeVariant } from "../builders/buildings";
+import { resolveBuildingHeightM } from "../builders/cityBuildings";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
@@ -56,6 +58,18 @@ const X_LANE = 4.06;
 /** The curbs the staged walkers step off (half-carriageway + 1.6 stand-back). */
 const CURB_X_WEST = -9.72;
 const CURB_X_EAST = 9.73;
+/**
+ * What `facadeVariant` deals these five WITHOUT `kind: "residential"`, at the
+ * honest 12 m — the lottery the kind exists to refuse (0 bay_grid / 1 bay_band /
+ * 2 bay_strip / 3 bay_curtain, StaticWorld FACADE_SETS order).
+ */
+const RAW_VARIANT: Record<string, number> = {
+  "pz-b-west-approach": 3,
+  "pz-b-east-approach": 1,
+  "pz-b-west": 0,
+  "pz-b-east-fault": 3,
+  "pz-b-east": 2,
+};
 /** The CrossingZoneTracker's arming radius. */
 const CROSSING_ZONE_M = 35;
 
@@ -231,6 +245,104 @@ describe(`${ID} through the world builder`, () => {
     expect(-east[1].position[2]).toBeGreaterThan(CROSSING_Y);
   });
 
+  it("BUILDS THE ЖИЛИЩНИ БЛОКОВЕ AT THE HEIGHT IT AUTHORS THEM", () => {
+    // sc-pe-zone-living:37bbb618, „the drive happens on a wide multi-lane
+    // boulevard with … office-scale towers. Nothing about the geometry signals
+    // the zone the rule depends on." The CROSS-SECTION half of that row is
+    // refuted in templates-pe2.ts — the kerbs really do step in 8 m at Д15 —
+    // and the FACADE/SCALE half was left there as „a scene/generator row —
+    // reported, not answered". This is the answer, and it is measured.
+    //
+    // These five authored `height: 12` beside `heightSource: "default"`, and
+    // `cityBuildings.resolveBuildingHeightM` reads „default" as NO DATA and
+    // substitutes a 15–25 m jitter hashed off the id. So the четириетажни
+    // блокове this map believes it flanks a home zone with were built at
+    // 19.67 / 16.49 / 21.68 / 22.95 / 15.54 m — up to eight storeys. Both the
+    // wall mesh and the collider take that number (`buildings.buildOne` calls
+    // it once), which is `scene/lessonWorldRecipe.ts` §(b)'s contract mismatch,
+    // the one it measured on `pkd-b-garage` (authored 4 m, built 18.27 m) and
+    // called „the first thing to fix on this row".
+    const authored = district.buildings.filter((b) => b.id.startsWith("pz-b-"));
+    expect(authored.length).toBe(5);
+    for (const b of authored) {
+      expect(b.height, `${b.id} authored height`).toBe(12);
+      // The number the renderer and the collider actually take.
+      expect(resolveBuildingHeightM(b), `${b.id} built height`).toBe(12);
+    }
+  });
+
+  it("…and пинва them to the панелен facade, which the honest height needs", () => {
+    // The height fix ALONE makes the street worse, and that is why the two
+    // ship together. `facadeVariant` skews to `bay_grid` only at
+    // `height >= 15`, so the substituted heights were the sole reason these
+    // five were on the panelka palette. At the honest 12 m the raw hash deals
+    //
+    //     pz-b-west-approach  bay_curtain   (the bronze glass curtain wall)
+    //     pz-b-east-approach  bay_band
+    //     pz-b-west           bay_grid
+    //     pz-b-east-fault     bay_curtain   (the bronze glass curtain wall)
+    //     pz-b-east           bay_strip     ( = SCHOOL_FACADE_VARIANT)
+    //
+    // — two office towers and the ribbon-window system builders/buildings.ts
+    // reserves for a SCHOOL because „a school must not read as one more
+    // жилищен блок". `kind: "residential"` pins all five; grading never reads
+    // `buildings[].kind`.
+    const authored = district.buildings.filter((b) => b.id.startsWith("pz-b-"));
+    for (const b of authored) {
+      expect(b.kind, `${b.id} kind`).toBe("residential");
+      // The index StaticWorld feeds FACADE_SETS with (bay_grid = 0).
+      expect(
+        facadeVariant(b.id, resolveBuildingHeightM(b), b.kind),
+        `${b.id} facade set`,
+      ).toBe(0);
+      // …and WITHOUT the kind the same call is the lottery this pins.
+      expect(facadeVariant(b.id, resolveBuildingHeightM(b), undefined)).toBe(
+        RAW_VARIANT[b.id]!,
+      );
+    }
+    // The blocks are still told apart: the TINT hash is a different lane from
+    // the variant, so pinning the variant must not have made five clones.
+    const tints = new Set(authored.map((b) => facadeTint(b.id, b.kind).join(",")));
+    expect(tints.size).toBe(5);
+  });
+
+  it("the kind MOVES the renderer's own buffers — not a predicate nobody reads", () => {
+    // `buildingWalls[i]` is the merged mesh StaticWorld draws with
+    // FACADE_SETS[i], so this compares the SHIPPED world against the same
+    // district with the kind stripped and shows the prisms change draw bucket.
+    //
+    // Variants 1–3 are not empty even now: `buildWorldGeometry` also feeds
+    // `buildBuildings` the procedural EXTRA VOLUMES (terminus closures, lot
+    // edges, the world rim), which carry no kind and keep their hash. Those are
+    // the far backdrop belt, not this street's frontage — so what is asserted
+    // is the DELTA, and the delta is exactly the four blocks that move.
+    const stripped = buildWorldGeometry(
+      {
+        ...district,
+        buildings: district.buildings.map((b) =>
+          b.id.startsWith("pz-b-") ? { ...b, kind: undefined } : b,
+        ),
+      },
+      { seed: 7 },
+    );
+    const verts = (g: WorldGeometry): number[] =>
+      g.buildingWalls.map((m) => m.positions.length / 3);
+    const now = verts(world);
+    const raw = verts(stripped);
+    // Nothing added or dropped — only re-bucketed.
+    const sum = (a: number[]): number => a.reduce((x, y) => x + y, 0);
+    expect(sum(now)).toBe(sum(raw));
+    // bay_grid GAINED the four blocks that hashed elsewhere…
+    expect(now[0]).toBeGreaterThan(raw[0]);
+    // …and no other bucket grew.
+    for (let k = 1; k < now.length; k++) {
+      expect(now[k], `variant ${k}`).toBeLessThanOrEqual(raw[k]);
+    }
+    // Concretely: bay_strip (the school system) and bay_curtain (the glass)
+    // each carried frontage of this street and now carry none of it.
+    expect(raw[2]).toBeGreaterThan(now[2]);
+    expect(raw[3]).toBeGreaterThan(now[3]);
+  });
   it("warns of NO пешеходна пътека — an А18 inside the zone would deny чл. 62", () => {
     // The other half of the same row. props.ts posts А18 „Пешеходна пътека" in
     // advance of an authored crossing on every scenario map, and it used to

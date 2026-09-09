@@ -275,7 +275,18 @@ describe("the canvas actually paints what the floor was computed from", () => {
   });
 
   it("gates the panel on signPanelAlpha and takes the post with it", () => {
-    expect(src).toContain("const alpha = signPanelAlpha(eyeDistM);");
+    // EXPECTATION UPDATED 2026-09-09, and the product is what changed.
+    // `signPanelAlpha` is still the whole distance gate and it still takes the
+    // post with it; what is new beside it is a SECOND withholder on the same
+    // alpha — `markerSignIsCovered`, which drops the sign when a road plate is
+    // drawn through the panel's own title (sc-zebra-approach:2c75cf8f, where
+    // the lateral offset in guidanceRoute.ts cannot help because the occluder
+    // is at a shorter RANGE and not at a different offset). Pinning the old
+    // literal would have meant „a caption may never yield to a road sign",
+    // which is not what this suite is about; pinning the call keeps everything
+    // it WAS about.
+    expect(src).toContain("signPanelAlpha(eyeDistM)");
+    expect(src).toContain("const alpha = covered ? 0 : signPanelAlpha(eyeDistM);");
     expect(src).toContain("sign.visible = alpha > 0;");
     expect(src).toContain("postMatRef.current.opacity = alpha * 0.85");
   });

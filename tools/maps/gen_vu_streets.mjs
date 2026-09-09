@@ -113,6 +113,17 @@ export function buildVuStreet(params) {
       lanesSource: "tag",
       maxspeed: maxspeedKmh,
       maxspeedSource: "tag",
+      // FR-21, the `pass` variant only. „NO intersections, NO zones — the whole
+      // point of the emptiness" (this header) was never true of the scenery:
+      // `residential` draws no parking band, so TrafficLayer's procedural row
+      // seated all 41 of vu-pass-v1's bodies at travelHalf + 2.0 = 10.125 m,
+      // in the middle of the 8.125–11.625 m footway and sunk 0.12 m into it —
+      // a ghost rank standing exactly where VU-02 grades the driver's lateral
+      // clearance to a kerb-riding rider. Declaring the street parks nobody is
+      // the emptiness the drill was designed around. `door` keeps its row: its
+      // parked cars are AUTHORED bays (`meta.scenario.bays`, occupied and
+      // hittable) and the door ambush needs them.
+      ...(variant === "pass" ? { parkingBand: false } : {}),
       length: polylineLength(geometry),
       geometry,
     },

@@ -52,11 +52,29 @@
  *
  * MEASURED ON THIS TREE:
  *
- * | | before the first lane | after it | after the SP/FO pass |
- * |---|---|---|---|
- * | districts with ≥ 1 such body   | 83 | 76 | **68** |
- * | PE family (catalog 24–30)      | 7 of 7 dirty | 0 of 7 — 178 bodies | 0 of 7 |
- * | SP/FO family (catalog 31–40)   | 8 of 8 dirty | 8 of 8 dirty | **0 of 8 — 368 bodies** |
+ * | | before the first lane | after it | after the SP/FO pass | after the VRU/zone pass |
+ * |---|---|---|---|---|
+ * | districts with ≥ 1 such body   | 83 | 76 | **68** | **65** |
+ * | PE family (catalog 24–30)      | 7 of 7 dirty | 0 of 7 — 178 bodies | 0 of 7 | 0 of 7 |
+ * | SP/FO family (catalog 31–40)   | 8 of 8 dirty | 8 of 8 dirty | **0 of 8 — 368 bodies** | 0 of 8 |
+ *
+ * THE VRU/ZONE PASS — the three maps whose LESSON is the body that was hidden.
+ * `vu-pass-v1` 41, `vu-cyclist-v1` 27, `pe-zone-v1` 11 = **79 bodies**, all
+ * three closed with `parkingBand: false` rather than `true`, and the reason is
+ * the same one three times: on these maps the row was not merely in the wrong
+ * place, it was standing between the student and the thing he is graded on.
+ * VU-02 grades the lateral clearance the driver leaves a KERB-RIDING rider and
+ * VU-01 is a right hook across one — the founder's own line 239 („I cant see
+ * the car coming on the right because of the cars that have stopped on the side
+ * walk") is that geometry exactly — and `sc-pe-zone-living` teaches чл. 62,
+ * where the pedestrian owns the whole carriageway and the pavement both.
+ * `true` was refused on all three with a measurement each: it moves the kerb
+ * out 4 m, which puts vu-*'s staged rider 5.5 m off the kerb he is authored to
+ * hug, and erases the 8.125 → 12.125 СТЕСНЕНИЕ that is the only geometric
+ * difference between pe-zone-v1's жилищна зона and its tertiary approach.
+ * pe-zone-v1 keeps the 20 bodies on its three tertiary edges — those stand on
+ * a band that IS drawn, which is the honest picture: the ordinary street parks,
+ * the зона does not.
  *
  * THE SP/FO PASS (doc 87 FR-21 + B59/B63/B64/B65/B70/B72 — the stretch of the
  * catalogue he actually played and photographed). Eight budget rows deleted:
@@ -131,17 +149,17 @@ const FOOTWAY_BUDGET: Record<string, number> = {
   "ac-bridge-v1": 60, "jx-equal-v1": 46,
   "ac-ice-v1": 41, "ac-night-v1": 41, "ac-rain-v1": 41,
   "ov-oneway-v1": 41, "pk-banx-v1": 41,
-  "vp-ready-v1": 41, "vu-pass-v1": 41, "ov-solid-v1": 39,
+  "vp-ready-v1": 41, "ov-solid-v1": 39,
   "tj-rhr-v1": 36, "ov-lane-v1": 35, "rb-mini-v1": 34,
   "rb-ped-v1": 34, "rb-single-v1": 34, "rx-drop-v1": 34, "rx-guarded-v1": 34,
   "rx-unguarded-v1": 34, "vu-child-v1": 34, "vu-door-v1": 34, "pk-rail-v1": 33,
   "sig-wave-v1": 33, "tj-occluded-v1": 33, "vu-bikelane-v1": 32,
   "pk-busstop-v1": 31, "rb-2lane-v1": 30, "hz-obstacle-v1": 27,
-  "ov-narrow-v1": 27, "pe-school-v1": 27, "vu-cyclist-v1": 27, "sx-v1": 26,
+  "ov-narrow-v1": 27, "pe-school-v1": 27, "sx-v1": 26,
   "pk-double-v1": 24, "pk-stop-v1": 21, "wb-boulevard-v1": 21,
   "hz-accident-v1": 19, "ln-arrows-v1": 19, "pk-ban-v1": 19, "zb-v1": 18,
   "pk-ban2-v1": 17, "pe-jay-v1": 14, "rx-tram-island-v1": 13,
-  "rx-tram-stop-v1": 13, "pe-zone-v1": 11, "tj-stop-v1": 11, "lot-45-v1": 8,
+  "rx-tram-stop-v1": 13, "tj-stop-v1": 11, "lot-45-v1": 8,
   "lot-45rev-v1": 8, "lot-double-v1": 8, "lot-gap-judge-v1": 8,
   "lot-gap-long-v1": 8, "lot-gap-short-v1": 8, "lot-left-v1": 8,
   "lot-narrow-v1": 8, "lot-par-v1": 8, "lot-perp-v1": 8, "lot-van-v1": 8,
@@ -294,5 +312,45 @@ describe("FR-21 — no parked body stands on a footway", () => {
     const d = loadDistrict("pe-rain-v1")!;
     expect(d.roads.edges[0]).toMatchObject({ parkingBand: false });
     expect(computeParkedCars(d, LANE_W).length).toBe(0);
+  });
+
+  it("the VRU/zone pass — the row is gone from the streets whose lesson it hid", () => {
+    // The three rows this pass deleted, pinned in BOTH directions so neither
+    // half can rot: the tag is declared on the edges that own the defect, and
+    // the row those edges used to carry is measurably empty.
+    for (const [id, edgeIds] of [
+      ["vu-pass-v1", ["vup-e-street"]],
+      ["vu-cyclist-v1", ["vu-e-w", "vu-e-e", "vu-e-s"]],
+      ["pe-zone-v1", ["pz-e-zone"]],
+    ] as const) {
+      const d = loadDistrict(id)!;
+      expect(id in FOOTWAY_BUDGET, `${id} is closed — it must not be back in the budget`).toBe(
+        false,
+      );
+      for (const edgeId of edgeIds) {
+        const e = d.roads.edges.find((x) => x.id === edgeId);
+        expect(e, `${id}: ${edgeId}`).toBeDefined();
+        expect(e).toMatchObject({ parkingBand: false });
+      }
+      expect(footwayBodies(d).length, `${id} still stands bodies on its footway`).toBe(0);
+    }
+  });
+
+  it("…and the зона's fix is the ZONE's, not the map's", () => {
+    // The negative control, and the whole reason `pz-e-zone` alone carries the
+    // tag: sc-pe-zone-living's ordinary street outside the зона still parks.
+    // A repair that emptied the map would satisfy the case above and would have
+    // taken the scenery with it, so the count is asserted from the SHIPPED
+    // placement rather than from the tag.
+    const d = loadDistrict("pe-zone-v1")!;
+    const banded = ["pz-e-approach", "pz-e-out", "pz-e-cross"];
+    for (const edgeId of banded) {
+      const e = d.roads.edges.find((x) => x.id === edgeId);
+      expect(e, edgeId).toBeDefined();
+      expect((e as { parkingBand?: unknown }).parkingBand, `${edgeId} must not opt out`).toBe(
+        undefined,
+      );
+    }
+    expect(computeParkedCars(d, LANE_W).length).toBe(20);
   });
 });

@@ -58,6 +58,7 @@ import {
   crossingMuteSpans,
   markerApproachDir,
   markerRingRadii,
+  markerSignIsCovered,
   markerSignOffset,
   markerSignOpacity,
   nearestArcOnRoute,
@@ -75,6 +76,7 @@ import {
   type GuidanceGoal,
   type GuidancePointGoal,
   type RouteDistrictLike,
+  type WorldSignLike,
 } from "@/modules/sim/scene/guidanceRoute";
 import { createRibbonBuffers, writeRibbonStrip } from "@/modules/sim/scene/ribbonStrip";
 
@@ -427,6 +429,10 @@ const POST_HEIGHT_M = POST_TOP_Y - MARKER_SIGN_POST_BASE_Y;
 /** Distance at which the speed-cap warning arms — far enough that easing off
  *  still works, near enough that it is clearly about THIS marker. */
 const CAP_WARN_LEAD_M = 35;
+
+/** One frozen empty list for the default `worldSigns`, so an omitted prop is
+ *  the same object on every render and no memo downstream ever re-runs on it. */
+const EMPTY_WORLD_SIGNS: readonly WorldSignLike[] = [];
 
 /**
  * THE SIGN MAY NOT BE A VEIL — the legibility floor under the chip.
@@ -985,6 +991,13 @@ export interface RouteGuidanceProps {
   /** District-space spawn pose — start of the FIRST route (the sample is not
    * live yet at mount; later rebuilds start from the live sample). */
   spawnStart: { x: number; y: number; headingDeg: number };
+  /**
+   * The world's own sign posts, so the coach panel can get out of the way of
+   * one that is drawn through it (`markerSignIsCovered`, sc-zebra-approach:
+   * 2c75cf8f). Optional: a mount with no built world simply never yields,
+   * which is the behaviour every test of this layer had before it existed.
+   */
+  worldSigns?: readonly WorldSignLike[];
 }
 
 /** Write the derived route into the ribbon's preallocated attribute buffers.
@@ -1000,6 +1013,7 @@ export function RouteGuidance({
   activeObjectiveIndex,
   sampleRef,
   spawnStart,
+  worldSigns = EMPTY_WORLD_SIGNS,
 }: RouteGuidanceProps) {
   const graph = useMemo(() => buildRouteGraph(district), [district]);
   const reducedMotion = useMemo(() => prefersReducedMotion(), []);
@@ -1409,10 +1423,26 @@ export function RouteGuidance({
         // Distance to the SIGN, not to the marker: it now stands a lane's half
         // width to the side, and the band it fades in is measured off the thing
         // the eye is actually reading.
-        const dx = state.camera.position.x - (marker.position.x + sign.position.x);
-        const dz = state.camera.position.z - (marker.position.z + sign.position.z);
+        const panelX = marker.position.x + sign.position.x;
+        const panelZ = marker.position.z + sign.position.z;
+        const dx = state.camera.position.x - panelX;
+        const dz = state.camera.position.z - panelZ;
         const eyeDistM = Math.hypot(dx, dz);
-        const alpha = signPanelAlpha(eyeDistM);
+        // …AND IT LEAVES FOR A ROAD SIGN DRAWN THROUGH IT, for the same reason
+        // it leaves below the alpha floor: a title with an А18 triangle across
+        // it is not information, and the plate it is washing over is the one
+        // object on this street the student is legally obliged to read
+        // (sc-zebra-approach:2c75cf8f — the lateral offset in guidanceRoute.ts
+        // clears a sign STANDING BESIDE the panel and cannot clear one further
+        // up the same kerb, which is a bearing collision and not a metres one).
+        const covered =
+          worldSigns.length > 0 &&
+          markerSignIsCovered(
+            state.camera.position,
+            { x: panelX, y: MARKER_SIGN_PANEL_Y, z: panelZ },
+            worldSigns,
+          );
+        const alpha = covered ? 0 : signPanelAlpha(eyeDistM);
         // Shown or gone, never a veil: below the floor the whole sign leaves —
         // panel AND post — instead of hanging over the road at an alpha its own
         // text cannot be told from its own plate at.

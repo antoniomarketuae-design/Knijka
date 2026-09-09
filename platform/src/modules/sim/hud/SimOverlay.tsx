@@ -482,6 +482,24 @@ export function composeCardDismissHandlers(
 }
 
 /** What one press of the dismiss-button card does. */
+/**
+ * Is there a READ SHEET behind this card at all?
+ *
+ * Lifted out of the component body 2026-09-09 because a SECOND control now
+ * has to ask it — the peek's own «Разбрах», whose action is created as a hook
+ * ~90 lines above the place `hasDetail` is computed and therefore cannot read
+ * that binding. Two copies of this expression is how the ЗАЩО chip and the
+ * acknowledgement beside it would come to disagree about whether there is
+ * anywhere to send the reader, and the whole point of the repair below is that
+ * they must not.
+ */
+export function overlayHasDetail(item: SimOverlayItem): boolean {
+  return (
+    (typeof item.detailBg === "string" && item.detailBg.trim().length > 0) ||
+    item.hasRichDetail === true
+  );
+}
+
 export type CardTapAction = { kind: "dismiss" } | { kind: "scroll"; top: number };
 
 /**
@@ -1702,7 +1720,6 @@ export function SimOverlay({
   // de-duplicates the compatibility click belongs to the element that earned
   // it. They sit above the early return because they are hooks.
   const tapWhy = useTapActivation(() => setOpenItem(open ? null : shown));
-  const tapAck = useTapActivation(acknowledge);
   const tapDismissChip = useTapActivation(dismiss);
   // `tapDismissCard` IS NOT IN THIS GROUP ANY MORE and the reason is ordering,
   // not taste: its action reads the peek's own text window (see the block at
@@ -1711,8 +1728,9 @@ export function SimOverlay({
   // the same on every render, and this one is; a ref reached backwards through
   // a callback assignment would not be.
   //
-  // `tapSheetAck` LEFT THIS GROUP FOR THE SAME REASON, one row later — see the
-  // block at `tapSheetAck` for what its action now reads.
+  // `tapSheetAck` LEFT THIS GROUP FOR THE SAME REASON, one row later — and
+  // `tapAck`, the PEEK's own «Разбрах», left it on 2026-09-09 for the third
+  // time the same reason has been given: see the block at `tapAck` below.
   const tapCloseSheet = useTapActivation(() => setOpenItem(null));
   /* ── THE SENTENCE THAT WAS CUT IS ITSELF THE WAY TO THE REST — 2026-08-26.
      The overflow-clip lane, eight phone rows, one shape: «Удари човек. Това е
@@ -2081,6 +2099,85 @@ export function SimOverlay({
   });
 
   /* ══════════════════════════════════════════════════════════════════════════
+     …AND THE SAME RULE ON THE SURFACE THAT SENDS THE STUDENT TO THAT SHEET —
+     2026-09-09, sc-vu-emergency:2e634d4d, „the mobile in-cockpit briefing card
+     is a clipped teaser that hides 6 to 27 lines behind a «↓ ОЩЕ N РЕДА»
+     fade".
+
+     THE FRAME. `w10-2/frames/sc-vu-emergency__mobile-right/01-arrival.png`,
+     iPhone 16 landscape 852 × 393 at dpr 3. The peek prints «ⓘ ИНСТРУКЦИИ»,
+     TWO lines of «Потегли по булеварда в дясната лента и се установи» — cut
+     after a verb, the object «на спокойна скорост» below the fold — then
+     «↓ ОЩЕ 20 РЕДА», and under that counter, twelve pixels away, «ПРОЧЕТИ» and
+     «РАЗБРАХ». The lesson's own 02-briefing frame proves the twenty lines are
+     whole in the sheet, so nothing is lost by authoring: what the card does is
+     ANNOUNCE twenty unread lines and put the control that ends the briefing
+     directly under the announcement.
+
+     THIS IS THE ROW THE FILE HAS ALREADY RULED ON TWICE, ON BOTH NEIGHBOURS.
+     `tapDismissCard` (2026-08-26): „the student cannot delete words he has not
+     seen." `tapSheetAck` (2026-09-04, sc-merge-accel-lane:b75b356e): „the
+     button that admits the fold may not also delete it" — a cue wired to a
+     LABEL and not to a BEHAVIOUR, „which is this project's own failure class".
+     The peek's «Разбрах» is the third control of that shape on this card and
+     was still `useTapActivation(acknowledge)`: it carries no cue of its own,
+     it stands under the one cue there is, and one press retired the card.
+
+     WHY IT OPENS THE SHEET AND DOES NOT SCROLL, which is the one place this
+     departs from its two siblings. `cardTapAction` answers a fold by scrolling
+     to THE END, and that is right for a 220 px sheet scroller and for the
+     plain `cardIsDismissButton` card, where the end is a line or two away. This
+     window is the card's only shrinkable item and every compact profile lands
+     on its 44 px floor (the block at `textWindowStyle.minHeight`), so „scroll
+     to the end" of a twenty-line body would jump past eighteen unread lines
+     and take «↓ още N реда» to zero having shown none of them — a counter that
+     reaches zero without the reader is worse than the one that could not reach
+     it at all, which is the trap the fold rule was written against. So the
+     first press does what «ПРОЧЕТИ» beside it does and what the cut words
+     themselves do (`tapCutText`): it opens the read sheet, with the whole
+     authored text and the car stopped. The sheet's own «Разбрах» then reveals
+     what is left and acknowledges on the press after — so the two-press
+     contract is the sheet's, unchanged, and this control simply stops being a
+     way around it.
+
+     `blocking`, and not `blocking || hasAck` — the condition the chip renders
+     under. A non-blocking acknowledgement is an authored control with an
+     authored label («Резултат» on the end-of-session line, which opens the
+     debrief); it does not end a reading, and hijacking its first press would
+     change what its own word promises. This is the same half-condition
+     `ackCarriesSheetFold` uses on the sheet, for the same reason.
+
+     READ FROM THE ELEMENT AT TAP TIME, not from `peekFold.lines`: that number
+     is refreshed by a `ResizeObserver` and by `onScroll`, and a tap that ends a
+     briefing may not depend on which of them ran last. An engine that answers
+     nothing (`scrollHeight === 0`, no ref) gets `readRestScrollTop === null`
+     and therefore today's behaviour exactly — one press, acknowledged.
+
+     NOTHING LOSES A ONE-PRESS EXIT THAT HAD ONE: Space/Enter still calls
+     `acknowledge()` outright, which is the assistive path, and the whole body
+     is in the accessibility tree regardless of the fold (`showFoldLabel` is
+     `aria-hidden` for exactly that reason). A blocking card paints no ✕
+     (`closable` requires `!blocking`), so nothing else on it is affected.
+     ══════════════════════════════════════════════════════════════════════════ */
+  const tapAck = useTapActivation(() => {
+    const el = peekFold.ref.current;
+    if (shown !== null && blocking && el !== null && overlayHasDetail(shown)) {
+      const padRaw = Number.parseFloat(getComputedStyle(el).paddingBottom);
+      const rest = readRestScrollTop({
+        scrollTop: el.scrollTop,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        padBottomPx: Number.isFinite(padRaw) ? padRaw : 0,
+      });
+      if (rest !== null) {
+        setOpenItem(shown);
+        return;
+      }
+    }
+    acknowledge();
+  });
+
+  /* ══════════════════════════════════════════════════════════════════════════
      WHICH MOMENT THE VERDICT IS ABOUT — §2.6 O33's SECOND HALF, 2026-08-25.
 
      THE FRAME (`w10-4/sc-sp-curve__mobile-wrong/04-t193s.png`, iPhone 16
@@ -2133,9 +2230,7 @@ export function SimOverlay({
   // unstamped card gets `null` and prints nothing: inventing «сега» for a fault
   // that may be a minute old is 04-t193s wearing the costume of its own fix.
   const momentBg = overlayCarriesMoment(shown.kind) ? overlayMomentBg(shown, nowMs) : null;
-  const hasDetail =
-    (typeof shown.detailBg === "string" && shown.detailBg.trim().length > 0) ||
-    shown.hasRichDetail === true;
+  const hasDetail = overlayHasDetail(shown);
   // WHAT ROW 2b PRINTS — the authored summary where the copy has one, the whole
   // explanation where it does not (sc-pk-driveway:fa602d10). `hasDetail`
   // deliberately still reads `detailBg`: the ЗАЩО chip opens the FULL text and

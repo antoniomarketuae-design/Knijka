@@ -45,10 +45,16 @@ export default async function LoginPage({ searchParams }: Props) {
         lead="Влез в акаунта си, за да продължиш обучението."
       />
 
+      {/* The banner is 74px of the 393 a landscape phone has, and it is up on
+          exactly the three URLs where a wrong password is most likely — so its
+          box tightens on `short:` while its TEXT does not: `py-1.5` and a
+          smaller gap, never a smaller type size. A status line a student has to
+          squint at is not a saving. Worth 12px of the 79 that put the
+          banner+wrong-password submit button back inside the fold. */}
       {notice && (
         <p
           role="status"
-          className="mb-5 rounded-lg border border-success/50 bg-success/10 px-3 py-2.5 text-sm font-semibold text-success short:mb-3"
+          className="mb-5 rounded-lg border border-success/50 bg-success/10 px-3 py-2.5 text-sm font-semibold text-success short:mb-2 short:py-1.5"
         >
           {notice}
         </p>

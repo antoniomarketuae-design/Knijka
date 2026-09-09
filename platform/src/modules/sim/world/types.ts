@@ -226,12 +226,34 @@ export interface DistrictBuilding {
    * „a bus stop belongs here". This key says it, and props.ts parks the same
    * shelter on the pavement in front of the authored footprint.
    *
+   * `"residential"` is the жилищен блок — `"school"` read the other way
+   * round, and it is half of one repair with the map's height source.
+   *
+   * `buildings.facadeVariant` already skews to the панелен блок above 15 m
+   * („Студентски град is panelka country"), and it reads the RESOLVED height,
+   * so a block authored at the 12 m a четириетажен блок really is only stayed
+   * on that facade while `heightSource: "default"` was silently inflating it
+   * into the 15–25 m jitter band. MEASURED on pe-zone-v1 — the one map in the
+   * corpus whose whole lesson is чл. 61–62, whose generator calls its five
+   * footprints „Residential blocks flanking the zone (the зона's visual
+   * anchor)" — the moment those heights become honest the lottery deals
+   * pz-b-west-approach and pz-b-east-fault `bay_curtain` (the bronze glass
+   * curtain wall) and pz-b-east `bay_strip`, the ribbon-window system
+   * `buildings.ts` reserves for a SCHOOL because „a school must not read as
+   * one more жилищен блок". Two office towers on a home zone is a worse
+   * street than the one sc-pe-zone-living:37bbb618 filed, so the height fix
+   * cannot ship without this key.
+   *
+   * Like the two above it dresses and never grades: the 20 km/h still comes
+   * from the edge's own `maxspeed`, and the зона's legality from its
+   * `zone: "residential"` tag and the Д15/Д16 posts derived from it.
+   *
    * It is NOT a grading input: the reduced limit still comes from the edge's
    * own `maxspeed` / `zone` tag, exactly as before. A building kind may dress
    * the world; it may never decide a fault. (The В27/„спирка" stopping ban is
    * a `zones` span and stays one — nothing here posts a sign or bans a stop.)
    */
-  kind?: "school" | "busStop";
+  kind?: "school" | "busStop" | "residential";
 }
 
 export interface DistrictSpawnPoint {

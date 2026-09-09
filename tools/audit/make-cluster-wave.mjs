@@ -204,6 +204,21 @@ THE RULES, IN THE ORDER THAT MATTERS:
 
 1. VERIFY EACH CAUSE IN CURRENT SOURCE BEFORE EDITING. These rows were filed against older builds and many waves have run since. If a row is ALREADY FIXED, say so with the evidence and change nothing for it. If it was never a defect, say REFUTED and prove it. Both are valuable outcomes — a wave that always finds something to change is inventing work.
 
+1c. A GREP THAT FINDS NOTHING IS NOT EVIDENCE OF ABSENCE. w31.
+
+   A judge retired a row by searching the product for РЕЖИМ, finding no
+   hit, and concluding that the rail had been removed product-wide. It had not:
+   it renders as Режим, and a case-insensitive sweep found it on five
+   lanes of that same wave. The verdict happened to survive on other grounds,
+   but the reason given was false — and false in the direction that reassures.
+
+   This is the ALREADY-FIXED trap in its cheapest form, so before you write
+   that verdict off a search: run it case-insensitively, search for the
+   SHORTEST distinctive fragment rather than the whole phrase, and remember
+   that a UI string may be assembled from pieces at render time and exist
+   nowhere in the source as one literal. Prove a repair by naming the commit
+   that made it and the consumer that reads it — never by an empty grep.
+
 1b. TWO MEASUREMENT TRAPS THAT COST THE w30 ROUND, BOTH FOUND BY VERIFIERS.
 
    A results-file "ms" FIELD IS NOT DRIVE TIME. It is the whole leg: page

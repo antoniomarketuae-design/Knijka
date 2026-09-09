@@ -60,6 +60,37 @@ export interface BuildingBuildResult {
 const SCHOOL_FACADE_VARIANT = 2;
 
 /**
+ * Facade variant a `kind: "residential"` block always takes. Variant 0 is the
+ * punched panel grid (StaticWorld FACADE_SETS index 0 = `bay_grid`) — the
+ * панелен блок the height skew below sends every tall block to, made reachable
+ * by the SHORT ones a жилищен квартал is actually built from.
+ *
+ * WHY IT IS NOT LEFT TO THE HASH, and why this constant arrived together with
+ * a change in a map generator. The skew is gated on the RESOLVED height, and
+ * `cityBuildings.resolveBuildingHeightM` reads `heightSource: "default"` as NO
+ * DATA and substitutes a 15–25 m jitter — so a четириетажен блок authored at
+ * 12 m was drawing `bay_grid` only because the renderer was quietly building
+ * it at 16–23 m. MEASURED on pe-zone-v1, the one map whose whole lesson is the
+ * жилищна зона: with the authored 12 m finally honoured, its five flanking
+ * blocks fall back to `hash % FACADE_VARIANTS` and land
+ *
+ *     pz-b-west-approach  bay_curtain   (the bronze glass curtain wall)
+ *     pz-b-east-approach  bay_band
+ *     pz-b-west           bay_grid
+ *     pz-b-east-fault     bay_curtain   (the bronze glass curtain wall)
+ *     pz-b-east           bay_strip     ( = SCHOOL_FACADE_VARIANT above)
+ *
+ * i.e. two office towers and the very ribbon-window system this file reserves
+ * for a school BECAUSE „a school must not read as one more жилищен блок". That
+ * is sc-pe-zone-living:37bbb618's „office-scale towers" stated as code, and it
+ * is why the honest height and this kind are one repair and not two.
+ *
+ * The TINT hash is deliberately untouched: `facadeTint` runs on its own hash
+ * lane, so five pinned blocks still weather apart instead of becoming clones.
+ */
+const RESIDENTIAL_FACADE_VARIANT = 0;
+
+/**
  * Cornice band, art pass 2026-08-03. Height of the crown strip cut off the top
  * of every wall. 1.1 m is a real Bulgarian parapet + coping: tall enough to
  * read at the 40–120 m a driver sees a block from, short enough that it never
@@ -219,6 +250,8 @@ export function facadeVariant(buildingId: string, height: number, kind?: string)
   // A school is never hashed into the residential palette: it is the ONE
   // building on the street a driver has to recognise (founder item 61).
   if (kind === "school") return SCHOOL_FACADE_VARIANT;
+  // …and a блок is never hashed into the office palette, at any height.
+  if (kind === "residential") return RESIDENTIAL_FACADE_VARIANT;
   const h = hashString(buildingId);
   // Tall blocks skew toward the panel-block palette (variant 0) — Студентски
   // град is panelka country.

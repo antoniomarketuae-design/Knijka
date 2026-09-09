@@ -64,6 +64,7 @@ import {
   solidLineFaultVoidsObjective,
   speedFaultVoidsObjective,
   stepObjective,
+  stopSignRollVoidsObjective,
   yieldFailedVoidsObjective,
   type ObjectiveContext,
   type YieldFaultCode,
@@ -1079,6 +1080,24 @@ function isYieldFault(e: ScorableEvent): e is ViolationEvent {
 const NO_YIELD_FAULTS: readonly YieldFaultRecord[] = [];
 
 /**
+ * The one conviction that falsifies a «спри напълно на Б2» banner — the second
+ * fact `ReachZoneParams.requireFullStop` consults (objectives.ts
+ * `stopSignRollFaultsSec` carries the drive, the mechanism and the window).
+ *
+ * ONE CODE, and deliberately not a set: `STOP_SIGN_NO_FULL_STOP` is the only
+ * conviction in the catalogue whose subject IS «пълно спиране», so it is the
+ * only one that can contradict the tick. Pooling it with the neighbouring red
+ * lamp or give-way codes would refuse gates whose banners are about something
+ * else, which is exactly what the window below already exists to prevent.
+ */
+function isStopSignRollFault(e: ScorableEvent): e is ViolationEvent {
+  return e.kind === "violation" && e.code === "STOP_SIGN_NO_FULL_STOP";
+}
+
+/** Shared empty ledger, for the reason `NO_YIELD_FAULTS` has one. */
+const NO_STOP_SIGN_ROLLS: readonly number[] = [];
+
+/**
  * The three convictions that falsify a «задържах тавана» banner — the fact
  * `ReachZoneParams.requireSpeedClean` consults (objectives.ts carries the two
  * demonstration drives and why the set is exactly these three).
@@ -1157,9 +1176,15 @@ function isCoachedSpeedFault(m: CoachedMistake): boolean {
  * Read off the POST-tick state, so the frame a stop becomes qualifying is the
  * frame the certificate may be issued on.
  */
-function qualifyingStopCurrent(rules: RuleEngineState, t: number): boolean {
+function qualifyingStopCurrent(rules: RuleEngineState, _t: number): boolean {
   const last = rules.stop.lastQualifyingStopAt;
-  return last !== null && t - last <= rules.config.stopRecencySec;
+  // DRIVING seconds since the stop, not wall-clock ones — the same read the Б2
+  // branch itself makes (`rules/engine.ts`, `stop.movingSinceStopSec`). Kept
+  // literally identical to it for this predicate's own founding reason: two
+  // implementations of «пълно спиране» is how one protocol came to print a ✓
+  // and a −10 for the same act, and a repair applied to one of them only would
+  // be that defect a second time.
+  return last !== null && rules.stop.movingSinceStopSec <= rules.config.stopRecencySec;
 }
 
 /**
@@ -1587,6 +1612,15 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           .filter(isYieldFault)
           .map((e) => ({ code: e.code as YieldFaultCode, tSec: e.t }))
       : NO_YIELD_FAULTS;
+  // …AND THE Б2 ROLL, on the same terms and for the same reason: a windowed
+  // demand needs the SECOND each conviction was billed on, not a boolean. Built
+  // exactly like the ledger above — the clean frame pays two `some` scans and
+  // returns the shared empty array, and the overwhelming majority of frames in
+  // the corpus carry no such fault at all.
+  const stopSignRollFaultsSec: readonly number[] =
+    prev.events.some(isStopSignRollFault) || scoredEvents.some(isStopSignRollFault)
+      ? [...prev.events, ...scoredEvents].filter(isStopSignRollFault).map((e) => e.t)
+      : NO_STOP_SIGN_ROLLS;
   // …AND THE CEILING THE ROAD GAVE, EXCEEDED ANYWHERE, for
   // `ReachZoneParams.requireSpeedClean` (objectives.ts carries the two demos:
   // one sheet printing «✓ Стигни края на отсечката, задържал тавана от
@@ -1807,6 +1841,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
         ...(overTheCeilingInRun ? { overTheCeilingInRun: true } : {}),
         qualifyingStopCurrent: fullStopHeld,
+        ...(stopSignRollFaultsSec.length > 0 ? { stopSignRollFaultsSec } : {}),
         ...(restIsCrashPinned ? { restIsCrashPinned: true } : {}),
         ...(activeSince !== null ? { objectiveActiveSinceSec: activeSince } : {}),
       };
@@ -2173,6 +2208,18 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           // objective loop uses, because `currentIndex` has moved since.
           yieldFailedVoidsObjective(params[currentIndex], {
             yieldFaults,
+            ...(terminalActiveSince !== null
+              ? { objectiveActiveSinceSec: terminalActiveSince }
+              : {}),
+          }) ||
+          // The Б2-roll term is monotone within its own window for the same
+          // reason, and `deriveFullStopDemand` arms SEVEN gates — several of
+          // them the last objective of their drill — so this arm is what stops
+          // the repair that removes «✓ Спри напълно на Б2» from a sheet that
+          // also prints «✗ Неспиране на знак Б2» from handing back a drive that
+          // cannot end. Same window, recomputed here for the same reason.
+          stopSignRollVoidsObjective(params[currentIndex], {
+            stopSignRollFaultsSec,
             ...(terminalActiveSince !== null
               ? { objectiveActiveSinceSec: terminalActiveSince }
               : {}),

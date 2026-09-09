@@ -130,11 +130,26 @@ describe("the sheet's «Разбрах» carries the fold count (sc-merge-accel-
  * would take the dismiss branch no matter what the component did.
  */
 describe("the sheet's «Разбрах» reveals before it ends (sc-merge-accel-lane:b75b356e)", () => {
-  /** The handler's body, comments already stripped by `CODE`. */
-  const HANDLER = CODE.slice(
-    CODE.indexOf("const tapSheetAck = useTapActivation("),
-    CODE.indexOf("const tapSheetAck = useTapActivation(") + 900,
-  );
+  /**
+   * The handler's body, comments already stripped by `CODE` — and cut at its
+   * OWN terminator rather than at a character count.
+   *
+   * IT USED TO BE `+ 900` AND THAT WAS A BUG IN THIS FILE, not a stylistic
+   * point (2026-09-09, sc-vu-emergency:2e634d4d). A fixed-width slice reads
+   * whatever happens to follow the subject, so the pinned ABSENCE below — „this
+   * handler must not read `peekFold`" — became an assertion about the next
+   * declaration in the component. The moment the PEEK's own «Разбрах» was given
+   * the same reveal-before-you-end rule one block down, this test failed while
+   * the sheet's handler was byte-identical. `\n  });` is the handler's own
+   * closing indent; every nested call inside it closes deeper.
+   */
+  const HANDLER = ((): string => {
+    const at = CODE.indexOf("const tapSheetAck = useTapActivation(");
+    expect(at, "the sheet's acknowledgement handler is gone").toBeGreaterThan(-1);
+    const end = CODE.indexOf("\n  });", at);
+    expect(end, "the handler does not close where its indent says").toBeGreaterThan(at);
+    return CODE.slice(at, end + "\n  });".length);
+  })();
 
   it("no longer acknowledges unconditionally", () => {
     // The exact shape this repair replaces. Pinned as an absence because it is

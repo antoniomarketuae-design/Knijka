@@ -68,6 +68,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "parkingBand": false,
     "length": 360,
     "geometry": [
      [

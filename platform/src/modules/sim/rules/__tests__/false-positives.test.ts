@@ -139,6 +139,60 @@ describe("FP battery — stop lines", () => {
     expect(events.map((e) => e.code)).toContain("FULL_STOP_AT_STOP_SIGN");
   });
 
+  /**
+   * REGRESSION: THE WAIT IS THE SECOND HALF OF THE DUTY — sc-merge-from-property:
+   * ab353b86, measured at HEAD ad9a4bf on `.audit-frames/w31/frames/
+   * sc-merge-from-property__pc-right/run.log` (EVIDENCE complete; the mobile
+   * leg prints the same pair).
+   *
+   * The car stands at 0 км/ч from 04-t022s to 04-t033s — eleven seconds, enough
+   * that the route task «Спри напълно на Б2 на изхода» ticked off it — then
+   * creeps away and crosses the paint at 04-t044s. `stopRecencySec` was read as
+   * a WALL clock, so nine seconds of lawful waiting had aged the stop out and
+   * the sheet printed «✗ Неспиране на знак Б2 „Спри!“ −10 изпитни т. ОПАСНА
+   * ГРЕШКА» beside the ✓ it had just issued for the same act: twenty points and
+   * НЕИЗДЪРЖАН for waiting at a STOP sign.
+   *
+   * Б2 is stop AND give way (ЗДвП чл. 47). A clock that expires during the give-
+   * way half bills the student for performing it, and teaches him to roll the
+   * sign — the anti-safety direction, which is why the fix is the clock and not
+   * a wider tolerance. `stop.movingSinceStopSec` counts DRIVING seconds, so the
+   * distance the window has always stood for is unchanged.
+   */
+  it("regression: a long lawful wait at Б2 does not age the stop out", () => {
+    const { events } = drive([
+      tick(0, { speedKmh: 20 }),
+      tick(1, { speedKmh: 6 }),
+      // A real halt at the line…
+      ...cruise(2, 3, { speedKmh: 0 }),
+      // …then TWELVE seconds of waiting for a gap in the cross traffic, twice
+      // `stopRecencySec`.
+      ...cruise(4, 15, { speedKmh: 0 }),
+      // …and away, crossing the paint two seconds of driving later.
+      tick(16, { speedKmh: 5 }),
+      tick(17, { speedKmh: 9, events: [stopSign] }),
+    ]);
+    expectInnocent(events);
+    expect(events.map((e) => e.code)).toContain("FULL_STOP_AT_STOP_SIGN");
+  });
+
+  /**
+   * THE OTHER DIRECTION, so the repair above cannot be satisfied by never
+   * billing: a stop made and then DRIVEN AWAY FROM is still spent. Twelve
+   * seconds of driving at 30 км/ч is a hundred metres of road, which is exactly
+   * the „you stopped a block back" case `stopRecencySec` exists for.
+   */
+  it("a stop driven away from is still spent — the Б2 bill survives the repair", () => {
+    const { events } = drive([
+      tick(0, { speedKmh: 20 }),
+      ...cruise(1, 2, { speedKmh: 0 }),
+      ...cruise(3, 15, { speedKmh: 30 }),
+      tick(16, { speedKmh: 30, events: [stopSign] }),
+    ]);
+    expect(events.map((e) => e.code)).toContain("STOP_SIGN_NO_FULL_STOP");
+    expect(events.map((e) => e.code)).not.toContain("FULL_STOP_AT_STOP_SIGN");
+  });
+
   it("braking firmly-but-legally to a stop line at red (no crossing)", () => {
     // Innocent: a decisive ~4.5 m/s² stop before the line is good driving,
     // not an event — there is no harsh-braking violation and no line crossing.
