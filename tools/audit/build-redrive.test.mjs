@@ -23,7 +23,7 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 
-import { legOfFrame, redriveSet, legsInProse } from "./build-redrive.mjs";
+import { legOfFrame, redriveSet, legsInProse , NO_SIMULATOR_ROUTE } from "./build-redrive.mjs";
 
 const BS = String.fromCharCode(92);
 const row = (o) => ({ scenario: "sc-x", severity: "major", frame: "", ...o });
@@ -172,4 +172,38 @@ test("§3(f) the union is a SUPERSET — never smaller than the frame legs alone
   const legs = redriveSet(rows)[0].legs;
   for (const must of ["pc-right", "pc-wrong"]) assert.ok(legs.includes(must), must + " was dropped");
   assert.ok(legs.includes("mobile-wrong"), "the prose leg was not added");
+});
+
+/* ── §7 lessons with no /simulator route ─────────────────────────────────── */
+
+test("§7 app-login is not dispatched, and its row is NOT removed from the open list", () => {
+  const open = [
+    { scenario: "app-login", severity: "major", what: "the login form at 852x393", frame: "" },
+    { scenario: "sc-park-wall", severity: "critical", what: "pc-right shows x", frame: "" },
+  ];
+  const set = redriveSet(open);
+  assert.deepEqual(set.map((r) => r.lesson), ["sc-park-wall"]);
+  // The point of the exclusion is that the CAMERA cannot reach it — not that the
+  // defect stopped existing. `open` is untouched, which is what keeps the count
+  // honest.
+  assert.equal(open.length, 2);
+  // MUTATION WATCHED: drop the NO_SIMULATOR_ROUTE guard and the set carries
+  // app-login again — four drives a round, exit=7 four times, as in w30.
+});
+
+test("§7 --include-undrivable puts it back, so the exclusion is testable rather than permanent", () => {
+  const open = [{ scenario: "app-login", severity: "major", what: "", frame: "" }];
+  assert.equal(redriveSet(open).length, 0);
+  assert.equal(redriveSet(open, { includeUndrivable: true }).length, 1);
+  // MUTATION WATCHED: ignore the flag and "no drive can ever photograph this"
+  // becomes unfalsifiable — the exact shape of claim this corpus has been wrong
+  // about before (93 rows once called structurally out of reach, refuted by probe).
+});
+
+test("§7 every excluded lesson carries a reason, not just a name", () => {
+  for (const [lesson, why] of NO_SIMULATOR_ROUTE) {
+    assert.ok(why && why.length > 20, `${lesson} needs a reason`);
+  }
+  // MUTATION WATCHED: a bare Set instead of a Map. A skip list without reasons is
+  // one that grows by accretion.
 });

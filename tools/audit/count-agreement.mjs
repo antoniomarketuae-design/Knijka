@@ -315,6 +315,16 @@ export const RECIPES = {
   // because this check refused the round it appeared in, which is exactly what
   // it is for. One argument, the output path; it honours an absolute one so
   // this probe never touches the .audit-frames work-list a sweep may be reading.
+  // The CAUSE-grouped wave generator (2026-09-09) — a lane owns one hot file and
+  // every open row naming it, which is the shape the flat tail needed once the
+  // median lesson carried 1.7 rows. Registered the day it moved into the repo,
+  // because this check refused the round it appeared in. That is twice now that
+  // a wave generator has been caught by this rule on its first day, which is an
+  // argument for the rule and not against the generators.
+  "make-cluster-wave.mjs": (t) => {
+    const out = path.join(t, "cluster-wave-probe.js");
+    return { args: [out], emits: "file", file: out };
+  },
   "make-lesson-wave.mjs": (t) => {
     const out = path.join(t, "lesson-wave-probe.js");
     return { args: [out], emits: "file", file: out };

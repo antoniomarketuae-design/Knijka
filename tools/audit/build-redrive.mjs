@@ -120,12 +120,35 @@ export function legsInProse(what) {
  * LATENT, which is exactly when someone tidying deletes it. `build-redrive.test.mjs`
  * §3(b) goes red if they do.
  */
-export function redriveSet(open, { only = null } = {}) {
+/**
+ * LESSONS THE SWEEP CANNOT DRIVE, AND WHY THEY ARE NAMED HERE RATHER THAN SKIPPED.
+ *
+ * A `-right` / `-wrong` leg is a drive of `/simulator/<lesson>`. `app-login`
+ * is not a lesson: its finding is about the /login form's layout at 852x393,
+ * the viewport the harness itself drives. Every round it was dispatched four
+ * drives and returned exit=7 four times — «no verdict surface» — because there
+ * is no verdict card to read. w30 spent ~20 minutes of a two-hour sweep on it.
+ *
+ * The row STAYS OPEN and stays in every count. This list only says which
+ * lessons the CAMERA cannot reach, so the sweep stops pointing it at them. A
+ * row here needs a different instrument — for app-login, a viewport
+ * measurement — and until someone builds one it is honest for it to sit open
+ * rather than to accumulate exit=7 drives that certify nothing.
+ *
+ * Adding a name here is a claim that no drive can EVER photograph it. That is a
+ * strong claim, so it carries a reason, and `--include-undrivable` overrides
+ * the whole list for anyone who wants to re-test one.
+ */
+export const NO_SIMULATOR_ROUTE = new Map([
+  ["app-login", "the /login form, not a lesson — there is no /simulator/app-login to drive"],
+]);
+export function redriveSet(open, { only = null, includeUndrivable = false } = {}) {
   const per = new Map();
   for (const f of open) {
     const lesson = f.scenario || f.lesson;
     if (!lesson) continue;
     if (only && !only.has(lesson)) continue;
+    if (!includeUndrivable && NO_SIMULATOR_ROUTE.has(lesson)) continue;
     const cur = per.get(lesson) || {
       lesson, total: 0, critical: 0, frameLegs: new Set(), proseLegs: new Set(),
     };
@@ -169,11 +192,25 @@ if (isMain || process.argv[1]?.endsWith("build-redrive.mjs")) {
   const used = only ? counts.open.filter((f) => only.has(f.scenario || f.lesson)) : counts.open;
   console.log(workedLine("open", used));
 
-  const set = redriveSet(counts.open, { only });
+  const includeUndrivable = process.argv.includes("--include-undrivable");
+  const set = redriveSet(counts.open, { only, includeUndrivable });
   const drives = set.reduce((n, r) => n + (r.legs.length || 4), 0);
 
   console.log("lessons in the drive set : " + set.length + (only ? "  (restricted to " + only.size + " named)" : ""));
   console.log("drives it will dispatch  : " + drives);
+  if (!includeUndrivable) {
+    const skipped = counts.open
+      .map((f) => f.scenario || f.lesson)
+      .filter((l) => NO_SIMULATOR_ROUTE.has(l));
+    const uniq = [...new Set(skipped)];
+    if (uniq.length) {
+      console.log(
+        "NOT DRIVEN — no /simulator route (" + skipped.length + " open row(s) stay open):",
+      );
+      for (const l of uniq) console.log("   " + l + " — " + NO_SIMULATOR_ROUTE.get(l));
+      console.log("   (pass --include-undrivable to dispatch them anyway)");
+    }
+  }
   const noLeg = set.filter((r) => r.legs.length === 0).length;
   if (noLeg) console.log("lessons whose findings name no leg (all four will be driven): " + noLeg);
 
