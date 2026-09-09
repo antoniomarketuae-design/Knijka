@@ -248,6 +248,38 @@ describe("the coach's sign does not stand where the road's own signs stand", () 
     expect(beforeAcross).toBeGreaterThan(0.4); // dead centre — the defect
   });
 
+  /**
+   * …AND THE OTHER PLACEMENT PASS, which the zb-v1 pin above cannot reach.
+   *
+   * `sc-hz-accident-scene:9925844d` (major): «the «Карай дотук» world label and
+   * the real В27 no-stopping sign are drawn at the same screen point, the sign
+   * disc sitting through the middle of the word»
+   * (`sweep161/sc-hz-accident-scene/mobile-right/04-t067s.png`, 2026-08-17 —
+   * eleven days before this offset landed). The А18 above is posted by
+   * `props.ts`; a В27 is posted by `builders/zoneSigns.ts` off a District zone
+   * span, a different pass with its own `ZONE_SIGN_LATERAL_M`. The two happen
+   * to agree today, and „happen to agree" is exactly the kind of claim that
+   * stops being true without anyone noticing — so it is measured on the map the
+   * row was filed against rather than assumed from the constant.
+   */
+  it("a zone-driven В27 stands in the same band the offset clears", () => {
+    const raw = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname, "../../../../../content/world/hz-accident-v1.json"),
+        "utf8",
+      ),
+    ) as unknown;
+    const world = buildWorldGeometry(assertDistrict(raw));
+    const v27 = world.signs.filter((s) => s.kind === "noStopping");
+    expect(v27.length).toBeGreaterThan(0);
+    // hz-accident-v1's street is the north-running centreline x = 0 and the
+    // northbound route is the east lane centre at GATE_HALF_WIDTH_M.
+    const lateral = Math.max(...v27.map((s) => s.position[0])) - GATE_HALF_WIDTH_M;
+    expect(lateral).toBeCloseTo(WORLD_KERB_SIGN_LATERAL_M, 3);
+    // …so the coach's post is outboard of THIS sign too, by the same 1.8 m.
+    expect(MARKER_SIGN_LATERAL_M - lateral).toBeGreaterThan(1.5);
+  });
+
   it("is still on the pavement of the scenario street, not in a building", () => {
     // Cross-section of the 1+1 scenario street: kerb at LANE_WIDTH_M (2 ×
     // GATE_HALF_WIDTH_M), 3.5 m of footway behind it (SIDEWALK_WIDTH_M).

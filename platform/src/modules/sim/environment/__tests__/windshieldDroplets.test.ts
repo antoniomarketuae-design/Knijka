@@ -255,11 +255,35 @@ describe("the material and the triangle are actually wired to the depth", () => 
     expect(CODE).toContain("material.uniforms.uDepthNdc.value = ndcDepthForDistance(");
   });
 
-  it("the wiped arc and the med+/dry gates are untouched by this fix", () => {
+  it("the wiped arc and the dry gate are untouched by this fix", () => {
     // The droplet field's own behaviour was not the defect; a "fix" that also
     // quietly disabled the wiper channel or started drawing on a dry road would
     // pass every case above.
     expect(CODE).toContain("uWipeLevel");
-    expect(CODE).toContain('level === "low" || effective <= 0.01');
+    expect(CODE).toContain("effective <= 0.01");
+  });
+
+  /**
+   * THE EXPECTATION THAT MOVED, AND WHY — sc-follow-rain-gap:b18e6e60.
+   *
+   * This case read `level === "low" || effective <= 0.01` and that is no longer
+   * the code, because the PRODUCT changed rather than the test. `low` is what
+   * `seedQualityFromSignals` returns for every touch-only device, so bailing at
+   * `low` meant the entire phone audience drove the rain lessons behind dry
+   * glass — the same weather-floor argument `quality.ts` already accepted for
+   * RainStreaks (row B71). The tier now selects a cheaper SHADER, not nothing.
+   *
+   * Both halves are asserted, because either alone is passable by a mistake:
+   * that `low` no longer short-circuits, and that it still does not pay for the
+   * second droplet grid.
+   */
+  it("every tier draws the glass when it is wet, and low draws the cheap variant", () => {
+    expect(CODE).not.toContain('level === "low" || effective');
+    expect(CODE).toContain('level === "low" ? { DROPLETS_ONE_LAYER: "1" } : {}');
+    expect(CODE).toContain("#ifndef DROPLETS_ONE_LAYER");
+    // The define is compiled into the program, so the material must be rebuilt
+    // — not reconciled — when the tier moves.
+    expect(CODE).toContain("[level],");
+    expect(CODE).toContain("<mesh key={level}");
   });
 });

@@ -4093,6 +4093,16 @@ const guidance = {
   sustainHolds: 0,
   /** …and the ones that hit SUSTAIN_MAX, i.e. were stopped by the guard */
   sustainCapped: 0,
+  /**
+   * …and the samples AFTER that guard fired on which the turn demand was still
+   * there, same sign, still over SUSTAIN_DEG. `sustainRun` is only reset by the
+   * error entering the deadband or changing sign, so once it passes
+   * SUSTAIN_CONFIRM + SUSTAIN_MAX the sustained branch is retired for the rest
+   * of that demand and the loop answers a turn with MAX_HOLD_MS pulses — „~9 %
+   * duty … a turning radius near 52 m" by lib/guidance.mjs's own arithmetic.
+   * Non-zero therefore means THE WHEEL RAN OUT, not that the road went straight.
+   */
+  sustainExhausted: 0,
   /** …and every time a sustained hold was let go. Published because a hold
    *  that is never released is a car turning with nothing watching. */
   sustainReleases: 0,
@@ -4463,6 +4473,14 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     // field's own note says it counts „every time a sustained hold was let go";
     // it has to be true on every branch or it is not a count of anything.
     if (guideHeldBySustain) { await steer(null, kmh); guideHeldBySustain = false; guidance.sustainReleases += 1; }
+    // …AND IF THE DEMAND IS STILL A CONFIRMED TURN, THIS PULSE IS THE LOOP
+    // RUNNING OUT OF WHEEL. Banked here rather than inferred later: after
+    // SUSTAIN_MAX the sustained branch is retired while `sustainRun` keeps
+    // climbing, so a manoeuvre longer than that window is answered by pulses
+    // and the car goes on nearly straight. See `guidance.sustainExhausted`.
+    if (Math.abs(errDeg) >= TUNE.SUSTAIN_DEG && guideSustainRun >= TUNE.SUSTAIN_CONFIRM + TUNE.SUSTAIN_MAX) {
+      guidance.sustainExhausted += 1;
+    }
     await steer(cmd.dir, kmh);
     await page.waitForTimeout(cmd.holdMs);
     await steer(null, kmh);
@@ -7868,6 +7886,17 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
       (steering.channel.legs.length
         ? ` (${steering.channel.legs.map((l) => `${l.dir} ${l.error ? "err" : `${l.px}px`}`).join(", ")}, ${steering.channel.costMs} ms)`
         : "") +
+      // THE SUSTAIN BOOK, WHICH WAS COUNTED AND READ BY NOTHING. Four counters
+      // were incremented on every drive and published nowhere, so a reader of
+      // this line could not tell a lane that never needed a held wheel from one
+      // whose held wheel ran out mid-manoeuvre. `sustainExhausted` is the one
+      // that separates them.
+      (guidance.sustainHolds
+        ? ` · ${guidance.sustainHolds} sustained hold(s), ${guidance.sustainReleases} release(s), ${guidance.sustainCapped} capped at SUSTAIN_MAX`
+        : "") +
+      (guidance.sustainExhausted
+        ? ` · ${guidance.sustainExhausted} sample(s) of a CONFIRMED turn answered by ≤${TUNE.MAX_HOLD_MS} ms pulses after the cap`
+        : "") +
       (steering.refusedBothAtOnce ? ` · refused ${steering.refusedBothAtOnce} both-at-once command(s)` : "") +
       (steering.atStandstill ? ` · ${steering.atStandstill} issued below ${STEER_MIN_KMH} км/ч, where the wheel moves the CAMERA and not the car` : "") +
       (steering.releasedByPauseDrain ? ` · released ${steering.releasedByPauseDrain}× by a pause drain` : ""),
@@ -7898,6 +7927,32 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
           : chState === "live"
             ? "The channel itself read LIVE at the spawn mark, so this is the traces' silence and not a broken instrument."
             : `The channel was never tested on this lane (${steering.channel.why}), so it is not even known which.`),
+    );
+  }
+  // …AND THE SAME CONFLATION ONE STEP ALONG, WHICH THE GUARD ABOVE CANNOT SEE.
+  // `everSteered` is true the moment ONE pulse is issued, so a drive that
+  // steered a little and then ran out of held wheel walks past it with its
+  // uncredited objectives looking exactly like a product that withheld credit.
+  // sc-rb-busy-gap:5ee56710 („leaving at the second exit never ticks in any
+  // leg") is that shape: across w23–w30, sixteen legs, `sc-rbg-exit` ticked on
+  // none — and the six mobile-right legs that were measured report 74–77 m of
+  // witness path at straightness 0.998–0.999, i.e. a straight line up the
+  // approach of a lesson whose whole task is to go round. The product side is
+  // not in doubt: 45 lawful lines × paces × rungs collect that objective
+  // through the real `applyTick` in `platform/src/modules/sim/lessons/scenario/
+  // __tests__/rbg-exit-reachable.test.ts`.
+  if (guidance.sustainExhausted && uncredited.length) {
+    loud(
+      `${uncredited.length} objective(s) went UNCREDITED on a drive whose steering loop RAN OUT OF HELD WHEEL: ` +
+        `${guidance.sustainExhausted} sample(s) carried a confirmed same-sign turn demand over ${TUNE.SUSTAIN_DEG}° ` +
+        `AFTER the ${TUNE.SUSTAIN_MAX}-sample SUSTAIN_MAX guard had retired the held wheel, so the turn was answered ` +
+        `by ≤${TUNE.MAX_HOLD_MS} ms pulses — „~9 % duty … a turning radius near 52 m" by lib/guidance.mjs's own ` +
+        `arithmetic. A manoeuvre that needs a longer continuous lock than that window — a roundabout circulation, a ` +
+        `slow junction turn — CANNOT be completed by this instrument, whatever the lesson does. ` +
+        `${uncredited.map((o) => `«${o.titleBg}»`).slice(0, 4).join(", ")}` +
+        `${uncredited.length > 4 ? ` …and ${uncredited.length - 4} more` : ""} are therefore UNJUDGED on this drive: ` +
+        `no finding may name the lesson, its objectives or its geometry as the reason they are unticked. ` +
+        `Settle them from a source that can hold a turn — an engine-level completability test — not from this leg.`,
     );
   }
 }

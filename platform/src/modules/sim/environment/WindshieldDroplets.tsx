@@ -63,7 +63,8 @@
 // The integrator mounts this inside the Canvas ONLY while the cockpit view is
 // active. Intensity follows the shared weather channel by default (droplets
 // while raining, a faint residue while the world dries) and can be overridden
-// via the `intensity` prop. Renders nothing when dry or on the low preset.
+// via the `intensity` prop. Renders nothing when dry; `low` renders the
+// single-layer variant (see the weather-floor block beside `defines`).
 //
 // WIPED ARC (doc 62 #24): when a `wiperRef` channel is provided (VehicleRig
 // writes the live blade state into it), the droplet field inside the blades'
@@ -160,7 +161,10 @@ float dropLayer(vec2 uv, float cells, float t, float seed) {
 
 void main() {
   float a = dropLayer(vUv, 22.0, uTime, 3.1)
-          + dropLayer(vUv, 38.0, uTime * 1.3, 7.7) * 0.7;
+#ifndef DROPLETS_ONE_LAYER
+          + dropLayer(vUv, 38.0, uTime * 1.3, 7.7) * 0.7
+#endif
+          ;
   // Slightly denser toward the edges — reads as windshield, not screen dirt.
   float edge = 0.65 + 0.35 * smoothstep(0.25, 0.95, distance(vUv, vec2(0.5, 0.45)));
   // Wiped arc (doc 62 #24): a sector around the blade pivot (below the frame's
@@ -197,6 +201,25 @@ export function WindshieldDroplets({
       {
         vertexShader: VERTEX,
         fragmentShader: FRAGMENT,
+        // THE WEATHER FLOOR, ON THE ONE SURFACE A PHONE ACTUALLY LOOKS THROUGH
+        // (sc-follow-rain-gap:b18e6e60 — „no droplets or streaks on the glass …
+        // rain is conveyed only by a light haze and sparse white specks",
+        // mobile-right/04-t049s). This sheet used to `return null` at `low`,
+        // and `low` is not an edge case: `seedQualityFromSignals` returns it
+        // for EVERY touch-only device without exception, so the whole phone
+        // audience drove «Дистанция в дъжд» behind dry glass. That is the same
+        // argument `quality.ts` already accepted for RainStreaks (register row
+        // B71, rainParticles 0 → 260): a lesson whose entire subject is rain
+        // must be able to state its own premise on the device it is played on.
+        //
+        // PAID DOWN RATHER THAN WAIVED. The sheet is one fullscreen transparent
+        // triangle either way — the overdraw does not change with the layer
+        // count — so what `low` drops is the second, finer droplet grid: one
+        // `dropLayer` (a hash, a length and three smoothsteps) instead of two,
+        // half the ALU of a pass that only mounts on a wet cockpit lesson at
+        // all. Every dry lesson at `low` is untouched: the integrator mounts
+        // this only when `cockpit && rain`.
+        defines: level === "low" ? { DROPLETS_ONE_LAYER: "1" } : {},
         uniforms: {
           uIntensity: { value: 0 },
           uTime: { value: 0 },
@@ -212,7 +235,12 @@ export function WindshieldDroplets({
         toneMapped: false,
       },
     ],
-    [],
+    // `level` is the ONLY dep, and it is one because `defines` is compiled
+    // into the program: a tier change has to build a new material, not mutate
+    // a live one. It cannot fire mid-drive (`qualityStore` changes tier only
+    // between lessons, with the canvas unmounted), so this rebuilds at most
+    // once per mount in practice.
+    [level],
   );
 
   useFrame((state) => {
@@ -234,12 +262,17 @@ export function WindshieldDroplets({
     );
   });
 
-  // Rain visuals are med+ (matching the streaks); skip entirely when dry.
+  // Skip entirely when dry. Every tier draws the glass when it is wet — see
+  // the weather-floor block beside `defines`; `low` draws the cheaper of the
+  // two shaders rather than nothing.
   const effective = intensity ?? Math.max(rain, wetness * 0.3);
-  if (level === "low" || effective <= 0.01) return null;
+  if (effective <= 0.01) return null;
 
   return (
-    <mesh frustumCulled={false} renderOrder={999}>
+    // `key` on the tier for the same reason `materialArgs` depends on it: the
+    // `defines` are baked into the compiled program, so the material must be
+    // recreated rather than reconciled when the tier moves.
+    <mesh key={level} frustumCulled={false} renderOrder={999}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[TRIANGLE_POSITIONS, 3]} />
       </bufferGeometry>

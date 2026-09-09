@@ -204,6 +204,24 @@ THE RULES, IN THE ORDER THAT MATTERS:
 
 1. VERIFY EACH CAUSE IN CURRENT SOURCE BEFORE EDITING. These rows were filed against older builds and many waves have run since. If a row is ALREADY FIXED, say so with the evidence and change nothing for it. If it was never a defect, say REFUTED and prove it. Both are valuable outcomes — a wave that always finds something to change is inventing work.
 
+1b. TWO MEASUREMENT TRAPS THAT COST THE w30 ROUND, BOTH FOUND BY VERIFIERS.
+
+   A results-file "ms" FIELD IS NOT DRIVE TIME. It is the whole leg: page
+   load, sign-in, briefing, demo playback, drive and debrief scroll together.
+   Two w30 verdicts quoted it as time behind the wheel and inflated their claim
+   2.6x — "5 full stops over 169 s" was a 169,192 ms LEG against about 64 s
+   of actual driving. For drive duration read the last 04-t<NNN>s frame name or
+   the PACE line in run.log. Never the results file.
+
+   A FORCE-TERMINATED LEG IS NOT COMPARABLE TO A COMPLETE ONE. run.log says
+   'ended naturally: false (forced via Прекрати урока)' when the harness burned
+   its 210 s budget and stopped the session itself. An objective is then
+   unticked because THE CAR WAS CUT OFF SHORT OF IT, not because the product
+   withheld credit: w30 nearly retired a critical row on exactly that
+   comparison, on a leg whose odometer read 208 m of a 300 m route. Check
+   'ended naturally' and the odometer against the authored route length before
+   concluding anything from a missing tick.
+
 2. LAND CODE OR LAND NOTHING. Never write an essay into a source file. An earlier wave produced 265 lines of comment and zero code across four files; that is worse than an empty diff, because a comment makes git report the file as changed and unlocks the audit's re-closure gate. Analysis goes in your REPORT.
 
 3. IT MUST COMPILE AND THE SUITE MUST STAY GREEN. Run \\\`npx tsc --noEmit -p tsconfig.json\\\` from platform/, and the tests covering what you touched. If a TOTAL Record gains a member (rules/n38.ts N38_BASIS, rules/catalog.ts VIOLATIONS, world/referents.ts), every such Record needs the row or it is a compile error.

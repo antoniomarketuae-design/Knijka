@@ -169,12 +169,82 @@ describe("foldWindowPx — the cut goes between the line boxes, never inside one
     // stands between this window and a hard cut announced where there is no
     // fold — a card claiming a fold it does not have is the counter's own
     // failure mode, pointing backwards.
+    //
+    // ── EXPECTATION UPDATED 2026-09-09, AND THE CLAIM IT MAKES IS UNCHANGED.
+    //    Six lines ending at 90 in a 96 px window put the last 4 px of the
+    //    sixth line box INSIDE the 10 px fade, so „handed back whole" was
+    //    handing back a dimmed line. The window is now taken opaque to the end
+    //    of its own text (`bottomPx: 90`) instead. THE THING THIS CASE IS
+    //    ACTUALLY FOR is asserted directly below and is what it always meant:
+    //    no fold is claimed, because none exists.
     const justFits: FoldRow[] = [{ offsetTop: 0, heightPx: 6 * 15, lineHeightPx: 15 }];
-    expect(foldWindowPx(justFits, { scrollTop: 0, clientHeight: 96 })).toEqual({
-      topPx: 0,
-      bottomPx: 96,
-      hardEdge: false,
-    });
+    const fitted = foldWindowPx(justFits, { scrollTop: 0, clientHeight: 96 });
+    expect(fitted).toEqual({ topPx: 0, bottomPx: 90, hardEdge: true });
+    // …and NOT ONE LINE IS ANNOUNCED. `useFoldLines` feeds `bottomPx` to the
+    // counter, so a snap that invented a fold would show up here as «↓ още 1
+    // ред» under a text the student can read in full.
+    expect(
+      foldLinesBelow(
+        { scrollTop: 0, scrollHeight: 6 * 15 + FIXED_BAND_PX, clientHeight: fitted.bottomPx, padBottomPx: FIXED_BAND_PX },
+        15,
+      ),
+    ).toBe(0);
+  });
+
+  it("does not let the fade stand on «караш» — the band with nothing to announce", () => {
+    /* w30 `frames/sc-ov-solid-return__mobile-right/04-t000s.png`, iPhone 16
+       landscape 852 × 393 at dpr 3, `SimOverlay.tsx` byte-identical to HEAD at
+       that build. The `cardIsDismissButton` legend peek, whose window holds ONE
+       row — the `text-[11px] leading-tight` line, five boxes of 13.75 px:
+
+         «Синя линия — колата-сянка · зелена, стрелката и светлинният стълб —
+          маршрутът и целта, до която караш»
+
+       PEAK INK DOWN THE GLYPHS' OWN COLUMN (device px, luminance):
+
+         line 4  «маршрутът и целта, до която»   y 406–429   245.6, flat
+         line 5  «караш»                          y 447–467   207.4 → 67.0
+
+       A linear ramp across one whole line box, and the frame carries NO
+       «↓ още N реда» — the counter was right, there was nothing below. The
+       overflow branch never ran, so the soft 10 px band shipped and came to
+       rest on the verb the sentence ends on.
+
+       The row overflows the box by 1 px, i.e. inside `FOLD_SLACK_PX`: nothing
+       is hidden, so nothing may be faded. */
+    const LEGEND: FoldRow[] = [
+      { offsetTop: 0, heightPx: 5 * TITLE_LEADING, lineHeightPx: TITLE_LEADING },
+    ];
+    const clientHeight = 5 * TITLE_LEADING - 1; // 67.75 — the column's cap, one px under its text
+    const win = foldWindowPx(LEGEND, { scrollTop: 0, clientHeight });
+
+    expect(win.hardEdge, "the fade may not survive on a window with nothing under it").toBe(true);
+    expect(win.bottomPx).toBeCloseTo(clientHeight, 6);
+    // The mask the window publishes carries no band at all — this is the string
+    // the pre-2026-09-09 behaviour emitted, and it is the ramp on «караш».
+    expect(foldMaskCss(win)).not.toContain("calc(100% -");
+
+    // AND NOTHING IS INVENTED IN THE OTHER DIRECTION: the counter is fed
+    // `bottomPx`, and it still says zero, exactly as the filed frame does.
+    expect(
+      foldLinesBelow(
+        {
+          scrollTop: 0,
+          scrollHeight: 5 * TITLE_LEADING + FIXED_BAND_PX,
+          clientHeight: win.bottomPx,
+          padBottomPx: FIXED_BAND_PX,
+        },
+        TITLE_LEADING,
+      ),
+    ).toBe(0);
+
+    // …and the same window with room for its padding is untouched: the soft
+    // band's real job (a text that FITS is not faded) is not being taken away.
+    const roomy = foldWindowPx(LEGEND, { scrollTop: 0, clientHeight: 5 * TITLE_LEADING + 12 });
+    expect(roomy).toEqual({ topPx: 0, bottomPx: 5 * TITLE_LEADING + 12, hardEdge: false });
+    expect(foldMaskCss(roomy)).toBe(
+      "linear-gradient(to bottom, #000 calc(100% - 10px), transparent)",
+    );
   });
 
   it("refuses to snap past a row whose line grid it cannot see", () => {

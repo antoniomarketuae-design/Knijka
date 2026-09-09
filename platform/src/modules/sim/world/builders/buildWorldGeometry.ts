@@ -27,7 +27,7 @@ import { buildBuildingInstances, CITY_MODELS } from "./cityBuildings";
 import { buildRoadDecals } from "./decals";
 import { countStaticDrawSlots } from "./drawSlots";
 import { buildCrossingFurniture, buildMarkings } from "./markings";
-import { perpRight, type Vec2 } from "./math2d";
+import { hashString, perpRight, type Vec2 } from "./math2d";
 import { analyzeNetwork, type RoadNetwork } from "./network";
 import { buildProps } from "./props";
 import { buildRailTracks } from "./railTrack";
@@ -40,6 +40,17 @@ import { buildWaterDecals } from "./waterDecals";
 import { buildWorldRim } from "./worldRim";
 
 export const DEFAULT_SEED = 1337;
+
+/**
+ * The prop RNG seed for a district that pins none — `DEFAULT_SEED` keyed by the
+ * district's own id. See the call site in `buildWorldGeometry` for the finding
+ * and the measurement; exported so the corpus can assert the keys never
+ * collide (a collision silently restores the shared-street defect for that
+ * pair).
+ */
+export function propSeedFor(district: District): number {
+  return DEFAULT_SEED ^ hashString(district.meta.district);
+}
 
 /**
  * The road class that IS a parking lot's own roadway. Not a new vocabulary —
@@ -500,7 +511,18 @@ export function buildWorldGeometry(
   const schools = buildSchools(district.buildings, network);
   const props = buildProps(district, network, buildings.aabbs, {
     treeDensity: options.treeDensity ?? 1,
-    seed: options.seed ?? DEFAULT_SEED,
+    // THE PROP RNG IS THIS DISTRICT'S, NOT THE CATALOGUE'S (sc-junction-stop
+    // :5d3cc55e — „separately-named junction lessons render as one and the same
+    // route"). `DEFAULT_SEED` alone seeded all 105 maps, so two districts with
+    // the same road shape got the same planting, the same species and the same
+    // jitter in the same order: measured on the five committed T-junctions, the
+    // first three tree stations were z 17.18 / −17.46 / 17.34 on tj-stop-v1,
+    // tj-emerge-v1 AND tj-scan-v1, differing only by the arm-length shift in x.
+    // The same defect the world rim carried until wave 8 put the district in the
+    // mass id (worldRim.ts), one layer over: the ONE term that tells these maps
+    // apart was missing from the seed. `options.seed` still wins, so every
+    // caller that pins a seed (the clip rig, the recipe A/Bs) is unmoved.
+    seed: options.seed ?? propSeedFor(district),
     // …and the rings resolved above, so the Г9 island plates stand on the SAME
     // island `buildRoundabouts` draws below rather than on a second derivation
     // of it (props.ts, the Г9 pass).

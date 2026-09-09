@@ -569,10 +569,28 @@ describe("the briefing list yields instead of being guillotined", () => {
       lineHeightPx: 14,
     }));
     const win = foldWindowPx(rows, { scrollTop: 0, clientHeight: 298 });
-    expect(win).toEqual({ topPx: 0, bottomPx: 298, hardEdge: false });
-    // …and with no hard edge the card emits the 2026-08-14 band, character for
-    // character. The fade is still the floor.
-    expect(foldMaskCss(win, BRIEFING_FADE_PX)).toBe(BRIEFING_FADE_MASK_CSS);
+    // NOT ONE PIXEL IS HIDDEN, which is what this case is for: `bottomPx` is
+    // the content's own bottom and it is also the box's.
+    expect(win.bottomPx).toBe(298);
+    expect(win.topPx).toBe(0);
+    // ── EXPECTATION UPDATED 2026-09-09 (`hardEdge` was pinned `false` here).
+    //    Step 10's box is 270 → 298 and the box floor is 298, so the 10 px band
+    //    was standing on the bottom 10 px of a 14 px line box — the second line
+    //    of the last step, at declining alpha, on a list that FITS. That is the
+    //    decapitation this file's own §2 is about, arriving through the branch
+    //    that was supposed to be the safe one. `foldWindowPx` now takes the
+    //    hard edge to the end of the content whenever the fade would otherwise
+    //    land on it, so the last step keeps its ink; nothing is hidden and
+    //    `rowsBelowFold(BRIDGE_ICE_ROWS, 0, 298)` is still 0 above.
+    expect(win.hardEdge).toBe(true);
+    // …and the mask is two coincident stops at the content's end, with no band
+    // anywhere. `BRIEFING_FADE_MASK_CSS` is what shipped and is the fade on the
+    // step, so it must NOT come back.
+    const css = foldMaskCss(win, BRIEFING_FADE_PX);
+    expect(css).toContain("#000 298px");
+    expect(css).toContain("transparent 298px");
+    expect(css).not.toBe(BRIEFING_FADE_MASK_CSS);
+    expect(css).not.toContain("calc(");
   });
 
   it("scrolled into the middle, BOTH ends land on the grid", () => {

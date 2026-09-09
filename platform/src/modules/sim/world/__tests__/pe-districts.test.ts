@@ -1064,10 +1064,13 @@ describe("the PE family is seven DIFFERENT streets (doc 87 FR-41)", () => {
     // used to get byte-identical planting: (14.4, −11.0) and (−14.0, −33.0)
     // appeared on FOUR of these seven. Authored near-field frontage on the kerb
     // line displaces those stations (`props.insideBuilding`), which is how it
-    // is fixed here. The GLOBAL cure is a per-district seed; it is not done,
-    // because DEFAULT_SEED is shared by all 90 districts and every pinned prop
-    // census in the tree. This case is what stops the symptom coming back
-    // silently in the meantime.
+    // is fixed here. The GLOBAL cure is a per-district seed, and it LANDED with
+    // sc-junction-stop:5d3cc55e — `buildWorldGeometry` now seeds the prop rng
+    // from `propSeedFor(district)` (`DEFAULT_SEED ^ hashString(id)`), asserted
+    // corpus-wide in `builders/__tests__/two-districts-are-not-one-street.test
+    // .ts`. Two pinned tree censuses moved; nothing else in the tree did. This
+    // case stays: it is the near-field half, and it fails on the frontage
+    // displacement even when the seeds agree.
     const stations = built.map((b) =>
       new Set(
         b.world.trees

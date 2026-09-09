@@ -652,9 +652,13 @@ export type FoldRow = {
  * TWO REFUSALS TO SNAP, and each guards against turning a sliced line into a
  * deleted paragraph:
  *
- *   · NOTHING IS OVERFLOWING. Then there is no cut to move and the window is
- *     handed back whole. A snap here would hide a line the student can already
- *     read — the false-failure twin of the defect being fixed.
+ *   · NOTHING IS OVERFLOWING. Then there is no cut to move and no line is
+ *     hidden. A snap here would hide a line the student can already read — the
+ *     false-failure twin of the defect being fixed. What that window MAY still
+ *     get is a hard edge at the end of its own text rather than the fade, and
+ *     only when the fade would otherwise stand on the last line: see the block
+ *     in the `else if` below for the frame that measured it. Nothing is hidden
+ *     either way, so the counter is identical; the last line keeps its ink.
  *   · THE SNAP WOULD COST MORE THAN ONE LINE BOX. A partial line is at most one
  *     line box tall, so a snap that shaves more than that is not landing on a
  *     text grid at all: it is landing on the top of an opaque row whose insides
@@ -671,6 +675,19 @@ export function foldWindowPx(
   rows: readonly FoldRow[],
   scroll: { scrollTop: number; clientHeight: number },
   slackPx: number = FOLD_SLACK_PX,
+  /**
+   * The band `foldMaskCss` fades over when it is handed `hardEdge: false`.
+   *
+   * IT IS READ, unlike the `padBottomPx` the note above refuses, and for the
+   * opposite reason: the soft branch's whole safety argument is „`padding-
+   * bottom` is the same 10 px, so a text that FITS has its last line's box
+   * bottom sitting on the fade's opaque edge". That holds only while the
+   * padding is inside the viewport. This window is the card's only `shrink`
+   * item under a `max-height`-capped column, so the flex algorithm routinely
+   * shrinks it BELOW content + padding — the padding scrolls out of view and
+   * the band comes to rest on real text instead. See the block below.
+   */
+  fadePx: number = TEXT_FADE_PX,
 ): { topPx: number; bottomPx: number; hardEdge: boolean } {
   const whole = { topPx: 0, bottomPx: scroll.clientHeight, hardEdge: false };
   if (rows.length === 0) return whole;
@@ -716,6 +733,49 @@ export function foldWindowPx(
       // floor, and a mask stop past the box is meaningless. The cut is still
       // hard — see `hardEdge` above for the case this exists for.
       bottomPx = Math.min(snapped, scroll.clientHeight);
+      hardEdge = true;
+    }
+  } else if (contentBottom > viewBottom - fadePx + slackPx) {
+    /* ── THE BAND WITH NOTHING TO ANNOUNCE, STANDING ON THE LAST LINE.
+       w30 `sc-ov-solid-return__mobile-right/04-t000s.png`, iPhone 16 landscape
+       852 × 393 at dpr 3, this file byte-identical to HEAD. The legend peek
+       prints five lines and the fifth is «караш» — the verb the sentence
+       «…маршрутът и целта, до която караш» ends on. Peak ink down the card,
+       device px, sampled over the glyphs' own column:
+
+         line 4  «маршрутът и целта, до която»   y 406–429   245.6, flat
+         line 5  «караш»                          y 447–467   207.4 → 67.0
+
+       A clean linear ramp across one line box: the 10 px band, on text. And
+       the card printed NO «↓ още N реда», because it truthfully had nothing to
+       announce — `foldLinesBelow` subtracts the same 10 px as padding, so it
+       reported 0. The overflow branch above never ran (`contentBottom` is
+       inside the box), so `hardEdge` stayed false and the soft gradient
+       shipped. The student was shown four sentences and a ghost.
+
+       THE TWO 10 px ARE MEASURED FROM OPPOSITE ENDS, which is the whole bug.
+       The padding is at the bottom of the CONTENT; the fade is at the bottom
+       of the VIEWPORT. While the window is tall enough for both they coincide
+       and nothing is dimmed — the case the soft branch is right about, and the
+       one this leaves alone (`contentBottom` a comfortable line above the
+       band). Once the column's cap squeezes the window under content + padding,
+       the padding goes below the fold and the band lands on the last line.
+
+       SO WHEN NOTHING IS HIDDEN, NOTHING IS FADED. A fade is a claim that the
+       text continues; here it continues by at most the slack, i.e. not at all,
+       so the mask is taken opaque to the end of what the window shows. Nothing
+       moves, nothing is hidden and the counter is unchanged — `foldLinesBelow`
+       is handed `bottomPx`, and `scrollHeight − contentBottom − padBottom` is
+       the same 0 it already reported. The only thing that changes is that the
+       last line keeps its ink.
+
+       `Math.min` with the box: `contentBottom` may sit a fraction of a pixel
+       BELOW the floor (the slack case `keeps the sub-pixel slack` pins), and a
+       mask stop past the box is meaningless — the same clamp the branch above
+       makes for the same reason. */
+    const painted = Math.min(contentBottom - viewTop, scroll.clientHeight);
+    if (painted > 0) {
+      bottomPx = painted;
       hardEdge = true;
     }
   }

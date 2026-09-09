@@ -142,6 +142,31 @@ describe("§C the wheel is never left down where nothing is watching", () => {
     assert.match(SRC, /phaseExitReleases: 0,/);
     assert.match(SRC, /guidance\.phaseExitReleases \+= 1;/);
   });
+
+  it("says out loud when the held wheel RAN OUT under a turn it had confirmed", () => {
+    // `everSteered` is true after ONE pulse, so the §B guard above — which
+    // fires only on a drive that never turned the wheel at all — cannot see a
+    // drive that steered a little and then hit SUSTAIN_MAX with the demand
+    // still there. That drive answers a confirmed turn with ≤MAX_HOLD_MS
+    // pulses, goes on almost straight, and publishes its uncredited objectives
+    // as if the lesson had refused them. sc-rb-busy-gap:5ee56710 is sixteen
+    // legs of exactly that.
+    assert.match(SRC, /sustainExhausted: 0,/, "the exhausted-cap counter is gone");
+    assert.match(
+      SRC,
+      /guidance\.sustainExhausted \+= 1;/,
+      "nothing increments sustainExhausted — the counter is dead again",
+    );
+    assert.match(
+      SRC,
+      /if \(guidance\.sustainExhausted && uncredited\.length\) \{\s*\n\s*loud\(/,
+      "an uncredited objective on a drive that ran out of held wheel is quiet again",
+    );
+    assert.match(SRC, /RAN OUT OF HELD WHEEL/);
+    // The counters were incremented and read by NOTHING before this pass; the
+    // STEERING line is the one place a judge looks at the wheel.
+    assert.match(SRC, /guidance\.sustainHolds\s*\n?\s*\?/, "the sustain book is unpublished again");
+  });
 });
 
 describe("§D the witness keeps enough to check the loop's own story", () => {

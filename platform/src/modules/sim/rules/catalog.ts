@@ -757,6 +757,26 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     titleBg: "Непропускане на предимство",
     explanationBg:
       "Не пропусна превозно средство, което имаше предимство. На кръстовище без светофар пропускаш идващите отдясно; при знак „Пропусни движението“ — всички по главния път. Предимството се отстъпва, не се взема.",
+    // ── THE TITLE FITS NOW AND THE PARAGRAPH STILL DOES NOT ──────────────────
+    // `sc-roundabout-entry:fe081cf1`, „the fault card's body text is cut, so the
+    // explanation the student is judged by is not on screen" —
+    // `.audit-frames/sweep161/sc-roundabout-entry/mobile-right/04-t062s.png`,
+    // «↓ ОЩЕ 7 РЕДА» under two faded lines. The title half of that frame was
+    // repaired above (three lines → two, 2026-09-02); the body half was not.
+    // Absent a summary the peek prints `explanationBg` whole
+    // (`overlayPeekBodyBg`), and 204 characters is ~8 wrapped lines behind the
+    // one or two the 44 px window shows — `whyIsReachable` false on a card that
+    // also terminates the exam.
+    //
+    // ONE LINE, AND THAT IS WHY THE SENTENCE IS HALVED. «Непропускане на
+    // предимство» is 26 characters, so at the tight end of the band
+    // `violation-title-fits-peek.test.ts` measures (25 chars/line) the TITLE
+    // takes two boxes and the body is left exactly one; «…, не се взема»
+    // wrapped to a second line there, i.e. into the very cut this row is about.
+    // The words are the explanation's own closing clause, so the summary makes
+    // no claim the paragraph does not, and it is the PRINCIPLE rather than a
+    // situation because this pooled row is read wherever the act is not the ring.
+    peekBg: "Предимството се отстъпва.",
     // CORRECTIVE WIDENED TO THE RING, 2026-09-03 (sc-roundabout-entry). It is
     // read BY CODE at display time with no event in hand — the COLLISION row's
     // constraint, and the same „not a licence to give ONE situation's answer"
@@ -2469,13 +2489,25 @@ export const FAILED_TO_YIELD_SITUATION_ROUNDABOUT = "roundabout";
 
 export const FAILED_TO_YIELD_SITUATION_COPY: Record<
   string,
-  { titleBg: string; explanationBg: string; lawRef: string }
+  // `peekBg` is REQUIRED here for COLLISION_CONTACT_COPY's reason: every row in
+  // this table REPLACES the pooled explanation on the phone card, and these
+  // situation paragraphs are the longest in the catalogue — the ring one is 674
+  // characters against the pooled row's 204. A second situation added without a
+  // summary would put the −10 card straight back behind «↓ ОЩЕ 20+ РЕДА», and
+  // `tsc` says so before a sweep photographs it (`sc-roundabout-entry:fe081cf1`).
+  { titleBg: string; explanationBg: string; lawRef: string; peekBg: string }
 > = {
   [FAILED_TO_YIELD_SITUATION_ROUNDABOUT]: {
     titleBg: "Влизане без пропускане",
     explanationBg:
       "Влезе в кръга пред кола, която вече се движеше в него. Тя има предимство и идва ОТЛЯВО, защото в кръговото се обикаля обратно на часовниковата стрелка. На входа на кръгово кръстовище знакът „Път с предимство“ не се поставя (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), затова там стои Б1 „Пропусни движението“ или Б2 „Спри!“ — ти си на пътя без предимство, а ЗДвП чл. 50, ал. 1 задължава водачите от другите пътища да пропуснат движещите се по пътя с предимство, и тук този път е самият кръг. „Пропусни идващите отдясно“ е чл. 48 и важи за кръстовище на равнозначни пътища — на кръгово не се прилага. Затова гледаш наляво, изчакваш реален интервал и чак тогава влизаш.",
     lawRef: "ЗДвП чл. 50, ал. 1",
+    // The two facts the drill exists to install, in the two body lines this
+    // 22-character title leaves: WHO has the right (the car already circulating)
+    // and WHERE to look for it (left). Both are the paragraph's own first
+    // sentence; the articles, the Б1/Б2 step and the чл. 48 contrast stay one
+    // «ЗАЩО» tap away, whole.
+    peekBg: "Колата в кръга има предимство и идва отляво.",
   },
 };
 

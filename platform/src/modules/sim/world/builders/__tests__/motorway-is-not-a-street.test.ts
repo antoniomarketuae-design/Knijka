@@ -250,19 +250,34 @@ describe("§2 the catalogue — every motorway carriageway, whatever its class",
     // The mis-tagged map is the whole reason this file exists, so its numbers
     // are pinned rather than merely ordered. If the ramp's own furniture moves
     // these change — and they should, loudly, not silently.
+    //
+    // `trees: 462 → 454` (sc-junction-stop:5d3cc55e, the per-district prop
+    // seed in `buildWorldGeometry`). The tree pass jitters each station off
+    // `options.seed`, which used to be one constant for all 105 districts;
+    // it is now `DEFAULT_SEED ^ hashString(district.meta.district)`, so the
+    // jitter — and therefore which stations `insideBuilding` rejects — is this
+    // map's own. Eight stations on the re-tagged control now land inside a
+    // footprint that the shared seed happened to miss. The four counts that do
+    // NOT move are the class-gated passes this file is about, which is the
+    // point: the predicate under test is untouched.
     expect(asStreet).toMatchObject({
       streetlights: 96,
       utilityPoles: 77,
       utilityWireSpans: 72,
       railings: 248,
-      trees: 462,
+      trees: 454,
     });
+    // `trees: 303 → 276`, the same per-district-seed move as the arm above and
+    // for the same reason. The four class-gated counts are unmoved on BOTH
+    // arms, which is the claim this test carries: the seed changed which
+    // stations survive `insideBuilding`, not which passes the predicate
+    // suppresses.
     expect(shipped).toMatchObject({
       streetlights: 9,
       utilityPoles: 8,
       utilityWireSpans: 7,
       railings: 25,
-      trees: 303,
+      trees: 276,
     });
   });
 }, 120_000);
