@@ -600,3 +600,77 @@ export function summariseTracking(samples, tune = TUNE) {
     verdictWhy,
   };
 }
+
+/**
+ * CAN THE CONTROL LOOP AFFORD TO RUN ON THIS LEG, AND IS THAT STILL TRUE?
+ *
+ * A screenshot was measured at ~360-790 ms on the mobile leg and 11,999 ms on
+ * the pc leg. At twelve seconds a frame a control law corrects the car once
+ * every twelve seconds, which is not a control law — it is a straight line
+ * with occasional flinches that would look STEERED in the status file. So the
+ * loop measures its own cost and refuses when it cannot afford to run.
+ *
+ * THE REFUSAL IS RIGHT. Two properties of HOW it was decided were not, and
+ * both are fixed here rather than in the caller, so that a test can reach
+ * them:
+ *
+ *  1. IT WAS DECIDED ON THE FIRST THREE SCANS A DRIVE EVER TOOK. Those land
+ *     while every shard is starting, each WebKit is compiling its first route
+ *     and one 7200 rpm disk serves them all. That is a measurement of the
+ *     STARTUP, generalised to the next several minutes. `warmup` scans are
+ *     now recorded and then thrown away.
+ *
+ *  2. IT WAS PERMANENT. Nothing anywhere cleared `unaffordable`, so a box
+ *     that freed up ten seconds later still drove straight to the end. Cost
+ *     is a property of the BOX AT A MOMENT, not of the lane, so the verdict
+ *     expires and is re-measured. It may refuse again — this makes the
+ *     verdict revisable, not weaker.
+ *
+ * Measured consequence of the old shape, w29: 50 of 127 open audit rows came
+ * back UNJUDGED, 27 of the 49 remaining criticals among them, overwhelmingly
+ * on legs whose log reads «0 trace commands — THIS DRIVE DID NOT STEER».
+ */
+export const COST = {
+  /** scans thrown away before the cost is believed */
+  warmupScans: 3,
+  /** …and how many are then measured. Odd, because it is a median. */
+  sample: 5,
+  /** past this, a control loop is not a control loop */
+  budgetMs: 1500,
+  /** how often a refusal is reconsidered */
+  recheckEverySec: 20,
+};
+
+/**
+ * The affordability verdict, or null while there is not yet enough evidence.
+ *
+ * `scanCostMs` is every scan the drive has taken, oldest first, INCLUDING the
+ * warm-up ones — the caller keeps recording them because every refusal in this
+ * loop records itself, and a decision made on samples nobody can see is the
+ * same silence in a smaller place.
+ *
+ * Returns `{ medianMs, affordable }` once `warmup + sample` scans exist, and
+ * judges on the MOST RECENT `sample` of the post-warm-up window so a later
+ * re-measurement is not dragged back by the samples that produced the refusal.
+ */
+export function costVerdict(scanCostMs, opts = {}) {
+  const { warmupScans, sample, budgetMs } = { ...COST, ...opts };
+  const window = scanCostMs.slice(warmupScans);
+  if (window.length < sample) return null;
+  const recent = window.slice(-sample);
+  const medianMs = [...recent].sort((a, b) => a - b)[sample >> 1];
+  return { medianMs, affordable: medianMs <= budgetMs };
+}
+
+/**
+ * Has a refusal stood long enough to be worth one scan to re-test?
+ *
+ * A null decision time means nothing has been decided yet, which is not the
+ * same as a decision that has expired — but the caller only asks this while
+ * already refusing, and a refusal with no timestamp is a bug that should
+ * re-measure rather than persist forever. So: expired.
+ */
+export function refusalExpired(decidedAtMs, nowMs, everySec = COST.recheckEverySec) {
+  if (decidedAtMs === null || decidedAtMs === undefined) return true;
+  return nowMs - decidedAtMs >= everySec * 1000;
+}

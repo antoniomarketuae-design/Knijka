@@ -260,7 +260,17 @@ import { captureFrame, createFrameLedger } from "./lib/frames.mjs";
 // of it is exercised by __tests__/guidance.test.mjs without a sim; the page
 // side of it lives in `guideTick` below.
 import { decodePng } from "./lib/png.mjs";
-import { aimFrom, degPerPxAtCentre, scanBand, steerCommand, summariseTracking, TUNE } from "./lib/guidance.mjs";
+import {
+  COST,
+  TUNE,
+  aimFrom,
+  costVerdict,
+  degPerPxAtCentre,
+  refusalExpired,
+  scanBand,
+  steerCommand,
+  summariseTracking,
+} from "./lib/guidance.mjs";
 // THE BRAKE THAT HAS A REASON — same contract as guidance.mjs above: the
 // control law is pure and lives in the lib, the page side (`hazardRead`, and
 // the fold in the roll phase) lives here. `hazard.mjs`'s header carries the
@@ -4065,6 +4075,14 @@ const guidance = {
   degPerPx: null,
   scans: 0,
   scanCostMs: [],
+  /** wall-clock of the last affordability decision, for the recheck clock */
+  costDecidedAtMs: null,
+  /** how many times the loop was switched back ON after refusing. Published
+   *  because a drive that steered for only part of its length must not read
+   *  as one that steered throughout — a judge needs to know which. */
+  costRecoveries: 0,
+  /** …and how many times it refused. >1 means the box was thrashing. */
+  costRefusals: 0,
   /** every moving sample, seen or not — see "IT CANNOT BE QUIET" above */
   samples: [],
   commands: 0,
@@ -4106,8 +4124,13 @@ const guideWitness = [];
  * first few scans, and if the median is past this the loop stops, says
  * `state: "unaffordable"`, and the drive continues UNSTEERED AND LABELLED.
  */
-const GUIDE_SCAN_BUDGET_MS = 1500;
-const GUIDE_COST_SAMPLE = 3;
+// The affordability numbers and the decision that reads them now live in
+// lib/guidance.mjs, where a test can reach them — see COST there for the two
+// bugs that made this decision wrong for months without anything catching it.
+const GUIDE_SCAN_BUDGET_MS = COST.budgetMs;
+const GUIDE_COST_WARMUP_SCANS = COST.warmupScans;
+const GUIDE_COST_SAMPLE = COST.sample;
+const GUIDE_RECHECK_EVERY_SEC = COST.recheckEverySec;
 
 /** The band of the windscreen the ribbon is looked for in, and the ruler. */
 async function guideBand() {
@@ -4294,7 +4317,29 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     const w = await guideWitnessRead();
     if (w) { witnessNow = w; guideWitness.push({ tSec, ...w }); }
   }
-  if (guidance.state === "unaffordable" || guidance.state === "no-band") {
+  // A REFUSAL IS A MEASUREMENT OF THE BOX, SO IT EXPIRES.
+  // `no-band` does not: that is a claim about the WORLD (this lane draws no
+  // guidance ribbon), and re-measuring it every 20 s would only spend the
+  // budget it exists to protect. `unaffordable` is a claim about contention,
+  // and contention passes.
+  if (guidance.state === "unaffordable") {
+    if (refusalExpired(guidance.costDecidedAtMs, Date.now())) {
+      // Cost one scan to find out. Reset the window so the decision is made on
+      // fresh samples rather than on the ones that produced the refusal.
+      guidance.scanCostMs = guidance.scanCostMs.slice(0, GUIDE_COST_WARMUP_SCANS);
+      guidance.costDecidedAtMs = Date.now();
+      guidance.state = "not-run";
+      guidance.costRecoveries += 1;
+      guidance.why =
+        "the affordability refusal expired after " + GUIDE_RECHECK_EVERY_SEC +
+        " s; re-measuring the scan cost on fresh samples";
+      loud(`RE-MEASURING WHETHER THE STEERING LOOP CAN AFFORD TO RUN — ${guidance.why}`);
+    } else {
+      push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, why: "unaffordable" });
+      return;
+    }
+  }
+  if (guidance.state === "no-band") {
     push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, why: guidance.state });
     return;
   }
@@ -4340,14 +4385,21 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
   guidance.scanCostMs.push(scanMs);
 
   // ── THE COST REFUSAL, MEASURED RATHER THAN ASSUMED ──────────────────────
-  if (guidance.scanCostMs.length === GUIDE_COST_SAMPLE) {
-    const med = [...guidance.scanCostMs].sort((a, b) => a - b)[GUIDE_COST_SAMPLE >> 1];
-    if (med > GUIDE_SCAN_BUDGET_MS) {
+  // The warm-up scans are recorded (every refusal in this loop records itself)
+  // but not counted: the cost that decides the drive is measured after the
+  // herd, over GUIDE_COST_SAMPLE samples, and re-measured every recheck window.
+  const costCall = costVerdict(guidance.scanCostMs);
+  if (costCall) {
+    const med = costCall.medianMs;
+    guidance.costDecidedAtMs = Date.now();
+    if (!costCall.affordable) {
+      if (guidance.state !== "unaffordable") guidance.costRefusals += 1;
       guidance.state = "unaffordable";
       guidance.why =
         `reading the ribbon costs ${med} ms a sample on this leg (budget ${GUIDE_SCAN_BUDGET_MS} ms), so a control loop ` +
         "here would correct the car about once every " + (med / 1000).toFixed(1) + " s. THIS DRIVE DID NOT STEER — it is a " +
-        "straight-line drive and must be read as one.";
+        "straight-line drive FOR AS LONG AS THAT HOLDS — the cost is re-measured every " +
+        GUIDE_RECHECK_EVERY_SEC + " s and the loop resumes if the box frees up (costRecoveries says whether it did).";
       loud(`THE STEERING LOOP CANNOT AFFORD TO RUN ON THIS LEG — ${guidance.why}`);
       await steerRelease();
       guideHeldBySustain = false;
@@ -7810,7 +7862,7 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
     // instrument was incapable when it was merely blind here. The MACHINE
     // SUMMARY must state what happened ON THIS DRIVE and name the loop state
     // that explains it; `guidance.state`/`tracking.verdict` carry the detail.
-    `  STEERING: ${steering.everSteered ? `${steering.commands} command(s) · ${steering.heldMs.left} ms left / ${steering.heldMs.right} ms right` : `0 trace commands — THIS DRIVE DID NOT STEER (guidance loop ${guidance.state.toUpperCase()})`}` +
+    `  STEERING: ${steering.everSteered ? `${steering.commands} command(s) · ${steering.heldMs.left} ms left / ${steering.heldMs.right} ms right` : `0 trace commands — THIS DRIVE DID NOT STEER (guidance loop ${guidance.state.toUpperCase()}${guidance.costRefusals ? ` · ${guidance.costRefusals} affordability refusal(s), ${guidance.costRecoveries} recovery attempt(s)` : ``})`}` +
       ` · channel ${steering.wired ? `WIRED (${STEER_KEYS.left}/${STEER_KEYS.right})` : "ABSENT"}` +
       ` · liveness ${chState.toUpperCase()}` +
       (steering.channel.legs.length
