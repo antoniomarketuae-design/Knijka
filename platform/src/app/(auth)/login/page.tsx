@@ -48,7 +48,7 @@ export default async function LoginPage({ searchParams }: Props) {
       {notice && (
         <p
           role="status"
-          className="mb-5 rounded-lg border border-success/50 bg-success/10 px-3 py-2.5 text-sm font-semibold text-success"
+          className="mb-5 rounded-lg border border-success/50 bg-success/10 px-3 py-2.5 text-sm font-semibold text-success short:mb-3"
         >
           {notice}
         </p>
@@ -58,7 +58,7 @@ export default async function LoginPage({ searchParams }: Props) {
 
       {/* Was a link to /contact + a promise of manual recovery — against an
           inbox that does not exist (audit H-14). Now it is the real flow. */}
-      <p className="mt-4 text-center text-xs">
+      <p className="mt-4 text-center text-xs short:mt-2">
         <Link
           href="/forgot"
           className="rounded font-semibold text-accent underline-offset-4 hover:underline"

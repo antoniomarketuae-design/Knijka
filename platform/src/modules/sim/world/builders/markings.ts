@@ -92,6 +92,10 @@ export interface MarkingBuildResult {
    *  own citation: „ЗДвП-98-1 / Наредба № 2/2001 — зигзаг"). 0 on the 103
    *  districts that author no stop span. */
   busStopZigzagQuads: number;
+  /** Closing line + hatch + the survivor's new edge line of an authored
+   *  lane drop (`meta.scenario` archetype "merge-lane", `lanesAfter` 1).
+   *  0 on every district that authors none. */
+  laneDropQuads: number;
   /** М18 „триъгълник" symbols painted before an М7 линия за изчакване
    *  (Наредба № 2/2001 чл. 23 ал. 3). 0 on every map with no Б1 approach. */
   giveWayTriangles: number;
@@ -905,6 +909,233 @@ function paintLaneArrows(acc: MeshAccumulator, district: District, network: Road
 }
 
 // ---------------------------------------------------------------------------
+// THE LANE THAT ENDS — the lane-drop taper (meta.scenario, archetype
+// "merge-lane" with lanesAfter 1).
+//
+// WHY IT EXISTS — sc-merge-lane-end:ae6166e2, major: „the lesson's own event
+// never happens: the lane does not end. Across the whole pc-right sequence the
+// carriageway keeps its width — no taper, no chevrons, no lane-ends sign, no
+// merge arrow on the tarmac." The COPY half of that row was closed in
+// `traces/scMergeLaneEnd.ts` (W16) by making the demo captions stop naming
+// furniture the world does not draw; that file's own note ends „WHAT THIS DOES
+// NOT CLOSE … the WORLD half. A student still sees no taper."
+//
+// This is that half. ln-merge-v1 has carried `taperFromY` 180, `taperToY` 240,
+// `laneEndingX` +4.06 and `params.lanesAfter` 1 in its own `meta.scenario`
+// since the map was generated — the map has always KNOWN where its lane dies,
+// and nothing read it. The paint is derived from those numbers and from the
+// edge's own drawn width, so the tarmac, the taper and the lesson's own gate
+// cannot drift apart.
+//
+// WHAT IS PAINTED, and it is the marking crew's own sequence:
+//   1. the closing lane's kerb-side edge line swings IN, from where it runs at
+//      `taperFromY` to the lane boundary at `taperToY` — the line the driver in
+//      the dying lane watches cross his own bonnet;
+//   2. the wedge it closes is hatched with oblique bars leaning downstream (the
+//      chevrons the row names), so the closed area reads as closed rather than
+//      as a widening;
+//   3. past the taper the dying lane's inner boundary IS the carriageway edge,
+//      so its dashes are suppressed and a solid edge line is painted in their
+//      place. Leaving it dashed is the crime the В24 block above records —
+//      paint that invites the manoeuvre the lesson grades, here a broken line
+//      into a lane that no longer exists.
+//
+// WHAT IS NOT PAINTED, stated so the row is not read as finished. The А-group
+// „пътно стеснение" plate has no face in the kit and no row in
+// `content/signs/signs.json`, so there is no `SignKind` to place and writing a
+// law citation for one is exactly what ADR-002 forbids. The sign half stays
+// open and its prerequisite is content, not code.
+//
+// THE ASPHALT ITSELF IS UNCHANGED, deliberately. `roads.ts` sweeps the surface
+// from `edgeHalfWidth`, which the runtime's lane graph, the traffic system and
+// the lane-offset grading all read; narrowing it would move the ground under
+// `ln-merge-districts.test.ts`'s whole contract in order to make a picture. A
+// lane ends where the paint says it ends — that is true of the road outside,
+// and reading that paint is what чл. 25 asks of the student.
+// ---------------------------------------------------------------------------
+
+/** Sampling pitch of the converging taper line, m. */
+const LANE_DROP_SAMPLE_M = 5;
+/** Pitch of the hatch bars inside the closing wedge, m of travel. */
+const LANE_DROP_HATCH_PITCH_M = 7;
+/** Stroke width of one hatch bar, m. */
+const LANE_DROP_HATCH_W_M = 0.4;
+/** A bar shorter than this is the wedge's own tip and is not painted. */
+const LANE_DROP_HATCH_MIN_M = 1.5;
+
+interface LaneDropPlan {
+  eb: EdgeBuild;
+  /** The junction-trimmed drawn line — the frame every `s` below is in. */
+  line: Vec2[];
+  lineLen: number;
+  /** Arclength where the lane is still full width / where it is gone. */
+  sFrom: number;
+  sTo: number;
+  /** Signed lateral offset of the shipped kerb-side edge line on that side. */
+  outerOff: number;
+  /** Signed lateral offset of the boundary that BECOMES the edge. */
+  survivorOff: number;
+  /** Which `k` of the lane-line loop that boundary is. */
+  dividerK: number;
+}
+
+/** Arclength along `line` at world `y`, or null when no segment spans it (the
+ *  read refuses rather than guesses). */
+function arcAtY(line: readonly Vec2[], y: number): number | null {
+  let acc = 0;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1] as Vec2;
+    const b = line[i] as Vec2;
+    const seg = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (seg <= 1e-9) continue;
+    const dy = b[1] - a[1];
+    if (Math.abs(dy) > 1e-9) {
+      const t = (y - a[1]) / dy;
+      if (t >= 0 && t <= 1) return acc + t * seg;
+    }
+    acc += seg;
+  }
+  return null;
+}
+
+/**
+ * Defensive read + geometry of the authored lane drop. Anything missing,
+ * malformed or not shaped like this archetype returns null and the whole pass
+ * is a no-op, so every district that does not author one keeps byte-identical
+ * marking buffers (the `paintLaneArrows` law).
+ *
+ * The authored span is in WORLD Y because that is what `meta.scenario` states,
+ * so the read requires a street that actually runs along +Y — a lane drop on a
+ * curve or on an eastbound street would need the fields to say something else,
+ * and refusing to guess is the discipline `buildRingDivider` states for
+ * single-lane rings.
+ */
+function planLaneDrop(district: District, network: RoadNetwork): LaneDropPlan | null {
+  const sc = district.meta.scenario as
+    | {
+        archetype?: unknown;
+        streetEdgeId?: unknown;
+        taperFromY?: unknown;
+        taperToY?: unknown;
+        laneEndingX?: unknown;
+        laneThroughX?: unknown;
+        params?: { lanesAfter?: unknown };
+      }
+    | undefined;
+  if (!sc || sc.archetype !== "merge-lane") return null;
+  if (sc.params?.lanesAfter !== 1) return null;
+  const edgeId = sc.streetEdgeId;
+  const fromY = sc.taperFromY;
+  const toY = sc.taperToY;
+  const endingX = sc.laneEndingX;
+  const throughX = sc.laneThroughX;
+  if (typeof edgeId !== "string") return null;
+  if (typeof fromY !== "number" || typeof toY !== "number" || !(fromY < toY)) return null;
+  if (typeof endingX !== "number" || typeof throughX !== "number") return null;
+  if (!(endingX * throughX < 0)) return null; // the two lanes must straddle the axis
+
+  const eb = network.edgeById.get(edgeId);
+  if (!eb?.line) return null;
+  if (!MARKED_CLASSES.has(eb.edge.class)) return null;
+  const line = trimPolyline(eb.line, 0.8, 0.8, 2.5);
+  if (!line || line.length < 2) return null;
+
+  // `perpRight` of (0, 1) is (+1, 0) — which is what makes the sign of
+  // `laneEndingX` the side of travel the lane dies on. A street that does not
+  // run along +Y paints nothing.
+  const first = line[0] as Vec2;
+  const last = line[line.length - 1] as Vec2;
+  const run: Vec2 = [last[0] - first[0], last[1] - first[1]];
+  const runLen = Math.hypot(run[0], run[1]);
+  if (runLen < 1e-6 || run[1] / runLen < 0.999) return null;
+
+  const sFrom = arcAtY(line, fromY);
+  const sTo = arcAtY(line, toY);
+  if (sFrom === null || sTo === null || !(sFrom + 1 < sTo)) return null;
+
+  const lanes = Math.max(1, eb.edge.lanes);
+  if (lanes < 2) return null;
+  const travelHalf = eb.halfWidth - eb.parkingM;
+  const side = endingX > 0 ? 1 : -1;
+  // The same expression the edge-line loop uses, so the taper starts exactly ON
+  // the shipped edge line instead of a parallel millimetre away from it.
+  const outerOff = side * (eb.parkingM > 0 ? travelHalf : travelHalf - EDGE_LINE_INSET_M);
+  // The dying lane's INNER boundary: one lane pitch in from the kerb side.
+  const survivorOff = side * (travelHalf - LANE_WIDTH_M);
+  const dividerK = Math.round((survivorOff + travelHalf) / LANE_WIDTH_M);
+  if (dividerK < 1 || dividerK >= lanes) return null;
+  if (Math.abs(-travelHalf + dividerK * LANE_WIDTH_M - survivorOff) > 1e-6) return null;
+  if (Math.abs(survivorOff) > travelHalf - 0.4) return null; // the lane loop's own skip
+
+  return { eb, line, lineLen: polylineLength(line), sFrom, sTo, outerOff, survivorOff, dividerK };
+}
+
+/** The closing line's offset at arclength `s` — the kerb-side edge line at
+ *  `sFrom`, the surviving boundary at `sTo`, straight between. */
+function laneDropOffsetAt(plan: LaneDropPlan, s: number): number {
+  const u = (s - plan.sFrom) / (plan.sTo - plan.sFrom);
+  const c = Math.min(1, Math.max(0, u));
+  return plan.outerOff + (plan.survivorOff - plan.outerOff) * c;
+}
+
+/**
+ * Paint the closing line, its hatch and the survivor's new edge line. Appended
+ * LAST in `buildMarkings`, so a district without the meta adds zero geometry.
+ */
+function paintLaneDrop(acc: MeshAccumulator, plan: LaneDropPlan): number {
+  let quads = 0;
+
+  // 1. The converging line. Sampled rather than two-point so `paintSolidLine`'s
+  //    own miter frames stay well conditioned at the joins.
+  const taper: Vec2[] = [];
+  const span = plan.sTo - plan.sFrom;
+  const steps = Math.max(2, Math.ceil(span / LANE_DROP_SAMPLE_M));
+  for (let i = 0; i <= steps; i++) {
+    const s = plan.sFrom + (span * i) / steps;
+    const at = pointAlong(plan.line, s);
+    taper.push(add(at.point, mul(perpRight(at.tangent), laneDropOffsetAt(plan, s))));
+  }
+  quads += paintSolidLine(acc, taper, EDGE_LINE_WIDTH_M);
+
+  // 2. The hatch. One oblique bar per station, from the closing line out to the
+  //    kerb-side edge line and leaning downstream at ~45° — so the bars point
+  //    the way the traffic in this lane has to go.
+  for (let s = plan.sFrom + LANE_DROP_HATCH_PITCH_M; s < plan.sTo; s += LANE_DROP_HATCH_PITCH_M) {
+    const inner = laneDropOffsetAt(plan, s);
+    const width = Math.abs(plan.outerOff - inner);
+    if (width < LANE_DROP_HATCH_MIN_M) continue;
+    const sOut = Math.min(plan.sTo, s + width);
+    const a0 = pointAlong(plan.line, s);
+    const a1 = pointAlong(plan.line, sOut);
+    const from = add(a0.point, mul(perpRight(a0.tangent), inner));
+    const to = add(a1.point, mul(perpRight(a1.tangent), plan.outerOff));
+    const d: Vec2 = [to[0] - from[0], to[1] - from[1]];
+    const barLen = Math.hypot(d[0], d[1]);
+    if (barLen < LANE_DROP_HATCH_MIN_M) continue;
+    const dir: Vec2 = [d[0] / barLen, d[1] / barLen];
+    const mid: Vec2 = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2];
+    paintQuad(acc, mid, dir, barLen / 2, LANE_DROP_HATCH_W_M / 2);
+    quads++;
+  }
+
+  // 3. Past the taper the survivor's inner boundary IS the carriageway edge.
+  //    Its dashes are suppressed in the lane-line loop; this is what replaces
+  //    them.
+  if (plan.lineLen - plan.sTo > 1) {
+    const tail: Vec2[] = [];
+    const tailSpan = plan.lineLen - plan.sTo;
+    const tailSteps = Math.max(2, Math.ceil(tailSpan / LANE_DROP_SAMPLE_M));
+    for (let i = 0; i <= tailSteps; i++) {
+      const s = plan.sTo + (tailSpan * i) / tailSteps;
+      const at = pointAlong(plan.line, s);
+      tail.push(add(at.point, mul(perpRight(at.tangent), plan.survivorOff)));
+    }
+    quads += paintSolidLine(acc, tail, EDGE_LINE_WIDTH_M);
+  }
+  return quads;
+}
+
+// ---------------------------------------------------------------------------
 // Painted zone-speed numerals (founder R3 doc 62 #33/#34: the 30-zone drills
 // show NO „30" anywhere, and the sign kit ships no В26-30 face — placing the
 // 50 face would lie, so the HONEST render stopgap is the road glyph BG zone
@@ -1367,6 +1598,11 @@ export function buildMarkings(
 
   // -- lane lines ------------------------------------------------------------
   const zones = district.zones ?? [];
+  // Read BEFORE the loop because the drop suppresses dashes as well as adding
+  // paint: past the taper the dying lane's inner boundary is the carriageway
+  // EDGE, and a broken line there invites a lane change into a lane that no
+  // longer exists. Null on every district that authors no drop.
+  const laneDrop = planLaneDrop(district, network);
   for (const eb of network.edges) {
     if (!eb.line) continue;
     if (!MARKED_CLASSES.has(eb.edge.class)) continue;
@@ -1386,6 +1622,15 @@ export function buildMarkings(
       for (const b of authoredSolidBoundaries(eb, line, s0, travelHalf, lanes, zones)) {
         if (b.k >= 1) suppress.set(b.k, [...(suppress.get(b.k) ?? []), ...b.segs]);
       }
+    }
+    if (laneDrop && laneDrop.eb === eb) {
+      // From the end of the taper to the end of the street this boundary is the
+      // carriageway edge, and `paintLaneDrop` paints it solid.
+      const k = laneDrop.dividerK;
+      suppress.set(k, [
+        ...(suppress.get(k) ?? []),
+        { from: laneDrop.sTo, to: laneDrop.lineLen },
+      ]);
     }
     // Lane boundaries at every internal multiple of LANE_WIDTH from the left
     // edge. For two-way edges the middle boundary is the center line.
@@ -1533,6 +1778,12 @@ export function buildMarkings(
   const busStopZigzagQuads = paintBusStopZigzag(acc, district, network);
   markingQuads += busStopZigzagQuads;
 
+  // -- the lane-drop taper — appended after everything for the same
+  //    byte-identity reason: one shipped district authors a drop and every
+  //    other one keeps an identical marking buffer ---------------------------
+  const laneDropQuads = laneDrop ? paintLaneDrop(acc, laneDrop) : 0;
+  markingQuads += laneDropQuads;
+
   return {
     markings: acc,
     markingQuads,
@@ -1543,6 +1794,7 @@ export function buildMarkings(
     speedGlyphQuads,
     busLegendQuads,
     busStopZigzagQuads,
+    laneDropQuads,
     giveWayTriangles,
   };
 }

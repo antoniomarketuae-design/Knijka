@@ -1069,7 +1069,33 @@ function makeBlobTexture(): CanvasTexture {
 // where he still has time to act on it, which is exactly where
 // `sc-sig-controller-postures` grades him.
 // ---------------------------------------------------------------------------
-export const BUBBLE_W_M = 3.6;
+/**
+ * WIDENED 3.6 → 4.95 m (sc-sig-controller-postures:ef0e821c, „five lines of
+ * tiny … text, unreadable at native phone size").
+ *
+ * THIS IS THE INK-BOX LEVER THE MIP BLOCK BELOW NAMES AND DEFERS. Cap height on
+ * this card is `fontPx / BUBBLE_TEX_H × BUBBLE_H_M`, so the ONLY way to make a
+ * body line bigger without adding plane height (which the windscreen refuses —
+ * see `BUBBLE_H_M`) is to raise `BUBBLE_LINE_PX`, and that was blocked from the
+ * other side: `poseBg` already painted 939 texture px into a 936 px box, i.e.
+ * it was AT the shrink clamp. Width is the axis with room — the card spans
+ * 17.8° of a 75.4° hFOV and `bubbleWhollyVisible`'s binding corner has always
+ * been the VERTICAL one — so the box grows and the type grows with it.
+ *
+ * WIDTH AND TEXTURE GROW BY THE SAME FACTOR (1.375), which is what makes this
+ * safe rather than a re-layout: metres per texture px is unchanged at
+ * 3.6/1024 = 4.95/1408 = 0.003516, so the corner radius, the 7 px border, the
+ * 80 px speech tail and `BUBBLE_PAD_X` all keep the exact physical size they
+ * were photographed at, and the texel:pixel ratio the mip decision rests on is
+ * still 1.94. Only the ink box is bigger, and only the type inside it moves.
+ *
+ * WHAT IT COSTS, measured: the card's NDC half-width goes 0.2025 → 0.2785 on
+ * the audited phone lens. The worst on-screen case the legibility gate drives —
+ * the officer 6 m off axis at 20 m — reads corners at NDC −0.667 … −0.110
+ * against a ±0.97 frame, so nothing that was whole stops being whole; the two
+ * cases that must stay HIDDEN (8 m, and 12 m off axis at 14 m) still are.
+ */
+export const BUBBLE_W_M = 4.95;
 /**
  * DELIBERATELY UNCHANGED when the sixth line landed (B41, 2026-08-10). The
  * card gained `priorityBg` and the obvious move was to grow it — 540 → 576 px
@@ -1084,7 +1110,9 @@ export const BUBBLE_W_M = 3.6;
  * size costs nothing and gives back 2 m of approach.
  */
 export const BUBBLE_H_M = 1.9;
-export const BUBBLE_TEX_W = 1024;
+/** 1024 × 1.375 — see `BUBBLE_W_M`. The two move together or the card's
+ *  physical proportions and its texel density both change with them. */
+export const BUBBLE_TEX_W = 1408;
 export const BUBBLE_TEX_H = 540;
 /** Bubble base sits this far above the figure's head. */
 export const BUBBLE_GAP_M = 0.42;
@@ -1340,11 +1368,28 @@ export const BUBBLE_PAD_X = 44;
  */
 export const BUBBLE_LINE_PX = {
   headline: 116,
-  pose: 44,
-  go: 46,
-  stop: 46,
-  priority: 44,
-  law: 38,
+  // RAISED on the widened ink box (`BUBBLE_W_M`), which is the whole of the
+  // size half of `sc-sig-controller-postures:ef0e821c`. Cap height at the range
+  // the drill grades (27 m) goes 16.5 → 21.0 device px for the four body lines
+  // and 14.25 → 18.75 for the citation, on the audited 2556 × 1179 frame —
+  // ≈5.5 → ≈7.0 CSS px at 3×, and the citation, which was the smallest and
+  // dimmest line on a card ADR-002 will not let the лекция drop, gains the most.
+  //
+  // THE HEADLINE DOES NOT MOVE. It was never the illegible half, and the
+  // legibility gate forbids buying the body with it (`bodyCapPx(headline) >
+  // 2 × bodyCapPx(go)`): 116/56 = 2.07 keeps that true with the body raised.
+  //
+  // AND NOTHING SHRINKS ANY MORE, which is a second gain the numbers hide.
+  // Against `controller-bubble.test.ts`' deliberately unforgiving 0.62 em/char
+  // stub the shipped card had THREE of six lines over the 936 px box —
+  // `poseBg` 1009, `priorityBg` 982, `lawRef` 989 — so they rendered a size or
+  // two below what is authored here. On the 1320 px box the longest of each is
+  // 1285 / 1285 / 1302: every line now paints at the size below it.
+  pose: 56,
+  go: 56,
+  stop: 56,
+  priority: 56,
+  law: 50,
 } as const;
 
 /**
@@ -1367,8 +1412,13 @@ export const BUBBLE_LINE_PX = {
  * read as a footnote to nothing. ADR-002 — it is the citation, and it stays.
  */
 export const BUBBLE_POSTURE_LINE_PX = {
-  name: 84,
-  law: 46,
+  // 84 → 112 and 46 → 50 on the widened box, for the same reason the six-line
+  // card's body moved: the ratio this card is authored against — the teaching
+  // line at ≥1.8× the largest body line, pinned by `controller-bubble.test.ts`
+  // — is a ratio, so raising the body without raising this would have quietly
+  // undone the «Частична помощ» card's own repair. 112/56 = 2.0.
+  name: 112,
+  law: 50,
 } as const;
 
 /**
@@ -1533,8 +1583,9 @@ export function drawControllerBubble(
   // goBg 76.7 %, stopBg 76.9 %, priorityBg 93.4 %, lawRef 91.0 %. A heavier
   // face is ≈3–5 % wider in Cyrillic, and `bubbleLine` answers overflow by
   // SHRINKING — so on a line already at the clamp a bolder weight buys stem
-  // width by spending cap height, which is a net loss. `poseBg` is that line
-  // and it is left at 600; everything else has the room and takes it.
+  // width by spending cap height, which is a net loss. `poseBg` WAS that line
+  // and was left at 600; the widened box (`BUBBLE_W_M`) took it off the clamp —
+  // 1285 px of ink in a 1320 px box — so it now takes the weight too.
   //
   // `lawRef` also moves colour. It is the smallest line on the card AND the
   // dimmest: #8ea3bd on the near-black body is ≈8.2:1 where every other line
@@ -1542,18 +1593,28 @@ export function drawControllerBubble(
   // without — the citation is how the card proves it retrieved the rule rather
   // than recalled it. #b9c9de keeps the same cool-grey slot (the colours are a
   // learnable layout, per the note above) at ≈13:1.
+  //
+  // THE BASELINES RE-SPACE WITH THE TYPE (ef0e821c). 44–46 px lines sat on a
+  // 62–66 px rhythm — a line height of 1.39, i.e. a third of the body's height
+  // spent on air. At 56 px the same rhythm would collide, so the body drops to
+  // an even 66 px pitch starting at 198: ascender 0.8 em + descender 0.3 em is
+  // 61.6 px against 66, the headline's descender ends at 152.8 against the
+  // first body ascender at 153.2, and the law line's descender ends at 478.8
+  // against the body edge at 506 (`BUBBLE_TAIL_PX` reserved). Metrics are the
+  // painter test's own 0.8/0.3 em, which round away from the card in both
+  // directions.
   g.fillStyle = copy.accent;
-  bubbleLine(g, copy.headlineBg, 700, BUBBLE_LINE_PX.headline, 120, W);
+  bubbleLine(g, copy.headlineBg, 700, BUBBLE_LINE_PX.headline, 118, W);
   g.fillStyle = "#dbe5f2";
-  bubbleLine(g, copy.poseBg, 600, BUBBLE_LINE_PX.pose, 186, W);
+  bubbleLine(g, copy.poseBg, 700, BUBBLE_LINE_PX.pose, 198, W);
   g.fillStyle = "#9ff0c4";
-  bubbleLine(g, copy.goBg, 700, BUBBLE_LINE_PX.go, 250, W);
+  bubbleLine(g, copy.goBg, 700, BUBBLE_LINE_PX.go, 264, W);
   g.fillStyle = "#ffc9c2";
-  bubbleLine(g, copy.stopBg, 700, BUBBLE_LINE_PX.stop, 314, W);
+  bubbleLine(g, copy.stopBg, 700, BUBBLE_LINE_PX.stop, 330, W);
   g.fillStyle = copy.accent;
-  bubbleLine(g, copy.priorityBg, 700, BUBBLE_LINE_PX.priority, 376, W);
+  bubbleLine(g, copy.priorityBg, 700, BUBBLE_LINE_PX.priority, 396, W);
   g.fillStyle = "#b9c9de";
-  bubbleLine(g, copy.lawRef, 700, BUBBLE_LINE_PX.law, 440, W);
+  bubbleLine(g, copy.lawRef, 700, BUBBLE_LINE_PX.law, 462, W);
 }
 
 /** Structural slice of the runtime's JU-18 read model (module boundary: the
@@ -1720,8 +1781,10 @@ export function TrafficLayer({
     //
     // MEASURED on `.audit-frames/w22/.../sc-sig-controller-postures__mobile-
     // right/04-t042s.png` — a drive of the CURRENT tree, at native 2556 × 1179:
-    // the card's accent border spans x 783 → 1311, i.e. 528 device px, for a
-    // BUBBLE_TEX_W = 1024 canvas. That is 1.94 texels per pixel, so GL's LOD is
+    // the card's accent border spans x 783 → 1311, i.e. 528 device px, for the
+    // 1024 px canvas that build shipped. That is 1.94 texels per pixel — and it
+    // is STILL 1.94 after the widening, because `BUBBLE_TEX_W` and `BUBBLE_W_M`
+    // grew by the same 1.375 — so GL's LOD is
     // log2(1.94) = 0.96 and `LinearMipmapLinearFilter` — three's DEFAULT for a
     // CanvasTexture, which is what this used to be — samples 96 % mip 1. Mip 1
     // is a 512 × 270 box average: a 46 px body line is reduced to 23 px of
@@ -1744,15 +1807,12 @@ export function TrafficLayer({
     // screen size never changes shimmers only under translation, and 528 px of
     // card translating a few pixels a second does not read as aliasing.
     //
-    // WHAT THIS DOES NOT FIX, said plainly: it makes the shipped type sharp, it
-    // does NOT make it bigger, and ≈17 px of cap height on a 3× phone is ≈5.6
-    // CSS px — small however crisp it is. The size lever is the card's INK BOX
-    // (`BUBBLE_PAD_X`, `BUBBLE_TEX_W`), and it is measured and blocked: on that
-    // same frame `poseBg` already paints 939 texture px into a 936 px box —
-    // it is at the shrink clamp — so `BUBBLE_LINE_PX` cannot be raised without
-    // widening the card, and the card cannot be widened without moving four
-    // assertions in `__tests__/controller-bubble.test.ts` that are calibrated
-    // to the 1024 px canvas. That is a second lane's edit, not this one's.
+    // WHAT THIS DID NOT FIX, and what since has: sharpening the texture made
+    // the shipped type crisp, not bigger, and ≈17 px of cap height on a 3×
+    // phone is ≈5.6 CSS px however crisp it is. The size lever named here — the
+    // card's INK BOX — has now been pulled: `BUBBLE_W_M` and `BUBBLE_TEX_W` grew
+    // by 1.375 together, which took `poseBg` off the shrink clamp it was pinned
+    // to and let `BUBBLE_LINE_PX` rise to ≈7.0 CSS px of cap.
     t.generateMipmaps = false;
     t.minFilter = LinearFilter;
     return t;

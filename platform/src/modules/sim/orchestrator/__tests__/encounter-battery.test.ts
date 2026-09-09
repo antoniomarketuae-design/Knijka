@@ -562,10 +562,21 @@ describe("encounter battery · ETA SYNC — she is still crossing when you get t
 
     it(`${e.scenarioId}/${s.id}: below ${crossoverKmh.toFixed(1)} km/h the meeting point is SPEED-INVARIANT`, () => {
       // The whole point of the field: under the crossover the release is a
-      // clock, so she is at `speedMps × triggerEtaSec` when the car arrives no
-      // matter how slowly it came. Tolerance is frame quantisation only (the
+      // clock, so she is at `speedMps × (her own horizon)` when the car arrives
+      // no matter how slowly it came. Tolerance is frame quantisation only (the
       // battery's rng draw is fixed, so the ±3 m trigger jitter is zero).
-      const want = s.speedMps * eta;
+      //
+      // HER OWN HORIZON IS NOT ALWAYS `triggerEtaSec` (2026-09-09,
+      // `sc-hz-emergency-stop:e0c4ef23`). `triggerEtaSec` is when the ENCOUNTER
+      // arms; `ballLeadSec` — when a template authors one — spends the first
+      // part of that on the warning ball and releases the WALKER that many
+      // seconds later (`runners.ts`, the `hazardActive` branch). So a spec with
+      // a ball lead synchronises its walker at `eta − ballLeadSec`, and reading
+      // `eta` alone here compares the BALL's horizon against the CHILD's
+      // position — two different events. The tolerance is untouched; only the
+      // quantity the tolerance is measured against is now the right one, and a
+      // lead-less spec computes bit-identically to before.
+      const want = s.speedMps * (eta - (s.ballLeadSec ?? 0));
       for (const v of [floorKmh, (floorKmh + crossoverKmh) / 2, crossoverKmh - 1]) {
         if (v < floorKmh) continue;
         const r = probeDart(e, v);

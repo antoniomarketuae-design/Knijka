@@ -1752,7 +1752,7 @@ export const SC_FOLLOW_TAILGATER: ScenarioSpec = {
   tagsBg: ["лепка отзад", "дистанция", "спокойна реакция", "пропускане"],
   titleBg: "Лепка отзад",
   objectiveBg:
-    "Агресивна кола се лепи на метри зад теб. Правилният отговор няма нищо общо с нея: вдигни газта, увеличи дистанцията НАПРЕД и я остави да те изпревари. Спирачният удар „за урок“ е точно обратното — предпоставка за удар отзад, в който пострадалият си ти.",
+    "Агресивна кола се лепи на метри зад теб. Правилният отговор няма нищо общо с нея: отпусни плавно газта, увеличи дистанцията НАПРЕД и я остави да те изпревари. Спирачният удар „за урок“ е точно обратното — предпоставка за удар отзад, в който пострадалият си ти.",
   archetypeIds: ["FO-07"],
   conceptIds: ["c-following-distance", "c-safety-space", "c-general-care-duty"],
   map: {
@@ -1775,8 +1775,15 @@ export const SC_FOLLOW_TAILGATER: ScenarioSpec = {
     { n: 2, textBg: "Погледни в огледалото: кола е залепена на метри зад теб." },
     // 66 ch
     { n: 3, textBg: "Не решавай това със спирачка — не е приятно, но не е твой проблем." },
-    // 49 ch
-    { n: 4, textBg: "Вдигни газта плавно и увеличи дистанцията НАПРЕД." },
+    // 60 ch. „Вдигни газта" is this bank's idiom for lifting OFF the pedal, and
+    // every other use of it in scenario/ stands beside an explicit slow-down cue
+    // („остави колата да намали", „влез в зоната под 30"). This card had none,
+    // and it is the one card that cannot afford the other reading: taken as
+    // „give it gas" the step becomes the drill's OWN graded mistake (mistakes[1]
+    // „Гузно ускоряване", SPEEDING_OVER_LIMIT) and contradicts steps 6 and 7.
+    // It is also impossible — FTG_LEAD cruises a constant 11,5 m/s, so the gap
+    // AHEAD only opens below it. „Отпусни" cannot be read both ways.
+    { n: 4, textBg: "Отпусни плавно газта и остави дистанцията НАПРЕД да порасне." },
     // 62 ch
     { n: 5, textBg: "Помни: тя поема и твоето спиране, и грешката на лепката отзад." },
     // 83 ch

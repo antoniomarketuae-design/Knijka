@@ -33,6 +33,7 @@ import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
+import { LANE_WIDTH_M } from "../builders/constants";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
 /** ln-merge-v1 truths (generator params — asserted against the file below). */
@@ -148,6 +149,97 @@ describe("ln-merge-v1 through the world builder", () => {
     expect(world.stats.signs.stop).toBe(0);
     expect(world.stats.signs.giveWay).toBe(0);
     expect(world.stats.zebraCrossings).toBe(0);
+  });
+
+  /**
+   * THE LANE HAS TO END WHERE A STUDENT CAN SEE IT — sc-merge-lane-end:ae6166e2,
+   * major: „the lesson's own event never happens: the lane does not end. Across
+   * the whole pc-right sequence the carriageway keeps its width — no taper, no
+   * chevrons, no lane-ends sign, no merge arrow on the tarmac."
+   *
+   * The COPY half was closed in `traces/scMergeLaneEnd.ts` (W16) by making the
+   * demo captions stop naming furniture the world does not draw. Its own note
+   * ends „WHAT THIS DOES NOT CLOSE … the WORLD half. A student still sees no
+   * taper", and this is what says he does. Read off the MESH, not off a
+   * counter: `markings.ts`'s own paint-truth census records at length why a
+   * booking is not paint.
+   *
+   * The SIGN half stays open and is not asserted here: the А-group „пътно
+   * стеснение" plate has no face in the kit and no row in
+   * content/signs/signs.json, so there is no SignKind to place and writing a
+   * law citation for one is what ADR-002 forbids.
+   */
+  it("DRAWS the lane ending: a closing line that crosses the dying lane over the authored taper", () => {
+    // District space out of the markings buffer: toWorld(x, y, h) = [x, h, −y].
+    const p = world.markings.positions;
+    const at: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i + 2 < p.length; i += 3) {
+      at.push({ x: p[i] as number, y: -(p[i + 2] as number) });
+    }
+    expect(at.length).toBeGreaterThan(0);
+
+    /** The closing line's own x at world `y`, taken as the mean of the paint
+     *  standing there on the DYING side of the carriageway. */
+    const closingXAt = (y: number): number | null => {
+      const near = at.filter((v) => Math.abs(v.y - y) < 0.05 && v.x > -1);
+      if (near.length === 0) return null;
+      return near.reduce((s, v) => s + v.x, 0) / near.length;
+    };
+
+    // At the start of the taper the line stands ON the kerb-side М1 edge line;
+    // at the end it has reached the boundary between the two lanes, i.e. the
+    // street's own axis. This street is a "primary", so it carries a curbside
+    // parking band and its М1 sits ON the travel/parking boundary at the travel
+    // half width (two 8.125 m lanes → 8.125), not inset from a curb.
+    const head = closingXAt(TAPER_FROM_Y);
+    const tail = closingXAt(TAPER_TO_Y);
+    expect(head, `no paint at the taper's start (y = ${TAPER_FROM_Y})`).not.toBeNull();
+    expect(tail, `no paint at the taper's end (y = ${TAPER_TO_Y})`).not.toBeNull();
+    expect(head as number).toBeCloseTo(LANE_WIDTH_M, 2);
+    expect(Math.abs(tail as number)).toBeLessThan(0.2);
+
+    // …and it closes MONOTONICALLY across the whole 60 m, which is what makes it
+    // readable as a narrowing from the seat rather than as two unrelated lines.
+    let previous = Infinity;
+    for (let y = TAPER_FROM_Y; y <= TAPER_TO_Y; y += 5) {
+      const x = closingXAt(y);
+      expect(x, `no closing paint at y = ${y}`).not.toBeNull();
+      expect(x as number).toBeLessThan(previous + 1e-6);
+      previous = x as number;
+    }
+
+    // THE HATCH: oblique bars inside the wedge the line closes, so the dead
+    // lane reads as dead. Counted as paint standing strictly between the
+    // closing line and the edge line, at a y no boundary of this street has.
+    const wedge = at.filter(
+      (v) => v.y > TAPER_FROM_Y + 2 && v.y < TAPER_TO_Y && v.x > 0.5 && v.x < LANE_WIDTH_M - 0.4,
+    );
+    expect(wedge.length).toBeGreaterThan(8);
+  });
+
+  it("stops dashing the boundary the taper turns into a carriageway edge", () => {
+    // Past the taper the dying lane's inner boundary IS the road's edge. A
+    // BROKEN line there invites the lane change into a lane that no longer
+    // exists — the same crime `markings.ts` records against a dashed осева over
+    // a В24 span. So the paint at x ≈ 0 past TAPER_TO_Y must be continuous.
+    const p = world.markings.positions;
+    const onAxis: number[] = [];
+    for (let i = 0; i + 2 < p.length; i += 3) {
+      const x = p[i] as number;
+      const y = -(p[i + 2] as number);
+      if (Math.abs(x) < 0.2 && y > TAPER_TO_Y + 1 && y < END_Y - 1) onAxis.push(y);
+    }
+    onAxis.sort((a, b) => a - b);
+    expect(onAxis.length).toBeGreaterThan(4);
+    // A dashed line leaves DASH_GAP_M (8 m) of bare road between strokes; the
+    // solid replacement is sampled every 5 m, so no gap may exceed that pitch
+    // by more than a rounding.
+    for (let i = 1; i < onAxis.length; i++) {
+      expect(
+        (onAxis[i] as number) - (onAxis[i - 1] as number),
+        `a ${((onAxis[i] as number) - (onAxis[i - 1] as number)).toFixed(1)} m gap at y = ${onAxis[i]}`,
+      ).toBeLessThan(5.5);
+    }
   });
 
   it("produces no NaN/infinite coordinates in any buffer or placement", () => {

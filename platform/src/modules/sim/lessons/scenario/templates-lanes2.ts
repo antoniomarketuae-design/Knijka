@@ -1011,6 +1011,18 @@ const OVCC_LEAD_TRUCK: BrakingLeadCarSpec = {
   },
   followGapM: 38,
   maxMatchSpeedMps: 15.8, // ~57 km/h — see the doc above: the hinge of all three
+  // …AND THE CEILING NOW HAS THE FLOOR THE DOC ABOVE SAID IT WAS OWED
+  // (sc-ov-crest-curve:b26aaa0b). 4.17 m/s = 15.0 км/ч is not chosen, it is
+  // `DEFAULT_RULE_CONFIG.townCrawlFloorCapKmh` (rules/types.ts) — the product's
+  // OWN line between traffic and an obstruction, the speed under which it
+  // convicts a student of DRIVING_TOO_SLOW_IN_TOWN. A lead vehicle may not pace
+  // slower than the pace this product calls obstruction, and a truck on a
+  // 90 км/ч road certainly may not: below it the „бавен камион" of the briefing
+  // is a parked one and there is nothing to overtake.
+  // It can only OPEN the 38 m station, never close it, so the follow-band
+  // arithmetic in the doc above (FOLLOWING_TOO_CLOSE cannot leak into a demo
+  // about the arc) is preserved in the safe direction.
+  minMatchSpeedMps: 4.17,
   slamAt: { x: OVCC_OWN, y: 1400 }, // far past the 902 m road — never reached
   slamRadiusM: 2,
   slamDecelMps2: 6,
@@ -1684,6 +1696,16 @@ const LNBD_CRAWLER: BrakingLeadCarSpec = {
   },
   followGapM: 45,
   maxMatchSpeedMps: 5.5, // ~20 km/h — see the doc above: the hinge of all three
+  // THE FLOOR THE DOC ABOVE ASKED FOR, in the words it asked for it in („the fix
+  // is a `minMatchSpeedMps` floor on the matchPlayer command"). Same number and
+  // same derivation as OVCC_LEAD_TRUCK's: 4.17 m/s = 15.0 км/ч =
+  // `DEFAULT_RULE_CONFIG.townCrawlFloorCapKmh`, the product's own obstruction
+  // line. It leaves this crawler a 15–20 км/ч band, so instruction 2's «бавна
+  // кола с около 20 км/ч» is now true at EVERY student speed instead of only
+  // above 20 — and it is not the `scheduledCruise` failure the doc rules out:
+  // at 24 % under its own 5.5 cruise the crawler still eases off for a closing
+  // student, so it is overtaken rather than gone.
+  minMatchSpeedMps: 4.17,
   slamAt: { x: LNBD_RIGHT, y: 900 }, // far past the 200 m road — never reached
   slamRadiusM: 2,
   slamDecelMps2: 6,

@@ -1061,7 +1061,30 @@ export const SC_SPEED_TRANSITION: ScenarioSpec = {
   success: [
     {
       id: "sc-trn-approach",
-      titleBg: "Измини подхода спокойно до знака за зоната",
+      // THE CHIP STILL SAT ABOVE THE SIGN — `sc-speed-transition:0eaa42b5`,
+      // frame `.audit-frames/sweep161/sc-speed-transition/pc-right/
+      // 01-arrival.png`, whose complaint has two halves.
+      //
+      // HALF ONE IS CLOSED: the photographed «дръж под 57 км/ч» was the
+      // GRADER'S TOLERANCE (52 + the rung's grace), and `advisor.spokenCapKmh`
+      // source 4 ended that — the card has printed the author's 52 since
+      // a4a4bf7. HALF TWO SURVIVED IT: 52 is still above the 50 the student is
+      // told on the same screen. Source 3 (the sign) is blind here because it
+      // reads `map.params.maxspeedKmh`, and this street has no single limit to
+      // put there — its recipe posts TWO, `approachKmh: 50` then `zoneKmh: 30`.
+      //
+      // SO THE TITLE SAYS THE 50, exactly as sc-spcv-curve's says its 50 — the
+      // authored figure is source 2 and `titleCapKmh` Math.mins it against the
+      // gate. The number is RETRIEVED, not chosen: `map.params.approachKmh`
+      // below, mirrored into content/world/sp-trans-v1.json, whose two edges
+      // are asserted to post exactly [30, 50] by sp-world-claims.test.ts, and
+      // stated to the student by instruction 1 («ограничението все още е 50»).
+      //
+      // THE GATE IS UNTOUCHED (52, widened to 57 on the aided rungs), so no
+      // drive this drill ever credited is refused now and no committed trace
+      // is re-recorded: a student who obeys the new sentence clears the old
+      // gate with room. Pinned in task-title-agrees-with-briefing.test.ts.
+      titleBg: "Измини подхода спокойно до знака за зоната, не повече от 50 км/ч",
       // On the 50 approach — reach it under a relaxed cap (a normal ~46 drive).
       params: { kind: "reachZone", x: LANE_X, y: 120, radiusM: 12, maxSpeedKmh: 52 },
     },

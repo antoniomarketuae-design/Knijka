@@ -84,7 +84,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4">
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4 short:space-y-2">
       <TextField
         id="email"
         label="Имейл"

@@ -215,7 +215,7 @@
  *     skew clamp markings.ts keeps private, the 1/cos span widening, the refuge
  *     island's kerbed gap and the staggered half's walk along the street.
  * The catalogue now grades
- * 4,285 of the corpus's 11,026 marking quads — 38.86%, up from one in 6.7. It
+ * 4,309 of the corpus's 11,050 marking quads — 39.00%, up from one in 6.7. It
  * is 84% of the DISTRICTS and 39% of the PAINT because the 17 still outside are
  * the biggest maps in the corpus. They are attributed one by one, as before: 6
  * painted numerals, 5 roundabout rings, 3 arrow maps, 2 bus-lane legends, 1
@@ -2124,6 +2124,13 @@ function boundaryFramesOf(built: Built, edgeId: string): BoundaryFrame[] {
     // with the painter on every map in this corpus and disagree on the first
     // one where those two part company.
     const exclude = solids.filter((b) => b.k === k).flatMap((b) => b.segs);
+    // …and the SECOND thing that silences a dash: past an authored lane drop's
+    // taper the dying lane's inner boundary is the carriageway EDGE, and
+    // `paintLaneDrop` strokes it solid. Keyed by `k` for the same reason.
+    const drop = laneDropOf(built);
+    if (drop && drop.edgeId === edgeId && drop.dividerK === k) {
+      exclude.push({ from: drop.sTo, to: drop.length });
+    }
     return {
       off,
       line,
@@ -2319,6 +2326,177 @@ function edgeLineLicences(built: Built, edgeId: string): QuadLicence[] {
   return out;
 }
 
+/**
+ * Every quad an authored LANE DROP entitles its street to, and no others —
+ * `paintLaneDrop`'s arithmetic restated, never imported, for the reason the
+ * zebra catalogue states about `paintZebra`: a reader that asks the painter
+ * where it put the paint agrees with it by construction.
+ *
+ * Restated in full, so a change to any of them turns this red:
+ *   · the drop is read off `meta.scenario` — archetype "merge-lane",
+ *     `params.lanesAfter` 1, `streetEdgeId`, `taperFromY` < `taperToY`, and
+ *     `laneEndingX`/`laneThroughX` straddling the axis; the street must run
+ *     along +Y, which is what makes the sign of `laneEndingX` a side of travel;
+ *   · the closing line runs STRAIGHT from the kerb-side М1 offset at
+ *     `taperFromY` to the surviving boundary at `taperToY`, sampled every 5 m
+ *     and stroked at EDGE_LINE_WIDTH_M;
+ *   · one 0.400 m hatch bar every 7 m of that span, from the closing line out
+ *     to the М1 offset and leaning downstream by its own width (≈45°), skipping
+ *     any bar under 1.5 m — the wedge's tip;
+ *   · past `taperToY` the surviving boundary IS the carriageway edge, so it is
+ *     stroked solid at EDGE_LINE_WIDTH_M to the end of the drawn line (and its
+ *     dashes are suppressed — the dash axis sees them gone).
+ *
+ * Empty on all 105 districts that author no drop, which is what keeps this
+ * catalogue's reach honest: ln-merge-v1 is the only map in the corpus whose
+ * lane ends, and any lane-drop-shaped paint anywhere else is an offence by
+ * construction rather than by a counter's say-so.
+ */
+interface LaneDropRead {
+  edgeId: string;
+  line: Vec2[];
+  length: number;
+  sFrom: number;
+  sTo: number;
+  outerOff: number;
+  survivorOff: number;
+  dividerK: number;
+}
+
+const laneDropMemo = new WeakMap<Built, { read: LaneDropRead | null }>();
+
+/** The authored lane drop this district declares, or null — the read both the
+ *  licence catalogue and the dash-station plan work from. */
+function laneDropOf(built: Built): LaneDropRead | null {
+  return perBuilt(laneDropMemo, built, () => ({ read: laneDropReadOf(built) })).read;
+}
+
+function laneDropReadOf(built: Built): LaneDropRead | null {
+  const sc = built.district.meta.scenario as
+    | {
+        archetype?: unknown;
+        streetEdgeId?: unknown;
+        taperFromY?: unknown;
+        taperToY?: unknown;
+        laneEndingX?: unknown;
+        laneThroughX?: unknown;
+        params?: { lanesAfter?: unknown };
+      }
+    | undefined;
+  if (!sc || sc.archetype !== "merge-lane" || sc.params?.lanesAfter !== 1) return null;
+  const edgeId = sc.streetEdgeId;
+  const fromY = sc.taperFromY;
+  const toY = sc.taperToY;
+  const endingX = sc.laneEndingX;
+  const throughX = sc.laneThroughX;
+  if (typeof edgeId !== "string" || !built.net.edgeById.has(edgeId)) return null;
+  if (typeof fromY !== "number" || typeof toY !== "number" || !(fromY < toY)) return null;
+  if (typeof endingX !== "number" || typeof throughX !== "number") return null;
+  if (!(endingX * throughX < 0)) return null;
+  const eb = built.net.edgeById.get(edgeId)!;
+  if (!MARKED_CLASSES.has(eb.edge.class)) return null;
+
+  const { line, length } = drawnLine(built, edgeId);
+  const first = line[0]!;
+  const last = line[line.length - 1]!;
+  const run: Vec2 = [last[0] - first[0], last[1] - first[1]];
+  const runLen = Math.hypot(run[0], run[1]);
+  if (runLen < 1e-6 || run[1] / runLen < 0.999) return null;
+
+  /** Arclength along the drawn line at world `y` (the street runs along +Y). */
+  const arcAt = (y: number): number | null => {
+    let acc = 0;
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1]!;
+      const b = line[i]!;
+      const seg = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (seg <= 1e-9) continue;
+      const dy = b[1] - a[1];
+      if (Math.abs(dy) > 1e-9) {
+        const t = (y - a[1]) / dy;
+        if (t >= 0 && t <= 1) return acc + t * seg;
+      }
+      acc += seg;
+    }
+    return null;
+  };
+  const sFrom = arcAt(fromY);
+  const sTo = arcAt(toY);
+  if (sFrom === null || sTo === null || !(sFrom + 1 < sTo)) return null;
+
+  const lanes = Math.max(1, eb.edge.lanes);
+  if (lanes < 2) return null;
+  const travelHalf = eb.halfWidth - eb.parkingM;
+  const side = endingX > 0 ? 1 : -1;
+  const outerOff = side * edgeLineOffset(built, edgeId);
+  const survivorOff = side * (travelHalf - LANE_WIDTH_M);
+  const dividerK = Math.round((survivorOff + travelHalf) / LANE_WIDTH_M);
+  if (dividerK < 1 || dividerK >= lanes) return null;
+  if (Math.abs(-travelHalf + dividerK * LANE_WIDTH_M - survivorOff) > 1e-6) return null;
+  if (Math.abs(survivorOff) > travelHalf - 0.4) return null;
+
+  return { edgeId, line, length, sFrom, sTo, outerOff, survivorOff, dividerK };
+}
+
+/** The closing line's offset at arclength `s` — `paintLaneDrop`'s straight
+ *  taper, restated. */
+function laneDropOffAt(drop: LaneDropRead, s: number): number {
+  const c = Math.min(1, Math.max(0, (s - drop.sFrom) / (drop.sTo - drop.sFrom)));
+  return drop.outerOff + (drop.survivorOff - drop.outerOff) * c;
+}
+
+function laneDropLicences(built: Built): QuadLicence[] {
+  const drop = laneDropOf(built);
+  if (!drop) return [];
+  const { edgeId, line, length, sFrom, sTo, outerOff, survivorOff } = drop;
+  const SAMPLE_M = 5;
+  const HATCH_PITCH_M = 7;
+  const HATCH_W_M = 0.4;
+  const HATCH_MIN_M = 1.5;
+  const strand = (s0: number, s1: number, taper: boolean): Vec2[] => {
+    const out: Vec2[] = [];
+    const steps = Math.max(2, Math.ceil((s1 - s0) / SAMPLE_M));
+    for (let i = 0; i <= steps; i++) {
+      const s = s0 + ((s1 - s0) * i) / steps;
+      const at = pointAlong(line, s);
+      out.push(
+        add(at.point, mul(perpRight(at.tangent), taper ? laneDropOffAt(drop, s) : survivorOff)),
+      );
+    }
+    return out;
+  };
+
+  const out: QuadLicence[] = [
+    ...ribbonLicences(strand(sFrom, sTo, true), EDGE_LINE_WIDTH_M, `М-taper@${edgeId}`),
+  ];
+  let n = 0;
+  for (let s = sFrom + HATCH_PITCH_M; s < sTo; s += HATCH_PITCH_M) {
+    const inner = laneDropOffAt(drop, s);
+    const width = Math.abs(outerOff - inner);
+    if (width < HATCH_MIN_M) continue;
+    const a0 = pointAlong(line, s);
+    const a1 = pointAlong(line, Math.min(sTo, s + width));
+    const from = add(a0.point, mul(perpRight(a0.tangent), inner));
+    const to = add(a1.point, mul(perpRight(a1.tangent), outerOff));
+    const d: Vec2 = [to[0] - from[0], to[1] - from[1]];
+    const barLen = Math.hypot(d[0], d[1]);
+    if (barLen < HATCH_MIN_M) continue;
+    out.push(
+      licenceAt(
+        `М-taperHatch${n++}@${edgeId}`,
+        [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2],
+        [d[0] / barLen, d[1] / barLen],
+        barLen / 2,
+        HATCH_W_M / 2,
+      ),
+    );
+  }
+  if (length - sTo > 1) {
+    out.push(...ribbonLicences(strand(sTo, length, false), EDGE_LINE_WIDTH_M, `М1drop@${edgeId}`));
+  }
+  return out;
+}
+
 /** Does this quad cover exactly the rectangle `L` licenses? */
 function coversLicence(q: MeshQuad, L: QuadLicence): boolean {
   for (let i = 0; i < 4; i++) {
@@ -2417,6 +2595,9 @@ function districtLicences(built: Built): {
     // host authoring an М1 span paints no dashes and must still show the solid
     // осева.
     for (const { id } of drawableEdges(built)) licences.push(...zoneSolidLicences(built, id));
+    // …and the lane drop, which is a per-DISTRICT read (`meta.scenario` names
+    // its own street) rather than a per-edge one.
+    licences.push(...laneDropLicences(built));
     return { licences, index: licenceIndex(licences) };
   });
 }
@@ -2718,7 +2899,7 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
  * a feature: the district simply leaves the domain and says so.
  *
  * 88 districts of 105 — and
- * 4,285 of the corpus's 11,026 marking quads — 38.86%, which is the number that
+ * 4,309 of the corpus's 11,050 marking quads — 39.00%, which is the number that
  * matters, because a district is not a unit of paint. This block was titled
  * „every quad the world paints is a quad the world was authored to paint" while
  * it graded one quad in 6.7. It is now titled what it does, and the fraction is
@@ -3724,12 +3905,22 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
       // catalogue licences every one of them: the per-district census in this
       // same block passes unchanged, which is what says the new paint is
       // authored paint and not drift.
-    }).toEqual({ districts: 106, booked: 11134, triangles: 108 });
+      //
+      // +24 over 11,134, all of it ln-merge-v1's: `sc-merge-lane-end:ae6166e2`
+      // — the lane-drop drill's lane never ended anywhere a student could see
+      // it. `paintLaneDrop` adds 12 taper segments, 7 hatch bars and 8 strips
+      // of the survivor's new edge line (27), and SUPPRESSES the 3 dashes that
+      // ran past the taper on a boundary that is now the carriageway edge.
+      // 27 − 3 = 24, and `laneDropLicences` licences every one of the 27: the
+      // per-district census in this same block passes unchanged.
+    }).toEqual({ districts: 106, booked: 11158, triangles: 108 });
     expect({
       districts: domain.length,
       booked: booked(domain),
       triangles: bookedTriangles(domain),
-    }).toEqual({ districts: 89, booked: 4299, triangles: 14 });
+      // …and the same +24: ln-merge-v1 is INSIDE the domain, so the lane drop's
+      // paint is licensed rather than excused by an exclusion.
+    }).toEqual({ districts: 89, booked: 4323, triangles: 14 });
     // The mesh, and the booking it is supposed to equal. 59% of the denominator
     // below still sits in the 14 excluded districts — they are the biggest maps
     // in the corpus, which is why 87% of the DISTRICTS is only 41% of the PAINT
@@ -3742,7 +3933,7 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
     const share = ((domainMesh / corpusMesh) * 100).toFixed(2);
     // 38.68 → 38.86: tj-occluded-v1's three new пътеки are inside the domain,
     // so the reach grew slightly faster than the corpus did.
-    expect(share).toBe("38.86");
+    expect(share).toBe("39.00");
     // „NOT CLAIMED IN A COMMENT" IS NOW ITSELF A CHECK. The line this replaces
     // — `expect(share.toFixed(1)).toBe("14.8")` — could not fail: with both
     // totals pinned exactly two lines above it, the ratio was arithmetic, and

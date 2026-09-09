@@ -310,7 +310,17 @@ describe("sweep161 part D — the card stops publishing the grader's tolerance a
   // anything.
   const cases: [string, string, number, number, number][] = [
     // scenario, objective, photographed gate, the author's own cap, spoken
-    ["sc-speed-transition", "sc-trn-approach", 57, 52, 52],
+    // 52 → 50 on 2026-09-09, `sc-speed-transition:0eaa42b5`, and the expectation
+    // moved because the PRODUCT did: source 4 had closed the „grader's tolerance
+    // on the glass" half of that row (57 → 52) and left the half the row is also
+    // filed as — «дръж под 52 км/ч» beside instruction 1's «ограничението все
+    // още е 50 км/ч». The sign source could not reach it (this street posts two
+    // limits, so `map.params.maxspeedKmh` is absent by construction), so the
+    // TITLE now names the 50 its own recipe posts — sc-spcv-curve's repair, one
+    // street over. The gate is still the photographed 57 and `authored` is still
+    // 52, which the invariants below re-prove: spoken ≤ authored ≤ gate, so this
+    // is a sentence getting stricter and not a drive getting refused.
+    ["sc-speed-transition", "sc-trn-approach", 57, 52, 50],
     ["sc-speed-transition", "sc-trn-in-zone", 38, 33, 30],
     ["sc-sp-curve", "sc-spcv-curve", 60, 55, 50],
     ["sc-sp-eco-coast", "sc-ecoc-coast", 41, 36, 36],

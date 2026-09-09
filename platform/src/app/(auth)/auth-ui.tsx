@@ -21,13 +21,17 @@ export function AuthHeading({
   lead?: ReactNode;
 }) {
   return (
-    <header className="mb-6">
+    <header className="mb-6 short:mb-3">
       <p className="hud-label">{eyebrow}</p>
-      <h1 className="mt-1.5 font-display text-2xl font-black tracking-tight">
+      <h1 className="mt-1.5 font-display text-2xl font-black tracking-tight short:text-xl">
         {title}
       </h1>
+      {/* `short:sr-only` and NOT `short:hidden`: on a phone held sideways the
+          lead is the one line here a student can do without, but it is still a
+          sentence — sr-only takes it out of the flow while leaving it in the
+          accessibility tree, so the cost of the fold is paid in pixels only. */}
       {lead ? (
-        <p className="mt-2 text-sm leading-relaxed text-muted">{lead}</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted short:sr-only">{lead}</p>
       ) : null}
     </header>
   );
@@ -42,8 +46,8 @@ export function AuthHeading({
 export function AuthFooterNote({ children }: { children: ReactNode }) {
   return (
     <>
-      <div aria-hidden role="presentation" className="rule mt-6" />
-      <p className="mt-4 text-center text-sm text-muted">{children}</p>
+      <div aria-hidden role="presentation" className="rule mt-6 short:mt-3" />
+      <p className="mt-4 text-center text-sm text-muted short:mt-2">{children}</p>
     </>
   );
 }

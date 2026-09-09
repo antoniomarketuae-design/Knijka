@@ -301,16 +301,19 @@ describe("§3 it changes no grade — the flow is scenery to the rule engine", (
  * `tier-feasibility`'s band-top census now names two templates — which is the
  * repair, since the two drills finally declare the same band on the same road.
  *
- * ONE SURFACE OF THIS ROW IS STILL OPEN, recorded here rather than in a report
- * because this is where the next reader will be standing. The shadow recording
- * (`traces/scMwMinSpeed.ts`, `FLOW_KMH = 110`) still drives 110 and its caption
- * still says «Установени 110 км/ч — далеч под тавана и точно в ритъма», so the
- * DEMONSTRATION contradicts the briefing it demonstrates. Moving it is not a
- * copy edit: the drive is a committed byte-gated recording, re-recording it at
- * ~125 changes what the staged flow car does relative to the ego, and this
- * file's §3 asserts `tick.leadGapM` stays non-finite for the whole shadow —
- * i.e. the ego never closes on the flow. That has to be re-measured, not
- * assumed, which is a different round's work.
+ * THAT LAST SURFACE IS NOW CLOSED TOO — sc-mw-min-speed:66e4f566, the row
+ * filed on exactly the gap this note left open. The shadow recording
+ * (`traces/scMwMinSpeed.ts`) drove 110 under the caption «Установени 110 км/ч
+ * — далеч под тавана и точно в ритъма» while the briefing it demonstrates
+ * taught 120–130. It is re-recorded at 125 — inside that band, and the speed
+ * this file's own SHADOW() drives for the sibling drill.
+ *
+ * The re-measurement this note demanded was done rather than assumed: on all
+ * three committed drives `tick.leadGapM` is still non-finite on every frame,
+ * the shadow still books zero violations and CLEAN_DRIVING, and the staged
+ * pass still resolves inside the drive (`sc-mw-min-speed-traces.test.ts` §3
+ * and the shadow gate, whose speed expectation now reads the band off
+ * `instructionsBg` rather than pinning a constant).
  */
 describe("§4 both motorway drills teach the floor the engine actually grades", () => {
   const FLOOR = DEFAULT_RULE_CONFIG.motorwayMinFlowKmh;

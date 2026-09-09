@@ -1416,6 +1416,7 @@ export class BrakingLeadCarRunner implements EventRunner {
       type: "matchPlayer",
       gapM: this.stationGapM(traffic, input),
       maxSpeedMps: s.maxMatchSpeedMps,
+      minSpeedMps: s.minMatchSpeedMps,
     });
   }
 

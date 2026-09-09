@@ -662,8 +662,30 @@ export type StagedCommand =
    * controller. A real tailgater is a car that was ALREADY TRAVELLING when it
    * appeared in your mirror; parking it at the kerb first is the artificial
    * part, and the seed removes it.
+   *
+   * `minSpeedMps` is the CEILING'S MISSING FLOOR, and it is the whole of
+   * sc-ov-crest-curve:b26aaa0b / the `LNBD_CRAWLER` doc. The band's fixed point
+   * is `gap = gapM`, where `target === playerSpeed` — so a lead commanded to
+   * „pace the player" mirrors him all the way DOWN, and a student who crawls
+   * gets a 57 km/h truck standing 40 m ahead of him on an empty rural road
+   * (.audit-frames/sweep161/sc-ov-crest-curve/mobile-right/04-t172s.png). Every
+   * such lesson says in its own briefing that the vehicle ahead is SLOW, not
+   * stopped: there is nothing to draw level with and pull past, and the drill
+   * inverts into a queue behind a parked car.
+   *
+   * A real slow vehicle has its own pace and does not stop because you stopped,
+   * so this is a floor on the TARGET, applied before the player guard — the
+   * guard still clamps below it, which is what keeps „never ram the player from
+   * behind" true even for a floored actor. Absent = the historical behaviour,
+   * bit-identical.
    */
-  | { type: "matchPlayer"; gapM: number; maxSpeedMps: number; seedSpeedMps?: number }
+  | {
+      type: "matchPlayer";
+      gapM: number;
+      maxSpeedMps: number;
+      minSpeedMps?: number;
+      seedSpeedMps?: number;
+    }
   /** Vehicles only: brake-slam at `decelMps2` (default 7.5) to a stop; holds
    *  the stop and suppresses the player guard (already braking). */
   | { type: "brake"; decelMps2?: number }

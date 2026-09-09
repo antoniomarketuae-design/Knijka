@@ -436,6 +436,9 @@ interface CommandState {
   speedMps: number;
   gapM: number;
   maxSpeedMps: number;
+  /** `matchPlayer`'s optional pace FLOOR, m/s. 0 = absent, and 0 is already the
+   *  band's own lower clamp, so an actor never commanded one is bit-identical. */
+  minSpeedMps: number;
   decelMps2: number;
 }
 
@@ -985,7 +988,7 @@ export function createStagedVehicle(
       lateralOffsetM: 0,
       returns: 0,
     },
-    command: { type: "hold", speedMps: 0, gapM: 0, maxSpeedMps: 0, decelMps2: 0 },
+    command: { type: "hold", speedMps: 0, gapM: 0, maxSpeedMps: 0, minSpeedMps: 0, decelMps2: 0 },
     holdS,
     s: holdS,
     speed: 0,
@@ -1083,6 +1086,7 @@ export function applyStagedCommand(
         v.command.type = "matchPlayer";
         v.command.gapM = command.gapM;
         v.command.maxSpeedMps = command.maxSpeedMps;
+        v.command.minSpeedMps = command.minSpeedMps ?? 0;
         // FR-56 rolling start: the actor enters the mirror ALREADY TRAVELLING
         // rather than launching from the kerb. Never slows an actor that is
         // already faster, and never exceeds the command's own cap.
@@ -1211,6 +1215,14 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
         target = env.playerSpeedMps + MATCH_GAIN * (cmd.gapM - gap);
         if (target > cmd.maxSpeedMps) target = cmd.maxSpeedMps;
         if (target < 0) target = 0;
+        // THE CEILING'S FLOOR (see StagedCommand.matchPlayer's `minSpeedMps`).
+        // Never above the ceiling — an authoring slip must not turn a floor
+        // into a faster lead than the author capped — and never applied to a
+        // FINISHED actor, which is the `else` arm's 0 and stays 0: a lead that
+        // has run out of path stops there rather than being pushed past its
+        // own last node. The player guard below still clamps this down.
+        const floor = Math.min(cmd.minSpeedMps, cmd.maxSpeedMps);
+        if (target < floor) target = floor;
       } else {
         target = 0;
       }

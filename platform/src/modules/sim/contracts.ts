@@ -1069,6 +1069,22 @@ export interface BrakingLeadCarSpec extends StagedEventBase {
   /** Gap held ahead of the player while matching, m. */
   followGapM: number;
   maxMatchSpeedMps: number;
+  /**
+   * MINIMUM pace under `matchPlayer`, m/s — the floor `maxMatchSpeedMps` never
+   * had (sc-ov-crest-curve:b26aaa0b, and the `LNBD_CRAWLER` doc in
+   * templates-lanes2.ts, which names this field as the fix it is owed).
+   *
+   * The band's fixed point is `target === playerSpeed`, so an unfloored lead
+   * mirrors a crawling student all the way to a standstill: the „бавен камион"
+   * a lesson is built on becomes a parked one 40 m ahead, and the overtake it
+   * teaches has nothing left to overtake. Author it on any lead whose briefing
+   * calls it SLOW rather than STOPPED; leave it absent everywhere the lead is
+   * a braking-reaction rig, where a lead that will not stop is the wrong lead.
+   *
+   * Ignored under `paceMode: "scheduledCruise"` (that lead already drives its
+   * own fixed profile) and clamped to `maxMatchSpeedMps` at the command.
+   */
+  minMatchSpeedMps?: number;
   /** The staged slam point on the lead car's path (district space). */
   slamAt: { x: number; y: number };
   slamRadiusM: number;

@@ -412,19 +412,25 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
   // traces/scMwMinSpeed.ts; gates in traces/__tests__/sc-mw-min-speed-traces
   // .test.ts (re-record with RECORD_TRACES=1).
   //
-  // THE ONE SURFACE OF sc-mw-min-speed:f3c26187 THAT DID NOT MOVE, named here
-  // so the claim cannot walk to it unnoticed the way it walked across three
-  // surfaces of sc-sp-wet-limit-plate. `traces/scMwMinSpeed.ts` holds
-  // `FLOW_KMH = 110` and captions the shadow «Установени 110 км/ч — далеч под
-  // тавана и точно в ритъма», so the DEMONSTRATION now names a rhythm the
-  // briefing above no longer teaches.
+  // THE FOURTH SURFACE, CLOSED — sc-mw-min-speed:66e4f566 (major), the row
+  // filed on exactly the gap f3c26187's repair left behind. That patch moved
+  // briefing step 2 and both task chips to «около 120–130 км/ч» and left
+  // `traces/scMwMinSpeed.ts` at `FLOW_KMH = 110`, captioning the shadow
+  // «Установени 110 км/ч — далеч под тавана и точно в ритъма» — so the
+  // DEMONSTRATION the student is invited to watch FIRST taught a different
+  // rhythm from the lesson demonstrating it.
   //
-  // It is not a copy edit and that is why it is not in this patch: the drive is
-  // a committed byte-gated recording, and re-recording it at ~125 changes where
-  // the ego sits relative to the staged flow car — `sp-mw-flow-visible.test.ts`
-  // §3 asserts `tick.leadGapM` stays non-finite for the whole shadow (the drill
-  // corridor is congestion-free, which is what makes the crawl convictions
-  // honest). That has to be re-measured, not assumed.
+  // The shadow is now recorded at 125: inside the band step 2 names, and the
+  // same speed the sibling drill's own shadow drives on this same motorway
+  // (`sp-mw-flow-visible.test.ts` SHADOW). It was never a copy edit — the trace
+  // is a committed byte-gated recording, so the staged pass was RE-MEASURED
+  // rather than assumed: the shadow still books zero violations and
+  // CLEAN_DRIVING, the flow car is still never a lead on any of the three
+  // drives (so the crawl demos keep their congestion innocence), and its pass
+  // still resolves at t ≈ 35.1 inside a 41.7 s drive. All of that is asserted
+  // in `sc-mw-min-speed-traces.test.ts`, whose speed expectation now reads the
+  // band off `instructionsBg` instead of pinning a constant — briefing and
+  // demonstration can no longer drift apart in silence.
   shadow: { path: "content/traces/sc-mw-min-speed/shadow-correct.trace.json" },
   staged: [MWM_FLOW_CAR],
   mistakes: [

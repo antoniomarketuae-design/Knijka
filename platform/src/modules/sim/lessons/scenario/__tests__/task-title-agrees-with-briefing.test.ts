@@ -313,3 +313,107 @@ describe("a task that invokes the recommended speed says which number that is", 
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// 3. A task on a street with TWO posted limits still says the one it is on
+//
+// `sc-speed-transition:0eaa42b5`, `.audit-frames/sweep161/
+// sc-speed-transition/pc-right/01-arrival.png`: «ЗАДАЧА 1/3 · Измини подхода
+// спокойно до знака за зоната» / «дръж под 57 км/ч», beside instruction 1
+// «Потегли по правата улица — тук ограничението все още е 50 км/ч».
+//
+// The 57 half is closed (advisor source 4 — the card printed the author's 52
+// from a4a4bf7 on). What survived is 52 > 50: this street posts 50 then 30, so
+// it has no single `map.params.maxspeedKmh` and the SIGN source (B58) cannot
+// see it at all. The `b58-gate-never-over-posted` survey skips the template for
+// the same reason, which is why nothing was red while the chip stood two km/h
+// over the plate the student is looking at.
+//
+// The repair is sc-spcv-curve's, applied to a regulatory limit instead of an
+// advisory one: the TITLE names the figure, and it is the figure the recipe
+// posts on the segment the gate stands on.
+// ---------------------------------------------------------------------------
+
+describe("the zone-transition approach chip stands at the plate, not above it", () => {
+  const SPEC = () => {
+    const s = SCENARIO_TEMPLATES.find((x) => x.id === "sc-speed-transition");
+    expect(s, "sc-speed-transition left the registry").toBeDefined();
+    return s!;
+  };
+
+  it("the approach limit is the recipe's own, and the recipe is what builds the street", () => {
+    // Not a number chosen here: `approachKmh` is the generator recipe, mirrored
+    // into content/world/sp-trans-v1.json, whose two edges sp-world-claims.test
+    // asserts post exactly [30, 50].
+    expect(SPEC().map.params["approachKmh"]).toBe(50);
+    expect(SPEC().map.params["zoneKmh"]).toBe(30);
+    // …and the reason the sign source is blind: two limits, so no single one.
+    expect(SPEC().map.params["maxspeedKmh"]).toBeUndefined();
+  });
+
+  it("the title names that figure, and the briefing on the same screen states it too", () => {
+    const authored = SPEC().success.find((o) => o.id === "sc-trn-approach")!;
+    expect(kmhIn(authored.titleBg)).toContain(50);
+    const briefing = (compileScenario(SPEC(), 1).briefingBg ?? []).map((s) => s.textBg).join(" | ");
+    expect(briefing).toContain("50 км/ч");
+  });
+
+  it("the card publishes 50 on every rung — never 52, never the ladder's 57", () => {
+    for (const level of rungsOf(SPEC())) {
+      const text = cardFor(SPEC(), level, "sc-trn-approach");
+      expect(text, `L${level}`).toContain("дръж под 50 км/ч");
+      expect(text, `L${level}`).not.toContain("52");
+      expect(text, `L${level}`).not.toContain("57");
+    }
+  });
+
+  it("the LIVE session path prints it too, not just the pure function", () => {
+    // The same door the sibling case above closes: the shell calls
+    // `advisorPromptForSession`, and a lane that stranded the authored-cap hop
+    // would leave every assertion above green.
+    const lesson = compileScenario(SPEC(), 1);
+    const idx = lesson.objectives.findIndex((o) => o.id === "sc-trn-approach");
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const session: LessonSessionState = {
+      ...createLessonSession(lesson),
+      phase: "driving",
+      currentObjectiveIndex: idx,
+    };
+    expect(advisorPromptForSession(session)?.textBg).toBe(
+      "Измини подхода спокойно до знака за зоната, не повече от 50 км/ч — дръж под 50 км/ч",
+    );
+  });
+
+  it("the gate did not move, so no drive this drill credited is refused now", () => {
+    // The false-refusal guard. The author's 52 and the ladder's 57 both stand
+    // exactly where the photograph found them; only the sentence got stricter,
+    // so a student who obeys 50 clears every rung with room and the three
+    // committed traces do not have to be re-recorded.
+    const authored = SPEC().success.find((o) => o.id === "sc-trn-approach")!;
+    expect((authored.params as { maxSpeedKmh?: number }).maxSpeedKmh).toBe(52);
+    for (const level of rungsOf(SPEC())) {
+      const o = compileScenario(SPEC(), level).objectives.find((x) => x.id === "sc-trn-approach")!;
+      const gate = (o.params as { maxSpeedKmh?: number }).maxSpeedKmh!;
+      expect(gate, `L${level}: the gate may never fall below the printed number`).toBeGreaterThanOrEqual(50);
+    }
+    expect(
+      (compileScenario(SPEC(), 1).objectives.find((x) => x.id === "sc-trn-approach")!.params as {
+        maxSpeedKmh?: number;
+      }).maxSpeedKmh,
+      "the photographed ladder gate is untouched",
+    ).toBe(57);
+  });
+
+  it("the mutation that must turn this red: drop the figure from the title", () => {
+    // Judged by the exact predicate, on the exact string the photograph carries.
+    expect(kmhIn("Измини подхода спокойно до знака за зоната")).toEqual([]);
+    const p = advisorPromptForObjective(
+      "Измини подхода спокойно до знака за зоната",
+      { kind: "reachZone", x: 0, y: 0, radiusM: 12, maxSpeedKmh: 57 },
+      undefined,
+      undefined,
+      52,
+    );
+    expect(p.textBg).toBe("Измини подхода спокойно до знака за зоната — дръж под 52 км/ч");
+  });
+});

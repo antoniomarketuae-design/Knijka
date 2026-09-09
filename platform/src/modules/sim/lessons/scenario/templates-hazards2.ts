@@ -191,6 +191,62 @@ const PARKED_CAR_Y = 185;
  * At 16 км/ч the reaction + full-force stop spends ≈ 5.5 m of the 9.8, so the
  * window is honest at the low end rather than a trap.
  */
+/**
+ * ── THE BALL STEP 3 PROMISES (2026-09-09, `sc-hz-emergency-stop:e0c4ef23`) ───
+ *
+ * FILED: „the ball the briefing promises never rolls onto the carriageway".
+ * VERIFIED IN CURRENT SOURCE, and it was exactly right: this template's
+ * instruction 3 reads «Някъде напред ТОПКА ще изскочи на платното, а след нея —
+ * дете», the shadow's own annotation says «Топка на платното — и веднага след
+ * нея детето», the `teach.whenBg` names «дете след топка между паркираните
+ * коли» as the archetype — and `staged` carried the child alone, with no
+ * `hazard`. The student was told to watch for a warning cue the world never
+ * produced, which is a briefing that lies about the road.
+ *
+ * NOT A NEW MECHANISM. `SC_CROSSING_CHILD_BALL` (templates-pe.ts, founder R3
+ * #27) already ships this pair end to end: `ScenarioSpec.hazard` compiles to
+ * `LessonSpec.hazard` (compile.ts, the signalPlan opt-in pattern), TrafficLayer
+ * mounts and animates the ball, and `PedestrianDartOutSpec.ballLeadSec` is what
+ * flips the runner's `hazardActive` — the ONLY thing that does. So the ball
+ * cannot be added without taking the lead too.
+ *
+ * AND THE LEAD IS PAID FOR IN ADVANCE, NOT TAKEN OUT OF THE STUDENT'S TWO
+ * SECONDS. `ballLeadSec` delays the WALKER by its own value, so authoring it
+ * naked would move the child from 2.2 s of warning to 1.7 s and make step 3's
+ * «около две секунди» false — the same defect this block's own wave-5 note was
+ * filed for, wearing a different hat. Both trigger bounds are therefore moved
+ * OUT by exactly one lead:
+ *
+ *   ETA horizon   2.2 → 2.2 + 0.5 = 2.7 s. The horizon is evaluated per frame
+ *                 at the player's own speed, so the compensation is EXACT at
+ *                 every speed the horizon governs: released 2.7 s out, walker
+ *                 0.5 s later, child still at 2.2 s.
+ *   metres        30 → 30 + 0.5 × (50 / 3.6) = 36.944 m, the outer bound moved
+ *                 by one lead's worth of road AT THE DRILL'S DESIGN SPEED, so
+ *                 at 50 км/ч — where the metres govern, ≥ 49.3 км/ч — the
+ *                 walker is released at 30.00 m, the authored number.
+ *
+ * The child's release is therefore unchanged, which is why the committed
+ * recordings replay byte-identically (the trace gate re-proves it: the drive
+ * scripts are open-loop, and the one thing that moved is when `hazardActive`
+ * goes true). What DOES move is the reaction stopwatch, which now arms at the
+ * BALL — and that is the correct stimulus to measure: the whole of
+ * `teach.whenBg` is that a ball IS the child, half a second early.
+ *
+ * The below-floor backstop moves with the horizon for the same reason
+ * (`dartFloorReleaseM` = max(8, 14 × 0.2778 × 2.7) = 10.5 m, was 8.56): a
+ * creeping driver gets the ball at 10.5 m and the child 0.5 s later, i.e. the
+ * band still only ever moves in the generous direction.
+ */
+/** The ball leads the child by this much (s) — the `SC_CROSSING_CHILD_BALL`
+ *  figure, and for its reason: the ball launches faster than the child runs, so
+ *  the visual lead keeps GROWING across the road while the child still reaches
+ *  the lane centre inside the window the briefing states. */
+const HZES_BALL_LEAD_SEC = 0.5;
+/** The drill's design approach speed (m/s) — the 50 км/ч instruction 1 asks
+ *  for, and the speed at which the metre bound below is compensated exactly. */
+const HZES_DESIGN_MPS = 50 / 3.6;
+
 export const SC_HZ_EMERGENCY_STOP_DART: PedestrianDartOutSpec = {
   id: "sc-hzes-child",
   kind: "pedestrianDartOut",
@@ -206,12 +262,17 @@ export const SC_HZ_EMERGENCY_STOP_DART: PedestrianDartOutSpec = {
   // s ∈ [1.375, 17.625].
   roadFromM: 1.375,
   roadToM: 17.625,
-  triggerDistM: 30,
+  // 30 m + one ball-lead of road at the design speed: the BALL arms here so the
+  // CHILD is still released at the authored 30 m. See the block above.
+  triggerDistM: 30 + HZES_BALL_LEAD_SEC * HZES_DESIGN_MPS,
   // 25 -> 14 with the ETA horizon below: see the block above. The seconds are
   // what this drill teaches; the metres are only the ceiling on them.
   minTriggerSpeedKmh: 14,
-  triggerEtaSec: 2.2,
+  // 2.2 s of child + the ball's half-second head start, so step 3's «около две
+  // секунди» stays the window the child actually gives at every speed.
+  triggerEtaSec: 2.2 + HZES_BALL_LEAD_SEC,
   variant: "child", // R3 P6: the PE-04 figure renders as the small child rig
+  ballLeadSec: HZES_BALL_LEAD_SEC,
 };
 
 /**
@@ -365,6 +426,25 @@ export const SC_HZ_EMERGENCY_STOP: ScenarioSpec = {
     { level: 5, conditions: { weather: "rain" } },
   ],
   staged: [SC_HZ_EMERGENCY_STOP_DART],
+  // THE BALL INSTRUCTION 3 PROMISES (`sc-hz-emergency-stop:e0c4ef23`) — the
+  // `SC_CROSSING_CHILD_BALL` pair, on this map's own geometry: it rolls off the
+  // SAME east kerb the child pushes off, on her line and at her y, 0.5 s ahead
+  // of her (`SC_HZ_EMERGENCY_STOP_DART.ballLeadSec` is what starts it).
+  // 4.5 m/s against her 2.5, so the gap keeps opening across the road — the
+  // cue reads as a cue and not as a second obstacle. travelM 20.5 carries it
+  // over the 16.25 m carriageway and onto the far kerb, where it rests.
+  // RENDER-ONLY: the recorded traces and every grading path are blind to it
+  // (contracts.ts HazardStimulusSpec — TrafficLayer animates, nothing grades),
+  // so the two mistake demos still bill exactly their authored codeRefs.
+  hazard: {
+    kind: "ballDartOut",
+    x: CURB_X,
+    y: DART_Y,
+    dirX: -1,
+    dirY: 0,
+    speedMps: 4.5,
+    travelM: 20.5,
+  },
   conditions: { weather: "dry" },
   // THE CORRECTNESS FIX, not a convenience — see the file header for the full
   // argument. The cause ledger cannot see a staged dart on a crossing-less

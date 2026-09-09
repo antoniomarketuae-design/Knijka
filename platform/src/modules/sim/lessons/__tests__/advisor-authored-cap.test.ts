@@ -503,8 +503,16 @@ describe("the exhibits", () => {
     // recommended speed» and started naming the табела's own 50, which puts it
     // inside the reach of the OLD rule (title + posted-below-gate) as well.
     // The 953 still reconciles, and nothing moved from spoken to silent.
-    expect(oldSpoken).toBe(459);
-    expect(953 - oldSpoken).toBe(494);
+    //
+    // RE-MEASURED 2026-09-09 (sc-speed-transition:0eaa42b5): 459 → 464, by the
+    // same route and for the same reason as the 454 → 459 above. The five are
+    // the five rungs of sc-speed-transition/sc-trn-approach, whose title stopped
+    // saying only «до знака за зоната» and started naming the 50 its own map
+    // recipe posts on the approach (`map.params.approachKmh`, the segment the
+    // gate stands on) — so the OLD rule's title source now reaches it too.
+    // Nothing moved from spoken to silent; the 953 still reconciles.
+    expect(oldSpoken).toBe(464);
+    expect(953 - oldSpoken).toBe(489);
     // The two classes inside that 499.
     expect(noneStated).toBe(169);
     //

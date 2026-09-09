@@ -241,8 +241,15 @@ describe("FR-OFC-CARD — the caption is readable where the decision is made, an
       BUBBLE_LINE_PX.priority,
       BUBBLE_LINE_PX.law,
     );
-    expect(bodyCapPx(smallestBody, D)).toBeGreaterThan(14);
-    expect(bodyCapPx(BUBBLE_LINE_PX.go, D)).toBeGreaterThan(16);
+    // THE FLOORS MOVED UP WITH THE CARD (sc-sig-controller-postures:ef0e821c).
+    // 14 and 16 were what the 1024 px card could reach, and the row filed
+    // against that card says plainly what those numbers buy: ≈4.7 and ≈5.3 CSS
+    // px of cap on a 3× phone, i.e. „tiny … unreadable at native phone size".
+    // Widening the ink box (`BUBBLE_W_M` 3.6 → 4.95 m) lifted the authored
+    // sizes to 18.75 and 21.0 device px, and the floors follow so the gain
+    // cannot be given back by a later edit to `BUBBLE_LINE_PX` alone.
+    expect(bodyCapPx(smallestBody, D)).toBeGreaterThan(18);
+    expect(bodyCapPx(BUBBLE_LINE_PX.go, D)).toBeGreaterThan(20);
     // The headline was never the problem and must not have been shrunk to buy
     // the body lines.
     expect(bodyCapPx(BUBBLE_LINE_PX.headline, D)).toBeGreaterThan(

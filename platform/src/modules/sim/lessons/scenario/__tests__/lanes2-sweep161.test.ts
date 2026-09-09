@@ -45,6 +45,10 @@ import { createEvalState, parseObjectiveParams, stepObjective } from "../../obje
 import type { ObjectiveParams } from "../../types";
 import { makeTick } from "../../__tests__/fixtures";
 import type { ScenarioTrace } from "@/modules/sim/traces/types";
+// The one number both pace floors are derived from — read from the rule config
+// rather than re-typed, so §4's last assertion cannot drift from the product's
+// own definition of an obstruction.
+import { DEFAULT_RULE_CONFIG } from "@/modules/sim/rules";
 import { compileScenario } from "../compile";
 import {
   SC_LN_BOULEVARD_DISCIPLINE,
@@ -322,13 +326,29 @@ describe("§4 the sweep's remaining causes are still exactly where the comments 
     }
   });
 
-  it("the paced leads are still ceiling-only — the treadmill has no floor to author", () => {
-    // maxMatchSpeedMps caps the lead at the player's speed and nothing floors
-    // it, which is why a crawling student gets a crawling „20 km/h" crawler and
-    // a standing truck. A minimum-pace field is the fix and does not exist yet.
-    // What it costs is the drill's STORY, not its gates: none of the six rows
-    // this file and the refutation file defend reads a staged actor, and the
-    // refutation file drives all of them home at 30 % of the shadow's speed.
+  it("the paced leads now carry the FLOOR this test used to pin the absence of", () => {
+    // WHAT THIS ASSERTION USED TO SAY, AND WHY IT SAYS THE OPPOSITE NOW. It
+    // read „the paced leads are still ceiling-only — the treadmill has no floor
+    // to author" and required `minMatch|minPace|floor` to be ABSENT, with the
+    // message «gained a pace floor — re-read the sweep-161 note on it». It was a
+    // tripwire on an unrepaired defect, not a contract: `maxMatchSpeedMps` caps
+    // the lead at the player's speed and nothing floored it, so a crawling
+    // student got a crawling „20 km/h" crawler and a STANDING 57 km/h truck
+    // (.audit-frames/sweep161/sc-ov-crest-curve/mobile-right/04-t172s.png).
+    // Both docs above named the same fix in the same words — „a `minMatchSpeedMps`
+    // floor on the matchPlayer command, in runners.ts / contracts.ts" — and it
+    // has now landed, so the tripwire has done its job and is re-pointed at what
+    // must not drift instead of at what had not happened yet.
+    //
+    // The three things it holds are the three a future edit could quietly break:
+    // that the floor EXISTS on both leads, that it is genuinely BELOW the
+    // ceiling (a floor at the cap is `scheduledCruise` wearing another name, the
+    // failure the LNBD doc rules out), and that it is the ONE number both were
+    // derived from — `DEFAULT_RULE_CONFIG.townCrawlFloorCapKmh` (15 км/ч), the
+    // product's own line between traffic and an obstruction. Nothing here reads
+    // a GATE: as before, none of the six rows this file and the refutation file
+    // defend reads a staged actor, so this is the drill's STORY being pinned.
+    const FLOOR_MPS = DEFAULT_RULE_CONFIG.townCrawlFloorCapKmh / 3.6;
     for (const [spec, id] of [
       [SC_LN_BOULEVARD_DISCIPLINE, "sc-lnbd-crawler"],
       [SC_OV_CREST_CURVE, "sc-ovcc-lead"],
@@ -337,12 +357,14 @@ describe("§4 the sweep's remaining causes are still exactly where the comments 
         | Record<string, unknown>
         | undefined;
       expect(lead, `${spec.id}/${id}`).toBeDefined();
-      expect(lead!["maxMatchSpeedMps"]).toBeTypeOf("number");
+      const cap = lead!["maxMatchSpeedMps"] as number;
+      const floor = lead!["minMatchSpeedMps"] as number;
+      expect(cap).toBeTypeOf("number");
       expect(lead!["paceMode"]).toBeUndefined(); // still the matchPlayer rubber band
-      expect(
-        Object.keys(lead!).some((k) => /minMatch|minPace|floor/i.test(k)),
-        `${spec.id}/${id} gained a pace floor — re-read the sweep-161 note on it`,
-      ).toBe(false);
+      expect(floor, `${spec.id}/${id} lost its pace floor`).toBeTypeOf("number");
+      expect(floor, `${spec.id}/${id}: a floor at or above the cap is a cruise`).toBeLessThan(cap);
+      expect(Math.abs(floor - FLOOR_MPS), `${spec.id}/${id} floor is no longer the crawl line`).
+        toBeLessThanOrEqual(0.01);
     }
   });
 });

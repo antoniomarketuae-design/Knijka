@@ -107,9 +107,11 @@ describe("controller bubble copy (B42)", () => {
   });
 
   it("stays short enough to read on a billboard from the approach", () => {
-    // The bubble canvas is 1024 px wide and these are drawn at 44-46 px; past
-    // ~44 characters a line starts running off the card. A hard cap is cheaper
-    // than discovering it in a frame.
+    // The bubble canvas is 1408 px wide and these are drawn at 56 px; past
+    // ~38 characters a line starts running off the card. A hard cap is cheaper
+    // than discovering it in a frame. (The 40 below is the standing contract
+    // and is 2 characters loose of that — the painter's shrink clamp is what
+    // catches the difference, which is what it is there for.)
     for (const b of CONTROLLER_BUBBLES) {
       expect(b.headlineBg.length, b.posture).toBeLessThanOrEqual(12);
       expect(b.poseBg.length, b.posture).toBeLessThanOrEqual(40);
@@ -126,9 +128,9 @@ describe("controller bubble copy (B42)", () => {
       // is read FROM THE DRIVING SEAT.
       //
       // The cap is derived from a line that has already been rendered and
-      // looked at rather than guessed: `poseBg` is 40 characters at 46 px, and
-      // the law line is drawn at 38 px, so the ink-equivalent budget is
-      // 40 × 46/38 ≈ 48. Today's longest is 43.
+      // looked at rather than guessed: `poseBg` is 40 characters at 56 px, and
+      // the law line is drawn at 50 px, so the ink-equivalent budget is
+      // 40 × 56/50 ≈ 45. Today's longest is 43.
       //
       // The budget STAYS — a line that needs shrinking to fit is still worse
       // copy than one that fits — but it is no longer the only thing standing
@@ -462,8 +464,16 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
     const law = lines[5];
     expect(law.text).toBe(grown); // no ellipsis, no cut — ADR-002
     expect(law.width).toBeLessThanOrEqual(INK_BUDGET);
-    expect(law.sizePx).toBeLessThan(38); // it did shrink
-    expect(law.sizePx).toBeGreaterThanOrEqual(Math.floor(38 * BUBBLE_MIN_FONT_SCALE));
+    // AGAINST THE CONSTANT, NOT A LITERAL. This read `38` — the authored law
+    // size of the 1024 px card — so widening the ink box for
+    // `sc-sig-controller-postures:ef0e821c` (law 38 → 50) failed it while the
+    // behaviour it names, „a citation that outgrows the card is shrunk whole",
+    // was untouched. The assertion is the same claim, sourced where the painter
+    // sources it.
+    expect(law.sizePx).toBeLessThan(BUBBLE_LINE_PX.law); // it did shrink
+    expect(law.sizePx).toBeGreaterThanOrEqual(
+      Math.floor(BUBBLE_LINE_PX.law * BUBBLE_MIN_FONT_SCALE),
+    );
   });
 
   it("past the legibility floor the canvas squeeze still keeps ink on the card", () => {
@@ -476,15 +486,15 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
     drawControllerBubble(canvas, { ...CONTROLLER_BUBBLES[1], lawRef: absurd });
     const law = lines[5];
     expect(law.text).toBe(absurd);
-    expect(law.sizePx).toBe(Math.floor(38 * BUBBLE_MIN_FONT_SCALE));
+    expect(law.sizePx).toBe(Math.floor(BUBBLE_LINE_PX.law * BUBBLE_MIN_FONT_SCALE));
     expect(law.width).toBeLessThanOrEqual(INK_BUDGET);
   });
 
   it("a line that already fits is painted at its authored size (no silent shrink)", () => {
     const { canvas, lines } = recordingCanvas();
     drawControllerBubble(canvas, CONTROLLER_BUBBLES[2]); // „ВНИМАНИЕ" — the short one
-    expect(lines[0].sizePx).toBe(116);
-    expect(lines[1].sizePx).toBe(44);
+    expect(lines[0].sizePx).toBe(BUBBLE_LINE_PX.headline);
+    expect(lines[1].sizePx).toBe(BUBBLE_LINE_PX.pose);
   });
 
   it("NON-VACUITY: the pre-fix painter would have overflowed on today's copy", () => {
@@ -495,7 +505,7 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
     const longest = CONTROLLER_BUBBLES.reduce((a, b) =>
       a.lawRef.length >= b.lawRef.length ? a : b,
     );
-    const unclamped = longest.lawRef.length * EM_PER_CHAR * 38;
+    const unclamped = longest.lawRef.length * EM_PER_CHAR * BUBBLE_LINE_PX.law;
     expect(unclamped).toBeGreaterThan(INK_BUDGET);
   });
 });

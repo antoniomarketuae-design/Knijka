@@ -19,10 +19,10 @@
  * latch window (followBehindM 26 + 4), it latches immediately too. pressureSec
  * therefore runs from t ≈ 0 in EVERY drive and the pass commits at a shared
  * t ≈ 28 s. The pass is a laneShift into the LEFT lane, so:
- *   - shadow (43.8 s) and mistake-crawl-right (43.0 s) run past it and the
+ *   - shadow (41.7 s) and mistake-crawl-right (43.0 s) run past it and the
  *     pass plays out in full into an empty overtaking lane — the beat the
  *     cards describe („трябваше да излиза отляво, за да се измъкне"); the
- *     encounter resolves at t ≈ 36.2 / 34.3 respectively;
+ *     encounter resolves at t ≈ 35.1 / 34.3 respectively;
  *   - mistake-crawl-left is authored to END at t ≈ 20.5, long before the
  *     commit, so the actor is never commanded into the lane the player is
  *     occupying. That is not a workaround dressed as a story — it IS the
@@ -48,7 +48,7 @@
  *
  * RECORDER SPEED HONESTY (traces/recorder.ts — no top-speed cap; only the
  * authored targetKmh, accel 2.2 m/s² and the curve cap a straight never
- * triggers): the authored 110 records its real speed, and the crawl/brake
+ * triggers): the authored 125 records its real speed, and the crawl/brake
  * transitions ride |a| ≈ 2.2–4.6 m/s², far above the crawl detector's 0.5
  * steady band — only the held plateaus grade (the A12 transition exemption).
  *
@@ -74,8 +74,24 @@ const X_CRUISE = 0;
 const X_LEFT = -8.12;
 /** The authored crawl — one speed, two lanes (the template's single variable). */
 const CRAWL_KMH = 40;
-/** The authored flow-speed cruise: well under the posted 140, well over the crawl floor. */
-const FLOW_KMH = 110;
+/**
+ * The authored flow-speed cruise: well under the posted 140, well over the
+ * crawl floor — AND INSIDE THE BAND THE BRIEFING TEACHES.
+ *
+ * sc-mw-min-speed:66e4f566 (major): this was 110 while briefing step 2 and
+ * both task chips said «установи около 120–130 км/ч», so the shadow the
+ * student is invited to watch FIRST — captioned «точно в ритъма» — drove a
+ * different rhythm from the one the lesson demonstrating it teaches. Those
+ * three surfaces moved together on 2026-08-25 and this one was held back
+ * because the drive is a committed byte-gated recording whose staged pass
+ * had to be re-measured rather than assumed. Re-measured now, at 125 (the
+ * middle of the band, and the speed the sibling drill's own shadow drives on
+ * this same motorway — `sp-mw-flow-visible.test.ts` SHADOW): the shadow still
+ * books zero violations and CLEAN_DRIVING, `tick.leadGapM` is still
+ * non-finite on every frame of all three drives, and the flow car's pass
+ * still resolves at t ≈ 35.1 inside a 41.7 s drive.
+ */
+const FLOW_KMH = 125;
 
 // ---------------------------------------------------------------------------
 // The correct demonstration (shadow)
@@ -87,9 +103,9 @@ export function scMwMinSpeedShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Автомагистрала, ограничение 140. Целта не е таванът, а ритъмът на потока — в дясната лента за движение." },
       { kind: "glance", mirror: "rear" },
       // Confident acceleration to flow speed in the RIGHT travel lane. Passes
-      // the sc-mwms-join gate (0, 300) already established at 110.
+      // the sc-mwms-join gate (0, 300) already established at 125.
       { kind: "drive", points: [[X_CRUISE, 15], [X_CRUISE, 340]], targetKmh: FLOW_KMH, stopAtEnd: false },
-      { kind: "annotation", textBg: "Установени 110 км/ч — далеч под тавана и точно в ритъма. Дясната лента е нашата." },
+      { kind: "annotation", textBg: "Установени 125 км/ч — далеч под тавана и точно в ритъма. Дясната лента е нашата." },
       { kind: "glance", mirror: "rear" },
       // Through the sc-mwms-hold gate (0, 640). The flow car's pass commits
       // around here (t ≈ 28) — it goes left, we hold our lane and our speed.

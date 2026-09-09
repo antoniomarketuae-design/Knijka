@@ -108,11 +108,22 @@ describe("sc-mw-min-speed — the shadow gate (doc 76 §5)", () => {
   });
 
   it("really cruises at flow speed in the RIGHT travel lane (the recorder-honesty assert)", () => {
-    // The authored 110 must be REACHED (no silent kinematic rewrite) — and it
+    // The authored 125 must be REACHED (no silent kinematic rewrite) — and it
     // must stay a FLOW speed, not a crawl: comfortably over the authored 50 km/h
     // construction line, comfortably under the posted 140.
-    expect(maxKmh(shadow)).toBeGreaterThan(105);
-    expect(maxKmh(shadow)).toBeLessThan(112);
+    //
+    // THE BAND MOVED WITH THE BRIEFING (sc-mw-min-speed:66e4f566). It used to
+    // be 105–112, i.e. the shadow drove 110 while briefing step 2 and both task
+    // chips taught «около 120–130 км/ч» — the demonstration the student watches
+    // first taught a different rhythm from the lesson demonstrating it. The
+    // expectation is asserted against the band the BRIEFING names rather than
+    // against a bare constant, so the two can never drift apart again silently.
+    const band = /установи[^.]*?(\d+)\s*–\s*(\d+)\s*км\/ч/u.exec(
+      SC_MW_MIN_SPEED.instructionsBg.map((i) => i.textBg).join(" "),
+    );
+    expect(band, "briefing names no settle band for the shadow to match").not.toBeNull();
+    expect(maxKmh(shadow)).toBeGreaterThan(Number(band![1]) - 1);
+    expect(maxKmh(shadow)).toBeLessThan(Number(band![2]) + 1);
     // …and held in the cruise lane: x = 0 throughout (never the left lane at
     // -8.12, never the emergency lane at +8.13).
     for (const s of shadow.trace.samples) {

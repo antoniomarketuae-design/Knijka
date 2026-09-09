@@ -131,6 +131,57 @@ describe("staged vehicle commands", () => {
     }
   });
 
+  // ── THE CEILING'S FLOOR (sc-ov-crest-curve:b26aaa0b) ──────────────────────
+  //
+  // The band's fixed point is `gap = gapM`, where `target === playerSpeed`, so
+  // an unfloored `matchPlayer` lead mirrors the player all the way DOWN. The
+  // audit photographed the end state: a 57 km/h truck STANDING 40 m ahead of a
+  // stopped student on an empty rural road, in a lesson whose whole subject is
+  // deciding whether to overtake it. Two tests, because the repair has to be
+  // true in both directions — the floored lead keeps rolling, and every lead
+  // that was never given one is untouched.
+  it("matchPlayer without a floor still mirrors a stopped player to a standstill", () => {
+    const system = squareSystem();
+    const view = system.stage(SQUARE_CAR)!;
+    system.stagedCommand("car-1", { type: "matchPlayer", gapM: 25, maxSpeedMps: 20 });
+    // A player standing on the lane 25 m behind the actor's hold: the band is
+    // AT its station, so the target is exactly the player's own zero.
+    run(system, 6, ctx({ x: 25, y: -4.06, speedKmh: 0, headingDeg: 90 }));
+    expect(view.speedMps).toBe(0);
+  });
+
+  it("matchPlayer with minSpeedMps keeps a slow lead rolling past a stopped player", () => {
+    const system = squareSystem();
+    const view = system.stage(SQUARE_CAR)!;
+    const sBefore = view.s;
+    system.stagedCommand("car-1", {
+      type: "matchPlayer",
+      gapM: 25,
+      maxSpeedMps: 20,
+      minSpeedMps: 4.17, // the crawl line — DEFAULT_RULE_CONFIG.townCrawlFloorCapKmh
+    });
+    run(system, 6, ctx({ x: 25, y: -4.06, speedKmh: 0, headingDeg: 90 }));
+    // It drives on at the floor and opens the station rather than freezing in
+    // it: that is what leaves the student something to draw level with.
+    expect(view.speedMps).toBeCloseTo(4.17, 2);
+    expect(view.s - sBefore).toBeGreaterThan(15);
+  });
+
+  it("the floor never outruns the ceiling it was authored under", () => {
+    // An authoring slip (floor above cap) must not turn a floor into a lead
+    // FASTER than the author capped — the command clamps to the ceiling.
+    const system = squareSystem();
+    const view = system.stage(SQUARE_CAR)!;
+    system.stagedCommand("car-1", {
+      type: "matchPlayer",
+      gapM: 25,
+      maxSpeedMps: 3,
+      minSpeedMps: 12,
+    });
+    run(system, 6, ctx({ x: 25, y: -4.06, speedKmh: 0, headingDeg: 90 }));
+    expect(view.speedMps).toBeCloseTo(3, 2);
+  });
+
   it("brake slams to a full stop and holds it", () => {
     const system = squareSystem();
     const view = system.stage(SQUARE_CAR)!;

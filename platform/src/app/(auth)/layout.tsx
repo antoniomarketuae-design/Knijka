@@ -33,11 +33,18 @@ export default function AuthLayout({
   return (
     <main
       data-surface="cluster"
-      className="grain relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 text-foreground"
+      className="grain relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 text-foreground short:py-2"
     >
       <div aria-hidden className="pointer-events-none absolute inset-0 hud-grid-fade" />
       <div aria-hidden className="pointer-events-none absolute inset-0 haze" />
 
+      {/* `short:` — THE VARIANT THIS SHELL NEVER GOT (globals.css §short).
+          Measured in WebKit at 852x393, the iPhone 16 held sideways: the panel
+          ran 689px, #password ended at 399 and the submit button at 415-459, so
+          elementFromPoint at its centre returned null — a student saw the e-mail
+          field and neither of the two controls they need next. The utilities
+          below buy back 135px of chrome above the button and nothing else
+          changes: at any normal height every one of them is inert. */}
       <div className="relative w-full max-w-md">
         {/* --enter-i places each block in the shared 70ms choreography; the
             animation only exists inside prefers-reduced-motion: no-preference,
@@ -45,7 +52,7 @@ export default function AuthLayout({
         <Link
           href="/"
           style={step(0)}
-          className="enter mb-7 flex items-center justify-center gap-2 rounded-lg font-display text-lg font-extrabold tracking-tight"
+          className="enter mb-7 flex items-center justify-center gap-2 rounded-lg font-display text-lg font-extrabold tracking-tight short:mb-2"
         >
           <span
             aria-hidden
@@ -63,7 +70,7 @@ export default function AuthLayout({
         <Panel
           corners
           style={step(1)}
-          className="enter p-6 shadow-depth-2 sm:p-7"
+          className="enter p-6 shadow-depth-2 short:p-4 sm:p-7"
         >
           {children}
         </Panel>
@@ -71,7 +78,7 @@ export default function AuthLayout({
         <nav
           aria-label="Правна информация"
           style={step(2)}
-          className="enter mt-6 flex justify-center gap-5"
+          className="enter mt-6 flex justify-center gap-5 short:mt-3"
         >
           <Link
             href="/terms"
