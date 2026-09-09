@@ -517,6 +517,13 @@ export interface RuleEngineState {
   // -- ZONE-BAN data layer (ADR-006 stage 2a) --------------------------------
   /** Casual rest inside an authored В27 no-stopping zone (PK-06). */
   banZoneStop: EpisodeState;
+  /**
+   * The SAME rest, `BAN_ZONE_REST_REGRADE_SEC` later — the second bill that
+   * exists only to reach the charge the teach-first free lesson consumed. Same
+   * condition, same reset, strictly larger sustain, so it can only ever fire
+   * AFTER the bill above and never instead of it.
+   */
+  banZoneStopRegrade: EpisodeState;
   // -- LINE TYPES + BUS LANES (ADR-006 stage 2b) -----------------------------
   /**
    * Fully across the solid осева inside an authored М1 span (OV-04/SN-03
@@ -1444,6 +1451,61 @@ const TOWN_CRAWL_REGRADE_SEC = 10;
 const NEEDLESS_STOP_REGRADE_SEC = 6;
 
 /**
+ * THE SAME TWO DEFECTS, FOR THE REST IN A ZONE WHERE ПРЕСТОЯТ IS FORBIDDEN —
+ * seconds of held illegal rest AFTER the first bill before the breach is
+ * re-graded (ILLEGAL_STOP_IN_BAN_ZONE; audit `sc-pk-double-park:11ddd063`).
+ *
+ * ── WHAT WAS MEASURED, THROUGH THE PRODUCTION STACK AT HEAD ─────────────────
+ * `compileScenario(sc-pk-double-park) → createWorldRuntime(pk-double-v1) →
+ * applyTick → buildLessonResult`, a car that stops in the lane beside the
+ * parked row at y = 130 (inside the authored чл. 98 span [70, 210]) and simply
+ * never moves again:
+ *   coachedMistakes  ILLEGAL_STOP_IN_BAN_ZONE          ×1
+ *   summary.mistakes (empty)                    score 0 наказателни точки
+ * Fifty seconds standing where престоят е забранен, on the lesson whose ENTIRE
+ * subject is that act, priced at nothing. This code is основна, so
+ * `policyForViolation` hands the first bill to the teach-first free
+ * mini-lesson — and `stepEpisode` bills ONCE per rest and never asks again, so
+ * for a student who is shown the card and does not move, that free bill is the
+ * only bill there will ever be.
+ *
+ * That is verbatim `STANDING_DUTY_REGRADE_SEC`'s defect, verbatim
+ * `MOTORWAY_CRAWL_REGRADE_SEC`'s, `BUS_LANE_REGRADE_SEC`'s,
+ * `OFF_CARRIAGEWAY_REGRADE_SEC`'s and `NEEDLESS_STOP_REGRADE_SEC`'s — and this
+ * was the one member of that family with no re-grade sibling. It takes their
+ * answer unchanged: a second episode object with a strictly larger threshold,
+ * marked `regrade`, which `lessons/engine.ts` (`applyTick`, the
+ * `alreadyCharged` guard) DROPS wherever the code has already been charged. So
+ * exam mode is byte-identical (`coach.ts` scores unconditionally there, the
+ * first bill IS the charge, and the re-grade is dropped before it can double
+ * it), and a SECOND rest later in the same drive still costs one act.
+ *
+ * ── THE NUMBER ─────────────────────────────────────────────────────────────
+ * 6 s, the same as the bus lane's, and by the same arithmetic: it is one and a
+ * half times the 4 s `banZoneStopRestSec` that billed him in the first place,
+ * so the re-grade means „he was shown the rule and then went on standing there
+ * for half as long again". Ten seconds of held rest in total.
+ *
+ * ── WHAT IT DELIBERATELY DOES NOT TOUCH ─────────────────────────────────────
+ *  · The detector's ACQUITTALS. Not one moves — the queue lead, the person in
+ *    the path, the stop line / red light and the armed crossing are the same
+ *    predicate (`illegalBanRest`), evaluated once and shared, so a rest that is
+ *    innocent on the first threshold is innocent on the second.
+ *  · The reset. Driving on above `movingSpeedKmh`, or leaving the span, zeroes
+ *    BOTH episodes — a student who answers the card the way `correctiveBg`
+ *    asks („подмини зоната и спри чак след края ѝ") can never be reached by
+ *    this bill.
+ *  · The recorded mistake demos. Measured on the committed traces: the two
+ *    `sc-pk-double-park` demos hold 5,15 s and 5,65 s of rest and the
+ *    `sc-pk-*` shadows rest only outside their spans, so every committed
+ *    recording still grades its authored codes exactly once.
+ *  · The praise gate at the foot of this file, which reads `s.banZoneStop` —
+ *    already `emitted` from the first bill, so a second episode there would be
+ *    redundant (the same reading `OFF_CARRIAGEWAY_REGRADE_SEC` states).
+ */
+const BAN_ZONE_REST_REGRADE_SEC = 6;
+
+/**
  * THE SAME TWO DEFECTS, ON THE BUS LANE — seconds of qualifying travel after
  * the first bill before the breach is re-graded (w13 · lane „rules",
  * sc-ov-bus-lane:b309af77, 2026-08-27).
@@ -1954,6 +2016,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     followingRain: { ...IDLE_EPISODE },
     leadClosing: { ...IDLE_EPISODE },
     banZoneStop: { ...IDLE_EPISODE },
+    banZoneStopRegrade: { ...IDLE_EPISODE },
     solidCross: { ...IDLE_EPISODE },
     busLane: { ...IDLE_EPISODE },
     busLaneCruiseSec: 0,
@@ -2027,6 +2090,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     followingRain: { ...s.followingRain },
     leadClosing: { ...s.leadClosing },
     banZoneStop: { ...s.banZoneStop },
+    banZoneStopRegrade: { ...s.banZoneStopRegrade },
     solidCross: { ...s.solidCross },
     busLane: { ...s.busLane },
     busLaneRegrade: { ...s.busLaneRegrade },
@@ -4486,16 +4550,37 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     !banZoneVruAhead &&
     !banZoneControl &&
     s.crossing === null;
+  // Evaluated ONCE and shared by both thresholds: the re-grade below is the
+  // same breach, so it must not be able to drift apart from the bill on the
+  // predicate that decides whether the car may stand here at all.
+  const banZoneRestReset = tick.noStopZone !== true || speed > cfg.movingSpeedKmh;
   if (
     stepEpisode(
       s.banZoneStop,
       illegalBanRest,
-      tick.noStopZone !== true || speed > cfg.movingSpeedKmh,
+      banZoneRestReset,
       t,
       cfg.banZoneStopRestSec,
     )
   ) {
     events.push(makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t));
+  }
+  // THE RE-GRADE THE FREE LESSON CONSUMED (`BAN_ZONE_REST_REGRADE_SEC` — its
+  // block is the whole derivation). Same condition, same reset, on a sustain
+  // that is strictly larger, so it can only ever fire AFTER the bill above and
+  // exactly once per rest. `regrade: true` is a FACT about the event — „this is
+  // the same breach again" — and `lessons/engine.ts` drops it wherever the code
+  // was already charged, so one held rest can never cost twice.
+  if (
+    stepEpisode(
+      s.banZoneStopRegrade,
+      illegalBanRest,
+      banZoneRestReset,
+      t,
+      cfg.banZoneStopRestSec + BAN_ZONE_REST_REGRADE_SEC,
+    )
+  ) {
+    events.push({ ...makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t), regrade: true });
   }
 
   // Driving in a bus lane (SN-05 „бус лента" — ADR-006 stage 2b): sustained

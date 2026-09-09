@@ -148,6 +148,14 @@
  * either drill, in any sweep, has ever collected the ring row or the maneuver
  * row after it.
  *
+ * ⚠ THE FIRST SENTENCE BELOW IS NO LONGER TRUE, and it is kept because the
+ * rest of the paragraph still is. `RoundaboutParams.exit` landed in wave 26
+ * (guidance-only; grading never reads it), so a template CAN now name its exit
+ * arm — `sc-rbg-exit` did on 2026-09-08 and `sc-rb2-exit` on 2026-09-09, which
+ * is what closes the „neither ever reaches the third exit" clause above. What
+ * remains this file's non-problem is everything after it: the arbitrary snap,
+ * and the ring walk's own lane.
+ *
  * STILL NOT THIS FILE'S TO FIX, and the reason is now arithmetic rather than
  * ownership: `RoundaboutParams` carries one centre and two radii, so no
  * template here can name its exit ARM to the guidance layer. Appending an
@@ -1446,6 +1454,26 @@ export const SC_RB_LANE_CHOICE: ScenarioSpec = {
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator. enterRadiusM 33 admits the whole two-lane band (the
       // outer lane rides 30.06); exitRadiusM 46 sits clear of it.
+      //
+      // THE EXIT IS NAMED, 2026-09-09 (row sc-rb-lane-choice:ffdffd55 — „neither
+      // ever reaches the third exit"), on the sc-rbg-exit precedent one drill up.
+      // Grading is untouched: `RoundaboutParams.exit` is guidance-only and
+      // `stepRoundabout` still credits ANY signalled departure, so naming it can
+      // refuse no drive. What it buys is the RIBBON. Measured at a2c7aec through
+      // the pair the scene calls (`guidanceGoalFor` → `deriveGuidanceRoute`),
+      // handing the row over anywhere on the inner lane from the north mouth on:
+      //   φ 175–245  the leg ended at (−26.00, 0.00) — the WEST MOUTH, on the
+      //              ring — while the objective is not complete until r > 46, so
+      //              the third exit itself, the 20 m of arm between that mouth
+      //              and the radius it completes on, had NO ribbon at all;
+      //   φ 260      past his own exit, the walk carried on to the SOUTH mouth
+      //              (−0.07, −25.99): a further lap drawn as guidance, on the L1
+      //              rung where the HUD says «Следвай синята линия».
+      // (−52, 0) is the west arm's centreline, 52 m from the island — 6 m beyond
+      // `exitRadiusM`, the same margin sc-rbg-exit uses, so the ribbon plainly
+      // crosses the circle the objective completes on. `exitArmRaw` snaps it to
+      // `rb2-e-arm-w` and takes that edge's mouth end (rb2-n-w at (−26, 0),
+      // inside enterRadiusM 33). Held by rb2-exit-ribbon.test.ts.
       params: {
         kind: "completeManeuver",
         maneuver: "roundabout",
@@ -1453,6 +1481,7 @@ export const SC_RB_LANE_CHOICE: ScenarioSpec = {
         y: 0,
         enterRadiusM: 33,
         exitRadiusM: 46,
+        exit: { x: -52, y: 0 },
       },
     },
   ],

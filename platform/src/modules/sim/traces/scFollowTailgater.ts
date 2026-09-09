@@ -50,7 +50,12 @@ export function scFollowTailgaterShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Карай спокойно — в огледалото се появява кола, залепена зад теб." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[RIGHT, 15], [RIGHT, 150]], targetKmh: 42, stopAtEnd: false },
-      { kind: "annotation", textBg: "Лепка отзад. Не наказвай със спирачка — вдигни газта и увеличи дистанцията НАПРЕД." },
+      // The card the template settled on, word for word (templates-following.ts
+      // instruction 4). „Вдигни газта" is this bank's idiom for lifting OFF, but
+      // it only reads that way beside an explicit slow-down cue — and this was
+      // the one caption in the bank that had none, over a leg that drops 42 → 28
+      // km/h, on the one drill whose OWN graded mistake is „Гузно ускоряване".
+      { kind: "annotation", textBg: "Лепка отзад. Не наказвай със спирачка — отпусни плавно газта и остави дистанцията НАПРЕД да порасне." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[RIGHT, 150], [RIGHT, 260]], targetKmh: 28, stopAtEnd: false },
       { kind: "annotation", textBg: "Предната дистанция расте — сега тя поема и твоето спиране, и грешката на лепката. Изнервеният отзад изпреварва и си заминава." },

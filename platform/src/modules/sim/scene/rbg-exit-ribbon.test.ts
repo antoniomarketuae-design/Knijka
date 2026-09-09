@@ -106,7 +106,13 @@ describe("sc-rbg-exit — the ribbon runs OUT of the named exit", () => {
 });
 
 describe("the naming is opt-in — nothing else in the catalogue moved", () => {
-  it("exactly one shipped maneuver row carries an exitPoint, and it is this one", () => {
+  it("only rows that ASKED for it carry an exitPoint — the census, by name", () => {
+    // WAS «exactly one … and it is this one». sc-rb-lane-choice/sc-rb2-exit
+    // joined it on 2026-09-09 (row sc-rb-lane-choice:ffdffd55 — „neither ever
+    // reaches the third exit"): the same repair, on the drill whose own title
+    // names an exit its ribbon stopped short of. The expectation is a CENSUS,
+    // not a count — it exists so a third row cannot arrive unnoticed — so it
+    // gains the name rather than the number being relaxed.
     const named: string[] = [];
     for (const spec of SCENARIO_TEMPLATES) {
       for (const rung of spec.levels) {
@@ -118,7 +124,10 @@ describe("the naming is opt-in — nothing else in the catalogue moved", () => {
         }
       }
     }
-    expect([...new Set(named)]).toEqual(["sc-rb-busy-gap/sc-rbg-exit"]);
+    expect([...new Set(named)].sort()).toEqual([
+      "sc-rb-busy-gap/sc-rbg-exit",
+      "sc-rb-lane-choice/sc-rb2-exit",
+    ]);
   });
 
   it("a roundabout row that names no exit still stops at a mouth, on the ring", () => {
