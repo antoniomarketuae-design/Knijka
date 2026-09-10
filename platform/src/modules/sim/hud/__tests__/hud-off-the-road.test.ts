@@ -690,6 +690,38 @@ describe("row 6 · the route pill and the telltale cue clear the throttle band's
     expect(rule).not.toMatch(/width: \$\{NOTIFY_COLUMN_WIDTH_CSS_COMPACT\};/);
   });
 
+  /**
+   * …AND THE FOURTH TENANT OF THIS CORRIDOR, WHICH GOT HALF THE LANE —
+   * 2026-09-10, while re-verifying `sc-junction-gap:df95401c`.
+   *
+   * `[data-hud="audio-prompt"]` was moved off the corner datum on 2026-08-24
+   * and given the mirror's VERTICAL lane; its right edge was left where it
+   * was. Measured on `.audit-frames/w33/frames/sc-mw-emergency-lane__mobile-
+   * right/04-t100s.png` (852 × 393 at dpr 3): the card lays out [541, 77,
+   * 240 × 115], right edge 781, over «З ОГЛЕДАЛО» and «Д ОГЛЕДАЛО» at 741 —
+   * and its «Разбрах», the one pointer-events control on the card, lands on
+   * two of the three stations the mirror-glance drills grade.
+   *
+   * It is asserted from its OWN rule rather than by adding it to the selector
+   * list above, because that rule also writes `top` and
+   * `mirror-lane-corridor.test.ts` scans `top:` declarations by selector. The
+   * DECLARATIONS are what this row is about, and they must be the same two.
+   */
+  it("the audio card pays the same lane, out of its own compact rule", () => {
+    const at = CSS.search(/\n\s*\[data-sim-compact="on"\] \[data-hud="audio-prompt"\] \{/);
+    expect(at, "the compact audio-prompt rule").toBeGreaterThan(-1);
+    const from = CSS.slice(at);
+    const rule = from.slice(0, from.search(/\n\s*\}/));
+    expect(rule).toContain("right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_VAR});");
+    expect(rule).toContain("width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR});");
+    // The bare width is the defect itself: a 240 px card on a datum whose
+    // right edge is 781 while the stations run 741 → 785.
+    expect(rule).not.toMatch(/width: \$\{NOTIFY_COLUMN_WIDTH_CSS_COMPACT\};/);
+    // …and the vertical lane it was given in 2026-08 is still there: this
+    // repair must not be read as a replacement for that one.
+    expect(rule).toContain("top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN};");
+  });
+
   it("the arithmetic clears station 0 rather than merely moving", () => {
     // Landscape: the lane is 60 (ARC_EDGE_PX 8 + TOUCH_MIN_PX 44 + an 8 px gap
     // wide enough to read as a gap) and the notch inset is a real 59 px.

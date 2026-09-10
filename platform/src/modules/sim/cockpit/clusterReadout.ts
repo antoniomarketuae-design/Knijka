@@ -102,12 +102,37 @@ export function speedDigits(speedKmh: number, count = 3): string[] {
 }
 
 /**
- * Selector label → the one glyph the readout draws. "M2" (manual mode, gear 2)
- * shows "M": the cluster's job is which GATE the driver is in; the ratio is a
- * detail the big letter must not lose legibility to.
+ * Selector label → the one glyph the readout draws. P, R, N and D are drawn as
+ * themselves; "M2" (manual mode, gear 2) draws the RATIO, "2".
+ *
+ * WHY THE RATIO AND NOT THE "M" — sc-pk-stop-vs-park:e788ce46, „one analogue
+ * dial, a digital км/ч and a gear letter". This cell used to take the first
+ * character, so all five manual gears drew the same glyph, and in the cockpit
+ * camera that is the ONLY gear surface there is: `StatusDashboard` renders the
+ * whole `gearLabel` ("M2") but `PlayAreaStyles` folds its `data-hud="speed-block"`
+ * away under `html[data-sim-camera="cockpit"]` — the camera every lesson opens
+ * in — on the recorded trade that „the cluster is also a speedometer". The
+ * trade holds for the speed and it did not hold here: the cluster was showing
+ * strictly less than the label it replaced.
+ *
+ * The half that was dropped is the half that moves. "M" is a constant for the
+ * whole drive — the student chose the „Напреднал" tier and is looking at a
+ * clutch pedal — while the ratio changes every shift and changes what the car
+ * DOES: `vehicle/driveline.ts MANUAL_GEAR_MAX_KMH` revs each gear out at
+ * 30/55/85/115/190 км/ч, and the stall model is manual-only. Bulgarian
+ * category B is examined on a manual (same file), so which gear you are in is
+ * the lesson, not a detail. A real manual's indicator reads P R N 1 2 3 4 5,
+ * and every one of those glyphs is already in `CHAR_SET` — no geometry, no
+ * atlas, one quad, as before.
  */
 export function gearGlyph(gearLabel: string): string {
-  return gearLabel.length > 0 ? gearLabel[0] : "N";
+  if (gearLabel.length === 0) return "N";
+  const ratio = gearLabel[1];
+  // Guarded so an unknown label can never point the quad at a blank cell: a
+  // gear cell drawing nothing reads as a broken instrument (the fallback below
+  // is the same reason "" answers "N").
+  if (gearLabel[0] === "M" && ratio >= "1" && ratio <= "9") return ratio;
+  return gearLabel[0];
 }
 
 /**

@@ -1008,9 +1008,23 @@ ${TOUCH_BAND_CSS_VARS}
          its top edge steps from 8 px to 73.24 (852 × 393), 67.76 (780 × 360),
          64.44 (780 × 340), which is the lane plus its 8 px gutter and nothing
          else. */
+      /* …AND IT PAYS THE FLANK'S LANE TOO — 2026-09-10. The move above bought
+         this card the mirror's VERTICAL lane and left its RIGHT edge on the
+         column datum, which is the same half-repair the [data-hud="follow-
+         hint"] block below records for the route pill. Measured on
+         .audit-frames/w33/frames/sc-mw-emergency-lane__mobile-right/
+         04-t100s.png (852 × 393 at dpr 3): the card lays out [541, 77,
+         240 × 115], right edge 781, straight across «З ОГЛЕДАЛО» and
+         «Д ОГЛЕДАЛО» at 741 — and its «Разбрах», the one pointer-events
+         control on it, sits on top of two of the three graded glance
+         stations. The declarations are byte-for-byte the pair
+         [data-hud="touch-hint"] and the three chips below already ship, for
+         the same reason: only a variable crosses the inline-style cascade
+         (FLANK_LANE_VAR). */
       [data-sim-compact="on"] [data-hud="audio-prompt"] {
         top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN};
-        width: ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT};
+        right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_VAR});
+        width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR});
       }
       /* …and its inner card stops being a one-line strip: in a 240 px column
          the icon, the sentence and the «Разбрах» need three rows, not one. */

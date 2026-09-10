@@ -45,7 +45,8 @@ export interface ClusterDevSeed {
 const MAX_SEED_KMH = 999;
 
 /** The selector labels the cluster knows how to draw (clusterReadout.gearGlyph
- *  takes the first character, and the atlas has cells for exactly these). */
+ *  reduces each to one glyph — the gate letter, or the RATIO in manual — and
+ *  the atlas has cells for exactly those). */
 const GEAR_PATTERN = /^[PRNDM][0-9]?$/;
 
 /**

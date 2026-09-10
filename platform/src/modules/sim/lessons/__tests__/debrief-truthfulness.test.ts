@@ -177,14 +177,33 @@ describe("debrief — teach moments the score is silent about (sc-signal-flashin
   });
 
   /**
-   * THE OTHER DIRECTION. With no teach moment the praise is unchanged — the
+   * THE OTHER DIRECTION. With no teach moment the praise still prints — the
    * channel must not be a blanket suppressor of every clean-drive line.
+   *
+   * RE-AIMED, NOT RELAXED (2026-09-10, `sc-hz-emergency-stop:9d07cc7c`). The
+   * fixture is `unfinishedResult` — a route lesson ended with every objective
+   * still open — and it used to assert «задръж това ниво» on it. That clause
+   * is an instruction to REPEAT the drive, and `debrief.ts`'s good-block now
+   * withholds it on an unfinished route for the same reason it already
+   * withholds it on a teach moment and on a near miss. The EXPECTATION moves
+   * with the product; what the test proves is unchanged and is now proved as a
+   * pair, because the praise LINE is still asserted present here and the
+   * invitation is asserted present on a drive that earned it.
    */
   it("keeps the clean-drive praise when no teach moment was recorded", () => {
     const d = buildDebrief(l2, unfinishedResult([]), { coachedMistakes: [] });
-    expect(d.text).toContain("чисто каране");
-    expect(d.text).toContain("задръж това ниво");
+    expect(d.text).toContain("чисто каране по изпитния лист");
     expect(d.text).not.toContain("Учебни моменти");
+    // The route was never driven, so the invitation to hold THIS standard is
+    // absent — and the card says what to do instead, one block down.
+    expect(d.text).not.toContain("задръж това ниво");
+    expect(d.text).toContain("Какво да упражниш: повтори урока и завърши всички задачи");
+  });
+
+  /** …and a clean drive that DID finish still gets the invitation whole. */
+  it("keeps the invitation on a clean drive that completed its lesson", () => {
+    const d = buildDebrief(l0, resultWithEvents([]));
+    expect(d.text).toContain("задръж това ниво");
   });
 
   /**

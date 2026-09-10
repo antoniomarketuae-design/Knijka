@@ -638,8 +638,38 @@ export function buildDebrief(
      * CLAIM stays true and scoped — the sheet was clean — but a drive the
      * product itself flagged is not one to reproduce.
      */
+    /**
+     * …AND AN UNFINISHED ROUTE REVOKES IT FOR THE THIRD TIME, on the same
+     * sentence and the same reasoning — `sc-hz-emergency-stop:9d07cc7c`.
+     *
+     * MEASURED · sweep161 · `sc-hz-emergency-stop/mobile-wrong/log.txt`, one
+     * card, four lines apart and pointing opposite ways:
+     *
+     *   «не е завършен — остана неизпълнена задача от маршрута»
+     *   «Какво се получи добре: чисто каране без нито едно нарушение —
+     *    задръж това ниво.»
+     *   «Какво да упражниш: повтори урока и завърши всички задачи…»
+     *
+     * That leg is the bot driving BADLY on purpose: top 59 км/ч on a 50 street,
+     * ZERO full stops, all three objectives «–» on a lesson whose subject is
+     * stopping for a child. „задръж това ниво" is an instruction to REPEAT this
+     * drive, and the same card two lines down tells him to do the opposite.
+     *
+     * THE CENSUS, over every sweep161 leg whose log carries the sentence: 123
+     * print it and 45 of those did not complete their route — 34 of the 45 are
+     * `-wrong` legs. So the invitation was going to the deliberately-bad bot
+     * three times in four times it was misplaced.
+     *
+     * SCOPED LIKE ITS TWO SIBLINGS ABOVE: the CLAIM stays — the sheet really
+     * was clean and the other branch says so in full — and only the invitation
+     * comes off. No number moves (score, verdict, stars and XP are untouched),
+     * and the reason is already on the card: «Какво да упражниш: повтори урока
+     * и завърши всички задачи от маршрута» prints directly under it, so this is
+     * not a bare withdrawal (THEO-4). A lesson with no tasks at all completes
+     * vacuously and is unaffected.
+     */
     goodBlock.push(
-      coached.length > 0 || nearMissCount > 0
+      coached.length > 0 || nearMissCount > 0 || !result.completedAll
         ? "Какво се получи добре: чисто каране по изпитния лист — нито едно нарушение не влезе в точките."
         : "Какво се получи добре: чисто каране без нито едно нарушение по изпитния лист — задръж това ниво.",
     );

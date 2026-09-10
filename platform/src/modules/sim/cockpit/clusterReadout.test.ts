@@ -89,11 +89,27 @@ describe("gear glyph", () => {
     expect(gearGlyph("D")).toBe("D");
   });
 
-  it("manual mode shows the gate letter, not the ratio", () => {
-    // „M2" → „M": the cluster's job is WHICH GATE, and the big letter must not
-    // trade legibility for a detail. This is one of the unreadable reels.
-    expect(gearGlyph("M2")).toBe("M");
-    expect(gearGlyph("M4")).toBe("M");
+  it("manual mode shows the RATIO, because the gate letter is a constant", () => {
+    // EXPECTATION MOVED (sc-pk-stop-vs-park:e788ce46) — it used to read „M2"
+    // → „M". Nothing about legibility changed: this is still ONE glyph in the
+    // same cell. What changed is WHICH glyph, and the old one was a constant.
+    // In the cockpit camera this cell is the only gear surface on the screen
+    // (`PlayAreaStyles` folds `[data-hud="speed-block"]` under
+    // `html[data-sim-camera="cockpit"]`), so drawing „M" for all five gears
+    // meant the ratio was on no surface at all — while `MANUAL_GEAR_MAX_KMH`
+    // revs each gear out at a different speed. See `gearGlyph`'s docblock.
+    expect(gearGlyph("M1")).toBe("1");
+    expect(gearGlyph("M2")).toBe("2");
+    expect(gearGlyph("M4")).toBe("4");
+    expect(gearGlyph("M5")).toBe("5");
+  });
+
+  it("a bare M — and any label the atlas has no ratio for — still draws a glyph", () => {
+    // The guard exists so an unexpected label can never point the quad at the
+    // blank cell: `charCell` falls back to " ", and an empty gear cell reads as
+    // a broken instrument.
+    expect(gearGlyph("M")).toBe("M");
+    expect(gearGlyph("MX")).toBe("M");
   });
 
   it("an empty label falls back to N rather than drawing nothing", () => {
