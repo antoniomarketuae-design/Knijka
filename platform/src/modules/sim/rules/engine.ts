@@ -4563,7 +4563,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       cfg.banZoneStopRestSec,
     )
   ) {
-    events.push(makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t));
+    events.push(makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t, { detail: tick.noStopBasis }));
   }
   // THE RE-GRADE THE FREE LESSON CONSUMED (`BAN_ZONE_REST_REGRADE_SEC` — its
   // block is the whole derivation). Same condition, same reset, on a sustain
@@ -4580,7 +4580,14 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       cfg.banZoneStopRestSec + BAN_ZONE_REST_REGRADE_SEC,
     )
   ) {
-    events.push({ ...makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t), regrade: true });
+    // THE SAME `detail` AS THE BILL ABOVE, and it is not optional garnish: the
+    // re-grade is the SAME breach, so a basis on one and not the other would
+    // print two different laws for one held rest — the wire.ts/FaultCard defect
+    // this file already records twice (the WRONG_WAY note ~1798).
+    events.push({
+      ...makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t, { detail: tick.noStopBasis }),
+      regrade: true,
+    });
   }
 
   // Driving in a bus lane (SN-05 „бус лента" — ADR-006 stage 2b): sustained

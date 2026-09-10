@@ -209,6 +209,49 @@ export type SimTickEvent =
  *   (signs/zones already resolved by the engine).
  * - `events` are the discrete events since the previous tick, in order.
  */
+
+/**
+ * WHY A NO-STOPPING SPAN IS A NO-STOPPING SPAN — one authored clause per span,
+ * carried to the card as `ViolationEvent.detail` and resolved to a RETRIEVED
+ * citation by `catalog.ts NO_STOP_BASIS_COPY`.
+ *
+ * IT IS AN ENUM AND NOT THE WORLD DOC'S OWN `lawRef` STRING, and that is the
+ * load-bearing choice rather than a stylistic one. The authored refs in
+ * `content/world/*.json meta.scenario.banZonesY[]` are themselves miscited
+ * against the retrieved чл. 98: pk-banx's two JUNCTION spans say «т. 2» (which
+ * is «до престояващо или паркирано ППС»), its zebra span and lot-zebra say
+ * «т. 1» (the generic obstruction clause), and pk-rail says a bare «чл. 98».
+ * Piping those strings into the card — the obvious shortcut — would replace one
+ * miscitation with five. An enum can only ever select a REVIEWED catalogue row.
+ *
+ * NOT SPLIT sign/law ONLY. A student who stopped three metres before a zebra
+ * must be told about the zebra (THEO-4, doc 64): «чл. 98 in general» is a
+ * verdict with a citation stapled to it, and the four law spans in the corpus
+ * break four DIFFERENT точки. The author already knows which one — they
+ * hand-wrote it into the span's `signRef` prose.
+ *
+ * "law-busstop" IS DELIBERATELY ABSENT. pk-busstop-v1 authors two `noStopping`
+ * spans citing «чл. 98, ал. 1», but ал. 1 contains no bus-stop clause at all,
+ * and the only spirka clause in the act — ал. 2, т. 3 — sits under a chapeau
+ * that bans ПАРКИРАНЕТО, not престоя. Its real basis would be the зигзаг
+ * МАРКИРОВКА (чл. 6, т. 1), and that map ships `markings: null`, so nothing is
+ * painted for the student to have read. That is a content-truth ruling for the
+ * founder, not an engineering choice, so the map keeps the pooled row until it
+ * is made — see the report accompanying this change. The union is left open to
+ * gain "law-marking" without a schema break.
+ */
+export type NoStopBasis =
+  /** A real В27 plate governs the span (чл. 6, т. 1 — the duty to obey it). */
+  | "sign"
+  /** чл. 98, ал. 1, т. 2 — до престояващо или паркирано ППС. pk-double-v1. */
+  | "law-alongside"
+  /** чл. 98, ал. 1, т. 6 — на кръстовище и на по-малко от 5 м от него. */
+  | "law-junction"
+  /** чл. 98, ал. 1, т. 5 — на пешеходна пътека и на 5 м преди нея. */
+  | "law-crossing"
+  /** чл. 98, ал. 1, т. 4 — върху/в близост до релсите. pk-rail-v1. */
+  | "law-rail";
+
 export interface SimTick {
   /** Seconds since session start. Monotonic. */
   t: number;
@@ -498,6 +541,38 @@ export interface SimTick {
   /** Inside an authored В27 no-stopping span (престоят и паркирането са
    * забранени). Read by the ILLEGAL_STOP_IN_BAN_ZONE detector. */
   noStopZone?: boolean;
+  /**
+   * WHICH RULE BANS THE STOP IN THAT SPAN — the discriminator that decides
+   * which law the card cites, and NOTHING ELSE. It arms no detector: the bill
+   * still keys on `noStopZone === true` alone, so no drive changes shape, no
+   * event count moves and no severity moves. It only selects which TRUE
+   * sentence a convicted student reads.
+   *
+   * WHY IT HAD TO EXIST (ADR-002). The pooled row says «под знак В27» and
+   * cites чл. 6, т. 1 — the duty to obey A SIGN. Five shipped districts author
+   * a span whose ban is in the STATUTE and needs no plate at all: pk-double-v1
+   * (до спряло ППС), pk-banx-v1 (кръстовище ×2 + пешеходна пътека), pk-rail-v1
+   * (релси ×2) and lot-zebra-v1 (пътека в паркинг алея). sc-pk-double-park's
+   * own instruction says the ban is written by the parked cars «със или без
+   * знак», and then the card that charges three точки answered with the law
+   * for a sign that is not the reason. See `catalog.ts NO_STOP_BASIS_COPY`,
+   * where every clause is quoted from `content/law/acts/zdvp.json`.
+   *
+   * ABSENT = THE POOLED В27 ROW, BYTE-IDENTICALLY, and that default is the
+   * conservative one rather than the convenient one: six districts (d2-v1,
+   * hz-accident-v1, pe-clear-v1, pe-slow-v1, pk-ban-v1, pk-ban2-v1) really do
+   * post a plate, so defaulting to a чл. 98 clause would print the SAME lie
+   * inverted, on more maps than it fixes. `actCopy` already returns null for
+   * an undefined detail, so absent costs no code and cannot drift — and the
+   * content gate `world/__tests__/no-stop-basis-declared.test.ts` is what makes
+   * the default honest, by failing the build if a law-basis span omits it.
+   *
+   * NOT DERIVED FROM `DistrictZone.signRef`: that field is documented free-text
+   * provenance ("the runtime grades off `kind` alone"), and `clipPlanBuilder`
+   * was already burned treating it as structured. Making free text load-bearing
+   * for a legal citation is the defect this channel repairs, one layer down.
+   */
+  noStopBasis?: NoStopBasis;
   /** Inside an authored В28 no-parking span. SURFACE-ONLY in this slice: a
    * short престой under В28 is LEGAL, and parking vs престой cannot be told
    * apart with current telemetry (the same A12 bar that deferred the generic

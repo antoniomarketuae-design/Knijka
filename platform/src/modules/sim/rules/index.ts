@@ -17,6 +17,9 @@ export {
   type IndicatorState,
   type LaneArrow,
   type MirrorKind,
+  /** Which rule bans the stop in a `noStopping` span — the citation
+   *  discriminator authored on the zone (see catalog.ts NO_STOP_BASIS_COPY). */
+  type NoStopBasis,
   type RuleEngineConfig,
   type RuleEvent,
   type ScorableEvent,
@@ -33,6 +36,14 @@ export {
 export {
   COLLISION_CONTACT_COPY,
   COMMENDATIONS,
+  /**
+   * ILLEGAL_STOP_IN_BAN_ZONE's five bases and their RETRIEVED citations. Same
+   * reason as the two act tables below: a surface that groups or checks faults
+   * must be gated against the table the engine and `rebuildRuleEvents` build
+   * from, never against a copy of the sentence. See catalog.ts for the defect
+   * (a чл. 98 span charged under the law for a В27 plate).
+   */
+  NO_STOP_BASIS_COPY,
   VIOLATIONS,
   /**
    * THE ACT, NOT THE CODE. Two contacts and three rail acts share one code each

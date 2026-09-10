@@ -8,6 +8,9 @@
  */
 
 import { TERRAIN_MARGIN_M } from "../world/builders/constants";
+import type { NoStopBasis } from "../rules/types";
+
+export type { NoStopBasis };
 
 export interface DistrictNode {
   id: string;
@@ -260,6 +263,22 @@ export interface DistrictZone {
    *  stage 3a: "А34" guarded / "А35" unguarded rail crossing) — provenance +
    *  (future) rendering; the runtime grades off `kind` alone. */
   signRef: string;
+  /**
+   * noStopping only (BAN-BASIS slice): WHICH RULE bans the stop in this span.
+   * The runtime publishes it as `SimTick.noStopBasis` and the rules catalogue
+   * resolves it to a RETRIEVED citation; it arms no detector and changes no
+   * grade — see `rules/types.ts NoStopBasis` for the whole derivation.
+   *
+   * ABSENT = a real В27 plate governs the span, which is what the pooled card
+   * has always said, so every map that does not author it is byte-identical.
+   * A law-implied span (чл. 98, ал. 1) MUST declare it, and the content gate
+   * `world/__tests__/no-stop-basis-declared.test.ts` fails the build if one
+   * does not. Other kinds ignore the field.
+   *
+   * DELIBERATELY NOT INFERRED FROM `signRef`, three lines up: that string is
+   * documented free-text provenance, and a legal citation must not rest on it.
+   */
+  basis?: NoStopBasis;
   /**
    * railCrossing only (stage 3a): true = GUARDED crossing (barriers/РЖ lamps
    * — doc 72 RX-01). Legal asymmetry (ЗДвП чл. 51–53): an UNGUARDED crossing

@@ -752,7 +752,23 @@ describe("5 · RED MEANS „CLOSING ON SOMETHING CLOSE“ — both halves", () =
     // recording changed because the DRILL changed: `MirrorGlanceKind` grew
     // `"shoulder"`, so „Огледало и през ЛЯВО РАМО преди изнасянето" is now
     // performed instead of being mimed with the interior mirror.
-    expect(samples).toBe(36375);
+    //
+    // 36 375 → 36 366 on 2026-09-10: `sc-park-zebra`'s `mistake-park-after`
+    // was RE-AIMED, and the census moved by exactly that one drive (765 → 756
+    // samples; every other recording in the corpus is byte-identical — the
+    // sibling `shadow-correct` file changed only in an annotation STRING and
+    // kept all 922 of its samples). The drill used to bill the student for
+    // resting 5 m PAST the zebra, on a `noStopping` span authored to y = +8;
+    // чл. 98, ал. 1, т. 5 is «на пешеходни или велосипедни пътеки и на
+    // разстояние, по-малко от 5 метра ПРЕДИ тях» (retrieved:
+    // content/law/acts/zdvp.json) and reaches no ground past a пътека, so the
+    // span now ends at the paint's far edge (+3.0) and the demo stops where
+    // the offence is real — rest y 3.709 → 2.351, with 2.67 m of the body
+    // still on the paint. A shorter approach and a 1.36 m shorter run are the
+    // 9 samples. `badgeUp` and `red` below are UNCHANGED by them, and that is
+    // the check on this story rather than a coincidence: the dropped frames are
+    // forward approach samples in the open aisle, nowhere near the car behind.
+    expect(samples).toBe(36366);
     // …and the badge is up for all eight of them (4 350 → 4 358): the beat is
     // a braked pause in the parallel slot with the car behind still inside the
     // cue's range, so the badge state does not change — only its duration.

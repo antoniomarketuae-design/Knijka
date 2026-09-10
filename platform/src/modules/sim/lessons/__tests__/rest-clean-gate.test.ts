@@ -171,7 +171,16 @@ describe("§3 requireRestClean 'banZone' — the billed rest, which is what w16 
     // bills the основна instead of coaching it — the state the w16 frame was
     // in, where the repeat had already spent the free mini-lesson.
     const out = drive("mistake-stop-before-crossing", 1, true);
-    expect(out.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
+    // THE ACT IS NOW NAMED, exactly as §1's rail row above already names
+    // «/stopped-on-track»: same one violation, same code, same −3 — but the
+    // event carries the BASIS of the ban it broke (BAN-BASIS slice). pk-rail's
+    // spans are law-implied, so the card cites ЗДвП чл. 98, ал. 1, т. 4
+    // («върху трамвайни и железопътни линии или в такава близост до тях…»)
+    // instead of чл. 6, т. 1 and a В27 plate this map does not carry. The
+    // assertion is unchanged in what it demands; it just stopped being blind to
+    // which act was billed — and this drive is the end-to-end evidence that the
+    // authored basis survives the recording, the runtime and the session.
+    expect(out.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE/law-rail"]);
     expect(out.done["sc-pkr-past-zone"]).toBe(false);
   });
 });

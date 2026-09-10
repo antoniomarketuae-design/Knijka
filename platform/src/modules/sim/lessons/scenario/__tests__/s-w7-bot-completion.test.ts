@@ -49,10 +49,12 @@ function loadDistrict(id: string): unknown {
 }
 
 // ---------------------------------------------------------------------------
-// sc-pk-rail-ban — the drill is won by NOT STOPPING ANYWHERE for 106 metres:
-//                  чл. 98 owns the fifty metres either side of the rails, and
-//                  the rails own themselves. Six metres apart, the same excuse
-//                  is основна and then опасна — that gap IS the template.
+// sc-pk-rail-ban — the drill is won by NOT STOPPING ANYWHERE across the whole
+//                  crossing: чл. 98, ал. 1, т. 4 owns the two metres either side
+//                  of the RAILS (201.21 / 204.79, less the metres the band takes
+//                  — 2026-09-10, when the 50 m myth came out), and the rails own
+//                  themselves. A car length apart, the same excuse is основна and
+//                  then опасна — that gap IS the template.
 // ---------------------------------------------------------------------------
 
 describe("wave-7 bot completion — sc-pk-rail-ban at L3", () => {

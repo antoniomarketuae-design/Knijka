@@ -62,7 +62,7 @@
    "banZonesY": [
     {
      "id": "pkd-z-second-line",
-     "lawRef": "ЗДвП чл. 98, ал. 1",
+     "lawRef": "ЗДвП чл. 98, ал. 1, т. 2",
      "fromY": 70,
      "toY": 210
     }
@@ -482,6 +482,7 @@
   {
    "id": "pkd-z-second-line",
    "kind": "noStopping",
+   "basis": "law-alongside",
    "edgeId": "pkd-e-street",
    "fromM": 70,
    "toM": 210,

@@ -27,13 +27,14 @@ import type {
   VehicleSample,
   WorldRuntime,
 } from "../contracts";
-import type { SimTick, SimTickEvent } from "../rules/types";
+import type { NoStopBasis, SimTick, SimTickEvent } from "../rules/types";
 import {
   BG_URBAN_DEFAULT_KMH,
   parseDistrict,
   worldEdgeClearanceM,
   type District,
 } from "./district";
+import { PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M } from "../collision/bodies";
 import { Locator } from "./locator";
 import { DistrictIndex, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
 import { bearingDeg, signedDeltaDeg } from "./geometry";
@@ -1077,6 +1078,16 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     | "railCrossing"
     | "curveAdvisory"
     | "emergencyLane";
+  /** The reviewed clauses, as a runtime guard — the authored string is data. */
+  const NO_STOP_BASES = new Set<string>([
+    "sign",
+    "law-alongside",
+    "law-junction",
+    "law-crossing",
+    "law-rail",
+  ]);
+  const isNoStopBasis = (v: unknown): v is NoStopBasis =>
+    typeof v === "string" && NO_STOP_BASES.has(v);
   const KNOWN_ZONE_KINDS = new Set<string>([
     "noStopping",
     "noParking",
@@ -1096,6 +1107,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     railBarrier: { cycleSec: number; downFromSec: number; downToSec: number } | null;
     /** curveAdvisory only (curve-envelope slice): validated advisory, km/h. */
     advisoryKmh: number;
+    /** noStopping only (BAN-BASIS slice): WHICH RULE bans the stop, or null
+     *  when the span declares nothing (= a real В27 plate, the pooled card).
+     *  The one place the authored basis survives the parse — `signRef` does
+     *  NOT, deliberately, and that is why a citation cannot rest on it. */
+    noStopBasis: NoStopBasis | null;
   }
   const banZonesByEdge = new Map<number, ZoneSpan[]>();
   // Render seam (railBarrierDownAt): one entry per GUARDED railCrossing span,
@@ -1149,6 +1165,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         ? { cycleSec: b.cycleSec, downFromSec: b.downFromSec, downToSec: b.downToSec }
         : null,
       advisoryKmh: z.kind === "curveAdvisory" ? (z.advisoryKmh as number) : 0,
+      // BAN-BASIS slice. Validated the way every optional zone field on this
+      // loop is: an unrecognised string is DROPPED to null rather than carried,
+      // so a data slip falls back to the pooled В27 card instead of selecting a
+      // clause nobody reviewed (the advisoryKmh / rail-timetable tolerance).
+      noStopBasis:
+        z.kind === "noStopping" && isNoStopBasis(z.basis) ? z.basis : null,
     });
     if (guarded) {
       const [bx, by] = index.pointAt(host.idx, z.fromM);
@@ -2445,6 +2467,110 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           // next-stop-line context runs. Computed lazily: only frames on a
           // rail-carrying edge OUTSIDE the band pay for it.
           let railTravelSign: 1 | -1 | 0 = 0;
+          // A CAR IS A BODY, AND «НА ПЕШЕХОДНА ПЪТЕКА» IS ABOUT THE BODY.
+          //
+          // Every flag on this loop is resolved from the committed lane fix —
+          // a POINT — and for a ban that runs tens of metres that is the right
+          // referent. For чл. 98, ал. 1, т. 5 it is not, and lot-zebra-v1 is
+          // where it broke in the open. Retrieved verbatim
+          // (content/law/acts/zdvp.json, unit ref "чл. 98"): «5. на пешеходни
+          // или велосипедни пътеки и на разстояние, по-малко от 5 метра преди
+          // тях». The first limb bans standing ON the marking, and the marking
+          // is 6.0 m long (ZEBRA_LENGTH_M) against a 4.04 m car — so „is the
+          // vehicle on the пътека" and „is the vehicle's CENTRE on the пътека"
+          // are different questions, and the law asks the first one.
+          //
+          // MEASURED, lot-zebra-v1: the span is y ∈ [−8, +3] (the paint plus
+          // the five metres BEFORE it — see gen_parking_lot.mjs for why it is
+          // not symmetric). A car resting in the free bay lotzb-bay-4, centre
+          // y = 3.75, has its body at y ∈ [1.73, 5.77]: 1.27 m of car standing
+          // on the zebra. The point test read sM 33.75 against toM 33 and
+          // acquitted it, while the drill's own briefing step 3 tells the
+          // student that slot is «върху пътеката». Teach and grade disagreed.
+          //
+          // THIS DOES NOT WIDEN THE BANNED GROUND, and that distinction is the
+          // whole reason the fix is allowed to exist: the span is still
+          // [fromM, toM] to the millimetre, and «5 метра СЛЕД пътеката» —
+          // which the previous round removed because чл. 98, ал. 1 does not
+          // contain it — stays removed. What changes is WHO is measured
+          // against it: the car instead of a point inside the car. At the far
+          // end that means a rear bumper on the paint is on the paint; at the
+          // near end it means the «по-малко от 5 метра преди» distance is
+          // measured from the nose, which is the part of the car that is
+          // actually that far from the crossing. Both are the same article,
+          // read the way it is written.
+          //
+          // NO-STOPPING SPANS ONLY. The other span kinds on this loop
+          // (noOvertaking, solidCenterLine, curveAdvisory, emergencyLane,
+          // busLane) grade a MOVING car's position, where the lane fix is the
+          // referent the law and every existing expectation use; a body test
+          // there would arm an overtaking ban two metres early on a different
+          // rule's authority. `noParking` is left alone for the same reason it
+          // never convicts at all (В28 — престоят е разрешен; see the reducer).
+          //
+          // The half-extent is the standard SAT projection of the body box
+          // onto the edge tangent (collision/obb.ts `extentAlong`, same
+          // formula), so a car standing at an angle to the aisle is measured
+          // by the reach it actually has along the road rather than by its
+          // full length. Computed at most once per frame, and only on a frame
+          // that is already inside a `noStopping`-carrying edge's span list.
+          let banBodyHalfM = -1;
+          const bodyHalfAlongEdge = (): number => {
+            if (banBodyHalfM >= 0) return banBodyHalfM;
+            const [btx, bty] = index.tangentAt(fix.edgeIdx, fix.sM);
+            const h = (v.headingDeg * Math.PI) / 180;
+            const bfx = Math.sin(h);
+            const bfy = Math.cos(h);
+            banBodyHalfM =
+              PLAYER_HALF_LENGTH_M * Math.abs(bfx * btx + bfy * bty) +
+              PLAYER_HALF_WIDTH_M * Math.abs(bfy * btx - bfx * bty);
+            return banBodyHalfM;
+          };
+          // THE RAIL BAND OWNS ITS OWN METRES — one act, one code (F2).
+          //
+          // pk-rail-v1 is the only district where a `noStopping` span and a
+          // `railCrossing` band share an edge, and the two layers are authored
+          // to ABUT: чл. 98, ал. 1, т. 4 spans up to the band edge, the band
+          // from there on, „no legal metre between and no double-billed one
+          // either" (tools/maps/gen_pk_rail.mjs). ABUTTING IN THE DATA IS NOT
+          // ENOUGH, because the two tests have different referents: the band is
+          // read from the lane fix (a POINT) and a no-stopping span from the
+          // vehicle's reach (a BODY, the block above). A car resting on the
+          // deck overhangs the span behind it, so it armed noStopZone AND
+          // railCrossing "on" — and `rules/engine.ts` bills those separately
+          // (ILLEGAL_STOP_IN_BAN_ZONE основна 3 + RAIL_CROSSING_VIOLATION
+          // опасна 10) with nothing between them to notice. MEASURED before the
+          // fix, at heading 0 where the body half-extent is PLAYER_HALF_LENGTH_M
+          // = 2.02 m: y = 200, 201, 202, 204, 205 and 206 all reported
+          // noStopZone true INSIDE the band — 4.04 m of a 6 m deck billed twice
+          // for one act, while the district header and the battery both claimed
+          // each metre bills exactly one code.
+          //
+          // So the band wins its own ground outright: no `noStopping` span arms
+          // on a metre a `railCrossing` span already covers. It is the GRAVER
+          // and the more specific of the two (and the one with no queue
+          // exemption), the student is told the worse thing he did rather than
+          // both, and the ban keeps every metre outside the band — including
+          // the ones it reaches only through the body test, which is where the
+          // act's «2 метра преди първата релса» actually lands.
+          //
+          // NOT A GENERAL PRECEDENCE RULE. It is scoped to railCrossing because
+          // that kind is the only span whose OWN detector already convicts the
+          // rest that a ban span would convict; two `noStopping` spans still
+          // compose, and no other pair on this loop grades the same act twice.
+          let railBandHere: boolean | null = null;
+          const onRailBand = (): boolean => {
+            if (railBandHere !== null) return railBandHere;
+            railBandHere = false;
+            for (let j = 0; j < spans.length; j++) {
+              const r = spans[j];
+              if (r.kind === "railCrossing" && fix.sM >= r.fromM && fix.sM <= r.toM) {
+                railBandHere = true;
+                break;
+              }
+            }
+            return railBandHere;
+          };
           for (let i = 0; i < spans.length; i++) {
             const z = spans[i];
             if (z.kind === "railCrossing") {
@@ -2482,9 +2608,26 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
               }
               continue;
             }
-            if (fix.sM >= z.fromM && fix.sM <= z.toM) {
-              if (z.kind === "noStopping") tick.noStopZone = true;
-              else if (z.kind === "noParking") tick.noParkZone = true;
+            // The rail band's ground is the rail zone's alone (the block above).
+            if (z.kind === "noStopping" && onRailBand()) continue;
+            // The BODY reach for a no-stopping span (the block above), a bare
+            // point for every other kind.
+            const zHalf = z.kind === "noStopping" ? bodyHalfAlongEdge() : 0;
+            if (fix.sM + zHalf >= z.fromM && fix.sM - zHalf <= z.toM) {
+              if (z.kind === "noStopping") {
+                tick.noStopZone = true;
+                // BAN-BASIS slice: which rule the card must cite. OVERLAPPING
+                // SPANS COMPOSE BY FIRST-DECLARED — the same span-array order
+                // every flag on this loop already uses, and it matters on
+                // pk-banx-v1, whose junction and crossing spans can be metres
+                // apart. A span that declares nothing NEVER clears a basis an
+                // earlier span set: an undeclared span means „a plate governs
+                // this", which is the pooled row, and the pooled row is what an
+                // absent basis already resolves to.
+                if (z.noStopBasis !== null && tick.noStopBasis === undefined) {
+                  tick.noStopBasis = z.noStopBasis;
+                }
+              } else if (z.kind === "noParking") tick.noParkZone = true;
               else if (z.kind === "noOvertaking") tick.noOvertakeZone = true;
               else if (z.kind === "solidCenterLine") tick.solidCenterLine = true;
               else if (z.kind === "curveAdvisory") {

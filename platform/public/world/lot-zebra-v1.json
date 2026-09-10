@@ -235,8 +235,9 @@
    "kind": "noStopping",
    "edgeId": "lotzb-e-aisle",
    "fromM": 22,
-   "toM": 38,
-   "signRef": "ЗДвП-98-1-1"
+   "toM": 33,
+   "signRef": "ЗДвП-98-1-5",
+   "basis": "law-crossing"
   }
  ]
 }

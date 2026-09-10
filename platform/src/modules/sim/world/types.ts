@@ -14,6 +14,7 @@
  */
 
 import type { ParkingBaySpec } from "../contracts";
+import type { NoStopBasis } from "../rules/types";
 
 // ---------------------------------------------------------------------------
 // district-v1.json shapes
@@ -295,6 +296,9 @@ export interface DistrictZone {
   fromM: number;
   toM: number;
   signRef: string;
+  /** noStopping only: WHICH RULE bans the stop (BAN-BASIS slice). Absent = a
+   *  real В27 plate; a чл. 98 span declares its точка — runtime/district.ts. */
+  basis?: NoStopBasis;
   /** railCrossing only: guarded (А34) vs unguarded (А35) — runtime/district.ts. */
   guarded?: boolean;
   /** railCrossing + guarded only: deterministic periodic barrier timetable. */

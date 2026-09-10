@@ -19,6 +19,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import type { VehicleSample } from "../../../contracts";
+import { PLAYER_HALF_LENGTH_M } from "../../../collision/bodies";
+import { createRuleEngine, reduceTick, type RuleEvent, type ViolationEvent } from "../../../rules";
+import { createWorldRuntime } from "../../../runtime";
 import { REACH_ZONE_GRACE_M, REACH_ZONE_HALT_CAP_KMH } from "../../objectives";
 import { compileScenario } from "../compile";
 import { SCENARIO_TEMPLATES_PARKING3 } from "../templates-parking3";
@@ -386,5 +390,224 @@ describe("§4 — a halt gate's backward grace reaches behind the space it names
       reaching.every((r) => /@L[1-5]:/.test(r)),
       "the reach is rung-dependent; it is not",
     ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §5 — the briefing names two unlawful free slots; the grading must reach them
+// ---------------------------------------------------------------------------
+
+/**
+ * THE TEACH/GRADE CONTRADICTION THIS GATE EXISTS TO KEEP CLOSED (2026-09-10).
+ *
+ * sc-park-zebra briefing step 3 tells the student «две свободни места не стават
+ * — едното е ВЪРХУ ПЪТЕКАТА, другото в петте метра преди нея». Both halves are
+ * true of the committed world:
+ *
+ *   · lotzb-bay-3, centre y = −5.25, rect y ∈ [−8.00, −2.50] — wholly inside
+ *     the чл. 98 span, the «пет метра преди» limb;
+ *   · lotzb-bay-4, centre y = 3.75, rect y ∈ [1.00, 6.50] — its first 2.00 m
+ *     lie on the zebra's paint (y ∈ [−3, +3]: ZEBRA_LENGTH_M = 6.0, laid
+ *     symmetrically about the node by markings.ts). A car centred in it stands
+ *     at y ∈ [1.73, 5.77], with 1.27 m of body ON the пешеходна пътека.
+ *
+ * THE GRADING DID NOT REACH THE SECOND ONE. The ban span was trimmed to end at
+ * the paint's far edge — correctly: чл. 98, ал. 1, т. 5 is «на пешеходни или
+ * велосипедни пътеки и на разстояние, по-малко от 5 метра ПРЕДИ тях» (retrieved
+ * from content/law/acts/zdvp.json, unit ref "чл. 98"), and no clause of ал. 1
+ * reaches ground past a пътека — while span membership stayed a POINT test on
+ * the lane fix. bay-4's centre sits at sM 33.75 against a span ending at 33, so
+ * the student who parked NEATLY in the slot the briefing calls unlawful was
+ * billed nothing at all. The drill taught one rule and graded another, which is
+ * the defect class this whole file exists to remove.
+ *
+ * WHAT FIXED IT, and what this gate refuses to let be swapped for it: the
+ * runtime now measures the VEHICLE against a no-stopping span instead of a
+ * point inside it (runtime/worldRuntime.ts, the `bodyHalfAlongEdge` block). The
+ * banned GROUND is untouched, and that is the point — widening the span would
+ * need an article for «пет метра СЛЕД пътеката», and there is none. Assertion 3
+ * is the counter-proof: bay-4's centre must stay OUTSIDE the span. It goes red
+ * if someone reverts the body test (via assertion 4) AND if someone "fixes"
+ * this by stretching the span over the bay instead (via assertion 3 itself).
+ */
+describe("§5 — sc-park-zebra grades the slot its briefing calls unlawful", () => {
+  const ZEBRA_HALF_M = 3.0; // ZEBRA_LENGTH_M / 2 — markings.ts paints ±3.0
+  const AISLE_SOUTH_Y = -30; // lotzb-e-aisle runs y −30 → +40, so sM = y + 30
+  const APPROACH_X = 4.0625; // the aisle lane the spawn sits on
+  const BAY_X = 6.28;
+
+  const zebraDistrict = () => district("lot-zebra-v1");
+  const bay = (id: string): BayMeta => {
+    const b = zebraDistrict().meta.scenario.bays.find((z) => z.id === id);
+    if (!b) throw new Error(`no bay ${id}`);
+    return b;
+  };
+  const banSpan = () => {
+    const z = (zebraDistrict().zones ?? []).find((s) => s.kind === "noStopping");
+    if (!z) throw new Error("lot-zebra-v1 lost its noStopping span");
+    return z;
+  };
+
+  const zebraSample = (x: number, y: number, speedKmh: number): VehicleSample => ({
+    position: { x, y },
+    headingDeg: 0,
+    speedKmh,
+    indicator: "off",
+    headlights: "off",
+    seatbeltOn: true,
+    handbrakeOn: false,
+    gear: 1,
+    mirrorGlance: null,
+  });
+
+  /** Approach up the aisle, swing into the bay row, rest centred at `restY` —
+   *  through the REAL runtime and the REAL reducer, not a hand-built tick. The
+   *  approach rides at 15 km/h so the aisle's own 20 km/h limit cannot add a
+   *  speeding code and muddy the read. */
+  function restDriveZebra(restY: number, restSec = 12): RuleEvent[] {
+    const raw = JSON.parse(
+      readFileSync(path.join(REPO_ROOT, "content", "world", "lot-zebra-v1.json"), "utf-8"),
+    ) as unknown;
+    const rt = createWorldRuntime(raw);
+    let rules = createRuleEngine();
+    const out: RuleEvent[] = [];
+    const dt = 0.1;
+    let t = 0;
+    const step = (x: number, y: number, speedKmh: number) => {
+      t += dt;
+      rt.update(dt);
+      const r = reduceTick(rules, rt.sample(zebraSample(x, y, speedKmh), t, false));
+      rules = r.state;
+      out.push(...r.events);
+    };
+    const swingFrom = restY - 6;
+    for (let y = -100; y < swingFrom; y += (15 / 3.6) * dt) step(APPROACH_X, y, 15);
+    const n = 40;
+    for (let i = 0; i <= n; i++) {
+      const f = i / n;
+      step(APPROACH_X + (BAY_X - APPROACH_X) * f, swingFrom + (restY - swingFrom) * f, 5);
+    }
+    for (let i = 0; i < restSec / dt; i++) step(BAY_X, restY, 0);
+    return out;
+  }
+
+  const violations = (evs: RuleEvent[]): ViolationEvent[] =>
+    evs.filter((e): e is ViolationEvent => e.kind === "violation");
+
+  it("1 — briefing step 3 still names a free slot that is ON the crossing", () => {
+    const step3 = byId("sc-park-zebra").instructionsBg.find((i) => i.n === 3)!;
+    expect(step3.textBg).toMatch(/върху\s+пътеката/iu);
+    expect(step3.textBg).toMatch(/в\s+петте\s+метра\s+преди/iu);
+  });
+
+  it("2 — and the world really does put a FREE bay on the paint", () => {
+    const b4 = bay("lotzb-bay-4");
+    expect(b4.occupied, "a taken bay tempts nobody").toBe(false);
+    // The bay's own rectangle reaches onto the zebra…
+    expect(b4.y - b4.lengthM / 2).toBeLessThan(ZEBRA_HALF_M);
+    // …and so does the BODY of a car centred in it, which is the act т. 5 bans.
+    expect(b4.y - PLAYER_HALF_LENGTH_M).toBeLessThan(ZEBRA_HALF_M);
+    // The other slot the briefing counts: wholly inside the „5 m before" limb.
+    const b3 = bay("lotzb-bay-3");
+    expect(b3.occupied).toBe(false);
+    expect(b3.y + b3.lengthM / 2).toBeLessThanOrEqual(ZEBRA_HALF_M);
+  });
+
+  it("3 — COUNTER-PROOF: bay-4's centre is OUTSIDE the span, so a point test acquits it", () => {
+    const z = banSpan();
+    // The span must still end AT the paint — this is the invented „five metres
+    // after the crossing", removed on 2026-09-10, staying removed.
+    expect(z.toM).toBeCloseTo(ZEBRA_HALF_M - AISLE_SOUTH_Y, 6);
+    // …and the bay centre must still sit past it. If this goes red, the span has
+    // been stretched over the bay and assertion 4 has become vacuous.
+    expect(bay("lotzb-bay-4").y - AISLE_SOUTH_Y).toBeGreaterThan(z.toM);
+  });
+
+  it("4 — yet a car resting centred in bay-4 IS billed, and cited to the crossing", () => {
+    const ban = violations(restDriveZebra(bay("lotzb-bay-4").y)).find(
+      (e) => e.code === "ILLEGAL_STOP_IN_BAN_ZONE",
+    );
+    expect(ban, "the slot the briefing calls unlawful must grade as unlawful").toBeDefined();
+    // THEO-4: the card cites the article that actually applies, not the pooled
+    // „a plate governs this" row — чл. 98, ал. 1, т. 5, via the span's basis.
+    expect(ban!.detail).toBe("law-crossing");
+  });
+
+  it("5 — and the TARGET bay is still clean, so the reach did not become an over-reach", () => {
+    // lotzb-bay-5 (y = 11.75) is the drill's answer: body y ∈ [9.73, 13.77],
+    // rear 6.73 m past the paint. Convicting it would make the drill unwinnable.
+    const codes = violations(restDriveZebra(bay("lotzb-bay-5").y)).map((e) => e.code);
+    expect(codes).not.toContain("ILLEGAL_STOP_IN_BAN_ZONE");
+  });
+
+  it("6 — bay-3 is acquitted BY DESIGN, and the drill still teaches it another way", () => {
+    // The honest half of the briefing's „two slots". A rest SHORT of a zebra is
+    // structurally excused by the reducer (`s.crossing === null` is a hard
+    // precondition of `illegalBanRest`) because a car stopped before a crossing
+    // can always be yielding to someone on it — convicting that would be the
+    // false positive the ban detector is armored against. So this slot is not
+    // graded, and the drill demonstrates it through its CONSEQUENCE instead.
+    const codes = violations(restDriveZebra(bay("lotzb-bay-3").y)).map((e) => e.code);
+    expect(codes).not.toContain("ILLEGAL_STOP_IN_BAN_ZONE");
+    // …and that other way must still exist, or half of step 3 teaches nothing.
+    const hidden = byId("sc-park-zebra").mistakes!.find((m) =>
+      m.traceRef.path.includes("mistake-hidden-pedestrian"),
+    );
+    expect(hidden, "the 5-m-before limb is demonstrated by this demo alone").toBeDefined();
+    expect(hidden!.codeRefs).toContain("COLLISION");
+  });
+
+  /**
+   * §4's defect, re-armed against the BODY instead of the ground — because
+   * measuring the car is what moved the line the setup gate has to clear.
+   *
+   * The gate credits „Задача 1" anywhere in a capsule that reaches
+   * `radiusM + REACH_ZONE_GRACE_M` BEHIND its mark. The span was trimmed so
+   * that capsule could not certify a pose the engine bills (the note on
+   * sc-pzb-setup), and the arithmetic that said so compared the capsule
+   * against the GROUND: rear edge +5.50 at L1 against a span ending at +3.00,
+   * 2.5 m of daylight. That comparison is no longer the right one. The runtime
+   * measures the vehicle, so the last pose that gets billed is not the last
+   * pose ON the ban but the last pose whose REAR BUMPER is — 2.02 m further
+   * north — and the L1 daylight is really 0.48 m.
+   *
+   * It holds. But it holds by less than half a metre, on a number nobody was
+   * watching, and four independent things eat it: REACH_ZONE_GRACE_M, the L1
+   * radius ramp, PLAYER_HALF_LENGTH_M, and the bay row's own pitch. So the
+   * margin is computed here every build rather than believed.
+   */
+  it("7 — the setup gate still cannot certify a pose the engine bills, measured on the CAR", () => {
+    const z = banSpan();
+    // The last centre pose whose body still reaches the paint.
+    const lastBilledY = z.toM + AISLE_SOUTH_Y + PLAYER_HALF_LENGTH_M;
+
+    // THE FORMULA IS CHECKED AGAINST THE ENGINE, not asserted about it: drive
+    // a pose 5 cm each side of it and require the verdict to flip exactly here.
+    // If `bodyHalfAlongEdge` is reverted, the „inside" drive goes clean and
+    // this fails before the margin below can be read as reassurance.
+    const billedInside = violations(restDriveZebra(lastBilledY - 0.05)).some(
+      (e) => e.code === "ILLEGAL_STOP_IN_BAN_ZONE",
+    );
+    const billedOutside = violations(restDriveZebra(lastBilledY + 0.05)).some(
+      (e) => e.code === "ILLEGAL_STOP_IN_BAN_ZONE",
+    );
+    expect(billedInside, "a rear bumper on the paint must still be billed").toBe(true);
+    expect(billedOutside, "a car wholly past the paint must not be").toBe(false);
+
+    // …and no rung's capsule may reach back into that.
+    const spec = byId("sc-park-zebra");
+    const tight: string[] = [];
+    for (const rung of spec.levels) {
+      const gate = compileScenario(spec, rung.level).objectives[0]!.params as {
+        y: number;
+        radiusM: number;
+      };
+      const rearEdge = gate.y - (gate.radiusM + REACH_ZONE_GRACE_M);
+      tight.push(`L${rung.level}: rear edge y=${rearEdge.toFixed(2)}, clear by ${(rearEdge - lastBilledY).toFixed(2)} m`);
+      expect(
+        rearEdge,
+        `L${rung.level} credits «подмини забраната» at a pose the rule engine bills:\n${tight.join("\n")}`,
+      ).toBeGreaterThan(lastBilledY);
+    }
   });
 });

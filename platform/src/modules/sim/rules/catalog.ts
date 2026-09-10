@@ -82,6 +82,7 @@ import {
   SEVERITY_POINTS,
   type CommendationCode,
   type CommendationEvent,
+  type NoStopBasis,
   type SeverityClass,
   type ViolationCode,
   type ViolationEvent,
@@ -1233,8 +1234,15 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     titleBg: "Спиране в забранена зона",
     explanationBg:
       "Спря в участък, в който престоят е забранен — под знак В27 „Забранени са престоят и паркирането“. „Само за минутка“ не съществува: точно там спрялата кола закрива видимостта и запушва лентата — затова знакът забранява дори краткия престой.",
+    // BASIS-NEUTRAL 2026-09-09 (BAN-BASIS slice) — and this field, unlike the
+    // title and the explanation above, HAD to move. `correctiveBg` has NO
+    // per-event channel: `historyMistakes.ts:76`, `DualGhostReplay.tsx:521`,
+    // `session-history.tsx:177` and `LessonPlayShell.tsx:5554` all read it BY
+    // CODE with no event in hand, exactly as RAIL_CROSSING_ACT_COPY's docblock
+    // records for its own corrective. So it has to be true of BOTH bases, and
+    // the way to do that is the way the rail row did it: walk every branch.
     correctiveBg:
-      "Преди да спреш, огледай знаците и маркировката на участъка: под В27 не спираш изобщо. Подмини зоната и спри чак след края ѝ — на разрешено място, плътно вдясно до бордюра.",
+      "Преди да спреш, огледай участъка: под знак В27 не спираш изобщо. Но забраната често не е закачена на стълб — законът сам забранява престоя на кръстовище и до 5 м от него, на пешеходна пътека и до 5 м преди нея, върху и до релси, и до вече спряла кола от страната на движението. Подмини участъка и спри чак след края му — на разрешено място, плътно вдясно до бордюра.",
     // CITATION CORRECTED 2026-08-09. This cited чл. 98, and чл. 98, ал. 1 was
     // read in full: it is a CLOSED list of eight places where the LAW ITSELF
     // bans stopping (junctions, crossings, bridges, tram rails, …) and it
@@ -1244,6 +1252,24 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // sign: чл. 6, т. 1. The sign's own meaning lives in an ordinance the corpus
     // does not hold, so it is named by SUBJECT, per content/law/README.md and
     // exactly as STOP_SIGN_NO_FULL_STOP names Б2.
+    //
+    // THIS ROW IS UNCHANGED BY THE BAN-BASIS SLICE (2026-09-09), and both halves
+    // of that are deliberate.
+    //
+    // IT STAYS В27-WORDED because it is what the six districts that really post
+    // a plate resolve to — d2-v1, hz-accident-v1, pe-clear-v1, pe-slow-v1,
+    // pk-ban-v1, pk-ban2-v1. Rewriting it to чл. 98 would swap one miscitation
+    // for its mirror image on those six. The чл. 98 spans get their own rows
+    // (NO_STOP_BASIS_COPY) selected by the authored basis, not this one.
+    //
+    // AND THE ORDINANCE KEEPS ITS ARTICLE-LESS SUBJECT PHRASING. `signs.json`
+    // holds a more precise pointer for В27 («прил. № 3, знак В27»), and this
+    // lane tried to adopt it. `__tests__/law-citations.test.ts` refused, and it
+    // was right: `content/law/acts/` does NOT hold Наредба № РД-02-21-1/
+    // 23.11.2023, so an appendix number here is one nobody can check —
+    // content/law/README.md's ruling is that the rule and the act with NO
+    // ARTICLE NUMBER beats a number nobody can verify. The sign catalogue may
+    // carry that ref for its own purposes; a graded citation may not.
     lawRef: "ЗДвП чл. 6, т. 1; Наредба № РД-02-21-1/23.11.2023 правила за поставяне на знак В27",
     realWorldBg:
       "Извън изпита: глоба 50 лв. по ЗДвП чл. 183, ал. 2 — водач, който „неправилно престоява или е паркирал неправилно“. Ако спрялата кола е създала непосредствена опасност за движението, чл. 180, ал. 1 налага глоба 100 лв.",
@@ -2560,6 +2586,153 @@ export const HANDBRAKE_ACT_COPY: Record<
  * `VIOLATIONS` to has to be total over this registry as well, or an override
  * reintroduces the photographed defect on a row whose pooled title passes.
  */
+/**
+ * ILLEGAL_STOP_IN_BAN_ZONE — ONE CODE, TWO KINDS OF BAN, AND UNTIL NOW ONE
+ * CITATION FOR BOTH.
+ *
+ * THE DEFECT, filed independently by two audit passes. The pooled row says
+ * «под знак В27» and cites чл. 6, т. 1 — the duty to obey A SIGN. Five shipped
+ * districts author a `noStopping` span whose ban is written in the STATUTE and
+ * holds with no plate anywhere: pk-double-v1, pk-banx-v1 (three spans),
+ * pk-rail-v1 (two) and lot-zebra-v1. sc-pk-double-park is the sharpest — its
+ * own instruction reads «забраната я пишат самите коли … СЪС ИЛИ БЕЗ ЗНАК»,
+ * and then the card that charges the student three точки answers with the law
+ * for a sign. That is ADR-002's core prohibition, in the direction that costs
+ * the student: a citation the runtime never establishes.
+ *
+ * WHY AN ENUM AND NOT THE WORLD DOC'S OWN `lawRef`. Those strings are in the
+ * maps already (`meta.scenario.banZonesY[].lawRef`) and read by nothing but
+ * tests — the obvious shortcut is to forward them. THEY ARE THEMSELVES
+ * MISCITED: pk-banx's two JUNCTION spans say «т. 2» (which is «до престояващо
+ * или паркирано ППС»), its zebra span and lot-zebra say «т. 1» (the generic
+ * obstruction clause), and pk-rail says a bare «чл. 98». Forwarding them would
+ * replace one miscitation with five. `rules/types.ts NoStopBasis` carries the
+ * rest of that derivation; the enum's only job is to select a REVIEWED row
+ * here, and every клауза below is quoted from the retrieved text.
+ *
+ * RETRIEVED, NOT RECALLED — `content/law/acts/zdvp.json`, unit `ref: "чл. 98"`,
+ * `contextBg` «Глава втора · ПРАВИЛА ЗА ДВИЖЕНИЕ ПО ПЪТИЩАТА · Раздел ХIХ»:
+ *
+ *   «Чл. 98. (1) Престоят и паркирането са забранени:
+ *      2. до престояващо или паркирано пътно превозно средство от страната на
+ *         движението;
+ *      4. върху трамвайни и железопътни линии или в такава близост до тях,
+ *         която може да затрудни движението на релсовите превозни средства;
+ *      5. на пешеходни или велосипедни пътеки и на разстояние, по-малко от 5
+ *         метра преди тях;
+ *      6. на кръстовище и на по-малко от 5 метра от тях;»
+ *
+ * ал. 1 IS A CLOSED LIST WITH NO SIGN-BASED CASE — which is precisely why the
+ * 2026-08-09 note on the pooled row was right to move OFF it for a В27 span,
+ * and equally why it is the only correct citation for these five maps.
+ *
+ * NO ITEM IS ASSERTED THAT THE SPAN DOES NOT DECLARE. One tick flag serves four
+ * maps whose real точки differ; deriving the точка from a bare sign/law bit
+ * would be free-recall wearing a data channel's clothes. So the AUTHOR names
+ * the clause on the span, and this table only knows how to read it back.
+ *
+ * `severityClass`, `points` and the corrective stay catalogue-owned and are NOT
+ * reachable from here — every basis is the same основна 3, because the act is
+ * identical (the car is standing where it may not stand) and only the rule that
+ * says so differs. `correctiveBg` has no per-event channel at all and was made
+ * to walk both branches on the pooled row instead; see its note there.
+ *
+ * `peekBg` IS REQUIRED on every row: each of these REPLACES the pooled
+ * explanation on the phone card, and the pooled row carries no summary, so
+ * without one the −10 card would arrive as a title over «↓ ОЩЕ N РЕДА» —
+ * THEO-4 breached by a string length, which `violation-title-fits-peek.test.ts`
+ * exists to refuse.
+ */
+export const NO_STOP_BASIS_COPY: Record<
+  NoStopBasis,
+  { titleBg: string; explanationBg: string; lawRef: string; peekBg: string }
+> = {
+  // The plate branch. It deliberately RE-USES the pooled row's own strings
+  // rather than restating them: an author who edits one and forgets the other
+  // is exactly how a card and its own catalogue row start printing two
+  // different sentences for one act.
+  sign: {
+    titleBg: VIOLATIONS.ILLEGAL_STOP_IN_BAN_ZONE.titleBg,
+    explanationBg: VIOLATIONS.ILLEGAL_STOP_IN_BAN_ZONE.explanationBg,
+    lawRef: VIOLATIONS.ILLEGAL_STOP_IN_BAN_ZONE.lawRef,
+    peekBg: "Знакът забранява и краткия престой.",
+  },
+  "law-alongside": {
+    titleBg: "Спиране до спряла кола",
+    explanationBg:
+      "Спря на платното до вече спряла или паркирана кола — застана втори ред. Престоят до престояващо или паркирано превозно средство ОТ СТРАНАТА НА ДВИЖЕНИЕТО е забранен от самия закон, дори там, където няма знак: тук забраната я пишат самите коли. Зад теб всеки трябва да излезе в насрещната лента, за да те подмине, а ти закриваш човека, който в този момент отваря врата или излиза между паркираните коли. Спри след редицата, плътно вдясно.",
+    lawRef: "ЗДвП чл. 98, ал. 1, т. 2",
+    peekBg: "Ставаш втори ред на платното.",
+  },
+  "law-junction": {
+    titleBg: "Спиране на кръстовище",
+    explanationBg:
+      "Спря на кръстовището или на по-малко от 5 метра от него. Законът забранява престоя там, дори без знак, и причината е видимостта: точно в тези пет метра всички се оглеждат един друг: завиващият, пресичащият и пешеходецът. Спрялата кола ги закрива взаимно, а завиващите нямат как да минат покрай теб, без да излязат в чуждата лента. Подмини кръстовището и спри поне пет метра след него.",
+    lawRef: "ЗДвП чл. 98, ал. 1, т. 6",
+    peekBg: "Закриваш видимостта в него.",
+  },
+  "law-crossing": {
+    titleBg: "Спиране на пешеходна пътека",
+    explanationBg:
+      "Спря на пешеходната пътека или на по-малко от 5 метра преди нея. Законът забранява престоя там, дори без знак, защото спрялата кола става стена: пешеходецът тръгва иззад теб точно когато другите вече не могат да го видят, а те минават покрай теб със скорост. Тези пет метра съществуват, за да има кой да го види навреме. Спри след пътеката, не преди нея.",
+    lawRef: "ЗДвП чл. 98, ал. 1, т. 5",
+    peekBg: "Закриваш пешеходеца.",
+  },
+  // THE NUMBER IN THIS ROW IS THE ACT'S OWN, and — corrected 2026-09-10 (F1) —
+  // the MAP now measures it from the same place the row does. The first cut of
+  // the re-cut anchored pk-rail-v1's spans to the band edge, which put the
+  // convicted ground 3.21 m from the first rail while this card quoted «не
+  // по-малко от 2 метра преди първата релса»; the spans are now derived from
+  // the rails builders/railTrack.ts actually draws, so the sentence below
+  // describes the ground the student was really convicted on. The opening
+  // clause names that ground and nothing wider: «върху релсите» is the RAIL
+  // code's business (RAIL_CROSSING_VIOLATION owns every metre of the band —
+  // runtime/worldRuntime.ts), and this row must not claim a fault it never
+  // bills.
+  // Until 2026-09-10 pk-rail-v1 convicted across 50 m either side of the band —
+  // a distance т. 4 does not contain and no article in content/law/acts/ gives
+  // for престой. The bank had already ruled on it: q-spirane-i-parkirane-056
+  // keys «Няма мярка в метри» as correct and «на по-малко от 50 метра от двете
+  // му страни» as false, calling it «ИЗМИСЛЕНО ЧИСЛО ... мит от стари помагала».
+  // So the card had to stop billing it, and — because a student who is convicted
+  // will look for the rule — had to say the myth's name out loud. The 2 m is
+  // retrieved three times over (чл. 51, ал. 4; чл. 53, ал. 2; чл. 54, ал. 1) and
+  // the FUNCTIONAL test stays the headline, because that is what т. 4 is.
+  //
+  // AND THE SENTENCE IS NOW QUOTED TO ITS FULL STOP — corrected 2026-09-10 (D1).
+  // This row used to say «Единственото разстояние, което законът изобщо пише за
+  // прелез, са тези два метра» and then cite чл. 51, ал. 4, whose own text
+  // refutes it past the comma: «…спират на разстояние не по-малко от 2 метра
+  // преди първата релса, А КОГАТО ИМА БАРИЕРИ - НА 1 МЕТЪР ОТ ТЯХ». A universal
+  // negative killed by the sentence carrying it is the same defect class as the
+  // 50 m it replaced — a claim about the law the law does not support — and it
+  // was worse here than elsewhere, because pk-rail-v1 authors `guarded: true`
+  // with a barrier arm, so the counterexample is the very crossing the card
+  // prints on. The row's own sibling table knew: RAIL_CROSSING_ACT_COPY's
+  // chapeau says «чл. 51, ал. 4 does give 2 m / 1 m», and consequences.ts quotes
+  // the whole sentence in its DUTY list.
+  //
+  // WHICH MEASURE GOVERNS WHAT — and why this row still bills two metres. Ал. 4
+  // places a WAITING vehicle («пред железопътния прелез … спират»): with
+  // barriers you wait a metre in front of the arm, without them two metres in
+  // front of the first rail, and either way only «ако няма други указания,
+  // дадени с пътни знаци или с пътна маркировка» (pk-rail-v1 authors no marking
+  // and no Б2, so ал. 4 applies unabridged). This row is not about waiting: it
+  // bills a car LEFT standing, and the floor for that is written twice in
+  // barrier-INDEPENDENT terms — чл. 53, ал. 2 («на разстояние по-малко от 2
+  // метра от тях») and чл. 54, ал. 1 («по-малко от 2 метра преди първата или
+  // след последната релса»), under чл. 53, ал. 1's «независимо от състоянието
+  // на бариерите». A raised arm does not make 1.19 m from the steel safe. So
+  // the SPAN does not move; only the sentence stops overstating the act.
+  "law-rail": {
+    titleBg: "Спиране в близост до релси",
+    explanationBg:
+      "Спря на по-малко от два метра от релсите — толкова близо, че спрялата кола вече пречи на релсовото движение. Забранява го самият закон, без никакъв знак, и обърни внимание КАК: ЗДвП чл. 98, ал. 1, т. 4 не дава мярка в метри, а тест — „върху трамвайни и железопътни линии или в такава близост до тях, която може да затрудни движението на релсовите превозни средства“. Разстоянията, които законът наистина пише за прелез, са две — и стоят в едно изречение: „Ако няма други указания, дадени с пътни знаци или с пътна маркировка, пред железопътния прелез пътните превозни средства спират на разстояние не по-малко от 2 метра преди първата релса, а когато има бариери – на 1 метър от тях“ (чл. 51, ал. 4). И двете мерят МЯСТОТО, на което ЧАКАШ: при бариера — на метър пред нея; без бариера — на два метра пред първата релса. Ти обаче не си чакал, а си оставил колата, и за спряла кола двата метра до релсите са подът, който важи независимо от бариерите: по-близо от два метра не започваш преминаване (чл. 53, ал. 2), а спреш ли принудително там, това вече е авария — изваждаш пътниците и предупреждаваш влака (чл. 54, ал. 1). Прословутите „50 метра от двете страни на прелеза“ не са нито едното от двете и ги няма в нито един член: мит са от стари помагала. Мярката е влакът — той не може нито да завие, нито да спре навреме.",
+    lawRef: "ЗДвП чл. 98, ал. 1, т. 4",
+    peekBg: "Влакът не може да завие.",
+  },
+};
+
 export const PER_ACT_COPY: Partial<
   Record<
     ViolationCode,
@@ -2571,6 +2744,7 @@ export const PER_ACT_COPY: Partial<
   WRONG_WAY: WRONG_WAY_ROAD_COPY,
   FAILED_TO_YIELD: FAILED_TO_YIELD_SITUATION_COPY,
   HANDBRAKE_LEFT_ON: HANDBRAKE_ACT_COPY,
+  ILLEGAL_STOP_IN_BAN_ZONE: NO_STOP_BASIS_COPY,
 };
 
 /**

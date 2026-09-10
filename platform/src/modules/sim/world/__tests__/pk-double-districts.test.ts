@@ -26,6 +26,7 @@ import type { VehicleSample } from "../../contracts";
 import { scenarioBaysOf } from "../../contracts";
 import { createRuleEngine, reduceTick, type RuleEvent } from "../../rules";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
+import { PLAYER_HALF_LENGTH_M } from "../../collision/bodies";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
@@ -304,7 +305,19 @@ describe(`${ID} through the world runtime — the FP-armor precondition`, () => 
     };
     // Clear road on the approach — where the driver decides.
     expect(flagOf(30)).toBeUndefined();
-    expect(flagOf(BAN_FROM_Y - 2)).toBeUndefined();
+    // THE BOUNDARY IS THE CAR'S, NOT THE CENTRE'S (2026-09-10). This probe read
+    // `toBeUndefined()` while the runtime tested the lane fix — a POINT —
+    // against the span; it now tests the vehicle's reach along the edge
+    // (PLAYER_HALF_LENGTH_M = 2.02 m, headingDeg 0 ⇒ exactly that). чл. 98,
+    // ал. 1, т. 2 bans standing «до престояващо или паркирано пътно превозно
+    // средство от страната на движението» (retrieved:
+    // content/law/acts/zdvp.json, unit ref "чл. 98") — being „до" a parked car
+    // is a fact about the car's body drawing level with it, so the first metre
+    // of the row is second-line for a nose as much as for a midpoint.
+    //
+    // TIGHTENED, NOT RELAXED: the boundary is pinned from both sides now.
+    expect(flagOf(BAN_FROM_Y - 2)).toBe(true);
+    expect(flagOf(BAN_FROM_Y - 2 - PLAYER_HALF_LENGTH_M)).toBeUndefined();
     // Beside the row: the whole stretch is second line.
     expect(flagOf(REST_SECOND_LINE_Y)).toBe(true);
     expect(flagOf(REST_SQUEEZE_Y)).toBe(true);

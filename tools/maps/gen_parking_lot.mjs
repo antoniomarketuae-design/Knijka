@@ -80,7 +80,8 @@ function polylineLength(pts) {
  *   pitchesM?: number[],       // bays-1 centre-to-centre gaps (default: uniform, derived)
  *   targetIndex?: number,      // which FREE bay is the drill's target (default: the first)
  *   crossings?: Array<{ id: string, y: number }>, // marked zebra across the aisle
- *   banSpans?: Array<{ id: string, fromY: number, toY: number, signRef: string }>,
+ *   banSpans?: Array<{ id: string, fromY: number, toY: number, signRef: string,
+ *                      basis?: NoStopBasis }>,
  * }} params
  */
 export function buildParkingLotDistrict(params) {
@@ -371,6 +372,12 @@ export function buildParkingLotDistrict(params) {
    * ILLEGAL_STOP_IN_BAN_ZONE from and the kind zoneSigns.ts stands a В27 post
    * at — so a span authored here is BOTH graded and visible, which is the only
    * shape a prohibition lesson is allowed to ship in.
+   *
+   * A span whose ban is the LAW rather than a plate declares `basis` (see
+   * rules/types.ts NoStopBasis), which is what decides the article the fault
+   * card cites. The В27 post zoneSigns stands over a law-implied span remains
+   * the known render gap the district batteries pin; the citation no longer
+   * depends on it.
    */
   const ZONES = banSpans.map((z) => {
     if (!(typeof z?.id === "string" && Number.isFinite(z?.fromY) && Number.isFinite(z?.toY))) {
@@ -387,6 +394,12 @@ export function buildParkingLotDistrict(params) {
       fromM: r2(z.fromY - aisleSouthY),
       toM: r2(z.toY - aisleSouthY),
       signRef: z.signRef ?? "В27",
+      // BAN-BASIS slice (rules/types.ts NoStopBasis): WHICH rule bans the stop,
+      // so ILLEGAL_STOP_IN_BAN_ZONE cites the article that really applies.
+      // ABSENT = a real В27 plate governs the span, which is what the pooled
+      // card has always said and what `signRef`'s own default assumes — so
+      // every lot that does not author it is byte-identical.
+      ...(z.basis === undefined ? {} : { basis: z.basis }),
     };
   });
 
@@ -753,11 +766,32 @@ const INSTANCES = [
     entry: "south",
   },
 
-  // 6 — чл. 98 at a marked crossing. The zebra sits at y = 0 (6 m of paint,
-  // ЗДвП: 5 m of ban either side ⇒ the span y ∈ [−8, 8]); the two free slots
-  // INSIDE it are the tempting ones and the third, at y = 11.75, is the first
-  // legal one. The span is a real `noStopping` zone, so it both GRADES
-  // (ILLEGAL_STOP_IN_BAN_ZONE) and STANDS a В27 post the student can read.
+  // 6 — чл. 98 at a marked crossing. The zebra sits at y = 0 and the paint is
+  // ZEBRA_LENGTH_M = 6.0 m along the road axis, laid symmetrically about the
+  // node (world/builders/markings.ts paints each bar at ZEBRA_LENGTH_M / 2
+  // either side of `at`) ⇒ the paint is y ∈ [−3, +3]. The ban span is the
+  // paint plus the 5 m BEFORE it ⇒ y ∈ [−8, +3]; see the banSpans note for why
+  // it is not symmetric. The span is a real `noStopping` zone, so it both
+  // GRADES (ILLEGAL_STOP_IN_BAN_ZONE) and STANDS a В27 post the student reads.
+  //
+  // THE THREE FREE SLOTS ARE THE LESSON, AND THE TWO BAD ONES FAIL FOR
+  // DIFFERENT REASONS — briefing step 3 counts them out loud («две свободни
+  // места не стават — едното е върху пътеката, другото в петте метра преди
+  // нея»), so all three are listed here or the pitch row drifts away from the
+  // copy that describes it:
+  //   · bay-3, centre y = −5.25, rect y ∈ [−8.00, −2.50] — the «пет метра
+  //     ПРЕДИ» limb of т. 5, and the one the mistake-hidden-pedestrian demo
+  //     is built on (see below: the reducer cannot bill a rest short of a
+  //     crossing, so this half is taught by its consequence, not by a card);
+  //   · bay-4, centre y = 3.75, rect y ∈ [1.00, 6.50] — 2.00 m of the SLOT and
+  //     1.27 m of a car centred in it (PLAYER_HALF_LENGTH_M = 2.02 ⇒ body
+  //     y ∈ [1.73, 5.77]) lie on the paint. This is т. 5's FIRST limb, «на
+  //     пешеходни … пътеки», and it is deliberate: the neat-looking slot that
+  //     is unlawful for a reason the student has to look down to see. Do not
+  //     "tidy" this pitch away — the copy calls it «върху пътеката» and the
+  //     grading reaches it (banSpans note, last paragraph);
+  //   · bay-5, centre y = 11.75, rect y ∈ [9.00, 14.50] — clear of the paint by
+  //     6.00 m. The target (`targetIndex: 4`).
   {
     districtId: "lot-zebra-v1",
     prefix: "lotzb",
@@ -774,7 +808,47 @@ const INSTANCES = [
     entry: "south",
     crossings: [{ id: "lotzb-x-zebra", y: 0 }],
     banSpans: [
-      { id: "lotzb-z-zebra", fromY: -8, toY: 8, signRef: "ЗДвП-98-1-1" },
+      // чл. 98, ал. 1, Т. 5 — «на пешеходни или велосипедни пътеки и на
+      // разстояние, по-малко от 5 метра ПРЕДИ тях» (retrieved verbatim:
+      // content/law/acts/zdvp.json, unit ref "чл. 98"). The signRef prose said
+      // «98-1-1», the generic obstruction clause; т. 5 is the clause this span
+      // is built from and the one the card cites.
+      //
+      // THE SPAN IS NOT SYMMETRIC, AND THAT IS THE WHOLE POINT (corrected
+      // 2026-09-10). It read `toY: 8` — the paint plus 5 m PAST it — on the
+      // strength of a rule that does not exist: т. 5 says «преди тях» and
+      // nothing in чл. 98, ал. 1 bans stopping AFTER a пешеходна пътека
+      // (т. 6 carries the «на по-малко от 5 метра ОТ тях» both-sides wording,
+      // and it is about кръстовища, not пътеки). The extra 5 m convicted a
+      // student under an article that does not reach the act, so it is gone.
+      //   fromY = −3 (near edge of paint) − 5      = −8
+      //   toY   = +3 (far  edge of paint)          = +3   ← ends AT the paint
+      // This is the shape gen_pk_banx.mjs already uses for its own zebra span
+      // (`toM: zebraS + ZEBRA_BAND_HALF_M`): end at the far edge, never cross
+      // it.
+      //
+      // THE SPAN IS GROUND. THE THING MEASURED AGAINST IT IS A CAR — and the
+      // two are not the same number, which is what a first reading of these
+      // bounds gets wrong. `runtime/worldRuntime.ts` projects the body box
+      // onto the edge tangent (`bodyHalfAlongEdge`) for `noStopping` spans, so
+      // membership is „does the CAR reach this ground", not „is the car's
+      // centre standing on it". Consequence, measured on this district by
+      // driving it (parking3-claim-gates.test.ts §5): a rest is billed while
+      // its centre is y ≤ 5.020 = toY + PLAYER_HALF_LENGTH_M — i.e. right up
+      // to the pose whose REAR BUMPER leaves the paint, which is bay-4's whole
+      // reason for existing. Nothing about the banned ground changed to get
+      // there: `toY` is still +3, and «пет метра СЛЕД пътеката» — the article
+      // that does not exist, removed above — stays removed.
+      //
+      // SO DO NOT REACH FOR `toY` IF A POSE YOU EXPECT TO BE BILLED IS NOT.
+      // Widening the ground needs a clause to widen it under, and чл. 98,
+      // ал. 1 has none past a пътека; the referent is the part that was wrong
+      // before, and it is already fixed. (The NEAR limb is the mirror case and
+      // is deliberately ungraded: `illegalBanRest` requires `s.crossing ===
+      // null`, and a car resting short of a zebra is inside its 35 m approach
+      // zone, so it is structurally innocent — it may be yielding. bay-3 is
+      // taught through mistake-hidden-pedestrian's COLLISION instead.)
+      { id: "lotzb-z-zebra", fromY: -8, toY: 3, signRef: "ЗДвП-98-1-5", basis: "law-crossing" },
     ],
   },
 

@@ -753,7 +753,7 @@ function zbShadow(): DriveScript {
   const s = reverseS(ZB_SETUP_X, ZB_S_TOP, ZB_BAY_X, 4.0);
   return {
     steps: [
-      { kind: "annotation", textBg: "Пред пътеката има свободни места — но законът ги затваря: 5 метра преди и след нея." },
+      { kind: "annotation", textBg: "До пътеката има свободни места — но законът ги затваря: самата пътека и 5 метра ПРЕДИ нея." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: approach(-105), targetKmh: 18 },
       { kind: "glance", mirror: "right" },
@@ -783,35 +783,54 @@ function zbShadow(): DriveScript {
       },
       { kind: "drive", points: [[ZB_BAY_X, s.endY], [ZB_BAY_X, ZB_BAY_Y]], targetKmh: 2.5 },
       ...SETTLE,
-      { kind: "annotation", textBg: "Готово: паркирано законно, на повече от пет метра след пътеката." },
+      { kind: "annotation", textBg: "Готово: паркирано законно — цялата кола е извън маркировката на пътеката и извън петте метра преди нея." },
     ],
   };
 }
 
 /**
- * The ban is graded on the SECOND slot, not the first, and that is an engine
- * fact worth stating: rules/engine.ts exempts a rest inside a ban span while
- * the crossing episode is live (`s.crossing === null` is a precondition of
- * `illegalBanRest`) — a car stopped SHORT of a zebra can always be yielding to
- * someone on it, and convicting that would be a false positive. So the drill's
- * graded demo is the slot five metres PAST the crossing, which no such reading
- * excuses; the slot before it is demonstrated through its consequence instead
- * (the second demo below).
+ * The ban is graded on the demo that stops ON THE PAINT, and both halves of
+ * that sentence are load-bearing.
+ *
+ * WHY NOT THE SLOT BEFORE: rules/engine.ts exempts a rest inside a ban span
+ * while the crossing episode is live (`s.crossing === null` is a precondition
+ * of `illegalBanRest`) — a car stopped SHORT of a zebra can always be yielding
+ * to someone on it, and convicting that would be a false positive. The slot
+ * before the crossing is therefore demonstrated through its CONSEQUENCE
+ * instead (the second demo below).
+ *
+ * WHY NOT „five metres past the crossing", which is what this demo used to be:
+ * THERE IS NO SUCH RULE. чл. 98, ал. 1, т. 5 reads «на пешеходни или
+ * велосипедни пътеки и на разстояние, по-малко от 5 метра ПРЕДИ тях»
+ * (retrieved: content/law/acts/zdvp.json, unit ref "чл. 98"); the five metres
+ * run one way only, and nothing in чл. 98, ал. 1 bans stopping past a пътека.
+ * The old demo rested at y = 3.71 — clear of the paint's far edge (+3.0) — and
+ * was billed by a span that had been authored 5 m too long. The span is now
+ * y ∈ [−8, +3] and the demo stops where the offence is REAL.
+ *
+ * WHAT IT NOW SHOWS: the car pulls into the free slot beside the crossing and
+ * comes to rest at y = 2.4, i.e. body y ∈ [0.38, 4.42] (CHASSIS_HALF_EXTENTS.z
+ * = 2.02) — its NOSE is 1.42 m past the paint, its REAR is still 2.62 m ON it.
+ * That is т. 5's first limb, «на пешеходни пътеки», word for word, and it is a
+ * better lesson than the invented one: „I passed the crossing" is false while
+ * any part of the car is still on it. `crossingPassed` has already fired at
+ * this pose (the node is behind the car, lateral 6.28 m ≪ PASS_LATERAL_MAX_M),
+ * so `s.crossing` is null and the rest is gradable.
  */
 function zbMistakeAfterZebra(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: „минах пътеката, значи може“ — забраната важи и след нея." },
+      { kind: "annotation", textBg: "Грешка: „минах пътеката, значи може“ — а е минала само предницата." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: approach(-105), targetKmh: 18 },
       { kind: "indicator", setting: "right" },
-      { kind: "drive", points: easeTo(4.0, -1.0), targetKmh: 9 },
-      { kind: "drive", points: [[4.0, -1.0], [5.3, 1.6], [6.28, 3.0], [6.28, 3.75]], targetKmh: 5 },
+      { kind: "drive", points: easeTo(4.0, -3.0), targetKmh: 9 },
+      { kind: "drive", points: [[4.0, -3.0], [5.3, -0.4], [6.28, 1.6], [6.28, 2.4]], targetKmh: 5 },
       { kind: "pause", sec: 8.0, brake: true },
       {
         kind: "annotation",
         textBg:
-          "Мястото е свободно, но е на по-малко от пет метра СЛЕД пътеката. Чл. 98 брои и в двете посоки: спряла тук, колата пак крие тръгващия пешеходец. Първото разрешено място е следващото.",
+          "Задницата стои ВЪРХУ зебрата. Чл. 98, ал. 1, т. 5 забранява престоя и паркирането „на пешеходни или велосипедни пътеки“ — забранена е самата пътека, а петте метра се броят само ПРЕДИ нея. Пътеката е премината едва когато цялата кола е извън маркировката.",
       },
     ],
   };

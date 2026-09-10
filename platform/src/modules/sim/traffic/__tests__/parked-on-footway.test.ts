@@ -76,6 +76,25 @@
  * a band that IS drawn, which is the honest picture: the ordinary street parks,
  * the зона does not.
  *
+ * THE RAIL-BAN CLOSURE (2026-09-10) — the row that a MYTH had been hiding.
+ * `pk-rail-v1` sat here at 33 for as long as this ledger has existed, and the
+ * number was artificially low: `computeParkedCars` suppresses the curb row
+ * inside a `noStopping` span, and that map banned 50 m either side of its track
+ * band — a distance ЗДвП contains nowhere, and one the project's own question
+ * bank marks as the WRONG answer (`q-spirane-i-parkirane-056`: «ИЗМИСЛЕНО
+ * ЧИСЛО … мит от стари помагала»). Re-cutting the span to the 2 m the act
+ * really names (чл. 51, ал. 4; чл. 53, ал. 2; чл. 54, ал. 1) handed 96 m of
+ * kerb back to the pass and the row went 33 → 45 — i.e. the ledger was about to
+ * grow because a legal repair landed. It did not: the map declares
+ * `parkingBand: false` and the row is deleted, −33 rather than +12. `true` was
+ * refused with a measurement, as everywhere else in this file — it moves the
+ * kerb out 4 m, which puts that map's frontage (|x| = 14.13) inside the widened
+ * pavement (back edge 15.98) and widens the rail deck `builders/railTrack.ts`
+ * draws across the carriageway, i.e. it would redraw the one object the lesson
+ * exists to show. And the declaration is the honest one twice over: every body
+ * on that street stood fully on the pavement, on the ONE lesson in the
+ * catalogue whose whole subject is where a car may lawfully stand.
+ *
  * THE SP/FO PASS (doc 87 FR-21 + B59/B63/B64/B65/B70/B72 — the stretch of the
  * catalogue he actually played and photographed). Eight budget rows deleted:
  * `fo-brake-v1` 48, `fo-follow-v1` 41, `sp-creep-v1` 41, `sp-creep2-v1` 75,
@@ -152,7 +171,7 @@ const FOOTWAY_BUDGET: Record<string, number> = {
   "vp-ready-v1": 41, "ov-solid-v1": 39,
   "tj-rhr-v1": 36, "ov-lane-v1": 35, "rb-mini-v1": 34,
   "rb-ped-v1": 34, "rb-single-v1": 34, "rx-drop-v1": 34, "rx-guarded-v1": 34,
-  "rx-unguarded-v1": 34, "vu-child-v1": 34, "vu-door-v1": 34, "pk-rail-v1": 33,
+  "rx-unguarded-v1": 34, "vu-child-v1": 34, "vu-door-v1": 34,
   "sig-wave-v1": 33, "tj-occluded-v1": 33, "vu-bikelane-v1": 32,
   "pk-busstop-v1": 31, "rb-2lane-v1": 30, "hz-obstacle-v1": 27,
   "ov-narrow-v1": 27, "pe-school-v1": 27, "sx-v1": 26,

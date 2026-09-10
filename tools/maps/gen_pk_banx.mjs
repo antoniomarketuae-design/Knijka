@@ -220,27 +220,38 @@ export function buildLawBanStreet(params) {
   const zebraS = r2(zebraY - junctionY); // the zebra's arclength on street-n
   const ZONES = [
     {
-      // чл. 98 ал. 1 т. 2 — approaching half: the last 5 m + the junction body.
+      // чл. 98, ал. 1, Т. 6 — approaching half: the last 5 m + the junction body.
+      // CLAUSE CORRECTED 2026-09-09 (BAN-BASIS slice): this said «т. 2», which
+      // is «до престояващо или паркирано ППС» — pk-double's rule, not a
+      // junction. The retrieved т. 6 is «на кръстовище и на по-малко от 5
+      // метра от тях» (content/law/acts/zdvp.json, unit ref "чл. 98").
       id: `${idPrefix}-z-jx-before`,
       kind: "noStopping",
+      basis: "law-junction",
       edgeId: eStreetS,
       fromM: r2(junctionY - jxBanM),
       toM: r2(junctionY),
       signRef: "ЗДвП-98-1-2",
     },
     {
-      // чл. 98 ал. 1 т. 2 — departing half: the corner and the 5 m past it.
+      // чл. 98, ал. 1, т. 6 — departing half: the corner and the 5 m past it.
       id: `${idPrefix}-z-jx-after`,
       kind: "noStopping",
+      basis: "law-junction",
       edgeId: eStreetN,
       fromM: 0,
       toM: jxBanM,
       signRef: "ЗДвП-98-1-2",
     },
     {
-      // чл. 98 ал. 1 т. 1 — the crossing itself + the 5 m before it.
+      // чл. 98, ал. 1, Т. 5 — the crossing itself + the 5 m before it.
+      // CLAUSE CORRECTED 2026-09-09: this said «т. 1», the generic obstruction
+      // clause. The retrieved т. 5 is «на пешеходни или велосипедни пътеки и
+      // на разстояние, по-малко от 5 метра преди тях» — the clause this span
+      // is literally built from (LAW_CLEAR_M = 5).
       id: `${idPrefix}-z-zebra`,
       kind: "noStopping",
+      basis: "law-crossing",
       edgeId: eStreetN,
       fromM: r2(zebraS - LAW_CLEAR_M),
       toM: r2(zebraS + ZEBRA_BAND_HALF_M),
@@ -346,9 +357,9 @@ export function buildLawBanStreet(params) {
     /** District-y (not edge-arclength) view of every ban — what the
      *  ScenarioSpec and the trace scripts are written against. */
     banZonesY: [
-      { id: ZONES[0].id, lawRef: "ЗДвП чл. 98, ал. 1, т. 2", fromY: r2(junctionY - jxBanM), toY: r2(junctionY) },
-      { id: ZONES[1].id, lawRef: "ЗДвП чл. 98, ал. 1, т. 2", fromY: r2(junctionY), toY: r2(junctionY + jxBanM) },
-      { id: ZONES[2].id, lawRef: "ЗДвП чл. 98, ал. 1, т. 1", fromY: r2(zebraY - LAW_CLEAR_M), toY: r2(zebraY + ZEBRA_BAND_HALF_M) },
+      { id: ZONES[0].id, lawRef: "ЗДвП чл. 98, ал. 1, т. 6", fromY: r2(junctionY - jxBanM), toY: r2(junctionY) },
+      { id: ZONES[1].id, lawRef: "ЗДвП чл. 98, ал. 1, т. 6", fromY: r2(junctionY), toY: r2(junctionY + jxBanM) },
+      { id: ZONES[2].id, lawRef: "ЗДвП чл. 98, ал. 1, т. 5", fromY: r2(zebraY - LAW_CLEAR_M), toY: r2(zebraY + ZEBRA_BAND_HALF_M) },
     ],
   };
 

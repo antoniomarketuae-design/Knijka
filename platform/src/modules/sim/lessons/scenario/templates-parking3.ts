@@ -621,7 +621,9 @@ export const LOT_LEFT_BAY: ParkingBaySpec = {
   lengthM: 5,
 };
 
-/** lot-zebra-v1 — the first LEGAL slot, 3.75 m clear of the чл. 98 span. */
+/** lot-zebra-v1 — the first slot a car fits in ENTIRELY clear of the paint: at
+ *  y = 11.75 the body (±2.02) runs y ∈ [9.73, 13.77], so its rear is 6.73 m
+ *  past the zebra's far edge (+3.0) and 8.75 m past the чл. 98 span's end. */
 export const LOT_ZEBRA_BAY: ParkingBaySpec = {
   x: 6.28,
   y: 11.75,
@@ -1409,7 +1411,7 @@ export const SC_PARK_ZEBRA: ScenarioSpec = {
   tagsBg: ["паркиране", "пешеходна пътека", "чл. 98", "знак В27", "избор на място"],
   titleBg: "Паркиране до пешеходна пътека",
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция до първото РАЗРЕШЕНО място — то е чак след забранената зона около пътеката, а спиране в самата зона се наказва отделно; после паркирай на заден ход в него.",
+    "Две задачи, в този ред: първо спри в изходната позиция до първото РАЗРЕШЕНО място — то е чак след забранената зона, която покрива самата пътека и петте метра преди нея, а спиране в зоната се наказва отделно; после паркирай на заден ход в него.",
   archetypeIds: ["PK-01", "PK-06"],
   conceptIds: ["c-parking-prohibitions", "c-reversing", "c-pedestrian-rights-duties"],
   map: {
@@ -1437,12 +1439,16 @@ export const SC_PARK_ZEBRA: ScenarioSpec = {
     { n: 1, textBg: "Мини през забранената зона, без да спираш в нея." },
     // 76 ch
     { n: 2, textBg: "Спри успоредно на колата след първото разрешено място — под 6 км/ч, в покой." },
-    // 79 ch
-    { n: 3, textBg: "Виж: от трите свободни места две са на под пет метра от пътеката (ЗДвП чл. 98)." },
+    // 93 ch — COPY CORRECTED 2026-09-10: this said both free slots were „на под
+    // пет метра от пътеката", the т. 6 (кръстовище) both-sides wording. Under
+    // т. 5 they fail for two DIFFERENT reasons, and naming each is the lesson.
+    { n: 3, textBg: "Виж: две свободни места не стават — едното е върху пътеката, другото в петте метра преди нея." },
     // 50 ch
     { n: 4, textBg: "Прочети знака В27 в началото на пътеката, отдясно." },
-    // 81 ch
-    { n: 5, textBg: "Помни: забраната важи и преди, и след пътеката — спряла кола там крие пешеходеца." },
+    // 91 ch — COPY CORRECTED 2026-09-10: this said „забраната важи и преди, и
+    // след пътеката". чл. 98, ал. 1, т. 5 bans the пътека itself and the 5 m
+    // BEFORE it («преди тях»); no clause of ал. 1 reaches ground past a пътека.
+    { n: 5, textBg: "Помни: забранена е самата пътека и петте метра ПРЕДИ нея — спряла там кола крие пешеходеца." },
     // 71 ch
     { n: 6, textBg: "Включи на задна — огледала, после през рамо — и завърти докрай надясно." },
     // 63 ch
@@ -1457,8 +1463,8 @@ export const SC_PARK_ZEBRA: ScenarioSpec = {
       // и спри до първото разрешено място“ while the disc cannot see the ban
       // at all — and its own halt-grace capsule reaches INTO it. Measured
       // against the committed district: lot-zebra-v1's `noStopping` zone
-      // lotzb-z-zebra runs fromM 22 → toM 38 of lotzb-e-aisle, which starts at
-      // y = −30, i.e. the чл. 98 span is y ∈ [−8, +8]. The capsule's rear edge
+      // lotzb-z-zebra runs fromM 22 → toM 33 of lotzb-e-aisle, which starts at
+      // y = −30, i.e. the чл. 98 span is y ∈ [−8, +3]. The capsule's rear edge
       // is mark − (radius + REACH_ZONE_GRACE_M) = 18 − 10 = +8.0 at L3 and
       // 18 − 12.5 = +5.5 at L1 — so at the guided rung a student parked INSIDE
       // the banned span was handed a green „подмини забраната“ by the task
@@ -1466,6 +1472,29 @@ export const SC_PARK_ZEBRA: ScenarioSpec = {
       // same act (doc 87 B58: the product must not certify the offence it
       // bills). The duty is not lost — it is the зона's, mistake-park-after's
       // and instruction 1's. What is lost is the false certificate.
+      //
+      // SPAN TRIMMED 2026-09-10: toM was 38 (y = +8), which banned 5 m PAST the
+      // crossing on the strength of a rule чл. 98, ал. 1 does not contain, so
+      // the span now ends at the paint (toM 33, y = +3).
+      //
+      // …AND THE MARGIN THAT LEAVES IS 0.48 m, NOT 2.5 m. The first draft of
+      // this note said „both capsule edges (+8.0, +5.5) now clear the span
+      // outright", which compared the capsule against the GROUND. The runtime
+      // measures the CAR against that ground (worldRuntime.ts
+      // `bodyHalfAlongEdge`, so that a rest with its rear bumper on the zebra
+      // is billed for standing on the zebra), which means the pose the capsule
+      // has to clear is not toM but toM + PLAYER_HALF_LENGTH_M:
+      //   conviction ends at centre y = +3 + 2.02 = +5.02  (driven, not typed:
+      //     parking3-claim-gates.test.ts §5 bisects it to 5.0199 / 5.0200)
+      //   capsule rear edge   L3–L5 y = 18 − (5    + 5) = +8.00   → 2.98 m clear
+      //                       L2    y = 18 − (6.25 + 5) = +6.75   → 1.73 m clear
+      //                       L1    y = 18 − (7.5  + 5) = +5.50   → 0.48 m clear
+      // Still no overlap at any rung, so the false certificate stays gone — but
+      // the guided rung clears it by less than half a metre, and NOTHING here
+      // is free to move without re-running that arithmetic: a wider grace, a
+      // bigger L1 radius, a longer chassis or a bay row pitched further north
+      // all eat the same 0.48 m. §5 of the claim gates asserts it every build
+      // so the day it goes negative is the day a test says so.
       titleBg: "Задача 1: спри до първото разрешено място след пътеката",
       params: { kind: "reachZone", x: 4.0, y: 18.0, radiusM: 5, maxSpeedKmh: 6 },
     },
@@ -1498,16 +1527,22 @@ export const SC_PARK_ZEBRA: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-park-zebra/mistake-park-after.trace.json" },
-      titleBg: "Спря веднага СЛЕД пътеката",
+      titleBg: "„Минах пътеката“ — а задницата остана върху нея",
+      // COPY CORRECTED 2026-09-10. This read „чл. 98 брои пет метра и в двете
+      // посоки" — a rule that does not exist. чл. 98, ал. 1, т. 5 (retrieved:
+      // content/law/acts/zdvp.json) is «на пешеходни или велосипедни пътеки и
+      // на разстояние, по-малко от 5 метра ПРЕДИ тях»: the five metres run one
+      // way only. The demo now rests ON the paint, which is т. 5's first limb,
+      // so the card explains the offence the student actually committed.
       whatWentWrongBg:
-        "„Минах пътеката, значи може“ — но чл. 98 брои пет метра и в двете посоки. Спряла непосредствено след пътеката, колата пак закрива човека, който тъкмо е тръгнал по нея, от всички, които идват насреща. Първото разрешено място е следващото.",
+        "„Минах пътеката, значи може“ — но е минала само предницата: задницата на колата все още стои върху зебрата. Чл. 98, ал. 1, т. 5 забранява престоя и паркирането „на пешеходни или велосипедни пътеки“ — забранена е самата маркировка, а петте метра се броят само ПРЕДИ нея. Докато част от колата е върху пътеката, пешеходецът трябва да я заобикаля — точно там, където никой не го очаква. Пътеката е премината, когато цялата кола е извън маркировката.",
       codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE"],
     },
     {
       traceRef: { path: "content/traces/sc-park-zebra/mistake-hidden-pedestrian.trace.json" },
       titleBg: "Паркира плътно ПРЕД пътеката — и после я закри",
       whatWentWrongBg:
-        "Колата спря на по-малко от пет метра преди пътеката, а при тръгването пешеходецът излезе точно иззад нея. Ето за какво са петте метра: те не пазят мястото, а видимостта — и за теб, и за всички зад теб. Затова забраната е и преди, не само след.",
+        "Колата спря на по-малко от пет метра преди пътеката, а при тръгването пешеходецът излезе точно иззад нея. Ето за какво са петте метра: те не пазят мястото, а видимостта — и за теб, и за всички зад теб. Затова законът брои тези метри именно ПРЕДИ пътеката: там стои колата, която крие тръгващия пешеходец от идващите насреща.",
       codeRefs: ["COLLISION"],
     },
   ],

@@ -362,7 +362,14 @@ export const N38_BASIS: Record<ViolationCode, N38Basis> = {
   },
   ILLEGAL_STOP_IN_BAN_ZONE: {
     clause: "а",
-    rationaleBg: "Спиране под знак В27 — неспазено предписание на знак, класическо неправилно действие от незнание.",
+    // BASIS-NEUTRAL 2026-09-09 (BAN-BASIS slice). This is keyed by ViolationCode
+    // alone and has no `detail` channel, so it may not name В27: the same code
+    // grades the чл. 98, ал. 1 spans (pk-double, pk-banx, pk-rail, lot-zebra),
+    // where no plate is required for the stop to be illegal. The Н38 clause
+    // itself is unchanged — б. „а" fits both bases identically, because in
+    // either case the fault is that the driver did not know he could not stand
+    // there.
+    rationaleBg: "Спиране там, където престоят е забранен — под знак В27 или направо по ЗДвП чл. 98, ал. 1. И в двата случая е неправилно действие от незнание, не установен конфликт.",
   },
   OVERTAKING_IN_BAN_ZONE: {
     clause: "а",

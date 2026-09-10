@@ -5,9 +5,16 @@
  *      before the rails, one unbroken motion over the band, no relief stop after
  *      — and rests at the LEGAL bay 74 m past everything → ZERO violations.
  *   2. MISTAKE DEMOS grade their EXACT codes, ONCE each, and they are DIFFERENT
- *      codes 28 m apart: ILLEGAL_STOP_IN_BAN_ZONE in the чл. 98 approach span,
+ *      codes ~4 m apart: ILLEGAL_STOP_IN_BAN_ZONE in the чл. 98 approach span,
  *      RAIL_CROSSING_VIOLATION ("stopped-on-track") on the band no span reaches.
  *      That separation IS the template; the assert below is what defends it.
+ *      IT USED TO SAY 28 m, and the gap was made of an invented distance: the
+ *      map banned 50 m either side of the band, a number ЗДвП does not contain
+ *      and content/questions/spirane-i-parkirane.json (q-…-056) marks as the
+ *      WRONG answer, calling it «ИЗМИСЛЕНО ЧИСЛО ... мит от стари помагала».
+ *      With the span re-cut to the 2 m the act really names (чл. 51, ал. 4;
+ *      чл. 53, ал. 2; чл. 54, ал. 1), the two demos sit about one car length
+ *      apart — which is the true width of the boundary the student must feel.
  *   3. COMMITTED FILES under content/traces/sc-pk-rail-ban/ ARE the recordings,
  *      byte-for-byte, with identical public copies.
  *
@@ -28,6 +35,7 @@ import { SC_PK_RAIL_BAN } from "../../lessons/scenario/templates-parking2";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import { recordScPkRailBanDrive, type ScPkRailBanTraceName } from "../scPkRailBan";
 import type { RecordedDrive } from "../recorder";
+import { PLAYER_HALF_LENGTH_M } from "../../collision/bodies";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
@@ -40,9 +48,15 @@ const NAMES: ScPkRailBanTraceName[] = [
 ];
 
 /** The authored spans, in district y (== edge arclength: one edge on x = 0). */
-const BAN_BEFORE = { fromY: 150, toY: 200 };
+const BAN_BEFORE = { fromY: 199.21, toY: 200 };
 const BAND = { fromY: 200, toY: 206 };
-const BAN_AFTER = { fromY: 206, toY: 256 };
+const BAN_AFTER = { fromY: 206, toY: 206.79 };
+/** The spans are measured against the CAR, not against a point inside it
+ *  (runtime/worldRuntime.ts; чл. 51, ал. 4 measures a vehicle-to-rail gap), so
+ *  the outermost CENTRE positions that still convict are the span edges pushed
+ *  out by half a car — 197.19 and 208.81. */
+const BAN_OPENS_Y = BAN_BEFORE.fromY - PLAYER_HALF_LENGTH_M;
+const BAN_CLOSES_Y = BAN_AFTER.toY + PLAYER_HALF_LENGTH_M;
 const BAY_Y = 330;
 
 function loadDistrict(id: string): unknown {
@@ -75,7 +89,10 @@ describe("sc-pk-rail-ban — the shadow gate (doc 76 §5)", () => {
   });
 
   it("never comes to rest anywhere in the zone — ban spans OR band (the honest zero)", () => {
-    const forbidden = (y: number) => y >= BAN_BEFORE.fromY && y <= BAN_AFTER.toY;
+    // Measured on the CAR's reach, which is what actually convicts: a shadow
+    // that parked its nose inside the act's two metres would be a clean drive
+    // in a point test and a −3 on the real tick.
+    const forbidden = (y: number) => y >= BAN_OPENS_Y && y <= BAN_CLOSES_Y;
     const restingInZone = shadow.trace.samples.filter(
       (s) => Math.abs(s.speedKmh) < 1 && forbidden(s.y),
     );
@@ -88,7 +105,7 @@ describe("sc-pk-rail-ban — the shadow gate (doc 76 §5)", () => {
     // gets caught on it. Every sample from the ban's start to the far side of the
     // band stays at cruise — the decision was made early, which is the objective.
     const inZone = shadow.trace.samples.filter(
-      (s) => s.y >= BAN_BEFORE.fromY && s.y <= BAND.toY,
+      (s) => s.y >= BAN_OPENS_Y && s.y <= BAND.toY,
     );
     expect(inZone.length).toBeGreaterThan(0);
     for (const s of inZone) expect(s.speedKmh).toBeGreaterThan(25);
@@ -111,7 +128,7 @@ describe("sc-pk-rail-ban — mistakes grade their exact codes (doc 76 §9 stage 
     });
   }
 
-  it("THE TEMPLATE: the two demos rest 28 m apart and bill DIFFERENT codes", () => {
+  it("THE TEMPLATE: the two demos rest ~4 m apart and bill DIFFERENT codes", () => {
     /** The y of the first rest the DRIVE demonstrates — i.e. after the car has
      *  actually moved off (the samples open at rest on the spawn). */
     const restY = (name: ScPkRailBanTraceName) => {
@@ -124,12 +141,23 @@ describe("sc-pk-rail-ban — mistakes grade their exact codes (doc 76 §9 stage 
     };
     const inBan = restY("mistake-stop-before-crossing");
     const onRails = restY("mistake-stop-on-rails");
-    // One rest per detector, each provably inside the right span…
-    expect(inBan).toBeGreaterThanOrEqual(BAN_BEFORE.fromY);
+    // One rest per detector, each provably inside the right span… and the ban
+    // rest is pinned the way the runtime reads it: the NOSE inside the act's two
+    // metres, the CENTRE still short of the deck, so the two codes cannot blur.
+    expect(inBan + PLAYER_HALF_LENGTH_M).toBeGreaterThanOrEqual(BAN_BEFORE.fromY);
     expect(inBan).toBeLessThan(BAND.fromY); // pkr-z-ban-before
     expect(onRails).toBeGreaterThanOrEqual(BAND.fromY);
     expect(onRails).toBeLessThanOrEqual(BAND.toY); // pkr-z-railcrossing
-    expect(onRails - inBan).toBeGreaterThan(25);
+    // CHANGED WITH THE SPAN, and tightened rather than loosened: the old bound
+    // (> 25 m) could only be met by a ban span reaching a distance no article
+    // gives. The honest claim is that the two rests are in DIFFERENT authored
+    // spans and about a car length apart — so this asserts a window, not a
+    // floor, and a demo that drifted onto the band would fail the checks above.
+    expect(onRails - inBan).toBeGreaterThan(2);
+    expect(onRails - inBan).toBeLessThan(8);
+    // …and they are separated by REAL ground: the ban demo's own bumper stops
+    // short of the deck, so nothing about this pair depends on rounding.
+    expect(inBan + PLAYER_HALF_LENGTH_M).toBeLessThan(BAND.fromY + 0.1);
     // …and the codes really are different, which is the whole point: a single
     // ban span laid over the rails would collapse this pair into one lesson.
     expect(violationCodes(drives.get("mistake-stop-before-crossing")!)).toEqual([
@@ -153,8 +181,11 @@ describe("sc-pk-rail-ban — mistakes grade their exact codes (doc 76 §9 stage 
   });
 
   it("the ban demo crosses the rails cleanly — the fault is the rest, never the transit", () => {
-    // It stops before the crossing and then drives over it: if the transit cost
-    // anything, this demo's card would be teaching two faults at once.
+    // It stops with its nose 1.19 m from the first rail and then drives over the
+    // band: if the transit cost anything, this demo's card would be teaching two
+    // faults at once. This is the load-bearing separation now that the two rests
+    // are five metres apart — the rest sits in the rail APPROACH phase, and only
+    // the "on" phase can arm the rest-on-track arm.
     const codes = violationCodes(drives.get("mistake-stop-before-crossing")!);
     expect(codes).not.toContain("RAIL_CROSSING_VIOLATION");
   });

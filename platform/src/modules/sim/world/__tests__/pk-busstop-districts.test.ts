@@ -26,6 +26,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { VehicleSample } from "../../contracts";
 import { createRuleEngine, reduceTick, type RuleEvent } from "../../rules";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
+import { PLAYER_HALF_LENGTH_M } from "../../collision/bodies";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
@@ -237,7 +238,25 @@ describe(`${ID} through the world runtime — the FP-armor precondition`, () => 
     };
     // Clear road on the approach — where the driver decides.
     expect(flagOf(100)).toBeUndefined();
-    expect(flagOf(MARKING_FROM_Y - 2)).toBeUndefined();
+    // THE BOUNDARY IS THE CAR'S, NOT THE CENTRE'S (2026-09-10). This probe read
+    // `toBeUndefined()` while the runtime tested the lane fix — a POINT — against
+    // the span. It now tests the vehicle's own reach along the edge
+    // (PLAYER_HALF_LENGTH_M = CHASSIS_HALF_EXTENTS.z = 2.02 m, headingDeg 0 on a
+    // north-running edge ⇒ exactly 2.02 m), because чл. 98, ал. 2, т. 3 bans
+    // престоя «на спирките на превозните средства от редовните линии за
+    // обществен превоз на пътници» (retrieved: content/law/acts/zdvp.json, unit
+    // ref "чл. 98") — the СПИРКА is ground, and a car is on it when its BODY is,
+    // not when its midpoint is.
+    //
+    // TIGHTENED, NOT RELAXED: the boundary is now pinned from BOTH sides, which
+    // the single `-2` probe never did. At centre y = 148 the nose sits 0.02 m
+    // over the зигзаг's first metre, so the flag is true and says so; 0.5 m
+    // further back the whole car is short of it and the road is clear again.
+    // Neither pose convicts anybody — ILLEGAL_STOP_IN_BAN_ZONE needs
+    // `speed <= fullStopMaxSpeedKmh` and this probe rides at 30 km/h — so what
+    // moved is the honesty of the flag, not the grade.
+    expect(flagOf(MARKING_FROM_Y - 2)).toBe(true);
+    expect(flagOf(MARKING_FROM_Y - 2 - PLAYER_HALF_LENGTH_M)).toBeUndefined();
     // The зигзаг approach: already the spirka (the template's whole point).
     expect(flagOf(REST_MARKING_Y)).toBe(true);
     // The seam between the two spans is continuous ban, not a legal gap.

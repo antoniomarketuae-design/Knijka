@@ -292,6 +292,14 @@ export function buildDoubleParkStreet(params) {
     {
       id: ZONE_ID,
       kind: "noStopping",
+      // BAN-BASIS slice: WHICH rule bans the stop, so the card can cite it.
+      // чл. 98, ал. 1, т. 2 — «до престояващо или паркирано пътно превозно
+      // средство от страната на движението». Retrieved from
+      // content/law/acts/zdvp.json, unit ref "чл. 98". Without this the card
+      // charges the student under чл. 6, т. 1 for disobeying a В27 plate that
+      // this map does not have, while the lesson's own instruction says the
+      // ban holds «със или без знак».
+      basis: "law-alongside",
       edgeId,
       fromM: r2(banFromM),
       toM: r2(banToM),
@@ -418,7 +426,7 @@ export function buildDoubleParkStreet(params) {
      *  and the trace scripts are written against. Identical to the arclength
      *  here (one edge, x = 0), and stated anyway so the template never has to
      *  know that. */
-    banZonesY: [{ id: ZONE_ID, lawRef: "ЗДвП чл. 98, ал. 1", fromY: r2(banFromM), toY: r2(banToM) }],
+    banZonesY: [{ id: ZONE_ID, lawRef: "ЗДвП чл. 98, ал. 1, т. 2", fromY: r2(banFromM), toY: r2(banToM) }],
     /** S1 single geometric truth: occupied bays become precise hittable parked
      *  cars (ScenarioObstacles in the scene, ObstacleRect2D in the recorder). */
     bays: BAYS,

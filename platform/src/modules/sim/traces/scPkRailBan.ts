@@ -22,17 +22,23 @@
  *     one unbroken motion over the band (чл. 52 asks no stop of a guarded-open
  *     crossing), no relief stop after them — and rests at the LEGAL bay 74 m past
  *     everything (y = 330) → ZERO violations;
- *   - „Престой в зоната пред прелеза": a casual 6 s rest at y = 175, inside
- *     pkr-z-ban-before → EXACTLY ILLEGAL_STOP_IN_BAN_ZONE (основна);
+ *   - „Престой на метър от релсите": a casual 6 s rest with the CENTRE at
+ *     y = 198 — a nose at 200.02, i.e. 1.19 m from the first rail (201.21) and
+ *     inside pkr-z-ban-before by the body test → EXACTLY
+ *     ILLEGAL_STOP_IN_BAN_ZONE (основна);
  *   - „Спиране върху самата прелезна ивица": a 6 s rest at y = 203, mid-band,
  *     where NO ban span reaches → EXACTLY RAIL_CROSSING_VIOLATION (опасна,
  *     detail "stopped-on-track").
  *
- * The two demos are 28 metres apart and grade DIFFERENT codes — that separation
- * is the template. It only holds because the map authors the ban spans up to the
- * rails and never over them (tools/maps/gen_pk_rail.mjs); the district battery
- * proves both verdicts through the real reducer before a single frame is
- * recorded here.
+ * The two demos are FIVE metres apart and grade DIFFERENT codes — that
+ * separation is the template, and five metres is the honest width of it: the
+ * law's own line for a standing vehicle is «по-малко от 2 метра от тях», so the
+ * основна and the опасна really are about one car length apart. It holds because
+ * the map measures those two metres from the RAILS the renderer draws and stops
+ * each span at the band edge, never over it (tools/maps/gen_pk_rail.mjs), and
+ * because the runtime gives every metre of the band to the rail zone alone; the
+ * district battery proves both verdicts — and the one-code-per-metre census —
+ * through the real reducer before a single frame is recorded here.
  *
  * Every stop uses the default SCRIPT_DECEL (4.6 m/s², below the
  * harshBrakeDecelMps2 = 7 threshold), so no demo smuggles in a
@@ -40,9 +46,12 @@
  * recover to the legal bay: the fault is the REST, never the route.
  *
  * Geometry pinned to content/world/pk-rail-v1.json: a 1+1 street on x = 0, lane
- * center x = 4.06, чл. 98 spans y ∈ [150, 200] and [206, 256], guarded track band
- * y ∈ [200, 206] (А34), СТОП line y = 195, legal bay y = 330, spawn
- * pkr-spawn-start (4.06, 15) heading north, 400 m long, limit 50 km/h.
+ * center x = 4.06, чл. 98 spans y ∈ [199.21, 200] and [206, 206.79] (the act's
+ * 2 m measured from the rails at 201.21 / 204.79, less the metres the band
+ * already owns), guarded track band y ∈ [200, 206] (А34), СТОП line y = 195
+ * (legal ground — the lawful waiting position under чл. 51, ал. 4 sits at or
+ * before the ban's edge), legal bay y = 330, spawn pkr-spawn-start (4.06, 15)
+ * heading north, 400 m, limit 50 km/h.
  */
 
 import {
@@ -58,8 +67,21 @@ export const SC_PK_RAIL_BAN_ID = "sc-pk-rail-ban";
 const X_LANE = 4.06;
 /** Mid-band: the six metres no чл. 98 span reaches — RX-03's ground. */
 const Y_RAILS = 203;
-/** Mid-approach-ban: 25 m short of the near rail, deep inside pkr-z-ban-before. */
-const Y_BAN = 175;
+/**
+ * A NOSE 1.19 m FROM THE FIRST RAIL. The centre rests at 198 and the car is
+ * 4.04 m long, so the bumper stands at 200.02 against a first rail at 201.21 —
+ * comfortably inside the two metres чл. 51, ал. 4 protects, and comfortably
+ * short of the band, so this demo bills the чл. 98 code and never the rail one.
+ * (worldRuntime.ts measures a no-stopping span against the vehicle's reach,
+ * which is what «на разстояние по-малко от 2 метра» measures too.)
+ *
+ * THE DEMO MOVED BECAUSE THE OLD ONE WAS INNOCENT: a 6 s rest at y = 175 is a
+ * car standing 25 m from a crossing on an empty residential street, and no
+ * article in content/law/acts/ forbids that. It was convicted only because the
+ * map carried an invented span — the same „50 метра от двете страни" the content
+ * bank marks correct: false in q-spirane-i-parkirane-056.
+ */
+const Y_BAN = 198;
 /** The ONE legal mark, 74 m past every span. */
 const Y_BAY = 330;
 
@@ -73,7 +95,7 @@ export function scPkRailBanShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Задачата: „спри някъде тук за малко“. Напред е железопътен прелез — а около него престоят е забранен от закона, не от знак." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 90], [X_LANE, 145]], targetKmh: 40, stopAtEnd: false },
-      { kind: "annotation", textBg: "Оттук нататък сме в зоната на прелеза (чл. 98). Табела няма — и точно затова мястото изглежда свободно." },
+      { kind: "annotation", textBg: "Напред е прелезът. Табела „не спирай“ няма — законът не мери прелеза в метри, а пита дали спрялата кола пречи на влака (чл. 98, ал. 1, т. 4)." },
       // Through the WHOLE approach ban at cruise: the drill's first claim is that
       // the decision is made early, not shopped for at the rails.
       { kind: "drive", points: [[X_LANE, 145], [X_LANE, 180], [X_LANE, 196]], targetKmh: 40, stopAtEnd: false },
@@ -81,15 +103,15 @@ export function scPkRailBanShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Бариерата е вдигната и прелезът е охраняем — не сме длъжни да спираме. Не спираме и „за всеки случай“." },
       // The band in one unbroken motion (чл. 52: guarded + open = no stop duty).
       { kind: "drive", points: [[X_LANE, 196], [X_LANE, 206], [X_LANE, 235]], targetKmh: 38, stopAtEnd: false },
-      { kind: "annotation", textBg: "Коловозът е преминат на едно движение. Забраната обаче продължава и от тази страна — „минах прелеза“ не значи „вече може“." },
+      { kind: "annotation", textBg: "Коловозът е преминат на едно движение. И от тази страна не спираме веднага: законът мери еднакво преди първата и след последната релса." },
       { kind: "drive", points: [[X_LANE, 235], [X_LANE, 275], [X_LANE, 300]], targetKmh: 40, stopAtEnd: false },
-      { kind: "annotation", textBg: "Цялата зона е зад нас. Сега — десен мигач и спиране на първото разрешено място." },
+      { kind: "annotation", textBg: "Прелезът е далеч зад нас и не пречим на никого. Сега — десен мигач и спиране на първото разрешено място." },
       { kind: "indicator", setting: "right" },
       { kind: "glance", mirror: "right" },
       { kind: "drive", points: [[X_LANE, 300], [X_LANE, Y_BAY]], targetKmh: 20 },
       { kind: "pause", sec: 3, brake: true },
       { kind: "indicator", setting: "off" },
-      { kind: "annotation", textBg: "Готово: спирането никога не е било забранено — забранено беше МЯСТОТО. То свърши на 256-ия метър." },
+      { kind: "annotation", textBg: "Готово: спирането никога не е било забранено — забранено беше МЯСТОТО, а то е там, където пречиш на влака." },
     ],
   };
 }
@@ -101,22 +123,25 @@ export function scPkRailBanShadowScript(): DriveScript {
 export function scPkRailBanMistakeStopBeforeCrossingScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: „бариерата е вдигната, никого не преча“ — и колата спира на десетина метра пред релсите." },
+      { kind: "annotation", textBg: "Грешка: „бариерата е вдигната, никого не преча“ — и колата спира с предница на метър и деветнайсет от първата релса." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 90], [X_LANE, 150], [X_LANE, Y_BAN]], targetKmh: 30 },
-      // A casual 6 s rest inside pkr-z-ban-before (y ∈ [150, 200]) — past the 4 s
+      // A casual 6 s rest inside pkr-z-ban-before (y ∈ [199.21, 200], reached by
+      // the nose rather than the centre) — past the 4 s
       // sustain. No lead, no stop line, no crossing anywhere on this map: every
       // structural innocent context is absent, so the authored fault convicts and
-      // nothing else. The rails are still 25 m away, so no rail arm can arm.
+      // nothing else. The car is in the rail APPROACH phase here (the window
+      // opens 30 m out), but the "on" phase starts at the band — so the rail
+      // rest arm cannot arm and the codes stay distinct.
       { kind: "pause", sec: 6, brake: true },
-      { kind: "annotation", textBg: "Около прелеза престой няма — от двете страни, и то без никакъв знак (чл. 98)." },
-      { kind: "annotation", textBg: "Спрялата тук кола крие идващия влак от всички зад нея — а те решават да минат по това, което виждат." },
+      { kind: "annotation", textBg: "Толкова близо до релсите престой няма: законът иска поне два метра, а тук са метър и деветнайсет (чл. 51, ал. 4; чл. 54, ал. 1)." },
+      { kind: "annotation", textBg: "Габаритът на влака е по-широк от релсите. А спрялата тук кола крие идващия влак от всички зад нея." },
       // The transit itself is lawful and must cost nothing — the fault was the
       // rest, and the sheet has to say exactly that.
       { kind: "drive", points: [[X_LANE, Y_BAN], [X_LANE, 206], [X_LANE, 275]], targetKmh: 30, stopAtEnd: false },
       { kind: "drive", points: [[X_LANE, 275], [X_LANE, Y_BAY]], targetKmh: 25 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Разрешеното място беше на 150 метра напред — по-малко от петнайсет секунди шофиране." },
+      { kind: "annotation", textBg: "Разрешеното място беше на 130 метра напред — по-малко от петнайсет секунди шофиране." },
     ],
   };
 }
@@ -128,7 +153,7 @@ export function scPkRailBanMistakeStopBeforeCrossingScript(): DriveScript {
 export function scPkRailBanMistakeStopOnRailsScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: същото решение, двайсет и осем метра по-нататък — колата спира между релсите." },
+      { kind: "annotation", textBg: "Грешка: същото решение, една дължина на кола по-нататък — колата спира между релсите." },
       { kind: "glance", mirror: "rear" },
       // Through the approach ban WITHOUT resting (a stop here would bill the
       // other demo's code and blur the pair) and onto the band, stopping at 203.
@@ -137,12 +162,15 @@ export function scPkRailBanMistakeStopOnRailsScript(): DriveScript {
       { kind: "annotation", textBg: "И колата остава там, където никога не се спира: върху коловоза, без изход напред." },
       // Rest ON the band: 6 s ≫ the 2 s sustain — one bill, once. No чл. 98 span
       // reaches these six metres, so the ONLY code here is the опасна one.
+      // (The ban span now ends 3 m short of this rest rather than 28, and the
+      // runtime refuses to arm it anywhere on the band — the trace gate measures
+      // the gap and the district census measures the codes.)
       { kind: "pause", sec: 6, brake: true },
       { kind: "annotation", textBg: "Тук извинение няма — нито „колоната спря“, нито „само за миг“. Влакът спира след километър и не завива." },
       { kind: "drive", points: [[X_LANE, Y_RAILS], [X_LANE, 240], [X_LANE, 275]], targetKmh: 30, stopAtEnd: false },
       { kind: "drive", points: [[X_LANE, 275], [X_LANE, Y_BAY]], targetKmh: 25 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Двете грешки са на шест метра една от друга — и се оценяват различно: основна пред прелеза, опасна върху него." },
+      { kind: "annotation", textBg: "Двете грешки са на няколко метра една от друга — и се оценяват различно: основна до прелеза, опасна върху него." },
     ],
   };
 }

@@ -193,18 +193,35 @@ describe("parking-depth mistake demos — exactly the authored codes", () => {
     expect(van.kind === "violation" ? van.detail : undefined).toBe("vehicle");
   });
 
-  it("the чл. 98 demo grades the ban, and it grades it AFTER the crossing", () => {
-    // Why after and not before: rules/engine.ts exempts a rest inside a ban
-    // span while the crossing episode is live (a car stopped short of a zebra
-    // can always be yielding). The drill therefore GRADES the slot past the
-    // crossing and DEMONSTRATES the one before it through its consequence.
+  it("the чл. 98 demo grades the ban, and it grades a car still ON the paint", () => {
+    // Why not the slot BEFORE the crossing: rules/engine.ts exempts a rest
+    // inside a ban span while the crossing episode is live (a car stopped short
+    // of a zebra can always be yielding). That slot is demonstrated through its
+    // consequence instead (mistake-hidden-pedestrian).
+    //
+    // EXPECTATION TIGHTENED 2026-09-10, and the reason is the whole point of
+    // this gate. It used to accept `at.y < 8`, because lotzb-z-zebra ran to
+    // y = +8 — the paint plus five metres PAST it. чл. 98, ал. 1, т. 5 is «на
+    // пешеходни или велосипедни пътеки и на разстояние, по-малко от 5 метра
+    // ПРЕДИ тях» (retrieved: content/law/acts/zdvp.json); the five metres run
+    // one way only and no clause of чл. 98, ал. 1 reaches ground past a пътека.
+    // The span now ends at the paint's far edge, so `< 8` would today pass on a
+    // pose the law does not cover — the bound is the far edge itself, and the
+    // demo must be convicted for standing ON the crossing, not beyond it.
+    const ZEBRA_FAR_EDGE_Y = 3.0; // ZEBRA_LENGTH_M / 2, markings.ts paints ±3.0
+    const BODY_HALF_LEN_M = 2.02; // CHASSIS_HALF_EXTENTS.z
     const d = drive("sc-park-zebra", "mistake-park-after");
     expect([...new Set(violationCodes(d))]).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     const at = createTracePoint();
     const ev = d.ruleEvents.find((e) => e.kind === "violation")!;
     sampleAt(d.trace, ev.t, at);
-    expect(at.y).toBeGreaterThan(0); // past the zebra at y = 0
-    expect(at.y).toBeLessThan(8); // and still inside the [−8, 8] span
+    // Past the crossing NODE — so `crossingPassed` has fired, `s.crossing` is
+    // null, and the rest is gradable rather than excused as yielding.
+    expect(at.y).toBeGreaterThan(0);
+    // …and never past the paint, which is where т. 5's reach stops.
+    expect(at.y).toBeLessThanOrEqual(ZEBRA_FAR_EDGE_Y);
+    // The act the card names: part of the car is still on the пешеходна пътека.
+    expect(at.y - BODY_HALF_LEN_M).toBeLessThan(ZEBRA_FAR_EDGE_Y);
   });
 
   it("the night demo grades the lamps, and the shadow of the same drill does not", () => {

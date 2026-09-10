@@ -4,15 +4,45 @@
  *
  * Every other чл. 98 map bans with ONE data layer. This one is the first
  * district where the ban spans and a railCrossing band share a street, and its
- * whole claim is that the two layers SPLIT the geography on the rail edge:
- *  - the чл. 98 spans own the approach [150, 200] and the run-out [206, 256] —
- *    a rest there is основна (ILLEGAL_STOP_IN_BAN_ZONE);
+ * whole claim is that the two layers SPLIT the geography on the band edge:
+ *  - the чл. 98, ал. 1, т. 4 spans own [199.21, 200] and [206, 206.79] — the
+ *    part of the act's two metres that lies outside the band — and a rest there
+ *    is основна (ILLEGAL_STOP_IN_BAN_ZONE);
  *  - the band [200, 206] carries NO ban span, because the rail zone's
  *    rest-on-tracks arm already owns it with a HEAVIER code (опасна,
  *    RAIL_CROSSING_VIOLATION detail "stopped-on-track") and — the asymmetry
  *    that is the whole lesson — with NO queue exemption.
- * Together they cover y ∈ [150, 256] with no legal metre anywhere between, each
- * metre billing exactly one code. This battery proves the file earns that.
+ *
+ * THE SPANS ARE ANCHORED TO THE FIRST/LAST RAIL, NOT THE BAND EDGE, and the two
+ * are 1.20625 m apart: builders/railTrack.ts draws the rails at the band centre
+ * ∓ RAIL_GAUGE_M / 2 = 203 ∓ 1.79375. Anchoring to the band edge (the first cut
+ * of the 2026-09-10 re-cut) made the convicted ground start 3.21 m from the
+ * steel while the card it prints quotes чл. 51, ал. 4 «не по-малко от 2 метра
+ * преди първата релса» — card and world disagreeing about a number, which is
+ * the defect the re-cut existed to remove. `the act's two metres are measured
+ * from the rails the renderer draws` below pins the derivation against the real
+ * RAIL_GAUGE_M, so the boundary cannot drift when a drawing constant moves.
+ *
+ * AND EVERY METRE BILLS EXACTLY ONE CODE — proven by driving the whole stretch
+ * through `createWorldRuntime` in `THE CENSUS`, not asserted in a comment. It
+ * does not follow from the spans abutting: the band is read from the lane fix
+ * (a POINT) and a no-stopping span from the vehicle's reach (a BODY), so a car
+ * resting on the deck used to overhang the span behind it and arm both flags —
+ * 4.04 m of a 6 m band billed twice. `runtime/worldRuntime.ts` now refuses to
+ * arm a noStopping span on any metre a railCrossing span covers.
+ *
+ * THE SPANS WERE [150, 200] AND [206, 256] UNTIL 2026-09-10, i.e. 50 m either
+ * side of the band, and this battery pinned that number as though it were law.
+ * It is not: ЗДвП чл. 98, ал. 1, т. 4 states a FUNCTIONAL test with no metre in
+ * it («в такава близост до тях, която може да затрудни движението на релсовите
+ * превозни средства»), and the only rail distance the act gives for a standing
+ * vehicle is 2 m — чл. 51, ал. 4 («не по-малко от 2 метра преди първата релса»),
+ * чл. 53, ал. 2 and чл. 54, ал. 1. The project's own question bank had already
+ * ruled: q-spirane-i-parkirane-056 keys «Няма мярка в метри» CORRECT and «на
+ * по-малко от 50 метра от двете му страни» false, calling it «ИЗМИСЛЕНО ЧИСЛО».
+ * So the numbers below moved to the retrieved ones, and the assertions that
+ * could only pass while the myth held were CHANGED rather than deleted — each
+ * carries its own note.
  *
  * It also pins the two structural preconditions the map is built on:
  *  - the TOTAL FP-armor precondition (gen_pk_banx's, verbatim): ZERO
@@ -29,6 +59,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { VehicleSample } from "../../contracts";
 import { createRuleEngine, reduceTick, type RuleEvent } from "../../rules";
 import { createWorldRuntime, RAIL_APPROACH_M, type DistrictWorldRuntime } from "../../runtime";
+import { PLAYER_HALF_LENGTH_M } from "../../collision/bodies";
+import { RAIL_GAUGE_M } from "../builders/railTrack";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
@@ -39,14 +71,23 @@ const ID = "pk-rail-v1";
 /** The single northbound lane center (1+1, PERCEPTUAL_ROAD_SCALE). */
 const LANE = 4.06;
 /** Authored geometry — mirrored in meta.scenario (asserted below). */
-const BAN_BEFORE_FROM_Y = 150;
+const BAN_BEFORE_FROM_Y = 199.21;
 const BAND_FROM_Y = 200;
 const BAND_TO_Y = 206;
-const BAN_AFTER_TO_Y = 256;
+const BAN_AFTER_TO_Y = 206.79;
 const BAY_Y = 330;
 const STOP_LINE_Y = 195;
-/** Where the two mistake demos rest — one per detector. */
-const REST_BAN_Y = 175;
+/** The act's own rail clearance — the reach of each span, measured from the
+ *  RAIL rather than the band edge (see the header). */
+const LAW_RAIL_CLEAR_M = 2;
+/** Where builders/railTrack.ts draws the steel: the band centre ∓ half the
+ *  gauge. Imported, never typed — this is what makes the boundary derived. */
+const FIRST_RAIL_Y = (BAND_FROM_Y + BAND_TO_Y) / 2 - RAIL_GAUGE_M / 2;
+const LAST_RAIL_Y = (BAND_FROM_Y + BAND_TO_Y) / 2 + RAIL_GAUGE_M / 2;
+/** Where the two mistake demos rest — one per detector. The ban demo's CENTRE
+ *  is short of the span; its NOSE is 1.19 m from the first rail, which is what
+ *  чл. 51, ал. 4 measures and what the runtime's body test reads. */
+const REST_BAN_Y = 198;
 const REST_RAILS_Y = 203;
 /** The authored barrier timetable + the window every drive must fit inside. */
 const BARRIER = { cycleSec: 600, downFromSec: 480, downToSec: 540 };
@@ -114,9 +155,32 @@ describe(`${ID} through the world builder`, () => {
     expect([after.fromM, after.toM]).toEqual([BAND_TO_Y, BAN_AFTER_TO_Y]);
   });
 
+  it("the act's two metres are measured from the RAILS the renderer draws, not from the band edge", () => {
+    // F1, pinned against the real drawing constant. `RAIL_GAUGE_M` is imported
+    // from builders/railTrack.ts — the module that lays the steel — so if the
+    // gauge ever moves, this fails until tools/maps/gen_pk_rail.mjs is re-run.
+    // The band edge is NOT the rail: 200 vs 201.20625, a 1.20625 m difference
+    // that would make the card's «не по-малко от 2 метра преди първата релса»
+    // (чл. 51, ал. 4) describe ground the map does not convict.
+    const [before, , after] = district.zones!;
+    expect(FIRST_RAIL_Y).toBeCloseTo(201.20625, 6);
+    expect(LAST_RAIL_Y).toBeCloseTo(204.79375, 6);
+    // Stored to the centimetre and rounded INWARD, so the convicted strip is
+    // never longer than the article — 1.99625 m here, 3.75 mm short of 2.
+    expect(FIRST_RAIL_Y - before.fromM).toBeLessThanOrEqual(LAW_RAIL_CLEAR_M);
+    expect(FIRST_RAIL_Y - before.fromM).toBeGreaterThan(LAW_RAIL_CLEAR_M - 0.02);
+    expect(after.toM - LAST_RAIL_Y).toBeLessThanOrEqual(LAW_RAIL_CLEAR_M);
+    expect(after.toM - LAST_RAIL_Y).toBeGreaterThan(LAW_RAIL_CLEAR_M - 0.02);
+    // The map publishes the rail coordinates rather than making every reader
+    // recompute them (meta.scenario.railCrossing).
+    const rc = (district.meta.scenario as { railCrossing: Record<string, number> }).railCrossing;
+    expect(rc.firstRailM).toBeCloseTo(FIRST_RAIL_Y, 2);
+    expect(rc.lastRailM).toBeCloseTo(LAST_RAIL_Y, 2);
+  });
+
   it("the two layers ABUT the band and never overlap it — the map's central law, as data", () => {
     const [before, rail, after] = district.zones!;
-    // No legal metre between y = 150 and y = 256…
+    // No legal metre between y = 199.21 and y = 206.79…
     expect(before.toM).toBe(rail.fromM);
     expect(rail.toM).toBe(after.fromM);
     // …and no metre of the band is claimed by a ban span, so a rest on the rails
@@ -189,7 +253,17 @@ describe(`${ID} through the world builder`, () => {
     expect(s.params.maxspeedKmh).toBe(50);
     expect(s.params.bandFromM).toBe(BAND_FROM_Y);
     expect(s.params.bandToM).toBe(BAND_TO_Y);
-    expect(s.params.banReachM).toBe(50);
+    // RETRIEVED, not chosen: чл. 51, ал. 4 / чл. 53, ал. 2 / чл. 54, ал. 1. Any
+    // larger number here is the map asserting a distance no article contains.
+    // It is a reach FROM THE RAIL, so each span is the 2 m less the 1.20625 m
+    // the band already owns — 0.79 m of чл. 98 ground on each side, and the
+    // remainder convicted by the heavier rail code.
+    expect(s.params.banReachM).toBe(LAW_RAIL_CLEAR_M);
+    /** The act's reach less the band-edge-to-rail inset the band already owns. */
+    const spanLenM = LAW_RAIL_CLEAR_M - (FIRST_RAIL_Y - BAND_FROM_Y);
+    expect(spanLenM).toBeCloseTo(0.79375, 6);
+    expect(BAND_FROM_Y - BAN_BEFORE_FROM_Y).toBeCloseTo(spanLenM, 2);
+    expect(BAN_AFTER_TO_Y - BAND_TO_Y).toBeCloseTo(spanLenM, 2);
     expect(s.params.legalBayY).toBe(BAY_Y);
     expect(s.legalBayY).toBe(BAY_Y);
     // The template's whole claim: this ban comes from the LAW, not from a plate.
@@ -200,7 +274,9 @@ describe(`${ID} through the world builder`, () => {
     expect(s.railCrossing.drillWindowSec).toBe(DRILL_WINDOW_SEC);
     // banZonesY lists the чл. 98 spans ONLY — the band is not a ban span.
     expect(s.banZonesY.map((z) => z.id)).toEqual(["pkr-z-ban-before", "pkr-z-ban-after"]);
-    for (const z of s.banZonesY) expect(z.lawRef).toMatch(/^ЗДвП чл\. 98/);
+    // The точка, not a bare «чл. 98»: т. 4 is the rail clause, and the card the
+    // student reads resolves off it (rules/catalog.ts NO_STOP_BASIS_COPY).
+    for (const z of s.banZonesY) expect(z.lawRef).toBe("ЗДвП чл. 98, ал. 1, т. 4");
     // The ban reaches the same distance on both sides — the law is symmetric.
     expect(s.banZonesY[0].toY - s.banZonesY[0].fromY).toBe(s.banZonesY[1].toY - s.banZonesY[1].fromY);
   });
@@ -292,15 +368,36 @@ describe(`${ID} through the world runtime — the two layers on the tick`, () =>
     };
     // Clear road on the approach — where the driver decides.
     expect(flagOf(100)).toBeUndefined();
-    expect(flagOf(BAN_BEFORE_FROM_Y - 2)).toBeUndefined();
-    // The approach ban.
+    // THE BOUNDARY IS THE CAR'S, NOT THE CENTRE'S (2026-09-10). This probe read
+    // `toBeUndefined()` while the runtime tested the lane fix — a POINT —
+    // against the span; it now tests the vehicle's reach along the edge
+    // (PLAYER_HALF_LENGTH_M = 2.02 m, headingDeg 0 ⇒ exactly that). чл. 98,
+    // ал. 1, т. 4 bans standing «върху трамвайни и железопътни линии или в
+    // такава близост до тях, която може да затрудни движението на релсовите
+    // превозни средства» (retrieved: content/law/acts/zdvp.json, unit ref
+    // "чл. 98") — a bumper inside the run-up is what затруднява the tram, and
+    // it is the bumper the article is about.
+    //
+    // TIGHTENED, NOT RELAXED: pinned from both sides, and against the ARTICLE
+    // rather than against a span coordinate. Because the referent is the body,
+    // the flag arms exactly when the car's nearest part comes within
+    // LAW_RAIL_CLEAR_M of the steel — which is how «спират на разстояние не
+    // по-малко от 2 метра преди първата релса» is measured in the first place.
+    const noseAt = (gapToRailM: number) => FIRST_RAIL_Y - gapToRailM - PLAYER_HALF_LENGTH_M;
+    expect(flagOf(noseAt(LAW_RAIL_CLEAR_M - 0.05))).toBe(true); // nose 1.95 m out
+    expect(flagOf(noseAt(LAW_RAIL_CLEAR_M + 0.05))).toBeUndefined(); // nose 2.05 m out
+    // The approach ban, and the demo's own rest (nose 1.19 m from the rail).
     expect(flagOf(REST_BAN_Y)).toBe(true);
     expect(flagOf(BAND_FROM_Y - 1)).toBe(true);
-    // THE BAND: no ban flag — the rail zone owns these six metres alone.
+    // THE BAND: no ban flag — the rail zone owns these six metres alone, and
+    // THE CENSUS below drives every one of them to prove it.
     expect(flagOf(REST_RAILS_Y)).toBeUndefined();
-    // The run-out ban, immediately past the far rail.
+    // The run-out ban: the mirror, measured from the LAST rail (чл. 54, ал. 1
+    // says «преди първата ИЛИ след последната релса» in one breath).
+    const tailAt = (gapToRailM: number) => LAST_RAIL_Y + gapToRailM + PLAYER_HALF_LENGTH_M;
     expect(flagOf(BAND_TO_Y + 1)).toBe(true);
-    expect(flagOf(BAN_AFTER_TO_Y - 1)).toBe(true);
+    expect(flagOf(tailAt(LAW_RAIL_CLEAR_M - 0.05))).toBe(true);
+    expect(flagOf(tailAt(LAW_RAIL_CLEAR_M + 0.05))).toBeUndefined();
     // Past the zone: legal road again.
     expect(flagOf(BAN_AFTER_TO_Y + 5)).toBeUndefined();
     // The legal bay: the ONE place the drill may rest.
@@ -313,7 +410,7 @@ describe(`${ID} through the world runtime — the two layers on the tick`, () =>
     expect(t.solidCenterLine).toBeUndefined();
   });
 
-  it("phases the rail band exactly, and the ban span reaches BEYOND the approach window", () => {
+  it("phases the rail band exactly, and the ban span sits INSIDE the approach window", () => {
     const rt = createWorldRuntime(loadRaw(ID));
     const phaseOf = (y: number) => {
       rt.update(1 / 60);
@@ -322,10 +419,20 @@ describe(`${ID} through the world runtime — the two layers on the tick`, () =>
     };
     // Absent before the approach window opens (30 m out = y 170)…
     expect(phaseOf(BAND_FROM_Y - RAIL_APPROACH_M - 5).phase).toBeUndefined();
-    // …"approach" inside it — and the ban span already started 20 m EARLIER
-    // (y = 150), which is the drill's shape: you are forbidden to stop before
-    // the crossing even announces itself to the reducer.
+    // …"approach" inside it. THIS EXPECTATION WAS INVERTED 2026-09-10 and the
+    // inversion is the finding, not a weakening. It used to read „the ban span
+    // already started 20 m EARLIER (y = 150) … you are forbidden to stop before
+    // the crossing even announces itself" — a shape that only existed because
+    // the map banned 50 m, which no article gives. The road out here is LEGAL
+    // road: the reducer calls it an approach, and the student may stop on it.
+    // What must hold is the containment — every metre the ban convicts is
+    // already inside the phase window, so the two layers agree about where the
+    // crossing's influence begins.
     expect(phaseOf(BAND_FROM_Y - RAIL_APPROACH_M + 5).phase).toBe("approach");
+    const rt2 = createWorldRuntime(loadRaw(ID));
+    rt2.update(1 / 60);
+    expect(rt2.sample(sample(LANE, BAND_FROM_Y - RAIL_APPROACH_M + 5, 0, 25), 1, false).noStopZone)
+      .toBeUndefined();
     expect(phaseOf(REST_BAN_Y).phase).toBe("approach");
     expect(phaseOf(REST_RAILS_Y).phase).toBe("on");
     expect(phaseOf(BAND_TO_Y + 2).phase).toBeUndefined();
@@ -350,18 +457,55 @@ describe(`${ID} through the world runtime — the two layers on the tick`, () =>
     expect(barredAt(BARRIER.cycleSec + BARRIER.downFromSec + 1)).toBe(true);
   });
 
-  it("the ONE metre where both layers touch: the near rail carries both flags", () => {
-    // Documentation-as-assertion, not a wish. The approach ban ends AT y = 200
-    // and the band starts AT y = 200 (spans are inclusive both ends), so a fix
-    // landing exactly on the near rail reads noStopZone AND railCrossing "on".
-    // Measure-zero and unreachable by either demo (they rest at 175 and 203),
-    // and both readings are legally true of that metre — but if a future demo
-    // ever parks there, it will bill two codes, and this test says why.
+  it("THE CENSUS: every position from the run-up to the run-out bills EXACTLY ONE code", () => {
+    // F2, and it is DRIVEN rather than asserted. The header's claim — „no legal
+    // metre between and no double-billed one either" — does not follow from the
+    // spans abutting in the data, because the two layers have different
+    // referents: `railCrossing` is read from the lane fix (a POINT) and a
+    // noStopping span from the vehicle's reach (a BODY). Measured on the first
+    // cut of this change, at heading 0 where the body half-extent is
+    // PLAYER_HALF_LENGTH_M = 2.02 m exactly: y = 200, 201, 202, 204, 205 and 206
+    // ALL reported noStopZone true while inside the band — 4.04 m of a 6 m deck
+    // carrying both flags, i.e. ILLEGAL_STOP_IN_BAN_ZONE (основна 3) and
+    // RAIL_CROSSING_VIOLATION (опасна 10) for one act, with nothing in
+    // rules/engine.ts to notice. worldRuntime.ts now refuses to arm a
+    // noStopping span on any metre a railCrossing span covers.
     const rt = createWorldRuntime(loadRaw(ID));
-    rt.update(1 / 60);
-    const t = rt.sample(sample(LANE, BAND_FROM_Y, 0, 20), 1, false);
-    expect(t.noStopZone).toBe(true);
-    expect(t.railCrossing).toBe("on");
+    const at = (y: number) => {
+      rt.update(1 / 60);
+      const t = rt.sample(sample(LANE, y, 0, 20), 1, false);
+      return { ban: t.noStopZone === true, onBand: t.railCrossing === "on" };
+    };
+    /** The outermost centre positions that still convict — the body reach. */
+    const BAN_OPENS_Y = BAN_BEFORE_FROM_Y - PLAYER_HALF_LENGTH_M; // 197.19
+    const BAN_CLOSES_Y = BAN_AFTER_TO_Y + PLAYER_HALF_LENGTH_M; // 208.81
+    const both: number[] = [];
+    const neither: number[] = [];
+    for (let y = BAN_OPENS_Y; y <= BAN_CLOSES_Y + 1e-9; y = Math.round((y + 0.05) * 1e6) / 1e6) {
+      const { ban, onBand } = at(y);
+      if (ban && onBand) both.push(y);
+      if (!ban && !onBand) neither.push(y);
+    }
+    // NOT ONE position carries both codes…
+    expect(both).toEqual([]);
+    // …and not one carries neither: the convicted stretch is unbroken from the
+    // first metre the nose enters the act's 2 m to the last the tail leaves it.
+    expect(neither).toEqual([]);
+    // The split itself, spot-checked at the exact metres the audit measured.
+    for (const y of [200, 201, 202, 203, 204, 205, 206]) {
+      expect(at(y), `y=${y} must be the rail zone's alone`).toEqual({ ban: false, onBand: true });
+    }
+    for (const y of [197.5, 198, 199, 199.9]) {
+      expect(at(y), `y=${y} must be чл. 98 ground`).toEqual({ ban: true, onBand: false });
+    }
+    for (const y of [206.5, 207, 208, 208.8]) {
+      expect(at(y), `y=${y} must be чл. 98 ground`).toEqual({ ban: true, onBand: false });
+    }
+    // And the ground outside is legal on BOTH counts — the 50 m myth, refuted
+    // as geometry rather than as prose.
+    for (const y of [190, 197, 209, 230]) {
+      expect(at(y), `y=${y} must be legal road`).toEqual({ ban: false, onBand: false });
+    }
   });
 });
 
@@ -402,8 +546,23 @@ describe(`${ID} — the two detectors split the geography (the real reducer)`, (
   });
 
   it("a casual 6 s rest in the RUN-OUT ban grades exactly ILLEGAL_STOP_IN_BAN_ZONE", () => {
-    // The ban is symmetric: „минах прелеза, вече може" is the same fault.
-    expect(violations(restDrive(BAND_TO_Y + 20))).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
+    // The ban is symmetric — чл. 54, ал. 1 says «преди първата ИЛИ след
+    // последната релса» in one breath — so „минах прелеза, вече може" is the
+    // same fault ONE metre past the band. It was measured at +20 m while the
+    // map banned 50; +20 is legal road now, and the case below proves it is,
+    // rather than leaving the change as a silently smaller number.
+    expect(violations(restDrive(BAND_TO_Y + 1))).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
+  });
+
+  it("…and a rest 20 m past the band bills NOTHING — the 50 m myth, refuted here", () => {
+    // The single most load-bearing case in this file after the re-cut. A car
+    // standing 20 m clear of a level crossing on an empty residential street
+    // breaks no article in content/law/acts/: чл. 98, ал. 1, т. 4 asks whether
+    // it hinders rail traffic, and nothing in this engine says it does. Until
+    // 2026-09-10 the sim convicted it anyway, while the theory bank taught that
+    // the number behind that conviction is a myth (q-spirane-i-parkirane-056).
+    expect(violations(restDrive(BAND_TO_Y + 20))).toEqual([]);
+    expect(violations(restDrive(BAND_FROM_Y - 25))).toEqual([]);
   });
 
   it("a 6 s rest ON THE BAND grades exactly RAIL_CROSSING_VIOLATION — and no ban code", () => {
@@ -414,6 +573,20 @@ describe(`${ID} — the two detectors split the geography (the real reducer)`, (
     // The rail code carries three arms; this map may only ever produce the third
     // (the "no-stop" arm is guarded-exempt, "entered-barred" is out of window).
     expect((rail[0] as { detail?: string }).detail).toBe("stopped-on-track");
+  });
+
+  it("a rest on the deck EDGE bills the rail code ALONE — one act is never two bills", () => {
+    // F2, end to end through the reducer. y = 201 and y = 205 are the positions
+    // where the car's body (± PLAYER_HALF_LENGTH_M) overhangs a чл. 98 span
+    // while its centre stands on the band. Before the fix each of them produced
+    // BOTH events: ILLEGAL_STOP_IN_BAN_ZONE (основна 3) and
+    // RAIL_CROSSING_VIOLATION (опасна 10) for one stop, 13 точки for a single
+    // act. The band is the graver and the more specific rule, so it takes the
+    // ground outright.
+    for (const y of [BAND_FROM_Y + 1, BAND_TO_Y - 1]) {
+      const events = restDrive(y).filter((e) => e.kind === "violation");
+      expect(events.map((e) => e.code), `y=${y}`).toEqual(["RAIL_CROSSING_VIOLATION"]);
+    }
   });
 
   it("THE ASYMMETRY: a queue lead acquits the ban rest — and never acquits the rails rest", () => {
