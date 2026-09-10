@@ -5912,7 +5912,7 @@ function handleTickEvent(
                     e.situation === "warning-lamp"
                     ? "WARNING_LAMP_IGNORED"
                     : // VP-11: the police-stop runner's own duty — ЗДвП чл. 103
-                      // („длъжен е да спре плавно в най-дясната част на
+                      // („е длъжен да спре плавно в най-дясната част на
                       // платното"), which is neither a junction priority nor a
                       // manoeuvre.
                       e.situation === "police-stop-signal"

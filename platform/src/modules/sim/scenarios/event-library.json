@@ -680,7 +680,7 @@
       "detection": "Lateral clearance when passing (≥1.5 m); does ego cut across a cyclist when turning right or crossing a bike lane.",
       "success": "Pass with ≥1.5 m clearance and don't right-hook the cyclist; give way across bike lanes (ЗДвП чл. 40, чл. 42).",
       "failure": "Passing too close or turning right/across into the cyclist.",
-      "feedback": "Изпреварвай велосипедиста с поне 1,5 м и не го засичай при десен завой; пази велоалеята.",
+      "feedback": "Законът иска „достатъчно странично разстояние“, когато изпреварваш велосипедист (ЗДвП чл. 42, ал. 2, т. 1). За безопасно се учи около 1,5 м въздух: велосипедистът няма ламарина около себе си и всеки миг може да се отклони заради дупка, шахта или порив на вятъра. Не го засичай при десен завой и му дай път при пресичане на велоалея (ЗДвП чл. 25, чл. 37).",
       "policyDefault": "teach-first-then-grade",
       "worldPrimitives": [
         "cyclist NPC (with hand-signals)",
@@ -700,7 +700,7 @@
       "safety": "critical",
       "examPointsCovered": 23,
       "lawRef": "ЗДвП чл. 42 (достатъчно странично разстояние); чл. 25 и чл. 37 при завиване/пресичане на велоалея",
-      "legalNote": "Законът иска „достатъчно странично разстояние“ (чл. 42) — 1.5 м е препоръка за безопасност, не норма. Без чл. 40 (то е за движение назад)."
+      "legalNote": "Законът иска „достатъчно странично разстояние“ при изпреварване (ЗДвП чл. 42, ал. 2, т. 1). Числото 1.5 м е препоръка за безопасност, а не норма от закона. Без чл. 40 (то е за движение назад)."
     },
     {
       "id": "ev-oncoming-meeting",

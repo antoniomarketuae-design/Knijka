@@ -1,0 +1,1302 @@
+{
+  "note": "Claims the gate in platform/src/lib/content/law/claimGate.test.ts cannot verify mechanically. status:accepted = a human read the claim AND the retrieved article and wrote down why the claim is safe. status:open-defect = a human read it and it is WRONG; the repair is in `why` and the count may only shrink. status:inherited = frozen at gate creation and NOT REVIEWED BY ANYBODY; may only shrink. A claim of these shapes that is NOT in this file fails the gate.",
+  "seededAt": "2026-09-10",
+  "pins": [
+    {
+      "id": "17cd407c28f0",
+      "kind": "metre-not-in-cited-law",
+      "where": "content/questions/patni-znatsi.json :: [20].explanationBg",
+      "subject": "100 метра",
+      "status": "accepted",
+      "why": "The sentence QUOTES the figure in order to refute it: „важи и 100 метра преди него“ е безсмислица. It is a folk claim being denied, not a rule being taught, and the denial is correct — no article of the retrieved ЗДвП attaches a 100 m run-up to a prohibition sign.",
+      "excerptBg": "а. Преди знака тя просто още не е започнала, затова „важи и 100 метра преди него“ е безсмислица: няма как да те задължи нещо, коет"
+    },
+    {
+      "id": "0336f2a13e7a",
+      "kind": "metre-not-in-cited-law",
+      "where": "content/questions/ptp-i-parva-pomosht.json :: [35].explanationBg",
+      "subject": "5 см",
+      "status": "accepted",
+      "why": "Chest-compression depth, attributed IN THE SENTENCE to Български Червен кръст („също казва …“) and to ERC 2021, neither of which is a Bulgarian statute this repo holds. Наредба № 24, чл. 9, т. 4 is cited for the EXAM TOPIC („поведение при остри нарушения на дишането и сърдечната дейност“), not for the depth. Not a claim about the law.",
+      "excerptBg": "първа помощ на Български Червен кръст също казва „най-малко 5 см (макс. 6 см)“. Темата е изпитна по Наредба № 24, чл. 9, т. 4."
+    },
+    {
+      "id": "f3a2e91904b0",
+      "kind": "metre-not-in-cited-law",
+      "where": "content/questions/ptp-i-parva-pomosht.json :: [35].explanationBg",
+      "subject": "6 см",
+      "status": "accepted",
+      "why": "The upper bound of the same first-aid figure, from the same named guideline. See pin 0336f2a13e7a — Наредба № 24 is cited for the topic, not for a depth in centimetres.",
+      "excerptBg": "на Български Червен кръст също казва „най-малко 5 см (макс. 6 см)“. Темата е изпитна по Наредба № 24, чл. 9, т. 4."
+    },
+    {
+      "id": "6709072f8ece",
+      "kind": "metre-not-in-cited-law",
+      "where": "content/questions/spirane-i-parkirane.json :: [56].options[1].textBg",
+      "subject": "50 метра",
+      "status": "accepted",
+      "why": "q-spirane-i-parkirane-057 puts the number on the SIGN in its own scenario: „Под знак В28 има табела с надпис „50 m“.“ The 50 m is a premise of the item, not a figure the law fixes — the plate is табела Т2 „Дължина на“ of Наредба № РД-02-21-1, an act this repo does not hold. A correct answer that reads the plate is not a legal claim about a distance.",
+      "excerptBg": "Забраната важи за следващите 50 метра."
+    },
+    {
+      "id": "9d78f17189e3",
+      "kind": "metre-not-in-cited-law",
+      "where": "content/questions/spirane-i-parkirane.json :: [56].explanationBg",
+      "subject": "50 метра",
+      "status": "accepted",
+      "why": "The explanation of the same item, restating the plate's own value while teaching the Т1/Т2 distinction. Same reasoning as pin 6709072f8ece.",
+      "excerptBg": "акът, тоест паркирането е забранено по цялото протежение от 50 метра след него. Лесно е да я объркаш с Т1 „Разстояние до“, която и"
+    },
+    {
+      "id": "c2dcd4d7af4d",
+      "kind": "metre-not-in-cited-law",
+      "where": "platform/src/modules/sim/rules/catalog.ts :: literal",
+      "subject": "1,5 метра",
+      "status": "accepted",
+      "why": "The sentence marks the figure as TAUGHT PRACTICE against a qualitative statutory standard, in so many words: „законът изисква ДОСТАТЪЧНА странична дистанция - УЧИ СЕ около 1,5 метра“. ЗДвП чл. 42, ал. 2, т. 1 requires „достатъчно странично разстояние“ and fixes no number; the copy says so rather than inventing one.",
+      "excerptBg": "конът изисква ДОСТАТЪЧНА странична дистанция - учи се около 1,5 метра въздух: велосипедистът няма ламарина около себе си и може вс"
+    },
+    {
+      "id": "6f09c91cc7a7",
+      "kind": "universal-negative",
+      "where": "content/concepts.json :: [54].summaryBg",
+      "subject": "законът не::acb8ae91",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ият пропуска теб. Ако четири коли пристигнат едновременно, се разбирате с поглед и жест - законът не решава този случай."
+    },
+    {
+      "id": "d71d63a32b65",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-accidents-duties.json :: beats[8].narrationBg",
+      "subject": "законът не::d2f70506",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "само едно: решението „няма нищо“ се взима от най-заинтересования човек на мястото. Затова законът не го оставя на теб."
+    },
+    {
+      "id": "a84452b93c89",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-admin-documents.json :: beats[1].narrationBg",
+      "subject": "нито един::90a83704",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Законът иска три документа и нито един повече. Свидетелството ти за управление. Свидетелството за регистрация на автомобила. И „Гражданска отговорност“. Забел"
+    },
+    {
+      "id": "313f2b480b31",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-admin-documents.json :: beats[8].narrationBg",
+      "subject": "закона не::0baf9a93",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "преглед, и „тя си върви“ не замества нито едната. И ако запомниш само едно: тази част от закона не се проверява с преценка, а с дати. Единственото умение тук е да ги знаеш преди да са минали."
+    },
+    {
+      "id": "9d39cae18904",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-admin-insurance-tax.json :: beats[0].narrationBg",
+      "subject": "единствен::eb9915c3",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Гражданска отговорност“. Винетка. И контролни точки. Първите две са за колата. Третото е единственото в целия закон, което е вързано лично за теб - и е единственото, което можеш да свършиш."
+    },
+    {
+      "id": "80e66e973e34",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-admin-insurance-tax.json :: beats[0].narrationBg",
+      "subject": "единствен::9141de90",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ве са за колата. Третото е единственото в целия закон, което е вързано лично за теб - и е единственото, което можеш да свършиш."
+    },
+    {
+      "id": "a18825457952",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-admin-insurance-tax.json :: beats[1].narrationBg",
+      "subject": "Единствен::2dcb1e66",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "томобил, прибран в двора и недокоснат с месеци, дължи полица, защото си стои регистриран. Единственият законен начин да спреш плащанията е официално да прекратиш регистрацията и да върнеш табелите. Ин"
+    },
+    {
+      "id": "01f1c700cd5e",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-admin-newdriver-police.json :: beats[7].narrationBg",
+      "subject": "единствен::c53f3ca3",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Три изречения да останат. Като нов водач стартираш с по-малко контролни точки - и това е единствената разлика, която законът у нас прави за теб. При сигнал за проверка спираш плавно и възможно най-вдя"
+    },
+    {
+      "id": "57fc1c536de5",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-basics-safety.json :: beats[1].narrationBg",
+      "subject": "Законът не::38ed4153",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "дължителен при всяко пътуване, на всяка седалка, при всяка скорост. В града и извън него. Законът не прави отстъпки за „кратко“, „бавно“ или „само до магазина“. Защо толкова категорично? При удар с пе"
+    },
+    {
+      "id": "a653998fb957",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-conditions-night.json :: beats[1].narrationBg",
+      "subject": "Законът не::e9714f7d",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": ", при която спираш в границите на осветеното, а не в това, което се надяваш да е празно. Законът не сваля ограниченията нощем - той задължава теб да ги свалиш. Табелата е таван за идеални условия. Нощ"
+    },
+    {
+      "id": "fe77673356a0",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-fitness-alcohol-drugs.json :: beats[5].narrationBg",
+      "subject": "законът не::5a580346",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ите няма граница, която да търсиш. Забраната е за самата употреба, а не за концентрация - законът не пита колко. Затова „малко“, „чувствам се добре“ и „беше вчера“ не значат нищо. Тестовете улавят вещ"
+    },
+    {
+      "id": "f3f10df11b75",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-junctions-signed-light.json :: beats[1].narrationBg",
+      "subject": "закона не::29803050",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "спирането оглеждаш и пропускаш всички с предимство, и отляво, и отдясно. „Почти спрях“ в закона не съществува. И една подробност между колите без предимство. Знаците уреждат само отношението към главн"
+    },
+    {
+      "id": "a9bf1c96d377",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-parking-rules.json :: beats[1].narrationBg",
+      "subject": "Законът не::cfdbdb11",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "и наблизо. Третото е паркиране: оставяш колата по всяка друга причина. Сега най-важното. Законът не мери с хронометър. Няма праг от петнайсет минути, няма праг от трийсет. Гледат се целта и това дали "
+    },
+    {
+      "id": "700ce04f35cf",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-parking-rules.json :: beats[2].visual.captionBg",
+      "subject": "не съществува::2e84535c",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Една улица, два знака - и една минутка, която не съществува в закона"
+    },
+    {
+      "id": "424164db0763",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-parking-safe-leaving.json :: beats[4].narrationBg",
+      "subject": "законът не::cd798f5a",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Наклонът. Тук законът не описва техника, а изисква резултат: колата да не може да потегли сама. Техниката е твоя работа и тя е три независими за"
+    },
+    {
+      "id": "7f72088b45f0",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-parking-special-towing.json :: beats[1].narrationBg",
+      "subject": "не съществува::b39185e4",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "е. Аварийните светлини и оставането в колата не са изключение. Тези три оправдания просто не съществуват в закона. Сега най-често бърканото. Картата не е издадена на автомобила, а на човека. Тя е личн"
+    },
+    {
+      "id": "0b7529ad5fa2",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-priority-situations.json :: beats[1].narrationBg",
+      "subject": "закона не::e77659a3",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "о е поставен знакът. Винаги. Дори когато пътят изглежда напълно свободен. „Почти спрях“ в закона не съществува. Защо толкова строго? Спирането ти дава секундата, в която виждаш онова, което си пропусн"
+    },
+    {
+      "id": "4787365be803",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-priority-situations.json :: beats[4].narrationBg",
+      "subject": "закона не::5fb817f4",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "орото е мигачът. Мигачът е предупреждение за намерение, не заявка за предимство. Никъде в закона не пише, че някой е длъжен да спре, защото ти си светнал. „Включих мигача навреме“ е най-скъпата грешка"
+    },
+    {
+      "id": "db8f5f14ecc2",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-priority-special.json :: beats[1].narrationBg",
+      "subject": "Законът не::e0c4ce73",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "нищо. Логиката е физическа: трамваят не може да завие настрани и спира на десетки метри. Законът не му дава избор, затова дава задължението на теб. И се пропуска празен точно толкова, колкото и пълен "
+    },
+    {
+      "id": "db74252e2c9f",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-roads-rural.json :: beats[1].narrationBg",
+      "subject": "законът не::6012999b",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": ". Трактор излиза от нива. Стадо запушва платното. Човек върви по банкета привечер. Затова законът не иска просто да спазиш знака - иска скорост, съобразена с пътя, релефа и видимостта. При деветдесет "
+    },
+    {
+      "id": "98ec591be6be",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-speed-limits.json :: beats[1].narrationBg",
+      "subject": "не съществува::f0e67004",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ст. Не чакаш кръгче с число - такова рядко се поставя, а „преходна скорост“ от седемдесет не съществува в закона. И най-скъпото убеждение в страната: толерансът от десет километра. Няма такъв. Скалата"
+    },
+    {
+      "id": "6d71ba9fa586",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-speed-limits.json :: beats[7].narrationBg",
+      "subject": "Законът не::242319c3",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Дотук - тавани. Сега задължението, което стои над всеки таван. Законът не казва „карай до знака“. Казва: съобрази скоростта с атмосферните условия, с релефа, със състоянието на пътя и на превоз"
+    },
+    {
+      "id": "2a7b891607a2",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-vulnerable-pedestrians.json :: beats[1].narrationBg",
+      "subject": "закона не::6623a55f",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Първо кой. Пешеходец по закона не е само този, който върви. Пешеходец е и човекът, който бута велосипед или детска количка, и човекът в инвалидна количка."
+    },
+    {
+      "id": "f47409deca81",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-vulnerable-pedestrians.json :: beats[1].narrationBg",
+      "subject": "не съществува::9aeb3364",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "чно разстояние. И едно изречение, което си струва да остане: „по-бързият има предимство“ не съществува в закона. Пешеходци очакваш около спирките, в жилищните зони и по всеки път без тротоар. Пътеката"
+    },
+    {
+      "id": "c7eec6229583",
+      "kind": "universal-negative",
+      "where": "content/lessons/l-vulnerable-pedestrians.json :: beats[8].narrationBg",
+      "subject": "законът не::7f81d671",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "не вижда над колите, не може да прецени скорост и разстояние и действа импулсивно. Затова законът не разчита на неговата преценка, а прехвърля цялата предпазливост върху теб: при деца на пътя или в бл"
+    },
+    {
+      "id": "7eaa8c4a189a",
+      "kind": "universal-negative",
+      "where": "content/questions/alkohol-i-godnost.json :: [4].explanationBg",
+      "subject": "не съществува::f8ba395f",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "о - вдига самочувствието точно когато уменията падат; „изострена концентрация“ от алкохол не съществува (ЗДвП чл. 5)."
+    },
+    {
+      "id": "8ff802380910",
+      "kind": "universal-negative",
+      "where": "content/questions/alkohol-i-godnost.json :: [11].explanationBg",
+      "subject": "единствен::7460cf36",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "“ километри и неволното криволичене са последните сигнали преди микросъня - появят ли се, единственият верен ход е спиране и почивка (ЗДвП чл. 5)."
+    },
+    {
+      "id": "938f2d1690a0",
+      "kind": "universal-negative",
+      "where": "content/questions/alkohol-i-godnost.json :: [12].explanationBg",
+      "subject": "единствен::0e5a8665",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "мо минути измамна бодрост, а микросънят идва без предупреждение - мозъкът се възстановява единствено с почивка (ЗДвП чл. 5)."
+    },
+    {
+      "id": "7640750b3694",
+      "kind": "universal-negative",
+      "where": "content/questions/alkohol-i-godnost.json :: [37].explanationBg",
+      "subject": "единствен::47a9f46e",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "т компанията е сред най-честите причини млади водачи да катастрофират - зад волана решава единствено шофьорът, а истинската увереност е да кажеш „не“ (ЗДвП чл. 5; чл. 20)."
+    },
+    {
+      "id": "ede68b65a667",
+      "kind": "universal-negative",
+      "where": "content/questions/alkohol-i-godnost.json :: [42].explanationBg",
+      "subject": "не съществува::7f11077b",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "сички - не зависи от стаж, възраст или това дали си в града; митът за „нулева за младите“ не съществува, а значение има чистият алкохол в кръвта (ЗДвП чл. 5; чл. 174)."
+    },
+    {
+      "id": "b969fcae509e",
+      "kind": "universal-negative",
+      "where": "content/questions/alkohol-i-godnost.json :: [46].explanationBg",
+      "subject": "единствен::e76787a7",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "оку-що, значи съм чист“ е опасна заблуда. Тези минути са физиология, а не срок от закона: единственото число, което ЗДвП дава тук, е границата по чл. 5, ал. 3, т. 1 - „над 0,5 на хиляда“. Практическия"
+    },
+    {
+      "id": "3fd498e3200f",
+      "kind": "universal-negative",
+      "where": "content/questions/alkohol-i-godnost.json :: [54].explanationBg",
+      "subject": "единствен::b32a58fe",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ключва за секунди без позволение, а „още малко издържам“ е точно мисълта преди микросъня; единственото решение е спиране (ЗДвП чл. 5)."
+    },
+    {
+      "id": "29ee7098d1fa",
+      "kind": "universal-negative",
+      "where": "content/questions/dokumenti-i-sanktsii.json :: [8].explanationBg",
+      "subject": "единствен::ecb02402",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ка отговорност“, защото тя защитава другите (чл. 483 КЗ) - „Каско“ е твой личен избор и е единствената от двете, която плаща за собствената ти кола."
+    },
+    {
+      "id": "3de3e611df0b",
+      "kind": "universal-negative",
+      "where": "content/questions/dokumenti-i-sanktsii.json :: [13].explanationBg",
+      "subject": "единствен::0703f6ee",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ое от трите ще получиш не зависи от това колко „тежко“ ти изглежда нарушението, а от един-единствен въпрос, който законът задава дословно: предвижда ли се за него ЛИШАВАНЕ ОТ ПРАВО да управляваш. Чл. "
+    },
+    {
+      "id": "6044342847ac",
+      "kind": "universal-negative",
+      "where": "content/questions/eko-i-zashtitno-shofirane.json :: [28].explanationBg",
+      "subject": "единствен::37257dd4",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ените“ километри са признак на микросън - музиката и кофеинът само отлагат заспиването, а единственото истинско лекарство е кратък сън на безопасно място (ЗДвП чл. 5)."
+    },
+    {
+      "id": "666639c8665a",
+      "kind": "universal-negative",
+      "where": "content/questions/eko-i-zashtitno-shofirane.json :: [60].explanationBg",
+      "subject": "законът не::108c8459",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Пред училище законът не чака да стигнеш до „зебрата“: щом на пътя или в близост до него има деца, си длъжен да намалиш скоростта, а при необход"
+    },
+    {
+      "id": "f2a832cb00ad",
+      "kind": "universal-negative",
+      "where": "content/questions/krastovishta.json :: [23].explanationBg",
+      "subject": "закона не::1b8d10d4",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "от чл. 50, ал. 1 ЗДвП - ти си на пътя без предимство. „Почти спрях, защото беше празно“ в закона не съществува: спирането е това, което ти дава секундата, в която виждаш пропуснатото."
+    },
+    {
+      "id": "a0665ba354da",
+      "kind": "universal-negative",
+      "where": "content/questions/krastovishta.json :: [46].explanationBg",
+      "subject": "закона не::6da436c7",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Никъде в закона не пише „заден ход на кръстовище е забранен“ - и точно затова въпросът е по-труден, отколкото изглежда. Заден ход се урежда"
+    },
+    {
+      "id": "4739d127853f",
+      "kind": "universal-negative",
+      "where": "content/questions/krastovishta.json :: [62].explanationBg",
+      "subject": "закона не::fbccdb1e",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "без предимство, затова пропускаш всички по главната, и отляво, и отдясно. „Почти спрях“ в закона не съществува, а точно от бавното промъкване се раждат ударите в страничната врата."
+    },
+    {
+      "id": "f84140aa468f",
+      "kind": "universal-negative",
+      "where": "content/questions/magistrali-i-izvangradsko.json :: [38].explanationBg",
+      "subject": "Законът не::3faef96c",
+      "status": "accepted",
+      "why": "„Законът не дава конкретни метри“ for the side clearance when overtaking a cyclist. TRUE: ЗДвП чл. 42, ал. 2, т. 1 requires „достатъчно странично разстояние“ and states no figure — verified against the retrieved article.",
+      "excerptBg": "42, ал. 1, т. 2 ЗДвП) и осигуряваш достатъчно странично разстояние (чл. 42, ал. 2, т. 1). Законът не дава конкретни метри - практиката е да им отделиш цяла лента. Продължителният клаксон в ухото е точ"
+    },
+    {
+      "id": "9ad29c91ba79",
+      "kind": "universal-negative",
+      "where": "content/questions/manevri-i-izprevarvane.json :: [44].explanationBg",
+      "subject": "законът не::fa1e1399",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "аобикалянето на релсово превозно средство от лявата страна.“ Забележи как е формулирано - законът не ти нарежда да минеш отдясно, а ти забранява лявата страна, и това оставя само дясната. Няма изключе"
+    },
+    {
+      "id": "c1b9facf0d85",
+      "kind": "universal-negative",
+      "where": "content/questions/manevri-i-izprevarvane.json :: [51].explanationBg",
+      "subject": "единствен::09ab3eb2",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "етра - и еднопосочната улица не е сред тях. Проблемът е в самата посока: улицата има едно-единствено разрешено направление, въведено със знак, а чл. 6, т. 1 ЗДвП те задължава да се съобразяваш с пътни"
+    },
+    {
+      "id": "2aad27d26675",
+      "kind": "universal-negative",
+      "where": "content/questions/manevri-i-izprevarvane.json :: [55].explanationBg",
+      "subject": "Законът не::ff3f732a",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Законът не забранява изпреварването на няколко коли наведнъж, но то изисква много по-дълъг свободен участък и предварително видима"
+    },
+    {
+      "id": "89faeb8f4bea",
+      "kind": "universal-negative",
+      "where": "content/questions/nosht-i-uslozhneni-uslovia.json :: [16].explanationBg",
+      "subject": "Законът не::8cd1ee98",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Законът не сваля ограниченията нощем - но чл. 20 ЗДвП те задължава сам да свалиш скоростта според видимостта, защото на тъмно очит"
+    },
+    {
+      "id": "07a2196eff21",
+      "kind": "universal-negative",
+      "where": "content/questions/nosht-i-uslozhneni-uslovia.json :: [17].explanationBg",
+      "subject": "Единствен::e66a38d2",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Единствената работеща защита е да пазиш очите си и да свалиш скоростта - чл. 77 ЗДвП изисква точно това при заслепяване. Отговориш"
+    },
+    {
+      "id": "1870ac22c06f",
+      "kind": "universal-negative",
+      "where": "content/questions/nosht-i-uslozhneni-uslovia.json :: [36].explanationBg",
+      "subject": "Законът не::ab479ae6",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "й-обикновена умора, без да пита колко е часът - кафето и въздухът отлагат, но не лекуват. Законът не дава секунди: той дава задължение - водачът контролира непрекъснато превозното средство (чл. 20, ал"
+    },
+    {
+      "id": "56d463ef6fb0",
+      "kind": "universal-negative",
+      "where": "content/questions/nosht-i-uslozhneni-uslovia.json :: [46].explanationBg",
+      "subject": "единствен::7d1e32e0",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "т въздух само заслепява насрещните и не добавя видимост - затова чл. 74 ЗДвП ги разрешава единствено при реално намалена видимост от мъгла, сняг или дъжд. Цветът им няма значение, а мощността им е дос"
+    },
+    {
+      "id": "4f3de957a2e2",
+      "kind": "universal-negative",
+      "where": "content/questions/osnovni-ponyatia.json :: [16].explanationBg",
+      "subject": "законът не::560a4772",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "рофи стават на километри от вкъщи, по познатите улици, където хората се разсейват. Затова законът не прави отстъпки за „кратко“, „бавно“ или „само до магазина“."
+    },
+    {
+      "id": "aa664ac115f3",
+      "kind": "universal-negative",
+      "where": "content/questions/osnovni-ponyatia.json :: [18].explanationBg",
+      "subject": "не съществува::00329350",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ете на възрастен не удържат и 20 кг при 50 км/ч - детето просто излита. „Кратко пътуване“ не съществува като изключение в закона (ЗДвП, чл. 137в, ал. 2)."
+    },
+    {
+      "id": "6aceb1c3bedf",
+      "kind": "universal-negative",
+      "where": "content/questions/osnovni-ponyatia.json :: [32].explanationBg",
+      "subject": "единствен::f3fcb456",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": ", отвореният прозорец и аварийните светлини не връщат вниманието, а само отлагат момента; единственото, което работи, е да спреш на безопасно място и да поспиш (ЗДвП, чл. 20, ал. 1)."
+    },
+    {
+      "id": "8d514924d0d2",
+      "kind": "universal-negative",
+      "where": "content/questions/osnovni-ponyatia.json :: [45].explanationBg",
+      "subject": "законът не::3e5fcf4a",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "2, т. 2). Възрастта е една и е проста: минималната възраст е шестнадесет години (ал. 3) - законът не прави отстъпка нито за велоалеите, нито за „само до близкия магазин“."
+    },
+    {
+      "id": "2ca4fbcb58ec",
+      "kind": "universal-negative",
+      "where": "content/questions/patni-znatsi.json :: [21].explanationBg",
+      "subject": "единствен::7001b125",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "на видимост, и на железопътен прелез без бариери - прелезът е единият от двата случая, не единственият (чл. 60, ал. 2)."
+    },
+    {
+      "id": "c17c15c2523f",
+      "kind": "universal-negative",
+      "where": "content/questions/patni-znatsi.json :: [57].explanationBg",
+      "subject": "единствен::77e986c6",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ция. Движението на неутрална предавка ти отнема точно този резерв и превръща спирачките в единствената ти защита (ЗДвП, чл. 20)."
+    },
+    {
+      "id": "1fc4131341ec",
+      "kind": "universal-negative",
+      "where": "content/questions/patni-znatsi.json :: [59].explanationBg",
+      "subject": "не съществува::eb9a0eba",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "т с името на града вече е този знак, - а измислени междинни стойности като 60 км/ч просто не съществуват в закона (ЗДвП, чл. 21)."
+    },
+    {
+      "id": "d9d1f841cc80",
+      "kind": "universal-negative",
+      "where": "content/questions/patni-znatsi.json :: [80].explanationBg",
+      "subject": "единствен::6b819f43",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "3 сочи наляво и името му в наредбата е буквално „Движение само наляво след знака“: това е единствената разрешена посока оттам нататък. Г1 задължава направо, Г2 - надясно, а Г4 ти оставя избор между на"
+    },
+    {
+      "id": "92b52f98b468",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [11].explanationBg",
+      "subject": "никъде не::f56dcb2d",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "чът е предупреждение за намерение (чл. 28, ал. 1 ЗДвП), не заявка за предимство - законът никъде не казва, че някой е длъжен да спре, защото ти си светнал. Правото се дава от чл. 37, ал. 1: завиващият"
+    },
+    {
+      "id": "391e621a875c",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [13].explanationBg",
+      "subject": "законът не::18f23e0c",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Логиката е физическа: трамваят не може да завие настрани и спира на десетки метри, затова законът не му дава избор."
+    },
+    {
+      "id": "aaecf84491dc",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [27].explanationBg",
+      "subject": "закона не::7c27898f",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": ". 48 ЗДвП - пропускаш идващия отдясно. Ширината на платното и посоката „направо“ никъде в закона не раздават предимство; те само изглеждат убедително."
+    },
+    {
+      "id": "63460d0a6fc2",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [39].explanationBg",
+      "subject": "единствен::b68c62ce",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "П). Мигачът е предупреждение за намерение (чл. 28), клаксонът в населено място е разрешен единствено за да предотврати произшествие (чл. 30), а мощността на колата не фигурира никъде в закона. Единств"
+    },
+    {
+      "id": "bd0f4b9c1e9f",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [57].explanationBg",
+      "subject": "Не съществува::462645a7",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "та пътека е отделно задължение по чл. 119, ал. 1 и то не се отменя от знак за предимство. Не съществува и правило „докато не стигне средата“: законът брои стъпилите на пътеката. Клаксонът в населено м"
+    },
+    {
+      "id": "ab3bd7ea2cac",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [58].options[3].textBg",
+      "subject": "Законът не::cd55dd80",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Законът не решава еднозначно този случай - правилото на дясното води до „задънена“ верига."
+    },
+    {
+      "id": "1676b29008d3",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [59].explanationBg",
+      "subject": "единствен::d52fcea6",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "На равнозначно кръстовище чл. 48 ЗДвП използва един-единствен критерий - кой е отдясно. Редът на пристигане не е записан никъде, защото е неизмерим и всеки го помни в своя полза. Шир"
+    },
+    {
+      "id": "05eb3b44fbdf",
+      "kind": "universal-negative",
+      "where": "content/questions/prevozno-sredstvo.json :: [5].explanationBg",
+      "subject": "закона не::f9aad41d",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Обличаш я преди да слезеш - денем също. Условието в закона не е нито часът, нито дали си извън града: щом спряното превозно средство е в обхвата на пътното платно, водачът трябва да"
+    },
+    {
+      "id": "10a62cc36f2a",
+      "kind": "universal-negative",
+      "where": "content/questions/ptp-i-parva-pomosht.json :: [13].explanationBg",
+      "subject": "единствен::cdecfcd5",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "пропуснеш точка от списък - обади се рано, отговаряй и не затваряй. Законът те задължава единствено ДА уведомиш (ЗДвП чл. 123, ал. 1, т. 2, б. „а“, а ако не си участник - чл. 124, т. 2); какво да каже"
+    },
+    {
+      "id": "d0f692a02fa2",
+      "kind": "universal-negative",
+      "where": "content/questions/ptp-i-parva-pomosht.json :: [25].textBg",
+      "subject": "законът не::904ce9d8",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Участник си в ПТП с пострадал и чакате полицията. Кои от посочените действия законът не ти позволява, докато тя пристигне?"
+    },
+    {
+      "id": "ff7eb8ff56ef",
+      "kind": "universal-negative",
+      "where": "content/questions/ptp-i-parva-pomosht.json :: [43].explanationBg",
+      "subject": "никъде не::1717709d",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "амото събитие е ПТП по § 6, т. 30 от ДР на ЗДвП - там законът дефинира произшествието, но никъде не казва кого броим за загинал. И това не е пропуск, който да намериш в друг член: прагът изобщо не е в"
+    },
+    {
+      "id": "5f0993d8efe8",
+      "kind": "universal-negative",
+      "where": "content/questions/signali-i-markirovka.json :: [4].explanationBg",
+      "subject": "единствен::98e9ce08",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Допълнителната секция отваря само своята посока и се подава единствено заедно с включена червена и/или жълта светлина на светофара (ППЗДвП, чл. 32). За всяка друга посока важи основният сигн"
+    },
+    {
+      "id": "5c7e3b68b4b7",
+      "kind": "universal-negative",
+      "where": "content/questions/signali-i-markirovka.json :: [16].explanationBg",
+      "subject": "единствен::eaf5a965",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "илственото престрояване в кръстовището или движението назад струват удар отстрани. Затова единственият разумен ход е да завиеш и да се върнеш по нормалния път."
+    },
+    {
+      "id": "4c14ee418cbc",
+      "kind": "universal-negative",
+      "where": "content/questions/signali-i-markirovka.json :: [57].explanationBg",
+      "subject": "единствен::c6e0e227",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": ": движението по BUS лента без право се наказва с глоба 100 лв. (чл. 183, ал. 4, т. 12), а единственото изключение в чл. 15, ал. 6 е превозът на деца и ученици, не бързането. Изпреварването през BUS ле"
+    },
+    {
+      "id": "11ce40dac542",
+      "kind": "universal-negative",
+      "where": "content/questions/skorost-i-distantsia.json :: [21].explanationBg",
+      "subject": "не съществува::5b7f8fae",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "то да видиш числото е грешка, която ще ти струва глоба, а „преходна скорост“ от 70 просто не съществува в закона (ЗДвП чл. 21)."
+    },
+    {
+      "id": "54094a97a17e",
+      "kind": "universal-negative",
+      "where": "content/questions/skorost-i-distantsia.json :: [33].explanationBg",
+      "subject": "Единствен::0bb454c4",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "а, в който сцеплението се върне: тогава колата тръгва натам, накъдето си завъртял волана. Единственият изход е плавно да свалиш скоростта и да чакаш (ЗДвП чл. 20)."
+    },
+    {
+      "id": "12ddc2eba203",
+      "kind": "universal-negative",
+      "where": "content/questions/skorost-i-distantsia.json :: [46].explanationBg",
+      "subject": "Законът не::691b18c7",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "разбиват калника и спирачните маркучи - това е границата, която дават производителите им. Законът не изписва число за вериги, но изисква скоростта ти да е съобразена със състоянието на пътя и на прево"
+    },
+    {
+      "id": "680ae239e362",
+      "kind": "universal-negative",
+      "where": "content/questions/spirane-i-parkirane.json :: [1].explanationBg",
+      "subject": "Законът не::fb4f92c0",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Законът не мери с хронометър: щом оставяш колата и се отдалечаваш не заради пътници или товар, това е паркиране (чл. 93 ЗДвП) - не"
+    },
+    {
+      "id": "2a1f15f3926f",
+      "kind": "universal-negative",
+      "where": "content/questions/spirane-i-parkirane.json :: [19].explanationBg",
+      "subject": "не съществува::aa1293b5",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "лата. Затова пълният паркинг, късният час и аварийните светлини не отварят това място: те не съществуват в закона като основание. Глобата и „паякът“ също не питат колко минути си стоял - питат само да"
+    },
+    {
+      "id": "a43504af3d51",
+      "kind": "universal-negative",
+      "where": "content/questions/uyazvimi-uchastnitsi.json :: [37].explanationBg",
+      "subject": "единствен::bab21d80",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "това ги очакваш навсякъде, а не само на „зебрата“: пътеката е тяхното право, а не тяхното единствено място (ЗДвП, чл. 108 и чл. 116)."
+    },
+    {
+      "id": "dbff2773122d",
+      "kind": "universal-negative",
+      "where": "content/questions/uyazvimi-uchastnitsi.json :: [40].explanationBg",
+      "subject": "законът не::8fe46038",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "нът“ на пътниците - те слизат право пред колата ти и нямат къде другаде да стъпят. Затова законът не ти оставя избор: приближаваш ли отдясно спиращ или спрял на обозначена спирка трамвай, спираш на ед"
+    },
+    {
+      "id": "c02505294824",
+      "kind": "universal-negative",
+      "where": "content/traces/sc-ed-d2-priority-run/mistake-rolling-stop.trace.json :: events[4].textBg",
+      "subject": "не съществува::e17ae3b5",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "На Б2 се спира ДОКРАЙ - колелата неподвижни. „Почти спрях“ не съществува нито в закона, нито на изпита."
+    },
+    {
+      "id": "b28af4df300c",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/advisor.ts :: literal",
+      "subject": "не съществува::4f70220b",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "да чакаш тук. На Б2 се спира докрай ВИНАГИ, дори пътят да изглежда празен - „почти спрях“ не съществува нито в закона, нито на изпита. Мястото на това спиране е ДО самата линия: спреш ли по-рано - за "
+    },
+    {
+      "id": "af27a40b428d",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/exam.ts :: literal",
+      "subject": "единствен::884ee82b",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "настъпи пътнотранспортно произшествие - \u0001, единственото основание, по което наредбата спира самото каране"
+    },
+    {
+      "id": "d0d6ad0948ac",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-exam.ts :: literal",
+      "subject": "единствен::e517557f",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "е размина с него. Пътеката в средата на участъка няма светофар: там пешеходецът е защитен единствено от чл. 119 и от твоята спирачка. Премерената скорост не е извинение да не пропуснеш - тя е само при"
+    },
+    {
+      "id": "29474bdeb7b1",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-exam.ts :: literal",
+      "subject": "не съществува::f428b3cc",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "затова грешката е чиста и единствена: огледът беше налице, спирането - не. „Почти спрях“ не съществува нито в закона, нито на изпита. Знакът Б2 иска неподвижни колела, защото само спрялата кола ти дав"
+    },
+    {
+      "id": "f0dc5d13c3d8",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-following2.ts :: literal",
+      "subject": "единствен::a396a147",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "питния лист по Наредба № 38 (приложение № 5, т. 10, б. „в“) при таван 9 за целия изпит, и единствената грешка, която го прекратява (същата наредба, чл. 48, ал. 3). Не са контролни точки по книжката. П"
+    },
+    {
+      "id": "f6968bb1c68f",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-hazards2.ts :: literal",
+      "subject": "единствен::b0437d7e",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "лини още преди да потеглиш (чл. 70): при аварийно спиране на мокро задните ти светлини са единственото предупреждение, което идващият отзад получава навреме."
+    },
+    {
+      "id": "dc4365a70ee3",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-hazards2.ts :: literal",
+      "subject": "единствен::28fbbf5d",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "о ПТП - опасна грешка, 10 наказателни точки (Наредба № 38 приложение № 5, т. 10, б. „в“), единствената грешка, която прекратява изпита (същата наредба, чл. 48, ал. 3). И двете са от изпитния лист, не "
+    },
+    {
+      "id": "23d701e52622",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-junctions.ts :: literal",
+      "subject": "единствен::c7e09d1f",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": ". По тъмно карай с включени къси светлини (чл. 70): нощем на кръстовище чуждите фарове са единственото, по което се чете кой идва - и твоите са единственото, по което другите четат теб."
+    },
+    {
+      "id": "1198068aeed8",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-lanes2.ts :: literal",
+      "subject": "законът не::78eabae2",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "остите се събират, така че две секунди повече са стотици метри по-малко за всички. Затова законът не оставя това на добрата воля: на изпреварвания е ЗАБРАНЕНО да увеличава скоростта си. Помощта ти е п"
+    },
+    {
+      "id": "73d4e436c75b",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-lanes2.ts :: literal",
+      "subject": "единствен::f10cc83c",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Изпреварването е единствената нормална маневра, при която доброволно излизаш в насрещното платно - и остава безопасна само докато виждаш целия учас"
+    },
+    {
+      "id": "56fef4f69964",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-lanes2.ts :: literal",
+      "subject": "законът не::7bd55256",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ина метра и вие оставате без нищо освен спирачки, каквито няма къде да използвате. Затова законът не оставя това на преценка: при ограничена видимост изпреварването е ЗАБРАНЕНО. Цената на търпението е"
+    },
+    {
+      "id": "3fb99294553e",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-parking2.ts :: literal",
+      "subject": "законът не::f3de70ae",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "зобщо. Знакът стои точно там, където спряла кола стеснява платното или крие нещо - затова законът не е оставил вратичка за „минутката“, а изпитът брои престоя в забранена зона като основна грешка."
+    },
+    {
+      "id": "eea00e64da41",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-parking2.ts :: literal",
+      "subject": "Законът не::8159ffb9",
+      "status": "accepted",
+      "why": "„Законът не мери прелеза с ролетка: чл. 98, ал. 1, т. 4 забранява престоя върху релсите и в такава близост до тях...“ — the claim names the article it is denying a figure in, and the retrieved article carries none.",
+      "excerptBg": "Законът не мери прелеза с ролетка: чл. 98, ал. 1, т. 4 забранява престоя върху релсите и в такава близост до тях, че да пречиш на"
+    },
+    {
+      "id": "26824cb25ade",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-parking2.ts :: literal",
+      "subject": "законът не::2cdbfc11",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "то решение вече не е нарушение на реда, а въпрос на живот: колата спря между релсите. Тук законът не признава никакво извинение - нито „колоната спря“, нито „само за миг“: на прелеза се влиза само ког"
+    },
+    {
+      "id": "32b938148b83",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-parking2.ts :: literal",
+      "subject": "законът не::520cee4c",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "прословутите „50 метра от двете страни“ са мит от стари помагала, който изпитът не пита и законът не пише. Числата, които ЗДвП наистина пише за прелез, мерят други неща. Първото е КЪДЕ ДА ЧАКАШ пред н"
+    },
+    {
+      "id": "f75275549ca5",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-parking2.ts :: literal",
+      "subject": "законът не::996b4455",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ра не са бюрокрация: габаритът на влака е по-широк от релсите. И остава третото, за което законът не дава число, защото го оставя на преценката ти: спрялата кола на подхода крие идващия влак от всички"
+    },
+    {
+      "id": "359f78dc19ab",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-pe2.ts :: literal",
+      "subject": "единствен::6a5153a0",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Жилищната зона е единственото място, където законът обръща приоритета: платното е на хората, а колата е гост в него (чл. 61-62). Затова таванът е 2"
+    },
+    {
+      "id": "7edf843b883e",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-rail.ts :: literal",
+      "subject": "единствен::40c3c53e",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "стигне до него. Намаляването покрай спрял трамвай не е учтивост, а законово задължение и единствената защита срещу непоправимото."
+    },
+    {
+      "id": "0d77cbf9ed20",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-speed2.ts :: literal",
+      "subject": "законът не::b31f6a0d",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "елен удар в града - и всеки зад нея трябва или да спира рязко, или да сменя лента. Затова законът не пуска на магистралата превозни средства, чиято конструктивна максимална скорост не надвишава 70 км/"
+    },
+    {
+      "id": "d25124f978ce",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/catalog.ts :: literal",
+      "subject": "не съществува::cbb8e174",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "о спиране. На СТОП се спира напълно винаги - дори пътят да изглежда празен. „Почти спрях“ не съществува нито в закона, нито на изпита."
+    },
+    {
+      "id": "88130bcbd4c4",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "законът не::cae6f302",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "приспадането на 3 % дава дробно число. Тук превишението се закръгля НАДОЛУ до цял km/h - законът не казва как се закръглява, затова избираме посоката в полза на водача. Ако реалният фиш се разминава, "
+    },
+    {
+      "id": "8ee8ba7299e7",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "Законът не::c33b42a0",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Законът не различава мигача при завой от мигача при престрояване - една и съща точка, една и съща глоба. Евтино за грешка, която р"
+    },
+    {
+      "id": "949074a84feb",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "единствен::ac3aca6a",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "о в ЗДвП няма. В наказателните разпоредби (чл. 174-189) думата „маневра“ се среща на едно-единствено място - чл. 183, ал. 2, т. 7 - и то за СИГНАЛА, не за огледалото. Остава общата остатъчна клауза на"
+    },
+    {
+      "id": "559369bbc215",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "Законът не::b5ca98d4",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Законът не мери дистанцията в секунди и не глобява „две вместо три“. Изискването е функционално - да можеш да спреш зад него - и с"
+    },
+    {
+      "id": "7cd6f0f539f4",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "законът не::e966d33c",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Непълното оглеждане само по себе си не е нарушение - законът не може да провери накъде си гледал. Наказва се резултатът: предимството, което не си пропуснал, защото не си видял."
+    },
+    {
+      "id": "4765ae15b991",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "законът не::24bd3f4c",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ез основателна причина с твърде ниска скорост“, когато пречиш (чл. 22, ал. 1) - и за него законът не предвижда отделно наказание. Остава остатъчната клауза чл. 185, назована тук без число: тя се прила"
+    },
+    {
+      "id": "0f39d9ee1c3c",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "нито един::82514060",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "В ЗДвП няма нито един член за ръчната спирачка. Съставът за технически неизправно превозно средство (чл. 179, ал. 6) съди СЪСТОЯНИЕТО на автом"
+    },
+    {
+      "id": "f7338ff4775e",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "Законът не::66a39ea9",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Законът не оставя избор: при неизправност, която застрашава безопасността, водачът е ДЛЪЖЕН да спре (чл. 101, ал. 1) - карането на"
+    },
+    {
+      "id": "5ee3346aefba",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "единствен::10574774",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "който да назовава регулировчика откъм ВОДАЧА: думата се среща в закона тринадесет пъти и единственият път, когато стои в санкция, тя наказва ПЕШЕХОДЕЦ (чл. 184). Чл. 179, ал. 1, т. 5 стига до знаците,"
+    },
+    {
+      "id": "1e8f4150cad7",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/consequences.ts :: literal",
+      "subject": "Единствен::0666bc64",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Задължението е безусловно, санкцията не е. Единственият състав в закона, който назовава светлините, е чл. 180, ал. 1, т. 1 - и той се задейства САМО когато от нарушението е"
+    },
+    {
+      "id": "6f3866dda535",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/traces/scEdD2PriorityRun.ts :: literal",
+      "subject": "не съществува::e17ae3b5",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "На Б2 се спира ДОКРАЙ - колелата неподвижни. „Почти спрях“ не съществува нито в закона, нито на изпита."
+    },
+    {
+      "id": "c2c696da147b",
+      "kind": "universal-negative",
+      "where": "platform/public/traces/sc-ed-d2-priority-run/mistake-rolling-stop.trace.json :: events[4].textBg",
+      "subject": "не съществува::e17ae3b5",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "На Б2 се спира ДОКРАЙ - колелата неподвижни. „Почти спрях“ не съществува нито в закона, нито на изпита."
+    },
+    {
+      "id": "626251909bd7",
+      "kind": "metre-not-in-cited-law",
+      "where": "content/concepts.json :: [143].summaryBg",
+      "subject": "7 см",
+      "status": "accepted",
+      "why": "Tourniquet placement (5-7 cm above the wound, never over a joint) — first-aid practice from ERC/Български Червен кръст. The concept row cites ЗДвП чл. 123 for the DUTY to render aid at a crash; the article says nothing about centimetres and was never claimed to. Not a claim about Bulgarian statute.",
+      "excerptBg": "страшаващо въпреки натиска - турникет възможно най-скоро: 5-7 см над раната, не върху става, записваш часа и не го разхлабваш, сва"
+    },
+    {
+      "id": "b6234ff3e21a",
+      "kind": "universal-negative",
+      "where": "content/questions/dokumenti-i-sanktsii.json :: [9].explanationBg",
+      "subject": "не съществува::14f33da2",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ете не са в обхвата ѝ, а камерите правят проверката непрекъсната, така че „само за малко“ не съществува."
+    },
+    {
+      "id": "4a9068e7c09d",
+      "kind": "universal-negative",
+      "where": "content/questions/krastovishta.json :: [39].explanationBg",
+      "subject": "единствен::dd99e276",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ри червен основен сигнал отваря само своята посока и те пуска „на опашката“ - продължаваш единствено накъдето сочи стрелката и пропускаш и превозните средства, и пешеходците, които преминават през кръ"
+    },
+    {
+      "id": "09fc37450257",
+      "kind": "universal-negative",
+      "where": "content/questions/nosht-i-uslozhneni-uslovia.json :: [15].explanationBg",
+      "subject": "единствен::4b0a1f31",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "В мъгла виждаш опасността едва когато е близо, затова ниска скорост и голяма дистанция са единствената защита - а „закачането“ за стоповете на предния значи, че при негово внезапно спиране се удряш пр"
+    },
+    {
+      "id": "d6e2da7db1d8",
+      "kind": "universal-negative",
+      "where": "content/questions/nosht-i-uslozhneni-uslovia.json :: [28].explanationBg",
+      "subject": "Единствен::2d2869bd",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "олеква, защото триенето изчезва - това не е нито топла гума, нов асфалт или спукана гума. Единствената безопасна реакция е плавно сваляне на скоростта без спирачка и без завой, докато излезеш от участ"
+    },
+    {
+      "id": "91fc5f9bf68a",
+      "kind": "universal-negative",
+      "where": "content/questions/osnovni-ponyatia.json :: [12].explanationBg",
+      "subject": "единствен::65fbfeba",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "чно за да излезеш на изпит навреме. Не са шест месеца и не зависи от съгласие на родител; единственото изключение е държавният прием в средното образование, където срокът е една година (ЗДвП, чл. 151;"
+    },
+    {
+      "id": "09ea98691842",
+      "kind": "universal-negative",
+      "where": "content/questions/osnovni-ponyatia.json :: [62].explanationBg",
+      "subject": "единствен::ade12d78",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ва и слиза, без да създава опасност за другите участници. Какво прави обаче колата решава единствено водачът - „хайде, минавай, ще успееш“ от съседната седалка не е сигнал за движение (ЗДвП, чл. 137, "
+    },
+    {
+      "id": "a42f0ea65166",
+      "kind": "universal-negative",
+      "where": "content/questions/patni-znatsi.json :: [35].explanationBg",
+      "subject": "нито един::74a16f98",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "къде е пътеката. Затова размяната на ролите им е грешка, знаците не са взаимозаменяеми, и нито един от двата не забранява на хората да пресичат - точно обратното, пешеходецът на пътеката е с предимств"
+    },
+    {
+      "id": "316927008164",
+      "kind": "universal-negative",
+      "where": "content/questions/patni-znatsi.json :: [45].explanationBg",
+      "subject": "единствен::9aacafd9",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Синият кръг е задължителен знак от група Г и казва едно-единствено нещо: движението в това кръстовище е кръгово и се извършва само в посоката на стрелките (Наредба № РД-02-21-1, чл. 98,"
+    },
+    {
+      "id": "a3b97aad3fd0",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [43].explanationBg",
+      "subject": "не съществува::c11acda5",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "агистрала или скоростен път, е длъжен да пропусне движещите се по тях. Лентата за ускоряване съществува точно за това - да изравниш скоростта си с потока, преди да влезеш (чл. 25, ал. 2). Правилото на"
+    },
+    {
+      "id": "cfaf310d585f",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [67].explanationBg",
+      "subject": "единствен::e9a63150",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Осмоъгълникът Б2 е единственият знак с уникална форма, разпознаваема дори изкалян или отзад - и единственият, който изисква пълно спиране винаги: на"
+    },
+    {
+      "id": "be57edcc55eb",
+      "kind": "universal-negative",
+      "where": "content/questions/predimstvo.json :: [67].explanationBg",
+      "subject": "единствен::7724f9e1",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "ълникът Б2 е единственият знак с уникална форма, разпознаваема дори изкалян или отзад - и единственият, който изисква пълно спиране винаги: на стоп-линията, а ако няма такава - на линията на знака (ПП"
+    },
+    {
+      "id": "64acf4ff693a",
+      "kind": "universal-negative",
+      "where": "content/questions/prevozno-sredstvo.json :: [54].explanationBg",
+      "subject": "единствен::7be366c4",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Стоп-светлините са единственият сигнал към идващия отзад, че намаляваш - без тях той реагира твърде късно и следва удар отзад; чл. 139 от ЗДвП не доп"
+    },
+    {
+      "id": "ae54dee72f5f",
+      "kind": "universal-negative",
+      "where": "content/questions/ptp-i-parva-pomosht.json :: [44].explanationBg",
+      "subject": "нито един::1c772dab",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "евозно средство - щом при движението му има ранен, това е ПТП, независимо че наоколо няма нито един автомобил. Велоалеята е част от пътя, а възрастта на участниците няма нищо общо с определението: тя "
+    },
+    {
+      "id": "0b908fd9d147",
+      "kind": "universal-negative",
+      "where": "content/questions/skorost-i-distantsia.json :: [20].explanationBg",
+      "subject": "единствен::72e8cd90",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "томобил, а дете край платното може да тръгне без да погледне. Сух прав път без движение е единствената от четирите ситуации, в която таванът на знака си остава разумен (ЗДвП чл. 20)."
+    },
+    {
+      "id": "a9c010ab4a0d",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-hazards2.ts :: literal",
+      "subject": "единствен::af3fca1f",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "и светлини (чл. 70): около катастрофа се движат хора пеша и те виждат приближаващата кола единствено по фаровете ѝ."
+    },
+    {
+      "id": "0b018d157034",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-junctions.ts :: literal",
+      "subject": "единствен::63bc888a",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "щем на кръстовище чуждите фарове са единственото, по което се чете кой идва - и твоите са единственото, по което другите четат теб."
+    },
+    {
+      "id": "1c7dbeba84ad",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-merging.ts :: literal",
+      "subject": "ЕДИНСТВЕН::7c1d3b3b",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "з нито един мигач. Огледалото беше погледнато, но това не стига: мигачът не е учтивост, а ЕДИНСТВЕНИЯТ начин другите да разберат намерението ти, преди то да се е случило (чл. 25). Колата отляво няма к"
+    },
+    {
+      "id": "781255af8477",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-merging.ts :: literal",
+      "subject": "ЕДИНСТВЕН::a05e5998",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "з нито един мигач. Огледалото беше погледнато, но това не стига: мигачът не е учтивост, а ЕДИНСТВЕНИЯТ начин другите да разберат намерението ти, преди то да се е случило (чл. 25). Ремонтът не е изнена"
+    },
+    {
+      "id": "befc5709144e",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-parking2.ts :: literal",
+      "subject": "няма друг::dc43be91",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "о ЗДвП наистина пише за прелез, мерят други неща. Първото е КЪДЕ ДА ЧАКАШ пред него: „Ако няма други указания, дадени с пътни знаци или с пътна маркировка, пред железопътния прелез пътните превозни ср"
+    },
+    {
+      "id": "c5c8d2cf59ea",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-roundabout.ts :: literal",
+      "subject": "единствен::dbd72706",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "(чл. 70): движещият се в кръга те чете странично, през мокро стъкло - там фаровете ти са единственото, което казва „идва кола“."
+    },
+    {
+      "id": "933bcda7c0fe",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-roundabout.ts :: literal",
+      "subject": "единствен::29706dde",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "Кръговото има едно-единствено работещо правило и то не е отделен член „за кръговите“ - такъв в ЗДвП няма. То се сглобява от знака и от чл. 50: на вхо"
+    },
+    {
+      "id": "4bb2f13443ae",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/rules/catalog.ts :: literal",
+      "subject": "няма друг::04b78ba4",
+      "status": "inherited",
+      "why": "INHERITED AT GATE CREATION AND NOT REVIEWED. Frozen so that no NEW claim of this shape can be added silently. Replace this line with the reasoning that justifies the claim, or repair the claim and delete this pin.",
+      "excerptBg": "стоянията, които законът наистина пише за прелез, са две - и стоят в едно изречение: „Ако няма други указания, дадени с пътни знаци или с пътна маркировка, пред железопътния прелез пътните превозни ср"
+    },
+    {
+      "id": "f0a49897281f",
+      "kind": "metre-not-in-cited-law",
+      "where": "content/lessons/l-signs-plates-scope.json :: beats[3].narrationBg",
+      "subject": "сто метра",
+      "status": "accepted",
+      "why": "DENIAL, NOT A REQUIREMENT — and the figure is never asserted anywhere in the beat. „сто метра“ occurs only inside the quoted myth „Важи и сто метра преди него“, which the SAME sentence calls безсмислица and then refutes on its own terms („няма как да те задължи нещо, което още не си подминал“). The beat's actual rule is the opposite claim and carries no figure at all: a prohibition starts AT the sign and ends at the next junction, at an end-sign, or at the distance written on a supplementary plate. Nothing here claims any article contains a hundred metres, so there is no citation to check. Same shape as accepted pin 17cd407c28f0 (q-patni-znatsi-021), which quotes a 100 m myth to kill it. The classifier fires because NORMATIVE_NEAR matches „важи“ — a word belonging to the myth being refuted, not to the assertion. If this sentence is ever rewritten to ASSERT a hundred metres, the excerpt changes, this pin goes stale, and the gate asks again.",
+      "excerptBg": "Забраната започва от мястото на знака. Не по-рано. „Важи и сто метра преди него“ е безсмислица - няма как да те задължи нещо, кое"
+    },
+    {
+      "id": "e494b878a889",
+      "kind": "metre-not-in-cited-law",
+      "where": "content/lessons/l-signs-prohibition-mandatory.json :: beats[1].narrationBg",
+      "subject": "сто метра",
+      "status": "accepted",
+      "why": "DENIAL, NOT A REQUIREMENT — identical in shape to pin f0a49897281f. „сто метра“ appears only inside the quoted myth „важи и сто метра преди него“, which the same sentence calls безсмислица. The beat's own rule is that a prohibition lives only forward of its sign — „до следващото кръстовище, до знак за край, или до разстоянието от допълнителна табела“ — which is a rule with no metre figure in it. No article is claimed to carry a hundred metres. NORMATIVE_NEAR fires on „важи“, a word inside the refuted myth. Rewriting this into an assertion breaks the excerpt and re-opens the question.",
+      "excerptBg": "табела. Преди знака забраната още не е започнала - „важи и сто метра преди него“ е безсмислица. Краят има и общ знак: В34, белия"
+    },
+    {
+      "id": "bf5ee7b838ba",
+      "kind": "metre-not-in-cited-law",
+      "where": "platform/src/modules/sim/lessons/scenario/templates-parking2.ts :: literal",
+      "subject": "четири метра",
+      "status": "accepted",
+      "why": "MAP GEOMETRY, NOT A LEGAL REQUIREMENT — the ScenarioSpec restating what content/world/pk-rail-v1.json authors, and the same reasoning as pin 0d53bc7ffd9d. „чака се на метър пред бариерата, а тя стои на повече от четири метра пред първата релса“ is arithmetic over this district's own numbers (barrier y = 197, firstRailM = 201.21 → 4,21 m). The METRE it does state as law — one metre from the barriers — is чл. 51, ал. 4's second branch, retrieved verbatim: „а когато има бариери - на 1 метър от тях“. The four metres are the map's, not the act's, and no article is claimed to contain them.",
+      "excerptBg": "нт: чака се на метър пред бариерата, а тя стои на повече от четири метра пред първата релса - тоест чакащият спира още по-назад, о"
+    },
+    {
+      "id": "074764c89f84",
+      "kind": "universal-negative",
+      "where": "content/traces/sc-pk-rail-ban/shadow-correct.trace.json :: events[2].textBg",
+      "subject": "няма мярка::c09c37b8",
+      "status": "accepted",
+      "why": "NARROWED ON 2026-09-10 AND RE-VERIFIED AGAINST THE RETRIEVED TEXT. The sentence now reads „тази забрана няма мярка в метри“, and „тази забрана“ is the one the sentence itself names and cites: ЗДвП чл. 98, ал. 1, т. 4, retrieved in full as „върху трамвайни и железопътни линии или в такава близост до тях, която може да затрудни движението на релсовите превозни средства“ — no metre figure in it. чл. 98's only figures are 5 метра (т. 5 and т. 6) and 3 метра (т. 7), none of them about rails. WHAT IT USED TO SAY, AND WHY THAT WAS WRONG: „ЗАКОНЪТ не мери прелеза в метри“. ЗДвП measures this crossing three times over — чл. 51, ал. 4 („не по-малко от 2 метра преди първата релса, а когато има бариери - на 1 метър от тях“), чл. 53, ал. 2 and чл. 54, ал. 1 (2 метра). The pin that accepted the old wording reasoned about чл. 98 while the sentence said ЗАКОНЪТ — an acceptance of a narrower claim than the one that shipped — and the mistake trace of this same scenario simultaneously taught the student that the law DOES want two metres, so one drill contradicted itself across two captions. The negative is now exactly as wide as what was verified. If чл. 98 ever gains a figure, this acceptance re-opens.",
+      "excerptBg": "Напред е прелезът. Табела „не спирай“ няма - тази забрана няма мярка в метри, а пита дали спрялата кола пречи на влака (чл. 98, ал. 1, т. 4)."
+    },
+    {
+      "id": "fe73bbe3f28d",
+      "kind": "universal-negative",
+      "where": "platform/src/modules/sim/traces/scPkRailBan.ts :: literal",
+      "subject": "няма мярка::c09c37b8",
+      "status": "accepted",
+      "why": "NARROWED ON 2026-09-10 AND RE-VERIFIED AGAINST THE RETRIEVED TEXT. The sentence now reads „тази забрана няма мярка в метри“, and „тази забрана“ is the one the sentence itself names and cites: ЗДвП чл. 98, ал. 1, т. 4, retrieved in full as „върху трамвайни и железопътни линии или в такава близост до тях, която може да затрудни движението на релсовите превозни средства“ — no metre figure in it. чл. 98's only figures are 5 метра (т. 5 and т. 6) and 3 метра (т. 7), none of them about rails. WHAT IT USED TO SAY, AND WHY THAT WAS WRONG: „ЗАКОНЪТ не мери прелеза в метри“. ЗДвП measures this crossing three times over — чл. 51, ал. 4 („не по-малко от 2 метра преди първата релса, а когато има бариери - на 1 метър от тях“), чл. 53, ал. 2 and чл. 54, ал. 1 (2 метра). The pin that accepted the old wording reasoned about чл. 98 while the sentence said ЗАКОНЪТ — an acceptance of a narrower claim than the one that shipped — and the mistake trace of this same scenario simultaneously taught the student that the law DOES want two metres, so one drill contradicted itself across two captions. The negative is now exactly as wide as what was verified. If чл. 98 ever gains a figure, this acceptance re-opens.",
+      "excerptBg": "Напред е прелезът. Табела „не спирай“ няма - тази забрана няма мярка в метри, а пита дали спрялата кола пречи на влака (чл. 98, ал. 1, т. 4)."
+    },
+    {
+      "id": "89f39176d14a",
+      "kind": "universal-negative",
+      "where": "platform/public/traces/sc-pk-rail-ban/shadow-correct.trace.json :: events[2].textBg",
+      "subject": "няма мярка::c09c37b8",
+      "status": "accepted",
+      "why": "NARROWED ON 2026-09-10 AND RE-VERIFIED AGAINST THE RETRIEVED TEXT. The sentence now reads „тази забрана няма мярка в метри“, and „тази забрана“ is the one the sentence itself names and cites: ЗДвП чл. 98, ал. 1, т. 4, retrieved in full as „върху трамвайни и железопътни линии или в такава близост до тях, която може да затрудни движението на релсовите превозни средства“ — no metre figure in it. чл. 98's only figures are 5 метра (т. 5 and т. 6) and 3 метра (т. 7), none of them about rails. WHAT IT USED TO SAY, AND WHY THAT WAS WRONG: „ЗАКОНЪТ не мери прелеза в метри“. ЗДвП measures this crossing three times over — чл. 51, ал. 4 („не по-малко от 2 метра преди първата релса, а когато има бариери - на 1 метър от тях“), чл. 53, ал. 2 and чл. 54, ал. 1 (2 метра). The pin that accepted the old wording reasoned about чл. 98 while the sentence said ЗАКОНЪТ — an acceptance of a narrower claim than the one that shipped — and the mistake trace of this same scenario simultaneously taught the student that the law DOES want two metres, so one drill contradicted itself across two captions. The negative is now exactly as wide as what was verified. If чл. 98 ever gains a figure, this acceptance re-opens.",
+      "excerptBg": "Напред е прелезът. Табела „не спирай“ няма - тази забрана няма мярка в метри, а пита дали спрялата кола пречи на влака (чл. 98, ал. 1, т. 4)."
+    }
+  ]
+}

@@ -3056,7 +3056,7 @@ export class PoliceStopRunner implements EventRunner {
       return this.resolve(input, true, "yielded");
     }
     // Ignored: the officer fell passBeyondM behind without a compliant stop —
-    // ЗДвП чл. 103, the driver's own duty („длъжен е да спре плавно в
+    // ЗДвП чл. 103, the driver's own duty („е длъжен да спре плавно в
     // най-дясната част на платното за движение… и да изпълнява неговите
     // указания"). Until 2026-09-04 this branch recorded the outcome and told
     // nobody, so the ONLY thing the sheet could name was whatever the student

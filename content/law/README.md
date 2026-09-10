@@ -513,3 +513,42 @@ Say which:
 
 Four different answers, four different documents, and not one of them can be
 added to another. That is why `PenaltyEntry` has four fields.
+
+## `claim-ledger.json` — the claims retrieval cannot settle
+
+`claim-ledger.json` is not part of the corpus. It is the allow-list of the gate
+in `platform/src/lib/content/law/claimGate.test.ts`, which walks the whole tree
+— `content/`, `platform/src/`, the shipped half of `platform/public/` — and
+traces every student-facing legal claim back to a retrieved article.
+
+Most of what that gate checks is mechanical: a citation must resolve, a
+quotation must be verbatim in the article it names, a metre figure offered as a
+rule must appear in an article the record cites. Two shapes are not:
+
+* **A universal negative** («единственото разстояние, което законът пише за
+  прелез…», «законът не мери прелеза в метри») cannot be proved by any scanner.
+  Proving the law says nothing else would mean reading all 288 articles and
+  agreeing what *else* means. Some of these are true and load-bearing — the
+  sentences that debunk the „50 метра" myth are universal negatives — and some
+  are how the myth got in.
+* **A figure whose source is not a Bulgarian statute** — a first-aid depth from
+  ERC/БЧК, a value printed on the sign in a question's own scenario.
+
+Each of those needs a person, so each gets a pin here with the reasoning beside
+it. Three statuses, and the difference between them is the whole point:
+
+| status | meaning |
+| --- | --- |
+| `accepted` | somebody read the claim **and the retrieved article** and wrote down why the claim is safe |
+| `open-defect` | somebody read it and it is **wrong**; the repair is in `why`, and the count may only shrink |
+| `inherited` | frozen when the gate was written and **not reviewed by anybody** — honest about it, and may only shrink |
+
+A claim of one of those shapes that is **not** pinned here fails the gate. That
+is the point: a new universal negative about the law cannot ship until a human
+has written the sentence that justifies it.
+
+To record a newly-found claim without hand-writing the pin:
+`CLAIM_LEDGER_SEED=1 npx vitest run src/lib/content/law/claimGate.test.ts`
+from `platform/`. It **merges** — existing pins keep their status and their
+reasoning — and then fails on purpose, because seeding is a step that produces a
+file a human still has to read.

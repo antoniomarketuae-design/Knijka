@@ -861,7 +861,7 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
       // control, how the signal is given (ал. 3), what the officer must show
       // (ал. 6) — and it is what the objective and the recorded demo
       // annotations cite. The DRIVER's own obligation, and therefore the
-      // offence this code convicts, is чл. 103: „длъжен е да спре плавно в
+      // offence this code convicts, is чл. 103: „е длъжен да спре плавно в
       // най-дясната част на платното… и да изпълнява неговите указания". The
       // briefing copy is left as recorded (the committed traces narrate the
       // same чл. 170 line, and a half-swap would put two citations for one act

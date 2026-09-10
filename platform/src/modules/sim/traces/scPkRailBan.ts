@@ -95,7 +95,15 @@ export function scPkRailBanShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Задачата: „спри някъде тук за малко“. Напред е железопътен прелез — а около него престоят е забранен от закона, не от знак." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 90], [X_LANE, 145]], targetKmh: 40, stopAtEnd: false },
-      { kind: "annotation", textBg: "Напред е прелезът. Табела „не спирай“ няма — законът не мери прелеза в метри, а пита дали спрялата кола пречи на влака (чл. 98, ал. 1, т. 4)." },
+      // NARROWED FROM „законът не мери прелеза в метри". The claim-ledger pin
+      // that accepted that sentence reasoned about чл. 98, ал. 1, т. 4 — which
+      // really does carry no figure — but the sentence said ЗАКОНЪТ, and ЗДвП
+      // measures this crossing in metres three times over (чл. 51, ал. 4;
+      // чл. 53, ал. 2; чл. 54, ал. 1). So the shipped sentence was a universal
+      // negative its own act refutes, and it contradicted the sister trace in
+      // this very scenario, which tells the student the law wants two metres.
+      // Narrowed to the BAN, which is what was actually verified.
+      { kind: "annotation", textBg: "Напред е прелезът. Табела „не спирай“ няма — тази забрана няма мярка в метри, а пита дали спрялата кола пречи на влака (чл. 98, ал. 1, т. 4)." },
       // Through the WHOLE approach ban at cruise: the drill's first claim is that
       // the decision is made early, not shopped for at the rails.
       { kind: "drive", points: [[X_LANE, 145], [X_LANE, 180], [X_LANE, 196]], targetKmh: 40, stopAtEnd: false },
@@ -103,7 +111,20 @@ export function scPkRailBanShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Бариерата е вдигната и прелезът е охраняем — не сме длъжни да спираме. Не спираме и „за всеки случай“." },
       // The band in one unbroken motion (чл. 52: guarded + open = no stop duty).
       { kind: "drive", points: [[X_LANE, 196], [X_LANE, 206], [X_LANE, 235]], targetKmh: 38, stopAtEnd: false },
-      { kind: "annotation", textBg: "Коловозът е преминат на едно движение. И от тази страна не спираме веднага: законът мери еднакво преди първата и след последната релса." },
+      // The symmetry is the statute's own wording, so it is cited like any
+      // other legal claim (ADR-002): чл. 54, ал. 1 reads „…по-малко от 2 метра
+      // преди първата ИЛИ СЛЕД ПОСЛЕДНАТА релса".
+      //
+      // NARROWED WITH THE SISTER CAPTION BELOW, and for the same reason. This
+      // read „не спираме веднага: ЗАКОНЪТ МЕРИ еднакво … (чл. 54, ал. 1)" — a
+      // colon that hangs a stopping rule on an article that states no
+      // prohibition at all. Read to the end, чл. 54, ал. 1 governs a
+      // ПРИНУДИТЕЛНО спиране and lists what the driver then owes; the reason
+      // not to rest here is still чл. 98, ал. 1, т. 4. What чл. 54, ал. 1 does
+      // give — and what this beat is for — is that its two metres run BOTH
+      // ways, „преди първата ИЛИ СЛЕД ПОСЛЕДНАТА релса", so the far side is not
+      // safe ground the moment the wheels clear the paint.
+      { kind: "annotation", textBg: "Коловозът е преминат на едно движение. И от тази страна не спираме веднага: ЗДвП чл. 54, ал. 1 брои същите два метра и след последната релса — спре ли колата там принудително, водачът е длъжен да изведе пътниците и да предупреди машинистите." },
       { kind: "drive", points: [[X_LANE, 235], [X_LANE, 275], [X_LANE, 300]], targetKmh: 40, stopAtEnd: false },
       { kind: "annotation", textBg: "Прелезът е далеч зад нас и не пречим на никого. Сега — десен мигач и спиране на първото разрешено място." },
       { kind: "indicator", setting: "right" },
@@ -134,7 +155,42 @@ export function scPkRailBanMistakeStopBeforeCrossingScript(): DriveScript {
       // opens 30 m out), but the "on" phase starts at the band — so the rail
       // rest arm cannot arm and the codes stay distinct.
       { kind: "pause", sec: 6, brake: true },
-      { kind: "annotation", textBg: "Толкова близо до релсите престой няма: законът иска поне два метра, а тук са метър и деветнайсет (чл. 51, ал. 4; чл. 54, ал. 1)." },
+      // THE CITATION MOVED TWICE. Round one: this line read „законът иска поне
+      // два метра … (чл. 51, ал. 4; чл. 54, ал. 1)" — чл. 51, ал. 4 is a
+      // TWO-BRANCH sentence („…не по-малко от 2 метра преди първата релса,
+      // А КОГАТО ИМА БАРИЕРИ - НА 1 МЕТЪР ОТ ТЯХ."), pk-rail-v1 authors
+      // guarded: true with the arm at y = 197, so the branch that governs HERE
+      // is the one metre from the barriers, and the caption quoted the branch
+      // that does not apply.
+      //
+      // Round two swapped чл. 51, ал. 4 for чл. 53, ал. 2 and kept the
+      // ASSERTION: „на по-малко от два метра от релсите НЕ СЕ СПИРА ИЗОБЩО
+      // (чл. 53, ал. 2; чл. 54, ал. 1)". Neither article says that, and reading
+      // each to the end of its own sentence is what shows it:
+      //
+      //   чл. 53, ал. 2 — „Водачът … НЕ ТРЯБВА ДА ЗАПОЧВА ПРЕМИНАВАНЕТО на
+      //     железопътния прелез, ако не е предварително убеден, че няма да се
+      //     наложи спиране върху релсите или на разстояние по-малко от 2 метра
+      //     от тях, поради техническите особености на превозното средство,
+      //     условията на движение или други предвидими причини." A duty about
+      //     ENTERING, conditioned on foresight — not a prohibition on standing.
+      //   чл. 54, ал. 1 — „В случай на ПРИНУДИТЕЛНО СПИРАНЕ … водачът е длъжен:
+      //     1. да изведе пътниците … 2. да вземе мерки за извеждането на
+      //     превозното средство извън обсега на релсовия път, а ако това е
+      //     невъзможно, да направи всичко необходимо за предупреждаване на
+      //     водачите на релсовите превозни средства от двете посоки." It
+      //     PROHIBITS NOTHING; it is written about a forced stop and it imposes
+      //     duties once you are already there.
+      //
+      // So the flat «не се спира изобщо» had no home in either, and a third
+      // article was NOT gone looking for. What actually convicts this rest is
+      // чл. 98, ал. 1, т. 4 — „върху трамвайни и железопътни линии или в такава
+      // близост до тях, която може да затрудни движението на релсовите превозни
+      // средства" — a functional test with no metre count. The two metres are
+      // real and barrier-independent, but they are the line the act draws
+      // elsewhere for a vehicle standing near rails, and the caption now says
+      // which duty each of them carries instead of borrowing them as a ban.
+      { kind: "annotation", textBg: "Престоят тук е забранен, защото спряла кола в такава близост до релсите може да затрудни движението на релсовите превозни средства (ЗДвП чл. 98, ал. 1, т. 4). Двата метра, които законът пише, са за друго: чл. 53, ал. 2 забранява да ВЛИЗАШ в прелеза, ако не си убеден, че няма да спреш върху релсите или на по-малко от два метра от тях; чл. 54, ал. 1 пък прави спирането там принудителна авария — изведи пътниците и предупреди машинистите. Предницата е на метър и деветнайсет." },
       { kind: "annotation", textBg: "Габаритът на влака е по-широк от релсите. А спрялата тук кола крие идващия влак от всички зад нея." },
       // The transit itself is lawful and must cost nothing — the fault was the
       // rest, and the sheet has to say exactly that.

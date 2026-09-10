@@ -42,6 +42,21 @@
  * site count and the classifier are all asserted — including NEGATIVE CONTROLS,
  * strings that appear nowhere in the tree and must be refused, because a
  * checker that cannot fail has not passed.
+ *
+ * WHAT THIS FILE STILL CANNOT SEE, AND WHERE THAT LIVES NOW. Resolving a
+ * citation proves the article EXISTS; it says nothing about whether the
+ * sentence beside it is true. That is the exact hole four rounds of the
+ * чл. 51, ал. 4 defect walked through — „2 метра" is quoted correctly, чл. 51
+ * exists, and the claim built on them („единственото разстояние, което законът
+ * пише за прелез") is refuted by the second half of the same sentence. The
+ * checks for that — quote fidelity, quote completeness past the comma, metre
+ * figures traced into the retrieved article, and the pinned allow-list for
+ * universal negatives — are in
+ * `platform/src/lib/content/law/claimGate.test.ts`, which walks the WHOLE tree
+ * (content/, platform/src/, the shipped half of platform/public/) rather than
+ * this one module. Neither subsumes the other: this file judges every `lawRef`
+ * under modules/sim including the ones no sentence surrounds; that one judges
+ * what the sentences claim.
  */
 
 import fs from "node:fs";

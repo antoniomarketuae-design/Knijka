@@ -1242,7 +1242,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // records for its own corrective. So it has to be true of BOTH bases, and
     // the way to do that is the way the rail row did it: walk every branch.
     correctiveBg:
-      "Преди да спреш, огледай участъка: под знак В27 не спираш изобщо. Но забраната често не е закачена на стълб — законът сам забранява престоя на кръстовище и до 5 м от него, на пешеходна пътека и до 5 м преди нея, върху и до релси, и до вече спряла кола от страната на движението. Подмини участъка и спри чак след края му — на разрешено място, плътно вдясно до бордюра.",
+      "Преди да спреш, огледай участъка: под знак В27 не спираш изобщо. Но забраната често не е закачена на стълб — законът сам забранява престоя на кръстовище и до 5 м от него, на пешеходна пътека и до 5 м преди нея, върху и до релси, и до вече спряла кола от страната на движението (ЗДвП чл. 98, ал. 1). Подмини участъка и спри чак след края му — на разрешено място, плътно вдясно до бордюра.",
     // CITATION CORRECTED 2026-08-09. This cited чл. 98, and чл. 98, ал. 1 was
     // read in full: it is a CLOSED list of eight places where the LAW ITSELF
     // bans stopping (junctions, crossings, bridges, tram rails, …) and it
