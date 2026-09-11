@@ -183,8 +183,11 @@ const counts = corpusCounts();
 const broken = counts.open;
 const perLesson = new Map();
 for (const j of broken) {
-  const e = perLesson.get(j.scenario) || { lesson: j.scenario, total: 0, critical: 0 };
+  // `ids` is carried so the renderer below can look each finding up in the
+  // verdict ledger. It is the findingIds of THIS lesson only, in filing order.
+  const e = perLesson.get(j.scenario) || { lesson: j.scenario, total: 0, critical: 0, ids: [] };
   e.total++;
+  e.ids.push(j.findingId);
   if (String(j.severity).toLowerCase() === "critical") e.critical++;
   perLesson.set(j.scenario, e);
 }
@@ -407,6 +410,15 @@ const RULES = [
   "   pattern and its inverse also produces agreement by chance. You may write",
   "   STILL or leave it open on one sample each; you may NOT write CLOSED. Retiring",
   "   a cross-leg row needs a repeat-rate the harness cannot yet take.",
+  " . A ROW MARKED «!! PRIOR VERIFY» HAS ALREADY BEEN CLOSED AND REOPENED. You may",
+  "   still close it — a repair may have landed since — but you must ANSWER THE",
+  "   REFUTATION PRINTED WITH IT, by name, in your why. «The symptom is gone» is no",
+  "   answer to «the symptom was measured present at a beat you did not open».",
+  "   On w34 all four closures were overturned and THREE were second closures of",
+  "   rows verification had already reopened, re-argued on the points that killed",
+  "   them the first time. A closure that does not engage its own prior refutation",
+  "   will be overturned again, and the row oscillates instead of retiring.",
+  "",
   " . OPEN THE FRAME. DO NOT DESCRIBE IT. This is the single commonest way a",
   "   verdict dies here, and w32 overturned thirteen on it. A verifier put the",
   "   shape better than I can: the closure's CONCLUSION was reached before its",
@@ -498,16 +510,53 @@ fs.mkdirSync(outDir, { recursive: true });
 const J = (v) => JSON.stringify(v);
 const written = [];
 
+// THE LAST TIME A VERIFIER OVERTURNED THIS ROW, AND WHY.
+//
+// w34 overturned ALL FOUR of its closures, and three were second closures of
+// rows verification had already reopened (w26, w27, w32), re-argued on the very
+// points that killed them the first time. One judge noted the prior overturn in
+// its own reasoning and closed the row regardless.
+//
+// A judge cannot weigh an argument it has never seen. This hands it the previous
+// refutation along with the finding, so re-closing a row now costs an explicit
+// answer to what killed it last time instead of being free.
+//
+// Deliberately the LAST verify line only: a row overturned four times would
+// otherwise bury its own finding in history, and the most recent refutation is
+// the one written against the most recent product.
+const VERDICTS_LEDGER = path.join(REPO, '.audit-frames', 'wave-c', 'verdicts.jsonl');
+function lastVerifyByFinding() {
+  const out = new Map();
+  let raw;
+  try { raw = fs.readFileSync(VERDICTS_LEDGER, "utf8"); } catch { return out; }
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    let j;
+    try { j = JSON.parse(line); } catch { continue; }   // torn line, skip
+    if (!j || !j.findingId || j.correctedBy !== "verify") continue;
+    out.set(j.findingId, j);   // append-only file: last wins
+  }
+  return out;
+}
+const PRIOR_VERIFY = lastVerifyByFinding();
+
 batches.forEach((group, bi) => {
   const n = bi + 1;
   const lanes = group.map((g) => ({
     key: g.key,
     lessons: g.lessons.map((e) => e.lesson),
-    rows: g.lessons.map(
-      (e) =>
-        "  " + e.lesson + "  ->  " + e.critical + " critical / " + e.total +
-        " findings   legs re-driven: " + e.legs.join(", "),
-    ),
+    rows: g.lessons.map((e) => {
+      const head = "  " + e.lesson + "  ->  " + e.critical + " critical / " + e.total +
+        " findings   legs re-driven: " + e.legs.join(", ");
+      const priors = (e.ids || []).map((id) => PRIOR_VERIFY.get(id)).filter(Boolean);
+      if (!priors.length) return head;
+      const notes = priors.map((v) => {
+        const why = String(v.why || v.evidence || "").replace(/\s+/g, " ").slice(0, 420);
+        return "      !! PRIOR VERIFY — " + v.findingId + " was ruled " +
+          String(v.verdict || "?").toUpperCase() + " by an adversarial pass: " + why;
+      });
+      return [head, ...notes].join("\n");
+    }),
     total: g.total,
     critical: g.critical,
   }));
