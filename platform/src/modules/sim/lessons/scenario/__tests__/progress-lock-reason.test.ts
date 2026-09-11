@@ -21,7 +21,8 @@
  * THE DEFECT. B9 (doc 86 §3) changed what opens a rung — an ATTEMPT, not two
  * stars — and this fold told nobody. It emits `unlockedBy` for an OPEN rung and
  * bare `null` for a SHUT one, so the picker had no requirement to print and
- * wrote its own, which still says:
+ * wrote its own, which said (both retired 2026-09-11, when the sentence finally
+ * reached the screen — the last describe() below is that wire):
  *
  *   ScenarioCatalog.tsx:113  „следващото ниво се отключва с ≥ 2★."
  *   ScenarioCatalog.tsx:226  „Отключва се с ≥ 2★ на предишното ниво"
@@ -56,6 +57,8 @@
  * field cannot have moved a verdict.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   SCENARIO_UNLOCK_MIN_STARS,
@@ -278,5 +281,61 @@ describe("…and the fold it was added to did not move", () => {
       "admin",
       "admin",
     ]);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE SENTENCE REACHES THE SCREEN — 2026-09-11.
+
+   Everything above held from the day it was written and NO STUDENT COULD SEE
+   ANY OF IT. `lockedByBg` was computed on every request and then dropped at
+   `page.tsx`'s projection into `ScenarioCatalogEntry`, which carried four
+   fields; the picker went on painting the caption it wrote for itself,
+   „Отключва се с ≥ 2★ на предишното ниво", which B9 had made false. That is
+   this programme's commonest defect — a repair that ships a measurement and
+   wires it to no consumer — and it is invisible to every test that stops at
+   the module edge: the seven above stay green with the wire cut.
+
+   These two are the wire. Source-pinned rather than rendered because the
+   projection lives in a server component that this `node` suite cannot mount,
+   and because the exact failure being guarded is a DELETED LINE, which no
+   behavioural test of the fold can ever see. Newlines are normalised first:
+   this worktree is CRLF and the tree is LF, and a source-pinned test that
+   forgets it fails as if the code were wrong.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const SRC = (...parts: string[]): string =>
+  readFileSync(join(__dirname, "..", "..", "..", "..", "..", ...parts), "utf8")
+    .replace(/\r\n/g, "\n")
+    // Blank comments, keeping line count: BOTH files quote the retired copy in
+    // prose, and a test that read prose would pass over a reverted component.
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .split("\n")
+    .map((l) => l.replace(/\/\/.*$/, ""))
+    .join("\n");
+
+describe("the shut rung's sentence reaches the student", () => {
+  it("page.tsx carries `lockedByBg` across the server → client seam", () => {
+    const page = SRC("app", "(dashboard)", "simulator", "page.tsx");
+    const at = page.indexOf("scenarioLevelProgress(spec, scenarioRows, gate)");
+    expect(at, "the catalog's fold call moved — re-anchor this test").toBeGreaterThan(0);
+    const projection = page.slice(at, at + 600);
+    expect(
+      projection,
+      "the wire is cut: the picker would render a field nobody sets, and all seven tests above would stay green",
+    ).toContain("lockedByBg: l.lockedByBg");
+  });
+
+  it("ScenarioCatalog prints the gate's sentence and no longer writes its own", () => {
+    const catalog = SRC("components", "sim", "lesson-ui", "ScenarioCatalog.tsx");
+    expect(catalog, "the picker stopped reading the requirement").toContain("l.lockedByBg");
+    // The retired caption, in code and not in prose. It is the one string that
+    // must never come back: it names a star bar that opens nothing.
+    expect(catalog, "the hand-written star caption is back on the rung").not.toMatch(
+      /Отключва се с/,
+    );
+    // …and the zone subtitle stopped promising the same rule one screen up.
+    expect(catalog, "the zone subtitle still teaches the retired gate").not.toMatch(
+      /следващото ниво се отключва/,
+    );
   });
 });

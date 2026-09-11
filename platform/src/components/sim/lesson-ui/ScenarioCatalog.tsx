@@ -110,7 +110,10 @@ export function ScenarioCatalogSection({
         <p className="mt-0.5 text-sm text-muted">
           Отделни маневри от реалния живот — учиш се, като караш: първо гледаш
           и следваш сянката, после сам, накрая при изпитни условия. Ниво 1 е
-          винаги отворено; следващото ниво се отключва с ≥ {SCENARIO_UNLOCK_MIN_STARS}★.
+          винаги отворено; следващото се отваря щом караш предишното веднъж —
+          независимо от оценката. Звездите не отключват нищо: ≥{" "}
+          {SCENARIO_UNLOCK_MIN_STARS}★ отбелязва нивото като взето, за да знаеш
+          към кое да се върнеш.
         </p>
       </div>
 
@@ -220,10 +223,22 @@ export function ScenarioCatalogSection({
                           <span className="block text-sm font-bold leading-tight">
                             {SCENARIO_LEVEL_NAMES_BG[l.level]}
                           </span>
-                          <span className="block truncate text-[11px] text-muted">
-                            {l.unlocked
-                              ? LEVEL_AIDS_BG[l.level] ?? ""
-                              : `Отключва се с ≥ ${SCENARIO_UNLOCK_MIN_STARS}★ на предишното ниво`}
+                          {/* THE SHUT RUNG'S CAPTION IS THE GATE'S OWN SENTENCE.
+                              It used to be written here — „Отключва се с ≥ 2★ на
+                              предишното ниво" — and B9 (doc 86 §3) had long since
+                              made an ATTEMPT the thing that opens a rung, so the
+                              copy pointed a 1★ student at a star target that opens
+                              nothing. `lockedByBg` is computed in the same branch
+                              of `scenarioLevelProgress` that decides `unlocked`,
+                              so the two cannot drift apart again. Not truncated:
+                              the requirement is the one line he has to be able to
+                              read (the open-rung aid still is — it is a label). */}
+                          <span
+                            className={`block text-[11px] text-muted ${
+                              l.unlocked ? "truncate" : "leading-snug"
+                            }`}
+                          >
+                            {l.unlocked ? LEVEL_AIDS_BG[l.level] ?? "" : l.lockedByBg ?? ""}
                           </span>
                         </span>
                         <span className="shrink-0">

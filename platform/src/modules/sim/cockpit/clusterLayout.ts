@@ -287,6 +287,70 @@ export const GEAR_CY = DIGITS_CY;
 export const GEAR_W = 76;
 export const GEAR_H = 96;
 
+/**
+ * ── THE TRIP ODOMETER — sc-pk-stop-vs-park:e788ce46 ────────────────────────
+ * „The cluster has no tachometer, no fuel gauge and no odometer — one analogue
+ * dial, a digital км/ч and a gear letter." Of the three, this is the one the
+ * car actually HAS a quantity for: `VehicleSim.tripDistanceM` integrates the
+ * same forward speed the dial and the digits already display, and `reset()`
+ * rewinds it with the attempt. A rev counter and a fuel gauge have no state
+ * behind them at all — the driveline models gear BANDS, not engine speed, and
+ * the fictional vehicle (ADR-001) has no tank — so a needle for either would be
+ * an instrument that cannot be wrong because it is not reading anything, which
+ * is the „pretty lie" this world's own sign passes refuse to place.
+ *
+ * IN METRES, NOT KILOMETRES, and that is the whole reason it teaches. A trip
+ * meter at 0.1 km resolution would read „0.2" for the length of a lesson: the
+ * authored routes are 150–300 m (the `shadow-correct` tapes under
+ * `content/traces` measure 156.2 m and 169.1 m), and every objective is phrased
+ * in metres — «Карай дотук», the pocket between the ring and the zebra, the
+ * distance a В24 ban runs. Metres are the unit he is being asked to judge.
+ *
+ * WHERE IT STANDS, AND WHY IT IS THREE CELLS AND NOT FOUR. R1's two clear
+ * panels are taken (dial left, speed/gear right), so this takes the strip BELOW
+ * the gear column and ABOVE the hairline rule — and that strip is SHORT and
+ * NARROW at once, which is what decides the readout's shape rather than taste:
+ *
+ *   HEIGHT is decided by R2's glance floor. `ODO_DIGIT_H` 48 was the first
+ *   answer and it is 8.3 CSS px of ink at the cabin mount's 158 px face —
+ *   inside the 5.6–8.3 px band `dialNumeralsLegibleAt` exists to REFUSE. The
+ *   floor needs ≥ 60.5 design units; 62 gives 10.76 px, and the 1:2 character
+ *   aspect then fixes the width at 31.
+ *   WIDTH is decided by the wheel. The strip's usable left end is the knot at
+ *   x 107 (floor −48): to the left of it the boss climbs to +41 and there is no
+ *   band at all. So the block has x 107…252 — 145 units — and four 31-wide
+ *   cells plus a unit caption need 177. THREE plus the caption need 143.
+ *
+ * Three metre cells stop at 999 m and the longest authored route in the
+ * catalogue is 1 042.5 m (`sc-merge-motorway-exit`), so the readout would clamp
+ * on a real lesson — an instrument that stops reading is the failure this whole
+ * block is about. It therefore CHANGES UNIT instead: metres to 999, whole
+ * kilometres above that, with the caption quad re-pointed between „м" and „км"
+ * so the unit is always on the glass beside the number. Every lesson but one
+ * lives entirely in the metre range, which is the range the objectives are
+ * phrased in; kilometres are the overflow, and they are labelled.
+ *
+ * The block runs y −41…21: clear of the wheel by 7.6 units and of the gear cell
+ * (which starts at y 28) by 7 — the same order of margin the speed readout's
+ * own ink ships with (8). `clusterOcclusion.test.ts` checks all of that against
+ * the measured silhouette rather than against this paragraph.
+ */
+export const ODO_DIGIT_W = 31;
+export const ODO_DIGIT_H = 62;
+export const ODO_DIGIT_GAP = 4;
+export const ODO_DIGIT_COUNT = 3;
+/** Centre of the three-cell digit group. */
+export const ODO_DIGITS_CX = 158.5;
+export const ODO_DIGITS_CY = -10;
+/** The unit, on the digits' own line and to their right — the „км/ч" grammar.
+ *  ONE quad, two atlas cells: see `ODO_UNIT_M_CELL`. */
+export const ODO_UNIT_W = 35;
+export const ODO_UNIT_H = 35;
+export const ODO_UNIT_CX = 234;
+export const ODO_UNIT_CY = ODO_DIGITS_CY;
+/** Above this many metres the readout switches to whole kilometres. */
+export const ODO_METRES_MAX = Math.pow(10, ODO_DIGIT_COUNT) - 1;
+
 /** „В И Т О К" wordmark (ADR-001: the fictional marque). Marque, not data —
  *  so it takes the dead centre-bottom, where it is a proper badge in the reel
  *  camera and out of the way of every value the driver has to read. */
@@ -541,6 +605,19 @@ export function charCell(ch: string): AtlasCell {
  */
 export const UNIT_CELL: AtlasCell = { x: 0, y: 256, w: 128, h: 64 };
 export const MARK_CELL: AtlasCell = { x: 256, y: 256, w: 224, h: 64 };
+/**
+ * …and the trip odometer's two unit cells, in the 128-px gap row 2 already had
+ * between the two words above.
+ *
+ * SAME SIZE, both of them, because ONE quad samples them: the readout re-points
+ * that quad's UVs between metres and kilometres exactly as it re-points a digit
+ * cell, and a quad cannot change its aspect mid-flight. `drawClusterAtlas`
+ * fills each cell to its own fraction, so „м" and „км" come out the same
+ * HEIGHT — which is the dimension the glance floor is about — instead of the
+ * same width.
+ */
+export const ODO_UNIT_M_CELL: AtlasCell = { x: 128, y: 256, w: 64, h: 64 };
+export const ODO_UNIT_KM_CELL: AtlasCell = { x: 192, y: 256, w: 64, h: 64 };
 
 /** Row 3: the radial halo, and the solid-white patch untextured quads use. */
 export const HALO_CELL: AtlasCell = { x: 0, y: 320, w: 128, h: 128 };

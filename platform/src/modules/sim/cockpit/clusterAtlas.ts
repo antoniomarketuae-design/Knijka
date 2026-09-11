@@ -24,6 +24,8 @@ import {
   HALO_CELL,
   LAMP_KEYS,
   MARK_CELL,
+  ODO_UNIT_KM_CELL,
+  ODO_UNIT_M_CELL,
   UNIT_CELL,
   WHITE_CELL,
   glyphCell,
@@ -77,6 +79,12 @@ export function drawClusterAtlas(ctx: CanvasRenderingContext2D): void {
   // every browser's canvas yet, and the atlas must paint identically everywhere
   // (a capture machine and the founder's laptop must produce the same frame).
   fitText(ctx, "В И Т О К", MARK_CELL, 0.94, 40);
+  // The trip odometer's two unit cells, painted at ONE font size into cells of
+  // ONE size — see ODO_UNIT_M_CELL. The fills differ because the words do (one
+  // letter against two): each is condensed toward its own natural width, so
+  // neither is stretched, and the pair comes out the same height.
+  fitText(ctx, "м", ODO_UNIT_M_CELL, 0.45, 44);
+  fitText(ctx, "км", ODO_UNIT_KM_CELL, 0.95, 44);
 
   // Radial halo — the light a lit telltale throws onto its housing.
   const hx = HALO_CELL.x + HALO_CELL.w / 2;

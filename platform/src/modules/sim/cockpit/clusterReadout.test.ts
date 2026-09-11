@@ -20,11 +20,12 @@ import {
   gearGlyph,
   lampBank,
   litTickCount,
+  odoCells,
   speedDigits,
   type ClusterInputs,
   type LampBank,
 } from "./clusterReadout";
-import { DIAL_MAX_KMH, LAMP_KEYS, TICK_COUNT } from "./clusterLayout";
+import { DIAL_MAX_KMH, LAMP_KEYS, ODO_METRES_MAX, TICK_COUNT } from "./clusterLayout";
 // The dial does not get to invent its own definition of „stopped". This is the
 // one every other machine in the sim uses (reverseAssist, reverseStuck,
 // stuckStart, reverseView), and it is the band the STANDSTILL row below sweeps.
@@ -78,6 +79,68 @@ describe("speed digits", () => {
   it("rounds to the nearest whole km/h", () => {
     expect(speedDigits(49.6)).toEqual([" ", "5", "0"]);
     expect(speedDigits(49.4)).toEqual([" ", "4", "9"]);
+  });
+});
+
+describe("trip odometer — sc-pk-stop-vs-park:e788ce46", () => {
+  it("reads WHOLE metres driven, zero-padded into three cells", () => {
+    expect(odoCells(0)).toEqual({ digits: ["0", "0", "0"], unit: "m" });
+    expect(odoCells(42)).toEqual({ digits: ["0", "4", "2"], unit: "m" });
+    // The two authored route lengths the layout block quotes.
+    expect(odoCells(156.2)).toEqual({ digits: ["1", "5", "6"], unit: "m" });
+    expect(odoCells(ODO_METRES_MAX)).toEqual({ digits: ["9", "9", "9"], unit: "m" });
+  });
+
+  it("FLOORS — a counter may never run ahead of the car", () => {
+    // The whole difference from `speedDigits`, which rounds. 41.8 m driven is
+    // 41 m driven; reading 42 would put the instrument a metre in front of the
+    // bumper, and the drills this serves are judged in single metres (the
+    // 7.94 m pocket between a roundabout's ring and its zebra).
+    expect(odoCells(41.8).digits).toEqual(["0", "4", "1"]);
+    expect(odoCells(0.99).digits).toEqual(["0", "0", "0"]);
+  });
+
+  it("CHANGES UNIT rather than clamping — the longest route is 1 042.5 m", () => {
+    // `sc-merge-motorway-exit`'s shadow tape. A metres-only readout would stop
+    // reading on a lesson that ships, which is the defect this row is about.
+    expect(odoCells(1042.5)).toEqual({ digits: ["0", "0", "1"], unit: "km" });
+    expect(odoCells(2600)).toEqual({ digits: ["0", "0", "2"], unit: "km" });
+    // The switch is at the first metre the metre cells cannot carry, and not
+    // one metre earlier: 999 m is still metres.
+    expect(odoCells(ODO_METRES_MAX).unit).toBe("m");
+    expect(odoCells(ODO_METRES_MAX + 1).unit).toBe("km");
+  });
+
+  it("never renders garbage, and holds only where nothing can be driven", () => {
+    // A negative or non-finite reading is a bug upstream; the cells must still
+    // hold a number rather than point at a blank or a minus sign that the atlas
+    // character strip does not carry.
+    expect(odoCells(-5)).toEqual({ digits: ["0", "0", "0"], unit: "m" });
+    expect(odoCells(Number.NaN)).toEqual({ digits: ["0", "0", "0"], unit: "m" });
+    // Infinity is NOT "very far": it is a broken reading, and the honest answer
+    // to a broken reading is 0, not a full instrument.
+    expect(odoCells(Number.POSITIVE_INFINITY)).toEqual({ digits: ["0", "0", "0"], unit: "m" });
+    // 999 km is the only hold left, and it is past anything a session can drive.
+    expect(odoCells(5_000_000)).toEqual({ digits: ["9", "9", "9"], unit: "km" });
+  });
+
+  it("the full readout carries it, and the change detector moves with it", () => {
+    const out = createClusterReadout();
+    const base = clusterReadoutHash(clusterReadout(nominal(), out));
+    expect(out.odoDigits).toEqual(["0", "0", "0"]);
+    expect(out.odoUnit).toBe("m");
+    const moved = clusterReadout({ ...nominal(), tripMetres: 87.4 }, out);
+    expect(moved.odoDigits).toEqual(["0", "8", "7"]);
+    // A UV upload is what the hash gates: without this the cells would keep
+    // the digits they were built with for the whole drive.
+    expect(clusterReadoutHash(moved)).not.toBe(base);
+    // …and the UNIT is in the hash too, because the caption quad is re-pointed
+    // in the same block. 1 000 m and 1 m both read "001": if the unit were out
+    // of the hash, crossing the kilometre would leave „м" on the glass beside a
+    // number that had become kilometres.
+    const metres = clusterReadoutHash(clusterReadout({ ...nominal(), tripMetres: 1 }, out));
+    const km = clusterReadoutHash(clusterReadout({ ...nominal(), tripMetres: 1000 }, out));
+    expect(km).not.toBe(metres);
   });
 });
 

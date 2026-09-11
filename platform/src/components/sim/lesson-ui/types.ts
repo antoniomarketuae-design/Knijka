@@ -73,6 +73,15 @@ export interface ScenarioCatalogEntry {
     unlocked: boolean;
     attempts: number;
     bestStars: 1 | 2 | 3 | null;
+    /**
+     * What a SHUT rung is waiting on, computed by the gate itself
+     * (`ScenarioLevelProgress.lockedByBg`) — non-null exactly when `unlocked`
+     * is false. The picker prints THIS instead of restating the rule in its
+     * own words: its hand-written caption said „≥ 2★ на предишното ниво" long
+     * after B9 made an ATTEMPT the thing that opens a rung, so a student on
+     * 1★ was told he needed stars he did not need.
+     */
+    lockedByBg: string | null;
   }>;
 }
 

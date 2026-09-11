@@ -59,6 +59,8 @@ import {
   FACE_W,
   LAMP_KEYS,
   NEEDLE_Z,
+  ODO_UNIT_KM_CELL,
+  ODO_UNIT_M_CELL,
   buildClusterFaceMesh,
   buildClusterHousingMesh,
   buildClusterNeedleMesh,
@@ -422,6 +424,14 @@ export function InstrumentCluster({
         writeQuadUv(uvs, built.face.digitQuad[i], cellUv(charCell(readout.digits[i])));
       }
       writeQuadUv(uvs, built.face.gearQuad, cellUv(charCell(readout.gearChar)));
+      for (let i = 0; i < built.face.odoQuad.length; i++) {
+        writeQuadUv(uvs, built.face.odoQuad[i], cellUv(charCell(readout.odoDigits[i])));
+      }
+      writeQuadUv(
+        uvs,
+        built.face.odoUnitQuad,
+        cellUv(readout.odoUnit === "km" ? ODO_UNIT_KM_CELL : ODO_UNIT_M_CELL),
+      );
       built.faceUvs.needsUpdate = true;
     }
   });

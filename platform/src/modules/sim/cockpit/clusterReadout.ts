@@ -15,7 +15,7 @@
  */
 
 import { REVERSE_ASSIST_STANDSTILL_KMH } from "../engine/reverseAssist";
-import { DIAL_MAX_KMH, LAMP_KEYS, TICK_COUNT, type LampKey } from "./clusterLayout";
+import { DIAL_MAX_KMH, LAMP_KEYS, ODO_DIGIT_COUNT, TICK_COUNT, type LampKey } from "./clusterLayout";
 
 /** Every channel the cluster draws — all of it pre-existing vehicle state. */
 export interface ClusterInputs {
@@ -30,6 +30,13 @@ export interface ClusterInputs {
    *  relay, never a free-running animation (dashboardStatus.ts's law). */
   indicatorLeftLit: boolean;
   indicatorRightLit: boolean;
+  /**
+   * Distance driven this attempt, metres — `VehicleSim.tripDistanceM`
+   * (sc-pk-stop-vs-park:e788ce46). A mount that has no vehicle to read (the
+   * clip rig's parked car, the reel) leaves the 0 `createClusterInputs` writes,
+   * which is the honest reading for a car that has not moved.
+   */
+  tripMetres: number;
   /** N11 (VP-06): the director-staged red warning telltale. */
   tempWarnOn: boolean;
   /** N11 (VP-06): the director-staged AMBER warning telltale — the other half
@@ -49,6 +56,7 @@ export function createClusterInputs(): ClusterInputs {
     stalled: false,
     indicatorLeftLit: false,
     indicatorRightLit: false,
+    tripMetres: 0,
     tempWarnOn: false,
     cautionWarnOn: false,
   };
@@ -75,6 +83,10 @@ export interface ClusterReadout {
   digits: string[];
   /** Single glyph for the selector — "M2" shows the mode letter. */
   gearChar: string;
+  /** Trip-odometer cells, right-aligned and ZERO-padded: 42 m → ["0","4","2"]. */
+  odoDigits: string[];
+  /** …and which unit those cells are counting in. */
+  odoUnit: OdoUnit;
   /** How many dial ticks are lit, counting up from 0 km/h. */
   litTicks: number;
   lamps: LampBank;
@@ -85,7 +97,45 @@ export interface ClusterReadout {
 export function createClusterReadout(): ClusterReadout {
   const lamps = {} as LampBank;
   for (const key of LAMP_KEYS) lamps[key] = { tone: "off", pulse: false };
-  return { digits: ["", "", ""], gearChar: "P", litTicks: 1, lamps };
+  const odoDigits: string[] = [];
+  for (let i = 0; i < ODO_DIGIT_COUNT; i++) odoDigits.push("0");
+  return { digits: ["", "", ""], gearChar: "P", odoDigits, odoUnit: "m", litTicks: 1, lamps };
+}
+
+/** Which unit the trip readout is currently counting in. */
+export type OdoUnit = "m" | "km";
+
+/**
+ * The trip odometer's cells AND its unit — one function, because the two
+ * cannot be decided separately without the number meaning nothing.
+ *
+ * ZERO-PADDED where the speed is BLANK-padded, and the difference is the
+ * difference between the two instruments. A leading blank on the speed is what
+ * stops „7 км/ч" reading as „07"; an odometer is a counter, its leading zeros
+ * are how a real trip meter looks, and a blank one would make «  42 м» wander
+ * left and right across the face as the distance grows — motion the eye reads
+ * as a fault.
+ *
+ * FLOORED, never rounded, in either unit: 41.8 m is 41 m driven, and a counter
+ * that reads 42 before the metre is complete is a counter that can be ahead of
+ * the car.
+ *
+ * THE UNIT CHANGES INSTEAD OF THE NUMBER CLAMPING — the face has room for three
+ * legible cells (clusterLayout's ODO block has the arithmetic) and the longest
+ * authored route is 1 042.5 m, so a metres-only readout would stop reading on a
+ * real lesson. Above 999 m the same three cells count whole kilometres and the
+ * caption says so. Only past 999 km — which no drive can reach — is there
+ * nothing left to do but hold.
+ */
+export function odoCells(
+  metres: number,
+  count = ODO_DIGIT_COUNT,
+): { digits: string[]; unit: OdoUnit } {
+  const max = Math.pow(10, count) - 1;
+  const safe = Number.isFinite(metres) ? Math.max(0, metres) : 0;
+  const km = safe > max;
+  const v = Math.min(max, Math.floor(km ? safe / 1000 : safe));
+  return { digits: String(v).padStart(count, "0").split(""), unit: km ? "km" : "m" };
 }
 
 /**
@@ -249,6 +299,9 @@ export function clusterReadout(input: ClusterInputs, out: ClusterReadout): Clust
   const digits = speedDigits(input.speedKmh, out.digits.length);
   for (let i = 0; i < out.digits.length; i++) out.digits[i] = digits[i];
   out.gearChar = gearGlyph(input.gearLabel);
+  const odo = odoCells(input.tripMetres, out.odoDigits.length);
+  for (let i = 0; i < out.odoDigits.length; i++) out.odoDigits[i] = odo.digits[i];
+  out.odoUnit = odo.unit;
   out.litTicks = litTickCount(input.speedKmh);
   lampBank(input, out.lamps);
   return out;
@@ -261,5 +314,5 @@ export function clusterReadout(input: ClusterInputs, out: ClusterReadout): Clust
  * repaints colours every frame and re-points UVs only when this string moves.
  */
 export function clusterReadoutHash(r: ClusterReadout): string {
-  return `${r.digits.join("")}|${r.gearChar}|${r.litTicks}`;
+  return `${r.digits.join("")}|${r.gearChar}|${r.odoDigits.join("")}${r.odoUnit}|${r.litTicks}`;
 }

@@ -111,14 +111,15 @@
  * `level - 1` arithmetic (the trap progression.ts:52 documents: a gapped ladder
  * makes arithmetic point at a rung that does not exist).
  *
- * NOT YET ON THE SCREEN, and this is the honest half of the note: `page.tsx:122`
- * projects the fold into `ScenarioCatalogEntry` (components/sim/lesson-ui/
- * types.ts:71) as four fields — level, unlocked, attempts, bestStars — so
- * `passed`, `unlockedBy` and now `lockedByBg` die at that seam, and B9's own
- * promise („Nothing is hidden — `passed`, `bestStars` and `unlockedBy` all ride
- * out of this fold") has never been true past this module's edge. Carrying the
- * field through is one line in each of those two files plus the subtitle at
- * ScenarioCatalog.tsx:226; none of the three is this lane's to edit.
+ * ON THE SCREEN SINCE 2026-09-11, and it was not for eighteen days: `page.tsx`
+ * projected the fold into `ScenarioCatalogEntry` (components/sim/lesson-ui/
+ * types.ts) as four fields — level, unlocked, attempts, bestStars — so
+ * `lockedByBg` was computed on every request and died at that seam, which is
+ * this programme's commonest failure (a repair that ships a measurement and
+ * wires it to no consumer). `lockedByBg` now travels that projection and
+ * `ScenarioCatalog.tsx` prints it in place of the caption it used to write
+ * itself; the zone subtitle states the same rule. `passed` and `unlockedBy`
+ * still stop at the seam — nothing on the picker asks for them yet.
  */
 
 import { parseScenarioLessonId } from "./resolve";

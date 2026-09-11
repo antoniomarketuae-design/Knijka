@@ -750,3 +750,92 @@ describe("row 6 · the route pill and the telltale cue clear the throttle band's
     expect(TOUCH).toContain("const FLANK_LANE_PORTRAIT_PX = 0;");
   });
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+   ROW 7 — „THE ROUTE PILL IS PRINTED THROUGH THE AUDIO CARD."
+   sc-vu-emergency:011b0e98, re-verified 2026-09-11.
+
+   ROW 6 ABOVE HOLDS AND IS NOT WHAT THIS IS. Re-measured on
+   `.audit-frames/w34/frames/sc-ac-crosswind__mobile-right/04-t040s.png` —
+   iPhone 16 landscape, 852 × 393 at dpr 3, driven at a428c9a — the pill’s
+   right edge stands at 131.3 CSS off the edge against a mirror station that
+   ends at 111, which is row 6’s arithmetic to the tenth of a pixel.
+
+   THE ROW’S SENTENCE IS STILL TRUE THERE BECAUSE THE NEIGHBOUR CHANGED. Off
+   the same frame, counting accent-blue pixels per row across the pill’s own
+   x band:
+
+     the pill’s top border        CSS y 64.0   436 blue px on the row
+     every row of its sentence    CSS y 65–93     3–18 blue px
+     the audio card’s first line  CSS y 86–96   inside the pill’s box
+
+   A factor of twenty-five, and the card’s glyphs land inside the pill. Both
+   are ghost surfaces, so neither hides the other.
+
+   THE CAUSE IS THAT RANK 3 HAD FOUR MEMBERS AND NO ORDER AMONG THEM — the
+   corridor’s own 2026-08-09 note says so in one line, „the two chips above are
+   rank 3 as well", and nothing then ranked them against each other. The tie is
+   broken on the corridor’s own criterion, „which one the student can act on
+   soonest": the three chips name something happening to the car this second
+   and he answers them with the wheel; the audio card asks for a device setting
+   he cannot change while moving, and rank 3’s own text already says it keeps.
+
+   WHY A SOURCE PIN: the header at the top of this file. These are CSS rules
+   inside a template literal, the one thing here that can rot into a no-op with
+   no type error and no failing render.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** The three chips that share the compact corridor with the audio card. A
+ *  fourth may join it (the wind cue did, 2026-09-08) and must join this list
+ *  in the same commit — which is what the loop below is for. */
+const RANK3_CHIPS = ["follow-hint", "telltale-cue", "wind-swing-cue"] as const;
+
+describe("row 7 · rank 3 has an order, so the card and the chips are never both up", () => {
+  /** The stand-down rule, sliced off its first selector. No interpolation runs
+   *  inside it, so the first closing brace after it is its own. */
+  const chipOverAudioRule = (): string => {
+    const head =
+      '[data-sim-compact="on"]:has([data-hud="follow-hint"]) [data-hud="audio-prompt"],';
+    const at = CSS.indexOf(head);
+    expect(at, "the chip-outranks-audio rule").toBeGreaterThan(-1);
+    const from = CSS.slice(at);
+    return from.slice(0, from.indexOf("}"));
+  };
+
+  it("stands the audio card down behind EVERY chip that shares its lane", () => {
+    const rule = chipOverAudioRule();
+    for (const chip of RANK3_CHIPS) {
+      expect(rule, chip).toContain(
+        '[data-sim-compact="on"]:has([data-hud="' + chip + '"]) [data-hud="audio-prompt"]',
+      );
+    }
+    expect(rule).toContain("display: none;");
+  });
+
+  it("…and it is the AUDIO CARD that yields, not the chips", () => {
+    // The opposite rule would be the north-star failure in layout form: a
+    // „pull over now" lamp or a drift warning stood down behind a
+    // sound-settings card, on a moving car. Only rank 1 (the shell’s overlay
+    // line) and rank 2 (the first-run touch hint) may take the band off a
+    // chip, and both of those already ship above.
+    for (const chip of RANK3_CHIPS) {
+      expect(
+        CSS.includes(':has([data-hud="audio-prompt"]) [data-hud="' + chip + '"]'),
+        chip,
+      ).toBe(false);
+    }
+  });
+
+  it("is scoped to COMPACT, because a roomy stage has no collision to rank", () => {
+    // Roomy: the card reads NOTIFY_COLUMN_TOP_CSS_ROOMY and the chips keep
+    // their own top-16, so they stand 52 px apart and both are readable. A
+    // stand-down there would cost a surface for nothing.
+    const lines = chipOverAudioRule()
+      .split("\n")
+      .filter((l) => l.includes("data-hud="));
+    expect(lines.length).toBe(RANK3_CHIPS.length);
+    for (const line of lines) {
+      expect(line.trim().startsWith('[data-sim-compact="on"]:has('), line).toBe(true);
+    }
+  });
+});

@@ -1684,6 +1684,11 @@ export function VitokCockpit({
       const blink = cabin?.blinkOn ?? false;
       const hazardBlink = cabin?.hazardBlinkOn ?? false;
       out.speedKmh = sim?.speedKmh ?? 0;
+      // The trip odometer reads the sim's own integrator, not one kept here: a
+      // render-loop accumulator would survive `resetCar()` (which calls
+      // VehicleSim.reset and does NOT remount this cockpit) and show the next
+      // attempt the previous attempt's metres.
+      out.tripMetres = sim?.tripDistanceM ?? 0;
       out.gearLabel = cabin ? cabin.driveline.gearLabel : String(sim?.gear ?? "N");
       out.seatbeltOn = cabin?.seatbeltOn ?? false;
       out.parkingBrakeOn =

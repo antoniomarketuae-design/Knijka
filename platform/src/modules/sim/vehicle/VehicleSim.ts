@@ -236,6 +236,15 @@ export class VehicleSim {
   private readonly windActive: boolean;
   /** Wind clock (s) for the deterministic gust sine; reset() rewinds it. */
   private windClockSec = 0;
+  /**
+   * TRIP DISTANCE since spawn, metres — the cluster's odometer
+   * (sc-pk-stop-vs-park:e788ce46). Integrated here and nowhere else because
+   * this is the only object that owns BOTH the fixed timestep and `reset()`;
+   * `trip-odometer.test.ts` holds the argument and the rewind. `Math.abs`, so a
+   * reverse manoeuvre adds metres rather than subtracting them. Read-only for
+   * the physics: nothing in `update()` consumes it.
+   */
+  private tripMetres = 0;
   /** Low-passed lateral acceleration (m/s², car-local, + = left). */
   private aLatSmooth = 0;
   /** F3 gate: true only when a caller opted into engine braking. */
@@ -376,6 +385,7 @@ export class VehicleSim {
     const speedMs = this.forwardSpeedMs();
     const speedKmh = speedMs * 3.6;
     const absKmh = Math.abs(speedKmh);
+    this.tripMetres += Math.abs(speedMs) * dt;
 
     // --- Steering: speed-sensitive limit + rate-limited wheel ---------------
     const range = T.STEER_MIN_SPEED_KMH - T.STEER_FULL_SPEED_KMH;
@@ -641,6 +651,7 @@ export class VehicleSim {
     this.aLatGripSmooth = 0; // F1: the tyre stops protesting on a restart
     this.aLongGripSmooth = 0;
     this.windClockSec = 0; // gust sine restarts with the attempt (determinism)
+    this.tripMetres = 0; // …and so does the trip meter: a retry starts at 0 m
     this.prevVel.x = 0;
     this.prevVel.y = 0;
     this.prevVel.z = 0;
@@ -738,6 +749,11 @@ export class VehicleSim {
   /** Signed speed in km/h (+ forward). Use this for HUD and engine lookup. */
   get speedKmh(): number {
     return this.forwardSpeedMs() * 3.6;
+  }
+
+  /** Distance driven this attempt, metres (see `tripMetres`). Display only. */
+  get tripDistanceM(): number {
+    return this.tripMetres;
   }
 
   /** Current road-wheel steering angle (rad, + = left). */

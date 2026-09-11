@@ -57,6 +57,17 @@ import {
   MARK_CY,
   MARK_H,
   MARK_W,
+  ODO_DIGIT_COUNT,
+  ODO_DIGIT_GAP,
+  ODO_DIGIT_H,
+  ODO_DIGIT_W,
+  ODO_DIGITS_CX,
+  ODO_DIGITS_CY,
+  ODO_UNIT_M_CELL,
+  ODO_UNIT_CX,
+  ODO_UNIT_CY,
+  ODO_UNIT_H,
+  ODO_UNIT_W,
   NEEDLE_HALF_W_BASE,
   NEEDLE_HALF_W_TIP,
   NEEDLE_R_TAIL,
@@ -252,6 +263,11 @@ export interface ClusterFaceMesh {
   /** Quad index of digit cell i, left → right. UVs are re-pointed per readout. */
   digitQuad: number[];
   gearQuad: number;
+  /** Trip-odometer cells, left → right — re-pointed the same way the speed is. */
+  odoQuad: number[];
+  /** The odometer's unit caption — ONE quad, re-pointed between the two
+   *  same-sized unit cells as the reading crosses a kilometre. */
+  odoUnitQuad: number;
 }
 
 /** Static ink colours (dynamic elements are overwritten every frame anyway). */
@@ -418,11 +434,55 @@ export function buildClusterFaceMesh(options: ClusterFaceOptions = {}): ClusterF
     INK_FORE,
   );
 
+  // 6b — the trip odometer: four smaller mono cells on the clear strip under
+  //      the gear column (clusterLayout's ODO block carries the geometry and
+  //      the reason it is in metres). INK_MUTED, not INK_FORE: it is a counter
+  //      the driver consults, and it must never compete for the glance the
+  //      speed owns.
+  const odoQuad: number[] = [];
+  const odoSpan = ODO_DIGIT_COUNT * ODO_DIGIT_W + (ODO_DIGIT_COUNT - 1) * ODO_DIGIT_GAP;
+  for (let i = 0; i < ODO_DIGIT_COUNT; i++) {
+    const cx = ODO_DIGITS_CX - odoSpan / 2 + ODO_DIGIT_W / 2 + i * (ODO_DIGIT_W + ODO_DIGIT_GAP);
+    odoQuad.push(
+      pushRect(
+        b,
+        cx,
+        ODO_DIGITS_CY,
+        ODO_DIGIT_W,
+        ODO_DIGIT_H,
+        Z_TEXT,
+        cellUv(charCell("0")),
+        INK_MUTED,
+      ),
+    );
+  }
+
   // 7 — captions last (they never change).
   pushRect(b, UNIT_CX, UNIT_CY, UNIT_W, UNIT_H, Z_TEXT, cellUv(UNIT_CELL), INK_MUTED);
   pushRect(b, MARK_CX, MARK_CY, MARK_W, MARK_H, Z_TEXT, cellUv(MARK_CELL), INK_RULE);
+  // …except this one, which DOES change: metres below a kilometre, kilometres
+  // above it. Built pointing at „м" — the reading every drive starts at.
+  const odoUnitQuad = pushRect(
+    b,
+    ODO_UNIT_CX,
+    ODO_UNIT_CY,
+    ODO_UNIT_W,
+    ODO_UNIT_H,
+    Z_TEXT,
+    cellUv(ODO_UNIT_M_CELL),
+    INK_MUTED,
+  );
 
-  return { ...finish(b), tickQuad, lampHaloQuad, lampGlyphQuad, digitQuad, gearQuad };
+  return {
+    ...finish(b),
+    tickQuad,
+    lampHaloQuad,
+    lampGlyphQuad,
+    digitQuad,
+    gearQuad,
+    odoQuad,
+    odoUnitQuad,
+  };
 }
 
 // ---------------------------------------------------------------------------

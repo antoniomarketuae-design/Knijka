@@ -289,10 +289,21 @@ export class SimInput {
     // preventDefault stays consistent across both channels: an ArrowDown that
     // arrives with e.code "Unidentified" must still not scroll the page.
     if (HANDLED_CODES.has(e.code) || fallback !== null) e.preventDefault();
-    if (e.repeat) return;
-    if (this.debugKeys) this.logKey(e);
+    // THE AUTO-REPEAT STREAM IS THE OS SAYING „THIS KEY IS STILL DOWN", so the
+    // hold is recorded BEFORE the one-shot guard below rather than after it.
+    //
+    // It used to be dropped whole, and that made `onBlur`'s clear PERMANENT.
+    // Blur is not exotic — alt-tab, a notification stealing focus, a click in
+    // the URL bar — and the key goes on being physically held across it. The
+    // set was cleared, the repeats that say otherwise were discarded, and
+    // nothing else could heal it: `read()` asks this set and no other, so the
+    // student stood on a brake the sim did not believe in until they lifted the
+    // foot and pressed again. On a brake, at a junction, that is the crash.
+    // (The one-shots keep the guard: not re-firing on repeat is what it is for.)
     this.pressed.add(e.code);
     if (fallback !== null) this.pressedViaKey.add(fallback);
+    if (e.repeat) return;
+    if (this.debugKeys) this.logKey(e);
     if (e.code === "KeyC") this.callbacks.onToggleCamera?.();
     if (e.code === "KeyR") this.callbacks.onReset?.();
     if (e.code === "Escape") this.callbacks.onTogglePause?.();

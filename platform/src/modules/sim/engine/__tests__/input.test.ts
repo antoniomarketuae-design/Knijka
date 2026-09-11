@@ -218,6 +218,32 @@ describe("SimInput keyboard pedal ramps", () => {
     h.input.dispose();
   });
 
+  // …AND THE KEY THAT WAS NEVER LIFTED COMES BACK, which is the other half of
+  // the same clear. The blur above is correct — a window that lost focus stops
+  // receiving keyups, so an un-cleared set is a stuck pedal — but the key is
+  // still down, and the OS says so on every repeat. Discarding those made the
+  // clear permanent until the student lifted and pressed again.
+  it("an auto-repeat restores a hold that blur cleared (the key never came up)", () => {
+    const h = harness();
+    h.press("KeyS");
+    expect(h.advance(BRAKE_ATTACK_S * 1100).brake).toBe(1);
+    h.blur();
+    expect(h.advance(BRAKE_RELEASE_S * 1100).brake).toBe(0);
+    h.fire("keydown", { code: "KeyS", key: "s", repeat: true, preventDefault: () => {} });
+    expect(h.advance(BRAKE_ATTACK_S * 1100).brake).toBe(1);
+    h.input.dispose();
+  });
+
+  it("…and a repeat still never re-fires a one-shot (camera/reset/pause)", () => {
+    const win = stubWindow();
+    let cameras = 0;
+    const input = new SimInput({ onToggleCamera: () => (cameras += 1) }, () => 0);
+    win.fire("keydown", { code: "KeyC", key: "c", repeat: false, preventDefault: () => {} });
+    win.fire("keydown", { code: "KeyC", key: "c", repeat: true, preventDefault: () => {} });
+    expect(cameras).toBe(1);
+    input.dispose();
+  });
+
   it("Space is NOT the momentary handbrake anymore (A1: parking-brake toggle lives in cabin.ts)", () => {
     const h = harness();
     h.press("Space");

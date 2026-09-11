@@ -121,6 +121,10 @@ export default async function SimulatorPage({ searchParams }: SimulatorPageProps
       unlocked: l.unlocked,
       attempts: l.attempts,
       bestStars: l.bestStars,
+      // The gate's OWN sentence for a shut rung. Carried across this seam so
+      // the picker stops writing its own — see the field's declaration in
+      // `lesson-ui/types.ts` and `scenarioLockRequirementBg`.
+      lockedByBg: l.lockedByBg,
     })),
   }));
 

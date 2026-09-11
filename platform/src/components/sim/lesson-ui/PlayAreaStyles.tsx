@@ -1488,6 +1488,56 @@ ${TOUCH_BAND_CSS_VARS}
       [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="audio-prompt"] {
         display: none;
       }
+      /* …AND RANK 3 HAD FOUR MEMBERS AND NO ORDER AMONG THEM — 2026-09-11,
+         re-verifying sc-vu-emergency:011b0e98.
+
+         That row's OWN collision is gone: the flank lane above (8b9d135) put
+         the route pill's right edge at 131.3 CSS off the edge against a mirror
+         station that ends at 111. The ROW'S SENTENCE is still true, because the
+         neighbour changed. Measured on .audit-frames/w34/frames/
+         sc-ac-crosswind__mobile-right/04-t040s.png — iPhone 16 landscape,
+         852 x 393 at dpr 3, driven today at a428c9a:
+
+           the pill's top border    CSS y 64.0, 436 accent-blue px on the row
+           every row of its own     CSS y 65 - 93, 3 - 18 accent-blue px
+             sentence
+           the audio card's first   CSS y 86 - 96, inside the pill's box
+             line of glyphs
+
+         i.e. "Звукът е част от урока…" is drawn through "Следвай синята линия"
+         and the card's plate takes the pill's own ink down by a factor of 25.
+         Both are ghost surfaces, so neither hides the other.
+
+         THE CAUSE IS THE TIE, and the 2026-08-09 note above admits it in one
+         line — "the two chips above are rank 3 as well". Rank 3 then had four
+         members that stand down for ranks 1 and 2 and never for each other, so
+         two of them up at once is a band two surfaces deep, which is the one
+         thing this corridor exists to prevent.
+
+         BROKEN ON THE CORRIDOR'S OWN CRITERION, "which one the student can act
+         on soonest". The three chips name something happening to the car this
+         second and he answers them with the wheel: a lit temperature lamp, the
+         second swing, a drift off the demonstrated line. The audio card asks
+         him to change a device setting — the one thing in this corridor he
+         cannot do while the car is moving — and rank 3's own description of it
+         already says it keeps. So it keeps, and it is not lost:
+         AudioLessonPrompt polls audioRef on an interval and is dismissible-
+         then-silent, while the chips are transient (the follow chip clears the
+         moment the student is back on the line), so the card takes the band a
+         few seconds later, whole.
+
+         ":has()" READS THE DOM AND NOT THE PAINTED BOX, so a chip standing down
+         for rank 1 or rank 2 still matches here. That invents no new state: in
+         both of those the audio card is already hidden by the two rules above.
+
+         COMPACT ONLY. On a roomy stage the card has its own top
+         (NOTIFY_COLUMN_TOP_CSS_ROOMY) and the chips keep "top-16" — 52 px of
+         clear air — so there is nothing there to rank. */
+      [data-sim-compact="on"]:has([data-hud="follow-hint"]) [data-hud="audio-prompt"],
+      [data-sim-compact="on"]:has([data-hud="telltale-cue"]) [data-hud="audio-prompt"],
+      [data-sim-compact="on"]:has([data-hud="wind-swing-cue"]) [data-hud="audio-prompt"] {
+        display: none;
+      }
       /* …AND THE DEMONSTRATION DECK IS RANK 3 TOO — 2026-08-12.
          It was left out of this list, and the omission is measurable: on the
          360 × 780 Samsung profile the first-run hint's own «Завърти телефона

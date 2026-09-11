@@ -42,6 +42,7 @@ import {
   DIGIT_W,
   DIGITS_CX,
   DIGITS_CY,
+  ODO_DIGIT_COUNT,
   FACE_H,
   FACE_W,
   GEAR_CX,
@@ -105,6 +106,7 @@ describe("mesh shape", () => {
   it("the face carries a quad for every element the readout can drive", () => {
     expect(face.tickQuad).toHaveLength(TICK_COUNT);
     expect(face.digitQuad).toHaveLength(DIGIT_COUNT);
+    expect(face.odoQuad).toHaveLength(ODO_DIGIT_COUNT);
     expect(Object.keys(face.lampGlyphQuad).sort()).toEqual([...LAMP_KEYS].sort());
     expect(Object.keys(face.lampHaloQuad).sort()).toEqual([...LAMP_KEYS].sort());
     // Every driven quad index must be a real, distinct quad — an aliased index
@@ -112,6 +114,7 @@ describe("mesh shape", () => {
     const driven = [
       ...face.tickQuad,
       ...face.digitQuad,
+      ...face.odoQuad,
       face.gearQuad,
       ...Object.values(face.lampGlyphQuad),
       ...Object.values(face.lampHaloQuad),

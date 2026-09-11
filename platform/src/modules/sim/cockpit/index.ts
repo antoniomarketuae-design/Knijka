@@ -78,6 +78,10 @@ export {
   GLANCE_FLOOR_CSS_PX,
   LAMP_KEYS,
   NEEDLE_Z,
+  ODO_DIGIT_COUNT,
+  ODO_METRES_MAX,
+  ODO_UNIT_KM_CELL,
+  ODO_UNIT_M_CELL,
   TICK_COUNT,
   cellUv,
   charCell,
@@ -113,12 +117,14 @@ export {
   gearGlyph,
   lampBank,
   litTickCount,
+  odoCells,
   speedDigits,
   type ClusterInputs,
   type ClusterReadout,
   type LampBank,
   type LampState,
   type LampTone,
+  type OdoUnit,
 } from "./clusterReadout";
 
 export { drawClusterAtlas } from "./clusterAtlas";

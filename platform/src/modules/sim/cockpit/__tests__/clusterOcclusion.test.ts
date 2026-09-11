@@ -47,9 +47,23 @@ import {
   MARK_CY,
   MARK_H,
   MARK_W,
+  ODO_DIGIT_COUNT,
+  ODO_DIGIT_GAP,
+  ODO_DIGIT_H,
+  ODO_DIGIT_W,
+  ODO_DIGITS_CX,
+  ODO_DIGITS_CY,
+  ODO_UNIT_CX,
+  ODO_UNIT_CY,
+  ODO_UNIT_H,
+  ODO_UNIT_W,
+  UNIT_H,
   NEEDLE_R_TIP,
   RULE_Y,
+  FACE_W,
+  GLANCE_FLOOR_CSS_PX,
   faceElementIsVisible,
+  inkHeightCssPx,
   faceInkRect,
   faceVisibleFloorY,
   faceVisibleFraction,
@@ -66,6 +80,17 @@ function digitCells(): FaceRect[] {
     cy: DIGITS_CY,
     w: DIGIT_W,
     h: DIGIT_H,
+  }));
+}
+
+/** The trip-odometer digit cells, laid out exactly as the builder lays them. */
+function odoDigitCells(): FaceRect[] {
+  const span = ODO_DIGIT_COUNT * ODO_DIGIT_W + (ODO_DIGIT_COUNT - 1) * ODO_DIGIT_GAP;
+  return Array.from({ length: ODO_DIGIT_COUNT }, (_, i) => ({
+    cx: ODO_DIGITS_CX - span / 2 + ODO_DIGIT_W / 2 + i * (ODO_DIGIT_W + ODO_DIGIT_GAP),
+    cy: ODO_DIGITS_CY,
+    w: ODO_DIGIT_W,
+    h: ODO_DIGIT_H,
   }));
 }
 
@@ -137,6 +162,75 @@ describe("what the founder CAN read stays readable", () => {
     const gear = faceInkRect({ cx: GEAR_CX, cy: GEAR_CY, w: GEAR_W, h: GEAR_H });
     expect(faceElementIsVisible(gear)).toBe(true);
     expect(gear.cy - gear.h / 2 - faceWorstFloorY(gear)).toBeGreaterThan(100);
+  });
+
+  it("…and so is every cell of the trip odometer — sc-pk-stop-vs-park:e788ce46", () => {
+    // The row is „no tachometer, no fuel gauge and no odometer", and the ONE of
+    // the three the car has a real quantity behind is now on the face. It is
+    // worth a placement assertion for the same reason the speed digits are: the
+    // strip it took is BELOW the gear column, i.e. closer to the wheel than
+    // anything else that has to be read, so a future layout pass that drifts it
+    // down has to fail here rather than in a sweep frame.
+    for (const cell of odoDigitCells()) {
+      expect(faceElementIsVisible(faceInkRect(cell))).toBe(true);
+      // Whole CELLS, not just their ink — this readout has no boss above it.
+      expect(faceElementIsVisible(cell)).toBe(true);
+    }
+    expect(
+      faceElementIsVisible({ cx: ODO_UNIT_CX, cy: ODO_UNIT_CY, w: ODO_UNIT_W, h: ODO_UNIT_H }),
+    ).toBe(true);
+  });
+
+  it("…and it clears R2's glance floor at the CABIN mount, not just the reel", () => {
+    // THE HALF THAT THE OCCLUSION TEST ALONE WOULD MISS, and the reason this
+    // readout is 62 units tall and three cells wide rather than 48 and four.
+    // `dialNumeralsLegibleAt` exists because an element can be wholly visible
+    // and still not be a number: the dial ring is 5.6–8.3 CSS px of ink at the
+    // cabin's 158 px face and was withdrawn there. A four-cell odometer at
+    // ODO_DIGIT_H 48 would have been 8.3 px — the same band, the same defect.
+    const CABIN_LANDSCAPE_FACE_CSS_PX = 158;
+    expect(inkHeightCssPx(ODO_DIGIT_H, CABIN_LANDSCAPE_FACE_CSS_PX)).toBeGreaterThanOrEqual(
+      GLANCE_FLOOR_CSS_PX,
+    );
+    // The unit caption is a WORD cell (fitText fills it), so its quad height IS
+    // its ink height — no CHAR_INK_H_FRACTION applies. 35 rather than the
+    // shipped „км/ч" caption's 34: at 158 px, 34 gives 10.492, which misses the
+    // floor by 0.008 px. Not worth moving the speed's caption for, worth not
+    // copying into a new one.
+    expect((CABIN_LANDSCAPE_FACE_CSS_PX * ODO_UNIT_H) / FACE_W).toBeGreaterThanOrEqual(
+      GLANCE_FLOOR_CSS_PX,
+    );
+    expect(ODO_UNIT_H).toBeGreaterThanOrEqual(UNIT_H);
+    // NON-VACUITY: the size that was first shipped fails this, which is what
+    // makes the assertion above a floor rather than a description.
+    expect(inkHeightCssPx(48, CABIN_LANDSCAPE_FACE_CSS_PX)).toBeLessThan(GLANCE_FLOOR_CSS_PX);
+  });
+
+  it("a FOURTH digit cell would not fit — the reason the unit changes instead", () => {
+    // Pinned because it is the whole justification for `odoCells` switching to
+    // kilometres, and because the obvious "improvement" is to add a cell. The
+    // block's left end is what costs: past the x-107 knot the wheel boss climbs
+    // to +41 and the strip stops existing.
+    const four = odoDigitCells();
+    const span = ODO_DIGIT_COUNT * ODO_DIGIT_W + (ODO_DIGIT_COUNT - 1) * ODO_DIGIT_GAP;
+    const widened: FaceRect = {
+      cx: ODO_DIGITS_CX - (ODO_DIGIT_W + ODO_DIGIT_GAP) / 2,
+      cy: ODO_DIGITS_CY,
+      w: span + ODO_DIGIT_W + ODO_DIGIT_GAP,
+      h: ODO_DIGIT_H,
+    };
+    expect(four).toHaveLength(ODO_DIGIT_COUNT);
+    expect(faceElementIsVisible(widened)).toBe(false);
+  });
+
+  it("the odometer does not collide with the gear column it sits under", () => {
+    // Two elements on the same columns, one above the other: the gap is what
+    // keeps «0042 м» from reading as part of the selector.
+    const gearBottom = GEAR_CY - GEAR_H / 2;
+    for (const cell of odoDigitCells()) expect(cell.cy + cell.h / 2).toBeLessThan(gearBottom);
+    expect(ODO_UNIT_CY + ODO_UNIT_H / 2).toBeLessThan(gearBottom);
+    // …and it stays above the hairline rule, which belongs to the hidden band.
+    for (const cell of odoDigitCells()) expect(cell.cy - cell.h / 2).toBeGreaterThan(RULE_Y);
   });
 
   it("the dial's needle tip band clears the rim at the speeds a learner drives", () => {
