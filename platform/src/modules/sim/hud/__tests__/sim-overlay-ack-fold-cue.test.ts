@@ -40,6 +40,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  detailNodePaints,
+  foldLinesBelow,
+  foldWindowPx,
+  readRestScrollTop,
+} from "../SimOverlay";
 
 const SOURCE = readFileSync(resolve(__dirname, "../SimOverlay.tsx"), "utf8");
 
@@ -195,5 +201,131 @@ describe("the sheet's «Разбрах» reveals before it ends (sc-merge-accel-
     // scroll position, which is why the cue is `aria-hidden` in the first place.
     expect(CODE).toMatch(/const\s+tapCloseSheet\s*=\s*useTapActivation\(\(\)\s*=>\s*setOpenItem\(null\)\)/);
     expect(CODE).toMatch(/if\s*\(blocking\)\s*acknowledge\(\);/);
+  });
+});
+
+/**
+ * …AND THE COUNT ITSELF WAS COUNTING A ROW THAT HAS NEVER HELD A WORD —
+ * 2026-09-11, the same row, third pass.
+ *
+ * The two blocks above gated the CUE and the BEHAVIOUR and both are intact.
+ * What neither asked is whether the number is true. `w36/frames/
+ * sc-merge-accel-lane__mobile-right/02-briefing.png` prints «↓ ОЩЕ 2 РЕДА»
+ * and the authored briefing has ONE line left under the cut — item 6's tail,
+ * «лента — там не се кара.» (templates-merging.ts). Measured off that frame at
+ * device resolution (iPhone 16 landscape 852 × 393 at dpr 3): the lead is four
+ * 19.25 px line boxes, the body is nine 16.5 px ones of which eight are
+ * painted, and the scroller is 217 px.
+ *
+ * THE MISSING 8 px ARE A `<div className="mt-2">` WITH NOTHING IN IT. The
+ * sheet gated that row on `renderDetail` — an optional PROP that
+ * `LessonPlayShell` always passes — rather than on what the prop returns,
+ * which is `null` for every kind but `predrive`. `useFoldLines.measure` reads
+ * `el.children`, so the empty row joined `rows` and `scrollHeight`, and both
+ * consumers of the fold read its margin as unread Bulgarian.
+ *
+ * Asserted on the exported arithmetic rather than on a render: this project's
+ * vitest is `environment: "node"` and jsdom has no layout engine, so a mounted
+ * sheet reports `scrollHeight === 0` and every branch below would be dead.
+ */
+describe("the sheet's fold counts TEXT, not an empty row (sc-merge-accel-lane:b75b356e)", () => {
+  /** The scroller's own line grid, off the frame above. */
+  const LEAD_LEADING = 19.25; // text-sm × leading-snug
+  const BODY_LEADING = 16.5; // text-xs × leading-snug
+  const PAD_BOTTOM = 10; // TEXT_FADE_PX, the fade's twin
+  const MT_2 = 8; // the empty row's margin, and the whole defect
+
+  /**
+   * The window at the moment the frame was taken, as `useFoldLines.measure`
+   * builds it: the lead `<h2>`, the body `<p>` (`mt-1.5`), and — before this
+   * repair — the empty `renderDetail` wrapper.
+   */
+  const leadRow = { offsetTop: 0, heightPx: 4 * LEAD_LEADING, lineHeightPx: LEAD_LEADING };
+  const bodyTop = leadRow.heightPx + 6;
+  const bodyRow = { offsetTop: bodyTop, heightPx: 9 * BODY_LEADING, lineHeightPx: BODY_LEADING };
+  const textBottom = bodyRow.offsetTop + bodyRow.heightPx;
+  const emptyRow = { offsetTop: textBottom + MT_2, heightPx: 0, lineHeightPx: BODY_LEADING };
+  const CLIENT_HEIGHT = 217;
+
+  /** What the surface prints, for a given set of scroller children. */
+  const printed = (rows: readonly typeof leadRow[], contentBottom: number): number => {
+    const win = foldWindowPx(rows, { scrollTop: 0, clientHeight: CLIENT_HEIGHT });
+    return foldLinesBelow(
+      {
+        scrollTop: 0,
+        // `scrollHeight` is integer-rounded by the engine, and it includes the
+        // scroller's own `padding-bottom` — which is why `foldLinesBelow` takes
+        // `padBottomPx` and subtracts it again.
+        scrollHeight: Math.round(contentBottom + PAD_BOTTOM),
+        clientHeight: win.bottomPx,
+        padBottomPx: PAD_BOTTOM,
+      },
+      BODY_LEADING,
+    );
+  };
+
+  it("printed «2» on a sheet with one authored line left", () => {
+    // The frame. This is the state being repaired, pinned so the repair below
+    // is a measured difference and not an assertion about itself.
+    expect(printed([leadRow, bodyRow, emptyRow], emptyRow.offsetTop)).toBe(2);
+  });
+
+  it("…and prints «1» once the empty row is gone — the truth", () => {
+    expect(printed([leadRow, bodyRow], textBottom)).toBe(1);
+  });
+
+  it("invents a whole fold on a sheet whose text fits exactly", () => {
+    // The half of this that is not a rounding argument. Eight lines of body,
+    // the window exactly as tall as the text: nothing is hidden, nothing may
+    // be announced.
+    const fits = { ...bodyRow, heightPx: 8 * BODY_LEADING };
+    const fitsBottom = fits.offsetTop + fits.heightPx; // = 215
+    expect(printed([leadRow, fits], fitsBottom)).toBe(0);
+    // With the empty row, 8 px of margin clear `FOLD_SLACK_PX` and
+    // `foldLinesBelow`'s `Math.max(1, …)` floor turns them into a line of
+    // Bulgarian that does not exist — on the button that ENDS the briefing.
+    const ghost = { ...emptyRow, offsetTop: fitsBottom + MT_2 };
+    expect(printed([leadRow, fits, ghost], ghost.offsetTop)).toBe(1);
+  });
+
+  it("…and sent «Разбрах» scrolling instead of acknowledging on that sheet", () => {
+    // `tapSheetAck` reads the live element through `readRestScrollTop`, which
+    // needs only `hidden > FOLD_SLACK_PX`. So the same 8 px cost the student a
+    // press: the first one scrolled empty margin, and the control that the
+    // briefing tells him to use did nothing he could see.
+    const fitsBottom = bodyRow.offsetTop + 8 * BODY_LEADING;
+    const window = (contentBottom: number) => ({
+      scrollTop: 0,
+      scrollHeight: Math.round(contentBottom + PAD_BOTTOM),
+      clientHeight: CLIENT_HEIGHT,
+      padBottomPx: PAD_BOTTOM,
+    });
+    expect(readRestScrollTop(window(fitsBottom))).toBeNull();
+    expect(readRestScrollTop(window(fitsBottom + MT_2))).not.toBeNull();
+  });
+
+  it("gates the row on the NODE, and `predrive` keeps its checklist", () => {
+    // The repair itself. `renderDetail ? …` is a test of the prop, and the
+    // prop is always there; this is a test of what it returned.
+    expect(CODE).not.toMatch(/\{\s*renderDetail\s*\?\s*<div className="mt-2">/);
+    expect(CODE).toContain("detailNodePaints(sheetDetailNode)");
+    // Called inside the sheet's own branch, so a shut sheet allocates nothing
+    // on a component a `ResizeObserver` re-renders six times a second.
+    expect(CODE).toMatch(
+      /const\s+sheetDetailNode:\s*ReactNode\s*=\s*open\s*&&\s*renderDetail\s*!==\s*undefined\s*\?\s*renderDetail\(shown\)\s*:\s*null/,
+    );
+  });
+
+  it("the predicate calls React's own non-painting nodes what they are", () => {
+    expect(detailNodePaints(null)).toBe(false);
+    expect(detailNodePaints(undefined)).toBe(false);
+    // What a `cond && <X/>` guard returns when `cond` is false — the shape
+    // `renderDetail` implementations reach for next.
+    expect(detailNodePaints(false)).toBe(false);
+    expect(detailNodePaints(true)).toBe(false);
+    expect(detailNodePaints("")).toBe(false);
+    // …and anything that can take height gets its row back.
+    expect(detailNodePaints("х")).toBe(true);
+    expect(detailNodePaints(0)).toBe(true);
   });
 });

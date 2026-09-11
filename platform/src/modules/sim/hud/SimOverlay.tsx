@@ -285,6 +285,60 @@ export function readRestScrollTop(el: {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   …AND THE ROW IN THAT WINDOW THAT HAS NEVER HELD A WORD — 2026-09-11,
+   sc-merge-accel-lane:b75b356e, „the briefing overlay clips its last line …
+   and THE REST IS HIDDEN".
+
+   `renderDetail` is an OPTIONAL PROP AND THE SHEET GATED ON THE FUNCTION:
+   `{renderDetail ? <div className="mt-2">{renderDetail(shown)}</div> : null}`.
+   `LessonPlayShell` always passes one, and that one returns `null` for every
+   kind but `predrive` — so every briefing, hint and violation sheet in the
+   product mounts an EMPTY `<div>` at the bottom of the scroller whose `mt-2`
+   puts 8 px of nothing into the scrollable overflow. `useFoldLines.measure`
+   reads `el.children`, so that row lands in `rows` (offsetTop = text bottom
+   + 8, height 0) and in `scrollHeight`, and BOTH consumers of the fold read
+   it as unread Bulgarian.
+
+   MEASURED, `w36/frames/sc-merge-accel-lane__mobile-right/02-briefing.png`,
+   iPhone 16 landscape 852 × 393 at dpr 3 (this lane's own row's own lesson).
+   Scroller box 217 px; lead `<h2>` 4 × 19.25; body `<p>` `mt-1.5` + 9 ×
+   16.5, of which EIGHT are painted and one is not — item 6's tail, «лента —
+   там не се кара.», one line:
+
+     with the empty row    scrollHeight 250 → hidden 25 → «↓ ОЩЕ 2 РЕДА»
+     without it            scrollHeight 242 → hidden 17 → «↓ още 1 ред»
+
+   The frame prints «↓ ОЩЕ 2 РЕДА» and the authored text has one line left.
+   8 px is 0.48 of a 16.5 px line, which is why this is not a rounding quibble:
+   it is the half-line that tips `Math.round`, and the button that carries the
+   count is the one control on the sheet that ENDS the reading.
+
+   IT IS ALSO A BEHAVIOUR AND NOT ONLY A LABEL. `readRestScrollTop` is read
+   off the live element by `tapSheetAck` and needs only `hidden > 2`, so on a
+   sheet whose text fits EXACTLY the 8 px alone answers „there is more": the
+   first press of «Разбрах» scrolls the student 8 px of empty margin instead
+   of acknowledging, and `foldLinesBelow`'s `Math.max(1, …)` floor prints
+   «↓ още 1 ред» over a sheet on which every authored word is already visible
+   — „the band with nothing to announce", which the `foldWindowPx` soft branch
+   fixed on the other side of the same window.
+
+   SO THE GATE MOVES FROM THE FUNCTION TO WHAT THE FUNCTION RETURNS. Nothing
+   about the `predrive` checklist changes: it returns an element, this says
+   so, and the wrapper (and its `mt-2`) render exactly as before.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Would this `renderDetail` result put anything in the sheet's scroller?
+ *
+ * The falsy `ReactNode`s React renders as nothing — `null`, `undefined`, the
+ * booleans a `&&` guard returns, and the empty string. Everything else may
+ * have height and is given its row.
+ */
+export function detailNodePaints(node: ReactNode): boolean {
+  return !(node === null || node === undefined || typeof node === "boolean" || node === "");
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    …AND THE ✕ ON THAT CARD MUST STILL CLOSE IT ON THE FIRST PRESS — 2026-08-28.
 
    THE REGRESSION THE BLOCK ABOVE SHIPPED, stated plainly. On the
@@ -2354,6 +2408,18 @@ export function SimOverlay({
    */
   const ackCarriesSheetFold = blocking && sheetFold.lines > 0;
   /**
+   * …AND WHAT THAT COUNT IS COUNTING. The block at `detailNodePaints` has the
+   * measurement: the sheet gated its `renderDetail` row on the PROP, which is
+   * always present, so every non-`predrive` sheet carried an empty row worth
+   * 8 px of `mt-2` that both `sheetFold.lines` and `tapSheetAck` read as text.
+   *
+   * `open` and not `true`: the call happens exactly when it happened before —
+   * inside the sheet's own branch — so a card whose sheet is shut allocates
+   * nothing, which matters on a component a `ResizeObserver` re-renders six
+   * times a second over a live WebGL canvas.
+   */
+  const sheetDetailNode: ReactNode = open && renderDetail !== undefined ? renderDetail(shown) : null;
+  /**
    * Is there text under the fold RIGHT NOW, on a card that has somewhere to
    * send the reader?
    *
@@ -3653,7 +3719,13 @@ export function SimOverlay({
                   {shown.lawRef}
                 </span>
               ) : null}
-              {renderDetail ? <div className="mt-2">{renderDetail(shown)}</div> : null}
+              {/* GATED ON THE NODE, NOT ON THE PROP — see `detailNodePaints`.
+                  `LessonPlayShell` always passes a `renderDetail`, and it
+                  returns `null` for every kind but `predrive`, so this used to
+                  mount an empty row whose `mt-2` the fold counted as a line. */}
+              {detailNodePaints(sheetDetailNode) ? (
+                <div className="mt-2">{sheetDetailNode}</div>
+              ) : null}
             </div>
 
             {blocking ? (

@@ -172,9 +172,34 @@ describe("the four crashes keep four summaries", () => {
     expect(violationPeekBg("COLLISION", undefined)).toBe(VIOLATIONS.COLLISION.peekBg);
   });
 
-  it("returns null where no summary is authored, which prints the full paragraph", () => {
-    expect(VIOLATIONS.SPEEDING_OVER_LIMIT.peekBg).toBeUndefined();
-    expect(violationPeekBg("SPEEDING_OVER_LIMIT", undefined)).toBeNull();
+  /**
+   * ── THIS CASE USED TO PIN THE DEFECT AS THE DEFAULT — `sc-roundabout-entry:
+   *    fe081cf1`, 2026-09-11 ────────────────────────────────────────────────
+   *
+   * It read `expect(VIOLATIONS.SPEEDING_OVER_LIMIT.peekBg).toBeUndefined()` and
+   * called the fallback „prints the full paragraph". That fallback was not a
+   * corner: it was 55 of the 58 codes, and on every one of them the full
+   * paragraph is a 100–700-character body folded into a window that holds ONE
+   * line — the cut card the row was filed on. `ViolationSpec.peekBg` is
+   * REQUIRED now, so the old assertion cannot be true for ANY code and pinning
+   * it on one was pinning the hole open.
+   *
+   * WHAT IS KEPT is the behaviour the case was really about, moved to where it
+   * is still reachable: the resolver's act-then-pool fallback, exercised on a
+   * row that genuinely has no act summary of its own, and the card's own
+   * paragraph fallback, which `overlayPeekBodyBg` still performs for any item
+   * that arrives without one (the describe block below).
+   */
+  it("no code can print a paragraph into the peek — every one resolves a summary", () => {
+    const missing = (Object.keys(VIOLATIONS) as (keyof typeof VIOLATIONS)[]).filter(
+      (code) => violationPeekBg(code, undefined) === null,
+    );
+    expect(missing).toEqual([]);
+    // The fallback itself is intact — an act this code does not carry copy for
+    // resolves the pooled row rather than nothing.
+    expect(violationPeekBg("SPEEDING_OVER_LIMIT", "no-such-act")).toBe(
+      VIOLATIONS.SPEEDING_OVER_LIMIT.peekBg,
+    );
   });
 });
 

@@ -433,7 +433,22 @@ export const SC_FO_MOTORWAY_GAP: ScenarioSpec = {
       // cite FOLLOWING_TOO_CLOSE). So the title claims only what an 8 m disc can
       // prove — that he got there — and the cap stays as an arrival condition
       // rather than as a sentence about the journey.
-      titleBg: "Стигни края на отсечката по магистралата",
+      //
+      // …AND THE ARRIVAL CLAIM NAMED THE WRONG PLACE — sc-fo-motorway-gap:
+      // d18105c7, 2026-09-11. The row's first half („the reckless driver gets
+      // the route credit the careful driver is denied") is refuted by its own
+      // legs: sweep161 mobile-right topped 19 км/ч with 25 full stops and was
+      // FORCED at 210 s, so it was cut off short of this disc, not denied it.
+      // Its second half is true and is this line. «Края на отсечката» at y=400
+      // is 385 m of a carriageway that runs 15 → 2585 (mw-v1 names y=2585
+      // «Контролна точка — край на отсечката» itself), the drill's OWN last
+      // gate is 390 m further on at y=790, and FMG_LEAD's staged brake at
+      // y=720 is called „mid-segment" fifty lines up. So the disc is a
+      // checkpoint and now says so — the corpus's own word for one
+      // (templates-reels «стигни контролната точка»). Params untouched, `done`
+      // bit-identical, no new refusal, no THEO-4 card owed; no км/ч figure,
+      // because `advisorPromptForObjective` already appends the cap.
+      titleBg: "Стигни контролната точка по магистралата",
       params: { kind: "reachZone", x: MW_X_CRUISE, y: 400, radiusM: 8, maxSpeedKmh: 140 },
     },
     {

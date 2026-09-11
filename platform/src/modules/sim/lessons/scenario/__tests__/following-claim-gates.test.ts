@@ -1265,3 +1265,74 @@ describe("no demonstration caption states a speed the student may read as his ow
     }
   });
 });
+
+/**
+ * sc-follow-tailgater — THE CARD, THE BRIEFING AND THE CAP MUST POINT THE SAME
+ * WAY (audit row `sc-follow-tailgater:instruction-4-contradiction`, major).
+ *
+ * THE ROW NAMED A LINE THAT NO LONGER EXISTS, AND NOTHING HELD ITS PLACE.
+ * Instruction 4 once read «Вдигни газта плавно и увеличи дистанцията НАПРЕД» —
+ * this bank's idiom for lifting OFF the pedal, but the one card in the corpus
+ * standing without an explicit slow-down cue beside it, on the one drill whose
+ * OWN graded mistake is «Гузно ускоряване» (SPEEDING_OVER_LIMIT). Read the other
+ * way it instructed the exact act steps 3 and 6 forbid. `10930c9` replaced it
+ * with «Отпусни плавно газта…» and rewrote the briefing to match; no test
+ * pinned either, and a „tidy the Bulgarian" pass puts the ambiguity back.
+ *
+ * WHY A TEST AND NOT A DRIVE. The drive is graded CORRECTLY — there is no frame
+ * to file, because the defect was never in the engine. The only instrument that
+ * can see this class is one that reads the taught TEXT against the NUMBER that
+ * grades it.
+ *
+ * AND THE INVARIANT IS PHYSICAL, NOT EDITORIAL. `FTG_LEAD` cruises a CONSTANT
+ * 11,5 m/s: its `followGapM` 150 is authored ABOVE the real ~95 m gap, so the
+ * matchPlayer target is permanently over the cap and the lead never tracks the
+ * player. The gap AHEAD — the whole taught response to a лепка, ЗДвП чл. 23 —
+ * therefore opens below 41,4 км/ч and CLOSES above it. A cap at or over that
+ * number would hand the «увеличи дистанцията НАПРЕД» tick to a student reeling
+ * the lead in, which is the row's allegation made true.
+ */
+describe("sc-follow-tailgater: the taught direction is the graded direction", () => {
+  const lead = (SC_FOLLOW_TAILGATER.staged ?? []).find(
+    (s): s is BrakingLeadCarSpec => s.kind === "brakingLeadCar",
+  );
+  const ease = SC_FOLLOW_TAILGATER.success.find((o) => o.id === "sc-ftg-ease");
+
+  it("the pace cap sits below the front lead's constant cruise, by more than a needle's error", () => {
+    expect(lead, "the drill stages a constant front cruiser to open a gap to").toBeDefined();
+    expect(ease?.params.kind, "sc-ftg-ease is the pace gate").toBe("reachZone");
+    const cruiseKmh = (lead?.maxMatchSpeedMps ?? 0) * 3.6;
+    const capKmh = ease?.params.kind === "reachZone" ? (ease.params.maxSpeedKmh ?? 0) : 0;
+    expect(cruiseKmh).toBeCloseTo(41.4, 1);
+    // Below it, and outside the slack the rest of this family is measured by —
+    // a cap decided by needle wobble cannot certify a direction.
+    expect(cruiseKmh - capKmh).toBeGreaterThanOrEqual(REACH_ZONE_CAP_SLACK_KMH);
+  });
+
+  it("…and every word the student is told BEFORE driving sends him the same way", () => {
+    // The briefing and the instruction card only — the text that INSTRUCTS. The
+    // debrief copy and the two mistake cards describe acceleration in order to
+    // condemn it, and scanning them would ban the vocabulary the lesson needs.
+    const steps = SC_FOLLOW_TAILGATER.instructionsBg.map((i) => i.textBg);
+    const taught = [SC_FOLLOW_TAILGATER.objectiveBg, ...steps].join("\n");
+
+    // The unambiguous release verb, in both places — briefing and card.
+    expect(SC_FOLLOW_TAILGATER.objectiveBg).toContain("отпусни плавно газта");
+    expect(steps).toContain("Отпусни плавно газта и остави дистанцията НАПРЕД да порасне.");
+    // …and never the bare idiom, which is safe elsewhere in this bank and is
+    // the one reading this drill cannot afford.
+    expect(taught).not.toMatch(/вдигни газта/i);
+
+    // Acceleration may still be NAMED here — step 6 forbids it by name, which is
+    // requirement-zero doing its job. What it may never be is asked for: every
+    // sentence that mentions it has to be a prohibition.
+    // `\b` is ASCII-only in JS — against Cyrillic it matches nothing and the
+    // guard would pass on every sentence. The boundary is spelled out instead.
+    const NEGATED = /(^|[^\p{L}])не([^\p{L}]|$)/iu;
+    for (const sentence of taught.match(/[^.\n]*ускор[^.\n]*/gi) ?? []) {
+      expect(sentence, `«${sentence.trim()}» asks for speed on a tailgating drill`).toMatch(
+        NEGATED,
+      );
+    }
+  });
+});

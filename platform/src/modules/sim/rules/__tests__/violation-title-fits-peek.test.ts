@@ -300,6 +300,41 @@ describe("the peek card's summary budget", () => {
     expect(over).toEqual([]);
   });
 
+  /**
+   * ── AND THE CASE ABOVE WAS VACUOUS FOR 55 OF THE 58 CODES ────────────────
+   * `sc-roundabout-entry:fe081cf1`, 2026-09-11.
+   *
+   * „every AUTHORED summary finishes" is a gate on the rows that HAVE one, and
+   * `violationPeekBg` returns `null` for a row that does not — on which the
+   * phone card prints the whole `explanationBg`. Counted on the build this case
+   * was written against: 3 codes carried a summary and 55 did not, so the fit
+   * gate was measuring 5 % of the surface it reads as covering. Measured at
+   * this file's own budget, every one of the 55 overflowed the window: the
+   * mildest 4 lines into a room of 1 (PREDRIVE_SEATBELT_SKIPPED), the worst 31
+   * (STOPPED_WITHOUT_CAUSE), with DRIVING_TOO_SLOW_IN_TOWN at 30 and
+   * RAIL_CROSSING_VIOLATION at 23. That is the photographed defect — a body cut
+   * mid-clause with «↓ ОЩЕ N РЕДА» under it — as the DEFAULT rather than as an
+   * exception, on 12 опасни −10 cards among them.
+   *
+   * `ViolationSpec.peekBg` is REQUIRED now, so `tsc` holds the pooled half. This
+   * case holds the half a type cannot: that the LIVE resolver answers for every
+   * (code, act) pair a student can meet, including the act tables that override
+   * the pooled row and could otherwise inherit a `null` from a sibling.
+   */
+  it("every code and every act resolves a summary — the fit gate is total", () => {
+    const missing: string[] = [];
+    for (const code of Object.keys(VIOLATIONS) as ViolationCode[]) {
+      if (violationPeekBg(code, undefined) === null) missing.push(code);
+      for (const detail of Object.keys(PER_ACT_COPY[code] ?? {})) {
+        if (violationPeekBg(code, detail) === null) missing.push(`${code}/${detail}`);
+      }
+    }
+    expect(missing).toEqual([]);
+    // …and the fit case above therefore walks the whole catalogue, not a corner
+    // of it. 58 pooled rows plus every act row, not the 6 its own floor asked.
+    expect(peekRows().length).toBeGreaterThanOrEqual(Object.keys(VIOLATIONS).length);
+  });
+
   /** The four strings this lane cut, kept so the gate is anchored to the defect. */
   it("refuses the four summaries the frame photographed and accepts their repairs", () => {
     for (const [was, titleBg] of [
