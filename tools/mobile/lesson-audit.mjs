@@ -265,12 +265,31 @@ import {
   TUNE,
   aimFrom,
   costVerdict,
+  createFurnitureRegister,
   degPerPxAtCentre,
+  readAim,
   refusalExpired,
   scanBand,
   steerCommand,
   summariseTracking,
 } from "./lib/guidance.mjs";
+// THE WHEEL WHILE THE CAR IS GOING BACKWARDS — same contract again: the law is
+// pure and lives in the lib, the page side (the pose read, the keys) is here.
+// It exists because `armReverse` gave this harness a way to SELECT R in August
+// and never gave it a way to AIM in it, so every reverse-park lesson was driven
+// straight backwards past its bay and eleven critical rows read the result as a
+// product defect. reverse-plan.mjs's header carries the measurements and the
+// admissibility limit; the short version is that a leg it steers is evidence
+// about GRADING and never about what a student could work out from the glass.
+import {
+  buildReversePlan,
+  createSignAudit,
+  foldSignAudit,
+  median as reverseMedian,
+  reverseCommand,
+  reverseSteerLine,
+  REVERSE_TUNE,
+} from "./lib/reverse-plan.mjs";
 // THE BRAKE THAT HAS A REASON — same contract as guidance.mjs above: the
 // control law is pure and lives in the lib, the page side (`hazardRead`, and
 // the fold in the roll phase) lives here. `hazard.mjs`'s header carries the
@@ -929,8 +948,12 @@ const read = () =>
  * question, which is the whole shape of this defect. `topSpeed` starts at 0 and
  * only ever climbs, so a dial reading −1 («not in the DOM») and a dial reading
  * 0 («the car is stopped») both leave it at 0 — a paywall and a stationary car
- * were the same number. `guidance.samples` is only pushed in the `roll` phase,
- * so on every MODE=«wrong» lane it is empty and says nothing either way.
+ * were the same number. `guidance.samples` used to be pushed ONLY in the `roll`
+ * phase, so on every MODE=«wrong» lane it was empty and said nothing either
+ * way; since `guidePose` (2026-09-10) those lanes carry a POSE per tick and
+ * still no steering measurement — which is the honest shape, and it does not
+ * make `guidance` a whole-drive speed witness, because a pose sample records
+ * `kmh` without ever asking whether the dial was readable.
  * `steering.channel` reads the dial ONCE, at one instant.
  *
  * This is the whole-drive witness the three of them add up to and none of them
@@ -1537,6 +1560,22 @@ const steering = {
     commands: 0,
     heldMs: { left: 0, right: 0 },
   },
+  /**
+   * A THIRD SET OF BOOKS, for the same reason there is a second one.
+   *
+   * The reverse leg turns the wheel too, and `steering.commands` /
+   * `everSteered` are read downstream as „the RIBBON loop steered this drive" —
+   * the loud line about uncredited objectives keys off exactly that. Banking a
+   * reverse-park's wheel work into the trace's books would let a lane whose
+   * forward guidance never saw a thing report itself as steered, which is the
+   * same conflation `channel` was split out to stop, arriving from a third
+   * direction. `reverse-plan.mjs` publishes the aim record; these are just the
+   * key-level counters, kept where they cannot be mistaken for the ribbon's.
+   */
+  reverse: {
+    commands: 0,
+    heldMs: { left: 0, right: 0 },
+  },
   note: null,
 };
 let steerHeld = null;
@@ -1570,7 +1609,7 @@ const steer = async (dir, kmh = null, by = "trace") => {
     // check releases through `steer(null)`, and billing that release to the
     // trace is how `heldMs.left: 1129` appears on a drive whose traces never
     // touched the wheel.
-    if (steerSince !== null) (steerHeldBy === "trace" ? steering.heldMs : steering.channel.heldMs)[steerHeld] += now - steerSince;
+    if (steerSince !== null) (steerHeldBy === "trace" ? steering.heldMs : steerHeldBy === "reverse" ? steering.reverse.heldMs : steering.channel.heldMs)[steerHeld] += now - steerSince;
     steerHeld = null;
     steerSince = null;
     steerHeldBy = null;
@@ -1598,6 +1637,8 @@ const steer = async (dir, kmh = null, by = "trace") => {
       steering.commands += 1;
       steering.everSteered = true;
       if (kmh !== null && kmh >= 0 && kmh < STEER_MIN_KMH) steering.atStandstill += 1;
+    } else if (by === "reverse") {
+      steering.reverse.commands += 1;
     } else {
       steering.channel.commands += 1;
     }
@@ -4089,10 +4130,47 @@ const guidance = {
   commandMs: 0,
   tooSmall: 0,
   errors: 0,
-  /** samples on which the wheel was LEFT DOWN across a scan (a confirmed turn) */
+  /**
+   * PRESSES AUTHORISED BY A CONFIRMED TURN — the only ones allowed past
+   * `MAX_HOLD_MS`. It used to read „samples on which the wheel was LEFT DOWN
+   * across a scan", and that is no longer what happens: the wheel is now sized
+   * by pure pursuit and RELEASED INSIDE THE TICK, bounded by the tightest
+   * radius the corpus demands and by `period − FULL_RETURN_MS` so it is always
+   * back at centre before the next scan. The count means the same thing (how
+   * often the loop was allowed a manoeuvre) and the wheel does something
+   * different and bounded with it — `turnHoldMs`, `maxHoldMsIssued` and
+   * `holdHistogram` in `tracking` say exactly what.
+   */
   sustainHolds: 0,
   /** …and the ones that hit SUSTAIN_MAX, i.e. were stopped by the guard */
   sustainCapped: 0,
+  /** …and the ones the THREE bounds on a turn press shortened, by which bound.
+   *  Published because a ceiling was raised: a reader has to be able to see
+   *  what the wheel was actually allowed to do, not infer it from constants. */
+  turnHoldCappedBy: { radius: 0, tick: 0, ceiling: 0 },
+  /**
+   * Runs carried across a tick too slow to take evidence on, and runs dropped
+   * because the slow stretch outlasted `GUIDE_SLOW_CARRY_MAX`.
+   *
+   * MEASURED: the below-MIN_KMH branch used to zero `guideSustainRun`, and
+   * across 468 parking lanes that single line ended 846 of 1,088 active holds
+   * early (78 %) and killed 315 of the 695 runs that never reached
+   * SUSTAIN_CONFIRM (45 %). 769 of those ticks sat SANDWICHED between two
+   * same-sign ≥15° demands — the car slowed for the turn, which is correct
+   * driving, and the loop answered it by forgetting what it had seen.
+   */
+  sustainCarriedSlow: 0,
+  sustainDroppedStale: 0,
+  /** presses paid for out of the sub-floor bank — see THE SUB-FLOOR
+   *  ACCUMULATOR in lib/guidance.mjs TUNE */
+  carriedPulses: 0,
+  /** the real wall-clock period between consecutive scans, which is NOT the
+   *  `dtMs` on the samples. See `guideLastTickAt`. */
+  periodMs: [],
+  /** ticks recorded by `guidePose` — the stop, the reverse leg and the whole
+   *  `flat` law of a MODE=«wrong» lane. They carry a pose and nothing else and
+   *  are excluded from every tracking rate. See `guidePose`. */
+  poseOnlyTicks: 0,
   /**
    * …and the samples AFTER that guard fired on which the turn demand was still
    * there, same sign, still over SUSTAIN_DEG. `sustainRun` is only reset by the
@@ -4103,7 +4181,11 @@ const guidance = {
    * Non-zero therefore means THE WHEEL RAN OUT, not that the road went straight.
    */
   sustainExhausted: 0,
-  /** …and every time a sustained hold was let go. Published because a hold
+  /** …and every time a turn press was let go. It should now equal
+   *  `sustainHolds` on a clean drive, because every press releases inside the
+   *  tick that issued it; a SHORTFALL means a press was still down when
+   *  something else took over, which is the state this loop must not reach.
+   *  Published because a hold
    *  that is never released is a car turning with nothing watching. */
   sustainReleases: 0,
   /** …of which were forced by the drive leaving the roll phase with the wheel
@@ -4118,10 +4200,55 @@ const guidance = {
   caveat: null,
 };
 let guideBandGeom = null;
+// THE FURNITURE REGISTER — CARRIED, AND PRICED AT ZERO.
+// It remembers cells that stay lit in the same place across a sliding window,
+// so a permanently-bright HUD corner cannot be mistaken for road. The lane that
+// built it MEASURED IT AT NO GAIN — every counter with it is byte-identical to
+// without — and reported that rather than burying it. It stays because the
+// chevron reader is easier to trust when the plate is separated first, and its
+// pixel count is published as `shape.fixedPx` so no future round can credit it
+// with the win that belongs to reading the arrow.
+let guideFurniture = null;
 let guidePrevErrDeg = null;
 let guideSustainRun = 0;
 let guideSustainDir = 0;
 let guideHeldBySustain = false;
+/** The sub-floor bank — see THE SUB-FLOOR ACCUMULATOR in TUNE. The caller's book, like the
+ *  run: `steerCommand` is pure and returns the new value each tick. */
+let guideCarryMs = 0;
+/** consecutive ticks under `TUNE.MIN_KMH` — the carry's staleness clock. */
+let guideSlowTicks = 0;
+/**
+ * How many consecutive too-slow ticks a confirmed run may survive.
+ *
+ * At the measured ~1 s period this is about four seconds of standing still,
+ * which is longer than any deceleration into a junction in the corpus and
+ * shorter than the shortest lawful wait the drive path honours (`STOP_MS`
+ * plus `MIN_PHASE_TICKS`). Past it the run is dropped and `sustainDroppedStale`
+ * says so — the world has had time to change and a run rebuilt out of not
+ * looking is not repeated evidence.
+ */
+const GUIDE_SLOW_CARRY_MAX = 4;
+/**
+ * WALL CLOCK AT THE TOP OF THE PREVIOUS `guideTick`, AND WHY IT IS NOT `dtMs`.
+ *
+ * `dtMs` is `now - lastTickAt` with `lastTickAt` assigned at the END of the
+ * previous tick body, so THIS tick's mask read, screenshot, pixel scan and
+ * press are charged to no interval at all — the same defect the odometer has,
+ * and the file already names it there („THE ODOMETER GETS ITS OWN CLOCK").
+ * The control law sizes a press as a fraction of the interval the wheel is
+ * centred for, so it needs the interval that really elapses between two
+ * scans, which is about 1.87× larger. Measured three ways on w33:
+ * `tSec` deltas inside a roll give 1,021 ms, `dtMs + scanMs` gives 1,079 ms,
+ * and integrating the dial against `dtMs` recovers only 0.49 of the witness's
+ * own path length against 0.84 with the scan added back.
+ *
+ * So the loop measures it directly and hands the law the real number.
+ * `dtMs` is left exactly as it was, because every historical `movingMs`,
+ * `blindMs` and `offLineFrac` was computed from it and moving it would
+ * silently restate every drive ever taken.
+ */
+let guideLastTickAt = null;
 const guideWitness = [];
 /**
  * WHAT A SCAN IS ALLOWED TO COST, AND THE REFUSAL WHEN IT COSTS MORE.
@@ -4279,6 +4406,14 @@ const guideWitnessRead = () =>
  */
 async function guideTick(kmh, tElapsedMs, dtMs) {
   const tSec = Math.round(tElapsedMs / 1000);
+  // THE PERIOD THE LAW SIZES ITS PRESS AGAINST — measured, not inferred from
+  // `dtMs`. See `guideLastTickAt`. The first tick has no predecessor and falls
+  // back to the corpus-measured constant, which is stated rather than assumed.
+  const nowTick = Date.now();
+  const periodMs =
+    guideLastTickAt === null ? TUNE.TICK_MS_ASSUMED : Math.min(6000, Math.max(120, nowTick - guideLastTickAt));
+  guideLastTickAt = nowTick;
+  guidance.periodMs.push(Math.round(periodMs));
   /* ── AND THE POSE GOES ON THE SAMPLE, NOT ONLY INTO A SCALAR — 2026-08-22 ──
    *
    * THE TRACKING RECORD WAS NOT INDEPENDENT OF THE CONTROLLER, AND THAT IS THE
@@ -4305,6 +4440,10 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
       tSec,
       kmh,
       dtMs,
+      /** the REAL interval since the previous scan. `dtMs` excludes this
+       *  tick's own scan and screenshot; this does not. They differ by ~1.87×
+       *  and the control law uses this one. */
+      periodMs: Math.round(periodMs),
       wx: witnessNow ? Number(witnessNow.x.toFixed(2)) : null,
       wz: witnessNow ? Number(witnessNow.z.toFixed(2)) : null,
       ...s,
@@ -4354,15 +4493,55 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     return;
   }
   if (!(kmh >= TUNE.MIN_KMH)) {
-    // Not a moving sample — `summariseTracking` filters these out of every
-    // rate it computes, but it is still written down, because "the car was
-    // stopped" and "the loop skipped a tick" must not look the same.
+    /* ── SLOWING FOR A TURN IS CORRECT DRIVING, AND THE LOOP USED TO PUNISH
+     *    IT BY FORGETTING — 2026-09-10 ────────────────────────────────────
+     *
+     * This branch zeroed `guideSustainRun`. MEASURED across 468 parking lanes:
+     * that one line ended 846 of 1,088 active holds early (78 %) and killed
+     * 315 of the 695 runs that never reached `SUSTAIN_CONFIRM` (45 %), and 769
+     * of the ticks that did it sat SANDWICHED BETWEEN TWO SAME-SIGN ≥15°
+     * DEMANDS. The car braked for the junction it was about to turn into and
+     * the loop treated the deceleration as evidence that the junction had gone
+     * away.
+     *
+     * The run is CARRIED now, and carrying it is honest for a reason worth
+     * writing down: `sustainRun` counts CONSECUTIVE SAMPLES THAT SAW A LARGE
+     * SAME-SIGNED ERROR, and a sample with no scan is not a sample that
+     * disagreed — it is one that did not look. Carrying does not INCREMENT the
+     * run (no evidence was taken), it only declines to destroy it.
+     *
+     * IT IS BOUNDED, because „did not look" stops being innocent eventually: a
+     * car that has been under `MIN_KMH` for `GUIDE_SLOW_CARRY_MAX` consecutive
+     * ticks has been standing still, the world has had time to change, and the
+     * run is dropped and counted (`sustainDroppedStale`). Both outcomes are
+     * counted so the carry can be audited rather than believed.
+     *
+     * The WHEEL is still released, unconditionally, exactly as before. */
     if (guideHeldBySustain) { await steer(null, kmh); guideHeldBySustain = false; guidance.sustainReleases += 1; }
-    guideSustainRun = 0;
-    guideSustainDir = 0;
-    push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, why: `below ${TUNE.MIN_KMH} км/ч` });
+    guideSlowTicks += 1;
+    let carried = false;
+    if (guideSustainRun > 0) {
+      if (guideSlowTicks <= GUIDE_SLOW_CARRY_MAX) {
+        carried = true;
+        guidance.sustainCarriedSlow += 1;
+      } else {
+        guidance.sustainDroppedStale += 1;
+        guideSustainRun = 0;
+        guideSustainDir = 0;
+      }
+    }
+    guideCarryMs = 0;
+    push({
+      seen: false,
+      errDeg: null,
+      nearDeg: null,
+      dir: null,
+      holdMs: 0,
+      why: `below ${TUNE.MIN_KMH} км/ч${carried ? ` — the run of ${guideSustainRun} same-sign sighting(s) is CARRIED, not taken (slow tick ${guideSlowTicks}/${GUIDE_SLOW_CARRY_MAX})` : ""}`,
+    });
     return;
   }
+  guideSlowTicks = 0;
   if (guideBandGeom === null) {
     guideBandGeom = await guideBand();
     if (guideBandGeom === null) {
@@ -4374,6 +4553,11 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     }
     guidance.band = guideBandGeom.clip;
     guidance.degPerPx = Number(guideBandGeom.degPerPx.toFixed(5));
+    guideFurniture = createFurnitureRegister({
+      w: Math.round(guideBandGeom.clip.width * guideBandGeom.dpr),
+      h: Math.round(guideBandGeom.clip.height * guideBandGeom.dpr),
+      dpr: guideBandGeom.dpr,
+    });
   }
 
   const t0scan = Date.now();
@@ -4381,7 +4565,17 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
   try {
     const masks = await guideMasks(guideBandGeom);
     const png = await page.screenshot({ clip: guideBandGeom.clip });
-    aim = aimFrom(scanBand(decodePng(png), masks));
+    // READ THE ARROW, DO NOT WEIGH THE BAND. `aimFrom` took the centroid of the
+    // brightest mass, so a fat near-ribbon or a lit sign could out-vote the road.
+    // `readAim` finds the chevron the product paints for the student and takes
+    // its ORIENTATION, which is what stops this being «steer at the nearest
+    // bright thing»: dropping the arrowhead test and accepting any glowing plate
+    // reads more turns correct but takes shipping wrong-way from 18 to 30.
+    aim = readAim(scanBand(decodePng(png), masks, { keepMask: true }), {
+      register: guideFurniture,
+      moving: kmh >= TUNE.MOVING_KMH,
+      dpr: guideBandGeom.dpr,
+    });
   } catch (error) {
     guidance.errors += 1;
     if (guideHeldBySustain) { await steer(null, kmh).catch(() => {}); guideHeldBySustain = false; guidance.sustainReleases += 1; }
@@ -4443,22 +4637,56 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     guideSustainDir = 0;
   }
 
-  const cmd = steerCommand({ errDeg, prevErrDeg: guidePrevErrDeg, kmh, sustainRun: guideSustainRun, confident: aim.confident === true });
+  const cmd = steerCommand({
+    errDeg,
+    prevErrDeg: guidePrevErrDeg,
+    kmh,
+    // THE MEASURED PERIOD, NOT `dtMs`. See `guideLastTickAt` — the two differ
+    // by ~1.87× and a press sized against the smaller one delivers ~55 % of
+    // the bend it asked for with no way to notice.
+    dtMs: periodMs,
+    sustainRun: guideSustainRun,
+    confident: aim.confident === true,
+    carryMs: guideCarryMs,
+  });
+  guideCarryMs = cmd.carryMs ?? 0;
   if (aim.seen && !aim.confident) guidance.thinSightings += 1;
   if (cmd.tooSmall) guidance.tooSmall += 1;
+  if (cmd.carried) guidance.carriedPulses += 1;
 
   if (cmd.sustain) {
-    // THE WHEEL STAYS DOWN THROUGH THE NEXT SCAN. Only reachable after
-    // SUSTAIN_CONFIRM consecutive same-sign samples over SUSTAIN_DEG — see the
-    // measurement on sc-junction-left in lib/guidance.mjs. `steer` is
-    // idempotent on a direction already held, so this does not re-press.
+    /* THE TURN PRESS — PRESSED AND RELEASED INSIDE THE TICK.
+     *
+     * It used to be `steer(dir)` with NO release: the key stayed down through
+     * the scan and through however many consecutive sustained samples
+     * followed, so a four-sample sustain was ~4 s of unbroken full lock with
+     * nothing watching, at a 4.2 m radius — 2.3× tighter than any junction in
+     * the corpus asks for, and `guideLeaveRoll` existed only to clean up after
+     * the phase-transition case. Now the press is sized by pure pursuit
+     * against the MEASURED period and released before the next scan, so the
+     * one path in this loop that could leave the wheel down unattended is
+     * gone. `guideHeldBySustain` is set ACROSS the wait, so if the release
+     * throws, `guideLeaveRoll` still finds it.
+     */
     await steer(cmd.dir, kmh);
-    guidance.sustainHolds += 1;
     guideHeldBySustain = true;
+    guidance.sustainHolds += 1;
+    if (cmd.cappedBy && guidance.turnHoldCappedBy[cmd.cappedBy] !== undefined) guidance.turnHoldCappedBy[cmd.cappedBy] += 1;
     if (guideSustainRun >= TUNE.SUSTAIN_CONFIRM + TUNE.SUSTAIN_MAX - 1) guidance.sustainCapped += 1;
+    await page.waitForTimeout(cmd.holdMs);
+    await steer(null, kmh);
+    guideHeldBySustain = false;
+    // …AND THE RELEASE IS BANKED HERE TOO, so the two books balance. The
+    // field's own note says it counts „every time a sustained hold was let go",
+    // and a verifier already caught one branch that let one go without saying
+    // so — a reader checking `sustainHolds` against `sustainReleases` would
+    // otherwise read every turn press on every drive as a leaked key.
+    guidance.sustainReleases += 1;
+    guidance.commands += 1;
+    guidance.commandMs += cmd.holdMs;
     if (guidance.state === "not-run" || guidance.state === "blind") {
       guidance.state = "steering";
-      guidance.why = "the loop saw the ribbon and is holding a sustained turn";
+      guidance.why = "the loop saw the ribbon and is driving a confirmed turn";
     }
   } else if (cmd.dir !== null) {
     // PULSE, THEN CENTRE. Outside a confirmed turn the wheel is never left
@@ -4478,7 +4706,21 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     // SUSTAIN_MAX the sustained branch is retired while `sustainRun` keeps
     // climbing, so a manoeuvre longer than that window is answered by pulses
     // and the car goes on nearly straight. See `guidance.sustainExhausted`.
-    if (Math.abs(errDeg) >= TUNE.SUSTAIN_DEG && guideSustainRun >= TUNE.SUSTAIN_CONFIRM + TUNE.SUSTAIN_MAX) {
+    /* ── AND `confident` IS PART OF THE CONDITION, WHICH IT WAS NOT ────────
+     * MEASURED, and the bias ran 18.6× in the direction that mattered most.
+     * This counter's own doc-comment says „Non-zero therefore means THE WHEEL
+     * RAN OUT" — i.e. that the SUSTAIN_MAX guard retired a branch that would
+     * otherwise have armed. It incremented without re-checking `confident`,
+     * and the sustained branch requires `confident`. Replaying w30–w33: 223
+     * samples cleared the old condition and only 12 of them were confident
+     * sightings the guard could ever have retired. The other 211 could not
+     * have armed the branch at all, and the inflated count is what pointed a
+     * whole round's suspicion at `SUSTAIN_MAX` — which turned out to be the
+     * sole binding gate on 12 of 1,623 turn demands (0.7 %).
+     *
+     * A counter that means something 5 % of the time is worse than no counter,
+     * because the loud line downstream quotes it. */
+    if (Math.abs(errDeg) >= TUNE.SUSTAIN_DEG && guideSustainRun >= TUNE.SUSTAIN_CONFIRM + TUNE.SUSTAIN_MAX && aim.confident === true) {
       guidance.sustainExhausted += 1;
     }
     await steer(cmd.dir, kmh);
@@ -4524,6 +4766,20 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     ribbonPx: aim.total,
     confident: aim.confident === true,
     source: aim.source,
+    // WHAT THE AIM WAS ACTUALLY MADE OF. A verdict that cannot say whether it
+    // read an arrow or guessed from mass is unauditable, and this programme has
+    // been burned by exactly that. `conflict` is set when ribbon and arrow
+    // disagree — recorded, never silently resolved.
+    signal: aim.signal ?? "mass",
+    conflict: aim.conflict === true,
+    shape: aim.shape
+      ? {
+          linePx: aim.shape.linePx,
+          objectPx: aim.shape.objectPx,
+          fixedPx: aim.shape.fixedPx,
+          chevronPx: aim.shape.chevronPx,
+        }
+      : null,
     dir: cmd.dir,
     holdMs: cmd.holdMs,
     sustain: cmd.sustain === true,
@@ -4558,13 +4814,96 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
  * `phaseExitReleases` says how many of them were this.
  */
 async function guideLeaveRoll() {
-  if (!guideHeldBySustain) return;
+  /* ── IT ASKS THE KEY, NOT THE FLAG — 2026-09-10 ───────────────────────────
+   *
+   * It used to return early unless `guideHeldBySustain`, i.e. unless the loop
+   * BELIEVED it was holding. Since the turn press is now pressed and released
+   * inside the tick, that flag is only true across the `waitForTimeout` — and
+   * the one case this function has to catch is exactly the one where the
+   * release did not happen, which is also the case where the flag can be
+   * stale. `steerHeld` is what `steer()` actually did to the keyboard, so it
+   * is the honest question. Belief is kept as a second condition rather than
+   * replaced, because a flag set with no key down is its own bug and should
+   * still be cleared. */
+  if (steerHeld === null && !guideHeldBySustain) return;
   await steer(null).catch(() => {});
   guideHeldBySustain = false;
   guideSustainRun = 0;
   guideSustainDir = 0;
+  guideSlowTicks = 0;
+  guideCarryMs = 0;
   guidance.sustainReleases += 1;
   guidance.phaseExitReleases += 1;
+}
+
+/**
+ * THE POSE WITNESS FOR THE PHASES THE STEERING LOOP DOES NOT RUN IN.
+ *
+ * ═══ THE DEFECT, MEASURED ══════════════════════════════════════════════════
+ *
+ * `route-fidelity.mjs` reconstructs where the car went out of
+ * `guidance.samples[].wx/.wz` AND NOTHING ELSE (`posesFromStatus`, line 536).
+ * `guideTick` is called only under `if (phase === "roll")`. So on a parking
+ * lesson — the whole of class C — the cross-track and the coverage are
+ * computed on the FORWARD APPROACH with the manoeuvre itself absent, and the
+ * row still prints a verdict over the gap. Counted across 428 right-mode
+ * parking lanes: reverse was demanded on 334 and attempted on all 334, for
+ * 19,094 reverse ticks against 20,422 guidance ticks — about half of every
+ * parking drive's control ticks — and the number of poses recorded at negative
+ * speed is ZERO of 27,716. Every MODE=«wrong» lane is invisible the same way:
+ * 116 of 398 lanes with not one sample.
+ *
+ * That is the same shape as the defect route-fidelity was written to catch
+ * („certified `tracked` at 37.5 m off the line"), one level down: a
+ * measurement of a different part of the drive, published without saying so.
+ *
+ * ═══ IT RECORDS. IT DOES NOT STEER, AND IT MUST NOT ════════════════════════
+ *
+ * Two independent reasons, and both are hard:
+ *
+ *  1. ON SELECTOR R THE COCKPIT IS YAWED 106°. `reverseViewTarget` returns 1
+ *     below `REVERSE_VIEW_FORWARD_HOLD_KMH` and `CameraRig` swings the view by
+ *     `COCKPIT_SHOULDER_YAW = −1.85 rad`. Every piece of `lib/guidance.mjs`
+ *     geometry — `COCKPIT_HFOV_DEG`, `degPerPxAtCentre`, the band clip, and the
+ *     sign convention „positive error = the ribbon is right of image centre" —
+ *     assumes a forward view. A ribbon scan through a 106°-yawed camera would
+ *     produce a CONFIDENTLY WRONG `errDeg` on half of every parking drive,
+ *     which is worse than the honest silence it replaced.
+ *  2. A `wrong` leg THAT FOLLOWED THE ROUTE would invalidate every verdict
+ *     ever taken from a wrong leg. The whole point of that mode is that it
+ *     drives badly.
+ *
+ * So this writes a sample with `loop: false`, no scan, no wheel, and the phase
+ * that produced it. `summariseTracking` excludes those from every rate and
+ * publishes `poseOnlySamples` so the exclusion is visible; `posesFromStatus`
+ * picks them up unchanged, because all it ever wanted was `wx/wz`.
+ *
+ * `guideWitness` is deliberately NOT fed from here. It folds to
+ * path/net/straightness, and a reversing manoeuvre has a path of 40 m for a
+ * net of 0 — which would read as „the car drove in circles" on the one triple
+ * a skimming judge uses to ask whether the car turned at all. Two artefacts,
+ * two jobs; the split is stated in `guidance.witness.scope`.
+ */
+async function guidePose(kmh, tElapsedMs, dtMs, phaseName) {
+  const w = await guideWitnessRead();
+  guidance.samples.push({
+    tSec: Math.round(tElapsedMs / 1000),
+    kmh,
+    dtMs,
+    wx: w ? Number(w.x.toFixed(2)) : null,
+    wz: w ? Number(w.z.toFixed(2)) : null,
+    /** THE FLAG THAT KEEPS THIS OUT OF EVERY TRACKING RATE. */
+    loop: false,
+    phase: phaseName,
+    seen: false,
+    errDeg: null,
+    nearDeg: null,
+    dir: null,
+    holdMs: 0,
+    sustain: false,
+    why: `${phaseName} — the steering loop does not run here; this sample is a POSE and nothing else`,
+  });
+  guidance.poseOnlyTicks += 1;
 }
 
 const TICK_MS = 500;          // the control law's rate
@@ -5030,6 +5369,187 @@ if (paceTape !== null) {
     stops: paceTape.stops,
   };
 }
+
+/* ===========================================================================
+ * THE REVERSE AIM — the same file, the same gate, a different question
+ * ===========================================================================
+ *
+ * `loadPaceTape` above reads this lesson's authored shadow for a SPEED profile.
+ * The reverse leg needs the other half of the same recording: WHERE the car
+ * went while the gear was R. See `lib/reverse-plan.mjs` for the two measured
+ * conventions and for what a leg steered this way may and may not testify to.
+ *
+ * IT IS BEHIND THE `right` GATE, and for `loadPaceTape`'s own stated reason: a
+ * `wrong` leg is not a correct drive and must not be handed one. A wrong leg
+ * that reversed neatly into the bay would void every conviction ever taken
+ * from a wrong leg.
+ */
+const reverseAim = {
+  /** did a reference path load at all — the field the disclosure keys off. */
+  planned: false,
+  why: "not attempted",
+  path: null,
+  legsAvailable: 0,
+  /** which authored reverse leg the NEXT entry into the reverse phase takes. */
+  legIndex: 0,
+  legLengthM: null,
+  turnDeg: null,
+  ticks: 0,
+  /* NO `commands` FIELD HERE, DELIBERATELY. The first version had one, never
+   * incremented it, and the first real drive published `"commands": 0` in this
+   * block beside `steering.reverse.commands: 2` — a status file disagreeing
+   * with itself, in the reassuring direction, about the one number that says
+   * whether the wheel moved. The key-level count has exactly one home and it
+   * is `steering.reverse`, where `steer()` writes it. */
+  blindTicks: 0,
+  offPathM: [],
+  offPathMedianM: null,
+  errDeg: [],
+  reachedEnd: false,
+  finalToEndM: null,
+  sign: { verdict: "undetermined", why: "the leg never held a wheel long enough" },
+  tune: REVERSE_TUNE,
+};
+const reversePlan = (() => {
+  if (MODE !== "right") {
+    reverseAim.why = "MODE=wrong — the authored path is a correct drive and only a `right` leg may be aimed with it";
+    return null;
+  }
+  if (!existsSync(PACE_TAPE_PATH)) {
+    reverseAim.why = `no shadow trace on disk at ${PACE_TAPE_PATH}`;
+    return null;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(readFileSync(PACE_TAPE_PATH, "utf8"));
+  } catch (error) {
+    reverseAim.why = `the shadow trace would not parse (${String(error?.message ?? error)})`;
+    return null;
+  }
+  const plan = buildReversePlan(doc);
+  reverseAim.legsAvailable = plan.legs.length;
+  reverseAim.path = PACE_TAPE_PATH.slice(REPO_ROOT.length + 1).replace(/\\/g, "/");
+  if (plan.legs.length === 0) {
+    reverseAim.why = plan.why ?? "the authored demonstration has no reverse leg";
+    return null;
+  }
+  reverseAim.planned = true;
+  reverseAim.why = null;
+  return plan;
+})();
+
+/* THE PER-LEG STATE. Reset on every entry into the reverse phase, because a
+ * lesson can reverse twice and the second manoeuvre is not a continuation of
+ * the first. */
+let aimWaypoints = null;
+let aimIndex = 0;
+let aimPrevPose = null;
+let aimBearingRad = null;
+/** The wrong-way audit's state — the reducer lives in the lib. */
+let aimSign = createSignAudit();
+
+/** Read the pose probe, and say nothing rather than something when it is dark. */
+const aimPose = () =>
+  page
+    .evaluate(() => {
+      const p = window.__camProbe;
+      return p && Number.isFinite(p.chassisX) && Number.isFinite(p.chassisZ)
+        ? { x: p.chassisX, z: p.chassisZ }
+        : null;
+    })
+    .catch(() => null);
+
+/**
+ * Fold one pose reading into the motion bearing.
+ *
+ * The bearing stays `null` until the car has actually covered
+ * `minBearingStepM`, and that is the honest state: two poses a centimetre apart
+ * define noise, not a direction, and a controller steering off noise is the
+ * „confident zero" this harness has already shipped once.
+ */
+const aimObserve = (pose) => {
+  if (pose === null) return 0;
+  if (aimPrevPose === null) {
+    aimPrevPose = pose;
+    return 0;
+  }
+  const step = Math.hypot(pose.x - aimPrevPose.x, pose.z - aimPrevPose.z);
+  if (step < REVERSE_TUNE.minBearingStepM) return 0;
+  aimBearingRad = Math.atan2(pose.z - aimPrevPose.z, pose.x - aimPrevPose.x);
+  aimPrevPose = pose;
+  // …and the metres are HANDED BACK rather than banked into a module-level
+  // counter: they are the denominator of the wrong-way audit, whose state
+  // machine is `foldSignAudit` in the lib, where its awkward cases are tested.
+  return step;
+};
+
+/**
+ * The wrong-way audit, folded once per tick.
+ *
+ * A verdict is taken ONCE per leg and only from a wheel that stayed put long
+ * enough for the world to answer it. A `contradicts` here means the measured
+ * convention in reverse-plan.mjs §2 is wrong for this build and every steering
+ * decision on the leg is mirrored — which the drive must report as ITS OWN
+ * failure, loudly, and never as a lesson that cannot be parked.
+ */
+const aimAuditSign = (dir, stepM) => {
+  const { state, verdict: got } = foldSignAudit(aimSign, { dir, bearingRad: aimBearingRad, stepM });
+  aimSign = state;
+  if (got === null) return;
+  reverseAim.sign = got;
+  if (got.verdict === "contradicts") {
+    loud(
+      `THE REVERSE STEERING SIGN THIS HARNESS USES IS WRONG FOR THIS BUILD — ${got.why} ` +
+        `This is an INSTRUMENT failure: the car was aimed away from the bay by the harness, so a missed parking ` +
+        `objective below is NOT evidence that the product refuses a good reverse, and no finding about the ` +
+        `reversing half of this manoeuvre may be drawn from this run in either direction.`,
+    );
+  } else {
+    note(`      reverse steering sign check: ${got.why}`);
+  }
+};
+
+/** Take the next authored reverse leg, or say — on the drive, not only in the
+ *  status file — that there is not one and what that costs. */
+const aimEnterLeg = () => {
+  aimIndex = 0;
+  aimPrevPose = null;
+  aimBearingRad = null;
+  aimSign = createSignAudit();
+  aimWaypoints = null;
+  if (reversePlan === null) {
+    note(
+      `      REVERSE AIM: NONE — ${reverseAim.why}. The car will reverse in a STRAIGHT LINE, which parks nothing: ` +
+        `a missed parking objective on this leg is THIS HARNESS's result and not the product's.`,
+    );
+    return;
+  }
+  const leg = reversePlan.legs[reverseAim.legIndex];
+  if (leg === undefined) {
+    note(
+      `      REVERSE AIM: EXHAUSTED — the authored demonstration holds ${reverseAim.legsAvailable} reverse leg(s) and ` +
+        `this drive has entered R ${reverseAim.legIndex + 1} time(s). This leg reverses in a straight line and a ` +
+        `missed objective on it is THIS HARNESS's result and not the product's.`,
+    );
+    return;
+  }
+  aimWaypoints = leg.waypoints;
+  reverseAim.legLengthM = leg.lengthM;
+  reverseAim.turnDeg = leg.turnDeg;
+  note(
+    `      REVERSE AIM: following the lesson's authored reverse leg ${reverseAim.legIndex + 1}/${reverseAim.legsAvailable} ` +
+      `(${leg.lengthM} m, ${leg.turnDeg}° of turn, ${leg.waypoints.length} waypoints, from ${reverseAim.path}).`,
+  );
+};
+
+/** Close the books on a leg and let go of the wheel. */
+const aimLeaveLeg = async () => {
+  // `finalToEndM` / `reachedEnd` are written by the TICK, off the controller's
+  // own reading — see the note at their call site. Nothing is recomputed here.
+  if (aimWaypoints !== null) reverseAim.legIndex += 1;
+  aimWaypoints = null;
+  await steer(null, null, "reverse").catch(() => {});
+};
 
 /** The slowest the authored drive was over the road just ahead — and NEVER
  *  below CRUISE_KMH, which is the whole safety argument above. */
@@ -5985,6 +6505,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
         // would reverse the car along a curve nothing is watching.
         await guideLeaveRoll();
         phase = "reverse";
+        aimEnterLeg();
         phaseAt = Date.now();
         phaseTicks = 0;
         restLogged = false;
@@ -6027,6 +6548,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
           await shot("05r-reverse-R-late");
           await guideLeaveRoll();
           phase = "reverse";
+          aimEnterLeg();
           phaseAt = Date.now();
           phaseTicks = 0;
           restLogged = false;
@@ -6281,6 +6803,10 @@ while (!ended && Date.now() - t0 < budgetMs) {
       }
     } else if (phase === "stop") {
       phaseTicks++;
+      // THE POSE, NOT THE WHEEL — see `guidePose`. The stop phase is braking
+      // to a halt and nothing here steers; the sample exists so the car's path
+      // does not go dark between two rolls.
+      await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "stop"));
       await throttle(false);
       // Press the brake only while the car is STILL MOVING, then hold it. A
       // fresh press at a standstill is the auto-reverse gesture; a pedal held
@@ -6346,6 +6872,13 @@ while (!ended && Date.now() - t0 < budgetMs) {
       // „I sent the keys once" is the belief this whole task exists to kill.
       phaseTicks++;
       reverse.reverseTicks++;
+      /* THE HALF OF EVERY PARKING DRIVE THAT WAS INVISIBLE — see `guidePose`.
+       * 19,094 reverse ticks across 334 lanes left no pose at all, so every
+       * class-C cross-track was computed on the forward approach with the
+       * manoeuvre absent. It records; it does NOT steer, and it must not: the
+       * cockpit is yawed 106° on selector R and every angle in lib/guidance.mjs
+       * assumes a forward view. */
+      await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "reverse"));
       for (const g of p.gear) if (!reverse.gearSeen.includes(g)) reverse.gearSeen.push(g);
       if (p.gear.length && !p.gear.includes("R")) {
         // The pause drain lifts BOTH pedals at whatever speed the car is at
@@ -6363,6 +6896,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
         reverse.armed = false;
         await sChannel(false);
         await throttle(false);
+        await aimLeaveLeg();
         phase = "roll";
         phaseAt = now;
         phaseTicks = 0;
@@ -6375,6 +6909,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
               : `its ${REVERSE_MS / 1000}s budget is spent.`),
         );
         await shot("05r-reverse-end");
+        await aimLeaveLeg();
         await timed("reverse", disarmReverse);
         saveStatus({ reverse });
         phase = "roll";
@@ -6383,11 +6918,81 @@ while (!ended && Date.now() - t0 < budgetMs) {
         restLogged = false;
         lastTickAt = Date.now();
       } else {
+        /* ── AIM FIRST, THEN THE PEDALS ──────────────────────────────────────
+         *
+         * Until 2026-09-12 this branch was the pedals alone, and that is the
+         * whole of the eleven «no leg has ever completed this reverse-park»
+         * rows: `armReverse` could SELECT R, and nothing could AIM in it, so
+         * every reverse-park drive went straight backwards past its bay on a
+         * product whose own authored answer swings 90° to get in.
+         *
+         * The wheel is set from that authored answer (lib/reverse-plan.mjs).
+         * A tick with no pose steers NOTHING and is counted as blind, because
+         * a controller that cannot see must not report that it is on course. */
+        const pose = await timed("aim", aimPose);
+        const stepM = aimObserve(pose);
+        const cmd = reverseCommand({
+          pose,
+          bearingRad: aimBearingRad,
+          waypoints: aimWaypoints ?? [],
+          index: aimIndex,
+        });
+        aimIndex = cmd.index;
+        // COUNTED ONLY WHERE THERE WAS A PATH TO AIM ALONG. `reverse.reverseTicks`
+        // already counts every tick in R; `reverseAim.ticks` means the narrower
+        // thing the disclosure keys off — ticks this instrument actually aimed.
+        // Counting the others here would let a leg that ran out of authored
+        // legs be described by the PREVIOUS leg's length and turn.
+        if (aimWaypoints !== null) {
+          reverseAim.ticks += 1;
+          if (cmd.blind) reverseAim.blindTicks += 1;
+        }
+        if (Number.isFinite(cmd.offPathM)) reverseAim.offPathM.push(cmd.offPathM);
+        if (Number.isFinite(cmd.errDeg)) reverseAim.errDeg.push(Math.abs(cmd.errDeg));
+        // HOW FAR THERE IS LEFT TO RUN IS TAKEN FROM THE CONTROLLER, EVERY
+        // TICK, and not recomputed when the leg ends. The first version did
+        // the latter and the first real drive printed «stopped ? m short»:
+        // the leg had exited by a path where the last pose was no longer to
+        // hand, so the one number that says WHOSE failure it was came out
+        // blank. A measurement a tick already made must not be re-derived
+        // later from state that may be gone.
+        if (Number.isFinite(cmd.toEndM)) {
+          reverseAim.finalToEndM = cmd.toEndM;
+          reverseAim.reachedEnd = cmd.done === true;
+        }
+        if (aimWaypoints !== null) {
+          const changed = cmd.steer !== aimSign.dir;
+          await timed("aim", () => steer(cmd.steer, p.kmh, "reverse"));
+          // The audit of §2's sign law runs on the SAME direction the wheel
+          // was just given, so it can never grade a hold that did not happen.
+          aimAuditSign(cmd.steer, stepM);
+          if (changed) {
+            note(
+              `      reverse aim: ${cmd.steer === null ? "wheel STRAIGHT" : `wheel ${cmd.steer.toUpperCase()}`} · ` +
+                `${cmd.blind ? `BLIND (${cmd.why})` : `err ${cmd.errDeg}° · off-path ${cmd.offPathM} m · ${cmd.toEndM} m to run`}`,
+            );
+          }
+        }
+        /* THE SPEED IS THE CONTROLLER'S. The objective's box is ±0.5 m and a
+         * tick on this box costs seconds; at the old flat 6 км/ч the car
+         * covered ~3 m between two steering decisions, which is most of the
+         * manoeuvre. `targetKmh` crawls near the end for exactly that reason.
+         * With no authored path there is nothing to crawl toward and the old
+         * constant stands, so an unaimed leg drives exactly as it used to. */
+        const cap = aimWaypoints === null ? REVERSE_CRUISE_KMH : cmd.targetKmh;
         // The cap is pressed ONLY while the car is genuinely moving, for the
         // exact reason brake() refuses a standstill press in D: at rest in R,
         // a fresh press of the functional brake is the gesture that selects D.
         await timed("pedals", async () => {
-          if (p.kmh > REVERSE_CRUISE_KMH + BRAKE_CAP_OVER_KMH && p.kmh > 1) {
+          if (cmd.done || cap <= 0) {
+            // ARRIVED — hold it still so the manoeuvre's `holdSec` can run.
+            // Lifting the reverse accelerator is the whole gesture at rest;
+            // the functional brake is pressed only while there is still
+            // motion to take out, because a fresh press at 0-1 км/ч selects D
+            // and would end the manoeuvre one tick before it was credited.
+            await sChannel(false);
+            await throttle(p.kmh > 1);
+          } else if (p.kmh > cap + BRAKE_CAP_OVER_KMH && p.kmh > 1) {
             await throttle(true); // the functional BRAKE in R
             await sChannel(false);
           } else {
@@ -6421,6 +7026,13 @@ while (!ended && Date.now() - t0 < budgetMs) {
       // coast band, no wheel: `guideTick` is deliberately not called, because a
       // wrong leg that follows the route would invalidate every verdict ever
       // taken from a wrong leg.
+      //
+      // …BUT WHERE IT WENT IS STILL EVIDENCE, AND IT WAS BEING THROWN AWAY.
+      // 116 of 398 lanes — every MODE=«wrong» lane — published not one sample,
+      // so `route-fidelity.mjs` could say nothing whatever about the mode whose
+      // whole job is to leave the correct line. `guidePose` records the pose
+      // and turns no wheel; the leg drives exactly as it did.
+      await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "flat"));
       await timed("pedals", () => throttle(true));
       drivingTicks++;
       phaseTicks++;
@@ -6435,6 +7047,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
       }
     } else if (phase === "flat-rest") {
       phaseTicks++;
+      await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "flat-rest"));
       await throttle(false);
       // THE SAME STANDSTILL DISCIPLINE THE `stop` PHASE RUNS UNDER, and for the
       // same reason: press the brake only while the car still MOVES, then hold
@@ -6866,6 +7479,32 @@ saveStatus({ pace });
           : ""),
     );
   }
+}
+/* ── AND WHETHER IT COULD AIM, WHICH IS A DIFFERENT QUESTION FROM WHETHER IT
+ * COULD SHIFT — 2026-09-12.
+ *
+ * «Armed» and «aimed» were the same silence until today, and the silence read
+ * as the first one: eleven critical rows said the product never completes a
+ * reverse park, off drives that HAD selected R, photographed it, and then
+ * reversed in a straight line past the bay because nothing turned the wheel. */
+if (reverse.demanded) {
+  reverseAim.offPathMedianM = reverseMedian(reverseAim.offPathM);
+  reverseAim.errMedianDeg = reverseMedian(reverseAim.errDeg);
+  note(
+    reverseSteerLine({
+      planned: reverseAim.planned && reverseAim.ticks > 0,
+      why: reverseAim.why ?? "the drive never entered the reverse phase",
+      ticks: reverseAim.ticks,
+      commands: steering.reverse.commands,
+      offPathMedianM: reverseAim.offPathMedianM,
+      blindTicks: reverseAim.blindTicks,
+      legLengthM: reverseAim.legLengthM,
+      turnDeg: reverseAim.turnDeg,
+      reachedEnd: reverseAim.reachedEnd,
+      finalToEndM: reverseAim.finalToEndM,
+      sign: reverseAim.sign,
+    }),
+  );
 }
 if (reverse.demanded && !reverse.armed) {
   loud(
@@ -7710,6 +8349,71 @@ note(
 note(`OBJECTIVES (${facts.objectives?.length ?? 0}):`);
 for (const o of facts.objectives ?? []) note(`   ${o.done ? "✓" : "–"} ${o.titleBg}`);
 if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives at all)");
+/* ── THE REVERSE VERDICT, IN ONE SENTENCE, WHERE THE OBJECTIVES ARE ─────────
+ *
+ * The `REVERSE:` and `REVERSE AIM:` lines above are printed before the debrief
+ * exists, so neither of them can say the thing a judge actually needs: DID THE
+ * MANOEUVRE COMPLETE. This line is the join, and it carries all four facts at
+ * once — demanded, armed, ticks in R, credited — because separately they are
+ * four places to stop reading.
+ *
+ * IT NAMES THE PARTY AT FAULT WHENEVER IT CAN. Getting that backwards is not a
+ * hypothetical: it is what happened to eleven critical rows, which read
+ * «product cannot be parked» off drives whose harness could not steer. An
+ * uncredited reverse objective is only ever evidence about the PRODUCT when
+ * this harness both armed R and aimed with a reference path it followed to the
+ * end; every other combination is an instrument result and says so here. */
+{
+  const objectives = facts.objectives ?? [];
+  const revObjectives = objectives.filter((o) => REVERSE_DEMAND_RE.test(String(o?.titleBg ?? "")));
+  const credited = revObjectives.filter((o) => o?.done === true);
+  const head =
+    `REVERSE OUTCOME: demanded ${reverse.demanded ? `YES («${reverse.demandedBy}»)` : "NO"}` +
+    ` · armed ${reverse.armed ? `YES at t=${reverse.armedAtSec}s` : "NO"}` +
+    ` · ${reverse.reverseTicks} tick(s) in R` +
+    ` · aimed ${reverseAim.ticks > 0 && reverseAim.legLengthM !== null ? `YES (${reverseAim.ticks} tick(s), ${reverseAim.blindTicks} blind)` : "NO"}` +
+    ` · reverse objective(s) ${revObjectives.length === 0 ? "NONE IN THE DEBRIEF" : `${credited.length}/${revObjectives.length} credited`}`;
+  note(head);
+  for (const o of revObjectives) note(`   ${o.done ? "✓" : "–"} ${o.titleBg}`);
+  if (!reverse.demanded) {
+    // Nothing to attribute. Said anyway, so the silence is not the answer.
+    note("   (this lesson never asked for reverse, so nothing above is a reverse result)");
+  } else if (!reverse.armed) {
+    loud(
+      `THE REVERSE OBJECTIVE ON THIS LANE IS UNJUDGED, AND THE REASON IS THIS HARNESS: the cluster never read «R», so the ` +
+        `manoeuvre was never attempted. It was neither passed nor failed and no finding may be drawn from it in either direction.`,
+    );
+  } else if (reverseAim.legLengthM === null || reverseAim.ticks === 0) {
+    loud(
+      `THE REVERSE OBJECTIVE ON THIS LANE IS UNJUDGED, AND THE REASON IS THIS HARNESS: the car reached «R» but had no ` +
+        `reference path to aim along (${reverseAim.why ?? "no path"}), so it reversed in a straight line. A reverse park ` +
+        `cannot be completed in a straight line on ANY product; an uncredited objective here is the instrument's result.`,
+    );
+  } else if (reverseAim.sign?.verdict === "contradicts") {
+    loud(
+      `THE REVERSE OBJECTIVE ON THIS LANE IS UNJUDGED, AND THE REASON IS THIS HARNESS: the steering-sign check ` +
+        `contradicted the convention this drive steered by, so the wheel was mirrored for the whole manoeuvre.`,
+    );
+  } else if (!reverseAim.reachedEnd) {
+    loud(
+      `THE REVERSE OBJECTIVE ON THIS LANE IS UNJUDGED, AND THE REASON IS THIS HARNESS: it armed R and followed the ` +
+        `authored path but stopped ${reverseAim.finalToEndM ?? "?"} m short of the end of it (tolerance ` +
+        `${REVERSE_TUNE.stopTolM} m), so the car never arrived where the manoeuvre is graded. That is a driving ` +
+        `failure by this harness and NOT a refusal by the product.`,
+    );
+  } else if (credited.length === revObjectives.length && revObjectives.length > 0) {
+    note(
+      `   THE PRODUCT CREDITED A COMPLETED REVERSE MANOEUVRE on this lane. This is admissible evidence about GRADING; ` +
+        `it is not evidence that a student could find the manoeuvre from the screen — see the REVERSE AIM caveat above.`,
+    );
+  } else {
+    loud(
+      `THE HARNESS DROVE THE AUTHORED REVERSE PATH TO ITS END (${reverseAim.finalToEndM} m from the mark) AND THE PRODUCT ` +
+        `DID NOT CREDIT THE MANOEUVRE (${credited.length}/${revObjectives.length}). This one IS about the product: the ` +
+        `instrument did its job, so a finding may be drawn from it.`,
+    );
+  }
+}
 /* ── WHAT THIS DRIVE DID WITH THE WHEEL, ON EVERY LANE ──────────────────────
  *
  * PRINTED WHETHER OR NOT IT TURNED, and that is the entire point. For 376
@@ -7790,6 +8494,17 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
       })(),
       posesEveryNth: Math.max(1, Math.ceil(guideWitness.length / 240)),
       frame: "x, z are __camProbe chassis world coordinates; the shipped shadow trace uses y = −z (LessonScene.tsx:597)",
+      /* ── TWO POSE ARTEFACTS, TWO JOBS, AND THE SPLIT IS DELIBERATE ────────
+       * `guidePose` (2026-09-10) records the stop, the reverse leg and the
+       * whole `flat` law of a wrong lane into `guidance.samples`, so
+       * route-fidelity stops being blind to about half of every parking
+       * drive. It is deliberately NOT fed into THIS array, because this one
+       * folds to path/net/straightness — and a reversing manoeuvre has a path
+       * of 40 m for a net of 0, which would read as „the car drove in
+       * circles" on the one triple a skimming judge uses to ask whether the
+       * car turned at all. Cross-track wants every metre the car travelled;
+       * straightness wants only the metres it was being steered through. */
+      scope: "the ROLL phase only — the reverse and stop legs are recorded as poses in guidance.samples (loop:false) and deliberately not folded into path/net/straightness here",
     };
   }
   guidance.caveat =
@@ -7893,6 +8608,31 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
       // that separates them.
       (guidance.sustainHolds
         ? ` · ${guidance.sustainHolds} sustained hold(s), ${guidance.sustainReleases} release(s), ${guidance.sustainCapped} capped at SUSTAIN_MAX`
+        : "") +
+      /* ── WHAT THE WHEEL ACTUALLY DID, BECAUSE A CEILING WAS RAISED ───────
+       * A confirmed turn may now press past `MAX_HOLD_MS`, so „how long was
+       * the longest press" stops being derivable from the constants and has
+       * to be stated. A reader who wants to know whether this drive LOOKED
+       * steered because it WAS reads this clause: on a lane with a junction,
+       * a `maxPress` still at ${TUNE.MAX_HOLD_MS} ms means the rung was never
+       * reached and the drive is a straight line whatever else it says. */
+      (guidance.tracking?.commands
+        ? ` · press p50 ${guidance.tracking.commandMs && guidance.tracking.commands ? Math.round(guidance.tracking.commandMs / guidance.tracking.commands) : 0} ms / max ${guidance.tracking.maxHoldMsIssued} ms` +
+          ` (${guidance.tracking.turnHolds} turn-authorised, ${JSON.stringify(guidance.tracking.holdHistogram)})` +
+          (guidance.tracking.carriedPulses ? ` · ${guidance.tracking.carriedPulses} paid from the sub-floor bank` : "") +
+          (guidance.turnHoldCappedBy.radius || guidance.turnHoldCappedBy.tick || guidance.turnHoldCappedBy.ceiling
+            ? ` · turn press shortened by radius ${guidance.turnHoldCappedBy.radius}× / tick ${guidance.turnHoldCappedBy.tick}× / ceiling ${guidance.turnHoldCappedBy.ceiling}×`
+            : "")
+        : "") +
+      (guidance.periodMs.length
+        ? ` · real scan period p50 ${[...guidance.periodMs].sort((a, b) => a - b)[guidance.periodMs.length >> 1]} ms` +
+          ` (the samples' own dtMs excludes this tick's scan and reads ~1.87× smaller — the law uses the real one)`
+        : "") +
+      (guidance.sustainCarriedSlow || guidance.sustainDroppedStale
+        ? ` · confirmation run carried across ${guidance.sustainCarriedSlow} slow tick(s), dropped stale ${guidance.sustainDroppedStale}×`
+        : "") +
+      (guidance.poseOnlyTicks
+        ? ` · ${guidance.poseOnlyTicks} POSE-ONLY tick(s) recorded off the roll phase (${(guidance.tracking?.poseOnlyPhases ?? []).join("/") || "—"}) — no wheel, no scan, excluded from every rate above`
         : "") +
       (guidance.sustainExhausted
         ? ` · ${guidance.sustainExhausted} sample(s) of a CONFIRMED turn answered by ≤${TUNE.MAX_HOLD_MS} ms pulses after the cap`
@@ -8079,6 +8819,12 @@ saveStatus({
   // present, `demanded:false` included, because "this lesson never asked" and
   // "this lesson asked and never got it" must never be the same silence again.
   reverse,
+  // …AND WHETHER IT COULD AIM ONCE IT WAS IN R, which is a different question
+  // and was the same silence until 2026-09-12. `planned: false` means the car
+  // reversed in a STRAIGHT LINE, which parks nothing on any product — so an
+  // uncredited parking objective on such a lane is this harness's result.
+  // `sign.verdict === "contradicts"` means worse: the wheel was mirrored.
+  reverseAim,
   // …AND WHAT IT DID WITH THE WHEEL. Always present, `everSteered: false`
   // included, because „this lesson never needed to steer" and „this lesson
   // needed to and the instrument could not" were the same silence for 376
