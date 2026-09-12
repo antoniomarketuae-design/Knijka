@@ -146,8 +146,10 @@ import {
   minusPointsBg,
   N38_CLASS_LABEL_BG,
   pointsBg,
+  violationPeekBg,
   VIOLATIONS,
   type SimTick,
+  type ViolationCode,
 } from "@/modules/sim/rules";
 import {
   hasTouchScreen,
@@ -1031,6 +1033,64 @@ export function objectiveTitleUnderHold(
       ? "Колата е притисната след удара — измъкни се назад, за да продължиш"
       : "Колата е извън пътя — върни се на платното, за да продължиш";
   return `${leadBg}: ${titleBg}`;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE ONE-LINE WHY THE TEACH CARD NEVER ASKED FOR
+ * (sc-merge-from-property:6715b581, major, re-judged STILL on the w41 re-drive:
+ * `.audit-frames/w41/frames/sc-merge-from-property__mobile-right/04-t093s.png`.)
+ *
+ * THE FRAME, opened before anything here was written. iPhone 16 landscape, the
+ * only teach beat of that leg. The card reads, top to bottom:
+ *
+ *   ⏸ УЧЕБЕН МОМЕНТ
+ *   Излизане от платното за движение          ← the title, two lines
+ *   Излезе с колата извън                     ← ONE line, object missing
+ *   [ ЗАЩО ↓39 ]  [ РАЗБРАХ ]
+ *
+ * The body row is the opening of `VIOLATIONS.OFF_CARRIAGEWAY.explanationBg`
+ * („Излезе с колата извън платното за движение — отвъд бордюра, на банкета,
+ * тротоара или тревата — и…") clamped to the peek's one-line window: the
+ * sentence dies on its preposition and thirty-nine more lines sit behind the
+ * counter. A seventeen-year-old is told he did something „outside" and not
+ * what, which is the bare verdict doc 64 THEO-4 forbids, arriving through the
+ * one surface whose entire job is the explanation.
+ *
+ * THE PRODUCT ALREADY AUTHORED THE FIX AND THIS SURFACE NEVER ASKED FOR IT.
+ * `rules/catalog.ts` carries `peekBg` on 87 rows — a complete one-line summary
+ * sized for exactly this window (OFF_CARRIAGEWAY's is „Там никой не те
+ * очаква.") — and `hud/overlayQueue.overlayPeekBodyBg` prints it in preference
+ * to `detailBg` on EVERY item that carries one. The violation TOAST has carried
+ * it since sc-pk-driveway:fa602d10 (`lessons/engine.toHudEvents`, „…(peekBg ===
+ * null ? {} : { peekBg })"). The compact TEACH item is built two thousand lines
+ * below this one, by hand, out of `titleBg` / `explanationBg` / `lawRef` — and
+ * the field was simply never passed, so `overlayPeekBodyBg` fell through to
+ * `detailBg` and the card has been clamping a 750-character paragraph ever
+ * since the peek existed.
+ *
+ * SO THE REPAIR IS THE FIELD, NOT A NEW CLAMP. Nothing is deleted: `detailBg`
+ * stays whole and is exactly what «ЗАЩО» opens with the car stopped. What
+ * changes is that the row the student CAN read now finishes its sentence.
+ *
+ * KEYED ON THE CODE AND NOT ON THE ACT, stated because it is a residual and not
+ * an oversight: `violationPeekBg(code, detail)` prefers the per-ACT summary
+ * (`actCopy` — the four COLLISION bodies each have their own), and `TeachMoment`
+ * (`lessons/types.ts`) carries no `detail` to select with. The pooled row is
+ * therefore the best this surface can reach, and it is right for every code
+ * whose peek is not act-split. Carrying `detail` on the moment is a change to
+ * `lessons/types.ts` + `lessons/engine.ts`, which this lane does not own.
+ *
+ * `hasOwnProperty` RATHER THAN A CAST: `TeachMoment.code` is typed `string`,
+ * `violationPeekBg` indexes `VIOLATIONS` unguarded, and a moment raised by a
+ * future code this catalogue has not got must print today's body rather than
+ * throw inside a render.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function teachMomentPeekBg(code: string): string | null {
+  if (!Object.prototype.hasOwnProperty.call(VIOLATIONS, code)) return null;
+  const peek = violationPeekBg(code as ViolationCode, undefined);
+  return typeof peek === "string" && peek.trim().length > 0 ? peek : null;
 }
 
 export function snapshotOf(
@@ -2597,6 +2657,77 @@ export const BRIEFING_ROAD_MIN_LIST_PX = 38;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
+ * …AND THE ONE BEAT THE SPEED RULE IS FORBIDDEN TO OWN, WHICH IS THE BEAT THE
+ * ROW IS PHOTOGRAPHED ON (sc-junction-rhr:486cad54, major, re-judged STILL on
+ * the w41 re-drive — `.audit-frames/w41/frames/sc-junction-rhr__pc-right/
+ * 01-arrival.png`).
+ *
+ * THE MEASUREMENT, off that frame: a 1167 × 655 stage at (264, 97); the
+ * ИНСТРУКЦИИ card at x 1110–1420 × y 328–575, i.e. the right 27 % of the width
+ * and 0.343 → 0.737 of the height. The horizon is 0.402 and the hazard band's
+ * top 0.53, so 0.33 of the card's height stands on the ROAD — the right kerb,
+ * the parked queue along it and the side-road mouth. And the sentence it covers
+ * that view with is its own step 3: «Преди устието се огледай: първо наляво,
+ * после НАДЯСНО. Кола отдясно има предимство — това е правилото на дясното.»
+ * The panel that says look right is the thing covering right.
+ *
+ * WHY `briefingStandsDown` CANNOT REACH IT, and why this is a second predicate
+ * rather than a wider version of the first. That rule folds the panel to its
+ * chip the moment the car is genuinely moving, and it owns every driving beat
+ * in the corpus. This row is filed on `01-arrival` — 0 км/ч, 0 m travelled —
+ * where the fold correctly does not fire, because folding a briefing at the
+ * standstill it exists for is the opposite defect. Twelve judges have now read
+ * that same frame and ruled STILL on it.
+ *
+ * SO THE CEILING IS CHARGED AT THE STANDSTILL TOO — BUT ONLY WHERE THE ROW'S
+ * OWN SENTENCE IS TRUE. The ceiling is not a delete: it is a `max-height` on
+ * the `<ol>`, the chrome is `shrink-0`, and the steps it takes join the fold
+ * that already counts them and already has a 44 px «↓ още N стъпки — покажи»
+ * under them. What it costs is that the student pages instead of scrolling, and
+ * that price is worth paying exactly where the panel is standing on the hazard
+ * the panel is talking about — and worth NOT paying on the ~150 lessons whose
+ * steps send his eyes somewhere else. Those get today's card, byte for byte.
+ *
+ * RETRIEVED FROM THE AUTHORED STEPS, NEVER RECALLED. This reads the lesson's
+ * own `briefingBg` and makes no claim about Bulgarian law (ADR-002 is not
+ * engaged: nothing here asserts a rule, it asks which way this lesson points
+ * the student's head).
+ *
+ * THE TWO TOKENS, AND WHY NOT MORE:
+ *   · «отдясно» — „from the right". In this catalogue it is only ever written
+ *     about something ARRIVING from the right («Кола отдясно има предимство»),
+ *     which is the hazard the column is sitting on.
+ *   · «огледай» + «дясно» in one step — the imperative to look, and the side.
+ *     The imperative form is used rather than the stem: «огледало» (the mirror)
+ *     shares „огледал" and a mirror glance is an instrument reading, not the
+ *     windscreen view this card is covering. „огледай" is not a substring of
+ *     „огледало", so the two cannot be confused.
+ *
+ * DELIBERATELY NOT MATCHED: «завий надясно», «десен мигач», «дръж се вдясно».
+ * A turn, an indicator and a lane position are things the student DOES, not
+ * things he has to SEE through the glass this card is standing on — and a
+ * predicate that fired on all three would be charging the ceiling on most of
+ * the catalogue, which is the unconditional rule wearing a condition's name.
+ *
+ * Case-folded once, over a list that is at most eight short strings and is
+ * recomputed only when the steps themselves change.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function briefingSendsEyesRight(
+  steps: ReadonlyArray<{ textBg: string }> | null | undefined,
+): boolean {
+  if (!steps) return false;
+  for (const s of steps) {
+    const t = typeof s?.textBg === "string" ? s.textBg.toLowerCase() : "";
+    if (t.length === 0) continue;
+    if (t.includes("отдясно")) return true;
+    if (t.includes("огледай") && t.includes("дясно")) return true;
+  }
+  return false;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
  * …AND THE PANEL THE STUDENT ASKS BACK IS THE ONE THAT STANDS ON THE ROAD
  * (sc-junction-rhr:486cad54 · sc-ov-crossing-overtake:4bce6fca, the same
  * sentence twice: „the ИНСТРУКЦИИ panel covers the right third of the
@@ -2809,6 +2940,13 @@ export function BriefingCard({
   /** The list's own `scrollTop`, mirrored so the control row can render off it.
    *  See the note beside its write in `measure`. */
   const [scrollTopPx, setScrollTopPx] = useState(0);
+  /** Does THIS lesson's briefing send the student's eyes across the side this
+   *  column stands on? The frame, the measurement and the two matched tokens
+   *  are at `briefingSendsEyesRight`; the one declaration that spends it is the
+   *  `<ol>`'s `max-height` below. Memoised on the steps because the shell
+   *  re-renders this card on its 150 ms HUD poll and the answer cannot change
+   *  between two renders of the same authored list. */
+  const sendsEyesRight = useMemo(() => briefingSendsEyesRight(steps), [steps]);
   /** The lifetime — the frame and the ruling are at `briefingStandsDown`; the
    *  seed is the header's own block, and it is why a teach moment no longer
    *  hands the student back a panel he had already folded. */
@@ -3272,16 +3410,23 @@ export function BriefingCard({
           //    `briefingStandsDown` the fold uses, so the card cannot hold one
           //    opinion about „he is driving now" while the fold holds another.
           //
-          //    AT A STANDSTILL THERE IS NO CEILING AT ALL, and that is the half
-          //    that keeps this from being the opposite defect. `01-arrival` and
-          //    `03-ready` are 0 км/ч on every lesson in the catalogue: the
+          //    AT A STANDSTILL THERE IS NO CEILING AT ALL on the lessons whose
+          //    steps point the student's head somewhere else, and that is the
+          //    half that keeps this from being the opposite defect. `01-arrival`
+          //    and `03-ready` are 0 км/ч on every lesson in the catalogue: the
           //    student is reading, the world behind the card is a parked street,
-          //    and trading four authored steps for a view of it is a loss. The
-          //    ceiling is charged only where the row's own sentence is true with
-          //    a car in motion — the panel a student asked back mid-drive, which
-          //    „once, and never against the student" (above `unfold`) entitles
-          //    him to keep and which nothing until now bounded.
-          ...(roadCeilingPx !== null && briefingStandsDown(speedKmh)
+          //    and trading four authored steps for a view of it is a loss.
+          //
+          //    …EXCEPT WHERE THE CARD IS COVERING THE VERY VIEW ITS OWN STEPS
+          //    SEND HIM TO — `briefingSendsEyesRight`, which carries
+          //    sc-junction-rhr:486cad54's frame, its measurement and the two
+          //    tokens it matches. On those lessons the standstill is not a
+          //    parked street: it is the give-way line, and the right third of
+          //    the windscreen is where the priority car comes from. There the
+          //    ceiling is charged at 0 км/ч too, and the steps it takes are
+          //    one press of the «↓ още N стъпки — покажи» row directly under
+          //    this list away — the same trade the moving case already makes.
+          ...(roadCeilingPx !== null && (briefingStandsDown(speedKmh) || sendsEyesRight)
             ? { maxHeight: roadCeilingPx }
             : null),
           // ── THE FADE IS BOUND TO THE COUNTER'S OWN PREDICATE, `below > 0`,
@@ -5597,6 +5742,13 @@ export function LessonPlayShell({
               // comes out of — а chip reading „ЗДвП чл. 21" beside a 10-point
               // mark is what the founder read as his licence being docked.
               detailBg: `${teachQueue[0].explanationBg}\n\nПърва среща — не се брои в резултата. При повторение: ${minusPointsBg("exam", teachQueue[0].points)} по ${examMarkCitationBg(teachQueue[0].severity)}, а повторните грешки тежат още повече (×1.5 / ×2.0).\n\n${EXAM_POINTS_SHORT_NOTE_BG}`,
+              // …AND THE ONE LINE THE PEEK CAN FINISH (sc-merge-from-property:
+              // 6715b581). `detailBg` above stays whole and is what «ЗАЩО»
+              // opens; this is the row the student can actually read while the
+              // drive is frozen. `null` for a code with no summary authored is
+              // exactly today's card — see `teachMomentPeekBg` for the frame,
+              // the field's other two call sites and the act-split residual.
+              peekBg: teachMomentPeekBg(teachQueue[0].code),
               lawRef: teachQueue[0].lawRef ?? null,
               blocking: true,
               onAck: handleTeachAcknowledged,

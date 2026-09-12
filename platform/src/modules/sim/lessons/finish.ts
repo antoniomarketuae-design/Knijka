@@ -762,57 +762,44 @@ export const CRASH_PIN_RADIUS_M = 6;
  * NOTE the pause aid: at L1/L2 a graded fault freezes physics behind a teach
  * card and sim time does not advance, so the card can never spend this clock.
  *
- * OPEN, AND NOT THIS LANE'S TO CLOSE (recorded 2026-08-16 while widening
- * YIELD_STOP_LINE_REACH_M below). `engine.ts` drops this pin's partial dwell on
- * every frame `yieldWait.holding` is true, on the argument that „B15's freeze
- * applies here for the same reason it applies to the other two gates". That
- * reason does not transfer. The other two gates read only position and speed,
- * which is why a lawful standstill is invisible to them; THIS one has already
- * been handed independent evidence that the standstill is involuntary — a
- * graded collision, and a car that has not left the pose it hit in. A pinned
- * car is not waiting for the light, it is unable to move, and freezing its
- * rescue postpones the drive's end to YIELD_WAIT_MAX_S + CRASH_PIN_STUCK_S ≈
- * 190 s instead of 10. The interaction predates this file's widening — it is
- * already live for a rear-ender into the back of a queue at the line, which is
- * the likeliest place to have one — and 12 → 26 m widens the band it can
- * happen in. The fix is one condition in `engine.ts` (exempt the crash pin from
- * the freeze), which is another lane's file.
- *
  * ---------------------------------------------------------------------------
- * 2026-08-17 — TWO MORE, MEASURED, AND THE FIRST ONE VOIDS THE PIN OUTRIGHT.
- * Driven on staging with the shipped harness (`tools/mobile/lesson-audit.mjs`,
- * sc-follow-distance · mobile · wrong). Recorded here because the pin's
- * EVIDENCE MODEL is specified in this file; both defects are in `engine.ts`'s
- * fold of it, so neither is this lane's to close either.
+ * THE REGISTER OF `engine.ts` DEFECTS THIS BLOCK USED TO CARRY IS CLOSED —
+ * re-measured 2026-09-13 against `lessons/engine.ts` at HEAD, and every entry
+ * of it had stopped being true without anything here saying so.
  *
- *  P1 — THE RE-ARM WIPES THE CLOCK, so the pin cannot fire in the one case it
- *  was written for. `engine.ts` re-arms on every graded collision
- *  („the pose that matters is the LAST one") and that re-arm sets
- *  `stillSinceSec: null`. But a collision is NOT a one-shot event against a
- *  thing you stay in contact with: `rules/engine.ts` reopens one every
- *  COLLISION_REOPEN_TRAVEL_M = 2 m of travel since the last report. So a car in
- *  sustained contact emits a fresh COLLISION every 2 m — MEASURED at 65 of them
- *  in a single 177 s drive, i.e. ~130 m spent pushing the thing it hit — and
- *  each one resets the ten-second clock that was supposed to end the drive.
- *  The dwell can only ever accumulate for a car that travels LESS than 2 m in
- *  CRASH_PIN_STUCK_S, which is the one pin that would also have satisfied the
- *  speed test anyway. Grinding forward against an obstacle — the founder's
- *  „held at full throttle" — defeats the pin twice over and always has.
- *  The fix is to re-arm the POSE without clearing `stillSinceSec` (the pose is
- *  what „did not leave the spot" is measured from; the clock is what „has not
- *  moved" is measured with, and a re-report is not evidence of movement — the
- *  `awayM > CRASH_PIN_RADIUS_M` test already carries that).
+ * WHY THAT MATTERS MORE THAN THE THREE ITEMS. This block is the only place in
+ * the tree that specifies the pin's EVIDENCE MODEL, so it is where a lane
+ * routing a „the drive never ended after the crash" row comes to read the
+ * cause. It named three open defects in another file; two had been repaired
+ * eighteen days earlier and the third had been ruled on and refused, with the
+ * measurement, in `engine.ts` itself. A cause is as stale as its report, and a
+ * register that cannot stop being true sends the next wave at a fix that is
+ * already in the tree. What it says now is where to LOOK, not what to fix.
  *
- *  P2 — THE STANDSTILL TEST IS UNSIGNED, alone in this module. `engine.ts`
- *  reads `tick.speedKmh > FINISH_STANDSTILL_KMH`; every other speed test on
- *  this side of the wall compares the MAGNITUDE — `stepYieldWait` and
- *  `stepFinishGate`, the latter carrying the reason in as many words
- *  („Reverse reads negative — compare the magnitude"). Reverse reads negative,
- *  so a student backing out of what he hit at −20 km/h scores −20 > 1 = false
- *  and is counted as STANDING STILL, banking dwell toward having his lesson
- *  closed for him. He is saved only once he clears CRASH_PIN_RADIUS_M, so the
- *  exposure is the first 6 m of the one manoeuvre this gate's own comment
- *  promises never to punish („drove away — not stuck, and never closed down").
+ *  P1 — THE RE-ARM WIPED THE CLOCK WITH THE POSE (filed 2026-08-17; a car in
+ *  sustained contact re-reports a COLLISION every COLLISION_REOPEN_TRAVEL_M
+ *  = 2 m, and each re-arm set `stillSinceSec: null`, so the dwell could never
+ *  accumulate). CLOSED in 2706813 (2026-08-25, wave 2): the re-arm now
+ *  INHERITS `stillSinceSec` and drops it only when the dwell is unspendable or
+ *  `rearmMovedM > CRASH_PIN_RADIUS_M` — the pose moves, the clock survives.
+ *
+ *  P2 — THE STANDSTILL TEST WAS UNSIGNED (`tick.speedKmh > FINISH_STANDSTILL
+ *  _KMH`, so a student reversing out of what he hit at −20 km/h was counted as
+ *  standing still and banked dwell toward having his lesson closed for him).
+ *  CLOSED in the same commit: `engine.ts` reads `Math.abs(tick.speedKmh)`, the
+ *  magnitude spelling `stepYieldWait` and `stepFinishGate` already used.
+ *
+ *  THE `yieldWait.holding` FREEZE — filed here 2026-08-16 as „the fix is one
+ *  condition in `engine.ts` (exempt the crash pin from the freeze)". It is NOT
+ *  a pending fix: `engine.ts` (above `dwellUnspendable`) carries a three-part
+ *  measured refusal — the exemption costs the 31 shipped scenarios whose spawn
+ *  sits at laneOffsetM 4.06 and takes a lawful give-way wait within 26 m of a
+ *  shunt; it cannot fire on either drive it was derived from (both had already
+ *  cleared CRASH_PIN_RADIUS_M, and off the network both of the freeze's inputs
+ *  go to zero so `yieldReasonAt` returns null anyway); and both cited drives
+ *  carry the harness's own „no lane-position finding may be drawn from this
+ *  drive" stamp. The freeze stays unconditional until a drive photographs it
+ *  suppressing the pin. Do not re-file it from this file.
  */
 export const CRASH_PIN_STUCK_S = 10;
 

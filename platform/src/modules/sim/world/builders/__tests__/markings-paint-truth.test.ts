@@ -215,7 +215,7 @@
  *     skew clamp markings.ts keeps private, the 1/cos span widening, the refuge
  *     island's kerbed gap and the staggered half's walk along the street.
  * The catalogue now grades
- * 4,309 of the corpus's 11,050 marking quads — 39.00%, up from one in 6.7. It
+ * 4,309 of the corpus's 11,040 marking quads — 39.03%, up from one in 6.7. It
  * is 84% of the DISTRICTS and 39% of the PAINT because the 17 still outside are
  * the biggest maps in the corpus. They are attributed one by one, as before: 6
  * painted numerals, 5 roundabout rings, 3 arrow maps, 2 bus-lane legends, 1
@@ -2899,7 +2899,7 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
  * a feature: the district simply leaves the domain and says so.
  *
  * 88 districts of 105 — and
- * 4,309 of the corpus's 11,050 marking quads — 39.00%, which is the number that
+ * 4,309 of the corpus's 11,040 marking quads — 39.03%, which is the number that
  * matters, because a district is not a unit of paint. This block was titled
  * „every quad the world paints is a quad the world was authored to paint" while
  * it graded one quad in 6.7. It is now titled what it does, and the fraction is
@@ -3913,7 +3913,19 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
       // ran past the taper on a boundary that is now the carriageway edge.
       // 27 − 3 = 24, and `laneDropLicences` licences every one of the 27: the
       // per-district census in this same block passes unchanged.
-    }).toEqual({ districts: 106, booked: 11158, triangles: 108 });
+      //
+      // −10 against 11,158, all of it pe-zone-v1's: `sc-pe-zone-living:37bbb618`
+      // — the home-zone street was carrying a centre line down the middle of
+      // the one carriageway whose whole width ЗДвП чл. 62, т. 1 gives to people
+      // on foot and to children at play („пътя по цялата му широчина"), which
+      // is the rule that lesson grades. `calmedZoneKeepsWholeWidth` skips the
+      // lane-boundary loop on a `zone: "residential"` edge and nothing else:
+      // the «20» road numerals and both kerb-side edge lines are untouched, and
+      // exactly ONE edge in these 106 districts carries the tag, so this is the
+      // whole of the delta. `home-zone-has-no-lane-division.test.ts` measures
+      // that blast radius every run and isolates these 10 quads against a
+      // control build of the same district relabelled `"thirty"`.
+    }).toEqual({ districts: 106, booked: 11148, triangles: 108 });
     expect({
       districts: domain.length,
       booked: booked(domain),
@@ -3933,7 +3945,12 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
     const share = ((domainMesh / corpusMesh) * 100).toFixed(2);
     // 38.68 → 38.86: tj-occluded-v1's three new пътеки are inside the domain,
     // so the reach grew slightly faster than the corpus did.
-    expect(share).toBe("39.00");
+    //
+    // 39.00 → 39.03: pe-zone-v1 is OUTSIDE the domain (it books a speed glyph),
+    // so the home-zone centre line `calmedZoneKeepsWholeWidth` stopped painting
+    // came off the DENOMINATOR only — see the −10 note on the corpus total
+    // above. The reach did not grow; the corpus shrank under it.
+    expect(share).toBe("39.03");
     // „NOT CLAIMED IN A COMMENT" IS NOW ITSELF A CHECK. The line this replaces
     // — `expect(share.toFixed(1)).toBe("14.8")` — could not fail: with both
     // totals pinned exactly two lines above it, the ratio was arithmetic, and

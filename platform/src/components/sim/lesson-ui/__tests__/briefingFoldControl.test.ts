@@ -54,6 +54,7 @@ import { HAZARD_BAND_TOP_FRACTION } from "@/modules/sim/hud";
 import {
   BRIEFING_ROAD_MIN_LIST_PX,
   briefingRoadCeilingPx,
+  briefingSendsEyesRight,
   briefingStandsDown,
   compactBriefingFold,
 } from "../LessonPlayShell";
@@ -499,15 +500,69 @@ describe("briefingRoadCeilingPx · the recalled panel stops above the hazard ban
   });
 
   it("a standstill keeps every authored step — 01-arrival is not shortened", () => {
-    // The half that stops this from being the opposite defect, and the reason
-    // the row it is filed under does NOT close on its own frame. `01-arrival`
-    // and `03-ready` are 0 км/ч on every lesson in the catalogue: the student is
+    // The half that stops this from being the opposite defect. `01-arrival` and
+    // `03-ready` are 0 км/ч on every lesson in the catalogue: the student is
     // reading, the world behind the card is a parked street 120 m short of the
     // junction, and trading four authored steps for a view of it is a loss.
+    //
+    // NARROWED, NOT WITHDRAWN (sc-junction-rhr:486cad54, w41). The exemption is
+    // now „…on the lessons whose steps point his head somewhere else": the one
+    // family where the standstill is NOT a parked street is the one whose own
+    // briefing says the priority car arrives from the side this column stands
+    // on. `briefingSendsEyesRight` is that condition and the test below is its
+    // behaviour; here the guard is pinned so the disjunct cannot be dropped
+    // while the arithmetic above stays green.
     expect(briefingStandsDown(0)).toBe(false);
     const list = CARD.slice(CARD.indexOf("<ol"), CARD.indexOf("</ol>"));
     const capAt = list.indexOf("maxHeight: roadCeilingPx");
     const guard = list.slice(0, capAt);
-    expect(guard).toContain("roadCeilingPx !== null && briefingStandsDown(speedKmh)");
+    expect(guard).toContain("roadCeilingPx !== null");
+    expect(guard).toContain("briefingStandsDown(speedKmh)");
+    expect(guard).toContain("sendsEyesRight");
+  });
+
+  it("…and the one family where the standstill IS the hazard", () => {
+    // sc-junction-rhr's own step 3, verbatim off `01-arrival.png` — the sentence
+    // the panel was photographed covering the right third of the windscreen
+    // with. Both matched tokens are in it.
+    expect(
+      briefingSendsEyesRight([
+        { textBg: "Тръгни по страничната улица към кръстовището — то е равнозначно." },
+        {
+          textBg:
+            "Преди устието се огледай: първо наляво, после НАДЯСНО. Кола отдясно има предимство — това е правилото на дясното.",
+        },
+      ]),
+    ).toBe(true);
+    // Either token alone is enough, because either one is a car arriving.
+    expect(briefingSendsEyesRight([{ textBg: "Кола отдясно има предимство." }])).toBe(true);
+    expect(
+      briefingSendsEyesRight([{ textBg: "Огледай се надясно, преди да тръгнеш." }]),
+    ).toBe(true);
+
+    // …AND THE THINGS A STUDENT DOES RATHER THAN SEES, which must NOT charge the
+    // ceiling — a predicate that fired on these would be the unconditional rule
+    // wearing a condition's name, and ~150 lessons would silently lose steps at
+    // their reading beat.
+    expect(briefingSendsEyesRight([{ textBg: "Завий надясно и продължи." }])).toBe(false);
+    expect(briefingSendsEyesRight([{ textBg: "Пусни десен мигач." }])).toBe(false);
+    expect(briefingSendsEyesRight([{ textBg: "Движи се спокойно в дясната лента." }])).toBe(
+      false,
+    );
+    // The mirror is an instrument reading, not the windscreen view this card
+    // stands on: „огледай" is deliberately not a substring of „огледало".
+    expect(
+      briefingSendsEyesRight([{ textBg: "Погледни в дясното огледало преди престрояване." }]),
+    ).toBe(false);
+
+    // Nothing measurable → today's card, exactly (the `null` direction every
+    // predicate in this file takes).
+    expect(briefingSendsEyesRight([])).toBe(false);
+    expect(briefingSendsEyesRight(null)).toBe(false);
+    expect(briefingSendsEyesRight(undefined)).toBe(false);
+
+    // WIRED: the card computes it once from its own authored steps and the
+    // `<ol>` is the only declaration that spends it.
+    expect(CARD).toContain("briefingSendsEyesRight(steps)");
   });
 });

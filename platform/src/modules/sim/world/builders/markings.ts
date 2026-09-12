@@ -1583,6 +1583,26 @@ function paintBusStopZigzag(
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Does this edge's authored zone hand the carriageway's WHOLE WIDTH to people
+ * on foot — so that painting a lane division across it would be the world
+ * contradicting the rule the lesson grades?
+ *
+ * The frame, the measurement and the retrieved чл. 62 are at the call site (the
+ * lane-boundary loop in `buildMarkings`). Only `"residential"` answers yes:
+ * `"school"` and `"thirty"` are speed regimes on an ordinary carriageway whose
+ * lanes still mean what they say, and giving them this would be the repair
+ * running past the rule that justifies it.
+ *
+ * Structural parameter so the catalogue sweep in
+ * `__tests__/home-zone-has-no-lane-division.test.ts` can drive it off raw
+ * district JSON without a builder in the way — and so a null/undefined `zone`,
+ * which is 105 of the 106 districts, is the byte-identical answer.
+ */
+export function calmedZoneKeepsWholeWidth(edge: { zone?: string | null }): boolean {
+  return edge.zone === "residential";
+}
+
 export function buildMarkings(
   district: District,
   network: RoadNetwork,
@@ -1632,6 +1652,57 @@ export function buildMarkings(
         { from: laneDrop.sTo, to: laneDrop.lineLen },
       ]);
     }
+    // ── A HOME ZONE'S CARRIAGEWAY IS NOT DIVIDED INTO LANES ────────────────
+    //    (sc-pe-zone-living:37bbb618, major, re-judged STILL on the w41
+    //    re-drive — `.audit-frames/w41/frames/sc-pe-zone-living__pc-right/
+    //    04-t064s.png` and `04-t092s.png`.)
+    //
+    // THE ROW: „The world is not a home zone. The briefing describes
+    // «стеснението между жилищните блокове» … but the drive happens on a wide
+    // multi-lane boulevard … Nothing about the geometry signals the zone the
+    // rule depends on." Its judge, having accepted that a width step IS built
+    // (the zone edge withdraws `edgeParkingWidthM`, so kerb-to-kerb steps
+    // 24.25 → 16.25 m), held the row anyway on what the carriageway SHOWS, and
+    // quoted its own crop of the boundary: „the carriageway fills the frame
+    // between two continuous white lines".
+    //
+    // WHAT THIS FILE WAS ACTUALLY PUTTING THERE, measured on the shipped
+    // builder before anything was changed (`buildMarkings` on pe-zone-v1):
+    //   markingQuads 56 · speedGlyphQuads 22 · laneArrowQuads 0 ·
+    //   parkingBays 0 · laneDropQuads 0
+    // — so two of the four things the row lists are ALREADY not painted here
+    // (the „lane arrows" it names are 22 quads of the «20» zone numeral and the
+    // М18 give-way triangles of the Б1 approach at the exit junction, both
+    // correct), and what IS this file's is the lane division: a centre line
+    // down the middle of a 16.25 m street whose whole width the lesson's own
+    // rule gives away.
+    //
+    // THE LAW, RETRIEVED AND NOT RECALLED (ADR-002) — `content/law/acts/
+    // zdvp.json`, чл. 62:
+    //   „В жилищната зона действат следните специални правила: 1. пешеходците
+    //   могат да използват за движение, а децата за игра пътя по цялата му
+    //   широчина, без ненужно да пречат на движението на превозните средства;
+    //   2. водачите на пътни превозни средства са длъжни да се движат със
+    //   скорост не по-голяма от 20 km/h…"
+    //
+    // THE INFERENCE IS ABOUT THE WORLD, NOT ABOUT НАРЕДБА № 2. Nothing here
+    // claims a marking regulation. A centre line is a statement that this
+    // carriageway is two directional lanes; т. 1 is the statement that its
+    // whole width is a pedestrian and play surface. The world was making the
+    // first claim on the exact street where the lesson grades the second, and
+    // a student reading a boulevard's markings is being taught the wrong
+    // expectation by the one surface he cannot argue with. The «20» numerals
+    // stay — they carry т. 2 — and so do the EDGE lines below, because the
+    // kerb against the pavement is a boundary т. 1 does not dissolve.
+    //
+    // SURGICAL BY MEASUREMENT, not by hope: exactly ONE edge in the 106-
+    // district catalogue carries `zone: "residential"` (pe-zone-v1's
+    // `pz-e-zone`), so every other district's lane geometry is byte-identical.
+    // `calmedZoneKeepsWholeWidth` is the predicate and
+    // `__tests__/home-zone-has-no-lane-division.test.ts` drives it over the
+    // whole catalogue so a district that acquires the tag later cannot get the
+    // division back without that test saying so.
+    //
     // Lane boundaries at every internal multiple of LANE_WIDTH from the left
     // edge. For two-way edges the middle boundary is the center line.
     //
@@ -1641,7 +1712,7 @@ export function buildMarkings(
     // the same-direction dividers he may legally cross. Dash rhythm is
     // untouched, so the quad COUNT of every already-marked district is
     // unchanged: only the stroke of the middle line moves.
-    for (let k = 1; k < lanes; k++) {
+    for (let k = 1; k < lanes && !calmedZoneKeepsWholeWidth(eb.edge); k++) {
       const off = -travelHalf + k * LANE_WIDTH_M;
       if (Math.abs(off) > travelHalf - 0.4) continue;
       const isCentreLine = !eb.edge.oneway && Math.abs(off) < 1e-6;

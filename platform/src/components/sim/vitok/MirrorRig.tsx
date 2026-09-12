@@ -525,6 +525,61 @@ export const INERT_SKY_MIX = 0.5;
 /** The same for the ground band — much less, because tarmac is the darkest
  *  thing in every frame this mirror has been photographed in. */
 export const INERT_GROUND_MIX = 0.16;
+/**
+ * ── THE SPLIT COLLAPSES WHENEVER THE AUTHORED TINT IS ALREADY SKY-COLOURED,
+ *    AND ON THE SHIPPED ASSET IT IS — sc-vu-pass-clearance:d770323a, w41.
+ *
+ * The two mixes above are both measured FROM the authored glass tint TOWARD
+ * the atmosphere, so the whole distance between the bands is
+ * `(INERT_SKY_MIX − INERT_GROUND_MIX) × |atmosphere − glass|` = 0.34 of a gap
+ * that is only as wide as the tint is far from the sky. Feed it a PALE glass
+ * and both bands land on the atmosphere, one horizon apart in name only.
+ *
+ * MEASURED ON THE w41 FRAMES, at the commit they attest (1f39940567d2), with a
+ * single-pixel column down the visible left-mirror glass — not read off a
+ * thumbnail:
+ *
+ *   sc-follow-rain-gap/mobile-right 04-t034s, x = 145, y 856…904
+ *       rgb(90, 98,108) on every one of 49 rows — no step anywhere
+ *   sc-ac-snow/mobile-right        04-t034s, x = 145, y 841…886
+ *       rgb(175,180,187) on every one of 46 rows
+ *   sc-vu-pass-clearance/mobile-right 04-t066s, x = 140/150, y 856…904
+ *       rgb(145,156,165) on every row, against an open sky of rgb(142,153,167)
+ *
+ * Three lessons, three atmospheres, three DIFFERENT flat tones: the clear is
+ * running and it is reading `scene.fog.color` (the tone tracks the weather, so
+ * this is not a stale buffer and not the authored material). What it is not is
+ * two bands. The glass is one flat fill — the exact picture five successive
+ * verifies described and the one the two-band repair exists to remove.
+ *
+ * WHY NO GATE SAW IT. Every case in `mirrorGlassHonesty.test.ts` calls this
+ * function with `glass = 0x0a0c10`, which is `INERT_GLASS_FALLBACK` — the
+ * colour used ONLY when the mesh material has no `color` at all. Against a
+ * pale atmosphere those two mixes are 3.0× apart in luminance and every
+ * assertion is comfortably true. The suite therefore pins the FALLBACK and has
+ * never once evaluated the colour the shipped GLB actually carries, which the
+ * frames above say is pale.
+ *
+ * SO THE HORIZON IS NOW A FLOOR AND NOT A HOPE. It is a luminance RATIO rather
+ * than a number of levels because what a mirror needs is CONTRAST, and a fixed
+ * offset that reads on a bright day disappears at night. The sky band is never
+ * touched — night, fog and rain keep exactly the tone they have — and the
+ * ground is only ever pulled DOWN toward black, which is the direction the
+ * physics already argues for: the glass is aimed 4–5° down at tarmac.
+ *
+ * BYTE-IDENTICAL ON THE PINNED FIXTURE, deliberately, so the four existing
+ * cases stay green on the values they were written against: 0x0a0c10 under
+ * 0x8fa2b4 gives ground/sky = 0.334, already past this cap, and the clamp does
+ * not fire. It fires exactly where the frames say the picture is broken.
+ */
+export const INERT_HORIZON_MAX_RATIO = 0.55;
+
+/** Rec. 709 relative luminance of a three.js Color, in whatever space that
+ *  Color is held in — the same expression `mirrorGlassHonesty.test.ts` compares
+ *  the two bands with, so the floor below and the gate hold one definition. */
+function bandLuminance(c: Color): number {
+  return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
 
 /**
  * The two inert band colours for a piece of unattended door glass.
@@ -532,6 +587,10 @@ export const INERT_GROUND_MIX = 0.16;
  * Pure and exported so the split can be asserted without a renderer — the
  * whole of what this repair claims is that the unattended state is no longer
  * ONE colour, and a test that cannot see the two colours cannot hold that.
+ *
+ * The claim now holds for EVERY authored tint, not only for a dark one — see
+ * INERT_HORIZON_MAX_RATIO for the three columns of shipped pixels that say why
+ * that distinction was not academic.
  */
 export function inertGlassBands(
   glass: Color,
@@ -544,6 +603,16 @@ export function inertGlassBands(
   if (!atmosphere) return;
   sky.lerp(atmosphere, INERT_SKY_MIX);
   ground.lerp(atmosphere, INERT_GROUND_MIX);
+  // …and the horizon survives a pale tint. Scaling toward black keeps the
+  // ground band's HUE — it is still the same glass under the same sky, just
+  // the half of it that is looking at road.
+  const skyLum = bandLuminance(sky);
+  const groundLum = bandLuminance(ground);
+  const cap = skyLum * INERT_HORIZON_MAX_RATIO;
+  // `groundLum > cap` is false for 0 and for NaN, so a black sky (cap 0) and a
+  // degenerate colour both fall through to the unclamped bands rather than to
+  // a divide that would hand the clear an unusable colour.
+  if (groundLum > cap) ground.multiplyScalar(cap / groundLum);
 }
 
 /**

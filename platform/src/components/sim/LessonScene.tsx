@@ -387,17 +387,69 @@ const TOUCH_HINT_STORAGE_KEY = "sim.touchHintSeen";
  * SimOverlay's `PEEK_CHIP_TOTAL_ALPHA`, the rung 0.80 was measured at and
  * rejected FOR THE CARD (a card is a window onto the road) and adopted for a
  * 44 px control (it is not).
+ *
+ * ── …AND 0.90 IS THE IN-DRIVE RUNG, WHICH THIS CONTROL IS NOT ON — 2026-09-13,
+ *    sc-ac-crosswind:8f42504c, „the world reads through the РАЗБРАХ button".
+ *
+ * THE FRAME, AND THE NUMBER IT ACTUALLY CARRIES.
+ * `.audit-frames/w41/frames/sc-ac-crosswind__mobile-right/03-ready.png`
+ * (iPhone 16 landscape, 852 × 393 at dpr 3), the judge's own crop
+ * x 1570 y 455 w 600 h 180 at 3×: a parked vehicle's screen pillar, its wheel
+ * arch and its dark wheel read through the pill, and the same vehicle
+ * continues past its right edge. MEASURED rather than eyeballed, luminance sd
+ * over glyph-free bands of the SAME world patch:
+ *
+ *   inside the pill   device y 490–515, x 1750–2100   sd_r  2.03   mean 18.1
+ *   below the card    device y 615–640, x 1750–2100   sd_r 26.55   mean 65.7
+ *
+ * 2.03 / 26.55 = 0.076 — which is 0.10 of world left by a 0.90 ground, times
+ * the 0.82 the 18 % tint puts over it. So the ground is not missing and the
+ * ramp is not on the control (`touchHintFeatherRoom` holds both): the shipped
+ * arithmetic is landing to the second decimal, and 7.6 % of a world that
+ * swings 26 sd IS a legible car inside a 44 px target. The row is about the
+ * RUNG, and the rung is the one thing the paragraph above never defended for
+ * this particular control.
+ *
+ * WHY THE RUNG MAY MOVE HERE AND MAY NOT MOVE ON THE PEEK. Everything that
+ * caps a HUD ground at less than opaque on this product is one founder
+ * sentence, quoted at `PEEK_SCRIM_ALPHA`: „An instruction he can read but
+ * which hides the hazard it is about is a different failure." It is a rule
+ * about a card the student reads WHILE DRIVING — SimOverlay's chips ride the
+ * violation peek, which only ever appears with the car in motion, and they
+ * keep 0.90 untouched by this edit.
+ *
+ * This card is the first-run touch hint. It is raised in the READY state and
+ * `touchHintShouldHide(speedKmh, shownMs)` takes it off the glass as soon as
+ * the car moves, so for its whole life the ego is stationary and there is no
+ * hazard behind it to preserve — the frame above is a parked car in a car
+ * park at 0 км/ч. A rule about not hiding the road cannot bind a control that
+ * is never on screen while the student is on it.
+ *
+ * AND IT IS STILL NOT THE PILL THE 2026-08-03 REVIEW DELETED. What goes opaque
+ * is the CARD'S OWN near-black `PEEK_SCRIM_RGB` (6, 11, 20) — the 18 % accent
+ * tint above it is untouched, so the chip keeps the identity register the
+ * founder signed off and reads as the same dark blue-cast chip it reads as
+ * today, minus the ghost of a car inside it. „SOLID BRAND-BLUE" is
+ * `background: var(--accent)` at full strength; this is 18 % of it over black.
+ * Composited against the same world, the residual goes 7.6 % → 0 %.
  */
-const ACK_CHIP_TOTAL_ALPHA = 0.9;
+const ACK_CHIP_TOTAL_ALPHA = 1;
 
 /**
- * …and the chip's own layer, derived from the published card alpha. 0.50.
+ * …and the chip's own layer, derived from the published card alpha. 1.00 at
+ * today's total, and it stays DERIVED for the reason it always was: the
+ * expression is the thing that must survive, so that a card alpha which moves
+ * re-picks this instead of leaving a paragraph to rot. At a total of 1 the
+ * identity `1 − (1 − a)(1 − β) = 1` has the same answer β = 1 for every card
+ * alpha below 1 — which is the honest reading of „opaque whatever is under it",
+ * and is why the `PEEK_SCRIM_ALPHA >= 1` guard below still earns its place.
  *
  * Clamped to [0, 1] for the reason `chipGroundAlphaFor` states — a total below
  * the card's own ground is not a lighter chip, it is a request this compositor
- * cannot honour and must not silently invert — and ROUNDED because the naive
- * expression is 0.5000000000000001 in binary floating point and that number
- * would ship into the DOM as the chip's alpha.
+ * cannot honour and must not silently invert — and ROUNDED because at the
+ * previous 0.90 rung the naive expression was 0.5000000000000001 in binary
+ * floating point and that number would have shipped into the DOM as the chip's
+ * alpha.
  */
 const ACK_CHIP_GROUND_ALPHA =
   PEEK_SCRIM_ALPHA >= 1
@@ -424,6 +476,149 @@ const ACK_CHIP_GROUND_ALPHA =
  * 2026-08-03 review deleted.
  */
 const ACK_CHIP_GROUND_CSS = `rgba(${PEEK_SCRIM_RGB.join(", ")}, ${ACK_CHIP_GROUND_ALPHA})`;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE AIR PUSHES AND NOTHING ON THE GLASS SAYS SO — 2026-09-13,
+   sc-ac-crosswind:a9db1738, major.
+
+   THE ROW, and the two thirds of it that are already answered, so that nothing
+   below is a second copy of something shipped:
+
+     „A lesson built on constant steering correction gives the student nothing
+      to correct with or against: the wheel shows no counter-steer at any
+      point, there is no wind force visible in the car's attitude, and the
+      briefing's «втора корекция» warning has no observable trigger. Nothing in
+      the cockpit reports a lateral disturbance."
+
+   · «втора корекция» HAS a trigger: `vehicle/secondSwing.ts` watches for the
+     movement instruction 7 names and `windSwingCueOn` puts the line on the
+     glass. That clause is closed and this cue is deliberately RANKED BELOW it.
+   · The attitude channel exists too: `VehicleSim.windLatAccelMs2` feeds
+     `cockpitLean.ts`, so the driver's head leans with the shove instead of
+     with his own steering.
+   · And the AIR is drawn — `windDrift.ts` + the mote layer, on the same
+     `currentWindN()` the chassis is pushed with.
+
+   WHAT SURVIVES ALL THREE is the judge's sentence at 1f39940, cropped off the
+   cluster and the wheel of `w41/frames/sc-ac-crosswind__pc-right/04-t026s.png`:
+   „no wind gauge, no lateral-force readout, no gust arrow and no attitude cue
+   of any kind". Every channel above makes the push FELT. Not one of them NAMES
+   it. A student who is leaned on by a camera and shown dust does not thereby
+   learn that the air is pushing him to the right and that the gust is still
+   building — and the product's own note at `PEEK_SCRIM_ALPHA` for the wheel
+   („equilibrium counter-steer below 0.01 of full input") says the one
+   instrument he WOULD read it off cannot show it. Doc 64 THEO-4: a decision
+   the product asks for explains itself, and „hold a little more wheel now,
+   give it back in a moment" is a decision this lesson asks for twice every
+   five seconds.
+
+   SO THE CUE STATES THE TWO THINGS THE STUDENT CANNOT DERIVE.
+   · WHICH SIDE the air is taking him, read from `windLatAccelMs2` — the
+     CAR-LOCAL projection, so it means „you are being pushed right" and not „the
+     air blows west", and it is the same number the head lean already uses.
+   · WHETHER THE GUST IS BUILDING OR DYING, read from `windLateralNow` — the
+     WORLD-frame magnitude, i.e. the gust envelope itself, so a turn of the
+     wheel cannot make the air look as if it changed. This is the anticipatory
+     half the row is really about: the shipped gust is a 5 s sine
+     (CROSSWIND_GUST_PERIOD_SEC), so a student who can see it rise learns to
+     meet it instead of catching it.
+
+   TWO NUMBERS, BOTH GROUNDED IN THE SHIPPED ENVELOPE AND NEITHER GUESSED.
+   `windLateralNow` runs CROSSWIND_BRIDGE_N ± CROSSWIND_GUST_AMPLITUDE_N, i.e.
+   700 → 1700 N on a 500 N half-amplitude, and at CHASSIS_MASS 1220 kg the
+   broadside peak is 1700 / 1220 = 1.393 m/s².
+
+   Both are written as LITERALS rather than imported, which is `windDrift.ts`'s
+   own discipline stated verbatim („so `sim/environment` takes no dependency on
+   `sim/vehicle` for one constant") and the same concession `ACK_CHIP_TOTAL_
+   ALPHA` above records: CHASSIS_MASS is not on the vehicle barrel and doc-05
+   forbids reaching past one. The arithmetic that ties them to the real
+   constants is written out here so a retune turns this paragraph false in a
+   place a reader will look, rather than quietly rescaling a cue.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Which way the air is shoving the CAR, in the driver's own frame. */
+type WindPushSide = "left" | "right";
+
+/** What the glass says about the air this frame. `null` = nothing to say. */
+interface WindPushCue {
+  side: WindPushSide;
+  /** Building toward the peak (true) or dying back to the lull (false). */
+  rising: boolean;
+}
+
+interface WindPushState {
+  cue: WindPushCue | null;
+  /** The last turning point of the gust's |force| the tracker committed to, N. */
+  extremeN: number;
+}
+
+/**
+ * How much of the gust has to reach the car's lateral axis before the cue will
+ * name a side, m/s². 0.15 is 11 % of the 1.393 m/s² broadside peak: enough that
+ * a car running nearly ALONG the wind — where the projection collapses to zero
+ * and its sign is noise — says nothing rather than flickering left/right at
+ * 60 Hz, and low enough that every heading the lesson's route actually holds is
+ * well inside it.
+ */
+const WIND_PUSH_SIDE_DEADBAND_MS2 = 0.15;
+
+/**
+ * How far |force| must come back off a turning point before the cue commits to
+ * the other phase, newtons. 150 N is 30 % of the gust's 500 N half-amplitude:
+ * at 60 Hz the sine's own step near a peak is 2π·500/5/60 ≈ 10.5 N, so this is
+ * fourteen frames of MONOTONE travel and no amount of frame jitter can trip it,
+ * while a real turn is announced about a fifth of the way down rather than at
+ * the instant of the peak — which is the honest reading of „it is easing now".
+ */
+const WIND_PUSH_PHASE_HYSTERESIS_N = 150;
+
+function createWindPushState(): WindPushState {
+  return { cue: null, extremeN: 0 };
+}
+
+/**
+ * Advance the cue by one frame. Pure, total and side-effect free: a lesson that
+ * authors no crosswind reads 0 from both getters and gets `cue: null` forever,
+ * so nothing is drawn and no calm scene pays for this.
+ *
+ * It returns the SAME `cue` object while the cue has not changed, which is what
+ * lets the caller publish on edges only — a per-frame `setState` here would be
+ * a re-render of the whole scene tree sixty times a second, the trap the
+ * telltale channel's own note describes.
+ */
+function stepWindPush(
+  state: WindPushState,
+  read: { lateralN: number; latAccelMs2: number },
+): WindPushState {
+  const gustN = Math.abs(read.lateralN);
+  const side: WindPushSide | null =
+    read.latAccelMs2 >= WIND_PUSH_SIDE_DEADBAND_MS2
+      ? "left"
+      : read.latAccelMs2 <= -WIND_PUSH_SIDE_DEADBAND_MS2
+        ? "right"
+        : null;
+  if (!(gustN > 0) || side === null) {
+    return state.cue === null ? state : createWindPushState();
+  }
+  const prev = state.cue;
+  // A new side is a new gust as far as the reader is concerned: start it
+  // rising, and start the tracker from this force rather than from a turning
+  // point that belonged to the other side.
+  if (prev === null || prev.side !== side) {
+    return { cue: { side, rising: true }, extremeN: gustN };
+  }
+  if (prev.rising) {
+    if (gustN >= state.extremeN) return { cue: prev, extremeN: gustN };
+    return state.extremeN - gustN >= WIND_PUSH_PHASE_HYSTERESIS_N
+      ? { cue: { side, rising: false }, extremeN: gustN }
+      : state;
+  }
+  if (gustN <= state.extremeN) return { cue: prev, extremeN: gustN };
+  return gustN - state.extremeN >= WIND_PUSH_PHASE_HYSTERESIS_N
+    ? { cue: { side, rising: true }, extremeN: gustN }
+    : state;
+}
 
 /**
  * Perf readout opt-in: `?simPerf=1` on the URL, or `localStorage["sim.perfLog"]
@@ -1855,6 +2050,12 @@ export function ReadyScene({
   // because the detector's own wind gate is `windLatAccelMs2`, which is 0
   // there — no per-lesson branch is needed here and none is written.
   const [windSwingCueOn, setWindSwingCueOn] = useState(false);
+  // AC-12, the ANTICIPATORY half — sc-ac-crosswind:a9db1738. Same edge-callback
+  // shape again: RuntimeDriver steps `stepWindPush` per frame off the sim's own
+  // two wind getters and publishes only when the side or the phase changes, so
+  // a 5 s gust costs about two re-renders a second and a calm lesson costs
+  // none (both getters return the literal 0 without authored `physics.crosswind`).
+  const [windPushCue, setWindPushCue] = useState<WindPushCue | null>(null);
   // #24 wiper visual channel: VehicleRig writes the live blade sweep +
   // wiped-arc clearing level per frame; WindshieldDroplets reads it (render-
   // free ref, the hazardActiveRef pattern).
@@ -2408,6 +2609,12 @@ export function ReadyScene({
               // on the advisor's own rule: a training aid is not part of the
               // car, and naming the fault mid-assessment coaches the candidate.
               onSecondSwing={lesson.examMode === true ? undefined : setWindSwingCueOn}
+              // …and the cue that arrives BEFORE the mistake. Gated on exam
+              // mode for the same reason as its neighbour — a training aid is
+              // not part of the car — and, unlike it, ALSO gated at the render
+              // by the aid tier: this one IS „notice the instrument" help, and
+              // reading the air for yourself is what L3 is.
+              onWindPush={lesson.examMode === true ? undefined : setWindPushCue}
               sampleRef={sampleRef}
               simRef={simRef}
               inputRef={inputRef}
@@ -2845,6 +3052,61 @@ export function ReadyScene({
           <div className="rounded-2xl border border-danger/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-danger shadow-glow-sm backdrop-blur">
             Втори замах! Отпускай корекцията плавно — рязко назад изхвърля
             колата към бордюра.
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── AC-12 THE PUSH, NAMED WHILE IT IS HAPPENING —
+          sc-ac-crosswind:a9db1738's surviving clause („nothing in the cockpit
+          reports a lateral disturbance"). The measurement, the three channels
+          that already exist and why none of them answers it are at
+          `stepWindPush`; what lands here is the sentence.
+
+          IT IS LAST IN THE C1 CORRIDOR, and the rank is the whole of its
+          gating. A lamp is a fault in the car, «втори замах» is a mistake made
+          half a second ago, «Следвай синята линия» is standing guidance — all
+          three outrank a running commentary on the weather, and „one surface
+          in the corridor, always" is this corridor's rule, not a preference.
+          The cue comes back the frame the lane clears.
+
+          AND IT IS AN AID, gated on `aids.pathRibbon` exactly as the telltale
+          cue beside it is: at L3 the student has the dust, the head lean and
+          the wheel, and reading them himself is the drill. `null` on every
+          lesson that authors no `physics.crosswind`, because both sim getters
+          return the literal 0 there — no lesson-id branch is written and none
+          is needed.
+
+          THEO-4 IN ONE LINE, NOT TWO: the chip names the direction, the state
+          of the gust AND the action, and it says «без втори замах» in the
+          template's own words (instruction 7, and the swing chip above) so the
+          warning, the commentary and the consequence are recognisably one
+          lesson rather than three vocabularies. It cites no article because it
+          decides nothing a law grades — it grades nothing at all.
+
+          `data-hud` for its neighbours' reason: row C1 owns this corridor's
+          geometry and an unnamed panel stays stranded dead centre over the
+          road. No `data-hud-ink` and no scrim, also for their reason — this
+          chip is not on `PlayAreaStyles.GHOST_SURFACES`, so the UNPANEL sweep
+          never reaches it and `bg-background/85 backdrop-blur` is what ships.
+          ────────────────────────────────────────────────────────────────── */}
+      {windPushCue &&
+      aids?.pathRibbon &&
+      !windSwingCueOn &&
+      !telltaleCueOn &&
+      !telltaleCautionCueOn &&
+      !(followHintOn && aids?.followHints) ? (
+        <div
+          data-hud="wind-push-cue"
+          className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2"
+        >
+          <div className="rounded-2xl border border-accent-2/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-accent-2 shadow-glow-sm backdrop-blur">
+            {windPushCue.rising
+              ? `Поривът се усилва — въздухът те бута ${
+                  windPushCue.side === "left" ? "наляво" : "надясно"
+                }. Задръж лек волан ${
+                  windPushCue.side === "left" ? "надясно" : "наляво"
+                } срещу него.`
+              : "Поривът отслабва — връщай волана плавно и без втори замах."}
           </div>
         </div>
       ) : null}
@@ -3490,9 +3752,11 @@ export function ReadyScene({
             //       bottom and the last third of it is live road. The `18%,
             //       transparent` mix has no ground of its own to carry it, which
             //       is the peek's «ЗАЩО» defect on the surface beside it. It now
-            //       stands on the CARD'S OWN near-black at 0.50, so the two
-            //       layers read 0.90 where the shade is up and 0.50 where the
-            //       ramp has gone — never nothing. The 18 % tint is unchanged
+            //       stands on the CARD'S OWN near-black, and since 2026-09-13
+            //       (sc-ac-crosswind:8f42504c — see `ACK_CHIP_TOTAL_ALPHA`) at
+            //       full strength, so the control reads the SAME wherever the
+            //       card's own ramp happens to be rather than 0.90 at its top
+            //       edge and 0.50 at its bottom. The 18 % tint is unchanged
             //       and, because `background-image` paints above
             //       `background-color`, still on top where it belongs.
             //
@@ -3507,9 +3771,11 @@ export function ReadyScene({
             //       keeps the label where it already read.
             //
             //    NOT A PANEL AND NOT THE COOKIE BANNER: 180 × 44 is 2.4 % of an
-            //    852 × 393 stage, the world stays legible inside it at 1.13 : 1
-            //    (SimOverlay's measurement of the same pair), and there is still
-            //    no blur, no shadow and no radius but the pill's own.
+            //    852 × 393 stage, it is raised only while the car is stopped in
+            //    the ready state (`touchHintShouldHide` takes it away the moment
+            //    the car moves, so it hides no hazard on any road the student is
+            //    driving), and there is still no blur, no shadow and no radius
+            //    but the pill's own.
             data-hud-ink=""
             className="pointer-events-auto flex min-h-11 shrink-0 w-full items-center justify-center rounded-full border px-4 text-[11px] font-black uppercase tracking-wider text-foreground"
             style={{
@@ -4003,6 +4269,7 @@ function RuntimeDriver({
   onTelltale,
   onTelltaleCaution,
   onSecondSwing,
+  onWindPush,
   sampleRef,
   simRef,
   inputRef,
@@ -4059,6 +4326,13 @@ function RuntimeDriver({
    * detector is never stepped, which is the exam-mode gate.
    */
   onSecondSwing?: (on: boolean) => void;
+  /**
+   * AC-12, the anticipatory cue — the side the air is taking the car and
+   * whether the gust is building, on the same edge contract as everything else
+   * in this group (published only when the pair changes). Absent = the stepper
+   * is never run, which is the exam-mode gate.
+   */
+  onWindPush?: (cue: WindPushCue | null) => void;
   sampleRef: React.RefObject<VehicleSample>;
   /** S0-View: live steer angle for the attempt recorder (visual channel). */
   simRef: React.RefObject<VehicleSim | null>;
@@ -4161,6 +4435,10 @@ function RuntimeDriver({
   // re-render per frame).
   const swingRef = useRef(createSecondSwingState());
   const swingCueRef = useRef(false);
+  // …and the anticipatory cue's own pair: the tracker's state, and the last cue
+  // published, so `onWindPush` fires on edges only for the reason above.
+  const windPushRef = useRef(createWindPushState());
+  const windPushCueRef = useRef<WindPushCue | null>(null);
 
   useFrame((_, delta) => {
     // QW10: consume the throttle-while-locked latch every frame (so attempts
@@ -4625,6 +4903,34 @@ function RuntimeDriver({
           tRef.current,
           "Втори замах: воланът се върна рязко срещу порива, който вече бе отслабнал — вятърът и корекцията избутаха колата в една и съща посока.",
         );
+      }
+    }
+
+    // ── AC-12: THE SAME GUST, NAMED BEFORE IT IS FELT ───────────────────────
+    //
+    // sc-ac-crosswind:a9db1738's surviving clause — „nothing in the cockpit
+    // reports a lateral disturbance". The block at `stepWindPush` has the
+    // measurement and why the three channels that already exist do not answer
+    // it. This is the read; the chip in LessonScene is the reader.
+    //
+    // BOTH GETTERS AND NOT ONE: `windLateralNow` is the gust envelope in the
+    // world, which is what „rising/easing" must be judged on, and
+    // `windLatAccelMs2` is the same force projected onto the car, which is what
+    // „left/right" must be judged on. Reading the phase off the car-local
+    // number would make a turn of the wheel look like a change in the weather.
+    //
+    // OUTSIDE `if (director)` for the reason its neighbour states: this lesson
+    // stages no actors and has no director.
+    if (onWindPush) {
+      const next = stepWindPush(windPushRef.current, {
+        lateralN: simRef.current?.windLateralNow ?? 0,
+        latAccelMs2: simRef.current?.windLatAccelMs2 ?? 0,
+      });
+      windPushRef.current = next;
+      const last = windPushCueRef.current;
+      if (next.cue?.side !== last?.side || next.cue?.rising !== last?.rising) {
+        windPushCueRef.current = next.cue;
+        onWindPush(next.cue);
       }
     }
 
