@@ -389,6 +389,59 @@ export interface ReachZoneParams {
    */
   requireBrakingClean?: true;
   /**
+   * HE WENT WHEN THE GREEN CAME — sc-signal-hesitation:440b1f7c (critical),
+   * and the seventh term this file's own templates route here rather than
+   * invent an instrument for.
+   *
+   * WHAT IT MEANS. `true` = this waypoint is thrown away by a run that has
+   * been convicted of `HESITATION_AT_GREEN` — the второстепенна the catalogue
+   * titles «Колебание на зелен сигнал» (Наредба № 38 приложение № 5, т. 10,
+   * б. „б“) — whether the sheet CHARGED it or the teach-first coach gave the
+   * first one away as a card. Absent = no such claim, which is every other
+   * gate in the catalogue.
+   *
+   * THE DRIVE IT CLOSES, measured at HEAD through
+   * `compileScenario → applyTick → buildLessonResult → buildDebrief` on the
+   * drill's OWN ❌ demonstration `mistake-freeze`, i.e. the recording whose
+   * whole content is the fault the lesson exists to teach:
+   *
+   *     HESITATION_AT_GREEN billed    t = 19.32 s
+   *     objectives                    2 / 2   ← «без да замръзваш» ticked
+   *     verdict                       ИЗДЪРЖАН (L1 3★, L4 2★)
+   *
+   * The banner on the tick reads «Премини правó напред на зелено, БЕЗ ДА
+   * ЗАМРЪЗВАШ», and the sheet under it was holding the conviction for
+   * freezing. A `reachZone` samples an ARRIVAL and the freeze is a fact about
+   * the JOURNEY, so no radius, cap or dwell on this side could ever have seen
+   * it — the same gap `requireSolidLineClean` and `requireBrakingClean` were
+   * added for, in the drill where the certified act and the graded fault are
+   * the same act.
+   *
+   * IT CANNOT REFUSE A CLEAN DRIVE. The channel is the run's own ledger of a
+   * BILLED (or coached) conviction, never a speedometer read: the detector is
+   * gated on a live green with a clear box ahead (`leadGapM === null ||
+   * leadGapM > cfg.hesitationClearGapM`), so a student held by a lead car, a
+   * red, or a person on the crossing raises nothing. The drill's
+   * `shadow-correct` replays with scored `[]` and coached `[]` — measured —
+   * and keeps this tick at every authored rung.
+   *
+   * NOT A SILENT VERDICT (THEO-4): the withheld tick never arrives alone. The
+   * same drive is holding the engine's own «Колебание на зелен сигнал» card
+   * with the catalogue's explanation («…кръстовището пропуска по-малко коли, а
+   * колоната зад теб чака теб»), its «✔ Правилното действие» corrective and
+   * its Наредба № 38 citation, and the debrief repeats it. This demand removes
+   * a contradiction from a protocol that already explains itself.
+   *
+   * A CLAIM ABOUT THE JOURNEY, so it is read per frame off the run's own
+   * ledger and stays outside the `capMet` latch — the shape of the journey
+   * demands above it. `greenStartFaultVoidsObjective` (objectives.ts) is wired
+   * into `lessons/engine.ts`'s `terminalUnearnable`, and here that is NOT
+   * optional: `sc-shes-cross` is the LAST objective of its drill (2 of 2), so
+   * without it the refusal would strand the chain and the student who froze
+   * could reach the card that teaches him the fault only by quitting.
+   */
+  requireGreenStartClean?: true;
+  /**
    * REPORT THE ONCOMING GAP HE TURNED INTO, against this drill's taught norm,
    * in seconds — the authored half of the only key here that refuses nothing.
    * `done` is bit-identical with it and without it; what it adds is the

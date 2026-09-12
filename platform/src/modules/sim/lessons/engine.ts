@@ -54,6 +54,7 @@ import {
   brakingFaultVoidsObjective,
   contactVoidsObjective,
   createEvalState,
+  greenStartFaultVoidsObjective,
   oncomingGapDetail,
   parseObjectiveParams,
   personContactVoidsObjective,
@@ -1020,6 +1021,39 @@ function isCoachedNeedlessStop(m: CoachedMistake): boolean {
 }
 
 /**
+ * Sat still on a green with a clear box in front — the ledger row
+ * `ReachZoneParams.requireGreenStartClean` consults (lessons/types.ts carries
+ * the frame, the measured drive and the census).
+ *
+ * IT READS THE BILL, NOT THE SPEEDOMETER, exactly like its neighbours:
+ * `HESITATION_AT_GREEN` fires only on a LIVE green whose box the detector has
+ * already found clear (`leadGapM === null || leadGapM > cfg.hesitationClearGapM`
+ * — rules/engine.ts), so a car held by a lead, a red or a person on the zebra
+ * never reaches here. What arrives is a conviction the protocol already prints
+ * with the catalogue's explanation and its Наредба № 38 citation.
+ */
+function isHesitationAtGreen(e: ScorableEvent): boolean {
+  return e.kind === "violation" && e.code === "HESITATION_AT_GREEN";
+}
+
+/**
+ * …AND THE SAME FAULT AS THE COACH RECORDED IT. Второстепенна like the needless
+ * stop above, so the sheet is not empty in a training drive from the SECOND
+ * freeze on — but the first is the teach-first free mini-lesson, and on the one
+ * drill that authors this demand the whole ❌ demonstration is a single freeze.
+ * Measured at L1 on `mistake-freeze`: scored `[]`, coached
+ * `[HESITATION_AT_GREEN]`. A scored-only read would refuse nothing there.
+ *
+ * `CoachedMistake.code` is a plain string (future codes pass through), so this
+ * is a string compare; the SCORED half above is typed against the real
+ * `ViolationCode`, which is what makes a rename fail the build instead of
+ * quietly emptying the gate.
+ */
+function isCoachedHesitationAtGreen(m: CoachedMistake): boolean {
+  return m.code === "HESITATION_AT_GREEN";
+}
+
+/**
  * Came to rest between the rails — the ledger row
  * `ReachZoneParams.requireRestClean: "railBand"` consults.
  *
@@ -1770,6 +1804,24 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     prev.events.some(isNeedlessStop) ||
     scoredEvents.some(isNeedlessStop) ||
     needlessStopCoached;
+  // …AND THE FREEZE ON GREEN, for `ReachZoneParams.requireGreenStartClean`
+  // (lessons/types.ts carries the frame: one sheet printing «✓ Премини правó
+  // напред на зелено, БЕЗ ДА ЗАМРЪЗВАШ» and «Урокът е издържан» over the
+  // drill's OWN ❌ demonstration of the freeze). Both halves of the scored
+  // ledger for the reason the blocks above give, PLUS the shown-but-not-charged
+  // half, which is the only half there IS at the aided rungs: the code is
+  // второстепенна and the demonstration freezes exactly once, so at L1 the
+  // sheet reads «Общо 0» while the coach holds the card. The
+  // `mistakeExperience` exemption is the same one and for the same reason: in a
+  // THEO-3 sandbox the wrong act IS the assignment.
+  const hesitationCoached =
+    mistakeXp === undefined &&
+    (coachedPrev.some(isCoachedHesitationAtGreen) ||
+      coachedNew.some(isCoachedHesitationAtGreen));
+  const hesitatedAtGreenInRun =
+    prev.events.some(isHesitationAtGreen) ||
+    scoredEvents.some(isHesitationAtGreen) ||
+    hesitationCoached;
 
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
@@ -1838,6 +1890,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(crossedSolidLineInRun ? { crossedSolidLineInRun: true } : {}),
         ...(harshBrakeNoCauseInRun ? { harshBrakeNoCauseInRun: true } : {}),
         ...(stoppedWithoutCauseInRun ? { stoppedWithoutCauseInRun: true } : {}),
+        ...(hesitatedAtGreenInRun ? { hesitatedAtGreenInRun: true } : {}),
         ...(yieldFaults.length > 0 ? { yieldFaults } : {}),
         ...(overTheCeilingInRun ? { overTheCeilingInRun: true } : {}),
         qualifyingStopCurrent: fullStopHeld,
@@ -2269,7 +2322,15 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           brakingFaultVoidsObjective(params[currentIndex], {
             ...(harshBrakeNoCauseInRun ? { harshBrakeNoCauseInRun: true } : {}),
             ...(stoppedWithoutCauseInRun ? { stoppedWithoutCauseInRun: true } : {}),
-          }));
+          }) ||
+          // The freeze-on-green term (`requireGreenStartClean`) is monotone in
+          // the same way — and this is the second arm here where wiring is NOT
+          // optional: its one census member, `sc-shes-cross`, IS the last
+          // objective of its drill (2 of 2). Without this the refusal would
+          // strand the chain, the run-out would never arm, and the student who
+          // slept through the green could reach the card that teaches him the
+          // fault only by quitting.
+          greenStartFaultVoidsObjective(params[currentIndex], hesitatedAtGreenInRun));
       if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {

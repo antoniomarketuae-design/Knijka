@@ -289,6 +289,16 @@ export function serializeObjectiveParams(
       // car behind you with the brake pedal" has the same answer at L1 as at
       // L5, and sc-follow-tailgater's whole subject IS that answer.
       if (p.requireBrakingClean === true) params.requireBrakingClean = true;
+      // …AND THE EIGHTH (`requireGreenStartClean`), on this whitelist because
+      // the trap the two blocks above describe CAUGHT IT: with the field, the
+      // parse, the honoured read, the void arm and the template key all in
+      // place, `inprocess-drive` re-drove `mistake-freeze` and returned a
+      // BYTE-IDENTICAL projection (sha256 50feeb52…) — 2/2 and «издържан», the
+      // same drive as before the repair, because the key stopped here. NOT
+      // LADDERED for its neighbours' reason: „did you sit still on a green with
+      // a clear box ahead" has the same answer at L1 as at L5, and
+      // sc-signal-hesitation's whole subject IS that second.
+      if (p.requireGreenStartClean === true) params.requireGreenStartClean = true;
       // …AND THE FIFTH (`requireFullStop`), on this whitelist for the identical
       // measured reason and NOT laddered for a sharper one than its neighbours':
       // the aid ladder cannot forgive this even in principle. «Спри напълно» is

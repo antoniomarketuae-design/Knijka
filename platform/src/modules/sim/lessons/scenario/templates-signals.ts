@@ -877,9 +877,53 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
     },
     {
       id: "sc-shes-cross",
+      // A TITLE THAT CERTIFIED ITS OWN FREEZE DEMO — sc-signal-hesitation:
+      // 440b1f7c, 2026-09-12.
+      //
+      // MEASURED AT HEAD 095054b through `compileScenario → applyTick →
+      // buildLessonResult`, on this drill's OWN ❌ demonstration
+      // `mistake-freeze` — the recording whose entire content is the fault the
+      // lesson is named after:
+      //
+      //     HESITATION_AT_GREEN billed   t = 19.32 s
+      //     this gate completed          2 / 2, «Урокът е издържан»
+      //     L1 3★ (coached, «Общо 0») · L4 2★ (charged, второстепенна 1 т.)
+      //
+      // The banner says «без да замръзваш» and the sheet under it was holding
+      // the conviction for freezing. That is the audit row's «the wrong drive
+      // books no mistake» read honestly: at the aided rungs it books none AND
+      // is certified for the act it failed.
+      //
+      // WHY A GATE AND NOT A RETITLE. «без да замръзваш» is not decoration —
+      // it is the only clause that distinguishes this drill from the four
+      // other sx-family crossings, and striking it to make a picture-match go
+      // green would delete the subject (the same argument templates-
+      // conditions2.ts makes for «пелена»). `requireGreenStartClean` is not a
+      // tolerance and has no geometry: it reads the run's own ledger of a
+      // billed OR coached HESITATION_AT_GREEN, outside the `capMet` latch —
+      // the `requireNoContact` / `requireSolidLineClean` shape.
+      //
+      // IT CANNOT REFUSE A CLEAN DRIVE. The channel is the engine's conviction,
+      // and the detector is gated on a live green with a clear box
+      // (`leadGapM === null || leadGapM > cfg.hesitationClearGapM`), so a
+      // student held by a lead, a red or a person raises nothing. This drill's
+      // `shadow-correct` replays with scored [] and coached [] — measured — so
+      // it keeps this tick at every authored rung.
+      //
+      // IT CANNOT STRAND ANYONE. This gate is TERMINAL (2 of 2), so
+      // `greenStartFaultVoidsObjective` is wired into `lessons/engine.ts`'s
+      // `terminalUnearnable`: the finish gate arms anyway, the objective keeps
+      // its honest `active` status, and the student reaches the debrief that
+      // teaches him the fault instead of having to quit and forfeit the
+      // attempt.
+      //
+      // NOT A SILENT VERDICT (THEO-4). The withheld tick never arrives alone:
+      // the same sheet holds «Колебание на зелен сигнал» with the catalogue's
+      // explanation and its «✔ Правилното действие» corrective, cited to
+      // Наредба № 38 приложение № 5, т. 10, б. „б“.
       titleBg: "Премини правó напред на зелено, без да замръзваш",
       // North-arm northbound lane center, past the 40 m junction area.
-      params: { kind: "reachZone", x: 4.06, y: 45, radiusM: 9 },
+      params: { kind: "reachZone", x: 4.06, y: 45, radiusM: 9, requireGreenStartClean: true },
     },
   ],
   // The lesson's subject, staged. It grades nothing (see the spec's own doc).

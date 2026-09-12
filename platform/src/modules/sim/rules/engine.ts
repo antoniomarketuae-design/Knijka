@@ -654,6 +654,31 @@ export interface RuleEngineState {
    * fire AFTER the bill above and never instead of it.
    */
   offCarriagewayRegrade: EpisodeState;
+  /**
+   * VP-06 / N11 — the RED dashboard telltale, once the drive-on has been billed.
+   *
+   * `null` until the telltale runner's ignore branch reports its
+   * `prioritySituation "warning-lamp" violated` (orchestrator/runners.ts); the
+   * session time of that bill from then on. The lamp does NOT go out — a
+   * coolant fault does not clear because a card was dismissed, and the runner
+   * says so in its own class doc — so the чл. 101, ал. 1 duty («длъжен е да
+   * спре») is still owed on every frame after it. That is what the re-grade
+   * measures; see `WARNING_LAMP_REGRADE_SEC`.
+   */
+  warningLampIgnoredAt: number | null;
+  /** The fastest the car has gone SINCE that bill — the baseline the
+   *  compliance drop is measured down from (the emergency runner's
+   *  `peakSinceReleaseKmh` discipline, for its reason: a level alone pays a
+   *  car that was already slow and never changed pace). */
+  warningLampPeakKmh: number;
+  /** Accrued seconds of NOT-YET-COMPLYING driving since that bill — the ledger
+   *  `WARNING_LAMP_REGRADE_SEC` is spent against. Zeroed the moment the driver
+   *  actually begins to slow. */
+  warningLampDriveOnSec: number;
+  /** The SECOND bill of one continuing drive-on: the charge the teach-first
+   *  free mini-lesson consumed, and the only повторение this once-per-drive
+   *  duty can ever have. See `WARNING_LAMP_REGRADE_SEC`. */
+  warningLampRegrade: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = {
@@ -1727,6 +1752,106 @@ const OFF_CARRIAGEWAY_SUSTAIN_SEC = 2;
 const OFF_CARRIAGEWAY_REGRADE_SEC = 6;
 
 /**
+ * THE SAME FAMILY, ON THE RED DASHBOARD TELLTALE — accrued seconds of driving
+ * on WITHOUT BEGINNING TO SLOW after the ignore bill (VP-06 / N11, audit
+ * `sc-vp-telltale-red:c172d48b`).
+ *
+ * ── WHAT WAS MEASURED, THROUGH THE PRODUCTION CHAIN AT HEAD ─────────────────
+ * `tools/audit/inprocess-drive.mjs --lesson sc-vp-telltale-red --rung 1`, a
+ * script that holds the right lane at 55 км/ч from the spawn to the end of
+ * ln-v1 and never stops — i.e. the row's own sentence, „a student who treats a
+ * red lamp as a yellow one and keeps driving WITHOUT CRASHING":
+ *   reducer  WARNING_LAMP_IGNORED at t = 20,5 s — fired, exactly as designed
+ *   sheet    опасни 0/0 · основни 0/0 · второстепенни 0/0 · Общо 0
+ *   debrief  the code under «Учебни моменти (не влизат в точките)»
+ * The row's verdict, verbatim, on the изпитен лист: faultless.
+ *
+ * ── WHY, AND IT IS NOT THE EMITTER ──────────────────────────────────────────
+ * The emitter landed at `b8b1ce4` (2026-09-02) and works. `WARNING_LAMP_IGNORED`
+ * is основна, so `policyForViolation` returns undefined and teach-first governs:
+ * the FIRST encounter is the founder-ratified free mini-lesson. And the telltale
+ * runner resolves EXACTLY ONCE PER DRIVE (its own class doc; `phase` goes
+ * "resolved" and `step` returns immediately after), while `prior` is counted per
+ * TOPIC per DRIVE (`scenarios/coach.ts` — „one free lesson per topic"). So the
+ * only bill this duty can ever produce is spent on the card, on every attempt,
+ * for ever — and the debrief prints this engine's own promise, «Първата среща не
+ * се наказва … При повторение вече влиза в изпитния лист», over a drive that can
+ * have no повторение because nothing asks a second time.
+ *
+ * That is verbatim `STANDING_DUTY_REGRADE_SEC`'s defect, verbatim
+ * `MOTORWAY_CRAWL_REGRADE_SEC`'s, `BUS_LANE_REGRADE_SEC`'s,
+ * `BAN_ZONE_REST_REGRADE_SEC`'s and `OFF_CARRIAGEWAY_REGRADE_SEC`'s, so it takes
+ * their answer unchanged: ONE more bill, marked `regrade`, which
+ * `lessons/engine.ts` (`applyTick`, the `alreadyCharged` guard) DROPS wherever
+ * the code has already been charged. Exam mode is byte-identical (`coach.ts`
+ * scores unconditionally there, so the first bill IS the charge and the re-grade
+ * is dropped before it can double it).
+ *
+ * ── WHAT THIS IS NOT ────────────────────────────────────────────────────────
+ * It is NOT the founder question w37 flagged and declined („a red warning lamp
+ * may be the one case where a first-offence amnesty is wrong on safety
+ * grounds"). Carving an exception out of teach-first would charge the student on
+ * the very beat the lesson exists to teach. Teach-first is untouched here: the
+ * first encounter is still free, still shown as a card, still worth zero. What
+ * changes is that the ESCALATION the card promises becomes reachable.
+ *
+ * ── THE CONDITION IS „HAS HE BEGUN TO COMPLY", NOT „IS HE STILL MOVING" ─────
+ * A plain still-moving clock would convict the student who IS obeying: from the
+ * posted 50 (13,9 m/s) a calm 1,5 m/s² pull-over — «плавно намаляване», which is
+ * literally what `correctiveBg` asks for — takes over nine seconds, and a slam
+ * to beat the clock is the OTHER wrong answer this drill is built to punish
+ * (`HARSH_BRAKING_NO_CAUSE`, the „Паническо спиране" demo). So the clock stops
+ * the instant the car has actually shed speed, and runs only while it has not:
+ * the question is whether he STARTED, never whether he FINISHED.
+ * `WARNING_LAMP_COMPLY_DROP_KMH` is that test.
+ *
+ * ── THE NUMBER ──────────────────────────────────────────────────────────────
+ * 6 s, and it is `SPEED_REGRADE_SEC`'s number for `SPEED_REGRADE_SEC`'s stated
+ * reason: the corrective act being waited for is ONE PEDAL — lifting off is the
+ * first line of the card the student has just dismissed — so it does not get the
+ * ten seconds `STANDING_DUTY_REGRADE_SEC` gives a hand that may be wanted on the
+ * wheel, nor the eight `OFF_CARRIAGEWAY_REGRADE_SEC` gives a steering recovery.
+ * Six seconds of holding pace after being told «спри безопасно СЕГА» is a
+ * refusal, not a reaction.
+ * And it reaches the drive that was measured: the bill lands at 20,5 s of a
+ * 29,9 s full-route drive-on, so six accrued seconds is spent with room to
+ * spare — while a student who lifts off at any point in those six seconds
+ * trips the reset and can never be reached by this bill at all.
+ *
+ * ── WHAT IT DELIBERATELY DOES NOT TOUCH ─────────────────────────────────────
+ *  · The EMITTER. Not one gate of the runner's ignore branch moves; a drive
+ *    that books nothing today books nothing after this. The re-grade is armed
+ *    only by the first bill, so no drive that was never billed can meet it.
+ *  · The AMBER lamp. It authors no halt contract and emits nothing, so nothing
+ *    here can arm on it — carrying on IS its taught answer.
+ *  · `POLICE_STOP_SIGNAL_IGNORED`, the twin one runner down. It is основна and
+ *    ITS runner also resolves once per drive, so it has the same shape — but no
+ *    frame in this wave photographs it, and this file's own discipline is that
+ *    an unphotographed neighbour is reported, not widened into. Reported.
+ */
+const WARNING_LAMP_REGRADE_SEC = 6;
+
+/**
+ * How much speed the driver must have SHED since the ignore bill for the
+ * re-grade above to count him as responding, km/h.
+ *
+ * A DROP, NOT A LEVEL, and for the reason `EM_YIELD_DROP_KMH`
+ * (orchestrator/runners.ts) was written against one lesson over: an absolute
+ * „is he slow now" test pays the car that was already slow and never changed
+ * pace, which on that row was measured as a free certificate for a drive that
+ * did nothing at all. The mirror of that failure here would be a free
+ * conviction for a car that was already crawling, so the test is the same one
+ * in the same direction: did the driver DO something.
+ *
+ * 5, the same as `EM_YIELD_DROP_KMH` and for its stated derivation: it is above
+ * the ripple a car holding a target speed shows against the tier governor —
+ * which is the only thing it must clear to stop reading a steady hold as a
+ * response — and low enough that a genuine lift-off is credited within the
+ * first second of it (13,9 m/s at even 1,5 m/s² sheds 5 км/ч in under a second).
+ */
+const WARNING_LAMP_COMPLY_DROP_KMH = 5;
+
+/**
  * The frame-zero placeholder's motion floor, km/h — the local mirror of
  * `lessons/engine.ts POSE_MOTION_KMH` (0.5). Duplicated rather than imported
  * because `rules/` is the leaf module and importing `lessons/` would invert the
@@ -2038,6 +2163,10 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     emergencyLane: { ...IDLE_EPISODE },
     offCarriageway: { ...IDLE_EPISODE },
     offCarriagewayRegrade: { ...IDLE_EPISODE },
+    warningLampIgnoredAt: null,
+    warningLampPeakKmh: 0,
+    warningLampDriveOnSec: 0,
+    warningLampRegrade: { ...IDLE_EPISODE },
   };
 }
 
@@ -2106,6 +2235,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     emergencyLane: { ...s.emergencyLane },
     offCarriageway: { ...s.offCarriageway },
     offCarriagewayRegrade: { ...s.offCarriagewayRegrade },
+    warningLampRegrade: { ...s.warningLampRegrade },
   };
 }
 
@@ -4430,6 +4560,35 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push({ ...makeViolation("OFF_CARRIAGEWAY", t), regrade: true });
   }
 
+  // -- 4a1'. THE RED TELLTALE THAT WAS IGNORED AND STILL IS (VP-06 / N11 —
+  // `WARNING_LAMP_REGRADE_SEC` carries the measurement and the derivation).
+  // Armed ONLY by the runner's own ignore bill above, so no drive that was
+  // never billed can be reached here. The clock runs while the driver has not
+  // begun to slow and stops the instant he has — «спри безопасно СЕГА» is
+  // answered by lifting off, not by finishing the stop.
+  if (s.warningLampIgnoredAt !== null) {
+    if (speed > s.warningLampPeakKmh) s.warningLampPeakKmh = speed;
+    const beganToComply =
+      s.warningLampPeakKmh - speed >= WARNING_LAMP_COMPLY_DROP_KMH ||
+      speed < cfg.movingSpeedKmh;
+    const lampStep = stepAccruedEpisode(
+      s.warningLampRegrade,
+      s.warningLampDriveOnSec,
+      !beganToComply,
+      beganToComply,
+      t,
+      dt,
+      WARNING_LAMP_REGRADE_SEC,
+    );
+    s.warningLampDriveOnSec = lampStep.accruedSec;
+    if (lampStep.fired) {
+      events.push({
+        ...makeViolation("WARNING_LAMP_IGNORED", t, { detail: "warning-lamp" }),
+        regrade: true,
+      });
+    }
+  }
+
   // -- 4a2. B1a Wave-2 small-rule detectors (doc 72 capability 1). Each rides
   // EXISTING telemetry and carries the exemptions that keep innocent driving
   // clean (A12); the OV-07 overtake-at-crossing composite lives in the
@@ -5923,6 +6082,17 @@ function handleTickEvent(
         );
         if (placeAct === null) out.push(bill);
         else billAct(s, tick, out, placeAct, bill);
+        // VP-06 (N11): ARM the drive-on re-grade. The lamp does not go out, so
+        // the чл. 101, ал. 1 duty survives this bill — and this bill is the only
+        // one the runner will ever produce (it resolves once per drive), which
+        // is why the teach-first card was the whole price of the offence. See
+        // `WARNING_LAMP_REGRADE_SEC`. Once per drive: a second arming would
+        // reset the baseline the drop is measured from.
+        if (e.situation === "warning-lamp" && s.warningLampIgnoredAt === null) {
+          s.warningLampIgnoredAt = t;
+          s.warningLampPeakKmh = tick.speedKmh;
+          s.warningLampDriveOnSec = 0;
+        }
       } else if (e.yielded) {
         // …AND THE PRAISE NAMES THE ACT TOO (round 10, 2026-08-24). The bill
         // above has picked one of five codes by `e.situation` since VU-09; the

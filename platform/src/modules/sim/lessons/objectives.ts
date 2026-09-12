@@ -351,6 +351,23 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         }
         out.requireBrakingClean = true;
       }
+      // THE GREEN THE BANNER SAYS HE DID NOT SLEEP THROUGH (ReachZoneParams
+      // .requireGreenStartClean — lessons/types.ts carries the frame, the
+      // measured drive, the false-refusal check and the THEO-4 companion).
+      // AUTHORED ONLY, for the reason the brake term above it gives: this arm
+      // decides whether a route counts as driven, and «без да замръзваш» is a
+      // phrase a title-derived fallthrough would have to guess at — the
+      // fallthrough that once manufactured a demand out of a banner's words was
+      // reverted by two adversarial verifiers (the `requireLamps` block above).
+      if (p.requireGreenStartClean !== undefined) {
+        if (p.requireGreenStartClean !== true) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "reachZone requireGreenStartClean must be true",
+          );
+        }
+        out.requireGreenStartClean = true;
+      }
       // THE YIELD THE BANNER SAYS HAPPENED (see `ReachZoneWitnessDemands.
       // requireYieldClean` for the drive, the census and the window). AUTHORED
       // WINS, TITLE FILLS IN — the same law the lamp, gear, officer and
@@ -965,6 +982,26 @@ export interface ObjectiveContext {
    * shipped.
    */
   stoppedWithoutCauseInRun?: boolean;
+  /**
+   * Has this drive been told, anywhere, that it sat still on a green with a
+   * clear box in front of it — `HESITATION_AT_GREEN`, the второстепенна the
+   * catalogue titles «Колебание на зелен сигнал» and cites to Наредба № 38
+   * приложение № 5, т. 10, б. „б“? The one fact
+   * `ReachZoneParams.requireGreenStartClean` consults.
+   *
+   * „TOLD", NOT „CHARGED", exactly like the three facts above it: the code is
+   * второстепенна, so in a training drive the FIRST freeze is handed over as
+   * the teach-first free mini-lesson on `LessonSessionState.coachedMistakes`
+   * instead of `events`. MEASURED on the drive this demand was written for —
+   * `sc-signal-hesitation` @L1 · `mistake-freeze`: scored `[]`, coached
+   * `[HESITATION_AT_GREEN]`, sheet «Общо 0» — so a scored-only read would
+   * refuse nothing at the aided rungs, which are the rungs a beginner drives.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+   * (the rigs, the fixtures, `EMPTY_CONTEXT`) omits it and behaves exactly as
+   * shipped.
+   */
+  hesitatedAtGreenInRun?: boolean;
   /**
    * When the objective being stepped BECAME the active one, in session seconds.
    * The chain is strictly sequential, so this is the moment its predecessor
@@ -1661,6 +1698,22 @@ export interface ReachZoneWitnessDemands {
    * fact is session-monotone, so the read is pure per frame.
    */
   requireSolidLineClean?: true;
+  /**
+   * HE WENT WHEN THE GREEN CAME — the frame, the measured drive, the census and
+   * the two false-refusal checks live on `ReachZoneParams.requireGreenStartClean`
+   * in lessons/types.ts, because that is where a template author reads it.
+   *
+   * THE CENSUS IS ONE GATE AND IS NAMED RATHER THAN GENERALISED:
+   * `sc-shes-cross` («Премини правó напред на зелено, без да замръзваш»,
+   * templates-signals.ts) is the only banner in the catalogue that claims the
+   * absence of this fault, and it is the only drill that arms the detector as
+   * its subject. A title-derived fallthrough is deliberately NOT offered — see
+   * the parse site.
+   *
+   * Outside the `capMet` latch, like the journey demands above it: the fact is
+   * session-monotone, so the read is pure per frame.
+   */
+  requireGreenStartClean?: true;
   /**
    * THE YIELD THE BANNER SAYS HAPPENED — the seventh demand, and the first one
    * whose refusal is bounded by a WINDOW rather than by the whole run
@@ -3032,6 +3085,27 @@ function brakingCleanHonoured(ctx: ObjectiveContext): boolean {
 }
 
 /**
+ * Did the crossing this banner certifies happen WHEN THE GREEN CAME, or after
+ * the freeze the drill exists to name? (see
+ * `ReachZoneParams.requireGreenStartClean` in lessons/types.ts for the frame,
+ * the measured drive, the census and the false-refusal check.)
+ *
+ * ONE CONVICTION AND NOT A POOL: `HESITATION_AT_GREEN` alone. The neighbouring
+ * codes a pooled read would sweep in are different acts with different prices —
+ * `STOPPED_WITHOUT_CAUSE` is a standstill on an OPEN road with no signal at all
+ * (чл. 24, ал. 2, and it ships disarmed), `YELLOW_LIGHT_NOT_STOPPED` is the
+ * opposite fault at the same signal — and a banner about the green start may
+ * not be withdrawn for either.
+ *
+ * `true` IS THE ONLY REFUSING VALUE, the polarity every arm in this file ships
+ * with: `undefined` is „the caller cannot answer" (every fixture, rig, replay
+ * and `EMPTY_CONTEXT`), and unknown must never become a refusal.
+ */
+function greenStartCleanHonoured(ctx: ObjectiveContext): boolean {
+  return ctx.hesitatedAtGreenInRun !== true;
+}
+
+/**
  * Was the halt the banner promises still a halt FOR a living person? Reads the
  * one fact `vruWaitHonoured` reads first and for the identical reason — a
  * struck person is session-monotone and outranks everything — but it does NOT
@@ -3054,8 +3128,8 @@ function haltForVruHonoured(ctx: ObjectiveContext): boolean {
 /** True when the demands a reachZone makes are met by the whole zone contract. */
 function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
   // `requireVruUntouched`, `requireNoContact`, `requireRailClear`,
-  // `requireYieldClean`, `requireHaltForVru`, `requireRestClean` and
-  // `requireSolidLineClean` are
+  // `requireYieldClean`, `requireHaltForVru`, `requireRestClean`,
+  // `requireSolidLineClean` and `requireGreenStartClean` are
   // deliberately absent: none
   // of them rides the `capMet` latch (every one of those facts is
   // session-monotone, or monotone within its window, so none needs eval-state
@@ -3537,6 +3611,30 @@ export function brakingFaultVoidsObjective(
   }
   if (params.kind !== "reachZone") return false;
   return (params as WitnessedReachZoneParams).requireBrakingClean === true;
+}
+
+/**
+ * …AND THE SAME QUESTION FOR THE FREEZE ON GREEN (`requireGreenStartClean`).
+ *
+ * HERE THE WIRING IS NOT OPTIONAL, and that is the difference from the brake
+ * arm above. The one census member — `sc-shes-cross` — IS the last objective of
+ * its drill (2 of 2), so without this the refusal would never advance
+ * `currentIndex`, the run-out would never arm, and the student who slept
+ * through the green could reach the card that teaches him the fault only by
+ * quitting — forfeiting the attempt's XP and its calibration. The certificate
+ * is still withheld: the objective keeps its honest `active` status and
+ * `buildLessonResult` still reports finished-and-failed. Only the strand goes.
+ *
+ * Kept separate from its neighbours rather than merged, on the rule they all
+ * state: each demand reads a different fact, and a caller that knows only one of
+ * them must be able to ask only that one.
+ */
+export function greenStartFaultVoidsObjective(
+  params: ObjectiveParams,
+  hesitatedAtGreenInRun: boolean,
+): boolean {
+  if (!hesitatedAtGreenInRun || params.kind !== "reachZone") return false;
+  return (params as WitnessedReachZoneParams).requireGreenStartClean === true;
 }
 
 /**
@@ -4874,6 +4972,18 @@ function stepReachZone(
   // the fact is session-monotone, and `done` latches, so a slam AFTER the tick
   // can never withdraw a certificate the student had already performed.
   const brakingCleanOk = params.requireBrakingClean !== true || brakingCleanHonoured(ctx);
+  // ── HE WENT WHEN THE GREEN CAME (requireGreenStartClean) ──────────────────
+  // Eleventh arm of the journey half and the eleventh outside the `capMet`
+  // latch. The drive it closes is this drill's own authored ❌ demonstration:
+  // `sc-signal-hesitation` · `mistake-freeze`, HESITATION_AT_GREEN billed at
+  // 19.32 s — and «✓ Премини правó напред на зелено, БЕЗ ДА ЗАМРЪЗВАШ», 2/2,
+  // «Урокът е издържан». No radius, cap or dwell on this side could see it: a
+  // reachZone samples an ARRIVAL and the freeze is a fact about the journey.
+  // Run-wide rather than windowed: the fact is session-monotone, and `done`
+  // latches, so a later freeze can never withdraw a certificate the student had
+  // already performed.
+  const greenStartCleanOk =
+    params.requireGreenStartClean !== true || greenStartCleanHonoured(ctx);
   const arrivalHonoured =
     reached &&
     capMet &&
@@ -4886,7 +4996,8 @@ function stepReachZone(
     solidLineOk &&
     stopOk &&
     speedCleanOk &&
-    brakingCleanOk;
+    brakingCleanOk &&
+    greenStartCleanOk;
   // ── THE MARK IS WHERE THE BANNER POINTS (round 13, 2026-08-27) ────────────
   //
   // WHAT IS BROKEN. `reached` latches on the FIRST swept contact with the

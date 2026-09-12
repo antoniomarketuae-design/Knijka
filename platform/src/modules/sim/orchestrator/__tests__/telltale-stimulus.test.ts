@@ -211,13 +211,60 @@ describe("telltaleStimulus (integration)", () => {
     }
     expect(stack.outcomes).toHaveLength(2);
     // ONE bill per adjudication — which is the claim in this test's own title,
-    // and it is only checkable now that the runner bills at all. Two ignored
-    // lamps across two attempts, two основни; the five seconds of driving on
-    // past the first resolution added none.
-    expect(violationCodes(stack.ruleEvents)).toEqual([
-      "WARNING_LAMP_IGNORED",
-      "WARNING_LAMP_IGNORED",
-    ]);
+    // and it is a claim about the RUNNER: two ignored lamps across two
+    // attempts, two основни, and the reducer never turns one resolution into a
+    // per-frame stream.
+    expect(
+      stack.ruleEvents.filter((e) => e.kind === "violation" && e.regrade !== true).map((e) => e.code),
+    ).toEqual(["WARNING_LAMP_IGNORED", "WARNING_LAMP_IGNORED"]);
+    // …AND THE DRIVING ON IS NO LONGER FREE (`WARNING_LAMP_REGRADE_SEC`,
+    // rules/engine.ts, 2026-09-12). This line used to read „the five seconds of
+    // driving on past the first resolution added none", and that was the whole
+    // reason the offence was priced at zero: the runner resolves ONCE per drive,
+    // основна is teach-first, so the single bill was spent on the free
+    // mini-lesson and nothing ever asked a second time — measured through the
+    // production chain, a full drive-on past a red lamp reached its debrief on
+    // «Общо 0». The extra event is the RE-GRADE and says so: `regrade: true`
+    // means „the same breach, not a new act", and `lessons/engine.ts` drops it
+    // wherever the code has already been charged, so one continuing drive-on
+    // can never cost twice. Teach-first itself is untouched — the FIRST
+    // encounter is still the free card.
+    // It belongs to attempt 1: `director.reset()` re-arms the RUNNER, not the
+    // rule engine, and this stack keeps one engine across both attempts, where
+    // `createLessonSession` builds a fresh one per lesson start.
+    expect(
+      stack.ruleEvents.filter((e) => e.kind === "violation" && e.regrade === true).map((e) => e.code),
+    ).toEqual(["WARNING_LAMP_IGNORED"]);
+  });
+
+  it("the re-grade cannot reach a student who BEGINS to slow — it reads a drop, not a level", () => {
+    // THE FALSE-CONVICTION HALF of `WARNING_LAMP_REGRADE_SEC`, and the one that
+    // matters: «спри безопасно СЕГА» is answered by lifting off, and a calm
+    // pull-over from 40 км/ч takes longer than the six-second clock. So the
+    // clock must stop the moment the car has actually shed speed — otherwise
+    // this repair would convict the student doing exactly what `correctiveBg`
+    // asks, and the only way to escape it would be the panic slam the drill's
+    // other demo exists to punish. Same route, same ignored lamp, same six
+    // seconds of driving on — but easing off throughout.
+    const stack = makeStack([telltaleSpec()]);
+    const path = offsetRight(edgeGeometry(), LANE_OFFSET);
+    const driver = new PolyDriver(path, 20);
+    for (let i = 0; i < 60 * 30 && stack.outcomes.length === 0; i++) {
+      stepFrame(stack, driver.advance(DT, 11));
+      if (driver.s >= driver.length) break;
+    }
+    expect(stack.outcomes[0]).toMatchObject({ detail: "passedWithoutStopping" });
+    const billed = stack.ticks[stack.ticks.length - 1]!.t;
+    // Ten seconds — comfortably past the six-second clock — spent easing off at
+    // a gentle 1 m/s² rather than standing on the pedal.
+    let speedMps = 11;
+    for (let i = 0; i < 10 * 30; i++) {
+      speedMps = Math.max(0, speedMps - 1 * DT);
+      stepFrame(stack, driver.advance(DT, speedMps));
+      if (driver.s >= driver.length) break;
+    }
+    expect(stack.ticks[stack.ticks.length - 1]!.t - billed).toBeGreaterThan(6);
+    expect(stack.ruleEvents.filter((e) => e.kind === "violation" && e.regrade === true)).toEqual([]);
   });
 
   it("same seed + same driving = identical outcomes (deterministic staging)", () => {
