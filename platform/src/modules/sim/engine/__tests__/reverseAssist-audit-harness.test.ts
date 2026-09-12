@@ -90,6 +90,10 @@ import {
   ReversePedalMapper,
   type ReverseAssistCommand,
 } from "../reverseAssist";
+// The real selector gate, so «which key reaches R» is answered by the product
+// and not by a comment. If the gate is ever reordered these tests change their
+// minds with it, instead of guarding a shape that stopped existing.
+import { DrivelineState } from "../../vehicle";
 import type { VehicleInput } from "../../vehicle";
 
 const HARNESS = path.resolve(__dirname, "../../../../../../tools/mobile/lesson-audit.mjs");
@@ -104,47 +108,237 @@ const BRAKE_CAP_OVER_KMH = 2;
 // §1 — the grammar, read out of the instrument
 // ---------------------------------------------------------------------------
 
+/**
+ * EVERY KEY THE HARNESS CAN PRESS, resolved through whatever names it at the
+ * call site — a literal, a bare `const`, or a member of a `const` object.
+ *
+ * Returns `unresolved` as well as `keys`, and that second field is the whole
+ * design. Two earlier versions of this census were green and blind at the same
+ * time, each having been taught the single shape that escaped its predecessor.
+ * A resolver cannot be taught the shape nobody has written yet, so this one
+ * reports its own failures and the caller fails on them.
+ */
+function censusKeys(src: string): { keys: string[]; unresolved: string[] } {
+  // `const MANUAL_GEAR_UP = "BracketRight";`
+  const scalars = new Map<string, string>();
+  for (const m of src.matchAll(/const ([A-Z][A-Z0-9_]*) = "([A-Za-z][A-Za-z0-9]*)";/g)) {
+    scalars.set(m[1], m[2]);
+  }
+  // `const STEER_KEYS = { left: "KeyA", right: "KeyD" };`
+  const objects = new Map<string, Map<string, string>>();
+  for (const m of src.matchAll(/const ([A-Z][A-Z0-9_]*) = \{([^}]*)\};/g)) {
+    const fields = new Map<string, string>();
+    for (const f of m[2].matchAll(/([A-Za-z_$][\w$]*)\s*:\s*"([^"]+)"/g)) fields.set(f[1], f[2]);
+    if (fields.size) objects.set(m[1], fields);
+  }
+  const keys = new Set<string>();
+  const unresolved: string[] = [];
+  // The first argument of every `keyboard.*(…)`, read by BALANCING rather than
+  // by a character class. `[^),]+?` looked equivalent and was not: it truncates
+  // `keyFor(lesson).primary` to `keyFor(lesson`, which still refuses the call —
+  // correctly — but then names it wrongly in the failure a human has to read.
+  // The mutation test below caught that on its first run.
+  const argsAt: string[] = [];
+  for (const call of src.matchAll(/keyboard\.(?:down|up|press)\(/g)) {
+    let depth = 1;
+    let k = call.index! + call[0].length;
+    const from = k;
+    for (; k < src.length && depth > 0; k++) {
+      const c = src[k];
+      if (c === "(" || c === "[" || c === "{") depth++;
+      else if (c === ")" || c === "]" || c === "}") depth--;
+      else if (c === "," && depth === 1) break; // a second argument; the key is the first
+    }
+    argsAt.push(src.slice(from, depth === 0 ? k - 1 : k));
+  }
+  for (const raw of argsAt) {
+    const arg = raw.trim();
+    const lit = arg.match(/^"([^"]+)"$/);
+    if (lit) {
+      keys.add(lit[1]);
+      continue;
+    }
+    const scalar = scalars.get(arg);
+    if (scalar) {
+      keys.add(scalar);
+      continue;
+    }
+    // `OBJ.field` resolves to one key; `OBJ[expr]` could be ANY of them, so it
+    // counts as all of them — a census must over-report a computed index rather
+    // than under-report it.
+    const member = arg.match(/^([A-Z][A-Z0-9_]*)(?:\.([\w$]+)|\[[^\]]+\])$/);
+    const fields = member ? objects.get(member[1]) : undefined;
+    if (member && fields) {
+      const one = member[2] ? fields.get(member[2]) : undefined;
+      if (one) {
+        keys.add(one);
+        continue;
+      }
+      if (!member[2]) {
+        for (const v of fields.values()) keys.add(v);
+        continue;
+      }
+    }
+    unresolved.push(arg);
+  }
+  return { keys: [...keys].sort(), unresolved };
+}
+
 describe("§1 the audit harness's gesture grammar", () => {
-  it("sends no GEAR key — the pedals and the wheel are the whole keyboard", () => {
-    const literal = [...SRC.matchAll(/keyboard(?:\.(?:down|up|press)|\[[^\]]*\])\("([^"]+)"/g)].map(
-      (m) => m[1],
+  // ── THE MUTATION, AND WHY IT IS NOT OPTIONAL HERE ──────────────────────────
+  //
+  // §3 below mutates the harness's control law to prove its refutation means
+  // something, and this census owes the same debt for a sharper reason: its two
+  // predecessors were GREEN AND BLIND, so «it passes» is precisely the evidence
+  // that has already failed twice. What follows is the resolver run against
+  // sources whose answers are known, including the three shapes that have
+  // actually escaped a version of it — a literal, a bare const, and a computed
+  // member — plus one nobody has written yet.
+  //
+  // These are synthetic on purpose. Mutating `lesson-audit.mjs` on disk to test
+  // this would be a write into a file another lane owns, and a census that
+  // corrupts the thing it measures is worse than one that cannot see.
+  it("the census can be caught being blind — three shapes, and one it must refuse", () => {
+    const literal = censusKeys('await page.keyboard.press("KeyQ");');
+    expect(literal).toEqual({ keys: ["KeyQ"], unresolved: [] });
+
+    // The 2026-08-29 escape, exactly as it happened.
+    const viaConst = censusKeys(
+      ['const MANUAL_GEAR_UP = "BracketRight";', "await page.keyboard.press(MANUAL_GEAR_UP);"].join(
+        "\n",
+      ),
     );
-    // Positive control first: a matcher that stopped matching would make the
-    // set empty and every claim below vacuously true.
-    expect(literal.length, "no keyboard calls found — the matcher is broken").toBeGreaterThan(3);
-    // ── THIS TEST'S OWN CLAIM WAS TRUE AND STOPPED BEING TRUE — 2026-08-21 ──
+    expect(
+      viaConst.keys,
+      "a key named by a const is invisible again — this is the bug this rewrite exists for",
+    ).toEqual(["BracketRight"]);
+
+    // The 2026-08-21 escape. A COMPUTED index could be any field, so the census
+    // must report all of them: under-reporting here is how a key hides.
+    const viaIndex = censusKeys(
+      [
+        'const STEER_KEYS = { left: "KeyA", right: "KeyD" };',
+        "await page.keyboard.down(STEER_KEYS[dir]);",
+      ].join("\n"),
+    );
+    expect(viaIndex.keys).toEqual(["KeyA", "KeyD"]);
+    expect(
+      censusKeys(
+        [
+          'const STEER_KEYS = { left: "KeyA", right: "KeyD" };',
+          "await page.keyboard.up(STEER_KEYS.right);",
+        ].join("\n"),
+      ).keys,
+      "a named member should resolve to ONE key, not the whole object",
+    ).toEqual(["KeyD"]);
+
+    // AND THE SHAPE NOBODY HAS WRITTEN YET. This is the assertion that ends the
+    // series: the resolver does not have to recognise a new evasion, only to
+    // admit it did not. Anything it cannot read lands in `unresolved`, and the
+    // census above fails on a non-empty `unresolved`.
+    const unknown = censusKeys("await page.keyboard.press(keyFor(lesson).primary);");
+    expect(unknown.keys).toEqual([]);
+    expect(
+      unknown.unresolved,
+      "an unreadable argument was silently dropped — the census is blind again and will not say so",
+    ).toEqual(["keyFor(lesson).primary"]);
+  });
+
+  it("every key it can press is accounted for — including the ones a const hides", () => {
+    const { keys, unresolved } = censusKeys(SRC);
+    // ── THE ANTI-BLINDNESS ASSERTION, AND WHY IT COMES FIRST ──────────────
     //
-    // It read „sends only KeyW, KeyS and Escape" and it went on passing after
-    // the harness gained a steering channel, because the wheel actuates through
-    // `STEER_KEYS[dir]` — a variable — and this matcher only sees string
-    // literals. A green test whose NAME is false is the reassuring-direction
-    // failure this suite exists to catch, arriving inside the suite. The census
-    // is therefore taken over BOTH forms, and what it pins is the thing that
-    // actually matters here: there is no key that works the GEAR by hand.
-    const viaConst = [...SRC.matchAll(/const STEER_KEYS = \{ left: "([^"]+)", right: "([^"]+)" \}/g)]
-      .flatMap((m) => [m[1], m[2]]);
-    expect(viaConst, "the steering channel is gone").toHaveLength(2);
-    const all = [...new Set([...literal, ...viaConst])].sort();
-    // KeyB JOINED THE CENSUS ON 2026-08-27, and it is admissible for the reason
-    // this test exists: it is a CABIN control, not a GEAR control.
+    // Twice now this census has gone green while blind, and both times the
+    // repair was to teach it the ONE shape that had just escaped it — first
+    // string literals only, then literals plus `STEER_KEYS`. On 2026-08-29 the
+    // harness gained `const MANUAL_GEAR_UP = "BracketRight"` and walked past
+    // both, so a test whose entire purpose was to refuse a gear key sat green
+    // for two weeks beside a harness pressing one.
     //
-    // 194 of 204 drives in the w12 sweep were charged «Движение без предпазен
-    // колан −3». That is the product working as the founder ruled (LessonScene
-    // against commit 265629d: all 150 scenarios spawn ready-to-drive with
-    // exactly one item outstanding, the belt). The harness was driving like a
-    // student who never buckles up, which put a 3-point floor under EVERY score
-    // and made every «does a good drive get credited» finding unanswerable.
-    // Proven fix: sc-ac-ice pc-right went 3 -> 0 with the verdict unchanged.
-    //
-    // The claim in this test's NAME is untouched: KeyB works the buckle, and
-    // the two assertions below still refuse the gear keys. If a future key is
-    // added here, ask the same question — does it work the GEAR by hand?
-    expect(all).toEqual(["Escape", "KeyA", "KeyB", "KeyD", "KeyS", "KeyW"]);
-    // `[` and `]` are the cockpit's own gear keys (StatusDashboard's title says
-    // so: „Скоростен лост ([ към P · ] към D)"). The harness must not have them:
-    // its only route into R is the deliberate assist gesture, which §5 pins.
-    expect(all).not.toContain("BracketLeft");
-    expect(all).not.toContain("BracketRight");
+    // Enumerating evasions cannot work, because the next one has not been
+    // written yet. So the resolver reports what it FAILED to read, and an
+    // unreadable argument fails here — the census can be blind, or green, and
+    // no longer both.
+    expect(
+      unresolved,
+      `keyboard() arguments this census cannot resolve: ${unresolved.join(", ")} — a key it cannot read is a key it cannot refuse`,
+    ).toEqual([]);
+    // Positive control: a resolver that stopped resolving would empty the set
+    // and make every claim below vacuously true.
+    expect(keys.length, "no keyboard calls found — the matcher is broken").toBeGreaterThan(3);
+    // The full grammar, stated so ANY new key fails here and has to be argued
+    // for. KeyB works the buckle (2026-08-27: 194 of 204 drives in w12 were
+    // charged «Движение без предпазен колан −3», putting a 3-point floor under
+    // every score). KeyZ + BracketRight walk a manual car out of N (905eddb) —
+    // sc-vp-stall is the catalogue's only manual lesson and it spawns in N, so
+    // three sweeps photographed a car at 0 км/ч and correctly refused to judge.
+    expect(keys).toEqual([
+      "BracketRight",
+      "Escape",
+      "KeyA",
+      "KeyB",
+      "KeyD",
+      "KeyS",
+      "KeyW",
+      "KeyZ",
+    ]);
+  });
+
+  it("still has no hand route into R — and it is `[`, not `]`, that would be one", () => {
+    // WHAT THE OLD ASSERTION WAS ACTUALLY FOR. It refused both gear keys, which
+    // was a fair proxy while the harness had neither. It is the wrong test now:
+    // the harness has `]` deliberately, and the property that matters — that no
+    // frame in the sweep reaches R except through the assist §5 pins — does not
+    // depend on which keys exist. It depends on the GATE.
+    const { keys } = censusKeys(SRC);
+
+    // `[` IS THE DANGEROUS KEY, and it is the one that is absent. driveline's
+    // gate is P — R — N — D, so from the state 160 of the 161 lessons actually
+    // spawn in, two presses of `[` land the car in R — with no clutch, no
+    // standstill argument and nothing else to go wrong.
+    const auto = new DrivelineState("ready", "automatic"); // automatic ready === D
+    expect(auto.selector).toBe("D");
+    auto.gearDown();
+    auto.gearDown();
+    expect(auto.selector, "the gate changed shape — re-derive which key reaches R").toBe("R");
+    expect(keys, "`[` is two presses from R on an automatic — the harness must not have it").not.toContain(
+      "BracketLeft",
+    );
+
+    // `]` IS PRESENT, and it is safe for exactly one reason: the harness presses
+    // it only from N, where gearUp steps AWAY from R. From P — where every cold
+    // car spawns — the very same key steps straight into it.
+    expect(keys).toContain("BracketRight");
+    const cold = new DrivelineState("cold"); // engine off, selector P
+    expect(cold.selector).toBe("P");
+    cold.gearUp();
+    expect(
+      cold.selector,
+      "`]` from P no longer reaches R — the N-only guard below may be moot, re-derive it",
+    ).toBe("R");
+    const guard = SRC.match(
+      /if \(!before\.length \|\| !before\.every\(\(g\) => g === "N"\)\) return null;/,
+    );
+    expect(
+      guard,
+      "the N-only guard on engageManualGear is gone — `]` at a cold car steps the gate into R, and every sweep frame reading «R» becomes the harness's own doing",
+    ).not.toBeNull();
+
+    // …and from N — the only place the guard lets it press — `]` steps AWAY
+    // from R on both transmissions. Both, because the guard tests the cluster
+    // letter and not the gearbox, so an automatic sitting in N would be engaged
+    // by the same code path.
+    for (const transmission of ["manual", "automatic"] as const) {
+      const fromN = new DrivelineState("ready", transmission);
+      if (fromN.selector !== "N") fromN.gearDown(); // automatic ready is D; one step back is N
+      expect(fromN.selector, `could not put the ${transmission} car in N`).toBe("N");
+      fromN.clutchDown = true; // manual needs it to go INTO a gear; harmless on an automatic
+      fromN.gearUp();
+      expect(
+        fromN.selector,
+        `\`]\` from N now reaches R on the ${transmission} — §2's refutation is void, re-drive the reversing lessons`,
+      ).not.toBe("R");
+    }
   });
 
   it("every brake PRESS is speed-gated, and the gate refuses the standstill press", () => {
@@ -819,7 +1013,38 @@ describe("§6 the harness has a steering channel, and says so on every lane", ()
     // reader would quote. `everSteered` still means THE TRACE steered.
     expect(SRC).toMatch(/if \(by === "trace"\) \{\s*\n\s*steering\.commands \+= 1;\s*\n\s*steering\.everSteered = true;/);
     expect(SRC).toMatch(/steering\.channel\.commands \+= 1;/);
-    expect(SRC).toMatch(/steerHeldBy === "trace" \? steering\.heldMs : steering\.channel\.heldMs/);
+
+    // ── WHY THIS READS THE CHAIN INSTEAD OF MATCHING IT ────────────────────
+    //
+    // This assertion used to be the literal two-branch ternary, and it went red
+    // the day the harness grew a THIRD book for steering under reverse. Red for
+    // the wrong reason: the books were still separate — which is the entire
+    // claim — and the test was objecting to the arity. That is the same failure
+    // §1 above was just rebuilt out of, arriving from the opposite side: there a
+    // brittle matcher stayed GREEN while its claim went false, here it went RED
+    // while its claim stayed true. Both are a test asserting a shape when it
+    // meant a property.
+    //
+    // So the routing chain is parsed, and what is checked is what the comment
+    // above actually says: each `by` lands in its OWN ledger, and none of them
+    // share one. A fourth book is then free; two books sharing a counter is not.
+    const chain = SRC.match(/\((steerHeldBy === "trace"[\s\S]*?)\)\[steerHeld\] \+=/);
+    expect(chain, "the heldMs routing chain is gone or reshaped beyond reading").not.toBeNull();
+    const arms = [...chain![1].matchAll(/steerHeldBy === "([^"]+)"\s*\?\s*([\w.]+)/g)].map((m) => ({
+      by: m[1],
+      book: m[2],
+    }));
+    const fallback = chain![1].match(/:\s*([\w.]+)\s*$/);
+    expect(arms.length, "no `by` arms found — the parser is broken").toBeGreaterThanOrEqual(1);
+    expect(fallback, "the chain has no final book").not.toBeNull();
+    // The trace's own ledger is the one the field `everSteered` speaks for.
+    expect(arms.find((a) => a.by === "trace")?.book).toBe("steering.heldMs");
+    // …and every book is distinct, which is the whole point of the split.
+    const books = [...arms.map((a) => a.book), fallback![1]];
+    expect(
+      new Set(books).size,
+      `two steering ledgers share a counter: ${books.join(", ")} — a lane's own keystrokes would be reported as the trace's`,
+    ).toBe(books.length);
   });
 });
 
