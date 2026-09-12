@@ -475,10 +475,34 @@ if (superseded.size) {
 if (reclosed.length) {
   console.log("");
   console.log(reclosed.length + " re-closure(s) on an UNCHANGED product tree — these retire nothing:");
-  for (const x of reclosed.slice(0, 12)) {
-    console.log("   " + x.id + "   verifier opened it at " + String(x.a).slice(0, 8) + ", re-closed at " + String(x.b).slice(0, 8) + " — " + (fileOfRow(x.id) || "platform/src") + " identical between them");
+  // THE REFUSED LIST IS THE WORK QUEUE — printed whole, 2026-09-12.
+  //
+  // This printed 12 and "... and 25 more" on a run that retired 3. Two thirds
+  // of the reason the ledger did not move was invisible, and the run read as
+  // "3 closed, nothing else happened". Criticals first, because a truncation
+  // that drops criticals is the worst version of this.
+  const sevOf = (id) => {
+    const f = byId.get(id);
+    return f ? String(f.severity || "?").toLowerCase() : "?";
+  };
+  const rank = { critical: 0, major: 1, minor: 2 };
+  const ordered = [...reclosed].sort(
+    (m, n) => (rank[sevOf(m.id)] ?? 3) - (rank[sevOf(n.id)] ?? 3) || String(m.id).localeCompare(String(n.id)),
+  );
+  for (const x of ordered) {
+    console.log("   [" + sevOf(x.id).padEnd(8) + "] " + x.id + "   opened at " + String(x.a).slice(0, 8) + ", re-closed at " + String(x.b).slice(0, 8) + " — " + (fileOfRow(x.id) || "platform/src") + " identical between them");
   }
-  if (reclosed.length > 12) console.log("   ... and " + (reclosed.length - 12) + " more");
+  {
+    const c = ordered.filter((x) => sevOf(x.id) === "critical").length;
+    console.log("   (" + c + " critical among them)");
+    // WHAT THIS LIST ACTUALLY MEANS, said once so it is not re-derived every round:
+    // the gate asks whether the row's OWN suspectFile moved. A row whose address is
+    // wrong is therefore held to a STRICTER test than a row with no address at all
+    // (that one falls back to a tree-wide diff), and two thirds of this corpus's
+    // addresses were measured wrong on 2026-08-28. Before re-driving any of these,
+    // check whether the named file could contain the defect at all — findingId is
+    // sha1(what + frame), so correcting suspectFile orphans no verdicts.
+  }
 }
 if (reclosedUnknown.length) {
   console.log("");
@@ -486,8 +510,9 @@ if (reclosedUnknown.length) {
   console.log("   Reported, not refused — the frame sits in a sweep with no results file, so this is");
   console.log("   missing provenance rather than bad reasoning, and a false refusal is as bad as a");
    console.log("   false certificate. Attribute those sweeps and this list empties.");
-  for (const x of reclosedUnknown.slice(0, 10)) {
-    console.log("   " + x.id);
+  for (const x of reclosedUnknown) {
+    const f = byId.get(x.id);
+    console.log("   [" + String((f && f.severity) || "?").padEnd(8) + "] " + x.id);
   }
 }
 if (unknown.length) {
