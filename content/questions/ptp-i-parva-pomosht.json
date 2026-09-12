@@ -225,7 +225,7 @@
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid — scene safety; do not move the person", "claimId": "med-move-only-if-unsafe" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-014",
@@ -246,7 +246,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Expectations of a first aid provider", "claimId": "med-call-early" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-015",
@@ -266,21 +266,21 @@
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid — check for responsiveness; AVPU", "claimId": "med-responsiveness-check" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-016",
     "conceptIds": ["c-cpr-basics"],
     "type": "single",
     "points": 2,
-    "textBg": "Пострадал при ПТП не диша и започваш сърдечен масаж. Къде и с каква честота натискаш?",
+    "textBg": "Пострадал при ПТП не реагира и не диша нормално — започваш сърдечен масаж. Къде и с каква честота натискаш?",
     "options": [
       { "id": "c", "textBg": "В лявата половина на гърдите, точно над сърцето, с около 40–50 натискания в минута.", "correct": false },
       { "id": "a", "textBg": "В центъра на гърдите, но само 30 натискания общо, след което изчакваш линейката.", "correct": false },
       { "id": "b", "textBg": "В центъра на гръдния кош, с около 100–120 натискания в минута.", "correct": true },
       { "id": "d", "textBg": "Върху корема, с бавни и дълбоки натискания под ребрата.", "correct": false }
     ],
-    "explanationBg": "Натисканията са в центъра на гръдния кош и са бързи, защото заместват спрялото сърце и поддържат кръв към мозъка. Числото не е от ЗДвП и не може да бъде — то е клинична насока. ERC 2025 (Guidelines for Everyone): „the most effective rate is 100 to 120 chest compressions per minute“ и „The hands should be positioned on the centre of the chest“. Resuscitation Council UK (Adult Basic Life Support 2025) го уточнява анатомично: „Place the heel of one hand on the lower half of the sternum («in the centre of the chest»)“. Ляво „над сърцето“ е мит — така натискаш ребра, не сърце. Твърде бавното темпо не изтласква достатъчно кръв, а спреш ли след 30 натискания, кръвообращението спира отново. За отговора „върху корема“ ти дължим предупреждение, което е по-важно от самия въпрос: точно това пише днес на публичната страница за първа помощ на Български Червен кръст — „Натискайте върху горната част на корема или долната част на гръдната кост.“ ERC и RCUK 2025 казват долната половина на ГРЪДНАТА КОСТ и изрично НЕ корема; натиск върху корема поврежда черен дроб и стомах и не изпомпва сърцето. Ако си срещал това на български сайт, срещнал си грешка — прилича на изгубено отрицание при превод. Темата е изпитна по Наредба № 24, чл. 9, т. 4.",
+    "explanationBg": "Натисканията са в центъра на гръдния кош и са бързи, защото заместват спрялото сърце и поддържат кръв към мозъка. Числото не е от ЗДвП и не може да бъде — то е клинична насока. ERC 2025 (Guidelines for Everyone): „the most effective rate is 100 to 120 chest compressions per minute“ и „The hands should be positioned on the centre of the chest“. Resuscitation Council UK (Adult Basic Life Support 2025) го уточнява анатомично: „Place the heel of one hand on the lower half of the sternum («in the centre of the chest»)“. Ляво „над сърцето“ е мит — така натискаш ребра, не сърце. Твърде бавното темпо не изтласква достатъчно кръв, а спреш ли след 30 натискания, кръвообращението спира отново. За отговора „върху корема“ ти дължим предупреждение, което е по-важно от самия въпрос: точно това пише днес на публичната страница за първа помощ на Български Червен кръст — „Натискайте върху горната част на корема или долната част на гръдната кост.“ ERC и RCUK 2025 казват долната половина на ГРЪДНАТА КОСТ и изрично НЕ корема; натиск върху корема поврежда черен дроб и стомах и не изпомпва сърцето. Ако си срещал това на български сайт, срещнал си грешка — прилича на изгубено отрицание при превод. И една дума в условието, която не е стилистична, а решава дали изобщо ще започнеш: масаж се почва при човек, който НЕ РЕАГИРА И НЕ ДИША НОРМАЛНО — не при човек, който просто „не диша“. Спрялото сърце рядко изглежда като спряло дишане; по-често изглежда като рядко, хъркащо, задавено дишане (агонални вдишвания), и който го приеме за живот, чака минути, които няма. Resuscitation Council UK (Adult Basic Life Support 2025): „If any person is unresponsive with abnormal breathing, cardiac arrest should be assumed.“ (По-ранната редакция на условието казваше само „не диша“; прагът е поправен с думата НОРМАЛНО, за да съвпада с насоката и с урока.) Темата е изпитна по Наредба № 24, чл. 9, т. 4.",
     "lawRefs": [{ "act": "Наредба № 24", "ref": "чл. 9, т. 4" }],
     "sourceRefs": [
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid — chest compressions: rate", "claimId": "med-cpr-rate" },
@@ -309,7 +309,7 @@
       { "sourceId": "src-rcuk-2025-bls", "ref": "Adult Basic Life Support (2025) — recognition of cardiac arrest; call before confirming breathing", "claimId": "med-breathing-check" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-018",
@@ -330,7 +330,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Life-threatening bleeding: tourniquet", "claimId": "med-tourniquet" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-019",
@@ -350,7 +350,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Life-threatening bleeding: direct manual pressure", "claimId": "med-bleeding-direct-pressure" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-020",
@@ -371,7 +371,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Suspected cervical spine injury (helmets are not addressed)", "claimId": "med-helmet-removal" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-021",
@@ -392,7 +392,7 @@
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid — scene safety; do not move the person", "claimId": "med-move-only-if-unsafe" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-022",
@@ -412,7 +412,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Recovery position, and the trauma exclusion", "claimId": "med-recovery-position" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-023",
@@ -606,7 +606,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Expectations of a first aid provider (order of attention)", "claimId": "med-triage-unresponsive-first" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-034",
@@ -626,7 +626,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — use only equipment and medications you are trained to use", "claimId": "med-nothing-by-mouth" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-035",
@@ -647,7 +647,7 @@
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid ABCDE — C: Circulation (signs of shock); preventing hypothermia", "claimId": "med-shock-recognition" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-036",
@@ -667,7 +667,7 @@
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid — chest compressions: depth", "claimId": "med-cpr-depth" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-037",
@@ -681,7 +681,7 @@
       { "id": "d", "textBg": "Не — масаж се прави само при липса на нормално дишане; оставяш дихателния път отворен, не го местиш без нужда и следиш дишането непрекъснато.", "correct": true },
       { "id": "b", "textBg": "Да, но с по-бавно темпо и по-плитки натискания, за да не му счупиш ребро.", "correct": false }
     ],
-    "explanationBg": "Сърдечният масаж замества спряло сърце — при човек, който диша нормално, той е излишен и опасен, независимо колко „внимателно“ го правиш. Поводът за масаж по Resuscitation Council UK (Adult Basic Life Support 2025) е точно определен: пострадал, който не реагира И диша ненормално. Такъв пострадал не се сяда — седналото положение притиска корема към диафрагмата и не пази дихателния път — и се наблюдава без прекъсване, защото дишането може да спре по-късно и точно тогава масажът става нужен. А защо тук не ти казваме направо „сложи го в стабилно странично положение“: защото по този въпрос източниците се разминават и решението не е наше да го вземем вместо теб. ERC 2025 и RCUK (First Aid 2025) казват едно и също и то дословно — „In cases of agonal breathing or trauma, do NOT move the person into the recovery position“ — а пострадал при ПТП по определение е травма. Български Червен кръст, който по Наредба № 24 изготвя учебната програма, учи страничното положение за всеки в безсъзнание, който диша, без изключение за травма. Тоест международните насоки от 2025 г. и българското учебно съдържание днес не съвпадат по този въпрос и ти го казваме открито. Правилото, което важи и по двете, е: не мести пострадалия без нужда (ERC 2025: „Do not move the person unless they are in an unsafe situation“), пази дихателния път отворен и следи дишането до идването на екипа. Темата е изпитна по Наредба № 24, чл. 9, т. 2 и т. 4.",
+    "explanationBg": "Сърдечният масаж замества спряло сърце — при човек, който диша нормално, той е излишен и опасен, независимо колко „внимателно“ го правиш. Поводът за масаж по Resuscitation Council UK (Adult Basic Life Support 2025) е точно определен: пострадал, който не реагира И диша ненормално. Такъв пострадал не се сяда — седналото положение притиска корема към диафрагмата и не пази дихателния път — и се наблюдава без прекъсване, защото дишането може да спре по-късно и точно тогава масажът става нужен. А защо тук не ти казваме направо „сложи го в стабилно странично положение“: защото по този въпрос източниците се разминават и ние избрахме страна открито, вместо да премълчим разминаването. ERC 2025 и RCUK (First Aid 2025) казват едно и също и то дословно — „In cases of agonal breathing or trauma, do NOT move the person into the recovery position“ — а пострадал при ПТП по определение е травма. Български Червен кръст, който по Наредба № 24 изготвя учебната програма, учи страничното положение за всеки в безсъзнание, който диша, без изключение за травма. Тоест международните насоки от 2025 г. и българското учебно съдържание днес не съвпадат по този въпрос и ти го казваме открито. Ние следваме изданията от 2025 г. на ERC и RCUK — това е съзнателен избор, а не пропуск. И понеже цената му е твоя, я знаеш предварително: на теста към 12-часовия курс по първа помощ (Наредба № 24) точно този отговор може да ти бъде отбелязан като грешен. На пътя обаче важи насоката от 2025 г., защото там пострадалият е травма. Правилото, което важи и по двете, е: не мести пострадалия без нужда (ERC 2025: „Do not move the person unless they are in an unsafe situation“), пази дихателния път отворен и следи дишането до идването на екипа. И изключението, без което всичко дотук става опасно в обратната посока: дихателният път бие всичко останало. Ако не можеш да опазиш пътя отворен — човекът повръща, в устата му тече кръв, дишането почва да клокочи — не стоиш и не гледаш. RCUK (First Aid 2025) го формулира като принцип: „Airway opening, if required, always has priority over in-line immobilisation“ — отварянето на дихателния път ВИНАГИ изпреварва обездвижването. Значи първо избутваш долната челюст напред, без да въртиш главата. А ако и това не опази пътя, обръщаш го — но КАТО ЕДНО ЦЯЛО, глава, врат и гръб в една линия, по възможност с чужда помощ. Запомни го в едно изречение: не настрани важи, докато пътят е чист; запуши ли се пътят, пътят командва. И бъди наясно докъде стига цитатът, защото разликата решава колко уверено действаш: изречението за приоритета е дословно от насоките, но самото обръщане в този случай е УТВЪРДЕНА ПРАКТИКА на първата помощ, изведена от този принцип, а не отделно записано указание. Казваме ти го, вместо да го премълчим. Темата е изпитна по Наредба № 24, чл. 9, т. 2 и т. 4.",
     "lawRefs": [{ "act": "Наредба № 24", "ref": "чл. 9, т. 2" }, { "act": "Наредба № 24", "ref": "чл. 9, т. 4" }],
     "sourceRefs": [
       { "sourceId": "src-rcuk-2025-bls", "ref": "Adult Basic Life Support (2025) — recognition of cardiac arrest; call before confirming breathing", "claimId": "med-breathing-check" },
@@ -709,7 +709,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Life-threatening bleeding: tourniquet", "claimId": "med-tourniquet" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-039",
@@ -729,7 +729,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Life-threatening bleeding: direct manual pressure", "claimId": "med-bleeding-direct-pressure" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-040",
@@ -749,7 +749,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Life-threatening bleeding: direct manual pressure", "claimId": "med-bleeding-direct-pressure" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-041",
@@ -770,7 +770,7 @@
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid — scene safety; do not move the person", "claimId": "med-move-only-if-unsafe" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-042",
@@ -790,7 +790,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Suspected cervical spine injury", "claimId": "med-spinal-handling" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-043",
@@ -1039,7 +1039,7 @@
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid ABCDE — A: Airway", "claimId": "med-airway-opening" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-057",
@@ -1059,7 +1059,7 @@
       { "sourceId": "src-rcuk-2025-bls", "ref": "Adult Basic Life Support (2025) — recognition of cardiac arrest; call before confirming breathing", "claimId": "med-breathing-check" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-058",
@@ -1081,7 +1081,7 @@
       { "sourceId": "src-ecc-report-324", "ref": "§ 2.1 и § 6.2 — държави, които не допускат повикване без SIM карта", "claimId": "reg-112-simless-not-eu-wide" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-059",
@@ -1101,21 +1101,21 @@
       { "sourceId": "src-rcuk-2025-bls", "ref": "Adult Basic Life Support (2025) — When and how to use an AED", "claimId": "med-aed-use" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-060",
     "conceptIds": ["c-cpr-basics"],
     "type": "single",
     "points": 1,
-    "textBg": "Пострадал не диша, но ти не си обучен или не смееш да правиш обдишване уста в уста. Какво правиш?",
+    "textBg": "Пострадал не реагира и не диша нормално, но ти не си обучен или не смееш да правиш обдишване уста в уста. Какво правиш?",
     "options": [
       { "id": "b", "textBg": "Правиш само непрекъснати натискания в центъра на гърдите — масаж без обдишване е много по-добре от нищо.", "correct": true },
       { "id": "a", "textBg": "Не правиш нищо — без обдишване масажът е безсмислен и само пречиш.", "correct": false },
       { "id": "c", "textBg": "Чакаш линейката, без да пипаш пострадалия, за да не му навредиш.", "correct": false },
       { "id": "d", "textBg": "Правиш само обдишване уста в уста, без натискания, докато дойде помощ.", "correct": false }
     ],
-    "explanationBg": "Ако не можеш или не смееш да обдишваш, прави само непрекъснати натискания в центъра на гърдите. Това е изрична насока, а не отстъпка заради неопитност: Resuscitation Council UK (Adult Basic Life Support 2025) — „If you are not trained to provide rescue breaths, perform continuous chest compressions without interruptions“; същите насоки указват на операторите на спешния номер да приемат, че се обажда необучен човек, и да дават указания само за натискания. В кръвта има достатъчно кислород за първите минути; липсва ѝ движение — затова обдишване без натискания не движи нищо, а бездействието е единствената наистина погрешна реакция. И за да сме точни, вместо да те успокояваме с преувеличение: не че „не можеш да навредиш“, а че рискът е малък и несъизмерим с риска да не направиш нищо. RCUK 2025: „The risk of harm from CPR is low. Rescuers should not be concerned that they will cause serious injury if the person is not in cardiac arrest“; а в главата за първа помощ: „Saving a person's life is a priority, and first aiders should not be concerned about causing harm to the patient.“ Ако си обучен и искаш да обдишваш, редуваш 30 натискания с 2 обдишвания. Темата е изпитна по Наредба № 24, чл. 9, т. 4.",
+    "explanationBg": "Ако не можеш или не смееш да обдишваш, прави само непрекъснати натискания в центъра на гърдите. Това е изрична насока, а не отстъпка заради неопитност: Resuscitation Council UK (Adult Basic Life Support 2025) — „If you are not trained to provide rescue breaths, perform continuous chest compressions without interruptions“; същите насоки указват на операторите на спешния номер да приемат, че се обажда необучен човек, и да дават указания само за натискания. В кръвта има достатъчно кислород за първите минути; липсва ѝ движение — затова обдишване без натискания не движи нищо, а бездействието е единствената наистина погрешна реакция. И за да сме точни, вместо да те успокояваме с преувеличение: не че „не можеш да навредиш“, а че рискът е малък и несъизмерим с риска да не направиш нищо. RCUK 2025: „The risk of harm from CPR is low. Rescuers should not be concerned that they will cause serious injury if the person is not in cardiac arrest“; а в главата за първа помощ: „Saving a person's life is a priority, and first aiders should not be concerned about causing harm to the patient.“ Ако си обучен и искаш да обдишваш, редуваш 30 натискания с 2 обдишвания. И за прага в условието, защото той решава дали изобщо ще стигнеш до този избор: поводът е човек, който НЕ РЕАГИРА И НЕ ДИША НОРМАЛНО, а не човек, спрял да диша напълно. Рядкото, хъркащо, задавено дишане е признак на спряло сърце, а не на живот — Resuscitation Council UK (Adult Basic Life Support 2025): „Slow, laboured breathing, as well as other abnormal patterns such as agonal gasping or panting, must be recognised as signs of cardiac arrest.“ (По-ранната редакция на условието казваше само „не диша“; прагът е поправен с думата НОРМАЛНО, за да съвпада с насоката и с урока.) Темата е изпитна по Наредба № 24, чл. 9, т. 4.",
     "lawRefs": [{ "act": "Наредба № 24", "ref": "чл. 9, т. 4" }],
     "sourceRefs": [
       { "sourceId": "src-erc-2025-layperson", "ref": "Adult basic life support — 30 compressions : 2 breaths", "claimId": "med-cpr-ratio" }
@@ -1142,7 +1142,7 @@
       { "sourceId": "src-erc-2025-layperson", "ref": "First aid ABCDE — C: Circulation (signs of shock); preventing hypothermia", "claimId": "med-shock-recognition" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-062",
@@ -1163,7 +1163,7 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Life-threatening bleeding: direct manual pressure", "claimId": "med-bleeding-direct-pressure" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-063",
@@ -1184,7 +1184,7 @@
       { "sourceId": "src-bchk-first-help-steps", "ref": "„Основните стъпки в първата помощ“ — „Спешно извеждане на пострадал“", "claimId": "med-extrication-technique" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   },
   {
     "id": "q-ptp-064",
@@ -1205,6 +1205,6 @@
       { "sourceId": "src-rcuk-2025-first-aid", "ref": "First Aid (2025) — Suspected cervical spine injury", "claimId": "med-spinal-handling" }
     ],
     "media": null,
-    "status": "needs-review"
+    "status": "approved"
   }
 ]

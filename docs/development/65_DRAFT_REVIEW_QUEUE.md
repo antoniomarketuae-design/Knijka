@@ -2,7 +2,7 @@
 
 > **GENERATED FILE** — rebuild with `node tools/theory/verify_drafts.mjs --report`
 > after any content edit or approval batch. Manual edits will be overwritten.
-> Generated: 2026-08-09. Mechanical checks only — no machine ever
+> Generated: 2026-09-12. Mechanical checks only — no machine ever
 > judges content. **draft → approved is HUMAN-ONLY** (the founder).
 
 ## 1. Totals
@@ -12,8 +12,8 @@
 | draft (this queue) | 0 |
 | — CLEAN (passed every mechanical check) | 0 |
 | — FLAGGED (at least one precise issue) | 0 |
-| needs-review (separate pass — see §3) | 293 |
-| approved | 796 |
+| needs-review (separate pass — see §3) | 267 |
+| approved | 822 |
 
 Estimated total review time: **~1 min** (20s per clean, 120s per flagged), splittable per topic below.
 
@@ -37,7 +37,7 @@ Estimated total review time: **~1 min** (20s per clean, 120s per flagged), split
 
 ## 3. The ~290 flagged questions from PROGRESS §7 — cross-reference
 
-The list EXISTS AS DATA: it is exactly the 293 questions with
+The list EXISTS AS DATA: it is exactly the 267 questions with
 `status: "needs-review"`. 288 of them carry the machine-visible markers
 ('?'-suffixed lawRef or a `[REVIEW: …]` note); the adversarial audits'
 `flaggedLegal` tallies (`content/audits/*.audit.json`) account for 152 —
@@ -63,7 +63,7 @@ writes). Per-topic needs-review counts:
 | nosht-i-uslozhneni-uslovia | 3 |
 | alkohol-i-godnost | 21 |
 | dokumenti-i-sanktsii | 28 |
-| ptp-i-parva-pomosht | 33 |
+| ptp-i-parva-pomosht | 7 |
 | eko-i-zashtitno-shofirane | 6 |
 
 ## 4. Review batches per topic (cleanest share first)

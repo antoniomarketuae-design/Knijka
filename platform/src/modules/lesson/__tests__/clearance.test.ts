@@ -37,7 +37,7 @@ import {
 } from "../clearance";
 import { CARRIED_CONCEPT_SUMMARIES, CARRY_CEILING } from "../clearanceCarry";
 import { allLessons, resetLessonCache } from "../compose";
-import { beatMaterials } from "../interrupt";
+import { beatCitations, beatMaterials } from "../interrupt";
 import { courseClearance, lessonClearance, resolveBeat, resolveOutline } from "../resolve";
 import type { Beat, SayRef } from "../types";
 
@@ -242,12 +242,60 @@ describe("the first-aid lesson — what the classroom says today", () => {
   });
 
   it("offers no chip whose only answer would be withheld material", () => {
+    // CLEARED MATERIAL, NOT NO MATERIAL — re-frozen 2026-09-12.
+    //
+    // `law` used to be refused here, and that was right while all 29 first-aid
+    // rows were unsigned: with nothing cleared, `beatCitations(beatMaterials())`
+    // was empty and the chip would have been a button that answers nothing.
+    // 26 rows are signed now, so the chip HAS an answer and offering it is
+    // correct — the claim in this test's name is about WITHHELD material, not
+    // about the chip existing.
+    //
+    // So the refusal is replaced by the property it was a proxy for: every
+    // citation the chip would answer with comes from a CLEARED row. That is the
+    // stronger statement, and unlike `not.toContain` it keeps holding as more
+    // rows are signed.
     const beat = resolveBeat(FIRST_AID, "b4-explain");
     const intents = (beat?.chips ?? [])
       .filter((c) => c.kind === "ask")
       .map((c) => (c.kind === "ask" ? c.intent : ""));
+
+    // `why` is still refused, and for the unchanged reason: it answers out of a
+    // CONCEPT, and all four first-aid concepts remain uncarried (doc 92 §7.1,
+    // the ЗДвП чл. 123 citation). The day they are carried this flips, and it
+    // should be a deliberate edit rather than a silent one.
     expect(intents).not.toContain("why");
-    expect(intents).not.toContain("law");
+
+    // The law chip's answer, checked rather than assumed.
+    //
+    // beatMaterials() takes the RAW beat — the authored one carrying conceptIds /
+    // questionIds — not the resolved beat resolveBeat() hands back, which has
+    // already been through the gate and carries utterances and chips instead.
+    const repo = getContentRepo();
+    const raw = allLessons()
+      .find((l) => l.id === FIRST_AID)
+      ?.beats.find((b) => b.id === "b4-explain");
+    expect(raw, "b4-explain has left the lesson — re-derive this test").toBeDefined();
+    const materials = beatMaterials(raw!);
+    if (intents.includes("law")) {
+      expect(
+        beatCitations(materials).length,
+        "the law chip is offered but would answer with nothing",
+      ).toBeGreaterThan(0);
+    }
+    // Whatever the chip can say must come from rows the gate cleared. Anything
+    // else is the leak this file exists to catch.
+    const uncleared = materials.filter((m) => {
+      if (m.kind === "question") {
+        const q = repo.questionById(m.id);
+        return q === undefined || q.status !== "approved";
+      }
+      return false;
+    });
+    expect(
+      uncleared.map((m) => m.id),
+      "an unapproved row reached the material the chips answer from",
+    ).toEqual([]);
   });
 
   it("reports itself as teaching nothing, so the silence is a number and not a vibe", () => {
@@ -262,17 +310,32 @@ describe("the first-aid lesson — what the classroom says today", () => {
       // needs-review, isLessonEligible requires `approved`, so the lesson asks
       // nothing. A student who hears a withheld beat is not quizzed on it
       // either — which is now consistent rather than dangerous.
-      quizDealt: 0,
-      // …and now the number is ACTED ON rather than merely available. Nothing
-      // outside this module read the census; the lesson was in the hub behind
-      // an ordinary link.
+      // 0 -> 4 on 2026-09-12: the founder signed 26 of the 29 first-aid rows,
+      // so the lesson CAN now deal four questions. What did not change is the
+      // line above it — speaking is still 0, because the four first-aid
+      // CONCEPTS were not part of that decision and stay uncarried.
+      quizDealt: 4,
+      // STILL in-preparation, and this is the assertion that matters most in
+      // this file. `offerFor` used to let a quiz rescue a silent lesson, on the
+      // stated ground that «the withheld beats' questions are the ones under
+      // review» — true only while concepts and questions shared one review
+      // state. They stopped sharing it, and for a few hours this census read
+      // `offer: "open"`: four «Тази част още се проверява» bubbles followed by
+      // a quiz on cardiac massage. Asking about what you refused to teach is a
+      // bare verdict, which THEO-4 forbids outright. resolve.ts now requires
+      // speaking > 0 for the rescue, so this reads in-preparation again.
       offer: "in-preparation",
     });
   });
 
   it("still walks: the outline keeps a pause point for every beat", () => {
     const outline = resolveOutline(FIRST_AID);
-    expect(outline?.beats.length).toBe(6);
+    // 6 -> 10 on 2026-09-12. The lesson gained quiz beats when its questions
+    // were signed; the beats themselves are unchanged. The COUNT was never the
+    // claim — the loop below is: not one beat may have a zero say-count, i.e.
+    // no beat is silently skipped. That is asserted over whatever beats exist,
+    // so it does not need re-freezing again next time the number moves.
+    expect(outline?.beats.length).toBe(10);
     for (const beat of outline?.beats ?? []) {
       expect(beat.sayCount, `${beat.id} would be silently skipped`).toBeGreaterThan(0);
     }

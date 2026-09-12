@@ -516,7 +516,25 @@ export interface LessonClearance {
  * the ones under review. That consistency is what makes the rescue honest.
  */
 function offerFor(input: Omit<LessonClearance, "offer">): LessonOffer {
-  if (input.speaking === 0 && input.quizDealt === 0) return "in-preparation";
+  // A LESSON THAT TEACHES NOTHING MAY NOT QUIZ — the docstring's own
+  // precondition, made load-bearing on 2026-09-12.
+  //
+  // The rescue above is honest only while «the withheld beats' questions are
+  // the ones under review». That held for as long as the first-aid concepts and
+  // the first-aid questions shared one review state. They stopped sharing it the
+  // day 26 of the 29 questions were signed and the four concepts were not: the
+  // census went speaking=0, withheld=4, quizDealt=4, offer=open, i.e. four «Тази
+  // част още се проверява» bubbles followed by a quiz on cardiac massage.
+  //
+  // With speaking === 0 there is no teaching at all, so every question dealt is
+  // necessarily about a withheld beat and the rescue cannot be honest by its own
+  // definition. Asking without teaching is a bare verdict, which THEO-4 forbids.
+  //
+  // This subsumes the old `speaking === 0 && quizDealt === 0` floor, and it
+  // selects nothing new: today exactly one lesson of 54 has speaking === 0.
+  // The way out is to CARRY the concepts (doc 92 §7.1 — the ЗДвП чл. 123
+  // citation), after which speaking rises and the lesson opens on its own.
+  if (input.speaking === 0) return "in-preparation";
   if (input.quizDealt === 0 && input.withheld > input.speaking) return "in-preparation";
   return "open";
 }

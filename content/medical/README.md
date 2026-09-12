@@ -148,14 +148,29 @@ Two side findings worth keeping:
 ## Where the sources disagree
 
 Recorded, not resolved. `claims.json` carries each as a `conflicts[]` entry.
+One of them has since been *ruled on* — a ruling settles which side we teach,
+it does not make the disagreement go away, so the conflict entry stays.
 
-1. **The recovery position at a road accident.** ERC 2025 and RCUK 2025 both
-   say: *"In cases of agonal breathing or trauma, do NOT move the person into
-   the recovery position."* A ПТП casualty **is** trauma. Our `q-ptp-022` and
-   `q-ptp-037` instruct exactly that move. БЧК teaches it with no trauma
-   exception. **This is the most consequential finding of the wave and it is a
-   founder decision, not a content edit** — follow the 2025 consensus and
-   rewrite the questions, or follow what БЧК actually examines.
+1. **The recovery position at a road accident — ⚖️ RULED 2026-09-12, ERC/RCUK
+   2025 over БЧК.** ERC 2025 and RCUK 2025 both say: *"In cases of agonal
+   breathing or trauma, do NOT move the person into the recovery position."* A
+   ПТП casualty **is** trauma. БЧК teaches the side-lying position for every
+   unconscious breathing casualty, with no trauma exception.
+   **The founder ruled for the 2025 consensus on 2026-09-12.** `q-ptp-022` and
+   `q-ptp-037` follow it: both keys are inverted away from the roll, and both
+   tell the student in plain Bulgarian that БЧК teaches otherwise, because the
+   accepted cost of this ruling is that a student answering from our bank may
+   be marked wrong on the БЧК course test (Наредба № 24, чл. 10). The reverse
+   error is forbidden too: *"настрани е грешно"* on its own kills, so both rows
+   also carry the exit — airway opening outranks in-line immobilisation, and a
+   casualty whose airway cannot be kept open is turned **as a unit**.
+   **How the ruling was given, verbatim, because that is the difference between
+   a record and a claim:** the founder said *"approve them"* in chat on
+   2026-09-12, to an agent-written **summary** of the decision list. He did not
+   read the 29 rows one by one. See `med-recovery-position.noteBg` in
+   `claims.json` and the signature notes in `content/review/approvals.json`.
+   ~~This is a founder decision, not a content edit~~ — it was, and it has been
+   taken.
 2. **The order of the breathing check.** RCUK states the 2025 change in its own
    words: *"Call 999 for any unresponsive person. Rescuers no longer need to
    confirm abnormal breathing before calling."* Any question built on

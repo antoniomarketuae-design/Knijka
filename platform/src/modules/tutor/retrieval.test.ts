@@ -238,22 +238,56 @@ describe("clearance against the REAL bank (the measurement that found this)", ()
     );
   });
 
-  it("hands the model NO first-aid material for a first-aid question", () => {
-    // Every first-aid row in the bank is `q-ptp-*` or one of the four
-    // first-aid concepts, and all of them are withheld. This is the assertion
-    // that matters clinically: not merely „nothing ungated" but „nothing about
-    // first aid at all", so no answer can be assembled about moving a casualty.
+  // THE THREE ROWS THAT MAY NEVER REACH A STUDENT, NAMED.
+  //
+  // Not a style choice: forbiddenRows() already derives the gate from
+  // `status === "approved"` over the whole tree, and the test above proves
+  // nothing outside it leaks. But a derived gate states the guarantee
+  // abstractly, and these three carry a specific clinical hazard that a future
+  // content wave could open by flipping one status field with no reviewer
+  // realising what it turns back on.
+  const UNSIGNED_CLINICAL: ReadonlyArray<readonly [string, string]> = [
+    ["q-ptp-016", "stem says «не диша»; the threshold is «не реагира и не диша нормално»"],
+    ["q-ptp-060", "same short threshold — agonal gasping reads as breathing"],
+    ["q-ptp-037", "text was extended AFTER the ruling to carry the airway escape hatch"],
+  ];
+
+  it("still withholds the three first-aid rows the founder did NOT sign", () => {
+    // Until 2026-09-12 this test read «hands the model NO first-aid material at
+    // all», because all 29 rows sat at needs-review. 26 were signed that day, so
+    // first-aid material reaching the tutor is now the INTENDED behaviour and
+    // the old assertion would only be measuring the quarantine, not the danger.
+    // The danger is these three, and they were excluded from the batch by name.
     const real = getContentRepo();
-    const clinical: string[] = [];
-    for (const question of STUDENT_QUESTIONS.slice(0, 6)) {
+    const reached: string[] = [];
+    for (const question of STUDENT_QUESTIONS) {
       for (const item of retrieveGrounding(real, question)) {
-        if (item.id.startsWith("q-ptp-") || item.id.startsWith("c-first-aid")) {
-          clinical.push(`„${question}" → ${item.id}`);
-        }
+        const hit = UNSIGNED_CLINICAL.find((row) => row[0] === item.id);
+        if (hit) reached.push(`„${question}" → ${hit[0]} — ${hit[1]}`);
       }
     }
-    expect(clinical, `first-aid material reached the model:\n${clinical.join("\n")}`)
-      .toEqual([]);
+    expect(
+      reached,
+      `an UNSIGNED first-aid row reached the model:\n${reached.join("\n")}`,
+    ).toEqual([]);
+
+    // ANTI-NEUTRALISATION. The assertion above passes trivially if the ids stop
+    // existing or the retriever returns nothing, and both have happened to
+    // tests in this repo. So: the rows must still be in the bank, must still be
+    // unsigned, and the retriever must still be answering these questions.
+    const byId = new Map(real.questions().map((q) => [q.id, q]));
+    for (const [id, why] of UNSIGNED_CLINICAL) {
+      const row = byId.get(id);
+      expect(row, `${id} has left the bank — re-derive this guard (${why})`).toBeDefined();
+      expect(
+        row!.status,
+        `${id} is now «${row!.status}» — if that signature is deliberate, delete it from UNSIGNED_CLINICAL and say why; if it is not, this is the door reopening`,
+      ).not.toBe("approved");
+    }
+    const answered = STUDENT_QUESTIONS.filter(
+      (q) => retrieveGrounding(real, q).length > 0,
+    ).length;
+    expect(answered, "the retriever answered nothing at all — the check above is vacuous").toBeGreaterThan(0);
   });
 
   it("leaves the first-aid questions with almost nothing — and pins the residual", () => {
@@ -278,7 +312,17 @@ describe("clearance against the REAL bank (the measurement that found this)", ()
     const total = STUDENT_QUESTIONS.slice(0, 3)
       .map((q) => retrieveGrounding(real, q).filter((i) => i.kind !== "rule").length)
       .reduce((a, b) => a + b, 0);
-    expect(total).toBeLessThanOrEqual(3);
+    // RE-PINNED 2026-09-12: 3 -> 18, and the reason is a signature, not a
+    // regression. The three questions this counts are first-aid questions; the
+    // bank's answers to them were withheld while all 29 rows were unsigned, so
+    // «almost nothing» measured the quarantine. With 26 signed, the retriever
+    // returns the material it is supposed to return, and the residual it was
+    // built to watch — off-topic rows scraping the coverage floor on generic
+    // words — is no longer what dominates the count.
+    //
+    // The ratchet is kept: this may only FALL. If a content wave pushes it up,
+    // that is the signal this pin exists for.
+    expect(total).toBeLessThanOrEqual(18);
   });
 
   it("still answers the questions the bank genuinely covers", () => {
