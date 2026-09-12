@@ -338,11 +338,62 @@ ${TOUCH_BAND_CSS_VARS}
          is 16 px taller than it needs to be here — one constant, and the extra
          clearance is free. Portrait is untouched: there the pill starts at
          y 443.5 against a column that ends by y 173, so the right corridor
-         holds all three with 270 px to spare. */
+         holds all three with 270 px to spare.
+
+         ── AND IT LANDED IN THE FLANK LANE, WHICH IS THE ONE THING IN THE LEFT
+            CORRIDOR THAT IS NOT EMPTY. sweep w37, 2026-09-12.
+
+         The paragraph above says this corridor „is empty from the lesson menu
+         (ends y 52) down to the steering arc (starts y 171.5)". The arc has
+         since grown to "ARC_STATIONS_LEFT" = 4 and that sentence stopped being
+         true without anything noticing, because the clearance was written as a
+         literal "0.75rem" from the STAGE edge instead of from the band. Resolved
+         against TouchControls' own arithmetic ("arcStationRectPx", iPhone 16
+         landscape 852 × 393, insets 59/21, not collapsed at 393 > 240):
+
+           station k    x        y            what the frame calls it
+             3        67–111    60–104        ⚙ КОЛА
+             2        67–111   104–148        ⊙ КЛАКС     ← the collision
+             1        67–111   148–192        ⇨ МИГАЧ
+             0        67–111   192–236        ⇦ МИГАЧ
+
+         against the collapsed pill at [71, 109, 134 × 26.5] and row C2's
+         "::before" (the 0.75 rem pad two sections down, not the class list's
+         0.625) taking its hit rect to the y 97–147.5 this file already records:
+
+           paint on paint   40 × 26.5 = 1 060 px²
+           hit on hit       40 × 43.5 = 1 740 px²
+
+         — i.e. the 1 861 px² «🎬 Демонстрация ▸» × «Клаксон — задръж» overlap
+         that the block above this one says it closed, back in the other
+         corridor, at 89 % of its old size. PHOTOGRAPHED, not only computed:
+         ".audit-frames/w37/frames/sc-mw-emergency-lane__mobile-right/
+         04-t028s.png" and "…/sc-vu-emergency__mobile-right/04-t105s.png", tree
+         5c200d0 — the pill's «Д» is behind the flank ghost's plate and its
+         (invisible-in-WebKit) 🎬 is drawn on the horn's own ⊙, which is what
+         "sc-vu-emergency:011b0e98" files as „the «Демонстрация ▸» chip is drawn
+         over the «КЛАКС» control label, icon on icon".
+
+         THE FIX IS THE CLEARANCE THIS FILE ALREADY OWNS, not a new number.
+         "DECK_COMPACT_OPEN_LEFT_CSS" is what the OPEN deck 40 lines down and
+         "TOP_RAIL_LEFT_CSS" both stand on, and it resolves to exactly 8 px past
+         "FLANK_LANE_PX" on every profile in the ladder (12 + 56 = 68 against a
+         60 px lane; +59 of notch on both terms, so the margin is inset-free).
+         The collapsed pill was the one surface in the left corridor measuring
+         from the stage instead. „One rail, one clearance" — the same sentence
+         "TOP_RAIL_LEFT_CSS" is written under.
+
+         WHAT IT COSTS, MEASURED: the pill moves 71 → 127 (iPhone) / 12 → 68
+         (780 × 360). Its container keeps "width:
+         NOTIFY_COLUMN_WIDTH_CSS_COMPACT" and "align-items: flex-start", so the
+         right edge goes 251 → 307 of an 852 px stage against a notification
+         column whose left edge is 529 — 222 px of slack, and 220 on the 780.
+         Nothing else lives in that band: «МЕНЮ» ends at y 52, the pill starts
+         at y 99. Portrait does not enter this media query at all. */
       @media (max-height: 560px) {
         [data-sim-compact="on"] [data-hud="demo-deck"] {
           right: auto;
-          left: calc(0.75rem + env(safe-area-inset-left, 0px));
+          left: ${DECK_COMPACT_OPEN_LEFT_CSS};
           align-items: flex-start;
         }
       }
@@ -1706,7 +1757,63 @@ ${TOUCH_BAND_CSS_VARS}
          more moving parts than the rule is worth. ":has()" reads the DOM the
          menu already renders, and this file uses that grammar in four other
          places. Scoped to compact, where PlayMenu is the only thing that
-         mounts. */
+         mounts.
+
+         ── AND THE DECK WAS NOT THE ONLY SURFACE LEFT STANDING ON IT —
+            sc-ed-reverse-line:d6fb0f3c, 2026-09-12: „with the settings sheet
+            open and the rest of the HUD dimmed, the «Следвай синята линия»
+            pill stays at full brightness outside the overlay, SO A MODAL THAT
+            SHOULD OWN THE SCREEN DOES NOT."
+
+         THE FRAME, and it is the row's own: ".audit-frames/sweep161/
+         sc-ed-reverse-line/mobile-right/07b-menu.png" (iPhone 16 landscape,
+         852 × 393 at dpr 3). The w37 sweep no longer opens this sheet, so this
+         is still the newest photograph of the state — and the state is
+         unchanged in source, which is the half that decides it: the selector
+         below named ONE surface and the route pill is not it.
+
+         WHAT THE PHOTOGRAPH SHOWS, and it is a census rather than an
+         impression. Menu open, car frozen. Gone from the stage: the objective
+         banner, the notification column, the collapsed deck pill, the whole
+         touch rail. Still painted: the interior mirror (ruled untouchable —
+         „the mirror does not move, the HUD does", rows B74/B76), the cluster,
+         and this pill. Read off the pixels at device y 240, the pill's own
+         glyph row: its ink is rgb(72, 169, 255) — "--accent" at FULL strength,
+         to the unit — against a bare sky of rgb(153, 161, 170) 40 px to its
+         left. „Full brightness" is the row's word and the frame's number.
+
+         IT IS THE THIRD LIST, AND "overlayQueue.ts" ALREADY WROTE THE OTHER
+         TWO. That module's 2026-08-17 census ("OVERLAY_SCREEN_OWNERS",
+         "overlayQueueMaySpeak") was written for exactly this failure — „two
+         interaction layers on one screen" — after the same lesson's same
+         "07b-menu" frame caught a warning card painted live behind the menu.
+         It derives who freezes the CAR and who silences the QUEUE. The
+         STANDING AIDS are neither: "followHintOn" is scene state with no
+         reader in that census, so the one surface that is up for the whole of
+         every L1 drive was the one surface the rule could not reach.
+
+         SO IT JOINS THE RULE THAT ALREADY EXISTS rather than getting a
+         mechanism of its own — same trigger, same "visibility", same sentence:
+         one tap on ЗАТВОРИ brings it straight back, and the pill is
+         "pointer-events-none", so nothing about the menu's own hit testing
+         moves. "visibility" and not "display" for the reason above: this pill
+         is absolutely positioned, so neither reflows anything, and "display"
+         would be a second grammar for one arbitration.
+
+         SCOPED TO COMPACT, AND THAT IS THE ROW'S OWN SCOPE. On a roomy stage
+         «Меню на урока» is the top toolbar, not a modal that owns the screen
+         (".audit-frames/w37/frames/sc-ac-crosswind__pc-right/04-t000s.png"
+         shows it as a strip of chips above the stage), and the pill is nowhere
+         near it. A rule that fired there would delete a standing aid from a
+         desktop that never had the defect.
+
+         THE ROUTE PILL FIRST IN THE SELECTOR LIST, DELIBERATELY.
+         "touchSurfaces.test.ts" reads the 130 characters that follow the deck's
+         own selector and asserts "visibility" is inside them; a second selector
+         inserted AFTER it pushes the declaration out of that window and turns a
+         guard green-to-red for a reason that has nothing to do with what it
+         guards. The order is load-bearing and the test is not weakened. */
+      [data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="follow-hint"],
       [data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="demo-deck"] {
         visibility: hidden;
       }

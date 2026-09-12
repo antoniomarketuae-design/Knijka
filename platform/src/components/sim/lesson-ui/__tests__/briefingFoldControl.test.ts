@@ -49,7 +49,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { briefingStandsDown, compactBriefingFold } from "../LessonPlayShell";
+import { HAZARD_BAND_TOP_FRACTION } from "@/modules/sim/hud";
+
+import {
+  BRIEFING_ROAD_MIN_LIST_PX,
+  briefingRoadCeilingPx,
+  briefingStandsDown,
+  compactBriefingFold,
+} from "../LessonPlayShell";
 import { TOUCH_HINT_MOVING_KMH } from "../touchHintLifetime";
 
 const SHELL = readFileSync(resolve(__dirname, "../LessonPlayShell.tsx"), "utf8");
@@ -362,5 +369,145 @@ describe("compactBriefingFold · one lifetime, two surfaces", () => {
     expect(CODE.slice(retryAt, retryAt + 400)).toContain(
       "setBriefingFold({ folded: false, latched: false });",
     );
+  });
+});
+
+/**
+ * =============================================================================
+ * …AND THE PANEL THE STUDENT ASKS BACK HAD NO CEILING AT ALL — 2026-09-12.
+ * =============================================================================
+ *
+ * sc-junction-rhr:486cad54, major, re-judged STILL on twelve consecutive
+ * re-drives (w26 → w37), every one of them on `01-arrival`: „the ИНСТРУКЦИИ
+ * panel is pinned over the right third of the windscreen — exactly the side the
+ * priority vehicle arrives from in a right-hand-priority lesson."
+ *
+ * THE SIBLING ROW WITH THE SAME SENTENCE CLOSED, AND THE DIFFERENCE IS THE BEAT.
+ * `sc-ov-crossing-overtake:4bce6fca` was filed on a DRIVING frame (11 км/ч,
+ * `sweep161/…/04-t160s.png`) and was retired on the w12 re-drive because
+ * `briefingStandsDown` had turned all 33 of that leg's beats into the pill.
+ * 486cad54's frame is a 0 км/ч standstill, where the fold correctly does not
+ * fire — folding a briefing at the standstill it exists for is the opposite
+ * defect, and this suite already pins that direction two describes up.
+ *
+ * WHAT IS LEFT IS THE ONE DRIVING BEAT THE FOLD IS FORBIDDEN TO OWN. „Once, and
+ * never against the student" entitles a student who presses «ⓘ Инструкции · 6
+ * стъпки ▸» at 40 км/ч to keep the whole panel for the rest of the lesson, and
+ * nothing bounded it: ~320 px of opaque card on a ~1165 px stage, standing on
+ * the right kerb at speed. `briefingRoadCeilingPx` is that bound, borrowed from
+ * the surface in this same lane that already pays it.
+ * =============================================================================
+ */
+describe("briefingRoadCeilingPx · the recalled panel stops above the hazard band", () => {
+  /* THE NUMBERS ARE OFF THE ROW'S OWN NEWEST FRAME, not off an estimate.
+     `.audit-frames/w37/frames/sc-junction-rhr__pc-right/01-arrival.png`,
+     1440 × 900, edges found by scanning the raw pixels for the `26,33,48`
+     border: the stage box is x 264–1431 × y 97–753, and the ИНСТРУКЦИИ card is
+     x 1099–1418 × y 323–581 — 320 px wide, 27.4 % of a 1167 px stage, with its
+     floor at 0.737 of the stage, a third of the frame below the horizon. */
+  const STAGE_TOP = 98;
+  const STAGE_H = 655;
+  /** The `<ol>`'s own top on that frame: the card starts at 323 and its
+   *  `py-1.5`, header row and `mt-1` take ~28 before the first step. */
+  const LIST_TOP = 351;
+
+  it("is the BAND's top and not the horizon, because the horizon is unreachable", () => {
+    // The measurement that chooses the constant. At 0.402 (the cockpit horizon,
+    // which `NOTIFY_COLUMN_MAX_STAGE_FRACTION` rounds down to 0.40 for the
+    // compact peek) the corridor between this list's top and the line is 10 px,
+    // so the ceiling would be FLOORED on every roomy stage in the ladder — a
+    // fixed 38 px cap wearing a rule's name. The band's own top is reachable.
+    const horizon = briefingRoadCeilingPx(LIST_TOP, STAGE_TOP, STAGE_H, 0.402);
+    expect(horizon).toBe(BRIEFING_ROAD_MIN_LIST_PX);
+    const band = briefingRoadCeilingPx(LIST_TOP, STAGE_TOP, STAGE_H);
+    expect(band).toBeGreaterThan(BRIEFING_ROAD_MIN_LIST_PX);
+    // 98 + 0.53 × 655 − 351 = 94.15 px ≈ seven 13.75 px line boxes ≈ 3 steps,
+    // with the rest under the counter that already pages to them. The card's
+    // floor moves 581 → ~467, i.e. ~114 px of the right kerb handed back.
+    expect(band).toBeCloseTo(94.15, 2);
+  });
+
+  it("the number is IMPORTED, so two surfaces cannot disagree about the road", () => {
+    // `PlayAreaStyles` spends the same fraction on `[data-hud="touch-hint"]`,
+    // the other reading surface in this corridor. A locally written 0.53 here
+    // is how one frame ends up carrying two answers to „where does the road
+    // begin"; this case fails if the briefing ever grows its own number.
+    expect(HAZARD_BAND_TOP_FRACTION).toBe(0.53);
+    expect(briefingRoadCeilingPx(LIST_TOP, STAGE_TOP, STAGE_H)).toBe(
+      briefingRoadCeilingPx(LIST_TOP, STAGE_TOP, STAGE_H, HAZARD_BAND_TOP_FRACTION),
+    );
+  });
+
+  it("never reaches zero — a ceiling that deletes the teaching is not a ceiling", () => {
+    // A card already below the band would compute a negative budget. Clamping to
+    // 0 would hand the student a header, a counter and nothing between them,
+    // which is the В27 shape: removing the teaching to satisfy a row about the
+    // teaching being in the way. It fails toward keeping the words.
+    expect(briefingRoadCeilingPx(600, STAGE_TOP, STAGE_H)).toBe(BRIEFING_ROAD_MIN_LIST_PX);
+    expect(BRIEFING_ROAD_MIN_LIST_PX).toBeGreaterThan(0);
+  });
+
+  it("an unreadable geometry is null, never a small number", () => {
+    // jsdom returns 0 for every rect, a server render measures nothing, and the
+    // popup rig has no `[data-sim-stage]` ancestor at all. Each of those must
+    // resolve to TODAY's behaviour — no cap — and not to a card clipped to its
+    // floor by a measurement that never happened.
+    expect(briefingRoadCeilingPx(0, 0, 0)).toBeNull();
+    expect(briefingRoadCeilingPx(LIST_TOP, STAGE_TOP, -1)).toBeNull();
+    expect(briefingRoadCeilingPx(Number.NaN, STAGE_TOP, STAGE_H)).toBeNull();
+    expect(briefingRoadCeilingPx(LIST_TOP, Number.NaN, STAGE_H)).toBeNull();
+    expect(briefingRoadCeilingPx(LIST_TOP, STAGE_TOP, Number.NaN)).toBeNull();
+    expect(briefingRoadCeilingPx(LIST_TOP, STAGE_TOP, STAGE_H, Number.NaN)).toBeNull();
+  });
+
+  it("a taller stage stops binding, so 32:9 and a desk monitor are untouched", () => {
+    // Blast radius, stated as an assertion rather than as a claim. The ceiling
+    // is a `max-height`: on a stage where the band's top is already below the
+    // card's natural floor it simply does not bind, and the panel is byte-for-
+    // byte what it is today. Only the short stages — where the card genuinely
+    // reaches the road — pay anything.
+    //
+    // The reference is the list's own natural height on the frame this suite is
+    // measured off: the six steps run to 14 wrapped 13.75 px line boxes ≈ 200 px
+    // (card y 323–581, less ~28 of header and ~30 of counter row and padding).
+    // On a 1400 px stage the budget is 98 + 0.53 × 1400 − 351 = 489, so the
+    // `max-height` is more than twice the content and never binds.
+    const NATURAL_LIST_PX = 200;
+    const tall = briefingRoadCeilingPx(LIST_TOP, STAGE_TOP, 1400);
+    expect(tall).toBeCloseTo(489, 0);
+    expect(tall).toBeGreaterThan(NATURAL_LIST_PX);
+  });
+
+  it("the ceiling is WIRED, and only while the car is moving", () => {
+    // The dead-predicate gate. The arithmetic above is pure and stays green
+    // whether or not one line of rendered code reads it, which is the 51-of-82
+    // class this programme measured. Three places it can be dropped:
+    //   · the measurement (the stage box is walked to, in the list's own coords)
+    const measureAt = CARD.indexOf("const measure");
+    expect(measureAt, "the measurement moved — re-anchor").toBeGreaterThan(-1);
+    const m = CARD.slice(measureAt, CARD.indexOf("const revealMoreSteps", measureAt));
+    expect(m, "the measure/reveal anchors crossed — re-anchor").not.toBe("");
+    expect(m).toContain('ol.closest("[data-sim-stage]")');
+    expect(m).toContain("briefingRoadCeilingPx(listTop, stageRect.top, stageRect.height)");
+    //   · the application (on the LIST, so the header, the ▾/✕ pair and the
+    //     «↓ още N стъпки — покажи» row can never be what gets clipped)…
+    const list = CARD.slice(CARD.indexOf("<ol"), CARD.indexOf("</ol>"));
+    expect(list).toContain("maxHeight: roadCeilingPx");
+    //   · …and the predicate, which is the fold's own, so the card cannot hold
+    //     one opinion about „he is driving now" while the fold holds another.
+    expect(list).toContain("briefingStandsDown(speedKmh)");
+  });
+
+  it("a standstill keeps every authored step — 01-arrival is not shortened", () => {
+    // The half that stops this from being the opposite defect, and the reason
+    // the row it is filed under does NOT close on its own frame. `01-arrival`
+    // and `03-ready` are 0 км/ч on every lesson in the catalogue: the student is
+    // reading, the world behind the card is a parked street 120 m short of the
+    // junction, and trading four authored steps for a view of it is a loss.
+    expect(briefingStandsDown(0)).toBe(false);
+    const list = CARD.slice(CARD.indexOf("<ol"), CARD.indexOf("</ol>"));
+    const capAt = list.indexOf("maxHeight: roadCeilingPx");
+    const guard = list.slice(0, capAt);
+    expect(guard).toContain("roadCeilingPx !== null && briefingStandsDown(speedKmh)");
   });
 });

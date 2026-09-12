@@ -85,31 +85,65 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4 short:space-y-2">
-      <TextField
-        id="email"
-        label="Имейл"
-        type="email"
-        autoComplete="email"
-        required
-        value={email}
-        onChange={setEmail}
-        onBlur={revalidate}
-        error={fieldErrors.email}
-        disabled={pending}
-      />
+      {/* THE FOLD IS BOUGHT ON THE AXIS THAT HAS ROOM (row app-login:e2577ced).
+          Wave 29 took ~200px of CHROME out of this screen and that moved the
+          submit button from y=459 back to y=257 at rest — but every pixel it
+          bought was FIXED chrome, and what pushes the button off a 393px
+          landscape phone is the VARIABLE chrome: the ?changed=1 banner (two
+          lines, 62px), a wrong-password FormError (50px) and a field error
+          under each input (22px each). Computed at 852x393 with the iPhone 16's
+          real insets, the body's content box ends at 372 (393 - 21 of
+          safe-area-inset-bottom) and the submit button's bottom went
 
-      <TextField
-        id="password"
-        label="Парола"
-        type="password"
-        autoComplete="current-password"
-        required
-        value={password}
-        onChange={setPassword}
-        onBlur={revalidate}
-        error={fieldErrors.password}
-        disabled={pending}
-      />
+            at rest                                    257   (115 clear)
+            ?changed=1 + wrong password                369   (  3 clear)
+            ...+ one field error                       391   (past 372)
+            ...+ both field errors                     413   (past 393)
+
+          A repair with 3px of margin against copy we do not control is not a
+          repair. This grid is the structural one: held sideways the screen has
+          852px of WIDTH and 393 of height, so the two fields stop queueing down
+          the scarce axis and sit side by side on the abundant one. It removes
+          one 68px field block AND one 8px gap from every state, and it makes
+          two simultaneous field errors cost 22px instead of 44 (grid rows are
+          as tall as their tallest cell, not the sum). Worst state above:
+          413 -> 315, i.e. 57px clear instead of -41.
+
+          `short:sm:` and not `short:` alone — two 203px columns need the width
+          to exist. It is „short AND wide" = a phone held sideways, exactly the
+          case globals.css §short documents; the stacked spelling was checked
+          against the compiled stylesheet, because a variant that emits nothing
+          is a fold fix that never runs. Portrait, desktop and every tall
+          viewport get `grid gap-4`, which is the 16px `space-y-4` this
+          replaced, to the pixel. DOM order is untouched, so the tab order,
+          autofill and focusFirstError all behave exactly as before. */}
+      <div className="grid items-start gap-4 short:gap-2 short:sm:grid-cols-2">
+        <TextField
+          id="email"
+          label="Имейл"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={setEmail}
+          onBlur={revalidate}
+          error={fieldErrors.email}
+          disabled={pending}
+        />
+
+        <TextField
+          id="password"
+          label="Парола"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={setPassword}
+          onBlur={revalidate}
+          error={fieldErrors.password}
+          disabled={pending}
+        />
+      </div>
 
       {formError && <FormError>{formError}</FormError>}
 

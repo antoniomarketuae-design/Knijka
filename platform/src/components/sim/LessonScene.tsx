@@ -124,6 +124,8 @@ import {
   createDashboardStatus,
   FollowGapCue,
   followGapTarget,
+  PEEK_CHIP_TOTAL_ALPHA,
+  peekChipGroundCss,
   PEEK_SCRIM_ALPHA,
   PEEK_SCRIM_FEATHER_PX,
   PEEK_SCRIM_RGB,
@@ -221,7 +223,7 @@ import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/ca
 import { SimAudio } from "@/modules/sim/scene/simAudio";
 import { AudioLessonPrompt } from "./AudioLessonPrompt";
 import { CameraRig, type CameraMode, type TopdownAidHandle } from "./CameraRig";
-import { ImpactCut, type ImpactCutHandle } from "./ImpactCut";
+import { ImpactCut, type ImpactCutHandle, type ImpactShakeHandle } from "./ImpactCut";
 import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
 import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "@/modules/sim/scene/vehicleSample";
@@ -1550,6 +1552,10 @@ export function ReadyScene({
   const sampleRef = useRef<VehicleSample>(createVehicleSample());
   /** The crash response (flash + exterior cut) — filled by `ImpactCut`. */
   const impactCutRef = useRef<ImpactCutHandle | null>(null);
+  /** …and its third half, the camera's own jolt — filled by `CameraRig`, which
+   *  is the only writer of the pose. `ImpactCut` reaches it through this ref on
+   *  the same graded contact, inside the same refractory window. */
+  const impactShakeRef = useRef<ImpactShakeHandle | null>(null);
   const [cockpit, setCockpit] = useState(true);
   // Difficulty: EVERY SCENE OPENS AT DEFAULT_DIFFICULTY ("normal" since the
   // 2026-07-19 founder ruling — beginner's 40 km/h governor made speeding
@@ -2538,6 +2544,7 @@ export function ReadyScene({
               topdownAllowed={topdownInCycle}
               enterTopdown={enterTopdown}
               topdownAidRef={topdownAidRef}
+              impactShakeRef={impactShakeRef}
               driveLocked={driveLocked}
             />
           </Physics>
@@ -2604,6 +2611,10 @@ export function ReadyScene({
         sampleRef={sampleRef}
         cameraModeRef={cameraModeRef}
         applyCameraMode={applyCameraMode}
+        // f0023997's third ask. The rig fills this from inside the Canvas; the
+        // cut is outside it, so the ref is the join. Optional on the component,
+        // so a scene that mounts no rig still flashes and still cuts.
+        shakeRef={impactShakeRef}
         // sc-turn-left-oncoming:e91c1e01 — the bay carve-out, said as the thing
         // it is. A graded bay IS the manoeuvring drill (`compile.ts` writes
         // `parkingBay` from the parking objective's own rect); everywhere else
@@ -3856,13 +3867,71 @@ function DemoDeck({
       // — overriding it with a different wording is the „label in name" trap
       // (WCAG 2.5.3) for anyone driving this by voice.
       aria-label={compact && open ? "Затвори демонстрацията" : undefined}
+      /* ── IT PAINTED NO GROUND, AND ON A BRIGHT SKY THAT IS 1.16 : 1.
+         sweep w37, 2026-09-12, and it is the mechanism this file already
+         records twice — at the touch-hint shade and at «Разбрах».
+
+         `bg-background/80 backdrop-blur` was authored on both arms of this
+         button and NEITHER reached the glass. `[data-hud="demo-deck"]` is on
+         `GHOST_SURFACES`, so `PlayAreaStyles`' UNPANEL sweep hands
+         `background-color: transparent !important` AND `background-image: none
+         !important` to every child of the ghost that is not marked
+         `data-hud-ink`. This button carried no such mark, so its fill has been
+         a declaration with no pixel behind it for as long as the sweep has
+         shipped — the same way the tier picker's segment and «Разбрах» both
+         survived a whole unpanel pass.
+
+         MEASURED, not inferred, on the shipped build:
+         `.audit-frames/w37/frames/sc-mw-emergency-lane__mobile-right/
+         04-t028s.png` (WebKit, iPhone 16 landscape 852 × 393 at dpr 3, tree
+         5c200d0). Reading the label's own row, device y 380, x 350–500:
+
+           the glyph ink        rgb(195, 207, 226)  = `--muted`, the ghost's pin
+           the sky under it     rgb(162, 167, 172)
+           contrast                                   1.16 : 1
+
+         and on `sc-vu-emergency__mobile-right/04-t105s.png` the inter-glyph
+         pixels inside the pill read rgb(86, 83, 80) against rgb(88, 84, 82) of
+         BARE WORLD 170 device px to its left — the same facade, to two units.
+         There is no ground; the world is the ground. 1.16 : 1 is not „low
+         contrast", it is the «--muted at 1.01 : 1» reading `HudToasts` already
+         has a block about, on a control rather than on prose.
+
+         WHY 0.90 AND NOT THE CARD'S 0.80. `SimOverlay`'s two blocks settle
+         this: 0.80 is the ground for PROSE and is CAPPED there by the founder's
+         rule that the world under a card must stay „dimmed, and still plainly
+         two different things"; 0.90 is the rung it computed and then adopted
+         for a CONTROL, on the argument that „three 44 px targets are 1.7 % of
+         the stage … and every pixel of it is inside a box the chip was already
+         painting a border and a label on". This pill is 134 × 27 closed = 1.1 %
+         of an 852 × 393 stage, in the left corridor the 2026-08-03 drawing
+         reserves for HUD, inside its own `border-border` hairline — the same
+         sentence, verbatim. On the corpus's brightest world pixel
+         (rgb(204, 205, 206), `sim-overlay-scrim.test.ts`' `WORST_WORLD`) it
+         takes `--muted` from 1.24 : 1 to **10.57 : 1**, and the world inside
+         the pill stays 1.13 : 1 — dimmed, never erased, which is the same
+         residual the ✕ and «ЗАЩО» ship at.
+
+         `PEEK_CHIP_TOTAL_ALPHA` AND NOT `peekChipGroundCss()`'s DEFAULT. The
+         default is `PEEK_CHIP_GROUND_ALPHA` 0.50 — the second layer, the one
+         that composites with a card's 0.80. This control has no card under it,
+         so the default would give it half a ground and 3.35 : 1, under AA,
+         while looking repaired. The barrel says so at the export.
+
+         AND THE DEAD DECLARATIONS GO WITH IT rather than staying as a
+         fallback: `data-hud-ink` exempts this element from BOTH sweep lines, so
+         a surviving `backdrop-blur` would come back with the ground — and blur
+         is one of the three things the 2026-08-03 ruling named. The ground is
+         stated once, inline, in the HUD's own near-black. */
+      data-hud-ink=""
+      style={{ backgroundColor: peekChipGroundCss(PEEK_CHIP_TOTAL_ALPHA) }}
       className={
         compact && open
           ? // In the row, and a real 44 px control rather than a 26.5 px pill
             // wearing row C2's invisible hit pad — it is the CLOSE control of a
             // panel that covers the road, and this is the one the founder has
             // to be able to hit.
-            "pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background/80 text-base text-muted backdrop-blur transition hover:text-foreground"
+            "pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-base text-muted transition hover:text-foreground"
           : // DOC 91 · L9/§I14 — measured 134×**27** closed, 17 px short of the
             // thumb minimum. The BOX is not grown (a 44 px-tall pill with an
             // 11 px label reads as a button bar on the road, which is the
@@ -3873,7 +3942,7 @@ function DemoDeck({
             // 27 + 2×10 = 47. Safe here because the pill is horizontally
             // isolated: closed, it is the only child of its column; open, the
             // compact arm above replaces it with a real 44 px round control.
-            "pointer-events-auto relative flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition before:absolute before:-inset-y-2.5 before:left-0 before:right-0 before:content-[''] hover:text-foreground"
+            "pointer-events-auto relative flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-muted transition before:absolute before:-inset-y-2.5 before:left-0 before:right-0 before:content-[''] hover:text-foreground"
       }
     >
       {compact && open ? (

@@ -104,6 +104,16 @@ import {
   DOOR_MIRROR_YAW_RAD,
   type DoorMirrorSide,
 } from "@/modules/sim/scene/cockpitDoorMirror";
+// The crash jolt's SHAPE (f0023997's third ask). Pure functions only, and the
+// type-only half of the pair — `ImpactCut` imports `CameraMode` back from here
+// with `import type`, which the compiler erases, so there is no runtime cycle.
+import {
+  impactShakeAmplitudeRad,
+  impactShakeOffsetRad,
+  impactShakeReducedMotion,
+  IMPACT_SHAKE_MS,
+  type ImpactShakeHandle,
+} from "./ImpactCut";
 
 export type CameraMode = "chase" | "cockpit" | "topdown";
 
@@ -471,6 +481,7 @@ export function CameraRig({
   topdownAllowed = true,
   enterTopdown,
   topdownAidRef,
+  impactShakeRef,
   driveLocked = false,
 }: {
   chassisGroupRef: RefObject<Group | null>;
@@ -498,6 +509,19 @@ export function CameraRig({
    * reading a mutable ref during render.
    */
   topdownAidRef?: RefObject<TopdownAidHandle | null>;
+  /**
+   * THE CRASH JOLT — sweep161 `sc-hz-brake-dont-swerve:f0023997`, the row's
+   * third ask („no impact effect, no shake, no damage, no exterior cut").
+   *
+   * Same `topdownAidRef` idiom, and for the same reason: the pose is written
+   * once a frame inside `useFrame`, so the shake has to be applied HERE — a
+   * second writer outside the rig would be overwritten on the next tick. The
+   * rig decides nothing about it. `ImpactCut` owns whether a contact shakes,
+   * how hard, and for how long (all pure, all unit-tested); this ref is the
+   * door it reaches the camera through. Absent ⇒ no shake, and every other
+   * scene that mounts a rig is byte-for-byte unchanged.
+   */
+  impactShakeRef?: RefObject<ImpactShakeHandle | null>;
   /** QW10 pre-drive gate is up: the car cannot move and a held brake is a
    *  procedure step — never a reverse. Vetoes the reversing POV. */
   driveLocked?: boolean;
@@ -583,6 +607,61 @@ export function CameraRig({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // -------------------------------------------------------------------------
+  // THE CRASH JOLT (sweep161 `sc-hz-brake-dont-swerve:f0023997`, third ask).
+  //
+  // Two numbers and a clock — the whole of the state. `ImpactCut` owns every
+  // rule (whether, how hard, how long, and the reduced-motion refusal); this
+  // block owns only WHEN, and the pose write down in `useFrame`.
+  // -------------------------------------------------------------------------
+  /** Peak radians for the bang in flight, and the wall clock it landed at. */
+  const impactShakeStateRef = useRef({ amplitudeRad: 0, atMs: 0 });
+  /** The one pending „draw me level again" timer (see the `invalidate` note). */
+  const impactSettleTimerRef = useRef(0);
+  const invalidate = useThree((s) => s.invalidate);
+  const shake = useCallback(
+    (impactKmh: number) => {
+      const amplitudeRad = impactShakeAmplitudeRad(impactKmh, impactShakeReducedMotion());
+      if (amplitudeRad <= 0) {
+        // A refusal must also CANCEL: a student who turns reduced-motion on
+        // mid-scrape has asked for the head to stop, not for the current
+        // envelope to play out.
+        impactShakeStateRef.current = { amplitudeRad: 0, atMs: 0 };
+        return;
+      }
+      impactShakeStateRef.current = { amplitudeRad, atMs: performance.now() };
+      // The Canvas runs `frameloop="demand"` while any card is up. Ask for one
+      // frame after the window has closed, so a world that pauses mid-jolt
+      // cannot be left frozen at a tilt: `impactShakeOffsetRad` returns null
+      // past IMPACT_SHAKE_MS, and that one frame is what renders the level
+      // pose. Harmless under "always" — R3F is already drawing.
+      //
+      // ONE timer, re-armed rather than stacked, and cleared on unmount: a
+      // lesson torn down inside the window would otherwise call `invalidate`
+      // on a disposed R3F store, which is a console error in the debrief of
+      // every drive that ended in a crash.
+      window.clearTimeout(impactSettleTimerRef.current);
+      impactSettleTimerRef.current = window.setTimeout(
+        () => invalidate(),
+        IMPACT_SHAKE_MS + 32,
+      );
+    },
+    [invalidate],
+  );
+  useEffect(
+    () => () => {
+      window.clearTimeout(impactSettleTimerRef.current);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!impactShakeRef) return;
+    impactShakeRef.current = { shake };
+    return () => {
+      impactShakeRef.current = null;
+    };
+  }, [impactShakeRef, shake]);
 
   // -------------------------------------------------------------------------
   // CHASE REAR-VIEW WINDOW (doc 86 L16 — founder items 44/45). The cockpit's
@@ -817,6 +896,10 @@ export function CameraRig({
     // B67 probe scratch — the camera's offset expressed in the CAR's frame.
     probeLocal: new Vector3(),
     probeInv: new Quaternion(),
+    // Crash jolt (f0023997): a camera-LOCAL rotation, applied last of the pose
+    // writers and before the mirror quads park themselves against it.
+    shakeEuler: new Euler(),
+    shakeQuat: new Quaternion(),
   });
   const prevPosValid = useRef(false);
 
@@ -1169,6 +1252,36 @@ export function CameraRig({
           camY: cam.position.y,
           camZ: cam.position.z,
         };
+      }
+    }
+
+    // --- THE CRASH JOLT (f0023997). The last writer of the camera POSE, and
+    // the first thing before the two mirror quads, which park themselves with
+    // `applyQuaternion(cam.quaternion)` and must therefore ride it.
+    //
+    // ROTATION ONLY, deliberately: `cam.position` is the quantity the B67
+    // contract is written against (`__camProbe.errM` < 0.15 m car-local against
+    // COCKPIT_EYE at 145 км/ч, published a dozen lines above), so a positional
+    // shake would move a number a founder row is pinned to. A head snapping at
+    // the neck is also the truer thing — the seat does not move, the driver in
+    // it does.
+    //
+    // Applied in EVERY view. The exterior cut takes a cockpit crash to chase on
+    // the same event, so the jolt lands in chase far more often than in the
+    // cockpit; and a student who was already in chase or top-down gets no cut
+    // (`impactCutView` refuses — those views already show the car) and this is
+    // then the only thing that marks the contact on the glass.
+    const jolt = impactShakeStateRef.current;
+    if (jolt.amplitudeRad > 0) {
+      const off = impactShakeOffsetRad(jolt.amplitudeRad, performance.now() - jolt.atMs);
+      if (off === null) {
+        // Past the window (or cancelled). Zero it BY VALUE so the pose handed
+        // on is exactly the one the branch above computed.
+        jolt.amplitudeRad = 0;
+      } else {
+        const { shakeEuler, shakeQuat } = scratchRef.current;
+        shakeEuler.set(off.pitch, off.yaw, off.roll, "YXZ");
+        cam.quaternion.multiply(shakeQuat.setFromEuler(shakeEuler));
       }
     }
 

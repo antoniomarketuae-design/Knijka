@@ -19,6 +19,12 @@
  *   ?buf=<samples>                        ring-buffer depth (default 20000)
  *   ?readout=0                            hide the on-screen readout
  *
+ * An id that does not resolve — or a `?level=` the template does not author —
+ * mounts NOTHING and paints the reason (`[data-testid="drive-rig-refusal"]`).
+ * It used to fall through to the free polygon and drive it; see
+ * `resolveLesson.ts`. The readout names the lesson actually under the car, so
+ * a frame carries the answer as well as the request.
+ *
  * Client-only: the shell pulls the 3D stack through SceneSlot's ssr:false
  * dynamic import (rapier wasm must never run during SSR/build).
  */
@@ -26,10 +32,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ScenarioLevel } from "@/modules/sim/lessons";
-import { compileScenario, lessonById, scenarioById } from "@/modules/sim/lessons";
 import { DriveRig, parseDriveScript, type DriveStep } from "@/modules/sim/devrig";
 import { LessonPlayShell } from "@/components/sim/lesson-ui/LessonPlayShell";
 import type { QualityPreset } from "@/components/sim/lesson-ui/types";
+import { resolveRigLesson } from "./resolveLesson";
 
 const noop = () => undefined;
 
@@ -80,11 +86,14 @@ export function DriveRigClient() {
 }
 
 function Mounted({ cfg }: { cfg: RigConfig }) {
-  const lesson = useMemo(() => {
-    const spec = cfg.scenario !== null ? scenarioById(cfg.scenario) : undefined;
-    if (spec !== undefined) return compileScenario(spec, cfg.level);
-    return lessonById(cfg.lesson ?? "l0p-poligon-free") ?? lessonById("l0p-poligon-free") ?? null;
-  }, [cfg.scenario, cfg.level, cfg.lesson]);
+  // NOTHING IS SUBSTITUTED HERE. An unknown `?scenario=` used to fall through
+  // to the free polygon and drive it — see resolveLesson.ts for what that did
+  // to a `?script=` aimed at another district's coordinates.
+  const resolved = useMemo(
+    () => resolveRigLesson({ scenario: cfg.scenario, level: cfg.level, lesson: cfg.lesson }),
+    [cfg.scenario, cfg.level, cfg.lesson],
+  );
+  const lesson = resolved.lesson;
 
   const [rig] = useState(
     () =>
@@ -101,7 +110,25 @@ function Mounted({ cfg }: { cfg: RigConfig }) {
     return () => rig.dispose();
   }, [rig]);
 
-  if (lesson === null) return null;
+  // A REFUSAL IS A FRAME, NOT A BLANK PAGE. This branch used to `return null`,
+  // which is the same screenshot as a scene that never mounted — and after the
+  // fall-through above was removed it is the branch every mistyped id lands on,
+  // so it has to say which id and why.
+  if (lesson === null) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div
+          data-testid="drive-rig-refusal"
+          className="max-w-3xl rounded border-2 border-red-500 bg-black/80 p-4 font-mono text-[13px] leading-snug text-red-300"
+        >
+          <div className="mb-2 text-red-400">drive-rig: NOTHING MOUNTED</div>
+          <div className="mb-2 break-all text-lime-300">asked: {resolved.asked}</div>
+          <div>{resolved.error ?? "no lesson"}</div>
+          {cfg.scriptError !== null ? <div className="mt-2">{cfg.scriptError}</div> : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-2">
@@ -113,7 +140,9 @@ function Mounted({ cfg }: { cfg: RigConfig }) {
         onStartLesson={noop}
         onDevTelemetry={rig.onTick}
       />
-      {cfg.readout ? <Readout rig={rig} scriptError={cfg.scriptError} /> : null}
+      {cfg.readout ? (
+        <Readout rig={rig} scriptError={cfg.scriptError} mountedLessonId={lesson.id} />
+      ) : null}
     </div>
   );
 }
@@ -136,7 +165,16 @@ function Mounted({ cfg }: { cfg: RigConfig }) {
  * the bottom edge because Next's dev-tools badge parks there and its
  * „Compiling" pill sat on the speed readout in the first frame produced here.
  */
-function Readout({ rig, scriptError }: { rig: DriveRig; scriptError: string | null }) {
+function Readout({
+  rig,
+  scriptError,
+  mountedLessonId,
+}: {
+  rig: DriveRig;
+  scriptError: string | null;
+  /** WHICH lesson is under the car, on the frame. See resolveLesson.ts. */
+  mountedLessonId: string;
+}) {
   const [, force] = useState(0);
   const [host, setHost] = useState<Element | null>(null);
   useEffect(() => {
@@ -160,6 +198,7 @@ function Readout({ rig, scriptError }: { rig: DriveRig; scriptError: string | nu
       className="pointer-events-none fixed bottom-12 left-1 z-[60] rounded bg-black/75 px-2 py-1 font-mono text-[11px] leading-tight text-lime-300"
     >
       {scriptError !== null ? <div className="text-red-400">{scriptError}</div> : null}
+      <div data-testid="drive-rig-lesson">lesson={mountedLessonId}</div>
       {s === null ? (
         <div>drive-rig: waiting for first tick…</div>
       ) : (

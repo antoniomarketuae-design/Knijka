@@ -63,6 +63,25 @@ describe("§1 · the ⚙ sheet and the demonstration deck are one surface", () =
     expect(STYLES_CODE).toContain('html[data-sim-car-sheet="open"] [data-hud="demo-deck"]');
   });
 
+  /* ── THE OTHER HALF OF `touchArc.test.ts`' NEW SWEEP — w37, 2026-09-12.
+        That file proves the ARITHMETIC clears the steering flank; this one
+        proves the stylesheet is still spending it. The two are separable and
+        the separation is the whole failure: the collapsed pill's left was a
+        literal `0.75rem` inside a `calc()` inside a template literal, so a
+        resolver could be perfect while the CSS put the pill on the horn — which
+        is exactly what w37's frames photographed. Interpolated now, from the
+        constant the OPEN deck and the top rail already stand on. */
+  it("the collapsed landscape deck is placed from the flank clearance, not from the stage edge", () => {
+    const at = STYLES_CODE.indexOf('@media (max-height: 560px) { [data-sim-compact="on"] [data-hud="demo-deck"] {');
+    expect(at, "the compact-landscape deck rule moved — re-anchor this test").toBeGreaterThan(-1);
+    const rule = STYLES_CODE.slice(at, at + 220);
+    expect(rule).toContain("left: ${DECK_COMPACT_OPEN_LEFT_CSS}");
+    // The value it replaced, by name: 12 px from the stage edge is 48 px inside
+    // `FLANK_LANE_PX`, and the notch cancels so it was every landscape profile.
+    expect(rule).not.toContain("0.75rem + env(safe-area-inset-left");
+  });
+
+
   it("takes the sheet's own inert state into account, not just its open flag", () => {
     // A teach card makes this overlay inert and the sheet's node is not
     // rendered at all. A `true` left published there would keep a
@@ -342,6 +361,47 @@ describe("§1c · the ⚙ sheet and the lesson menu each clear their corridor", 
     expect(STYLES_CODE).toContain(
       '[data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="demo-deck"]',
     );
+  });
+
+  /**
+   * sc-ed-reverse-line:d6fb0f3c — „with the settings sheet open and the rest of
+   * the HUD dimmed, the «Следвай синята линия» pill stays at full brightness
+   * outside the overlay, so a modal that should own the screen does not."
+   *
+   * The deck was not the only surface left standing on the menu. Read off the
+   * row's own frame (`.audit-frames/sweep161/sc-ed-reverse-line/mobile-right/
+   * 07b-menu.png`, device y 240): the pill's ink is rgb(72, 169, 255) — the
+   * accent at full strength — while the objective banner, the notification
+   * column, the deck pill and the whole touch rail are gone from the stage.
+   *
+   * The ORDER is asserted as well as the presence, and that is not tidiness:
+   * the case below reads a fixed window after the deck's selector, so a second
+   * selector appended AFTER it moves the declaration out of that window. The
+   * rule's own site says so; this is the half that fails if someone reorders it.
+   */
+  it("…and so does the standing route pill, in the same rule and before the deck", () => {
+    const pill =
+      '[data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="follow-hint"]';
+    const deck =
+      '[data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="demo-deck"]';
+    expect(
+      STYLES_CODE,
+      "the route pill is up for the whole of every L1 drive and was the one " +
+        "surface the menu could not stand down",
+    ).toContain(pill);
+    const pillAt = STYLES_CODE.indexOf(pill);
+    const deckAt = STYLES_CODE.indexOf(deck);
+    expect(pillAt).toBeGreaterThan(-1);
+    expect(deckAt).toBeGreaterThan(-1);
+    expect(
+      pillAt,
+      "the pill's selector moved after the deck's — the `visibility` window the " +
+        "next case reads is 130 chars and a second selector does not fit in it",
+    ).toBeLessThan(deckAt);
+    // ONE rule, not two: the slice from the pill to the deck must be nothing
+    // but the comma that joins them, or these are two declarations that can
+    // drift apart the way `pauseModalUp` and `paused` did.
+    expect(STYLES_CODE.slice(pillAt + pill.length, deckAt)).toBe(", ");
   });
 
   it("…and both use `visibility`, never `display`, because a deck owns a replay clock", () => {

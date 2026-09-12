@@ -508,9 +508,11 @@ const INERT_GROUND_SCRATCH = new Color();
  * shader PROGRAM twice per glance, on the tier the founder has already called
  * „brutally low". This keeps one program for the life of the scene.
  *
- * Restores the renderer's render target, clear colour and scissor: the
- * composer owns all three, and doc 82 §3.2 is the standing reminder of what
- * leaving renderer state modified costs here.
+ * Restores the renderer's render target and clear colour — the composer owns
+ * both, and doc 82 §3.2 is the standing reminder of what leaving renderer state
+ * modified costs here. The band's scissor is NOT renderer state at all any
+ * more: it lives on the target and unwinds with it, which is the subject of the
+ * second docblock below and was the reason this repair reached nobody.
  */
 /** Fraction of the glass, measured from the bottom, that is ground rather than
  *  sky. The door mirrors are aimed 4–5° down (see the pose table above), so
@@ -544,7 +546,83 @@ export function inertGlassBands(
   ground.lerp(atmosphere, INERT_GROUND_MIX);
 }
 
-function clearMirrorToInert(
+/**
+ * Where the sky band sits in the target, in TARGET PIXELS, GL's origin (bottom
+ * left) — so `y … y + height` is the strip ABOVE the ground fraction.
+ *
+ * Exported so the rect can be asserted without a GL context, and split out
+ * because the number it returns is the whole of what the band is: a rect that
+ * must reach the top row of the glass (`y + height === target.height`) and
+ * must never be expressed in anything but this target's own pixels. See
+ * `clearMirrorToInert` for why that second clause needed enforcing.
+ */
+export function inertSkyBandRect(height: number): { y: number; height: number } {
+  const groundPx = Math.round(height * INERT_GROUND_FRACTION);
+  return { y: groundPx, height: height - groundPx };
+}
+
+/**
+ * ── THE BAND IS SCISSORED ON THE TARGET, NOT ON THE RENDERER ────────────────
+ *    sc-vu-pass-clearance:d770323a again, and this is the half that decided
+ *    whether the repair above reached a student at all.
+ *
+ * The two-band clear shipped through `gl.setScissorTest()` / `gl.setScissor()`,
+ * and those are RENDERER-space calls: three multiplies their argument by the
+ * renderer's pixel ratio before it reaches GL —
+ *
+ *     state.scissor( _currentScissor.copy( _scissor ).multiplyScalar( _pixelRatio ).round() )
+ *     — three 0.185.1, WebGLRenderer.setScissor
+ *
+ * — because on the DEFAULT framebuffer a scissor is authored in CSS pixels. A
+ * bound render target is not the default framebuffer and has no CSS size at
+ * all: `setRenderTarget` programs the scissor straight from `renderTarget
+ * .scissor`, unscaled (same file, `_currentScissor.copy( renderTarget.scissor )`).
+ * So the band was being multiplied by a ratio the 160 × 96 target does not
+ * live in.
+ *
+ * MEASURED, on the app's own numbers. The band is (0, 60, 160, 36) and the
+ * target is 160 × 96, so the rows the sky clear actually reaches are:
+ *
+ *   pixelRatio  rect that reached GL      rows painted of the 36 it asked for
+ *   1.0         (0,  60, 160,  36)        36   ← correct
+ *   1.25        (0,  75, 200,  45)        21   ← wrong size AND 15 rows high
+ *   1.5         (0,  90, 240,  54)         6
+ *   2.0         (0, 120, 320,  72)         0
+ *   3.0         (0, 180, 480, 108)         0
+ *
+ * and the ratios the product hands out (`maxDprFor`, clamped by R3F's
+ * `dpr={[1, canvasMaxDpr(level)]}`):
+ *   · a HANDSET on `med` — DEFAULT_PRESET, and the tier `autoQualityCeiling()`
+ *     hard-caps every touch-only device at — renders at
+ *     `clamp(devicePixelRatio, 1, TOUCH_MED_MAX_DPR = 2)`. The founder's
+ *     iPhone: 2.0. ZERO rows.
+ *   · a handset on `high`, the one tier a deliberate «Високо» press can reach:
+ *     `clamp(dpr, 1, TOUCH_HIGH_MAX_DPR = 3)` = 3.0. Zero rows.
+ *   · a desktop on `med` (preset maxDpr 1.25) with any display scaling at all:
+ *     1.25. Twenty-one rows, in the wrong place.
+ *   · pixelRatio 1 — a plain 1× desktop, which is the PC audit harness. Right.
+ *
+ * So the sky clear wrote NOTHING on the device the founder reviews on, and the
+ * unattended door glass stayed the ONE FLAT FILL this repair exists to remove,
+ * while coming out correct on the only machine the corpus is photographed by.
+ * That is the reassuring direction, and it is why the band is now asserted by a
+ * test that counts the clears rather than by a grep for the line — the grep
+ * passed the whole time.
+ *
+ * THE FIX IS THE TARGET'S OWN `scissor` / `scissorTest`, re-bound. Those are
+ * documented in target pixels, they cannot see a pixel ratio, and
+ * `setRenderTarget(prevTarget)` at the end unwinds them by construction rather
+ * than by us remembering to.
+ *
+ * IT ALSO STOPS A LEAK THIS FUNCTION'S OWN DOCBLOCK CLAIMED IT DID NOT HAVE.
+ * `gl.setScissor` writes the renderer's `_scissor`, and only `_scissorTest` was
+ * being restored — so every blanked door mirror left the DEFAULT framebuffer's
+ * scissor box set to the mirror band, waiting for the first thing that turns
+ * the scissor test on. Nothing does today; that is luck, not design, and doc 82
+ * §3.2 is the standing reminder of what leaving renderer state modified costs
+ * here. The renderer-space calls are simply gone now.
+ */
+export function clearMirrorToInert(
   gl: WebGLRenderer,
   target: WebGLRenderTarget,
   color: Color,
@@ -553,26 +631,37 @@ function clearMirrorToInert(
   const prevTarget = gl.getRenderTarget();
   const prevColor = gl.getClearColor(CLEAR_COLOR_SCRATCH).clone();
   const prevAlpha = gl.getClearAlpha();
-  const prevScissor = gl.getScissorTest();
   inertGlassBands(color, atmosphere, INERT_SKY_SCRATCH, INERT_GROUND_SCRATCH);
+  // Off BEFORE the ground clear, not just after the band: this target is shared
+  // with the live pass, and a band left armed from the previous blank would let
+  // the ground cover only the strip and leave the rest of the glass stale.
+  target.scissorTest = false;
   gl.setRenderTarget(target);
   // Ground first, over the WHOLE target — so if the scissor below is ever
   // refused the glass is still fully written and never shows an uninitialised
   // buffer, which is the one failure this blank exists to prevent.
   gl.setClearColor(INERT_GROUND_SCRATCH, 1);
   gl.clear(true, true, false);
-  // …then the sky band over the top of it. GL's origin is bottom-left, so the
-  // sky is the rect ABOVE the ground fraction.
-  const groundPx = Math.round(target.height * INERT_GROUND_FRACTION);
-  if (target.height - groundPx > 0) {
-    gl.setScissorTest(true);
-    gl.setScissor(0, groundPx, target.width, target.height - groundPx);
-    gl.setClearColor(INERT_SKY_SCRATCH, 1);
-    gl.clear(true, false, false);
-    gl.setScissorTest(prevScissor);
+  // …then the sky band over the top of it.
+  const band = inertSkyBandRect(target.height);
+  try {
+    if (band.height > 0) {
+      target.scissor.set(0, band.y, target.width, band.height);
+      target.scissorTest = true;
+      // Re-binding the SAME target is what applies them: `setRenderTarget` has
+      // no identity early-out and reads both fields every call.
+      gl.setRenderTarget(target);
+      gl.setClearColor(INERT_SKY_SCRATCH, 1);
+      gl.clear(true, false, false);
+    }
+  } finally {
+    // NEVER conditional, for the same reason the instance cull's restore is
+    // not: a throw here must not leave the live mirror pass rendering into a
+    // 36-row strip of its own glass for the rest of the lesson.
+    target.scissorTest = false;
+    gl.setClearColor(prevColor, prevAlpha);
+    gl.setRenderTarget(prevTarget);
   }
-  gl.setClearColor(prevColor, prevAlpha);
-  gl.setRenderTarget(prevTarget);
 }
 
 /**

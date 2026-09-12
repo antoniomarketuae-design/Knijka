@@ -25,6 +25,7 @@ import {
 } from "./TouchControls";
 import {
   notifyColumnWidthPx,
+  deckCompactOpenLeftPx,
   FLANK_LANE_VAR,
   NOTIFY_COLUMN_GUTTER_PX,
 } from "@/modules/sim/hud";
@@ -314,6 +315,68 @@ describe("nothing on this screen is under anything else on this screen", () => {
     // …and the same three boxes are clear under what ships now.
     for (const stage of [small, galaxy, iphone]) {
       expect(overlap(arcStationRectPx(3, "left", stage), playMenuRectPx(stage))).toBe(0);
+    }
+  });
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     …AND THE OTHER SURFACE THAT MEASURES FROM THE STAGE EDGE — w37, 2026-09-12.
+
+     The two tests above sweep «МЕНЮ» against the flank. Exactly one more thing
+     in this corridor is placed by a length rather than by the lane, and it is
+     the one the 2026-08-10 pass MOVED here: `PlayAreaStyles`' compact-landscape
+     rule for the collapsed «🎬 Демонстрация ▸» pill, which read
+     `left: calc(0.75rem + env(safe-area-inset-left))` — 12 px from the stage,
+     inside a 60 px lane.
+
+     THE COLLISION IS THE ONE THIS FILE'S HEADER ALREADY NAMES. „«🎬
+     Демонстрация ▸» × «Клаксон — задръж» = 1 861 px², the largest overlap on
+     the screen, reported by no lane at all" was closed by raising the deck's
+     FLOOR; the same pass then dropped it into the left corridor at a stage-edge
+     offset, and it landed on the same horn from the side. Photographed on w37
+     (`sc-mw-emergency-lane__mobile-right/04-t028s.png`,
+     `sc-vu-emergency__mobile-right/04-t105s.png`, tree 5c200d0): the pill's «Д»
+     behind the flank ghost's plate, its 🎬 on the horn's own ⊙.
+
+     The pill's box is not resolvable from this file — its height is a Tailwind
+     class and its width is type — so the sweep asks the only question that does
+     not need them: does its LEFT edge start past the flank? A box that starts
+     past the lane cannot overlap a station on any row, whatever its height.
+     ═════════════════════════════════════════════════════════════════════════ */
+  it("the collapsed demonstration pill starts past the steering flank, on every landscape profile", () => {
+    const bad: string[] = [];
+    for (const { id, stage } of LADDER) {
+      if (stage.height >= stage.width) continue; // the media query is landscape-only
+      const left = deckCompactOpenLeftPx({ left: stage.insetLeft });
+      for (const s of stations(stage)) {
+        if (s.side !== "left") continue;
+        const gap = left - (s.rect.x + s.rect.w);
+        if (gap < 8) bad.push(`${id} ${s.id}: the pill starts ${gap.toFixed(1)} px past it`);
+      }
+      // …and past the LANE, not merely past the boxes: the flank ghost paints a
+      // plate the full width of `FLANK_LANE_PX`, and it is the plate the «Д»
+      // disappeared behind.
+      const lane = FLANK_LANE_PX + (stage.insetLeft ?? 0);
+      if (left < lane) bad.push(`${id}: the pill starts ${(lane - left).toFixed(1)} px INSIDE the lane`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("and it did not pass by accident: the OLD 0.75rem offset fails this same sweep", () => {
+    // The negative control the test above it also carries. `0.75rem` from the
+    // stage edge is 12 + notch, and the notch cancels — so the pill was 48 px
+    // inside a 60 px lane on EVERY landscape profile, not just the notched one.
+    const oldLeft = (stage: StageBox) => 12 + (stage.insetLeft ?? 0);
+    for (const { id, stage } of LADDER) {
+      if (stage.height >= stage.width) continue;
+      const lane = FLANK_LANE_PX + (stage.insetLeft ?? 0);
+      expect(`${id} ${lane - oldLeft(stage)}`).toBe(`${id} 48`);
+      // Station 2 is «КЛАКС» on the four-station flank — the box the frames
+      // show the pill standing on. Its right edge is 8 + notch + 44; the pill
+      // started at 12 + notch, so 40 px of the horn were under the pill on
+      // every profile, which is the horizontal term of the 1 060 px² the CSS
+      // rule's own site works out.
+      const horn = arcStationRectPx(2, "left", stage);
+      expect(`${id} ${horn.x + horn.w - oldLeft(stage)}`).toBe(`${id} 40`);
     }
   });
 

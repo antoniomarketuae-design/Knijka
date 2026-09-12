@@ -1400,12 +1400,35 @@ export const DECK_TOUCH_TRANSPORT_ROW_PX = 58;
  */
 export const DECK_TOUCH_CAPTION_ROAD_MAX_PX = 174;
 
+/**
+ * What `DECK_COMPACT_OPEN_LEFT_CSS` resolves to — and since w37 (2026-09-12)
+ * what the COLLAPSED landscape pill resolves to as well.
+ *
+ * IT IS A FUNCTION AND NOT A THIRD COPY OF `8 + 56`. The constant already
+ * existed three times in three registers — the CSS string above, the literal
+ * inside `deckCompactOpenWidthPx` below, and `TOP_RAIL_LEFT_CSS`'s own
+ * derivation — and the fourth consumer is a TEST that has to prove the deck
+ * clears the steering flank (`touchArc.test.ts`). A test that restates the
+ * number it is checking proves that someone typed it twice.
+ *
+ * WHY THE COLLAPSED PILL NEEDED IT. `PlayAreaStyles`' compact-landscape rule
+ * used to say `left: calc(0.75rem + env(safe-area-inset-left))` — 12 px from
+ * the STAGE edge, inside `FLANK_LANE_PX` (60), i.e. on top of the ⊙ horn.
+ * Measured 1 060 px² of paint and 1 660 px² of hit rect on w37's frames; the
+ * rule's own site carries the table. This value clears the lane by 8 px on
+ * every profile in the ladder, inset or not, because the notch appears in both
+ * terms and cancels.
+ */
+export function deckCompactOpenLeftPx(insets: { left?: number } = {}): number {
+  return 8 + 56 + (insets.left ?? 0);
+}
+
 /** What `DECK_COMPACT_OPEN_WIDTH_CSS` resolves to on a given landscape stage. */
 export function deckCompactOpenWidthPx(
   stageWidthPx: number,
   insets: { left?: number; right?: number } = {},
 ): number {
-  const left = 8 + 56 + (insets.left ?? 0);
+  const left = deckCompactOpenLeftPx(insets);
   const right =
     NOTIFY_COLUMN_GUTTER_PX + (insets.right ?? 0) + notifyColumnWidthPx(stageWidthPx, true) + 8;
   return stageWidthPx - left - right;

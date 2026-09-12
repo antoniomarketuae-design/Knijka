@@ -30,6 +30,7 @@ import {
   gearDownWithBg,
   gearUpActBg,
   gearUpWithBg,
+  HAZARD_BAND_TOP_FRACTION,
   hintInputFor,
   HudStyles,
   HudToasts,
@@ -2579,6 +2580,111 @@ export function briefingStandsDown(speedKmh: number): boolean {
 }
 
 /**
+ * The list may keep this much even when the ceiling below would take more, px.
+ *
+ * One authored step at the shipped `text-[11px] leading-tight` (13.75 px per
+ * line) is two line boxes on the median step in this catalogue = 27.5, plus the
+ * list's own `pb-2.5` (10 px), which is what puts the last line's box bottom on
+ * the fade's opaque edge instead of inside it. 38 is that sum rounded up.
+ *
+ * A ceiling that can reach zero is not a ceiling, it is a delete: it would hand
+ * the student a header, a counter and nothing between them, which is the В27
+ * shape — removing the teaching to satisfy a row about the teaching being in
+ * the way. When the floor bites, the card is over the band and the ceiling has
+ * failed; it fails toward keeping the words.
+ */
+export const BRIEFING_ROAD_MIN_LIST_PX = 38;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * …AND THE PANEL THE STUDENT ASKS BACK IS THE ONE THAT STANDS ON THE ROAD
+ * (sc-junction-rhr:486cad54 · sc-ov-crossing-overtake:4bce6fca, the same
+ * sentence twice: „the ИНСТРУКЦИИ panel covers the right third of the
+ * windscreen — exactly the side the priority vehicle arrives from").
+ *
+ * WHY THE SIBLING ROW CLOSED AND THIS ONE DID NOT, which is the whole shape of
+ * the remaining defect. 4bce6fca was filed on a DRIVING beat
+ * (`sweep161/sc-ov-crossing-overtake/pc-right/04-t160s.png`, 11 км/ч) and was
+ * closed on the w12 re-drive because `briefingStandsDown` had turned every one
+ * of that leg's 33 beats into the one-line pill. 486cad54 is filed on
+ * `01-arrival`, a 0 км/ч frame, and has been re-judged STILL twelve times on
+ * that same frame — where the fold correctly does not fire, because folding a
+ * briefing at the standstill it exists for is the opposite defect.
+ *
+ * SO THE FOLD ALREADY OWNS THE DRIVING BEATS — EXCEPT THE ONE IT IS FORBIDDEN
+ * TO OWN. „Once, and never against the student" (the paragraph above `unfold`)
+ * means a student who presses «ⓘ Инструкции · 6 стъпки ▸» at 40 км/ч gets the
+ * whole panel back and keeps it for the rest of the lesson, however often the
+ * car stops and starts. That ruling is right and is not touched here. What it
+ * leaves is a five-to-eight-step opaque card, ~320 px of a ~1165 px stage,
+ * standing on the right kerb at speed, with no ceiling of any kind on it — the
+ * exact picture both rows photograph, reachable by an ordinary gesture the
+ * chip invites.
+ *
+ * THE CEILING IS BORROWED, NOT INVENTED. `HAZARD_BAND_TOP_FRACTION` is where a
+ * 2.2 m sign at 30 m and a pedestrian at 15 m land, derived at the 50 km/h
+ * limit; `PlayAreaStyles` already spends it on `[data-hud="touch-hint"]`, the
+ * other reading surface in this corridor. A second opinion about where the road
+ * begins is how two surfaces on one frame disagree, so the number is imported.
+ *
+ * AND NOT THE TIGHTER `NOTIFY_COLUMN_MAX_STAGE_FRACTION` (0.40, the horizon),
+ * which is what the compact peek pays. MEASURED off the pixels of the row's own
+ * newest frame rather than derived — `.audit-frames/w37/frames/
+ * sc-junction-rhr__pc-right/01-arrival.png`, 1440 × 900, edges found by scanning
+ * for the `26,33,48` border: the stage box is x 264–1431 × y 97–753, i.e. a
+ * 1167 × 655 stage whose content starts at y = 98, and this card is
+ * x 1099–1418 (320 px = 27.4 % of the stage) × y 323–581.
+ *
+ *   card top      323 px = 0.343 of the stage (the mirror lane, then ЗАДАЧА)
+ *   list top     ~351 px = 0.386   (card `py-1.5`, the header row, `mt-1`)
+ *   horizon 0.402 361 px →  10 px of corridor
+ *   hazard  0.53  445 px →  94 px of corridor ≈ 7 line boxes ≈ 3 steps
+ *   card floor    581 px = 0.737 of the stage — 0.33 of it BELOW the horizon
+ *
+ * A ceiling written at the horizon is therefore FLOORED on every roomy stage in
+ * the ladder — a fixed 38 px cap wearing a rule's name, which is worse than no
+ * rule because the next reader believes it. The band's own top is reachable and
+ * it is what the sibling surface in this lane already pays.
+ *
+ * IT IS A `max-height` ON THE LIST AND NOT ON THE CARD, so the chrome cannot be
+ * the thing that is clipped: the header, the ▾/✕ pair and the «↓ още N стъпки —
+ * покажи» row are `shrink-0` siblings of a `min-h-0` scroller, and the words the
+ * ceiling takes join the fold that already counts them and already has a button
+ * that pages to them. That is the same trade `NOTIFY_COLUMN_MAX_STAGE_FRACTION`
+ * states in its own header — „the words are not deleted".
+ *
+ * `null` FOR ANYTHING UNREADABLE, and that direction is deliberate: a server
+ * render, jsdom (every rect is 0 there), a popup rig with no `[data-sim-stage]`
+ * ancestor and a stage of zero height all resolve to today's behaviour exactly.
+ * An unreadable geometry must never be the thing that shortens the teaching.
+ *
+ * `cardTopPx` is the LIST's viewport top and it does not move when the list
+ * shrinks — the column is top-anchored and every sibling above this card holds
+ * its own size (`min-h-0` lives on this card alone) — so applying the result
+ * cannot change the input. Without that the `ResizeObserver` that recomputes it
+ * would be an oscillator.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function briefingRoadCeilingPx(
+  listTopPx: number,
+  stageTopPx: number,
+  stageHeightPx: number,
+  hazardTopFraction: number = HAZARD_BAND_TOP_FRACTION,
+): number | null {
+  if (
+    !Number.isFinite(listTopPx) ||
+    !Number.isFinite(stageTopPx) ||
+    !Number.isFinite(stageHeightPx) ||
+    !Number.isFinite(hazardTopFraction)
+  ) {
+    return null;
+  }
+  if (stageHeightPx <= 0) return null;
+  const bandTopPx = stageTopPx + hazardTopFraction * stageHeightPx;
+  return Math.max(BRIEFING_ROAD_MIN_LIST_PX, bandTopPx - listTopPx);
+}
+
+/**
  * …AND THE SAME RULE ON THE PHONE, WHERE THERE IS NO CARD TO HOLD IT
  * (sc-signal-hesitation:f5ffccf3 — the row, the census and the three quarters
  * of it that other waves already closed are at the effect that calls this).
@@ -2760,6 +2866,10 @@ export function BriefingCard({
     bottomPx: number;
     hardEdge: boolean;
   } | null>(null);
+  /** How tall the list may be before its floor enters the hazard band — the
+   *  geometry only. Whether it is SPENT is the road's question, and that is
+   *  asked at the `<ol>`'s own style. `null` = nothing measurable, i.e. today. */
+  const [roadCeilingPx, setRoadCeilingPx] = useState<number | null>(null);
   const measure = useCallback(() => {
     const ol = listRef.current;
     if (ol === null) return;
@@ -2817,6 +2927,20 @@ export function BriefingCard({
     // step 1 — otherwise the last press of «покажи» strands the reader at the
     // bottom of a list whose opening steps are now the unreachable ones.
     setScrollTopPx(ol.scrollTop);
+    // …AND WHERE THE ROAD BEGINS, in the same coordinates. `briefingRoadCeilingPx`
+    // has the rows, the arithmetic and why the number is the band's top and not
+    // the horizon. The stage is walked to rather than passed in because this card
+    // is mounted from three places (the shell, the popup rig, and whatever the
+    // next rung is) and a prop none of them can compute is a prop that arrives
+    // wrong; `closest` answers with the box the column is positioned in or with
+    // nothing, and nothing is the safe reading.
+    const stage = ol.closest("[data-sim-stage]");
+    const stageRect = stage === null ? null : stage.getBoundingClientRect();
+    setRoadCeilingPx(
+      stageRect === null
+        ? null
+        : briefingRoadCeilingPx(listTop, stageRect.top, stageRect.height),
+    );
   }, []);
   useEffect(() => {
     const ol = listRef.current;
@@ -3141,7 +3265,25 @@ export function BriefingCard({
         ref={listRef}
         onScroll={measure}
         className="mt-1 flex min-h-0 flex-col gap-0.5 overflow-y-auto pb-2.5 [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]"
-        style={
+        style={{
+          // ── AND THE LIST STOPS ABOVE THE HAZARD BAND WHILE THE CAR IS MOVING.
+          //    The rows, the two frames and the arithmetic are at
+          //    `briefingRoadCeilingPx`; the predicate is the SAME
+          //    `briefingStandsDown` the fold uses, so the card cannot hold one
+          //    opinion about „he is driving now" while the fold holds another.
+          //
+          //    AT A STANDSTILL THERE IS NO CEILING AT ALL, and that is the half
+          //    that keeps this from being the opposite defect. `01-arrival` and
+          //    `03-ready` are 0 км/ч on every lesson in the catalogue: the
+          //    student is reading, the world behind the card is a parked street,
+          //    and trading four authored steps for a view of it is a loss. The
+          //    ceiling is charged only where the row's own sentence is true with
+          //    a car in motion — the panel a student asked back mid-drive, which
+          //    „once, and never against the student" (above `unfold`) entitles
+          //    him to keep and which nothing until now bounded.
+          ...(roadCeilingPx !== null && briefingStandsDown(speedKmh)
+            ? { maxHeight: roadCeilingPx }
+            : null),
           // ── THE FADE IS BOUND TO THE COUNTER'S OWN PREDICATE, `below > 0`,
           //    and that is the row directly under this list stating the rule:
           //    „It exists only while something is genuinely below the fold, so
@@ -3171,7 +3313,7 @@ export function BriefingCard({
           //    that would swallow more than one line box), the 2026-08-14 band
           //    is emitted exactly as before. Faded-through remains the floor;
           //    it is no longer the ceiling.
-          below > 0 || foldWin?.hardEdge === true
+          ...(below > 0 || foldWin?.hardEdge === true
             ? {
                 // Both spellings: unprefixed in current WebKit, prefixed in the
                 // engine the founder reads this on. Same pair `SimOverlay`'s two
@@ -3185,8 +3327,8 @@ export function BriefingCard({
                     ? foldMaskCss(foldWin, BRIEFING_FADE_PX)
                     : BRIEFING_FADE_MASK_CSS,
               }
-            : undefined
-        }
+            : null),
+        }}
       >
         {steps.map((s) => (
           <li

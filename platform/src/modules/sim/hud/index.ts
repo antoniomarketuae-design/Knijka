@@ -75,6 +75,36 @@ export {
   peekScrimMaskCss,
 } from "./SimOverlay";
 /**
+ * …AND THE CHIP GROUND WITH IT — sweep w37, 2026-09-12, and it travels with the
+ * same warning the block above ends on.
+ *
+ * The shade above is the ground for PROSE. `SimOverlay`'s 2026-08-27 block
+ * („A GROUND SIZED FOR READING IS NOT A GROUND FOR A 44 px CONTROL") measured
+ * the other half: inside a touch target the world's own edges become objects
+ * INSIDE the control, and the rung that fixes it is `PEEK_CHIP_TOTAL_ALPHA`
+ * 0.90 — accepted for a control and explicitly rejected for the card, because
+ * „a chip is not a window onto the road".
+ *
+ * THE SECOND SURFACE WITH THE IDENTICAL DEFECT is the demonstration deck's own
+ * «🎬 Демонстрация ▸» toggle (`LessonScene`), and it is worse than the chips
+ * were: they at least stood on the card's 0.80: this one stands on BARE WORLD.
+ * Measured on `.audit-frames/w37/frames/sc-mw-emergency-lane__mobile-right/
+ * 04-t028s.png` — the label ink is rgb(195, 207, 226) (`--muted`, the ghost's
+ * own pin) and the sky it is painted on is rgb(162, 167, 172): **1.16 : 1**.
+ * Its authored `bg-background/80` never reached the glass — `demo-deck` is on
+ * `GHOST_SURFACES` and the button carried no `data-hud-ink`.
+ *
+ * ── THE TRAP, AND IT IS THE DEFAULT ARGUMENT. `peekChipGroundCss()` defaults to
+ *    `PEEK_CHIP_GROUND_ALPHA` (0.50), which is the SECOND layer — the one that
+ *    composites with a card ground of 0.80 to reach 0.90. A control standing on
+ *    bare world that takes the default gets HALF a ground and looks repaired:
+ *    `--muted` on 0.50 over the corpus's brightest world pixel is 3.35 : 1,
+ *    under AA. So a consumer outside a card must pass `PEEK_CHIP_TOTAL_ALPHA`
+ *    explicitly, which is why the constant is published beside the function
+ *    rather than left inside it.
+ */
+export { PEEK_CHIP_GROUND_ALPHA, PEEK_CHIP_TOTAL_ALPHA, peekChipGroundCss } from "./SimOverlay";
+/**
  * THE LINE-GRID SNAP, PUBLISHED — sweep w10 round 11, and it was ROUTED here
  * in writing before it was asked for.
  *
@@ -167,9 +197,17 @@ export {
   // Declared by components/sim/TouchControls (TOUCH_BAND_CSS_VARS); pinned to
   // that declaration by touchArc.test.ts.
   FLANK_LANE_VAR,
+  // Where the hazard band STARTS, as a fraction of the stage — „a 2.2 m sign at
+  // 30 m and a pedestrian at 15 m", derived at the 50 km/h limit. It was
+  // module-private because only `PlayAreaStyles` spent it (the touch hint's
+  // ceiling); the roomy briefing is the second tenant of the same corridor with
+  // the same duty, and a second opinion about where the road begins is how two
+  // surfaces on one frame end up disagreeing. See `briefingRoadCeilingPx`.
+  HAZARD_BAND_TOP_FRACTION,
   notifyColumnWidthPx,
   // …and the demonstration transport, which shares this corridor on a phone —
   // and, when it is OPEN, leaves it for the left one on a desktop too.
+  deckCompactOpenLeftPx,
   deckCompactOpenWidthPx,
   deckTouchRowMinWidthPx,
   COCKPIT_CLUSTER_LEFT_PCT,

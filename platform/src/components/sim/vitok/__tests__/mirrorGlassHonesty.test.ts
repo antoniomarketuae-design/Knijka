@@ -34,10 +34,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { Color } from "three";
+import { Color, Vector4, type WebGLRenderTarget, type WebGLRenderer } from "three";
 import { describe, expect, it } from "vitest";
 
-import { inertGlassBands, initialPrimeMask, mirrorGlassIsLive } from "../MirrorRig";
+import {
+  clearMirrorToInert,
+  inertGlassBands,
+  inertSkyBandRect,
+  initialPrimeMask,
+  mirrorGlassIsLive,
+  INERT_GROUND_FRACTION,
+} from "../MirrorRig";
 import { MIRROR_BIT, MIRROR_KINDS } from "@/modules/sim/scene/vitok/mirrorAttention";
 
 describe("mirrorGlassIsLive — the door glass tells the truth or nothing", () => {
@@ -170,13 +177,176 @@ describe("inertGlassBands — unlit glass, not a hole", () => {
     expect(ground.getHex()).toBe(glass().getHex());
   });
 
-  it("the bands reach the renderer — the clear is scissored into two", () => {
+  it("the bands reach the frame loop — the clear really is the live scene's", () => {
     // Without these two lines `inertGlassBands` is a pure function nothing
     // calls and the glass is exactly as flat as it was before the repair.
+    // (The band's GEOMETRY is no longer grepped for; it is driven below, which
+    // is what caught the pixel-ratio defect a grep had certified as fixed.)
     const rig = readFileSync(resolve(__dirname, "../MirrorRig.tsx"), "utf8");
     expect(rig).toContain("inertGlassBands(color, atmosphere, INERT_SKY_SCRATCH, INERT_GROUND_SCRATCH);");
-    expect(rig).toContain("gl.setScissor(0, groundPx, target.width, target.height - groundPx);");
     // …and the atmosphere really is the live scene's, not a constant.
     expect(rig).toContain("scene.fog instanceof FogExp2 ? scene.fog.color : null,");
+  });
+});
+
+/**
+ * ── AND THE SECOND BAND HAD TO SURVIVE A PIXEL RATIO — sc-vu-pass-clearance:d770323a.
+ *
+ * `inertGlassBands` computes two colours; the clear has to actually land them
+ * in two different parts of a 160 × 96 render target. It did not. The band was
+ * programmed with `gl.setScissor`, which is a CSS-pixel call — three multiplies
+ * it by the renderer's pixel ratio before it reaches GL — while a bound render
+ * target's scissor is read straight off `renderTarget.scissor`, unscaled.
+ *
+ * `autoQualityCeiling()` caps every touch device at `med`, and `maxDprFor` gives
+ * a handset on `med` `clamp(devicePixelRatio, 1, 2)` — so on the founder's phone
+ * the rect (0, 60, 160, 36) reached GL as (0, 120, 320, 72): entirely above a
+ * 96-row buffer, an intersection of zero pixels. The sky clear wrote nothing and
+ * the glass stayed the single flat fill the repair existed to remove. It painted
+ * 21 of 36 rows at 1.25 (a desktop on `med`), 6 at 1.5, and came out right only
+ * at pixelRatio 1 — the desktop audit harness, the one machine the corpus is
+ * photographed on.
+ *
+ * The previous version of the assertion was `expect(rig).toContain("gl.setScissor(…)")`.
+ * It passed. That is why these cases DRIVE the function against a recording
+ * renderer instead of reading the file: a grep can only confirm that a line was
+ * written, never that the rectangle it writes lands inside the glass.
+ *
+ * MUTATION CHECK RUN BEFORE COMMIT: restoring the `gl.setScissor` /
+ * `gl.setScissorTest` pair reds „never programs a RENDERER-space scissor" and
+ * „writes the ground over the whole glass…"; dropping the band entirely reds
+ * the clear count; leaving `target.scissorTest` armed reds „hands the glass
+ * back whole".
+ */
+describe("clearMirrorToInert — the band is expressed in TARGET pixels", () => {
+  const TARGET_W = 160;
+  const TARGET_H = 96;
+  const GLASS = 0x0a0c10;
+  const ATMOSPHERE = 0x8fa2b4;
+  /** What the composer had set before the blank runs, so the restore is real. */
+  const PREV_COLOR = 0x123456;
+  const PREV_ALPHA = 0.25;
+
+  interface ClearRecord {
+    target: unknown;
+    scissorTest: boolean;
+    scissor: [number, number, number, number];
+    color: number;
+  }
+
+  function drive() {
+    // A stub and not a real WebGLRenderTarget: the four fields the blank reads
+    // are the whole contract, and a real one would want a GL context.
+    const target = {
+      width: TARGET_W,
+      height: TARGET_H,
+      scissor: new Vector4(0, 0, TARGET_W, TARGET_H),
+      scissorTest: false,
+    };
+    const priorTarget = { name: "the composer's own target" };
+    let bound: unknown = priorTarget;
+    const clearColor = new Color(PREV_COLOR);
+    let clearAlpha = PREV_ALPHA;
+    const clears: ClearRecord[] = [];
+    /** Every CSS-pixel call the repair is forbidden to make. */
+    const rendererSpace: string[] = [];
+
+    const gl = {
+      getRenderTarget: () => bound,
+      getClearColor: (out: Color) => out.copy(clearColor),
+      getClearAlpha: () => clearAlpha,
+      setClearColor: (c: Color, a: number) => {
+        clearColor.copy(c);
+        clearAlpha = a;
+      },
+      setRenderTarget: (t: unknown) => {
+        bound = t;
+      },
+      clear: () => {
+        const t = bound === target ? target : null;
+        clears.push({
+          target: bound,
+          scissorTest: t ? t.scissorTest : false,
+          scissor: t
+            ? [t.scissor.x, t.scissor.y, t.scissor.z, t.scissor.w]
+            : [0, 0, 0, 0],
+          color: clearColor.getHex(),
+        });
+      },
+      setScissor: () => rendererSpace.push("setScissor"),
+      setScissorTest: () => rendererSpace.push("setScissorTest"),
+      getScissorTest: () => {
+        rendererSpace.push("getScissorTest");
+        return false;
+      },
+    };
+
+    clearMirrorToInert(
+      gl as unknown as WebGLRenderer,
+      target as unknown as WebGLRenderTarget,
+      new Color(GLASS),
+      new Color(ATMOSPHERE),
+    );
+    return { target, priorTarget, clears, rendererSpace, bound: () => bound, clearColor, alpha: () => clearAlpha };
+  }
+
+  it("writes the ground over the whole glass, then the sky over the top band", () => {
+    const { clears } = drive();
+    expect(clears).toHaveLength(2);
+    // 1 — the ground, unscissored, so no part of the glass is ever left
+    // uninitialised even if the band below is refused.
+    expect(clears[0].scissorTest).toBe(false);
+    // 2 — the sky, scissored to the strip above the ground fraction. GL's
+    // origin is bottom-left, so that strip is the HIGH rows.
+    expect(clears[1].scissorTest).toBe(true);
+    const [x, y, w, h] = clears[1].scissor;
+    expect([x, w]).toEqual([0, TARGET_W]);
+    expect(y).toBe(Math.round(TARGET_H * INERT_GROUND_FRACTION));
+    expect(h).toBeGreaterThan(0);
+    // THE CASE THAT WOULD HAVE CAUGHT IT: the band must reach the top row of
+    // THIS target. Any rect scaled by a pixel ratio > 1 overshoots it, and at
+    // ratio 2 it clears the buffer entirely and paints nothing.
+    expect(y + h).toBe(TARGET_H);
+    // …and the two clears are two DIFFERENT colours, or there is one band.
+    expect(clears[0].color).not.toBe(clears[1].color);
+  });
+
+  it("never programs a RENDERER-space scissor — that one is in CSS pixels", () => {
+    const { rendererSpace } = drive();
+    expect(rendererSpace).toEqual([]);
+  });
+
+  it("hands the glass back whole, so the live pass is not clipped to the band", () => {
+    // The same target carries the attended pass. A band left armed would render
+    // world into 36 rows and leave the rest holding the last blank.
+    const { target } = drive();
+    expect(target.scissorTest).toBe(false);
+  });
+
+  it("restores the render target and clear colour the composer owns", () => {
+    const { bound, priorTarget, clearColor, alpha } = drive();
+    expect(bound()).toBe(priorTarget);
+    expect(clearColor.getHex()).toBe(PREV_COLOR);
+    expect(alpha()).toBe(PREV_ALPHA);
+  });
+});
+
+describe("inertSkyBandRect — the rect the glass is split on", () => {
+  it("puts the split at the ground fraction and runs to the top row", () => {
+    const band = inertSkyBandRect(96);
+    expect(band.y).toBe(60); // round(96 × 0.62)
+    expect(band.height).toBe(36);
+    expect(band.y + band.height).toBe(96);
+  });
+
+  it("never returns a band that would spill past the glass", () => {
+    // Sizes this rig does not use today, so a future target size cannot make
+    // the sky clear write outside its own buffer.
+    for (const h of [1, 2, 3, 16, 64, 96, 128, 256]) {
+      const band = inertSkyBandRect(h);
+      expect(band.y).toBeGreaterThanOrEqual(0);
+      expect(band.height).toBeGreaterThanOrEqual(0);
+      expect(band.y + band.height).toBe(h);
+    }
   });
 });

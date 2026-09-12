@@ -3751,14 +3751,74 @@ export function SimOverlay({
                        appending a number to the one control doc 87 rows C1/C2
                        are about. No `style={{ color }}`: this rides on the
                        accent fill and inherits `--accent-foreground`, i.e. the
-                       ink the button already guarantees for its own label. */}
+                       ink the button already guarantees for its own label.
+
+                       ── …AND THE COUNT NOW NAMES WHAT THE PRESS DOES —
+                          2026-09-12, sc-ed-d2-priority-run:5fa62cb7, „the
+                          mobile briefing modal cuts instruction item 7
+                          mid-sentence, and item 7 is the equal-priority rule
+                          the lesson grades".
+
+                          THE CUT IS REAL AND IT IS NOT REMOVABLE HERE.
+                          `w37/frames/sc-ed-d2-priority-run__mobile-right/
+                          02-briefing.png` (this HEAD, driven 2026-09-12 01:45):
+                          item 7 ends at «Пропусни колата, която идва» and its
+                          tail «отдясно по „Галичица“.» is the one line below
+                          the fold. Measured against this sheet's own cap —
+                          iPhone 16 landscape, `--sim-vh` 393, `--sim-dash-h`
+                          ≈ 45, so `maxHeight` resolves to 336 — the briefing
+                          needs a ≥ 4-line lead (66 px even at the body's
+                          12 px), `mt-1.5` 6, nine 16.5 px body lines 148.5,
+                          `TEXT_FADE_PX` 10, and 120 px of chrome (`pt-2` +
+                          the 44 px header + two `gap-2` + this 44 px button +
+                          `pb-2`): 350.5 px asked of 336. Fourteen px short
+                          with every in-lane reduction already spent, so
+                          „make it fit" is arithmetic and not taste — and
+                          buying the difference by shrinking the lead's face
+                          is a WRAP question no test in this repo can answer
+                          and no lane may assert.
+
+                          WHAT WAS STILL WRONG IS THE SENTENCE, NOT THE PIXELS.
+                          The chain that answers the row already ships:
+                          `foldMaskCss` snaps the cut off the glyphs, this cue
+                          announces it, and `tapSheetAck` scrolls on the press
+                          that used to acknowledge. But the button read
+                          «Разбрах ↓ ОЩЕ 1 РЕД» — a verb meaning „I have
+                          finished" over a press that reveals, and a quantity
+                          with no action attached to it. THEO-4: the control a
+                          student reads has to explain itself, and a bare
+                          number is the same bare verdict this product refuses
+                          everywhere else.
+
+                          «— покажи» IS THE PC PANEL'S OWN WORD, not a new one.
+                          `LessonPlayShell`'s roomy briefing counter reads
+                          «↓ още N стъпки — покажи», so the two surfaces now
+                          name one action once — which is the standing half of
+                          sc-junction-rhr:9b6c83fa, „the briefing renders
+                          differently on the two platforms".
+
+                          AND IT GOES IN THE CUE AND NOT IN THE LABEL, which is
+                          where this repair started. Swapping «Разбрах» for
+                          «Покажи останалото» while the fold stands is the
+                          honest control and it is REFUSED: the sweep drives
+                          this very sheet by that literal —
+                          `tools/mobile/lesson-audit.mjs`'s
+                          `sheet.locator('button:has-text("Разбрах")')`, plus
+                          the `^Разбрах$` role locators in frame-cost.mjs and
+                          dpr-cost.mjs — so the label is a harness contract,
+                          and tools/ is not this lane's tree. The cue is
+                          `aria-hidden`, so the accessible name stays exactly
+                          «Разбрах» and none of those locators can see this
+                          change; `tools/mobile/sheet-fold.mjs` reports the
+                          element's text verbatim and parses no number out of
+                          it. */}
                 {ackCarriesSheetFold ? (
                   <span
                     data-sim-overlay-ack-fold=""
                     aria-hidden
                     className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase leading-none tracking-wider"
                   >
-                    ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"}
+                    ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"} — покажи
                   </span>
                 ) : null}
               </button>
