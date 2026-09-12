@@ -29,7 +29,20 @@ STATS=$(node tools/audit/verdict-coverage.mjs 2>/dev/null | head -1)
 
 export GIT_INDEX_FILE="${TMPDIR:-/tmp}/knijka-ledger.index"
 rm -f "$GIT_INDEX_FILE"
+# THE LEDGER, AND THE INSTRUMENTS THAT WROTE IT.
+#
+# wave-scripts/ was added 2026-09-12. It is not data — it is where the
+# invariants live, and the reasons behind them exist nowhere else: invariant 2
+# (twelve drives at exit=0 photographing the paywall), the PostCSS deadline
+# panic and how to tell it from a slow compile, port discovery from LISTENING
+# rather than a typed list, the stale-cookie clearance, the one-canary rule.
+# Every one of those was learned by having a sweep go wrong, and all of it sat
+# in a single gitignored directory on a 7,200 rpm disk — the exact shape of the
+# risk this script was written for, one level up from the ledger.
+#
+# A lost number can be recomputed. A lost reason cannot.
 git add --force .audit-frames/findings/*.jsonl .audit-frames/wave-c/*.jsonl 2>/dev/null
+git add --force .audit-frames/wave-scripts 2>/dev/null
 TREE=$(git write-tree) || exit 1
 PARENT=$(git rev-parse --verify -q ledger/audit || true)
 
