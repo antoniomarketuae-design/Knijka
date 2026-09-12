@@ -140,6 +140,7 @@ import {
   sprayActiveSlabs,
   sprayDensity,
   spraySlabShape,
+  sprayStrength,
   updateEmergencyStrobe,
 } from "./vehicleFleet";
 // ВОДНАТА ПЕЛЕНА reads the LIVE weather store, not a prop, and that is on
@@ -1883,8 +1884,10 @@ export function TrafficLayer({
   // ВОДНАТА ПЕЛЕНА (FO-04/FO-06) — the spray curtain trailing every heavy
   // staged vehicle. `sprayIdx` maps vehicle index -> emitter ordinal, or -1;
   // it is built ONCE per system, so the frame loop never asks a Set anything.
-  // A lesson that stages no truck/van/emergency gets nSprayEmitters === 0, the
-  // whole block below is never mounted and the cost is one `> 0` test.
+  // A lesson that stages no cast at all gets nSprayEmitters === 0, the whole
+  // block below is never mounted and the cost is one `> 0` test. (Ambient
+  // agents are never emitters — `vehicleFleet.sprayStrength` gates on the
+  // staged-only `indicator` channel.)
   const sprayIdx = useMemo(() => {
     const map = new Int32Array(system.vehicles.length).fill(-1);
     let n = 0;
@@ -2378,7 +2381,14 @@ export function TrafficLayer({
           const ex = tailX - cam.x;
           const ez = tailZ - cam.z;
           const eyeGapM = Math.sqrt(ex * ex + ez * ez);
-          const k = sprayActiveSlabs(sprayDensity(rainNow, v.speedMps, eyeGapM));
+          // …× how hard THIS vehicle throws it. A heavy profile is 1 and is
+          // bit-identical to shipped; a staged car is a fraction, which is
+          // what keeps «the HIGH vehicle you cannot see past» a discriminator
+          // while still giving sc-follow-rain-gap the пръски its own briefing
+          // names (vehicleFleet.ts `SPRAY_CAR_STRENGTH`).
+          const k = sprayActiveSlabs(
+            sprayDensity(rainNow, v.speedMps, eyeGapM) * sprayStrength(v),
+          );
           // Cylindrical billboard toward the eye: a curtain seen edge-on is a
           // line, and the one view that matters here is from directly behind.
           const faceYaw = Math.atan2(cam.x - tailX, cam.z - tailZ);
@@ -3000,11 +3010,13 @@ export function TrafficLayer({
         <meshBasicMaterial color="#ffffff" toneMapped={false} />
       </instancedMesh>
 
-      {/* ВОДНАТА ПЕЛЕНА — SPRAY_SLABS camera-facing quads trailing each heavy
-          staged vehicle (sc-ac-truck-spray). Mounted ONLY when the lesson
-          stages an emitter, exactly like the parked-blob pass: one extra draw
-          call and ~10 triangles on the four templates that need it, and
-          literally nothing anywhere else. Geometry + material are the shared
+      {/* ВОДНАТА ПЕЛЕНА — SPRAY_SLABS camera-facing quads trailing each staged
+          vehicle that throws water: the full curtain for a heavy profile
+          (sc-ac-truck-spray), a one-to-two-slab haze for a car
+          (sc-follow-rain-gap). Mounted ONLY when the lesson stages a cast,
+          exactly like the parked-blob pass: one extra draw call and ~10
+          triangles, and literally nothing on a lesson with no staged actors —
+          ambient traffic never qualifies. Geometry + material are the shared
           curtain from vehicleFleet (the rig owns its own plume); `dispose`
           stays with the buildSprayCurtain cleanup effect above, so React must
           not free them on unmount. */}

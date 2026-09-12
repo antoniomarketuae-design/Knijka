@@ -54,7 +54,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ScenarioTrace } from "../../traces/types";
-import { createEvalState, parseObjectiveParams, stepObjective } from "../objectives";
+import {
+  createEvalState,
+  parseObjectiveParams,
+  stepObjective,
+  type ObjectiveContext,
+} from "../objectives";
 import { compileScenario } from "../scenario/compile";
 import { SCENARIO_TEMPLATES_FOLLOWING2 } from "../scenario/templates-following2";
 import { SCENARIO_TEMPLATES_LANES } from "../scenario/templates-lanes";
@@ -158,6 +163,32 @@ const provesASpeed = (params: ObjectiveParams): boolean =>
   params.kind === "reachZone" && params.maxSpeedKmh !== undefined;
 
 /**
+ * THE CONTACT HALF OF THE SPACING TIER, AND THE ONE THAT IS NOW PROVABLE —
+ * sc-fo-motorway-gap:d18105c7, 2026-09-12.
+ *
+ * «удари» / «сблъс» were banned outright beside the distance markers because
+ * nothing on a SimTick can measure either. That is still true of a DISTANCE and
+ * it is no longer true of a STRIKE: `ReachZoneParams.requireNoContact` reads the
+ * run's SCORED ledger through `ObjectiveContext.struckABodyInRun`, which is a
+ * fact about the journey rather than a field on the tick, and `stepReachZone`
+ * spends it as `contactOk` outside the `capMet` latch.
+ *
+ * So the two markers move from „banned" to „redeemable", exactly as `provesAGap`
+ * is written to accept a gap demand the day a duration semantic lands — the
+ * instruction on that function is „a new provable field must be ADDED here,
+ * never worked around", and this is that addition. A distance marker is NOT
+ * redeemed by it: `requireNoContact` says nothing about how much room he left,
+ * only that he did not hit anything, so «дистанц» and its siblings stay banned.
+ */
+const CONTACT_MARKERS: readonly string[] = ["удари", "сблъс"];
+const provesNoContact = (params: ObjectiveParams): boolean =>
+  params.kind === "reachZone" &&
+  (params as unknown as Record<string, unknown>)["requireNoContact"] === true;
+/** Is this spacing marker one the contact term can redeem? */
+const redeemedByContact = (marker: string, params: ObjectiveParams): boolean =>
+  CONTACT_MARKERS.includes(marker) && provesNoContact(params);
+
+/**
  * THE RECEIPTS. Every title this change struck, with the marker that must catch
  * it. Listing them is not decoration: the guard below is only as good as this
  * vocabulary, and the last net shipped with /дистанц/ alone and missed the row
@@ -169,6 +200,11 @@ const HISTORICAL_OFFENDERS: ReadonlyArray<{ was: string; marker: string; whereBg
   { was: "Следвай колоната на съобразена дистанция", marker: "дистанц", whereBg: "sc-fbc-read" },
   { was: "Спри зад колоната, без да я удариш", marker: "удари", whereBg: "sc-fbc-stop" },
   { was: "Дръж 2-секундната дистанция със скоростта на потока", marker: "дистанц", whereBg: "sc-fmg-gap" },
+  // …and this one CAME BACK on 2026-09-12 with the gate that earns it
+  // (`requireNoContact`, §4b). The row stays here because this section tests the
+  // VOCABULARY — the net must still know the word — not whether the word is
+  // currently banned; `offendersIn` is what decides that, and it now redeems a
+  // contact marker backed by the term.
   { was: "Спри зад спирачещия, без да го удариш", marker: "удари", whereBg: "sc-fmg-stop" },
   { was: "Премини покрай спрелия трамвай, пропуснал слизащия пътник", marker: "пропусн", whereBg: "sc-rts-clear" },
   { was: "Премини прелеза едва след като пътят отвъд се е освободил", marker: "освобод", whereBg: "sc-rxq-cross" },
@@ -216,7 +252,7 @@ function offendersIn(rows: ReadonlyArray<{ where: string; titleBg: string; param
   for (const row of rows) {
     if (row.params.kind !== "reachZone") continue;
     const spacing = find(SPACING_CLAIMS, row.titleBg);
-    if (spacing && !provesAGap(row.params)) {
+    if (spacing && !provesAGap(row.params) && !redeemedByContact(spacing.marker, row.params)) {
       out.push(
         `${row.where} — «${row.titleBg}» promises ${spacing.claimBg}; ` +
           `params ${JSON.stringify(row.params)} carry no gap demand` +
@@ -311,8 +347,17 @@ describe("§3 the reason the following titles were retitled and not gated", () =
       // this evaluator, which is precisely why the claim had to go.
       expect(completesWithLeadGap(params, Number.POSITIVE_INFINITY)).toBe(true);
       // And therefore the shipped title says nothing about a distance.
+      //
+      // A CONTACT CLAIM IS NOT A DISTANCE CLAIM, and since 2026-09-12 one row
+      // here proves one: `sc-fmg-stop` carries `requireNoContact`, so «без да го
+      // удариш» is redeemed while «дистанция» would still be refused. The two
+      // assertions above are unchanged and still hold for it — a gate that can
+      // see a billed strike remains completely blind to 0.2 m of bumper, which
+      // is exactly why only the contact half of the tier became sayable.
+      const titleBg = spec.success.find((o) => o.id === row.objectiveId)!.titleBg;
+      const claim = find(SPACING_CLAIMS, titleBg);
       expect(
-        find(SPACING_CLAIMS, spec.success.find((o) => o.id === row.objectiveId)!.titleBg),
+        claim && !redeemedByContact(claim.marker, params) ? claim : undefined,
         `${row.objectiveId} is back to promising a distance the tick above walks straight through`,
       ).toBeUndefined();
     });
@@ -329,7 +374,14 @@ function readTrace(path: string): ScenarioTrace {
 
 /** Replay a recorded drive through the SHIPPED evaluator exactly as a session
  *  would: fresh eval state, one tick per sample, monotonic latches. */
-function replay(params: ObjectiveParams, trace: ScenarioTrace): boolean {
+/**
+ * `ctx` is OPTIONAL and omitting it is the shipped behaviour every row in §4
+ * relies on: every witness fact on `ObjectiveContext` is „absent means unknown,
+ * never yes", so a context-free replay measures the gate's GEOMETRY alone. §4b
+ * passes one in, because the claim it checks lives on the ledger and not on the
+ * tick.
+ */
+function replay(params: ObjectiveParams, trace: ScenarioTrace, ctx?: ObjectiveContext): boolean {
   let state = createEvalState(params);
   let done = false;
   for (const s of trace.samples) {
@@ -344,6 +396,7 @@ function replay(params: ObjectiveParams, trace: ScenarioTrace): boolean {
         gear: s.gear,
         indicator: s.indicator,
       }),
+      ctx,
     );
     state = r.evalState;
     done = done || r.done;
@@ -370,13 +423,15 @@ const BLIND_ROWS: ReadonlyArray<{
   codeRef: string;
   wasBg: string;
 }> = [
-  {
-    specId: "sc-fo-motorway-gap",
-    objectiveId: "sc-fmg-stop",
-    demo: "mistake-bumper-crash",
-    codeRef: "COLLISION",
-    wasBg: "Спри зад спирачещия, без да го удариш",
-  },
+  // sc-fo-motorway-gap/sc-fmg-stop LEFT THIS LIST ON 2026-09-12
+  // (sc-fo-motorway-gap:d18105c7). It sat here because the gate could not see
+  // the collision and the sentence was the only half a template could fix; the
+  // gate has since arrived (`requireNoContact`) and the clause came back with
+  // it, so the row now belongs to the OPPOSITE assertion — §4b below, which
+  // replays the same demo and requires the tick to be REFUSED. Leaving it here
+  // would have kept passing, because `replay` builds no ObjectiveContext and an
+  // absent `struckABodyInRun` means „unknown", never „yes" — a green line
+  // asserting a blindness the product no longer has.
   {
     specId: "sc-rx-tram-stop-doors",
     objectiveId: "sc-rts-clear",
@@ -418,6 +473,40 @@ describe("§4 the gates cannot see the claim — in the templates' own recording
       ).toBeUndefined();
     });
   }
+
+  /**
+   * §4b — THE ROW THAT GRADUATED OUT OF THIS SECTION.
+   *
+   * `sc-fmg-stop` was a BLIND_ROW: «Спри зад спирачещия, без да го удариш» over
+   * a place and a halt cap, and the drill's own crash demo completing it at
+   * every rung. `requireNoContact` now witnesses the claim, so the same demo
+   * must be REFUSED — and the shadow must not be, which is the half that keeps
+   * a repair from being a new false refusal.
+   *
+   * Both sides are measured here rather than asserted, and the context is built
+   * the way `lessons/engine.ts` builds it: monotone, and folded from the demo's
+   * own `codeRefs` rather than from a flag this test chose.
+   */
+  it("sc-fmg-stop: the crash demo is refused and the shadow is not, at every rung", () => {
+    const spec = FAMILY.find((s) => s.id === "sc-fo-motorway-gap")!;
+    const demo = demoOf(spec, "mistake-bumper-crash");
+    // The template still bills that drive for the very fault the title names.
+    expect(demo.codeRefs).toContain("COLLISION");
+    const crash = readTrace(demo.traceRef.path);
+    const shadow = readTrace(spec.shadow!.path);
+
+    for (const rung of spec.levels) {
+      const obj = compileScenario(spec, rung.level).objectives.find((o) => o.id === "sc-fmg-stop")!;
+      const params = parseObjectiveParams(obj);
+      // Struck a body: the tick is withheld however well the car came to rest.
+      expect(replay(params, crash, { stagedOutcomes: [], redsMetInRun: 0, struckABodyInRun: true }), `L${rung.level} crash`).toBe(false);
+      // …and the very same geometry still completes when nothing was struck,
+      // which is what proves the refusal is the contact term and not a radius.
+      expect(replay(params, crash), `L${rung.level} crash without the ledger`).toBe(true);
+      // The clean drive keeps it either way — the term cannot refuse it.
+      expect(replay(params, shadow, { stagedOutcomes: [], redsMetInRun: 0 }), `L${rung.level} shadow`).toBe(true);
+    }
+  });
 
   /**
    * The one row where the claim WAS expressible, so the remedy is a smaller

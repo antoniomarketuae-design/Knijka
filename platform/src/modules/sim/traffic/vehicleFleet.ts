@@ -503,16 +503,71 @@ function buildCityBusRig(): ModelRig {
 // ---------------------------------------------------------------------------
 
 /** Profiles that throw a pelena: the tall, heavy, many-wheeled ones the лекция
- *  names — „камион, автобус или бус". A car throws spray too, but the drill's
- *  whole discriminator is the HIGH vehicle you cannot see past, and putting a
- *  curtain behind every hatchback in every rain lesson would bury that. */
+ *  names — „камион, автобус или бус". */
 const SPRAY_PROFILES: ReadonlySet<string> = new Set(["truck", "van", "emergency"]);
 
-/** True when this vehicle's profile throws a spray plume in rain. Ambient
- *  vehicles carry no profile, so the answer for them is always false and every
- *  non-staged lesson allocates nothing. */
-export function emitsSpray(v: Pick<TrafficVehicleState, "profile">): boolean {
-  return v.profile !== undefined && SPRAY_PROFILES.has(v.profile);
+/**
+ * …AND THE CAR IN FRONT THROWS ONE TOO — sc-follow-rain-gap:b18e6e60.
+ *
+ * This paragraph used to read „A car throws spray too, but the drill's whole
+ * discriminator is the HIGH vehicle you cannot see past, and putting a curtain
+ * behind every hatchback in every rain lesson would bury that", and the second
+ * half of that sentence is still right. The first half was being paid for by a
+ * different lesson.
+ *
+ * `sc-follow-rain-gap` stages ONE lead CAR (`templates-following.ts
+ * FR_LEAD_CAR`, no `profile`, so `emitsSpray` was false), teaches «Помни:
+ * дневните светят само напред и оставят габаритите ти тъмни В ПРЪСКИТЕ», and
+ * then renders a road with no пръски anywhere on it. Judged STILL on six
+ * consecutive rounds, most recently at `5c200d0b102f` on the lesson's own
+ * mobile-right leg, which is ИЗДЪРЖАН — so this is a world-versus-briefing
+ * mismatch and not a false refusal. Two of the row's five clauses are already
+ * repaired (the glass carries droplets, the carriageway renders darker); the
+ * verifier's own scope for what is left names spray FIRST.
+ *
+ * THE DISCRIMINATOR IS KEPT BY ARITHMETIC, NOT BY ABSENCE. Strength multiplies
+ * `sprayDensity`, which `sprayActiveSlabs` then rounds into k of 5. At rain
+ * 1.0 and full speed a heavy emitter runs k = 3 at the truck drill's pinned
+ * 59 m gap and k = 5 inside `SPRAY_NEAR_M`; a car at 0.35 runs k = 1 at the
+ * same far gap and k = 2 up close. One slab is `spraySlabShape(0)` alone — a
+ * 1.9 m sheet off the rear tyres, at the car's own narrower track — against
+ * the truck's crown at 2.86 m and 0.72 m proud of the body each side. They are
+ * not the same object and cannot be confused for one.
+ *
+ * AMBIENT TRAFFIC IS UNCHANGED AND STILL ALLOCATES NOTHING, which is the perf
+ * property the section header defends. The gate is `indicator`, not `profile`:
+ * types.ts states it outright — „Absent on every ambient agent … staged
+ * vehicles ALWAYS publish it (default \"off\")" — so it is the one published
+ * field that separates a lesson's own cast from the scenery, and a lesson's
+ * cast is a handful of cars. A non-staged lesson reaches `sprayStrength` 0 for
+ * every vehicle it has, `nSprayEmitters` stays 0, and TrafficLayer mounts no
+ * spray InstancedMesh at all — bit-identical to shipped.
+ */
+const SPRAY_CAR_STRENGTH = 0.35;
+
+/**
+ * How hard this vehicle throws water, 0..1 — 0 = none, and `emitsSpray` is
+ * exactly „> 0". See `SPRAY_CAR_STRENGTH` for why a staged car is not 1 and an
+ * ambient one is not anything.
+ */
+export function sprayStrength(
+  v: Pick<TrafficVehicleState, "profile" | "indicator">,
+): number {
+  if (v.profile !== undefined && SPRAY_PROFILES.has(v.profile)) return 1;
+  // Staged (the lesson's own cast) and not one of the heavy profiles: a car,
+  // whether it authored `profile: "car"` or left it absent.
+  if (v.indicator !== undefined && (v.profile === undefined || v.profile === "car")) {
+    return SPRAY_CAR_STRENGTH;
+  }
+  return 0;
+}
+
+/** True when this vehicle throws a spray plume in rain at all — the allocation
+ *  gate TrafficLayer sizes its InstancedMesh from. */
+export function emitsSpray(
+  v: Pick<TrafficVehicleState, "profile" | "indicator">,
+): boolean {
+  return sprayStrength(v) > 0;
 }
 
 /** Trailing quads per emitter. Five is what the compounding curve needs to

@@ -26,7 +26,17 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import {
+  contactVoidsObjective,
+  createEvalState,
+  parseObjectiveParams,
+  stepObjective,
+  type ObjectiveContext,
+} from "../../lessons/objectives";
+import { compileScenario } from "../../lessons/scenario/compile";
 import { SC_FO_MOTORWAY_GAP } from "../../lessons/scenario/templates-following2";
+import type { ObjectiveEvalState } from "../../lessons/types";
+import type { SimTick } from "../../rules";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import {
   recordScFoMotorwayGapDrive,
@@ -131,6 +141,84 @@ describe("sc-fo-motorway-gap — mistake demos grade their exact codes (doc 76 �
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
     // The contact is with the lead (the runner's collision outcome).
     expect(drive.outcomes.find((o) => o.eventId === "sc-fmg-lead")?.detail).toBe("collision");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE TERMINAL GATE AND THE CRASH (sc-fo-motorway-gap:d18105c7, 2026-09-12)
+//
+// «Спри зад спирачещия автомобил, без да го удариш» was, until this wave, a
+// place plus a halt cap. Measured through the production evaluator on this
+// drill's OWN ❌ demonstration: COLLISION billed at t = 29.17 s, the gate
+// satisfied at t = 29.32 s — the drive that came to rest by hitting the lead
+// collected the route's last tick a sixth of a second after the −10 was booked.
+//
+// `requireNoContact` is the shipped term for that claim. These cases drive the
+// REAL tick stream (the same `onTick` the bot-completion gate uses, not a
+// hand-built fixture) through the COMPILED objective, and rebuild the objective
+// context exactly as `lessons/engine.ts` does: `struckABodyInRun` is monotone
+// and folded from this drive's own billed COLLISION, so the fixture cannot
+// disagree with the rule engine about when the car hit something.
+// ---------------------------------------------------------------------------
+
+const RUNGS = [1, 2, 3, 4, 5] as const;
+
+function stopGateOn(name: ScFoMotorwayGapTraceName, level: (typeof RUNGS)[number]) {
+  const objective = compileScenario(SC_FO_MOTORWAY_GAP, level).objectives.find(
+    (o) => o.id === "sc-fmg-stop",
+  )!;
+  const params = parseObjectiveParams(objective);
+  // The billed collisions of THIS drive, from the rule engine's own log.
+  const struckAtSec = drives
+    .get(name)!
+    .ruleEvents.filter((e) => e.kind === "violation" && e.code === "COLLISION")
+    .map((e) => e.t);
+
+  let state: ObjectiveEvalState = createEvalState(params);
+  let doneAtSec: number | null = null;
+  recordScFoMotorwayGapDrive(district, name, {
+    onTick: (tick: SimTick) => {
+      const struck = struckAtSec.some((t) => t <= tick.t);
+      const ctx: ObjectiveContext = {
+        stagedOutcomes: [],
+        redsMetInRun: 0,
+        ...(struck ? { struckABodyInRun: true } : {}),
+      };
+      const r = stepObjective(params, state, tick, ctx);
+      state = r.evalState;
+      if (r.done && doneAtSec === null) doneAtSec = tick.t;
+    },
+  });
+  return { params, doneAtSec, struckAtSec };
+}
+
+describe("sc-fmg-stop — the tick says «без да го удариш» and now proves it", () => {
+  it("the crash demo is REFUSED at every rung — it stopped by hitting him", () => {
+    for (const level of RUNGS) {
+      const { doneAtSec, struckAtSec } = stopGateOn("mistake-bumper-crash", level);
+      expect(struckAtSec.length, `L${level}: the demo must still be billed a COLLISION`).toBeGreaterThan(0);
+      expect(doneAtSec, `L${level} certified the drive that came to rest inside the lead car`).toBeNull();
+    }
+  });
+
+  it("the shadow KEEPS it at every rung — the term cannot refuse a clean drive", () => {
+    for (const level of RUNGS) {
+      const { doneAtSec, struckAtSec } = stopGateOn("shadow-correct", level);
+      expect(struckAtSec).toEqual([]);
+      expect(doneAtSec, `L${level} lost the shadow's tick`).not.toBeNull();
+    }
+  });
+
+  it("NO STRAND: this is the terminal objective, so the void arm must own it", () => {
+    // 2 of 2 — `!onTerminal` does not cover this row, so the finish gate is
+    // armed only through `terminalUnearnable`, whose contact arm is this call.
+    // Without it a student who rear-ends the lead could reach the чл. 23 card
+    // only by quitting, forfeiting the attempt's XP and its calibration.
+    const objectives = compileScenario(SC_FO_MOTORWAY_GAP, 3).objectives;
+    expect(objectives[objectives.length - 1].id).toBe("sc-fmg-stop");
+    const { params } = stopGateOn("shadow-correct", 3);
+    expect(contactVoidsObjective(params, true)).toBe(true);
+    expect(contactVoidsObjective(params, false)).toBe(false);
   });
 });
 

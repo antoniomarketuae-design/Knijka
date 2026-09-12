@@ -4830,6 +4830,15 @@ export function LessonPlayShell({
     // to say „this showing was asked for mid-drive, so it must not hold the
     // car" (`recallBriefing`), and a retry's first showing is an arrival again.
     setBriefingRecalled(false);
+    // …AND SO DOES THE PANEL ITSELF, which the line above asserts and nothing
+    // delivered: `briefingOpen` was reset nowhere, so a student who had read
+    // the steps and pressed ✕ (or «Разбрах») started attempt 2 — and every
+    // attempt after it — with no briefing on the glass at all, on both legs.
+    // „A retry's first showing is an arrival again" is the contract three lines
+    // up; this is the writer that makes it true. It is also what keeps the new
+    // roomy recall pill honest: without it a retry would open on the pill
+    // instead of on the steps.
+    setBriefingOpen(true);
     // …AND THE FOLD LATCH BELONGS TO ONE ATTEMPT FOR THE SAME REASON. It was
     // never reset, which on the roomy leg handed a retry its briefing already
     // folded — the previous run's answer to a question this run has not been
@@ -6183,7 +6192,9 @@ export function LessonPlayShell({
           : []),
         // ── «ИНСТРУКЦИИ» · THE STEPS THE PHONE COULD NOT GET BACK TO ─────────
         // (sc-lane-change:385c1b28 — the derivation and the run.log census are
-        // at `recallBriefing`, which this row is the one caller of.)
+        // at `recallBriefing`, which this row is the PHONE's caller of — the
+        // roomy leg reaches the same callback through its own recall pill,
+        // `data-hud="briefing-recall"`, for the reasons written beside it.)
         //
         // The roomy stage keeps the authored steps a click away for the whole
         // drive («ⓘ Инструкции · N стъпки ▸»); the phone showed them once and
@@ -7160,6 +7171,58 @@ export function LessonPlayShell({
               foldLatchedAtMount={briefingFold.latched}
               onFoldChange={setBriefingFold}
             />
+          ) : null}
+
+          {/* ── THE LAST HALF OF sc-signal-hesitation:f5ffccf3, ON THE OTHER LEG.
+              The row is „the same briefing is a blocking modal on mobile and a
+              persistent side panel on PC", and every quarter of it closed so far
+              was closed BY GIVING THE PHONE what the desktop had. This is the one
+              that runs the other way: `recallBriefing` — the МЕНЮ row that undoes
+              both of the phone's exits, «Разбрах» and the ✕ — is gated `compact`,
+              and `PlayMenu` itself renders only when `compact`. So the roomy ✕ was
+              still the one-way door `PlayAreaStyles` describes: `closeBriefing`
+              clears `briefingOpen`, the only other writer is `useState(true)` at
+              mount, and the authored steps are gone for the rest of the lesson.
+              Same lesson, same gesture, two permanences — which is the divergence
+              the row is about, photographed from the side nobody looked at.
+
+              The fold («▾») was offered as the non-destructive third option, and a
+              third option is not a way back: it asks the student to have predicted,
+              before reading, that one control is recoverable and the neighbouring
+              one is not. „ANY LINE THE STUDENT CAN SEND AWAY NEEDS A WAY BACK"
+              (`recallPreDriveOverlay`, stated there as a rule that outlives its
+              card) now holds on both legs.
+
+              IT IS THE PHONE'S GRAMMAR AND NOT A NEW ONE: the same pill the fold
+              already leaves on the glass, carrying the step count for the same
+              stated reason — a recall whose state the student can see is a recall
+              he will use. `recallBriefing` spends the auto-fold latch, so the panel
+              he asked for at 40 км/ч is not taken off him again on his next metre.
+              Its own `data-hud` name, because the drive census lists surfaces held
+              in the tree but never painted, and a recall that never reaches the
+              glass is this programme's commonest failure wearing a repair's
+              clothes. */}
+          {!briefingOpen &&
+          briefing.length > 0 &&
+          !mistakeMode &&
+          !ended &&
+          activeQuiz === null &&
+          teachQueue.length === 0 ? (
+            <button
+              type="button"
+              onClick={recallBriefing}
+              data-hud="briefing-recall"
+              // Row A6's hit rect, the same unpainted 44 px ring the ✕ and the ▾
+              // carry — see `[data-hud-fold]` in PlayAreaStyles.
+              data-hud-fold=""
+              aria-label={`Покажи инструкциите за упражнението — ${briefing.length} ${
+                briefing.length === 1 ? "стъпка" : "стъпки"
+              }`}
+              className="pointer-events-auto flex shrink-0 items-center gap-1.5 self-end rounded-full border border-border bg-background/85 px-2.5 py-1 text-right text-[9px] font-black uppercase tracking-wider text-accent backdrop-blur transition hover:text-foreground motion-reduce:transition-none"
+            >
+              ⓘ Инструкции · {briefing.length}{" "}
+              {briefing.length === 1 ? "стъпка" : "стъпки"} ▸
+            </button>
           ) : null}
 
           {/* Toasts — the bottom of the same column, so a graded fault arrives

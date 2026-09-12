@@ -465,17 +465,28 @@ describe("sc-vu-pass-clearance: the three committed demos survive the WHOLE jitt
 // 3. sc-vu-cyclist-hook — the commendation paid to the car that never turned
 // ---------------------------------------------------------------------------
 
-describe("sc-vu-cyclist-hook: the чл. 25 commendation — TRIPWIRE: red is the goal", () => {
-  it("a car that blasts STRAIGHT through at 59 км/ч, never turning, is commended for yielding to the cyclist", () => {
-    // Staging, both flat-out legs: 59 км/ч, ZERO full stops, TWO
-    // «Пътнотранспортно произшествие», НЕИЗДЪРЖАН — and «★ ✓ Правилно
-    // отстъпено предимство» at 0:37 (pc) and 0:44 (mobile). Both careful legs,
-    // 23 and 24 full stops: no commendation at all. Here is the same drive.
-    //
-    // WHEN THE RUNNER REPAIR LANDS (CyclistRightHookRunner must require the
-    // right turn and a clear rider before it pays "yielded" — see the note at
-    // VU_CYCLIST), this becomes:
-    //     expect(leg.commendations).not.toContain("YIELDED_TO_PRIORITY");
+describe("sc-vu-cyclist-hook: the чл. 25 commendation — the tripwire has fired", () => {
+  // DEFECT 5 IS CLOSED (`CyclistRightHookRunner.turnedRight`,
+  // orchestrator/runners.ts). This was the characterisation pin and it went red
+  // the day the repair landed, which is what it was for. The replacement is the
+  // one the pin named, word for word:
+  //     expect(leg.commendations).not.toContain("YIELDED_TO_PRIORITY");
+  //
+  // What it was pinning, for anyone reading this after the symptom is gone.
+  // Staging, both flat-out legs: 59 км/ч, ZERO full stops, TWO
+  // «Пътнотранспортно произшествие», НЕИЗДЪРЖАН — and «★ ✓ Правилно отстъпено
+  // предимство» at 0:37 (pc) and 0:44 (mobile). Both careful legs, 23 and 24
+  // full stops: no commendation at all. The credit was decided by
+  // `minPlayerJunctionM` + `dPJ` + `conflictExisted`, none of which asks
+  // whether the driver ever made the right turn чл. 35, ал. 2 is a duty of.
+  //
+  // THE OTHER DIRECTION IS GATED WHERE IT ALWAYS WAS, and deliberately not
+  // duplicated here: `traces/__tests__/sc-vu-cyclist-hook-traces.test.ts` §1
+  // replays the committed shadow — which turns right and waits — and still
+  // requires ZERO violations and YIELDED_TO_PRIORITY. A repair that bought this
+  // case by withholding the credit from the yielding student too would red that
+  // file, which is the guard that makes this assertion safe to make.
+  it("is no longer commended for a straight-through pass it never turned out of", () => {
     const leg = driveStraight({
       districtId: "vu-cyclist-v1",
       staged: [...(SC_VU_CYCLIST_HOOK.staged ?? [])] as StagedEventSpec[],
@@ -488,8 +499,9 @@ describe("sc-vu-cyclist-hook: the чл. 25 commendation — TRIPWIRE: red is the
       seconds: 30,
       crossAt: 0, // vu-n-c
     });
-    expect(leg.commendations).toContain("YIELDED_TO_PRIORITY");
-    // …paid to a car that was never anywhere but its own lane at full speed.
+    expect(leg.commendations).not.toContain("YIELDED_TO_PRIORITY");
+    // …and it is still CONVICTED of the thing it actually did, so the repair is
+    // a withdrawn certificate and not a quieter sheet.
     expect(leg.violations).toContain("SPEEDING_OVER_LIMIT");
   });
 });

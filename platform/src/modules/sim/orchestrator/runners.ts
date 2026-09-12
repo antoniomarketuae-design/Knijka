@@ -1640,6 +1640,27 @@ export class CyclistRightHookRunner implements EventRunner {
   private releaseDistM = 0;
   private conflictExisted = false;
   private minPlayerJunctionM = Infinity;
+  /**
+   * DID HE ACTUALLY TURN RIGHT? — `templates-vru.ts` DEFECT 5, routed to this
+   * runner by name and measured on the sweep's own debriefs: the flat-out legs
+   * of `sc-vu-cyclist-hook` (59 км/ч, zero stops, two ПТП, НЕИЗДЪРЖАН) both
+   * carry «★ ✓ Правилно отстъпено предимство», while the careful legs that
+   * stopped 23 and 24 times carry none.
+   *
+   * The reason is in the branch at the bottom of `step`: the commendation was
+   * paid on `minPlayerJunctionM` + `dPJ` + `conflictExisted`, and none of those
+   * three asks whether the manoeuvre the lesson is about ever happened. On this
+   * map the through road runs straight past the mouth, so DRIVING PAST AT SPEED
+   * satisfies all three — and the rider the credit names was overtaken at
+   * dPC ≈ 3.7 m, inside any window a wider `conflictWindowM` could draw.
+   *
+   * So the yield credit now requires the TURN. Same channel the hook branch
+   * above already reads (`turnStarted` / `direction: "right"`), latched because
+   * the turn begins long before the player is `HOOK_PASS_FAR_M` clear of the
+   * mouth. A straight-through pass resolves "clear", which is what it is — and
+   * the three committed demos are unaffected, because all three DO turn right.
+   */
+  private turnedRight = false;
 
   /**
    * The cyclist proxy is a VEHICLE agent with a real heading on the bicycle
@@ -1682,6 +1703,7 @@ export class CyclistRightHookRunner implements EventRunner {
     this.outcome = null;
     this.conflictExisted = false;
     this.minPlayerJunctionM = Infinity;
+    this.turnedRight = false;
     this.contacted = false;
   }
 
@@ -1719,6 +1741,9 @@ export class CyclistRightHookRunner implements EventRunner {
     // existing prioritySituation vocabulary (grades FAILED_TO_YIELD).
     for (const e of input.tickEvents) {
       if (e.kind === "turnStarted" && e.direction === "right" && dPJ <= 40) {
+        // Latched for the credit branch below — see `turnedRight`. Set on the
+        // SAME event the hook reads, so „he turned" means one thing here.
+        this.turnedRight = true;
         if (cyclistArc < CYCLIST_CLEAR_ARC_M && dPC <= s.dangerRadiusM) {
           out.push({ kind: "prioritySituation", situation: "cyclist-right-hook", violated: true });
           return this.resolve(input, false, "violation");
@@ -1727,7 +1752,11 @@ export class CyclistRightHookRunner implements EventRunner {
     }
     // Player completed the junction passage cleanly.
     if (this.minPlayerJunctionM < HOOK_PASS_NEAR_M && dPJ > HOOK_PASS_FAR_M) {
-      if (this.conflictExisted) {
+      // …and the credit for the чл. 35, ал. 2 yield is owed only to a driver
+      // who performed the manoeuvre it is a duty of, and left the rider ahead
+      // of him when he did (`turnedRight`). Everything else is a car that went
+      // past, which resolves "clear" — no praise, no charge.
+      if (this.conflictExisted && this.turnedRight && cyclistArc >= CYCLIST_CLEAR_ARC_M) {
         out.push({
           kind: "prioritySituation",
           situation: "cyclist-right-hook",
@@ -2986,6 +3015,39 @@ export class PoliceStopRunner implements EventRunner {
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
   contacted = false;
+  /**
+   * HAS THIS DRIVE RUN A PERSON DOWN? — sc-vp-police-stop:ab262758, the last
+   * surviving clause of a row that has been re-confirmed STILL on six rounds.
+   *
+   * The w37 sheet for this lesson's own mobile-right leg (`.audit-frames/w37/
+   * frames/sc-vp-police-stop__mobile-right/_audit-debrief.json`, ended
+   * naturally, ribbon 34/36) books «Удар в пешеходец −10 изпитни т. ОПАСНА
+   * ГРЕШКА в 1:33» and prints, under «Похвали», «✓ Спиране по сигнала на
+   * полицая 1:33». The same second. The car satisfied every term of the halt
+   * contract below — inside `stopRadiusM`, at or under `stopSpeedKmh` —
+   * BECAUSE it had just struck the officer, and the compliant branch could not
+   * tell the difference between stopping FOR a man and stopping ON him.
+   *
+   * READ OFF THE TICK STREAM, not off the sentinel. `contactCast` is empty on
+   * this runner by the policy stated below it, so `contacted` is never set for
+   * the officer; the contact that IS billed comes from the live physics through
+   * `LessonScene.handleCollision → runtime.pushCollision`, which reaches the
+   * director as an ordinary `collision` event on the frame it happens (the
+   * director steps AFTER `runtime.sample`, `orchestrator/types.ts`
+   * `DirectorInput.tickEvents`).
+   *
+   * LATCHED, because the two frames need not coincide: the strike is reported
+   * as the bodies overlap and the car may only fall under 4 км/ч a frame or
+   * two later. Session-monotone, exactly like the `struckAPersonInRun` ledger
+   * the route task's own `requireNoContact` gate consults — one fact, read by
+   * both surfaces, so the sheet cannot contradict itself again.
+   *
+   * PEDESTRIAN ONLY. Clipping a parked car 150 m back is a different fault and
+   * is not evidence about whether this driver obeyed the стоп-палка; the one
+   * thing that makes the praise a lie is having hit the man giving the signal,
+   * and on this staged encounter he is the only person on the map.
+   */
+  private struckAPerson = false;
 
   constructor(readonly spec: PoliceStopSpec) {}
 
@@ -3026,6 +3088,9 @@ export class PoliceStopRunner implements EventRunner {
     // No jitter draw: the officer is scenery — nothing about it varies.
     this.phase = "armed";
     this.outcome = null;
+    // A fresh attempt (R-key retry) is a fresh drive: the previous run's
+    // strike may not follow the student into it.
+    this.struckAPerson = false;
   }
 
   step(_traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -3037,14 +3102,30 @@ export class PoliceStopRunner implements EventRunner {
     // is authored per spec (contracts.ts `bindingUnderArt103`) and absent means
     // MEASURED, NOT CHARGED, which is what every policeStop spec did before it.
     const grades = s.bindingUnderArt103 === true;
+    // The latch behind the branch below — see `struckAPerson`. Read every
+    // frame, before any resolution, so a strike on the very frame the car
+    // comes to rest is already known when the halt is adjudicated.
+    for (const e of input.tickEvents) {
+      if (e.kind === "collision" && e.withWhat === "pedestrian") this.struckAPerson = true;
+    }
     // Complied: at rest (≤ stopSpeedKmh) inside the halt zone — the same
     // radius/speed contract the scenario's stop objective grades (by value).
     // The praise rides the same channel as the charge, and in the same breath
     // (THEO-4: a drill that can only convict teaches half a rule).
+    //
+    // …UNLESS THE CAR STOPPED BY HITTING HIM. Then the encounter resolves as
+    // the accident it was (`detail: "collision"`, success false) and no praise
+    // is emitted: the debrief already carries «Удар в пешеходец» with its own
+    // explanation, and a commendation for «Спиране по сигнала на полицая»
+    // printed beside it teaches a seventeen-year-old that running an officer
+    // over is a way of obeying him. The drive-past branch below is deliberately
+    // NOT taken instead — he did not ignore the signal, and charging чл. 103 on
+    // top of the ПТП would bill one act twice.
     if (
       input.speedKmh <= s.stopSpeedKmh &&
       dist(input.x, input.y, s.stop.x, s.stop.y) <= s.stopRadiusM
     ) {
+      if (this.struckAPerson) return this.resolve(input, false, "collision");
       if (grades) {
         out.push({
           kind: "prioritySituation",

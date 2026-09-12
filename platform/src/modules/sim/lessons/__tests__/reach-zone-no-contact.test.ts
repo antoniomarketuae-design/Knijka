@@ -235,6 +235,10 @@ describe("the catalogue census", () => {
     // right-hand lane, and `lane15-parking-depth` asserts that exclusion every
     // build. Reported to the integrator; the row stays open.
     expect(bound).toEqual([
+      // «Спри плътно вдясно при полицая» — added by the templates-cockpit lane
+      // of this same wave; that template carries its own frame and argument
+      // (a −10 «Удар в пешеходец» and the ✓ on the same second, 1:33).
+      "sc-vp-police-stop/sc-vpps-stop",
       // WAVE 12 — and this one is the strongest member of the set, because its
       // banner names the RELATIONSHIP to the body it must not strike:
       // «Следвай предната кола с къси светлини». The w17 frame shows that tick
@@ -245,8 +249,23 @@ describe("the catalogue census", () => {
       // vehicle -> active, both reaching phase=completed so the debrief still
       // renders.
       "sc-ac-highbeam-lead/sc-ahl-follow",
-      // The founding member — the only one whose banner names the contact.
+      // The founding member — the second of the two whose banner names the
+      // contact (the census note in §1 predates the row below and now returns
+      // two contact-claiming reachZone titles, not one; the demand is still
+      // authored-only and that assertion is unchanged).
       "sc-hazard-obstacle/sc-obs-cleared",
+      // «Спри зад спирачещия автомобил, БЕЗ ДА ГО УДАРИШ» — sc-fo-motorway-gap:
+      // d18105c7, 2026-09-12, and the FIRST TERMINAL member of this census
+      // (2 of 2), so `!onTerminal` does not cover it and the no-strand property
+      // rests on `contactVoidsObjective` being wired into `lessons/engine.ts`'s
+      // `terminalUnearnable` — asserted below rather than assumed.
+      //
+      // Measured on the drill's own ❌ demo `mistake-bumper-crash`: COLLISION
+      // billed at t = 29.17 s, this gate completed at t = 29.32 s. The drive
+      // that came to rest by hitting the lead was ticked off as having stopped
+      // behind it, 0.15 s after the −10 was booked. The shadow replays scored
+      // [] / coached [] and keeps the tick at every rung.
+      "sc-fo-motorway-gap/sc-fmg-stop",
       // The four reverse-parking setup halts (wave 8). Ordered as the
       // catalogue compiles them, which is what `toEqual` compares.
       "sc-park-van/sc-pvn-setup",
@@ -288,6 +307,8 @@ describe("the catalogue census", () => {
     const CENSUS: ReadonlyArray<readonly [string, string]> = [
       ["sc-ac-highbeam-lead", "sc-ahl-follow"],
       ["sc-hazard-obstacle", "sc-obs-cleared"],
+      ["sc-fo-motorway-gap", "sc-fmg-stop"],
+      ["sc-vp-police-stop", "sc-vpps-stop"],
       ["sc-park-van", "sc-pvn-setup"],
       ["sc-park-45-rev", "sc-p45r-setup"],
       ["sc-park-wall", "sc-pwl-setup"],

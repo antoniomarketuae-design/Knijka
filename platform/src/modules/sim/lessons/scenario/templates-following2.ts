@@ -453,31 +453,67 @@ export const SC_FO_MOTORWAY_GAP: ScenarioSpec = {
     },
     {
       id: "sc-fmg-stop",
-      // A TITLE THAT CERTIFIED ITS OWN CRASH DEMO — the hardest-measured row of
-      // the census, and the one that is not a matter of principle at all.
-      // «Спри зад спирачещия, БЕЗ ДА ГО УДАРИШ» is a distance claim over
-      // `{radiusM: 18, maxSpeedKmh: 8}` — a place and a halt cap, nothing that
-      // measures a distance to anything. Replayed through the production
-      // evaluator, `mistake-bumper-crash` — the drive whose own copy reads «удар
-      // отзад на магистрала… сред най-тежките ПТП» and whose codeRefs carry
-      // COLLISION — completes this gate at L1, L2, L3, L4 AND L5, at t = 29.35 s,
-      // at (0, 800.00) and 0.00 км/ч: it came to rest by hitting him, and was
-      // ticked off as having stopped without hitting him.
+      // A TITLE THAT CERTIFIED ITS OWN CRASH DEMO — and the gate it was waiting
+      // for has arrived, so the clause comes back with it
+      // (sc-fo-motorway-gap:d18105c7, 2026-09-12).
       //
-      // NO RADIUS SEPARATES THEM. The shadow rests at y = 791.96 and the crash
-      // at y = 800.00 — eight metres apart, against an L1 widening of five, so a
-      // disc tight enough to exclude the crash would refuse a student who simply
-      // braked a little later and stopped forty metres clear. That is the false
-      // REFUSAL this catalogue has already paid for once. So the clause goes
-      // (the give-way remedy) and the collision keeps its grader: the demo above
-      // cites COLLISION, and instruction 5 still teaches the smooth stop.
+      // MEASURED AT HEAD 2e96586 through `applyTick` + `stepObjective`, on the
+      // drill's OWN ❌ demonstration `mistake-bumper-crash` — the drive whose
+      // copy reads «удар отзад на магистрала… сред най-тежките ПТП»:
       //
-      // Params untouched — `done` is bit-identical, nothing new can fail, no
-      // THEO-4 card is owed. The shadow absorbs the firm brake and rolls to rest
-      // with a big margin; the low speed cap makes reaching this AT REST the
-      // drill (measured: it satisfies the cap at y = 791.51, 7.87 км/ч).
-      titleBg: "Спри зад спирачещия автомобил",
-      params: { kind: "reachZone", x: MW_X_CRUISE, y: 790, radiusM: 18, maxSpeedKmh: 8 },
+      //     FOLLOWING_TOO_CLOSE billed   t = 26.75 s
+      //     COLLISION billed             t = 29.17 s
+      //     this gate completed          t = 29.32 s   ← 0.15 s LATER
+      //
+      // It came to rest by hitting him, and a sixth of a second after the −10
+      // «Пътнотранспортно произшествие» was booked it was ticked off as having
+      // stopped behind him. That is the audit row's «the reckless driver gets
+      // the route credit», on the terminal gate of this route.
+      //
+      // THE EARLIER ROUND RETITLED INSTEAD OF GATING, and its reason was a
+      // RADIUS one: the shadow rests at y = 791.96 and the crash at y = 800.00,
+      // eight metres apart against an L1 widening of five, so no disc can
+      // separate them without refusing a student who simply braked late and
+      // stopped forty metres clear. That argument is untouched and still true —
+      // and it does not reach `requireNoContact`, which is not a tolerance and
+      // has no geometry (templates-parking3.ts says exactly that of this key).
+      // It reads the run's SCORED ledger: `lessons/engine.ts` folds a billed
+      // COLLISION into `struckABodyInRun` and `objectives.ts stepReachZone`
+      // spends it as `contactOk`, OUTSIDE the `capMet` latch. Every number the
+      // radius argument produced is kept.
+      //
+      // IT CANNOT REFUSE A CLEAN DRIVE. The channel is the engine's BILLED
+      // collision, never the raw contact stream (a bumper kiss under the
+      // closing-speed floor never becomes a `ScorableEvent`), and this drill's
+      // `shadow-correct` replays with scored [] and coached [] — measured — so
+      // it keeps this tick at L1…L5 exactly as shipped, completing at t = 33.95
+      // s. The one body on this carriageway is the lead car the banner names,
+      // so the run-wide read and „the car in front" coincide here — the
+      // sc-obs-cleared argument verbatim.
+      //
+      // IT CANNOT STRAND ANYONE, and this is the first member of the census
+      // that is TERMINAL (2 of 2), so that is checked rather than inherited:
+      // `contactVoidsObjective` is already wired into `lessons/engine.ts`'s
+      // `terminalUnearnable`, which arms the finish gate once the last
+      // objective can no longer be earned — so the student who rear-ends the
+      // lead still reaches the debrief that teaches him чл. 23, instead of
+      // having to quit and forfeit the attempt's XP and its calibration.
+      //
+      // NOT A SILENT VERDICT (THEO-4). The withheld tick never arrives alone:
+      // the same sheet holds the −10 «Пътнотранспортно произшествие» card with
+      // its Наредба № 38 explanation, and «Несъобразена дистанция» with ЗДвП
+      // чл. 23, ал. 1 above it. The low speed cap still makes reaching this AT
+      // REST the drill (measured: the shadow satisfies the cap at y = 791.51,
+      // 7.87 км/ч).
+      titleBg: "Спри зад спирачещия автомобил, без да го удариш",
+      params: {
+        kind: "reachZone",
+        x: MW_X_CRUISE,
+        y: 790,
+        radiusM: 18,
+        maxSpeedKmh: 8,
+        requireNoContact: true,
+      },
     },
   ],
   rubric: { parTimeSec: 60 },

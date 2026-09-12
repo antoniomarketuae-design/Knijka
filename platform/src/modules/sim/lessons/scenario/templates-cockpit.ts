@@ -835,6 +835,19 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
         // still refuses the filed frame by a full metre. See the spec's doc
         // comment above for the measurement and the ladder argument.
         requireKerbwardM: PS_STOP_KERBWARD_M,
+        // …AND THE CAR MAY NOT HAVE ARRIVED BY RUNNING HIM OVER — the third
+        // and last surviving clause of sc-vp-police-stop:ab262758. The w37
+        // debrief for this lesson's own mobile-right leg books «Удар в
+        // пешеходец −10 изпитни т. ОПАСНА ГРЕШКА в 1:33» and, on the same
+        // sheet, «✓ Спри плътно вдясно при полицая 1:33» — the same second.
+        // The car came to rest inside the disc, kerb-ward of the boundary, at
+        // ≤ 4 км/ч, because it had just struck the officer; every geometric
+        // term this waypoint owns was honestly satisfied by the collision.
+        // `requireNoContact` is the shipped term for exactly this claim
+        // (lessons/types.ts carries its census and its «cannot refuse a clean
+        // drive» argument) and it is the only one that can refuse a halt for
+        // the REASON it happened rather than for where it happened.
+        requireNoContact: true,
       },
     },
   ],

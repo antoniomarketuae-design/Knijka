@@ -54,8 +54,10 @@
 //   the SPAWN MOMENT held for the whole lesson — which is what sweep 161 shot
 //   in sc-vu-pass-clearance, and worse than the „no reflection" it was filed
 //   as. A stale mirror reads as a live one and tells the learner the lane
-//   beside him is clear. So an unattended door target is BLANKED to its own
-//   authored glass colour, and the doors' two priming passes per scene are
+//   beside him is clear. So an unattended door target is BLANKED — since
+//   2026-09-12 to two bands off its own authored glass colour and the world's
+//   atmosphere rather than one flat fill, because a flat fill read as a broken
+//   part rather than as glass (`inertGlassBands`) — and the two priming passes
 //   dropped — they only ever wrote a picture nobody was allowed to trust.
 //   Cost: two fewer 160×96 passes per scene, one 160×96 clear per glance
 //   transition, nothing in the steady state, and not one pass added anywhere.
@@ -467,33 +469,108 @@ function authoredGlassColor(mesh: Mesh): Color {
 
 /** Scratch for the renderer's clear colour, so the swap below never allocates. */
 const CLEAR_COLOR_SCRATCH = new Color();
+/** Scratch for the two inert bands, so the sweep below never allocates either. */
+const INERT_SKY_SCRATCH = new Color();
+const INERT_GROUND_SCRATCH = new Color();
 
 /**
- * Blank a mirror target to its inert glass colour.
+ * ── UNLIT GLASS, NOT A HOLE — sc-vu-pass-clearance:d770323a, and this is the
+ *    clause that survived every round of that row.
+ *
+ * The blank the sweep below paints was right about WHAT it must not show — a
+ * frozen reflection of the spawn moment is a lie about the lane beside you —
+ * and wrong about what it should look like. It cleared the whole 160×96 target
+ * to ONE flat colour, and the verifier described the result in five successive
+ * rounds, word for word: „a solid matte-black housing with one flat grey-blue
+ * quad standing in for glass … a uniform dark rectangle in a frame where road,
+ * kerb and buildings are all lit and visible around it". A uniform fill does
+ * not read as glass at all; it reads as a broken part. That matters because
+ * `cabinLook` measures ~47 % of the left mirror's width on screen at the
+ * `forward` pose — the student is looking straight at it while the lesson tells
+ * him «Огледало, мигач наляво и се отмести осезаемо наляво».
+ *
+ * SO THE INERT STATE IS NOW TWO BANDS AND NOT ONE: the world's own atmosphere
+ * colour above the horizon line, a much darker band below it, both pulled
+ * toward the GLB's authored glass tint. It is the least a mirror can honestly
+ * show — sky over ground is true of every mirror on every road in the
+ * catalogue — and it makes no claim whatever about traffic, which is the one
+ * thing the blank exists to refuse. Night, rain and fog come out right for
+ * free, because the colour is read per clear off `scene.fog` rather than
+ * authored: a night lesson's mirror goes dark because its sky is dark.
+ *
+ * COST: one extra scissored `gl.clear` of a 160×96 target on the transition
+ * only — no pass, no shader, no material swap, nothing in the steady state.
  *
  * WHY A CLEAR AND NOT A MATERIAL SWAP. The obvious way to make an unattended
  * door mirror honest is to put the authored material back on the quad — but
  * the authored glass is a MeshStandardMaterial and the RTT one is
  * MeshBasicMaterial, so swapping them at every glance changes the mesh's
  * shader PROGRAM twice per glance, on the tier the founder has already called
- * „brutally low". This is a 160×96 clear on the transition only, it keeps one
- * program for the life of the scene, and it lands the same picture.
+ * „brutally low". This keeps one program for the life of the scene.
  *
- * Restores the renderer's render target and clear colour: the composer owns
- * both, and doc 82 §3.2 is the standing reminder of what leaving renderer
- * state modified costs here.
+ * Restores the renderer's render target, clear colour and scissor: the
+ * composer owns all three, and doc 82 §3.2 is the standing reminder of what
+ * leaving renderer state modified costs here.
  */
+/** Fraction of the glass, measured from the bottom, that is ground rather than
+ *  sky. The door mirrors are aimed 4–5° down (see the pose table above), so
+ *  most of what they hold is road. */
+export const INERT_GROUND_FRACTION = 0.62;
+/** How far the sky band is pulled from the authored glass tint toward the
+ *  world's own atmosphere colour, 0..1. Well short of 1: it is TINTED glass
+ *  seen at a glancing angle, not a window. */
+export const INERT_SKY_MIX = 0.5;
+/** The same for the ground band — much less, because tarmac is the darkest
+ *  thing in every frame this mirror has been photographed in. */
+export const INERT_GROUND_MIX = 0.16;
+
+/**
+ * The two inert band colours for a piece of unattended door glass.
+ *
+ * Pure and exported so the split can be asserted without a renderer — the
+ * whole of what this repair claims is that the unattended state is no longer
+ * ONE colour, and a test that cannot see the two colours cannot hold that.
+ */
+export function inertGlassBands(
+  glass: Color,
+  atmosphere: Color | null,
+  sky: Color,
+  ground: Color,
+): void {
+  sky.copy(glass);
+  ground.copy(glass);
+  if (!atmosphere) return;
+  sky.lerp(atmosphere, INERT_SKY_MIX);
+  ground.lerp(atmosphere, INERT_GROUND_MIX);
+}
+
 function clearMirrorToInert(
   gl: WebGLRenderer,
   target: WebGLRenderTarget,
   color: Color,
+  atmosphere: Color | null,
 ): void {
   const prevTarget = gl.getRenderTarget();
   const prevColor = gl.getClearColor(CLEAR_COLOR_SCRATCH).clone();
   const prevAlpha = gl.getClearAlpha();
+  const prevScissor = gl.getScissorTest();
+  inertGlassBands(color, atmosphere, INERT_SKY_SCRATCH, INERT_GROUND_SCRATCH);
   gl.setRenderTarget(target);
-  gl.setClearColor(color, 1);
+  // Ground first, over the WHOLE target — so if the scissor below is ever
+  // refused the glass is still fully written and never shows an uninitialised
+  // buffer, which is the one failure this blank exists to prevent.
+  gl.setClearColor(INERT_GROUND_SCRATCH, 1);
   gl.clear(true, true, false);
+  // …then the sky band over the top of it. GL's origin is bottom-left, so the
+  // sky is the rect ABOVE the ground fraction.
+  const groundPx = Math.round(target.height * INERT_GROUND_FRACTION);
+  if (target.height - groundPx > 0) {
+    gl.setScissorTest(true);
+    gl.setScissor(0, groundPx, target.width, target.height - groundPx);
+    gl.setClearColor(INERT_SKY_SCRATCH, 1);
+    gl.clear(true, false, false);
+    gl.setScissorTest(prevScissor);
+  }
   gl.setClearColor(prevColor, prevAlpha);
   gl.setRenderTarget(prevTarget);
 }
@@ -726,7 +803,16 @@ export function MirrorRig({
       liveRef.current &= ~bit;
       // Already blank — the steady unattended state costs nothing at all.
       if ((inertRef.current & bit) !== 0) continue;
-      clearMirrorToInert(gl, e.target, e.inertColor);
+      // The world's own atmosphere, read per clear rather than authored, so a
+      // night or a fog lesson gets the mirror its own sky implies (see
+      // `inertGlassBands`). Absent fog = the flat authored tint, i.e. exactly
+      // what shipped.
+      clearMirrorToInert(
+        gl,
+        e.target,
+        e.inertColor,
+        scene.fog instanceof FogExp2 ? scene.fog.color : null,
+      );
       inertRef.current |= bit;
     }
 

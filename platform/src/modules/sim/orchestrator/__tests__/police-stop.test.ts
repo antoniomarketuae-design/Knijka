@@ -188,6 +188,79 @@ describe("policeStop (integration)", () => {
     ]);
   });
 
+  it("stopping ON the officer is an accident, not compliance — no praise, detail 'collision'", () => {
+    // sc-vp-police-stop:ab262758, the last surviving clause. The w37 sheet for
+    // this lesson's own mobile-right leg books «Удар в пешеходец −10 ОПАСНА
+    // ГРЕШКА в 1:33» and prints «Похвали ✓ Спиране по сигнала на полицая 1:33»
+    // — the same second, because a halt inside `stopRadiusM` at ≤ `stopSpeedKmh`
+    // satisfies the compliant branch WHOEVER stopped the car. Here the car
+    // takes exactly the compliant line of the test above it, and the live
+    // physics reports the strike one frame before it comes to rest.
+    const spec = policeSpec();
+    const stack = makeStack([spec]);
+    const pullOver = offsetRight(edgeGeometry(), LANE_OFFSET + 1.6);
+    const driver = new PolyDriver(pullOver, 20);
+    let struck = false;
+    for (let i = 0; i < 60 * 30 && stack.outcomes.length === 0; i++) {
+      // The channel the officer actually arrives on: `LessonScene
+      // .handleCollision → runtime.pushCollision`, drained by `sample()` into
+      // this frame's `tick.events`. Fired while still ROLLING, so the latch —
+      // and not a same-frame read — is what carries it to the halt.
+      if (!struck && driver.s >= 93) {
+        stack.runtime.pushCollision("pedestrian", spec.id);
+        struck = true;
+      }
+      const target = driver.s >= 95 ? 0 : 9;
+      stepFrame(stack, driver.advance(DT, target));
+    }
+    expect(struck).toBe(true);
+    expect(stack.outcomes).toHaveLength(1);
+    expect(stack.outcomes[0]).toMatchObject({
+      eventId: "t-police",
+      kind: "policeStop",
+      success: false,
+      detail: "collision",
+    });
+    // THE WHOLE POINT: no commendation. The debrief still carries the ПТП with
+    // its own explanation; what it may not also carry is a ✓ for having obeyed
+    // the man the car ran over.
+    expect(commendationCodes(stack.ruleEvents)).toEqual([]);
+    // …and чл. 103 is NOT charged on top of it: he did not ignore the signal,
+    // and one act may not be billed twice.
+    expect(violationCodes(stack.ruleEvents)).not.toContain("POLICE_STOP_SIGNAL_IGNORED");
+    const priorityEvents = stack.ticks.flatMap((tick) =>
+      tick.events.filter((e) => e.kind === "prioritySituation"),
+    );
+    expect(priorityEvents).toEqual([]);
+  });
+
+  it("a clean retry after a strike is praised again — the latch is per attempt", () => {
+    // The other direction of the same latch, and the one a `private` field is
+    // easiest to get wrong: `stage()` re-arms on R, so the previous attempt's
+    // ПТП may not follow the student into the fresh one.
+    const spec = policeSpec();
+    const stack = makeStack([spec]);
+    const pullOver = offsetRight(edgeGeometry(), LANE_OFFSET + 1.6);
+    let driver = new PolyDriver(pullOver, 20);
+    let struck = false;
+    for (let i = 0; i < 60 * 30 && stack.outcomes.length === 0; i++) {
+      if (!struck && driver.s >= 93) {
+        stack.runtime.pushCollision("pedestrian", spec.id);
+        struck = true;
+      }
+      stepFrame(stack, driver.advance(DT, driver.s >= 95 ? 0 : 9));
+    }
+    expect(stack.outcomes[0]).toMatchObject({ success: false, detail: "collision" });
+    stack.director.reset();
+    driver = new PolyDriver(pullOver, 20);
+    for (let i = 0; i < 60 * 30 && stack.outcomes.length < 2; i++) {
+      stepFrame(stack, driver.advance(DT, driver.s >= 95 ? 0 : 9));
+    }
+    expect(stack.outcomes).toHaveLength(2);
+    expect(stack.outcomes[1]).toMatchObject({ success: true, detail: "yielded" });
+    expect(commendationCodes(stack.ruleEvents)).toEqual(["YIELDED_TO_PRIORITY"]);
+  });
+
   it("the SAME pose without the чл. 103 flag measures and charges nothing", () => {
     // The half that keeps `sc-pe-school-patrol` byte-identical: its warden
     // holds the identical paddle pose, and driving past her is чл. 119's
