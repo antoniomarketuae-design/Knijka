@@ -57,7 +57,7 @@ fi
 cd "$REPO" || exit 2
 
 # The audit tooling has its own tests and its own agreement gate.
-run "audit-tests"     node --test tools/audit/reclosure.test.mjs tools/audit/comment-blind.test.mjs tools/audit/build-redrive.test.mjs tools/audit/finding-reader.test.mjs
+run "audit-tests"     node --test tools/audit/reclosure.test.mjs tools/audit/comment-blind.test.mjs tools/audit/build-redrive.test.mjs tools/audit/finding-reader.test.mjs tools/audit/inprocess-drive.test.mjs
 run "count-agreement" node tools/audit/count-agreement.mjs
 
 H1="$(tree_hash)"

@@ -321,6 +321,15 @@ export const RECIPES = {
   // because this check refused the round it appeared in. That is twice now that
   // a wave generator has been caught by this rule on its first day, which is an
   // argument for the rule and not against the generators.
+  // The in-process adjudicator (2026-09-12): it settles GRADING rows by driving
+  // the real production chain with no browser, and reads the corpus to pull a
+  // finding claim text. Registered the day it was written, because this check
+  // refused the commit it appeared in — the third tool caught that way, which
+  // argues for the rule rather than against the tools.
+  //
+  // --list only enumerates and stamps: it drives nothing, so the probe is cheap
+  // and cannot touch a lesson, a tape or the ledger.
+  "inprocess-drive.mjs": (t) => ({ args: ["--list"] }),
   "make-cluster-wave.mjs": (t) => {
     const out = path.join(t, "cluster-wave-probe.js");
     return { args: [out], emits: "file", file: out };
