@@ -41,7 +41,7 @@
  * and nothing else in 167 scenarios.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -76,19 +76,45 @@ const BLIND_ROAD_RE =
 const BLIND_PRED_RE =
   /(завоят|завоя|дъгата|участъкът|участъка|отсечката|билото|върхът)\s+е\s+(сляп|сляпа|сляпо)/i;
 
+/**
+ * withFileTypes, because the statSync it replaces was one metadata seek PER
+ * FILE on a 7,200 rpm disk — 1,006 of them — and seeks are the exact resource
+ * this test is starved of inside the full suite. readdir already knows whether
+ * each entry is a directory; asking it again is the cost that made a 3.4 s test
+ * take 243 s beside two competing workers.
+ */
 function walkFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
   const out: string[] = [];
-  for (const name of readdirSync(dir)) {
-    const p = path.join(dir, name);
-    if (statSync(p).isDirectory()) out.push(...walkFiles(p));
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkFiles(p));
     else if (p.endsWith(".trace.json")) out.push(p);
   }
   return out;
 }
 
-function captionsOf(file: string): string[] {
-  const raw = JSON.parse(readFileSync(file, "utf-8")) as {
+/**
+ * THE PRE-FILTER, AND WHY IT CANNOT MISS ANYTHING.
+ *
+ * Every caption is a substring of the file's raw text. So a file whose text
+ * contains neither «склон» nor a «сл[ея]п» stem cannot contain a caption that
+ * matches SLOPE_RE, BLIND_ROAD_RE or BLIND_PRED_RE — the skip is sound by
+ * construction rather than by sampling.
+ *
+ * The stem class is deliberately WIDER than the three patterns it stands in
+ * for: /сл[ея]п/ admits сляп, сляпа, сляпо, слепи, слепия, слепият, слепите and
+ * more besides. A filter that over-admits costs a parse; one that under-admits
+ * hides an offence, so the asymmetry is chosen on purpose.
+ *
+ * Measured on the corpus: 11 of 503 files mention a stem at all, so 98% of the
+ * JSON.parse work disappears while every byte is still read and scanned.
+ */
+const MENTIONS_A_STEM = /склон|сл[ея]п/i;
+
+/** `text` is passed in so the caller's read is not repeated. */
+function captionsOf(file: string, text?: string): string[] {
+  const raw = JSON.parse(text ?? readFileSync(file, "utf-8")) as {
     events?: Array<{ kind?: string; textBg?: string }>;
   };
   return (raw.events ?? [])
@@ -120,8 +146,16 @@ describe("§2 — no committed caption narrates terrain the world cannot build",
     const offenders: string[] = [];
     let captions = 0;
     for (const file of files) {
-      for (const text of captionsOf(file)) {
-        captions++;
+      const raw = readFileSync(file, "utf-8");
+      // THE COUNTER STILL COUNTS THE WHOLE CORPUS. `captions` guards against a
+      // walk that found nothing (`toBeGreaterThan(200)` below), so if it only
+      // counted the files that survive the filter it would become a statement
+      // about eleven files and stop being a positive control at all. Counting
+      // the annotation markers in the raw text is exact for this format — the
+      // recorder writes one `"kind":"annotation"` per annotation event.
+      captions += (raw.match(/"kind":\s*"annotation"/g) ?? []).length;
+      if (!MENTIONS_A_STEM.test(raw)) continue;
+      for (const text of captionsOf(file, raw)) {
         const rel = path.relative(REPO_ROOT, file);
         if (SLOPE_RE.test(text)) offenders.push(`SLOPE  ${rel}\n       «${text}»`);
         if (BLIND_ROAD_RE.test(text) || BLIND_PRED_RE.test(text)) {
@@ -145,5 +179,20 @@ describe("§2 — no committed caption narrates terrain the world cannot build",
     // whole-corpus walk is the point of the gate; give it room rather than
     // narrowing what it reads. Its sibling no-spoiler-captions.test.ts carries the
     // same bound for the same reason.
-  }, 240_000);
+    //
+    // BOUND LOWERED 2026-09-12, 240 s -> 120 s, which is the opposite of what
+    // happened the last two times this went red and is the point. It failed
+    // the suite at 243,135 ms — three seconds over — and passed alone at
+    // 3.43 s immediately after. Raising it a third time would have been the
+    // re-run-until-green habit the note above warns about.
+    //
+    // Instead the work came down and nothing it reads was narrowed: readdir
+    // withFileTypes removes one metadata seek per file (1,006 of them on a
+    // 7,200 rpm disk), and a substring pre-filter skips JSON.parse for the 492
+    // of 503 files that cannot contain a match. Every byte is still read and
+    // still scanned; `captions` still counts the whole corpus.
+    //
+    // A LOWER bound is now the honest one: if this ever takes two minutes
+    // again, something real has changed and the gate should say so.
+  }, 120_000);
 });

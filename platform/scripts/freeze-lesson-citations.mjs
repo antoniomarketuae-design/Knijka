@@ -56,8 +56,34 @@ const CONTENT = path.resolve(HERE, "..", "..", "content");
 const OUT_FILE = path.resolve(HERE, "..", "src", "modules", "lesson", "clearanceCitations.ts");
 const check = process.argv.includes("--check");
 
-/** Acts we ship full text for — must mirror lib/content/law/corpus.ts ACT_IDS. */
-const ACT_IDS = ["zdvp", "naredba-iz-2539", "naredba-38"];
+/**
+ * Acts we ship full text for — READ OUT OF corpus.ts, never retyped.
+ *
+ * This was a local literal saying "must mirror lib/content/law/corpus.ts
+ * ACT_IDS", and it stopped mirroring it. corpus.ts grew to six acts — the
+ * camera-tolerance chain and the consolidated Наредба № Iз-2539 that a bare
+ * reference now resolves to — while this copy stayed at three, so `actIdFor`
+ * matched an alias for an act `acts` had never loaded and the script died on
+ * `acts.get(actId).units`. Worse than the crash: any citation that reached one
+ * of the three missing aliases was being judged against a corpus without it.
+ *
+ * The alias table below is already lifted from corpus.ts for exactly this
+ * reason, and says so — "Reading the literal out of the module that owns it
+ * cannot drift." The id list is the other half of the same literal.
+ */
+function actIdsFromCorpus() {
+  const src = readFileSync(
+    path.resolve(HERE, "..", "src", "lib", "content", "law", "corpus.ts"),
+    "utf8",
+  );
+  const block = /export const ACT_IDS = \[[\s\S]*?\n\] as const;/.exec(src);
+  if (block === null) throw new Error("corpus.ts: could not find ACT_IDS");
+  // Only quoted entries — the block is half comment prose.
+  const out = [...block[0].matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1]);
+  if (out.length === 0) throw new Error("corpus.ts: ACT_IDS parsed to nothing");
+  return out;
+}
+const ACT_IDS = actIdsFromCorpus();
 
 /** Numbered refs whose act is on disk but not yet wired into ACT_IDS. */
 const PENDING_CORPUS = new Set(["Наредба № 24"]);
@@ -86,7 +112,21 @@ const citationPin = (concept) => fingerprint(concept.lawRefs.map(citationLine).j
 
 const acts = new Map();
 for (const id of ACT_IDS) {
-  acts.set(id, JSON.parse(readFileSync(path.join(CONTENT, "law", "acts", `${id}.json`), "utf8")));
+  // A LOUD FAILURE ON PURPOSE. If corpus.ts names an act with no file on disk,
+  // this must stop: a freeze script that quietly pins against fewer acts than
+  // the real resolver uses puts the two permanently out of step, which is the
+  // bug this whole block was just repaired for.
+  const file = path.join(CONTENT, "law", "acts", `${id}.json`);
+  let raw;
+  try {
+    raw = readFileSync(file, "utf8");
+  } catch {
+    throw new Error(
+      `corpus.ts lists act "${id}" but ${file} does not exist — the freeze corpus and the ` +
+        `resolver's corpus must be the same set, so this cannot be skipped.`,
+    );
+  }
+  acts.set(id, JSON.parse(raw));
 }
 
 /**
@@ -145,7 +185,18 @@ function resolves(lawRef) {
   if (actId === null) return false;
   const unit = normaliseUnitRef(lawRef.ref);
   if (unit === null) return false;
-  return acts.get(actId).units.some((u) => u.ref === unit);
+  // The loader above guarantees this is present, so an absence here means the
+  // alias table resolved to an id ACT_IDS does not contain — a corpus.ts
+  // inconsistency rather than a citation problem. Say which, instead of
+  // dereferencing undefined and reporting it as "reading 'units'".
+  const act = acts.get(actId);
+  if (act === undefined) {
+    throw new Error(
+      `ACT_ALIASES maps "${lawRef.act}" to act id "${actId}", which is not in ACT_IDS. ` +
+        `Both are read from corpus.ts, so corpus.ts disagrees with itself.`,
+    );
+  }
+  return act.units.some((u) => u.ref === unit);
 }
 
 /** RESOLVABLE | NUMBERLESS | PENDING | REFUSED — with the reason, for the log. */

@@ -1,4 +1,35 @@
-@import "tailwindcss";
+/* source(none) — WHY THE @source BELOW ONLY WORKS WITH THIS. Added 2026-09-12.
+
+   `@source` ADDS to Tailwind v4's automatic detection; it does not replace it.
+   The header under this line has said since August that the pin stopped the
+   whole-repo walk. It never did — the scan has always been
+   <auto-detected root> + platform/src, and the auto half anchors on the .git
+   directory at the repo root.
+
+   It was merely fast enough then. This repo now carries 185 git worktrees
+   under .claude/worktrees, each a full checkout, none of them gitignored; in
+   August there were none. Somewhere in between the walk crossed the deadline
+   Turbopack gives its PostCSS child, and the panic came back —
+
+     [project]/src/app/globals.css [app-client] (css)
+     Execution of PostCssTransformedAsset::process failed
+     - timeout while receiving message from process / deadline has elapsed
+
+   — five times in three days, taking out /login, /review, / and, worst,
+   /(dashboard)/simulator, which is the whole target of the audit sweep.
+
+   IT WAS BEING READ AS A POISONED BUILD CACHE and treated by deleting
+   platform/.next. That is why the misdiagnosis survived: deleting the cache
+   changes the timing enough to get one good compile, so the remedy appeared
+   to work. Today it reappeared on a COMPLETELY FRESH .next inside fifteen
+   minutes, which a cache explanation cannot survive.
+
+   Safety is the header's own test, unchanged: the emitted CSS was
+   byte-identical pinned vs unpinned (160,393 B both), so nothing outside
+   platform/src contributes a utility and turning the auto half off can only
+   remove scanning, never output. Re-run that comparison if this line is ever
+   doubted. */
+@import "tailwindcss" source(none);
 
 /* ============================================================
    @source — THE PIN THAT MAKES THIS FILE COMPILABLE ON THIS BOX.

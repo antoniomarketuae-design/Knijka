@@ -57,15 +57,25 @@ fail() { echo ""; echo "STOPPED: $*"; echo ""; exit 1; }
 # These are known, they are founder-blocked, and they must never be silently
 # tolerated by a script that also has to catch a NEW red. Named here so the gate
 # can subtract exactly these and shout about anything else.
-#   . vitest  t-accidents content-bank  — 29 first-aid questions sit at
-#     needs-review because every one cited ЗДвП чл. 123 and чл. 123 contains no
-#     compression depth, rate, breathing check or ratio. The citation was
-#     decorative. Signing them is the founder's, not an engineer's.
-#   . vitest  l-accidents-first-aid compose — same 29 questions, same block.
+#   . [CLEARED — SIGNED 2026-09-12] vitest t-accidents content-bank and
+#     l-accidents-first-aid compose. Both were red because 29 first-aid rows
+#     sat at needs-review, every one citing ЗДвП чл. 123 — an article with no
+#     compression depth, rate, breathing check or ratio in it. The founder
+#     signed 26 of the 29 and both suites went GREEN.
+#
+#     THE ALLOWANCE BELOW WENT FROM 2 TO 0 WITH THEM, and that is the point of
+#     writing this down rather than deleting the entry: while it stayed at 2,
+#     the gate silently tolerated two NEW failures. Approving content had made
+#     the gate weaker, which is the one direction a side effect must never go.
+#
+#     Three rows are still held back and still needs-review (q-ptp-016 and
+#     q-ptp-060 — «не диша» where the threshold is «не реагира и не диша
+#     нормално»; q-ptp-037 — text extended after the ruling). They do not
+#     re-red these suites. If they ever do, this gate must say so out loud.
 #   . tools-tests  deck-captions freeze — the caption corpus is frozen against a
 #     reviewed snapshot; it re-reds whenever a caption legitimately changes and
 #     is re-frozen deliberately, not automatically.
-STANDING_REDS=3
+STANDING_REDS=1   # was 3 until the first-aid rows were signed
 
 gate() {
   local rc=0
@@ -87,9 +97,11 @@ gate() {
   vfail="${vfail:-0}"
   local vpass; vpass=$(sed -n 's/.*[^0-9]\([0-9][0-9]*\) passed.*/\1/p' /tmp/wc-vitest.log | tail -1)
   say "         failed: $vfail   passed: ${vpass:-?}"
-  if [ "$vfail" -gt 2 ]; then
+  # 0, not 2: both first-aid reds were cleared by the 2026-09-12 signatures.
+  # Leaving it at 2 would let two new failures through in silence.
+  if [ "$vfail" -gt 0 ]; then
     grep -E "FAIL|✗|×" /tmp/wc-vitest.log | head -30
-    fail "vitest has $vfail failures; 2 are the founder-blocked first-aid reds, so $((vfail - 2)) are NEW"
+    fail "vitest has $vfail failures, and ALL of them are new — the two founder-blocked first-aid reds were cleared by the 2026-09-12 signatures, so nothing is subtracted here any more"
   fi
 
   say "gate 3/4 — content validation"
