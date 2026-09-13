@@ -1103,9 +1103,9 @@ export function SessionEndScreen({
   // the last bare unit left on the repaired result screen, and the tariff is
   // read off the engine's own SEVERITY_POINTS rather than retyped here.
   const rows = [
-    { label: "Опасни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.opasna), count: score.opasniCount, points: score.opasniPoints, tone: "var(--danger)" },
-    { label: "Основни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.osnovna), count: score.osnovniCount, points: score.osnovniPoints, tone: "var(--warning)" },
-    { label: "Второстепенни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.vtorostepenna), count: score.vtorostepenniCount, points: score.vtorostepenniPoints, tone: "var(--accent-soft)" },
+    { sev: "opasna", label: "Опасни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.opasna), count: score.opasniCount, points: score.opasniPoints, tone: "var(--danger)" },
+    { sev: "osnovna", label: "Основни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.osnovna), count: score.osnovniCount, points: score.osnovniPoints, tone: "var(--warning)" },
+    { sev: "vtorostepenna", label: "Второстепенни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.vtorostepenna), count: score.vtorostepenniCount, points: score.vtorostepenniPoints, tone: "var(--accent-soft)" },
   ];
 
   // I1: the gate holds the whole screen back. Nothing below this line renders
@@ -1341,7 +1341,37 @@ export function SessionEndScreen({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.label} className="border-t border-border">
+              <tr
+                key={r.label}
+                className="border-t border-border"
+                /* ── THE THREE CLASS COUNTS, READABLE WITHOUT A SCREENSHOT ──
+                 *
+                 * `sc-vp-readiness:b3c922d5` has been UNJUDGED EIGHT TIMES
+                 * (w33·w34·w35·w36·w37·w41×2·w43) and the reason is not the
+                 * drive: it is that these three numbers existed ONLY as pixels.
+                 * 125 debrief sidecars in w43 carry `score`, `verdict` and six
+                 * screenshots each, and not one of them carries «Опасни 0 0».
+                 * A row that asserts something about all three classes across
+                 * four lanes therefore cost twenty-four screenshot reads to
+                 * settle, so in eight sweeps it was never settled.
+                 *
+                 * These attributes are bound to `r.count` / `r.points` — the
+                 * SAME expressions the two cells below render. There is no
+                 * second derivation that could drift from the pixel, which is
+                 * the whole point: the HUD probes that have lied in this
+                 * codebase all lied by measuring something ADJACENT to what the
+                 * screen showed (`scrollWidth` for overflow, an `/id:/` anchor
+                 * for identity). This reads the cell's own value.
+                 *
+                 * `data-sev` is the stable key. The Bulgarian label is a
+                 * caption and may be reworded; `opasna|osnovna|vtorostepenna`
+                 * are the `SeverityClass` union and cannot be reworded without
+                 * a type error.
+                 */
+                data-sev={r.sev}
+                data-sev-count={r.count}
+                data-sev-points={r.points}
+              >
                 <td className="py-2 font-semibold">
                   <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: r.tone }} aria-hidden />
                   {r.label} <span className="text-xs text-muted">({r.per})</span>

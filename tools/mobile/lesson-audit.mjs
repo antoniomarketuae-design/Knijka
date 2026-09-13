@@ -1524,8 +1524,45 @@ await beat("03-ready");
 // charged in the debrief. If «предпазен колан» keeps appearing after this,
 // the press is not landing and the next reader should say so loudly rather
 // than assume it worked.
-await page.keyboard.press("KeyB").catch(() => {});
-await page.waitForTimeout(400);
+//
+// ── …EXCEPT ON THE ONE LESSON WHOSE AUTHORED MISTAKE *IS* THE BELT ─────────
+//
+// `sc-vp-readiness:b3c922d5` has come back UNJUDGED eight times running (w33,
+// w34, w35, w36, w37, w41 ×2, w43). The drive was never the problem. The
+// problem is that this file fastens the belt at module top level, on EVERY
+// lane of EVERY lesson, and then the audit asks why the belt offence never
+// fires on the lesson whose own demo #1 is «Тръгване без колан».
+//
+// `content/traces/sc-vp-readiness/mistake-no-belt.trace.json` is the lesson's
+// AUTHORED mistake — the fault the lesson exists to teach. The gate is derived
+// from that file's existence rather than from a slug list, so it cannot drift
+// from the content: today exactly one scenario in `content/traces` carries it,
+// and if a second one ever does, its wrong leg inherits this behaviour for the
+// same reason and with no edit here.
+//
+// THIS IS NOT THE INSTRUMENT CHOOSING A CONVICTION. It omits an action — the
+// same shape as every other wrong leg, which omits the steering — and leaves
+// the product to decide whether the omission was forbidden. `moving` is the
+// product's own antecedent (`rules/engine.ts` `cfg.seatbeltSustainSec` = 1 s),
+// so a wrong leg that never moves is never charged, and that acquittal is the
+// product's to give.
+//
+// DO NOT UN-GATE THIS GLOBALLY. Doing so restores the false −3 floor that
+// 6e94cb8 removed: 194 of 204 drives in w12 were charged «Движение без
+// предпазен колан −3», which put a floor under every score in the sweep and
+// made every «is a good drive credited» finding unanswerable.
+const LESSON_AUTHORS_NO_BELT = existsSync(
+  `${REPO_ROOT}/content/traces/${SCENARIO}/mistake-no-belt.trace.json`,
+);
+const DRIVE_UNBELTED = LESSON_AUTHORS_NO_BELT && MODE !== "right";
+if (DRIVE_UNBELTED) {
+  note(
+    `  SEATBELT: DELIBERATELY NOT FASTENED — ${SCENARIO} authors mistake-no-belt.trace.json and this is the «${MODE}» leg, whose job is to perform it. If «предпазен колан» does NOT appear in this debrief, that is the finding.`,
+  );
+} else {
+  await page.keyboard.press("KeyB").catch(() => {});
+  await page.waitForTimeout(400);
+}
 
 /* ── WHICH CHANNEL DROVE THE CAR — ATTESTED, NOT ASSUMED ───────────────────
  *
@@ -8422,8 +8459,62 @@ const facts = await page
       return { done: glyph === "✓", titleBg: t(li).replace(/^[✓–-]\s*/, "").slice(0, 120) };
     });
     const stars = document.querySelector('[aria-label$="от 3 звезди"]');
+    /* ── THE THREE ERROR CLASSES, AS DATA ──────────────────────────────────
+     *
+     * WHY: 125 debrief sidecars in w43 recorded a verdict, a score and six
+     * screenshots each, and NONE of them recorded «Опасни грешки 0 0». So
+     * `sc-vp-readiness:b3c922d5` — a claim ABOUT those three numbers, over
+     * four lanes — could only be settled by opening twenty-four screenshots,
+     * and in eight consecutive sweeps nobody did. It is UNJUDGED not because
+     * the drive failed but because the instrument threw the answer away.
+     *
+     * PREFERRED PATH: `data-sev` on the table row, whose `data-sev-count` and
+     * `data-sev-points` are bound to the same two expressions the visible
+     * cells render (SessionEndScreen.tsx). No adjacent quantity, no second
+     * derivation — the failure mode of every HUD probe that ever lied here.
+     *
+     * FALLBACK: the Bulgarian caption plus the row's own two <td>s, for a
+     * build that predates the hook. It is marked `via: "text"` so a reader can
+     * see which one answered, because a fallback that is indistinguishable
+     * from the real thing is how a stale instrument passes for a live one.
+     *
+     * `null` MEANS NOT READ. It must never collapse to 0 — "no table" and
+     * "a table of zeroes" are opposite findings, and the second one is the
+     * entire content of b3c922d5.
+     */
+    const severity = (() => {
+      const keyed = [...document.querySelectorAll("tr[data-sev]")];
+      if (keyed.length) {
+        const out = { via: "data-sev" };
+        for (const tr of keyed) {
+          const n = (a) => {
+            const v = Number(tr.getAttribute(a));
+            return Number.isFinite(v) ? v : null;
+          };
+          out[tr.getAttribute("data-sev")] = { count: n("data-sev-count"), points: n("data-sev-points") };
+        }
+        return out;
+      }
+      const LABELS = { "Опасни грешки": "opasna", "Основни грешки": "osnovna", "Второстепенни грешки": "vtorostepenna" };
+      const out = { via: "text" };
+      for (const tr of document.querySelectorAll("tr")) {
+        const cells = [...tr.querySelectorAll("td")];
+        if (cells.length < 3) continue;
+        const head = t(cells[0]);
+        for (const [bg, key] of Object.entries(LABELS)) {
+          if (!head.startsWith(bg)) continue;
+          const num = (el) => {
+            const m = t(el).match(/-?d+/);
+            return m ? Number(m[0]) : null;
+          };
+          out[key] = { count: num(cells[cells.length - 2]), points: num(cells[cells.length - 1]) };
+        }
+      }
+      return Object.keys(out).length > 1 ? out : null;
+    })();
     return {
       verdict,
+      severity,
       score: scoreMatch ? Number(scoreMatch[1]) : null,
       stars: stars ? stars.getAttribute("aria-label") : null,
       objectives,
@@ -8864,6 +8955,11 @@ try {
         verdict: facts.verdict ?? null,
         verdictSurface: facts.verdictSurface ?? null,
         score: facts.score ?? null,
+        // The three class counts as FIELDS. Any row about «Опасни / Основни /
+        // Второстепенни» is now settled by parsing this, never by grepping the
+        // prose of a run.log — the habit that produced three wrong numbers in
+        // one day. `null` = the table was not read; it is not a zero.
+        severity: facts.severity ?? null,
         geometry: {
           scroller: geo.scroller,
           viewportH: geo.viewportH ?? null,
