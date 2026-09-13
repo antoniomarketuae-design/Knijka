@@ -182,3 +182,49 @@ where reverse begins».
 
 `sc-pk-driveway/pc-right` is the near miss worth watching: off-path median
 4.9 m, and it finished **0.97 m** from the mark against a 0.45 m tolerance.
+
+---
+
+## I. CORRECTION to section E — it is not gap acceptance, it is the scan period
+
+Section E concluded the roundabout trio is blocked by missing gap-acceptance
+behaviour: «it either waits at the line forever or enters regardless». **The
+first half is wrong and I withdraw it.**
+
+`sc-rb-busy-gap/mobile-right` does not wait at the line. Its own pace line reads
+«This drive's odometer read **106.3 m (67 % of that route)** over 2 roll(s) …
+every roll ended on its METRES, not on the clock», its objective 1 «Спри на
+линията за пропускане преди входа» ticks at **0:54**, and its tracking reads
+**straightness 0.999** over 75.4 m of witness path. Objective 2 «Подмини първия
+изход, без да излизаш от кръга» is dashed.
+
+So: the car stops at the give-way line correctly, then **drives straight on
+through the roundabout and off the far side**, where the product ends the lesson
+(«end line → «Резултат»» in the ladder). It never enters the circle at all on
+this leg. `pc-right` is the leg that entered, and it is the one that left the
+route and hit a building.
+
+### The actual cause, and it was measurable from the start
+
+- `TUNE.DEAD_DEG` is **3.0°** and this drive's `|err|` median is **2.75°** — so
+  the majority of sightings command nothing at all.
+- The real scan period is **p50 757 ms**. At the 12–24 км/ч this drive ran, that
+  is **2.5–5 m between steering decisions**. A roundabout entry needs one every
+  metre or so.
+- The loop did see the turn — `|err|` p90 18.92°, worst 43.71° — but issued only
+  **5 corrections / 315 ms at the wheel** across the whole drive. The large
+  demands arrived, and arrived too late to be driven.
+
+`TUNE.LOOKAHEAD_M` is 15 m against roundabout radii around 12 m; pure pursuit
+with a lookahead longer than the path radius cuts the corner by construction.
+
+**This is tractable and does not need a product change**, which the gap-
+acceptance framing did. It is the same cost problem that shows up everywhere in
+this loop: the scan is the expensive operation and everything is paced by it.
+The recovery build already skips the scan when the car is off-road; the
+roundabout wants the opposite — a cheaper or more frequent scan where the
+geometry is tight.
+
+**Nothing here is built.** It is recorded so the next attempt starts from the
+measurement rather than from the wrong cause, which is what section E would have
+sent it to.
