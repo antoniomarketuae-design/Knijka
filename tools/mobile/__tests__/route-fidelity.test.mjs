@@ -21,6 +21,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  MATCH_AHEAD_SLACK_M,
   RECOVERY_MAX_EPISODES,
   RECOVERY_MAX_M,
   RECOVERY_MAX_MS,
@@ -29,6 +30,7 @@ import {
   ROUTE_OFF_M,
   authoredLinePolyline,
   distanceToPolyline,
+  projectNear,
   projectOnPolyline,
   recoveryAim,
   recoveryBudget,
@@ -518,5 +520,54 @@ describe("9 · a car parked on its route has not driven it", () => {
     // not «did the student drive well». A high floor would start refusing legs
     // that legitimately end early on a lesson that ends early.
     assert.equal(ROUTE_MIN_COVERED_FRAC, 0.5);
+  });
+});
+
+describe("10 · the match walks forward with the drive", () => {
+  /* A ROUNDABOUT'S LINE COMES BACK TO MEET THE CAR. Unwindowed nearest-point
+   * matching therefore cannot tell a car going round from one going straight
+   * across the middle: both are always near some part of the circle. The window
+   * is what makes the measurement mean «followed this line» rather than «was
+   * near this line at some point». */
+  const CIRCLE = Array.from({ length: 73 }, (_, i) => {
+    const a = (i / 72) * Math.PI * 2;
+    return [20 * Math.sin(a), 20 * Math.cos(a)];
+  });
+
+  it("a car driving straight across a circular route is NOT on it", () => {
+    // Due south through the middle of a 20 m-radius circle. Every point is
+    // within 20 m of the ring, and the centre is 20 m from all of it.
+    const s = Array.from({ length: 20 }, (_, i) => move(0, -20 + i * 2));
+    const d = routeDeviation(s, CIRCLE);
+    // MUTATION WATCHED: drop the window and the middle of the circle matches
+    // the far side, the car reads a few metres off route, and a drive that went
+    // straight on through a roundabout is certified as having driven it.
+    assert.equal(d.onRoute, false, `maxM ${d.maxM}`);
+    assert.ok(d.maxM > ROUTE_OFF_M, `maxM ${d.maxM}`);
+  });
+
+  it("a car actually going round it is on it", () => {
+    const s = CIRCLE.filter((_, i) => i % 2 === 0).map(([x, z]) => move(x, z));
+    const d = routeDeviation(s, CIRCLE);
+    assert.equal(d.onRoute, true, `maxM ${d.maxM}`);
+    assert.ok(d.coveredFrac > 0.9, `coveredFrac ${d.coveredFrac}`);
+    assert.equal(d.droveIt, true);
+  });
+
+  it("projectNear searches the whole line when there is no cursor yet", () => {
+    // The first sample has no predecessor and must not be trapped at the start.
+    const pr = projectNear(0, 40, [[0, 0], [0, 100]], null, 0);
+    assert.equal(Math.round(pr.alongM), 40);
+    assert.equal(Math.round(pr.distanceM), 0);
+  });
+
+  it("and refuses to leap further ahead than the car travelled, plus slack", () => {
+    // Cursor at 0, car travelled 1 m: a point 90 m along the line must NOT be
+    // matched at 90 m — the window ends at 0 + 1 + MATCH_AHEAD_SLACK_M.
+    const pr = projectNear(0, 90, [[0, 0], [0, 100]], 0, 1);
+    assert.ok(pr.alongM <= 1 + MATCH_AHEAD_SLACK_M + 0.001, `alongM ${pr.alongM}`);
+    // …and the distance it reports is to the windowed foot, so the leap shows
+    // up as a departure rather than disappearing.
+    assert.ok(pr.distanceM > 60, `distanceM ${pr.distanceM}`);
   });
 });

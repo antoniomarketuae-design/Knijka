@@ -2016,6 +2016,75 @@ export function refusalExpired(decidedAtMs, nowMs, everySec = COST.recheckEveryS
  * says so in one sentence a judge can act on.
  */
 
+/** How far the match may run ahead of the last one, beyond the distance the
+ *  car actually travelled. Slack for a coarse authored line, not licence to
+ *  skip a leg of the route. */
+export const MATCH_AHEAD_SLACK_M = 25;
+/** How far it may fall back. A car that reverses a little must still match;
+ *  a car that drives the route backwards must not. */
+export const MATCH_BACK_SLACK_M = 10;
+
+/**
+ * Project a point onto a polyline, but only onto the stretch NEAR where the
+ * previous sample matched.
+ *
+ * WHY A WINDOW, AND WHY THIS WAS FOUND THE HARD WAY. A roundabout's authored
+ * line curves back on itself, so a car driving DEAD STRAIGHT across the middle
+ * of one is never more than a few metres from some part of that line.
+ * `sc-rb-busy-gap/mobile-right` in w43 is exactly that drive — 75.4 m of path
+ * at straightness 0.999, through a roundabout lesson — and unwindowed nearest-
+ * point matching called it 4.54 m off route, i.e. on it. The car went straight
+ * on and the measurement congratulated it.
+ *
+ * So the match walks forward with the drive: each sample may advance by the
+ * distance the car actually travelled plus `MATCH_AHEAD_SLACK_M`, and may fall
+ * back by `MATCH_BACK_SLACK_M`. A car that leaves the route and rejoins it
+ * further on therefore records the departure instead of teleporting along the
+ * line to meet itself.
+ *
+ * `cursorM` of `null` means «no previous match» — the first sample searches
+ * the whole line, as it must.
+ */
+export function projectNear(px, pz, poly, cursorM, travelledM = 0) {
+  if (!Array.isArray(poly) || poly.length < 2) return null;
+  const lo = cursorM === null ? -Infinity : cursorM - MATCH_BACK_SLACK_M;
+  const hi = cursorM === null ? Infinity : cursorM + travelledM + MATCH_AHEAD_SLACK_M;
+  let best = Infinity;
+  let bestAlong = 0;
+  let run = 0;
+  let total = 0;
+  for (let i = 1; i < poly.length; i++) {
+    const ax = poly[i - 1][0], az = poly[i - 1][1];
+    const bx = poly[i][0], bz = poly[i][1];
+    const dx = bx - ax, dz = bz - az;
+    const segLen = Math.hypot(dx, dz);
+    total += segLen;
+  }
+  for (let i = 1; i < poly.length; i++) {
+    const ax = poly[i - 1][0], az = poly[i - 1][1];
+    const bx = poly[i][0], bz = poly[i][1];
+    const dx = bx - ax, dz = bz - az;
+    const segLen = Math.hypot(dx, dz);
+    const L2 = dx * dx + dz * dz;
+    // Skip a segment that lies entirely outside the window.
+    if (run + segLen >= lo && run <= hi) {
+      let t = L2 === 0 ? 0 : ((px - ax) * dx + (pz - az) * dz) / L2;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      // …and clamp the foot to the window itself, so a long segment cannot
+      // smuggle a match from beyond it.
+      const along = run + t * segLen;
+      const clamped = Math.min(Math.max(along, Math.max(lo, run)), Math.min(hi, run + segLen));
+      const tc = segLen === 0 ? 0 : (clamped - run) / segLen;
+      const qx = ax + tc * dx, qz = az + tc * dz;
+      const d = Math.hypot(px - qx, pz - qz);
+      if (d < best) { best = d; bestAlong = clamped; }
+    }
+    run += segLen;
+  }
+  if (!Number.isFinite(best)) return null;
+  return { distanceM: best, alongM: bestAlong, totalM: total };
+}
+
 /**
  * Project a point onto a polyline: the perpendicular distance AND how far
  * along the line the foot of that perpendicular lies.
@@ -2111,6 +2180,9 @@ export const ROUTE_MIN_COVERED_FRAC = 0.5;
 export function routeDeviation(samples, poly, { minSamples = 5, minKmh = 1 } = {}) {
   if (!Array.isArray(samples) || !Array.isArray(poly) || poly.length < 2) return null;
   const d = [];
+  let cursorM = null;
+  let prevX = null;
+  let prevZ = null;
   let firstAlong = null;
   let lastAlong = null;
   let minAlong = Infinity;
@@ -2119,8 +2191,15 @@ export function routeDeviation(samples, poly, { minSamples = 5, minKmh = 1 } = {
   for (const s of samples) {
     if (!Number.isFinite(s?.wx) || !Number.isFinite(s?.wz)) continue;
     if (!((s.kmh ?? 0) > minKmh)) continue;
-    const pr = projectOnPolyline(s.wx, s.wz, poly);
+    /* WINDOWED, IN TIME ORDER. See `projectNear`: unwindowed matching calls a
+     * car that drove straight across a roundabout «on route», because the
+     * authored line comes back around to meet it. */
+    const travelled = prevX === null ? 0 : Math.hypot(s.wx - prevX, s.wz - prevZ);
+    prevX = s.wx;
+    prevZ = s.wz;
+    const pr = projectNear(s.wx, s.wz, poly, cursorM, travelled);
     if (pr === null) continue;
+    cursorM = pr.alongM;
     d.push(pr.distanceM);
     totalM = pr.totalM;
     if (firstAlong === null) firstAlong = pr.alongM;
