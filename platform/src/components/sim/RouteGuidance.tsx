@@ -33,8 +33,14 @@
  *     is a sign or it is absent — never the half-transparent veil sweep 161
  *     photographed over a facade, over the В14 and under the «РАЗБРАХ» pill.
  *
- * PERF contract: geometry rebuilds ONLY on objective change (route derivation
- * included); per frame we update uniforms + one transform, allocation-free.
+ * PERF contract: geometry rebuilds ONLY on objective change OR route loss
+ * (route derivation included); per frame we update uniforms + one transform,
+ * allocation-free. "Route loss" is the student leaving the corridor the ribbon
+ * was drawn for — see THE ROUTE HAS TO FOLLOW THE STUDENT in
+ * `scene/guidanceRoute.ts` for the frames, the measured trace and the cooldown
+ * that bounds it. It is at most one graph search per 3 s, only while lost, and
+ * zero on a drive that follows the line (proved against the committed shadow
+ * trace). What this contract has always meant — never per frame — is unchanged.
  * `prefers-reduced-motion` freezes the band scroll, pulse and bob.
  *
  * Pattern note: objects follow the WindshieldDroplets convention — memoized
@@ -44,7 +50,7 @@
  * re-renders never stomp the imperative state.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { VehicleSample } from "@/modules/sim/contracts";
@@ -61,7 +67,11 @@ import {
   markerSignIsCovered,
   markerSignOffset,
   markerSignOpacity,
-  nearestArcOnRoute,
+  nearestOnRoute,
+  createRouteFollowWatch,
+  noteRouteDerived,
+  rerouteDue,
+  routeLossApplies,
   routePointAt,
   stopLinesForGuidance,
   MARKER_SIGN_PANEL_H_M,
@@ -76,6 +86,7 @@ import {
   type GuidanceGoal,
   type GuidancePointGoal,
   type RouteDistrictLike,
+  type RouteHead,
   type WorldSignLike,
 } from "@/modules/sim/scene/guidanceRoute";
 import { createRibbonBuffers, writeRibbonStrip } from "@/modules/sim/scene/ribbonStrip";
@@ -1269,7 +1280,22 @@ export function RouteGuidance({
   const goalRef = useRef<GuidanceGoal | null>(null);
   // Per-frame scratch — never allocated inside useFrame.
   const scratchPtRef = useRef({ x: 0, y: 0 });
+  const headRef = useRef<RouteHead>({ s: 0, latM: 0 });
   const overCapRef = useRef(false);
+
+  /**
+   * ROUTE LOSS — see "THE ROUTE HAS TO FOLLOW THE STUDENT" in guidanceRoute.ts
+   * for the frames and the measured trace. The layout effect below is keyed on
+   * objective change; a student who leaves the corridor cannot complete the
+   * objective, so without this counter the ONE event that re-derives their
+   * guidance is the one event they are locked out of. Bumping it re-runs the
+   * effect, which already derives from the car's own pose on every build after
+   * the first — so the line is rebuilt from where the student actually is.
+   */
+  const [rerouteSeq, setRerouteSeq] = useState(0);
+  const watchRef = useRef(createRouteFollowWatch());
+  /** Last frame clock, so the layout effect can stamp the latch it re-arms. */
+  const clockRef = useRef(0);
 
   // Rebuild route + visuals on objective change ONLY (never per frame).
   // Layout effect: visibility/positions land before the first paint, so the
@@ -1288,6 +1314,20 @@ export function RouteGuidance({
 
     const route = deriveGuidanceRoute(graph, start, goal, { lookahead });
     routeRef.current = route;
+
+    // Re-arm the loss latch against the route the student is actually being
+    // given. `baseLatM` is how far off it already is at the pose it was built
+    // from — on a wide boulevard the ribbon opens on the centreline and only
+    // reaches the goal's lane over the last 40 m, so that is 12 m on d2-v1 and
+    // ~0 m on a two-lane street. Measuring the next excursion from THERE is
+    // what lets one trigger serve both without a per-district number.
+    noteRouteDerived(
+      watchRef.current,
+      route ? nearestOnRoute(route, start.x, start.y, headRef.current).latM : null,
+      start.x,
+      start.y,
+      clockRef.current,
+    );
 
     const geo = ribbonGeoRef.current;
     if (geo && route) fillRibbon(geo, route);
@@ -1379,6 +1419,10 @@ export function RouteGuidance({
     spawnStart,
     sampleRef,
     district,
+    // NOT a cosmetic dep: this is the whole route-loss repair. Everything else
+    // in this list is objective identity; this one is "the student is no longer
+    // on the line we drew for them".
+    rerouteSeq,
   ]);
 
   useFrame((state) => {
@@ -1490,10 +1534,37 @@ export function RouteGuidance({
 
     const route = routeRef.current;
     const ribbonMat = ribbonMatRef.current;
-    if (!route || !sample || !ribbonMat) return;
+    clockRef.current = t;
+    if (!sample) return;
 
-    // Ribbon head: fade window follows the car along the route.
-    const headS = nearestArcOnRoute(route, sample.position.x, sample.position.y);
+    // Ribbon head: fade window follows the car along the route — and the SAME
+    // scan now yields how far off the route the car is, which is the half this
+    // loop used to throw away (`nearestArcOnRoute` returned only the arc).
+    const head = headRef.current;
+    if (route) nearestOnRoute(route, sample.position.x, sample.position.y, head);
+
+    // ROUTE LOSS. Deliberately BEFORE the `!route` bail-out: no route at all,
+    // with an objective still live, is the state that most needs re-deriving —
+    // it is a student off the road network being shown nothing (the shipped
+    // off-road banner is what explains that to them; this is what gives the
+    // line back on the first frame a road is reachable again).
+    if (
+      routeLossApplies(goalNow) &&
+      rerouteDue(
+        watchRef.current,
+        route ? head.latM : null,
+        sample.position.x,
+        sample.position.y,
+        sample.speedKmh,
+        t,
+      )
+    ) {
+      setRerouteSeq((n) => n + 1);
+    }
+
+    if (!route || !ribbonMat) return;
+
+    const headS = head.s;
     ribbonMat.uniforms.uHeadS.value = headS;
     ribbonMat.uniforms.uTime.value = t;
 

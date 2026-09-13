@@ -2711,9 +2711,23 @@ export function deriveGuidanceRoute(
 // Per-frame helpers (allocation-free)
 // ---------------------------------------------------------------------------
 
-/** Arclength of the route sample nearest to (x, y) — the "head" the ribbon
- * fades around. Full scan over ≤1024 samples: trivial, zero allocation. */
-export function nearestArcOnRoute(route: ArcSampledPath, x: number, y: number): number {
+/** Where the car sits relative to the route: the "head" arclength the ribbon
+ *  fades around, and HOW FAR OFF the route that nearest sample actually is. */
+export interface RouteHead {
+  /** Arclength of the nearest route sample. */
+  s: number;
+  /** Distance from (x, y) to that sample, meters. */
+  latM: number;
+}
+
+/** Nearest route sample to (x, y), written into `out`. Full scan over ≤1024
+ * samples: trivial, zero allocation. */
+export function nearestOnRoute(
+  route: ArcSampledPath,
+  x: number,
+  y: number,
+  out: RouteHead,
+): RouteHead {
   const { pts, count } = route;
   let best = 0;
   let bestD2 = Infinity;
@@ -2726,7 +2740,238 @@ export function nearestArcOnRoute(route: ArcSampledPath, x: number, y: number): 
       best = i;
     }
   }
-  return route.arc[best];
+  out.s = route.arc[best];
+  out.latM = Math.sqrt(bestD2);
+  return out;
+}
+
+const NEAREST_SCRATCH: RouteHead = { s: 0, latM: 0 };
+
+/** Arclength of the route sample nearest to (x, y). Thin wrapper over
+ * `nearestOnRoute` for the call sites that only want the head. */
+export function nearestArcOnRoute(route: ArcSampledPath, x: number, y: number): number {
+  return nearestOnRoute(route, x, y, NEAREST_SCRATCH).s;
+}
+
+// ---------------------------------------------------------------------------
+// THE ROUTE HAS TO FOLLOW THE STUDENT, NOT THE OTHER WAY ROUND
+// ---------------------------------------------------------------------------
+//
+// THE DEFECT (sweep w41, `sc-ed-d2-city-run__mobile-right`, attested against
+// 1f39940567d2, drive ended naturally). The ribbon is on the glass for 26 s and
+// then gone for the remaining 190 s — 24 of 28 saved drive frames carry no
+// ribbon colour ANYWHERE on a 2556×1179 canvas — while the lesson keeps asking
+// the student to follow it. It is not the camera, not the band, not frustum
+// culling (`frustumCulled={false}` + a 1e6 bounding sphere), not the route
+// ending: the car drove 676 m and finished with tasks still live.
+//
+// MEASURED, by replaying that drive's own recorded poses (132 of its 141
+// guidance samples; consecutive duplicates dropped) against the real d2-v1
+// graph and the real compiled lesson — guidance-route-recovery.test.ts:
+//
+//   t=26 s  objective 0 completes; the route is re-derived from the car and is
+//           463 m long. The car is already 9.6 m off it — it has just turned.
+//   t=27 s  16.5 m off      t=31 s   40.6 m off     t=49 s  106.9 m off
+//   t=100 s 141.6 m off     t=218 s  554.6 m off
+//
+//   and `headS` — the point the fade window is centred on — crawls to 47.5 m
+//   and then FREEZES THERE FOR 150 SECONDS, because the nearest point on an
+//   abandoned corridor stops moving once you stop travelling along it.
+//
+// So the ribbon is still being drawn, at full alpha, on 136 m of asphalt that
+// is a quarter of a kilometre away on a road the student left. Off-screen, or
+// sub-pixel where it is not.
+//
+// THE CAUSE IS THE DERIVATION SCHEDULE, not the geometry. `deriveGuidanceRoute`
+// has exactly one production call site (RouteGuidance's layout effect) and that
+// effect is keyed on OBJECTIVE CHANGE. Leave the corridor and the one event
+// that would re-derive from your new position is the objective completing —
+// which is precisely the thing you can no longer do. The student is locked out
+// of their own guidance by the act of needing it.
+//
+// THE RULE. Re-derive when the car has diverged from the route it was given.
+// The trigger is measured against the divergence the route ALREADY had when it
+// was derived (`baseLatM`), not against zero, for two reasons: it absorbs the
+// lane offset the ribbon opens with on a wide boulevard (12.2 m on d2-v1, see
+// `alignRawToGoalLane`) without a magic number tuned to one district, and it
+// makes a second re-derivation require a FURTHER excursion, so a car stranded
+// off the network cannot spin the graph search once a cooldown.
+//
+// PROVED NOT TO FIRE ON A GOOD DRIVE. The committed shadow trace for this
+// lesson — 2,218 poses, the whole clean 971 m run — never exceeds 12.8 m of
+// lateral, against a trigger that sits at 36-37 m. Zero divergence
+// re-derivations across the entire recording. That assertion is in the test.
+//
+// COST, MEASURED rather than guessed. `nearestOnRoute` already ran per frame;
+// it now also returns the sqrt it was throwing away. One re-derivation costs
+// **0.94 ms** on d2-v1 — the biggest world we ship, a 21.7 km OSM cut with 283
+// graph edges — and 0.01-0.07 ms on the small authored worlds (`lot-left-v1`
+// 0.01, `rb-mini-v1` 0.07, `poligon-v1` 0.03; 200 derivations each, timed
+// 2026-09-13). Bounded by ROUTE_REDERIVE_COOLDOWN_S, that is at worst 0.3 ms
+// per second, and only while the student is lost. The PERF contract in
+// RouteGuidance's header — "geometry rebuilds ONLY on objective change" — is
+// amended to "…on objective change or route loss", which is the same statement
+// of intent: never per frame.
+//
+// WHERE IT MUST NOT APPLY, established by replaying ALL 167 COMMITTED SHADOW
+// TRACES (the recorded correct drives) against this rule. For 161 of them the
+// worst lateral of the whole drive is 16.3 m (`sc-ln-turn-lane-arrows`) against
+// a trigger that cannot be lower than 25 — a margin of at least 8.7 m, and
+// under 13 m for every other one. The exceptions are structural, not sloppy
+// driving, and they split into two kinds:
+//
+//   ROUNDABOUTS — `sc-roundabout-entry` 53.8 m, `sc-rb-circulate-priority`
+//   40.2, `sc-rb-exit-signal` 34.2, `sc-rb-lane-choice` 23.4, `sc-rb-ped-exit`
+//   21.3, `sc-rb-busy-gap` 18.4. A ring leg is a loop around a 17.85-25.78 m
+//   island, so "distance to the polyline" is large BY CONSTRUCTION while the
+//   student circulates correctly — it measures the island, not a mistake. And
+//   re-deriving a ring leg from a pose INSIDE the ring is the exact hazard
+//   ROUNDABOUT RIBBONS (below `walkAheadRaw`) exists to keep closed. Ring goals
+//   are therefore exempt: see `routeLossApplies`.
+//
+//   THE POLIGON — `sc-ed-poligon-chain` reaches 126.5 m from its own guidance
+//   line on its CORRECT drive, because the manoeuvring ground's 20 edges are
+//   not where the exercise happens. That is a real defect of this same family
+//   and it is NOT fixed here; the rule fires 3 times across its 3,289 poses
+//   (0.09 ms in total) and each firing moves the line closer to the student,
+//   which is the direction that helps. It is left in, deliberately, and pinned
+//   by name in guidance-route-recovery.test.ts so it cannot grow quietly.
+
+/**
+ * How far past the route's OWN starting divergence the car must get before the
+ * line is treated as no longer serving them.
+ *
+ * 25 m is wider than any lawful position on a carriageway the route uses (the
+ * perceptual carriageway is 8.125 m per lane and the widest shipped arterial is
+ * four of them), and narrower than the first junction you can take by mistake.
+ * The measured wrong drive crosses it 5 s after the wrong turn; the measured
+ * correct drive never comes within 23 m of it.
+ */
+export const ROUTE_DIVERGED_LAT_M = 25;
+/** Continuous seconds beyond the trigger before it counts. Kills a single
+ *  bad pose (a resumed tab, a physics pop) without delaying a real excursion. */
+export const ROUTE_DIVERGE_SUSTAIN_S = 1;
+/** Floor between two derivations, so a lost car cannot run the graph search
+ *  every frame. */
+export const ROUTE_REDERIVE_COOLDOWN_S = 3;
+/**
+ * How far the car must have MOVED since the last attempt before a null
+ * derivation is retried. Re-deriving from an unchanged pose snaps to the same
+ * edge and returns the same null: the retry exists for a car driving back
+ * toward the network, not for one parked off it.
+ */
+export const ROUTE_REDERIVE_MOVE_M = 8;
+/**
+ * Below this the car is not driving, so nothing about its divergence is news.
+ * It is also the guard that makes the placeholder pose safe: the scene ticks a
+ * frame-zero sample at the district ORIGIN before the chassis publishes
+ * (scene/vehicleSample.ts — `createVehicleSample` is (0, 0) at 0 km/h), and on
+ * a district whose extent is ~1 km that pose is hundreds of metres "off route".
+ * It reports 0 km/h and it never moves, so it can never arm this.
+ */
+const ROUTE_REDERIVE_MIN_KMH = 0.5;
+
+/** The re-derivation latch. One per mounted guidance layer; carried in a ref. */
+export interface RouteFollowWatch {
+  /** Lateral distance the CURRENT route had when it was derived. */
+  baseLatM: number;
+  /** Clock at which divergence first exceeded the trigger, or null. */
+  offSinceS: number | null;
+  /** Clock of the last derivation (or claim). */
+  lastAtS: number;
+  /** Pose the last derivation was made from. */
+  lastX: number;
+  lastY: number;
+}
+
+export function createRouteFollowWatch(): RouteFollowWatch {
+  return { baseLatM: 0, offSinceS: null, lastAtS: 0, lastX: 0, lastY: 0 };
+}
+
+/**
+ * Whether the route-loss rule may act on this objective at all.
+ *
+ * FALSE for a null goal — there is nothing to route to, the ribbon is standing
+ * down by design, and re-deriving would only produce the same null forever.
+ * That covers all objectives done and a `smoothStop`, and it is also what keeps
+ * this rule out of an EXAM: A13 has `LessonPlayShell` pass the all-done index
+ * unconditionally in exam mode (`examMode ? lesson.objectives.length : …`), so
+ * `guidanceGoalFor` returns null and no route loss can resurrect a ghost route
+ * the examiner's student is not supposed to have.
+ *
+ * FALSE for a ROUNDABOUT ring goal, for the two reasons measured in the block
+ * above: lateral distance to a ring is a measure of the island rather than of
+ * the student, and a ring leg re-derived from inside the ring is precisely
+ * what ROUNDABOUT RIBBONS is written to prevent.
+ */
+export function routeLossApplies(goal: GuidanceGoal | null): boolean {
+  if (goal === null) return false;
+  if (goal.kind === "point" && goal.leaveRadiusM !== undefined) return false;
+  return true;
+}
+
+/**
+ * Record that a route was just derived from (x, y) and lands `latM` away from
+ * it (null when no route could be derived at all). Re-arms the latch.
+ */
+export function noteRouteDerived(
+  w: RouteFollowWatch,
+  latM: number | null,
+  x: number,
+  y: number,
+  nowS: number,
+): void {
+  w.baseLatM = latM ?? 0;
+  w.offSinceS = null;
+  w.lastAtS = nowS;
+  w.lastX = x;
+  w.lastY = y;
+}
+
+/**
+ * True on the frame the route must be derived again.
+ *
+ * MUTATES `w`, including on a true return — it stamps the cooldown as it
+ * answers, so the caller cannot fire twice before the new route lands. Pass
+ * `latM: null` when there is no route at all; that is the branch that gets a
+ * lost student their line back the moment a road is reachable again.
+ */
+export function rerouteDue(
+  w: RouteFollowWatch,
+  latM: number | null,
+  x: number,
+  y: number,
+  speedKmh: number,
+  nowS: number,
+): boolean {
+  if (Math.abs(speedKmh) < ROUTE_REDERIVE_MIN_KMH) {
+    w.offSinceS = null;
+    return false;
+  }
+  const claim = () => {
+    w.offSinceS = null;
+    w.lastAtS = nowS;
+    return true;
+  };
+  if (nowS - w.lastAtS < ROUTE_REDERIVE_COOLDOWN_S) {
+    // Still inside the cooldown — but keep the sustain clock honest, or a long
+    // excursion that began during it would have to start counting over.
+    if (latM !== null && latM <= w.baseLatM + ROUTE_DIVERGED_LAT_M) w.offSinceS = null;
+    else if (latM !== null && w.offSinceS === null) w.offSinceS = nowS;
+    return false;
+  }
+  if (latM === null) {
+    return Math.hypot(x - w.lastX, y - w.lastY) >= ROUTE_REDERIVE_MOVE_M ? claim() : false;
+  }
+  if (latM <= w.baseLatM + ROUTE_DIVERGED_LAT_M) {
+    w.offSinceS = null;
+    return false;
+  }
+  if (w.offSinceS === null) {
+    w.offSinceS = nowS;
+    return false;
+  }
+  return nowS - w.offSinceS >= ROUTE_DIVERGE_SUSTAIN_S ? claim() : false;
 }
 
 // ---------------------------------------------------------------------------
