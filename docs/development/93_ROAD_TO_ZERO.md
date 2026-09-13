@@ -149,8 +149,8 @@ enter the circle and stop about halfway, which is exactly why «Стигни п�
 
 This programme has been caught by this shape before: «1 cm of lateral spread
 over 289 m» was once offered as proof a car held its lane, and proved only that
-it drove STRAIGHT.  now reports  and 
-beside the distances, and  requires both halves.
+it drove STRAIGHT. `routeDeviation` now reports `coveredFrac` and `reachedFrac`
+beside the distances, and `droveIt` requires both halves.
 
 | | rows | crit |
 |---|---|---|
