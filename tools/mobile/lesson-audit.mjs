@@ -5127,6 +5127,14 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     reverse.armed !== true &&
     guideWitness.length >= 2
   ) {
+    /* THE WHEEL IS LET GO BEFORE ANYTHING ELSE, AND THE RELEASE IS BANKED.
+     * Every other branch in this loop that can be entered with a sustained
+     * hold outstanding does this, because a verifier already caught one that
+     * did not: a drive then published sustainHolds 6 / sustainReleases 0 and a
+     * reader checking the two for balance would conclude six keys had leaked.
+     * This branch RETURNS, so without it a hold entered on the tick the car
+     * left the road would stay down for the whole recovery. */
+    if (guideHeldBySustain) { await steer(null, kmh); guideHeldBySustain = false; guidance.sustainReleases += 1; }
     if (!recovery.active) {
       recovery.active = true;
       recovery.episodes += 1;
