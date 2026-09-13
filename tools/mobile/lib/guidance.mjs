@@ -506,6 +506,63 @@ export function aimFrom(scan, { lookLo = 0.18, lookHi = 0.52, minRowPx = MIN_ROW
  * not produce.
  */
 export const CONFIDENT_LINE_PX = 1000;
+
+/**
+ * THE SAME RULER ON TWO CAMERAS THAT DIFFER 4.8x IN DENSITY — added 2026-09-13.
+ *
+ * Both floors above are raw device-pixel counts, and the two legs photograph the
+ * same road at very different densities. Measured over all 131 legs of w41:
+ *
+ *   drivable glass   mobile 2556x393.8 = 1,006,553 px   pc 1166x179.7 = 209,504   4.80x
+ *   median sighting  mobile 6,679 (n=1,200)             pc 1,375 (n=1,264)        4.86x
+ *
+ * So the median pc sighting sits 2.2x UNDER CONFIDENT_BAND_PX while the median
+ * mobile sighting sits 2.2x OVER it. Same world, same ribbon, opposite verdicts,
+ * decided by the ruler. The gate at :290-300 already records itself blocking
+ * 67.2% of turn demands, and the blindness split follows: sc-pk-driveway 11% on
+ * mobile against 64% on pc, sc-park-judge 15% vs 62%.
+ *
+ * The principle is already in this file — :550 scales MIN_COMPONENT_PX by
+ * dpr*dpr. The confidence floors were never given it.
+ *
+ * BAND AREA, NOT dpr². dpr² would say 9x; the bands are 966,168 and 244,860
+ * device px, a ratio of 3.95, because pc's CSS band is wider even at dpr 1. The
+ * band's own area needs no assumption about how the device got there.
+ *
+ * MOBILE IS THE REFERENCE AND DOES NOT MOVE. Its floors are the ones fitted on
+ * the corpus by perception-bench.mjs --sweep, and it is the leg that behaves.
+ * scaleFor() returns exactly 1 on a mobile-sized band, so those numbers are
+ * unchanged to the pixel; only pc's come down to the same share of its own band.
+ *
+ * AND IT RAISES NO REFUSAL. MIN_ROW_PX and MIN_BAND_PX — the floors that decide
+ * whether anything was SEEN — are deliberately not scaled here. A loop that sees
+ * more because it refuses less is a regression wearing a fix's clothes. This
+ * changes only whether a sighting already accepted as real is trusted enough to
+ * turn on.
+ */
+export const REFERENCE_BAND_PX = 2556 * 378;
+
+/**
+ * How much of the reference band this one is, clamped so a probe that returns a
+ * nonsense geometry cannot silently disable the floors. The upper clamp of 1 is
+ * the load-bearing half: a band LARGER than the reference must not RAISE the
+ * floor above the value the corpus was fitted against.
+ */
+export function bandScale(bandW, bandH) {
+  const area = Number(bandW) * Number(bandH);
+  if (!Number.isFinite(area) || area <= 0) return 1;
+  return Math.min(1, Math.max(0.15, area / REFERENCE_BAND_PX));
+}
+
+/** The two confidence floors, at this band's density. */
+export function confidenceFloors(bandW, bandH) {
+  const k = bandScale(bandW, bandH);
+  return {
+    scale: k,
+    confidentBandPx: Math.round(CONFIDENT_BAND_PX * k),
+    confidentLinePx: Math.round(CONFIDENT_LINE_PX * k),
+  };
+}
 /** …and the chevron's own floor. Below this the arrowhead is a few pixels at
  *  the far end of the route and its axis is noise with a plausible value.
  *  Measured: 100 px is where the corpus stops changing — 50 and 24 give the
@@ -542,11 +599,33 @@ export const CHEVRON_MIN_AXIS_X = 0.8;
  *        is pure and cannot see the previous frame.
  */
 export function readAim(scan, o = {}) {
-  const legacy = aimFrom(scan, o);
-  if (!scan.mask) return { ...legacy, signal: "mass", shape: null };
+  // THE FLOORS ARE DERIVED FROM THIS SCAN'S OWN BAND, not from a constant fitted
+  // on the other device. mobile and pc photograph the same road at 4.8x
+  // different density, and a raw pixel count means opposite things on the two —
+  // the median pc sighting was 2.2x under a floor the median mobile sighting was
+  // 2.2x over. bandScale() returns exactly 1 on a mobile-sized band, so the leg
+  // that behaves is unchanged to the pixel.
+  //
+  // An explicit override still wins: perception-bench.mjs --sweep varies these,
+  // and a bench that could not set them could not have fitted them.
+  const derived = confidenceFloors(scan.width, scan.height);
+  const withFloors = {
+    ...o,
+    confidentPx: o.confidentPx ?? derived.confidentBandPx,
+    perception: {
+      ...(o.perception ?? {}),
+      confidentLinePx: (o.perception ?? {}).confidentLinePx ?? derived.confidentLinePx,
+    },
+  };
+  const legacy = aimFrom(scan, withFloors);
+  if (!scan.mask) return { ...legacy, signal: "mass", shape: null, bandScale: derived.scale };
   const { width: W, height: H } = scan;
+  o = withFloors;
   const dpr = o.dpr ?? 1;
   const P = o.perception ?? {};
+  // Carried onto the sample so run.log can say WHICH ruler judged it. A
+  // confidence verdict whose floor is invisible cannot be re-checked later.
+  const bandScaleUsed = confidenceFloors(W, H).scale;
   const comps = labelComponents(scan.mask, W, H, { minPx: Math.round(MIN_COMPONENT_PX * dpr * dpr) });
 
   /* ── B. THE SCREEN-FIXED FURNITURE, SUBTRACTED ─────────────────────────── */

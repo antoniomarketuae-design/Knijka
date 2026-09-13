@@ -30,7 +30,7 @@ import {
   isPlate,
   labelComponents,
 } from "../lib/perception.mjs";
-import { CONFIDENT_LINE_PX, aimFrom, readAim, rowsFromPixels, scanBand } from "../lib/guidance.mjs";
+import { CONFIDENT_LINE_PX, aimFrom, confidenceFloors, readAim, rowsFromPixels, scanBand } from "../lib/guidance.mjs";
 
 /* ── the raster the tests draw on: the `pc` leg's real scan band ──────────── */
 const W = 1166;
@@ -383,13 +383,30 @@ describe("§5 readAim", () => {
     // The point of the whole pass: `CONFIDENT_LINE_PX` is a statement about how
     // much ROAD is on the glass. MUTATION WATCHED: sum `legacy.total` instead
     // of `linePx` and a lane whose only teal is a bright marker reads confident.
+    // RECALIBRATED 2026-09-13, claim unchanged. This canvas is 1166x210 — the pc
+    // band — and the confidence floor is now a SHARE of the band rather than a raw
+    // count, because mobile and pc photograph the same road at 4.8x different
+    // density and the median pc sighting was sitting 2.2x under a floor the median
+    // mobile sighting sat 2.2x over. At this band the line floor is 253, not 1000.
+    //
+    // The old 360 px of road was chosen as "well under 1000" and is 0.147% of this
+    // band — proportionally MORE than mobile's floor of 0.104%. So it is now
+    // confident, and correctly so. The number was calibrated against the absolute
+    // ruler; the CLAIM was never about the number.
+    //
+    // The claim is: confidence counts the ROAD ALONE, not road plus furniture. It
+    // is preserved exactly by moving the road under the scaled floor and leaving
+    // the marker large — sum legacy.total instead of linePx and this still reads
+    // confident off a lane whose only teal is a bright marker.
     const img = canvas();
-    img.rect(560, 45, 8, 45); // 360 px of road, well under the floor
+    const floor = confidenceFloors(1166, 210).confidentLinePx;
+    img.rect(560, 45, 8, 25); // 200 px of road, under the scaled floor
     img.disc(900, 70, 26); // plus a big bright marker, ~2,100 px
     const s = scanBand(img, [], { keepMask: true });
     const a = readAim(s);
-    assert.ok(s.total > CONFIDENT_LINE_PX, `the frame as a whole (${s.total} px) clears the floor`);
-    assert.ok(a.shape.linePx < CONFIDENT_LINE_PX, `road alone ${a.shape.linePx} px`);
+    assert.ok(floor < CONFIDENT_LINE_PX, `the pc band scales the floor down (${floor} < ${CONFIDENT_LINE_PX})`);
+    assert.ok(s.total > floor, `the frame as a whole (${s.total} px) clears the floor`);
+    assert.ok(a.shape.linePx < floor, `road alone ${a.shape.linePx} px, floor ${floor}`);
     assert.equal(a.signal, "line");
     assert.equal(a.confident, false);
   });
