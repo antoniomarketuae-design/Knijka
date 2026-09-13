@@ -264,11 +264,14 @@ import {
   COST,
   TUNE,
   aimFrom,
+  authoredLinePolyline,
   costVerdict,
   createFurnitureRegister,
   degPerPxAtCentre,
   readAim,
   refusalExpired,
+  routeDeviation,
+  routeDeviationRefusal,
   scanBand,
   steerCommand,
   summariseTracking,
@@ -8943,6 +8946,28 @@ const foldReport = (geo.sections ?? []).map((s) => {
 const surfaceCoveredPx = coveredPx(0, geo.contentH ?? 0, debriefPages);
 const lastFrameEnd = debriefPages.reduce((m, f) => Math.max(m, f.coversTo), 0);
 const trailingUnphotographedPx = Math.max(0, (geo.contentH ?? 0) - lastFrameEnd);
+  {
+    let authored = null;
+    try {
+      authored = authoredLinePolyline(
+        JSON.parse(readFileSync(`${REPO_ROOT}/content/traces/${SCENARIO}/shadow-correct.trace.json`, "utf8")),
+      );
+    } catch {
+      authored = null;
+    }
+    const dev = authored ? routeDeviation(guidance.samples, authored) : null;
+    /* Kept apart from `route` on purpose: it says the LINE was found, which is
+     * the other half of why a measurement is missing. Without it "NOT
+     * MEASURED" cannot tell "no authored line on disk" from "the car barely
+     * moved", and those want opposite follow-ups — one is a content gap, the
+     * other is a drive that died. */
+    guidance.routeReferencePoints = authored ? authored.length : null;
+    guidance.route = dev
+      ? { ...dev, referenceLine: `content/traces/${SCENARIO}/shadow-correct.trace.json`, points: authored.length }
+      : null;
+    guidance.routeRefusal = routeDeviationRefusal(dev);
+  }
+
 try {
   writeFileSync(
     `${OUT}/_audit-debrief.json`,
@@ -8960,6 +8985,13 @@ try {
         // prose of a run.log — the habit that produced three wrong numbers in
         // one day. `null` = the table was not read; it is not a zero.
         severity: facts.severity ?? null,
+        // WHERE THE CAR WAS, against the lesson's OWN authored zero-violation
+        // line, in the product's frame. `null` = not measured, never 0. The
+        // refusal beside it is the one sentence a judge must apply before
+        // filing anything about what the product did ALONG this route.
+        route: guidance.route ?? null,
+        routeRefusal: guidance.routeRefusal ?? null,
+        routeReferencePoints: guidance.routeReferencePoints ?? null,
         geometry: {
           scroller: geo.scroller,
           viewportH: geo.viewportH ?? null,
@@ -9320,6 +9352,48 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
     "carriageway. NO LANE-POSITION FINDING — «drifted into the oncoming lane», «clipped the kerb», «failed to keep " +
     "right» — MAY BE DRAWN FROM THIS DRIVE. What it can support is direction: whether the car followed the road the " +
     "lesson routes it down instead of travelling straight off the carriageway.";
+  /* ── AND WHERE THE CAR ACTUALLY WENT, AGAINST THE LESSON'S OWN LINE ──────
+   *
+   * The caveat above is the honest limit of the RIBBON: it is a centreline, so
+   * tracking it perfectly says nothing about lane position. That limit has
+   * blocked twenty-one open rows, eleven of them critical, whose whole content
+   * is where the car was relative to the road.
+   *
+   * It needs no new instrument. `guidance.samples[].wx/wz` has carried the
+   * chassis pose on every tick for weeks, and every scenario ships
+   * `shadow-correct.trace.json` — a drive authored under «must replay with
+   * ZERO violations» — in the same frame. The distance between them is a
+   * road-referenced measurement whose reference is the PRODUCT'S OWN idea of
+   * correct, not this loop's, not the car's own past chord (the mistake that
+   * got the first attempt at this reverted).
+   *
+   * MEASURED ON w43 BEFORE THIS LANDED, over its 79 `right` legs: 39 of them
+   * (49 %) put the car more than 8 m from its own lesson's correct line at
+   * some point, only 11 (14 %) never left 3 m, and the worst reached 185 m.
+   * Every one of those drives reported `TRACKING` and none of them reported
+   * this, which is how a leg that was never on the route came to be read as
+   * evidence about what the product credits along it.
+   *
+   * THE REFUSAL IS THE POINT, not the numbers. It is narrow on purpose: a leg
+   * that left the route can still witness a HUD defect or a debrief that
+   * contradicts itself. What it cannot witness is what the product did along a
+   * road the car was not on. */
+  {
+    const dev = guidance.route;
+    if (dev) {
+      note(
+        `  ROUTE FIDELITY: worst ${dev.maxM} m off the lesson's own correct line · median ${dev.medianM} m · p90 ${dev.p90M} m ` +
+          `· ${dev.pctOverNear}% of ${dev.n} moving samples beyond 3 m, ${dev.pctOverOff}% beyond 8 m ` +
+          `(reference: content/traces/${SCENARIO}/shadow-correct.trace.json, ${guidance.route.points} authored points, product frame)`,
+      );
+    } else {
+      note(
+        `  ROUTE FIDELITY: NOT MEASURED — ${guidance.routeReferencePoints ? "too few moving pose samples" : `no content/traces/${SCENARIO}/shadow-correct.trace.json on disk`}. ` +
+          `This is UNKNOWN, not zero.`,
+      );
+    }
+    if (guidance.routeRefusal) loud(guidance.routeRefusal);
+  }
   const tr = guidance.tracking;
   note(
     `  TRACKING: ${tr.verdict.toUpperCase()} · ribbon seen on ${tr.seenSamples}/${tr.movingSamples} moving samples ` +

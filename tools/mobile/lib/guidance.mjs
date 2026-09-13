@@ -1971,3 +1971,152 @@ export function refusalExpired(decidedAtMs, nowMs, everySec = COST.recheckEveryS
   if (decidedAtMs === null || decidedAtMs === undefined) return true;
   return nowMs - decidedAtMs >= everySec * 1000;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 9. WHERE THE CAR ACTUALLY WENT, IN THE PRODUCT'S OWN FRAME
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * WHY THIS EXISTS. Twenty-one open rows — eleven of them critical — are all
+ * UNJUDGED for one reason: nobody could establish where the car was RELATIVE
+ * TO THE ROAD. The first attempt at it was reverted, and correctly: it measured
+ * displacement from the car's own prior chord, a line through its own last
+ * 25 m, while every positional detector in the product measures from the road
+ * (`rules/types.ts laneOffsetM` is "offset FROM LANE CENTER";
+ * `runtime/spatial.ts OFF_ROAD_DISTANCE_M` is distance from an edge
+ * centreline). A car driving dead straight while the road curves away reads
+ * ~0 m on the chord scale and hundreds of metres on the product's. The
+ * proposed replacement was a new dev-only `__roadProbe` in the product.
+ *
+ * NO NEW INSTRUMENT IS NEEDED, AND THAT IS THE POINT OF THIS BLOCK. Both
+ * halves have been recorded on every drive for weeks and were thrown away at
+ * the reporting layer:
+ *
+ *   · `guidance.samples[].wx/wz` — the chassis pose from `__camProbe`, read on
+ *     EVERY tick including the ones where the loop did nothing.
+ *   · `content/traces/<id>/shadow-correct.trace.json` — 20 Hz `x, y,
+ *     headingDeg` of a drive whose authoring rule is «must replay with ZERO
+ *     violations», in the same frame (district y = −world z).
+ *
+ * So the reference line is not the car's own history and not this harness's
+ * opinion: it is the route the LESSON says is correct, authored by the
+ * product, validated by the product. The distance between them is a
+ * road-referenced measurement of the only kind that was missing.
+ *
+ * MEASURED ON w43 THE DAY THIS LANDED, over 79 `right` legs: 39 of them (49 %)
+ * put the car MORE THAN 8 m from its own lesson's correct line at some point,
+ * only 11 (14 %) never left 3 m of it, and the worst reached 185 m. That is
+ * the real state of the instrument, and until now no artefact said it.
+ *
+ * WHAT IT MAY AND MAY NOT BE USED FOR. It says where the car was. It does NOT
+ * say the product was wrong to be silent, or right to charge — the governing
+ * rule is unchanged: the instrument supplies the behaviour, the product decides
+ * whether that place was forbidden. Its use is the OTHER direction: a leg whose
+ * car was never on the route cannot support a finding about what the product
+ * did or did not credit ALONG that route, and `routeDeviationRefusal` below
+ * says so in one sentence a judge can act on.
+ */
+
+/** Perpendicular distance from a point to a polyline, in the polyline's units. */
+export function distanceToPolyline(px, pz, poly) {
+  if (!Array.isArray(poly) || poly.length < 2) return null;
+  let best = Infinity;
+  for (let i = 1; i < poly.length; i++) {
+    const ax = poly[i - 1][0], az = poly[i - 1][1];
+    const bx = poly[i][0], bz = poly[i][1];
+    const dx = bx - ax, dz = bz - az;
+    const L2 = dx * dx + dz * dz;
+    let t = L2 === 0 ? 0 : ((px - ax) * dx + (pz - az) * dz) / L2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const qx = ax + t * dx, qz = az + t * dz;
+    const d = Math.hypot(px - qx, pz - qz);
+    if (d < best) best = d;
+  }
+  return Number.isFinite(best) ? best : null;
+}
+
+/**
+ * The authored correct line as a `[x, z]` polyline in `__camProbe`'s frame.
+ *
+ * THE SIGN IS THE WHOLE OF IT. The trace is authored in DISTRICT coordinates
+ * and the probe reports WORLD; they differ by `z = −y` and nothing else. Get
+ * that backwards and every number below is a plausible-looking measurement of
+ * a mirrored road, which is worse than no number — so it is one line, named,
+ * rather than an inline negation somebody later "tidies".
+ */
+export function authoredLinePolyline(trace) {
+  const s = trace?.samples;
+  if (!Array.isArray(s) || s.length < 2) return null;
+  const poly = [];
+  for (const p of s) {
+    if (!Number.isFinite(p?.x) || !Number.isFinite(p?.y)) continue;
+    poly.push([p.x, -p.y]);
+  }
+  return poly.length >= 2 ? poly : null;
+}
+
+/** Deviation thresholds, in metres. `NEAR` is about a lane's worth of slack;
+ *  `OFF` is past any lane of any carriageway this product builds, so a car
+ *  beyond it is not "wide in its lane", it is somewhere else. */
+export const ROUTE_NEAR_M = 3;
+export const ROUTE_OFF_M = 8;
+
+/**
+ * Fold the drive's poses against the authored line.
+ *
+ * MOVING SAMPLES ONLY, and that is not a convenience. A car parked 40 m from
+ * the line before it is allowed to start would otherwise dominate the median
+ * and describe the drive by the place it had not left yet.
+ *
+ * Returns `null` when there is nothing to say — no line on disk, or too few
+ * poses — and the caller must print that rather than a zero. A missing
+ * measurement and a measurement of zero are opposite claims about a drive.
+ */
+export function routeDeviation(samples, poly, { minSamples = 5, minKmh = 1 } = {}) {
+  if (!Array.isArray(samples) || !Array.isArray(poly) || poly.length < 2) return null;
+  const d = [];
+  for (const s of samples) {
+    if (!Number.isFinite(s?.wx) || !Number.isFinite(s?.wz)) continue;
+    if (!((s.kmh ?? 0) > minKmh)) continue;
+    const m = distanceToPolyline(s.wx, s.wz, poly);
+    if (m !== null) d.push(m);
+  }
+  if (d.length < minSamples) return null;
+  const sorted = d.slice().sort((a, b) => a - b);
+  const at = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
+  const pct = (m) => Math.round((100 * d.filter((x) => x > m).length) / d.length);
+  const r2 = (x) => Number(x.toFixed(2));
+  return {
+    n: d.length,
+    medianM: r2(at(0.5)),
+    p90M: r2(at(0.9)),
+    maxM: r2(sorted[sorted.length - 1]),
+    pctOverNear: pct(ROUTE_NEAR_M),
+    pctOverOff: pct(ROUTE_OFF_M),
+    onRoute: sorted[sorted.length - 1] <= ROUTE_OFF_M,
+  };
+}
+
+/**
+ * The one sentence a judge needs, or `null` when the drive stayed on its route.
+ *
+ * It is deliberately narrow. It does NOT say the drive proves nothing — a leg
+ * that left the route can still witness a HUD defect, a debrief contradiction
+ * or a card that never mounted. It says the drive cannot witness what the
+ * product did ALONG a route the car was not on, which is precisely the class
+ * that has been mis-filed: «the task never ticked», «the offence never fired»,
+ * «the route credit never came».
+ */
+export function routeDeviationRefusal(dev) {
+  if (dev === null || dev === undefined) {
+    return "NO AUTHORED LINE TO MEASURE AGAINST — this drive's position relative to the road is UNKNOWN, not zero. No route-position finding may be filed from it.";
+  }
+  if (dev.onRoute) return null;
+  return (
+    `THIS CAR LEFT ITS OWN LESSON'S CORRECT LINE — ${dev.maxM} m at worst, ` +
+    `${dev.pctOverOff}% of moving samples beyond ${ROUTE_OFF_M} m (median ${dev.medianM} m over ${dev.n} samples), ` +
+    `measured against content/traces/<lesson>/shadow-correct.trace.json in the product's own frame. ` +
+    `NO FINDING ABOUT WHAT THE PRODUCT DID ALONG THIS ROUTE — a task that never ticked, an offence that never fired, ` +
+    `route credit that never came — MAY BE DRAWN FROM THIS LEG: the car was not there to be graded. ` +
+    `Findings about the HUD, the debrief or a card that never mounted are unaffected.`
+  );
+}
