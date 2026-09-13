@@ -68,7 +68,18 @@ export function legEvidence(dir) {
           medianAbsDeg: st.guidance.tracking.medianAbsDeg,
         }
       : null,
-    route: route ? { maxM: route.maxM, medianM: route.medianM, p90M: route.p90M, onRoute: route.onRoute, n: route.n } : null,
+    route: route
+      ? {
+          maxM: route.maxM,
+          medianM: route.medianM,
+          p90M: route.p90M,
+          onRoute: route.onRoute,
+          droveIt: route.droveIt,
+          coveredFrac: route.coveredFrac,
+          routeLengthM: route.routeLengthM,
+          n: route.n,
+        }
+      : null,
     routeHold: db?.routeHold ?? null,
     recovery: db?.recovery ?? null,
     severity,
@@ -82,9 +93,18 @@ export function renderEvidence(e) {
   L.push(`  ${e.leg}  —  ${e.verdict ?? "NO VERDICT"}${e.score === null ? "" : ` · ${e.score} наказателни т.`}${e.exit === 0 || e.exit === null ? "" : ` · EXIT ${e.exit}`}`);
   if (e.treeMoved) L.push(`      !! TREE MOVED DURING THIS RUN — it certifies nothing.`);
   if (e.route) {
+    // BOTH HALVES, ALWAYS TOGETHER. Lateral fidelity on its own says a car did
+    // not wander from where it was parked; six w43 legs sat ON their authored
+    // line having covered 4–47 % of it, four of them roundabouts that stop
+    // halfway. Printing one without the other is how «1 cm of lateral spread
+    // over 289 m» once read as proof a car held its lane.
+    const cov =
+      e.route.coveredFrac === null || e.route.coveredFrac === undefined
+        ? ""
+        : `, and covered ${Math.round(e.route.coveredFrac * 100)}% of its ${e.route.routeLengthM} m`;
     L.push(
-      `      ROUTE: ${e.route.onRoute ? "stayed on" : "LEFT"} the lesson's own authored line — worst ${e.route.maxM} m, median ${e.route.medianM} m over ${e.route.n} moving samples.` +
-        (e.route.onRoute
+      `      ROUTE: ${e.route.onRoute ? "stayed within 8 m of" : "LEFT"} the lesson's own authored line — worst ${e.route.maxM} m, median ${e.route.medianM} m over ${e.route.n} moving samples${cov}.` +
+        (e.route.droveIt
           ? ""
           : ` NO finding about what the product did ALONG this route may rest on this leg.`),
     );

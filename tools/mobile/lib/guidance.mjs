@@ -2016,6 +2016,39 @@ export function refusalExpired(decidedAtMs, nowMs, everySec = COST.recheckEveryS
  * says so in one sentence a judge can act on.
  */
 
+/**
+ * Project a point onto a polyline: the perpendicular distance AND how far
+ * along the line the foot of that perpendicular lies.
+ *
+ * THE SECOND HALF IS NOT A CONVENIENCE. Lateral distance alone says a car is
+ * on its route when it is parked at the start of one: the nearest point on a
+ * 927 m line to a car that has moved 5 m is 5 m along, at ~0 m off. This
+ * programme has already been caught by exactly that shape once, when «1 cm of
+ * lateral spread over 289 m» was offered as proof a car stayed in its lane and
+ * actually proved it drove STRAIGHT. Fidelity without progress is half a
+ * measurement, and it is the reassuring half.
+ */
+export function projectOnPolyline(px, pz, poly) {
+  if (!Array.isArray(poly) || poly.length < 2) return null;
+  let best = Infinity;
+  let bestAlong = 0;
+  let run = 0;
+  for (let i = 1; i < poly.length; i++) {
+    const ax = poly[i - 1][0], az = poly[i - 1][1];
+    const bx = poly[i][0], bz = poly[i][1];
+    const dx = bx - ax, dz = bz - az;
+    const segLen = Math.hypot(dx, dz);
+    const L2 = dx * dx + dz * dz;
+    let t = L2 === 0 ? 0 : ((px - ax) * dx + (pz - az) * dz) / L2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const qx = ax + t * dx, qz = az + t * dz;
+    const d = Math.hypot(px - qx, pz - qz);
+    if (d < best) { best = d; bestAlong = run + t * segLen; }
+    run += segLen;
+  }
+  return Number.isFinite(best) ? { distanceM: best, alongM: bestAlong, totalM: run } : null;
+}
+
 /** Perpendicular distance from a point to a polyline, in the polyline's units. */
 export function distanceToPolyline(px, pz, poly) {
   if (!Array.isArray(poly) || poly.length < 2) return null;
@@ -2059,6 +2092,10 @@ export function authoredLinePolyline(trace) {
  *  beyond it is not "wide in its lane", it is somewhere else. */
 export const ROUTE_NEAR_M = 3;
 export const ROUTE_OFF_M = 8;
+/** How much of the authored route a leg must cover before it can be said to
+ *  have DRIVEN it. Deliberately low: this is not «did the student do well»,
+ *  it is «was this car ever on enough of the road to witness anything». */
+export const ROUTE_MIN_COVERED_FRAC = 0.5;
 
 /**
  * Fold the drive's poses against the authored line.
@@ -2074,17 +2111,35 @@ export const ROUTE_OFF_M = 8;
 export function routeDeviation(samples, poly, { minSamples = 5, minKmh = 1 } = {}) {
   if (!Array.isArray(samples) || !Array.isArray(poly) || poly.length < 2) return null;
   const d = [];
+  let firstAlong = null;
+  let lastAlong = null;
+  let minAlong = Infinity;
+  let maxAlong = -Infinity;
+  let totalM = 0;
   for (const s of samples) {
     if (!Number.isFinite(s?.wx) || !Number.isFinite(s?.wz)) continue;
     if (!((s.kmh ?? 0) > minKmh)) continue;
-    const m = distanceToPolyline(s.wx, s.wz, poly);
-    if (m !== null) d.push(m);
+    const pr = projectOnPolyline(s.wx, s.wz, poly);
+    if (pr === null) continue;
+    d.push(pr.distanceM);
+    totalM = pr.totalM;
+    if (firstAlong === null) firstAlong = pr.alongM;
+    lastAlong = pr.alongM;
+    if (pr.alongM < minAlong) minAlong = pr.alongM;
+    if (pr.alongM > maxAlong) maxAlong = pr.alongM;
   }
   if (d.length < minSamples) return null;
   const sorted = d.slice().sort((a, b) => a - b);
   const at = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
   const pct = (m) => Math.round((100 * d.filter((x) => x > m).length) / d.length);
   const r2 = (x) => Number(x.toFixed(2));
+  /* HOW MUCH OF THE ROUTE THE CAR ACTUALLY COVERED. `reachedFrac` is the
+   * furthest point reached; `coveredFrac` is the span between the furthest
+   * back and the furthest on, so a car that shuttles inside 20 m of a 900 m
+   * route cannot read as having driven it. Both are needed: a car dropped at
+   * the far end would score a high `reachedFrac` on no driving at all. */
+  const reachedFrac = totalM > 0 && Number.isFinite(maxAlong) ? maxAlong / totalM : null;
+  const coveredFrac = totalM > 0 && Number.isFinite(maxAlong) ? (maxAlong - minAlong) / totalM : null;
   return {
     n: d.length,
     medianM: r2(at(0.5)),
@@ -2093,6 +2148,14 @@ export function routeDeviation(samples, poly, { minSamples = 5, minKmh = 1 } = {
     pctOverNear: pct(ROUTE_NEAR_M),
     pctOverOff: pct(ROUTE_OFF_M),
     onRoute: sorted[sorted.length - 1] <= ROUTE_OFF_M,
+    routeLengthM: r2(totalM),
+    coveredM: Number.isFinite(maxAlong) ? r2(maxAlong - minAlong) : null,
+    coveredFrac: coveredFrac === null ? null : Number(coveredFrac.toFixed(3)),
+    reachedFrac: reachedFrac === null ? null : Number(reachedFrac.toFixed(3)),
+    /* THE TWO HALVES TOGETHER. A leg only witnesses what the product did along
+     * a route if it was BOTH on that route and actually drove it. Either half
+     * alone is the reassuring half. */
+    droveIt: sorted[sorted.length - 1] <= ROUTE_OFF_M && coveredFrac !== null && coveredFrac >= ROUTE_MIN_COVERED_FRAC,
   };
 }
 
@@ -2109,6 +2172,14 @@ export function routeDeviation(samples, poly, { minSamples = 5, minKmh = 1 } = {
 export function routeDeviationRefusal(dev) {
   if (dev === null || dev === undefined) {
     return "NO AUTHORED LINE TO MEASURE AGAINST — this drive's position relative to the road is UNKNOWN, not zero. No route-position finding may be filed from it.";
+  }
+  if (dev.onRoute && dev.coveredFrac !== null && dev.coveredFrac < ROUTE_MIN_COVERED_FRAC) {
+    return (
+      `THIS CAR STAYED ON ITS LINE AND NEVER DROVE IT — ${dev.coveredM} m of a ${dev.routeLengthM} m authored route ` +
+      `(${Math.round(dev.coveredFrac * 100)}%), furthest point reached ${Math.round((dev.reachedFrac ?? 0) * 100)}% along. ` +
+      `Lateral fidelity is the reassuring half of this measurement and on its own it means only that the car did not ` +
+      `wander from where it was parked. NO FINDING ABOUT WHAT THE PRODUCT DID ALONG THIS ROUTE may be drawn from this leg.`
+    );
   }
   if (dev.onRoute) return null;
   return (

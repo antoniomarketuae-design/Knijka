@@ -48,7 +48,10 @@ const open = corpusCounts().open;
 const rows = open.map((f) => {
   const legs = byLesson.get(f.scenario) ?? [];
   const measured = legs.filter((l) => l.dev);
-  const onRoute = measured.filter((l) => l.dev.onRoute);
+  // BOTH HALVES. `onRoute` alone says a car did not wander from where it was
+  // parked; `droveIt` adds that it covered the route. Six w43 legs pass the
+  // first and fail the second, four of them roundabouts that stop halfway.
+  const onRoute = measured.filter((l) => l.dev.droveIt);
   const best = measured.length ? measured.reduce((a, b) => (a.dev.maxM <= b.dev.maxM ? a : b)) : null;
   return {
     id: f.findingId, scenario: f.scenario, sev: f.severity,
@@ -63,8 +66,8 @@ const cat = (r) =>
   r.legs === 0 ? "NOT DRIVEN IN THIS SWEEP"
   : r.noLine ? "NO AUTHORED LINE FOR THIS LESSON"
   : r.measured === 0 ? "DRIVEN BUT NO MOVING POSE SAMPLES"
-  : r.onRoute > 0 ? "HAS AT LEAST ONE ON-ROUTE LEG"
-  : "EVERY LEG LEFT THE ROUTE";
+  : r.onRoute > 0 ? "HAS A LEG THAT STAYED ON ITS ROUTE AND DROVE IT"
+  : "NO LEG BOTH STAYED ON THE ROUTE AND DROVE IT";
 
 const groups = new Map();
 for (const r of rows) {
@@ -75,8 +78,8 @@ for (const r of rows) {
 
 console.log(`open rows: ${rows.length}   sweep: ${SWEEP}\n`);
 const order = [
-  "HAS AT LEAST ONE ON-ROUTE LEG",
-  "EVERY LEG LEFT THE ROUTE",
+  "HAS A LEG THAT STAYED ON ITS ROUTE AND DROVE IT",
+  "NO LEG BOTH STAYED ON THE ROUTE AND DROVE IT",
   "DRIVEN BUT NO MOVING POSE SAMPLES",
   "NO AUTHORED LINE FOR THIS LESSON",
   "NOT DRIVEN IN THIS SWEEP",
@@ -87,10 +90,10 @@ for (const k of order) {
   console.log(`${String(g.length).padStart(3)}  (${String(crit).padStart(2)} crit)  ${k}`);
 }
 console.log("\n--- rows whose every leg left the route (the ones a re-drive cannot settle as-is) ---");
-for (const r of (groups.get("EVERY LEG LEFT THE ROUTE") ?? []).sort((a, b) => (b.bestMaxM ?? 0) - (a.bestMaxM ?? 0))) {
+for (const r of (groups.get("NO LEG BOTH STAYED ON THE ROUTE AND DROVE IT") ?? []).sort((a, b) => (b.bestMaxM ?? 0) - (a.bestMaxM ?? 0))) {
   console.log(`  [${(r.sev ?? "?").slice(0, 4).toUpperCase().padEnd(4)}] ${r.id}  best leg ${r.bestLeg} at ${r.bestMaxM} m off`);
 }
 console.log("\n--- rows with a leg that stayed on its route (these are judgeable NOW) ---");
-for (const r of (groups.get("HAS AT LEAST ONE ON-ROUTE LEG") ?? []).sort((a, b) => (a.bestMaxM ?? 0) - (b.bestMaxM ?? 0))) {
+for (const r of (groups.get("HAS A LEG THAT STAYED ON ITS ROUTE AND DROVE IT") ?? []).sort((a, b) => (a.bestMaxM ?? 0) - (b.bestMaxM ?? 0))) {
   console.log(`  [${(r.sev ?? "?").slice(0, 4).toUpperCase().padEnd(4)}] ${r.id}  ${r.onRoute}/${r.measured} legs on route, best ${r.bestLeg} at ${r.bestMaxM} m`);
 }

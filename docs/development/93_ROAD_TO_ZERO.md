@@ -137,3 +137,29 @@ The seatbelt gate landed (a2fa487) and `sc-vp-readiness:54c815da` — whose judg
 wrote «this harness has no seatbelt control to leave undone» — now has a wrong
 leg that drives unbelted. The three error-class counts are now fields, not
 pixels, in every debrief sidecar.
+
+### CORRECTION, same day: 65 was wrong, the figure is 54
+
+The partition above was computed on LATERAL distance alone, and lateral
+distance is the reassuring half. Six w43 legs sit within 8 m of their authored
+line having covered **4-47 % of it** — four of them roundabouts
+(sc-rb-busy-gap, sc-rb-lane-choice, sc-rb-ped-exit, sc-roundabout-entry) that
+enter the circle and stop about halfway, which is exactly why «Стигни по кръга
+до втория изход» never ticks.
+
+This programme has been caught by this shape before: «1 cm of lateral spread
+over 289 m» was once offered as proof a car held its lane, and proved only that
+it drove STRAIGHT.  now reports  and 
+beside the distances, and  requires both halves.
+
+| | rows | crit |
+|---|---|---|
+| has a leg that stayed on its route AND drove it | **54** | **26** |
+| no leg did both | 45 | 13 |
+| driven, no moving pose samples | 1 | 0 |
+| not driven in this sweep | 1 | 0 |
+
+The roundabout finding survives the correction and is sharpened by it: those
+cars now demonstrably ENTER the roundabout (contradicting w42) and demonstrably
+stop between 28 % and 48 % of the way round. That is a measurement a next drive
+can be aimed at.

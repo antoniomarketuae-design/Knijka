@@ -24,10 +24,12 @@ import {
   RECOVERY_MAX_EPISODES,
   RECOVERY_MAX_M,
   RECOVERY_MAX_MS,
+  ROUTE_MIN_COVERED_FRAC,
   ROUTE_NEAR_M,
   ROUTE_OFF_M,
   authoredLinePolyline,
   distanceToPolyline,
+  projectOnPolyline,
   recoveryAim,
   recoveryBudget,
   routeDeviation,
@@ -440,5 +442,81 @@ describe("8 · reverse, where a travel-derived heading is inverted", () => {
     // all, so a refactor cannot quietly drop it back to caller discipline.
     const src = read("tools/mobile/lib/guidance.mjs");
     assert.match(src, /export function recoveryAim\(\{[^}]*reversing = false/u);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 9 · PROGRESS ALONG THE ROUTE — the half that lateral distance hides
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * WRITTEN AFTER THE MEASUREMENT CORRECTED ITS OWN AUTHOR. The first cut of
+ * `routeDeviation` reported only lateral distance, and on that basis 65 of the
+ * 101 open rows were said to have a leg good enough to judge from. Six w43 legs
+ * then turned out to be sitting ON their authored line having covered 4–47 % of
+ * it — four of them roundabouts that stop halfway — and the honest figure was
+ * 54. This programme has been caught by exactly this shape once before, when
+ * «1 cm of lateral spread over 289 m» was offered as proof a car held its lane
+ * and in fact proved it drove STRAIGHT.
+ */
+
+describe("9 · a car parked on its route has not driven it", () => {
+  const LINE = Array.from({ length: 51 }, (_, i) => [0, i * 2]); // 100 m long
+
+  it("projectOnPolyline reports how far along the foot of the perpendicular lies", () => {
+    const pr = projectOnPolyline(3, 40, LINE);
+    assert.equal(Math.round(pr.distanceM), 3);
+    assert.equal(Math.round(pr.alongM), 40);
+    assert.equal(Math.round(pr.totalM), 100);
+  });
+
+  it("a car that shuttles inside 5 m of a 100 m route is NOT counted as having driven it", () => {
+    // Dead on the line the whole time — `onRoute` is true and says nothing.
+    const s = Array.from({ length: 20 }, (_, i) => move(0, (i % 3) * 2));
+    const d = routeDeviation(s, LINE);
+    assert.equal(d.onRoute, true);
+    assert.equal(d.maxM, 0);
+    // MUTATION WATCHED: report `onRoute` alone and this drive certifies as
+    // evidence about what the product credits along 100 m the car never saw.
+    assert.equal(d.droveIt, false);
+    assert.ok(d.coveredFrac < 0.1, `coveredFrac ${d.coveredFrac}`);
+    assert.match(routeDeviationRefusal(d), /STAYED ON ITS LINE AND NEVER DROVE IT/);
+    assert.match(routeDeviationRefusal(d), /NO FINDING ABOUT WHAT THE PRODUCT DID ALONG THIS ROUTE/);
+  });
+
+  it("a car that drives the whole thing passes both halves and draws no refusal", () => {
+    const s = Array.from({ length: 40 }, (_, i) => move(0.2, i * 2.5));
+    const d = routeDeviation(s, LINE);
+    assert.equal(d.onRoute, true);
+    assert.equal(d.droveIt, true);
+    assert.ok(d.coveredFrac > 0.9, `coveredFrac ${d.coveredFrac}`);
+    assert.equal(routeDeviationRefusal(d), null);
+  });
+
+  it("covered and reached are different questions, and both are reported", () => {
+    // A car that appears at the far end and drives the last 10 m has a high
+    // `reachedFrac` on almost no driving. MUTATION WATCHED: report only
+    // `reachedFrac` and a drive that starts at the finish line reads complete.
+    const s = Array.from({ length: 10 }, (_, i) => move(0, 90 + i));
+    const d = routeDeviation(s, LINE);
+    assert.ok(d.reachedFrac > 0.95, `reachedFrac ${d.reachedFrac}`);
+    assert.ok(d.coveredFrac < 0.2, `coveredFrac ${d.coveredFrac}`);
+    assert.equal(d.droveIt, false);
+  });
+
+  it("a car far off the line is still refused for THAT, not for coverage", () => {
+    const s = Array.from({ length: 40 }, (_, i) => move(40, i * 2.5));
+    const d = routeDeviation(s, LINE);
+    assert.equal(d.onRoute, false);
+    assert.equal(d.droveIt, false);
+    // The departure sentence, not the never-drove-it one — the two want
+    // different follow-ups and must stay distinguishable.
+    assert.match(routeDeviationRefusal(d), /LEFT ITS OWN LESSON/);
+  });
+
+  it("the coverage floor is stated, low, and not a quality bar", () => {
+    // It asks «was this car ever on enough of the road to witness anything»,
+    // not «did the student drive well». A high floor would start refusing legs
+    // that legitimately end early on a lesson that ends early.
+    assert.equal(ROUTE_MIN_COVERED_FRAC, 0.5);
   });
 });
