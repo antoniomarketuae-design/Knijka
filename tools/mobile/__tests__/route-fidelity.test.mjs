@@ -21,10 +21,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  RECOVERY_MAX_EPISODES,
+  RECOVERY_MAX_M,
+  RECOVERY_MAX_MS,
   ROUTE_NEAR_M,
   ROUTE_OFF_M,
   authoredLinePolyline,
   distanceToPolyline,
+  recoveryAim,
+  recoveryBudget,
   routeDeviation,
   routeDeviationRefusal,
 } from "../lib/guidance.mjs";
@@ -258,5 +263,182 @@ describe("5 · the route-hold leads are the product's own, verbatim", () => {
     assert.match(harness, /routeHold: undefined/u);
     assert.match(harness, /if \(p\.routeHold === undefined\) routeHold\.unread \+= 1;/u);
     assert.match(harness, /agreesWithGeometry:\s*dev === null \|\| routeHold\.unread > 0 \? null :/u);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 6 · GETTING BACK ON THE ROAD
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+describe("6 · recoveryAim, in the product's own frame", () => {
+  /* THE FRAME IS THE PRODUCT'S AND IS QUOTED, NOT INFERRED.
+   * scene/vehicleSample.ts:70 — "District-space mapping … three.js +X =
+   * district x (east), three.js −Z = district y (north) … headingDeg is
+   * 0 = north, clockwise positive (facing +X/east = 90°)".
+   *
+   * TWO CONSEQUENCES THAT ARE EASY TO GET BACKWARDS, AND BOTH WERE, ONCE:
+   *   · WORLD +z IS SOUTH. A car whose pose is increasing in z is driving
+   *     south, not north.
+   *   · heading is CLOCKWISE-positive, so "turn right" means "increase
+   *     heading", which is what makes errDeg > 0 mean right in steerCommand.
+   *
+   * Working the bearing difference through in that frame gives exactly
+   * atan2(hx·vz − hz·vx, h·v), which is what recoveryAim computes. These cases
+   * pin the RESULT rather than the derivation, so a later reader can check the
+   * sign without redoing the algebra. */
+  const LINE = Array.from({ length: 40 }, (_, i) => [0, i * 2]); // due SOUTH at x = 0
+
+  it("driving south, off to the EAST of the line, is told to steer RIGHT", () => {
+    // Facing south (+z), east (+x) is on the driver's LEFT, so a line to the
+    // west of him is on his RIGHT.
+    const a = recoveryAim({ x: 10, z: 20, prevX: 10, prevZ: 18, poly: LINE });
+    assert.ok(a.errDeg > 0, `expected a right demand, got ${a.errDeg}`);
+    assert.equal(a.offRouteM, 10);
+  });
+
+  it("…and mirrored, off to the WEST of it, is told to steer LEFT", () => {
+    // MUTATION WATCHED: swap the cross-product operands and both of these point
+    // the wrong way — the car would be steered further off the road at exactly
+    // the moment it is already off it, and the drive would look recovered
+    // because metres were spent trying.
+    const a = recoveryAim({ x: -10, z: 20, prevX: -10, prevZ: 18, poly: LINE });
+    assert.ok(a.errDeg < 0, `expected a left demand, got ${a.errDeg}`);
+  });
+
+  it("a car already on the line and pointing along it is told to go straight", () => {
+    const a = recoveryAim({ x: 0, z: 20, prevX: 0, prevZ: 18, poly: LINE });
+    assert.ok(Math.abs(a.errDeg) < 1, `expected ~0, got ${a.errDeg}`);
+    assert.equal(a.offRouteM, 0);
+  });
+
+  it("a car pointing the WRONG WAY down the line is told to turn about", () => {
+    // Driving north (−z) along a line that runs south. The demand must be near
+    // ±180°, not near 0 — a controller that reads this as "on line, carry on"
+    // drives the length of the route backwards.
+    const a = recoveryAim({ x: 0, z: 20, prevX: 0, prevZ: 22, poly: LINE });
+    assert.ok(Math.abs(a.errDeg) > 150, `expected a turn-about, got ${a.errDeg}`);
+  });
+
+  it("REFUSES a heading derived from jitter instead of inventing one", () => {
+    // MUTATION WATCHED: drop the step floor and a stationary car's heading is
+    // whatever the last two floating-point poses happened to differ by. The
+    // wheel would then be turned confidently at right angles to the truth.
+    const a = recoveryAim({ x: 10, z: 20, prevX: 10.01, prevZ: 20.01, poly: LINE });
+    assert.equal(a.errDeg, null);
+    assert.match(a.why, /noise, not a direction/);
+  });
+
+  it("refuses without a line, and without a pose pair", () => {
+    assert.equal(recoveryAim({ x: 1, z: 1, prevX: 0, prevZ: 0, poly: [] }).errDeg, null);
+    assert.equal(recoveryAim({ x: 1, z: 1, prevX: null, prevZ: 0, poly: LINE }).errDeg, null);
+    assert.equal(recoveryAim({ x: NaN, z: 1, prevX: 0, prevZ: 0, poly: LINE }).errDeg, null);
+  });
+
+  it("aims along the ARC of the line, not across the chord of a bend", () => {
+    // South for 20 m, then east. A car at the corner must be aimed round it.
+    const BEND = [
+      ...Array.from({ length: 11 }, (_, i) => [0, i * 2]),
+      ...Array.from({ length: 10 }, (_, i) => [(i + 1) * 2, 20]),
+    ];
+    const a = recoveryAim({ x: 0, z: 20, prevX: 0, prevZ: 18, poly: BEND, lookaheadM: 8 });
+    assert.equal(a.targetX, 8);
+    assert.equal(a.targetZ, 20);
+    assert.equal(a.arcM, 8);
+    // Facing south, east (+x) is a LEFT turn.
+    assert.ok(a.errDeg < -45, `expected a hard left round the bend, got ${a.errDeg}`);
+    // MUTATION WATCHED: taking the nearest vertex within a straight-line RADIUS
+    // instead of walking the arc picks a point on the incoming leg and steers
+    // the car straight on through the corner — the exact shape that puts a car
+    // on the grass at a roundabout.
+  });
+
+  it("clamps to the end of the line rather than running off it", () => {
+    const a = recoveryAim({ x: 5, z: 76, prevX: 5, prevZ: 74, poly: LINE, lookaheadM: 500 });
+    assert.notEqual(a.errDeg, null);
+    assert.equal(a.targetZ, 78);
+  });
+
+  it("the frame it assumes is still the frame the product documents", () => {
+    // MUTATION WATCHED: the product changing its district mapping without this
+    // module noticing is the one failure that produces confident, plausible
+    // numbers about a mirrored road. If this goes red, re-derive the sign — do
+    // not adjust the expectations above to match.
+    const vs = read("platform/src/modules/sim/scene/vehicleSample.ts");
+    assert.match(vs, /district y = −worldZ/u);
+    assert.match(vs, /headingDeg is 0 = north, clockwise positive/u);
+  });
+});
+
+describe("7 · the recovery ceilings", () => {
+  it("passes inside all three", () => {
+    assert.deepEqual(recoveryBudget({ metresSpent: 10, msSpent: 5000, episode: 1 }), { ok: true });
+  });
+
+  it("stops on distance, on time, and on repetition — each with its own sentence", () => {
+    const d = recoveryBudget({ metresSpent: RECOVERY_MAX_M + 1, msSpent: 0, episode: 1 });
+    assert.equal(d.ok, false);
+    assert.match(d.why, /m spent rejoining the route/);
+
+    const t = recoveryBudget({ metresSpent: 0, msSpent: RECOVERY_MAX_MS + 1, episode: 1 });
+    assert.equal(t.ok, false);
+    assert.match(t.why, /s spent rejoining the route/);
+
+    const e = recoveryBudget({ metresSpent: 0, msSpent: 0, episode: RECOVERY_MAX_EPISODES + 1 });
+    assert.equal(e.ok, false);
+    assert.match(e.why, /left the road [0-9]+ times in one drive/);
+    // The episode ceiling must say the drive is unusable, not merely that
+    // recovery stopped. A reader who sees only "recovery abandoned" will still
+    // file a route finding off the leg.
+    assert.match(e.why, /no route-position finding may be filed from it/);
+  });
+
+  it("every refusal refuses «we tried» explicitly", () => {
+    // MUTATION WATCHED: soften these to "recovery ended" and a drive that spent
+    // 60 m failing to rejoin reads the same as one that never left.
+    for (const args of [
+      { metresSpent: RECOVERY_MAX_M + 1, msSpent: 0, episode: 1 },
+      { metresSpent: 0, msSpent: RECOVERY_MAX_MS + 1, episode: 1 },
+    ]) {
+      assert.match(recoveryBudget(args).why, /«we tried» is not evidence/);
+    }
+  });
+
+  it("the ceilings are bounded in SHAPE as well as time", () => {
+    // The reverted lane-departure build could spin the car three times while
+    // reporting success because it bounded only duration. A distance ceiling is
+    // the shape bound: an arc costs metres even when it goes nowhere.
+    assert.ok(RECOVERY_MAX_M > 0 && Number.isFinite(RECOVERY_MAX_M));
+    assert.ok(RECOVERY_MAX_MS > 0 && Number.isFinite(RECOVERY_MAX_MS));
+    assert.ok(RECOVERY_MAX_EPISODES >= 1);
+    // A recovery may not out-drive the departure it is undoing by an order of
+    // magnitude — 60 m against an 8 m off-route threshold.
+    assert.ok(RECOVERY_MAX_M <= 10 * ROUTE_OFF_M);
+  });
+});
+
+describe("8 · reverse, where a travel-derived heading is inverted", () => {
+  const LINE = Array.from({ length: 40 }, (_, i) => [0, i * 2]);
+
+  it("refuses outright rather than issuing a demand that is 180 degrees wrong", () => {
+    // MUTATION WATCHED: drop the gate and every parking lesson's recovery turns
+    // the wheel the opposite way while the car is already off the road. This is
+    // not hypothetical — it is what the w43 comparison found: outside the
+    // parking lessons every disagreement with the ribbon was the ribbon
+    // drifting; inside them, every one was this.
+    const a = recoveryAim({ x: 10, z: 20, prevX: 10, prevZ: 18, poly: LINE, reversing: true });
+    assert.equal(a.errDeg, null);
+    assert.match(a.why, /in reverse/);
+  });
+
+  it("and the same pose forward still produces a demand", () => {
+    assert.notEqual(recoveryAim({ x: 10, z: 20, prevX: 10, prevZ: 18, poly: LINE }).errDeg, null);
+  });
+
+  it("the gate is a parameter, not a caller's discipline", () => {
+    // A default of `false` is the safe one ONLY because every call site is
+    // required to pass the real value; this pins that the parameter exists at
+    // all, so a refactor cannot quietly drop it back to caller discipline.
+    const src = read("tools/mobile/lib/guidance.mjs");
+    assert.match(src, /export function recoveryAim\(\{[^}]*reversing = false/u);
   });
 });

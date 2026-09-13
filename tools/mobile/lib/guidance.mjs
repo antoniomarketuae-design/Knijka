@@ -2120,3 +2120,175 @@ export function routeDeviationRefusal(dev) {
     `Findings about the HUD, the debrief or a card that never mounted are unaffected.`
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 10. GETTING BACK ON THE ROAD, WHEN THE PRODUCT SAYS THE CAR IS OFF IT
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * MEASURED ON w43: 39 of 79 `right` legs put the car more than 8 m from their
+ * own lesson's authored line, and the drives that did it did not come back.
+ * They kept scanning for a ribbon that was not in view — `isRibbonPixel`'s note
+ * records the ratio: 33.9 % blind samples on legs that left the carriageway
+ * against 6.1 % on legs that did not, so the blindness is 5.5× DOWNSTREAM of
+ * the departure — and several drove into scenery. Every objective after that
+ * point is missing for a reason that is this harness's, and rows were filed
+ * against the product for it.
+ *
+ * ── WHY THIS IS NOT THE INSTRUMENT MANUFACTURING ANYTHING ──────────────────
+ *
+ * The governing rule is that the instrument supplies the BEHAVIOUR and the
+ * product decides whether the place was forbidden; an instrument that knows in
+ * advance which conviction it wants is manufacturing a fault. Recovery wants no
+ * conviction. By the time it runs the product has ALREADY convicted — «Излизане
+ * от платното за движение», an основна — and printed its own instruction to the
+ * student on the glass: «Не дърпай волана — отпусни газта, изправи колелата и
+ * се върни под малък ъгъл». Recovery performs that instruction. It does not
+ * un-charge the departure, and it does not touch the wrong legs, which never
+ * steer.
+ *
+ * ── AND IT IS BOUNDED THREE WAYS, ON THE OVER-CAP TEMPLATE ─────────────────
+ *
+ * The reverted lane-departure build could put the car through three full
+ * revolutions while reporting success, because it bounded duration and not
+ * shape. So: a distance ceiling AND a clock ceiling AND an episode ceiling, the
+ * steer issued through `steerCommand` so the same radius and lock bounds that
+ * govern ordinary driving govern this, every recovery tick marked in the sample
+ * record so it can be excluded from the tracking rate, and a LOUD refusal when
+ * a ceiling bites — because «we tried» is not evidence.
+ */
+
+/** Metres of travel a single recovery episode may spend. */
+export const RECOVERY_MAX_M = 60;
+/** Wall-clock a single recovery episode may spend. */
+export const RECOVERY_MAX_MS = 25_000;
+/** Episodes per drive. A car that leaves the road four times is not having a
+ *  bad moment; it is a drive that should be read as failed and said so. */
+export const RECOVERY_MAX_EPISODES = 3;
+/** How far along the authored line to aim. Shorter than `TUNE.LOOKAHEAD_M`
+ *  because the car is coming back at an angle and a long lookahead flattens the
+ *  very correction it is there to make. */
+export const RECOVERY_LOOKAHEAD_M = 8;
+/** Below this the heading derived from two poses is noise, not a direction. */
+export const RECOVERY_MIN_STEP_M = 0.3;
+
+/** Index of the polyline vertex nearest a point, and the distance to it. */
+function nearestVertex(px, pz, poly) {
+  let bi = 0;
+  let bd = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const d = Math.hypot(px - poly[i][0], pz - poly[i][1]);
+    if (d < bd) { bd = d; bi = i; }
+  }
+  return { i: bi, d: bd };
+}
+
+/**
+ * Where to steer to rejoin the authored line, in the same `errDeg` units the
+ * ribbon loop produces — positive means «the target is to the right».
+ *
+ * ── THE SIGN WAS DERIVED, AND THEN CHECKED AGAINST REAL DRIVES ────────────
+ *
+ * `scene/vehicleSample.ts` documents the frame: district (x, y) sits at
+ * three.js (x, 0, −y), so «district y = −worldZ», and «headingDeg is 0 = north,
+ * clockwise positive». WORLD +z IS THEREFORE SOUTH, and «turn right» means
+ * «increase heading». Working the bearing difference through that frame gives
+ * exactly `atan2(hx·vz − hz·vx, h·v)`, which is what is computed below and
+ * agrees with `steerCommand`’s `errDeg > 0 ? "right"`.
+ *
+ * A DERIVATION IS NOT A MEASUREMENT, SO IT WAS CHECKED. Over w43’s TRACKED
+ * forward legs, on samples where the car was within 3 m of its authored line
+ * and both this module and the ribbon loop demanded at least 8°, the two agree
+ * on direction 74 % of the time — and the disagreements are the interesting
+ * half. `sc-turn-left-oncoming/pc-right` t55–t59s: the car sits at z ≈ −2.2
+ * against an authored line at z = −4.06, heading 264° (nearly due west), so the
+ * line is on the driver’s RIGHT. This module says +10.7° (right). The ribbon
+ * says LEFT — and the car’s distance from its own route climbs 1.37 → 1.45 →
+ * 1.60 → 1.74 → 1.88 → 2.13 → 2.69 m across those five samples. The ribbon
+ * loop is driving the car off its own route and this module is catching it,
+ * which is both the validation of the sign and the whole reason it exists.
+ *
+ * THE HEADING COMES FROM THE CAR'S OWN TWO LAST POSES and nothing else,
+ * because `__camProbe` publishes position and no yaw. That is only honest while
+ * the car is actually translating, so a step under `RECOVERY_MIN_STEP_M`
+ * returns a refusal rather than a direction: a heading derived from jitter
+ * would steer confidently at right angles to the truth, and the wheel would be
+ * turned on it.
+ *
+ * Returns `{ errDeg, ... }` or `{ errDeg: null, why }`. Never a number it did
+ * not earn.
+ */
+export function recoveryAim({ x, z, prevX, prevZ, poly, reversing = false, lookaheadM = RECOVERY_LOOKAHEAD_M }) {
+  /* ── REVERSE INVERTS THE ONLY HEADING THIS FUNCTION HAS ──────────────────
+   * The heading comes from two poses, so it is the direction of TRAVEL, and a
+   * reversing car travels backwards along its own nose. Every demand computed
+   * from it is then 180° wrong, which is not a small error: it is a wheel
+   * turned the opposite way while the car is already somewhere it should not
+   * be.
+   *
+   * FOUND EMPIRICALLY, NOT ANTICIPATED. Comparing this module against the
+   * ribbon loop over w43’s tracked legs, every disagreement OUTSIDE the
+   * parking lessons was the ribbon drifting; every disagreement INSIDE them
+   * was this. It is a parameter rather than a caller’s discipline so that it
+   * cannot be forgotten at one of the call sites. */
+  if (reversing) return { errDeg: null, why: "the car is in reverse — a heading derived from travel is inverted, and no demand may be issued from it" };
+  if (!Array.isArray(poly) || poly.length < 2) return { errDeg: null, why: "no authored line to rejoin" };
+  if (![x, z, prevX, prevZ].every(Number.isFinite)) return { errDeg: null, why: "no pose pair — the probe did not answer twice" };
+  const hx = x - prevX;
+  const hz = z - prevZ;
+  const step = Math.hypot(hx, hz);
+  if (step < RECOVERY_MIN_STEP_M) {
+    return { errDeg: null, why: `the car moved ${step.toFixed(2)} m between poses — under ${RECOVERY_MIN_STEP_M} m a heading is noise, not a direction` };
+  }
+  // Walk forward along the line from the nearest vertex until `lookaheadM` of
+  // ARC has been covered. Arc, not chord: on a curve a chord cuts the corner,
+  // which is the very error that puts a car on the grass at a roundabout.
+  const { i: ni, d: offM } = nearestVertex(x, z, poly);
+  let acc = 0;
+  let ti = ni;
+  for (let i = ni; i < poly.length - 1; i++) {
+    acc += Math.hypot(poly[i + 1][0] - poly[i][0], poly[i + 1][1] - poly[i][1]);
+    ti = i + 1;
+    if (acc >= lookaheadM) break;
+  }
+  const tx = poly[ti][0];
+  const tz = poly[ti][1];
+  // Signed angle from the heading vector to the target vector, in degrees.
+  // `atan2` of the 2-D cross and dot products — the branch-free form, so there
+  // is no quadrant case to get wrong.
+  const vx = tx - x;
+  const vz = tz - z;
+  if (Math.hypot(vx, vz) < 1e-6) return { errDeg: null, why: "the aim point is the car's own position" };
+  const cross = hx * vz - hz * vx;
+  const dot = hx * vx + hz * vz;
+  const errDeg = (Math.atan2(cross, dot) * 180) / Math.PI;
+  return {
+    errDeg: Number(errDeg.toFixed(2)),
+    offRouteM: Number(offM.toFixed(2)),
+    targetX: Number(tx.toFixed(2)),
+    targetZ: Number(tz.toFixed(2)),
+    arcM: Number(acc.toFixed(1)),
+    headingStepM: Number(step.toFixed(2)),
+    why: `rejoining the authored line: ${offM.toFixed(1)} m off it, aiming ${acc.toFixed(1)} m along`,
+  };
+}
+
+/**
+ * May a recovery episode continue?
+ *
+ * Separated from the aim so the ceilings are one readable predicate rather than
+ * three conditions scattered through a loop — the shape the reverted build got
+ * wrong. Returns `{ ok }` or `{ ok: false, why }`, and the `why` is written to
+ * be shouted verbatim.
+ */
+export function recoveryBudget({ metresSpent, msSpent, episode }) {
+  if (episode > RECOVERY_MAX_EPISODES) {
+    return { ok: false, why: `RECOVERY REFUSED — this car has left the road ${episode} times in one drive, past the ceiling of ${RECOVERY_MAX_EPISODES}. It is not having a bad moment; this drive did not work, and no route-position finding may be filed from it.` };
+  }
+  if (metresSpent > RECOVERY_MAX_M) {
+    return { ok: false, why: `RECOVERY ABANDONED — ${Math.round(metresSpent)} m spent rejoining the route, past the ${RECOVERY_MAX_M} m ceiling. The car did not come back and «we tried» is not evidence.` };
+  }
+  if (msSpent > RECOVERY_MAX_MS) {
+    return { ok: false, why: `RECOVERY ABANDONED — ${Math.round(msSpent / 1000)} s spent rejoining the route, past the ${RECOVERY_MAX_MS / 1000} s ceiling. The car did not come back and «we tried» is not evidence.` };
+  }
+  return { ok: true };
+}
