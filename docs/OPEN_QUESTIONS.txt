@@ -1,0 +1,2418 @@
+==============================================================================
+  THE 101 OPEN QUESTIONS — Книжка.AI simulator audit
+  generated 2026-09-13 · commit 9aec4c5178af
+==============================================================================
+
+WHAT THIS IS
+
+  Every row below is a defect someone filed against the driving simulator,
+  with a photograph of it happening. 1,511 were filed in total; 1,410 have
+  been fixed and retired. These 101 are what is left.
+
+  A row only closes when the simulator is re-driven by a robot, the moment is
+  photographed, a judge reads the photograph, and a second pass tries and
+  fails to overturn it. That is why 'we fixed it' and 'it is closed' are two
+  different things.
+
+  They are grouped by WHAT IS STOPPING EACH ONE, because that is what decides
+  who can do something about it.
+
+SUMMARY
+
+  A.   46 rows (8 critical)   BROKEN — we know what is wrong, it needs fixing
+  B.   14 rows (11 critical)   THE TEST-DRIVER CANNOT REVERSE PROPERLY — it stops short of the parking place
+  C.   21 rows (11 critical)   THE TEST-DRIVER WANDERS OFF THE ROAD — its evidence is not admissible
+  D.    1 rows (0 critical)   NO TOOL EXISTS TO MEASURE IT — e.g. nothing can hear sound
+  E.    1 rows (0 critical)   NEEDS YOUR DECISION — a teaching question, not an engineering one
+  F.    1 rows (0 critical)   NEVER JUDGED — no drive has ever answered it
+  G.   17 rows (9 critical)   OTHER — needs reading individually
+
+==============================================================================
+
+==============================================================================
+  GROUP A — BROKEN — we know what is wrong, it needs fixing
+  46 rows, 8 critical
+==============================================================================
+
+  A1.  [CRITICAL]  sc-follow-tailgater
+      id: sc-follow-tailgater:63c0c28c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong drive escapes entirely: 0 наказателни точки, 0 опасни, 0
+        основни, 0 второстепенни. The lesson's two authored mistakes — the
+        punishing brake check at the tailgater and the guilty acceleration
+        — produced no fault at all; the only reason the screen says
+        НЕИЗДЪРЖАН is that not all route tasks were done. Driving at 59
+        km/h in a posted 50 zone drew a teach card and no penalty.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR PARTIAL BY NAME: it overturned the w29 CLOSED
+        because two of four clauses moved and the clause the row turns on
+        did not — «the only reason the screen is not a pass is that not
+        all route tasks were done». At w42 the product prints that clause
+        itself, on this frame, in its own words. MOVED, and no lane should
+        redo it: the 0/0/0/0 half is dead — mobile-wrong books 5 т.
+        (Спиране без причина на открит път x2 plus Рязко спиране без
+        причина) and pc-wrong 2 т., so the authored brake check IS scored
+        on b
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  A2.  [CRITICAL]  sc-junction-gap
+      id: sc-junction-gap:63e4e93e
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The correct drive is convicted: 10 наказателни точки for a
+        collision and НЕИЗДЪРЖАН, on a run that had already earned both of
+        the lesson's commendations at 1:37 and 2:18. The student is
+        rewarded and failed for the same drive.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, upheld on the fault name the prior verify corrected and
+        with the magnitudes brought up to date. That verify kept the
+        verdict and struck the w32 line for naming «Удар в друго превозно
+        средство», a string that occurs nowhere in this leg's sidecar; at
+        33d562e1f0f6 the dangerous fault is «Удар в неподвижно
+        препятствие», exactly as it corrected. THE MAGNITUDES HAVE MOVED
+        AND ARE CORRECTED HERE, so a repair wave inherits the relation and
+        not the numbers: filed as both commendations at 1:37 and 2:18 with
+        10 т.; mea
+
+      where we think it lives: platform/src/modules/sim/lessons/finish.ts
+
+      ----------------------------------------------------------------------
+
+  A3.  [CRITICAL]  sc-junction-stop
+      id: sc-junction-stop:4cbe4552
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The correct drive is not credited: 20 наказателни точки, 2 опасни
+        грешки, НЕИЗДЪРЖАН, «Урокът беше прекъснат преди края». The car
+        made 15 full stops and two lawful waits totalling 91 s and still
+        ended convicted.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned the w34 CLOSED
+        on the closure’s own reasoning — 20 т./2 dangerous becoming 10
+        т./1 dangerous is a smaller conviction, not credit. At w42 the
+        conviction is LARGER: 30 наказателни точки, three dangerous plus
+        one basic, НЕИЗДЪРЖАН, 1 of 3 stars, objectives 2 and 3 open. The
+        load-bearing charge cannot be laid at the harness: the drive log
+        records «4 full stops · 1 lawful wait honoured (8s)» and the
+        product still books «Неспиране на знак Б2 „Спри!“ — Премина знака
+        Б2 без
+
+      where we think it lives: platform/src/modules/sim/lessons/finish.ts
+
+      ----------------------------------------------------------------------
+
+  A4.  [CRITICAL]  sc-merge-from-property
+      id: sc-merge-from-property:ab353b86
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The correct drive collides and fails — 10 наказателни точки, one
+        опасна грешка, НЕИЗДЪРЖАН.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it upheld STILL, struck the
+        mechanism, and recorded that on both platforms the correct leg
+        debriefed at 20 т./НЕИЗДЪРЖАН with «Спри напълно на Б2 на изхода»
+        reading «–». That objective now TICKS on both legs (1:09 mobile,
+        1:42 pc) — real movement — and the conviction survives anyway:
+        mobile-right 23 т./НЕИЗДЪРЖАН, pc-right 10 т./НЕИЗДЪРЖАН. Two
+        contradictions inside single debriefs carry it, and neither
+        depends on where the car was, so the «STEERED BADLY» caveat on
+        both lanes (55
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/compile.ts
+
+      ----------------------------------------------------------------------
+
+  A5.  [CRITICAL]  sc-rb-busy-gap
+      id: sc-rb-busy-gap:a6f83f6b
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The most careful drive of the four — 15 full stops and 43 s of
+        lawful waiting — scores the WORST at 21 т. with three convictions
+        including a collision.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL ON THE RELATION; THE FILED MAGNITUDES DO NOT REPRODUCE AND
+        ARE CORRECTED HERE, so a repair wave inherits the relation and not
+        the numbers. Filed: 15 full stops, 43 s of lawful waiting, 21 т.,
+        three convictions including a collision. Measured at 33d562e1f0f6:
+        the careful lane is pc-right with one honoured 30 s wait, six rest
+        beats, 20 т. and TWO convictions — one of which is the collision.
+        ANSWERING THE PRIOR VERIFY, whose stated ground was that the row
+        ranks four drives and only two were re-driven: all four e
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-roundabout.ts
+
+      ----------------------------------------------------------------------
+
+  A6.  [CRITICAL]  sc-roundabout-entry
+      id: sc-roundabout-entry:4ab693eb
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The car ends up driving on the central island. The whole
+        windscreen is grass and a hedge at point-blank range while the
+        coach calmly says to leave the roundabout with the right
+        indicator. This is what earns the careful drive its −10 collision.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and this is the prior verify's picture exactly. It
+        overturned the w41 CLOSED because that closure's load-bearing
+        sentence («I opened the same chip on the same lesson leg and it is
+        no longer that string») was false five seconds earlier on the same
+        continuous trajectory, while the car rolled over grass. At
+        33d562e1f0f6 the sequence is the same and I opened all three
+        beats: t059s the car is at road level at 6 км/ч with the bare chip
+        up; t065s it is ON the island in chase view, stopped against the
+        kerb, with the
+
+      where we think it lives: platform/src/modules/sim/world/builders/roundabout.ts
+
+      ----------------------------------------------------------------------
+
+  A7.  [CRITICAL]  sc-vu-emergency
+      id: sc-vu-emergency:4056508c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The debrief never tells the student he failed to give way to the
+        ambulance — the Разбор instead commends «Правилно отстъпено
+        предимство» on the leg that did not yield.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and it answers both prior verifies rather than restating
+        the row. w35 excused the praise by a measured ≥5 км/ч drop inside
+        the armed window (EM_YIELD_DROP_KMH); the prior verify called that
+        false in the reassuring direction, and the w42 beat list settles
+        it arithmetically — the commendation is stamped 0:06 and this
+        drive read 12 км/ч at t000 rising to 57 км/ч at t005, so the car
+        is at full acceleration through the beat the credit is paid, with
+        its first stop not until t010. No deceleration precedes the prais
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  A8.  [CRITICAL]  sc-vu-pass-clearance
+      id: sc-vu-pass-clearance:260b13fd
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The lesson ticks ЗАДАЧА 2/2 at t017s while the car is holding 59
+        км/ч past the cyclist.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and the prior verify's argument is photographed rather than
+        inferred at a new commit. It overturned the w37 UNJUDGED, whose
+        reason was «neither leg overtook anything, and a car that never
+        moved laterally can neither produce nor withhold the clearance»,
+        by pointing out that not moving laterally is precisely HOW the
+        clearance is withheld. At 33d562e1f0f6 the product supplies the
+        measurement itself: it books the pass at 0,5 m against a briefing
+        that demands «поне метър и половина въздух», prints it in the
+        near-
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  A9.  [MAJOR]  sc-ac-crosswind
+      id: sc-ac-crosswind:a9db1738
+
+      WHAT IS CLAIMED TO BE WRONG:
+        A lesson built on constant steering correction gives the student
+        nothing to correct with or against: the wheel shows no
+        counter-steer at any point, there is no wind force visible in the
+        car's attitude, and the briefing's «втора корекция» warning has no
+        observable trigger. Nothing in the cockpit reports a lateral
+        disturbance.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, agreeing with the prior verify rather than re-arguing the
+        closure it overturned, and crediting a real repair so the next
+        round does not chase the whole row. WHAT IS REPAIRED,
+        photographed: two of the row's four clauses are now false.
+        «Nothing in the cockpit reports a lateral disturbance» is refuted
+        — the product prints a two-phase gust announcement that names the
+        direction and prescribes the counter-steer. «The briefing's «втора
+        корекция» warning has no observable trigger» is refuted by its
+        complement, «Пори
+
+      where we think it lives: platform/src/modules/sim/environment/weather.ts
+
+      ----------------------------------------------------------------------
+
+  A10.  [MAJOR]  sc-ac-crosswind
+      id: sc-ac-crosswind:4607edf0
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The objective chip and the route pill have no opaque plate — world
+        geometry reads straight through their text.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, measured rather than eyeballed. I cropped the objective
+        chip at 4x on the leg and lesson the row names: the plate is
+        translucent and the world geometry behind it is not merely visible
+        but readable — you can count window openings through the words
+        «Стигни края на отсечката». The same holds for the route pill on
+        this component elsewhere in the pack (sc-vu-emergency mobile-right
+        04-t040s, where the world label «Карай дотук» reads through the
+        lower half of the «Следвай синята линия» pill). Note the contrast
+        that
+
+      where we think it lives: platform/src/modules/sim/hud/ObjectiveBanner.tsx
+
+      ----------------------------------------------------------------------
+
+  A11.  [MAJOR]  sc-ac-crosswind
+      id: sc-ac-crosswind:8f42504c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The mobile touch-hint overlay has no opaque plate: its text is
+        painted straight onto the sky and the building facades and the
+        world reads through the РАЗБРАХ button.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL on the row's leading clause, with its second clause credited
+        as repaired and the prior verify answered on its own measurement.
+        That verify overturned the w29 CLOSED on one sentence — «the
+        button is not opaque; crop x1570..2170 y455..635 of the cited
+        frame at 3x shows a parked car straight through the blue fill». I
+        took that exact crop, at that exact scale, on the w42 frame: the
+        РАЗБРАХ button is now a solid dark-navy fill with a blue border
+        and nothing of the world shows through it. That half is fixed and
+        sho
+
+      where we think it lives: platform/src/components/sim/LessonScene.tsx
+
+      ----------------------------------------------------------------------
+
+  A12.  [MAJOR]  sc-ac-snow
+      id: sc-ac-snow:55ddf562
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The in-drive ИНСТРУКЦИИ panel is plateless — the buildings behind
+        it read through the text.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHOSE FIRST AND MAIN GROUND FOR
+        OVERTURNING w26 WAS «WRONG SURFACE» — the legend line «Синя линия
+        — колата-сянка …» mounted in no beat, so the drive never exercised
+        the finding. That objection is met by comparison rather than by
+        assertion. I opened the FILED frame, w10-4
+        sc-ac-snow__mobile-right/04-t013s, and the w42 frame side by side.
+        They are the same overlay in the same place: the ⓘ-marked in-drive
+        card in the top-right notify column of the mobile cockpit, above
+        the mirror strip. Onl
+
+      where we think it lives: platform/src/modules/sim/hud/SimOverlay.tsx
+
+      ----------------------------------------------------------------------
+
+  A13.  [MAJOR]  sc-ac-truck-spray
+      id: sc-ac-truck-spray:c042440d
+
+      WHAT IS CLAIMED TO BE WRONG:
+        There is no motorway signage and no gantry anywhere on the route
+        the briefing calls a motorway.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, on a claim that does not depend on the wheel. I opened
+        three beats of the pc-right leg spread over the drive — 04-t011s
+        (102 m), 04-t044s (544 m) and 04-t099s (856 m) — chosen because at
+        each of them the car is demonstrably still on the authored
+        carriageway with the guidance ribbon ahead of it, so the absence
+        is not an artefact of the BLIND loop having driven off the road.
+        Not one of them carries a single piece of motorway furniture: no
+        Д5, no gantry, no distance board, no exit board, no
+        emergency-telephone
+
+      where we think it lives: platform/src/modules/sim/world/builders/zoneSigns.ts
+
+      ----------------------------------------------------------------------
+
+  A14.  [MAJOR]  sc-ed-d2-priority-run
+      id: sc-ed-d2-priority-run:5fa62cb7
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The mobile briefing modal cuts instruction item 7 mid-sentence,
+        and item 7 is the equal-priority rule the lesson grades.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        The row says the mobile briefing modal cuts instruction item 7
+        mid-sentence and that item 7 is the equal-priority rule the lesson
+        grades. I opened the modal on the fresh mobile-right leg at
+        33d562e1f0f6 and the cut is verbatim what was filed: item 7 ends
+        at «Пропусни колата, която идва» with the words that say WHICH car
+        still missing, clipped at the button. The default state of the
+        surface the student is shown still withholds the graded rule, so
+        the symptom is present. A PARTIAL REPAIR HAS LANDED AND I RECORD
+        IT PR
+
+      where we think it lives: platform/src/components/sim/lesson-ui/ExamBriefingCard.tsx
+
+      ----------------------------------------------------------------------
+
+  A15.  [MAJOR]  sc-ed-reverse-line
+      id: sc-ed-reverse-line:e05f2cee
+
+      WHAT IS CLAIMED TO BE WRONG:
+        There is no rear proximity read-out on screen at any point of the
+        reverse manoeuvre.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, with the one new surface that could have closed it examined
+        and ruled out. Since this row was filed the product has gained a
+        «Заден ход · N м» chip during the manoeuvre, and it is NOT a
+        proximity read-out: it counts UP monotonically as the car reverses
+        — mobile-right 1 → 8 → 14 → 20 м, pc-right 8 → 40 → 49 → 56 → 63 →
+        68 м — sailing past the 25 m the task asks for, so it is a reverse
+        odometer measuring travel, not clearance to anything astern. With
+        that excluded, nothing on either leg's reverse frame reports
+
+      where we think it lives: platform/src/modules/sim/engine/reverseView.ts
+
+      ----------------------------------------------------------------------
+
+  A16.  [MAJOR]  sc-ed-reverse-line
+      id: sc-ed-reverse-line:1f812456
+
+      WHAT IS CLAIMED TO BE WRONG:
+        There is no rear-facing camera image.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL. I opened the reverse beat on both legs at 33d562e1f0f6.
+        pc-right shows the cabin from the driver's eye swung over the
+        shoulder: headrest, pillar, side glass, and the world beyond it.
+        mobile-right is the same shot in portrait, with the R telltale in
+        the right-hand control strip and the «Следвай синята линия» pill
+        above. Neither carries a rear-camera image in any form — no inset,
+        no picture-in-picture, no full-screen feed, no guide lines. Same
+        admissibility note as its sibling e05f2cee: this is what the
+        produc
+
+      where we think it lives: platform/src/modules/sim/engine/reverseView.ts
+
+      ----------------------------------------------------------------------
+
+  A17.  [MAJOR]  sc-follow-rain-gap
+      id: sc-follow-rain-gap:b18e6e60
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The world does not match its own briefing. The instructions lean
+        on a wet carriageway that swallows light and on spray around the
+        car, and the road renders exactly as it does in the dry lessons:
+        same dry asphalt shading, no specular wetness, no puddles, no
+        spray off the lead car, no droplets or streaks on the glass. Rain
+        is conveyed only by a light haze and sparse white specks.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH SUSTAINED STILL AND STRUCK
+        CLAUSE (1) AS THE ONE A REPAIR ANSWERED AND THIS DRIVE CANNOT
+        MEASURE. I do not touch clause (1). I judged only the two clauses
+        it left standing — no puddles and no specular wetness — and I
+        judged them by opening the frame and then cropping it, not by
+        describing it: a 2.6x crop of the carriageway directly beneath the
+        lit facades on the right (the one place a wet road would mirror
+        something) shows uniform matte asphalt, a white edge line and two
+        pale speck
+
+      where we think it lives: platform/src/modules/sim/environment
+
+      ----------------------------------------------------------------------
+
+  A18.  [MAJOR]  sc-junction-gap
+      id: sc-junction-gap:df95401c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The ПРОЧЕТИ and РАЗБРАХ buttons sit on top of parked cars and on
+        top of the «Карай дотук» world label.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL. I cropped the button row on the row's own leg and beat at
+        2.2x: neither button has an opaque plate, and what is behind them
+        is not sky but two parked vehicles whose geometry is fully legible
+        through the fills — the van's near-side wheel sits inside the
+        «ПРОЧЕТИ ↓15» pill. The buttons are also placed directly over the
+        busiest quarter of the windscreen, which is the kerb the lesson's
+        Б2 stop is measured against. NOT PHOTOGRAPHED THIS ROUND, and I do
+        not claim it: the «Карай дотук» world label is not in the 01-
+
+      where we think it lives: platform/src/modules/sim/hud/notifyColumn.ts
+
+      ----------------------------------------------------------------------
+
+  A19.  [MAJOR]  sc-junction-gap
+      id: sc-junction-gap:e87d5be1
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The КОЛАН seatbelt warning disc is drawn on top of a yellow world
+        car.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, on the row's own leg, beat and frame. I cropped the
+        seatbelt telltale at 2.2x: the disc is a translucent red circle
+        carrying a yellow warning triangle and the word КОЛАН, and it is
+        laid straight across the yellow vehicle at the right kerb — the
+        bodywork reads through the fill and the wheel arch runs under the
+        lower edge. It sits in the same crowded right-hand corner as the
+        ПРОЧЕТИ/РАЗБРАХ pair (df95401c), so the two rows are one layout
+        problem seen twice, but they are filed against different
+        components and I
+
+      where we think it lives: platform/src/components/sim/TouchControls.tsx
+
+      ----------------------------------------------------------------------
+
+  A20.  [MAJOR]  sc-junction-rhr
+      id: sc-junction-rhr:486cad54
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The ИНСТРУКЦИИ panel is pinned over the right third of the
+        windscreen — exactly the side the priority vehicle arrives from in
+        a right-hand-priority lesson. The student is told to look right
+        and the UI covers right.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and it is judgeable without any reference to how the car
+        was driven: this is where the product pins a panel, not where the
+        harness took the car. I opened pc-right 01-arrival.png at
+        33d562e1f0f6 and measured the panel against the canvas: it
+        occupies the right quarter of the windscreen at the exact
+        eye-line, and behind it sit the right-hand kerb, the parked line
+        and a bus. The lesson's own briefing step 3 is «Преди устието се
+        огледай: първо наляво, после НАДЯСНО. Кола отдясно има предимство
+        — това е правилото
+
+      where we think it lives: platform/src/components/sim/lesson-ui/LessonPlayShell.tsx
+
+      ----------------------------------------------------------------------
+
+  A21.  [MAJOR]  sc-junction-rhr
+      id: sc-junction-rhr:9b6c83fa
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The briefing renders differently on the two platforms: PC numbers
+        all six steps 1.–6.; mobile drops the «1.» and promotes step one
+        to a headline in a different weight and size, so the list reads as
+        a heading plus five items.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and it answers the prior verify by conceding what it
+        credited and reproducing what it kept. That verify overturned a
+        closure because the row is a TWO-PART claim — «mobile drops the
+        «1.» AND promotes step one to a headline in a different weight and
+        size» — and only the first part was repaired, while the second was
+        reproduced in the closing judge's own frame and conceded in his
+        own why. Both halves hold again at 33d562e1f0f6. The «1.» is
+        present, so that sub-clause stays repaired. The promotion is not:
+        I opene
+
+      where we think it lives: platform/src/components/sim/lesson-ui/ExamBriefingCard.tsx
+
+      ----------------------------------------------------------------------
+
+  A22.  [MAJOR]  sc-jx-priority-confidence
+      id: sc-jx-priority-confidence:9c987e7b
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The lesson is titled 'По пътя с предимство — без излишни спирания'
+        and its point is not to stop needlessly on a priority road. The
+        credited drive made 14 full stops (pc) / 17 full stops (mobile),
+        peaked at 15–19 км/ч and took 135–160 s against a 40 s benchmark —
+        and was given ИЗДЪРЖАН, 3 of 3 stars, +100/+150 XP and a
+        commendation. The behaviour the lesson forbids is never measured.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH OVERTURNED THE CLOSURE ON THE
+        GROUND THAT A CHANGE IN THE NUMBER OF STOPS IS A CHANGE IN THE
+        DRIVING, NOT IN THE ENGINE, AND THAT THE «Рязко спиране без
+        причина» CONVICTION IS THE HARNESS'S OWN ACT. I accept both and
+        therefore rest nothing on the stop count. The credited drive at
+        33d562e1f0f6 does make far fewer stops than the filing (3, not 17)
+        and reaches 41 км/ч — and it is still ИЗДЪРЖАН with 0 наказателни
+        точки, 3 of 3 stars, a commendation «Правилно отстъпено предимство
+        1:09»
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-junctions3.ts
+
+      ----------------------------------------------------------------------
+
+  A23.  [MAJOR]  sc-merge-accel-lane
+      id: sc-merge-accel-lane:b75b356e
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The briefing overlay clips its last line behind the Разбрах button
+        — item 6 breaks at «вече е аварийната» and the rest is hidden.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        I opened the briefing overlay on the fresh mobile-right leg at
+        33d562e1f0f6. Item 6 breaks at «вече е аварийната», character for
+        character the string the row was filed with, and it is clipped by
+        the Разбрах button exactly as described — so the photographed
+        symptom is unchanged. A PARTIAL REPAIR HAS LANDED AND I NAME IT SO
+        THE NEXT ROUND AIMS AT WHAT IS LEFT: the button now discloses the
+        hidden remainder and offers it, «↓ ОЩЕ 1 РЕД — ПОКАЖИ», where the
+        filed frame simply cut the text with no affordance. The student
+
+      where we think it lives: platform/src/modules/sim/hud/SimOverlay.tsx
+
+      ----------------------------------------------------------------------
+
+  A24.  [MAJOR]  sc-merge-lane-end
+      id: sc-merge-lane-end:ae6166e2
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The lesson's own event never happens: the lane does not end.
+        Across the whole pc-right sequence (t001s→t161s) the carriageway
+        keeps its width — no taper, no chevrons, no lane-ends sign, no
+        merge arrow on the tarmac. At t120s the coach still narrates that
+        the lane ends in about 180 m while the road ahead is unchanged and
+        a «Карай дотук» waypoint hovers over it.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH SUSTAINED STILL BUT STRUCK ITS
+        SECOND FRAME (w14 cited 04-t137s, which photographs a car stopped
+        off the carriageway between buildings and carries no road at all).
+        I reused neither w14 frame. I opened four cockpit beats of the
+        fresh pc-right leg at 33d562e1f0f6 and cropped the road ahead at
+        2.4x on t011s; the carriageway keeps its width in every one.
+        COVERAGE, so this is not the same error in the other direction:
+        run.log's PACE line puts the authored route at 264.9 m and this
+        drive
+
+      where we think it lives: platform/src/modules/sim/traces/scMergeLaneEnd.ts
+
+      ----------------------------------------------------------------------
+
+  A25.  [MAJOR]  sc-mw-emergency-lane
+      id: sc-mw-emergency-lane:63336390
+
+      WHAT IS CLAIMED TO BE WRONG:
+        2600 m of motorway carrying exactly one vehicle — the staged
+        broken-down car. No other traffic in either direction across 67
+        mobile and 74 pc frames, no median barrier between the
+        carriageways, no motorway sign, no gantry, no distance boards. It
+        does not read as a магистрала.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR PARTIAL BY NAME: it downgraded the w31 CLOSED
+        because only two of the row’s five stated absences had fallen. At
+        w42 THREE have fallen and I opened the frames rather than
+        describing them. 04-t123s (mobile-right, commit 33d562e1f0f6): (1)
+        TRAFFIC — a dark box vehicle with a red flank stripe on the right
+        carriageway plus a second distant vehicle, so «exactly one vehicle
+        … no other traffic in either direction» is dead; (2) BARRIER — a
+        2.5x crop of x250-1150,y420-620 shows a continuous post-and-rail
+
+      where we think it lives: platform/public/world/mw-v1.json
+
+      ----------------------------------------------------------------------
+
+  A26.  [MAJOR]  sc-mw-emergency-lane
+      id: sc-mw-emergency-lane:3ffb0692
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The rear-view mirror is a black housing floating detached in open
+        sky above the windscreen header, skewed off-axis and clipped by
+        the top edge of the screen, on every mobile frame.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        Opened the frame and cropped x1500-2556,y0-300 at 2x. The mirror
+        box floats free against sky: nothing connects it to the cabin, its
+        lower shell is a skewed trapezoid (off-axis), and its upper edge
+        is cut by the top of the viewport so the glass is clipped.
+        Reproduced on a second beat of the same leg, 04-t201s, in the
+        identical pose. The claim is «on every mobile frame» and both
+        mobile beats I opened, 78 s apart, carry it. This is paint, so the
+        lane’s DEAD steering channel does not bar the finding.
+
+      where we think it lives: platform/src/components/sim/CameraRig.tsx
+
+      ----------------------------------------------------------------------
+
+  A27.  [MAJOR]  sc-ov-solid-return
+      id: sc-ov-solid-return:70845fcc
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The card carries no panel of its own, so world geometry — a world
+        sign, a lamp column, kerbside vehicles — reads straight through
+        its body text.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR STILL BY NAME: it overturned the w33 CLOSED
+        because that closure opened 04-t005s, the one beat where the card
+        happens to sit against featureless sky and haze. I did not repeat
+        that mistake: I opened the w42 mobile-right beat where the card
+        sits against a treeline and cropped x1560-2260, y220-420 at 3x. At
+        3x a dark green faceted treetop is plainly visible inside the
+        plate, its facets readable through the text block, while the
+        mirror column immediately to its right is opaque — so this is the
+        card
+
+      where we think it lives: platform/src/modules/sim/hud/SimOverlay.tsx
+
+      ----------------------------------------------------------------------
+
+  A28.  [MAJOR]  sc-ov-solid-return
+      id: sc-ov-solid-return:5cb8eb40
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The card's «ЗАЩО» control lands on top of world geometry
+        (traffic-light poles, vehicles, world signs).
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        Opened the beat where a violation card is up on the w42
+        mobile-right lane. The ЗАЩО control is an unfilled circular ring
+        with no panel of its own: the building wall behind it shows
+        through the ring’s interior, and the tan window column of that
+        facade continues uninterrupted under the card body next to it. The
+        row’s named victims are traffic-light poles, vehicles and world
+        signs; here it is a building elevation, the same class. The old
+        quote attached to this row («↓ ОЩЕ N РЕДА») no longer exists on
+        this surface — th
+
+      where we think it lives: platform/src/modules/sim/hud/SimOverlay.tsx
+
+      ----------------------------------------------------------------------
+
+  A29.  [MAJOR]  sc-pe-zone-living
+      id: sc-pe-zone-living:37bbb618
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The world is not a home zone. The briefing describes 'стеснението
+        между жилищните блокове' — a narrowing between residential blocks
+        — but the drive happens on a wide multi-lane boulevard with lane
+        arrows, a painted give-way triangle, kerbside parking bays and
+        office-scale towers. Nothing about the geometry signals the zone
+        the rule depends on.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH WITHDREW ITS OWN EARLIER LINE
+        AND ESTABLISHED THAT A WIDTH STEP IS REAL — edgeParkingWidthM
+        gives the tertiary approach a 4 m kerbside band per side and
+        parkingBand:false withdraws it at the residential edge, 24.25 m →
+        16.25 m. I do not dispute the step and I did not re-argue the
+        code. I went to the frames instead and cropped three beats inside
+        the zone at 1.35x. A 16 m kerb-to-kerb carriageway carrying
+        multiple dashed lane lines, a parked-car row and office-scale
+        towers is still n
+
+      where we think it lives: platform/src/modules/sim/world/builders/markings.ts
+
+      ----------------------------------------------------------------------
+
+  A30.  [MAJOR]  sc-pk-busstop-ban
+      id: sc-pk-busstop-ban:b103c282
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The fail path for the offence this lesson exists to teach —
+        stopping inside the зона на спирката, чл. 98, ал. 1 — is never
+        exercised, so the leg is convicted of the wrong thing.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it sustained STILL with two
+        corrections, having confirmed in the debrief JSON that «Спиране в
+        забранена зона» is filed under «Учебни моменти (не влизат в
+        точките)» while the only graded entry is the harsh brake. Both
+        hold at w42, and I read them off frames this time rather than a
+        summary. This page is the whole graded ledger: two harsh-brake
+        charges, 6 наказателни точки, nothing about чл. 98, ал. 1. One
+        clause of the row has to be corrected, though, and a repair lane
+        needs the co
+
+      where we think it lives: platform/src/modules/sim/devrig/driveScript.ts
+
+      ----------------------------------------------------------------------
+
+  A31.  [MAJOR]  sc-pk-busstop-ban
+      id: sc-pk-busstop-ban:105f805c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Nothing proves a student who stops inside the bus-stop zone is
+        penalised — the lesson's own fail path is unverified.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it sustained STILL and
+        qualified one w37 clause, confirming that «Грешки (2)» holds only
+        the two harsh-brake notices and both route tasks read «–». All of
+        that reproduces at w42. The row says nothing proves a student who
+        stops inside the bus-stop zone is penalised, and the fail path is
+        unverified. It is verified now — and the answer is that he is NOT
+        penalised. This frame is the product’s own instructor debrief
+        stating that the bus-stop-zone stop is a teaching moment outside
+        the
+
+      where we think it lives: unknown
+
+      ----------------------------------------------------------------------
+
+  A32.  [MAJOR]  sc-rb-busy-gap
+      id: sc-rb-busy-gap:7bbdd45e
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The same lesson renders and grades differently on the two
+        platforms. The briefing is a blocking modal on mobile whose
+        numbered list starts at «2.» (step 1 is promoted to an unnumbered
+        lead) and a side panel on pc that numbers 1–5; a perfect drive is
+        worth +150 XP on mobile and +100 XP on pc; and across this chunk
+        the same drive that passes on pc is repeatedly failed or
+        force-closed on mobile.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL on the clause the prior verify kept alive, shown on both
+        platforms at ONE commit. That verify credited the numbering repair
+        and refused the closure because the row's leading clause — «The
+        briefing is a BLOCKING MODAL on mobile … and a SIDE PANEL on pc» —
+        was still in the closure's own frame. It still is: I opened both.
+        The mobile sheet interrupts the drive and offers a single
+        dismissal; the PC panel never interrupts it. THREE DISCLOSURES, so
+        a repair wave does not chase the whole row. (1) The NUMBERING
+        sub-cl
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/progress.ts
+
+      ----------------------------------------------------------------------
+
+  A33.  [MAJOR]  sc-rb-busy-gap
+      id: sc-rb-busy-gap:8f50287b
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The most careful of the four drives scores worst, so the scoring
+        punishes patience.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and the w41 ground for UNJUDGED has dissolved. That line
+        refused because all four legs were level at 10 т., «so no drive
+        scores worse than another and the ranking the row rests on does
+        not exist». At 33d562e1f0f6 the ranking exists and is 20 / 10 / 10
+        / 10, with the 20 on the most patient lane by every measure the
+        pack offers: pc-right took 220 s to cover 73 m of a 159 m route,
+        is the only leg with an honoured lawful wait (30 s), and is the
+        only leg the product itself certified with «Чакаш правилно — в
+        кръга
+
+      where we think it lives: unknown
+
+      ----------------------------------------------------------------------
+
+  A34.  [MAJOR]  sc-roundabout-entry
+      id: sc-roundabout-entry:fe081cf1
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The fault card's body text is cut, so the explanation the student
+        is judged by is not on screen.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and it answers the prior verify on the ground that killed
+        the w37 CLOSED. That closure rested on «neither PC leg of this
+        lesson painted a violation card this round, so the closure rests
+        on the mobile legs», and the verify showed both PC legs did paint
+        one. At 33d562e1f0f6 I opened both PC legs and both paint one:
+        pc-right «Влизане без пропускане» at t059s and «Удар в неподвижно
+        препятствие» at t065s (clipped mid-sentence at «Излизането от
+        платното е самото…» under «↓ ОЩЕ 1 ИЗВЕСТИЕ — ПОКАЖИ»), pc-wrong
+        «Удар
+
+      where we think it lives: platform/src/modules/sim/hud/FaultCard.tsx
+
+      ----------------------------------------------------------------------
+
+  A35.  [MAJOR]  sc-roundabout-entry
+      id: sc-roundabout-entry:7b747c15
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The two platforms convict different faults for the same careful
+        drive — PC one collision, mobile a failure-to-yield plus a
+        collision.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL — the divergence is CONFIRMED and not retired, and this
+        round produced it with the roles INVERTED for the second sweep
+        running, which is exactly why the earlier closure had to go. The
+        filed direction was «PC one collision, mobile a failure-to-yield
+        plus a collision»; at 33d562e1f0f6 it is PC that books the
+        failure-to-yield plus the collision for 20 т. and mobile that
+        books the collision alone for 10 т. One sample per leg may confirm
+        a divergence and may NOT retire one, so I confirm and stop. FULL
+        DISCLOSURE O
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  A36.  [MAJOR]  sc-sig-controller-postures
+      id: sc-sig-controller-postures:f7e046c4
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The same lesson renders and grades differently on the two
+        platforms. The briefing is a blocking modal on mobile whose
+        numbered list starts at «2.» (step 1 is promoted to an unnumbered
+        lead) and a side panel on pc that numbers 1–5; a perfect drive is
+        worth +150 XP on mobile and +100 XP on pc; and across this chunk
+        the same drive that passes on pc is repeatedly failed or
+        force-closed on mobile.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it upheld UNJUDGED and struck
+        w37’s sentence «the divergence did not appear», naming CREDIT as
+        the clause that still diverged (pc credited «★ Правилно изпълнен
+        сигнал на регулировчика 2:05», mobile did not). At w42 both legs
+        ran at one commit and the divergence is present with its DIRECTION
+        INVERTED: this pc-right frame leaves the signature objective «–»
+        and its lane books COMMENDATIONS (0), while mobile-right ticks «✓
+        Премини кръстовището, когато позата разреши посоката ти 2:58»
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/progress.ts
+
+      ----------------------------------------------------------------------
+
+  A37.  [MAJOR]  sc-sig-controller-postures
+      id: sc-sig-controller-postures:ef0e821c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The controller's speech billboard is five lines of tiny
+        multi-coloured text, unreadable at native phone size.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR STILL BY NAME: it overturned the w33 CLOSED
+        («the billboard is gone from the world») by opening beats the w33
+        judge had skipped. I did the same and the billboard is on the
+        glass at 04-t029s of the w42 mobile-right leg, speech tail
+        pointing down at the controller’s head. It is now SIX lines, not
+        five, in four colours: yellow headline, white posture line, green,
+        salmon and orange verdict lines, and a small white ППЗДвП footer.
+        On legibility I did not describe, I measured: the frame is 2556 px
+        wide
+
+      where we think it lives: platform/src/modules/sim/traffic/TrafficLayer.tsx
+
+      ----------------------------------------------------------------------
+
+  A38.  [MAJOR]  sc-sig-controller-postures
+      id: sc-sig-controller-postures:3936550e
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The billboard states the answer outright, removing the
+        reading-the-posture exercise the task asks for.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR STILL BY NAME: it overturned the w33 CLOSED on
+        the same false premise as ef0e821c — that only a posture-code DOM
+        card is left. At 04-t029s of the w42 mobile-right leg the world
+        billboard is above the controller while his arm is raised
+        vertically, and it does exactly what the row says: line 2 NAMES
+        the posture the student was supposed to read, and lines 3-5 hand
+        him the three answers he was supposed to derive from it — who
+        goes, who stops, whose priority. The exercise is performed for him
+        on the
+
+      where we think it lives: platform/src/modules/sim/traffic/controllerGestures.ts
+
+      ----------------------------------------------------------------------
+
+  A39.  [MAJOR]  sc-signal-hesitation
+      id: sc-signal-hesitation:f5ffccf3
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The same briefing is a blocking modal on mobile and a persistent
+        side panel on PC.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR PARTIAL BY NAME: it overturned the w17 CLOSED,
+        conceding that the numbering half is genuinely fixed but holding
+        that the blocking-modal half reproduces on w17’s own two frames.
+        Both halves behave identically at w42 and I opened both frames.
+        The numbering is repaired — the mobile sheet runs 1. through 7. —
+        and no repair lane should redo it. The row’s actual `what` is the
+        surviving half: «The same briefing is a blocking modal on mobile
+        and a persistent side panel on PC.» Mobile has a dedicated 02-
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/progress.ts
+
+      ----------------------------------------------------------------------
+
+  A40.  [MAJOR]  sc-vp-readiness
+      id: sc-vp-readiness:97c472e2
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The only reason the wrong lane fails is that it did not finish the
+        route.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        OVERTURNS THE w42 CLOSED. The closure retired this row because the
+        symptom SENTENCE went away, and the condition the sentence
+        described got worse instead of better. The row is that the wrong
+        lane's outcome is decided by route completion and not by its
+        driving. At w42 the wrong lane's outcome is still not decided by
+        its driving: the ONE lesson-scripted fault it committed is booked
+        NOWHERE. The harness's own machine summary certifies the fault
+        happened — «over-cap: task cap «дръж под 50 км/ч» · top on the
+        flat 58 км/
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/rubric.ts
+
+      ----------------------------------------------------------------------
+
+  A41.  [MAJOR]  sc-vp-telltale-red
+      id: sc-vp-telltale-red:c172d48b
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong lane is convicted for a collision, not for mis-triaging
+        the lamp colour. A student who treats a red lamp as a yellow one
+        and keeps driving without crashing would be recorded as faultless.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned w41’s STILL to
+        UNJUDGED because the repair for this findingId had landed inside
+        the build w41 judged and the harness could not drive the path it
+        repaired. That ground is answered at w42: the lamp path IS
+        reachable and IS evaluated — this frame carries a lamp-specific
+        commendation stamped 1:14 — so the row can be judged, and what the
+        repaired path produces is the opposite of a conviction. On the
+        deliberately-WRONG lane, the one that mis-triages the red
+        telltale, the
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  A42.  [MAJOR]  sc-vu-emergency
+      id: sc-vu-emergency:9e72c8bd
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The crawling drive still collects ИЗДЪРЖАН.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and all FOUR clauses of the prior verify hold at
+        33d562e1f0f6 — which is more than w41 could say, where only three
+        did (that pack had two stars and no commendation, withheld by 6
+        penalty points rather than by the pace). The prior verify
+        corrected an earlier line's «Nothing in the debrief mentions the
+        pace» and said instead that the product MEASURES the crawl, PRINTS
+        it, calls it «спокойно», and then pays it a commendation and a
+        third star. I opened 08-debrief-p3.png: the sentence stating the
+        115 s against th
+
+      where we think it lives: platform/src/modules/sim/lessons/debrief.ts
+
+      ----------------------------------------------------------------------
+
+  A43.  [MAJOR]  sc-vu-emergency
+      id: sc-vu-emergency:2e634d4d
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The mobile in-cockpit briefing card is a clipped teaser that hides
+        6 to 27 lines behind a «↓ ОЩЕ N РЕДА» fade.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and it answers the prior verify on the exact ground that
+        overturned the w34 CLOSED: «The teaser is still a teaser: one step
+        of five, seventeen lines hidden. What moved is the chrome …
+        «ПРОЧЕТИ» is not a new affordance either: it is in the row's own
+        quote.» Both points hold at this commit and the count has not
+        moved in five sweeps — still seventeen (w35, w36, w37, w40-picture
+        and now w42). I opened 01-arrival.png at full size: step one only,
+        then ПРОЧЕТИ ↓17 and РАЗБРАХ, while the run.log for the same beat
+        ho
+
+      where we think it lives: platform/src/modules/sim/hud/SimOverlay.tsx
+
+      ----------------------------------------------------------------------
+
+  A44.  [MAJOR]  sc-vu-emergency-junction
+      id: sc-vu-emergency-junction:853790f7
+
+      WHAT IS CLAIMED TO BE WRONG:
+        FREE OBSERVATION — the reference 'correct' drive crawls at 10–11
+        км/ч for well over two minutes on a road posted 40 with mode ≤50,
+        and nothing anywhere flags it as too slow, as obstructing, or as
+        failing «спокойна градска скорост». Meanwhile the flat-out drive
+        is penalised once per tick for the mirror-image fault. The engine
+        grades one side of the speed envelope only, so 'drive at walking
+        pace forever' is an unpunished strategy for the whole lesson set.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH SUSTAINED STILL AND STRUCK ONE
+        MEASUREMENT (the «5 full stops over 169 s» figure that no artefact
+        of that leg supported). I quote no derived duration: the number
+        below is the product's own printed one. The fresh pc-right leg at
+        33d562e1f0f6 crawled the whole lesson — DRIVE line «top 25 км/ч ·
+        4 full stops» — and took 143 s against the product's own 60 s
+        benchmark, 2.4x over. Not one fault of any class is booked for
+        slowness, obstructing or failing «спокойна градска скорост»; the
+        on
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  A45.  [MAJOR]  sc-vu-pass-clearance
+      id: sc-vu-pass-clearance:d770323a
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The left wing mirror is a solid matte-black lump with a single
+        flat grey-blue quad standing in for glass — it reflects nothing at
+        all, in any frame. Briefing step 3 is «Огледало, мигач наляво и се
+        отмести осезаемо наляво», so the lesson instructs a check the
+        cockpit physically cannot render. Only the centre rear-view inset
+        works.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL, and it confirms the judge's own superseding line without
+        depending on a tie-break, exactly as the prior verify asked. Two
+        w27 lines exist for this findingId — an UNJUDGED citing
+        04-t011s.png, which does not exist on disk, and a later STILL on a
+        frame that does — and the prior verify observed that a row this
+        old should not rest on which one wave-c-post ranks higher. It does
+        not have to: I cropped the near-side mirror on the re-driven
+        mobile-right leg at 33d562e1f0f6 and it is the object the row
+        describes, unc
+
+      where we think it lives: platform/src/components/sim/vitok/MirrorRig.tsx
+
+      ----------------------------------------------------------------------
+
+  A46.  [MINOR]  sc-vp-police-stop
+      id: sc-vp-police-stop:44cfeff6
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong lane is convicted for causing a collision, not for
+        disobeying the officer's stop signal. The conviction is correct in
+        law but does not measure the skill this lesson teaches, so a
+        student who ignores the officer without crashing would not be
+        caught.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        STILL. This is a CATALOGUE-CONTENT claim — whether
+        rules/catalog.ts publishes a fault for disobeying an authorised
+        officer's stop signal — and it is read off the debrief, which is
+        where credit is read. At 33d562e1f0f6 the wrong lane is convicted
+        for two harsh brakes and a static-obstacle collision, exactly as
+        filed in kind: the conviction is correct in law and measures
+        nothing this lesson teaches. A student who rolled past the officer
+        without touching anything would leave this sheet clean. The
+        unsteered caveat on t
+
+      where we think it lives: platform/src/modules/sim/rules/catalog.ts
+
+      ----------------------------------------------------------------------
+
+
+==============================================================================
+  GROUP B — THE TEST-DRIVER CANNOT REVERSE PROPERLY — it stops short of the parking place
+  14 rows, 11 critical
+==============================================================================
+
+  B1.  [CRITICAL]  sc-park-45-rev
+      id: sc-park-45-rev:24ccb58b
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Задача 2, the reverse into the bay itself, never ticks on either
+        leg, so the 45-degree reverse-park lesson cannot be completed.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH HELD UNJUDGED AND CORRECTED THE
+        w17 NUMBERS (that judge had quoted sc-park-van's ribbon figures
+        for this lane; the true ones were 11 of 36 and a tracking verdict
+        of blind, worse than cited and in the same direction). I did not
+        reuse any figure from either line; every number below is from this
+        pack. The row says Задача 2, the reverse into the bay, never ticks
+        on either leg — and it does not tick on any of the four. But only
+        one leg is competent and that leg stopped ELEVEN METRES sho
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  B2.  [CRITICAL]  sc-park-bay-exit-rev
+      id: sc-park-bay-exit-rev:49af2940
+
+      WHAT IS CLAIMED TO BE WRONG:
+        This lesson has never once been observed WORKING — no leg has
+        completed it successfully.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        VERDICT UNCHANGED — UNJUDGED — BUT THE OPENING SENTENCE IS STRUCK,
+        BECAUSE IT IS THE ONE A LATER ROUND WOULD QUOTE TO RETIRE A
+        CRITICAL ROW. w42 opens «THE ABSOLUTE IS NO LONGER ACCURATE at
+        33d562e1f0f6 and I record that first, because it is the first time
+        this lesson has been photographed doing anything: BOTH right legs
+        now credit «Задача 1: излез от мястото на заден ход, с пешеходна
+        скорост» (mobile 0:37, pc 1:01), and both run.logs record «reverse
+        objective(s) 1/1 credited».» Every number in that sentence is tru
+
+      where we think it lives: tools/mobile/lesson-audit.mjs
+
+      ----------------------------------------------------------------------
+
+  B3.  [CRITICAL]  sc-park-gap-short
+      id: sc-park-gap-short:b1024483
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The correct drive fails on both platforms with the same cause.
+        mobile-right and pc-right each end НЕИЗДЪРЖАН with exactly 1
+        опасна грешка / 10 точки and „Настъпи сблъсък“ — a correct drive
+        that crashes identically on two platforms points at the staged
+        geometry (the gap or its colliders), not at the driver.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED UPHELD, BUT THE PRIOR VERIFY'S REASON IS NOW CURED AND A
+        STRONGER ONE REPLACES IT. That line rested on staleness (both legs
+        were round-10 legs at ae4a499, one sample per platform on
+        unchanged code) and on the crashes not being identical. Both are
+        answered: w42 re-drove BOTH legs at one head, 33d562e1f0f6, and
+        they are now identical in exactly the way the row alleges — each
+        10 наказателни точки, each НЕИЗДЪРЖАН, each a single «Удар в друго
+        превозно средство», each crediting objective 1 (mobile 1:16, pc
+        1:49
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  B4.  [CRITICAL]  sc-park-judge
+      id: sc-park-judge:6d88a05a
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Both correct legs come back «10 наказателни точки · НЕИЗДЪРЖАН ·
+        Урокът беше прекъснат преди края» with a collision, so a student
+        who follows the guided line is told he crashed and failed.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH OVERTURNED THE w34 CLOSED
+        BECAUSE THE CAR NEVER REVERSED ON A LESSON WHOSE «Задача 2:
+        паркирай на заден ход във ВТОРОТО място» IS THE WHOLE POINT. Both
+        halves of that objection recur at 33d562e1f0f6, and one of them is
+        worse than before. mobile-right AGAIN never selected R — demanded
+        NO, armed NO, 0 ticks — and is additionally declared unsteered at
+        10% ribbon visibility. pc-right did select R, and its own log then
+        disqualifies the manoeuvre in a new way: the steering-sign check
+        con
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  B5.  [CRITICAL]  sc-park-left
+      id: sc-park-left:fcce489f
+
+      WHAT IS CLAIMED TO BE WRONG:
+        «Задача 2: паркирай на заден ход в лявото гнездо» — the whole
+        point of the lesson — never ticks in any of the four legs, and
+        both right legs collide (10 т.). Passing is impossible.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH OVERTURNED w37's STILL BECAUSE
+        «steered and tidy» WAS NOT WHAT THOSE TWO LOGS SAID. At
+        33d562e1f0f6 the position is unchanged in substance and the
+        disclosure is now explicit rather than inferred. «Задача 2:
+        паркирай на заден ход в лявото гнездо» dashes on all four legs,
+        but on the two legs that even engaged R the car stopped 6.8 m and
+        6.92 m short of the end of the lesson's own authored reverse path
+        — fifteen times the 0.45 m tolerance — and both logs declare the
+        reverse objective
+
+      where we think it lives: platform/src/modules/sim/lessons/objectives.ts
+
+      ----------------------------------------------------------------------
+
+  B6.  [CRITICAL]  sc-park-van
+      id: sc-park-van:f2460a24
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The RIGHT drive is CONVICTED, not credited. 08-debrief shows 10
+        наказателни точки / НЕИЗДЪРЖАН for the correct-behaviour run,
+        COMMENDATIONS (0), and both objectives ('Задача 1: спри в
+        изходната позиция покрай гнездото', 'Задача 2: паркирай на заден
+        ход, без да опираш буса') left unticked. The lesson has no
+        drivable success path in this build.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED FOR THE THIRD TIME, ON THE SINGLE STANDARD THE PRIOR
+        VERIFY DEMANDED — «one standard has to govern all ten rows» — but
+        this time with a fact that ends the argument instead of repeating
+        it. The row's charge is that the reference correct drive is
+        convicted with both objectives left unticked. On the w42 re-drive
+        REVERSE GEAR WAS NEVER SELECTED: demanded NO, armed NO, 0 ticks in
+        R. Задача 2 is a reverse park; a car that never engaged R did not
+        fail it, it never attempted it, and Задача 1 falls with it because
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  B7.  [CRITICAL]  sc-park-wall
+      id: sc-park-wall:ab74e4fe
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Задача 2 («паркирай на заден ход в крайното гнездо») never ticks,
+        so the lesson cannot be passed.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        The row turns on an objective that grades a reverse park, and at
+        w42 BOTH right lanes finally engaged R (47 ticks mobile, 25 pc) —
+        and both then refused the question on my behalf, in the harness’s
+        own words. pc-right: «THE REVERSE OBJECTIVE ON THIS LANE IS
+        UNJUDGED, AND THE REASON IS THIS HARNESS: it armed R and followed
+        the authored path but stopped 6.53 m short of the end of it
+        (tolerance 0.45 m), so the car never arrived where the manoeuvre
+        is graded. That is a driving failure by this harness and NOT a
+        refusal b
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  B8.  [CRITICAL]  sc-park-wall
+      id: sc-park-wall:2bf89308
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Both right legs collide twice, for 20 наказателни точки.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned the w36 CLOSED
+        because mobile-right never engaged reverse on a reverse-parking
+        lesson. At w42 it does — 47 ticks in R — so that ground is
+        answered, and the row’s arithmetic is now wrong on both legs:
+        pc-right collides ONCE for 10 наказателни точки (this frame), and
+        mobile-right collides twice but is charged 10, not 20, because the
+        exam terminates at the first («Удар в друго превозно средство без
+        допълнителни изпитни точки»). I still cannot record STILL on the
+        surviv
+
+      where we think it lives: platform/src/modules/sim/scene/scenarioSceneryProps.ts
+
+      ----------------------------------------------------------------------
+
+  B9.  [CRITICAL]  sc-park-zebra
+      id: sc-park-zebra:2b3c10b1
+
+      WHAT IS CLAIMED TO BE WRONG:
+        «Задача 2: паркирай на заден ход в разрешеното място» never ticks.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        The row is an objective-crediting claim about a reverse park, and
+        both right lanes at w42 armed R (48 ticks mobile, 54 pc) and were
+        then disqualified by their own logs for exactly this class of
+        claim. pc-right: «THE REVERSE OBJECTIVE ON THIS LANE IS UNJUDGED,
+        AND THE REASON IS THIS HARNESS: the steering-sign check
+        contradicted the convention this drive steered by, so the wheel
+        was mirrored for the whole manoeuvre.» mobile-right: «it armed R
+        and followed the authored path but stopped 3.79 m short of the end
+        of it (t
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  B10.  [CRITICAL]  sc-park-zebra
+      id: sc-park-zebra:ca9f7144
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The right legs also collide.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned w37’s STILL to
+        UNJUDGED because the one leg w37 called admissible was
+        disqualified by its own log for a critical collision row. At w42
+        the same disqualification lands on both right lanes, for named
+        reasons: pc-right (this frame) reversed with a MIRRORED wheel for
+        the whole manoeuvre, and mobile-right stopped 3.79 m short of the
+        graded end and is rated STEERED BADLY (INTERMITTENT, off the line
+        6 s of 16 s). Both collisions sit inside that window —
+        mobile-right’s «Уда
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  B11.  [CRITICAL]  sc-pk-driveway
+      id: sc-pk-driveway:655b5213
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The RIGHT drive is convicted. pc-right debrief: 20 наказателни
+        точки, НЕИЗДЪРЖАН, Опасни грешки 2. mobile-right: 10 точки,
+        НЕИЗДЪРЖАН, Опасни грешки 1. A student who drives the model line
+        is failed for a crash the lesson itself walked him into.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        The row charges that a student who drives the model line is failed
+        for a crash the lesson walked him into. On the w42 re-drive both
+        right legs are convicted again — each 10 наказателни точки,
+        НЕИЗДЪРЖАН, «Удар в неподвижно препятствие» — but neither leg is
+        entitled to say so: both steered badly by their own logs (WANDERED
+        19.5°, INTERMITTENT), both collided during a reverse that ended
+        4.71 m and 1.83 m short of the lesson's OWN authored reverse path,
+        and each log declares the reverse objective unjudgeable and the f
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-pk.ts
+
+      ----------------------------------------------------------------------
+
+  B12.  [MAJOR]  sc-ed-poligon-chain
+      id: sc-ed-poligon-chain:dceba965
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong run is convicted of three speeding faults at 49-50 км/ч
+        while the identical 0/5 objective record earns the careful run
+        nothing — the two drives differ only in penalties, never in
+        credit, so the lesson can distinguish bad from worse but never
+        good from bad.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned the w41 STILL
+        because the leg w41 settled it on was not a careful run — it
+        struck a static obstacle mid-manoeuvre and four of five objectives
+        were never attempted. At w42 all three lanes are disqualified for
+        the same class of claim. mobile-right: BLIND, «0 ribbon px in the
+        band (floor 120)», plus «THE REVERSE OBJECTIVE ON THIS LANE IS
+        UNJUDGED, AND THE REASON IS THIS HARNESS: it armed R and followed
+        the authored path but stopped 5.47 m short of the end of it
+        (tolera
+
+      where we think it lives: platform/src/modules/sim/lessons/objectives.ts
+
+      ----------------------------------------------------------------------
+
+  B13.  [MAJOR]  sc-ed-poligon-chain
+      id: sc-ed-poligon-chain:317d2b4a
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The reverse objectives never resolve — three of five route tasks
+        stay «–» after the reverse manoeuvre is performed.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned the w41 STILL
+        because the row says the reverse objectives never resolve AFTER
+        THE MANOEUVRE IS PERFORMED, and on that leg no reverse park was
+        performed — the car wandered off the path and was pinned by an
+        impact. At w42 the manoeuvre is again not performed to its end,
+        and the harness says so on both lanes that armed R: pc-right
+        «stopped 3.27 m short of the end of it (tolerance 0.45 m), so the
+        car never arrived where the manoeuvre is graded. That is a driving
+        failure
+
+      where we think it lives: platform/src/modules/sim/engine/reverseAssist.ts
+
+      ----------------------------------------------------------------------
+
+  B14.  [MAJOR]  sc-ln-boulevard-discipline
+      id: sc-ln-boulevard-discipline:939776d0
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The same drive that passes on pc is repeatedly failed or
+        force-closed on mobile.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH OVERTURNED w37's REFUTED — THE
+        ONLY RETIRING VERDICT IN THAT BATCH — BECAUSE ONE AGREEING PAIR
+        MAY NOT END A CROSS-LEG ROW. I am not retiring it; UNJUDGED keeps
+        it open, which is what that line demanded. What w42 shows is that
+        the filed sentence is not reproduced in its filed direction: it is
+        MOBILE that passes and PC that fails, and neither leg was
+        force-closed — both ended naturally. The structure of the grading
+        is identical on the two platforms: all three objectives credit on
+        bo
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/progress.ts
+
+      ----------------------------------------------------------------------
+
+
+==============================================================================
+  GROUP C — THE TEST-DRIVER WANDERS OFF THE ROAD — its evidence is not admissible
+  21 rows, 11 critical
+==============================================================================
+
+  C1.  [CRITICAL]  sc-ac-truck-spray
+      id: sc-ac-truck-spray:990e5f64
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong leg finishes 0 опасни / 0 основни / 0 второстепенни,
+        Общо 0 and +40 XP after running at 127-131 км/ч in a task that
+        asks for ≤80.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED, twin of 8ed4d8b3 and refused for the same reason at the
+        same commit, answering the prior verify (STILL, «re-grounded on
+        the attested re-drive and the direction is WORSE than the row
+        records») on its own terms. Two of the row's three numbers have
+        moved and the third never happened. The sheet is no longer
+        0/0/0/Общо 0 — it books 1 второстепенна and the Разбор says «Но
+        „издържан“ не значи „чисто“». The XP has moved in the direction
+        the prior verify warned of, and further: the filed «+40 XP» is now
+        «+100 XP»,
+
+      where we think it lives: platform/src/modules/sim/lessons/engine.ts
+
+      ----------------------------------------------------------------------
+
+  C2.  [CRITICAL]  sc-ed-d2-city-run
+      id: sc-ed-d2-city-run:04f6f4d8
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Three of four route tasks never fire in any run on either
+        platform: „Премини второто светофарно кръстовище по сигнала“,
+        „Дръж дясната лента по булеварда“ and „Довърши сегмента след
+        пешеходната пътека“ show „–“ in all four debriefs. The lesson
+        advertises a full exam segment and delivers one junction.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned the w32 STILL
+        because the leg re-driven was the most blind drive of its batch
+        and four «–» on a car that travelled in a straight line measures
+        the harness. w42 drove all FOUR lanes and every one is
+        disqualified the same way: mobile-right BLIND 10/30 (33%),
+        pc-right BLIND 8/48 (17%), and both wrong lanes NOT-INVOKED with
+        the log’s own refusal «3 objective(s) went UNCREDITED on a drive
+        whose scripted traces never turned the wheel. This instrument
+        cannot tell „the less
+
+      where we think it lives: platform/src/modules/sim/lessons/objectives.ts
+
+      ----------------------------------------------------------------------
+
+  C3.  [CRITICAL]  sc-fo-motorway-gap
+      id: sc-fo-motorway-gap:d18105c7
+
+      WHAT IS CLAIMED TO BE WRONG:
+        «the reckless driver gets the route credit the careful driver is
+        denied» — the objective tracks something other than driving well.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        VERDICT UNCHANGED — UNJUDGED — BUT THE CLOSURE PRESCRIPTION IS
+        STRUCK, BECAUSE IT IS THE SENTENCE THE NEXT ROUND WOULD EXECUTE
+        AND IT WOULD RETIRE A CRITICAL ROW ON HALF A MEASUREMENT.
+        Everything w42 verified positively I re-verified myself and it
+        holds: 1f39940567d2 is «chore(audit): the ledger snapshot…» and
+        touches no template; the gate landed in ebc56e1 (wave 34), which
+        `git merge-base --is-ancestor` confirms is an ancestor of
+        33d562e1f0f6; requireNoContact is validated at objectives.ts:285,
+        contactVoidsObjecti
+
+      where we think it lives: platform/src/app/(dashboard)/simulator/actions.ts
+
+      ----------------------------------------------------------------------
+
+  C4.  [CRITICAL]  sc-merge-motorway-exit
+      id: sc-merge-motorway-exit:2b903830
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The right drive is never credited — the task counter never leaves
+        1/3, the exit the lesson is named after is never reached and
+        nothing about it is assessed.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned the w32 STILL
+        because the single re-driven leg had a dead steering channel and
+        all three of this lesson’s route tasks are steering tasks. w42
+        re-drove the same single leg and reproduced the same
+        disqualification, not a repair: liveness DEAD (left 20 px ≈0.7°,
+        right 0 px ≈0°, floor 1.4°), tracking BLIND at 14%, and the log’s
+        own sentence «Every objective below, and every frame, is evidence
+        about a car travelling in a straight line.» Three «–» on this
+        frame therefore
+
+      where we think it lives: platform/src/modules/sim/lessons/objectives.ts
+
+      ----------------------------------------------------------------------
+
+  C5.  [CRITICAL]  sc-ov-solid-line
+      id: sc-ov-solid-line:3436a5e7
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong drive scores 0 наказателни точки on both platforms.
+        CROSSED_SOLID_LINE — the single fault code this lesson is built
+        around, worth 3 т. as основна грешка per its own teach text —
+        never fires. The lesson fails the student only for not reaching
+        the end zone, never for the offence.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        The row's charge is that CROSSED_SOLID_LINE, the one fault code
+        this lesson is built around, never fires on the wrong drive.
+        Neither w42 wrong leg gave it anything to fire on. Both are
+        NOT-INVOKED with 0 trace commands, so both held a straight line,
+        and the product's own debrief says so on pc-wrong: it CREDITS
+        «Дръж своята лента през плътната линия» at 0:49 — the car stayed
+        in its lane across the solid line. An offence that requires
+        steering across a line cannot be recorded absent on a car that
+        never turned the whe
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  C6.  [CRITICAL]  sc-park-gap-long
+      id: sc-park-gap-long:6e1d02ce
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Not one of the four legs passes. pc-right and mobile-right both
+        end НЕИЗДЪРЖАН at 10 точки with „Настъпи сблъсък“; pc-wrong racks
+        up 11 опасни грешки / 110 точки and mobile-wrong 90 точки. A
+        lesson with a 0/4 pass rate on its own scripted correct drive is
+        not teachable.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH SUSTAINED UNJUDGED AND STRUCK
+        THE «best result 0 наказателни точки» INFERENCE: I do not use the
+        stored best and I agree it says nothing about whether anyone ever
+        completed this lesson. On the four fresh legs at 33d562e1f0f6 the
+        row is still unjudgeable, and I can now name why precisely. Task 2
+        here is a FORWARD entry into a kerbside bay, and the only aiming
+        instrument this harness has for it is the guidance ribbon, whose
+        own log says it emits ROAD CENTRELINE geometry — a drive that
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  C7.  [CRITICAL]  sc-rb-busy-gap
+      id: sc-rb-busy-gap:5ee56710
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Leaving at the second exit never ticks in any leg — no drive has
+        completed the roundabout the lesson is named after.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED, upholding both prior lines and replacing the reason the
+        earlier one corrected. The prior verify was right that this lane
+        is not an unsteered drive — mobile-right is TRACKED (21/22 moving
+        samples, |err| median 1.57°), pc-right INTERMITTENT at 82 %, and
+        both logs end «EVIDENCE: complete — this lane can be judged».
+        Being steered is not enough for THIS row. mobile-right ran a
+        witness path of 76.7 m at straightness 0.997 and pc-right 76.4 m
+        at straightness 1.000, on a lesson whose entire task is to travel
+        roun
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-roundabout.ts
+
+      ----------------------------------------------------------------------
+
+  C8.  [CRITICAL]  sc-rb-lane-choice
+      id: sc-rb-lane-choice:ffdffd55
+
+      WHAT IS CLAIMED TO BE WRONG:
+        mobile-right — the careful drive — scores 33 т. with four
+        convictions (two collisions, a failure to yield, a mirror-less
+        lane change) while the 58 км/ч wrong drive scores 20 т. The
+        careful student is punished harder than the reckless one, and
+        neither ever reaches the third exit.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH OVERTURNED w14's CLOSED ON TWO
+        GROUNDS, THE FIRST BEING THAT THE DRIVE NEVER ENTERED THE
+        ROUNDABOUT. That ground still holds in part: mobile-right now
+        credits «Заеми вътрешната лента преди кръга ✓ 0:55» and its
+        straightness is 0.839 over 162.8 m, so it did approach and turn,
+        but both ring objectives still dash and no leg completes the
+        manoeuvre. THE FILED INVERSION IS GONE IN THE FILED DIRECTION: the
+        careful drive scored 33 т. with four convictions including two
+        collisions when thi
+
+      where we think it lives: platform/src/modules/sim/scene/guidanceRoute.ts
+
+      ----------------------------------------------------------------------
+
+  C9.  [CRITICAL]  sc-rb-ped-exit
+      id: sc-rb-ped-exit:5f1217f9
+
+      WHAT IS CLAIMED TO BE WRONG:
+        NOT ONE of the three tasks is ticked in ANY of the four legs. The
+        careful drive (7 full stops, 2 lawful waits) is stamped НЕИЗДЪРЖАН
+        10 т. exactly like the 49 км/ч wrong drive — the lesson cannot be
+        passed and cannot distinguish a good student from a bad one.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH OVERTURNED w37's STILL BECAUSE
+        THE DRIVE NEVER ENTERED THE ROUNDABOUT, SO «not one of the three
+        tasks ticks» WAS A DESCRIPTION OF THE HARNESS. That ground is now
+        itself refuted, and I say so before anything else: at 33d562e1f0f6
+        mobile-right DID enter the ring — witness path 192.9 m against a
+        net displacement of 145.7 m (straightness 0.755, a car that
+        turned), it is convicted for «Влизане без пропускане», a
+        roundabout-entry fault, and the frame above shows «Подмини първия
+        изход и о
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-roundabout2.ts
+
+      ----------------------------------------------------------------------
+
+  C10.  [CRITICAL]  sc-signal-hesitation
+      id: sc-signal-hesitation:440b1f7c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        On PC the wrong drive books no mistake either — the row says the
+        bare verdict happens on both platforms.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR STILL BY NAME: it overturned the w24 CLOSED
+        because the row names PC explicitly, no wave had ever driven
+        pc-wrong, and the closure rested the PC half on «the rule engine
+        is the same code on both platforms» — a source argument standing
+        in for a photograph on a critical row. w42 finally drove pc-wrong,
+        and the photograph does not settle it either. This lane books
+        MISTAKES (0), which looks like the row confirmed, but both
+        objectives read «–» and the drive ended at 04-t021s after five
+        in-drive beats
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-signals.ts
+
+      ----------------------------------------------------------------------
+
+  C11.  [CRITICAL]  sc-vu-cyclist-hook
+      id: sc-vu-cyclist-hook:d867ca4c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        In both drives the car finishes INSIDE a building: the windscreen
+        is filled edge to edge with a flat orange facade, tan window
+        frames and a grey structural column at arm's length, with the car
+        stationary at 0 km/h. The collision the debrief books is with
+        architecture, not with the cyclist the lesson teaches — and the
+        vehicle has clearly penetrated the wall rather than been stopped
+        by it.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY (PARTIAL, which kept the row open while
+        conceding one clause had gone, and which caught 05-stopped.png
+        being a mid-drive capture rather than the end). I did not read
+        05-stopped on either leg. THE RENDERING CLAUSE IS GONE, AND ON
+        BOTH LEGS THIS TIME, not one: the row's symptom is a windscreen
+        «filled edge to edge with a flat orange facade, tan window frames
+        and a grey structural column at arm's length», i.e. the camera
+        inside the struck geometry, suspectFile collision/bodies.ts.
+        mobile-wro
+
+      where we think it lives: platform/src/modules/sim/collision/bodies.ts
+
+      ----------------------------------------------------------------------
+
+  C12.  [MAJOR]  sc-ac-truck-spray
+      id: sc-ac-truck-spray:8ed4d8b3
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong leg books 0 опасни / 0 основни / 0 второстепенни, Общо
+        0, after running to 127 км/ч against a task cap of 80.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED, same refusal as w40-picture and w41, re-grounded on this
+        attested re-drive rather than on w17/w18 — which is the METHOD
+        FAULT the prior verify corrected when it ruled STILL (the original
+        line cited .audit-frames/wave-c/frames/, the 2026-08-20 sweep, and
+        called it «the re-driven lane»). At 33d562e1f0f6 the filed sheet
+        is gone in form: it books 1 второстепенна («Движение в дъжд без
+        светлини −1») and Общо 1, not 0/0/0/Общо 0. I refuse to call that
+        a repair of THIS row, because the row is a conditional and it
+
+      where we think it lives: platform/src/modules/sim/lessons/engine.ts
+
+      ----------------------------------------------------------------------
+
+  C13.  [MAJOR]  sc-follow-tailgater
+      id: sc-follow-tailgater:f42dce4f
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Same lesson, same wrong script, opposite verdicts by platform: PC
+        records 0 наказателни точки and no fault of any class, mobile
+        records 31 with a collision.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR STILL BY NAME: it kept the wave-c CLOSED
+        overturned on the strength of a 0-versus-31 split with a collision
+        on the mobile side. At w42 both wrong lanes ran at one commit and
+        the split is gone: pc-wrong 2 т. (two Спиране без причина на
+        открит път, this frame) against mobile-wrong 5 т. (the same two
+        plus one Рязко спиране), the same НЕЗАВЪРШЕН pill, the same fault
+        families, no collision on either. A three-point gap of one extra
+        harsh-brake charge is not «opposite verdicts by platform». CLOSED
+        is b
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  C14.  [MAJOR]  sc-hz-brake-dont-swerve
+      id: sc-hz-brake-dont-swerve:f0023997
+
+      WHAT IS CLAIMED TO BE WRONG:
+        When the reckless drive collides, the camera clips inside the
+        struck geometry and the entire windscreen becomes a flat,
+        untextured tan rectangle spanning the full view. There is no
+        impact effect, no shake, no damage, no exterior cut — just a blank
+        orange wall with the coach still talking over it. The same failure
+        mode appears in sc-fo-brakelight-chain pc-wrong t047 as a flat
+        blue slab.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY (PARTIAL, which downgraded w35's CLOSED
+        and confirmed on its own frames that pc-RIGHT 04-t108s/t113s are
+        genuine exterior cuts carrying «Колата е притисната след удара —
+        измъкни се назад, за да продължиш»). The reason that closure
+        failed is that the row is about pc-WRONG, and w35 settled it on
+        pc-RIGHT. So I went to pc-wrong, which w42 re-drove. THE RECKLESS
+        DRIVE DID NOT COLLIDE. Its debrief books zero mistakes of any
+        class and passes with three stars; grepping the leg for «Удар» and
+        «сб
+
+      where we think it lives: platform/src/components/sim/ScenarioObstacles.tsx
+
+      ----------------------------------------------------------------------
+
+  C15.  [MAJOR]  sc-junction-left
+      id: sc-junction-left:2e42b935
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Objective 3 'Завий наляво и излез от кръстовището на запад' never
+        ticks in any of the four runs — dash on every debrief. The lesson
+        has no reachable end state.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        OVERTURNING THE STANDING STILL TO UNJUDGED, AND SAYING PLAINLY
+        WHY, BECAUSE THE PRIOR VERIFY SUSTAINED STILL ON A GOOD LEG. Its
+        ground was that mobile-right at 5c200d0b102f was genuinely TRACKED
+        with no STEERED-BADLY banner, credited objective 2, and still
+        dashed objective 3. That leg does not exist at 33d562e1f0f6. Here
+        the TRACKED leg is mobile-right again, but it crashed at 75.9 m
+        into another vehicle without ever reaching the stop line, so it
+        never got to the turn; and the leg that did credit objective 2
+        (pc-ri
+
+      where we think it lives: platform/src/modules/sim/lessons/objectives.ts
+
+      ----------------------------------------------------------------------
+
+  C16.  [MAJOR]  sc-merge-motorway-exit
+      id: sc-merge-motorway-exit:22f793e2
+
+      WHAT IS CLAIMED TO BE WRONG:
+        At 05-stopped the car sits at 2 км/ч with a lamp post / tree trunk
+        filling the centre of the windscreen, off the carriageway on the
+        pavement side. On a lesson about holding motorway pace, the
+        vehicle never exceeds walking speed in any captured frame.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it overturned the w34 CLOSED
+        because that closure read the speed off the cluster and never
+        opened the frame around it, where the car turned out to be off the
+        carriageway. I opened this one before quoting it and the same
+        thing is true at w42: the dial reads 96 км/ч, so the row’s literal
+        clause («never exceeds walking speed in any captured frame») is
+        false — but the car is crossing a grass field with ИЗВЪН ПЛАТНОТО
+        lit and an off-carriageway charge on the glass, which is not the
+        le
+
+      where we think it lives: platform/src/modules/sim/traces/scMergeMotorwayExit.ts
+
+      ----------------------------------------------------------------------
+
+  C17.  [MAJOR]  sc-mv-uturn-ban
+      id: sc-mv-uturn-ban:e98407b1
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong drive is convicted for a crash and a speed slip, not for
+        the U-turn ban. The debrief lists 1 опасна (сблъсък) + 1
+        второстепенна (превишена скорост) = 11 точки and never mentions
+        В23 or turning against a solid axis line. The lesson's own rule is
+        never the ground of the verdict on either the right or the wrong
+        side.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        VERDICT UNCHANGED — UNJUDGED — AND ITS OPERATIVE REASON IS SOUND:
+        pc-wrong is NOT-INVOKED with 0 trace commands and all four of its
+        convictions are «Рязко спиране без причина», so a 180° turn
+        against a solid axis was never attempted and cannot be graded.
+        WHAT I STRIKE IS THE CLAUSE ABOUT WHERE THE MENTION LIVES, BECAUSE
+        IT NAMES THE WRONG SURFACE AND IT NAMES IT IN THE REASSURING
+        DIRECTION. w42 wrote «I re-checked the mention clause on THIS
+        drive's debrief rather than taking the earlier line's word: «Още
+        от 40-ия м
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  C18.  [MAJOR]  sc-roundabout-entry
+      id: sc-roundabout-entry:08a0b701
+
+      WHAT IS CLAIMED TO BE WRONG:
+        On the wrong run the platform split inverts — mobile 10, PC 20 —
+        so the wrong drive is punished less than the right one on PC.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED, upholding the prior verify's refusal and replacing its
+        reason, which is now settled. Its ground was that the stated
+        mechanism is false and that the wrong lanes DO exist in the
+        corpus; both hold. All four legs exist at 33d562e1f0f6, so the row
+        is no longer unmeasurable for want of them. What it is
+        unmeasurable for is attribution, and the numbers have now inverted
+        twice: filed mobile 10 / PC 20, w41 both 10, w42 mobile 20 / PC
+        10. A split whose direction flips between sweeps is not a property
+        of the platfor
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  C19.  [MAJOR]  sc-sp-curve
+      id: sc-sp-curve:2f4e0a54
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The mobile violation card is cut off mid-word with eight further
+        lines hidden behind ↓ ОЩЕ 8 РЕДА. The visible text ends at В завоя
+        гумите — the student sees the -3 изпитни т. penalty and the
+        offence name but the physics explanation stops in the middle of a
+        clause. A bare verdict with a hidden explanation is exactly what
+        the theory requirement-zero rule forbids.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UPHOLDING THE PRIOR VERIFY'S UNJUDGED ON ITS OWN GROUND,
+        RE-MEASURED RATHER THAN INHERITED. That line overturned w33
+        because the row is scoped to ONE card — the curve-speed card whose
+        body opens «В завоя гумите» — which did not mount, so w33 settled
+        the row on a different card of the same class. The w42 re-drive
+        repeats the same history for the same reason: the flat-throttle
+        lane (NOT-INVOKED, loop NOT-RUN, top 96 км/ч) left the carriageway
+        before the bend, never booked the curve objective, and the string
+        «В завоя
+
+      where we think it lives: platform/src/modules/sim/hud/notifyColumn.ts
+
+      ----------------------------------------------------------------------
+
+  C20.  [MAJOR]  sc-vp-police-stop
+      id: sc-vp-police-stop:ab262758
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The briefing demands a stop hard against the right edge exactly
+        level with the officer and explicitly not out in the roadway. In
+        the stopped frame the officer is still a block away near the
+        horizon and the car is a full lane width from the kerb, yet the
+        drive is credited ИЗДЪРЖАН with 3 stars and 0 errors. The
+        tolerance accepts the very mistake the briefing names.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        OVERTURNS THE w42 CLOSED — the row's lateral tolerance was never
+        exercised, and the cited frame does not carry three quarters of
+        the quote hung on it. (1) THE CLOSURE'S OWN FRAME FAILS RULE 1. It
+        cites 08-debrief-p1.png for four things: «10 наказателни точки …
+        НЕИЗДЪРЖАН … 1 от 3 звезди», «Удар в пешеходец −10 … ОПАСНА
+        ГРЕШКА» and «Задачи от маршрута … – Спри плътно вдясно при
+        полицая» un-ticked. I opened p1. It carries the first two strings
+        and NOTHING else: the sidecar's own frame table puts «Оценка на
+        маневрата»
+
+      where we think it lives: platform/src/modules/sim/lessons/types.ts
+
+      ----------------------------------------------------------------------
+
+  C21.  [MAJOR]  sc-vp-readiness
+      id: sc-vp-readiness:54c815da
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The belt offence contributes nothing — the debrief books 0
+        dangerous, 0 basic and 0 secondary errors.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it upheld UNJUDGED and struck
+        the w41 pointer that hung a handbrake banner on pc-right/04-t010s.
+        At w42 the row still cannot be exercised, for a cleaner reason:
+        the belt offence never happened. I opened the wrong lane mid-drive
+        and the cluster carries no lit КОЛАН telltale, and no entry
+        containing «колан» appears in either mobile debrief although the
+        lesson’s own step 1 is «закопчай предпазния колан» — this harness
+        has no seatbelt control to leave undone. The two pc lanes cannot
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/observation.ts
+
+      ----------------------------------------------------------------------
+
+
+==============================================================================
+  GROUP D — NO TOOL EXISTS TO MEASURE IT — e.g. nothing can hear sound
+  1 rows, 0 critical
+==============================================================================
+
+  D1.  [MAJOR]  sc-vu-pass-clearance
+      id: sc-vu-pass-clearance:9116af05
+
+      WHAT IS CLAIMED TO BE WRONG:
+        «no audio evidence of any kind … every cue (engine, indicator, the
+        cyclist's presence) is delivered as text».
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED upheld, on the reasoning the prior verify gave and which
+        remains exactly right: this harness photographs glass and records
+        no audio channel, so no frame taken by it can settle whether sound
+        is emitted. Nothing in w42 changes that — the instrument gained no
+        microphone. I also carry forward the evidence correction the prior
+        verify made, because it is the kind of error that outlives its
+        round: the w28 line cited
+        .audit-frames/w28/frames/sc-merge-motorway-exit__mobile-right/04-t033s.png
+        — a frame from a DIFFER
+
+      where we think it lives: platform/src/components/sim/AudioLessonPrompt.tsx
+
+      ----------------------------------------------------------------------
+
+
+==============================================================================
+  GROUP E — NEEDS YOUR DECISION — a teaching question, not an engineering one
+  1 rows, 0 critical
+==============================================================================
+
+  E1.  [MAJOR]  sc-ov-keep-right
+      id: sc-ov-keep-right:64391c6a
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong drive is convicted only for crashing and never for the
+        keep-right failure the lesson exists to teach.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        Neither leg can answer this row. The lesson is about lane
+        discipline, and both legs' logs both declare them unsteered and
+        carry the caveat that the guidance signal is a road CENTRELINE, so
+        NO LANE-POSITION FINDING may be drawn from them. The filed
+        sentence is also not reproduced: pc-wrong is not «convicted only
+        for crashing» — it never crashed, and every one of its 9 points is
+        the harness's own harsh-brake artefact. A MECHANISM CORRECTION FOR
+        WHOEVER ROUTES THIS NEXT, measured in this same pack rather than
+        argued:
+
+      where we think it lives: platform/src/modules/sim/lessons/finish.ts
+
+      ----------------------------------------------------------------------
+
+
+==============================================================================
+  GROUP F — NEVER JUDGED — no drive has ever answered it
+  1 rows, 0 critical
+==============================================================================
+
+  F1.  [MAJOR]  app-login
+      id: app-login:e2577ced
+
+      WHAT IS CLAIMED TO BE WRONG:
+        On a phone held sideways (852x393, the viewport the audit harness
+        itself drives) the login form does not fit the screen: #password
+        ends at y=399 and the submit button at y=459, both past the 393 px
+        fold, and elementFromPoint at the button's centre returns null
+        because it is outside the viewport entirely. A student sees the
+        email field and neither of the two controls they need next, and
+        must scroll blind to find each. Measured in WebKit at HEAD
+        b224c7e: signing in required three separate scroll-and-stabilise
+        cycles, 6.2 s each on an unloaded box.
+
+      where we think it lives: platform/src/app/(auth)/login/page.tsx
+
+      ----------------------------------------------------------------------
+
+
+==============================================================================
+  GROUP G — OTHER — needs reading individually
+  17 rows, 9 critical
+==============================================================================
+
+  G1.  [CRITICAL]  sc-ac-truck-spray
+      id: sc-ac-truck-spray:7e53374c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        At t102 the mobile wrong drive is doing 145 км/ч across open green
+        field with no road anywhere in frame — the car left the
+        carriageway entirely and the sim keeps driving, keeps the 140
+        limit chip on screen and raises no off-road state. A large
+        untextured translucent grey plane hangs in the sky above the
+        field.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED upheld at a new commit (33d562e1f0f6, tree clean),
+        answering the prior verify that restored it and the w41 line that
+        upheld it. THE FILED CONDITION NEVER RECURRED, for the fourth pack
+        running: the row is «At t102 the mobile wrong drive is doing 145
+        км/ч across open green field with no road anywhere in frame», and
+        this leg tops 61 км/ч (beat list 8·30·49·0·0·5·48·0·0·14·52 … peak
+        61 at t096/t139), pc-right 63 and pc-wrong 75. The beat nearest
+        the filed one, 04-t096s, photographs the car ON the motorway at 5
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  G2.  [CRITICAL]  sc-ed-d2-city-run
+      id: sc-ed-d2-city-run:a0bdad4b
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The route puts the car onto a pedestrian plaza. At pc t087 and
+        mobile t101 the vehicle is stopped on a wide grey paved area with
+        a planter and a kiosk directly in its path, grass to the right and
+        the road behind it; the blue guidance line runs off to the left.
+        This is where the wrong-way convictions come from and it is why
+        the segment never reaches its second junction.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY BY NAME: it ruled UNJUDGED because the
+        row is a claim about the ROUTE («the blue guidance line runs off
+        to the left») and the ribbon was not in the frame the closure
+        cited. I opened the closest w42 equivalent — the beat where this
+        leg is booked for leaving the carriageway — and the same hole is
+        there: the tableau matches (pale paved area, car nose-on to a
+        facade, off-carriageway charge up) but there is NO ribbon in the
+        frame, so nothing shows where the route wanted the car to go.
+        Worse fo
+
+      where we think it lives: platform/src/modules/sim/world/builders/network.ts
+
+      ----------------------------------------------------------------------
+
+  G3.  [CRITICAL]  sc-junction-rhr
+      id: sc-junction-rhr:83b4fd69
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The correct drive is convicted, not credited. Debrief: 20
+        наказателни точки, НЕИЗДЪРЖАН, 2 опасни грешки, and «Не всички
+        задачи от маршрута бяха изпълнени». A student who drives this
+        lesson right is told they failed. Identical on mobile (20 pts).
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED upheld, with the prior verify's correction kept and the
+        numbers re-measured. That verify was right to strike the w34
+        explanation — «the harness's 4-sample wheel cap» — and it is
+        struck again here: mobile-right's STEERING line reads «0 capped at
+        SUSTAIN_MAX» and pc-right's carries no cap clause at all, so the
+        cap did not fire on this lesson at this commit either. The row is
+        certainly not repaired: both right legs are НЕИЗДЪРЖАН with «Завий
+        наляво и излез от кръстовището на запад» unfinished, which is the
+        fi
+
+      where we think it lives: platform/src/modules/sim/lessons/objectives.ts
+
+      ----------------------------------------------------------------------
+
+  G4.  [CRITICAL]  sc-jx-giveway-b1
+      id: sc-jx-giveway-b1:d7531206
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Same lesson, same scripted correct drive: PC ticks 0 of 3
+        objectives and scores 0, mobile ticks 2 of 3 (at 1:55 and 2:47)
+        and scores 3. Whether a student progresses in this lesson depends
+        on the device they use.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH HELD UNJUDGED AND WARNED THAT
+        w30's CLOSURE PATH — «drive mobile-right at this commit and this
+        row can close» — WOULD HAVE MANUFACTURED A FALSE CLOSED, because
+        that leg burned its whole budget without the session ending and
+        had to be force-terminated. w42 drove exactly that leg, and
+        exactly that happened again: mobile-right was force-closed on
+        «Прекрати урока» with a НЕЗАВЪРШЕН pill. So the prescribed path is
+        still not available. On top of that the filed pattern has INVERTED
+        — the
+
+      where we think it lives: platform/src/modules/sim/lessons/objectives.ts
+
+      ----------------------------------------------------------------------
+
+  G5.  [CRITICAL]  sc-ln-obstacle-meeting
+      id: sc-ln-obstacle-meeting:56ff9740
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The correct drive is punished harder than the deliberately wrong
+        one. mobile-right (the RIGHT drive) debriefs at 20 наказателни
+        точки with two Пътнотранспортно произшествие entries and
+        НЕИЗДЪРЖАН; mobile-wrong debriefs at only 10. A student who does
+        the lesson properly is told he did worse than one who does not.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR STILL BY NAME: it overturned the wave-c CLOSED
+        by producing the 20 т. / two-ПТП mobile-right document from a w17
+        re-drive. At w42 the same leg produces the inverse and I opened
+        it: mobile-right (the RIGHT drive) books 0 наказателни точки,
+        MISTAKES (0) and a commendation («★ ✓ Правилно разминаване в
+        стеснението 1:24»), while mobile-wrong books 10 т. and one «Удар в
+        друго превозно средство». The punished-harder relation is not
+        present on this commit. CLOSED is barred: this is a cross-leg row
+        and o
+
+      where we think it lives: platform/src/modules/sim/lessons/debrief.ts
+
+      ----------------------------------------------------------------------
+
+  G6.  [CRITICAL]  sc-ln-obstacle-meeting
+      id: sc-ln-obstacle-meeting:114706e0
+
+      WHAT IS CLAIMED TO BE WRONG:
+        THE REFERENCE CORRECT DRIVE PASSES ONE TIME IN EIGHT, ON IDENTICAL
+        CODE. sc-ln-obstacle-meeting/pc-right was driven eight consecutive
+        times against commit 641a4475c0ac with an unchanged worktree, no
+        repair between runs, same harness, same server: SIX returned
+        НЕИЗДЪРЖАН with exactly 10 наказателни точки and one star, ONE
+        returned ИЗДЪРЖАН with 0 points and three stars, ONE returned
+        НЕЗАВЪРШЕН. A pass rate of 13% on the drive the lesson itself
+        defines as correct. The durations are BIMODAL and reveal the
+        mechanism: 140-170 s with 29-33 frames when the drive ends
+        naturally, against 269-271 s with 50-54 frames when it burns the
+        whole 210 s budget — two entirely different journeys from
+        identical
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        The row is a REPEAT-RATE measurement — eight consecutive pc-right
+        runs on one commit returning 6x НЕИЗДЪРЖАН 10т/1 star, 1x
+        ИЗДЪРЖАН, 1x НЕЗАВЪРШЕН — and w42 drove pc-right exactly once. I
+        opened its result card: it landed on the modal outcome, 10 т. / 1
+        star / one dangerous error, which is consistent with a 13% pass
+        rate and equally consistent with a repair. One run can neither
+        confirm nor refute a distribution. Noted for the instrument
+        backlog: nothing in this harness re-runs a single lane n times at
+        one commit,
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-lanes.ts
+
+      ----------------------------------------------------------------------
+
+  G7.  [CRITICAL]  sc-park-wall
+      id: sc-park-wall:1edd6ff2
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The right legs score the same as or worse than the wrong drives.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        The row is a right-versus-wrong comparison, and at w42 it runs the
+        right way on both platforms: right 10 т. (mobile and pc), wrong 20
+        т. (mobile and pc, two dangerous errors each). I may not write
+        CLOSED on that — a cross-leg row cannot be retired on one sample
+        per leg — and this one has two further reasons to stay open.
+        First, the wrong lanes’ 20 т. is largely the harness’s own act:
+        both are NOT-INVOKED («THE STEERING LOOP WAS NEVER INVOKED ON THIS
+        DRIVE») and their heaviest charge is «Превишаване с повече от 10 к
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-parking3.ts
+
+      ----------------------------------------------------------------------
+
+  G8.  [CRITICAL]  sc-signal-flashing
+      id: sc-signal-flashing:0d68b149
+
+      WHAT IS CLAIMED TO BE WRONG:
+        «although it ran 59 км/ч in a posted 50» — the speeding that the
+        row names as the unpunished behaviour is still not billed.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UPHOLDING THE PRIOR VERIFY'S UNJUDGED ON ITS OWN GROUND,
+        RE-MEASURED. That line re-read the frames itself, montaged all
+        eight 04-* beats and found cabin readings of 10 · 45 · 0 · 0 · 15
+        · 30 with the chase beats reading «D 0 км/ч · (50)» — nothing
+        above the limit was ever photographed, so the unbilled speeding
+        could not be seen. The same holds at 33d562e1f0f6: the highest
+        photographed cluster reading on this leg is 48 км/ч in a posted
+        50, and the 58 км/ч the row would rest on is a probe sample taken
+        between screens
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  G9.  [CRITICAL]  sc-vu-emergency
+      id: sc-vu-emergency:155903c1
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Failing to give way to an emergency vehicle carries no penalty —
+        the wrong leg books Опасни 0, Основни 0, Второстепенни 0, total 0.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED upheld — the fourth round running, and the mechanism
+        correction the prior verify made is re-confirmed and carried
+        forward. The filed symptom (Опасни 0 / Основни 0 / Второстепенни 0
+        / Общо 0) is dead in form: the leg books Основни 3 for 9 т. and is
+        НЕИЗДЪРЖАН. But the row's substance — «failing to give way carries
+        no penalty» — needs a FAILURE to give way, and this lane cannot
+        produce one: run.log reads «THIS DRIVE WAS NOT STEERED AND NOT
+        MEASURED — THE STEERING LOOP WAS NEVER INVOKED ON THIS DRIVE», and
+        чл
+
+      where we think it lives: platform/src/modules/sim/rules/engine.ts
+
+      ----------------------------------------------------------------------
+
+  G10.  [MAJOR]  sc-ac-ice
+      id: sc-ac-ice:86eab7e9
+
+      WHAT IS CLAIMED TO BE WRONG:
+        sc-ac-aquaplane, sc-ac-ice and sc-ac-bridge-ice still render the
+        same stretch of street — the same mid-rise block facades, the same
+        tree line and the same unbroken kerbside parked-car row.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        THE COMPARISON THIS ROW MAKES CANNOT BE MADE IN THIS PACK. The row
+        names a trio — sc-ac-aquaplane, sc-ac-ice and sc-ac-bridge-ice —
+        and asserts that all three still render the same stretch of
+        street. w42 re-drove only ONE member of that trio: the pack's
+        sc-ac lanes are sc-ac-ice, sc-ac-snow, sc-ac-crosswind and
+        sc-ac-truck-spray, with neither aquaplane nor bridge-ice among
+        them. Settling it by holding the new sc-ac-ice frame against
+        sweep161 frames of the other two would certify a same-build claim
+        across two differ
+
+      where we think it lives: platform/src/modules/sim/world/builders/worldRim.ts
+
+      ----------------------------------------------------------------------
+
+  G11.  [MAJOR]  sc-ac-truck-spray
+      id: sc-ac-truck-spray:3f5a3ef3
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The wrong leg never passes the truck and never enters the water
+        curtain the lesson is named after.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        The observation reproduces and I can put a number on it — the
+        wrong legs never get within 44 m of the truck, so they never enter
+        the spray curtain the lesson is named after — but the verdict must
+        be UNJUDGED, not STILL. The row is a ROUTE-PROGRESS claim and both
+        wrong legs are unsteered: run.log on each reads «THIS DRIVE WAS
+        NOT STEERED AND NOT MEASURED — THE STEERING LOOP WAS NEVER
+        INVOKED», and mobile-wrong additionally reads «THE STEERING
+        CHANNEL IS DEAD ON THIS DRIVE». The row's own suspect file is
+        platform/src
+
+      where we think it lives: platform/src/modules/sim/devrig/driveScript.ts
+
+      ----------------------------------------------------------------------
+
+  G12.  [MAJOR]  sc-merge-from-property
+      id: sc-merge-from-property:6715b581
+
+      WHAT IS CLAIMED TO BE WRONG:
+        On mobile the teach card is a two-line headline that fades out
+        mid-phrase behind a «↓ ОЩЕ N РЕДА» counter, so the body is never
+        shown.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        OVERTURNS THE w42 CLOSED, BECAUSE THE CLOSURE'S OWN GREP IS WRONG
+        IN THE REASSURING DIRECTION. Its load-bearing sentence is «I ran
+        the same test over the whole w42 mobile-right lane and it returns
+        ONE hit: «Разбрах↓ още 2 реда — покажи», at the 02-briefing beat …
+        not on a teach card». Case-insensitively that lane's run.log
+        returns THREE hits, at lines 39, 104 and 161, and two of them are
+        in-drive cards on the glass: line 104 is beat [04-t000s]
+        card=legend/peek, «…маршрутът и целта, до която караш↓ още 1 ред»;
+        line
+
+      where we think it lives: platform/src/modules/sim/rules/catalog.ts
+
+      ----------------------------------------------------------------------
+
+  G13.  [MAJOR]  sc-mw-emergency-lane
+      id: sc-mw-emergency-lane:70e5a601
+
+      WHAT IS CLAIMED TO BE WRONG:
+        The objective never checks WHICH lane the pass was made from,
+        which is the only thing its title claims to measure.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR STILL BY NAME: it overturned the w28 CLOSED
+        because no leg had driven the emergency lane, so the objective’s
+        refusal was never photographed. At w42 a leg finally DOES drive it
+        — pc-right books «Движение по аварийната лента −10 изпитни т.» —
+        and it still does not settle the row, for a reason the timestamps
+        make plain. The fault entry in that lane’s _audit-debrief.json is
+        stamped «в 2:39», while the pass objective on this frame ticked at
+        2:03, thirty-six seconds EARLIER, so the objective was credi
+
+      where we think it lives: platform/src/modules/sim/lessons/scenario/templates-lanes.ts
+
+      ----------------------------------------------------------------------
+
+  G14.  [MAJOR]  sc-sig-controller-live
+      id: sc-sig-controller-live:f3984089
+
+      WHAT IS CLAIMED TO BE WRONG:
+        A held brake is silently dropped — the harness has to re-assert it
+        after the sim loses the key.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH HELD STILL AND MEASURED THE
+        DEFECT'S PREVALENCE PACK-WIDE (2 of 143 lanes at 85b375db3da7)
+        WHILE REFUTING w36's ATTRIBUTION. I re-ran the same measurement at
+        33d562e1f0f6 and this row cannot be closed on it, but neither can
+        it be stood up on its own lane. THIS LANE DID NOT LOSE THE KEY
+        THIS TIME: no re-assert clause, no refused press. That is one
+        non-reproduction of an intermittent fault, not a repair. PACK-WIDE
+        THE FAULT IS ALIVE AND MORE COMMON, NOT LESS: 7 of 125 lanes in
+        this s
+
+      where we think it lives: platform/src/components/sim/TouchControls.tsx
+
+      ----------------------------------------------------------------------
+
+  G15.  [MAJOR]  sc-turn-left-oncoming
+      id: sc-turn-left-oncoming:d079e687
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Same lesson, same scripted correct drive, different convictions by
+        platform: pc-right records 1 опасна грешка and 10 points,
+        mobile-right records 0 mistakes and 0 points. Both still
+        НЕИЗДЪРЖАН, so the student gets a fail either way but a different
+        story about why.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        ANSWERING THE PRIOR VERIFY, WHICH RULED UNJUDGED ON A BOOK-KEEPING
+        CORRECTION AND RECORDED THAT AT HEAD 2300ab5f2350 BOTH LEGS SCORED
+        EXACTLY 20 т., i.e. the filed divergence had closed there. At
+        33d562e1f0f6 a divergence is back — mobile 13 т., pc 10 т. — so
+        nothing has settled, but it may not be charged to the product
+        either. Both legs' own logs declare them unsteered in capitals;
+        the ribbon fell below the 50% floor on each, and the log adds that
+        for most of the drive the control loop was OPEN and the car was
+        tra
+
+      where we think it lives: platform/src/modules/sim/collision/probe.ts
+
+      ----------------------------------------------------------------------
+
+  G16.  [MAJOR]  sc-vp-readiness
+      id: sc-vp-readiness:b3c922d5
+
+      WHAT IS CLAIMED TO BE WRONG:
+        Every error class reads 0 in all four lanes.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        OVERTURNS THE w42 CLOSED TO PARTIAL. WHAT IS REAL AND MUST NOT BE
+        RE-LITIGATED: I opened the cited frame and it carries every word
+        of the quote — the Основни class does populate, 2 errors / 6
+        points, and it drives the star count and the Разбор. summary.ts is
+        not dead. WHY IT STILL RETIRES NOTHING. The row is a universal
+        over FOUR LANES AND THREE CLASSES and exactly one lane and one
+        class moved. I read all four w42 _audit-debrief.json files: Опасни
+        грешки reads 0 0 and Второстепенни грешки reads 0 0 in ALL FOUR
+        lane
+
+      where we think it lives: platform/src/modules/sim/rules/summary.ts
+
+      ----------------------------------------------------------------------
+
+  G17.  [MINOR]  sc-ed-reverse-line
+      id: sc-ed-reverse-line:d6fb0f3c
+
+      WHAT IS CLAIMED TO BE WRONG:
+        With the settings sheet open and the rest of the HUD dimmed, the
+        'Следвай синята линия' pill stays at full brightness outside the
+        overlay, so a modal that should own the screen does not.
+
+      WHY IT IS STILL OPEN (the judge's own words):
+        UNJUDGED — the re-drive did not exercise this finding. The row is
+        about what happens WITH THE SETTINGS SHEET OPEN, and neither leg
+        opened one at 33d562e1f0f6: the beat that photographs it,
+        07b-menu, is absent from both folders and the string does not
+        occur in either log. I cannot answer the prior verify in either
+        direction, and I will not pretend to. WHAT THAT VERIFY
+        ESTABLISHED, carried forward intact because the next round needs
+        it: it overturned the w41 REFUTED not on the measurement but on
+        the CATEGORY. The mea
+
+      where we think it lives: platform/src/modules/sim/hud/overlayQueue.ts
+
+      ----------------------------------------------------------------------
+

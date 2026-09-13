@@ -495,12 +495,55 @@ describe("§6b foldSignAudit — the state machine, including the cases that hid
 
   it("CONTRADICTS when the world turns the other way, and reports it once", () => {
     // MUTATION WATCHED: swap the sign in checkSteerSign -> "agrees", red.
+    //
+    // stepM 2 -> 3 on 2026-09-13. A conviction voids the leg, so it now needs
+    // SIGN_CONVICT_AFTER_M (2.5 m) and SIGN_CONVICT_MIN_DEG (10 deg); 2 m no
+    // longer carries one. The claim is unchanged — a wrong-way bearing under a
+    // held wheel is still a conviction — only the sample is now one that can
+    // support it. -0.4 rad is -22.9 deg, well clear of the 10 deg bar.
     const { verdicts } = run([
       { dir: "left", bearingRad: 0, stepM: 0 },
-      { dir: "left", bearingRad: -0.4, stepM: 2 },
+      { dir: "left", bearingRad: -0.4, stepM: 3 },
     ]);
     assert.equal(verdicts.length, 1);
     assert.equal(verdicts[0].verdict, "contradicts");
+  });
+
+  it("A CONVICTION NEEDS A SAMPLE THAT CAN CARRY IT — the noise band acquits nobody and convicts nobody", () => {
+    // THE DEFECT THIS CLOSES, measured over w41+w42's recorded reverse holds:
+    // `settled` is sticky, so the FIRST hold to clear the floors decides the
+    // whole leg. Six of the eight live convictions settled under 2.0 m travelled
+    // and four on a bearing delta of 4.1-7.3 deg against a 4.0 deg floor — while
+    // all nineteen acquittals settled at 2.43 m or more. Eight lanes across two
+    // sweeps were voided by that, printing «the wheel was mirrored for the whole
+    // manoeuvre» about a convention that agrees 82% of the time.
+    //
+    // Under the bar the verdict is UNDETERMINED, not "contradicts", so the audit
+    // does not settle and later, longer holds still get to speak.
+
+    // too short: wrong way, 22.9 deg, but only 1.8 m
+    const short = run([
+      { dir: "left", bearingRad: 0, stepM: 0 },
+      { dir: "left", bearingRad: -0.4, stepM: 1.8 },
+    ]);
+    assert.equal(short.verdicts.length, 0, "1.8 m must not convict — six of eight real ones settled under 2.0 m");
+
+    // far enough, but the bearing barely moved: 5.7 deg
+    const smallDelta = run([
+      { dir: "left", bearingRad: 0, stepM: 0 },
+      { dir: "left", bearingRad: -0.1, stepM: 4 },
+    ]);
+    assert.equal(smallDelta.verdicts.length, 0, "5.7 deg must not convict — four of eight real ones settled on 4.1-7.3 deg");
+
+    // AND THE ACQUITTAL KEEPS ITS ORIGINAL FLOORS. Raising the bar on the
+    // harmless verdict would be the reassuring-direction change: it is the
+    // conviction that destroys evidence, so it is the conviction that must be sure.
+    const agrees = run([
+      { dir: "left", bearingRad: 0, stepM: 0 },
+      { dir: "left", bearingRad: 0.12, stepM: 1.6 },
+    ]);
+    assert.equal(agrees.verdicts.length, 1, "an acquittal at 1.6 m / 6.9 deg must still settle");
+    assert.equal(agrees.verdicts[0].verdict, "agrees");
   });
 
   it("never settles while the wheel is straight or the bearing unknown", () => {

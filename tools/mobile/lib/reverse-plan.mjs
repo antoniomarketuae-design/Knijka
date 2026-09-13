@@ -431,6 +431,30 @@ export function reverseCommand({
  * Returns "agrees", "contradicts", or "undetermined" — and undetermined is a
  * real answer, not a gap in one.
  */
+/**
+ * WHAT IT TAKES TO CONVICT THE WHEEL, as opposed to acquit it.
+ *
+ * `contradicts` VOIDS THE LEG — lesson-audit.mjs:9104 prints «the wheel was
+ * mirrored for the whole manoeuvre» and no reverse finding may be filed off it.
+ * `agrees` costs nothing. So the two verdicts must not share an evidential bar,
+ * and until 2026-09-13 they did.
+ *
+ * Measured over every recorded reverse hold of w41+w42, replayed offline through
+ * the live controller: all holds agree 50/61 = 82.0%, and at travelled >= 6 m it
+ * is 93.5%. The convention is RIGHT. But `settled` is sticky, so the first hold
+ * to clear the floors decides the leg — and of the eight live convictions, SIX
+ * settled under 2.0 m travelled and four on a bearing delta of 4.1-7.3 deg
+ * against a 4.0 deg floor, while all nineteen acquittals settled at >= 2.43 m.
+ * Eight lanes across two sweeps were voided on that.
+ *
+ * These two numbers are the gap the data already shows, not a fit: 2.5 m sits in
+ * the empty band between 2.0 and 2.43, and 10 deg is well clear of the 4-7 deg
+ * noise floor. Below them the verdict is UNDETERMINED and the audit keeps
+ * looking — which is where the 82% lives.
+ */
+export const SIGN_CONVICT_AFTER_M = 2.5;
+export const SIGN_CONVICT_MIN_DEG = 10;
+
 export function checkSteerSign({ dir, travelledM, bearingDeltaDeg, tune = REVERSE_TUNE }) {
   if (dir !== "left" && dir !== "right") return { verdict: "undetermined", why: "the wheel was not held" };
   if (!Number.isFinite(travelledM) || travelledM < tune.signCheckAfterM) {
@@ -448,6 +472,24 @@ export function checkSteerSign({ dir, travelledM, bearingDeltaDeg, tune = REVERS
   // §2: reversing, LEFT increases the bearing.
   const expectIncrease = dir === "left";
   const didIncrease = bearingDeltaDeg > 0;
+  // A CONVICTION NEEDS MORE THAN AN ACQUITTAL, because it destroys the leg.
+  // Under the conviction bar we return UNDETERMINED rather than `contradicts`,
+  // so `foldSignAudit` does not settle and later, longer holds still get to
+  // speak. An acquittal keeps the original floors — raising the bar on the
+  // harmless verdict would be the reassuring-direction change.
+  if (expectIncrease !== didIncrease) {
+    if (travelledM < SIGN_CONVICT_AFTER_M || Math.abs(bearingDeltaDeg) < SIGN_CONVICT_MIN_DEG) {
+      return {
+        verdict: "undetermined",
+        why:
+          `the wheel ${dir} moved the bearing ${bearingDeltaDeg.toFixed(1)}° over ` +
+          `${travelledM.toFixed(2)} m, which is the WRONG WAY — but a conviction voids this ` +
+          `leg's reverse findings and needs ${SIGN_CONVICT_AFTER_M} m and ${SIGN_CONVICT_MIN_DEG}°. ` +
+          `Measured on w41+w42, six of eight convictions settled under 2.0 m and four on a ` +
+          `4.1-7.3° delta, while every acquittal settled at 2.43 m or more. Still looking.`,
+      };
+    }
+  }
   return expectIncrease === didIncrease
     ? {
         verdict: "agrees",
