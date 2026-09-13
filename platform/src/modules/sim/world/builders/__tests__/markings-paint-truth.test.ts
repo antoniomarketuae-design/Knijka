@@ -215,7 +215,7 @@
  *     skew clamp markings.ts keeps private, the 1/cos span widening, the refuge
  *     island's kerbed gap and the staggered half's walk along the street.
  * The catalogue now grades
- * 4,309 of the corpus's 11,040 marking quads — 39.03%, up from one in 6.7. It
+ * 4,309 of the corpus's 11,038 marking quads — 39.04%, up from one in 6.7. It
  * is 84% of the DISTRICTS and 39% of the PAINT because the 17 still outside are
  * the biggest maps in the corpus. They are attributed one by one, as before: 6
  * painted numerals, 5 roundabout rings, 3 arrow maps, 2 bus-lane legends, 1
@@ -2899,7 +2899,7 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
  * a feature: the district simply leaves the domain and says so.
  *
  * 88 districts of 105 — and
- * 4,309 of the corpus's 11,040 marking quads — 39.03%, which is the number that
+ * 4,309 of the corpus's 11,038 marking quads — 39.04%, which is the number that
  * matters, because a district is not a unit of paint. This block was titled
  * „every quad the world paints is a quad the world was authored to paint" while
  * it graded one quad in 6.7. It is now titled what it does, and the fraction is
@@ -3920,12 +3920,24 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
       // on foot and to children at play („пътя по цялата му широчина"), which
       // is the rule that lesson grades. `calmedZoneKeepsWholeWidth` skips the
       // lane-boundary loop on a `zone: "residential"` edge and nothing else:
-      // the «20» road numerals and both kerb-side edge lines are untouched, and
-      // exactly ONE edge in these 106 districts carries the tag, so this is the
-      // whole of the delta. `home-zone-has-no-lane-division.test.ts` measures
-      // that blast radius every run and isolates these 10 quads against a
-      // control build of the same district relabelled `"thirty"`.
-    }).toEqual({ districts: 106, booked: 11148, triangles: 108 });
+      // the «20» road numerals are untouched, and exactly ONE edge in these 106
+      // districts carries the tag, so this is the whole of the delta.
+      // `home-zone-has-no-lane-division.test.ts` measures that blast radius
+      // every run and isolates these 10 quads against a control build of the
+      // same district relabelled `"thirty"`.
+      //
+      // −2 more against 11,148, the same district and the same row re-judged
+      // STILL at 33d562e (w42) with the centre line already gone. The two М1
+      // carriageway edge lines went with it: measured off the shipped builder
+      // `pz-e-zone` has halfWidth 8.125 m and parkingM 0, so the kerb face is
+      // at ±8.125 and the paint at travelHalf − EDGE_LINE_INSET_M = ±7.625 —
+      // half a metre INSIDE the kerb, i.e. not the pavement boundary the old
+      // note called it but a 15.25 m vehicle corridor drawn down a 16.25 m
+      // shared surface. `EDGE_LINE_CLASSES` already refuses one to a
+      // `living_street` on exactly that ground; pe-zone spells its home zone
+      // as the чл. 62 tag on a `residential` class, so the ruling could not
+      // reach it. One quad per side on a two-vertex line = 2.
+    }).toEqual({ districts: 106, booked: 11146, triangles: 108 });
     expect({
       districts: domain.length,
       booked: booked(domain),
@@ -3950,7 +3962,11 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
     // so the home-zone centre line `calmedZoneKeepsWholeWidth` stopped painting
     // came off the DENOMINATOR only — see the −10 note on the corpus total
     // above. The reach did not grow; the corpus shrank under it.
-    expect(share).toBe("39.03");
+    //
+    // 39.03 → 39.04, and it is the same mechanism a second time: the two М1
+    // edge lines the same predicate now also withholds are two more quads off
+    // the denominator alone (4,309 / 11,038). Nothing entered the domain.
+    expect(share).toBe("39.04");
     // „NOT CLAIMED IN A COMMENT" IS NOW ITSELF A CHECK. The line this replaces
     // — `expect(share.toFixed(1)).toBe("14.8")` — could not fail: with both
     // totals pinned exactly two lines above it, the ratio was arithmetic, and

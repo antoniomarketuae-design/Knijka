@@ -450,6 +450,16 @@ const ACK_CHIP_TOTAL_ALPHA = 1;
  * previous 0.90 rung the naive expression was 0.5000000000000001 in binary
  * floating point and that number would have shipped into the DOM as the chip's
  * alpha.
+ *
+ * ⚠ AND IT KEEPS READING `PEEK_SCRIM_ALPHA` ON PURPOSE, now that the card under
+ *   it is `TOUCH_HINT_SCRIM_ALPHA` = 1 (below). Re-basing the expression on the
+ *   card's real alpha would answer β = 0 — arithmetically right, since an
+ *   opaque ground needs no second one — and would take the chip's OWN opaque
+ *   layer away, which is the exact layer the w42 judge measured and credited as
+ *   repaired („a solid dark-navy fill … nothing of the world shows through
+ *   it"). Two opaque layers composite to opaque, so the pill is bit-identical
+ *   either way and the belt stays on beside the braces: if the card's alpha is
+ *   ever lowered again, this control does not silently follow it down.
  */
 const ACK_CHIP_GROUND_ALPHA =
   PEEK_SCRIM_ALPHA >= 1
@@ -476,6 +486,56 @@ const ACK_CHIP_GROUND_ALPHA =
  * 2026-08-03 review deleted.
  */
 const ACK_CHIP_GROUND_CSS = `rgba(${PEEK_SCRIM_RGB.join(", ")}, ${ACK_CHIP_GROUND_ALPHA})`;
+
+/**
+ * THE CARD'S OWN GROUND — and it is 1, not `PEEK_SCRIM_ALPHA`, since 2026-09-13.
+ *
+ * sc-ac-crosswind:8f42504c's LEADING clause, the half the chip repair above did
+ * not touch: „The mobile touch-hint overlay has no opaque plate: its text is
+ * painted straight onto the sky and the building facades." The w42 judge took
+ * the crop and upheld it; so did I, on
+ * `.audit-frames/w42/frames/sc-ac-crosswind__mobile-right/03-ready.png`.
+ *
+ * THE GROUND WAS NEVER MISSING — the block above is right about that, and a
+ * repair aimed at „there is no shade" would still move no pixel. Solved per
+ * pixel against `01-arrival.png` (same camera pose, hint NOT on the glass;
+ * α = (L_arrival − L_ready) / (L_arrival − 10.0) over the columns whose ARRIVAL
+ * luma is > 100, i.e. the only ones that can move — the method that block
+ * establishes, re-run here rather than trusted):
+ *
+ *   above the card   device y 120–212            median α 0.000   ← control
+ *   left of the card device x 1200–1450          median α 0.000   ← control
+ *   the prose rows   device y 330–400            median α 0.932
+ *   the cyan rows    device y 460–520            median α 0.819
+ *   the whole box    device y 330–600            p25 0.800, median 0.889
+ *
+ * THE ROW IS ABOUT THE RUNG, EXACTLY AS THE CHIP'S WAS. 0.80–0.93 leaves 7–20 %
+ * of the world, and on THIS card's ground that residue is not a wash — at 2×
+ * on the same crop the lit tower windows, the truck's white flank stripes and
+ * the red 50 disc are all separately identifiable THROUGH the cyan sentence
+ * that teaches how to select R. `PEEK_SCRIM_FEATHER_PX`'s own standard, quoted
+ * one block up, is „a glyph standing on a partial ground is the defect this
+ * shade exists to close, not a milder version of it".
+ *
+ * AND IT IS THE SAME EXEMPTION `ACK_CHIP_TOTAL_ALPHA` ALREADY ARGUED AND WON,
+ * applied to the surface the control sits on rather than to the control. The
+ * founder sentence quoted at `PEEK_SCRIM_ALPHA` — „An instruction he can read
+ * but which hides the hazard it is about is a different failure" — is a rule
+ * about a card read WHILE DRIVING. This is the first-run touch hint:
+ * `touchHintShouldHide(speedKmh, shownMs)` takes it off the glass the moment
+ * the car moves, so for its whole life the ego is stationary and there is no
+ * hazard behind it to preserve. Everything that rule protects is untouched —
+ * `PEEK_SCRIM_ALPHA` itself does not move, so SimOverlay's peek, `AdvisorCard`
+ * and `AudioLessonPrompt`, all of which DO ride a moving car, keep 0.80.
+ *
+ * WHAT DOES NOT CHANGE, so this is not the 2026-08-03 register through the back
+ * door: the feathers. `PEEK_SCRIM_FEATHER_PX` still ramps 26 px left, 12 px
+ * right and 16 px bottom, so the shade still has no hard edge, no border, no
+ * radius and no blur — it is a denser version of the same dissolving stroke,
+ * not a plate. The one thing that becomes opaque is the flat core under the
+ * ink, which is the only place a glyph ever stands.
+ */
+const TOUCH_HINT_SCRIM_ALPHA = 1;
 
 /* ═══════════════════════════════════════════════════════════════════════════
    THE AIR PUSHES AND NOTHING ON THE GLASS SAYS SO — 2026-09-13,
@@ -545,6 +605,12 @@ interface WindPushCue {
   side: WindPushSide;
   /** Building toward the peak (true) or dying back to the lull (false). */
   rising: boolean;
+  /**
+   * HOW HARD, on `WIND_PUSH_METER_RUNGS` rungs of the shipped envelope — the
+   * third thing the sentence alone cannot say, added 2026-09-13 for
+   * sc-ac-crosswind:a9db1738's surviving clause.
+   */
+  rung: number;
 }
 
 interface WindPushState {
@@ -572,6 +638,70 @@ const WIND_PUSH_SIDE_DEADBAND_MS2 = 0.15;
  * the instant of the peak — which is the honest reading of „it is easing now".
  */
 const WIND_PUSH_PHASE_HYSTERESIS_N = 150;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND A SENTENCE IS NOT A GAUGE — 2026-09-13, sc-ac-crosswind:a9db1738 again,
+   upheld STILL at 33d562e1f0f6 on `w42/frames/sc-ac-crosswind__pc-right/
+   04-t049s.png` (opened; the cue is on the glass and the cockpit under it is
+   bare).
+
+   THE JUDGE CREDITED THE SENTENCE AND KEPT THE ROW, and the clause it kept it
+   on is a list of four instruments, not of words: „no wind gauge, no
+   lateral-force read-out, no gust arrow and no attitude cue of any kind". The
+   block at `stepWindPush` answers WHICH SIDE and WHETHER IT IS BUILDING. It
+   cannot answer HOW HARD, and „hold a little more wheel" is a quantity — a
+   student who is told the air pushes him left, every five seconds, for the
+   whole lesson, is told the same thing at 700 N and at 1700 N.
+
+   SO THE CHIP GROWS THE TWO GLYPHS THE LIST NAMES, off the number it already
+   reads: an ARROW that points the way the air is taking the car, and a
+   five-rung METER of |force| across the shipped envelope. Not a new channel and
+   not a new physics term — `windLateralNow` is already sampled every frame by
+   `stepWindPush`; what was missing was that its MAGNITUDE never left the
+   function.
+
+   WHY FIVE RUNGS AND WHY QUANTISED AT ALL. The publish is edge-driven on
+   purpose (the note at `stepWindPush`: a per-frame `setState` here re-renders
+   the scene tree at 60 Hz). A continuous bar would make every frame an edge.
+   Five rungs across a 5 s sine cross a boundary ~8 times per period — about
+   1.6 publishes a second, the same order as the phase flips the chip already
+   ships — and five is also the coarsest split that still separates „the lull"
+   from „the peak" from the three readings between them a driver can act on
+   differently.
+
+   THE FLOOR AND THE CEILING ARE THE SHIPPED ENVELOPE, not a scale invented for
+   a picture: `VehicleSim` adds `windLateralN + amplitude·sin(2πt/period)` every
+   step, so |force| runs CROSSWIND_BRIDGE_N ± CROSSWIND_GUST_AMPLITUDE_N =
+   700 → 1700 N and a full meter IS the broadside peak (1700 / 1220 kg =
+   1.393 m/s²). The constants are imported, not re-typed, so a retune of the
+   wind moves the gauge with it instead of leaving it describing an old sky.
+
+   THEO-4: the meter is LABELLED («ПОРИВ») and carries its reading in words for
+   a screen reader, because an unlabelled row of pips is a decision the product
+   asks the student to read and does not explain. It grades nothing and cites no
+   article for the same reason the sentence beside it cites none.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Rungs on the gust meter. See the block above for why five and why discrete. */
+const WIND_PUSH_METER_RUNGS = 5;
+
+/** The gust envelope the meter spans, newtons — the physics', not a scale. */
+const WIND_PUSH_FLOOR_N = CROSSWIND_BRIDGE_N - CROSSWIND_GUST_AMPLITUDE_N;
+const WIND_PUSH_CEILING_N = CROSSWIND_BRIDGE_N + CROSSWIND_GUST_AMPLITUDE_N;
+
+/**
+ * |force| → 1..`WIND_PUSH_METER_RUNGS`. Never 0: the chip is only ever on the
+ * glass while a side has been named, and „the air is pushing you left, strength
+ * nothing" is not a state this lesson has — the lull is one rung, the peak is
+ * five. Clamped at both ends so a retune that widens the gust cannot paint
+ * outside the meter.
+ */
+function windPushRung(gustN: number): number {
+  const span = WIND_PUSH_CEILING_N - WIND_PUSH_FLOOR_N;
+  if (!(span > 0)) return 1;
+  const filled = Math.ceil(((gustN - WIND_PUSH_FLOOR_N) / span) * WIND_PUSH_METER_RUNGS);
+  return Math.min(WIND_PUSH_METER_RUNGS, Math.max(1, filled));
+}
 
 function createWindPushState(): WindPushState {
   return { cue: null, extremeN: 0 };
@@ -602,22 +732,47 @@ function stepWindPush(
     return state.cue === null ? state : createWindPushState();
   }
   const prev = state.cue;
+  const rung = windPushRung(gustN);
+  // THE PHASE AND THE TURNING POINT, decided exactly as before — the two
+  // branches below are the shipped ones rewritten as assignments so the rung
+  // can be folded in once at the bottom instead of at each of the five exits.
+  let rising: boolean;
+  let extremeN: number;
   // A new side is a new gust as far as the reader is concerned: start it
   // rising, and start the tracker from this force rather than from a turning
   // point that belonged to the other side.
   if (prev === null || prev.side !== side) {
-    return { cue: { side, rising: true }, extremeN: gustN };
+    rising = true;
+    extremeN = gustN;
+  } else if (prev.rising) {
+    if (gustN >= state.extremeN) {
+      rising = true;
+      extremeN = gustN;
+    } else if (state.extremeN - gustN >= WIND_PUSH_PHASE_HYSTERESIS_N) {
+      rising = false;
+      extremeN = gustN;
+    } else {
+      rising = true;
+      extremeN = state.extremeN;
+    }
+  } else if (gustN <= state.extremeN) {
+    rising = false;
+    extremeN = gustN;
+  } else if (gustN - state.extremeN >= WIND_PUSH_PHASE_HYSTERESIS_N) {
+    rising = true;
+    extremeN = gustN;
+  } else {
+    rising = false;
+    extremeN = state.extremeN;
   }
-  if (prev.rising) {
-    if (gustN >= state.extremeN) return { cue: prev, extremeN: gustN };
-    return state.extremeN - gustN >= WIND_PUSH_PHASE_HYSTERESIS_N
-      ? { cue: { side, rising: false }, extremeN: gustN }
-      : state;
-  }
-  if (gustN <= state.extremeN) return { cue: prev, extremeN: gustN };
-  return gustN - state.extremeN >= WIND_PUSH_PHASE_HYSTERESIS_N
-    ? { cue: { side, rising: true }, extremeN: gustN }
-    : state;
+  // …AND THE EDGE DISCIPLINE IS UNCHANGED. `prev` is handed back by identity
+  // whenever all THREE fields still read the same, so the caller's `setState`
+  // still fires only when the glass would actually differ — a rung crossing is
+  // now one of those moments, which is the whole point of quantising it.
+  const unchanged =
+    prev !== null && prev.side === side && prev.rising === rising && prev.rung === rung;
+  if (unchanged && extremeN === state.extremeN) return state;
+  return { cue: unchanged ? prev : { side, rising, rung }, extremeN };
 }
 
 /**
@@ -3099,14 +3254,74 @@ export function ReadyScene({
           data-hud="wind-push-cue"
           className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2"
         >
-          <div className="rounded-2xl border border-accent-2/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-accent-2 shadow-glow-sm backdrop-blur">
-            {windPushCue.rising
-              ? `Поривът се усилва — въздухът те бута ${
-                  windPushCue.side === "left" ? "наляво" : "надясно"
-                }. Задръж лек волан ${
-                  windPushCue.side === "left" ? "надясно" : "наляво"
-                } срещу него.`
-              : "Поривът отслабва — връщай волана плавно и без втори замах."}
+          <div className="flex max-w-full flex-col gap-1 rounded-2xl border border-accent-2/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-accent-2 shadow-glow-sm backdrop-blur">
+            {/* ── THE GAUGE HALF (a9db1738). The arrow points the way the AIR
+                takes the car — the same «наляво/надясно» the sentence says, so
+                a reader who takes the glyph and a reader who takes the words
+                can never come away with opposite instructions — and the pips
+                are `windPushRung`'s reading of the live force across the
+                shipped 700–1700 N envelope.
+
+                ── IT IS A ROW ABOVE THE SENTENCE AND NOT A COLUMN BESIDE IT,
+                   and that is the one layout decision here that is forced.
+                   THIS CHIP IS NOT IN THE C1 CORRIDOR: PlayAreaStyles' three
+                   C1 rules name `follow-hint`, `telltale-cue` and
+                   `wind-swing-cue` and NOT `wind-push-cue`, so nothing re-homes
+                   it into the notification column and nothing caps its width —
+                   it lays out at its natural width, centred, at `top-16`.
+                   MEASURED on `w42/frames/sc-ac-crosswind__mobile-right/
+                   03-ready.png` (iPhone 16 landscape, 852 × 393 at dpr 3): the
+                   chip is ~310 CSS px wide and its right end already runs under
+                   the touch-hint card at x 503. A gauge laid out BESIDE the
+                   sentence would have widened that overlap by the gauge; laid
+                   out ABOVE it the chip's width is the sentence's, unchanged to
+                   the pixel, and the cost is ~14 px of height into empty sky.
+                   The corridor routing itself is a one-line fix in
+                   `PlayAreaStyles.tsx` — add `[data-hud="wind-push-cue"]` to
+                   the three selector lists its two siblings are already in —
+                   and that file is not this lane's to edit. Filed, not applied.
+
+                The pips are `aria-hidden` and the reading is spoken once by the
+                group's `aria-label`, because five separately announced <span>s
+                are noise; «ПОРИВ» is on the glass so the row is not an
+                unlabelled instrument (THEO-4). */}
+            <span
+              data-hud="wind-push-meter"
+              data-wind-side={windPushCue.side}
+              data-wind-rung={windPushCue.rung}
+              role="img"
+              aria-label={`Порив ${windPushCue.rung} от ${WIND_PUSH_METER_RUNGS}, бута ${
+                windPushCue.side === "left" ? "наляво" : "надясно"
+              }`}
+              className="flex shrink-0 items-center gap-1.5"
+            >
+              <span aria-hidden className="text-sm leading-none">
+                {windPushCue.side === "left" ? "←" : "→"}
+              </span>
+              <span aria-hidden className="text-[8px] font-black uppercase tracking-wider opacity-70">
+                порив
+              </span>
+              <span aria-hidden className="flex items-end gap-[2px]">
+                {Array.from({ length: WIND_PUSH_METER_RUNGS }, (_, i) => (
+                  <span
+                    key={i}
+                    className={`w-[3px] rounded-[1px] ${
+                      i < windPushCue.rung ? "bg-accent-2" : "bg-accent-2/25"
+                    }`}
+                    style={{ height: `${4 + i * 2}px` }}
+                  />
+                ))}
+              </span>
+            </span>
+            <span className="min-w-0">
+              {windPushCue.rising
+                ? `Поривът се усилва — въздухът те бута ${
+                    windPushCue.side === "left" ? "наляво" : "надясно"
+                  }. Задръж лек волан ${
+                    windPushCue.side === "left" ? "надясно" : "наляво"
+                  } срещу него.`
+                : "Поривът отслабва — връщай волана плавно и без втори замах."}
+            </span>
           </div>
         </div>
       ) : null}
@@ -3623,10 +3838,19 @@ export function ReadyScene({
               inset: 0,
               zIndex: -1,
               pointerEvents: "none",
-              backgroundImage: peekScrimBackgroundCss({
-                left: PEEK_SCRIM_FEATHER_PX.left,
-                right: PEEK_SCRIM_FEATHER_PX.right,
-              }),
+              // …AT THIS CARD'S OWN RUNG, not the peek's. The second argument
+              // is why sc-ac-crosswind:8f42504c's leading clause survived the
+              // chip repair: the helper defaults to `PEEK_SCRIM_ALPHA` (0.80),
+              // which is the number that let the tower windows and the red 50
+              // disc read through the cyan sentence. `TOUCH_HINT_SCRIM_ALPHA`
+              // carries the measurement and the exemption.
+              backgroundImage: peekScrimBackgroundCss(
+                {
+                  left: PEEK_SCRIM_FEATHER_PX.left,
+                  right: PEEK_SCRIM_FEATHER_PX.right,
+                },
+                TOUCH_HINT_SCRIM_ALPHA,
+              ),
               // Both spellings — WebKit is the engine these two frames were
               // photographed on, and an unprefixed-only mask there is no mask.
               WebkitMaskImage: peekScrimMaskCss({
@@ -4928,7 +5152,17 @@ function RuntimeDriver({
       });
       windPushRef.current = next;
       const last = windPushCueRef.current;
-      if (next.cue?.side !== last?.side || next.cue?.rising !== last?.rising) {
+      // ⚠ IDENTITY, NOT A FIELD LIST — 2026-09-13, and the field list is why
+      //   the gauge would have been a dead predicate. This read used to be
+      //   `next.cue?.side !== last?.side || next.cue?.rising !== last?.rising`,
+      //   i.e. it enumerated the cue's fields; `rung` is a third one, and a
+      //   gust that grows from one rung to four WITHOUT changing side or phase
+      //   — which is the whole of a rising gust — would have moved the number
+      //   inside `stepWindPush` and never reached the glass.
+      //   `stepWindPush` hands `prev` back BY IDENTITY exactly when all three
+      //   fields still read the same, so `!==` is the complete test and it
+      //   cannot go stale the next time a field is added.
+      if (next.cue !== last) {
         windPushCueRef.current = next.cue;
         onWindPush(next.cue);
       }

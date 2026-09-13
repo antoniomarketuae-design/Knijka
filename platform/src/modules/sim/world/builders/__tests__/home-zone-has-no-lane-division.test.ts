@@ -14,8 +14,21 @@
  * могат да използват за движение, а децата за игра пътя по цялата му широчина".
  * A centre line is the world asserting two directional lanes on the one street
  * whose whole width the lesson grades as a shared surface. The «20» numerals
- * and the kerb-side edge lines are untouched — they carry т. 2 and the pavement
- * boundary, neither of which т. 1 dissolves.
+ * are untouched — they carry т. 2, which т. 1 does not dissolve.
+ *
+ * ── W42: THE EDGE LINES WENT TOO, AND THIS FILE'S OWN SENTENCE ABOUT THEM WAS
+ *    WRONG ABOUT WHERE THEY ARE. It used to read „the kerb-side edge lines are
+ *    untouched — they carry … the pavement boundary". Measured off the shipped
+ *    builder, `pz-e-zone` has halfWidth 8.125 m and parkingM 0, so the kerb
+ *    face is at ±8.125 and the М1 line at travelHalf − EDGE_LINE_INSET_M =
+ *    ±7.625: half a metre INSIDE the kerb, on the carriageway. It is not the
+ *    pavement boundary, it is a 15.25 m vehicle corridor drawn down a 16.25 m
+ *    shared surface — the same claim the centre line was making, at the other
+ *    edge, and the one the judge's crop names („two continuous white lines").
+ *    `EDGE_LINE_CLASSES` already refuses it for a `living_street`; pe-zone
+ *    spells its home zone as the чл. 62 TAG on a `residential` class, so the
+ *    ruling could not reach the one district it was written for. Both halves
+ *    are now pinned separately below rather than as one delta.
  *
  * WHY THE SWEEP AND NOT ONE DISTRICT: the repair is worth exactly as much as
  * its blast radius is small, and „one edge in the catalogue" is a fact about
@@ -109,9 +122,34 @@ describe("…and it is WIRED — the paint actually changes", () => {
     );
     expect(boulevard.speedGlyphQuads).toBe(m.speedGlyphQuads);
     expect(boulevard.markingQuads).toBeGreaterThan(m.markingQuads);
-    // One two-way centre line over the zone edge's drawn length — the whole of
-    // the delta, so nothing else in this builder moved with it.
-    expect(m.markingQuads).toBe(boulevard.markingQuads - 10);
+    // The delta is TWO named things and nothing else, so a third one appearing
+    // in it cannot hide inside a single magic number:
+    //   · the two-way centre line over the zone edge's drawn length  10 quads
+    //   · the two М1 carriageway edge lines, one quad per side        2 quads
+    // `zoneEdgeOnly` re-measures each half by rebuilding the district with
+    // that half's cause removed, so the split is the builder's answer rather
+    // than this file's arithmetic.
+    expect(m.markingQuads).toBe(boulevard.markingQuads - 12);
+    // …and the edge-line half on its own: give the SAME tagged district a
+    // class the edge-line set does not carry, and the boulevard control loses
+    // exactly the two quads this repair removes from the home zone.
+    const asLivingStreet = {
+      ...asBoulevard,
+      roads: {
+        ...asBoulevard.roads,
+        edges: asBoulevard.roads.edges.map((e) =>
+          e.id === "pz-e-zone" ? { ...e, class: "living_street" } : e,
+        ),
+      },
+    } as District;
+    const noEdgeLines = buildMarkings(
+      asLivingStreet,
+      analyzeNetwork(asLivingStreet),
+      new Set(),
+      new Set(),
+      [],
+    );
+    expect(noEdgeLines.markingQuads).toBe(boulevard.markingQuads - 2);
   });
 
   it("every other district paints exactly what it painted before", () => {

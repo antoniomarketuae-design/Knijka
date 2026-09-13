@@ -571,6 +571,40 @@ export const INERT_GROUND_MIX = 0.16;
  * cases stay green on the values they were written against: 0x0a0c10 under
  * 0x8fa2b4 gives ground/sky = 0.334, already past this cap, and the clamp does
  * not fire. It fires exactly where the frames say the picture is broken.
+ *
+ * ── AND IT NEVER FIRES ON THIS GLASS, BECAUSE THE „PALE TINT" ABOVE IS NOT
+ *    THE SHIPPED ONE — measured 2026-09-13 on the asset, w42.
+ *
+ * The block above infers a pale authored tint from three flat frames. The GLB
+ * refutes it directly. `platform/public/sim/vehicles/hero_interior.glb` gives
+ * all three of `hotspot_mirror_left` / `_right` / `_rear` the material
+ * `int_gloss`, `baseColorFactor` (0.00080, 0.00120, 0.00226) — and
+ * `VitokCockpit.CABIN_TRIM_GRADE.int_gloss` then overwrites it with `#0a0d12`,
+ * which is within two levels per channel of `INERT_GLASS_FALLBACK` 0x0a0c10.
+ * So the fixture the gate uses was REPRESENTATIVE all along: with that tint the
+ * bands come out 0.5·atm and 0.16·atm, i.e. 3.1x apart in linear luminance, and
+ * `groundLum` (0.16·atm) is already under `cap` (0.275·atm) — the clamp cannot
+ * fire on this mesh at any weather.
+ *
+ * AND THE GLASS IS BRIGHTER THAN EITHER BAND, WHICH IS THE FACT THAT DECIDES
+ * WHERE THIS ROW GOES NEXT. On `.audit-frames/w42/frames/
+ * sc-vu-pass-clearance__mobile-right/04-t061s.png`, at the commit it attests,
+ * the visible left glass spans x 127-160, y 856-910 and is rgb(145,156,165) on
+ * all 1,216 of its pixels — against that frame's own open sky of ~rgb(142,153,
+ * 167). For the shipped dark tint the sky band renders near rgb(105) and the
+ * ground band near rgb(59). The pixels are therefore NOT this function's
+ * output at all, and no further colour dial in this file can move them.
+ *
+ * WHAT THAT LEAVES, named so the next lane does not re-measure it. `int_gloss`
+ * is `metalness: 0.85, roughness: 0.16, envMapIntensity: 0.55` — a polished
+ * near-black metal, which reflects the environment as one flat sky tone and
+ * tracks the weather across lessons exactly the way the three w41 columns do.
+ * That is the picture. So the live suspects are (a) the RTT material swap in
+ * `MirrorRig`'s entry effect not reaching the door quad in the shipped build
+ * while the rear's does, and (b) the quad in frame being the exterior body's
+ * own mirror face (`hero_car.glb`, material `car_glass`) drawn where the RTT
+ * quad is expected. Both are decided by `components/sim/vitok/VitokCockpit.tsx`
+ * (mirror-mesh resolution + the trim grade) and the vehicle body rig, not here.
  */
 export const INERT_HORIZON_MAX_RATIO = 0.55;
 
@@ -829,6 +863,40 @@ export function MirrorRig({
   /** Which door targets have already been cleared to the inert glass colour,
    *  so the clear happens on the transition and not every frame. */
   const inertRef = useRef(0);
+  /**
+   * ── THE FLAT FILL HAD A SECOND DOOR, AND THE LATCH HELD IT OPEN FOR THE
+   *    WHOLE LESSON — sc-vu-pass-clearance:d770323a, w42.
+   *
+   * `inertGlassBands` returns the authored tint in BOTH bands when it is handed
+   * no atmosphere (`if (!atmosphere) return;` — and `mirrorGlassHonesty.test.ts`
+   * pins that contract, so the split may not be moved into that function). The
+   * sweep below then sets this door's bit in `inertRef` and, from the next
+   * frame on, `continue`s past it for the life of the scene. So a blank painted
+   * on a frame where `scene.fog` did not exist yet is ONE FLAT FILL — the exact
+   * picture five successive verifies described — and nothing ever repaints it.
+   *
+   * THAT FRAME IS REACHABLE, not hypothetical: the fog is attached by
+   * `environment/SimEnvironment.tsx` (`<fogExp2 attach="fog">`), a sibling
+   * subtree, so whether it exists on this rig's FIRST `useFrame` is a mount-
+   * order race and not a guarantee — and `active` can turn true before it
+   * resolves. The clip rig's `CaptureScene` mounts this component with no
+   * SimEnvironment at all.
+   *
+   * SO THE LATCH NOW RECORDS WHAT IT PAINTED WITH, not merely that it painted.
+   * A door blanked without an atmosphere is repainted ONCE, on the first frame
+   * one exists; a door blanked with one is latched exactly as before. Bounded
+   * at two clears per door per scene — no loop, nothing per frame, and a rig
+   * that never has fog still pays exactly the one clear it paid before.
+   *
+   * WHAT THIS IS NOT. It is not the whole of d770323a, and the frames say so:
+   * measured on `.audit-frames/w42/frames/sc-vu-pass-clearance__mobile-right/
+   * 04-t061s.png` at the commit it attests, the visible left glass (x 127-160,
+   * y 856-910) is rgb(145,156,165) on all 1,216 of its pixels — BRIGHTER than
+   * either band this rig can paint for the shipped tint, and equal to the
+   * scene's own sky. See `INERT_HORIZON_MAX_RATIO` for that measurement and for
+   * what it rules out.
+   */
+  const inertNeedsAtmosphereRef = useRef(0);
 
   // Swap the RTT material onto the glass and lift the quad clear of its
   // authored casing (see MIRROR_DEFS / REF 8); restore the authored material,
@@ -837,6 +905,7 @@ export function MirrorRig({
   useEffect(() => {
     liveRef.current = 0;
     inertRef.current = 0;
+    inertNeedsAtmosphereRef.current = 0;
     const restores = entries.map((e) => {
       const previous = e.mesh.material;
       const previousPosition = new Vector3().copy(e.mesh.position);
@@ -871,6 +940,7 @@ export function MirrorRig({
       for (const restore of restores) restore();
       liveRef.current = 0;
       inertRef.current = 0;
+      inertNeedsAtmosphereRef.current = 0;
       for (const e of entries) {
         e.target.dispose();
         e.material.dispose();
@@ -959,12 +1029,21 @@ export function MirrorRig({
       const attended = mirrorIsAttended(e.kind, glanceMirror, glanceStrength, lookPose);
       if (mirrorGlassIsLive(e.kind, wasLive, attended, false)) continue;
       liveRef.current &= ~bit;
-      // Already blank — the steady unattended state costs nothing at all.
-      if ((inertRef.current & bit) !== 0) continue;
       // The world's own atmosphere, read per clear rather than authored, so a
       // night or a fog lesson gets the mirror its own sky implies (see
       // `inertGlassBands`). Absent fog = the flat authored tint, i.e. exactly
       // what shipped.
+      const hasAtmosphere = scene.fog instanceof FogExp2;
+      // Already blank — the steady unattended state costs nothing at all.
+      //
+      // …UNLESS THE BLANK WE PAINTED WAS THE ONE-COLOUR ONE. A door blanked
+      // before `SimEnvironment` attached its `<fogExp2>` got both bands equal
+      // to the authored tint and then latched forever; it is repainted here on
+      // the first frame an atmosphere exists, and only then. See
+      // `inertNeedsAtmosphereRef` for why that frame is reachable and for the
+      // bound (two clears per door per scene, nothing per frame).
+      const repaint = (inertNeedsAtmosphereRef.current & bit) !== 0 && hasAtmosphere;
+      if ((inertRef.current & bit) !== 0 && !repaint) continue;
       clearMirrorToInert(
         gl,
         e.target,
@@ -972,6 +1051,8 @@ export function MirrorRig({
         scene.fog instanceof FogExp2 ? scene.fog.color : null,
       );
       inertRef.current |= bit;
+      if (hasAtmosphere) inertNeedsAtmosphereRef.current &= ~bit;
+      else inertNeedsAtmosphereRef.current |= bit;
     }
 
     // WHICH mirror (cadence + „is he looking through it") is decided by

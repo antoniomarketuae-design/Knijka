@@ -616,6 +616,13 @@ export interface RuleEngineState {
   townCrawlRegrade: EpisodeState;
   /** The re-grade episode's own accrued ledger (see `townCrawlSec`). */
   townCrawlRegradeSec: number;
+  /**
+   * Seconds the car has been CONTINUOUSLY at or above the crawl's RECOVERY
+   * band — the ledger `TOWN_CRAWL_RECOVERY_HELD_SEC` is spent against, and the
+   * only thing that now wipes `townCrawlSec`. Zeroed the instant the speed
+   * falls back below the band. See `TOWN_CRAWL_RECOVERY_HELD_SEC`.
+   */
+  townCrawlRecoverySec: number;
   // -- THE STOP THAT HAD NO REASON (STOPPED_WITHOUT_CAUSE) -------------------
   /**
    * A standstill HELD in a live lane on an open through road with nothing to
@@ -1456,6 +1463,78 @@ const MOTORWAY_CRAWL_REGRADE_SEC = 6;
 const TOWN_CRAWL_REGRADE_SEC = 10;
 
 /**
+ * THE SLOW SIDE OF THE ENVELOPE HAD NO HYSTERESIS AT ALL — how long the car
+ * must HOLD the recovery band before the town crawl's accrued ledger is wiped
+ * (w42 · `sc-vu-emergency-junction:853790f7`, the row the detector above was
+ * written for and still does not reach).
+ *
+ * ── WHAT WAS MEASURED, THROUGH THIS REDUCER, AT HEAD ────────────────────────
+ * The w42 `sc-vu-emergency-junction__pc-right` leg's OWN printed dial — the
+ * beats in its `run.log`, 10 · 18 · 4 · 12 · 7 · 13 · 14 · 14 · 15 · 9 · 4 · 0
+ * км/ч — interpolated to 1 Hz and run out to the 143 s the debrief prints
+ * («Ориентировъчно време — 143 с при ориентир 60 с»), on the road that leg is
+ * posted at (40, floor 12):
+ *
+ *   bills of DRIVING_TOO_SLOW_IN_TOWN … 0
+ *   PEAK townCrawlSec over 143 s ……… 9.0   of the 20 s it needs
+ *   every event the drive produced … CLEAN_DRIVING
+ *
+ * Nine seconds is not „nearly": the ledger was wiped SIX times and never got
+ * past half. A detector written for this row cannot reach its own threshold on
+ * the drive the row is filed on, so the row is open for the same reason it was
+ * opened — «nothing anywhere flags it as too slow».
+ *
+ * ── THE CAUSE IS ONE LINE, AND THE FILE ALREADY FIXED IT ON THE FAST SIDE ───
+ * `townReset` was `speed >= townFloorKmh`, and `stepAccruedEpisode`'s reset arm
+ * ZEROES the ledger. So the detection line and the recovery line were the SAME
+ * NUMBER, and one frame brushing it discarded every second banked before it.
+ * That is verbatim the defect M-16 records for speeding — „a dip back to the
+ * limit only re-arms once the driver has genuinely HELD it; anything shorter is
+ * one continuing offence, not a new one" — and verbatim the one the
+ * `SPEED_REGRADE_SEC` block re-fixed for the speeding RE-GRADE in 2026-08-30.
+ * The fast side has carried BOTH guards for months:
+ *
+ *   fast side   convict above `limit + grace` · reset at or under `limit`
+ *               · and only after `speedingRearmSec` of holding it
+ *   slow side   convict below `floor` ………… · reset at `floor`
+ *               · on ONE frame
+ *
+ * A band and a hold on one side of the envelope and neither on the other is
+ * not an envelope, which is the sentence the detector above was built on.
+ *
+ * ── SO THE SLOW SIDE TAKES THE FAST SIDE'S TWO GUARDS, UNCHANGED ────────────
+ *  · THE BAND is `speedingGraceRatio` / `speedingGraceMaxKmh`, the engine's own
+ *    declared „this is not the same speed as the line" margin, added to the
+ *    floor instead of the limit: 12 → 16 км/ч on a road posted 40, 15 → 20 on a
+ *    50. Reaching 13 км/ч on a 40 road is not a recovery from a crawl; it is
+ *    the crawl, one км/ч higher.
+ *  · THE HOLD is 4 s — `speedingRearmSec`'s figure, which `WRONG_WAY_REARM_SEC`
+ *    already borrows for exactly this job. One tick in the band is a blip; four
+ *    seconds of it is a driver who has gone back to driving.
+ * No number is invented and none is shown to the student: ЗДвП чл. 22, ал. 1
+ * states no minimum speed (see the detector's own block), so these stay
+ * DETECTION thresholds and the catalogue row keeps citing the article alone.
+ *
+ * ── A12 — WHAT CANNOT MOVE, AND WHY ─────────────────────────────────────────
+ *  · Every ACQUITTAL is untouched. `townCrawlCond` is the same predicate, gate
+ *    for gate — lead vehicle at any distance, junction/stop line/VRU inside
+ *    `townCrawlClearAheadM`, crossing, rail, curve advisory, narrow meeting,
+ *    night/rain/fog/snow, calmed zone, reverse, standstill, stall, handbrake,
+ *    recent hazard. A drive that qualifies for NOT ONE second still banks not
+ *    one second, and this constant cannot conjure the seconds it wipes.
+ *  · A genuine recovery still wipes the ledger AND re-arms the episode in full,
+ *    so `town-crawl.test.ts`'s „a second, distinct crawl after a genuine
+ *    recovery is a second act and bills again" (15 s at 45 км/ч between two
+ *    crawls) is byte-identical: 45 ≥ 20 and 15 s ≥ 4 s.
+ *  · Leaving the through road still resets on the frame it happens — the seed
+ *    below is the held threshold itself, so `townReset` is true immediately.
+ *  · The ceiling is unchanged at TWO bills per episode (one второстепенна each,
+ *    the second `regrade`-marked and dropped by `lessons/engine.ts` wherever
+ *    the code was already charged), so exam mode is byte-identical.
+ */
+const TOWN_CRAWL_RECOVERY_HELD_SEC = 4;
+
+/**
  * THE SAME DEFECT ONE MORE TIME, FOR A CAR THAT IS NOT MOVING AT ALL — seconds
  * of held causeless standstill AFTER the first bill before the breach is
  * re-graded (STOPPED_WITHOUT_CAUSE).
@@ -2158,6 +2237,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     townCrawlSec: 0,
     townCrawlRegrade: { ...IDLE_EPISODE },
     townCrawlRegradeSec: 0,
+    townCrawlRecoverySec: 0,
     needlessStop: { ...IDLE_EPISODE },
     needlessStopRegrade: { ...IDLE_EPISODE },
     emergencyLane: { ...IDLE_EPISODE },
@@ -4233,9 +4313,23 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     !tick.handbrakeOn &&
     (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec) &&
     forwardGear;
-  // Re-armed by genuine recovery (back at/above the floor) or by leaving the
-  // through road entirely — the motorway block's reset, one road over.
-  const townReset = !townThroughRoad || speed >= townFloorKmh;
+  // Re-armed by a GENUINE recovery — back into the recovery band and HELD
+  // there — or by leaving the through road entirely. Both guards, and the
+  // measurement that says why one line was not enough, are at
+  // `TOWN_CRAWL_RECOVERY_HELD_SEC`: the detection line and the recovery line
+  // used to be the same number, read on one frame, so 143 s of the
+  // photographed crawl banked a peak of 9.0 s against a 20 s threshold and
+  // reached the debrief as «CLEAN_DRIVING».
+  const townRecoveryFloorKmh =
+    townFloorKmh + Math.min(limit * cfg.speedingGraceRatio, cfg.speedingGraceMaxKmh);
+  // Off the through road the ledger is void, so seed the hold at its own
+  // threshold: `townReset` is then true on that very frame, exactly as before.
+  s.townCrawlRecoverySec = !townThroughRoad
+    ? TOWN_CRAWL_RECOVERY_HELD_SEC
+    : speed >= townRecoveryFloorKmh
+      ? s.townCrawlRecoverySec + Math.max(0, Math.min(dt, 2))
+      : 0;
+  const townReset = s.townCrawlRecoverySec >= TOWN_CRAWL_RECOVERY_HELD_SEC;
   const townStep = stepAccruedEpisode(
     s.townCrawl,
     s.townCrawlSec,

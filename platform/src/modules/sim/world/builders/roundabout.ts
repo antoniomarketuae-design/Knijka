@@ -256,6 +256,57 @@
  * `world/__tests__/roundabout-ring-edge-line.test.ts` and
  * `builders/__tests__/island-wall-is-a-collider.test.ts` are 48 passing at this
  * commit, and `ISLAND_WALL_RISE_M` is still 0.45 (`ISLAND_WALL_TOP_Y` 0.59).
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * WAVE 42, 2026-09-13 — sc-roundabout-entry:4ab693eb A FOURTEENTH TIME, AND
+ * THE ARITHMETIC IS RE-RUN OFF THE NEW SWEEP RATHER THAN COPIED AGAIN. This
+ * entry exists because the two blocks above were both written that way and the
+ * one time a number WAS copied (rb-ped's island quoted as 13.94 m when it is
+ * 13.7499) it survived a fortnight.
+ *
+ * THE LEG: `.audit-frames/w42/frames/sc-roundabout-entry__pc-right`, recorded
+ * 2026-09-13 against `target.attested: true`, `dirty: false`, `dirtyCount: 0`,
+ * head == expected == 33d562e1f0f6.
+ *
+ * THE PREMISE IS FALSE AGAIN, BY THIS SWEEP'S OWN LAST POSE. `guidance.samples`
+ * closes at t = 75 s, 0 км/ч, world (6.38, 14.57). Ring centre is (0, 0), so
+ *
+ *     r          = √(6.38² + 14.57²)                 = 15.906 m
+ *     nose       = r − CHASSIS_HALF_EXTENTS.z (2.02) = 13.886 m
+ *     wall face  = `islandRadiusM`                   = 13.7499 m
+ *
+ * — 136 mm of air, with the body centre 2.156 m OUTSIDE the island. Third sweep
+ * in a row (w10-4 17 mm, w22 touching, w42 136 mm) in which the wall holds the
+ * car on the asphalt, and the third time „the car ends up driving on the
+ * central island" is false by two metres of body centre. Nothing in this module
+ * moved between 33d562e and HEAD (`git diff` on this file is empty).
+ *
+ * AND THE INSTRUMENT SAYS THE SAME THING IT SAID IN w22, with the steering
+ * excuse now gone: `steering.channel.state: "live"` (the wheel moved the world
+ * 5.3° left / 5.2° right against a 1.4° floor), 18 commands issued — and
+ * `guidance.tracking` still grades the leg «wandered», medianAbsDeg 14.3,
+ * p90 24.31. A live wheel that wanders 14° of median heading error into a fixed
+ * obstacle is a driving verdict, not a world one.
+ *
+ * THE HALF THAT WAS ROUTED IN WAVE 12 HAS LANDED, AND THIS SWEEP PHOTOGRAPHS
+ * IT — which is the one thing the w22 block could not check („the w22 leg
+ * writes no drive frame between t060s and the end card"). `04-t070s.png` shows
+ * the ЗАДАЧА banner reading «Колата е притисната след удара — измъкни се назад,
+ * за да продължиш: Премини през кръговото и излез с десен мигач» with the
+ * coach card beside it («Съвсем леко назад с прави колела…»), i.e.
+ * `lesson-ui/LessonPlayShell.objectiveTitleUnderHold` and
+ * `lessons/advisor.routeHoldAdvisorPrompt` both firing. The bare chip the judge
+ * quotes at `04-t065s.png` is the ROUTE_HOLD_S debounce, and that number is
+ * derived rather than chosen (`lessons/advisor.ts`: CRASH_PIN_RADIUS_M 6 m at
+ * the 5 км/h driving floor = 4.32 s, so five seconds after an impact a car
+ * still inside the radius has not been driving away from what it hit). The
+ * beats are 5–6 s apart, so t065 is inside that window by construction.
+ *
+ * WHAT WOULD MOVE THE ROW: not this file. Either a founder ruling that shortens
+ * ROUTE_HOLD_S (`lessons/advisor.ts`) so a billed −10 qualifies the banner
+ * sooner, or the harness lane's steering work landing a leg that CIRCULATES —
+ * because no frame in this catalogue has yet photographed a car that entered
+ * the ring and came round it.
  * ───────────────────────────────────────────────────────────────────────────
  */
 

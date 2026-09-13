@@ -1692,8 +1692,48 @@ export function buildMarkings(
     // first claim on the exact street where the lesson grades the second, and
     // a student reading a boulevard's markings is being taught the wrong
     // expectation by the one surface he cannot argue with. The «20» numerals
-    // stay — they carry т. 2 — and so do the EDGE lines below, because the
-    // kerb against the pavement is a boundary т. 1 does not dissolve.
+    // stay — they carry т. 2.
+    //
+    // ── …AND THE EDGE LINES DO NOT STAY. THE SENTENCE THAT KEPT THEM
+    //    DESCRIBED A LINE THIS BUILDER DOES NOT DRAW (w42, the same row
+    //    re-judged STILL at 33d562e — the commit this block already shipped
+    //    in, so the judge read the carriageway WITH the division already
+    //    gone and held the row on what was left).
+    //
+    // WHAT THIS PARAGRAPH USED TO SAY: „…and so do the EDGE lines below,
+    // because the kerb against the pavement is a boundary т. 1 does not
+    // dissolve." The premise is true about a KERB and false about this PAINT,
+    // and the difference is 0.5 m of asphalt that is measurable off the
+    // shipped builder rather than arguable:
+    //
+    //   pz-e-zone   class residential · halfWidth 8.125 m · parkingM 0.000
+    //   kerb face                       ±8.125 m
+    //   М1 edge line  travelHalf − EDGE_LINE_INSET_M (0.5) = ±7.625 m
+    //
+    // The kerb is a 3-D step that draws itself (CURB_CHAMFER_M, CURB_FOOT_TINT)
+    // and nothing here touches it. What the painter adds is a second boundary
+    // half a metre INSIDE it, with a strip of carriageway left outside — so it
+    // is not the pavement edge at all: it is the world drawing a 15.25 m
+    // vehicle corridor down the middle of the 16.25 m surface т. 1 hands to
+    // pedestrians and to children at play. That is the same claim the centre
+    // line was making, at the other boundary, and the judge's crop names it in
+    // as many words: „the carriageway fills the frame between two continuous
+    // white lines".
+    //
+    // THE PRODUCT HAD ALREADY MADE THIS RULING AND FILED IT UNDER THE WRONG
+    // KEY, which is why this is a re-route and not a new opinion.
+    // `EDGE_LINE_CLASSES` (builders/constants.ts) keeps `living_street` out of
+    // the set on exactly this ground, in its own words: „a жилищна зона is a
+    // shared surface where the carriageway edge is the point that is NOT
+    // defined, and painting one there would teach the opposite of what the
+    // zone means." pe-zone-v1 spells its home zone as a TAG
+    // (`zone: "residential"`, чл. 62's zone) on an edge whose CLASS is
+    // `residential`, which IS in the set — so the one district the ruling was
+    // written for is the one district it could not reach. Two spellings of
+    // „home zone", one answer; the class set stays untouched (it is not this
+    // lane's file) and the tag is asked here, beside the division it already
+    // gates. Both withholdings are bounded by the one predicate below, so the
+    // blast radius does not grow with the second of them.
     //
     // SURGICAL BY MEASUREMENT, not by hope: exactly ONE edge in the 106-
     // district catalogue carries `zone: "residential"` (pe-zone-v1's
@@ -1723,7 +1763,9 @@ export function buildMarkings(
         ? paintDashedLineExcluding(acc, offLine, width, ex)
         : paintDashedLine(acc, offLine, width);
     }
-    if (EDGE_LINE_CLASSES.has(eb.edge.class)) {
+    // `calmedZoneKeepsWholeWidth` — чл. 62 т. 1, the block above. A home zone's
+    // carriageway edge is the point that is NOT defined, so it is not painted.
+    if (EDGE_LINE_CLASSES.has(eb.edge.class) && !calmedZoneKeepsWholeWidth(eb.edge)) {
       // With a parking band the edge line sits ON the travel/parking boundary;
       // without one it stays inset from the curb so paint never underlaps it.
       const edgeOff = eb.parkingM > 0 ? travelHalf : travelHalf - EDGE_LINE_INSET_M;

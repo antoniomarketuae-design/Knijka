@@ -88,7 +88,7 @@
  */
 
 import type { LessonAidsSpec, LessonObjective, LessonSpec, ParkingBaySpec } from "../../contracts";
-import { REACH_ZONE_GRACE_M, parseObjectiveParams } from "../objectives";
+import { REACH_ZONE_GRACE_M, deriveFullStopDemand, parseObjectiveParams } from "../objectives";
 import { L5_LADDER_FLOOR_CONDITIONS } from "./complications";
 import { serializeObjectiveParams } from "./params";
 import { assertScenarioSpec } from "./validate";
@@ -534,6 +534,84 @@ function radiusWidenBudget(spec: ScenarioSpec): number[] {
     const half = Math.max(0, (Math.hypot(b.x - a.x, b.y - a.y) - a.r - b.r) / 2);
     budget[i] = Math.min(budget[i], half);
     budget[i + 1] = Math.min(budget[i + 1], half);
+  }
+  /* ═════════════════════════════════════════════════════════════════════════
+     …AND A «СПРИ НАПЪЛНО» GATE GETS NO BUDGET AT ALL — w43, 2026-09-13,
+     sc-merge-from-property:ab353b86 („the correct drive collides and fails"),
+     whose surviving half is the contradiction the judge read off the sheet.
+
+     THE PHOTOGRAPH, and it is of THIS build. `.audit-frames/w42/frames/
+     sc-merge-from-property__mobile-right/run.log`, serving 33d562e1f0f6, tree
+     clean, L1, EVIDENCE complete. One debrief, two verdicts on ONE act:
+
+       ✓ Спри напълно на Б2 на изхода 1:09
+       ✗ Неспиране на знак Б2 „Спри!" −10 изпитни т. ОПАСНА ГРЕШКА
+
+     The beats: 0 км/ч from 04-t028s to 04-t044s, the certificate at 04-t055s
+     with the car still at 0, then 3 км/ч at t061s, and at t068s the violation
+     card «преди 2 с». The wheels did stand still. They stood still in the
+     WRONG PLACE, and the ladder is what made that place wide enough.
+
+     THE ARITHMETIC, printed off `compileScenario` rather than argued.
+     `sc-mfp-stop-line` is authored `radiusM: 3, acceptBeforeMarkM: -1.275`
+     around the mark at x = 29, and the car approaches from +x:
+
+       L3/L4/L5   radiusM 3      acceptance x ∈ [30.275, 32.00]   1.7 m of road
+       L2         radiusM 3.75   acceptance x ∈ [30.275, 32.75]   2.5 m
+       L1         radiusM 4.25   acceptance x ∈ [30.275, 33.25]   3.0 m
+
+     `acceptBeforeMarkM` guards the FAR side only, and params.ts says so in its
+     own words: „the widening above stretches the acceptance backwards down the
+     approach at L1/L2 and this flag stops it stretching forwards over the
+     paint." Backwards down the approach is the whole defect here. At L1 the
+     tick is issuable with the vehicle CENTRE 4.25 m short of the mark — bumper
+     2.23 m short at PLAYER_HALF_LENGTH_M 2.02 — and the rule engine then bills
+     the roll over the line, because a standstill that far back is neither at
+     the line nor (at 3 км/ч onwards) inside `stopRecencySec` when the line
+     arrives. Two graders of one act, disagreeing by 1.25 m of ladder.
+
+     WHY THE FLAG'S OWN CARVE-OUT DID NOT COVER THIS. params.ts already refuses
+     to ladder `requireFullStop` itself, and its reason is exactly this row:
+     „a rung that let a beginner's rolling stop keep the tick would teach
+     exactly the thing the sign forbids, AND WOULD DO IT WHILE THE SAME SHEET
+     BILLS HIM TEN POINTS FOR IT." It exempted the demand and left the DISC it
+     is evaluated on laddered — so the rung still forgave the rolling stop, by
+     moving where «напълно» was allowed to happen instead of by weakening the
+     word. The exemption has to cover the geometry or it covers nothing.
+
+     WHY 0 AND NOT A SMALLER NUMBER. The authored radius is not a guess to be
+     tuned here: `validate.ts` round-trips every gate at toleranceScale 1, so
+     the authored disc IS the tightest rung, is the disc L3/L4/L5 already
+     grade, and is the one every committed shadow is recorded against. Clamping
+     the budget to 0 makes L1 and L2 grade that same disc — never tighter than
+     the author wrote, so this cannot strand a chain and cannot refuse a drive
+     the taught recording performs. Any other number would be a metre nobody
+     authored.
+
+     AND IT IS THE DERIVED POPULATION, NOT THE AUTHORED KEY. `parseObjectiveParams`
+     fills `requireFullStop` in from the banner (`deriveFullStopDemand`, the
+     adverb «напълно» / «пълна спирачка»), and six of the seven census members
+     carry no key at all — reading only `o.params.requireFullStop` here would
+     have exempted one gate and laddered the other six, which is the shape of
+     silence that matcher was written to end. Same predicate, same import, one
+     answer.
+
+     THEO-4: this removes a certificate, and the sentence that replaces it is
+     already on the glass — the same drive's own hint reads «Мястото на това
+     спиране е ДО самата линия: спреш ли по-рано…». The tick now agrees with
+     the coaching instead of contradicting it and the ten points beside it.
+
+     WHAT THIS DOES NOT CLOSE, named so the next lane aims past it: even at
+     radius 3 the acceptance opens 3 m before the mark, so a halt made 2 m
+     early and rolled through can still take the tick. Ending that needs a
+     NEAR-side cut (the mirror of `acceptBeforeMarkM`) in `objectives.ts` +
+     `params.ts`, or the certificate deferred until the line is behind the car.
+     Neither file is this lane's, and neither is guessable from here.
+     ═════════════════════════════════════════════════════════════════════════ */
+  for (let i = 0; i < n; i += 1) {
+    const o = spec.success[i];
+    if (o.params.kind !== "reachZone") continue;
+    if (o.params.requireFullStop === true || deriveFullStopDemand(o.titleBg)) budget[i] = 0;
   }
   return budget;
 }

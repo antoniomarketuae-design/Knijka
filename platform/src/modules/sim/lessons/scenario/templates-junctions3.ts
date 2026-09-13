@@ -461,12 +461,72 @@ export const SC_JX_PRIO_WAITING_CAR: PriorityFromRightSpec = {
   kind: "priorityFromRight",
   libraryEventId: "JU-04",
   junction: { nodeId: "tj-n-c", x: 0, y: 0 },
-  // The node IS guarded — by the Б2 on the OTHER arm. The runner reads this only
-  // to decide whether to emit the give-way commendation itself, and its sawYield
-  // gate (playerLineDist <= 14 AND speedKmh <= 8) can never latch for a player
-  // who correctly never slows: no commendation, no event, no grading. Which is
-  // the point — nothing about this car may touch the player's ledger.
-  junctionControl: "stopLine",
+  // ── THE LESSON PRAISED THE ONE ACT IT FORBIDS ──────────────────────────────
+  // (audit sc-jx-priority-confidence:9c987e7b, w42 mobile-right at 33d562e.)
+  //
+  // WHAT THIS KEY USED TO SAY, and why it was wrong on a drive nobody had
+  // photographed until w42. It read `"stopLine"`, under a comment asserting
+  // that the runner's `sawYield` gate „can never latch for a player who
+  // correctly never slows: no commendation, no event, no grading." Every word
+  // of that is true — OF A CORRECT PLAYER. This drill exists for the other one.
+  //
+  // MEASURED, `.audit-frames/w42/frames/sc-jx-priority-confidence__mobile-right`:
+  // run.log:461 «top 41 км/ч · 3 full stops», beats at 0 км/ч on t023s, t040s
+  // and t045s, then a 6–16 км/ч crawl to the end — 92 s against this template's
+  // own 40 s `parTimeSec`. At t051s the glass printed «Браво · Правилно
+  // отстъпено предимство» (run.log:347); the debrief printed it again under
+  // «Похвали ✓ … 1:09» and a third time in the instructor's «Какво се получи
+  // добре». A lesson titled «без излишни спирания» commended a student for
+  // stopping dead on his own priority road and surrendering it to a car that was
+  // obliged to wait for him — the exact misconception instruction 2 („не ѝ
+  // отстъпвай") is written to kill.
+  //
+  // THE MECHANISM, off the runner rather than guessed (orchestrator/runners.ts):
+  //   · `sawYield` latches at `playerLineDist <= 14 && speedKmh <= 8 &&
+  //     |carArc| <= 26`. With `lineDistM: 0` below, playerLineDist IS the
+  //     distance to the node, so a halt anywhere in the mouth arms it as soon as
+  //     the waiter has crept ~1.7 m off its Б2 hold (−27.725 → within 26).
+  //   · `yieldWaitSec` then banks while `carArc < 0` — the waiter is short of the
+  //     node for its whole pull-out — and clears YIELD_PRAISE_WAIT_SEC (1 s) on
+  //     any of these three stops.
+  //   · at `carArc > PRIORITY_CLEAR_ARC_M` the runner reaches line 1112:
+  //     `this.sawYield && (s.junctionControl ?? "stopLine") === "stopLine" && …`
+  //     and PUSHES `{prioritySituation, give-way, yielded:true}` itself.
+  // That push is this key's only effect anywhere in the product — it is the
+  // single `junctionControl` read in the codebase.
+  //
+  // WHY THE VALUE IS NOW "uncontrolled", stated plainly rather than smuggled:
+  // NEITHER enum value describes tj-n-c, and this spec has always known it. The
+  // header above proves the node is not uncontrolled (`isUncontrolledJunction`
+  // is FALSE — the derived Б2 sits on the stem) AND that the player's own edge
+  // carries no line either, which is why `lineDistM` below is 0. So no runtime
+  // detector adjudicates THIS player at THIS node, in either direction, and the
+  // field is being asked a question with no true answer. What it actually
+  // decides is one thing: „may this runner mint the give-way commendation?" On
+  // this template the answer is categorically no — yielding here is the fault,
+  // not the skill — and "uncontrolled" is the value whose BEHAVIOUR is true.
+  // Nothing takes over: the runtime's RHR tracker cannot arm here (that is the
+  // template's whole premise, pinned by the tj battery), so the praise is not
+  // moved, it is gone.
+  //
+  // WHAT DOES NOT MOVE. `sawYield` still labels the OUTCOME — the fall-through
+  // is `resolve(input, true, this.sawYield ? "yielded" : "clear")` — so every
+  // committed trace's `detail` is byte-identical, and the three authored drives
+  // (which never slow, so `sawYield` is false on all of them) are unchanged:
+  // `sc-jx-priority-confidence-traces.test.ts` still gets `detail: "clear"` on
+  // the waiter and still gets zero prioritySituation events. That gate's §2
+  // claim of „structural immunity" was only ever true of drives that never
+  // slowed — the orchestrator was the hole in it, and this is the plug.
+  //
+  // NOT CLOSED HERE, and named so the next round aims correctly: the crawl
+  // itself is still ungraded. `ruleConfig.needlessStopEnabled` below is armed
+  // and did not fire because each halt was under `needlessStopSustainSec` (6 s),
+  // and TOWN_CRAWL cannot fire either — its `townReasonAhead` excuses everything
+  // inside `townCrawlClearAheadM` of a junction, which is where this crawl
+  // happened. The instrument that WOULD grade it is `ReachZoneParams.minSpeedKmh`
+  // on `sc-jxpc-cross`, and authoring it needs two files this lane does not own
+  // (see the note on that objective).
+  junctionControl: "uncontrolled",
   actor: {
     pathNodes: ["tj-n-s", "tj-n-c", "tj-n-w"],
     hold: { nodeIndex: 1, offsetM: -TJ_STOP_B2_LINE_M },
@@ -630,6 +690,45 @@ export const SC_JX_PRIORITY_CONFIDENCE: ScenarioSpec = {
       id: "sc-jxpc-cross",
       titleBg: "Премини кръстовището и продължи по главната",
       // East-arm eastbound lane center, past the junction area.
+      //
+      // THE GATE THAT SHOULD CARRY A SPEED FLOOR, AND CANNOT YET — the second
+      // half of sc-jx-priority-confidence:9c987e7b (the first is on
+      // SC_JX_PRIO_WAITING_CAR's `junctionControl`). w42's mobile-right leg
+      // crawled through this zone at 6–16 км/ч after three dead stops and this
+      // objective ticked ✓ at 1:28, because a bare `reachZone` is satisfied by
+      // ARRIVING and says nothing about arriving in motion — the same defect
+      // `ReachZoneParams.minSpeedKmh` was built for (sc-ac-night-overdrive:
+      // b9d61410, „a ceiling alone is satisfied by a car at walking pace").
+      // The instrument even names this shape in `hasArrivalDemand`: „«Не пълзи
+      // през участъка» is a whole claim, so a gate may carry a floor and no
+      // ceiling."
+      //
+      // THE ONE-LINE EDIT IS `minSpeedKmh: 20` here — 20 км/ч because it is
+      // DERIVED and not picked: the rule engine's own urban crawl floor on a
+      // road posted 50 is `min(50 × townCrawlFractionOfLimit 0.3,
+      // townCrawlFloorCapKmh 15)` = 15 км/ч, and REACH_ZONE_CAP_SLACK_KMH (5)
+      // is spent under the authored figure, so a floor of 20 refuses exactly
+      // below 15 — the product's existing definition of пълзене, on the arm
+      // this map posts at 50 (`priorityMaxKmh` above). It is comfortable at L1
+      // for the reason the floor's own docblock demands one be: the shadow runs
+      // 45.9 км/ч top and its gate test already pins > 35 км/ч through the box.
+      //
+      // TWO FILES THIS LANE DOES NOT OWN HAVE TO MOVE FIRST, so the number is
+      // NOT authored here — a floor added today would ship a refusal with the
+      // wrong explanation and a red suite:
+      //  · `lessons/engine.ts` ~747–776, the «Мина точката твърде бавно» card.
+      //    Its copy is written for the night lesson — it quotes «съобразена
+      //    скорост» (a phrase absent from this drill), reasons about „спираш в
+      //    осветеното пред теб" and warns about „бавната кола в тъмното". On a
+      //    dry daytime priority road three of those are false. THEO-4 makes the
+      //    card part of the repair, not a follow-up: the clause needs to be
+      //    per-lesson (or generalised to „пълзенето през участък") before a
+      //    second gate may adopt the floor.
+      //  · `lessons/__tests__/reach-zone-speed-floor.test.ts` §5 asserts
+      //    „exactly one gate in the whole library carries a floor" by census
+      //    (`expect(carriers).toEqual([sc-acno-adapted@L…])`), so a second
+      //    carrier turns that file red by design — it is the tripwire against a
+      //    blanket floor and must be updated deliberately, in its own lane.
       params: { kind: "reachZone", x: 60, y: -4.06, radiusM: 9 },
     },
   ],
