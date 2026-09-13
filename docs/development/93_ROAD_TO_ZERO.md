@@ -70,3 +70,70 @@ reported as "already fixed" while the broken code was still live.
 - Check any row against the open list **before** spending on it. A 53-agent
   workflow was once spent on 37 rows that were not open.
 - Push after every commit. Thirteen commits once sat on one HDD.
+
+## 2026-09-14 — the 101 re-partitioned by whether the car was on the road
+
+The table above groups the rows by what a reader THOUGHT was blocking them.
+This one groups them by a measurement, and it changes the plan.
+
+`routeDeviation` (commit a783bf6) folds every drive's recorded chassis pose
+against `content/traces/<lesson>/shadow-correct.trace.json` — the line the
+lesson itself authored under «must replay with ZERO violations». It needed no
+new instrument: `guidance.samples[].wx/wz` and the authored trace have both
+been on disk for weeks, in the same frame, and were discarded at the reporting
+layer. The planned `__roadProbe` product change is therefore **cancelled**.
+
+Over w43's 79 `right` legs: **39 (49 %) put the car more than 8 m from its own
+lesson's correct line**, only 11 (14 %) never left 3 m, and the worst reached
+185.7 m. Every one of those legs reported `TRACKING` and none reported this.
+
+Crossing that against the 101 (`node .audit-frames/retro-route.mjs`):
+
+| | rows | crit | what it means |
+|---|---|---|---|
+| **has at least one ON-ROUTE leg** | **65** | **32** | judgeable NOW, from frames already on disk — no re-drive |
+| every leg left the route | 34 | 7 | no route-behaviour verdict can rest on these; they need a better DRIVE, not a repair |
+| driven, no moving pose samples | 1 | 0 | the drive died before it moved |
+| not driven in this sweep | 1 | 0 | |
+
+### What this corrects
+
+- **The roundabout rows are not what w42 said.** `sc-rb-busy-gap:5ee56710`,
+  `sc-rb-ped-exit:5f1217f9` and `sc-rb-lane-choice:ffdffd55` were all held on
+  «the drive never entered the roundabout». In w43 the car DID enter — the
+  pc-right leg ticks «Спри на линията за пропускане преди входа 1:40» and
+  «Подмини първия изход, без да излизаш от кръга 2:28» — and 3 of 4 legs stayed
+  on route. The guidance-route recovery fix (33d562e) moved this and nobody
+  re-judged. **A cause is as stale as its report**, again.
+- **`sc-merge-motorway-exit:2b903830`** (critical) says «the right drive is
+  never credited». Its best leg sits at a MEDIAN of 101 m off the route. The car
+  was never on the road to be credited; the row's evidence is void, not the
+  product's behaviour.
+- **Group C was never one class.** Of its 21 rows, the roundabout and merge rows
+  are drive-quality; `sc-ov-solid-line:3436a5e7` is the wrong-leg-cannot-steer
+  gap (its wrong leg sat 0 m from the CORRECT line, which is exactly why
+  `CROSSED_SOLID_LINE` never fired); and several are ordinary product rows that
+  were mis-filed here.
+
+### The order of attack, revised
+
+1. **Judge the 65 on-route rows against evidence already on disk.** No sweep, no
+   re-drive. This is the cheapest closure path available and it has never been
+   run, because until now nobody could tell which legs were worth reading.
+2. Repair waves on the confirmed-STILL rows (w44 is 39 rows over 30 files).
+3. The 34 off-route rows need the drive fixed before anything else is spent on
+   them. The measured cause is not blindness: `guidance.mjs` §1 records that
+   ribbon zeros are 33.9 % on legs whose car left the carriageway and 6.1 % on
+   those that did not — **the blindness is 5.5× downstream of the departure**,
+   not upstream.
+4. The product publishes `«Колата е извън пътя — върни се на платното»` in the
+   objective banner (`LessonPlayShell.tsx objectiveTitleUnderHold`) and the
+   harness has never read it. Reading it gives the drive an off-carriageway
+   signal in the product's own words, and a recovery to perform.
+
+### Still true and still unspent
+
+The seatbelt gate landed (a2fa487) and `sc-vp-readiness:54c815da` — whose judge
+wrote «this harness has no seatbelt control to leave undone» — now has a wrong
+leg that drives unbelted. The three error-class counts are now fields, not
+pixels, in every debrief sidecar.
