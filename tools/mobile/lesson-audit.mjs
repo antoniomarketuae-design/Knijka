@@ -6196,6 +6196,37 @@ const paceRollCapMs = (target) =>
  *  Two from `yieldWaitAdvisorPrompt` (four of the five reasons open «Чакаш
  *  правилно», Б2 opens with its own), two from the yield VOICE's named and
  *  settled cards. Closed union, five reasons, zero lessons. */
+/* ── THE PRODUCT'S OWN «THE CAR IS NOT ON THE ROAD» ─────────────────────────
+ *
+ * `LessonPlayShell.tsx objectiveTitleUnderHold` prefixes the live objective
+ * with one of exactly two leads while a `RouteHold` is in force, and publishes
+ * the result into the objective banner. This harness has never read either,
+ * which is why every drive that ended in a field reported `TRACKING` and
+ * nothing else, and why «the car wandered» has been an inference from prose for
+ * months instead of a fact from the product.
+ *
+ * IT IS A SECOND, INDEPENDENT WITNESS AND THAT IS THE POINT. `routeDeviation`
+ * measures geometry against the authored line; this is the PRODUCT'S own
+ * judgement, computed by `runtime/spatial.ts` against its own edge centrelines.
+ * Two measurements of one question, from different sides. Agreement makes both
+ * trustworthy; disagreement is itself a finding, and neither can quietly become
+ * the other's evidence.
+ *
+ * Matched as authored, whole, and NOT loosened to «извън пътя» — that fragment
+ * also appears in `rules/catalog.ts`'s explanation of taking a bend too fast
+ * and in `lessons/finish.ts`'s ending title, and a loose match would report a
+ * car as off the road because the debrief was explaining what off the road
+ * means. Three wrong numbers in this programme came from grepping prose. */
+/** What the PRODUCT said about where the car was, folded over the drive.
+ *  `unread` counts ticks where the probe threw — those are not "on the road",
+ *  and keeping them apart is the difference between a measurement and an
+ *  assumption. `firstSec`/`lastSec` bound it so a judge can put the departure
+ *  beside the frame that photographed it. */
+const routeHold = { offRoadTicks: 0, crashPinnedTicks: 0, clearTicks: 0, unread: 0, firstSec: null, lastSec: null, kinds: new Set() };
+
+const ROUTE_HOLD_OFF_ROAD_BG = "Колата е извън пътя — върни се на платното, за да продължиш";
+const ROUTE_HOLD_CRASH_PINNED_BG = "Колата е притисната след удара — измъкни се назад, за да продължиш";
+
 const LAWFUL_WAIT_RE =
   /Чакаш правилно|пълното спиране е задължително|Защо чакаш|Чакането Е маневрата/;
 
@@ -6276,7 +6307,7 @@ const probe = () =>
       // while printing a tidy blind line nobody had a reason to open. It
       // degraded toward the OLD DRIVE, exactly as the module promises, which
       // is why it was survivable — and it is also why nothing went red.
-      ({ waitSrc, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark }) => {
+      ({ waitSrc, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg }) => {
         const sp = document.querySelector('[aria-label^="Скорост "]');
         const paused = [...document.querySelectorAll(pauseSel)].find((e) => {
           const r = e.getBoundingClientRect();
@@ -6324,6 +6355,14 @@ const probe = () =>
           // правилно…») and a lingering notice about a wait that already
           // happened («Чакането Е маневрата») mean opposite things.
           lawfulWait: (shell.innerText.match(new RegExp(waitSrc)) ?? [null])[0],
+          /** Which `RouteHold` the product is asserting, or null. Read off
+           *  `revText` — the objective banner and advisor, already collected
+           *  above — so it costs no extra layout flush. */
+          routeHold: revText.includes(holdOffRoadBg)
+            ? "off-road"
+            : revText.includes(holdCrashPinnedBg)
+              ? "crash-pinned"
+              : null,
           // ── DOES THE PRODUCT WANT R RIGHT NOW ────────────────────────────
           // Folded into THIS evaluate rather than given its own, and that is
           // not tidiness: a second round trip costs 2.0 s on the `pc` leg (the
@@ -6469,6 +6508,8 @@ const probe = () =>
         revStaySrc: REVERSE_STAY_RE.source,
         revSel: REVERSE_DEMAND_SEL,
         gearSel: GEAR_SEL,
+        holdOffRoadBg: ROUTE_HOLD_OFF_ROAD_BG,
+        holdCrashPinnedBg: ROUTE_HOLD_CRASH_PINNED_BG,
       },
     )
     .catch((e) => ({
@@ -6477,6 +6518,9 @@ const probe = () =>
       pause: null,
       end: false,
       lawfulWait: null,
+      /** NOT `null`-as-"on the road": a probe that threw knows nothing, and
+       *  the fold below counts `undefined` as unread rather than as clear. */
+      routeHold: undefined,
       reverseWant: null,
       reverseStay: null,
       // "" and not null: `taskCapKmh("")` is `null`, i.e. „no cap on the
@@ -6838,6 +6882,21 @@ while (!ended && Date.now() - t0 < budgetMs) {
   // the two apart and covers the `flat` phase, where the control loop that
   // records the other speed history is never invoked at all.
   cockpitSee(p);
+  /* ── AND THE PRODUCT'S OWN ANSWER TO «IS THE CAR ON THE ROAD» ─────────────
+   * Folded here, beside the cockpit census, for the same reason: this is the
+   * one place every tick passes through whatever branch it later takes. Put it
+   * inside the roll phase and a car that left the road and stopped — the
+   * commonest shape of the failure — would be counted as never having left. */
+  if (p.routeHold === undefined) routeHold.unread += 1;
+  else if (p.routeHold === null) routeHold.clearTicks += 1;
+  else {
+    const sec = Math.round((Date.now() - t0) / 1000);
+    if (p.routeHold === "off-road") routeHold.offRoadTicks += 1;
+    else routeHold.crashPinnedTicks += 1;
+    routeHold.kinds.add(p.routeHold);
+    if (routeHold.firstSec === null) routeHold.firstSec = sec;
+    routeHold.lastSec = sec;
+  }
   // …and BEFORE `topSpeed` takes it, because the first tick's reading is the
   // one number in the drive the drive did not earn — see `enteredLoopKmh`.
   if (enteredLoopKmh === null) enteredLoopKmh = p.kmh;
@@ -8966,6 +9025,28 @@ const trailingUnphotographedPx = Math.max(0, (geo.contentH ?? 0) - lastFrameEnd)
       ? { ...dev, referenceLine: `content/traces/${SCENARIO}/shadow-correct.trace.json`, points: authored.length }
       : null;
     guidance.routeRefusal = routeDeviationRefusal(dev);
+    /* ── THE TWO WITNESSES, CROSS-CHECKED ────────────────────────────────────
+     * `dev` is geometry against the authored line; `routeHold` is the
+     * product's own `runtime/spatial.ts` judgement against its own edge
+     * centrelines, read off the objective banner. They answer one question
+     * from opposite sides and neither derives from the other.
+     *
+     * A DISAGREEMENT IS A FINDING AND IS PRINTED AS ONE, in whichever
+     * direction it falls. If the product says the car left the road and the
+     * geometry says it never left 8 m of the authored line, then either the
+     * authored line does not lie on the carriageway or the product's off-road
+     * test is wrong — both worth knowing, and neither visible until now.
+     * If the geometry says 100 m and the product never said a word, the same
+     * applies in reverse. Silence here is the only reassuring reading, and it
+     * is earned rather than assumed. */
+    const held = routeHold.offRoadTicks > 0 || routeHold.crashPinnedTicks > 0;
+    guidance.routeHold = {
+      ...routeHold,
+      kinds: [...routeHold.kinds],
+      /** `null` where one of the two could not be measured — an unmeasured
+       *  witness cannot agree or disagree, and must not be scored as agreeing. */
+      agreesWithGeometry: dev === null || routeHold.unread > 0 ? null : held === !dev.onRoute,
+    };
   }
 
 try {
@@ -8992,6 +9073,10 @@ try {
         route: guidance.route ?? null,
         routeRefusal: guidance.routeRefusal ?? null,
         routeReferencePoints: guidance.routeReferencePoints ?? null,
+        // The product's own «the car is not on the road», independent of the
+        // geometry above. `agreesWithGeometry` is null when either witness
+        // could not be measured — never true by default.
+        routeHold: guidance.routeHold ?? null,
         geometry: {
           scroller: geo.scroller,
           viewportH: geo.viewportH ?? null,
@@ -9393,6 +9478,29 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
       );
     }
     if (guidance.routeRefusal) loud(guidance.routeRefusal);
+    {
+      const rh = guidance.routeHold;
+      const total = rh.offRoadTicks + rh.crashPinnedTicks + rh.clearTicks + rh.unread;
+      if (rh.offRoadTicks || rh.crashPinnedTicks) {
+        loud(
+          `THE PRODUCT ITSELF SAID THE CAR WAS NOT ON THE ROAD — ${rh.kinds.join(" + ")} on ` +
+            `${rh.offRoadTicks + rh.crashPinnedTicks} of ${total} drive tick(s), from t=${rh.firstSec}s to t=${rh.lastSec}s. ` +
+            `This is «${ROUTE_HOLD_OFF_ROAD_BG}» in the objective banner — the product's own judgement, not this harness's geometry.`,
+        );
+      } else if (rh.unread === total) {
+        note(`  ROUTE HOLD: NOT READ on any tick — the probe threw every time. UNKNOWN, not clear.`);
+      } else {
+        note(`  ROUTE HOLD: the product never declared the car off the road (${rh.clearTicks} clear tick(s)${rh.unread ? `, ${rh.unread} unread` : ""}).`);
+      }
+      if (rh.agreesWithGeometry === false) {
+        loud(
+          `THE TWO WITNESSES DISAGREE. The product says ${rh.offRoadTicks + rh.crashPinnedTicks ? "OFF the road" : "ON the road"}; ` +
+            `the geometry against this lesson's own authored line says ${dev && dev.onRoute ? "ON" : "OFF"} ` +
+            `(worst ${dev ? dev.maxM : "?"} m). One of the two is wrong and BOTH are used to qualify findings — ` +
+            `resolve this before filing anything positional from this leg.`,
+        );
+      }
+    }
   }
   const tr = guidance.tracking;
   note(

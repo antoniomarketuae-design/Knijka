@@ -189,3 +189,74 @@ describe("4 · the refusal says the narrow thing, not the broad one", () => {
     assert.equal(past.onRoute, false);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 5 · THE PRODUCT'S OWN «THE CAR IS NOT ON THE ROAD»
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * The harness reads two authored Bulgarian sentences out of the objective
+ * banner to learn what the PRODUCT thinks about where the car is. Those
+ * sentences live in `LessonPlayShell.tsx` and nothing but this test stops them
+ * drifting apart — and a drifted matcher does not fail loudly, it reports every
+ * drive as on the road, which is the reassuring direction.
+ */
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(HERE, "..", "..", "..");
+const read = (p) => readFileSync(resolve(REPO, p), "utf8");
+
+describe("5 · the route-hold leads are the product's own, verbatim", () => {
+  const harness = read("tools/mobile/lesson-audit.mjs");
+  const shell = read("platform/src/components/sim/lesson-ui/LessonPlayShell.tsx");
+  const leadOf = (name) => {
+    const m = new RegExp(`const ${name} = "([^"]+)"`, "u").exec(harness);
+    assert.ok(m, `${name} is not declared as a plain string literal in lesson-audit.mjs`);
+    return m[1];
+  };
+
+  it("the off-road lead exists in the product, character for character", () => {
+    const lead = leadOf("ROUTE_HOLD_OFF_ROAD_BG");
+    // MUTATION WATCHED: change one word of the product sentence and this goes
+    // red. Without it the harness reads a sentence nobody prints and every
+    // drive reports «the product never declared the car off the road».
+    assert.ok(shell.includes(lead), `LessonPlayShell.tsx no longer contains «${lead}»`);
+  });
+
+  it("the crash-pinned lead exists in the product, character for character", () => {
+    const lead = leadOf("ROUTE_HOLD_CRASH_PINNED_BG");
+    assert.ok(shell.includes(lead), `LessonPlayShell.tsx no longer contains «${lead}»`);
+  });
+
+  it("the two leads are distinguishable — neither contains the other", () => {
+    const off = leadOf("ROUTE_HOLD_OFF_ROAD_BG");
+    const pinned = leadOf("ROUTE_HOLD_CRASH_PINNED_BG");
+    assert.notEqual(off, pinned);
+    assert.ok(!off.includes(pinned) && !pinned.includes(off));
+  });
+
+  it("the match is on the WHOLE sentence, not the fragment «извън пътя»", () => {
+    // That fragment also appears in rules/catalog.ts explaining a bend taken
+    // too fast, and in lessons/finish.ts's ending title. A loose match would
+    // report a car as off the road because the DEBRIEF was explaining what off
+    // the road means — and the debrief is on screen at the end of every drive.
+    const lead = leadOf("ROUTE_HOLD_OFF_ROAD_BG");
+    assert.ok(lead.length > 30, "the lead has been shortened toward a fragment");
+    assert.ok(lead.includes("върни се на платното"), "the lead no longer carries its imperative half");
+    const elsewhere = read("platform/src/modules/sim/rules/catalog.ts") + read("platform/src/modules/sim/lessons/finish.ts");
+    assert.ok(elsewhere.includes("извън пътя"), "the fragment this test guards against no longer appears elsewhere — re-derive the risk before relaxing the matcher");
+    assert.ok(!elsewhere.includes(lead), "the whole lead now appears outside the banner too — the matcher needs a scope, not just a longer string");
+  });
+
+  it("an unread probe is counted apart from a clear one", () => {
+    // `routeHold: undefined` on the probe's catch path, and a fold that keeps
+    // `unread` separate from `clearTicks`. MUTATION WATCHED: default the catch
+    // to `null` and a page that threw on every tick certifies the drive as
+    // having stayed on the road all the way.
+    assert.match(harness, /routeHold: undefined/u);
+    assert.match(harness, /if \(p\.routeHold === undefined\) routeHold\.unread \+= 1;/u);
+    assert.match(harness, /agreesWithGeometry:\s*dev === null \|\| routeHold\.unread > 0 \? null :/u);
+  });
+});
