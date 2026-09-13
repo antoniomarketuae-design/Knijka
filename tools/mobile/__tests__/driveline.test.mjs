@@ -162,11 +162,24 @@ describe("§C the parking brake — which control does this page offer?", () => 
     assert.equal(v.route, "hotspot");
     assert.match(v.why, /pointer-events: none/);
   });
-  it("returns NO ROUTE on a pc lane and names all three reasons — this is the refusal that keeps a held car honest", () => {
+  it("falls back to the PRODUCT'S OWN KEY on a pc lane, and only after every on-screen control", () => {
+    // THE HANDOVER IS CLOSED — 2026-09-13. This asserted route === null and
+    // «Space key is refused», recording that the pc half was blocked by the
+    // closed keyboard grammar in platform/src. That grammar now carries Space,
+    // with the argument it demands, so the refusal is gone and the route exists.
+    //
+    // What still matters, and is asserted here, is the ORDER: a harness should
+    // press what a student presses wherever it can, so the sheet cell, the
+    // ⚙«Кола» opener and the cockpit hotspot all come first. The key is the lane
+    // where none of them mount.
     const v = parkingBrakeRoute(dom({}));
-    assert.equal(v.route, null);
-    assert.match(v.why, /TouchControls does not mount/);
-    assert.match(v.why, /Space key is refused/);
+    assert.equal(v.route, "key");
+    assert.match(v.why, /TouchControls is touch-only|TouchControls does not mount/);
+    assert.match(v.why, /PARKING_BRAKE_KEY|Space/);
+    // …and the on-screen routes still win when they are there.
+    assert.equal(parkingBrakeRoute(dom({ sheetOpen: true, pillPresent: true })).route, "pill");
+    assert.equal(parkingBrakeRoute(dom({ sheetOpener: true })).route, "sheet");
+    assert.equal(parkingBrakeRoute(dom({ hotspotChip: true })).route, "hotspot");
   });
   it("an open sheet with no cell in it is a route of NONE, not the sheet route again", () => {
     // Otherwise the caller opens the sheet, finds nothing, and re-opens it.
@@ -528,21 +541,31 @@ describe("§J the drive path actually calls all of it", () => {
     assert.match(CODE, /THIS LANE IS A HELD CAR/, "the loud line that voids a held lane's findings is gone");
   });
 
-  it("PRESSES NO KEY — the closed keyboard grammar in platform/src is not this lane's to widen", () => {
-    // `reverseAssist-audit-harness.test.ts` §1 censuses every keyboard call in
-    // this harness and asserts the grammar as a CLOSED set
-    // ["BracketRight","Escape","KeyA","KeyB","KeyD","KeyS","KeyW","KeyZ"],
-    // «stated so ANY new key fails here and has to be argued for». Adding
-    // "Space" turns that gate red in a file this lane may read and may not
-    // write, so the release goes through the product's own controls instead.
-    // THIS ASSERTION IS THE HANDOVER: it fails the day somebody adds the key
-    // here, which is the day that gate has to be updated in the same change.
+  it("presses the product's own key — and still reaches for its on-screen controls first", () => {
+    // Was «PRESSES NO KEY». The closed grammar in platform/src now carries Space
+    // (added 2026-09-13 with the argument that gate charges), so the pc lane can
+    // finally free a held car. w42 had photographed three sc-vp-readiness legs
+    // stuck at 0 км/ч with the product printing «Ръчната спирачка е вдигната» and
+    // the harness with nothing to press.
     const kb = [...CODE.matchAll(/keyboard\.(?:down|up|press)\(\s*([^),]+)/g)].map((m) => m[1].trim());
-    assert.ok(kb.length > 3, "no keyboard calls found — this matcher is broken and the assertion below is vacuous");
-    for (const arg of kb) {
-      assert.ok(!/Space|PARKING_BRAKE_KEY/.test(arg), `the harness now presses ${arg} — update the closed grammar in platform/src/modules/sim/engine/__tests__/reverseAssist-audit-harness.test.ts in the same change, or that gate goes red`);
-    }
-    // …and the route it uses instead really is the product's own control.
+    assert.ok(kb.length > 3, "no keyboard calls found — this matcher is broken and the assertions below are vacuous");
+    assert.ok(
+      kb.some((a) => /PARKING_BRAKE_KEY/.test(a)),
+      "the harness no longer presses PARKING_BRAKE_KEY — a pc lane can no longer free a held car",
+    );
+    // THE TWO FILES MUST NOT DRIFT. If the key is pressed here it must be named
+    // in the census there, or the census goes green while blind — which is
+    // exactly what it did for two weeks over BracketRight.
+    // Read directly: `src` is scoped to the §J suite below, and this seam is worth
+    // checking from both sides rather than relocated to wherever a helper lives.
+    const G = readFileSync(resolve(HERE, "..", "..", "..", "platform/src/modules/sim/engine/__tests__/reverseAssist-audit-harness.test.ts"), "utf8");
+    const set = G.match(/expect\(keys\)\.toEqual\(\[([\s\S]*?)\]\);/);
+    assert.ok(set, "the closed keyboard grammar could not be found");
+    assert.ok(
+      /"Space"/.test(set[1]),
+      "the harness presses PARKING_BRAKE_KEY but the closed grammar no longer lists Space — the two have drifted",
+    );
+    // …and the product's own controls are still there, still tried first.
     assert.match(CODE, /role="toolbar"\]\[aria-label="\$\{CAR_SHEET_LABEL\}"\] button\[aria-label="\$\{PARKING_BRAKE_LABEL\}"\]/, "the «РЪЧНА» cell selector is gone");
     assert.match(CODE, /page\.mouse\.click\(at\.chipAt\.x, at\.chipAt\.y\)/, "the cockpit-hotspot fallback click is gone");
   });
@@ -688,18 +711,19 @@ describe("§K the product surfaces this reader stands on", () => {
     assert.ok(C.includes("toggleParkingBrake()"), "CabinControls.toggleParkingBrake is gone — both routes this harness uses go through it");
   });
 
-  it("THE HANDOVER — the closed keyboard grammar still refuses Space, so the pc half is still blocked", () => {
-    // This is the assertion that RETIRES the pc refusal. `parkingBrakeRoute`
-    // returns null on a non-touch lane and says the key is refused by this
-    // gate; the day somebody adds "Space" to it (with the argument the gate
-    // demands — see the note on PARKING_BRAKE_KEY), this row goes red and the
-    // next lane is told, in one line, that the pc release can now be built.
+  it("the census and the harness agree about Space — neither may move without the other", () => {
+    // This was the handover: it failed the day somebody added Space to the closed
+    // grammar, and told the next lane in one line that the pc release could be
+    // built. It fired, the release was built, and the marker is now inverted.
+    //
+    // It guards the same seam from the other side: the harness presses the key,
+    // so the census must list it. Drop it from either and this goes red.
     const G = src("platform/src/modules/sim/engine/__tests__/reverseAssist-audit-harness.test.ts");
     const set = G.match(/expect\(keys\)\.toEqual\(\[([\s\S]*?)\]\);/);
-    assert.ok(set, "the closed keyboard grammar could not be found — re-check whether Space is still refused before trusting parkingBrakeRoute's refusal text");
+    assert.ok(set, "the closed keyboard grammar could not be found");
     assert.ok(
-      !/"Space"/.test(set[1]),
-      "the harness's closed keyboard grammar now ALLOWS Space — the pc parking-brake release is no longer blocked, so build it: press DRIVELINE_KEYS.parkingBrake where parkingBrakeRoute returns null, and delete the «Space key is refused» clause from its why",
+      /"Space"/.test(set[1]),
+      "Space has left the closed grammar while the harness still presses it — restore it, or stop pressing the key and put parkingBrakeRoute back to refusing the pc lane",
     );
   });
 

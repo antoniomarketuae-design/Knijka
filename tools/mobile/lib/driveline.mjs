@@ -327,12 +327,25 @@ export function parkingBrakeRoute(dom) {
         "its centre passes through to the hotspot mesh underneath it (VitokCockpit.tsx:2099-2103)",
     };
   }
+  // THE PRODUCT'S OWN KEY, AND ONLY WHERE NOTHING ELSE MOUNTS — 2026-09-13.
+  //
+  // Every branch above presses a control a STUDENT presses, and they are tried
+  // first for that reason. This one is the non-touch desktop lane, where
+  // TouchControls never mounts and no cockpit chip is asking for the step. It
+  // used to return null, and w42 photographed the consequence: three
+  // sc-vp-readiness legs held at 0 км/ч with the product printing «Ръчната
+  // спирачка е вдигната» and the harness unable to answer it.
+  //
+  // Space is DRIVELINE_KEYS.parkingBrake (scene/cabin.ts:589) — the product's
+  // own binding, and a toggle on `parkingBrakeOn` alone. It cannot reach R:
+  // the selector gate is P—R—N—D and only gearUp/gearDown step it. That is why
+  // adding it satisfies the keyboard census rather than evading it.
   return {
-    route: null,
+    route: "key",
     why:
-      "this page offers NO parking-brake control this harness may actuate: TouchControls does not mount on a " +
-      "non-touch lane, no cockpit chip is asking for the step, and the Space key is refused by the harness's own " +
-      "closed keyboard grammar (see PARKING_BRAKE_KEY)",
+      "no on-screen parking-brake control mounts on this lane — TouchControls is touch-only and no cockpit " +
+      "chip is asking for the step — so the product's own key binding is used (PARKING_BRAKE_KEY = Space, " +
+      "DRIVELINE_KEYS.parkingBrake at scene/cabin.ts:589)",
   };
 }
 

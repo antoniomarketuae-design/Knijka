@@ -121,8 +121,41 @@ const BRAKE_CAP_OVER_KMH = 2;
 function censusKeys(src: string): { keys: string[]; unresolved: string[] } {
   // `const MANUAL_GEAR_UP = "BracketRight";`
   const scalars = new Map<string, string>();
-  for (const m of src.matchAll(/const ([A-Z][A-Z0-9_]*) = "([A-Za-z][A-Za-z0-9]*)";/g)) {
-    scalars.set(m[1], m[2]);
+  const declaredIn = (text: string) => {
+    for (const m of text.matchAll(/(?:export )?const ([A-Z][A-Z0-9_]*) = "([A-Za-z][A-Za-z0-9]*)";/g)) {
+      if (!scalars.has(m[1])) scalars.set(m[1], m[2]);
+    }
+  };
+  declaredIn(src);
+
+  // ── FOLLOW THE IMPORT, DO NOT DODGE IT ─────────────────────────────────
+  //
+  // The harness presses `PARKING_BRAKE_KEY`, which is declared in
+  // tools/mobile/lib/driveline.mjs and imported. The resolver could not read it
+  // and REPORTED it — `a key it cannot read is a key it cannot refuse` — which
+  // is this census working as designed on the first shape it had not met.
+  //
+  // Declaring the key locally would have silenced the failure and left the next
+  // imported key invisible: the same patch-the-latest-evasion approach that let
+  // this test sit green for two weeks beside a harness pressing BracketRight.
+  //
+  // Only the harness's OWN lib is followed. An import from node_modules stays
+  // unresolved and still fails here, which is correct — a third-party key is
+  // precisely the kind of thing that has to be argued for.
+  const LIB = path.resolve(__dirname, "../../../../../../tools/mobile/lib");
+  for (const im of src.matchAll(/import \{([^}]*)\} from "\.\/lib\/([\w.-]+)";/g)) {
+    const wanted = im[1]
+      .split(",")
+      .map((x) => x.trim())
+      .filter((x) => /^[A-Z][A-Z0-9_]*$/.test(x));
+    if (!wanted.length) continue;
+    let text: string;
+    try {
+      text = fs.readFileSync(path.join(LIB, im[2]), "utf8");
+    } catch {
+      continue; // an unreadable module leaves its names unresolved, which fails below
+    }
+    declaredIn(text);
   }
   // `const STEER_KEYS = { left: "KeyA", right: "KeyD" };`
   const objects = new Map<string, Map<string, string>>();
@@ -272,6 +305,28 @@ describe("§1 the audit harness's gesture grammar", () => {
     // every score). KeyZ + BracketRight walk a manual car out of N (905eddb) —
     // sc-vp-stall is the catalogue's only manual lesson and it spawns in N, so
     // three sweeps photographed a car at 0 км/ч and correctly refused to judge.
+    // SPACE JOINED THE CENSUS ON 2026-09-13, and this paragraph is the price
+    // the gate charges for it.
+    //
+    // It is the PRODUCT'S OWN parking-brake binding — DRIVELINE_KEYS.parkingBrake
+    // at scene/cabin.ts:589 — and it is a toggle on `parkingBrakeOn` and nothing
+    // else. Ask the question this test exists to ask: does it work the GEAR by
+    // hand? No. The selector gate is P—R—N—D and only gearUp/gearDown step it, so
+    // Space cannot reach R, which is the claim the next test pins against the
+    // live DrivelineState.
+    //
+    // WHY IT HAD TO BE ADDED. sc-vp-readiness and sc-vp-handbrake hand the car
+    // over with the lever UP by design (scene/spawnParkingBrake.test.ts pins it).
+    // w42 photographed three sc-vp-readiness legs held at 0 км/ч while the product
+    // printed «Ръчната спирачка е вдигната» and the harness had nothing to press:
+    // TouchControls is touch-only and no cockpit chip mounts on a desktop lane. A
+    // harness with no key for it photographs frozen lanes and files them as product
+    // defects — which is exactly what happened, for months, to three open rows
+    // (sc-vp-readiness:54c815da, b3c922d5, 97c472e2).
+    //
+    // It is a LAST RESORT in the code: the sheet's «РЪЧНА» cell, the ⚙«Кола»
+    // opener and the cockpit hotspot are all tried first, because a harness should
+    // press what a student presses wherever it can.
     expect(keys).toEqual([
       "BracketRight",
       "Escape",
@@ -281,6 +336,7 @@ describe("§1 the audit harness's gesture grammar", () => {
       "KeyS",
       "KeyW",
       "KeyZ",
+      "Space",
     ]);
   });
 

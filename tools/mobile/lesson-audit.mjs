@@ -318,29 +318,7 @@ import {
 // `evaluate`s and the presses) is here. `lib/driveline.mjs`'s header carries
 // the measurement behind each one, and `__tests__/driveline.test.mjs` pins
 // both halves — the arithmetic AND the fact that this file still calls it.
-import {
-  CABIN_BLOCKER_SEL,
-  cabinActuationSafe,
-  CAR_SHEET_LABEL,
-  DRIVELINE_CARD_SEL,
-  ERROR_BOUNDARY_RETRIES,
-  ERROR_BOUNDARY_RETRY_LABEL,
-  errorBoundaryVerdict,
-  OVER_CAP_MARGIN_KMH,
-  OVER_CAP_MAX_M,
-  OVER_CAP_MAX_MS,
-  overCapHold,
-  PARKING_BRAKE_CARD_RE,
-  PARKING_BRAKE_LABEL,
-  parkingBrakeRoute,
-  parkingBrakeVerdict,
-  passRate,
-  rateVerdict,
-  releaseVerdict,
-  SEATBELT_LABEL,
-  STUCK_START_OTHER_RE,
-  taskCapKmh,
-} from "./lib/driveline.mjs";
+import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, cabinActuationSafe, errorBoundaryVerdict, overCapHold, parkingBrakeRoute, parkingBrakeVerdict, passRate, rateVerdict, releaseVerdict, taskCapKmh } from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -4391,7 +4369,12 @@ async function releaseParkingBrake(kmhBefore, repress) {
     return null;
   }
   parkingBrake.attempted = true;
-  if (plan.route === "pill") {
+  if (plan.route === "key") {
+    // The product's own binding, pressed only because nothing a student could
+    // touch exists on this lane. Verified the same way every other route is —
+    // by the re-press below, which asks the CAR rather than the DOM.
+    await page.keyboard.press(PARKING_BRAKE_KEY).catch(() => {});
+  } else if (plan.route === "pill") {
     // The SHEET's cell, not any button carrying the label — scoped for the
     // same reason the «ПРОЧЕТИ» drain had to be scoped to the open sheet.
     await page
