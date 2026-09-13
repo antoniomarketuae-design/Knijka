@@ -131,6 +131,38 @@ export { MIN_COMPONENT_PX, chevronAim, classify, createFurnitureRegister, labelC
  *
  * The last clause is the load-bearing one and it was measured: without it the
  * scan picked up the «ПРОЧЕТИ»/«РАЗБРАХ» pills and the demo car's blue path.
+ *
+ * ── TWO RELAXATIONS WERE PRICED AGAINST w41 AND BOTH WERE REFUSED ─────────
+ *
+ * 834 of 4,423 moving samples over w41's 82 `right` legs scan the band and
+ * find ZERO pixels here (18.86 %). Two loosenings would each move that, and
+ * neither pays for itself. Both are pinned by §1b of
+ * `tools/mobile/__tests__/guidance.test.mjs`, with the real RGB triples.
+ *
+ *   · THE WEATHER-WASHED RIBBON. The spray shader on sc-ac-truck-spray takes
+ *     #17e1c4 (g−r 202, b−r 173) down to g−r 22-32 / b−r 9-20 — real ribbon,
+ *     on the carriageway, refused. `g − r > 20 && b − r > 10` recovers 11 of
+ *     the 174 measurable zeros (→ ~17.66 %) and, on 110 frames that already
+ *     held a healthy sighting, admits 2.31x the band mass at the median and
+ *     more than DOUBLES it on 80 of the 110. CONFIDENT_BAND_PX is a mass
+ *     gate; that trade buys four weather lessons and inflates every drive.
+ *
+ *   · THE SHADOW CAR'S BLUE PATH. It fails only `g >= b`, on the blended edge
+ *     by 4 units. Dropping the clause recovers 8 of the 174 (→ ~18.00 %) and
+ *     re-admits the whole interface. It would have to be a SEPARATE channel
+ *     with its own shape gate, and whether that line may steer the harness at
+ *     all is a product decision — the legend calls it «пътят на колата-сянка»
+ *     while this scan follows «маршрутът до целта».
+ *
+ * AND THE BAND ITSELF WAS EXONERATED, so no geometry change follows either:
+ * out-of-band teal on pc is a 1,202 px CONSTANT (82 % of 61 frames within
+ * 1150-1250) spread over ~20 unrelated lessons — the advisor pill above the
+ * canvas and the legend strip below the cowl. Widening the band imports it.
+ * On mobile, 66 % of the measurable zeros hold no teal ANYWHERE on a
+ * 2556x1179 canvas: the ribbon is not rendered, which is a product bug and
+ * not this file's to fix. Zeros are 33.9 % of moving samples on the 36 legs
+ * whose run.log records the car off the carriageway and 6.1 % on the other
+ * 46 — the blindness is 5.5x downstream of a steering failure, not upstream.
  */
 export function isRibbonPixel(r, g, b) {
   return g > 110 && g - r > 55 && b - r > 25 && g >= b;

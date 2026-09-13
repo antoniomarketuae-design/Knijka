@@ -311,6 +311,36 @@ import {
   observeHazardTick,
   parseHazard,
 } from "./lib/hazard.mjs";
+// THE FOUR CAPABILITIES THE HARNESS DID NOT HAVE — the parking brake, the
+// task cap a `wrong` leg has to be seen to beat, the pass-rate arithmetic of a
+// repeated lesson, and the product's own error boundary. Pure, browser-free
+// and therefore testable without driving; the page side (three scoped
+// `evaluate`s and the presses) is here. `lib/driveline.mjs`'s header carries
+// the measurement behind each one, and `__tests__/driveline.test.mjs` pins
+// both halves — the arithmetic AND the fact that this file still calls it.
+import {
+  CABIN_BLOCKER_SEL,
+  cabinActuationSafe,
+  CAR_SHEET_LABEL,
+  DRIVELINE_CARD_SEL,
+  ERROR_BOUNDARY_RETRIES,
+  ERROR_BOUNDARY_RETRY_LABEL,
+  errorBoundaryVerdict,
+  OVER_CAP_MARGIN_KMH,
+  OVER_CAP_MAX_M,
+  OVER_CAP_MAX_MS,
+  overCapHold,
+  PARKING_BRAKE_CARD_RE,
+  PARKING_BRAKE_LABEL,
+  parkingBrakeRoute,
+  parkingBrakeVerdict,
+  passRate,
+  rateVerdict,
+  releaseVerdict,
+  SEATBELT_LABEL,
+  STUCK_START_OTHER_RE,
+  taskCapKmh,
+} from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -392,6 +422,123 @@ try {
 export const BASE = BASE_RESOLVED;
 
 mkdirSync(OUT, { recursive: true });
+
+/* ── KNIJKA_REPEAT — DRIVE THE SAME LESSON N TIMES AND PUBLISH THE RATE ─────
+ *
+ * `sc-ln-obstacle-meeting:114706e0` is a CRITICAL row about a PASS RATE: eight
+ * consecutive drives of pc-right against commit 641a4475c0ac with an unchanged
+ * worktree returned six НЕИЗДЪРЖАН, one ИЗДЪРЖАН and one НЕЗАВЪРШЕН — 13% on
+ * the drive the lesson itself defines as correct. w41 drove it once, and the
+ * judge refused to rule: „One draw can neither confirm nor refute 13%."
+ *
+ * THIS IS A SERIES OF REAL LANES, NOT A LOOP INSIDE ONE. Each repetition is a
+ * fresh process with its own browser, its own sign-in, its own target
+ * attestation and its own `_audit-status.json` in its own directory. That is
+ * not laziness: a rate measured inside one process would share a warmed page,
+ * a warmed Turbopack cache and one attestation, and the bimodality the row
+ * describes (140–170 s / 29–33 frames against 269–271 s / 50–54 frames) is
+ * exactly the kind of thing a shared process flattens. It also means the tree
+ * is re-checked between drives, so a series that straddles a commit SAYS SO
+ * instead of averaging two builds.
+ *
+ * THE DEFAULT IS UNCHANGED. Unset, empty, `0` or `1` and this block does
+ * nothing at all — every existing caller invokes exactly the same single
+ * drive it always did, on the same path, with the same exit code.
+ *
+ * WHAT IT REFUSES TO SAY. `passRate` publishes no rate below two JUDGEABLE
+ * drives, and „judgeable" is `exit === 0` — a lane that never started is a
+ * draw of the harness, not of the lesson, and must not enter the denominator.
+ * The parent's own exit is 0 only if every child exited 0: a series with a
+ * dead lane in it is incomplete evidence, and `wave-c-merge.mjs` refuses to
+ * certify a non-zero exit, which is the behaviour we want here.
+ */
+const REPEAT_N = Math.max(0, Math.trunc(Number(process.env.KNIJKA_REPEAT ?? 0) || 0));
+if (REPEAT_N >= 2) {
+  const { spawnSync } = await import("node:child_process");
+  const SELF = fileURLToPath(import.meta.url);
+  const pad = (i) => String(i).padStart(2, "0");
+  const say = (s) => { try { console.log(s); } catch { /* the disk is gone; the JSON below is the record */ } };
+  say(`=== ${SCENARIO} · ${PLATFORM} · ${MODE} · REPEAT SERIES ×${REPEAT_N} ===`);
+  say(
+    `  a rate claim cannot be measured from one draw. Each run below is a separate process with its own browser, ` +
+      `sign-in and target attestation, writing into ${OUT}/rep-NN.`,
+  );
+  const runs = [];
+  for (let i = 1; i <= REPEAT_N; i++) {
+    const dir = `${OUT}/rep-${pad(i)}`;
+    const env = { ...process.env };
+    // WITHOUT THIS THE SERIES IS INFINITE. Deleted rather than set to "1",
+    // because `1` is also the "no series" value and a future reader must not
+    // have to know that to see why the recursion stops.
+    delete env.KNIJKA_REPEAT;
+    const startedAt = Date.now();
+    const r = spawnSync(process.execPath, [SELF, dir, SCENARIO, PLATFORM, MODE], { env, stdio: "inherit" });
+    const ms = Date.now() - startedAt;
+    // THE CHILD'S OWN STATUS FILE IS THE RECORD, NOT THE EXIT CODE ALONE. An
+    // exit code cannot carry a verdict, and the verdict is the whole point.
+    let st = null;
+    try { st = JSON.parse(readFileSync(`${dir}/_audit-status.json`, "utf8")); } catch { /* the lane may not have got that far */ }
+    const exit = r.status === null ? 4 : r.status;
+    runs.push({
+      i,
+      dir,
+      exit,
+      signal: r.signal ?? null,
+      ms,
+      verdict: st?.verdict ?? null,
+      score: st?.score ?? null,
+      endedNaturally: st?.endedNaturally ?? null,
+      forcedBy: st?.forcedBy ?? null,
+      topKmh: st?.speed?.topKmh ?? null,
+      frames: st?.framesWritten ?? null,
+      framesLost: st?.framesLost ?? null,
+      driveClass: st?.drive?.class ?? null,
+      head: st?.target?.head ?? null,
+      dirty: st?.target?.dirtyCount ?? null,
+    });
+    say(
+      `  [rep-${pad(i)}] exit ${exit} · ${st?.verdict ?? "(no verdict surface)"} · ${st?.score ?? "?"} наказ. т. · ` +
+        `top ${st?.speed?.topKmh ?? "?"} км/ч · ${st?.framesWritten ?? "?"} frame(s) · ${Math.round(ms / 1000)}s · ` +
+        `drive ${st?.drive?.class ?? "?"}`,
+    );
+  }
+  const rate = passRate(runs);
+  const series = {
+    scenario: SCENARIO, platform: PLATFORM, mode: MODE, repeat: REPEAT_N,
+    finishedAt: new Date().toISOString(),
+    runs, rate,
+    // The row this capability exists to settle quotes 1/8. It is compared here
+    // rather than left to a reader's arithmetic, and it is allowed to answer
+    // "cannot-say" — a two-run series whose interval spans everything has
+    // refuted nothing, and saying so is the whole discipline.
+    against: { claim: 1 / 8, ...rateVerdict(rate, 1 / 8) },
+  };
+  try { writeFileSync(`${OUT}/_audit-repeat.json`, `${JSON.stringify(series, null, 2)}\n`); } catch { /* best effort, as everywhere else on this disk */ }
+  // …AND A STATUS FILE, so a lane reader is not told "never dispatched" about
+  // a directory holding N complete drives. `phase` names what this folder is;
+  // it deliberately carries no `drive` block, because a series is not a drive.
+  try {
+    writeFileSync(
+      `${OUT}/_audit-status.json`,
+      `${JSON.stringify({
+        scenario: SCENARIO, platform: PLATFORM, mode: MODE,
+        phase: "repeat-series", repeat: REPEAT_N,
+        exit: runs.every((r) => r.exit === 0) ? EXIT_JUDGEABLE : EXIT_EVIDENCE_INCOMPLETE,
+        rate, runs: runs.map(({ i, dir, exit, verdict }) => ({ i, dir, exit, verdict })),
+      }, null, 2)}\n`,
+    );
+  } catch { /* best effort */ }
+  const pct = (x) => (x === null ? "—" : `${(x * 100).toFixed(0)}%`);
+  say(`--- MACHINE SUMMARY (${SCENARIO}/${PLATFORM}/${MODE} · repeat ×${REPEAT_N}) ---`);
+  say(`  dispatched ${rate.dispatched} · judgeable ${rate.n} · ИЗДЪРЖАН ${rate.counts.pass} · НЕИЗДЪРЖАН ${rate.counts.fail} · НЕЗАВЪРШЕН ${rate.counts.unfinished} · no-verdict ${rate.counts.unknown}`);
+  say(`  PASS RATE: ${pct(rate.point)}  95% ${pct(rate.lo95)}–${pct(rate.hi95)}  —  ${rate.why}`);
+  say(`  against the filed 13% claim: ${series.against.verdict.toUpperCase()} — ${series.against.why}`);
+  if (!rate.buildStable) {
+    say(`  !! THE TREE MOVED DURING THIS SERIES (${rate.heads.length} distinct HEADs: ${rate.heads.join(", ")}) — the rate above is not about one build.`);
+  }
+  say(`  series JSON: ${OUT}/_audit-repeat.json`);
+  process.exit(runs.every((r) => r.exit === 0) ? EXIT_JUDGEABLE : EXIT_EVIDENCE_INCOMPLETE);
+}
 
 const log = [];
 /**
@@ -1237,6 +1384,96 @@ await page.waitForTimeout(25_000);
 
 note(`=== ${SCENARIO} · ${PLATFORM} · ${MODE} ===`);
 saveStatus({ phase: "arrived" });
+
+/* ── DID THE SEGMENT FALL TO ITS ERROR BOUNDARY? ────────────────────────────
+ *
+ * `.audit-frames/w41/frames/sc-vu-emergency__mobile-right/` is the whole
+ * argument: 10 frames and ~200 s of drive spent photographing
+ * `app/(dashboard)/error.tsx` — «Системен доклад · Нещо се обърка · Код:
+ * 1262971832» — after the dev server's socket timed out («ServerConnection
+ * terminated due to connection timeout», caught in this file's own stripped
+ * next-overlay note on 01-arrival). Every beat read −1 км/ч, no gear ever, the
+ * camera «(unset)», and the lane's paint finding (`sc-vu-emergency:011b0e98`,
+ * a MOBILE claim) went UNJUDGED for want of a lane that reached a lesson.
+ *
+ * The verdict at the end was already right — exit 7, RE-DRIVE — but it had to
+ * hedge, in `classifyDrive`'s own words: „a paywall on an unentitled session
+ * and a lesson that crashed into its error boundary leave the same silence".
+ * THEY DO NOT. One of them prints two named sentences and carries its own
+ * recovery button, and `unstable_retry()` is documented on that component as
+ * the thing that makes „transient DB/network hiccups recover in place".
+ *
+ * So this reads the two sentences, presses the product's own control a bounded
+ * number of times, and only then gives up — with the digest, which is the line
+ * that joins this folder to the server log. The exit code is unchanged; what
+ * changes is that the lane costs seconds instead of minutes and that the
+ * folder can no longer be mistaken for the paywall.
+ */
+const readBoundary = () =>
+  page
+    .evaluate(
+      (retryLabel) => ({
+        // `textContent`, not `innerText`: the boundary is a static card and a
+        // layout flush buys nothing. Whole document, because the boundary
+        // REPLACES the segment — there is no shell to scope to.
+        text: (document.body?.textContent ?? "").replace(/\s+/g, " ").slice(0, 2000),
+        shell: document.querySelector("[data-sim-shell]") !== null,
+        retryPresent: [...document.querySelectorAll("button")].some((b) =>
+          (b.textContent ?? "").includes(retryLabel),
+        ),
+      }),
+      ERROR_BOUNDARY_RETRY_LABEL,
+    )
+    .catch(() => ({ text: "", shell: false, retryPresent: false }));
+
+let boundary = errorBoundaryVerdict(await readBoundary());
+if (boundary.boundaried) {
+  loud(
+    `THE LESSON SEGMENT FELL TO ITS ERROR BOUNDARY — ${boundary.why} Pressing the product's own ` +
+      `«${ERROR_BOUNDARY_RETRY_LABEL}» up to ${ERROR_BOUNDARY_RETRIES}× before giving up.`,
+  );
+  await shot("01x-error-boundary");
+  for (let i = 1; i <= ERROR_BOUNDARY_RETRIES && boundary.boundaried; i++) {
+    const retry = page.locator(`button:has-text("${ERROR_BOUNDARY_RETRY_LABEL}")`).first();
+    if (await retry.count().catch(() => 0)) {
+      await retry.click({ timeout: 6000 }).catch(() => {});
+    } else {
+      // The boundary is up and its own control is not reachable — a full
+      // re-navigation is the only thing left, and it is bounded by the same
+      // counter so this cannot become a loop.
+      await page.goto(`${BASE}/simulator?scenario=${SCENARIO}&level=1`, { waitUntil: "domcontentloaded", timeout: 300_000 }).catch(() => {});
+    }
+    await page.waitForTimeout(20_000);
+    boundary = errorBoundaryVerdict(await readBoundary());
+    note(`      retry ${i}/${ERROR_BOUNDARY_RETRIES}: ${boundary.boundaried ? "still boundaried" : "the segment came back"}`);
+  }
+}
+saveStatus({ errorBoundary: boundary });
+if (boundary.boundaried) {
+  // NOT `classifyDrive`. That ladder reads a whole drive's instruments and
+  // this lane has none — it would fall through its two-reader bar and return
+  // something softer than the truth. The class, the exit and the redrive flag
+  // still come from `DRIVE_CLASSES`, so nothing downstream sees a shape it
+  // does not know; only the `why` is ours, and ours is the specific one.
+  const cls = DRIVE_CLASSES["never-started"];
+  const why =
+    `THE SEGMENT FELL TO ITS ERROR BOUNDARY AND ${ERROR_BOUNDARY_RETRIES} PRESS(ES) OF «${ERROR_BOUNDARY_RETRY_LABEL}» DID NOT ` +
+    `RECOVER IT. ${boundary.why} This is NOT the paywall and it is NOT a lesson that refused to grade: it is ` +
+    `app/(dashboard)/error.tsx over a segment that threw. No finding may be filed off this folder. RE-DRIVE this lane` +
+    `${boundary.digest ? ` and grep the server log for digest ${boundary.digest}` : ""}.`;
+  loud(why);
+  await beat("01-arrival");
+  saveStatus({
+    phase: "error-boundary",
+    why,
+    exit: EXIT_DRIVE_NEVER_STARTED,
+    drive: { class: "never-started", exit: cls.exit, redrive: cls.redrive, headline: cls.headline, tag: cls.tag, why, looked: ["the error-boundary reader"], alive: [] },
+  });
+  try { writeFileSync(`${OUT}/_audit-transcript.log`, `${log.join("\n")}\n`); } catch { /* the disk is gone */ }
+  await browser.close().catch(() => {});
+  process.exit(EXIT_DRIVE_NEVER_STARTED);
+}
+
 await beat("01-arrival");
 
 // THE FULL BRIEFING — open the sheet, read it, and CLOSE IT AGAIN. The close is
@@ -3899,6 +4136,308 @@ const POSITIVE_CONTROL_POLL_MS = 250;
  *  moving latch even after the dial's rounding — see the note above. */
 const POSITIVE_CONTROL_MOVING_KMH = 6;
 
+/* ── THE LEVER, AND WHY «CAR DID NOT MOVE» WAS AN ACCUSATION ────────────────
+ *
+ * MEASURED, all four `sc-vp-readiness` lanes of w41 and `sc-vu-emergency`'s
+ * pc-wrong: `POSITIVE CONTROL: 0 км/ч after 5.1 s of throttle`, `cockpit
+ * { reads: 336, speedReadable: 335, gears: ["D"], movingReads: 0 }`, and — in
+ * the same second — `steering.channel.state: "live"` («the wheel went over and
+ * the world answered — left 151 px ≈5.2°, right −153 px ≈−5.3°»). A world that
+ * renders, a wheel that works, a gear letter reading D, and a car that will
+ * not leave zero. The judge who refused three rows off those lanes wrote the
+ * fix into the refusal: „a harness that releases the handbrake (РЪЧНА) before
+ * the throttle".
+ *
+ * THE PRODUCT IS RIGHT AND THE HARNESS WAS BLIND. `scene/cabin.ts` hands
+ * `sc-vp-readiness` and `sc-vp-handbrake` — and only those two, derived from
+ * their own briefings and pinned by `scene/spawnParkingBrake.test.ts` — a car
+ * with the lever UP, because a hand-over that has already performed the
+ * lesson's own step 2 («Свали ръчната спирачка докрай») falsifies the lamp
+ * sentence the briefing calls the sole verification instrument. A census of
+ * this file for `РЪЧНА`, `handbrake`, `parkingBrake` or `Space` returned
+ * nothing at all.
+ *
+ * FOUR PROPERTIES, EACH ONE PAID FOR BY A FAILURE THIS PROGRAMME HAS ALREADY
+ * HAD, and all four are `lib/driveline.mjs`'s to decide — this is the page
+ * side only:
+ *
+ *  1. IT READS BEFORE IT PRESSES. Every one of these controls is a TOGGLE, so
+ *     a press made on a belief rather than a reading immobilises a free car
+ *     and then reports a release. `parkingBrakeVerdict` is three-valued and
+ *     `null` REFUSES.
+ *  2. IT READS THE PRODUCT'S OWN SENTENCE, not `read().strings`. That census
+ *     breaks at `strings.length >= 26` and the pc page spends all 26 on the
+ *     toolbar, the demonstration deck and the tier picker — which is why the
+ *     w41 pc log shows no held-car card while
+ *     `sc-vp-readiness__pc-right/04-t005s.png` has it on the glass, bottom
+ *     right, in full: «Ръчната спирачка е вдигната — колата е задържана».
+ *  3. IT ACTUATES THE PRODUCT'S OWN CONTROL, not the key. See the long note on
+ *     `PARKING_BRAKE_KEY` in lib/driveline.mjs: `Space` would turn the closed
+ *     keyboard-grammar census in platform/src red, and that file is not this
+ *     lane's to write. The «РЪЧНА» cell and the cockpit hotspot reach the
+ *     identical `CabinControls.toggleParkingBrake()`.
+ *  4. IT VERIFIES, AND ITS STRONGEST WITNESS IS THE CAR. `releaseVerdict`
+ *     takes the state either side of the press AND the dial either side of a
+ *     re-press of the throttle. A lever that comes off a car something ELSE is
+ *     holding is a third fact and is reported as one, not as a failed release.
+ *
+ * ── IT RUNS ON THE `wrong` LANE TOO, AND THAT IS AN ARGUMENT, NOT AN OVERSIGHT
+ *
+ * The reflex is that a reckless lane should leave the lever up and let the
+ * engine convict it. It cannot: `HANDBRAKE_LEFT_ON` needs `moving &&
+ * parkingBrakeOn` above 5 км/ч sustained 1.5 s (rules/types.ts), and
+ * `PARKING_BRAKE_FORCE_N` holds the car at a measured maximum of 0.32 км/ч —
+ * a fifteenth of the threshold — so from a standstill the fault is
+ * UNREACHABLE by construction, and `scene/cabin.ts` says so in as many words.
+ * A wrong lane that keeps the lever up therefore books nothing because the car
+ * never moves, which is indistinguishable in the debrief from the product
+ * failing to grade — and is exactly the 0-опасни/0-основни/0-второстепенни
+ * that three sc-vp-readiness rows are about. Releasing it and RECORDING that
+ * it was up is what makes those two apart: `parkingBrake.held` says the lever
+ * was up at hand-over, and the question of whether an unreleased lever should
+ * cost a student anything is a conviction question for the founder, not
+ * something this instrument may settle by refusing to drive.
+ */
+const readDriveline = () =>
+  page
+    .evaluate(
+      ({ brakeLabel, beltLabel, sheetLabel, cardSrc, otherSrc, cardSel, blockerSel }) => {
+        const shell = document.querySelector("[data-sim-shell]");
+        // The same ancestor-chain test `read()` uses, for the same reason: a
+        // card that is in the DOM and not on the glass must not witness
+        // anything, and a degenerate border box is not proof of that.
+        const painted = (el) => {
+          for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+            const cs = getComputedStyle(n);
+            if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0) return false;
+            if (cs.contentVisibility === "hidden") return false;
+          }
+          const r = el.getBoundingClientRect();
+          if (r.width >= 1 && r.height >= 1) return true;
+          for (const q of el.getClientRects()) if (q.width >= 1 && q.height >= 1) return true;
+          return false;
+        };
+        // BOTH surfaces carry `aria-label="Контроли на автомобила"` — the ⚙
+        // «Кола» button that opens the sheet and the sheet itself. Told apart
+        // by ROLE, never by the label, or the opener and the strip are one
+        // selector and the click is a lottery.
+        const sheet = document.querySelector(`[role="toolbar"][aria-label="${sheetLabel}"]`);
+        const opener = [...document.querySelectorAll(`button[aria-label="${sheetLabel}"]`)].find(painted) ?? null;
+        const cellOf = (label) => (sheet ? sheet.querySelector(`button[aria-label="${label}"]`) : null);
+        const pressedOf = (el) => {
+          if (!el) return null;
+          const v = el.getAttribute("aria-pressed");
+          return v === "true" ? true : v === "false" ? false : null;
+        };
+        const pillEl = cellOf(brakeLabel);
+        let card = false;
+        let otherBlocker = false;
+        const cardRe = new RegExp(cardSrc, "u");
+        const otherRe = new RegExp(otherSrc, "u");
+        for (const el of (shell ?? document).querySelectorAll(cardSel)) {
+          if (!painted(el)) continue;
+          const t = (el.textContent ?? "").replace(/\s+/g, " ");
+          if (cardRe.test(t)) card = true;
+          else if (otherRe.test(t)) otherBlocker = true;
+        }
+        const blockEl = [...document.querySelectorAll(blockerSel)].find(painted) ?? null;
+        // THE COCKPIT CHIP, for the lane that has no sheet. `VitokCockpit`
+        // renders it through drei's <Html>, i.e. a real DOM node parked at the
+        // projected screen point of the hotspot mesh, with
+        // `pointer-events: none` so it can never steal the click it is asking
+        // for — which is exactly what makes its CENTRE a usable aim point: the
+        // click falls through to the mesh underneath. Leaf-only, so the chip's
+        // wrapper does not also match and move the aim off the control.
+        let chip = null;
+        for (const el of document.querySelectorAll("span, div")) {
+          if ((el.textContent ?? "").trim() !== brakeLabel) continue;
+          if (el.querySelector("*")) continue;
+          if (sheet && sheet.contains(el)) continue;
+          if (!painted(el)) continue;
+          const r = el.getBoundingClientRect();
+          chip = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+          break;
+        }
+        return {
+          shell: shell !== null,
+          sheetOpen: sheet !== null,
+          sheetOpener: opener !== null,
+          pillPresent: pillEl !== null,
+          pill: pressedOf(pillEl),
+          belt: pressedOf(cellOf(beltLabel)),
+          card,
+          otherBlocker,
+          hotspotChip: chip !== null,
+          chipAt: chip,
+          blocker: blockEl
+            ? blockEl.getAttribute("aria-label") ??
+              blockEl.getAttribute("data-sim-overlay") ??
+              blockEl.getAttribute("data-hud") ??
+              "a modal layer"
+            : null,
+        };
+      },
+      {
+        brakeLabel: PARKING_BRAKE_LABEL,
+        beltLabel: SEATBELT_LABEL,
+        sheetLabel: CAR_SHEET_LABEL,
+        cardSrc: PARKING_BRAKE_CARD_RE.source,
+        otherSrc: STUCK_START_OTHER_RE.source,
+        cardSel: DRIVELINE_CARD_SEL,
+        blockerSel: CABIN_BLOCKER_SEL,
+      },
+    )
+    .catch(() => ({
+      shell: false, sheetOpen: false, sheetOpener: false, pillPresent: false,
+      pill: null, belt: null, card: false, otherBlocker: false,
+      hotspotChip: false, chipAt: null, blocker: null,
+    }));
+
+/** Everything the release did, published whole. `attempted:false` with a
+ *  `refusal` is a real answer and a reader must be able to tell it from „the
+ *  release was never considered on this lane". */
+const parkingBrake = {
+  looked: false, held: null, witnesses: [], conflict: false,
+  attempted: false, route: null, refusal: null,
+  released: null, releasedBy: null, why: null,
+  kmhBefore: null, kmhAfter: null,
+  beltAtLook: null, sheetOpenedByUs: false, sheetClosed: null,
+};
+
+/**
+ * Release it, but only where the car is actually held — and prove it came off.
+ * Returns the dial after the re-press, or `null` when nothing was attempted.
+ */
+async function releaseParkingBrake(kmhBefore, repress) {
+  const before = await readDriveline();
+  parkingBrake.looked = true;
+  parkingBrake.kmhBefore = kmhBefore;
+  parkingBrake.beltAtLook = before.belt;
+  const verdict = parkingBrakeVerdict(before);
+  parkingBrake.held = verdict.held;
+  parkingBrake.witnesses = verdict.by;
+  parkingBrake.conflict = verdict.conflict;
+  if (verdict.held !== true) {
+    parkingBrake.refusal = verdict.why;
+    note(`  PARKING BRAKE: NOT RELEASED — ${verdict.why}.`);
+    return null;
+  }
+  const safe = cabinActuationSafe(before);
+  if (!safe.safe) {
+    parkingBrake.refusal = safe.why;
+    loud(`THE LEVER IS UP AND NOTHING MAY BE PRESSED — ${safe.why}.`);
+    return null;
+  }
+  let at = before;
+  // ROUTE «sheet» is route «pill» with one more press in front of it: the
+  // «РЪЧНА» cell only exists in the DOM while the sheet is open
+  // (`TouchControls.tsx:3299` — `{sheetOpen ? …`), so the sheet is opened,
+  // read again, and CLOSED at the end whatever happens. It suppresses two HUD
+  // elements and pauses nothing (`LessonScene.tsx:2928,2938`), so the drive
+  // that follows is unaffected — but an open sheet left behind would sit over
+  // the road in every frame after this.
+  const closeSheet = async () => {
+    if (!parkingBrake.sheetOpenedByUs) return;
+    await page.locator(`button[aria-label="${CAR_SHEET_LABEL}"]`).first().click({ timeout: 6000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    const now = await readDriveline();
+    parkingBrake.sheetClosed = now.sheetOpen === false;
+    if (!parkingBrake.sheetClosed) {
+      loud(`THE DRIVELINE SHEET WOULD NOT CLOSE — it stands over the road in every frame after this one.`);
+    }
+    return now;
+  };
+  let plan = parkingBrakeRoute(at);
+  if (plan.route === "sheet") {
+    await page.locator(`button[aria-label="${CAR_SHEET_LABEL}"]`).first().click({ timeout: 6000 }).catch(() => {});
+    await page.waitForTimeout(700);
+    at = await readDriveline();
+    parkingBrake.sheetOpenedByUs = at.sheetOpen === true;
+    plan = parkingBrakeRoute(at);
+    /* ── THE VERDICT IS RE-TAKEN, BECAUSE OPENING THE SHEET ADDED A WITNESS ──
+     * `before` was read with the sheet CLOSED, so on a touch lane the pill was
+     * `null` and the card carried the verdict alone. The sheet is where the
+     * pill lives, so the reading that decides the press must be the one taken
+     * with it open — otherwise a card outliving its state would toggle the
+     * lever UP on a car whose pill is right there saying it is already down.
+     * That is the conflict case `parkingBrakeVerdict` exists to refuse, and
+     * checking it only on the earlier read is checking it where it cannot
+     * fire. */
+    const second = parkingBrakeVerdict(at);
+    parkingBrake.held = second.held;
+    parkingBrake.witnesses = second.by;
+    parkingBrake.conflict = second.conflict;
+    if (second.held !== true) {
+      await closeSheet();
+      parkingBrake.refusal = second.why;
+      loud(`THE SHEET OPENED AND ITS «РЪЧНА» CELL DISAGREES WITH THE CARD — ${second.why}. Nothing pressed.`);
+      return null;
+    }
+  }
+  parkingBrake.route = plan.route;
+  if (plan.route === null || (plan.route === "hotspot" && !at.chipAt)) {
+    // THE SHEET GOES BACK EVEN ON THE FAILING PATH. The first draft returned
+    // here without closing it, which is the same class of defect as the
+    // «ПРОЧЕТИ» sheet that stayed open and froze a world: a refusal that
+    // leaves a panel over the road has changed the drive it declined to fix.
+    await closeSheet();
+    parkingBrake.refusal = plan.why;
+    loud(
+      `THE LEVER IS UP AND THIS LANE HAS NO CONTROL TO PRESS — ${plan.why}. Every frame after this is a HELD car, ` +
+        `not a frozen world and not a dead channel: the cockpit answers, the wheel is live, and the product is ` +
+        `printing «Ръчната спирачка е вдигната». NO finding about this drive's speed, route, tracking or grading may ` +
+        `be filed off this lane.`,
+    );
+    return null;
+  }
+  parkingBrake.attempted = true;
+  if (plan.route === "pill") {
+    // The SHEET's cell, not any button carrying the label — scoped for the
+    // same reason the «ПРОЧЕТИ» drain had to be scoped to the open sheet.
+    await page
+      .locator(`[role="toolbar"][aria-label="${CAR_SHEET_LABEL}"] button[aria-label="${PARKING_BRAKE_LABEL}"]`)
+      .first()
+      .click({ timeout: 6000 })
+      .catch(() => {});
+  } else {
+    // The chip is `pointer-events: none`, so this lands on the canvas and is
+    // raycast onto `hotspot_parking_brake` → `runAction({type:
+    // "parkingBrakeToggle"})` → the same `CabinControls.toggleParkingBrake()`.
+    await page.mouse.click(at.chipAt.x, at.chipAt.y).catch(() => {});
+  }
+  await page.waitForTimeout(900);
+  let after = await readDriveline();
+  // READ BEFORE CLOSING, then re-read after: the pill only exists while the
+  // sheet is open, so the `after` that `releaseVerdict` compares against has
+  // to be taken with the sheet still up or the pill witness reads `null` on
+  // every touch lane and the verification falls back to the weakest one.
+  if (after.sheetOpen) {
+    const closed = await closeSheet();
+    // …and if the sheet would not close, the LATER read is the honest one for
+    // every field except the pill, which the earlier read already has.
+    if (closed) after = { ...closed, pill: after.pill, pillPresent: after.pillPresent };
+  }
+  // THE VERIFICATION IS THE RE-PRESS. A pill that flipped is one hop from the
+  // driveline boolean and a card that cleared is a queued notification; the
+  // car leaving zero under the same throttle that could not move it is the
+  // only witness that cannot be argued with, so it is asked for last and
+  // weighted first.
+  const kmhAfter = await repress();
+  parkingBrake.kmhAfter = kmhAfter;
+  const rv = releaseVerdict({ before, after, kmhBefore, kmhAfter });
+  parkingBrake.released = rv.released;
+  parkingBrake.releasedBy = rv.by;
+  parkingBrake.why = rv.why;
+  if (rv.released === true) {
+    note(`  PARKING BRAKE: RELEASED via ${plan.route === "pill" ? "«РЪЧНА»" : "the cockpit hotspot"} — ${rv.why}.`);
+  } else if (rv.released === false) {
+    loud(`THE PARKING BRAKE WAS PRESSED AND DID NOT COME OFF — ${rv.why}. This lane is a HELD car.`);
+  } else {
+    loud(`THE PARKING BRAKE PRESS CANNOT BE VERIFIED — ${rv.why}.`);
+  }
+  return kmhAfter;
+}
+
 const exitIsBackwards = await reverseDemand();
 /** What the positive control did, published whole. `deferred` is a real answer
  *  and a reader must be able to tell it from „the control was never run". */
@@ -3920,17 +4459,27 @@ if (exitIsBackwards !== null) {
   );
 } else {
   positiveControl.direction = "forward";
-  const pressedAt = Date.now();
-  await throttle(true);
-  while (Date.now() - pressedAt < POSITIVE_CONTROL_MS) {
-    await page.waitForTimeout(POSITIVE_CONTROL_POLL_MS);
-    moved = (await read()).kmh;
-    if (moved >= POSITIVE_CONTROL_MOVING_KMH) break;
-  }
-  // THE RELEASE IS THE REPAIR. Everything above it only decides how long the
-  // press lasts; this line is what stops the burst bleeding into the drive.
-  await throttle(false);
-  positiveControl.heldMs = Date.now() - pressedAt;
+  // THE PRESS IS A FUNCTION NOW BECAUSE IT IS MADE TWICE. Not a loop and not a
+  // retry: the second press is the VERIFICATION of a parking-brake release,
+  // and it has to be the identical gesture or it proves nothing. Everything
+  // inside it is byte-for-byte the press that was here before.
+  const pressForAnswer = async () => {
+    const pressedAt = Date.now();
+    await throttle(true);
+    let kmh = 0;
+    while (Date.now() - pressedAt < POSITIVE_CONTROL_MS) {
+      await page.waitForTimeout(POSITIVE_CONTROL_POLL_MS);
+      kmh = (await read()).kmh;
+      if (kmh >= POSITIVE_CONTROL_MOVING_KMH) break;
+    }
+    // THE RELEASE IS THE REPAIR. Everything above it only decides how long the
+    // press lasts; this line is what stops the burst bleeding into the drive.
+    await throttle(false);
+    return { kmh, heldMs: Date.now() - pressedAt };
+  };
+  const first = await pressForAnswer();
+  moved = first.kmh;
+  positiveControl.heldMs = first.heldMs;
   positiveControl.kmh = moved;
   movedKnown = true;
   note(
@@ -3938,11 +4487,36 @@ if (exitIsBackwards !== null) {
       `${moved >= POSITIVE_CONTROL_MOVING_KMH ? ` (released on the product's own ${POSITIVE_CONTROL_MOVING_KMH} км/ч moving latch — the pedal is UP entering the drive)` : ` (the full ${POSITIVE_CONTROL_MS / 1000} s ceiling; pedal released)`}`,
   );
   if (moved <= 0) {
-    loud(`CAR DID NOT MOVE — every frame after this is a frozen world, not a drive.`);
+    // ── THE LEVER IS ASKED ABOUT HERE AND NOWHERE EARLIER ──────────────────
+    // Not before the press, and that is the whole timing argument: the
+    // product's own held-car sentence needs `STUCK_START_HINT_S` = 1.2 s of
+    // CONTINUOUS throttle at a standstill before it will speak
+    // (`engine/stuckStart.ts:156`), so a reading taken on an untouched car
+    // sees nothing on either device and the release would be made blind. The
+    // five seconds that have just failed are what put the witness on the
+    // glass.
+    const after = await releaseParkingBrake(moved, async () => (await pressForAnswer()).kmh);
+    if (after !== null && after > moved) {
+      // The whole-drive question is „was there ever a moving car", and after a
+      // verified release the answer is this number. The pre-release reading is
+      // kept beside it — `parkingBrake.kmhBefore` — so nobody has to infer
+      // that the first press failed.
+      moved = after;
+      positiveControl.kmh = after;
+      positiveControl.afterParkingBrake = after;
+    }
+  }
+  if (moved <= 0) {
+    loud(
+      `CAR DID NOT MOVE — every frame after this is a frozen world, not a drive.` +
+        (parkingBrake.held === true
+          ? ` THE CAUSE IS NAMED: the parking brake is UP (${parkingBrake.witnesses.join("; ")}) and ${parkingBrake.attempted ? "the press did not free it" : "this lane has no control this harness may press"}. This is a HELD car, which is neither a frozen world nor a dead channel.`
+          : ""),
+    );
     await beat("03b-frozen");
   }
 }
-saveStatus({ positiveControl });
+saveStatus({ positiveControl, parkingBrake });
 /* ── AND THE POSITIVE CONTROL GETS TO OVERRULE THE STEERING VERDICT ─────────
  *
  * A SIM THAT IS NOT RUNNING LOOKS EXACTLY LIKE A CHANNEL THAT IS NOT WIRED, and
@@ -5690,6 +6264,24 @@ const probe = () =>
         // the body also holds the nav rail, the keyboard-shortcut list and the
         // demonstration deck, none of which can ever carry a yield line.
         const shell = document.querySelector("[data-sim-shell]") ?? document.body;
+        /* ── THE TWO DEMAND SURFACES, READ ONCE ──────────────────────────────
+         * `reverseWant` and `reverseStay` each built this string for
+         * themselves, so every tick paid for TWO `innerText` passes over the
+         * objective banner and the advisor — and `innerText` is the call that
+         * forces a layout flush against a live WebGL canvas, which is what put
+         * a `pc` control tick at 17.7 s once already. Hoisting it makes the
+         * third reader (the task cap, below) FREE and leaves the probe cheaper
+         * than it was before that reader existed.
+         *
+         * Identical construction to the two it replaces, character for
+         * character — same selector, same whitespace collapse, same trailing
+         * newline per element — because the two regexes below are matched
+         * against it and a subtle difference here is a silent change to when
+         * this harness thinks a lesson wants R. */
+        let revText = "";
+        for (const el of document.querySelectorAll(revSel)) {
+          revText += `${(el.innerText || "").replace(/\s+/g, " ").trim()}\n`;
+        }
         return {
           kmh: sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\d+)/) || [0, -1])[1]) : -1,
           overlay: document.querySelector("[data-sim-overlay]")?.getAttribute("data-sim-overlay") ?? "-",
@@ -5724,10 +6316,7 @@ const probe = () =>
             // title as absent and no lesson ever asked for reverse.
             // `innerText` is itself the render test: it returns "" for a
             // surface that is not being laid out.
-            let t = "";
-            for (const el of document.querySelectorAll(revSel)) {
-              t += `${(el.innerText || "").replace(/\s+/g, " ").trim()}\n`;
-            }
+            const t = revText;
             if (!t.trim()) return null;
             const act = new RegExp(revSrc, "u");
             const purpose = new RegExp(revPurposeSrc, "u");
@@ -5737,13 +6326,29 @@ const probe = () =>
             const m = t.match(act);
             return m ? m[0] : null;
           })(),
+          /* ── THE TASK'S OWN SPEED CAP, OFF THE SAME TWO SURFACES ─────────
+           *
+           * `sc-ac-truck-spray:990e5f64` (critical) and `:8ed4d8b3` were both
+           * refused with one sentence — „the antecedent is absent — this leg
+           * tops 57 км/ч, never above the cap, so the engine was never asked
+           * to book the over-speed the row is about." The cap is authored
+           * (`templates-conditions2.ts:172`, `maxSpeedKmh: 80`) and the wrong
+           * leg does hold the throttle down; what stops it is this harness's
+           * own `FLAT_REST_EVERY_M = 45`, which returns the car to a
+           * standstill roughly where it reaches 62.
+           *
+           * READ OFF THE GLASS, NOT OFF THE TEMPLATE. What the engine grades
+           * and what the student is told are two facts — `shownCapKmh` clamps
+           * to the posted limit — and the one a `wrong` leg must be SEEN to
+           * beat is the one on screen. Same surfaces and the same free
+           * innerText as `reverseWant` above; the parse is
+           * `lib/driveline.mjs`'s.
+           */
+          taskCapText: revText,
           /** The looser "is this still a reversing task?" test — see
            *  REVERSE_STAY_RE. Only ever read while the drive is ALREADY in R. */
           reverseStay: (() => {
-            let t = "";
-            for (const el of document.querySelectorAll(revSel)) {
-              t += `${(el.innerText || "").replace(/\s+/g, " ").trim()}\n`;
-            }
+            const t = revText;
             if (!t.trim()) return null;
             if (new RegExp(revPurposeSrc, "u").test(t) && !new RegExp(revSrc, "u").test(t)) return null;
             const m = t.match(new RegExp(revStaySrc, "u"));
@@ -5851,6 +6456,11 @@ const probe = () =>
       lawfulWait: null,
       reverseWant: null,
       reverseStay: null,
+      // "" and not null: `taskCapKmh("")` is `null`, i.e. „no cap on the
+      // glass", which is what a probe that could not read the glass knows.
+      // It is the identity for the over-cap hold — a lane whose probe is
+      // failing keeps exactly the rest cadence it had before this existed.
+      taskCapText: "",
       gear: [],
       // THE WHOLE PROBE FELL OVER, so the hazard channel saw nothing — and
       // „saw nothing" here means BLIND, not clear. The old fallback said
@@ -6036,6 +6646,33 @@ let rollM = 0;
 let rollHazardCapMs = 0;
 /** Metres the `wrong` leg has run flat out since its last rest. */
 let flatM = 0;
+/* ── AND THE ONE THING THAT MAY HOLD THAT REST BACK ─────────────────────────
+ *
+ * The `wrong` leg's rest cadence is not decoration — it is what lets a reader
+ * say WHERE the car was at rest, and removing it would invalidate every
+ * verdict ever taken from a wrong leg. But `FLAT_REST_EVERY_M = 45` also means
+ * the car is returned to zero at roughly the distance it takes to reach
+ * 62 км/ч, and two rows on sc-ac-truck-spray are about what the engine books
+ * ABOVE 80. Both were refused for want of the antecedent, not for want of a
+ * verdict.
+ *
+ * So the FIRST rest — and only the first — waits until the dial has beaten the
+ * cap the product itself is showing, after which the leg is exactly the leg it
+ * has always been. `lib/driveline.mjs` owns every clause of that decision,
+ * including the two ceilings that stop it becoming a leg with no rests at all,
+ * and including the loud sentence for the case where the ceiling is reached
+ * with the cap still unbeaten — „we tried" is not evidence, and a capability
+ * that quietly closes the row it was built to open is worse than none.
+ *
+ * WITH NO CAP ON THE GLASS THIS IS THE IDENTITY: `overCapHold` returns
+ * `hold:false, done:"no-cap"` and every `wrong` lane that has no
+ * «дръж под N км/ч» drives byte-for-byte as it did before. */
+const overCap = {
+  capKmh: null, needKmh: null, topKmh: -1,
+  proven: false, provenAtSec: null, provenAtKmh: null,
+  restsHeld: 0, metres: 0, ms: 0, done: null, why: null,
+};
+let overCapFrom = null;
 /** When that rest was BOOKED — which is not when the phase began, because the
  *  car spends the first seconds of the phase still braking. */
 let flatRestAt = 0;
@@ -7037,7 +7674,65 @@ while (!ended && Date.now() - t0 < budgetMs) {
       drivingTicks++;
       phaseTicks++;
       flatM += (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
-      if ((flatM >= FLAT_REST_EVERY_M || now - phaseAt >= FLAT_REST_MAX_MS) && phaseTicks >= 1) {
+      /* ── HOLD THE FIRST REST UNTIL THE CAP IS BEATEN ────────────────────
+       * The cap comes off the product's own glass every tick (a task can be
+       * credited and the next one posted mid-leg, and the cap moves with it);
+       * `overCap.capKmh` keeps the HIGHEST ever shown, so beating it beats
+       * every cap this leg was ever asked about. `overCapFrom` is the clock
+       * the ceiling is measured against and it starts the first time a cap is
+       * seen, not at t0 — a lane whose banner takes twenty seconds to mount
+       * must not have those twenty seconds charged to its hold. */
+      let holdRest = false;
+      if (!overCap.proven && overCap.done === null) {
+        const shown = taskCapKmh(p.taskCapText);
+        if (shown !== null && (overCap.capKmh === null || shown > overCap.capKmh)) {
+          overCap.capKmh = shown;
+          overCap.needKmh = shown + OVER_CAP_MARGIN_KMH;
+          overCapFrom ??= now;
+        }
+        if (p.kmh > overCap.topKmh) overCap.topKmh = p.kmh;
+        overCap.metres = flatM;
+        overCap.ms = overCapFrom === null ? 0 : now - overCapFrom;
+        const gate = overCapHold({
+          capKmh: overCap.capKmh,
+          topKmh: overCap.topKmh,
+          metres: overCap.metres,
+          ms: overCap.ms,
+          marginKmh: OVER_CAP_MARGIN_KMH,
+          maxM: OVER_CAP_MAX_M,
+          maxMs: OVER_CAP_MAX_MS,
+        });
+        // NO `continue` HERE, AND THAT IS DELIBERATE. Skipping the rest of the
+        // tick would also skip the periodic frame block at the foot of the
+        // loop, so a 400 m hold would be 400 m with no photographs — buying an
+        // antecedent by losing the evidence it exists to support. The hold is
+        // a flag on ONE transition, nothing else.
+        if (gate.hold) {
+          holdRest = true;
+          overCap.restsHeld += 1;
+          overCap.why = gate.why;
+        } else {
+          overCap.done = gate.done;
+          overCap.why = gate.why;
+          if (gate.done === "proven") {
+            overCap.proven = true;
+            overCap.provenAtSec = Math.round((now - t0) / 1000);
+            overCap.provenAtKmh = overCap.topKmh;
+            note(
+              `      the wrong leg BEAT ITS TASK CAP at t=${overCap.provenAtSec}s — ${overCap.topKmh} км/ч against ` +
+                `«дръж под ${overCap.capKmh} км/ч», after holding ${overCap.restsHeld} rest(s) back over ` +
+                `${Math.round(overCap.metres)} m. The over-speed the engine is being asked about has now happened on ` +
+                `the record; the rest cadence resumes here.`,
+            );
+          } else if (gate.done !== "no-cap") {
+            loud(
+              `THE WRONG LEG DID NOT BEAT ITS TASK CAP — ${gate.why} Any row about what the engine books ABOVE ` +
+                `${overCap.capKmh} км/ч is STILL unjudgeable from this lane: the antecedent was not exercised.`,
+            );
+          }
+        }
+      }
+      if (!holdRest && (flatM >= FLAT_REST_EVERY_M || now - phaseAt >= FLAT_REST_MAX_MS) && phaseTicks >= 1) {
         phase = "flat-rest";
         phaseAt = now;
         phaseTicks = 0;
@@ -8335,6 +9030,39 @@ note(`ladder: ${trail.length} action(s) over ${rungsUsed} step(s)${trail.length 
 // back to being unfalsifiable.
 note(`drive: top ${topSpeed} км/ч (entered the loop at ${enteredLoopKmh ?? "?"} км/ч) · ${stopsMade} full stops · ${waitsHonoured} lawful waits (${waitSeconds}s) · ${teachDrained} pause layers · final ${debrief.kmh} км/ч${manualGear ? ` · gearbox MANUAL, engaged N → ${manualGear} by the harness` : ""}`);
 note(`positive control: ${positiveControl.direction}${positiveControl.direction === "forward" ? ` · ${positiveControl.kmh} км/ч after ${(positiveControl.heldMs / 1000).toFixed(1)} s` : ` · ${positiveControl.why}`}`);
+/* ── THE LEVER, ON EVERY LANE, WHETHER OR NOT IT MATTERED ───────────────────
+ * Unconditional for the reason the input-channel line is: a state nobody
+ * prints is a state every reader assumes. `not-looked` is a real answer (the
+ * lane's positive control was deferred, or the car moved and there was nothing
+ * to ask about) and it must be distinguishable from „the brake was down". */
+note(
+  `parking brake: ${
+    !parkingBrake.looked
+      ? "not-looked (the car left zero, or the positive control was deferred — nothing was blocking)"
+      : parkingBrake.held === true
+        ? `HELD at hand-over (${parkingBrake.witnesses.join("; ") || "no named witness"}) · ${
+            parkingBrake.attempted
+              ? `pressed via ${parkingBrake.route} → released ${parkingBrake.released === null ? "UNVERIFIED" : parkingBrake.released ? `YES by ${parkingBrake.releasedBy}` : "NO"}${parkingBrake.kmhAfter === null ? "" : ` · ${parkingBrake.kmhBefore} → ${parkingBrake.kmhAfter} км/ч`}`
+              : `NOT PRESSED — ${parkingBrake.refusal}`
+          }`
+        : parkingBrake.held === false
+          ? "down at hand-over (the РЪЧНА pill says so) — nothing to release"
+          : `UNKNOWN — ${parkingBrake.refusal ?? "no witness could speak"}`
+  }${parkingBrake.beltAtLook === null ? "" : ` · seatbelt ${parkingBrake.beltAtLook ? "FASTENED" : "OFF"} (read, not assumed — the KeyB press above has never been able to self-verify)`}`,
+);
+if (parkingBrake.held === true && parkingBrake.released !== true) {
+  loud(
+    `THIS LANE IS A HELD CAR. The parking brake was up at hand-over and this drive never freed it, so every frame ` +
+      `below photographs a car the product is deliberately holding — NOT a frozen world and NOT a dead channel. No ` +
+      `speed, route, tracking, objective-credit or grading finding may be filed off this lane.`,
+  );
+}
+if (MODE !== "right" && overCap.capKmh !== null) {
+  note(
+    `over-cap: task cap «дръж под ${overCap.capKmh} км/ч» · top on the flat ${overCap.topKmh} км/ч · ` +
+      `${overCap.proven ? `BEATEN at t=${overCap.provenAtSec}s` : "NOT BEATEN"} · ${overCap.restsHeld} rest(s) held back · ${overCap.why ?? "-"}`,
+  );
+}
 note(`briefing chars: ${briefing.length}`);
 if (facts.error) loud(`the debrief reader threw: ${facts.error}`);
 // «(none)» NOW MEANS WHAT IT SAYS. Since the matcher learned «НЕЗАВЪРШЕН» the
@@ -8838,6 +9566,20 @@ saveStatus({
   // means the harness drove badly and its failures are not the product's.
   // `caveat` states what the signal cannot support — read it before filing.
   guidance,
+  // …AND WHETHER THE CAR WAS EVER HELD BY ITS OWN LEVER. Always present,
+  // `looked:false` included, because „this lane never asked" and „this lane
+  // asked and the answer was no" are the two states this whole block exists
+  // to keep apart. `held:true` with `released` anything but `true` is the one
+  // combination that voids the drive: those frames are a HELD car, which is
+  // neither a frozen world nor a dead channel, and no speed, route, tracking
+  // or grading finding may be drawn from them.
+  parkingBrake,
+  // …AND, ON A `wrong` LEG, WHETHER IT WAS EVER SEEN ABOVE THE TASK'S OWN CAP.
+  // `proven:false` with a `capKmh` means the antecedent for every „the engine
+  // books nothing above N" row is STILL absent from this lane — the same
+  // silence two sc-ac-truck-spray rows were refused on, now stated instead of
+  // left to arithmetic.
+  overCap: MODE === "right" ? null : overCap,
   // …and where the rest of the debrief went. `sidecar` is the claim a reader
   // checks first: if it is false, the sections below the fold are gone.
   debrief: {

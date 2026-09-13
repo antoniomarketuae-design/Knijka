@@ -92,6 +92,79 @@ describe("§1 isRibbonPixel separates the world's ribbon from the interface", ()
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * §1b THE TWO RELAXATIONS THAT WERE PRICED ON THE CORPUS AND REFUSED
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Both were proposed to close the blindness bucket — 834 of 4,423 moving
+ * samples over w41's 82 `right` legs scan the band and find ZERO ribbon pixels
+ * (18.86 %). Both would have moved that number. Both cost more than they
+ * moved, and the price is pinned here because the proposal is a natural one
+ * and will be made again by someone reading the zero count without it.
+ *
+ * REPRODUCE. Two populations out of `.audit-frames/w41`, both read through
+ * `lib/png.mjs` + the band recorded in each lane's `_audit-status.json`:
+ *   (a) the 174 zero-px moving samples that have an `04-t###s.png` at the same
+ *       second — what a relaxation would RECOVER;
+ *   (b) 110 frames from 62 legs where the drive already had a healthy sighting
+ *       (recorded ribbonPx ≥ 3000) — what it would COST.
+ * Population (b) is the one the first draft of each proposal did not look at.
+ */
+
+describe("§1b the priced relaxations stay refused", () => {
+  it("REFUSES the ribbon the weather shader washed out — worth 1.2 points, costs 2.3x the mass", () => {
+    // MEASURED on sc-ac-truck-spray__pc-right/04-t037s.png: the spray effect
+    // washes #17e1c4 (g−r 202, b−r 173) down to these, a ~7x loss of
+    // saturation. These are REAL RIBBON on the carriageway and the scan does
+    // refuse them — a known blind spot, kept deliberately.
+    assert.equal(isRibbonPixel(120, 142, 129), false, "spray-washed ribbon, g−r 22");
+    assert.equal(isRibbonPixel(121, 150, 138), false, "spray-washed ribbon, g−r 29");
+    assert.equal(isRibbonPixel(122, 154, 142), false, "spray-washed ribbon, g−r 32");
+    // WHY IT IS KEPT. Admitting them means `g − r > 20 && b − r > 10`. On
+    // population (a) that recovers 11 of 174 zeros — 18.86 % → ~17.66 %. On
+    // population (b) it admits 2.31x the band mass at the median, 4.60x at
+    // p90, 11.40x at worst, and MORE THAN DOUBLES the mass on 80 of the 110
+    // frames. The mildest variant that still helps (g−r > 35, b−r > 15) is
+    // 1.65x median and doubles 34 of 110. That extra mass is wet asphalt, and
+    // CONFIDENT_BAND_PX is a MASS gate — inflating it manufactures confidence
+    // across the whole shipping regime to buy sightings on four weather
+    // lessons. The 1.2 points are not worth it.
+    //
+    // MUTATION WATCHED, and the first draft of this comment was WRONG about
+    // it: relaxing `g - r` to > 20 ALONE leaves all three green, and so does
+    // relaxing `b - r` to > 10 alone — these pixels sit under BOTH floors
+    // (b−r is 9-20), so either clause on its own still refuses them. It takes
+    // `g - r > 20 && b - r > 10` together, which is exactly the proposal, and
+    // then all three go red. A single-clause mutation here MUTATION-SURVIVES.
+    assert.equal(isRibbonPixel(23, 225, 196), true, "and the unwashed ribbon still passes");
+  });
+
+  it("REFUSES the shadow-car's blue path — that is a product decision, not a threshold", () => {
+    // MEASURED on sc-mw-emergency-lane__pc-right/04-t058s.png, where a bright
+    // cyan line runs the full depth of the band and the scan reports 8 px.
+    // The line's core is the --accent token itself (2,470 pixels of it) and
+    // its blend over asphalt clears g−r 52-55 and b−r 57-60 — it fails ONLY on
+    // `g >= b`, and on the blended edge by as little as 4 units.
+    assert.equal(isRibbonPixel(72, 169, 255), false, "the shadow path's core, --accent neat");
+    assert.equal(isRibbonPixel(133, 187, 191), false, "its blend over asphalt, b−g = 4");
+    assert.equal(isRibbonPixel(132, 186, 191), false, "and one shade darker");
+    // WHY IT IS NOT SIMPLY ADMITTED. Dropping `g >= b` recovers 8 of the 174
+    // (18.86 % → ~18.00 %) and re-admits every pill, ring and border in the
+    // interface — the exact regression §1 exists to prevent. Measured on 75
+    // frames where the whole canvas holds no ribbon at all, a predicate that
+    // reaches for this blue lights 7 of them, one with 32,500 px of sky.
+    // A blue channel would have to be a SEPARATE signal with its own shape
+    // gate; and whether the shadow car's path may steer the harness at all is
+    // a product question, because the legend calls it «синя — пътят на
+    // колата-сянка» while the ribbon this scan follows is «зелена — маршрутът
+    // до целта». Filed, not fixed.
+    //
+    // MUTATION WATCHED: delete `&& g >= b` and all three go red.
+    assert.equal(isRibbonPixel(108, 185, 172), true, "the real ribbon over asphalt still passes");
+    assert.equal(isRibbonPixel(16, 151, 133), true, "and its dim tail");
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * §2 THE MASK — page furniture must never be read as world
  * ═══════════════════════════════════════════════════════════════════════════ */
 
