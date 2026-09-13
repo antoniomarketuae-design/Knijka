@@ -545,6 +545,40 @@ function lastVerifyByFinding() {
   }
   return out;
 }
+/**
+ * WHAT A REPAIR LANE FOUND AT THIS ROW'S ADDRESS, if one has been there.
+ *
+ * Repair wave 44 wrote almost no product code: 14 of 25 lanes reported
+ * ALREADY-FIXED, 8 MISROUTED, 2 REFUTED, 0 REPAIRED. That is not a failed
+ * wave — it is a wave whose findings are ABOUT the rows, and they were about
+ * to be thrown away because nothing carried them to a judge.
+ *
+ * A judge deciding STILL-vs-CLOSED on a row that a repair lane has just
+ * declared misrouted, or already fixed by a named commit, is deciding it with
+ * half the evidence. This carries the lane's own words across.
+ *
+ * IT IS QUOTED, NOT SUMMARISED, and marked as a CLAIM. A lane's verdict is
+ * evidence about a row, not a verdict on it — that is the judge's job, and a
+ * claim of «already fixed» that names no commit is exactly the shape Rule 0
+ * exists to refuse.
+ */
+function laneReportsByFinding() {
+  const out = new Map();
+  const dir = path.join(REPO, ".audit-frames", "w44-reports");
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith(".md")).sort(); } catch { return out; }
+  for (const f of files) {
+    let txt = "";
+    try { txt = fs.readFileSync(path.join(dir, f), "utf8"); } catch { continue; }
+    const ids = [...new Set(txt.match(/[a-z0-9-]+:[0-9a-f]{8}/g) || [])];
+    // The header comment we wrote holds the id list; the body holds the prose.
+    const body = txt.replace(/^<!--[\s\S]*?-->\s*/, "").trim();
+    for (const id of ids) if (!out.has(id)) out.set(id, { file: f, body });
+  }
+  return out;
+}
+const LANE_REPORT = laneReportsByFinding();
+
 const PRIOR_VERIFY = lastVerifyByFinding();
 
 batches.forEach((group, bi) => {
@@ -575,15 +609,31 @@ batches.forEach((group, bi) => {
             })
             .filter(Boolean)
         : [];
+      /* THE REPAIR LANE'S OWN WORDS, once per report rather than once per row,
+       * because one lane covers several rows of one file and repeating it would
+       * bury the frames. Trimmed hard: a judge needs the verdict and the reason,
+       * and can open .audit-frames/w44-reports/ for the rest. */
+      const seenReports = new Set();
+      const laneNotes = [];
+      for (const id of e.ids || []) {
+        const rep = LANE_REPORT.get(id);
+        if (!rep || seenReports.has(rep.file)) continue;
+        seenReports.add(rep.file);
+        const claim = rep.body.replace(/\s+/g, " ").slice(0, 700);
+        laneNotes.push(
+          "      >> A REPAIR LANE WENT TO THIS ADDRESS (" + rep.file + ") AND CLAIMS: " + claim +
+            " [this is the LANE'S CLAIM, not a verdict. If it says ALREADY-FIXED and names no commit, Rule 0 refuses it: that is indistinguishable from «could not reproduce».]",
+        );
+      }
       const priors = (e.ids || []).map((id) => PRIOR_VERIFY.get(id)).filter(Boolean);
-      if (!priors.length && !evidence.length) return head;
-      if (!priors.length) return [head, ...evidence].join("\n");
+      if (!priors.length && !evidence.length && !laneNotes.length) return head;
+      if (!priors.length) return [head, ...evidence, ...laneNotes].join("\n");
       const notes = priors.map((v) => {
         const why = String(v.why || v.evidence || "").replace(/\s+/g, " ").slice(0, 420);
         return "      !! PRIOR VERIFY — " + v.findingId + " was ruled " +
           String(v.verdict || "?").toUpperCase() + " by an adversarial pass: " + why;
       });
-      return [head, ...evidence, ...notes].join("\n");
+      return [head, ...evidence, ...laneNotes, ...notes].join("\n");
     }),
     total: g.total,
     critical: g.critical,
