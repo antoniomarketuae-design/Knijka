@@ -34,6 +34,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 import { classifyLeg, tallyStates } from "./verdict-surface.mjs";
+import { legEvidence, renderEvidence } from "./leg-evidence.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const [outDir, perRaw, batchRaw] = process.argv.slice(2);
@@ -101,6 +102,12 @@ function freshestResults() {
 }
 
 const resultsPath = process.env.WAVEC_RESULTS || freshestResults();
+/* The frames live beside the merged results. Judges are handed MEASURED
+ * facts about each leg, not only the prose of a filed symptom — see
+ * leg-evidence.mjs for why: three of the four facts it prints did not exist
+ * as fields before 2026-09-14, and their absence is why the same rows came
+ * back UNJUDGED sweep after sweep. */
+const FRAMES_DIR = resultsPath ? path.join(path.dirname(resultsPath), "frames") : null;
 if (!resultsPath) {
   console.error("[verdicts] no merged sweep found under .audit-frames — run phase 1 first.");
   process.exit(2);
@@ -548,14 +555,35 @@ batches.forEach((group, bi) => {
     rows: g.lessons.map((e) => {
       const head = "  " + e.lesson + "  ->  " + e.critical + " critical / " + e.total +
         " findings   legs re-driven: " + e.legs.join(", ");
+      /* THE MEASURED FACTS, BEFORE ANY PROSE. A judge who cannot cheaply
+       * establish whether the drive was CAPABLE of witnessing the claim
+       * writes UNJUDGED, and that is what most of the backlog is. Route
+       * fidelity in particular decides a whole class outright: a leg whose
+       * car was 176 m from its own lesson’s authored line cannot witness
+       * what the product credits along that route, however good the frames
+       * look. */
+      const evidence = FRAMES_DIR
+        ? (e.legs || [])
+            .map((leg) => {
+              const bare = String(leg).replace(/\s*\(.*$/, "").replace(/\s*\[.*$/, "").trim();
+              try {
+                const ev = legEvidence(path.join(FRAMES_DIR, e.lesson + "__" + bare));
+                return ev ? renderEvidence(ev) : null;
+              } catch {
+                return null;
+              }
+            })
+            .filter(Boolean)
+        : [];
       const priors = (e.ids || []).map((id) => PRIOR_VERIFY.get(id)).filter(Boolean);
-      if (!priors.length) return head;
+      if (!priors.length && !evidence.length) return head;
+      if (!priors.length) return [head, ...evidence].join("\n");
       const notes = priors.map((v) => {
         const why = String(v.why || v.evidence || "").replace(/\s+/g, " ").slice(0, 420);
         return "      !! PRIOR VERIFY — " + v.findingId + " was ruled " +
           String(v.verdict || "?").toUpperCase() + " by an adversarial pass: " + why;
       });
-      return [head, ...notes].join("\n");
+      return [head, ...evidence, ...notes].join("\n");
     }),
     total: g.total,
     critical: g.critical,
