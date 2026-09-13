@@ -228,3 +228,32 @@ geometry is tight.
 **Nothing here is built.** It is recorded so the next attempt starts from the
 measurement rather than from the wrong cause, which is what section E would have
 sent it to.
+
+### …and the mechanism inside that, from the tick-cost breakdown
+
+`sc-rb-busy-gap/mobile-right`, its own line:
+
+```
+TICK COST: screenshot ×17 med 1068ms · idle ×50 med 508ms · probe ×52 med 9ms
+           · guide ×50 med 5ms max 2620ms · pedals ×42 med 0ms
+```
+
+Of a ~54 s drive, ~25 s is the deliberate `TICK_MS = 500` pacing and ~18 s is
+screenshots. Twelve seconds is driving. The idle is the control law's 2 Hz rate
+and is not waste — but combined with scan cost it gives a **real period of
+757 ms p50**, which at 24 км/ч is **5 m between steering decisions**, or about
+24° of arc on a 12 m roundabout.
+
+Then the sustain law cannot fire in time. `SUSTAIN_DEG` is 15° and
+`SUSTAIN_CONFIRM` is 2, so a held turn needs **two consecutive samples** at
+≥15° — ten metres into the corner at this period. The drive's five corrections
+total **315 ms**, about 63 ms each: all short pulses, never a sustained turn.
+The loop saw the corner (|err| worst 43.71°) and was structurally unable to
+commit to it before the corner was gone.
+
+**Deliberately not changed before w45.** The next sweep is the one that has to
+convert, and re-tuning a control law blind — with no way to test it until that
+same sweep — risks making it worse than w43 for every lesson in order to help
+three. The candidate, for after: let a sustain confirm on the FIRST large error
+when the product's own turn chevron is on screen, since the chevron is advance
+warning and waiting for the error to persist is what arrives late.
