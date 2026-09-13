@@ -804,6 +804,75 @@ saveStatus({ phase: "target-attested", target });
 const { browser, context } = await open();
 const page = await context.newPage();
 
+/* ══ THE AUDIO WITNESS ═══════════════════════════════════════════
+ *
+ * `sc-vu-pass-clearance:9116af05` is the only row in the whole open list
+ * classified «no tool exists to measure it — nothing can hear sound». It has
+ * stood on that classification for weeks, and the classification was never
+ * checked against the product.
+ *
+ * IT IS WRONG IN BOTH DIRECTIONS. `scene/simAudio.ts` is a full procedural
+ * WebAudio stack — engine rpm stack, tyre/road noise, wind rush above 40 km/h,
+ * brake hiss, ambient city bed, NPC hum, rain patter, wiper swish, a two-tone
+ * siren, the indicator relay, a collision thump and a seatbelt click. So the
+ * row's blanket «no audio evidence of any kind» is a statement about this
+ * harness, filed as a statement about the product. AND the instrument was
+ * never impossible: a browser cannot be listened to, but every sound it makes
+ * has to be built out of WebAudio nodes first, and those are countable.
+ *
+ * WHAT THIS MEASURES AND WHAT IT DOES NOT. It counts AudioContexts created,
+ * source nodes constructed, `start()` calls actually made, and the context's
+ * final state. That is enough to separate three cases this programme has been
+ * unable to tell apart:
+ *
+ *   · the page never built any audio          → sources 0
+ *   · it built audio and never started it     → sources > 0, starts 0
+ *   · it built and started audio, but the      → starts > 0, state "suspended"
+ *     autoplay gate never opened
+ *
+ * IT IS NOT A CLAIM THAT A STUDENT HEARD ANYTHING. A started node in a running
+ * context can still be silent at zero gain, and this counts nodes rather than
+ * measuring amplitude. So it can prove audio ABSENT and it can prove audio
+ * CONSTRUCTED AND STARTED; it cannot prove audio AUDIBLE, and the field names
+ * say so rather than implying more than was measured.
+ *
+ * `addInitScript` runs before the page's own scripts, which is the only place
+ * this can be installed — by the time `evaluate` could reach the page, the
+ * constructors it needs to wrap have already been used.
+ */
+await page.addInitScript(() => {
+  const w = /** @type {any} */ (window);
+  w.__audioWitness = { contexts: 0, sources: 0, starts: 0, kinds: {}, states: [] };
+  const wit = w.__audioWitness;
+  const wrapCtor = (name) => {
+    const Orig = w[name];
+    if (typeof Orig !== "function") return;
+    const Wrapped = function (...args) {
+      const ctx = new Orig(...args);
+      wit.contexts += 1;
+      for (const m of ["createOscillator", "createBufferSource", "createConstantSource"]) {
+        const orig = ctx[m];
+        if (typeof orig !== "function") continue;
+        ctx[m] = function (...a) {
+          const node = orig.apply(this, a);
+          wit.sources += 1;
+          wit.kinds[m] = (wit.kinds[m] || 0) + 1;
+          const st = node.start;
+          if (typeof st === "function") {
+            node.start = function (...b) { wit.starts += 1; return st.apply(this, b); };
+          }
+          return node;
+        };
+      }
+      return ctx;
+    };
+    Wrapped.prototype = Orig.prototype;
+    w[name] = Wrapped;
+  };
+  wrapCtor("AudioContext");
+  wrapCtor("webkitAudioContext");
+});
+
 // ── WHERE THE HARNESS'S OWN TIME GOES ──────────────────────────────────────
 // Not decoration. A `pc` drive was measured at 18 s per control-law tick while
 // every constituent call timed 1-100 ms in isolation, and no amount of reading
@@ -9169,6 +9238,21 @@ const trailingUnphotographedPx = Math.max(0, (geo.contentH ?? 0) - lastFrameEnd)
       ? { ...dev, referenceLine: `content/traces/${SCENARIO}/shadow-correct.trace.json`, points: authored.length }
       : null;
     guidance.routeRefusal = routeDeviationRefusal(dev);
+  }
+  /* WHAT THIS PAGE ACTUALLY BUILT OUT OF WEBAUDIO. See the witness install
+   * beside `newPage()` for why this exists and for the three cases it
+   * separates. Read once, at the end, because the counters are cumulative
+   * and a mid-drive read would answer a question nobody asked. */
+  {
+    const aw = await page
+      .evaluate(() => {
+        const w = window;
+        const wit = w.__audioWitness;
+        if (!wit) return null;
+        return { ...wit, kinds: { ...wit.kinds } };
+      })
+      .catch(() => null);
+    guidance.audio = aw;
     guidance.recovery = {
       ...recovery,
       /* A drive that had to be steered back is not the same drive as one that
@@ -9229,6 +9313,10 @@ try {
         // could not be measured — never true by default.
         routeHold: guidance.routeHold ?? null,
         recovery: guidance.recovery ?? null,
+        // WebAudio nodes built and started on this drive. `null` = the witness
+        // did not install; `sources: 0` = the page built no audio. Those are
+        // different findings and the first must never read as the second.
+        audio: guidance.audio ?? null,
         geometry: {
           scroller: geo.scroller,
           viewportH: geo.viewportH ?? null,
@@ -9627,6 +9715,22 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
       note(
         `  ROUTE FIDELITY: NOT MEASURED — ${guidance.routeReferencePoints ? "too few moving pose samples" : `no content/traces/${SCENARIO}/shadow-correct.trace.json on disk`}. ` +
           `This is UNKNOWN, not zero.`,
+      );
+    }
+    if (guidance.audio === null || guidance.audio === undefined) {
+      note(`  AUDIO: NOT WITNESSED — the init script did not install. UNKNOWN, not silent.`);
+    } else if (guidance.audio.sources === 0) {
+      loud(
+        `THIS LESSON BUILT NO AUDIO AT ALL — 0 WebAudio source node(s) over ${guidance.audio.contexts} context(s). ` +
+          `scene/simAudio.ts ships engine, tyre, wind, brake, ambient, siren, indicator and collision layers, and none of ` +
+          `them was constructed on this drive. This is measurable absence, not this instrument being deaf.`,
+      );
+    } else {
+      note(
+        `  AUDIO: ${guidance.audio.sources} source node(s) built and ${guidance.audio.starts} started over ` +
+          `${guidance.audio.contexts} context(s) (${Object.entries(guidance.audio.kinds).map(([k, v]) => `${k} ${v}`).join(", ") || "no kinds recorded"}). ` +
+          `This says audio was CONSTRUCTED and STARTED; it does not say a student would have heard it — a started node ` +
+          `at zero gain is silent and this counts nodes, not amplitude.`,
       );
     }
     if (guidance.recovery.everLeft) {
