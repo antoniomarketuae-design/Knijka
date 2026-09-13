@@ -264,8 +264,10 @@ import {
   COST,
   TUNE,
   aimFrom,
+  ROUTE_OFF_M,
   authoredLinePolyline,
   costVerdict,
+  distanceToPolyline,
   createFurnitureRegister,
   degPerPxAtCentre,
   readAim,
@@ -4947,6 +4949,11 @@ const recovery = {
   startedAt: null,
   refusals: [],
   rejoined: 0,
+  /** Ticks where the PRODUCT said off-road and the geometry did not — the
+   *  parking-bay case the second witness exists to protect. Counted rather
+   *  than assumed absent, because if this is large on a lesson that is not a
+   *  parking one, the guard is hiding real departures and must be re-derived. */
+  witnessesDisagreed: 0,
   sustainRun: 0,
   sustainDir: 0,
 };
@@ -5189,11 +5196,37 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
    * then derive a heading from two poses and has nothing left to steer with.
    * The minimal intervention is the wheel, and the wheel is what is bounded.
    */
+  /* ── AND THE SECOND WITNESS HAS TO AGREE, OR A PARKING CAR GETS DRAGGED OUT ─
+   *
+   * The product declares off-road from `runtime/spatial.ts`, against its own
+   * edge centrelines. A PARKING BAY IS NOT THE CARRIAGEWAY. So a car doing
+   * exactly what «Задача 2: влез НАПРЕД в мястото и спри успоредно на бордюра»
+   * asks of it is off-road by that test, correctly, and a recovery keyed on
+   * that test alone would steer it back out into the road in the middle of the
+   * manoeuvre the lesson exists to grade — destroying the drive while
+   * reporting that it had rescued it.
+   *
+   * The reverse gate below is not enough on its own: a FORWARD bay entry
+   * never arms R.
+   *
+   * So both witnesses must agree. The geometric one asks a different question
+   * — «is the car far from the line the LESSON authored» — and the authored
+   * line drives into the bay, so a car parking correctly is ON it. Recovery
+   * fires only where the product says off-road AND the car is more than
+   * ROUTE_OFF_M from where its own lesson says it should be. Everything else
+   * is left alone.
+   */
+  const offAuthoredM =
+    AUTHORED_LINE !== null && witnessNow
+      ? distanceToPolyline(witnessNow.x, witnessNow.z, AUTHORED_LINE)
+      : null;
   if (
     MODE === "right" &&
     lastRouteHold === "off-road" &&
     AUTHORED_LINE !== null &&
     reverse.armed !== true &&
+    offAuthoredM !== null &&
+    offAuthoredM > ROUTE_OFF_M &&
     guideWitness.length >= 2
   ) {
     /* THE WHEEL IS LET GO BEFORE ANYTHING ELSE, AND THE RELEASE IS BANKED.
@@ -5214,7 +5247,7 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
       recovery.sustainRun = 0;
       recovery.sustainDir = 0;
       note(
-        `  REJOINING THE ROUTE (episode ${recovery.episodes}) at t=${tSec}s — the product says the car is off the road, and this leg is steering back to content/traces/${SCENARIO}/shadow-correct.trace.json.`,
+        `  REJOINING THE ROUTE (episode ${recovery.episodes}) at t=${tSec}s — the product says the car is off the road AND it is ${offAuthoredM.toFixed(1)} m from the line its own lesson authored. Steering back to content/traces/${SCENARIO}/shadow-correct.trace.json.`,
       );
     }
     const a = guideWitness[guideWitness.length - 2];
@@ -5265,6 +5298,14 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
       why: `rejoining: ${aim.why} — ${cmd.why}`,
     });
     return;
+  }
+  /* THE GUARD, AUDITED RATHER THAN TRUSTED. Every tick where the product said
+   * off-road and the geometry did not is counted. On a parking lesson that is
+   * the guard working. On anything else a large count means the guard is
+   * hiding real departures and the threshold has to be re-derived — which
+   * nobody could tell without this number. */
+  if (lastRouteHold === "off-road" && offAuthoredM !== null && offAuthoredM <= ROUTE_OFF_M) {
+    recovery.witnessesDisagreed += 1;
   }
   if (recovery.active) {
     recovery.active = false;
@@ -9741,6 +9782,11 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
           `and are excluded from the tracking rate — they are this harness driving, not the product being measured.`,
       );
       for (const r of guidance.recovery.refusals) loud(r);
+    }
+    if (guidance.recovery.witnessesDisagreed) {
+      note(
+        `  REJOIN GUARD: ${guidance.recovery.witnessesDisagreed} tick(s) where the product said off-road and the geometry said the car was within ${ROUTE_OFF_M} m of its own lesson’s line — recovery correctly did NOT fire. On a parking lesson that is a car in its bay. On anything else it means this guard is hiding real departures.`,
+      );
     }
     if (guidance.routeRefusal) loud(guidance.routeRefusal);
     {
