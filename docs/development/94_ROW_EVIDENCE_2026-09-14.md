@@ -135,3 +135,50 @@ steering gap.
 Only **18 of 80** `right` legs in w43 completed every objective; **22**
 completed none. Of those 22, **15 left the route**. That is what the recovery
 build (`f704c8d`) targets, and it is why the next sweep is the one that matters.
+
+---
+
+## H. Group B is downstream of group C, and that unifies the whole picture
+
+Group B is 14 rows, 11 critical, held on «the reverse manoeuvre does not
+arrive». **It arrives.** All 16 w43 legs that demanded reverse armed it, reached
+R, and spent real ticks there — 5 to 96 each, with **zero recorded failures**.
+
+What does not happen is completion. `reachedEnd` is **false on every one of the
+16**. And on three of them the car finishes with more distance left to run than
+its authored path is long:
+
+| leg | authored reverse leg | distance still to run |
+|---|---|---|
+| `sc-park-judge/pc-right` | 8.27 m | **20.93 m** |
+| `sc-park-wall/pc-right` | 8.65 m | **13.99 m** |
+| `sc-park-gap-short/mobile-right` | 7.02 m | **8.73 m** |
+
+That is not «stopped short». Reading the controller's own per-tick record for
+`sc-park-judge/pc-right`: **off-path median 20.47 m**, heading error **median
+166.8°** — the car is twenty metres from the authored path and pointing almost
+exactly the opposite way along it, from the first tick to the last. Its sign
+audit reads `agrees` («wheel right over 4.03 m moved the bearing −8.4°, the way
+§2 of reverse-plan.mjs says it should»), so the wheel is not inverted.
+
+**The car is trying to drive a reverse path that starts twenty metres away from
+where it is.** Its objective «Задача 1: спри срещу свободното място» is dashed:
+the forward approach never reached the manoeuvre's starting position, R was
+engaged anyway, and a parking controller was asked to park from the wrong place.
+
+### Why this matters more than either group separately
+
+Only **18 of 80** `right` legs completed every objective. A parking or reversing
+manoeuvre begins at the END of a forward route, so a drive that does not
+complete its route cannot begin its manoeuvre — and then fails it for reasons
+that have nothing to do with the product. Group B's 11 criticals and group C's
+11 criticals are **the same blocker seen from two ends**.
+
+That is why route fidelity (`a783bf6`), the off-road witness (`9b2a55e`) and
+recovery (`f704c8d`) are the right spend: they attack the forward drive, which
+is upstream of both. It also means **no repair wave can close group B**, and the
+next sweep's first question is not «did reverse work» but «did the car get to
+where reverse begins».
+
+`sc-pk-driveway/pc-right` is the near miss worth watching: off-path median
+4.9 m, and it finished **0.97 m** from the mark against a 0.45 m tolerance.
