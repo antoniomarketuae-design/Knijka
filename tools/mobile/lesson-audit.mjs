@@ -269,6 +269,9 @@ import {
   createFurnitureRegister,
   degPerPxAtCentre,
   readAim,
+  RECOVERY_MAX_EPISODES,
+  recoveryAim,
+  recoveryBudget,
   refusalExpired,
   routeDeviation,
   routeDeviationRefusal,
@@ -4847,6 +4850,40 @@ const GUIDE_SLOW_CARRY_MAX = 4;
  */
 let guideLastTickAt = null;
 const guideWitness = [];
+
+/* ── THE LESSON’S OWN CORRECT LINE, LOADED ONCE ─────────────────────────
+ * Read at startup rather than per tick: it is a file on disk that cannot
+ * change during a drive, and the drive loop is the one place in this harness
+ * where a synchronous read would be paid for 160 times. */
+const AUTHORED_LINE = (() => {
+  try {
+    return authoredLinePolyline(
+      JSON.parse(readFileSync(`${REPO_ROOT}/content/traces/${SCENARIO}/shadow-correct.trace.json`, "utf8")),
+    );
+  } catch {
+    return null;
+  }
+})();
+
+/** The state of GETTING BACK ON THE ROAD. `episodes` counts departures, not
+ *  ticks: a car that leaves once and takes twenty ticks to return has had one
+ *  bad moment, and one that leaves four times has had a bad drive. */
+const recovery = {
+  active: false,
+  episodes: 0,
+  ticks: 0,
+  metres: 0,
+  ms: 0,
+  startedAtMs: null,
+  startedAt: null,
+  refusals: [],
+  rejoined: 0,
+  sustainRun: 0,
+  sustainDir: 0,
+};
+/** What the product said on the LAST tick, so `guideTick` can see it without
+ *  a second round trip. Written by the drive loop’s own fold. */
+let lastRouteHold = null;
 /**
  * WHAT A SCAN IS ALLOWED TO COST, AND THE REFUSAL WHEN IT COSTS MORE.
  *
@@ -5062,6 +5099,104 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
   {
     const w = await guideWitnessRead();
     if (w) { witnessNow = w; guideWitness.push({ tSec, ...w }); }
+  }
+  /* ══ GETTING BACK ON THE ROAD ═══════════════════════════════════
+   *
+   * Placed BEFORE the band scan on purpose, and not only to save the 757 ms
+   * the scan costs. When the car is off the carriageway the ribbon is not
+   * usually in view — 33.9 % blind samples on legs that left it against 6.1 %
+   * on legs that did not — so continuing to scan is paying the most expensive
+   * operation in the loop for the answer least likely to arrive, while the car
+   * carries on toward whatever it is about to hit.
+   *
+   * WHAT AUTHORISES IT. The product has already convicted — «Излизане от
+   * платното за движение», основна — and printed its own instruction to the
+   * student on the glass. This performs that instruction. It changes no
+   * grading, and `MODE === "right"` keeps it away from the wrong legs, which
+   * never steer.
+   *
+   * THE THROTTLE IS DELIBERATELY NOT TOUCHED. The product’s advice to a human
+   * includes «отпусни газта», but a harness that also stops the car cannot
+   * then derive a heading from two poses and has nothing left to steer with.
+   * The minimal intervention is the wheel, and the wheel is what is bounded.
+   */
+  if (
+    MODE === "right" &&
+    lastRouteHold === "off-road" &&
+    AUTHORED_LINE !== null &&
+    reverse.armed !== true &&
+    guideWitness.length >= 2
+  ) {
+    if (!recovery.active) {
+      recovery.active = true;
+      recovery.episodes += 1;
+      recovery.startedAtMs = Date.now();
+      recovery.startedAt = tSec;
+      recovery.metres = 0;
+      recovery.ms = 0;
+      recovery.sustainRun = 0;
+      recovery.sustainDir = 0;
+      note(
+        `  REJOINING THE ROUTE (episode ${recovery.episodes}) at t=${tSec}s — the product says the car is off the road, and this leg is steering back to content/traces/${SCENARIO}/shadow-correct.trace.json.`,
+      );
+    }
+    const a = guideWitness[guideWitness.length - 2];
+    const b = guideWitness[guideWitness.length - 1];
+    recovery.metres += Math.hypot(b.x - a.x, b.z - a.z);
+    recovery.ms = Date.now() - recovery.startedAtMs;
+    const budget = recoveryBudget({ metresSpent: recovery.metres, msSpent: recovery.ms, episode: recovery.episodes });
+    if (!budget.ok) {
+      if (!recovery.refusals.includes(budget.why)) { recovery.refusals.push(budget.why); loud(budget.why); }
+      recovery.active = false;
+      push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, loop: false, recovery: true, why: budget.why });
+      return;
+    }
+    const aim = recoveryAim({ x: b.x, z: b.z, prevX: a.x, prevZ: a.z, poly: AUTHORED_LINE, reversing: false });
+    if (aim.errDeg === null) {
+      push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, loop: false, recovery: true, why: `rejoin held off — ${aim.why}` });
+      return;
+    }
+    /* THE SAME CONTROL LAW, so the same radius, lock and tick bounds govern
+     * this as govern ordinary driving. A bespoke recovery controller would be
+     * a second set of physics nobody has measured. */
+    if (recovery.sustainDir === Math.sign(aim.errDeg)) recovery.sustainRun += 1;
+    else { recovery.sustainRun = 1; recovery.sustainDir = Math.sign(aim.errDeg); }
+    const cmd = steerCommand({
+      errDeg: aim.errDeg,
+      kmh,
+      dtMs: periodMs,
+      sustainRun: recovery.sustainRun,
+      confident: true,
+    });
+    if (cmd.dir !== null && cmd.holdMs > 0) {
+      await steer(cmd.dir, kmh);
+      await page.waitForTimeout(cmd.holdMs);
+      await steer(null, kmh);
+      recovery.ticks += 1;
+    }
+    push({
+      seen: false,
+      errDeg: null,
+      nearDeg: null,
+      loop: false,
+      recovery: true,
+      recoveryErrDeg: aim.errDeg,
+      offRouteM: aim.offRouteM,
+      dir: cmd.dir,
+      holdMs: cmd.holdMs,
+      sustain: cmd.sustain === true,
+      why: `rejoining: ${aim.why} — ${cmd.why}`,
+    });
+    return;
+  }
+  if (recovery.active) {
+    recovery.active = false;
+    recovery.rejoined += 1;
+    recovery.sustainRun = 0;
+    recovery.sustainDir = 0;
+    note(
+      `  BACK ON THE ROAD at t=${tSec}s — episode ${recovery.episodes} cost ${Math.round(recovery.metres)} m and ${Math.round(recovery.ms / 1000)} s. Those metres are the harness’s, not the student’s, and are excluded from the tracking rate.`,
+    );
   }
   // A REFUSAL IS A MEASUREMENT OF THE BOX, SO IT EXPIRES.
   // `no-band` does not: that is a claim about the WORLD (this lane draws no
@@ -6887,6 +7022,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
    * one place every tick passes through whatever branch it later takes. Put it
    * inside the roll phase and a car that left the road and stopped — the
    * commonest shape of the failure — would be counted as never having left. */
+  lastRouteHold = p.routeHold ?? null;
   if (p.routeHold === undefined) routeHold.unread += 1;
   else if (p.routeHold === null) routeHold.clearTicks += 1;
   else {
@@ -9025,6 +9161,13 @@ const trailingUnphotographedPx = Math.max(0, (geo.contentH ?? 0) - lastFrameEnd)
       ? { ...dev, referenceLine: `content/traces/${SCENARIO}/shadow-correct.trace.json`, points: authored.length }
       : null;
     guidance.routeRefusal = routeDeviationRefusal(dev);
+    guidance.recovery = {
+      ...recovery,
+      /* A drive that had to be steered back is not the same drive as one that
+       * never left, and a reader must not have to infer which they are holding. */
+      everLeft: recovery.episodes > 0,
+      ceiling: RECOVERY_MAX_EPISODES,
+    };
     /* ── THE TWO WITNESSES, CROSS-CHECKED ────────────────────────────────────
      * `dev` is geometry against the authored line; `routeHold` is the
      * product's own `runtime/spatial.ts` judgement against its own edge
@@ -9077,6 +9220,7 @@ try {
         // geometry above. `agreesWithGeometry` is null when either witness
         // could not be measured — never true by default.
         routeHold: guidance.routeHold ?? null,
+        recovery: guidance.recovery ?? null,
         geometry: {
           scroller: geo.scroller,
           viewportH: geo.viewportH ?? null,
@@ -9476,6 +9620,15 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
         `  ROUTE FIDELITY: NOT MEASURED — ${guidance.routeReferencePoints ? "too few moving pose samples" : `no content/traces/${SCENARIO}/shadow-correct.trace.json on disk`}. ` +
           `This is UNKNOWN, not zero.`,
       );
+    }
+    if (guidance.recovery.everLeft) {
+      note(
+        `  REJOIN: ${guidance.recovery.episodes} departure(s), ${guidance.recovery.rejoined} rejoined, ` +
+          `${guidance.recovery.ticks} steering tick(s) spent, ${Math.round(guidance.recovery.metres)} m and ` +
+          `${Math.round(guidance.recovery.ms / 1000)} s inside the last episode. Recovery samples are marked loop:false ` +
+          `and are excluded from the tracking rate — they are this harness driving, not the product being measured.`,
+      );
+      for (const r of guidance.recovery.refusals) loud(r);
     }
     if (guidance.routeRefusal) loud(guidance.routeRefusal);
     {
