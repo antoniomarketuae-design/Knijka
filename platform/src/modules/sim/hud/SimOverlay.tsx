@@ -1940,8 +1940,19 @@ export function SimOverlay({
   // and not `detailBg` since sc-pk-driveway:fa602d10 — two items sharing one
   // paragraph and carrying two different summaries would otherwise be ONE key,
   // and the fold would be counted against the row the previous card painted.
+  // ── THE SEPARATOR IS WRITTEN `\u0000` AND NOT TYPED — 2026-09-14, and it is a
+  //    TOOLING fact rather than a style one. A RAW NUL BYTE anywhere in a source
+  //    file makes every tool built on grep or ripgrep classify it as BINARY and
+  //    skip it IN SILENCE: `grep -n` answers „Binary file … matches“ and a
+  //    ripgrep-backed search answers NOTHING AT ALL, with no error, on the
+  //    most-edited component in this product. That is this repo's own „a matcher
+  //    must report what it cannot read“ failure wearing a different hat, and it
+  //    cost this lane one wrong answer before it was noticed. The escape yields
+  //    the identical U+0000 in the identical template literal, so the key is
+  //    byte-for-byte the one it was; the reason for a separator that cannot
+  //    occur in authored Bulgarian is untouched.
   const foldKey =
-    shown === null ? "" : `${shown.id} ${shown.lineBg} ${shown.detailBg ?? ""} ${shown.peekBg ?? ""}`;
+    shown === null ? "" : `${shown.id}\u0000${shown.lineBg}\u0000${shown.detailBg ?? ""}\u0000${shown.peekBg ?? ""}`;
   const peekFold = useFoldLines(`peek ${foldKey}`);
   // …and the ground's own measurement, keyed on the same identity: a new item
   // is a new row set, and the row set is what decides how far the card paints
@@ -3259,13 +3270,89 @@ export function SimOverlay({
           fit a 167.5 px rail lane), so a rule that stood it down for a second
           could never match. Removed rather than left as dead CSS that reads
           like a live arbitration. The tier lives in the ⚙ sheet on a phone. */}
+      {/* ══ THE ENTRANCE SPENT THE GROUND THE CARD WAS GIVEN — 2026-09-14,
+             sc-ac-snow:55ddf562, „the in-drive ИНСТРУКЦИИ panel is plateless —
+             the buildings behind it read through the text".
+
+             THE FRAME IS THIS FILE'S OWN BYTES. `.audit-frames/w45/frames/
+             sc-ac-snow__mobile-right/04-t035s.png` (iPhone 16 landscape
+             852 × 393 at dpr 3, served 1ca91558076e — and `git diff 1ca9155
+             HEAD -- SimOverlay.tsx` is EMPTY, so the sweep photographed the
+             source below and not an ancestor of it). The card prints «Стигна
+             точката, но без светлините, които задачата иска» and the tree, the
+             parked queue and the red saloon behind it are legible THROUGH the
+             words. Peak ink and median ground down the line-2 band, x 1620–2240:
+
+               04-t035s   ink peak 208.7   ground p50 60.1
+               04-t041s   ink peak 245.6   ground p50 27.0   ← the same drive,
+                                                               six seconds later,
+                                                               a DIFFERENT card
+
+             [Corrected by the wave-46 verifier. This table first said «the
+             same card». It is not: t035 is «Стигна точката, но без
+             светлините…» (ЗАЩО ↓10) and t041 is «Стигна точката, но твърде
+             бързо» (ЗАЩО ↓9, «преди 3 с»), so the table alone proves nothing
+             about time. The control that does is inside t035 itself: the
+             dash band's own `--foreground` ink reaches the full 245.6 in that
+             frame, so the dimming is local to the card — not an impact flash,
+             not the scene, not tone mapping. Independently, sc-junction-gap
+             mobile-right 04-t039s has a card-band maximum of 211.4 with no
+             plate visible at all, against 245.6 / 20.8 at 04-t045s of the
+             same drive.]
+
+             This card's line row is `--foreground` #f2f6fc; settled frames
+             peak at 237.4–245.6 (14 of this leg's 20 in-drive frames sit at
+             237.4). A card whose INK and
+             whose GROUND are both short BY THE SAME FACTOR is not a shade that
+             failed to paint: it is the whole element compositing at partial
+             opacity — and the only thing on this element that animates opacity
+             is the rule three lines below. Nothing else can: PlayAreaStyles
+             gives `[data-hud="notify-column"]` a `top` transition and gives
+             opacity only to the tier picker and the pedal ghosts.
+
+             SO THE 0 → 1 RAMP IS A GLYPH STANDING ON A PARTIAL GROUND, WHICH IS
+             THE ONE STATE THIS CARD'S SHADE EXISTS TO ABOLISH. The block at
+             `PEEK_SCRIM_FEATHER_PX` refuses the SPATIAL version of exactly this
+             in its own words — „a glyph standing on a partial ground is the
+             defect this shade exists to close, not a milder version of it" —
+             and a group `opacity` is the TEMPORAL version of the same picture:
+             the shade is a `z-index: -1` CHILD, so one factor dims the ground
+             and the letters together and the ink never meets a full ground at
+             all. Arithmetic over the 8-bit sRGB the compositor actually uses,
+             with this lesson's facade at L 200 (measured L90 207.3 in the world
+             band beside the card) and the shade's near-black at L 10.6:
+
+               α     ground    ink     ink vs ground    world vs world
+               0.4    139.4   218.2       2.43 : 1         2.73 : 1
+               0.6    109.1   227.4       4.04 : 1
+               0.8     78.8   236.5       6.99 : 1
+               1.0     48.5   245.6      12.09 : 1         1.32 : 1  ← measured,
+                                                                       shipped
+
+             AA is not reached until α ≈ 0.64, i.e. about 75 ms of the 180. And
+             the row's own sentence is TRUE across that stretch, at 2.73 : 1 in
+             a card whose ruled ceiling is 1.37 : 1 („it must not become a
+             curtain", the 0.80 block) — this does not retire that row, whose
+             steady state IS the founder's cap, but it is the only part of the
+             card's life in which the claim exceeds the ruling.
+
+             THE MOTION IS NOT THE DEFECT AND IS KEPT. `translateY(-6px)` is
+             what makes this read as an arrival; the fade is what makes it
+             unreadable while it arrives, and it buys nothing the slide does not
+             already say. The animation predates the ground by three weeks
+             (7d6ea2a 2026-07-29, against e9bf33c 2026-08-19) — it was written
+             for a card that had no ground to be partial, and nobody came back
+             to it when one arrived. A card that appears at full strength is
+             also not a new appearance in this product: the reduced-motion rule
+             below has shipped exactly it, with no ramp at all, since the same
+             commit. ══════════════════════════════════════════════════════ */}
       <style>{`
         [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="telltale-pings"] {
           display: none;
         }
         @keyframes sim-overlay-in {
-          from { opacity: 0; transform: translateY(-6px); }
-          to   { opacity: 1; transform: none; }
+          from { transform: translateY(-6px); }
+          to   { transform: none; }
         }
         .sim-overlay-in { animation: sim-overlay-in 180ms ease-out both; }
         @media (prefers-reduced-motion: reduce) {

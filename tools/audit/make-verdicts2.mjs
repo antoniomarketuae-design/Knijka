@@ -572,18 +572,46 @@ function lastVerifyByFinding() {
  * claim of «already fixed» that names no commit is exactly the shape Rule 0
  * exists to refuse.
  */
+/*
+ * EVERY WAVE'S REPORTS, NEWEST FIRST — not just w44's. This read one hardcoded
+ * directory, so wave 46's lanes would have reached no judge at all. And the
+ * newest report must win: a row a w44 lane called ALREADY-FIXED that a w46
+ * verifier then ruled NOT-REPAIRED is judged on the w46 words or not at all.
+ *
+ * THE HEADER'S ID LIST IS THE ROW LIST WHEN THERE IS ONE. A report body names
+ * other rows in passing (a lane cites a sibling's closure as precedent), and
+ * matching ids anywhere in the text handed that report to rows it is not about.
+ * Whole-text matching stays only as the fallback for a report with no header.
+ *
+ * From wave 46 a report file carries the ADVERSARIAL VERIFIER'S ruling FIRST
+ * and the lane's claim after it, so the slice a judge sees leads with the
+ * ruling. Measured on w46 chunk 1: of 7 lanes, the verifier overturned the
+ * lane's own headline on 4 (a REPAIRED that repaired another defect, two
+ * MISROUTEDs that were BLOCKED, an ALREADY-FIXED that was partial).
+ */
 function laneReportsByFinding() {
   const out = new Map();
-  const dir = path.join(REPO, ".audit-frames", "w44-reports");
-  let files = [];
-  try { files = fs.readdirSync(dir).filter((f) => f.endsWith(".md")).sort(); } catch { return out; }
-  for (const f of files) {
-    let txt = "";
-    try { txt = fs.readFileSync(path.join(dir, f), "utf8"); } catch { continue; }
-    const ids = [...new Set(txt.match(/[a-z0-9-]+:[0-9a-f]{8}/g) || [])];
-    // The header comment we wrote holds the id list; the body holds the prose.
-    const body = txt.replace(/^<!--[\s\S]*?-->\s*/, "").trim();
-    for (const id of ids) if (!out.has(id)) out.set(id, { file: f, body });
+  const root = path.join(REPO, ".audit-frames");
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(root)
+      .map((d) => ({ d, n: Number((d.match(/^w(\d+)-reports$/) || [])[1]) }))
+      .filter((x) => Number.isFinite(x.n))
+      .sort((a, b) => b.n - a.n)
+      .map((x) => x.d);
+  } catch { return out; }
+  for (const d of dirs) {
+    let files = [];
+    try { files = fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".md")).sort(); } catch { continue; }
+    for (const f of files) {
+      let txt = "";
+      try { txt = fs.readFileSync(path.join(root, d, f), "utf8"); } catch { continue; }
+      const header = (txt.match(/^<!--([\s\S]*?)-->/) || [])[1] || "";
+      const listed = (header.match(/findings:\s*([^\n]*)/) || [])[1] || "";
+      const ids = [...new Set((listed || txt).match(/[a-z0-9-]+:[0-9a-f]{8}/g) || [])];
+      const body = txt.replace(/^<!--[\s\S]*?-->\s*/, "").trim();
+      for (const id of ids) if (!out.has(id)) out.set(id, { file: d + "/" + f, body });
+    }
   }
   return out;
 }
@@ -622,16 +650,16 @@ batches.forEach((group, bi) => {
       /* THE REPAIR LANE'S OWN WORDS, once per report rather than once per row,
        * because one lane covers several rows of one file and repeating it would
        * bury the frames. Trimmed hard: a judge needs the verdict and the reason,
-       * and can open .audit-frames/w44-reports/ for the rest. */
+       * and can open the named .audit-frames/wNN-reports/ file for the rest. */
       const seenReports = new Set();
       const laneNotes = [];
       for (const id of e.ids || []) {
         const rep = LANE_REPORT.get(id);
         if (!rep || seenReports.has(rep.file)) continue;
         seenReports.add(rep.file);
-        const claim = rep.body.replace(/\s+/g, " ").slice(0, 700);
+        const claim = rep.body.replace(/\s+/g, " ").slice(0, 1200);
         laneNotes.push(
-          "      >> A REPAIR LANE WENT TO THIS ADDRESS (" + rep.file + ") AND CLAIMS: " + claim +
+          "      >> A REPAIR LANE (AND, FROM w46, ITS ADVERSARIAL VERIFIER) WENT TO THIS ADDRESS (.audit-frames/" + rep.file + ") AND SAYS: " + claim +
             " [this is the LANE'S CLAIM, not a verdict. If it says ALREADY-FIXED and names no commit, Rule 0 refuses it: that is indistinguishable from «could not reproduce».]",
         );
       }

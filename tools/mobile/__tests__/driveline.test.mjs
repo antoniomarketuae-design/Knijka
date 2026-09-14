@@ -57,6 +57,7 @@ import {
   releaseVerdict,
   SEATBELT_LABEL,
   STUCK_START_OTHER_RE,
+  TASK_CAP_STRIP_SEL,
   taskCapKmh,
   wilson,
 } from "../lib/driveline.mjs";
@@ -284,6 +285,30 @@ describe("§E the task cap, read off the product's own glass", () => {
     const t = "дръж под 40 км/ч";
     assert.equal(taskCapKmh(t), 40);
     assert.equal(taskCapKmh(t), 40);
+  });
+  it("reads the COCKPIT STRIP's form — the only surface sc-ac-truck-spray shows its cap on", () => {
+    // Verbatim shape of `StatusDashboard.tsx:661` as `innerText` returns it,
+    // and of `w37/frames/sc-ac-truck-spray__pc-wrong/04-t060s.png`'s strip.
+    assert.equal(taskCapKmh("· задачата иска ≤80\n"), 80);
+    // The whole probe string: banner + advisor with NO cap, then the strip.
+    const banner = "Задача 1/2 Мини зоната с пръските зад камиона\n";
+    const advisor = "Отдалечи се от камиона и гледай през пръските\n";
+    assert.equal(taskCapKmh(banner + advisor), null, "the control: without the strip, this lesson has no cap on the glass");
+    assert.equal(taskCapKmh(banner + advisor + "· задачата иска ≤80\n"), 80);
+  });
+  it("takes the HIGHEST across BOTH phrasings, with the decimal comma either way", () => {
+    assert.deepEqual(parseTaskCapsKmh("… дръж под 36 км/ч …\n· задачата иска ≤47,5\n"), [36, 47.5]);
+    assert.equal(taskCapKmh("… дръж под 55 км/ч …\n· задачата иска ≤55\n"), 55, "the common case — both surfaces, one number");
+  });
+  it("does not read a cap out of the strip's NEIGHBOURS — «РЕЖИМ Нормален ≤60» and the disc are not the task's", () => {
+    // The strip prints three ceilings side by side; only the task's is billed
+    // as the task's, and a leg held to beat the MODE ceiling would be held to
+    // the wrong number.
+    assert.equal(taskCapKmh("140 · РЕЖИМ Нормален ≤150 · знакът важи\n"), null);
+    assert.equal(taskCapKmh("140 · РЕЖИМ Нормален ≤150 · знакът важи · задачата иска ≤80\n"), 80);
+  });
+  it("still refuses the TRUNCATED banner after the second phrasing was added", () => {
+    assert.equal(taskCapKmh("… дръж под 63 км/"), null);
   });
 });
 
@@ -696,6 +721,20 @@ describe("§K the product surfaces this reader stands on", () => {
       assert.ok(S.includes(`titleBg: "${other}`), `the «${other}…» stuck-start title moved — a car held by that blocker will now read as UNHELD`);
       assert.match(other, STUCK_START_OTHER_RE);
     }
+  });
+
+  it("the cockpit strip still prints the task's cap in the form TASK_CAP_RE reads, under the selector the probe queries", () => {
+    const D = src("platform/src/modules/sim/hud/StatusDashboard.tsx");
+    const at = D.indexOf(`data-hud="governor-task-binds"`);
+    assert.ok(at >= 0, "the strip's binding-cap span lost `data-hud=\"governor-task-binds\"` — TASK_CAP_STRIP_SEL now reads nothing and sc-ac-truck-spray goes back to „no cap on the glass\"");
+    assert.equal(TASK_CAP_STRIP_SEL, '[data-hud="governor-task-binds"]');
+    assert.ok(/·\s*задачата иска ≤\{bindingKmh\}/.test(D.slice(at, at + 400)), "the strip no longer prints «· задачата иска ≤{bindingKmh}» inside that span — re-derive TASK_CAP_RE's second phrasing from it");
+    // …and the probe actually reads it, into the cap text and ONLY there.
+    const A = src("tools/mobile/lesson-audit.mjs");
+    assert.ok(A.includes("capStripSel: TASK_CAP_STRIP_SEL"), "probe() no longer passes the strip selector into its evaluate");
+    const cap = A.slice(A.indexOf("taskCapText: (() => {"), A.indexOf("taskCapText: (() => {") + 400);
+    assert.ok(cap.includes("querySelectorAll(capStripSel)"), "taskCapText no longer appends the strip");
+    assert.ok(!/revText\s*\+=[^\n]*capStripSel/.test(A), "the strip leaked into revText — the reverse regexes would now see a third surface");
   });
 
   it("the cap phrasing is still the one the shell's own regex emits", () => {

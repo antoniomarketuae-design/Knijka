@@ -473,13 +473,42 @@ export function releaseVerdict({ before, after, kmhBefore = null, kmhAfter = nul
  */
 
 /**
- * `LessonPlayShell.tsx:849,926` — `${titleBg} — дръж под ${shown} км/ч`, the
- * only cap phrasing the advisor and the objective banner emit. Read off the
- * product's own glass, never from the template: what the engine grades and
- * what the student is told are two facts (`shownCapKmh` clamps to the posted
- * limit), and the one a `wrong` leg must be seen to beat is the one on screen.
+ * THE TWO PHRASINGS A TASK CAP REACHES THE GLASS IN. Read off the product's own
+ * glass, never from the template: what the engine grades and what the student
+ * is told are two facts (`shownCapKmh` clamps to the posted limit), and the one
+ * a `wrong` leg must be seen to beat is the one on screen.
+ *
+ *   1. `lessons/advisor.ts` / `LessonPlayShell.tsx` — `${titleBg} — дръж под
+ *      ${shown} км/ч`, on the objective banner and the advisor card.
+ *   2. `hud/StatusDashboard.tsx:661` — `· задачата иска ≤{bindingKmh}`, amber,
+ *      on the cockpit strip, `data-hud="governor-task-binds"`, printed whenever
+ *      the task's cap is the number the student is actually billed against.
+ *
+ * THIS DOCBLOCK USED TO SAY PHRASING 1 WAS „THE ONLY" ONE, and that sentence
+ * kept two rows unjudgeable. Wave 46's truck-spray lane measured it on
+ * `w37/frames/sc-ac-truck-spray__pc-wrong/04-t060s.png`: the disc reads 140 and
+ * the strip reads «задачата иска ≤80», while the objective banner states the
+ * task with no cap in it (the lane's verifier found no «дръж под» on that
+ * surface). So the w45 sidecar said `"done": "no-cap"` — „no «дръж под N км/ч»
+ * is on the glass" — about a lesson whose cap was painted in amber in front of
+ * the driver. `sc-ac-truck-spray:990e5f64` (critical) and `:8ed4d8b3` have been
+ * refused for want of the antecedent on every sweep since wave C: no wrong leg
+ * in w17, w34–w37 or w45 topped 66 км/ч, because nothing told the hold there
+ * was a cap to beat.
+ * The product already knew there are two surfaces: `advisor.ts:562` recovers
+ * the strip's figure with a regex of its own.
+ *
+ * Phrasing 2 needs no unit: the strip prints the numeral straight after `≤`.
+ * The truncation guard on phrasing 1 is unchanged — «… дръж под 63 км/» still
+ * reads as no cap.
  */
-export const TASK_CAP_RE = /дръж\s+под\s+(\d+(?:[.,]\d+)?)\s*км\/ч/gu;
+export const TASK_CAP_RE = /(?:дръж\s+под\s+(\d+(?:[.,]\d+)?)\s*км\/ч|задачата\s+иска\s+≤\s*(\d+(?:[.,]\d+)?))/gu;
+
+/** The cockpit strip's binding-cap span (phrasing 2 above). Read in the SAME
+ *  `evaluate` as the banner and the advisor, appended to `taskCapText` only —
+ *  never to the reverse-demand text, whose regexes must see exactly the two
+ *  surfaces they always saw. */
+export const TASK_CAP_STRIP_SEL = '[data-hud="governor-task-binds"]';
 
 /** Every cap on the glass, in the order found.
  *
@@ -492,7 +521,7 @@ export function parseTaskCapsKmh(text) {
   if (typeof text !== "string" || text === "") return [];
   const out = [];
   for (const m of text.matchAll(new RegExp(TASK_CAP_RE.source, TASK_CAP_RE.flags))) {
-    const v = Number(String(m[1]).replace(",", "."));
+    const v = Number(String(m[1] ?? m[2]).replace(",", "."));
     if (Number.isFinite(v) && v > 0) out.push(v);
   }
   return out;
@@ -535,7 +564,7 @@ export function overCapHold({
     return {
       hold: false,
       done: "no-cap",
-      why: "no «дръж под N км/ч» is on the glass, so this leg has no antecedent to exercise and its rest cadence is untouched",
+      why: "no task cap is on the glass — neither «дръж под N км/ч» on the banner or advisor nor «задачата иска ≤N» on the cockpit strip — so this leg has no antecedent to exercise and its rest cadence is untouched",
     };
   }
   const need = capKmh + marginKmh;

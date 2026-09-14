@@ -529,12 +529,68 @@ export const SC_JX_PRIO_WAITING_CAR: PriorityFromRightSpec = {
   // изпитния лист — задръж това ниво». Its beats were replayed through
   // `reduceTick` with THIS lesson's compiled `ruleConfig`, smooth and chopped:
   //
-  //   · STOPPED_WITHOUT_CAUSE — armed below, correctly wired, and NOT dead. It
-  //     is silent because the harness counted three SEPARATE halts and each was
-  //     shorter than `needlessStopSustainSec` (6 s). Smooth the same beats so
-  //     the t061/t067 pair becomes one 7 s rest and the code fires. The 6 s is
-  //     also not movable from here: its own note derives it as 3× the longest
-  //     rest in this template's committed traces.
+  //   · STOPPED_WITHOUT_CAUSE — armed below, correctly wired, NOT dead, and
+  //     silent for TWO reasons. This bullet used to name only the smaller one,
+  //     and it sent the next lane at the wrong lever. Re-measured 2026-09-14
+  //     at 3c1e1c6 by driving `recordScriptedDrive` → `applyTick` on the
+  //     compiled rung, the same pipe `s-w3-bot-completion.test.ts` uses:
+  //
+  //      1. THE JUNCTION ACQUITS EVERY STOP NEAR IT, HOWEVER LONG. The first
+  //         arm of `townReasonAheadExceptLead` (rules/engine.ts), which
+  //         `needlessStopReason` reads, is `tick.nextJunctionM <=
+  //         townCrawlClearAheadM` (25 m). `nextJunctionM` is a RADIUS
+  //         (runtime/worldRuntime.ts: `Math.hypot` to the nearest node), so
+  //         the band is 25 m on EITHER side of tj-n-c. A 10 s dead stop at
+  //         x = −12 on L1 books nothing. That band is where this drill's
+  //         fault happens: the w42 commendation above could only latch
+  //         within 14 m of the node. On a generic route the arm is right,
+  //         because the reducer cannot see who owes way at a node. On THIS
+  //         route the header above proves tj-n-c obliges this driver to
+  //         nothing.
+  //
+  //         A PER-LESSON SWITCH ON THAT ARM IS NECESSARY AND NOT SUFFICIENT.
+  //         [Corrected by the wave-46 verifier, who re-ran it.] This bullet
+  //         first said a replay "with that arm removed" bills a stop at
+  //         x = −12 — but that replay's stand-in, `townCrawlClearAheadM: 0`,
+  //         also switched off the stop-line, pedestrian and 25 m lead-queue
+  //         excuses. Deleting ONLY `tick.nextJunctionM` before `reduceTick`:
+  //         a 7 s or 10 s stop at x = −12 or x = −5 still books nothing, and
+  //         only a 15 s stop is billed (at 26.5 s). The waiting car pulls
+  //         into the lane about 5.5 s into any stop that close (at x = −12 it
+  //         is 11.8–12 m ahead from 18.7 to 20.5 s), the kept lead-queue arm
+  //         excuses those frames, and `stepEpisode` RESETS `activeSince` on
+  //         any excused frame (rules/engine.ts, the IDLE branch) — so the
+  //         6 s count starts over once the waiter clears. In the ≤ ~12 m band
+  //         the clock reset is the real blocker. Under that emulation the
+  //         shadow, phantom-brake and blind-priority demos grade identically
+  //         to HEAD. The switch itself belongs in rules/types.ts +
+  //         rules/engine.ts, then one key in `ruleConfig` below; it cannot be
+  //         written here first, because `ruleConfig` is
+  //         `Partial<RuleEngineConfig>` and tsc rejects an unknown key.
+  //
+  //      2. THE SUSTAIN. A stop shorter than `needlessStopSustainSec` (6 s)
+  //         books nothing: fourteen 3 s halts at 18 км/ч, 97 s against the
+  //         40 s par, ИЗДЪРЖАН with score 0. The old bullet said this value
+  //         could not be moved from here. It can: `ruleConfig` moves
+  //         thresholds per drill, and `conditionSpeedNightFactor` in
+  //         templates-conditions2.ts does exactly that. It still must NOT be
+  //         moved here, for a reason the old bullet did not know. L5 stages a
+  //         cause the reducer cannot see. A student who stops 28–30 m short
+  //         of the node for SC_JX_PRIO_CREEPER is outside BOTH 25 m bands.
+  //         With a 3 s sustain he gets the card saying «пред теб нямаше нищо
+  //         — нито кола» about the car crossing his path (measured). And the
+  //         6 s protects that student only for stops SHORTER than 6 s: at
+  //         HEAD an 8 s stop at x = −30 or −28 is already billed (18.4 /
+  //         18.6 s), while the creeper left his lane at 13.8 s and its
+  //         encounter only resolves at 19.3 s — a pre-existing conviction of
+  //         a student waiting on a car the reducer cannot see, measured by
+  //         replay and not yet photographed. Setting
+  //         the value on L1–L4 only does not help either: `compile.ts` treats
+  //         a `ruleConfig` that differs between rungs as the higher rung
+  //         adding «rules», and tells the student «Оценява се по-строго» on
+  //         the one rung that would grade MORE leniently. The stop-and-go half
+  //         belongs to the engine too: it needs causeless rest ADDED UP across
+  //         separate stops, not one shorter stop.
   //
   //   · DRIVING_TOO_SLOW_IN_TOWN — the junction does NOT excuse it, which is
   //     what this note used to claim. `tick.nextJunctionM` is the distance to

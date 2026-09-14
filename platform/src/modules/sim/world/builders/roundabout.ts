@@ -331,10 +331,21 @@
  * approach in all 145 samples is r = 16.79 m at t067s — body centre 3.04 m
  * outside the wall face, and even if the car were pointed straight at the
  * middle its nose (`CHASSIS_HALF_EXTENTS.z` 2.02) would still be 1.02 m short
- * of the concrete — and it comes to rest at (36.61, −30.03), r = 47.35 m.
+ * of the concrete — and it ends at (56.77, −46.96), r = 73.68 m.
  * `w43` (2026-09-13, commit 177c4ba9, attested, clean) is the same drive:
- * closest 15.97 m at t067s, final rest r = 45.76 m. Neither leg ends ON the
- * island; they end 25.4 m and 23.8 m OUTSIDE the ring's own outer kerb.
+ * closest 15.97 m at t067s, ending r = 69.71 m. Neither leg ends ON the
+ * island; they end 51.6 m and 47.7 m OUTSIDE the ring's own outer kerb.
+ *   [CORRECTED IN WAVE 45 — this sentence originally read „comes to rest at
+ *   (36.61, −30.03), r = 47.35 m … 25.4 m and 23.8 m OUTSIDE", which is each
+ *   leg's SEVENTH distinct stop (w41 t086s, w43 t086s — w41 also stands still
+ *   at t8s, t24–54 for the billed 31 s yield, t60–62, t70–73 and t76; this
+ *   note first called it the «first 0 км/ч sample», which the wave-46 verifier
+ *   struck) and not where it stopped:
+ *   both cars pull away again and drive on to the figures above. The direction
+ *   of the error was toward the refutation's own conclusion being weaker than
+ *   the truth, which is the only reason it survived a read — and it is exactly
+ *   the failure this module's „print every number off this commit" discipline
+ *   exists to catch, so it is corrected in place rather than restated below.]
  *
  * AND THE ISLAND BILLS NOTHING ON EITHER. w41's debrief carries TWO faults and
  * NO collision: «Влизане без пропускане −10» (в 2:17 — the chip is on the glass
@@ -390,6 +401,70 @@
  * REFUTED, NO CODE. The fourth refutation of this row from this file, and the
  * first that does not need the island wall to make its case — because on the
  * legs now being cited the car never got within three metres of it.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * WAVE 45, 2026-09-14 — A SIXTEENTH PICK-UP. The block above is re-derived
+ * from the artefacts rather than re-read, which is what found the wrong number
+ * now corrected in place at „THE HEAD CLAUSE IS FALSE" — and the re-derivation
+ * adds two things that block could not say. Both are printed off w41's own
+ * `_audit-status.json` / `_audit-debrief.json` and off THIS commit's
+ * `analyzeRoundabouts` (rb-mini-v1: centre (0, 0), `islandRadiusM` 13.7499,
+ * `ringHalfWidthM` 4.0625, `ringOuterRadiusAt` 21.91–22.05 over 360 samples,
+ * `ISLAND_WALL_RISE_M` 0.45 / `ISLAND_WALL_TOP_Y` 0.59 — every one unchanged).
+ *
+ * FIRST: THE HEAD CLAUSE IS NOW FALSE BY CLASSIFICATION, NOT BY A MINIMUM.
+ * The earlier blocks answer „is the car on the island" with the drive's closest
+ * approach, which is one sample and invites the reply that the sampler missed
+ * the moment. Every one of w41's 145 poses was instead classified against the
+ * shipped geometry — inside the island (r < 13.7499), on the circulating
+ * carriageway (13.785 … 22.05), on an arm (within the 8.125 m travel half
+ * width of x = 0 or z = 0 beyond r = 18), or off the road. The island bucket is
+ * EMPTY. Not „nearly empty": no pose of this drive is inside the wall, and the
+ * nearest miss is 3.04 m of body centre. The frame the row leans on,
+ * `04-t081s.png`, classifies OFF at r = 35.00 m — 13.0 m beyond the ring's own
+ * outer kerb and 21.2 m beyond the island — so the grass filling that
+ * windscreen is outer terrain in the wedge between the east and south arms,
+ * where this module draws nothing at all. The car crosses the EAST ARM's south
+ * kerb between t078s (23.48, −7.70; 7.70 m off the arm axis, on) and the next
+ * sample (25.04, −10.56; 10.56 m off, off) — and that kerb is drawn and
+ * continuous: `ringMouthKerbRuns` flares from (19.75, −9.54) into (22.00,
+ * −8.13) and runs straight down the arm at z = −8.125 to x = 36.83.
+ *
+ * SECOND, AND IT IS THE GROUND THE ESCALATION STANDS ON: THE COACH IS NOT
+ * SERENE AT t081s. The refiling says the coach „calmly says to leave the
+ * roundabout with the right indicator" while the windscreen is grass. Opened,
+ * `04-t081s.png` carries a full teach card beside the banner — «Излезе от
+ * кръговото без десен мигач … Излизането от кръговото е маневра надясно и се
+ * сигнализира — мигачът казва на колите зад теб и на чакащите на изхода, че
+ * напускаш кръга. Задачата остава отворена: Върни се в кръговото и излез с
+ * пуснат десен мигач.» That is the student being told what he did, why it
+ * matters and how to recover, at the exact beat quoted as proof that nothing
+ * was being said. The reading that produced the escalation took the bare
+ * ЗАДАЧА line as the whole feed; the card to its right is the rest of it.
+ * `04-t086s.png` then has all three at once — the prefixed banner («Колата е
+ * извън пътя — върни се на платното, за да продължиш»), the recovery coaching
+ * («Не дърпай волана — отпусни газта, изправи колелата и се върни под малък
+ * ъгъл…») and the «ОСНОВНА ГРЕШКА −3 · Излизане от платното за движение» card.
+ * Requirement-zero is met on this leg, five seconds after the departure and
+ * three seconds after the debounce that governs the banner.
+ *
+ * WHAT IS LEFT IS THE DEBOUNCE, AND IT IS UNCHANGED AND UNMOVED. Off-road from
+ * t ≈ 78 s (inside t ∈ [78, 79) — `tSec` is integer in the artefact, so any
+ * decimal here is interpolation, not measurement), so t081s is about 3 s into
+ * `ROUTE_HOLD_S = 5` and the banner qualifies at ≈ t083s; the beats are 5–6 s apart, so t086s is the first
+ * frame this catalogue can photograph it on — which is where the refiling finds
+ * it. The address is still `lessons/advisor.ROUTE_HOLD_S` / `routeHoldForSession`
+ * → `LessonPlayShell.objectiveTitleUnderHold` (line 7544, `titleBg`) and
+ * `routeHoldAdvisorPrompt`, all four verified present and live at this commit,
+ * and shortening a DERIVED number is still a founder ruling and still not here.
+ *
+ * AND THE MODULE CANNOT HAVE MOVED UNDER THE SWEEP: `git diff 1f399405 HEAD`
+ * on this file is +134 lines, every one of them a comment line. The code w41
+ * photographed is the code at HEAD, so no verdict on this row turns on a repair
+ * that landed after the sweep.
+ *
+ * REFUTED, NO PRODUCT CODE — the fifth refutation, and the first in which the
+ * island bucket is empty by census rather than by minimum.
  * ───────────────────────────────────────────────────────────────────────────
  */
 

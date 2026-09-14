@@ -326,7 +326,7 @@ import {
 // `evaluate`s and the presses) is here. `lib/driveline.mjs`'s header carries
 // the measurement behind each one, and `__tests__/driveline.test.mjs` pins
 // both halves — the arithmetic AND the fact that this file still calls it.
-import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, cabinActuationSafe, errorBoundaryVerdict, overCapHold, parkingBrakeRoute, parkingBrakeVerdict, passRate, rateVerdict, releaseVerdict, taskCapKmh } from "./lib/driveline.mjs";
+import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, cabinActuationSafe, errorBoundaryVerdict, overCapHold, parkingBrakeRoute, parkingBrakeVerdict, passRate, rateVerdict, releaseVerdict, taskCapKmh } from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -6573,7 +6573,7 @@ const probe = () =>
       // while printing a tidy blind line nobody had a reason to open. It
       // degraded toward the OLD DRIVE, exactly as the module promises, which
       // is why it was survivable — and it is also why nothing went red.
-      ({ waitSrc, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg }) => {
+      ({ waitSrc, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, capStripSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg }) => {
         const sp = document.querySelector('[aria-label^="Скорост "]');
         const paused = [...document.querySelectorAll(pauseSel)].find((e) => {
           const r = e.getBoundingClientRect();
@@ -6671,8 +6671,23 @@ const probe = () =>
            * beat is the one on screen. Same surfaces and the same free
            * innerText as `reverseWant` above; the parse is
            * `lib/driveline.mjs`'s.
+           *
+           * PLUS THE COCKPIT STRIP, appended here and nowhere else. On
+           * sc-ac-truck-spray the cap reaches the glass ONLY as the strip's
+           * amber «задачата иска ≤80» — the banner never names it — so a read
+           * of the banner and advisor alone reported „no cap" for a lesson
+           * whose cap was in front of the driver (see TASK_CAP_RE). The strip
+           * is kept OUT of `revText` because the reverse regexes above must
+           * keep seeing exactly the two surfaces they always saw. One span, in
+           * the same evaluate and after the same layout flush, so it is free.
            */
-          taskCapText: revText,
+          taskCapText: (() => {
+            let t = revText;
+            for (const el of document.querySelectorAll(capStripSel)) {
+              t += `${(el.innerText || "").replace(/\s+/g, " ").trim()}\n`;
+            }
+            return t;
+          })(),
           /** The looser "is this still a reversing task?" test — see
            *  REVERSE_STAY_RE. Only ever read while the drive is ALREADY in R. */
           reverseStay: (() => {
@@ -6773,6 +6788,7 @@ const probe = () =>
         revPurposeSrc: REVERSE_DEMAND_PURPOSE_RE.source,
         revStaySrc: REVERSE_STAY_RE.source,
         revSel: REVERSE_DEMAND_SEL,
+        capStripSel: TASK_CAP_STRIP_SEL,
         gearSel: GEAR_SEL,
         holdOffRoadBg: ROUTE_HOLD_OFF_ROAD_BG,
         holdCrashPinnedBg: ROUTE_HOLD_CRASH_PINNED_BG,
@@ -6998,8 +7014,10 @@ let flatM = 0;
  * that quietly closes the row it was built to open is worse than none.
  *
  * WITH NO CAP ON THE GLASS THIS IS THE IDENTITY: `overCapHold` returns
- * `hold:false, done:"no-cap"` and every `wrong` lane that has no
- * «дръж под N км/ч» drives byte-for-byte as it did before. */
+ * `hold:false, done:"no-cap"` and every `wrong` lane that shows neither
+ * «дръж под N км/ч» nor the strip's «задачата иска ≤N» drives byte-for-byte
+ * as it did before. A lane that shows ONLY the strip's form (sc-ac-truck-spray)
+ * holds for the first time on the sweep after wave 46 — see TASK_CAP_RE. */
 const overCap = {
   capKmh: null, needKmh: null, topKmh: -1,
   proven: false, provenAtSec: null, provenAtKmh: null,
