@@ -2816,6 +2816,57 @@ export function briefingRoadCeilingPx(
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * …AND THE BUDGET HAS TO PAY FOR THE CHROME THAT HANGS BELOW THE LIST
+ * (sc-junction-rhr:486cad54 again — the row the ceiling above was written for,
+ * re-judged STILL on the w43 re-drive.)
+ *
+ * WHAT THE CEILING ABOVE ACTUALLY GUARANTEES, WHICH IS NOT WHAT IT PROMISES.
+ * `briefingRoadCeilingPx` is spent as a `max-height` on the `<ol>`, and that
+ * placement is right for the reason its own header gives: the header, the ▾/✕
+ * pair and the «↓ още N стъпки — покажи» row are `shrink-0` siblings, so a
+ * ceiling on the CARD would clip the very control that pages to the words the
+ * ceiling took. But the consequence was never subtracted. Below the list sit
+ * that 18 px counter row, its `mt-0.5`, the card's `py-1.5` and a 1 px border —
+ * ~27 px of opaque card that the band's arithmetic never saw. So the LIST stops
+ * on the hazard band and the CARD keeps going into it.
+ *
+ * ITS OWN SUITE SAYS SO, IN ITS OWN NUMBERS. `briefingFoldControl.test.ts`
+ * predicts „the card's floor moves 581 → ~467" on the row's frame, and the
+ * band's top on that same stage is 98 + 0.53 × 655 = 445. 467 − 445 = 22 px of
+ * card standing inside the band the rule exists to clear — a rule that misses
+ * by exactly the chrome nobody counted. This is not a new policy: it is the
+ * arithmetic the paragraph above already claims to be doing.
+ *
+ * A SEPARATE EXPORT AND NOT A FIFTH PARAMETER. `briefingRoadCeilingPx` answers
+ * „where does the road begin, in the list's coordinates" and is pinned by six
+ * cases that call it positionally; this answers „and what does the card owe
+ * below the list", which is a fact about the markup rather than about the road.
+ * Composing them keeps each testable on its own, and keeps the band question
+ * free of a number that changes whenever the counter row does.
+ *
+ * THE FLOOR IS THE SAME FLOOR, and for the same reason: a ceiling that can
+ * reach zero is not a ceiling, it is a delete. Subtracting the chrome can only
+ * take the budget DOWN, so without the clamp the В27 shape arrives through this
+ * function instead of the other one — a header, a counter and nothing between
+ * them.
+ *
+ * AN UNREADABLE CHROME IS ZERO, i.e. exactly today's behaviour, which is the
+ * direction every refusal in this cluster picks: jsdom measures 0 for every
+ * rect, a card with no parent element measures nothing, and neither may be the
+ * reason the teaching is shortened.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function briefingCardCeilingPx(
+  listCeilingPx: number | null,
+  chromeBelowListPx: number,
+): number | null {
+  if (listCeilingPx === null) return null;
+  if (!Number.isFinite(chromeBelowListPx)) return listCeilingPx;
+  return Math.max(BRIEFING_ROAD_MIN_LIST_PX, listCeilingPx - Math.max(0, chromeBelowListPx));
+}
+
+/**
  * …AND THE SAME RULE ON THE PHONE, WHERE THERE IS NO CARD TO HOLD IT
  * (sc-signal-hesitation:f5ffccf3 — the row, the census and the three quarters
  * of it that other waves already closed are at the effect that calls this).
@@ -3016,7 +3067,14 @@ export function BriefingCard({
     // ancestor — never the `<ol>` (static), always the card root (backdrop-blur
     // makes it one in both engines). The full derivation and what the wrong
     // number actually said is at `listRowsInScrollCoords`.
-    const listTop = ol.getBoundingClientRect().top;
+    //
+    // THE WHOLE RECT AND NOT ONLY ITS TOP, because the ceiling now has to know
+    // where the list ENDS as well as where it starts — the card's chrome hangs
+    // below `listRect.bottom` and it is what the band was being measured
+    // without. One `getBoundingClientRect` either way; `listTop` keeps its name
+    // because `listRowsInScrollCoords` and the ceiling both read it.
+    const listRect = ol.getBoundingClientRect();
+    const listTop = listRect.top;
     const rects = Array.from(ol.children).map((li) => {
       const el = li as HTMLElement;
       const r = el.getBoundingClientRect();
@@ -3074,10 +3132,24 @@ export function BriefingCard({
     // nothing, and nothing is the safe reading.
     const stage = ol.closest("[data-sim-stage]");
     const stageRect = stage === null ? null : stage.getBoundingClientRect();
+    // …AND WHAT THE CARD OWES BELOW THE LIST, in the same coordinates again.
+    // `ol.parentElement` IS the card root — the `<ol>` is a direct child of the
+    // `flex min-h-0 flex-col` box, with the counter row its next sibling — so
+    // `card.bottom − list.bottom` is the counter, its margin, the card's bottom
+    // padding and the border, measured rather than assumed. It is read off the
+    // live box because that row comes and goes with `below`, and a constant
+    // would be wrong on exactly the beats the row is absent. `briefingCardCeilingPx`
+    // has the derivation and the 22 px the band was missing by.
+    const card = ol.parentElement;
+    const chromeBelowListPx =
+      card === null ? 0 : card.getBoundingClientRect().bottom - listRect.bottom;
     setRoadCeilingPx(
       stageRect === null
         ? null
-        : briefingRoadCeilingPx(listTop, stageRect.top, stageRect.height),
+        : briefingCardCeilingPx(
+            briefingRoadCeilingPx(listTop, stageRect.top, stageRect.height),
+            chromeBelowListPx,
+          ),
     );
   }, []);
   useEffect(() => {
@@ -3103,6 +3175,75 @@ export function BriefingCard({
     }
     const ro = new ResizeObserver(measure);
     ro.observe(ol);
+    /* ══ …AND THE CEILING'S OWN INPUTS HAVE TO BE WATCHED TOO ════════════════
+       sc-junction-rhr:486cad54, w43. The counter's inputs are all inside this
+       box, so observing the box was the whole answer for it. `roadCeilingPx`'s
+       are NOT: it is a function of the list's POSITION and of the STAGE's rect,
+       and a `ResizeObserver` bound to the `<ol>` fires for neither. Both can
+       move while this box's own size does not change by a pixel, and when they
+       do the ceiling keeps a number computed for a layout that is gone.
+
+       IT IS NOT LATENT, AND IT IS NOT A ONE-FRAME TRANSIENT. Measured off the
+       row's own newest frame, `.audit-frames/w43/frames/
+       sc-junction-rhr__pc-right/01-arrival.png` (1440 × 900, stage
+       x 264–1431 × y 97–753, card x 1104–1419 × y 323–418): the `<ol>` renders
+       ~42 px there, while `briefingRoadCeilingPx` on that geometry returns
+       94.15 — the number this file's own suite asserts, to two decimals. The
+       counter is the proof that needs no pixels: it reads «↓ още 5 стъпки», and
+       with six authored steps at 13.75 px and `gap-0.5`, five below the fold
+       requires a box under 43 px. At the designed 94 the counter would read 4.
+       `03-ready`, seconds later, is the same 42 — settled, not mid-layout.
+
+       AND THE SHORTFALL IS THE SAME ON A LESSON THAT SHARES NOTHING WITH IT.
+       `sc-ac-crosswind__pc-right/01-arrival.png`, whose step 2 («Очаквай пориви
+       отдясно…») also trips `briefingSendsEyesRight`: a ONE-line objective
+       banner puts its list top at ~335 instead of ~349, so the budget should be
+       ~110 — and it renders ~56. Both legs are short by 53–54 px, which is a
+       shared cause rather than two accidents, and 53–54 px is an advisor card
+       plus the column's `gap-1.5`. The card is measured while the advisor sits
+       above it and keeps that number after the advisor goes; the list never
+       changed size, so nothing asked again.
+
+       So the value on the glass is not the value the arithmetic computes, and
+       the pure cases stay green either way — the 51-of-82 shape, arriving
+       through the recompute trigger instead of through a missing consumer.
+
+       THE TWO SIBLINGS THAT MOVE IT, and why observing them is enough:
+        · the STAGE. `aspect-video` + the measured `playMaxWidth` cap, plus the
+          immersive/«Цял екран» switch to `min-h-0 flex-1`, plus any window
+          resize — every one of them moves the hazard band. The column's width
+          is `min(20rem, 30vw)`, i.e. a flat 20rem on every roomy stage in the
+          ladder, so this box's size does NOT follow the stage and the existing
+          observer stays silent through all of it.
+        · the COLUMN. An advisor card or a toast arriving above this one pushes
+          the card down without resizing it; the column's own height is content
+          driven under its `max-height`, so it changes when they do. In the one
+          case it cannot — the column already at its cap — the card is being
+          flex-shrunk instead and the `<ol>` resizes, which the first observer
+          already catches. Between them the class is closed, not one instance.
+
+       BOTH DIRECTIONS ARE DEFECTS AND ONLY ONE OF THEM IS THIS ROW. A ceiling
+       left too GENEROUS puts the card's floor inside the hazard band, over the
+       right kerb — 486cad54's own sentence. Left too TIGHT it deletes authored
+       steps at the standstill the student reads them on, which is the В27 shape
+       the floor above exists to refuse. The frame currently carries the second.
+
+       `ResizeObserver` de-duplicates its callback per delivery, so three
+       targets are still one `measure` per frame, and a missing ancestor is
+       simply not observed — the safe reading, and the one the popup rig needs.
+
+       THE COLUMN IS REACHED BY PARENTAGE AND NOT BY ITS `data-hud` NAME, which
+       is a deliberate ugliness. `shellClipAffordances.test.ts` locates the real
+       column by the FIRST occurrence of that attribute in this file's source
+       and asserts what follows it; a selector string here is an earlier match
+       and turns three live guards red against a column that never changed.
+       `ol.parentElement` is the card root (the `<ol>` is its direct child), so
+       its parent is the box the card is laid out in — which is the thing that
+       moves the card, whatever it is called. ═══════════════════════════════ */
+    const stageBox = ol.closest("[data-sim-stage]");
+    if (stageBox !== null) ro.observe(stageBox);
+    const columnBox = ol.parentElement?.parentElement ?? null;
+    if (columnBox !== null) ro.observe(columnBox);
     return () => ro.disconnect();
     // `folded` is in the deps because the fold UNMOUNTS the `<ol>`: without it
     // the observer stays attached to a detached node and the counter freezes at

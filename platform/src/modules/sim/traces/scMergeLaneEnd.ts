@@ -128,15 +128,56 @@
  * instruction 1 («стеснението е твое, не на другите»), which claims no
  * furniture.
  *
- * WHAT THIS DOES NOT CLOSE, stated so nobody reads the row as finished: the
- * WORLD half. A student still sees no taper, and making him see one is two
- * files neither this lane nor the template lane owns — a `laneEnds` (А
- * „Пътно стеснение") member in `world/builders/signs.ts` plus its census row,
- * and THEN `tools/maps/gen_ln_merge.mjs` (with its two committed copies)
- * placing it at `meta.scenario.taperFromY` = 180 with the М-taper paint 180 →
- * 240 and `lanes` dropping 2 → 1 past it. Until the sign kind exists the
- * generator has nothing to place. What is gone is the product TELLING the
- * student it is there while he is looking straight at where it is not.
+ * WHAT THIS DID NOT CLOSE AT THE TIME: the WORLD half — a student still saw no
+ * taper. That half has since LANDED. The paragraph is corrected below rather
+ * than deleted, because a routing note that has gone false is how a later lane
+ * gets sent to a file that no longer holds the defect.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * FOLLOW-UP — sc-merge-lane-end:ae6166e2, re-verified from this file. THE
+ * TAPER IS PAINTED NOW; THE PLATE IS THE HALF STILL OPEN.
+ *
+ * W16 prescribed the world repair as „a `laneEnds` member in
+ * `world/builders/signs.ts`, and THEN `gen_ln_merge.mjs` placing it with the
+ * М-taper paint". BOTH halves of that prescription are now wrong, and a lane
+ * routed by it would open the wrong files:
+ *
+ *  · THE PAINT LANDED, and NOT in the generator. `world/builders/markings.ts`
+ *    (`planLaneDrop` → `paintLaneDrop`, called from `buildMarkings`, which
+ *    `buildWorldGeometry.ts:534` calls on every district) DERIVES the lane drop
+ *    from the `meta.scenario` fields ln-merge-v1 has carried since it was
+ *    generated — `taperFromY` 180, `taperToY` 240, `laneEndingX` +4.06,
+ *    `params.lanesAfter` 1. It swings the closing lane's kerb line in across
+ *    the dying lane, hatches the wedge it shuts with the oblique bars the row
+ *    calls chevrons, and stops dashing the boundary that becomes the
+ *    carriageway edge past 240. Derived rather than authored precisely so the
+ *    tarmac and the lesson's gate cannot drift apart — which is why
+ *    `tools/maps/gen_ln_merge.mjs` and the two committed district copies are
+ *    UNCHANGED and need no change. Gate: `ln-merge-districts.test.ts` „DRAWS
+ *    the lane ending: a closing line that crosses the dying lane over the
+ *    authored taper" + „stops dashing the boundary the taper turns into a
+ *    carriageway edge", both read off the built mesh, both green.
+ *
+ *  · THE PLATE IS STILL MISSING, and its blocker is CONTENT, not code. There is
+ *    still no narrowing member in `SignKind` (world/types.ts) — but minting one
+ *    is the wrong FIRST move: `content/signs/signs.json` carries nineteen
+ *    А-group rows and not one of them is „Стесняване на пътя" (А23 „Участък от
+ *    пътя в ремонт" is the nearest miss and says something else). No row means
+ *    no `lawRefs` to retrieve, and ADR-002 forbids free-recalling the Наредба
+ *    article to supply them. So the order is: the content row + its face, THEN
+ *    the `SignKind` + census row, THEN the placement — not the reverse.
+ *
+ * AND THE CAPTIONS BELOW STAY AS THEY ARE — that silence is a decision, not an
+ * oversight, recorded so the next reader does not "finish" the row by undoing
+ * W16. With a taper on the tarmac, re-arming «знакът и маркировката» is
+ * tempting; three reasons not to. The „знак" half would still be false. The
+ * present wording tracks the RATIFIED instruction 1 of the template
+ * („стеснението е твое, не на другите"). And every annotation string below is
+ * byte-gated against `content/traces/sc-merge-lane-end/*.trace.json` and their
+ * `platform/public/traces/` copies („committed JSON is exactly this script's
+ * recording"), so a one-word caption edit is six regenerated artefacts and
+ * must be made by whoever owns them, in one hand.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 

@@ -154,5 +154,15 @@ describe("scripts/seed-founder.mjs", () => {
     expect(status).not.toBe(0);
     // The exact reason, not a connection error: proof the guard ran first.
     expect(stderr).toContain("SEED_FOUNDER_PASSWORD is required");
-  }, 30_000);
+    // ── THE BUDGET IS THE BOX, NOT THE GUARD ──────────────────────────────
+    // This is the only test in the file that SPAWNS the real script, which
+    // means a fresh node, its module graph and dotenv off a 7200 rpm HDD.
+    // MEASURED 2026-09-14: 20.6 s run on its own, 30.2 s inside the full
+    // ~16,400-test gate at `--maxWorkers=2` — i.e. it failed the gate on
+    // patience while passing on its own, twice in a row, and a gate that
+    // demands zero failures cannot carry a test that is only sometimes fast
+    // enough. The assertions above are untouched; only the waiting is.
+    // If this ever needs raising AGAIN, the answer is not a bigger number —
+    // it is that the spawn has stopped being the cost.
+  }, 120_000);
 });

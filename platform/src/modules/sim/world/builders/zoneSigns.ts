@@ -158,6 +158,43 @@ const CURVE_PLATE_MIN_ROOM_M = HAZARD_WARNING_AHEAD_M + 3;
  */
 const UPSTREAM_HEADING_BREAK_DEG = 20;
 
+/**
+ * WHY THERE IS NO Д5 „Автомагистрала" IN THIS TABLE, AND WHY THAT IS RIGHT —
+ * sc-ac-truck-spray:c042440d („no motorway signage anywhere on the route the
+ * briefing calls a motorway") is routed to THIS FILE by the block at the top of
+ * `lessons/scenario/templates-conditions2.ts`, and that routing is stale. It is
+ * written down here rather than only there because a lane handed the row lands
+ * on this table, and the misrouted-finding class is the largest single sink of
+ * repair effort this programme has measured.
+ *
+ * NOTHING IN THIS PASS COULD EVER HAVE SAID „магистрала". A post here needs an
+ * authored `District.zones` span, and being a motorway is a property of the
+ * EDGE (`class: "motorway"` / `motorway: true`), not of a span: mw-v1's only
+ * zones are two `emergencyLane` bands (0–2600 m, one per carriageway) whose
+ * `signRef` „М2" is a MARKING that `markings.ts` already draws as the wide
+ * continuous seam bounding the аварийна лента.
+ *
+ * THE PLATE WAS BUILT AT THE OTHER ADDRESS AND IS IN THE WORLD. `props.ts`'s
+ * carriageway pass (the last sign pass in that file) derives Д5 from the
+ * motorway boundary dead-end the entry В26 already uses: on mw-v1 it stands at
+ * y = 40.5 m on the northbound verge — 25 m ahead of `mw-spawn-approach` and
+ * 4.5 m before the В26 «140» — gated by `__tests__/mw-district.test.ts`
+ * („Д5 (Автомагистрала) — the motorway now says so"), green at HEAD.
+ *
+ * AND IT IS IN THE FRAMES THE ROW CITES, which is the part a re-read of the
+ * finding will not tell you. Measured 2026-09-14 on the w43 sweep,
+ * `sc-ac-truck-spray__pc-right/04-t000s.png`: the green Д5 face occupies
+ * x 1328–1354, y ≈ 305–334, and the collapsed «ИНСТРУКЦИИ · 10 СТЪПКИ» HUD pill
+ * covers y 309–332 of it — 24 of its ~30 rows, leaving a 3 px strip above and a
+ * 2 px strip below. On `03-ready.png` the EXPANDED panel leaves only the top
+ * edge. So the residue of c042440d is an on-glass occlusion in
+ * `components/sim/lesson-ui/LessonPlayShell.tsx`, not a missing post. The two
+ * beats the judge chose (113 m and 378 m) are both PAST the plate, and a Д5
+ * marks a beginning — Наредба № РД-02-21-1/23.11.2023, прил. № 5, знак Д5,
+ * „Начало на автомагистрала" — so the rest of the route is correctly bare of
+ * it. Adding a repeat here would state „this motorway begins here" three times
+ * on one carriageway: the pretty lie this file refuses elsewhere.
+ */
 /** Marking-only / physics-only kinds place no post. */
 const ZONE_SIGN_KIND: Partial<Record<DistrictZoneKind, SignKind>> = {
   noOvertaking: "noOvertaking",

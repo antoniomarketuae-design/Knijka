@@ -120,6 +120,51 @@
  * `ScenarioCatalog.tsx` prints it in place of the caption it used to write
  * itself; the zone subtitle states the same rule. `passed` and `unlockedBy`
  * still stop at the seam — nothing on the picker asks for them yet.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-09-14 — W43 ROUTING: THE NEXT FINDING FILED HERE, AND IT IS NOT HERE.
+ *
+ * `sc-rb-busy-gap:7bbdd45e` (major) was routed at this file: „the briefing is a
+ * blocking modal on mobile whose numbered list starts at «2.» and a side panel
+ * on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100
+ * XP on pc; the same drive that passes on pc is repeatedly failed or force-
+ * closed on mobile." Not one of the three clauses can be produced by this fold,
+ * and the sweep's own four legs are what says so. RE-WALKED rather than
+ * inherited: the sweep161 routing that reaches the same conclusion is written
+ * in `__tests__/progress-lock-reason.test.ts`, and a row filed at THIS file
+ * sends nobody there — which is the whole cost this note exists to stop.
+ *
+ *   1. THE GATE NEVER MET A SHUT RUNG. All four legs of `.audit-frames/w43/
+ *      frames/sc-rb-busy-gap__{mobile,pc}-{right,wrong}` are `@L1` („· Ниво 1 —
+ *      Пълна помощ" on every debrief head) and none of the four `run.log`s
+ *      contains „Отключва", „Заключено ниво" or `LEVEL_LOCKED` — the picker was
+ *      never opened. L1 is unconditionally open (`unlockedBy: "first"`), so the
+ *      one live call a drive does make into this module, the save gate at
+ *      `actions.ts:272`, answered „open" and decided nothing on these frames.
+ *   2. XP IS NOT A CONCEPT IN THIS MODULE — and on these frames it is not a
+ *      platform either. THREE legs print „+40 XP за завършеното каране":
+ *      mobile-right, mobile-wrong AND pc-right, the same number on both
+ *      platforms (pc-wrong printed no XP string at all, so it measures nothing
+ *      about XP either way). `gamification/xp.ts:59` is a pure function of
+ *      `passed`, `firstPass` and `cleanDrives` with no viewport term anywhere in
+ *      it or in its caller; `lessons/__tests__/progression-sweep161-xp.test.ts`
+ *      holds the enumeration of how 150 and 100 arise — a one-time first-pass
+ *      milestone spent by whichever leg drove first, not a screen size.
+ *   3. THERE IS NO PC PASS ON THIS LESSON to price the last clause against. All
+ *      four legs are НЕИЗДЪРЖАН (pc-right 20 наказателни точки, the other three
+ *      10), and pc-wrong force-closed as well („Край на упражнението след
+ *      удара"). The clause needs a pc drive that passed where mobile failed; the
+ *      sweep did not produce one here, so no perfect drive exists either.
+ *
+ * The briefing halves are owned elsewhere, and the numbering half is already
+ * closed: the mobile sheet's lead ordinal is `hud/overlayQueue.ts`
+ * (`briefingLineOrdinal` + `isUsableLineOrdinal`), painted by `hud/SimOverlay
+ * .tsx` and wired at `LessonPlayShell.tsx:6013` — which is why the judge's own
+ * reading of the w43 frames photographs mobile steps „1.–5." and not the «2.»
+ * the row text claims. The modal-versus-panel split is `LessonPlayShell.tsx`
+ * `compact` (`useCompactHud()`, :4127) and its `BriefingCard` fold control.
+ * NOTHING WAS CHANGED HERE — this is the routing, not a repair.
+ *
  */
 
 import { parseScenarioLessonId } from "./resolve";

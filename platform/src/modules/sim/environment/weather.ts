@@ -579,6 +579,150 @@
 //    would trade a measured criterion for an unmeasured one. The two dim
 //    constants have no measurement behind a new value at all, and this file's
 //    whole discipline is that its numbers reproduce.
+//
+// 7. WAVE 42, 2026-09-14 — `sc-follow-rain-gap:b18e6e60` WAS ROUTED HERE AND
+//    NEITHER OF ITS TWO SURVIVING CLAUSES IS REACHABLE FROM THIS MODULE. The
+//    w41 re-judge struck clause (1) („no spray off the lead car" — the пелена
+//    now mounts, `traffic/vehicleFleet.ts` + `TrafficLayer.tsx`) and left
+//    (2) NO PUDDLES and (3) NO SPECULAR WETNESS. Both are carriageway
+//    properties; this store owns the SIGNAL, and the signal is not the fault.
+//
+//    THE WETNESS CHANNEL IS DOING ITS WHOLE JOB, MEASURED RATHER THAN
+//    ASSERTED. Near-carriageway rectangle (820,590 280x80) on
+//    `.audit-frames/w41/frames/sc-follow-rain-gap__mobile-right/04-t029s.png`,
+//    against the DRY control on the SAME map (fo-follow-v1), the same tier and
+//    the same 2556x1179 viewport — `sc-follow-tailgater__mobile-wrong/
+//    04-t029s.png`, identical rectangle:
+//
+//                        mean sRGB            L709
+//      rain  (FO-04)     25.5/25.2/25.0       25.3     per-pixel 20 … 44
+//      dry   (tailgater) 91.1/89.1/86.4       89.3     per-pixel 33 … 147
+//
+//    The rain road renders at 0.28x the dry road. `getWetness` reaches the
+//    material and spends its entire budget. What is missing is not DARKNESS,
+//    it is STRUCTURE: the wet carriageway's luma range is 24 levels wide where
+//    the dry one is 114. A wet street is dark AND streaked; this one is dark
+//    and dead flat, which is exactly the sentence the judge wrote by eye
+//    („matte dark grey … not one lit window grid mirrored in it").
+//
+//    CLAUSE (3) CANNOT BE MOVED BY ANY CONSTANT IN THIS MODULE ON THE DRIVE
+//    THAT JUDGED IT, AND THAT IS AN ARITHMETIC FACT, NOT AN OPINION. The
+//    audit's mobile leg is WebKit at `iphone16-landscape` with `isMobile` and
+//    `hasTouch` (tools/mobile/lib/devices.mjs `contextOptions`), in a fresh
+//    context that carries no quality ledger. So `readDeviceSignals` reports
+//    `(pointer: coarse)` with no `(any-pointer: fine)`, `isTouchOnlyDevice` is
+//    true, and `seedQualityFromSignals` returns `low` — by design, and the
+//    reasoning is in `quality.ts`. At `low`, `TEXTURE_BUDGETS.hdrEnvironment`
+//    is FALSE, so `LessonScene.tsx` mounts no `<Environment>` at all:
+//    `scene.environment` is null and `StaticWorld`'s `ROAD_ENV_INTENSITY`
+//    (1.5 dry -> 0.55 soaked) multiplies nothing. The whole doc-66 R5
+//    wet-gloss retune is invisible on the tier the phone gets — and so is
+//    `RAIN_IBL_DIM` (0.6, `presets.ts`), which is a factor inside an
+//    `environmentIntensity` prop on a component that is not mounted. Changing
+//    it here would be this programme's signature failure: a constant wired to
+//    an absent reader. Two more `low` rulings sit on top of it —
+//    `groundMaps: "colorOnly"` (no normal, no roughness map on the asphalt, so
+//    no micro-relief for a highlight to break over) and `postprocessing:
+//    false` (no bloom to carry one). A phone cannot show a specular wet road
+//    until one of those three tier rulings changes, and none of them is here.
+//
+//    CLAUSE (2) HAS NO GEOMETRY TO SHADE. `content/world/fo-follow-v1.json`
+//    carries `zones: []`. `buildWaterDecals` is additive by construction, so a
+//    map with no `waterPatch` span emits ZERO quads and `StaticWorld`'s water
+//    mesh never renders. Nothing in this store can put standing water on a map
+//    that authors none — and a `waterPatch` is the WRONG instrument here
+//    anyway: it drops grip and arms aquaplaning (`runtime/surface.ts`), which
+//    is AC-07's lesson, not FO-04's. FO-04 teaches a THREE-SECOND GAP; a
+//    hidden grip cliff under the driving line would fail a student for the
+//    thing the drill is not about. What the briefing promises is COSMETIC
+//    pooling — gutter and kerb water keyed off `getWetness()`, no physics —
+//    and that is a new world builder, not a new channel in this file.
+//
+//    ROUTED, three addresses, none of them this module:
+//      · `world/textures/textureBudget.ts` + `quality.ts`'s `low` preset — the
+//        tier ruling that makes clause (3) unreachable on a phone. It is a
+//        RULING, with a measured defence (one 1.5 MB HDR against the whole low
+//        texture budget), so it is a founder-level trade, not a lane's edit.
+//      · `world/components/StaticWorld.tsx` — the road/decal/water materials,
+//        for the med/high half of clause (3). The water sheet's own retune
+//        queue is already written down in `world/builders/waterDecals.ts`
+//        („if the sheet is still invisible at metalness 0, the next suspect is
+//        `opacity 0.4`"), and it says what this note says: the frame is owed
+//        FIRST, because a shading change measured by a source scan is how a
+//        round gets spent.
+//      · a cosmetic standing-water builder in `world/builders/` + a rain-map
+//        authoring pass over `content/world/*.json`, for clause (2).
+//
+//    ONE OBSERVATION HANDED ON, DELIBERATELY NOT ACTED ON, BECAUSE IT IS A
+//    LOOK AND THIS LANE CANNOT TAKE ONE. `RAIN_HEMISPHERE_DIM` (0.42) is
+//    TIER-BLIND, and `low` is the tier with no IBL. The DAY `hemisphere`
+//    docblock in `presets.ts` already states the trap for the DRY case — „0.50,
+//    not lower. Tier `low` has NO shadow map and NO HDRI ambient … on the
+//    phone this hemisphere IS the entire fill — measured at 0.42 the shaded
+//    faces of every block went to near-black". Under rain that same fill lands
+//    at 0.5 x 0.42 = 0.21 on exactly that tier, and L709 25.3 above is the
+//    photograph of it. The founder's three „too bright" rounds were judged on
+//    clip renders at `high`, where the IBL carries the ambient; the constants
+//    those rounds moved are shared with a tier that has none. No number is
+//    changed here. This file's discipline is that its numbers reproduce, and
+//    nobody has yet driven a new one.
+//
+// 8. WAVE 43, 2026-09-14 — `sc-ac-crosswind:a9db1738` IS STILL ROUTED TO THIS
+//    FILE BY THE LEDGER, AND §4/§5's ROUTING OF IT IS NOW SPENT: THE ROW WAS
+//    ANSWERED, IN OTHER FILES, WHILE THIS HEADER WENT ON DESCRIBING IT AS OPEN.
+//    This lane wrote no code — there is none here to write — and this paragraph
+//    is the whole of its output, because the next lane the generator sends to
+//    this file will read §4 and §5 first and re-derive a conclusion that is
+//    already standing in the tree.
+//
+//    WHY IT KEEPS ARRIVING. `.audit-frames/findings/chunk-1.jsonl` carries the
+//    row with `suspectFile: "platform/src/modules/sim/environment/weather.ts"`
+//    and no `rerouteSecondary`, and `tools/audit/make-cluster-wave.mjs` lanes
+//    on exactly those two fields (`filesOf`, then greedy hottest-file first).
+//    So the address is the ledger's, not the judge's, and it has never been one
+//    this store could answer: every clause of the row is about the COCKPIT and
+//    the CAR, and this store owns four scene-wide 0..1 numbers — wetness, rain,
+//    fog, snow — with no fifth for wind and, per §4 and §5, none coming. The
+//    durable fix is that one ledger field, not a line in here.
+//
+//    WHAT IS TRUE AT HEAD, read out of the tree rather than off the w22 frame
+//    the brief still carries. Three of the four clauses are answered, each
+//    named with the LIVE CONSUMER that mounts it, because „the force exists
+//    somewhere" is the sentence §5 already had and it is not enough:
+//      · „the briefing's «втора корекция» warning has no observable trigger" —
+//        `vehicle/secondSwing.ts`, stepped at `LessonScene.tsx:5108`, published
+//        through `onSecondSwing` (:2766, withheld in exam mode) into
+//        `windSwingCueOn` (:2207) and drawn as `data-hud="wind-swing-cue"`
+//        (:3204).
+//      · „there is no wind force visible in the car's attitude" —
+//        `vehicle/cockpitLean.ts` through `CameraRig.tsx:1105`, which adds
+//        `sim.windLatAccelMs2` to the kinematic estimate so a force the
+//        STEERING does not explain still leans the head; and the world leans
+//        with it, `VehicleRig.tsx:585` driving `world/textures/windSway.ts`
+//        off the same `sim.windLateralNow` the chassis is pushed with.
+//      · „nothing in the cockpit reports a lateral disturbance" — the clause
+//        the w22 judge kept, on the ground that a coaching sentence is not a
+//        gauge. It has a gauge now: `LessonScene.tsx:3254` mounts
+//        `data-hud="wind-push-cue"` carrying a direction arrow and a five-rung
+//        meter of |force| across the shipped 700–1700 N envelope
+//        (CROSSWIND_BRIDGE_N 1200 ± CROSSWIND_GUST_AMPLITUDE_N 500), fed by
+//        `stepWindPush` (:5149) → `onWindPush` (:2772, non-exam) →
+//        `windPushCue` (:2213).
+//
+//    THE ONE CLAUSE THAT SURVIVES IS THE RIM, AND IT IS NOT A DEFECT IN ANY
+//    FILE. „The wheel shows no counter-steer at any point": `HeroCarBody.tsx
+//    :361` turns the front pair by `sim.steerRad`, the DRIVER'S OWN INPUT, so
+//    the rim can only ever show a correction that was MADE and never the push
+//    that demanded one. And `vehicle/tuning.ts:245` measures the equilibrium
+//    correction this wind asks for at BELOW 0.01 of full input — sub-pixel on a
+//    rendered rim at every camera this product ships — so even a perfectly
+//    driven leg photographs a centred wheel. Turning the rim without the driver
+//    turning it would be a LIE about the car, told to satisfy a photograph, and
+//    a student who learned to read wind off a rim that moves by itself would
+//    have learned something no real car will ever do. That is the north-star
+//    test failing, not passing. The instrument that can carry the quantity is
+//    the gauge above; the rim is not it, and no version of this row is owed a
+//    change in this file.
 
 import { useSyncExternalStore } from "react";
 

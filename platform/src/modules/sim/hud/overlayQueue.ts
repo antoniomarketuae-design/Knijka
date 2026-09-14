@@ -157,9 +157,18 @@ export function overlayCentreBand(
    What is true is narrower and still worth writing down: these two rules have
    no enforcer INSIDE the app — nothing in `platform/src` measures a painted
    rect — and the two deleted predicates were not one either, because nothing
-   called them. Rules 1 and 4 are enforced in-process (`selectOverlay` and
-   `overlayQueueMaySpeak`, both called by `LessonPlayShell`); 2 and 3 are
-   enforced out of process, by the probe, on a real device ladder.
+   called them. Rule 1 is enforced in-process (`selectOverlay`, called by
+   `LessonPlayShell`); 2 and 3 are enforced out of process, by the probe, on a
+   real device ladder.
+
+   AND RULE 4 IS ENFORCED BY NOTHING. This paragraph used to name
+   `overlayQueueMaySpeak` beside `selectOverlay` as „both called by
+   `LessonPlayShell`“, and that half was false the day it was written: the
+   shell calls `selectOverlay` with no options, so the owners list the gate
+   reads is empty on every frame a student has ever seen. Counted 2026-09-14 by
+   the `sc-ed-reverse-line:d6fb0f3c` lane; the ⚠ block above
+   `OverlayScreenOwner` carries the grep, the two divergent lists the census
+   was written to replace, and the one edit that would make this sentence true.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /** Fraction of the viewport a painted rect costs — the arithmetic behind
@@ -1009,6 +1018,60 @@ export function itemEchoesLine(item: Pick<SimOverlayItem, "lineBg" | "detailBg">
      `teachQueue.length > 0` — the queue's OWN blocking item, named by its
        producer instead of by its property. That is what `blocking` and the
        new `held` below are for; see the block on `OverlaySelection.held`.
+
+   ⚠ AND TWENTY-EIGHT DAYS LATER THE CENSUS STILL HAS NO PRODUCER.
+     Counted 2026-09-14 by the `sc-ed-reverse-line:d6fb0f3c` lane, which was
+     routed to this file on the strength of the paragraphs above.
+
+     `selectOverlay` has exactly ONE non-test call site —
+     `components/sim/lesson-ui/LessonPlayShell.tsx:6111` — and it passes no
+     `options`, so `options.screenOwners ?? []` is `[]` on every live frame and
+     `overlayQueueMaySpeak([])` is unconditionally true. `overlayHoldsDrive` has
+     NO non-test call site at all. `grep -rn -e screenOwners -e overlayHoldsDrive
+     -e overlayQueueMaySpeak platform/src` returns this file, two barrel lines in
+     `hud/index.ts`, four comment blocks that talk about the census
+     (`PlayAreaStyles.tsx:1786`, `LessonPlayShell.tsx:4343`, `:4376`, `:6026` —
+     two of which already say out loud that it holds nothing), and two test
+     files. Nothing the student sees is in that list.
+
+     SO THE TWO HAND-KEPT LISTS ARE STILL THERE AND STILL DIVERGENT — the same
+     row of the same table this block opens with. `paused` at
+     `LessonPlayShell.tsx:7147` now carries SIX disjuncts (`ended`, `activeQuiz`,
+     `teachQueue.length > 0`, `consequence`, `overlaySheetOpen`, `playMenuOpen`);
+     `pauseModalUp` at `:5667` still carries TWO (`activeQuiz`, `mistakeMode &&
+     consequence`). „«Меню на урока» freezes the car and does NOT silence the
+     queue“ is true today, twenty-eight days after the frame that filed it.
+
+     IT IS LEFT STANDING RATHER THAN DELETED, which is the opposite of what the
+     dead-predicate census did to `rectClearsCentreBand` at the top of this file,
+     and the difference is the whole of the argument: those two answered a
+     question something else already answers (the WebKit probe). This one answers
+     a question NOTHING answers, so deleting it would lose the derivation and
+     leave the divergence with nothing written down. What may NOT stand is prose
+     that reads as though the wiring exists — `PlayAreaStyles.tsx:1785-1793`
+     cites these two functions as the rule its own `visibility: hidden` selector
+     is joining, which is true of the design and false of the build.
+
+     THE ONE EDIT THAT WOULD MAKE IT TRUE is in another file and is written out
+     here so it cannot be lost again. At `LessonPlayShell.tsx:6111`:
+
+       const screenOwners: OverlayScreenOwner[] = [
+         ...(activeQuiz !== null ? ["quiz" as const] : []),
+         ...(consequence !== null ? ["consequence" as const] : []),
+         ...(playMenuOpen ? ["playMenu" as const] : []),
+         ...(overlaySheetOpen ? ["readSheet" as const] : []),
+       ];
+       const overlay = selectOverlay(candidates, { screenOwners });
+
+     …and `pauseModalUp` at `:5667` becomes
+     `!overlayQueueMaySpeak(screenOwners)`, which is the point of the table: one
+     census, two answers, no third list. ONE JUDGEMENT CALL COMES WITH IT and it
+     belongs to whoever holds that file — the shell guards the consequence card
+     with `mistakeMode` and this census does not, so adopting it silences the
+     queue behind a THEO-3 card outside mistake mode too. The table above says
+     that is the intended reading (`consequence` is marked ← as a divergence,
+     not as a difference), but it is a behaviour change and it is named here
+     rather than smuggled.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /** A surface OUTSIDE the overlay queue that can take the drive screen. */

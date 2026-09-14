@@ -257,3 +257,85 @@ same sweep — risks making it worse than w43 for every lesson in order to help
 three. The candidate, for after: let a sustain confirm on the FIRST large error
 when the product's own turn chevron is on screen, since the chevron is advance
 warning and waiting for the error to persist is what arrives late.
+
+---
+
+## J. The gate found a live defect the audit had not — and it is the founder's own sentence
+
+Running the four-part gate over w44's tree turned up two vitest failures, both
+pre-existing and neither caused by the wave (its world-builder edits are 100 %
+comment). One of them is a real product defect on a lesson that has an open row.
+
+`lane-paint-referent.test.ts` asserts an invariant worth quoting, because of why
+it exists:
+
+> the set of edges the runtime reports an осева on equals the set the BUILT
+> marking mesh actually carries one on … The founder hit it on his first lesson:
+> «it say we step on some line that doesnt exist at all».
+
+On `pe-zone-v1` it failed:
+
+```
+- expected  [ pz-e-approach, pz-e-cross, pz-e-out ]          ← what the MESH paints
++ received  [ pz-e-approach, pz-e-cross, pz-e-out, pz-e-zone ] ← what the RUNTIME grades
+```
+
+**The painter was right and the grader was wrong.** ЧЛ. 62 Т. 1: in a «зона за
+живеене» the carriageway is not defined as one, so it carries no division at
+all. `markings.ts` has known this since the home-zone pass — its whole lane-
+boundary loop runs under `k < lanes && !calmedZoneKeepsWholeWidth(eb.edge)`, and
+its comment names `pz-e-zone` by id.
+
+`paintsCentreLine` in `constants.ts` did not have that clause. Its own docblock
+says it is *"the painter's own arithmetic … so `runtime/spatial.ts` publishes the
+same answer the painter acts on — the single decision doc 86 T1 says was never
+shared"*. It had drifted from the painter in exactly the way that paragraph
+exists to prevent.
+
+**The consequence for a student:** on the home-zone lesson the three codes that
+grade the axis — `CENTER_LINE_TOUCHED`, `POOR_LANE_KEEPING`, `NOT_KEEPING_RIGHT`
+— had a referent with no paint under it. A seventeen-year-old could be convicted
+of touching a centre line on the one road in the catalogue that is legally
+undivided.
+
+**The fix:** `calmedZoneKeepsWholeWidth` moves to `constants.ts` — the file both
+the builder and the runtime already import — and gates both `paintsCentreLine`
+and `paintsLaneLines`. `markings.ts` re-exports the name so its existing test and
+importers bind to one definition rather than two that can disagree. 130/130 on
+`lane-paint-referent` + `home-zone-has-no-lane-division`.
+
+**It bears on `sc-pe-zone-living:37bbb618`** (major, open), whose judge cropped
+three beats inside the zone and reported *"multiple dashed lane lines"*. That is
+a claim about the MESH, which the painter already gates; this repair is the
+GRADER half. The row still needs a drive to settle which half its frames
+photographed — but the half nobody had looked at is now closed.
+
+The second failure, `seedFounderGuards`, is not a defect: it spawns the real
+script and measured 20.6 s alone against 30.2 s inside the full gate at
+`--maxWorkers=2`. It failed on patience, not on its assertion, and its budget is
+raised to 120 s with the measurement recorded beside it.
+
+### …and the frame for `sc-pe-zone-living:37bbb618`, opened rather than argued
+
+`.audit-frames/w43/frames/sc-pe-zone-living__pc-right/04-t041s.png`, inside the
+zone, at HEAD `177c4ba` — i.e. AFTER the painter's home-zone gate landed in
+`9aec4c5` (2026-09-13):
+
+- **the carriageway carries no lane division at all** — a bare surface; the only
+  line on it is the teal guidance ribbon. The row's «multiple dashed lane lines»
+  is not on this frame.
+- the flanking buildings are four- and five-storey blocks with balconies, not
+  the «office-scale towers» the row describes.
+- «ЗАДАЧА 1/5 Влез в жилищната зона с 20», and the engine is demonstrably awake
+  on it: «ОПАСНА ГРЕШКА −10 изпитни т. · Превишаване с повече от 10 км/ч ·
+  Отчетена скорост 40,6 км/ч при разрешени 20 км/ч».
+
+So the row's principal claim — «the world is not a home zone» — does not survive
+its own lesson's newest frame. What it may still hold on is the APPROACH
+(«lane arrows, a painted give-way triangle, kerbside parking bays»), which is a
+tertiary edge and is *supposed* to carry markings — the width step from 24.25 m
+to 16.25 m at the zone boundary is the thing the lesson teaches.
+
+This is a closure candidate for the judging pass, and it now arrives with three
+things it has never had together: the frame, the painter's commit, and the
+grader fix that was still missing until today.

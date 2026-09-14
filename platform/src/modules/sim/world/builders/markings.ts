@@ -38,6 +38,7 @@ import {
   GIVE_WAY_TRIANGLE_LENGTH_M,
   GIVE_WAY_TRIANGLE_SETBACK_M,
   MARKED_CLASSES,
+  calmedZoneKeepsWholeWidth,
   MARKING_Y,
   paintsZebra,
   ROAD_Y,
@@ -1599,9 +1600,11 @@ function paintBusStopZigzag(
  * district JSON without a builder in the way — and so a null/undefined `zone`,
  * which is 105 of the 106 districts, is the byte-identical answer.
  */
-export function calmedZoneKeepsWholeWidth(edge: { zone?: string | null }): boolean {
-  return edge.zone === "residential";
-}
+// MOVED TO constants.ts so the RUNTIME can ask the same question — see its
+// docblock there for what the drift cost. Re-exported under the same name so
+// every existing importer, and home-zone-has-no-lane-division.test.ts, keeps
+// working against one definition rather than two that can disagree.
+export { calmedZoneKeepsWholeWidth };
 
 export function buildMarkings(
   district: District,

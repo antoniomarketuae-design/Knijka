@@ -534,6 +534,62 @@ const ACK_CHIP_GROUND_CSS = `rgba(${PEEK_SCRIM_RGB.join(", ")}, ${ACK_CHIP_GROUN
  * radius and no blur — it is a denser version of the same dissolving stroke,
  * not a plate. The one thing that becomes opaque is the flat core under the
  * ink, which is the only place a glyph ever stands.
+ *
+ * ── ✅ AND IT SHIPPED — RE-MEASURED ON `.audit-frames/w43`, 2026-09-14. The row
+ *    came back a third time („STILL … the plate is measurably not opaque"),
+ *    citing `w43/frames/sc-ac-crosswind__mobile-right/03-ready.png`. w43 is the
+ *    FIRST sweep photographed after this constant landed (9aec4c5, 17:02; the
+ *    leg's frames are stamped 21:42 the same evening), so it is the right frame
+ *    to argue from — and the defect does not reproduce on it.
+ *
+ *    THE METHOD, because the honest next step this row asked for is „a measured
+ *    alpha threshold rather than another eyeball", and because the subtraction
+ *    the blocks above use is UNAVAILABLE on this pair: w43's `01-arrival.png`
+ *    carries the ИНСТРУКЦИИ card over the same corner, so there is no
+ *    hint-free backdrop of this pose to solve α against. It needs none. A
+ *    translucent surface is a function of what is behind it and an opaque one
+ *    is not, so hash the card's own pixels across legs whose worlds have
+ *    nothing in common (sha1 of the raw RGB rows, first 10 hex):
+ *
+ *      w43 leg, 03-ready      core            ack pill        world control
+ *                             x1650–2100      x1700–2050      x300–900
+ *                             y240–460        y490–560        y400–800
+ *      sc-ac-crosswind        294cce75b3      e4a9431136      4a83203c66
+ *      sc-ac-snow             294cce75b3      e4a9431136      b1012df027
+ *      sc-fo-motorway-gap     294cce75b3      e4a9431136      963eae5c74
+ *      sc-park-45-rev         294cce75b3      e4a9431136      05dff012f6
+ *      sc-junction-rhr        294cce75b3      e4a9431136      384890a2e2
+ *      sc-ed-poligon-chain    294cce75b3      e4a9431136      f6b2358ace
+ *
+ *    Six different worlds — the control column proves they are different — and
+ *    ONE byte-identical card. Backdrop-invariance is what „opaque" means, and
+ *    unlike a threshold there is nothing in it left to judge.
+ *
+ *    PER PIXEL, over the whole core above the pill on the crosswind leg
+ *    (x 1600–2125, y 221–465, 128,100 px): 20.1 % is EXACTLY rgb(6, 11, 20) =
+ *    `PEEK_SCRIM_RGB`, 66.2 % is darker than it in all three channels, 13.2 %
+ *    is glyph, and 0.44 % is brighter-but-dark — every one of those a repeated
+ *    (20, 24, 32), which is white type at ~6 % coverage over the ground and not
+ *    a facade. Inside the pill the count is 3,900 of 3,900 px at exactly
+ *    rgb(18, 39, 62), one distinct value, so `ACK_CHIP_TOTAL_ALPHA` lands too.
+ *
+ *    WHY THE 66 % IS NOT THE LEAK IT LOOKS LIKE, since „the fill is not uniform"
+ *    is what the last three readings turned into „translucent": every deviation
+ *    is k · (6, 11, 20) with k < 1 — (4,7,13) is 0.66×, (5,9,16) is 0.80×,
+ *    (6,11,19) is 0.96× — the ground pulled toward BLACK. That is the root's own
+ *    `textShadow` (`0 1px 4px rgba(0,0,0,.96), 0 0 14px rgba(0,0,0,.8)`, set on
+ *    the card element below) haloing every glyph across a 14 px blur. World
+ *    reading through a partial ground makes a pixel BRIGHTER than the ground
+ *    wherever the world is bright; it cannot darken all three channels at once.
+ *
+ *    AND WHAT THE 7× LIFT ACTUALLY SHOWS, so the next reader does not take the
+ *    same crop. The judge's is x 1570 y 455 w 600 h 180. The core's right edge
+ *    is x ≈ 2130 and the ink ends at y ≈ 595, so that rectangle's last ~40
+ *    columns and last 48 rows are the published `PEEK_SCRIM_FEATHER_PX` ramps
+ *    (12 px right, 16 px bottom, at dpr 3) and the bare road past them. Lift it
+ *    7× and the facades that appear are all OUTSIDE the flat core — i.e. they
+ *    are the paragraph directly above this one, working as written. A crop that
+ *    includes the feather cannot answer „is the core opaque". The hash can.
  */
 const TOUCH_HINT_SCRIM_ALPHA = 1;
 

@@ -552,23 +552,44 @@ function radiusWidenBudget(spec: ScenarioSpec): number[] {
      card «преди 2 с». The wheels did stand still. They stood still in the
      WRONG PLACE, and the ladder is what made that place wide enough.
 
-     THE ARITHMETIC, printed off `compileScenario` rather than argued.
-     `sc-mfp-stop-line` is authored `radiusM: 3, acceptBeforeMarkM: -1.275`
-     around the mark at x = 29, and the car approaches from +x:
+     THE ARITHMETIC — CORRECTED w44, 2026-09-14, AND IT IS SIX METRES WORSE
+     THAN THE BLOCK BELOW IT ORIGINALLY CLAIMED. What stood here was computed
+     on paper and was wrong in the reassuring direction, by a factor of five:
 
-       L3/L4/L5   radiusM 3      acceptance x ∈ [30.275, 32.00]   1.7 m of road
-       L2         radiusM 3.75   acceptance x ∈ [30.275, 32.75]   2.5 m
-       L1         radiusM 4.25   acceptance x ∈ [30.275, 33.25]   3.0 m
+       CLAIMED (w43, on paper)          MEASURED (w44, through stepObjective)
+       L3/L4/L5  x ∈ [30.275, 32.00]    x ∈ [27.75, 35.50]   7.75 m of road
+       L2        x ∈ [30.275, 32.75]    x ∈ [27.75, 36.25]   8.50 m
+       L1        x ∈ [30.275, 33.25]    x ∈ [27.75, 36.75]   9.00 m
 
-     `acceptBeforeMarkM` guards the FAR side only, and params.ts says so in its
-     own words: „the widening above stretches the acceptance backwards down the
-     approach at L1/L2 and this flag stops it stretching forwards over the
-     paint." Backwards down the approach is the whole defect here. At L1 the
-     tick is issuable with the vehicle CENTRE 4.25 m short of the mark — bumper
-     2.23 m short at PLAYER_HALF_LENGTH_M 2.02 — and the rule engine then bills
-     the roll over the line, because a standstill that far back is neither at
-     the line nor (at 3 км/ч onwards) inside `stopRecencySec` when the line
-     arrives. Two graders of one act, disagreeing by 1.25 m of ladder.
+     TWO ERRORS, and the second is the one that matters. (1) The SIGN of
+     `acceptBeforeMarkM` was read backwards: objectives.ts computes
+     `beyondMark = along > -bound`, so a bound of −1.275 puts the far boundary
+     at mark − 1.275 = 27.725 — ON the paint (`mg-property-v1.json`
+     meta.scenario.stopLineX = 27.73), which is the whole point of the flag —
+     not at 30.275. (2) The near end is not the disc at all. A halt gate
+     completes through `reached = … || (graceArmed && halted && isHaltDemand)`,
+     and `inApproachGrace` is a CAPSULE of `REACH_ZONE_GRACE_M` (5) plus the
+     disc's own half-chord behind the boundary. That is where 6.5 of the 7.75
+     metres come from; the disc contributes 3.
+
+     SO THE LADDER WAS 1.25 m OF A 9.00 m WINDOW, not 1.25 of 3.00. The clamp
+     below is still right and still lands — L1..L5 now all grade the same
+     7.75 m, and the census tick that used to appear at 1:09 on the w42 sheet
+     (`.audit-frames/w42/frames/sc-merge-from-property__mobile-right`) is «–»
+     on the w43 sheet driven after it. What it does NOT do is end the
+     contradiction: at 35.50 the vehicle CENTRE is 6.50 m short of the mark and
+     7.77 m short of the paint — bumper 5.75 m short at PLAYER_HALF_LENGTH_M
+     2.02 — so «Спри напълно на Б2 на изхода» is still earnable by a car that
+     halts six metres before the line, creeps the rest, and is billed −10 by
+     the rule engine because that standstill is outside `stopRecencySec` (6 s)
+     by the time the line arrives. Two graders of one act, disagreeing by the
+     capsule — and the capsule is not in this file.
+
+     HOW TO RE-MEASURE RATHER THAN RE-DERIVE, because that is what went wrong:
+     drive `stepObjective` (lessons/objectives.ts) with a crawl-in-then-rest
+     tick train at successive x and read back the first x that completes. Every
+     number above came off that sweep on the current tree. A geometry claim
+     about this gate that was not driven through the real evaluator is a guess.
 
      WHY THE FLAG'S OWN CARVE-OUT DID NOT COVER THIS. params.ts already refuses
      to ladder `requireFullStop` itself, and its reason is exactly this row:
@@ -601,12 +622,28 @@ function radiusWidenBudget(spec: ScenarioSpec): number[] {
      спиране е ДО самата линия: спреш ли по-рано…». The tick now agrees with
      the coaching instead of contradicting it and the ten points beside it.
 
-     WHAT THIS DOES NOT CLOSE, named so the next lane aims past it: even at
-     radius 3 the acceptance opens 3 m before the mark, so a halt made 2 m
-     early and rolled through can still take the tick. Ending that needs a
-     NEAR-side cut (the mirror of `acceptBeforeMarkM`) in `objectives.ts` +
-     `params.ts`, or the certificate deferred until the line is behind the car.
-     Neither file is this lane's, and neither is guessable from here.
+     WHAT THIS DOES NOT CLOSE, named so the next lane aims past it — and
+     RE-AIMED w44 now that the window has been measured instead of derived. The
+     residual is 6.50 m, not 3, and it is the grace capsule, not the disc: a
+     halt anywhere in x ∈ [27.75, 35.50] takes the tick, and the far half of
+     that is `REACH_ZONE_GRACE_M` (5, objectives.ts) plus the half-chord the
+     capsule keeps behind its boundary. Nothing compile.ts owns can reach it —
+     the budget is already 0 here and the authored radius is validate.ts's to
+     round-trip. Ending it needs one of: a NEAR-side cut (the mirror of
+     `acceptBeforeMarkM`) in `objectives.ts` + `params.ts`; a per-gate capsule
+     length so a «спри напълно» gate does not inherit the 5 m written for a
+     45 km/h approach; or the certificate deferred until the line is behind the
+     car. All three are objectives.ts, and none is guessable from here.
+
+     AND THE SAME MEASUREMENT INDICTS THE NEIGHBOUR, which this clamp does NOT
+     cover: `sc-mfp-walk-yield` is a halt gate by params.ts's own definition
+     (cap 5 ≤ REACH_ZONE_HALT_CAP_KMH 8 — „a halt demand is never widened"),
+     its title carries no «напълно» and it authors no `requireFullStop`, so the
+     predicate below passes over it and it still ladders 9.25 m at L1 against
+     8.00 m at L3. Whether the exemption should key on the HALT CAP rather than
+     on the word is a catalogue-wide completability question (35 further gates,
+     doc 86 B3/B5), not a merge-from-property question, so it is filed rather
+     than taken here.
      ═════════════════════════════════════════════════════════════════════════ */
   for (let i = 0; i < n; i += 1) {
     const o = spec.success[i];

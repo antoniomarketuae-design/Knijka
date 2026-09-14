@@ -772,9 +772,27 @@ describe("sim/collision barrel — the boundary six sweep161 criticals were rout
       breaches,
       "the bare swept pair keeps a teleport fallback ContactProbe removes; the three budgets are held by this test alone",
     ).toEqual([]);
-    // The whole of platform/src is read off disk here. 60 s is not a licence to
-    // be slow — it is the margin between „the tree grew / the disk was busy"
-    // and a RED, because a tree-walk assertion that times out under load is one
-    // that gets deleted for being flaky rather than believed.
-  }, 60_000);
+    // The whole of platform/src is read off disk here. This budget is not a
+    // licence to be slow — it is the margin between „the tree grew / the disk
+    // was busy" and a RED, because a tree-walk assertion that times out under
+    // load is one that gets deleted for being flaky rather than believed.
+    //
+    // ── AND THE TREE DID GROW — RE-MEASURED 2026-09-14 ─────────────────────
+    // 60 s was written when this walk was cheap. It is now the SLOWEST test in
+    // the suite by an order of magnitude: 19.2 s standalone against ~960
+    // product sources, where the next heaviest scanner is 1.7 s. Inside the
+    // full single-worker gate it took 71.2 s and went red on the clock with
+    // every assertion passing — 3.7x its own baseline, which is ordinary
+    // contention, against a budget that was only 3.1x it.
+    //
+    // vitest.config.ts sets the GLOBAL 60 s as «~18x the slowest real
+    // standalone time», measured when that was 3.3 s. This test outgrew that
+    // rule rather than breaking it, so it takes its own budget instead of
+    // dragging the global one up for 17,845 tests that do not need it.
+    // 240 s is 12.5x the baseline and 3.4x the worst observed run.
+    //
+    // If this needs raising AGAIN, the answer is not a bigger number: it is
+    // that ~1,000 test files each re-read ~960 sources, and that read should
+    // be memoised across the suite.
+  }, 240_000);
 });

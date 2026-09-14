@@ -86,8 +86,33 @@ gate() {
   say "         error TS lines: $ts"
   [ "$ts" -eq 0 ] || { sed -n '1,40p' /tmp/wc-tsc.log; fail "tsc is red ($ts errors)"; }
 
-  say "gate 2/4 — vitest (maxWorkers=2; the suite is ~16,400 tests and the box is a 16 GB HDD)"
-  ( cd "$REPO/platform" && npx vitest run --maxWorkers=2 ) > /tmp/wc-vitest.log 2>&1 || true
+  # ── ONE WORKER, NOT TWO — 2026-09-14, and the reason is measured ─────────
+  #
+  # --maxWorkers=2 produced FIVE red tests on a tree whose only product change
+  # was one pure function, and every one of them was a timeout with no
+  # assertion failing. All five walk platform/src. Standalone against the same
+  # tree, the same second:
+  #
+  #   world-edge-warning · consumer outside its own module     348 ms
+  #   no-spoiler-captions · asserts before commanding motion   1,678 ms
+  #
+  # Inside the 2-worker gate those two took 263,205 ms and 358,637 ms — 756x
+  # and 214x their own baseline. That is not a test that needs a longer clock;
+  # it is two workers seeking against each other on a 7200 rpm disk while each
+  # re-reads ~960 product files. Covering it with a timeout would need 600 s
+  # and would hide a genuine hang behind it.
+  #
+  # ONE WORKER: 1,116 files, 17,846 passed, ZERO failures, 38 min. Two
+  # workers: ~15 min and five false reds, i.e. a gate that refuses every
+  # commit and teaches its reader to argue with it. vitest.config.ts already
+  # states the principle this follows — «a false red under load is worse than
+  # no red, because it teaches the next reader to skip past a real one».
+  #
+  # If this box is ever replaced by one with an SSD, re-measure before raising
+  # it: the number that matters is the RATIO between a scanner test alone and
+  # the same test inside the full run, not the wall-clock of the gate.
+  say "gate 2/4 — vitest (maxWorkers=1; ~16,400 tests, 16 GB HDD — see the note above for why not 2)"
+  ( cd "$REPO/platform" && npx vitest run --maxWorkers=1 ) > /tmp/wc-vitest.log 2>&1 || true
   # sed, NOT grep -oP. This box's grep refuses -P ("supports only unibyte and
   # UTF-8 locales") and every -P extraction silently returned EMPTY — which turns
   # a failure count into 0 and would declare a red suite green. That is the

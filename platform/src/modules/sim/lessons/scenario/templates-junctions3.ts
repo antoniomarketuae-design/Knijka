@@ -518,14 +518,49 @@ export const SC_JX_PRIO_WAITING_CAR: PriorityFromRightSpec = {
   // claim of „structural immunity" was only ever true of drives that never
   // slowed — the orchestrator was the hole in it, and this is the plug.
   //
-  // NOT CLOSED HERE, and named so the next round aims correctly: the crawl
-  // itself is still ungraded. `ruleConfig.needlessStopEnabled` below is armed
-  // and did not fire because each halt was under `needlessStopSustainSec` (6 s),
-  // and TOWN_CRAWL cannot fire either — its `townReasonAhead` excuses everything
-  // inside `townCrawlClearAheadM` of a junction, which is where this crawl
-  // happened. The instrument that WOULD grade it is `ReachZoneParams.minSpeedKmh`
-  // on `sc-jxpc-cross`, and authoring it needs two files this lane does not own
-  // (see the note on that objective).
+  // NOT CLOSED HERE — and the second half of what this slot used to say was
+  // WRONG, which matters more than that it was incomplete: a comment is how the
+  // next lane picks its address, and this one was sending it at the wrong
+  // predicate. Re-measured, not re-reasoned. The drive is w43's own
+  // (`.audit-frames/w43/frames/sc-jx-priority-confidence__mobile-right`,
+  // attested 177c4ba9f7a7): 3 full stops, top 46 км/ч, 90 s against this
+  // template's 40 s par, ИЗДЪРЖАН · ★★★ · +100 XP, «Грешки» NOT PRESENT, and an
+  // instructor debrief reading «чисто каране без нито едно нарушение по
+  // изпитния лист — задръж това ниво». Its beats were replayed through
+  // `reduceTick` with THIS lesson's compiled `ruleConfig`, smooth and chopped:
+  //
+  //   · STOPPED_WITHOUT_CAUSE — armed below, correctly wired, and NOT dead. It
+  //     is silent because the harness counted three SEPARATE halts and each was
+  //     shorter than `needlessStopSustainSec` (6 s). Smooth the same beats so
+  //     the t061/t067 pair becomes one 7 s rest and the code fires. The 6 s is
+  //     also not movable from here: its own note derives it as 3× the longest
+  //     rest in this template's committed traces.
+  //
+  //   · DRIVING_TOO_SLOW_IN_TOWN — the junction does NOT excuse it, which is
+  //     what this note used to claim. `tick.nextJunctionM` is the distance to
+  //     tj-n-c, so `townReasonAhead`'s junction arm reaches only |x| ≤
+  //     `townCrawlClearAheadM` (25 m) of a 195 m route — 14–20 s of an 88 s
+  //     drive — and on a SMOOTH replay of these very speeds the code fires
+  //     TWICE straight through that band (42 s banked against a 20 s sustain).
+  //     What actually starves the clock is `steadyForCrawl`. A stop-go dawdle is
+  //     never steady, and the mean arm that exists to forgive that smooths over
+  //     `motorwaySlowSteadyMeanWindowSec` = 1 s — a window that field's own note
+  //     sizes for „a beginner pumping the pedal at ~2 Hz". This drive's cycle is
+  //     0.2–0.5 Hz, LONGER than the window, so every phase of it reads as a
+  //     transition: the chopped replay banks 3.8 s of the 20. Widening the
+  //     window to 8 s banks 19.2 s and to 12 s convicts — which is the
+  //     measurement, not the repair (the same note warns that a long window
+  //     smears a real merge into a crawl). The town half needs its own
+  //     steadiness reading now that its episode is accrued, in `rules/engine.ts`
+  //     (`steadyForCrawl` / `townCrawlCond`), and that is deliberately NOT
+  //     authorable here: `ruleConfig` states things about THIS ROUTE, while a
+  //     smoothing window is a claim about the detector's arithmetic that would
+  //     be a lie to patch one lesson at a time.
+  //
+  // The one instrument that would grade this drive from INSIDE this file is
+  // `ReachZoneParams.minSpeedKmh` on `sc-jxpc-cross`; authoring it still needs
+  // two files this lane does not own, and both blockers were re-verified
+  // present today (see the note on that objective).
   junctionControl: "uncontrolled",
   actor: {
     pathNodes: ["tj-n-s", "tj-n-c", "tj-n-w"],

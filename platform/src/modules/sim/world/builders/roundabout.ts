@@ -306,7 +306,90 @@
  * ROUTE_HOLD_S (`lessons/advisor.ts`) so a billed −10 qualifies the banner
  * sooner, or the harness lane's steering work landing a leg that CIRCULATES —
  * because no frame in this catalogue has yet photographed a car that entered
- * the ring and came round it.
+ * the ring and came round it. (SUPERSEDED — see wave 43 below: w41 and w43
+ * both do.)
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * WAVE 43, 2026-09-14 — A FIFTEENTH PICK-UP, AND THE FIRST LEG THAT NEVER
+ * REACHES THIS WALL AT ALL. The judge refiles against `w41` and says, fairly,
+ * that the row's HEAD CLAUSE has never been measured on the leg it is filed
+ * against. It is measured here — and so is the sentence the block above closes
+ * with, which these two sweeps FALSIFY. Every number below is printed off THIS
+ * commit's `analyzeRoundabouts` and off the legs' own `guidance.samples` and
+ * `_audit-debrief.json`; nothing is carried over from the blocks above, which
+ * is the discipline this module keeps because the one time a number WAS copied
+ * it survived a fortnight.
+ *
+ * THE GEOMETRY, RE-PRINTED AND UNCHANGED: rb-mini-v1 centre (0, 0), ring
+ * centreline 17.8477 m, `ringHalfWidthM` 4.0625, `islandRadiusM` 13.7499,
+ * circulatory carriageway 13.785 … 21.910 m, four mouths at 0/90/180/270° of
+ * ±25.8° each.
+ *
+ * THE HEAD CLAUSE IS FALSE, AND NO LONGER BY TWO METRES BUT BY THIRTY-THREE.
+ * `.audit-frames/w41/frames/sc-roundabout-entry__pc-right` (2026-09-12,
+ * `attested: true`, `dirtyCount: 0`) never comes near the island. Its CLOSEST
+ * approach in all 145 samples is r = 16.79 m at t067s — body centre 3.04 m
+ * outside the wall face, and even if the car were pointed straight at the
+ * middle its nose (`CHASSIS_HALF_EXTENTS.z` 2.02) would still be 1.02 m short
+ * of the concrete — and it comes to rest at (36.61, −30.03), r = 47.35 m.
+ * `w43` (2026-09-13, commit 177c4ba9, attested, clean) is the same drive:
+ * closest 15.97 m at t067s, final rest r = 45.76 m. Neither leg ends ON the
+ * island; they end 25.4 m and 23.8 m OUTSIDE the ring's own outer kerb.
+ *
+ * AND THE ISLAND BILLS NOTHING ON EITHER. w41's debrief carries TWO faults and
+ * NO collision: «Влизане без пропускане −10» (в 2:17 — the chip is on the glass
+ * from the t058s beat, the tick the car pulls out of its stop at r = 27.68 and
+ * crosses the give-way line) and «Излизане от платното за движение −3» (в
+ * 2:47). So the row's causal clause — „This is what earns the careful drive its
+ * −10 collision" — is false on the very leg it was refiled against: that −10 is
+ * a YIELD fault at the entry, correctly graded and fully explained, and nothing
+ * struck anything. w43 does bill «Удар в неподвижно препятствие −10», but out
+ * at r ≈ 45 m in the terrain wedge between the east and south arms — 24 m past
+ * the outer kerb, where this module draws nothing at all.
+ *
+ * WHAT THE CAR DID INSTEAD RETIRES THE LAST SENTENCE OF THE BLOCK ABOVE, which
+ * reads „no frame in this catalogue has yet photographed a car that entered the
+ * ring and came round it". It has now, twice. w41 runs t063s → t070s from
+ * bearing 66.4° to 0.6° at r 21.10 → 17.81 m; w43 runs t062s → t072s from 72.3°
+ * to 4.1° at r 20.96 → 18.65 m. Every sample of both quadrants lies inside the
+ * 13.785 … 21.910 m carriageway band. The ring is drivable, a student can
+ * circulate it, and the last standing reason to suspect this module's geometry
+ * goes with the sentence it corrects.
+ *
+ * WHERE IT LEAVES THE ROAD IS THE ARM, NOT THE RING. `rbm-e-arm-e` is two
+ * lanes, travel half width 8.125 m, node (18, 0). w41 crosses that kerb line
+ * between t078s (5.48 m along the arm, 7.70 m off its axis — ON) and the next
+ * sample half a second later (7.04 m along, 10.56 m off — OFF), i.e. at
+ * t ≈ 78.2 s at 13 км/ч while still turning right. Everything the row describes
+ * as „grass and a hedge at point-blank range" is outer terrain beyond that
+ * kerb: the t081s frame the row leans on is taken at r = 35.00 m, twenty-one
+ * metres further out than the island it names.
+ *
+ * THE COACHING HALF IS MEASURED THIS TIME INSTEAD OF ROUTED, AND IT SURVIVES
+ * NEITHER OF THE TWO MOVING BEATS THE JUDGE CITES. At **t075s** (16 км/ч) the
+ * car is on the CARRIAGEWAY — 2.72 m along the east arm, 2.75 m off its axis
+ * against an 8.125 m travel half width — so a bare objective line there is
+ * correct rather than a defect, and the feed is not serene at that beat either:
+ * the run log has it printing «Излез от кръговото с десен мигач.». At **t081s**
+ * the car IS off the road, and it has been for 2.8 s against `ROUTE_HOLD_S = 5`
+ * (`lessons/advisor.ts`) — so the banner qualifies at ≈ t083s, and t086s, where
+ * the judge finds it, is the FIRST frame this catalogue can photograph it on.
+ * The beats are 5–6 s apart and the hold is 5 s, so no frame of this leg can
+ * ever show a car off-road for a full hold under a bare banner; t081s is inside
+ * the debounce by construction, exactly as t065s was in wave 42.
+ *
+ * NOTHING NEW TO ROUTE. The address is the one wave 12 and wave 42 already gave
+ * — `lessons/advisor.ROUTE_HOLD_S` / `routeHoldForSession`, consumed by
+ * `LessonPlayShell.objectiveTitleUnderHold` and `routeHoldAdvisorPrompt` — and
+ * shortening that number is a founder ruling rather than a repair: it is
+ * DERIVED (`CRASH_PIN_RADIUS_M` 6 m ÷ the 5 км/ч driving floor = 4.32 s) and
+ * the off-road clause borrowed it deliberately so the banner and the coach card
+ * cannot change on different frames. An off-road-specific hold would need its
+ * own derivation, not a smaller taste.
+ *
+ * REFUTED, NO CODE. The fourth refutation of this row from this file, and the
+ * first that does not need the island wall to make its case — because on the
+ * legs now being cited the car never got within three metres of it.
  * ───────────────────────────────────────────────────────────────────────────
  */
 

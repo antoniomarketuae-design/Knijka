@@ -586,25 +586,70 @@ export const INERT_GROUND_MIX = 0.16;
  * `groundLum` (0.16·atm) is already under `cap` (0.275·atm) — the clamp cannot
  * fire on this mesh at any weather.
  *
- * AND THE GLASS IS BRIGHTER THAN EITHER BAND, WHICH IS THE FACT THAT DECIDES
- * WHERE THIS ROW GOES NEXT. On `.audit-frames/w42/frames/
- * sc-vu-pass-clearance__mobile-right/04-t061s.png`, at the commit it attests,
- * the visible left glass spans x 127-160, y 856-910 and is rgb(145,156,165) on
- * all 1,216 of its pixels — against that frame's own open sky of ~rgb(142,153,
- * 167). For the shipped dark tint the sky band renders near rgb(105) and the
- * ground band near rgb(59). The pixels are therefore NOT this function's
- * output at all, and no further colour dial in this file can move them.
+ * ── „THE GLASS IS BRIGHTER THAN EITHER BAND" WAS A UNIT ERROR AND A SAMPLING
+ *    ERROR. BOTH BANDS ARE ON THE SHIPPED GLASS, AND HAVE BEEN SINCE w41
+ *    — measured 2026-09-14 on the w37/w41/w42/w43 frames, w44.
  *
- * WHAT THAT LEAVES, named so the next lane does not re-measure it. `int_gloss`
- * is `metalness: 0.85, roughness: 0.16, envMapIntensity: 0.55` — a polished
- * near-black metal, which reflects the environment as one flat sky tone and
- * tracks the weather across lessons exactly the way the three w41 columns do.
- * That is the picture. So the live suspects are (a) the RTT material swap in
- * `MirrorRig`'s entry effect not reaching the door quad in the shipped build
- * while the rear's does, and (b) the quad in frame being the exterior body's
- * own mirror face (`hero_car.glb`, material `car_glass`) drawn where the RTT
- * quad is expected. Both are decided by `components/sim/vitok/VitokCockpit.tsx`
- * (mirror-mesh resolution + the trim grade) and the vehicle body rig, not here.
+ * The paragraph that stood here concluded from one column of pixels that the
+ * shipped glass „is NOT this function's output at all", and sent the row on to
+ * `VitokCockpit`'s material swap and to `hero_car.glb`'s `car_glass`. Both
+ * addresses are wrong; the frame it cited refutes it; and it is recorded at
+ * length because a wrong address in a docblock costs a whole lane.
+ *
+ * THE UNIT ERROR. `Color.lerp` runs in the LINEAR working space — `setHex`
+ * converts out of sRGB on the way in — so the bands must be inverted back
+ * through the transfer function before they can be compared with a PNG. With
+ * the shipped tint #0a0d12 and the day-clear atmosphere (`presets.ts`
+ * `day.fog.color` #c6d5e0) `inertGlassBands` returns
+ *
+ *   sky    = 0.50·atm + 0.50·glass → linear (0.28387, 0.33471, 0.37573)
+ *                                  → sRGB   rgb(145, 156, 165)
+ *   ground = 0.16·atm + 0.84·glass → linear (0.09290, 0.10984, 0.12435)
+ *                                  → sRGB   rgb( 86,  93,  99)
+ *
+ * — not the „near rgb(105) / near rgb(59)" the old block predicted, which is
+ * what a lerp read as though it happened in sRGB gives. rgb(145,156,165) is the
+ * SKY BAND, to the level, on all three channels. (Feeding the fallback
+ * 0x0a0c10 instead lands on the same two triples, so the pixels do not by
+ * themselves prove which tint was read — only that this function painted them.)
+ *
+ * THE SAMPLING ERROR, which is why two rounds in a row called it flat. The
+ * mirror housing cuts the quad IN TWO on screen, and both rounds measured only
+ * the upper-right piece (w41: x 145, y 856-904; w42: x 127-160, y 856-910),
+ * which is entirely above the horizon. The other piece is hard against the LEFT
+ * FRAME EDGE, x 0-34, and it carries the horizon. Exact-match pixels, no
+ * tolerance, counted over x 0-200 / y 820-1080 of the same drive:
+ *
+ *   frame                                    sky 145,156,165   ground 86,93,99
+ *   w37 04-t015s (before the two bands)               0                 0
+ *   w41 04-t016s                                  2,814               794
+ *   w42 04-t061s ← the frame the old block        1,302               233
+ *       measured and called „1,216 flat px"
+ *   w43 04-t032s                                  2,277               593
+ *
+ * and every frame of the w41, w42 and w43 drives carries both. A column at
+ * x = 0 in w43 04-t032s reads sky from y 892, the horizon transition at
+ * y 950-954, ground from y 955 to y 973, then the housing. Projecting the quad
+ * — cockpit camera at COCKPIT_EYE with the hFOV-locked vFOV (39.25° at
+ * 2556×1179), the GLB node through the yaw-π / y−0.55 mount — puts the horizon
+ * at y 944 on that column and the quad's own top edge at y 879 against an
+ * observed 892: single-digit pixels, i.e. suspension damping. The same
+ * projection puts the mirror's centre at frame-x 0.001 against `cabinLook`'s
+ * −0.005 and the interior mirror at 0.710 against its measured 0.704, so the
+ * camera model that produced those numbers is the shipped one.
+ *
+ * WHAT TO CARRY FORWARD INSTEAD, because one real thing survives the refutation:
+ * the split the student SEES is not the authored one. The target is 38 % sky /
+ * 62 % ground, but the housing hides most of the quad's lower half from the
+ * driving eye, so the frames come out about 6:1 the other way (2,277 sky against
+ * 593 ground). „A single flat grey-blue quad" was an honest description of that
+ * sliver. INERT_GROUND_FRACTION is deliberately NOT retuned for it: the band
+ * being hidden is the DARK one, so pulling the horizon up would spend the little
+ * visible glass there is on tarmac, at a mirror the pose table already aims
+ * 4-5° down. The remedy for a door mirror that shows no world is the GLANCE,
+ * which is built and live (`mirrorIsAttended` → `selectMirrorPass` → a pass on
+ * the next door phase, at every preset); what has never exercised it is the
+ * audit harness, which presses only Escape / KeyW / KeyS.
  */
 export const INERT_HORIZON_MAX_RATIO = 0.55;
 

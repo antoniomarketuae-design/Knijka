@@ -448,9 +448,42 @@ export function notifyColumnMirrorLanePx(
    «↓ още N реда» beside «ПРОЧЕТИ». It is also NOT a clipped control — the
    compact column sets no `overflow`, and the card's «ПРОЧЕТИ» row is a
    `shrink-0` sibling of a `min-h-0` scroller, so a card whose chrome needs
-   more than 84.0 px paints past the ceiling rather than losing its buttons:
-   worst case its floor lands at 0.405 (852 × 393) / 0.427 (780 × 360) of the
-   stage, i.e. the chrome and not the ceiling is what still reaches the road.
+   more than 84.0 px paints past the ceiling rather than losing its buttons.
+
+   ⚠ …AND THE SIZE OF THAT OVERHANG WAS STATED AN ORDER OF MAGNITUDE TOO SMALL.
+   Corrected in place 2026-09-14, on `sc-junction-gap:df95401c`. The sentence
+   that ended this paragraph read „worst case its floor lands at 0.405
+   (852 × 393) / 0.427 (780 × 360) of the stage, i.e. the chrome and not the
+   ceiling is what still reaches the road." The second half of it is right and
+   is the whole point; the number was an estimate and nobody had ever held it
+   against a frame. 0.405 of a 393 px stage is 159.2 — two pixels past a box
+   whose bottom is 0.400 BY CONSTRUCTION, which should have read as too good.
+
+   MEASURED down the card's own column on the row's own leg,
+   `.audit-frames/w43/frames/sc-junction-gap__mobile-right/01-arrival.png`
+   (iPhone 16 sideways, 852 × 393 at dpr 3; the four-row shape — chip, two body
+   lines, «ПРОЧЕТИ ↓15» + «РАЗБРАХ»). The shade's flat core is the ruler:
+   `SimOverlay.useCardOverhang` sizes it to the LOWEST ROW THE CARD PAINTS, so
+   where the core ends IS the painted floor, and the 16 px feather after it is
+   `PEEK_SCRIM_FEATHER_PX.bottom` to the pixel:
+
+     card box bottom  CSS 157.2 = 0.400 of the stage   (73.24 + the 84.0 min())
+     pills' bottom    CSS 186.0                        (their border arc's row)
+     painted floor    CSS 188.7 = **0.480** of the stage
+     bare world at    CSS 203.3                        (188.7 + 14.6 of feather)
+
+   So the chrome hangs 31.5 px past the ceiling, not 2, and the card's INK
+   stands ~30 px onto the road against a horizon at 0.402. The ceiling is doing
+   exactly what it was written to do — the BOX lands on 0.400 to the pixel —
+   and what it has never bounded is the four `shrink-0` rows that overflow it.
+   That is the honest mechanism behind every „the buttons are standing on the
+   world" row filed against this corner, and it is NOT closed by tightening
+   this number: 84.0 px already holds about four lines of authored Bulgarian,
+   and buying the 31.5 back would leave the text window under one. The two
+   surfaces that pay for it instead are the fold («↓ още N реда», which
+   announces what is cut) and the chips' own opaque ground in `SimOverlay`
+   (`PEEK_CHIP_TOTAL_ALPHA`), whose measurement is in the block by
+   `FLANK_LANE_VAR` below.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -748,6 +781,48 @@ export function notifyColumnTopPx(
  * have banked a green tick and walked past it. That one is live and is routed:
  * see the fold measurements in the mirror-lane block above and
  * `overlayQueue.whyIsReachable`.
+ *
+ * ── AND A SECOND FILING AGAINST THE SAME CORNER. HALF TRUE AND NOT THIS
+ *    FILE'S, HALF REFUTED ON ITS OWN FRAME — 2026-09-14 ────────────────────
+ *
+ * `sc-junction-gap:df95401c`: „the ПРОЧЕТИ and РАЗБРАХ buttons sit on top of
+ * parked cars … the ПРОЧЕТИ pill has no opaque plate and the geometry behind it
+ * — the dark vehicle body and a pale horizontal window bar of the van at the
+ * kerb — is fully legible through the fill."
+ *
+ * THE PILLS DO STAND OVER THE PARKED VAN, and that half is not a defect this
+ * file can answer: the mirror owns the ceiling, the notch inset and the flank
+ * band own the right edge, the road law owns the floor, and the founder's own
+ * drawing put the corridor here. There is no third corridor, and a right-edge
+ * rail is over the right kerb by definition — which is where parked vehicles
+ * are. What the corridor must NOT cover is the thing the rung grades, and on
+ * this frame it does not: the „40" repeater, the Б2 face, the junction and the
+ * guidance ribbon are all left of the column's 0.635 edge.
+ *
+ * THE HALF THAT IS A DEFECT CLAIM IS „NO OPAQUE PLATE", AND IT FAILS ON THE
+ * ROW'S OWN FRAME AT THE ROW'S OWN COMMIT (177c4ba). Luminance sampled inside
+ * each pill with the glyph rows avoided, same leg and frame as the block above:
+ *
+ *   «ПРОЧЕТИ» interior                          mean 13.4–14.2  sd  3.9–6.3
+ *   «РАЗБРАХ» interior (it carries the 18 % tone) mean 39.7–42.0  sd  9.2–11.3
+ *   the card's own reading ground, between its body lines        sd  7.1
+ *   bare world, matched strip beside the column                  sd 28–36
+ *
+ * The plate is there, it is UNDER THE PILLS and not merely behind the words,
+ * and the world's surviving variance inside «ПРОЧЕТИ» is LOWER than inside the
+ * card's own reading ground. What a 3× gain shows is the residual
+ * `PEEK_CHIP_TOTAL_ALPHA = 0.90` deliberately leaves — the founder's „two small
+ * translucent chips", the register that is explicitly not a solid button.
+ * `SimOverlay.useCardOverhang` is what carries that ground down over a control
+ * row hanging past this file's ceiling, and its flat core ends at CSS 188.7,
+ * i.e. 2.7 px BELOW the pills' own bottom border. Nothing here paints alpha,
+ * so nothing here could have caused it either way.
+ *
+ * The «Карай дотук» half of the filing is untested rather than refuted: the
+ * string does not occur in this leg's log, which the judge states and does not
+ * claim. It is left open on purpose — a lane that recorded a refutation of the
+ * half it could measure and let the other half ride on it would be doing the
+ * thing the block above this one was written to stop.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export const FLANK_LANE_VAR = "var(--sim-flank-lane, 0px)";

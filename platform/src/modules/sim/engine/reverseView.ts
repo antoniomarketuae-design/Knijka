@@ -79,7 +79,7 @@
  *
  *  · `sc-ed-reverse-line:e05f2cee` „no rear proximity read-out at any point of
  *    the reverse". True of the frame and correct of the product. The badge
- *    exists (`hud/RearProximityCue.tsx`, mounted at `LessonScene.tsx`:2553)
+ *    exists (`hud/RearProximityCue.tsx`, mounted at `LessonScene.tsx`:3049)
  *    and its honesty contract is that it renders ONLY for a real body behind:
  *    `hud/rearProximity.ts` `stepRearCue` opens with
  *    `if (!Number.isFinite(gapM)) return null`. This drill runs on poligon-v1
@@ -102,6 +102,49 @@
  *    the lesson. Overturnable by the founder, and if it is ever overturned the
  *    camera belongs behind an explicit setting, never as the default view of a
  *    manoeuvre the state examines by shoulder check.
+ *
+ * ── BOTH CHILDREN ARE SETTLED, AND NEITHER SETTLED HERE (2026-09-14) ───────
+ *
+ * The block above predicted where each row would land IF it landed at all.
+ * Re-checked against live source and against `w43` — the freshest sweep of
+ * this leg, and six days after the surface below shipped — both predictions
+ * hold and this module still owns no repair for either. Written down because
+ * two judges in a row routed these rows to this file, and an address that
+ * keeps attracting a row it cannot contain is itself a defect in the trail.
+ *
+ *  · `e05f2cee` — the honest half IS BUILT, and not where the guess above
+ *    sent it: it is `hud/reverseTravel.ts` (+ the container in
+ *    `hud/RearProximityCue.tsx`), not an objective/RouteGuidance surface.
+ *    `stepReverseRun` integrates the reverse PATH off the same 5 Hz poll the
+ *    proximity cue already ran on, and `rearChannelBadge` gives a real body
+ *    behind strict priority over it, so metres DRIVEN and metres of AIR can
+ *    never share the box. `.audit-frames/w43/frames/
+ *    sc-ed-reverse-line__mobile-right/05r-reverse-end.png` prints
+ *    «Заден ход · 132 м» over the shoulder-checked cockpit while task 3/3
+ *    reads «Спри след 25 метра заден ход до бордюра» — the quantity the gate
+ *    bills the student for, finally on the glass.
+ *
+ *    THAT FRAME IS ALSO THE RUNTIME PROOF OF THE OTHER HALF. The travel badge
+ *    renders only on `rearChannelBadge`'s `cue === null` branch, so SEEING it
+ *    means `stepRearCue` returned null at that instant — `rearBodyBehind`
+ *    found nothing behind the car, exactly as the template authors it (no
+ *    `actors`, no ambient override, poligon-v1). „No proximity read-out during
+ *    the reverse" is therefore settled by measurement rather than by argument:
+ *    the rear channel is occupied throughout the manoeuvre, and the one number
+ *    it does not print is the one that would have been a distance to nothing.
+ *
+ *  · `1f812456` — unchanged, and still not this module's. A grep of `src/`
+ *    finds zero rear-camera surfaces anywhere in the product, so the
+ *    observation is true; the ruling above is why, and only the founder can
+ *    overturn it. Note what the drill already does INSTEAD, which is what
+ *    requirement-zero asks of it: instruction 4 spells the duty out with its
+ *    lawRef («обърни се и гледай през рамо назад, не разчитай само на
+ *    огледалото (чл. 40)»), `teach.whyBg` explains why reversing is the
+ *    under-rated manoeuvre, and the `mistake-no-look` debrief names the child
+ *    behind the car. The absence is TAUGHT, not merely present — which is the
+ *    difference between a design ruling and a hole. If it is ever overturned,
+ *    a camera is a RENDER surface (a second view plus a HUD panel, behind a
+ *    setting); this module decides only WHETHER the head turns.
  */
 
 import type { SelectorPosition } from "../vehicle";

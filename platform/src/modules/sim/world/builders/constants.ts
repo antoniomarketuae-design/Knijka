@@ -549,6 +549,39 @@ export interface MarkedEdgeLike {
   class: string;
   oneway: boolean;
   lanes: number;
+  /** ЧЛ. 62 Т. 1 — see `calmedZoneKeepsWholeWidth`. Optional because a
+   *  hand-built edge and a recorded trace both omit it, and absence must mean
+   *  «an ordinary street», which is what every caller meant before the field
+   *  existed. */
+  zone?: string | null;
+}
+
+/**
+ * Does чл. 62 т. 1 leave this carriageway UNDIVIDED?
+ *
+ * In a «зона за живеене» the carriageway is not defined as a carriageway, so it
+ * carries no lane division at all — no осева, no dividers, no edge line. The
+ * painter has known this since the home-zone pass:
+ * `markings.ts` runs its whole lane-boundary loop under
+ * `k < lanes && !calmedZoneKeepsWholeWidth(eb.edge)`.
+ *
+ * IT LIVES HERE NOW BECAUSE THE RUNTIME HAD NOT HEARD OF IT. `paintsCentreLine`
+ * below is documented as «the painter's own arithmetic … so runtime/spatial.ts
+ * publishes the same answer the painter acts on», and it did not include this
+ * clause — so on `pe-zone-v1` the runtime reported an осева on `pz-e-zone`
+ * that the mesh does not paint, and the three codes that grade the axis
+ * (CENTER_LINE_TOUCHED, POOR_LANE_KEEPING, NOT_KEEPING_RIGHT) had a referent
+ * with no paint under it. That is the founder's own sentence — «it say we step
+ * on some line that doesnt exist at all» — surviving in the one place the test
+ * written to end it could not see, because the test compares the runtime to the
+ * MESH and the drift was in the predicate they were supposed to share.
+ *
+ * Defined in constants.ts and re-exported by markings.ts rather than the other
+ * way round: constants.ts is the file both the builder and the runtime already
+ * import, and markings.ts imports IT, so the dependency only runs one way.
+ */
+export function calmedZoneKeepsWholeWidth(edge: { zone?: string | null }): boolean {
+  return edge.zone === "residential";
 }
 
 /**
@@ -564,6 +597,10 @@ export interface MarkedEdgeLike {
  */
 export function paintsCentreLine(edge: MarkedEdgeLike): boolean {
   if (!MARKED_CLASSES.has(edge.class)) return false;
+  // чл. 62 т. 1 — a home zone's carriageway is undivided, and the painter
+  // skips its whole boundary loop. Without this the runtime grades an axis the
+  // mesh leaves bare.
+  if (calmedZoneKeepsWholeWidth(edge)) return false;
   if (edge.oneway) return false;
   const lanes = Math.max(1, edge.lanes);
   return lanes >= 2 && lanes % 2 === 0;
@@ -576,6 +613,11 @@ export function paintsCentreLine(edge: MarkedEdgeLike): boolean {
  */
 export function paintsLaneLines(edge: MarkedEdgeLike): boolean {
   if (!MARKED_CLASSES.has(edge.class)) return false;
+  // The SAME clause, and for the same reason: markings.ts gates the entire
+  // `k = 1..lanes-1` loop on it, not merely the middle boundary. A home zone
+  // has no painted lane to keep, so POOR_LANE_KEEPING and NOT_KEEPING_RIGHT
+  // have no referent there either.
+  if (calmedZoneKeepsWholeWidth(edge)) return false;
   return Math.max(1, edge.lanes) >= 2;
 }
 

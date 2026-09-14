@@ -3775,6 +3775,42 @@ function FlankGhost({
  * buckles up, which is the whole of the pre-drive checklist every lesson
  * opens with. NOTE for whoever re-drives it: the w12+ harness now fastens the
  * belt, so a sweep leg will photograph this disc only before that step.
+ *
+ * ── AND IT HELD. THE SAME FRAME, 31 WAVES LATER — 2026-09-14 ───────────────
+ *
+ * This row keeps coming back STILL, and the reason is worth stating once: the
+ * disc is still LAID OVER a parked yellow car — it always will be, because the
+ * station is a fixed rect on the glass and the world drives underneath it — so
+ * an eye reading „a warning sitting on top of a car" reads the old defect. The
+ * defect was never the OVERLAP, which is charged for at the top of this file
+ * („any pixel a control paints on is NOT road"). It was the TRANSPARENCY, and
+ * that is a measurement rather than an impression.
+ *
+ * Both rows below are the SAME r ≤ 50 device-px interior of the SAME lane's
+ * `01-arrival.png`, sampled outside a 12 px dilation of every ink pixel — so
+ * the ⚠, the caption and `GLYPH_SHADOW`'s 8 px halo are all excluded, and what
+ * is left can only be the ground:
+ *
+ *   w12  this repair's own evidence frame, PRE-plate
+ *        red channel  mean 60.9  sd 7.64  min 50  max 74   → 24 levels
+ *   w43  post-plate, and the frame the newest STILL verdict cites
+ *        red channel  mean 91.2  sd 1.19  min 88  max 93   →  5 levels
+ *
+ * against ~113 levels of car contrast in the annulus immediately OUTSIDE the
+ * ring on that very frame (lit body srgb(113, 90, 37) against near-black
+ * glass). 24/113 = 21 % of the world survived the old fill, which is the
+ * „10–20 % of the scene's contrast landing inside a WARNING" measured above;
+ * 5/113 = 4 % is the plate's own dither plus the outermost ring of the text
+ * shadow. Stretch both interiors 16 levels to full range and w12 draws the
+ * car's window aperture, its A-pillar and its roofline; w43 draws the ⚠, the
+ * word, and nothing else at all.
+ *
+ * The MEAN moved (61 → 91) and that is the repair landing, not drifting: the
+ * plate is what the danger fill now composites onto, and 20–42 % of `--danger`
+ * rgb(255, 106, 88) over opaque black is 51 … 107. 91 is a mid-pulse frame of
+ * exactly that. `touchDock.test.tsx` §3d pins the three ways this could rot
+ * back (behind the control · a disc, not a square · an ink with no alpha);
+ * nothing here needs a fourth guard, and nothing here needs another wave.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 const WARNING_PLATE_INK = "rgb(0, 0, 0)";
