@@ -136,11 +136,26 @@ gate() {
   say "gate 4/4 — tools tests (NOT a substitute for gate 2: a seatbelt fix once passed"
   say "         tsc + tools-tests and broke a vitest file that reads lesson-audit.mjs off disk)"
   node platform/scripts/tools-tests.mjs > /tmp/wc-tools.log 2>&1 || true
-  local tfail; tfail=$(grep -ciE "^\s*(FAIL|not ok)" /tmp/wc-tools.log || true)
-  say "         failing: $tfail   (1 expected: the deck-captions freeze)"
-  if [ "$tfail" -gt 1 ]; then
-    grep -iE "FAIL|not ok" /tmp/wc-tools.log | head -20
-    fail "tools-tests has $tfail failures; 1 is the deck-captions freeze, so $((tfail - 1)) are NEW"
+  # READ THE RUNNER'S OWN SUMMARY, NOT A PREFIX THE RUNNER NO LONGER PRINTS —
+  # 2026-09-14. This counted lines starting `FAIL` or `not ok`. Node 24's
+  # node:test spec reporter prints neither: a failure is `✖ <name>` and the run
+  # ends `ℹ fail N`. So the pattern matched ZERO lines on every run, printed
+  # "failing: 0 (1 expected)", and passed. Measured on the gate that certified
+  # 13692e3 and af71e71: its log said `ℹ fail 3` — the deck-captions freeze
+  # plus two count-agreement.test.mjs failures (route-fidelity-open.mjs and
+  # stale-claims.mjs read the corpus with no recipe) that shipped through two
+  # green gates. A gate that cannot find the number must not report one.
+  local tsum; tsum=$(tr -d '\r' < /tmp/wc-tools.log | sed -n 's/^ℹ fail \([0-9][0-9]*\)$/\1/p')
+  [ -n "$tsum" ] || { tail -20 /tmp/wc-tools.log; fail "tools-tests printed no «ℹ fail N» summary — the result is UNREADABLE, which is not green"; }
+  local tfail=0 n; for n in $tsum; do tfail=$((tfail + n)); done
+  # The one standing red is named, not just counted: a new failure must not be
+  # able to hide behind the allowance while the freeze happens to pass.
+  local tfreeze; tfreeze=$(tr -d '\r' < /tmp/wc-tools.log | grep -cE "^\s*✖ the corpus has not changed since it was measured" || true)
+  [ "$tfreeze" -gt 1 ] && tfreeze=1
+  say "         failing: $tfail   (standing: deck-captions freeze ×$tfreeze)"
+  if [ "$tfail" -gt "$tfreeze" ]; then
+    tr -d '\r' < /tmp/wc-tools.log | grep -E "^\s*✖ " | sort -u | head -20
+    fail "tools-tests has $tfail failure(s); $tfreeze is the deck-captions freeze, so $((tfail - tfreeze)) are NEW"
   fi
 
   say "GATE GREEN — the $STANDING_REDS standing reds and nothing else"

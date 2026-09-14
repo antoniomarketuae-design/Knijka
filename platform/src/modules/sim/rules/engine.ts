@@ -469,6 +469,16 @@ export interface RuleEngineState {
   /** Stationary at a green light with a clear box (JU-09). */
   hesitation: EpisodeState;
   /**
+   * Where the car last crossed a traffic-light stop line on a GREEN it was
+   * allowed to take — `null` when no such entry is live. The past-the-line arm
+   * of HESITATION_AT_GREEN reads it, because the runtime stops describing a
+   * line the instant the car's centre is over it (`worldRuntime.ts` keeps only
+   * lines AHEAD, `d >= 0`), so a freeze with the nose in the mouth had no
+   * light, no line and no distance on its tick. Assigned whole, never mutated.
+   * See `HESITATION_PAST_LINE` in the reducer for the measurement.
+   */
+  hesitationGreenEntry: { x: number; y: number } | null;
+  /**
    * Causeless harsh braking — episode with onset-speed memory (SP-11).
    * `causeSeen` (C3): a plausible cause observed at ANY point of the current
    * continuous braking episode exempts the WHOLE episode — a cause that
@@ -673,11 +683,15 @@ export interface RuleEngineState {
    * measures; see `WARNING_LAMP_REGRADE_SEC`.
    */
   warningLampIgnoredAt: number | null;
-  /** The fastest the car has gone SINCE that bill — the baseline the
-   *  compliance drop is measured down from (the emergency runner's
-   *  `peakSinceReleaseKmh` discipline, for its reason: a level alone pays a
-   *  car that was already slow and never changed pace). */
-  warningLampPeakKmh: number;
+  /** The speed samples of the LAST `WARNING_LAMP_REGRADE_SEC` since that bill,
+   *  kept as a decreasing run (each sample drops every earlier one it is not
+   *  slower than), so the first entry is the fastest the car has gone in that
+   *  window — the baseline the compliance drop is measured down from. A DROP
+   *  and not a level, for the emergency runner's `peakSinceReleaseKmh` reason: a
+   *  level alone pays a car that was already slow and never changed pace. A
+   *  RECENT drop and not one since the bill, for the reason at
+   *  `WARNING_LAMP_COMPLY_DROP_KMH`. Samples are pushed/shifted, never mutated. */
+  warningLampRecent: Array<{ t: number; speedKmh: number }>;
   /** Accrued seconds of NOT-YET-COMPLYING driving since that bill — the ledger
    *  `WARNING_LAMP_REGRADE_SEC` is spent against. Zeroed the moment the driver
    *  actually begins to slow. */
@@ -1881,8 +1895,10 @@ const OFF_CARRIAGEWAY_REGRADE_SEC = 6;
  * to beat the clock is the OTHER wrong answer this drill is built to punish
  * (`HARSH_BRAKING_NO_CAUSE`, the „Паническо спиране" demo). So the clock stops
  * the instant the car has actually shed speed, and runs only while it has not:
- * the question is whether he STARTED, never whether he FINISHED.
- * `WARNING_LAMP_COMPLY_DROP_KMH` is that test.
+ * the question is whether he is SLOWING, never whether he has FINISHED.
+ * `WARNING_LAMP_COMPLY_DROP_KMH` is that test — and until 2026-09-14 it asked
+ * whether he had EVER slowed since the bill, which is a different question
+ * with a different answer for the one student this row is about (see there).
  *
  * ── THE NUMBER ──────────────────────────────────────────────────────────────
  * 6 s, and it is `SPEED_REGRADE_SEC`'s number for `SPEED_REGRADE_SEC`'s stated
@@ -1911,8 +1927,53 @@ const OFF_CARRIAGEWAY_REGRADE_SEC = 6;
 const WARNING_LAMP_REGRADE_SEC = 6;
 
 /**
- * How much speed the driver must have SHED since the ignore bill for the
- * re-grade above to count him as responding, km/h.
+ * How much speed the driver must have SHED within the last
+ * `WARNING_LAMP_REGRADE_SEC` for the re-grade above to count him as
+ * responding, km/h.
+ *
+ * ── „WITHIN THE LAST SIX SECONDS", NOT „SINCE THE BILL" (2026-09-14) ─────────
+ * The baseline used to be the fastest the car had gone SINCE the bill, and it
+ * never came down. So the first 5 км/ч shed was a permanent acquittal: a
+ * student who lifted off once and then drove on at the lower pace was „still
+ * complying" for the rest of the drive. That is the row's own sentence —
+ * `sc-vp-telltale-red:c172d48b`, „a student who treats a red lamp as a yellow
+ * one and keeps driving without crashing" — because the yellow lamp's taught
+ * answer IS „ease off and carry on carefully". MEASURED through
+ * `compileScenario → recordScriptedDrive → applyTick` on ln-v1 at L1, the
+ * runner billing the ignore at 23,7 s at 45 км/ч:
+ *
+ *   held 45 to the end of the road       → re-grade @ 29,7 s, Общо 3 (pinned
+ *                                           in telltale-red-sweep161.test.ts)
+ *   eased to 30 at y = 275, drove on     → NO re-grade, «Общо 0» — BEFORE
+ *                                         → re-grade @ 36,3 s, Общо 3 — AFTER
+ *
+ * and `.audit-frames/w46/frames/sc-vp-telltale-red__pc-wrong` is the same
+ * shape in the wild: a 57 км/ч peak, then plateaus in the low fifties with
+ * stops between them, «Продължаване с червена контролна лампа» under «Учебни
+ * моменти (не влизат в точките)» and nothing on the sheet.
+ *
+ * So the drop is now read against the fastest speed of the last six seconds
+ * (`warningLampRecent`): the student who is slowing keeps shedding, and stays
+ * acquitted for as long as he does; the student who eased off and then HELD a
+ * pace stops shedding, and six seconds later his clock is running again. The
+ * window is the re-grade's own six seconds, not a new number, and it is the
+ * right size for a reason of its own: 5 км/ч in 6 s is a mean of 0,23 m/s²,
+ * the size of the chassis's rolling resistance on its own (280 N on 1 220 kg,
+ * `vehicle/tuning.ts`), before the linear damping (24,4·v N at 12 m/s is
+ * another ~0,24 m/s²) and the drag a real lift-off adds on top — so a lifted
+ * foot still counts as slowing, and the promise below («a genuine lift-off is
+ * credited») survives.
+ *
+ * WHAT IS UNCHANGED: the reset is still the reset — the moment he IS slowing
+ * the ledger is zeroed, so reaction seconds before a real pull-over are
+ * forgiven exactly as before; a full stop still complies; the arm, the single
+ * re-grade and the `regrade` marking are untouched; and `orchestrator/
+ * __tests__/telltale-stimulus.test.ts`'s 1 m/s² pull-over stays acquitted.
+ * WHAT IT STILL CANNOT REACH, written down: a student who eases off inside the
+ * last ~11 s of the road (≈ five seconds for the old pace to leave the window,
+ * six to accrue). On ln-v1 that is the final ~115 m at 38 км/ч; the drive ends
+ * first. A settle-at-drive-end in the `settleUnpaidSpeedingTeach` shape would
+ * close it, and its consumer is `lessons/engine.ts`, not this file.
  *
  * A DROP, NOT A LEVEL, and for the reason `EM_YIELD_DROP_KMH`
  * (orchestrator/runners.ts) was written against one lesson over: an absolute
@@ -2205,6 +2266,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     inLaneSeen: false,
     centerLine: { ...IDLE_EPISODE },
     hesitation: { ...IDLE_EPISODE },
+    hesitationGreenEntry: null,
     harshBrake: {
       activeSince: null,
       emitted: false,
@@ -2244,7 +2306,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     offCarriageway: { ...IDLE_EPISODE },
     offCarriagewayRegrade: { ...IDLE_EPISODE },
     warningLampIgnoredAt: null,
-    warningLampPeakKmh: 0,
+    warningLampRecent: [],
     warningLampDriveOnSec: 0,
     warningLampRegrade: { ...IDLE_EPISODE },
   };
@@ -2315,6 +2377,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     emergencyLane: { ...s.emergencyLane },
     offCarriageway: { ...s.offCarriageway },
     offCarriagewayRegrade: { ...s.offCarriagewayRegrade },
+    warningLampRecent: [...s.warningLampRecent],
     warningLampRegrade: { ...s.warningLampRegrade },
   };
 }
@@ -4657,19 +4720,23 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // -- 4a1'. THE RED TELLTALE THAT WAS IGNORED AND STILL IS (VP-06 / N11 —
   // `WARNING_LAMP_REGRADE_SEC` carries the measurement and the derivation).
   // Armed ONLY by the runner's own ignore bill above, so no drive that was
-  // never billed can be reached here. The clock runs while the driver has not
-  // begun to slow and stops the instant he has — «спри безопасно СЕГА» is
-  // answered by lifting off, not by finishing the stop.
+  // never billed can be reached here. The clock runs while the driver is not
+  // slowing and stops the instant he is — «спри безопасно СЕГА» is answered by
+  // lifting off, not by finishing the stop. „Is slowing" is read over the last
+  // `WARNING_LAMP_REGRADE_SEC`, not since the bill: see
+  // `WARNING_LAMP_COMPLY_DROP_KMH` for the drive that shows why.
   if (s.warningLampIgnoredAt !== null) {
-    if (speed > s.warningLampPeakKmh) s.warningLampPeakKmh = speed;
-    const beganToComply =
-      s.warningLampPeakKmh - speed >= WARNING_LAMP_COMPLY_DROP_KMH ||
-      speed < cfg.movingSpeedKmh;
+    const recent = s.warningLampRecent;
+    while (recent.length > 0 && recent[recent.length - 1].speedKmh <= speed) recent.pop();
+    recent.push({ t, speedKmh: speed });
+    while (recent[0].t < t - WARNING_LAMP_REGRADE_SEC) recent.shift();
+    const isComplying =
+      recent[0].speedKmh - speed >= WARNING_LAMP_COMPLY_DROP_KMH || speed < cfg.movingSpeedKmh;
     const lampStep = stepAccruedEpisode(
       s.warningLampRegrade,
       s.warningLampDriveOnSec,
-      !beganToComply,
-      beganToComply,
+      !isComplying,
+      isComplying,
       t,
       dt,
       WARNING_LAMP_REGRADE_SEC,
@@ -5064,11 +5131,86 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     leadGapM !== null &&
     leadGapM <= cfg.hesitationQueueGapM &&
     gapOpeningMps < cfg.followRecoveryRateMps;
-  const hesitating =
+  // HESITATION_PAST_LINE — THE FREEZE THAT HAPPENS ONE CAR-LENGTH LATER
+  // (sc-signal-hesitation:440b1f7c, critical).
+  //
+  // WHAT WAS MEASURED, through `compileScenario → recordScriptedDrive →
+  // applyTick` on sxh-v1 with sx-n-c pinned GREEN (the recorder's own
+  // `SX_PIN_NS_GREEN_HOLD`), the SAME nine-second freeze at five places:
+  //   centre 2.3 m BEFORE the line (y = −30)  → HESITATION_AT_GREEN @ 19.2 s,
+  //                                              «…без да замръзваш» withheld
+  //   centre 3.7 m PAST it (y = −24)          → violations [], gate ticked
+  //                                  (after)  → HESITATION_AT_GREEN @ 20.1 s, withheld
+  //   centre 7.7 m past (y = −20)             → violations [], gate ticked
+  //                                  (after)  → HESITATION_AT_GREEN @ 20.6 s, withheld
+  //   centre 15.7 m past (y = −12)            → violations [], gate ticked
+  //                                  (after)  → unchanged: deeper than the window
+  // and `.audit-frames/w45/frames/sc-signal-hesitation__pc-wrong/04-t016s.png`
+  // is the second row in the wild: 0 км/ч, odometer 082 м from the y = −105
+  // spawn, i.e. the centre ~5 m over the y = −27.725 line, the light green,
+  // the road empty — and the sheet «Премини правó напред на зелено, без да
+  // замръзваш ✓». The lesson is named for that picture.
+  //
+  // WHY. Every clause above reads `tick.nextStopLineM`, and the runtime keeps
+  // only lines AHEAD of the car's centre (`worldRuntime.ts`, `d >= 0`). The
+  // frame the centre is over the line the tick loses the line, its distance and
+  // its lamp all at once, so the detector's twelve-metre window was really a
+  // window that ENDED at the line — and stopping with the nose in the mouth, the
+  // commonest way a hesitant learner stops, was unconvictable by construction.
+  //
+  // THE ANSWER READS THE CROSSING INSTEAD OF THE LAMP. `hesitationGreenEntry`
+  // is written by the `stopLineCrossed` event (only on a green lamp the
+  // approach was permitted to take), and this arm lives for exactly the same
+  // `hesitationMaxLineDistM` on the far side of the line that the arm above has
+  // on the near side — one number, both sides, no new threshold. The latch
+  // dies the moment the car is farther than that from where it crossed, or the
+  // moment the runtime reports ANY stop line inside the near-side window again
+  // (a car that reversed back over the line, or a second junction's line close
+  // ahead): the near-side arm, which sees the live lamp, owns those frames.
+  //
+  // WHAT IT CANNOT SEE, WRITTEN DOWN: the lamp after the crossing. A car that
+  // entered on green and froze in the mouth while the phase turned amber is
+  // still convicted here — and should be: once lawfully over the line the duty
+  // is to clear the junction, not to stand in it, and the catalogue's
+  // «Светна зелено, пътят пред теб беше свободен, а ти остана на място» is true
+  // of him. The code, its severity and its Наредба № 38 citation are unchanged.
+  //
+  // A12 — IT ADDS TWO ACQUITTALS THE NEAR SIDE NEVER NEEDED. Past the line the
+  // car is in the mouth, where the reasons to stand still multiply: a person on
+  // the exit crossing (`vruAheadM` inside `townCrawlClearAheadM`, the engine's
+  // existing „close enough ahead to be the reason" band) and any hazard-shaped
+  // event inside the harsh-brake cooldown (a priority conflict, an emergency
+  // vehicle). Every clause the near-side arm carries — indicator, lead, queued
+  // exit, crossing zone, stall, gear — is shared below unchanged, so a left
+  // turn waiting on oncoming traffic with its indicator on is acquitted on both
+  // sides exactly alike.
+  //
+  // NOT WIDENED, and reported instead: either window's DEPTH. A freeze 17 m
+  // short of the same green (y = −45) books nothing, and neither does one 15.7
+  // m into the mouth (y = −12). No frame in this corpus photographs either, and
+  // this file's discipline is that an unphotographed neighbour is reported, not
+  // widened into.
+  const nearLineWindow =
+    tick.nextStopLineM !== undefined && tick.nextStopLineM <= cfg.hesitationMaxLineDistM;
+  const greenEntry = s.hesitationGreenEntry;
+  if (
+    greenEntry !== null &&
+    (nearLineWindow ||
+      Math.hypot(tick.position.x - greenEntry.x, tick.position.y - greenEntry.y) >
+        cfg.hesitationMaxLineDistM)
+  ) {
+    s.hesitationGreenEntry = null;
+  }
+  const atGreenLine =
     tick.nextStopLineControl === "trafficLight" &&
     tick.nextStopLineState === "green" &&
-    tick.nextStopLineM !== undefined &&
-    tick.nextStopLineM <= cfg.hesitationMaxLineDistM &&
+    nearLineWindow;
+  const pastGreenLine =
+    s.hesitationGreenEntry !== null &&
+    (tick.vruAheadM === undefined || tick.vruAheadM > cfg.townCrawlClearAheadM) &&
+    (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec);
+  const hesitating =
+    (atGreenLine || pastGreenLine) &&
     speed <= cfg.fullStopMaxSpeedKmh &&
     tick.indicator === "off" &&
     (leadGapM === null || leadGapM > cfg.hesitationClearGapM) &&
@@ -5612,6 +5754,16 @@ function handleTickEvent(
   switch (e.kind) {
     case "stopLineCrossed": {
       if (e.control === "trafficLight") {
+        // The past-the-line hesitation arm's latch (`HESITATION_PAST_LINE` in
+        // the reducer). Written on EVERY signal crossing, so an entry on amber
+        // or red — or against a регулировчик's halt — overwrites a stale green
+        // with nothing: only a crossing on a green lamp the approach was
+        // permitted to take can arm it, which is the only crossing whose freeze
+        // the catalogue's «Светна зелено…» describes truthfully.
+        s.hesitationGreenEntry =
+          e.lightState === "green" && e.controller !== "halt"
+            ? { x: tick.position.x, y: tick.position.y }
+            : null;
         // JU-18: a resolved CONTROLLER permission is the effective signal and
         // overrides the lamps entirely (ЗДвП чл. 7 — сигналите на
         // регулировчика са над светофара): "halt" is the dedicated 10-point
@@ -6184,7 +6336,7 @@ function handleTickEvent(
         // reset the baseline the drop is measured from.
         if (e.situation === "warning-lamp" && s.warningLampIgnoredAt === null) {
           s.warningLampIgnoredAt = t;
-          s.warningLampPeakKmh = tick.speedKmh;
+          s.warningLampRecent = [{ t, speedKmh: tick.speedKmh }];
           s.warningLampDriveOnSec = 0;
         }
       } else if (e.yielded) {

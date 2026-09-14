@@ -37,6 +37,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { corpusCounts, findingId, openListLine, workedLine } from "./finding-reader.mjs";
+import { effectiveVerdicts, parseVerdictRows } from "./effective-verdict.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
@@ -67,15 +68,13 @@ for (const l of fs.readFileSync(SRC, "utf8").split("\n")) {
   live.set(j.findingId, j);
 }
 
-// ---- the live verdict per finding, so an unjudged row cannot be routed
-const verdictOf = new Map();
-for (const l of fs.readFileSync(path.join(REPO, ".audit-frames", "wave-c", "verdicts.jsonl"), "utf8").split("\n")) {
-  if (!l.trim()) continue;
-  try {
-    const j = JSON.parse(l);
-    if (j.findingId) verdictOf.set(j.findingId, String(j.verdict || "").toUpperCase());
-  } catch { /* torn tail */ }
-}
+// ---- the live verdict per finding, so an unjudged row cannot be routed.
+// THE POSTER'S RULE (effective-verdict.mjs), not the last line in the file: a
+// judge line appended after its own round's verifier must not outrank it.
+const verdictOf = new Map(
+  [...effectiveVerdicts(parseVerdictRows(fs.readFileSync(path.join(REPO, ".audit-frames", "wave-c", "verdicts.jsonl"), "utf8")))]
+    .map(([id, r]) => [id, String(r.verdict || "").toUpperCase()]),
+);
 
 const openById = new Map(counts.open.map((f) => [f.findingId, f]));
 

@@ -23,7 +23,7 @@
  * and skipped, not guessed at.
  */
 import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { corpusCounts } from "./finding-reader.mjs";
+import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 import { severityFromDebriefText } from "./severity-from-debrief.mjs";
 
 const SWEEP = process.argv[2] || ".audit-frames/w43/frames";
@@ -122,6 +122,9 @@ const CHECKS = [
 ];
 
 const c = corpusCounts();
+// THE STAMP — this reads the corpus, so count-agreement.mjs requires it.
+console.log(openListLine(c));
+console.log(workedLine("open", c.open));
 const hits = [];
 let checkable = 0;
 for (const f of c.open) {

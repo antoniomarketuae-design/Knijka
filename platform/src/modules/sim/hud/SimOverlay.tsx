@@ -2431,6 +2431,77 @@ export function SimOverlay({
    */
   const sheetDetailNode: ReactNode = open && renderDetail !== undefined ? renderDetail(shown) : null;
   /**
+   * ══ IS THE SHEET'S LEAD A HEADLINE, OR ITEM 1 OF A LIST? — 2026-09-14 ══════
+   *
+   * sc-junction-rhr:9b6c83fa, „the briefing renders differently on the two
+   * platforms: PC numbers all six steps 1.–6.; mobile … promotes step one to a
+   * headline in a different weight and size, so the list reads as a heading
+   * plus five items".
+   *
+   * HALF OF THAT ROW CLOSED ON 2026-08-24 AND HALF OF IT NEVER WAS. The number
+   * arrived (`briefingLineOrdinal` → the `<span>` in the sheet's lead), and the
+   * w46 frame prints «1.»–«6.». But `w46/frames/sc-junction-rhr__mobile-right/
+   * 02-briefing.png` still sets «1. Тръгни по страничната улица…» in the lead's
+   * `text-sm` over «2.»–«6.» in the body's `text-xs`: 19.25 px line boxes over
+   * 16.5 px ones, a bigger face over a smaller one. A number says „this is item
+   * one"; a face two pixels larger than every other item says „this is the
+   * title of what follows", and the glass was saying both. The pc panel the
+   * same judge opened (`BriefingCard`, `LessonPlayShell.tsx`) sets every step
+   * in one `<li>` register at one size. So on this sheet the lead joins the
+   * body's face — size, weight and spacing — and 1…N is one list again.
+   *
+   * KEYED ON THE ORDINAL, AND NOT ON `kind`. The briefing item is `kind:
+   * "hint"`, and so are cards whose line really IS a headline over a WHY; a
+   * graded fault's sheet is a title and an explanation, and it keeps its
+   * headline face. What makes a line a list item is that it carries a list
+   * position, and exactly one producer gives it one — `lineOrdinal:
+   * briefingLineOrdinal(briefing)` in `LessonPlayShell`'s briefing item. It is
+   * the SAME predicate that decides whether «1.» is painted, so the face and
+   * the number cannot disagree: a lead with a usable position is numbered AND
+   * set as an item, a lead without one is neither.
+   *
+   * THE ELEMENT STAYS AN `<h2>`, which is a deliberate compromise and not an
+   * oversight. `tools/mobile/sheet-fold.mjs` reads the sheet as
+   * `section.querySelector("h2")` (title) and `[data-sim-overlay-sheet-text] p`
+   * (body); a `<p>` lead would become that probe's „body" and leave its title
+   * null. tools/ is not this file's tree. The dialog is already named by its
+   * `aria-label={lineBg}`, so nothing a screen reader announces changes.
+   *
+   * ── AND IT IS ALSO THE 14 px THE 2026-09-12 NOTE CALLED IMPOSSIBLE —
+   *    sc-ed-d2-priority-run:5fa62cb7, „the mobile briefing modal cuts
+   *    instruction item 7 mid-sentence". The note at `data-sim-overlay-ack-fold`
+   *    below ruled the cut „not removable here" on a MODELLED cap
+   *    (`--sim-dash-h ≈ 45`) and a lead it priced at the body's size while the
+   *    glass still paints it at the headline's. MEASURED instead, off
+   *    `w46/frames/sc-ed-d2-priority-run__mobile-right/02-briefing.png` at
+   *    device resolution (iPhone 16 landscape, 852 × 393 at dpr 3):
+   *
+   *      header ✕ ring        device y 63–194     → CSS 21–65
+   *      «Разбрах» top edge   device y 900        → CSS 300
+   *      scroller             65 + gap 8 … 300 − gap 8  = 219 px
+   *      lead                 glyph pitch 57.75 device = 4 × 19.25 =  77
+   *      `mt-1.5`                                                   =   6
+   *      body                 glyph pitch 49.5 device  = 9 × 16.5  = 148.5
+   *                           asked 231.5 of 219 → item 7's tail cut, «↓ ОЩЕ 1 РЕД»
+   *
+   *    With the lead in the body face: its four 14 px lines are 628 + 629 + 592
+   *    + 449 CSS px of ink wide, ≈ 1 979 px at 12 px against a 646 px measure —
+   *    more than three lines hold, and never more lines than it takes at 14 px
+   *    (a narrower face cannot break a line later), so 4 × 16.5 = 66. No
+   *    `mt-1.5`: the body's own steps are separated by nothing but their line
+   *    breaks, and item 1 is one of them. 66 + 148.5 = 214.5 of 219 — every
+   *    word of item 7, including WHICH car to yield to, on first paint, with
+   *    4.5 px to spare. `foldLinesBelow` then reports 0, so `ackCarriesSheetFold`
+   *    is false and «Разбрах» acknowledges on the first press instead of
+   *    scrolling. A shorter screen still folds, and for it the whole 2026-09-12
+   *    chain — the line-grid edge, the cue, the scroll-on-press — is untouched.
+   *
+   *    Not a legibility trade: 12 px is the face steps 2…N were ALREADY read in
+   *    on this sheet, and the pc panel reads all of them at 11.
+   * ══════════════════════════════════════════════════════════════════════════
+   */
+  const sheetLeadIsListItem = isUsableLineOrdinal(shown.lineOrdinal);
+  /**
    * Is there text under the fold RIGHT NOW, on a card that has somewhere to
    * send the reader?
    *
@@ -3771,8 +3842,22 @@ export function SimOverlay({
                      A separate `<span>` rather than a template literal so the
                      ordinal cannot be mistaken for authored Bulgarian by the
                      copy gates that read `lineBg`. `tabular-nums` keeps «10.»
-                     from shifting the sentence's first glyph against «1.». */}
-              <h2 className="break-words text-sm font-extrabold leading-snug text-foreground">
+                     from shifting the sentence's first glyph against «1.».
+
+                  ── …AND IN THE ITEMS' FACE WHEN IT IS AN ITEM — 2026-09-14.
+                     The number closed the hole in the sequence; the headline
+                     face kept it reading as „a heading plus five items"
+                     (sc-junction-rhr:9b6c83fa). The frame, the arithmetic, and
+                     why the key is the ordinal and not `kind`, are at
+                     `sheetLeadIsListItem`. Every other sheet keeps its
+                     headline, because its line IS one. */}
+              <h2
+                className={
+                  sheetLeadIsListItem
+                    ? "break-words text-xs leading-snug text-foreground"
+                    : "break-words text-sm font-extrabold leading-snug text-foreground"
+                }
+              >
                 {/* THE GUARD IS THE MODULE'S, NOT THIS FILE'S — 2026-08-26. It read
                     `typeof shown.lineOrdinal === "number"`, and `NaN` is a number, and
                     so is `0`: an unusable ordinal painted «NaN. » / «0. » in the
@@ -3795,9 +3880,16 @@ export function SimOverlay({
                      пътека, вдигни… 3. Стъпи ли пешеходец…" with no break
                      anywhere. The steps are authored as a numbered list and the
                      one surface that shows all of them was the one that threw
-                     the numbering's shape away. */}
+                     the numbering's shape away.
+
+                  ── NO `mt-1.5` UNDER A LEAD THAT IS ITEM 1 — 2026-09-14.
+                     Steps 2…N are separated by their line breaks and nothing
+                     else, so a 6 px gap after step 1 alone is the heading's gap
+                     and not the list's. It is also 6 of the 12.5 px that put
+                     item 7 of sc-ed-d2-priority-run below the fold — the
+                     measurement is at `sheetLeadIsListItem`. */}
               {shown.detailBg ? (
-                <p className="mt-1.5 whitespace-pre-line break-words text-xs leading-snug text-foreground">
+                <p className={`${sheetLeadIsListItem ? "" : "mt-1.5 "}whitespace-pre-line break-words text-xs leading-snug text-foreground`}>
                   {shown.detailBg}
                 </p>
               ) : null}
@@ -3864,6 +3956,24 @@ export function SimOverlay({
                           buying the difference by shrinking the lead's face
                           is a WRAP question no test in this repo can answer
                           and no lane may assert.
+
+                          ⚠ SUPERSEDED 2026-09-14, AND BY MEASUREMENT RATHER
+                          THAN BY ASSERTION. Three terms of the sum above were
+                          models, and the w46 frame corrects each: the cap is
+                          341 and not 336 (`--sim-dash-h` measures 40, not 45),
+                          leaving a 219 px window; `TEXT_FADE_PX` was
+                          counted against the fit although `foldLinesBelow`
+                          subtracts it (text may run into the padding); and the
+                          lead was priced at the body's 12 px while the glass
+                          painted it at 14. The real overshoot was 12.5 px of
+                          text, and the lead's face plus the 6 px gap under it
+                          buy back 17. The wrap question has a one-sided
+                          answer that needs no test: a narrower face cannot
+                          break a line LATER, so the lead is at most the four
+                          lines it already takes. `sheetLeadIsListItem` carries
+                          the numbers — 214.5 of 219 — and item 7 now prints
+                          whole on that geometry. Everything below still holds
+                          for a screen on which it does not.
 
                           WHAT WAS STILL WRONG IS THE SENTENCE, NOT THE PIXELS.
                           The chain that answers the row already ships:

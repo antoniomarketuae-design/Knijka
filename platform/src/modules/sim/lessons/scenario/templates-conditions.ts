@@ -1715,6 +1715,19 @@ export const SC_AC_ICE: ScenarioSpec = {
     },
   ],
   rubric: { parTimeSec: 90 },
+  // THE TOWN-CRAWL DETECTOR IS OFF ON THIS DRILL, because the drill ORDERS the
+  // crawl. `sc-ac-ice:90f0d390` (w45 pc-right, 08-debrief-p5/p6): objective 1
+  // «Намали до пълзене ПРЕДИ леда» credited at 1:48, then «Движение с
+  // необосновано ниска скорост −1» at 3:13 on the same sheet, its card saying
+  // «нямаше … лоши условия» and advising 30–40 км/ч — a black-ice lesson that
+  // teaches the opposite of the task it just credited. The engine cannot see
+  // the ice: `townConditionsExcuse` (rules/engine.ts) knows night, rain, fog and
+  // snow, and SimTick carries no grip field, so an engine-side excuse would be
+  // a predicate nothing live feeds. The switch is the address both wave-47's
+  // lane and its verifier named. Set on the TEMPLATE, never on a rung:
+  // `compile.ts` reads a ruleConfig that differs between rungs as the higher
+  // rung adding «rules» and prints «Оценява се по-строго» on it.
+  ruleConfig: { townCrawlEnabled: false },
   // RECORDED: committed deterministic recordings of the authored scripts in
   // traces/scAcIce.ts; gates in traces/__tests__/sc-ac-ice-traces.test.ts
   // (re-record with RECORD_TRACES=1).

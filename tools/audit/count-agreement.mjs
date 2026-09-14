@@ -330,6 +330,14 @@ export const RECIPES = {
   // --list only enumerates and stamps: it drives nothing, so the probe is cheap
   // and cannot touch a lesson, a tape or the ledger.
   "inprocess-drive.mjs": (t) => ({ args: ["--list"] }),
+  // Two read-only reports written 2026-09-14 (route fidelity per open row; stale
+  // numeric claims against a sweep's sidecars). Both read the open list and
+  // write nothing. Registered the same day, after this check refused the
+  // audit-tool suite — they had shipped two commits earlier without a stamp,
+  // and the gate's tools step does not run tools/audit/*.test.mjs, so nothing
+  // else noticed. Default sweep argument: w43, which is on disk.
+  "route-fidelity-open.mjs": (t) => ({ args: [] }),
+  "stale-claims.mjs": (t) => ({ args: [] }),
   "make-cluster-wave.mjs": (t) => {
     const out = path.join(t, "cluster-wave-probe.js");
     return { args: [out], emits: "file", file: out };

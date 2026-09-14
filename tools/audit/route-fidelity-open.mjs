@@ -21,9 +21,14 @@
  */
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { authoredLinePolyline, routeDeviation } from "../mobile/lib/guidance.mjs";
-import { corpusCounts } from "./finding-reader.mjs";
+import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 
 const SWEEP = process.argv[2] || ".audit-frames/w43/frames";
+// THE STAMP, because this reads the corpus and count-agreement.mjs refused the
+// audit-tool suite until it said which corpus and which rows it operated on.
+const COUNTS = corpusCounts();
+console.log(openListLine(COUNTS));
+console.log(workedLine("open", COUNTS.open));
 
 // 1 · route fidelity of every leg in the sweep, keyed by lesson.
 const byLesson = new Map();
@@ -44,7 +49,7 @@ for (const dir of readdirSync(SWEEP)) {
 }
 
 // 2 · the open rows.
-const open = corpusCounts().open;
+const open = COUNTS.open;
 const rows = open.map((f) => {
   const legs = byLesson.get(f.scenario) ?? [];
   const measured = legs.filter((l) => l.dev);
