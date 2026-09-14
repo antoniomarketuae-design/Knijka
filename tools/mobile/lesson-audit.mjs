@@ -4954,6 +4954,15 @@ const recovery = {
    *  than assumed absent, because if this is large on a lesson that is not a
    *  parking one, the guard is hiding real departures and must be re-derived. */
   witnessesDisagreed: 0,
+  /** Set the first time a ceiling refuses, and never cleared. MEASURED on
+   *  w45, recovery's first live run: three lanes logged episodes 88 / 90 / 37
+   *  against refusals 87 / 87 / 36 — the ceiling tripped, `active` went false,
+   *  the next tick re-entered the branch, counted a NEW episode and refused it
+   *  again, every tick to the end of the drive. Nothing was steered wrongly
+   *  (the refusal path returns before the wheel), but `episodes` meant nothing
+   *  on those lanes and run.log carried one sentence eighty-seven times for a
+   *  judge to wade through. A ceiling is final for the drive. */
+  exhausted: false,
   sustainRun: 0,
   sustainDir: 0,
 };
@@ -5225,6 +5234,7 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     lastRouteHold === "off-road" &&
     AUTHORED_LINE !== null &&
     reverse.armed !== true &&
+    !recovery.exhausted &&
     offAuthoredM !== null &&
     offAuthoredM > ROUTE_OFF_M &&
     guideWitness.length >= 2
@@ -5258,6 +5268,9 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     if (!budget.ok) {
       if (!recovery.refusals.includes(budget.why)) { recovery.refusals.push(budget.why); loud(budget.why); }
       recovery.active = false;
+      // A ceiling is final for this drive. Without the latch the next tick
+      // re-enters, counts a fresh episode and refuses it again — see `exhausted`.
+      recovery.exhausted = true;
       push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, loop: false, recovery: true, why: budget.why });
       return;
     }
@@ -5313,7 +5326,7 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     recovery.sustainRun = 0;
     recovery.sustainDir = 0;
     note(
-      `  BACK ON THE ROAD at t=${tSec}s — episode ${recovery.episodes} cost ${Math.round(recovery.metres)} m and ${Math.round(recovery.ms / 1000)} s. Those metres are the harness’s, not the student’s, and are excluded from the tracking rate.`,
+      `  BACK ON A CARRIAGEWAY at t=${tSec}s — the PRODUCT no longer says off-road; the car is ${offAuthoredM === null ? "?" : offAuthoredM.toFixed(1)} m from its own lesson's authored line. Episode ${recovery.episodes} cost ${Math.round(recovery.metres)} m and ${Math.round(recovery.ms / 1000)} s; those metres are the harness's, not the student's, and are excluded from the tracking rate. ON A ROAD IS NOT ON THE ROUTE — measured over w45's 18 recovering drives, the banner cleared while the car was still 13–296 m from its authored line on EVERY one. ROUTE FIDELITY below, not this line, decides whether this leg may witness anything along its route.`,
     );
   }
   // A REFUSAL IS A MEASUREMENT OF THE BOX, SO IT EXPIRES.

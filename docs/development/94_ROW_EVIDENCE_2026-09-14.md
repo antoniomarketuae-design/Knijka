@@ -339,3 +339,63 @@ to 16.25 m at the zone boundary is the thing the lesson teaches.
 This is a closure candidate for the judging pass, and it now arrives with three
 things it has never had together: the frame, the painter's commit, and the
 grader fix that was still missing until today.
+
+
+---
+
+## K. w45 — the first sweep on today's instruments (added post-sweep, 2026-09-14)
+
+Numbers taken at 93 of 125 drives, every exit 0, zero tree moves, zero harness
+deaths; the merged totals are in `.audit-frames/w45/`.
+
+### The audio witness answers row D1, and the answer has two halves
+
+| leg | drives | built ZERO WebAudio | built and started nodes |
+|---|---|---|---|
+| mobile (right + wrong) | 49 | **49** | 0 |
+| pc (right + wrong) | 40 | 0 | **40** (~21 sources each) |
+
+A hard platform split, not noise. `simAudio.ts:353 unlock()` reads
+`window.AudioContext` **only** and `return`s silently when it is absent — no
+`webkitAudioContext` fallback, no telemetry. The harness's mobile leg is
+Playwright WebKit, where the unprefixed symbol may be missing, so the 49/49 is
+most likely the harness's browser rather than a real iPhone (iOS ≥ 14.5 exposes
+it unprefixed). **The product's silent return is still a defect**: any device
+without the symbol gets no engine, tyre, wind or indicator sound and nothing on
+the glass says so. Judge on the split; do not rule "students hear nothing" from
+it, and do not rule "audio works" either — rule on what `unlock()` does when the
+constructor is missing.
+
+### Recovery: «back on a carriageway» is not «back on the route»
+
+Recovery fired on 18 drives. The product's off-road banner cleared on 11 of them
+— and on **all 18** the car was still **13–296 m** from its own authored line
+afterwards (`droveIt: false` on every one). The product's test is "an edge
+centreline within reach"; the route is a specific line. A `REJOIN` / `BACK ON A
+CARRIAGEWAY` line therefore says nothing about whether the leg can witness a
+task, an offence or a credit along its route — **`ROUTE FIDELITY` decides that,
+and it still refuses those legs.**
+
+Three of those lanes also carry my state-machine bug (episode counts 88/90/37
+with refusals 87/87/36 — re-entry every tick after the ceiling). Nothing was
+steered wrongly; the counts are meaningless on those three lanes and the log
+repeats one sentence. Fixed after the sweep; treat `recovery.episodes` on w45
+as unreliable where it exceeds 3.
+
+### Route fidelity is flat
+
+23 of 53 `right` legs drove ≥ 50 % of their route within 8 m (43 %), against
+33 of 79 (42 %) in w43. Recovery did not move it. The steering tune finding in
+section I (deadband 3° vs median error 2.75°; 757 ms real period; sustain needs
+two consecutive samples) stands as the next lever, deliberately untouched here.
+
+### The two witnesses agree
+
+The product said off-road on 28 drives; the geometry disagreed on **1**. Both
+instruments can be trusted where they agree, which is nearly everywhere.
+
+### One lane with no verdict
+
+`sc-mw-emergency-lane__pc-wrong` — the wrong leg burned its full 210 s budget on
+a motorway lesson without the session ending; the harness disclosed it as
+«forced via „nothing" — itself a finding». Known class, not new.
