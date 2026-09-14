@@ -9285,6 +9285,15 @@ const trailingUnphotographedPx = Math.max(0, (geo.contentH ?? 0) - lastFrameEnd)
    * separates. Read once, at the end, because the counters are cumulative
    * and a mid-drive read would answer a question nobody asked. */
   {
+    /* `dev` was bound in the block above and this block was split off it when
+     * the audio read was hoisted — the two-witness cross-check below still
+     * reads it. Re-derived from `guidance.route`, which is the same object
+     * (or null) with the reference line and point count attached. MEASURED:
+     * the first drive on this code crashed here with «ReferenceError: dev is
+     * not defined» AFTER a complete 27-frame drive that had reached its
+     * debrief — the canary of 2026-09-14 10:07 — so every line below this
+     * comment ran for the first time on that crash. */
+    const dev = guidance.route;
     const aw = await page
       .evaluate(() => {
         const w = window;
@@ -9315,7 +9324,16 @@ const trailingUnphotographedPx = Math.max(0, (geo.contentH ?? 0) - lastFrameEnd)
      * If the geometry says 100 m and the product never said a word, the same
      * applies in reverse. Silence here is the only reassuring reading, and it
      * is earned rather than assumed. */
-    const held = routeHold.offRoadTicks > 0 || routeHold.crashPinnedTicks > 0;
+    /* ONLY THE OFF-ROAD HOLD IS A GEOMETRIC CLAIM. «Колата е притисната след
+     * удара» says the car is pinned against something it hit — which happens
+     * ON the route as readily as off it. The first drive on this code
+     * (sc-park-wall/mobile-right, 2026-09-14) was pinned for 9 ticks against
+     * the wall it had just collided with, 5.8 m from its own authored line,
+     * and the cross-check shouted «THE TWO WITNESSES DISAGREE» at a judge who
+     * would then have had to work out that nothing disagreed at all. So
+     * crash-pinned is reported beside off-road but is never scored against
+     * the geometry. */
+    const held = routeHold.offRoadTicks > 0;
     guidance.routeHold = {
       ...routeHold,
       kinds: [...routeHold.kinds],
@@ -9805,7 +9823,7 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
       }
       if (rh.agreesWithGeometry === false) {
         loud(
-          `THE TWO WITNESSES DISAGREE. The product says ${rh.offRoadTicks + rh.crashPinnedTicks ? "OFF the road" : "ON the road"}; ` +
+          `THE TWO WITNESSES DISAGREE. The product says ${rh.offRoadTicks ? "OFF the road" : "ON the road"}${rh.crashPinnedTicks ? ` (and crash-pinned on ${rh.crashPinnedTicks} tick(s), which is not a route claim and is not scored here)` : ""}; ` +
             `the geometry against this lesson's own authored line says ${dev && dev.onRoute ? "ON" : "OFF"} ` +
             `(worst ${dev ? dev.maxM : "?"} m). One of the two is wrong and BOTH are used to qualify findings — ` +
             `resolve this before filing anything positional from this leg.`,
