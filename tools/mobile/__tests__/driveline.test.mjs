@@ -59,6 +59,7 @@ import {
   STUCK_START_OTHER_RE,
   TASK_CAP_STRIP_SEL,
   taskCapKmh,
+  taskCapPhrase,
   wilson,
 } from "../lib/driveline.mjs";
 
@@ -309,6 +310,13 @@ describe("§E the task cap, read off the product's own glass", () => {
   });
   it("still refuses the TRUNCATED banner after the second phrasing was added", () => {
     assert.equal(taskCapKmh("… дръж под 63 км/"), null);
+  });
+  it("quotes the phrase that ACTUALLY carried the cap — w46's log said «дръж под 80 км/ч» for a strip-only cap", () => {
+    assert.equal(taskCapPhrase("Задача 1/2 Мини пелената\n· задачата иска ≤80\n"), "задачата иска ≤80");
+    assert.equal(taskCapPhrase("Мини зоната — дръж под 50 км/ч\n"), "дръж под 50 км/ч");
+    assert.equal(taskCapPhrase("… дръж под 36 км/ч …\n· задачата иска ≤47,5\n"), "задачата иска ≤47,5", "the phrase of the HIGHEST cap, the one taskCapKmh returns");
+    assert.equal(taskCapPhrase(""), null);
+    assert.equal(taskCapPhrase("… дръж под 63 км/"), null);
   });
 });
 
@@ -735,6 +743,9 @@ describe("§K the product surfaces this reader stands on", () => {
     const cap = A.slice(A.indexOf("taskCapText: (() => {"), A.indexOf("taskCapText: (() => {") + 400);
     assert.ok(cap.includes("querySelectorAll(capStripSel)"), "taskCapText no longer appends the strip");
     assert.ok(!/revText\s*\+=[^\n]*capStripSel/.test(A), "the strip leaked into revText — the reverse regexes would now see a third surface");
+    // …and the logs quote what was read, never a hardcoded phrasing.
+    assert.ok(!A.includes("«дръж под ${overCap.capKmh} км/ч»"), "a run.log line hardcodes «дръж под N км/ч» again — it misquoted sc-ac-truck-spray's strip-only cap on w46");
+    assert.ok(A.includes("overCap.capPhrase = taskCapPhrase(p.taskCapText)"), "the over-cap ledger no longer records which phrase carried the cap");
   });
 
   it("the cap phrasing is still the one the shell's own regex emits", () => {

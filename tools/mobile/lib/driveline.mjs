@@ -528,6 +528,28 @@ export function parseTaskCapsKmh(text) {
 }
 
 /**
+ * The PHRASE on the glass that carried the cap `taskCapKmh` returns, verbatim
+ * (whitespace collapsed). `null` when no cap is shown.
+ *
+ * WHY A LOG NEEDS THIS. The w46 sweep's run.log for sc-ac-truck-spray/pc-wrong
+ * said the leg beat «дръж под 80 км/ч» — a phrase that was never on that
+ * lesson's glass. The cap was read off the cockpit strip as «задачата иска
+ * ≤80»; the log line was simply written back when phrasing 1 was the only one
+ * this harness knew. A judge reading it would conclude the objective banner
+ * named the cap, which is the exact opposite of the THEO-4 row filed against
+ * that banner the same day. A log must quote what the student saw.
+ */
+export function taskCapPhrase(text) {
+  if (typeof text !== "string" || text === "") return null;
+  let best = null;
+  for (const m of text.matchAll(new RegExp(TASK_CAP_RE.source, TASK_CAP_RE.flags))) {
+    const v = Number(String(m[1] ?? m[2]).replace(",", "."));
+    if (Number.isFinite(v) && v > 0 && (best === null || v > best.v)) best = { v, phrase: m[0].replace(/\s+/g, " ") };
+  }
+  return best ? best.phrase : null;
+}
+
+/**
  * The cap the leg must beat: the HIGHEST one on the glass, so that beating it
  * beats every other cap showing at the same time. `null` when none is shown.
  */

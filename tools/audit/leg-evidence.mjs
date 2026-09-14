@@ -82,6 +82,7 @@ export function legEvidence(dir) {
       : null,
     routeHold: db?.routeHold ?? null,
     recovery: db?.recovery ?? null,
+    overCap: st?.overCap ?? null,
     severity,
     objectives: (db?.debrief?.objectives ?? st?.debrief?.objectives ?? null),
   };
@@ -116,6 +117,20 @@ export function renderEvidence(e) {
   }
   if (e.recovery?.everLeft) {
     L.push(`      REJOINED: ${e.recovery.episodes} departure(s), ${Math.round(e.recovery.metres)} m steered back by the HARNESS — those metres are not the student's.`);
+  }
+  // THE ANTECEDENT OF EVERY «what does the engine book ABOVE the task cap» ROW,
+  // as a fact rather than a sentence in run.log. Before w46 the hold armed only
+  // on «дръж под N км/ч», so a strip-only cap (sc-ac-truck-spray) read „no cap"
+  // and no wrong leg ever beat it; and w46's run.log quotes «дръж под N км/ч»
+  // even where the strip carried the cap. `capPhrase` is the phrase actually
+  // read (from the sweep after w46); absent means that run predates it.
+  if (e.overCap && e.overCap.capKmh !== null && e.overCap.capKmh !== undefined) {
+    const phrase = e.overCap.capPhrase ? `«${e.overCap.capPhrase}»` : "(phrase not recorded — do NOT trust run.log's «дръж под …» wording for which surface showed it)";
+    L.push(
+      e.overCap.proven
+        ? `      OVER-CAP: the leg BEAT its task cap — ${e.overCap.provenAtKmh} км/ч against ${e.overCap.capKmh} at t=${e.overCap.provenAtSec}s, cap printed as ${phrase}. The antecedent of an above-the-cap row HAPPENED on this leg; where on the route is for the frames to say.`
+        : `      OVER-CAP: the leg did NOT beat its task cap of ${e.overCap.capKmh} (top ${e.overCap.topKmh} км/ч, ${e.overCap.done}). No row about what the engine books above that cap may rest on this leg.`,
+    );
   }
   if (e.tracking) {
     L.push(`      TRACKING: ${String(e.tracking.verdict).toUpperCase()} · ribbon seen ${e.tracking.seen}${e.tracking.medianAbsDeg === null ? "" : ` · |err| median ${e.tracking.medianAbsDeg}°`}`);

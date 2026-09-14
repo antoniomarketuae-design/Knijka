@@ -326,7 +326,7 @@ import {
 // `evaluate`s and the presses) is here. `lib/driveline.mjs`'s header carries
 // the measurement behind each one, and `__tests__/driveline.test.mjs` pins
 // both halves — the arithmetic AND the fact that this file still calls it.
-import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, cabinActuationSafe, errorBoundaryVerdict, overCapHold, parkingBrakeRoute, parkingBrakeVerdict, passRate, rateVerdict, releaseVerdict, taskCapKmh } from "./lib/driveline.mjs";
+import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, cabinActuationSafe, errorBoundaryVerdict, overCapHold, parkingBrakeRoute, parkingBrakeVerdict, passRate, rateVerdict, releaseVerdict, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -7019,6 +7019,8 @@ let flatM = 0;
  * as it did before. A lane that shows ONLY the strip's form (sc-ac-truck-spray)
  * holds for the first time on the sweep after wave 46 — see TASK_CAP_RE. */
 const overCap = {
+  /** The phrase that carried `capKmh`, verbatim off the glass — see `taskCapPhrase`. */
+  capPhrase: null,
   capKmh: null, needKmh: null, topKmh: -1,
   proven: false, provenAtSec: null, provenAtKmh: null,
   restsHeld: 0, metres: 0, ms: 0, done: null, why: null,
@@ -8054,6 +8056,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
         const shown = taskCapKmh(p.taskCapText);
         if (shown !== null && (overCap.capKmh === null || shown > overCap.capKmh)) {
           overCap.capKmh = shown;
+          overCap.capPhrase = taskCapPhrase(p.taskCapText);
           overCap.needKmh = shown + OVER_CAP_MARGIN_KMH;
           overCapFrom ??= now;
         }
@@ -8087,7 +8090,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
             overCap.provenAtKmh = overCap.topKmh;
             note(
               `      the wrong leg BEAT ITS TASK CAP at t=${overCap.provenAtSec}s — ${overCap.topKmh} км/ч against ` +
-                `«дръж под ${overCap.capKmh} км/ч», after holding ${overCap.restsHeld} rest(s) back over ` +
+                `«${overCap.capPhrase ?? `${overCap.capKmh} км/ч`}» as the glass printed it, after holding ${overCap.restsHeld} rest(s) back over ` +
                 `${Math.round(overCap.metres)} m. The over-speed the engine is being asked about has now happened on ` +
                 `the record; the rest cadence resumes here.`,
             );
@@ -9585,7 +9588,7 @@ if (parkingBrake.held === true && parkingBrake.released !== true) {
 }
 if (MODE !== "right" && overCap.capKmh !== null) {
   note(
-    `over-cap: task cap «дръж под ${overCap.capKmh} км/ч» · top on the flat ${overCap.topKmh} км/ч · ` +
+    `over-cap: task cap ${overCap.capKmh} км/ч, printed as «${overCap.capPhrase ?? "?"}» · top on the flat ${overCap.topKmh} км/ч · ` +
       `${overCap.proven ? `BEATEN at t=${overCap.provenAtSec}s` : "NOT BEATEN"} · ${overCap.restsHeld} rest(s) held back · ${overCap.why ?? "-"}`,
   );
 }
