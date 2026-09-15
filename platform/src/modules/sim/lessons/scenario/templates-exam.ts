@@ -428,7 +428,11 @@ export const SC_ED_D2_PRIORITY_RUN: ScenarioSpec = {
     {
       n: 7,
       textBg:
-        "Последното кръстовище е РАВНОЗНАЧНО — няма знаци и няма светофар. Пропусни колата, която идва отдясно по „Галичица“.",
+        // One line shorter than it was, and nothing lost: on a 780×360 Android
+        // landscape phone the open sheet had 186 px for 208 px of list, and the
+        // line that fell off was «отдясно по „Галичица“.» — WHICH car to yield
+        // to (sc-ed-d2-priority-run:5fa62cb7, tools/mobile/sheet-fold.mjs).
+        "Последното кръстовище е РАВНОЗНАЧНО, без знаци и светофар: пропусни колата отдясно по „Галичица“.",
     },
   ],
   success: [
