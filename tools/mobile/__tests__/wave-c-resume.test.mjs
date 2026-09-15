@@ -96,3 +96,15 @@ test("§3 empty and absent input yield an empty set rather than throwing", () =>
   assert.equal(measuredLegs(undefined, HEAD).size, 0);
   assert.equal(measuredLegs("\n\n  \n", HEAD).size, 0);
 });
+
+test("§4 a pc-path leg resumes under its own key and never stands in for pc-right (DESIGN-v2 §12.6)", () => {
+  const ledger = [
+    JSON.stringify({ lesson: "sc-park-wall", leg: "pc-path", head: HEAD, exit: 0 }),
+    JSON.stringify({ lesson: "sc-park-wall", leg: "pc-right", head: HEAD, exit: 2 }),
+  ].join("\n");
+  const done = measuredLegs(ledger, HEAD);
+  assert.equal(done.has("sc-park-wall/pc-path"), true);
+  assert.equal(done.has("sc-park-wall/pc-right"), false, "the path leg's measurement is not the right leg's");
+  // a path refusal before mkdirSync is EXIT_USAGE (2): a re-drive, never a measurement
+  assert.equal(measuredLegs(JSON.stringify({ lesson: "sc-park-wall", leg: "pc-path", head: HEAD, exit: 2 }), HEAD).size, 0);
+});

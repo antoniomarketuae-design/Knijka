@@ -237,6 +237,7 @@
  * broken run, and conflating the two is how a re-drive lane wastes a day.
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -298,6 +299,42 @@ import {
   reverseSteerLine,
   REVERSE_TUNE,
 } from "./lib/reverse-plan.mjs";
+// THE pc-path LEG — DESIGN-v2 Slice 1. Same contract again: the law, the reducer
+// and every sentence it prints are pure and live in the lib; the page side (the
+// pose read, the keys, the yields) is here, and every block of it is gated on
+// `STEER_BY === "authored-path"`. `path-evidence.mjs` is the INDEPENDENT half: it
+// never imports path-follow and never reads a pathref.
+import {
+  EMPTY_WORLD_CAVEAT,
+  PATH_PACE_LINE,
+  PATH_SPAWN_DEAD_SENTENCE,
+  PATH_TESTIMONY,
+  PATH_TUNE,
+  createPathState,
+  loadPathRef,
+  pathApplyActions,
+  pathCreditBySegment,
+  pathFollowBooks,
+  pathObservation,
+  pathOnPauseDrain,
+  pathYieldState,
+  pathReverseLine,
+  pathReverseOutcome,
+  pathRouteLine,
+  pathRunnerBudgetMs,
+  pathRunnerEntry,
+  pathSafeKmh,
+  pathStep,
+  pathSteeringLine,
+  pathTrackingWord,
+  pathUncreditedLine,
+  pathYieldActions,
+  refusePathState,
+  steeredByLine,
+  wrapDeg as pathWrapDeg,
+  yawFromCamOffset,
+} from "./lib/path-follow.mjs";
+import { computePathEvidence } from "./lib/path-evidence.mjs";
 // THE BRAKE THAT HAS A REASON — same contract as guidance.mjs above: the
 // control law is pure and lives in the lib, the page side (`hazardRead`, and
 // the fold in the roll phase) lives here. `hazard.mjs`'s header carries the
@@ -346,7 +383,16 @@ import { classifyDrive, DRIVE_CLASSES } from "../audit/verdict-surface.mjs";
  *  make the build stamp depend on who called. */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const [OUT, SCENARIO, PLATFORM = "mobile", MODE = "right"] = process.argv.slice(2);
+const [OUT, SCENARIO, PLATFORM = "mobile", LEG_MODE = "right"] = process.argv.slice(2);
+/** Every existing gate keys on MODE and keeps its meaning: a path leg IS a right leg to them. */
+const MODE = LEG_MODE === "wrong" ? "wrong" : "right";
+/**
+ * Who steers. "ribbon" on right legs and "none" on wrong legs, both unchanged.
+ * "authored-path" is the Slice 1 pc-path leg (lib/path-follow.mjs): it drives a
+ * committed witness of the lesson's own authored parking/reverse line, closed on
+ * the DEV-ONLY pose probe, and every block that serves it is gated on this value.
+ */
+const STEER_BY = LEG_MODE === "path" ? "authored-path" : LEG_MODE === "right" ? "ribbon" : "none";
 
 // ── WHAT EACH EXIT CODE MEANS, IN ONE PLACE ────────────────────────────────
 //
@@ -378,10 +424,48 @@ const EXIT_LESSON_NOT_PERFORMABLE = DRIVE_CLASSES["not-performable"].exit; // 8 
 // and can never be mistaken for one that ran.
 if (!OUT || !SCENARIO) {
   console.error(
-    "[lesson-audit] usage: node tools/mobile/lesson-audit.mjs <outDir> <scenarioId> [mobile|pc] [right|wrong]",
+    "[lesson-audit] usage: node tools/mobile/lesson-audit.mjs <outDir> <scenarioId> [mobile|pc] [right|wrong|path]",
   );
   process.exit(EXIT_USAGE);
 }
+// ── AN UNKNOWN LEG LITERAL IS A MISSING ARGUMENT TOO ────────────────────────
+// Before the path leg existed, any other string silently ran the wrong-leg law
+// (`MODE !== "right"`), so a typo produced a flat-out drive filed under a name
+// nobody asked for. Refused here, with no directory, like every other bad usage.
+if (!["right", "wrong", "path"].includes(LEG_MODE)) {
+  console.error(`[lesson-audit] unknown leg «${LEG_MODE}» — the leg is one of right | wrong | path`);
+  process.exit(EXIT_USAGE);
+}
+/* ── THE pc-path LEG'S OWN REFUSALS, ALL BEFORE mkdirSync(OUT) (DESIGN-v2 §1.2) ──
+ *
+ * Every one of them sits inside `LEG_MODE === "path"`, so a right or wrong leg
+ * gains no refusal and no header line on any directory (S-12). */
+let PATH_PLAN_RESOLVED = null;
+if (LEG_MODE === "path") {
+  if (PLATFORM !== "pc") {
+    console.error(`[lesson-audit] refused (platform): mobile-path is not in Slice 1 — the path leg runs on pc only`);
+    process.exit(EXIT_USAGE);
+  }
+  // FOLDER AGREEMENT, walking OUT's segments from the leaf upward, so a
+  // KNIJKA_REPEAT child's `rep-NN` under a `…__pc-path` parent is accepted.
+  const legSegment = String(OUT)
+    .split(/[\\/]+/)
+    .reverse()
+    .find((segment) => /__(pc|mobile)-(right|wrong|path)$/.test(segment));
+  if (legSegment && !legSegment.endsWith("__pc-path")) {
+    console.error(`[lesson-audit] refused (folder): the output folder names leg «${legSegment}», not a pc-path leg`);
+    process.exit(EXIT_USAGE);
+  }
+  console.log(`[lesson-audit] pc-path leg · ${legSegment ? `folder ${legSegment}` : "folder names no leg"}`);
+  try {
+    PATH_PLAN_RESOLVED = loadPathRef(SCENARIO, REPO_ROOT);
+  } catch (error) {
+    console.error(`[lesson-audit] refused (${error?.code ?? "no-pathref"}): ${String(error?.message ?? error)}`);
+    process.exit(EXIT_USAGE);
+  }
+}
+/** The committed witness plan, bound HERE so every later reader sees it (S-3). Null on right and wrong legs. */
+const PATH_PLAN = PATH_PLAN_RESOLVED;
 
 // ── AND A MISSING TARGET IS A MISSING ARGUMENT, NOT A DEFAULT ──────────────
 //
@@ -444,7 +528,7 @@ if (REPEAT_N >= 2) {
   const SELF = fileURLToPath(import.meta.url);
   const pad = (i) => String(i).padStart(2, "0");
   const say = (s) => { try { console.log(s); } catch { /* the disk is gone; the JSON below is the record */ } };
-  say(`=== ${SCENARIO} · ${PLATFORM} · ${MODE} · REPEAT SERIES ×${REPEAT_N} ===`);
+  say(`=== ${SCENARIO} · ${PLATFORM} · ${LEG_MODE} · REPEAT SERIES ×${REPEAT_N} ===`);
   say(
     `  a rate claim cannot be measured from one draw. Each run below is a separate process with its own browser, ` +
       `sign-in and target attestation, writing into ${OUT}/rep-NN.`,
@@ -458,7 +542,7 @@ if (REPEAT_N >= 2) {
     // have to know that to see why the recursion stops.
     delete env.KNIJKA_REPEAT;
     const startedAt = Date.now();
-    const r = spawnSync(process.execPath, [SELF, dir, SCENARIO, PLATFORM, MODE], { env, stdio: "inherit" });
+    const r = spawnSync(process.execPath, [SELF, dir, SCENARIO, PLATFORM, LEG_MODE], { env, stdio: "inherit" });
     const ms = Date.now() - startedAt;
     // THE CHILD'S OWN STATUS FILE IS THE RECORD, NOT THE EXIT CODE ALONE. An
     // exit code cannot carry a verdict, and the verdict is the whole point.
@@ -490,7 +574,7 @@ if (REPEAT_N >= 2) {
   }
   const rate = passRate(runs);
   const series = {
-    scenario: SCENARIO, platform: PLATFORM, mode: MODE, repeat: REPEAT_N,
+    scenario: SCENARIO, platform: PLATFORM, mode: LEG_MODE, repeat: REPEAT_N,
     finishedAt: new Date().toISOString(),
     runs, rate,
     // The row this capability exists to settle quotes 1/8. It is compared here
@@ -507,7 +591,7 @@ if (REPEAT_N >= 2) {
     writeFileSync(
       `${OUT}/_audit-status.json`,
       `${JSON.stringify({
-        scenario: SCENARIO, platform: PLATFORM, mode: MODE,
+        scenario: SCENARIO, platform: PLATFORM, mode: LEG_MODE,
         phase: "repeat-series", repeat: REPEAT_N,
         exit: runs.every((r) => r.exit === 0) ? EXIT_JUDGEABLE : EXIT_EVIDENCE_INCOMPLETE,
         rate, runs: runs.map(({ i, dir, exit, verdict }) => ({ i, dir, exit, verdict })),
@@ -515,7 +599,7 @@ if (REPEAT_N >= 2) {
     );
   } catch { /* best effort */ }
   const pct = (x) => (x === null ? "—" : `${(x * 100).toFixed(0)}%`);
-  say(`--- MACHINE SUMMARY (${SCENARIO}/${PLATFORM}/${MODE} · repeat ×${REPEAT_N}) ---`);
+  say(`--- MACHINE SUMMARY (${SCENARIO}/${PLATFORM}/${LEG_MODE} · repeat ×${REPEAT_N}) ---`);
   say(`  dispatched ${rate.dispatched} · judgeable ${rate.n} · ИЗДЪРЖАН ${rate.counts.pass} · НЕИЗДЪРЖАН ${rate.counts.fail} · НЕЗАВЪРШЕН ${rate.counts.unfinished} · no-verdict ${rate.counts.unknown}`);
   say(`  PASS RATE: ${pct(rate.point)}  95% ${pct(rate.lo95)}–${pct(rate.hi95)}  —  ${rate.why}`);
   say(`  against the filed 13% claim: ${series.against.verdict.toUpperCase()} — ${series.against.why}`);
@@ -587,7 +671,7 @@ const loud = (s) => note(`  !! ${s}`);
 // status file that only appears on success answers nothing about the failures.
 const STATUS = `${OUT}/_audit-status.json`;
 const status = {
-  scenario: SCENARIO, platform: PLATFORM, mode: MODE,
+  scenario: SCENARIO, platform: PLATFORM, mode: LEG_MODE,
   startedAt: new Date().toISOString(),
   phase: "starting",
   framesWritten: 0, framesLost: 0, lostFrames: [],
@@ -1437,7 +1521,7 @@ await page.goto(`${BASE}/simulator?scenario=${SCENARIO}&level=1`, {
 });
 await page.waitForTimeout(25_000);
 
-note(`=== ${SCENARIO} · ${PLATFORM} · ${MODE} ===`);
+note(`=== ${SCENARIO} · ${PLATFORM} · ${LEG_MODE} ===`);
 saveStatus({ phase: "arrived" });
 
 /* ── DID THE SEGMENT FALL TO ITS ERROR BOUNDARY? ────────────────────────────
@@ -1905,6 +1989,12 @@ const steering = {
     commands: 0,
     heldMs: { left: 0, right: 0 },
   },
+  /* A FOURTH SET, AND IT EXISTS ONLY ON A pc-path LEG. The authored-path
+   * runner's key edges are neither the ribbon's nor the reverse aim's nor the
+   * liveness check's, and a right or wrong sidecar must not gain a field for a
+   * leg it is not (DESIGN-v2 §5.1 of the check). Spread in, so on every other
+   * leg this literal is byte-for-byte what it was. */
+  ...(STEER_BY === "authored-path" ? { path: { commands: 0, heldMs: { left: 0, right: 0 } } } : {}),
   note: null,
 };
 let steerHeld = null;
@@ -1938,7 +2028,7 @@ const steer = async (dir, kmh = null, by = "trace") => {
     // check releases through `steer(null)`, and billing that release to the
     // trace is how `heldMs.left: 1129` appears on a drive whose traces never
     // touched the wheel.
-    if (steerSince !== null) (steerHeldBy === "trace" ? steering.heldMs : steerHeldBy === "reverse" ? steering.reverse.heldMs : steering.channel.heldMs)[steerHeld] += now - steerSince;
+    if (steerSince !== null) (steerHeldBy === "trace" ? steering.heldMs : steerHeldBy === "reverse" ? steering.reverse.heldMs : steerHeldBy === "path" ? steering.path.heldMs : steering.channel.heldMs)[steerHeld] += now - steerSince;
     steerHeld = null;
     steerSince = null;
     steerHeldBy = null;
@@ -1968,6 +2058,8 @@ const steer = async (dir, kmh = null, by = "trace") => {
       if (kmh !== null && kmh >= 0 && kmh < STEER_MIN_KMH) steering.atStandstill += 1;
     } else if (by === "reverse") {
       steering.reverse.commands += 1;
+    } else if (by === "path") {
+      steering.path.commands += 1;
     } else {
       steering.channel.commands += 1;
     }
@@ -3357,8 +3449,16 @@ async function armReverse(kmhNow) {
       note(`      (the ${still} км/ч during the lift is the car ALREADY ROLLING BACKWARDS — the dial shows |v| and the cluster reads «R»)`);
     } else {
       await sChannel(true);
-      await page.waitForTimeout(REVERSE_HOLD_MS);
-      g = await gear();
+      // ON A pc-path LEG THE PRESS IS LIFTED THE INSTANT R LANDS (DESIGN-v2 §5.3,
+      // N2). That same press is the reverse THROTTLE since the 2026-08-11 ruling,
+      // so holding it the full REVERSE_HOLD_MS reversed the car straight, with the
+      // wheel released and nothing watching, for 0.13–0.60 m on w47 pc-right. The
+      // right and wrong legs keep the fixed hold, verbatim.
+      if (STEER_BY === "authored-path") g = await pathSelectorHold("R", REVERSE_HOLD_MS, sChannel);
+      else {
+        await page.waitForTimeout(REVERSE_HOLD_MS);
+        g = await gear();
+      }
       reverse.gearSeen.push(...g.filter((x) => !reverse.gearSeen.includes(x)));
     }
     if (g.length > 1) {
@@ -3409,12 +3509,25 @@ async function armReverse(kmhNow) {
  */
 async function disarmReverse() {
   // Stop first, on the pedal that brakes IN R.
-  await sChannel(false);
-  await throttle(true);
-  for (let i = 0; i < 8; i++) {
-    await page.waitForTimeout(600);
-    const v = await speedNow();
-    if (v === 0 || v < 0) break;
+  //
+  // …EXCEPT ON A pc-path LEG ALREADY AT REST (DESIGN-v2-CHECK N4). Its reverse
+  // ends at rest with W lifted for well over REVERSE_ASSIST_LIFT_S, so this
+  // "brake" press is an ARMED selector press: D lands ≈ 0.43 s in, W is the D
+  // accelerator from then on, and the loop below holds it for up to 8 × 600 ms —
+  // 1.16 m forward at 5 км/ч across one w47 disarm. At rest there is nothing to
+  // stop, so the press is skipped and the attempt loop's lift-then-press below is
+  // the one armed press, bounded by `pathSelectorHold`.
+  // SINCE 2026-09-15 a path leg's reverse ends with W HELD from motion through rest
+  // (path-follow.mjs holdPedalsR — LAW 1 never arms a press that began moving), so this
+  // press would find the key already down and be a no-op; the skip stays, as the first net.
+  if (!(STEER_BY === "authored-path" && (await speedNow()) === 0)) {
+    await sChannel(false);
+    await throttle(true);
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(600);
+      const v = await speedNow();
+      if (v === 0 || v < 0) break;
+    }
   }
   const rest = await speedNow();
   if (rest < 0) {
@@ -3443,7 +3556,9 @@ async function disarmReverse() {
     await throttle(false); // lift the functional brake…
     await page.waitForTimeout(REVERSE_LIFT_MS);
     await throttle(true); // …and press it again: R → N → D
-    await page.waitForTimeout(REVERSE_HOLD_MS);
+    // pc-path: lifted the instant «D» lands (§5.3) — in D this W is the accelerator.
+    if (STEER_BY === "authored-path") await pathSelectorHold("D", REVERSE_HOLD_MS, throttle);
+    else await page.waitForTimeout(REVERSE_HOLD_MS);
     // AND LET GO AT ONCE. The flip is labelled "assist", so LAW 2 does NOT
     // disown the held channel — in D that same W key is the accelerator again,
     // and a hand still on it drives the car forward out of the bay it just
@@ -4545,11 +4660,14 @@ let moved = 0;
  *  silently convert „we did not ask" into „the world is frozen". */
 let movedKnown = false;
 
-if (exitIsBackwards !== null) {
+if (exitIsBackwards !== null || (STEER_BY === "authored-path" && PATH_PLAN.segments[0].gear === -1)) {
   positiveControl.direction = "deferred";
   positiveControl.why =
-    `the live task asks the car to leave IN REVERSE («${exitIsBackwards}»), so the forward press this control has always ` +
-    `made would be driving into whatever the bay noses onto — that press is the collision, not the measurement`;
+    exitIsBackwards === null
+      ? `this authored-path leg's first segment is REVERSE (the committed witness for ${SCENARIO} starts in R), so the forward ` +
+        `press this control has always made would be driving into whatever the bay noses onto — that press is the collision, not the measurement`
+      : `the live task asks the car to leave IN REVERSE («${exitIsBackwards}»), so the forward press this control has always ` +
+        `made would be driving into whatever the bay noses onto — that press is the collision, not the measurement`;
   note(
     `  POSITIVE CONTROL: DEFERRED — ${positiveControl.why}. The drive loop's arm gate takes R from the first tick, and the ` +
       `cockpit census (every beat and every tick, both modes) is what answers „was there ever a moving car?" on this lane.`,
@@ -4674,6 +4792,7 @@ if (movedKnown && moved <= 0 && steering.channel.state === "dead") {
         `keeping, turning, manoeuvring or „no drivable success path" is admissible: they describe the instrument. The frames ` +
         `are real; what they are evidence OF is the harness. Re-drive on a harness whose channel reads LIVE.`,
     );
+    if (STEER_BY === "authored-path") note(`  ${PATH_SPAWN_DEAD_SENTENCE}`);
     await shot("03s-steer-DEAD");
   } else {
     // AND „UNTESTED" IS LOUD TOO, JUST NOT AS LOUD. It is the state in which
@@ -4687,6 +4806,12 @@ if (movedKnown && moved <= 0 && steering.channel.state === "dead") {
   }
 }
 saveStatus({ steering });
+// THE HEADLINE A pc-path LEG CARRIES FIRST — and again directly above OBJECTIVES.
+if (STEER_BY === "authored-path") {
+  loud(steeredByLine({ lesson: SCENARIO, digest: PATH_PLAN.digest, pathref: PATH_PLAN.refPath }));
+  note(`     MAY testify: ${PATH_TESTIMONY.mayTestify.join(" · ")}`);
+  note(`     MAY NOT testify: ${PATH_TESTIMONY.mayNotTestify.join(" · ")}`);
+}
 
 // ── THE DRIVE ──────────────────────────────────────────────────────────────
 //
@@ -4773,6 +4898,9 @@ saveStatus({ steering });
  * (`guidance.witness`), where being dev-only costs nothing, because a
  * measurement of where the car went does not have to be a measurement a
  * student could make.
+ *
+ * EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs;
+ * pending founder ratification (DESIGN-v2 §14.2). This rule text is NOT rewritten.
  */
 const guidance = {
   /** what the loop closes around, named so a consumer never has to infer it */
@@ -4935,6 +5063,67 @@ const AUTHORED_LINE = (() => {
     return null;
   }
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE pc-path LEG'S BOOKS (DESIGN-v2 §5, §7, §8) — null on every other leg
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `pathState` is the reducer's state (lib/path-follow.mjs); `pathFollow` is the
+ * LIVE mirror the outer tick reads (the flags) and the SELF-REPORT books it
+ * publishes; `steeredBy` is the declaration every artefact of the leg carries
+ * first. The reducer never assigns `phase`: it raises flags here, and the outer
+ * tick — the arm gate, the stop exits, the reverse exit — reads them. */
+const PATH_TRACE = STEER_BY === "authored-path" ? JSON.parse(readFileSync(`${REPO_ROOT}/content/traces/${SCENARIO}/shadow-correct.trace.json`, "utf8")) : null;
+let pathState = STEER_BY === "authored-path" ? createPathState(PATH_PLAN, PATH_TUNE) : null;
+const pathFollow =
+  STEER_BY === "authored-path"
+    ? {
+        wantStop: false, stopRelease: false, atGearChange: false, segmentDone: false, routeEnd: false, shutterOk: false,
+        hz: null, lastAbsKmh: null, dwellMs: 0, reverseBudgetMs: null,
+        armGateWaitMs: 0, armGateClosedMs: 0, armGateSince: null, armNotes: [], selectorLifts: [], spawn: null, budgetWhy: null,
+        routeHoldBySegment: [], edge: { seq: 0, atMs: null }, ledger: [], ledgerDropped: 0,
+        cadence: { entries: 0, subTicks: 0, runnerPeriodMs: [], rttMs: [], frameMs: [], blindMs: [], blindMsByPhase: {}, blindGapM: [], blindGapNearStop: [], beatsDeferred: 0, pedalEvents: 0, lastLeaveAt: null, lastLeavePhase: null, lastYieldPose: null, pendingGap: false },
+      }
+    : null;
+const steeredBy =
+  STEER_BY === "authored-path"
+    ? {
+        mode: "authored-path",
+        platform: PLATFORM,
+        reference: `content/traces/${SCENARIO}/shadow-correct.trace.json`,
+        referenceSha: (() => {
+          try {
+            return execFileSync("git", ["hash-object", `content/traces/${SCENARIO}/shadow-correct.trace.json`], { cwd: REPO_ROOT, encoding: "utf8" }).trim();
+          } catch {
+            return null;
+          }
+        })(),
+        pathref: PATH_PLAN.refPath,
+        samplesDigest: PATH_PLAN.digest,
+        poseSource: "window.__camProbe (CameraRig.tsx, DEV BUILDS ONLY) — the CONTROL INPUT on this leg",
+        yawSource: "camera-offset rigid-body yaw (probeLocal vs world offset)",
+        actuator: "keys",
+        ribbonObserved: false,
+        recovery: "disabled on authored-path legs",
+        proceduralChannelsNotReproduced: (() => {
+          const samples = PATH_TRACE.samples ?? [];
+          const events = {};
+          for (const e of PATH_TRACE.events ?? []) events[e.kind] = (events[e.kind] ?? 0) + 1;
+          return { indicatorSamples: samples.filter((x) => x.indicator && x.indicator !== "off").length, events };
+        })(),
+        mayTestify: PATH_TESTIMONY.mayTestify,
+        mayNotTestify: PATH_TESTIMONY.mayNotTestify,
+        doctrine: "declared exception to lesson-audit.mjs's «WHY THE PIXELS» rule — pending founder ratification",
+      }
+    : null;
+let pathEvidence = null;
+if (STEER_BY === "authored-path") {
+  guidance.state = "authored-path";
+  guidance.why =
+    "authored-path leg — the car follows a committed witness of the lesson's own authored line on the dev-only pose probe; the ribbon loop is NOT used and nothing here is a guidance measurement";
+}
+/** The stop phase may leave only when the path runner released it, and never at route end (§7.4). Identity off path legs. */
+const pathStopExit = () => STEER_BY !== "authored-path" || (pathFollow.stopRelease === true && pathFollow.routeEnd !== true);
 
 /** The state of GETTING BACK ON THE ROAD. `episodes` counts departures, not
  *  ticks: a car that leaves once and takes twenty ticks to return has had one
@@ -5107,7 +5296,8 @@ const guideMasks = (band) =>
     )
     .catch(() => []);
 
-/** The dev-only pose probe, read as a witness and never as a control input. */
+/** The dev-only pose probe, read as a witness and never as a control input.
+ *  EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs; pending founder ratification. */
 const guideWitnessRead = () =>
   page
     .evaluate(() => {
@@ -5230,6 +5420,7 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
       ? distanceToPolyline(witnessNow.x, witnessNow.z, AUTHORED_LINE)
       : null;
   if (
+    STEER_BY !== "authored-path" &&
     MODE === "right" &&
     lastRouteHold === "off-road" &&
     AUTHORED_LINE !== null &&
@@ -5769,6 +5960,300 @@ async function guidePose(kmh, tElapsedMs, dtMs, phaseName) {
   guidance.poseOnlyTicks += 1;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE pc-path RUNNER — the only new page-side loop (DESIGN-v2 §5.2–§5.5)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Every helper below opens with `if (STEER_BY !== "authored-path") return`, and
+ * is only ever called from a block guarded by the same test, so a right or wrong
+ * leg cannot reach one. `__tests__/path-follow-wiring.test.mjs` W-4 counts every
+ * call site and fails on any it cannot attribute to that guard.
+ *
+ * THE YIELD CONTRACT. `pathRun` exits through `finally { pathYield() }`: at every
+ * exit the wheel is released and the accelerator lifted, and only a brake
+ * latched from motion through rest stays down. Everything the outer tick does
+ * between two runner calls — the probe, the beat, the shots, saveStatus, the
+ * arm and disarm bursts — therefore runs with no key down that nothing watches. */
+
+const ARM_POLL_MS = 60;
+const PATH_LEDGER_MAX = 20_000;
+
+/**
+ * One pose read: the probe's frame, the pose, the camera offset, THE DIAL AND THE
+ * CLUSTER LETTER — all in this one evaluation — and, only when no new frame
+ * arrived, whether a pause layer is up.
+ *
+ * THE DIAL AND THE CLUSTER ARE READ HERE, NOT TAKEN FROM THE OUTER PROBE
+ * (CODE-REVIEW-1 M2). `probe()`'s copy is from the start of the tick, up to a whole
+ * tick old: a stale-low dial gates a brake press into the coast branch, and the «R»
+ * it read before a disarm would refuse the next forward segment as `disarm-failed`.
+ * Same attribute reads as `speedNow()` and `gear()`, no layout flush.
+ */
+async function pathRead() {
+  if (STEER_BY !== "authored-path") return null;
+  return page
+    .evaluate(({ pauseSel, gearSel }) => {
+      const p = window.__camProbe;
+      if (!p) return null;
+      const fresh = p !== window.__pathSeen;
+      if (fresh) {
+        window.__pathSeen = p;
+        window.__pathFrame = (window.__pathFrame || 0) + 1;
+      }
+      // Only when no new frame arrived: is a pause layer on the glass? Same rect filter as probe().
+      const pz = fresh
+        ? false
+        : [...document.querySelectorAll(pauseSel)].some((e) => {
+            const r = e.getBoundingClientRect();
+            return r.width > 1 && r.height > 1;
+          });
+      const sp = document.querySelector('[aria-label^="Скорост "]');
+      const dial = sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\d+)/) || [0, -1])[1]) : -1;
+      const shell = document.querySelector("[data-sim-shell]") ?? document.body;
+      const gear = [];
+      for (const el of shell.querySelectorAll(gearSel)) {
+        const g = el.getAttribute("aria-label").replace(/^Скоростен лост:\s*/, "").trim();
+        if (g && !gear.includes(g)) gear.push(g);
+      }
+      return { f: window.__pathFrame, x: p.chassisX, z: p.chassisZ, v: p.speedKmh, d: p.delta, lx: p.localX, lz: p.localZ, cx: p.camX, cz: p.camZ, pz, dial, gear };
+    }, { pauseSel: PAUSE_SEL, gearSel: GEAR_SEL })
+    .catch(() => null);
+}
+
+const pathQuant = (arr, q) => {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.floor(q * (s.length - 1)))];
+};
+
+/**
+ * THE EXECUTOR — every key decision is `pathApplyActions` / `pathYieldActions` in
+ * lib/path-follow.mjs, unit-tested there and run verbatim by the bench; this maps an
+ * action onto the existing helpers and books the steer edge sequence. It decides
+ * nothing, and `path-follow-wiring.test.mjs` pins its body (CODE-REVIEW-1 M4).
+ *
+ * THE PRESS SPEED IS GATED, and the census in reverseAssist-audit-harness.test.ts
+ * reads that off the call: every pressing brake() carries the gated speed `p.kmh`,
+ * which is the plan's min(|v|, dial) — never a value made up here.
+ */
+async function pathActuate(actions) {
+  if (STEER_BY !== "authored-path") return;
+  for (const a of actions) {
+    if (a.ch === "steer") {
+      await steer(a.dir, a.kmh, "path");
+      pathFollow.edge = { seq: pathFollow.edge.seq + 1, atMs: Date.now() };
+    } else if (a.ch === "W") await throttle(a.down);
+    else if (a.ch === "S-accel") await sChannel(a.down);
+    else if (a.ch === "S-brake") {
+      const p = { kmh: a.kmh };
+      if (a.down) await brake(true, p.kmh);
+      else await brake(false);
+    }
+  }
+}
+
+/** Apply the reducer's command through the existing helpers — never a raw key (W-12). */
+async function pathApply(cmd, obs) {
+  if (STEER_BY !== "authored-path") return;
+  const before = inputChannel.driveKeyEvents;
+  await pathActuate(pathApplyActions(cmd, { phase, held: { W: holdW, S: holdS, steer: steerHeld }, vAbs: Math.abs(obs?.v ?? 0), dialKmh: obs?.dialKmh }).actions);
+  pathFollow.cadence.pedalEvents += inputChannel.driveKeyEvents - before;
+}
+
+/** The yield (§5.3): wheel released, modulator reset, accelerator lifted; only a latched brake stays. */
+async function pathYield(why) {
+  if (STEER_BY !== "authored-path") return;
+  await pathActuate(pathYieldActions({ phase, held: { W: holdW, S: holdS, steer: steerHeld }, latch: pathState.latch, mode: pathState.mode, vAbs: Math.abs(pathState.last?.v ?? 0) }).actions);
+  pathState = pathYieldState(pathState);
+  pathFollow.cadence.lastLeaveAt = Date.now();
+  pathFollow.cadence.lastLeavePhase = phase;
+  pathFollow.cadence.lastYieldPose = pathState.last ? { x: pathState.last.x, z: pathState.last.z } : null;
+  pathFollow.cadence.lastYieldWhy = why;
+}
+
+function pathLedgerPush(row) {
+  if (STEER_BY !== "authored-path") return;
+  if (pathFollow.ledger.length < PATH_LEDGER_MAX) pathFollow.ledger.push(row);
+  else pathFollow.ledgerDropped += 1;
+}
+
+/** The measured distributions τ_eff and the R band are re-derived from (§4.3, §6.2). */
+function pathMeasured() {
+  if (STEER_BY !== "authored-path") return {};
+  const c = pathFollow.cadence;
+  const recent = (a) => a.slice(-400);
+  return {
+    frameP90S: pathQuant(recent(c.frameMs), 0.9) === null ? undefined : pathQuant(recent(c.frameMs), 0.9) / 1000,
+    ioP90S: pathQuant(recent(c.rttMs), 0.9) === null ? undefined : pathQuant(recent(c.rttMs), 0.9) / 1000,
+    periodP50S: pathQuant(recent(c.runnerPeriodMs), 0.5) === null ? undefined : pathQuant(recent(c.runnerPeriodMs), 0.5) / 1000,
+    // SPLIT BY PHASE (§5.4): the anticipation in R must not buy a short stop with the
+    // blind of a forward beat, nor with an arm burst (a gap that spans a phase change is
+    // booked in blindMs only).
+    blindP90S: (() => {
+      const own = recent(c.blindMsByPhase[phase] ?? []);
+      const q = pathQuant(own.length >= 5 ? own : recent(c.blindMs), 0.9);
+      return q === null ? undefined : q / 1000;
+    })(),
+  };
+}
+
+/**
+ * The runner. Replaces only the idle wait, and always yields. `budgetMs` is the base (TICK_MS);
+ * the budget itself is the lib's `pathRunnerBudgetMs`, re-read every sub-tick, so a lock-limited
+ * reverse span runs longer between yields and a call ends at the base once the span does.
+ */
+async function pathRun(budgetMs) {
+  if (STEER_BY !== "authored-path") return;
+  const c = pathFollow.cadence;
+  const enteredAt = Date.now();
+  c.entries += 1;
+  if (c.lastLeaveAt !== null) {
+    c.blindMs.push(enteredAt - c.lastLeaveAt);
+    if (c.lastLeavePhase === phase) (c.blindMsByPhase[phase] ??= []).push(enteredAt - c.lastLeaveAt);
+  }
+  c.pendingGap = c.lastYieldPose !== null;
+  pathState = pathRunnerEntry(pathState, pathMeasured(), budgetMs);
+  let entry = true;
+  let lastSubAt = null;
+  try {
+    while (Date.now() - enteredAt < pathRunnerBudgetMs(pathState, budgetMs) && !pathState.done) {
+      const t = Date.now();
+      const obs = await pathRead();
+      const rtt = Date.now() - t;
+      if (obs === null) {
+        pathLedgerPush({ t, why: "no __camProbe on the page" });
+        break;
+      }
+      if (c.pendingGap && Number.isFinite(obs.x)) {
+        const gapM = Math.round(Math.hypot(obs.x - c.lastYieldPose.x, obs.z - c.lastYieldPose.z) * 1000) / 1000;
+        c.blindGapM.push(gapM);
+        const lastRow = pathFollow.ledger[pathFollow.ledger.length - 1];
+        const toStop = Number.isFinite(lastRow?.toStop) ? lastRow.toStop : Number.isFinite(lastRow?.toEnd) ? lastRow.toEnd : null;
+        if (gapM > 0.3 && toStop !== null) c.blindGapNearStop.push({ m: gapM, distToStopM: toStop });
+        c.pendingGap = false;
+      }
+      if (lastSubAt !== null) c.runnerPeriodMs.push(t - lastSubAt);
+      c.rttMs.push(rtt);
+      if (Number.isFinite(obs.d)) c.frameMs.push(Math.round(obs.d * 1000));
+      c.subTicks += 1;
+      // THE OBSERVATION IS THE LIB'S (`pathObservation`), built exactly as the bench builds it.
+      const pobs = pathObservation(obs, {
+        wallMs: Date.now(),
+        rttMs: rtt,
+        phase,
+        hz: pathFollow.hz,
+        untilMs: enteredAt + pathRunnerBudgetMs(pathState, budgetMs),
+        entry,
+        disarmed: reverse.disarmed,
+        held: { W: holdW, S: holdS, steer: steerHeld },
+        heldS: lastSubAt === null ? null : (t - lastSubAt) / 1000,
+        blindP90S: pathMeasured().blindP90S,
+        edge: pathFollow.edge,
+        // the product's own «crash-pinned» banner as the outer probe last read it
+        crash: lastRouteHold === "crash-pinned",
+      });
+      const step = pathStep(pathState, pobs);
+      entry = false;
+      lastSubAt = t;
+      if (step.state.refusals.length > pathState.refusals.length) {
+        // A refusal is LOUD the moment it happens, in run.log where the canary's G0 reads it (§7.7).
+        const rf = step.state.refusals[step.state.refusals.length - 1];
+        loud(`THE pc-path LEG REFUSED (${rf.code}) at segment ${rf.k ?? "?"} in mode «${rf.atMode}»: ${rf.why}`);
+      }
+      pathState = step.state;
+      Object.assign(pathFollow, step.state.flags);
+      pathFollow.lastAbsKmh = Math.abs(obs.v ?? 0);
+      pathFollow.dwellMs = Math.round((pathState.currentStop?.dwellS ?? 0) * 1000);
+      await pathApply(step.cmd, pobs);
+      pathLedgerPush({ ...step.row, why: step.row.why ?? step.cmd.why ?? undefined });
+      if (step.cmd.returnNow) break;
+      await page.waitForTimeout(Math.max(0, PATH_TUNE.runner.pollMs - (Date.now() - t)));
+    }
+  } finally {
+    await pathYield("runner exit");
+  }
+}
+
+/**
+ * THE SELECTOR PRESS, LIFTED THE INSTANT THE GEAR LANDS (§5.3, N2). The press is
+ * issued by the caller exactly as today; this replaces only the fixed wait. If
+ * `want` never appears, the final read is returned with the pedal still down —
+ * today's state — and the existing flow continues unchanged.
+ */
+async function pathSelectorHold(want, holdMs, releasePedal) {
+  if (STEER_BY !== "authored-path") return gear();
+  const t0 = Date.now();
+  while (Date.now() - t0 < holdMs) {
+    await page.waitForTimeout(ARM_POLL_MS);
+    const g = await gear();
+    if (g.length === 1 && g[0] === want) {
+      await releasePedal(false);
+      pathFollow.selectorLifts.push({ want, liftMs: Date.now() - t0 });
+      return g;
+    }
+  }
+  return gear();
+}
+
+/**
+ * THE ARM GATE MAY NOT STALL SILENTLY (§7.2, N1). Called on every tick the path
+ * leg stands at a gear change with the gate closed. Lawful waits do not count,
+ * and drained ticks never reach here (the drain `continue`s).
+ */
+function pathArmGateWait(p, now) {
+  if (STEER_BY !== "authored-path") return;
+  const dt = Math.max(0, now - lastTickAt);
+  pathFollow.armGateSince ??= now;
+  pathFollow.armGateClosedMs = now - pathFollow.armGateSince;
+  if (p.lawfulWait === null) pathFollow.armGateWaitMs += dt;
+  if (pathState.mode !== "refused" && (pathFollow.armGateWaitMs >= 10_000 || pathFollow.armGateClosedMs >= 60_000)) {
+    const conj = `phase «${phase}» · p.kmh ${p.kmh} · p.lawfulWait ${p.lawfulWait === null ? "null" : `«${p.lawfulWait}»`} · cluster «${gearLine(p.gear)}» · reverse.blocked ${reverse.blocked === null ? "null" : `«${reverse.blocked}»`} · reverse.attempted ${reverse.attempted}/${REVERSE_ARM_BUDGET}`;
+    pathState = refusePathState(pathState, "arm-gate-stalled", `at the authored gear change for ${Math.round(pathFollow.armGateWaitMs / 1000)} s of non-lawful-wait ticks (${Math.round(pathFollow.armGateClosedMs / 1000)} s in total) with the arm gate closed — ${conj}`);
+    Object.assign(pathFollow, pathState.flags);
+    loud(`THE pc-path LEG REFUSED (arm-gate-stalled): ${pathState.refusals[pathState.refusals.length - 1].why}`);
+  }
+}
+
+/** Per-segment route-hold tallies, indexed by the runner's segment (§8.3.5). */
+function pathRouteHoldTally(kind) {
+  if (STEER_BY !== "authored-path") return;
+  const seg = PATH_PLAN.segments[pathState.segIndex];
+  const k = seg?.k ?? 0;
+  const book = (pathFollow.routeHoldBySegment[k] ??= { k, gear: seg?.gear ?? 1, offRoad: 0, crashPinned: 0, clear: 0, unread: 0, bay: seg?.gear === -1 || k === PATH_PLAN.segments.length - 1 });
+  if (kind === undefined) book.unread += 1;
+  else if (kind === null) book.clear += 1;
+  else if (kind === "off-road") book.offRoad += 1;
+  else book.crashPinned += 1;
+}
+
+/** The reverse exit's budget on a path leg (§7.4). */
+function pathReverseBudgetMs() {
+  if (STEER_BY !== "authored-path") return REVERSE_MS;
+  const seg = PATH_PLAN.segments[pathState.segIndex];
+  if (pathFollow.routeEnd || PATH_PLAN.lastSegmentIsR || !seg) return Infinity;
+  const authoredS = Array.isArray(seg.tSec) ? seg.tSec[1] - seg.tSec[0] : 20;
+  pathFollow.reverseBudgetMs = Math.max(40_000, 3 * authoredS * 1000 + 20_000);
+  return pathFollow.reverseBudgetMs;
+}
+
+/** The INDEPENDENT evidence from the samples so far (no debrief yet) — for lines printed before the debrief exists. */
+function pathEvidenceNow() {
+  if (STEER_BY !== "authored-path") return null;
+  return computePathEvidence({ samples: guidance.samples, trace: PATH_TRACE, lesson: SCENARIO, routeHold, routeHoldBySegment: pathFollow.routeHoldBySegment });
+}
+
+/** The self-report object attribution may use ONLY to blame the harness (§8.3.12). */
+function pathSelfReportBlame() {
+  if (STEER_BY !== "authored-path") return null;
+  const books = pathFollowBooks(pathState);
+  return {
+    blindGapM: pathFollow.cadence.blindGapNearStop,
+    stopErrM: books.segments.map((s) => s.stopErrM).filter((v) => Number.isFinite(v)),
+    arrivalLagWorldS: [],
+    stopLate: books.segments.map((s) => s.stopLate).filter(Boolean),
+  };
+}
+
 const TICK_MS = 500;          // the control law's rate
 const FRAME_MS = 5000;        // the textual beat's cadence
 const EXPENSIVE_SHOT_MS = 20_000; // floor for the frame cadence when frames are dear
@@ -6074,6 +6559,9 @@ const FLAT_REST_GIVEUP_MS = 15_000;
  * publishes what it witnesses ABOUT the index (`pace.alignment`) and never
  * steers by it.
  *
+ * EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs;
+ * pending founder ratification. That leg never reads the tape (loadPaceTape).
+ *
  * The known error is named because it is not small. The liveness checks that
  * run BEFORE the control law — «POSITIVE CONTROL: 44 км/ч after 5 s of
  * throttle» plus two ~1 s steering legs — move the car perhaps 50 m down the
@@ -6140,6 +6628,11 @@ const pace = {
 let paceOdoM = 0;
 
 const loadPaceTape = () => {
+  // pc-path: speed is indexed by POSE along the committed witness, never by the tape.
+  if (STEER_BY === "authored-path") {
+    pace.why = "authored-path leg — speed is indexed by POSE along the committed witness (lib/path-follow.mjs), not by the tape";
+    return null;
+  }
   // A `wrong` leg is not a correct drive and must not be given one: its
   // convictions are earned flat out and in a straight line, and every verdict
   // ever taken from a wrong leg means that.
@@ -6274,6 +6767,11 @@ const reverseAim = {
   tune: REVERSE_TUNE,
 };
 const reversePlan = (() => {
+  // pc-path: the reverse is driven along the committed witness, not reverse-plan.mjs's waypoints.
+  if (STEER_BY === "authored-path") {
+    reverseAim.why = "authored-path leg — the reverse follows the committed witness (tools/mobile/path-refs), not reverse-plan.mjs";
+    return null;
+  }
   if (MODE !== "right") {
     reverseAim.why = "MODE=wrong — the authored path is a correct drive and only a `right` leg may be aimed with it";
     return null;
@@ -6380,6 +6878,8 @@ const aimEnterLeg = () => {
   aimBearingRad = null;
   aimSign = createSignAudit();
   aimWaypoints = null;
+  // pc-path: the path runner aims; this leg's REVERSE AIM line is the path one (§8.3.7).
+  if (STEER_BY === "authored-path") return;
   if (reversePlan === null) {
     note(
       `      REVERSE AIM: NONE — ${reverseAim.why}. The car will reverse in a STRAIGHT LINE, which parks nothing: ` +
@@ -7121,7 +7621,7 @@ if (STEER_PROOF) {
   steering.note =
     "this lane ran the STEERING PROOF and did not drive the lesson — no finding about the lesson may be drawn from it.";
   try {
-    writeFileSync(`${OUT}/_audit-steering.json`, `${JSON.stringify({ scenario: SCENARIO, platform: PLATFORM, mode: MODE, steering }, null, 2)}\n`);
+    writeFileSync(`${OUT}/_audit-steering.json`, `${JSON.stringify({ scenario: SCENARIO, platform: PLATFORM, mode: LEG_MODE, steering }, null, 2)}\n`);
   } catch (error) {
     loud(`_audit-steering.json could not be written (${String(error?.message ?? error)}).`);
   }
@@ -7141,21 +7641,52 @@ if (MODE !== "right") await throttle(true);
 // there was ever a car. A `crashed` status that carries the census can be told
 // apart from one that never reached a lesson page; one that does not, cannot.
 saveStatus({ phase: "driving", reverse, steering, guidance, cockpit });
-let budgetMs = DRIVE_BUDGET_MS;
+// A pc-path leg is budgeted from its authored duration (§7.5): sc-ed-poligon-chain
+// is 164.4 s authored with three reverses, and 210 s of wall clock cannot hold it.
+let budgetMs =
+  STEER_BY === "authored-path"
+    ? Math.max(DRIVE_BUDGET_MS, (1.6 * (PATH_PLAN.durationSec ?? 0) + 15 * PATH_PLAN.reverseSegments + 30) * 1000)
+    : DRIVE_BUDGET_MS;
 let budgetSaid = false;
+if (STEER_BY === "authored-path") {
+  pathFollow.budgetWhy = `max(${DRIVE_BUDGET_MS / 1000} s, 1.6 × ${Math.round(PATH_PLAN.durationSec ?? 0)} s authored + 15 s × ${PATH_PLAN.reverseSegments} reverse(s) + 30 s) = ${Math.round(budgetMs / 1000)} s`;
+  note(`  PATH BUDGET: ${pathFollow.budgetWhy}`);
+  // THE SPAWN READ (S2, C-M11a): cam yaw against trace sample 0's heading, and —
+  // when the first segment is R (sc-park-bay-exit-rev) — the gear change is AT
+  // spawn, so the arm gate's path arm is opened before the first tick.
+  const r0 = await pathRead();
+  const cam0 = r0 ? yawFromCamOffset({ lx: r0.lx, lz: r0.lz, wx: r0.cx - r0.x, wz: r0.cz - r0.z }) : { valid: false };
+  const s0 = PATH_TRACE.samples?.[0];
+  pathFollow.spawn = {
+    pose: r0 ? { x: r0.x, z: r0.z } : null,
+    camYawDeg: cam0.valid ? Math.round(cam0.psi * 100) / 100 : null,
+    traceHeadingDeg: s0?.headingDeg ?? null,
+    spawnYawErrDeg: cam0.valid && Number.isFinite(s0?.headingDeg) ? Math.round(Math.abs(pathWrapDeg(cam0.psi - s0.headingDeg)) * 100) / 100 : null,
+    distToTraceStartM: r0 && s0 ? Math.round(Math.hypot(r0.x - s0.x, r0.z + s0.y) * 100) / 100 : null,
+  };
+  note(`  PATH SPAWN (S2): cam yaw ${pathFollow.spawn.camYawDeg ?? "UNMEASURED"}° against the trace's ${pathFollow.spawn.traceHeadingDeg}° (error ${pathFollow.spawn.spawnYawErrDeg ?? "?"}°), ${pathFollow.spawn.distToTraceStartM ?? "?"} m from the trace start`);
+  if (PATH_PLAN.segments[0].gear === -1) {
+    const w0 = PATH_PLAN.segments[0].witnesses[0];
+    const inSpawnBand = r0 && w0 && Math.hypot(r0.x - w0.startPose.x, r0.z - w0.startPose.z) <= 0.3 && (!cam0.valid || Math.abs(pathWrapDeg(cam0.psi - w0.startPose.psi)) <= 3);
+    pathFollow.atGearChange = true;
+    pathState = { ...pathState, flags: { ...pathState.flags, atGearChange: true } };
+    note(`  PATH: the first segment is R — the gear change is at spawn (${inSpawnBand ? "inside" : "OUTSIDE"} the 0.3 m / 3° spawn band); the arm gate's path arm is open from the first tick.`);
+  }
+}
 const medianTick = () => {
   if (tickMs.length < 6) return 0;
   const v = [...tickMs].sort((a, b) => a - b);
   return v[Math.floor(v.length / 2)];
 };
 while (!ended && Date.now() - t0 < budgetMs) {
-  if (budgetMs === DRIVE_BUDGET_MS && medianTick() > SLOW_TICK_MS) {
-    budgetMs = SLOW_DRIVE_BUDGET_MS;
+  if ((STEER_BY === "authored-path" ? !budgetSaid : budgetMs === DRIVE_BUDGET_MS) && medianTick() > SLOW_TICK_MS) {
+    const budgetBefore = budgetMs;
+    budgetMs = STEER_BY === "authored-path" ? Math.max(SLOW_DRIVE_BUDGET_MS, 2 * budgetMs) : SLOW_DRIVE_BUDGET_MS;
     if (!budgetSaid) {
       budgetSaid = true;
       note(
         `  (a control-law tick costs ${medianTick()} ms here — the drive budget goes ` +
-          `${DRIVE_BUDGET_MS / 1000}s -> ${SLOW_DRIVE_BUDGET_MS / 1000}s so the same road still gets driven)`,
+          `${budgetBefore / 1000}s -> ${budgetMs / 1000}s so the same road still gets driven)`,
       );
     }
   }
@@ -7183,6 +7714,12 @@ while (!ended && Date.now() - t0 < budgetMs) {
     routeHold.kinds.add(p.routeHold);
     if (routeHold.firstSec === null) routeHold.firstSec = sec;
     routeHold.lastSec = sec;
+  }
+  if (STEER_BY === "authored-path") {
+    // The per-segment tally keeps a bay manoeuvre's off-road ticks off the
+    // approach's books (C-M9c). The runner does NOT read this probe's dial or
+    // cluster: they are a tick old; `pathRead` reads its own (CODE-REVIEW-1 M2).
+    pathRouteHoldTally(p.routeHold);
   }
   // …and BEFORE `topSpeed` takes it, because the first tick's reading is the
   // one number in the drive the drive did not earn — see `enteredLoopKmh`.
@@ -7238,6 +7775,8 @@ while (!ended && Date.now() - t0 < budgetMs) {
     await page.keyboard.up(STEER_KEYS.left).catch(() => {});
     await page.keyboard.up(STEER_KEYS.right).catch(() => {});
     inputChannel.driveKeyEvents += 2;
+    // pc-path (§6.7): the latched brake is gone, the modulator resets, the stall clock restarts.
+    if (STEER_BY === "authored-path") pathState = pathOnPauseDrain(pathState);
     if (drained === 0) {
       // A LAYER THAT VANISHES BETWEEN THE PROBE AND THE DRAIN IS NOT A FAILURE,
       // AND THE FIRST VERSION OF THIS LINE TREATED IT AS ONE — SILENTLY. It was
@@ -7479,8 +8018,15 @@ while (!ended && Date.now() - t0 < budgetMs) {
       p.kmh >= 0 &&
       p.kmh <= 1 &&
       p.lawfulWait === null &&
-      p.reverseWant !== null &&
-      !reverse.armed &&
+      // ── WHO MAY ASK FOR R: the product's text on a ribbon leg, the authored
+      // gear change on a pc-path leg (DESIGN-v2 §7.2, N1). `!reverse.armed` lives
+      // in the ribbon arm ONLY: it means "ever armed" to five readers, so on a
+      // path leg — which re-arms at every authored gear change (poligon R3, R5) —
+      // "not already reversing" is `phase !== "reverse"` above, and "the selector
+      // is not already in R" is the cluster read.
+      (STEER_BY === "authored-path"
+        ? pathFollow.atGearChange === true && !(p.gear.length === 1 && p.gear[0] === "R")
+        : p.reverseWant !== null && !reverse.armed) &&
       // ── THE GATE DOES NOT LATCH — 2026-08-21 ──────────────────────────────
       // It used to read `reverse.failure === null`, and `reverse.failure` was
       // written by the FIRST burst that ran out of presses. So one burst — on
@@ -7495,14 +8041,32 @@ while (!ended && Date.now() - t0 < budgetMs) {
     ) {
       if (!reverse.demanded) {
         reverse.demanded = true;
-        reverse.demandedBy = p.reverseWant;
-        note(`      THE TASK ASKS FOR REVERSE («${p.reverseWant}») — the cluster reads «${gearLine(p.gear)}». Arming R.`);
+        reverse.demandedBy =
+          STEER_BY === "authored-path"
+            ? p.reverseWant ?? `authored gear change at t=${Math.round((now - t0) / 1000)}s (shadow-correct) — the task text did not ask`
+            : p.reverseWant;
+        note(`      THE TASK ASKS FOR REVERSE («${reverse.demandedBy}») — the cluster reads «${gearLine(p.gear)}». Arming R.`);
+      }
+      if (STEER_BY === "authored-path") {
+        const nextK = PATH_PLAN.segments[pathState.segIndex]?.gear === -1 ? pathState.segIndex : pathState.segIndex + 1;
+        const armNote = `      ARMING R for segment ${nextK} (authored gear change at t=${PATH_PLAN.segments[nextK]?.tSec?.[0] ?? "?"}s)`;
+        if (pathFollow.armNotes[pathFollow.armNotes.length - 1] !== armNote) {
+          pathFollow.armNotes.push(armNote);
+          note(armNote);
+        }
       }
       if (p.kmh !== 0) {
         note(`      (holding for a true standstill before arming R — the dial reads ${p.kmh} км/ч, which rounds from as much as 1.4)`);
         await throttle(false);
       } else if (await timed("reverse", () => armReverse(p.kmh))) {
         reverse.armedAtSec = Math.round((now - t0) / 1000);
+        // pc-path: lift the selecting press before anything else can take time —
+        // a no-op after the poll lift; covers the ALREADY-ARMED return (§5.3, W35).
+        if (STEER_BY === "authored-path") {
+          await sChannel(false);
+          pathFollow.armGateWaitMs = 0;
+          pathFollow.armGateSince = null;
+        }
         // THE PROOF FRAME. Named for what the cluster said, taken BEFORE one
         // metre is driven, so a reader can answer "did this drive ever enter
         // reverse?" from a picture instead of from a claim.
@@ -7552,6 +8116,10 @@ while (!ended && Date.now() - t0 < budgetMs) {
               `the shutter. Believed, photographed as 05r-reverse-R-late, and the drive reverses.`,
           );
           await shot("05r-reverse-R-late");
+          if (STEER_BY === "authored-path") {
+            pathFollow.armGateWaitMs = 0;
+            pathFollow.armGateSince = null;
+          }
           await guideLeaveRoll();
           phase = "reverse";
           aimEnterLeg();
@@ -7581,9 +8149,18 @@ while (!ended && Date.now() - t0 < budgetMs) {
           // system will take without losing which of the two it was.
           await shot(`05r-reverse-REFUSED-${g.replace(/[^\p{L}\p{N}]+/gu, "-")}`);
           dumpCensus(await census(), `reverse was demanded and could not be armed (cluster «${g}»)`);
+          if (STEER_BY === "authored-path" && pathState.mode !== "refused") {
+            pathState = refusePathState(pathState, "reverse-not-armed", `${reverse.attempted}/${REVERSE_ARM_BUDGET} deliberate press(es) and the cluster reads «${g}»${reverse.blocked ? ` — ${reverse.blocked}` : ""}`);
+            Object.assign(pathFollow, pathState.flags);
+            loud(`THE pc-path LEG REFUSED (reverse-not-armed): ${pathState.refusals[pathState.refusals.length - 1].why}`);
+          }
         }
         saveStatus({ reverse });
       }
+    } else if (STEER_BY === "authored-path" && pathFollow.atGearChange === true && phase !== "reverse") {
+      // The path arm of the gate is waiting and the gate is closed: count it, and
+      // refuse loudly at 10 s — naming every conjunct — rather than stall silently (N1).
+      pathArmGateWait(p, now);
     }
     // ACT FIRST, DECIDE AFTERWARDS — AND THAT ORDER IS THE WHOLE FIX.
     //
@@ -7623,7 +8200,8 @@ while (!ended && Date.now() - t0 < budgetMs) {
        * no-tape lane now aims about 1.8 км/ч lower than it used to. That is
        * the direction the overshoot argument points and it is under a km/h of
        * cruise; it is not zero. */
-      const paced = paceTarget(paceOdoM, p.kmh);
+      // pc-path (§6.1, C-S3): the pace law is skipped from here — the runner owns speed on this leg.
+      const paced = STEER_BY === "authored-path" ? null : paceTarget(paceOdoM, p.kmh);
       /* ── THE BRAKE THAT HAS A REASON ────────────────────────────────────
        *
        * Everything above this line is the metronome: hold 12 км/ч, stop every
@@ -7709,8 +8287,18 @@ while (!ended && Date.now() - t0 < budgetMs) {
           );
         }
       }
+      let target = null;
+      if (STEER_BY === "authored-path") {
+        // THE RUNNER OWNS THE PEDALS AND THE WHEEL IN THIS PHASE (DESIGN-v2 §6.1).
+        // The hazard reading and its books above are kept and handed over; the
+        // pace row, the pedal block and the ribbon loop below are not run. The
+        // pose is written by the unchanged guidePose, tagged roll-path, so the
+        // INDEPENDENT evidence (lib/path-evidence.mjs) can assign it by order.
+        pathFollow.hz = hz;
+        await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "roll-path"));
+      } else {
       // `capKmh` folds by `min`, and `null` is the identity — see (1) above.
-      const target = Math.min(paced, hz.capKmh ?? Number.POSITIVE_INFINITY);
+      target = Math.min(paced, hz.capKmh ?? Number.POSITIVE_INFINITY);
       const lift = paceLift(target);
       /* ── AND THE ROW SAYS WHO ASKED FOR IT ───────────────────────────────
        * `pace` is published as „the authored shadow's speed-by-distance
@@ -7741,6 +8329,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
       // `guideTick` is a no-op that RECORDS ITSELF whenever it cannot see, so
       // a lane that stops steering never stops saying so.
       await timed("guide", () => guideTick(p.kmh, now - t0, now - lastTickAt));
+      }
       drivingTicks++;
       phaseTicks++;
       rollM += (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
@@ -7754,10 +8343,11 @@ while (!ended && Date.now() - t0 < budgetMs) {
        * about 12 m. The roll was time-bounded, and a time-bounded roll is as
        * long as the box is fast. When the cap fires now it SAYS SO, because a
        * roll bounded by the clock is a roll whose length is not the road's. */
-      const lookM = paceLookM(target);
-      const capMs = paceRollCapMs(target);
+      const lookM = STEER_BY === "authored-path" ? Infinity : paceLookM(target);
+      const capMs = STEER_BY === "authored-path" ? Infinity : paceRollCapMs(target);
       const cappedOut = now - phaseAt >= capMs;
-      if ((rollM >= lookM || cappedOut) && phaseTicks >= 1) {
+      // pc-path: the roll ends when the runner has brought the car to rest at a stop (§7.3).
+      if ((STEER_BY === "authored-path" ? pathFollow.wantStop === true : rollM >= lookM || cappedOut) && phaseTicks >= 1) {
         if (cappedOut && rollM < lookM) {
           pace.capHits += 1;
           /* ── AND WHOSE CLOCK IT WAS ────────────────────────────────────────
@@ -7778,7 +8368,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
                 : `THAT roll was bounded by the clock, so its length is this box's and not this road's.`),
           );
         }
-        pace.rolls += 1;
+        if (STEER_BY !== "authored-path") pace.rolls += 1;
         // THE HAZARD HOLD ENDS WITH THE PHASE. The stop phase's brake is the
         // metronome's, not the hazard channel's; billing those seconds to the
         // hold would run `HAZARD_HOLD_MAX_MS` down during an ordinary cadence
@@ -7828,7 +8418,8 @@ while (!ended && Date.now() - t0 < budgetMs) {
         holdS = false;
         lostKeys += 1;
       }
-      await brake(true, p.kmh);
+      // pc-path (S-4): a fresh press below PRESS_MIN is refused by brake()'s own test; a held latch is untouched.
+      await brake(true, STEER_BY === "authored-path" ? pathSafeKmh(p.kmh, pathFollow.lastAbsKmh) : p.kmh);
       const atRest = p.kmh >= 0 && p.kmh <= 1;
       if (atRest && !restLogged) {
         restLogged = true;
@@ -7842,7 +8433,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
           waitsHonoured++;
           note(`      LAWFUL WAIT declared at t=${Math.round((now - t0) / 1000)}s («${p.lawfulWait}») — the sim says standing still IS the manoeuvre; holding.`);
           if (!shotWaited) { shotWaited = true; await shot("06-waited"); }
-        } else if (now - waitStartedAt > LAWFUL_WAIT_MAX_MS) {
+        } else if (now - waitStartedAt > LAWFUL_WAIT_MAX_MS && pathStopExit()) {
           loud(`the lawful-wait line («${p.lawfulWait}») never went away in ${LAWFUL_WAIT_MAX_MS / 1000}s — moving off, and this run's verdict is suspect.`);
           waitSeconds += Math.round((now - waitStartedAt) / 1000);
           waitStartedAt = null;
@@ -7850,7 +8441,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
           phaseAt = now;
           phaseTicks = 0;
         }
-      } else if (waitStartedAt !== null) {
+      } else if (waitStartedAt !== null && pathStopExit()) {
         const held = Math.round((now - waitStartedAt) / 1000);
         waitSeconds += held;
         note(`      the lawful wait was withdrawn after ${held}s — moving off.`);
@@ -7858,11 +8449,11 @@ while (!ended && Date.now() - t0 < budgetMs) {
         phase = "roll";
         phaseAt = now;
         phaseTicks = 0;
-      } else if (atRest && now - phaseAt >= STOP_MS && phaseTicks >= MIN_PHASE_TICKS) {
+      } else if (atRest && now - phaseAt >= (STEER_BY === "authored-path" ? pathFollow.dwellMs : STOP_MS) && phaseTicks >= MIN_PHASE_TICKS && pathStopExit()) {
         phase = "roll";
         phaseAt = now;
         phaseTicks = 0;
-      } else if (!atRest && now - phaseAt >= STOP_MS + 8000) {
+      } else if (!atRest && now - phaseAt >= STOP_MS + 8000 && pathStopExit()) {
         loud(`the car would not come to rest in ${Math.round((STOP_MS + 8000) / 1000)}s (${p.kmh} км/ч, brake ${holdS ? "down" : "UP"}, throttle ${holdW ? "DOWN" : "up"}) — rolling on.`);
         phase = "roll";
         phaseAt = now;
@@ -7900,6 +8491,11 @@ while (!ended && Date.now() - t0 < budgetMs) {
         // reversing — the same conflation the whole block is about, arriving
         // from the other side.
         reverse.armed = false;
+        if (STEER_BY === "authored-path" && pathState.mode !== "refused") {
+          pathState = refusePathState(pathState, "lost-R", `the selector left R mid-manoeuvre — the cluster reads «${gearLine(p.gear)}»`);
+          Object.assign(pathFollow, pathState.flags);
+          loud(`THE pc-path LEG REFUSED (lost-R): ${pathState.refusals[pathState.refusals.length - 1].why}`);
+        }
         await sChannel(false);
         await throttle(false);
         await aimLeaveLeg();
@@ -7907,12 +8503,19 @@ while (!ended && Date.now() - t0 < budgetMs) {
         phaseAt = now;
         phaseTicks = 0;
         saveStatus({ reverse });
-      } else if (p.reverseStay === null || now - phaseAt >= REVERSE_MS) {
+      } else if (
+        (STEER_BY === "authored-path" ? pathFollow.segmentDone === true && pathFollow.routeEnd !== true : p.reverseStay === null) ||
+        now - phaseAt >= (STEER_BY === "authored-path" ? pathReverseBudgetMs() : REVERSE_MS)
+      ) {
         note(
           `      the reverse leg ends after ${Math.round((now - phaseAt) / 1000)}s — ` +
-            (p.reverseStay === null
-              ? "the task no longer mentions reversing at all."
-              : `its ${REVERSE_MS / 1000}s budget is spent.`),
+            (STEER_BY === "authored-path"
+              ? pathFollow.segmentDone === true
+                ? "the authored-path witness for this reverse segment is captured (end pose held)."
+                : `its ${Math.round(pathReverseBudgetMs() / 1000)}s path budget is spent.`
+              : p.reverseStay === null
+                ? "the task no longer mentions reversing at all."
+                : `its ${REVERSE_MS / 1000}s budget is spent.`),
         );
         await shot("05r-reverse-end");
         await aimLeaveLeg();
@@ -7923,6 +8526,11 @@ while (!ended && Date.now() - t0 < budgetMs) {
         phaseTicks = 0;
         restLogged = false;
         lastTickAt = Date.now();
+      } else if (STEER_BY === "authored-path") {
+        // THE RUNNER OWNS THE WHEEL AND BOTH PEDALS IN R ON THIS LEG (§6.1): the
+        // aim-and-pedal block below is the ribbon leg's and is skipped. The pose
+        // above, the lost-R check and the exit block are kept.
+        drivingTicks++;
       } else {
         /* ── AIM FIRST, THEN THE PEDALS ──────────────────────────────────────
          *
@@ -8171,7 +8779,12 @@ while (!ended && Date.now() - t0 < budgetMs) {
   // spent describing a car instead of driving it. The log loses resolution; the
   // drive does not.
   const readDear = (cost.read ?? []).at(-1) > 1000;
-  if (now - lastFrame >= (readDear ? EXPENSIVE_SHOT_MS : FRAME_MS)) {
+  // pc-path (§5.4): a due beat waits for a steer-neutral instant — at rest, or
+  // straight and settled on the witness — for at most three beat periods.
+  if (STEER_BY === "authored-path" && now - lastFrame >= (readDear ? EXPENSIVE_SHOT_MS : FRAME_MS) && !(pathFollow.shutterOk || now - lastFrame >= 3 * FRAME_MS)) {
+    pathFollow.cadence.beatsDeferred += 1;
+  }
+  if (now - lastFrame >= (readDear ? EXPENSIVE_SHOT_MS : FRAME_MS) && (STEER_BY !== "authored-path" || pathFollow.shutterOk || now - lastFrame >= 3 * FRAME_MS)) {
     lastFrame = now;
     // A frame every FRAME_MS while frames are cheap; every EXPENSIVE_SHOT_MS
     // when one costs seconds — see lastShotCostMs().
@@ -8200,7 +8813,15 @@ while (!ended && Date.now() - t0 < budgetMs) {
   prevKmh = p.kmh;
   tickMs.push(Date.now() - tickStart);
   lastTickAt = Date.now();
-  await timed("idle", () => page.waitForTimeout(TICK_MS));
+  // pc-path: the runner replaces ONLY this idle wait (§5.2); right and wrong legs wait as before.
+  await timed("idle", () => (STEER_BY === "authored-path" && !pathState.done ? pathRun(TICK_MS) : page.waitForTimeout(TICK_MS)));
+  if (STEER_BY === "authored-path" && pathState.done) {
+    // A refusal is final for the leg's remaining segments (§7.7): the car is at
+    // rest, the runner has stopped, and nothing further can be driven.
+    pathFollow.refusedRestTicks = (pathFollow.refusedRestTicks ?? 0) + 1;
+    if (pathFollow.refusedRestTicks === 1) loud(`THE pc-path LEG REFUSED (${pathState.refusals[pathState.refusals.length - 1]?.code}) AND IS AT REST — ${pathState.refusals[pathState.refusals.length - 1]?.why}. No further segment is driven; the drive ends after 10 s at rest.`);
+    if (pathFollow.refusedRestTicks * TICK_MS >= 10_000) break;
+  }
 }
 await throttle(false);
 await brake(false);
@@ -8212,7 +8833,7 @@ if (!ended) {
   );
 }
 note(
-  `  DRIVE: ${MODE} · top ${topSpeed} км/ч · ${stopsMade} full stop${stopsMade === 1 ? "" : "s"} · ` +
+  `  DRIVE: ${LEG_MODE} · top ${topSpeed} км/ч · ${stopsMade} full stop${stopsMade === 1 ? "" : "s"} · ` +
     `${waitsHonoured} lawful wait${waitsHonoured === 1 ? "" : "s"} honoured (${waitSeconds}s) · ` +
     `${teachDrained} pause layer${teachDrained === 1 ? "" : "s"} drained` +
     (refusedReversePress ? ` · refused ${refusedReversePress} standstill brake press${refusedReversePress === 1 ? "" : "es"} (would have selected R)` : "") +
@@ -8252,7 +8873,8 @@ inputChannel.touchProbe = touchProbe;
 note(
   `  INPUT: ${inputChannel.channel} · ${inputChannel.driveKeyEvents} pedal/steer key events · ` +
     `${inputChannel.touchEvents} touch events dispatched · touch overlay ` +
-    `${inputChannel.overlayMounted === null ? "unreadable" : inputChannel.overlayMounted ? "mounted" : "absent"}`,
+    `${inputChannel.overlayMounted === null ? "unreadable" : inputChannel.overlayMounted ? "mounted" : "absent"}` +
+    (STEER_BY === "authored-path" ? ` · path ${steering.path.commands} key edges` : ""),
 );
 note(touchProbeLine(touchProbe));
 if (PLATFORM !== "pc" && inputChannel.channel === "keyboard") {
@@ -8374,6 +8996,7 @@ if (MODE === "right") {
   pace.odoM = Number(paceOdoM.toFixed(1));
   if (paceTape !== null && guideWitness.length > 0) {
     // MEASURED, NOT USED. `__camProbe` is dev-only and may never enter the
+    // (EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs; pending founder ratification)
     // control law (see THE PACE TAPE), but it can say how far from the trace's
     // own starting point this drive's odometer zero actually sat — the lag the
     // pre-drive liveness checks leave behind. `y = −z` (LessonScene.tsx:597).
@@ -8386,7 +9009,9 @@ if (MODE === "right") {
         "took over. It is EVIDENCE: it did not steer, aim or index anything on this drive.",
     };
   }
-  if (paceTape === null) {
+  if (paceTape === null && STEER_BY === "authored-path") {
+    note(`  ${PATH_PACE_LINE}`);
+  } else if (paceTape === null) {
     loud(
       `NO PACE TAPE ON THIS LANE (${pace.why}) — the drive fell back to the fixed ${CRUISE_KMH} км/ч creep behind the ` +
         `${ROLL_DISTANCE_M} m / ${ROLL_MS / 1000}s roll bound, and measured on this tree that bound is the CLOCK: two runs ` +
@@ -8556,7 +9181,7 @@ if (reverse.demanded) {
   reverseAim.offPathMedianM = reverseMedian(reverseAim.offPathM);
   reverseAim.errMedianDeg = reverseMedian(reverseAim.errDeg);
   note(
-    reverseSteerLine({
+    STEER_BY === "authored-path" ? pathReverseLine(pathEvidenceNow(), pathFollowBooks(pathState)) : reverseSteerLine({
       planned: reverseAim.planned && reverseAim.ticks > 0,
       why: reverseAim.why ?? "the drive never entered the reverse phase",
       ticks: reverseAim.ticks,
@@ -9376,6 +10001,44 @@ const trailingUnphotographedPx = Math.max(0, (geo.contentH ?? 0) - lastFrameEnd)
       agreesWithGeometry: dev === null || routeHold.unread > 0 ? null : held === !dev.onRoute,
     };
   }
+  /* ── pc-path: THE INDEPENDENT EVIDENCE, AND THE ROUTE QUALIFIER (§8.1, §8.3.4–5) ──
+   *
+   * Computed by lib/path-evidence.mjs from the outer-tick samples the unchanged
+   * guidePose wrote, the trace and the debrief — never from the runner's books.
+   * `routeRefusal` is never null on this leg: the car is on its line BY
+   * CONSTRUCTION, so route fidelity measures the harness. And the whole-drive
+   * two-witness check is replaced by a per-segment one, because every bay
+   * manoeuvre is off the carriageway by the product's own test (C-M9c). */
+  if (STEER_BY === "authored-path") {
+    pathEvidence = computePathEvidence({
+      samples: guidance.samples,
+      trace: PATH_TRACE,
+      lesson: SCENARIO,
+      debrief: dump,
+      mistakes: facts.mistakes ?? [],
+      rubric: dump?.sections?.['section[aria-label="Оценка на маневрата"]']?.items ?? [],
+      routeHold: guidance.routeHold,
+      routeHoldBySegment: pathFollow.routeHoldBySegment.filter(Boolean),
+      selfReportMayOnlyBlame: pathSelfReportBlame(),
+    });
+    guidance.routeRefusal = pathRouteLine(pathEvidence, guidance.routeRefusal);
+    /* ── NO `route` ON A PATH LEG'S SIDECARS (CODE-REVIEW-2 M5) ──────────────────
+     * `_audit-debrief.json.route` (with onRoute / droveIt) is what the judge brief
+     * tells every judge to parse as «this leg stayed on its route». On this leg the
+     * car was put on the authored line by the harness, so that object would be a
+     * certified student-route witness nobody earned. It is published under a key no
+     * route reader knows, `harnessRoute`, and `route` is null in both sidecars. */
+    guidance.harnessRoute = guidance.route
+      ? { ...guidance.route, byConstruction: true, measures: "THE HARNESS following its witness — never a route witness; route is null on authored-path legs" }
+      : { byConstruction: true, measured: false };
+    guidance.route = null;
+    const bays = new Set(pathFollow.routeHoldBySegment.filter((b) => b && b.bay).map((b) => b.k));
+    const candidates = pathEvidence.routeBySegment.filter(
+      (sg) => sg.gear === 1 && !bays.has(sg.k) && sg.measured && sg.maxM <= sg.corridorM && (pathFollow.routeHoldBySegment[sg.k]?.offRoad ?? 0) > 0,
+    );
+    guidance.routeHold.agreesWithGeometry = guidance.routeHold.unread > 0 ? null : candidates.length === 0;
+    guidance.routeHold.pathCandidateSegments = candidates.map((sg) => sg.k);
+  }
 
 try {
   writeFileSync(
@@ -9384,7 +10047,7 @@ try {
       {
         scenario: SCENARIO,
         platform: PLATFORM,
-        mode: MODE,
+        mode: LEG_MODE,
         reachedVerdictCard: reached,
         verdict: facts.verdict ?? null,
         verdictSurface: facts.verdictSurface ?? null,
@@ -9426,6 +10089,7 @@ try {
         frames: debriefPages,
         fold: foldReport,
         debrief: dump,
+        ...(STEER_BY === "authored-path" ? { steeredBy, pathEvidence } : {}),
       },
       null,
       2,
@@ -9503,7 +10167,7 @@ if (!hasVerdict) {
 }
 note(`  ended naturally: ${endedNaturally}${endedNaturally ? "" : `  (forced via «${forcedBy ?? "nothing"}» — itself a finding)`}`);
 
-note(`\n--- MACHINE SUMMARY (${SCENARIO}/${PLATFORM}/${MODE}) ---`);
+note(`\n--- MACHINE SUMMARY (${SCENARIO}/${PLATFORM}/${LEG_MODE}) ---`);
 // THE BUILD STAMP OUTRANKS EVEN THE FRAME LEDGER, so it goes above it. How
 // many pixels exist is the second question; WHAT THEY ARE OF is the first, and
 // the sweep this replaces could not answer it at all — an unset KNIJKA_BASE
@@ -9603,6 +10267,7 @@ note(
   `VERDICT: ${facts.verdict ?? `(none — ${verdictWhyNone})`}` +
     ` · SCORE: ${facts.score ?? "(none)"} наказателни точки · ${facts.stars ?? "no rubric stars"}`,
 );
+if (STEER_BY === "authored-path") loud(steeredByLine({ lesson: SCENARIO, digest: PATH_PLAN.digest, pathref: PATH_PLAN.refPath }));
 note(`OBJECTIVES (${facts.objectives?.length ?? 0}):`);
 for (const o of facts.objectives ?? []) note(`   ${o.done ? "✓" : "–"} ${o.titleBg}`);
 if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives at all)");
@@ -9640,6 +10305,21 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
       `THE REVERSE OBJECTIVE ON THIS LANE IS UNJUDGED, AND THE REASON IS THIS HARNESS: the cluster never read «R», so the ` +
         `manoeuvre was never attempted. It was neither passed nor failed and no finding may be drawn from it in either direction.`,
     );
+  } else if (STEER_BY === "authored-path") {
+    // pc-path (§8.3.8): every harness fault, per R segment, before any product
+    // blame — the order is lib/path-follow.mjs's pathReverseOutcome, unit-tested.
+    const outcomes = pathReverseOutcome({
+      segments: PATH_PLAN.segments,
+      refusals: pathState.refusals,
+      evidence: pathEvidence ?? {},
+      sign: pathState.sign,
+      endPoses: pathState.endPoses,
+      creditBySegment: pathCreditBySegment({ segments: PATH_PLAN.segments, revObjectives, parkCredited: pathEvidence?.productPark?.credited ?? null }),
+      disarmFailed: reverse.disarmed === false,
+    });
+    for (const o of outcomes) (o.blame === "harness" || o.blame === "unjudged" ? loud : note)(`   ${o.text}`);
+    if (!outcomes.length) loud("   the authored-path leg has no reverse segment to report");
+    // (the ribbon leg's straight-line branch follows)
   } else if (reverseAim.legLengthM === null || reverseAim.ticks === 0) {
     loud(
       `THE REVERSE OBJECTIVE ON THIS LANE IS UNJUDGED, AND THE REASON IS THIS HARNESS: the car reached «R» but had no ` +
@@ -9691,6 +10371,12 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
  */
 {
   guidance.tracking = summariseTracking(guidance.samples);
+  if (STEER_BY === "authored-path") {
+    const tw = pathTrackingWord(pathEvidence, pathState.refusals, { authoredArcM: PATH_PLAN.segments[PATH_PLAN.segments.length - 1]?.arcM?.[1] ?? null });
+    guidance.tracking.verdict = tw.word;
+    guidance.tracking.verdictWhy = `authored-path leg — ${tw.why}. This word describes THE HARNESS following its witness, never a guidance measurement.`;
+    if (pathEvidence) pathEvidence.trackingWord = tw.word;
+  }
   if (guideWitness.length >= 2) {
     // The dev-only pose probe, folded to two numbers: how far the car actually
     // travelled, and how far it ended from where it started. They differ
@@ -9765,6 +10451,9 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
     };
   }
   guidance.caveat =
+    (STEER_BY === "authored-path"
+      ? "AUTHORED-PATH LEG: the ribbon was NOT the signal on this drive — the car followed a committed witness of the lesson's own line on the dev-only pose probe, so nothing below is a guidance measurement. "
+      : "") +
     "THE SIGNAL IS A ROAD CENTRELINE, NOT A LANE. guidanceRoute.ts emits centreline geometry and only eases the ribbon " +
     "into the goal's lane on the FINAL leg, so a drive that tracks it perfectly is driving down the middle of the " +
     "carriageway. NO LANE-POSITION FINDING — «drifted into the oncoming lane», «clipped the kerb», «failed to keep " +
@@ -9798,7 +10487,14 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
    * road the car was not on. */
   {
     const dev = guidance.route;
-    if (dev) {
+    if (STEER_BY === "authored-path") {
+      const hr = guidance.harnessRoute;
+      note(
+        `  HARNESS ROUTE (authored-path leg — NOT route fidelity, never a route witness): ` +
+          (hr && hr.measured !== false ? `worst ${hr.maxM} m · median ${hr.medianM} m off the lesson's authored line over ${hr.n} moving samples, BY CONSTRUCTION` : "not measured") +
+          `. \`route\` is null in this leg's sidecars; per-segment evidence is under pathEvidence.routeBySegment.`,
+      );
+    } else if (dev) {
       note(
         `  ROUTE FIDELITY: worst ${dev.maxM} m off the lesson's own correct line · median ${dev.medianM} m · p90 ${dev.p90M} m ` +
           `· ${dev.pctOverNear}% of ${dev.n} moving samples beyond 3 m, ${dev.pctOverOff}% beyond 8 m ` +
@@ -9855,7 +10551,11 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
       } else {
         note(`  ROUTE HOLD: the product never declared the car off the road (${rh.clearTicks} clear tick(s)${rh.unread ? `, ${rh.unread} unread` : ""}).`);
       }
-      if (rh.agreesWithGeometry === false) {
+      if (rh.agreesWithGeometry === false && STEER_BY === "authored-path") {
+        loud(
+          `UNJUDGED CANDIDATE: the product says off-road on forward segment(s) ${(rh.pathCandidateSegments ?? []).join(", ")} while the car is on its own lesson's authored line — the authored line is not on the product's carriageway, the world changed since the recording, or the off-road test is wrong; needs a frame plus a ribbon-leg or world check before filing.`,
+        );
+      } else if (rh.agreesWithGeometry === false) {
         loud(
           `THE TWO WITNESSES DISAGREE. The product says ${rh.offRoadTicks ? "OFF the road" : "ON the road"}${rh.crashPinnedTicks ? ` (and crash-pinned on ${rh.crashPinnedTicks} tick(s), which is not a route claim and is not scored here)` : ""}; ` +
             `the geometry against this lesson's own authored line says ${dev && dev.onRoute ? "ON" : "OFF"} ` +
@@ -9907,10 +10607,14 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
   steering.uncreditedObjectives = uncredited.length;
   steering.uncreditedTitles = uncredited.map((o) => o.titleBg);
   // WRITTEN FROM WHAT HAPPENED, NEVER DECLARED — see the field's own note.
-  steering.tracesSteer = steering.everSteered;
+  steering.tracesSteer = STEER_BY === "authored-path" ? steering.path.commands > 0 : steering.everSteered;
   const chState = steering.channel.state;
   steering.note =
-    (steering.everSteered
+    (STEER_BY === "authored-path"
+      ? `this authored-path leg issued ${steering.path.commands} key edge(s) (${steering.path.heldMs.left} ms left, ${steering.path.heldMs.right} ms right) ` +
+        "following a committed witness of the lesson's own authored line on the DEV-ONLY pose probe; the ribbon loop was NOT used. " +
+        "`everSteered` and `commands` are the ribbon's and read zero BY DESIGN on this leg. GRADING evidence only — see steeredBy.mayNotTestify."
+      : steering.everSteered
       ? `this drive issued ${steering.commands} steering command(s) (${steering.heldMs.left} ms left, ${steering.heldMs.right} ms right) ` +
         `under the guidance loop, and the tracking verdict on this drive is «${guidance.tracking?.verdict ?? "unsummarised"}». ` +
         "READ `guidance.caveat` BEFORE FILING: the signal is a road CENTRELINE, so this drive supports findings about " +
@@ -9939,7 +10643,8 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
     // thing a lane said about the wheel — so a lane whose channel had been
     // BROKEN said exactly the same words as a lane whose channel was perfect.
     ` CHANNEL: ${chState.toUpperCase()} — ${steering.channel.why}.`;
-  note(
+  if (STEER_BY === "authored-path") note(`${pathSteeringLine(steering.path)} · liveness ${chState.toUpperCase()}`);
+  else note(
     // „the scripted traces do not steer" WAS A CATEGORICAL CLAIM AND IT IS NO
     // LONGER TRUE OF THE HARNESS — 2026-08-22, verifier. It printed on every
     // lane that issued no command, including lanes where the loop RAN and
@@ -9997,7 +10702,20 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
   // a drive that could not turn is not evidence about the lesson in either
   // direction, and Wave C recorded 92 of 145 lessons as having „no drivable
   // success path" on exactly this evidence.
-  if (!steering.everSteered && uncredited.length) {
+  if (STEER_BY === "authored-path") {
+    if (uncredited.length) loud(pathUncreditedLine(uncredited, pathEvidence));
+    const at = pathEvidence?.attribution;
+    if (at) {
+      note(`  ATTRIBUTION (INDEPENDENT release: ${at.release?.label ?? "not computed"}):`);
+      for (const x of at.proceduralOmission) note(`     PROCEDURAL-OMISSION «${x.code}» — ${x.label}`);
+      for (const x of at.timingActuation) note(`     TIMING/ACTUATION «${x.code}» — ${x.label}`);
+      for (const x of at.collisionCandidates) note(`     COLLISION «${x.code}» — ${x.label}`);
+      for (const x of at.other) note(`     OTHER «${x.code}» — ${x.label}`);
+    }
+    note(`  EMPTY-WORLD CAVEAT: ${EMPTY_WORLD_CAVEAT}`);
+    for (const c of PATH_PLAN.caveats ?? []) note(`  CAVEAT: ${c}`);
+  }
+  if (STEER_BY !== "authored-path" && !steering.everSteered && uncredited.length) {
     loud(
       // "a drive that never turned the wheel" was true while nothing on the
       // lane could turn it. Since the liveness check the wheel IS turned on
@@ -10146,6 +10864,17 @@ const exit =
         ? EXIT_EVIDENCE_INCOMPLETE
         : EXIT_JUDGEABLE;
 if (drive.class !== "drove") loud(`${drive.headline.toUpperCase()} — ${drive.why}`);
+// pc-path: the runner's sub-tick ledger, beside the frames (§5.5). SELF-REPORT.
+if (STEER_BY === "authored-path") {
+  try {
+    writeFileSync(
+      `${OUT}/_audit-path.json`,
+      `${JSON.stringify({ scenario: SCENARIO, platform: PLATFORM, mode: LEG_MODE, selfReport: "SELF-REPORT — the runner's own sub-tick books; they gate nothing", dropped: pathFollow.ledgerDropped, rows: pathFollow.ledger })}\n`,
+    );
+  } catch (error) {
+    loud(`_audit-path.json could not be written (${String(error?.message ?? error)}).`);
+  }
+}
 if (stdoutBroken) {
   // The one recovery attempt for a transcript that never reached run.log. It
   // shares the disk that just failed, so it is allowed to fail too — but
@@ -10190,6 +10919,37 @@ saveStatus({
   // means the harness drove badly and its failures are not the product's.
   // `caveat` states what the signal cannot support — read it before filing.
   guidance,
+  // …AND, ON A pc-path LEG ONLY, WHAT STEERED IT, WHAT WAS MEASURED INDEPENDENTLY
+  // OF THE CONTROLLER, AND THE CONTROLLER'S OWN (SELF-REPORT) BOOKS. Spread in, so
+  // a right or wrong status file gains no key.
+  ...(STEER_BY === "authored-path"
+    ? {
+        steeredBy,
+        pathEvidence,
+        pathFollow: {
+          ...pathFollowBooks(pathState),
+          cadence: {
+            entries: pathFollow.cadence.entries,
+            subTicks: pathFollow.cadence.subTicks,
+            runnerPeriodMs: { p50: pathQuant(pathFollow.cadence.runnerPeriodMs, 0.5), p90: pathQuant(pathFollow.cadence.runnerPeriodMs, 0.9) },
+            rttMs: { p50: pathQuant(pathFollow.cadence.rttMs, 0.5), p90: pathQuant(pathFollow.cadence.rttMs, 0.9) },
+            frameMs: { p50: pathQuant(pathFollow.cadence.frameMs, 0.5), p90: pathQuant(pathFollow.cadence.frameMs, 0.9) },
+            blindMs: { p50: pathQuant(pathFollow.cadence.blindMs, 0.5), p90: pathQuant(pathFollow.cadence.blindMs, 0.9), max: pathQuant(pathFollow.cadence.blindMs, 1) },
+            blindMsByPhase: Object.fromEntries(Object.entries(pathFollow.cadence.blindMsByPhase).map(([ph, a]) => [ph, { n: a.length, p50: pathQuant(a, 0.5), p90: pathQuant(a, 0.9), max: pathQuant(a, 1) }])),
+            blindGapM: { p50: pathQuant(pathFollow.cadence.blindGapM, 0.5), p90: pathQuant(pathFollow.cadence.blindGapM, 0.9), max: pathQuant(pathFollow.cadence.blindGapM, 1) },
+            blindGapNearStop: pathFollow.cadence.blindGapNearStop,
+            beatsDeferred: pathFollow.cadence.beatsDeferred,
+            pedalEventsPerTick: pathFollow.cadence.entries ? Math.round((pathFollow.cadence.pedalEvents / pathFollow.cadence.entries) * 100) / 100 : 0,
+          },
+          selectorLifts: pathFollow.selectorLifts,
+          armGateWaitMs: pathFollow.armGateWaitMs,
+          routeHoldBySegment: pathFollow.routeHoldBySegment.filter(Boolean),
+          spawn: pathFollow.spawn,
+          budgetWhy: pathFollow.budgetWhy,
+          ledger: "_audit-path.json",
+        },
+      }
+    : {}),
   // …AND WHETHER THE CAR WAS EVER HELD BY ITS OWN LEVER. Always present,
   // `looked:false` included, because „this lane never asked" and „this lane
   // asked and the answer was no" are the two states this whole block exists
