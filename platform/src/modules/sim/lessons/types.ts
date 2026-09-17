@@ -933,7 +933,40 @@ export interface YieldVoiceState {
     /** When the wheels turned; null = the wait ended but he has not moved yet
      *  (a light went green and he is still gathering himself). */
     wentAtSec: number | null;
+    /**
+     * WHERE ROUND WHICH ISLAND HE STOOD — a `roundaboutEntry` verdict only, and
+     * only when the caller said where the car was (advisor.ts `YieldVoiceSite`).
+     * `sc-roundabout-entry:8be266cf`: four seconds after the wheels turn is not
+     * „after the entry" for a car that creeps off the line, and the verdict says
+     * «влезе». With this present the verdict waits for the car to be that far
+     * round the SAME island (advisor.ts `YIELD_VOICE_RING_ENTRY_ARC_DEG`), which
+     * is past the point the entry adjudicator can still convict. Absent = the
+     * caller could not say, and the verdict keeps the time window alone.
+     */
+    ring?: { x: number; y: number; azDeg: number };
   } | null;
+  /**
+   * The live episode carries a graded mute-code conviction
+   * (`sc-roundabout-entry:8be266cf`, advisor.ts `stepYieldVoice` section 0).
+   * Such an episode is narrated no further, earns no verdict, and its card
+   * drops the approval. Absent = it does not — so a drive that was never
+   * convicted folds a state with exactly the five fields above.
+   */
+  convicted?: boolean;
+  /**
+   * Mute-code convictions graded within the last YIELD_VOICE_EPISODE_GAP_S —
+   * the window a NEW episode at the same site is convicted from (a barge billed
+   * on the way in, then braked into a stop at the same mouth). `x`/`y` are where
+   * the car was when it was billed, when the caller said; absent, the
+   * conviction speaks for any site, which errs toward silence. Pruned every
+   * frame; absent when empty.
+   */
+  recentConvictions?: ReadonlyArray<{
+    atSec: number;
+    code: Extract<ScorableEvent, { kind: "violation" }>["code"];
+    x?: number;
+    y?: number;
+  }>;
 }
 
 /** Per-session memory of the route-finish gate (finish.ts `stepFinishGate`). */

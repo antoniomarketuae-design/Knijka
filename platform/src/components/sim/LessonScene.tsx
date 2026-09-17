@@ -91,6 +91,7 @@ import {
   parseScenarioLessonId,
   scenarioById,
   type LessonSpec,
+  type RouteHold,
 } from "@/modules/sim/lessons";
 import {
   createScenarioDirector,
@@ -279,6 +280,60 @@ function traceUrlFor(repoPath: string): string {
 const FOLLOW_HINT_DEVIATION_M = 1.2;
 const FOLLOW_HINT_SUSTAIN_S = 2;
 const FOLLOW_HINT_POLL_S = 0.25;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «СЛЕДВАЙ СИНЯТА ЛИНИЯ» STANDS DOWN WHILE THE ROUTE IS OUT OF REACH —
+ * sc-roundabout-entry:8ae6f7a2 (major), the surface round 2 left.
+ *
+ * THE FRAME: `.audit-frames/w49/frames/sc-roundabout-entry__pc-right/
+ * 04-t080s.png`. The car is on the lawn outside the ring at 14 км/ч, and every
+ * surface on the glass talks to a car that is still on the carriageway. Round 2
+ * moved the banner, the phone task line, the dashboard indicator and the
+ * advisor card onto the grader's own off-carriageway episode
+ * (`routeHoldForSession`, `lessons/advisor.ts`). The round-2 verifier found
+ * this pill untouched: it is top-right on that frame, beside the car on the
+ * grass, and nothing in round 2 reached it.
+ *
+ * WHY STAND DOWN, AND NOT SAY SOMETHING ELSE. Under a hold the recovery has
+ * owners: the banner puts the condition in front of the task («Колата е извън
+ * пътя — върни се на платното…»), and the advisor card gives the manoeuvre
+ * («Не дърпай волана — … върни се под малък ъгъл»). This pill's probe measures
+ * one thing, the car's distance from the demonstrated line, and a car on the
+ * grass beside a ring is off that line by construction. „Follow the blue line"
+ * asks for a turn back towards the line, which is the sharp return the advisor
+ * card forbids. A second sentence about being off the road would repeat the
+ * banner in a third place. So while the hold stands, the pill says nothing. It
+ * returns the moment the hold clears, if the car is still off the line:
+ * `FollowHintProbe` is untouched and keeps its own state, and only the render
+ * consults this.
+ *
+ * ONE SOURCE, READ ONCE. The hold is not re-derived here. This scene has no
+ * session, and a second reading of „off the road" from `edgeId` would be a
+ * second clock. That is exactly how round 2 found the coach three seconds
+ * behind the grader. The shell reads `routeHoldForSession` once per poll into
+ * `snap.objectiveHold` and passes that value to this scene as the `routeHold`
+ * prop (its `<SceneSlot>` mount), so this pill acts on the same string as the
+ * banner and the advisor card. Absent means null, which means the pill exactly
+ * as it shipped.
+ *
+ * A HOLD OF EITHER KIND. `crashPinned` stands the pill down too. A car pinned
+ * against what it hit is told «Съвсем леко назад с прави колела…» — back out
+ * first — and „follow the line" would compete with the one order that card
+ * gives.
+ *
+ * MEASURED ON THE PARKING CORPUS, the direction that is worse than the defect:
+ * all 78 committed sc-park-* / sc-pk-* tapes (26 shadow-correct, 52 mistake),
+ * 55,420 frames through the production runtime and the lesson engine, reach NO
+ * hold on any frame. Replaying the probe's own rule over the same frames, the
+ * pill is up on 0 shadow-correct frames and 2,429 mistake frames, identically
+ * with and without this gate. `__tests__/followHintRouteHold.test.ts` holds
+ * the shadow-correct half.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function followHintStandsDown(routeHold: RouteHold | null | undefined): boolean {
+  return routeHold !== null && routeHold !== undefined;
+}
 
 /**
  * Day IBL: Poly Haven `shanghai_riverside` (CC0) — a true-unclipped-sun (25 EV)
@@ -1108,6 +1163,12 @@ export interface LessonSceneProps {
    *  live cabin/driveline/sample state — the shell's StatusDashboard bar
    *  samples it low-Hz (hud/dashboardStatus.ts). Absent = no writes. */
   dashboardStatusRef?: React.RefObject<DashboardStatus>;
+  /** The shell's `snap.objectiveHold` (`routeHoldForSession`): non-null while
+   *  the objective cannot be acted on from where the car is. Read by the
+   *  «Следвай синята линия» pill only — see `followHintStandsDown`. A string
+   *  that changes on hold edges, so `SceneSlot`'s memo still holds. Absent =
+   *  null = the pill as it shipped. */
+  routeHold?: RouteHold | null;
 }
 
 export default function LessonScene(props: LessonSceneProps) {
@@ -1843,6 +1904,7 @@ export function ReadyScene({
   onToggleFullscreen,
   attemptRecorderRef,
   dashboardStatusRef,
+  routeHold = null,
 }: LessonSceneProps & {
   built: Built;
   menuPaused: boolean;
@@ -3161,8 +3223,14 @@ export function ReadyScene({
           rank, not a coin toss: «Следвай синята линия» is standing guidance the
           student can act on at any time in the next minute, and the AC-12 swing
           line names a mistake he made half a second ago and has four seconds to
-          read. The guidance chip comes back the moment the line clears. */}
-      {followHintOn && aids?.followHints && !windSwingCueOn ? (
+          read. The guidance chip comes back the moment the line clears.
+
+          …AND IT STANDS DOWN UNDER THE ROUTE HOLD — a car on the lawn or
+          pinned against what it hit is being given its recovery by the banner
+          and the advisor card, and „follow the line" is the order that
+          recovery forbids. `followHintStandsDown` has the frame
+          (sc-roundabout-entry:8ae6f7a2) and the reasoning. */}
+      {followHintOn && aids?.followHints && !windSwingCueOn && !followHintStandsDown(routeHold) ? (
         <div
           data-hud="follow-hint"
           className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2"

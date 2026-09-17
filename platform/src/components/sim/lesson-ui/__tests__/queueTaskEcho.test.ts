@@ -453,7 +453,13 @@ describe("the phone reads the task row, with the counter and the coaching on it"
     expect(binding.fold.taskDetailBg).toBeNull();
     const seen = glass(rows);
     expect(seen.kind).toBe("advisor");
-    expect(seen.html).toContain(waiting.advisorPrompt!.textBg);
+    // The advisor row is the hint card's shape since sc-merge-from-property:
+    // 6715b581 — name, then the prompt's own SUMMARY on the glass, the whole
+    // sentence behind «Прочети». The summary is the advisor's sentence as far as
+    // the glass is concerned, and for a clean wait it still carries the
+    // reassurance and its reason («Чакаш правилно: пешеходецът е пръв.»).
+    expect(seen.html).toContain(waiting.advisorPrompt!.peekBg!);
+    expect(waiting.advisorPrompt!.peekBg).toMatch(/^Чакаш правилно: /u);
   });
 
   it("no advisor row survives the gate — even when the prompt is a different sentence", () => {

@@ -163,8 +163,11 @@ describe("on the central island the coach stops ordering the ring exit", () => {
 
   it("BEFORE the hold matures the authored objective still stands", () => {
     // The qualification may not fire on a wheel that clipped a kerb for a
-    // frame: the ladder is the same five seconds the banner already waits.
-    const s = ontoTheIsland(ROUTE_HOLD_S - 2);
+    // frame. The ladder is the GRADER'S OWN — OFF_CARRIAGEWAY_SUSTAIN_SEC, 2 s
+    // (sc-roundabout-entry:8ae6f7a2, `routeHoldForSession` reads the rule
+    // reducer's episode) — not the crash pin's five seconds it used to borrow,
+    // so «before it matures» is one second on the island, not three.
+    const s = ontoTheIsland(1);
     expect(routeHoldForSession(s)).toBeNull();
     expect(advisorPromptForSession(s)?.textBg).toBe(RING_CARD_BG);
   });

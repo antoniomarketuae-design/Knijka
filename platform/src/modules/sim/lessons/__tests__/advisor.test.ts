@@ -106,6 +106,9 @@ describe("pre-drive prompts", () => {
     expect(advisorPromptForSession(s)).toEqual({
       textBg: expect.stringContaining("седалката"),
       keys: [],
+      // The phone's line (`CoachedAdvisorPrompt`): this sentence fits two
+      // 24-character lines, so the summary is the sentence itself.
+      peekBg: expect.stringContaining("седалката"),
     });
     s = applyPreDriveStep(s, "adjust-seat", 1).state;
     // Next: mirrors — the Q/E/F glances.

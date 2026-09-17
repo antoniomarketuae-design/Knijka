@@ -538,16 +538,13 @@ function ToastShell({
 function ToastFooter({
   lawRef,
   ageBg,
-  trailing = null,
 }: {
   lawRef: string | undefined;
   ageBg: string | null;
-  /** The «Защо» chip on a summarised violation card, right-aligned after the
-   *  moment. Last on the row, so under `flex-wrap` it is the one that takes a
-   *  second line — never the citation. */
-  trailing?: ReactNode;
 }) {
-  if (lawRef === undefined && ageBg === null && trailing === null) return null;
+  // The «Защо» chip used to ride this row as a third item and is now beside the
+  // sentence it opens — see „…AND THE CHIP MOVED UP BESIDE THE SENTENCE".
+  if (lawRef === undefined && ageBg === null) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
       {lawRef !== undefined ? (
@@ -558,7 +555,6 @@ function ToastFooter({
       {ageBg !== null ? (
         <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted">{ageBg}</span>
       ) : null}
-      {trailing}
     </div>
   );
 }
@@ -642,11 +638,14 @@ function DismissGlyph({ show }: { show: boolean }) {
    that WAS on its first line with it.
 
    HOW IT IS MEASURED, and the four choices that are not arbitrary:
-     · ONCE, AT ARRIVAL, BEFORE PAINT (`useLayoutEffect`), THEN LATCHED. A body
-       that changes while it is being read is the founder's „elements moving"
-       complaint; the student sees exactly one body for the life of the card
-       unless HE asks for the other (the «Защо» chip, below), and the age tick
-       re-rendering it every second cannot re-open the question.
+     · AT ARRIVAL, BEFORE PAINT (`useLayoutEffect`), THEN LATCHED AGAINST
+       GROWTH. A body that changes while it is being read is the founder's
+       „elements moving" complaint; the age tick re-rendering the card every
+       second cannot re-open the question, and nothing but the student's own
+       «Защо» press ever puts a paragraph back. The ONE later move is the
+       shrinking one — paragraph → summary when the window closes in on a
+       card that fitted — and „THE WINDOW SHRANK UNDER A CARD THAT FITTED"
+       below has why that move, and only that one, is allowed.
      · `offsetHeight`, NOT `getBoundingClientRect`. `hud-toast-in`
        (`HudStyles.tsx`) enters from `scale(0.96)` and this effect runs on the
        animation's first frame, so a transformed rect under-reads a tall card by
@@ -668,10 +667,13 @@ function DismissGlyph({ show }: { show: boolean }) {
        curve case above) goes behind the chip with it; carrying a readout as
        its own field is a `contracts.ts` + `lessons/engine.ts` change, not this
        file's.
-     · Arrival-only means a window that SHRINKS afterwards — the fold row
-       mounting under a second card, a banner growing — can still cut a card
-       that fitted when it arrived. That residue is a line or two, not half a
-       paragraph, and it is the shell's fold control's to announce.
+     · (Retired 2026-09-17.) This line used to accept that a window which
+       SHRINKS after arrival „can still cut a card that fitted", as „a line or
+       two". Measured, it is not a line or two: a fault that pins the car grows
+       the banner to three lines and posts a recovery card in the same second,
+       and the room under them drops from 242 px to 110 (81 with the fold row).
+       The card now follows the window down — see „THE WINDOW SHRANK UNDER A
+       CARD THAT FITTED".
      · The roomy leg still has no car-stopping route to the whole text, and the
        chip does not add one: it expands the card inside the same eight-second
        TTL. The shell records that as an open decision about what this column
@@ -724,6 +726,9 @@ function DismissGlyph({ show }: { show: boolean }) {
 
 /** The shell's toast scroller — the box whose height is this card's window. */
 export const TOAST_SCROLLER_SELECTOR = "[data-hud-toast-scroller]";
+
+/** The attribute on the body `<p>` — the one element whose text the choice swaps. */
+const TOAST_BODY_ATTR = "data-hud-toast-body";
 
 /**
  * Rounding slack for the fit test, px. `offsetHeight` and `clientHeight` are
@@ -826,13 +831,426 @@ function measureToastBodyChoice(
   return fits ? "paragraph" : "summary";
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE WINDOW SHRANK UNDER A CARD THAT FITTED — sc-roundabout-entry:fe081cf1,
+   the w49 verifier's overturn of the arrival-only repair above.
+
+   THE MECHANISM, measured before a line here was written, in a copy of the
+   verifier's rig (the real `HudToasts`, `ObjectiveBanner` and `AdvisorCard`
+   in the shell's roomy column, copied class for class, at the w49 stage,
+   1166 × 656, with the app's own faces and `lang="bg"` — without the last two
+   the advisor sets three lines where the frame shows four). A −10 «Удар в
+   неподвижно препятствие» arrives into a column holding a one-line task and
+   the recall pill, with 242 px of room below them — `04-t011s.png` on the
+   pc-wrong leg, card whole. The crash then pins the car. In the same second
+   the banner grows to three lines («Колата е притисната след удара — …») and
+   the advisor posts its recovery card, and the room below them is 110 px, 81
+   once the shell's fold row takes its share. Nothing re-asked the question
+   the arrival measurement had answered: measured on HEAD, a 144 px
+   SPEEDING_OVER_LIMIT paragraph that arrived whole stayed a paragraph in a
+   111 px window, cut, for as long as it lived.
+
+   SO THE QUESTION IS RE-ASKED WHEN THE WINDOW MOVES — AND ONLY ONE ANSWER MAY
+   CHANGE THE CARD. `toastBodyChoiceAfterResize` is the one-way half of the
+   rule, `toastSummaryMendsCut` the geometric half (round 3 narrowed it — see
+   „…BUT ONLY A CARD THE WINDOW ITSELF CUT, INTO A SUMMARY THAT IS WHOLE"):
+     · paragraph → summary, only when the window has cut THIS card where it
+       stands and the summary would be whole there. Any time in the card's
+       life. The card gets SHORTER, which is the one direction a change under
+       a reader cannot hide anything he has not been offered: the paragraph is
+       one «Защо» press away, exactly as on a card that fell back at arrival.
+     · summary → paragraph: NEVER here. Only the student's own «Защо» press
+       brings the paragraph back (`whyOpen`, in `ViolationToast`). A window
+       that grows again — the recovery card dismissed, the banner back to one
+       line — leaves the summary where it is; a card that swells by itself is
+       the founder's „elements moving" complaint in its purest form.
+     · an OPEN chip stays open. It rides on a card whose choice is already
+       `"summary"`, and the observer below exists only while the choice is
+       `"paragraph"`, so no resize can reach it.
+     · pending stays pending: that is the arrival effect's to resolve.
+
+   WHAT IS OBSERVED, AND WHY NOT A TIMER. A `ResizeObserver` on the shell's
+   scroller — the box whose height IS the window — and on the card itself,
+   whose own height would move if a citation long enough to share its row
+   with the ticking age wrapped (none in today's catalogue does, 0 of 73), and
+   which the scroller cannot report once it is at its cap. Unmeasurable is
+   still no claim: a window squeezed to 0 px keeps the paragraph, because a
+   summary in a 0 px box is not a summary anyone can read, and the next resize
+   that gives the box height asks again. (Round 2 wrote here that the callback
+   „reads the same two layout values the arrival test reads". It no longer
+   does, on purpose, and the section below has why: height against height was
+   the regression.)
+
+   WHAT IT DOES NOT DO, stated rather than found later — and it is most of
+   what the w49 frames photographed:
+     · IT DOES NOT MOVE THE SHELL'S FOLD ROW. The −3 «Излизане от платното за
+       движение» at pc-right `04-t090s.png` and the −10 above both arrived as
+       summaries, so this switch had nothing to switch on either leg. Below the
+       recall pill that column has 119.7 px, and the summary card — 117 px now,
+       see „…AND THE CHIP MOVED UP BESIDE THE SENTENCE" — fits it. But while
+       `LessonPlayShell.tsx`'s fold row («↓ обяснението продължава — покажи»,
+       23.5 px + the 6 px gap) is up the window is 90, whose last 28 px are the
+       shell's fade: header and title legible, summary under the fade, which is
+       the frame. That row was up for the PREVIOUS card («📚 Научи», cut), and
+       it only leaves when nothing is cut — so a card between 90 and 119.7 px
+       is kept cut by the row that announces the cut. Measured: the same card
+       arriving with no row up is whole; arriving under the row, it stays cut
+       after the older card expires, until it expires itself. The shell's, and
+       no third, smaller card is invented here to hide it — a card without its
+       citation row is a bare verdict (THEO-4), and one without its title is
+       not a card.
+     · IT CANNOT PREVENT ONE FALSE FRAME OF THAT ROW ON THE SWITCH ITSELF. The
+       shell's observer and this one fire in the same delivery, before either
+       update commits, so it counts the paragraph that is about to go: the row
+       mounts with the summary and leaves on the next frame (rig, 10 of 10,
+       both engines). Committing the switch synchronously inside the callback
+       does remove it — and raised „ResizeObserver loop completed with
+       undelivered notifications" on 10 of 10, an error event on every page
+       that switches. One frame of a row that was true a frame earlier is the
+       cheaper defect.
+     · The pc-wrong `04-t016s.png` „zero-height column" is not a squeezed live
+       card. The column there ends 90 px above its cap, which a live card
+       would have filled (the same card and column measure 81 px of window,
+       not 0): the card had EXPIRED — its eight seconds are wall time, and it
+       read «сега» on `05-stopped.png` at the t = 9 s rest — and the fold row
+       is the shell's state from the frame before — one animation frame in the
+       rig, on 5 of 5 expiries. Also the shell's.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …BUT ONLY A CARD THE WINDOW ITSELF CUT, INTO A SUMMARY THAT IS WHOLE —
+   round 3 of sc-roundabout-entry:fe081cf1, the w49 verifier's regression
+   finding on round 2's switch above.
+
+   ROUND 2 ASKED THE WRONG QUESTION. It compared the card's HEIGHT to the
+   window's height — `toastCardFitsWindow(card.offsetHeight,
+   scroller.clientHeight)` — which is the arrival test's question, and at
+   arrival it is the right one, because the newest card is always at the top
+   of the stack. Later in a card's life it is not: HOW TALL the card is says
+   nothing about WHERE it is, and a card can stop „fitting" by that test
+   without the window having done anything to it. The verifier's case: a
+   second fault arrives, the new card goes ON TOP (newest first), the paragraph
+   that was whole on the glass is pushed down under it, the shell's fold row
+   mounts for the push and takes the scroller from 243 px to 213 — and the
+   height test, seeing a 243 px card in a 213 px window, collapsed the
+   paragraph under its reader. COLLISION / pedestrian went 243 px → the 111 px
+   «Човекът няма ламарина и колан.» with 88 px of it visible, still cut;
+   FOLLOWING_TOO_CLOSE_FOR_RAIN 234 → 138, still cut. Nothing was gained on
+   the glass, and the card he was reading changed under him — the founder's
+   standing „elements moving" complaint, produced by the repair for it.
+
+   SO THE SWITCH NOW NEEDS FOUR THINGS, and each one is a way round 2 was wrong
+   (`toastSummaryMendsCut`, and section 6 of `hud-toast-fit.test.ts` turns red
+   when any one of them is removed):
+     1 · THE CARD IS CUT WHERE IT STANDS. Its top in the window (its place in
+         the stack less `scrollTop`) plus its height, against the window — not
+         its height against the window. A card fully on the glass is never
+         touched, however the window moved.
+     2 · THE WINDOW DID THE CUTTING, NOT A NEWER CARD. The card must be no
+         lower in the stack than where it was last seen whole; the top of the
+         stack, where every card arrives, is the baseline for one that has not
+         been seen whole yet. A card pushed down by a newer one keeps its
+         paragraph, and the shell's fold row — «↓ обяснението продължава» — is
+         the honest answer there: it says the card continues, and the student
+         can page to it. When the newer card leaves and this one rises back,
+         the question is asked again from where it stands.
+     3 · THE FOLD ROW IS NOT THE WINDOW. While `[data-hud-toast-more]` is up
+         the window is read as it would be WITHOUT the row: the row is the
+         shell's statement ABOUT the cards, and if its height counted as a
+         shrink, the row raised for a push would collapse the card it was
+         raised for — which is exactly the 243 → 213 above. Read, not added
+         up: the row is taken out of flow for one `clientHeight` read and put
+         back — see `readToastWindow` for why `clientHeight` plus the row plus
+         the gap is the wrong number whenever the briefing is open.
+     4 · THE SUMMARY WOULD BE WHOLE THERE — in the window IT would get.
+         Measured, not inferred: a hidden, `aria-hidden` copy of the card, with
+         the summary and its «Защо» chip in the body box exactly as
+         `ViolationToast` would render them, is put into the column for one
+         read of its `offsetHeight` and removed (`measureToastSummaryCardPx`).
+         And the window is read again with the live card holding the summary's
+         room, because the window depends on it: the scroller is a flex item
+         whose base size is its content, and a shorter card hands part of the
+         column back to the briefing. Measured with the briefing open, the
+         no-row window was 110 px beside a 144 px paragraph and 106 px beside
+         its 111 px summary — the first read called that summary whole, the
+         shell's fold count then called it cut, and the row stayed over it
+         (`readToastSummaryFit`). A summary that would still be cut is no gain,
+         so the paragraph stays — the student's text does not change for a card
+         that stays cut either way.
+
+   AND ALL FOUR ARE ASKED IN THE SHELL'S OWN ARITHMETIC — the reason this is a
+   rule and not a guess. „Whole" here decides whether the student gets a
+   summary; the shell's fold count (`LessonPlayShell.tsx`,
+   `measureToastColumnFold`, as the shell's lane rewrote it in this same round
+   — at HEAD it counted off rects and kept its row up while it cut anything,
+   which no rule in this file can change) then decides, from its own reads,
+   whether the row goes. If the two disagree by a pixel, a summary this called
+   whole is cut by the shell's count, the row stays up and takes ~30 px more of
+   it, and the summary's last line goes under the edge: a collapse for no gain, the
+   regression itself, at the margin. That is not hypothetical. Measured on all
+   73 catalogue codes, each shrunk from a whole paragraph to six windows (its
+   summary's height +1, 0, −1, −2, −3, −4 px): a draft of this rule that read
+   the row back as `offsetTop + offsetHeight` spans, against the round-2
+   arithmetic for the shell's row, switched 44 of the 438 in Chromium and 108
+   in WebKit into a summary that then went under the edge (26.5 px, worst). So
+   this reads what the shell's fold reads, the way it reads them: a card's
+   place as an `offsetTop` difference and its height as `offsetHeight`
+   (layout px, blind to the entry animation), the window as `clientHeight`
+   with the row taken out of flow while it is up, and „cut" as more than
+   `TOAST_FIT_SLACK_PX` past the foot — which is also `toastCardFitsWindow`'s
+   rule at arrival. The copy's `offsetHeight` equals the rendered summary
+   card's on all 73 codes, in Chromium and in WebKit.
+
+   WHAT DID NOT CHANGE: one-way (only `"paragraph"` is ever moved, and nothing
+   but «Защо» brings a paragraph back); the observer lives only while there is
+   a paragraph to give up; an open chip is out of its reach; an unmeasurable
+   read — a 0 px window, a card whose `offsetParent` is not the scroller's —
+   is no claim and keeps the paragraph.
+
+   WHAT IT STILL DOES NOT DO, stated: the NEWEST card, cut at its foot only by
+   a fold row that was raised for an OLDER card below it, keeps its paragraph
+   under the row's fade (rule 3 gives the row back, so to this rule it is
+   whole). That is HEAD's behaviour for that card, not a new one, and the row
+   over it is true — the older card really is cut.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 /**
- * The measurement, latched. A card with a summary starts `"pending"` and
- * leaves it in its arrival commit's layout effect, before paint; nothing moves
- * it again. The effect keys on `choice` alone, so neither the age tick's
- * once-a-second re-render nor the student opening «Защо» can re-run it.
+ * The shell's fold row («↓ обяснението продължава — покажи» / «↓ още N
+ * известия»), a sibling of the scroller in the notify column. Read only to give
+ * its box back to the window — see rule 3 above.
  */
-function useToastBodyChoice(canSummarise: boolean): {
+export const TOAST_MORE_SELECTOR = "[data-hud-toast-more]";
+
+/** Where a card stands against its window. */
+export type ToastWindowFit = "whole" | "cut" | "unmeasured";
+
+/**
+ * Is the card whole in the window where it stands? Its top below the window's
+ * top and its foot above the window's foot, each with the rounding slack — the
+ * same `TOAST_FIT_SLACK_PX` the arrival test and the shell's fold count allow.
+ * A non-finite read, a card of no height or a window of no height is
+ * `"unmeasured"` — no claim, which every caller treats as keeping the card as
+ * it is.
+ */
+export function toastCardInWindow(topPx: number, cardPx: number, windowPx: number): ToastWindowFit {
+  if (!Number.isFinite(topPx) || !Number.isFinite(cardPx) || !Number.isFinite(windowPx)) return "unmeasured";
+  if (cardPx <= 0 || windowPx <= 0) return "unmeasured";
+  return topPx >= -TOAST_FIT_SLACK_PX && topPx + cardPx <= windowPx + TOAST_FIT_SLACK_PX ? "whole" : "cut";
+}
+
+/** One read of a paragraph card against its window, in layout px. */
+export interface ToastWindowRead {
+  /** The card's top in the scroller's CONTENT — its place in the stack, whatever the scroll. */
+  contentTopPx: number;
+  /** The scroller's `scrollTop`: the student paging the stack. */
+  scrollTopPx: number;
+  /** The card as it stands, paragraph in flow. */
+  cardPx: number;
+  /** The scroller's `clientHeight` — as it would be without the fold row, while the row is up. */
+  windowPx: number;
+}
+
+/** The summary as it would stand: its card's height, and the window the scroller would give that card. */
+export interface ToastSummaryRead {
+  cardPx: number;
+  windowPx: number;
+}
+
+/**
+ * THE GEOMETRIC HALF OF THE SWITCH — the four rules above, in order, cheapest
+ * first; `readSummary` is only called (and the hidden copy only built) once
+ * the first three have passed.
+ *
+ * `wholeContentTopPx` is where in the stack this card was last seen whole; 0,
+ * the top of the stack, for a card not yet seen whole.
+ */
+export function toastSummaryMendsCut(
+  read: ToastWindowRead,
+  wholeContentTopPx: number,
+  readSummary: () => ToastSummaryRead,
+): boolean {
+  const topPx = read.contentTopPx - read.scrollTopPx;
+  // 1 · cut where it stands. A whole card, and an unmeasurable one, stay.
+  if (toastCardInWindow(topPx, read.cardPx, read.windowPx) !== "cut") return false;
+  // 2 · the window did it, not a newer card pushing this one down the stack.
+  if (!(read.contentTopPx <= wholeContentTopPx + TOAST_FIT_SLACK_PX)) return false;
+  // 4 · the summary, where the card stands, is whole in the window it would
+  // get — rule 3 is in both windows. (A card whose top the student has scrolled
+  // past cannot pass this: no card with its top above the window is whole in it.)
+  const summary = readSummary();
+  return toastCardInWindow(topPx, summary.cardPx, summary.windowPx) === "whole";
+}
+
+/**
+ * The body after the window moved. One-way by construction: the only change
+ * it can make is a paragraph becoming its summary, and only when
+ * `toastSummaryMendsCut` said so. `"summary"` is returned as-is whatever the
+ * window does — growing back is the student's «Защо» press and nothing else —
+ * and `"pending"` is the arrival measurement's to resolve.
+ */
+export function toastBodyChoiceAfterResize(
+  current: ToastBodyChoice,
+  summaryMendsCut: boolean,
+): ToastBodyChoice {
+  return current === "paragraph" && summaryMendsCut ? "summary" : current;
+}
+
+/**
+ * The read `toastSummaryMendsCut` judges — layout px throughout, and never a
+ * rect: the card enters from `scale(0.96)`, and a rect read during that
+ * animation puts its top 2–3 px low, which rule 2 would read as a push.
+ *
+ * THE WINDOW WITH THE ROW UP IS PROBED, NOT ADDED UP. The row is a `shrink-0`
+ * sibling of the scroller in a flex column, and when it goes the freed pixels
+ * are shared by every item that was shrunk — and the briefing card is
+ * `[flex-shrink:20]` in the same column, so with the briefing open the
+ * scroller gets back only a small part of the row and its gap. `clientHeight`
+ * + the row + the gap promises the scroller the whole of it, calls a summary
+ * whole that is not, and the row that stays then cuts it by its own 30 px.
+ * (`LessonPlayShell.tsx` measured the same trap for its fold count and
+ * replaced the same sum with the same read.) So the row is taken out of flow —
+ * `position: absolute` removes a flex item and its gap exactly as unmounting
+ * it would, and keeps it rendered, so a focused «покажи» keeps focus — the
+ * scroller's `clientHeight` is read, and the row's inline style and the
+ * scroller's `scrollTop` (which the grown box can clamp) are put back before
+ * this returns. Every box ends the call at the size it started, so no
+ * `ResizeObserver` gathers anything from it.
+ *
+ * `offsetTop` is measured from the nearest POSITIONED ancestor, and the
+ * scroller is not one, so the card and the scroller share an `offsetParent`
+ * (the notify column) and the difference is the card's place in the scroller's
+ * content. Measured in Chromium and WebKit both: that `offsetTop` does NOT
+ * move when the scroller scrolls, which is why `scrollTop` is subtracted here
+ * and nowhere else. A card whose `offsetParent` is anything else — a
+ * positioned box put between them by a later edit — is unmeasured, not
+ * guessed at.
+ */
+function readToastWindow(card: HTMLElement, scroller: HTMLElement): ToastWindowRead {
+  const sharedParent = card.offsetParent !== null && card.offsetParent === scroller.offsetParent;
+  return {
+    contentTopPx: sharedParent ? card.offsetTop - scroller.offsetTop - scroller.clientTop : Number.NaN,
+    scrollTopPx: scroller.scrollTop,
+    cardPx: card.offsetHeight,
+    windowPx: readToastScrollerWindow(scroller),
+  };
+}
+
+/** The scroller's `clientHeight`, with the fold row out of flow for the read while it is up — rule 3. */
+function readToastScrollerWindow(scroller: HTMLElement): number {
+  const clientPx = scroller.clientHeight;
+  const more = scroller.parentElement?.querySelector(TOAST_MORE_SELECTOR) ?? null;
+  if (!(more instanceof HTMLElement) || clientPx <= 0) return clientPx;
+  const position = more.style.position;
+  const scrollTop = scroller.scrollTop;
+  more.style.position = "absolute";
+  const windowPx = scroller.clientHeight;
+  more.style.position = position;
+  if (scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;
+  return windowPx;
+}
+
+/**
+ * Rule 4's read: the summary card's height (`measureToastSummaryCardPx`), and
+ * the window the scroller would give the card AT that height.
+ *
+ * THE SECOND READ IS THE ARRIVAL TEST'S OWN TECHNIQUE (`measureToastBodyChoice`),
+ * run the other way: the live body's inline `height` and `overflow` are set so
+ * the live card takes exactly the summary card's room, the window is read, and
+ * both are put back to the exact strings they held before this returns. No text
+ * in the `aria-live` stack changes — only a height, for one read — and every
+ * box ends the call at the size it started, so no observer gathers anything. If
+ * the squeezed card does not come out at the summary's height (a layout this
+ * does not understand), it is unmeasured and the paragraph stays.
+ */
+function readToastSummaryFit(
+  card: HTMLElement,
+  body: HTMLElement | null,
+  scroller: HTMLElement,
+  summaryBg: string,
+): ToastSummaryRead {
+  const unmeasured = { cardPx: Number.NaN, windowPx: Number.NaN };
+  const cardPx = measureToastSummaryCardPx(card, scroller, summaryBg);
+  if (body === null || !Number.isFinite(cardPx) || cardPx <= 0) return unmeasured;
+  const shorterByPx = card.offsetHeight - cardPx;
+  if (shorterByPx <= 0) return { cardPx, windowPx: readToastScrollerWindow(scroller) };
+  // The squeeze shortens the scroller's CONTENT, and a scroller whose content
+  // shrinks under a `scrollTop` clamps it — a clamp that putting the height
+  // back does not undo. Measured: without this, Chromium raised
+  // „ResizeObserver loop completed with undelivered notifications" on the
+  // second-card case, because the clamp fires a `scroll` the shell answers
+  // with a fold measurement inside the same delivery.
+  const kept = { height: body.style.height, overflow: body.style.overflow, scrollTop: scroller.scrollTop };
+  body.style.height = `${Math.max(0, body.offsetHeight - shorterByPx)}px`;
+  body.style.overflow = "hidden";
+  try {
+    if (Math.abs(card.offsetHeight - cardPx) > TOAST_FIT_SLACK_PX) return unmeasured;
+    return { cardPx, windowPx: readToastScrollerWindow(scroller) };
+  } finally {
+    body.style.height = kept.height;
+    body.style.overflow = kept.overflow;
+    if (scroller.scrollTop !== kept.scrollTop) scroller.scrollTop = kept.scrollTop;
+  }
+}
+
+/**
+ * How tall this card would be showing its summary — rule 4. A deep copy of the
+ * card (so every class, the title and the footer are the card's own), its body
+ * set to the summary and the «Защо» chip put at the head of the body box as
+ * `ViolationToast` renders it, laid out once in the notify column and removed.
+ *
+ * THE COPY, AND NOT THE CARD ITSELF, because the card is inside
+ * `[data-hud="toasts"]`, which is `aria-live`: swapping the text of the live
+ * card for one read, even undone synchronously, re-inserts text into a live
+ * region, and whether a screen reader announces that is not something a
+ * headless rig can prove. The copy goes into the COLUMN — outside the live
+ * region and outside the scroller, `position: absolute` so it takes no place in
+ * the column's flow and adds nothing to the scroller's overflow —
+ * `visibility: hidden` and `aria-hidden`, and it is gone before the callback
+ * returns, so no paint, no observer and no query ever meets it. Its width is
+ * the card's own: `TOAST_CARD_WIDTH_CLASS` is `w-60` capped by the viewport,
+ * which does not depend on the parent it is laid out in.
+ *
+ * Anything missing — no column, no body in the copy — is `NaN`: unmeasured,
+ * and the paragraph stays.
+ */
+function measureToastSummaryCardPx(card: HTMLElement, scroller: HTMLElement, summaryBg: string): number {
+  const column = scroller.parentElement;
+  if (column === null || typeof document === "undefined") return Number.NaN;
+  const copy = card.cloneNode(true);
+  if (!(copy instanceof HTMLElement)) return Number.NaN;
+  const body = copy.querySelector(`[${TOAST_BODY_ATTR}]`);
+  const box = body instanceof HTMLElement ? body.parentElement : null;
+  if (!(body instanceof HTMLElement) || box === null) return Number.NaN;
+  const chip = document.createElement("span");
+  chip.className = TOAST_WHY_CHIP_CLASS;
+  chip.textContent = TOAST_WHY_LABEL_BG.closed;
+  box.insertBefore(chip, body);
+  body.textContent = summaryBg;
+  copy.setAttribute("aria-hidden", "true");
+  copy.style.position = "absolute";
+  copy.style.top = "0";
+  copy.style.left = "0";
+  copy.style.visibility = "hidden";
+  column.appendChild(copy);
+  try {
+    return copy.offsetHeight;
+  } finally {
+    column.removeChild(copy);
+  }
+}
+
+/**
+ * The measurement. A card with a summary starts `"pending"` and leaves it in
+ * its arrival commit's layout effect, before paint. That effect keys on
+ * `choice` alone, so neither the age tick's once-a-second re-render nor the
+ * student opening «Защо» can re-run it. After that, only a window that closes
+ * in on a paragraph moves it — see „THE WINDOW SHRANK UNDER A CARD THAT
+ * FITTED".
+ */
+function useToastBodyChoice(
+  canSummarise: boolean,
+  summaryBg: string,
+): {
   setCard: (el: HTMLElement | null) => void;
   bodyRef: { current: HTMLParagraphElement | null };
   choice: ToastBodyChoice;
@@ -851,6 +1269,40 @@ function useToastBodyChoice(canSummarise: boolean): {
     if (choice !== "pending") return;
     setChoice(measureToastBodyChoice(cardRef.current, bodyRef.current));
   }, [choice]);
+  // THE WINDOW, WATCHED — only while there is a paragraph to give up and a
+  // summary to give it up for. The moment the choice is `"summary"` this
+  // disconnects, which is the second lock on the one-way rule: nothing is
+  // listening that could put the paragraph back. No scroller (the popup rig)
+  // or no `ResizeObserver` is no claim, i.e. the arrival choice as shipped.
+  const watchesWindow = canSummarise && choice === "paragraph";
+  useEffect(() => {
+    if (!watchesWindow) return;
+    const card = cardRef.current;
+    if (card === null || typeof ResizeObserver === "undefined") return;
+    const scroller = card.closest(TOAST_SCROLLER_SELECTOR);
+    if (!(scroller instanceof HTMLElement)) return;
+    // Where in the stack this card was last seen whole — rule 2 of „…BUT ONLY A
+    // CARD THE WINDOW ITSELF CUT". It starts at the top of the stack, where
+    // every card arrives, and follows the card only through reads that SAW it
+    // whole, so neither a push nor an unmeasurable read can move the baseline.
+    let wholeContentTopPx = 0;
+    const observer = new ResizeObserver(() => {
+      // Decided HERE, synchronously, against the layout this delivery is
+      // about — never inside a state updater, which runs at render time
+      // against whatever the DOM has become by then.
+      const read = readToastWindow(card, scroller);
+      if (toastCardInWindow(read.contentTopPx - read.scrollTopPx, read.cardPx, read.windowPx) === "whole") {
+        wholeContentTopPx = read.contentTopPx;
+      }
+      const mends = toastSummaryMendsCut(read, wholeContentTopPx, () =>
+        readToastSummaryFit(card, bodyRef.current, scroller, summaryBg),
+      );
+      setChoice((current) => toastBodyChoiceAfterResize(current, mends));
+    });
+    observer.observe(scroller);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [watchesWindow, summaryBg]);
   return { setCard, bodyRef, choice };
 }
 
@@ -898,8 +1350,60 @@ function useToastBodyChoice(canSummarise: boolean): {
    for every long card before the repair above.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE CHIP MOVED UP BESIDE THE SENTENCE — 2026-09-17, found measuring
+   sc-roundabout-entry:fe081cf1's summary card against the w49 column.
+
+   IT USED TO BE THE THIRD ITEM ON THE FOOTER ROW — the law chip, the age, the
+   chip — and that row is `flex-wrap` in a 224 px content box. The three fit
+   beside «сега» and do not beside «преди 2 с», so two seconds into its life
+   the chip dropped to a row of its own and the card grew under its reader
+   with nothing new to read. MEASURED, the real card in a copy of the shell's
+   column with the app's faces and `lang="bg"`, Chromium and WebKit alike:
+
+     OFF_CARRIAGEWAY (the w49 −3)   114 px «сега» → 139 px «преди 2 с»
+     COLLISION / staticObject       114 px        → 139 px
+     FAILED_TO_YIELD / roundabout   111 px        → 136 px
+
+   and 35 of the catalogue's 73 codes, each summarised, grew the same 25 px
+   between «сега» and «преди 9 с». THE ROW IS WHY IT MATTERS: pc-right
+   `04-t090s.png` gives the −3 card 119.7 px of column below the recall pill.
+   At 139 px the whole summary card cannot be on the glass however the shell
+   arranges its fold row; at the height it has now it can.
+
+   NOW IT FLOATS RIGHT, AT THE START OF THE BODY BOX. On a summary — one short
+   catalogue sentence — it sits on the sentence's first line and costs the
+   2.5 px by which it is taller than that line: the −3 card is 117 px (116 in
+   WebKit) from arrival to expiry, and 0 of the 73 codes grow. A float and not
+   a flex row, because the chip stays when the student opens the paragraph: a
+   row would narrow EVERY line of a 674-character explanation by the chip's
+   63 px (measured on the ring paragraph: 24 characters on its first line
+   against 38, and about a third fewer on every line after it, on a card that
+   pages against an eight-second clock), where a float narrows only the
+   lines beside it and the rest take the full width. `flow-root` on the box is
+   what makes the box contain the float, so the footer below never slides up
+   under it. The chip also stays where it was pressed when the paragraph
+   opens — at the top of the card, above the fold, which is where the student
+   who wants it closed again will look.
+
+   What did not change: the chip's size and word (the shape above), its press
+   region (`closest`, not geometry), and the body `<p>` — still the one
+   element carrying `data-hud-toast-body`, still the one the fit test lets
+   into flow and collapses again. A paragraph card renders no chip, so its
+   body box is the `<p>` alone at full width and the fit test measures exactly
+   the card it measured before.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 /** The attribute that marks the «Защо» chip — and the press region it is. */
 export const TOAST_WHY_ATTR = "data-hud-toast-why";
+
+/**
+ * The chip's classes — ONE string, because two things lay it out: the chip
+ * itself, and the hidden copy `measureToastSummaryCardPx` measures a summary
+ * card with. A copy with a different chip would measure a different card.
+ */
+const TOAST_WHY_CHIP_CLASS =
+  "pointer-events-auto float-right ml-1.5 cursor-pointer rounded-full border px-2.5 py-1 text-[9px] font-black uppercase leading-none tracking-wider";
 
 /** The chip's label, in the phone card's word (`SimOverlay`: „Защо"). */
 export const TOAST_WHY_LABEL_BG = { closed: "Защо ↓", open: "Защо ↑" } as const;
@@ -943,7 +1447,7 @@ function ToastWhyChip({ open, color }: { open: boolean; color: string }) {
     <span
       data-hud-toast-why={open ? "open" : "closed"}
       title={open ? "Свий обяснението" : "Покажи цялото обяснение"}
-      className="pointer-events-auto ml-auto shrink-0 cursor-pointer rounded-full border px-2.5 py-1 text-[9px] font-black uppercase leading-none tracking-wider"
+      className={TOAST_WHY_CHIP_CLASS}
       style={{ color, borderColor: `color-mix(in srgb, ${color} 45%, transparent)` }}
     >
       {open ? TOAST_WHY_LABEL_BG.open : TOAST_WHY_LABEL_BG.closed}
@@ -962,7 +1466,7 @@ function ViolationToast({
 }) {
   const meta = SEVERITY_META[event.severity];
   const canSummarise = typeof event.peekBg === "string" && event.peekBg.trim().length > 0;
-  const { setCard, bodyRef, choice } = useToastBodyChoice(canSummarise);
+  const { setCard, bodyRef, choice } = useToastBodyChoice(canSummarise, violationToastBodyBg(event, false));
   const [whyOpen, setWhyOpen] = useState(false);
   const toggleWhy = useCallback(() => setWhyOpen((open) => !open), []);
   const summarised = choice === "summary";
@@ -999,23 +1503,24 @@ function ViolationToast({
           Quiet mode NEVER removes this; it removes praise. What CAN change it
           is the fit test above: a paragraph the column would cut is replaced
           by the catalogue's own summary of it, never by nothing — and the
-          «Защо» chip in the footer brings the paragraph back on request.
+          «Защо» chip beside it brings the paragraph back on request.
           `data-hud-toast-body` names which one is in the box, so a sweep can
           read the choice off the DOM instead of inferring it from a crop;
-          `"pending"` there is the one commit before the choice, never painted. */}
-      <p
-        ref={bodyRef}
-        data-hud-toast-body={choice === "pending" ? "pending" : showParagraph ? "paragraph" : "summary"}
-        className="mt-1 text-xs leading-snug text-muted"
-        style={choice === "pending" ? TOAST_BODY_PENDING_STYLE : undefined}
-      >
-        {violationToastBodyBg(event, showParagraph)}
-      </p>
-      <ToastFooter
-        lawRef={event.lawRef}
-        ageBg={ageBg}
-        trailing={summarised ? <ToastWhyChip open={whyOpen} color={meta.color} /> : null}
-      />
+          `"pending"` there is the one commit before the choice, never painted.
+          The chip comes FIRST in this box because it floats: see „…AND THE
+          CHIP MOVED UP BESIDE THE SENTENCE" for why a float and not a row. */}
+      <div className="mt-1 flow-root">
+        {summarised ? <ToastWhyChip open={whyOpen} color={meta.color} /> : null}
+        <p
+          ref={bodyRef}
+          data-hud-toast-body={choice === "pending" ? "pending" : showParagraph ? "paragraph" : "summary"}
+          className="text-xs leading-snug text-muted"
+          style={choice === "pending" ? TOAST_BODY_PENDING_STYLE : undefined}
+        >
+          {violationToastBodyBg(event, showParagraph)}
+        </p>
+      </div>
+      <ToastFooter lawRef={event.lawRef} ageBg={ageBg} />
     </ToastShell>
   );
 }

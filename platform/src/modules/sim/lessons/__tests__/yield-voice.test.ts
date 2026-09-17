@@ -92,6 +92,43 @@ function pullAway(
   return { state, t };
 }
 
+/**
+ * …and on past the approach: up the lane to the 18.5 m circulating lane at
+ * 10 км/ч, then round the island. The gap verdict at a ring says «влезе», and
+ * since sc-roundabout-entry:8be266cf it waits for that entry — the car 45°
+ * round the island from where it stood (advisor.ts
+ * YIELD_VOICE_RING_ENTRY_ARC_DEG) — so a drive that is to hear it has to make it.
+ */
+function ontoTheRing(
+  s: LessonSessionState,
+  fromT: number,
+  fromY: number,
+  seconds: number,
+  said: LessonNotice[],
+): { state: LessonSessionState; t: number } {
+  const R = 18.5;
+  const joinY = -Math.sqrt(R * R - LANE_X * LANE_X);
+  const step = (10 / 3.6) * 0.1;
+  let state = s;
+  let t = fromT;
+  let x = LANE_X;
+  let y = fromY;
+  for (let i = 0; i < seconds * 10; i++) {
+    t = +(t + 0.1).toFixed(1);
+    if (x === LANE_X && y < joinY) {
+      y = Math.min(joinY, y + step);
+    } else {
+      const az = Math.atan2(x, -y) + step / R;
+      x = R * Math.sin(az);
+      y = -R * Math.cos(az);
+    }
+    const tick = applyTick(state, makeTick({ t, position: { x, y }, speedKmh: 10 }));
+    state = tick.state;
+    said.push(...lessonNotices(tick.hudEvents));
+  }
+  return { state, t };
+}
+
 /** The founder's approach: spawn frame, then settle on the paint. */
 function atTheLine(lesson = LESSON_L3): { state: LessonSessionState; t: number } {
   let s = createLessonSession(lesson);
@@ -261,7 +298,7 @@ describe("B15-VOICE — the graded exam is assessed, not taught", () => {
 // ---------------------------------------------------------------------------
 
 describe("B15-VOICE — the gap verdict", () => {
-  it("lands once, after the window the rule engine needs to convict a barge", () => {
+  it("lands once, after the window the rule engine needs to convict a barge — and after the entry it names", () => {
     const said: LessonNotice[] = [];
     const start = atTheLine();
     const waited = hold(start.state, start.t, 20, said);
@@ -271,7 +308,17 @@ describe("B15-VOICE — the gap verdict", () => {
     const early = pullAway(waited.state, waited.t, YIELD_VOICE_VERDICT_S - 1, said);
     expect(said).toEqual([]);
 
-    pullAway(early.state, early.t, 2, said);
+    // Not at the window alone either (sc-roundabout-entry:8be266cf): past four
+    // seconds and still short of the entry latch, the verdict — which says
+    // «влезе» — has nothing true to say yet.
+    const due = pullAway(early.state, early.t, 2, said);
+    expect(said).toEqual([]);
+
+    // On the ring and round it: now, once. `pullAway` RE-ANCHORS at PAINT_Y on
+    // every call and walks 0.22 m per frame, so this is where the 2 s one left
+    // the car — the pose `ontoTheRing` has to continue from.
+    const leftAt = PAINT_Y + 0.22 * 2 * 10;
+    ontoTheRing(due.state, due.t, leftAt, 12, said);
     expect(said.length).toBe(1);
     expect(said[0].titleBg).toBe("Интервалът беше добър");
     // It reports the measured wait and the standard, never a bare „правилно".

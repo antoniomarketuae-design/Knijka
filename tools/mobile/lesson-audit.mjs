@@ -6458,10 +6458,6 @@ const paceLookM = (target) =>
 const paceRollCapMs = (target) =>
   paceTape === null ? ROLL_MS : Math.max(ROLL_MS, 3000 * (target / 3.6 / PACE_ACCEL_MPS2 + LOOK_EVERY_S));
 
-/** The stems of every sentence the product says when standing still is correct.
- *  Two from `yieldWaitAdvisorPrompt` (four of the five reasons open «Чакаш
- *  правилно», Б2 opens with its own), two from the yield VOICE's named and
- *  settled cards. Closed union, five reasons, zero lessons. */
 /* ── THE PRODUCT'S OWN «THE CAR IS NOT ON THE ROAD» ─────────────────────────
  *
  * `LessonPlayShell.tsx objectiveTitleUnderHold` prefixes the live objective
@@ -6493,8 +6489,143 @@ const routeHold = { offRoadTicks: 0, crashPinnedTicks: 0, clearTicks: 0, unread:
 const ROUTE_HOLD_OFF_ROAD_BG = "Колата е извън пътя — върни се на платното, за да продължиш";
 const ROUTE_HOLD_CRASH_PINNED_BG = "Колата е притисната след удара — измъкни се назад, за да продължиш";
 
-const LAWFUL_WAIT_RE =
-  /Чакаш правилно|пълното спиране е задължително|Защо чакаш|Чакането Е маневрата/;
+/* ── THE PRODUCT'S OWN «STANDING STILL IS THE MANOEUVRE» — TWO SURFACES ─────
+ *
+ * WHAT IS BEING DETECTED. `finish.ts stepYieldWait` holds the finish gates
+ * while the car is at rest with a yield reason, and while it holds the product
+ * says so twice: the ADVISOR CARD (`advisor.ts yieldWaitAdvisorPrompt` /
+ * `railPriorityWaitAdvisorPrompt`, constant for the wait) and the yield VOICE's
+ * two notices (`stepYieldVoice`: «Защо чакаш: …» at 1.2 s, «Чакането Е
+ * маневрата …» at 10 s, each an 8 s card). The stop phase holds while either is
+ * readable and moves off when both are gone.
+ *
+ * ROUND 2 (2026-09-17) TOOK BOTH AWAY FROM A CONVICTED WAIT, and correctly.
+ * sc-roundabout-entry:8be266cf — w49 `sc-roundabout-entry__pc-right/04-t059s`,
+ * «Чакаш правилно» over «Влизане без пропускане −10» booked two seconds
+ * earlier. An episode that carries a graded conviction now speaks NO notice at
+ * all, and its card is `convictedCardBg`, which is the same duty with the
+ * approval taken off («В кръга имат предимство. Гледай НАЛЯВО…»). Against the
+ * old matcher that wait said nothing, so a `right` leg that had just been
+ * convicted and braked to a stop at the same mouth would sit out STOP_MS (3 s)
+ * and roll into the ring — photographing a crash the lesson's student, who can
+ * read the card, would never have driven.
+ *
+ * …AND ON THE PHONE THE SENTENCE LEFT THE GLASS. `LessonPlayShell
+ * advisorOverlayRow` now prints «Съветник» as the row's line and the prompt's
+ * `peekBg` summary under it, with the whole sentence behind «Прочети» and not
+ * in the DOM until opened. Counted over every run.log in w45–w49: of 22 mobile
+ * «LAWFUL WAIT declared» lines, 8 quoted the card's «Чакаш правилно» — a stem
+ * the phone glass no longer carries — and 13 quoted «Защо чакаш», which a
+ * convicted wait no longer says.
+ *
+ * AND ONE STEM HAD BEEN DEAD SINCE WAVE 25. «пълното спиране е задължително»
+ * left the Б2 card in 6363677 (wave 25, «Знак Б2 иска две неща…» replaced
+ * «Знак Б2: пълното спиране е задължително — и е направено»). From then on a
+ * Б2 wait held exactly as long as its 8 s «Защо чакаш» notice — w45 and w46
+ * `sc-junction-stop__pc-right` both log «the lawful wait was withdrawn after
+ * 8s» — and the dead stem stayed armed against a string that still exists:
+ * sc-jx-giveway-b1's briefing step 4 (`templates-junctions.ts`) reads «…тук
+ * пълното спиране е задължително…», which would have declared a lawful wait at
+ * any rest the briefing was on the glass for. A copy change failed a sweep
+ * silently, which is the failure `driveline.test.mjs` §L now makes a red test.
+ *
+ * THERE IS NO STABLE HOOK, SO THE SCOPE IS THE HOOK. A census of `platform/src`
+ * finds no attribute publishing the hold or its reason. What does exist, on
+ * BOTH device classes, is `AdvisorCard` — `[role="status"][aria-label="Съветник
+ * — следващо действие"]` — whose `<p>` is the whole authored `prompt.textBg`.
+ * On the phone it is mounted inside the roomy notify column that the shell
+ * renders with `hidden` rather than unmounting (the same element
+ * REVERSE_DEMAND_SEL reads, and the same 0 × 0 «Съветник» the 2026-08-21 census
+ * measured). So:
+ *
+ *   LAWFUL_WAIT_RE       the notice family and the clean card, off the shell's
+ *                        painted text — exactly what it always read, minus the
+ *                        dead stem.
+ *   LAWFUL_WAIT_CARD_RE  the whole card family — clean AND convicted, seven
+ *                        reasons plus the rail-priority red — off the advisor
+ *                        card's `textContent` and nothing else. Scoped because
+ *                        a stem like «На червено се спира» is ordinary prose
+ *                        in a briefing or a debrief; on the one element that
+ *                        prints only the next action it can mean one thing.
+ *
+ * `textContent` and not `innerText`: no layout flush, and it is the same text —
+ * `innerText` of an element that is not rendered returns its text content by
+ * spec, which is why REVERSE_DEMAND_SEL's own reads of this card work on the
+ * phone at all.
+ *
+ * THREE THINGS ARE DELIBERATELY NOT A LAWFUL WAIT, and §L pins each:
+ *  · THE LONG CARD («Чакането стана дълго…», YIELD_CARD_LONG_WAIT_S = 30 s on
+ *    Б1, Б2 and the ring mouth) IS THE PRODUCT'S RELEASE. On those three duties
+ *    `yieldReasonAt` is positional — a car at rest near the line or the mouth
+ *    has the reason whatever the traffic — so the opening card never clears by
+ *    itself, and the long card («…тръгвай сега», «…влизай сега») is the only
+ *    sentence in which the product lets the wait end short of the 180 s
+ *    ceiling. The pc waits at sc-jx-giveway-b1, sc-rb-busy-gap,
+ *    sc-roundabout-entry and sc-rb-ped-exit in w45 each log «withdrawn after
+ *    30s» on exactly that swap. Matching it would sit every such leg to
+ *    LAWFUL_WAIT_MAX_MS and print «verdict is suspect» about a wait the
+ *    product had already released.
+ *  · THE OFFICER'S CARD («Тук решава регулировчикът, не лампата…») makes no
+ *    claim that standing is right — «страничен профил — минаваш, дори на
+ *    червено» — and holding on the lamp's card at that junction is precisely
+ *    what convicted sc-sig-controller-live's right leg.
+ *  · THE PHONE SUMMARIES (`cardPeekBg`). Each is authored beside a card
+ *    sentence this matcher reads whole off the mounted card, so matching the
+ *    summary adds nothing but a second copy to go stale — and the round-3
+ *    advisor lane is still rewriting them.
+ *
+ * THE PRODUCT EDIT THAT WOULD RETIRE BOTH REGEXES: `AdvisorCard` carrying the
+ * prompt's hold as an attribute (e.g. `data-advisor-hold={reason}` from a
+ * `holdReason` field on `CoachedAdvisorPrompt`). Not this file's to make. */
+const LAWFUL_WAIT_RE = /Чакаш правилно|Защо чакаш|Чакането Е маневрата/;
+const LAWFUL_WAIT_CARD_RE =
+  /Чакаш правилно|Знак Б2 иска две неща|В кръга имат предимство\. Гледай НАЛЯВО|Знак Б1: пропускаш движещите се|На червено се спира|Пешеходецът на пътеката минава пръв|Трамваят минава пръв|Насрещните минават първи\. Брой секундите/;
+/** The advisor card — see the block above. One selector, one owner. */
+const ADVISOR_CARD_SEL = '[role="status"][aria-label="Съветник — следващо действие"]';
+
+/* ── A FAULT CARD ON PC LIVES EIGHT SECONDS; THE BEAT IS FIVE AND A HALF ─────
+ *
+ * `HudToasts.tsx` TEACHING_TOAST_TTL_MS = 8000 — a violation card is on the
+ * glass for eight seconds of wall time and then it is gone. The textual beat
+ * runs every FRAME_MS plus a tick (measured ~5.5 s on the w49 pc legs), so a
+ * card is photographed once or, when it lands just after a beat and is evicted
+ * by the next fault, never. The round-2 verifier reported the w49
+ * `sc-roundabout-entry__pc-wrong` −10 card unjudgeable for that reason: one
+ * frame of a card is one reading of its fold, its «Защо» chip and its age.
+ *
+ * SO A NEW CARD BUYS TWO MORE BEATS INSIDE ITS LIFE, at +2 s and +5 s from the
+ * tick that first read it. The probe sees it within a tick of it mounting, so
+ * the later beat still lands a second or more before the TTL. They are ordinary
+ * beats — `beat()`, the same census line, the same `04-t<NNN>s.png` name every
+ * judge-side reader already enumerates (`perception-corpus.mjs` FRAME_RE,
+ * make-verdicts2's `*.png`) — so no reader needs to learn a new file.
+ *
+ * WHAT THEY MAY NOT DO:
+ *  · STEER, BRAKE OR WAIT. They run where the periodic beat runs, after the
+ *    tick's control law has already acted, and they touch no pedal, no phase
+ *    and no clock the control law reads (`lastFrame`/`lastShot` included).
+ *  · OVERWRITE A FRAME. Names are integer seconds, so two beats in one second
+ *    would write one file twice and publish it twice in `frames`. A label
+ *    already taken is skipped (extra) or deferred a tick (periodic).
+ *  · COST A DRIVE. On a box where a screenshot costs seconds the periodic frame
+ *    already backs off (`lastShotCostMs`); an extra beat there is refused and
+ *    counted, never taken.
+ *  · RUN ON THE PHONE. A phone fault is `SimOverlay`'s card, not this column,
+ *    and its lifetime is a different question.
+ *
+ * `[data-hud-toast-body]` IS THE HOOK, and it is a published one: ViolationToast
+ * is the only card that carries it, and HudToasts says it is there «so a sweep
+ * can read the choice off the DOM». The card is its ancestor that is a direct
+ * child of `[data-hud="toasts"]`, which «HOLDS CARDS AND ONLY CARDS». */
+const FAULT_TOAST_BODY_SEL = "[data-hud-toast-body]";
+const FAULT_TOAST_COLUMN_SEL = '[data-hud="toasts"]';
+const FAULT_CARD_BEAT_OFFSETS_MS = [2000, 5000];
+/** Two cards inside this window share a beat rather than taking two frames a
+ *  few hundred milliseconds apart. */
+const FAULT_CARD_BEAT_COALESCE_MS = 1000;
+/** A beat this far past its due time is past the card it was for — a pause
+ *  drain can hold the loop for tens of seconds — and is counted, not taken. */
+const FAULT_CARD_BEAT_LATE_MS = 2500;
 
 /* ── THE TWO FORWARD HAZARD CHIPS ──────────────────────────────────────────
  *
@@ -6573,7 +6704,7 @@ const probe = () =>
       // while printing a tidy blind line nobody had a reason to open. It
       // degraded toward the OLD DRIVE, exactly as the module promises, which
       // is why it was survivable — and it is also why nothing went red.
-      ({ waitSrc, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, capStripSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg }) => {
+      ({ waitSrc, waitCardSrc, advisorSel, faultBodySel, faultColumnSel, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, capStripSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg }) => {
         const sp = document.querySelector('[aria-label^="Скорост "]');
         const paused = [...document.querySelectorAll(pauseSel)].find((e) => {
           const r = e.getBoundingClientRect();
@@ -6602,6 +6733,18 @@ const probe = () =>
         for (const el of document.querySelectorAll(revSel)) {
           revText += `${(el.innerText || "").replace(/\s+/g, " ").trim()}\n`;
         }
+        /* ── THE LAWFUL WAIT, OFF ITS TWO SURFACES — see LAWFUL_WAIT_CARD_RE ──
+         * The painted shell first, so every wait the old matcher caught is
+         * caught by the same read and quoted in the same words; the advisor
+         * card's own text second, which is where a convicted wait and every
+         * phone wait now say it. `textContent`: no second layout flush. */
+        const glassWait = (shell.innerText.match(new RegExp(waitSrc)) ?? [null])[0];
+        let cardWait = null;
+        if (glassWait === null) {
+          let advisorText = "";
+          for (const el of shell.querySelectorAll(advisorSel)) advisorText += `${el.textContent || ""}\n`;
+          cardWait = (advisorText.match(new RegExp(waitCardSrc)) ?? [null])[0];
+        }
         return {
           kmh: sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\d+)/) || [0, -1])[1]) : -1,
           overlay: document.querySelector("[data-sim-overlay]")?.getAttribute("data-sim-overlay") ?? "-",
@@ -6620,7 +6763,34 @@ const probe = () =>
           // still on the glass, because a live advisor prompt («Чакаш
           // правилно…») and a lingering notice about a wait that already
           // happened («Чакането Е маневрата») mean opposite things.
-          lawfulWait: (shell.innerText.match(new RegExp(waitSrc)) ?? [null])[0],
+          lawfulWait: glassWait ?? cardWait,
+          /** WHERE it was read: "glass" (painted shell text) or "card" (the
+           *  advisor card's own sentence, painted or not — on the phone it is
+           *  not). A judge reading «LAWFUL WAIT … via card» on a mobile leg knows
+           *  the frame shows a summary, not the sentence quoted. */
+          lawfulWaitVia: glassWait !== null ? "glass" : cardWait !== null ? "card" : null,
+          /** Every PAINTED violation card in the toast column, as «header ·
+           *  title» — see FAULT_TOAST_BODY_SEL. `null` on a throw: unread is
+           *  not „no card", and the fold below keeps the two apart. */
+          faultCards: (() => {
+            try {
+              const out = [];
+              for (const body of shell.querySelectorAll(faultBodySel)) {
+                let card = body;
+                while (card.parentElement !== null && !card.parentElement.matches(faultColumnSel)) card = card.parentElement;
+                if (card.parentElement === null) continue;
+                const r = card.getBoundingClientRect();
+                if (r.width <= 1 || r.height <= 1) continue;
+                const title = card.querySelector("p");
+                const head = title ? title.previousElementSibling : null;
+                const text = (el) => (el ? el.textContent || "" : "").replace(/\s+/g, " ").trim();
+                out.push(`${text(head)} · ${text(title)}`);
+              }
+              return out;
+            } catch {
+              return null;
+            }
+          })(),
           /** Which `RouteHold` the product is asserting, or null. Read off
            *  `revText` — the objective banner and advisor, already collected
            *  above — so it costs no extra layout flush. */
@@ -6783,6 +6953,10 @@ const probe = () =>
         // the string `parseHazard` and its test expect must not drift.
         hazGlanceMark: GLANCE_NO_LABEL,
         waitSrc: LAWFUL_WAIT_RE.source,
+        waitCardSrc: LAWFUL_WAIT_CARD_RE.source,
+        advisorSel: ADVISOR_CARD_SEL,
+        faultBodySel: FAULT_TOAST_BODY_SEL,
+        faultColumnSel: FAULT_TOAST_COLUMN_SEL,
         pauseSel: PAUSE_SEL,
         revSrc: REVERSE_DEMAND_RE.source,
         revPurposeSrc: REVERSE_DEMAND_PURPOSE_RE.source,
@@ -6800,6 +6974,9 @@ const probe = () =>
       pause: null,
       end: false,
       lawfulWait: null,
+      lawfulWaitVia: null,
+      // Unread, not „no fault card" — see the field.
+      faultCards: null,
       /** NOT `null`-as-"on the road": a probe that threw knows nothing, and
        *  the fold below counts `undefined` as unread rather than as clear. */
       routeHold: undefined,
@@ -7079,6 +7256,43 @@ let hazardPrevCls = null;
 let drivingTicks = 0;
 const tickMs = [];
 let shotStopped = false, shotWaited = false;
+/* ── THE FAULT-CARD BEATS' BOOKS — see FAULT_TOAST_BODY_SEL ──────────────────
+ *
+ * Published live (it rides the `driving` status below) so a lane that dies
+ * mid-drive still says which of its frames were taken for a card. `taken` is
+ * the list of frame names a judge can open for the second and third look at a
+ * fault; every refusal is its own counter, because „no extra frame" has four
+ * different causes and only one of them is „no card". */
+const faultBeats = {
+  applies: PLATFORM === "pc",
+  why:
+    PLATFORM === "pc"
+      ? `a new violation card in [data-hud="toasts"] buys beats at ${FAULT_CARD_BEAT_OFFSETS_MS.map((ms) => `+${ms / 1000} s`).join(" and ")} of its 8 s life`
+      : "phone leg — a phone fault is SimOverlay's card, not the pc toast column, and gets no extra beats",
+  cardsSeen: 0,
+  /** Ticks whose probe could not read the column at all. */
+  unread: 0,
+  scheduled: 0,
+  /** Frame names taken for a card, in order. */
+  taken: [],
+  /** Refused: that second already has a frame. */
+  sameSecond: 0,
+  /** Refused: another card's beat was due within FAULT_CARD_BEAT_COALESCE_MS. */
+  coalesced: 0,
+  /** Refused: a screenshot or a read costs seconds on this box. */
+  unaffordable: 0,
+  /** Refused: FAULT_CARD_BEAT_LATE_MS past due — the card is gone. */
+  late: 0,
+  /** First sightings, capped — `firstSec` beside the card's own header and title. */
+  cards: [],
+};
+/** The previous tick's painted cards as «header · title» → count. Null until the
+ *  first readable tick, so a card already up when the loop opens is not „new". */
+let faultPrev = null;
+/** Pending extra beats, soonest first. */
+const faultBeatQueue = [];
+/** Every `04-t<NNN>s` label this loop has written, periodic and extra. */
+const beatLabelsTaken = new Set();
 
 /* ── THE STEERING PROOF RUNS INSTEAD OF THE DRIVE, NEVER BESIDE IT ──────────
  *
@@ -7140,7 +7354,7 @@ if (MODE !== "right") await throttle(true);
 // `reverse` is: a lane that dies mid-drive must still be able to say whether
 // there was ever a car. A `crashed` status that carries the census can be told
 // apart from one that never reached a lesson page; one that does not, cannot.
-saveStatus({ phase: "driving", reverse, steering, guidance, cockpit });
+saveStatus({ phase: "driving", reverse, steering, guidance, cockpit, faultBeats });
 let budgetMs = DRIVE_BUDGET_MS;
 let budgetSaid = false;
 const medianTick = () => {
@@ -7183,6 +7397,49 @@ while (!ended && Date.now() - t0 < budgetMs) {
     routeHold.kinds.add(p.routeHold);
     if (routeHold.firstSec === null) routeHold.firstSec = sec;
     routeHold.lastSec = sec;
+  }
+  /* ── A NEW FAULT CARD ON PC: BOOK TWO MORE BEATS INSIDE ITS LIFE ──────────
+   * Folded here, where every tick passes, for the routeHold reason above: a
+   * card that mounts on a tick that then drains a pause is still a new card.
+   * Only the BOOKING happens here; the beats are taken where the periodic
+   * beat is, after the control law has acted. A count that rises is a new
+   * card, so the same fault twice in a row is two cards, as it is on screen. */
+  if (faultBeats.applies) {
+    if (p.faultCards === null || !Array.isArray(p.faultCards)) {
+      faultBeats.unread += 1;
+    } else {
+      const counts = new Map();
+      for (const card of p.faultCards) counts.set(card, (counts.get(card) ?? 0) + 1);
+      if (faultPrev !== null) {
+        const at = Date.now();
+        for (const [card, n] of counts) {
+          for (let k = faultPrev.get(card) ?? 0; k < n; k += 1) {
+            faultBeats.cardsSeen += 1;
+            const sec = Math.round((at - t0) / 1000);
+            if (faultBeats.cards.length < 40) faultBeats.cards.push({ firstSec: sec, card: card.slice(0, 160) });
+            const booked = [];
+            for (const offsetMs of FAULT_CARD_BEAT_OFFSETS_MS) {
+              const dueAt = at + offsetMs;
+              if (faultBeatQueue.some((q) => Math.abs(q.dueAt - dueAt) < FAULT_CARD_BEAT_COALESCE_MS)) {
+                faultBeats.coalesced += 1;
+                continue;
+              }
+              faultBeatQueue.push({ dueAt, offsetMs, firstSec: sec });
+              faultBeats.scheduled += 1;
+              booked.push(`+${offsetMs / 1000} s`);
+            }
+            faultBeatQueue.sort((a, b) => a.dueAt - b.dueAt);
+            note(
+              `      FAULT CARD on the glass at t=${sec}s («${card.slice(0, 90)}») — ` +
+                (booked.length
+                  ? `extra beat(s) booked at ${booked.join(" and ")} of its 8 s life.`
+                  : "its beats coincide with a card already booked; no extra beat."),
+            );
+          }
+        }
+      }
+      faultPrev = counts;
+    }
   }
   // …and BEFORE `topSpeed` takes it, because the first tick's reading is the
   // one number in the drive the drive did not earn — see `enteredLoopKmh`.
@@ -7840,7 +8097,9 @@ while (!ended && Date.now() - t0 < budgetMs) {
         if (waitStartedAt === null) {
           waitStartedAt = now;
           waitsHonoured++;
-          note(`      LAWFUL WAIT declared at t=${Math.round((now - t0) / 1000)}s («${p.lawfulWait}») — the sim says standing still IS the manoeuvre; holding.`);
+          note(
+            `      LAWFUL WAIT declared at t=${Math.round((now - t0) / 1000)}s («${p.lawfulWait}»${p.lawfulWaitVia === "card" ? ", read off the advisor card's own sentence — not necessarily what the frame shows" : ""}) — the sim says standing still IS the manoeuvre; holding.`,
+          );
           if (!shotWaited) { shotWaited = true; await shot("06-waited"); }
         } else if (now - waitStartedAt > LAWFUL_WAIT_MAX_MS) {
           loud(`the lawful-wait line («${p.lawfulWait}») never went away in ${LAWFUL_WAIT_MAX_MS / 1000}s — moving off, and this run's verdict is suspect.`);
@@ -8171,8 +8430,14 @@ while (!ended && Date.now() - t0 < budgetMs) {
   // spent describing a car instead of driving it. The log loses resolution; the
   // drive does not.
   const readDear = (cost.read ?? []).at(-1) > 1000;
-  if (now - lastFrame >= (readDear ? EXPENSIVE_SHOT_MS : FRAME_MS)) {
+  // THE LABEL IS DECIDED BEFORE THE CADENCE IS SPENT: a second that already
+  // holds a frame (one of the fault-card beats below, taken late in the last
+  // tick) defers this beat by one tick rather than writing that file twice.
+  // `lastFrame` is not touched, so the deferral costs the cadence nothing.
+  const periodicLabel = `04-t${String(Math.round((now - t0) / 1000)).padStart(3, "0")}s`;
+  if (now - lastFrame >= (readDear ? EXPENSIVE_SHOT_MS : FRAME_MS) && !beatLabelsTaken.has(periodicLabel)) {
     lastFrame = now;
+    beatLabelsTaken.add(periodicLabel);
     // A frame every FRAME_MS while frames are cheap; every EXPENSIVE_SHOT_MS
     // when one costs seconds — see lastShotCostMs().
     const dear = lastShotCostMs() > 2000;
@@ -8193,10 +8458,30 @@ while (!ended && Date.now() - t0 < budgetMs) {
     // reading the folder in name order would see the drive out of sequence and
     // narrate a car that jumps backwards. The frames are the evidence; their
     // order is part of it.
-    const s = await beat(`04-t${String(Math.round((now - t0) / 1000)).padStart(3, "0")}s`, { withShot });
+    const s = await beat(periodicLabel, { withShot });
     if (s.kmh > topSpeed) topSpeed = s.kmh;
     if (s.end) { ended = true; break; }
   }
+  /* ── …AND THE FAULT-CARD BEATS THAT ARE DUE ─────────────────────────────
+   * AFTER the periodic beat, so a frame's name never sorts ahead of one taken
+   * before it. Named on `Date.now()`, not the tick's `now`, because they run
+   * later in the tick than the periodic one does. Each refusal is counted in
+   * `faultBeats` — see its declaration for why they are four counters. */
+  while (faultBeatQueue.length > 0 && Date.now() >= faultBeatQueue[0].dueAt) {
+    const due = faultBeatQueue.shift();
+    const takenAt = Date.now();
+    if (takenAt - due.dueAt > FAULT_CARD_BEAT_LATE_MS) { faultBeats.late += 1; continue; }
+    if (lastShotCostMs() > 2000 || readDear) { faultBeats.unaffordable += 1; continue; }
+    const label = `04-t${String(Math.round((takenAt - t0) / 1000)).padStart(3, "0")}s`;
+    if (beatLabelsTaken.has(label)) { faultBeats.sameSecond += 1; continue; }
+    beatLabelsTaken.add(label);
+    faultBeats.taken.push(label);
+    note(`      (fault-card beat: +${due.offsetMs / 1000} s after the card first read at t=${due.firstSec}s)`);
+    const s = await beat(label, { withShot: true });
+    if (s.kmh > topSpeed) topSpeed = s.kmh;
+    if (s.end) { ended = true; break; }
+  }
+  if (ended) break;
   prevKmh = p.kmh;
   tickMs.push(Date.now() - tickStart);
   lastTickAt = Date.now();
@@ -8218,6 +8503,24 @@ note(
     (refusedReversePress ? ` · refused ${refusedReversePress} standstill brake press${refusedReversePress === 1 ? "" : "es"} (would have selected R)` : "") +
     (lostKeys ? ` · re-asserted the brake ${lostKeys}× after the sim lost the key` : ""),
 );
+/* ── WHICH FRAMES WERE TAKEN FOR A FAULT CARD, ON EVERY PC LANE ─────────────
+ * Unconditional on pc for the hazard line's reason: „no extra frame" read off
+ * silence is indistinguishable from „no card". The names are the files. */
+if (faultBeats.applies) {
+  const refused = [
+    faultBeats.sameSecond ? `${faultBeats.sameSecond} already had a frame that second` : null,
+    faultBeats.coalesced ? `${faultBeats.coalesced} shared another card's beat` : null,
+    faultBeats.unaffordable ? `${faultBeats.unaffordable} refused — frames cost seconds on this box` : null,
+    faultBeats.late ? `${faultBeats.late} too late for the card` : null,
+    faultBeats.unread ? `the column was unreadable on ${faultBeats.unread} tick(s)` : null,
+  ].filter(Boolean);
+  note(
+    `  FAULT-CARD BEATS: ${faultBeats.cardsSeen} card(s) first read · ${faultBeats.taken.length} extra beat(s) taken` +
+      (faultBeats.taken.length ? ` (${faultBeats.taken.join(", ")})` : "") +
+      (refused.length ? ` · ${refused.join(" · ")}` : ""),
+  );
+}
+saveStatus({ faultBeats });
 /* ── WHAT DROVE THE CAR, PRINTED ON EVERY LANE ─────────────────────────────
  *
  * Unconditional for the reason the hazard line below is: a channel nobody

@@ -29,6 +29,11 @@ import { VIOLATIONS, type SimTick, type ViolationCode } from "../rules";
 // The arc the ring objective demands before it will credit an exit — imported
 // rather than mirrored so the card and the grade cannot drift apart.
 import { ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG } from "./objectives";
+// The two reaches the lawful-wait hold is defined over, read by the voice to
+// name WHICH site a wait or a conviction belongs to — imported for the same
+// reason the arc above is: the hold and the voice may not disagree about where
+// „this junction" ends.
+import { YIELD_ROUNDABOUT_APPROACH_M, YIELD_STOP_LINE_REACH_M } from "./finish";
 import { parseScenarioLessonId } from "./scenario";
 // Deep, not through the `./scenario` barrel: the barrel line belongs in
 // scenario/index.ts, a file this lane does not own. The value import above
@@ -88,6 +93,82 @@ export interface AdvisorPrompt {
   textBg: string;
   /** Key caps to render as <kbd> chips; [] = no keyboard action (info steps). */
   keys: string[];
+  /**
+   * The one sentence of this prompt the PHONE card can finish — see
+   * `CoachedAdvisorPrompt`, which is what every function in this module
+   * returns and where the field stops being optional.
+   *
+   * Optional on THIS type only because it is the consumer's type: a test double
+   * or a story that hand-builds `{ textBg, keys }` still describes a card, and
+   * `LessonPlayShell advisorOverlayRow` prints such a prompt exactly as it did
+   * before the field existed. Nothing in the product builds one.
+   */
+  peekBg?: string;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE PROMPT THIS MODULE EMITS — and the summary is not optional on it
+ * (sc-merge-from-property:6715b581, major, STILL on w49 at 98bf8ae).
+ *
+ * THE FRAMES, opened before any of this was written, iPhone 16 landscape:
+ *
+ *   `.audit-frames/w49/frames/sc-merge-from-property__mobile-right/04-t090s.png`
+ *     ⓘ
+ *     Не дърпай волана — отпусни
+ *     газта, изправи колелата и
+ *     се върни под малък ъгъл:
+ *     извън платното сцеплението        ← and nothing after it
+ *                     ↓ ОЩЕ 2 РЕДА
+ *
+ *   `…/04-t178s.png` — the crash-pin card, the same cut, «([)» and a fold.
+ *
+ * 98bf8ae made the yield voice's HINT card whole with a finishable `peekBg`
+ * (`YieldVoiceCopy.namedPeekBg`). The ADVISOR card on the same glass was the
+ * one surface left printing its whole paragraph as the card's LINE — and a line
+ * is the row `SimOverlay` does not summarise: row 2 prints `lineBg` whole and
+ * row 2b prints `overlayPeekBodyBg` under it, so a 139-character instruction in
+ * row 2 is cut by the 44 px text window whatever row 2b says. The half that
+ * went under the fold on 04-t090s is the REASON («…спирачният път е
+ * по-дълъг») — the same THEO-4 shape the hint card had: the order reached the
+ * glass and the why did not.
+ *
+ * SO THE CARD TAKES THE HINT CARD'S SHAPE, and this is the half of it only this
+ * module can supply: a summary authored beside the sentence it summarises.
+ * `LessonPlayShell advisorOverlayRow` prints the card's name as the line, THIS
+ * as row 2b's peek, and the whole sentence (with its key chips) behind
+ * «Прочети» — nothing authored is deleted, it moves one tap away, exactly as
+ * the hint card's paragraph did.
+ *
+ * `peekBg: string | undefined`, REQUIRED AS A KEY. tsc refuses a prompt
+ * literal in this module that does not decide. `undefined` has exactly one
+ * meaning and exactly one door, `taskSentencePrompt`: the prompt IS the active
+ * objective's own authored title (or the title with a tail), and such a prompt
+ * never becomes an advisor card on the phone — `foldAdvisorIntoTask` hands it to
+ * the TASK row, which prints the title as its line and the tail as its detail.
+ * `advisorPeekSummary.test.tsx` drives every compiled rung to prove both
+ * halves: every `undefined` starts with its own objective's title, and every
+ * other prompt this module can emit carries a summary that fits.
+ *
+ * WHAT A SUMMARY MAY SAY — the rules `YieldVoiceCopy.namedPeekBg` set, kept:
+ *   · an ACT or a REASON, never „правилно" / „грешно" on its own — the one
+ *     approval a summary may carry is «Чакаш правилно» followed by WHO has
+ *     priority or WHAT the wait is for (`YieldVoiceCopy.cardPeekBg`);
+ *   · no figure and no article (the whole sentence keeps both);
+ *   · true of EVERY variant it stands for (so a convicted wait has its own
+ *     line, `convictedCardPeekBg`, and that one approves of nothing);
+ *   · at most two lines of 24 characters: the card's name is one line of the
+ *     44 px window, which leaves exactly two body lines whole.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export type CoachedAdvisorPrompt = AdvisorPrompt & { peekBg: string | undefined };
+
+/**
+ * The ONE door to a prompt without a summary: the objective's own title, alone
+ * or with the tail this module appends to it. See `CoachedAdvisorPrompt`.
+ */
+function taskSentencePrompt(textBg: string, keys: string[]): CoachedAdvisorPrompt {
+  return { textBg, keys, peekBg: undefined };
 }
 
 /**
@@ -118,10 +199,51 @@ const PRE_DRIVE_ACTION_TEXT_BG: Record<PreDriveStepId, string> = {
   "move-off": "Потегли плавно с газта",
 };
 
+/**
+ * The phone card's line per step (`CoachedAdvisorPrompt`). TEN OF THE
+ * THIRTEEN ARE THE SENTENCE ITSELF, because the sentence already fits two
+ * 24-character lines — a summary shorter than a sentence that finishes is a
+ * sentence with words taken out. The one that does not fit loses only what the
+ * step already implies: «около колата» (there is nothing else to look round).
+ * The confirm clause on the three INFO steps is kept whole on purpose — it is
+ * their ONLY completion path (doc 91 · C5), and a phone card that dropped it
+ * would be the 4-pixel dead end in words.
+ *
+ * THE TWO MIRROR LINES NAME THE LOOK, NOT THE HAND (round 3, the round-2
+ * verifier's note on sc-merge-from-property:6715b581). The sentences say
+ * «Задръж с мишката…» / «Задръж…» — true of the cabin hotspots a mouse holds,
+ * and false on the phone this line is printed on, where the same glances are
+ * the „Ляво" / „Дясн" / „Задн" rail cells (`PRE_DRIVE_STEP_CONTROLS.tapBg`).
+ * This module is handed no device — `advisorPromptForPreDriveStep` takes a step
+ * id and nothing else, and the shell's `(pointer: coarse)` reading does not
+ * reach it — so the line says what is true on both: the act the step checks
+ * (`performedSteps.ts` counts the glances), in the order-free form the rail
+ * performs it.
+ */
+const PRE_DRIVE_ACTION_PEEK_BG: Record<PreDriveStepId, string> = {
+  "adjust-seat": PRE_DRIVE_ACTION_TEXT_BG["adjust-seat"],
+  "adjust-mirrors": "Погледни в трите огледала едно по едно",
+  "check-surroundings": "Огледай се и потвърди в списъка вляво",
+  "fasten-seatbelt": PRE_DRIVE_ACTION_TEXT_BG["fasten-seatbelt"],
+  "check-dashboard": PRE_DRIVE_ACTION_TEXT_BG["check-dashboard"],
+  "headlights-on": PRE_DRIVE_ACTION_TEXT_BG["headlights-on"],
+  "start-engine": PRE_DRIVE_ACTION_TEXT_BG["start-engine"],
+  "press-brake": PRE_DRIVE_ACTION_TEXT_BG["press-brake"],
+  "select-gear": PRE_DRIVE_ACTION_TEXT_BG["select-gear"],
+  "release-handbrake": PRE_DRIVE_ACTION_TEXT_BG["release-handbrake"],
+  "final-mirror-check": "Погледни в лявото и вътрешното огледало",
+  signal: PRE_DRIVE_ACTION_TEXT_BG.signal,
+  "move-off": PRE_DRIVE_ACTION_TEXT_BG["move-off"],
+};
+
 /** Prompt for one pending pre-drive step (keys from the honest control map). */
-export function advisorPromptForPreDriveStep(stepId: PreDriveStepId): AdvisorPrompt {
+export function advisorPromptForPreDriveStep(stepId: PreDriveStepId): CoachedAdvisorPrompt {
   const keys = PRE_DRIVE_STEP_CONTROLS[stepId]?.keys.split(" ") ?? [];
-  return { textBg: PRE_DRIVE_ACTION_TEXT_BG[stepId], keys };
+  return {
+    textBg: PRE_DRIVE_ACTION_TEXT_BG[stepId],
+    keys,
+    peekBg: PRE_DRIVE_ACTION_PEEK_BG[stepId],
+  };
 }
 
 /**
@@ -516,11 +638,16 @@ const CONTROLLER_WAIT_CARD_BG =
   "страничен профил — минаваш, дори на червено; ръка горе — чакаш.";
 
 /** The live-wait card at a junction an officer is directing. */
-export function controllerWaitAdvisorPrompt(): AdvisorPrompt {
+export function controllerWaitAdvisorPrompt(): CoachedAdvisorPrompt {
   // No key chips, exactly as `yieldWaitAdvisorPrompt`: the next action depends
   // on a posture this module cannot read, and the honesty rule of this file is
   // that a chip may only name a control that PERFORMS the step.
-  return { textBg: CONTROLLER_WAIT_CARD_BG, keys: [] };
+  //
+  // The phone's line is the card's first sentence turned into the act it asks
+  // for. The three postures do not fit two lines and are not cut to fit — a
+  // posture list missing one posture is the officer's rule with a hole in it —
+  // so they stay whole behind «Прочети».
+  return { textBg: CONTROLLER_WAIT_CARD_BG, keys: [], peekBg: "Гледай регулировчика, не лампата." };
 }
 
 /**
@@ -540,16 +667,20 @@ export function advisorPromptForObjective(
   evalState?: ObjectiveEvalState,
   postedLimitKmh?: number,
   authoredCapKmh?: number,
-): AdvisorPrompt {
+): CoachedAdvisorPrompt {
+  // Every branch that returns the title — alone or with a tail — goes through
+  // `taskSentencePrompt` and carries no summary: on the phone that sentence is
+  // the TASK row's (`foldAdvisorIntoTask`), never an advisor card. The branches
+  // that say something the title does not are the ones that author one.
   switch (params.kind) {
     case "reachZone": {
       // Speed-capped zones: the cap is the coachable part (approach discipline).
-      if (params.maxSpeedKmh === undefined) return { textBg: titleBg, keys: [] };
+      if (params.maxSpeedKmh === undefined) return taskSentencePrompt(titleBg, []);
       // One sentence, one number, and it belongs to the sign, the author's
       // title, the halt band or the author's own cap — never to the grader's
       // tolerance alone (spokenCapKmh).
       const shown = spokenCapKmh(params.maxSpeedKmh, titleBg, postedLimitKmh, authoredCapKmh);
-      if (shown === undefined) return { textBg: titleBg, keys: [] };
+      if (shown === undefined) return taskSentencePrompt(titleBg, []);
       // ── AND THE BAND'S LOWER EDGE, WHERE A GATE AUTHORS ONE ────────────────
       //
       // A gate may not refuse a number the student was never told, and since
@@ -571,29 +702,38 @@ export function advisorPromptForObjective(
       // band, and the only card this clause touches goes 80 → 92.
       const floor = params.minSpeedKmh;
       if (floor !== undefined && floor < shown) {
-        return { textBg: `${titleBg} — не под ${floor} и дръж под ${shown} км/ч`, keys: [] };
+        return taskSentencePrompt(`${titleBg} — не под ${floor} и дръж под ${shown} км/ч`, []);
       }
-      return { textBg: `${titleBg} — дръж под ${shown} км/ч`, keys: [] };
+      return taskSentencePrompt(`${titleBg} — дръж под ${shown} км/ч`, []);
     }
 
     case "passSignal":
       if (params.control === "stopSign") {
-        return { textBg: "Спри напълно на стоп-линията при знака „Стоп“", keys: ["S"] };
+        return {
+          textBg: "Спри напълно на стоп-линията при знака „Стоп“",
+          keys: ["S"],
+          // The act and where it is discharged; the sign's name is on the sign.
+          peekBg: "Спри напълно на стоп-линията.",
+        };
       }
       if (params.requireRedMet === true) {
         // A REGULATED junction is the one place the lamp is not the authority
         // (titleNamesController — measured on sc-sig-controller-live). The
         // authored title is the instruction there; the chip still names the
         // brake, because reading the officer is done stopped.
-        if (titleNamesController(titleBg)) return { textBg: titleBg, keys: ["S"] };
+        if (titleNamesController(titleBg)) return taskSentencePrompt(titleBg, ["S"]);
         // The drilled sequence the gate certifies (objectives.ts): stop at
         // the line, wait the red out, cross on green.
-        return { textBg: "Спри на стоп-линията на светофара и изчакай зелено", keys: ["S"] };
+        return {
+          textBg: "Спри на стоп-линията на светофара и изчакай зелено",
+          keys: ["S"],
+          peekBg: "Спри на линията и изчакай зелено.",
+        };
       }
-      return { textBg: titleBg, keys: [] };
+      return taskSentencePrompt(titleBg, []);
 
     case "driveDistance":
-      return { textBg: titleBg, keys: ["W"] };
+      return taskSentencePrompt(titleBg, ["W"]);
 
     case "completeManeuver":
       switch (params.maneuver) {
@@ -601,11 +741,13 @@ export function advisorPromptForObjective(
           return {
             textBg: "Спри плавно — отпусни газта рано и натискай спирачката леко",
             keys: ["S"],
+            // The method, which is the half the objective's title never says.
+            peekBg: "Отпусни газта рано, спирачката — леко.",
           };
         case "emergencyStop":
           // Stimulus-locked (A10) — the objective's own title carries the
           // instruction; the key chip names the brake.
-          return { textBg: titleBg, keys: ["S"] };
+          return taskSentencePrompt(titleBg, ["S"]);
         case "parkInBay":
           // A1 (founder, doc 87): „push the R reverse gear … although we are
           // on automatic mode". The PROMPT is right — the sim's automatic is a
@@ -658,12 +800,22 @@ export function advisorPromptForObjective(
           // `deriveGearDemand` (objectives.ts:1358) reads the objective's
           // TITLE, not the advisor's sentence — so dropping «на заден ход»
           // from the card moves no gate and no demand.
+          //
+          // THE PHONE'S LINE KEEPS THE SAME STEM, for the same harness reason
+          // (the mobile legs read the card's peek, not the sheet behind it),
+          // and the rule of the selector after it — the half that stops a
+          // learner flooring a car that is still in D.
           return params.entry === "forward"
-            ? { textBg: "Остави лоста на D — D е за напред; заден ход тук не ти трябва", keys: ["]"] }
+            ? {
+                textBg: "Остави лоста на D — D е за напред; заден ход тук не ти трябва",
+                keys: ["]"],
+                peekBg: "Остави лоста на D — влизаш напред.",
+              }
             : {
                 textBg:
                   "Премести лоста на R — заден ход има само на R; на D газта пак ще те подкара напред",
                 keys: ["["],
+                peekBg: "Премести лоста на R — само R върви назад.",
               };
         case "roundabout": {
           // The card may only order the manoeuvre the evaluator would CREDIT.
@@ -684,11 +836,16 @@ export function advisorPromptForObjective(
             (rb.traversalArcDeg === null ||
               Math.abs(rb.traversalArcDeg) >= ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG);
           return traversed
-            ? { textBg: "Излез от кръговото с десен мигач", keys: ["."] }
-            : { textBg: titleBg, keys: [] };
+            ? {
+                textBg: "Излез от кръговото с десен мигач",
+                keys: ["."],
+                // Fits two lines as it stands, so the sentence is its own line.
+                peekBg: "Излез от кръговото с десен мигач",
+              }
+            : taskSentencePrompt(titleBg, []);
         }
         case "threePointTurn":
-          return { textBg: titleBg, keys: ["["] };
+          return taskSentencePrompt(titleBg, ["["]);
       }
   }
 }
@@ -750,9 +907,90 @@ export function routeHoldForSession(s: LessonSessionState): RouteHold | null {
   if (!Number.isFinite(t)) return null;
   const pinnedForS = s.crashPin === undefined ? null : t - s.crashPin.atSec;
   if (pinnedForS !== null && pinnedForS >= ROUTE_HOLD_S) return "crashPinned";
+  // THE CARRIAGEWAY FACT THE GRADER ALREADY COMMITTED TO — see the block below.
+  if (s.crashPin === undefined && offCarriagewaySustainedNow(s)) return "offRoad";
   const offRoadForS = s.offNetworkSinceSec == null ? null : t - s.offNetworkSinceSec;
   if (offRoadForS !== null && offRoadForS >= ROUTE_HOLD_S) return "offRoad";
   return null;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * IS THIS CAR OFF THE CARRIAGEWAY BY THE GRADER'S OWN STANDARD, RIGHT NOW?
+ * — sc-roundabout-entry:8ae6f7a2 (major, filed from w49 at 98bf8ae).
+ *
+ * THE FRAME: `.audit-frames/w49/frames/sc-roundabout-entry__pc-right/
+ * 04-t080s.png` — the car on the lawn outside the ring at 14 км/ч, and every
+ * surface on the glass addressing a car on the carriageway: the task, this
+ * card («Излез от кръговото с десен мигач»), «Следвай синята линия». The
+ * banner's «Колата е извън пътя» came from t = 84 s.
+ *
+ * THE HYPOTHESIS HANDED TO THIS LANE WAS STALE, and it is written down so the
+ * next reader does not re-derive it. It said `offNetworkSinceSec` is the 30 m
+ * „no centreline" signal. It was, until f72c4ee (2026-08-24) made
+ * `runtime/worldRuntime.ts` publish `edgeId: offCarriageway ? null : fix.edgeId`
+ * — `edgeId` now goes null 0.97 m past the KERB wherever the district has a
+ * drivable surface, and `finish.ts stepOffNetwork` and the rule engine's
+ * OFF_CARRIAGEWAY detector read that one field. REPLAYED, the w49 poses through
+ * `createWorldRuntime("rb-mini-v1").sample`: `edgeId` is `rbm-e-ring-*` up to
+ * (22.34, ∓8.18) and null from (23.40, ∓10.03) on, both at t ≈ 78 s. So the
+ * coach was never waiting for thirty metres. It was waiting for ROUTE_HOLD_S —
+ * five seconds, derived from the CRASH PIN's radius and borrowed by this clause
+ * „rather than inventing a second number" — while the grader had already
+ * decided at OFF_CARRIAGEWAY_SUSTAIN_SEC = 2 s that the excursion was real.
+ * Three seconds in which the product billed the student for being off the road
+ * and went on telling him to exit the ring.
+ *
+ * THE NUMBER WAS NEVER THE COACH'S TO CHOOSE, AND NOW IT DOES NOT. The rule
+ * reducer's own episode (`RuleEngineState.offCarriageway`) is live session
+ * state: `activeSince` is the onset of the current excursion (null the frame
+ * the car is back on a road, or on a frame whose tick cannot say), and
+ * `emitted` flips on the frame the sustain is met — the frame the grader decides
+ * the excursion is REAL. Reading the pair means the banner and this card change
+ * on the grader's frame, by the grader's derivation (its 1.9 m
+ * corrected-excursion arithmetic), and a kerb clip the grader forgives is
+ * forgiven here too.
+ *
+ * THAT FRAME IS NOT ALWAYS A −3, and an earlier version of this paragraph said
+ * it was (corrected in round 3, after the round-2 verifier's corpus replay).
+ * `emitted` is the SUSTAIN, not the bill: the reducer withholds the bill on
+ * that frame when `crashCausedDeparture` calls the departure part of a contact,
+ * and the lesson engine decides separately what reaches the sheet. MEASURED on
+ * the committed replay of `sc-sign-warning/mistake-hold-speed` (production
+ * runtime, `applyTick`): `activeSince` 21.20, `emitted` from 23.25, the
+ * hold moves from 26.25 s to 23.25 s — and no OFF_CARRIAGEWAY reaches the HUD
+ * or `s.events` anywhere on that drive. The card is still true there (the car
+ * IS off the carriageway, by the grader's own standard); it is only not
+ * beside a −3, because that drive has none.
+ *
+ * THE ENDING IS UNTOUCHED. `stepOffNetwork` / OFF_NETWORK_STUCK_S end a drive
+ * and keep their own signal; the ROUTE_HOLD_S clause above stays as the
+ * fallback for a session whose rule state predates the episode. Only what the
+ * coach SAYS moved.
+ *
+ * TWO GUARDS, BOTH ON THE SIDE OF SAYING LESS:
+ *  · `emitted` WITHOUT `activeSince` is not a hold — the flag survives a frame
+ *    whose `edgeId` is undefined (a replay, a rig), and that frame is evidence
+ *    of nothing.
+ *  · AN ARMED CRASH PIN DEFERS TO ITS OWN CLAUSE. The grader swallows a
+ *    departure an impact caused (`crashCausedDeparture`) and the coach has no
+ *    way to see that it did — so a car shoved onto the verge keeps the pin's
+ *    five-second ladder and meets ONE card, «Съвсем леко назад…», instead of
+ *    the off-road card for three seconds and then a second one.
+ *
+ * THE FALSE-OFF-ROAD DIRECTION, which is worse than the defect: a car at a
+ * legal kerbside band or in a parking bay. The grader convicts neither — all
+ * 167 shadow-correct drives read zero null-`edgeId` frames through the real
+ * runtime (`rules/__tests__/off-carriageway.test.ts`) — and
+ * `advisor-route-hold-carriageway.test.ts` drives every sc-park-* / sc-pk-*
+ * shadow tape and the catalogue's worst kerbside pose through this function.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+function offCarriagewaySustainedNow(s: LessonSessionState): boolean {
+  // `rules` is required on the type; a hand-built session double may still omit
+  // it, and an absent measurement is „no hold" — this function's standing rule.
+  const episode = s.rules?.offCarriageway;
+  return episode !== undefined && episode.activeSince !== null && episode.emitted === true;
 }
 
 /**
@@ -800,9 +1038,40 @@ const ROUTE_HOLD_CARD_BG: Record<RouteHold, string> = {
     "Не дърпай волана — отпусни газта, изправи колелата и се върни под малък ъгъл: извън платното сцеплението е друго и спирачният път е по-дълъг.",
 };
 
+/**
+ * THE TWO LINES THE PHONE PHOTOGRAPHED CUT — w49 `sc-merge-from-property__
+ * mobile-right` 04-t090s (off-road, stopped at «…извън платното сцеплението»)
+ * and 04-t178s (pinned, «…в удареното. ([)↓ ощ…»).
+ *
+ * EACH LINE IS ONE ACT AND ITS REASON (round 3). Round 2 wrote the act alone —
+ * «Не дърпай волана — върни се под малък ъгъл.» — and the round-2 verifier
+ * named it for what it was: the order reached the glass and the why did not,
+ * which is the very THEO-4 shape 04-t090s was filed for, one tap further away.
+ * Two 24-character lines hold one act and one because, not three acts, so each
+ * keeps the act a student in a field or against a wall needs FIRST and the
+ * reason that act exists:
+ *  · off the road, «Не дърпай волана» — the reflex that throws a car back
+ *    across the kerb — because the grip there is not the tarmac's. «друго»,
+ *    not a stronger word: it is the catalogue's own clause for OFF_CARRIAGEWAY
+ *    (`rules/catalog.ts`) and the card's, and `advisor-route-hold.test.ts`
+ *    pins the card to it;
+ *  · pinned, reverse first, because throttle forward only presses the car
+ *    further into what it hit — the card's own because-clause.
+ * The rest — lift off, straighten the wheels, the small angle, look before
+ * going forward — stays whole behind «Прочети».
+ */
+const ROUTE_HOLD_PEEK_BG: Record<RouteHold, string> = {
+  crashPinned: "Първо назад: напред притиска в удареното.",
+  offRoad: "Не дърпай волана — тук сцеплението е друго.",
+};
+
 /** The card the coach shows instead of an unobeyable objective. */
-export function routeHoldAdvisorPrompt(hold: RouteHold): AdvisorPrompt {
-  return { textBg: ROUTE_HOLD_CARD_BG[hold], keys: hold === "crashPinned" ? ["["] : [] };
+export function routeHoldAdvisorPrompt(hold: RouteHold): CoachedAdvisorPrompt {
+  return {
+    textBg: ROUTE_HOLD_CARD_BG[hold],
+    keys: hold === "crashPinned" ? ["["] : [],
+    peekBg: ROUTE_HOLD_PEEK_BG[hold],
+  };
 }
 
 /**
@@ -810,7 +1079,7 @@ export function routeHoldAdvisorPrompt(hold: RouteHold): AdvisorPrompt {
  * session, or null when there is nothing to advise (exam mode, ended
  * session, free drive / all objectives done).
  */
-export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | null {
+export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPrompt | null {
   if (s.lesson.examMode === true) return null;
 
   if (s.phase === "preDrive") {
@@ -839,6 +1108,7 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
     // standing still lawfully is an answer to „what now" even on the run-out.
     const trailing = s.yieldWait;
     if (trailing === undefined || !trailing.holding || trailing.reason === null) return null;
+    const trailingConvicted = yieldEpisodeConvicted(s, trailing.reason);
     // The officer outranks the lamp on the run-out too — the route ends north
     // of sc-sig-controller-live's junction, so a hold there is the same
     // junction with the objectives spent.
@@ -849,9 +1119,9 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
       // …and the rails outrank the lamp's second clause on the run-out too:
       // sc-rx-tram-left's route ends 50 m south of the junction the tram
       // crosses, so a hold there is the same junction with the chain spent.
-      if (lessonYieldsToRailVehicle(s.lesson)) return railPriorityWaitAdvisorPrompt();
+      if (lessonYieldsToRailVehicle(s.lesson)) return railPriorityWaitAdvisorPrompt(trailingConvicted);
     }
-    return yieldWaitAdvisorPrompt(trailing.reason, heldWaitSec(s, trailing));
+    return yieldWaitAdvisorPrompt(trailing.reason, heldWaitSec(s, trailing), trailingConvicted);
   }
   const active = s.objectives[s.currentObjectiveIndex];
 
@@ -892,10 +1162,16 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
     // same green releases the tram this turn crosses (ЗДвП чл. 8, ал. 2). The
     // officer is asked first: a junction with both would be the officer's, and
     // his card already refuses to say «Тръгваш на зелено» at all.
+    // sc-roundabout-entry:8be266cf — A WAIT WHOSE EPISODE WAS CONVICTED IS NOT
+    // PRAISED. See `YieldVoiceState.convicted`: the voice remembers the
+    // conviction across the resume, and the card reads the same memory, so
+    // «Чакаш правилно» can no longer sit over «Влизане без пропускане» booked
+    // two seconds earlier.
+    const convicted = yieldEpisodeConvicted(s, waiting.reason);
     if (waiting.reason === "redLight" && lessonYieldsToRailVehicle(s.lesson)) {
-      return railPriorityWaitAdvisorPrompt();
+      return railPriorityWaitAdvisorPrompt(convicted);
     }
-    return yieldWaitAdvisorPrompt(waiting.reason, heldWaitSec(s, waiting));
+    return yieldWaitAdvisorPrompt(waiting.reason, heldWaitSec(s, waiting), convicted);
   }
 
   // The author's own cap comes off the RAW compiled objective, not off
@@ -1023,7 +1299,11 @@ export function shownObjectiveCapKmh(
 //     the graded stream but never writes to it. And the gap verdict MUTES
 //     itself the moment a yield-family fault is graded inside its window: a
 //     screen that says „good gap" beside a 10-point опасна is a worse failure
-//     than the silence this replaces.
+//     than the silence this replaces. AND THE MUTE OUTLIVES THE FRAME
+//     (sc-roundabout-entry:8be266cf, 2026-09-17): it is remembered for the
+//     whole episode, so a stop and a second departure inside the episode gap
+//     cannot earn back the praise the first one forfeited — see
+//     `YieldVoiceState.convicted`.
 // ---------------------------------------------------------------------------
 
 /**
@@ -1056,8 +1336,77 @@ export const YIELD_VOICE_SETTLE_S = 10;
  * YIELD_BRAKE_RESPONSE_MAX_SEC (3.0 s) — both in worldRuntime.ts. Four seconds
  * clears both, so „nothing was graded" means the adjudication has actually
  * run and come back clean, not that it has not run yet.
+ *
+ * A FLOOR, NOT THE WHOLE CONDITION, AT A RING (sc-roundabout-entry:8be266cf,
+ * 2026-09-17). Both windows above are measured from the moment the conflict is
+ * visible to a car ALREADY inside the ring's commit radius and moving faster
+ * than 3 км/ч — not from the moment the wheels turn. A car that creeps off the
+ * give-way line at a walking pace can spend all four seconds reaching the
+ * place that clock starts. So a `roundaboutEntry` verdict also waits for the entry it
+ * describes; see `YIELD_VOICE_RING_ENTRY_ARC_DEG`.
  */
 export const YIELD_VOICE_VERDICT_S = 4;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * HOW FAR ROUND THE ISLAND A CAR MUST BE BEFORE «ИНТЕРВАЛЪТ БЕШЕ ДОБЪР» MAY
+ * SAY «И ВЛЕЗЕ» — sc-roundabout-entry:8be266cf (critical), the ordering round 2
+ * left standing.
+ *
+ * REPRODUCED ON THE ROUND-2 TREE before this block was written: the frame's
+ * drive through `applyTick` — 28 s at the line, off at 3 км/ч — with the barge
+ * billed N seconds after the wheels turned. N = 0, 2, 4: the conviction, no
+ * praise. N = 4.1: «Интервалът беше добър» at 32.2, «Влизане без пропускане» at
+ * 32.3. N = 6 and N = 10: the praise at 32.2 again, the fault at 34.2 and 38.2.
+ * The w49 leg crept off at 3 км/ч (04-t053s) and was billed four to five
+ * seconds later, so a re-drive could land on either side of that line.
+ *
+ * WHY TIME CANNOT FIX IT. The verdict clock started when the wheels turned; the
+ * entry adjudicator (worldRuntime.ts, the roundabout tracker) does not. Its
+ * clock runs only inside the commit radius, only above 3 км/ч, only while a
+ * circulating car is in the band, and it resets on every frame at or below
+ * 3 км/ч. A creep, a hesitation in the mouth, or a circulator that arrives
+ * late each moves the conviction later by any amount, so there is no number of
+ * seconds after departure that the verdict can wait and be true.
+ *
+ * WHAT THE ADJUDICATOR ITSELF STANDS DOWN ON is geometry: once the car has swept
+ * RB_ON_RING_DEG = 35° about the island inside its commit radius it is
+ * CIRCULATING, it holds ring priority, and no entry conviction can fire. So the
+ * verdict now waits for the car to be at least this far round the SAME island
+ * from where it stood, and inside `enterRadiusM`: 45°, the objective's own
+ * ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG, imported rather than mirrored — the number
+ * the ring objective already calls „went round the island" before it will
+ * credit an exit. THE MARGIN, AND WHICH WAY THE ERROR LEANS: measured from the
+ * stopping point, this arc also counts the approach metres between the paint
+ * and the tracker's commit radius, and because the arm lane is offset from the
+ * island centre those sweep in the SAME sense as the circulation — so it reads
+ * HIGH against the tracker by that approach sweep. On rb-mini, the drill the
+ * row was filed on, that is 2.5° at most (5.3° at the outer edge of the hold,
+ * 7.8° at the commit radius, lane 4.06 m) against the 10° between 45 and 35.
+ * The verdict's own last sentence — «Оттук нататък излизането е отклонение
+ * надясно…» — still arrives on the ring and before the first exit (70.5° on
+ * rb-mini, the shortest passage in the census beside
+ * ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG in objectives.ts).
+ *
+ * SPEAK LATER, CORRECTLY — NOT SPEAK AND RETRACT. The teach channel has no way
+ * to take a line back, and a retraction beside a −10 is the frame this row was
+ * filed on with one more card in it. A departure that never reaches the ring
+ * (he turned away, or backed off past the approach) is dropped unjudged — and
+ * so, by the same test, is a hold that re-arms in the approach annulus on the
+ * way OUT of the ring (the annulus is symmetric, finish.ts clause 5), which the
+ * time window used to congratulate for an entry that departure never made.
+ *
+ * ONLY THE RING. The other six duties keep the time window, and that is a
+ * known residual of the same class rather than a claim that they are safe: a
+ * Б1/Б2 verdict can in principle precede a FAILED_TO_YIELD that a creep delays
+ * past four seconds. It is left because no committed drive or filed frame
+ * shows it, and „past THAT line" needs a line identity the tick does not
+ * publish (`nextStopLineM` / `nextStopLineControl` describe whichever line is
+ * next, not the one he stood at) — the ring's centre is the one site this
+ * module can name without inventing geometry.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const YIELD_VOICE_RING_ENTRY_ARC_DEG = ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG;
 
 /**
  * How long a finished wait keeps waiting for the wheels to turn, seconds. A
@@ -1220,6 +1569,64 @@ interface YieldVoiceCopy {
   /** The advisor card, CONSTANT for the whole wait (see rule 1 above). */
   cardBg: string;
   /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * THE SAME CARD FOR A WAIT WHOSE EPISODE WAS CONVICTED — REQUIRED
+   * (sc-roundabout-entry:8be266cf, critical, filed from w49 at 98bf8ae).
+   *
+   * THE FRAME: `.audit-frames/w49/frames/sc-roundabout-entry__pc-right/
+   * 04-t059s.png`. The fault card «ОПАСНА ГРЕШКА −10 изпитни т. · Влизане без
+   * пропускане», booked «преди 2 с», sits directly under this card reading
+   * «Чакаш правилно — в кръга имат предимство», and five seconds later
+   * (04-t064s) the teach channel says «Интервалът беше добър · Изчака 33 с и
+   * влезе — и при влизането не беше отчетено нарушение на предимството».
+   *
+   * REPRODUCED ON THE REAL ENGINE before a line changed
+   * (`yield-voice-convicted-episode.test.ts`): wait 30 s at the give-way line,
+   * pull off, FAILED_TO_YIELD, stop again inside YIELD_VOICE_EPISODE_GAP_S,
+   * pull off again. The first departure's verdict WAS muted — and the stop
+   * resumed the SAME episode, with nothing in `YieldVoiceState` remembering
+   * why the verdict had been dropped. The card read «Чакаш правилно» over the
+   * conviction, and the second departure, four clean seconds later, earned the
+   * verdict the first one had forfeited — measured over both segments, which
+   * is where «33 с» came from.
+   *
+   * WHAT THIS CARD KEEPS AND WHAT IT DROPS. The duty and the act stay — the
+   * student standing at the mouth after barging in still has a ring car to let
+   * past, and «в кръга имат предимство, гледай НАЛЯВО» is still exactly what he
+   * needs. Only the approval goes. Where `cardBg` already approves of nothing
+   * (`stopSign`) this is the same string, and it is spelled out rather than
+   * made optional so a sixth reason has to decide.
+   * ═════════════════════════════════════════════════════════════════════════
+   */
+  convictedCardBg: string;
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * THE PHONE'S LINE FOR `cardBg` — and it keeps the reassurance, WITH its
+   * reason (sc-merge-from-property:6715b581, round 3).
+   *
+   * Round 2 gave the opening card and its convicted twin ONE line, and to be
+   * true of both that line could approve of nothing. The price was paid on the
+   * phone alone: `LessonPlayShell advisorOverlayRow` prints the card's name and
+   * this summary, the whole card sits behind «Прочети», so a CLEAN wait on the
+   * glass stopped saying «Чакаш правилно» at all. That sentence is not
+   * decoration. It is the answer to the founder's own „am I broken?" after a
+   * ~40 s wait (YIELD_VOICE_SETTLE_S has the numbers), and the desktop card
+   * never lost it.
+   *
+   * So the two cards have two lines. This one may open «Чакаш правилно» — never
+   * alone, always followed by WHO has priority or WHAT he is waiting for, which
+   * is what turns a verdict word into an explanation (THEO-4). Where `cardBg`
+   * approves of nothing (`stopSign`) neither does this. `convictedCardPeekBg` is
+   * the other line.
+   * ═════════════════════════════════════════════════════════════════════════
+   */
+  cardPeekBg: string;
+  /**
+   * The phone's line for `convictedCardBg`: the duty or the act, no approval —
+   * exactly the cut `convictedCardBg` makes to `cardBg`.
+   */
+  convictedCardPeekBg: string;
+  /**
    * THE SECOND — AND LAST — CARD OF A WAIT THAT HAS OUTLASTED ITS OWN REASON
    * (sc-rb-ped-exit:c1e5b6df, 2026-08-25). Present only on the three duties a
    * driver DISCHARGES BY LOOKING; see `YIELD_CARD_LONG_WAIT_S` for the number
@@ -1237,8 +1644,12 @@ interface YieldVoiceCopy {
    * measured, per reason, in `advisor-yield-long-wait.test.ts` §4 with the same
    * greedy wrapper and the same 35-chars-per-216 px ratio `advisorFace.test.tsx`
    * measures the face with.
+   *
+   * A PAIR, NOT A STRING (2026-09-17): the card and the phone's line for it
+   * travel together, so a long card cannot exist without a summary and tsc says
+   * so. It is not suppressed by a conviction — see `yieldWaitAdvisorPrompt`.
    */
-  longCardBg?: string;
+  longCard?: { textBg: string; peekBg: string };
   namedTitleBg: string;
   namedBg: string;
   /**
@@ -1339,6 +1750,12 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   roundaboutEntry: {
     cardBg:
       "Чакаш правилно — в кръга имат предимство. Гледай НАЛЯВО и тръгвай, когато можеш да влезеш, без някой в кръга да намалява заради теб.",
+    // The 04-t059s card, with the approval taken off and nothing else.
+    convictedCardBg:
+      "В кръга имат предимство. Гледай НАЛЯВО и тръгвай, когато можеш да влезеш, без някой в кръга да намалява заради теб.",
+    // The reassurance and who it rests on; the look is the teach line's peek.
+    cardPeekBg: "Чакаш правилно: в кръга имат предимство.",
+    convictedCardPeekBg: "В кръга имат предимство — гледай НАЛЯВО.",
     // The ring is the one duty whose end the driver reads for himself: there is
     // no lamp and nobody waves him in. So the „go" is never unconditional — it
     // is the back half of a sentence whose front half is the look, which is the
@@ -1346,8 +1763,12 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     // closing clause survives the length cut because „чакам си реда" is the
     // misconception this drill was written against; `settledBg` teaches it at
     // length and this is its five-word form.
-    longCardBg:
-      "Чакането стана дълго. Погледни пак НАЛЯВО: празен ли е кръгът, интервалът е твой — влизай сега. Ред по пристигане на кръгово няма.",
+    longCard: {
+      textBg:
+        "Чакането стана дълго. Погледни пак НАЛЯВО: празен ли е кръгът, интервалът е твой — влизай сега. Ред по пристигане на кръгово няма.",
+      // The condition first, then the act — never the act alone.
+      peekBg: "Празен ли е кръгът отляво — влизай.",
+    },
     namedTitleBg: "Защо чакаш: в кръга имат предимство",
     namedBg:
       "Спрял си правилно. На входа на кръгово кръстовище не може да стои знак „Път с предимство“ — там винаги е Б1 или Б2, тоест ти си на пътя без предимство и пропускаш движещите се в кръга. Гледай НАЛЯВО. Интервалът, който чакаш, е такъв, че да влезеш и да набереш скоростта на кръга, без движещият се в него да намалява заради теб.",
@@ -1378,6 +1799,12 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   giveWayLine: {
     cardBg:
       "Чакаш правилно — знак Б1: пропускаш движещите се по пътя с предимство. Огледай ляво–дясно–ляво и тръгвай в реален интервал.",
+    convictedCardBg:
+      "Знак Б1: пропускаш движещите се по пътя с предимство. Огледай ляво–дясно–ляво и тръгвай в реален интервал.",
+    // Who he is yielding to — the sign's code carries a digit and a peek carries none.
+    cardPeekBg: "Чакаш правилно: пропускаш главния път.",
+    // The act, which is all the convicted card keeps.
+    convictedCardPeekBg: "Огледай ляво–дясно–ляво, чакай интервал.",
     // Б1 does not demand a full stop at all, so half a minute at the line is
     // already far past what the sign asks. The poor-visibility answer — edge
     // out slowly until you see, then stop again — is NOT repeated here: this
@@ -1385,8 +1812,11 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     // it at YIELD_VOICE_SETTLE_S = 10 s, twenty seconds before this card can
     // appear. Restating it cost the phone column four lines it does not have
     // (see `longCardBg`'s own note above).
-    longCardBg:
-      "Чакането стана дълго. Б1 иска да пропуснеш, не да стоиш: огледай пак ляво–дясно–ляво и щом главният е чист — тръгвай сега.",
+    longCard: {
+      textBg:
+        "Чакането стана дълго. Б1 иска да пропуснеш, не да стоиш: огледай пак ляво–дясно–ляво и щом главният е чист — тръгвай сега.",
+      peekBg: "Щом главният е чист — тръгвай.",
+    },
     namedTitleBg: "Защо чакаш: знак Б1 „Пропусни движението“",
     namedBg:
       "Спрял си правилно. Знакът Б1 те поставя на пътя БЕЗ предимство: на кръстовище, на което единият път е сигнализиран като път с предимство, водачите от другите пътища са длъжни да пропуснат движещите се по него. Пълно спиране Б1 не изисква — задължението е да пропуснеш. Огледай ляво–дясно–ляво и чакай интервал, в който пресичаш, без някой по главния път да намалява заради теб.",
@@ -1445,12 +1875,23 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
      */
     cardBg:
       "Знак Б2 иска две неща: пълно спиране ДО самата линия, с неподвижни колела, и чак тогава — да пропуснеш движещите се по пътя с предимство.",
+    // Already approves of nothing (the block above is why), so a conviction
+    // leaves it exactly as it is.
+    convictedCardBg:
+      "Знак Б2 иска две неща: пълно спиране ДО самата линия, с неподвижни колела, и чак тогава — да пропуснеш движещите се по пътя с предимство.",
+    // The two acts in the card's own order; it certifies neither — so the clean
+    // line is the convicted line (stop-sign-card-cannot-certify-the-stop.test.ts).
+    cardPeekBg: "Спри докрай до линията, после пропусни.",
+    convictedCardPeekBg: "Спри докрай до линията, после пропусни.",
     // The half-minute of standstill this card waits for says the wheels are
     // still; it does not say WHERE. So the second card names the two steps in
     // order instead of ticking the first one off — and «тръгвай сега» is the
     // last of them, not the first.
-    longCardBg:
-      "Чакането стана дълго. Ако още не си спрял ДО линията — спри там докрай, после огледай пак ляво–дясно–ляво и щом е чисто, тръгвай сега.",
+    longCard: {
+      textBg:
+        "Чакането стана дълго. Ако още не си спрял ДО линията — спри там докрай, после огледай пак ляво–дясно–ляво и щом е чисто, тръгвай сега.",
+      peekBg: "Спри до линията; тръгни, щом е чисто.",
+    },
     namedTitleBg: "Защо чакаш: знак Б2 „Спри! Пропусни движението!“",
     namedBg:
       "Правилно е да чакаш тук. На Б2 се спира докрай ВИНАГИ, дори пътят да изглежда празен — „почти спрях“ не съществува нито в закона, нито на изпита. Мястото на това спиране е ДО самата линия: спреш ли по-рано — за пешеходец на тротоара или зад чужда кола — това не е спирането по знака и то се прави още веднъж, на линията, с неподвижни колела и брой наум до три. Спирането обаче е само първата половина: знакът иска и да ПРОПУСНЕШ движещите се по пътя с предимство, така че тръгваш чак когато никой не приближава.",
@@ -1475,6 +1916,18 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   redLight: {
     cardBg:
       "Чакаш правилно на червено. Тръгваш на зелено — освен ако регулировчик не пуска твоята посока: тогава важи само неговият сигнал.",
+    // «ПРЕД линията» is the rule, not a claim about where he stopped — the
+    // pedestrian row's note below is why this module may not make that claim.
+    convictedCardBg:
+      "На червено се спира ПРЕД линията. Тръгваш на зелено — освен ако регулировчик не пуска твоята посока: тогава важи само неговият сигнал.",
+    // The reason the wait is right, and NOTHING about what releases him: that
+    // is where the officer's clause lives, and two lines cannot carry both. A
+    // lesson that stages an officer never shows this card at all
+    // (`advisorPromptForSession` asks `lessonStagesController` first).
+    cardPeekBg: "Чакаш правилно: на червено не се тръгва.",
+    // The officer's clause is the difference between waiting and −10, so the
+    // line says when green is NOT the signal rather than dropping it.
+    convictedCardPeekBg: "Тръгваш на зелено — ако няма регулировчик.",
     namedTitleBg: "Защо чакаш: червен сигнал",
     // SWEEP161: this line used to say „без изключения" and there IS one. The
     // exception is retrieved, not recalled — the second sentence is the rule
@@ -1529,6 +1982,10 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   pedestrian: {
     cardBg:
       "Чакаш правилно — пешеходецът на пътеката минава пръв. Изчакай да освободи платното; не минавай зад гърба му.",
+    convictedCardBg:
+      "Пешеходецът на пътеката минава пръв. Изчакай да освободи платното; не минавай зад гърба му.",
+    cardPeekBg: "Чакаш правилно: пешеходецът е пръв.",
+    convictedCardPeekBg: "Изчакай пешеходеца да освободи платното.",
     namedTitleBg: "Защо чакаш: пешеходец на пътеката",
     // SWEEP161, sc-crossing-dart/mobile/right 06-waited.png: the car is halted
     // with its nose already over the first zebra bars — the painted stripes run
@@ -1581,6 +2038,10 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   railVehicle: {
     cardBg:
       "Чакаш правилно — трамваят минава пръв. Изчакай го да премине ИЗЦЯЛО и чак тогава завивай: той не може да те заобиколи.",
+    convictedCardBg:
+      "Трамваят минава пръв. Изчакай го да премине ИЗЦЯЛО и чак тогава завивай: той не може да те заобиколи.",
+    cardPeekBg: "Чакаш правилно: трамваят минава пръв.",
+    convictedCardPeekBg: "Изчакай трамвая да мине изцяло.",
     namedTitleBg: "Защо чакаш: релсовото возило минава пръв",
     namedBg:
       "Спрял си правилно. Когато на дадено място едновременно е разрешено преминаването на нерелсови и релсови пътни превозни средства, водачът на нерелсовото е длъжен да пропусне релсовото — независимо от неговото местоположение и посока на движение. Тук към това се добавя и левият завой: завиващият пропуска насрещно движещите се. Затова чакането не е учтивост, а задължение, и трамваят не се „премерва“ като кола: спирачният му път е в пъти по-дълъг, а релсите не завиват — той няма как да те заобиколи, дори да иска. Изчакай целите му 14 метра да минат покрай устието и чак тогава завивай.",
@@ -1629,6 +2090,11 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   oncomingVehicle: {
     cardBg:
       "Чакаш правилно — насрещните минават първи. Брой секундите до най-близкия: под 4 секунди не се тръгва, а се чака.",
+    convictedCardBg:
+      "Насрещните минават първи. Брой секундите до най-близкия: под 4 секунди не се тръгва, а се чака.",
+    // No „4": the figure is the card's and the briefing's, never a peek's.
+    cardPeekBg: "Чакаш правилно: насрещните са първи.",
+    convictedCardPeekBg: "Насрещните минават първи — брой секундите.",
     namedTitleBg: "Защо чакаш: завиващият наляво пропуска",
     namedBg:
       "Спрял си правилно. При завиване наляво за навлизане в друг път водачът на завиващото нерелсово пътно превозно средство е длъжен да пропусне насрещно движещите се пътни превозни средства. Зеленото отваря кръстовището, но не отменя това задължение — предимството остава на насрещните. Затова интервалът се мери в СЕКУНДИ, а не „на око“: самият ляв завой отнема 2–3 секунди от насрещната лента, така че под 4 секунди резервът ти е нула. Ударът при отнет ляв завой е страничен, в незащитената врата.",
@@ -1735,6 +2201,13 @@ export function lessonYieldsToRailVehicle(lesson: LessonSpec): boolean {
 const RAIL_PRIORITY_RED_COPY: YieldVoiceCopy = {
   cardBg:
     "Чакаш правилно на червено. Зеленото пуска и трамвая насреща, а той минава пръв: изчакай го да отмине изцяло и чак тогава завивай.",
+  convictedCardBg:
+    "На червено се спира. Зеленото пуска и трамвая насреща, а той минава пръв: изчакай го да отмине изцяло и чак тогава завивай.",
+  // The reassurance, and the half the generic red-light line gets wrong on this
+  // lesson in the fewest words that fit: the tram goes first, green or not.
+  cardPeekBg: "Чакаш правилно — и трамваят е пръв.",
+  // The half the generic red-light line gets wrong on this lesson.
+  convictedCardPeekBg: "Зеленото пуска и трамвая — той минава пръв.",
   // No long-wait card, exactly as `redLight`: this wait ends when a lamp turns
   // and a tram clears, neither of which a second card may hint him past.
   namedTitleBg: "Защо чакаш: червен сигнал и релси в платното",
@@ -1757,11 +2230,17 @@ const RAIL_PRIORITY_RED_COPY: YieldVoiceCopy = {
   lawRef: LAW_RAIL_PRIORITY,
 };
 
-/** The live-wait card at a red the rails do not release. */
-export function railPriorityWaitAdvisorPrompt(): AdvisorPrompt {
+/**
+ * The live-wait card at a red the rails do not release. `convicted` — see
+ * `yieldWaitAdvisorPrompt`; absent means the card as it always was.
+ */
+export function railPriorityWaitAdvisorPrompt(convicted = false): CoachedAdvisorPrompt {
   // No key chips, for the reason `yieldWaitAdvisorPrompt` gives: neither
   // „carry on waiting" nor „watch the tram" is a control this car has.
-  return { textBg: RAIL_PRIORITY_RED_COPY.cardBg, keys: [] };
+  const copy = RAIL_PRIORITY_RED_COPY;
+  return convicted
+    ? { textBg: copy.convictedCardBg, keys: [], peekBg: copy.convictedCardPeekBg }
+    : { textBg: copy.cardBg, keys: [], peekBg: copy.cardPeekBg };
 }
 
 /**
@@ -1797,7 +2276,17 @@ function yieldVoiceCopyFor(reason: YieldReason, railPriority: boolean): YieldVoi
  * hold lasts. `yieldCardCopyCoversLongWait` (below) is what stops a future
  * author closing that gap for tidiness.
  */
-export function yieldWaitAdvisorPrompt(reason: YieldReason, heldSec?: number): AdvisorPrompt {
+export function yieldWaitAdvisorPrompt(
+  reason: YieldReason,
+  heldSec?: number,
+  /**
+   * The episode this wait belongs to already carries a graded mute-code
+   * conviction (`yieldEpisodeConvicted`). The card then keeps the duty and the
+   * act and drops the approval — `convictedCardBg`. Omitted by every caller that
+   * has no voice memory, which is the card as it always was.
+   */
+  convicted = false,
+): CoachedAdvisorPrompt {
   const copy = YIELD_VOICE_COPY[reason];
   // An unreadable clock is NOT a long wait — the same direction the demo deck
   // and the touch hint take with an unreadable speed: a number nobody can read
@@ -1814,11 +2303,28 @@ export function yieldWaitAdvisorPrompt(reason: YieldReason, heldSec?: number): A
   // to guard asked its own private version instead. Two spellings of one rule is
   // how a later author closes that gap „for tidiness" in one of them and nothing
   // fails: the predicate keeps saying no while the card starts saying go.
+  //
+  // THE LONG CARD SURVIVES A CONVICTION, and deliberately: none of its three
+  // texts approves of the wait («Чакането стана дълго…» and then how it ends),
+  // so a convicted episode that has since stood thirty seconds is owed the same
+  // „how does this end" as a clean one. What a conviction removes is praise.
   const textBg =
-    yieldCardCopyCoversLongWait(reason) && held >= YIELD_CARD_LONG_WAIT_S
-      ? (copy.longCardBg ?? copy.cardBg)
-      : copy.cardBg;
-  return { textBg, keys: [] };
+    yieldCardCopyCoversLongWait(reason) && held >= YIELD_CARD_LONG_WAIT_S && copy.longCard
+      ? copy.longCard.textBg
+      : convicted
+        ? copy.convictedCardBg
+        : copy.cardBg;
+  // …and the phone's line for whichever card that is. The opening card and its
+  // convicted twin each have their own (`YieldVoiceCopy.cardPeekBg`): the clean
+  // line keeps «Чакаш правилно» with its reason, the convicted one approves
+  // nothing, exactly as the two cards differ.
+  const peekBg =
+    textBg === copy.longCard?.textBg
+      ? copy.longCard.peekBg
+      : convicted
+        ? copy.convictedCardPeekBg
+        : copy.cardPeekBg;
+  return { textBg, keys: [], peekBg };
 }
 
 /**
@@ -1838,7 +2344,189 @@ export function yieldWaitAdvisorPrompt(reason: YieldReason, heldSec?: number): A
  * somebody decide which side it falls on.
  */
 export function yieldCardCopyCoversLongWait(reason: YieldReason): boolean {
-  return YIELD_VOICE_COPY[reason].longCardBg !== undefined;
+  return YIELD_VOICE_COPY[reason].longCard !== undefined;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHAT THE VOICE REMEMBERS ABOUT A CONVICTION — sc-roundabout-entry:8be266cf.
+ *
+ * `YieldVoiceState` (types.ts) remembers what was SAID about a wait and nothing
+ * about what was GRADED during it. The mute in `stepYieldVoice` dropped the
+ * pending verdict on the conviction frame and kept no trace of having done so,
+ * so the moment the car stopped again inside YIELD_VOICE_EPISODE_GAP_S the
+ * episode resumed clean: the card went back to «Чакаш правилно», and the next
+ * departure — four seconds with no further fault — was congratulated on its
+ * gap. `.audit-frames/w49/frames/sc-roundabout-entry__pc-right/04-t059s.png`
+ * and `04-t064s.png`; reproduced through `applyTick` in
+ * `yield-voice-convicted-episode.test.ts` before anything changed.
+ *
+ * THE RULE NOW: an episode any of whose segments carries a graded code THAT
+ * GRADES THE DUTY BEING WAITED FOR speaks no praise at all. No naming line (it
+ * opens «Спрял си правилно»), no settled line, no verdict; and the card drops
+ * its approval (`convictedCardBg`). The graded channel owns that junction for
+ * the rest of the episode, which is the sentence rule 4 at the head of this
+ * block already states for one frame.
+ *
+ * „THE DUTY BEING WAITED FOR" AND NOT „ANY MUTE CODE", measured — round 3's
+ * first cut convicted on any of the eight, and `YIELD_VOICE_MUTE_CODES` holds
+ * two that grade no junction duty at all. A lawful red-light wait with a
+ * COLLISION graded at t = 0.5 s lost BOTH its lines («Защо чакаш: червен
+ * сигнал», «Чакането Е маневрата») and its card turned into «На червено се
+ * спира ПРЕД линията…» — a stop-line recital aimed at the one student who DID
+ * stop, on a wait the grader never faulted. That is requirement zero inverted:
+ * the conviction was suppressing an EXPLANATION, not a congratulation. So the
+ * in-episode conviction asks `muteCodeGradesThisDuty`, which is the question it
+ * can answer exactly — the code landed on a frame of THIS episode, so there is
+ * nothing to attribute and no hedge to make.
+ *
+ * NO SITE CHECK HERE, and the reason is the same sentence: attribution is what
+ * a site check is FOR, and in-episode there is nothing to attribute. MEASURED
+ * on the six committed race witnesses, a site gate would also be inert — the
+ * barge is billed 0.08 / 1.75 / 5.56 / 5.83 / 11.11 / 19.61 m from the paint
+ * (N = 0 … 10 at the frame's own 3 км/ч crawl), all inside
+ * YIELD_VOICE_SAME_SITE_M = 26. So it cannot make a row pass that does not
+ * already; the only thing it could ever DO is acquit, because a departure moves
+ * the car away from its stopping point by construction — 26 m is about thirteen
+ * seconds at 10 км/ч, and the 120° ring pose those drives end at is 46.59 m
+ * from the paint. A gate whose only reachable effect is to hand «Интервалът
+ * беше добър» back to a departure the grader has just billed is not a
+ * safeguard; it is 04-t064s with a distance in front of it.
+ *
+ * AND ONE STEP WIDER, NARROWED BY DUTY AND BY SITE. A barge billed on the way
+ * in and braked into a stop at the same mouth never had a clean segment to
+ * convict — the episode begins AFTER the fault — and «Спрял си правилно» two
+ * seconds after «Влизане без пропускане» is the same frame by another route. So
+ * a conviction within YIELD_VOICE_EPISODE_GAP_S before an episode begins
+ * convicts it too, but only when it can be about THIS wait:
+ *  · BY DUTY (`MUTE_CODE_DUTIES`). A student who rolled a Б2 and then stopped
+ *    correctly for a pedestrian eight metres on keeps «Защо чакаш: пешеходец на
+ *    пътеката» — the explanation of a DIFFERENT duty he is discharging
+ *    correctly, which is a THEO-4 loss this row has no business causing.
+ *  · BY SITE (`YIELD_VOICE_SAME_SITE_M`), where the caller says where the car
+ *    is. The round-2 verifier's residual: a FAILED_TO_YIELD at one junction and
+ *    a correct stop at a DIFFERENT give-way line inside the twelve seconds lost
+ *    «Защо чакаш» there, because duty alone cannot tell two Б1 lines apart.
+ *    Without a site the rule is the round-2 rule, which errs toward silence.
+ *
+ * THE FIELDS LIVE ON `YieldVoiceState` (types.ts) since round 3. Round 2 had to
+ * carry them on an intersection type because that file was another lane's;
+ * `engine.ts` stores the state it is handed without rebuilding it, so nothing
+ * about the runtime changed when the declaration moved, and
+ * `yield-voice-convicted-episode.test.ts` drives the real `applyTick` so an
+ * engine that ever rebuilt the object field by field turns red.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+type RecentConviction = NonNullable<YieldVoiceState["recentConvictions"]>[number];
+
+/**
+ * How near to where a conviction was billed a NEW wait must stand to inherit
+ * it, metres: YIELD_STOP_LINE_REACH_M, the reach within which the hold itself
+ * calls a line „the line he is waiting at". A barge at a ring mouth braked into
+ * a stop at that mouth is a car length or two from its bill (w49's witness
+ * poses, product frame: «преди 2 с» on 04-t059s puts the bill at t ≈ 56–57, the
+ * car between (5.21, −27.38) and (5.84, −24.60); it stood at (5.97, −23.95) —
+ * under four metres); two different junctions of the catalogue's drills are
+ * further apart than one approach.
+ */
+export const YIELD_VOICE_SAME_SITE_M = YIELD_STOP_LINE_REACH_M;
+
+/**
+ * WHICH WAITS A CONVICTION SPEAKS FOR, when it lands BEFORE the wait began.
+ * Read off what each code grades in the rule catalogue:
+ *
+ *   FAILED_TO_YIELD               the priority family — a Б1/Б2 line, a ring
+ *                                 mouth, the oncoming stream, the rails
+ *   PEDESTRIAN_NOT_YIELDED /
+ *   PEDESTRIAN_CROSSING_TOO_FAST  the zebra
+ *   RED_LIGHT_CROSSED /
+ *   CONTROLLER_SIGNAL_VIOLATED    the signal (an officer's junction holds as
+ *                                 `redLight`, see `controllerWaitAdvisorPrompt`)
+ *   STOP_SIGN_NO_FULL_STOP        the Б2 line
+ *
+ * ABSENT MEANS „GRADES NO JUNCTION DUTY", IN BOTH READERS: a COLLISION and an
+ * unyielded emergency vehicle are not a duty of one junction, so neither
+ * convicts a wait, whichever side of the wait's first frame it landed on.
+ *
+ * IT WAS ASYMMETRIC FOR ONE EVENING, AND THE ASYMMETRY WAS THE DEFECT. The
+ * in-episode reader took „absent convicts nothing" (the red-light/COLLISION
+ * measurement in THE RULE NOW above) while the cross-gap reader kept
+ * „absent convicts every duty" on the reasoning that a conviction billed BEFORE
+ * a wait is a guess and a wrong guess should err toward silence (rule 4). An
+ * adversarial verifier then measured the consequence end to end through
+ * `engine.applyTick` on the roundabout drill: a car that clips another at
+ * t = 2.0 s and then stops CORRECTLY at the ring at t ≈ 3.0 s lost «Защо чакаш:
+ * в кръга имат предимство» and «Чакането Е маневрата» outright, where HEAD said
+ * both — the same harm the in-episode filter had just been written to stop, one
+ * frame away, and reachable because `YIELD_VOICE_EPISODE_GAP_S` is twelve
+ * seconds. The product answered one question two opposite ways depending on
+ * whether the crash landed a tenth of a second before or after the wait began.
+ *
+ * SO BOTH READERS NOW ASK „does this code grade THIS duty". Rule 4's „err
+ * toward silence" still governs the half where silence is the honest answer —
+ * an unknown SITE (`convictionAtThisSite`) — and it no longer reaches the
+ * EXPLANATION of a duty the grader never faulted, which is what THEO-4
+ * protects. Measured on the swap: the 503-tape corpus is unchanged on every
+ * field, and the roundabout barge (FAILED_TO_YIELD → `roundaboutEntry`, mapped
+ * below) still convicts, which is the whole of sc-roundabout-entry:8be266cf.
+ *
+ * `muteCodeConvictsDuty` is kept as the older name so a reader who arrives from
+ * the round-2/round-3 comments finds it; it now delegates.
+ */
+const MUTE_CODE_DUTIES: Partial<Record<ViolationCode, readonly YieldReason[]>> = {
+  FAILED_TO_YIELD: ["giveWayLine", "stopSign", "roundaboutEntry", "railVehicle", "oncomingVehicle"],
+  PEDESTRIAN_NOT_YIELDED: ["pedestrian"],
+  PEDESTRIAN_CROSSING_TOO_FAST: ["pedestrian"],
+  RED_LIGHT_CROSSED: ["redLight"],
+  CONTROLLER_SIGNAL_VIOLATED: ["redLight"],
+  STOP_SIGN_NO_FULL_STOP: ["stopSign"],
+};
+
+const NO_CONVICTIONS: ReadonlyArray<RecentConviction> = [];
+
+/**
+ * Does this conviction speak for a wait of this duty? The older name, kept
+ * because the round-2 and round-3 comments point a reader at it; it is now
+ * exactly `muteCodeGradesThisDuty`. See `MUTE_CODE_DUTIES` for the evening the
+ * two differed and the measurement that ended it.
+ */
+export function muteCodeConvictsDuty(code: ViolationCode, reason: YieldReason): boolean {
+  return muteCodeGradesThisDuty(code, reason);
+}
+
+/**
+ * Does this code grade THE DUTY BEING WAITED FOR? The one question both
+ * conviction readers ask. A code that grades no junction duty — a COLLISION, an
+ * unyielded emergency vehicle — convicts no wait: it is billed and explained on
+ * its own card, and silencing the explanation of a duty the grader never
+ * faulted is THEO-4 inverted. See `MUTE_CODE_DUTIES`.
+ */
+export function muteCodeGradesThisDuty(code: ViolationCode, reason: YieldReason): boolean {
+  const duties = MUTE_CODE_DUTIES[code];
+  return duties !== undefined && duties.includes(reason);
+}
+
+/**
+ * Was this conviction billed at the site the car is now waiting at? Unknown on
+ * either side — no site this frame, or a conviction recorded without one — is
+ * „yes", the round-2 rule, because the direction a wrong guess may err in is
+ * silence (rule 4). See `YIELD_VOICE_SAME_SITE_M`.
+ */
+function convictionAtThisSite(c: RecentConviction, site: YieldVoiceSite | undefined): boolean {
+  if (site === undefined || c.x === undefined || c.y === undefined) return true;
+  return Math.hypot(site.x - c.x, site.y - c.y) <= YIELD_VOICE_SAME_SITE_M;
+}
+
+/**
+ * Does the wait the card is about to describe belong to a convicted episode?
+ * Read off the voice's own memory, so the card and the teach channel cannot
+ * disagree about one wait. The reason must match: the memory describes the
+ * episode the voice folded THIS frame, and a mismatch is a hold the voice has
+ * not seen yet (or never will — an exam session), which is „not convicted".
+ */
+export function yieldEpisodeConvicted(s: LessonSessionState, reason: YieldReason): boolean {
+  const voice: YieldVoiceState | undefined = s.yieldVoice;
+  return voice !== undefined && voice.convicted === true && voice.reason === reason;
 }
 
 /** Fresh voice: nothing said, nothing pending. */
@@ -1866,6 +2554,113 @@ export interface YieldVoiceInput {
    * absent means „no" — the generic copy, byte-identical.
    */
   railPriority?: boolean;
+  /**
+   * WHERE the car is this frame, and where round the route's nearest ring
+   * (`yieldVoiceSiteAt`). sc-roundabout-entry:8be266cf — the two facts the
+   * voice needed and was never handed: which site a conviction belongs to, and
+   * whether the entry a `roundaboutEntry` verdict describes has happened (see
+   * YIELD_VOICE_RING_ENTRY_ARC_DEG). Optional, and ABSENT MEANS „CANNOT SAY":
+   * the verdict keeps its time window and a recent conviction speaks for any
+   * site, which is exactly the fold before this field existed.
+   */
+  site?: YieldVoiceSite;
+}
+
+/**
+ * One frame of WHERE, for the voice. Pure geometry off the route's own
+ * objectives — nothing graded reads it, and it grades nothing.
+ */
+export interface YieldVoiceSite {
+  /** The car, route space (SimTick.position). */
+  x: number;
+  y: number;
+  /** The nearest roundabout this route drives, measured from the car; null = none. */
+  ring: YieldVoiceRingFix | null;
+}
+
+/** The car's polar position about one ring objective's island. */
+export interface YieldVoiceRingFix {
+  /** The island centre — also the ring's identity from frame to frame. */
+  x: number;
+  y: number;
+  /** The objective's own entry circle (`stepRoundabout`'s `entered` latch). */
+  enterRadiusM: number;
+  /** Car → island centre, metres. */
+  dM: number;
+  /** Azimuth of the car about the island, degrees, in `stepRoundabout`'s own
+   *  convention (only differences are ever read, so the zero does not matter). */
+  azDeg: number;
+}
+
+/**
+ * The frame's `YieldVoiceSite` — what `engine.ts` hands `stepYieldVoice` as
+ * `site`. Every `completeManeuver`/`roundabout` objective of the ROUTE is a
+ * candidate, completed or not: the wait is already known to be a
+ * `roundaboutEntry` (finish.ts `yieldReasonAt` decided that off the unfinished
+ * ones), and what the voice needs afterwards is the island the car stood at,
+ * which does not stop existing when its objective ticks. Takes the objectives
+ * rather than a params array so the engine's call allocates nothing to make
+ * one.
+ */
+export function yieldVoiceSiteAt(
+  objectives: ReadonlyArray<{ params: ObjectiveParams }>,
+  position: { x: number; y: number },
+): YieldVoiceSite {
+  let ring: YieldVoiceRingFix | null = null;
+  for (const o of objectives) {
+    const p = o.params;
+    if (p.kind !== "completeManeuver" || p.maneuver !== "roundabout") continue;
+    const dM = Math.hypot(position.x - p.x, position.y - p.y);
+    if (ring !== null && ring.dM <= dM) continue;
+    ring = {
+      x: p.x,
+      y: p.y,
+      enterRadiusM: p.enterRadiusM,
+      dM,
+      azDeg: (Math.atan2(position.x - p.x, -(position.y - p.y)) * 180) / Math.PI,
+    };
+  }
+  return { x: position.x, y: position.y, ring };
+}
+
+/** Signed shortest turn from `fromDeg` to `toDeg`, in (−180, 180]. */
+function signedTurnDeg(fromDeg: number, toDeg: number): number {
+  const raw = (((toDeg - fromDeg) % 360) + 360) % 360;
+  return raw > 180 ? raw - 360 : raw;
+}
+
+/**
+ * Has the entry a pending `roundaboutEntry` verdict describes HAPPENED — the
+ * car inside the same island's entry circle and YIELD_VOICE_RING_ENTRY_ARC_DEG
+ * round it from where it stood? A pending verdict with no stopping point
+ * recorded (any other duty, or a caller that gave no site) is not waiting for
+ * an entry, so it is `true`: the time window alone, as before.
+ */
+function ringEntryHappened(
+  stood: NonNullable<YieldVoiceState["pending"]>["ring"],
+  site: YieldVoiceSite | undefined,
+): boolean {
+  if (stood === undefined) return true;
+  const now = site?.ring;
+  if (now == null || now.x !== stood.x || now.y !== stood.y) return false;
+  return now.dM <= now.enterRadiusM && Math.abs(signedTurnDeg(stood.azDeg, now.azDeg)) >= YIELD_VOICE_RING_ENTRY_ARC_DEG;
+}
+
+/**
+ * Has the car LEFT the ring a pending verdict was waiting to see it enter —
+ * beyond the approach the hold is defined over (finish.ts
+ * YIELD_ROUNDABOUT_APPROACH_M), or nearer a different island? Then no entry is
+ * coming, «влезе» can never be true, and the verdict is dropped unjudged.
+ * No site this frame is „cannot tell", which keeps it waiting.
+ */
+function ringEntryAbandoned(
+  stood: NonNullable<YieldVoiceState["pending"]>["ring"],
+  site: YieldVoiceSite | undefined,
+): boolean {
+  if (stood === undefined || site === undefined) return false;
+  const now = site.ring;
+  if (now === null || now.x !== stood.x || now.y !== stood.y) return true;
+  return now.dM > now.enterRadiusM + YIELD_ROUNDABOUT_APPROACH_M;
 }
 
 /**
@@ -1916,9 +2711,10 @@ function say(
  *    and what gap he is looking for, with the article;
  *  · the wait lasts  → after YIELD_VOICE_SETTLE_S, say once that the waiting
  *    itself is the manoeuvre and is costing him nothing;
- *  · the wait ends and the wheels turn → after YIELD_VOICE_VERDICT_S, say
- *    whether the gap was right — unless the graded channel already said it was
- *    not, in which case say nothing at all.
+ *  · the wait ends and the wheels turn → after YIELD_VOICE_VERDICT_S (and, at a
+ *    ring the caller can locate, once the car has actually entered it —
+ *    YIELD_VOICE_RING_ENTRY_ARC_DEG), say whether the gap was right — unless
+ *    the graded channel already said it was not, in which case say nothing.
  *
  * Everything else is bookkeeping that keeps each of those to exactly once.
  */
@@ -1926,9 +2722,9 @@ export function stepYieldVoice(
   prev: YieldVoiceState | undefined,
   input: YieldVoiceInput,
 ): YieldVoiceStep {
-  const { t, wait, violations } = input;
+  const { t, wait, violations, site } = input;
   const railPriority = input.railPriority === true;
-  const base = prev ?? createYieldVoice();
+  const base: YieldVoiceState = prev ?? createYieldVoice();
   const notices: YieldVoiceNotice[] = [];
   const moving = Math.abs(input.speedKmh) > YIELD_VOICE_STANDSTILL_KMH;
 
@@ -1938,10 +2734,52 @@ export function stepYieldVoice(
   let endedAtSec = base.endedAtSec;
   let spoken = base.spoken;
   let pending = base.pending;
+  let convicted = base.convicted === true;
+
+  // --- 0. The conviction, before anything reads it (`YieldVoiceState`). ----
+  // Read once and remembered, where it used to be read once and FORGOTTEN: the
+  // mute below dropped the verdict and nothing else, so a stop inside the
+  // episode gap resumed a clean episode. An episode that is still alive — the
+  // wait is running, or ended recently enough to resume — carries it from here
+  // until it is forgotten.
+  const gradedMute = violations.some((c) => YIELD_VOICE_MUTE_CODES.includes(c));
+  // …but only a code that grades THE DUTY BEING WAITED FOR convicts the episode
+  // (`muteCodeGradesThisDuty`). `gradedMute` below still drops any pending
+  // verdict on this frame whatever the code — dropping a verdict is silence, and
+  // silence is the direction rule 4 allows. Convicting is not: it silences the
+  // wait's own EXPLANATION and re-aims its card, and a COLLISION graded during a
+  // lawful red-light wait did exactly that (THE RULE NOW, in the block above).
+  // (A const so the `!== null` narrowing reaches inside the callback — `reason`
+  // is a `let` the fold reassigns below, and TS will not narrow one of those
+  // through a closure.)
+  const episodeDuty = reason;
+  if (
+    episodeDuty !== null &&
+    violations.some((c) => YIELD_VOICE_MUTE_CODES.includes(c) && muteCodeGradesThisDuty(c, episodeDuty))
+  ) {
+    convicted = true;
+  }
+  // The window a NEW episode is convicted from. Entries are appended in time
+  // order, so the oldest is first; the list is rebuilt only on a frame that adds
+  // or expires one — this fold runs on every driving frame, and a per-frame
+  // allocation for a list that is empty on almost every drive buys nothing.
+  // Each entry keeps WHERE it was billed when the caller said, so a later wait
+  // can ask whether it is the same site (`convictionAtThisSite`).
+  const prior = base.recentConvictions ?? NO_CONVICTIONS;
+  const expired = prior.length > 0 && t - prior[0].atSec > YIELD_VOICE_EPISODE_GAP_S;
+  const recentConvictions =
+    !gradedMute && !expired
+      ? prior
+      : [
+          ...prior.filter((c) => t - c.atSec <= YIELD_VOICE_EPISODE_GAP_S),
+          ...violations
+            .filter((c) => YIELD_VOICE_MUTE_CODES.includes(c))
+            .map((code): RecentConviction => (site === undefined ? { atSec: t, code } : { atSec: t, code, x: site.x, y: site.y })),
+        ];
 
   // --- 1. The verdict window, first: it can be muted by this very frame. ----
   if (pending !== null) {
-    if (violations.some((c) => YIELD_VOICE_MUTE_CODES.includes(c))) {
+    if (gradedMute) {
       // The graded channel owns this departure. Drop it silently — this is the
       // one branch that must never speak, and it is why the verdict waits.
       pending = null;
@@ -1950,10 +2788,21 @@ export function stepYieldVoice(
       // standing at the same line again. Nothing has been judged, so nothing
       // is said; the episode below simply resumes.
       pending = null;
+    } else if (ringEntryAbandoned(pending.ring, site)) {
+      // He left the ring he was waiting to enter — turned off, or backed out
+      // past its approach. No entry is coming, so «…и влезе» can never become
+      // true: dropped unjudged, like a departure that never came.
+      pending = null;
     } else if (pending.wentAtSec === null) {
       if (moving) pending = { ...pending, wentAtSec: t };
       else if (t - (endedAtSec ?? t) > YIELD_VOICE_DEPART_GRACE_S) pending = null;
-    } else if (t - pending.wentAtSec >= YIELD_VOICE_VERDICT_S) {
+    } else if (
+      t - pending.wentAtSec >= YIELD_VOICE_VERDICT_S &&
+      // sc-roundabout-entry:8be266cf — AND the entry it describes has happened,
+      // past the point its adjudicator can still convict. Always true for a
+      // verdict that recorded no stopping point; see YIELD_VOICE_RING_ENTRY_ARC_DEG.
+      ringEntryHappened(pending.ring, site)
+    ) {
       const copy = yieldVoiceCopyFor(pending.reason, railPriority);
       notices.push(
         say(
@@ -1981,6 +2830,17 @@ export function stepYieldVoice(
       // a new episode is allowed to be explained from the top.
       sinceSec = wait.sinceSec ?? t;
       spoken = 0;
+      // …UNLESS THE JUNCTION CONVICTED HIM ON THE WAY IN. A barge that is
+      // billed and then braked into a stop at the same mouth never had a clean
+      // wait to resume, and «Спрял си правилно» two seconds after
+      // «Влизане без пропускане» is the 04-t059s frame by another route. „The
+      // same junction" is the number this fold already uses for it, and only a
+      // code that grades THIS duty, billed at THIS site where the caller says
+      // where that was, counts (`MUTE_CODE_DUTIES`, `YIELD_VOICE_SAME_SITE_M`).
+      const duty = wait.reason;
+      convicted = recentConvictions.some(
+        (c) => muteCodeConvictsDuty(c.code, duty) && convictionAtThisSite(c, site),
+      );
     } else if (endedAtSec !== null) {
       // RESUMING AFTER MOTION — the lecture must not re-open (that is what
       // `spoken` carries across), but the CLOCK must not count the metres he
@@ -2003,17 +2863,23 @@ export function stepYieldVoice(
 
     const heldSec = t - sinceSec;
     const copy = yieldVoiceCopyFor(wait.reason, railPriority);
-    if (spoken < 1 && heldSec >= YIELD_VOICE_NAME_S) {
+    // A CONVICTED EPISODE IS NOT NARRATED, and `spoken` does not advance: it
+    // counts lines SAID, and a wait that was never told anything has no verdict
+    // owed to it either (section 3 below reads the same counter).
+    if (!convicted && spoken < 1 && heldSec >= YIELD_VOICE_NAME_S) {
       notices.push(say(copy, copy.namedTitleBg, copy.namedBg, copy.namedPeekBg));
       spoken = 1;
     }
-    if (spoken < 2 && heldSec >= YIELD_VOICE_SETTLE_S) {
+    if (!convicted && spoken < 2 && heldSec >= YIELD_VOICE_SETTLE_S) {
       notices.push(
         say(copy, copy.settledTitleBg, copy.settledBg(Math.round(heldSec)), copy.settledPeekBg),
       );
       spoken = 2;
     }
-    return { state: { reason, sinceSec, endedAtSec, spoken, pending }, notices };
+    return {
+      state: withConviction({ reason, sinceSec, endedAtSec, spoken, pending }, convicted, recentConvictions),
+      notices,
+    };
   }
 
   // --- 3. The wait just ended. --------------------------------------------
@@ -2022,8 +2888,22 @@ export function stepYieldVoice(
     // Only a wait the student was actually TOLD about gets a verdict. A
     // sub-YIELD_VOICE_NAME_S dip was never narrated and judging it would be a
     // bare verdict of exactly the kind this file exists to abolish.
-    if (spoken >= 1 && pending === null) {
+    //
+    // …AND NOT A WAIT WHOSE EPISODE WAS CONVICTED. `spoken` survives a resume
+    // (that is its job), so without this the second departure of 04-t064s —
+    // the stop after «Влизане без пропускане» and four clean seconds — earned
+    // «Интервалът беше добър» for a gap the grader had already judged.
+    if (spoken >= 1 && pending === null && !convicted) {
       pending = { reason, waitedSec: Math.max(0, t - sinceSec), wentAtSec: moving ? t : null };
+      // …AND AT A RING, WHERE ROUND THE ISLAND HE STOOD, so the verdict can wait
+      // for the entry it will describe (YIELD_VOICE_RING_ENTRY_ARC_DEG). This
+      // frame is the first one off the standstill bar, so the car is within
+      // centimetres of its stopping point. No site, no ring: nothing recorded,
+      // and the verdict keeps the time window alone.
+      const ring = site?.ring;
+      if (reason === "roundaboutEntry" && ring != null) {
+        pending = { ...pending, ring: { x: ring.x, y: ring.y, azDeg: ring.azDeg } };
+      }
     }
   }
 
@@ -2032,9 +2912,33 @@ export function stepYieldVoice(
   if (reason !== null && endedAtSec !== null && t - endedAtSec > YIELD_VOICE_EPISODE_GAP_S) {
     reason = null;
     spoken = 0;
+    // …and so is its conviction: the next junction is explained from the top.
+    // `recentConvictions` is kept — it is what lets a barge billed on the way
+    // INTO a new episode still count against it.
+    convicted = false;
   }
 
-  return { state: { reason, sinceSec, endedAtSec, spoken, pending }, notices };
+  return {
+    state: withConviction({ reason, sinceSec, endedAtSec, spoken, pending }, convicted, recentConvictions),
+    notices,
+  };
+}
+
+/**
+ * Attach the conviction memory only where it says something, so a drive that
+ * was never convicted folds a voice state byte-identical to the one it folded
+ * before the conviction memory existed.
+ */
+function withConviction(
+  state: YieldVoiceState,
+  convicted: boolean,
+  recentConvictions: ReadonlyArray<RecentConviction>,
+): YieldVoiceState {
+  return {
+    ...state,
+    ...(convicted ? { convicted: true } : {}),
+    ...(recentConvictions.length > 0 ? { recentConvictions } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -71,7 +71,7 @@ import {
   type YieldFaultCode,
   type YieldFaultRecord,
 } from "./objectives";
-import { lessonYieldsToRailVehicle, shownObjectiveCapKmh, stepYieldVoice } from "./advisor";
+import { lessonYieldsToRailVehicle, shownObjectiveCapKmh, stepYieldVoice, yieldVoiceSiteAt } from "./advisor";
 import { foldTrainingScore, type PenaltyEscalation } from "./escalation";
 import { examTerminationFor } from "./exam";
 import {
@@ -2191,6 +2191,11 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // advisor card reads, so the card and this teach channel cannot say two
       // different things about one wait. Pure copy selection; nothing graded.
       railPriority: lessonYieldsToRailVehicle(prev.lesson),
+      // sc-roundabout-entry:8be266cf — WHERE the car is, so the gap verdict can
+      // wait for the ring entry it describes («…и влезе») and a conviction can be
+      // tied to the site it was billed at (advisor.ts `YieldVoiceSite`). Pure
+      // geometry off the route's own objectives; nothing graded reads it.
+      site: yieldVoiceSiteAt(objectives, tick.position),
     });
     yieldVoice = voice.state;
     for (const n of voice.notices) hudEvents.push(n);

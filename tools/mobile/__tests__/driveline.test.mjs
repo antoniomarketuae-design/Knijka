@@ -25,7 +25,7 @@
  * boundary check exits, and the repeat series stops recursing. It is the same
  * discipline, and the same argument, as `__tests__/guidance-wiring.test.mjs`.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import assert from "node:assert/strict";
@@ -813,5 +813,311 @@ describe("§K the product surfaces this reader stands on", () => {
       ["sc-vp-handbrake", "sc-vp-readiness"],
       "the set of lessons handed over with the parking brake UP has changed — check that every new one has a touch lane, because a pc lane of one cannot be released",
     );
+  });
+});
+
+/**
+ * ═══ §L THE LAWFUL WAIT, PINNED TO THE ADVISOR'S OWN SOURCE ════════════════
+ *
+ * THE FAILURE THIS EXISTS FOR HAPPENED ONCE ALREADY, SILENTLY. 6363677 (wave
+ * 25) rewrote the Б2 card from «Знак Б2: пълното спиране е задължително — и е
+ * направено» to «Знак Б2 иска две неща…», and LAWFUL_WAIT_RE kept the old stem
+ * through w49: every Б2 wait after it held only as long as its 8 s «Защо
+ * чакаш» notice (w45/w46 `sc-junction-stop__pc-right`, «withdrawn after 8s»),
+ * and nothing went red, because the only thing that could notice was a sweep.
+ * Round 2 (2026-09-17) then moved every wait on the phone behind a summary and
+ * stripped «Чакаш правилно» off a convicted wait on both platforms.
+ *
+ * So the strings are read out of `advisor.ts` AT TEST TIME, never copied here:
+ * a card rewritten on the next commit fails THIS file on that commit. Every
+ * field is resolved or the test fails naming it — a reader that skips a shape
+ * it cannot parse is green and blind, which is the one kind of instrument this
+ * programme has paid for three times.
+ *
+ * AND BOTH DIRECTIONS, because a matcher that matches everything is worth what
+ * one that matches nothing is: a false wait parks a `right` leg for 45 s and
+ * prints «verdict is suspect» about a drive that did nothing wrong.
+ */
+describe("§L the lawful wait is read in every form advisor.ts can say it", () => {
+  const REPO = resolve(HERE, "..", "..", "..");
+  const src = (p) => readFileSync(resolve(REPO, p), "utf8");
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  /** A one-line regex literal of the harness, compiled the way the page compiles it. */
+  const harnessRe = (name) => {
+    const m = CODE.match(new RegExp(`const ${name} =\\s*\\/(.+?)\\/([a-z]*);\\n`));
+    assert.ok(m, `${name} is no longer a one-line regex literal in lesson-audit.mjs — re-derive this reader`);
+    return new RegExp(m[1], m[2]);
+  };
+  const GLASS = harnessRe("LAWFUL_WAIT_RE");
+  const CARD = harnessRe("LAWFUL_WAIT_CARD_RE");
+  const ADVISOR = strip(src("platform/src/modules/sim/lessons/advisor.ts"));
+
+  /** The `{…}` that opens at or after `from`, skipping every string literal. */
+  const braceBlock = (code, from) => {
+    const open = code.indexOf("{", from);
+    assert.ok(open >= 0, "no block where one was expected — the parse, not the product, is wrong");
+    let depth = 0;
+    for (let i = open; i < code.length; i += 1) {
+      const ch = code[i];
+      if (ch === '"' || ch === "`" || ch === "'") {
+        for (i += 1; i < code.length && code[i] !== ch; i += 1) if (code[i] === "\\") i += 1;
+        continue;
+      }
+      if (ch === "{") depth += 1;
+      else if (ch === "}" && (depth -= 1) === 0) return code.slice(open, i + 1);
+    }
+    return assert.fail("an unterminated block — the parse, not the product, is wrong");
+  };
+  /** A field whose value is ONE plain string literal. Absent → undefined; present
+   *  in any other shape → a failure that names it, never a skip. */
+  const literal = (block, name, where) => {
+    if (!new RegExp(`(?:^|[\\s{,])${name}:`).test(block)) return undefined;
+    const m = new RegExp(`(?:^|[\\s{,])${name}:\\s*"((?:[^"\\\\]|\\\\.)*)"\\s*[,}]`).exec(block);
+    assert.ok(m, `${where}.${name} is not one plain string literal — this reader cannot see it; teach it the shape instead of skipping it`);
+    return JSON.parse(`"${m[1]}"`);
+  };
+  const required = (block, name, where) => {
+    const v = literal(block, name, where);
+    assert.ok(typeof v === "string" && v.trim() !== "", `${where}.${name} is missing — the wait copy changed shape`);
+    return v;
+  };
+  const tableAt = (head) => {
+    const at = ADVISOR.indexOf(head);
+    assert.ok(at >= 0, `«${head}» is gone from advisor.ts — the wait copy moved and this reader reads nothing`);
+    return { at, block: braceBlock(ADVISOR, ADVISOR.indexOf("=", at)) };
+  };
+  const YIELD = tableAt("const YIELD_VOICE_COPY");
+  const RAIL = tableAt("const RAIL_PRIORITY_RED_COPY");
+  const entries = [
+    ...[...YIELD.block.matchAll(/\n {2}(\w+): \{/g)].map((m) => ({
+      where: `YIELD_VOICE_COPY.${m[1]}`,
+      block: braceBlock(YIELD.block, m.index + m[0].length - 1),
+    })),
+    { where: "RAIL_PRIORITY_RED_COPY", block: RAIL.block },
+  ];
+
+  it("reads every duty: seven reasons and the rail-priority red, or it says it could not", () => {
+    assert.ok(entries.length >= 8, `only ${entries.length} wait copies parsed — the parse is wrong, not the product`);
+  });
+
+  it("every opening card AND every convicted card is a lawful wait, off the advisor card", () => {
+    for (const { where, block } of entries) {
+      const card = required(block, "cardBg", where);
+      const convicted = required(block, "convictedCardBg", where);
+      assert.match(card, CARD, `${where}.cardBg «${card}» is not recognised — a right leg releases this wait at STOP_MS`);
+      assert.match(
+        convicted,
+        CARD,
+        `${where}.convictedCardBg «${convicted}» is not recognised — after a conviction the leg drives off from the second stop (sc-roundabout-entry:8be266cf)`,
+      );
+    }
+  });
+
+  it("every notice that names or settles a wait is a lawful wait, off the glass", () => {
+    for (const { where, block } of entries) {
+      for (const field of ["namedTitleBg", "settledTitleBg"]) {
+        const t = required(block, field, where);
+        assert.match(t, GLASS, `${where}.${field} «${t}» is not recognised on the glass`);
+      }
+    }
+  });
+
+  it("the long card is the product's RELEASE, never a wait — on every duty that has one", () => {
+    // On Б1, Б2 and the ring mouth `yieldReasonAt` is positional, so the long
+    // card is the only sentence that lets the wait end short of 180 s: the w45
+    // pc waits at sc-jx-giveway-b1, sc-rb-busy-gap, sc-roundabout-entry and
+    // sc-rb-ped-exit each log «withdrawn after 30s» on exactly that swap.
+    let seen = 0;
+    for (const { where, block } of entries) {
+      if (!/(?:^|[\s{,])longCard:/.test(block)) continue;
+      const long = braceBlock(block, block.search(/(?:^|[\s{,])longCard:/));
+      for (const field of ["textBg", "peekBg"]) {
+        const t = required(long, field, `${where}.longCard`);
+        assert.doesNotMatch(t, CARD, `${where}.longCard.${field} «${t}» reads as a wait — every such leg would sit to LAWFUL_WAIT_MAX_MS`);
+        assert.doesNotMatch(t, GLASS, `${where}.longCard.${field} «${t}» reads as a wait on the glass`);
+      }
+      seen += 1;
+    }
+    assert.ok(seen >= 1, "no long card parsed — either the release moved or this reader went blind");
+  });
+
+  it("the officer's card claims no wait — holding on the lamp's card is how sc-sig-controller-live was convicted", () => {
+    const m = ADVISOR.match(/const CONTROLLER_WAIT_CARD_BG =\s*((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+);/);
+    assert.ok(m, "CONTROLLER_WAIT_CARD_BG is not a concatenation of literals any more — this reader cannot see it");
+    const card = [...m[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((x) => JSON.parse(`"${x[1]}"`)).join("");
+    assert.match(card, /регулировчик/u, "the parse returned something that is not the officer's card");
+    assert.doesNotMatch(card, CARD);
+    assert.doesNotMatch(card, GLASS);
+  });
+
+  it("nothing else advisor.ts can put on that card reads as a wait", () => {
+    const rest = ADVISOR.replace(YIELD.block, "").replace(RAIL.block, "");
+    const lits = [...rest.matchAll(/"((?:[^"\\\n]|\\.)*)"/g)]
+      .map((m) => m[1])
+      .filter((s) => /[А-Яа-я]/u.test(s) && s.length >= 12);
+    assert.ok(lits.length >= 30, `only ${lits.length} other literals found — the parse is wrong`);
+    for (const s of lits) {
+      assert.doesNotMatch(s, CARD, `«${s}» is not a wait card and reads as one`);
+      assert.doesNotMatch(s, GLASS, `«${s}» is not a wait card and reads as one on the glass`);
+    }
+  });
+
+  it("no lesson's objective title or briefing step reads as a wait — the dead Б2 stem matched one", () => {
+    // Objective titles reach the advisor card through `taskSentencePrompt`;
+    // briefing steps reach the glass. Against the matcher before this change,
+    // sc-jx-giveway-b1's step 4 («…тук пълното спиране е задължително…») fails
+    // this test — a lawful wait declared by a briefing.
+    const dir = resolve(REPO, "platform/src/modules/sim/lessons/scenario");
+    let n = 0;
+    for (const f of readdirSync(dir).filter((x) => x.endsWith(".ts"))) {
+      const t = strip(readFileSync(resolve(dir, f), "utf8"));
+      for (const m of t.matchAll(/(?:titleBg|textBg):\s*"((?:[^"\\\n]|\\.)*)"/g)) {
+        n += 1;
+        assert.doesNotMatch(m[1], CARD, `${f}: «${m[1]}» reads as a wait card`);
+        assert.doesNotMatch(m[1], GLASS, `${f}: «${m[1]}» reads as a lawful wait on the glass`);
+      }
+    }
+    assert.ok(n >= 1000, `only ${n} scenario titles/steps parsed — the parse is wrong`);
+  });
+
+  it("the phone's summary is never what the wait hangs on — the card carrying it carries the sentence, and the phone mounts that card", () => {
+    for (const { where, block } of entries) required(block, "cardPeekBg", where);
+    // The pairing: whichever card a wait prompt prints, its `textBg` is one of
+    // the sentences above.
+    const fn = (name) => {
+      const at = ADVISOR.indexOf(`export function ${name}(`);
+      assert.ok(at >= 0, `${name} is gone from advisor.ts`);
+      return braceBlock(ADVISOR, ADVISOR.indexOf(")", ADVISOR.indexOf("):", at)));
+    };
+    const yieldFn = fn("yieldWaitAdvisorPrompt");
+    for (const needle of ["copy.cardBg", "copy.convictedCardBg", "copy.cardPeekBg"]) {
+      assert.ok(yieldFn.includes(needle), `yieldWaitAdvisorPrompt no longer builds its prompt from ${needle}`);
+    }
+    const railFn = fn("railPriorityWaitAdvisorPrompt");
+    for (const needle of ["copy.cardBg", "copy.convictedCardBg", "copy.cardPeekBg"]) {
+      assert.ok(railFn.includes(needle), `railPriorityWaitAdvisorPrompt no longer builds its prompt from ${needle}`);
+    }
+    // The card: the harness's selector names the element that prints the sentence.
+    const sel = CODE.match(/const ADVISOR_CARD_SEL = '(.+)';/);
+    assert.ok(sel, "ADVISOR_CARD_SEL is gone from the harness");
+    const label = sel[1].match(/aria-label="([^"]+)"/)[1];
+    const AC = strip(src("platform/src/components/sim/lesson-ui/AdvisorCard.tsx"));
+    assert.ok(AC.includes(`aria-label="${label}"`), `AdvisorCard no longer carries aria-label="${label}" — the card read finds nothing`);
+    assert.ok(AC.includes('role="status"'), "AdvisorCard is no longer role=status");
+    assert.ok(AC.includes("{prompt.textBg}"), "AdvisorCard no longer prints the whole sentence");
+    // …and the phone keeps it MOUNTED: inside the roomy column the shell hides
+    // with a class on compact, not behind a condition that unmounts it.
+    const S = strip(src("platform/src/components/sim/lesson-ui/LessonPlayShell.tsx"));
+    assert.equal(S.split("<AdvisorCard").length - 1, 1, "AdvisorCard is mounted in more or fewer places than the one this reader proved");
+    const mount = S.indexOf("<AdvisorCard");
+    const column = S.lastIndexOf('data-hud="notify-column"', mount);
+    assert.ok(column >= 0, "AdvisorCard is no longer inside the roomy notify column");
+    const between = S.slice(column, mount);
+    assert.deepEqual(
+      between.match(/compact[^\n]*/g),
+      ['compact ? "hidden" : ""'],
+      "the roomy column's only compact clause is no longer a `hidden` class — on the phone the card may now be UNMOUNTED, and every phone wait reads as nothing",
+    );
+    assert.ok(S.slice(mount, mount + 600).includes("textBg: advisorTextBg"), "the card no longer receives the advisor's sentence as textBg");
+  });
+
+  it("the probe reads both surfaces and the stop phase holds on what it read", () => {
+    assert.ok(CODE.includes("waitCardSrc: LAWFUL_WAIT_CARD_RE.source"), "the card matcher is not handed to the page");
+    assert.ok(CODE.includes("advisorSel: ADVISOR_CARD_SEL"), "the advisor selector is not handed to the page");
+    assert.ok(/shell\.querySelectorAll\(advisorSel\)\)\s*advisorText \+= `\$\{el\.textContent/.test(CODE), "the card is not read off its textContent");
+    assert.ok(CODE.includes("lawfulWait: glassWait ?? cardWait"), "the probe's lawfulWait no longer carries the card read");
+    assert.ok(CODE.includes("if (atRest && p.lawfulWait !== null)"), "THE CONSUMER: the stop phase no longer holds on lawfulWait");
+    assert.ok(!GLASS.source.includes("пълното спиране е задължително"), "the dead Б2 stem is back");
+  });
+});
+
+/**
+ * ═══ §M TWO MORE LOOKS AT A PC FAULT CARD ══════════════════════════════════
+ *
+ * A violation card lives TEACHING_TOAST_TTL_MS on the glass and the textual
+ * beat is ~5.5 s, so a card was photographed once or never. The extra beats are
+ * pinned from both sides: they must land inside the card's life as HudToasts
+ * defines it TODAY, and they must be frames — named, ordered and inert — that
+ * every existing reader already consumes.
+ */
+describe("§M the fault-card beats", () => {
+  const REPO = resolve(HERE, "..", "..", "..");
+  const src = (p) => readFileSync(resolve(REPO, p), "utf8");
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const num = (name) => {
+    const m = CODE.match(new RegExp(`const ${name} = ([\\d_]+);`));
+    assert.ok(m, `${name} is gone from the harness`);
+    return Number(m[1].replace(/_/g, ""));
+  };
+  const OFFSETS = (() => {
+    const m = CODE.match(/const FAULT_CARD_BEAT_OFFSETS_MS = \[([^\]]*)\];/);
+    assert.ok(m, "FAULT_CARD_BEAT_OFFSETS_MS is gone from the harness");
+    return m[1].split(",").map((s) => Number(s.trim().replace(/_/g, ""))).filter((v) => Number.isFinite(v));
+  })();
+  const H = strip(src("platform/src/modules/sim/hud/HudToasts.tsx"));
+
+  it("both beats land inside the card's life as HudToasts defines it, a tick of sighting included", () => {
+    const ttl = H.match(/const TEACHING_TOAST_TTL_MS = ([\d_]+);/);
+    assert.ok(ttl, "TEACHING_TOAST_TTL_MS is gone — the fault card's life is no longer a number this reader can see");
+    const TTL = Number(ttl[1].replace(/_/g, ""));
+    assert.ok(/event\.kind === "violation"[\s\S]{0,80}\?\s*TEACHING_TOAST_TTL_MS/.test(H), "a violation card no longer lives TEACHING_TOAST_TTL_MS");
+    const TICK = num("TICK_MS");
+    const LATE = num("FAULT_CARD_BEAT_LATE_MS");
+    const COALESCE = num("FAULT_CARD_BEAT_COALESCE_MS");
+    assert.ok(OFFSETS.length >= 2, "fewer than two extra beats per card");
+    for (const o of OFFSETS) assert.ok(o > 0, `an extra beat at +${o} ms is not after the sighting`);
+    const last = Math.max(...OFFSETS);
+    assert.ok(last + 2 * TICK <= TTL, `the last beat (+${last} ms) plus a tick to see the card is past its ${TTL} ms life`);
+    assert.ok(last + LATE <= TTL, `a beat taken FAULT_CARD_BEAT_LATE_MS (${LATE}) late would photograph an expired card`);
+    const sorted = [...OFFSETS].sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i += 1) {
+      assert.ok(sorted[i] - sorted[i - 1] >= COALESCE, "one card's own beats would coalesce into one");
+    }
+  });
+
+  it("the hook is the violation card and only the violation card", () => {
+    assert.ok(CODE.includes('const FAULT_TOAST_BODY_SEL = "[data-hud-toast-body]";'));
+    assert.ok(CODE.includes(`const FAULT_TOAST_COLUMN_SEL = '[data-hud="toasts"]';`));
+    assert.equal(H.split("data-hud-toast-body=").length - 1, 1, "data-hud-toast-body is no longer on exactly one card kind");
+    const v = H.indexOf("function ViolationToast(");
+    const c = H.indexOf("function ToastCard(");
+    const at = H.indexOf("data-hud-toast-body=");
+    assert.ok(v >= 0 && c > v && at > v && at < c, "data-hud-toast-body is no longer inside ViolationToast");
+    const firstP = H.indexOf("<p", v);
+    assert.ok(H.slice(firstP, firstP + 200).includes("{event.titleBg}"), "the violation card's first <p> is no longer its title — the card key reads the wrong line");
+    assert.ok(H.slice(v, firstP).includes("minusPointsBg("), "the header before the title no longer carries the points");
+    assert.ok(H.includes('data-hud="toasts"'), "the toast column lost its handle");
+  });
+
+  it("the extra beats are ordinary 04-t<NNN>s frames every reader already enumerates", () => {
+    const P = src("tools/mobile/lib/perception-corpus.mjs");
+    const m = P.match(/const FRAME_RE = \/(.+)\/;/);
+    assert.ok(m, "perception-corpus.mjs FRAME_RE moved");
+    const FRAME_RE = new RegExp(m[1]);
+    assert.ok(CODE.includes('const label = `04-t${String(Math.round((takenAt - t0) / 1000)).padStart(3, "0")}s`;'), "the extra beat's name changed shape");
+    assert.ok(CODE.includes('const periodicLabel = `04-t${String(Math.round((now - t0) / 1000)).padStart(3, "0")}s`;'), "the periodic beat's name changed shape");
+    for (const sec of [0, 7, 61, 184]) assert.match(`04-t${String(sec).padStart(3, "0")}s.png`, FRAME_RE);
+  });
+
+  it("booked only on pc, taken after the periodic beat, and touching nothing the control law reads", () => {
+    assert.ok(CODE.includes('applies: PLATFORM === "pc"'), "the extra beats are no longer pc-only");
+    assert.ok(CODE.includes("faultBodySel: FAULT_TOAST_BODY_SEL") && CODE.includes("faultColumnSel: FAULT_TOAST_COLUMN_SEL"), "the probe is not handed the card hooks");
+    assert.ok(CODE.includes("shell.querySelectorAll(faultBodySel)"), "the probe no longer reads the violation cards");
+    // THE CONSUMER CHAIN: probe field → booking → queue → beat().
+    const book = CODE.indexOf("if (faultBeats.applies) {");
+    assert.ok(book >= 0 && CODE.slice(book, book + 2000).includes("p.faultCards"), "nothing books beats off the probe's faultCards");
+    assert.ok(CODE.slice(book, book + 2000).includes("faultBeatQueue.push("), "a new card books no beat");
+    const periodic = CODE.indexOf("await beat(periodicLabel, { withShot })");
+    const extraAt = CODE.indexOf("while (faultBeatQueue.length > 0 && Date.now() >= faultBeatQueue[0].dueAt)");
+    const extraEnd = CODE.indexOf("if (ended) break;", extraAt);
+    assert.ok(periodic > 0 && extraAt > periodic && extraEnd > extraAt, "the extra beats no longer run after the periodic beat");
+    const extra = CODE.slice(extraAt, extraEnd);
+    assert.ok(extra.includes("await beat(label, { withShot: true })"), "a due extra beat takes no frame");
+    assert.ok(extra.includes("beatLabelsTaken.has(label)"), "an extra beat can overwrite a frame of the same second");
+    for (const forbidden of ["lastFrame =", "lastShot =", "throttle(", "brake(", "steer(", "phase =", "waitStartedAt", "phaseAt ="]) {
+      assert.ok(!extra.includes(forbidden), `the extra-beat block touches «${forbidden}» — it may photograph, never drive`);
+    }
+    assert.ok(CODE.includes("!beatLabelsTaken.has(periodicLabel)"), "the periodic beat can overwrite an extra beat's frame");
+    assert.ok(CODE.includes("saveStatus({ faultBeats })"), "the books are never published");
   });
 });

@@ -52,6 +52,7 @@ import type {
   LessonSpec,
   NearMissEvent,
   NearMissStats,
+  RouteHold,
   StagedEventOutcome,
 } from "@/modules/sim/lessons";
 import type { DashboardStatus, MinimapFrame } from "@/modules/sim/hud";
@@ -141,6 +142,16 @@ export interface SceneSlotProps {
    *  shell's StatusDashboard bar samples it on a low-Hz interval (see
    *  hud/dashboardStatus.ts). Absent = no writes (bar shows cold defaults). */
   dashboardStatusRef?: React.RefObject<DashboardStatus>;
+  /**
+   * sc-roundabout-entry:8ae6f7a2 — THE ROUTE HOLD, so the in-world pill can
+   * stand «Следвай синята линия» down while the car is off the carriageway or
+   * pinned against what it hit (`followHintStandsDown`, LessonScene.tsx). The
+   * shell reads it with `routeHoldForSession` and hands it down here; this
+   * component spreads every prop into the scene, so declaring it is what makes
+   * the journey type-checked rather than accidental. Absent = no hold, which is
+   * the pill exactly as it shipped.
+   */
+  routeHold?: RouteHold | null;
 }
 
 // The heavy Three.js/rapier bundle loads client-side only (rapier wasm must

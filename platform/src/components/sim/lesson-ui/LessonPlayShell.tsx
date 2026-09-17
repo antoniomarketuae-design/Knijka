@@ -59,6 +59,7 @@ import {
   TOUCH_SHEET_LOCATOR_BG,
   useHudToastQueue,
   useTapActivation,
+  visibleToasts,
   withSheetLocatorBg,
   writeStoredFlag,
   type DashboardStatus,
@@ -2129,6 +2130,57 @@ export function taskOverlayRow(input: AdvisorTaskRowsInput): SimOverlayItem | nu
   };
 }
 
+/**
+ * ── THE ADVISOR CARD ON THE PHONE — sc-merge-from-property:6715b581 ─────────
+ *
+ * THE FRAMES: `.audit-frames/w49/frames/sc-merge-from-property__mobile-right/
+ * 04-t090s.png` stops at «…извън платното сцеплението» above «↓ ОЩЕ 2 РЕДА»,
+ * and 04-t178s is the crash-pin card cut the same way with «([)» in it. Both
+ * are this row, and the cause was the row's SHAPE, not its words: the whole
+ * 131–139-character instruction was built as `lineBg`, and `SimOverlay` prints
+ * the line whole in row 2 with no summary under it — so the 44 px text window
+ * cut the paragraph wherever it ran out, which on both frames was the reason.
+ *
+ * THE HINT CARD ONE ROW UP HAS THE SHAPE THAT FINISHES (98bf8ae, 04-t023s:
+ * «Защо чакаш: пешеходец на пътеката · Пешеходецът минава пръв.»): a short
+ * line, a summary row 2b prints through `overlayPeekBodyBg`, and the whole text
+ * one tap away. This builds the same three for the advisor:
+ *
+ *   lineBg   ADVISOR_ROW_LINE_BG — the card's name, one line. It is the name
+ *            on the control that turns the card off («Съветник»), so a
+ *            student who wants it gone knows which switch it is.
+ *   peekBg   `prompt.peekBg` — authored in `lessons/advisor.ts` beside the
+ *            sentence (`CoachedAdvisorPrompt` makes it required there), held to
+ *            two 24-character lines: one line of name leaves exactly two whole
+ *            body lines in the window.
+ *   detailBg the WHOLE instruction with its key chips, exactly what this row
+ *            used to print, behind «Прочети». Nothing authored is dropped.
+ *            Null when it would only repeat the summary, so a sentence that
+ *            already fits does not grow a button that opens itself.
+ *
+ * A PROMPT WITH NO SUMMARY KEEPS THE OLD SHAPE. Nothing in `advisor.ts` emits
+ * one onto this row — its only summary-less door is the objective's own title,
+ * which `foldAdvisorIntoTask` hands to the task row before this is reached —
+ * but a hand-built prompt still renders as the card it always was rather than
+ * as an empty name. `advisorPeekSummary.test.tsx` proves the census, the
+ * render, and the whole chain from a live session.
+ */
+export const ADVISOR_ROW_LINE_BG = "Съветник";
+
+export function advisorOverlayRow(prompt: AdvisorPrompt): SimOverlayItem {
+  const fullBg = prompt.keys.length > 0 ? `${prompt.textBg} (${prompt.keys.join(" ")})` : prompt.textBg;
+  const base = { id: `advisor:${prompt.textBg}`, kind: "advisor" as const, tone: "neutral" as const };
+  const peek = prompt.peekBg;
+  if (typeof peek !== "string" || peek.trim() === "") return { ...base, lineBg: fullBg };
+  return {
+    ...base,
+    lineBg: ADVISOR_ROW_LINE_BG,
+    peekBg: peek,
+    detailBg: fullBg === peek ? null : fullBg,
+    openLabelBg: "Прочети",
+  };
+}
+
 export function advisorTaskRows(
   input: AdvisorTaskRowsInput,
   fresh: AdvisorTaskFreshness,
@@ -2142,15 +2194,7 @@ export function advisorTaskRows(
   //    `foldAdvisorIntoTask`.
   const advisorRow: SimOverlayItem | null =
     fresh.advisorFresh && advisorPrompt !== null && input.fold.advisorSpeaks
-      ? {
-          id: `advisor:${advisorPrompt.textBg}`,
-          kind: "advisor",
-          tone: "neutral",
-          lineBg:
-            advisorPrompt.keys.length > 0
-              ? `${advisorPrompt.textBg} (${advisorPrompt.keys.join(" ")})`
-              : advisorPrompt.textBg,
-        }
+      ? advisorOverlayRow(advisorPrompt)
       : null;
 
   // 7. The objective, announced and then retired to the micro menu.
@@ -2588,6 +2632,190 @@ export function toastPageScrollTop(
  */
 export function isToastArrival(resetForId: number, newestId: number): boolean {
   return newestId >= 0 && newestId > resetForId;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE FOLD, READ OFF THE PAINTED COLUMN — sc-roundabout-entry:fe081cf1 (major),
+ * repair round 3. `measureToastFold` took two readings that were wrong, and
+ * both errors were silent ones.
+ *
+ * 1 · THE FOLD ROW COUNTED ITS OWN HEIGHT AS A CUT.
+ *
+ *   THE FRAME: `.audit-frames/w49/frames/sc-roundabout-entry__pc-right/
+ *   04-t090s.png` shows «Излизане от платното за движение», −3. Its summary
+ *   «Там никой не те очаква.» is under the fade, its citation is under the
+ *   edge, and «↓ обяснението продължава — покажи» sits underneath. That row
+ *   went up for the PREVIOUS card (the cut «Научи» on 04-t085s) and never came
+ *   down. Below the recall pill the column has 119.7 px, and the −3 card is
+ *   117 px, so it fits. But the row is a `shrink-0` sibling of this scroller.
+ *   While it is up, the scroller is 119.7 − 23.5 − 6 (the column's `gap-1.5`)
+ *   = 90 px. The card is cut in that, the count says „cut", and the row stays.
+ *   The only thing cutting the card was the control announcing the cut.
+ *
+ *   SO WHILE THE ROW IS UP, „IS ANYTHING BELOW THE FOLD" IS ASKED OF THE
+ *   COLUMN WITHOUT THE ROW. A row that is only needed because it exists is not
+ *   needed. Replayed in the round-3 rig (the «Научи» card up and cut, the −3
+ *   arriving under it, the «Научи» card's TTL running out), 5 of 5 in each
+ *   engine: before, the −3 card ends CUT in a 90 px window with the row up;
+ *   after, it ends WHOLE, with no row, in 117 px (116 in WebKit).
+ *
+ *   THE LAYOUT ENGINE ANSWERS, NOT ARITHMETIC. The first proposal was
+ *   `clientHeight + row.offsetHeight + rowGap`. That sum is the window without
+ *   the row ONLY while this scroller is the column's sole yielder, and it is
+ *   not: `BriefingCard` is `[flex-shrink:20]` in the same column, and flexbox
+ *   hands a freed pixel back to it roughly nine-to-one (the ratio argued at
+ *   `data-hud-toast-scroller`). With a briefing up — which is how every student
+ *   who never presses its ✕ drives — the sum promised the scroller pixels it
+ *   would mostly never get. So the row went down, the card was still cut, the
+ *   row came back, and the sum said „down" again. Measured in the round-3 rig
+ *   (this module bundled whole, the real `BriefingCard` and `HudToasts` in the
+ *   shell's column class for class): the row mounted and unmounted on EVERY
+ *   frame, ~60 times a second in Chromium and ~32 in headless WebKit, on 20
+ *   and 23 of the scanned briefing-open columns — and 0 with the read below.
+ *   Instead, the row is taken out of flow for ONE read. `position: absolute`
+ *   removes a flex item and its gap exactly as unmounting it would. The
+ *   scroller's `clientHeight` is read, and the inline style is put back to the
+ *   exact string it held, synchronously, before any paint or `ResizeObserver`
+ *   gather. Every observed box ends the call at the size it started, so no
+ *   observer delivers anything. `HudToasts` measures its card body the same
+ *   way, for the same reason: this question belongs to the layout engine.
+ *
+ *   Stable by construction, in both directions. With the row up and the probe
+ *   saying „fits", the row unmounts into exactly the layout the probe read. With
+ *   no row and the plain read saying „cut", the row mounts, and the probe then
+ *   reads the layout from before it mounted, which was cut.
+ *
+ *   TWO DETAILS OF THE READ.
+ *     · `position: absolute`, not `display: none`. Both take the row out of
+ *       flex flow, but only the first keeps it rendered, so nothing that reacts
+ *       to an element leaving the render tree (focus fix-up) has anything to
+ *       see. A keyboard press on «покажи» is exactly when this runs. Measured:
+ *       a focused row keeps focus through the read in both engines, with 0
+ *       blur events. For the record, a synchronous `display: none` round trip
+ *       did not blur it either, so this choice relies on nothing.
+ *     · A scroller that grows while scrolled near its end has its `scrollTop`
+ *       CLAMPED, and putting the style back does not undo that. Measured in
+ *       both engines, a read at `scrollTop` 121 left it at 93 without the
+ *       write-back. That only happens when the read says the row can go, and
+ *       the unmount clamps the same way a frame later, but without the
+ *       write-back the frame in between would paint a 28 px jump. So
+ *       `scrollTop` is written back if it moved.
+ *
+ *   THE SENTENCE IS STILL COUNTED IN THE WINDOW THE STUDENT HAS. If the probe
+ *   says the row is still needed, the row stays, and «още N известия» must
+ *   describe what is under THAT cut. Counting against the larger, hypothetical
+ *   window would call a whole hidden second fault „the explanation continues",
+ *   which is the direction `rowsFullyBelowFold` may never round in.
+ *
+ * 2 · THE ENTRY ANIMATION WAS MEASURED AS A FIT.
+ *
+ *   `hud-toast-in` (`HudStyles.tsx`) starts at `scale(0.96)` about the card's
+ *   centre. The fold was measured with `getBoundingClientRect` in the arrival
+ *   commit's passive effect, which runs on the animation's first frames, so the
+ *   card's measured bottom came up 2 % of its height short. A card cut by a few
+ *   pixels raised no row (a 114 px card in a 111 px window, 5 of 5, round-2
+ *   verifier; round-3 rig, a 176 px card cut by 2 and 3 px, 5 of 5 in both
+ *   engines, and by 4 px in Chromium). Nothing asked again: a transform moves
+ *   no layout box, so no `ResizeObserver` fires when the animation ends. The
+ *   card stayed cut, with no row, for its whole life. It was an artefact of
+ *   MOTION, not a threshold anyone chose: under `prefers-reduced-motion` the
+ *   animation is `none`, and the same code raised the row for the same 2, 3
+ *   and 4 px cuts (Chromium, rig).
+ *
+ *   The rows are now LAYOUT reads. The height is `offsetHeight`, and each
+ *   card's place in the stack is an `offsetTop` difference. CSSOM View defines
+ *   both as „ignoring any transforms". They are also the integer reads
+ *   `HudToasts` uses to choose paragraph or summary (`toastCardFitsWindow`), so
+ *   the card and the fold row now agree on what „fits" means, to the pixel. A
+ *   lone card is below the fold exactly when `offsetHeight > clientHeight + 1`,
+ *   which is exactly when that function calls it cut.
+ *
+ *   `offsetTop` is measured from the offset PARENT, the trap
+ *   `listRowsInScrollCoords` was written about. Here it is only ever a
+ *   DIFFERENCE between a card and the stack holding it, and that cancels the
+ *   parent as long as they share one, which they do today: the column is the
+ *   nearest positioned ancestor of both. If a later edit makes the stack itself
+ *   a containing block, the card's `offsetTop` is already stack-relative. Any
+ *   other shape is read the old way, off the rect, which is how every card was
+ *   read before this repair and is no worse.
+ *
+ *   WHAT THAT COSTS, stated rather than found later. A cut of 2–4 px usually
+ *   falls in the card's own bottom padding (`py-1`) and hides no ink, yet it
+ *   now raises a row that takes ~30 px of window. That is the same 1 px rule
+ *   `rowsBelowFold` and `toastCardFitsWindow` already apply everywhere else,
+ *   and it is what this column already did for every student who reads with
+ *   reduced motion. Giving the fold a padding-sized allowance would make the
+ *   fold and the card's own choice disagree again, and it would be a separate
+ *   decision, not part of this repair.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export interface ToastFold {
+  /** Cards that cannot be read to their last line — decides whether the row is up. */
+  belowFold: number;
+  /** Cards the student has seen none of — decides which sentence the row says. */
+  unseenBelowFold: number;
+}
+
+const NO_TOAST_FOLD: ToastFold = { belowFold: 0, unseenBelowFold: 0 };
+
+/** `HudToasts`' cards in the scroller's content coordinates, off LAYOUT reads —
+ *  see „THE ENTRY ANIMATION WAS MEASURED AS A FIT". */
+export function toastCardRowsInScrollCoords(
+  scroller: HTMLElement,
+  stack: HTMLElement,
+): Array<{ top: number; height: number }> {
+  const stackTop = stack.getBoundingClientRect().top;
+  return listRowsInScrollCoords(
+    scroller.getBoundingClientRect().top,
+    scroller.scrollTop,
+    Array.from(stack.children, (child) => {
+      const card = child as HTMLElement;
+      if (card.offsetParent !== null && card.offsetParent === stack.offsetParent) {
+        return { top: stackTop + (card.offsetTop - stack.offsetTop), height: card.offsetHeight };
+      }
+      if (card.offsetParent === stack) {
+        return { top: stackTop + stack.clientTop + card.offsetTop, height: card.offsetHeight };
+      }
+      const rect = card.getBoundingClientRect();
+      return { top: rect.top, height: rect.height };
+    }),
+  );
+}
+
+/** The scroller's `clientHeight` as it would be with `row` gone from the
+ *  column's flow — one read, every write undone before it returns. See „THE
+ *  FOLD ROW COUNTED ITS OWN HEIGHT AS A CUT". */
+export function toastScrollerHeightWithoutRow(scroller: HTMLElement, row: HTMLElement): number {
+  const position = row.style.position;
+  const scrollTop = scroller.scrollTop;
+  row.style.position = "absolute";
+  const height = scroller.clientHeight;
+  row.style.position = position;
+  if (scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;
+  return height;
+}
+
+/**
+ * The toast column's fold, measured. `scroller` is `[data-hud-toast-scroller]`;
+ * the cards are `[data-hud="toasts"]`'s children (`HudToasts` owns that box);
+ * the fold row, when it is up, is `[data-hud-toast-more]` beside the scroller.
+ */
+export function measureToastColumnFold(scroller: HTMLElement): ToastFold {
+  const stack = scroller.querySelector<HTMLElement>('[data-hud="toasts"]');
+  if (stack === null) return NO_TOAST_FOLD;
+  const rows = toastCardRowsInScrollCoords(scroller, stack);
+  const scrollTop = scroller.scrollTop;
+  const fold: ToastFold = {
+    belowFold: rowsBelowFold(rows, scrollTop, scroller.clientHeight),
+    unseenBelowFold: rowsFullyBelowFold(rows, scrollTop, scroller.clientHeight),
+  };
+  if (fold.belowFold === 0) return fold;
+  const row = scroller.parentElement?.querySelector<HTMLElement>(":scope > [data-hud-toast-more]") ?? null;
+  if (row === null) return fold;
+  return rowsBelowFold(rows, scrollTop, toastScrollerHeightWithoutRow(scroller, row)) === 0
+    ? NO_TOAST_FOLD
+    : fold;
 }
 
 /**
@@ -6368,27 +6596,28 @@ export function LessonPlayShell({
   // picks the sentence. See `rowsFullyBelowFold` for why one count cannot do
   // both jobs on a column of faults.
   const [toastsUnseenBelowFold, setToastsUnseenBelowFold] = useState(0);
+  // THE READING ITSELF IS `measureToastColumnFold` (module level, beside
+  // `isToastArrival`), since sc-roundabout-entry:fe081cf1 round 3: layout reads
+  // rather than transformed rects, and a fold row that no longer holds itself
+  // up. This callback only stores what it returns.
   const measureToastFold = useCallback(() => {
     const el = toastScrollRef.current;
     if (el === null) return;
-    const stack = el.querySelector('[data-hud="toasts"]');
-    if (stack === null) {
-      setToastsBelowFold(0);
-      setToastsUnseenBelowFold(0);
-      return;
-    }
-    const listTop = el.getBoundingClientRect().top;
-    const rows = listRowsInScrollCoords(
-      listTop,
-      el.scrollTop,
-      Array.from(stack.children).map((card) => {
-        const r = (card as HTMLElement).getBoundingClientRect();
-        return { top: r.top, height: r.height };
-      }),
-    );
-    setToastsBelowFold(rowsBelowFold(rows, el.scrollTop, el.clientHeight));
-    setToastsUnseenBelowFold(rowsFullyBelowFold(rows, el.scrollTop, el.clientHeight));
+    const fold = measureToastColumnFold(el);
+    setToastsBelowFold(fold.belowFold);
+    setToastsUnseenBelowFold(fold.unseenBelowFold);
   }, []);
+  // …AND THE ROW LEAVES WITH THE LAST CARD, in the same commit rather than one
+  // frame later. `toastsBelowFold` is state, and the only thing that zeroes it
+  // once `HudToasts` stops rendering is the observer effect below, re-created
+  // after that commit has PAINTED. So on the frame the last card expired, the
+  // column was empty with «↓ обяснението продължава — покажи» under it (5 of 5
+  // expiries in the round-2 rig). That is the shape pc-wrong `04-t016s.png`
+  // photographs; its timestamps cannot settle whether it IS that frame, and
+  // the repair does not depend on it. `visibleToasts` is the very rule
+  // `HudToasts` returns null on, so this count is zero exactly when there is no
+  // card to be below anything.
+  const toastsShownCount = visibleToasts(toasts, toastsQuiet).length;
   useEffect(() => {
     const el = toastScrollRef.current;
     if (el === null) return;
@@ -7370,6 +7599,12 @@ export function LessonPlayShell({
             // Car status dashboard: the scene writes the live cabin state
             // (blink clock included) into this shared per-frame channel.
             dashboardStatusRef={dashboardStatusRef}
+            // sc-roundabout-entry:8ae6f7a2 — the route hold, so the in-world
+            // «Следвай синята линия» pill stands down while the car is off the
+            // carriageway or pinned against what it hit. Same fact the objective
+            // banner already renders (`objectiveTitleUnderHold` above); the pill
+            // reads it through `followHintStandsDown` (LessonScene.tsx).
+            routeHold={snap.objectiveHold}
           />
         </div>
 
@@ -7779,7 +8014,10 @@ export function LessonPlayShell({
                   // («it severs a whole text line through the letter bodies»).
                   // `TOAST_FADE_PX` is derived from THIS surface's type; the
                   // derivation and the 28 are at its declaration.
-                  toastsBelowFold > 0
+                  //
+                  // `toastsShownCount > 0`: no fade over an empty box — see
+                  // „THE ROW LEAVES WITH THE LAST CARD" at `measureToastFold`.
+                  toastsBelowFold > 0 && toastsShownCount > 0
                     ? {
                         WebkitMaskImage: TOAST_FADE_MASK_CSS,
                         maskImage: TOAST_FADE_MASK_CSS,
@@ -7801,8 +8039,12 @@ export function LessonPlayShell({
                   sweep. WebKit's overlay bar exists only during a scroll and the
                   harness runs Chromium with `--hide-scrollbars`, so a measured
                   sentence is the only affordance both the student and the
-                  instrument can see. */}
-              {toastsBelowFold > 0 ? (
+                  instrument can see.
+
+                  …AND NOT ONE FRAME AFTER THE LAST CARD HAS GONE:
+                  `toastsShownCount` is `HudToasts`' own rule, read at render —
+                  see „THE ROW LEAVES WITH THE LAST CARD" at `measureToastFold`. */}
+              {toastsBelowFold > 0 && toastsShownCount > 0 ? (
                 <button
                   type="button"
                   onClick={revealMoreToasts}
