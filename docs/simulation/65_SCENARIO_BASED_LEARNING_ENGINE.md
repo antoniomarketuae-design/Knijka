@@ -69,7 +69,13 @@ The 5 highest-leverage events by exam points: **ev-overtake** (33q/75pt) · **ev
 
 The learning discipline, implemented in `platform/src/modules/sim/scenarios/policy.ts`:
 
-- **`teach-first-then-grade`** (default): the **first** encounter of a scenario **teaches** — pause, contextual mini-lesson with the law citation, **no penalty**. Every **repeat grades**, and grades harder each time (penalty ×1.0 → ×1.5 → ×2.0, capped).
+- **`teach-first-then-grade`** (default): the **first** encounter of a scenario **teaches** — pause, contextual mini-lesson with the law citation, **no penalty**. Every **repeat grades**, and grades harder each time (penalty ×1.0 → ×1.5 → ×2.0, capped). One qualification on „no penalty", because the exception below turns on it: a breach still running 6 s or 10 s later, or at the finish, is re-billed once — `rules/engine.ts:1162-1166`, where that second bill „exists ONLY to reach the charge the free lesson consumed". So the free first time is free only if the student stops.
+  - **Exception — the lesson's own mistake ([ADR-009](../architecture/07_ARCHITECTURE_DECISION_RECORDS.md), founder Ruling A, 2026-09-17).** This is decided but **not yet implemented**; until it lands, the shipped engine applies the rule above to these codes too. On a practice rung (L1/L2/L3/L5) of a scenario lesson, a code in `lessonMistakeTargets` is handled as follows:
+    - its first occurrence is always taught, even when its topic was already taught by another code;
+    - its continuing-breach re-bill is not charged;
+    - the lesson is **not taken**.
+
+    A genuine repeat still grades as above (founder answer F1). Incidental mistakes and exam mode (L4) are unchanged by **Ruling A** itself; curriculum lessons, exam-bank variants and the exam card are out of scope by **founder answer F2**.
 - **`always-grade`**: safety-critical scenarios (wrong-way, running a red, railway crossing) grade from the first encounter — but still show the lesson the first time.
 - **`learn-only`**: illustrative, never penalised.
 

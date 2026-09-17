@@ -21,6 +21,8 @@
 
 **Produced media (implemented):** [66 Produced-media ground rules](development/66_PRODUCED_MEDIA_GROUND_RULES.md) — R0–R6, LAW for every clip/still ✅ · [69 Headless clip production](development/69_HEADLESS_CLIP_PRODUCTION.md) — the unattended renderer ✅ · [90 FR-19 clip production spec](simulation/90_FR19_CLIP_PRODUCTION_SPEC.md) — which of the thirteen pre-drive steps get a clip, which keep the still, and the reject gate ✅
 
+**Grading policy (founder Ruling A, 2026-09-17):** [ADR-009](architecture/07_ARCHITECTURE_DECISION_RECORDS.md) — a practice lesson is not taken when the student commits the mistake that lesson teaches (no exam points, always explained) · [92 ADR-009 implementation spec](simulation/92_ADR009_LESSON_MISTAKE_SPEC.md) — the derivation, the lanes, the copy and the acceptance census, with its evidence under `simulation/adr-009/` 🚧 implementation pending
+
 **Mobile:** [91 Mobile audit](simulation/91_MOBILE_AUDIT.md) — the phone the founder actually drives on: what is broken (§C), why (§D), the smallest fix for each (§I), the wave order (§J), and the measured wave results (§N, performance on a production build) ✅
 
 ## ai/

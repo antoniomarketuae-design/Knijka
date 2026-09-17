@@ -19,6 +19,10 @@
 
 ## 2. Simulator
 - [x] 150 scenario templates (18k+ exam variants); cockpit-first, real Sofia topology, rule-engine scoring
+  - [ ] **Scenario grading — the lesson's own mistake ([ADR-009](architecture/07_ARCHITECTURE_DECISION_RECORDS.md), founder Ruling A, 2026-09-17).** On a practice rung, committing the mistake the lesson exists to teach means the lesson is **not taken**, even the first time. That first occurrence costs no points, and the card still explains it. **ACCEPTED, implementation pending** — no code yet; lanes 0/R/A/B/C/D/E/F/H/P/G/I, docs first. Founder questions:
+    - **F1 — decided:** repeats cost points as today.
+    - **F2 — decided:** scenario lessons only; curriculum l0–l8, exam-bank variants and the exam card are out of scope.
+    - **F3 — open, conditional:** where the pre-drive rule line goes, asked only if it does not fit the phone briefing.
 - [x] Headless clip renderer — Claude produces reels himself, no founder browser
 - [ ] Founder visual audit of all 150 scenarios (the review-reel; the Half-B reels double as this)
 - [ ] 2 pilot taste-pass fixes still open: emergency-lane hard-block, overtake-ban reframe

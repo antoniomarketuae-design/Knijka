@@ -275,7 +275,7 @@ Ordering logic: unbrick and de-risk first (days), then the four reconstruction p
 | A9 | **Teach moment = pause + card**: freeze physics (MicroQuizOverlay pattern), mini-lesson + citation + acknowledgment; wire ×1.0→×2.0 escalation; miss-replay where the event supports it | Restores the founder-approved doc-65 design (D2, D3); RAPT's replay is the evidence core | M | A8 for replays |
 | A10 | **Objective hardening**: L7 bay geometry + alignment/attempts, L5 stimulus-locked stop, L2 requires meeting ≥1 red, L3 exit-signal check | Objectives must verify the behavior they name (D4) | M | A8 (L5), A5 (L7) |
 | A11 | **Hittable traffic**: dynamic-body NPC proximity shells, car-to-car collision grading, near-miss detection | A driving-consequence product where crashes are impossible teaches invincibility (C1) | M | — |
-| A12 | **FP regression suite + tolerance bands** formalized per detector; warn-once-then-grade for второстепенни in teach mode | Genre's #1 trust-killer, now systematized (D10) | M | QW6 seeds |
+| A12 | **FP regression suite + tolerance bands** formalized per detector; warn-once-then-grade for второстепенни in teach mode. *Amended by [ADR-009](../architecture/07_ARCHITECTURE_DECISION_RECORDS.md) (decided 2026-09-17, implementation pending):* warn-once governs points for incidental mistakes; for the lesson's own mistake on a scenario practice rung, the first occurrence and its re-bill are free and the pass is withheld | Genre's #1 trust-killer, now systematized (D10) | M | QW6 seeds |
 
 **Pillar 4: the closed loop (weeks 5–6)**
 | # | What | Why | Effort | Deps |

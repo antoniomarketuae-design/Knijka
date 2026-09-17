@@ -114,7 +114,14 @@ interface ScenarioSpec {
   success: ObjectiveParams[];      // 6. the graded contract (existing objective kinds)
   rubric?: RubricSpec;             // placement mm-accuracy, attempts, observation checks, par time
   shadow: TraceRef;                // 7. the correct demonstration (recorded trace)
-  mistakes: MistakeDemo[];         // 9/10. { traceRef, titleBg, whatWentWrongBg, codeRefs[] }
+  mistakes: MistakeDemo[];         // 9/10. { traceRef, titleBg, whatWentWrongBg, codeRefs[], incidentalCodeRefs?[] }
+                                   // incidentalCodeRefs (ADR-009, pending): the subset of codeRefs the demo
+                                   // grades only as a SIDE EFFECT — only where the template's own source says
+                                   // so, never all of codeRefs. Every other code on the demo becomes one of
+                                   // the lesson's own mistakes, EXCEPT опасна and terminating codes (already
+                                   // graded on first sight). Second source: any code armed by a default-false
+                                   // ruleConfig detector on that rung — those sit on no demo, so they CANNOT
+                                   // be marked incidental. Practice rungs (L1/L2/L3/L5) only.
   teach: { whenBg, whyBg, lawRef, examinerBg };   // the what/when/why/rule/expectation card set
   levels: LevelSpec[];             // L1..L5 param deltas (aids, traffic, conditions, tolerances)
   staged?: StagedEventSpec[];      // hazards/actors via the orchestrator
@@ -166,6 +173,14 @@ obstacles + spawn + finish, nothing else (the brief's principle).
   format → side-by-side replay + deviation heat coloring + the A15 mistake map.
 - **Validation rule**: every shadow trace must replay through the rules engine with
   ZERO violations (CI gate — a "correct" demo that grades dirty cannot ship).
+- **Mistake-demo rule** ([ADR-009](../architecture/07_ARCHITECTURE_DECISION_RECORDS.md);
+  decided 2026-09-17, implementation pending): every mistake demo should end NOT passed
+  at every practice rung (L1/L2/L3/L5). Two demos are on a named allowlist because their
+  offence comes after the lesson has already completed, so no verdict rule can reach it:
+  `sc-follow-standstill/mistake-creep-up` and `sc-park-perp-forward/mistake-blind-exit`
+  (the latter cites COLLISION alone, so its lesson has no targets in any case). The
+  allowlist may only shrink, and the acceptance census gates it — measured once on a
+  scratch prototype, 2 of 336 demos per rung still passed, and those were these two.
 
 ## 6. Feedback & scoring
 Three verdict classes, mapped to machinery that exists:
@@ -181,15 +196,36 @@ fail — time pressure only at L5). Final screen = official points + rubric star
 (1–3) + the existing corrective texts + „какво да подобриш" + retry. All results
 feed mastery/XP via the shipped A14 path.
 
+**Own-mistake refusal** ([ADR-009](../architecture/07_ARCHITECTURE_DECISION_RECORDS.md);
+decided 2026-09-17, implementation pending). On a practice rung where one of the
+lesson's own mistakes occurred, the final screen shows:
+- a fourth **session-end** verdict — distinct from the three *event* classes above —
+  **„Не е взет"**, beside Издържан / Неиздържан / Незавършен. It is third of four in
+  precedence, not an override: a pass still reads Издържан, a **failed official sheet
+  still reads Неиздържан**, and an aborted run Незавършен. „Не е взет" appears when the
+  sheet passed, the run was not aborted, and one of the lesson's own mistakes occurred;
+- a reason block built only from catalogue text (title, explanation, corrective, lawRef).
+  It renders on every one of those four verdicts, not only on „Не е взет";
+- **stars ≤ 1 when the lesson's own mistake occurred**.
+
+The rule is also stated before the drive, as one briefing line naming the mistakes
+that cost the lesson (founder question F3 applies only if that line does not fit the
+phone briefing; until it is answered, the teach card and the reason block carry the
+rule on their own).
+
 ## 7. Difficulty levels (mapped to existing machinery)
 | Level | Name | Aids | Machinery |
 |---|---|---|---|
-| L1 | Пълна помощ | Shadow ON + follow-hints + pause-on-error | teach-first coach, Instruction mode |
-| L2 | Частична помощ | Path ribbon only, hints after idle | Practice mode patterns |
-| L3 | Самостоятелно | No aids, normal grading | standard lesson grading |
-| L4 | Изпитни условия | Coach OFF, official protocol | examMode (exists) |
-| L5 | Усложнени | + traffic/pedestrians/rain/night/narrow/time | variant tiers + staged events + conditions |
+| L1 | Пълна помощ | Shadow ON + follow-hints + pause-on-error | teach-first coach, Instruction mode + own-mistake refusal (ADR-009) |
+| L2 | Частична помощ | Path ribbon only, hints after idle | Practice mode patterns + own-mistake refusal (ADR-009) |
+| L3 | Самостоятелно | No aids, normal grading | standard lesson grading + own-mistake refusal (ADR-009) |
+| L4 | Изпитни условия | Coach OFF, official protocol | examMode (exists) — no own-mistake refusal; verdict from the official sheet and the route, as today (rubric stars unchanged) |
+| L5 | Усложнени | + traffic/pedestrians/rain/night/narrow/time | variant tiers + staged events + conditions + own-mistake refusal (ADR-009) |
 Level = parameter delta on the SAME template — never a copy.
+The own-mistake refusal (§6) is decided (founder Ruling A, 2026-09-17) and **not yet
+implemented**. L4 never gets it, nor does any other `examMode` rung: there the verdict
+stays „official sheet passed ∧ route completed ∧ not aborted" (`lessons/engine.ts:3093`),
+and the rubric stars are untouched.
 **Top-down (`topdownAllowed`) is granted on EVERY rung, L1–L5** — founder ruling
 2026-07-17: it is a POV, not an aid (§12), and a reverse-park is unreadable without
 it; denying it at L4 while every exam-bank practical variant granted it was an
@@ -200,9 +236,13 @@ out explicitly with `aids: { topdownAllowed: false }`; none ships that way today
 `/simulator` gains a third zone (beside curriculum + exam): **„Сценарии"** — filter
 chips (family, level, conditions, „изпитни упражнения"), search, per-card: title,
 family icon, level dots, personal best stars, „с Shadow Car" badge. Progress feeds
-the dashboard weak-spots/readiness like everything else. Levels gate softly
-(L4 unlocks after L3 stars, etc.) — but any template's L1 is always open (this is a
-practice library, not a second campaign).
+the dashboard weak-spots/readiness like everything else. Levels gate softly — the
+shipped rule is **one attempt on the previous rung, whatever its grade**
+(`lessons/scenario/progress.ts:304-313`; the student-facing sentence is „отваря се
+независимо от оценката", `:207`), with ≥ 2★ merely the nicer reason the catalogue
+prints. Stars open nothing. That matters more now: ADR-009 caps a refused drive at 1★,
+and it is the attempt rule that keeps the ladder moving. Any template's L1 is always
+open (this is a practice library, not a second campaign).
 
 ## 9. Production pipeline (the assembly line; every stage gate is automated where possible)
 1. **Research/spec** (doc-72-grounded): template one-pager — objective, archetypes,
@@ -214,7 +254,13 @@ practice library, not a second campaign).
 4. **Annotations + teach copy**: keyframes, what/when/why/rule/examiner texts —
    catalog-linked, law-cited. [content agents]
 5. **Mistake demos**: 2–4 scripted wrong runs → traces; each MUST grade the exact
-   intended codes (auto-asserted). [behavior agents]
+   intended codes (auto-asserted); a code the demo grades only as a side effect is
+   listed in `incidentalCodeRefs` (**ADR-009 — decided 2026-09-17, implementation
+   pending: the field does not exist yet, so do not author it until lane B lands.**
+   Every other code on the demo becomes one of the lesson's own mistakes on the
+   practice rungs, except опасна and terminating codes; a code armed by a
+   default-false `ruleConfig` detector is a target too and cannot be marked
+   incidental). [behavior agents]
 6. **Wire + variants**: levels/conditions/tiers; property tests over every variant
    (the exam-bank pattern). [assembly agents]
 7. **QA**: independent bot re-run + adversarial FP probe (innocent completion = 0

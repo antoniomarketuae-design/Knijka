@@ -103,7 +103,11 @@ red, narrated, and the student is never scored while the wrong way is shown)
 and a **teach-first-then-grade engine**
 (`platform/src/modules/sim/scenarios/policy.ts` `resolveEncounter`,
 `coach.ts`, integrated in `lessons/engine.ts` `applyTick` — first minor
-mistake teaches, repeats grade, dangerous errors always grade). The
+mistake teaches, repeats grade, dangerous errors always grade — except the
+lesson's own mistake on a scenario practice rung, which costs the lesson, not
+points, on first occurrence: [ADR-009](../architecture/07_ARCHITECTURE_DECISION_RECORDS.md),
+decided 2026-09-17, implementation pending). The THEO-3 sandbox itself is exempt
+from ADR-009, but its graded retry is not. The
 mistake-experience mode composes: student drives the wrong way in a sandboxed
 non-scored pass (teach-first already knows how to suppress scoring) →
 consequence scene (D2 reels) → lawRef citation (already on every template) →
