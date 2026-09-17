@@ -449,12 +449,45 @@ export const TOUCH_MED_MAX_DPR = 2.0;
 export function maxDprFor(level: QualityLevel, signals: DeviceSignals): number {
   const preset = QUALITY_PRESETS[level].maxDpr;
   if (!isTouchOnlyDevice(signals)) return preset;
-  if (level === "low") return Math.min(preset, TOUCH_MAX_DPR);
+  // FOUNDER RULING, 2026-09-16: A PHONE RENDERS AT ITS OWN GLASS, ON EVERY TIER.
+  //
+  // «make it automatically on dp3 for the whole mobile platform if we need
+  // reduced ill tell you» — after reviewing the simulator on his handset and
+  // finding it soft. This REVERSES doc 82 §2.2 ("Do not raise the phone dpr cap.
+  // dpr 1.5 is 2.25× the fill and destroys the parity the whole budget rests on"),
+  // and the reversal is his to make: that ruling was a performance judgement, and
+  // he is the one who has now judged the result unacceptable on a real device.
+  //
+  // WHAT IT COST BEFORE. `seedQualityFromSignals` hands EVERY touch device `low`
+  // regardless of how capable it is, and `low` clamped here to TOUCH_MAX_DPR = 1.
+  // So a student on a dpr-3 handset saw the scene drawn at 852×393 and upscaled to
+  // 2556×1179 — ONE NINTH of the pixels his screen has. He could reach dpr 2 only
+  // after the probe measured 57 fps, and dpr 3 never at all: `autoQualityCeiling`
+  // hard-caps touch at `med`, and `high` needed a deliberate press on a control
+  // most students will never find.
+  //
+  // WHAT THIS DOES NOT CHANGE. The TIER still governs textures, shadows and the
+  // download plan (TEXTURE_BUDGETS: 725,950 B at `low` against 5,950,303 B at
+  // `med`), so a weak device still downloads and shades cheaply — it just stops
+  // being blurry as well. Resolution and asset budget are different currencies and
+  // were only ever welded together by this one clamp.
+  //
+  // THE RISK, STATED PLAINLY: dpr 3 is 9× the fragments of dpr 1, and that fill
+  // cost lands on exactly the low-end Androids many Bulgarian students carry. The
+  // probe still measures every device (PROMOTE_FPS / HOLD_FPS / STRUGGLE_FPS), so a
+  // drowning phone still falls to a cheaper TIER — it will simply fall while staying
+  // sharp. If that proves too slow in the field the lever is this one line, and the
+  // founder has said he will call it.
+  //
+  // SAFE ON THE MIRRORS, verified in code rather than taken from a comment: the
+  // render-target scissor bug that painted ZERO rows at pixelRatio ≥ 2 (MirrorRig’s
+  // docblock) was fixed by re-binding the TARGET’s own `scissor`/`scissorTest`
+  // (MirrorRig.tsx:786-809), which cannot see a pixel ratio at all.
+  //
   // A garbage `devicePixelRatio` (0, NaN, negative) must degrade to the old
   // behaviour, never to a blank drawing buffer.
   const native = Number.isFinite(signals.dpr) && signals.dpr > 0 ? signals.dpr : TOUCH_MAX_DPR;
-  const ceiling = level === "high" ? TOUCH_HIGH_MAX_DPR : TOUCH_MED_MAX_DPR;
-  return Math.min(Math.max(native, TOUCH_MAX_DPR), ceiling);
+  return Math.min(Math.max(native, TOUCH_MAX_DPR), TOUCH_HIGH_MAX_DPR);
 }
 
 /**

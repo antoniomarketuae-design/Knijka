@@ -304,13 +304,20 @@ describe("autoQualityCeiling", () => {
 });
 
 describe("maxDprFor", () => {
-  it("renders a handset 1:1 with its CSS pixels at `low` — the rung nobody paid for", () => {
-    // `low` is the cold start of EVERY touch-only device, the tier an
-    // unmeasured GPU gets, and the tier a failed one is sent back to. It is the
-    // one rung on the automatic path where no frame time has ever been
-    // produced, so it is the one rung that may not spend fill.
-    expect(maxDprFor("low", iphone16())).toBe(TOUCH_MAX_DPR);
-    expect(maxDprFor("low", galaxyA16())).toBe(TOUCH_MAX_DPR);
+  it("renders a handset at its OWN glass on every tier, `low` included", () => {
+    // REWRITTEN 2026-09-16 — the founder ruled: «make it automatically on dp3 for
+    // the whole mobile platform if we need reduced ill tell you».
+    //
+    // This test used to defend the opposite rule, that `low` is the rung nobody
+    // paid for and so may not spend fill. That doctrine cost him the picture: the
+    // seed hands EVERY touch device `low`, so the defence applied to every student
+    // on a phone, on their first lesson, permanently unless a probe promoted them.
+    // Resolution is no longer rationed by tier on a handset; the TIER still rations
+    // textures, shadows and the download plan, which is what it is good at.
+    expect(maxDprFor("low", iphone16())).toBe(3);
+    expect(maxDprFor("low", galaxyA16({ dpr: 2.625 }))).toBe(2.625);
+    // The seed itself is UNCHANGED and still says `low` — the tier is still earned.
+    // It simply no longer decides how sharp the picture is.
     expect(seedQualityFromSignals(iphone16())).toBe("low");
     expect(seedQualityFromSignals(galaxyA16())).toBe("low");
   });
@@ -322,11 +329,12 @@ describe("maxDprFor", () => {
     // pressed his phone renders `low` at dpr 1.0, because `high` costs a press
     // he never made. `med` is the only rung `auto` reaches on its own, so it is
     // the only place the default picture can improve.
-    expect(maxDprFor("med", iphone16())).toBe(TOUCH_MED_MAX_DPR);
-    expect(maxDprFor("med", galaxyA16({ dpr: 2.625 }))).toBe(TOUCH_MED_MAX_DPR);
-    // 4× the fragments of 1.0, not 9×: the evidence for this rung is ONE
-    // measurement taken at 1×, and it does not stretch to native.
-    expect(TOUCH_MED_MAX_DPR).toBe(2);
+    expect(maxDprFor("med", iphone16())).toBe(3);
+    expect(maxDprFor("med", galaxyA16({ dpr: 2.625 }))).toBe(2.625);
+    // THE OLD CAP NO LONGER BINDS. `TOUCH_MED_MAX_DPR` survives as the record of
+    // the rung this tier used to buy; asserting that a handset now exceeds it is
+    // what makes this test fail if anyone quietly restores the ladder.
+    expect(maxDprFor("med", iphone16())).toBeGreaterThan(TOUCH_MED_MAX_DPR);
     expect(TOUCH_MED_MAX_DPR).toBeLessThan(TOUCH_HIGH_MAX_DPR);
   });
 
@@ -352,7 +360,10 @@ describe("maxDprFor", () => {
     const drowned = ledgerFromSample(null, { level: "med", fpsMedian: 26, samples: 120 }, "med");
     expect(drowned.failedAt).toBe("med");
     expect(levelFromLedger("low", drowned, "med")).toBe("low");
-    expect(maxDprFor(levelFromLedger("low", drowned, "med"), iphone16())).toBe(TOUCH_MAX_DPR);
+    // …and it still falls to the cheaper TIER — but it falls while staying SHARP.
+    // That is the whole shape of the 2026-09-16 ruling: a drowning phone gives up
+    // textures and effects, not the resolution of its own screen.
+    expect(maxDprFor(levelFromLedger("low", drowned, "med"), iphone16())).toBe(3);
   });
 
   it("gives a handset its OWN screen at `high` — the founder's ruling, twice given", () => {
@@ -396,9 +407,11 @@ describe("maxDprFor", () => {
     }
   });
 
-  it("never raises a cap on the tiers a device did not ask for", () => {
+  it("never raises a cap on a POINTING device, whatever the handsets get", () => {
+    // The 2026-09-16 ruling is about handsets only. A laptop on `low` is still
+    // exactly its preset, and the touch floor is still no higher than that preset.
     expect(maxDprFor("low", laptop())).toBe(1);
-    expect(maxDprFor("low", iphone16())).toBe(1);
+    expect(maxDprFor("low", iphone16())).toBe(3);
     expect(TOUCH_MAX_DPR).toBeLessThanOrEqual(QUALITY_PRESETS.low.maxDpr);
   });
 });

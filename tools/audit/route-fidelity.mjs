@@ -797,10 +797,19 @@ export function sweepCorpus(opts = {}) {
  * CLI
  * ──────────────────────────────────────────────────────────────────────────*/
 
-function summarise(rows, out = process.stderr) {
+export function summarise(allRows, out = process.stderr) {
+  // A pc-path lane is on its authored line BY CONSTRUCTION (DESIGN-v2 §8.5): its
+  // fidelity measures the harness, so it enters no verdict tally and no
+  // «tracked but not on-line» disagreement, and is printed on its own line.
+  const pathRows = allRows.filter((r) => r.mode === "path");
+  const rows = allRows.filter((r) => r.mode !== "path");
   const measured = rows.filter((r) => r.maxCrossTrackM !== null);
   const byVerdict = new Map();
   for (const r of rows) byVerdict.set(r.verdict, (byVerdict.get(r.verdict) ?? 0) + 1);
+  if (pathRows.length) {
+    const on = pathRows.filter((r) => r.verdict === "on-line").length;
+    out.write(`harness competence (pc-path lanes, excluded from every tally below): ${pathRows.length} lane(s), ${on} on-line\n`);
+  }
   const xs = measured.map((r) => r.maxCrossTrackM).sort((a, b) => a - b);
   const cov = measured.map((r) => r.routeCoveredFrac).sort((a, b) => a - b);
   out.write(`lanes ${rows.length}, measured ${measured.length}\n`);

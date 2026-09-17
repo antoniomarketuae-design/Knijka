@@ -11,6 +11,10 @@
 # restarting a run it already declared hung.
 set -u
 SH="$1"; LIST="$2"; BASE="${3:-http://localhost:3460}"
+# Optional 4th argument, passed through to wave-c.mjs verbatim (DESIGN-v2 §9):
+# `--with-path-legs` lets rows that NAME pc-path drive it. Absent, the command
+# line below is byte-identical to what it was.
+EXTRA="${4:-}"
 REPO="E:/AI driver"
 OUT="$REPO/.audit-frames/fill-$SH"
 RES="$OUT/wave-c-results.jsonl"
@@ -40,7 +44,7 @@ reap_descendants() {
 }
 
 for attempt in $(seq 1 $MAX_RESTARTS); do
-  node tools/mobile/wave-c.mjs --base "$BASE" --out "$OUT" --lessons "$(cat "$LIST")" >> "$LOG" 2>&1 &
+  node tools/mobile/wave-c.mjs --base "$BASE" --out "$OUT" --lessons "$(cat "$LIST")" $EXTRA >> "$LOG" 2>&1 &
   PID=$!
   # Windows PID of the node process, for the descendant walk.
   WPID=$(powershell.exe -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { \$_.CommandLine -like '*fill-$SH*' } | Select-Object -First 1).ProcessId" 2>/dev/null | tr -d '\r ')

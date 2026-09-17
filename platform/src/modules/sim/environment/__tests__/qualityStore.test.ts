@@ -179,22 +179,19 @@ describe("seedQualityLevel / refreshSeededQuality", () => {
 });
 
 describe("canvasMaxDpr", () => {
-  it("walks a handset UP a resolution ladder whose rungs are each paid for", async () => {
+  it("gives a handset its own glass on EVERY tier — the 2026-09-16 ruling", async () => {
     installBrowser(PHONE); // devicePixelRatio 3
     const { canvasMaxDpr } = await freshStore();
-    // `low` — the cold start of every touch-only device and the tier a failed
-    // one returns to. No frame time has ever been produced here, so no fill is
-    // spent here.
-    expect(canvasMaxDpr("low")).toBe(1);
-    // `med` — unreachable by guessing (the seed returns `low` for every phone),
-    // so a device on it has cleared 57 fps over 60+ clean frames. THIS is the
-    // rung the founder's default path actually lands on, and it is why „we
-    // shipped dpr 3" stopped being the same sentence as „his phone renders
-    // dpr 3": with nothing pressed, the deployed build gave him 393×852.
-    expect(canvasMaxDpr("med")).toBe(2);
-    // §I26(c) / the founder's ruling: the top tier is only reachable by an
-    // explicit press in the lesson menu, and when it is reached the phone
-    // renders the pixels its screen actually has.
+    // THE LADDER IS GONE, BY FOUNDER RULING: «make it automatically on dp3 for the
+    // whole mobile platform if we need reduced ill tell you».
+    //
+    // It was a real ladder and it was climbed honestly — but the seed hands EVERY
+    // phone `low`, so the bottom rung WAS the product for every student on a phone
+    // until a probe promoted them, and the top rung needed a press almost nobody
+    // makes. That is why „we shipped dpr 3" was never the same sentence as „his
+    // phone renders dpr 3". Now all three rungs render the pixels the screen has.
+    expect(canvasMaxDpr("low")).toBe(3);
+    expect(canvasMaxDpr("med")).toBe(3);
     expect(canvasMaxDpr("high")).toBe(3);
   });
 
