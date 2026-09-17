@@ -399,3 +399,87 @@ instruments can be trusted where they agree, which is nearly everywhere.
 `sc-mw-emergency-lane__pc-wrong` — the wrong leg burned its full 210 s budget on
 a motorway lesson without the session ending; the harness disclosed it as
 «forced via „nothing" — itself a finding». Known class, not new.
+
+## L. DOCTRINE — the `pc-path` leg: what it is, what it may witness, what it never can (added 2026-09-15)
+
+**What it is.** A third leg literal beside `right` and `wrong`:
+`node tools/mobile/lesson-audit.mjs <out> <lesson> pc path`, for the eleven parking
+and reverse lessons of DESIGN-v2 Slice 1 only (`tools/mobile/lib/path-plan/policy.mjs`
+`PATH_LESSONS`). It drives a committed, bicycle-consistent **witness of the lesson's
+own authored line** (`tools/mobile/path-refs/<lesson>.pathref.json`, planned offline
+by `lib/path-plan/build-pathrefs.mjs` from `content/traces/<lesson>/shadow-correct.trace.json`
+and pinned to it by `trace.samplesDigest`), closed on the pose probe
+`window.__camProbe`. The `right` and `wrong` legs are meant to be unchanged: the path
+leg's blocks are gated on `STEER_BY === "authored-path"` (its argument refusals on
+`LEG_MODE === "path"`; an unknown leg literal is now refused on every leg). What pins
+that is narrower than "every block", and says so:
+`tools/mobile/__tests__/path-follow-wiring.test.mjs` W-4 attributes every call site of
+13 named path functions and accepts a guard only when `STEER_BY === "authored-path"`
+is the block's CONTROLLING condition — the whole condition or a top-level `&&`
+conjunct. A header that merely contains the token (negated, under `?:`, `||` or `??`,
+as the arm gate, roll exit, reverse exit, slow budget, positive control and the
+disarm's at-rest skip do) is UNRESOLVED and fails the pin; three unguarded calls
+planted in those ribbon-reachable blocks are pinned red (CODE-REVIEW-2 M4). W-6
+evaluates the arm gate against HEAD's on a random grid. Every key decision of the
+runner lives in `lib/path-follow.mjs` (`pathApplyActions` / `pathYieldActions`,
+tested exhaustively with mutants), and lesson-audit's executor body is pinned verbatim
+(W-20).
+
+**The one exception to the probe doctrine, and only here.** Everywhere else in this
+harness the dev-only pose probe is a WITNESS and never a control input (the blocks
+«WHY THE PIXELS, WHEN A CHEAPER SIGNAL EXISTS» and «THE INDEX IS AN ODOMETER» in
+`lesson-audit.mjs`). **On a `pc-path` leg, and on no other leg type, the dev-only
+chassis pose is a steering input.** Those blocks are not rewritten; each carries a
+pointer to `PATH_TESTIMONY` in `lib/path-follow.mjs`. The exception is pending
+founder ratification (DESIGN-v2 §14.2) and does not extend to any future leg by
+analogy.
+
+**What a `pc-path` leg MAY witness** — along a known-correct path, and only where its
+ROUTE and ARM lines (independent of the controller; same pose probe — run.log,
+`pathEvidence`) were MEASURED inside corridor and band. An UNMEASURED line is inside
+nothing, and its segment is UNJUDGED. REVERSE OUTCOME names the product
+(«…admissible») only when the arm, the reverse route and the end-pose yaw were all
+measured in tolerance, the product's credit for THAT segment was read as false (one
+lesson-wide flag is never spread over several R segments), and the product's OWN
+«отместване / ъгъл» put the car inside the park tolerance; otherwise it prints THE
+HARNESS or UNJUDGED:
+- whether the product **credits** the manoeuvre — objective ticks, «подравняване», «ъгъл»;
+- the faults it books on that drive, **net of ATTRIBUTION** (procedural omissions and
+  harness timing/actuation are the harness's, never the product's);
+- **collisions** on that drive, as CANDIDATES only (the authored line's clearance was
+  never screened);
+- HUD, ReverseAssist flow, cards and debrief behaviour during a correct manoeuvre.
+
+**What a `pc-path` leg can NEVER witness**:
+- that the guidance ribbon, the chevron, the briefing or the glass would lead a student
+  onto that line, or kept one on route — **the car is on the authored line BY
+  CONSTRUCTION**, so its route fidelity measures the harness, not the product;
+- legibility, lane choice or route-keeping of any kind;
+- a wrong drive, or any conviction that needs one;
+- pass rates, determinism or cross-platform parity;
+- production builds (the probe is dev-only), mobile or touch.
+
+The run.log headline says so first (`STEERED BY: THE LESSON'S AUTHORED LINE … NOT the
+guidance ribbon … It CANNOT show that the ribbon, the briefing or the glass would lead
+a student there`), `_audit-status.json` / `_audit-debrief.json` carry
+`steeredBy.mayTestify` / `mayNotTestify`, and `tools/audit/leg-evidence.mjs` prints
+STEERED BY first and never «stayed within 8 m of» for such a leg. Its sidecars carry
+**`route: null`** — the whole-drive distance is published as `harnessRoute`, a key no
+route reader knows, and `legEvidence()` returns no route for a `-path` folder
+(CODE-REVIEW-2 M5). `route-fidelity-open.mjs` and `route-fidelity.mjs summarise`
+exclude it (pinned by `tools/audit/path-leakage.test.mjs`); `route-fidelity.mjs
+--corpus` rows and `steer-bench.mjs collectLanes` do not filter it yet (CODE-REVIEW-2
+S3, open). The verdict brief
+(`make-verdicts2.mjs`) marks any guidance, legibility, lane-choice, route-keeping,
+wrong-drive, parity or determinism row **UNJUDGED on it — never STILL, never FIXED**.
+
+**Dispatch is off by default.** A path leg is swept only with `wave-c.mjs
+--with-path-legs`, and routed by `build-redrive.mjs` only for lessons whose rows in
+`tools/audit/path-routing.json` carry `canaryPassed: true` — set by a commit after
+`tools/audit/path-canary.mjs` passes on that lesson from witnesses the controller did
+not write. Every row is `null` today: **no path leg has been driven.**
+
+**A harness change repairs no product defect.** Nothing in Slice 1 touches
+`platform/src`. A credit earned on a `pc-path` leg refutes «no success path exists»
+for the authored line only (see the per-lesson CAVEATS in `policy.mjs`); it closes
+no guidance row, and a row it cannot witness stays open.

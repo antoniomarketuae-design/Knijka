@@ -51,7 +51,13 @@ for (const dir of readdirSync(SWEEP)) {
 // 2 · the open rows.
 const open = COUNTS.open;
 const rows = open.map((f) => {
-  const legs = byLesson.get(f.scenario) ?? [];
+  // A pc-path LEG IS ON ITS LINE BY CONSTRUCTION and is never a route witness
+  // (DESIGN-v2 §8.5, S-7). It is removed from the partition INPUT, so no
+  // category below — «NOT DRIVEN», «NO MOVING POSE SAMPLES», «best leg … at X m
+  // off», «HAS A LEG THAT STAYED ON ITS ROUTE» — can be reached through one.
+  const all = byLesson.get(f.scenario) ?? [];
+  const legs = all.filter((l) => l.mode !== "path");
+  const pathLegs = all.length - legs.length;
   const measured = legs.filter((l) => l.dev);
   // BOTH HALVES. `onRoute` alone says a car did not wander from where it was
   // parked; `droveIt` adds that it covered the route. Six w43 legs pass the
@@ -64,6 +70,7 @@ const rows = open.map((f) => {
     bestLeg: best ? best.leg : null,
     bestMaxM: best ? best.dev.maxM : null,
     noLine: legs.length > 0 && legs.every((l) => !l.hasLine),
+    pathLegs,
   };
 });
 
@@ -93,6 +100,10 @@ for (const k of order) {
   const g = groups.get(k) ?? [];
   const crit = g.filter((r) => r.sev === "critical").length;
   console.log(`${String(g.length).padStart(3)}  (${String(crit).padStart(2)} crit)  ${k}`);
+}
+{
+  const withPath = rows.filter((r) => r.pathLegs > 0);
+  console.log(`PATH LEGS — on their line BY CONSTRUCTION, never a route witness: ${withPath.reduce((n, r) => n + r.pathLegs, 0)} leg(s) across ${withPath.length} row(s), counted in none of the categories above`);
 }
 console.log("\n--- rows whose every leg left the route (the ones a re-drive cannot settle as-is) ---");
 for (const r of (groups.get("NO LEG BOTH STAYED ON THE ROUTE AND DROVE IT") ?? []).sort((a, b) => (b.bestMaxM ?? 0) - (a.bestMaxM ?? 0))) {

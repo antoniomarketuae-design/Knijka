@@ -58,11 +58,71 @@ export const PROBE = () => {
   const scroller = section && section.querySelector("[data-sim-overlay-sheet-text]");
   if (!scroller) return { error: "no scroller inside the sheet" };
   const cs = getComputedStyle(scroller);
-  // The fade is a mask ending in `transparent`; its tail is not readable text,
-  // so the visible band stops there. `padding-bottom` is authored to match it.
+  // The fade is a mask whose tail is fully transparent; that tail is not
+  // readable text, so the visible band stops where it starts.
+  //
+  // A BROWSER DOES NOT SAY «transparent». This tested /transparent/ only, and
+  // the w47 briefing verifier measured the sheet's real computed mask: a hard
+  // line-grid stop serialised as `rgba(0, 0, 0, 0)` at 181.5 px on a 186 px
+  // scroller. The probe printed «fade 0px» and counted a band 4.5 px taller
+  // than the one on the glass — in the reassuring direction, which is the only
+  // direction this family of probes has ever failed in. So: any alpha-zero stop
+  // counts, and when the computed value carries the stop's px position the band
+  // ends THERE; `padding-bottom` (authored to match the fade) is only the
+  // fallback when no position can be read.
+  //
+  // TWO SHAPES MEASURED ON 4209dad, and the first attempt at this fix read the
+  // wrong stop of the first one (a degenerate top stop at 0 px → «fade 186px»):
+  //   780×360   linear-gradient(rgba(0,0,0,0) 0px, rgb(0,0,0) 0px, rgb(0,0,0) 181.5px, rgba(0,0,0,0) 181.5px)
+  //   852×393   linear-gradient(rgb(0,0,0) calc(100% - 10px), rgba(0,0,0,0))
+  // The rule that reads both: the band ends at the LAST opaque stop that is
+  // followed by a transparent one. A soft fade's partly-visible tail is counted
+  // as not readable — the conservative side, which is the side this probe needs.
   const pad = Number.parseFloat(cs.paddingBottom);
-  const faded = /transparent/.test(cs.maskImage || cs.webkitMaskImage || "none");
-  const fadePx = faded && Number.isFinite(pad) ? pad : 0;
+  const mask = String(cs.maskImage || cs.webkitMaskImage || "none");
+  const H = scroller.clientHeight;
+  const stops = (() => {
+    const m = mask.match(/linear-gradient\((.*)\)\s*$/);
+    if (!m) return [];
+    const parts = [];
+    let depth = 0, cur = "";
+    for (const ch of m[1]) {
+      if (ch === "(") depth += 1;
+      if (ch === ")") depth -= 1;
+      if (ch === "," && depth === 0) { parts.push(cur.trim()); cur = ""; } else cur += ch;
+    }
+    if (cur.trim()) parts.push(cur.trim());
+    const out = [];
+    for (const p of parts) {
+      const c = p.match(/^(rgba?\([^)]*\)|transparent|#[0-9a-fA-F]{3,8}|black|white)\s*(.*)$/);
+      if (!c) continue; // a direction such as «to bottom» or «180deg»
+      let alpha = 1;
+      if (c[1] === "transparent") alpha = 0;
+      else if (c[1].startsWith("rgba")) alpha = Number(c[1].replace(/^rgba\(|\)$/g, "").split(",")[3]);
+      const pos = c[2].trim();
+      let px = NaN;
+      let mm;
+      if ((mm = pos.match(/^(-?[\d.]+)px$/))) px = Number(mm[1]);
+      else if ((mm = pos.match(/^calc\(\s*100%\s*-\s*([\d.]+)px\s*\)$/))) px = H - Number(mm[1]);
+      else if ((mm = pos.match(/^([\d.]+)%$/))) px = (H * Number(mm[1])) / 100;
+      out.push({ alpha, px });
+    }
+    if (out.length) {
+      if (!Number.isFinite(out[0].px)) out[0].px = 0;
+      if (!Number.isFinite(out[out.length - 1].px)) out[out.length - 1].px = H;
+    }
+    return out;
+  })();
+  let bandEnd = null;
+  for (let i = stops.length - 2; i >= 0; i -= 1) {
+    if (stops[i].alpha > 0 && stops[i + 1].alpha === 0) { bandEnd = stops[i].px; break; }
+  }
+  const faded = bandEnd !== null;
+  const fadePx = !faded
+    ? 0
+    : Number.isFinite(bandEnd) && bandEnd >= 0 && bandEnd <= H
+      ? Math.round((H - bandEnd) * 10) / 10
+      : Number.isFinite(pad) ? pad : 0;
   const r = scroller.getBoundingClientRect();
   const bandTop = r.top;
   const bandBottom = r.top + scroller.clientHeight - fadePx;
@@ -109,6 +169,7 @@ export const PROBE = () => {
       scrollTop: R(scroller.scrollTop),
       overflowPx: R(scroller.scrollHeight - scroller.clientHeight - fadePx),
       fadePx,
+      mask,
       leadingPx: R(Number.parseFloat(cs.lineHeight)),
     },
     title: foldOf(section.querySelector("h2")),
@@ -177,7 +238,7 @@ if (process.argv[1] && process.argv[1].endsWith("sheet-fold.mjs")) {
           `  viewport ${d.viewport.w}×${d.viewport.h} · section ${d.section.w}×${d.section.h} at ${d.section.x},${d.section.y}`,
         );
         console.log(
-          `  scroller ${d.scroller.box.w}×${d.scroller.box.h} · clientH ${d.scroller.clientH} · scrollH ${d.scroller.scrollH} · OVERFLOW ${d.scroller.overflowPx}px · fade ${d.scroller.fadePx}px · leading ${d.scroller.leadingPx}px`,
+          `  scroller ${d.scroller.box.w}×${d.scroller.box.h} · clientH ${d.scroller.clientH} · scrollH ${d.scroller.scrollH} · OVERFLOW ${d.scroller.overflowPx}px · fade ${d.scroller.fadePx}px · leading ${d.scroller.leadingPx}px\n  mask (computed) ${d.scroller.mask}`,
         );
         for (const [n, v] of [
           ["TITLE", d.title],
