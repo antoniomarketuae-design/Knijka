@@ -5961,6 +5961,10 @@ export function LessonPlayShell({
                   tone: "teach",
                   lineBg: t.event.titleBg,
                   detailBg: t.event.explanationBg,
+                  // The coach's summary, as the violation branch above carries
+                  // its own (sc-merge-from-property:6715b581); `detailBg` stays
+                  // whole behind «ЗАЩО». Absent → null → the paragraph, as before.
+                  peekBg: t.event.peekBg ?? null,
                   lawRef: t.event.lawRef ?? null,
                   raisedAtMs: t.raisedAtMs,
                 };

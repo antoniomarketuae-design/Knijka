@@ -1241,11 +1241,91 @@ interface YieldVoiceCopy {
   longCardBg?: string;
   namedTitleBg: string;
   namedBg: string;
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * THE ONE LINE OF THE WHY THE PHONE CAN FINISH — one per stage, REQUIRED
+   * (sc-merge-from-property:6715b581, major, re-judged STILL on w47 at 7648edf).
+   *
+   * THE FRAME, opened before any of this was written:
+   * `.audit-frames/w47/frames/sc-merge-from-property__mobile-right/04-t027s.png`,
+   * iPhone 16 landscape, the student standing at the zebra:
+   *
+   *   ⓘ
+   *   Защо чакаш: пешеходец на              ← `namedTitleBg`, two lines
+   *   пътеката
+   *   Правилно е да чакаш тук. При          ← `namedBg`, cut at a preposition
+   *   преди 5 с
+   *   [ ЗАЩО ↓17 ]  [ ✕ ]
+   *
+   * Seventeen lines of the reason behind a tap, on a card the car is still
+   * rolling under — and the one line that did reach the glass is the half of
+   * the sentence that says „you are right" and not the half that says WHY.
+   * That is the bare verdict doc 64 THEO-4 forbids, delivered by the channel
+   * this file built precisely to abolish it (see `stepYieldVoice`).
+   *
+   * THE CHAIN, traced rather than assumed: `say` → `engine.ts` pushes the
+   * notice into `hudEvents` unchanged → `LessonPlayShell`'s `push(...)` stores
+   * the SAME object as `toast.event` (`hud/HudToasts.stampToasts`) → the
+   * shell's phone re-map turns a `lesson` toast into a `kind: "hint"`
+   * `SimOverlayItem` → `SimOverlay` row 2b prints `overlayPeekBodyBg(item)`,
+   * which is `peekBg` when the item carries one and the WHOLE `detailBg`
+   * otherwise. Every violation card has carried a `peekBg` since
+   * sc-pk-driveway:fa602d10 and the teach moment since `teachMomentPeekBg`
+   * (85b1953); the hint is the one kind on that card nobody ever authored a
+   * summary for, so row 2b has been clamping these 190–645-character
+   * paragraphs (measured over all twenty-four stages) since the voice first
+   * spoke. The prior verify said it in as
+   * many words: „the repair lane owes the advisor card the same treatment".
+   *
+   * THE BUDGET IS THE FLOOR WINDOW UNDER THE CARD'S OWN TITLE, and it is
+   * stricter than the violation gate's on purpose. That gate allows two body
+   * lines and accepts half of them visible (`WHY_REACHABLE_MIN_VISIBLE_FRACTION`).
+   * The judge's standard on this row is the violation card at 04-t032s,
+   * „whole … with no fade", and whole is arithmetic: the text window's floor is
+   * `minHeight: "2.75rem"` = 44 px, a title line box is 13.75 px, a body line
+   * box 15.125 px (the literals `violation-peek-summary.test.tsx` re-cuts). So:
+   *
+   *   one-line title  → 13.75 + 2 × 15.125 = 44.0   two body lines, whole
+   *   two-line title  → 27.5  + 1 × 15.125 = 42.6   ONE body line, whole
+   *
+   * — which is exactly what both w47 frames photograph (04-t032s: 1 + 2;
+   * 04-t027s: 2 + 1 and a cut). Eighteen of the twenty-four titles below are
+   * two lines at the siblings' 26-character proxy, so eighteen of these
+   * summaries are one line. `yield-voice-peek.test.ts` holds every stage to it.
+   *
+   * WHAT THE LINE MAY SAY, and each rule is one this file already keeps:
+   *   · A REASON OR THE ACT THAT DISCHARGES THE DUTY — never „правилно": the
+   *     title already names the wait, and a peek that merely approved of it
+   *     would be the cut line again, finished.
+   *   · NO ARTICLE AND NO FIGURE (ADR-002, and the catalogue's own `peekBg`
+   *     rule): every claim is compressed out of the stage's own body, which
+   *     keeps its `lawRef`; «ЗАЩО» still opens that body whole. Seconds are
+   *     not repeated either — the body counts them and the peek must not
+   *     disagree with it by a tick.
+   *   · NOTHING THIS MODULE CANNOT SEE. The stop-sign lines do not certify the
+   *     stop (sc-merge-from-property:ab353b86, the block on `stopSign`), the
+   *     pedestrian lines do not praise a position, and the rail-red verdict
+   *     does not say the tram has gone.
+   *
+   * ⚠ NOT ON THE GLASS UNTIL TWO LINES IN TWO OTHER FILES LAND. The field
+   * rides the event at runtime from this commit on, but `contracts.ts`'s
+   * `lesson` member has no `peekBg` and the shell's `lesson` → `hint` re-map
+   * does not forward one, so row 2b still falls through to `detailBg`. Those
+   * are the violation member's own `peekBg?: string` and the violation
+   * re-map's own `peekBg: t.event.peekBg ?? null`, one kind over. This lane
+   * owns neither file; the edits are in its report, not made here.
+   * ═════════════════════════════════════════════════════════════════════════
+   */
+  namedPeekBg: string;
   settledTitleBg: string;
   /** `sec` = whole seconds waited so far, so the reassurance is measured. */
   settledBg: (sec: number) => string;
+  /** The settled stage's finishable line — see `namedPeekBg`. Seconds-free. */
+  settledPeekBg: string;
   verdictTitleBg: string;
   verdictBg: (sec: number) => string;
+  /** The verdict stage's finishable line — see `namedPeekBg`. Seconds-free. */
+  verdictPeekBg: string;
   lawRef: string;
 }
 
@@ -1271,6 +1351,8 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     namedTitleBg: "Защо чакаш: в кръга имат предимство",
     namedBg:
       "Спрял си правилно. На входа на кръгово кръстовище не може да стои знак „Път с предимство“ — там винаги е Б1 или Б2, тоест ти си на пътя без предимство и пропускаш движещите се в кръга. Гледай НАЛЯВО. Интервалът, който чакаш, е такъв, че да влезеш и да набереш скоростта на кръга, без движещият се в него да намалява заради теб.",
+    // The act, not the priority: the title above already names who has it.
+    namedPeekBg: "Гледай НАЛЯВО за интервал.",
     // THE HEADING NAMES ITS OWN DUTY (sweep161, sc-turn-left-oncoming
     // 04-t043s.png). All five reasons used to head their middle line with the
     // bare «Чакането Е маневрата», so one НАУЧИ title carried a different body
@@ -1282,9 +1364,15 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     settledTitleBg: "Чакането Е маневрата — кръгът командва",
     settledBg: (sec) =>
       `Стоиш вече ${sec} секунди и това е правилно — на кръгово се чака точно толкова, колкото поиска кръгът. Тези секунди не ти струват нито точка и се изваждат от ориентировъчното време на урока, така че не бързай. И не гледай надясно за „ред“: редът на пристигане не е правило за предимство — гледай наляво и тръгвай на първия истински интервал.`,
+    // The misconception this drill was written against, in its shortest form.
+    settledPeekBg: "Ред по пристигане няма.",
     verdictTitleBg: "Интервалът беше добър",
     verdictBg: (sec) =>
       `Изчака ${sec} с и влезе — и при влизането не беше отчетено нарушение на предимството. Точно това е проверката, която ще правиш цял живот на всяко кръгово: тръгваш само когато можеш да влезеш и да набереш скорост, без движещият се в кръга да намалява заради теб. Оттук нататък излизането е отклонение надясно и се обявява с десен мигач.`,
+    // THE MEASURE, NOT A CLAIM ABOUT THIS ENTRY: the voice knows no fault was
+    // graded, not that nobody in the ring lifted off. A one-line title leaves
+    // two body lines, and this is two.
+    verdictPeekBg: "Мярката: никой в кръга не намалява заради теб.",
     lawRef: LAW_ROUNDABOUT,
   },
   giveWayLine: {
@@ -1302,12 +1390,22 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     namedTitleBg: "Защо чакаш: знак Б1 „Пропусни движението“",
     namedBg:
       "Спрял си правилно. Знакът Б1 те поставя на пътя БЕЗ предимство: на кръстовище, на което единият път е сигнализиран като път с предимство, водачите от другите пътища са длъжни да пропуснат движещите се по него. Пълно спиране Б1 не изисква — задължението е да пропуснеш. Огледай ляво–дясно–ляво и чакай интервал, в който пресичаш, без някой по главния път да намалява заради теб.",
+    // The duty the sign creates, compressed out of the body's second sentence.
+    // Not „Б1 не иска спиране": on one line that reads as „do not stop".
+    namedPeekBg: "Главният път минава пръв.",
     settledTitleBg: "Чакането Е маневрата — знак Б1",
     settledBg: (sec) =>
       `${sec} секунди на линията са правилни, не бавни. Времето, което стоиш заради предимство, се изважда от ориентировъчното време на урока и не ти струва точки — законът иска да приближаваш кръстовището с такава скорост, че при необходимост да спреш и да пропуснеш, тоест да можеш да чакаш толкова, колкото поиска главният път. Ако видимостта е лоша, изнеси се напред бавно, докато видиш, и пак спри.`,
+    // The reason not to hurry. The poor-visibility edge-out stays in the body:
+    // cut to one line it loses „и пак спри", and without that clause it is an
+    // instruction to roll out blind.
+    settledPeekBg: "Чакането не струва точки.",
     verdictTitleBg: "Пропусна и тръгна в истински интервал",
     verdictBg: (sec) =>
       `Изчака ${sec} с и премина — без отчетено нарушение на предимството. Запомни мярката вместо секундите: интервалът е достатъчен, когато пресичаш и се подреждаш в потока, без някой по главния път да вдига крак от газта заради теб.`,
+    // The body's „мярка", stated as the rule it is and not as a fact about this
+    // departure — see the roundabout's verdict line.
+    verdictPeekBg: "Мярка: никой не намалява.",
     lawRef: LAW_GIVE_WAY,
   },
   stopSign: {
@@ -1356,12 +1454,22 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     namedTitleBg: "Защо чакаш: знак Б2 „Спри! Пропусни движението!“",
     namedBg:
       "Правилно е да чакаш тук. На Б2 се спира докрай ВИНАГИ, дори пътят да изглежда празен — „почти спрях“ не съществува нито в закона, нито на изпита. Мястото на това спиране е ДО самата линия: спреш ли по-рано — за пешеходец на тротоара или зад чужда кола — това не е спирането по знака и то се прави още веднъж, на линията, с неподвижни колела и брой наум до три. Спирането обаче е само първата половина: знакът иска и да ПРОПУСНЕШ движещите се по пътя с предимство, така че тръгваш чак когато никой не приближава.",
+    // THE RULE, NEVER THE CERTIFICATE — the block above this row is why. The
+    // catalogue's own corrective for STOP_SIGN_NO_FULL_STOP, cut to where the
+    // stop is discharged; it says nothing about whether it has been.
+    namedPeekBg: "Спри докрай — до линията.",
     settledTitleBg: "Чакането Е маневрата — знак Б2",
     settledBg: (sec) =>
       `${sec} секунди пред Б2 са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока, така че изчакай спокойно да мине всичко, което има предимство. Използвай ги и за проверката, която изпитващият прави отделно: стоят ли колелата неподвижни ДО самата линия. Спрял си по-назад — за пешеходец или зад друга кола — стигни до линията и спри там пак, преди да пропускаш.`,
+    // A QUESTION, deliberately: the body's check is one only the student can
+    // make from the seat, and this module cannot answer it for him.
+    settledPeekBg: "Стоиш ли ДО самата линия?",
     verdictTitleBg: "Изчака и потегли по предимството",
     verdictBg: (sec) =>
       `Изчака ${sec} с и потегли — без отчетено нарушение на предимството. Това е втората половина на Б2. Първата се проверява отделно и на друго място: колелата неподвижни ДО самата линия, преди да тръгнеш. На истинския изпит двете се отбелязват поотделно, затова и тук чистото пропускане не покрива спирането.`,
+    // The one line on this card that could have credited the stop, spent on
+    // saying it is not credited here.
+    verdictPeekBg: "Спирането се мери отделно.",
     lawRef: VIOLATIONS.STOP_SIGN_NO_FULL_STOP.lawRef,
   },
   redLight: {
@@ -1374,6 +1482,12 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     // and the fault that grades the same duty now say the same words.
     namedBg:
       "Спрял си пред стоп-линията и на червено това е правилното: спира се напълно ПРЕД линията и се потегля на зелено. Изключението е човек, не лампа — сигналите на регулировчика са НАД светофара и знаците: има ли регулировчик на кръстовището, гледай неговите ръце, не светофара, и изпълнявай само неговия сигнал, дори когато твоята лампа свети червено. Няма ли регулировчик, дръж крак на спирачката и гледай светофара за ТВОЯТА посока; когато светне зелено, преди да тръгнеш погледни самото кръстовище — навлизане е забранено дори при разрешаващ сигнал, ако обстановката вътре ще те принуди да спреш в кръстовището и да пречиш на напречното движение.",
+    // The rule, then the exception — the order `settledBg`'s note below gives
+    // for the body, and for the same reason: the officer's clause is the
+    // difference between waiting and −10, so it may not be the half that is
+    // cut. «Тръгваш на зелено» is safe HERE and only here — `yieldVoiceCopyFor`
+    // swaps this whole row out on a lesson where rails make green conditional.
+    namedPeekBg: "Тръгваш на зелено. Регулировчик? Гледай него.",
     // The one settled title that stays bare: `signal-stop-line-window.test.ts`
     // pins this exact string in the emitted titles of a red-light wait.
     settledTitleBg: "Чакането Е маневрата",
@@ -1402,9 +1516,14 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     // difference between waiting and −10.
     settledBg: (sec) =>
       `${sec} секунди на червено са просто цикълът на светофара, не грешка — тези секунди се изваждат от ориентировъчното време на урока. Но първо провери едно: ако на кръстовището има регулировчик, чакаш него, а не лампата — неговият сигнал важи независимо от светофара и може да пуска твоята посока точно сега. Няма ли регулировчик, използвай секундите: виж кой стои насреща, кой ще завива и къде са пешеходците, за да тръгнеш с готова картина вместо да я събираш в движение.`,
+    // The exception in every stage (the note above): it rides the second line.
+    settledPeekBg: "Това е цикълът, не грешка. Регулировчик? Чакаш него.",
     verdictTitleBg: "Изчака сигнала и тръгна чисто",
     verdictBg: (sec) =>
       `Изчака ${sec} с и премина — без отчетено нарушение на сигнала. Разрешаващият сигнал е разрешение да минеш, не задължение да тръгнеш веднага: проверката, която току-що направи — свободно ли е кръстовището отсреща — е тази, която пази от засядане в средата му. И помни кой го дава: има ли регулировчик, разрешението е неговото, а не на лампата.`,
+    // „Разрешението" and not „зеленото", so the one line is true at an officer's
+    // junction too — whoever gave the permission, it was not an order to go.
+    verdictPeekBg: "Разрешението не е заповед.",
     lawRef: LAW_RED_LIGHT,
   },
   pedestrian: {
@@ -1427,12 +1546,21 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     // without convicting anybody for it.
     namedBg:
       "Правилно е да чакаш тук. При приближаване към пешеходна пътека си длъжен да пропуснеш стъпилите на нея или преминаващите по нея пешеходци, като намалиш скоростта или спреш. Мястото на спирането е ПРЕД зебрата, не върху нея: колата не влиза в самата пътека, докато по нея има човек. Изчакай го да освободи платното — не го заобикаляй и не минавай зад гърба му, дори да изглежда, че има място. Погледни и встрани от пътеката: който сигнализира, че ще пресича, също се пропуска.",
+    // THE LINE 04-t027s NEVER GOT TO. The frame's visible half was «Правилно е
+    // да чакаш тук. При» — the approval, cut before the reason. This is the
+    // reason, and it praises no position (the note above on `namedBg`).
+    namedPeekBg: "Пешеходецът минава пръв.",
     settledTitleBg: "Чакането Е маневрата — пешеходецът минава пръв",
     settledBg: (sec) =>
       `${sec} секунди пред пътеката са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока. Пешеходецът може да е бавен, да се върне или да поведе дете: не тръгвай на предположение, тръгни, когато го видиш от другата страна.`,
+    // What ends this wait, which is outside the car — the reason `pedestrian`
+    // has no long card, stated as the condition instead of a clock.
+    settledPeekBg: "Тръгваш, щом е отсреща.",
     verdictTitleBg: "Пропусна пешеходеца",
     verdictBg: (sec) =>
       `Изчака ${sec} с и потегли — без отчетено нарушение спрямо пешеходец. Това е грешката с най-тежка цена в целия списък, и ти я избегна по правилния начин: спиране, изчакване докрай, чак после газ.`,
+    // The body's method, verbatim — the sequence is the lesson, not the praise.
+    verdictPeekBg: "Спиране, изчакване докрай, чак после газ.",
     lawRef: VIOLATIONS.PEDESTRIAN_NOT_YIELDED.lawRef,
   },
   // RX-05 (sc-rx-tram-left:07c63b97) — THE WAIT THE PRODUCT COULD NOT NAME.
@@ -1456,12 +1584,20 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     namedTitleBg: "Защо чакаш: релсовото возило минава пръв",
     namedBg:
       "Спрял си правилно. Когато на дадено място едновременно е разрешено преминаването на нерелсови и релсови пътни превозни средства, водачът на нерелсовото е длъжен да пропусне релсовото — независимо от неговото местоположение и посока на движение. Тук към това се добавя и левият завой: завиващият пропуска насрещно движещите се. Затова чакането не е учтивост, а задължение, и трамваят не се „премерва“ като кола: спирачният му път е в пъти по-дълъг, а релсите не завиват — той няма как да те заобиколи, дори да иска. Изчакай целите му 14 метра да минат покрай устието и чак тогава завивай.",
+    // Why the duty is not a courtesy, in the body's own terms: „релсите не
+    // завиват — той няма как да те заобиколи".
+    namedPeekBg: "Трамваят не може да свие.",
     settledTitleBg: "Чакането Е маневрата — релсите минават първи",
     settledBg: (sec) =>
       `${sec} секунди пред трасето са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока. Не търси интервал: пред релсово возило интервал не се взема, то се пропуска. Използвай секундите, за да видиш докъде стига задната му част и има ли втори трамвай зад него.`,
+    // The exact opposite of `oncomingVehicle`'s settled line, and it has to be.
+    settledPeekBg: "Не търси интервал — чакай.",
     verdictTitleBg: "Пропусна релсовото возило",
     verdictBg: (sec) =>
       `Изчака ${sec} с и завъртя чак след като трасето беше чисто — без отчетено нарушение на предимството. Точно това е разликата, която прави този завой опасен на живо: пред кола можеш да прецениш интервал, пред трамвай не се преценява, а се чака. Запази го и когато бързаш.`,
+    // The body's whole point — a tram is not gapped, it is waited for — and
+    // it needs one of the two lines a one-line title leaves.
+    verdictPeekBg: "Пред трамвай само се чака.",
     lawRef: LAW_RAIL_PRIORITY,
   },
   // sc-turn-left-oncoming:7974670c — THE SECONDS THE BRIEFING ASKS HIM TO COUNT.
@@ -1496,12 +1632,19 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     namedTitleBg: "Защо чакаш: завиващият наляво пропуска",
     namedBg:
       "Спрял си правилно. При завиване наляво за навлизане в друг път водачът на завиващото нерелсово пътно превозно средство е длъжен да пропусне насрещно движещите се пътни превозни средства. Зеленото отваря кръстовището, но не отменя това задължение — предимството остава на насрещните. Затова интервалът се мери в СЕКУНДИ, а не „на око“: самият ляв завой отнема 2–3 секунди от насрещната лента, така че под 4 секунди резервът ти е нула. Ударът при отнет ляв завой е страничен, в незащитената врата.",
+    // „Това" is the title's duty. The body's second sentence, which is the
+    // misreading a signalized left turn invites.
+    namedPeekBg: "Зеленото не отменя това.",
     settledTitleBg: "Чакането Е маневрата — насрещните минават първи",
     settledBg: (sec) =>
       `${sec} секунди пред устието са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока. Използвай ги, за да броиш: докато най-близкият насрещен е на по-малко от 4 секунди, тръгването не е преценка, а отнето предимство. Гледай и колата зад него — интервалът се взема след нея, не пред нея.`,
+    // No „4": the figure is the card's and the briefing's, and a peek carries
+    // none. The skill without the number is still the skill.
+    settledPeekBg: "Мери в секунди, не на око.",
     verdictTitleBg: "Пропусна насрещните",
     verdictBg: (sec) =>
       `Изчака ${sec} с и зави чак когато интервалът стигна — без отчетено нарушение на предимството. Точно това мери този урок: не „ще успея“, а колко секунди има до насрещния, преброени преди волана. Запази го и когато отзад те чакат.`,
+    verdictPeekBg: "Не „ще успея“, а секунди, преброени преди волана.",
     lawRef: LAW_LEFT_TURN_ONCOMING,
   },
 };
@@ -1597,12 +1740,20 @@ const RAIL_PRIORITY_RED_COPY: YieldVoiceCopy = {
   namedTitleBg: "Защо чакаш: червен сигнал и релси в платното",
   namedBg:
     "Спрял си пред стоп-линията и на червено това е правилното: спира се напълно ПРЕД линията. Но зеленото тук не е разрешение да завиеш — когато на дадено място едновременно е разрешено преминаването на нерелсови и релсови пътни превозни средства, водачът на нерелсовото е длъжен да пропусне релсовото независимо от местоположението и посоката му. Насрещният трамвай минава пръв, а левият завой пресича трасето му: изчакай го да премине изцяло и чак тогава завивай.",
+  // The half the generic red-light line gets wrong on this lesson — which is
+  // why this row exists at all.
+  namedPeekBg: "Зеленото пуска и трамвая.",
   settledTitleBg: "Чакането Е маневрата — трамваят минава пръв",
   settledBg: (sec) =>
     `${sec} секунди на червено са просто цикълът на светофара, не грешка — тези секунди се изваждат от ориентировъчното време на урока. Използвай ги, за да решиш едно предварително: зеленото ще пусне и трамвая срещу теб. Той спира в пъти по-дълго от кола и не може да те заобиколи — релсите не завиват — затова първо минава той, а ти завиваш след него.`,
+  // The cause, not a second copy of the title's „трамваят минава пръв".
+  settledPeekBg: "Той спира в пъти по-дълго.",
   verdictTitleBg: "Сигналът те пусна — трамваят не",
   verdictBg: (sec) =>
     `Изчака ${sec} с и премина на разрешаващ сигнал — без отчетено нарушение на сигнала. Дотук стига зеленото: то не решава кой минава пръв през релсите. Насрещният трамвай се пропуска независимо от посоката му, така че преди да завиеш наляво изчакай трасето да е чисто по цялата му дължина.`,
+  // What is still in front of him — never that the tram has gone (the block
+  // above this record: on the measured drive it had not).
+  verdictPeekBg: "Чакай трасето да е чисто.",
   lawRef: LAW_RAIL_PRIORITY,
 };
 
@@ -1717,18 +1868,43 @@ export interface YieldVoiceInput {
   railPriority?: boolean;
 }
 
+/**
+ * One line of the instructor's voice: the teach-channel event, plus the one
+ * line of its WHY the phone card can finish (`YieldVoiceCopy.namedPeekBg`).
+ *
+ * AN INTERSECTION AND NOT A CAST, and the difference is the point.
+ * `contracts.ts`'s `lesson` member does not declare `peekBg` yet (the report
+ * for sc-merge-from-property:6715b581 names the line), so an object literal of
+ * type `HudEvent` would refuse it — and a cast would let a missing summary
+ * through as silently as it has always gone missing. Typed like this, every
+ * notice this module emits MUST carry one, `tsc` says so, and the value is
+ * still an ordinary `HudEvent` to `engine.ts`, which pushes it unchanged. Once
+ * the contract declares the field this type means exactly the same thing.
+ */
+export type YieldVoiceNotice = Extract<HudEvent, { kind: "lesson" }> & { peekBg: string };
+
 /** What the voice produced this frame. `notices` is empty on almost all of them. */
 export interface YieldVoiceStep {
   state: YieldVoiceState;
-  notices: readonly HudEvent[];
+  notices: readonly YieldVoiceNotice[];
 }
 
 /** The standstill bar, mirroring finish.ts FINISH_STANDSTILL_KMH — kept as a
  *  local literal so this pure copy module stays free of the gate machinery. */
 const YIELD_VOICE_STANDSTILL_KMH = 1;
 
-function say(copy: YieldVoiceCopy, titleBg: string, explanationBg: string): HudEvent {
-  return { kind: "lesson", titleBg, explanationBg, lawRef: copy.lawRef };
+/**
+ * The peek rides beside the paragraph it summarises, never instead of it:
+ * `explanationBg` stays whole and is what «ЗАЩО» opens and what the roomy
+ * `HudToasts` card prints. See `YieldVoiceCopy.namedPeekBg` for the frame.
+ */
+function say(
+  copy: YieldVoiceCopy,
+  titleBg: string,
+  explanationBg: string,
+  peekBg: string,
+): YieldVoiceNotice {
+  return { kind: "lesson", titleBg, explanationBg, peekBg, lawRef: copy.lawRef };
 }
 
 /**
@@ -1753,7 +1929,7 @@ export function stepYieldVoice(
   const { t, wait, violations } = input;
   const railPriority = input.railPriority === true;
   const base = prev ?? createYieldVoice();
-  const notices: HudEvent[] = [];
+  const notices: YieldVoiceNotice[] = [];
   const moving = Math.abs(input.speedKmh) > YIELD_VOICE_STANDSTILL_KMH;
 
 
@@ -1780,7 +1956,12 @@ export function stepYieldVoice(
     } else if (t - pending.wentAtSec >= YIELD_VOICE_VERDICT_S) {
       const copy = yieldVoiceCopyFor(pending.reason, railPriority);
       notices.push(
-        say(copy, copy.verdictTitleBg, copy.verdictBg(Math.max(1, Math.round(pending.waitedSec)))),
+        say(
+          copy,
+          copy.verdictTitleBg,
+          copy.verdictBg(Math.max(1, Math.round(pending.waitedSec))),
+          copy.verdictPeekBg,
+        ),
       );
       pending = null;
     }
@@ -1823,11 +2004,13 @@ export function stepYieldVoice(
     const heldSec = t - sinceSec;
     const copy = yieldVoiceCopyFor(wait.reason, railPriority);
     if (spoken < 1 && heldSec >= YIELD_VOICE_NAME_S) {
-      notices.push(say(copy, copy.namedTitleBg, copy.namedBg));
+      notices.push(say(copy, copy.namedTitleBg, copy.namedBg, copy.namedPeekBg));
       spoken = 1;
     }
     if (spoken < 2 && heldSec >= YIELD_VOICE_SETTLE_S) {
-      notices.push(say(copy, copy.settledTitleBg, copy.settledBg(Math.round(heldSec))));
+      notices.push(
+        say(copy, copy.settledTitleBg, copy.settledBg(Math.round(heldSec)), copy.settledPeekBg),
+      );
       spoken = 2;
     }
     return { state: { reason, sinceSec, endedAtSec, spoken, pending }, notices };

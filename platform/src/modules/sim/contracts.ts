@@ -1850,12 +1850,55 @@ export type HudEvent =
    * on. Retrieved from the catalogue by (code, detail) — `rules/catalog.ts`
    * `violationPeekBg` — never authored at the emission site.
    *
+   * TWO SURFACES READ IT, and they read it differently — which is why the
+   * field is a summary and never a replacement for the paragraph:
+   *   · the PHONE card (`LessonPlayShell`'s toast → `SimOverlayItem` re-map →
+   *     `hud/overlayQueue.overlayPeekBodyBg` → `SimOverlay` row 2b) prints it
+   *     whenever it is present, because that row is one or two lines tall;
+   *   · the ROOMY toast column (`hud/HudToasts.ViolationToast`, through
+   *     `violationToastBodyBg`) prints it ONLY when the card, measured once at
+   *     arrival, cannot be seen whole in its window — otherwise the paragraph,
+   *     whose measured readouts («Отчетена скорост …») the summary does not
+   *     carry.
+   * «ЗАЩО» / the sheet opens `explanationBg` whole on both.
+   *
    * Absent means „print `explanationBg`", i.e. the behaviour of every card
    * before this field existed.
    */
   | { kind: "violation"; titleBg: string; explanationBg: string; peekBg?: string; points: number; severity: "opasna" | "osnovna" | "vtorostepenna"; lawRef?: string }
   | { kind: "commendation"; titleBg: string }
   /** A first, teachable encounter — coached, not scored (teach-first-then-grade). */
-  | { kind: "lesson"; titleBg: string; explanationBg: string; lawRef?: string }
+  /**
+   * `peekBg` — THE SAME SHORT WHY, FOR THE COACH'S CHANNEL
+   * (`sc-merge-from-property:6715b581`).
+   *
+   * The frame: `.audit-frames/w47/frames/sc-merge-from-property__mobile-right/
+   * 04-t027s.png` — «Защо чакаш: пешеходец на пътеката / Правилно е да чакаш
+   * тук. При / ЗАЩО ↓17». On a phone the shell re-maps a `lesson` toast into a
+   * `kind: "hint"` overlay item, and row 2b printed the head of a 190–645
+   * character paragraph cut at a preposition: the approval reached the glass,
+   * the reason did not — a bare verdict delivered by the channel built to
+   * abolish them (doc 64 THEO-4). The violation member above has carried this
+   * field since sc-pk-driveway:fa602d10; this kind never had it, so
+   * `lessons/advisor.ts` authored a summary per yield-voice stage that this
+   * contract then dropped on the way to the glass.
+   *
+   * Read by the phone card only (the re-map carries it as
+   * `peekBg: t.event.peekBg ?? null`). The roomy «Научи» toast prints
+   * `explanationBg` and does not read it.
+   *
+   * WHO AUTHORS IT. Copy that is the rule catalogue's (a coached violation, a
+   * pre-drive step out of order) RETRIEVES it — `rules/catalog.ts`
+   * `violationPeekBg` — and never types it at the emission site. Copy that is
+   * the emitter's own (`advisor.ts` yield voice, `engine.ts` objective cards)
+   * authors it beside the paragraph it summarises, under the same rules as the
+   * catalogue's: a whole sentence, a reason or an act, no article and no
+   * figure (ADR-002 — the citation stays in `lawRef`, the numbers stay in the
+   * paragraph), and true of EVERY variant of the paragraph it rides with.
+   *
+   * Absent means „print `explanationBg`" — byte-identical to every lesson card
+   * before the field existed.
+   */
+  | { kind: "lesson"; titleBg: string; explanationBg: string; peekBg?: string; lawRef?: string }
   | { kind: "objectiveComplete"; titleBg: string }
   | { kind: "quiz"; questionId: string };

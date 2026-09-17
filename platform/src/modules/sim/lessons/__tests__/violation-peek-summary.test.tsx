@@ -26,7 +26,11 @@
  *
  * NOTHING IS DELETED. `explanationBg` is untouched, «ЗАЩО» still opens it whole
  * with its citations, and `SessionEndScreen`'s FaultCard never was on this path.
- * The ONLY surface that changes is the phone card's body row.
+ * When this gate was written the ONLY surface that changed was the phone card's
+ * body row. Since `sc-roundabout-entry:fe081cf1` the PC toast card
+ * (`hud/HudToasts.tsx`) prints the same summary too — only on a card whose
+ * paragraph the column would cut, and with a «Защо» chip that expands it back;
+ * that surface is gated in `hud/__tests__/hud-toast-fit.test.ts`, not here.
  */
 
 import { readFileSync } from "node:fs";

@@ -40,7 +40,15 @@
  * ---------------------------------------------------------------------------
  */
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import type { HudEvent } from "../contracts";
 import { minusPointsBg } from "../rules";
 import {
@@ -409,13 +417,40 @@ function ToastGround() {
 function ToastShell({
   color,
   onDismiss,
+  onWhy,
+  cardRef,
   children,
 }: {
   color: string;
   onDismiss: (() => void) | null;
+  /** Present only on a card that prints a «Защо» chip — a press that lands on
+   *  the chip runs this instead of the card's own activation. See „…AND ON PC
+   *  THE SUMMARY BECAME THE LAST WORD" for why it is a region and not a
+   *  nested `<button>`. */
+  onWhy?: () => void;
+  /** The card's root element, for the fit measurement `ViolationToast` makes —
+   *  see „THE CARD PRINTED A PARAGRAPH IT HAD NO ROOM AND NO TIME FOR". */
+  cardRef?: (el: HTMLElement | null) => void;
   children: ReactNode;
 }) {
   const interactive = onDismiss !== null;
+  const hasWhy = onWhy !== undefined;
+  // ONE composition, exported and asserted (`toastCardPressAction`), so the
+  // gate runs the branch the card runs instead of a transcription of it —
+  // `SimOverlay`'s ✕ shipped green twice on exactly that difference.
+  const press = (e: MouseEvent<HTMLElement>) => {
+    const action = toastCardPressAction(e.target, { interactive, hasWhy });
+    if (action === "why") onWhy?.();
+    else if (action === "dismiss") onDismiss?.();
+  };
+  // THE KEYBOARD DRIVES THE CAR, so a press of «Защо» may not leave focus on a
+  // card whose own activation is DISMISS: Chromium focuses a `<button>` on
+  // mousedown, and the next Enter would then delete the paragraph the student
+  // just asked for. Cancelling the mousedown keeps focus where it was; the
+  // `click` that toggles still fires. Presses anywhere else are untouched.
+  const holdFocus = (e: MouseEvent<HTMLElement>) => {
+    if (hasWhy && pressLandedOnToastWhy(e.target)) e.preventDefault();
+  };
   // `hud-ghost` — the founder's words about this exact column were „those pop
   // ups … are much much annoying, important but annoying". The information is
   // not the annoyance; the opaque blurred card that parks itself on his road is.
@@ -447,8 +482,16 @@ function ToastShell({
   const style = { borderColor: color };
 
   if (!interactive) {
+    // The inert column (no `onDismiss`) still owes a «Защо» chip its press:
+    // the chip is `pointer-events-auto`, and its click bubbles to here.
     return (
-      <div className={className} style={style}>
+      <div
+        ref={cardRef}
+        onClick={hasWhy ? press : undefined}
+        onMouseDown={hasWhy ? holdFocus : undefined}
+        className={className}
+        style={style}
+      >
         <ToastGround />
         {children}
       </div>
@@ -456,8 +499,10 @@ function ToastShell({
   }
   return (
     <button
+      ref={cardRef}
       type="button"
-      onClick={onDismiss}
+      onClick={press}
+      onMouseDown={hasWhy ? holdFocus : undefined}
       aria-label="Скрий известието"
       title="Щракни, за да го скриеш"
       className={className}
@@ -490,8 +535,19 @@ function ToastShell({
  * appears on cited faults would be missing from exactly the rows that have the
  * least other evidence.
  */
-function ToastFooter({ lawRef, ageBg }: { lawRef: string | undefined; ageBg: string | null }) {
-  if (lawRef === undefined && ageBg === null) return null;
+function ToastFooter({
+  lawRef,
+  ageBg,
+  trailing = null,
+}: {
+  lawRef: string | undefined;
+  ageBg: string | null;
+  /** The «Защо» chip on a summarised violation card, right-aligned after the
+   *  moment. Last on the row, so under `flex-wrap` it is the one that takes a
+   *  second line — never the citation. */
+  trailing?: ReactNode;
+}) {
+  if (lawRef === undefined && ageBg === null && trailing === null) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
       {lawRef !== undefined ? (
@@ -502,6 +558,7 @@ function ToastFooter({ lawRef, ageBg }: { lawRef: string | undefined; ageBg: str
       {ageBg !== null ? (
         <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted">{ageBg}</span>
       ) : null}
+      {trailing}
     </div>
   );
 }
@@ -531,6 +588,438 @@ function DismissGlyph({ show }: { show: boolean }) {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE CARD PRINTED A PARAGRAPH IT HAD NO ROOM AND NO TIME FOR —
+   sc-roundabout-entry:fe081cf1, re-judged STILL on w47.
+
+   THE FRAME, opened before anything here was written:
+   `.audit-frames/w47/frames/sc-roundabout-entry__pc-right/04-t058s.png`
+   (1440 × 900, swept on 7648edf; this file, the shell's column and the
+   catalogue row are byte-identical from there to 4209dad). −10 ОПАСНА ГРЕШКА
+   «Влизане без пропускане», and the body is `FAILED_TO_YIELD_SITUATION_COPY`'s
+   ring paragraph: 674 characters. The column's reading window holds about ten
+   body lines of it, and the glass ends at «…или Б2» — character 322 — faded
+   under «↓ обяснението продължава — покажи». The same leg at `04-t107s` cuts
+   the 305-character «Удар в пешеходец» paragraph at «…а не след това». The
+   judge's ruling on the control is the one this block accepts: a renamed
+   teaser over a severed explanation is chrome, not a repair.
+
+   TWO BUDGETS, AND THE PARAGRAPH BROKE BOTH.
+     · SPACE. The window is the shell's (`notifyColumnCapPx`, less the banner,
+       the recall pill and whatever the briefing still holds), and nothing in
+       this file can make it taller.
+     · TIME. `TEACHING_TOAST_TTL_MS` at the top of this file is 8 000 ms, sized
+       for „1–3 sentences … ~15 chars/s at driving load" — 120 characters. The
+       card removes itself after about a sixth of the ring paragraph however it
+       is laid out, so paging the column with «покажи» was never a route to its
+       end.
+
+   THE CATALOGUE HAS ALREADY AUTHORED WHAT FITS BOTH, AND THE JUDGE CREDITED IT.
+   `peekBg` is REQUIRED on every row (`rules/catalog.ts`, since 2026-09-11) and
+   rides this very event (`lessons/engine.ts` → `HudEvent.peekBg`). The phone
+   card prints it in preference to the paragraph
+   (`overlayQueue.overlayPeekBodyBg`), and the w47 judge read that card whole
+   and ruled the structure „not to be undone". For the ring act it is «Колата в
+   кръга има предимство и идва отляво.» — WHO has the right and WHERE to look,
+   44 characters. ADR-002: retrieved from the catalogue, not written here.
+   THEO-4: it is a reason, not a verdict, and the law chip stays beside it.
+
+   BUT ONLY WHERE THE PARAGRAPH IS ACTUALLY CUT — which is why this is a
+   measurement and not `overlayPeekBodyBg` copied across. Measured against the
+   catalogue, the median pooled paragraph is 206 characters and fits this
+   window whole, and `lessons/engine.ts` writes figures into some of them that
+   the summary does not carry («Отчетена скорост 58 км/ч при разрешени 50
+   км/ч», «Дистанция в момента: 0,8 с»). Swapping every card would spend that
+   evidence on ~50 codes to repair the ten or so pooled rows (plus the per-act
+   copies) whose paragraphs overflow a window this size. So the card keeps the
+   paragraph whenever it can be seen whole, and prints the summary only when it
+   cannot. The gap readout is a SUFFIX, i.e. the part the column already cut
+   first on any card long enough to fall back, so nothing legible is lost
+   there; SPEEDING_OVER_LIMIT/_DANGEROUS carry their readout as a PREFIX on a
+   paragraph under 130 characters that fits. SPEED_TOO_FAST_FOR_CURVE is the
+   exception and is named rather than hidden: 266 characters plus its ~65
+   character prefix can fall back in a window this tight and take a readout
+   that WAS on its first line with it.
+
+   HOW IT IS MEASURED, and the four choices that are not arbitrary:
+     · ONCE, AT ARRIVAL, BEFORE PAINT (`useLayoutEffect`), THEN LATCHED. A body
+       that changes while it is being read is the founder's „elements moving"
+       complaint; the student sees exactly one body for the life of the card
+       unless HE asks for the other (the «Защо» chip, below), and the age tick
+       re-rendering it every second cannot re-open the question.
+     · `offsetHeight`, NOT `getBoundingClientRect`. `hud-toast-in`
+       (`HudStyles.tsx`) enters from `scale(0.96)` and this effect runs on the
+       animation's first frame, so a transformed rect under-reads a tall card by
+       4 % — a cut card measured as one that fits.
+     · AGAINST `[data-hud-toast-scroller]`'s `clientHeight` — the shell's box,
+       named by its attribute exactly as the shell names `[data-hud="toasts"]`
+       in this file. No such ancestor (`app/dev/popup-rig`, a server render, a
+       test) or an unlaid box (0 px) is NO CLAIM, and no claim keeps the
+       paragraph: the one direction that is exactly the card as it shipped.
+     · …AND THE PARAGRAPH TAKES NO HEIGHT UNTIL THE CHOICE IS MADE — see
+       „THE SHELL SAW THE PARAGRAPH FOR ONE FRAME" below for the frame that
+       made this necessary and the arithmetic that makes it exact.
+
+   WHAT IT COSTS, stated rather than found later:
+     · On a card that falls back, the paragraph is one press away rather than
+       on the glass — the «Защо» chip, see „…AND ON PC THE SUMMARY BECAME THE
+       LAST WORD". It is also whole in the debrief (`FaultCard` prints
+       `event.explanationBg`). A measured readout riding that paragraph (the
+       curve case above) goes behind the chip with it; carrying a readout as
+       its own field is a `contracts.ts` + `lessons/engine.ts` change, not this
+       file's.
+     · Arrival-only means a window that SHRINKS afterwards — the fold row
+       mounting under a second card, a banner growing — can still cut a card
+       that fitted when it arrived. That residue is a line or two, not half a
+       paragraph, and it is the shell's fold control's to announce.
+     · The roomy leg still has no car-stopping route to the whole text, and the
+       chip does not add one: it expands the card inside the same eight-second
+       TTL. The shell records that as an open decision about what this column
+       IS (`LessonPlayShell.tsx`, the block above `revealMoreToasts`); this
+       does not make it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE SHELL SAW THE PARAGRAPH FOR ONE FRAME — the verifier's third item on the
+   repair above, 5 of 5 trials.
+
+   WHAT HAPPENED, in React's own order. The arrival commit painted nothing
+   wrong: the layout effect chose the summary and its state update is
+   processed before the browser paints. But React flushes the PREVIOUS
+   commit's passive effects before it starts that synchronous re-render, and
+   the shell's arrival effect (`LessonPlayShell.tsx`, the `newestToastId`
+   effect → `measureToastFold`) is one of them. So the shell measured the card
+   while it still held the 674-character paragraph, counted it cut, and
+   scheduled «↓ обяснението продължава — покажи». Its `ResizeObserver` then
+   read the summary card and took the row away again — one painted frame
+   later. Recorded per animation frame in the verifier's rig:
+   `summary|fold summary|- summary|- …`, on every trial of both long rows.
+
+   A LAYOUT EFFECT CANNOT WIN THAT RACE, and a lasting DOM write behind
+   React's back (swapping the text in the effect) would, at the cost of a node
+   React believes it owns. So the card does the declarative thing instead:
+   until the choice is made it renders nothing the shell can measure. The body
+   `<p>` is in the tree at its true width — but at `height: 0; overflow:
+   hidden`, so the card the shell's passive effect reads is the card WITHOUT
+   its body. That undercounts, and undercounting is the safe direction for a
+   fold row: the worst it can do is appear one frame late when a real fold
+   exists, never announce a cut that does not.
+
+   THE FIT TEST IS THE SAME TWO READS IT WAS VERIFIED ON — card `offsetHeight`
+   against scroller `clientHeight`, with the paragraph in flow. The effect lets
+   the body back into flow for exactly those two reads and collapses it again
+   before it returns (`measureToastBodyChoice` has why that is not optional:
+   the scroller's height FOLLOWS its content, so a collapsed card cannot be
+   measured against it).
+
+   `"pending"` IS NEVER PAINTED — it is resolved inside the same layout effect
+   the choice always lived in. It is printed on `data-hud-toast-body` anyway,
+   so a frame-by-frame probe can prove that rather than assume it. A server
+   render (no `document`) starts at `"paragraph"`, because there is nothing to
+   measure there and no claim keeps the paragraph whole; no toast is ever
+   server-rendered in the product (`useHudToastQueue` starts empty, and the
+   popup rig's literal cards carry no `peekBg`), so the two starting states
+   cannot meet in a hydration.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The shell's toast scroller — the box whose height is this card's window. */
+export const TOAST_SCROLLER_SELECTOR = "[data-hud-toast-scroller]";
+
+/**
+ * Rounding slack for the fit test, px. `offsetHeight` and `clientHeight` are
+ * both integer-rounded layout reads, so a card that exactly fills its window
+ * can read one pixel over. Anything past that is a cut, and is called one.
+ */
+export const TOAST_FIT_SLACK_PX = 1;
+
+/**
+ * Can a card of this height be seen whole in a window of this height?
+ *
+ * Unmeasurable input — a non-finite read, or a zero from a box that has not
+ * been laid out (a server render, a test DOM) — answers TRUE. That is not
+ * optimism: `true` keeps the paragraph, i.e. the card exactly as it shipped,
+ * so an instrument that cannot read never changes what the student is shown.
+ */
+export function toastCardFitsWindow(cardHeightPx: number, windowHeightPx: number): boolean {
+  if (!Number.isFinite(cardHeightPx) || !Number.isFinite(windowHeightPx)) return true;
+  if (cardHeightPx <= 0 || windowHeightPx <= 0) return true;
+  return cardHeightPx <= windowHeightPx + TOAST_FIT_SLACK_PX;
+}
+
+/**
+ * The violation card's body: the authored paragraph while it fits (or once the
+ * student has opened it with «Защо»), the catalogue's summary otherwise. A
+ * missing or blank summary keeps the paragraph — a cut sentence is a defect, a
+ * blank body is a bare verdict, and only the first is allowed to survive this
+ * function.
+ */
+export function violationToastBodyBg(
+  event: { explanationBg: string; peekBg?: string },
+  showParagraph: boolean,
+): string {
+  if (showParagraph) return event.explanationBg;
+  const peek = event.peekBg;
+  return typeof peek === "string" && peek.trim().length > 0 ? peek : event.explanationBg;
+}
+
+/**
+ * Where the card's body stands. `"pending"` exists for exactly one commit and
+ * is never painted — see „THE SHELL SAW THE PARAGRAPH FOR ONE FRAME".
+ */
+export type ToastBodyChoice = "pending" | "paragraph" | "summary";
+
+/**
+ * The body a card starts from. Only a card that HAS a summary to fall back to
+ * and a DOM to measure in waits for the measurement; every other card is the
+ * paragraph from its first render, exactly as it shipped.
+ */
+export function initialToastBodyChoice(
+  canSummarise: boolean,
+  canMeasure: boolean,
+): ToastBodyChoice {
+  return canSummarise && canMeasure ? "pending" : "paragraph";
+}
+
+/**
+ * The pending body: in the tree at its true width, contributing no height and
+ * painting no line. `overflow: hidden` is what keeps a zero-height paragraph
+ * from spilling its lines over the footer — and whatever the pending card's
+ * margins then do, it can only be SHORTER than the card that follows it, which
+ * is the direction the shell's fold count may safely be wrong in.
+ */
+const TOAST_BODY_PENDING_STYLE = { height: 0, overflow: "hidden" } as const;
+
+/**
+ * The measurement itself, on a card whose body is still pending. No card, no
+ * body or no scroller is no claim: paragraph.
+ *
+ * THE BODY IS LET BACK INTO FLOW FOR THE TWO READS AND COLLAPSED AGAIN BEFORE
+ * THIS RETURNS — and that is the only way to ask the question at all, found by
+ * getting it wrong first. The scroller is not a fixed box: it is a flex item
+ * that grows with its content up to the column's cap, so its `clientHeight`
+ * against a COLLAPSED card is the collapsed card's height, and the first draft
+ * of this function (body-less card + `body.scrollHeight` against that) called
+ * the 127-character SPEEDING_OVER_LIMIT paragraph „cut" in the verifier's
+ * Chromium rig, 5 of 5, on a card that fits with room to spare. With the body
+ * in flow the two reads are the same two reads the repair was verified on:
+ * the card's `offsetHeight` against the window the column actually gives it.
+ *
+ * The writes are to the inline style React set for `"pending"` and are put
+ * back to the exact strings read, synchronously, with no paint and no
+ * `ResizeObserver` delivery in between — so the DOM React committed is the DOM
+ * the shell's passive effect then reads. `offsetHeight`/`clientHeight` here
+ * force the layout; nothing is left changed by it.
+ */
+function measureToastBodyChoice(
+  card: HTMLElement | null,
+  body: HTMLElement | null,
+): "paragraph" | "summary" {
+  if (card === null || body === null) return "paragraph";
+  const scroller = card.closest(TOAST_SCROLLER_SELECTOR);
+  if (!(scroller instanceof HTMLElement)) return "paragraph";
+  const collapsed = { height: body.style.height, overflow: body.style.overflow };
+  body.style.height = "";
+  body.style.overflow = "";
+  const fits = toastCardFitsWindow(card.offsetHeight, scroller.clientHeight);
+  body.style.height = collapsed.height;
+  body.style.overflow = collapsed.overflow;
+  return fits ? "paragraph" : "summary";
+}
+
+/**
+ * The measurement, latched. A card with a summary starts `"pending"` and
+ * leaves it in its arrival commit's layout effect, before paint; nothing moves
+ * it again. The effect keys on `choice` alone, so neither the age tick's
+ * once-a-second re-render nor the student opening «Защо» can re-run it.
+ */
+function useToastBodyChoice(canSummarise: boolean): {
+  setCard: (el: HTMLElement | null) => void;
+  bodyRef: { current: HTMLParagraphElement | null };
+  choice: ToastBodyChoice;
+} {
+  const cardRef = useRef<HTMLElement | null>(null);
+  const bodyRef = useRef<HTMLParagraphElement | null>(null);
+  // A stable callback ref: an inline one would be detached and re-attached on
+  // every tick of the age clock.
+  const setCard = useCallback((el: HTMLElement | null) => {
+    cardRef.current = el;
+  }, []);
+  const [choice, setChoice] = useState<ToastBodyChoice>(() =>
+    initialToastBodyChoice(canSummarise, typeof document !== "undefined"),
+  );
+  useLayoutEffect(() => {
+    if (choice !== "pending") return;
+    setChoice(measureToastBodyChoice(cardRef.current, bodyRef.current));
+  }, [choice]);
+  return { setCard, bodyRef, choice };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND ON PC THE SUMMARY BECAME THE LAST WORD — the verifier's second item.
+
+   The w48 re-route that sent this row here specified „render event.peekBg ??
+   event.explanationBg with the paragraph behind an in-card toggle", and the
+   repair above shipped the first half. The phone's card has carried that
+   toggle all along: «ЗАЩО» (`SimOverlay`) opens the whole authored paragraph
+   from the summary. On PC the summary was all there was until the debrief —
+   a reason, but the SHORT reason, with the law and the explanation it
+   compresses unreachable for the eight seconds the fault is live. THEO-4 does
+   not accept „it is in the debrief" for the moment of the mistake; the chip is
+   what keeps the summary a summary rather than a verdict with a caption.
+
+   THE SHAPE, and each property is a constraint rather than a taste:
+     · THE PHONE'S WORD. «Защо» set `uppercase`, the same label `SimOverlay`
+       prints, with ↓ closed / ↑ open. One product, one name for „the rest of
+       the reason".
+     · ONLY ON A SUMMARISED CARD. A card showing its paragraph has nothing
+       behind a chip, and a control that opens what is already open is chrome.
+     · A POINTER TARGET, NOT A KEY. The keyboard drives the car (see the file
+       header: no binding here, on purpose). The chip is sized like the
+       shell's own «покажи» fold row — `rounded-full border px-2.5 py-1
+       text-[9px]` — because that is the affordance this column already
+       teaches for „there is more, press here".
+     · A REGION OF THE CARD, NOT A `<button>` IN A `<button>`. The interactive
+       card IS a `<button>` (click removes it — the founder's A6). A second
+       button inside it is invalid HTML, React warns on it, and `SimOverlay`
+       has already refused that nesting once and solved the same problem by
+       asking WHERE the press landed (`pressOnDismissGlyph`). Here the target
+       is the chip's own element, so `closest` answers it without geometry:
+       a press on the chip toggles, a press anywhere else still dismisses.
+     · IT DOES NOT RE-OPEN THE FIT QUESTION, AND IT SURVIVES THE CLOCK. The
+       open state is this component's own `useState`, keyed by the toast id,
+       so the age tick re-renders it without resetting it; the measurement
+       keys on `choice` and never sees it.
+
+   WHAT OPENING IT DOES TO THE COLUMN, stated: the paragraph comes back at the
+   size it has, which on the ring row is taller than the window. That is the
+   student's explicit choice, the shell's `ResizeObserver` on
+   `[data-hud="toasts"]` sees the card grow, and its fold row then offers
+   «↓ обяснението продължава — покажи» to page through it, exactly as it did
+   for every long card before the repair above.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The attribute that marks the «Защо» chip — and the press region it is. */
+export const TOAST_WHY_ATTR = "data-hud-toast-why";
+
+/** The chip's label, in the phone card's word (`SimOverlay`: „Защо"). */
+export const TOAST_WHY_LABEL_BG = { closed: "Защо ↓", open: "Защо ↑" } as const;
+
+/**
+ * Did this press land on a «Защо» chip? Structural rather than `instanceof
+ * Element`, so the gate can ask it of a stand-in without a DOM; anything that
+ * cannot answer `closest` (a text node, `null`) is not on the chip.
+ */
+export function pressLandedOnToastWhy(target: unknown): boolean {
+  if (typeof target !== "object" || target === null) return false;
+  const closest = (target as { closest?: unknown }).closest;
+  if (typeof closest !== "function") return false;
+  return (target as Pick<Element, "closest">).closest(`[${TOAST_WHY_ATTR}]`) !== null;
+}
+
+/** What one press of a card does. `"none"` is the inert column off the chip. */
+export type ToastPressAction = "why" | "dismiss" | "none";
+
+/**
+ * THE CARD'S PRESS, AS ONE FUNCTION THE COMPONENT CALLS AND THE GATE RUNS. A
+ * card with a chip toggles when the press lands on it; otherwise an
+ * interactive card dismisses, as it always has, and an inert one does nothing.
+ */
+export function toastCardPressAction(
+  target: unknown,
+  card: { interactive: boolean; hasWhy: boolean },
+): ToastPressAction {
+  if (card.hasWhy && pressLandedOnToastWhy(target)) return "why";
+  return card.interactive ? "dismiss" : "none";
+}
+
+/**
+ * The chip. `pointer-events-auto` because the inert column's card is
+ * `pointer-events-none`; `title` because the card's own „Щракни, за да го
+ * скриеш" would otherwise be the tooltip over the one spot where it is false.
+ * Its colour is the fault's, as the phone's «Защо» label is.
+ */
+function ToastWhyChip({ open, color }: { open: boolean; color: string }) {
+  return (
+    <span
+      data-hud-toast-why={open ? "open" : "closed"}
+      title={open ? "Свий обяснението" : "Покажи цялото обяснение"}
+      className="pointer-events-auto ml-auto shrink-0 cursor-pointer rounded-full border px-2.5 py-1 text-[9px] font-black uppercase leading-none tracking-wider"
+      style={{ color, borderColor: `color-mix(in srgb, ${color} 45%, transparent)` }}
+    >
+      {open ? TOAST_WHY_LABEL_BG.open : TOAST_WHY_LABEL_BG.closed}
+    </span>
+  );
+}
+
+function ViolationToast({
+  event,
+  ageBg,
+  onDismiss,
+}: {
+  event: Extract<HudEvent, { kind: "violation" }>;
+  ageBg: string | null;
+  onDismiss: (() => void) | null;
+}) {
+  const meta = SEVERITY_META[event.severity];
+  const canSummarise = typeof event.peekBg === "string" && event.peekBg.trim().length > 0;
+  const { setCard, bodyRef, choice } = useToastBodyChoice(canSummarise);
+  const [whyOpen, setWhyOpen] = useState(false);
+  const toggleWhy = useCallback(() => setWhyOpen((open) => !open), []);
+  const summarised = choice === "summary";
+  const showParagraph = !summarised || whyOpen;
+  return (
+    <ToastShell
+      color={meta.color}
+      onDismiss={onDismiss}
+      onWhy={summarised ? toggleWhy : undefined}
+      cardRef={setCard}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="text-[10px] font-black uppercase tracking-wide"
+          style={{ color: meta.color }}
+        >
+          {meta.label}
+        </span>
+        <span className="flex items-center gap-1">
+          {/* The unit rides ON the number. A bare „−10 т." on a toast is the
+              same misreading as on the result screen, three minutes earlier. */}
+          <span
+            className="whitespace-nowrap text-xs font-black tabular-nums"
+            style={{ color: meta.color }}
+          >
+            {minusPointsBg("exam", event.points)}
+          </span>
+          <DismissGlyph show={onDismiss !== null} />
+        </span>
+      </div>
+      <p className="mt-1 text-sm font-bold leading-snug text-foreground">{event.titleBg}</p>
+      {/* The WHY — same layout as the "lesson" teaching toast below (QW7):
+          our moat is the law-cited explanation at the moment of learning.
+          Quiet mode NEVER removes this; it removes praise. What CAN change it
+          is the fit test above: a paragraph the column would cut is replaced
+          by the catalogue's own summary of it, never by nothing — and the
+          «Защо» chip in the footer brings the paragraph back on request.
+          `data-hud-toast-body` names which one is in the box, so a sweep can
+          read the choice off the DOM instead of inferring it from a crop;
+          `"pending"` there is the one commit before the choice, never painted. */}
+      <p
+        ref={bodyRef}
+        data-hud-toast-body={choice === "pending" ? "pending" : showParagraph ? "paragraph" : "summary"}
+        className="mt-1 text-xs leading-snug text-muted"
+        style={choice === "pending" ? TOAST_BODY_PENDING_STYLE : undefined}
+      >
+        {violationToastBodyBg(event, showParagraph)}
+      </p>
+      <ToastFooter
+        lawRef={event.lawRef}
+        ageBg={ageBg}
+        trailing={summarised ? <ToastWhyChip open={whyOpen} color={meta.color} /> : null}
+      />
+    </ToastShell>
+  );
+}
+
 function ToastCard({
   event,
   ageBg,
@@ -542,36 +1031,9 @@ function ToastCard({
   onDismiss: (() => void) | null;
 }) {
   if (event.kind === "violation") {
-    const meta = SEVERITY_META[event.severity];
-    return (
-      <ToastShell color={meta.color} onDismiss={onDismiss}>
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className="text-[10px] font-black uppercase tracking-wide"
-            style={{ color: meta.color }}
-          >
-            {meta.label}
-          </span>
-          <span className="flex items-center gap-1">
-            {/* The unit rides ON the number. A bare „−10 т." on a toast is the
-                same misreading as on the result screen, three minutes earlier. */}
-            <span
-              className="whitespace-nowrap text-xs font-black tabular-nums"
-              style={{ color: meta.color }}
-            >
-              {minusPointsBg("exam", event.points)}
-            </span>
-            <DismissGlyph show={onDismiss !== null} />
-          </span>
-        </div>
-        <p className="mt-1 text-sm font-bold leading-snug text-foreground">{event.titleBg}</p>
-        {/* The WHY — same layout as the "lesson" teaching toast below (QW7):
-            our moat is the law-cited explanation at the moment of learning.
-            Quiet mode NEVER removes this; it removes praise. */}
-        <p className="mt-1 text-xs leading-snug text-muted">{event.explanationBg}</p>
-        <ToastFooter lawRef={event.lawRef} ageBg={ageBg} />
-      </ToastShell>
-    );
+    // Its own component because it holds hooks (the fit measurement), and a
+    // hook called in one arm of this `if` chain is outside the rules of hooks.
+    return <ViolationToast event={event} ageBg={ageBg} onDismiss={onDismiss} />;
   }
 
   if (event.kind === "commendation") {

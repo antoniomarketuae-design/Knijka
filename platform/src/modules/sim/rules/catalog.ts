@@ -112,8 +112,13 @@ export interface ViolationSpec {
    *
    * IT IS A SECOND STRING, NOT A SHORTER `explanationBg`. Nothing is deleted:
    * `SimOverlay`'s sheet still prints the whole authored paragraph, the debrief
-   * FaultCard still prints it, and `whyIsReachable` still measures the peek. The
-   * ONLY surface that reads this is the phone card's body row.
+   * FaultCard still prints it, and `whyIsReachable` still measures the peek.
+   * TWO surfaces read this, and both keep the paragraph one press away: the
+   * phone card's body row (always, behind «ЗАЩО»), and — since
+   * `sc-roundabout-entry:fe081cf1` — the PC toast card in `hud/HudToasts.tsx`,
+   * but ONLY when that card measures its paragraph as cut by the column's
+   * window, and with its own «Защо» chip that expands it back. A PC card whose
+   * paragraph fits still prints the paragraph, figures and all.
    *
    * THE BUDGET IS TWO BODY LINE BOXES, and it is derived, not chosen —
    * `__tests__/violation-peek-summary.test.ts` re-cuts it off the same

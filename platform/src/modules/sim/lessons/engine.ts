@@ -549,6 +549,27 @@ function objectiveNotice(
       // the speed the card just printed, which is the speed that would carry
       // him past the mark if he keeps it.
       explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, ${measuredBg} ${tailBg}${alsoKerbward}`,
+      // ── THE ONE LINE THE PHONE CARD CAN FINISH (sc-merge-from-property:
+      //    6715b581 — `HudEvent`'s `lesson` member carries the frame) ─────────
+      //
+      // The paragraph above is 200–400 characters and its title wraps to two
+      // lines at the compact card's width, so the peek's floor window has room
+      // for exactly ONE body line under it. Row 2b used to print the head of
+      // the paragraph there — «Задачата иска да си тук с не повече от» — and
+      // stop, with the reason and the instruction both behind «ЗАЩО».
+      //
+      // ONE STRING FOR SIX PARAGRAPHS, so it had to be true of all of them:
+      // arrived fast / sped up on the mark (`measuredBg`) × still on the mark /
+      // mark behind or approach blown (`tailBg`), and on the first tail with or
+      // without the kerbward clause (it only rides that one). What
+      // they share is the MECHANISM the founder's «стоя върху точката и нищо
+      // не става» was about: reaching the mark is not the whole task, the speed
+      // at it is read too. What they do NOT share is the corrective — «Намали
+      // СЕГА» is right on one tail and useless on the other — so the line
+      // carries no instruction; the tail that is true of this frame is one tap
+      // away. No figure (the cap is in the paragraph and on the strip), no
+      // article, no verdict word.
+      peekBg: "Отчита се и скоростта.",
     };
   }
   // ── AND WHEN THE STANDSTILL IS THE CRASH'S, SAY SO (w29, 2026-09-08 —
@@ -588,6 +609,10 @@ function objectiveNotice(
       titleBg: "Колата спря от удара, а не от спирачката",
       explanationBg:
         "Колата стои неподвижно на маркера, защото удари това пред себе си — а задачата иска ТИ да я спреш там. Ударът не се брои за спиране: точката се дава за спиране със спирачката, преди препятствието и в своята лента. Затова задачата остава неизпълнена, въпреки че колата стои на място. Спирай по-рано и по-твърдо — спирането право в своята лента е по-безопасно от завиването встрани.",
+      // The phone card's one line (see the cap card above for the window). The
+      // title already says the crash was not a stop, so the line is the ACT
+      // the paragraph closes on, not a second telling of the verdict.
+      peekBg: "Спирай по-рано и твърдо.",
     };
   }
   // ── THE OTHER HALF OF THE ARRIVAL CONTRACT FINALLY SPEAKS (round 12,
@@ -671,6 +696,13 @@ function objectiveNotice(
             (stillAtTheMark
               ? "Нагласи ги СЕГА, докато си върху точката — задачата се отчита на следващия кадър. Ако я подминеш така, остава неизпълнена, но урокът продължава и разборът я показва накрая."
               : "Подмина точката така, затова задачата остава неизпълнена: светлините се нагласят ПРЕДИ участъка, не в него. Урокът продължава и разборът показва задачата накрая."),
+          // The cap card's line, for the lamps: true of all four demands and
+          // both tails («Нагласи ги СЕГА» / «ПРЕДИ участъка»), which is why it
+          // names the mechanism and not either corrective. ⚠ This title is
+          // THREE lines at the compact width, so even one body line is below
+          // the peek's 44 px floor here — the line still shortens what «ЗАЩО ↓N»
+          // hides, but it is not whole on the glass until the title is shorter.
+          peekBg: "Отчитат се и светлините.",
           lawRef: refusal.demand === "fog" ? "ЗДвП чл. 74" : "ЗДвП чл. 70",
         };
       }
@@ -698,6 +730,12 @@ function objectiveNotice(
             (stillAtTheMark
               ? "Отдръпни се още надясно, докато си на точката — задачата се отчита на следващия кадър. Спряла кола насред платното изненадва движещия се зад теб и е предпоставка за удар отзад."
               : "Мястото е вече зад теб, затова задачата остава неизпълнена: към десния край се отдръпва ПРЕДИ спирането, не след него. Урокът продължава и разборът показва задачата накрая."),
+          // The REASON both tails rest on, as a general truth rather than a
+          // claim about this frame: on the second tail the car may already be
+          // rolling on, so «you are blocking» would be a present tense that
+          // stopped being true. Seconds and metres stay out (see `laneOffsetM`
+          // above for why a figure here would teach a road that is not there).
+          peekBg: "Средата е за движението.",
         };
       }
       return {
@@ -709,6 +747,9 @@ function objectiveNotice(
             ? "Включи R и мини мястото назад — задачата се отчита, когато колата наистина се движи на заден ход. Урокът продължава и разборът я показва накрая."
             : "Мястото е вече зад теб, затова задачата остава неизпълнена. Заден ход се включва ПРЕДИ маневрата, не след нея. Урокът продължава и разборът показва задачата накрая."),
         lawRef: "ЗДвП чл. 40",
+        // What the task IS, which both tails agree on; when to engage R is the
+        // part they disagree about, so it stays in the paragraph.
+        peekBg: "Мястото се минава назад.",
       };
     }
   }
@@ -773,6 +814,11 @@ function objectiveNotice(
           ? "Ускори СЕГА, докато си върху точката — задачата се отчита на следващия кадър, ако си в границите. Ако я подминеш така, остава неизпълнена, но урокът продължава и разборът я показва накрая."
           : "Точката е вече зад теб, затова задачата остава неизпълнена: скоростта се избира ПРЕДИ участъка. Урокът продължава и разборът я показва накрая."),
       lawRef: "ЗДвП чл. 5",
+      // The drill's safety half, compressed out of the paragraph's own «бавната
+      // кола … сама става пречка»: the misconception is that slower is always
+      // safer, and the line answers exactly that. Seconds-, figure- and
+      // tail-free, so it is true on both tails.
+      peekBg: "Бавната кола е пречка.",
     };
   }
   if (
@@ -788,6 +834,9 @@ function objectiveNotice(
       explanationBg:
         "Излизането от кръгово е маневра надясно и се сигнализира — мигачът казва на колите зад теб и на чакащите на изхода, че напускаш кръга. Задачата остава отворена: върни се в кръговото и излез с пуснат десен мигач. Ако продължиш напред, урокът приключва и разборът показва точно това място.",
       lawRef: "ЗДвП чл. 25",
+      // WHY the lamp, in the paragraph's own words: the title names the missing
+      // signal, the line says what it would have told the others.
+      peekBg: "Мигачът казва: излизам.",
     };
   }
   return null;
@@ -1273,11 +1322,19 @@ export function applyPreDriveStep(
   // coached (lesson toast with the authored law-cited WHY), never scored.
   for (const e of events) {
     if (e.kind === "stepOutOfOrder") {
+      // The phone card's one line, RETRIEVED: `StepOutOfOrderEvent` is
+      // documented as carrying „the same authored texts as the
+      // PREDRIVE_WRONG_ORDER violation" (procedures/types.ts), and assess mode
+      // bills that very code through `toHudEvents` with this very summary — so
+      // the coached card and the billed card cannot say two different things.
+      // `stepId` is the act key `makeViolation` was given as `detail`.
+      const peekBg = violationPeekBg("PREDRIVE_WRONG_ORDER", e.stepId);
       hudEvents.push({
         kind: "lesson",
         titleBg: e.titleBg,
         explanationBg: e.explanationBg,
         lawRef: e.lawRef,
+        ...(peekBg === null ? {} : { peekBg }),
       });
     }
   }
@@ -1554,11 +1611,18 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         });
         lastTeachAt = tick.t;
       } else {
+        // The SAME catalogue row as the violation card, so the same summary
+        // (`peekBg` above, keyed on the act). Before `HudEvent`'s `lesson`
+        // member could carry one, this downgraded card was the one place the
+        // phone printed a coached fault as a clamped paragraph while the billed
+        // copy of the same fault printed its line (sc-merge-from-property:
+        // 6715b581).
         hudEvents.push({
           kind: "lesson",
           titleBg: e.titleBg,
           explanationBg,
           lawRef: e.lawRef,
+          ...(peekBg === null ? {} : { peekBg }),
         });
       }
     } else {
@@ -1586,12 +1650,14 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         continue;
       }
       // learn-only scenarios stay ambient: surfaced as a toast, never scored,
-      // never interrupting.
+      // never interrupting. Its summary rides with it for the reason given at
+      // the teach-downgrade branch above.
       hudEvents.push({
         kind: "lesson",
         titleBg: e.titleBg,
         explanationBg,
         lawRef: e.lawRef,
+        ...(peekBg === null ? {} : { peekBg }),
       });
     }
   }
