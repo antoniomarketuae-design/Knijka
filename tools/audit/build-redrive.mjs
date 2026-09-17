@@ -469,7 +469,36 @@ export function legsInProse(what, { frameLeg = null, lesson = null } = {}) {
 export const NO_SIMULATOR_ROUTE = new Map([
   ["app-login", "the /login form, not a lesson — there is no /simulator/app-login to drive"],
 ]);
-export function redriveSet(open, { only = null, includeUndrivable = false } = {}) {
+/**
+ * THE pc-path LEG — ROUTED FROM A FILE, NEVER FROM PROSE (DESIGN-v2 §9).
+ *
+ * A path leg is a GRADING instrument that exists for fourteen named parking /
+ * reverse rows (`tools/audit/path-routing.json`). It is never derived from a
+ * finding's sentence, never counted toward "all four", never satisfies `VALID`,
+ * and a row is routed only once its lesson's canary has passed
+ * (`canaryPassed === true`) — which is also the founder-ratification gate.
+ */
+export const PATH_LEGS = new Set(["pc-path"]);
+export const PATH_ROUTING_FILE = path.join(HERE, "path-routing.json");
+
+/** Lessons with at least one routed (canary-passed) path row. Unreadable file → none. */
+export function routedPathLessons(routing) {
+  const rows = Array.isArray(routing?.rows) ? routing.rows : Array.isArray(routing) ? routing : [];
+  return new Set(rows.filter((r) => r && r.canaryPassed === true && PATH_LEGS.has(r.leg) && r.lesson).map((r) => r.lesson));
+}
+
+/**
+ * APPENDING NEVER SHRINKS A LESSON'S RE-DRIVE (S-8). `[]` means "drive all four"
+ * downstream, so appending `pc-path` to an empty list would turn four drives
+ * into one: the list is expanded to the four VALID legs FIRST, and only when a
+ * path leg is actually appended. A lesson with no routed path row keeps `[]`.
+ */
+export function withPathLeg(legs) {
+  const base = legs.length ? legs : [...VALID].sort();
+  return [...new Set([...base, "pc-path"])].sort();
+}
+
+export function redriveSet(open, { only = null, includeUndrivable = false, pathRouting = null } = {}) {
   const per = new Map();
   for (const f of open) {
     const lesson = f.scenario || f.lesson;
@@ -491,15 +520,19 @@ export function redriveSet(open, { only = null, includeUndrivable = false } = {}
   }
   // Heaviest-in-critical first: the sweep dispatcher interleaves shards, so the
   // expensive lessons spread across drivers instead of piling on shard 0.
+  const pathLessons = routedPathLessons(pathRouting);
   return [...per.values()]
     .sort((a, b) => b.critical - a.critical || b.total - a.total || a.lesson.localeCompare(b.lesson))
-    .map((x) => ({
-      lesson: x.lesson,
-      total: x.total,
-      critical: x.critical,
+    .map((x) => {
       // Union only when a frame named a leg — see THE EMPTY GUARD above.
-      legs: x.frameLegs.size ? [...new Set([...x.frameLegs, ...x.proseLegs])].sort() : [],
-    }));
+      const legs = x.frameLegs.size ? [...new Set([...x.frameLegs, ...x.proseLegs])].sort() : [];
+      return {
+        lesson: x.lesson,
+        total: x.total,
+        critical: x.critical,
+        legs: pathLessons.has(x.lesson) ? withPathLeg(legs) : legs,
+      };
+    });
 }
 
 // ---------------------------------------------------------------------- main
@@ -523,7 +556,17 @@ if (isMain || process.argv[1]?.endsWith("build-redrive.mjs")) {
   console.log(workedLine("open", used));
 
   const includeUndrivable = process.argv.includes("--include-undrivable");
-  const set = redriveSet(counts.open, { only, includeUndrivable });
+  let pathRouting = null;
+  try {
+    pathRouting = JSON.parse(fs.readFileSync(PATH_ROUTING_FILE, "utf8"));
+  } catch {
+    pathRouting = null;
+  }
+  const set = redriveSet(counts.open, { only, includeUndrivable, pathRouting });
+  {
+    const routed = routedPathLessons(pathRouting);
+    console.log("pc-path lessons routed (canaryPassed === true): " + routed.size + (routed.size ? " — " + [...routed].join(", ") : " — none; path legs are dispatched only with wave-c.mjs --with-path-legs"));
+  }
   const drives = set.reduce((n, r) => n + (r.legs.length || 4), 0);
 
   console.log("lessons in the drive set : " + set.length + (only ? "  (restricted to " + only.size + " named)" : ""));

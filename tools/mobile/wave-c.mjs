@@ -78,6 +78,15 @@ const BASE = flag("--base", process.env.KNIJKA_BASE);
 const OUT = flag("--out", path.join(REPO, ".audit-frames", "wave-c"));
 const LIMIT = Number(flag("--limit", "0")) || 0;
 const LEGS = (flag("--legs", "pc-right,pc-wrong,mobile-right,mobile-wrong") || "").split(",");
+/**
+ * THE pc-path LEG IS OFF BY DEFAULT (DESIGN-v2 §9). `--with-path-legs` appends it
+ * to LEGS, and even then a path leg is driven only for a row that NAMES it
+ * (build-redrive.mjs routes one only after its lesson's canary passed). A row that
+ * names no leg means "all four" and never gets a path leg; `mobile-path` is not in
+ * Slice 1 and is skipped with a reason.
+ */
+const PATH_LEGS = new Set(["pc-path", "mobile-path"]);
+if (has("--with-path-legs") && !LEGS.includes("pc-path")) LEGS.push("pc-path");
 const ONLY = (flag("--lessons", "") || "").split(",").filter(Boolean);
 
 if (!BASE) {
@@ -141,8 +150,12 @@ const planned = [];
 for (const r of rows) {
   // A lesson whose findings named no leg is re-driven on all four: the finding
   // could be on any of them, and guessing is how coverage counts go wrong.
-  const legs = r.legs && r.legs.length ? r.legs : LEGS;
+  const legs = r.legs && r.legs.length ? r.legs : LEGS.filter((l) => !PATH_LEGS.has(l));
   for (const leg of legs) {
+    if (leg === "mobile-path") {
+      console.log(`[wave-c] ${r.lesson}/mobile-path skipped — mobile-path is not in Slice 1 (lesson-audit.mjs refuses it)`);
+      continue;
+    }
     if (!LEGS.includes(leg)) continue;
     if (done.has(`${r.lesson}/${leg}`)) continue;
     planned.push({ lesson: r.lesson, leg, critical: r.critical, total: r.total });

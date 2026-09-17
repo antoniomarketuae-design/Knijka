@@ -379,7 +379,7 @@ export const CAVEATS = Object.freeze([
   {
     class: "platform-cross",
     why: "this drove no platform. Any claim that two platforms DIFFER is untouched by it — the chain graded one input, once.",
-    re: /(?<![\p{L}\p{N}_])(?:pc-right|pc-wrong|mobile-right|mobile-wrong)(?![\p{L}\p{N}_])|on pc\b|on mobile\b|on desktop\b|on the phone\b|both platforms|either platform|two platforms|per platform|the device they use/iu,
+    re: /(?<![\p{L}\p{N}_])(?:pc-right|pc-wrong|pc-path|mobile-right|mobile-wrong|mobile-path)(?![\p{L}\p{N}_])|on pc\b|on mobile\b|on desktop\b|on the phone\b|both platforms|either platform|two platforms|per platform|the device they use/iu,
   },
   {
     class: "sweep-leg",

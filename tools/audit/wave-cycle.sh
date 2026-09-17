@@ -235,7 +235,9 @@ preflight)
 
 sweep)
   ROUND="${2:-}"; LESSONS="${3:-}"; SHARDS="${4:-2}"
-  [ -n "$ROUND" ] && [ -f "${LESSONS:-/nonexistent}" ] || fail "usage: wave-cycle.sh sweep <round> <lessonsfile> [shards]"
+  # [--with-path-legs] as the 5th argument forwards to the supervisor (DESIGN-v2 §9); off by default.
+  PATH_FLAG=""; [ "${5:-}" = "--with-path-legs" ] && PATH_FLAG="--with-path-legs"
+  [ -n "$ROUND" ] && [ -f "${LESSONS:-/nonexistent}" ] || fail "usage: wave-cycle.sh sweep <round> <lessonsfile> [shards] [--with-path-legs]"
   bash "$REPO/.audit-frames/wave-scripts/sweep-preflight.sh" || fail "preflight refused; a sweep dispatched now photographs the paywall"
   # TWO DRIVERS ON ONE SERVER, NEVER TWO SERVERS. Two dev servers on one box
   # contend for the same 7200 rpm disk and the same Turbopack cache and both
@@ -277,7 +279,7 @@ sweep)
   for f in "$REPO/.audit-frames/$ROUND/shard-"*.txt; do
     s=$(basename "$f" .txt | sed 's/shard-//')
     say "  dispatching shard $s under the supervisor"
-    bash "$REPO/tools/mobile/drive-supervisor.sh" "$ROUND-$s" "$f" "http://localhost:$PORT" &
+    bash "$REPO/tools/mobile/drive-supervisor.sh" "$ROUND-$s" "$f" "http://localhost:$PORT" $PATH_FLAG &
   done
   wait
   say "all shards exited; run: wave-cycle.sh merge $ROUND"
