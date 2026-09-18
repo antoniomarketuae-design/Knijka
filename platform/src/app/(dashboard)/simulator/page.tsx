@@ -26,6 +26,7 @@ import { FeatureOffline } from "@/components/ui/FeatureOffline";
 import { isFeatureDisabled } from "@/lib/features";
 import { canDriveSimulator } from "./access";
 import { SimulatorPaywall } from "./paywall";
+import { historyLessonMistakeRowFields } from "./historyLessonMistakes";
 import { historyMistakeGroups } from "./historyMistakes";
 import { resolveScenarioDeepLink } from "./scenarioDeepLink";
 import { SimulatorClient } from "./simulator-client";
@@ -246,7 +247,14 @@ function buildHistoryEntries(rows: SimSessionDetailRow[]): SessionHistoryEntry[]
       mistakeCount: mistakes.reduce((n, m) => n + m.count, 0),
       // Pre-A15 rows never recorded the stat — null (unknown), not zero.
       nearMissCount: ev?.nearMisses !== undefined ? ev.nearMisses.length : null,
-      topMistakeTitleBg: mistakes.length > 0 ? mistakes[0].titleBg : null,
+      /**
+       * ADR-009 (doc 92 §5.8): the row's word, its cause and its corner — all
+       * four in one call, in a file a test can import. See
+       * `historyLessonMistakes.ts` for the trust model, for why the label
+       * follows the stored rows rather than the retitling, and for what
+       * happened when these four expressions lived here instead.
+       */
+      ...historyLessonMistakeRowFields(ev, mistakes.length > 0 ? mistakes[0].titleBg : null),
       mistakes,
       debrief: r.debrief,
       payloadUnreadable: ev === null,

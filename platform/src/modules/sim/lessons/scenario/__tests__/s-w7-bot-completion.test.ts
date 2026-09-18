@@ -1196,7 +1196,7 @@ describe("wave-7 bot completion — sc-sp-eco-coast at L3", () => {
     expect(l4.r.completedAll).toBe(false);
   });
 
-  it("counter-proof: the clean stop that dawdles on green — TAUGHT at L3, SCORED at L4, still finishes", () => {
+  it("counter-proof: the clean stop that dawdles on green — НЕ Е ВЗЕТ at L3, SCORED at L4, still finishes", () => {
     // The mirror image, and the reason both demos exist. This driver coasted
     // perfectly — he cleared the coast gate — but then sat through the opening
     // green. HESITATION_AT_GREEN is второстепенна: taught first at L3 (no points,
@@ -1208,7 +1208,22 @@ describe("wave-7 bot completion — sc-sp-eco-coast at L3", () => {
     expect(l3.scored).not.toContain("STOP_LINE_OVERSHOOT"); // the stop was in front of the line
     expect(l3.r.objectives.find((o) => o.id === "sc-ecoc-coast")!.done).toBe(true);
     expect(l3.r.completedAll).toBe(true);
-    expect(l3.r.passed).toBe(true);
+    // ADR-009, 2026-09-18 (founder Ruling A; doc 92 §8.3 names this very line).
+    // This line read `true`. Sitting through the opening green is the mistake
+    // THIS drill exists to teach — `sc-sp-eco-coast`'s own ❌ demo grades
+    // HESITATION_AT_GREEN — so the lesson is not taken, even on the first
+    // occurrence and even though the изпитен лист still takes nothing for it.
+    //
+    // THE THREE LINES ABOVE ARE UNCHANGED AND THAT IS THE POINT. The route was
+    // driven correctly, the coast gate was earned, the sheet is clean: none of
+    // that moved, and the student's debrief still says so. What changed is only
+    // the one claim the founder ruled on — a lesson is not «взет» when the
+    // student commits the very act it was built around.
+    expect(l3.r.passed).toBe(false);
+    expect((l3.r.lessonMistakes ?? []).map((h) => [h.code, h.charged])).toEqual([
+      ["HESITATION_AT_GREEN", false],
+    ]);
+    expect(l3.r.score).toBe(0); // no exam points for that first occurrence
     const l4 = replay("mistake-sleep-at-green", 4);
     expect(l4.taught).toEqual([]);
     expect(l4.scored).toEqual(["HESITATION_AT_GREEN"]);
@@ -1216,6 +1231,11 @@ describe("wave-7 bot completion — sc-sp-eco-coast at L3", () => {
     expect(l4.r.passed).toBe(true); // one второстепенна < the 9-point budget
     expect(l4.r.completedAll).toBe(true);
     expect(scoreRubric(l4.r, SC_SP_ECO_COAST.rubric!).stars).toBeLessThanOrEqual(2);
+    // …AND THE EXAM RUNG IS EXEMPT FROM ADR-009, byte for byte. A practical exam
+    // in Bulgaria is scored on Наредба № 38 and nothing about a lesson rule may
+    // move that number: `compile.ts` writes no targets on an exam rung, so the
+    // candidate above passes on one второстепенна exactly as he always did.
+    expect(l4.r.lessonMistakes).toBeUndefined();
   });
 
   it("compiles at every authored rung; L4 is the exam cold start, and there is no L5", () => {

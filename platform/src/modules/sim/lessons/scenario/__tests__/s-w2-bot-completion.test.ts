@@ -48,6 +48,20 @@ function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8")) as unknown;
 }
 
+/**
+ * ADR-009's rollback, for the counter-proof controls below (founder Ruling A;
+ * doc 92 §3.6 "Rollback"). `lessonMistakeTargets` is the ONE field the ruling
+ * reads, so a copy of the compiled lesson without it IS the pre-ADR-009 product
+ * — which is how a case can show both what the ruling withholds and that the
+ * machinery underneath it still fires. A pair of answers that can only ever
+ * agree is not a measurement.
+ */
+function withoutLessonMistakeTargets<T extends object>(lesson: T): T {
+  const copy = { ...lesson };
+  delete (copy as { lessonMistakeTargets?: unknown }).lessonMistakeTargets;
+  return copy;
+}
+
 // ---------------------------------------------------------------------------
 // sc-ov-night-gap — the night corridor: refuse the headlights, keep the beams
 //                   dipped behind the lead
@@ -814,7 +828,7 @@ describe("wave-2 bot completion — sc-ac-night-overdrive at L3", () => {
     expect(scoreRubric(r, SC_AC_NIGHT_OVERDRIVE.rubric!).stars).toBe(1);
   });
 
-  it("counter-proof: the dark drive TEACHES HEADLIGHTS_OFF_AT_NIGHT, then GRADES it once", () => {
+  it("counter-proof: the dark drive TEACHES HEADLIGHTS_OFF_AT_NIGHT — and ADR-009 withholds the bill", () => {
     let s = createLessonSession(compileScenario(SC_AC_NIGHT_OVERDRIVE, 3));
     const taught: string[] = [];
     recordScAcNightOverdriveDrive(loadDistrict("ov-oncoming-v1"), "mistake-lights-off", {
@@ -840,8 +854,40 @@ describe("wave-2 bot completion — sc-ac-night-overdrive at L3", () => {
     // lesson-long omission; the lamps still teach first, and are then graded
     // ONCE, ten driving seconds later (`STANDING_DUTY_MAX_BILLS` = 2 bills per
     // episode, so the debrief can never grow a rattle of lamp rows either).
+    //
+    // …AND THEN ADR-009 TOOK THAT BILL BACK, 2026-09-18 (founder Ruling A, doc
+    // 92 §3.4b b). Driving the night section unlit is the mistake THIS lesson
+    // exists to teach, so the ruling forbids the points: «NO exam points are
+    // taken for that first occurrence». The re-bill is not a second act — it is
+    // the first one billed late, `regrade: true`, reaching for exactly the
+    // charge the free card consumed — so it is dropped.
+    //
+    // THE FINDING THIS CASE WAS WRITTEN FOR IS NOT REOPENED, and that is the
+    // load-bearing half. `sc-ac-night-lights / pc-wrong` reached its debrief on
+    // «Опасни 0 · Основни 0 · Второстепенни 0» under «чисто каране по изпитния
+    // лист» having driven the whole night dark. What that drive gets now is not
+    // silence: it is «Не е взет», with the act named and a reason block. The
+    // sheet is the weaker of the two statements, and it is the one the ruling
+    // traded away on purpose.
     expect(taught).toEqual(["HEADLIGHTS_OFF_AT_NIGHT"]);
-    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
+    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([]);
+    const r = buildLessonResult(s);
+    expect((r.lessonMistakes ?? []).map((h) => h.code)).toEqual(["HEADLIGHTS_OFF_AT_NIGHT"]);
+    expect(r.passed).toBe(false);
+
+    // THE RE-BILL MACHINERY IS STILL MEASURED — the same drive with only
+    // `lessonMistakeTargets` removed. Without this control, a day when
+    // `STANDING_DUTY_REGRADE_SEC` stopped firing entirely would look exactly
+    // like the line above and nothing here would move.
+    let control = createLessonSession(
+      withoutLessonMistakeTargets(compileScenario(SC_AC_NIGHT_OVERDRIVE, 3)),
+    );
+    recordScAcNightOverdriveDrive(loadDistrict("ov-oncoming-v1"), "mistake-lights-off", {
+      onTick: (tick) => {
+        control = applyTick(control, tick).state;
+      },
+    });
+    expect(control.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
       "HEADLIGHTS_OFF_AT_NIGHT",
     ]);
   });
@@ -965,13 +1011,38 @@ describe("wave-2 bot completion — sc-sp-limit-end at L3", () => {
     // across seven lessons. ONE bill, marked `regrade`: it is the charge the free
     // lesson consumed, not a second act, and `lessons/engine.ts` drops it
     // wherever the code was already charged.
+    //
+    // …AND ADR-009 NOW DROPS IT HERE TOO, 2026-09-18 (founder Ruling A, doc 92
+    // §3.4b b): running on past the end-of-limit sign is what this drill exists
+    // to teach, so no exam point may be taken for the first occurrence. What the
+    // sweep filed — «Второстепенни 0 0 · ИЗДЪРЖАН» across seven lessons — is
+    // answered by «Не е взет» instead of by one наказателна точка, which is the
+    // stronger of the two answers and the one the founder ruled for.
     const billed = s.events.filter((e) => e.kind === "violation");
-    expect(billed.map((e) => [e.code, e.severityClass, e.points, e.regrade === true])).toEqual([
-      ["SPEEDING_OVER_LIMIT", "vtorostepenna", 1, true],
-    ]);
-    // The teach still comes FIRST and the charge lands a full SPEED_REGRADE_SEC
-    // (6 s) later — the discipline is teach-then-grade, not grade-on-sight.
-    expect(billed[0]!.t).toBeGreaterThan(taughtAtSec + 5.9);
+    expect(billed).toEqual([]);
+    expect((r.lessonMistakes ?? []).map((h) => h.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(r.passed).toBe(false);
+    // The teach still comes FIRST, which is the half that never depended on the
+    // bill: the card is what the student reads at the moment of the mistake.
+    expect(taughtAtSec).toBeGreaterThan(0);
+
+    // THE CONTROL — same drive, `lessonMistakeTargets` stripped. The bill comes
+    // back at its own second, marked `regrade`, a full SPEED_REGRADE_SEC (6 s)
+    // after the card: teach-then-grade, not grade-on-sight. This is what keeps
+    // the w11 mechanism gated now that the lesson's own act no longer pays it.
+    let control = createLessonSession(
+      withoutLessonMistakeTargets(compileScenario(SC_SP_LIMIT_END, 3)),
+    );
+    recordScSpLimitEndDrive(loadDistrict("sp-signs-v1"), "mistake-early-accel", {
+      onTick: (tick) => {
+        control = applyTick(control, tick).state;
+      },
+    });
+    const controlBilled = control.events.filter((e) => e.kind === "violation");
+    expect(
+      controlBilled.map((e) => [e.code, e.severityClass, e.points, e.regrade === true]),
+    ).toEqual([["SPEEDING_OVER_LIMIT", "vtorostepenna", 1, true]]);
+    expect(controlBilled[0]!.t).toBeGreaterThan(taughtAtSec + 5.9);
     // …and the drill's own gate bites independently of the detector: it was
     // doing ~48 at y = 310, so it was never „still in the zone at 40" there.
     expect(r.objectives.find((o) => o.id === "sc-sple-hold-to-junction")!.done).toBe(false);

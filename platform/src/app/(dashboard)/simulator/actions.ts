@@ -32,6 +32,7 @@ import {
   buildDebrief,
   gradeFinishWire,
   isScenarioLevelUnlocked,
+  lessonMistakeConceptIds,
   parseScenarioLessonId,
   scenarioById,
   scoreRubric,
@@ -301,10 +302,29 @@ export async function finishLessonAction(
     }
   }
 
+  /**
+   * ADR-009 (doc 92 §5.6.9) — THE CONCEPTS OF THE LESSON'S OWN MISTAKE COME
+   * FIRST, and they have to be resolved HERE or the debrief cannot name them.
+   *
+   * `summary.conceptIds` is folded from the CHARGED ledger, and a lesson
+   * mistake's first occurrence is never charged: on the drives this whole ADR is
+   * about, the one concept the student needs revising was the one concept with
+   * no title in this map. `buildDebrief` then degrades to «Какво да упражниш:
+   * повтори урока…» with no theory link, which is the pointer the student is
+   * least able to act on.
+   *
+   * Union, not replacement, and deduplicated: the lesson's mistake leads, every
+   * charged concept still follows in its own order.
+   */
+  const debriefConceptIds = uniqueIds([
+    ...lessonMistakeConceptIds(result.lessonMistakes ?? []),
+    ...result.summary.conceptIds,
+  ]);
+
   const conceptTitles: Record<string, string> = {};
   try {
     const repo = getContentRepo();
-    for (const id of result.summary.conceptIds) {
+    for (const id of debriefConceptIds) {
       const concept = repo.conceptById(id);
       if (concept) conceptTitles[id] = concept.titleBg;
     }
@@ -366,6 +386,49 @@ export async function finishLessonAction(
       : {}),
     // S1: scenario rubric stars (server-computed above; display + unlock).
     ...(scenarioRubric !== null ? { rubricStars: scenarioRubric.stars } : {}),
+    /**
+     * ADR-009 (doc 92 §5.8) — WHY the verdict above is what it is, stored so the
+     * history row can say it instead of printing a bare fail beside a clean
+     * sheet. Server-folded (`gradeFinishWire` → `foldLessonMistakes`), so the
+     * client cannot add a hit or hide one it committed.
+     *
+     * CODE, TIME, CHARGED, ACT — and no title: the history screen retitles from
+     * the catalogue at render time (`StoredLessonMistake`'s declaration carries
+     * the reason, and it is the same one `historyMistakes.ts` states).
+     */
+    ...((result.lessonMistakes ?? []).length > 0
+      ? {
+          lessonMistakes: (result.lessonMistakes ?? []).map((hit) => ({
+            code: hit.code,
+            t: hit.t,
+            charged: hit.charged,
+            ...(hit.detail !== undefined ? { detail: hit.detail } : {}),
+          })),
+        }
+      : {}),
+    /**
+     * ADR-009 §5.9 — the изпитен-лист-plus-route verdict, which is what `passed`
+     * above meant until ADR-009 added its fourth conjunct. Written on EVERY row
+     * (not only the ones with a hit) so a missing field dates the row rather
+     * than describing the drive: `calibrationStore.readSessionPassed` prefers
+     * this field and falls back to `passed` for older rows, where the two are
+     * the same number by construction.
+     *
+     * Self-calibration measures whether the student can read THE EXAM, and the
+     * exam rung is untouched by Ruling A — so the instrument must not start
+     * counting a clean-sheet not-taken drive as a wrong call about the exam.
+     */
+    sheetRoutePassed: result.summary.passed && result.completedAll && !result.aborted,
+    /**
+     * ADR-009 §5.8 — the изпитен лист ALONE, which is what decides whether the
+     * history row reads «Не е взет» or «Неиздържан». The result screen asks the
+     * sheet first (`sessionVerdict`) and the row must say the same word about
+     * the same drive; neither `passed` (now the lesson verdict) nor
+     * `sheetRoutePassed` (which folds the route) can answer that question.
+     * Written on EVERY row, like the field above, so a missing value dates the
+     * row instead of describing the drive.
+     */
+    sheetPassed: result.summary.passed,
   };
 
   let sessionId: string;
@@ -469,6 +532,15 @@ export async function finishLessonAction(
     ok: true,
     sessionId,
     debriefText: debrief.text,
+    /**
+     * ADR-009: the theory links the end screen offers. `buildDebrief` already
+     * puts the hits' concepts at the FRONT of `conceptIds` (doc 92 §5.6.9,
+     * lane D, `debrief.ts:1436-1439`), so this line needs no union of its own —
+     * measured: adding one here is a change no assertion in this repo can see.
+     * `__tests__/finish-lesson-mistake.test.ts` pins the link at this boundary
+     * instead, so if that fold ever stops leading with the hit, the test that
+     * goes red is the one about the student's theory link.
+     */
     concepts: enrichConcepts(debrief.conceptIds),
     xpEarned,
   };
@@ -477,6 +549,15 @@ export async function finishLessonAction(
 // ---------------------------------------------------------------------------
 // helpers (not exported — "use server" files may only export async functions)
 // ---------------------------------------------------------------------------
+
+/** First occurrence wins — the order the caller listed them in. */
+function uniqueIds(ids: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!out.includes(id)) out.push(id);
+  }
+  return out;
+}
 
 /** Map mistake concept ids → titled theory links (content repo, server-only). */
 function enrichConcepts(

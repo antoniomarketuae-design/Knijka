@@ -48,6 +48,7 @@ import { describe, expect, it } from "vitest";
 import { buildSessionSummary, makeViolation, type ScorableEvent } from "../../rules";
 import type { LessonResult } from "../../lessons";
 import {
+  SESSION_VERDICT_LABEL_BG,
   SessionEndScreen,
   pointsToneClass,
   sessionVerdict,
@@ -188,6 +189,51 @@ describe("the badge no longer convicts a drive the изпитен лист clear
     ]) {
       expect(`${r.lessonId} ${sessionVerdict(r) === "passed"}`).toBe(`${r.lessonId} ${r.passed}`);
     }
+  });
+
+  it("ADR-009 added a FOURTH state and did not disturb these three", () => {
+    // Founder Ruling A, 2026-09-17 · doc 92 §5.1. The full case for the new arm
+    // is `lesson-mistake-reason-block.test.tsx`; what belongs HERE is the
+    // partner half this file exists for — that adding it moved none of the
+    // shapes this sweep repaired. All six fixtures above carry no
+    // `lessonMistakes`, so all six must read exactly what they read before.
+    expect(sessionVerdict(CLEAN_AND_UNFINISHED)).toBe("unfinished");
+    expect(sessionVerdict(CLEAN_AND_ABORTED)).toBe("unfinished");
+    expect(sessionVerdict(COLLIDED)).toBe("failed");
+    expect(sessionVerdict(OVER_ALLOWANCE)).toBe("failed");
+    expect(sessionVerdict(CLEAN_AND_PASSED)).toBe("passed");
+    expect(sessionVerdict(PASSED_WITH_POINTS)).toBe("passed");
+    // …and the new member is a real one, with a word and a colour of its own.
+    const refused = resultOf([], {
+      passed: false,
+      lessonMistakes: [
+        {
+          code: "VULNERABLE_PASS_TOO_CLOSE",
+          t: 20.9,
+          charged: false,
+          titleBg: "Тясно изпреварване на велосипедист",
+        },
+      ],
+    });
+    expect(sessionVerdict(refused)).toBe("lessonMistake");
+    expect(SESSION_VERDICT_LABEL_BG.lessonMistake).toBe("Не е взет");
+    // The three shipped labels are byte-identical — `SESSION_VERDICT_LABEL_BG`
+    // is read by `xpChipBg` and by the roomy end bar, so a relabel here would
+    // travel to surfaces this file cannot see.
+    expect(SESSION_VERDICT_LABEL_BG.passed).toBe("Издържан");
+    expect(SESSION_VERDICT_LABEL_BG.failed).toBe("Неиздържан");
+    expect(SESSION_VERDICT_LABEL_BG.unfinished).toBe("Незавършен");
+  });
+
+  it("the XP chip prints the fourth label with no code change of its own", () => {
+    // `xpChipBg` takes the VERDICT and reads the label map, which is why the
+    // new word reaches it for free — and why it must be checked, because a
+    // hard-coded «Неиздържан» in that note is exactly the defect this file
+    // repaired for «Незавършен» (see the block below).
+    const chip = xpChipBg(40, "lessonMistake");
+    expect(chip.noteBg).toContain("„Не е взет“");
+    expect(chip.noteBg).not.toContain("„Неиздържан“");
+    expect(chip.chipClass).not.toContain("accent");
   });
 
   it("and the run is still not credited: the warning lines stay exactly as they were", () => {

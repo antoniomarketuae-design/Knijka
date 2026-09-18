@@ -151,7 +151,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // ---------------------------------------------------------------------------
 
 export const INSTRUMENT = "tools/audit/inprocess-drive.mjs";
-export const CONTRACT_VERSION = "1";
+/**
+ * "2" since 2026-09-18 (ADR-009). The version moves when what an artefact MAY
+ * BE CITED FOR changes, because that is the only field a judge reads as a
+ * licence: artefacts on disk stamped "1" were produced by an instrument that
+ * could not name the lesson's own mistake and could not read the fourth
+ * verdict, so «no lessonMistakes in that JSON» means «not projected», not «none
+ * happened». Nothing compares the number today; it is stamped so that the
+ * distinction is recoverable when something does.
+ */
+export const CONTRACT_VERSION = "2";
 
 /**
  * Shipped verbatim inside every artefact. Two rules govern edits:
@@ -177,6 +186,7 @@ export const CONTRACT = Object.freeze({
     "buildLessonResult(session)",
     "buildDebrief(lesson, result, { coachedMistakes })",
     "scoreRubric(result, spec.rubric, observationFromTrace) when the template authors a rubric",
+    "sessionVerdict(result) and SESSION_VERDICT_LABEL_BG (hud/SessionEndScreen.tsx) — the PRODUCT's own four-way read of that same result, called, never re-implemented here",
   ],
   mayBeCitedFor: Object.freeze([
     "whether an objective ticks at all, and the session time it ticks at",
@@ -184,6 +194,8 @@ export const CONTRACT = Object.freeze({
     "the exam-sheet totals (опасни / основни / второстепенни / Общо) and the pass/fail verdict those totals produce",
     "which commendations the chain books",
     "which teach moments were raised and which mistakes were coached (shown, deliberately not charged)",
+    "ADR-009: which of the lesson's OWN mistakes the fold recorded (`LessonResult.lessonMistakes`), the session time of the earliest occurrence, the act (`detail`) behind it, and whether any occurrence of that code also reached the изпитен лист",
+    "ADR-009: the four-way verdict the product's own sessionVerdict(result) returns — passed / failed / lessonMistake / unfinished — as a RETURN VALUE",
     "the star count scoreRubric derives from that result",
     "the debrief TEXT the deterministic template generates from that result (the words, not their rendering)",
     "whether two identical inputs produce two identical gradings",
@@ -192,6 +204,8 @@ export const CONTRACT = Object.freeze({
   mayNotBeCitedFor: Object.freeze([
     "anything a student SEES: what is on the glass at any moment of the drive",
     "what a card, panel, modal, banner, toast or result surface looks like, or whether one mounted at all",
+    "whether the «Не е взет» pill, the note under it, the «Грешката на този урок» section or the teach card's stake sentence ever REACHED the glass, fitted a phone, or rendered at all — ADR-009's verdict here is a function's return value and its reason rows are a list, not a screen anybody looked at",
+    "whether a teach moment PAUSED the drive, was downgraded to a toast, was queued behind another or was ever dismissed: this is the record of what the engine raised, and the pacing lives in the UI queue this file never runs",
     "whether text is cut, truncated, overflowing, wrapped, clipped or legible",
     "contrast, colour, font, weight, size, spacing, z-order, or what is hidden behind what",
     "the camera, the FOV, the cockpit, the windscreen or the mirrors as rendered",
@@ -808,8 +822,59 @@ export async function loadChain(root) {
     load("lessons/scenario/observation.ts"),
     load("contracts.ts"),
   ]);
-  CHAIN = { jiti, sim, engine, compile, templates, debrief, rubric, observation, contracts };
+  const screen = await loadScreen(root);
+  CHAIN = { jiti, sim, engine, compile, templates, debrief, rubric, observation, contracts, ...screen };
   return CHAIN;
+}
+
+/**
+ * ADR-009 — THE VERDICT WORD IS FETCHED FROM THE PRODUCT, NEVER RE-DERIVED HERE.
+ *
+ * Founder Ruling A (2026-09-17) gives the result screen a FOURTH verdict, «Не е
+ * взет», and `hud/SessionEndScreen.tsx sessionVerdict(result)` is the one place
+ * that reads it: four arms over `passed`, `summary.passed`, `aborted` and
+ * `lessonMistakes`, in that order, with `!aborted` load-bearing. Writing those
+ * four arms a second time inside an audit instrument is the exact shape this
+ * programme has measured over and over — two implementations of one verdict,
+ * drifting apart silently, and the drift showing up as a judge reading a word
+ * the student never got. So it is CALLED.
+ *
+ * WHY A SECOND JITI. The chain's jiti is configured for `.ts`; the verdict
+ * lives in a `.tsx` and its parser refuses the JSX. A second instance with
+ * `jsx: true` loads the module (measured: ~1.5 s, once per process) and the
+ * three exports used here are pure functions of one `LessonResult`.
+ *
+ * IF IT WILL NOT LOAD, THE ARTEFACT SAYS SO AND NAMES THE ERROR. `screen: null`
+ * plus `screenUnavailable: "<reason>"`, and the projection writes
+ * `sessionVerdict: null` beside it rather than a guess — the silence this file
+ * exists to prevent would be a `"unfinished"` computed by an instrument that
+ * could not read the rule. Every consumer of the field must branch on null.
+ */
+async function loadScreen(root) {
+  const jitiEntry = path.join(root, "platform", "node_modules", "jiti", "lib", "jiti.mjs");
+  try {
+    const { createJiti } = await import(pathToFileURL(jitiEntry).href);
+    const jsxJiti = createJiti(pathToFileURL(path.join(HERE, "inprocess-drive.mjs")).href, {
+      fsCache: true,
+      interopDefault: true,
+      jsx: true,
+      alias: { "@": path.join(root, "platform", "src") },
+    });
+    const mod = await jsxJiti.import(
+      path.join(root, "platform", "src", "modules", "sim", "hud", "SessionEndScreen.tsx"),
+    );
+    if (typeof mod.sessionVerdict !== "function" || typeof mod.SESSION_VERDICT_LABEL_BG !== "object") {
+      return {
+        screen: null,
+        screenUnavailable:
+          "hud/SessionEndScreen.tsx loaded but exports no sessionVerdict/SESSION_VERDICT_LABEL_BG — " +
+          "the four-way verdict cannot be read and is reported as null",
+      };
+    }
+    return { screen: mod, screenUnavailable: null };
+  } catch (err) {
+    return { screen: null, screenUnavailable: `hud/SessionEndScreen.tsx did not load: ${String(err?.message ?? err)}` };
+  }
 }
 
 /** Which rungs the template actually authors — probed, not assumed. */
@@ -830,7 +895,13 @@ export function authoredRungs(chain, spec) {
 // § THE DRIVE
 // ---------------------------------------------------------------------------
 
-function loadDistrict(root, districtId) {
+/**
+ * Exported for the census (`lesson-mistake-census.mjs`), which drives 2,434
+ * plans in one process and must cache the district JSON and the recorder index
+ * instead of paying `planDrive`'s per-drive re-scan of 148 traces modules.
+ * Same loader, same DISTRICT_MISSING refusal — not a second reader.
+ */
+export function loadDistrict(root, districtId) {
   const p = path.join(worldDir(root), `${districtId}.json`);
   if (!fs.existsSync(p)) {
     throw new InProcessDriveError("DISTRICT_MISSING", `content/world/${districtId}.json does not exist`, {
@@ -872,7 +943,23 @@ export function runOnce(chain, plan) {
     const step = engine.applyTick(session, tick);
     session = step.state;
     for (const m of step.teachMoments ?? []) {
-      teachMoments.push({ code: m.code, t: m.t, severity: m.severity, points: m.points, titleBg: m.titleBg });
+      teachMoments.push({
+        code: m.code,
+        t: m.t,
+        severity: m.severity,
+        points: m.points,
+        titleBg: m.titleBg,
+        // ADR-009. BOTH FLAGS ARE PROJECTED AS EXPLICIT BOOLEANS, never left
+        // absent: the product writes them as optional `true`, and a projection
+        // that simply omitted them would make «the instrument did not look» and
+        // «the flag was false» the same silence — the discriminator
+        // `verdict-surface.mjs` spent a whole section learning to keep.
+        // `lessonMistake` is what makes the card say the lesson will not count;
+        // `charged` is the L1 pause-on-error arm, where points WERE taken and
+        // the card used to claim otherwise.
+        lessonMistake: m.lessonMistake === true,
+        charged: m.charged === true,
+      });
     }
   };
 
@@ -950,6 +1037,43 @@ export function runOnce(chain, plan) {
       aborted: result.aborted,
       score: result.score,
       effectiveScore: result.effectiveScore,
+      // ─ ADR-009 ─────────────────────────────────────────────────────────────
+      // WHY `passed` ALONE STOPPED BEING AN ANSWER. Since founder Ruling A a
+      // practice drive can end with a spotless изпитен лист, every objective
+      // ticked, and `passed: false` — because the student committed the one
+      // mistake the lesson exists to teach. An artefact carrying only `passed`
+      // says the lesson was refused and cannot say WHY, so every lane so far
+      // re-implemented this census by hand (lanes C, D, E, F and T each wrote
+      // their own, five times, to get at one field).
+      //
+      // ONE ROW PER CODE, as the fold emits them. `charged` means some LATER
+      // occurrence of the same code also reached the изпитен лист — under
+      // Ruling A the first one never can — and `detail` is the ACT inside the
+      // code, the selector both sides retitle from (ADDENDUM 1).
+      lessonMistakes: (result.lessonMistakes ?? []).map((h) => ({
+        code: h.code,
+        t: h.t,
+        charged: h.charged === true,
+        detail: h.detail ?? null,
+        titleBg: h.titleBg,
+        demoTitleBg: h.demoTitleBg ?? null,
+      })),
+      // The product's own four-way read of THIS result (see `loadScreen`).
+      // `null` is not a verdict: it means the screen module would not load and
+      // the artefact says so in `input.screenUnavailable`.
+      sessionVerdict: chain.screen === null || chain.screen === undefined ? null : chain.screen.sessionVerdict(result),
+      sessionVerdictLabelBg:
+        chain.screen === null || chain.screen === undefined
+          ? null
+          : chain.screen.SESSION_VERDICT_LABEL_BG[chain.screen.sessionVerdict(result)],
+      // The reason rows the result screen would have to print under «Грешката
+      // на този урок» — the product's own `lessonMistakeReasonsBg`, by code.
+      // A LIST, NOT A RENDERING: that these ever reached a phone is exactly
+      // what this instrument may not be cited for.
+      lessonMistakeReasonCodes:
+        chain.screen === null || chain.screen === undefined
+          ? null
+          : chain.screen.lessonMistakeReasonsBg(result).map((r) => r.code),
     },
     objectives: result.objectives.map((o) => ({
       id: o.id,
@@ -960,7 +1084,18 @@ export function runOnce(chain, plan) {
     })),
     faults: result.summary.mistakes.map(projectFault),
     commendations: result.summary.commendations.map((c) => ({ code: c.code, t: c.t, titleBg: c.titleBg })),
-    coachedMistakes: (result.coachedMistakes ?? []).map((c) => ({ code: c.code, t: c.t, titleBg: c.titleBg })),
+    // `detail` (ADDENDUM 1): the coached row is the ONLY record of a lesson's
+    // own mistake — Ruling A never charges the first occurrence — so a row
+    // carrying just the code retitles to the POOLED catalogue string on both
+    // sides, and a judge comparing client and server titles would be comparing
+    // two pooled strings and finding them equal. Projected as `null` when the
+    // act is absent, never dropped.
+    coachedMistakes: (result.coachedMistakes ?? []).map((c) => ({
+      code: c.code,
+      t: c.t,
+      titleBg: c.titleBg,
+      detail: c.detail ?? null,
+    })),
     teachMoments,
     escalations: (result.escalations ?? []).map((e) => ({ ...e })),
     stagedOutcomes: drive.outcomes.map((o) => ({
@@ -1204,6 +1339,11 @@ export async function drive(opts) {
       authoredRungs: plan.rungs,
       districtId: plan.districtId,
       source: plan.source,
+      // Null on a healthy run. When it is a string, `verdict.sessionVerdict`
+      // and `verdict.lessonMistakeReasonCodes` are null because the product's
+      // own verdict module would not load — NOT because the drive was passed
+      // or unfinished. A judge reads this field before those two.
+      screenUnavailable: plan.chain.screenUnavailable ?? null,
       worktree: worktreeStamp(plan.root),
     },
     determinism,
@@ -1275,6 +1415,64 @@ export function parseArgs(argv) {
 function loud(lines) {
   const bar = "=".repeat(78);
   process.stderr.write(`\n${bar}\n${lines.join("\n")}\n${bar}\n`);
+}
+
+/**
+ * The one word for the human block — the PRODUCT's, uppercased the way the
+ * sweep harness records a pill, or a loud statement that it could not be read.
+ *
+ * NEVER FALLS BACK TO THE BOOLEAN. `passed: false` covers three different
+ * outcomes since ADR-009 («Неиздържан», «Не е взет», «Незавършен») and picking
+ * one of them without the product's own function is a guess in the reassuring
+ * direction — it would print a conviction over a clean изпитен лист. When the
+ * word is unavailable the line says so and prints the raw facts beside it, so
+ * the operator has the inputs and no verdict.
+ */
+export function verdictWordForHuman(artefact) {
+  const label = artefact.verdict.sessionVerdictLabelBg;
+  if (typeof label === "string" && label.length > 0) return label.toUpperCase();
+  const hits = artefact.verdict.lessonMistakes?.length ?? 0;
+  return (
+    "NOT READ — " +
+    (artefact.input?.screenUnavailable ?? "the product's verdict module did not load") +
+    ` [passed=${artefact.verdict.passed} · sheet ${artefact.sheet.passed ? "в допустимото" : "над допустимото"}` +
+    ` · lesson mistakes=${hits}]`
+  );
+}
+
+/**
+ * ADR-009's half of the human block: WHY a lesson was refused, never just that
+ * it was. A judge who reads «НЕ Е ВЗЕТ» and nothing else has been handed the
+ * bare verdict doc 64 THEO-4 calls a defect in its own right — and this block
+ * is the only thing most operators read.
+ *
+ * The Bulgarian in these lines is RETRIEVED (the catalogue title the fold
+ * stamped, the product's own verdict word); everything this file says for
+ * itself is English, so nothing here can be mistaken for student copy or for a
+ * legal citation this instrument composed.
+ */
+export function lessonMistakeLines(artefact) {
+  const hits = artefact.verdict.lessonMistakes ?? [];
+  if (hits.length === 0) return [];
+  const charged = hits.filter((h) => h.charged).length;
+  const lines = [
+    `  ADR-009 — the mistake THIS LESSON EXISTS TO TEACH was committed: ${hits.length} code(s), ${charged} also charged`,
+  ];
+  for (const h of hits) {
+    lines.push(
+      `    · ${h.code} at ${h.t.toFixed(1)} s — «${h.titleBg}»` +
+        `${h.detail === null ? "" : ` (act: ${h.detail})`}` +
+        `${h.charged ? " — a REPEAT reached the изпитен лист" : " — first occurrence, deliberately not charged"}`,
+    );
+  }
+  if (artefact.verdict.sessionVerdict === "lessonMistake") {
+    lines.push(
+      "    «НЕ Е ВЗЕТ» IS NOT A CONVICTION: the изпитен лист is within tolerance and the practice",
+      "    lesson is not counted because the student committed the mistake it teaches (founder",
+      "    Ruling A, 2026-09-17). 0 наказателни точки for that first occurrence is RULED, not a bug.",
+    );
+  }
+  return lines;
 }
 
 /**
@@ -1415,9 +1613,18 @@ export async function main(argv) {
       `  ticks ${artefact.drive.ticks} · end ${artefact.drive.endPhase} · ${artefact.drive.durationSec.toFixed(1)} s`,
       `  sheet  опасни ${s.opasniCount}/${s.opasniPoints}т · основни ${s.osnovniCount}/${s.osnovniPoints}т ` +
         `· второстепенни ${s.vtorostepenniCount}/${s.vtorostepenniPoints}т · Общо ${s.totalPoints}`,
-      `  verdict ${artefact.verdict.passed ? "ИЗДЪРЖАН" : "НЕИЗДЪРЖАН"}` +
+      // THE TWO-WAY PRINT WAS WRONG FROM THE DAY ADR-009 LANDED. It read the
+      // boolean and printed «НЕИЗДЪРЖАН» for every false — so a practice drive
+      // with a spotless изпитен лист, every objective ticked and the lesson
+      // refused under founder Ruling A printed the word the product reserves
+      // for a conviction on Наредба № 38. The word is the product's own now
+      // (`chain.screen.sessionVerdict`), uppercased the way the sweep harness
+      // records a pill, and when the module would not load it says so instead
+      // of falling back to the boolean.
+      `  verdict ${verdictWordForHuman(artefact)}` +
         `${artefact.rubric ? ` · ${artefact.rubric.stars}★` : ""}` +
         ` · objectives ${artefact.objectives.filter((o) => o.done).length}/${artefact.objectives.length}`,
+      ...lessonMistakeLines(artefact),
       `  determinism ${artefact.determinism.reran ? "verified over 2 runs" : "NOT VERIFIED (--single-run)"} · ${artefact.determinism.digest}`,
       ...(artefact.admissibility.claim.caveats?.length
         ? ["", "  CAVEATS — halves of the claim this artefact does NOT settle:",

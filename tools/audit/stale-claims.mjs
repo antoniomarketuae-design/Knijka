@@ -23,8 +23,17 @@
  * and skipped, not guessed at.
  */
 import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 import { severityFromDebriefText } from "./severity-from-debrief.mjs";
+import { normaliseVerdict } from "./verdict-surface.mjs";
+
+/**
+ * ADR-009's word, as `verdict-surface.mjs PILL_WORDS` carries it. Imported as a
+ * literal rather than by index so a rename shows up here as a failing test and
+ * not as a check that quietly stops recognising the verdict.
+ */
+const NOT_TAKEN = "НЕ Е ВЗЕТ";
 
 const SWEEP = process.argv[2] || ".audit-frames/w43/frames";
 
@@ -54,7 +63,7 @@ function legsOf(scenario) {
 }
 
 /** The assertions this tool knows how to check, each with how to test it. */
-const CHECKS = [
+export const CHECKS = [
   {
     id: "zero-penalty-points",
     // «scores 0 наказателни точки», «0 наказателни точки», «Общо 0»
@@ -97,12 +106,37 @@ const CHECKS = [
      * verdict matcher, and it was not enough to stop me repeating it. So the
      * test is anchored: the word must not be preceded by «НЕ». */
     claims: (w) => /(^|[^Н])(^|[^Е])credited ИЗДЪРЖАН|(?<!НЕ)ИЗДЪРЖАН with/u.test(w) && !/НЕИЗДЪРЖАН/u.test(w),
+    /* ── ADR-009: «НЕ Е ВЗЕТ» IS ITS OWN WORD HERE, NOT A KIND OF «НЕИЗДЪРЖАН».
+     *
+     * Founder Ruling A gave the result screen a fourth pill, and doc 92 §12 R3
+     * expects about TEN right legs that pass today to start reading it on the
+     * next sweep — five of them on legs the harness never steered. Folding it
+     * into «no longer credited ИЗДЪРЖАН» and stopping there would hand a judge
+     * a contradiction that is, on half those legs, this harness drifting into
+     * the lesson's own fault rather than the product changing its mind.
+     *
+     * So the word is REPORTED BY NAME with the one instruction that keeps the
+     * next verdict honest: read the leg's own inputs first. The hit still
+     * fires — the filed sentence «credited ИЗДЪРЖАН» genuinely no longer
+     * describes the drive — but it can no longer be read as «the product now
+     * penalises this», which is a different claim about a different ledger. */
     test: (legs) => {
       const right = legs.filter((l) => l.mode === "right" && l.verdict);
       if (!right.length) return null;
-      return right.every((l) => l.verdict !== "ИЗДЪРЖАН")
-        ? `no right leg is credited ИЗДЪРЖАН any more: ${right.map((l) => `${l.leg} ${l.verdict}`).join(", ")}`
-        : null;
+      const said = (l) => normaliseVerdict(l.verdict);
+      if (!right.every((l) => said(l) !== "ИЗДЪРЖАН")) return null;
+      const notTaken = right.filter((l) => said(l) === NOT_TAKEN);
+      const base = `no right leg is credited ИЗДЪРЖАН any more: ${right
+        .map((l) => `${l.leg} ${l.verdict}`)
+        .join(", ")}`;
+      if (notTaken.length === 0) return base;
+      return (
+        `${base}. ${notTaken.length} of them read «${NOT_TAKEN}» (ADR-009): the изпитен лист is ` +
+        "within tolerance and the LESSON was refused because its own taught mistake happened — " +
+        "not a наказателна точка more than before. Before filing a regression, check that leg's " +
+        "own inputs (run.log STEERING, route/droveIt): doc 92 §12 R3 expects ~10 right legs to " +
+        "move for harness reasons"
+      );
     },
   },
   {
@@ -121,35 +155,55 @@ const CHECKS = [
   },
 ];
 
-const c = corpusCounts();
-// THE STAMP — this reads the corpus, so count-agreement.mjs requires it.
-console.log(openListLine(c));
-console.log(workedLine("open", c.open));
-const hits = [];
-let checkable = 0;
-for (const f of c.open) {
-  const w = String(f.what ?? "");
-  const applicable = CHECKS.filter((k) => k.claims(w));
-  if (!applicable.length) continue;
-  checkable++;
-  const legs = legsOf(f.scenario);
-  if (!legs.length) continue;
-  for (const k of applicable) {
-    const why = k.test(legs);
-    if (why) hits.push({ id: f.findingId, sev: f.severity, check: k.id, why, what: w.slice(0, 150) });
+/**
+ * The report. WRAPPED IN A FUNCTION SO THE TABLE ABOVE CAN BE TESTED WITHOUT
+ * READING THE CORPUS — and, more to the point, without PRINTING it. At import
+ * time this file used to call `corpusCounts()` and log the whole queue, so any
+ * test that wanted to look at one regex dragged the corpus and a page of output
+ * in with it. That is how this file reached 2026-09-18 with four checks, one
+ * shipped bug (the «НЕИЗДЪРЖАН» substring) and no test at all.
+ *
+ * THE COST, MEASURED RATHER THAN GUESSED (E:, 7200 rpm, 2026-09-18):
+ * `corpusCounts()` takes **14.4 s on a cold page cache and 0.21 s warm** over
+ * 99 open rows, and an unguarded import prints **2,375 bytes**. An earlier
+ * revision of this comment justified the refactor with «~100 s on this disk» —
+ * a number nobody measured, wrong by two orders of magnitude warm, and a claim
+ * all the same. The guard earns its place on the printing, not on the clock.
+ */
+export function report() {
+  const c = corpusCounts();
+  // THE STAMP — this reads the corpus, so count-agreement.mjs requires it.
+  console.log(openListLine(c));
+  console.log(workedLine("open", c.open));
+  const hits = [];
+  let checkable = 0;
+  for (const f of c.open) {
+    const w = String(f.what ?? "");
+    const applicable = CHECKS.filter((k) => k.claims(w));
+    if (!applicable.length) continue;
+    checkable++;
+    const legs = legsOf(f.scenario);
+    if (!legs.length) continue;
+    for (const k of applicable) {
+      const why = k.test(legs);
+      if (why) hits.push({ id: f.findingId, sev: f.severity, check: k.id, why, what: w.slice(0, 150) });
+    }
+  }
+
+  console.log(`open rows: ${c.open.length}   ·  rows carrying a checkable numeric claim: ${checkable}   ·  sweep: ${SWEEP}\n`);
+  if (!hits.length) {
+    console.log("No open row's filed arithmetic is contradicted by this sweep.");
+  } else {
+    console.log(`${hits.length} row(s) assert something this sweep contradicts.`);
+    console.log("A hit is NOT a closure: the substance of a row usually survives its arithmetic.\n");
+    for (const h of hits) {
+      console.log(`  [${String(h.sev ?? "?").slice(0, 4).toUpperCase().padEnd(4)}] ${h.id}   (${h.check})`);
+      console.log(`      FILED : ${h.what}…`);
+      console.log(`      NOW   : ${h.why}`);
+      console.log("");
+    }
   }
 }
 
-console.log(`open rows: ${c.open.length}   ·  rows carrying a checkable numeric claim: ${checkable}   ·  sweep: ${SWEEP}\n`);
-if (!hits.length) {
-  console.log("No open row's filed arithmetic is contradicted by this sweep.");
-} else {
-  console.log(`${hits.length} row(s) assert something this sweep contradicts.`);
-  console.log("A hit is NOT a closure: the substance of a row usually survives its arithmetic.\n");
-  for (const h of hits) {
-    console.log(`  [${String(h.sev ?? "?").slice(0, 4).toUpperCase().padEnd(4)}] ${h.id}   (${h.check})`);
-    console.log(`      FILED : ${h.what}…`);
-    console.log(`      NOW   : ${h.why}`);
-    console.log("");
-  }
-}
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) report();

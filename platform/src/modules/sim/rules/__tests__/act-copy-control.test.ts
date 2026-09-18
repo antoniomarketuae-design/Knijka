@@ -39,26 +39,28 @@
  *      resolve the SAME title for each detail, round-tripped through the real
  *      `serializeRuleEvents`. THIS IS THE CHARGED PATH ONLY. It is NOT a claim
  *      that a lesson's two halves agree today: see 2.
- *   2. THE COACHED PATH IS STILL BROKEN, AND IS PINNED SO (§ „LANE C GAP").
- *      Lane R's verifier drove every committed tape at L1 and L3 — 1,006 drives
- *      — and JUNCTION_SCAN_INCOMPLETE is COACHED on all of them and charged on
- *      none. A coached row crosses as `WireCoachedMistake = { code, t }` and
- *      the server re-titles it from `VIOLATIONS[code].titleBg`, so the two
- *      halves of one debrief STILL name two different acts for all of today's
- *      traffic. That is lane C's work, and it is FOUR edits rather than the two
- *      the first version of this block named (spec 92 ADDENDUM 1 item 1):
- *      `recordCoached` fills `detail`, `serializeCoachedMistakes` carries it,
+ *   2. THE COACHED PATH, WHICH IS 100% OF THIS CODE'S REAL TRAFFIC — CLOSED BY
+ *      LANE C AND PINNED HERE. Over the 1,006 L1/L3 drives,
+ *      JUNCTION_SCAN_INCOMPLETE is RAISED on 8, coached on all 8 and charged on
+ *      0; across every authored rung it is raised on 16 and charged on 4, all
+ *      four at L4, where ADR-009 does not apply. So on every practice drive
+ *      that raises it the code is coached, and §1's parity reached no student
+ *      at all. («COACHED on all of 1,006 drives» counted the run, not the code
+ *      — corrected 2026-09-18 by lane I.) The four edits (spec 92 ADDENDUM 1 item 1) are: `recordCoached`
+ *      fills `detail`, `serializeCoachedMistakes` carries it,
  *      `parseCoachedMistakes` KEEPS it — capped, the way `parseRuleEvents`
- *      already caps a charged detail at `wire.ts:297` — and `gradeFinishWire`
- *      re-titles through `actCopy(code, detail)`, never by accepting a
- *      client-authored title. The tests below assert TODAY'S WRONG BEHAVIOUR on
- *      purpose and say which lines to flip.
- *      WHICH EDIT REDS WHICH — measured by this file's verifier rather than
- *      assumed: FLIP 1 on the serialiser, FLIP 4 on `recordCoached`, FLIP 5 on
- *      the parser, FLIP 6 on the parser and the re-title together. FLIPs 2 and
- *      3 sit behind FLIP 1 inside one `it` and therefore cannot red on their
- *      own — the verifier landed the re-title alone and all 36 cases stayed
- *      green, which is exactly why FLIP 5 and FLIP 6 exist.
+ *      already caps a charged detail at `wire.ts`'s `MAX_DETAIL_LEN` — and
+ *      `gradeFinishWire` re-titles through `actCopy(code, detail)`, never by
+ *      accepting a client-authored title.
+ *      THESE CASES WERE WRITTEN INVERTED, asserting the pre-lane-C answer with
+ *      a FLIP marker on each line, and all four `it`s went red when lane C
+ *      landed. They are now flipped to the right answer at the same addresses.
+ *      WHICH EDIT REDS WHICH — measured rather than assumed: FLIP 1 on the
+ *      serialiser, FLIP 4 on `recordCoached`, FLIP 5 on the parser, FLIP 6 on
+ *      the parser and the re-title together. FLIPs 2 and 3 sit behind FLIP 1
+ *      inside one `it` and therefore cannot red on their own — the lane R
+ *      verifier landed the re-title ALONE and all 36 cases stayed green, which
+ *      is exactly why FLIP 5 and FLIP 6 are separate `it`s and must stay so.
  *   3. THE ENGINE BILLS THE RIGHT ACT — «give-way» at a Б1 line, «stop» at a Б2
  *      line, «snow» in a snowfall, driven through the real reducer. (The Б1/Б2
  *      CARD is also held by `junction-scan-control-copy.test.ts`, which asserts
@@ -233,23 +235,31 @@ describe("act copy resolves identically on both sides of the CHARGED wire", () =
 // ---------------------------------------------------------------------------
 
 /**
- * WHY THIS TEST ASSERTS THE WRONG ANSWER ON PURPOSE.
+ * THE GAP IS CLOSED, AND THESE ARE THE SAME SIX PINS, INVERTED.
  *
- * A permanently-red test is not a tripwire in this repo — it is a thing the
- * next gate run has to explain away, and the standing order is to keep the
- * gates readable. So the gap is pinned the other way round: every assertion
- * below states what the product does TODAY, each one marked FLIP. When lane C
- * carries `detail` on the coached wire row, this file goes red at the exact
- * lines that describe the defect, and the reader flips them into the assertions
- * §1 already makes for the charged path.
+ * This block was written to assert the WRONG answer on purpose: every case
+ * stated what the product did before lane C and carried a FLIP marker naming
+ * the edit that would red it. All four `it`s went red the moment lane C landed
+ * — FLIP 1 on `serializeCoachedMistakes`, FLIP 4 on `recordCoached`, FLIP 5 on
+ * `parseCoachedMistakes`, FLIP 6 on `gradeFinishWire`'s re-title — which is
+ * what the markers were for. They are now flipped to the assertions §1 already
+ * makes for the charged path, at the same addresses, so the same four edits
+ * being reverted reds the same four cases.
  *
- * DO NOT READ §1 AS „CLIENT AND SERVER AGREE". It proves the charged path only.
- * On the coached path — the ONLY one 1,006 measured drives of this code reach —
- * the student's card says «Непълно оглеждане при знак Б1» and the server's
- * stored record says «Непълно оглеждане на кръстовището», which is the very
- * thing §3.3b of the spec exists to stop, and ADR-009's fold reads that title.
+ * THE PREMISE THAT CHANGED, in one sentence: a coached row now crosses the wire
+ * as `{ code, t, detail }` and the server re-titles through its OWN
+ * `actCopy(code, detail)`, so the card on the glass and the stored record name
+ * ONE act. Nothing about ADR-002 moved — `detail` selects a catalogued row and
+ * authors nothing, `wire.ts` still refuses a client-authored `titleBg`, and the
+ * cap is the one `parseRuleEvents` already applies to a charged event's detail.
+ *
+ * DO NOT READ §1 AS „CLIENT AND SERVER AGREE" ON ITS OWN. It proves the CHARGED
+ * path; this block proves the COACHED one, which is the only path 1,006
+ * measured drives of `JUNCTION_SCAN_INCOMPLETE` ever reach. Both are needed:
+ * the lane R verifier landed the re-title alone and all 36 cases stayed green,
+ * because the row lost its `detail` a step earlier, in the validator.
  */
-describe("LANE C GAP: the coached path still pools the title (spec 92, ADDENDUM 1 item 1)", () => {
+describe("the coached path titles the act, on both sides (spec 92, ADDENDUM 1 item 1)", () => {
   const basePayload = {
     lessonId: "l0-free-drive",
     startedAtMs: 1_000,
@@ -259,7 +269,7 @@ describe("LANE C GAP: the coached path still pools the title (spec 92, ADDENDUM 
     objectives: [],
   };
 
-  it("the coached wire row drops `detail`, so the server can only pool — FLIP WHEN LANE C LANDS", () => {
+  it("the coached wire row carries `detail`, so the server titles the act", () => {
     const client = crossLine("giveWay").find((e) => e.code === "JUNCTION_SCAN_INCOMPLETE");
     expect(client, "the reducer must still produce the Б1 scan fault").toBeDefined();
     // What the STUDENT SAW: the act's own card, act title and act detail.
@@ -267,9 +277,8 @@ describe("LANE C GAP: the coached path still pools the title (spec 92, ADDENDUM 
     expect(client!.detail).toBe("give-way");
 
     // The client's coached record, shaped exactly as `lessons/engine.ts`
-    // `recordCoached` shapes it — except that `recordCoached` does not copy
-    // `detail` at all yet, which is half of what lane C owes. Passing it here
-    // makes the DROP the wire performs the thing under test.
+    // `recordCoached` shapes it — `detail` included, which is the first of the
+    // four edits (pinned at its own address by the source case below).
     const coached: CoachedMistake = {
       code: client!.code,
       titleBg: client!.titleBg,
@@ -277,19 +286,31 @@ describe("LANE C GAP: the coached path still pools the title (spec 92, ADDENDUM 
       detail: client!.detail,
     };
     const wire = serializeCoachedMistakes([coached]);
-    // FLIP 1: today the wire row is code+t only. Lane C adds `detail: "give-way"`.
-    expect(wire).toEqual([{ code: "JUNCTION_SCAN_INCOMPLETE", t: client!.t }]);
+    // FLIP 1 (flipped): the act travels. The TITLE deliberately does not —
+    // ADR-002: the client sends a selector, never a sentence.
+    expect(wire).toEqual([
+      { code: "JUNCTION_SCAN_INCOMPLETE", t: client!.t, detail: "give-way" },
+    ]);
+    expect(wire[0]).not.toHaveProperty("titleBg");
 
     const graded = gradeFinishWire({ ...basePayload, coachedMistakes: wire });
     expect(graded.status).toBe("ok");
     if (graded.status !== "ok") return;
-    // FLIP 2: today the server re-titles from the POOLED catalogue row, because
-    // code+t is all it was given. Lane C re-titles through `actCopy(code, detail)`.
+    // FLIP 2 (flipped): the server re-titles through its OWN `actCopy(code,
+    // detail)`, so the stored row names the act the card named.
     expect(graded.result.coachedMistakes).toEqual([
-      { code: "JUNCTION_SCAN_INCOMPLETE", titleBg: "Непълно оглеждане на кръстовището", t: client!.t },
+      {
+        code: "JUNCTION_SCAN_INCOMPLETE",
+        titleBg: "Непълно оглеждане при знак Б1",
+        t: client!.t,
+        detail: "give-way",
+      },
     ]);
-    // FLIP 3 (delete this one): the two halves of one debrief name two acts.
-    expect(graded.result.coachedMistakes![0]!.titleBg).not.toBe(client!.titleBg);
+    // FLIP 3 (flipped): the two halves of one debrief now name ONE act. This is
+    // the assertion the whole item exists for — keep it pointing at the
+    // CLIENT's own string rather than at a literal, so a change to the
+    // catalogue row moves both sides or reds here.
+    expect(graded.result.coachedMistakes![0]!.titleBg).toBe(client!.titleBg);
   });
 
   /**
@@ -305,15 +326,15 @@ describe("LANE C GAP: the coached path still pools the title (spec 92, ADDENDUM 
    * A pin that stays green under the very change it advertises is the
    * green-and-blind class this repo has repaired three times.
    *
-   * So this case hands the server the payload LANE C'S CLIENT WILL SEND — a
-   * coached row that ALREADY carries `detail` — and pins each half of the loss
-   * at the boundary it happens at, behind nothing:
-   *   FLIP 5 — the VALIDATOR drops it. Reds the moment `parseCoachedMistakes`
-   *            carries a `detail` (capped at `MAX_DETAIL_LEN`, as
-   *            `parseRuleEvents` does at `wire.ts:297`), whatever the
-   *            serialiser and `recordCoached` do.
-   *   FLIP 6 — the RE-TITLE pools it. Reds once the parser keeps the detail AND
-   *            `gradeFinishWire` resolves the title through `actCopy`.
+   * So this case hands the server the payload LANE C'S CLIENT SENDS — a coached
+   * row that ALREADY carries `detail` — and pins each half at the boundary it
+   * happens at, behind nothing:
+   *   FLIP 5 — the VALIDATOR. Reds if `parseCoachedMistakes` ever stops
+   *            carrying `detail`, whatever the serialiser and `recordCoached`
+   *            do.
+   *   FLIP 6 — the RE-TITLE. Reds if `gradeFinishWire` goes back to
+   *            `VIOLATIONS[code].titleBg`, or if the parser drops the act
+   *            underneath it.
    *
    * THEY ARE TWO `it`s ON PURPOSE, which is the whole lesson of FLIP 2/3: an
    * assertion parked behind a failing one in the same case is not a tripwire,
@@ -322,63 +343,97 @@ describe("LANE C GAP: the coached path still pools the title (spec 92, ADDENDUM 
    */
   const coachedWireRow = { code: "JUNCTION_SCAN_INCOMPLETE", t: 17, detail: "give-way" };
 
-  it("FLIP 5 — the validator drops `detail` from a coached row that carries it", () => {
+  it("FLIP 5 — the validator KEEPS `detail` on a coached row that carries it", () => {
     const graded = gradeFinishWire({ ...basePayload, coachedMistakes: [coachedWireRow] });
     expect(graded.status).toBe("ok");
     if (graded.status !== "ok") return;
-    // The parsed row is code+t: the client's act did not survive validation, so
-    // nothing downstream of it can be blamed for pooling the title.
-    expect(graded.wire.coachedMistakes).toEqual([{ code: "JUNCTION_SCAN_INCOMPLETE", t: 17 }]);
+    // The act survives validation, so the re-title below has something to read.
+    expect(graded.wire.coachedMistakes).toEqual([coachedWireRow]);
   });
 
-  it("FLIP 6 — …so the stored record names the POOLED act, not the student's", () => {
+  it("FLIP 5b — …under the SAME cap a charged event's detail crosses at", () => {
+    // 64 is `MAX_DETAIL_LEN` (`wire.ts`), the bound `parseRuleEvents` applies at
+    // the charged boundary. One field, one rule — and an over-long value DROPS
+    // rather than rejecting the save, because it is display metadata.
+    const long = "x".repeat(65);
+    const graded = gradeFinishWire({
+      ...basePayload,
+      coachedMistakes: [{ code: "JUNCTION_SCAN_INCOMPLETE", t: 5, detail: long }],
+    });
+    expect(graded.status).toBe("ok");
+    if (graded.status !== "ok") return;
+    expect(graded.wire.coachedMistakes).toEqual([{ code: "JUNCTION_SCAN_INCOMPLETE", t: 5 }]);
+    // …and an unrecognised act pools, rather than blanking the row.
+    expect(graded.result.coachedMistakes![0]!.titleBg).toBe(
+      VIOLATIONS.JUNCTION_SCAN_INCOMPLETE.titleBg,
+    );
+    // A non-string detail is dropped the same way — never coerced, never
+    // rejected, never the string "invalid".
+    const junk = gradeFinishWire({
+      ...basePayload,
+      coachedMistakes: [{ code: "JUNCTION_SCAN_INCOMPLETE", t: 5, detail: 7 }],
+    });
+    expect(junk.status).toBe("ok");
+    if (junk.status !== "ok") return;
+    expect(junk.wire.coachedMistakes).toEqual([{ code: "JUNCTION_SCAN_INCOMPLETE", t: 5 }]);
+  });
+
+  it("FLIP 6 — …so the stored record names the STUDENT's act, not the pooled one", () => {
     const graded = gradeFinishWire({ ...basePayload, coachedMistakes: [coachedWireRow] });
     expect(graded.status).toBe("ok");
     if (graded.status !== "ok") return;
     expect(graded.result.coachedMistakes).toEqual([
-      { code: "JUNCTION_SCAN_INCOMPLETE", titleBg: "Непълно оглеждане на кръстовището", t: 17 },
+      {
+        code: "JUNCTION_SCAN_INCOMPLETE",
+        titleBg: "Непълно оглеждане при знак Б1",
+        t: 17,
+        detail: "give-way",
+      },
     ]);
-    // …and the act's own sentence really is a different one, sitting in the
-    // catalogue on the SERVER's own side of the import the whole time — or the
-    // assertion above would also pass on a server that had already been fixed.
+    // …and the act's own sentence really is a different one from the pooled row,
+    // sitting in the catalogue on the SERVER's own side of the import — or the
+    // assertion above would also pass on a server that had never been fixed.
     expect(JUNCTION_SCAN_CONTROL_COPY["give-way"]!.titleBg).not.toBe(
       VIOLATIONS.JUNCTION_SCAN_INCOMPLETE.titleBg,
     );
   });
 
   /**
-   * THE OTHER HALF LANE C OWES, pinned at its own address. The wire can only
-   * drop what it is given, and today the client never even fills it:
-   * `lessons/engine.ts recordCoached` builds `{ code, titleBg, t }` and stops.
-   * Read from source because this lane owns neither file and cannot drive the
-   * lesson engine from here; it FAILS rather than skips when the anchor moves,
-   * which is the rule three green-and-blind scanners in this repo were repaired
-   * by.
+   * THE FIRST OF THE FOUR EDITS, pinned at its own address. The wire can only
+   * carry what it is given, and `lessons/engine.ts recordCoached` is where the
+   * value is either kept or discarded at the moment of the mistake. Read from
+   * source because this lane owns neither file and cannot drive the lesson
+   * engine from here; it FAILS rather than skips when the anchor moves, which
+   * is the rule three green-and-blind scanners in this repo were repaired by.
+   *
+   * PINNED AS A SHAPE, NOT AS A WORD. `toContain("detail")` would also pass on
+   * a body that merely mentions `detail` in a comment, and `coachedNew.push({
+   * ...e })` would fill the field without spelling it — the inverse trap the
+   * FLIP-4 version of this case was written to close. So the assertion is on
+   * the push's own argument: the row is built field by field, and `detail` is
+   * one of the fields, conditionally spread so an absent act stays absent.
    */
-  it("…and `recordCoached` never fills `detail` — FLIP WHEN LANE C LANDS", () => {
+  it("`recordCoached` fills `detail` — the first of lane C's four edits", () => {
     const engineSrc = readFileSync(join(SIM_ROOT, "lessons", "engine.ts"), "utf8");
     const body = /const recordCoached = \([\s\S]*?\n {2}\};/.exec(engineSrc);
     expect(
       body,
       "recordCoached moved or was renamed — re-anchor this case before believing it",
     ).not.toBeNull();
-    // FLIP 4: lane C pushes `detail` here too, and this assertion inverts.
-    expect(body![0]).not.toContain("detail");
-    expect(body![0]).toContain("coachedNew.push(");
-    // …and the SHAPE, not merely the absence of a word. `coachedNew.push({
-    // ...e })` fills `detail` without ever spelling it, and the two assertions
-    // above wave it through — the verifier planted exactly that and the suite
-    // stayed green. Pinning the field list means any widening of the row, by
-    // spread or by name, has to come past this line.
-    expect(body![0].replace(/\s+/g, " ")).toContain(
-      "coachedNew.push({ code: e.code, titleBg: e.titleBg, t: e.t });",
-    );
+    const flat = body![0].replace(/\s+/g, " ");
+    // FLIP 4 (flipped). The signature must accept it…
+    expect(flat).toMatch(/const recordCoached = \(e: \{[^}]*detail\?: string[^}]*\}\)/);
+    // …and the row must carry it, by name, only when the event has one.
+    expect(flat).toContain("coachedNew.push({");
+    expect(flat).toContain("...(e.detail !== undefined ? { detail: e.detail } : {})");
+    // The title is still stamped from the event's catalogue copy, not composed.
+    expect(flat).toContain("titleBg: e.titleBg");
   });
 
-  it("the act copy the server cannot reach is nevertheless there, keyed on the detail it is not sent", () => {
-    // The repair lane C needs is a WIRE change, not a copy change: the sentence
-    // already exists on the server's own side of the import. Nothing here needs
-    // a client-authored `titleBg` — `wire.ts`'s docblock refuses one (ADR-002)
+  it("the act copy the server reaches is the catalogue's own, keyed on the detail it is sent", () => {
+    // The repair was a WIRE change, not a copy change: the sentence already
+    // existed on the server's own side of the import. Nothing here needs a
+    // client-authored `titleBg` — `wire.ts`'s docblock refuses one (ADR-002)
     // and is right.
     expect(JUNCTION_SCAN_CONTROL_COPY["give-way"]!.titleBg).toBe(
       "Непълно оглеждане при знак Б1",

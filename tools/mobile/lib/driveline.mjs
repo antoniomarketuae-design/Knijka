@@ -654,17 +654,49 @@ export function wilson(k, n, z = 1.96) {
 }
 
 /**
- * The product's three end verdicts, matched WHOLE. `НЕЗАВЪРШЕН` is neither a
+ * The product's FOUR end verdicts, matched WHOLE. `НЕЗАВЪРШЕН` is neither a
  * pass nor a fail: the lesson was not finished, so it is not a draw of the
  * quantity the row is about, and it is counted separately rather than folded
  * into the denominator's numerator.
+ *
+ * ── «НЕ Е ВЗЕТ» IS THE FOURTH, AND IT IS ITS OWN BUCKET — ADR-009, 2026-09-18.
+ *
+ * Founder Ruling A: in a PRACTICE scenario lesson, committing the mistake that
+ * lesson exists to teach means the lesson is not passed, even the first time,
+ * and NO наказателни точки are taken for that first occurrence. The изпитен
+ * лист therefore reads «в допустимото» while the lesson is refused — which is
+ * precisely why `SessionEndScreen`'s pill needed a word that is neither
+ * «Издържан» nor «Неиздържан».
+ *
+ * WHY IT MAY NOT BE FOLDED INTO EITHER EXISTING BUCKET, in the two directions
+ * a judge would read it:
+ *  · as a PASS — the student did not pass; the row would say the product
+ *    credited a lesson it refused;
+ *  · as a FAIL — «Неиздържан» means the изпитен лист convicted him, and on
+ *    these drives it did not. A pass rate built on that conflation would
+ *    attribute a spotless sheet to a broken grader.
+ * It is not `unfinished` either: the route was driven to the end. It is a
+ * fourth state of one finished drive, so it is a fourth key.
+ *
+ * ⚠ THE SUBSTRING TRAP HAS A SECOND MOUTH ON THIS WORD. «НЕ Е ВЗЕТ» is three
+ * tokens, and the product prints it inside a pill the harness reads with
+ * whitespace already collapsed (`lesson-audit.mjs` `t()`), so the match is on
+ * the single-spaced form. A `.includes("ВЗЕТ")` test would also match the
+ * catalogue's «взето»; whole-string equality is the only form that cannot.
+ *
+ * ⚠ AND ABOUT 10 RIGHT LEGS WILL READ IT ON THE NEXT SWEEP (doc 92 §12 R3).
+ * That is expected behaviour, not a regression: a right leg that commits the
+ * lesson's own mistake is now refused by design. A judge must check the leg's
+ * own inputs before filing a product finding — which it can only do if this
+ * function hands it the word instead of hiding it inside `fail`.
  */
 export function classifyVerdict(verdict) {
-  const v = String(verdict ?? "").trim().toUpperCase();
+  const v = String(verdict ?? "").trim().replace(/\s+/g, " ").toUpperCase();
   if (v === "") return "unknown";
   if (v === "НЕИЗДЪРЖАН") return "fail";
   if (v === "ИЗДЪРЖАН") return "pass";
   if (v === "НЕЗАВЪРШЕН") return "unfinished";
+  if (v === "НЕ Е ВЗЕТ") return "lessonMistake";
   return "unknown";
 }
 
@@ -679,7 +711,11 @@ export const RATE_MIN_N = 2;
 export function passRate(runs) {
   const rows = Array.isArray(runs) ? runs : [];
   const judgeable = rows.filter((r) => r?.exit === 0);
-  const counts = { pass: 0, fail: 0, unfinished: 0, unknown: 0 };
+  // Every key `classifyVerdict` can return, seeded at 0 — including
+  // `lessonMistake` (ADR-009). A key that appears only when the state occurs
+  // reads as `undefined` in a report that prints all four, and `undefined + 1`
+  // is NaN in the one arithmetic this file exists to keep honest.
+  const counts = { pass: 0, fail: 0, unfinished: 0, lessonMistake: 0, unknown: 0 };
   for (const r of judgeable) counts[classifyVerdict(r?.verdict)] += 1;
   const n = judgeable.length;
   const k = counts.pass;

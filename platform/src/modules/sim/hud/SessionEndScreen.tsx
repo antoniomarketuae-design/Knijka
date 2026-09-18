@@ -87,6 +87,15 @@ import {
 } from "../rules";
 import {
   REACTION_BAND_LABELS_BG,
+  // ADR-009 (founder Ruling A) — the lesson's own mistake, RETRIEVED. This
+  // screen composes no copy for it: `lessonMistakeCopy` returns the catalogue's
+  // own title / explanation / corrective / lawRef and `lessonMistakeNamesBg`
+  // the phrase a running sentence takes them in, so the reason block can
+  // neither re-word law (ADR-002) nor disagree with the teach card that showed
+  // the same act live.
+  lessonMistakeCopy,
+  lessonMistakeNamesBg,
+  type LessonMistakeHit,
   type LessonResult,
   type ObjectiveDetail,
   type ParkAlignment,
@@ -265,7 +274,33 @@ export function manoeuvreGradeReasonBg(result: LessonResult): string | null {
   else if (result.summary.score.hasDangerous) floors.push("има опасна грешка");
   if (result.aborted) floors.push("урокът беше прекъснат");
   if (!result.completedAll) floors.push("остана неизпълнена задача от маршрута");
+  // ── ADR-009's FIFTH FLOOR (doc 92 §5.7). `scoreRubric` now caps a drive with
+  // a lesson mistake at one star, so this note owes it a clause or it goes back
+  // to explaining a floor by naming a different one — the exact drift
+  // `session-end-numbers.test.tsx`'s agreement loop exists to catch. LAST in
+  // the list on purpose: the four above are the law's floors and read as a
+  // group, this one is the lesson's own rule.
+  const hits = result.lessonMistakes ?? [];
+  const lessonMistakeFloorBg =
+    hits.length > 0
+      ? `допусна ${lessonMistakeNamesBg(hits)} — ` +
+        `${hits.length === 1 ? "грешката, която" : "грешките, които"} този урок учи`
+      : null;
+  if (lessonMistakeFloorBg !== null) floors.push(lessonMistakeFloorBg);
   if (floors.length > 0) {
+    // AND WHEN IT IS THE ONLY FLOOR, THE TAIL WOULD BE FALSE. «не може да
+    // надскочи закона» is right about a collision, an опасна and an abandoned
+    // route; ADR-009 is a LESSON rule and not law at all — these drives are «в
+    // допустимото» on the изпитен лист, which is the whole reason the verdict
+    // above reads «Не е взет» rather than «Неиздържан». So the sentence names
+    // the real ceiling instead: «взето» is two stars (`progress.ts`), and a
+    // lesson that was not taken may not print it.
+    if (floors.length === 1 && lessonMistakeFloorBg !== null) {
+      return (
+        `Само една звезда, защото ${lessonMistakeFloorBg}. Звездите не могат да ` +
+        `кажат „взето“ за урок, който не е взет.`
+      );
+    }
     return (
       `Само една звезда, защото ${floors.join(", ")}. Оценката на маневрата не ` +
       `може да надскочи закона: докато това е в сила, тя стои на дъното, ` +
@@ -489,31 +524,69 @@ export function nearMissReservationBg(
   );
 }
 
-/** passed · failed (the изпитен лист says so) · unfinished (nothing says so). */
-export type SessionVerdict = "passed" | "failed" | "unfinished";
+/**
+ * passed · failed (the изпитен лист says so) · lessonMistake (ADR-009: the
+ * lesson's OWN mistake happened) · unfinished (nothing says so).
+ */
+export type SessionVerdict = "passed" | "failed" | "lessonMistake" | "unfinished";
 
 /**
- * The three-way read of one `LessonResult`. `result.passed` is the AND of three
- * conditions and this splits the false branch by WHICH of them failed — it
- * never re-derives any of them.
+ * The four-way read of one `LessonResult`. `result.passed` is the AND of four
+ * conditions since ADR-009 and this splits the false branch by WHICH of them
+ * failed — it never re-derives any of them.
+ *
+ * ── ADR-009, AND THE 133 DRIVES THAT SENT A STUDENT BACK TO A FINISH HE HAD
+ *    ALREADY REACHED.
+ *
+ * `engine.ts buildLessonResult` now ANDs `lessonMistakes.length === 0` into
+ * `passed` (founder Ruling A, 2026-09-17). With three arms the refused drive
+ * fell through to `unfinished`, because its изпитен лист really is clean — so
+ * MEASURED on this tree (`docs/simulation/adr-009` census, re-measured by this
+ * lane): 133 practice drives that finished the route with a spotless sheet
+ * printed «Незавършен» over a note reading «зачита се само урок, изкаран
+ * докрай. Карай го отново и стигни до края» — the one instruction that cannot
+ * help, to a student who did reach the end. The product refused the lesson and
+ * then said the wrong thing about it, which is the defect doc 64 THEO-4 calls
+ * worse than silence.
+ *
+ * `!result.aborted` IS LOAD-BEARING (doc 92 §5.1, graft 5). An aborted run has
+ * no verdict to give — it was not driven to the end — so a hit on it may not
+ * read «Не е взет»; it stays «Незавършен» and `unfinishedVerdictNoteBg` tells
+ * that student both halves instead (see its abort variant).
+ *
+ * THE OTHER THREE ARMS ARE BYTE-IDENTICAL, and the test pins that as a loop
+ * over every fixture: nothing here can widen `passed`, and nothing can move a
+ * drive off «Неиздържан» — the изпитен лист is still the only authority for
+ * that word, and it is consulted FIRST.
  */
 export function sessionVerdict(result: LessonResult): SessionVerdict {
   if (result.passed) return "passed";
   // The изпитен лист is the only authority for „Неиздържан". When it is clean
   // the drive failed no rule; it merely stopped early — see the block above.
-  return result.summary.passed ? "unfinished" : "failed";
+  if (!result.summary.passed) return "failed";
+  if (!result.aborted && (result.lessonMistakes?.length ?? 0) > 0) return "lessonMistake";
+  return "unfinished";
 }
 
 export const SESSION_VERDICT_LABEL_BG: Record<SessionVerdict, string> = {
   passed: "Издържан",
   failed: "Неиздържан",
+  // The product's own existing words for this state (`sessionEndCtas.ts`
+  // „не е взет", `ScenarioCatalog.tsx` „взето") — not a new verdict vocabulary.
+  lessonMistake: "Не е взет",
   unfinished: "Незавършен",
 };
 
-/** Warning, not danger: an unfinished run is unresolved, not condemned. */
+/**
+ * Warning, not danger: an unfinished run is unresolved, not condemned — and
+ * neither is a not-taken one. «Не е взет» is a lesson rule, not a conviction on
+ * the изпитен лист (whose verdict on these drives is «в допустимото»), so it
+ * may not wear `--danger`: that colour is what «Неиздържан» means here.
+ */
 const VERDICT_PILL_CLASS: Record<SessionVerdict, string> = {
   passed: "bg-success/15 text-success",
   failed: "bg-danger/15 text-danger",
+  lessonMistake: "bg-warning/15 text-warning",
   unfinished: "bg-warning/15 text-warning",
 };
 
@@ -526,12 +599,244 @@ const VERDICT_PILL_CLASS: Record<SessionVerdict, string> = {
  * — and what to do about it. Null for the other two verdicts: they are already
  * accounted for, and a third sentence would be wallpaper.
  */
+/**
+ * WHERE THE ИЗПИТЕН ЛИСТ STANDS, as one clause two verdicts both need.
+ *
+ * Extracted from `unfinishedVerdictNoteBg` unchanged — same expression, same
+ * two strings — because ADR-009's «Не е взет» note opens on exactly the same
+ * fact («the sheet is clean, and that is WHY this does not say Неиздържан») and
+ * a second copy is how two notes on one screen start naming the same sheet
+ * differently. Its «Незавършен» output is byte-identical; the test drives both
+ * verdicts through it and compares.
+ */
+function sheetStandingBg(result: LessonResult): string {
+  return result.score === 0
+    ? "Изпитният лист остана чист"
+    : `${pointsWordsBg("exam", result.score)} — в допустимото по изпитния лист`;
+}
+
+/**
+ * THE «НЕ Е ВЗЕТ» ACCOUNT — the sentence that made ADR-009 shippable.
+ *
+ * The pill alone is the bare verdict THEO-4 forbids, and on this state it is
+ * worse than bare: the изпитен лист is clean and the route is finished, so a
+ * student reading only «Не е взет» has been given a refusal with every visible
+ * fact pointing the other way. So the note answers, in order, the four
+ * questions he actually has: why it is not «Неиздържан» (the sheet), what
+ * happened (the lesson's own mistake, named), that the first time counts too
+ * (the ruling), and what to do (drive it again without that act). The WHY and
+ * the corrective are in the reason block, and the note points AT IT BY NAME
+ * rather than repeating catalogue text here.
+ *
+ * ── IT SAYS THE SECTION'S NAME AND NOT «ВЕДНАГА ОТДОЛУ», AND THAT IS A
+ *    MEASUREMENT, NOT A PREFERENCE.
+ *
+ * Doc 92 §5.2 authors this clause as «Защо е грешка и как се прави правилно —
+ * веднага отдолу». MEASURED on the shipping CSS at 360 px, two hits: the
+ * reason block's top is 256 px below this note's last line, with the whole
+ * 195 px «Разбивка на наказателните точки по класове грешки» table between
+ * them. On a 360×800 phone that is most of a screen and a table — «веднага»
+ * is simply not true, and a sentence that sends a 17-year-old to a place he
+ * cannot see is the small untruth this file keeps being repaired for. The
+ * placement is the spec's (§5.3 fixes the block after the sheet card), so the
+ * WORDING is what gives way.
+ *
+ * Naming it buys a second thing: `endFoldNames` walks
+ * `section[aria-label]` and now finds this landmark, so the fold pill and this
+ * sentence call the section the same thing.
+ *
+ * AND THE POINTER IS COMPUTED FROM THE SECTION, NOT FROM THE HITS. The first
+ * draft pluralised on `hits.length` while the `<h3>` — and the section's very
+ * existence — run off `lessonMistakeReasonsBg(result).length`, which DROPS a
+ * code this catalogue no longer carries. The two disagree in exactly the state
+ * the drop exists for: a stored drive naming one live code and one ghost cites
+ * «Грешките на този урок» over a heading that reads «Грешката на този урок»,
+ * and a ghost-ONLY drive points at a section that is not rendered at all. That
+ * is the same shape — a sentence sending a student somewhere he cannot see —
+ * that this note's own «веднага отдолу» was repaired for, so the clause is
+ * built from the list that decides the heading, and disappears with it.
+ * Latent today (`lessonMistakeTargets.ts` throws `ScenarioCompileError` on an
+ * uncatalogued target, and the clause is byte-identical on all 558 live
+ * «Не е взет» drives), live for any drive stored across a catalogue change.
+ *
+ * ── AND THE LAST CLAUSE ASKS FOR BOTH CONDITIONS WHEN BOTH ARE MISSING.
+ *
+ * Doc 92 §5.2 closes on «Карай урока отново: ще го вземеш, когато мине без
+ * нея», which reads as THE one thing standing between the student and the
+ * lesson. MEASURED on this tree over all 2,434 authored drives: of the 558 that
+ * now read «Не е взет», only 133 finished their route — 425 did not. On those
+ * 425 the sentence is necessary-but-not-sufficient advice, i.e. the same shape
+ * of wrongness this whole lane exists to remove, pointed the other way: the
+ * 133 were told to finish something they had finished, and 425 would be told
+ * that not repeating the mistake is enough when it is not.
+ *
+ * So the ask is conditional, in the words doc 92 already authored for the abort
+ * variant below («— до края и без нея»), rather than a new phrase. The screen
+ * does also print «Не всички задачи от маршрута бяха изпълнени.» on its own
+ * line, but a sentence that names ONE condition and gets it wrong is not
+ * rescued by a true sentence somewhere else on the card.
+ *
+ * ADR-002: the only lesson-specific words are `lessonMistakeNamesBg(hits)` —
+ * catalogue titles, retrieved. No article, no law text, nothing re-worded.
+ *
+ * `null` for the other three verdicts — «Неиздържан» has `failReasons`,
+ * «Издържан» needs no defence, and «Незавършен» has its own note below.
+ */
+export function lessonMistakeVerdictNoteBg(result: LessonResult): string | null {
+  if (sessionVerdict(result) !== "lessonMistake") return null;
+  const hits = result.lessonMistakes ?? [];
+  // Unreachable while `sessionVerdict` guards on the same length — kept because
+  // this function is exported and tested directly, not because it can fire.
+  if (hits.length === 0) return null;
+  const one = hits.length === 1;
+  const it = one ? "нея" : "тях";
+  const askBg = result.completedAll
+    ? `Карай урока отново: ще го вземеш, когато мине без ${it}.`
+    : `Карай урока отново — до края и без ${it}.`;
+  // The rows the reason block will actually render — see the header: the
+  // pointer is the section's, or there is no pointer.
+  const explained = lessonMistakeReasonsBg(result);
+  const pointerBg =
+    explained.length === 0
+      ? ""
+      : `Защо е грешка и как се прави правилно — по-долу, в ` +
+        `„${lessonMistakeSectionHeadingBg(explained.length)}“. `;
+  return (
+    `${sheetStandingBg(result)}, затова тук не пише „Неиздържан“. Но ` +
+    `${lessonMistakeNamesBg(hits)} ${one ? "е грешката, която" : "са грешките, които"} ` +
+    `този урок учи — щом ${one ? "тя се случи" : "някоя от тях се случи"}, урокът не се ` +
+    `зачита, дори първия път. ${pointerBg}${askBg}`
+  );
+}
+
+/**
+ * The reason block's heading — ONE function, because the note cites it by name
+ * and the `<h3>` prints it. Two copies is how a sentence ends up pointing at a
+ * heading that reads differently three hundred pixels away.
+ *
+ * The `aria-label` deliberately does NOT come from here: a screen reader's
+ * landmark list must not change shape with the number of hits (doc 92 §5.3).
+ */
+function lessonMistakeSectionHeadingBg(count: number): string {
+  return count === 1 ? "Грешката на този урок" : "Грешките на този урок";
+}
+
+/**
+ * One entry of the reason block — every field RETRIEVED (doc 92 §5.3).
+ *
+ * THREE FIELDS ARE DECLARED NON-NULLABLE BECAUSE THEY ARE. `lessonMistakeCopy`
+ * narrowed `correctiveBg`, `lawRef` and `peekBg` to `string` on purpose
+ * (`lessonMistake.ts` header: tsc refuses a catalogue row without a corrective
+ * or a peek, and `makeViolation` always resolves a lawRef), and the spec's
+ * «omitted when null» for the corrective and the law chip is therefore a branch
+ * that CANNOT run. Rendering them behind `!== null` here would ship the
+ * dead-predicate shape this programme has measured 51 times in 82 repairs — and
+ * worse, it would tell the next reader that a hit with no corrective is a state
+ * the product handles. It is not: it does not exist.
+ *
+ * `demoTitleBg` IS genuinely optional and the null branch really renders — the
+ * fold stamps it only when exactly ONE authored demo cites the code (doc 92
+ * graft 19), so a code two demos teach carries none and the entry simply has no
+ * demo line. Measured on this tree by this lane's census re-run: both branches
+ * occur, and the test drives one of each.
+ */
+export interface LessonMistakeReason {
+  code: string;
+  titleBg: string;
+  /** m:ss of the EARLIEST occurrence — the one the student was taught at. */
+  clockBg: string;
+  /** «Това е грешката от демонстрацията „…“.» — null when two demos cite it. */
+  demoLineBg: string | null;
+  explanationBg: string;
+  correctiveBg: string;
+  lawRef: string;
+  /** What it cost, which differs for a first occurrence and for a repeat. */
+  stakeBg: string;
+}
+
+/**
+ * THE REASON BLOCK — the half of ADR-009 without which the pill is a refusal
+ * with no reason attached.
+ *
+ * WHY IT RENDERS ON THREE VERDICTS AND NOT ONLY ON «Не е взет». A target's
+ * first occurrence is ALWAYS coached (doc 92 §3.4b), so no `FaultCard` below
+ * ever explains the act that cost the lesson — on a drive that ALSO failed the
+ * изпитен лист, or was abandoned, the lesson rule would otherwise be the one
+ * thing on the screen with no account anywhere. Revision 1's «only uncharged
+ * hits on a failed sheet» filter is dropped for that reason. Not on a pass:
+ * `passed` is false whenever a hit exists, so «passed with a hit» cannot occur
+ * — the guard is the anti-loosening assertion, not a live branch.
+ *
+ * AN UNCATALOGUED CODE DROPS ITS ROW, and if that empties the list the section
+ * does not render at all. `lessonMistakeCopy` returns null for a code this
+ * catalogue no longer carries (a stored drive can name one), and a blank bullet
+ * under «Грешката на този урок» would be the bare verdict THEO-4 forbids with
+ * the heading still promising an explanation.
+ */
+export function lessonMistakeReasonsBg(result: LessonResult): LessonMistakeReason[] {
+  const hits: readonly LessonMistakeHit[] = result.lessonMistakes ?? [];
+  if (hits.length === 0 || result.passed) return [];
+  const out: LessonMistakeReason[] = [];
+  for (const hit of hits) {
+    const copy = lessonMistakeCopy(hit);
+    if (copy === null) continue;
+    out.push({
+      code: hit.code,
+      titleBg: copy.titleBg,
+      clockBg: clock(hit.t),
+      demoLineBg:
+        hit.demoTitleBg === undefined
+          ? null
+          : `Това е грешката от демонстрацията „${hit.demoTitleBg}“.`,
+      explanationBg: copy.explanationBg,
+      correctiveBg: copy.correctiveBg,
+      lawRef: copy.lawRef,
+      // THE TWO STAKES ARE NOT THE SAME SENTENCE, and the difference is the
+      // ruling: the first occurrence costs no наказателни точки and still costs
+      // the lesson (founder Ruling A), while a repeat also reached the изпитен
+      // лист (founder answer F1) and is in the fault list below. Saying «не
+      // влиза в наказателните точки» on a charged repeat would be the false
+      // «не се брои в резултата» the live teach card used to print, moved to
+      // the result screen.
+      stakeBg: hit.charged
+        ? "Първия път не влезе в наказателните точки; повторението ѝ влезе в " +
+          "изпитния лист — виж „Грешки“ по-долу. Урокът не се зачита, защото това е " +
+          "грешката, която той учи."
+        : "При първа поява тази грешка не влиза в наказателните точки. Но урокът " +
+          "съществува, за да научи точно нея — затова не се зачита, докато не го " +
+          "изкараш без нея.",
+    });
+  }
+  return out;
+}
+
 export function unfinishedVerdictNoteBg(result: LessonResult): string | null {
   if (sessionVerdict(result) !== "unfinished") return null;
-  const sheetBg =
-    result.score === 0
-      ? "Изпитният лист остана чист"
-      : `${pointsWordsBg("exam", result.score)} — в допустимото по изпитния лист`;
+  const sheetBg = sheetStandingBg(result);
+  /**
+   * ── ADR-009's ABORT VARIANT (doc 92 §5.2, graft 5).
+   *
+   * An aborted run with a hit is the one state where BOTH accounts are true and
+   * the shipped tail is the wrong half of them: «зачита се само урок, изкаран
+   * докрай. Карай го отново и стигни до края, за да получиш оценка» tells a
+   * student that finishing is what he is missing, when finishing would not have
+   * earned him the lesson either. So it says both — no grade, because he
+   * stopped; and no credit even so, because the lesson's own mistake happened —
+   * and then asks for the two things together.
+   *
+   * WITHOUT A HIT THE NOTE IS BYTE-IDENTICAL, including on an aborted run, and
+   * that is asserted rather than assumed.
+   */
+  const abortHits = result.aborted ? (result.lessonMistakes ?? []) : [];
+  if (abortHits.length > 0) {
+    const one = abortHits.length === 1;
+    return (
+      `${sheetBg}, затова тук не пише „Неиздържан“; прекъсна урока преди края, затова ` +
+      `няма и оценка. Но и изкаран докрай, урокът нямаше да се зачете: ` +
+      `${lessonMistakeNamesBg(abortHits)} ${one ? "е грешката, която" : "са грешките, които"} ` +
+      `той учи. Карай го отново — до края и без ${one ? "нея" : "тях"}.`
+    );
+  }
   /**
    * „НЯМА НАРУШЕНИЕ" WAS A CLAIM ABOUT THE DRIVE, ON THE EVIDENCE OF THE
    * SHEET. MEASURED · wave-c · `sc-signal-hesitation` · mobile · wrong
@@ -958,18 +1263,85 @@ export function SessionEndScreen({
    * The judgement is not made here. `commendationRiderFlags` and
    * `commendationRiderBg` live in `lessons/debrief.ts` and are the same two
    * functions the «Разбор» prose asks — the whole reason for the deep import at
-   * the top of this file, and the reason the two post-drive surfaces can never
-   * say different things about one commendation. What this memo adds is only
-   * TIMING: the card can now ask before it prints its heading, instead of
-   * inside the row loop, where the answer arrived too late to gate anything.
+   * the top of this file. What this memo adds is only TIMING: the card can now
+   * ask before it prints its heading, instead of inside the row loop, where the
+   * answer arrived too late to gate anything.
+   *
+   * ── 2026-09-18 · THE SAME TWO FUNCTIONS WERE NOT THE SAME QUESTION ────────
+   * This block used to end „…and the reason the two post-drive surfaces can
+   * never say different things about one commendation". Sharing a function is
+   * not sharing a question, and that sentence was false from the day ADR-009
+   * landed. Both functions grew a third parameter — the ruling's hits (doc 92
+   * §5.6.7) — because under ADR-009 the mistake a lesson exists to teach is
+   * normally NOT written on the изпитен лист: its first occurrence is taught
+   * and not scored. `summary` IS the лист, so with the hits withheld from it
+   * both flags come back false. `debrief.ts commendationLines` passes them.
+   * This call site did not, so it went on asking the pre-ADR question.
+   *
+   * MEASURED 2026-09-18 on the production chain — every committed tape ×
+   * authored rung, 2,434 drives (654 carrying a hit), this component rendered
+   * and the riders read off its own markup: on 95 drives / 130 rows / 22
+   * lessons the card printed the full green ✓ and NO rider while the «Разбор»
+   * prose immediately below it printed «…но само на отделни отсечки от
+   * маршрута: в същия урок се случи грешката, която той учи…» about that same
+   * commendation. The gate below (`stands`) was released on all 130 — a card
+   * certifying as clean a drive this very screen had just refused, in the badge
+   * a finger's width above it: «Не е взет» on 87 of the 95 (clean лист, the
+   * lesson's own mistake), «Неиздържан» on the other 8 (the лист failed too).
+   * Re-measured on the same instrument after this line: 0 drives, 0 rows. The
+   * 2,434 drives print 975 «Похвали» cards between them (1,459 print none at
+   * all — no commendation, no card), and of those 975: 880 byte-identical, 95
+   * moved, every one of them a hit drive. 130 riders ADDED, 0 removed, 0
+   * re-texted, 130 green ✓ turned to «(✓)» and none the other way, 81 headings
+   * success → warning and none back, 0 rows re-ordered or re-titled.
+   *   (Counted a second time, independently, on 2026-09-18 by this round's
+   *   verifier, whose oracle decodes the RENDERED riders back to flags and
+   *   compares them with the prose bullets rather than re-calling the two
+   *   functions: same 95 / 130 / 22, same 87–8 split, same 880 / 95. The
+   *   sentence corrected there was this one — it first read „2,339 of the
+   *   2,434 cards", which counts DRIVES as cards and so reported the 1,459
+   *   drives that print no card at all as cards that did not move.)
+   *
+   * WHAT STILL STANDS ON A REFUSED DRIVE, AND WHY IT IS NOT A LEAK. 73 of the
+   * 181 hit drives that print a card still paint the heading `text-success`,
+   * because a row still stands on them: 71 `SAFE_LANE_CHANGE`, 24
+   * `YIELDED_TO_PRIORITY`, 4 `PEDESTRIAN_YIELDED` — praise for a skill the hit
+   * neither convicted nor shares a concept with. NOT ONE of them is
+   * `CLEAN_DRIVING`: across all 2,434 drives, zero hit drives leave the
+   * DRIVE-LEVEL claim unqualified, which is the invariant this repair is
+   * actually about. A specific skill was driven well and the metres are owed;
+   * the refusal is carried by the badge, the note and the reason block. Do not
+   * „fix" the green heading — grey it and the card stops distinguishing the
+   * skill that survived from the one that did not.
+   *
+   * ONE BOUND, STATED RATHER THAN PROMISED. `commendationLines` pools by TITLE
+   * and ORs the flags across the rows a title pools; this card asks per ROW. On
+   * the corpus the fold is a no-op — 224 titles pool two or more rows and in
+   * every one of them the rows agree — so the two surfaces are row-for-row
+   * identical today. They could differ if one title ever pooled two codes with
+   * different flags (`YIELD_PRAISE_SITUATION_COPY` retitles per situation), and
+   * the prose would then be the WIDER claim. No drive reaches that state.
+   *
+   * So the hits travel in off `result` — not off a second derivation here —
+   * and the two calls are now argument-for-argument the pair
+   * `commendationLines` makes. `__tests__/session-end-commendation-rider.test.tsx`
+   * renders THIS screen and goes red when either argument is dropped, because
+   * the claim is about what the two surfaces DO and only a drive through both
+   * can hold it.
    */
-  const commendationRiders = useMemo(
-    () =>
-      summary.commendations.map((c) =>
-        commendationRiderBg(summary, commendationRiderFlags(summary, c)),
+  const commendationRiders = useMemo(() => {
+    // Read off the result and defaulted HERE, exactly as `commendationLines`
+    // opens: a stored row from before the ADR carries none, and its praise is
+    // then byte-identical to what it printed yesterday.
+    const lessonMistakes = result.lessonMistakes ?? [];
+    return summary.commendations.map((c) =>
+      commendationRiderBg(
+        summary,
+        commendationRiderFlags(summary, c, lessonMistakes),
+        lessonMistakes,
       ),
-    [summary],
-  );
+    );
+  }, [summary, result.lessonMistakes]);
   /**
    * Does ANY praise on this card stand unqualified? A card on which not one
    * does is not a certificate surface, and its heading stops being painted in
@@ -1095,6 +1467,11 @@ export function SessionEndScreen({
   // badge — see SESSION_VERDICT_LABEL_BG and pointsToneClass.
   const verdict = sessionVerdict(result);
   const unfinishedNoteBg = unfinishedVerdictNoteBg(result);
+  // ADR-009: the account under «Не е взет», and the block that explains it.
+  // Mutually exclusive with `unfinishedNoteBg` by construction — each returns
+  // null unless `sessionVerdict` names its own arm.
+  const lessonMistakeNote = lessonMistakeVerdictNoteBg(result);
+  const lessonMistakeReasons = lessonMistakeReasonsBg(result);
   // …and the reservation a PASS can carry — see nearMissReservationBg. Mutually
   // exclusive with the line above by construction (that one is НЕЗАВЪРШЕН-only).
   const nearMissNoteBg = nearMissReservationBg(result, verdict);
@@ -1261,6 +1638,15 @@ export function SessionEndScreen({
             {unfinishedNoteBg}
           </p>
         ) : null}
+        {/* …and ADR-009's own badge, which had the same problem and worse: a
+            clean sheet, a finished route, and a refusal. See
+            lessonMistakeVerdictNoteBg. `--warning`, matching its pill: this is
+            a lesson rule, not a conviction on the изпитен лист. */}
+        {lessonMistakeNote !== null ? (
+          <p className="-mt-1 max-w-prose text-center text-xs font-semibold leading-relaxed text-warning">
+            {lessonMistakeNote}
+          </p>
+        ) : null}
         {/* …and the one reservation an ИЗДЪРЖАН can carry: the run's own
             near-miss record, which sat six screenshots below this badge while
             the badge, the ★★★ row and the „+100 XP" chip read as a clean bill.
@@ -1416,6 +1802,69 @@ export function SessionEndScreen({
           </p>
         ) : null}
       </section>
+
+      {/* ── ADR-009 · «Грешката на този урок» — THE REASON, DIRECTLY UNDER THE
+          REFUSAL (doc 92 §5.3, founder Ruling A).
+
+          FIRST OF THE CARDS ON PURPOSE. The verdict pill says the lesson was
+          not taken; the изпитен лист above it says «в допустимото»; and the
+          fault list further down does not contain the act at all, because a
+          target's first occurrence is always coached and never charged. This is
+          the only place on the screen the two can be reconciled, so it sits
+          between them rather than below the stars.
+
+          EVERY WORD IS RETRIEVED (ADR-002) — the title, the explanation, the
+          corrective and the law chip all come out of the rule catalogue through
+          `lessonMistakeCopy`, which is the same retrieval the live teach card
+          ran at the moment of the mistake. The only composed sentences are the
+          heading and the stake, and neither states law.
+
+          The `aria-label` is FIXED while the heading pluralises: a screen
+          reader's landmark list must not change shape with the number of hits
+          (doc 92 §5.3). */}
+      {lessonMistakeReasons.length > 0 ? (
+        <section
+          aria-label="Грешката на този урок"
+          data-hud="lesson-mistake-reason"
+          className="card flex flex-col gap-3 border-warning/40 p-5"
+        >
+          <h3 className="text-sm font-extrabold text-warning">
+            {lessonMistakeSectionHeadingBg(lessonMistakeReasons.length)}
+          </h3>
+          <ul className="flex flex-col gap-4">
+            {lessonMistakeReasons.map((reason) => (
+              <li key={reason.code} className="flex flex-col gap-1.5">
+                <p className="flex flex-wrap items-baseline gap-x-2 text-sm font-extrabold leading-snug">
+                  <span>✗ {reason.titleBg}</span>
+                  <span className="font-bold tabular-nums text-muted">· {reason.clockBg}</span>
+                </p>
+                {/* The AUTHOR's name for the act, when exactly one demo of this
+                    lesson teaches it — so the student can tie the refusal to
+                    the thing he was shown before the drive. */}
+                {reason.demoLineBg !== null ? (
+                  <p className="text-xs font-semibold leading-relaxed text-muted">
+                    {reason.demoLineBg}
+                  </p>
+                ) : null}
+                <p className="text-sm leading-relaxed text-foreground">{reason.explanationBg}</p>
+                {/* „✔ Правилното действие:" — the same label FaultCard uses, so
+                    the corrective reads the same on both surfaces. */}
+                <p className="text-sm leading-relaxed text-foreground">
+                  <span className="font-bold">✔ Правилното действие:</span> {reason.correctiveBg}
+                </p>
+                <p className="flex flex-wrap items-center gap-2">
+                  <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
+                    правило: {reason.lawRef}
+                  </span>
+                </p>
+                <p className="text-xs font-semibold leading-relaxed text-warning">
+                  {reason.stakeBg}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* S1: scenario rubric — the maneuver-quality layer (doc 76 §6).
           Official points above remain the verdict; stars grade HOW WELL. */}

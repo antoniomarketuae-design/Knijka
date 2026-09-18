@@ -126,6 +126,26 @@ const NO_QUALITY_MEASURED_BG =
   "а не от оценка на самото изпълнение.";
 
 /**
+ * THE SAME ROW, ON A DRIVE THE LESSON RULE REFUSED (ADR-009, doc 92 §5.7).
+ *
+ * `NO_QUALITY_MEASURED_BG` says the stars «идват само от изпитния лист», and on
+ * one of these drives that sentence is false in the reassuring direction: the
+ * изпитен лист is clean and inside the allowance, so read literally the row
+ * accounts for a star row of three while the card above it shows one. The
+ * critic measured 44 L1/L3 hit drives rendering this row, 16 of them verdict
+ * flips (`sc-merge-lane-end/mistake-no-indicator`,
+ * `sc-vp-handbrake/mistake-no-observation`,
+ * `sc-vu-blindspot-moto/mistake-no-indicator` and others).
+ *
+ * So on those drives the row names the cap that is actually holding the number,
+ * and drops «само» — the sheet is no longer the whole story.
+ */
+const NO_QUALITY_MEASURED_LESSON_MISTAKE_BG =
+  "Нито един показател за качеството на маневрата не бе измерен на това каране: " +
+  "звездите горе идват от изпитния лист и изпълнените задачи — и тук са само една, " +
+  "защото се случи грешката, която този урок учи.";
+
+/**
  * THE ONLY LINE ON THE CARD THAT TOLD THE FLAT-OUT DRIVE IT WAS THE RIGHT ONE.
  *
  * MEASURED · w11 · `sc-vu-pass-clearance` — the lesson whose entire subject is
@@ -550,9 +570,18 @@ export function scoreRubric(
   //
   // The par-time row is untouched by construction: it reports measured:true.
   const nothingMeasured = measuredCount === 0;
+  // ADR-009: when nothing was measured AND the lesson's own mistake happened,
+  // the variant that names the cap instead of the sheet — see
+  // NO_QUALITY_MEASURED_LESSON_MISTAKE_BG. `NOT_IN_STARS_BG` is untouched: that
+  // row is about ONE indicator abstaining while others scored, which the lesson
+  // rule does not speak to.
+  const nothingMeasuredBg =
+    (result.lessonMistakes?.length ?? 0) > 0
+      ? NO_QUALITY_MEASURED_LESSON_MISTAKE_BG
+      : NO_QUALITY_MEASURED_BG;
   for (const line of breakdownBg) {
     if (line.measured) continue;
-    line.detailBg = `${line.detailBg} ${nothingMeasured ? NO_QUALITY_MEASURED_BG : NOT_IN_STARS_BG}`;
+    line.detailBg = `${line.detailBg} ${nothingMeasured ? nothingMeasuredBg : NOT_IN_STARS_BG}`;
   }
 
   // -- Par time: informational line only (doc 76 §6).
@@ -812,7 +841,39 @@ export function scoreRubric(
   }
   // Caps: quality never outranks legality.
   if (result.score > 0 && stars > 2) stars = 2;
-  if (result.summary.terminated || result.summary.score.hasDangerous || result.aborted || !result.completedAll) {
+  // ── ADR-009 (founder Ruling A, doc 92 §5.7): A LESSON THAT WAS NOT TAKEN
+  //    CANNOT READ „взето".
+  //
+  // `progress.ts:333` defines «взето» as two stars or more, so three stars on a
+  // refused lesson is not a cosmetic disagreement — it is the star row saying
+  // the opposite of the verdict above it, in the one number the catalogue reads
+  // back as progress.
+  //
+  // MEASURED ON THIS TREE, and the second number is the one that makes the cap
+  // non-optional: 118 not-passed drives printed THREE stars, and 10 printed
+  // MORE stars than they did before ADR-009 — because the withheld re-bill (doc
+  // 92 §3.4b b) took their `score` to 0, so the `score > 0` ceiling one line
+  // above stopped firing and the fold handed them the cleanliness stars. A
+  // ruling that refuses the lesson cannot be allowed to RAISE its grade.
+  //
+  // THIS IS NOT THE REVERTED WAVE-7 CAP (see the note above the fold). That one
+  // charged a star for ANY coached code, with no target split and no sentence
+  // anywhere to explain the number; this one fires only on a code the lesson
+  // exists to teach, and the card says so twice — `manoeuvreGradeReasonBg`
+  // names the floor and `NO_QUALITY_MEASURED_LESSON_MISTAKE_BG` covers the rows
+  // that measured nothing.
+  //
+  // A REPEAT lands here through the same door and for the same reason: the hit
+  // is on the record either way, so a repeat is capped at one star too — it
+  // simply also carries its own наказателни точки, which the sheet above
+  // already reports (founder answer F1).
+  if (
+    result.summary.terminated ||
+    result.summary.score.hasDangerous ||
+    result.aborted ||
+    !result.completedAll ||
+    (result.lessonMistakes?.length ?? 0) > 0
+  ) {
     stars = 1;
   }
 

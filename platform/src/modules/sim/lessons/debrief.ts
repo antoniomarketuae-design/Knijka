@@ -14,6 +14,18 @@
  * is measured rather than aesthetic: an опасна грешка outranks praise, and
  * nothing else does. See the „gravity before praise" comment at the site.
  *
+ * ADR-009 (2026-09-17, founder Ruling A) ADDS A FOURTH OUTCOME THIS TEXT HAS TO
+ * BE ABLE TO SAY: a practice lesson whose own mistake was committed is NOT
+ * taken, even the first time, and the изпитен лист takes no points for it. Two
+ * of this file's sentences were exhaustive about the old three outcomes and
+ * broke on it — the criteria headline printed «не е издържан по официалните
+ * критерии: .» with an empty list on 133 drives, and «не пада заради маршрута,
+ * а заради изпитния лист по-горе» sent a student to look for points that were
+ * not there. Every branch it touches is tagged `doc 92 §5.6.<n>`, reads
+ * `result.lessonMistakes`, and retrieves its copy through
+ * `lessonMistake.ts lessonMistakeCopy` (ADR-002 — no law is written here).
+ * A drive with no hit produces BYTE-IDENTICAL text.
+ *
  * ============================ AI DEBRIEF SEAM ============================
  * The tutor layer will later replace/augment `text` with an LLM-written
  * debrief (dialogue tone, personalized). Contract for that layer:
@@ -56,7 +68,12 @@ import {
   type ViolationCode,
   type ViolationEvent,
 } from "../rules";
-import type { LessonResult, SessionNearMiss } from "./types";
+import {
+  lessonMistakeConceptIds,
+  lessonMistakeCopy,
+  lessonMistakeNamesBg,
+} from "./lessonMistake";
+import type { LessonMistakeHit, LessonResult, SessionNearMiss } from "./types";
 
 export interface DebriefOutput {
   /** Plain text (newline-separated sections) — stored in SimSession.debrief. */
@@ -65,6 +82,11 @@ export interface DebriefOutput {
    * Concept ids to practice, mistake-driven, in order of first occurrence —
    * the UI links them to theory topics; the learning module uses them for
    * recommendations.
+   *
+   * ADR-009: the LESSON'S OWN mistakes' concepts come FIRST (doc 92 §5.6.9),
+   * ahead of the sheet's, so the theory a student is pointed at after a
+   * not-taken lesson is the theory for the act that cost it. Unchanged,
+   * element for element, on a drive with no hit.
    */
   conceptIds: string[];
 }
@@ -234,6 +256,40 @@ export function buildDebrief(
   const { summary } = result;
   const lines: string[] = [];
   /**
+   * ADR-009 — THE LESSON'S OWN MISTAKES, AS THE FOLD RECORDED THEM.
+   *
+   * Read off the RESULT and never re-derived: `lessons/engine.ts
+   * buildLessonResult` and `lessons/wire.ts gradeFinishWire` both fold them
+   * through the one function (`lessonMistake.ts foldLessonMistakes`), and this
+   * file renders the debrief for BOTH — the client's instant fallback and the
+   * server's stored copy, which is the text `LessonPlayShell.tsx` actually
+   * shows. A second derivation here would be a third opinion about one verdict.
+   *
+   * Empty on every exam rung, every THEO-3 sandbox, every lesson with no
+   * targets and every stored row written before this ADR (the field is absent,
+   * not `[]`, on a clean drive — see `LessonResult.lessonMistakes`). So every
+   * `hits.length > 0` guard below is inert wherever the ruling does not reach,
+   * and a drive with no hit must produce BYTE-IDENTICAL text (doc 92 §5.6,
+   * pinned by `lesson-mistake-debrief.test.ts` § „hit-free drives").
+   */
+  const hits: readonly LessonMistakeHit[] = result.lessonMistakes ?? [];
+  /** Exactly one hit — the agreement every sentence below has to make. */
+  const oneHit = hits.length === 1;
+  /** „A“ · „A“ и „B“ · „A“, „B“ и още N — retrieved titles, never composed here. */
+  const hitNamesBg = lessonMistakeNamesBg(hits);
+  /**
+   * CODES WHOSE „Правилното действие" IS ALREADY ON THE PAGE — filled by the
+   * two blocks that print one (the mistakes block, and ADR-009's «Грешката на
+   * този урок»), read by the «Какво да упражниш» line at the foot.
+   *
+   * It exists because the corrective is authored per CODE and three blocks can
+   * want it for the same drive. Printing it twice, eight lines apart, is the
+   * defect the teach-section header records against an earlier draft of this
+   * file; a Set keyed on the code is the cheapest thing that cannot get it
+   * wrong. Filled in reading order, and the foot of the text is read last.
+   */
+  const actionGivenForCode = new Set<string>();
+  /**
    * Shown, deliberately unscored — see DebriefContext.coachedMistakes.
    *
    * FILTERED AGAINST THE LEDGER, and the filter is the section's own heading.
@@ -322,6 +378,26 @@ export function buildDebrief(
      * branch below, not a guess about a drive that did not happen. The gentle
      * sentence is kept whole for the drive it was written for: a student who
      * quits with a clean sheet is still met with «Нищо страшно».
+     *
+     * ============================================================
+     * …AND A CLEAN SHEET IS NOT THE SAME THING AS A LESSON THAT WOULD HAVE
+     * COUNTED — ADR-009, doc 92 §5.6.3 (critic gap 9).
+     *
+     * «Нищо страшно — запазихме наблюденията дотук, а маршрутът те чака
+     * отново» is an invitation to come back and finish THIS drive, and on a
+     * drive that committed the lesson's own mistake finishing it would have
+     * changed nothing: the lesson was already not taken. So the reassurance
+     * keeps its shape and gains the one fact that makes it honest, plus the way
+     * out («този път без нея»). Nothing is re-priced: the abort branch prints
+     * no points and ADR-009 takes none.
+     *
+     * NOT MEASURED ON ANY AUTHORED TAPE. The lane-D census over all 2,434
+     * tape×rung drives found 654 hit drives and ZERO of them aborted — an
+     * authored tape drives to its end or runs out, it never presses „Прекрати
+     * урока". This branch is therefore pinned by `lesson-mistake-debrief.test.ts`
+     * against a session aborted through `engine.abortSession`, which is the same
+     * call the shell makes, and by nothing on the census.
+     * ============================================================
      */
     const head = `Прекъсна урока „${lesson.titleBg}“ преди края.`;
     // Agreeing, because one broken criterion is the common case and „всеки от
@@ -332,7 +408,11 @@ export function buildDebrief(
         : "Всеки от тези критерии сам по себе си прави урока неиздържан";
     lines.push(
       criteriaBroken.length === 0
-        ? `${head} Нищо страшно — запазихме наблюденията дотук, а маршрутът те чака отново.`
+        ? hits.length > 0
+          ? `${head} Урокът и без прекъсването нямаше да се зачете: допусна ${hitNamesBg} — ` +
+            `${oneHit ? "грешката, която" : "грешките, които"} той учи. Запазихме наблюденията, ` +
+            `а маршрутът те чака отново — този път без ${oneHit ? "нея" : "тях"}.`
+          : `${head} Нищо страшно — запазихме наблюденията дотук, а маршрутът те чака отново.`
         : `${head} Но прекъсването не изтрива изпитния лист — ${criteriaBroken.join("; ")}. ` +
           `${eachOfThem} (Наредба № 38, приложение № 5, т. 11), така че довършването на маршрута ` +
           `нямаше да го поправи. Запазихме наблюденията, а маршрутът те чака отново — започни от ` +
@@ -437,6 +517,58 @@ export function buildDebrief(
           `Изпитващият гледа цялото каране, а не само дали запасът е стигнал — прочети ${where} ` +
           `и повтори урока с тях наум.`,
     );
+  } else if (summary.passed && hits.length > 0) {
+    /**
+     * ============================================================
+     * ADR-009's OWN HEADLINE, AND IT IS MANDATORY RATHER THAN NICE — doc 92
+     * §5.6.1, and §1 item 17 («without a new debrief branch, the headline is
+     * broken on flips»).
+     *
+     * MEASURED on this tree, over all 2,434 authored tape×rung drives (the lane
+     * D census; `tools/audit/inprocess-drive.mjs` drives the chain): 133
+     * practice drives complete their route with a CLEAN изпитен лист and are
+     * refused by ADR-009, and every one of the 133 printed, verbatim:
+     *
+     *   «Урокът „Изпреварване на велосипедист · Ниво 3 — Самостоятелно“ не е
+     *    издържан по официалните критерии: .»
+     *
+     * — the final `else` with an EMPTY criteria list, because that branch was
+     * written for the only way a completed, unaborted drive could fail before
+     * this ADR: the point rule. A colon, a space and a full stop are what the
+     * student was given as the reason his lesson did not count. The other 425
+     * hit drives with a clean sheet took the `!completedAll` branch below and
+     * were told the lesson „не е завършен" and to „мини целия маршрут" — true
+     * of the route, and advice that would not have passed the drive.
+     *
+     * WHY IT SITS HERE AND NOT FIRST. The abort branch above owns a drive the
+     * student stopped (a lesson he did not finish is not a lesson he failed on
+     * the rule), and `result.passed` above is unreachable with a hit —
+     * `buildLessonResult` ANDs `lessonMistakes.length === 0` into it — so the
+     * order below it costs nothing and keeps «издържан» for a hand-built result
+     * rather than inventing a fifth verdict for a state the engine cannot
+     * produce.
+     *
+     * WHAT IT MAY NOT SAY. Not one point moves for ADR-009 (founder ruling:
+     * «NO exam points are taken for that first occurrence»), so the sentence
+     * states the sheet's standing as the sheet's own arithmetic and says
+     * plainly that nothing there changed. The RULE is the lesson's, and it is
+     * given as a rule and not as a verdict (THEO-4): «упражнение се зачита само
+     * когато собствената му грешка не се случи нито веднъж». Every name in it
+     * is retrieved from the rules catalogue (ADR-002, `lessonMistakeNamesBg`).
+     * ============================================================
+     */
+    const head =
+      `Урокът „${lesson.titleBg}“ не е взет: допусна ${hitNamesBg} — точно ` +
+      `${oneHit ? "грешката, която" : "грешките, които"} този урок учи. По изпитния лист ` +
+      `карането е в допустимото (${examPointsWordBg(summary.score.totalPoints)} при допустими 9) ` +
+      `и там нищо не се променя; но упражнение се зачита само когато собствената му грешка не се ` +
+      `случи нито веднъж.`;
+    // The route half is a SECOND fact about the same drive, not an alternative
+    // reason: 425 of the 558 clean-sheet hit drives also left a task open, and
+    // dropping the phrase would lose the only place the open task is named.
+    lines.push(
+      result.completedAll ? head : `${head} Маршрутът: ${unfinishedTaskPhrase(result)}.`,
+    );
   } else if (!result.completedAll) {
     const head = `Урокът „${lesson.titleBg}“ не е завършен — ${unfinishedTaskPhrase(result)}.`;
     lines.push(
@@ -482,6 +614,36 @@ export function buildDebrief(
           `${pointsEachBg("exam", SEVERITY_POINTS.opasna)} правят ${pointsBg("exam", summary.score.opasniPoints)} — сблъсъкът е една от тях.`,
       );
     }
+  }
+
+  /**
+   * A FAILED SHEET AND A NOT-TAKEN LESSON ARE TWO VERDICTS, NOT ONE — doc 92
+   * §5.6.2.
+   *
+   * The criteria headline above (and the abort branch's, and the unfinished
+   * branch's second arm) is Наредба № 38's verdict and is untouched: the drive
+   * really did break the point rule, and finishing the route really would not
+   * have rescued it. What it cannot say is that the lesson ALSO fails a rule of
+   * its own — so a student who repairs the sheet would come back expecting
+   * «взет» and get «не е взет» with nothing on the card having warned him.
+   *
+   * Measured on this tree: 96 of the 654 hit drives fail the sheet as well.
+   *
+   * PLACED AFTER THE SHEET'S WHOLE STORY, not directly under the headline, and
+   * the word decides it: «Отделно от изпитния лист» is a claim about what the
+   * sheet does NOT cover, so it may not be wedged between the criteria and the
+   * collision arithmetic that finishes accounting for them. The ACT itself is
+   * explained under «Грешката на този урок» below, and the points for a repeat
+   * stay in the mistakes block where they were charged (founder answer F1).
+   */
+  if (!summary.passed && hits.length > 0) {
+    lines.push(
+      `Отделно от изпитния лист: ${hitNamesBg} ${
+        oneHit
+          ? "е грешката, която този урок учи — и сама по себе си тя не позволява"
+          : "са грешките, които този урок учи — и сами по себе си те не позволяват"
+      } урокът да се зачете.`,
+    );
   }
 
   // -- failed with a spotless sheet ------------------------------------------
@@ -541,7 +703,39 @@ export function buildDebrief(
    * passing on a spotless run.
    * ============================================================
    */
-  if (!result.passed && summary.mistakes.length === 0 && summary.score.totalPoints === 0) {
+  /*
+   * ADR-009 TAKES THIS LINE OFF ITS OWN DRIVES — doc 92 §5.6.4 — and the reason
+   * is in the sentence's own words. «По изпитния лист нямаш нито една
+   * наказателна точка (0 при допустими 9) — оценката е за незавършения
+   * маршрут…» names the cause of the red verdict, and on a refused lesson the
+   * cause is the DRIVING.
+   *
+   * RE-MEASURED 2026-09-18 over all 2,434 authored drives, because the first
+   * draft of this comment quoted a sentence the corpus never printed and hung
+   * a subset count on it. 519 hit drives reached this block before the
+   * `hits.length === 0` conjunct above — ALL 519 through its reservations arm
+   * («…Но чистият лист не значи чисто каране: …»), because a target's first
+   * occurrence is always coached and `unscoredReservationsBg` is therefore
+   * never empty on a hit drive, so the shorter «…, не за карането» form printed
+   * on NONE of them. Of the 519, 124 had completed their route: on those the
+   * sentence pointed at a route the student had finished and denied the act
+   * that actually cost him the lesson. The new headline says the same true half
+   * («По изпитния лист карането е в допустимото … и там нищо не се променя») in
+   * the one branch where it is not contradicted by the next clause.
+   *
+   * WHAT IS LEFT BEHIND THIS GUARD, said plainly: 0 of the 2,434 authored
+   * drives. Every hit-free drive that fails carries at least one charged fault,
+   * so no committed tape reaches a spotless sheet with an unfinished route. The
+   * live audience is the student who abandons or leaves a route unfinished
+   * having driven cleanly — which is precisely who the sentence was written
+   * for, and is the one reader it was never wrong for.
+   */
+  if (
+    !result.passed &&
+    summary.mistakes.length === 0 &&
+    summary.score.totalPoints === 0 &&
+    hits.length === 0
+  ) {
     const forWhat = result.aborted ? "прекъснатия урок" : "незавършения маршрут";
     // Points are 0 by the guard above, so „грешките" can never be one of the
     // things pointed at here — the pointer is the teach section and the
@@ -576,6 +770,27 @@ export function buildDebrief(
    * complete, unaborted and still !passed must have broken the point rule, so
    * its sheet is never spotless.
    */
+  /*
+   * …AND IT HAD TO LEARN A THIRD REASON A LESSON CAN FALL — doc 92 §5.6.5.
+   *
+   * «не пада заради маршрута, а заради изпитния лист по-горе» was an exhaustive
+   * claim, and it was exhaustive because before ADR-009 the two halves of
+   * `passed` really were the only two. Measured on this tree: 133 hit drives
+   * printed it over a CLEAN sheet — the student was sent to look for points
+   * that were not there. `!summary.passed` scopes the original sentence to the
+   * drives it is true of, and the hit drives get the same credit for the route
+   * with the real cause named; the cause is explained under «Грешката на този
+   * урок» below rather than left as a verdict (THEO-4).
+   *
+   * THE GUARD IS NOT WIDENED, only the text chosen inside it. Under the four
+   * conditions already there — not passed, not aborted, route complete, tasks
+   * authored — `summary.passed` and `hits.length > 0` are the SAME question:
+   * `buildLessonResult` ANDs all four of its own conjuncts, so a clean sheet
+   * here can only have failed on the hit. An extra `&& (!summary.passed ||
+   * hits.length > 0)` would therefore be a predicate that can never be false,
+   * which is the dead-predicate shape this programme has measured 51 times in
+   * 82 repairs; the condition that decides the WORDS is the one written.
+   */
   if (
     !result.passed &&
     !result.aborted &&
@@ -583,7 +798,9 @@ export function buildDebrief(
     result.objectives.length > 0
   ) {
     lines.push(
-      "Задачите от маршрута са изпълнени — този урок не пада заради маршрута, а заради изпитния лист по-горе.",
+      summary.passed && hits.length > 0
+        ? "Задачите от маршрута са изпълнени — този урок не пада заради маршрута, а заради грешката, която учи (по-горе)."
+        : "Задачите от маршрута са изпълнени — този урок не пада заради маршрута, а заради изпитния лист по-горе.",
     );
   }
 
@@ -618,7 +835,7 @@ export function buildDebrief(
     goodBlock.push("");
     goodBlock.push("Какво се получи добре:");
     goodBlock.push(...goodLines);
-  } else if (summary.mistakes.length === 0 && !result.aborted) {
+  } else if (summary.mistakes.length === 0 && !result.aborted && hits.length === 0) {
     goodBlock.push("");
     /**
      * SCOPED TO THE SHEET IT READ. This said «чисто каране без нито едно
@@ -667,6 +884,30 @@ export function buildDebrief(
      * и завърши всички задачи от маршрута» prints directly under it, so this is
      * not a bare withdrawal (THEO-4). A lesson with no tasks at all completes
      * vacuously and is unaffected.
+     */
+    /**
+     * …AND THE FOURTH TIME, THE SCOPE WAS NOT ENOUGH — ADR-009, doc 92 §5.6.6.
+     *
+     * The three repairs above all kept the CLAIM and narrowed it, because the
+     * claim was true: the sheet really was clean. This one cannot be narrowed,
+     * because the sentence sits under the heading «Какво се получи добре» on a
+     * drive the product has just REFUSED for the very act the lesson exists to
+     * teach — and «нито едно нарушение не влезе в точките» is then not a
+     * qualified compliment, it is the ruling's own withholding read back as an
+     * achievement.
+     *
+     * MEASURED on this tree, over all 2,434 authored tape×rung drives: 381 of
+     * the 654 hit drives printed it. `sc-vu-pass-clearance/mistake-squeeze@L3`
+     * is the whole defect in two lines of one paragraph — «Какво се получи
+     * добре: чисто каране по изпитния лист — нито едно нарушение не влезе в
+     * точките» above «Тясно изпреварване на велосипедист», the pass at half a
+     * metre that cost the lesson.
+     *
+     * The praise is WITHHELD rather than rewritten (the whole point of the
+     * withheld charge is already stated, twice, by the headline and by the
+     * «Грешката на този урок» block), and nothing else in the block moves: a
+     * hit drive that earned real commendations still prints them, with the
+     * riders §5.6.7 gives them.
      */
     goodBlock.push(
       coached.length > 0 || nearMissCount > 0 || !result.completedAll
@@ -790,7 +1031,10 @@ export function buildDebrief(
       // the grounding draft for the post-Alpha LLM debrief: the LLM may
       // rephrase this line but must not invent corrective advice.
       const corrective = correctiveFor(g.code);
-      if (corrective !== null) mistakeBlock.push(`  → Правилното действие: ${corrective}`);
+      if (corrective !== null) {
+        mistakeBlock.push(`  → Правилното действие: ${corrective}`);
+        actionGivenForCode.add(g.code);
+      }
       // The debrief is PLAIN TEXT — it has no FaultCard to carry the rider, and
       // it is what /review/my-drive replays weeks later. So the one fault that
       // ends an exam quotes the article that ends it, here, verbatim. Derived
@@ -1033,10 +1277,79 @@ export function buildDebrief(
    * of those are the same kind of thing, a session fact that carries no points
    * and is said anyway (THEO-4).
    */
-  if (coached.length > 0) {
+  /**
+   * ============================================================
+   * ADR-009 — THE LESSON'S OWN MISTAKE IS NOT ONE OF THE «Учебни моменти», AND
+   * MAY NOT BE FILED UNDER A HEADING THAT PRICES IT AT NOTHING (doc 92 §5.6.8).
+   *
+   * Both facts about a first occurrence are true at once — it cost no изпитни
+   * точки, and it cost the whole lesson — and «Учебни моменти (не влизат в
+   * точките)» states the first and buries the second: a student reading
+   * «Първата среща не се наказва — точно затова я показахме» under a verdict of
+   * «не е взет» has been handed two sentences that contradict each other, and
+   * the reassuring one is the one with the section heading. Measured on this
+   * tree: 622 of the 654 hit drives have a coached hit row that lands here.
+   *
+   * The remaining 32 are the ones whose hit was also CHARGED (a genuine repeat,
+   * founder answer F1): `scoredCodes` drops those because the mistakes block
+   * prints them with their points and their law, which is where a charged act
+   * belongs. So this block prints only what was withheld, and nothing is said
+   * twice.
+   *
+   * DRIVEN OFF `hits` AND NOT OFF THE COACHED ROWS, which is the one place this
+   * implementation is wider than doc 92 §5.6.8's wording («coached rows whose
+   * code is a hit move into their own block»). On every real drive the two are
+   * the SAME SET — a hit is either coached or charged, and the charged ones are
+   * filtered out here either way — but `context.coachedMistakes` is an OPTIONAL
+   * field the caller supplies (see `DebriefContext`), and keying the block on it
+   * means a caller that omits it prints «не е взет» with no reason under it.
+   * That is precisely the bare verdict THEO-4 calls a defect, and this channel
+   * has already been dead once: `CoachedMistake`'s own header records that
+   * `DebriefContext.coachedMistakes` «existed, was documented, was filtered, was
+   * tested — and NO live caller fed it». The hits are on the RESULT and cannot
+   * go missing that way.
+   *
+   * EVERY WORD OF IT IS RETRIEVED (ADR-002): the title, the explanation, the
+   * corrective and the article all come from `lessonMistakeCopy`, i.e. from
+   * `makeViolation` over the catalogue, act-aware where the catalogue authors an
+   * act. An uncatalogued code (a stored row whose code a later catalogue
+   * dropped) degrades to its bare title rather than to a blank bullet.
+   * ============================================================
+   */
+  const hitCodes = new Set(hits.map((h) => h.code));
+  /** Hits the изпитен лист did NOT charge — the ones this block owns. */
+  const withheldHits = hits.filter((h) => !scoredCodes.has(h.code));
+  const coachedIncidental = coached.filter((c) => !hitCodes.has(c.code));
+  if (withheldHits.length > 0) {
+    lines.push("");
+    // Agreeing with what this BLOCK holds, not with `hits`: on a drive whose
+    // second hit was a charged repeat, that row is priced in the mistakes block
+    // and «Грешките» here would promise a bullet that is not below it.
+    lines.push(
+      `${withheldHits.length === 1 ? "Грешката на този урок" : "Грешките на този урок"} (при първа поява не влиза в наказателните точки, но урокът не се зачита):`,
+    );
+    // In the fold's own order (t, code) — the order he met them in.
+    for (const hit of withheldHits) {
+      const copy = lessonMistakeCopy(hit);
+      if (copy === null) {
+        lines.push(`• ${hit.titleBg}`);
+        continue;
+      }
+      lines.push(`• ${copy.titleBg}`);
+      lines.push(`  → Защо: ${copy.explanationBg}`);
+      lines.push(`  → Правилното действие: ${copy.correctiveBg}`);
+      actionGivenForCode.add(hit.code);
+      // The same chip the teach card printed at the moment of the mistake
+      // (`TeachMomentOverlay.tsx` «правило: …»), so the card and the debrief
+      // cite one article in one form. Retrieved, never written here.
+      lines.push(`  → Правило: ${copy.lawRef}`);
+    }
+    lines.push("При повторение вече влиза и в изпитния лист.");
+  }
+  if (coachedIncidental.length > 0) {
     lines.push("");
     lines.push("Учебни моменти (не влизат в точките):");
-    for (const line of coachedLines(coached)) lines.push(line);
+    for (const line of coachedLines(coachedIncidental)) lines.push(line);
     lines.push(
       "Първата среща не се наказва — точно затова я показахме. При повторение вече влиза в изпитния лист, така че не я подминавай.",
     );
@@ -1124,8 +1437,114 @@ export function buildDebrief(
   }
 
   // -- what to practice next --------------------------------------------------
-  const conceptIds = summary.conceptIds;
-  if (conceptIds.length > 0) {
+  /**
+   * ============================================================
+   * THE THEORY BEHIND THE ACT THAT COST THE LESSON GOES FIRST — doc 92 §5.6.9
+   * (critic gap 14).
+   *
+   * `summary.conceptIds` is built from the SHEET (`rules/summary.ts` walks
+   * `summary.mistakes`), and under ADR-009 the lesson's own mistake is normally
+   * not on the sheet. So on a refused drive this list was empty or, worse, held
+   * only the concepts of whatever INCIDENTAL code happened to be charged — and
+   * the theory chips the student was offered after a not-taken lesson were
+   * about a different subject than the reason it was not taken. Measured on
+   * this tree: 531 of the 654 hit drives returned an EMPTY `conceptIds`.
+   *
+   * The hits' concepts are unioned in FRONT, so `enrichConcepts`
+   * (`app/(dashboard)/simulator/actions.ts`) resolves and links them first.
+   * `lessonMistakeConceptIds` is the retrieval (ADR-002) and drops the 3 of 58
+   * catalogue codes that author no concept — FOLLOWING_TOO_CLOSE,
+   * NOT_KEEPING_RIGHT, POOR_LANE_KEEPING — which is a live branch and not a
+   * defensive one: ALL THREE are targets, of 7, 4 and 11 lessons respectively
+   * (re-counted 2026-09-18 from `lesson-mistake-targets.fixture.json`
+   * `counts.codeFrequencyByLesson`; an earlier draft of this comment said «two
+   * of the three» and quoted two of the three numbers).
+   *
+   * HIT-FREE DRIVES GET THE SAME LIST THEY ALWAYS DID: `summary.conceptIds` is
+   * already de-duplicated at source (`rules/summary.ts` pushes behind an
+   * `includes` guard), so the union of an empty list with it is equal,
+   * element for element, in order.
+   * ============================================================
+   */
+  const hitConceptIds = lessonMistakeConceptIds(hits);
+  const conceptIds =
+    hitConceptIds.length === 0
+      ? summary.conceptIds
+      : [...hitConceptIds, ...summary.conceptIds.filter((id) => !hitConceptIds.includes(id))];
+  if (hits.length > 0) {
+    /**
+     * THE «what to practice» POINTER ON A REFUSED LESSON — doc 92 §5.6.9 (the
+     * focus is the first hit's concept) and §5.6.10 (what to print when no
+     * title resolved).
+     *
+     * Its own branch rather than a widened first one, because the existing
+     * sentence's reason — «темата зад най-тежката ти грешка» — is FALSE here in
+     * the common case: 558 of the 654 hit drives pass the изпитен лист, so
+     * there is no heaviest mistake to be the theme behind. The lesson's own
+     * mistake is named instead, which is both true and the thing the student
+     * has to repeat the lesson without.
+     *
+     * `conceptTitles` is supplied by the server action (lane F) over the same
+     * union above; with none supplied — the client's instant fallback, and every
+     * in-process drive — the §5.6.10 form is what prints, and it still names the
+     * act and the corrective rather than a bare instruction to try again.
+     */
+    const focusConceptId = hitConceptIds[0];
+    const focusTitle = focusConceptId ? context.conceptTitles?.[focusConceptId] : undefined;
+    /**
+     * ONE SENTENCE, ONE MISTAKE — and on a two-hit drive those were two.
+     *
+     * `hitConceptIds` is `lessonMistakeConceptIds(hits)`, which skips the three
+     * catalogue codes that author no concept, so on a drive whose FIRST hit is
+     * one of them the focus topic belongs to the SECOND — while `hits[0]` named
+     * the first. MEASURED on this tree, 2026-09-18, over all 2,434 authored
+     * drives: 566 print this sentence and 4 of them paired a topic with the
+     * wrong act — `sc-vu-cyclist-group/mistake-cut-in` @L1/L2/L3/L5, where the
+     * student was sent to „Велосипедисти" (the topic behind
+     * VULNERABLE_PASS_TOO_CLOSE, withheld) to fix „Несъобразена дистанция"
+     * (FOLLOWING_TOO_CLOSE, charged 3 т. and concept-less). Both acts are
+     * mistakes this lesson teaches, so neither half was false — the SENTENCE
+     * was, and a seventeen-year-old reading a cyclist topic to repair a
+     * following-distance mistake is exactly the small untruth this file keeps
+     * being repaired for.
+     *
+     * So when a topic resolved, the act named is the hit that topic is behind.
+     * With no topic (the client's instant fallback, every in-process drive, and
+     * the 88 hit drives whose hits carry no concept at all — 654 − 566)
+     * nothing resolves and `hits[0]` stands, which is the order the student met
+     * them in.
+     */
+    const first =
+      (focusTitle !== undefined
+        ? hits.find((h) => lessonMistakeConceptIds([h])[0] === focusConceptId)
+        : undefined) ?? hits[0];
+    const firstCopy = lessonMistakeCopy(first);
+    /**
+     * WHICH OF THE SPEC'S TWO FORMS, and it is decided by what is already on
+     * the page rather than by taste. §5.6.10 gives the line with the corrective
+     * and, «with no corrective», without it. Taken literally that repeats the
+     * corrective VERBATIM a few lines under a «→ Правилното действие:» the same
+     * text has already printed — measured on 622 hit drives through «Грешката
+     * на този урок» and on 39 more through the mistakes block (a charged
+     * repeat, F1) — which is the defect this file's own teach-section header
+     * records against an earlier draft of itself. So the short form is used
+     * when the action for this very act is already on the page, and the full
+     * form when nothing else has given it.
+     */
+    const actionAlreadyGiven = actionGivenForCode.has(first.code);
+    lines.push("");
+    if (focusTitle) {
+      lines.push(
+        `Какво да упражниш: започни от „${focusTitle}“ — темата зад грешката, която този урок учи. Отвори я в раздел „Теория“, после повтори урока без „${first.titleBg}“.`,
+      );
+    } else if (firstCopy !== null && !actionAlreadyGiven) {
+      lines.push(
+        `Какво да упражниш: повтори урока без „${first.titleBg}“ — ${firstCopy.correctiveBg}`,
+      );
+    } else {
+      lines.push(`Какво да упражниш: повтори урока и този път без „${first.titleBg}“.`);
+    }
+  } else if (conceptIds.length > 0) {
     // Focus = the concept behind the single most severe mistake (dangerous
     // first, then most damaging). This is the concrete "start here" pointer.
     const focusId = groups.length > 0 ? groups[0].conceptId : conceptIds[0];
@@ -1698,12 +2117,16 @@ function improvementLine(
  * What the student stops being handed is the unscoped reading.
  */
 function commendationLines(result: LessonResult): string[] {
+  // ADR-009: the hits travel into both derivations (doc 92 §5.6.7). Read off
+  // the result, so a stored row from before the ADR has none and its praise is
+  // byte-identical.
+  const lessonMistakes = result.lessonMistakes ?? [];
   const seen = new Map<string, { count: number; contradicted: boolean; unclean: boolean }>();
   for (const c of result.summary.commendations) {
     // ONE derivation, two surfaces — see `commendationRiderFlags`. The card
     // asks the same question per ROW; this block ORs the answers across the
     // rows a title pools, because the bullet stands for all of them.
-    const { contradicted, unclean } = commendationRiderFlags(result.summary, c);
+    const { contradicted, unclean } = commendationRiderFlags(result.summary, c, lessonMistakes);
     const prev = seen.get(c.titleBg);
     if (prev === undefined) seen.set(c.titleBg, { count: 1, contradicted, unclean });
     else {
@@ -1715,7 +2138,7 @@ function commendationLines(result: LessonResult): string[] {
   return [...seen.entries()]
     .slice(0, MAX_COMMENDATION_LINES)
     .map(([title, g]) => {
-      const rider = commendationRiderBg(result.summary, g);
+      const rider = commendationRiderBg(result.summary, g, lessonMistakes);
       // The dash is this medium's punctuation — see COMMENDATION_CONTRADICTED_BG.
       return `• ${title}${g.count > 1 ? ` ×${g.count}` : ""}${rider === null ? "" : ` — ${rider}`}`;
     });
@@ -1755,13 +2178,36 @@ export interface CommendationRiders {
 export function commendationRiderFlags(
   summary: LessonResult["summary"],
   c: { code: string; conceptId?: string },
+  /**
+   * ADR-009's hits (doc 92 §5.6.7, critic gap 5) — OPTIONAL and empty by
+   * default, so every existing caller compiles and every hit-free drive's
+   * praise is byte-identical.
+   *
+   * Why the flags need them at all: both questions below are asked of
+   * `summary`, and `summary` is the SHEET. Under ADR-009 the lesson's own
+   * mistake is normally not on the sheet — its first occurrence is always
+   * taught and always free — so a drive refused for passing a cyclist at half
+   * a metre reaches this function with `summary.mistakes` empty and
+   * `summary.conceptIds` empty, and both flags come back false. The critic
+   * measured 58 L1/L3 hit drives carrying «Чисто и спокойно каране», and bare
+   * skill praise of the very concept the hit convicted (FULL_STOP_AT_STOP_SIGN
+   * and JUNCTION_SCAN_INCOMPLETE are both `c-give-way-stop-behavior`).
+   */
+  lessonMistakes: readonly { code: string }[] = [],
 ): CommendationRiders {
   return {
-    contradicted: c.conceptId !== undefined && summary.conceptIds.includes(c.conceptId),
+    contradicted:
+      c.conceptId !== undefined &&
+      (summary.conceptIds.includes(c.conceptId) ||
+        // The hit's concept is retrieved from the catalogue for the same reason
+        // the summary's is: this file may not decide what a code is about.
+        lessonMistakeConceptIds(lessonMistakes).includes(c.conceptId)),
     // Keyed on the CODE and not on the title: `rules/catalog.ts` retitles
     // pooled praise per situation (YIELD_PRAISE_SITUATION_COPY), so a title
     // match is not a code match on this channel.
-    unclean: c.code === "CLEAN_DRIVING" && summary.mistakes.length > 0,
+    unclean:
+      c.code === "CLEAN_DRIVING" &&
+      (summary.mistakes.length > 0 || lessonMistakes.length > 0),
   };
 }
 
@@ -1773,10 +2219,12 @@ export function commendationRiderFlags(
 export function commendationRiderBg(
   summary: LessonResult["summary"],
   flags: CommendationRiders,
+  /** ADR-009's hits — see `commendationRiderFlags`; empty by default. */
+  lessonMistakes: readonly { code: string }[] = [],
 ): string | null {
   const parts: string[] = [];
   if (flags.contradicted) parts.push(COMMENDATION_CONTRADICTED_BG);
-  if (flags.unclean) parts.push(cleanDrivingScopeBg(summary));
+  if (flags.unclean) parts.push(cleanDrivingScopeBg(summary, lessonMistakes));
   return parts.length === 0 ? null : parts.join(" — ");
 }
 
@@ -1793,14 +2241,25 @@ export function commendationRiderBg(
  * priced: the rider states WHAT the praise was measured over and leaves every
  * number where the summary put it.
  */
-function cleanDrivingScopeBg(summary: LessonResult["summary"]): string {
+function cleanDrivingScopeBg(
+  summary: LessonResult["summary"],
+  /** ADR-009's hits — see `commendationRiderFlags`; empty by default. */
+  lessonMistakes: readonly { code: string }[] = [],
+): string {
   const opasni = summary.score.opasniCount;
   const alsoBg =
     opasni === 1
       ? "в същия урок има и опасна грешка"
       : opasni > 1
         ? `в същия урок има и ${opasni} опасни грешки`
-        : "в същия урок има и отбелязани грешки";
+        : // ADR-009 (doc 92 §5.6.7). With the sheet empty, «има и отбелязани
+          // грешки» would point at a mistakes block that does not print — the
+          // ruling's own withholding means the act is recorded and NOT scored.
+          // So the rider names what actually happened, which is also the one
+          // thing that makes „чисто" false on this drive.
+          summary.mistakes.length === 0 && lessonMistakes.length > 0
+          ? "в същия урок се случи грешката, която той учи"
+          : "в същия урок има и отбелязани грешки";
   // No leading „ — ": the sentence is shared with the result screen's «Похвали»
   // card, which prints it as a line of its own. See COMMENDATION_CONTRADICTED_BG.
   return (
@@ -1937,6 +2396,19 @@ function groupMistakes(
  * this function exists to prevent. Display order is untouched: the survivors
  * are printed in the sort's own order, so the sheet still reads „подредени по
  * тежест".
+ *
+ * ADR-009 CONSIDERED A SECOND EXEMPT CLASS AND DID NOT TAKE IT (2026-09-18),
+ * which is recorded here because the next reader will think of it too. A
+ * CHARGED hit — a repeat, founder answer F1 — is on the sheet, so «Грешката на
+ * този урок» below skips it (`withheldHits` filters by `scoredCodes`), and cut
+ * from here it loses its «Защо» and its article. Three measurements said no:
+ * the act and its corrective are still on the page (the «Какво да упражниш»
+ * line's full form is reachable for EXACTLY this state and prints both, §5.6.10
+ * — so it is not a bare verdict); exempting it would evict an ОПАСНА row to
+ * keep an основна one, out of a block whose own heading says „подредени по
+ * тежест"; and it reaches 0 of the 2,434 authored drives (no hit drive carries
+ * more than 2 charged groups). A terminating fault is exempt because nothing
+ * else on the screen can carry it; this act has somewhere else to be.
  */
 function selectShownGroups(groups: ReadonlyArray<MistakeGroup>): MistakeGroup[] {
   const endsTheExam = (g: MistakeGroup): boolean =>

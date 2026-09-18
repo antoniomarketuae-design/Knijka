@@ -101,6 +101,61 @@ describe("readSessionPassed", () => {
     expect(readSessionPassed({ version: 2, passed: true })).toBe(false); // future format
     expect(readSessionPassed({ version: 1, passed: "true" })).toBe(false);
   });
+
+  /**
+   * ADR-009 (doc 92 §5.9) — THE INSTRUMENT MUST KEEP MEASURING THE SAME THING.
+   *
+   * `SimSessionEventsJson.passed` used to mean «изпитен лист + route»; founder
+   * Ruling A added a fourth conjunct to it («and the lesson's own mistake did
+   * not happen»). This function feeds `actualPass`, i.e. the «Изпитът каза …»
+   * tile, `verdictAgrees` («the claim that maps onto the real exam») and the
+   * trend page's «разликата между твоя отговор и този на изпитната логика» — a
+   * claim about THE EXAM, and the exam rung is untouched by the ruling.
+   *
+   * Read as the exam's answer, the new `passed` would count a student who read
+   * his own clean sheet correctly as having got the exam WRONG: 133 practice
+   * drives on this tree finish the route with a clean sheet and are not taken.
+   */
+  it("reads the EXAM verdict — `sheetRoutePassed` — not the new lesson one", () => {
+    // The state ADR-009 created: clean изпитен лист, route finished, lesson not
+    // taken. The student who answered «Да, издържах» was right about the exam.
+    expect(readSessionPassed({ version: 1, passed: false, sheetRoutePassed: true })).toBe(true);
+    // And the other direction: a failed sheet is a failed sheet.
+    expect(readSessionPassed({ version: 1, passed: false, sheetRoutePassed: false })).toBe(false);
+  });
+
+  it("lets the field win over `passed`, in both directions", () => {
+    // Vacuity guard for the case above: if the fallback simply ORed the two,
+    // the assertion above would pass while the field did nothing.
+    expect(readSessionPassed({ version: 1, passed: true, sheetRoutePassed: false })).toBe(false);
+  });
+
+  it("falls back to `passed` on a row written before ADR-009", () => {
+    // Those rows carry no field, and their `passed` IS that same expression —
+    // so this is the same number under its old name, not a guess. Coercing
+    // them to `false` would tell the trend page that every drive a student
+    // made before 2026-09-18 failed the exam.
+    expect(readSessionPassed({ version: 1, passed: true })).toBe(true);
+    expect(readSessionPassed({ version: 1, passed: false })).toBe(false);
+    // A non-boolean is not a reading — fall back rather than coerce.
+    expect(readSessionPassed({ version: 1, passed: true, sheetRoutePassed: "true" })).toBe(true);
+    expect(readSessionPassed({ version: 1, passed: true, sheetRoutePassed: 0 })).toBe(true);
+  });
+
+  it("ignores the lesson's own mistakes — that is a different question", () => {
+    // Deliberately NOT consulted here. Whether the lesson counted is answered
+    // on the screens after this gate (§5.9's reveal line, the result screen's
+    // «Не е взет», the history row), and folding it into `actualPass` is
+    // exactly the revision-1 approach that doc 92 §5.9 withdraws.
+    expect(
+      readSessionPassed({
+        version: 1,
+        passed: false,
+        sheetRoutePassed: true,
+        lessonMistakes: [{ code: "VULNERABLE_PASS_TOO_CLOSE", t: 20.9, charged: false }],
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("CalibrationStore.record", () => {
@@ -128,6 +183,26 @@ describe("CalibrationStore.record", () => {
     const res = await getCalibrationStore().record("u1", "sess-1", {
       predictedPoints: 3,
       predictedPass: false,
+    });
+    expect(res.record).toMatchObject({ actualPoints: 0, actualPass: true });
+  });
+
+  it("stores the EXAM verdict for a lesson that was not taken (ADR-009 §5.9)", async () => {
+    // The row that reaches the trend page and its «сгреши и самата присъда»
+    // clause. The drive: clean изпитен лист, route finished, the lesson's own
+    // mistake committed — so `passed` is false and the exam reading is true.
+    // A stored `actualPass: false` here would count a correct call as a wrong
+    // one on every one of these drives.
+    sessions[0].events = {
+      version: 1,
+      passed: false,
+      sheetRoutePassed: true,
+      lessonMistakes: [{ code: "VULNERABLE_PASS_TOO_CLOSE", t: 20.9, charged: false }],
+    };
+    sessions[0].score = 0;
+    const res = await getCalibrationStore().record("u1", "sess-1", {
+      predictedPoints: 0,
+      predictedPass: true,
     });
     expect(res.record).toMatchObject({ actualPoints: 0, actualPass: true });
   });

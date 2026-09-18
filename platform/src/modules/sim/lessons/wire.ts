@@ -19,6 +19,7 @@
 
 import type { LessonSpec } from "../contracts";
 import {
+  actCopy,
   buildSessionSummary,
   COMMENDATIONS,
   VIOLATIONS,
@@ -42,6 +43,7 @@ import {
 } from "./escalation";
 import { examTerminationFor } from "./exam";
 import { examVariantById } from "./examBank";
+import { foldLessonMistakes } from "./lessonMistake";
 import { scenarioLessonById } from "./scenario/resolve";
 import { lessonById } from "./specs";
 import type {
@@ -112,17 +114,48 @@ export interface WireMicroQuiz {
 
 /**
  * One violation the drive SHOWED and deliberately did not score (the teach /
- * learn-only arms — lessons/types.ts CoachedMistake). CODE AND TIME ONLY, no
+ * learn-only arms — lessons/types.ts CoachedMistake). CODE, TIME AND ACT, no
  * title: the server re-derives the Bulgarian copy from its own catalog, so a
  * client cannot author a sentence into the debrief it will be handed back
- * (ADR-002 — the same reason WireRuleEvent carries no copy). Display/debrief
- * metadata, never the score: the worst a tampered list can do is add an
- * „Учебни моменти" row to the student's own debrief, and OMITTING it merely
- * reproduces the old behaviour — the direction this channel exists to end.
+ * (ADR-002 — the same reason WireRuleEvent carries no copy).
+ *
+ * `detail` IS A SELECTOR, NOT COPY, and that is why it may cross (ADR-009, doc
+ * 92 ADDENDUM 1 item 1). The server looks it up in its OWN `PER_ACT_COPY`, and
+ * a value it does not recognise falls back to the pooled row
+ * (`rules/catalog.ts makeViolation`). So a tampered `detail` can make the
+ * student's own debrief name a different CATALOGUED act — it can never author a
+ * sentence, cite an article or move a point. That is the identical trust level
+ * `WireRuleEvent.detail` has always crossed at, under the identical
+ * `MAX_DETAIL_LEN` cap.
+ *
+ * WHY IT HAD TO CROSS AT ALL. Under ADR-009 the lesson's own mistake is never
+ * charged the first time, so this row is the ONLY record of it — and a row
+ * carrying just the code re-titles to the pooled string. Measured 2026-09-18
+ * over every committed tape at every authored rung: `JUNCTION_SCAN_INCOMPLETE`
+ * is raised on 16 drives, coached on every practice occurrence and charged on
+ * 4 — all four at L4, where ADR-009 does not apply. So on every practice drive
+ * that raises it, the card on the glass said «Непълно оглеждане при знак Б1»
+ * while the stored record said «…на кръстовището»: 100% of that code's practice
+ * traffic. (An earlier wording here read «1,006 drives in which it was coached
+ * on every one», which counted the run rather than the occurrences.)
+ *
+ * TRUST — AND THIS LIST NOW REACHES THE VERDICT, IN BOTH DIRECTIONS. It was
+ * „display/debrief metadata, never the score", and ADR-009 ended that: the fold
+ * reads it, so a tampered list moves the pass. MEASURED by a verifier: a forged
+ * ADDED row naming the lesson's own code turns a clean
+ * `sc-jx-giveway-b1/shadow-correct` into not-passed server-side, score 0, with
+ * the hit synthesised from the forgery. That direction is self-harm only — a
+ * student can refuse their own lesson, never buy one — but it is the verdict and
+ * not a debrief row, and saying otherwise here would be false. OMITTING a row is
+ * the direction that gains something — it
+ * reproduces the pre-ADR-009 pass (§12 R5), pinned by M4a/M4b, and it is the
+ * same trust level as the client-claimed objective flags.
  */
 export interface WireCoachedMistake {
   code: string;
   t: number;
+  /** ADR-009: the act inside the code (`ViolationEvent.detail`), capped like a charged event's. */
+  detail?: string;
 }
 
 export interface FinishLessonWire {
@@ -255,15 +288,15 @@ export function serializeNearMisses(
 
 /**
  * The shown-but-not-charged record → wire. Titles are dropped here on purpose
- * (see WireCoachedMistake); the cap matches the engine's, so a capped state
- * serializes whole.
+ * and the ACT is kept (see WireCoachedMistake); the cap matches the engine's,
+ * so a capped state serializes whole.
  */
 export function serializeCoachedMistakes(
-  coached: ReadonlyArray<{ code: string; t: number }>,
+  coached: ReadonlyArray<{ code: string; t: number; detail?: string }>,
 ): WireCoachedMistake[] {
   return coached
     .slice(0, MAX_COACHED_MISTAKES_WIRE)
-    .map((c) => ({ code: c.code, t: c.t }));
+    .map((c) => ({ code: c.code, t: c.t, ...(c.detail !== undefined ? { detail: c.detail } : {}) }));
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +575,24 @@ function parseCoachedMistakes(value: unknown): WireCoachedMistake[] | null | "in
     const c = item as Record<string, unknown>;
     if (typeof c.code !== "string" || c.code.length > MAX_CODE_LEN) return "invalid";
     if (!isFiniteNum(c.t) || c.t < 0 || c.t > MAX_SESSION_SEC) return "invalid";
-    out.push({ code: c.code, t: c.t });
+    const row: WireCoachedMistake = { code: c.code, t: c.t };
+    // ADR-009 — THE ACT SURVIVES VALIDATION. Same field, same bound, one rule:
+    // `parseRuleEvents` caps a CHARGED event's `detail` at MAX_DETAIL_LEN a few
+    // hundred lines above, and this is the same value on the same trust
+    // footing. An over-long or non-string detail DROPS SILENTLY rather than
+    // rejecting — it is display metadata, exactly like the code this helper
+    // already drops — and the row then re-titles to the pooled catalogue row,
+    // which is what it did for every row before ADR-009.
+    //
+    // THIS IS THE EDIT NOBODY HAD NAMED. Before it, this loop rebuilt every row
+    // as `{ code, t }`, so a `detail` the client sent was gone one step before
+    // anything could read it — and `act-copy-control.test.ts`'s FLIP 5 exists
+    // because a verifier landed the re-title below ALONE and all 36 cases of
+    // that file stayed green.
+    if (typeof c.detail === "string" && c.detail.length <= MAX_DETAIL_LEN) {
+      row.detail = c.detail;
+    }
+    out.push(row);
   }
   return out;
 }
@@ -741,8 +791,10 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
 
   /**
    * The shown-but-not-charged record, TITLED BY OUR OWN CATALOG. The wire
-   * carries code+t only (WireCoachedMistake — ADR-002: a client must not be
-   * able to author debrief copy); an uncatalogued code drops here for the
+   * carries the code, the time and — since ADR-009 — the ACT (`detail`), and
+   * never a title: a `detail` SELECTS a catalogue row, it cannot author one
+   * (ADR-002, and the reason this field is re-titled here rather than trusted).
+   * An uncatalogued code drops here for the
    * parse helper's reason. This is the producer for the SERVER debrief's
    * `DebriefContext.coachedMistakes` — the channel that was documented,
    * filtered and tested while NO live call site fed it, which is how
@@ -750,11 +802,32 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
    * had raised «Превишена скорост» twice (findings ef1eb9cf · a448e5f0 ·
    * 0fde4ec0 · faae7057).
    */
-  const coachedMistakes = (wire.coachedMistakes ?? []).flatMap((c) =>
-    c.code in VIOLATIONS
-      ? [{ code: c.code, titleBg: VIOLATIONS[c.code as ViolationCode].titleBg, t: c.t }]
-      : [],
-  );
+  const coachedMistakes = (wire.coachedMistakes ?? []).flatMap((c) => {
+    if (!(c.code in VIOLATIONS)) return [];
+    const code = c.code as ViolationCode;
+    // ADR-009 — ACT-THEN-POOL, THE SAME TWO STEPS `makeViolation` RUNS for a
+    // charged event, and from the server's OWN catalogue: the client sends a
+    // selector, never a sentence. `wire.ts`'s docblock above refuses a
+    // client-authored `titleBg` on ADR-002 grounds and is right; nothing here
+    // reads one. A row with no detail, or one the catalogue does not declare an
+    // act for, resolves the pooled title exactly as it did before — which is
+    // what keeps every hit-free debrief byte-identical (T3).
+    const titleBg = actCopy(code, c.detail)?.titleBg ?? VIOLATIONS[code].titleBg;
+    return [{ code: c.code, titleBg, t: c.t, ...(c.detail !== undefined ? { detail: c.detail } : {}) }];
+  });
+
+  /**
+   * ADR-009 — THE SAME FOLD THE CLIENT RAN, over the server's own rebuilt
+   * records (`rebuildRuleEvents` above and the coached list beside it). The
+   * server recompiles the rung from its id, so its `lessonMistakeTargets` are
+   * the client's; `engine.ts buildLessonResult` and this line are the only two
+   * places `passed` is computed, and they must call one function or the stored
+   * verdict starts disagreeing with the screen.
+   *
+   * IT RECOMPUTES THE TITLE from `(code, t, detail)` — doc 92 §12 R5 — and
+   * never trusts one the client wrote, because the client does not send one.
+   */
+  const lessonMistakes = foldLessonMistakes(lesson, events, coachedMistakes);
 
   const result: LessonResult = {
     lessonId: lesson.id,
@@ -762,13 +835,16 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
     objectives,
     completedAll,
     aborted: wire.aborted,
-    passed: summary.passed && completedAll && !wire.aborted,
+    // ADR-009: the same conjunct as `engine.ts buildLessonResult`, from the
+    // same fold — inert on exam rungs, sandboxes and untargeted lessons.
+    passed: summary.passed && completedAll && !wire.aborted && lessonMistakes.length === 0,
     score: summary.score.totalPoints,
     effectiveScore: effectiveTotalPoints,
     escalations: escalated,
     durationSec: (wire.finishedAtMs - wire.startedAtMs) / 1000,
     ...(examTermination !== null ? { examTermination } : {}),
     ...(coachedMistakes.length > 0 ? { coachedMistakes } : {}),
+    ...(lessonMistakes.length > 0 ? { lessonMistakes } : {}),
   };
 
   return { status: "ok", lesson, wire, events, result };

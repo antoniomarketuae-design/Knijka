@@ -68,6 +68,108 @@ export interface SimSessionEventsJson {
    * official score.
    */
   rubricStars?: 1 | 2 | 3;
+  /**
+   * ADR-009 (additive, optional): the mistakes THIS LESSON EXISTS TO TEACH that
+   * the student made anyway — the whole reason `passed` above is false on a
+   * practice rung with a clean изпитен лист (founder Ruling A, 2026-09-17; doc
+   * 92 §5.8).
+   *
+   * NO `titleBg`, DELIBERATELY. The history screen retitles from the violation
+   * catalogue at render time (`historyLessonMistakes.ts`), on exactly the terms
+   * `historyMistakes.ts` already states for a charged event: a stored payload
+   * may LIST what happened, never name it — `detail` selects a row of an
+   * AUTHORED per-act table and an unrecognised value falls back to the pooled
+   * one (ADR-002). A title denormalised into this column would also freeze the
+   * catalogue's wording on the day of the drive, which is the shape that shipped
+   * «Удар в друго превозно средство ×2» over a drive that struck a person.
+   *
+   * ABSENT, NOT EMPTY, on every exam rung, every sandbox and every clean
+   * practice drive — so a row written before ADR-009 and a clean row written
+   * after it are the same shape, and no reader has to tell «[]» from «never
+   * measured» (the same discipline `LessonResult.lessonMistakes` keeps).
+   */
+  lessonMistakes?: StoredLessonMistake[];
+  /**
+   * THE PRE-ADR-009 READING OF `passed`, STORED EXPLICITLY (doc 92 §5.9):
+   * `summary.passed && completedAll && !aborted` — the изпитен лист plus the
+   * route, with the lesson rule left out.
+   *
+   * WHY IT EXISTS. `passed` above used to mean exactly that expression, and
+   * ADR-009 added a fourth conjunct to it. Self-calibration measures whether a
+   * student can read THE EXAM (`modules/learning/calibration.ts:227-230`, the
+   * trend page's own legend), and the exam rung is untouched by Ruling A — so
+   * the instrument has to keep reading the exam verdict rather than silently
+   * change what it measures the day the lesson rule landed. It is written on
+   * EVERY row, so «the field is missing» means «written before 2026-09-18» and
+   * nothing else; `calibrationStore.readSessionPassed` falls back to `passed`
+   * for those rows, where the two are the same number by construction.
+   */
+  sheetRoutePassed?: boolean;
+  /**
+   * THE ИЗПИТЕН ЛИСТ ALONE — `result.summary.passed`, with neither the route
+   * nor the lesson rule folded in (doc 92 §5.8).
+   *
+   * WHY A THIRD BOOLEAN AND NOT A DERIVATION FROM THE OTHER TWO. The history
+   * row has to answer «is this drive „Не е взет" or „Неиздържан"?», and the
+   * result screen answers it by asking the sheet FIRST (`sessionVerdict`: a
+   * failed лист is «Неиздържан» whatever else happened). `sheetRoutePassed`
+   * cannot stand in: it folds `completedAll`, and 425 of the 654 hit drives on
+   * this tree are hit + clean sheet + route unfinished, where gating the row on
+   * it would break it in the other direction. `passed` is now the LESSON
+   * verdict. So the sheet's own answer is stored, once, on every row.
+   *
+   * ABSENT means «written before 2026-09-18» and nothing else — the fold reads
+   * `!== false`, so an old row keeps the label it was given on the day (doc 92
+   * §6: stored history is not regraded).
+   */
+  sheetPassed?: boolean;
+}
+
+/**
+ * One stored lesson-mistake row: the code, when it happened, and whether any
+ * occurrence of it reached the изпитен лист. `LessonMistakeHit` minus the
+ * retrieved copy — see `SimSessionEventsJson.lessonMistakes` for why the title
+ * is not here.
+ */
+export interface StoredLessonMistake {
+  code: string;
+  t: number;
+  /** Some occurrence was charged — under ADR-009 that can only be a repeat. */
+  charged: boolean;
+  /** The act inside the code (`ViolationEvent.detail`) — a catalogue selector. */
+  detail?: string;
+}
+
+/**
+ * Shape-check a stored `lessonMistakes` array, dropping malformed ENTRIES
+ * rather than refusing the whole payload (doc 92 §5.8).
+ *
+ * Per-entry rather than all-or-nothing because the alternative punishes the
+ * student twice: a single bad row would make `parseSimSessionEvents` return
+ * null for the session, and an unreadable payload takes the mistake list, the
+ * near-miss stat and the training score with it. One dropped row costs one line
+ * of the reason list.
+ *
+ * `detail` is kept only when it is a string and is NOT length-capped here. It
+ * reaches exactly one consumer — `actCopy(code, detail)`, a lookup in our own
+ * authored table — so a tampered or absurd value resolves the pooled row and
+ * nothing else; the write side already caps it at `wire.ts MAX_DETAIL_LEN`, and
+ * a second, different cap in the read path would silently disagree with it.
+ */
+function parseStoredLessonMistakes(value: unknown): StoredLessonMistake[] {
+  if (!Array.isArray(value)) return [];
+  const rows: StoredLessonMistake[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const o = raw as Record<string, unknown>;
+    if (typeof o.code !== "string" || o.code.length === 0) continue;
+    if (typeof o.t !== "number" || !Number.isFinite(o.t)) continue;
+    if (typeof o.charged !== "boolean") continue;
+    const row: StoredLessonMistake = { code: o.code, t: o.t, charged: o.charged };
+    if (typeof o.detail === "string") row.detail = o.detail;
+    rows.push(row);
+  }
+  return rows;
 }
 
 /**
@@ -119,6 +221,24 @@ export function parseSimSessionEvents(value: unknown): SimSessionEventsJson | nu
   // S1: rubric stars — strict members only (1 | 2 | 3).
   if (o.rubricStars === 1 || o.rubricStars === 2 || o.rubricStars === 3) {
     parsed.rubricStars = o.rubricStars;
+  }
+  // ADR-009: the lesson's own mistakes. Assigned only when a row SURVIVED the
+  // shape check, so «every entry was malformed» and «there were none» arrive at
+  // the history screen as the same absent field rather than as an empty array
+  // that would read as a measured fact.
+  const lessonMistakes = parseStoredLessonMistakes(o.lessonMistakes);
+  if (lessonMistakes.length > 0) {
+    parsed.lessonMistakes = lessonMistakes;
+  }
+  // ADR-009 §5.9: the exam-only reading of the verdict. Absent on every row
+  // written before 2026-09-18 — see the field's declaration.
+  if (typeof o.sheetRoutePassed === "boolean") {
+    parsed.sheetRoutePassed = o.sheetRoutePassed;
+  }
+  // ADR-009 §5.8: the изпитен лист on its own, for the history row's word.
+  // Same treatment and the same dating rule as the field above it.
+  if (typeof o.sheetPassed === "boolean") {
+    parsed.sheetPassed = o.sheetPassed;
   }
   return parsed;
 }

@@ -590,3 +590,223 @@ describe("coachStep counts through policy.recordEncounter", () => {
     );
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADR-009 T-COACH — THE LESSON'S OWN MISTAKE IS TAUGHT UNDER ITS OWN CODE
+   (founder Ruling A, 2026-09-17; spec doc 92 §3.4b c and §8.1 T-coach; the
+   critic's gap 2).
+
+   THE DEFECT THIS CLOSES, in the product's own words. The free teach is keyed
+   by TOPIC — one mini-lesson per situation, not per code, and the block at the
+   top of `coachStep` argues at length for why. That argument holds for an
+   INCIDENTAL fault and fails for the lesson's own: a target code whose topic had
+   already been spent by a different code was graded ON SIGHT, with наказателни
+   точки and NO card, on the one act the student was brought to this lesson to
+   understand. Measured across the bank: 64 of the 105 lessons with targets share
+   a topic between a target and a non-target code.
+
+   Under Ruling A that first occurrence must be taught — 0 points, and a card —
+   whatever else spent the topic. So a FOURTH counter, `teach-own:<code>`, keyed
+   on the code, and reachable only when the engine stamps
+   `CoachInput.lessonMistakeTarget`.
+
+   WHY THIS CANNOT RE-ISSUE THE 2026-08-19 FALSE CERTIFICATE, which is the
+   objection the topic key exists to answer. Keying the teach per code once turned
+   `sc-ln-turn-lane-arrows` with a late two-lane swerve from FAILED to PASSED.
+   Under ADR-009 the own-code teach buys a CARD and never a pass:
+   `foldLessonMistakes` refuses the pass on any target hit. Measured on that very
+   tape by this lane's 2,434-drive census — 9 т. «Неиздържан» → 6 т. «Не е взет».
+   The last block below drives the sequence and states the arithmetic.
+
+   THE LADDER IS UNTOUCHED (founder answer F1): `gradedKey` never sees this flag,
+   so a genuine repeat costs exactly what it costs today.
+
+   M12 (doc 92 §8.5): disable the own key and (i) and (iv) go red.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** `asDriven`, plus the flag the engine stamps from `lessonMistakeTargets`. */
+function asTarget(code: string, detail?: string): CoachInput {
+  return { ...asDriven(code, detail), lessonMistakeTarget: true };
+}
+
+describe("ADR-009: a target's FIRST occurrence is taught under its own code", () => {
+  it("(i) incidental first, then the target of the SAME topic -> still taught, still free", () => {
+    // The 64-lesson case. `LANE_CHANGE_WITHOUT_INDICATOR` spends
+    // `ev-lane-change`'s single lesson; `LANE_CHANGE_WITHOUT_MIRROR_CHECK` is
+    // the act this lesson teaches and arrives with the topic already gone.
+    // Before ADR-009 it was graded on sight with no card.
+    expect(scenarioForCode("LANE_CHANGE_WITHOUT_INDICATOR")).toBe(
+      scenarioForCode("LANE_CHANGE_WITHOUT_MIRROR_CHECK"),
+    );
+    const first = coachStep({}, asDriven("LANE_CHANGE_WITHOUT_INDICATOR"));
+    expect(first.decision).toMatchObject({ mode: "teach", scored: false });
+    const target = coachStep(first.encounters, asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"));
+    expect(target.decision).toMatchObject({ mode: "teach", scored: false });
+    // THE CONTROL IN THE SAME BREATH — without the flag this is the old answer,
+    // so the assertion above cannot be a constant.
+    const without = coachStep(first.encounters, asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK"));
+    expect(without.decision).toMatchObject({ mode: "grade", scored: true });
+  });
+
+  it("(ii) the target first, then an incidental of the same topic -> graded, as today", () => {
+    // The direction that must NOT move: the topic still counts on a target, so
+    // an incidental code arriving after it finds the budget spent and grades.
+    // This is what keeps «Incidental mistakes: unchanged, byte-identical» true.
+    const target = coachStep({}, asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"));
+    expect(target.decision).toMatchObject({ mode: "teach", scored: false });
+    const incidental = coachStep(target.encounters, asDriven("LANE_CHANGE_WITHOUT_INDICATOR"));
+    expect(incidental.decision).toMatchObject({
+      mode: "grade",
+      scored: true,
+      penaltyMultiplier: 1,
+    });
+    // …and identically to the pre-ADR-009 sequence, where the first code was
+    // taught without any flag. Same budget, same answer.
+    const before = coachStep(
+      coachStep({}, asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK")).encounters,
+      asDriven("LANE_CHANGE_WITHOUT_INDICATOR"),
+    );
+    expect(incidental.decision).toEqual(before.decision);
+  });
+
+  it("(iii) the target twice -> the second grades at the BASE multiplier (F1)", () => {
+    // The repeat ladder is not a teach budget and does not see the flag. The
+    // second occurrence is a new act: it grades, at ×1.0, because nothing of
+    // this code has been GRADED before — `gradedKey` counts gradings, not
+    // occurrences. The third escalates, exactly as any other repeat.
+    let enc: Record<string, number> = {};
+    const decisions: CoachDecision[] = [];
+    for (let i = 0; i < 3; i++) {
+      const step = coachStep(enc, asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"));
+      enc = step.encounters;
+      decisions.push(step.decision);
+    }
+    expect(decisions.map((d) => d.mode)).toEqual(["teach", "grade", "grade"]);
+    // …and that is the SAME ladder an untargeted code walks, which is the whole
+    // content of founder answer F1.
+    let plain: Record<string, number> = {};
+    const plainDecisions: CoachDecision[] = [];
+    for (let i = 0; i < 3; i++) {
+      const step = coachStep(plain, asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK"));
+      plain = step.encounters;
+      plainDecisions.push(step.decision);
+    }
+    expect(decisions.map((d) => d.penaltyMultiplier)).toEqual(
+      plainDecisions.map((d) => d.penaltyMultiplier),
+    );
+  });
+
+  it("(iv) TWO targets of one topic -> both taught, neither charged", () => {
+    // `sc-rb-lane-choice` carries four target codes and two of them share a
+    // topic. Under the topic key the second was charged on sight; under Ruling A
+    // neither first occurrence may cost a point.
+    const a = coachStep({}, asTarget("LANE_CHANGE_WITHOUT_INDICATOR"));
+    const b = coachStep(a.encounters, asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"));
+    expect(a.decision).toMatchObject({ mode: "teach", scored: false });
+    expect(b.decision).toMatchObject({ mode: "teach", scored: false });
+    // The CONTROL: without the flags, the second is graded — which is the
+    // behaviour this case exists to change, so it must be shown to differ.
+    const a2 = coachStep({}, asDriven("LANE_CHANGE_WITHOUT_INDICATOR"));
+    const b2 = coachStep(a2.encounters, asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK"));
+    expect(b2.decision).toMatchObject({ mode: "grade", scored: true });
+  });
+
+  it("(v) examMode and learnOnly ignore the flag entirely", () => {
+    // Ruling A exempts the exam rung, and the THEO-3 sandbox is its mirror. Both
+    // are decided before the teach budget is consulted, so the own key must not
+    // even be written — a counter nobody reads is the dead-predicate shape this
+    // programme has measured 51 times in 82 repairs.
+    const exam = coachStep({}, asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"), { examMode: true });
+    expect(exam.decision).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+    expect(Object.keys(exam.encounters).filter((k) => k.startsWith("teach-own:"))).toEqual([]);
+
+    const sandbox = coachStep({}, asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"), {
+      learnOnly: true,
+    });
+    expect(sandbox.decision).toMatchObject({ scored: false });
+    expect(Object.keys(sandbox.encounters).filter((k) => k.startsWith("teach-own:"))).toEqual([]);
+
+    // …and both are byte-identical to the same call without the flag.
+    expect(exam.decision).toEqual(
+      coachStep({}, asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK"), { examMode: true }).decision,
+    );
+    expect(sandbox.decision).toEqual(
+      coachStep({}, asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK"), { learnOnly: true }).decision,
+    );
+  });
+
+  it("(vi) the flag ABSENT is byte-identical over every catalogued code", () => {
+    // The widest control this file can run: `lessonMistakeTarget` is optional,
+    // and every caller that does not stamp it — every exam rung, every sandbox,
+    // every untargeted lesson, and every other case in this file — must get the
+    // decision AND the counters it always got. The encounters are asserted too,
+    // because a stray key would change the NEXT step rather than this one.
+    for (const code of Object.keys(VIOLATIONS)) {
+      const before = coachStep({}, asDriven(code));
+      const explicitlyFalse = coachStep({}, { ...asDriven(code), lessonMistakeTarget: false });
+      expect(explicitlyFalse.decision, code).toEqual(before.decision);
+      expect(explicitlyFalse.encounters, code).toEqual(before.encounters);
+      expect(
+        Object.keys(before.encounters).filter((k) => k.startsWith("teach-own:")),
+        code,
+      ).toEqual([]);
+    }
+  });
+
+  it("the own key is the FOURTH counter — the other three are untouched", () => {
+    // Stated as a shape, because the risk is not that the new key is missing but
+    // that it replaces one of the three this file's header argues for.
+    const step = coachStep({}, asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"));
+    const keys = Object.keys(step.encounters).sort();
+    const plain = Object.keys(
+      coachStep({}, asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK")).encounters,
+    );
+    for (const k of plain) expect(keys, `${k} must survive`).toContain(k);
+    expect(keys.filter((k) => k.startsWith("teach-own:"))).toEqual([
+      "teach-own:LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+    ]);
+    // Keyed on the CODE, not on the act: two acts of one code are one mistake to
+    // teach. (The ×1.5/×2 ladder is the half that splits by act — `encounterKey`
+    // — and it is deliberately not mirrored here.)
+    const withAct = coachStep({}, asTarget("ILLEGAL_STOP_IN_BAN_ZONE", "law-alongside"));
+    expect(Object.keys(withAct.encounters).filter((k) => k.startsWith("teach-own:"))).toEqual([
+      "teach-own:ILLEGAL_STOP_IN_BAN_ZONE",
+    ]);
+  });
+});
+
+describe("ADR-009: the own-code teach cannot re-issue the 2026-08-19 false certificate", () => {
+  it("sc-ln-turn-lane-arrows: two of four faults now teach, and the drive still loses", () => {
+    // The exact four decisions of „mistake-late-two-lanes" (t=8.23 and t=9.72,
+    // both codes on each tick), with BOTH codes flagged — which is what the
+    // template derives: the demo's own `codeRefs` name them.
+    const seq = [
+      asTarget("LANE_CHANGE_WITHOUT_INDICATOR"),
+      asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"),
+      asTarget("LANE_CHANGE_WITHOUT_INDICATOR"),
+      asTarget("LANE_CHANGE_WITHOUT_MIRROR_CHECK"),
+    ];
+    let enc: Record<string, number> = {};
+    const out: CoachDecision[] = [];
+    for (const v of seq) {
+      const step = coachStep(enc, v);
+      enc = step.encounters;
+      out.push(step.decision);
+    }
+    // TWO scored, where the pre-ADR-009 answer was three — and three is what the
+    // case above this one still asserts for the unflagged sequence. This IS the
+    // drive the 2026-08-19 note calls the false certificate (6 т. against an
+    // allowance of 9), reached here on purpose.
+    expect(out.map((d) => d.mode)).toEqual(["teach", "teach", "grade", "grade"]);
+    expect(out.filter((d) => d.scored)).toHaveLength(2);
+    // WHAT MAKES IT NOT A CERTIFICATE THIS TIME, and the reason this file may
+    // hand the teach budget back per code without reopening that defect: the
+    // pass is no longer decided here. `lessons/lessonMistake.ts`'s
+    // `foldLessonMistakes` refuses it on any target hit, and both of these codes
+    // are hits. Measured end to end by this lane's census on the real tape: 9 т.
+    // «Неиздържан» → 6 т. «Не е взет». The verdict itself is pinned in
+    // `lessons/__tests__/lesson-mistake-verdict.test.ts`, which is where a claim
+    // about `passed` belongs; this comment records WHY the trade is sound.
+    expect(out.filter((d) => d.penaltyMultiplier > 1)).toHaveLength(0);
+  });
+});

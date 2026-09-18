@@ -36,15 +36,26 @@
  *
  *   L1 training  mistake-stop-on-pocket   scored []  coached [BAN_ZONE]
  *                                         sc-pkbs-past-zone REFUSED
+ *                                         ADR-009: НЕ Е ВЗЕТ, uncharged hit
  *   L4 exam      mistake-stop-on-pocket   scored [BAN_ZONE] osnovni 3
  *                                         sc-pkbs-past-zone REFUSED
  *   L1 training  8 s held rest            coached only — the free lesson
- *   L1 training  11 s held rest           coached AND scored, `regrade: true`
+ *   L1 training  11 s held rest           coached only; the re-bill is DROPPED
+ *                                         …targets stripped: scored, `regrade`
  *
  * So the fail path DOES bite, on both channels, and the escalation the debrief
  * promises is real: `BAN_ZONE_REST_REGRADE_SEC` (6 s on top of the 4 s
  * `banZoneStopRestSec`) turns a held rest into the charge the free mini-lesson
  * consumed. None of it was pinned anywhere. Now it is.
+ *
+ * WHAT ADR-009 CHANGED HERE, 2026-09-18 (founder Ruling A, doc 92 §3.4b b/g and
+ * §8.1 T4). Stopping on the spirka is the mistake THIS lesson exists to teach,
+ * so two things move and both are argued in §3's own block: the re-bill of that
+ * one continuing rest is dropped, because the ruling forbids the points it was
+ * reaching for; and the drive is NOT PASSED, which is a stronger answer to
+ * `sc-pk-busstop-ban:105f805c` than three наказателни точки were. The re-grade
+ * machinery itself stays measured through a strip control that removes only
+ * `lessonMistakeTargets` and watches the −3 come back.
  *
  * THE HALF THIS FILE DELIBERATELY DOES NOT ASSERT, and it is REPORTED, NOT
  * PATCHED. The card the student reads on this map is the POOLED
@@ -81,7 +92,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import type { LessonObjective } from "../../contracts";
+import type { LessonObjective, LessonSpec } from "../../contracts";
 import { recordScriptedDrive, type DriveScript } from "../../traces/recorder";
 import {
   recordScPkBusstopBanDrive,
@@ -125,6 +136,10 @@ interface DriveOutcome {
   score: { totalPoints: number; osnovniPoints: number; osnovniCount: number };
   /** Was the charge the RE-GRADE (the second bill) rather than the first? */
   regrades: boolean[];
+  /** ADR-009: the lesson's own mistakes, as `foldLessonMistakes` read them. */
+  lessonMistakes: { code: string; charged: boolean }[];
+  /** ADR-009: the whole verdict — «взет» is what this drill is really about. */
+  passed: boolean;
 }
 
 /**
@@ -154,7 +169,23 @@ function playRecorded(name: ScPkBusstopBanTraceName, level: ScenarioLevel): Driv
  * Nothing is written: `recordScriptedDrive` returns a recording, and the
  * committed traces are untouched by anything here.
  */
-function playHeldRest(restSec: number): DriveOutcome {
+type LessonTweak = (lesson: LessonSpec) => LessonSpec;
+
+/**
+ * ADR-009's own control. `lessonMistakeTargets` is the ONE field the ruling
+ * reads (`lessonMistake.ts lessonMistakeTargetCodes`), so removing it from a
+ * COPY of the compiled lesson reproduces the pre-ADR-009 product exactly — the
+ * rollback the spec's dead-predicate ledger describes, run here rather than
+ * asserted. Nothing else about the drill moves, which is what makes the pair of
+ * answers attributable to the ruling and to nothing else.
+ */
+const stripLessonMistakeTargets: LessonTweak = (lesson) => {
+  const copy = { ...lesson };
+  delete (copy as { lessonMistakeTargets?: unknown }).lessonMistakeTargets;
+  return copy;
+};
+
+function playHeldRest(restSec: number, tweak?: LessonTweak): DriveOutcome {
   const script: DriveScript = {
     steps: [
       {
@@ -180,7 +211,10 @@ function playHeldRest(restSec: number): DriveOutcome {
       { kind: "pause", sec: 1.5, brake: true },
     ],
   };
-  let session: LessonSessionState = createLessonSession(compileScenario(SC_PK_BUSSTOP_BAN, 1));
+  const compiled = compileScenario(SC_PK_BUSSTOP_BAN, 1);
+  let session: LessonSessionState = createLessonSession(
+    tweak === undefined ? compiled : tweak(compiled),
+  );
   recordScriptedDrive(district, script, {
     scenarioId: "sc-pk-busstop-ban",
     kind: "mistake",
@@ -211,6 +245,11 @@ function finish(session: LessonSessionState): DriveOutcome {
     regrades: result.summary.mistakes
       .filter((m) => (m as { code?: string }).code === "ILLEGAL_STOP_IN_BAN_ZONE")
       .map((m) => (m as { regrade?: boolean }).regrade === true),
+    lessonMistakes: (result.lessonMistakes ?? []).map((h) => ({
+      code: h.code,
+      charged: h.charged,
+    })),
+    passed: result.passed,
   };
 }
 
@@ -240,6 +279,16 @@ describe("§1 L1–L3 — the free mini-lesson does not buy the certificate", ()
         // is withdrawn. This is the half nothing measured: a free offence is not
         // a forgotten one.
         expect(out.done[PAST_ZONE]).toBe(false);
+        // ADR-009 (founder Ruling A, doc 92 §8.1 T4) — AND THE LESSON IS NOT
+        // TAKEN. Stopping on the spirka is the mistake THIS lesson exists to
+        // teach (`lessonMistakeTargets` derives it from the ❌ demo's own
+        // `codeRefs`), so the free first encounter buys a card and no longer
+        // buys a pass. The sheet is untouched: 0 т. above, and this row is
+        // `charged: false` — the ruling's «no exam points the first time».
+        expect(out.lessonMistakes).toEqual([
+          { code: "ILLEGAL_STOP_IN_BAN_ZONE", charged: false },
+        ]);
+        expect(out.passed).toBe(false);
       });
     }
   }
@@ -286,7 +335,7 @@ describe("§2 L4 examMode — «Спиране в забранена зона» 
 //      изпитния лист.»
 // ---------------------------------------------------------------------------
 
-describe("§3 the escalation is real — a held rest reaches the изпитен лист", () => {
+describe("§3 the escalation is real — and ADR-009 withholds it on this lesson's OWN act", () => {
   it("8 s of standing on the spirka: taught, and only taught", () => {
     // Past `banZoneStopRestSec` (4 s) so the first bill exists, short of the
     // 4 + `BAN_ZONE_REST_REGRADE_SEC` (10 s) that re-grades it. This is the
@@ -296,29 +345,78 @@ describe("§3 the escalation is real — a held rest reaches the изпитен 
     expect(out.scored).toEqual([]);
     expect(out.score.totalPoints).toBe(0);
     expect(out.done[PAST_ZONE]).toBe(false);
+    // ADR-009: free of points, and not free of consequence.
+    expect(out.passed).toBe(false);
   });
 
-  it("11 s: the student was shown the rule and went on standing — now it is billed", () => {
-    // The re-grade is a SECOND episode with a strictly larger threshold, marked
-    // `regrade: true`, which `applyTick`'s `alreadyCharged` guard drops wherever
-    // the code was already charged. Here it was not (the free lesson took the
-    // first bill), so it lands — and lands ONCE.
+  /**
+   * THE PREMISE OF THE NEXT CASE CHANGED ON 2026-09-18, AND IT CHANGED FOR THE
+   * REASON THIS FILE'S OWN HEADER ARGUES FOR.
+   *
+   * It was written to prove the debrief's promise — «Първата среща не се
+   * наказва … При повторение вече влиза в изпитния лист» — was not a lie, by
+   * showing that an 11 s rest reached the изпитен лист through
+   * `BAN_ZONE_REST_REGRADE_SEC`. But that re-bill is not a second offence: it
+   * is the FIRST one billed late, marked `regrade: true`, and it exists only to
+   * reach the charge the free mini-lesson consumed.
+   *
+   * ADR-009 (founder Ruling A) forbids exactly that charge on the mistake the
+   * lesson exists to teach — «NO exam points are taken for that first
+   * occurrence» — and stopping on the spirka IS this drill's own act. So the
+   * re-bill is dropped by `lessons/engine.ts`'s regrade guard, and what the
+   * re-bill protected — a drive reaching its debrief looking clean — is now
+   * carried by «Не е взет» and the reason block, which is a stronger answer to
+   * `sc-pk-busstop-ban:105f805c` than three наказателни точки were.
+   *
+   * WHAT IS STILL PROMISED, AND STILL TRUE. The promise was never about the
+   * re-bill: a genuine repeat EPISODE — a second rest after the card — grades
+   * on the ×1.5/×2 ladder exactly as before (founder answer F1, 2026-09-17).
+   * The teach card says so in its own words: `lessonMistake.ts`'s `lesson-first`
+   * stake sentence reads «В наказателните точки не влиза; при повторение: …».
+   *
+   * SO THE MECHANISM IS NOT LEFT UNMEASURED. The case after it re-drives the
+   * SAME script against a copy of the lesson with `lessonMistakeTargets`
+   * removed, and the −3 reappears with `regrade: true`. That control is what
+   * keeps `BAN_ZONE_REST_REGRADE_SEC` gated: if the re-grade ever stopped firing
+   * at all, the control would red while the ADR-009 case stayed green — and a
+   * pair that can only ever agree is not a measurement.
+   */
+  it("11 s: the re-bill is DROPPED, because this is the lesson's own mistake", () => {
     const out = playHeldRest(11);
+    expect(out.coached).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
+    expect(out.scored).toEqual([]);
+    expect(out.score.totalPoints).toBe(0);
+    expect(out.regrades).toEqual([]);
+    // The two halves of Ruling A in one place: no points, and no pass.
+    expect(out.lessonMistakes).toEqual([
+      { code: "ILLEGAL_STOP_IN_BAN_ZONE", charged: false },
+    ]);
+    expect(out.passed).toBe(false);
+  });
+
+  it("…and it is ADR-009 that drops it: strip the targets and the −3 comes back", () => {
+    const out = playHeldRest(11, stripLessonMistakeTargets);
     expect(out.coached).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(out.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(out.score).toEqual({ totalPoints: 3, osnovniPoints: 3, osnovniCount: 1 });
     // …and the sheet says WHICH bill it is, so «При повторение» is a fact about
     // the event and not a hope about the copy.
     expect(out.regrades).toEqual([true]);
+    // With no targets there is no hit, so this drive's verdict is the
+    // pre-ADR-009 one. It still fails — on the withdrawn banner — and the two
+    // refusals are independent, which is what §6 exists to say.
+    expect(out.lessonMistakes).toEqual([]);
   });
 
   it("standing three times as long still costs ONE act (no fifteen-row runaway)", () => {
     // `STANDING_DUTY_MAX_BILLS`'s discipline, on this code: the re-grade cannot
-    // produce a third bill, so the sheet a student who freezes for half a minute
-    // reads is the same 3 точки Наредба № 38 prices the offence at.
-    const out = playHeldRest(30);
-    expect(out.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
-    expect(out.score.osnovniPoints).toBe(3);
+    // produce a third bill. Under ADR-009 the lesson's own act reaches the sheet
+    // at ZERO bills; the strip control shows the ceiling underneath is still the
+    // same 3 точки Наредба № 38 prices the offence at, once.
+    expect(playHeldRest(30).scored).toEqual([]);
+    const control = playHeldRest(30, stripLessonMistakeTargets);
+    expect(control.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
+    expect(control.score.osnovniPoints).toBe(3);
   });
 });
 
@@ -414,6 +512,18 @@ describe("§6 the demand is load-bearing — strip it and the drill certifies it
       // reads `false` too, §1 has stopped measuring anything and both must be
       // re-derived before either is believed.
       expect(out.done[PAST_ZONE]).toBe(true);
+      // ADR-009 — AND THE DRIVE IS STILL NOT PASSED, through a completely
+      // different mechanism. That is worth pinning here rather than assuming:
+      // the two refusals are independent, so this section can go on being the
+      // mutation it was written to be. `requireRestClean` is the BANNER's half
+      // and `lessonMistakeTargets` is the LESSON's; strip the first and the
+      // student collects a certificate he did not earn, but the lesson he came
+      // for still reads «Не е взет» with the act named. Nothing about this
+      // weakens the row: the defect §6 demonstrates is still a defect.
+      expect(out.lessonMistakes).toEqual([
+        { code: "ILLEGAL_STOP_IN_BAN_ZONE", charged: false },
+      ]);
+      expect(out.passed).toBe(false);
     });
   }
 

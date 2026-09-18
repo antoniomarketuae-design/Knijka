@@ -154,17 +154,42 @@ describe("sc-follow-tailgater · the audit's wrong leg reaches the изпите�
     expect(out.engine.some((e) => e.code === "SPEEDING_DANGEROUS")).toBe(false);
   });
 
-  it("…and the SESSION charges it — the half the frame photographed as empty", () => {
-    // The frame's whole complaint: the reducer saw it, the sheet never did.
-    expect(out.billed.map((e) => e.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
-    // It is the re-grade that lands, not the first bill — the first is still
-    // the free mini-lesson.
+  /**
+   * ============================================================
+   * RE-AIMED BY ADR-009, NOT RELAXED (2026-09-18, doc 92 §3.4b b and §8.3).
+   *
+   * This test used to assert `billed === ["SPEEDING_OVER_LIMIT"]`: the re-grade
+   * six driving seconds after the card was the charge that closed the frame's
+   * complaint, and it landed inside the gradeable window.
+   *
+   * `SPEEDING_OVER_LIMIT` is one of this lesson's OWN mistakes — its demo is
+   * «Гузно ускоряване» (`lesson-mistake-targets.fixture.json`
+   * `sc-follow-tailgater@L1`) — and under founder Ruling A a target's first
+   * occurrence is always taught and the automatic re-bill of that same
+   * continuing episode is DROPPED. So the sheet is deliberately empty here, and
+   * the thing that used to cost one второстепенна точка now costs the whole
+   * lesson (the next test).
+   *
+   * THE FRAME'S COMPLAINT IS STILL WHAT IS PINNED, and it has to be, or this
+   * file has quietly retired the row it exists for: «0 наказателни точки · 0
+   * опасни · 0 основни · 0 второстепенни · НЕИЗДЪРЖАН, resting on nothing but
+   * the route». The reducer saw it twice (the test above), the coach took the
+   * first as the free mini-lesson, and the VERDICT is where the answer now is.
+   * A repeat on a LATER episode still bills exactly as today (founder answer
+   * F1) — `needlessStopEnabled`'s five rests below are the measured proof.
+   * ============================================================
+   */
+  it("…and the SESSION takes no point for it: a target's re-bill is dropped (ADR-009)", () => {
+    expect(out.billed).toEqual([]);
+    // Taught at the FIRST occurrence, which is the arm the ruling protects.
     const speeding = out.engine.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
-    expect(out.billed[0]!.t).toBeCloseTo(speeding[1]!.t, 5);
-    // …AND NOTHING ELSE COULD HAVE BILLED IT. `speedingRepeatSec` is 20 s and
-    // this drive is shorter than that, which is the whole reason the frame was
-    // empty. So this charge exists because of the re-grade or not at all —
-    // the assertion above is directional, not a coincidence of cadence.
+    const coached = out.result.coachedMistakes ?? [];
+    expect(coached.map((c) => c.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(coached[0]!.t).toBeCloseTo(speeding[0]!.t, 5);
+    // …AND NOTHING ELSE COULD HAVE BILLED IT EITHER. `speedingRepeatSec` is
+    // 20 s and this drive is shorter than that, so the dropped re-grade was the
+    // only charge available — the empty sheet above is ADR-009's doing and not
+    // a cadence accident.
     expect(out.driveEndSec).toBeLessThan(speeding[0]!.t + 20);
   });
 
@@ -180,21 +205,35 @@ describe("sc-follow-tailgater · the audit's wrong leg reaches the изпите�
     expect(out.session.endedAtSec === null || out.session.endedAtSec > regrade.t).toBe(true);
   });
 
-  it("the Наредба № 38 sheet reads ONE второстепенна, one наказателна точка", () => {
+  it("the Наредба № 38 sheet stays empty — ADR-009 moves no point, in either direction", () => {
     const s = out.result.summary.score;
-    expect(s.vtorostepenniCount).toBe(1);
-    expect(s.vtorostepenniPoints).toBe(1);
+    expect(s.vtorostepenniCount).toBe(0);
     expect(s.osnovniCount).toBe(0);
     expect(s.opasniCount).toBe(0);
-    expect(s.totalPoints).toBe(1);
+    expect(s.totalPoints).toBe(0);
+    // «в допустимото по изпитния лист» — which is exactly why the verdict has
+    // to say something the sheet cannot.
+    expect(out.result.summary.passed).toBe(true);
   });
 
-  it("the debrief names the fault and prices it, instead of praising a clean sheet", () => {
-    expect(out.debriefText).toContain("Превишена скорост");
-    expect(out.debriefText).toContain("второстепенна, 1 наказателна т.");
-    // Requirement-zero (doc 64 THEO-4): the measured numbers, not a verdict.
-    expect(out.debriefText).toContain("при ограничение 50 km/h");
+  it("…and the LESSON is refused for it: the frame's «escapes entirely» is closed", () => {
+    expect((out.result.lessonMistakes ?? []).map((h) => h.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(out.result.lessonMistakes?.[0]?.charged).toBe(false);
+    expect(out.result.passed).toBe(false);
+  });
+
+  it("the debrief names the fault and refuses the lesson, instead of praising a clean sheet", () => {
+    expect(out.debriefText).toContain("не е взет: допусна „Превишена скорост“");
+    // Requirement-zero (doc 64 THEO-4): never a bare verdict — the act, why it
+    // is a mistake, what to do instead, and the article, all retrieved.
+    expect(out.debriefText).toContain("Грешката на този урок (при първа поява");
+    expect(out.debriefText).toContain("→ Защо: Движеше се над разрешената скорост");
+    expect(out.debriefText).toContain("→ Правилното действие: Свали газта още при знака");
+    expect(out.debriefText).toContain("→ Правило: ЗДвП чл. 21, ал. 1");
+    expect(out.debriefText).toContain("При повторение вече влиза и в изпитния лист.");
     expect(out.debriefText).not.toContain("чисто каране");
+    // …and it does not claim a point it did not take.
+    expect(out.debriefText).not.toContain("второстепенна, 1 наказателна т.");
   });
 });
 
@@ -251,17 +290,31 @@ describe("sc-follow-tailgater · the authored brake-check is TOLD, by name", () 
       ["sc-ftg-finish", false],
     ]);
     expect(brake.passed).toBe(false);
-    // The refusal is not a trap: the route is unfinished, so the debrief says
-    // WHICH tasks are open rather than printing a green verdict over a slam.
-    expect(brake.text).toContain("не е завършен");
+    /*
+     * RE-AIMED BY ADR-009 (doc 92 §8.3, which names these two assertions).
+     * `HARSH_BRAKING_NO_CAUSE` is this lesson's own mistake — the demo is
+     * «Спирачен удар „за урок“» — so the verdict is no longer «не е завършен»
+     * (true of the route, and not the reason) but «не е взет», which is the
+     * reason. The open task is still named, in the same sentence.
+     */
+    expect(brake.text).toContain("не е взет: допусна „Рязко спиране без причина“");
     expect(brake.text).toContain("«Успокой темпото»");
     expect(brake.text).not.toContain("е издържан");
   });
 
-  it("…so the debrief prints it under «Учебни моменти», never as a clean drive", () => {
-    expect(brake.text).toContain("Учебни моменти (не влизат в точките)");
+  it("…so the debrief prints it as the lesson's OWN mistake, never as a clean drive", () => {
+    /*
+     * ALSO RE-AIMED (doc 92 §5.6.8). It used to print under «Учебни моменти (не
+     * влизат в точките)», and both facts about this slam are true at once — it
+     * cost no изпитни точки, and it cost the whole lesson. That heading states
+     * the first and buries the second: «Първата среща не се наказва — точно
+     * затова я показахме» under a verdict of «не е взет» is two sentences
+     * contradicting each other, with the reassuring one wearing the heading.
+     */
+    expect(brake.text).toContain("Грешката на този урок (при първа поява");
     expect(brake.text).toContain("Рязко спиране без причина");
-    expect(brake.text).toContain("При повторение вече влиза в изпитния лист");
+    expect(brake.text).toContain("При повторение вече влиза и в изпитния лист.");
+    expect(brake.text).not.toContain("Учебни моменти (не влизат в точките)");
     // The frame's exact sentence, and it must never come back unqualified.
     expect(brake.text).not.toContain("чисто каране без нито едно нарушение — задръж това ниво");
   });
@@ -412,12 +465,28 @@ describe("sc-follow-tailgater · the careless rest reaches the изпитен л
       ["sc-ftg-finish", false],
     ]);
     expect(out.result.passed).toBe(false);
-    // The refusal is not a trap and not a bare verdict: the debrief says the
-    // lesson is unfinished and names the task that is still open, beside the
-    // priced row and its чл. 24, ал. 2 asserted two tests up.
-    expect(out.debriefText).toContain("не е завършен");
+    /*
+     * The refusal is not a trap and not a bare verdict: the debrief names the
+     * task that is still open, beside the priced rows and their чл. 24, ал. 2
+     * asserted two tests up.
+     *
+     * RE-AIMED BY ADR-009: `STOPPED_WITHOUT_CAUSE` is one of this lesson's own
+     * mistakes (the `needlessStopEnabled` opt-in, doc 92 §2.1), so the headline
+     * is «не е взет» rather than «не е завършен» — and the open task rides in
+     * the same sentence. The five charged rests are UNCHANGED (founder answer
+     * F1 grades a genuine repeat exactly as today), which is the assertion
+     * below.
+     */
+    // The act's own catalogue title, not the pooled row — `rules/catalog.ts`
+    // PER_ACT_COPY names this one «…на открит път», and the fold stamps the act.
+    expect(out.debriefText).toContain("не е взет: допусна „Спиране без причина на открит път“");
     expect(out.debriefText).toContain("«Успокой темпото»");
     expect(out.debriefText).not.toContain("е издържан");
+    // F1: the four repeats are on the sheet, so the act is priced in the
+    // mistakes block and NOT filed under the withheld-first heading.
+    expect(out.result.lessonMistakes?.[0]?.charged).toBe(true);
+    expect(out.debriefText).toContain("Най-важните грешки");
+    expect(out.debriefText).not.toContain("Грешката на този урок (при първа поява");
   });
 
   it("…and the sheet is UNCHANGED by the refusal — the drive still grades to the end", () => {

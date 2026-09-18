@@ -80,7 +80,7 @@
  * screen he actually meets first.
  */
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import {
   IconBolt,
   IconBook,
@@ -89,11 +89,23 @@ import {
   IconTarget,
   IconWheel,
 } from "@/components/icons";
-import type { TeachMoment } from "@/modules/sim/lessons";
+import {
+  // ADR-009 — the four stake sentences, the header and the subline, all from
+  // the one module the three printing sites share. See StakeText below.
+  LESSON_MISTAKE_CHIP_BG,
+  teachChipBg,
+  teachStakeSegments,
+  teachSublineBg,
+  type StakeSegment,
+  type TeachMoment,
+} from "@/modules/sim/lessons";
 import {
   EXAM_POINTS_SHORT_NOTE_BG,
+  // `minusPointsBg` is no longer imported here: the mark is composed inside
+  // `teachStakeSegments`, which calls it, so this file can no longer print a
+  // bare „−10 т." by forgetting the scale. `examMarkCitationBg` stays for the
+  // roomy card's own «оценка:» chip, which is not part of the stake sentence.
   examMarkCitationBg,
-  minusPointsBg,
 } from "@/modules/sim/rules";
 import { OVERLAY_SCRIM_CLASS } from "./playArea";
 
@@ -241,6 +253,53 @@ const SEVERITY_LABEL: Record<TeachMoment["severity"], string> = {
 };
 
 /**
+ * ── ADR-009 (founder Ruling A, 2026-09-17) · THE CARD THAT PROMISED THE
+ *    OPPOSITE OF WHAT WAS ABOUT TO HAPPEN.
+ *
+ * Both stake sentences on this file used to read «Първа среща — не се брои в
+ * резултата» UNCONDITIONALLY (the compact arm and the roomy arm). Under Ruling
+ * A that is false on the two arms that matter most: on the lesson's OWN mistake
+ * the first encounter is exactly what costs the lesson, and on the L1
+ * pause-on-error arm the points had already been taken when the card said they
+ * had not. The engine now flags both (`TeachMoment.lessonMistake` /
+ * `.charged`, set in `lessons/engine.ts applyTick`), and the four honest
+ * sentences live in ONE module — `lessons/lessonMistake.ts` — because there are
+ * three sites printing them (this file twice, `LessonPlayShell.tsx`'s phone
+ * notification once) and a sentence copied three times is a sentence that will
+ * disagree with itself.
+ *
+ * `free-first` — the ordinary card, the overwhelming majority of teach moments
+ * — is BYTE-IDENTICAL through the helper. That is not an aspiration: lane A
+ * pinned the literals copied out of this file, and this file's own
+ * `__tests__/teach-stake.test.tsx` renders the card and compares its full text
+ * against the string that shipped.
+ */
+function StakeText({
+  segments,
+  strongClass,
+}: {
+  segments: readonly StakeSegment[];
+  strongClass?: string;
+}) {
+  return (
+    <>
+      {segments.map((segment, i) =>
+        segment.strong === true ? (
+          <strong key={i} className={strongClass}>
+            {segment.text}
+          </strong>
+        ) : (
+          // A Fragment and not a <span>: the non-emphasised runs must render as
+          // bare text nodes, or adopting the helper would change the markup of
+          // every teach card in the product to make room for two new sentences.
+          <Fragment key={i}>{segment.text}</Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+/**
  * Simple diagram slot v1: a category pictogram per violation family. A real
  * illustrated diagram per scenario can replace this map without touching the
  * card layout — the slot is the rounded stage below the header.
@@ -363,12 +422,21 @@ export function TeachMomentOverlay({
             >
               <CategoryIcon className="h-3.5 w-3.5" />
             </span>
+            {/* ADR-009: «Грешката на урока» on a target moment. A student who
+                reads «Учебен момент» and nothing else has been told the
+                opposite of what is happening to his lesson — and this header is
+                visible WITHOUT tapping «Повече», unlike the stake sentence. */}
             <p className="text-[10px] font-black uppercase tracking-wider text-accent-2">
-              Учебен момент
+              {teachChipBg(moment)}
             </p>
             <span className="text-[10px] font-semibold text-muted">
               · {SEVERITY_LABEL[moment.severity]}
             </span>
+            {moment.lessonMistake === true ? (
+              <span className="text-[10px] font-bold text-warning">
+                · {LESSON_MISTAKE_CHIP_BG}
+              </span>
+            ) : null}
             {remaining > 0 ? (
               <span className="ml-auto shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-bold text-muted">
                 още {remaining}
@@ -393,11 +461,13 @@ export function TeachMomentOverlay({
             {expanded ? (
               <>
                 <p className="mt-1.5 text-[11px] leading-snug text-muted">
-                  Първа среща — <strong className="text-foreground">не се брои в резултата</strong>.
-                  При повторение:{" "}
-                  <strong className="text-foreground">{minusPointsBg("exam", moment.points)}</strong>{" "}
-                  ({SEVERITY_LABEL[moment.severity]}) по {examMarkCitationBg(moment.severity)}, а
-                  повторните грешки тежат още повече (×1.5 / ×2.0).
+                  <StakeText
+                    segments={teachStakeSegments(moment, {
+                      citeMark: true,
+                      severityLabelBg: SEVERITY_LABEL[moment.severity],
+                    })}
+                    strongClass="text-foreground"
+                  />
                 </p>
                 {/* THE SENTENCE THAT ANSWERS THE MISREADING. He met „−10 т." here,
                     minutes before the result screen, and read it as his licence. */}
@@ -470,10 +540,14 @@ export function TeachMomentOverlay({
             <IconBook className="h-5 w-5" />
           </span>
           <div className="min-w-0">
+            {/* ADR-009: header AND subline per kind. The subline used to be the
+                fixed «Пауза — първа среща с тази ситуация», which was false on
+                three of the four kinds — including the L1 pause-on-error arm,
+                where the points had already been taken. */}
             <h2 id="teach-moment-title" className="text-sm font-black leading-tight">
-              Учебен момент
+              {teachChipBg(moment)}
             </h2>
-            <p className="text-xs text-muted">Пауза — първа среща с тази ситуация</p>
+            <p className="text-xs text-muted">{teachSublineBg(moment)}</p>
           </div>
           {remaining > 0 ? (
             <span className="ml-auto rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted">
@@ -524,11 +598,16 @@ export function TeachMomentOverlay({
 
             {/* The teach-first promise + the stake on repeat */}
             <div className="rounded-xl border border-accent-2/40 bg-accent-2/10 p-4">
+              {/* `citeMark: false` — this card already prints the same clause
+                  as its own «оценка:» chip above, and a card citing one
+                  provision twice reads as two rules. */}
               <p className="text-sm leading-relaxed">
-                Първа среща — <strong>не се брои в резултата</strong>. При повторение:{" "}
-                <strong>{minusPointsBg("exam", moment.points)}</strong> (
-                {SEVERITY_LABEL[moment.severity]}), а повторните грешки тежат още повече
-                (×1.5 / ×2.0).
+                <StakeText
+                  segments={teachStakeSegments(moment, {
+                    citeMark: false,
+                    severityLabelBg: SEVERITY_LABEL[moment.severity],
+                  })}
+                />
               </p>
               <p className="mt-2 text-xs leading-relaxed text-muted">
                 {EXAM_POINTS_SHORT_NOTE_BG}

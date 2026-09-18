@@ -103,7 +103,7 @@ The 2 tapes still passing at each practice rung are the two whose offence comes 
 | 3 | J3 | Raising `MAX_COACHED_MISTAKES_WIRE` risks an old server rejecting the wire (`wire.ts:538` rejects > 100) | **Fixed** with a reserve inside the cap (§3.4b d). Both caps stay at 100 |
 | 4 | J1, J2, J3 | Three teach-card sites print the stake sentence independently | **Grafted** one helper module, `lessons/lessonMistake.ts` (§3.2) |
 | 5 | J1, J3 | An aborted run with a hit would read «Не е взет» | **Grafted** the `!aborted` guard (§5.1), plus an abort note variant (§5.2, critic gap 9) |
-| 6 | J2 | A target mistake could be downgraded to the rate-limited toast and lose its lesson-costing sentence | **Grafted, then narrowed in revision 2.** The rate limit is bypassed only for the **first lesson-mistake card of the session**. Later target first-occurrences use today's rate limit, because the student has already been told the lesson will not count. Measured: 7 of 654 hit drives show a second lesson-mistake card (only when today's rules would pause anyway). `HudToasts.tsx` is not edited |
+| 6 | J2 | A target mistake could be downgraded to the rate-limited toast and lose its lesson-costing sentence | **Grafted, then narrowed in revision 2.** The rate limit is bypassed only for the **first lesson-mistake card of the session**. Later target first-occurrences use today's rate limit, because the student has already been told the lesson will not count. Measured: **10** of 654 hit drives show a second lesson-mistake card (only when today's rules would pause anyway; «7» until the 2026-09-18 re-measure, §9 criterion 9). `HudToasts.tsx` is not edited |
 | 7 | J2 | `lessons/debrief.ts` and `lessons/lessonMistake.ts` are outside the point-scales guard (`rules/__tests__/point-scales.test.ts:87-93`) | **Grafted** explicit vocabulary assertions over both, each with a mutation test (T0, T7, M10) |
 | 8 | J3 | Completeness of detector opt-ins was keyed on a naming convention | **Fixed:** keyed on value, plus classification of every authored ruleConfig key (T8b) |
 | 9 | J3 | A future co-fault on `codeRefs` becomes a target silently | **Fixed:** the full target table is pinned as a fixture (T8a), and the markers are pinned (T8c) |
@@ -488,7 +488,7 @@ Today the teach key is the **topic** (`coach.ts:232`). A target whose topic was 
 +          ...(isTarget ? { lessonMistake: true as const } : {}),
 ```
 
-Measured: 654 hit drives, 661 lesson-mistake cards. 7 drives show two (`sc-ln-turn-lane-arrows/mistake-late-two-lanes` ×4 rungs, `sc-sig-green-wave/mistake-sprint` ×3 rungs), both at the same tick or outside the gap.
+Measured: 654 hit drives, **665** lesson-mistake cards. **10** drives show two or more (`sc-ln-turn-lane-arrows/mistake-late-two-lanes` ×4 rungs, `sc-sig-green-wave/mistake-sprint` ×4 rungs — three cards at L1 — plus `sc-speed-zone/mistake-boulevard-speed@L1` and `sc-vu-cyclist-group/mistake-narrow@L1`), each extra card either at the same tick or outside the gap. *This paragraph read «661 … 7 drives … ×3 rungs» until 2026-09-18; see §9 criterion 9 for who re-measured it and why the prototype's figure was lower.*
 
 **(f) S1 pauseOnError scored arm** (`lessons/engine.ts:1560-1577`): add `charged: true as const`, plus `lessonMistake: true` for a target. There is no bypass here.
 
@@ -777,18 +777,21 @@ The critic measured 44 L1/L3 hit drives rendering this row, 16 of them flips (`s
 
 ### 5.8 History (lane F) — revised, critic gap 4
 
-- **`lessons/store.ts`** (`SimSessionEventsJson` :31-60, parse :76-122) gains two optional fields:
+- **`lessons/store.ts`** (`SimSessionEventsJson` :31-60, parse :76-122) gains three optional fields:
   - `lessonMistakes?: { code: string; t: number; charged: boolean; detail?: string }[]`, parsed shape-checked (malformed entries dropped);
-  - `sheetRoutePassed?: boolean` (§5.9).
-- **`app/(dashboard)/simulator/actions.ts`** payload (:327-368): write `lessonMistakes` when non-empty, and `sheetRoutePassed: result.summary.passed && result.completedAll && !result.aborted` on every row.
+  - `sheetRoutePassed?: boolean` (§5.9);
+  - `sheetPassed?: boolean` — the изпитен лист ALONE (`result.summary.passed`), which is what decides the word below. **Corrected 2026-09-18**, see `notTaken`.
+- **`app/(dashboard)/simulator/actions.ts`** payload (:327-368): write `lessonMistakes` when non-empty, and `sheetRoutePassed: result.summary.passed && result.completedAll && !result.aborted` plus `sheetPassed: result.summary.passed` on every row.
 - **`page.tsx`** (:229-252) adds entry fields:
-  - `notTaken` = non-empty `ev.lessonMistakes` && !aborted.
+  - `notTaken` = non-empty `ev.lessonMistakes` && `!aborted` && `ev.sheetPassed !== false`.
+    **This cell used to read «non-empty `ev.lessonMistakes` && !aborted», and that was wrong.** The result screen asks the изпитен лист FIRST (`sessionVerdict`: a failed лист is «Неиздържан», whatever else the drive did). Measured 2026-09-18 over all 2,434 authored drives: of the 654 with a hit, 558 have a clean лист and **96 a failed one**, 68 of those having struck something — and on all 96 the history row printed «Не е взет» in warning tone, with the lesson's act in the corner, over a crash the end screen calls «Неиздържан». `sheetRoutePassed` cannot stand in for the new field (it folds `completedAll`, and 425 of the 654 are hit + clean лист + route unfinished). `!== false` and not `=== true`: the field is absent on every row written before 2026-09-18, and an absent field dates the row rather than regrading it (§6).
+    The four entry fields below are folded in `historyLessonMistakes.ts` (`historyLessonMistakeRowFields`) and spread into the entry, not written out in `page.tsx`: a server component cannot be unit-tested, and with them written there every one could be reverted with 3,088 tests still green.
   - `lessonMistakeTitlesBg: string[]`, retitled from the catalogue through the sim module's public index (`lessonMistakeCopy`, retrieval).
   - `topMistakeTitleBg` = the first lesson-mistake title when `notTaken`; otherwise as today (:249). A charged-mistake count of 0 no longer implies «без грешки».
 - **`session-history.tsx`:**
   - The label (:99-107) becomes «Прекъснат» / «Издържан» / **«Не е взет»** (warning) / «Неиздържан».
-  - «без грешки» (:130-134) is suppressed when `notTaken`.
-  - The expanded panel (:148) starts with «Грешката на урока: „A“, „B“» (no points: a first occurrence has none) above the charged list.
+  - «без грешки» (:130-134) is suppressed when `notTaken` **or when the row carries any named lesson mistake** — the 96 read «Неиздържан» and are no more «без грешки» for it.
+  - The expanded panel (:148) starts with «Грешката на урока: „A“, „B“» (no points: a first occurrence has none) above the charged list, on `notTaken` **or on any row with a named lesson mistake**: on the 96 the лист decides the WORD and this block is the other fact, so gating it on the pill would cost the student one of the two.
 - **Stored rows are not regraded** (§6).
 
 ### 5.9 Calibration — revised, critic gap 3 (lanes F and G)
@@ -806,7 +809,21 @@ Ruling A's lesson rule is not an exam rule (L4 is untouched). So the calibration
   - `lessonMistake?: { namesBg: string; one: boolean }` — reveal branch only. Under the tiles (:325-347), which stay unchanged («Изпитът каза … издържан/неиздържан» is now literally true), it adds:
     > {reveal.actualPass ? "По изпитния лист: издържан. Урокът обаче не е взет" : "Урокът също не е взет"} — {namesBg} {one ? "е грешката, която той учи" : "са грешките, които той учи"}.
   - The «сгреши и самата присъда» clause (:367) is **not suppressed**: agreement is computed on the verdict the tile shows.
-- **Lane G** passes both props from the shell (anchor `<CalibrationGate`, worktree :5578): `lessonHasTargets` from `lesson.lessonMistakeTargets`, and `lessonMistake` from the client `result`.
+- **Lane G** passes both props from the shell (anchor `<CalibrationGate`, worktree :5737): `lessonHasTargets` from the
+  applicability rule `lessonMistakeTargetCodes(lesson) !== null` (so an exam rung and the THEO-3 sandbox read as today), and
+  `lessonMistake` from the client `result` through `calibrationLessonMistakeBg` (:1242), which is gated on the изпитен лист: on the
+  **96** drives whose sheet failed the pill is «Неиздържан» and the prop is null, so the gate never argues with the badge. On the
+  **558** where it is non-null, all 96 excluded, every drive carries at least one reason row.
+- **WHICH BRANCH OF THAT SENTENCE FIRES, measured 2026-09-18 over all 2,434 authored drives — and the branch name is not the failed
+  лист.** `reveal.actualPass` is `readSessionPassed` → `sheetRoutePassed` (`actions.ts:421` = `summary.passed && completedAll &&
+  !aborted`), which folds the ROUTE; `sessionVerdict` does not. Of the 558 drives on which the prop is non-null, **133** have
+  `sheetRoutePassed === true` and take «По изпитния лист: издържан. Урокът обаче не е взет», and **425** have it false and take
+  «Урокът също не е взет» — because the route stopped short, not because any server disagreed. A test naming that state «when the
+  sheet failed too» is mis-titled; the honest name is «when the sheet-and-route flag is false (an unfinished route)».
+- **OPEN, routed out of lane G:** on those 425 the gate's own tile reads «Изпитът каза … неиздържан» one tap in front of
+  `lessonMistakeVerdictNoteBg`'s «…в допустимото по изпитния лист, затова тук не пише „Неиздържан“» — the same class of
+  contradiction §5.9 exists to prevent, on the tile rather than the sentence. It belongs to `calibrationStore.readSessionPassed` /
+  `CalibrationGate`'s tile, not to the shell, and it predates ADR-009 (the route/sheet conflation is §12's inherited wrinkle).
 
 ### 5.10 The rule before the drive — new, critic gap 16
 
@@ -1083,7 +1100,23 @@ Lane R additionally runs every trace test that names JUNCTION_SCAN_INCOMPLETE or
    - Every flip falls to 1★.
    - On already-failing drives, stars fall only on `sc-ln-turn-lane-arrows/mistake-late-two-lanes` (2★ → 1★, L1/L2/L3/L5) and `sc-vu-cyclist-group/mistake-narrow` (2★ → 1★, L1 only). Measured.
 8. The flip lists match Appendix B (measured identical to revision 1's lists; only the `*` charged markers changed).
-9. Lesson-mistake cards: 661 across 654 hit drives, with 7 drives showing two (§3.4b e).
+9. **Lesson-mistake cards: 665 across 654 hit drives, with 10 drives showing two or more (§3.4b e).** *Corrected 2026-09-18, revision 2 — this criterion read «661 … with 7 drives showing two» and that figure is the patched prototype's, refuted by three independent instruments on the live tree. The hit-drive count, 654, was never in dispute and is unchanged.*
+
+   **Who measured what.** (a) Lane C's own in-process fold over the whole bank: **665 / 654 / 10**. (b) Lane C's verifier, recomputing it a different way rather than re-running the lane: **665 / 654 / 10**, same drives. (c) Lane H's `tools/audit/lesson-mistake-census.mjs` over all 2,434 authored drives: **665 / 654 / 10**, with the drive list below. (d) Lane H's verifier, re-running that census twice on the live tree (`--runs 2`, digest `sha256:e20f5297…` both runs): the same 665 / 654 / 10 and the same 10 drives. Three instruments, four parties, one list.
+
+   **The 10 drives** (11 cards above one-per-drive): `sc-sig-green-wave/mistake-sprint` @L1 (three cards) / L2 / L3 / L5 · `sc-ln-turn-lane-arrows/mistake-late-two-lanes` @L1 / L2 / L3 / L5 · `sc-speed-zone/mistake-boulevard-speed` @L1 · `sc-vu-cyclist-group/mistake-narrow` @L1. **Seven of the ten raise their cards on two DIFFERENT target codes; three tell one mistake twice.** The three are
+   `sc-speed-zone/mistake-boulevard-speed@L1` (SPEEDING_OVER_LIMIT at 6.2 s and 26.2 s), `sc-vu-cyclist-group/mistake-narrow@L1`
+   (VULNERABLE_PASS_TOO_CLOSE at 21.9 s and 41.6 s) and `sc-sig-green-wave/mistake-sprint@L1` (SPEEDING_OVER_LIMIT at 8.9 s,
+   28.9 s and 57.1 s — the same mistake told three times). Counting each drive's `lessonMistakes` ROWS instead of its CARDS gives
+   eight of ten, because `sc-sig-green-wave/mistake-sprint@L1` also carries a HARSH_BRAKING_NO_CAUSE row that raised no card at L1;
+   the two figures answer different questions and this criterion is about the cards. *Re-measured 2026-09-18 by lane H's verifier,
+   by re-driving the four lessons and reading every teach moment's tick.*
+
+   **The converse does NOT hold, and criterion 9 does not claim it.** More cards than hit drives is not «every refusing code raised a card». Measured by the census on the same run: **0 drives carry a hit and no card at all** — nothing is refused in silence — but **27 drives across 7 lessons** (`sc-follow-standstill`, `sc-ln-boulevard-discipline`, `sc-rb-lane-choice`, `sc-vu-cyclist-group`, `sc-mw-min-speed`, `sc-sp-wet-limit-plate`, `sc-ln-decisive-change`) render MORE lesson-mistake reason rows on the end screen than they raised cards in the moment: a second refusing code the student meets only at the end. 35 drives print a two-row reason block and only 10 raised two cards. Whether that is acceptable teaching is open, and it is not settled by this criterion.
+
+   **What the number counts, and why the prototype's was smaller.** This is what `applyTick` EMITTED: teach moments the engine raised with `TeachMoment.lessonMistake` set. It is not what the shell painted — two cards raised on the same tick render as a single pause — which is the most likely source of the smaller prototype figure, and is why the card count is not evidence about pacing on the glass (lane P's photographs are).
+
+   **The claim this criterion actually defends survives the correction.** Of the 11 extra cards, 4 are same-tick merges and 7 sit outside the 15 s gap, i.e. cards today's rate limit would have allowed anyway: **0 extra cards are forced by the first-card bypass** (lane C's verifier, structurally as well as by measurement — `firstLessonCard` reads `coachedNew`/`coachedPrev` before `recordCoached(e)`, so it can be true at most once per session). The bypass buys **10** cards on **10** drives, and every one of those drives would otherwise have shown the student **no** lesson-mistake card at all.
 10. Two census runs give equal digests. **Not measured by the reviser:** the prototype ran once with `singleRun`; revision 1's 6-drive sample in `synth-det/` is the only determinism evidence.
 
 **Training score.** `effectiveScore` changed on 76 of the L1/L3 hit drives where the baseline records it (e.g. `sc-ln-turn-lane-arrows/mistake-late-two-lanes` 10.5 → 6, `sc-rb-lane-choice/mistake-exit-across-outer` 23 → 20). The L2/L5 baseline did not record it.
@@ -1208,7 +1241,7 @@ Row text comes from `node tools/audit/finding-reader.mjs <lesson>`, saved as `de
 | R4 | Four of six rows need a steered or non-colliding leg | In-process proofs T1, T2, T4, I1 |
 | **R5** | **Trust (corrected, critic gap 10):** the server never re-runs the rules; omitting a target from either client list reproduces the old pass | Pinned by M4a/M4b; the same level as objective `done`; stated in the ADR |
 | R6 | A stale client across the deploy shows ИЗДЪРЖАН while the server stores not taken | Transient; stated in the ADR |
-| R7 | Pacing: one bypassed pause per session | T6-engine; measured 661 cards on 654 hit drives |
+| R7 | Pacing: one bypassed pause per session | T6-engine; measured **665** cards on 654 hit drives (§9 criterion 9, corrected 2026-09-18) — and the bypass accounts for **0** of the 11 extra |
 | R8 | Phone fit: header chip, roomy subline, reason section, end line, calibration hint and reveal line, **briefing rule line** | Lane P rig photographs; T16; fallbacks §5.5, F3 |
 | **R9** | **Concurrent edits.** The dirty set grew during this session from 7 to **11 modified and 5 untracked** files, including `lessons/types.ts`, `LessonScene.tsx` and the mobile harness | Precondition in §7; lane G last |
 | R10 | The live objective ribbon still ticks, e.g. «ЗАДАЧА 2/2» | The end screen explains |

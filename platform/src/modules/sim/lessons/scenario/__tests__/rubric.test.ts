@@ -630,4 +630,119 @@ describe("scoreRubric", () => {
     const b = scoreRubric(makeResult(), RUBRIC, { observedMomentIds: ["m1"] });
     expect(a).toEqual(b);
   });
+
+  // -------------------------------------------------------------------------
+  // ADR-009 (founder Ruling A, 2026-09-17) · doc 92 §5.7 — A LESSON THAT WAS
+  // NOT TAKEN CANNOT READ „взето".
+  //
+  // «взето» is two stars or more (`progress.ts:333`), so three stars on a
+  // refused lesson is not cosmetic: it is the star row saying the opposite of
+  // the verdict above it, in the number the catalogue reads back as progress.
+  //
+  // MEASURED before the cap, on this tree: 118 not-passed drives printed THREE
+  // stars, and 10 printed MORE stars than they did pre-ADR-009 — the withheld
+  // re-bill took their `score` to 0, so the `score > 0` ceiling stopped firing
+  // and the fold handed them the cleanliness stars. A ruling that REFUSES the
+  // lesson must not be able to RAISE its grade.
+  // -------------------------------------------------------------------------
+  const CYCLIST_SQUEEZE = {
+    code: "VULNERABLE_PASS_TOO_CLOSE",
+    t: 20.9,
+    charged: false,
+    titleBg: "Тясно изпреварване на велосипедист",
+  };
+  /** Doc 92 §5.7's variant row, duplicated for the same reason as the three above. */
+  const NO_QUALITY_MEASURED_LESSON_MISTAKE =
+    "Нито един показател за качеството на маневрата не бе измерен на това каране: " +
+    "звездите горе идват от изпитния лист и изпълнените задачи — и тук са само една, " +
+    "защото се случи грешката, която този урок учи.";
+
+  it("FAILS BEFORE THE CAP: a flawless park with a lesson mistake is 1 star", () => {
+    // Everything else about this drive earns three: the route is finished, the
+    // sheet is spotless, the bay is centred on the first attempt and both
+    // glances happened. Only the lesson's own mistake is on the record.
+    const flawless = scoreRubric(makeResult(), RUBRIC, { observedMomentIds: ["m1", "m2"] });
+    expect(flawless.stars).toBe(3);
+    const refused = scoreRubric(
+      makeResult({ passed: false, lessonMistakes: [CYCLIST_SQUEEZE] }),
+      RUBRIC,
+      { observedMomentIds: ["m1", "m2"] },
+    );
+    expect(refused.stars).toBe(1);
+    // …and the measured rows are UNTOUCHED: nothing is re-graded, the cap is
+    // applied to the total. A student can still read what he did well.
+    expect(refused.breakdownBg.map((l) => [l.id, l.points])).toEqual(
+      flawless.breakdownBg.map((l) => [l.id, l.points]),
+    );
+  });
+
+  it("the cap also holds a REPEAT at one star, and the sheet reports its points", () => {
+    // Founder answer F1: a genuine repeat costs наказателни точки exactly as
+    // today — so it arrives here with `score > 0` AND a hit, and both the
+    // two-star ceiling and the one-star floor apply. The floor wins.
+    const repeat = scoreRubric(
+      makeResult({
+        passed: false,
+        score: 10,
+        summary: buildSessionSummary([makeViolation("VULNERABLE_PASS_TOO_CLOSE", 61)]),
+        lessonMistakes: [{ ...CYCLIST_SQUEEZE, charged: true }],
+      }),
+      RUBRIC,
+      { observedMomentIds: ["m1", "m2"] },
+    );
+    expect(repeat.stars).toBe(1);
+  });
+
+  it("FAILS BEFORE THE VARIANT: the no-measurement row names the cap, not the sheet", () => {
+    // `NO_QUALITY_MEASURED` says the stars «идват само от изпитния лист», and
+    // on one of these drives that is false in the reassuring direction: the
+    // sheet is clean and inside the allowance while the card shows one star.
+    const row = scoreRubric(
+      makeResult({ passed: false, lessonMistakes: [CYCLIST_SQUEEZE] }, unsettled(0)),
+      { observation: { moments: [{ id: "m1", titleBg: "Огледала преди задна" }] } },
+    ).breakdownBg.find((l) => l.id === "observation")!;
+    expect(row.detailBg).toContain(NO_QUALITY_MEASURED_LESSON_MISTAKE);
+    expect(row.detailBg).not.toContain(NO_QUALITY_MEASURED);
+  });
+
+  it("THE OTHER DIRECTION: without a hit, every row is byte-identical", () => {
+    // The whole file above is the long version of this. The short version, run
+    // over the four rubric shapes this suite uses, is that ADR-009 is invisible
+    // on a drive with no hit — including the `NOT_IN_STARS` arm, which the
+    // lesson rule does not speak to at all.
+    const specs: RubricSpec[] = [
+      RUBRIC,
+      { observation: { moments: [{ id: "m1", titleBg: "Огледала преди задна" }] } },
+      { placement: { objectiveId: "park" }, parTimeSec: 90 },
+      { parTimeSec: 90 },
+    ];
+    for (const spec of specs) {
+      const withHit = scoreRubric(makeResult({ passed: true }), spec);
+      const withoutHit = scoreRubric(makeResult({ passed: true, lessonMistakes: [] }), spec);
+      expect(withoutHit).toEqual(withHit);
+      expect(withHit.breakdownBg.every((l) => !l.detailBg.includes("този урок учи"))).toBe(true);
+    }
+    // …and a mixed card keeps `NOT_IN_STARS`: placement SCORED off the park
+    // detail while observation abstained (no observation input at all, which is
+    // what a drive with no reverse phase gives), so `measuredCount > 0` and the
+    // stronger sentence must stay away — hit or no hit.
+    const mixed = scoreRubric(
+      makeResult({ passed: false, lessonMistakes: [CYCLIST_SQUEEZE] }, parkDetail()),
+      {
+        placement: { objectiveId: "park" },
+        observation: { moments: [{ id: "m1", titleBg: "Огледала" }] },
+      },
+    );
+    const mixedObs = mixed.breakdownBg.find((l) => l.id === "observation")!;
+    expect(mixedObs.measured).toBe(false);
+    expect(mixedObs.detailBg).toContain(NOT_IN_STARS);
+    expect(mixedObs.detailBg).not.toContain("този урок учи");
+  });
+
+  it("stays pure with the new field", () => {
+    const over = { passed: false, lessonMistakes: [CYCLIST_SQUEEZE] };
+    expect(scoreRubric(makeResult(over), RUBRIC, { observedMomentIds: ["m1"] })).toEqual(
+      scoreRubric(makeResult(over), RUBRIC, { observedMomentIds: ["m1"] }),
+    );
+  });
 });

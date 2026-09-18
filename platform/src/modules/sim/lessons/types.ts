@@ -1989,7 +1989,9 @@ export interface LessonResult {
    * The violations the drive SHOWED and the score deliberately did NOT charge
    * (additive; see CoachedMistake). Client results copy the engine state's
    * record; server-rebuilt results re-derive titles from the catalog over the
-   * wire's code+t list. Absent = none recorded (older sessions, clean drives).
+   * wire's list of code, time and act (`detail` — ADR-009; a client still
+   * cannot author a title, only select a catalogue row).
+   * Absent = none recorded (older sessions, clean drives).
    * Both debrief call sites feed `DebriefContext.coachedMistakes` from THIS
    * field — the context channel had no live producer before it.
    */

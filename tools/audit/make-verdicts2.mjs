@@ -33,7 +33,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
-import { classifyLeg, tallyStates } from "./verdict-surface.mjs";
+import { adr009JudgeBrief, classifyLeg, tallyStates } from "./verdict-surface.mjs";
 import { legEvidence, renderEvidence } from "./leg-evidence.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -339,6 +339,11 @@ const HOW = [
   "the guidance — that may itself be a defect worth filing. NOT-RUN on a",
   "vehicle-preparation lesson (sc-vp-*) is expected: the car is not meant to move.",
   "",
+  // ADR-009 (doc 92 §7 lane H). The block is built in `verdict-surface.mjs`
+  // from the same `PILL_WORDS` this file's `classifyLeg` reads, so the legend
+  // cannot go stale behind the list — the exact way the two bracket tags added
+  // on 2026-08-28 ended up with no entry here for three waves.
+  ...adr009JudgeBrief(),
   "-- WHAT THE BRACKET AFTER A LEG MEANS --",
   "`mobile-right (ИЗДЪРЖАН)` reached a verdict card and a pill was read off it.",
   "A leg in [SQUARE BRACKETS] did not, and the bracket says why. NONE of them means",

@@ -50,6 +50,20 @@ function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8")) as unknown;
 }
 
+/**
+ * ADR-009's rollback, for the counter-proof controls below (founder Ruling A;
+ * doc 92 §3.6 "Rollback"). `lessonMistakeTargets` is the ONE field the ruling
+ * reads, so a copy of the compiled lesson without it IS the pre-ADR-009 product
+ * — which is how a case can show both what the ruling withholds and that the
+ * machinery underneath it still fires. A pair of answers that can only ever
+ * agree is not a measurement.
+ */
+function withoutLessonMistakeTargets<T extends object>(lesson: T): T {
+  const copy = { ...lesson };
+  delete (copy as { lessonMistakeTargets?: unknown }).lessonMistakeTargets;
+  return copy;
+}
+
 // ---------------------------------------------------------------------------
 // sc-pe-night-unlit — the drill is won BEFORE the pedestrian appears: the speed
 //                     you chose in the dark is the whole answer
@@ -857,7 +871,7 @@ describe("wave-4 bot completion — sc-vp-handbrake at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: the raised lever TEACHES чл. 20 once — and, still raised ten seconds later, is GRADED once", () => {
+  it("counter-proof: the raised lever TEACHES чл. 20 once — and ADR-009 withholds the bill", () => {
     // HANDBRAKE_LEFT_ON is a teachable второстепенна fault, so its FIRST
     // encounter PAUSES with a card instead of merely docking a point — which is
     // the pedagogy: the student dragging the car has not connected the lamp to
@@ -888,14 +902,46 @@ describe("wave-4 bot completion — sc-vp-handbrake at L3", () => {
         for (const m of step.teachMoments ?? []) taught.push(m.code);
       },
     });
+    //
+    // …AND ADR-009 TOOK THAT CHARGE BACK, 2026-09-18 (founder Ruling A, doc 92
+    // §3.4b b). Dragging the car on the handbrake is the mistake THIS drill
+    // exists to teach, and the ruling forbids exam points for its first
+    // occurrence. The re-bill is not a second act — it is the first one billed
+    // ten seconds late, `regrade: true`, reaching for exactly the charge the
+    // card consumed — so it is dropped.
+    //
+    // THE DEFECT THE SECOND HALF WAS ADDED FOR IS STILL CLOSED, which is the
+    // part that matters: a whole lesson driven with the lever up no longer
+    // reaches «Опасни 0 · Основни 0 · Второстепенни 0» under «чисто каране».
+    // It reaches «Не е взет», with чл. 20 named. The sheet went quiet and the
+    // verdict got louder, which is the trade the founder ruled for.
     expect(taught).toEqual(["HANDBRAKE_LEFT_ON"]);
     const billed = s.events.filter((e) => e.kind === "violation");
-    expect(billed.map((e) => e.code)).toEqual(["HANDBRAKE_LEFT_ON"]);
+    expect(billed.map((e) => e.code)).toEqual([]);
+    const r = buildLessonResult(s);
+    expect((r.lessonMistakes ?? []).map((h) => h.code)).toEqual(["HANDBRAKE_LEFT_ON"]);
+    expect(r.passed).toBe(false);
     // The drill still COMPLETES: the route was never the problem, the lever was.
     // That asymmetry is the template's claim — this fault is invisible to the
     // objectives and visible only to the cockpit channel, which is exactly why
     // it needs teaching rather than a gate.
-    expect(buildLessonResult(s).completedAll).toBe(true);
+    expect(r.completedAll).toBe(true);
+
+    // THE CONTROL — the same drive with only `lessonMistakeTargets` removed.
+    // ONE charge, not a rattle of them (`STANDING_DUTY_MAX_BILLS` = 2 bills per
+    // episode, total), so the w11 mechanism stays gated now that this lesson's
+    // own act no longer pays it.
+    let control = createLessonSession(
+      withoutLessonMistakeTargets(compileScenario(SC_VP_HANDBRAKE, 3)),
+    );
+    recordScVpHandbrakeDrive(loadDistrict("vp-ready-v1"), "mistake-handbrake-on", {
+      onTick: (tick) => {
+        control = applyTick(control, tick).state;
+      },
+    });
+    expect(
+      control.events.filter((e) => e.kind === "violation").map((e) => e.code),
+    ).toEqual(["HANDBRAKE_LEFT_ON"]);
   });
 
   it("counter-proof: the skipped last step TEACHES чл. 25 — and ONLY it", () => {

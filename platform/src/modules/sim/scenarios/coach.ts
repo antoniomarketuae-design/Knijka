@@ -84,6 +84,27 @@ export interface CoachInput {
    * (every caller that does not stamp one) → the key is what it always was.
    */
   detail?: string;
+  /**
+   * ADR-009 (founder Ruling A) — one of the mistakes THIS lesson exists to
+   * teach, on a practice rung. Stamped by `lessons/engine.ts` from
+   * `LessonSpec.lessonMistakeTargets`; absent everywhere else, and absent is
+   * exactly today's behaviour.
+   *
+   * WHAT IT CHANGES, AND ONLY THIS: the FIRST occurrence of such a code is
+   * taught even when its TOPIC was already spent by a different code. The
+   * teach key is the topic (`teachKey` below — one free lesson per situation,
+   * not per code), which is right for an incidental fault and wrong for the
+   * lesson's own: 64 of the 105 target lessons share a topic between a target
+   * and a non-target code, so on those the act the lesson is ABOUT was graded
+   * on sight, with points and no card — a bare verdict on the one mistake the
+   * student was brought here to understand (THEO-4).
+   *
+   * WHAT IT DOES NOT CHANGE: the repeat ladder. `gradedKey` is untouched, so a
+   * genuine repeat costs points on the ×1.5/×2 ladder exactly as today
+   * (founder answer F1, 2026-09-17), and the topic still counts, so an
+   * incidental code that follows a target is graded exactly as today too.
+   */
+  lessonMistakeTarget?: boolean;
 }
 
 /**
@@ -225,6 +246,12 @@ export function coachStep(
   // unobserved — went from FAILED to PASSED. Separating them is what satisfies
   // both, and a false certificate is the graver of the two to leave standing.
   //
+  // ADR-009 ADDS A FOURTH KEY AND DOES NOT REOPEN THAT ARGUMENT. `ownKey` below
+  // restores the per-code free lesson for the lesson's OWN mistake alone — and
+  // it cannot re-issue the false certificate, because the same ADR refuses the
+  // pass on any target hit. Read the two together, or the fourth key looks like
+  // the mistake this paragraph was written about.
+  //
   // `graded:` counts GRADINGS rather than occurrences, so the ladder needs no
   // offset: a mistake that was taught the first time never incremented it.
   const scenarioId = scenarioForCode(v.code);
@@ -232,7 +259,28 @@ export function coachStep(
   const teachKey = `teach:${scenarioId ?? repeatKey}`;
   const seenKey = `seen:${repeatKey}`;
   const gradedKey = `graded:${repeatKey}`;
-  const prior = encounters[teachKey] ?? 0;
+  /**
+   * A FOURTH KEY, for ADR-009 only — „have I already taught you about THIS
+   * MISTAKE, the one this lesson is about". It exists because the third
+   * paragraph above is the whole argument for keying `teachKey` by topic, and
+   * that argument does not cover the lesson's own mistake: keyed by code, every
+   * distinct fault drew its own free lesson and `sc-ln-turn-lane-arrows` with a
+   * late two-lane swerve — unsignalled AND unobserved — went from FAILED to
+   * PASSED. Under ADR-009 that certificate can no longer be issued from here:
+   * `foldLessonMistakes` refuses the pass on any target hit, so the own-code
+   * teach buys the student a CARD, never a pass. The measured effect on that
+   * very tape is the opposite of the 2026-08-19 regression — 9 т. «Неиздържан»
+   * becomes 6 т. «Не е взет».
+   *
+   * `null` unless the engine stamped the flag, and never in exam mode or the
+   * learn-only sandbox: both of those ignore `mode` below anyway, and keying
+   * them would write a counter no one reads.
+   */
+  const ownKey =
+    v.lessonMistakeTarget === true && opts?.examMode !== true && opts?.learnOnly !== true
+      ? `teach-own:${v.code}`
+      : null;
+  const prior = ownKey !== null ? (encounters[ownKey] ?? 0) : (encounters[teachKey] ?? 0);
   const seen = encounters[seenKey] ?? 0;
   const priorGraded = encounters[gradedKey] ?? 0;
   // …and the three increments go through `policy.recordEncounter`, which is the
@@ -241,7 +289,10 @@ export function coachStep(
   // and had no caller: this file spelled the spread out by hand in three
   // places, which is three chances for one of them to drift from „+1 on this
   // key" into something else, silently, with every existing suite green.
-  const nextEncounters = recordEncounter(recordEncounter(encounters, teachKey), seenKey);
+  // The TOPIC still counts on a target too — that is what keeps an incidental
+  // code that follows the lesson's own mistake graded exactly as today.
+  const topicCounted = recordEncounter(recordEncounter(encounters, teachKey), seenKey);
+  const nextEncounters = ownKey !== null ? recordEncounter(topicCounted, ownKey) : topicCounted;
 
   // A13 exam mode — unconditional always-grade at official base points. Even
   // learn-only-mapped codes grade: if the rule engine emitted a violation, an

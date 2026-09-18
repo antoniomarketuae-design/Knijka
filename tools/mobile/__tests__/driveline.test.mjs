@@ -1121,3 +1121,202 @@ describe("§M the fault-card beats", () => {
     assert.ok(CODE.includes("saveStatus({ faultBeats })"), "the books are never published");
   });
 });
+
+// ---------------------------------------------------------------------------
+/**
+ * §K ADR-009 — «НЕ Е ВЗЕТ», THE FOURTH PILL (founder Ruling A, 2026-09-17).
+ *
+ * WHAT THE PRODUCT NOW DOES. In a PRACTICE scenario lesson, committing the
+ * mistake that lesson exists to teach refuses the lesson even the first time,
+ * and takes NO наказателни точки for that first occurrence. So the изпитен
+ * лист reads «в допустимото» and the pill reads «Не е взет» — a state that is
+ * neither of the two words this harness knew, on 558 of the corpus's 2,434
+ * drives (doc 92 §9).
+ *
+ * WHAT WOULD HAVE HAPPENED WITHOUT THIS SECTION, and it is the reason §K is
+ * here rather than one line in §G: the matcher would have recorded every one of
+ * those drives as `verdict: null` — «VERDICT: (none)» — which this harness's
+ * own 2026-08-21 block reserves for «there was no verdict surface at all». A
+ * product behaving exactly as the founder ruled would have read as a product
+ * with no verdict card, on roughly a quarter of the corpus, in the direction
+ * that makes it look untested rather than tested-and-refused. That is the same
+ * defect «НЕЗАВЪРШЕН» caused, filed and fixed once already.
+ *
+ * AND THE JUDGE-SIDE HAZARD (doc 92 §12 R3): about ten RIGHT legs will read
+ * «НЕ Е ВЗЕТ» on the next sweep, because a right leg that happens to commit the
+ * lesson's own act is now refused BY DESIGN. Folding it into `fail` would hand
+ * a judge ten grading regressions that are not regressions; folding it into
+ * `pass` would credit ten lessons the product refused. Its own bucket is the
+ * only reading that is not a lie in one direction or the other.
+ */
+describe("§K ADR-009 — the fourth pill", () => {
+  it("classifies «НЕ Е ВЗЕТ» as its own state — not a pass, not a fail, not unfinished", () => {
+    assert.equal(classifyVerdict("НЕ Е ВЗЕТ"), "lessonMistake");
+    // Each wrong answer, named, because each is a different false report:
+    assert.notEqual(classifyVerdict("НЕ Е ВЗЕТ"), "pass", "a refused lesson credited as taken");
+    assert.notEqual(classifyVerdict("НЕ Е ВЗЕТ"), "fail", "a clean изпитен лист reported as a conviction");
+    assert.notEqual(classifyVerdict("НЕ Е ВЗЕТ"), "unfinished", "a route driven to the end reported as abandoned");
+    assert.notEqual(classifyVerdict("НЕ Е ВЗЕТ"), "unknown", "the word was on the glass and the harness did not read it");
+  });
+
+  it("reads the pill in the case the glass paints it, and through collapsed whitespace", () => {
+    // The pill carries `uppercase` as CSS, so `innerText` in one engine and
+    // `textContent` in another disagree on case — §H's own lesson. And the
+    // audit's `t()` collapses runs of whitespace (including U+00A0) to single
+    // spaces before this ever sees the string, so the single-spaced form is
+    // what arrives; a value that reached here un-collapsed must still classify.
+    assert.equal(classifyVerdict("Не е взет"), "lessonMistake");
+    assert.equal(classifyVerdict("  не е взет  "), "lessonMistake");
+    assert.equal(classifyVerdict("Не е взет"), "lessonMistake");
+    assert.equal(classifyVerdict("Не  е   взет"), "lessonMistake");
+  });
+
+  it("is not confused by the words it shares letters with", () => {
+    // «взето» is the catalogue's word for a completed rung (ScenarioCatalog),
+    // and a `.includes("ВЗЕТ")` matcher would read it as this verdict — the
+    // same substring trap «НЕИЗДЪРЖАН» / «ИЗДЪРЖАН» carries, on a second word.
+    assert.equal(classifyVerdict("ВЗЕТО"), "unknown");
+    assert.equal(classifyVerdict("НЕ Е ВЗЕТА"), "unknown");
+    assert.equal(classifyVerdict("НЕИЗДЪРЖАН"), "fail", "the original trap still holds");
+    assert.equal(classifyVerdict("ИЗДЪРЖАН"), "pass");
+  });
+
+  it("gives the rate a fourth counter that exists before it is needed", () => {
+    // Seeded at 0, not created on first sight: a report that prints all four
+    // counts would otherwise print `undefined` for a clean series, and
+    // `undefined + 1` is NaN — in the one arithmetic this file protects.
+    const none = passRate([
+      { exit: 0, verdict: "ИЗДЪРЖАН", head: "a" },
+      { exit: 0, verdict: "ИЗДЪРЖАН", head: "a" },
+    ]);
+    assert.equal(none.counts.lessonMistake, 0);
+    assert.equal(none.point, 1);
+  });
+
+  it("counts a refused lesson in the denominator and never in the numerator", () => {
+    const r = passRate([
+      { exit: 0, verdict: "ИЗДЪРЖАН", head: "a" },
+      { exit: 0, verdict: "НЕ Е ВЗЕТ", head: "a" },
+      { exit: 0, verdict: "НЕ Е ВЗЕТ", head: "a" },
+      { exit: 0, verdict: "НЕИЗДЪРЖАН", head: "a" },
+    ]);
+    assert.equal(r.n, 4, "a refused lesson is a judgeable drive — it reached a verdict card");
+    assert.equal(r.counts.lessonMistake, 2);
+    assert.equal(r.passes, 1);
+    assert.equal(r.point, 0.25, "two refused lessons must not read as two passes");
+    // The four states plus the silence account for every judgeable drive. A
+    // fifth state added later without a counter shows up HERE, as a sum that
+    // no longer reaches `n`, instead of vanishing into `unknown` unremarked.
+    const { pass, fail, unfinished, lessonMistake, unknown } = r.counts;
+    assert.equal(pass + fail + unfinished + lessonMistake + unknown, r.n);
+  });
+});
+
+// ---------------------------------------------------------------------------
+/**
+ * §L ADR-009 IN THE HARNESS — the same §J argument, on the fourth pill.
+ *
+ * §K above is about `lib/driveline.mjs`, which `lesson-audit.mjs` calls for the
+ * REPEAT SERIES only. The single-drive path has its own matcher, inside a
+ * `page.evaluate`, and it is the one every sweep runs — so a `classifyVerdict`
+ * that knows the word while that regex does not is precisely the dead-predicate
+ * shape this whole file exists to refuse.
+ *
+ * THE REGEX IS EXTRACTED AND RUN, not grepped for. An `assert.match(CODE, /не е
+ * взет/)` would be satisfied by the paragraph that explains the change — which
+ * is why `CODE` strips comments — and, worse, by a regex that contains the
+ * words in a form that cannot match (an unanchored alternative, a `\b` on
+ * Cyrillic, a missing `i`). This repo has shipped four green-and-blind checks
+ * and the last one was a Bulgarian word-boundary regex in this ADR's own spec.
+ * So the literal is lifted out, compiled, and asked the questions a pill asks.
+ */
+describe("§L ADR-009 — the single-drive matcher and the rows under it", () => {
+  /** The verdict matcher, lifted from the harness. Unresolvable ⇒ FAIL. */
+  const verdictRe = (() => {
+    const m = CODE.match(/if \(\/\^\((.+?)\)\$\/i\.test\(s\)\) \{ verdict = s\.toUpperCase\(\); break; \}/);
+    return m === null ? null : new RegExp(`^(${m[1]})$`, "i");
+  })();
+
+  it("the matcher is where this test says it is — an unresolved anchor FAILS", () => {
+    // The rule this file is under: a source-scanning assertion that cannot find
+    // what it is about must go red. A silent `null` here would make every case
+    // below vacuous, which is how a matcher stays green while going blind.
+    assert.ok(
+      verdictRe !== null,
+      "the verdict matcher in lesson-audit.mjs could not be located by shape — this assertion is UNRESOLVED, " +
+        "not satisfied; re-anchor it before trusting anything below",
+    );
+  });
+
+  it("reads all four pills the product can paint, and nothing else", () => {
+    for (const w of ["Издържан", "Неиздържан", "Незавършен", "Не е взет"]) {
+      assert.ok(verdictRe.test(w), `the matcher does not read «${w}» — every such drive records verdict: null`);
+    }
+    // The note under the pill, the catalogue's «взето», and a bare fragment.
+    for (const w of [
+      "взето",
+      "Не е взета",
+      "Не е взет — виж защо",
+      "Изпитният лист остана чист, затова тук не пише „Неиздържан“.",
+    ]) {
+      assert.ok(!verdictRe.test(w), `the matcher accepts «${w}» as a verdict — the pill loop would stop on prose`);
+    }
+  });
+
+  it("MUTATION: a matcher without the fourth alternative goes blind on 558 drives", () => {
+    // The same string, against the matcher as it stood before ADR-009. If this
+    // ever passes, the alternative above is decorative.
+    const before = /^(издържан|неиздържан|незавършен)$/i;
+    assert.ok(!before.test("Не е взет"), "the pre-ADR-009 matcher already read it — then §L is testing nothing");
+    assert.ok(verdictRe.test("Не е взет"));
+  });
+
+  it("records WHY the lesson was refused, from the section the product renders for it", () => {
+    // THEO-4's requirement zero lands in the sidecar or it lands nowhere: doc 91
+    // measured that 08-debrief.png stops at the error-class table, and this
+    // section is below it. A verdict with no rows beside it is a bare verdict in
+    // the artefact a judge actually reads.
+    assert.match(
+      CODE,
+      /lessonMistakeRows: rows\("Грешката на този урок"\)/,
+      "the facts no longer record the reason rows — «НЕ Е ВЗЕТ» becomes a bare verdict in _audit-status.json",
+    );
+    assert.match(
+      CODE,
+      /'section\[aria-label="Грешката на този урок"\]'/,
+      "the reason section is not in DEBRIEF_SECTIONS — it gets no frame and no dump entry, the shape that left " +
+        "«Карта на грешките» unphotographed for eight sweeps",
+    );
+    assert.match(
+      CODE,
+      /lessonMistakeRows: facts\.lessonMistakeRows \?\? \[\]/,
+      "the rows are read and not published — a predicate nothing reads",
+    );
+  });
+
+  it("prints the fourth count in the series summary, off the counter and not a recount", () => {
+    assert.match(
+      CODE,
+      /НЕ Е ВЗЕТ \$\{rate\.counts\.lessonMistake\}/,
+      "the machine summary still prints three pills — four states summarised as three is how a reader " +
+        "concludes the counts are broken rather than that a state is missing",
+    );
+  });
+
+  it("the human log names the refusal beside the convictions, not inside them", () => {
+    // Two opposite facts about the изпитен лист: a MISTAKES row cost points, a
+    // LESSON MISTAKE row cost none and refused the lesson anyway. One list
+    // would tell a judge the drive was convicted of something it was not.
+    assert.match(CODE, /LESSON MISTAKE — why the lesson was not taken/, "the human block is gone");
+    const at = CODE.indexOf("const lmRows = facts.lessonMistakeRows");
+    assert.ok(at >= 0, "the LESSON MISTAKE block's own binding is gone — this assertion is UNRESOLVED, not satisfied");
+    const block = CODE.slice(at, at + 900);
+    assert.match(block, /LESSON MISTAKE — why the lesson was not taken/, "the header no longer follows the rows it prints");
+    assert.match(
+      block,
+      /facts\.verdict === "НЕ Е ВЗЕТ"/,
+      "the block is printed only when rows exist, so the one case that matters — a refusal the product " +
+        "failed to explain — prints nothing at all",
+    );
+  });
+});

@@ -516,7 +516,11 @@ if (REPEAT_N >= 2) {
   } catch { /* best effort */ }
   const pct = (x) => (x === null ? "—" : `${(x * 100).toFixed(0)}%`);
   say(`--- MACHINE SUMMARY (${SCENARIO}/${PLATFORM}/${MODE} · repeat ×${REPEAT_N}) ---`);
-  say(`  dispatched ${rate.dispatched} · judgeable ${rate.n} · ИЗДЪРЖАН ${rate.counts.pass} · НЕИЗДЪРЖАН ${rate.counts.fail} · НЕЗАВЪРШЕН ${rate.counts.unfinished} · no-verdict ${rate.counts.unknown}`);
+  // Four pills since ADR-009. «НЕ Е ВЗЕТ» is printed on its own and not folded
+  // into НЕИЗДЪРЖАН: the two mean opposite things about the изпитен лист, and a
+  // summary whose four counts no longer sum to `judgeable` is how a reader
+  // discovers a fifth state exists.
+  say(`  dispatched ${rate.dispatched} · judgeable ${rate.n} · ИЗДЪРЖАН ${rate.counts.pass} · НЕИЗДЪРЖАН ${rate.counts.fail} · НЕ Е ВЗЕТ ${rate.counts.lessonMistake} · НЕЗАВЪРШЕН ${rate.counts.unfinished} · no-verdict ${rate.counts.unknown}`);
   say(`  PASS RATE: ${pct(rate.point)}  95% ${pct(rate.lo95)}–${pct(rate.hi95)}  —  ${rate.why}`);
   say(`  against the filed 13% claim: ${series.against.verdict.toUpperCase()} — ${series.against.why}`);
   if (!rate.buildStable) {
@@ -9080,12 +9084,15 @@ const facts = await page
         const s = t(p);
         // ── THREE STATES, NOT TWO — 2026-08-21 ────────────────────────────
         //
-        // `SessionVerdict` (hud/SessionEndScreen.tsx) has been three-way since
-        // the day «Неиздържан» stopped being printed over a clean изпитен
-        // лист: `passed` · `failed` · `unfinished`, and
-        // SESSION_VERDICT_LABEL_BG spells the third one «Незавършен». This
-        // matcher knew two of them, so every unfinished drive was recorded as
-        // `verdict: null` and printed «VERDICT: (none)».
+        // `SessionVerdict` (hud/SessionEndScreen.tsx) went three-way on the day
+        // «Неиздържан» stopped being printed over a clean изпитен лист:
+        // `passed` · `failed` · `unfinished`, and SESSION_VERDICT_LABEL_BG
+        // spells the third one «Незавършен». (It went FOUR-way on 2026-09-18 —
+        // the ADR-009 block below. This paragraph is left in the past tense
+        // rather than rewritten: it is the record of how the defect was found,
+        // and a comment that keeps claiming the current shape is the thing that
+        // goes stale.) This matcher knew two of them, so every unfinished drive
+        // was recorded as `verdict: null` and printed «VERDICT: (none)».
         //
         // MEASURED OVER WAVE C: 0 of 376 drives lacked a debrief frame and 112
         // of them ended «Незавършен» — with a penalty-class table, a star
@@ -9098,9 +9105,27 @@ const facts = await page
         // stay distinguishable, because one of them is a finding about this
         // instrument and the other is a finding about the lesson.
         //
-        // Exact match, as before: «Неиздържан» contains «издържан», so a
-        // substring test cannot answer the right question.
-        if (/^(издържан|неиздържан|незавършен)$/i.test(s)) { verdict = s.toUpperCase(); break; }
+        // ── FOUR STATES SINCE ADR-009 — 2026-09-18 ────────────────────────
+        //
+        // Founder Ruling A gave `SessionVerdict` a fourth member: a PRACTICE
+        // scenario lesson in which the student commits the mistake that lesson
+        // exists to teach is refused — «Не е взет» — with a CLEAN изпитен лист
+        // and no наказателни точки for that first occurrence. Doc 92 §9 counts
+        // 558 of the corpus's 2,434 drives landing on it.
+        //
+        // Left unlearned, this matcher would have recorded every one of those
+        // as `verdict: null` / «VERDICT: (none)» — the same silence the
+        // 2026-08-21 block above describes, in the same direction: a product
+        // that is working exactly as ruled would read as one with no verdict
+        // surface at all, on 23 % of the corpus.
+        //
+        // TWO TOKENS AND A SPACE, WHICH IS NEW HERE. `t()` has already
+        // collapsed runs of whitespace to single spaces (and `\s` covers the
+        // U+00A0 a pill could carry), so the single-spaced form is the one on
+        // the string. Still an EXACT match: «Неиздържан» contains «издържан»
+        // and the catalogue says «взето» of a completed rung, so a substring
+        // test cannot answer the right question about either word.
+        if (/^(издържан|неиздържан|незавършен|не е взет)$/i.test(s)) { verdict = s.toUpperCase(); break; }
       }
     }
     const scoreText = t(verdictSection);
@@ -9172,6 +9197,25 @@ const facts = await page
       stars: stars ? stars.getAttribute("aria-label") : null,
       objectives,
       mistakes: rows("Грешки"),
+      /* ── WHY THE LESSON WAS REFUSED — ADR-009, 2026-09-18 ────────────────
+       *
+       * «Не е взет» without this array is a bare verdict in the sidecar, and
+       * the sidecar is what a judge reads (doc 91: 08-debrief.png stops at the
+       * error-class table, and this section is below it). Doc 92 §12 R3 expects
+       * about ten RIGHT legs to read «НЕ Е ВЗЕТ» on the next sweep — each one
+       * correct behaviour, each one indistinguishable from a grading regression
+       * unless the judge can see WHICH act the lesson teaches and WHEN it
+       * happened. These rows carry both, plus the corrective, straight out of
+       * the section `SessionEndScreen` renders for exactly that purpose.
+       *
+       * `section[aria-label="Грешката на този урок"]` — the aria-label is FIXED
+       * while the visible <h3> pluralises to «Грешките…», which is why the
+       * label and not the heading is the handle. `[]` here means «the section
+       * was not on the page», the same way `rows("Грешки")` already does; the
+       * two silences stay distinguishable through `verdict`, which says whether
+       * there was anything to explain.
+       */
+      lessonMistakeRows: rows("Грешката на този урок"),
       commendations: rows("Похвали"),
       nearMisses: rows("Разминавания на косъм"),
       debriefText: t(document.querySelector('section[aria-label="Разбор"]')).slice(0, 900),
@@ -9223,6 +9267,14 @@ const facts = await page
  */
 const DEBRIEF_SECTIONS = [
   'section[aria-labelledby="sim-result-title"]',
+  // ADR-009's reason block. It sits between the verdict card and «Оценка на
+  // маневрата» and it is the whole of the product's answer to «защо „Не е
+  // взет"» — THEO-4's requirement zero on the one verdict that is new. A
+  // section that is not in this list gets no frame (the cap is derived from
+  // this array's length), which is how «Карта на грешките» went unphotographed
+  // for eight sweeps; it is added here on the day the section ships rather
+  // than after a judge asks for a picture that does not exist.
+  'section[aria-label="Грешката на този урок"]',
   'section[aria-label="Оценка на маневрата"]',
   // A15's mistake MAP — «Къде се случи». SessionEndScreen renders eight
   // sections and this list was written with seven; the missing one is the
@@ -10354,6 +10406,33 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
 note(`MISTAKES (${facts.mistakes?.length ?? 0}):`);
 for (const m of facts.mistakes ?? []) note(`   ✗ ${m.slice(0, 240)}`);
 if (!(facts.mistakes ?? []).length) note("   (none convicted)");
+/* ── THE LESSON'S OWN MISTAKE — ADR-009, and the block R3 needs ────────────
+ *
+ * Printed next to MISTAKES and not inside it, because they are opposite facts
+ * about the изпитен лист: a row above is a CONVICTION that cost наказателни
+ * точки; a row here is the act the lesson exists to teach, whose FIRST
+ * occurrence costs none and refuses the lesson anyway (founder Ruling A).
+ * A judge reading «НЕ Е ВЗЕТ» over «(none convicted)» with nothing in between
+ * would be looking at a product that appears to refuse a spotless drive for no
+ * stated reason — which is the reading doc 92 §12 R3 warns will be filed about
+ * ten times on the next sweep. The refusal is stated here, in the product's own
+ * retrieved words, on the same line as the verdict that rests on it.
+ *
+ * The rows are long (title · clock · explanation · corrective · law chip), so
+ * they are cut at 400 rather than 240: the ✔ corrective is the half a judge
+ * needs and it is at the END of the row. Whole rows are in _audit-debrief.json.
+ */
+const lmRows = facts.lessonMistakeRows ?? [];
+if (lmRows.length || facts.verdict === "НЕ Е ВЗЕТ") {
+  note(`LESSON MISTAKE — why the lesson was not taken (${lmRows.length}):`);
+  for (const r of lmRows) note(`   ⊘ ${r.slice(0, 400)}`);
+  if (!lmRows.length) {
+    loud(
+      `the pill says «НЕ Е ВЗЕТ» and the product printed NO reason section — ` +
+        `that is a THEO-4 defect in the product (a bare verdict), not a gap in this instrument.`,
+    );
+  }
+}
 note(`COMMENDATIONS (${facts.commendations?.length ?? 0}):`);
 for (const c of facts.commendations ?? []) note(`   ★ ${c.slice(0, 200)}`);
 if (!(facts.commendations ?? []).length) note("   (none credited)");
@@ -10465,9 +10544,14 @@ saveStatus({
   endedNaturally,
   forcedBy,
   verdict: facts.verdict ?? null,
-  // Three verdicts and two silences, told apart at source. A consumer that
-  // sees `verdict: null` can now ask WHY without opening a picture.
+  // Four verdicts and two silences, told apart at source. A consumer that
+  // sees `verdict: null` can now ask WHY without opening a picture — and since
+  // ADR-009 a consumer that sees «НЕ Е ВЗЕТ» can ask WHICH act refused the
+  // lesson without opening one either, from the field below.
   verdictSurface: facts.verdictSurface ?? null,
+  // ADR-009 §5.3's reason rows, verbatim. `[]` means the section was not on
+  // the page; beside a «НЕ Е ВЗЕТ» verdict that pair is itself the finding.
+  lessonMistakeRows: facts.lessonMistakeRows ?? [],
   score: facts.score ?? null,
   reachedVerdictCard: reached,
   // WHAT HAPPENED TO REVERSE — see the block beside `armReverse`. Always

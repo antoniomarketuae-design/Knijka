@@ -70,6 +70,35 @@ import {
   type SimOverlayItem,
   type TelltaleWarning,
 } from "@/modules/sim/hud";
+// ADR-009 §5.4 — THE WORD THIS SHELL IS NOT ALLOWED TO AUTHOR.
+//
+// Two surfaces here printed a verdict of their own: the phone's end LINE and
+// the roomy end BAR both folded `result.passed` to «Издържан»/«Неиздържан» and
+// that was their whole rule. Since the result screen's pill became four-way
+// they disagreed with it on two of the four — «Незавършен» (a clean sheet, an
+// unfinished route) and now «Не е взет» — so a student who read the pill and
+// then glanced at the bar was told two different things about one drive. The
+// fold and the label table are `SessionEndScreen`'s, and they stay its: this
+// file composes the surrounding sentence, never the word.
+//
+// DEEP IMPORT, deliberately, and it is the narrow choice of the two available.
+// `modules/sim/hud/index.ts` publishes `SessionEndScreen` (imported above, so
+// this module is already in the bundle) but not the two values — and that
+// barrel belongs to no lane in this round, so adding the export line is an edit
+// this lane reports rather than makes (see PlayAreaStyles.tsx → hud/notifyColumn
+// and LessonScene.tsx → hud/dashboardStatus for the same shape). The one-line
+// alternative, for whoever owns the barrel next:
+//   export { SESSION_VERDICT_LABEL_BG, sessionVerdict, type SessionVerdict } from "./SessionEndScreen";
+// The case for it is no longer a promise: there are now TWO deep importers of
+// the same two symbols. `app/dev/popup-rig/popup-rig-client.tsx:77` reaches for
+// them the same way (doc 92 §7, lane P) because the rig's skipped-result bar had
+// hard-coded «Неиздържан» under a pill that could read anything — so a barrel
+// line would delete two deep imports, and every further reader of this word gets
+// the published symbol instead of a third copy of this paragraph.
+import {
+  SESSION_VERDICT_LABEL_BG,
+  sessionVerdict,
+} from "@/modules/sim/hud/SessionEndScreen";
 import {
   abortSession,
   ADVISOR_STORAGE_KEY,
@@ -86,6 +115,14 @@ import {
   EXAM_TERMINATION_TEXT_BG,
   finishSession,
   isDriveLocked,
+  // ADR-009 (founder Ruling A, 2026-09-17) — the lesson's own mistake. All
+  // four are RETRIEVAL/composition helpers from `lessons/lessonMistake.ts`, the
+  // one place the rule and its words are written; this shell composes none of
+  // them. See the four call sites: the teach notification's chip and stake, the
+  // calibration gate's two props, and the briefing's rule line.
+  lessonMistakeNamesBg,
+  lessonMistakeRuleBg,
+  lessonMistakeTargetCodes,
   MISTAKE_EXPERIENCE_DEMO_OFFER_SEC,
   observeQuizTick,
   parkingObservationFromTrace,
@@ -100,6 +137,8 @@ import {
   serializeCoachedMistakes,
   serializeNearMisses,
   serializeRuleEvents,
+  teachChipBg,
+  teachStakeBg,
   type AdvisorPrompt,
   type LessonResult,
   type LessonSessionState,
@@ -143,7 +182,6 @@ const PRE_DRIVE_DONE_HOLD_MS = 7000;
 import {
   accumulateScore,
   EXAM_POINTS_SHORT_NOTE_BG,
-  examMarkCitationBg,
   minusPointsBg,
   N38_CLASS_LABEL_BG,
   pointsBg,
@@ -1092,6 +1130,124 @@ export function teachMomentPeekBg(code: string): string | null {
   if (!Object.prototype.hasOwnProperty.call(VIOLATIONS, code)) return null;
   const peek = violationPeekBg(code as ViolationCode, undefined);
   return typeof peek === "string" && peek.trim().length > 0 ? peek : null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE TWO END SURFACES THIS SHELL OWNS, AND WHY THEY STOPPED GUESSING
+ * — ADR-009 §5.4 (founder Ruling A, 2026-09-17).
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * THE DEFECT, AS THE TREE STOOD. The result screen's verdict has been a
+ * `SessionVerdict` — four members since ADR-009, three before it — while both
+ * of this shell's end surfaces folded `result.passed` themselves:
+ *
+ *     result.aborted ? «Прекратена сесия» : result.passed ? «Издържан» : «Неиздържан»
+ *
+ * A two-way fold cannot say a four-way thing, so it said the wrong one twice:
+ *  · «Незавършен» — a clean изпитен лист and an unfinished route. The pill has
+ *    read «Незавършен» since 2026-08-21 and these two surfaces kept printing
+ *    «Неиздържан» beside it. PRE-EXISTING, and this is where it ends;
+ *  · «Не е взет» — ADR-009's own verdict, on 558 of the corpus's 2,434 drives
+ *    (doc 92 §9). The note under the pill says in words «затова тук не пише
+ *    „Неиздържан“» while the bar two centimetres away printed exactly that.
+ *
+ * THEO-4 is the reason this is a defect and not a cosmetic drift: doc 64 THEO-4
+ * forbids a bare verdict anywhere, and a product that announces two different
+ * verdicts for one drive has not merely failed to explain — it has made the
+ * explanation unreachable, because the student cannot tell which word to
+ * believe. The end bar's own comment (`data-hud="end-bar"`) has said so since
+ * the day it was written.
+ *
+ * WHAT THESE TWO FUNCTIONS ARE ALLOWED TO DO. Compose, not decide and not
+ * name: `sessionVerdict` is the fold (`SessionEndScreen`, one file, consulted
+ * by the screen and now by the glass) and `SESSION_VERDICT_LABEL_BG` is the
+ * word. Both arrive by import. The only thing written here is the invitation
+ * around the word, and `viewWordBg` is why it is a function rather than a
+ * literal: «виж разбора» is right for a verdict the изпитен лист produced and
+ * wrong for a lesson rule, whose whole content is a REASON — so the not-taken
+ * line says «виж защо», which is the same promise THEO-4 makes on the pill.
+ *
+ * ABORTED IS CHECKED FIRST, on both, and it is not the same question. The fold
+ * classifies a quit drive as `unfinished` (a clean sheet, no hit that counts),
+ * but «Прекратена сесия» is what these two surfaces have always said and it
+ * carries a fact the label does not: the student ended it himself. Doc 92 §5.4
+ * writes the arm explicitly for that reason.
+ */
+function viewWordBg(verdict: ReturnType<typeof sessionVerdict>): string {
+  return verdict === "lessonMistake" ? "защо" : "разбора";
+}
+
+/** The phone's end LINE — the verdict plus the tap that opens the account of
+ *  it. The overlay row is one line; the debrief is one tap behind it. */
+export function sessionEndLineBg(result: LessonResult): string {
+  if (result.aborted) return "Прекратена сесия";
+  const verdict = sessionVerdict(result);
+  return `${SESSION_VERDICT_LABEL_BG[verdict]} — виж ${viewWordBg(verdict)}`;
+}
+
+/** The roomy end BAR's label. No invitation here: the bar carries «Виж
+ *  разбора» as its own accented button, and a label that repeated it would be
+ *  the card citing one route twice. */
+export function sessionEndBarLabelBg(result: LessonResult): string {
+  if (result.aborted) return "Прекратена сесия";
+  return SESSION_VERDICT_LABEL_BG[sessionVerdict(result)];
+}
+
+/**
+ * Success colour, on either surface. `passed` and nothing else — the tone was
+ * already right (both sites read `result.passed`), and it is stated here so the
+ * colour and the word are read off ONE expression: a bar that paints «Не е
+ * взет» green would be the same contradiction in a second channel.
+ */
+export function sessionEndToneIsGood(result: LessonResult): boolean {
+  return !result.aborted && sessionVerdict(result) === "passed";
+}
+
+/**
+ * ADR-009 §5.9 — THE CALIBRATION GATE'S REVEAL HALF, AND THE ONE STATE IN
+ * WHICH IT MAY NOT SPEAK.
+ *
+ * That gate stands IN FRONT of the result screen, so whatever it says about the
+ * drive is the first verdict the student reads and the pill is the second. The
+ * prop was handed over on `lessonMistakes.length > 0` alone — which is not the
+ * question the pill asks. `sessionVerdict` consults the изпитен лист FIRST, so
+ * a drive that both failed the лист and committed the lesson's own mistake ends
+ * «Неиздържан», while the gate was telling that same student «Урокът също не е
+ * взет». MEASURED on this tree over all 2,434 authored drives: the gate is
+ * reachable on 654 of them, and on 96 — across 23 lessons — the лист had
+ * already convicted. Two surfaces one tap apart named one drive with two
+ * different words, and the sentence that reconciles them is null in exactly
+ * that state: `lessonMistakeVerdictNoteBg`'s «…, затова тук не пише
+ * „Неиздържан“» is written for the other arm and returns null on this one.
+ *
+ * SO THE CONDITION IS THE FOLD ITSELF, not a second reading of its inputs: this
+ * gate speaks the lesson's verdict when, and only when, the pill behind it will
+ * speak it. That also keeps it silent on a quit drive and on a rung that passed
+ * without this file re-deriving either fact. It is the same rule the history row
+ * already follows (`historyLessonMistakes.ts`, `notTaken: !aborted &&
+ * sheetPassed !== false`): the WORD belongs to the clean-sheet arm.
+ *
+ * AND THE ACT IS STILL NAMED ON ALL 96 — nothing is withheld from that student,
+ * which is the test this may not fail. The result screen's reason block runs off
+ * `lessonMistakeReasonsBg`, which drops a drive only when it PASSED, so those 96
+ * keep the title, the clock, the authored why, the corrective and the law ref;
+ * the teach card already named and priced the act at the moment it happened; and
+ * «Неиздържан» is not a softer word than «Не е взет». What the student loses is
+ * a second verdict word for one drive — which doc 64 THEO-4 counts worse than a
+ * bare one, because it makes the explanation unbelievable.
+ *
+ * `namesBg` is retrieved catalogue copy (`lessonMistakeNamesBg`): neither this
+ * file nor the gate composes a word about the acts.
+ */
+export function calibrationLessonMistakeBg(
+  result: LessonResult,
+): { namesBg: string; one: boolean } | null {
+  const hits = result.lessonMistakes ?? [];
+  if (hits.length === 0) return null;
+  // The pill's own fold, CALLED — never re-derived here. When it does not name
+  // this drive «Не е взет», the screen standing in front of it may not either.
+  if (sessionVerdict(result) !== "lessonMistake") return null;
+  return { namesBg: lessonMistakeNamesBg(hits), one: hits.length === 1 };
 }
 
 export function snapshotOf(
@@ -5228,8 +5384,11 @@ export function LessonPlayShell({
         nearMisses: serializeNearMisses(state.nearMisses ?? []),
         // The shown-but-not-charged violations (teach / learn-only arms), so
         // the SERVER debrief — the text the student actually reads — can stop
-        // calling such a drive «чисто каране». Codes + times only; the server
-        // re-titles from its own catalog (ADR-002).
+        // calling such a drive «чисто каране». Codes, times and the ACT
+        // (`detail`, since ADR-009) — never a title: the server re-titles from
+        // its own catalog, and a detail only SELECTS a row there (ADR-002).
+        // Since ADR-009 this list also reaches the VERDICT through
+        // `foldLessonMistakes`, so it is no longer display-only metadata.
         ...(r.coachedMistakes !== undefined && r.coachedMistakes.length > 0
           ? { coachedMistakes: serializeCoachedMistakes(r.coachedMistakes) }
           : {}),
@@ -5577,6 +5736,35 @@ export function LessonPlayShell({
     savedSessionId !== null && result !== null && !result.aborted ? (
       <CalibrationGate
         lessonTitleBg={lesson.titleBg}
+        /* ── ADR-009 §5.9 — THE TWO FACTS THE GATE CANNOT DERIVE ────────────
+         *
+         * Both props landed in `CalibrationGate.tsx` with no caller, which is
+         * the dead-predicate shape this programme has measured 51 times in 82
+         * repairs; lane F's verifier filed it as blocker F-3 and it is wired
+         * here. Without them the gate asks «Издържах ли?» bare, reveals
+         * «Изпитът каза … издържан», and the very next screen says «Не е взет»
+         * — the contradiction §5.9 exists to prevent, on the one surface whose
+         * whole purpose is to measure whether the student read himself right.
+         *
+         * `lessonHasTargets` is a fact about the LESSON, known before the
+         * drive, so the hint it prints leaks nothing about this attempt.
+         * `lessonMistakeTargetCodes` rather than `lesson.lessonMistakeTargets`
+         * deliberately: it is the one place the applicability rule is written,
+         * and it also answers `null` on an exam rung and in the THEO-3 sandbox,
+         * where ADR-009 does not apply and the gate must read as it does today.
+         *
+         * `lessonMistake` is the REVEAL half, and it goes through
+         * `calibrationLessonMistakeBg` — one exported, tested function rather
+         * than an expression only a source-reading test can see. It asks
+         * `sessionVerdict`, the very fold the pill behind this gate reads, so
+         * the two cannot name one drive with two words; its docblock has the
+         * 96 drives that made that a live defect and the reason nothing is
+         * withheld from them. Null when the drive has no hit: the reveal is
+         * then exactly today's, which is what keeps 1,780 hit-free drives
+         * unmoved.
+         */
+        lessonHasTargets={lessonMistakeTargetCodes(lesson) !== null}
+        lessonMistake={calibrationLessonMistakeBg(result)}
         onSubmit={async (predictedPoints, predictedPass) => {
           const answer = await recordSelfPredictionAction(savedSessionId, {
             predictedPoints,
@@ -6048,19 +6236,18 @@ export function LessonPlayShell({
               kind: "end" as const,
               tone: resultHeld
                 ? ("neutral" as const)
-                : result.aborted
-                  ? ("warn" as const)
-                  : result.passed
-                    ? ("good" as const)
-                    : ("warn" as const),
+                : sessionEndToneIsGood(result)
+                  ? ("good" as const)
+                  : ("warn" as const),
               chipBg: resultHeld ? null : pointsBg("exam", result.score),
+              // ADR-009 §5.4 — the word is the result screen's, not this
+              // line's. See `sessionEndLineBg` for the two verdicts the old
+              // two-way fold here got wrong («Незавършен», «Не е взет») and
+              // why a surface that disagrees with the pill is a THEO-4 defect
+              // rather than a cosmetic one.
               lineBg: resultHeld
                 ? "Сесията завърши — първо се самооцени"
-                : result.aborted
-                  ? "Прекратена сесия"
-                  : result.passed
-                    ? "Издържан — виж разбора"
-                    : "Неиздържан — виж разбора",
+                : sessionEndLineBg(result),
               // A2 — WHAT „НЕ ПОКАЗВАЙ АВТОМАТИЧНО" TURNS OFF ON A PHONE.
               //
               // On a roomy screen the end-of-lesson popup opens itself and the
@@ -6104,13 +6291,37 @@ export function LessonPlayShell({
               id: `teach:${teachQueue[0].code}:${teachQueue[0].t}`,
               kind: "teach" as const,
               tone: "teach" as const,
-              chipBg: "Учебен момент",
+              // ── ADR-009 §5.5 — THE PHONE'S ONLY TEACH SURFACE ─────────────
+              //
+              // The roomy card (`TeachMomentOverlay`) is desktop-only, so on a
+              // phone THIS notification is the whole of what the student is
+              // told at the moment of the mistake. It hard-coded «Учебен
+              // момент» and «Първа среща — не се брои в резултата», and on the
+              // lesson's own mistake both are now false in the direction that
+              // reassures: the lesson is being refused for exactly this act,
+              // and the card said it did not count. Lane E's verifier filed it
+              // as a live THEO-4 defect (F3) and routed it here.
+              //
+              // `teachChipBg` and `teachStakeBg` are the SAME two helpers the
+              // roomy card renders (`lessons/lessonMistake.ts`, doc 92 §5.5's
+              // four kinds), so the two surfaces cannot drift: whichever screen
+              // a student is on, the moment is named and priced identically.
+              chipBg: teachChipBg(teachQueue[0]),
               lineBg: teachQueue[0].titleBg,
               // The SAME sentence the teach card carries, and it had the SAME
               // bare „т.". Both now name the scale and the clause the number
               // comes out of — а chip reading „ЗДвП чл. 21" beside a 10-point
               // mark is what the founder read as his licence being docked.
-              detailBg: `${teachQueue[0].explanationBg}\n\nПърва среща — не се брои в резултата. При повторение: ${minusPointsBg("exam", teachQueue[0].points)} по ${examMarkCitationBg(teachQueue[0].severity)}, а повторните грешки тежат още повече (×1.5 / ×2.0).\n\n${EXAM_POINTS_SHORT_NOTE_BG}`,
+              //
+              // `citeMark: true` and no `severityLabelBg`: the clause, because
+              // this card has no «оценка:» chip of its own to carry it, and no
+              // «(опасна грешка)», because the chip row already names the class
+              // — which is exactly what the literal below it used to do, so an
+              // ORDINARY teach moment's text here is byte-identical to what it
+              // was (pinned in `__tests__/shell-end-surfaces.test.tsx` §3, «an
+              // ORDINARY teach moment does not change by a character», which
+              // reproduces the shipped literal instead of composing it).
+              detailBg: `${teachQueue[0].explanationBg}\n\n${teachStakeBg(teachQueue[0], { citeMark: true })}\n\n${EXAM_POINTS_SHORT_NOTE_BG}`,
               // …AND THE ONE LINE THE PEEK CAN FINISH (sc-merge-from-property:
               // 6715b581). `detailBg` above stays whole and is what «ЗАЩО»
               // opens; this is the row the student can actually read while the
@@ -8899,26 +9110,23 @@ export function LessonPlayShell({
               className="pointer-events-auto flex flex-wrap items-center gap-3 rounded-2xl border bg-background/90 px-4 py-2.5 backdrop-blur"
               style={{
                 borderColor: `color-mix(in srgb, ${
-                  result.aborted
-                    ? "var(--warning)"
-                    : result.passed
-                      ? "var(--success)"
-                      : "var(--warning)"
+                  sessionEndToneIsGood(result) ? "var(--success)" : "var(--warning)"
                 } 55%, transparent)`,
               }}
               role="status"
             >
+              {/* ADR-009 §5.4. The label and the colour now come off ONE fold
+                  (`sessionEndBarLabelBg` / `sessionEndToneIsGood`, both over
+                  `sessionVerdict`), so this bar cannot print a word the result
+                  screen's pill disagrees with — which it did on «Незавършен»
+                  and would have on «Не е взет». */}
               <span
                 className="text-sm font-black"
                 style={{
-                  color: result.passed && !result.aborted ? "var(--success)" : "var(--warning)",
+                  color: sessionEndToneIsGood(result) ? "var(--success)" : "var(--warning)",
                 }}
               >
-                {result.aborted
-                  ? "Прекратена сесия"
-                  : result.passed
-                    ? "Издържан"
-                    : "Неиздържан"}
+                {sessionEndBarLabelBg(result)}
               </span>
               <span className="text-xs font-bold tabular-nums text-muted">
                 {result.score} нак. точки

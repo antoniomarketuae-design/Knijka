@@ -1,0 +1,139 @@
+{
+  "_source": "docs/simulation/92_ADR009_LESSON_MISTAKE_SPEC.md §9 (Acceptance census), revision 2. TYPED BY HAND FROM THE SPEC, never generated from this tree: an expectation produced by the code under test measures nothing. Every number below is the spec's; where the tree disagrees, the census prints both and the disagreement is the finding.",
+  "_before": "The «before» half of every comparison comes from the COMMITTED pre-ADR-009 census — docs/simulation/adr-009/census-baseline.json (L1/L3/L4, 1,494 rows) and census-L25.json (L2/L5, 940 rows), measured on the clean tree at HEAD 98bf8ae. It is not re-derived here and it is not simulated by deleting the targets.",
+  "_corrections": "ONE PAIR OF CELLS HAS BEEN RETYPED SINCE REVISION 2 WAS FIRST TRANSCRIBED, and the reason is written down here because retyping an expectation to match the tree is precisely the failure this fixture exists to prevent. totals.cards 661→665 and totals.drivesWithTwoCards 7→10, on 2026-09-18, AFTER §9 criterion 9 itself was corrected — not before, and not instead. The prototype's 661/7 was refuted by three independent instruments (lane C's in-process fold, lane C's verifier recomputing it a different way, and this census, re-run twice by a fourth party to a byte-identical digest), all four landing on 665 / 654 / 10 with the same ten drives. §9 criterion 9 now states 665/10, names every measurer, and lists the drives; these two numbers are typed from THAT corrected sentence, exactly as every other number here is typed from its own. totals.hitDrives (654) was never in dispute. If you disagree with the correction, change §9 first and retype this second — never the other way round, and never both in one hand without saying so.",
+  "_scopes": {
+    "shadowDrives": "drives of a shadow-* tape at this rung",
+    "shadowPassed": "…of those, result.passed === true",
+    "mistakeDrives": "drives of a mistake-* tape at this rung",
+    "mistakePassed": "…of those, result.passed === true",
+    "mistakeThreeStar": "…of those, scoreRubric stars === 3",
+    "hitDrives": "drives with a non-empty result.lessonMistakes (all rungs: shadow drives must contribute none)",
+    "reasonRowDrives": "drives for which the product's own lessonMistakeReasonsBg(result) returns at least one row. NOT a rendered block: this instrument paints nothing",
+    "notTaken": "drives whose sessionVerdict(result) === 'lessonMistake'",
+    "notTakenFrom": "…split by the verdict the SAME drive had in the committed baseline",
+    "failedWithHit": "drives with a hit whose verdict is 'failed' (the изпитен лист convicted them as well)",
+    "unfinishedWithHit": "drives with a hit whose verdict is still 'unfinished' — the state §9 requires to be empty, because it tells a student who reached the end to go and reach it",
+    "mistakeSheetPoints": "sum of summary.score.totalPoints over the mistake-tape drives at this rung",
+    "drivesLosingPoints": "mistake-tape drives whose totalPoints is LOWER than the committed baseline's",
+    "cards": "teach moments the ENGINE raised with TeachMoment.lessonMistake set, summed over every drive. It is what applyTick emitted, NOT what the shell painted: the shell renders two cards raised on one tick as a single pause, which is one candidate explanation for §9's smaller figure",
+    "drivesWithTwoCards": "drives carrying two or more of those teach moments — usually two DIFFERENT target codes, one card each",
+    "practiceHits": "rows of result.lessonMistakes summed over non-exam drives (one row per code, not per occurrence)",
+    "chargedHitsWithNoEarlierCoached": "§9 criterion 4c: a charged occurrence of a target code with no earlier coached occurrence of that code on the same drive — i.e. a FIRST occurrence that was billed, which founder Ruling A forbids"
+  },
+  "totals": {
+    "drives": 2434,
+    "errors": 0,
+    "hitDrives": 654,
+    "cards": 665,
+    "drivesWithTwoCards": 10,
+    "practiceHits": 693,
+    "chargedHitsWithNoEarlierCoached": 0,
+    "drivesLosingPoints": 147,
+    "pointsWithheld": 231,
+    "drivesGainingPoints": 0,
+    "shadowDrivesWithHits": 0
+  },
+  "rungs": {
+    "1": {
+      "shadowDrives": 167,
+      "shadowPassed": 167,
+      "mistakeDrives": 336,
+      "mistakePassed": 2,
+      "mistakeThreeStar": 2,
+      "notTaken": 146,
+      "notTakenFrom": { "passed": 40, "unfinished": 105, "failed": 1 },
+      "failedWithHit": 25,
+      "hitDrives": 171,
+      "reasonRowDrives": 171,
+      "unfinishedWithHit": 0,
+      "mistakeSheetPoints": 2069,
+      "drivesLosingPoints": 38
+    },
+    "2": {
+      "shadowDrives": 167,
+      "shadowPassed": 167,
+      "mistakeDrives": 336,
+      "mistakePassed": 2,
+      "mistakeThreeStar": 2,
+      "notTaken": 146,
+      "notTakenFrom": { "passed": 35, "unfinished": 110, "failed": 1 },
+      "failedWithHit": 25,
+      "hitDrives": 171,
+      "reasonRowDrives": 171,
+      "unfinishedWithHit": 0,
+      "mistakeSheetPoints": 2069,
+      "drivesLosingPoints": 38
+    },
+    "3": {
+      "shadowDrives": 167,
+      "shadowPassed": 167,
+      "mistakeDrives": 336,
+      "mistakePassed": 2,
+      "mistakeThreeStar": 2,
+      "notTaken": 146,
+      "notTakenFrom": { "passed": 32, "unfinished": 113, "failed": 1 },
+      "failedWithHit": 25,
+      "hitDrives": 171,
+      "reasonRowDrives": 171,
+      "unfinishedWithHit": 0,
+      "mistakeSheetPoints": 2072,
+      "drivesLosingPoints": 38
+    },
+    "4": {
+      "shadowDrives": 162,
+      "shadowPassed": 162,
+      "mistakeDrives": 326,
+      "mistakePassed": 32,
+      "mistakeThreeStar": 2,
+      "notTaken": 0,
+      "notTakenFrom": { "passed": 0, "unfinished": 0, "failed": 0 },
+      "failedWithHit": 0,
+      "hitDrives": 0,
+      "reasonRowDrives": 0,
+      "unfinishedWithHit": 0,
+      "mistakeSheetPoints": 2206,
+      "drivesLosingPoints": 0,
+      "unfinishedMistakeDrives": 110
+    },
+    "5": {
+      "shadowDrives": 145,
+      "shadowPassed": 145,
+      "mistakeDrives": 292,
+      "mistakePassed": 2,
+      "mistakeThreeStar": 2,
+      "notTaken": 120,
+      "notTakenFrom": { "passed": 22, "unfinished": 97, "failed": 1 },
+      "failedWithHit": 21,
+      "hitDrives": 141,
+      "reasonRowDrives": 141,
+      "unfinishedWithHit": 0,
+      "mistakeSheetPoints": 1876,
+      "drivesLosingPoints": 33
+    }
+  },
+  "criteria": {
+    "stillPassingMistakeTapes": [
+      "sc-follow-standstill/mistake-creep-up",
+      "sc-park-perp-forward/mistake-blind-exit"
+    ],
+    "mistakeNotPassed": { "1": 334, "2": 334, "3": 334, "5": 290 },
+    "examRungDriftingDrives": 0,
+    "shadowDriftingDrives": 0,
+    "sheetVerdictFlips": [
+      "sc-ln-turn-lane-arrows/mistake-late-two-lanes@L1",
+      "sc-ln-turn-lane-arrows/mistake-late-two-lanes@L2",
+      "sc-ln-turn-lane-arrows/mistake-late-two-lanes@L3",
+      "sc-ln-turn-lane-arrows/mistake-late-two-lanes@L5"
+    ],
+    "starFallsOnAlreadyFailing": [
+      "sc-ln-turn-lane-arrows/mistake-late-two-lanes@L1",
+      "sc-ln-turn-lane-arrows/mistake-late-two-lanes@L2",
+      "sc-ln-turn-lane-arrows/mistake-late-two-lanes@L3",
+      "sc-ln-turn-lane-arrows/mistake-late-two-lanes@L5",
+      "sc-vu-cyclist-group/mistake-narrow@L1"
+    ],
+    "starsRising": 0,
+    "flipsNotAtOneStar": 0
+  }
+}

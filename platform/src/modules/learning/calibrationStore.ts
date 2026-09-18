@@ -63,7 +63,7 @@ export interface CalibrationStore {
 export const CALIBRATION_HISTORY_LIMIT = 60;
 
 /**
- * Defensive read of the lesson verdict out of a stored SimSession events Json.
+ * Defensive read of the EXAM verdict out of a stored SimSession events Json.
  *
  * The sim module owns that payload and parses it with its own validator; this
  * module deliberately re-derives the ONE field it needs instead of importing
@@ -71,11 +71,41 @@ export const CALIBRATION_HISTORY_LIMIT = 60;
  * events). An unreadable payload degrades to `false` — a drive we cannot
  * confirm passed did not pass, which is the conservative direction: it can
  * only ever mark the student MORE optimistic than they were, never less.
+ *
+ * ── WHICH FIELD, AND WHY IT IS NOT `passed` ANY MORE (ADR-009, doc 92 §5.9) ──
+ *
+ * WHAT THIS NUMBER IS. It becomes `SimSelfPrediction.actualPass`, i.e. the
+ * «Изпитът каза … издържан/неиздържан» tile, `verdictAgrees` in ./calibration
+ * (:227-230 — «the claim that maps onto the real exam») and the trend page's
+ * own legend, «разликата между твоя отговор и този на изпитната логика». The
+ * question the student answered was «Издържах ли?», printed beside the
+ * наказателни-точки field and the Наредба № 38 scale. It is a claim about THE
+ * EXAM.
+ *
+ * WHAT CHANGED UNDER IT. `SimSessionEventsJson.passed` used to mean
+ * `summary.passed && completedAll && !aborted`. ADR-009 (founder Ruling A) made
+ * it ALSO false when the student committed the mistake the practice lesson
+ * exists to teach — a LESSON rule, explicitly not an exam rule: the exam rung
+ * (L4 / examMode) is untouched byte for byte, and no изпитен-лист point moves.
+ * Read as the exam's answer, that new `passed` would score a student who read
+ * their own clean sheet correctly as having got the exam wrong — measured on
+ * this tree as 133 practice drives with a clean sheet and a finished route.
+ *
+ * SO IT READS `sheetRoutePassed`, the pre-ADR-009 expression stored explicitly
+ * by `finishLessonAction` on every row from 2026-09-18 on, and falls back to
+ * `passed` only when the field is ABSENT — which dates the row to before that
+ * write, where `passed` IS that same expression. The fallback is therefore not
+ * a guess: it is the same number under its old name. (The row's own
+ * `lessonMistakes` is deliberately NOT consulted here: whether the lesson
+ * counted is a different question, and it is answered on the screens the
+ * student reaches after this gate — §5.9's reveal line, the result screen's
+ * «Не е взет» and the history row.)
  */
 export function readSessionPassed(events: unknown): boolean {
   if (typeof events !== "object" || events === null) return false;
   const o = events as Record<string, unknown>;
-  return o.version === 1 && o.passed === true;
+  if (o.version !== 1) return false;
+  return typeof o.sheetRoutePassed === "boolean" ? o.sheetRoutePassed : o.passed === true;
 }
 
 // ---------------------------------------------------------------------------

@@ -72,6 +72,8 @@ import {
   SURFACE_NOUNS,
   tapesFor,
   verifyDeterminism,
+  verdictWordForHuman,
+  lessonMistakeLines,
   VERDICT_SHAPED_KEYS,
 } from "./inprocess-drive.mjs";
 
@@ -933,4 +935,257 @@ test("§10(e) authoredRungs probes rather than assuming five, and does it withou
   // MUTATION WATCHED: hard-code [1,2,3,4,5] and a --rung 5 on sc-animal-hazard
   // stops refusing and starts throwing a raw ScenarioCompileError out of the
   // drive — a stack trace instead of "this rung is not authored, these are".
+});
+
+// -----------------------------------------------------------------------------
+// § 11 — ADR-009. AN ARTEFACT THAT SAYS A LESSON WAS REFUSED MUST SAY WHY.
+//
+// Founder Ruling A (2026-09-17) made `verdict.passed` ambiguous: a practice
+// drive can end with a spotless изпитен лист, every objective ticked, and
+// `passed: false`, because the student committed the one mistake the lesson
+// exists to teach. Before this section the projection carried the boolean and
+// nothing else, so FIVE lanes (C, D, E, F, T) each wrote their own census over
+// the raw product chain to get at one field — and the human block printed
+// «НЕИЗДЪРЖАН», the word the product reserves for a conviction on Наредба № 38,
+// over a clean sheet.
+//
+// The pins here are the two that can rot quietly:
+//   · the flags are projected as BOOLEANS, so "did not look" and "false" cannot
+//     become the same silence (verdict-surface.mjs learned this the hard way);
+//   · the verdict WORD is the product's own function's return value. The
+//     sentinel in §11(d) is the whole defence against somebody re-deriving the
+//     four arms here, which is how two implementations of one verdict start.
+// -----------------------------------------------------------------------------
+
+/** A chain whose result and screen are whatever the case needs. */
+function adrChain({ hits = [], teach = [], screen = undefined, passed = false, sheetPassed = true } = {}) {
+  const result = {
+    summary: {
+      score: {
+        totalPoints: 0, opasniPoints: 0, osnovniPoints: 0, vtorostepenniPoints: 0,
+        opasniCount: 0, osnovniCount: 0, vtorostepenniCount: 0,
+        hasDangerous: false, ledgerClosedAtSec: null, unscoredAfterClose: 0,
+      },
+      passed: sheetPassed, failReasons: [], terminated: false,
+      mistakes: [], commendations: [], conceptIds: [],
+    },
+    objectives: [], completedAll: true, aborted: false, passed,
+    score: 0, effectiveScore: 0, escalations: [], durationSec: 12.5,
+    coachedMistakes: [
+      { code: "ILLEGAL_STOP_IN_BAN_ZONE", t: 8.25, titleBg: "Спиране в забранена зона", detail: "law-busstop" },
+      { code: "POOR_LANE_KEEPING", t: 9.5, titleBg: "Неточно държане в лентата" },
+    ],
+    ...(hits.length > 0 ? { lessonMistakes: hits } : {}),
+  };
+  const chain = {
+    engine: {
+      createLessonSession: () => ({ phase: "driving" }),
+      applyTick: (s) => ({ state: { ...s, phase: "completed" }, teachMoments: teach }),
+      buildLessonResult: () => result,
+    },
+    debrief: { buildDebrief: () => ({ text: "разбор", conceptIds: [] }) },
+    rubric: { scoreRubric: () => ({ stars: 1, breakdownBg: [] }) },
+    observation: { parkingObservationFromTrace: () => null },
+  };
+  if (screen !== undefined) {
+    chain.screen = screen;
+    chain.screenUnavailable = screen === null ? "the fixture withheld the screen module" : null;
+  }
+  return { chain, result };
+}
+
+const HIT = {
+  code: "ILLEGAL_STOP_IN_BAN_ZONE",
+  t: 8.25,
+  charged: false,
+  detail: "law-busstop",
+  titleBg: "Спиране на спирка на градския транспорт",
+  demoTitleBg: "Спиране на спирката",
+};
+
+test("§11(a) the fold's rows reach the artefact — code, time, act, title, and whether a repeat was charged", () => {
+  const { chain } = adrChain({
+    hits: [HIT, { code: "SPEEDING_OVER_LIMIT", t: 30.5, charged: true, titleBg: "Превишена скорост" }],
+  });
+  const out = runOnce(chain, fakePlan(drove(10)));
+  assert.equal(out.verdict.lessonMistakes.length, 2);
+  assert.deepEqual(out.verdict.lessonMistakes[0], {
+    code: "ILLEGAL_STOP_IN_BAN_ZONE",
+    t: 8.25,
+    charged: false,
+    detail: "law-busstop",
+    titleBg: "Спиране на спирка на градския транспорт",
+    demoTitleBg: "Спиране на спирката",
+  });
+  // The absent-optional case is projected as null, never dropped: a judge must
+  // be able to tell «no act» from «this instrument did not carry the act».
+  assert.deepEqual(out.verdict.lessonMistakes[1], {
+    code: "SPEEDING_OVER_LIMIT",
+    t: 30.5,
+    charged: true,
+    detail: null,
+    titleBg: "Превишена скорост",
+    demoTitleBg: null,
+  });
+  // MUTATION WATCHED: drop `lessonMistakes` from the projection and this whole
+  // case goes red — which is the state every lane worked around by hand.
+});
+
+test("§11(b) a drive with no lesson mistake projects an EMPTY LIST, not a missing key", () => {
+  const { chain } = adrChain({ hits: [] });
+  const out = runOnce(chain, fakePlan(drove(10)));
+  assert.deepEqual(out.verdict.lessonMistakes, []);
+  assert.ok(Object.hasOwn(out.verdict, "lessonMistakes"), "the key is always present");
+  // The product writes the field only when non-empty. Carrying that optionality
+  // into the artefact would make «this drive had no lesson mistake» and «this
+  // artefact predates the field» one silence — the pre-matcher confusion
+  // verdict-surface.mjs exists to keep apart.
+});
+
+test("§11(c) the teach flags are explicit BOOLEANS on every moment", () => {
+  const { chain } = adrChain({
+    teach: [
+      { code: "ILLEGAL_STOP_IN_BAN_ZONE", t: 8.25, severity: "osnovna", points: 3, titleBg: "x", lessonMistake: true },
+      { code: "POOR_LANE_KEEPING", t: 9.5, severity: "vtorostepenna", points: 1, titleBg: "y" },
+      { code: "SPEEDING_OVER_LIMIT", t: 30.5, severity: "osnovna", points: 3, titleBg: "z", lessonMistake: true, charged: true },
+    ],
+  });
+  const out = runOnce(chain, fakePlan(drove(1)));
+  assert.deepEqual(
+    out.teachMoments.map((m) => [m.code, m.lessonMistake, m.charged]),
+    [
+      ["ILLEGAL_STOP_IN_BAN_ZONE", true, false],
+      ["POOR_LANE_KEEPING", false, false],
+      ["SPEEDING_OVER_LIMIT", true, true],
+    ],
+  );
+  // MUTATION WATCHED: spread the moment's own optional flags instead
+  // (`...(m.lessonMistake ? { lessonMistake: true } : {})`) and the `false`
+  // entries become absent keys — deepEqual reds on `undefined`. The card that
+  // says «урокът не се зачита» and the card that does not must never be the
+  // same shape in the record.
+});
+
+test("§11(d) THE VERDICT WORD IS THE PRODUCT'S — a sentinel screen proves nothing is re-derived here", () => {
+  // If anybody ever re-implements sessionVerdict's four arms inside this file,
+  // this case goes red: the instrument must report what the product returned,
+  // even a value the product's own union does not contain.
+  let sawResult = null;
+  const screen = {
+    sessionVerdict: (r) => {
+      sawResult = r;
+      return "SENTINEL";
+    },
+    SESSION_VERDICT_LABEL_BG: { SENTINEL: "СЕНТИНЕЛ" },
+    // DELIBERATELY NOT THE HIT'S CODE. The product's own helper is a FILTER,
+    // not a copy of the hit list — it returns [] on a passing drive and drops
+    // a code the catalogue no longer carries — so a projection that mapped the
+    // hits instead of calling it would agree with it on every drive in the
+    // corpus and disagree on exactly the two cases nobody drives. (Measured:
+    // that mutation survived the first cut of this section, green and blind.)
+    lessonMistakeReasonsBg: () => [{ code: "ONLY_THE_PRODUCT_RETURNS_THIS" }],
+  };
+  const { chain, result } = adrChain({ hits: [HIT], screen });
+  const out = runOnce(chain, fakePlan(drove(10)));
+  assert.equal(out.verdict.sessionVerdict, "SENTINEL");
+  assert.equal(out.verdict.sessionVerdictLabelBg, "СЕНТИНЕЛ");
+  assert.equal(sawResult, result, "the PRODUCT's own LessonResult is passed in, not a rebuilt shape");
+  assert.deepEqual(out.verdict.lessonMistakeReasonCodes, ["ONLY_THE_PRODUCT_RETURNS_THIS"]);
+});
+
+test("§11(i) the reason rows are the PRODUCT's filter — a hit does not imply a row", () => {
+  // Two real states where the hit list and the reason list differ: the drive
+  // passed (the helper returns [] however many hits are recorded) and the code
+  // has left the catalogue (`lessonMistakeCopy` returns null and the row is
+  // dropped rather than printed blank). An artefact that equated them would
+  // tell a judge the screen had a reason to show where the product has none —
+  // the bare heading with nothing under it that THEO-4 forbids.
+  const screen = {
+    sessionVerdict: () => "passed",
+    SESSION_VERDICT_LABEL_BG: { passed: "Издържан" },
+    lessonMistakeReasonsBg: (r) => (r.passed ? [] : [{ code: "X" }]),
+  };
+  const { chain } = adrChain({ hits: [HIT], screen, passed: true });
+  const out = runOnce(chain, fakePlan(drove(10)));
+  assert.equal(out.verdict.lessonMistakes.length, 1, "the hit is still recorded");
+  assert.deepEqual(out.verdict.lessonMistakeReasonCodes, [], "and the product still offers no reason row");
+});
+
+test("§11(e) no screen module — nulls and a named reason, never a guessed verdict", () => {
+  const { chain } = adrChain({ hits: [HIT], screen: null });
+  const out = runOnce(chain, fakePlan(drove(10)));
+  assert.equal(out.verdict.sessionVerdict, null);
+  assert.equal(out.verdict.sessionVerdictLabelBg, null);
+  assert.equal(out.verdict.lessonMistakeReasonCodes, null);
+  // …and the human line refuses to fall back to the boolean.
+  const word = verdictWordForHuman({
+    verdict: out.verdict,
+    sheet: { passed: true },
+    input: { screenUnavailable: "SessionEndScreen.tsx did not load: boom" },
+  });
+  assert.match(word, /^NOT READ — SessionEndScreen\.tsx did not load: boom/);
+  assert.match(word, /passed=false/);
+  assert.match(word, /lesson mistakes=1/);
+  assert.ok(!/НЕИЗДЪРЖАН/.test(word), "an unreadable verdict may not print a conviction");
+  // MUTATION WATCHED: `label ?? (passed ? "ИЗДЪРЖАН" : "НЕИЗДЪРЖАН")` — the
+  // obvious fallback — reds the last assertion. That fallback is precisely the
+  // bug this section was written for: it printed «НЕИЗДЪРЖАН» over the drives
+  // whose sheet is within tolerance and whose lesson was merely refused.
+});
+
+test("§11(f) the human block names the act, the clock and the ruling — never a bare verdict", () => {
+  const artefact = {
+    verdict: {
+      passed: false,
+      sessionVerdict: "lessonMistake",
+      sessionVerdictLabelBg: "Не е взет",
+      lessonMistakes: [
+        HIT,
+        { code: "SPEEDING_OVER_LIMIT", t: 30.5, charged: true, detail: null, titleBg: "Превишена скорост", demoTitleBg: null },
+      ],
+    },
+    sheet: { passed: true },
+    input: { screenUnavailable: null },
+  };
+  assert.equal(verdictWordForHuman(artefact), "НЕ Е ВЗЕТ");
+  const lines = lessonMistakeLines(artefact).join("\n");
+  assert.match(lines, /2 code\(s\), 1 also charged/);
+  assert.match(lines, /ILLEGAL_STOP_IN_BAN_ZONE at 8\.3 s — «Спиране на спирка на градския транспорт» \(act: law-busstop\)/);
+  assert.match(lines, /first occurrence, deliberately not charged/);
+  assert.match(lines, /a REPEAT reached the изпитен лист/);
+  assert.match(lines, /0 наказателни точки for that first occurrence is RULED, not a bug/);
+  // A drive with no hit prints NOTHING extra — the untouched case stays
+  // byte-identical, which is what keeps this legible on the other drives.
+  assert.deepEqual(lessonMistakeLines({ verdict: { lessonMistakes: [] } }), []);
+  // MUTATION WATCHED: drop the code, the clock or the ruling sentence and one
+  // of these reds. A judge handed «НЕ Е ВЗЕТ» alone files the 0-points half as
+  // a product regression — which §12 R3 says is now RULED behaviour.
+});
+
+test("§11(g) the coached row carries the ACT, because on a lesson mistake it is the only record of it", () => {
+  const { chain } = adrChain({});
+  const out = runOnce(chain, fakePlan(drove(10)));
+  assert.deepEqual(out.coachedMistakes, [
+    { code: "ILLEGAL_STOP_IN_BAN_ZONE", t: 8.25, titleBg: "Спиране в забранена зона", detail: "law-busstop" },
+    { code: "POOR_LANE_KEEPING", t: 9.5, titleBg: "Неточно държане в лентата", detail: null },
+  ]);
+  // MUTATION WATCHED: drop `detail` here and every coached row in every
+  // artefact retitles to the POOLED catalogue string — two judges comparing
+  // client and server titles would compare two pooled strings and find them
+  // equal, which is the exact blindness ADDENDUM 1 item 1 was written about.
+});
+
+test("§11(h) the contract GREW for the new claims, and grew its blindness list too", () => {
+  // The contract's own rule: `mayBeCitedFor` may only grow when a test drives
+  // the new claim. §11(a)-(g) are that test.
+  const may = CONTRACT.mayBeCitedFor.join(" | ");
+  assert.match(may, /ADR-009: which of the lesson's OWN mistakes the fold recorded/);
+  assert.match(may, /ADR-009: the four-way verdict the product's own sessionVerdict/);
+  const mayNot = CONTRACT.mayNotBeCitedFor.join(" | ");
+  assert.match(mayNot, /«Не е взет» pill/);
+  assert.match(mayNot, /reason rows are a list, not a screen anybody looked at/);
+  assert.match(CONTRACT.chain.join(" | "), /sessionVerdict\(result\)/);
+  // MUTATION WATCHED: add the citation without the blindness line and the
+  // second half reds. An instrument that can name the verdict but cannot see
+  // the pill has to say BOTH, or its next reader closes a phone-fit row on it.
 });

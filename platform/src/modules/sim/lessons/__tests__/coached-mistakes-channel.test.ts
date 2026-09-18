@@ -69,8 +69,21 @@ describe("engine records shown-but-not-charged violations (the channel's produce
   it("a taught first encounter reaches LessonResult.coachedMistakes with catalog copy", () => {
     const s = run(createLessonSession(lesson), speedingEpisode(0));
     const result = buildLessonResult(s);
+    // ADR-009 (doc 92 ADDENDUM 1 item 1) — THE ROW GREW A FIELD, 2026-09-18.
+    // `recordCoached` used to build `{ code, titleBg, t }` and discard the
+    // event's own `detail`, so the act the student's card named was lost at the
+    // moment of the mistake and both the fold and the server re-titled to the
+    // POOLED catalogue row. On this episode the act is the speeding
+    // measurement; on `sc-jx-giveway-b1` it is «give-way», and that one is the
+    // difference between «Непълно оглеждане при знак Б1» and «…на
+    // кръстовището» for 100% of that code's measured traffic.
+    //
+    // The assertion stays EXACT rather than becoming `toMatchObject`: the whole
+    // value of this case is that it names every field the row carries, so the
+    // next widening — by spread or by name — has to come past this line, the
+    // way this one did.
     expect(result.coachedMistakes).toEqual([
-      { code: "SPEEDING_OVER_LIMIT", titleBg: "Превишена скорост", t: 2 },
+      { code: "SPEEDING_OVER_LIMIT", titleBg: "Превишена скорост", t: 2, detail: "v56/l50" },
     ]);
   });
 
@@ -148,6 +161,8 @@ describe("the wire carries it and the server re-titles it (ADR-002: no client co
       { code: "SPEEDING_OVER_LIMIT", t: 2 },
     ]);
     // The wire shape carries no title at all — a client cannot author copy.
+    // A row with no act is still a row with no act: `detail` is written only
+    // when the event had one, so nothing appears here that was not measured.
     expect(coached).toEqual([{ code: "SPEEDING_OVER_LIMIT", t: 2 }]);
     const graded = gradeFinishWire({ ...basePayload, coachedMistakes: coached });
     expect(graded.status).toBe("ok");
@@ -155,6 +170,39 @@ describe("the wire carries it and the server re-titles it (ADR-002: no client co
     expect(graded.result.coachedMistakes).toEqual([
       { code: "SPEEDING_OVER_LIMIT", titleBg: "Превишена скорост", t: 2 },
     ]);
+  });
+
+  it("an ACT crosses as a selector and the SERVER titles it — never the client", () => {
+    // ADR-009 doc 92 ADDENDUM 1 item 1, the half this file owns. The full
+    // four-edit chain (engine → serialiser → validator → re-title) is pinned in
+    // `rules/__tests__/act-copy-control.test.ts`; what belongs HERE is that the
+    // channel this file documents did not quietly become a copy channel.
+    // The `titleBg` is deliberately present on the INPUT — that is the row
+    // `recordCoached` builds — so that the serialiser dropping it is what the
+    // first assertion measures, rather than an absence nobody ever supplied.
+    const coached = serializeCoachedMistakes([
+      { code: "JUNCTION_SCAN_INCOMPLETE", t: 9, detail: "give-way", titleBg: "IGNORED" } as unknown as {
+        code: string;
+        t: number;
+        detail?: string;
+      },
+    ]);
+    expect(coached).toEqual([{ code: "JUNCTION_SCAN_INCOMPLETE", t: 9, detail: "give-way" }]);
+    expect(coached[0]).not.toHaveProperty("titleBg");
+    const graded = gradeFinishWire({ ...basePayload, coachedMistakes: coached });
+    expect(graded.status).toBe("ok");
+    if (graded.status !== "ok") return;
+    // The server resolved that act out of its OWN catalogue…
+    expect(graded.result.coachedMistakes?.[0].titleBg).toBe("Непълно оглеждане при знак Б1");
+    // …and an act it does not recognise falls back to the pooled row rather
+    // than to whatever the client hoped for. A selector, never a sentence.
+    const junk = gradeFinishWire({
+      ...basePayload,
+      coachedMistakes: [{ code: "JUNCTION_SCAN_INCOMPLETE", t: 9, detail: "Б7" }],
+    });
+    expect(junk.status).toBe("ok");
+    if (junk.status !== "ok") return;
+    expect(junk.result.coachedMistakes?.[0].titleBg).toBe("Непълно оглеждане на кръстовището");
   });
 
   it("an uncatalogued code drops silently; a malformed list rejects the payload", () => {

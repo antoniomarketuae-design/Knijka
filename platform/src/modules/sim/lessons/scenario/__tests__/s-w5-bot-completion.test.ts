@@ -46,6 +46,20 @@ function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8")) as unknown;
 }
 
+/**
+ * ADR-009's rollback, for the counter-proof controls below (founder Ruling A;
+ * doc 92 §3.6 "Rollback"). `lessonMistakeTargets` is the ONE field the ruling
+ * reads, so a copy of the compiled lesson without it IS the pre-ADR-009 product
+ * — which is how a case can show both what the ruling withholds and that the
+ * machinery underneath it still fires. A pair of answers that can only ever
+ * agree is not a measurement.
+ */
+function withoutLessonMistakeTargets<T extends object>(lesson: T): T {
+  const copy = { ...lesson };
+  delete (copy as { lessonMistakeTargets?: unknown }).lessonMistakeTargets;
+  return copy;
+}
+
 // ---------------------------------------------------------------------------
 // sc-ac-truck-spray — the drill is won by the GAP: 115 km/h is lawful on this
 //                     road and still convicted, because the pelena took the
@@ -169,7 +183,7 @@ describe("wave-5 bot completion — sc-ac-truck-spray at L3", () => {
     expect(r.passed).toBe(false);
   });
 
-  it("counter-proof: the unlit drive TEACHES чл. 70, then GRADES it once — on a sheet that still COMPLETES", () => {
+  it("counter-proof: the unlit drive TEACHES чл. 70 — ADR-009 withholds the bill, and it still COMPLETES", () => {
     // The mirror image of the demo above, and the reason both exist: this driver's
     // gap and speed are the shadow's, verbatim. The route was never the problem,
     // the lamp was — so the drill completes and the card IS the lesson
@@ -199,11 +213,41 @@ describe("wave-5 bot completion — sc-ac-truck-spray at L3", () => {
         for (const m of step.teachMoments ?? []) taught.push(m.code);
       },
     });
+    //
+    // …AND ADR-009 TOOK THAT CHARGE BACK, 2026-09-18 (founder Ruling A, doc 92
+    // §3.4b b). Driving the rain section dark is the mistake THIS drill exists
+    // to teach, and the ruling forbids exam points for its first occurrence.
+    // The re-bill is the first one billed late, `regrade: true`, reaching for
+    // exactly the charge the card consumed — so it is dropped.
+    //
+    // THE SWEEP FRAME IS STILL ANSWERED, and that is the load-bearing half:
+    // `.audit-frames/sweep161/sc-ac-truck-spray/pc-wrong/08-debrief.png` prints
+    // «чисто каране по изпитния лист» over a drive that ran the whole rain
+    // section dark. What that drive gets now is «Не е взет», with чл. 70 named
+    // and a reason block — a louder answer than one наказателна точка, and the
+    // one the founder ruled for.
     expect(taught).toEqual(["HEADLIGHTS_OFF_IN_RAIN"]);
-    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
+    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([]);
+    const r = buildLessonResult(s);
+    expect((r.lessonMistakes ?? []).map((h) => h.code)).toEqual(["HEADLIGHTS_OFF_IN_RAIN"]);
+    expect(r.passed).toBe(false);
+    expect(r.completedAll).toBe(true);
+
+    // THE CONTROL — the same drive with only `lessonMistakeTargets` removed, so
+    // `STANDING_DUTY_REGRADE_SEC` stays gated on this lesson now that its own
+    // act no longer pays. (The exam half of the same repair is the next case,
+    // where the charge lands at catalogue price and is untouched by ADR-009.)
+    let control = createLessonSession(
+      withoutLessonMistakeTargets(compileScenario(SC_AC_TRUCK_SPRAY, 3)),
+    );
+    recordScAcTruckSprayDrive(loadDistrict("mw-v1"), "mistake-lights-off", {
+      onTick: (tick) => {
+        control = applyTick(control, tick).state;
+      },
+    });
+    expect(control.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
       "HEADLIGHTS_OFF_IN_RAIN",
     ]);
-    expect(buildLessonResult(s).completedAll).toBe(true);
   });
 
   it("…and at L4, which is EXAM MODE, the same unlit drive is charged ONCE, not twice", () => {
@@ -466,7 +510,7 @@ describe("wave-5 bot completion — sc-mw-min-speed at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: at L3 the right-lane crawl is TAUGHT first and then costs its point", () => {
+  it("counter-proof: at L3 the right-lane crawl is TAUGHT — and ADR-009 withholds its point", () => {
     // DRIVING_TOO_SLOW_FOR_MOTORWAY is второстепенна, and the coach warns once
     // before grading regardless of mapping (scenarios/coach.ts) — so the FIRST
     // encounter PAUSES with a card and does NOT dock a point. That is the right
@@ -499,10 +543,39 @@ describe("wave-5 bot completion — sc-mw-min-speed at L3", () => {
     const r = buildLessonResult(s);
     // The TEACH is untouched: one card, on the first encounter, as before.
     expect(taught).toEqual(["DRIVING_TOO_SLOW_FOR_MOTORWAY"]);
-    // What is new is the single charge behind it — one row, one point, once.
+    // …AND ADR-009 WITHHOLDS THE CHARGE BEHIND IT, 2026-09-18 (founder Ruling A,
+    // doc 92 §3.4b b). Crawling on the motorway is the mistake THIS drill exists
+    // to teach, so no exam point may be taken for its first occurrence, and the
+    // re-grade — the same crawl billed six accrued seconds later, `regrade:
+    // true` — is exactly that charge arriving late.
+    //
+    // `sc-mw-discipline:9e8f6966` IS STILL ANSWERED. 273 s of crawling on a 140
+    // км/ч motorway no longer reads «Второстепенни 0 | 0» under a clean sheet;
+    // it reads «Не е взет», with the act named. The point went away and the
+    // verdict arrived, which is the trade the ruling makes on purpose.
     const charged = s.events.filter((e) => e.kind === "violation");
-    expect(charged.map((e) => e.code)).toEqual(["DRIVING_TOO_SLOW_FOR_MOTORWAY"]);
-    expect(r.score).toBe(1); // taught first, then charged once — never twice
+    expect(charged.map((e) => e.code)).toEqual([]);
+    expect(r.score).toBe(0);
+    expect((r.lessonMistakes ?? []).map((h) => h.code)).toEqual([
+      "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+    ]);
+
+    // THE CONTROL — same drive, `lessonMistakeTargets` stripped: one row, one
+    // point, once. That keeps `MOTORWAY_CRAWL_REGRADE_SEC` measured here, and
+    // keeps the „never twice" ceiling measured with it.
+    let control = createLessonSession(
+      withoutLessonMistakeTargets(compileScenario(SC_MW_MIN_SPEED, 3)),
+    );
+    recordScMwMinSpeedDrive(loadDistrict("mw-v1"), "mistake-crawl-right", {
+      onTick: (tick) => {
+        control = applyTick(control, tick).state;
+      },
+    });
+    const controlResult = buildLessonResult(control);
+    expect(
+      control.events.filter((e) => e.kind === "violation").map((e) => e.code),
+    ).toEqual(["DRIVING_TOO_SLOW_FOR_MOTORWAY"]);
+    expect(controlResult.score).toBe(1); // taught first, then charged once — never twice
     // The lane was RIGHT, so the crawler DOES clear the first gate — and then
     // simply never gets to the end of the kilometre. That asymmetry is the
     // template's grading claim: this driver is not lost, he is too slow.

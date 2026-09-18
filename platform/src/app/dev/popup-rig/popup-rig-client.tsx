@@ -13,6 +13,11 @@
  *   ?state=scales   every OTHER surface that prints a scored number, in one
  *                   scrollable column, so „which points?" can be photographed
  *                   instead of argued about (see the block below)
+ *   ?state=adr009   every surface ADR-009 adds or changes, at 360 px — the four
+ *                   teach kinds compact and roomy, «Не е взет» with 1 and with
+ *                   4 hits, the aborted-with-hit note, the reason block, the
+ *                   history row, the calibration hint and reveal line, and the
+ *                   briefing rule line (doc 92 §7 lane P). See Adr009Gallery.tsx
  *   ?compact=on     force the compact (phone) grammar without a coarse pointer
  */
 
@@ -51,8 +56,28 @@ import {
   type ViolationCode,
 } from "@/modules/sim/rules";
 import type { LessonResult, LessonSpec, RubricScore, TeachMoment } from "@/modules/sim/lessons";
+/**
+ * THE VERDICT WORD, TAKEN FROM THE PRODUCT INSTEAD OF RETYPED (doc 92 §7,
+ * lane P; audit row 17 names this literal by line).
+ *
+ * The skipped-result bar below printed the string „Неиздържан" — and since
+ * ADR-009 that is one of FOUR verdicts, wrong on three of them. Worse for a
+ * rig: 558 of the corpus's practice drives now read «Не е взет» on the real
+ * screen, so a rig that hard-codes the old word photographs a state the
+ * product cannot produce, which is the one thing a rig must never do.
+ *
+ * DEEP IMPORT, and it is the narrow choice of the two available.
+ * `modules/sim/hud/index.ts` publishes `SessionEndScreen` (imported above) but
+ * not the fold or the label table, and that barrel belongs to no lane in this
+ * round — so this lane reports the edit rather than making it, exactly as
+ * `LessonPlayShell.tsx:88-97` does for the same two symbols and for the same
+ * reason. The one line, for whoever owns the barrel next:
+ *   export { SESSION_VERDICT_LABEL_BG, sessionVerdict, type SessionVerdict } from "./SessionEndScreen";
+ */
+import { SESSION_VERDICT_LABEL_BG, sessionVerdict } from "@/modules/sim/hud/SessionEndScreen";
 
 import { ROOMY_HUD_FLOOR_PX } from "@/components/sim/lesson-ui/immersive";
+import { Adr009Gallery } from "./Adr009Gallery";
 
 const BRIEFING = [
   { n: 1, textBg: "Провери огледалата и постави колана." },
@@ -475,6 +500,8 @@ export function PopupRigClient() {
 
         {state === "scales" ? <ScalesGallery compact={compact} /> : null}
 
+        {state === "adr009" ? <Adr009Gallery /> : null}
+
         {state === "end" && skipped ? (
           <div
             data-rig-skipped=""
@@ -485,7 +512,14 @@ export function PopupRigClient() {
               role="status"
               className="pointer-events-auto flex flex-wrap items-center gap-3 rounded-2xl border border-warning/60 bg-background/90 px-4 py-2.5 backdrop-blur"
             >
-              <span className="text-sm font-black text-warning">Неиздържан</span>
+              {/* The word is the PRODUCT's, folded from this very result — see
+                  the import block at the top. `?codes=` therefore moves it:
+                  a clean list reads «Издържан», a failed one «Неиздържан», and
+                  a lesson-mistake result «Не е взет». The old literal said one
+                  of the four unconditionally. */}
+              <span className="text-sm font-black text-warning">
+                {SESSION_VERDICT_LABEL_BG[sessionVerdict(result)]}
+              </span>
               <span className="text-xs font-bold tabular-nums text-muted">
                 {/* Same vocabulary as the product; a rig that prints a different
                     string than the shell is a rig that lies about the shell. */}

@@ -109,8 +109,115 @@
 import fs from "node:fs";
 import path from "node:path";
 
-/** The three words the product can put on the pill, uppercased as the harness records them. */
-export const PILL_WORDS = ["ИЗДЪРЖАН", "НЕИЗДЪРЖАН", "НЕЗАВЪРШЕН"];
+/**
+ * The words the product can put on the pill, uppercased as the harness records
+ * them (`normaliseVerdict` upper-cases whatever it scraped).
+ *
+ * «НЕ Е ВЗЕТ» IS THE FOURTH, AND IT ARRIVED WITH ADR-009 (founder Ruling A,
+ * 2026-09-17): a PRACTICE lesson whose student committed the mistake that
+ * lesson exists to teach is not passed, even the first time, and even though
+ * the изпитен лист takes no points for that first occurrence. `SessionVerdict`
+ * is four-way (`hud/SessionEndScreen.tsx sessionVerdict`) and
+ * `SESSION_VERDICT_LABEL_BG.lessonMistake` spells it «Не е взет».
+ *
+ * THIS LIST HAS BEEN SHORT BY ONE WORD BEFORE, AND IT COST A WAVE. Until
+ * 2026-08-21 it knew two words while the product printed three, so every
+ * «Незавършен» drive was recorded as «(none)» and two consumers grew a
+ * compensator for the silence. The same failure with this word would be worse:
+ * a scrape of «НЕ Е ВЗЕТ» that is not in this list is not a pill, so
+ * `classifyLeg` cannot raise a row/ledger DISAGREEMENT on it, and the leg reads
+ * as if the row had said nothing.
+ *
+ * ADDED AS ITS OWN WORD, NOT AS A SHADE OF «НЕИЗДЪРЖАН». They are different
+ * facts about the drive: «Неиздържан» is the изпитен лист's conviction under
+ * Наредба № 38, «Не е взет» is a LESSON rule over a sheet that is within
+ * tolerance. Folding them together would let a judge close «the wrong leg is
+ * never penalised» on a drive that took no points at all.
+ */
+export const PILL_WORDS = ["ИЗДЪРЖАН", "НЕИЗДЪРЖАН", "НЕЗАВЪРШЕН", "НЕ Е ВЗЕТ"];
+
+/**
+ * WHAT EACH PILL MEANS TO A JUDGE — one sentence per word, keyed by the word.
+ *
+ * It lives here, beside `PILL_WORDS`, because a legend kept anywhere else goes
+ * stale the day the list grows: `make-verdicts2.mjs`'s brief already lost the
+ * two bracket tags added on 2026-08-28 that way, and a judge was told «the
+ * bracket says why» and handed a bracket with no entry. `adr009JudgeBrief()`
+ * below builds its block from THIS map, and `verdict-surface.test.mjs` fails if
+ * a word in `PILL_WORDS` has no sentence — so the next word cannot ship mute.
+ *
+ * ADR-002: every Bulgarian word quoted here is the product's own
+ * (`SESSION_VERDICT_LABEL_BG`). Nothing in this file authors copy or law.
+ */
+export const PILL_MEANING = {
+  ИЗДЪРЖАН: "the изпитен лист is within tolerance, the route was finished, and the lesson counts.",
+  НЕИЗДЪРЖАН:
+    "the изпитен лист says so — наказателни точки over the limit, or a terminating fault. This is the only word that is a conviction under Наредба № 38.",
+  НЕЗАВЪРШЕН:
+    "nothing above is true and the drive simply did not reach the end. It is a pill and prints like one: never read «(none)» as this word.",
+  "НЕ Е ВЗЕТ":
+    "ADR-009 (founder Ruling A, 2026-09-17): a PRACTICE lesson in which the student committed the very mistake that lesson exists to teach. The sheet is usually SPOTLESS — the first occurrence is taught, not charged — and the lesson is still not passed.",
+};
+
+/**
+ * The ADR-009 block for the judge brief (doc 92 §7 lane H, §12 R3).
+ *
+ * THREE THINGS A JUDGE CANNOT DERIVE FROM THE FRAMES, and each of them has
+ * already produced a wrong verdict in this corpus in its older form:
+ *
+ *  1. THE FOURTH PILL. A word a judge does not recognise reads as a defect.
+ *  2. «0 наказателни точки» ON A FIRST-TIME LESSON MISTAKE IS RULED BEHAVIOUR.
+ *     Several open rows say, in terms, «the wrong drive escapes entirely: 0
+ *     наказателни точки». Half of that sentence is now the product working as
+ *     the founder ruled — the half that survives is whether the lesson was
+ *     refused and whether the student was told why. Option B («also charge the
+ *     first time») was put to the founder and REJECTED.
+ *  3. A RIGHT LEG MAY NOW READ «НЕ Е ВЗЕТ» WITHOUT ANYTHING REGRESSING. About
+ *     ten of the right legs that pass today carry a target title (doc 92 §10),
+ *     and five of those legs have `droveIt=false`. The leg's own inputs decide:
+ *     an unsteered leg that drifts into the lesson's own fault is the harness,
+ *     not the product.
+ */
+export function adr009JudgeBrief() {
+  const missing = PILL_WORDS.filter((w) => typeof PILL_MEANING[w] !== "string");
+  if (missing.length > 0) {
+    // A legend that cannot explain a word it publishes is worse than no legend:
+    // it tells the judge the list is complete. Refuse loudly instead.
+    throw new Error(`verdict-surface: PILL_WORDS carries ${missing.join(", ")} with no entry in PILL_MEANING`);
+  }
+  return [
+    "",
+    "-- THE FOUR PILLS, AND THE ONE THAT IS NEW (ADR-009) --",
+    "The result screen prints exactly four words. Three are old; the fourth landed with",
+    "founder Ruling A on 2026-09-17 and the next sweep is the first to photograph it.",
+    "",
+    ...PILL_WORDS.flatMap((w) => [`  «${w}»  ${PILL_MEANING[w]}`, ""]),
+    "WHAT THIS CHANGES IN YOUR VERDICTS, AND IT IS NOT SMALL:",
+    "",
+    " . «0 наказателни точки» ON A FIRST-TIME LESSON MISTAKE IS NOW RULED BEHAVIOUR, NOT",
+    "   A DEFECT. Rows filed as «the wrong drive escapes entirely — 0 наказателни точки,",
+    "   0 опасни, 0 основни, 0 второстепенни» describe a practice drive in which the",
+    "   lesson's own mistake was TAUGHT and deliberately not billed. The founder was",
+    "   asked whether to charge it as well (option B) and said no. So that half of such a",
+    "   row is REFUTED by the ruling, and the half you still judge is: did the drive end",
+    "   «НЕ Е ВЗЕТ», and did the screen say WHICH mistake and what to do instead?",
+    "   A drive that ends «ИЗДЪРЖАН ★★★» on the lesson's own fault is still a defect.",
+    " . A BARE «НЕ Е ВЗЕТ» IS ITSELF A DEFECT (doc 64 THEO-4). The pill must come with",
+    "   the section «Грешката на този урок» naming the act, its corrective and its law",
+    "   chip. Pill alone, or a section with no rows under it: file it.",
+    " . A RIGHT LEG THAT READS «НЕ Е ВЗЕТ» IS NOT AUTOMATICALLY A REGRESSION (doc 92",
+    "   §12 R3). Check the leg's own inputs FIRST — run.log's STEERING line and the",
+    "   route/droveIt fields in the debrief sidecar. About ten right legs are expected to",
+    "   move, five of them on legs that never steered. An unsteered leg that wanders into",
+    "   the lesson's own fault is a fact about this harness. Say so, and mark it UNJUDGED",
+    "   rather than filing a product regression.",
+    " . «НЕИЗДЪРЖАН» AND «НЕ Е ВЗЕТ» ARE NOT DEGREES OF ONE THING. The first is the",
+    "   изпитен лист's conviction; the second is a lesson rule over a clean sheet. A row",
+    "   about penalty points is not settled by a leg that reads «НЕ Е ВЗЕТ», and a row",
+    "   about the lesson counting is not settled by a leg that reads «НЕИЗДЪРЖАН».",
+    "",
+  ];
+}
 
 /**
  * The selector positions a car can be driven from.

@@ -13,7 +13,19 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { classifyLeg, readLaneLedger, normaliseVerdict, LEG_STATES } from "./verdict-surface.mjs";
+import { fileURLToPath } from "node:url";
+import {
+  adr009JudgeBrief,
+  classifyLeg,
+  readLaneLedger,
+  normaliseVerdict,
+  LEG_STATES,
+  PILL_MEANING,
+  PILL_WORDS,
+} from "./verdict-surface.mjs";
+
+/** This directory — the ADR-009 wiring case reads make-verdicts2.mjs as text. */
+const REPO_TOOLS = path.dirname(fileURLToPath(import.meta.url));
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "verdict-surface-"));
 
@@ -220,3 +232,121 @@ test("exactly one state is judgeable, and it is the one with a pill", () => {
 });
 
 test.after(() => fs.rmSync(ROOT, { recursive: true, force: true }));
+
+// -----------------------------------------------------------------------------
+// ADR-009 — THE FOURTH PILL, AND THE BRIEF THAT HAS TO EXPLAIN IT
+//
+// Founder Ruling A (2026-09-17) added «Не е взет» to the result screen. This
+// file's whole history is a matcher that knew one word fewer than the product
+// printed, and the compensators two consumers grew around the resulting
+// silence. The cases below are the ones that would have caught that in 2026-08
+// — not «is the word in the list», but «does the consumer that reads the list
+// behave differently because of it».
+// -----------------------------------------------------------------------------
+
+test("ADR-009: «НЕ Е ВЗЕТ» is a pill — a leg that reads it is a verdict, not a silence", () => {
+  const c = classifyLeg(lane("adr009-pill", {
+    verdict: "НЕ Е ВЗЕТ",
+    status: { reachedVerdictCard: true, verdict: "НЕ Е ВЗЕТ", verdictSurface: "pill" },
+  }));
+  assert.equal(c.state, "verdict");
+  assert.equal(c.verdict, "НЕ Е ВЗЕТ");
+  assert.equal(c.judgeable, true);
+});
+
+test("ADR-009: REMOVING the word from PILL_WORDS costs a DISAGREEMENT, not just a label", () => {
+  // This is the case that reds if somebody trims the list. A row scraped as
+  // «НЕ Е ВЗЕТ» against a ledger that says «ИЗДЪРЖАН» is two instruments
+  // contradicting each other about the same drive — and `classifyLeg` can only
+  // say so for a word it recognises as a pill. Unrecognised, the scrape is
+  // treated as stdout noise and the leg quietly certifies on the LEDGER's word,
+  // which is exactly how a judge ends up citing a verdict nobody saw.
+  assert.ok(PILL_WORDS.includes("НЕ Е ВЗЕТ"), "the product's fourth verdict is a pill word");
+  const c = classifyLeg(lane("adr009-row-vs-ledger", {
+    verdict: "НЕ Е ВЗЕТ",
+    status: { reachedVerdictCard: true, verdict: "ИЗДЪРЖАН", verdictSurface: "pill" },
+  }));
+  assert.equal(c.state, "disagreement");
+  assert.match(c.why, /the row says «НЕ Е ВЗЕТ»/);
+  assert.equal(c.judgeable, false);
+});
+
+test("ADR-009: «НЕ Е ВЗЕТ» is its OWN word — it is not «ИЗДЪРЖАН» and not «НЕИЗДЪРЖАН»", () => {
+  // Substring arithmetic has bitten this corpus twice (`НЕИЗДЪРЖАН` contains
+  // `ИЗДЪРЖАН`; `stale-claims.mjs` shipped that bug). The new word shares no
+  // token with either, and the three words must stay distinguishable by
+  // equality — never by `includes`.
+  assert.equal(new Set(PILL_WORDS).size, PILL_WORDS.length);
+  assert.ok(!"НЕ Е ВЗЕТ".includes("ИЗДЪРЖАН"));
+  assert.equal(normaliseVerdict("Не е взет"), "НЕ Е ВЗЕТ", "the ledger's own casing normalises to the pill word");
+});
+
+test("ADR-009: every pill the brief publishes carries a sentence — a mute legend is refused", () => {
+  for (const w of PILL_WORDS) {
+    assert.equal(typeof PILL_MEANING[w], "string", `PILL_MEANING has no entry for «${w}»`);
+    assert.ok(PILL_MEANING[w].length > 40, `«${w}» has a stub, not an explanation`);
+  }
+  // MUTATION WATCHED: add a fifth word to PILL_WORDS without a meaning and
+  // `adr009JudgeBrief()` throws by construction rather than printing a list
+  // that silently omits it — the failure mode that left the two 2026-08-28
+  // bracket tags with no legend entry for three waves.
+});
+
+test("ADR-009: the judge brief names the four pills, the RULED 0 points, and the R3 check", () => {
+  // FLATTENED FIRST, and that is not cosmetic. Every sentence in the brief is
+  // wrapped across several array entries, so an assertion that matches one line
+  // passes while the sentence around it is deleted — measured: cutting the
+  // «A RIGHT LEG THAT READS …» header left a `/§12 R3/` assertion green,
+  // because the reference lives on the following line. Each claim below is
+  // therefore asserted as the WHOLE sentence a judge has to act on.
+  const brief = adr009JudgeBrief().join("\n").replace(/\s+/g, " ");
+  for (const w of PILL_WORDS) assert.ok(brief.includes(`«${w}»`), `the brief never names «${w}»`);
+  // The three things a judge cannot derive from the frames (doc 92 §7 lane H).
+  assert.ok(
+    brief.includes("«0 наказателни точки» ON A FIRST-TIME LESSON MISTAKE IS NOW RULED BEHAVIOUR, NOT A DEFECT"),
+    "0 points on a first-time lesson mistake is ruled",
+  );
+  assert.ok(
+    brief.includes("asked whether to charge it as well (option B) and said no"),
+    "the rejected alternative is named, so nobody re-files it",
+  );
+  assert.ok(
+    brief.includes("A RIGHT LEG THAT READS «НЕ Е ВЗЕТ» IS NOT AUTOMATICALLY A REGRESSION (doc 92 §12 R3)."),
+    "the R3 header is intact",
+  );
+  assert.ok(
+    brief.includes("Check the leg's own inputs FIRST — run.log's STEERING line and the route/droveIt fields"),
+    "…and it still says HOW to check, not merely that one should",
+  );
+  assert.ok(brief.includes("mark it UNJUDGED rather than filing a product regression"), "…and which verdict to write");
+  assert.ok(
+    brief.includes("A BARE «НЕ Е ВЗЕТ» IS ITSELF A DEFECT"),
+    "THEO-4: the pill without its reason is a finding",
+  );
+  assert.ok(
+    brief.includes("«НЕИЗДЪРЖАН» AND «НЕ Е ВЗЕТ» ARE NOT DEGREES OF ONE THING"),
+    "the two not-passed words settle different claims",
+  );
+  // MUTATION WATCHED: delete any ONE line of the R3 paragraph and one of these
+  // reds. Without it the next sweep files ~10 product regressions against legs
+  // that were never steered.
+});
+
+test("ADR-009: make-verdicts2's brief is BUILT FROM THIS MODULE — the wiring is asserted, not assumed", () => {
+  // A source assertion, because `make-verdicts2.mjs` reads the corpus at import
+  // (~100 s) and cannot be imported by a test. It REPORTS WHAT IT CANNOT READ:
+  // an anchor that no longer matches fails the case instead of passing it,
+  // which is the rule this programme wrote after four green-and-blind matchers.
+  const src = fs.readFileSync(path.join(REPO_TOOLS, "make-verdicts2.mjs"), "utf8");
+  const open = src.indexOf("const HOW = [");
+  assert.notEqual(open, -1, "UNRESOLVED: `const HOW = [` is no longer in make-verdicts2.mjs — re-anchor this test");
+  const close = src.indexOf('].join("\\n");', open);
+  assert.notEqual(close, -1, "UNRESOLVED: the end of the HOW block could not be located — re-anchor this test");
+  const how = src.slice(open, close);
+  assert.match(how, /\.\.\.adr009JudgeBrief\(\),/, "the judge brief does not splice the ADR-009 block");
+  assert.match(src, /import \{[^}]*adr009JudgeBrief[^}]*\} from "\.\/verdict-surface\.mjs"/,
+    "make-verdicts2 does not import the block from the module that owns the pill words");
+  // MUTATION WATCHED: delete the spread and this reds; rename the import and
+  // the second assertion reds. Without both, the block is a dead predicate —
+  // the shape this programme measured 51 times in 82 repairs.
+});

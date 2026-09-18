@@ -73,6 +73,7 @@ import {
 } from "./objectives";
 import { lessonYieldsToRailVehicle, shownObjectiveCapKmh, stepYieldVoice, yieldVoiceSiteAt } from "./advisor";
 import { foldTrainingScore, type PenaltyEscalation } from "./escalation";
+import { foldLessonMistakes, lessonMistakeTargetCodes } from "./lessonMistake";
 import { examTerminationFor } from "./exam";
 import {
   CRASH_PIN_RADIUS_M,
@@ -1427,6 +1428,21 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // UNCHANGED — the aid adds the pause, never touches points. Inert when the
   // flag is absent (every curriculum lesson).
   const pauseOnError = prev.lesson.aids?.pauseOnError === true;
+  /**
+   * ADR-009 (founder Ruling A) — THE LESSON'S OWN MISTAKES, on a practice rung.
+   *
+   * `null` on an exam rung, in the THEO-3 sandbox and on every lesson that
+   * carries no targets, and `null` means «this rung behaves exactly as it did
+   * before ADR-009» rather than «no targets»: every one of the four readers
+   * below (`?.has(...) === true`) is inert under it by construction, so an exam
+   * drive takes the same branches it always took.
+   *
+   * Computed ONCE per tick, not per event: `lessonMistakeTargetCodes` builds a
+   * Map, and building it inside the event loop would allocate one per violation
+   * in the render path. It is the SINGLE place the applicability rule is read
+   * here — see `lessonMistake.ts` for why that rule lives in one file.
+   */
+  const lessonTargets = lessonMistakeTargetCodes(prev.lesson);
 
   // Coach the violations: teach-first-then-grade. A first, teachable mistake
   // PAUSES the sim with a mini-lesson card (A9, doc 65 §5) and does NOT count
@@ -1459,9 +1475,49 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // typechecking and older hand-built state fixtures predate it.
   const coachedPrev = prev.coachedMistakes ?? [];
   let coachedCount = coachedPrev.length;
-  const recordCoached = (e: { code: string; titleBg: string; t: number }): void => {
-    if (coachedCount >= MAX_COACHED_MISTAKES) return;
-    coachedNew.push({ code: e.code, titleBg: e.titleBg, t: e.t });
+  /**
+   * ADR-009 — ROOM KEPT INSIDE THE EXISTING CAP FOR THE LESSON'S OWN MISTAKES.
+   *
+   * A target's first occurrence is the ONLY record that it happened at all (it
+   * is never charged, §3.4b b/c), so a drive that spent all 100 rows on a
+   * stuck-throttle code would have passed a lesson it did not take. Ordinary
+   * rows therefore stop `reserve` short of the cap and a target's FIRST row may
+   * use the last places. The cap itself does not move: `MAX_COACHED_MISTAKES`
+   * and `wire.ts MAX_COACHED_MISTAKES_WIRE` are both still 100, so no older
+   * server rejects a payload this build can produce (doc 92 §1 fix 3).
+   *
+   * `reserve` is 0 on every session ADR-009 does not apply to, which is what
+   * keeps exam rungs and sandboxes byte-identical.
+   */
+  const coachedReserve = lessonTargets?.size ?? 0;
+  const recordCoached = (e: { code: string; titleBg: string; t: number; detail?: string }): void => {
+    const firstOfTarget =
+      lessonTargets?.has(e.code) === true &&
+      !coachedPrev.some((c) => c.code === e.code) &&
+      !coachedNew.some((c) => c.code === e.code);
+    if (coachedCount >= (firstOfTarget ? MAX_COACHED_MISTAKES : MAX_COACHED_MISTAKES - coachedReserve)) {
+      return;
+    }
+    // ADR-009 / doc 92 ADDENDUM 1 item 1 — THE ACT TRAVELS WITH THE ROW. A
+    // coached row used to be `{ code, titleBg, t }`, so the act the student's
+    // card named («Непълно оглеждане при знак Б1») was discarded at the moment
+    // of the mistake and both the fold and the server re-titled to the pooled
+    // «…на кръстовището». Measured over the 1,006 L1/L3 drives: the code is
+    // RAISED on 8 of them, coached on all 8 and charged on 0. Across every
+    // authored rung it is raised on 16 and charged on 4 — and all four charges
+    // are at L4, where ADR-009 does not apply. So on every PRACTICE drive that
+    // raises it the code is coached and never charged, and the charged path's
+    // act copy reached no student at all. (This first read «coached on every
+    // one of 1,006 drives», which counted the drives in the run rather than the
+    // occurrences of the code; corrected 2026-09-18 by lane I's measurement.) The three
+    // edits downstream of this one are `serializeCoachedMistakes`,
+    // `parseCoachedMistakes` and `gradeFinishWire` in `wire.ts`.
+    coachedNew.push({
+      code: e.code,
+      titleBg: e.titleBg,
+      t: e.t,
+      ...(e.detail !== undefined ? { detail: e.detail } : {}),
+    });
     coachedCount += 1;
   };
   /**
@@ -1505,7 +1561,19 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       scoredEvents.push(e);
       continue;
     }
-    if (e.regrade === true && alreadyCharged(e.code)) continue;
+    // ADR-009 — AND THE RE-BILL OF THE LESSON'S OWN MISTAKE IS DROPPED TOO.
+    // The re-bill above exists ONLY to reach the charge the free teach consumed
+    // (`rules/engine.ts` standingDutyBill and the finish-time speeding
+    // settlement). For a TARGET code that charge is exactly what Ruling A
+    // forbids — «NO exam points are taken for that first occurrence» — so the
+    // second bill of one continuing breach has nothing left it may collect.
+    // What the re-bill protected, a drive reaching its debrief looking clean,
+    // is now carried by «Не е взет» and the reason block instead.
+    // A repeat EPISODE is untouched (founder answer F1): it is not a `regrade`,
+    // it is a new act, and it grades on the ×1.5/×2 ladder exactly as today.
+    if (e.regrade === true && (alreadyCharged(e.code) || lessonTargets?.has(e.code) === true)) {
+      continue;
+    }
     // SPD #39/#48: DISPLAY text only — the FOLLOWING family carries the
     // measured time-gap readout; every other code passes through unchanged.
     // The scored event (scoredEvents/state.events/wire) keeps catalog copy.
@@ -1534,6 +1602,13 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         // before adding it: the canonical wrong drive still printed «повторна
         // грешка ×1.5» for a mistake made once.
         detail: e.detail,
+        // ADR-009 — «this is one of the mistakes THIS lesson exists to teach».
+        // The coach keys its free teach on the TOPIC, so a target whose topic
+        // another code had already spent was graded on sight, with points and
+        // no card: 64 of the 105 target lessons share a topic between a target
+        // and a non-target code (doc 92 §3.4b c). `false` everywhere ADR-009
+        // does not apply, which is what keeps exam rungs byte-identical.
+        lessonMistakeTarget: lessonTargets?.has(e.code) === true,
       },
       coachOpts,
     );
@@ -1572,6 +1647,16 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
             severity: e.severityClass,
             points: e.points,
             t: e.t,
+            // THIS ARM HAS ALWAYS PAUSED OVER POINTS IT HAD JUST TAKEN, and the
+            // card said «Първа среща — не се брои в резултата» anyway. The flag
+            // is what lets `lessonMistake.ts teachStakeSegments` say where they
+            // went instead; it changes no number here.
+            charged: true as const,
+            // ADR-009: a CHARGED target is always a genuine repeat (the first
+            // occurrence is always taught, §3.4b c), so the card says «Отново».
+            // There is deliberately no rate-limit bypass on this arm — a
+            // pauseOnError session already pauses on everything it grades.
+            ...(lessonTargets?.has(e.code) === true ? { lessonMistake: true as const } : {}),
           });
           lastTeachAt = tick.t;
         }
@@ -1587,6 +1672,31 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         escalations = [...escalations, rec];
       }
     } else if (step.decision.mode === "teach") {
+      const isTarget = lessonTargets?.has(e.code) === true;
+      /**
+       * ADR-009 — THE CARD THAT SAYS «урокът няма да се зачете» IS NEVER
+       * DOWNGRADED TO A TOAST THE FIRST TIME.
+       *
+       * A target first-occurrence arriving inside the rate-limit window would
+       * otherwise become the silent `kind: "lesson"` toast below, and the
+       * student would first learn his lesson did not count on the end screen —
+       * a bare verdict arriving minutes after the act, which THEO-4 forbids.
+       *
+       * ONLY THE SESSION'S FIRST ONE (narrowed in revision 2, doc 92 §1 fix 6).
+       * A later target's first occurrence follows today's rate limit, because
+       * the student has already been told the lesson will not count and the
+       * reason block lists every hit after the drive.
+       *
+       * READ BEFORE `recordCoached`, DELIBERATELY. The obvious form reads the
+       * record afterwards and skips the last row as „this event's own" — which
+       * is wrong on the one drive where the cap refuses that row, because then
+       * the skipped row is somebody ELSE's target and the bypass fires a second
+       * time. Asking the question before the write needs no such correction.
+       */
+      const firstLessonCard =
+        isTarget &&
+        !coachedPrev.some((c) => lessonTargets?.has(c.code) === true) &&
+        !coachedNew.some((c) => lessonTargets?.has(c.code) === true);
       // Both arms display and neither charges → both are coached (the record
       // the debrief's honesty rests on — see recordCoached above).
       recordCoached(e);
@@ -1595,6 +1705,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // cards); a moment inside the min-gap window after the previous pause
       // downgrades to the classic lesson toast instead of chaining pauses.
       const canPause =
+        firstLessonCard ||
         lastTeachAt === null ||
         lastTeachAt === tick.t ||
         tick.t - lastTeachAt >= TEACH_PAUSE_MIN_GAP_S;
@@ -1608,6 +1719,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           severity: e.severityClass,
           points: e.points,
           t: e.t,
+          // ADR-009: read by `lessonMistake.ts teachChipBg / teachSublineBg /
+          // teachStakeSegments`, so the card names the stake instead of
+          // promising a free first encounter it is not going to be.
+          ...(isTarget ? { lessonMistake: true as const } : {}),
         });
         lastTeachAt = tick.t;
       } else {
@@ -2766,7 +2881,27 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // `phase === "completed"` alone is the edge this block wants.
   if (phase === "completed") {
     const settled = settleUnpaidSpeedingTeach(rules, tick);
-    if (settled !== null && !alreadyCharged(settled.code)) {
+    /**
+     * ADR-009 — AND THE SAME DROP APPLIES HERE (founder Ruling A; doc 92 §3.4b
+     * b names this site among the re-bills).
+     *
+     * THIS IS A SECOND ADDRESS FOR ONE RULE, and it was nearly missed: the
+     * settlement does not travel through the `regrade` guard at the top of this
+     * function — it is built here, `regrade: true` by construction
+     * (`rules/engine.ts settleUnpaidSpeedingTeach`), and asks only
+     * `alreadyCharged`. So the clause that drops a target's re-bill had to be
+     * written twice or this path would keep charging the first occurrence of
+     * SPEEDING_OVER_LIMIT, which 11 lessons carry as their own mistake.
+     *
+     * NOT REACHABLE FROM THE COMMITTED TAPE BANK, MEASURED: 0 regrade-marked
+     * target bills survive on 1,213 targeted practice drives, so this closes a
+     * hole rather than moving a number. It is reachable by a REAL student —
+     * start speeding inside the last six seconds and still be over the limit
+     * when the finish gate fires, and the settlement is the only bill of that
+     * episode. Ruling A forbids exactly that point.
+     */
+    const settledIsTarget = settled !== null && lessonTargets?.has(settled.code) === true;
+    if (settled !== null && !alreadyCharged(settled.code) && !settledIsTarget) {
       const step = coachStep(
         encounters,
         {
@@ -3089,13 +3224,40 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     state.penaltyEscalations,
   );
 
+  /**
+   * ADR-009 (founder Ruling A) — IN THE FOLD, NOT IN THE LOOP.
+   *
+   * It READS both records and writes neither: no event is added, no point is
+   * moved, no escalation is pushed. Everything ADR-009 withholds was withheld
+   * upstream by the two coach inputs (`applyTick`'s regrade guard and the
+   * own-code teach key); this is only where the two records are read back and
+   * turned into the verdict.
+   *
+   * THE SAME CALL RUNS ON THE SERVER, in `wire.ts gradeFinishWire`, and that is
+   * the whole reason `lessonMistake.ts` exists as a module: `LessonPlayShell`
+   * renders the SERVER's debrief whenever the save succeeds, so a second
+   * implementation here would not be a second opinion — it would be a stored
+   * verdict that disagrees with the screen that produced it. `escalation.ts`'s
+   * header carries the drive where exactly that shipped.
+   */
+  const lessonMistakes = foldLessonMistakes(
+    state.lesson,
+    state.events,
+    state.coachedMistakes ?? [],
+  );
+
   return {
     lessonId: state.lesson.id,
     summary,
     objectives,
     completedAll,
     aborted,
-    passed: summary.passed && completedAll && !aborted,
+    // ADR-009: a practice lesson whose own mistake was committed is NOT taken,
+    // even on the first occurrence and even though the изпитен лист took no
+    // points for it. `lessonMistakes` is empty on every exam rung, every
+    // sandbox and every lesson with no targets, so this conjunct is inert
+    // wherever the ruling does not reach.
+    passed: summary.passed && completedAll && !aborted && lessonMistakes.length === 0,
     score: summary.score.totalPoints,
     effectiveScore: effectiveTotalPoints,
     escalations: escalated,
@@ -3115,5 +3277,9 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     ...((state.coachedMistakes ?? []).length > 0
       ? { coachedMistakes: state.coachedMistakes }
       : {}),
+    // ADR-009: absent, not empty, on a drive with no hit — so a stored row from
+    // before this ADR and a clean drive after it are the same shape, and no
+    // surface has to tell «[]» from «never measured».
+    ...(lessonMistakes.length > 0 ? { lessonMistakes } : {}),
   };
 }

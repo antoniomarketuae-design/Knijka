@@ -89,12 +89,15 @@ function CalibrationFields({
   pass,
   onPass,
   disabled = false,
+  lessonHasTargets = false,
 }: {
   points: string;
   onPoints: (v: string) => void;
   pass: boolean | null;
   onPass: (v: boolean) => void;
   disabled?: boolean;
+  /** ADR-009 §5.9 — see the same prop on `CalibrationGate`. */
+  lessonHasTargets?: boolean;
 }) {
   return (
     <>
@@ -136,6 +139,21 @@ function CalibrationFields({
 
       <fieldset className="flex flex-col gap-1.5" disabled={disabled}>
         <legend className="text-xs font-extrabold">Издържах ли?</legend>
+        {/* ADR-009 §5.9 — THE QUESTION HAS TO SAY WHICH VERDICT IT MEANS.
+            On a practice rung the student now has two answers coming: the
+            изпитен лист, and whether the lesson counted. This gate measures the
+            first (`readSessionPassed` reads `sheetRoutePassed`), so a rung that
+            can end «Не е взет» says so BEFORE the answer — otherwise a student
+            who reads their own clean sheet correctly, then meets «Не е взет» on
+            the next screen, is told he got a call wrong that he actually made
+            right. It is a LESSON-level fact and reveals nothing about this
+            drive. */}
+        {lessonHasTargets ? (
+          <p className="text-[11px] leading-relaxed text-muted">
+            Отговори за изпитния лист — дали урокът се зачита, ще видиш веднага
+            след това.
+          </p>
+        ) : null}
         <div className="flex gap-2">
           {[
             { value: true, labelBg: "Да, издържах" },
@@ -251,6 +269,9 @@ export function CalibrationGate({
   lessonTitleBg,
   onSubmit,
   onResolved,
+  lessonHasTargets = false,
+  lessonMistake = null,
+  initialReveal = null,
 }: {
   lessonTitleBg: string;
   /**
@@ -263,11 +284,42 @@ export function CalibrationGate({
   /** Called once the student may proceed; carries the reveal when there is
    *  one so the result screen can show „ти каза / изпитът каза". */
   onResolved: (reveal: CalibrationReveal | null) => void;
+  /**
+   * ADR-009 §5.9 — this rung CAN end «Не е взет» (`lesson.lessonMistakeTargets`
+   * is non-empty and the rung is not an exam rung). A fact about the LESSON,
+   * known before the drive, so printing it leaks nothing about this attempt.
+   *
+   * Default false, so every existing call site — `app/dev/popup-rig` included,
+   * which builds its props by hand — renders exactly today's card.
+   */
+  lessonHasTargets?: boolean;
+  /**
+   * ADR-009 §5.9 — the lesson's own mistakes this drive committed, for the
+   * REVEAL half only. `namesBg` is `lessonMistakeNamesBg(hits)` (retrieved
+   * catalogue titles — this component composes no copy about the acts) and
+   * `one` says whether the sentence speaks of one or several.
+   *
+   * Null/absent = today's reveal. It must stay null until the answer is in:
+   * this card is the one screen in the product that is only worth anything
+   * because nothing about the result reached it early.
+   */
+  lessonMistake?: { namesBg: string; one: boolean } | null;
+  /**
+   * Start on the REVEAL half instead of the question. Null in the product — the
+   * reveal is what `onSubmit` answers with — and it exists for the two readers
+   * that cannot press a button:
+   *  - `app/dev/popup-rig`, which photographs this card at 360 px (doc 92 §7,
+   *    lane P) and could otherwise only reach the reveal by hand;
+   *  - this repo's tests, which run with vitest `environment: "node"` and no DOM
+   *    (vitest.config.ts), so a test can render markup but cannot click.
+   * Passing it changes nothing about how a submitted answer is revealed.
+   */
+  initialReveal?: CalibrationReveal | null;
 }) {
   const [points, setPoints] = useState("");
   const [pass, setPass] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-  const [reveal, setReveal] = useState<CalibrationReveal | null>(null);
+  const [reveal, setReveal] = useState<CalibrationReveal | null>(initialReveal);
 
   const parsed = Number(points);
   const pointsValid =
@@ -352,6 +404,26 @@ export function CalibrationGate({
             „20 т." on both tiles. Same repair as the screen behind it. */}
         <p className="text-[11px] leading-relaxed text-muted">{EXAM_POINTS_SHORT_NOTE_BG}</p>
 
+        {/* ADR-009 §5.9 — THE SECOND ANSWER, after the exam's one.
+            The tiles above stay exactly as they were, and they are now
+            literally true: «Изпитът каза … издържан» is the изпитен лист, and
+            the lesson rule is a separate sentence rather than a number folded
+            into the one the student was asked to predict. The «сгреши и самата
+            присъда» clause below is deliberately NOT suppressed — agreement is
+            computed on the verdict the tile shows. */}
+        {lessonMistake !== null ? (
+          <p className="text-sm font-semibold leading-relaxed text-warning">
+            {reveal.actualPass
+              ? "По изпитния лист: издържан. Урокът обаче не е взет"
+              : "Урокът също не е взет"}{" "}
+            — {lessonMistake.namesBg}{" "}
+            {lessonMistake.one
+              ? "е грешката, която той учи"
+              : "са грешките, които той учи"}
+            .
+          </p>
+        ) : null}
+
         <p className="text-sm leading-relaxed">{reveal.bodyBg}</p>
 
         {/* …AND THE ROW UNDERNEATH STOPS CALLING IT „преценка". Past the
@@ -401,7 +473,13 @@ export function CalibrationGate({
 
       {/* Shared with CalibrationPendingCard, which renders these disabled so
           the waiting student sees the question rather than a promise of it. */}
-      <CalibrationFields points={points} onPoints={setPoints} pass={pass} onPass={setPass} />
+      <CalibrationFields
+        points={points}
+        onPoints={setPoints}
+        pass={pass}
+        onPass={setPass}
+        lessonHasTargets={lessonHasTargets}
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn-primary" disabled={!ready} onClick={submit}>

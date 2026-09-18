@@ -274,6 +274,28 @@ describe("the manoeuvre grade says WHY it landed there", () => {
       ["dangerous, route finished", resultOf([makeViolation("RED_LIGHT_CROSSED", 30)])],
       ["clean and finished", resultOf([])],
       ["one minor, finished", resultOf([makeViolation("TURN_WITHOUT_INDICATOR", 12)])],
+      // ── ADR-009 (founder Ruling A), added by lane E · doc 92 §5.7, critic
+      //    gap 7. The six cases above are all LAW floors, and this loop was
+      //    the check that would have caught the ADR's fifth floor landing in
+      //    `scoreRubric` with no sentence beside it — or a sentence with no
+      //    cap behind it — and it could not, because none of them carries
+      //    `lessonMistakes`. This one drive is the whole ADR as far as this
+      //    loop is concerned: a spotless изпитен лист, a finished route, and a
+      //    grade floored by the lesson's own mistake.
+      [
+        "lesson mistake, clean sheet, route finished",
+        resultOf([], {
+          passed: false,
+          lessonMistakes: [
+            {
+              code: "VULNERABLE_PASS_TOO_CLOSE",
+              t: 20.9,
+              charged: false,
+              titleBg: "Тясно изпреварване на велосипедист",
+            },
+          ],
+        }),
+      ],
     ];
     for (const [label, result] of cases) {
       const stars = scoreRubric(result, {}).stars;

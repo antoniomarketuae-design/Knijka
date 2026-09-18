@@ -57,7 +57,64 @@ fi
 cd "$REPO" || exit 2
 
 # The audit tooling has its own tests and its own agreement gate.
-run "audit-tests"     node --test tools/audit/reclosure.test.mjs tools/audit/comment-blind.test.mjs tools/audit/build-redrive.test.mjs tools/audit/finding-reader.test.mjs tools/audit/inprocess-drive.test.mjs
+#
+# THIS STEP USED TO BE A HARDCODED LIST OF FIVE FILES, and a hardcoded list is
+# the bug one level up from the one this file's header describes. MEASURED
+# 2026-09-18: tools/audit holds 12 node:test files and the list named 5, so
+# SEVEN were run by nothing — count-agreement (7 tests), effective-verdict (9),
+# legend-coverage (3), route-fidelity (31) and verdict-surface (18), all of them
+# committed and none ever in the list, plus stale-claims (7) and
+# lesson-mistake-census (17) from this round. **92 tests.** Nobody deleted them
+# from the gate; the gate simply never learned they existed, which prints the
+# same green a passing suite does.
+#
+# `platform/scripts/tools-tests.mjs` is the repo's node:test collector and it
+# DISCOVERS BY RUNNER, not by directory: every test file under tools/ that
+# imports `node:test` is claimed by it, and it fails if any file is claimed by
+# both runners or by neither, so the next tools/<new-area>/x.test.mjs cannot be
+# missed the way these seven were. wave-cycle.sh gate 4 already runs exactly
+# this. Note the widened scope: this gate now covers ALL of tools/, not only
+# tools/audit — which is where the one standing red below comes from.
+#
+# IT IS NOT WRAPPED IN `run`, AND THAT IS DELIBERATE. `run` reads the exit code
+# alone, and the collector exits non-zero today on ONE standing red that is not
+# this repo's audit tooling at all (`tools/mobile/deck-captions.test.mjs`, "the
+# corpus has not changed since it was measured" — content/traces/ last moved at
+# bf16de1). A gate that can only ever be red is a gate people stop running, and
+# a gate that swallows that red with `|| true` cannot see a NEW one appear
+# beside it. So this reads the runner's OWN summary line, allows exactly the one
+# failure it can name, and REFUSES A LOG IT CANNOT READ — the same three rules
+# wave-cycle.sh:138 learned on 2026-09-14, when a `grep FAIL|not ok` matched
+# nothing against Node 24's «✖»/«ℹ fail N» and passed two gates over `ℹ fail 3`.
+echo "[gate] --- audit-tests"
+# The log goes OUTSIDE the worktree on purpose: `tree_hash` is `git status
+# --porcelain`, so a scratch file written under $REPO would make the gate refuse
+# its own run as "the tree CHANGED while the gate ran".
+TOOLS_LOG="$(mktemp)"
+node platform/scripts/tools-tests.mjs > "$TOOLS_LOG" 2>&1 || true
+TSUM="$(tr -d '\r' < "$TOOLS_LOG" | sed -n 's/^ℹ fail \([0-9][0-9]*\)$/\1/p')"
+if [ -z "$TSUM" ]; then
+  tail -20 "$TOOLS_LOG"
+  echo "[gate] audit-tests FAILED — tools-tests printed no «ℹ fail N» summary."
+  echo "[gate] An UNREADABLE result is not a green one."
+  FAIL=1
+else
+  TFAIL=0; for n in $TSUM; do TFAIL=$((TFAIL + n)); done
+  # The standing red is NAMED, not just counted, so a new failure cannot hide
+  # behind the allowance on a day the named one happens to pass.
+  TFREEZE="$(tr -d '\r' < "$TOOLS_LOG" | grep -cE "^[[:space:]]*✖ the corpus has not changed since it was measured" || true)"
+  [ "$TFREEZE" -gt 1 ] && TFREEZE=1
+  echo "[gate] audit-tests: $TFAIL failing (standing: deck-captions corpus freeze ×$TFREEZE)"
+  if [ "$TFAIL" -gt "$TFREEZE" ]; then
+    tr -d '\r' < "$TOOLS_LOG" | grep -E "^[[:space:]]*✖ " | sort -u | head -20
+    echo "[gate] audit-tests FAILED — $((TFAIL - TFREEZE)) failure(s) are NEW."
+    FAIL=1
+  else
+    echo "[gate] audit-tests ok"
+  fi
+fi
+rm -f "$TOOLS_LOG"
+
 run "count-agreement" node tools/audit/count-agreement.mjs
 
 H1="$(tree_hash)"
