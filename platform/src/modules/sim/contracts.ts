@@ -193,24 +193,37 @@ export interface LessonBriefingStep {
  * `ScenarioSpec.StepText`). Every consumer that needs the catalogue resolves
  * the code itself — `lessons/lessonMistake.ts` is the one place that does.
  *
- * ⚠ THE LOOSENESS IS NOT PAID FOR YET, AND A READER MUST NOT ASSUME IT IS
- * (corrected 2026-09-18; doc 92 addendum 1 item 3). This block used to end
- * «and `lessons/scenario/validate.ts` refuses an uncatalogued code at authoring
- * time, so the looseness here costs nothing at runtime». That validator is lane
- * B's UNBUILT work: `lessonMistakeTargets` appears nowhere under
- * `lessons/scenario/` at HEAD, `validate.ts` included. Measured consequence of
- * a one-character typo in a target code (`HARSH_BRAKIGN_NO_CAUSE` for
- * `HARSH_BRAKING_NO_CAUSE`): the code is carried into the target map intact,
- * `lessonMistakeRuleBg` returns `null` so the student is never warned,
- * `foldLessonMistakes` returns `[]` from both the charged and the coached
- * record so the mistake can never be found, and `lessonMistakeCopy` returns
- * `null`. ADR-009 is silently stripped from that rung and nothing fails
- * anywhere — no type error, no test, no runtime warning.
+ * AND THE LOOSENESS COSTS NOTHING AT RUNTIME, because every door a code can
+ * enter through is shut at AUTHORING time (lane B, 2026-09-18 — this paragraph
+ * replaces the retraction doc 92 addendum 1 item 3 required while the validator
+ * was unbuilt). The field is written by `compileScenario` alone, and
+ * `deriveLessonMistakeTargets` reads exactly two sources:
  *
- * So `code` is genuinely unvalidated today. Do not write a consumer-side guard
- * that assumes otherwise, and do not read a missing ADR-009 on some rung as
- * «the derivation found no targets». When lane B lands its validator, this
- * paragraph is replaced by the sentence it corrects.
+ *  · a demo's `codeRefs` minus its `incidentalCodeRefs`. `validate.ts` checks
+ *    every `codeRefs` entry against `rules/catalog` VIOLATIONS, and now checks
+ *    that every `incidentalCodeRefs` entry is IN that same `codeRefs` — so a
+ *    typo cannot hide in the exemption list either. `compileScenario` calls
+ *    `assertScenarioSpec` before it derives anything, so neither reaches here.
+ *  · `rules/detectorOptIns.ts DETECTOR_OPT_IN_CODES`, typed `ViolationCode[]`
+ *    and re-checked against the catalogue at runtime by T8b — a type is not a
+ *    runtime check, and this repository has shipped guards that could not fail.
+ *
+ * Second line, for a caller that skipped validation: the derivation itself
+ * throws `ScenarioCompileError` naming the code rather than dropping it.
+ *
+ * WHAT THAT PREVENTS, measured on this tree before the validator existed: a
+ * one-character typo (`HARSH_BRAKIGN_NO_CAUSE` for `HARSH_BRAKING_NO_CAUSE`)
+ * was carried into the target map intact, `lessonMistakeRuleBg` returned `null`
+ * so the student was never warned, `foldLessonMistakes` returned `[]` from both
+ * the charged and the coached record so the mistake could never be found, and
+ * `lessonMistakeCopy` returned `null` — ADR-009 silently stripped from that rung
+ * with no type error, no failing test and no runtime warning. The cases are
+ * pinned, each with the mutation that reds it, in
+ * `lessons/scenario/__tests__/incidental-code-refs-validate.test.ts`.
+ *
+ * Still do not read a missing ADR-009 on some rung as «the derivation found no
+ * targets» without checking: 62 of 167 templates legitimately carry no field
+ * (doc 92 §2.3 R5), and so does every exam rung.
  */
 export interface LessonMistakeTarget {
   /** rules-catalog ViolationCode (plain string: see the header). */

@@ -881,6 +881,14 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
       // on one screen); unifying them is a re-recording job, noted rather than
       // half-done.
       codeRefs: ["POLICE_STOP_SIGNAL_IGNORED", "NOT_KEEPING_RIGHT"],
+      // ADR-009 (doc 92 §2.3 R2): the act this lesson exists to teach is the
+      // чл. 103 pass-by; the left-lane hog is what the driver did WHILE doing it.
+      // The comment eight lines up says so in the template's own words — «the
+      // pass-by is чл. 103's own offence… the left-lane hog is чл. 15» — and the
+      // card's own sentence marks it as the second thing: «А оставането в лявата
+      // лента… е и „висене"». Staying left is graded teach-first as today; it
+      // does not cost the lesson.
+      incidentalCodeRefs: ["NOT_KEEPING_RIGHT"],
     },
     {
       traceRef: { path: "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json" },
@@ -1089,6 +1097,13 @@ export const SC_VP_TELLTALE: ScenarioSpec = {
       // the demo named „Игнорирана лампа" finally convicts the ignored lamp
       // instead of only the hurry that came with it.
       codeRefs: ["WARNING_LAMP_IGNORED", "SPEEDING_OVER_LIMIT"],
+      // ADR-009 (doc 92 §2.3 R2): the lamp is the act, the hurry is its side
+      // effect. The comment three lines up is the justification in the
+      // template's own words — the demo «finally convicts the ignored lamp
+      // instead of only the hurry that came with it» — and the card says the
+      // same: «А ускоряването „за да стигнеш" прати колата и над ограничението».
+      // Speeding here stays teach-first; ignoring the red lamp costs the lesson.
+      incidentalCodeRefs: ["SPEEDING_OVER_LIMIT"],
     },
     {
       traceRef: { path: "content/traces/sc-vp-telltale/mistake-panic-stop.trace.json" },

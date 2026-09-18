@@ -155,6 +155,14 @@ export const SC_LN_TURN_LANE_ARROWS: ScenarioSpec = {
       // for a manoeuvre that broke чл. 6 (marking) — the right severity for
       // the wrong law, which requirement-zero forbids.
       codeRefs: ["WRONG_LANE_FOR_DIRECTION", "TURN_WITHOUT_INDICATOR", "POOR_LANE_KEEPING"],
+      // ADR-009 (doc 92 §2.3 R2): the M-17 comment directly above names these
+      // two «the collateral faults» and WRONG_LANE_FOR_DIRECTION «the act
+      // itself». That is the marker's whole justification, written by the author
+      // who added the act's own code precisely so the card would stop explaining
+      // чл. 25 for a чл. 6 manoeuvre. Turning without a signal and drifting are
+      // still taught and still graded on a repeat; only the turn from the
+      // „само направо" lane costs the lesson.
+      incidentalCodeRefs: ["TURN_WITHOUT_INDICATOR", "POOR_LANE_KEEPING"],
     },
     {
       traceRef: { path: "content/traces/sc-ln-turn-lane-arrows/mistake-late-two-lanes.trace.json" },

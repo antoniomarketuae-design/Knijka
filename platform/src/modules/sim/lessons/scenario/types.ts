@@ -147,6 +147,33 @@ export interface MistakeDemo {
    * rules/catalog VIOLATIONS.
    */
   codeRefs: string[];
+  /**
+   * ADR-009 (founder Ruling A) — the subset of `codeRefs` this demo grades as a
+   * SIDE EFFECT of the act it demonstrates, rather than as the act itself. Those
+   * codes are dropped from the lesson's own-mistake targets, so committing one
+   * keeps today's teach-first treatment instead of costing the lesson (doc 92
+   * §2.3 R2).
+   *
+   * ONLY WHERE THE TEMPLATE'S OWN SOURCE ALREADY SAYS SO, and the bar is the
+   * template's prose, not a reviewer's opinion: `sc-ln-turn-lane-arrows`'s own
+   * comment calls TURN_WITHOUT_INDICATOR and POOR_LANE_KEEPING «the collateral
+   * faults» beside the act's own code, and `sc-vp-telltale`'s says the demo
+   * «finally convicts the ignored lamp instead of only the hurry that came with
+   * it». Three demos and four codes carry this at the time of writing (pinned
+   * by T8c); a fourth marker is a content change with its own justification.
+   *
+   * IT IS A SUBSET AND NEVER THE WHOLE LIST. Marking every code incidental would
+   * say "this demo demonstrates nothing", which is the one thing a mistake demo
+   * cannot be — `validate.ts` refuses it, along with a code that is not in
+   * `codeRefs` (so an uncatalogued code cannot enter the derivation through this
+   * door) and a duplicate.
+   *
+   * NOT a way to silence a stand-in detector. Doc 92 §2.3 R3 keeps stand-ins as
+   * targets on purpose: if the author put the code on the demo, the lesson grades
+   * it, and the remedy for a wrong one is this line WITH the sentence that earns
+   * it — not a quiet deletion.
+   */
+  incidentalCodeRefs?: string[];
 }
 
 /** The what/when/why/rule/expectation card set (doc 76 §2). */

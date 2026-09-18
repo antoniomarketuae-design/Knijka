@@ -299,3 +299,15 @@ export {
 } from "./scoring";
 
 export { buildSessionSummary, type FailReason, type SessionSummary } from "./summary";
+
+export {
+  /**
+   * WHICH CODES A `ruleConfig` KEY ARMS (ADR-009 source A, doc 92 §3.3). Read
+   * `armsDetector` rather than testing a key's name: `townCrawlEnabled` is
+   * spelled like the seven arming keys and ships ON, so `sc-ac-ice` writing it
+   * DISARMS a detector. A name-keyed rule read that lesson backwards.
+   */
+  DETECTOR_OPT_IN_CODES,
+  NON_ARMING_RULE_CONFIG_KEYS,
+  armsDetector,
+} from "./detectorOptIns";

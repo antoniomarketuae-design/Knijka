@@ -62,14 +62,19 @@ import type { CoachedMistake, LessonMistakeHit, TeachMoment } from "./types";
  * §2.2); a rung that suddenly wants nine has a derivation bug, and a reason
  * block naming nine acts is not a reason a seventeen-year-old can act on.
  *
- * ⚠ IT IS A NUMBER, NOT A GUARD, AND NOTHING AT HEAD ENFORCES IT (stated
- * plainly on 2026-09-18; the first version of this block said «read by lane B's
- * `deriveLessonMistakeTargets` and asserted by T8a», which reads as a guard
- * that exists). `deriveLessonMistakeTargets` and T8a are lane B's UNBUILT work;
- * this module never checks the cap, and `lessonMistakeTargetCodes` below will
- * happily return nine. The local test mirrors the literal so the two lanes
- * cannot drift apart on the value — a constant mirror is all it is. Lane B owns
- * the whole guard, and until lane B lands there is none.
+ * WHO ENFORCES IT: `lessons/scenario/lessonMistakeTargets.ts`
+ * `deriveLessonMistakeTargets`, which throws a `ScenarioCompileError` naming
+ * every code rather than truncating — a silently truncated target set is a
+ * lesson quietly opting half-way out of ADR-009. THIS MODULE DOES NOT CHECK IT:
+ * `lessonMistakeTargetCodes` below reads whatever the compiler wrote and will
+ * return nine if nine ever reach it, which is why the cap lives at the only
+ * place that can refuse the lesson instead of degrading it.
+ *
+ * (History, because this block has been wrong in both directions: it first
+ * claimed the derivation asserted the cap while lane B was unbuilt; it was then
+ * corrected to «a number, not a guard, and nothing enforces it», which lane B's
+ * landing made false in the other direction. The local test mirrors the literal
+ * so the two files cannot drift apart on the value.)
  */
 export const MAX_LESSON_MISTAKE_TARGETS = 8;
 

@@ -1,0 +1,3977 @@
+{
+  "generatedBy": "RECORD_LESSON_MISTAKE_TARGETS=1 npx vitest run src/modules/sim/lessons/scenario/__tests__/lesson-mistake-targets.test.ts — the real compileScenario over every template x every authored rung (ADR-009, doc 92 §8.2 T8a)",
+  "counts": {
+    "templates": 167,
+    "lessonsWithTargets": 105,
+    "lessonsEmpty": 62,
+    "practiceRungs": 646,
+    "examRungs": 162,
+    "examRungsWithTargets": 0,
+    "practiceSizeHistogram": {
+      "0": 243,
+      "1": 260,
+      "2": 120,
+      "3": 19,
+      "4": 4
+    },
+    "distinctTargetCodes": 38,
+    "codeFrequencyByLesson": {
+      "HARSH_BRAKING_NO_CAUSE": 13,
+      "POOR_LANE_KEEPING": 11,
+      "SPEEDING_OVER_LIMIT": 11,
+      "ILLEGAL_STOP_IN_BAN_ZONE": 8,
+      "LANE_CHANGE_WITHOUT_INDICATOR": 8,
+      "LANE_CHANGE_WITHOUT_MIRROR_CHECK": 8,
+      "SPEED_TOO_FAST_FOR_CONDITIONS": 8,
+      "FOLLOWING_TOO_CLOSE": 7,
+      "CENTER_LINE_TOUCHED": 5,
+      "CROSSED_SOLID_LINE": 5,
+      "HEADLIGHTS_OFF_AT_NIGHT": 5,
+      "MOVE_OFF_WITHOUT_OBSERVATION": 5,
+      "TURN_WITHOUT_INDICATOR": 5,
+      "NOT_KEEPING_RIGHT": 4,
+      "FOLLOWING_TOO_CLOSE_FOR_RAIN": 3,
+      "HESITATION_AT_GREEN": 3,
+      "JUNCTION_SCAN_INCOMPLETE": 3,
+      "SPEED_TOO_FAST_FOR_CURVE": 3,
+      "STANDSTILL_GAP_TOO_CLOSE": 3,
+      "VULNERABLE_PASS_TOO_CLOSE": 3,
+      "WARNING_LAMP_IGNORED": 3,
+      "DRIVING_TOO_SLOW_FOR_MOTORWAY": 2,
+      "ENGINE_STALLED": 2,
+      "HANDBRAKE_LEFT_ON": 2,
+      "HEADLIGHTS_OFF_IN_RAIN": 2,
+      "HIGH_BEAM_NOT_DIPPED": 2,
+      "OVERTAKE_RETURN_TOO_EARLY": 2,
+      "STOPPED_WITHOUT_CAUSE": 2,
+      "STOP_LINE_OVERSHOOT": 2,
+      "WRONG_LANE_FOR_DIRECTION": 2,
+      "CLOSING_ON_LEAD_TOO_FAST": 1,
+      "DRIVING_IN_BUS_LANE": 1,
+      "FOG_LIGHTS_OFF_IN_FOG": 1,
+      "OVERTAKING_IN_BAN_ZONE": 1,
+      "POLICE_STOP_SIGNAL_IGNORED": 1,
+      "RED_YELLOW_CROSSED": 1,
+      "SEATBELT_OFF_WHILE_MOVING": 1,
+      "YELLOW_LIGHT_NOT_STOPPED": 1
+    }
+  },
+  "rungs": {
+    "sc-park-perp-rev@L1": null,
+    "sc-park-perp-rev@L2": null,
+    "sc-park-perp-rev@L3": null,
+    "sc-park-perp-rev@L4": null,
+    "sc-park-perp-rev@L5": null,
+    "sc-park-parallel@L1": null,
+    "sc-park-parallel@L2": null,
+    "sc-park-parallel@L3": null,
+    "sc-park-parallel@L4": null,
+    "sc-park-parallel@L5": null,
+    "sc-park-45@L1": null,
+    "sc-park-45@L2": null,
+    "sc-park-45@L3": null,
+    "sc-park-45@L4": null,
+    "sc-park-45@L5": null,
+    "sc-park-narrow@L1": null,
+    "sc-park-narrow@L2": null,
+    "sc-park-narrow@L3": null,
+    "sc-park-narrow@L4": null,
+    "sc-park-narrow@L5": null,
+    "sc-park-perp-forward@L1": null,
+    "sc-park-perp-forward@L2": null,
+    "sc-park-perp-forward@L3": null,
+    "sc-park-perp-forward@L4": null,
+    "sc-park-perp-forward@L5": null,
+    "sc-park-parallel-exit@L1": null,
+    "sc-park-parallel-exit@L2": null,
+    "sc-park-parallel-exit@L3": null,
+    "sc-park-parallel-exit@L4": null,
+    "sc-park-parallel-exit@L5": null,
+    "sc-zebra-approach@L1": null,
+    "sc-zebra-approach@L2": null,
+    "sc-zebra-approach@L3": null,
+    "sc-zebra-approach@L4": null,
+    "sc-zebra-approach@L5": null,
+    "sc-roundabout-entry@L1": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Излизане без десен мигач"
+      }
+    ],
+    "sc-roundabout-entry@L2": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Излизане без десен мигач"
+      }
+    ],
+    "sc-roundabout-entry@L3": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Излизане без десен мигач"
+      }
+    ],
+    "sc-roundabout-entry@L4": null,
+    "sc-roundabout-entry@L5": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Излизане без десен мигач"
+      }
+    ],
+    "sc-lane-change@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без мигач"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без проверка в огледалото"
+      }
+    ],
+    "sc-lane-change@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без мигач"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без проверка в огледалото"
+      }
+    ],
+    "sc-lane-change@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без мигач"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без проверка в огледалото"
+      }
+    ],
+    "sc-lane-change@L4": null,
+    "sc-lane-change@L5": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без мигач"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без проверка в огледалото"
+      }
+    ],
+    "sc-junction-rhr@L1": null,
+    "sc-junction-rhr@L2": null,
+    "sc-junction-rhr@L3": null,
+    "sc-junction-rhr@L4": null,
+    "sc-junction-rhr@L5": null,
+    "sc-junction-stop@L1": null,
+    "sc-junction-stop@L2": null,
+    "sc-junction-stop@L3": null,
+    "sc-junction-stop@L4": null,
+    "sc-junction-stop@L5": null,
+    "sc-signal-response@L1": [
+      {
+        "code": "STOP_LINE_OVERSHOOT",
+        "source": "demo",
+        "demoTitleBg": "Пропълзяване на червено"
+      },
+      {
+        "code": "YELLOW_LIGHT_NOT_STOPPED",
+        "source": "demo",
+        "demoTitleBg": "Жълтото като зелено"
+      }
+    ],
+    "sc-signal-response@L2": [
+      {
+        "code": "STOP_LINE_OVERSHOOT",
+        "source": "demo",
+        "demoTitleBg": "Пропълзяване на червено"
+      },
+      {
+        "code": "YELLOW_LIGHT_NOT_STOPPED",
+        "source": "demo",
+        "demoTitleBg": "Жълтото като зелено"
+      }
+    ],
+    "sc-signal-response@L3": [
+      {
+        "code": "STOP_LINE_OVERSHOOT",
+        "source": "demo",
+        "demoTitleBg": "Пропълзяване на червено"
+      },
+      {
+        "code": "YELLOW_LIGHT_NOT_STOPPED",
+        "source": "demo",
+        "demoTitleBg": "Жълтото като зелено"
+      }
+    ],
+    "sc-signal-response@L4": null,
+    "sc-signal-response@L5": [
+      {
+        "code": "STOP_LINE_OVERSHOOT",
+        "source": "demo",
+        "demoTitleBg": "Пропълзяване на червено"
+      },
+      {
+        "code": "YELLOW_LIGHT_NOT_STOPPED",
+        "source": "demo",
+        "demoTitleBg": "Жълтото като зелено"
+      }
+    ],
+    "sc-turn-left-oncoming@L1": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Ляв завой без мигач"
+      }
+    ],
+    "sc-turn-left-oncoming@L2": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Ляв завой без мигач"
+      }
+    ],
+    "sc-turn-left-oncoming@L3": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Ляв завой без мигач"
+      }
+    ],
+    "sc-turn-left-oncoming@L4": null,
+    "sc-turn-left-oncoming@L5": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Ляв завой без мигач"
+      }
+    ],
+    "sc-junction-scan@L1": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo"
+      }
+    ],
+    "sc-junction-scan@L2": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo"
+      }
+    ],
+    "sc-junction-scan@L3": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo"
+      }
+    ],
+    "sc-junction-scan@L4": null,
+    "sc-junction-scan@L5": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo"
+      }
+    ],
+    "sc-jx-giveway-b1@L1": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo",
+        "demoTitleBg": "Излизане без пълен оглед в двете посоки"
+      }
+    ],
+    "sc-jx-giveway-b1@L2": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo",
+        "demoTitleBg": "Излизане без пълен оглед в двете посоки"
+      }
+    ],
+    "sc-jx-giveway-b1@L3": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo",
+        "demoTitleBg": "Излизане без пълен оглед в двете посоки"
+      }
+    ],
+    "sc-jx-giveway-b1@L4": null,
+    "sc-jx-giveway-b1@L5": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo",
+        "demoTitleBg": "Излизане без пълен оглед в двете посоки"
+      }
+    ],
+    "sc-junction-gap@L1": null,
+    "sc-junction-gap@L2": null,
+    "sc-junction-gap@L3": null,
+    "sc-junction-gap@L4": null,
+    "sc-junction-gap@L5": null,
+    "sc-junction-blind@L1": null,
+    "sc-junction-blind@L2": null,
+    "sc-junction-blind@L3": null,
+    "sc-junction-blind@L4": null,
+    "sc-junction-blind@L5": null,
+    "sc-junction-left@L1": null,
+    "sc-junction-left@L2": null,
+    "sc-junction-left@L3": null,
+    "sc-junction-left@L4": null,
+    "sc-junction-left@L5": null,
+    "sc-signal-dead@L1": null,
+    "sc-signal-dead@L2": null,
+    "sc-signal-dead@L3": null,
+    "sc-signal-dead@L4": null,
+    "sc-signal-dead@L5": null,
+    "sc-signal-flashing@L1": null,
+    "sc-signal-flashing@L2": null,
+    "sc-signal-flashing@L3": null,
+    "sc-signal-flashing@L4": null,
+    "sc-signal-flashing@L5": null,
+    "sc-signal-hesitation@L1": [
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo"
+      }
+    ],
+    "sc-signal-hesitation@L2": [
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo"
+      }
+    ],
+    "sc-signal-hesitation@L3": [
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo"
+      }
+    ],
+    "sc-signal-hesitation@L4": null,
+    "sc-signal-hesitation@L5": [
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo"
+      }
+    ],
+    "sc-signal-controller@L1": null,
+    "sc-signal-controller@L2": null,
+    "sc-signal-controller@L3": null,
+    "sc-signal-controller@L4": null,
+    "sc-signal-controller@L5": null,
+    "sc-signal-redyellow@L1": [
+      {
+        "code": "RED_YELLOW_CROSSED",
+        "source": "demo"
+      }
+    ],
+    "sc-signal-redyellow@L2": [
+      {
+        "code": "RED_YELLOW_CROSSED",
+        "source": "demo"
+      }
+    ],
+    "sc-signal-redyellow@L3": [
+      {
+        "code": "RED_YELLOW_CROSSED",
+        "source": "demo"
+      }
+    ],
+    "sc-signal-redyellow@L4": null,
+    "sc-signal-redyellow@L5": [
+      {
+        "code": "RED_YELLOW_CROSSED",
+        "source": "demo"
+      }
+    ],
+    "sc-crossing-let-pass@L1": null,
+    "sc-crossing-let-pass@L2": null,
+    "sc-crossing-let-pass@L3": null,
+    "sc-crossing-let-pass@L4": null,
+    "sc-crossing-let-pass@L5": null,
+    "sc-crossing-slow-crosser@L1": null,
+    "sc-crossing-slow-crosser@L2": null,
+    "sc-crossing-slow-crosser@L3": null,
+    "sc-crossing-slow-crosser@L4": null,
+    "sc-crossing-slow-crosser@L5": null,
+    "sc-crossing-rain-sprint@L1": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Дъждовна нощ без светлини"
+      }
+    ],
+    "sc-crossing-rain-sprint@L2": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Дъждовна нощ без светлини"
+      }
+    ],
+    "sc-crossing-rain-sprint@L3": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Дъждовна нощ без светлини"
+      }
+    ],
+    "sc-crossing-rain-sprint@L4": null,
+    "sc-crossing-rain-sprint@L5": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Дъждовна нощ без светлини"
+      }
+    ],
+    "sc-crossing-dart@L1": null,
+    "sc-crossing-dart@L2": null,
+    "sc-crossing-dart@L3": null,
+    "sc-crossing-dart@L4": null,
+    "sc-crossing-dart@L5": null,
+    "sc-crossing-bus-shadow@L1": null,
+    "sc-crossing-bus-shadow@L2": null,
+    "sc-crossing-bus-shadow@L3": null,
+    "sc-crossing-bus-shadow@L4": null,
+    "sc-crossing-bus-shadow@L5": null,
+    "sc-crossing-child-ball@L1": null,
+    "sc-crossing-child-ball@L2": null,
+    "sc-crossing-child-ball@L3": null,
+    "sc-crossing-child-ball@L4": null,
+    "sc-crossing-child-ball@L5": null,
+    "sc-crossing-white-cane@L1": null,
+    "sc-crossing-white-cane@L2": null,
+    "sc-crossing-white-cane@L3": null,
+    "sc-crossing-white-cane@L4": null,
+    "sc-crossing-white-cane@L5": null,
+    "sc-pe-jaywalker@L1": null,
+    "sc-pe-jaywalker@L2": null,
+    "sc-pe-jaywalker@L3": null,
+    "sc-pe-jaywalker@L4": null,
+    "sc-pe-jaywalker@L5": null,
+    "sc-speed-rain@L1": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-speed-rain@L2": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-speed-rain@L3": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-speed-rain@L4": null,
+    "sc-speed-rain@L5": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-speed-creep@L1": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo"
+      }
+    ],
+    "sc-speed-creep@L2": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo"
+      }
+    ],
+    "sc-speed-creep@L3": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo"
+      }
+    ],
+    "sc-speed-creep@L4": null,
+    "sc-speed-creep@L5": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo"
+      }
+    ],
+    "sc-speed-dangerous@L1": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Със скоростта на потока — 58"
+      }
+    ],
+    "sc-speed-dangerous@L2": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Със скоростта на потока — 58"
+      }
+    ],
+    "sc-speed-dangerous@L3": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Със скоростта на потока — 58"
+      }
+    ],
+    "sc-speed-dangerous@L4": null,
+    "sc-speed-dangerous@L5": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Със скоростта на потока — 58"
+      }
+    ],
+    "sc-speed-zone@L1": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Скорост от булеварда в зона 30"
+      }
+    ],
+    "sc-speed-zone@L2": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Скорост от булеварда в зона 30"
+      }
+    ],
+    "sc-speed-zone@L3": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Скорост от булеварда в зона 30"
+      }
+    ],
+    "sc-speed-zone@L4": null,
+    "sc-speed-zone@L5": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Скорост от булеварда в зона 30"
+      }
+    ],
+    "sc-speed-transition@L1": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Само наполовина намалена"
+      }
+    ],
+    "sc-speed-transition@L2": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Само наполовина намалена"
+      }
+    ],
+    "sc-speed-transition@L3": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Само наполовина намалена"
+      }
+    ],
+    "sc-speed-transition@L4": null,
+    "sc-speed-transition@L5": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Само наполовина намалена"
+      }
+    ],
+    "sc-sp-harsh-brake@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-harsh-brake@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-harsh-brake@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-harsh-brake@L4": null,
+    "sc-sp-harsh-brake@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-curve@L1": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-curve@L2": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-curve@L3": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-curve@L4": null,
+    "sc-sp-curve@L5": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo"
+      }
+    ],
+    "sc-mw-discipline@L1": [
+      {
+        "code": "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+        "source": "demo",
+        "demoTitleBg": "Пълзене с 40 по магистралата"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Висене в лявата лента при 130"
+      }
+    ],
+    "sc-mw-discipline@L2": [
+      {
+        "code": "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+        "source": "demo",
+        "demoTitleBg": "Пълзене с 40 по магистралата"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Висене в лявата лента при 130"
+      }
+    ],
+    "sc-mw-discipline@L3": [
+      {
+        "code": "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+        "source": "demo",
+        "demoTitleBg": "Пълзене с 40 по магистралата"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Висене в лявата лента при 130"
+      }
+    ],
+    "sc-mw-discipline@L4": null,
+    "sc-mw-discipline@L5": [
+      {
+        "code": "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+        "source": "demo",
+        "demoTitleBg": "Пълзене с 40 по магистралата"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Висене в лявата лента при 130"
+      }
+    ],
+    "sc-follow-distance@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-distance@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-distance@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-distance@L4": null,
+    "sc-follow-distance@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-brake@L1": null,
+    "sc-follow-brake@L2": null,
+    "sc-follow-brake@L3": null,
+    "sc-follow-brake@L4": null,
+    "sc-follow-brake@L5": null,
+    "sc-follow-standstill@L1": [
+      {
+        "code": "CLOSING_ON_LEAD_TOO_FAST",
+        "source": "detector"
+      },
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-standstill@L2": [
+      {
+        "code": "CLOSING_ON_LEAD_TOO_FAST",
+        "source": "detector"
+      },
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-standstill@L3": [
+      {
+        "code": "CLOSING_ON_LEAD_TOO_FAST",
+        "source": "detector"
+      },
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-standstill@L4": null,
+    "sc-follow-standstill@L5": [
+      {
+        "code": "CLOSING_ON_LEAD_TOO_FAST",
+        "source": "detector"
+      },
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-rain-gap@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-rain-gap@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-rain-gap@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-rain-gap@L4": null,
+    "sc-follow-rain-gap@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-truck@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-truck@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-truck@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-truck@L4": null,
+    "sc-follow-truck@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-cutin@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-cutin@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-cutin@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-cutin@L4": null,
+    "sc-follow-cutin@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-follow-tailgater@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спирачен удар „за урок“"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Гузно ускоряване"
+      },
+      {
+        "code": "STOPPED_WITHOUT_CAUSE",
+        "source": "detector"
+      }
+    ],
+    "sc-follow-tailgater@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спирачен удар „за урок“"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Гузно ускоряване"
+      },
+      {
+        "code": "STOPPED_WITHOUT_CAUSE",
+        "source": "detector"
+      }
+    ],
+    "sc-follow-tailgater@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спирачен удар „за урок“"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Гузно ускоряване"
+      },
+      {
+        "code": "STOPPED_WITHOUT_CAUSE",
+        "source": "detector"
+      }
+    ],
+    "sc-follow-tailgater@L4": null,
+    "sc-follow-tailgater@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спирачен удар „за урок“"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Гузно ускоряване"
+      },
+      {
+        "code": "STOPPED_WITHOUT_CAUSE",
+        "source": "detector"
+      }
+    ],
+    "sc-ov-keep-right@L1": [
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-keep-right@L2": [
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-keep-right@L3": [
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-keep-right@L4": null,
+    "sc-ov-keep-right@L5": [
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-lane-keeping@L1": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Изплуване върху осевата в десния завой"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Изнасяне към бордюра в левия завой"
+      }
+    ],
+    "sc-ov-lane-keeping@L2": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Изплуване върху осевата в десния завой"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Изнасяне към бордюра в левия завой"
+      }
+    ],
+    "sc-ov-lane-keeping@L3": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Изплуване върху осевата в десния завой"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Изнасяне към бордюра в левия завой"
+      }
+    ],
+    "sc-ov-lane-keeping@L4": null,
+    "sc-ov-lane-keeping@L5": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Изплуване върху осевата в десния завой"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Изнасяне към бордюра в левия завой"
+      }
+    ],
+    "sc-ov-oneway@L1": [
+      {
+        "code": "WRONG_LANE_FOR_DIRECTION",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-oneway@L2": [
+      {
+        "code": "WRONG_LANE_FOR_DIRECTION",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-oneway@L3": [
+      {
+        "code": "WRONG_LANE_FOR_DIRECTION",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-oneway@L4": null,
+    "sc-ov-oneway@L5": [
+      {
+        "code": "WRONG_LANE_FOR_DIRECTION",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-crossing-overtake@L1": null,
+    "sc-ov-crossing-overtake@L2": null,
+    "sc-ov-crossing-overtake@L3": null,
+    "sc-ov-crossing-overtake@L4": null,
+    "sc-ov-crossing-overtake@L5": null,
+    "sc-ov-narrow@L1": null,
+    "sc-ov-narrow@L2": null,
+    "sc-ov-narrow@L3": null,
+    "sc-ov-narrow@L4": null,
+    "sc-ov-narrow@L5": null,
+    "sc-ov-ban-overtake@L1": [
+      {
+        "code": "OVERTAKING_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-ban-overtake@L2": [
+      {
+        "code": "OVERTAKING_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-ban-overtake@L3": [
+      {
+        "code": "OVERTAKING_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-ban-overtake@L4": null,
+    "sc-ov-ban-overtake@L5": [
+      {
+        "code": "OVERTAKING_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-solid-line@L1": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-solid-line@L2": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-solid-line@L3": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-solid-line@L4": null,
+    "sc-ov-solid-line@L5": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-bus-lane@L1": [
+      {
+        "code": "DRIVING_IN_BUS_LANE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-bus-lane@L2": [
+      {
+        "code": "DRIVING_IN_BUS_LANE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-bus-lane@L3": [
+      {
+        "code": "DRIVING_IN_BUS_LANE",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-bus-lane@L4": null,
+    "sc-ov-bus-lane@L5": [
+      {
+        "code": "DRIVING_IN_BUS_LANE",
+        "source": "demo"
+      }
+    ],
+    "sc-mw-emergency-lane@L1": null,
+    "sc-mw-emergency-lane@L2": null,
+    "sc-mw-emergency-lane@L3": null,
+    "sc-mw-emergency-lane@L4": null,
+    "sc-mw-emergency-lane@L5": null,
+    "sc-ov-oncoming-gap@L1": null,
+    "sc-ov-oncoming-gap@L2": null,
+    "sc-ov-oncoming-gap@L3": null,
+    "sc-ov-oncoming-gap@L4": null,
+    "sc-ov-oncoming-gap@L5": null,
+    "sc-ov-abort@L1": null,
+    "sc-ov-abort@L2": null,
+    "sc-ov-abort@L3": null,
+    "sc-ov-abort@L4": null,
+    "sc-ov-abort@L5": null,
+    "sc-ov-return-gap@L1": [
+      {
+        "code": "OVERTAKE_RETURN_TOO_EARLY",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-return-gap@L2": [
+      {
+        "code": "OVERTAKE_RETURN_TOO_EARLY",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-return-gap@L3": [
+      {
+        "code": "OVERTAKE_RETURN_TOO_EARLY",
+        "source": "demo"
+      }
+    ],
+    "sc-ov-return-gap@L4": null,
+    "sc-ov-return-gap@L5": [
+      {
+        "code": "OVERTAKE_RETURN_TOO_EARLY",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-cyclist-hook@L1": null,
+    "sc-vu-cyclist-hook@L2": null,
+    "sc-vu-cyclist-hook@L3": null,
+    "sc-vu-cyclist-hook@L4": null,
+    "sc-vu-cyclist-hook@L5": null,
+    "sc-vu-emergency@L1": null,
+    "sc-vu-emergency@L2": null,
+    "sc-vu-emergency@L3": null,
+    "sc-vu-emergency@L4": null,
+    "sc-vu-emergency@L5": null,
+    "sc-vu-emergency-junction@L1": null,
+    "sc-vu-emergency-junction@L2": null,
+    "sc-vu-emergency-junction@L3": null,
+    "sc-vu-emergency-junction@L4": null,
+    "sc-vu-emergency-junction@L5": null,
+    "sc-vu-pass-clearance@L1": [
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-pass-clearance@L2": [
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-pass-clearance@L3": [
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-pass-clearance@L4": null,
+    "sc-vu-pass-clearance@L5": [
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-door-zone@L1": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Рязко избягване през непрекъснатата линия"
+      }
+    ],
+    "sc-vu-door-zone@L2": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Рязко избягване през непрекъснатата линия"
+      }
+    ],
+    "sc-vu-door-zone@L3": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Рязко избягване през непрекъснатата линия"
+      }
+    ],
+    "sc-vu-door-zone@L4": null,
+    "sc-vu-door-zone@L5": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Рязко избягване през непрекъснатата линия"
+      }
+    ],
+    "sc-pk-smooth-stop@L1": null,
+    "sc-pk-smooth-stop@L2": null,
+    "sc-pk-smooth-stop@L3": null,
+    "sc-pk-smooth-stop@L4": null,
+    "sc-pk-smooth-stop@L5": null,
+    "sc-pk-driveway@L1": null,
+    "sc-pk-driveway@L2": null,
+    "sc-pk-driveway@L3": null,
+    "sc-pk-driveway@L4": null,
+    "sc-pk-driveway@L5": null,
+    "sc-pk-ban-stop@L1": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-ban-stop@L2": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-ban-stop@L3": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-ban-stop@L4": null,
+    "sc-pk-ban-stop@L5": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-vp-readiness@L1": [
+      {
+        "code": "HANDBRAKE_LEFT_ON",
+        "source": "demo",
+        "demoTitleBg": "Тръгване с вдигната ръчна"
+      },
+      {
+        "code": "SEATBELT_OFF_WHILE_MOVING",
+        "source": "demo",
+        "demoTitleBg": "Тръгване без колан"
+      }
+    ],
+    "sc-vp-readiness@L2": [
+      {
+        "code": "HANDBRAKE_LEFT_ON",
+        "source": "demo",
+        "demoTitleBg": "Тръгване с вдигната ръчна"
+      },
+      {
+        "code": "SEATBELT_OFF_WHILE_MOVING",
+        "source": "demo",
+        "demoTitleBg": "Тръгване без колан"
+      }
+    ],
+    "sc-vp-readiness@L3": [
+      {
+        "code": "HANDBRAKE_LEFT_ON",
+        "source": "demo",
+        "demoTitleBg": "Тръгване с вдигната ръчна"
+      },
+      {
+        "code": "SEATBELT_OFF_WHILE_MOVING",
+        "source": "demo",
+        "demoTitleBg": "Тръгване без колан"
+      }
+    ],
+    "sc-vp-readiness@L4": null,
+    "sc-vp-readiness@L5": [
+      {
+        "code": "HANDBRAKE_LEFT_ON",
+        "source": "demo",
+        "demoTitleBg": "Тръгване с вдигната ръчна"
+      },
+      {
+        "code": "SEATBELT_OFF_WHILE_MOVING",
+        "source": "demo",
+        "demoTitleBg": "Тръгване без колан"
+      }
+    ],
+    "sc-pk-move-off@L1": [
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-move-off@L2": [
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-move-off@L3": [
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-move-off@L4": null,
+    "sc-pk-move-off@L5": [
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo"
+      }
+    ],
+    "sc-vp-stall@L1": [
+      {
+        "code": "ENGINE_STALLED",
+        "source": "demo"
+      }
+    ],
+    "sc-vp-stall@L2": [
+      {
+        "code": "ENGINE_STALLED",
+        "source": "demo"
+      }
+    ],
+    "sc-vp-stall@L3": [
+      {
+        "code": "ENGINE_STALLED",
+        "source": "demo"
+      }
+    ],
+    "sc-vp-stall@L4": null,
+    "sc-vp-stall@L5": [
+      {
+        "code": "ENGINE_STALLED",
+        "source": "demo"
+      }
+    ],
+    "sc-vp-police-stop@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паника в лентата"
+      },
+      {
+        "code": "POLICE_STOP_SIGNAL_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Подминаване на сигнала"
+      }
+    ],
+    "sc-vp-police-stop@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паника в лентата"
+      },
+      {
+        "code": "POLICE_STOP_SIGNAL_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Подминаване на сигнала"
+      }
+    ],
+    "sc-vp-police-stop@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паника в лентата"
+      },
+      {
+        "code": "POLICE_STOP_SIGNAL_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Подминаване на сигнала"
+      }
+    ],
+    "sc-vp-police-stop@L4": null,
+    "sc-vp-police-stop@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паника в лентата"
+      },
+      {
+        "code": "POLICE_STOP_SIGNAL_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Подминаване на сигнала"
+      }
+    ],
+    "sc-vp-telltale@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паника в лентата"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Игнорирана лампа"
+      }
+    ],
+    "sc-vp-telltale@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паника в лентата"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Игнорирана лампа"
+      }
+    ],
+    "sc-vp-telltale@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паника в лентата"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Игнорирана лампа"
+      }
+    ],
+    "sc-vp-telltale@L4": null,
+    "sc-vp-telltale@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паника в лентата"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Игнорирана лампа"
+      }
+    ],
+    "sc-ac-night-lights@L1": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-night-lights@L2": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-night-lights@L3": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-night-lights@L4": null,
+    "sc-ac-night-lights@L5": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-rain-lights@L1": [
+      {
+        "code": "HEADLIGHTS_OFF_IN_RAIN",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-rain-lights@L2": [
+      {
+        "code": "HEADLIGHTS_OFF_IN_RAIN",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-rain-lights@L3": [
+      {
+        "code": "HEADLIGHTS_OFF_IN_RAIN",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-rain-lights@L4": null,
+    "sc-ac-highbeam-lead@L1": [
+      {
+        "code": "HIGH_BEAM_NOT_DIPPED",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-highbeam-lead@L2": [
+      {
+        "code": "HIGH_BEAM_NOT_DIPPED",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-highbeam-lead@L3": [
+      {
+        "code": "HIGH_BEAM_NOT_DIPPED",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-highbeam-lead@L4": null,
+    "sc-ac-highbeam-lead@L5": [
+      {
+        "code": "HIGH_BEAM_NOT_DIPPED",
+        "source": "demo"
+      }
+    ],
+    "sc-ac-wet-braking@L1": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара като на сухо — 50 в дъжда"
+      }
+    ],
+    "sc-ac-wet-braking@L2": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара като на сухо — 50 в дъжда"
+      }
+    ],
+    "sc-ac-wet-braking@L3": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара като на сухо — 50 в дъжда"
+      }
+    ],
+    "sc-ac-wet-braking@L4": null,
+    "sc-ac-wet-braking@L5": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара като на сухо — 50 в дъжда"
+      }
+    ],
+    "sc-ac-fog@L1": [
+      {
+        "code": "FOG_LIGHTS_OFF_IN_FOG",
+        "source": "demo",
+        "demoTitleBg": "Без фарове за мъгла"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара „като на сухо“ в мъглата"
+      }
+    ],
+    "sc-ac-fog@L2": [
+      {
+        "code": "FOG_LIGHTS_OFF_IN_FOG",
+        "source": "demo",
+        "demoTitleBg": "Без фарове за мъгла"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара „като на сухо“ в мъглата"
+      }
+    ],
+    "sc-ac-fog@L3": [
+      {
+        "code": "FOG_LIGHTS_OFF_IN_FOG",
+        "source": "demo",
+        "demoTitleBg": "Без фарове за мъгла"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара „като на сухо“ в мъглата"
+      }
+    ],
+    "sc-ac-fog@L4": null,
+    "sc-ac-fog@L5": [
+      {
+        "code": "FOG_LIGHTS_OFF_IN_FOG",
+        "source": "demo",
+        "demoTitleBg": "Без фарове за мъгла"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара „като на сухо“ в мъглата"
+      }
+    ],
+    "sc-ac-snow@L1": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара „като на сухо“ — 40 в снега"
+      }
+    ],
+    "sc-ac-snow@L2": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара „като на сухо“ — 40 в снега"
+      }
+    ],
+    "sc-ac-snow@L3": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара „като на сухо“ — 40 в снега"
+      }
+    ],
+    "sc-ac-snow@L4": null,
+    "sc-ac-snow@L5": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Кара „като на сухо“ — 40 в снега"
+      }
+    ],
+    "sc-ac-crosswind@L1": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Полет срещу поривите"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Свръхкорекцията — вторият замах"
+      }
+    ],
+    "sc-ac-crosswind@L2": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Полет срещу поривите"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Свръхкорекцията — вторият замах"
+      }
+    ],
+    "sc-ac-crosswind@L3": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Полет срещу поривите"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Свръхкорекцията — вторият замах"
+      }
+    ],
+    "sc-ac-crosswind@L4": null,
+    "sc-ac-aquaplane@L1": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "„В нормата съм“ — 72 върху водата"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Полет във водата — 85 в дъжда"
+      }
+    ],
+    "sc-ac-aquaplane@L2": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "„В нормата съм“ — 72 върху водата"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Полет във водата — 85 в дъжда"
+      }
+    ],
+    "sc-ac-aquaplane@L3": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "„В нормата съм“ — 72 върху водата"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "Полет във водата — 85 в дъжда"
+      }
+    ],
+    "sc-ac-aquaplane@L4": null,
+    "sc-ac-ice@L1": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Рязък волан върху леда"
+      }
+    ],
+    "sc-ac-ice@L2": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Рязък волан върху леда"
+      }
+    ],
+    "sc-ac-ice@L3": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Рязък волан върху леда"
+      }
+    ],
+    "sc-ac-ice@L4": null,
+    "sc-maneuver-3point@L1": null,
+    "sc-maneuver-3point@L2": null,
+    "sc-maneuver-3point@L3": null,
+    "sc-maneuver-3point@L4": null,
+    "sc-maneuver-3point@L5": null,
+    "sc-maneuver-uturn@L1": null,
+    "sc-maneuver-uturn@L2": null,
+    "sc-maneuver-uturn@L3": null,
+    "sc-maneuver-uturn@L4": null,
+    "sc-maneuver-uturn@L5": null,
+    "sc-hazard-obstacle@L1": null,
+    "sc-hazard-obstacle@L2": null,
+    "sc-hazard-obstacle@L3": null,
+    "sc-hazard-obstacle@L4": null,
+    "sc-hazard-obstacle@L5": null,
+    "sc-rx-unguarded@L1": null,
+    "sc-rx-unguarded@L2": null,
+    "sc-rx-unguarded@L3": null,
+    "sc-rx-unguarded@L4": null,
+    "sc-rx-unguarded@L5": null,
+    "sc-rx-guarded@L1": null,
+    "sc-rx-guarded@L2": null,
+    "sc-rx-guarded@L3": null,
+    "sc-rx-guarded@L4": null,
+    "sc-rx-guarded@L5": null,
+    "sc-rx-tram-left@L1": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Завой през релсите без мигач"
+      }
+    ],
+    "sc-rx-tram-left@L2": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Завой през релсите без мигач"
+      }
+    ],
+    "sc-rx-tram-left@L3": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Завой през релсите без мигач"
+      }
+    ],
+    "sc-rx-tram-left@L4": null,
+    "sc-rx-tram-left@L5": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Завой през релсите без мигач"
+      }
+    ],
+    "sc-rx-tram-island@L1": null,
+    "sc-rx-tram-island@L2": null,
+    "sc-rx-tram-island@L3": null,
+    "sc-rx-tram-island@L4": null,
+    "sc-rx-tram-island@L5": null,
+    "sc-rx-barrier-drop@L1": null,
+    "sc-rx-barrier-drop@L2": null,
+    "sc-rx-barrier-drop@L3": null,
+    "sc-rx-barrier-drop@L4": null,
+    "sc-rx-barrier-drop@L5": null,
+    "sc-jx-equal-left@L1": null,
+    "sc-jx-equal-left@L2": null,
+    "sc-jx-equal-left@L3": null,
+    "sc-jx-equal-left@L4": null,
+    "sc-jx-equal-left@L5": null,
+    "sc-jx-priority-confidence@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране на предимство с кола зад теб"
+      },
+      {
+        "code": "STOPPED_WITHOUT_CAUSE",
+        "source": "detector"
+      }
+    ],
+    "sc-jx-priority-confidence@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране на предимство с кола зад теб"
+      },
+      {
+        "code": "STOPPED_WITHOUT_CAUSE",
+        "source": "detector"
+      }
+    ],
+    "sc-jx-priority-confidence@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране на предимство с кола зад теб"
+      },
+      {
+        "code": "STOPPED_WITHOUT_CAUSE",
+        "source": "detector"
+      }
+    ],
+    "sc-jx-priority-confidence@L4": null,
+    "sc-jx-priority-confidence@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране на предимство с кола зад теб"
+      },
+      {
+        "code": "STOPPED_WITHOUT_CAUSE",
+        "source": "detector"
+      }
+    ],
+    "sc-sig-flash-amber-ped@L1": null,
+    "sc-sig-flash-amber-ped@L2": null,
+    "sc-sig-flash-amber-ped@L3": null,
+    "sc-sig-flash-amber-ped@L4": null,
+    "sc-sig-flash-amber-ped@L5": null,
+    "sc-sig-green-wave@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спринт до всяко червено"
+      },
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo",
+        "demoTitleBg": "Заспиване на потеглящото зелено"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Спринт до всяко червено"
+      }
+    ],
+    "sc-sig-green-wave@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спринт до всяко червено"
+      },
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo",
+        "demoTitleBg": "Заспиване на потеглящото зелено"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Спринт до всяко червено"
+      }
+    ],
+    "sc-sig-green-wave@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спринт до всяко червено"
+      },
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo",
+        "demoTitleBg": "Заспиване на потеглящото зелено"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Спринт до всяко червено"
+      }
+    ],
+    "sc-sig-green-wave@L4": null,
+    "sc-sig-green-wave@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спринт до всяко червено"
+      },
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo",
+        "demoTitleBg": "Заспиване на потеглящото зелено"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Спринт до всяко червено"
+      }
+    ],
+    "sc-sig-controller-live@L1": null,
+    "sc-sig-controller-live@L2": null,
+    "sc-sig-controller-live@L3": null,
+    "sc-sig-controller-live@L4": null,
+    "sc-sig-controller-postures@L1": null,
+    "sc-sig-controller-postures@L2": null,
+    "sc-sig-controller-postures@L3": null,
+    "sc-sig-controller-postures@L4": null,
+    "sc-pk-crossing-ban@L1": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-crossing-ban@L2": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-crossing-ban@L3": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-crossing-ban@L4": null,
+    "sc-pk-crossing-ban@L5": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-busstop-ban@L1": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-busstop-ban@L2": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-busstop-ban@L3": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-busstop-ban@L4": null,
+    "sc-pk-stop-vs-park@L1": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-stop-vs-park@L2": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-stop-vs-park@L3": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-stop-vs-park@L4": null,
+    "sc-pk-stop-vs-park@L5": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-double-park@L1": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-double-park@L2": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-double-park@L3": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-pk-double-park@L4": null,
+    "sc-pk-double-park@L5": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo"
+      }
+    ],
+    "sc-park-bay-exit-rev@L1": null,
+    "sc-park-bay-exit-rev@L2": null,
+    "sc-park-bay-exit-rev@L3": null,
+    "sc-park-bay-exit-rev@L4": null,
+    "sc-park-bay-exit-rev@L5": null,
+    "sc-mv-uturn-ban@L1": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Обръщане през плътната линия"
+      }
+    ],
+    "sc-mv-uturn-ban@L2": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Обръщане през плътната линия"
+      }
+    ],
+    "sc-mv-uturn-ban@L3": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Обръщане през плътната линия"
+      }
+    ],
+    "sc-mv-uturn-ban@L4": null,
+    "sc-mv-uturn-ban@L5": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Обръщане през плътната линия"
+      }
+    ],
+    "sc-pk-rail-ban@L1": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "Престой на метър от релсите"
+      }
+    ],
+    "sc-pk-rail-ban@L2": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "Престой на метър от релсите"
+      }
+    ],
+    "sc-pk-rail-ban@L3": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "Престой на метър от релсите"
+      }
+    ],
+    "sc-pk-rail-ban@L4": null,
+    "sc-ln-turn-lane-arrows@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Късно престрояване през две ленти на самото кръстовище"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Късно престрояване през две ленти на самото кръстовище"
+      },
+      {
+        "code": "WRONG_LANE_FOR_DIRECTION",
+        "source": "demo",
+        "demoTitleBg": "Ляв завой от лента „само направо“"
+      }
+    ],
+    "sc-ln-turn-lane-arrows@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Късно престрояване през две ленти на самото кръстовище"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Късно престрояване през две ленти на самото кръстовище"
+      },
+      {
+        "code": "WRONG_LANE_FOR_DIRECTION",
+        "source": "demo",
+        "demoTitleBg": "Ляв завой от лента „само направо“"
+      }
+    ],
+    "sc-ln-turn-lane-arrows@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Късно престрояване през две ленти на самото кръстовище"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Късно престрояване през две ленти на самото кръстовище"
+      },
+      {
+        "code": "WRONG_LANE_FOR_DIRECTION",
+        "source": "demo",
+        "demoTitleBg": "Ляв завой от лента „само направо“"
+      }
+    ],
+    "sc-ln-turn-lane-arrows@L4": null,
+    "sc-ln-turn-lane-arrows@L5": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Късно престрояване през две ленти на самото кръстовище"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Късно престрояване през две ленти на самото кръстовище"
+      },
+      {
+        "code": "WRONG_LANE_FOR_DIRECTION",
+        "source": "demo",
+        "demoTitleBg": "Ляв завой от лента „само направо“"
+      }
+    ],
+    "sc-ov-night-gap@L1": [
+      {
+        "code": "HIGH_BEAM_NOT_DIPPED",
+        "source": "demo",
+        "demoTitleBg": "Следване на дълги светлини зад бавния"
+      }
+    ],
+    "sc-ov-night-gap@L2": [
+      {
+        "code": "HIGH_BEAM_NOT_DIPPED",
+        "source": "demo",
+        "demoTitleBg": "Следване на дълги светлини зад бавния"
+      }
+    ],
+    "sc-ov-night-gap@L3": [
+      {
+        "code": "HIGH_BEAM_NOT_DIPPED",
+        "source": "demo",
+        "demoTitleBg": "Следване на дълги светлини зад бавния"
+      }
+    ],
+    "sc-ov-night-gap@L4": null,
+    "sc-ov-night-gap@L5": [
+      {
+        "code": "HIGH_BEAM_NOT_DIPPED",
+        "source": "demo",
+        "demoTitleBg": "Следване на дълги светлини зад бавния"
+      }
+    ],
+    "sc-ov-being-overtaken@L1": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Ляво дърпане срещу изпреварващия"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Ускоряване, докато те изпреварват"
+      }
+    ],
+    "sc-ov-being-overtaken@L2": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Ляво дърпане срещу изпреварващия"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Ускоряване, докато те изпреварват"
+      }
+    ],
+    "sc-ov-being-overtaken@L3": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Ляво дърпане срещу изпреварващия"
+      },
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Ускоряване, докато те изпреварват"
+      }
+    ],
+    "sc-ov-being-overtaken@L4": null,
+    "sc-ov-crest-curve@L1": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo",
+        "demoTitleBg": "Прекалена скорост в дъгата"
+      }
+    ],
+    "sc-ov-crest-curve@L2": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo",
+        "demoTitleBg": "Прекалена скорост в дъгата"
+      }
+    ],
+    "sc-ov-crest-curve@L3": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo",
+        "demoTitleBg": "Прекалена скорост в дъгата"
+      }
+    ],
+    "sc-ov-crest-curve@L4": null,
+    "sc-ov-crest-curve@L5": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo",
+        "demoTitleBg": "Прекалена скорост в дъгата"
+      }
+    ],
+    "sc-ov-solid-return@L1": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Връщане върху вече плътната линия"
+      },
+      {
+        "code": "OVERTAKE_RETURN_TOO_EARLY",
+        "source": "demo",
+        "demoTitleBg": "Отрязване на изпреварения при късното прибиране"
+      }
+    ],
+    "sc-ov-solid-return@L2": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Връщане върху вече плътната линия"
+      },
+      {
+        "code": "OVERTAKE_RETURN_TOO_EARLY",
+        "source": "demo",
+        "demoTitleBg": "Отрязване на изпреварения при късното прибиране"
+      }
+    ],
+    "sc-ov-solid-return@L3": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo",
+        "demoTitleBg": "Връщане върху вече плътната линия"
+      },
+      {
+        "code": "OVERTAKE_RETURN_TOO_EARLY",
+        "source": "demo",
+        "demoTitleBg": "Отрязване на изпреварения при късното прибиране"
+      }
+    ],
+    "sc-ov-solid-return@L4": null,
+    "sc-ln-boulevard-discipline@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Лутане между лентите без мигач"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Постоянно каране в лявата лента"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Лутане между лентите без мигач"
+      }
+    ],
+    "sc-ln-boulevard-discipline@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Лутане между лентите без мигач"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Постоянно каране в лявата лента"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Лутане между лентите без мигач"
+      }
+    ],
+    "sc-ln-boulevard-discipline@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Лутане между лентите без мигач"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Постоянно каране в лявата лента"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Лутане между лентите без мигач"
+      }
+    ],
+    "sc-ln-boulevard-discipline@L4": null,
+    "sc-ln-obstacle-meeting@L1": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Провиране с настъпване на осевата под насрещен"
+      }
+    ],
+    "sc-ln-obstacle-meeting@L2": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Провиране с настъпване на осевата под насрещен"
+      }
+    ],
+    "sc-ln-obstacle-meeting@L3": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Провиране с настъпване на осевата под насрещен"
+      }
+    ],
+    "sc-ln-obstacle-meeting@L4": null,
+    "sc-ln-obstacle-meeting@L5": [
+      {
+        "code": "CENTER_LINE_TOUCHED",
+        "source": "demo",
+        "demoTitleBg": "Провиране с настъпване на осевата под насрещен"
+      }
+    ],
+    "sc-pe-school-patrol@L1": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Бърз подход към зоната на училището"
+      }
+    ],
+    "sc-pe-school-patrol@L2": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Бърз подход към зоната на училището"
+      }
+    ],
+    "sc-pe-school-patrol@L3": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Бърз подход към зоната на училището"
+      }
+    ],
+    "sc-pe-school-patrol@L4": null,
+    "sc-pe-school-patrol@L5": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Бърз подход към зоната на училището"
+      }
+    ],
+    "sc-pe-night-unlit@L1": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Нощно каране без светлини"
+      }
+    ],
+    "sc-pe-night-unlit@L2": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Нощно каране без светлини"
+      }
+    ],
+    "sc-pe-night-unlit@L3": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Нощно каране без светлини"
+      }
+    ],
+    "sc-pe-night-unlit@L4": null,
+    "sc-pe-night-unlit@L5": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Нощно каране без светлини"
+      }
+    ],
+    "sc-pe-zone-living@L1": null,
+    "sc-pe-zone-living@L2": null,
+    "sc-pe-zone-living@L3": null,
+    "sc-pe-zone-living@L4": null,
+    "sc-pe-zone-living@L5": null,
+    "sc-pe-parked-row-scan@L1": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Детето е ударено — 50 покрай редица, която го крие"
+      }
+    ],
+    "sc-pe-parked-row-scan@L2": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Детето е ударено — 50 покрай редица, която го крие"
+      }
+    ],
+    "sc-pe-parked-row-scan@L3": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Детето е ударено — 50 покрай редица, която го крие"
+      }
+    ],
+    "sc-pe-parked-row-scan@L4": null,
+    "sc-pe-parked-row-scan@L5": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Детето е ударено — 50 покрай редица, която го крие"
+      }
+    ],
+    "sc-rb-exit-signal@L1": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход без мигач"
+      }
+    ],
+    "sc-rb-exit-signal@L2": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход без мигач"
+      }
+    ],
+    "sc-rb-exit-signal@L3": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход без мигач"
+      }
+    ],
+    "sc-rb-exit-signal@L4": null,
+    "sc-rb-exit-signal@L5": [
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход без мигач"
+      }
+    ],
+    "sc-rb-circulate-priority@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране заради чакащия на входа"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Колебливо криволичене в пръстена"
+      }
+    ],
+    "sc-rb-circulate-priority@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране заради чакащия на входа"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Колебливо криволичене в пръстена"
+      }
+    ],
+    "sc-rb-circulate-priority@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране заради чакащия на входа"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Колебливо криволичене в пръстена"
+      }
+    ],
+    "sc-rb-circulate-priority@L4": null,
+    "sc-rb-busy-gap@L1": null,
+    "sc-rb-busy-gap@L2": null,
+    "sc-rb-busy-gap@L3": null,
+    "sc-rb-busy-gap@L4": null,
+    "sc-rb-busy-gap@L5": null,
+    "sc-rb-lane-choice@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Обикаляне по външната до далечния изход"
+      },
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      }
+    ],
+    "sc-rb-lane-choice@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Обикаляне по външната до далечния изход"
+      },
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      }
+    ],
+    "sc-rb-lane-choice@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Обикаляне по външната до далечния изход"
+      },
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      }
+    ],
+    "sc-rb-lane-choice@L4": null,
+    "sc-rb-lane-choice@L5": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Обикаляне по външната до далечния изход"
+      },
+      {
+        "code": "TURN_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Изход направо през външната кола"
+      }
+    ],
+    "sc-merge-accel-lane@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране в края на лентата за ускоряване"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Вливане без оглеждане пред идваща кола"
+      }
+    ],
+    "sc-merge-accel-lane@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране в края на лентата за ускоряване"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Вливане без оглеждане пред идваща кола"
+      }
+    ],
+    "sc-merge-accel-lane@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране в края на лентата за ускоряване"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Вливане без оглеждане пред идваща кола"
+      }
+    ],
+    "sc-merge-accel-lane@L4": null,
+    "sc-merge-accel-lane@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране в края на лентата за ускоряване"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Вливане без оглеждане пред идваща кола"
+      }
+    ],
+    "sc-merge-lane-end@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Вливане без мигач в последния метър"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Изтласкване на кола от съседната лента"
+      }
+    ],
+    "sc-merge-lane-end@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Вливане без мигач в последния метър"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Изтласкване на кола от съседната лента"
+      }
+    ],
+    "sc-merge-lane-end@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Вливане без мигач в последния метър"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Изтласкване на кола от съседната лента"
+      }
+    ],
+    "sc-merge-lane-end@L4": null,
+    "sc-merge-lane-end@L5": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Вливане без мигач в последния метър"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Изтласкване на кола от съседната лента"
+      }
+    ],
+    "sc-merge-roadworks-shift@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Вливане в последния момент без мигач"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Провиране през конусите"
+      }
+    ],
+    "sc-merge-roadworks-shift@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Вливане в последния момент без мигач"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Провиране през конусите"
+      }
+    ],
+    "sc-merge-roadworks-shift@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Вливане в последния момент без мигач"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Провиране през конусите"
+      }
+    ],
+    "sc-merge-roadworks-shift@L4": null,
+    "sc-merge-roadworks-shift@L5": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Вливане в последния момент без мигач"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Провиране през конусите"
+      }
+    ],
+    "sc-merge-bus-pullout@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Залепване зад автобуса след вливането"
+      }
+    ],
+    "sc-merge-bus-pullout@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Залепване зад автобуса след вливането"
+      }
+    ],
+    "sc-merge-bus-pullout@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Залепване зад автобуса след вливането"
+      }
+    ],
+    "sc-merge-bus-pullout@L4": null,
+    "sc-merge-bus-pullout@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Залепване зад автобуса след вливането"
+      }
+    ],
+    "sc-merge-from-property@L1": null,
+    "sc-merge-from-property@L2": null,
+    "sc-merge-from-property@L3": null,
+    "sc-merge-from-property@L4": null,
+    "sc-merge-from-property@L5": null,
+    "sc-ed-d2-city-run@L1": null,
+    "sc-ed-d2-city-run@L2": null,
+    "sc-ed-d2-city-run@L3": null,
+    "sc-ed-d2-city-run@L4": null,
+    "sc-ed-d2-city-run@L5": null,
+    "sc-ed-d2-priority-run@L1": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo",
+        "demoTitleBg": "Незавършен оглед след спирането"
+      }
+    ],
+    "sc-ed-d2-priority-run@L2": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo",
+        "demoTitleBg": "Незавършен оглед след спирането"
+      }
+    ],
+    "sc-ed-d2-priority-run@L3": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo",
+        "demoTitleBg": "Незавършен оглед след спирането"
+      }
+    ],
+    "sc-ed-d2-priority-run@L4": null,
+    "sc-ed-d2-priority-run@L5": [
+      {
+        "code": "JUNCTION_SCAN_INCOMPLETE",
+        "source": "demo",
+        "demoTitleBg": "Незавършен оглед след спирането"
+      }
+    ],
+    "sc-ed-d2-stop-address@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране на първото зърнато място"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Потегляне без оглед"
+      }
+    ],
+    "sc-ed-d2-stop-address@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране на първото зърнато място"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Потегляне без оглед"
+      }
+    ],
+    "sc-ed-d2-stop-address@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране на първото зърнато място"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Потегляне без оглед"
+      }
+    ],
+    "sc-ed-d2-stop-address@L4": null,
+    "sc-ed-reverse-line@L1": [
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Заден ход без поглед назад"
+      }
+    ],
+    "sc-ed-reverse-line@L2": [
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Заден ход без поглед назад"
+      }
+    ],
+    "sc-ed-reverse-line@L3": [
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Заден ход без поглед назад"
+      }
+    ],
+    "sc-ed-reverse-line@L4": null,
+    "sc-ed-poligon-chain@L1": [
+      {
+        "code": "ENGINE_STALLED",
+        "source": "demo",
+        "demoTitleBg": "Загасване под напрежение"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "detector"
+      }
+    ],
+    "sc-ed-poligon-chain@L2": [
+      {
+        "code": "ENGINE_STALLED",
+        "source": "demo",
+        "demoTitleBg": "Загасване под напрежение"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "detector"
+      }
+    ],
+    "sc-ed-poligon-chain@L3": [
+      {
+        "code": "ENGINE_STALLED",
+        "source": "demo",
+        "demoTitleBg": "Загасване под напрежение"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "detector"
+      }
+    ],
+    "sc-ed-poligon-chain@L4": null,
+    "sc-ed-poligon-chain@L5": [
+      {
+        "code": "ENGINE_STALLED",
+        "source": "demo",
+        "demoTitleBg": "Загасване под напрежение"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "detector"
+      }
+    ],
+    "sc-vu-blindspot-moto@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без мигач пред моториста"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване само по огледало"
+      }
+    ],
+    "sc-vu-blindspot-moto@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без мигач пред моториста"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване само по огледало"
+      }
+    ],
+    "sc-vu-blindspot-moto@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без мигач пред моториста"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване само по огледало"
+      }
+    ],
+    "sc-vu-blindspot-moto@L4": null,
+    "sc-vu-blindspot-moto@L5": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без мигач пред моториста"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване само по огледало"
+      }
+    ],
+    "sc-vu-cyclist-group@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Прибиране между велосипедистите"
+      },
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-cyclist-group@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Прибиране между велосипедистите"
+      },
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-cyclist-group@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Прибиране между велосипедистите"
+      },
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-cyclist-group@L4": null,
+    "sc-vu-cyclist-group@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Прибиране между велосипедистите"
+      },
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-child-cyclist@L1": [
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-child-cyclist@L2": [
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-child-cyclist@L3": [
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-child-cyclist@L4": null,
+    "sc-vu-child-cyclist@L5": [
+      {
+        "code": "VULNERABLE_PASS_TOO_CLOSE",
+        "source": "demo"
+      }
+    ],
+    "sc-vu-bikelane-turn@L1": null,
+    "sc-vu-bikelane-turn@L2": null,
+    "sc-vu-bikelane-turn@L3": null,
+    "sc-vu-bikelane-turn@L4": null,
+    "sc-vu-bikelane-turn@L5": null,
+    "sc-rx-queue-clear@L1": [
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Залепване зад спрелия на сантиметри"
+      }
+    ],
+    "sc-rx-queue-clear@L2": [
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Залепване зад спрелия на сантиметри"
+      }
+    ],
+    "sc-rx-queue-clear@L3": [
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Залепване зад спрелия на сантиметри"
+      }
+    ],
+    "sc-rx-queue-clear@L4": null,
+    "sc-rx-queue-clear@L5": [
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Залепване зад спрелия на сантиметри"
+      }
+    ],
+    "sc-rx-tram-stop-doors@L1": null,
+    "sc-rx-tram-stop-doors@L2": null,
+    "sc-rx-tram-stop-doors@L3": null,
+    "sc-rx-tram-stop-doors@L4": null,
+    "sc-rx-tram-stop-doors@L5": null,
+    "sc-ac-night-overdrive@L1": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Тъмен участък без включени фарове"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "90 км/ч на къси светлини"
+      }
+    ],
+    "sc-ac-night-overdrive@L2": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Тъмен участък без включени фарове"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "90 км/ч на къси светлини"
+      }
+    ],
+    "sc-ac-night-overdrive@L3": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Тъмен участък без включени фарове"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "90 км/ч на къси светлини"
+      }
+    ],
+    "sc-ac-night-overdrive@L4": null,
+    "sc-ac-night-overdrive@L5": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "Тъмен участък без включени фарове"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo",
+        "demoTitleBg": "90 км/ч на къси светлини"
+      }
+    ],
+    "sc-ac-truck-spray@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "demo",
+        "demoTitleBg": "Суха дистанция в мокрото"
+      },
+      {
+        "code": "HEADLIGHTS_OFF_IN_RAIN",
+        "source": "demo",
+        "demoTitleBg": "Дъжд без светлини"
+      }
+    ],
+    "sc-ac-truck-spray@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "demo",
+        "demoTitleBg": "Суха дистанция в мокрото"
+      },
+      {
+        "code": "HEADLIGHTS_OFF_IN_RAIN",
+        "source": "demo",
+        "demoTitleBg": "Дъжд без светлини"
+      }
+    ],
+    "sc-ac-truck-spray@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "demo",
+        "demoTitleBg": "Суха дистанция в мокрото"
+      },
+      {
+        "code": "HEADLIGHTS_OFF_IN_RAIN",
+        "source": "demo",
+        "demoTitleBg": "Дъжд без светлини"
+      }
+    ],
+    "sc-ac-truck-spray@L4": null,
+    "sc-ac-truck-spray@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "demo",
+        "demoTitleBg": "Суха дистанция в мокрото"
+      },
+      {
+        "code": "HEADLIGHTS_OFF_IN_RAIN",
+        "source": "demo",
+        "demoTitleBg": "Дъжд без светлини"
+      }
+    ],
+    "sc-ac-bridge-ice@L1": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Мостът с пътна скорост — задницата тръгва"
+      }
+    ],
+    "sc-ac-bridge-ice@L2": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Мостът с пътна скорост — задницата тръгва"
+      }
+    ],
+    "sc-ac-bridge-ice@L3": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Мостът с пътна скорост — задницата тръгва"
+      }
+    ],
+    "sc-ac-bridge-ice@L4": null,
+    "sc-ac-bridge-ice@L5": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Мостът с пътна скорост — задницата тръгва"
+      }
+    ],
+    "sc-ac-wind-truck-pass@L1": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Изненадан от порива — към разделителната ивица"
+      }
+    ],
+    "sc-ac-wind-truck-pass@L2": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Изненадан от порива — към разделителната ивица"
+      }
+    ],
+    "sc-ac-wind-truck-pass@L3": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Изненадан от порива — към разделителната ивица"
+      }
+    ],
+    "sc-ac-wind-truck-pass@L4": null,
+    "sc-ac-wind-truck-pass@L5": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Изненадан от порива — към разделителната ивица"
+      }
+    ],
+    "sc-sp-limit-end@L1": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Ускоряване 200 м преди края на зоната"
+      }
+    ],
+    "sc-sp-limit-end@L2": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Ускоряване 200 м преди края на зоната"
+      }
+    ],
+    "sc-sp-limit-end@L3": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Ускоряване 200 м преди края на зоната"
+      }
+    ],
+    "sc-sp-limit-end@L4": null,
+    "sc-mw-min-speed@L1": [
+      {
+        "code": "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+        "source": "demo"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Пълзене с 40, и то в лявата лента"
+      }
+    ],
+    "sc-mw-min-speed@L2": [
+      {
+        "code": "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+        "source": "demo"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Пълзене с 40, и то в лявата лента"
+      }
+    ],
+    "sc-mw-min-speed@L3": [
+      {
+        "code": "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+        "source": "demo"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Пълзене с 40, и то в лявата лента"
+      }
+    ],
+    "sc-mw-min-speed@L4": null,
+    "sc-mw-min-speed@L5": [
+      {
+        "code": "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+        "source": "demo"
+      },
+      {
+        "code": "NOT_KEEPING_RIGHT",
+        "source": "demo",
+        "demoTitleBg": "Пълзене с 40, и то в лявата лента"
+      }
+    ],
+    "sc-sp-wet-limit-plate@L1": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Пълно превишение в дъжда"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-wet-limit-plate@L2": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Пълно превишение в дъжда"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-wet-limit-plate@L3": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Пълно превишение в дъжда"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-sp-wet-limit-plate@L4": null,
+    "sc-sp-wet-limit-plate@L5": [
+      {
+        "code": "SPEEDING_OVER_LIMIT",
+        "source": "demo",
+        "demoTitleBg": "Пълно превишение в дъжда"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-hz-emergency-stop@L1": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Отклонение от лентата вместо спиране"
+      }
+    ],
+    "sc-hz-emergency-stop@L2": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Отклонение от лентата вместо спиране"
+      }
+    ],
+    "sc-hz-emergency-stop@L3": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Отклонение от лентата вместо спиране"
+      }
+    ],
+    "sc-hz-emergency-stop@L4": null,
+    "sc-hz-emergency-stop@L5": [
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Отклонение от лентата вместо спиране"
+      }
+    ],
+    "sc-hz-brake-dont-swerve@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Рязко отклонение в съседната кола"
+      }
+    ],
+    "sc-hz-brake-dont-swerve@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Рязко отклонение в съседната кола"
+      }
+    ],
+    "sc-hz-brake-dont-swerve@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Рязко отклонение в съседната кола"
+      }
+    ],
+    "sc-hz-brake-dont-swerve@L4": null,
+    "sc-hz-brake-dont-swerve@L5": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Рязко отклонение в съседната кола"
+      }
+    ],
+    "sc-hz-accident-scene@L1": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "Зяпане със спиране в лентата"
+      }
+    ],
+    "sc-hz-accident-scene@L2": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "Зяпане със спиране в лентата"
+      }
+    ],
+    "sc-hz-accident-scene@L3": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "Зяпане със спиране в лентата"
+      }
+    ],
+    "sc-hz-accident-scene@L4": null,
+    "sc-hz-accident-scene@L5": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "Зяпане със спиране в лентата"
+      }
+    ],
+    "sc-hz-breakdown-pulloff@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране в активната лента при работеща кола"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Каране по аварийната лента до изхода"
+      }
+    ],
+    "sc-hz-breakdown-pulloff@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране в активната лента при работеща кола"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Каране по аварийната лента до изхода"
+      }
+    ],
+    "sc-hz-breakdown-pulloff@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране в активната лента при работеща кола"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Каране по аварийната лента до изхода"
+      }
+    ],
+    "sc-hz-breakdown-pulloff@L4": null,
+    "sc-hz-breakdown-pulloff@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране в активната лента при работеща кола"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Каране по аварийната лента до изхода"
+      }
+    ],
+    "sc-fo-brakelight-chain@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Гледане само в бронята отпред"
+      }
+    ],
+    "sc-fo-brakelight-chain@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Гледане само в бронята отпред"
+      }
+    ],
+    "sc-fo-brakelight-chain@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Гледане само в бронята отпред"
+      }
+    ],
+    "sc-fo-brakelight-chain@L4": null,
+    "sc-fo-brakelight-chain@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Гледане само в бронята отпред"
+      }
+    ],
+    "sc-fo-motorway-gap@L1": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      },
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "detector"
+      }
+    ],
+    "sc-fo-motorway-gap@L2": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      },
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "detector"
+      }
+    ],
+    "sc-fo-motorway-gap@L3": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      },
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "detector"
+      }
+    ],
+    "sc-fo-motorway-gap@L4": null,
+    "sc-fo-motorway-gap@L5": [
+      {
+        "code": "FOLLOWING_TOO_CLOSE",
+        "source": "demo"
+      },
+      {
+        "code": "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+        "source": "detector"
+      }
+    ],
+    "sc-vp-handbrake@L1": [
+      {
+        "code": "HANDBRAKE_LEFT_ON",
+        "source": "demo",
+        "demoTitleBg": "Потегляне с вдигната ръчна"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Потегляне без оглед след чек-листа"
+      }
+    ],
+    "sc-vp-handbrake@L2": [
+      {
+        "code": "HANDBRAKE_LEFT_ON",
+        "source": "demo",
+        "demoTitleBg": "Потегляне с вдигната ръчна"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Потегляне без оглед след чек-листа"
+      }
+    ],
+    "sc-vp-handbrake@L3": [
+      {
+        "code": "HANDBRAKE_LEFT_ON",
+        "source": "demo",
+        "demoTitleBg": "Потегляне с вдигната ръчна"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Потегляне без оглед след чек-листа"
+      }
+    ],
+    "sc-vp-handbrake@L4": null,
+    "sc-vp-handbrake@L5": [
+      {
+        "code": "HANDBRAKE_LEFT_ON",
+        "source": "demo",
+        "demoTitleBg": "Потегляне с вдигната ръчна"
+      },
+      {
+        "code": "MOVE_OFF_WITHOUT_OBSERVATION",
+        "source": "demo",
+        "demoTitleBg": "Потегляне без оглед след чек-листа"
+      }
+    ],
+    "sc-vp-telltale-red@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране в активната лента"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Каране нататък с червената лампа"
+      }
+    ],
+    "sc-vp-telltale-red@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране в активната лента"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Каране нататък с червената лампа"
+      }
+    ],
+    "sc-vp-telltale-red@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране в активната лента"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Каране нататък с червената лампа"
+      }
+    ],
+    "sc-vp-telltale-red@L4": null,
+    "sc-vp-telltale-red@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Паническо спиране в активната лента"
+      },
+      {
+        "code": "WARNING_LAMP_IGNORED",
+        "source": "demo",
+        "demoTitleBg": "Каране нататък с червената лампа"
+      }
+    ],
+    "sc-jx-blocked-exit@L1": [
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Влизане на зелено в пълно кръстовище"
+      }
+    ],
+    "sc-jx-blocked-exit@L2": [
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Влизане на зелено в пълно кръстовище"
+      }
+    ],
+    "sc-jx-blocked-exit@L3": [
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Влизане на зелено в пълно кръстовище"
+      }
+    ],
+    "sc-jx-blocked-exit@L4": null,
+    "sc-jx-blocked-exit@L5": [
+      {
+        "code": "STANDSTILL_GAP_TOO_CLOSE",
+        "source": "demo",
+        "demoTitleBg": "Влизане на зелено в пълно кръстовище"
+      }
+    ],
+    "sc-merge-motorway-exit@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране на платното преди изхода"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo",
+        "demoTitleBg": "Рампата с магистрална скорост"
+      }
+    ],
+    "sc-merge-motorway-exit@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране на платното преди изхода"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo",
+        "demoTitleBg": "Рампата с магистрална скорост"
+      }
+    ],
+    "sc-merge-motorway-exit@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Спиране на платното преди изхода"
+      },
+      {
+        "code": "SPEED_TOO_FAST_FOR_CURVE",
+        "source": "demo",
+        "demoTitleBg": "Рампата с магистрална скорост"
+      }
+    ],
+    "sc-merge-motorway-exit@L4": null,
+    "sc-rb-ped-exit@L1": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Заковаване на спирачката заради пътеката"
+      }
+    ],
+    "sc-rb-ped-exit@L2": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Заковаване на спирачката заради пътеката"
+      }
+    ],
+    "sc-rb-ped-exit@L3": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Заковаване на спирачката заради пътеката"
+      }
+    ],
+    "sc-rb-ped-exit@L4": null,
+    "sc-rb-ped-exit@L5": [
+      {
+        "code": "HARSH_BRAKING_NO_CAUSE",
+        "source": "demo",
+        "demoTitleBg": "Заковаване на спирачката заради пътеката"
+      }
+    ],
+    "sc-sp-eco-coast@L1": [
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo",
+        "demoTitleBg": "Заспиване на зеленото"
+      },
+      {
+        "code": "STOP_LINE_OVERSHOOT",
+        "source": "demo",
+        "demoTitleBg": "Газ до последно, после закова"
+      }
+    ],
+    "sc-sp-eco-coast@L2": [
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo",
+        "demoTitleBg": "Заспиване на зеленото"
+      },
+      {
+        "code": "STOP_LINE_OVERSHOOT",
+        "source": "demo",
+        "demoTitleBg": "Газ до последно, после закова"
+      }
+    ],
+    "sc-sp-eco-coast@L3": [
+      {
+        "code": "HESITATION_AT_GREEN",
+        "source": "demo",
+        "demoTitleBg": "Заспиване на зеленото"
+      },
+      {
+        "code": "STOP_LINE_OVERSHOOT",
+        "source": "demo",
+        "demoTitleBg": "Газ до последно, после закова"
+      }
+    ],
+    "sc-sp-eco-coast@L4": null,
+    "sc-ln-decisive-change@L1": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Половинчато вмъкване, което кара другия да спира"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване върху колата в мъртвата зона"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Половинчато вмъкване, което кара другия да спира"
+      }
+    ],
+    "sc-ln-decisive-change@L2": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Половинчато вмъкване, което кара другия да спира"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване върху колата в мъртвата зона"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Половинчато вмъкване, което кара другия да спира"
+      }
+    ],
+    "sc-ln-decisive-change@L3": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Половинчато вмъкване, което кара другия да спира"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване върху колата в мъртвата зона"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Половинчато вмъкване, което кара другия да спира"
+      }
+    ],
+    "sc-ln-decisive-change@L4": null,
+    "sc-ln-decisive-change@L5": [
+      {
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Половинчато вмъкване, което кара другия да спира"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване върху колата в мъртвата зона"
+      },
+      {
+        "code": "POOR_LANE_KEEPING",
+        "source": "demo",
+        "demoTitleBg": "Половинчато вмъкване, което кара другия да спира"
+      }
+    ],
+    "sc-sign-warning@L1": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-sign-warning@L2": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-sign-warning@L3": [
+      {
+        "code": "SPEED_TOO_FAST_FOR_CONDITIONS",
+        "source": "demo"
+      }
+    ],
+    "sc-driver-distraction@L1": null,
+    "sc-driver-distraction@L2": null,
+    "sc-driver-distraction@L3": null,
+    "sc-accident-own-conduct@L1": null,
+    "sc-accident-own-conduct@L2": null,
+    "sc-accident-own-conduct@L3": null,
+    "sc-animal-hazard@L1": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo"
+      }
+    ],
+    "sc-animal-hazard@L2": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo"
+      }
+    ],
+    "sc-animal-hazard@L3": [
+      {
+        "code": "CROSSED_SOLID_LINE",
+        "source": "demo"
+      }
+    ],
+    "sc-lane-control-signal@L1": null,
+    "sc-lane-control-signal@L2": null,
+    "sc-lane-control-signal@L3": null,
+    "sc-park-gap-short@L1": null,
+    "sc-park-gap-short@L2": null,
+    "sc-park-gap-short@L3": null,
+    "sc-park-gap-short@L4": null,
+    "sc-park-gap-short@L5": null,
+    "sc-park-gap-long@L1": null,
+    "sc-park-gap-long@L2": null,
+    "sc-park-gap-long@L3": null,
+    "sc-park-gap-long@L4": null,
+    "sc-park-gap-long@L5": null,
+    "sc-park-van@L1": null,
+    "sc-park-van@L2": null,
+    "sc-park-van@L3": null,
+    "sc-park-van@L4": null,
+    "sc-park-van@L5": null,
+    "sc-park-45-rev@L1": null,
+    "sc-park-45-rev@L2": null,
+    "sc-park-45-rev@L3": null,
+    "sc-park-45-rev@L4": null,
+    "sc-park-45-rev@L5": null,
+    "sc-park-left@L1": null,
+    "sc-park-left@L2": null,
+    "sc-park-left@L3": null,
+    "sc-park-left@L4": null,
+    "sc-park-left@L5": null,
+    "sc-park-zebra@L1": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "„Минах пътеката“ — а задницата остана върху нея"
+      }
+    ],
+    "sc-park-zebra@L2": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "„Минах пътеката“ — а задницата остана върху нея"
+      }
+    ],
+    "sc-park-zebra@L3": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "„Минах пътеката“ — а задницата остана върху нея"
+      }
+    ],
+    "sc-park-zebra@L4": null,
+    "sc-park-zebra@L5": [
+      {
+        "code": "ILLEGAL_STOP_IN_BAN_ZONE",
+        "source": "demo",
+        "demoTitleBg": "„Минах пътеката“ — а задницата остана върху нея"
+      }
+    ],
+    "sc-park-wall@L1": null,
+    "sc-park-wall@L2": null,
+    "sc-park-wall@L3": null,
+    "sc-park-wall@L4": null,
+    "sc-park-wall@L5": null,
+    "sc-park-night@L1": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "„Паркингът е близо, няма да паля светлините“"
+      }
+    ],
+    "sc-park-night@L2": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "„Паркингът е близо, няма да паля светлините“"
+      }
+    ],
+    "sc-park-night@L3": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "„Паркингът е близо, няма да паля светлините“"
+      }
+    ],
+    "sc-park-night@L4": null,
+    "sc-park-night@L5": [
+      {
+        "code": "HEADLIGHTS_OFF_AT_NIGHT",
+        "source": "demo",
+        "demoTitleBg": "„Паркингът е близо, няма да паля светлините“"
+      }
+    ],
+    "sc-park-double@L1": null,
+    "sc-park-double@L2": null,
+    "sc-park-double@L3": null,
+    "sc-park-double@L4": null,
+    "sc-park-double@L5": null,
+    "sc-park-judge@L1": null,
+    "sc-park-judge@L2": null,
+    "sc-park-judge@L3": null,
+    "sc-park-judge@L4": null,
+    "sc-park-judge@L5": null
+  }
+}

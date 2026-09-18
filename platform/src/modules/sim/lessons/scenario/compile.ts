@@ -90,6 +90,7 @@
 import type { LessonAidsSpec, LessonObjective, LessonSpec, ParkingBaySpec } from "../../contracts";
 import { REACH_ZONE_GRACE_M, deriveFullStopDemand, parseObjectiveParams } from "../objectives";
 import { L5_LADDER_FLOOR_CONDITIONS } from "./complications";
+import { deriveLessonMistakeTargets } from "./lessonMistakeTargets";
 import { serializeObjectiveParams } from "./params";
 import { assertScenarioSpec } from "./validate";
 import {
@@ -1376,6 +1377,15 @@ export function compileScenario(
   const ruleConfig = { ...(spec.ruleConfig ?? {}), ...(rung.ruleConfig ?? {}) };
   const hasRuleConfig = Object.keys(ruleConfig).length > 0;
 
+  // ADR-009 (founder Ruling A) — WHICH MISTAKES THIS PRACTICE RUNG EXISTS TO
+  // TEACH, derived from the template's own mistake demos and the detectors it
+  // armed. Derived HERE and only here: the server recompiles the same pure spec
+  // from the lesson id (the B1b exam-bank pattern), so client and server reach
+  // the same list without either sending it. Reads the MERGED `ruleConfig`
+  // above, so a rung that disarms a detector is not credited with arming one.
+  // See lessonMistakeTargets.ts for why the set is derived rather than authored.
+  const lessonMistakeTargets = deriveLessonMistakeTargets(spec, level, ruleConfig, examMode);
+
   const lesson: LessonSpec = {
     // Variant naming (doc 76 §2): template id + level rung — the wire
     // resolver (resolve.ts scenarioLessonById) parses exactly this shape so
@@ -1468,6 +1478,11 @@ export function compileScenario(
     // Compiled COPY, never the template's own object (specs are shared data —
     // the signalPlan precedent), because a rung may now override keys in it.
     ...(hasRuleConfig ? { ruleConfig } : {}),
+    // ADR-009's whole footprint on the compiled lesson, and its rollback: delete
+    // this one spread and every reader downstream sees an absent field, which is
+    // today's behaviour byte for byte (doc 92 §3.6). 62 of 167 templates derive
+    // an empty set and are spread nothing at all, exactly as before.
+    ...(lessonMistakeTargets.length > 0 ? { lessonMistakeTargets } : {}),
     // 4a physics opt-in (the ruleConfig pattern): only a template OR RUNG that
     // AUTHORS physics.wetGrip / physics.snowGrip / physics.crosswind flips the
     // live car to reduced grip or lateral wind — no weather tag ever does.
@@ -1528,6 +1543,14 @@ export function compileScenario(
     // A sandbox is never an exam — drop the flag even if a template ever
     // authored its lowest rung as exam protocol.
     delete lesson.examMode;
+    // …AND NEVER AN ADR-009 RUNG EITHER. The THEO-3 sandbox's ASSIGNMENT is to
+    // commit the mistake — `descriptionBg` above literally instructs it. Costing
+    // the lesson for obeying that instruction would be the product contradicting
+    // its own briefing, so the field is dropped here rather than filtered by
+    // every downstream reader. `lessonMistakeTargetCodes` refuses a lesson with
+    // `mistakeExperience` as well (doc 92 §3.2), which is belt and braces on
+    // purpose: this delete is the one that keeps the lesson byte-identical.
+    delete lesson.lessonMistakeTargets;
     lesson.mistakeExperience = { mistakeIndex: idx, codes: [...mistake.codeRefs] };
   }
 

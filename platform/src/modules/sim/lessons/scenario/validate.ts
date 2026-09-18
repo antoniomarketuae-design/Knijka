@@ -20,6 +20,7 @@ import {
   RUNG_ADDITIONS,
   SCENARIO_FAMILIES,
   type LevelSpec,
+  type MistakeDemo,
   type ScenarioSpec,
   type TraceRef,
 } from "./types";
@@ -76,6 +77,68 @@ function checkTraceRef(ref: TraceRef | undefined, label: string, errors: string[
   }
   if (ref.pending !== undefined && typeof ref.pending !== "boolean") {
     errors.push(`${label}: traceRef.pending must be boolean when present`);
+  }
+}
+
+/**
+ * ADR-009 — `MistakeDemo.incidentalCodeRefs`, the one escape hatch out of a
+ * lesson's own-mistake target set (doc 92 §3.4, §2.3 R2).
+ *
+ * THIS IS THE CHECK `contracts.ts` WAS ALREADY PROMISING. `LessonMistakeTarget.code`
+ * is a plain string, because `contracts.ts` may not depend on `rules/`, and lane
+ * A's docblock had to retract the sentence that said the looseness costs nothing
+ * because this validator refuses an uncatalogued code — it did not exist yet
+ * (doc 92 addendum 1 item 3). With this function the sentence is true again, and
+ * the reason is the `codeRefs` rule below rather than a second catalogue lookup:
+ * a target can only come from a demo's `codeRefs` (already checked against
+ * VIOLATIONS six lines up) minus this list, or from `DETECTOR_OPT_IN_CODES`
+ * (typed `ViolationCode[]` and pinned by T8b). Requiring every entry here to be
+ * IN `codeRefs` therefore closes the only remaining door: a typo'd code cannot
+ * be marked incidental and slip past unnoticed, because a typo is by definition
+ * not in `codeRefs` and is reported by name.
+ *
+ * The four refusals, each with the failure it prevents:
+ *  - not an array of strings → the derivation would read `undefined.includes`
+ *    or silently treat a bare string as a list of its characters;
+ *  - a code not in `codeRefs` → a typo that would silence nothing and be seen
+ *    by nobody (the retracted claim);
+ *  - a duplicate → two authors marking the same code, each unaware of the other,
+ *    is a review signal, not a no-op;
+ *  - every code marked → a mistake demo that demonstrates no mistake. The
+ *    derivation would return an empty set and the lesson would quietly opt out
+ *    of ADR-009 with no trace in the diff but a deleted line.
+ */
+function validateIncidentalCodeRefs(m: MistakeDemo, i: number, errors: string[]): void {
+  const inc = m.incidentalCodeRefs;
+  if (inc === undefined) return;
+  const label = `mistakes[${i}].incidentalCodeRefs`;
+  if (!Array.isArray(inc) || inc.some((c) => typeof c !== "string")) {
+    errors.push(`${label} must be an array of ViolationCode strings when present (ADR-009 doc 92 §3.4)`);
+    return;
+  }
+  const refs = Array.isArray(m.codeRefs) ? m.codeRefs : [];
+  const seen = new Set<string>();
+  for (const code of inc) {
+    if (!refs.includes(code)) {
+      errors.push(
+        `${label}: "${code}" is not in this demo's codeRefs — ADR-009 marks a code the demo ALREADY grades as a ` +
+          `side effect; it cannot exempt a code the demo does not grade (codeRefs: ${refs.join(", ") || "none"})`,
+      );
+    }
+    if (seen.has(code)) errors.push(`${label}: duplicate "${code}"`);
+    seen.add(code);
+  }
+  // `refs.every` alone IS the question. An earlier draft also demanded
+  // `seen.size >= refs.length`, which a DUPLICATE in codeRefs defeats:
+  // codeRefs ["X","X","Y"] with incidental ["X","Y"] marks every act the demo
+  // grades, yet seen.size 2 < refs.length 3 and the refusal never fired. Found
+  // by an adversarial verifier; the case is pinned in
+  // incidental-code-refs-validate.test.ts.
+  if (refs.length > 0 && refs.every((c) => seen.has(c))) {
+    errors.push(
+      `${label} marks EVERY code this demo grades — a mistake demo whose codes are all incidental demonstrates ` +
+        `nothing (ADR-009 doc 92 §2.3 R2: mark the side effects, never the act)`,
+    );
   }
 }
 
@@ -289,6 +352,7 @@ export function validateScenarioSpec(
           }
         }
       }
+      validateIncidentalCodeRefs(m, i, errors);
     });
   }
 
