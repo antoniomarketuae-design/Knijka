@@ -492,7 +492,9 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // the lights row now runs `headlightDutyCode(conditions)` instead of the
     // legacy single bit — and that function maps BOTH the rain arm and the
     // SNOWFALL arm onto this code (rules/engine.ts `lowBeamDuty`: чл. 70, ал. 1
-    // is one duty, so snow reuses this row's code with SNOW_LIGHTS_COPY).
+    // is one duty, so snow reuses this row's code with SNOW_LIGHTS_ACT_COPY
+    // below — a `detail: "snow"` act row since ADR-009, an engine-side
+    // `makeViolation` override before it).
     //
     // MEASURED through the real modules, parked car, engine on, 0 км/ч, lights
     // off (`__tests__/telltale-warning-tense.test.ts`, which now derives over
@@ -504,7 +506,8 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // student who had never left P that he HAD been driving — the exact
     // `sc-rx-tram-left` defect, one row further on — and during a snowfall it
     // also told him it was RAINING, because the telltale card has no per-event
-    // override channel and never sees SNOW_LIGHTS_COPY.
+    // channel at all and so never sees the snow act's copy — neither the
+    // override it used to be nor SNOW_LIGHTS_ACT_COPY, which replaced it.
     //
     // WHAT WAS NOT DONE: the row was not emptied and „дъжд" was not deleted
     // from the card. It stays in `titleBg`, which the FAULT card prints and the
@@ -585,7 +588,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // („забранено е … движение на заден ход") handed to the student as advice,
     // at 140 км/ч closing speeds. `correctiveBg` has no per-event override
     // channel (it is read from this catalogue BY CODE at display time — see
-    // JUNCTION_SCAN_COPY in engine.ts), so the one string has to say both,
+    // JUNCTION_SCAN_CONTROL_COPY below), so the one string has to say both,
     // exactly as the снеговалеж reuse two entries down does. The title and
     // explanation DO split per road: `WRONG_WAY_ROAD_COPY` below.
     peekBg: "Насрещните не те очакват.",
@@ -2304,7 +2307,7 @@ export const YIELD_PRAISE_SITUATION_COPY: Record<
  * `armedTelltaleWarnings` began defaulting to them, it emits whatever
  * `headlightDutyCode` derives — and that is HEADLIGHTS_OFF_IN_RAIN for the rain
  * arm AND for the SNOWFALL arm (чл. 70, ал. 1 is one duty; `engine.ts` bills
- * snow through the same code with SNOW_LIGHTS_COPY). Between those two dates
+ * snow through the same code, with SNOW_LIGHTS_ACT_COPY). Between those two dates
  * the row said „Валеше, а караше без къси светлини" on a card that fires with
  * the car in P — and, in a snowfall, said it was raining, because the telltale
  * card has no per-event channel and never sees the snow override.
@@ -2339,14 +2342,21 @@ export const YIELD_PRAISE_SITUATION_COPY: Record<
  * above for what the sweep photographed; this is the half that answers „кое от
  * трите направих".
  *
- * WHY IT LIVES HERE AND NOT IN engine.ts. Its sibling split, JUNCTION_SCAN_COPY,
- * sits in engine.ts because ITS discriminator (which control the student
- * crossed) exists only inside the reducer — there is no channel on the event
- * that carries it. This one is the opposite case: `detail` is a shipped,
+ * WHY IT LIVES HERE AND NOT IN engine.ts. `detail` is a shipped,
  * machine-readable field, asserted by `rail-crossing-detectors.test.ts` on all
  * three arms, so the mapping is pure catalogue data and `makeViolation` can do
  * it for every producer at once. A call-site override would have to be
  * remembered three times in the reducer and again by procedures/machine.ts.
+ *
+ * WHAT THIS PARAGRAPH USED TO CLAIM, and why it was wrong — ADR-009 lane R,
+ * 2026-09-18. It contrasted this row with „its sibling split,
+ * JUNCTION_SCAN_COPY, [which] sits in engine.ts because ITS discriminator
+ * (which control the student crossed) exists only inside the reducer — there is
+ * no channel on the event that carries it." There is: the control is known at
+ * the call site, and `detail` IS that channel. The sibling has now made the
+ * same trip for the same reason (JUNCTION_SCAN_CONTROL_COPY below), which makes
+ * this row the rule and not the exception — an override that dies at `wire.ts`
+ * is a card the server retitles, whatever the discriminator's origin.
  *
  * `lawRef` SPLITS WITH THE COPY, and that is this file's whole point (see the
  * header: the slot answers WHAT RULE DID I BREAK). The row's own citation names
@@ -2500,7 +2510,9 @@ export const COLLISION_CONTACT_COPY: Record<
  *
  * AND IT RIDES `detail`, NOT AN OVERRIDE, BECAUSE THE OVERRIDE DIES AT THE WIRE.
  * The first cut of this repair passed `{ titleBg, explanationBg }` straight to
- * `makeViolation` in `engine.ts`, the way `JUNCTION_SCAN_COPY` does. The
+ * `makeViolation` in `engine.ts`, the way `JUNCTION_SCAN_COPY` then still did
+ * (ADR-009 lane R has since moved that pair here too, for this exact reason —
+ * see JUNCTION_SCAN_CONTROL_COPY). The
  * verifier ran it: `serializeRuleEvents` (wire.ts) carries `kind`, `code`, `t`,
  * `detail`, `penaltyMultiplier`, `x/y` — and NOTHING else — so the server's
  * `rebuildRuleEvents` reconstructed the pooled street row and the end screen
@@ -2819,6 +2831,121 @@ export const NO_STOP_BASIS_COPY: Record<
   },
 };
 
+/**
+ * JU-23 per-CONTROL copy for JUNCTION_SCAN_INCOMPLETE (doc 87, item 5 of the
+ * 2026-08-05 gate's open list) — MOVED HERE from `rules/engine.ts`'s
+ * module-private `JUNCTION_SCAN_COPY` by ADR-009 lane R, text unchanged.
+ *
+ * The code is armed at BOTH kinds of priority line — a Б1 give-way line and a
+ * Б2 stop line — because the fresh ляво-дясно scan is owed at both (see
+ * engine.ts's `stopLineCrossed` branch). The catalogue carries one string per
+ * code, so it used to name Б2 for both, and the founder photographed the
+ * consequence: a fault card reading «Премина стоп-линията на знак Б2» under the
+ * title bar of the lesson «Б1 не значи спри винаги»
+ * (`newdef/b5gw-card-t24.4.png`). The catalogue text is now control-neutral and
+ * these two rows put the sign the student actually crossed on the card.
+ *
+ * WHY IT MOVED, and it is the same defect one layer down. Until ADR-009 these
+ * two strings rode `makeViolation`'s `titleBg`/`explanationBg` OVERRIDE channel
+ * from inside the reducer, with no `detail` — and neither field crosses
+ * `wire.ts`. `serializeRuleEvents` carries `kind`, `code`, `t`, `detail`,
+ * `penaltyMultiplier` and `x/y`, so the server's `rebuildRuleEvents` rebuilt
+ * the POOLED «Непълно оглеждане на кръстовището» and the two halves of one
+ * debrief named two different acts — exactly the trip `WRONG_WAY_ROAD_COPY`
+ * was moved here for in w12. The WRONG_WAY docblock in engine.ts used to
+ * excuse this pair on the ground that „its events are billed inside a
+ * pre-drive/junction path that is retitled again on rebuild"; that sentence was
+ * never true. `rebuildRuleEvents`'s only retitler is `preDriveStepTitle`, which
+ * returns non-null for PREDRIVE_WRONG_ORDER and PREDRIVE_STEP_SKIPPED alone,
+ * and only for a `detail` that is a `PreDriveStepId`. Nothing retitled this
+ * code on the server. So the CONTROL now travels as `detail`, which does cross,
+ * and `actCopy` reaches the copy from both sides.
+ *
+ * `correctiveBg` HAS NO PER-EVENT CHANNEL (it is read from the catalogue BY
+ * CODE at display time), which is why the catalogue's corrective was rewritten
+ * to be true of both controls rather than split here. `peekBg` is deliberately
+ * NOT authored per control either: the pooled row's summary is „«Гледах, но не
+ * видях».", which is the one sentence both controls need and carries no sign,
+ * so `violationPeekBg` inherits it — a second string here would be new
+ * student-facing copy for a card that is already correct.
+ *
+ * The Б1 half must also not smuggle back the myth this lesson exists to kill:
+ * Б1 does not demand a stop (ЗДвП чл. 50), it demands that you give way — so
+ * its copy says „намали и огледай", never „спри".
+ */
+/** Б1 „Пропусни движението" — the same kebab word `prioritySituation` already
+ *  puts on FAILED_TO_YIELD for this line (`runtime/worldRuntime.ts:1478`). */
+export const JUNCTION_SCAN_CONTROL_GIVE_WAY = "give-way";
+/** Б2 „Спри!". The reducer's own control enum spells this leg `stopSign`; the
+ *  `detail` names the DUTY the sign imposes, as `give-way` does above. */
+export const JUNCTION_SCAN_CONTROL_STOP = "stop";
+
+export const JUNCTION_SCAN_CONTROL_COPY: Record<
+  string,
+  { titleBg: string; explanationBg: string }
+> = {
+  [JUNCTION_SCAN_CONTROL_GIVE_WAY]: {
+    titleBg: "Непълно оглеждане при знак Б1",
+    explanationBg:
+      "Премина линията на знак Б1 „Пропусни движението“, без да огледаш и наляво, и надясно. Б1 не иска да спреш винаги — иска да пропуснеш, а пропускаш само това, което си видял. „Един поглед не стига“: най-честата причина за удар на кръстовище е „гледах, но не видях“.",
+  },
+  [JUNCTION_SCAN_CONTROL_STOP]: {
+    titleBg: "Непълно оглеждане при знак Б2",
+    explanationBg:
+      "Премина стоп-линията на знак Б2 „Спри!“, без да огледаш и наляво, и надясно. „Един поглед не стига“ — най-честата причина за удар на кръстовище е „гледах, но не видях“: погледнал си веднъж отдалеч и си потеглил в това, което се е променило.",
+  },
+};
+
+/**
+ * O28 — SNOWFALL copy for the low-beam duty the `snowLights` detector grades,
+ * MOVED HERE from `rules/engine.ts`'s module-private `SNOW_LIGHTS_COPY` by
+ * ADR-009 lane R, text unchanged and for the reason stated above: the override
+ * channel does not cross `wire.ts`, `detail` does.
+ *
+ * WHY IT RIDES AN EXISTING CODE. The duty is ONE duty. Retrieved from the
+ * ingested act (content/law/acts/zdvp.json, чл. 70, ал. 1), verbatim: „При
+ * движение през нощта И ПРИ НАМАЛЕНА ВИДИМОСТ моторните превозни средства…
+ * трябва да бъдат с включени къси или дълги светлини…" — the article's
+ * operative condition is намалена видимост, and it names no weather at all.
+ * Снеговалеж is one of the conditions the same act lists as producing it
+ * (чл. 74, ал. 1: „…значително намалена видимост поради мъгла, СНЕГОВАЛЕЖ,
+ * дъжд или други подобни условия"). So snow is not a second law, it is the
+ * third weather flag under one law — and HEADLIGHTS_OFF_IN_RAIN is already
+ * that law's второстепенна row, cited to чл. 70, ал. 1 and classified Н38
+ * б. „б". A new code would duplicate the row, not the rule.
+ *
+ * THE CODE IS AN IDENTIFIER; THE CARD IS THE PRODUCT. The pooled title says
+ * „в дъжд", so the founder's Б1/Б2 defect would repeat verbatim: a card reading
+ * «Движение в дъжд без светлини» over a snow frame.
+ *
+ * `correctiveBg` HAS NO PER-EVENT CHANNEL (read from the catalogue BY CODE at
+ * display time). The pooled one is „тръгнат ли чистачките, светват и късите
+ * светлини". MEASURED before reusing it rather than assumed: the snow preset is
+ * a SNOWFALL veil, not dry packed snow — `environment/presets.ts snowWeather`
+ * is authored at density 0.012 (~40 % transmittance at 80 m) and `SnowFlakes`
+ * fall through it, so the wipers are running and the corrective lands on
+ * target. It is the only student-facing string this reuse does not get to
+ * restate; `n38.ts`'s rationale mentions rain but reaches no surface
+ * (`examMarkFor` publishes clause + quote only). `peekBg` is likewise left
+ * pooled: „За да те видят, не ти." is condition-neutral and true of snowfall.
+ *
+ * ROUTED, NOT SILENTLY ACCEPTED: renaming the code to something
+ * condition-neutral (HEADLIGHTS_OFF_IN_LOW_VISIBILITY) is the honest end state
+ * and touches rules/types.ts + catalog.ts + n38.ts + consequences.ts +
+ * scenarios/mapping.ts + world/referents.ts, none of which is this lane's.
+ */
+/** The third arm of the чл. 70, ал. 1 duty — `engine.ts lowBeamDuty` returns
+ *  this same word, so the detail is the duty's own name and not a new one. */
+export const HEADLIGHTS_CONDITION_SNOW = "snow";
+
+export const SNOW_LIGHTS_ACT_COPY: Record<string, { titleBg: string; explanationBg: string }> = {
+  [HEADLIGHTS_CONDITION_SNOW]: {
+    titleBg: "Движение в снеговалеж без светлини",
+    explanationBg:
+      "Валеше сняг, а караше без къси светлини. Снегът е намалена видимост точно както дъждът и мъглата: платното още се вижда, но сивата кола в бялото се губи и насрещният те забелязва секунди по-късно, отколкото ти се струва. При намалена видимост колата се движи с включени къси светлини — не толкова за да виждаш, колкото за да те виждат.",
+  },
+};
+
 export const PER_ACT_COPY: Partial<
   Record<
     ViolationCode,
@@ -2831,6 +2958,14 @@ export const PER_ACT_COPY: Partial<
   FAILED_TO_YIELD: FAILED_TO_YIELD_SITUATION_COPY,
   HANDBRAKE_LEFT_ON: HANDBRAKE_ACT_COPY,
   ILLEGAL_STOP_IN_BAN_ZONE: NO_STOP_BASIS_COPY,
+  // ADR-009 lane R. Both tables were `makeViolation` overrides inside the
+  // reducer until now, i.e. copy the server could not rebuild; registering them
+  // here is what puts the SAME title on both halves of one debrief. Neither row
+  // authors a `lawRef` or a `peekBg`: the pooled ones are already control- and
+  // condition-neutral, so `makeViolation` and `violationPeekBg` inherit them
+  // and no new student-facing sentence enters the product (ADR-002).
+  JUNCTION_SCAN_INCOMPLETE: JUNCTION_SCAN_CONTROL_COPY,
+  HEADLIGHTS_OFF_IN_RAIN: SNOW_LIGHTS_ACT_COPY,
 };
 
 /**
@@ -2886,7 +3021,12 @@ export function makeViolation(
   // An UNRECOGNISED detail falls back to the pooled row rather than to silence:
   // a card that teaches all three rules is worse than one that teaches the act,
   // and better than one that teaches the wrong act. An explicit override still
-  // wins over both (JUNCTION_SCAN_COPY rides that same channel).
+  // wins over both — but SINCE ADR-009 the only producer that uses it is
+  // `procedures/machine.ts`, which composes a step title from `PRE_DRIVE_STEPS`
+  // and sends `detail` BESIDE it precisely so `rebuildRuleEvents` can recompose
+  // the same string. Override copy without a `detail` does not survive the wire
+  // and must never be added: `rules/__tests__/act-copy-control.test.ts` scans
+  // platform/src and fails on one.
   const act = actCopy(code, overrides?.detail);
   const event: ViolationEvent = {
     kind: "violation",

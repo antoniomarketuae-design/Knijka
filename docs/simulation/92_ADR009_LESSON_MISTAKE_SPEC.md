@@ -1462,3 +1462,51 @@ L1: 40 · L2: 35 · L3: 32 · L5: 22 · across 30 lessons.
 - **F2: scenario lessons only.** Curriculum lessons l0–l8, exam-bank variants and the exam card are out of scope; they never carry
   `lessonMistakeTargets`.
 - **F3:** still conditional (only asked if the §5.10 rule line does not fit the phone briefing).
+
+---
+
+## ADDENDUM 1 (2026-09-18, integrator) — what lanes A and R measured, and what lane C now owes
+
+Lanes A and R are built and adversarially verified (see the commit that carries them). Two findings change what a later lane owes.
+
+**1. §3.3b's client/server parity is fixed on the CHARGED path only, and today's traffic is all COACHED — LANE C OWES THE OTHER HALF.**
+Measured by lane R's verifier over 1,006 in-process drives of every committed tape at L1 and L3: `JUNCTION_SCAN_INCOMPLETE` is
+coached on every one of them and charged on none. Coached rows cross the wire as `WireCoachedMistake = { code, t }`
+(`lessons/wire.ts:123-126`, `serializeCoachedMistakes` ~:261) and the server re-titles them from `VIOLATIONS[code].titleBg`
+(~:753-757) — the pooled «Непълно оглеждане на кръстовището», while the client card says «…при знак Б1». So the two halves of one
+debrief still name two different acts, which is exactly what §3.3b exists to stop, and ADR-009's fold reads that title.
+**LANE C MUST MAKE FOUR EDITS, NOT TWO.** The first version of this item named `recordCoached`, the wire row and the re-title, and
+that list is a **dead change**: lane R's verifier landed the re-title and all 36 cases of `act-copy-control.test.ts` stayed green,
+because the row loses its `detail` one step earlier than anybody had looked. Implemented literally, the three-edit version ships the
+dead-predicate shape this programme has measured 51 times in 82 repairs. The four, in the order the value travels:
+
+1. **`lessons/engine.ts recordCoached` (~:1462-1466) fills it.** It builds `{ code, titleBg, t }` and stops; the client's own
+   `ViolationEvent.detail` is discarded at the moment of the mistake. (Lane A already added `CoachedMistake.detail` in
+   `lessons/types.ts`, so the record can hold it.)
+2. **`lessons/wire.ts serializeCoachedMistakes` (~:261) carries it,** and `WireCoachedMistake` (`:123-126`) grows the field.
+3. **`lessons/wire.ts parseCoachedMistakes` (`:536-548`) KEEPS it — the edit nobody had named.** It rebuilds every row as
+   `{ code, t }` at the validation boundary, so the detail never survives to be read. It must apply the same `MAX_DETAIL_LEN` cap
+   (`:168`) that `parseRuleEvents` already applies to a charged event's detail at `wire.ts:297` — same field, same bound, one rule.
+4. **`gradeFinishWire` (`:753-757`) re-titles through `actCopy(code, detail)`** instead of `VIOLATIONS[code].titleBg` — **never** by
+   accepting a client-authored `titleBg`: `wire.ts:743-752`'s own docblock refuses that on ADR-002 grounds, and it is right.
+
+**Why edit 3 does not weaken the ADR-002 boundary.** `detail` is a SELECTOR, not copy: the server looks it up in its own
+`PER_ACT_COPY` and a value it does not recognise falls back to the pooled row (`rules/catalog.ts makeViolation`). A tampered detail
+can therefore make the student's own debrief name a different catalogued act — never author a sentence, never cite an article, never
+move a point. That is the same trust level `WireRuleEvent.detail` already crosses on the charged path, under the same cap.
+
+**Already pinned, on this tree** (`rules/__tests__/act-copy-control.test.ts`, § „LANE C GAP"): FLIP 1 reds on edit 2, FLIP 4 on
+edit 1, FLIP 5 on edit 3, FLIP 6 on edits 3+4 together. FLIPs 2 and 3 sit behind FLIP 1 inside one case and cannot red on their own —
+which is how the missing edit stayed invisible in the first place. Acceptance: a drive of `sc-jx-giveway-b1/mistake-no-scan` must
+produce the SAME title on both sides, pinned by a test that fails if either side drifts.
+
+**2. Two module bodies are unpinned, so no later lane may assume them.**
+- `lessonMistakeCopy().peekBg` — replacing it with `null` leaves the module's own 46 tests green, and all 58 catalogue codes have a
+  non-null peek, so `string | null` is a guard that cannot fire at HEAD. Lanes D/E/F: do not assume the peek is exercised; pin it
+  where you consume it.
+- `StakeSegment.strong` on the three new kinds — removing `strong: true` from «урокът няма да се зачете» leaves the suite green.
+  The emphasis on the one sentence this ADR exists to deliver is unpinned; lane E pins it where it renders.
+
+**3. Correction to `contracts.ts`'s own docblock** (made by the residual lane): it claimed `lessons/scenario/validate.ts` refuses an
+uncatalogued target code at authoring time. That validation is **lane B's unbuilt work**; until it lands, a typo'd code is silently
+carried and simply never matches. Lane B: build it, then the docblock becomes true.

@@ -176,6 +176,62 @@ export interface LessonBriefingStep {
   textBg: string;
 }
 
+/**
+ * ADR-009 — ONE OF THE MISTAKES A PRACTICE LESSON EXISTS TO TEACH (founder
+ * Ruling A, 2026-09-17; doc `docs/simulation/92_ADR009_LESSON_MISTAKE_SPEC.md`).
+ *
+ * Commit the act a lesson was built around and the lesson is NOT taken — even
+ * the first time, and even though no exam point is charged for that first
+ * occurrence. The ruling's reason is the north star: a student who parks on the
+ * bus stop in „Спиране в забранена зона" has not learned where he may stop,
+ * whatever the изпитен лист says, and a product that ticks the lesson anyway
+ * has taught him that the tick is the goal.
+ *
+ * WHY `code` IS A PLAIN STRING. `contracts.ts` is the boundary the exam bank,
+ * the curriculum and the scenario layer share, and it may not depend on
+ * `rules/` (the same argument `LessonBriefingStep` above makes about
+ * `ScenarioSpec.StepText`). Every consumer that needs the catalogue resolves
+ * the code itself — `lessons/lessonMistake.ts` is the one place that does.
+ *
+ * ⚠ THE LOOSENESS IS NOT PAID FOR YET, AND A READER MUST NOT ASSUME IT IS
+ * (corrected 2026-09-18; doc 92 addendum 1 item 3). This block used to end
+ * «and `lessons/scenario/validate.ts` refuses an uncatalogued code at authoring
+ * time, so the looseness here costs nothing at runtime». That validator is lane
+ * B's UNBUILT work: `lessonMistakeTargets` appears nowhere under
+ * `lessons/scenario/` at HEAD, `validate.ts` included. Measured consequence of
+ * a one-character typo in a target code (`HARSH_BRAKIGN_NO_CAUSE` for
+ * `HARSH_BRAKING_NO_CAUSE`): the code is carried into the target map intact,
+ * `lessonMistakeRuleBg` returns `null` so the student is never warned,
+ * `foldLessonMistakes` returns `[]` from both the charged and the coached
+ * record so the mistake can never be found, and `lessonMistakeCopy` returns
+ * `null`. ADR-009 is silently stripped from that rung and nothing fails
+ * anywhere — no type error, no test, no runtime warning.
+ *
+ * So `code` is genuinely unvalidated today. Do not write a consumer-side guard
+ * that assumes otherwise, and do not read a missing ADR-009 on some rung as
+ * «the derivation found no targets». When lane B lands its validator, this
+ * paragraph is replaced by the sentence it corrects.
+ */
+export interface LessonMistakeTarget {
+  /** rules-catalog ViolationCode (plain string: see the header). */
+  code: string;
+  /**
+   * Where the derivation found it (doc 92 §2.1): a mistake demo's `codeRefs`
+   * minus its `incidentalCodeRefs`, or a detector this template ARMED whose
+   * `DEFAULT_RULE_CONFIG` value is false. Carried so a census can say which
+   * source a target came from without re-deriving it.
+   */
+  source: "demo" | "detector";
+  /**
+   * `MistakeDemo.titleBg` — the author's own name for the act, and ONLY when
+   * exactly one demo cites this code. Two demos citing it means the name is
+   * ambiguous and the surfaces fall back to the catalogue title, because
+   * naming the wrong demo is worse than naming none (doc 92 §1 graft 19).
+   * Stored authored text, never generated (ADR-002).
+   */
+  demoTitleBg?: string;
+}
+
 /** A scored driving lesson. Specs are data; orchestration lives in lessons/. */
 export interface LessonSpec {
   id: string; // "l-first-drive"
@@ -527,6 +583,33 @@ export interface LessonSpec {
    * normal graded session, bit-identical.
    */
   mistakeExperience?: { mistakeIndex: number; codes: readonly string[] };
+  /**
+   * ADR-009 (founder Ruling A) — the coachable codes THIS PRACTICE RUNG exists
+   * to teach. Written ONLY by `compileScenario` (`deriveLessonMistakeTargets`),
+   * derived from data the template already carries: its mistake demos'
+   * `codeRefs` and the detectors it armed (doc 92 §2.1). Never hand-authored,
+   * so a lesson cannot acquire a target by a typo.
+   *
+   * ABSENT IS THE DEFAULT AND ABSENT IS TODAY'S BEHAVIOUR, byte for byte.
+   * Exam rungs (`examMode`), the THEO-3 sandbox (`mistakeExperience`),
+   * curriculum lessons `l0`–`l8`, exam-bank variants and the exam card all
+   * carry no field (founder answer F2, 2026-09-17), so the practical-exam
+   * verdict this product is measured against is untouched: doc 92 §9 (pass
+   * criterion 5) records 488 L4 drives graded identically.
+   *
+   * ⚠ THAT NUMBER IS PROTOTYPE-MEASURED AND CANNOT BE REPRODUCED IN THIS REPO.
+   * It was taken in `rev/proto`, a patched scratch worktree, and the instrument
+   * doc 92 §9 names for it — `tools/audit/lesson-mistake-census.mjs` — is lane
+   * H's unbuilt work: no such file exists at HEAD. Read it as the evidence
+   * behind the ruling's exam exemption, not as a check a reader can re-run
+   * here; when lane H lands, the census is what re-establishes it.
+   *
+   * The applicability rule is written ONCE, in
+   * `lessons/lessonMistake.ts lessonMistakeTargetCodes` — read it there rather
+   * than testing this field directly, or the exam exemption ends up stated in
+   * five places and drifts in four.
+   */
+  lessonMistakeTargets?: readonly LessonMistakeTarget[];
 }
 
 /**

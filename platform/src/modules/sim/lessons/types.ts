@@ -1465,6 +1465,27 @@ export interface TeachMoment {
   points: number;
   /** Session time of the mistake, seconds. */
   t: number;
+  /**
+   * ADR-009: this code is one of the mistakes THIS LESSON EXISTS TO TEACH
+   * (`LessonSpec.lessonMistakeTargets`), so the card must say that the lesson
+   * will not be counted — not merely that the first encounter is free. Set by
+   * `applyTick`'s teach arms; absent on every incidental first encounter, which
+   * is what keeps today's card byte-identical (`lessonMistake.ts`
+   * `teachStakeKind` → `"free-first"`).
+   */
+  lessonMistake?: true;
+  /**
+   * ADR-009: this moment ALSO reached the изпитен лист — the L1 „Пълна помощ"
+   * pause-on-error arm, which pauses for a mistake the coach did charge.
+   *
+   * IT EXISTS BECAUSE THE CARD WAS LYING THERE ALREADY. Both stake sentences
+   * say «Първа среща — не се брои в резултата» unconditionally
+   * (`TeachMomentOverlay.tsx:396`, `:528`), including on the charged arm, where
+   * the points had just been taken. Under ADR-009 a charged target is always a
+   * REPEAT (a target's first occurrence is always taught), so the two flags
+   * together pick one of four honest sentences instead of one dishonest one.
+   */
+  charged?: true;
 }
 
 /**
@@ -1497,6 +1518,72 @@ export interface CoachedMistake {
   titleBg: string;
   /** Session time of the mistake, seconds. */
   t: number;
+  /**
+   * ADR-009: the ACT inside the code, as `ViolationEvent.detail` carries it —
+   * „law-alongside" for a stop beside a parked car, „give-way" for a Б1 scan.
+   *
+   * WHY A COACHED ROW NEEDS IT WHEN A CHARGED EVENT ALREADY HAS IT. Under
+   * ADR-009 the lesson's own mistake is NEVER charged the first time, so the
+   * only record of it is this row — and a row carrying just the code retitles
+   * to the POOLED string on both sides. That is how «Спиране в забранена зона»
+   * would end up as the reason a lesson built around a bus stop was not taken,
+   * next to a teach card that had already named the act. `detail` travels the
+   * wire (`WireCoachedMistake`) exactly like the charged event's does, and the
+   * server re-derives the title from `(code, detail)` — the client still
+   * authors no sentence of its own.
+   */
+  detail?: string;
+}
+
+/**
+ * ADR-009 — ONE OF THE LESSON'S OWN MISTAKES, AS IT HAPPENED (founder Ruling A).
+ *
+ * The output of `lessonMistake.ts foldLessonMistakes`, which is the ONE place
+ * the rule is evaluated: it runs on the client in `buildLessonResult` and on
+ * the server in `gradeFinishWire`, over the same two records, and both sides
+ * must agree or the stored verdict disagrees with the screen that produced it.
+ *
+ * ONE ROW PER CODE, not per occurrence. Three panic stops in one drive are one
+ * reason the lesson was not taken, and a reason block that listed them three
+ * times would read as three lessons failed.
+ */
+export interface LessonMistakeHit {
+  /** Rule-catalog violation code — a plain string, as everywhere in this file. */
+  code: string;
+  /**
+   * EARLIEST occurrence across both records, seconds. The earliest is the one
+   * the student was actually taught at, so it is the one the debrief and the
+   * mistake map can point at; a later re-bill of the same episode is not a
+   * second event (see `ViolationEvent.regrade`).
+   */
+  t: number;
+  /**
+   * Some occurrence of this code reached the изпитен лист. Under ADR-009 that
+   * can only be a genuine REPEAT — the first occurrence is always taught and
+   * always free (founder answer F1, 2026-09-17) — which is what lets the teach
+   * card say «Отново грешката, която този урок учи» rather than guessing.
+   * Doc 92 §9 (pass criterion 4c) records 0 of 693 hits charged without an
+   * earlier coached occurrence.
+   *
+   * ⚠ PROTOTYPE-MEASURED, NOT REPRODUCIBLE HERE. That figure comes from
+   * `rev/proto`, a patched scratch worktree, and the instrument doc 92 §9 names
+   * — `tools/audit/lesson-mistake-census.mjs` — is lane H's unbuilt work and
+   * does not exist at HEAD. It is the evidence for the invariant, not a check
+   * this repo can currently run; do not build a consumer that assumes the
+   * invariant has been re-measured on a tree you can see.
+   */
+  charged: boolean;
+  /** The act of the earliest occurrence (see `CoachedMistake.detail`). */
+  detail?: string;
+  /**
+   * Catalogue title for `(code, detail)`, RETRIEVED on whichever side folded
+   * (ADR-002) — act-aware first, pooled second, exactly as `makeViolation`
+   * resolves a charged event's title. Stamped here so the surfaces do not each
+   * re-run that two-step and disagree about which one they ran.
+   */
+  titleBg: string;
+  /** `LessonMistakeTarget.demoTitleBg` — the author's name for the act, when unambiguous. */
+  demoTitleBg?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1857,7 +1944,9 @@ export interface LessonResult {
   aborted: boolean;
   /**
    * The lesson verdict: official pass rule AND all objectives done AND not
-   * aborted. A free drive (no objectives) passes purely on the official rule.
+   * aborted AND — on a PRACTICE rung — none of the lesson's own mistakes
+   * occurred (ADR-009, founder Ruling A: see `lessonMistakes` below). A free
+   * drive (no objectives) passes purely on the official rule.
    */
   passed: boolean;
   /** Total penalty points (lower is better) — stored in SimSession.score. */
@@ -1905,4 +1994,17 @@ export interface LessonResult {
    * field — the context channel had no live producer before it.
    */
   coachedMistakes?: CoachedMistake[];
+  /**
+   * ADR-009 — the mistakes THIS LESSON EXISTS TO TEACH that happened anyway
+   * (founder Ruling A). Non-empty is exactly what makes `passed` false on a
+   * practice rung, and it is also the whole reason material every surface
+   * downstream needs: the «Не е взет» verdict and its reason block, the 1★ cap,
+   * the debrief branch and its theory chips, the history label.
+   *
+   * ABSENT ON EVERY EXAM RUNG AND EVERY CLEAN PRACTICE DRIVE, which is why the
+   * rollback is one line: with no producer every reader sees an absent field
+   * and renders today's screen byte for byte. Folded by
+   * `lessonMistake.ts foldLessonMistakes` on BOTH sides (see `LessonMistakeHit`).
+   */
+  lessonMistakes?: LessonMistakeHit[];
 }

@@ -11,6 +11,7 @@
 export type {
   HudEvent,
   LessonAidsSpec,
+  LessonMistakeTarget,
   LessonObjective,
   LessonSpec,
   NearMissEvent,
@@ -90,6 +91,34 @@ export {
   type YieldReason,
   type YieldWaitContext,
 } from "./finish";
+
+// ADR-009 — the lesson's own mistake (founder Ruling A, 2026-09-17). A sibling
+// of escalation.ts below and on the barrel for the same reason: the rule is
+// folded by the client result (engine.ts) AND by the server wire (wire.ts), and
+// then explained by four surfaces outside this module — the end screen's reason
+// block, the debrief, the history row and the teach card. Six readers of one
+// rule is exactly how many places it must NOT be written in.
+export {
+  LESSON_MISTAKE_CHIP_BG,
+  MAX_LESSON_MISTAKE_TARGETS,
+  foldLessonMistakes,
+  lessonMistakeConceptIds,
+  lessonMistakeCopy,
+  lessonMistakeNamesBg,
+  lessonMistakeRuleBg,
+  lessonMistakeTargetCodes,
+  teachChipBg,
+  teachStakeBg,
+  teachStakeKind,
+  teachStakeSegments,
+  teachSublineBg,
+  type LessonMistakeCopy,
+  type LessonMistakeLesson,
+  type StakeSegment,
+  type TeachStakeKind,
+  type TeachStakeMoment,
+  type TeachStakeOptions,
+} from "./lessonMistake";
 
 // Repeat-penalty escalation (A9 — pure, shared by client fold + server grading)
 export {
@@ -319,6 +348,7 @@ export type {
   ExamTermination,
   ExamTerminationReason,
   FinishGateState,
+  LessonMistakeHit,
   LessonPhase,
   LessonResult,
   LessonSessionState,

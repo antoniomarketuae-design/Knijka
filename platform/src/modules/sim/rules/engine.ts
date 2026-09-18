@@ -71,6 +71,9 @@
 
 import {
   HANDBRAKE_ACT_MOVE_OFF_ATTEMPT,
+  HEADLIGHTS_CONDITION_SNOW,
+  JUNCTION_SCAN_CONTROL_GIVE_WAY,
+  JUNCTION_SCAN_CONTROL_STOP,
   makeCommendation,
   makeViolation,
   WRONG_WAY_ROAD_MOTORWAY,
@@ -2046,13 +2049,13 @@ const HARSH_BRAKE_TIE_TOLERANCE = 1e-9;
  * one-way street second, and a motorway carriageway is both one-way and a
  * пътен възел. So the mark, the severity and the citation stand exactly as
  * billed; only the sentence the student reads was written for the other half
- * of the clause. Same channel and same argument as `JUNCTION_SCAN_COPY` below
- * (Б1 vs Б2) — `makeViolation`'s `titleBg`/`explanationBg` override, no new
- * code, no severity or points change.
+ * of the clause. Same argument as the Б1/Б2 split (`catalog.ts`
+ * JUNCTION_SCAN_CONTROL_COPY) — copy keyed on the act, no new code, no severity
+ * or points change.
  *
  * AND THE CORRECTIVE COULD HAVE KILLED HIM. `correctiveBg` has no per-event
  * channel (read from the catalogue BY CODE at display time — see the note on
- * JUNCTION_SCAN_COPY), and the catalogue's said „спри веднага, включи
+ * JUNCTION_SCAN_CONTROL_COPY), and the catalogue's said „спри веднага, включи
  * аварийните и излез внимателно на заден ход". On a motorway that is ЗДвП
  * чл. 58, т. 1 („забранено е … движение на заден ход") given as advice, at
  * 140 км/ч closing speeds. The catalogue's corrective was therefore rewritten
@@ -2061,17 +2064,27 @@ const HARSH_BRAKE_TIE_TOLERANCE = 1e-9;
  *
  * THE COPY ITSELF IS NOT HERE, and that is the correction this repair took on
  * its verifier pass. It first rode `makeViolation`'s `titleBg`/`explanationBg`
- * override, the way `JUNCTION_SCAN_COPY` below does — and neither field
+ * override, the way `JUNCTION_SCAN_COPY` below then did — and neither field
  * crosses `wire.ts`. `serializeRuleEvents` carries `kind`, `code`, `t`,
  * `detail`, `penaltyMultiplier`, `x/y`, so `rebuildRuleEvents` rebuilt the
  * pooled street row on the server and the end screen printed «…по
  * автомагистрала» in «Грешки» beside «…по еднопосочна улица» in «Разбор». So
  * the road travels as `detail`, which DOES cross, and the copy lives in
  * `catalog.ts WRONG_WAY_ROAD_COPY` where `actCopy` reaches it from both sides.
- * JUNCTION_SCAN_COPY gets away with the override because its events are billed
+ *
+ * THIS PARAGRAPH USED TO END WITH A FALSE EXCUSE, and it is worth keeping the
+ * correction where the claim was made (ADR-009 lane R, 2026-09-18). It said
+ * „JUNCTION_SCAN_COPY gets away with the override because its events are billed
  * inside a pre-drive/junction path that is retitled again on rebuild; this one
- * is not, and „both surfaces happen to agree today" is what this codebase has
- * already been burned by twice (wire.ts's `situation` note; FaultCard's).
+ * is not". No such path exists: `rebuildRuleEvents` retitles through
+ * `preDriveStepTitle`, which answers for PREDRIVE_WRONG_ORDER and
+ * PREDRIVE_STEP_SKIPPED only, and only for a `detail` that is a
+ * `PreDriveStepId`. JUNCTION_SCAN_INCOMPLETE was rebuilt POOLED on the server
+ * for as long as that sentence stood — the very defect this block describes,
+ * two hundred lines below its own diagnosis. It has now made the same trip
+ * (`catalog.ts JUNCTION_SCAN_CONTROL_COPY`), and „both surfaces happen to agree
+ * today" is what this codebase has already been burned by three times
+ * (wire.ts's `situation` note; FaultCard's; this).
  *
  * WHAT IS ROUTED, NOT PATCHED. `realWorldBg` has no per-event channel either
  * and still prices the street case (чл. 183, ал. 4 — 100 лв.); the motorway
@@ -2092,83 +2105,31 @@ const HARSH_BRAKE_TIE_TOLERANCE = 1e-9;
  */
 
 /**
- * JU-23 per-CONTROL copy for JUNCTION_SCAN_INCOMPLETE (doc 87, item 5 of the
- * 2026-08-05 gate's open list).
+ * THE TWO ACT TABLES THAT USED TO LIVE HERE — moved to `rules/catalog.ts` by
+ * ADR-009 lane R, 2026-09-18. `JUNCTION_SCAN_COPY` (Б1 / Б2) is now
+ * `JUNCTION_SCAN_CONTROL_COPY` and `SNOW_LIGHTS_COPY` is `SNOW_LIGHTS_ACT_COPY`,
+ * both registered in `PER_ACT_COPY`; the retrieved articles, the founder's
+ * frame and the `correctiveBg` reasoning moved with the text, unchanged.
  *
- * The code is armed at BOTH kinds of priority line — a Б1 give-way line and a
- * Б2 stop line — because the fresh ляво-дясно scan is owed at both (see the
- * `stopLineCrossed` branch). The catalogue carries one string per code, so it
- * used to name Б2 for both, and the founder photographed the consequence: a
- * fault card reading «Премина стоп-линията на знак Б2» under the title bar of
- * the lesson «Б1 не значи спри винаги» (`newdef/b5gw-card-t24.4.png`).
+ * WHY THEY COULD NOT STAY. They rode `makeViolation`'s
+ * `titleBg`/`explanationBg` override channel WITHOUT a `detail`, and that
+ * channel dies at the wire: `serializeRuleEvents` carries `kind`, `code`, `t`,
+ * `detail`, `penaltyMultiplier` and `x/y`, so `rebuildRuleEvents` rebuilt the
+ * POOLED «Непълно оглеждане на кръстовището» on the server and the two halves
+ * of one debrief named two different acts. The WRONG_WAY block above used to
+ * excuse this pair — „JUNCTION_SCAN_COPY gets away with the override because
+ * its events are billed inside a pre-drive/junction path that is retitled again
+ * on rebuild" — and that sentence was never true: `rebuildRuleEvents`'s only
+ * retitler is `preDriveStepTitle`, which answers for PREDRIVE_WRONG_ORDER and
+ * PREDRIVE_STEP_SKIPPED alone and only for a `detail` that is a
+ * `PreDriveStepId`. So the control and the condition now travel as `detail`,
+ * which does cross, and both sides resolve the same title through `actCopy`.
  *
- * The catalogue text is now control-neutral and these two overrides put the
- * sign the student actually crossed on the card. They ride `makeViolation`'s
- * existing `titleBg`/`explanationBg` override channel — no new event field, no
- * new code, no severity or points change. `correctiveBg` has no per-event
- * channel (it is read from the catalogue BY CODE at display time), which is
- * why the catalogue's corrective was rewritten to be true of both controls
- * rather than split here.
- *
- * The Б1 half must also not smuggle back the myth this lesson exists to kill:
- * Б1 does not demand a stop (ЗДвП чл. 50), it demands that you give way — so
- * its copy says „намали и огледай", never „спри".
+ * Nothing about the GRADE moved: same codes, same severities, same points, same
+ * arming conditions, same `lawRef`. `rules/__tests__/act-copy-control.test.ts`
+ * holds the parity and refuses a new override-without-detail call anywhere in
+ * platform/src.
  */
-const JUNCTION_SCAN_COPY = {
-  giveWay: {
-    titleBg: "Непълно оглеждане при знак Б1",
-    explanationBg:
-      "Премина линията на знак Б1 „Пропусни движението“, без да огледаш и наляво, и надясно. Б1 не иска да спреш винаги — иска да пропуснеш, а пропускаш само това, което си видял. „Един поглед не стига“: най-честата причина за удар на кръстовище е „гледах, но не видях“.",
-  },
-  stop: {
-    titleBg: "Непълно оглеждане при знак Б2",
-    explanationBg:
-      "Премина стоп-линията на знак Б2 „Спри!“, без да огледаш и наляво, и надясно. „Един поглед не стига“ — най-честата причина за удар на кръстовище е „гледах, но не видях“: погледнал си веднъж отдалеч и си потеглил в това, което се е променило.",
-  },
-} as const;
-
-/**
- * O28 — SNOWFALL copy for the low-beam duty the `snowLights` detector grades.
- *
- * WHY IT RIDES AN EXISTING CODE. The duty is ONE duty. Retrieved from the
- * ingested act (content/law/acts/zdvp.json, чл. 70, ал. 1), verbatim: „При
- * движение през нощта И ПРИ НАМАЛЕНА ВИДИМОСТ моторните превозни средства…
- * трябва да бъдат с включени къси или дълги светлини…" — the article's
- * operative condition is намалена видимост, and it names no weather at all.
- * Снеговалеж is one of the conditions the same act lists as producing it
- * (чл. 74, ал. 1: „…значително намалена видимост поради мъгла, СНЕГОВАЛЕЖ,
- * дъжд или други подобни условия"). So snow is not a second law, it is the
- * third weather flag under one law — and HEADLIGHTS_OFF_IN_RAIN is already
- * that law's второстепенна row, cited to чл. 70, ал. 1 and classified Н38
- * б. „б". A new code would duplicate the row, not the rule.
- *
- * THE CODE IS AN IDENTIFIER; THE CARD IS THE PRODUCT. The catalogue carries one
- * title per code and that title says „в дъжд", so the founder's Б1/Б2 defect
- * would repeat verbatim: a card reading «Движение в дъжд без светлини» over a
- * snow frame. These overrides ride `makeViolation`'s existing
- * `titleBg`/`explanationBg` channel — the same channel and the same reason as
- * JUNCTION_SCAN_COPY above. No new event field, no severity or points change.
- *
- * `correctiveBg` HAS NO PER-EVENT CHANNEL (read from the catalogue BY CODE at
- * display time — see the JUNCTION_SCAN_COPY note). The catalogue's is „тръгнат
- * ли чистачките, светват и късите светлини". MEASURED before reusing it rather
- * than assumed: the snow preset is a SNOWFALL veil, not dry packed snow —
- * `environment/presets.ts snowWeather` is authored at density 0.012 (~40 %
- * transmittance at 80 m) and `SnowFlakes` fall through it, so the wipers are
- * running and the corrective lands on target. It is the only student-facing
- * string this reuse does not get to restate; `n38.ts`'s rationale mentions rain
- * but reaches no surface (`examMarkFor` publishes clause + quote only).
- *
- * ROUTED, NOT SILENTLY ACCEPTED: renaming the code to something
- * condition-neutral (HEADLIGHTS_OFF_IN_LOW_VISIBILITY) is the honest end state
- * and touches rules/types.ts + catalog.ts + n38.ts + consequences.ts +
- * scenarios/mapping.ts + world/referents.ts, none of which is this lane's.
- */
-const SNOW_LIGHTS_COPY = {
-  titleBg: "Движение в снеговалеж без светлини",
-  explanationBg:
-    "Валеше сняг, а караше без къси светлини. Снегът е намалена видимост точно както дъждът и мъглата: платното още се вижда, но сивата кола в бялото се губи и насрещният те забелязва секунди по-късно, отколкото ти се струва. При намалена видимост колата се движи с включени къси светлини — не толкова за да виждаш, колкото за да те виждат.",
-} as const;
 
 /**
  * WHICH low-beam duty is live — night, rain or snowfall — or null when the
@@ -2194,7 +2155,8 @@ const SNOW_LIGHTS_COPY = {
  * The order is the order the three arms below fire in, and each exclusion
  * answers a double bill rather than tidiness: night carries no exclusion and is
  * the основна row; rain is guarded `!isNight`; snow is guarded `!rain &&
- * !isNight` and reuses the rain row's CODE (with SNOW_LIGHTS_COPY) because чл.
+ * !isNight` and reuses the rain row's CODE (with the `detail: "snow"` act copy,
+ * `catalog.ts SNOW_LIGHTS_ACT_COPY`) because чл.
  * 70, ал. 1 is one duty. A snowy night bills the night row once — here and in
  * the HUD alike.
  *
@@ -3891,8 +3853,9 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   // Lights in SNOWFALL (O28, чл. 70, ал. 1 — the third arm of the low-beam
-  // duty; see SNOW_LIGHTS_COPY for the retrieved article and why it reuses the
-  // rain row's code rather than adding a second one for the same rule).
+  // duty; see `catalog.ts SNOW_LIGHTS_ACT_COPY` for the retrieved article and
+  // why it reuses the rain row's code rather than adding a second one for the
+  // same rule).
   //
   // WHAT WAS MEASURED, 2026-08-19. The rain arm above reads `raining`, the fog
   // arm reads `tick.fog`, and NEITHER reads `tick.snow` — so `sc-ac-snow`, the
@@ -3937,7 +3900,13 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     )
   ) {
     events.push(
-      standingDutyBill(s.snowLights, makeViolation("HEADLIGHTS_OFF_IN_RAIN", t, SNOW_LIGHTS_COPY)),
+      standingDutyBill(
+        s.snowLights,
+        // The condition travels as `detail`, not as a copy override: the
+        // override does not cross `wire.ts` and the server would rebuild the
+        // «в дъжд» title over a snow frame (ADR-009 lane R).
+        makeViolation("HEADLIGHTS_OFF_IN_RAIN", t, { detail: HEADLIGHTS_CONDITION_SNOW }),
+      ),
     );
   }
 
@@ -5854,7 +5823,12 @@ function handleTickEvent(
         // and it names Б1, not Б2. The catalogue string is control-neutral (see
         // its comment); this is the branch that puts the right sign on the card.
         if (scanIncomplete()) {
-          const bill = makeViolation("JUNCTION_SCAN_INCOMPLETE", t, JUNCTION_SCAN_COPY.giveWay);
+          // The SIGN travels as `detail` (ADR-009 lane R): the catalogue row is
+          // control-neutral, `catalog.ts JUNCTION_SCAN_CONTROL_COPY` holds the
+          // two sentences, and `rebuildRuleEvents` resolves the same one.
+          const bill = makeViolation("JUNCTION_SCAN_INCOMPLETE", t, {
+            detail: JUNCTION_SCAN_CONTROL_GIVE_WAY,
+          });
           billAct(s, tick, out, "junction-scan", bill);
         }
         break;
@@ -5879,7 +5853,10 @@ function handleTickEvent(
           : makeViolation("STOP_SIGN_NO_FULL_STOP", t),
       );
       if (scanIncomplete()) {
-        const bill = makeViolation("JUNCTION_SCAN_INCOMPLETE", t, JUNCTION_SCAN_COPY.stop);
+        // Б2's own sentence, keyed the same way as the give-way branch above.
+        const bill = makeViolation("JUNCTION_SCAN_INCOMPLETE", t, {
+          detail: JUNCTION_SCAN_CONTROL_STOP,
+        });
         billAct(s, tick, out, "junction-scan", bill);
       }
       break;
