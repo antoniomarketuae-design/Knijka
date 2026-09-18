@@ -1293,13 +1293,115 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
     titleBg: "Спиране в забранена зона",
+    // THE EXPLANATION *DOES* HAVE A PER-EVENT CHANNEL — re-measured at HEAD
+    // 370880b on 2026-09-18, because the row was re-filed on the premise that
+    // it has none, the way `correctiveBg` below really has none. It has one,
+    // and it has been wired end to end since the BAN-BASIS slice:
+    //
+    //   content/world/*.json  zones[].basis
+    //     → runtime/worldRuntime.ts:1172-1173 (isNoStopBasis guard), :2627-2628
+    //     → SimTick.noStopBasis
+    //     → rules/engine.ts:4855 / :4877
+    //         makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t, { detail: tick.noStopBasis })
+    //     → ViolationEvent.detail — which CROSSES lessons/wire.ts, so the
+    //       server's rebuild names the same act the client did
+    //     → actCopy() → PER_ACT_COPY.ILLEGAL_STOP_IN_BAN_ZONE = NO_STOP_BASIS_COPY,
+    //       which overrides titleBg, explanationBg, lawRef AND peekBg per basis.
+    //
+    // Counted over content/world on that HEAD: 16 `noStopping` spans — 7 plated
+    // (signRef В…), 9 law-implied, of which 7 DECLARE their basis and print
+    // their own чл. 98 точка, never the plate (pk-double-v1 т. 2 · pk-banx-v1
+    // т. 6 ×2 + т. 5 · lot-zebra-v1 т. 5 · pk-rail-v1 т. 4 ×2). The string
+    // below is what the 7 plated spans resolve to, and on them it is true.
+    //
+    // `ScenarioSpec.map.params.banBasis` IS NOT THAT CHANNEL and was never
+    // meant to be: it is the GENERATOR RECIPE, mirrored into the district's
+    // `meta.scenario.params` (templates-parking2.ts says so at each of its five
+    // sites; tools/maps/gen_pk_*.mjs consumes it), which is why only the trace
+    // and district batteries read it back. Piping a citation through it would
+    // rest the law on authoring provenance — the defect `rules/types.ts`
+    // NoStopBasis was written to avoid, one field over from `signRef`.
+    //
+    // WHAT IS STILL TRUE, AND IT IS ONE MAP: sc-pk-busstop-ban. pk-busstop-v1's
+    // two spans (`pkbs-z-stop-marking`, `pkbs-z-stop-pocket`) declare no basis,
+    // so that drive still convicts «под знак В27».
+    //
+    // AND THE WORLD AGREES WITH THE CARD — CORRECTED 2026-09-18, because what
+    // stood here said the opposite and said it as a measurement. It claimed the
+    // district „ships `signs: []` and no `markings` — zero В27 plates". Three
+    // things are wrong with that, in rising order of consequence.
+    //   (1) NEITHER FIELD EXISTS. Walking content/world: a top-level `signs` key
+    //       appears in 0 of 106 documents, and the string „markings" in 0 of
+    //       106. There is no array to be empty, and „no markings" was true of
+    //       every map in the corpus, so it said nothing about this one. Both are
+    //       BUILT, not authored (`WorldGeometry.markings`, `world/types.ts`:912).
+    //   (2) THE POSTS ARE DERIVED FROM THE ZONE KIND. `world/builders/
+    //       zoneSigns.ts` — `ZONE_SIGN_KIND` (:199-201) maps
+    //       `noStopping: "noStopping"`, which is the В27 face
+    //       (`world/types.ts`:504), and the placing loop (:376-384) branches on
+    //       `zone.kind` alone: the strings `zone.signRef` and `zone.basis` occur
+    //       ZERO times in that file. A В27 goes up at every noStopping span
+    //       start whatever the map says the ban rests on.
+    //   (3) SO THIS MAP GETS TWO, NOT ZERO.
+    //       `world/__tests__/pk-busstop-districts.test.ts`:379 pins exactly
+    //       that — `expect(world.stats.signs.noStopping).toBe(2)` — and passes
+    //       at HEAD.
+    //
+    // WHICH MAKES THE REAL DEFECT THE SUBTLER ONE, and worse than a card talking
+    // about a plate that is not there. The card and the world AGREE — both say
+    // В27 — and they are agreeing on furniture the test beside them already
+    // calls wrong. Its own words, :372-375: „posts one В27 face per span, though
+    // a real spirka is posted with a Д-group plate … Here the ban is law+marking
+    // implied, so these two posts are wrong-but-harmless furniture: render-only,
+    // and grading reads the spans, never the posts." Harmless while nothing
+    // cites them — but this row's `explanationBg` and `lawRef` DO cite them, so
+    // the student is shown a В27, charged under a В27, and the plate holding the
+    // whole account up is one the builder invented. The map's own authoring even
+    // names the true ground and the builder discards it: both spans carry a
+    // `signRef` — „ЗДвП-98-1 / Наредба № 2/2001 — зигзаг" and „ЗДвП-98-1 —
+    // спирка" — and zoneSigns never reads the field.
+    //
+    // THE EXIT IS ALREADY NAMED IN THE TREE, at pk-busstop-districts.test.ts
+    // :376-377: „a `posted?: boolean` on DistrictZone (default true ⇒ every
+    // shipped map byte-identical) that zoneSigns honours; then this expects 0."
+    // No such field exists today (`runtime/district.ts`:253, `world/types.ts`
+    // :292) and the default is what makes it safe: every other map keeps its
+    // posts unchanged.
+    //
+    // AND THE FLAG ALONE WOULD MAKE THIS CARD WORSE, not better. Take the face
+    // away and «под знак В27» cites a plate that then truly does not exist —
+    // today at least the student can see the thing he is being charged under.
+    // The pair only works if the removal is accompanied by a GROUND for the
+    // bus-stop ban, and that half is blocked on content truth, not engineering.
+    // Read back from content/law/acts/zdvp.json: чл. 98, ал. 1 is a closed list
+    // of eight places and none of them is a спирка; the act's only spirka clause
+    // is ал. 2, т. 3, and ал. 2 opens «Освен в посочените в ал. 1 случаи
+    // ПАРКИРАНЕТО е забранено» — a chapeau about ПАРКИРАНЕТО, while these spans
+    // are `noStopping` (ПРЕСТОЙ). The real ban is a зигзаг МАРКИРОВКА this map
+    // does not paint. So there is no чл. 98 клауза to re-cite to, and inventing
+    // one would be authored law — ADR-002's exact prohibition. It is
+    // FOUNDER-GATED: `world/__tests__/no-stop-basis-declared.test.ts` holds both
+    // span ids in AWAITING_FOUNDER_RULING, records the two options (re-cite to
+    // the marking and paint it, or re-author the spans as `noParking`), and goes
+    // red if the exception ever becomes two districts.
+    //
+    // AND SOFTENING *THIS* STRING WAS WEIGHED AND REFUSED. Walking both bases
+    // here, the way `correctiveBg` below had to, would cost the 7 plated spans
+    // their true sentence to spare 2 — and would not even cure those 2, because
+    // `lawRef` on this row cites чл. 6, т. 1 + the В27 ordinance and would go on
+    // citing the duty to obey a plate that stands there only because zoneSigns
+    // derived it from the zone kind — the miscitation moved one field over, not
+    // removed. A half-fix that hides it behind vaguer prose is worse than one
+    // the gate above keeps visible and named.
     explanationBg:
       "Спря в участък, в който престоят е забранен — под знак В27 „Забранени са престоят и паркирането“. „Само за минутка“ не съществува: точно там спрялата кола закрива видимостта и запушва лентата — затова знакът забранява дори краткия престой.",
     // BASIS-NEUTRAL 2026-09-09 (BAN-BASIS slice) — and this field, unlike the
     // title and the explanation above, HAD to move. `correctiveBg` has NO
     // per-event channel: `historyMistakes.ts:76`, `DualGhostReplay.tsx:521`,
-    // `session-history.tsx:177` and `LessonPlayShell.tsx:5554` all read it BY
-    // CODE with no event in hand, exactly as RAIL_CROSSING_ACT_COPY's docblock
+    // `session-history.tsx:336` and `LessonPlayShell.tsx:6441` all read it BY
+    // CODE with no event in hand (the last two re-measured 2026-09-18 — they had
+    // drifted to :177 and :5554, which are now a paragraph of markup and a note
+    // about phone controls), exactly as RAIL_CROSSING_ACT_COPY's docblock
     // records for its own corrective. So it has to be true of BOTH bases, and
     // the way to do that is the way the rail row did it: walk every branch.
     peekBg: "Спрялата кола закрива видимостта.",
@@ -2254,8 +2356,72 @@ export const YIELD_PRAISE_SITUATION_COPY: Record<
   // in the same breath the ignore is charged, or the drill can only convict —
   // and the pooled sentence ends «…безопасността на кръстовище», which is false
   // on an empty street where the only other party is the car itself.
+  //
+  // «ПРАВИЛНА» REMOVED 2026-09-18 — the `police-stop-signal` defect below,
+  // photographed on THIS row instead of reasoned about. WAS «Правилна реакция
+  // на червена контролна лампа». Read off
+  // `.audit-frames/w51/frames/sc-vp-telltale-red__pc-wrong/_audit-debrief.json`,
+  // one screen, three sections:
+  //   section[aria-label="Похвали"]            «✓ Правилна реакция на червена
+  //                                             контролна лампа 1:17»  (the only line)
+  //   section[aria-label="Задачи от маршрута"] «– Спри напълно вдясно при
+  //                                             червената лампа»  (objectives[1].done = false)
+  //   section[aria-label="Разбор"]             opens «…остана неизпълнена
+  //                                             задачата «Спри напълно вдясно при червената лампа»»
+  // The card called the reaction correct a few centimetres above the screen's
+  // own refusal of it.
+  //
+  // THE TWO CONDITIONS vs THE THIRD, and they are not the same measurement.
+  // The praise is minted on TWO terms only (`orchestrator/runners.ts:4232-4235`,
+  // TelltaleStimulusRunner): `input.speedKmh <= s.stopSpeedKmh &&
+  // dist(input, s.stop) <= s.stopRadiusM` — 4 km/h anywhere inside a 3 m disc
+  // (`TTR_STOP_SPEED_KMH` / `TTR_STOP_RADIUS_M`, templates-cockpit2.ts:233-234).
+  // The co-located route task grades a THIRD term the praise never reads:
+  // `requireKerbwardM: 1.0` on `tick.laneOffsetM`
+  // (`lessons/scenario/templates-cockpit2.ts:421`, sc-vptr-red-stop — the
+  // «вдясно» debt paid in w28). The disc's mark (TTR_STOP.x 13.9) sits 1.71 m
+  // curb-ward of the right-lane centre (12.19 — `TTR_RIGHT`, and ln-v1.json's
+  // own `meta.scenario.laneCenterRightM`) and its radius is 3, so its left edge
+  // reaches 1.29 m PAST that centre: a car resting mid-lane clears both praise
+  // terms and fails the task. That is the pose the `police-stop-signal` note
+  // below already describes for its own 3 m disc — same shape, same lane, now
+  // with a frame.
+  //
+  // «4.5 m AT L1» DELETED 2026-09-18, and it was attached to the wrong lesson
+  // twice over. The praise disc never passes through the rung ladder at all —
+  // `stopRadiusM` appears 0 times in `lessons/scenario/params.ts`, whose
+  // `widenRadius` touches `ObjectiveParams.radiusM` and nothing else (:207) —
+  // so the runner reads the authored 3 on every rung. Nor does the route task
+  // widen here, which is the half the deleted number really got wrong: its
+  // banner is «Спри напълно вдясно при червената лампа», `deriveFullStopDemand`
+  // (`lessons/objectives.ts`:2640) matches the «напълно», and `compile.ts`:652
+  // then zeroes that gate's widen budget. Driven through `compileScenario`
+  // rather than derived on paper, sc-vptr-red-stop reads radiusM 3 at L1 and 3
+  // at L3. The 4.5 is real but it belongs to sc-vpps-stop — «Спри ПЛЪТНО
+  // вдясно при полицая», no «напълно», budget unclamped — which compiles to 4.5
+  // at L1 against 3 at L3, and is the police-stop lesson two rows down, not
+  // this one. So on THIS card the two graders share one disc exactly, 3 m at
+  // every rung, and still disagree: the gap between them is the third TERM, not
+  // a radius, which is precisely why a wider disc was never what needed fixing.
+  //
+  // A VOICE FIX AND NOT A NUMBERS ONE, deliberately. `TTR_STOP_RADIUS_M` and
+  // `TTR_STOP_SPEED_KMH` are single truth with VP_TELLTALE_RED_LAMP's halt
+  // contract (the runner resolves the encounter by the same three numbers) and
+  // the committed traces are a byte gate on them; params.ts's WIDEN-ONLY
+  // doctrine forbids tightening a waypoint radius into a skill test. Nothing
+  // about the drive moves — only what the card claims about it.
+  //
+  // THEO-4 AFTER SHORTENING. A commendation's `explanationBg` has NO renderer
+  // anywhere in the product (the census in this table's header), so the title
+  // IS the praise — there is no body for a shorter title to leave stranded.
+  // What the student reads end to end on that screen is now: «✓ Спиране при
+  // червената контролна лампа 1:17» in «Похвали» — the act is credited; «– Спри
+  // напълно вдясно при червената лампа» still dashed in «Задачи от маршрута» —
+  // the place is refused; and a «Разбор» that opens on that unfulfilled task and
+  // spells it out. He reads WHAT he did right and WHERE he still owes, and the
+  // two halves no longer contradict each other.
   "warning-lamp": {
-    titleBg: "Правилна реакция на червена контролна лампа",
+    titleBg: "Спиране при червената контролна лампа",
     conceptId: "c-technical-condition",
   },
   // VP-11: the compliant answer to a стоп-палка. Same reason as the row above
