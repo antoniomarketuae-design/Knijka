@@ -326,7 +326,7 @@ import {
 // `evaluate`s and the presses) is here. `lib/driveline.mjs`'s header carries
 // the measurement behind each one, and `__tests__/driveline.test.mjs` pins
 // both halves — the arithmetic AND the fact that this file still calls it.
-import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, OVER_LIMIT_MAX_MS, OVER_LIMIT_SUSTAIN_SEC, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, POSTED_LIMIT_SEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, cabinActuationSafe, elapsedSec, errorBoundaryVerdict, holdCeilingFeeds, overCapHold, overCapScanStep, overLimitHold, overLimitLedgerStep, overLimitNoteLine, overLimitScanStep, overLimitSearchCeiling, overLimitSearchClock, parkingBrakeRoute, parkingBrakeVerdict, passRate, postedLimitKmh, rateVerdict, readSpeedingConfig, releaseVerdict, sustainedOverLimitLane, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
+import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, OVER_LIMIT_MAX_MS, OVER_LIMIT_SUSTAIN_SEC, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, POSTED_LIMIT_SEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, admitDraw, cabinActuationSafe, drawWitnesses, elapsedSec, errorBoundaryVerdict, holdCeilingFeeds, overCapHold, overCapScanStep, overLimitHold, overLimitLedgerStep, overLimitNoteLine, overLimitScanStep, overLimitSearchCeiling, overLimitSearchClock, parkingBrakeRoute, parkingBrakeVerdict, parseClaim, passRate, postedLimitKmh, rateVerdict, readSpeedingConfig, releaseVerdict, sustainedOverLimitLane, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -431,23 +431,50 @@ mkdirSync(OUT, { recursive: true });
  * nothing at all — every existing caller invokes exactly the same single
  * drive it always did, on the same path, with the same exit code.
  *
- * WHAT IT REFUSES TO SAY. `passRate` publishes no rate below two JUDGEABLE
- * drives, and „judgeable" is `exit === 0` — a lane that never started is a
- * draw of the harness, not of the lesson, and must not enter the denominator.
+ * WHAT IT REFUSES TO SAY. `passRate` publishes no rate below two ADMITTED
+ * drives, and „admitted" is not `exit === 0`. `exit === 0` says the drive
+ * happened; the rows this series settles ask for repeats of a TRACKED
+ * reference drive, because on w45–w47 every recorded fail was a harness
+ * driving act. `admitDraw` in lib/driveline.mjs holds the rule and its
+ * measurements; this block's job is to hand it the two witnesses, which are
+ * READ off each child rather than recomputed here:
+ *
+ *   · `guidance.tracking.verdict` — the child's own steering record, written
+ *     by `summariseTracking`. `tracked` is the one word that raises no loud.
+ *   · `laneFidelity().verdict` — `tools/audit/route-fidelity.mjs` over that
+ *     same `_audit-status.json` and the lesson's authored shadow trace. It is
+ *     the INDEPENDENT witness: a chassis pose, not the pixel scan that steered.
+ *
  * The parent's own exit is 0 only if every child exited 0: a series with a
  * dead lane in it is incomplete evidence, and `wave-c-merge.mjs` refuses to
- * certify a non-zero exit, which is the behaviour we want here.
+ * certify a non-zero exit, which is the behaviour we want here. A REFUSED draw
+ * is a different thing from a dead lane — the drive happened, it just was not
+ * a reference drive — so it does not change that exit, and the summary says
+ * how many were refused instead of letting exit 0 imply none were.
  */
 const REPEAT_N = Math.max(0, Math.trunc(Number(process.env.KNIJKA_REPEAT ?? 0) || 0));
 if (REPEAT_N >= 2) {
   const { spawnSync } = await import("node:child_process");
+  // THE ROUTE WITNESS, imported here and not at the top of the file so that the
+  // default path — every existing caller, REPEAT_N unset — loads exactly what
+  // it always loaded. Same reason `spawnSync` is imported here.
+  const { laneFidelity } = await import("../audit/route-fidelity.mjs");
   const SELF = fileURLToPath(import.meta.url);
   const pad = (i) => String(i).padStart(2, "0");
   const say = (s) => { try { console.log(s); } catch { /* the disk is gone; the JSON below is the record */ } };
+  // THE CLAIM COMES FROM THE OPERATOR, because it is the ROW's number and this
+  // harness drives three different rows. Unset means «compare against
+  // nothing», which `rateVerdict` answers „cannot-say" to — not 12.5%.
+  const CLAIM = parseClaim(process.env.KNIJKA_REPEAT_CLAIM);
   say(`=== ${SCENARIO} · ${PLATFORM} · ${MODE} · REPEAT SERIES ×${REPEAT_N} ===`);
   say(
     `  a rate claim cannot be measured from one draw. Each run below is a separate process with its own browser, ` +
       `sign-in and target attestation, writing into ${OUT}/rep-NN.`,
+  );
+  say(`  CLAIM: ${CLAIM.why}${CLAIM.claim === null ? " (set KNIJKA_REPEAT_CLAIM, e.g. «1/8», to compare against one)" : ""}`);
+  say(
+    `  ADMISSION: only a draw whose own ledger reads tracking «tracked» AND route fidelity «on-line» enters the ` +
+      `denominator. Every other draw is REFUSED and counted — see the refusal lines below.`,
   );
   const runs = [];
   for (let i = 1; i <= REPEAT_N; i++) {
@@ -465,6 +492,19 @@ if (REPEAT_N >= 2) {
     let st = null;
     try { st = JSON.parse(readFileSync(`${dir}/_audit-status.json`, "utf8")); } catch { /* the lane may not have got that far */ }
     const exit = r.status === null ? 4 : r.status;
+    // THE SECOND WITNESS, computed over the child's own artefacts and nothing
+    // else. It is wrapped because it reads a file on the same disk everything
+    // else here is best-effort about: a throw must leave `fidelity` null — a
+    // silence `admitDraw` REFUSES — and must not kill a series mid-way.
+    let fid = null;
+    try {
+      fid = laneFidelity({ statusPath: `${dir}/_audit-status.json`, status: st ?? undefined, lessonId: SCENARIO, repoRoot: REPO_ROOT });
+    } catch { /* the trace, the disk, or both — the null below is the honest answer */ }
+    // THE TWO ADMISSION WITNESSES, lifted by the one function the tests drive
+    // directly, and carried on the run so `_audit-repeat.json` records WHY each
+    // draw was admitted or refused and a later reader need not re-derive it.
+    const witnesses = drawWitnesses(st, fid);
+    const { tracking, fidelity } = witnesses;
     runs.push({
       i,
       dir,
@@ -478,26 +518,31 @@ if (REPEAT_N >= 2) {
       topKmh: st?.speed?.topKmh ?? null,
       frames: st?.framesWritten ?? null,
       framesLost: st?.framesLost ?? null,
-      driveClass: st?.drive?.class ?? null,
+      ...witnesses,
       head: st?.target?.head ?? null,
       dirty: st?.target?.dirtyCount ?? null,
     });
+    const ruling = admitDraw(runs[runs.length - 1]);
     say(
       `  [rep-${pad(i)}] exit ${exit} · ${st?.verdict ?? "(no verdict surface)"} · ${st?.score ?? "?"} наказ. т. · ` +
         `top ${st?.speed?.topKmh ?? "?"} км/ч · ${st?.framesWritten ?? "?"} frame(s) · ${Math.round(ms / 1000)}s · ` +
-        `drive ${st?.drive?.class ?? "?"}`,
+        `drive ${st?.drive?.class ?? "?"} · tracking ${tracking ?? "?"} · route ${fidelity ?? "?"}`,
     );
+    say(`             ${ruling.admitted ? "ADMITTED" : "REFUSED"} — ${ruling.why}`);
   }
   const rate = passRate(runs);
   const series = {
     scenario: SCENARIO, platform: PLATFORM, mode: MODE, repeat: REPEAT_N,
     finishedAt: new Date().toISOString(),
     runs, rate,
-    // The row this capability exists to settle quotes 1/8. It is compared here
-    // rather than left to a reader's arithmetic, and it is allowed to answer
-    // "cannot-say" — a two-run series whose interval spans everything has
-    // refuted nothing, and saying so is the whole discipline.
-    against: { claim: 1 / 8, ...rateVerdict(rate, 1 / 8) },
+    // WHAT THIS SERIES IS COMPARED AGAINST, and who said so. `1 / 8` used to be
+    // written here, which compared `sc-park-wall:1edd6ff2` and
+    // `sc-ln-obstacle-meeting:56ff9740` — two cross-leg rows that name no
+    // fraction — against a third row's 12.5%. The claim is now the operator's
+    // (`KNIJKA_REPEAT_CLAIM`), `source` records the string they typed, and an
+    // absent or unreadable one is `null`: `rateVerdict` answers "cannot-say" to
+    // a non-number, which is the honest reading of «nobody stated a claim».
+    against: { claim: CLAIM.claim, source: CLAIM.source, claimWhy: CLAIM.why, ...rateVerdict(rate, CLAIM.claim) },
   };
   try { writeFileSync(`${OUT}/_audit-repeat.json`, `${JSON.stringify(series, null, 2)}\n`); } catch { /* best effort, as everywhere else on this disk */ }
   // …AND A STATUS FILE, so a lane reader is not told "never dispatched" about
@@ -510,7 +555,10 @@ if (REPEAT_N >= 2) {
         scenario: SCENARIO, platform: PLATFORM, mode: MODE,
         phase: "repeat-series", repeat: REPEAT_N,
         exit: runs.every((r) => r.exit === 0) ? EXIT_JUDGEABLE : EXIT_EVIDENCE_INCOMPLETE,
-        rate, runs: runs.map(({ i, dir, exit, verdict }) => ({ i, dir, exit, verdict })),
+        // `tracking` and `fidelity` travel with each row here too: a lane
+        // reader that sees `admitted 2` must be able to see WHICH two without
+        // opening the sidecar.
+        rate, runs: runs.map(({ i, dir, exit, verdict, tracking, fidelity }) => ({ i, dir, exit, verdict, tracking, fidelity })),
       }, null, 2)}\n`,
     );
   } catch { /* best effort */ }
@@ -520,9 +568,21 @@ if (REPEAT_N >= 2) {
   // into НЕИЗДЪРЖАН: the two mean opposite things about the изпитен лист, and a
   // summary whose four counts no longer sum to `judgeable` is how a reader
   // discovers a fifth state exists.
-  say(`  dispatched ${rate.dispatched} · judgeable ${rate.n} · ИЗДЪРЖАН ${rate.counts.pass} · НЕИЗДЪРЖАН ${rate.counts.fail} · НЕ Е ВЗЕТ ${rate.counts.lessonMistake} · НЕЗАВЪРШЕН ${rate.counts.unfinished} · no-verdict ${rate.counts.unknown}`);
+  say(`  dispatched ${rate.dispatched} · admitted ${rate.admitted} · refused ${rate.refused} · ИЗДЪРЖАН ${rate.counts.pass} · НЕИЗДЪРЖАН ${rate.counts.fail} · НЕ Е ВЗЕТ ${rate.counts.lessonMistake} · НЕЗАВЪРШЕН ${rate.counts.unfinished} · no-verdict ${rate.counts.unknown}`);
+  // THE REFUSED PILE, BROKEN DOWN, ON ITS OWN LINE. A count of admitted draws
+  // beside no count of refused ones is how a reader mistakes an 8/8 that threw
+  // twelve draws away for a clean eight.
+  say(`  REFUSED BY: not-judgeable ${rate.refusedBy["not-judgeable"]} · no-drive ${rate.refusedBy["no-drive"]} · untracked ${rate.refusedBy.untracked} · off-line ${rate.refusedBy["off-line"]}`);
+  for (const f of rate.refusals) say(`    !! rep-${f.i === null ? "??" : pad(f.i)} REFUSED (${f.reason}) — ${f.why}`);
   say(`  PASS RATE: ${pct(rate.point)}  95% ${pct(rate.lo95)}–${pct(rate.hi95)}  —  ${rate.why}`);
-  say(`  against the filed 13% claim: ${series.against.verdict.toUpperCase()} — ${series.against.why}`);
+  say(`  against the claim: ${series.against.verdict.toUpperCase()} — ${series.against.why}`);
+  if (rate.refused > 0) {
+    say(
+      `  !! ${rate.refused} OF ${rate.dispatched} DRAWS WERE REFUSED and are not in the rate above. A refused draw is not a ` +
+        `failed one: it is a drive this harness cannot show was a TRACKED reference drive, and the rows this series settles ` +
+        `ask for repeats of one.`,
+    );
+  }
   if (!rate.buildStable) {
     say(`  !! THE TREE MOVED DURING THIS SERIES (${rate.heads.length} distinct HEADs: ${rate.heads.join(", ")}) — the rate above is not about one build.`);
   }

@@ -1604,13 +1604,200 @@ export function classifyVerdict(verdict) {
 export const RATE_MIN_N = 2;
 
 /**
- * @param runs [{exit, verdict, head}] — one entry per drive in the series.
- *   Only `exit === 0` runs enter the denominator: a lane that could not be
- *   judged is not a draw of the lesson, it is a draw of the harness.
+ * ═══ WHAT MAY ENTER A PASS-RATE DENOMINATOR, AND WHY `exit === 0` IS NOT IT ══
+ *
+ * The three open rows this series exists to settle all say the same sentence
+ * in their own verdict lines — «Needs N repeats of a TRACKED reference drive at
+ * one commit» (`sc-ln-obstacle-meeting:114706e0`, w47) — and they say WHY: on
+ * the last three sweeps «every recorded fail was a harness driving act», so a
+ * series of untracked draws measures this harness's variance and not the
+ * product's. `exit === 0` cannot express that. It means «the drive happened and
+ * every frame was written»; it is silent about whether the car was steered.
+ *
+ * MEASURED ON THE ROW'S OWN LESSON, w47 at head 7648edf7 (the three
+ * `_audit-status.json` files under `.audit-frames/w47/frames/`):
+ *
+ *   sc-ln-obstacle-meeting__pc-right     drove · tracking INTERMITTENT @ 0.69 · fidelity drifted  (5.3 m off)
+ *   sc-ln-obstacle-meeting__mobile-right drove · tracking TRACKED      @ 0.977 · fidelity on-line (≤2.57 m)
+ *   sc-ln-obstacle-meeting__mobile-wrong drove · tracking NOT-INVOKED  @ 0     · fidelity off-route (62%)
+ *
+ * All three exit 0. All three enter the denominator under the old rule, and the
+ * w47 judge threw the first one out by hand — «pc-right is INTERMITTENT 69%
+ * (STEERED BADLY)». A rule a judge has to apply by hand is a rule the harness
+ * does not have.
+ *
+ * ── TWO WITNESSES, AND NEITHER ONE ALONE ──────────────────────────────────
+ *
+ * `guidance.tracking.verdict` is the field that already says the word. It is
+ * `summariseTracking`'s own ladder (lib/guidance.mjs). `not-invoked`,
+ * `speed-unreadable` and `blind` raise «THIS DRIVE WAS NOT STEERED»;
+ * `wandered` and `intermittent` raise «THIS DRIVE STEERED BADLY». It is not
+ * invented here and it is not re-derived here; it is read.
+ *   AN EARLIER DRAFT CALLED `tracked` "the ONE value that raises no loud()",
+ *   and that is false: `never-moved` raises none either (the ladder at
+ *   lesson-audit.mjs:10792-10810 has three loud branches and that value is in
+ *   none of them). No hole follows — a `never-moved` draw is refused here like
+ *   any other non-`tracked` value — but the sentence was a JUSTIFICATION for
+ *   reading this field, and a justification that does not reproduce is the
+ *   defect this directory keeps meeting. The real justification is narrower and
+ *   survives: `tracked` is the only value the ladder treats as a drive that
+ *   steered, and this gate admits only that one.
+ *
+ * It is also not sufficient, and `tools/audit/route-fidelity.mjs` says so in
+ * its own header off a 279-lane recount: `sc-junction-rhr/pc-right` was
+ * certified `tracked` at 37.5 m off the authored line. That verdict grades the
+ * control law's own error signal against a locally-straight centreline; it
+ * never asks where the car was.
+ *
+ * The converse is equally measured, and I measured it this session on
+ * `.audit-frames/w47/frames/sc-park-wall__*` with `laneFidelity()`:
+ *
+ *   pc-wrong     tracking not-invoked @ 0     · fidelity ON-LINE (≤2.47 m, 77%)
+ *   mobile-wrong tracking not-invoked @ 0     · fidelity ON-LINE (≤2.44 m, 77%)
+ *   pc-right     tracking intermittent @ 0.783 · fidelity drifted (6.7 m)
+ *   mobile-right tracking tracked      @ 1     · fidelity on-line (≤2.92 m, 89%)
+ *
+ * The two `wrong` legs hold the flat throttle in a straight line with the
+ * steering loop never invoked, and the route witness calls them ON-LINE —
+ * because a straight road is a straight line. So fidelity alone admits an
+ * UNSTEERED drive and tracking alone admits a DRIFTED one. The two are
+ * independent by construction (a pixel scan of the ribbon; a chassis pose from
+ * `window.__camProbe` against the lesson's own authored trace), which is
+ * exactly why BOTH are required and neither is a fallback for the other.
+ *
+ * ── SILENCE REFUSES, AND THAT IS THE OPPOSITE OF `classifyDrive`'S RULE ────
+ *
+ * `verdict-surface.mjs` refuses to CONDEMN a drive on a field its ledger never
+ * carried, and is right to: silence there would fail every pre-census drive as
+ * «dead». Here the direction is inverted. A draw is being ADMITTED into a
+ * denominator that a `refutes` will be published from, so a missing witness
+ * must REFUSE the draw — «I cannot show this was tracked» and «this was
+ * tracked» are the two sentences this whole programme keeps confusing, and
+ * admitting on silence is the reassuring direction.
+ *
+ * ── AND A REFUSAL IS COUNTED, NEVER DROPPED ───────────────────────────────
+ *
+ * `passRate` publishes `dispatched`, `admitted` and `refused` with a reason
+ * count for each refusal, because an operator cannot otherwise tell a clean
+ * 8/8 from an 8/8 that silently threw twelve draws away. A filter that quietly
+ * shrinks a denominator is a worse instrument than no filter.
+ */
+export const TRACKED_VERDICT = "tracked";
+
+/** `routeFidelity`'s verdict for a drive that held its lesson's authored line.
+ *  The other three (`drifted`, `off-route`, `no-witness`) all refuse. */
+export const ON_LINE_VERDICT = "on-line";
+
+/**
+ * THE TWO WITNESSES, LIFTED OFF THE ARTEFACTS AND NOWHERE ELSE.
+ *
+ * This exists as a function, rather than as seven `st?.a?.b ?? null` lines
+ * inline in the series loop, for the reason §J of the test file exists at all:
+ * a predicate nothing reads is this programme's measured failure mode, and an
+ * extraction buried in a loop that only runs behind two browsers can only ever
+ * be checked by grepping the source for its own text. As a function it is
+ * EXECUTED against status objects shaped like the real ones.
+ *
+ * Every field defaults to `null` and `null` REFUSES in `admitDraw` — see the
+ * silence paragraph above. A ledger from an older drive that predates
+ * `guidance.tracking` therefore refuses, which is correct: it is not evidence
+ * that the drive was tracked, and nobody may publish a rate from it.
+ *
+ * @param status a parsed `_audit-status.json`, or null if it never arrived.
+ * @param fidelity `laneFidelity()`'s record for the same folder, or null.
+ */
+export function drawWitnesses(status, fidelity) {
+  const st = status ?? null;
+  const fid = fidelity ?? null;
+  return {
+    driveClass: st?.drive?.class ?? null,
+    tracking: st?.guidance?.tracking?.verdict ?? null,
+    trackingSeenFrac: st?.guidance?.tracking?.seenFrac ?? null,
+    fidelity: fid?.verdict ?? null,
+    fidelityMaxCrossM: fid?.maxCrossTrackM ?? null,
+    fidelityCoverage: fid?.routeCoveredFrac ?? null,
+    fidelityWhy: fid?.why ?? null,
+  };
+}
+
+/**
+ * Does this draw belong in a pass-rate denominator?
+ *
+ * @param run one entry of the series: `{exit, driveClass, tracking, fidelity}`.
+ *   `tracking` is `guidance.tracking.verdict` from the drive's own
+ *   `_audit-status.json`; `fidelity` is `laneFidelity().verdict` for the same
+ *   folder. Both are READ, not recomputed here.
+ * @returns {{admitted: boolean, reason: string, why: string}} — `reason` is the
+ *   key the report counts by, `why` the sentence it prints.
+ */
+export function admitDraw(run) {
+  const r = run ?? {};
+  const said = (v) => (v == null || v === "" ? "the ledger is silent" : `«${String(v)}»`);
+  if (r.exit !== 0) {
+    return {
+      admitted: false,
+      reason: "not-judgeable",
+      why: `exit ${r.exit ?? "?"} — this lane could not be judged, so it is a draw of the harness and not of the lesson`,
+    };
+  }
+  if (r.driveClass !== "drove") {
+    return {
+      admitted: false,
+      reason: "no-drive",
+      why: `drive class ${said(r.driveClass)} — only «drove» is a drive; a lane whose status file never arrived exits 0 with nothing in it`,
+    };
+  }
+  if (r.tracking !== TRACKED_VERDICT) {
+    return {
+      admitted: false,
+      reason: "untracked",
+      why: `tracking verdict ${said(r.tracking)} — the row asks for repeats of a TRACKED reference drive, and this draw is not one`,
+    };
+  }
+  // AN ABSENCE IS NOT A MEASUREMENT, AND THE SENTENCE MAY NOT PRETEND IT IS.
+  // Both branches refuse — that is not in question — but the old single reason
+  // asserted «the car was not on the line» even when the ledger held nothing at
+  // all, which states a fact about the drive from the fact that nobody wrote one
+  // down. That is the reassuring-direction failure inverted, and it is just as
+  // wrong: an operator reading the refusal ledger should be able to tell «we
+  // measured, and it was off the line» from «no route witness was produced».
+  if (r.fidelity === null || r.fidelity === undefined) {
+    return {
+      admitted: false,
+      reason: "off-line",
+      why: `route fidelity ${said(r.fidelity)} — no route witness was produced for this draw, so nothing says where the car was and it cannot stand as a repeat of the reference drive`,
+    };
+  }
+  if (r.fidelity !== ON_LINE_VERDICT) {
+    return {
+      admitted: false,
+      reason: "off-line",
+      why: `route fidelity ${said(r.fidelity)} — the wheel was busy, but the car was not on the line this lesson authored`,
+    };
+  }
+  return {
+    admitted: true,
+    reason: "admitted",
+    why: `tracked and on-line — this draw is a repeat of the reference drive`,
+  };
+}
+
+/**
+ * @param runs [{exit, verdict, head, driveClass, tracking, fidelity}] — one
+ *   entry per drive in the series. Only draws `admitDraw` ADMITS enter the
+ *   denominator; every refusal is counted and reported. See the block above.
  */
 export function passRate(runs) {
   const rows = Array.isArray(runs) ? runs : [];
-  const judgeable = rows.filter((r) => r?.exit === 0);
+  const rulings = rows.map((r) => ({ run: r, ruling: admitDraw(r) }));
+  const judgeable = rulings.filter((x) => x.ruling.admitted).map((x) => x.run);
+  const refusals = rulings
+    .filter((x) => !x.ruling.admitted)
+    .map((x, _i) => ({ i: x.run?.i ?? null, dir: x.run?.dir ?? null, reason: x.ruling.reason, why: x.ruling.why }));
+  // Seeded at 0 for the same reason `counts` is: a reason that appears only
+  // when it happens reads as `undefined` in a report that prints all four.
+  const refusedBy = { "not-judgeable": 0, "no-drive": 0, untracked: 0, "off-line": 0 };
+  for (const f of refusals) refusedBy[f.reason] += 1;
   // Every key `classifyVerdict` can return, seeded at 0 — including
   // `lessonMistake` (ADR-009). A key that appears only when the state occurs
   // reads as `undefined` in a report that prints all four, and `undefined + 1`
@@ -1619,12 +1806,30 @@ export function passRate(runs) {
   for (const r of judgeable) counts[classifyVerdict(r?.verdict)] += 1;
   const n = judgeable.length;
   const k = counts.pass;
+  // The HEADs are taken over EVERY dispatched row and not over the admitted
+  // ones. A tree that moved mid-series is a fact about the series, and reading
+  // it off the survivors only would let a refused draw hide the move.
   const heads = [...new Set(rows.map((r) => r?.head).filter(Boolean))];
   const buildStable = heads.length <= 1;
+  // The sentence every report below appends, so that no rate is ever printed
+  // without the size of the pile it was NOT computed from.
+  const ledger =
+    refusals.length === 0
+      ? `all ${rows.length} dispatched draw(s) were admitted`
+      : `${refusals.length} of ${rows.length} dispatched draw(s) were REFUSED (` +
+        Object.entries(refusedBy)
+          .filter(([, c]) => c > 0)
+          .map(([reason, c]) => `${reason} ${c}`)
+          .join(", ") +
+        `) and are not in this denominator`;
   if (n < RATE_MIN_N) {
     return {
       n,
       dispatched: rows.length,
+      admitted: n,
+      refused: refusals.length,
+      refusedBy,
+      refusals,
       counts,
       passes: k,
       point: null,
@@ -1632,13 +1837,17 @@ export function passRate(runs) {
       hi95: null,
       buildStable,
       heads,
-      why: `a rate needs at least ${RATE_MIN_N} judgeable drives and this series produced ${n} — no rate is published`,
+      why: `a rate needs at least ${RATE_MIN_N} admitted drives and this series admitted ${n} — no rate is published; ${ledger}`,
     };
   }
   const { lo, hi } = wilson(k, n);
   return {
     n,
     dispatched: rows.length,
+    admitted: n,
+    refused: refusals.length,
+    refusedBy,
+    refusals,
     counts,
     passes: k,
     point: k / n,
@@ -1647,8 +1856,8 @@ export function passRate(runs) {
     buildStable,
     heads,
     why: buildStable
-      ? `${k} of ${n} judgeable drives passed`
-      : `${k} of ${n} judgeable drives passed, BUT the tree moved during the series (${heads.length} distinct HEADs) — this rate is not about one build`,
+      ? `${k} of ${n} admitted drives passed; ${ledger}`
+      : `${k} of ${n} admitted drives passed, BUT the tree moved during the series (${heads.length} distinct HEADs) — this rate is not about one build; ${ledger}`,
   };
 }
 
@@ -1669,15 +1878,72 @@ export function rateVerdict(rate, claim) {
   }
   const inside = claim >= rate.lo95 && claim <= rate.hi95;
   const pct = (x) => `${(x * 100).toFixed(0)}%`;
+  // THE REFUSED PILE TRAVELS WITH THE VERDICT. `rate.why` carries it, but a
+  // reader quoting «refutes» quotes THIS sentence, and «(2/2)» with twelve
+  // draws thrown away says something very different from «(2/2)» out of two.
+  const aside =
+    rate.refused > 0
+      ? `, after refusing ${rate.refused} of ${rate.dispatched} dispatched draw(s)`
+      : "";
   return inside
     ? {
         verdict: "consistent",
-        why: `${pct(claim)} lies inside the 95% interval ${pct(rate.lo95)}–${pct(rate.hi95)} (${rate.passes}/${rate.n}) — this series does not refute it`,
+        why: `${pct(claim)} lies inside the 95% interval ${pct(rate.lo95)}–${pct(rate.hi95)} (${rate.passes}/${rate.n}${aside}) — this series does not refute it`,
       }
     : {
         verdict: "refutes",
-        why: `${pct(claim)} lies OUTSIDE the 95% interval ${pct(rate.lo95)}–${pct(rate.hi95)} (${rate.passes}/${rate.n})`,
+        why: `${pct(claim)} lies OUTSIDE the 95% interval ${pct(rate.lo95)}–${pct(rate.hi95)} (${rate.passes}/${rate.n}${aside})`,
       };
+}
+
+/**
+ * THE CLAIM IS THE ROW'S, NOT THE HARNESS'S.
+ *
+ * `1 / 8` was hardcoded at the single call site, so every repeat row was
+ * compared against 12.5% whatever it actually claimed. That is right for
+ * `sc-ln-obstacle-meeting:114706e0` (six НЕИЗДЪРЖАН / one ИЗДЪРЖАН / one
+ * НЕЗАВЪРШЕН over eight drives) and wrong for the two rows beside it:
+ * `sc-ln-obstacle-meeting:56ff9740` («Retiring needs a repeat rate») and
+ * `sc-park-wall:1edd6ff2` («Retiring this needs a repeat rate on legs that can
+ * park») are cross-leg orderings and name no fraction at all.
+ *
+ * ⚠ AN UNPARSEABLE CLAIM RETURNS `null`, NEVER A NUMBER. `rateVerdict` answers
+ * „cannot-say" to a non-number, which is the honest reading of «nobody told me
+ * what this row claims»; falling back to 12.5% would reinstate the exact defect
+ * in a place harder to see. It is the same rule the evidence block is held to
+ * — a `??` may fall back to a SENTENCE saying the number is absent, and never
+ * to a number.
+ *
+ * @param text `1/8`, `0.125`, `12.5%` or `13%` — however the row states it.
+ * @returns {{claim: number|null, source: string|null, why: string}}
+ */
+export function parseClaim(text) {
+  const raw = String(text ?? "").trim();
+  if (raw === "") {
+    return { claim: null, source: null, why: "no claimed rate was given — this series measures a rate and compares it to nothing" };
+  }
+  let value = null;
+  const frac = raw.match(/^(-?[\d.]+)\s*\/\s*(-?[\d.]+)$/);
+  const pct = raw.match(/^(-?[\d.]+)\s*%$/);
+  if (frac) {
+    const a = Number(frac[1]);
+    const b = Number(frac[2]);
+    value = Number.isFinite(a) && Number.isFinite(b) && b !== 0 ? a / b : null;
+  } else if (pct) {
+    const a = Number(pct[1]);
+    value = Number.isFinite(a) ? a / 100 : null;
+  } else {
+    const a = Number(raw);
+    value = Number.isFinite(a) ? a : null;
+  }
+  if (value === null || !Number.isFinite(value) || value < 0 || value > 1) {
+    return {
+      claim: null,
+      source: raw,
+      why: `«${raw}» is not a rate between 0 and 1 — no comparison is made rather than one against a number nobody claimed`,
+    };
+  }
+  return { claim: value, source: raw, why: `the row claims ${(value * 100).toFixed(1)}% (read as «${raw}»)` };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

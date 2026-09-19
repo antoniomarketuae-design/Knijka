@@ -40,7 +40,9 @@ import {
   CABIN_BLOCKER_SEL,
   cabinActuationSafe,
   CAR_SHEET_LABEL,
+  admitDraw,
   classifyVerdict,
+  drawWitnesses,
   DRIVELINE_CARD_SEL,
   ERROR_BOUNDARY_RETRIES,
   ERROR_BOUNDARY_RETRY_LABEL,
@@ -66,6 +68,7 @@ import {
   PARKING_BRAKE_LABEL,
   parkingBrakeRoute,
   parkingBrakeVerdict,
+  parseClaim,
   parseTaskCapsKmh,
   passRate,
   POSTED_LIMIT_SEL,
@@ -1218,6 +1221,22 @@ describe("§F2 the SUSTAINED over-posted-limit hold — §2b of driveline.mjs", 
 });
 
 // ---------------------------------------------------------------------------
+/**
+ * ONE DRAW OF THE REFERENCE DRIVE, spelled out so every fixture below says
+ * which kind of drive it is.
+ *
+ * The fixtures in §G and §K used to be `{exit: 0, verdict: "…"}` and nothing
+ * else, and under the old denominator that was the whole of «this drive
+ * counts». It is not any more: `admitDraw` requires the drive's own two
+ * witnesses to say `drove` / `tracked` / `on-line`, so a fixture that means
+ * «one real repeat of the reference drive» has to carry them. Adding them here
+ * WEAKENS nothing — the assertions those fixtures make are unchanged, and the
+ * tests immediately below prove that dropping any one witness refuses the
+ * draw. What it removes is the reading in which a bare `{exit: 0}` object
+ * silently stood for a tracked drive.
+ */
+const drew = (over = {}) => ({ exit: 0, driveClass: "drove", tracking: "tracked", fidelity: "on-line", ...over });
+
 describe("§G a rate is not a draw", () => {
   it("«НЕИЗДЪРЖАН» IS NOT A PASS — the substring trap, on the alphabet where it bites", () => {
     // `verdict.includes("ИЗДЪРЖАН")` scores every failure as a pass. On this
@@ -1231,7 +1250,7 @@ describe("§G a rate is not a draw", () => {
   });
 
   it("publishes NO rate below two judgeable drives — «1 of 1 = 100%» is the whole thing to prevent", () => {
-    const r = passRate([{ exit: 0, verdict: "ИЗДЪРЖАН" }]);
+    const r = passRate([drew({ verdict: "ИЗДЪРЖАН" })]);
     assert.equal(r.point, null);
     assert.equal(r.n, 1);
     assert.match(r.why, new RegExp(`at least ${RATE_MIN_N}`));
@@ -1240,8 +1259,8 @@ describe("§G a rate is not a draw", () => {
 
   it("counts only judgeable drives — a lane that never started is a draw of the harness", () => {
     const r = passRate([
-      { exit: 0, verdict: "ИЗДЪРЖАН" },
-      { exit: 0, verdict: "НЕИЗДЪРЖАН" },
+      drew({ verdict: "ИЗДЪРЖАН" }),
+      drew({ verdict: "НЕИЗДЪРЖАН" }),
       { exit: 7, verdict: null },
       { exit: 4, verdict: null },
     ]);
@@ -1249,13 +1268,15 @@ describe("§G a rate is not a draw", () => {
     assert.equal(r.n, 2);
     assert.equal(r.passes, 1);
     assert.equal(r.point, 0.5);
+    assert.equal(r.refused, 2, "the two dead lanes vanished instead of being counted as refusals");
+    assert.equal(r.refusedBy["not-judgeable"], 2);
   });
 
   it("reproduces the filed series — 6 fail / 1 pass / 1 unfinished — and does not refute 13%", () => {
     const runs = [
-      ...Array.from({ length: 6 }, () => ({ exit: 0, verdict: "НЕИЗДЪРЖАН", head: "641a4475c0ac" })),
-      { exit: 0, verdict: "ИЗДЪРЖАН", head: "641a4475c0ac" },
-      { exit: 0, verdict: "НЕЗАВЪРШЕН", head: "641a4475c0ac" },
+      ...Array.from({ length: 6 }, () => drew({ verdict: "НЕИЗДЪРЖАН", head: "641a4475c0ac" })),
+      drew({ verdict: "ИЗДЪРЖАН", head: "641a4475c0ac" }),
+      drew({ verdict: "НЕЗАВЪРШЕН", head: "641a4475c0ac" }),
     ];
     const r = passRate(runs);
     assert.equal(r.n, 8);
@@ -1269,19 +1290,214 @@ describe("§G a rate is not a draw", () => {
   });
 
   it("refutes a claim the interval excludes", () => {
-    const runs = Array.from({ length: 20 }, () => ({ exit: 0, verdict: "ИЗДЪРЖАН", head: "a" }));
+    const runs = Array.from({ length: 20 }, () => drew({ verdict: "ИЗДЪРЖАН", head: "a" }));
     const r = passRate(runs);
     assert.equal(rateVerdict(r, 1 / 8).verdict, "refutes");
   });
 
   it("REFUSES to attribute a rate to a build the series did not stay on", () => {
     const r = passRate([
-      { exit: 0, verdict: "ИЗДЪРЖАН", head: "aaa" },
-      { exit: 0, verdict: "НЕИЗДЪРЖАН", head: "bbb" },
+      drew({ verdict: "ИЗДЪРЖАН", head: "aaa" }),
+      drew({ verdict: "НЕИЗДЪРЖАН", head: "bbb" }),
     ]);
     assert.equal(r.buildStable, false);
     assert.equal(rateVerdict(r, 0.5).verdict, "cannot-say", "a rate spanning two commits is not about either of them");
     assert.match(r.why, /tree moved/);
+    /* …AND A REFUSED DRAW STILL COUNTS AS A SIGHTING OF ITS HEAD. Found by
+     * mutation: narrowing `heads` from every dispatched row to the ADMITTED
+     * ones survived the whole suite. A tree that moves mid-series is a fact
+     * about the SERIES, and reading it off the survivors lets one refused draw
+     * conceal the move — the refusal filter would then be buying honesty in
+     * one place and spending it in another. */
+    const hidden = passRate([
+      drew({ verdict: "ИЗДЪРЖАН", head: "aaa" }),
+      drew({ verdict: "ИЗДЪРЖАН", head: "aaa" }),
+      drew({ verdict: "НЕИЗДЪРЖАН", head: "bbb", tracking: "intermittent" }),
+    ]);
+    assert.equal(hidden.admitted, 2);
+    assert.equal(hidden.refused, 1);
+    assert.deepEqual(hidden.heads.sort(), ["aaa", "bbb"], "the refused draw's HEAD vanished from the series record");
+    assert.equal(hidden.buildStable, false, "a refused draw hid a commit the series straddled");
+    assert.equal(rateVerdict(hidden, 1).verdict, "cannot-say");
+  });
+
+  /* ── THE TRACKED FILTER, DRIVEN RATHER THAN GREPPED ──────────────────────
+   *
+   * Until this block the denominator's ONLY defence was
+   * `assert.match(CODE, /process\.env\.KNIJKA_REPEAT/)` — a source grep that
+   * asserts a line exists while the arithmetic underneath it goes wrong. It
+   * was wrong: `exit === 0` admitted every draw, and w47's own pc-right leg
+   * (tracking INTERMITTENT at seenFrac 0.69, route fidelity `drifted` at 5.3 m
+   * off the authored line) would have entered it. Executed on this build
+   * before the filter existed, eight such draws gave
+   * `{n: 8, lo95: 0.6755843804891231, hi95: 1}` and `rateVerdict(r, 1/8)`
+   * returned `refutes` — «13% lies OUTSIDE the 95% interval 68%–100% (8/8)».
+   * A critical row refuted because the harness drives better than it used to.
+   */
+  it("REFUSES a draw that steered badly — w47's own pc-right leg, by its numbers", () => {
+    // The real ledger: .audit-frames/w47/frames/sc-ln-obstacle-meeting__pc-right
+    // reads drive.class «drove», guidance.tracking.verdict «intermittent»,
+    // seenFrac 0.69, and laneFidelity() «drifted» (5.3 m off, 92% covered).
+    const w47pcRight = drew({ verdict: "ИЗДЪРЖАН", head: "7648edf7", tracking: "intermittent", fidelity: "drifted" });
+    const ruling = admitDraw(w47pcRight);
+    assert.equal(ruling.admitted, false);
+    assert.equal(ruling.reason, "untracked");
+    assert.match(ruling.why, /intermittent/, "the refusal does not name the verdict it read");
+  });
+
+  it("the whole defect, end to end: eight steered-badly draws no longer refute 13%", () => {
+    const series = Array.from({ length: 8 }, () =>
+      drew({ verdict: "ИЗДЪРЖАН", head: "7648edf7", tracking: "intermittent", fidelity: "drifted" }),
+    );
+    const r = passRate(series);
+    assert.equal(r.dispatched, 8);
+    assert.equal(r.admitted, 0, "a series of steered-badly draws still produced a denominator");
+    assert.equal(r.refused, 8);
+    assert.equal(r.refusedBy.untracked, 8);
+    assert.equal(r.point, null, "a rate was published from draws the row's own verdict line excludes");
+    const v = rateVerdict(r, 1 / 8);
+    assert.equal(v.verdict, "cannot-say", "a critical row was refuted on harness variance — the exact outcome this filter exists to stop");
+    assert.match(r.why, /REFUSED/, "the eight refusals were dropped silently");
+  });
+
+  it("each witness is load-bearing on its own — neither is a fallback for the other", () => {
+    // MEASURED on .audit-frames/w47/frames/sc-park-wall__* this session:
+    // pc-wrong and mobile-wrong both read tracking «not-invoked» (the loop is
+    // never invoked on a wrong leg) while laneFidelity() calls them ON-LINE at
+    // 2.47 m / 2.44 m — because that road is straight and a flat-throttle car
+    // travels a straight line. Route fidelity alone admits an UNSTEERED drive.
+    assert.equal(admitDraw(drew({ tracking: "not-invoked" })).reason, "untracked");
+    // And the other direction: route-fidelity.mjs' own header records
+    // sc-junction-rhr/pc-right certified `tracked` at 37.5 m off the line, so
+    // tracking alone admits a drive that was nowhere near the lesson.
+    assert.equal(admitDraw(drew({ fidelity: "drifted" })).reason, "off-line");
+    assert.equal(admitDraw(drew({ fidelity: "off-route" })).reason, "off-line");
+    // …and both together are what «a TRACKED reference drive» means.
+    assert.equal(admitDraw(drew()).admitted, true);
+  });
+
+  it("SILENCE REFUSES — «I cannot show this was tracked» is not «this was tracked»", () => {
+    // The direction is deliberately opposite to classifyDrive's, which refuses
+    // to CONDEMN on a missing field. Here a missing field would ADMIT, and
+    // admitting on silence is the reassuring direction.
+    for (const missing of ["driveClass", "tracking", "fidelity"]) {
+      const run = drew();
+      delete run[missing];
+      const ruling = admitDraw(run);
+      assert.equal(ruling.admitted, false, `a draw with no ${missing} was admitted on silence`);
+      assert.match(ruling.why, /the ledger is silent/, `the refusal for a missing ${missing} does not say the ledger was silent`);
+    }
+    assert.equal(admitDraw(drew({ driveClass: "never-started" })).reason, "no-drive");
+    assert.equal(admitDraw(drew({ driveClass: "not-performable" })).reason, "no-drive");
+    assert.equal(admitDraw(undefined).admitted, false, "an absent run object was admitted");
+    assert.equal(admitDraw(null).reason, "not-judgeable");
+  });
+
+  it("counts the refusals rather than shrinking the denominator behind the reader's back", () => {
+    const r = passRate([
+      drew({ verdict: "ИЗДЪРЖАН", head: "a" }),
+      drew({ verdict: "ИЗДЪРЖАН", head: "a" }),
+      drew({ verdict: "НЕИЗДЪРЖАН", head: "a", tracking: "wandered" }),
+      drew({ verdict: "НЕИЗДЪРЖАН", head: "a", fidelity: "no-witness" }),
+      drew({ verdict: null, head: "a", driveClass: "never-started" }),
+      { exit: 7, verdict: null, head: "a" },
+    ]);
+    assert.equal(r.dispatched, 6);
+    assert.equal(r.admitted, 2);
+    assert.equal(r.n, 2, "`n` and `admitted` disagree — two names for one number is how they drift apart");
+    assert.equal(r.refused, 4);
+    assert.deepEqual(r.refusedBy, { "not-judgeable": 1, "no-drive": 1, untracked: 1, "off-line": 1 });
+    assert.equal(r.refusals.length, 4);
+    // Every reason key exists before it is needed, for the reason `counts` does.
+    assert.equal(Object.values(r.refusedBy).reduce((a, b) => a + b, 0), r.refused);
+    assert.equal(r.admitted + r.refused, r.dispatched, "draws went missing between dispatch and the rate");
+    // A clean 8/8 and an 8/8 that threw twelve away must not read alike.
+    assert.match(r.why, /4 of 6 dispatched draw\(s\) were REFUSED/, "the refused pile is not in the published sentence");
+    assert.match(rateVerdict(r, 1).why, /after refusing 4 of 6/, "a quoted verdict hides the refused pile");
+    const clean = passRate([drew({ verdict: "ИЗДЪРЖАН", head: "a" }), drew({ verdict: "ИЗДЪРЖАН", head: "a" })]);
+    assert.match(clean.why, /all 2 dispatched draw\(s\) were admitted/);
+    assert.doesNotMatch(rateVerdict(clean, 1).why, /after refusing/, "a clean series is reported as if it had refusals");
+  });
+
+  it("an empty series, and a single draw, say so instead of publishing a number", () => {
+    const empty = passRate([]);
+    assert.equal(empty.dispatched, 0);
+    assert.equal(empty.admitted, 0);
+    assert.equal(empty.refused, 0);
+    assert.equal(empty.point, null);
+    assert.equal(empty.buildStable, true, "no heads at all is not a tree that moved");
+    assert.equal(rateVerdict(empty, 1 / 8).verdict, "cannot-say");
+    assert.equal(passRate(null).dispatched, 0, "a non-array argument threw or invented rows");
+    const one = passRate([drew({ verdict: "НЕИЗДЪРЖАН", head: "a" })]);
+    assert.equal(one.admitted, 1);
+    assert.equal(one.point, null);
+    assert.equal(rateVerdict(one, 1 / 8).verdict, "cannot-say");
+  });
+
+  it("all-pass and all-fail both publish, and neither pins a rate from eight draws", () => {
+    const allPass = passRate(Array.from({ length: 8 }, () => drew({ verdict: "ИЗДЪРЖАН", head: "a" })));
+    assert.equal(allPass.passes, 8);
+    assert.equal(allPass.point, 1);
+    assert.equal(allPass.hi95, 1);
+    assert.ok(allPass.lo95 > 0.6 && allPass.lo95 < 1, `8/8 gave lo95 ${allPass.lo95}`);
+    assert.equal(rateVerdict(allPass, 1 / 8).verdict, "refutes", "8 TRACKED passes cannot refute 13% — that is the row's own question");
+    const allFail = passRate(Array.from({ length: 8 }, () => drew({ verdict: "НЕИЗДЪРЖАН", head: "a" })));
+    assert.equal(allFail.passes, 0);
+    assert.equal(allFail.point, 0);
+    assert.equal(allFail.lo95, 0);
+    assert.ok(allFail.hi95 > 0 && allFail.hi95 < 0.4, `0/8 gave hi95 ${allFail.hi95}`);
+    assert.equal(rateVerdict(allFail, 1 / 8).verdict, "consistent", "13% is inside 0/8's interval and must not be refuted");
+  });
+
+  /* ── THE CLAIM IS THE ROW'S ───────────────────────────────────────────── */
+  it("parses a claim in the forms a row states it, and NEVER falls back to a number", () => {
+    assert.equal(parseClaim("1/8").claim, 0.125);
+    assert.equal(parseClaim(" 1 / 8 ").claim, 0.125);
+    assert.equal(parseClaim("0.125").claim, 0.125);
+    assert.equal(parseClaim("13%").claim, 0.13);
+    assert.equal(parseClaim("12.5%").claim, 0.125);
+    assert.equal(parseClaim("0").claim, 0);
+    assert.equal(parseClaim("1").claim, 1);
+    for (const bad of [undefined, null, "", "   ", "nope", "9/8", "-1/8", "101%", "1/0", "NaN", "Infinity", "2"]) {
+      const p = parseClaim(bad);
+      assert.equal(p.claim, null, `«${String(bad)}» was read as the claim ${p.claim} — a number nobody stated`);
+      assert.equal(typeof p.why, "string");
+      assert.ok(p.why.length > 0);
+    }
+    // The defect this replaces: an unstated claim must not become 12.5%.
+    assert.notEqual(parseClaim("").claim, 1 / 8);
+    const r = passRate(Array.from({ length: 20 }, () => drew({ verdict: "ИЗДЪРЖАН", head: "a" })));
+    assert.equal(rateVerdict(r, parseClaim("").claim).verdict, "cannot-say", "a series with no stated claim still published a verdict about one");
+    assert.equal(rateVerdict(r, parseClaim("1/8").claim).verdict, "refutes");
+    assert.equal(rateVerdict(r, parseClaim("95%").claim).verdict, "consistent");
+  });
+
+  /* ── THE EXTRACTION, EXECUTED ─────────────────────────────────────────── */
+  it("lifts both witnesses off a real-shaped status ledger, and null off an absent one", () => {
+    // Shaped exactly like .audit-frames/w47/frames/sc-ln-obstacle-meeting__mobile-right.
+    const st = {
+      drive: { class: "drove" },
+      guidance: { tracking: { verdict: "tracked", seenFrac: 0.977 } },
+    };
+    const fid = { verdict: "on-line", maxCrossTrackM: 2.57, routeCoveredFrac: 0.93, why: "it held within 2.57 m" };
+    const w = drawWitnesses(st, fid);
+    assert.equal(w.driveClass, "drove");
+    assert.equal(w.tracking, "tracked");
+    assert.equal(w.trackingSeenFrac, 0.977);
+    assert.equal(w.fidelity, "on-line");
+    assert.equal(w.fidelityMaxCrossM, 2.57);
+    assert.equal(admitDraw({ exit: 0, ...w }).admitted, true);
+    // A drive whose status file never arrived exits 0 with nothing in it.
+    const none = drawWitnesses(null, null);
+    assert.deepEqual(
+      { driveClass: none.driveClass, tracking: none.tracking, fidelity: none.fidelity },
+      { driveClass: null, tracking: null, fidelity: null },
+    );
+    assert.equal(admitDraw({ exit: 0, ...none }).admitted, false, "an empty ledger was admitted");
+    // A ledger from before `guidance.tracking` existed: present, and silent.
+    const old = drawWitnesses({ drive: { class: "drove" }, guidance: {} }, { verdict: "on-line" });
+    assert.equal(old.tracking, null);
+    assert.equal(admitDraw({ exit: 0, ...old }).reason, "untracked");
   });
 
   it("wilson behaves at the ends, which is exactly where a short series lands", () => {
@@ -2151,9 +2367,58 @@ describe("§J the drive path actually calls all of it", () => {
 
   it("publishes the rate through the arithmetic, not by hand", () => {
     assert.match(CODE, /const rate = passRate\(runs\);/, "the series computes its own rate instead of using the tested one");
-    assert.match(CODE, /rateVerdict\(rate, 1 \/ 8\)/, "the series no longer compares itself against the 13% the row claims");
     assert.match(CODE, /_audit-repeat\.json/, "the series writes no machine-readable record");
     assert.match(CODE, /phase: "repeat-series"/, "the series folder has no status file — a lane reader will call it «never dispatched»");
+  });
+
+  /* ── THE ADMISSION RULE MUST REACH THE SERIES ────────────────────────────
+   *
+   * `admitDraw` and `drawWitnesses` are driven by execution in §G. These four
+   * lines are the §J half of the same argument: both could be perfect and the
+   * series could hand `passRate` run records with neither witness on them, in
+   * which case every draw refuses and the capability is dead — the mirror of
+   * the dead-predicate class, and just as invisible from a green §G. */
+  it("hands the series BOTH witnesses, off the child's own artefacts", () => {
+    const block = CODE.match(/if \(REPEAT_N >= 2\) \{[\s\S]*?\n\}/);
+    assert.ok(block, "the repeat block could not be read — this assertion is UNRESOLVED and fails rather than passing blind");
+    /* THE CALL TEXT IS NOT THE RESULT, AND A GREP FOR ONE IS NOT A GUARD ON THE
+     * OTHER. MEASURED 2026-09-19: a judge changed the assignment to
+     * `fid = null && laneFidelity({ statusPath: …` — call text preserved,
+     * result destroyed — and the whole suite stayed GREEN at 164/164, because
+     * this line asked only whether the call appears. It fails CLOSED (every
+     * draw then refuses as `off-line`), so no row can be wrongly retired by it;
+     * but the capability would be silently dead, which is the dead-predicate
+     * class wearing a passing test. So anchor the ASSIGNMENT: `fid` must be
+     * assigned the call's value with nothing between the `=` and the call. */
+    assert.match(
+      block[0],
+      /(?:^|\n)\s*fid = laneFidelity\(\{ statusPath: `\$\{dir\}\/_audit-status\.json`/,
+      "the route witness is never computed for a draw, or its result is discarded before it reaches `fid`",
+    );
+    assert.match(block[0], /lessonId: SCENARIO/, "the route witness is computed against some other lesson's authored line");
+    assert.match(block[0], /repoRoot: REPO_ROOT/, "the route witness is resolved against some other repo's traces");
+    assert.match(block[0], /const witnesses = drawWitnesses\(st, fid\);/, "the witnesses are lifted by hand again instead of by the tested function");
+    assert.match(block[0], /\.\.\.witnesses,/, "the witnesses are computed and then not put on the run — `passRate` would refuse every draw");
+    assert.match(block[0], /admitDraw\(runs\[runs\.length - 1\]\)/, "no per-draw ruling is printed, so an operator cannot see WHY a draw was refused");
+  });
+
+  it("takes the claim from the operator and never from a constant", () => {
+    const block = CODE.match(/if \(REPEAT_N >= 2\) \{[\s\S]*?\n\}/);
+    assert.ok(block, "the repeat block could not be read — UNRESOLVED, so this fails");
+    assert.match(block[0], /parseClaim\(process\.env\.KNIJKA_REPEAT_CLAIM\)/, "the claim is no longer read from the operator");
+    assert.match(block[0], /rateVerdict\(rate, CLAIM\.claim\)/, "the series compares itself against something other than the stated claim");
+    // The exact hardcode this replaced. Two of the three rows the series
+    // serves (sc-ln-obstacle-meeting:56ff9740, sc-park-wall:1edd6ff2) are
+    // cross-leg orderings that name no fraction at all, and were being
+    // compared against a third row's 12.5%.
+    assert.doesNotMatch(block[0], /rateVerdict\(rate,\s*1\s*\/\s*8\)/, "the 12.5% hardcode is back");
+    assert.doesNotMatch(block[0], /claim:\s*1\s*\/\s*8/, "the series records a claim nobody made");
+  });
+
+  it("prints the refused pile, not just the admitted one", () => {
+    assert.match(CODE, /admitted \$\{rate\.admitted\} · refused \$\{rate\.refused\}/, "the summary reports a denominator with no count of what was kept out of it");
+    assert.match(CODE, /REFUSED BY: not-judgeable \$\{rate\.refusedBy\["not-judgeable"\]\}/, "the refusal breakdown is gone");
+    assert.match(CODE, /for \(const f of rate\.refusals\) say\(/, "the individual refusals are counted but never named");
   });
 
   // ── 4 · THE ERROR BOUNDARY ───────────────────────────────────────────────
@@ -2730,8 +2995,8 @@ describe("§K ADR-009 — the fourth pill", () => {
     // counts would otherwise print `undefined` for a clean series, and
     // `undefined + 1` is NaN — in the one arithmetic this file protects.
     const none = passRate([
-      { exit: 0, verdict: "ИЗДЪРЖАН", head: "a" },
-      { exit: 0, verdict: "ИЗДЪРЖАН", head: "a" },
+      drew({ verdict: "ИЗДЪРЖАН", head: "a" }),
+      drew({ verdict: "ИЗДЪРЖАН", head: "a" }),
     ]);
     assert.equal(none.counts.lessonMistake, 0);
     assert.equal(none.point, 1);
@@ -2739,10 +3004,10 @@ describe("§K ADR-009 — the fourth pill", () => {
 
   it("counts a refused lesson in the denominator and never in the numerator", () => {
     const r = passRate([
-      { exit: 0, verdict: "ИЗДЪРЖАН", head: "a" },
-      { exit: 0, verdict: "НЕ Е ВЗЕТ", head: "a" },
-      { exit: 0, verdict: "НЕ Е ВЗЕТ", head: "a" },
-      { exit: 0, verdict: "НЕИЗДЪРЖАН", head: "a" },
+      drew({ verdict: "ИЗДЪРЖАН", head: "a" }),
+      drew({ verdict: "НЕ Е ВЗЕТ", head: "a" }),
+      drew({ verdict: "НЕ Е ВЗЕТ", head: "a" }),
+      drew({ verdict: "НЕИЗДЪРЖАН", head: "a" }),
     ]);
     assert.equal(r.n, 4, "a refused lesson is a judgeable drive — it reached a verdict card");
     assert.equal(r.counts.lessonMistake, 2);
