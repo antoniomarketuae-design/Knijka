@@ -18,11 +18,13 @@ import {
   check,
   findCounters,
   recompute,
+  report,
   stampFrom,
   stampsOf,
   workedFrom,
   workedOf,
   stripComments,
+  verdictOf,
   RECIPES,
   AUDIT_DIR,
 } from "./count-agreement.mjs";
@@ -51,11 +53,114 @@ test("every corpus-reading tool in tools/audit reports the same open list", () =
   //                            than holding a second opinion about it.
   //
   // 1, 4, 5 and 7 were GREEN before workedLine() existed.
-  const { problems, results, expected, expectedWorked } = check();
-  assert.ok(results.length >= 5, "the counter detector found almost nothing — it is broken, not the directory");
-  assert.deepEqual(problems, [], "counters disagree about the open list");
-  assert.equal(stampsOf(expected).length, 1, "the recomputed stamp is not well formed");
-  assert.equal(workedOf(expectedWorked).length, 1, "the recomputed WORKED line is not well formed");
+  //
+  //  11  the corpus MOVES mid-run, 2026-09-19. Planting one new source in
+  //      .audit-frames/findings 15 s into a 49.5 s run produced 14 real
+  //      apparent disagreements — and this test passed, because the branch it
+  //      took handed back `problems: []` with `ok: true`. The assertion below
+  //      now reads the VERDICT before it reads `problems`, so an inconclusive
+  //      run fails here, saying re-run, instead of certifying the count.
+  const r = check();
+  assert.ok(r.results.length >= 5, "the counter detector found almost nothing — it is broken, not the directory");
+  assert.notEqual(
+    r.verdict,
+    "inconclusive",
+    "THE CORPUS MOVED while this ran, so agreement was not measured on a still tree. " +
+      "Re-run on a still corpus — an INCONCLUSIVE run is not a pass:\n" + r.note,
+  );
+  assert.deepEqual(r.problems, [], "counters disagree about the open list");
+  assert.equal(r.ok, true);
+  assert.equal(r.verdict, "agreed");
+  assert.equal(stampsOf(r.expected).length, 1, "the recomputed stamp is not well formed");
+  assert.equal(workedOf(r.expectedWorked).length, 1, "the recomputed WORKED line is not well formed");
+});
+
+// THE PRINTER, DRIVEN DIRECTLY — one synthetic result per verdict.
+//
+// Every test above this line calls check() and reads its fields, and check()
+// was never wrong: on a moved corpus it built a note naming the apparent
+// disagreements. (How MANY is a property of the race, not of the code — the
+// counters are spawned one at a time, so it is however many of the 17 had yet
+// to run when the corpus moved; observed 14, 16 and 17 at different offsets.
+// An earlier draft of this comment quoted one of them as if it were fixed.)
+// The defect was that the CLI destructured five of its fields
+// and not that one, so the reason was computed and thrown away, and the run
+// printed "AGREED — every counter reports the same open list." and exited 0.
+// Nothing here could see that, because nothing here ran the printer.
+//
+// So these hand report() a result and read back BOTH the exit code and every
+// line it printed. No corpus, no race, no 50 s — a test that needs a repair
+// agent to be filing findings at the right second is a test nobody re-runs.
+const CLI_RESULT = {
+  expected: "OPEN-LIST filed=9 retired=4 open=5 critical=2 major=3 minor=0 files=2 lessons=2",
+  expectedWorked: "WORKED scope=open n=5 critical=2",
+  results: [{ file: "never-edited.mjs", stamp: "OPEN-LIST filed=9", worked: ["WORKED scope=open n=9 critical=2"] }],
+};
+const runCli = (r) => {
+  const lines = [];
+  const code = report({ ...CLI_RESULT, ...r }, { log: (s) => lines.push(String(s)) });
+  return { code, out: lines.join("\n") };
+};
+
+test("the CLI exits 0 only on agreement, and never prints AGREED over a reason it holds", () => {
+  const agreed = runCli({ problems: [], moved: false, note: null, verdict: "agreed", ok: true });
+  assert.equal(agreed.code, 0);
+  assert.match(agreed.out, /AGREED/);
+
+  const disagreed = runCli({
+    problems: ["never-edited.mjs disagrees with the corpus"],
+    moved: false,
+    note: null,
+    verdict: "disagreed",
+    ok: false,
+  });
+  assert.equal(disagreed.code, 1);
+  assert.doesNotMatch(disagreed.out, /AGREED/);
+  assert.match(disagreed.out, /1 DISAGREEMENT/);
+  assert.match(disagreed.out, /never-edited\.mjs disagrees/);
+
+  // THE FAIL-OPEN, 2026-09-19: this exact case printed the agreed output and
+  // exited 0 while holding two reasons not to.
+  const moved = runCli({
+    problems: ["never-edited.mjs disagrees with the corpus", "wave-c-post.mjs disagrees with the corpus"],
+    moved: true,
+    note: "THE CORPUS MOVED WHILE THIS CHECK RAN — 2 apparent disagreement(s)",
+    verdict: "inconclusive",
+    ok: false,
+  });
+  assert.notEqual(moved.code, 0, "a moved corpus holding disagreements must NOT exit 0 — that is the fail-open");
+  assert.equal(moved.code, 2, "inconclusive is its own exit code, so a caller can tell it from a real red");
+  assert.doesNotMatch(moved.out, /AGREED/, "INCONCLUSIVE must never print the word wave-cycle.sh greps for");
+  assert.match(moved.out, /THE CORPUS MOVED/, "the reason was computed; it must be PRINTED, not discarded");
+  assert.match(moved.out, /never-edited\.mjs disagrees/, "what it would have said must reach the operator in full");
+  assert.match(moved.out, /INCONCLUSIVE/);
+});
+
+test("a moved corpus that changed no count still AGREES — and still says it moved", () => {
+  // The other half of the boundary. Bumping an mtime, or filing a row that no
+  // counter's arithmetic can see, moves the fingerprint without moving a single
+  // number: all seventeen matched the census recomputed before it moved, so
+  // that is agreement and refusing it would make this check cry wolf — which is
+  // how the suppression got written in the first place. It may not be SILENT,
+  // though: "it moved and nothing came of it" and "it moved and nobody looked"
+  // print the same green otherwise.
+  const quiet = runCli({ problems: [], moved: true, note: null, verdict: "agreed", ok: true });
+  assert.equal(quiet.code, 0);
+  assert.match(quiet.out, /AGREED/);
+  assert.match(quiet.out, /moved/, "a corpus that moved is never passed over in silence");
+});
+
+test("ok is the fail-closed field, so a caller that never learns `verdict` still refuses", () => {
+  // THE WHOLE TRUTH TABLE, in four lines, needing no corpus and no race.
+  //
+  // The safety may not live in the new field alone: every existing caller reads
+  // `ok` — this file, and the CLI — and one that never hears the word "verdict"
+  // must still fail closed when the corpus moves under a disagreement.
+  // Row 4 is the defect: it returned ok:true.
+  assert.deepEqual(verdictOf({ problems: [], moved: false }), { verdict: "agreed", ok: true });
+  assert.deepEqual(verdictOf({ problems: [], moved: true }), { verdict: "agreed", ok: true });
+  assert.deepEqual(verdictOf({ problems: ["x"], moved: false }), { verdict: "disagreed", ok: false });
+  assert.deepEqual(verdictOf({ problems: ["x"], moved: true }), { verdict: "inconclusive", ok: false });
 });
 
 test("WORKED is counted from the array, so it cannot be faked by importing", () => {

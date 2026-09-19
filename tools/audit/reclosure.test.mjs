@@ -12,12 +12,22 @@
 // §1 is the shape of the class and the two directions it must not err in.
 // §2 is build derivation, including the sweep that mixed two commits.
 // §3 is the regression exhibit: the exact bug that shipped in the first version.
+// §4 is PER-FRAME attribution, and — the half that matters more — the four
+//    shapes that must STILL be refused after it.
 // -----------------------------------------------------------------------------
 
 import { strict as assert } from "node:assert";
 import test from "node:test";
 
-import { buildOfFrame, findReclosures, linesByFinding, sweepHeadMap } from "./reclosure.mjs";
+import {
+  auditKey,
+  buildOfFrame,
+  findReclosures,
+  headMaps,
+  inProcessHead,
+  linesByFinding,
+  sweepHeadMap,
+} from "./reclosure.mjs";
 
 const frame = (sweep) => "E:/AI driver/.audit-frames/" + sweep + "/frames/sc-x__pc-right/01-arrival.png";
 const W15 = "32505eb55b4c53457fcb061a1c11a2b74877e63c";
@@ -148,4 +158,220 @@ test("§3 grouping preserves file order, which is the entire question", () => {
   const groups = linesByFinding([a, b]);
   assert.deepEqual(groups.get("sc-f:6"), [a, b]);
   assert.equal(groups.get("sc-f:6")[1].verdict, "CLOSED", "the LAST line must be the closing one");
+});
+
+// -----------------------------------------------------------------------------
+// §4 PER-FRAME ATTRIBUTION — and the refusals that survive it.
+//
+// The per-sweep vote left 13 re-closures unattributable, 8 of them critical.
+// Every result line in the corpus records the directory it wrote (`out`) next
+// to the commit it drove (`head`), so the drive directory is the better key.
+// The tests that matter here are not the ones where it answers — they are the
+// four shapes where it must still say nothing.
+// -----------------------------------------------------------------------------
+
+const SEP = String.fromCharCode(92);
+/**
+ * A results line in the shape the drivers actually write — `out` ABSOLUTE and
+ * BACKSLASHED, which is how all 10,994 of them are on disk, while the frames
+ * cited below are written forward-slashed and repo-relative. If the two shapes
+ * did not reduce to one key the directory map would miss on real data and this
+ * whole change would be a no-op that looked like it worked.
+ */
+const res = (sweep, lesson, leg, head, extra = {}) =>
+  JSON.stringify({
+    head, lesson, leg, exit: 0, treeMoved: false,
+    out: "E:" + SEP + "AI driver" + SEP + ".audit-frames" + SEP + sweep + SEP + "frames" + SEP + lesson + "__" + leg,
+    ...extra,
+  });
+const PROOF = "dd4e5983f63fda884723cfd1892b2597b0c3cd3b";
+const OTHER = "641a4475c0ac269943e8691f780b7bf2e11564ae";
+const INPROC = "095054b41d0179e626cdec7adedb42bd7b5ab747";
+
+const mapsFrom = (files) =>
+  headMaps("/audit", {
+    readDir: () => Object.keys(files),
+    exists: (p) => Object.prototype.hasOwnProperty.call(files, p.split("/")[2]),
+    readFile: (p) => files[p.split("/")[2]],
+  });
+
+test("§4 a sweep that spans two builds still names the build of EACH drive", () => {
+  // The `proof` case, and the whole reason the sweep was the wrong unit: 191 of
+  // its 195 drives agree, and the sweep-wide vote refused all 195.
+  const files = {
+    proof: [
+      res("proof", "sc-sp-wet-limit-plate", "mobile-right", OTHER),
+      res("proof", "sc-ac-ice", "pc-right", PROOF),
+      res("proof", "sc-junction-left", "pc-right", PROOF),
+    ].join("\n"),
+  };
+  const maps = mapsFrom(files);
+
+  assert.equal(maps.sweep.get("proof"), null, "the sweep vote must still refuse — it is the fallback, not the answer");
+  assert.equal(
+    buildOfFrame("E:/AI driver/.audit-frames/proof/frames/sc-ac-ice__pc-right/08-debrief-p3.png", maps),
+    PROOF,
+  );
+  assert.equal(
+    buildOfFrame(".audit-frames/proof/frames/sc-junction-left__pc-right/08-debrief-p1.png", maps),
+    PROOF,
+    "a repo-relative frame is the same frame",
+  );
+  assert.equal(
+    buildOfFrame("E:/AI driver/.audit-frames/proof/frames/sc-sp-wet-limit-plate__mobile-right/01-arrival.png", maps),
+    OTHER,
+    "the four that disagree must get their OWN build, not the majority's",
+  );
+});
+
+test("§4 REFUSAL KEPT: a drive whose tree moved under it names nothing, and does not fall back", () => {
+  // wave-c-merge prints "<-- certify nothing" next to these. If this fell
+  // through to the sweep vote, a drive the rest of the audit refuses to certify
+  // would be certified here by its neighbours.
+  const files = {
+    w17: [
+      res("w17", "sc-ac-snow", "mobile-right", W17, { treeMoved: true }),
+      res("w17", "sc-ac-fog", "pc-right", W17),
+    ].join("\n"),
+  };
+  const maps = mapsFrom(files);
+
+  assert.equal(maps.sweep.get("w17"), W17, "the sweep itself is unanimous — that is the looser answer this must refuse");
+  assert.equal(buildOfFrame("E:/AI driver/.audit-frames/w17/frames/sc-ac-snow__mobile-right/07-end.png", maps), null);
+  assert.equal(buildOfFrame("E:/AI driver/.audit-frames/w17/frames/sc-ac-fog__pc-right/07-end.png", maps), W17);
+});
+
+test("§4 REFUSAL KEPT: a head that is not a 40-hex commit names nothing", () => {
+  // ADDED 2026-09-19 after a judge drove headMaps with injected io and watched
+  // it ATTRIBUTE every one of these. The dangerous ones are the git revisions:
+  // "HEAD", "main" and "HEAD~5" all RESOLVE, so a line carrying one would be
+  // judged against whatever that ref points at today rather than the build the
+  // drive actually ran — `git diff HEAD dd4e5983 -- objectives.ts` exits 0 with
+  // 178 insertions and 3,788 deletions. The rest are here because a shape check
+  // that only rejects the scary-looking values is a shape check nobody can
+  // reason about.
+  const rubbish = [
+    "HEAD",
+    "main",
+    "HEAD~5",
+    "../../etc",
+    "dd4e598", // a 7-char prefix: resolves in git, is not what was written down
+    "z".repeat(40), // right length, not hex
+    12345,
+    true,
+    " " + W17, // a stray space is not the commit
+  ];
+  for (const bad of rubbish) {
+    const files = { odd: res("odd", "sc-ac-ice", "pc-right", bad) };
+    const maps = mapsFrom(files);
+    assert.equal(
+      buildOfFrame("E:/AI driver/.audit-frames/odd/frames/sc-ac-ice__pc-right/07-end.png", maps),
+      null,
+      `attributed a build from ${JSON.stringify(bad)} — that certifies a verdict against a tree nobody measured`,
+    );
+  }
+  // …and the well-formed one still answers, so this is a shape check and not a
+  // blanket refusal that would empty the gate by breaking it.
+  const good = mapsFrom({ odd: res("odd", "sc-ac-ice", "pc-right", W17) });
+  assert.equal(
+    buildOfFrame("E:/AI driver/.audit-frames/odd/frames/sc-ac-ice__pc-right/07-end.png", good),
+    W17,
+  );
+});
+
+test("§4 REFUSAL KEPT: one directory written by two builds names nothing, and does not fall back", () => {
+  const files = {
+    redrive: [
+      res("redrive", "sc-ac-ice", "pc-right", W15),
+      res("redrive", "sc-ac-ice", "pc-right", W17),
+    ].join("\n"),
+  };
+  const maps = mapsFrom(files);
+  assert.equal(
+    buildOfFrame("E:/AI driver/.audit-frames/redrive/frames/sc-ac-ice__pc-right/07-end.png", maps),
+    null,
+    "a re-drive into the same directory is two builds in one place; guessing certifies a state that never existed",
+  );
+});
+
+test("§4 REFUSAL KEPT: a frame path whose separators were eaten names no directory", () => {
+  // THE FIXTURE THE REFUSAL EXISTS FOR, copied byte-for-byte in shape from the
+  // corpus: JSON escaping turned "…\.audit-frames\w12\frames\02-briefing.png"
+  // into "…​.audit-framesw12" + FORMFEED + "rames…" + STX + "-briefing.png".
+  // Six of the thirteen unattributable rows are this, and no amount of
+  // per-frame attribution may recover them: the sweep name in that string
+  // survived a lossy transform, it is not a directory anybody recorded.
+  const mangled =
+    "E:AI driver.audit-framesw12" + String.fromCharCode(12) + "ramessc-ac-fog__mobile-right" +
+    String.fromCharCode(2) + "-briefing.png";
+  const maps = mapsFrom({ w12: res("w12", "sc-ac-fog", "mobile-right", W17) });
+
+  assert.equal(auditKey(mangled), null, "it contains '.audit-frames' but no '.audit-frames/'");
+  assert.equal(buildOfFrame(mangled, maps), null);
+  assert.equal(
+    buildOfFrame("E:/AI driver/.audit-frames/w12/frames/sc-ac-fog__mobile-right/02-briefing.png", maps),
+    W17,
+    "the SAME frame written intact resolves — which is what makes the refusal above a refusal and not a bug",
+  );
+});
+
+test("§4 REFUSAL KEPT: an unnameable build is still LISTED by the gate, not silently dropped", () => {
+  // End to end, because this is the property the whole tool rests on: a row
+  // whose build cannot be named must appear in `unattributable` and must never
+  // appear in `refused`. Constructed from the mangled shape above.
+  const mangled = "E:AI driver.audit-framesw12" + String.fromCharCode(12) + "ramessc-ac-fog__mobile-right.png";
+  const maps = mapsFrom({ w12: res("w12", "sc-ac-fog", "mobile-right", W17) });
+  const rows = [
+    { findingId: "sc-ac-fog:9a5d0fe0", verdict: "STILL", correctedBy: "verify", evidenceFrame: mangled },
+    { findingId: "sc-ac-fog:9a5d0fe0", verdict: "CLOSED", correctedBy: "w12", evidenceFrame: "E:/AI driver/.audit-frames/w12/frames/sc-ac-fog__mobile-right/02-briefing.png" },
+  ];
+
+  const { refused, unattributable } = findReclosures(rows, {
+    buildOf: (f) => buildOfFrame(f, maps),
+    productDiff: () => "",
+  });
+  assert.equal(refused.length, 0);
+  assert.equal(unattributable.length, 1);
+  assert.equal(unattributable[0].id, "sc-ac-fog:9a5d0fe0");
+  assert.equal(unattributable[0].a, null, "the side that could not be named must be reported as null, so the printout can say which");
+  assert.equal(unattributable[0].b, W17);
+});
+
+// --- the in-process record -----------------------------------------------------
+
+const inprocFile = (worktree) => JSON.stringify({ kind: "in-process-drive", input: { worktree } });
+const inprocIo = (body) => ({ readFile: () => body });
+
+test("§4 an in-process run names the worktree it executed, when that worktree was clean", () => {
+  const body = inprocFile({ head: INPROC, productDirty: false, productDirtyFiles: 0 });
+  const p = "E:/AI driver/.audit-frames/inprocess-w38/d9fd3821-L3-mistake-over-limit-in-wet.json";
+
+  assert.equal(inProcessHead(p, inprocIo(body)), INPROC);
+  // …and it reaches buildOfFrame, which no directory map can answer for: an
+  // in-process run photographed nothing and wrote no frame directory.
+  assert.equal(buildOfFrame(p, mapsFrom({}), inprocIo(body)), INPROC);
+});
+
+test("§4 REFUSAL KEPT: a DIRTY worktree names no build", () => {
+  // `productDirty` is the whole warrant — it is what says the code that ran is
+  // the code at that commit. Anything but an explicit false is an unnamed build.
+  const p = "E:/AI driver/.audit-frames/inprocess-w38/x.json";
+  assert.equal(inProcessHead(p, inprocIo(inprocFile({ head: INPROC, productDirty: true, productDirtyFiles: 4 }))), null);
+  assert.equal(inProcessHead(p, inprocIo(inprocFile({ head: INPROC }))), null, "absent is not false");
+  assert.equal(inProcessHead(p, inprocIo(inprocFile({ head: "095054b4", productDirty: false }))), null, "an abbreviation is not a commit this gate can diff");
+  assert.equal(inProcessHead(p, inprocIo(JSON.stringify({ kind: "in-process-drive" }))), null, "no worktree block at all");
+  assert.equal(inProcessHead(p, inprocIo("{not json")), null);
+  assert.equal(inProcessHead(p, inprocIo(null)), null, "resolveFrame hands back null for a zero-byte or missing file");
+  assert.equal(inProcessHead("E:/AI driver/.audit-frames/w12/frames/x/07-end.png", inprocIo(inprocFile({ head: INPROC, productDirty: false }))), null, "a .png is not a record, whatever the io returns");
+  assert.equal(inProcessHead(p, null), null, "no io means nothing was read, which names nothing");
+});
+
+test("§4 the old single-Map call still works, so nothing that had one map is quietly re-pointed", () => {
+  assert.equal(buildOfFrame(frame("w15"), MAP), W15);
+  assert.equal(buildOfFrame(frame("mixed"), MAP), null);
+  assert.equal(sweepHeadMap("/audit", {
+    readDir: () => ["w17"],
+    exists: () => true,
+    readFile: () => res("w17", "sc-x", "pc-right", W17),
+  }).get("w17"), W17);
 });

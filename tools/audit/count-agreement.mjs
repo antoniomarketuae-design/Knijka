@@ -58,12 +58,19 @@
  *    of the mutation battery recorded in count-agreement.test.mjs.
  *
  * WHAT IT COSTS, because a gate nobody can afford gets deleted. MEASURED on
- * this box, warm: 1.67 s end to end — six child processes, each of which parses
- * the 1.4 MB corpus and one of which generates a whole workflow. It runs inside
- * `node platform/scripts/tools-tests.mjs`, which takes 131 s, so it is ~1% of
- * the gate it lives in.
+ * 2026-09-19 over four consecutive runs of this file on this box: 89.6 s on a
+ * cold page cache, then 49.5 s, 22.9 s and 18.6 s as the 1.4 MB corpus warmed
+ * (`time node tools/audit/count-agreement.mjs`). SEVENTEEN child processes, not the
+ * six this paragraph was written for, each of which parses that corpus and five
+ * of which generate a whole workflow. It is a step of its own in gate.sh (`run
+ * "count-agreement"`), and wave-cycle.sh refuses to apply a wave without it.
  *
- *   node tools/audit/count-agreement.mjs           check, exit 1 on disagreement
+ * That spread is also the EXPOSURE WINDOW, which is why it is kept current: for
+ * the 19-90 s this runs, anything appending to .audit-frames/findings moves the
+ * corpus under it — and until 2026-09-19 a move made it print AGREED and exit 0
+ * over real disagreements. See the INCONCLUSIVE branch in check().
+ *
+ *   node tools/audit/count-agreement.mjs           exit 0 agreed · 1 disagreement · 2 inconclusive
  *   node tools/audit/count-agreement.mjs --verbose show each tool's stamp
  */
 import fs from "node:fs";
@@ -411,6 +418,20 @@ function corpusFingerprint() {
   return parts.join("|");
 }
 
+/**
+ * THE THREE OUTCOMES, AS A DECISION OF ITS OWN — so the truth table can be
+ * asserted in four lines instead of by racing a repair agent.
+ *
+ * `ok` is the fail-closed field and `verdict` is the explanation. They are
+ * derived together, here, because the defect this replaces was exactly a
+ * disagreement between the two: a branch that knew perfectly well the run was
+ * inconclusive, and set ok:true anyway.
+ */
+export function verdictOf({ problems, moved }) {
+  if (moved && problems.length) return { verdict: "inconclusive", ok: false };
+  return { verdict: problems.length ? "disagreed" : "agreed", ok: problems.length === 0 };
+}
+
 export function check({ verbose = false } = {}) {
   const fingerprintBefore = corpusFingerprint();
   const n = recompute();
@@ -548,48 +569,121 @@ export function check({ verbose = false } = {}) {
     );
   }
 
-  // A disagreement found while the corpus was being written is a MOVING TARGET,
-  // not a wrong number. Say so instead of accusing a tool: this check is not
-  // atomic, and twice in one session a verifier chased a red that reproduced
-  // green the moment the repair agents stopped filing findings.
+  /**
+   * A disagreement found while the corpus was being written is a MOVING TARGET,
+   * not a wrong number. Say so instead of accusing a tool: this check is not
+   * atomic, and twice in one session a verifier chased a red that reproduced
+   * green the moment the repair agents stopped filing findings.
+   *
+   * INCONCLUSIVE IS NOT A PASS — AND FOR 27 DAYS IT PRINTED AS ONE. The branch
+   * arrived in 2dabc85 on 2026-08-23 (`git log -S "are reported as
+   * INCONCLUSIVE, not as failures"`) and was found on 2026-09-19. It
+   * returned `{ problems: [], moved, note, ok: true }` while the CLI below
+   * destructured only `{ expected, expectedWorked, results, problems, ok }`, so
+   * `note` reached no printer, `moved` reached no reader, and an emptied
+   * `problems` with `ok:true` took the AGREED path.
+   *
+   * MEASURED 2026-09-19, real corpus, real 17 tools. A probe planted one new
+   * source file in .audit-frames/findings 30 s into a 49.5 s run: check()
+   * returned `ok:true, moved:true, problems:0` holding a note that named the
+   * apparent disagreements, and the CLI printed "AGREED — every counter
+   * reports the same open list." and exited 0. Re-run after this fix, planted
+   * at t+4 s of 18.6 s: INCONCLUSIVE, every disagreement printed in full,
+   * exit 2. Both runs left the corpus byte-identical (sha256 of the 26 sources
+   * before and after).
+   *   HOW MANY DISAGREEMENTS IS NOT A PROPERTY OF THIS CODE, so no integer is
+   *   quoted here. The counters are spawned one at a time and each pushes its
+   *   own row, so the number is simply however many of the 17 had yet to run
+   *   when the plant landed — one observer saw 14 at one offset and 16 at
+   *   another, a verifier saw 17 at the same t+4 s. An earlier draft of this
+   *   note stated those as if they described the mechanism.
+   *
+   * The trigger is not exotic: .audit-frames/ is gitignored, the fingerprint
+   * keys on mtime, and the window is the 19-90 s measured in the header — so
+   * any agent filing a finding during a gate run fires it, and this is the step
+   * that certifies the open-list counts the founder is told.
+   *
+   * THE FAIL-CLOSED HALF RIDES ON `ok`, NOT ON THE NEW FIELD. `verdict` tells a
+   * reader WHICH of the two it is looking at; `ok` is false for both, because
+   * `ok` is the field every existing caller already destructures. A future
+   * caller that forgets `verdict` still refuses. Putting the safety only in a
+   * field someone must remember to read is this same defect one field along.
+   */
   const moved = corpusFingerprint() !== fingerprintBefore;
-  if (moved && problems.length) {
-    const note = [
-      "THE CORPUS MOVED WHILE THIS CHECK RAN — " + problems.length + " apparent disagreement(s)",
-      "      are reported as INCONCLUSIVE, not as failures. This check recomputes the census",
-      "      and then runs seven tools in turn, so a finding filed or retired in between makes",
-      "      every later tool correctly report a different number. Re-run on a still corpus.",
-      ...problems.map((p) => "      would have said: " + String(p).split("\n")[0]),
-    ].join("\n");
-    return { expected, expectedWorked, results, problems: [], moved, note, ok: true };
+  const { verdict, ok } = verdictOf({ problems, moved });
+  const note =
+    verdict !== "inconclusive"
+      ? null
+      : [
+          "THE CORPUS MOVED WHILE THIS CHECK RAN — " + problems.length + " apparent disagreement(s)",
+          "      cannot be told apart from real ones, so this run is INCONCLUSIVE. That is NOT a pass.",
+          "      This check recomputes the census and then runs " + counters.length + " tools in turn, so a finding",
+          "      filed or retired in between makes every later tool correctly report a different",
+          "      number. Re-run on a still corpus: if they were real, they come back.",
+        ].join("\n");
+  // ONE RETURN, and every field on it. The old code had two, and the second one
+  // rewrote `problems` to `[]` on its way out — so the reasons existed, were
+  // counted into a note, and then left the building. A single exit makes that
+  // particular shape unwriteable rather than merely absent.
+  return { expected, expectedWorked, results, problems, moved, note, verdict, ok };
+}
+
+/**
+ * THE PRINTING AND THE EXIT CODE, AS ONE FUNCTION A TEST CAN DRIVE.
+ *
+ * The fail-open recorded above did not live inside check(): check() computed
+ * the note correctly, every time. It lived in the GAP between what check()
+ * returned and what the `if (isMain)` block chose to destructure — and a gap
+ * between a reason that is computed and a reason that is printed is invisible
+ * to every test that calls check() and reads its fields, which is why seven
+ * tests passed over it.
+ *
+ * So the gap is gone rather than patched. This is the CLI; it returns the exit
+ * code instead of calling process.exit, and count-agreement.test.mjs hands it a
+ * synthetic result for each of the three verdicts and reads back both the exit
+ * code and every line it printed. That test needs no corpus, no race and no
+ * 50 s, so it will still be runnable the next time somebody edits this.
+ */
+export function report(r, { verbose = false, log = console.log } = {}) {
+  log("recomputed independently : " + r.expected);
+  log("                           " + r.expectedWorked);
+  log("corpus-reading tools     : " + r.results.length + "   (" + r.results.map((x) => x.file).join(", ") + ")");
+  if (verbose) {
+    log("");
+    for (const x of r.results) {
+      log("  " + x.file.padEnd(24) + (x.stamp || "(NO STAMP)"));
+      log("  " + "".padEnd(24) + ((x.worked || [])[0] || "(NO WORKED LINE)"));
+    }
   }
-  return { expected, expectedWorked, results, problems, moved, ok: problems.length === 0 };
+  log("");
+  if (r.verdict === "inconclusive") {
+    log(r.note);
+    log("");
+    log(r.problems.length + " APPARENT DISAGREEMENT(S) — REPORTED, NOT JUDGED:");
+    for (const p of r.problems) log("   " + p);
+    log("");
+    log("INCONCLUSIVE — not a pass. Re-run on a still corpus before applying anything.");
+    return 2;
+  }
+  if (r.ok) {
+    // A corpus that moved without changing a single count still AGREED — all
+    // seventeen matched the census recomputed before it moved — but it is never
+    // passed over in silence: "it moved and nothing came of it" and "it moved
+    // and nobody looked" are the same green otherwise.
+    if (r.moved) log("(the corpus moved while this ran; every counter matched the census regardless)");
+    log("AGREED — every counter reports the same open list.");
+    return 0;
+  }
+  log(r.problems.length + " DISAGREEMENT(S):");
+  for (const p of r.problems) log("   " + p);
+  log("");
+  log("A number in a report is not a small thing here: the last two drifts sent a repair");
+  log("round at findings that were already closed and told it its own reader was wrong.");
+  return 1;
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const verbose = process.argv.includes("--verbose");
-  const { expected, expectedWorked, results, problems, ok } = check({ verbose });
-  console.log("recomputed independently : " + expected);
-  console.log("                           " + expectedWorked);
-  console.log("corpus-reading tools     : " + results.length + "   (" + results.map((r) => r.file).join(", ") + ")");
-  if (verbose) {
-    console.log("");
-    for (const r of results) {
-      console.log("  " + r.file.padEnd(24) + (r.stamp || "(NO STAMP)"));
-      console.log("  " + "".padEnd(24) + ((r.worked || [])[0] || "(NO WORKED LINE)"));
-    }
-  }
-  if (ok) {
-    console.log("");
-    console.log("AGREED — every counter reports the same open list.");
-    process.exit(0);
-  }
-  console.log("");
-  console.log(problems.length + " DISAGREEMENT(S):");
-  for (const p of problems) console.log("   " + p);
-  console.log("");
-  console.log("A number in a report is not a small thing here: the last two drifts sent a repair");
-  console.log("round at findings that were already closed and told it its own reader was wrong.");
-  process.exit(1);
+  process.exit(report(check({ verbose }), { verbose }));
 }

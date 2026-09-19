@@ -50,7 +50,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { splitParents, corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
-import { buildOfFrame, findReclosures, sweepHeadMap } from "./reclosure.mjs";
+import { auditKey, buildOfFrame, findReclosures, headMaps } from "./reclosure.mjs";
 import { commentOnlyChange } from "./comment-blind.mjs";
 
 /** (rev:path) -> source, so one blob is fetched once per posting run. */
@@ -273,11 +273,28 @@ const verdictOf = (r) => {
 // it can be tested without running a posting round — which is exactly how the
 // first version of this gate shipped splitting on a literal backslash-n,
 // resolving every sweep to null, and refusing nothing while looking correct.
-const sweepHead = sweepHeadMap(path.join(REPO, ".audit-frames"), {
+//
+// TWO MAPS, ONE PASS — 2026-09-19. A frame is attributed by its OWN drive
+// directory first and only then by the sweep-wide vote, because every one of
+// this corpus's 10,994 result lines records the directory it wrote alongside
+// the commit it drove. See reclosure.mjs for the measurement and for the three
+// places the finer key stays STRICTER than the coarse one.
+const sweepHead = headMaps(path.join(REPO, ".audit-frames"), {
   readDir: (d) => fs.readdirSync(d),
   exists: (f) => fs.existsSync(f),
   readFile: (f) => fs.readFileSync(f, "utf8"),
 });
+
+// An in-process run's record IS its evidence file, so it is read through the
+// same resolver a frame is: the same repo-relative / Windows / absolute
+// spellings resolve, and a zero-byte file is not a record.
+const evidenceIo = {
+  exists: (p) => Boolean(resolveFrame(p)),
+  readFile: (p) => {
+    const r = resolveFrame(p);
+    return r ? fs.readFileSync(r, "utf8") : null;
+  },
+};
 
 const fileOfRow = (id) => {
   const f = byId.get(id);
@@ -285,7 +302,7 @@ const fileOfRow = (id) => {
   return p2 && p2.startsWith("platform/") ? p2 : null;
 };
 const { refused: reclosed, unattributable: reclosedUnknown } = findReclosures(rows, {
-  buildOf: (f) => buildOfFrame(f, sweepHead),
+  buildOf: (f) => buildOfFrame(f, sweepHead, evidenceIo),
   // The suspectFile of the row being closed, so the gate asks whether THAT
   // file changed rather than whether anything in platform/src did.
   fileOf: (id) => {
@@ -507,12 +524,44 @@ if (reclosed.length) {
 if (reclosedUnknown.length) {
   console.log("");
   console.log(reclosedUnknown.length + " re-closure(s) after a verify line whose BUILD CANNOT BE NAMED:");
-  console.log("   Reported, not refused — the frame sits in a sweep with no results file, so this is");
-  console.log("   missing provenance rather than bad reasoning, and a false refusal is as bad as a");
-   console.log("   false certificate. Attribute those sweeps and this list empties.");
+  console.log("   Reported, not refused — missing provenance is not bad reasoning, and a false");
+  console.log("   refusal is as bad as a false certificate.");
+  // …BUT "ATTRIBUTE THOSE SWEEPS AND THIS LIST EMPTIES" WAS WRONG — 2026-09-19.
+  //
+  // This block used to state one cause for the whole list: "the frame sits in a
+  // sweep with no results file". Measured against the 13 it was naming, that
+  // was true of TWO of them. Six had a frame path that names no directory at
+  // all, five sat in a sweep that genuinely spans two builds, and none of the
+  // thirteen was missing a frame path. A list that states one cause for
+  // thirteen rows sends the next round to fix the wrong thing — so each row now
+  // says which side could not be named and why, from what is on disk.
+  const whyUnnameable = (fr) => {
+    if (!fr) return "the verdict line carries no frame at all";
+    const k = auditKey(fr);
+    if (!k) {
+      // `.audit-frames` carries no separator of its own, so this one substring
+      // test tells a mangled frame path from a string that was never one.
+      return String(fr).includes(".audit-frames")
+        ? "the path's separators were destroyed by JSON escaping, so it names no directory"
+        : "not a frame path";
+    }
+    const cut = k.lastIndexOf("/");
+    const dir = cut > 0 ? k.slice(0, cut) : k;
+    if (sweepHead.frame.has(dir)) return "that drive's own record names no single build (its tree moved, or two lines disagree)";
+    const sweep = k.split("/")[1] || "?";
+    // Say only what was actually looked at: an in-process record is consulted
+    // for a .json and nothing else, so claiming a .png "records no worktree"
+    // would describe a check that never ran.
+    const own = /\.json$/i.test(k) ? ", and the record itself carries no clean worktree" : "";
+    if (!sweepHead.sweep.has(sweep)) return "sweep '" + sweep + "' wrote no wave-c-results.jsonl" + own;
+    if (sweepHead.sweep.get(sweep) === null) return "sweep '" + sweep + "' spans two builds and recorded no drive for this directory" + own;
+    return "unattributed for a reason this tool does not have a name for";
+  };
   for (const x of reclosedUnknown) {
     const f = byId.get(x.id);
     console.log("   [" + String((f && f.severity) || "?").padEnd(8) + "] " + x.id);
+    if (!x.a) console.log("        opened  : " + whyUnnameable(x.prev.evidenceFrame));
+    if (!x.b) console.log("        re-closed: " + whyUnnameable(x.last.evidenceFrame));
   }
 }
 if (unknown.length) {
