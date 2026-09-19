@@ -161,6 +161,15 @@
  * lanes and calls them a product defect. The gate's «has to be argued for» is
  * satisfied by that paragraph; it is not this lane's to apply.
  */
+/* THE ONE THING IN THIS FILE THAT TOUCHES DISK, and it is confined to one
+ * loader. §2b has to know the band the ENGINE grades in, and a band retyped
+ * here is a band that stops mirroring the product the day an ADR moves it — so
+ * `readSpeedingConfig` reads `rules/types.ts` and `speedingConfigFrom` (pure,
+ * and the one the test drives) parses it. Node only; nothing here is imported
+ * into a browser. */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 export const PARKING_BRAKE_KEY = "Space";
 /** `SheetCell labelBg` — `components/sim/TouchControls.tsx:3330`. The cockpit
  *  hotspot's `shortBg` is the same string (`scene/vitok/hotspots.ts:150`), so
@@ -619,6 +628,897 @@ export function overCapHold({
     hold: true,
     done: null,
     why: `holding the rest back until the dial beats ${need} км/ч (cap ${capKmh} + ${marginKmh} margin); top so far ${topKmh} км/ч`,
+  };
+}
+
+/**
+ * THE OVER-CAP HOLD'S OWN SCAN STEP — THE TWIN OF §2b's, AND IT IS HERE
+ * BECAUSE TWO OF ITS LINES SURVIVED A MUTATION RUN THIS SESSION.
+ *
+ * §2b's scan was extracted first. With it driven, two mutations aimed at the
+ * SAME SHAPES five lines above it in the same block were run against the suite
+ * and both left it GREEN at 149/149:
+ *
+ *   `overCapFrom ??= now` → `overCapFrom = now`   — the clock restarts on every
+ *     cap RISE, so `overCap.ms` reads ~0 for ever and OVER_CAP_MAX_MS (45 s)
+ *     becomes a dead branch. This is M4's defect, on the sibling clock, and M4
+ *     is the mutation the previous pass was refused for missing.
+ *   `if (p.kmh > overCap.topKmh) overCap.topKmh = p.kmh;` → disabled — the top
+ *     of the dial never moves off its -1 sentinel, so `overCapHold` compares a
+ *     cap against -1 and the hold can never be beaten. Z-top, on the twin.
+ *
+ * That is the lane's own documented failure mode: pinning exactly what was
+ * named while the same class re-opens one layer up. The over-cap block is the
+ * layer up, so it gets the same treatment rather than a disclosure.
+ *
+ * NOTHING ABOUT WHAT IT COMPUTES CHANGED — every branch is transcribed from the
+ * block it left, including `needKmh`, which is written into the sidecar and
+ * read by nothing (`overCapHold` derives its own `need` from `capKmh +
+ * marginKmh`); it is preserved exactly rather than tidied, because a published
+ * field's disappearance is a change to what ~200 committed legs carry.
+ *
+ * @returns {{capKmh:null|number, capPhrase:null|string, needKmh:null|number,
+ *            topKmh:number, from:null|number, capRose:boolean}}
+ */
+export function overCapScanStep({
+  kmh = null,
+  shown = null,
+  phrase = null,
+  now = 0,
+  state = null,
+  marginKmh = OVER_CAP_MARGIN_KMH,
+} = {}) {
+  const fin = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const speed = (v) => (fin(v) !== null && v > 0 ? v : null);
+  const st = state && typeof state === "object" ? state : {};
+
+  let capKmh = speed(st.capKmh);
+  let capPhrase = typeof st.capPhrase === "string" ? st.capPhrase : null;
+  let needKmh = fin(st.needKmh);
+  let from = fin(st.from);
+
+  /* THE HIGHEST CAP EVER SHOWN, not the current one: a task can be credited and
+   * the next posted mid-leg, and beating the highest beats every cap this leg
+   * was ever asked about. */
+  const seen = speed(shown);
+  const capRose = seen !== null && (capKmh === null || seen > capKmh);
+  if (capRose) {
+    capKmh = seen;
+    capPhrase = typeof phrase === "string" ? phrase : null;
+    needKmh = seen + (fin(marginKmh) === null ? OVER_CAP_MARGIN_KMH : marginKmh);
+    // `??=`, NEVER `=` — the surviving mutation named in the header. The clock
+    // starts the first time a cap is seen and not at t0, so a lane whose banner
+    // takes twenty seconds to mount is not charged for them.
+    from ??= fin(now);
+  }
+
+  const priorTop = fin(st.topKmh) === null ? -1 : st.topKmh;
+  const dial = fin(kmh);
+  return { capKmh, capPhrase, needKmh, from, capRose, topKmh: dial !== null && dial > priorTop ? dial : priorTop };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 2b · TOUCHING A LIMIT IS NOT BEING BILLED FOR IT — THE SUSTAIN
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `sc-follow-tailgater:63c0c28c` (critical) has been closed and overturned four
+ * times, and every overturn says the same thing: the penalty points on its
+ * wrong leg are this harness's own careless rests, not the lesson's act. The
+ * row's own text names the two acts the drill teaches — „the punishing brake
+ * check at the tailgater and the guilty acceleration" (`mistakes[0]`
+ * HARSH_BRAKING_NO_CAUSE, `mistakes[1]` SPEEDING_OVER_LIMIT, in
+ * `scenario/templates-following.ts:1872-1886`) — and the w47 routing pass
+ * refused to rule with „the row stays open: it needs a wrong leg that really
+ * commits the offence."
+ *
+ * ── WHY SECTION 2's HOLD IS NOT ENOUGH, MEASURED ON w51 ────────────────────
+ * `.audit-frames/w51/frames/sc-follow-tailgater__pc-wrong/run.log`:
+ *
+ *   over-cap: task cap 36 км/ч … BEATEN at t=4s … top on the flat 47 км/ч
+ *   DRIVE: wrong · top 58 км/ч · 3 full stops
+ *
+ * Two separate reasons that leg cannot be asked about SPEEDING_OVER_LIMIT:
+ *
+ *  1. THE NUMBER IT WAS HELD AGAINST IS THE WRONG ONE. Section 2's hold
+ *     releases on the TASK cap («задачата иска ≤36» here, so `need` = 41), and
+ *     the изпитен лист is not billed against a drill instruction:
+ *     `rules/engine.ts:3242` grades `tick.maxSpeedKmh`, the POSTED limit, and
+ *     `engine.ts:1298-1310` says in so many words that the task cap „reaches
+ *     the glass and the objective gate and never the изпитен лист". On ln-v1
+ *     the posted disc is 50 and the task cap is 36 — beating 41 proves nothing
+ *     about the code the row is about. (The 36 is measured — w51's own
+ *     `_audit-status.json` `overCap.capKmh`; the 50 is the LESSON's own claim
+ *     about its road, `templates-following.ts:1884` «вдигна над 55 км/ч в
+ *     ограничение 50». The w51 run.log predates `POSTED_LIMIT_SEL` and records
+ *     no disc at all, so it is not the source for that number.)
+ *  2. TOUCHING IS NOT SUSTAINING. `speedingMinor` is a SUSTAINED episode
+ *     (`engine.ts:3251-3266`, `cfg.speedingMinorSustainSec`), so a dial that
+ *     peaks at 58 for one sample and is returned to zero by the 45 m cadence
+ *     is never a fault, only a blip. The w51 leg topped 58 over a posted 50 and
+ *     the debrief booked no «Превишена скорост» at all.
+ *
+ * ── WHAT THIS DOES AND, MORE IMPORTANTLY, WHAT IT DOES NOT CLAIM ───────────
+ * It holds the first rest back while the leg ACCRUES seconds strictly above
+ * `postedKmh + marginKmh`, and then it reports the two numbers it measured —
+ * the metres/seconds held and the accrued over-limit time. IT DOES NOT ASSERT
+ * THAT THE ENGINE WAS BILLED. It reads the engine's BAND
+ * (`speedingBands`, engine.ts:2639) so that it does not accrue outside the one
+ * the row's code is graded in — see `speedingBandsKmh` below — but it cannot
+ * see the engine's sustain state, its re-arm or its repeat ceiling, and a
+ * harness that asserted „the antecedent was exercised" from its own margin
+ * would be the reassuring-direction failure this whole file exists to refuse.
+ * The judge gets the measurement and the debrief, and decides.
+ *
+ * THE MARGIN IS THE HARNESS'S OWN, AND IT IS NOT A CLAIM ABOUT THE LAW. It is
+ * `OVER_CAP_MARGIN_KMH` reused for the reason that constant already states —
+ * one dial unit is a rounding artefact, 5 км/ч is not. That it happens to
+ * coincide with the engine's own grace on a 50 road is a fact a judge may check
+ * off the debrief; it is not an input to this decision.
+ *
+ * ── THE PRODUCT'S OWN LEDGER RULES, AND WHY A PROBE CLOCK THAT ONLY GOES UP
+ *    LIES IN THE REASSURING DIRECTION (2026-09-18; every line below re-read
+ *    off the product 2026-09-19, and one CORRECTION made then — see the band's
+ *    upper end, which this list was missing) ─────────────────────────────────
+ * The first cut of this hold accrued `overSec` monotonically: every tick over
+ * `needKmh` added its whole interval and nothing ever took any of it back. The
+ * engine does not work that way, and the difference is not academic — it is the
+ * difference between „3 s accrued, the MEASUREMENT the row needs is on the
+ * record" and an engine ledger sitting at exactly 0.
+ *
+ * Read off the product this session, by line:
+ *
+ *   · `rules/engine.ts:3244` — `const speedReset = speed <= limit;`. The reset
+ *     is the POSTED number itself, with NO margin, and it is what
+ *     `stepSustainedEpisode` (engine.ts:2432) is handed for `speedingMinor`
+ *     (engine.ts:3251-3262).
+ *   · `engine.ts:2443-2446` — the reset arm WIPES the ledger:
+ *     `e.qualifiedSec = 0; e.lastQualAt = null;`. So a dial that dips to or
+ *     below the posted disc for ONE sample gives every accrued second back.
+ *     A 56/49/56/49 trajectory over a posted 50 never reaches an episode at
+ *     all, while a monotonic probe clock would have printed 3 s and called the
+ *     antecedent delivered.
+ *   · `engine.ts:2473` — the accrual is capped per step:
+ *     `e.qualifiedSec += e.lastQualAt === null ? 0 : Math.max(0, Math.min(t - e.lastQualAt, 2));`
+ *     Two things, not one: no single step may add more than 2 s
+ *     (`OVER_LIMIT_STEP_CAP_SEC`), and the FIRST qualifying step after any gap
+ *     adds ZERO. A harness whose worst measured tick is 1,155 ms is under the
+ *     cap in ordinary running — but a stalled tick is precisely when a
+ *     monotonic clock would have handed itself the sustain for free.
+ *   · `engine.ts:2459-2469` — between the posted number and this harness's own
+ *     `needKmh` the engine is in its `!cond` arm with `accrue` true: the clock
+ *     STOPS (`e.lastQualAt = null`) and the ledger SURVIVES (`if (!accrue)
+ *     e.qualifiedSec = 0;` does not fire). Not a reset, not an accrual.
+ *   · `engine.ts:3251` — AND THE BAND HAS AN UPPER END:
+ *     `speed > bands.gradedAbove && speed <= bands.dangerousAbove`. Above the
+ *     опасна line the same `!cond` arm runs and the code booked is a different
+ *     one (SPEEDING_DANGEROUS, `engine.ts:3375`/`:3391`), so accruing there
+ *     would hand a SPEEDING_OVER_LIMIT row an antecedent the изпитен лист
+ *     never billed under it. The bound is READ off `rules/types.ts` rather
+ *     than typed — `speedingBandsKmh`/`readSpeedingConfig` below.
+ *
+ * `overLimitHold` therefore takes an `overSec` ITS CALLER HAS ALREADY KEPT
+ * under those four rules — which is precisely why it cannot be the guard over
+ * them. Those four rules now live in `overLimitLedgerStep` below, where a test
+ * drives a speed SEQUENCE through them; `lesson-audit.mjs`'s flat block keeps
+ * the wiring and nothing else. The harness
+ * reads the engine's BAND but still cannot see its `cfg.speedingMinorSustainSec`
+ * = 2 (`rules/types.ts:1767`), its re-arm or its repeat ceiling — it is
+ * mirroring the LEDGER's arithmetic, not predicting the bill.
+ *
+ * THE SAME THREE REFUSALS AS SECTION 2, for the same reason:
+ *   · NO DISC ON THE GLASS → no rest is ever held, byte-identical to today —
+ *     and it does NOT latch. The disc is painted by the dashboard and the first
+ *     flat tick can beat it there; a `done:"no-disc"` that stuck would end the
+ *     hold for the whole leg on one early tick. It retries until a disc appears
+ *     or a ceiling wins, and only then is it reported — as a hold that was
+ *     never ATTEMPTED, which is not the same fact as a hold that FAILED.
+ *   · TWO CEILINGS ON THE HOLD — a DISTANCE one and a CLOCK one, whichever
+ *     comes first (`overLimitHold`, which suppresses the cadence every tick so
+ *     its metres genuinely accumulate).
+ *   · BUT ONE CEILING ON THE SEARCH, and only one: the CLOCK
+ *     (`overLimitSearchCeiling`, whose docblock carries the arithmetic). No
+ *     rest is held back while the search looks, so the cadence keeps chopping
+ *     and a distance ceiling can never be reached inside the 20 s. It was
+ *     written as „150 m / 20 s, whichever comes first" and the 150 m half
+ *     could not fire; it is now removed rather than reworded.
+ *   · AND THE CEILING REACHED WITHOUT THE SUSTAIN IS SAID LOUDLY.
+ *
+ * AND IT IS OFF EVERYWHERE EXCEPT THE LANES THAT ASKED FOR IT — see
+ * `SUSTAINED_OVER_LIMIT_LANES`. This is an instrument change, not a repair:
+ * nothing it does may close a row, and a change that re-timed all ~200 `wrong`
+ * lanes to settle one of them would invalidate the evidence under the other
+ * 199.
+ */
+
+/** The В26 disc's accessible name on BOTH dashboard variants —
+ *  `hud/StatusDashboard.tsx:982` (compact) and `:1098` (roomy), both
+ *  `aria-label={`Ограничение ${limit} км/ч`}` where `limit` is the rounded
+ *  `tick.maxSpeedKmh` the reducer itself bills against. A production surface a
+ *  student is looking at; no test id was added to the product to read it. */
+export const POSTED_LIMIT_SEL = '[aria-label^="Ограничение "]';
+
+/** The posted limit off those labels. Both variants are in the DOM and carry
+ *  the SAME numeral, so the max is the numeral; `null` when the disc is not on
+ *  the glass, which is „no witness could speak" and not „no limit". */
+export function postedLimitKmh(labels) {
+  if (!Array.isArray(labels)) return null;
+  let best = null;
+  for (const l of labels) {
+    const m = typeof l === "string" ? l.match(/Ограничение\s+(\d+(?:[.,]\d+)?)\s*км\/ч/u) : null;
+    if (!m) continue;
+    const v = Number(m[1].replace(",", "."));
+    if (Number.isFinite(v) && v > 0 && (best === null || v > best)) best = v;
+  }
+  return best;
+}
+
+/* ── THE ENGINE'S OWN TWO BANDS, READ OFF THE PRODUCT RATHER THAN RETYPED ───
+ *
+ * WHY A LOWER BOUND WAS NOT ENOUGH, AND WHY THE MISSING HALF ERRED REASSURING.
+ * The accrual arm in `lesson-audit.mjs` used to be „faster than `needKmh`",
+ * with no ceiling. The engine's minor band has BOTH ends
+ * (`rules/engine.ts:3251`):
+ *
+ *     speedingMinorCond = speed > bands.gradedAbove && speed <= bands.dangerousAbove
+ *
+ * Above `dangerousAbove` the engine is in the `!cond` arm
+ * (`engine.ts:2459-2469`: the clock stops, the ledger survives) and it books a
+ * DIFFERENT code — SPEEDING_DANGEROUS (`engine.ts:3375`, `:3391`). A leg held
+ * at 65 over a posted 50 therefore accrued the harness's sustain, `run.log`
+ * named SPEEDING_OVER_LIMIT and `leg-evidence.mjs` printed „the antecedent was
+ * DRIVEN" — for an episode the изпитен лист never billed under that code.
+ *
+ * READ, NOT RETYPED. `dangerousSpeedOverKmh` is a CONFIG FIELD the engine
+ * resolves at run time (unlike `OVER_LIMIT_STEP_CAP_SEC` below, which is a
+ * literal in the product and so has to be restated), and `types.ts:1766` marks
+ * it «official, do not change without an ADR» — i.e. the one number whose
+ * movement must not leave a silent copy behind in a tool.
+ *
+ * AND THE LOWER BOUND STAYS THE HARNESS'S OWN. `needKmh` is still
+ * `posted + OVER_CAP_MARGIN_KMH`, for the reason the section header gives; it
+ * coincides with `gradedAbove` only from posted 50 up, where the 10 % ratio is
+ * already capped at 5 км/ч. MEASURED this session by calling
+ * `speedingBandsKmh` on the parsed config (grace 0.1 / cap 5 / опасна +10):
+ * posted 30 → graded 33, опасна 40, while `needKmh` is 35; posted 50 → 55 / 60
+ * and `needKmh` 55; posted 90 → 95 / 100 and `needKmh` 95 (and posted 140 →
+ * 145 / 150). Below 50 the harness demands MORE speed than the
+ * engine's own band starts at, which is the refusing direction and is left
+ * alone. */
+
+/** The product file `speedingBands` reads its three numbers out of. Resolved
+ *  from this module's own URL, so it does not depend on the cwd — the tools
+ *  tests run from `platform/` and a drive runs from the repo root. */
+export const RULES_TYPES_PATH = fileURLToPath(
+  new URL("../../../platform/src/modules/sim/rules/types.ts", import.meta.url),
+);
+
+/** The three fields `speedingBands(limit, cfg)` reads (`engine.ts:2639-2644`). */
+export const SPEEDING_CFG_FIELDS = ["speedingGraceRatio", "speedingGraceMaxKmh", "dangerousSpeedOverKmh"];
+
+/**
+ * Parse those three numbers out of the product's config SOURCE.
+ *
+ * A MATCHER MUST REPORT WHAT IT CANNOT READ — the standing rule this repo has
+ * paid for three times. So: a field with no numeric assignment is `missing`,
+ * and a field with MORE THAN ONE is `ambiguous` rather than „take the first".
+ * The interface declarations at `types.ts:928/934/936` are `field: number;`
+ * and carry no literal, so they do not match; a second config object that did
+ * would make this refuse rather than guess.
+ *
+ * @returns {{ok: boolean, cfg: null|{speedingGraceRatio:number,speedingGraceMaxKmh:number,dangerousSpeedOverKmh:number}, why: null|string}}
+ */
+export function speedingConfigFrom(source) {
+  if (typeof source !== "string" || source === "") {
+    return { ok: false, cfg: null, why: "the rule-config source was empty or not a string — nothing was parsed" };
+  }
+  const cfg = {};
+  const missing = [];
+  const ambiguous = [];
+  for (const field of SPEEDING_CFG_FIELDS) {
+    const hits = [...source.matchAll(new RegExp(`^[ \\t]*${field}:[ \\t]*(-?\\d+(?:\\.\\d+)?)[ \\t]*,`, "gmu"))];
+    if (hits.length === 0) missing.push(field);
+    else if (hits.length > 1) ambiguous.push(`${field} (${hits.length} assignments)`);
+    else cfg[field] = Number(hits[0][1]);
+  }
+  if (missing.length || ambiguous.length) {
+    return {
+      ok: false,
+      cfg: null,
+      why:
+        `the engine's speeding bands could not be read from the product` +
+        `${missing.length ? ` — no numeric assignment for ${missing.join(", ")}` : ""}` +
+        `${ambiguous.length ? ` — more than one assignment for ${ambiguous.join(", ")}, which this parser refuses to guess between` : ""}`,
+    };
+  }
+  return { ok: true, cfg, why: null };
+}
+
+let speedingConfigCache = null;
+/** …and the same, off disk, cached per path. A read that FAILS is cached too:
+ *  a drive must not pay the I/O twice to be told the same thing. */
+export function readSpeedingConfig(path = RULES_TYPES_PATH) {
+  if (speedingConfigCache && speedingConfigCache.path === path) return speedingConfigCache.read;
+  let source = null;
+  try {
+    source = readFileSync(path, "utf8");
+  } catch (e) {
+    const read = { ok: false, cfg: null, why: `could not read ${path}: ${String(e && e.message ? e.message : e)}` };
+    speedingConfigCache = { path, read };
+    return read;
+  }
+  const read = speedingConfigFrom(source);
+  speedingConfigCache = { path, read };
+  return read;
+}
+
+/** `speedingBands` (`rules/engine.ts:2639-2644`), by the engine's own formula:
+ *  the grace is the RATIO capped in absolute km/h, the опасна line is a flat
+ *  +N. `null` — never a default band — when the limit or the config is not
+ *  something this can compute from. */
+export function speedingBandsKmh(limit, cfg) {
+  if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) return null;
+  if (!cfg || SPEEDING_CFG_FIELDS.some((f) => !Number.isFinite(cfg[f]))) return null;
+  const grace = Math.min(limit * cfg.speedingGraceRatio, cfg.speedingGraceMaxKmh);
+  return { gradedAbove: limit + grace, dangerousAbove: limit + cfg.dangerousSpeedOverKmh };
+}
+
+/** How long the dial must stay over the posted limit before the cadence may
+ *  chop it. The ENGINE's own window is `cfg.speedingMinorSustainSec` = 2 s
+ *  (`rules/engine.ts:1260`, and it ACCRUES rather than requiring consecutive
+ *  seconds — `SPEEDING_SUSTAIN_ACCRUES`, engine.ts:3262); this is 3 because
+ *  the probe samples at ~2 Hz (w51 `TICK COST`: idle ×106 med 510 ms), so 2 s
+ *  is four samples and one long tick would spend half of it. The extra second
+ *  is the harness's sampling margin and nothing else. */
+export const OVER_LIMIT_SUSTAIN_SEC = 3;
+/** THE MOST ONE TICK MAY ADD TO THE LEDGER, mirroring the engine's own cap:
+ *  `Math.min(t - e.lastQualAt, 2)` at `rules/engine.ts:2473`. It is 2 there and
+ *  2 here, and it is a LITERAL in the product rather than a config field, which
+ *  is why it is restated rather than read. Measured this session: the worst
+ *  tick w51 recorded on this lane is 1,155 ms, comfortably under — the cap is
+ *  for the stalled tick, which is exactly the tick a monotonic clock would have
+ *  used to hand itself the sustain. */
+export const OVER_LIMIT_STEP_CAP_SEC = 2;
+/** Distance ceiling on the hold. Deliberately far tighter than the task cap's
+ *  400 m: ln-v1 is a 400 m road (`templates-following.ts:1669` — «on ln-v1
+ *  (reused 400 m 2+2»), so a 400 m hold is „this leg never rests",
+ *  which would take the rest evidence away from every other row on the lane.
+ *  The arithmetic it has to cover: 3 s at 55 км/ч (15,3 m/s) is 46 m, and the
+ *  w51 leg was at 55 км/ч by t=5 s on the flat
+ *  (`.audit-frames/w51/frames/sc-follow-tailgater__pc-wrong/run.log:95`,
+ *  «[04-t005s] 55 км/ч»). THE RUN.LOG RECORDS TIME, NOT DISTANCE — an earlier
+ *  draft of this line said „in ~45 m", which was inferred from
+ *  `FLAT_REST_EVERY_M` and never measured. 46 m fits inside 150 m with room to
+ *  spare either way. */
+export const OVER_LIMIT_MAX_M = 150;
+/** Clock ceiling, for a leg that is not covering ground. 20 s at ~2 Hz is ~40
+ *  samples; a leg that has not accrued 3 s over the disc in 40 samples of held
+ *  throttle is not going to. */
+export const OVER_LIMIT_MAX_MS = 20_000;
+
+/**
+ * HAS THE NO-DISC SEARCH LOOKED LONG ENOUGH TO GIVE UP? A CLOCK, AND ONLY A
+ * CLOCK — AND THE DISTANCE HALF IS REFUSED RATHER THAN FIXED.
+ *
+ * The first cut of the search gave up on `flatM >= OVER_LIMIT_MAX_M ||
+ * searchMs >= OVER_LIMIT_MAX_MS` and its log, §2b above and the guard test all
+ * said „150 m / 20 s, whichever comes first". The first half could not fire:
+ * `flatM` is the REST CADENCE's counter and is zeroed every
+ * `FLAT_REST_EVERY_M` = 45 m, and no rest is held back while the search is
+ * still looking, so it never passes ~45 m.
+ *
+ * GIVING THE SEARCH ITS OWN UNRESET COUNTER DOES NOT FIX IT EITHER, and this
+ * is the measurement that decided it (arithmetic on three committed constants,
+ * run this session): 150 m of flat needs THREE completed 45 m stretches
+ * (135 m) plus part of a fourth, each completed stretch is followed by a rest
+ * phase costing at least `FLAT_REST_HOLD_MS` = 8 s (or `FLAT_REST_GIVEUP_MS` =
+ * 15 s when the car will not stop), so ≥24 s of STANDSTILL alone must pass
+ * before 150 m can be covered — against a 20 s ceiling, before a single second
+ * of driving is counted. The clock always wins. A second unreachable branch
+ * dressed as a reachable one is what this lane was refused for; the honest
+ * move is to have one ceiling and say so.
+ *
+ * `OVER_LIMIT_MAX_M` is NOT dead — it still bounds `overLimitHold`, where the
+ * hold suppresses the cadence every tick and `flatM` therefore does grow past
+ * 45 m. It is only the SEARCH that has no distance half.
+ *
+ * @returns {{give: boolean, latch: null|"clock"}}
+ */
+export function overLimitSearchCeiling({ searchMs = 0, maxMs = OVER_LIMIT_MAX_MS } = {}) {
+  if (Number.isFinite(searchMs) && searchMs >= maxMs) return { give: true, latch: "clock" };
+  return { give: false, latch: null };
+}
+
+/* ── THE LEDGER ITSELF, MOVED HERE SO A TEST CAN DRIVE A SPEED SEQUENCE ─────
+ *
+ * WHY THIS MOVED (2026-09-19, and it is the whole reason this lane was refused
+ * a fourth time). `overLimitHold` above takes `overSec` as an INPUT. MEASURED
+ * on the test file as it stood before this extraction: 9 `overLimitHold(` call
+ * sites, and 9 of the 9 pass an `overSec:` of their own. Every one of them
+ * therefore HANDS IT the number
+ * whose computation is the thing under suspicion — the four engine rules §2b
+ * spends sixty lines mirroring were, until this extraction, reachable only by
+ * driving a browser, and the guards standing over them were `assert.match`
+ * calls against `lesson-audit.mjs` READ AS A STRING. A source matcher can see
+ * that an arm EXISTS. It cannot see that the arm computes the wrong number,
+ * and the judge's own mutation proved it: widening the accrual arm's upper
+ * bound by 100 км/ч — i.e. re-creating the defect the bound was added for, a
+ * leg held at 65 over a posted 50 accruing into the SPEEDING_OVER_LIMIT ledger
+ * — left the suite green at 127/127.
+ *
+ * So the three arms are a pure function here, `lesson-audit.mjs` keeps only
+ * the wiring, and `__tests__/driveline.test.mjs` drives 56,57,65,56,57,58 over
+ * a posted 50 through them and asserts where the seconds land. Exactly the
+ * move this section already made for `overLimitSearchCeiling`, for exactly the
+ * same reason.
+ *
+ * NOTHING ABOUT THE ARITHMETIC CHANGED. The arms are transcribed, in order,
+ * from the block they left; the only additions are the three-valued refusals
+ * this file's one rule requires — a dial, a disc or a band that is not a
+ * finite number now breaks the run of over-limit ticks instead of being
+ * compared with `!== null` and silently passing.
+ */
+
+/**
+ * ONE TICK OF THE OVER-POSTED-LIMIT LEDGER, under the engine's own four rules
+ * (`rules/engine.ts:3244`, `:2443-2446`, `:2473`, `:2459-2469`, `:3251` — the
+ * list with line numbers is in §2b's header above).
+ *
+ * @returns {{overSec:number, resets:number, qualAt:null|number,
+ *            arm:"no-dial"|"reset"|"accrue"|"stopped"}}
+ *   `arm` is which of the engine's three arms this tick took, and it is
+ *   returned rather than inferred so a test can assert the ROUTING and not
+ *   only the total: "stopped" and "reset" both leave `overSec` unchanged on a
+ *   tick that had nothing to give back, and they are not the same fact.
+ */
+export function overLimitLedgerStep({
+  kmh = null,
+  now = 0,
+  postedKmh = null,
+  needKmh = null,
+  dangerousAboveKmh = null,
+  overSec = 0,
+  resets = 0,
+  qualAt = null,
+  stepCapSec = OVER_LIMIT_STEP_CAP_SEC,
+} = {}) {
+  const fin = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const sec = fin(overSec) === null || overSec < 0 ? 0 : overSec;
+  const hits = fin(resets) === null || resets < 0 ? 0 : resets;
+  const dial = fin(kmh);
+  const posted = fin(postedKmh);
+  const need = fin(needKmh);
+  const dangerous = fin(dangerousAboveKmh);
+  const cap = fin(stepCapSec) === null ? OVER_LIMIT_STEP_CAP_SEC : stepCapSec;
+  // A TICK WITH NO DIAL IS NOT A TICK UNDER THE LIMIT. The run breaks, exactly
+  // as the engine's `lastQualAt = null` breaks it, and nothing is credited.
+  if (dial === null) return { overSec: sec, resets: hits, qualAt: null, arm: "no-dial" };
+  // 1 · `engine.ts:3244` + `:2445` — the reset is the POSTED number with NO
+  //     margin, and it WIPES the ledger.
+  if (posted !== null && dial <= posted) {
+    return { overSec: 0, resets: sec > 0 ? hits + 1 : hits, qualAt: null, arm: "reset" };
+  }
+  // 2 · `engine.ts:3251` — the minor band, BOTH ends. Above `dangerousAbove`
+  //     the engine books SPEEDING_DANGEROUS, a different code, so this arm is
+  //     bounded there and the tick falls to arm 3.
+  if (need !== null && dial > need && dangerous !== null && dial <= dangerous) {
+    // `engine.ts:2473` — the first qualifying step after a break credits ZERO,
+    // and no single step may add more than the cap.
+    const step = fin(qualAt) === null ? 0 : Math.min(Math.max(0, now - qualAt) / 1000, cap);
+    return { overSec: sec + step, resets: hits, qualAt: now, arm: "accrue" };
+  }
+  // 3 · `engine.ts:2459-2469` — the `!cond` arm with `accrue` true: the clock
+  //     STOPS and the ledger SURVIVES. Neither a reset nor an accrual.
+  return { overSec: sec, resets: hits, qualAt: null, arm: "stopped" };
+}
+
+/**
+ * THE TWO NUMBERS A HOLD'S CEILINGS ARE MEASURED IN — the metres of held
+ * throttle and the milliseconds since the cap or the disc was first seen.
+ *
+ * ONE FUNCTION FOR BOTH HOLDS, and that is the point. `overCap.metres = flatM`
+ * and `overLimit.metres = flatM` were two copies of the same line in the same
+ * block, each feeding a ceiling nothing executed; mutating either to `0` made
+ * its distance ceiling a dead branch and the suite stayed green. They are now
+ * one call each into this, and the test below drives a leg to
+ * `OVER_LIMIT_MAX_M` and asserts the hold actually ends on "metres".
+ *
+ * `from === null` is „the cap/disc has not been seen yet" and reads 0 ms, not
+ * „the whole drive so far": a lane whose banner takes twenty seconds to mount
+ * must not have those twenty seconds charged to its hold.
+ *
+ * @returns {{metres:number, ms:number}}
+ */
+export function holdCeilingFeeds({ flatM = null, now = 0, from = null } = {}) {
+  const metres = typeof flatM === "number" && Number.isFinite(flatM) && flatM > 0 ? flatM : 0;
+  const started = typeof from === "number" && Number.isFinite(from) ? from : null;
+  const ms = started === null || !Number.isFinite(now) ? 0 : Math.max(0, now - started);
+  return { metres, ms };
+}
+
+/**
+ * THE NO-DISC SEARCH'S CLOCK, WHICH STARTS ONCE AND IS NEVER RESTARTED.
+ *
+ * `overLimitSearchFrom ??= now` was the whole of this, inline, and a judge's
+ * mutation to `overLimitSearchFrom = now` — the counter-zeroed-by-its-own-
+ * cadence shape this lane has already removed once, from the distance half of
+ * `overLimitSearchCeiling` — left the suite green at 127/127. With it applied
+ * the search's ONLY ceiling can never be reached: `searchMs` is 0 on every
+ * tick for ever, `done` never latches, and the loud that tells a judge the
+ * disc was never painted never fires. The test drives 41 ticks through this.
+ *
+ * @returns {{searchFrom:number, searchMs:number}} `searchFrom` is what the
+ *   caller must store back — the FIRST tick's clock, not this one's.
+ */
+export function overLimitSearchClock({ now = 0, searchFrom = null } = {}) {
+  const from = typeof searchFrom === "number" && Number.isFinite(searchFrom) ? searchFrom : now;
+  return { searchFrom: from, searchMs: Number.isFinite(now) ? Math.max(0, now - from) : 0 };
+}
+
+/* ── THE SCAN STEP — THE OTHER HALF OF THE TICK, AND THE HALF NOBODY DROVE ──
+ *
+ * `overLimitLedgerStep` above was extracted because the guards over the ACCRUAL
+ * ARMS were `assert.match` calls against `lesson-audit.mjs` read as a string.
+ * That extraction pinned the ledger's CALL ARGUMENTS and stopped there — so the
+ * assignments that put the arguments INTO the object in the first place were
+ * never a surface at all. Nine mutations of those store-backs were run against
+ * the suite as it stood and all nine left it GREEN at 135/135 (measured this
+ * session; the baseline run is `node --test ../tools/mobile/__tests__/
+ * driveline.test.mjs` → `pass 135 / fail 0`).
+ *
+ * ONE OF THE NINE IS MATERIAL AND NOT COVERAGE DEBT, and this is the
+ * measurement that says so. Mutate `needKmh = posted + OVER_CAP_MARGIN_KMH` to
+ * `needKmh = posted` and drive the REAL `overLimitLedgerStep` with a leg pinned
+ * at 52 км/ч over a posted 50, ten ticks of 500 ms:
+ *
+ *   need 55 (as shipped) → overSec 0.0 s, arms: stopped ×10
+ *   need 50 (mutated)    → overSec 4.5 s, arms: accrue ×10  → past
+ *                          OVER_LIMIT_SUSTAIN_SEC = 3, so the hold reports
+ *                          "sustained"
+ *
+ * …while the ENGINE's own `gradedAbove` for a posted 50 is 55 (grace =
+ * min(50 × 0.1, 5) = 5, off `rules/types.ts:1761-1766` this session), so the
+ * изпитен лист bills NOTHING at 52. The harness would certify an antecedent as
+ * DRIVEN and print "accrued INSIDE it" about a band the leg never entered.
+ * That is the ledger extraction's own defect mirrored at the band's LOWER edge,
+ * in the same object, and it was unpinned.
+ *
+ * SO THE ARITHMETIC MOVES HERE, exactly as the ledger's did. `lesson-audit.mjs`
+ * keeps the wiring; this function is driven by `__tests__/driveline.test.mjs`.
+ * Nothing about what it computes changed — every branch is transcribed from the
+ * block it left, and the only additions are the three-valued refusals this
+ * file's one rule requires plus the two FLAGS below, which report states that
+ * were previously invisible rather than changing any.
+ *
+ * THE TWO FLAGS, AND WHY EACH IS A STRENGTHENING AND NOT A LOOSENING:
+ *
+ *  · `needBelowGraded` — the harness's own `needKmh` sitting BELOW the engine's
+ *    `gradedAbove`. Measured: for a posted 50 the two are EQUAL (55 and 55), so
+ *    the mirror is exact today by coincidence of two independent constants,
+ *    `OVER_CAP_MARGIN_KMH = 5` here and `speedingGraceMaxKmh = 5` there. Move
+ *    either and the harness accrues seconds in a band the engine does not bill
+ *    — silently, in the reassuring direction. Nothing guarded that coincidence.
+ *  · `topAboveBand` — the top of the flat ABOVE `dangerousAbove`. Up there the
+ *    engine books SPEEDING_DANGEROUS (a different code), so a leg that went
+ *    there has contaminated the antecedent it was driven to buy. `>` and not
+ *    `>=`: a top exactly ON `dangerousAbove` is still inside the minor band the
+ *    ledger's arm 2 accrues in, and must stay silent.
+ *
+ * @param {object}   a
+ * @param {number?}  a.kmh    this tick's dial
+ * @param {number?}  a.posted this tick's В26 disc, off `postedLimitKmh`
+ * @param {object?}  a.cfg    the engine's speeding config, off `readSpeedingConfig`
+ * @param {number}   a.now    this tick's clock
+ * @param {object?}  a.state  the previous tick's answer (all fields optional)
+ * @returns {{postedKmh:null|number, needKmh:null|number, gradedAboveKmh:null|number,
+ *            dangerousAboveKmh:null|number, topKmh:number, flatTicks:number,
+ *            noDiscTicks:number, from:null|number, discRose:boolean,
+ *            needBelowGraded:boolean, topAboveBand:boolean}}
+ */
+export function overLimitScanStep({
+  kmh = null,
+  posted = null,
+  cfg = null,
+  now = 0,
+  state = null,
+  marginKmh = OVER_CAP_MARGIN_KMH,
+} = {}) {
+  const fin = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  // A SPEED IS POSITIVE OR IT IS NOT A SPEED — the same rule `leg-evidence.mjs`
+  // had to learn when a `postedKmh` of -1 rendered «В26 disc -1 км/ч» through a
+  // guard that asked only whether the value was a number.
+  const speed = (v) => (fin(v) !== null && v > 0 ? v : null);
+  const count = (v) => (fin(v) !== null && v >= 0 ? Math.trunc(v) : 0);
+  const st = state && typeof state === "object" ? state : {};
+
+  /* THIS CALL IS THE FLAT TICK. The counter is the ONE field of the object with
+   * no legitimate zero: `0` means the drive ended before the flat phase, which
+   * `p.end` (lesson-audit.mjs:7593) and an uncleared pause layer
+   * (:7658) both do, and both sit ABOVE the flat phase at :8434 — so it is
+   * reachable on any lane. Counting it here rather than at the call site is
+   * what lets a test assert that a tick which found no disc still COUNTS. */
+  const flatTicks = count(st.flatTicks) + 1;
+
+  let postedKmh = speed(st.postedKmh);
+  let needKmh = fin(st.needKmh);
+  let gradedAboveKmh = fin(st.gradedAboveKmh);
+  let dangerousAboveKmh = fin(st.dangerousAboveKmh);
+  let from = fin(st.from);
+
+  /* ON A RISE ONLY, and that is transcribed rather than widened. A disc that
+   * DROPS mid-leg — 50 into a 30 zone — would leave the band and every sentence
+   * built on it describing the road the car has left; it cannot fire today
+   * (`content/world/ln-v1.json` holds ONE edge at maxspeed 50) and widening the
+   * condition would change what ~200 committed legs measured. The state object
+   * in `lesson-audit.mjs` carries the same note. */
+  const seen = speed(posted);
+  const discRose = seen !== null && (postedKmh === null || seen > postedKmh);
+  if (discRose) {
+    postedKmh = seen;
+    needKmh = seen + (fin(marginKmh) === null ? OVER_CAP_MARGIN_KMH : marginKmh);
+    // THE ENGINE'S OWN BAND, BY THE ENGINE'S OWN FORMULA. Read three-valued: a
+    // band that silently became a default is the reassuring-direction failure
+    // this whole section exists to refuse.
+    const bands = speedingBandsKmh(seen, cfg);
+    gradedAboveKmh = bands ? bands.gradedAbove : null;
+    dangerousAboveKmh = bands ? bands.dangerousAbove : null;
+    /* THE HOLD'S CLOCK STARTS ONCE — `??=`, never `=`. This is the sibling of
+     * `overLimitSearchClock`'s own start, whose mutation to `=` left the suite
+     * green at 127/127 for the previous pass: restarted on every rise, the
+     * clock reads ~0 ms for ever and the ceiling it feeds can never fire. It
+     * starts when a disc is FIRST seen and not at t0, because a lane whose
+     * dashboard takes twenty seconds to paint the disc must not have those
+     * twenty seconds charged to its hold. */
+    from ??= fin(now);
+  }
+
+  /* THE ONE INPUT ON WHICH THIS IS NOT BYTE-EQUIVALENT TO THE LINE IT REPLACES,
+   * AND IT IS DELIBERATE — found by running the old inline line and this one
+   * over the SAME stream, 4,375 ticks across 300 randomised drives (this
+   * session), comparing all eight fields every tick. Exactly one divergent
+   * input: a dial of `null`. `null > -1` is TRUE in JavaScript — null coerces
+   * to 0 — so `if (p.kmh > overLimit.topKmh)` STORED `null` as the top of the
+   * flat. This refuses a non-number and keeps the sentinel.
+   *
+   * IT CANNOT FIRE ON THE DRIVE PATH: an unreadable dial is `-1`, never null or
+   * undefined (`lesson-audit.mjs:1097`, `:1149`, `:6753`, and the probe's own
+   * catch at `:7005`). And both values render identically to every consumer —
+   * MEASURED: `overLimitNoteLine` prints «top on the flat NOT RECORDED» for -1
+   * and for null, and `leg-evidence.mjs` prints «top NOT RECORDED км/ч» for
+   * both. Nothing a judge reads changes; what changes is that a non-number can
+   * no longer become the published top. */
+  const priorTop = fin(st.topKmh) === null ? -1 : st.topKmh;
+  const dial = fin(kmh);
+  const topKmh = dial !== null && dial > priorTop ? dial : priorTop;
+
+  /* A TICK ON WHICH NO DISC WAS RESOLVED. This counter used to be incremented
+   * inside the `lim.done === "no-disc"` branch downstream. `overLimitHold`
+   * returns that verdict on exactly one condition — `on === true` (passed as a
+   * literal at the call site) and `postedKmh` not a finite number > 0 — so the
+   * predicate below is the same predicate, evaluated where it can be driven.
+   * The value at every point that reads it is unchanged. */
+  const noDiscTicks = count(st.noDiscTicks) + (postedKmh === null ? 1 : 0);
+
+  return {
+    postedKmh,
+    needKmh,
+    gradedAboveKmh,
+    dangerousAboveKmh,
+    topKmh,
+    flatTicks,
+    noDiscTicks,
+    from,
+    discRose,
+    needBelowGraded: needKmh !== null && gradedAboveKmh !== null && needKmh < gradedAboveKmh,
+    topAboveBand: dangerousAboveKmh !== null && topKmh > dangerousAboveKmh,
+  };
+}
+
+/**
+ * SECONDS SINCE A CLOCK, OR `null` — NEVER A PLAUSIBLE ZERO.
+ *
+ * `Math.round((now - t0) / 1000)` was written out at both holds' success sites
+ * (`overCap.provenAtSec`, `overLimit.sustainedAtSec`), and both feed the single
+ * most quotable sentence each hold produces: «HELD THE ROAD'S OWN LIMIT OPEN at
+ * t=Ns». Nothing executed either copy, so a divisor of 100 in place of 1000 —
+ * a ten-fold wrong reading in a judging brief — was invisible to the suite.
+ * One function, both sites, and a test drives it: the same move
+ * `holdCeilingFeeds` made for the two `metres`/`ms` copies.
+ *
+ * `null` rather than 0 when either end is not a finite number, for this file's
+ * one rule; and negatives clamp to 0, because a hold whose success is stamped
+ * at «t=-3s» is a sentinel printed as a measurement — the shape
+ * `leg-evidence.mjs` was refused for. Neither can fire on the drive path, where
+ * `now >= t0` by construction; both are pinned so they cannot start to.
+ *
+ * @returns {null|number} whole seconds, or `null` when it was not measurable
+ */
+export function elapsedSec({ now = null, from = null } = {}) {
+  const a = typeof now === "number" && Number.isFinite(now) ? now : null;
+  const b = typeof from === "number" && Number.isFinite(from) ? from : null;
+  if (a === null || b === null) return null;
+  return Math.round(Math.max(0, a - b) / 1000);
+}
+
+/**
+ * THE `run.log` LINE FOR THE OVER-LIMIT HOLD — AND THE THIRD PLACE THE INITIAL
+ * STATE WAS BEING PUBLISHED AS A MEASUREMENT.
+ *
+ * `leg-evidence.mjs` got this treatment and `lesson-audit.mjs` got the loud.
+ * The NOTE underneath that loud did not, and it is the line a judge quotes.
+ * MEASURED this session, the real template against the real initialiser
+ * (`lesson-audit.mjs:10319-10323` against the initialiser at `:7269-7326`, both
+ * as that file stood at the start of this session, with `on:true`):
+ *
+ *   «… · 0 flat tick(s) ran · top on the flat -1 км/ч · 0.0 s accrued over the
+ *    need (target 3 s) · NOT HELD …»
+ *
+ * Three invented numbers in one line: `-1` as a dial reading, `(?, ?]` as a
+ * band, and `0.0 s accrued` — which is not „absent", it is the REFUTING
+ * number. The loud above it mitigates and does not prevent; a reader who
+ * copies one sentence copies this one.
+ *
+ * THE UNRUN CASE GETS ITS OWN SENTENCE rather than a field-by-field "NOT
+ * RECORDED", because the two facts are different: „the hold ran and accrued
+ * nothing" refutes a sustained-overspeed row, and „the hold never ran" leaves
+ * it UNJUDGED. `overSec: 0` is a measurement in the first and an invention in
+ * the second, and only `flatTicks` can tell them apart.
+ *
+ * @returns {string} one line, safe to quote
+ */
+export function overLimitNoteLine(state = null, { sustainSec = OVER_LIMIT_SUSTAIN_SEC } = {}) {
+  const o = state && typeof state === "object" ? state : {};
+  const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const speed = (v) => (num(v) !== null && v > 0 ? v : null);
+  const ranTicks = num(o.flatTicks) !== null && o.flatTicks >= 0 ? o.flatTicks : null;
+
+  if (ranTicks === null || ranTicks === 0) {
+    return (
+      `over-limit (SUSTAINED_OVER_LIMIT_LANES): NOT ONE FLAT TICK RAN (${ranTicks === null ? "the counter is missing" : "0 counted"}) — ` +
+      `the drive ended before the flat phase, so no В26 disc was looked for, not one second was accrued and none was ` +
+      `refused. EVERY FIELD OF THIS BLOCK IS ITS INITIAL STATE AND NOTHING HERE WAS MEASURED: a row about what the ` +
+      `engine books for a SUSTAINED over-speed is UNJUDGED from this leg and is NOT refuted by it.`
+    );
+  }
+
+  const disc = speed(o.postedKmh) !== null ? `${o.postedKmh} км/ч` : "NOT ON THE GLASS";
+  const need = speed(o.needKmh) !== null ? `>${o.needKmh} км/ч` : "NOT RECORDED";
+  const band =
+    speed(o.gradedAboveKmh) !== null && speed(o.dangerousAboveKmh) !== null
+      ? `(${o.gradedAboveKmh}, ${o.dangerousAboveKmh}] км/ч`
+      : "NOT RECORDED";
+  // `>= 0` and not `isFinite`: the field's initial value is the sentinel -1.
+  const top = num(o.topKmh) !== null && o.topKmh >= 0 ? `${o.topKmh} км/ч` : "NOT RECORDED";
+  const secs = num(o.overSec) !== null && o.overSec >= 0 ? `${o.overSec.toFixed(1)} s` : "NOT RECORDED";
+  const at = num(o.sustainedAtSec) !== null && o.sustainedAtSec >= 0 ? `t=${o.sustainedAtSec}s` : "a time this leg did not record";
+  const held = o.sustained === true ? `HELD at ${at}` : "NOT HELD";
+  const rests = num(o.restsHeld) !== null && o.restsHeld >= 0 ? `${o.restsHeld}` : "NOT RECORDED";
+  const why = typeof o.why === "string" && o.why !== "" ? o.why : "-";
+
+  /* THE TWO FLAGS REACH THE LINE, or they are two more predicates nothing
+   * reads — the measured failure mode of this whole programme (51 of 82 audited
+   * repairs shipped a predicate no consumer read). */
+  const contaminated =
+    o.topAboveBand === true
+      ? ` · ⚠ THE TOP OF THE FLAT WENT ABOVE THE ENGINE'S MINOR BAND — up there the engine books SPEEDING_DANGEROUS, a ` +
+        `DIFFERENT code, so seconds spent there do not support a SUSTAINED_OVER_LIMIT row`
+      : "";
+  const mirrorBroken =
+    o.needBelowGraded === true
+      ? ` · ⚠ THIS HARNESS'S OWN need SITS BELOW THE ENGINE'S gradedAbove — it is accruing seconds in a band the ` +
+        `изпитен лист bills NOTHING for, and any "sustained" verdict on this line is the harness's, not the engine's`
+      : "";
+
+  return (
+    `over-limit (SUSTAINED_OVER_LIMIT_LANES): В26 disc ${disc} · need ${need} · engine band ${band} · ` +
+    `${ranTicks} flat tick(s) ran · top on the flat ${top} · ` +
+    `${secs} accrued over the need (target ${sustainSec} s) · ` +
+    `${held} · ${rests} rest(s) held back · ${why}${contaminated}${mirrorBroken}`
+  );
+}
+
+/**
+ * THE LANES THIS IS ON FOR, AND THE ROW EACH ONE SERVES.
+ *
+ * An allowlist and not a default, for the reason the section header gives: a
+ * harness change is not a repair, and re-timing every `wrong` lane to serve one
+ * row would move the evidence under all the others. Adding a lane here is a
+ * statement that an OPEN row on it needs a SUSTAINED over-posted-limit
+ * antecedent that the 45 m cadence is currently chopping — the same kind of
+ * per-route statement the product itself makes with `ruleConfig:
+ * { needlessStopEnabled: true }`.
+ */
+export const SUSTAINED_OVER_LIMIT_LANES = new Map([
+  [
+    "sc-follow-tailgater",
+    "sc-follow-tailgater:63c0c28c (critical, PARTIAL on its fourth overturn) — the drill's mistakes[1] «Гузно ускоряване» grades SPEEDING_OVER_LIMIT off the player's own dial, and w51's leg topped 58 over a posted 50 without ever holding it: 3 careless rests, 0 «Превишена скорост»",
+  ],
+]);
+
+/** `{ on, why }` for a scenario id. `why` is the row the lane was added for and
+ *  is printed on the drive, so a reader never meets the changed cadence without
+ *  meeting the reason for it. */
+export function sustainedOverLimitLane(scenario) {
+  const why = typeof scenario === "string" ? SUSTAINED_OVER_LIMIT_LANES.get(scenario) ?? null : null;
+  return { on: why !== null, why };
+}
+
+/**
+ * Should the `wrong` leg's first rest be held back one more tick so the dial
+ * can ACCRUE time over the posted disc?
+ *
+ * @returns {{hold: boolean, done: null|"sustained"|"metres"|"clock"|"no-disc"|"off", why: string}}
+ *   `done` is the reason the hold ENDED and is what the log prints; `null`
+ *   means it has not ended. `"sustained"` says the MEASUREMENT was taken — it
+ *   does not say the engine billed it.
+ *
+ *   `"no-disc"` IS THE ONE ANSWER A CALLER MUST NOT LATCH ON. It means „this
+ *   tick had no posted number to hold the dial over", and the dashboard can
+ *   paint the disc after the first flat tick — so it is a not-yet, not a
+ *   verdict, and the caller keeps asking until a disc appears or one of the two
+ *   ceilings it also owns is reached. Latching it would end the hold on tick
+ *   one AND then report a failure for an attempt that never happened.
+ */
+export function overLimitHold({
+  on = false,
+  postedKmh = null,
+  overSec = 0,
+  sustainSec = OVER_LIMIT_SUSTAIN_SEC,
+  topKmh = -1,
+  metres = 0,
+  ms = 0,
+  marginKmh = OVER_CAP_MARGIN_KMH,
+  maxM = OVER_LIMIT_MAX_M,
+  maxMs = OVER_LIMIT_MAX_MS,
+} = {}) {
+  if (on !== true) {
+    return {
+      hold: false,
+      done: "off",
+      why: "this lane is not in SUSTAINED_OVER_LIMIT_LANES — its rest cadence is untouched",
+    };
+  }
+  if (typeof postedKmh !== "number" || !Number.isFinite(postedKmh) || postedKmh <= 0) {
+    return {
+      hold: false,
+      done: "no-disc",
+      why: "the В26 disc «Ограничение N км/ч» is not on the glass ON THIS TICK, so there is no posted number to hold the dial over and this tick's rest cadence is untouched — ask again next tick, and do not latch this",
+    };
+  }
+  const need = postedKmh + marginKmh;
+  if (typeof overSec === "number" && Number.isFinite(overSec) && overSec >= sustainSec) {
+    return {
+      hold: false,
+      done: "sustained",
+      why:
+        `the dial held above ${need} км/ч (posted ${postedKmh} + ${marginKmh} margin) for ${overSec.toFixed(1)} s of ` +
+        `accrued time, top ${topKmh} км/ч — the MEASUREMENT the row needs is on the record. Whether the engine's own ` +
+        `grace band and sustain window turn it into a bill is the debrief's answer, not this harness's`,
+    };
+  }
+  if (metres >= maxM) {
+    return {
+      hold: false,
+      done: "metres",
+      why:
+        `${Math.round(metres)} m of held throttle accrued only ${Number(overSec || 0).toFixed(1)} s above ${need} км/ч ` +
+        `(top ${topKmh} км/ч) — the hold gives up at ${maxM} m and the leg rests. THE ANTECEDENT WAS NOT EXERCISED.`,
+    };
+  }
+  if (ms >= maxMs) {
+    return {
+      hold: false,
+      done: "clock",
+      why:
+        `${Math.round(ms / 1000)} s of held throttle accrued only ${Number(overSec || 0).toFixed(1)} s above ${need} км/ч ` +
+        `(top ${topKmh} км/ч) — the hold gives up at ${maxMs / 1000} s and the leg rests. THE ANTECEDENT WAS NOT EXERCISED.`,
+    };
+  }
+  return {
+    hold: true,
+    done: null,
+    why:
+      `holding the rest back until the dial has spent ${sustainSec} s above ${need} км/ч ` +
+      `(posted ${postedKmh} + ${marginKmh} margin); ${Number(overSec || 0).toFixed(1)} s so far, top ${topKmh} км/ч`,
   };
 }
 

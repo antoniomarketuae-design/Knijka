@@ -326,7 +326,7 @@ import {
 // `evaluate`s and the presses) is here. `lib/driveline.mjs`'s header carries
 // the measurement behind each one, and `__tests__/driveline.test.mjs` pins
 // both halves — the arithmetic AND the fact that this file still calls it.
-import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, cabinActuationSafe, errorBoundaryVerdict, overCapHold, parkingBrakeRoute, parkingBrakeVerdict, passRate, rateVerdict, releaseVerdict, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
+import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, OVER_LIMIT_MAX_MS, OVER_LIMIT_SUSTAIN_SEC, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, POSTED_LIMIT_SEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, cabinActuationSafe, elapsedSec, errorBoundaryVerdict, holdCeilingFeeds, overCapHold, overCapScanStep, overLimitHold, overLimitLedgerStep, overLimitNoteLine, overLimitScanStep, overLimitSearchCeiling, overLimitSearchClock, parkingBrakeRoute, parkingBrakeVerdict, passRate, postedLimitKmh, rateVerdict, readSpeedingConfig, releaseVerdict, sustainedOverLimitLane, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -6708,7 +6708,7 @@ const probe = () =>
       // while printing a tidy blind line nobody had a reason to open. It
       // degraded toward the OLD DRIVE, exactly as the module promises, which
       // is why it was survivable — and it is also why nothing went red.
-      ({ waitSrc, waitCardSrc, advisorSel, faultBodySel, faultColumnSel, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, capStripSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg }) => {
+      ({ waitSrc, waitCardSrc, advisorSel, faultBodySel, faultColumnSel, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, capStripSel, postedSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg }) => {
         const sp = document.querySelector('[aria-label^="Скорост "]');
         const paused = [...document.querySelectorAll(pauseSel)].find((e) => {
           const r = e.getBoundingClientRect();
@@ -6862,6 +6862,34 @@ const probe = () =>
             }
             return t;
           })(),
+          /* ── AND THE POSTED DISC, WHICH IS A DIFFERENT NUMBER ENTIRELY ────
+           *
+           * The cap above is the TASK's; the В26 disc is the ROAD's, and the
+           * изпитен лист is billed against the road — `rules/engine.ts:3242`
+           * grades `tick.maxSpeedKmh` and `:1298-1310` says the task cap
+           * „reaches the glass and the objective gate and never the изпитен
+           * лист". On sc-follow-tailgater the two are 36 and 50, so a leg held
+           * against the task cap says nothing about SPEEDING_OVER_LIMIT — see
+           * §2b of lib/driveline.mjs.
+           *
+           * ATTRIBUTES, NOT innerText: this is `getAttribute` over at most two
+           * spans on a trip whose layout flush is already paid for, so it costs
+           * nothing measurable. Both dashboard variants are in the DOM and
+           * carry the same numeral; `postedLimitKmh` takes the max and returns
+           * `null` for „the disc was not there", which is a third answer and
+           * not „no limit". */
+          postedLabels: (() => {
+            try {
+              const out = [];
+              for (const el of document.querySelectorAll(postedSel)) {
+                const l = el.getAttribute("aria-label");
+                if (typeof l === "string" && l !== "") out.push(l);
+              }
+              return out;
+            } catch {
+              return null;
+            }
+          })(),
           /** The looser "is this still a reversing task?" test — see
            *  REVERSE_STAY_RE. Only ever read while the drive is ALREADY in R. */
           reverseStay: (() => {
@@ -6967,6 +6995,7 @@ const probe = () =>
         revStaySrc: REVERSE_STAY_RE.source,
         revSel: REVERSE_DEMAND_SEL,
         capStripSel: TASK_CAP_STRIP_SEL,
+        postedSel: POSTED_LIMIT_SEL,
         gearSel: GEAR_SEL,
         holdOffRoadBg: ROUTE_HOLD_OFF_ROAD_BG,
         holdCrashPinnedBg: ROUTE_HOLD_CRASH_PINNED_BG,
@@ -6991,6 +7020,12 @@ const probe = () =>
       // It is the identity for the over-cap hold — a lane whose probe is
       // failing keeps exactly the rest cadence it had before this existed.
       taskCapText: "",
+      // `null` and NOT `[]`: a probe that threw did not LOOK at the disc, and
+      // `postedLimitKmh(null)` is `null` — „no witness could speak", which the
+      // over-limit hold treats as no-disc and leaves the cadence alone. An
+      // empty array here would read as „the disc was looked for and was not
+      // there", which is a claim this fallback cannot make.
+      postedLabels: null,
       gear: [],
       // THE WHOLE PROBE FELL OVER, so the hazard channel saw nothing — and
       // „saw nothing" here means BLIND, not clear. The old fallback said
@@ -7207,6 +7242,112 @@ const overCap = {
   restsHeld: 0, metres: 0, ms: 0, done: null, why: null,
 };
 let overCapFrom = null;
+/* ── …AND THE SECOND HOLD, WHICH IS ABOUT THE ROAD AND NOT THE TASK ─────────
+ *
+ * `lib/driveline.mjs` §2b owns every clause and the whole argument. In one
+ * sentence: the hold above releases when the dial TOUCHES the TASK cap, and
+ * `sc-follow-tailgater:63c0c28c` is about SPEEDING_OVER_LIMIT, which is billed
+ * against the POSTED disc and only after a SUSTAINED episode. Measured on
+ * w51's own leg: top 58 км/ч over a posted 50, three careless rests, and not
+ * one «Превишена скорост» in the debrief.
+ *
+ * OFF ON EVERY LANE BUT THE ALLOWLIST'S, and that is the point rather than a
+ * limitation — re-timing ~200 `wrong` lanes to serve one row would move the
+ * evidence under all the others. `sustainedOverLimitLane` is the whole switch;
+ * with `on:false` the block below is inert and this leg drives byte-for-byte
+ * as it did. */
+const overLimitLane = sustainedOverLimitLane(SCENARIO);
+/* AND THE SECOND SWITCH: THE ENGINE'S OWN BAND, OR NOTHING. The ledger below
+ * mirrors `rules/engine.ts`'s minor band, which has an UPPER end as well as a
+ * lower one (`engine.ts:3251`) — above `dangerousAbove` the engine books
+ * SPEEDING_DANGEROUS, a different code. Those numbers are read out of
+ * `rules/types.ts` by `readSpeedingConfig`; if they cannot be read this hold
+ * CANNOT mirror the engine, so it does not run at all and says so. Refusing is
+ * the only safe direction: a hold that accrued without the ceiling would hand
+ * a SPEEDING_OVER_LIMIT row an antecedent the изпитен лист billed elsewhere. */
+const speedingCfg = readSpeedingConfig();
+const overLimit = {
+  on: overLimitLane.on && speedingCfg.ok,
+  lane: overLimitLane.why,
+  /** `null` when the bands WERE read — a reader checks this before believing
+   *  `on:false` on a lane that is in the allowlist. */
+  bandsWhy: speedingCfg.ok ? null : speedingCfg.why,
+  /** The engine's own two ends for the posted disc actually seen. Both
+   *  published, because a judge reading `overSec` has to be able to see which
+   *  band it was accrued in.
+   *
+   *  AND THE SENTENCE THIS REPLACES WAS FALSE. It said „recomputed whenever
+   *  the disc changes"; the block below recomputes on a RISE only
+   *  (`posted > overLimit.postedKmh`), so a disc that DROPS mid-leg — 50 into a
+   *  30 zone — would leave the band, the `needKmh` and every sentence built on
+   *  them describing the road the car has left. That cannot fire today and the
+   *  arithmetic is measured rather than assumed: `content/world/ln-v1.json`
+   *  holds ONE edge, `ln-e-road`, `"maxspeed":50`, `"length":400`, so the disc
+   *  on this lane is 50 from end to end and never moves. It is a LATENT
+   *  mirror break — live the day a second lane joins
+   *  `SUSTAINED_OVER_LIMIT_LANES` on a road whose limit steps down — and it is
+   *  recorded here rather than quietly fixed, because widening the condition
+   *  would change what ~200 committed legs measured. */
+  gradedAboveKmh: null, dangerousAboveKmh: null,
+  postedKmh: null, needKmh: null, topKmh: -1,
+  /** SECONDS ACCRUED above `needKmh`, not consecutive ones — the engine's own
+   *  episode accrues too (`rules/engine.ts:3262 SPEEDING_SUSTAIN_ACCRUES`), and
+   *  a dial that dips for one sample has not stopped speeding.
+   *
+   *  BUT IT IS NOT MONOTONIC, because the engine's is not either: a dip to or
+   *  BELOW the posted number is `speedReset` (`rules/engine.ts:3244`) and wipes
+   *  the ledger (`engine.ts:2445`). See §2b of lib/driveline.mjs for all four
+   *  lines and the 56/49/56/49 trajectory that made the first cut of this field
+   *  print 3 s against an engine ledger of 0. */
+  overSec: 0,
+  /** How many of those wipes happened. A leg that accrued its 3 s having been
+   *  reset five times drove a saw-tooth, and a judge reading `overSec` alone
+   *  would never know. */
+  resets: 0,
+  sustained: false, sustainedAtSec: null,
+  /** Ticks on which the В26 disc was not yet on the glass. `done` is NOT set
+   *  from those (see the flat block): the dashboard can paint the disc after
+   *  the first flat tick, and latching there both ends the hold on tick one and
+   *  reports a failure for an attempt that never happened. */
+  noDiscTicks: 0,
+  /** FLAT TICKS ON WHICH THIS BLOCK ACTUALLY RAN, and `0` is a state of its
+   *  own rather than a quiet zero. The initial object renders, word for word,
+   *  «(0 looked, top -1 км/ч)» — a sentence about a search that never looked
+   *  once — and publication is gated only on MODE and `on`, both fixed before
+   *  the loop starts. A drive CAN end with zero flat ticks and it is not
+   *  hypothetical: `p.end` breaks the loop (see the `if (p.end)` break above)
+   *  and a pause layer that will not clear abandons it (the `abandoning the
+   *  drive` break), both before the flat phase is ever reached.
+   *  `tools/audit/leg-evidence.mjs` reads this and renders a FIFTH arm for it
+   *  — „the drive ended before its first flat tick" — instead of the fourth,
+   *  which would have said the leg failed to hold a limit it never met. */
+  flatTicks: 0,
+  /** TWO STATES THAT WERE INVISIBLE, published so a judge can see them without
+   *  re-deriving them from the three numbers above. `topAboveBand` — the top of
+   *  the flat went ABOVE `dangerousAboveKmh`, where the engine books
+   *  SPEEDING_DANGEROUS, a DIFFERENT code, so seconds spent up there do not
+   *  support the row this hold exists to serve. `needBelowGraded` — this
+   *  harness's own `needKmh` sits BELOW the engine's `gradedAboveKmh`, i.e. it
+   *  is accruing in a band the изпитен лист bills nothing for. Both are
+   *  computed by `overLimitScanStep` and both reach `run.log`; neither changes
+   *  a single decision this drive takes. */
+  topAboveBand: false, needBelowGraded: false,
+  restsHeld: 0, metres: 0, ms: 0, done: null, why: null,
+};
+let overLimitFrom = null;
+/** The last QUALIFYING tick's clock, mirroring `e.lastQualAt`
+ *  (`rules/engine.ts:2473-2474`). `null` means „the run of over-limit ticks is
+ *  broken", and the engine credits ZERO for the first tick after that break —
+ *  so this harness does too. */
+let overLimitQualAt = null;
+/** …and the clock the NO-DISC search is bounded by, which is a different clock
+ *  from `overLimitFrom`: that one starts when a disc is first seen, and the
+ *  whole point of this one is the case where that never happens. */
+let overLimitSearchFrom = null;
+/** …and it is the ONLY ceiling the search has. There is deliberately no
+ *  `overLimitSearchM`: no rest is held back while the search looks, so the
+ *  cadence keeps chopping and no distance ceiling can be reached inside the
+ *  20 s — `overLimitSearchCeiling` carries the arithmetic. */
 /** When that rest was BOOKED — which is not when the phase began, because the
  *  car spends the first seconds of the phase still braking. */
 let flatRestAt = 0;
@@ -8316,16 +8457,48 @@ while (!ended && Date.now() - t0 < budgetMs) {
        * must not have those twenty seconds charged to its hold. */
       let holdRest = false;
       if (!overCap.proven && overCap.done === null) {
-        const shown = taskCapKmh(p.taskCapText);
-        if (shown !== null && (overCap.capKmh === null || shown > overCap.capKmh)) {
-          overCap.capKmh = shown;
-          overCap.capPhrase = taskCapPhrase(p.taskCapText);
-          overCap.needKmh = shown + OVER_CAP_MARGIN_KMH;
-          overCapFrom ??= now;
-        }
-        if (p.kmh > overCap.topKmh) overCap.topKmh = p.kmh;
-        overCap.metres = flatM;
-        overCap.ms = overCapFrom === null ? 0 : now - overCapFrom;
+        /* THE SAME EXTRACTION §2b's SCAN GOT, AND FOR A MEASUREMENT RATHER THAN
+         * FOR SYMMETRY. With the over-limit scan driven, two mutations of the
+         * lines that stood here were run against the suite and BOTH SURVIVED:
+         * `overCapFrom ??= now` → `= now` (the clock restarts on every
+         * cap rise, `overCap.ms` reads ~0 for ever and OVER_CAP_MAX_MS is a
+         * dead branch — M4's defect on the sibling clock) and the top-of-dial
+         * tracker disabled (the top never leaves its -1 sentinel, so the hold
+         * can never be beaten).
+         *
+         * §F2e DRIVES THE FUNCTION, NOT THE PATH — and that difference IS the
+         * instrument gap. MEASURED 2026-09-19: mutation F3 drops the clock from
+         * the `state:` argument of the call below and SURVIVES at 152/152,
+         * because what §F2e executes is `overCapScanStep` itself, while the
+         * argument carrying the clock into it is source-matched and nothing
+         * more. The `149/149` an earlier draft of this comment claimed is a
+         * number no verifier could reconstruct from disk; the measured baseline
+         * at the parked state is 152/152.
+         * See docs/simulation/93_INSTRUMENT_GAPS.md. */
+        const capScan = overCapScanStep({
+          kmh: p.kmh,
+          shown: taskCapKmh(p.taskCapText),
+          phrase: taskCapPhrase(p.taskCapText),
+          now,
+          state: { ...overCap, from: overCapFrom },
+        });
+        overCap.capKmh = capScan.capKmh;
+        overCap.capPhrase = capScan.capPhrase;
+        overCap.needKmh = capScan.needKmh;
+        overCap.topKmh = capScan.topKmh;
+        overCapFrom = capScan.from;
+        /* M5, THE CONTROL, FIXED RATHER THAN ONLY DISCLOSED. These two lines
+         * were `overCap.metres = flatM` / `overCap.ms = overCapFrom === null ?
+         * 0 : now - overCapFrom`, and they had the identical hole the
+         * over-limit copy below had: mutating the first to `0` makes
+         * OVER_CAP_MAX_M a dead branch and the suite stayed green at 127/127,
+         * because nothing anywhere executed the FEED — only `overCapHold`,
+         * which takes the metres as an input. One shared pure function now
+         * computes both holds' ceiling inputs and a test drives a leg into the
+         * distance ceiling through it. */
+        const capFeeds = holdCeilingFeeds({ flatM, now, from: overCapFrom });
+        overCap.metres = capFeeds.metres;
+        overCap.ms = capFeeds.ms;
         const gate = overCapHold({
           capKmh: overCap.capKmh,
           topKmh: overCap.topKmh,
@@ -8349,7 +8522,11 @@ while (!ended && Date.now() - t0 < budgetMs) {
           overCap.why = gate.why;
           if (gate.done === "proven") {
             overCap.proven = true;
-            overCap.provenAtSec = Math.round((now - t0) / 1000);
+            // `Math.round((now - t0) / 1000)` — one function for BOTH holds'
+            // success stamps, for `holdCeilingFeeds`' reason: two copies of one
+            // line, each feeding the most quotable sentence its hold produces,
+            // and neither executable by any test.
+            overCap.provenAtSec = elapsedSec({ now, from: t0 });
             overCap.provenAtKmh = overCap.topKmh;
             note(
               `      the wrong leg BEAT ITS TASK CAP at t=${overCap.provenAtSec}s — ${overCap.topKmh} км/ч against ` +
@@ -8361,6 +8538,233 @@ while (!ended && Date.now() - t0 < budgetMs) {
             loud(
               `THE WRONG LEG DID NOT BEAT ITS TASK CAP — ${gate.why} Any row about what the engine books ABOVE ` +
                 `${overCap.capKmh} км/ч is STILL unjudgeable from this lane: the antecedent was not exercised.`,
+            );
+          }
+        }
+      }
+      /* ── AND THE ROAD'S OWN NUMBER, HELD LONG ENOUGH TO BE AN EPISODE ────
+       * §2b of lib/driveline.mjs. Its own gate, its own ledger and its own
+       * ceilings: the two holds answer different questions (a task cap TOUCHED
+       * vs the posted disc SUSTAINED) and either may be holding while the other
+       * has released, so they OR into `holdRest` rather than nesting. `on:false`
+       * — every lane not in the allowlist, AND any lane whose engine band could
+       * not be read (see the state object) — fails the gate below on its FIRST
+       * term, so nothing inside here ever runs, `overLimitHold` is never called
+       * and `done` stays `null`. (It is the gate and not the "off" return that
+       * keeps those ~200 lanes byte-identical; `done:"off"` exists for a caller
+       * that asks the pure function directly.) */
+      if (overLimit.on && !overLimit.sustained && overLimit.done === null) {
+        /* ── THE SCAN, AND IT IS A PURE FUNCTION NOW FOR THE LEDGER'S REASON ─
+         *
+         * This was ten assignments written out here: the flat-tick counter, the
+         * disc-rise branch with `needKmh`, both band ends and the hold's clock,
+         * and the running top of the dial. They were the INPUTS the ledger call
+         * below is handed — and the previous pass pinned that call's ARGUMENTS
+         * while leaving the lines that fill them unexecutable by any test.
+         * MEASURED: nine mutations of these store-backs, one at a time, each
+         * left `node --test ../tools/mobile/__tests__/driveline.test.mjs` GREEN
+         * at 135/135.
+         *
+         * ONE OF THE NINE WAS MATERIAL. `needKmh = posted` in place of `posted
+         * + OVER_CAP_MARGIN_KMH` makes a leg pinned at 52 км/ч over a posted 50
+         * accrue 4.5 s in ten 500 ms ticks (as shipped: 0.0 s, every tick on
+         * the ledger's "stopped" arm) — past OVER_LIMIT_SUSTAIN_SEC = 3, so the
+         * hold reports "sustained" and this harness certifies an antecedent as
+         * DRIVEN while the engine's `gradedAbove` for that disc is 55 and the
+         * изпитен лист bills nothing at 52. `overLimitScanStep` carries the
+         * argument and the arithmetic; §F2c drives this sequence through it.
+         *
+         * `noDiscTicks` MOVED INTO IT and is no longer incremented downstream.
+         * `overLimitHold` returns "no-disc" on exactly one condition — `on`
+         * true (a literal at the call below) and `postedKmh` not a finite
+         * number > 0 — so the scan evaluates the same predicate in a place a
+         * test can reach. Every reader of the counter sees the same value. */
+        const scan = overLimitScanStep({
+          kmh: p.kmh,
+          posted: postedLimitKmh(p.postedLabels),
+          cfg: speedingCfg.cfg,
+          now,
+          state: { ...overLimit, from: overLimitFrom },
+        });
+        overLimit.flatTicks = scan.flatTicks;
+        overLimit.postedKmh = scan.postedKmh;
+        overLimit.needKmh = scan.needKmh;
+        overLimit.gradedAboveKmh = scan.gradedAboveKmh;
+        overLimit.dangerousAboveKmh = scan.dangerousAboveKmh;
+        overLimit.topKmh = scan.topKmh;
+        overLimit.noDiscTicks = scan.noDiscTicks;
+        overLimit.topAboveBand = scan.topAboveBand;
+        overLimit.needBelowGraded = scan.needBelowGraded;
+        overLimitFrom = scan.from;
+        /* THE MIRROR'S OWN HEALTH — `needKmh` below `gradedAboveKmh`, i.e. this
+         * harness accruing in a band the engine bills nothing for — IS CARRIED
+         * BY THE TWO LINES A JUDGE ACTUALLY READS and not by a third copy here.
+         * A mid-drive `loud()` was written at this spot and then REMOVED: with
+         * it disabled the suite stayed green at 152/152 (measured this
+         * session), and the only way to pin a loud inside a file with a
+         * top-level await is another source grep — which is the move this lane
+         * has been refused for four times. `overLimitNoteLine` renders the
+         * warning into run.log and `leg-evidence.mjs` replaces the „antecedent
+         * was DRIVEN" clause with it in the judging brief; both are driven by
+         * §F2d and by the legEvidence fixture sweep. One fact, two consumers,
+         * both executed.
+         *
+         * MEASURED, and it is why the flag exists at all: for a posted 50 the
+         * harness's need and the engine's gradedAbove are EQUAL (55 and 55),
+         * and only because `OVER_CAP_MARGIN_KMH` here is 5 and
+         * `speedingGraceMaxKmh` in `rules/types.ts` is 5. Two independent
+         * constants; nothing guarded that they agree. */
+        /* ── THE LEDGER, UNDER THE ENGINE'S OWN THREE RULES ────────────────
+         * ACCRUED ON THE TICK'S OWN INTERVAL, not counted in samples: this loop
+         * runs at ~2 Hz but a single tick has been measured at 1,155 ms (w51
+         * `TICKS: … worst 1155 ms`), so „one sample = half a second" would
+         * under-count a slow tick and over-count a fast one.
+         *
+         * AND IT GOES DOWN AS WELL AS UP. The first cut of this block only ever
+         * added, which is the reassuring direction and is not what the product
+         * does. Mirrored here, line by line (§2b of lib/driveline.mjs carries
+         * the argument):
+         *
+         *   · `rules/engine.ts:3244` `const speedReset = speed <= limit;` — the
+         *     reset is the POSTED number with NO margin, and
+         *     `engine.ts:2443-2446` WIPES `qualifiedSec` and `lastQualAt` on it.
+         *     So does this. A 56/49/56/49 dial over a posted 50 accrues nothing
+         *     here, exactly as it bills nothing there.
+         *   · `engine.ts:2473` caps one step at `Math.min(…, 2)` and credits
+         *     ZERO for the first qualifying step after a break
+         *     (`e.lastQualAt === null ? 0 : …`). Both, not one.
+         *   · `engine.ts:2459-2469` — the band BETWEEN the posted number and
+         *     this harness's `needKmh` is the engine's `!cond` arm with
+         *     `accrue` true: the clock stops, the ledger survives. So the third
+         *     arm below does neither.
+         *   · `engine.ts:3251` — AND THE BAND HAS A TOP:
+         *     `speed > bands.gradedAbove && speed <= bands.dangerousAbove`.
+         *     ABOVE `dangerousAbove` the engine takes that SAME `!cond` arm and
+         *     books SPEEDING_DANGEROUS (`engine.ts:3375`, `:3391`) — a
+         *     DIFFERENT CODE. The accrual arm is bounded there so that a leg
+         *     held at 65 over a posted 50 falls to the third arm (clock stops,
+         *     ledger survives) instead of buying a SPEEDING_OVER_LIMIT row an
+         *     antecedent the изпитен лист billed elsewhere. `dangerousAboveKmh`
+         *     is READ off `rules/types.ts`, never typed here. */
+        /* AND THE THREE ARMS THEMSELVES LIVE IN `lib/driveline.mjs` NOW, for
+         * the reason its own header gives: written out here they were reachable
+         * only by driving a browser, so the guards over them were `assert.match`
+         * calls against this file read as a STRING — and a judge's mutation of
+         * the accrual arm's upper bound (`+ 100 км/ч`, i.e. the exact defect the
+         * bound was added for) left the suite green at 127/127. The arithmetic
+         * is unchanged and the comment above still describes it line for line;
+         * what changed is that a test now drives 56,57,65,56,57,58 over a
+         * posted 50 through it and asserts where the seconds land. This block
+         * keeps the WIRING, and every wire below is pinned. */
+        const led = overLimitLedgerStep({
+          kmh: p.kmh,
+          now,
+          postedKmh: overLimit.postedKmh,
+          needKmh: overLimit.needKmh,
+          dangerousAboveKmh: overLimit.dangerousAboveKmh,
+          overSec: overLimit.overSec,
+          resets: overLimit.resets,
+          qualAt: overLimitQualAt,
+        });
+        overLimit.overSec = led.overSec;
+        overLimit.resets = led.resets;
+        overLimitQualAt = led.qualAt;
+        // …and the hold's two ceilings are fed by the same shared function the
+        // over-cap block above uses, so neither copy can become a dead branch
+        // without the other's test going red.
+        const limFeeds = holdCeilingFeeds({ flatM, now, from: overLimitFrom });
+        overLimit.metres = limFeeds.metres;
+        overLimit.ms = limFeeds.ms;
+        const lim = overLimitHold({
+          on: true,
+          postedKmh: overLimit.postedKmh,
+          overSec: overLimit.overSec,
+          topKmh: overLimit.topKmh,
+          metres: overLimit.metres,
+          ms: overLimit.ms,
+          sustainSec: OVER_LIMIT_SUSTAIN_SEC,
+        });
+        // NO `continue`, for the reason the over-cap block gives above: an
+        // antecedent bought by losing the photographs is not evidence.
+        if (lim.hold) {
+          holdRest = true;
+          overLimit.restsHeld += 1;
+          overLimit.why = lim.why;
+        } else if (lim.done === "no-disc") {
+          /* ── A NOT-YET IS NOT A VERDICT, AND MUST NOT LATCH ───────────────
+           * `overLimit.done` is this block's own OFF SWITCH — the gate above
+           * reads `done === null`. Assigning "no-disc" here would end the hold
+           * for the WHOLE LEG on whichever early flat tick beat the dashboard
+           * to painting the disc, and then fire the loud below announcing that
+           * an antecedent was not exercised for a hold that was never
+           * attempted. The neighbouring over-cap block has the same shape and
+           * suppresses its loud on "no-cap"; this one keeps LOOKING instead,
+           * and speaks only when the clock ceiling it owns — the only one it
+           * can have, see `overLimitSearchCeiling` — says the disc is not
+           * coming. No rest is held while it looks, so the
+           * cadence over this stretch is byte-identical to a lane that has no
+           * hold at all. */
+          // `overLimit.noDiscTicks += 1;` STOOD HERE and is now computed by
+          // `overLimitScanStep` above, on the identical predicate, in a place a
+          // test can execute. Nothing that reads the counter — the `why` below
+          // and `leg-evidence.mjs` — sees a different number.
+          overLimit.why = lim.why;
+          /* A CLOCK, AND ONLY A CLOCK — see `overLimitSearchCeiling`. This gave
+           * up on `flatM >= OVER_LIMIT_MAX_M || searchMs >= …` and the first
+           * half could not fire: `flatM` is the REST CADENCE's counter, zeroed
+           * every FLAT_REST_EVERY_M = 45 m, and no rest is held back while the
+           * search looks. Giving the search its own unreset counter does not
+           * help either — 150 m needs three completed 45 m stretches and so
+           * three rests of at least FLAT_REST_HOLD_MS = 8 s, i.e. ≥24 s of
+           * standstill against a 20 s ceiling. The distance half is REMOVED
+           * rather than reworded, here and in the sentence below.
+           *
+           * …AND THE CLOCK'S OWN START IS NOW COMPUTED WHERE IT CAN BE DRIVEN.
+           * This was an `overLimitSearchFrom ??= now` written out here (the
+           * token sequence is deliberately not reproduced verbatim: a mutation
+           * run that finds its target inside a PARAGRAPH edits prose, gets a
+           * green suite, and reads as a surviving hole), and a
+           * judge's mutation of that one token to `=` — the counter-zeroed-by-
+           * its-own-cadence shape this lane already removed once from the
+           * distance half — left the suite green at 127/127: with it applied
+           * `searchMs` is 0 on every tick for ever, the search's ONLY ceiling
+           * can never fire, `done` never latches and the loud below never
+           * speaks. `overLimitSearchClock` is driven over 41 ticks by the
+           * test. */
+          const search = overLimitSearchClock({ now, searchFrom: overLimitSearchFrom });
+          overLimitSearchFrom = search.searchFrom;
+          const searchMs = search.searchMs;
+          if (overLimitSearchCeiling({ searchMs }).give) {
+            overLimit.done = "no-disc";
+            overLimit.why =
+              `the В26 disc «Ограничение N км/ч» was never on the glass — ${overLimit.noDiscTicks} flat tick(s) over ` +
+              `${Math.round(searchMs / 1000)} s looked for it and found nothing, and the search gives up at ` +
+              `${OVER_LIMIT_MAX_MS / 1000} s. THE HOLD WAS NEVER ATTEMPTED.`;
+            loud(
+              `NO POSTED LIMIT WAS EVER ON THE GLASS ON THIS LANE — ${overLimit.why} That is a MISSING INSTRUMENT and not a ` +
+                `leg that failed to speed: every rest below fell on the ordinary ${FLAT_REST_EVERY_M} m cadence, untouched, and a ` +
+                `row about what the engine books for a SUSTAINED over-speed is UNJUDGED from this leg rather than refuted by ` +
+                `it — no antecedent was attempted, so none failed.`,
+            );
+          }
+        } else {
+          overLimit.done = lim.done;
+          overLimit.why = lim.why;
+          if (lim.done === "sustained") {
+            overLimit.sustained = true;
+            overLimit.sustainedAtSec = elapsedSec({ now, from: t0 });
+            note(
+              `      the wrong leg HELD THE ROAD'S OWN LIMIT OPEN at t=${overLimit.sustainedAtSec}s — ` +
+                `${overLimit.overSec.toFixed(1)} s accrued above ${overLimit.needKmh} км/ч (В26 disc ${overLimit.postedKmh} + ` +
+                `${OVER_CAP_MARGIN_KMH} margin), top ${overLimit.topKmh} км/ч, after holding ${overLimit.restsHeld} rest(s) back over ` +
+                `${Math.round(overLimit.metres)} m. THIS IS A MEASUREMENT AND NOT A VERDICT: whether the engine's own grace band ` +
+                `and sustain window turn it into «Превишена скорост» is the debrief's answer. The rest cadence resumes here, ` +
+                `and every stop below is this instrument's as it always was.`,
+            );
+          } else if (lim.done !== "off") {
+            loud(
+              `THE WRONG LEG DID NOT HOLD THE POSTED LIMIT — ${lim.why} Any row about what the engine books for a SUSTAINED ` +
+                `over-speed is STILL unjudgeable from this lane: the antecedent was not exercised.`,
             );
           }
         }
@@ -8666,7 +9070,19 @@ if (MODE !== "right" && stopsMade > 0) {
       `(FLAT_REST_EVERY_M = ${FLAT_REST_EVERY_M} m). Any «Рязко спиране без причина» or «Спиране в забранена зона» below is ` +
       `the product judging THOSE stops — the instrument's behaviour, not the lesson script's. AND IT CUTS THE OTHER WAY: a ` +
       `careless rest can land on a „спри на разрешеното място" mark and CREDIT it, so a wrong leg that PASSES may have ` +
-      `stopped by luck rather than by driving well — measured on sc-pk-ban-stop/mobile/wrong, 2026-08-28.`,
+      `stopped by luck rather than by driving well — measured on sc-pk-ban-stop/mobile/wrong, 2026-08-28.` +
+      /* THE SENTENCE ABOVE IS NOT WEAKENED BY THE HOLD, and this clause exists
+       * so nobody reads it as if it were. When §2b's hold has run, the FIRST
+       * stop is later than it would have been and it follows a stretch this
+       * log has already described — but it is still the 45 m cadence choosing
+       * the moment, not the lesson's script, so «Рязко спиране без причина»
+       * remains the instrument's fault on EVERY stop including the first.
+       * What the hold buys is the stretch BEFORE it, which is measured and
+       * stated on its own line. */
+      (overLimit.on
+        ? ` AND THE FIRST STOP ON THIS LANE IS LATER THAN 45 m: SUSTAINED_OVER_LIMIT_LANES held the cadence back (${overLimit.why ?? "-"}). ` +
+          `That changes WHEN the first rest fell, not WHOSE act it is — every stop above is still this instrument's, the first one included.`
+        : ""),
   );
 }
 /* ── AND WHAT PACED THIS DRIVE, ON EVERY `right` LANE ──────────────────────
@@ -9947,6 +10363,83 @@ if (MODE !== "right" && overCap.capKmh !== null) {
       `${overCap.proven ? `BEATEN at t=${overCap.provenAtSec}s` : "NOT BEATEN"} · ${overCap.restsHeld} rest(s) held back · ${overCap.why ?? "-"}`,
   );
 }
+// PRINTED WHENEVER THE LANE IS IN THE ALLOWLIST, including when the hold never
+// found a disc or gave up — for the reason §2b gives: a capability that is
+// silent about its own failures becomes a way of closing the row it was built
+// to open. A lane that is NOT in the allowlist prints nothing, which is the
+// same silence it printed before this existed.
+// …AND AN ALLOWLISTED LANE WHOSE HOLD NEVER RAN SAYS SO ON ITS OWN LINE. The
+// gate is `on = allowlisted && the engine's bands were readable`; without this
+// line the second half would be an invisible silent-off, which is the shape
+// the whole capability was built against.
+if (MODE !== "right" && overLimitLane.on && !overLimit.on) {
+  loud(
+    `THE SUSTAINED OVER-LIMIT HOLD DID NOT RUN ON AN ALLOWLISTED LANE — ${overLimit.bandsWhy ?? "reason not recorded"}. The ledger ` +
+      `mirrors the engine's minor band (rules/engine.ts:3251) and cannot be kept without both of its ends, so this leg drove ` +
+      `the ordinary ${FLAT_REST_EVERY_M} m cadence and a row about what the engine books for a SUSTAINED over-speed is ` +
+      `UNJUDGED from it rather than refuted.`,
+  );
+}
+// …AND A HOLD THAT NEVER RAN A SINGLE FLAT TICK SAYS THAT, TOO, RATHER THAN
+// PUBLISHING ITS INITIAL STATE AS A MEASUREMENT. The object below renders, out
+// of the box, «(0 looked, top -1 км/ч)» — a search that never looked, printed
+// as a search that looked and found nothing. `p.end` and an uncleared pause
+// layer both break the drive loop before the flat phase, so this is reachable
+// on any lane, not a hypothetical.
+if (MODE !== "right" && overLimit.on && overLimit.flatTicks === 0) {
+  loud(
+    `THE SUSTAINED OVER-LIMIT HOLD NEVER RAN A FLAT TICK — the drive ended before the flat phase was reached, so no В26 disc ` +
+      `was ever looked for and not one second was accrued or refused. Every number in the over-limit block below is its ` +
+      `INITIAL state and none of it is a measurement: a row about what the engine books for a SUSTAINED over-speed is ` +
+      `UNJUDGED from this leg and is NOT refuted by it.`,
+  );
+}
+if (MODE !== "right" && overLimit.on) {
+  /* ── AND THE THIRD PLACE, WHICH IS THE ONE A JUDGE QUOTES ─────────────────
+   * The loud directly above and `leg-evidence.mjs` both refuse to read the
+   * initial state as a measurement. THIS LINE DID NOT, and it is the more
+   * copyable of the two. MEASURED this session — the template that stood here,
+   * rendered against the initialiser at :7269-7326 — both as this file stood
+   * at the start of this session — with `on:true`:
+   *
+   *   «… · 0 flat tick(s) ran · top on the flat -1 км/ч · 0.0 s accrued over
+   *    the need (target 3 s) · NOT HELD …»
+   *
+   * `-1` as a dial reading, `(?, ?]` as a band, and `0.0 s accrued` — not
+   * „absent" but the REFUTING number, invented. It is reachable on any lane:
+   * the flat phase begins at :8434 and BOTH drive-ending breaks are above it
+   * (`p.end` at :7593, the uncleared-pause abandon at :7658), with the state
+   * published unconditionally at the sidecar below. The rendering is a pure
+   * function now and §F2d drives this exact object through it. */
+  note(overLimitNoteLine(overLimit, { sustainSec: OVER_LIMIT_SUSTAIN_SEC }));
+  note(`  this lane is on the list because: ${overLimit.lane ?? "-"}`);
+  /* ── AND THE LAST LINE IS THE MOST QUOTABLE ONE, SO IT MUST BE TRUE ────────
+   * This note used to be unconditional, sitting directly under a LOUD that had
+   * just said «THE ANTECEDENT WAS NOT EXERCISED» and a status word «NOT HELD» —
+   * and it still claimed „the leg drove the act the drill's own mistakes[]
+   * authors". On the failure this lane's own risks list calls the likely one,
+   * the judge's last and most copyable sentence was therefore false.
+   *
+   * TWO CORRECTIONS, not one. It is now gated on `overLimit.sustained`, AND the
+   * true branch names the SPEEDING HALF ONLY. The plural `mistakes[]` swept in
+   * `mistakes[0]` HARSH_BRAKING_NO_CAUSE, which this hold does not touch and
+   * cannot: every stop on this leg is still produced by the blind
+   * FLAT_REST_EVERY_M cadence, which is the very thing four overturns of
+   * `sc-follow-tailgater:63c0c28c` were about. */
+  note(
+    overLimit.sustained
+      ? `  AND THIS IS AN INSTRUMENT LINE, NOT A REPAIR. Nothing above may close a finding. It says that the leg drove the ` +
+          `SPEEDING HALF AND ONLY THAT HALF — mistakes[1] «Гузно ускоряване» / SPEEDING_OVER_LIMIT, held over the road's own ` +
+          `disc. It says NOTHING about mistakes[0] HARSH_BRAKING_NO_CAUSE: every stop on this leg is still the blind ` +
+          `${FLAT_REST_EVERY_M} m rest cadence and not the drill's brake check. What the engine did with the over-speed is ` +
+          `the debrief, below.`
+      : `  AND THE ACT WAS NOT DELIVERED — read the two lines above, not this one, if they disagree. The hold ended ` +
+          `«${overLimit.done ?? "still open when the drive ended"}» without the sustain, so this leg drove NEITHER half of the ` +
+          `drill's mistakes[]: no sustained over-posted-limit episode for mistakes[1] SPEEDING_OVER_LIMIT, and mistakes[0] ` +
+          `HARSH_BRAKING_NO_CAUSE was never this hold's to deliver — its stops are the blind ${FLAT_REST_EVERY_M} m cadence, as ` +
+          `they have always been. Nothing here may close a finding, and nothing here may close one by failing either.`,
+  );
+}
 note(`briefing chars: ${briefing.length}`);
 if (facts.error) loud(`the debrief reader threw: ${facts.error}`);
 // «(none)» NOW MEANS WHAT IT SAYS. Since the matcher learned «НЕЗАВЪРШЕН» the
@@ -10591,6 +11084,35 @@ saveStatus({
   // silence two sc-ac-truck-spray rows were refused on, now stated instead of
   // left to arithmetic.
   overCap: MODE === "right" ? null : overCap,
+  // …AND THE SECOND HOLD, WHICH ASKS THE ROAD'S QUESTION RATHER THAN THE
+  // TASK'S. `on:false` is the answer for every lane outside
+  // SUSTAINED_OVER_LIMIT_LANES and means „this leg's rest cadence was
+  // untouched"; `on:true` with `sustained:false` means the allowlist promised
+  // an antecedent this drive did not deliver, which is exactly the state a
+  // judge must not have to infer from a missing field. THE THIRD STATE IS THE
+  // ONE THAT USED TO HIDE: `on:true` with `done:"no-disc"` is neither — the В26
+  // disc was never painted, so the hold was never ATTEMPTED and the row is
+  // UNJUDGED rather than refuted. `tools/audit/leg-evidence.mjs` prints all
+  // three apart, and this object is where it reads them.
+  //
+  // AND IT IS PUBLISHED ONLY FOR LANES THE CAPABILITY ACTUALLY COVERS. The
+  // first cut published `{on:false}` on EVERY non-`right` leg of EVERY lane,
+  // and `leg-evidence.mjs` gates on truthiness — so every wrong leg of every
+  // reverse, parking and standstill lane would have carried a sentence about
+  // „its 45 m rest cadence", a cadence this hold never measured there. `null`
+  // is the honest answer for a lane outside `SUSTAINED_OVER_LIMIT_LANES`: the
+  // same silence the field had before it existed.
+  //
+  // THE FOURTH STATE — A HOLD THAT NEVER RAN A FLAT TICK — IS PUBLISHED AND
+  // NOT SUPPRESSED, and that is a choice with a reason. Gating this on
+  // `flatTicks > 0` too would make an allowlisted lane whose drive died early
+  // indistinguishable from a lane the capability was never on for, which is
+  // the silent-off shape the loud above exists to refuse. It is published with
+  // `flatTicks: 0` on it, `leg-evidence.mjs` renders it as its own sentence,
+  // and the loud says it in run.log. What must never happen is the initial
+  // state reading as a MEASUREMENT, and that is now prevented in all three
+  // places rather than hidden in one.
+  overLimit: MODE === "right" || !overLimit.on ? null : overLimit,
   // …and where the rest of the debrief went. `sidecar` is the claim a reader
   // checks first: if it is false, the sections below the fold are gone.
   debrief: {
