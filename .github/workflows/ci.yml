@@ -151,8 +151,17 @@ jobs:
 
       - name: typecheck
         run: npx tsc --noEmit
+      # ONE WORKER, so this step and the local gate are the SAME COMMAND.
+      # tools/audit/gate.sh carries the measurement and the argument; the short
+      # version is that the source-scanning tests (readFileSync a product file,
+      # assert on its text) starve under vitest's default fan-out and produced
+      # five false reds, one round each to chase. That ratio was measured on a
+      # 7200 rpm HDD and is NOT a claim about this runner — the reason to pin it
+      # here is narrower and still worth it: a red in CI has to be reproducible
+      # by typing `bash tools/audit/gate.sh` locally, and it is not if the two
+      # run the suite at different concurrencies.
       - name: tests
-        run: npx vitest run
+        run: npx vitest run --maxWorkers=1
       # The repo's OTHER runner. tools/theory and tools/deploy are tested with
       # node:test, which `npx vitest run` cannot see, so until this step existed
       # 92 tests — the content-authoring guards and the whole H-17 deploy-order
@@ -168,6 +177,32 @@ jobs:
       # only check that reads content/, which the app trusts blindly at boot.
       - name: content contract
         run: node scripts/validate-content.mjs
+
+      # ---- THERE IS NO LINT STEP HERE, AND THAT IS A DECISION ---------------
+      # Written down because an absent step is invisible: nothing in a green log
+      # says "eslint did not run", and the next reader would otherwise have to
+      # discover it the way this one did — by noticing that the local gate has a
+      # step CI does not. tools/audit/gate.sh runs `npx eslint src`; this file
+      # never has.
+      #
+      # It is absent because it would be red on arrival, for the whole team, on
+      # work nobody here did. MEASURED 2026-09-19, `cd platform && npx eslint
+      # src`, exit 1, 72 s: «✖ 231 problems (82 errors, 149 warnings)». SEVENTY
+      # -NINE of the 82 errors are React Compiler diagnostics that arrived with
+      # eslint-plugin-react-hooks 7.1.1, pulled in by eslint-config-next 16.2.10
+      # / next 16.2.10 — react-hooks/refs 33, react-hooks/immutability 33,
+      # react-hooks/set-state-in-effect 13 (counted with `--format json`, not
+      # off the stylish log). The other three are @typescript-eslint/
+      # no-this-alias x2 and prefer-const. The 149 warnings are overwhelmingly
+      # @typescript-eslint/no-unused-vars (136).
+      #
+      # ADD THE STEP once those 79 are triaged — and triage means fixed or
+      # individually justified, never silenced wholesale, never mass `--fix`.
+      # Some of them are likely real: a ref read during render is exactly the
+      # class of defect that shows up as a frame stutter nobody can reproduce,
+      # in a cockpit that has to hold 60 fps. Until then, adding
+      # `- run: npx eslint src` here would block every PR in the repo on
+      # inherited debt, which is the fastest way to teach a team to merge red.
       - name: build
         run: npm run build
 

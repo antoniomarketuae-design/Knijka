@@ -1374,12 +1374,24 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // The pair only works if the removal is accompanied by a GROUND for the
     // bus-stop ban, and that half is blocked on content truth, not engineering.
     // Read back from content/law/acts/zdvp.json: чл. 98, ал. 1 is a closed list
-    // of eight places and none of them is a спирка; the act's only spirka clause
-    // is ал. 2, т. 3, and ал. 2 opens «Освен в посочените в ал. 1 случаи
-    // ПАРКИРАНЕТО е забранено» — a chapeau about ПАРКИРАНЕТО, while these spans
-    // are `noStopping` (ПРЕСТОЙ). The real ban is a зигзаг МАРКИРОВКА this map
-    // does not paint. So there is no чл. 98 клауза to re-cite to, and inventing
-    // one would be authored law — ADR-002's exact prohibition. It is
+    // of eight places and none of them is a спирка; ал. 2, т. 3 does name the
+    // спирки, but ал. 2 opens «Освен в посочените в ал. 1 случаи ПАРКИРАНЕТО е
+    // забранено» — a chapeau about ПАРКИРАНЕТО, while these spans are
+    // `noStopping` (ПРЕСТОЙ). So no чл. 98 клауза fits these two spans AS
+    // AUTHORED.
+    //
+    // ⚠ CORRECTED 2026-09-19. This paragraph used to continue «the act's only
+    // spirka clause is ал. 2, т. 3» and «the real ban is a зигзаг МАРКИРОВКА
+    // this map does not paint» — two claims about what the act does NOT contain,
+    // made without enumerating it, which is itself the ADR-002 breach it was
+    // warning against. Enumerated: NINE units of zdvp.json mention «спирк»
+    // (чл. 65, 66, 67, 68, 69, 80а, 98, 115, 183), and чл. 69 is a statutory
+    // restriction on OTHER vehicles stopping at a spirka that needs no plate and
+    // no marking — see the NO_STOP_BASIS_COPY docblock, which quotes it verbatim
+    // and records the corroborating чл. 183, ал. 4, т. 8. The ground is
+    // CONTESTED (чл. 69 · the unpainted зигзаг · re-authoring as `noParking`),
+    // not absent; PICKING one is still not this lane's to do, and inventing one
+    // would be authored law — ADR-002's exact prohibition. It is
     // FOUNDER-GATED: `world/__tests__/no-stop-basis-declared.test.ts` holds both
     // span ids in AWAITING_FOUNDER_RULING, records the two options (re-cite to
     // the marking and paint it, or re-author the spans as `noParking`), and goes
@@ -2252,14 +2264,110 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
  * branch prints `titleBg` · `hud/hudPreferences.ts` says so in its own words ·
  * `hud/SessionEndScreen.tsx` «Похвали» prints `titleBg` + clock ·
  * `lessons/debrief.ts commendationLines` builds `• ${title}` · `hud/FaultCard`
- * is typed `ViolationEvent` and never takes one. All SIX `CommendationCode`s
+ * is typed `ViolationEvent` and never takes one. All SEVEN `CommendationCode`s
  * carry explanation prose no student has ever read (counted off the union in
- * types.ts, not off the adversarial pass's „eleven", which was the wrong
- * number), and the pooled junction sentence above is one of them. THAT IS AN
+ * types.ts; SIX was RIGHT when this note was written on 2026-08-25 and went
+ * stale on 2026-09-04, when `CONTROLLER_SIGNAL_OBEYED` landed in 85495fd —
+ *   git log -S "CONTROLLER_SIGNAL_OBEYED" -- platform/src/modules/sim/rules/types.ts
+ * recounted 2026-09-19 at seven union members and seven `COMMENDATIONS` rows;
+ * neither number is the adversarial pass's „eleven", which was wrong for its
+ * own reason), and the pooled junction sentence above is one of
+ * them. THAT IS AN
  * OPEN ROW, not a thing this table may pretend to fix:
  * authoring three more unread sentences here would have been prose with no
  * reader. So this table carries the TITLE and the CONCEPT — the two columns
  * with a proven live path — and nothing else.
+ *
+ * ── RE-CERTIFIED 2026-09-19 · THE CLAIM STILL HOLDS, AND IT IS LOAD-BEARING ──
+ * It is the reason commit 7ac4e0d may shorten a praise TITLE without stranding
+ * a body, so it was re-measured rather than inherited. The census above named
+ * five call sites; this one enumerates every read of a commendation's copy in
+ * platform/src and says, per site, what it can print. («every» was RE-WALKED
+ * 2026-09-19 and was wrong by two — the phone's own toast re-map and the dev
+ * rig, both added below. Neither prints a body, so the verdict is unchanged;
+ * the claim is not. Read the MOBILE row for why the grep could not see one of
+ * them.) The event reaches a STUDENT surface by exactly two routes — the live
+ * HUD, in its two mutually exclusive renderers, and the post-drive summary —
+ * and the summary route is bounded by one grep:
+ *
+ *   grep -rn "\.commendations" src --include=*.ts --include=*.tsx
+ *   → outside `__tests__`, and outside this file's own prose: actions.ts:489 ·
+ *     SessionEndScreen 1075/1337/2160/2170 · debrief.ts:2125. Six live reads,
+ *     and that is the WHOLE summary path. (Do not quote a raw hit count here:
+ *     the pattern appears in this comment too, so the number moves with the
+ *     prose. The SITES are the measurement.)
+ *
+ *  SOURCE  `makeCommendation` is the ONLY writer — the sole construction of a
+ *          full `CommendationEvent` in platform/src. Enumerated with
+ *            grep -rn 'kind: "commendation"' src --include=*.ts --include=*.tsx
+ *              | grep -v __tests__ | grep -v "\.test\."
+ *          whose PRODUCTION hits — ignoring this comment, which matches
+ *          itself — are exactly nine: this file's builder · `types.ts:869`
+ *          and `contracts.ts:1965` (type declarations) ·
+ *          `SessionEndScreen.tsx:1078` (a map marker, x/y/code/t) ·
+ *          `lessons/engine.ts` 1284 + 1560 (the `{kind, titleBg}` HUD event) ·
+ *          and three conceptId-only observation records (`actions.ts:497`,
+ *          `hazard/learningFeed.ts:85`, `learning/store.ts:122`). NO second
+ *          builder of the event exists. `rules/summary.ts:46` then collects
+ *          the events WHOLE, so `explanationBg` really is in scope at every
+ *          consumer below — none of them prints it.
+ *  HUD     shut at the TYPE, not merely at the call site: `contracts.ts:1965`
+ *          declares the HUD event `{ kind: "commendation"; titleBg: string }`,
+ *          which has nowhere to put a body. `lessons/engine.ts` 1284 + 1560
+ *          build exactly that, so the field is dropped before the HUD exists;
+ *          `hud/HudToasts.tsx:1544-1558` prints «Браво» + `event.titleBg` and
+ *          nothing else, and `hud/hudPreferences.ts` :239-245 says so in its
+ *          own words with a test holding it.
+ *  MOBILE  ADDED 2026-09-19 — the HUD has TWO renderers, not one, and the grep
+ *          above is structurally blind to the second: it matches `kind:
+ *          "commendation"` (a property) and this one tests `kind ===
+ *          "commendation"` (a comparison). `components/sim/lesson-ui/
+ *          LessonPlayShell.tsx:6411-6418` re-maps the same toast queue into a
+ *          `SimOverlayItem` for the phone, and the two surfaces are mutually
+ *          exclusive by construction: `overlayCandidates` is `[]` whenever
+ *          `!compact` (:6226), and `compact` is what hides the HudToasts column
+ *          (:8239). The re-map emits `chipBg: "Браво"` + `lineBg:
+ *          t.event.titleBg` and STOPS — no `detailBg`, unlike the violation and
+ *          hint branches six lines above it, which both pass
+ *          `t.event.explanationBg`. So the verdict survives this surface; the
+ *          word «every» above did not, until this row.
+ *  DEVRIG  `devrig/rig.ts:436` and `:454` log `e.titleBg` / `h.titleBg` for
+ *          EVERY kind, commendations included, into the rig's event stream.
+ *          `explanationBg` appears 0 times in that file — the violation-only
+ *          spread beside each read takes severity/points/lawRef and no body.
+ *  DEBRIEF `lessons/debrief.ts commendationLines` :2119-2141 pools by
+ *          `c.titleBg` and emits `• ${title}` (+ an ADR-009 rider).
+ *  SUMMARY `hud/SessionEndScreen.tsx` :2170-2210 — «Похвали» prints `c.titleBg`
+ *          + `clock(c.t)` + an optional `riderBg`. THE ROW DESCRIPTION ABOVE
+ *          IS NOW INCOMPLETE BY ONE: the rider is new since ADR-009, but it
+ *          comes from `commendationRiderBg` (debrief.ts), NOT from the event —
+ *          it is generated qualification prose, not the authored body. :1075
+ *          takes code/t/x/y for map markers only.
+ *  WIRE    `lessons/wire.ts serializeRuleEvents` :239-250 puts `{kind, code, t,
+ *          situation?}` on the wire — `explanationBg` never crosses it. The
+ *          server rebuild :660-666 calls `makeCommendation` again, so the
+ *          field is REGENERATED server-side and still read by nobody.
+ *  REPLAY  the closest call, and it is closed by construction:
+ *          `traces/attemptReel.ts:158` is `if (e.kind !== "violation") continue;`
+ *          (with :143-146 explaining why). So the `fault.explanationBg` that
+ *          `review/my-drive/[simSessionId]/DualGhostReplay.tsx:516-517` really
+ *          does render can only ever be a VIOLATION's.
+ *  MODEL   `actions.ts:489` and `learning/simFeed.ts` take `conceptId` + kind
+ *          only — simFeed contains no `titleBg`/`explanationBg` read at all.
+ *  OTHER   `world/referents.ts:176` uses `Object.keys(COMMENDATIONS)` (code
+ *          names) · `modules/tutor/retrieval.ts:493` (path corrected
+ *          2026-09-19 — it read `tutor/retrieval.ts`, which resolves under
+ *          `modules/sim/` like every other entry in this row and does not
+ *          exist; the file is in the TUTOR module) excludes commendations from
+ *          grounding · `procedures/machine.ts:113` and
+ *          `dev/popup-rig/adr009-fixtures.ts:363` read a `makeViolation`
+ *          result, not a commendation · `classroom/ClassroomRoom.tsx:583`
+ *          prints a QUESTION verdict's `explanationBg`.
+ *
+ * VERDICT: no renderer. A shorter title therefore strands nothing. If a future
+ * surface starts printing this field, that inverts — the shortened titles in
+ * this table would then each leave an orphaned body, and 7ac4e0d's THEO-4
+ * argument would have to be re-made rather than re-cited.
  *
  * WHAT HE ACTUALLY DID is in the template: `SC_HZ_ACCIDENT_SCENE.staged` ends
  * with `SC_HZ_ACCIDENT_EMERGENCY`, and `EmergencyVehicleRunner` resolves with
@@ -2378,14 +2486,21 @@ export const YIELD_PRAISE_SITUATION_COPY: Record<
   // (`TTR_STOP_SPEED_KMH` / `TTR_STOP_RADIUS_M`, templates-cockpit2.ts:233-234).
   // The co-located route task grades a THIRD term the praise never reads:
   // `requireKerbwardM: 1.0` on `tick.laneOffsetM`
-  // (`lessons/scenario/templates-cockpit2.ts:421`, sc-vptr-red-stop — the
-  // «вдясно» debt paid in w28). The disc's mark (TTR_STOP.x 13.9) sits 1.71 m
-  // curb-ward of the right-lane centre (12.19 — `TTR_RIGHT`, and ln-v1.json's
-  // own `meta.scenario.laneCenterRightM`) and its radius is 3, so its left edge
-  // reaches 1.29 m PAST that centre: a car resting mid-lane clears both praise
-  // terms and fails the task. That is the pose the `police-stop-signal` note
-  // below already describes for its own 3 m disc — same shape, same lane, now
-  // with a frame.
+  // (`lessons/scenario/templates-cockpit2.ts`, sc-vptr-red-stop's objective —
+  // the «вдясно» debt paid in w28. FIND IT BY CONTENT, `grep -n
+  // 'requireKerbwardM' templates-cockpit2.ts`. This pointer read :421; measured
+  // TWICE within one session on 2026-09-19 it was :462 and then :477, because
+  // another lane is adding lines above it in the same worktree, so no number
+  // written here survives the day. :421 now lands mid-sentence in a comment
+  // paragraph, not on the field. The sibling pointer above — :233-234 for the
+  // two TTR consts — has held through all of it, being near the top of the
+  // file.) The disc's mark (TTR_STOP.x 13.9) sits 1.71 m curb-ward of the
+  // right-lane centre (12.19 — `TTR_RIGHT`,
+  // and ln-v1.json's own `meta.scenario.laneCenterRightM`) and its radius is 3,
+  // so its left edge reaches 1.29 m PAST that centre: a car resting mid-lane
+  // clears both praise terms and fails the task. That is the pose the
+  // `police-stop-signal` note below already describes for its own 3 m disc —
+  // same shape, same lane, now with a frame.
   //
   // «4.5 m AT L1» DELETED 2026-09-18, and it was attached to the wrong lesson
   // twice over. The praise disc never passes through the rung ladder at all —
@@ -2855,14 +2970,92 @@ export const HANDBRAKE_ACT_COPY: Record<
  * CITATION FOR BOTH.
  *
  * THE DEFECT, filed independently by two audit passes. The pooled row says
- * «под знак В27» and cites чл. 6, т. 1 — the duty to obey A SIGN. Five shipped
+ * «под знак В27» and cites чл. 6, т. 1 — the duty to obey A SIGN. FOUR shipped
  * districts author a `noStopping` span whose ban is written in the STATUTE and
- * holds with no plate anywhere: pk-double-v1, pk-banx-v1 (three spans),
+ * holds with no plate anywhere, AND WHICH DECLARES THE CLAUSE that says so —
+ * those four are the ones this enum serves: pk-double-v1, pk-banx-v1 (three),
  * pk-rail-v1 (two) and lot-zebra-v1. sc-pk-double-park is the sharpest — its
  * own instruction reads «забраната я пишат самите коли … СЪС ИЛИ БЕЗ ЗНАК»,
  * and then the card that charges the student three точки answers with the law
  * for a sign. That is ADR-002's core prohibition, in the direction that costs
  * the student: a citation the runtime never establishes.
+ *
+ * AND THERE IS A FIFTH STATUTE-GROUNDED DISTRICT THIS ENUM DOES NOT SERVE —
+ * corrected 2026-09-19. This block read «Five shipped districts» and then named
+ * four, and the number was not a typo for the list: pk-busstop-v1 authors two
+ * more law-implied spans («ЗДвП-98-1 / Наредба № 2/2001 — зигзаг» and
+ * «ЗДвП-98-1 — спирка»), so counted by AUTHORING the statute the districts
+ * really are five. What makes it four is the predicate this table turns on —
+ * DECLARING a `basis` — and pk-busstop-v1 declares none, deliberately. It is
+ * the one documented exception, held by name (`pkbs-z-stop-marking`,
+ * `pkbs-z-stop-pocket`) in `world/__tests__/no-stop-basis-declared.test.ts`
+ * AWAITING_FOUNDER_RULING — AND THE GROUND IS CONTESTED, NOT ABSENT.
+ *
+ * CORRECTED 2026-09-19. What stood here said «the act's only spirka клауза is
+ * ал. 2, т. 3» and «what really bans престой there is the зигзаг маркировка,
+ * which this district does not paint». Both are claims about what the act does
+ * NOT contain, written without enumerating it — the one thing ADR-002 forbids —
+ * and the act refutes both. Enumerated rather than recalled, NINE units of
+ * `content/law/acts/zdvp.json` mention «спирк»:
+ *
+ *   node -e 'const a=JSON.parse(require("fs").readFileSync(
+ *     "content/law/acts/zdvp.json","utf8"));
+ *     const h=a.units.filter(u=>JSON.stringify(u).includes("спирк"));
+ *     console.log(h.length, h.map(u=>u.ref).join(" "))'
+ *   → 9 · чл. 65 чл. 66 чл. 67 чл. 68 чл. 69 чл. 80а чл. 98 чл. 115 чл. 183
+ *
+ * Of those, чл. 98 is the престой/паркиране article this span cites, and чл. 69
+ * is the act's own rule for a car that is NOT the bus, at the spirka, with no
+ * plate and no marking anywhere in it — retrieved verbatim:
+ *
+ *   «Чл. 69. (…) На спирка на превозните средства от редовните линии за обществен
+ *    превоз на пътници други пътни превозни средства могат да спират само за
+ *    слизане на пътници само ако не пречат на превозните средства, за които е
+ *    предназначена спирката. Престоят на таксиметрови автомобили с цел
+ *    очакване на пътници е забранен.»
+ *
+ * The repo's own audited bank already reads it that way — `content/audits/
+ * manevri-i-izprevarvane.audit.json`:19, on q-manevri-036, moves the ref OFF
+ * чл. 68 with «the duty of OTHER drivers … is чл. 69 ЗДвП; чл. 68 regulates the
+ * route vehicle's own stopping duties». And чл. 183, ал. 4, т. 8 fines a driver
+ * who «неправилно престоява или паркира в зоната на … спирка за обществен
+ * превоз на пътници» — the act sanctions an unlawful престой at a spirka, so it
+ * cannot be that none is defined.
+ *
+ * WHAT IS TRUE OF чл. 98 STAYS TRUE: ал. 1 is a closed list of eight places and
+ * a спирка is not among them, and ал. 2, т. 3 does name «спирките на превозните
+ * средства от редовните линии за обществен превоз на пътници» but under a
+ * chapeau reading «Освен в посочените в ал. 1 случаи ПАРКИРАНЕТО е забранено» —
+ * parking, not престой. That is why the bare «ЗДвП чл. 98, ал. 1» these two
+ * spans carry cannot stand as authored.
+ *
+ * SO THE OPEN QUESTION IS WHICH GROUND, NOT WHETHER ONE EXISTS: чл. 69; or the
+ * зигзаг маркировка, which this district does not paint (pk-busstop-v1.json
+ * carries NO `markings` key at all — the test's note calls it `markings: null`;
+ * the key is absent, `"markings" in doc` is false); or re-authoring the spans
+ * as `noParking`, which convicts nothing today. It keeps the pooled В27 row
+ * until the founder picks one. Do not "fix" it by adding a basis: choosing
+ * among grounds is the ruling's job, and this table may only select a row that
+ * has already been reviewed.
+ *
+ * THE CENSUS BEHIND BOTH NUMBERS, re-run 2026-09-19 over content/world — node,
+ * one pass, counting only authored `zones[]` entries with `kind: "noStopping"`:
+ *
+ *   node -e 'const fs=require("fs"),p=require("path"),d="content/world";
+ *     let s=[];for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".json")))
+ *     for(const z of (JSON.parse(fs.readFileSync(p.join(d,f),"utf8")).zones??[]))
+ *     if(z.kind==="noStopping")s.push({f,signRef:z.signRef,basis:z.basis});
+ *     const L=s.filter(z=>!(z.signRef??"").startsWith("В"));
+ *     console.log(s.length,new Set(s.map(z=>z.f)).size,s.length-L.length,
+ *       L.length,s.filter(z=>z.basis!=null).length,
+ *       new Set(L.map(z=>z.f)).size)'
+ *   → 16 spans · 11 districts · 7 plated · 9 law-implied · 7 declaring a basis
+ *     · 5 districts holding at least one law-implied span
+ *
+ * Run it from the REPO ROOT, not platform/. And count `zones[]` only: a naive
+ * recursive walk reports 18, because hz-accident-v1 and pk-ban-v1 each mirror
+ * their span into `meta.scenario.banZone` — both В27, so a walk also inflates
+ * the plate count 7 → 9. The test above walks `doc.zones` for this reason.
  *
  * WHY AN ENUM AND NOT THE WORLD DOC'S OWN `lawRef`. Those strings are in the
  * maps already (`meta.scenario.banZonesY[].lawRef`) and read by nothing but
@@ -2886,9 +3079,19 @@ export const HANDBRAKE_ACT_COPY: Record<
  *         метра преди тях;
  *      6. на кръстовище и на по-малко от 5 метра от тях;»
  *
- * ал. 1 IS A CLOSED LIST WITH NO SIGN-BASED CASE — which is precisely why the
- * 2026-08-09 note on the pooled row was right to move OFF it for a В27 span,
- * and equally why it is the only correct citation for these five maps.
+ * ал. 1 IS A CLOSED LIST IN WHICH NO SIGN ITSELF CREATES THE BAN — which is
+ * precisely why the 2026-08-09 note on the pooled row was right to move OFF it
+ * for a В27 span, and equally why it is the only correct citation for these
+ * four maps.
+ *
+ * ⚠ CORRECTED 2026-09-19: this line read «A CLOSED LIST WITH NO SIGN-BASED
+ * CASE», and that is too strong — TWO of the eight точки do reference a пътен
+ * знак: т. 7 «…или с пътен знак е забранено изпреварването» and т. 8 «…върху
+ * пътна лента… обозначена с пътен знак». They use the sign to identify the
+ * PLACE (a no-overtaking stretch, a slow-vehicle lane), not to ban stopping —
+ * which is what the argument actually needs — so the conclusion stands and the
+ * wording did not. An unretrieved negative about the act is the same defect
+ * ADR-002 forbids, whichever direction it points.
  *
  * NO ITEM IS ASSERTED THAT THE SPAN DOES NOT DECLARE. One tick flag serves four
  * maps whose real точки differ; deriving the точка from a bare sign/law bit

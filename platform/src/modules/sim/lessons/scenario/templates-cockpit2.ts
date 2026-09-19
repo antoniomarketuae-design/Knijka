@@ -371,15 +371,71 @@ export const SC_VP_TELLTALE_RED: ScenarioSpec = {
     {
       id: "sc-vptr-red-stop",
       // WAS «Спри плътно вдясно…». The STOP half is real and stays: 4 km/h is a
-      // halt demand (≤ REACH_ZONE_HALT_CAP_KMH 8), never widened by the ladder,
-      // and the shadow rests inside the disc at 0.00 km/h. „ПЛЪТНО" was the
-      // false half. The acceptance is a disc of radius 3 (4.5 at L1) around a
-      // mark 1.71 m curb-ward of the right-lane centre (TTR_RIGHT 12.19, curb
-      // 16.25): every rung of it stays inside the right lane — the inner lane
-      // centre is never within 5 m of it — so „вдясно" is measured, but its
-      // left edge reaches 1.29 m PAST the lane centre, so a car resting mid-lane
-      // is credited too, and „плътно до бордюра" is precisely what this gate
-      // cannot tell apart from it. Tightening the disc was refused twice over:
+      // halt demand (≤ REACH_ZONE_HALT_CAP_KMH 8, objectives.ts:1182) and is
+      // never widened by the ladder — compiled, the cap reads 4 / 4 / 4 at
+      // L1/L2/L3 — and the shadow rests inside the disc at 0.00 km/h (the last
+      // sample of shadow-correct.trace.json is x 13.899, y 254.951, speedKmh 0:
+      // 0.05 m off the mark). „ПЛЪТНО" was the false half.
+      //
+      // THE ACCEPTANCE IS A DISC OF RADIUS 3 AT EVERY RUNG — 3 / 3 / 3 / 3 / 3
+      // at L1…L5, read off `compileScenario(spec, L).objectives`, and since
+      // 2026-09-19 PINNED BY MEASUREMENT beside the demand that causes it:
+      // lessons/__tests__/reach-zone-full-stop-derived.test.ts §3 asserts this
+      // ladder against the sibling's 4.5 / 3.75 / 3 / 3 / 3 and goes red if
+      // either moves. Until then the number lived ONLY in prose, on both sides
+      // of a disagreement — which is how a false „3 (4.5 at L1)" written on
+      // 2026-08-14 was still standing, in a GREEN test file, on 2026-09-19.
+      //
+      // WHERE THAT PARENTHETICAL CAME FROM, off `git log -S"(4.5 at L1)"`. It
+      // returns exactly ONE commit — cdb2f71, 2026-08-14 — for this file AND
+      // for lessons/__tests__/stop-claim-gates.test.ts: one commit seeded the
+      // same words into both at once, so this copy is the origin of nothing.
+      // A third copy, worded «4.5 m AT L1», was in rules/catalog.ts, and its
+      // history is different again: `git log -S"at L1" -- rules/catalog.ts`
+      // returns only 7ac4e0d (2026-09-18), and the words that commit ADDS are
+      // the note recording the deletion («…DELETED 2026-09-18, and it was
+      // attached to the wrong lesson»). The copy it deletes was never
+      // committed, so no commit can be cited for putting it there. The
+      // stop-claim-gates copy outlived all of this by a day and is struck by
+      // the same pass as this paragraph — until then a green test file went on
+      // attributing 4.5-at-L1 to the disc that compiles 3, in the very words
+      // the other two copies had lost.
+      //
+      //   WHY THIS GATE DOES NOT LADDER AND ITS SIBLING DOES. `stopRadiusM`
+      //   occurs 0 times in params.ts; `widenRadius` is applied there exactly
+      //   once (params.ts:207) and only to `ObjectiveParams.radiusM`, out of a
+      //   per-objective budget. compile.ts:652 ZEROES that budget for any
+      //   reachZone whose params say `requireFullStop === true` OR whose banner
+      //   satisfies `deriveFullStopDemand` (objectives.ts:2640 — the «напълно»
+      //   matcher). Nothing here authors `requireFullStop`; the TITLE below does
+      //   the work — «Спри НАПЪЛНО вдясно при червената лампа» — so the budget
+      //   is 0 and the authored 3 survives every rung. The 4.5 is a real number
+      //   that belongs to the sibling one lesson over: `sc-vpps-stop`
+      //   (templates-cockpit.ts:818, «Спри ПЛЪТНО вдясно при полицая») carries
+      //   no «напълно» and authors no `requireFullStop`, so its budget is
+      //   unclamped and it compiles 4.5 / 3.75 / 3. Same map, same authored
+      //   radius 3, same 4 km/h cap — one word of the banner is the whole of the
+      //   difference, and both banners are pinned in both directions by
+      //   lessons/__tests__/reach-zone-full-stop-derived.test.ts §1.
+      //
+      // The disc is drawn around a mark 1.71 m curb-ward of the right-lane
+      // centre (TTR_STOP.x 13.9 − TTR_RIGHT 12.19). LANE_WIDTH_M is 8.125
+      // (3.25 × PERCEPTUAL_ROAD_SCALE 2.5), so the right lane runs 8.13…16.25
+      // and the curb is at 16.25; at radius 3 the disc spans x 10.9…16.9. Its
+      // INNER edge stops 2.77 m short of the inner-lane boundary and 6.84 m
+      // short of the inner-lane centre (ln-v1 meta.scenario.laneCenterLeftM
+      // 4.06), so „вдясно" is measured: no rung can be satisfied from the inner
+      // lane. Its OUTER edge crosses the curb line by 0.65 m — off the
+      // carriageway, not into another lane, so it credits nobody it should not,
+      // but „every rung of it stays inside the right lane", which this comment
+      // also claimed, overstated that and is gone. What does NOT change is the
+      // conclusion the whole block rests on: that inner edge reaches 1.29 m PAST
+      // the lane centre (12.19 − 10.9), so a car resting mid-lane is credited
+      // too, and „плътно до бордюра" is precisely what this gate cannot tell
+      // apart from it. The 1.29 m was always the radius-3 figure; at the 4.5
+      // this comment wrongly claimed it would have read 2.79 m, so the false
+      // number made the hole look BIGGER than it is, not smaller.
+      // Tightening the disc was refused twice over:
       // the radius is single truth with VP_TELLTALE_RED_LAMP's halt contract
       // above (the runner resolves the encounter by the same three numbers, and
       // the committed traces are a byte gate on them), and params.ts's

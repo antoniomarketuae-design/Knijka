@@ -36,6 +36,28 @@
 //      the verdict has to be able to say so.
 //   4. THE PROBE SCORES THE APP NUMBER. A source scan, because the arithmetic
 //      being right in lib/ is worth nothing if the table still ranks `s.ms`.
+//   5. EVERY CLOCK-DERIVED LOWER BOUND IN THIS FILE HAS A MEASURED MARGIN.
+//      On 2026-09-19 one of them did not. `out.ms >= 400` failed the gate at
+//      399 — a true sentence about a wall clock that a timer is allowed to
+//      undercut, which makes it flaky by construction rather than by bad luck.
+//      It is fixed at its own site; the long note in the settle() block has the
+//      mechanism and the numbers. The OTHERS were then measured rather than
+//      assumed — drive settleBody with the same stubbed documents these tests
+//      build, 300 runs of each, and take the minimum (2026-09-19, node 24.18.0;
+//      a separate 120-run pass the same day agreed on every line to within
+//      1 ms, so these are the sample minimum and not a constant):
+//
+//        "reports rest at the FIRST…"   atRestMs >= 20    min 40   margin 20 ms
+//        "never stops moving…"          spanMs   >= 120   min 120  margin  0
+//        "counts what its OWN walk…"    walkMs   >= 24    min 36   margin 12 ms
+//        "carries the floor…"           atRestMs >= 20    min 29   margin  9 ms
+//
+//      The ZERO-margin one is the model here, not the hazard: `spanMs >= 120`
+//      reads back settleBody's own exit condition (`current.at >= windowMs`)
+//      on the same `performance.now()` it branched on, so nothing can get
+//      underneath it. That is the whole distinction this file now keeps —
+//      assert against the clock the code DECIDED with, never against a timer's
+//      promise measured on a different one.
 // -----------------------------------------------------------------------------
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -160,37 +182,110 @@ describe("settleBody — the loop that now runs inside the page", () => {
 });
 
 describe("settle() — the bridge is outside the metric by construction", () => {
-  /** A page whose round trip is slow while the page itself is fast. */
-  const slowBridgePage = (bridgeMs, inPage) => ({
-    evaluate: async () => {
-      await new Promise((r) => setTimeout(r, bridgeMs));
-      return inPage;
-    },
-  });
+  /** The nominal round trip this block scales the recorded defect down to. */
+  const BRIDGE_MS = 400;
+  /**
+   * How far UNDER `BRIDGE_MS` a real `setTimeout(…, BRIDGE_MS)` is allowed to
+   * land when the elapsed time is read with `Date.now()`. Measured, not
+   * guessed — the assertion that spends it carries the numbers and the reason.
+   */
+  const TIMER_SLACK_MS = 5;
+
+  /**
+   * A page whose round trip is slow while the page itself is fast.
+   *
+   * It also RECORDS the crossing it actually performed, on `Date.now()` — the
+   * same clock `settle()` brackets it with, and strictly inside that bracket.
+   * `crossedMs` is therefore a lower bound on `out.ms` by construction, which
+   * is what lets the assertion below stop guessing at a wall clock.
+   */
+  const slowBridgePage = (bridgeMs, inPage) => {
+    const page = {
+      crossedMs: null,
+      evaluate: async () => {
+        const entered = Date.now();
+        await new Promise((r) => setTimeout(r, bridgeMs));
+        page.crossedMs = Date.now() - entered;
+        return inPage;
+      },
+    };
+    return page;
+  };
 
   it("THE DEFECT, REPRODUCED AND REFUSED: a 400 ms round trip around a 60 ms layout", async () => {
     // The recorded shape, scaled down so the test is fast: wall clock is
     // dominated by the crossing, the layout came to rest long before it. The
     // old instrument returned the wall clock as the app's settle time.
-    const out = await settle(
-      slowBridgePage(400, {
-        settled: true,
-        atRestMs: 60,
-        spanMs: 90,
-        samples: 3,
-        walkMs: 6,
-        walkBeforeRestMs: 4,
-        floorMs: 20,
-        stepMs: 30,
-      }),
-    );
+    const page = slowBridgePage(BRIDGE_MS, {
+      settled: true,
+      atRestMs: 60,
+      spanMs: 90,
+      samples: 3,
+      walkMs: 6,
+      walkBeforeRestMs: 4,
+      floorMs: 20,
+      stepMs: 30,
+    });
+    const out = await settle(page);
 
     expect(appMs(out)).toBe(60); // the APP number — the page's own timestamp
-    expect(out.ms).toBeGreaterThanOrEqual(400); // the wall clock, still recorded
-    expect(out.bridgeMs).toBeGreaterThanOrEqual(250); // …and named as the probe's
-    expect(out.walkMs).toBe(6);
-    expect(out.evalMs).toBe(out.bridgeMs + out.walkMs);
+
+    // THE WALL CLOCK, STILL RECORDED — AND NO LONGER ASSERTED AGAINST A TIMER'S
+    // PROMISE. This was one line, `expect(out.ms).toBeGreaterThanOrEqual(400)`,
+    // and it failed the gate at **399**. One millisecond, on a file that imports
+    // nothing that had changed and that passes 23/23 run alone. The fault was
+    // the assertion, not the box: `out.ms` is a `Date.now()` delta taken around
+    // a `setTimeout(…, 400)`, and those are two different clocks. libuv
+    // truncates its loop time to whole milliseconds before adding the delay and
+    // `Date.now()` truncates again at each end, so the timer is free to land a
+    // hair UNDER 400 on the clock this line reads.
+    //
+    // AND IT IS NOT LOAD, which is why a longer timeout would have fixed
+    // nothing. MEASURED 2026-09-19 (node 24.18.0, this box) by driving the real
+    // `settle()` through this exact scenario 800 times:
+    //     min 399 · p50 406 · p90 410 · max 424
+    //     2 of the 800 (0.25%) landed under 400, both at 399.
+    // So the worst shortfall ever observed here is ONE millisecond, and it is a
+    // truncation artefact, not load: under 8 competing busy loops 250 runs of
+    // the same scenario produced 0 short ones (min 401 · p50 417 · max 452) —
+    // contention makes a timer LATE, and late was never the direction that
+    // failed.
+    //
+    // TWO ASSERTIONS REPLACE THE ONE, AND TOGETHER THEY REFUSE MORE THAN IT DID:
+    //
+    //   (a) `out.ms >= page.crossedMs` carries the meaning and has NO
+    //       tolerance at all. Both numbers come off `Date.now()`, and
+    //       `settle()` reads its bracket strictly outside the page's, so no
+    //       timer granularity can get underneath it. It fails the instant
+    //       `ms` stops containing the crossing — if it ever becomes the page's
+    //       own number (60), or `spanMs` (90), or 0, which is precisely the
+    //       regression this file exists to catch.
+    //   (b) the nominal bound keeps the SCENARIO honest: that this really is a
+    //       400 ms round trip around a 60 ms layout, and not a 4 ms one that
+    //       (a) on its own would pass without a murmur.
+    //
+    // WHAT (b) STILL REFUSES, written down so nobody has to re-derive it:
+    // anything more than 5 ms under 400. Five is 5x the worst shortfall
+    // measured above, while the nearest WRONG answers — 90 (`spanMs`) and 60
+    // (`atRestMs`) — sit 305 and 335 ms below the floor. So this is not
+    // "lower 400 to 350 and move on": 350 would still wave through a bridge
+    // that had quietly stopped being measured, and it would record nothing
+    // about why the number was allowed to move.
+    expect(typeof page.crossedMs).toBe("number"); // (a) is vacuous against null
+    expect(out.ms).toBeGreaterThanOrEqual(page.crossedMs);
+    expect(out.ms).toBeGreaterThanOrEqual(BRIDGE_MS - TIMER_SLACK_MS);
+
+    // THE BRIDGE, NAMED AS THE PROBE'S — AND CHECKED FOR THE SAME HAZARD
+    // rather than assumed clear of it. Over those same 800 runs `bridgeMs`
+    // (= ms − spanMs) came in at min 309 against this floor of 250: 59 ms of
+    // headroom, which is not the zero-slack shape the line above used to be,
+    // so it stands exactly as written.
+    expect(out.bridgeMs).toBeGreaterThanOrEqual(250);
+    expect(out.walkMs).toBe(6); // the injected value passed through — no clock
+    expect(out.evalMs).toBe(out.bridgeMs + out.walkMs); // an identity — no clock
     // The instrument owned most of the sample and the metric did not move.
+    // These two need ms > 168 and ms > 240 respectively; at the measured
+    // minimum of 399 that is >150 ms of headroom each, so neither shares it.
     expect(instrumentShare(out)).toBeGreaterThan(0.5);
     expect(appMs(out)).toBeLessThan(out.ms / 4);
   });

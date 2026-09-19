@@ -67,17 +67,33 @@ function noStopSpans(): { district: string; zone: Zone }[] {
  *
  * pk-busstop-v1 authors two `noStopping` (ПРЕСТОЙ) spans citing «ЗДвП чл. 98,
  * ал. 1». Against the retrieved text, ал. 1 is a closed list of eight places
- * and NONE of them is a bus stop; the only spirka clause in the act is ал. 2,
- * т. 3, and ал. 2 opens «Освен в посочените в ал. 1 случаи ПАРКИРАНЕТО е
+ * and NONE of them is a bus stop; чл. 98's only spirka clause is ал. 2, т. 3,
+ * and ал. 2 opens «Освен в посочените в ал. 1 случаи ПАРКИРАНЕТО е
  * забранено» — it bans parking, not престой. So as authored the map may be
  * convicting a legal престой, and there is no чл. 98 клауза to re-cite it to.
  *
- * What really bans престой at a spirka is the ЗИГЗАГ МАРКИРОВКА, binding
- * through чл. 6, т. 1 — but this district ships `markings: null`, so nothing is
- * painted for the student to have read, and citing an invisible marking is the
- * same defect one layer over. That is a CONTENT-TRUTH RULING for the founder
- * (re-cite to the marking and paint it, or re-author the spans as `noParking`,
- * which convicts nothing today), not an engineering choice — so the map keeps
+ * ⚠ CORRECTED 2026-09-19, AND THE CORRECTION CHANGES WHAT IS BEING RULED ON.
+ * This docblock used to say «the only spirka clause in the act is ал. 2, т. 3»
+ * and that «what really bans престой at a spirka is the ЗИГЗАГ МАРКИРОВКА».
+ * BOTH ARE REFUTED BY THE ACT. Retrieved from content/law/acts/zdvp.json, NINE
+ * units mention спирк — чл. 65, 66, 67, 68, 69, 80а, 98, 115, 183 — and чл. 69
+ * is the one that restricts OTHER vehicles at a spirka, with no plate and no
+ * marking in its text at all:
+ *
+ *   «Чл. 69. (…) На спирка на превозните средства от редовните линии за
+ *    обществен превоз на пътници други пътни превозни средства могат да спират
+ *    само за слизане на пътници само ако не пречат на превозните средства, за
+ *    които е предназначена спирката. Престоят на таксиметрови автомобили с цел
+ *    очакване на пътници е забранен.»
+ *
+ * So the founder is NOT choosing whether a ground exists — he is choosing WHICH
+ * ground is right: чл. 69, or the unpainted зигзаг, or re-authoring the spans
+ * as `noParking`. The earlier wording would have had him rule on a negative the
+ * act refutes. THIS DOCBLOCK IS WHAT HE READS WHEN HE RULES, which is why the
+ * correction is here and not only in the question filed with him.
+ *
+ * That is a CONTENT-TRUTH RULING for the founder, not an engineering choice —
+ * so the map keeps
  * the pooled row until it is made, and this list is the reminder.
  */
 const AWAITING_FOUNDER_RULING = new Set(["pkbs-z-stop-marking", "pkbs-z-stop-pocket"]);

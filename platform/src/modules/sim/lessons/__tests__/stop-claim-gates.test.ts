@@ -398,7 +398,14 @@ describe("the touched templates claim only what their gates measure", () => {
 
   it("no gate claims a precision its own disc cannot resolve («плътно»)", () => {
     // «Плътно вдясно» is flush against the kerb. The tightest of these discs is
-    // radius 3 (4.5 at L1) around a mark 1.71 m off the lane centre — it proves
+    // radius 3 at EVERY rung. The «4.5 at L1» that stood on this line from
+    // cdb2f71 (2026-08-14) until 2026-09-19 was false of this template: the
+    // «напълно» in sc-vptr-red-stop's banner zeroes its widen budget, so the
+    // authored 3 survives L1…L5, and the 4.5 belongs to the sibling
+    // sc-vpps-stop — which is NOT in TOUCHED and so is not one of these discs.
+    // Both ladders are pinned by measurement in
+    // reach-zone-full-stop-derived.test.ts §3. The disc is drawn around a mark
+    // 1.71 m off the lane centre (TTR_STOP.x 13.9 − TTR_RIGHT 12.19) — it proves
     // the SIDE and cannot tell a kerbside rest from a mid-lane one, which is
     // the very pair sc-vp-telltale-red exists to teach apart. (Two sibling rows
     // outside this pass — sc-vp-police-stop/sc-vpps-stop and

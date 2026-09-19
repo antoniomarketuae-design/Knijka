@@ -192,6 +192,31 @@ describe("the census is closed over the whole catalogue", () => {
 // ---------------------------------------------------------------------------
 
 describe("the demand survives the ladder onto the lesson the student plays", () => {
+  // THE SECOND THING THE DEMAND DOES, AND THE ONE NOTHING WAS READING. Besides
+  // reaching the session, «напълно» ZEROES the gate's widen budget in
+  // `compile.ts`, so the census member's acceptance disc must NOT grow on the
+  // aided rungs while an otherwise identical sibling's does. Until this row
+  // that ladder lived only in prose: a false „radius 3 (4.5 at L1)" about
+  // `sc-vptr-red-stop` was seeded on 2026-08-14 (cdb2f71) into two files at
+  // once and was still standing in a green test file on 2026-09-19. Both
+  // arrays below are `compileScenario(spec, L).objectives` at L1…L5, read off
+  // the compiler on 2026-09-19 — not derived on paper.
+  it("«напълно» zeroes the widen budget — this disc does not ladder, its «плътно» sibling's does", () => {
+    const ladder = (specId: string, objectiveId: string): number[] => {
+      const spec = SCENARIO_TEMPLATES.find((s) => s.id === specId)!;
+      return ([1, 2, 3, 4, 5] as const).map((level) => {
+        const gate = compileScenario(spec, level).objectives.find((o) => o.id === objectiveId)!;
+        return (parseObjectiveParams(gate) as WitnessedReachZoneParams).radiusM;
+      });
+    };
+    // «Спри НАПЪЛНО вдясно при червената лампа» — demand derived, budget 0, so
+    // the authored TTR_STOP_RADIUS_M 3 survives every rung.
+    expect(ladder("sc-vp-telltale-red", "sc-vptr-red-stop")).toEqual([3, 3, 3, 3, 3]);
+    // «Спри ПЛЪТНО вдясно при полицая» — same map, same authored radius 3
+    // (PS_STOP_RADIUS_M), same 4 km/h cap, no «напълно»: budget unclamped.
+    expect(ladder("sc-vp-police-stop", "sc-vpps-stop")).toEqual([4.5, 3.75, 3, 3, 3]);
+  });
+
   it("is present on every rung of every census member, after compileScenario", () => {
     // `serializeObjectiveParams` is a WHITELIST and silently drops what it does
     // not name. This derivation runs INSIDE `parseObjectiveParams`, downstream

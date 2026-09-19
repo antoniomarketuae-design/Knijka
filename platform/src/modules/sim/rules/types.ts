@@ -232,10 +232,21 @@ export type SimTickEvent =
  *
  * "law-busstop" IS DELIBERATELY ABSENT. pk-busstop-v1 authors two `noStopping`
  * spans citing «чл. 98, ал. 1», but ал. 1 contains no bus-stop clause at all,
- * and the only spirka clause in the act — ал. 2, т. 3 — sits under a chapeau
- * that bans ПАРКИРАНЕТО, not престоя. Its real basis would be the зигзаг
- * МАРКИРОВКА (чл. 6, т. 1), and that map ships `markings: null`, so nothing is
- * painted for the student to have read. That is a content-truth ruling for the
+ * and чл. 98's own spirka clause — ал. 2, т. 3 — sits under a chapeau
+ * that bans ПАРКИРАНЕТО, not престоя.
+ *
+ * ⚠ CORRECTED 2026-09-19. This block used to add «the only spirka clause in the
+ * act» and name the зигзаг МАРКИРОВКА as the real basis. Both are refuted by
+ * the retrieved act: NINE units mention спирк (чл. 65, 66, 67, 68, 69, 80а, 98,
+ * 115, 183), and чл. 69 restricts OTHER vehicles at a spirka to stopping only
+ * for passengers to alight, only if they do not obstruct — with no знак and no
+ * маркировка in its text. So a ground DOES exist without paint; what is open is
+ * WHICH ground is right (чл. 69 / the unpainted зигзаг / re-authoring as
+ * `noParking`). See the docblock in
+ * world/__tests__/no-stop-basis-declared.test.ts, which is what the founder
+ * reads when he rules, for the verbatim quote.
+ *
+ * That is a content-truth ruling for the
  * founder, not an engineering choice, so the map keeps the pooled row until it
  * is made — see the report accompanying this change. The union is left open to
  * gain "law-marking" without a schema break.
