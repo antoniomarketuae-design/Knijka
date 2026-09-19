@@ -42,28 +42,97 @@ lastbad=""
 while true; do
   bad=""
 
-  # 1. IS ANYTHING SERVING? 3000 IS in the list now and is checked last — 2026-08-28.
-  #    It was excluded as "nexflow, a different product", and on this box that was
-  #    wrong: knijka's own dev server was on 3000, this watchdog reported "no dev
-  #    server" for hours, and a second server got started on top of it. Identity is
-  #    established by the ANSWER below (db.ok, a commit field), not by the port, so
-  #    a neighbouring product answering here cannot be mistaken for ours.
+  # 1. IS ANYTHING SERVING, AND IS IT OURS? 3000 IS in the list and is checked last
+  #    — 2026-08-28. It was excluded as "nexflow, a different product", and on this
+  #    box that was wrong: knijka's own dev server was on 3000, this watchdog
+  #    reported "no dev server" for hours, and a second server got started on top
+  #    of it.
+  #
+  #    THE SHAPE OF THE ANSWER IS WHAT IDENTIFIES US — AND UNTIL 2026-09-19 THAT WAS
+  #    ONLY A COMMENT. This loop broke on the first port that answered AT ALL, and
+  #    the checks below could not tell a neighbour from us either: handed
+  #    {"ok":true,"service":"nexflow","version":"2.1.0"}, the old check 2 reported
+  #    HEALTHY (measured this session — see the note there). So a neighbouring
+  #    product on 3460 could hold this watchdog's attention while OUR server was
+  #    dead. Requiring a `commit` field is the same test the sweep preflight makes
+  #    (wave-cycle.sh discover_port), and it does not hide a sick server of ours: a
+  #    readiness-red 503 still carries `commit`, so it is still FOUND here and then
+  #    reported as sick by check 2 rather than as absent.
   PORT=""
   for p in $PORTS; do
-    if curl -s -m 4 "localhost:$p/api/health" >/dev/null 2>&1; then PORT=$p; break; fi
+    probe=$(curl -s -m 4 "localhost:$p/api/health" 2>/dev/null) || continue
+    case "$probe" in *'"commit"'*) PORT=$p; break;; esac
   done
   if [ -z "$PORT" ]; then
-    bad="no dev server answers /api/health on any known port"
+    bad="no dev server answers /api/health in our shape (a body carrying a commit field) on any known port"
   else
     H=$(curl -s -m 8 "localhost:$PORT/api/health" 2>/dev/null)
 
-    # 2. DOES IT SAY THE DATABASE IS THERE? A 200 from the app proves the app
-    #    mounted, not that a drive can sign in.
-    echo "$H" | grep -q '"ok":true' || bad="health on :$PORT does not report db ok  ->  $(echo "$H" | head -c 200)"
-
-    # 3. DOES IT KNOW WHICH BUILD IT IS? "commit":"unknown" means platform/.env
-    #    lost its stamp, and every drive from here on exits EXIT_TARGET_UNVERIFIED.
-    echo "$H" | grep -q '"commit":"unknown"' && bad="health reports commit:unknown — platform/.env has no NEXT_PUBLIC_COMMIT_SHA"
+    # 2. DOES IT SAY THE DATABASE IS THERE? PARSE THE FIELD; NEVER GREP STRUCTURED
+    #    OUTPUT. This was `echo "$H" | grep -q '"ok":true'`, and it could not fail in
+    #    the one direction that matters. route.ts:263-265 sets
+    #    `migrations = { ok: true, latencyMs: 0, error: "skipped" }` PRECISELY WHEN
+    #    `db.ok` is false — so on a DEAD database the body still contains the
+    #    substring `"ok":true`, inside `checks.migrations`, and the grep matched it.
+    #
+    #    Measured this session, running the committed line itself against bodies
+    #    built exactly as route.ts:241-284 builds them:
+    #      old line · database dead (checks.db.ok:false)   -> HEALTHY
+    #      old line · a neighbour's JSON on our port       -> HEALTHY
+    #      old line · a HEALTHY body truncated at 42 bytes -> HEALTHY
+    #      this parser · all three                         -> PROBLEM
+    #    (that third row says HEALTHY deliberately: the dead-db body cut to 42
+    #    bytes is `{"ok":false,"probe":"readiness","commit":"` and carries no
+    #    `"ok":true` substring, so the old line reported PROBLEM on it. An
+    #    earlier draft of this note left it under the two dead-db rows where it
+    #    read as a third dead-db case. Both truncations refuse here as
+    #    `not JSON`, so nothing behavioural turns on it — but a comment in this
+    #    file is a measurement, and that one did not reproduce.)
+    #    `prisma dev` has wedged this database TWICE, most recently 2026-09-18, so
+    #    this is the live case, not a hypothetical one. Same defect as the
+    #    invariant-2 guard that once waved a broken database through to a canary.
+    #
+    #    THE TOP-LEVEL `ok` IS THE FIELD TO READ, because it is what the route means
+    #    by healthy: route.ts:269 computes `ok = db.ok && migrations.ok`, and it
+    #    deliberately leaves `checks.mail` out of that decision — a console mailer on
+    #    a dev box must not page anyone, so this must not read mail.ok either.
+    #    Reading `ok` alone would still be a guess about a body whose shape we never
+    #    checked, so the parser also requires those three booleans to EXIST: if the
+    #    route contract changes, it says so instead of judging a field that is gone.
+    #
+    #    IT FAILS CLOSED. An unparseable body, a liveness answer, a missing field, or
+    #    a node that will not start all produce a PROBLEM — the empty verdict is
+    #    handled in the `case` below, so a broken parser cannot read as healthy.
+    #    Cost: 170 ms per parse (5 in 853 ms, measured this session) once per ${INT}s.
+    #
+    #    CHECK 3 (WHICH BUILD IS THIS?) IS IN HERE TOO, on purpose: it is the same
+    #    body, read once. It used to be a second grep, and because both checks
+    #    ASSIGNED to `bad` instead of appending to it, whichever matched last erased
+    #    the other's message — a dead database with a stale stamp reported only the
+    #    stamp, and the database never appeared in the log at all.
+    V=$(printf '%s' "$H" | node -e '
+      let s = "";
+      process.stdin.on("data", d => s += d);
+      process.stdin.on("end", () => {
+        let j;
+        try { j = JSON.parse(s); } catch (e) {
+          return console.log("the body is not JSON (" + s.length + " bytes) — the route 500ed, the socket closed mid-body, or this is not our health endpoint");
+        }
+        if (!j || typeof j !== "object") return console.log("the body parsed but is not an object");
+        if (j.probe !== "readiness") return console.log("not a readiness answer (probe=" + JSON.stringify(j.probe) + ") — a liveness probe says nothing about the database, and another product says nothing about us");
+        const c = j.checks;
+        if (typeof j.ok !== "boolean" || !c || !c.db || typeof c.db.ok !== "boolean" || !c.migrations || typeof c.migrations.ok !== "boolean") {
+          return console.log("the readiness body is missing ok / checks.db.ok / checks.migrations.ok — the route contract changed and this watchdog can no longer judge it");
+        }
+        if (!j.commit || j.commit === "unknown") return console.log("commit:unknown — platform/.env lost NEXT_PUBLIC_COMMIT_SHA; every drive from here exits EXIT_TARGET_UNVERIFIED");
+        if (j.ok !== true) return console.log("readiness is RED — db.ok=" + c.db.ok + " (" + (c.db.error || "-") + "), migrations.ok=" + c.migrations.ok + " (" + (c.migrations.error || "-") + ")");
+        console.log("OK");
+      });
+    ' 2>/dev/null)
+    case "$V" in
+      OK) ;;
+      *)  bad="health on :$PORT — ${V:-the verdict could not be computed at all (is node on PATH?), which is not a reason to call this healthy}  ->  $(printf '%s' "$H" | head -c 200)" ;;
+    esac
   fi
 
   # 4. IS THE STAMP THE COMMIT WE ARE ACTUALLY ON? Stale is worse than missing:
@@ -76,11 +145,43 @@ while true; do
 
   # 5. IS THE DISK STILL THERE? The ledger lives on one 7200 rpm HDD and C: fell
   #    to 1.08 GB free this week. A sweep on a full disk loses frames silently.
-  FREE=$(powershell.exe -NoProfile -Command "[math]::Round((Get-PSDrive C).Free/1GB,1)" 2>/dev/null | tr -d '\r ')
+  #
+  #    AN UNREADABLE ANSWER IS NOT A REASSURING ONE — 2026-09-19. The two
+  #    non-numeric arms of this check used to be one `case` arm doing `:` —
+  #    nothing at all — so when the value could not be read the check did not go
+  #    red, it CEASED TO EXIST, and the watchdog carried on reporting a clean
+  #    loop. It is the same shape as the health grep above: silence read as
+  #    health. Measured this session by stubbing powershell.exe to exit 127 —
+  #    FREE='' and the iteration reported no problem at all.
+  #
+  #    THE DECIMAL COMMA IS NORMALISED, NOT TRUSTED. Fed "0,9" the old arm also
+  #    said nothing — 0.9 GB free reported as fine, and 0.9 GB free is the exact
+  #    state in which prisma dev killed this database on 2026-09-18. Whether
+  #    this box ever answers with a comma is a property of its locale and not of
+  #    this code (it answered "19.9" today), so `tr` makes the value readable and
+  #    anything still unreadable is REPORTED rather than skipped.
+  #
+  #    The threshold is unchanged at 3 GB: measured this session, 3 -> quiet,
+  #    2.9 -> "only 2.9 GB free", the same two verdicts the awk line gave.
+  FREE=$(powershell.exe -NoProfile -Command "[math]::Round((Get-PSDrive C).Free/1GB,1)" 2>/dev/null | tr -d '\r ' | tr ',' '.')
+  # `grep -E` IS LINE-ANCHORED, AND THAT IS NOT WHAT THIS PROMISES. `^…$` matches
+  # ANY line, so a two-line value like "WARNING:…\n0.9" satisfies it, awk is then
+  # handed a two-line program and dies, and NOTHING is reported at 0.9 GB free —
+  # the exact figure at which prisma dev killed this database on 2026-09-18. Not
+  # reachable from `powershell.exe -NoProfile` emitting one stdout line, and not
+  # a regression (the old code was equally silent), but the sentence below claims
+  # anything unreadable is REPORTED, so the test has to be on the whole value.
+  # `case` matches the whole string, and the `*.*.*` arm refuses "1.2.3" (which
+  # the old line fed straight to awk as a false red).
   case "$FREE" in
-    ''|*[!0-9.]*) : ;;
-    *) awk "BEGIN{exit !($FREE < 3)}" && bad="${bad:+$bad; }C: has only ${FREE} GB free — frames will start disappearing" ;;
+    '' | *[!0-9.]* | *.*.* | .) FREE_OK=0 ;;
+    *) FREE_OK=1 ;;
   esac
+  if [ "$FREE_OK" = 1 ]; then
+    awk "BEGIN{exit !($FREE < 3)}" && bad="${bad:+$bad; }C: has only ${FREE} GB free — frames will start disappearing"
+  else
+    bad="${bad:+$bad; }cannot read C: free space (powershell answered '${FREE}') — the disk check is BLIND, and a sweep on a full disk loses frames silently"
+  fi
 
   if [ -n "$bad" ]; then
     [ "$bad" != "$lastbad" ] && say "PROBLEM: $bad"

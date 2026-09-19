@@ -81,10 +81,21 @@ gate() {
   local rc=0
   say "gate 1/4 — tsc (FROM platform/; from the repo root npx resolves a DIFFERENT package"
   say "         and exits 1 with zero 'error TS' lines, which reads as a red that is not one)"
-  ( cd "$REPO/platform" && npx tsc --noEmit ) > /tmp/wc-tsc.log 2>&1 || rc=1
+  ( cd "$REPO/platform" && npx tsc --noEmit ) > /tmp/wc-tsc.log 2>&1 || rc=$?
   local ts; ts=$(grep -c "error TS" /tmp/wc-tsc.log || true)
-  say "         error TS lines: $ts"
-  [ "$ts" -eq 0 ] || { sed -n '1,40p' /tmp/wc-tsc.log; fail "tsc is red ($ts errors)"; }
+  say "         exit $rc · error TS lines: $ts"
+  [ "$ts" -eq 0 ] || { sed -n '1,40p' /tmp/wc-tsc.log; fail "gate 1 (tsc) is red ($ts errors)"; }
+  # …AND THE EXIT CODE, WHICH THIS ASSIGNED AND THEN NEVER READ — 2026-09-19.
+  # `rc=1` was written on the line above and no branch ever looked at it, so the
+  # gate's entire verdict was `grep -c "error TS"`. A compiler that DIES instead
+  # of reporting — the wrong npx this very comment warns about, an OOM, a missing
+  # tsconfig — prints no such line, counts as zero errors, and certifies the tree.
+  # Measured this session by running the committed block with `npx` stubbed to
+  # exit 1 silently: "error TS lines: 0", a 0-byte log, GATE 1 GREEN.
+  # Gate 4 learned this on 2026-09-14 and refuses a log it cannot read; gates 1
+  # and 2 only got half of it. A tool that could not report is not a tool that
+  # found nothing.
+  [ "$rc" -eq 0 ] || { sed -n '1,40p' /tmp/wc-tsc.log; fail "gate 1 (tsc) exited $rc while printing ZERO «error TS» lines ($(wc -c < /tmp/wc-tsc.log) bytes of log) — the compiler DIED instead of reporting, and an unreadable result is not a green one"; }
 
   # ── ONE WORKER, NOT TWO — 2026-09-14, and the reason is measured ─────────
   #
@@ -112,22 +123,44 @@ gate() {
   # it: the number that matters is the RATIO between a scanner test alone and
   # the same test inside the full run, not the wall-clock of the gate.
   say "gate 2/4 — vitest (maxWorkers=1; ~16,400 tests, 16 GB HDD — see the note above for why not 2)"
-  ( cd "$REPO/platform" && npx vitest run --maxWorkers=1 ) > /tmp/wc-vitest.log 2>&1 || true
+  local vrc=0
+  ( cd "$REPO/platform" && npx vitest run --maxWorkers=1 ) > /tmp/wc-vitest.log 2>&1 || vrc=$?
   # sed, NOT grep -oP. This box's grep refuses -P ("supports only unibyte and
   # UTF-8 locales") and every -P extraction silently returned EMPTY — which turns
   # a failure count into 0 and would declare a red suite green. That is the
   # reassuring direction, which is where every instrument bug on this programme
   # has pointed.
+  # AND THE RUNNER MUST ACTUALLY HAVE REPORTED — 2026-09-19. This step threw the
+  # exit code away with `|| true`, then defaulted the count with `${vfail:-0}`, so
+  # a vitest that never ran left an EMPTY log, an empty extraction, a 0, and a
+  # GREEN gate. Measured this session by running the committed block with `npx`
+  # stubbed: an empty log printed "failed: 0   passed: ?" and passed; an OOM log
+  # ("Failed to start forks worker" + "Reached heap limit", exit 134) passed too.
+  # AGENTS.md warns that exact OOM "reports it like a failure" — it did not; it
+  # reported like a clean run.
+  #
+  # So the runner's own summary is required FIRST, and only then may the `:-0`
+  # default mean anything. That default is not wrong — a genuinely green run
+  # prints no «failed» segment at all (measured on the real log this box left at
+  # /tmp: «Tests  18569 passed | 171 skipped (18740)») — it is only wrong when it
+  # is allowed to stand in for a summary that never existed.
+  tr -d '\r' < /tmp/wc-vitest.log | grep -qE "Tests +[0-9]+ (failed|passed)" \
+    || { tail -20 /tmp/wc-vitest.log; fail "gate 2 (vitest) exited $vrc and printed no «Tests N failed/passed» summary ($(wc -c < /tmp/wc-vitest.log) bytes of log) — the run DIED or never started, and an unreadable result is not a green one"; }
   local vfail; vfail=$(sed -n 's/.*Tests  *\([0-9][0-9]*\) failed.*/\1/p' /tmp/wc-vitest.log | head -1)
   vfail="${vfail:-0}"
   local vpass; vpass=$(sed -n 's/.*[^0-9]\([0-9][0-9]*\) passed.*/\1/p' /tmp/wc-vitest.log | tail -1)
-  say "         failed: $vfail   passed: ${vpass:-?}"
+  say "         exit $vrc · failed: $vfail   passed: ${vpass:-?}"
   # 0, not 2: both first-aid reds were cleared by the 2026-09-12 signatures.
   # Leaving it at 2 would let two new failures through in silence.
   if [ "$vfail" -gt 0 ]; then
     grep -E "FAIL|✗|×" /tmp/wc-vitest.log | head -30
-    fail "vitest has $vfail failures, and ALL of them are new — the two founder-blocked first-aid reds were cleared by the 2026-09-12 signatures, so nothing is subtracted here any more"
+    fail "gate 2 (vitest) has $vfail failures, and ALL of them are new — the two founder-blocked first-aid reds were cleared by the 2026-09-12 signatures, so nothing is subtracted here any more"
   fi
+  # A non-zero exit whose own summary counts zero failures means the run broke
+  # OUTSIDE the test bodies — a suite that threw while being collected, an
+  # unhandled rejection, a worker killed after the summary printed. None of those
+  # is a passing suite, and none of them shows up in $vfail.
+  [ "$vrc" -eq 0 ] || { tail -30 /tmp/wc-vitest.log; fail "gate 2 (vitest) exited $vrc while its own summary counted $vfail failures — the run broke OUTSIDE the test bodies (collection error, unhandled rejection, a killed worker). Unaccounted is not green; read the tail above"; }
 
   say "gate 3/4 — content validation"
   node platform/scripts/validate-content.mjs > /tmp/wc-content.log 2>&1 || { tail -30 /tmp/wc-content.log; fail "content validation is red"; }
