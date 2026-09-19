@@ -71,6 +71,22 @@
 
 const BS = String.fromCharCode(92);
 
+/**
+ * Verdicts that RETIRE a row rather than leave it open.
+ *
+ * This gate's whole subject is "a row a verifier OPENED". A verify line
+ * carrying one of these opened nothing — it agreed the row was settled — so the
+ * closure that follows it is not walking backwards over a correction.
+ *
+ * REFUTED is a latch, not a repair: measured 2026-09-19 over the corpus's
+ * 10,328 verdict lines, the gate's candidate set breaks down
+ * {STILL 47, UNJUDGED 19, PARTIAL 10, CLOSED 7} and holds no REFUTED at all. It
+ * is in the set because "the verifier retired the row" is the property being
+ * tested, and listing only the spelling that happens to be reachable today is
+ * how the next spelling gets in free.
+ */
+const SETTLED = new Set(["CLOSED", "REFUTED"]);
+
 /** Forward slashes, so one path shape is compared against one path shape. */
 export const fwd = (s) => String(s ?? "").split(BS).join("/");
 
@@ -309,6 +325,46 @@ export function findReclosures(rows, { buildOf, productDiff, fileOf = null }) {
     // Only a VERIFIER's correction earns this protection. A judge changing its
     // own mind within a round is ordinary adjudication.
     if (prev.correctedBy !== "verify") continue;
+    /**
+     * …AND THE VERIFIER MUST HAVE OPENED THE ROW — 2026-09-19.
+     *
+     * This test was `correctedBy === "verify"` alone, which asks WHO wrote the
+     * previous line and never WHAT IT SAID. A verify pass that SUSTAINED a
+     * closure therefore armed the gate exactly as one that overturned it, and
+     * the closure that followed was refused for walking backwards over a
+     * correction that had never been made.
+     *
+     * MEASURED 2026-09-19 on .audit-frames/wave-c/verdicts.jsonl (10,328
+     * lines). 113 verify lines in the corpus carry CLOSED. 83 pairs reach this
+     * point; 7 of them have `prev.verdict === CLOSED`. Driving the module the
+     * way wave-c-post.mjs drives it — real headMaps over 303 sweeps / 10,760
+     * drive directories, real `git diff --shortstat` — SEVEN pairs reach this
+     * test with `prev.verdict` already settled, and ONE OF THEM WAS BEING
+     * REFUSED: sc-vp-police-stop:56d9e48c, whose verify line opens
+     * "VERDICT SUSTAINED, RATIONALE REPLACED — this is not a repair and the
+     * record should not say it is." The verifier left the row settled and the
+     * gate refused the next closure in the verifier's name. Five more of the
+     * seven sat in `unattributable`, i.e. printed to the operator as suspect.
+     *   "LEFT THE ROW SETTLED", not "SUSTAINED": six of the seven verify lines
+     *   open with "Verdict unchanged" / "CLOSED STANDS" / "VERDICT SUSTAINED",
+     *   but the seventh (sc-signal-response:f04226b7) opens "I OVERTURN w36
+     *   STILL" — an overturn that itself CLOSED the row. The code keys on the
+     *   verdict the verifier left behind, which is right for all seven; only an
+     *   earlier draft of this prose generalised from the six.
+     *
+     * A false refusal is the failure this file names in its own docstring as
+     * being as bad as a false certificate. MEASURED THROUGH THE REAL CONSUMER
+     * (`node tools/audit/wave-c-post.mjs`): the gate refuses 30 rows, not 7, so
+     * this was 1 in 30 — 3.3%, not "a seventh". The 7 was this lane's own
+     * `fileOf:null` probe quoted as if it were the gate's total. The fix's
+     * measured effect there: refused 30 -> 29, unattributable 7 -> 2.
+     *
+     * THIS DOES NOT LOOSEN THE GATE. It removes rows whose antecedent is not a
+     * correction; every STILL / UNJUDGED / PARTIAL verify line — the 76 that
+     * are the class — is untouched, and the arithmetic downstream (buildOf,
+     * productDiff) is unchanged for all of them.
+     */
+    if (SETTLED.has(String(prev.verdict ?? "").toUpperCase())) continue;
 
     const a = buildOf(prev.evidenceFrame);
     const b = buildOf(last.evidenceFrame);

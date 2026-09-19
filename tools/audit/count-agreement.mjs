@@ -395,19 +395,40 @@ export const RECIPES = {
  * A check that cries wolf gets switched off, so it must say which of the two it
  * is looking at.
  */
-function corpusFingerprint() {
+/**
+ * IT TAKES IO NOW, AND IT IS EXPORTED — 2026-09-19.
+ *
+ * It was module-private and read the real filesystem, and `check()` took no io
+ * at all, so the INCONCLUSIVE branch below could only be reached by racing a
+ * real writer against the live corpus. That is exactly how it was reached the
+ * day it was found: a probe planted a new source file in
+ * .audit-frames/findings 30 s into a 49.5 s run. A branch whose only test is a
+ * stopwatch is a branch nobody re-tests, and this one had been failing open for
+ * 27 days.
+ *
+ * `readDir`/`stat` are injected in the shape reclosure.mjs already uses for
+ * `headMaps` — the convention in this directory is a plain object of the fs
+ * calls, defaulted to the real ones — so count-agreement.test.mjs can assert
+ * what the key is made of (name, size, rounded mtime) without touching a file
+ * on disk.
+ */
+const FS_IO = {
+  readDir: (d) => fs.readdirSync(d),
+  stat: (p) => fs.statSync(p),
+};
+
+export function corpusFingerprint(base = path.join(REPO, ".audit-frames"), io = FS_IO) {
   const parts = [];
-  const base = path.join(REPO, ".audit-frames");
   for (const dir of [path.join(base, "findings"), path.join(base, "wave-c")]) {
     let names = [];
     try {
-      names = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")).sort();
+      names = io.readDir(dir).filter((f) => f.endsWith(".jsonl")).sort();
     } catch {
       continue;
     }
     for (const f of names) {
       try {
-        const st = fs.statSync(path.join(dir, f));
+        const st = io.stat(path.join(dir, f));
         parts.push(f + ":" + st.size + ":" + Math.round(st.mtimeMs));
       } catch {
         /* a file that vanished mid-check is itself movement */
@@ -432,12 +453,34 @@ export function verdictOf({ problems, moved }) {
   return { verdict: problems.length ? "disagreed" : "agreed", ok: problems.length === 0 };
 }
 
-export function check({ verbose = false } = {}) {
-  const fingerprintBefore = corpusFingerprint();
+/**
+ * `io` EXISTS TO MAKE THE INCONCLUSIVE BRANCH TESTABLE, AND FOR NOTHING ELSE.
+ *
+ * Both members default to the real thing, and the CLI at the bottom of this
+ * file passes none of them, so a normal run is byte-for-byte the run it always
+ * was. Two are needed rather than one, because INCONCLUSIVE is the conjunction
+ * of two facts:
+ *
+ *   io.fingerprint  the corpus moved. Injecting this alone gets `moved`, but on
+ *                   a healthy corpus `problems` is empty and the verdict is
+ *                   `agreed` — the branch stays unreached.
+ *   io.counters     something to disagree. A counter this file has no recipe
+ *                   for is a REAL problem the real loop pushes (damage case 8
+ *                   of the battery in count-agreement.test.mjs), it spawns
+ *                   nothing, and it needs no corpus to be tampered with.
+ *
+ * WHAT THIS DOES NOT OPEN. `counters` cannot be used to make the check examine
+ * nothing: an empty list still hits the "no corpus-reading tool was found"
+ * problem below, and `ok` is false for every non-empty `problems`. The fail-
+ * closed field is untouched by either injection.
+ */
+export function check({ verbose = false, io = {} } = {}) {
+  const fingerprint = io.fingerprint || (() => corpusFingerprint());
+  const fingerprintBefore = fingerprint();
   const n = recompute();
   const expected = stampFrom(n);
   const expectedWorked = workedFrom(n);
-  const counters = findCounters();
+  const counters = io.counters || findCounters();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "knijka-count-"));
   const results = [];
   const problems = [];
@@ -609,7 +652,7 @@ export function check({ verbose = false } = {}) {
    * caller that forgets `verdict` still refuses. Putting the safety only in a
    * field someone must remember to read is this same defect one field along.
    */
-  const moved = corpusFingerprint() !== fingerprintBefore;
+  const moved = fingerprint() !== fingerprintBefore;
   const { verdict, ok } = verdictOf({ problems, moved });
   const note =
     verdict !== "inconclusive"
@@ -625,7 +668,16 @@ export function check({ verbose = false } = {}) {
   // rewrote `problems` to `[]` on its way out — so the reasons existed, were
   // counted into a note, and then left the building. A single exit makes that
   // particular shape unwriteable rather than merely absent.
-  return { expected, expectedWorked, results, problems, moved, note, verdict, ok };
+  //
+  // `fingerprint` is the key this run MEASURED movement against, and it is on
+  // the return so that the default can be tested rather than trusted. Without
+  // it the only visible effect of the default is `moved`, which is false both
+  // when the corpus was still and when the fingerprint stopped saying anything:
+  // MEASURED 2026-09-19, replacing the default with `() => ""` left all four of
+  // this file's new tests green, which is the fail-open being rebuilt one floor
+  // up. With the key returned, count-agreement.test.mjs compares check()'s own
+  // default against corpusFingerprint() and goes red on that mutation.
+  return { expected, expectedWorked, results, problems, moved, note, verdict, ok, fingerprint: fingerprintBefore };
 }
 
 /**

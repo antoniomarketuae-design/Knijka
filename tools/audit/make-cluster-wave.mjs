@@ -26,14 +26,49 @@
 // two agents rewriting one file in one working tree is how a wave lands a diff
 // nobody authored. Here each hot file has EXACTLY ONE owner by construction, and
 // every lane is told which files belong to someone else this wave.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const REPO = "E:/AI driver";
+import { loadOpenFindings, normFile, corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
+
+/**
+ * THE REPO IS FOUND, NOT TYPED, AND THE IMPORT IS RELATIVE — 2026-09-19.
+ *
+ * This file had BOTH halves nailed to one machine: `const REPO = "E:/AI
+ * driver"` and `await import("file:///E:/AI%20driver/tools/audit/
+ * finding-reader.mjs")`. The second is the worse of the two, because a
+ * hardcoded absolute import means even the reader that would have derived the
+ * right root is the wrong COPY of the reader.
+ *
+ * MEASURED 2026-09-19. `tools/audit/*.mjs` and every `.audit-frames/
+ * {findings,wave-c}/*.jsonl` were copied to a temp root and 20 rows cut from
+ * that copy's chunk-0.jsonl, giving the copy an open list of 94 against this
+ * box's 95. Run from inside the copy, the old code wrote a wave stamped
+ * `OPEN-LIST filed=1523 … open=95` — E:/AI driver's census, in a workflow a
+ * lane in the OTHER checkout would be handed days later — and picked its lanes
+ * from E:/AI driver's verdicts.jsonl. After this change the same command in the
+ * copy stamps `filed=1511 … open=94`.
+ *
+ * Latent on this box; live in a git worktree, a second clone, or the
+ * two-developer mode docs/development/61 documents. The walk below is the one
+ * count-agreement.mjs, make-repair-wave.mjs, make-verdicts2.mjs,
+ * verdict-coverage.mjs, wave-c-post.mjs and make-repair-round.mjs already use.
+ */
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+function findRepo() {
+  let d = HERE;
+  for (;;) {
+    if (existsSync(path.join(d, ".audit-frames", "findings"))) return d;
+    const up = path.dirname(d);
+    if (up === d) break;
+    d = up;
+  }
+  return process.cwd();
+}
+const REPO = findRepo();
 const WAVE = process.argv[2] || "repair-wave-next.js";
 const MAX_LANES = Number(process.argv[3] || 14);
-
-const { loadOpenFindings, normFile, corpusCounts, openListLine, workedLine } =
-  await import("file:///E:/AI%20driver/tools/audit/finding-reader.mjs");
 
 // The live verdict per finding — only confirmed-STILL rows are worth a lane.
 const V = new Map();

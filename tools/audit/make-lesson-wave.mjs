@@ -11,12 +11,38 @@
 // holding all of them can see the whole failure rather than a slice — and two
 // lessons rarely contend for the same file, so lanes can run in PARALLEL
 // instead of the sequential crawl that made wave 17 take 15 hours.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const REPO = "E:/AI driver";
+import { loadOpenFindings, normFile, corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
+
+/**
+ * THE REPO IS FOUND, NOT TYPED, AND THE IMPORT IS RELATIVE — 2026-09-19. Same
+ * two hardcoded halves and the same repair as make-cluster-wave.mjs, which
+ * carries the long note.
+ *
+ * MEASURED here specifically: run from a temp copy of tools/audit + the `.jsonl`
+ * corpus whose open list is 94 against this box's 95, the old code wrote a wave
+ * stamped `OPEN-LIST filed=1523 … open=95` and picked its two lanes
+ * (sc-mw-emergency-lane, sc-roundabout-entry) out of E:/AI driver's
+ * verdicts.jsonl. The stamp inside a generated wave is not decoration — it is
+ * the number a repair lane is handed days later, and count-agreement.mjs reads
+ * it out of the generated FILE for exactly that reason.
+ */
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+function findRepo() {
+  let d = HERE;
+  for (;;) {
+    if (existsSync(path.join(d, ".audit-frames", "findings"))) return d;
+    const up = path.dirname(d);
+    if (up === d) break;
+    d = up;
+  }
+  return process.cwd();
+}
+const REPO = findRepo();
 const WAVE = process.argv[2] || "repair-wave-next.js";
-
-const { loadOpenFindings, normFile, corpusCounts, openListLine, workedLine } = await import("file:///E:/AI%20driver/tools/audit/finding-reader.mjs");
 
 // The live verdict per finding — only confirmed-STILL rows are worth a lane.
 const V = new Map();

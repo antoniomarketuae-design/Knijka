@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   check,
+  corpusFingerprint,
   findCounters,
   recompute,
   report,
@@ -148,6 +149,125 @@ test("a moved corpus that changed no count still AGREES — and still says it mo
   assert.equal(quiet.code, 0);
   assert.match(quiet.out, /AGREED/);
   assert.match(quiet.out, /moved/, "a corpus that moved is never passed over in silence");
+});
+
+// -----------------------------------------------------------------------------
+// THE INCONCLUSIVE BRANCH, DRIVEN WITHOUT A RACE — 2026-09-19.
+//
+// Everything above reads check()'s FIELDS or hands report() a hand-built
+// result. Neither touches the one thing that decides which verdict check()
+// computes: `corpusFingerprint()`, which was module-private and read the real
+// filesystem. The only way to make check() itself return "inconclusive" was to
+// plant a file in .audit-frames/findings during the 19-90 s window while it
+// shelled out to seventeen tools — which is how the fail-open was found, and is
+// not a test anybody can re-run on demand.
+//
+// So the fingerprint and the counter list are injectable now, both defaulted to
+// the real thing. These four tests need no corpus to be tampered with, spawn no
+// child process, and finish in the time recompute() takes.
+// -----------------------------------------------------------------------------
+
+/** A fingerprint function that returns each value in turn, then repeats the last. */
+const fingerprints = (...values) => {
+  let i = 0;
+  return () => values[Math.min(i++, values.length - 1)];
+};
+
+/** A counter this file has no recipe for: a real problem, pushed by the real loop. */
+const NO_RECIPE = ["zz-not-a-real-counter.mjs"];
+
+test("check() returns INCONCLUSIVE when the corpus moved under a disagreement", () => {
+  const r = check({ io: { fingerprint: fingerprints("before", "after"), counters: NO_RECIPE } });
+
+  assert.equal(r.moved, true, "two different fingerprints is a moved corpus");
+  assert.ok(r.problems.length > 0, "the no-recipe counter must produce a real problem, not a synthetic one");
+  assert.equal(r.verdict, "inconclusive");
+  assert.equal(r.ok, false, "this is the field every existing caller reads, and it is the fail-closed one");
+  assert.ok(r.note && /THE CORPUS MOVED/.test(r.note), "the reason must be ON the returned object, not only in a log line");
+  assert.match(r.problems[0], /zz-not-a-real-counter\.mjs/, "the apparent disagreement must still be reported in full");
+
+  // …and end to end through the printer, which is where the 27-day fail-open
+  // actually lived: computed correctly, destructured away.
+  const lines = [];
+  const code = report(r, { log: (s) => lines.push(String(s)) });
+  assert.equal(code, 2);
+  assert.doesNotMatch(lines.join("\n"), /AGREED/);
+});
+
+test("the SAME disagreement on a STILL corpus is a plain red, so the fingerprint is what divides them", () => {
+  // The control. If this also came back "inconclusive" the branch would be
+  // keyed on something other than movement, and the distinction the whole
+  // mechanism exists to draw would be decorative.
+  const r = check({ io: { fingerprint: fingerprints("same"), counters: NO_RECIPE } });
+
+  assert.equal(r.moved, false);
+  assert.equal(r.verdict, "disagreed");
+  assert.equal(r.ok, false);
+  assert.equal(r.note, null);
+  assert.equal(report(r, { log: () => {} }), 1, "a real disagreement is exit 1, never the inconclusive 2");
+});
+
+test("the DEFAULT fingerprint is the real one — injection may not have emptied it", () => {
+  // THE RISK THIS INJECTION CREATES, and the first version of this test did not
+  // close it. A default of `() => ""` makes `moved` false for ever and restores
+  // the 27-day fail-open, and MEASURED 2026-09-19 that mutation left all four
+  // of these tests green: the three above pass their own fingerprint in, and
+  // this one was calling corpusFingerprint() directly — asserting that the real
+  // function is real, which nobody doubted, while saying nothing about whether
+  // check() still calls it. A guard that cannot fail is the defect this whole
+  // round is about, so the assertion is now on the key CHECK ITSELF measured.
+  const real = corpusFingerprint();
+  assert.ok(real.length > 0, "the real fingerprint is empty — check() can no longer see the corpus move");
+  assert.match(real, /\.jsonl:\d+:\d+/, "it must key on the corpus files' size and mtime, not on their names alone");
+  assert.equal(corpusFingerprint(), real, "a still corpus must fingerprint the same twice, or every run cries wolf");
+
+  // No `fingerprint` in the io: this is check()'s own default, doing its own
+  // measuring. Compared by FILE NAME rather than byte-for-byte, because a size
+  // or an mtime may legitimately move between the two calls — this box runs
+  // several agents against one corpus, which is the entire reason the
+  // INCONCLUSIVE branch exists — while a corpus FILE appearing mid-test would
+  // invalidate every other test in this file too.
+  const names = (fp) => fp.split("|").map((p) => p.split(":")[0]);
+  const own = check({ io: { counters: NO_RECIPE } }).fingerprint;
+  assert.ok(own.length > 0, "check()'s default fingerprint returned nothing — `moved` is now false for ever");
+  assert.match(own, /\.jsonl:\d+:\d+/);
+  assert.deepEqual(
+    names(own),
+    names(real),
+    "check() measured movement against something other than the corpus it is certifying",
+  );
+});
+
+test("corpusFingerprint keys on size and mtime, and a vanished file is itself movement", () => {
+  // Driven with injected io in the shape reclosure.mjs uses, so what the key is
+  // MADE of is asserted rather than described.
+  const io = (size, mtimeMs) => ({
+    readDir: () => ["a.jsonl", "b.txt"],
+    stat: () => ({ size, mtimeMs }),
+  });
+  const base = corpusFingerprint("/fake", io(10, 1000));
+  assert.equal(base, "a.jsonl:10:1000|a.jsonl:10:1000", "both corpus directories are walked; .txt is not a corpus file");
+  assert.notEqual(corpusFingerprint("/fake", io(11, 1000)), base, "a file that grew is a corpus that moved");
+  assert.notEqual(corpusFingerprint("/fake", io(10, 1001)), base, "a file that was rewritten is a corpus that moved");
+
+  const gone = corpusFingerprint("/fake", {
+    readDir: () => ["a.jsonl"],
+    stat: () => {
+      throw new Error("ENOENT");
+    },
+  });
+  assert.match(gone, /a\.jsonl:gone/, "a file that disappeared mid-check must read as movement, not as an empty key");
+
+  assert.equal(
+    corpusFingerprint("/fake", {
+      readDir: () => {
+        throw new Error("ENOENT");
+      },
+      stat: () => ({ size: 1, mtimeMs: 1 }),
+    }),
+    "",
+    "an unreadable directory is skipped rather than thrown — this runs twice around a 19-90 s check",
+  );
 });
 
 test("ok is the fail-closed field, so a caller that never learns `verdict` still refuses", () => {

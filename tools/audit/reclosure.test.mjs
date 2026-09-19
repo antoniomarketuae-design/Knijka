@@ -75,6 +75,67 @@ test("§1 only a FINAL verdict of CLOSED is examined", () => {
   assert.equal(refused.length, 0);
 });
 
+/**
+ * §1 THE ANTECEDENT MUST BE A CORRECTION, NOT JUST A VERIFIER'S SIGNATURE.
+ *
+ * `findReclosures` asked `prev.correctedBy === "verify"` and never asked what
+ * that line SAID, so a verify pass that SUSTAINED a closure armed the gate
+ * exactly like one that overturned it.
+ *
+ * MEASURED 2026-09-19 on the real ledger (.audit-frames/wave-c/verdicts.jsonl,
+ * 10,328 lines): 113 verify lines carry CLOSED; 83 pairs reach the test; 7 have
+ * `prev.verdict === CLOSED`. Driven the way wave-c-post.mjs drives it — real
+ * headMaps over 303 sweeps, real `git diff --shortstat` — the pre-fix code
+ * refused 7 rows and ONE of them was sc-vp-police-stop:56d9e48c, whose verify
+ * line begins "VERDICT SUSTAINED, RATIONALE REPLACED". A seventh of everything
+ * this gate refused was a correction nobody had made.
+ */
+test("§1 a verify that SUSTAINED a closure is not a correction, and arms nothing", () => {
+  const sustained = (id, sweep) => ({
+    findingId: id,
+    verdict: "CLOSED",
+    correctedBy: "verify",
+    evidenceFrame: frame(sweep),
+  });
+  const rows = [sustained("sc-g:7", "w15"), closed("sc-g:7", "w17")];
+
+  const { refused, unattributable } = findReclosures(rows, { buildOf, productDiff: noProductChange });
+  assert.equal(
+    refused.length,
+    0,
+    "the verifier AGREED the row was closed — refusing the next closure attributes to it an overturn it never wrote",
+  );
+  assert.equal(unattributable.length, 0, "it is not this gate's business at all, so it may not be reported either");
+});
+
+test("§1 a verifier who REFUTED the row arms nothing either", () => {
+  // Zero of the 83 candidates carry this today (measured 2026-09-19), so it is
+  // a latch and not a repair. It is here because the property is "the verifier
+  // RETIRED the row", and a check that lists only the reachable spelling is how
+  // the next spelling gets in free.
+  const rows = [
+    { findingId: "sc-h:8", verdict: "REFUTED", correctedBy: "verify", evidenceFrame: frame("w15") },
+    closed("sc-h:8", "w17"),
+  ];
+  const { refused, unattributable } = findReclosures(rows, { buildOf, productDiff: noProductChange });
+  assert.equal(refused.length, 0);
+  assert.equal(unattributable.length, 0);
+});
+
+test("§1 the three OPENING verdicts all still arm the gate — the narrowing may not cost the class", () => {
+  // The other direction, and the one that matters more: 76 of the 83 real
+  // candidates are these three, and if the fix above swallowed any of them it
+  // would have emptied the gate instead of correcting it.
+  for (const opening of ["STILL", "UNJUDGED", "PARTIAL"]) {
+    const rows = [
+      { findingId: "sc-i:9", verdict: opening, correctedBy: "verify", evidenceFrame: frame("w15") },
+      closed("sc-i:9", "w17"),
+    ];
+    const { refused } = findReclosures(rows, { buildOf, productDiff: noProductChange });
+    assert.equal(refused.length, 1, `a verify line of ${opening} leaves the row OPEN and must still be protected`);
+  }
+});
+
 test("§1 an unnameable build is REPORTED, never refused", () => {
   // A false refusal is as bad as a false certificate. Missing provenance is not
   // evidence that a judge was wrong.

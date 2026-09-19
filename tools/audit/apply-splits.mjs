@@ -38,10 +38,48 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 import { openListLine, workedLine } from "./finding-reader.mjs";
 
-const REPO = "E:/AI driver";
+/**
+ * THE REPO IS FOUND, NOT TYPED — 2026-09-19.
+ *
+ * This was `const REPO = "E:/AI driver"`, and that made this tool read ONE tree
+ * while its own stamp read another. `openListLine()` comes from
+ * finding-reader.mjs, which has always walked up from its own file, so in any
+ * checkout that is not literally at E:/AI driver the two halves part company.
+ *
+ * MEASURED. `tools/audit/*.mjs` plus every `.audit-frames/{findings,wave-c}/
+ * *.jsonl` were copied to a temp root and 20 rows were cut from that copy's
+ * chunk-0.jsonl, so the copy's open list is 94 where this box's is 95. Run from
+ * the copy, the old code printed `OPEN-LIST … open=94` (the copy's, via
+ * finding-reader) above `parents named by the split : 253 / parents found in
+ * the corpus: 0 / children (live) : 706` — byte-for-byte the numbers the SAME
+ * command prints in E:/AI driver. One tool, two corpora, and the stamp is the
+ * half that is not doing the work. It also reported `GONE whose frame does NOT
+ * resolve: 28` against 0 here, because the frames it checked belong to the
+ * other tree.
+ *
+ * This is the walk the other counters already use — count-agreement.mjs,
+ * make-repair-wave.mjs, make-verdicts2.mjs, verdict-coverage.mjs,
+ * wave-c-post.mjs and make-repair-round.mjs all carry it verbatim. Matching it
+ * rather than inventing a seventh convention is the point: these four tools are
+ * among the 17 whose AGREEMENT certifies the open-list census, and agreement
+ * between tools that disagree about where the corpus IS is not agreement.
+ */
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+function findRepo() {
+  let d = HERE;
+  for (;;) {
+    if (fs.existsSync(path.join(d, ".audit-frames", "findings"))) return d;
+    const up = path.dirname(d);
+    if (up === d) break;
+    d = up;
+  }
+  return process.cwd();
+}
+const REPO = findRepo();
 const FIND = REPO + "/.audit-frames/findings";
 const SPLITS = REPO + "/.audit-frames/wave-c/splits.jsonl";
 const CLOSURES = REPO + "/.audit-frames/wave-c/closures.jsonl";

@@ -22,11 +22,38 @@
  *   node tools/audit/emit-split-verdicts.mjs --apply    write
  */
 import fs from "node:fs";
+import path from "node:path";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 import { openListLine, workedLine, corpusCounts } from "./finding-reader.mjs";
 
-const REPO = "E:/AI driver";
+/**
+ * THE REPO IS FOUND, NOT TYPED — 2026-09-19. Same defect and same repair as
+ * apply-splits.mjs, which carries the long note.
+ *
+ * MEASURED here specifically: with `tools/audit` and the `.jsonl` corpus copied
+ * to a temp root whose open list is 94 against this box's 95, the old code run
+ * from that copy printed `OPEN-LIST … open=94` — the copy's, because
+ * corpusCounts() walks up from finding-reader.mjs — over `open children : 48 /
+ * already carrying a line : 46 / lines to write : 2`, which is exactly what the
+ * same command prints in E:/AI driver. The stamp was the copy's and every row
+ * it judged belonged to the other tree. With `--apply` that writes verdict
+ * lines into E:/AI driver's verdicts.jsonl from a checkout nobody thought they
+ * were touching.
+ */
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+function findRepo() {
+  let d = HERE;
+  for (;;) {
+    if (fs.existsSync(path.join(d, ".audit-frames", "findings"))) return d;
+    const up = path.dirname(d);
+    if (up === d) break;
+    d = up;
+  }
+  return process.cwd();
+}
+const REPO = findRepo();
 const CHILDREN = REPO + "/.audit-frames/findings/chunk-split.jsonl";
 const VERDICTS = REPO + "/.audit-frames/wave-c/verdicts.jsonl";
 const APPLY = process.argv.includes("--apply");
