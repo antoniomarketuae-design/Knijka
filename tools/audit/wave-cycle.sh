@@ -211,7 +211,21 @@ stamp_env() {
   else
     printf '\nNEXT_PUBLIC_COMMIT_SHA="%s"\n' "$sha" >> "$f"
   fi
-  grep -q "$sha" "$f" || fail "the .env stamp did not take; a sweep now would exit EXIT_TARGET_UNVERIFIED on every drive"
+  # READ BACK THE KEY'S VALUE, NOT THE FILE — 2026-09-19. This was
+  # `grep -q "$sha" "$f"`, which passes on the sha appearing ANYWHERE: a rotation
+  # note, an old commented-out line, another key. Measured this session on a
+  # fixture .env whose first line was
+  #   `# rotated 2026-09-18: NEXT_PUBLIC_COMMIT_SHA=<sha>`
+  # while the live key held 0000…0000 — the old guard printed "the .env stamp
+  # took" and the value Next's env loader would have handed /api/health was the
+  # zeros. That is exactly the stale stamp this function exists to make
+  # impossible, certified as correct, and it costs a whole sweep at
+  # EXIT_TARGET_UNVERIFIED.
+  # The LAST matching line is the one that counts: dotenv assigns duplicate keys
+  # in order, so a later line wins, and `tr -d '"\r'` is there because the value
+  # is written quoted and this tree is edited from Windows.
+  local got; got=$(grep '^NEXT_PUBLIC_COMMIT_SHA=' "$f" | tail -1 | cut -d= -f2- | tr -d '"\r')
+  [ "$got" = "$sha" ] || fail "the .env stamp did not take: NEXT_PUBLIC_COMMIT_SHA reads «${got:-(the key is not in the file)}» but HEAD is «$sha» — a sweep now would exit EXIT_TARGET_UNVERIFIED on every drive"
   say "stamped platform/.env with ${sha:0:12} (gitignored — no worktree hash moved)"
   say "NOTE: the dev server must be RESTARTED to pick this up, or health still attests the old commit"
 }
@@ -237,6 +251,46 @@ push_both() {
   say "BOTH REMOTES HOLD ${local_sha:0:12}"
 }
 
+# THE BACKUP MUST ANNOUNCE ITSELF, AND A PIPE CANNOT SAY IT DID NOT — 2026-09-19.
+#
+# Both call sites were `bash snapshot-ledger.sh 2>&1 | tail -4`, and a pipeline
+# returns the status of its LAST element. Measured this session: a function that
+# prints one line and returns 3, piped to `tail -4`, yields status 0. So the one
+# signal that says «the only copy of the ledger was NOT written» was thrown away
+# at both of the two places that write it — and the thing at stake, measured this
+# session, is 26 findings chunks (2,479 raw lines, 1,523 findings once the corpus
+# reader has deduped them), 10,328 verdict lines and 1,428 closure lines, all
+# under a gitignored directory on one 7,200 rpm disk.
+#
+# THE STATUS IS NECESSARY AND NOT SUFFICIENT. snapshot-ledger.sh's last statement
+# is an `echo`, so it exits 0 on every path except its two early `exit 1`s (the
+# cd and `git write-tree`). The proof that a snapshot actually happened is the
+# `ledger/audit -> <sha>` line it prints, so that line is required too — and a
+# `git commit-tree` that failed leaves the arrow with nothing after it, which is
+# why the sha is matched rather than the prefix.
+#
+# A FAILED PUSH IS SHOUTED, NOT REFUSED. snapshot-ledger.sh:65-67 prints
+# `FAILED: origin` / `FAILED: vps` and exits 0 regardless — that is its own
+# behaviour and this step does not change what it accepts. But a branch on the
+# same disk as the corpus is not a backup against that disk, so it is said
+# loudly instead of being folded into a tail nobody reads.
+snapshot_ledger() {
+  local out rc=0
+  out=$(bash "$REPO/tools/audit/snapshot-ledger.sh" 2>&1) || rc=$?
+  printf '%s\n' "$out" | sed 's/^/    /'
+  [ "$rc" -eq 0 ] || fail "snapshot-ledger.sh exited $rc — the ledger was NOT snapshotted, and .audit-frames/ is gitignored, so it exists in ONE place on one HDD"
+  # tr -d '\r' for the same reason gates 2 and 4 do it: a stray CR before the
+  # line end would make `$` miss and turn a written snapshot into a refusal.
+  printf '%s\n' "$out" | tr -d '\r' | grep -qE "^ledger/audit -> [0-9a-f]{40}$" \
+    || fail "snapshot-ledger.sh exited 0 but printed no «ledger/audit -> <40-hex>» line — no snapshot commit was written, and an unreadable result is not a written one"
+  if printf '%s\n' "$out" | grep -q "^FAILED: "; then
+    echo ""
+    echo "  !! THE SNAPSHOT IS LOCAL ONLY — $(printf '%s\n' "$out" | grep '^FAILED: ' | tr '\n' ' ')"
+    echo "  !! ledger/audit now sits on the SAME disk as .audit-frames/. Re-push before trusting it as a backup."
+    echo ""
+  fi
+}
+
 case "$STEP" in
 
 gate) gate ;;
@@ -246,7 +300,12 @@ commit)
   [ -n "$MSG" ] && [ -f "$MSG" ] || fail "usage: wave-cycle.sh commit <path-to-message-file>"
   [ "$(git status --porcelain | wc -l)" -gt 0 ] || fail "nothing to commit"
   gate || exit 1
-  git add -A
+  # AND THE STAGING MUST HAVE HAPPENED — 2026-09-19. `git add -A` threw its
+  # status away here. If it refuses part-way (an index.lock left behind by a
+  # killed git, one unreadable path) the commit below still succeeds on whatever
+  # it managed to stage, and the tree that gets committed is NOT the tree the
+  # gate above just passed — which is the one thing the gate is for.
+  git add -A || fail "git add -A refused; the commit would carry a tree the gate never saw"
   git commit -q -F "$MSG" || fail "commit refused (a hook? do not skip it — fix it)"
   say "committed $(git rev-parse --short HEAD)"
   # STAMP BEFORE PUSHING. The stamp does not depend on any remote, and
@@ -259,7 +318,7 @@ commit)
   # was 34d7133. Retrying the push is cheap; noticing a stale stamp is not.
   stamp_env
   push_both
-  bash "$REPO/tools/audit/snapshot-ledger.sh" 2>&1 | tail -4
+  snapshot_ledger
   ;;
 
 preflight)
@@ -297,7 +356,19 @@ sweep)
   # INTERLEAVED, not halved. The re-drive set is sorted heaviest-first, so a
   # contiguous split hands shard 0 every expensive lesson and leaves shard 1 idle
   # for the back half of the run.
-  node -e '
+  #
+  # A SHARD COUNT THAT IS NOT A NUMBER PRODUCES NO SHARDS AT ALL. Measured this
+  # session with SHARDS="two": `Number("two")` is NaN, `i % NaN` is NaN, and the
+  # splitter dies on `out[NaN].push` with a TypeError and exit 1 having written
+  # NOTHING. Named here rather than left to a stack trace.
+  case "$SHARDS" in ''|*[!0-9]*) fail "shards must be a positive integer; got «$SHARDS»";; esac
+  [ "$SHARDS" -ge 1 ] || fail "shards must be at least 1; got «$SHARDS»"
+  # …AND THE SPLIT'S OWN STATUS, WHICH THE PIPE TO sed DISCARDED — 2026-09-19.
+  # A pipeline returns the status of its last element, so `node … | sed` reported
+  # 0 for a splitter that had died: measured this session at exit 9 with zero
+  # shard files written, pipeline status 0.
+  SPLIT_RC=0
+  SPLIT_OUT=$(node -e '
     const fs = require("fs");
     const names = fs.readFileSync(process.argv[1], "utf8").split(/[\s,]+/).filter(Boolean);
     const n = Number(process.argv[2]);
@@ -305,15 +376,73 @@ sweep)
     names.forEach((x, i) => out[i % n].push(x));
     out.forEach((list, i) => fs.writeFileSync(process.argv[3] + "/shard-" + i + ".txt", list.join(",") + "\n"));
     console.log(out.map((l, i) => "shard " + i + ": " + l.length).join("  ·  "));
-  ' "$LESSONS" "$SHARDS" "$REPO/.audit-frames/$ROUND" | sed 's/^/    /'
+  ' "$LESSONS" "$SHARDS" "$REPO/.audit-frames/$ROUND" 2>&1) || SPLIT_RC=$?
+  printf '%s\n' "$SPLIT_OUT" | sed 's/^/    /'
+  [ "$SPLIT_RC" -eq 0 ] || fail "the shard split exited $SPLIT_RC — nothing was dispatched, and the shard-*.txt files in .audit-frames/$ROUND are whatever was there BEFORE this round"
 
-  for f in "$REPO/.audit-frames/$ROUND/shard-"*.txt; do
-    s=$(basename "$f" .txt | sed 's/shard-//')
+  # DISPATCH THE SHARDS THIS ROUND WAS TOLD TO WRITE, NOT WHATEVER THE GLOB FINDS
+  # — 2026-09-19. The loop here was `for f in …/shard-*.txt` with no `nullglob`,
+  # and both halves of that were measured this session on fixtures:
+  #   . empty directory  -> the body runs ONCE with the literal pattern, i.e.
+  #     «dispatching shard '*'» with the list file «…/shard-*.txt», which the
+  #     supervisor then `cat`s.
+  #   . a stale shard-0.txt left by a previous round -> «dispatching shard '0'»
+  #     carrying the PREVIOUS round's lesson list under THIS round's name, which
+  #     is a sweep whose frames say they cover lessons nobody drove.
+  # Combined with the discarded split status above, a failed split dispatched the
+  # wrong sweep in silence. Iterating 0..SHARDS-1 dispatches exactly what the
+  # splitter was asked for; a leftover beyond that is named, not driven.
+  # A MID-LOOP `fail` USED TO LEAVE THE EARLIER SUPERVISORS RUNNING. `fail` exits
+  # this script, but the shards dispatched on previous iterations are detached
+  # children and keep going. MEASURED 2026-09-19 with 3 shards claimed and 2
+  # lists present: the script printed STOPPED and exited 1, and eight seconds
+  # later both shard-0 and shard-1 supervisors were still alive — still writing
+  # into `fill-<round>-*`, which `merge` later collects with no completion check.
+  # So a REFUSED sweep could be merged afterwards as though it were whole. The
+  # step fails closed either way; this is about what it leaves behind.
+  stop_dispatched() {
+    [ -n "${PIDS:-}" ] || return 0
+    for job in $PIDS; do
+      kill "${job%%:*}" 2>/dev/null || true
+    done
+    wait 2>/dev/null || true
+    say "  stopped the supervisors already dispatched, so a refused sweep leaves no half-written round behind"
+  }
+  PIDS=""
+  for s in $(seq 0 $((SHARDS - 1))); do
+    f="$REPO/.audit-frames/$ROUND/shard-$s.txt"
+    [ -s "$f" ] || { stop_dispatched; fail "shard $s list is missing or empty ($f) although the split reported success — refusing to dispatch a supervisor with no lessons"; }
     say "  dispatching shard $s under the supervisor"
     bash "$REPO/tools/mobile/drive-supervisor.sh" "$ROUND-$s" "$f" "http://localhost:$PORT" &
+    PIDS="$PIDS $!:$s"
   done
-  wait
-  say "all shards exited; run: wave-cycle.sh merge $ROUND"
+  for f in "$REPO/.audit-frames/$ROUND/shard-"*.txt; do
+    [ -e "$f" ] || continue
+    s=$(basename "$f" .txt | sed 's/shard-//')
+    case "$s" in ''|*[!0-9]*) continue;; esac
+    [ "$s" -lt "$SHARDS" ] || say "  NOTE: $f is a LEFTOVER from an earlier round of this name — not dispatched"
+  done
+
+  # EVERY JOB'S STATUS, NOT THE LAST ONE'S — 2026-09-19. Bare `wait` returns 0
+  # once every job has exited, whatever they exited WITH: measured this session,
+  # `( exit 7 ) & ( exit 0 ) & wait` yields 0. drive-supervisor.sh's own last
+  # statement is an `echo` into its log, so 0 is what it returns for an ordinary
+  # run however the drives went; a non-zero status from it means the SUPERVISOR
+  # itself died (its `cd` refused, it was killed) and that shard's lessons were
+  # never driven to the end. Saying "all shards exited" over that is how a sweep
+  # gets judged as if it were complete.
+  SWEEP_RC=0
+  for job in $PIDS; do
+    p="${job%%:*}"; s="${job##*:}"
+    if wait "$p"; then
+      say "  shard $s supervisor exited 0"
+    else
+      jrc=$?; SWEEP_RC=1
+      say "  shard $s supervisor EXITED $jrc"
+    fi
+  done
+  [ "$SWEEP_RC" -eq 0 ] || fail "at least one shard supervisor died (statuses above). Whatever landed is in .audit-frames/fill-$ROUND-*, and merging it is still possible — but this sweep is INCOMPLETE and must not be adjudicated as a full pass over $LESSON_N lessons"
+  say "all shards exited 0; run: wave-cycle.sh merge $ROUND"
   ;;
 
 merge)
@@ -339,7 +468,15 @@ merge)
   done
   [ -n "$HALVES" ] || fail "no fill-$ROUND-* halves to merge — did the sweep write anywhere else?"
   say "merging halves: $HALVES  ->  $ROUND"
-  node "$REPO/tools/audit/wave-c-merge.mjs" --halves "$HALVES" --dest "$ROUND" 2>&1 | sed 's/^/    /'
+  # AND ITS STATUS — the same pipe-swallows-it shape as the split and the
+  # snapshot. wave-c-merge.mjs has two `process.exit(1)` refusals (:110, :165);
+  # piped to sed, both read as a successful merge and the round then gets judged
+  # on whatever the halves happened to contain — which is the 2026-08-28 story
+  # the comment above is about, one layer down.
+  MERGE_RC=0
+  MERGE_OUT=$(node "$REPO/tools/audit/wave-c-merge.mjs" --halves "$HALVES" --dest "$ROUND" 2>&1) || MERGE_RC=$?
+  printf '%s\n' "$MERGE_OUT" | sed 's/^/    /'
+  [ "$MERGE_RC" -eq 0 ] || fail "wave-c-merge exited $MERGE_RC — $ROUND was NOT merged; judging it now would adjudicate an empty or half-collected sweep"
   ;;
 
 post)
@@ -349,10 +486,43 @@ post)
   node "$REPO/tools/audit/count-agreement.mjs" 2>&1 | tail -3 | grep -q "AGREED" \
     || fail "the counters disagree; do not apply anything until they do"
   say "3/4 wave-c-post --apply"
-  cp "$REPO/.audit-frames/wave-c/closures.jsonl" "$REPO/.audit-frames/wave-c/closures.jsonl.bak" 2>/dev/null
-  node "$REPO/tools/audit/wave-c-post.mjs" --apply 2>&1 | tail -14
+  # THE BACKUP IS A PRECONDITION OF THE APPLY, NOT A COURTESY — 2026-09-19.
+  # This line was `cp … 2>/dev/null` with the status discarded, one line before
+  # `wave-c-post.mjs --apply` does `fs.appendFileSync(CLOSURES, …)` (:657) to the
+  # live file. Measured this session: a cp that fails leaves NO .bak, prints
+  # nothing because of the 2>/dev/null, and the script walks straight into the
+  # apply — status 0, no backup, and the append happens anyway.
+  # Cost of doing it properly, measured on the real file (1,980,842 bytes /
+  # 1,428 lines, page cache warm): cp 0.057 s, cmp 0.110 s. A cold read off this
+  # 7,200 rpm disk is larger, and that is a property of the disk, not of this.
+  # What this .bak is and is not: it sits in the same directory on the same
+  # disk, so it protects against a bad --apply, not against losing the disk.
+  # That is what step 4/4 is for.
+  CLOSURES="$REPO/.audit-frames/wave-c/closures.jsonl"
+  if [ -f "$CLOSURES" ]; then
+    cp "$CLOSURES" "$CLOSURES.bak" || fail "could not back up closures.jsonl — NOT applying: the append below cannot be un-written and this is the file that says what was retired and on what evidence"
+    cmp -s "$CLOSURES" "$CLOSURES.bak" || fail "closures.jsonl.bak does not match closures.jsonl after the copy (a short write? a concurrent writer?) — NOT applying against a backup that is not one"
+    say "    backed up $(wc -l < "$CLOSURES") closure line(s) -> closures.jsonl.bak"
+  else
+    # Not a failure, and not silence either: there is genuinely nothing to lose
+    # yet, and the apply creates the file. This branch exists so that "no backup"
+    # can only ever mean "no data", never "the copy failed".
+    say "    closures.jsonl does not exist yet — nothing to back up; the apply will create it"
+  fi
+  # …AND THE APPLY'S OWN STATUS, WHICH THE PIPE TO tail DISCARDED. wave-c-post
+  # exits 1 on all three of its refusal paths (:606 nothing to apply, :619 a
+  # retirement already in closures.jsonl, :627 a verdict citing an id not in the
+  # corpus) and on any crash. Piped, every one of them read as a successful
+  # apply — and the step then snapshotted the ledger, i.e. wrote a possibly
+  # half-applied corpus over the last good copy on ledger/audit. Stopping before
+  # 4/4 is the conservative answer: on a refusal the ledger is unchanged, so the
+  # snapshot already on ledger/audit is still the right one.
+  POST_RC=0
+  POST_OUT=$(node "$REPO/tools/audit/wave-c-post.mjs" --apply 2>&1) || POST_RC=$?
+  printf '%s\n' "$POST_OUT" | tail -14
+  [ "$POST_RC" -eq 0 ] || fail "wave-c-post --apply exited $POST_RC (read its output above). NOT snapshotting: if that was a refusal the ledger did not change and the existing ledger/audit snapshot still stands; if it crashed mid-append, restore from $CLOSURES.bak BEFORE running any snapshot"
   say "4/4 snapshot the ledger (it is gitignored ON PURPOSE and lives on one HDD)"
-  bash "$REPO/tools/audit/snapshot-ledger.sh" 2>&1 | tail -4
+  snapshot_ledger
   ;;
 
 status)
@@ -361,7 +531,16 @@ status)
   echo "  HEAD    : $(git log --oneline -1)"
   echo "  dirty   : $(git status --porcelain | wc -l) file(s)"
   o=$(env -u GIT_SSH_COMMAND git ls-remote origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null | cut -f1)
-  echo "  origin  : ${o:0:12}$([ "$o" = "$(git rev-parse HEAD)" ] && echo "  (in sync)" || echo "  <-- BEHIND")"
+  # AN UNREACHABLE REMOTE IS NOT A BEHIND ONE — 2026-09-19. ls-remote is silenced
+  # by the 2>/dev/null and its status is eaten by the pipe to cut, so a refused
+  # key, no network or a dead host all left $o empty, and empty is not equal to
+  # HEAD: the line then printed «origin  :   <-- BEHIND» with a blank sha, which
+  # reads as "push again" when what happened is "nobody could look".
+  if [ -z "$o" ]; then
+    echo "  origin  : (no answer) <-- COULD NOT READ THE REMOTE — this is NOT the same as behind; see push_both for the two-keys trap"
+  else
+    echo "  origin  : ${o:0:12}$([ "$o" = "$(git rev-parse HEAD)" ] && echo "  (in sync)" || echo "  <-- BEHIND")"
+  fi
   # The stamp is quoted in .env; strip the quotes before comparing or this line
   # reports a mismatch on a file that is perfectly correct.
   envsha=$(grep '^NEXT_PUBLIC_COMMIT_SHA=' platform/.env 2>/dev/null | cut -d= -f2 | tr -d '"')
@@ -375,13 +554,35 @@ status)
   FILED=$(echo "$L" | sed -n 's/.*filed=\([0-9][0-9]*\).*/\1/p')
   RET=$(echo "$L" | sed -n 's/.*retired=\([0-9][0-9]*\).*/\1/p')
   OPEN=$(echo "$L" | sed -n 's/.* open=\([0-9][0-9]*\).*/\1/p')
+  # ALL THREE FIELDS, NOT JUST filed= — 2026-09-19. Only FILED was guarded, and
+  # the other two are used unquoted in arithmetic and in prose. Measured this
+  # session on a stamp that carries filed= and closed= but no retired= and no
+  # open= (`OPEN-LIST  filed=1510  closed=1416 …`), the old block printed, at
+  # exit 0:
+  #     1510 ever filed ·  closed with evidence · 0% done ·  open
+  # — an empty RET reads as 0 inside $(( )), so a missing field became «0% done»
+  # on a programme that is most of the way through, and the two blanks read as a
+  # spacing glitch rather than as an absence. This is the number the founder is
+  # given for where the loop stands; it must be unreadable loudly or not at all.
   [ -n "$FILED" ] && [ "$FILED" -gt 0 ] || fail "could not read the corpus counts; refusing to print a percentage derived from nothing"
+  [ -n "$RET" ] || fail "the OPEN-LIST stamp carries no retired= field («$L») — refusing to print a completion figure with a blank numerator"
+  [ -n "$OPEN" ] || fail "the OPEN-LIST stamp carries no open= field («$L») — refusing to print an open count that is blank"
   echo "  $FILED ever filed · $RET closed with evidence · $((RET * 100 / FILED))% done · $OPEN open"
   echo "  (the $OPEN open is three things — STILL, UNJUDGED, PARTIAL — and must never be"
   echo "   quoted as a bare defect count; run wave-c-post for the split)"
   echo ""
-  echo "  verdict lines: $(wc -l < "$REPO/.audit-frames/wave-c/verdicts.jsonl")"
-  echo "  closures     : $(wc -l < "$REPO/.audit-frames/wave-c/closures.jsonl")"
+  # A MISSING LEDGER MUST NOT PRINT AS A BLANK — 2026-09-19. `wc -l < file` on a
+  # file that is not there writes «No such file or directory» to stderr and
+  # substitutes NOTHING, so the line read «verdict lines: ». Measured this
+  # session. That is the loudest event this whole script exists for — the
+  # gitignored corpus gone from the one disk it lives on — rendering as a
+  # spacing defect at the bottom of a status report.
+  VJ="$REPO/.audit-frames/wave-c/verdicts.jsonl"
+  CJ="$REPO/.audit-frames/wave-c/closures.jsonl"
+  if [ -r "$VJ" ]; then echo "  verdict lines: $(wc -l < "$VJ")"
+  else echo "  verdict lines: !! $VJ IS NOT READABLE — the ledger is not on this disk; restore it from the ledger/audit branch before running anything else"; fi
+  if [ -r "$CJ" ]; then echo "  closures     : $(wc -l < "$CJ")"
+  else echo "  closures     : !! $CJ IS NOT READABLE — the ledger is not on this disk; restore it from the ledger/audit branch before running anything else"; fi
   ;;
 
 *) fail "unknown step '$STEP' — see the usage block at the top of this file" ;;
