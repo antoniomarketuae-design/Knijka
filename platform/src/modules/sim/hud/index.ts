@@ -273,6 +273,8 @@ export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
 // two-card, 240 px toast column with a „по-тихи известия" setting, and an
 // end-of-lesson debrief that Space skips and a setting can stop auto-opening.
 export {
+  briefingAutoDefault,
+  briefingOpensAtStart,
   endLineDemandsAnswer,
   hudToastCarriesWhy,
   parseStoredFlag,
@@ -285,6 +287,9 @@ export {
   toastColumnFraction,
   visibleToasts,
   writeStoredFlag,
+  BRIEFING_AUTO_DEFAULT_COMPACT,
+  BRIEFING_AUTO_DEFAULT_ROOMY,
+  BRIEFING_AUTO_STORAGE_KEY,
   QUIET_SUPPRESSED_KINDS,
   ROOMY_MIN_WIDTH_PX,
   SESSION_END_AUTO_DEFAULT,

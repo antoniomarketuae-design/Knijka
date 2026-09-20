@@ -3211,11 +3211,33 @@ export function SimOverlay({
               data-hud-ink=""
               {...tapWhy}
               aria-expanded={open}
-              // 44 px in BOTH axes. A 24 px chip with a big label is the
-              // touch-target violation this project already counts 19 of. This
-              // and the ack beside it are a matched PAIR — same height, same
-              // radius, same weight, one outlined and one lightly tinted.
-              className="flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full border px-2 text-[11px] font-black uppercase tracking-wider"
+              // 36 px in BOTH axes — DOWN FROM 44, ON THE FOUNDER'S EXPLICIT
+              // INSTRUCTION, AND THAT IS A DELIBERATE OVERRIDE OF THIS FILE'S
+              // OWN RULE.
+              //
+              // What it used to say, and it was not wrong: «44 px in BOTH axes.
+              // A 24 px chip with a big label is the touch-target violation this
+              // project already counts 19 of.» 44 is the iOS HIG minimum and
+              // this pair was sized to it on purpose.
+              //
+              // `sc-junction-gap:df95401c` filed the cost of that choice: «The
+              // ПРОЧЕТИ and РАЗБРАХ buttons sit on top of parked cars and on top
+              // of the «Карай дотук» world label». Measured on
+              // `.audit-frames/w47/frames/sc-junction-gap__mobile-right/01-arrival.png`
+              // (852 × 393 sideways phone): the ИНСТРУКЦИИ card and this pair
+              // cover the right third of the windscreen, the parked bus among it.
+              // Offered the choice between shrinking the text window, moving the
+              // buttons out of the card, and shrinking the buttons, the founder
+              // chose 2026-09-20: «Shrink the buttons».
+              //
+              // So 44 → 36 (h-9 / min-w-[2.25rem]), which is 33 % less area per
+              // chip and still a deliberate, thumb-sized target — not the 24 px
+              // the paragraph above warns about. It is recorded here as HIS call
+              // rather than applied quietly, because the next reader is entitled
+              // to know that the rule was overridden and by whom. The pair stays
+              // a PAIR: same height, same radius, same weight, one outlined and
+              // one lightly tinted.
+              className="flex h-9 min-w-[2.25rem] shrink-0 touch-manipulation items-center justify-center rounded-full border px-2 text-[11px] font-black uppercase tracking-wider"
               style={{
                 color,
                 // NO tone tint on this one, deliberately: the register ladder
@@ -3257,7 +3279,10 @@ export function SimOverlay({
               type="button"
               data-hud-ink=""
               {...tapAck}
-              className="flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full border px-3 text-[11px] font-black uppercase tracking-wider text-foreground"
+              // 36 px, matching the «ЗАЩО» chip above — see the override note
+              // there. The two are sized together or they stop reading as one
+              // control pair.
+              className="flex h-9 min-w-[2.25rem] shrink-0 touch-manipulation items-center justify-center rounded-full border px-3 text-[11px] font-black uppercase tracking-wider text-foreground"
               style={{
                 // THE 18 % IS THE SAME 18 %. All that changed is what it is
                 // mixed WITH: it used to be `transparent`, i.e. the tone alone

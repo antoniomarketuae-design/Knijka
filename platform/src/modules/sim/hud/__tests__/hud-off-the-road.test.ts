@@ -344,11 +344,18 @@ describe("row 2 · the fold has a name and a number", () => {
     const floorRem = /minHeight: "([\d.]+)rem"/.exec(OVERLAY)?.[1];
     expect(floorRem, "the text window's floor moved — re-anchor this test").toBeDefined();
     const WINDOW = Number(floorRem) * 16;
-    // The merged stamp/control row — `h-11` chips set its height, `mt-0.5` its
+    // The merged stamp/control row — `h-9` chips set its height, `mt-0.5` its
     // margin. On a card with no chips it is the 10 px `leading-none` stamp
     // instead, i.e. strictly shorter, so the chip case is the binding one.
-    expect(OVERLAY).toContain("flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation");
-    const ROW_3 = 44 + 2;
+    //
+    // 36 AND NOT 44 SINCE 2026-09-20: the founder ruled «Shrink the buttons» on
+    // `sc-junction-gap:df95401c`, deliberately overriding this project's own
+    // 44 px tap-target floor. The override is argued at the class itself in
+    // SimOverlay.tsx. This assertion moves WITH the source rather than being
+    // relaxed: it still pins an exact pair of values, so a drift back to 44 —
+    // or on to 24 — reds here.
+    expect(OVERLAY).toContain("flex h-9 min-w-[2.25rem] shrink-0 touch-manipulation");
+    const ROW_3 = 36 + 2;
     // `gap-0.5` between the card's three in-flow children (the shade is
     // absolutely positioned and is not one).
     expect(OVERLAY).toContain("flex-col items-stretch gap-0.5 text-left");
@@ -383,7 +390,7 @@ describe("row 2 · the fold has a name and a number", () => {
     expect(WINDOW).toBeGreaterThanOrEqual(3 * 13.75);
   });
 
-  it("…and the whole authored text is still one 44 px tap away, unclamped", () => {
+  it("…and the whole authored text is still one 36 px tap away, unclamped", () => {
     // THEO-4. Shrinking the peek may not delete the explanation — the read
     // surface is where it moves to, it stops the car, and it must not have
     // grown a clamp of its own while this row was being written.

@@ -42,6 +42,8 @@ import {
   ObjectiveBanner,
   parkingBrakeActBg,
   PreDriveChecklist,
+  briefingAutoDefault,
+  BRIEFING_AUTO_STORAGE_KEY,
   readStoredFlag,
   selectOverlay,
   SessionEndScreen,
@@ -4806,8 +4808,31 @@ export function LessonPlayShell({
   // Grammar: it is up when the session starts and the student closes it. It is
   // never up in the THEO-3 sandbox (the assignment there IS the mistake) and it
   // stands down the moment a pause overlay owns the glass.
+  //
+  // …EXCEPT ON A PHONE, WHERE IT IS NOW UP ONLY IF THE STUDENT ASKED FOR IT.
+  // FOUNDER RULING 2026-09-20: «we have to hide it and make it optional if the
+  // user wants it on». The rule itself, both defaults and the reasoning are in
+  // `hud/hudPreferences.ts` (`briefingOpensAtStart`) so they are executable in
+  // the node suite; this is only the call. The route back to the steps is the
+  // МЕНЮ row «Инструкции · N стъпки» below (`recallBriefing`), which is what
+  // keeps hiding the card from costing the student the lesson's instructions.
   const briefing = lesson.briefingBg ?? [];
-  const [briefingOpen, setBriefingOpen] = useState(true);
+  const [briefingAutoOpen, setBriefingAutoOpen] = useState<boolean>(() =>
+    readStoredFlag(BRIEFING_AUTO_STORAGE_KEY, briefingAutoDefault(compact)),
+  );
+  const toggleBriefingAutoOpen = useCallback(() => {
+    setBriefingAutoOpen((on) => {
+      const next = !on;
+      writeStoredFlag(BRIEFING_AUTO_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
+  // Reads `briefingAutoOpen`'s FIRST value and then goes its own way: the
+  // setting answers „open it next time", the card's own ✕ answers „be rid of it
+  // now", and folding them into one state would make a dismissal rewrite a
+  // preference — the same distinction `endSkipped` keeps beside
+  // `endAutoOpen` a few lines up.
+  const [briefingOpen, setBriefingOpen] = useState(() => briefingAutoOpen);
   const closeBriefing = useCallback(() => setBriefingOpen(false), []);
   /**
    * THE BRIEFING'S FOLD, HELD WHERE IT CANNOT BE UNMOUNTED — the derivation,
@@ -7102,6 +7127,29 @@ export function LessonPlayShell({
                   briefing.length === 1 ? "стъпка" : "стъпки"
                 }`,
                 onSelect: recallBriefing,
+              },
+              // ── «ПОКАЗВАЙ ГИ В НАЧАЛОТО» · THE OTHER HALF OF THE RULING ────
+              //
+              // Hiding the card by default is only half of «hide it and make it
+              // optional if the user wants it on» — without this row the
+              // «optional» is a localStorage key no student can reach, which is
+              // a setting in name only.
+              //
+              // It sits directly under the recall row on purpose: the moment a
+              // student goes looking for the steps is the moment the question
+              // „do you want these at the start?" means something. `keepOpen`
+              // for the reason «Карта» has it — a toggle whose sheet closes on
+              // the first press makes the student re-open it to see what
+              // happened.
+              {
+                key: "briefingAuto",
+                labelBg: "Показвай ги в началото",
+                valueBg: briefingAutoOpen ? "вкл." : "изкл.",
+                ariaLabelBg: `Показвай инструкциите в началото на урока — ${
+                  briefingAutoOpen ? "включено" : "изключено"
+                }`,
+                onSelect: toggleBriefingAutoOpen,
+                keepOpen: true,
               },
             ]
           : []),

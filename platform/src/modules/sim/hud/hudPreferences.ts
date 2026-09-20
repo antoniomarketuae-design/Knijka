@@ -67,6 +67,54 @@ export const TOAST_QUIET_DEFAULT = false;
 /** Nothing stored → the debrief still opens itself. Opt-OUT, never opt-in. */
 export const SESSION_END_AUTO_DEFAULT = true;
 
+/** localStorage key of „Инструкции при старт" (the lesson's authored steps). */
+export const BRIEFING_AUTO_STORAGE_KEY = "aidrive.sim.briefing.auto.v1";
+
+/**
+ * THE ONE SETTING WHOSE DEFAULT DIFFERS BY SURFACE, AND WHY IT IS ALLOWED TO.
+ *
+ * FOUNDER RULING 2026-09-20, quoted because it is not one of the three options
+ * it was asked to choose between: «In fact all this is causing huge issue for
+ * phone since its not working properly and its taking alot of space on the
+ * screen to we have to hide it and make it optional if the user wants it on».
+ *
+ * So the phone does not open the briefing by itself and the roomy stage still
+ * does. That divergence is DELIBERATE and it is the opposite of what the rows
+ * that prompted the question asked for — `sc-signal-hesitation:f5ffccf3` and
+ * the briefing clause of `sc-rb-busy-gap:7bbdd45e` /
+ * `sc-sig-controller-postures:f7e046c4` all complain that the two platforms
+ * behave differently. They were put to the founder in those terms and he ruled
+ * for the phone's screen space: a side panel on a 1440 px stage costs nobody
+ * any world, and a card that eats a 393 px one costs the student the road.
+ *
+ * IT IS A DEFAULT AND NOT A DELETION, which is what keeps THEO-4 intact. The
+ * authored steps ARE the lesson's instructions; a drive that cannot reach them
+ * is a bare task with no explanation. They stay one tap away for the whole
+ * drive through the МЕНЮ row «Инструкции · N стъпки» (`recallBriefing` in
+ * LessonPlayShell), which is present on the compact surface from arrival to the
+ * end of the session and carries its own step count.
+ */
+export const BRIEFING_AUTO_DEFAULT_ROOMY = true;
+export const BRIEFING_AUTO_DEFAULT_COMPACT = false;
+
+/** The surface's default, before any stored choice is consulted. */
+export function briefingAutoDefault(compact: boolean): boolean {
+  return compact ? BRIEFING_AUTO_DEFAULT_COMPACT : BRIEFING_AUTO_DEFAULT_ROOMY;
+}
+
+/**
+ * Does the briefing open by itself at the start of this lesson?
+ *
+ * PURE, AND TAKING THE STORED VALUE AS AN ARGUMENT rather than reading the
+ * store itself, so every branch is executable in the node-environment suite. A
+ * predicate that can only be exercised through `window.localStorage` ends up
+ * asserted by a source grep, and a source grep passes against a shell that has
+ * stopped calling it.
+ */
+export function briefingOpensAtStart(compact: boolean, stored: unknown): boolean {
+  return parseStoredFlag(stored) ?? briefingAutoDefault(compact);
+}
+
 /** Parse a persisted on/off flag; null = nothing stored / foreign value. */
 export function parseStoredFlag(v: unknown): boolean | null {
   if (v === "on") return true;
