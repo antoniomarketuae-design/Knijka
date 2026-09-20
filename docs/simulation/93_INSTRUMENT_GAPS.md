@@ -244,3 +244,43 @@ mean „an older shape" rather than „the runtime published nothing".
   *not* added: a key that fakes the act produces evidence about the harness, not the student.
 - **WebKit has no WebAudio** in the bundled Playwright build — every mobile audio claim is
   UNJUDGED by construction; only pc legs judge audio.
+
+## GAP-3 — the ten INSTRUMENT rows (`chunk-wavec-new.jsonl` 62–71), verified 2026-09-20
+
+These rows were filed by a workflow that was stopped before anything checked them, and the
+handoff carried them as **unverified** with the note that their measurements were two module
+generations stale. They are `bucket: INSTRUMENT`, so `finding-reader.mjs:217` (which counts only
+`bucket === "BROKEN"`) keeps them out of the open product arithmetic: **0 of the 90 open rows is
+one of these**, measured, and closing or reopening one moves no product number.
+
+Verified against `HEAD 5d56296` by EXECUTION — every verdict below names the test that produced
+it in `tools/mobile/__tests__/road-criteria-cheats.test.mjs` (44 tests, 44 pass), not a reading of
+the module. The suite's last case, *«the fixture still matches the recipe rows 62-67 carry»*, is
+what retires the "stale measurements" worry: the fixture was rebuilt to the rows' own recipe.
+
+| row | claim | verdict | the test that says so |
+|---|---|---|---|
+| 62 | only one contiguous run convicts, so chopping the offence under 0.6 s buys an unlimited amount | **DEAD** | `N1` (two-way, FRACTION rule) · `N15a` (one-way ring) |
+| 63 | every duration comes from `tSec`, a field the record supplies, and so does the sample floor | **DEAD** | `N3a` frozen · `N3b` stuttering · `CLOCK-ONLY-a` · `CLOCK-ONLY-b` · plus an honest-leg control |
+| 64 | the blindness census reads the longest single gap, never the total | **DEAD** | `N2` (2900 ms holes convicted in aggregate) · `N2 isolated` |
+| 65 | AC-LANE counts six exclusion classes and its ceiling divides only two | **DEAD** | `N13` unpainted · `N17` not-moving · `N12` two parks |
+| 66 | the record declares its own exemptions and nothing bounds them, in two places | **DEAD** | `N4` (leg-wide census) · `M5b` (the declaration goes over budget) |
+| 67 | a row may contradict itself and the file resolves it in the acquitting direction | **DEAD** | `N14` · `N14 IN THE OTHER DIRECTION` |
+| 68 | `wrongWay === false` is ambiguous; only the offence arms the channel — *awaiting a founder ruling* | **RESOLVED** | ruled 2026-09-20; built as `SimTick.edgeAlignment` in `eb0e016`; GAP-2 above. The `SEAM` test is the instrument's record of what it replaced |
+| 69 | no test catches a **consumer-side WIDENING** of the pill guard | **STANDS** | not this module. `verdict-surface.test.mjs` grew three ADR-009 cases, but they cover *recognition* and *REMOVAL* («REMOVING the word from PILL_WORDS costs a DISAGREEMENT»). Widening — a consumer accepting more than it should — is still uncovered |
+| 70 | addendum: «every one of the cheats is dead» | **SUPERSEDED** | it was wrong when written and row 71 corrects it; it is now *nearly* true, with L8 and L9 below the exceptions |
+| 71 | one cheat is still live (N15b) | **STANDS, in a narrower form** | `N15b` is refused, and *«NO witness length passes this leg — the floor and the budget meet with no gap»* — but only for a **5.00 s** calibration park. `L9 (STILL LIVE, disclosed)` shrinks it to 4.50 s and the same 1.50 s witness passes |
+
+**Two limits stay open ON PURPOSE and are asserted at the verdict they get, so a later repair reds
+the suite rather than silently changing the answer:**
+
+- **L8** — a leg can split its against-flow ticks across two surfaces, each honestly under its own
+  ceiling, and stay under the derivable leg-wide mix bound (0.1770 against 0.201581). A tighter
+  number would have to come from somewhere, and no product constant supplies one.
+  `L8 CONTROL` proves the bound does bite when the mix cannot afford the total.
+- **L9** — row 71's mechanism, reopened from the other end: the witness floor is defeated by
+  SHRINKING the calibration rather than by lengthening the witness. The derivable fix is a 9 s
+  calibration floor, and it would red the known-good leg's own 5.00 s park.
+
+**What to do with these rows:** nothing, unless L8 or L9 is being worked. They are a register, not
+a queue — a harness change closes no finding, and none of them was ever on the open list.
