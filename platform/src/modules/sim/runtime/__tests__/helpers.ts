@@ -115,7 +115,21 @@ export interface DriveResult {
 export function drive(
   rt: DistrictWorldRuntime,
   poses: PathPose[],
-  opts: { dtSec?: number; t0Sec?: number; isNight?: boolean; speedKmh?: number } = {},
+  opts: {
+    dtSec?: number;
+    t0Sec?: number;
+    isNight?: boolean;
+    speedKmh?: number;
+    /**
+     * Anything else about the car, applied AFTER `speedKmh` so a caller can
+     * override that too. Added for the reverse fixtures in
+     * `edge-alignment.test.ts`: `mkVehicle` fixes `gear: 1`, and
+     * `SimTick.speedKmh` is unsigned, so `gear` is the ONLY channel that can
+     * say the car is travelling backwards — a drive that cannot set it cannot
+     * produce the tick a reverse/park criterion has to be written against.
+     */
+    vehicle?: Partial<VehicleSample>;
+  } = {},
 ): DriveResult {
   const dt = opts.dtSec ?? 0.05;
   let t = opts.t0Sec ?? 0;
@@ -123,7 +137,13 @@ export function drive(
   for (const pose of poses) {
     t += dt;
     rt.update(dt);
-    ticks.push(rt.sample(mkVehicle(pose, { speedKmh: opts.speedKmh ?? 30 }), t, opts.isNight ?? false));
+    ticks.push(
+      rt.sample(
+        mkVehicle(pose, { speedKmh: opts.speedKmh ?? 30, ...opts.vehicle }),
+        t,
+        opts.isNight ?? false,
+      ),
+    );
   }
   return { ticks, tEnd: t };
 }

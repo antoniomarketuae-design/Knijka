@@ -107,7 +107,15 @@ export interface WorldRuntime {
    *  `leadGapM` does and it can only ever ACQUIT (`rules/engine.ts`, the
    *  ban-zone block); `Infinity` means „nobody there or nobody could answer",
    *  which is what every caller that omits it says. Measured by
-   *  `orchestrator/contact.ts vruAheadMeters`. */
+   *  `orchestrator/contact.ts vruAheadMeters`.
+   *
+   *  EVERY tick this method returns carries `edgeAlignment` — which way the car
+   *  faces along its committed edge, in signed degrees, with an explicit
+   *  „not measurable here" case. It is the one field on the tick that is
+   *  OPTIONAL in the type purely so hand-built ticks need not assert it, and
+   *  UNCONDITIONAL here: an observation published only when there is something
+   *  to convict is the ambiguity it exists to remove. Nothing grades it
+   *  (`rules/types.ts EdgeAlignment`, and the test named there). */
   sample(
     v: VehicleSample,
     tSec: number,

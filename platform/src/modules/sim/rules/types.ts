@@ -263,6 +263,152 @@ export type NoStopBasis =
   /** чл. 98, ал. 1, т. 4 — върху/в близост до релсите. pk-rail-v1. */
   | "law-rail";
 
+/**
+ * WHICH WAY THE CAR FACES ALONG THE ROAD IT IS ON — the OBSERVATION behind the
+ * `wrongWay` verdict, published on every runtime tick whether or not the
+ * verdict was asked for.
+ *
+ * WHY IT EXISTS. `SimTick.wrongWay === false` is ambiguous BY CONSTRUCTION: it
+ * means EITHER „the car faced the right way" OR „nobody asked", because the
+ * channel is armed only by three gates (`runtime/worldRuntime.ts`, the
+ * `wrongWayArmed` expression). Only the OFFENCE arms it, so the audit harness
+ * can convict a drive on this channel but can never clear one — and a criterion
+ * cannot invent a signal the product does not publish
+ * (`tools/mobile/lib/road-criteria.mjs`, cheat L6). Roundabouts are where that
+ * bites hardest: all 34 ring edges in `content/world/*.json` are `oneway`, and
+ * the ring is the largest family the steering instrument must judge.
+ *
+ * IT GRADES NOTHING, AND NOTHING MAY MAKE IT GRADE. No rule, objective, card,
+ * score, HUD field or debrief line reads this record; `wrongWay` keeps its
+ * exact prior meaning and remains the only conviction channel. That is not a
+ * promise, it is an executable one: `runtime/__tests__/edge-alignment-not-graded
+ * .test.ts` folds five real drives' tick streams through `reduceTick` and
+ * `lessons/applyTick` three times — as published, with this record stripped,
+ * and with EVERY member lied about — and requires the three results to be
+ * deep-equal. A detector that starts reading it turns that test red.
+ *
+ * „Every member" and „five drives" are both load-bearing, and both were
+ * learned the hard way: an earlier version perturbed three of the seven
+ * members and drove material that was measured, on the carriageway, one-way
+ * and `travelDir: +1` on every tick, and three separate grading reads of this
+ * record survived it green.
+ *
+ * THREE STATES THAT CANNOT COLLIDE:
+ *   · the record ABSENT        — the tick did not come from the world runtime
+ *                                (a hand-built unit-test tick, a recorded
+ *                                trace, a clip plan). It asserts nothing.
+ *   · `deg === null` + `reason` — the runtime LOOKED and could not measure.
+ *   · `deg` a number           — measured.
+ * `deg` is NEVER 0 for „unmeasured": 0 is the strongest possible „aligned",
+ * which is precisely the collision this record exists to remove.
+ */
+export interface EdgeAlignment {
+  /**
+   * SIGNED rotation FROM the committed edge's geometry-forward bearing TO the
+   * vehicle heading, in degrees, range (-180, +180].
+   *
+   * `+` = the heading lies CLOCKWISE of the edge direction (to its right);
+   * `0` = facing exactly along the edge's `from`→`to` direction;
+   * `±180` = facing exactly against it.
+   * `null` = not measurable here; `reason` says why.
+   *
+   * Same units and convention as `SimTick.headingDeg` (0 = north, clockwise)
+   * and directly comparable with the runtime's own `WRONG_WAY_ANGLE_DEG`. It is
+   * the UNTHRESHOLDED form of the quantity `isWrongWay` reduces to a boolean,
+   * measured off the SAME lane fix, the SAME tangent and the SAME heading, so
+   * it can never disagree with the verdict where the verdict is armed:
+   *
+   *   tick.wrongWay === (armed && deg !== null && |deg| > WRONG_WAY_ANGLE_DEG)
+   *
+   * holds on every tick, and is asserted as an invariant over a real drive in
+   * `runtime/__tests__/edge-alignment.test.ts`.
+   *
+   * On a TWO-WAY road the angle is still measured against the edge's geometry
+   * direction, which is only one of the two lawful directions — read it with
+   * `travelDir` (rotate by 180° when `-1`) to get a bank-relative angle.
+   *
+   * IT MEASURES THE NOSE, NOT THE DIRECTION OF TRAVEL — and on a car that is
+   * REVERSING those are opposite. `SimTick.speedKmh` is unsigned (see its own
+   * note below), so `SimTick.gear` is the only channel that says a car is
+   * travelling backwards: `gear === -1` ⇒ the car TRAVELS at `deg ± 180`.
+   *
+   *   direction of travel ≈ `gear === -1 ? deg + 180 : deg`   (mod 360)
+   *
+   * A criterion that reads `deg` as a direction of travel convicts every
+   * correct reverse manoeuvre: a car backing lawfully along its own lane
+   * reads `|deg| ≈ 180` on every frame, which is MEASURED in
+   * `runtime/__tests__/edge-alignment.test.ts` §7. That matters because the
+   * steering instrument this record was published for covers the reverse/park
+   * half as well as the forward-law half. `wrongWay` reads the nose the same
+   * way and is likewise armed on a lawful reverse around a ring — the two
+   * channels agree, and the invariant below holds, precisely because both are
+   * heading referents. Neither is changed by this note.
+   */
+  deg: number | null;
+  /**
+   * Present iff `deg === null`. One case only: the vehicle has no committed
+   * edge fix (`locator` reports nothing within its 30 m lock radius).
+   *
+   * There is deliberately no `degenerate-geometry` case. `tangentAt` fabricates
+   * a due-north tangent on a zero-length segment, but measured over all 106
+   * shipped `content/world/*.json` (876 edges) there is not one zero-length
+   * segment — the shortest is 0.2435 m — so that branch is unreachable and a
+   * reason for it would be a state no drive can enter.
+   */
+  reason?: "no-edge-fix";
+  /**
+   * Was the `wrongWay` conviction channel ASKED on this tick?
+   *
+   * `false` means `tick.wrongWay === false` carries NO claim about which way
+   * the car was facing. This is the disarming referent the audit criteria ask
+   * for by name. It is lifted out of the very same boolean chain that gates the
+   * verdict — one boolean, two readers — so the flag cannot drift from the gate
+   * it reports.
+   */
+  wrongWayArmed: boolean;
+  /**
+   * The edge `deg` is measured against; `null` iff `deg === null`.
+   *
+   * Deliberately NOT the same field as `SimTick.edgeId`, which is nulled past
+   * the kerb („this car is nowhere") while the lane fix — and therefore this
+   * angle — still refers to a real edge. Compare the two to see a car that is
+   * off the carriageway but still pointed along a road.
+   *
+   * PINNED by `runtime/__tests__/edge-alignment.test.ts` §5, which drives
+   * 25 m right of a street centreline: all 86 ticks come back with
+   * `SimTick.edgeId === null` and this field still naming the street.
+   * Collapsing the two (`offCarriageway ? null : id`) type-checks, changes
+   * nothing any consumer reads today, and survived a green run of all four
+   * guard files before that fixture existed.
+   */
+  edgeId: string | null;
+  /** The same predicate that disarms `wrongWay`: the car is more than
+   *  OFF_CARRIAGEWAY_M past the drawn kerb. The angle is published anyway —
+   *  suppressing it would recreate, one kerb over, the exact ambiguity this
+   *  record exists to remove — so a consumer that wants road-referenced ticks
+   *  only must filter on this. Pinned in both directions by the same §5
+   *  fixture (true past the kerb, false on the carriageway); hardcoding it
+   *  `false` also survived a green run before that fixture existed. */
+  offCarriageway: boolean;
+  /** Present iff `deg !== null`. Nominal travel direction of the vehicle's
+   *  occupied lane bank along the geometry (`locator` `LocateFix.travelDir`;
+   *  always +1 on a one-way). What turns `deg` into a bank-relative angle.
+   *
+   *  THE RECORD'S ONLY BANK DISCRIMINATOR. `SimTick.laneOffsetM` is signed
+   *  „+ = left of TRAVEL" on both banks, so it carries no bank at all; without
+   *  this member every opposing-bank car on a two-way road reads as facing the
+   *  right way. It can only ever be −1 on a two-way edge — `locator.ts`
+   *  `computeLane` returns +1 unconditionally on a one-way — so it is pinned
+   *  on a two-way fixture (`edge-alignment.test.ts` §4). Hardcoding it to 1
+   *  survived a green run of all four guard files while every fixture in them
+   *  was a one-way. */
+  travelDir?: 1 | -1;
+  /** Present iff `deg !== null`. Is the committed edge a roundabout ring?
+   *  Not otherwise published on the tick, and the ring is the family the
+   *  steering instrument exists for. */
+  roundabout?: boolean;
+}
+
 export interface SimTick {
   /** Seconds since session start. Monotonic. */
   t: number;
@@ -491,6 +637,18 @@ export interface SimTick {
   oncomingVehicleGapSec?: number;
   /** True when driving against the flow of a one-way street (runtime-computed). */
   wrongWay?: boolean;
+  /**
+   * Which way the car faces along the road it is on — the unthresholded,
+   * always-published OBSERVATION behind `wrongWay` above. See the
+   * `EdgeAlignment` docblock for the sign convention, the null case and the
+   * invariant tying it to `wrongWay`.
+   *
+   * OPTIONAL in the type and SET ON EVERY TICK the world runtime produces.
+   * Absent therefore means „this tick did not come from the runtime", never
+   * „aligned" and never „unarmed". NOTHING GRADES IT — and a test fails if
+   * anything starts to.
+   */
+  edgeAlignment?: EdgeAlignment;
   // -- B1a Wave-1 world context (doc 72 capabilities 1 + N3). ALL optional and
   // additive: absent = unknown, and every detector that reads them treats
   // unknown as innocent (A12 — conservative by construction).

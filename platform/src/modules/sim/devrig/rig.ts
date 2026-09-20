@@ -29,7 +29,7 @@
  * nothing outside that route imports this file.
  */
 
-import type { SimTick } from "../rules";
+import type { EdgeAlignment, SimTick } from "../rules";
 import type { LessonStepResult } from "../lessons";
 import {
   createDriveScript,
@@ -42,13 +42,42 @@ import {
   type DriveStepLogEntry,
 } from "./driveScript";
 
-/** Bumped whenever the published shape changes, so a stale script fails loudly. */
-export const DRIVE_RIG_VERSION = 1;
+/**
+ * Bumped whenever the published shape changes, so a stale script fails loudly.
+ *
+ * 2 (2026-09-20) — the ROAD REFERENCE. `DriveRigSample` gained three REQUIRED
+ * members (`seq`, `edgeId`, `laneId`) alongside the optional `oneway`,
+ * `wrongWay`, `opposingBank` and `edgeAlignment`, so „a dump without
+ * `edgeAlignment`" stopped being one thing. This counter is the only
+ * discriminator a reader has between „this run predates the road reference"
+ * and „the runtime published nothing on those frames" — which is the same
+ * absent-means-what ambiguity `edgeAlignment` itself exists to remove, one
+ * layer up, and the harness prints it into every evidence log
+ * (`tools/clips/headless/drive-rig.mjs`, „rig v${meta.version}"). Nothing in
+ * `platform/src` or `tools/` branches on the value, so moving it breaks
+ * nothing and leaving it stale would cost a reader the one fact that says
+ * which shape they are holding.
+ */
+export const DRIVE_RIG_VERSION = 2;
 /** Default ring-buffer depth: ~5.5 minutes of drive at 60 Hz. */
 export const DEFAULT_BUFFER = 20_000;
 
 /** One frame of the drive, as the shell saw it. */
 export interface DriveRigSample {
+  /**
+   * Monotonic frame counter, from 0 at rig construction, one per `onTick`.
+   *
+   * WHY A RECORD NEEDS ONE. The buffer is a RING and `dump(everyNth)`
+   * decimates, so „the samples I read back" and „the frames the drive had" are
+   * different sets, and `wallMs` gaps are ambiguous between a dropped window
+   * and a paused sim (a teach card / quiz / consequence overlay stops `onTick`
+   * entirely — see `wallMs` below). With `seq` a consumer can tell decimation
+   * (a constant step) from eviction (a step that changes) from a pause (a
+   * `wallMs` jump at a `seq` step of 1), instead of reading an absent window as
+   * an excluded one. NOT reset by `clear()`, deliberately: a reset would hide
+   * the discontinuity it exists to show.
+   */
+  seq: number;
   /** Session seconds (SimTick.t) — the clock every rule event is stamped in. */
   tSec: number;
   /** Wall clock (ms since the rig armed) — GAPS HERE MEAN THE SIM WAS PAUSED
@@ -77,6 +106,37 @@ export interface DriveRigSample {
    * instrument no single row justified. gap_seconds = leadGapM / (speedKmh/3.6).
    */
   leadGapM?: number;
+  // -- ROAD REFERENCE (the steering instrument, 2026-09-20). Everything below
+  // is a straight copy of a SimTick field. A drive record that carries a
+  // position and no road cannot say whether the car was where it should be:
+  // every road-referenced criterion has to join a frame to an EDGE and a BANK,
+  // and until now it had neither. `edgeId` and `laneId` are REQUIRED here —
+  // the runtime publishes both on every tick and a record that may omit them
+  // cannot be joined to a road — so this is NOT the additive-optional case the
+  // `leadGapM` note above describes, and DRIVE_RIG_VERSION moves to 2 with it.
+  /** `SimTick.edgeId` — the committed edge, or null. NULL PAST THE KERB by the
+   *  tick's own contract („this car is nowhere"), which is not the same thing
+   *  as having no lane fix — see `edgeAlignment.edgeId`. */
+  edgeId: string | null;
+  /** `SimTick.laneId` — 0 = rightmost of the vehicle's bank, increasing left. */
+  laneId: number;
+  /** `SimTick.oneway` — surface context for the committed edge; absent = no
+   *  edge resolved. The discriminator that picks which flow criterion applies. */
+  oneway?: boolean;
+  /** `SimTick.wrongWay` — the CONVICTION. `false` is ambiguous on its own
+   *  (see `edgeAlignment.wrongWayArmed`, which says whether it was asked). */
+  wrongWay?: boolean;
+  /** `SimTick.opposingBank` — set only when true, on TWO-WAY edges only. */
+  opposingBank?: boolean;
+  /**
+   * `SimTick.edgeAlignment` — WHICH WAY THE CAR FACED, in signed degrees from
+   * the edge's geometry direction, published on every runtime tick with an
+   * explicit „not measurable here" case. This is the field the rig exists to
+   * carry: without it a recorded drive can be convicted of driving against the
+   * flow but can never be cleared of it, because the conviction channel is the
+   * only thing that speaks. It grades nothing (see the type's docblock).
+   */
+  edgeAlignment?: EdgeAlignment;
   /** Lesson phase: preDrive | driving | completed | aborted. */
   phase: string;
   /** 0-based index of the ACTIVE objective (=== count once all are done). */
@@ -316,6 +376,8 @@ export class DriveRig {
   private readonly events: DriveRigEvent[] = [];
   private readonly capacity: number;
   private dropped = 0;
+  /** Next `DriveRigSample.seq`. Never reset — see the field's docblock. */
+  private seq = 0;
   private readonly armedAt = Date.now();
   private readonly pad = new SyntheticPad();
   private script: DriveScriptState | null = null;
@@ -381,6 +443,7 @@ export class DriveRig {
 
     // 1. the frame
     const sample: DriveRigSample = {
+      seq: this.seq++,
       tSec: tick.t,
       wallMs,
       speedKmh: tick.speedKmh,
@@ -393,6 +456,12 @@ export class DriveRig {
       seatbeltOn: tick.seatbeltOn,
       handbrakeOn: tick.handbrakeOn,
       leadGapM: tick.leadGapM,
+      edgeId: tick.edgeId ?? null,
+      laneId: tick.laneId,
+      oneway: tick.oneway,
+      wrongWay: tick.wrongWay,
+      opposingBank: tick.opposingBank,
+      edgeAlignment: tick.edgeAlignment,
       phase: state.phase,
       activeObjective: state.currentObjectiveIndex,
       objectivesDone: state.objectives.filter((o) => o.status === "done").length,

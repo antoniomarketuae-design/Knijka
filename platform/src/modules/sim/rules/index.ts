@@ -17,6 +17,9 @@ export {
   type IndicatorState,
   type LaneArrow,
   type MirrorKind,
+  /** Which way the car faces along its committed edge — the ungraded
+   *  observation behind `SimTick.wrongWay` (see the type's docblock). */
+  type EdgeAlignment,
   /** Which rule bans the stop in a `noStopping` span — the citation
    *  discriminator authored on the zone (see catalog.ts NO_STOP_BASIS_COPY). */
   type NoStopBasis,

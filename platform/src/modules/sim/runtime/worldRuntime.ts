@@ -268,8 +268,15 @@ export function comfortableStopPossible(distToLineM: number, speedKmh: number): 
   return distToLineM > needed;
 }
 
-/** Heading opposes the one-way's flow by more than this → wrong way. */
-const WRONG_WAY_ANGLE_DEG = 120;
+/**
+ * Heading opposes the one-way's flow by more than this → wrong way.
+ *
+ * EXPORTED so the `SimTick.edgeAlignment` invariant test — and any consumer
+ * that wants to reproduce the verdict from the published angle — reads the
+ * product's own threshold instead of hard-coding 120. A test that restates a
+ * product constant stops testing the product the first time the constant moves.
+ */
+export const WRONG_WAY_ANGLE_DEG = 120;
 
 /**
  * DOES THE DRAWN WORLD STATE THIS DISTRICT'S ONE-WAY STREETS AT ALL?
@@ -2303,13 +2310,27 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // on one of the 125 one-way edges that map posts not a single В1, Д4, Г2,
       // Г3 or М10 arrow for. The measurement, the law, the named cost and the
       // roundabout exception are all at `worldStatesOneWayStreets` above.
-      const wrongWay =
+      //
+      // THE GATE IS NOW NAMED, because `wrongWay === false` could not say which
+      // of two things it meant. The three-gate chain below is what arms the
+      // conviction; everything it does NOT arm publishes `false` as well, so a
+      // reader outside the engine cannot tell „he faced the right way" from
+      // „nobody asked". `wrongWayArmed` is lifted out of the chain rather than
+      // restated beside it — ONE boolean with TWO readers — so the disarming
+      // referent can never drift from the gate it reports, and the tangent is
+      // read ONCE so the observation below cannot be measured off a second
+      // answer to the same question. The verdict itself is byte-identical:
+      // `wrongWayArmed` implies `edgeRt !== null` implies `edgeTangent !== null`,
+      // and `tangentAt` is pure, so the only change is that it is also called on
+      // ticks that have an edge fix and no conviction to make.
+      const wrongWayArmed =
         edgeRt !== null &&
         edgeRt.edge.oneway &&
         !offCarriageway &&
-        (oneWayStreetsStated || edgeRt.edge.roundabout)
-          ? isWrongWay(true, index.tangentAt(fix.edgeIdx, fix.sM), v.headingDeg)
-          : false;
+        (oneWayStreetsStated || edgeRt.edge.roundabout);
+      const edgeTangent = edgeRt !== null ? index.tangentAt(fix.edgeIdx, fix.sM) : null;
+      const wrongWay =
+        wrongWayArmed && edgeTangent !== null ? isWrongWay(true, edgeTangent, v.headingDeg) : false;
 
       const tick: SimTick = {
         t: tSec,
@@ -2350,6 +2371,35 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         wrongWay,
         events,
       };
+      // WHICH WAY THE CAR FACES, EVERY TICK — the observation behind the
+      // verdict above, on the same additive seam but set UNCONDITIONALLY: an
+      // observation that only appears when there is something to convict is the
+      // ambiguity this field was added to remove. Nothing new is computed here;
+      // `edgeTangent`, `v.headingDeg`, `fix` and `edgeRt` are the verdict's own
+      // inputs, and `signedDeltaDeg`/`bearingDeg` are already imported.
+      //
+      // NOTHING GRADES IT. No rule, objective, card, score or HUD field reads
+      // `tick.edgeAlignment`, and `runtime/__tests__/edge-alignment-not-graded
+      // .test.ts` fails by EXECUTION the moment one does. See the field's
+      // contract in rules/types.ts and the register entry in
+      // docs/simulation/93_INSTRUMENT_GAPS.md (GAP-2).
+      tick.edgeAlignment =
+        edgeRt === null || edgeTangent === null
+          ? {
+              deg: null,
+              reason: "no-edge-fix",
+              wrongWayArmed,
+              edgeId: null,
+              offCarriageway,
+            }
+          : {
+              deg: signedDeltaDeg(bearingDeg(edgeTangent[0], edgeTangent[1]), v.headingDeg),
+              wrongWayArmed,
+              edgeId: edgeRt.edge.id,
+              offCarriageway,
+              travelDir: fix.travelDir,
+              roundabout: edgeRt.edge.roundabout,
+            };
       // FOG condition (doc 72 AC-03) — flows onto the tick exactly like rain,
       // but stays ADDITIVE (set only when on) so pre-fog tick shapes are
       // untouched; the fog-lamp channel rides along the same way. SNOW
