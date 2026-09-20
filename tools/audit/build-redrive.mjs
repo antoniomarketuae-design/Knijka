@@ -26,12 +26,19 @@
  *   node tools/audit/build-redrive.mjs                        every open lesson
  *   node tools/audit/build-redrive.mjs --lessons <file>       restrict to a list
  *   node tools/audit/build-redrive.mjs --out <path>           default waveC-redrive.json
+ *
+ * A NAMED LESSON THAT RESOLVES TO ZERO LEGS IS A REFUSAL (exit 4), not a note.
+ * See THE SILENT ZERO below.
+ *
+ * A `--lessons` FILE THAT NAMES NOTHING IS A REFUSAL TOO (exit 2) — and it is a
+ * separate one, because an empty Set is TRUTHY and walks straight past the
+ * refusal above. See THE LESSONS FILE THAT NAMES NOTHING.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
+import { corpusCounts, findingId, openListLine, workedLine } from "./finding-reader.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
@@ -469,7 +476,140 @@ export function legsInProse(what, { frameLeg = null, lesson = null } = {}) {
 export const NO_SIMULATOR_ROUTE = new Map([
   ["app-login", "the /login form, not a lesson — there is no /simulator/app-login to drive"],
 ]);
-export function redriveSet(open, { only = null, includeUndrivable = false } = {}) {
+
+/**
+ * WITNESS LESSONS — DRIVEN NOT BECAUSE THEY CARRY A ROW, BUT BECAUSE A ROW IS
+ * ABOUT THEM.
+ *
+ * The set is derived from `corpusCounts().open`, so a lesson with ZERO open rows
+ * can never enter it. That is right for almost every lesson and wrong for every
+ * CROSS-LESSON COMPARISON, because such a row names subjects that are not itself.
+ *
+ * THE ROW THAT FOUND THIS, measured 2026-09-19:
+ *
+ *   sc-ac-ice:86eab7e9 (major) — «sc-ac-aquaplane, sc-ac-ice and sc-ac-bridge-ice
+ *   still render the same stretch of street — the same mid-rise block facades,
+ *   the same tree line and the same unbroken kerbside parked-car row.»
+ *
+ * A three-way comparison. The other two subjects have NOTHING open:
+ *   sc-ac-aquaplane   filed=13  open=0
+ *   sc-ac-bridge-ice  filed= 4  open=0
+ *   sc-ac-ice         filed=10  open=1   <- the only one the set can contain
+ * and neither appeared in the 58-row `.audit-frames/waveC-redrive.json`. So the
+ * row cannot be settled by any sweep: a judge is handed one of the three streets
+ * and asked whether three streets are the same.
+ *
+ * WHICH LEGS A WITNESS IS DRIVEN ON — the legs of the finding that NEEDS it, not
+ * all four. A comparison has to be like-for-like: 86eab7e9's frame is
+ * `sweep161/sc-ac-ice/pc-right/03-ready.png`, so photographing the witnesses on
+ * mobile-wrong would compare a different leg's street to the subject's. That is
+ * also three drives cheaper per witness. When the needing finding names no leg at
+ * all the witness falls back to all four, for the same reason the main set does:
+ * see THE EMPTY GUARD.
+ *
+ * EVERY ENTRY CARRIES THE FINDING IDS THAT NEED IT, and that is not decoration:
+ * a witness whose needing rows have all been retired DROPS OUT OF THE SET BY
+ * ITSELF, so the line below is dead code you can delete on sight rather than a
+ * skip-list entry that has to be argued about. `--lessons` naming a lesson in
+ * that state refuses and says so — see THE SILENT ZERO.
+ *
+ * A LESSON THAT LATER CARRIES ITS OWN OPEN ROW is already in the set on its own
+ * merits and its witness line is ignored; delete it then too. That is deliberate
+ * — a lesson's own rows decide its legs — and it is the one case where a witness
+ * can be IN the set on the wrong legs, so `witnessGaps` says so out loud.
+ *
+ * WHICH RUNS GET THE WITNESSES is the other half of this map being usable at all,
+ * and it is a rule rather than a flag: see `neededHere`.
+ */
+export const WITNESS_LESSONS = new Map([
+  ["sc-ac-aquaplane", {
+    needs: ["sc-ac-ice:86eab7e9"],
+    why: "subject 1 of 3 in sc-ac-ice:86eab7e9's «render the same stretch of street» claim; 13 filed, 0 open, so the set cannot reach it",
+  }],
+  ["sc-ac-bridge-ice", {
+    needs: ["sc-ac-ice:86eab7e9"],
+    why: "subject 3 of 3 in sc-ac-ice:86eab7e9's «render the same stretch of street» claim; 4 filed, 0 open, so the set cannot reach it",
+  }],
+]);
+
+/**
+ * The legs ONE finding names — its frame's leg, widened by its own prose.
+ *
+ * Returns `[]` when the frame names no leg, and the caller must read that as
+ * "all four" rather than as "none": narrowing on prose alone is the one way this
+ * file can REDUCE coverage, which is THE EMPTY GUARD above, and a witness
+ * inherits it from the row it serves.
+ */
+function legsOfFinding(f) {
+  const frameLeg = legOfFrame(f.frame);
+  if (!frameLeg) return [];
+  const lesson = f.scenario || f.lesson;
+  return [...new Set([frameLeg, ...legsInProse(f.what, { frameLeg, lesson })])].sort();
+}
+
+/**
+ * THE ROWS A WITNESS ENTRY SERVES THAT **THIS RUN** IS ACTUALLY DRIVING.
+ *
+ * WHY A NAMED LESSON BRINGS ITS WITNESSES WITH IT, AUTOMATICALLY.
+ *
+ * The gate used to be `only.has(<the WITNESS's own name>)`, which made a witness
+ * reachable only by an operator who already knew the witness names — which is
+ * exactly the knowledge `WITNESS_LESSONS` exists to supply. MEASURED 2026-09-20
+ * on the pre-fix file, with a lessons file holding the single line `sc-ac-ice`,
+ * the natural targeted redrive of sc-ac-ice:86eab7e9:
+ *
+ *   node tools/audit/build-redrive.mjs --lessons ice.txt --out <tmp>
+ *     lessons in the drive set : 1  (restricted to 1 named)
+ *     drives it will dispatch  : 1
+ *     [{"lesson":"sc-ac-ice","total":1,"critical":0,"legs":["pc-right"]}]
+ *     EXIT 0 — no `witnessFor`, no warning, no mention of the other two.
+ *
+ * One of the three streets that row's «render the same stretch of street» claim
+ * compares, photographed, and reported as success. So a run that names the
+ * SUBJECT gets the witnesses too.
+ *
+ * NOT BEHIND A FLAG, and that was weighed rather than skipped. A flag only ever
+ * buys a run that deliberately under-photographs a claim — the failure this file
+ * exists to refuse — and it would put the knowledge back where the operator has
+ * to already have it. The cost of always is bounded and PRINTED: a witness
+ * carries 0 open rows (so no ledger moves), sorts to the tail, and gets its own
+ * line naming the row it serves and the legs. Measured on the live corpus the
+ * same day: 2 witnesses, 1 drive each, 124 drives against 122 without them.
+ *
+ * `only.has(lesson)` stays as its own branch because the pair has two ends:
+ * `--lessons sc-ac-aquaplane` names the WITNESS and not the subject, and the
+ * needing row lives in a different lesson, so filtering `open` first would make
+ * a witness unreachable by exactly the command that asks for it — §8(g).
+ *
+ * ONE DEFINITION, TWO READERS: `redriveSet` decides inclusion with it and
+ * `witnessGaps` decides with it whether a witness this run needs went missing.
+ * Two copies of this rule would drift, and the drifted half would be the
+ * warning — the half nobody is watching.
+ */
+function neededHere(open, lesson, w, only) {
+  const needed = open.filter((f) => (w.needs || []).includes(findingId(f)));
+  if (!only || only.has(lesson)) return needed;
+  return needed.filter((f) => only.has(f.scenario || f.lesson));
+}
+
+/**
+ * The legs a witness must be photographed on: the union of the legs of the
+ * findings that need it, and `[]` — which means all four downstream — as soon as
+ * ONE of them names no leg. That is THE EMPTY GUARD inherited: narrowing a
+ * witness onto a leg the subject only maybe used is the same reduction §3(b)
+ * forbids for a lesson's own rows.
+ */
+function witnessLegs(needed) {
+  const legs = new Set();
+  for (const f of needed) {
+    const L = legsOfFinding(f);
+    if (!L.length) return [];
+    for (const x of L) legs.add(x);
+  }
+  return [...legs].sort();
+}
+
+export function redriveSet(open, { only = null, includeUndrivable = false, witnesses = WITNESS_LESSONS } = {}) {
   const per = new Map();
   for (const f of open) {
     const lesson = f.scenario || f.lesson;
@@ -489,6 +629,36 @@ export function redriveSet(open, { only = null, includeUndrivable = false } = {}
     for (const L of legsInProse(f.what, { frameLeg: leg, lesson })) cur.proseLegs.add(L);
     per.set(lesson, cur);
   }
+
+  // The witnesses. `neededHere` scans ALL of `open`, deliberately NOT the rows
+  // `only` let through: the finding that needs a witness lives in a DIFFERENT
+  // lesson, so either end of the pair may be the one a run names.
+  for (const [lesson, w] of witnesses) {
+    const needed = neededHere(open, lesson, w, only);
+    // Either every needing row has retired — the entry is dead code, delete it —
+    // or this run drives none of them, so it needs no witness.
+    if (!needed.length) continue;
+    // The two ways a witness this run NEEDS is dropped anyway. Both are silent
+    // here by construction — `redriveSet` returns a drive set, not a report —
+    // so `witnessGaps` reads the same rule back and names what is missing.
+    if (per.has(lesson)) continue; // it carries open rows of its own — delete the entry
+    if (!includeUndrivable && NO_SIMULATOR_ROUTE.has(lesson)) continue;
+    per.set(lesson, {
+      lesson,
+      // ZERO, and it must stay zero: these counts are the open list, and a
+      // witness carries none. Counting it would inflate the ledger to buy a
+      // drive. It also sorts the witnesses to the tail, which is where the
+      // cheapest-to-drop work belongs.
+      total: 0,
+      critical: 0,
+      // Reuses the emit step's empty guard: an unconstrained witness gets no
+      // frame legs, so it emits `[]`, so it is driven on all four.
+      frameLegs: new Set(witnessLegs(needed)),
+      proseLegs: new Set(),
+      witnessFor: needed.map((f) => findingId(f)).sort(),
+    });
+  }
+
   // Heaviest-in-critical first: the sweep dispatcher interleaves shards, so the
   // expensive lessons spread across drivers instead of piling on shard 0.
   return [...per.values()]
@@ -499,7 +669,83 @@ export function redriveSet(open, { only = null, includeUndrivable = false } = {}
       critical: x.critical,
       // Union only when a frame named a leg — see THE EMPTY GUARD above.
       legs: x.frameLegs.size ? [...new Set([...x.frameLegs, ...x.proseLegs])].sort() : [],
+      // Only witnesses carry it, so a reader of the work-list can tell a lesson
+      // driven for its own rows from one driven for somebody else's.
+      ...(x.witnessFor ? { witnessFor: x.witnessFor } : {}),
     }));
+}
+
+/**
+ * THE WITNESSES THIS RUN NEEDS AND WILL NOT PHOTOGRAPH.
+ *
+ * `neededHere` decides that a run needs a witness; `redriveSet` then drops it
+ * anyway in exactly two places, and both were silent:
+ *
+ *   · NO_SIMULATOR_ROUTE without --include-undrivable. A witness is a reason to
+ *     point the camera at a lesson, not a claim that a camera can reach it — and
+ *     §8(i) keeps that precedence. The run must still say the claim is short a
+ *     subject, because the row stays open either way and the next judge is owed
+ *     the reason.
+ *   · the witness CARRIES OPEN ROWS OF ITS OWN. Then its own rows decide its
+ *     legs (§8(h), deliberate) and those legs need not include the ones the
+ *     claim compares — a like-for-like comparison photographed on unlike legs.
+ *     Nothing is changed here: the legs stay its own, and the gap is reported.
+ *
+ * REPORTS, NEVER REFUSES. An under-photographed witness is not a reason to throw
+ * away the rest of the set — the 57 lessons in it for their own rows today
+ * (measured 2026-09-20: 59 in the set, 2 of them witnesses) are still worth
+ * driving — it is a reason for the run to name the claim it will not settle. The
+ * refusals in main are for a request that cannot be served AT ALL.
+ *
+ * COMPOSED FROM `redriveSet`, not re-derived from `open`, so the warning can
+ * never describe a set other than the one about to be written.
+ */
+export function witnessGaps(open, { only = null, includeUndrivable = false, witnesses = WITNESS_LESSONS } = {}) {
+  const set = redriveSet(open, { only, includeUndrivable, witnesses });
+  const byLesson = new Map(set.map((r) => [r.lesson, r]));
+  const ALL = [...VALID].sort();
+  const gaps = [];
+  for (const [lesson, w] of witnesses) {
+    const needed = neededHere(open, lesson, w, only);
+    if (!needed.length) continue;
+    const witnessFor = needed.map((f) => findingId(f)).sort();
+    // `[]` from witnessLegs is the all-four fallback, so spell it out here: this
+    // is a list of legs that will NOT be photographed, and "none of four" has to
+    // read as four names rather than as an empty list.
+    const want = witnessLegs(needed);
+    const wanted = want.length ? want : ALL;
+    const row = byLesson.get(lesson);
+    if (!row) {
+      gaps.push({
+        lesson,
+        witnessFor,
+        missing: wanted,
+        why:
+          !includeUndrivable && NO_SIMULATOR_ROUTE.has(lesson)
+            ? NO_SIMULATOR_ROUTE.get(lesson) + " — pass --include-undrivable to dispatch it anyway"
+            : "it is not in the drive set",
+      });
+      continue;
+    }
+    // In the set AS a witness: `redriveSet` built its legs from the same
+    // `needed`, so they are exactly `wanted` — or `[]`, which is all four.
+    if (row.witnessFor) continue;
+    // In the set on its own rows. `[]` there means all four downstream, which
+    // covers anything `wanted` can ask for.
+    if (!row.legs.length) continue;
+    const missing = wanted.filter((l) => !row.legs.includes(l));
+    if (missing.length) {
+      gaps.push({
+        lesson,
+        witnessFor,
+        missing,
+        why:
+          "it is in the set for its OWN open rows, driven on " + row.legs.join(",") +
+          " — a lesson's own rows decide its legs, and those are not the legs this claim compares",
+      });
+    }
+  }
+  return gaps;
 }
 
 // ---------------------------------------------------------------------- main
@@ -517,6 +763,71 @@ if (isMain || process.argv[1]?.endsWith("build-redrive.mjs")) {
     only = new Set(
       fs.readFileSync(LESSONS_FILE, "utf8").split(/[\s,]+/).map((s) => s.trim()).filter(Boolean),
     );
+
+    /**
+     * THE LESSONS FILE THAT NAMES NOTHING — a second silent zero, and one THE
+     * SILENT ZERO below CANNOT catch, because it is the empty case of the very
+     * list that refusal iterates.
+     *
+     * `only` becomes `new Set()`. AN EMPTY SET IS TRUTHY, so every `if (only &&
+     * ...)` gate stays armed and filters every lesson out, and then the refusal
+     * at the bottom asks `[...only].filter(...)` — of an empty list — and finds
+     * nothing missing. MEASURED 2026-09-20 on the pre-fix file, both variants:
+     *
+     *   --lessons <0-byte file> --out <tmp>
+     *   --lessons <file of only spaces, tabs and newlines> --out <tmp>
+     *     -> "lessons in the drive set : 0  (restricted to 0 named)"
+     *        "drives it will dispatch  : 0"
+     *        a 3-byte `[]` written to --out, EXIT 0
+     *
+     * ON THE DEFAULT `--out` THAT IS THE LIVE WORK-LIST. Measured the same day:
+     * `.audit-frames/waveC-redrive.json` held 58 rows and 119 drives, and this
+     * command replaces it with `[]`.
+     *
+     * THE BLAST RADIUS STOPS ONE RUNG LATER, NOT TWO. `.audit-frames/wave-scripts/
+     * sweep-preflight.sh:273` refuses an empty work-list — «waveC-redrive.json is
+     * empty or unreadable — there is nothing to sweep» — so an empty file
+     * DESTROYS the list a sweep is planned from rather than certifying a hollow
+     * sweep. That script is gitignored and untracked, so it is not a guard this
+     * file may lean on. The zero is made here and it is refused here.
+     *
+     * EXIT 2, SHARED WITH "no such lessons file". Both are one class — a
+     * `--lessons` argument that resolves to no names at all — and both print the
+     * path, so an operator tells them apart by reading.
+     *   NOT "before the corpus is read", which an earlier draft of this comment
+     *   claimed. MEASURED 2026-09-20: `corpusCounts()` is called at :754, the
+     *   `if (LESSONS_FILE)` block opens at :758 and this refusal is at :806, so
+     *   every empty-file run prints the `OPEN-LIST filed=…` stamp on stdout
+     *   BEFORE the REFUSING block appears. Nothing fails open — exit 2 stands
+     *   and no file is written — but the order was wrong as stated, and the
+     *   stamp appearing first is what an operator will actually see.
+     *   AND THE REFUSAL IS ON THE FILE'S CONTENTS, NOT THE FLAG'S ARGUMENT.
+     *   `flag()` (:48-51) returns its default when the next argv is missing or
+     *   empty, so a trailing `--lessons`, or `--lessons ""`, never reaches here:
+     *   it reads as "no restriction" and builds the whole set at exit 0. Same at
+     *   HEAD, so it is not a regression — but do not read this block as covering
+     *   it. A bare trailing `--out` resolves to the live work-list the same way. Exit 4 stays reserved for the other question: a name the
+     * corpus cannot serve. Nothing branches on either code today
+     * (count-agreement.mjs runs this tool with `--out <tmp>` and no `--lessons`),
+     * and the first consumer that needs to is the reason to split the code.
+     *
+     * NOT READ AS "no restriction". Treating an empty request as a request for
+     * everything is the louder version of the same mistake: it would overwrite
+     * the work-list with all 59 lessons and 124 drives nobody asked for.
+     */
+    if (!only.size) {
+      console.error("");
+      console.error("[build-redrive] REFUSING: the --lessons file names no lesson at all.");
+      console.error("   " + LESSONS_FILE + " — empty, or nothing but whitespace and commas.");
+      console.error("");
+      console.error("  An empty name list is a request for NOTHING, and this tool used to serve it:");
+      console.error("  every lesson filtered out, an empty [] written to --out, exit 0. On the default");
+      console.error("  --out that REPLACES the work-list a sweep is planned from. Nothing was written to");
+      console.error("  " + OUT + " — the previous work-list is intact.");
+      console.error("");
+      console.error("  Drop --lessons entirely to build the set from every open lesson.");
+      process.exit(2);
+    }
   }
 
   const used = only ? counts.open.filter((f) => only.has(f.scenario || f.lesson)) : counts.open;
@@ -526,7 +837,18 @@ if (isMain || process.argv[1]?.endsWith("build-redrive.mjs")) {
   const set = redriveSet(counts.open, { only, includeUndrivable });
   const drives = set.reduce((n, r) => n + (r.legs.length || 4), 0);
 
-  console.log("lessons in the drive set : " + set.length + (only ? "  (restricted to " + only.size + " named)" : ""));
+  // `set.length` can now EXCEED `only.size`, because a named lesson brings the
+  // witnesses its rows need. "(restricted to 1 named)" printed beside a 3 reads
+  // as a contradiction, so the two are counted apart. Measured 2026-09-20:
+  // `--lessons <file holding only sc-ac-ice>` is 1 named + 2 witness = 3.
+  const wit = set.filter((r) => r.witnessFor);
+  console.log(
+    "lessons in the drive set : " + set.length +
+      (only
+        ? "  (restricted to " + only.size + " named" +
+          (wit.length ? " + " + wit.length + " witness" : "") + ")"
+        : ""),
+  );
   console.log("drives it will dispatch  : " + drives);
   if (!includeUndrivable) {
     const skipped = counts.open
@@ -544,13 +866,96 @@ if (isMain || process.argv[1]?.endsWith("build-redrive.mjs")) {
   const noLeg = set.filter((r) => r.legs.length === 0).length;
   if (noLeg) console.log("lessons whose findings name no leg (all four will be driven): " + noLeg);
 
+  // A witness carries 0 open rows, so without this line it reads as a lesson the
+  // set picked up by accident — which is how a skip-list entry gets deleted by
+  // someone tidying. It names the row that needs it, so it can be checked.
+  if (wit.length) {
+    console.log("witness lesson(s) driven for another row's claim (0 open rows of their own):");
+    for (const r of wit) {
+      console.log("   " + r.lesson + " — for " + r.witnessFor.join(", ") + " on " + (r.legs.length ? r.legs.join(",") : "all four"));
+    }
+  }
+
+  /**
+   * AND THE WITNESSES THIS RUN NEEDS BUT WILL NOT DRIVE — the other half of the
+   * block above, and the one that must never be absent from a run that has one.
+   *
+   * ON stderr, NOT stdout, unlike the "NOT DRIVEN" block. That block is about
+   * rows nobody expected this run to photograph; this one says the evidence this
+   * run produces CANNOT settle a claim it was asked to settle, which is the same
+   * family as the REFUSING blocks. `node build-redrive.mjs ... > plan.log` would
+   * put a stdout line in a file nobody reads until afterwards, and afterwards is
+   * where every silent zero in this file's history has been discovered.
+   * count-agreement.mjs scans stdout AND stderr for the OPEN-LIST stamp, so
+   * neither stream costs it anything.
+   */
+  const gaps = witnessGaps(counts.open, { only, includeUndrivable });
+  if (gaps.length) {
+    console.error("");
+    console.error(
+      "[build-redrive] UNDER-PHOTOGRAPHED: " + gaps.length +
+        " witness lesson(s) a row's claim is ABOUT will not be driven on the legs it compares.",
+    );
+    for (const g of gaps) {
+      console.error("   " + g.lesson + " — needed by " + g.witnessFor.join(", ") +
+        " on " + g.missing.join(",") + "; " + g.why);
+    }
+    console.error("  A judge handed only the subject is being asked whether two things are alike.");
+  }
+
+  /**
+   * THE SILENT ZERO — the defect this refusal exists for, measured 2026-09-19.
+   *
+   * `wave-c.mjs` SELECTS from this file and never adds to it:
+   *     if (ONLY.length) rows = rows.filter((r) => ONLY.includes(r.lesson));
+   * so a lesson the set does not contain is not an error there either — it is
+   * zero rows, zero planned drives, "0 lesson(s) · 0 drive(s) to run", exit 0.
+   * Replayed that filter against the live 58-row set with
+   * ONLY=[sc-ac-aquaplane, sc-ac-bridge-ice]: 58 rows in, 0 out, 0 planned.
+   * A batch would run, report success and photograph nothing.
+   *
+   * And THIS is where the silence starts. The same two names produced
+   * «lessons in the drive set : 0», an empty `[]` written to --out, exit 0, and
+   * the line this block replaces: "(that is not an error — a lesson with nothing
+   * open has nothing to prove)". It is an error. Somebody typed a name and asked
+   * for it to be driven; answering with a file that cannot drive it, and a 0,
+   * puts the discovery two hours downstream in a judge's empty evidence list.
+   *
+   * WHY IT REFUSES ONLY WHEN LESSONS WERE NAMED. An argument-free run that comes
+   * back empty is already legible — the open-list line says open=0 and there is
+   * nothing to drive. It is also how `count-agreement.mjs` probes this tool
+   * (RECIPES["build-redrive.mjs"], `--out <tmp>` and no `--lessons`), so a
+   * refusal there would couple that check's exit code to the corpus being
+   * non-empty. A NAMED lesson is a request, and a request that cannot be served
+   * is refused.
+   *
+   * Exit 4: 2 is already "no such lessons file" here, and wave-c.mjs spends 2
+   * and 3 on --base and a dirty tree.
+   */
   if (only) {
     const missing = [...only].filter((l) => !set.some((r) => r.lesson === l));
     if (missing.length) {
-      console.log("");
-      console.log(missing.length + " named lesson(s) carry NO open finding and will not be driven:");
-      for (const m of missing.slice(0, 20)) console.log("   " + m);
-      console.log("   (that is not an error — a lesson with nothing open has nothing to prove)");
+      const witnessHint = (l) =>
+        WITNESS_LESSONS.has(l)
+          ? "it IS a witness (" + WITNESS_LESSONS.get(l).needs.join(", ") +
+            "), but every finding that needed it has been retired — delete the WITNESS_LESSONS entry"
+          : "it carries no open finding. If another row's claim is ABOUT this lesson, add it to " +
+            "WITNESS_LESSONS with that finding's id; otherwise drop it from the lessons file";
+      const why = (l) =>
+        !includeUndrivable && NO_SIMULATOR_ROUTE.has(l)
+          ? "excluded: " + NO_SIMULATOR_ROUTE.get(l) + " — pass --include-undrivable to dispatch it anyway"
+          : witnessHint(l);
+      console.error("");
+      console.error(
+        "[build-redrive] REFUSING: " + missing.length + " of " + only.size +
+          " named lesson(s) resolve to ZERO legs, and nothing downstream would say so.",
+      );
+      for (const m of missing) console.error("   " + m + " — " + why(m));
+      console.error("");
+      console.error("  wave-c.mjs FILTERS this set, it never adds to it, so dispatching these names");
+      console.error("  would print \"0 lesson(s) · 0 drive(s) to run\" and exit 0. Nothing was written to");
+      console.error("  " + OUT + " — the previous work-list is intact.");
+      process.exit(4);
     }
   }
 

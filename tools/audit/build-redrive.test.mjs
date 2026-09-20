@@ -28,12 +28,33 @@
 // §5 is the rule §4 got INVERTED (`leg` is the platform word here, not the mode
 //    word) and the quantifiers it could not read at all ("no leg has completed
 //    it"), which left two CRITICAL rows driven on one leg each.
+//
+// A FOURTH WAY, measured 2026-09-19 and the first one the set could not express
+// AT ALL: a row whose claim is about lessons OTHER than its own. The set is
+// derived from the open list, so a lesson with zero open rows can never enter
+// it, and `wave-c.mjs` only ever FILTERS the set — naming such a lesson drives
+// zero legs and exits 0.
+// §8 is the witness map that lets such a lesson in, why each entry deletes
+//    itself, WHICH RUNS GET THE WITNESSES (§8k-l), and what a run must say when
+//    it needs a witness it cannot drive (§8m-p).
+// §9 is the refusal, which is the actual defect: a named lesson resolving to
+//    zero legs must say so instead of writing an empty work-list and exiting 0
+//    — and §9(d-f), the empty NAME LIST that walked past that refusal because an
+//    empty Set is truthy.
 // -----------------------------------------------------------------------------
 
 import { strict as assert } from "node:assert";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-import { legOfFrame, redriveSet, legsInProse , NO_SIMULATOR_ROUTE } from "./build-redrive.mjs";
+import {
+  legOfFrame, redriveSet, legsInProse, witnessGaps, NO_SIMULATOR_ROUTE, WITNESS_LESSONS,
+} from "./build-redrive.mjs";
+import { findingId } from "./finding-reader.mjs";
 
 const BS = String.fromCharCode(92);
 const row = (o) => ({ scenario: "sc-x", severity: "major", frame: "", ...o });
@@ -836,4 +857,419 @@ test("§5(j) «both debriefs» is genuinely mixed, so it crosses BOTH axes", () 
   // driven on whichever leg its screenshot came from. Leave `debriefs?` in
   // MODE_CROSS_RE instead and it returns the two mobile legs, which is the reading
   // sc-vp-telltale refutes.
+});
+
+// -----------------------------------------------------------------------------
+// § 8 — A LESSON DRIVEN FOR SOMEBODY ELSE'S ROW.
+//
+// The set is derived from `corpusCounts().open`, so a lesson with ZERO open rows
+// cannot enter it. Every CROSS-LESSON COMPARISON in this corpus therefore names
+// subjects the sweep cannot photograph. Measured 2026-09-19 on the live corpus:
+//
+//   sc-ac-ice:86eab7e9  «sc-ac-aquaplane, sc-ac-ice and sc-ac-bridge-ice still
+//                        render the same stretch of street ...»
+//   sc-ac-aquaplane   filed=13  open=0   absent from the 58-row work-list
+//   sc-ac-bridge-ice  filed= 4  open=0   absent from the 58-row work-list
+//
+// A judge is handed one of the three streets and asked whether three are alike.
+// `WITNESS_LESSONS` is how the other two get driven, and every entry names the
+// finding that needs it so the entry deletes itself when that row retires.
+// -----------------------------------------------------------------------------
+
+/**
+ * THE REAL ROW'S PROSE, with a frame shaped like the corpus's. The id is
+ * COMPUTED, not pasted: `findingId` is sha1(what \0 frame) and the corpus stores
+ * an ABSOLUTE frame path ("E:\AI driver\.audit-frames\sweep161\..."), so pasting
+ * `sc-ac-ice:86eab7e9` next to a relative path asserts a machine, not a rule.
+ * That is not hypothetical — the first draft of this fixture did exactly that and
+ * §8(a) failed with `sc-ac-ice:396757dd`, which is the same prose against a
+ * shorter path.
+ *
+ * So nothing here asserts equality with the live corpus. A shipped entry that
+ * stops matching a live finding is not a red test, it is a RETIRED ROW: §8(e)
+ * proves the entry then drops out on its own, and the line is deleted on sight.
+ */
+const ICE = {
+  scenario: "sc-ac-ice",
+  severity: "major",
+  frame: ["E:", "AI driver", ".audit-frames", "sweep161", "sc-ac-ice", "pc-right", "03-ready.png"].join(BS),
+  what: "sc-ac-aquaplane, sc-ac-ice and sc-ac-bridge-ice still render the same stretch of "
+    + "street — the same mid-rise block facades, the same tree line and the same unbroken "
+    + "kerbside parked-car row.",
+};
+const ICE_ID = findingId(ICE);
+const WITNESS_FIXTURE = new Map([
+  ["sc-ac-aquaplane", { needs: [ICE_ID], why: "subject 1 of 3 in " + ICE_ID }],
+  ["sc-ac-bridge-ice", { needs: [ICE_ID], why: "subject 3 of 3 in " + ICE_ID }],
+]);
+
+test("§8(a) the shipped map names finding IDS, and the row it names resolves to one leg", () => {
+  for (const [, w] of WITNESS_LESSONS) {
+    for (const id of w.needs) assert.match(id, /^[a-z0-9-]+:[0-9a-f]{8}$/, id + " is not a finding id");
+  }
+  // WHY THE WITNESSES ARE DRIVEN ON pc-right AND NOT ON FOUR LEGS: the subject's
+  // frame is a pc-right frame, and its prose — three lesson names and a street —
+  // names no leg at all. Both halves measured here rather than asserted upstream,
+  // because together they are the witness's leg list.
+  assert.equal(legOfFrame(ICE.frame), "pc-right");
+  assert.deepEqual(legsInProse(ICE.what, { frameLeg: "pc-right", lesson: "sc-ac-ice" }), []);
+});
+
+test("§8(b) a lesson with ZERO open rows enters the set as a witness", () => {
+  const set = redriveSet([ICE], { witnesses: WITNESS_FIXTURE });
+  assert.deepEqual(
+    set.map((r) => r.lesson),
+    ["sc-ac-ice", "sc-ac-aquaplane", "sc-ac-bridge-ice"],
+    "both witnesses present, sorted to the tail behind the row that needs them",
+  );
+  // MUTATION WATCHED: derive the set from `open` alone — the pre-2026-09-19
+  // behaviour — and the last two disappear while sc-ac-ice:86eab7e9 stays open
+  // for ever, because no sweep can photograph two thirds of its claim.
+});
+
+test("§8(c) a witness is driven on the legs of the finding that NEEDS it, not all four", () => {
+  const set = redriveSet([ICE], { witnesses: WITNESS_FIXTURE });
+  const w = set.find((r) => r.lesson === "sc-ac-aquaplane");
+  assert.deepEqual(w.legs, ["pc-right"], "the subject's frame is pc-right; a comparison is like-for-like");
+  assert.deepEqual(w.witnessFor, [ICE_ID], "the work-list must say WHY a 0-row lesson is in it");
+  // MUTATION WATCHED: emit `legs: []` for a witness and it costs 3 extra drives
+  // each; take the SUBJECT LESSON's union instead and a claim about the ready
+  // screen gets photographed on whatever other legs that lesson's other rows cite.
+});
+
+test("§8(d) THE EMPTY GUARD is inherited: a needing finding with no frame leg means all four", () => {
+  const frameless = { ...ICE, frame: "no/leg/in/this/path.png" };
+  const id = findingId(frameless);
+  const set = redriveSet([frameless], {
+    witnesses: new Map([["sc-ac-aquaplane", { needs: [id], why: "x" }]]),
+  });
+  assert.deepEqual(set.find((r) => r.lesson === "sc-ac-aquaplane").legs, []);
+  // [] means all four downstream. Narrowing a witness onto a leg the subject only
+  // maybe used is the same reduction §3(b) forbids for a lesson's own rows.
+});
+
+test("§8(e) a witness whose needing row has RETIRED drops out by itself", () => {
+  // The open list is the argument, so "retired" is simply "not in it".
+  const other = { scenario: "sc-other", severity: "major", frame: "", what: "unrelated" };
+  const set = redriveSet([other], { witnesses: WITNESS_FIXTURE });
+  assert.deepEqual(set.map((r) => r.lesson), ["sc-other"]);
+  // MUTATION WATCHED: add witnesses unconditionally and the map becomes a skip
+  // list that grows by accretion — drives every sweep, for ever, for a claim
+  // nobody is waiting on. This is what makes an entry safe to delete on sight.
+});
+
+test("§8(f) a witness never inflates the counts — it carries no open row", () => {
+  const w = redriveSet([ICE], { witnesses: WITNESS_FIXTURE }).find((r) => r.lesson === "sc-ac-aquaplane");
+  assert.equal(w.total, 0);
+  assert.equal(w.critical, 0);
+  // MUTATION WATCHED: count a witness as 1 and the drive set starts disagreeing
+  // with the open list — a ledger inflated to buy a drive.
+});
+
+test("§8(g) --lessons naming ONLY the witness still resolves it", () => {
+  // The finding that needs it lives in sc-ac-ice, which `only` excludes. Filtering
+  // the open rows before the witness pass would make a witness unreachable by
+  // exactly the command that asks for it.
+  const set = redriveSet([ICE], {
+    only: new Set(["sc-ac-aquaplane"]),
+    witnesses: WITNESS_FIXTURE,
+  });
+  assert.deepEqual(set.map((r) => r.lesson), ["sc-ac-aquaplane"]);
+  assert.deepEqual(set[0].legs, ["pc-right"]);
+});
+
+test("§8(h) a lesson that carries its OWN open rows keeps them, witness entry or not", () => {
+  const own = {
+    scenario: "sc-ac-aquaplane", severity: "critical",
+    frame: ".audit-frames/sweep161/sc-ac-aquaplane/mobile-wrong/08-debrief.png",
+    what: "the debrief is blank",
+  };
+  const set = redriveSet([ICE, own], { witnesses: WITNESS_FIXTURE });
+  const r = set.find((x) => x.lesson === "sc-ac-aquaplane");
+  assert.equal(r.total, 1);
+  assert.equal(r.critical, 1);
+  assert.deepEqual(r.legs, ["mobile-wrong"], "its own rows decide its legs");
+  assert.equal(r.witnessFor, undefined, "it is not in the set on somebody else's account");
+});
+
+test("§8(i) NO_SIMULATOR_ROUTE still wins over a witness entry", () => {
+  const need = { scenario: "sc-q", severity: "major", frame: "", what: "app-login renders the same header" };
+  const wits = new Map([["app-login", { needs: [findingId(need)], why: "x" }]]);
+  assert.deepEqual(redriveSet([need], { witnesses: wits }).map((r) => r.lesson), ["sc-q"]);
+  assert.ok(
+    redriveSet([need], { witnesses: wits, includeUndrivable: true }).some((r) => r.lesson === "app-login"),
+    "--include-undrivable must still reach it, or the exclusion stops being falsifiable",
+  );
+  // A witness is a reason to photograph a lesson, not a claim that a camera can.
+});
+
+/* ── §8 WHICH RUNS GET THE WITNESSES ──────────────────────────────────────────
+ *
+ * §8(g) proved a run naming the WITNESS resolves it. The other end of the pair
+ * was the hole: the gate tested `only.has(<the witness's own name>)`, so the
+ * natural targeted redrive — `--lessons <file holding only sc-ac-ice>`, the
+ * SUBJECT — drove one of the three streets its claim compares and exited 0.
+ * MEASURED 2026-09-20 on the pre-fix script:
+ *   lessons in the drive set : 1  ·  drives it will dispatch : 1
+ *   [{"lesson":"sc-ac-ice","total":1,"critical":0,"legs":["pc-right"]}]
+ *   EXIT 0, no witnessFor, no warning.
+ * The witness was reachable only by an operator who already knew the witness
+ * names, which is the knowledge WITNESS_LESSONS exists to supply.
+ * ------------------------------------------------------------------------- */
+
+test("§8(k) naming the SUBJECT brings its witnesses — the map is useless if it does not", () => {
+  const set = redriveSet([ICE], { only: new Set(["sc-ac-ice"]), witnesses: WITNESS_FIXTURE });
+  assert.deepEqual(
+    set.map((r) => r.lesson),
+    ["sc-ac-ice", "sc-ac-aquaplane", "sc-ac-bridge-ice"],
+    "a targeted redrive of the subject must photograph all three streets it compares",
+  );
+  // Like-for-like, exactly as the unrestricted run: the subject's frame is
+  // pc-right, so the witnesses are pc-right and not four legs each.
+  for (const w of set.filter((r) => r.witnessFor)) assert.deepEqual(w.legs, ["pc-right"]);
+  // MUTATION WATCHED: gate the witness pass on the WITNESS's own name —
+  // `if (only && !only.has(lesson)) continue;`, the pre-fix line — and this
+  // returns ["sc-ac-ice"] alone: one of three subjects, exit 0.
+});
+
+test("§8(l) a run that drives NONE of the needing rows gets no witness", () => {
+  // The other direction, and it is what keeps §8(k) from being "always add them".
+  // sc-other's rows have nothing to do with the claim, so paying for two extra
+  // lessons would be the over-matching failure.
+  const other = { scenario: "sc-other", severity: "major", frame: "", what: "unrelated" };
+  const set = redriveSet([ICE, other], { only: new Set(["sc-other"]), witnesses: WITNESS_FIXTURE });
+  assert.deepEqual(set.map((r) => r.lesson), ["sc-other"]);
+  assert.deepEqual(witnessGaps([ICE, other], { only: new Set(["sc-other"]), witnesses: WITNESS_FIXTURE }), [],
+    "a claim this run is not driving cannot be under-photographed by this run");
+  // MUTATION WATCHED: add every witness unconditionally and the first assertion
+  // returns three lessons — two of them driven for a row nobody is waiting on.
+});
+
+/* ── §8 A WITHHELD WITNESS MUST SAY SO ───────────────────────────────────────
+ *
+ * `redriveSet` drops a witness this run NEEDS in exactly two places, and both
+ * were silent. Silence is the whole defect class this file exists for, so each
+ * one is now a named gap rather than a `continue`.
+ * ------------------------------------------------------------------------- */
+
+test("§8(m) a needed witness with no /simulator route is REPORTED, not just skipped", () => {
+  const need = { scenario: "sc-q", severity: "major", frame: "", what: "app-login renders the same header" };
+  const wits = new Map([["app-login", { needs: [findingId(need)], why: "x" }]]);
+  const gaps = witnessGaps([need], { witnesses: wits });
+  assert.equal(gaps.length, 1);
+  assert.equal(gaps[0].lesson, "app-login");
+  assert.deepEqual(gaps[0].witnessFor, [findingId(need)], "the gap must name the claim it costs");
+  assert.match(gaps[0].why, /no \/simulator/, "and the reason, so a judge knows it is not an oversight");
+  // The needing row names no leg, so the missing legs are spelled out as four
+  // names rather than as the `[]` that means all four inside the builder.
+  assert.deepEqual(gaps[0].missing, ["mobile-right", "mobile-wrong", "pc-right", "pc-wrong"]);
+  // §8(i) still holds: the exclusion WINS, the report is what changed.
+  assert.deepEqual(redriveSet([need], { witnesses: wits }).map((r) => r.lesson), ["sc-q"]);
+  // And --include-undrivable drives it, so there is nothing left to report.
+  assert.deepEqual(witnessGaps([need], { witnesses: wits, includeUndrivable: true }), []);
+  // MUTATION WATCHED: return [] from witnessGaps whenever the witness is absent
+  // from the set and this goes red — which is the pre-fix behaviour exactly: the
+  // camera cannot reach the lesson, and nothing anywhere said the claim is short
+  // a subject.
+});
+
+test("§8(n) a witness in the set on its OWN rows, on the WRONG legs, is reported", () => {
+  // §8(h) pins the behaviour — a lesson's own rows decide its legs — and that
+  // stays. What was missing is anyone saying the comparison is no longer
+  // like-for-like: the claim compares pc-right, this lesson is driven mobile-wrong.
+  const own = {
+    scenario: "sc-ac-aquaplane", severity: "critical",
+    frame: ".audit-frames/sweep161/sc-ac-aquaplane/mobile-wrong/08-debrief.png",
+    what: "the debrief is blank",
+  };
+  const gaps = witnessGaps([ICE, own], { witnesses: WITNESS_FIXTURE });
+  assert.deepEqual(gaps.map((g) => g.lesson), ["sc-ac-aquaplane"]);
+  assert.deepEqual(gaps[0].missing, ["pc-right"]);
+  assert.match(gaps[0].why, /OWN open rows/);
+  // The set itself is untouched — §8(h)'s assertion, restated here so a future
+  // reader cannot mistake the report for a behaviour change.
+  const r = redriveSet([ICE, own], { witnesses: WITNESS_FIXTURE }).find((x) => x.lesson === "sc-ac-aquaplane");
+  assert.deepEqual(r.legs, ["mobile-wrong"]);
+  assert.equal(r.witnessFor, undefined);
+  // MUTATION WATCHED: skip every witness that is present in the set — the
+  // one-line reading of "it is already being driven" — and this goes red, which
+  // is the case that reads as covered and is not.
+});
+
+test("§8(o) a witness whose own legs already COVER the claim is not reported", () => {
+  // The negative control that keeps §8(n) from being "always warn". Same setup,
+  // own row on pc-right: the claim's leg is photographed, so there is no gap.
+  const own = {
+    scenario: "sc-ac-aquaplane", severity: "critical",
+    frame: ".audit-frames/sweep161/sc-ac-aquaplane/pc-right/08-debrief.png",
+    what: "the debrief is blank",
+  };
+  assert.deepEqual(witnessGaps([ICE, own], { witnesses: WITNESS_FIXTURE }), []);
+  // And a lesson driven on ALL FOUR (legs: []) covers anything a claim can ask.
+  const frameless = { ...own, frame: "no/leg/in/this/path.png" };
+  assert.deepEqual(redriveSet([ICE, frameless], { witnesses: WITNESS_FIXTURE })
+    .find((x) => x.lesson === "sc-ac-aquaplane").legs, []);
+  assert.deepEqual(witnessGaps([ICE, frameless], { witnesses: WITNESS_FIXTURE }), []);
+  // MUTATION WATCHED, one per assertion, because the two guards are separate.
+  // Skip the leg comparison (`const missing = wanted`) and assertion 1 goes red.
+  // Drop the `!row.legs.length` guard — so an all-four lesson reads as covering
+  // nothing — and assertion 3 does. A warning that fires on a covered claim is a
+  // warning a reader learns to skip, which is how the silence comes back.
+});
+
+test("§8(p) the unrestricted run has no gaps — the witnesses are all driven", () => {
+  assert.deepEqual(witnessGaps([ICE], { witnesses: WITNESS_FIXTURE }), []);
+  // MUTATION WATCHED: count a witness that IS in the set as a gap and this goes
+  // red on every run, which is the same silence by another route: a block that
+  // always prints is a block nobody reads.
+});
+
+test("§8(j) every shipped witness entry names the finding(s) that need it, and why", () => {
+  for (const [lesson, w] of WITNESS_LESSONS) {
+    assert.ok(Array.isArray(w.needs) && w.needs.length, lesson + " needs at least one finding id");
+    assert.ok(w.why && w.why.length > 20, lesson + " needs a reason a reader can check");
+  }
+  // MUTATION WATCHED: a bare Set of lesson names. Then nothing knows when the
+  // entry died, and §8(e)'s self-deletion is impossible to express.
+});
+
+// -----------------------------------------------------------------------------
+// § 9 — THE SILENT ZERO. This one can only be tested by RUNNING the script: the
+// refusal is in main, and main is what a wave dispatches.
+//
+// `wave-c.mjs` SELECTS from the work-list and never adds to it —
+//     if (ONLY.length) rows = rows.filter((r) => ONLY.includes(r.lesson));
+// so a name the set does not contain is 0 rows, 0 planned drives, "0 lesson(s) ·
+// 0 drive(s) to run", exit 0. Replayed against the live 58-row set with
+// ONLY=[sc-ac-aquaplane, sc-ac-bridge-ice] on 2026-09-19: 58 rows in, 0 out, 0
+// planned. The builder was the quieter half of the same silence — it wrote `[]`,
+// exited 0, and called it "not an error".
+// -----------------------------------------------------------------------------
+
+const SCRIPT = fileURLToPath(new URL("./build-redrive.mjs", import.meta.url));
+const TMP = mkdtempSync(path.join(tmpdir(), "redrive-refusal-"));
+let nth = 0;
+/** `raw` writes the file's bytes verbatim — that is the only way to hand it nothing. */
+const runBuilder = (lessons, { raw = null } = {}) => {
+  const tag = String(nth += 1);
+  const lessonsFile = path.join(TMP, "lessons-" + tag + ".txt");
+  const outFile = path.join(TMP, "out-" + tag + ".json");
+  writeFileSync(lessonsFile, raw === null ? lessons.join(" ") + "\n" : raw);
+  const r = spawnSync(process.execPath, [SCRIPT, "--lessons", lessonsFile, "--out", outFile], {
+    encoding: "utf8",
+  });
+  return { ...r, lessonsFile, outFile, wrote: existsSync(outFile) };
+};
+
+test("§9(a) a named lesson that resolves to ZERO legs REFUSES, names itself, and writes nothing", () => {
+  const ghost = "sc-no-such-lesson-9a";
+  const r = runBuilder([ghost]);
+  assert.equal(r.status, 4, "exit 4, not 0 — before 2026-09-19 it printed '0 drives' and exited clean");
+  assert.match(r.stderr, /REFUSING/);
+  assert.match(r.stderr, new RegExp(ghost), "the refusal must NAME the lesson, not just count it");
+  assert.equal(r.wrote, false, "a refused build must leave the previous work-list intact");
+  // MUTATION WATCHED: restore the old "(that is not an error — a lesson with
+  // nothing open has nothing to prove)" note and status goes 4 -> 0 while an
+  // empty `[]` lands on --out. That is the whole defect: a batch would run,
+  // report success and photograph nothing.
+});
+
+test("§9(b) it does NOT refuse a name the set can serve — the guard is not a blanket", () => {
+  // Corpus-independent: ask the tool which lessons it has, then ask for one of
+  // them. Skips rather than lies on the day the open list is drained.
+  const probe = spawnSync(process.execPath, [SCRIPT, "--out", path.join(TMP, "probe.json")], {
+    encoding: "utf8",
+  });
+  assert.equal(probe.status, 0, probe.stderr);
+  const set = JSON.parse(readFileSync(path.join(TMP, "probe.json"), "utf8"));
+  if (!set.length) return; // nothing open: there is no servable name to test with
+  const r = runBuilder([set[0].lesson]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.wrote, true);
+  assert.equal(JSON.parse(readFileSync(r.outFile, "utf8"))[0].lesson, set[0].lesson);
+});
+
+test("§9(c) one servable name does not excuse an unservable one in the same list", () => {
+  const probePath = path.join(TMP, "probe.json");
+  if (!existsSync(probePath)) return; // §9(b) skipped, so there is nothing to pair
+  const probe = JSON.parse(readFileSync(probePath, "utf8"));
+  if (!probe.length) return;
+  const ghost = "sc-no-such-lesson-9c";
+  const r = runBuilder([probe[0].lesson, ghost]);
+  assert.equal(r.status, 4, "a partially servable list is still a request that cannot be served");
+  assert.match(r.stderr, new RegExp(ghost));
+  assert.equal(r.wrote, false);
+  // MUTATION WATCHED: refuse only when the set is EMPTY and this passes silently
+  // — the shape build-redrive.mjs's own header records for w18, where 2 of 29
+  // named lessons were in the work-list and both shards exited clean on five
+  // drives. Measured here today: the same command, one good name and one bad,
+  // wrote a ONE-LESSON set and exited 0 before this refusal existed.
+});
+
+// -----------------------------------------------------------------------------
+// § 9 continued — THE LESSONS FILE THAT NAMES NOTHING.
+//
+// §9(a) refuses a name the corpus cannot serve. It could not refuse NO NAME AT
+// ALL, because an empty Set is TRUTHY: `only` stays armed and filters every
+// lesson out, and then §9(a)'s own check runs `[...only].filter(...)` over an
+// empty list and finds nothing missing. MEASURED 2026-09-20 on the pre-fix
+// script, both variants:
+//
+//   --lessons <0-byte file>                     "lessons in the drive set : 0
+//   --lessons <spaces, tabs and newlines>        (restricted to 0 named)"
+//                                                a 3-byte `[]` on --out, EXIT 0
+//
+// On the DEFAULT --out that is the live work-list: 58 rows and 119 drives
+// replaced by `[]`. The blast radius stops one rung later, at
+// `.audit-frames/wave-scripts/sweep-preflight.sh:273` («waveC-redrive.json is
+// empty or unreadable — there is nothing to sweep») — so it destroys the list a
+// sweep is planned FROM rather than certifying a hollow sweep. That script is
+// gitignored and untracked, which is why the refusal belongs here.
+// -----------------------------------------------------------------------------
+
+test("§9(d) an EMPTY --lessons file refuses, names the file, and writes nothing", () => {
+  const r = runBuilder([], { raw: "" });
+  assert.equal(r.status, 2, "exit 2 — before 2026-09-20 this wrote a 3-byte [] and exited 0");
+  assert.match(r.stderr, /REFUSING/);
+  assert.match(r.stderr, /names no lesson at all/);
+  assert.ok(r.stderr.includes(r.lessonsFile), "the refusal must NAME the file, or the operator hunts for it");
+  assert.equal(r.wrote, false, "on the default --out this is the live work-list");
+  // MUTATION WATCHED: delete the `if (!only.size)` block and status goes 2 -> 0
+  // while an empty [] lands on --out. §9(a) CANNOT cover this — it iterates the
+  // same empty Set — which is why it is its own refusal and its own test.
+  // MUTATION WATCHED: read an empty file as "no restriction" (`only = null`) and
+  // this writes the FULL set instead: 59 lessons, 124 drives nobody asked for.
+});
+
+test("§9(e) whitespace and commas are not names either — the refusal is on the NAMES, not the bytes", () => {
+  // A 0-byte file is the obvious case and the easy one to special-case wrongly.
+  // A shard splitter that emits separators and no names produces this instead,
+  // and it reaches the same empty Set by the same route.
+  const r = runBuilder([], { raw: "  \n\t\n , , \n" });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /REFUSING/);
+  assert.equal(r.wrote, false);
+  // MUTATION WATCHED: test the file's SIZE instead of the parsed name count —
+  // `if (!raw.trim())` is close but `if (!bytes)` is what a reader reaches for
+  // first — and this goes red while §9(d) stays green.
+});
+
+test("§9(f) a file holding ONE real lesson still builds — the refusal is not a blanket", () => {
+  // §9(b) proves this against whatever the corpus holds. This one proves the
+  // SHAPE the two new refusals sit either side of: one name, on one line, is a
+  // servable request and must stay one.
+  const probePath = path.join(TMP, "probe.json");
+  if (!existsSync(probePath)) return; // §9(b) skipped: nothing open to name
+  const probe = JSON.parse(readFileSync(probePath, "utf8"));
+  if (!probe.length) return;
+  const r = runBuilder([], { raw: probe[0].lesson + "\n" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.wrote, true);
+  const built = JSON.parse(readFileSync(r.outFile, "utf8"));
+  assert.ok(built.some((x) => x.lesson === probe[0].lesson), "the named lesson must be in the set it wrote");
+  // Every other row it carries is a witness the named lesson's claims need —
+  // §8(k) — and never a lesson that wandered in.
+  for (const x of built) {
+    if (x.lesson !== probe[0].lesson) assert.ok(x.witnessFor, x.lesson + " is in the set for no stated reason");
+  }
 });

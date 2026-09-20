@@ -23,6 +23,7 @@
 # USAGE
 #   tools/audit/wave-cycle.sh gate                 the four gates, standing reds named
 #   tools/audit/wave-cycle.sh commit <msgfile>     gate, commit, push BOTH remotes, restamp .env
+#   tools/audit/wave-cycle.sh stamp                restamp platform/.env at HEAD, and only that
 #   tools/audit/wave-cycle.sh preflight            invariant-2 preflight (server, db, commit match)
 #   tools/audit/wave-cycle.sh sweep <round> <lessonsfile> [shards]
 #   tools/audit/wave-cycle.sh merge <round>        merge shard results into the round
@@ -43,10 +44,124 @@ say()  { echo "[$(date +%H:%M:%S)] $*"; }
 # took /api/health from db 127 ms to a 9.7 s TIMEOUT, which reads as a dead
 # database. Only a server answering in OUR shape — carrying a `commit` field,
 # which is what invariant 2 needs anyway — counts. 3000 is probed last.
+#
+# …AND THE CANDIDATES ARE DISCOVERED TOO — restored here 2026-09-20.
+#
+# The line above says the port is discovered by asking. Only half of that was
+# true here: identity came from the answer, but the CANDIDATES were nine numbers
+# typed into this file. `.audit-frames/wave-scripts/sweep-preflight.sh:42-67`
+# fixed exactly that on 2026-09-12 — Next autoPorted the dev server to 63269
+# because 3000 was held by a dying process, and a nine-number loop reported "no
+# server" while a healthy one answered our own health shape — and this copy never
+# got the repair.
+#
+# MEASURED ON THIS BOX 2026-09-20, against a scratch server answering our health
+# shape on 3577 (a port in neither the nine nor anything this repo starts). Both
+# candidate constructions were probed with the same curl and the same `"commit"`
+# token, with the early return removed so both could be enumerated at one moment:
+#     nine hardcoded         ->  9 candidates probed, hits: 3000
+#     nine + every LISTENING -> 41 candidates probed, hits: 3000 3000 3577
+#                               (3000 twice — it is in both halves of the list;
+#                                the early return below makes that free)
+# `netstat … | sort -u -n | wc -l` was 31 listening ports before that scratch
+# server was started. Then the same pair run so that ONLY the scratch server
+# answered our shape — the probe path changed by one token, so the live Next
+# server on 3000 returned HTML with no `commit` field:
+#     nine hardcoded         -> returned 1, MISSED the only server there was
+#     nine + every LISTENING -> found 3577
+# That second pair is the failure in full: the miss is what makes the all-clear
+# below a lie, and it is why the all-clear had to be rewritten with it.
+#
+# THE TWO MUST NOT DRIFT AGAIN. `wave-cycle.sh sweep` runs sweep-preflight.sh and
+# then discovers the port a SECOND time with this function, so a divergence makes
+# the sweep refuse seconds after a preflight that passed, on the same box, over
+# the same server. What follows is the preflight's own method — its candidate
+# order (known ports first, so a purpose-started rig still wins), its `-m 2`, its
+# identity test. If you change one, change the other.
+KNOWN_PORTS="3460 3461 3462 3470 3480 3500 3200 3411 3000"
+
+# Every LISTENING TCP port on the box, deduplicated and numerically sorted.
+# Empty — and silently so — if netstat is missing or refuses; `discover_port`
+# still probes the nine, and the callers below are what say out loud that the
+# search was then narrower than it looks.
+listening_ports() {
+  netstat -ano 2>/dev/null |
+    sed -n 's/.*TCP[[:space:]]*[0-9.]*:\([0-9][0-9]*\)[[:space:]].*LISTENING.*/\1/p' |
+    sort -u -n
+}
+
+# WHAT EACH CANDIDATE ACTUALLY DID, WRITTEN DOWN INSTEAD OF THROWN AWAY.
+#
+# `discover_port` is called as `$(discover_port)` — a SUBSHELL — so a variable
+# it sets cannot reach the caller. A file can. One line per candidate:
+#     <port> <curl-exit-code> <ours|stranger|silent>
+# The census below is built from this file, so it can only ever describe probes
+# that really happened.
+DISCOVER_PROBE_LOG="${TMPDIR:-/tmp}/wc-discover-probe.$$"
+
 discover_port() {
-  for p in 3460 3461 3462 3470 3480 3500 3200 3411 3000; do
-    h=$(curl -s -m 4 "localhost:$p/api/health" 2>/dev/null) || continue
-    case "$h" in *'"commit"'*) echo "$p"; return 0;; esac
+  # Decided ONCE, and in a subshell: a failed `>` redirection is reported by the
+  # SHELL, before the command runs, so `2>/dev/null` on the command itself does
+  # not silence it — four "No such file or directory" lines leaked out of this
+  # function the first time it was run with an unwritable log path. If the log
+  # cannot be opened, nothing is logged and the census says "?" rather than a
+  # zero nobody measured.
+  LOGGING=1
+  ( : > "$DISCOVER_PROBE_LOG" ) 2>/dev/null || LOGGING=0
+  for p in $KNOWN_PORTS $(listening_ports); do
+    # 2 s, matching the preflight: the candidate list is now dozens long and a
+    # stranger's port that accepts a connection and never replies would stall
+    # every call. Probing a stranger is safe because identity comes from the
+    # ANSWER — only our health shape, carrying a `commit` field, counts.
+    #
+    # IT IS ALSO THE LIMIT OF THIS SEARCH, AND THAT IS MEASURED, NOT ASSUMED: on
+    # 2026-09-20 the dev server on 3000 had been up 110,858 s and its FIRST
+    # /api/health probe returned 0 bytes at `curl -m 2` while the next three
+    # answered in 377 ms / 16 ms / 242 ms. A 2 s probe cannot tell "nothing
+    # listening" from "listening, still compiling", so a MISS is not evidence of
+    # absence and no caller here may report it as one.
+    #
+    # ── AND THE EXIT CODE IS NOT THE BIT THAT TELLS THEM APART. MEASURED. ──
+    # The obvious repair here is "keep curl's exit code: 7 is connection
+    # refused, 28 is accepted-but-silent". On THIS box it does not discriminate
+    # at all. Measured 2026-09-20 with curl 8.18.0 (x86_64-w64-mingw32), three
+    # ports probed the same second with this exact command:
+    #
+    #   port    curl exit   netstat LISTENING   what was really there
+    #   53117      28             yes           a scratch listener that accepts
+    #                                           and never writes a byte
+    #   53118      28             no            nothing at all
+    #   3000       28             yes           the live dev server, cold
+    #
+    # `curl -v localhost:53118` on a port with NOTHING on it prints
+    #   Trying [::1]:53118... Trying 127.0.0.1:53118...
+    #   Connection timed out after 2007 milliseconds
+    # — no refusal, no exit 7. Windows drops rather than rejects on loopback
+    # here, so all three rows above come back 28 and the exit code separates
+    # none of them. Exit 7 did not occur once in any probe run this session; the
+    # only other code seen was 56 on port 445 (connection reset by a stranger's
+    # service), which is a fourth case, not the missing discriminator. Anyone
+    # "fixing" this back to a 7-vs-28 test will ship a distinction that is
+    # always false. THE BIT THAT DOES DISCRIMINATE is already computed:
+    # membership of `listening_ports`. 53117 was in it, 53118 was not.
+    #
+    # Third row of that table, same session, reproduced: the 3000 probe that
+    # timed out at `-m 2` answered our own shape in 219 ms on the very next
+    # call. A healthy server carrying the right commit was missed by this loop
+    # and found by the retry, which is why nothing downstream may read a miss
+    # as an absence.
+    h=$(curl -s -m 2 "localhost:$p/api/health" 2>/dev/null); rc=$?
+    if [ "$rc" -ne 0 ]; then
+      [ "$LOGGING" = 1 ] && printf '%s %s silent\n' "$p" "$rc" >> "$DISCOVER_PROBE_LOG"
+      continue
+    fi
+    case "$h" in
+      *'"commit"'*)
+        [ "$LOGGING" = 1 ] && printf '%s 0 ours\n' "$p" >> "$DISCOVER_PROBE_LOG"
+        echo "$p"; return 0;;
+      *)
+        [ "$LOGGING" = 1 ] && printf '%s 0 stranger\n' "$p" >> "$DISCOVER_PROBE_LOG";;
+    esac
   done
   return 1
 }
@@ -319,6 +434,126 @@ commit)
   stamp_env
   push_both
   snapshot_ledger
+  ;;
+
+stamp)
+  # THE ONE STEP THAT COSTS A WHOLE SWEEP HAD NO DOOR — 2026-09-19.
+  #
+  # `stamp_env` is the guard against the most expensive failure this programme
+  # has: platform/.env carrying a stale NEXT_PUBLIC_COMMIT_SHA, /api/health
+  # attesting a commit that is not HEAD, and every drive in a 211-drive fleet
+  # exiting EXIT_TARGET_UNVERIFIED. Until now it was reachable ONLY from the
+  # `commit` case — which refuses on a clean tree and runs the full gate first
+  # (38 min, measured in the gate's own notes). So restamping between commits
+  # meant editing .env by hand, and that is precisely why it is wrong when
+  # somebody finally looks:
+  #
+  #   MEASURED 2026-09-19 on this tree —
+  #     git rev-parse HEAD                         c9a7ad9f2772…
+  #     NEXT_PUBLIC_COMMIT_SHA in platform/.env    793335e4f234…
+  #     git rev-list --count 793335e4..HEAD        9
+  #   Nine commits behind. A sweep dispatched in that state photographs nothing
+  #   and certifies nothing, and the 38-minute gate is not what is missing.
+  #
+  # So: one door, no gate, no commit, no push. It does exactly what the `commit`
+  # case's own stamp does — the SAME function, so the character-for-character
+  # read-back that catches a sha appearing in a comment cannot be bypassed here.
+  stamp_env
+  # AND IT SAYS WHETHER THE RUNNING SERVER STILL DISAGREES, BY ASKING IT.
+  #
+  # `stamp_env` already prints "the dev server must be RESTARTED". That note is
+  # true and it is also easy to read past, because .env is on disk and looks
+  # done. Next reads .env at BOOT, so a server that was already running keeps
+  # serving the old sha from `process.env` no matter what this step wrote — and
+  # the operator's next move after a stamp is usually to dispatch.
+  #
+  # This does not refuse. It cannot sensibly: a second ago the stamp was written
+  # and no server can have restarted since, so a refusal here would be red every
+  # single time. sweep-preflight.sh step 4 is the ONE place that refuses on this
+  # ("the server attests a DIFFERENT commit than HEAD"), and duplicating that
+  # decision in a second file is the divergence this lane exists to remove. What
+  # this does is turn an instruction into a measurement, naming both shas.
+  say "checking whether a running dev server still attests the old commit…"
+  if p=$(discover_port); then
+    srv=$(curl -s -m 8 "localhost:$p/api/health" 2>/dev/null |
+      sed -n 's/.*"commit":[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    if [ "${srv:0:7}" = "$(git rev-parse --short=7 HEAD)" ]; then
+      say "the server on port $p already attests ${srv:0:12} — nothing to restart"
+    else
+      echo ""
+      echo "  !! THE SERVER ON PORT $p IS STILL ATTESTING «${srv:-(no commit field)}»"
+      echo "     HEAD is $(git rev-parse HEAD)"
+      echo "     .env is now correct; the RUNNING PROCESS is not, and it never will be —"
+      echo "     Next reads .env at boot. STOP IT AND START IT AGAIN before dispatching,"
+      echo "     or every drive exits EXIT_TARGET_UNVERIFIED and the sweep is lost."
+      echo "     sweep-preflight.sh step 4 will refuse until you do; that refusal is correct."
+      echo ""
+    fi
+  else
+    # AN ALL-CLEAR MAY ONLY BE AS STRONG AS THE SEARCH THAT EARNED IT.
+    #
+    # This line used to read "nothing is holding a stale sha", which is a claim
+    # about the whole box made from a loop that probed nine numbers. The operator
+    # sequence this case serves REQUIRES a dev-server restart, and a restart is
+    # exactly when Next autoPorts — 3000 held by a dying process is how 63269
+    # happened on 2026-09-12 — so the one moment the reassurance is read is the
+    # one moment it is most likely to be false.
+    #
+    # The search is wider now, and it still cannot prove absence: a `-m 2` probe
+    # cannot tell "nothing listening" from "listening, still compiling"
+    # (measured — see discover_port). So this reports WHAT WAS SEARCHED.
+    #
+    # ── AND IT NO LONGER ENDS WIDER THAN THAT SEARCH ──────────────────────
+    #
+    # The repair above left the last word conditioned on the operator: "if you
+    # have NOT started a server, nothing is holding a stale sha". That is still
+    # a claim about the whole box, and it turns on the one thing this script
+    # cannot see — it covers the reader's OWN server and nothing else. An orphan
+    # from a killed session, or a second Claude session's server, is holding a
+    # stale sha and was started by nobody the reader would count. That is not a
+    # hypothetical: it is this repo's recorded failure (port 63269, 2026-09-12,
+    # 3000 held by a dying process). So the conclusion is not handed to the
+    # operator either; the census is printed and no all-clear is drawn from it.
+    #
+    # So no all-clear is printed. What is printed is the census below, built
+    # from DISCOVER_PROBE_LOG — probes that really happened — and split by the
+    # one bit that discriminates on this box (see discover_port's table: curl's
+    # exit code is 28 for a closed port, a silent listener and a cold healthy
+    # server alike, so membership of `listening_ports` is what separates them).
+    LP_N=$(listening_ports | grep -c . || true)
+    KP_N=$(printf '%s\n' $KNOWN_PORTS | grep -c . || true)
+    say "no server answered our /api/health (a reply carrying a \"commit\" field) on any of $((KP_N + LP_N)) candidates: $KP_N known ports + $LP_N LISTENING"
+    if [ "$LP_N" -eq 0 ]; then
+      echo ""
+      echo "  !! netstat produced NO listening ports, so only the $KP_N hardcoded candidates were probed."
+      echo "     An autoPorted dev server CANNOT be seen by a search that narrow — that is the"
+      echo "     2026-09-12 failure (port 63269) exactly. THIS IS NOT AN ALL-CLEAR: find the"
+      echo "     server yourself and check its commit before dispatching anything."
+      echo ""
+    else
+      # Answered within 2 s, but not with our health shape.
+      STRANGER_N=$(grep -c ' 0 stranger$' "$DISCOVER_PROBE_LOG" 2>/dev/null || true)
+      # A count that could not be taken is not a count of zero — the failure
+      # class gate 1 and gate 4 were both repaired for. If the log is missing,
+      # say "?" rather than printing a reassuring 0 nobody measured.
+      [ -n "$STRANGER_N" ] || STRANGER_N="?"
+      # Did not answer within 2 s WHILE netstat called the port LISTENING: a
+      # socket is there and it said nothing. A compiling Next server, an orphan
+      # mid-shutdown and a stranger's daemon are indistinguishable here — which
+      # is the point, because two of those three hold a stale sha.
+      SILENT_LISTENING=$(awk '$3 == "silent" { print $1 }' "$DISCOVER_PROBE_LOG" 2>/dev/null |
+        grep -Fxf <(listening_ports) 2>/dev/null | sort -u -n | tr '\n' ' ' | sed 's/ *$//')
+      SL_N=$(printf '%s\n' $SILENT_LISTENING | grep -c . || true)
+      [ -r "$DISCOVER_PROBE_LOG" ] || SL_N="?"
+      say "  THIS IS NOT AN ALL-CLEAR — it is what the search found, and the search cannot prove absence:"
+      say "  · $STRANGER_N candidate(s) answered in 2 s but carried no \"commit\" field — not our health shape"
+      say "  · $SL_N candidate(s) netstat calls LISTENING answered NOTHING in 2 s${SILENT_LISTENING:+: $SILENT_LISTENING}"
+      say "  · every other miss is indistinguishable from a closed port at this timeout (measured — see discover_port)"
+      say "  An ORPHANED server from a killed session, or another session's server, is holding a stale sha and"
+      say "  appears in NO list above as such. If any port is named on the second line, probe it before dispatching:"
+      say "    curl -m 10 localhost:<port>/api/health"
+    fi
+  fi
   ;;
 
 preflight)
