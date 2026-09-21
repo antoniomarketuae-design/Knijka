@@ -1273,3 +1273,16 @@ test("§9(f) a file holding ONE real lesson still builds — the refusal is not 
     if (x.lesson !== probe[0].lesson) assert.ok(x.witnessFor, x.lesson + " is in the set for no stated reason");
   }
 });
+
+test("§6 S-8: a routed pc-path row expands an EMPTY leg list to all five, joins a named leg, and never appears unrouted", async () => {
+  const { redriveSet: rs } = await import("./build-redrive.mjs");
+  const routing = { rows: [{ lesson: "sc-park-wall", leg: "pc-path", canaryPassed: true }, { lesson: "sc-park-van", leg: "pc-path", canaryPassed: null }] };
+  const noLeg = [{ scenario: "sc-park-wall", severity: "critical", what: "the bay is never credited", frame: "sc-park-wall/debrief.png" }];
+  assert.deepEqual(rs(noLeg, { pathRouting: routing })[0].legs, ["mobile-right", "mobile-wrong", "pc-path", "pc-right", "pc-wrong"]);
+  const named = [{ scenario: "sc-park-wall", severity: "major", what: "the bay is never credited", frame: "w47/frames/sc-park-wall__pc-right/07-end.png" }];
+  assert.deepEqual(rs(named, { pathRouting: routing })[0].legs, ["pc-path", "pc-right"]);
+  const unrouted = [{ scenario: "sc-park-van", severity: "major", what: "the bay is never credited", frame: "sc-park-van/debrief.png" }];
+  assert.deepEqual(rs(unrouted, { pathRouting: routing })[0].legs, [], "canaryPassed null routes nothing");
+  assert.deepEqual(rs(noLeg, {})[0].legs, [], "no routing file, no path leg");
+  // MUTATION WATCHED: drop `canaryPassed === true` in routedPathLessons and the sc-park-van row gains pc-path.
+});

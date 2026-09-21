@@ -2362,7 +2362,9 @@ describe("§J the drive path actually calls all of it", () => {
     const block = CODE.match(/if \(REPEAT_N >= 2\) \{[\s\S]*?\n\}/);
     assert.ok(block, "the repeat block could not be read");
     assert.match(block[0], /delete env\.KNIJKA_REPEAT;/, "the child inherits KNIJKA_REPEAT — this forks for ever");
-    assert.match(block[0], /spawnSync\(process\.execPath, \[SELF, dir, SCENARIO, PLATFORM, MODE\]/, "the child is not this same harness on the same lane");
+    // LEG_MODE, not MODE (DESIGN-v2 §7.6): a pc-path parent must spawn pc-path
+    // children, and MODE reads "right" on that leg. Identical for right and wrong.
+    assert.match(block[0], /spawnSync\(process\.execPath, \[SELF, dir, SCENARIO, PLATFORM, LEG_MODE\]/, "the child is not this same harness on the same lane");
   });
 
   it("publishes the rate through the arithmetic, not by hand", () => {
