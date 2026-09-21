@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SCENARIO_TEMPLATES } from "../templates";
 import type { ScenarioSpec } from "../types";
+import { rearCueLabelBg, type RearCueKind } from "../../../hud/rearProximity";
 
 /**
  * =============================================================================
@@ -41,11 +42,52 @@ const briefingText = (id: string): string =>
   (spec(id).instructionsBg ?? []).map((i) => i.textBg).join(" · ");
 
 describe("sc-ed-reverse-line teaches that the reverse aids are absent ON PURPOSE", () => {
-  it("names the absent aids — a student must not read the blank glass as a broken car", () => {
+  it("names the absent camera — a student must not read the blank glass as a broken car", () => {
     const t = briefingText("sc-ed-reverse-line");
     expect(t, "the briefing no longer names the camera").toMatch(/камера/iu);
-    expect(t, "the briefing no longer names the sensors").toMatch(/датчиц/iu);
-    expect(t, "the absence is no longer stated as an absence").toMatch(/няма/iu);
+    expect(t, "the absence is no longer stated as an absence").toMatch(/камера[^.]*няма/iu);
+  });
+
+  /*
+   * THE FIRST VERSION OF THIS FILE PINNED A FALSE SENTENCE. It required the
+   * briefing to name «датчици» as absent, and the briefing obliged: «Камера и
+   * датчици за заден ход няма». But `hud/RearProximityCue.tsx` is mounted in
+   * every lesson and prints «Кола отзад · X м» whenever a car is behind — so on
+   * any frame with a car behind the player the glass contradicted itself, and
+   * this test was the thing holding the contradiction in place. An adversarial
+   * verifier found it (w53); these two tests are the correction.
+   *
+   * They read the chip's OWN label function, not a copy of its strings, so a
+   * renamed chip fails here instead of leaving the briefing describing a badge
+   * that no longer exists.
+   */
+  const CHIP_KINDS: readonly RearCueKind[] = ["vehicle", "cyclist"];
+  const chipLabels = CHIP_KINDS.map((kind) => rearCueLabelBg({ kind, meters: 7, level: "warn" }));
+
+  it("never denies the rear chip the product ships — the sentence must be true on every frame", () => {
+    const t = briefingText("sc-ed-reverse-line");
+    expect(t, "the briefing claims there are no rear sensors while the chip exists").not.toMatch(
+      /(датчиц|сензор)[^.]*няма|няма[^.]*(датчиц|сензор)/iu,
+    );
+    // The briefing names the chip by the one word every label of it shares.
+    for (const label of chipLabels) expect(label, "the chip's label lost «отзад»").toMatch(/ отзад · /u);
+    expect(t, "the briefing no longer names the distance-behind chip").toMatch(/табелката за разстояние отзад/iu);
+  });
+
+  it("names what the chip does NOT see — on that chip silence reads as «clear»", () => {
+    const t = briefingText("sc-ed-reverse-line");
+    // What it reports: exactly the kinds `RearCueKind` enumerates. If a kind is
+    // ever added, CHIP_KINDS stops being exhaustive and this sentence is stale —
+    // the `satisfies` below makes that a type error rather than a silent pass.
+    const exhaustive = { vehicle: true, cyclist: true } satisfies Record<RearCueKind, true>;
+    expect(Object.keys(exhaustive)).toEqual([...CHIP_KINDS]);
+    expect(t, "the briefing no longer says the chip reports cars").toMatch(/коли/iu);
+    expect(t, "the briefing no longer says the chip reports cyclists").toMatch(/велосипедист/iu);
+    // What it does not — and neither label can ever say it.
+    for (const blind of [/пешеход/iu, /стен/iu]) {
+      for (const label of chipLabels) expect(label).not.toMatch(blind);
+      expect(t, `the briefing no longer names the chip's blind spot ${blind}`).toMatch(blind);
+    }
   });
 
   it("says WHY, which is the half that makes it teaching rather than an apology (THEO-4)", () => {
