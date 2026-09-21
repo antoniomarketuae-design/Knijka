@@ -1052,8 +1052,18 @@ export const SC_ED_REVERSE_LINE: ScenarioSpec = {
     },
     {
       n: 4,
+      // FOUNDER RULING 2026-09-21 (decision 18, option B): the missing rear camera
+      // and proximity read-out are DELIBERATE — a camera would perform the very
+      // duty this drill grades — «and the product must say so on the glass». The
+      // second sentence is that saying-so, and it is teaching rather than an
+      // apology: it names the absence, matches it to the exam, and points at what
+      // replaces it. It rides on step 4 instead of becoming a seventh step because
+      // a briefing row is the thing that overflows on a 780x360 phone (4209dad
+      // shortened two of them for exactly that), and this is where the look-back
+      // instruction already lives. Retires sc-ed-reverse-line:1f812456 and
+      // :e05f2cee once a sweep photographs it.
       textBg:
-        "Включи на задна и се убеди, че пътят ЗАД теб е свободен: обърни се и гледай през рамо назад, не разчитай само на огледалото (чл. 40).",
+        "Включи на задна и се убеди, че пътят ЗАД теб е свободен: обърни се и гледай през рамо назад, не разчитай само на огледалото (чл. 40). Камера и датчици за заден ход няма — както и на изпита: оценява се твоят оглед, не уредът.",
     },
     {
       n: 5,
