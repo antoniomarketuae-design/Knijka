@@ -32,7 +32,7 @@ import { resolve } from "node:path";
 import { VEHICLE, maxSteerAtKmh, yawGainAtKmh } from "./guidance.mjs";
 import { SIGN_CONVICT_AFTER_M, SIGN_CONVICT_MIN_DEG } from "./reverse-plan.mjs";
 import { samplesDigest } from "./path-plan/geom.mjs";
-import { ACQUISITION, ARM_ROLL_ALLOW_M, D_FLOOR_KMH, R_BAND_KMH } from "./path-plan/policy.mjs";
+import { ACQUISITION, ARM_ROLL_ALLOW_M, D_FLOOR_KMH, REST_BACK_M, R_BAND_KMH } from "./path-plan/policy.mjs";
 import { DRIVE_CLEARANCE_FLOOR_M, bodyClearanceGuard, driveClearanceGate } from "./drive-clearance.mjs";
 import { BODY_FLOOR_M, witnessBodyVerdict } from "./path-plan/body-screen.mjs";
 export { movingMedianProfile } from "./path-plan/build-pathrefs.mjs";
@@ -88,6 +88,21 @@ export const PATH_TUNE = Object.freeze({
   nearLock: Object.freeze({ frac: 0.9, aheadM: 1.0, aheadS: 1.0 }),
   delay: Object.freeze({ poseS: 0.033, ioS: 0.015, periodS: 0.05, rateS: 0.05 }),
   lookahead: Object.freeze({ fwdMinM: 3.0, fwdMaxM: 8.0, revMinM: 1.5, revMaxM: 3.0, factor: 3.6, pmFloorD: 0.28, cutMaxM: 0.25, rAheadWindowM: 10 }),
+  // THE TERMINAL HEADING LAW (2026-09-21) — terminalHeadingGate / terminalHeadingCommand. On a reverse
+  // whose unreached tail turns toward the segment's authored end heading, the command hands over from
+  // rear pursuit to the curvature that closes the heading error by the end: none at `startM` from the
+  // witness end, all of it from `fullM` on; `dMinM` floors the distance that curvature is spread over
+  // (≈ the R stop trigger, 0.47 m — below it the car is braking). MEASURED on the calibrated bench,
+  // 8 driven parking lessons × seeds 1–20: startM 1.5 / fullM 0.5 leaves sc-park-gap-short 13/20 in the
+  // box (worst 11.1°); 2.0 / 1.0 puts it 20/20 (worst 9.5°) and costs no lesson a pass, a body
+  // clearance or a corridor. What it spends: sc-park-45-rev's lengthwise box margin 0.129 → 0.114 m,
+  // sc-pk-driveway's 0.119 → 0.116 m, and sc-park-gap-short's lateral 0.264 → 0.212 m (for 13.9° →
+  // 9.5° of heading). `on: false` is the law as it stood before — kept only so the T9.h mutation can
+  // measure what the hand-over buys. The figures above are the law ALONE. Shipped together with the micro
+  // square-up (squareUpCommand), re-measured 2026-09-21 on the same bench and seeds: gap-short worst 5.48°
+  // (20/20), lateral box margin 0.082 m, lengthwise 0.375 m; no other lesson loses a pass, a clearance or a
+  // corridor (the SQD case pins gap-short's heading on seeds 7–10).
+  terminal: Object.freeze({ on: true, startM: 2.0, fullM: 1.0, dMinM: 0.5 }),
   pedals: Object.freeze({
     landS: 0.1, aMaxMps2: 3, pressMarginKmh: 0.5,
     wOnBelowKmh: 0.8, trimOverKmh: 2.0, trimReleaseKmh: 0.5,
@@ -162,6 +177,12 @@ export const PATH_TUNE = Object.freeze({
   yaw: Object.freeze({ minLeverM: 0.2, suspectDeg: 3, suspectTravelM: 1.0, suspectMaxKappa: 0.1, suspectMaxU: 0.05, suspectMinKmh: 3, movingKmh: 0.5 }),
   shutter: Object.freeze({ straightRM: 50, ctM: 0.3, yawDeg: 3, minWindowM: 2, windowS: 0.6 }),
   modulator: Object.freeze({ gapQuanta: 2 }),
+  // THE MICRO SQUARE-UP'S HEADING LAW (squareUpCommand, 2026-09-21). floorM: the least
+  // distance-to-go the law divides the heading error by. Below it the law asks for the
+  // curvature that would close the error in floorM, so an error of 2.3 deg or more is full
+  // lock and 1 deg is about half, and a 0.1 deg residue at the very end does not whip the
+  // wheel to lock.
+  squareUp: Object.freeze({ floorM: 0.15 }),
   landing: Object.freeze({ maxSamples: 5, windowMs: 300, isolateMs: 300, minKmh: 3, departDeg: 0.24, maxReadLagMs: 100 }),
 });
 
@@ -542,6 +563,64 @@ export function rearPursuit({ pose, psi, target, lookaheadM, kmh, wheelbase = L,
   return { kappaM, delta, u, xm, ym, saturated: Math.abs(delta / maxSteerAtKmh(kmh)) >= 1 };
 }
 
+/**
+ * THE TERMINAL HEADING GATE (2026-09-21) — which reverses the terminal law may touch, decided once per
+ * witness from the pathref alone.
+ *
+ * The planner grades a reverse witness at the row REST_BACK_M (0.3 m) of arc BEFORE its end, because the
+ * follower comes to rest there (policy.mjs REST_BACK_M, measured on the browser and the bench); the
+ * witness still ends at the row the follower aims at. So the car never drives the witness's last 0.3 m.
+ * Where that unreached TAIL still turns toward the segment's authored end heading, the car rests mid-turn
+ * with that rotation owed — sc-park-gap-short's committed witness rests at 9.74° against a 10° box and its
+ * tail would have taken it to 6.37°. Where the tail turns AWAY from the authored end heading (sc-park-left
+ * 84.2° → 82.8°, sc-park-van) or not at all (sc-park-wall), there is nothing owed: the witness keeps its
+ * nose in against a rear axle it planned ~0.4 m off the bay line, and squaring it up would only swing the
+ * centre out (measured with the gate removed: sc-park-left's lateral box margin 0.051 → 0.024 m and
+ * sc-park-van's 0.087 → 0.055 m over seeds 1–20, for heading neither needed).
+ *
+ * ψT is the SEGMENT'S AUTHORED END heading (`seg.authoredEnd.psi`) — on every committed pathref the heading
+ * the plan's next segment starts from (the micro square-up's first row and `authoredStart` equal it) —
+ * and never on a segment whose authored end pose is declared infeasible (designedNegative, Slice 0 §8).
+ */
+export function terminalHeadingGate(seg, witness, backM = REST_BACK_M) {
+  const rows = witness?.rows;
+  const psiT = seg?.authoredEnd?.psi;
+  if (seg?.designedNegative || !Number.isFinite(psiT) || !Array.isArray(rows) || rows.length < 2) return { engage: false, psiT: Number.isFinite(psiT) ? psiT : null, restPsi: null, endPsi: null, owedDeg: null };
+  const end = rows[rows.length - 1];
+  let i = rows.length - 1;
+  while (i > 0 && rows[i][0] > end[0] - backM + 1e-9) i--;
+  const restErr = Math.abs(wrapDeg(psiT - rows[i][5]));
+  const endErr = Math.abs(wrapDeg(psiT - end[5]));
+  return { engage: endErr < restErr, psiT, restPsi: rows[i][5], endPsi: end[5], owedDeg: r2(restErr - endErr) };
+}
+
+/**
+ * THE TERMINAL HEADING LAW (2026-09-21). Rear pursuit aims at a POSITION `Ld` ahead; over the last metre
+ * of a reverse that point lies on the straight terminal extension (§4.2), so pursuit asks for LESS
+ * curvature than the witness exactly where the heading is graded — sc-park-gap-short seed 7: the command
+ * falls from u −0.66 to −0.23 over the last metre while the witness asks −0.62…−0.88, and the car rests
+ * 3.7° behind the witness heading at the same arc, 13.4° off the bay.
+ *
+ * This hands the command over, linearly in the distance to the end, to the curvature that closes the
+ * heading error by the end. In R the heading turns at dψ/ds = κm (rearPursuit's sign: κm + right of motion
+ * turns ψ clockwise), so κm = (ψT − ψ)/max(dMin, toEnd), converted to δ exactly as rearPursuit converts its
+ * κm. It cannot ask for more than the product's lock at this speed (VehicleSim.ts:391-394, tuning.ts:410-417)
+ * — the clamp — and the product's wheel rate (VehicleSim.ts:395-397, tuning.ts:419-421) applies downstream
+ * of the key, in the chain the bench models. Returns the blended u, the weight, the pure terminal command
+ * and the heading error (°).
+ */
+export function terminalHeadingCommand({ uPursuit, psi, psiT, toEndM, kmh, t = PATH_TUNE.terminal, wheelbase = L }) {
+  const none = { u: uPursuit, w: 0, uT: null, eDeg: null };
+  if (!t || t.on === false || !Number.isFinite(uPursuit) || !Number.isFinite(psi) || !Number.isFinite(psiT) || !Number.isFinite(toEndM)) return none;
+  const eDeg = wrapDeg(psiT - psi);
+  const w = ramp(t.startM - toEndM, 0, t.startM - t.fullM);
+  if (!(w > 0)) return { ...none, eDeg };
+  const kappaM = (eDeg * RAD) / Math.max(t.dMinM, toEndM);
+  const delta = -Math.atan((wheelbase * kappaM) / yawGainAtKmh(kmh));
+  const uT = clamp(delta / maxSteerAtKmh(kmh), -1, 1);
+  return { u: clamp((1 - w) * uPursuit + w * uT, -1, 1), w, uT, eDeg };
+}
+
 /** τ_eff = pose + io + zoh + lpf(v) + rate (§4.3). All seconds. */
 export function delayModel({ poseP90S, ioP90S, periodP50S, kmh = 0 } = {}, d = PATH_TUNE.delay) {
   const pose = Number.isFinite(poseP90S) ? poseP90S : d.poseS;
@@ -724,6 +803,65 @@ export function stopTrigger({ gear, vAbs, vGate, aBrake = null, aCoast = PATH_TU
     ? v * (landS + brakeAttackDeadS(vAbs, 1, p)) + (v * v) / (2 * aB) + 0.05
     : v * (landS + p.wReleaseHalfS) + (v * v) / (2 * aCoast) + 0.05;
   return { branch, distM };
+}
+
+/**
+ * THE PRODUCT'S THROTTLE CHAIN AT A CRAWL, as far as a lifted W still drives the car.
+ *  - attackS / releaseS: input.ts THROTTLE_ATTACK_S 0.35 / THROTTLE_RELEASE_S 0.25: holding W
+ *    ramps the pedal 0 to 1 in 0.35 s, lifting it lets it fall 1 to 0 in 0.25 s;
+ *  - capFull / capFullKmh / capEndKmh: difficulty.ts `creepThrottleCap` 0.45 (normal) applied at
+ *    or under CREEP_CAP_FULL_KMH 4 and faded out by CREEP_CAP_END_KMH 12 (applyDifficulty's S0
+ *    creep control): a CEILING, so a pedal ramped to 1 is still driving at the ceiling for
+ *    (1 - 0.45) x 0.25 s after the lift;
+ *  - and VehicleSim.update reads the throttle first: while it is above zero the car is DRIVEN,
+ *    the brake is not read and the rolling-resistance coast is not applied (VehicleSim.ts, the
+ *    «Throttle / brake / reverse state machine» and «Brakes» blocks).
+ * The drive magnitude per unit throttle is the follower's own `pedals.aMaxMps2` (3 m/s², the
+ * PRESS_MIN derivation's figure). The product shapes the pedal by pow(p, 1.4) x 0.75 before that
+ * ceiling (difficulty.ts `normal`), which reaches the ceiling LATER than this linear pedal, so
+ * against the product this model over-states the run-out: it errs toward stopping short.
+ * CORRECTION (2026-09-21, re-checked against source): that holds for the pedal SHAPING alone. The
+ * product's crawl drive per unit of shaped throttle is ENGINE_FORCE_CURVE's 4800 N (tuning.ts:346-348)
+ * over CHASSIS_MASS 1220 kg (tuning.ts:72), 3.93 m/s², not 3. Integrating both from source (resistances
+ * under throttle ignored), the product's run-out is SHORTER than this model's below a pedal of about
+ * 0.65 and up to 0.11 m LONGER at a pedal of 0.8–1 (0.5–3 km/h). The pedal bound from above and the
+ * resistances the integration ignores both pull toward short, but whether a browser creep stops short of
+ * its end pose is NOT established by source; SQ3/SQ3c hold it on the bench plant only.
+ */
+export const CREEP_THROTTLE = Object.freeze({ attackS: 0.35, releaseS: 0.25, capFull: 0.45, capFullKmh: 4, capEndKmh: 12 });
+
+/**
+ * HOW FAR A D CREEP RUNS IF W IS LIFTED NOW (2026-09-21), pure: the lift lands `landS` later
+ * (the pedal still rising meanwhile), the pedal then falls over the release ramp DRIVING the car
+ * the whole way down (it is a throttle above zero), and only then does the coast begin. Below
+ * PRESS_MIN the D brake cannot be pressed (a fresh press at rest selects R), so this run-out IS
+ * the stop. `stopTrigger`'s coast branch books the release as `v x wReleaseHalfS` at constant
+ * speed, which is right for a pedal held under the ceiling and wrong for one ramped past it: on
+ * the micro square-up's creep that model latched at 1.3 km/h and the car ran on to 2.1 km/h and
+ * 0.61 m past the end pose (sc-park-gap-short seed 10). Integrated at the product's 60 Hz frame.
+ */
+export function creepLiftRunOutM({ vKmh, pedal, aCoast = PATH_TUNE.pedals.aCoastMps2, landS = PATH_TUNE.pedals.landS, aMax = PATH_TUNE.pedals.aMaxMps2 }, c = CREEP_THROTTLE) {
+  const dt = 1 / 60;
+  let v = Math.max(0, Number.isFinite(vKmh) ? vKmh : 0) / 3.6;
+  let p = clamp(Number.isFinite(pedal) ? pedal : 0, 0, 1);
+  let d = 0;
+  const drive = () => {
+    const cap = c.capFull + (1 - c.capFull) * ramp(v * 3.6, c.capFullKmh, c.capEndKmh);
+    return aMax * Math.min(p, cap);
+  };
+  if (p > 0) {
+    for (let t = 0; t < landS - 1e-9; t += dt) {
+      p = Math.min(1, p + dt / c.attackS);
+      v += drive() * dt;
+      d += v * dt;
+    }
+    while (p > 0) {
+      p = Math.max(0, p - dt / c.releaseS);
+      v += drive() * dt;
+      d += v * dt;
+    }
+  }
+  return d + (v * v) / (2 * Math.max(0.05, Number.isFinite(aCoast) ? aCoast : PATH_TUNE.pedals.aCoastMps2));
 }
 
 /** The stop-phase press speed on a path leg (S-4): 0 below PRESS_MIN, so `brake()`'s own refusal blocks it. */
@@ -1903,6 +2041,18 @@ export function pathStep(state0, obs) {
       if (phase === "reverse") {
         state.segIndex = seg.gear === -1 ? state.segIndex : state.segIndex + 1;
         state.flags.atGearChange = false;
+        // THE GEAR-CHANGE STOP'S REQUEST IS SERVED HERE, SO IT IS WITHDRAWN HERE (2026-09-21).
+        // `wantStop` rose when the approach came to rest at its gear change (forwardStep); the
+        // outer tick answered it with «stop», and has now answered `atGearChange` with «reverse».
+        // Until today nothing lowered it on this path, so it was carried through the whole R
+        // segment and the outer tick read it AGAIN on its first «roll» after the disarm
+        // (lesson-audit.mjs `pathFollow.wantStop === true && phaseTicks >= 1`; path-bench the
+        // same): the forward segment after every reverse began inside a stop nobody asked for.
+        // On a micro square-up that stop ended the leg — the creep saw «stop», went hold-stop,
+        // consumed its routeEnd and never drove (sc-park-gap-short: 0.11–0.36 m of the authored
+        // square-up left undriven on every seed); on a full forward segment it cost a spurious
+        // stop and dwell (sc-ed-poligon-chain F2, F4).
+        state.flags.wantStop = false;
         state.mode = "reverse-settle";
         state.settle = { since: now, restFrom: null };
         state.latch = { brake: false, coast: false, wBrake: false };
@@ -2161,6 +2311,7 @@ function forwardStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys,
 
   // ── the wheel ──
   let u = 0;
+  let k;
   if (!creep && !seg.micro && Number.isFinite(psi)) {
     const Ld = lookaheadFor(Math.max(vAbs, 3), state.tauEffS, 1);
     const T = pointAt(state.poly, cursor.s + Ld);
@@ -2171,17 +2322,45 @@ function forwardStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys,
     state.books.pm.push(phaseMarginDeg(((Math.max(vAbs, 0.1) / 3.6) * state.tauEffS) / Ld));
     if (state.books.pm.length > 4000) state.books.pm.splice(0, 2000);
   }
-  const k = steerCommand(state, u, obs, v);
+  if (seg.micro && seg.gear === 1 && Number.isFinite(psi)) {
+    // THE MICRO SQUARE-UP STEERS (2026-09-21): its creep closes the heading to the micro's
+    // authored end heading over the distance left to that end pose (squareUpCommand). A pure
+    // pursuit cannot do this job: the micro is shorter than any lookahead, so its target point
+    // would sit on the 3 m straight extension past the end and command the car straight.
+    const sq = squareUpSteer(state, obs, pose, psi, vAbs, creep ? "creep" : "follow");
+    u = sq.u;
+    k = sq.k;
+  } else k = steerCommand(state, u, obs, v);
   state.sign = foldPathSign(state.sign, { u, v, stepM, psi });
   if (state.sign.verdict === "contradicts") return refusedStep(refusePathState(state, "sign-contradicts", state.sign.why), obs, cmd, row, vAbs, keys, now);
   row.u = r3(u);
   row.k = k;
 
   // ── the pedals ──
+  // THE MICRO CREEP LIFTS W WHERE ITS RUN-OUT ENDS AT THE END POSE (2026-09-21). Until the stale
+  // gear-change `wantStop` was withdrawn this creep never drove, so its stop was never measured;
+  // driven, the coast branch of `stopTrigger` let a W ramped past the crawl ceiling carry the car
+  // up to 0.61 m past the end pose. THE PEDAL IS BOUNDED, NOT TRACKED: from rest it cannot have
+  // risen faster than the attack ramp since W was FIRST commanded in this creep, so
+  // min(1, elapsed / attackS) is never below the real pedal, whatever the runner yields did to
+  // the key in between (each yield lifts W for the outer tick, and the first bench version that
+  // reset the estimate on that lift read the pedal as 0 while it stood at 0.67 and let
+  // sc-park-gap-short seed 16 run 0.52 m past its end). The run-out grows with the pedal, so a
+  // bound from above can only lift early.
+  const aCoastNow = state.aCoastMeas ?? tune.pedals.aCoastMps2;
+  let anticipateM = 0;
+  if (creep && seg.micro === true && Number.isFinite(toStopM) && !state.latch.brake && !state.latch.coast) {
+    const pedal = Number.isFinite(state.creepWAt) ? clamp((now - state.creepWAt) / 1000 / CREEP_THROTTLE.attackS, 0, 1) : 0;
+    const runOut = creepLiftRunOutM({ vKmh: vAbs, pedal, aCoast: aCoastNow, landS: tune.runner.pollMs / 1000, aMax: tune.pedals.aMaxMps2 });
+    const trig = stopTrigger({ gear: 1, vAbs, vGate: Math.min(vAbs, Number.isFinite(obs.dialKmh) && obs.dialKmh >= 0 ? obs.dialKmh : vAbs), aBrake: state.aBrakeMeas, aCoast: aCoastNow, landS: tune.pedals.landS, pressMin: pressMinFor(tune.pedals) }, tune.pedals);
+    anticipateM = Math.max(0, runOut - trig.distM);
+    row.runOut = r3(runOut);
+  }
   const g = pedalGrammar(state.latch, {
     gear: 1, vAbs, dialKmh: obs.dialKmh, vT, toStopM, aBrake: state.aBrakeMeas,
-    aCoast: state.aCoastMeas ?? tune.pedals.aCoastMps2, keys, release: releaseLatch,
+    aCoast: aCoastNow, keys, release: releaseLatch, anticipateM,
   }, tune.pedals);
+  if (creep && seg.micro === true && g.W && !Number.isFinite(state.creepWAt)) state.creepWAt = now;
   if (g.latch.brake !== state.latch.brake || g.latch.coast !== state.latch.coast) {
     if ((g.latch.brake || g.latch.coast) && bk) {
       bk.branch = g.trigger?.branch ?? null;
@@ -2377,8 +2556,9 @@ function reverseSettleStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
   }
   const poly = witnessPolyline(sel.witness, { gear: -1, leadM: Math.max(1.0, sel.leadM + 0.5), extendM: 3 });
   const cursor = advanceCursor(null, poly, rearPoint(pose, psi), 0, { acquire: true, leadM: 1.5 });
-  state = { ...state, witness: sel.witness, poly, cursor, leadM: sel.leadM, mode: "reverse-follow", settle: null, latch: { brake: false, coast: false, wBrake: false, hold: false }, yaw: resetYawHistory(state.yaw), lostCount: 0, stops: buildStops(seg, poly), currentStop: null, impact: { prev: null, reads: 0, peakMps2: 0 }, nearLock: false };
-  state.books.segments.push(newSegmentBook(seg, { witnessStartAlongM: sel.witness.startAlongM, leadM: r3(sel.leadM) }));
+  const terminal = terminalHeadingGate(seg, sel.witness);
+  state = { ...state, witness: sel.witness, poly, cursor, leadM: sel.leadM, mode: "reverse-follow", settle: null, latch: { brake: false, coast: false, wBrake: false, hold: false }, yaw: resetYawHistory(state.yaw), lostCount: 0, stops: buildStops(seg, poly), currentStop: null, impact: { prev: null, reads: 0, peakMps2: 0 }, nearLock: false, terminal };
+  state.books.segments.push(newSegmentBook(seg, { witnessStartAlongM: sel.witness.startAlongM, leadM: r3(sel.leadM), terminal: { engage: terminal.engage, psiT: terminal.psiT, owedDeg: terminal.owedDeg, handedM: 0 } }));
   const yawErr = Number.isFinite(psi) ? Math.abs(wrapDeg(psi - sel.witness.startPose.psi)) : 0;
   const lim = seg.designedNegative ? { ct: ACQUISITION.replannedCtM, yaw: ACQUISITION.replannedYawDeg } : { ct: ACQUISITION.ctM, yaw: ACQUISITION.yawDeg };
   if (!cursor.found || Math.abs(cursor.ctM) > lim.ct || yawErr > lim.yaw) {
@@ -2443,6 +2623,15 @@ function reverseStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys)
     const T = pointAt(state.poly, cursor.s + Ld);
     const law = rearPursuit({ pose, psi, target: T, lookaheadM: Ld, kmh: Math.max(vAbs, 1) });
     u = law.u;
+    // THE TERMINAL HEADING LAW (terminalHeadingGate / terminalHeadingCommand), over the witness's last startM.
+    if (state.terminal?.engage) {
+      const term = terminalHeadingCommand({ uPursuit: law.u, psi, psiT: state.terminal.psiT, toEndM: cursor.toEndM, kmh: Math.max(vAbs, 1), t: tune.terminal });
+      if (term.w > 0) {
+        u = term.u;
+        row.uTerm = r3(term.uT);
+        if (bk?.terminal) bk.terminal.handedM = r2(bk.terminal.handedM + stepM);
+      }
+    }
     if (law.saturated && bk) bk.saturatedM = r2(bk.saturatedM + stepM);
     state.books.pm.push(phaseMarginDeg(((Math.max(vAbs, 0.1) / 3.6) * state.tauEffS) / Ld));
     if (state.books.pm.length > 4000) state.books.pm.splice(0, 2000);
@@ -2556,6 +2745,89 @@ function captureStep(state, obs, cmd, row, pose, vAbs, now, keys) {
   return out(release(state), { ...cmd, steer: 0, W: hp.W, S: false, why: `reverse-capture — ${hp.why}` }, { ...row, why: "reverse-capture" });
 }
 
+/**
+ * THE MICRO SQUARE-UP'S HEADING LAW (2026-09-21), pure.
+ *
+ * WHAT IT IS FOR. A pathref's last forward micro segment (at most 1 m) is the plan's square-up:
+ * its authored rows turn the car the last 2-3 deg onto the bay (sc-park-gap-short F2 357.04 deg
+ * to 359.28 deg over 0.69 m, delta 34 deg falling to 12 deg). Until today the follower drove it
+ * with the wheel HARD-ZEROED (`!seg.micro` in forwardStep), and the disarm roll that carries the
+ * car into it was steered by nothing (forwardSettleStep `steer: 0`), so the heading the reverse
+ * ended on was the heading the leg ended on: every degree the square-up exists to deliver was
+ * dropped.
+ *
+ * THE TARGET IS THE PLAN'S, NEVER THE BOX'S. `targetPsi` is the micro witness's own END heading,
+ * the same end pose whose position the micro creep already aims at (`creepFrame`). The bay
+ * heading the product grades by is never read here: a follower follows its plan and does not
+ * invent a target, and the grader's number fed back into the driver would make the box verdict a
+ * statement about the harness grading itself. On the three lessons that carry a micro the two
+ * differ by 0.60-0.83 deg, and the plan's is the one taken.
+ *
+ * THE LAW. Close the heading error over the distance that ACTUALLY remains to that end pose:
+ * kappa = err / max(dGo, floorM), turned into a wheel fraction through the same yaw gain and
+ * speed-dependent lock the pursuit laws use (centrePursuit). Forward only: u > 0 turns the heading
+ * clockwise (+psi) in D, the convention `foldPathSign` convicts against. A car already past the
+ * end pose (dGo at or under floorM) gets the floor, so an error of a few degrees is full lock for
+ * whatever travel is left, which is the only travel there is.
+ *
+ * THE PHYSICS IT RELIES ON, from the product: the road wheel is rate-limited toward its target at
+ * STEER_SPEED whatever the car's speed, with no standstill gate (VehicleSim.ts:390-398;
+ * tuning.ts:411/419/421: 0.6 rad at or under 15 km/h, 3.2 rad/s out, 4.8 rad/s back), so the
+ * wheel reaches lock in about 0.19 s even as the disarm roll starts from rest; and a forward arc
+ * at that lock turns tan(0.6) x 1.02 / 2.56, about 0.27 rad/m (guidance.mjs YAW_GAIN_TABLE at or
+ * under 8 km/h).
+ */
+export function squareUpCommand({ psi, targetPsi, dGoM, kmh }, t = PATH_TUNE.squareUp) {
+  if (!Number.isFinite(psi) || !Number.isFinite(targetPsi)) return { u: 0, errDeg: null, kappa: 0, saturated: false, dGoM: null };
+  const errDeg = wrapDeg(targetPsi - psi);
+  const d = Math.max(Number.isFinite(dGoM) ? dGoM : 0, t.floorM);
+  const kappa = (errDeg * RAD) / d;
+  const k = Math.max(Math.abs(kmh ?? 0), 1);
+  const delta = Math.atan((L * kappa) / yawGainAtKmh(k));
+  const u = clamp(delta / maxSteerAtKmh(k), -1, 1);
+  return { u, errDeg, kappa, saturated: Math.abs(delta / maxSteerAtKmh(k)) >= 1, dGoM: d };
+}
+
+/** The micro witness's authored end pose (probe frame): the pose the square-up and its creep both aim at. */
+function microEndPose(seg) {
+  const rows = seg?.witnesses?.[0]?.rows;
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const e = rows[rows.length - 1];
+  return { x: e[1], z: e[2], psi: e[5] };
+}
+
+/**
+ * ONE SQUARE-UP STEERING DECISION: the law above toward the micro's end pose, through the same
+ * modulator every other steering decision goes through, booked per segment and per phase
+ * (`settle` = the disarm roll the harness does not drive longitudinally, `creep` = the micro's own
+ * creep) so a test can see that the branch FIRED and not merely that it exists.
+ */
+function squareUpSteer(state, obs, pose, psi, vAbs, phaseTag) {
+  const seg = segOf(state);
+  const end = microEndPose(seg);
+  const hEnd = end ? headingUnit(end.psi) : null;
+  const dGoM = end ? (end.x - pose.x) * hEnd.x + (end.z - pose.z) * hEnd.z : null;
+  const law = squareUpCommand({ psi, targetPsi: end?.psi, dGoM, kmh: vAbs }, (state.tune ?? PATH_TUNE).squareUp ?? PATH_TUNE.squareUp);
+  const v = Number.isFinite(obs.v) ? obs.v : vAbs;
+  const k = steerCommand(state, law.u, obs, v);
+  const books = (state.books.squareUp ??= []);
+  let b = books.find((x) => x.k === seg.k && x.phase === phaseTag);
+  if (!b) {
+    b = { k: seg.k, phase: phaseTag, subTicks: 0, keyTicks: 0, saturatedTicks: 0, keyM: 0, errStartDeg: law.errDeg === null ? null : r2(law.errDeg), errEndDeg: null, last: null };
+    books.push(b);
+  }
+  const stepM = b.last ? Math.hypot(pose.x - b.last.x, pose.z - b.last.z) : 0;
+  b.subTicks += 1;
+  if (k !== 0) {
+    b.keyTicks += 1;
+    b.keyM = r3(b.keyM + stepM);
+  }
+  if (law.saturated) b.saturatedTicks += 1;
+  b.errEndDeg = law.errDeg === null ? null : r2(law.errDeg);
+  b.last = { x: pose.x, z: pose.z };
+  return { k, u: law.u, law };
+}
+
 function forwardSettleStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
   const tune = state.tune ?? PATH_TUNE;
   const seg = segOf(state);
@@ -2564,6 +2836,19 @@ function forwardSettleStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
   state.settle = st;
   const settled = (st.restFrom !== null && now - st.restFrom >= tune.stops.settleS * 1000) || (now - st.since >= tune.stops.settleMaxS * 1000 && vAbs <= 1);
   if (!settled) {
+    // THE DISARM ROLL INTO A MICRO SQUARE-UP IS STEERED (2026-09-21). The roll is motion the
+    // harness does not drive: ReverseAssist's R to D flip hands the held W to D's accelerator
+    // (section 10b/10c), and it carries the car 0.17-0.31 m into a micro that is 0.42-0.76 m
+    // long. It happens whether or not the wheel is used, so it is travel the square-up gets for
+    // free; leaving the wheel at zero through it dropped the largest share of the heading
+    // (sc-park-gap-short: the whole micro ran straight at the reverse's -13.4 deg). The pedals
+    // are untouched: this changes which way the roll points, never how far it goes.
+    if (seg?.micro && seg.gear === 1 && Number.isFinite(psi)) {
+      const sq = squareUpSteer(state, obs, pose, psi, vAbs, "settle");
+      row.u = r3(sq.u);
+      row.k = sq.k;
+      return out(state, { ...cmd, steer: sq.k, W: false, S: keys.S && vAbs > 0.3, why: `forward-settle: square-up toward the micro's end heading (${r2(sq.law.errDeg)} deg to go)` }, { ...row, why: "forward-settle-squareup" });
+    }
     state.lastU = 0;
     return out(release(state), { ...cmd, steer: 0, W: false, S: keys.S && vAbs > 0.3, why: "forward-settle" }, { ...row, why: "forward-settle" });
   }
@@ -2593,7 +2878,16 @@ function forwardSettleStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
     state.creepTarget = 0;
     state.creepFrame = { x: end.x, z: end.z, psi: end.psi };
     state.currentStop = routeEndStop;
-    return out(release(state), { ...cmd, steer: 0, W: false, S: false, why: `micro square-up: ${r2(remaining)} m straight` }, { ...row, why: "micro-creep" });
+    state.creepWAt = null;
+    // the square-up keeps the wheel it built up through the disarm roll: a released key here
+    // would hand 50 ms of 4.8 rad/s return (0.24 rad) back before the creep's first step
+    if (seg.gear === 1 && Number.isFinite(psi)) {
+      const sq = squareUpSteer(state, obs, pose, psi, vAbs, "creep");
+      row.u = r3(sq.u);
+      row.k = sq.k;
+      return out(state, { ...cmd, steer: sq.k, W: false, S: false, why: `micro square-up: ${r2(remaining)} m to its end pose, ${r2(sq.law.errDeg)} deg to its end heading` }, { ...row, why: "micro-creep" });
+    }
+    return out(release(state), { ...cmd, steer: 0, W: false, S: false, why: `micro square-up: ${r2(remaining)} m, no yaw read to steer it by` }, { ...row, why: "micro-creep" });
   }
   state = enterForward(state, pose, psi);
   if (state.mode === "refused") return refusedStep(state, obs, cmd, row, vAbs, keys, now);
@@ -3174,6 +3468,10 @@ export function pathFollowBooks(state) {
     aCoastMeas: r3(state.aCoastMeas),
     authority: authorityVerdict(state.authority),
     microOvershootM: state.books.microOvershootM,
+    // the micro square-up's own books (squareUpSteer): per segment and phase, how many sub-ticks
+    // it decided, how many held a steer key, over how many metres, and the heading error to the
+    // micro's authored end heading when it started and when it last decided
+    squareUp: (state.books.squareUp ?? []).map(({ last, ...b }) => b),
     stopHeldWithoutBrake: state.books.stopHeldWithoutBrake,
     nearLock: { metres: state.books.nearLockM, budgetEntries: state.books.nearLockBudgetEntries, budgetMs: (state.tune ?? PATH_TUNE).runner.nearLockBudgetMs },
     impacts: state.books.impacts,

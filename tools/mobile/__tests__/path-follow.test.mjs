@@ -2983,6 +2983,265 @@ describe("T9 closed-loop benches", () => {
   });
 });
 
+/* ═══════════════════════════ T9.h the terminal heading law ═══════════════════════════
+ *
+ * path-follow.mjs terminalHeadingGate / terminalHeadingCommand (2026-09-21). Rear pursuit aims at a
+ * POSITION Ld ahead, which over the last metre of a reverse sits on the straight terminal extension, so
+ * it asks for less curvature than the witness exactly where the heading is graded; and the car rests
+ * REST_BACK_M short of the witness end BY PLAN (policy.mjs), so a witness whose last 0.3 m is still
+ * turning leaves that rotation owed. sc-park-gap-short rested 11.9–13.4° off a 10° box on seeds 7–10.
+ *
+ * MUTATIONS, each run against the whole T9 pattern (2026-09-21, scratch copy pcx-D-terminal-heading):
+ *   · the hand-over predicate removed (`if (state.terminal?.engage)` → `if (false && …)`):
+ *     T9.c gap-short red («0/4 in the box») and T9.h.3 red («only 0 m under the hand-over»);
+ *   · the gate forced open (`engage: endErr < restErr` → `engage: true`): T9.h.2 and T9.h.4 red (left, van
+ *     and wall all move), and T9.f red — sc-park-wall seed 5 under 3× blackouts then refuses end-overrun;
+ *   · the target moved to the witness's own last row (ψT = rows[n−1][5] in reverseStep): T9.c gap-short red
+ *     («1/4 in the box») and T9.h.3 red (judge seed 8 rests 5.20° from the authored end, 5.54° without);
+ *   · the curvature's sign flipped (κm = −(ψT − ψ)/d): T9.h.1, T9.h.3 and three T9.c cases red
+ *     (gap-short 0/4, 45-rev 0/4, driveway 2/4 in the box);
+ *   · the designed-negative exclusion dropped from the gate: T9.h.2 red. No DRIVEN plan carries one today
+ *     (sc-park-bay-exit-rev is refused before it moves — T9.d), so only the synthetic case can see it.
+ *
+ * RE-RUN WITH THE MICRO SQUARE-UP ALSO SHIPPED (SQ; 2026-09-21, scratch copy pcx-final, pattern «T9|SQ»):
+ * the predicate removed now reddens T9.h.3 and SQD1 but NOT T9.c — the square-up alone still carries
+ * gap-short to 4/4 in the box (worst 8.88°), which is why SQD1 exists; gate forced open: T9.f, T9.h.2,
+ * T9.h.4; target moved to the witness's last row: T9.h.3 and SQD1; sign flipped: T9.h.1, T9.h.3, SQD1 and
+ * three T9.c cases; designed-negative exclusion dropped: T9.h.2.
+ */
+const { terminalHeadingCommand, terminalHeadingGate } = await import("../lib/path-follow.mjs");
+const TERMINAL_OFF = { ...PATH_TUNE, terminal: { ...PATH_TUNE.terminal, on: false } };
+const finalReverse = (l) => plan(l).segments.filter((s) => s.gear === -1).at(-1);
+const finalReverseBook = (r) => r.books.follow.segments.filter((s) => s.gear === -1).at(-1);
+// the heading the final reverse comes to rest at (its last reverse-capture sub-tick): where the terminal law
+// acts. The final pose is not that heading once the micro square-up (squareUpCommand, SQ) has steered the
+// disarm roll and the creep after it, so T9.h.3 reads this, not `r.plant.psi`.
+const reverseRestPsi = (l, seed, tune) => {
+  const k = finalReverse(l).k;
+  let psi = null;
+  runBench({ plan: plan(l), seed, ...(tune ? { tune } : {}), onSubTick: ({ state, plant }) => {
+    const seg = state.plan.segments[state.segIndex];
+    if (seg && seg.gear === -1 && seg.k === k && state.mode === "reverse-capture") psi = plant.psi;
+  } });
+  assert.ok(Number.isFinite(psi), `${l} seed ${seed}: the final reverse never reached reverse-capture`);
+  return psi;
+};
+
+describe("T9.h the terminal heading law", () => {
+  it("T9.h.1 the command: untouched before startM, all of it from fullM, turning the way rearPursuit turns, never past lock, and off means off", () => {
+    const t = PATH_TUNE.terminal;
+    const far = terminalHeadingCommand({ uPursuit: 0.3, psi: -10, psiT: 0, toEndM: t.startM + 0.01, kmh: 3 });
+    assert.equal(far.u, 0.3);
+    assert.equal(far.w, 0);
+    const mid = terminalHeadingCommand({ uPursuit: 0.3, psi: -10, psiT: 0, toEndM: (t.startM + t.fullM) / 2, kmh: 3 });
+    near(mid.w, 0.5, 1e-9, "half-way through the ramp");
+    near(mid.u, 0.5 * 0.3 + 0.5 * mid.uT, 1e-9, "half of each");
+    const cw = terminalHeadingCommand({ uPursuit: 0.3, psi: -10, psiT: 0, toEndM: t.fullM - 0.1, kmh: 3 });
+    assert.equal(cw.w, 1);
+    near(cw.u, cw.uT, 1e-12, "inside fullM the terminal command alone");
+    // THE SIGN. In R a car short of its heading clockwise (ψ −10° → ψT 0°) must turn clockwise: that is
+    // rearPursuit's command for a target behind-LEFT of a car facing north (κm > 0 ⇒ δ < 0).
+    const rpLeft = rearPursuit({ pose: { x: 0, z: 0 }, psi: 0, target: { x: -1, z: A + 1.5 }, lookaheadM: 1.5, kmh: 3 });
+    assert.ok(cw.uT < 0 && rpLeft.u < 0, `ψ −10° → 0° in R: terminal u ${cw.uT}, rearPursuit behind-left u ${rpLeft.u} — both must be < 0`);
+    const ccw = terminalHeadingCommand({ uPursuit: 0, psi: 10, psiT: 0, toEndM: 0.4, kmh: 3 });
+    assert.ok(ccw.uT > 0, `ψ +10° → 0° in R must steer right, got ${ccw.uT}`);
+    // …the curvature is spread over max(dMin, toEnd), so a large error near the end saturates at lock
+    assert.equal(terminalHeadingCommand({ uPursuit: 0, psi: -60, psiT: 0, toEndM: 0.1, kmh: 3 }).uT, -1);
+    assert.equal(terminalHeadingCommand({ uPursuit: 0.3, psi: -10, psiT: 0, toEndM: 0.1, kmh: 3, t: { ...t, on: false } }).u, 0.3);
+  });
+
+  it("T9.h.2 the gate, read off the committed pathrefs: every final-reverse witness of gap-short, judge and zebra owes rotation to the heading the next segment starts from; none of left, van or wall does; a designed-negative segment never engages", () => {
+    for (const l of ["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]) {
+      const seg = finalReverse(l);
+      const next = plan(l).segments[plan(l).segments.indexOf(seg) + 1];
+      for (const w of seg.witnesses) {
+        const g = terminalHeadingGate(seg, w);
+        assert.equal(g.engage, true, `${l} witness ${w.startAlongM}: ${JSON.stringify(g)}`);
+        assert.ok(g.owedDeg >= 1, `${l} witness ${w.startAlongM}: its unreached tail owes ${g.owedDeg}°`);
+        angNear(g.psiT, next.witnesses[0].rows[0][5], 1e-9, `${l}: ψT is where the next segment starts`);
+      }
+    }
+    for (const l of ["sc-park-left", "sc-park-van", "sc-park-wall"]) {
+      const seg = finalReverse(l);
+      for (const w of seg.witnesses) assert.equal(terminalHeadingGate(seg, w).engage, false, `${l} witness ${w.startAlongM}: its tail turns away from (or not toward) ${seg.authoredEnd.psi}°`);
+    }
+    const gs = finalReverse("sc-park-gap-short");
+    assert.equal(terminalHeadingGate({ ...gs, designedNegative: true }, gs.witnesses[0]).engage, false, "an authored end pose declared infeasible is never a target");
+  });
+
+  it("T9.h.3 where the gate opens the hand-over happens and brings the rest heading toward the authored end on every seed — gap-short, judge, zebra × seeds 7–10 — with no refusal and every body held above the drive floor", () => {
+    for (const l of ["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]) {
+      const psiT = finalReverse(l).authoredEnd.psi;
+      for (const seed of [7, 8, 9, 10]) {
+        const on = bench(l, seed);
+        const off = bench(l, seed, { tune: TERMINAL_OFF });
+        const bk = finalReverseBook(on);
+        assert.equal(bk.terminal.engage, true, `${l} seed ${seed}`);
+        assert.ok(bk.terminal.handedM >= 1.0, `${l} seed ${seed}: only ${bk.terminal.handedM} m under the hand-over`);
+        assert.equal(finalReverseBook(off).terminal.handedM, 0, `${l} seed ${seed}: the law-off run handed over`);
+        // measured where the law acts — the heading the final reverse comes to rest at — not the final pose,
+        // which the micro square-up (squareUpCommand, SQ) moves afterwards in both runs (judge seed 8's final
+        // pose: 2.22° from the authored end with the law, 1.57° without). The 0.5° bar is unchanged.
+        const eOn = Math.abs(wrapDeg(psiT - reverseRestPsi(l, seed, null)));
+        const eOff = Math.abs(wrapDeg(psiT - reverseRestPsi(l, seed, TERMINAL_OFF)));
+        assert.ok(eOn <= eOff - 0.5, `${l} seed ${seed}: rests ${eOn.toFixed(2)}° from the authored end heading with the law, ${eOff.toFixed(2)}° without`);
+        assert.deepEqual(on.state.refusals, [], `${l} seed ${seed}`);
+        for (const b of on.books.follow.bodyClearance) assert.ok(b.worstHeldM >= DRIVE_CLEARANCE_FLOOR_M, `${l} seed ${seed} ${b.gear === -1 ? "R" : "F"}${b.k}: held ${b.worstHeldM} m from ${b.body}`);
+      }
+    }
+  });
+
+  it("T9.h.4 where the gate stays shut the drive is the law-off drive, pose for pose — sc-park-left, -van, -wall × seeds 7–10 (their lateral box margin is the binding one; squaring them up costs it)", () => {
+    for (const l of ["sc-park-left", "sc-park-van", "sc-park-wall"]) {
+      for (const seed of [7, 8, 9, 10]) {
+        const on = bench(l, seed);
+        const off = bench(l, seed, { tune: TERMINAL_OFF });
+        const bk = finalReverseBook(on);
+        assert.equal(bk.terminal.engage, false, `${l} seed ${seed}`);
+        assert.equal(bk.terminal.handedM, 0, `${l} seed ${seed}`);
+        assert.deepEqual([on.plant.rx, on.plant.rz, on.plant.psi], [off.plant.rx, off.plant.rz, off.plant.psi], `${l} seed ${seed}: the rest pose moved`);
+      }
+    }
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * T9.k THE PARK IS GRADED WHEN THE PRODUCT CREDITS IT — NOT AT THE LAST POSE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * FOUND BY THE PRODUCT-FIDELITY ADVERSARY of the reverse-end-heading panel (2026-09-21), and it is
+ * the same shape as the corridor that could not see a heading: T9.c reads the box at the drive's
+ * FINAL pose, and the product does not grade the final pose. `stepParkInBay` (lessons/objectives.ts)
+ * credits the park at the FIRST frame that is in the bay, stopped (|v| ≤ 1 km/h), entered in reverse,
+ * aligned, and held for holdSec (1.5 s), and engine.ts ends the lesson on that frame. For
+ * gap-short, judge and zebra that frame is where the REVERSE comes to rest — before the disarm and
+ * the micro square-up ever run. So the square-up's degrees, which T9.c counted, are degrees the
+ * product almost never sees; the heading it grades comes from the reverse alone.
+ *
+ * SO THIS STEPS THE PRODUCT'S OWN EVALUATOR, not a mirror of it. objectives.ts is imported through
+ * the same platform resolver hook `productPhysics` uses (Node strips the types), its parkInBay
+ * params are built by its own parseObjectiveParams from the lesson's authored park spec, and it is
+ * stepped on every 60 Hz bench frame with the pose mapped exactly as productBoxPrediction maps it
+ * (x, y = −z, heading = psi, signed speed, gear sign). What it can then say is the only thing a
+ * sweep is judged by: did the product credit the park, and at what heading.
+ *
+ * WHAT IT CANNOT SAY, named: the bench is still a plant. The credited heading of gap-short sits
+ * 0.1–0.5° inside its 10° line (panel verifier: worst 9.62° with source-derived drive magnitudes,
+ * 9.88° with revKappaScale 0.90), so a browser leg can fall either side of it. The authored plan
+ * itself ends the reverse at −6.4°; the margin cannot grow past that without re-planning.
+ */
+const PLATFORM_RESOLVE_HOOK = [
+  "export async function resolve(specifier, context, next) {",
+  "  if ((specifier.startsWith('./') || specifier.startsWith('../')) && String(context.parentURL).includes('/platform/src/') && !/\\.[cm]?[jt]sx?$/.test(specifier)) {",
+  "    for (const ext of ['.ts', '/index.ts']) { try { return await next(specifier + ext, context); } catch { /* the next form */ } }",
+  "  }",
+  "  return next(specifier, context);",
+  "}",
+].join("\n");
+let productObjectivesP = null;
+const productObjectives = () => {
+  productObjectivesP ??= (async () => {
+    const { register } = await import("node:module");
+    register(`data:text/javascript,${encodeURIComponent(PLATFORM_RESOLVE_HOOK)}`);
+    const O = await import(pathToFileURL(resolve(REPO, "platform", "src", "modules", "sim", "lessons", "objectives.ts")).href);
+    for (const k of ["parseObjectiveParams", "createEvalState", "stepObjective"]) {
+      if (typeof O[k] !== "function") throw new Error(`UNREADABLE: lessons/objectives.ts no longer exports ${k} — this proof cannot step the product's park evaluator`);
+    }
+    return O;
+  })();
+  return productObjectivesP;
+};
+
+/** The pose the bench plant is in, as the product's SimTick — the productBoxPrediction frame. */
+const productTickOf = (pl) => {
+  const c = plantCentre(pl);
+  return { t: pl.t, position: { x: c.x, y: -c.z }, headingDeg: psiOf(pl), speedKmh: pl.v * 3.6, gear: pl.gear === "R" ? -1 : pl.gear === "D" ? 1 : 0 };
+};
+
+/** Drive the bench and step the PRODUCT's parkInBay evaluator every frame; the first credited frame, or null. */
+const creditedPark = async (lesson, seed, opts = {}) => {
+  const O = await productObjectives();
+  const park = plan(lesson).product.park;
+  const params = O.parseObjectiveParams({
+    id: `${lesson}:t9g`, kind: "completeManeuver", titleBg: "t9g",
+    params: { maneuver: "parkInBay", bay: park.bay, centerTolM: park.centerTolM, headingTolDeg: park.headingTolDeg, ...(park.entry ? { entry: park.entry } : {}), ...(Number.isFinite(park.holdSec) ? { holdSec: park.holdSec } : {}) },
+  });
+  let st = O.createEvalState(params);
+  let credit = null;
+  let frames = 0;
+  const r = runBench({ plan: plan(lesson), seed, ...opts, onFrame: (pl) => {
+    if (credit) return;
+    frames += 1;
+    const tick = productTickOf(pl);
+    const res = O.stepObjective(params, st, tick);
+    st = res.evalState;
+    if (res.done) {
+      const box = productBoxPrediction(park, plantCentre(pl), psiOf(pl));
+      credit = { t: tick.t, gear: pl.gear, headingDeg: box.headingOffsetDeg, lonM: box.lonM, latM: box.latM, finalHeadingDeg: null };
+    }
+  } });
+  if (credit) credit.finalHeadingDeg = productBoxPrediction(park, plantCentre(r.plant), psiOf(r.plant)).headingOffsetDeg;
+  return { credit, frames, r, params };
+};
+
+describe("T9.k the product's own parkInBay evaluator, stepped on the bench — what a sweep is graded by", () => {
+  const CREDITED = ["sc-park-wall", "sc-park-left", "sc-park-van", "sc-pk-driveway", "sc-park-judge", "sc-park-zebra", "sc-park-gap-long", "sc-park-gap-short", "sc-park-45-rev"];
+
+  it("T9.k.1 the evaluator is the product's and it is actually stepped — params from its own parser, a frame count, and a pose it refuses", async () => {
+    const { credit, frames, params } = await creditedPark("sc-park-gap-short", 7);
+    assert.equal(params.maneuver, "parkInBay");
+    assert.ok(params.holdSec > 0 && params.headingTolDeg === plan("sc-park-gap-short").product.park.headingTolDeg, JSON.stringify(params));
+    assert.ok(frames > 1000, `only ${frames} frames were stepped`);
+    assert.ok(credit !== null, "sc-park-gap-short seed 7 was never credited");
+    // …and it is not a rubber stamp: the same drive with every pose shifted 3 m across the bay axis
+    // (the bay is 2.5 m wide) is a car beside the bay, never in it, and must never be credited.
+    const O = await productObjectives();
+    let st = O.createEvalState(params);
+    let wrongCredited = false;
+    runBench({ plan: plan("sc-park-gap-short"), seed: 7, onFrame: (pl) => {
+      const tick = productTickOf(pl);
+      const h = (params.bay.headingDeg * Math.PI) / 180;
+      const res = O.stepObjective(params, st, { ...tick, position: { x: tick.position.x + 3 * Math.cos(h), y: tick.position.y - 3 * Math.sin(h) } });
+      st = res.evalState;
+      if (res.done) wrongCredited = true;
+    } });
+    assert.equal(wrongCredited, false, "the evaluator credited a pose 3 m beside the bay — it is not reading the pose");
+  });
+
+  it("T9.k.2 every drivable parking lesson is CREDITED by the product on ≥ 3 of 4 seeds (7–10), and the credited heading is what is reported", async () => {
+    const report = [];
+    for (const lesson of CREDITED) {
+      let credited = 0;
+      const tol = plan(lesson).product.park.headingTolDeg;
+      for (const seed of [7, 8, 9, 10]) {
+        const { credit } = await creditedPark(lesson, seed);
+        if (credit) {
+          credited += 1;
+          assert.ok(credit.headingDeg <= tol, `${lesson} seed ${seed}: credited at ${credit.headingDeg}° over a ${tol}° tolerance — the evaluator and the box disagree`);
+          report.push(`${lesson} s${seed} credited ${credit.headingDeg}° in ${credit.gear} (final pose ${credit.finalHeadingDeg}°)`);
+        } else report.push(`${lesson} s${seed} NEVER credited`);
+      }
+      assert.ok(credited >= 3, `${lesson}: the product credited ${credited}/4 —\n  ${report.filter((x) => x.startsWith(lesson)).join("\n  ")}`);
+    }
+  });
+
+  it("T9.k.3 gap-short is credited at the REVERSE REST — the degrees that decide it come from the terminal law, and the square-up is its backstop", async () => {
+    for (const seed of [7, 8, 9, 10]) {
+      const on = await creditedPark("sc-park-gap-short", seed);
+      assert.ok(on.credit, `seed ${seed}: never credited`);
+      assert.equal(on.credit.gear, "R", `seed ${seed}: credited in ${on.credit.gear}, not at the reverse rest — re-read this test's header`);
+      const off = await creditedPark("sc-park-gap-short", seed, { tune: TERMINAL_OFF });
+      // without the terminal law the reverse rests out of tolerance and is NOT credited there…
+      assert.ok(!off.credit || off.credit.gear !== "R", `seed ${seed}: the law-off drive was credited at the reverse rest (${off.credit?.headingDeg}°) — the terminal law is not what decides this lesson`);
+      // …and THE SQUARE-UP IS THE BACKSTOP, which is the only thing it is for in the product: the
+      // lesson is not over at an out-of-tolerance rest, so the steered disarm roll and micro creep
+      // (squareUpCommand, SQ) get the car credited in D. On the bench the terminal law makes this
+      // branch unreachable at nominal; on a browser leg 0.1–0.5° inside the line, it is what is left.
+      assert.ok(off.credit && off.credit.gear === "D", `seed ${seed}: with the terminal law off the square-up did not get the park credited (${off.credit ? `credited in ${off.credit.gear}` : "never credited"}) — the backstop is gone`);
+    }
+  });
+});
+
 describe("T12.1 the reducer's sequence on the bench", () => {
   const seq = (lesson, seed = 7) => {
     const events = [];
@@ -3545,6 +3804,207 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
       assert.equal(W.inside && W.fr.latM < 0, false, `${lesson}: the closest wall pass (${where}) is BOTH inside the retired window and on its authored side — the proxy WAS looking at it`);
       // 2 — and its limit never fired on the authored side of any clean drive
       assert.equal(firedOnAuthored, 0, `${lesson}: the retired proxy's authored-face limit (${retiredNegM.toFixed(3)} m) fired on ${firedOnAuthored} pose(s) — it WAS binding, so removing it did give room`);
+    }
+  });
+});
+
+/* ═══════════════════ SQ the micro square-up (2026-09-21) ═══════════════════
+ *
+ * sc-park-gap-short ended every seed 11.9-13.4 deg off its bay against the product's 10 deg,
+ * and sc-park-judge / sc-park-zebra passed by 0.8-1.6 deg. The heading the reverse ended on
+ * was the heading the leg ended on, for three reasons found tick by tick on this bench:
+ *  1. a gear-change `wantStop` was never withdrawn, so the outer tick re-entered «stop» on its
+ *     first «roll» after the disarm and the micro creep went hold-stop -> route end without
+ *     moving (the "creep lasts one tick" of the earlier diagnosis);
+ *  2. the disarm roll into the micro (0.17-0.31 m) was driven with the wheel at zero;
+ *  3. the micro was driven with the wheel hard-zeroed (`!seg.micro`).
+ * And, once 1 was cured, a fourth: the micro creep's lift was timed by stopTrigger's coast
+ * branch, which does not see a W ramped past the crawl ceiling keep driving through its
+ * release, so the creep ran up to 0.61 m past its end pose.
+ * Each case below names the mutation it kills (mutate.mjs M1-M7 in the scratch copy).
+ */
+const { squareUpCommand, creepLiftRunOutM, CREEP_THROTTLE } = await import("../lib/path-follow.mjs");
+const { createPlant, sendKeys, advance } = await import("../lib/path-bench.mjs");
+const r2t = (v) => Math.round(v * 100) / 100;
+const MICRO_LESSONS = LESSONS.filter((l) => plan(l).segments.some((s) => s.micro && s.gear === 1));
+const microEndPsi = (l) => {
+  const seg = plan(l).segments.find((s) => s.micro && s.gear === 1);
+  const rows = seg.witnesses[0].rows;
+  return rows[rows.length - 1][5];
+};
+
+describe("SQ the micro square-up steers onto the plan's end heading, drives what is left of the micro, and stops on its end pose", () => {
+  it("SQ0 the lessons this covers: every pathref whose last forward segment is a micro square-up", () => {
+    assert.deepEqual([...MICRO_LESSONS].sort(), ["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]);
+  });
+
+  it("SQ1 squareUpCommand: the plan's end heading, clockwise-positive in D, the error closed over the distance left (floored), and nothing without a yaw", () => {
+    const cw = squareUpCommand({ psi: 346.61, targetPsi: 359.277, dGoM: 0.3, kmh: 1 });
+    near(cw.errDeg, 12.667, 1e-6, "error to the plan's end heading");
+    assert.equal(cw.u, 1, "a dozen degrees over 0.3 m is full lock, clockwise");
+    assert.equal(cw.saturated, true);
+    assert.equal(squareUpCommand({ psi: 5, targetPsi: 359.277, dGoM: 0.3, kmh: 1 }).u, -1, "anticlockwise the other way");
+    const across = squareUpCommand({ psi: 359.9, targetPsi: 0.1, dGoM: 1, kmh: 1 });
+    near(across.errDeg, 0.2, 1e-9, "the error wraps across 0/360");
+    assert.ok(across.u > 0 && across.u < 0.1, `0.2 deg over 1 m is a small clockwise wheel, got ${across.u}`);
+    const far = squareUpCommand({ psi: 358, targetPsi: 359, dGoM: 2, kmh: 1 });
+    const close = squareUpCommand({ psi: 358, targetPsi: 359, dGoM: 0.5, kmh: 1 });
+    assert.ok(far.u > 0 && far.u < close.u, "the same error over more distance asks for less wheel");
+    const past = squareUpCommand({ psi: 358, targetPsi: 359, dGoM: -0.4, kmh: 1 });
+    assert.equal(past.dGoM, PATH_TUNE.squareUp.floorM, "past the end pose the floor divides, never a negative distance");
+    assert.ok(past.u > 0.4 && past.u < 0.6, `1 deg over the ${PATH_TUNE.squareUp.floorM} m floor is about half the wheel, got ${past.u}`);
+    for (const kmh of [0.5, 2, 6]) {
+      const k = squareUpCommand({ psi: 358.5, targetPsi: 359, dGoM: 1, kmh });
+      const v = Math.max(kmh, 1);
+      near((Math.tan(k.u * maxSteerAtKmh(v)) * yawGainAtKmh(v)) / L, 0.5 * RAD, 1e-12, `the wheel asked for turns exactly err/dGo at ${kmh} km/h`);
+    }
+    assert.equal(squareUpCommand({ psi: 359, targetPsi: 359, dGoM: 0.3, kmh: 1 }).u, 0, "on the target, the wheel is centred");
+    assert.equal(squareUpCommand({ psi: NaN, targetPsi: 359, dGoM: 0.3, kmh: 1 }).u, 0, "no yaw, no steer");
+    assert.equal(squareUpCommand({ psi: 350, targetPsi: undefined, dGoM: 0.3, kmh: 1 }).u, 0, "no plan end, no steer");
+  });
+
+  it("SQ2 the square-up FIRES on every micro lesson x seed: the disarm roll is steered, gap-short's creep is steered, and the leg ends closer to the plan's end heading than the reverse left it (kills M2, M3)", () => {
+    for (const lesson of MICRO_LESSONS) {
+      for (const seed of [7, 8, 9, 10]) {
+        // the square-up measured on its own: the terminal heading law (T9.h) off, so what is asserted is this
+        // mechanism's work. With both on, the reverse leaves gap-short less error to close: on seed 9 its creep
+        // then travels 0.042 m and turns 0.29°, under the 0.05 m / 0.5° bars below (measured 2026-09-21).
+        const r = bench(lesson, seed, { tune: TERMINAL_OFF });
+        const sq = r.books.follow.squareUp;
+        const settle = sq.find((b) => b.phase === "settle");
+        assert.ok(settle, `${lesson} s${seed}: the disarm roll into the micro was never steered (no square-up decision booked in forward-settle)`);
+        assert.ok(settle.keyTicks >= 5 && settle.keyM >= 0.1, `${lesson} s${seed}: the disarm roll held a steer key on ${settle.keyTicks} sub-ticks over ${settle.keyM} m`);
+        const finalErr = Math.abs(wrapDeg(microEndPsi(lesson) - psiOf(r.plant)));
+        assert.ok(finalErr <= Math.abs(settle.errStartDeg) - 1.5, `${lesson} s${seed}: the square-up took the car from ${settle.errStartDeg} deg to only ${r2t(finalErr)} deg off the plan's end heading`);
+        if (lesson === "sc-park-gap-short") {
+          const creep = sq.find((b) => b.phase === "creep");
+          // the creep lifts W early by construction (its pedal is bounded from above), so it moves
+          // only what is left of the micro, 0.07-0.25 m on seeds 7-10; at full lock 5 cm is 0.76 deg
+          // and the cam yaw read carries 0.2-0.35 deg of noise and pitch leak, hence 0.5 deg
+          assert.ok(creep && creep.subTicks >= 5 && creep.keyM >= 0.05, `${lesson} s${seed}: the micro creep drove ${creep?.keyM ?? 0} m with the wheel held on ${creep?.keyTicks ?? 0} of ${creep?.subTicks ?? 0} sub-ticks`);
+          assert.ok(creep.errStartDeg - creep.errEndDeg >= 0.5, `${lesson} s${seed}: the creep turned the heading error only ${creep.errStartDeg} -> ${creep.errEndDeg} deg`);
+        }
+      }
+    }
+  });
+
+  it("SQ2b the wheel built up through the disarm roll is not dropped at the creep's entry (kills M5)", () => {
+    for (const seed of [7, 8, 9, 10]) {
+      const entries = [];
+      runBench({ plan: plan("sc-park-gap-short"), seed, onSubTick: ({ row, cmd }) => { if (row.why === "micro-creep") entries.push(cmd.steer); } });
+      assert.equal(entries.length, 1, `seed ${seed}: the micro creep was entered ${entries.length} times`);
+      assert.notEqual(entries[0], 0, `seed ${seed}: the creep's entry sub-tick released the wheel with degrees still to deliver`);
+    }
+  });
+
+  // seeds 1-20, not only the four T9.c drives: the creep's lift is a timing race against the
+  // runner's yields, and the estimator that re-anchored the pedal on every re-press after a yield
+  // stayed inside the bound on seeds 7-10 and ran sc-park-gap-short seed 16 0.52 m past its end (M6)
+  it("SQ3 the micro creep stops on its end pose: never past it by more than stops.overrunM on any micro lesson, seeds 1-20 (kills M4, M6)", () => {
+    for (const lesson of MICRO_LESSONS) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const r = bench(lesson, seed);
+        const micro = r.books.follow.segments.find((s) => s.micro === true);
+        assert.ok(micro, `${lesson} s${seed}: no micro segment book`);
+        if (micro.stopErrM === null) continue; // skipped: the disarm roll already carried the car past it (microOvershootM)
+        assert.ok(micro.stopErrM <= PATH_TUNE.stops.overrunM, `${lesson} s${seed}: the micro creep came to rest ${micro.stopErrM} m past its end pose (bound ${PATH_TUNE.stops.overrunM} m)`);
+      }
+    }
+  });
+
+  // THE LIFT IS NEVER LATE. The pedal is bounded from above and the lift is predicted one poll
+  // ahead, so a creep that begins SHORT of its end pose must not add distance past it: on this
+  // bench the follower's crawl model is the plant's own chain (SQ3b), so what is left is the cam
+  // yaw noise and one 60 Hz frame of granularity, 5 cm. Measured: worst 0.02 m (gap-short, seeds
+  // 1-20). A creep that begins already past the end (the disarm roll carried it there) presses
+  // nothing and is not this case. The version that re-anchored the pedal only on a re-press after
+  // a yield stayed inside overrunM and reached 0.10 m here (M7).
+  it("SQ3c a micro creep that begins short of its end pose comes to rest no more than 5 cm past it, seeds 1-20 (kills M4, M6, M7)", () => {
+    for (const lesson of MICRO_LESSONS) {
+      for (let seed = 1; seed <= 20; seed++) {
+        let startM = null;
+        const r = runBench({ plan: plan(lesson), seed, onSubTick: ({ row, cmd }) => {
+          if (row.why !== "micro-creep" || startM !== null) return;
+          const m = /micro square-up: (-?[0-9.]+) m/.exec(cmd.why ?? "");
+          startM = m ? Number(m[1]) : NaN;
+        } });
+        if (startM === null) continue; // the micro was skipped outright (microOvershootM)
+        assert.ok(Number.isFinite(startM), `${lesson} s${seed}: the creep entry did not state its distance to the end pose`);
+        if (startM <= 0) continue;
+        const micro = r.books.follow.segments.find((sg) => sg.micro === true);
+        assert.ok(micro && Number.isFinite(micro.stopErrM), `${lesson} s${seed}: a creep that began ${startM} m short booked no stop`);
+        assert.ok(micro.stopErrM <= 0.05, `${lesson} s${seed}: the creep began ${startM} m short of its end pose and came to rest ${micro.stopErrM} m past it`);
+      }
+    }
+  });
+
+  it("SQ3b creepLiftRunOutM is the crawl chain the bench plant runs: a W held then lifted from rest runs out to the predicted distance, and a lifted pedal is the coast alone", () => {
+    near(creepLiftRunOutM({ vKmh: 1, pedal: 0, aCoast: 0.23 }), (1 / 3.6) ** 2 / (2 * 0.23), 1e-12, "no pedal: the coast");
+    let prev = -1;
+    for (const p of [0, 0.1, 0.3, 0.45, 0.7, 1]) {
+      const d = creepLiftRunOutM({ vKmh: 0.5, pedal: p, aCoast: 0.23, landS: 0.05 });
+      assert.ok(d >= prev, `the run-out grows with the pedal (${p}: ${d} after ${prev})`);
+      prev = d;
+    }
+    for (const holdMs of [120, 200, 300, 450]) {
+      const pl = createPlant({ x: 0, z: 0, psi: 0, gear: "D", camNoise: false });
+      sendKeys(pl, { W: true }, 0);
+      advance(pl, holdMs);
+      const x0 = pl.rx;
+      const z0 = pl.rz;
+      const pred = creepLiftRunOutM({ vKmh: pl.v * 3.6, pedal: pl.pedal.W, aCoast: pl.aCoast, landS: 0, aMax: 3 }, CREEP_THROTTLE);
+      sendKeys(pl, { W: false }, 0);
+      for (let i = 0; i < 600 && (pl.v > 0 || pl.pedal.W > 0); i++) advance(pl, 1000 / 60);
+      const ran = Math.hypot(pl.rx - x0, pl.rz - z0);
+      assert.ok(Math.abs(ran - pred) <= 0.02 + 0.08 * ran, `W held ${holdMs} ms: the plant ran ${ran.toFixed(3)} m, the follower predicts ${pred.toFixed(3)} m`);
+    }
+  });
+
+  it("SQ4 the forward segment after every reverse begins in «roll»: the gear-change stop's wantStop is withdrawn when the reverse begins (kills M1)", () => {
+    for (const lesson of [...MICRO_LESSONS, "sc-ed-poligon-chain"]) {
+      const firsts = [];
+      let prevMode = null;
+      runBench({ plan: plan(lesson), seed: 7, onSubTick: ({ state, phase }) => {
+        if (state.mode === "reverse-settle" && prevMode !== "reverse-settle") assert.equal(state.flags.wantStop, false, `${lesson}: the reverse began still asking for a stop`);
+        if (state.mode === "forward-settle" && prevMode !== "forward-settle") firsts.push({ wantStop: state.flags.wantStop, phase });
+        prevMode = state.mode;
+      } });
+      assert.ok(firsts.length >= 1, `${lesson}: no forward segment followed a reverse`);
+      for (const f of firsts) {
+        assert.equal(f.wantStop, false, `${lesson}: the forward segment after a disarm began with a stale wantStop`);
+        assert.equal(f.phase, "roll", `${lesson}: the forward segment after a disarm began in «${f.phase}»`);
+      }
+    }
+  });
+});
+
+/* ═══════════════════ SQD the two heading mechanisms together (2026-09-21) ═══════════════════
+ *
+ * T9.c asks sc-park-gap-short for ≥ 3 of 4 seeds inside the product's 10° box, and EITHER mechanism alone
+ * clears that bar on this bench: the micro square-up alone (SQ; T9.h's law off) ends seeds 7–10 at worst
+ * 8.88°, the terminal heading law alone (T9.h; no square-up) at worst 8.31°. So T9.c stays green when
+ * either is reverted, and it cannot see the margin the pair buys together. This case pins that margin.
+ *
+ * THE BAR WAS CHOSEN AFTER MEASURING (2026-09-21, scratch copy pcx-final, seeds 7–10, the product box
+ * computed exactly as T9.c computes it): both mechanisms on, worst 4.15° (seed 7). With ONE key predicate
+ * reverted at a time, the worst seed becomes:
+ *   · the terminal hand-over `if (state.terminal?.engage)` → `if (false && …)`:        8.88°
+ *   · hold-for-arm's `state.flags.wantStop = false;` removed:                           5.81°
+ *   · forwardSettleStep's square-up branch `if (seg?.micro …)` → `if (false && …)`:    7.85°
+ *   · forwardStep's micro square-up branch `if (seg.micro …)` → `if (false && …)`:     5.75°
+ * 5.0° sits 0.85° above the pair and 0.75° below the nearest single revert. It is a figure on the
+ * calibrated bench plant, not a claim about the browser: if a mechanism's gain shrinks on the product,
+ * this is the case that says so first.
+ */
+describe("SQD the micro square-up and the terminal heading law together", () => {
+  it("SQD1 sc-park-gap-short rests no more than 5.0° off the product box's heading on every seed 7–10, with no refusal — the margin the two mechanisms buy only together", () => {
+    const lesson = "sc-park-gap-short";
+    for (const seed of [7, 8, 9, 10]) {
+      const r = bench(lesson, seed);
+      assert.deepEqual(r.state.refusals, [], `${lesson} seed ${seed}`);
+      const box = productBoxPrediction(plan(lesson).product.park, plantCentre(r.plant), psiOf(r.plant));
+      assert.equal(box.inBox, true, `${lesson} seed ${seed}: ${JSON.stringify(box)}`);
+      assert.ok(box.headingOffsetDeg <= 5.0, `${lesson} seed ${seed}: rests ${box.headingOffsetDeg}° off the bay heading (bar 5.0°; both mechanisms on measured 4.15° worst) — ${JSON.stringify(box)}`);
     }
   });
 });
