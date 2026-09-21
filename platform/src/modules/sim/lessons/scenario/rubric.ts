@@ -15,8 +15,12 @@
  *                 measured: false, stays OUT of the star math, and SAYS SO on
  *                 the card — see the row's own note);
  *  - par time   ← LessonResult.durationSec vs rubric.parTimeSec —
- *                 INFORMATIONAL ONLY, never affects stars (doc 76 §6: time
- *                 pressure is an L5 condition, not a rubric penalty). And the
+ *                 never a scoring COMPONENT and never RAISES a star (doc 76
+ *                 §6: time pressure is an L5 condition, not a rubric penalty).
+ *                 SINCE ADR-010 (founder ruling 2026-09-21) it is a one-sided
+ *                 CEILING: a finished drive more than 3× over the guideline is
+ *                 held to two stars and told why (PAR_STAR_CAP_BG). It never
+ *                 touches the verdict or the sheet. And the
  *                 row now SAYS so on the side that used to read as praise:
  *                 being under the ориентир is not an achievement on a driving
  *                 lesson (PAR_TIME_NOT_A_TARGET_BG — 42 of the 51 „в ориентира"
@@ -48,6 +52,45 @@ import type {
 
 const STARS_3_MIN_RATIO = 0.9;
 const STARS_2_MIN_RATIO = 0.5;
+
+/**
+ * ADR-010 — PAR TIME GATES THE STARS, NEVER THE VERDICT (founder ruling, 2026-09-21).
+ *
+ * Registered decision 21: *"May a drive that takes 3.2× the reference time still be ИЗДЪРЖАН with
+ * three stars?"* The ruling is C — the verdict stays exactly what Наредба 38 makes it, and no
+ * offence is invented that the regulation does not contain, but a drive that far over the guideline
+ * may not collect FULL MARKS for the manoeuvre.
+ *
+ * WHY THE NUMBER IS NOT MEASURED FROM THE CORPUS, which is the mistake that sank the last star cap
+ * built in this file (see "REVERTED IN WAVE 7" below: its live population turned out to be the
+ * reference drives). I measured it before choosing: across w52's 66 `-right` legs the pace ratio is
+ * **median 1.71× par, p90 2.83×, max 3.31×**, so a 1.5× cap would demote 67 % of them and a 2× cap
+ * 32 %. THAT IS NOT EVIDENCE ABOUT STUDENTS. Those legs are the audit harness, which crawls by
+ * construction — `sc-vu-emergency-junction:853790f7` is a filed row about the reference drive
+ * sitting at 10–11 км/ч for over two minutes. A threshold fitted to a known-slow robot would either
+ * demote most sweeps or never fire.
+ *
+ * So the number comes from the ruling itself. The founder named 3.2× as the case that must not
+ * collect three stars; the cap fires ABOVE 3×, so his example falls inside it, and 5 of those 66
+ * harness legs (8 %) would be capped — the two-thirds a fitted threshold would have taken.
+ *
+ * ONE-SIDED BY CONSTRUCTION. It can only WITHHOLD a star, never award one:
+ * `PAR_TIME_NOT_A_TARGET_BG` stands and beating the guideline still earns nothing. It also never
+ * touches `result.score`, the verdict or a `lawRef` — see the ADR's guardrails.
+ */
+const PAR_STAR_CAP_RATIO = 3;
+
+/**
+ * The sentence the cap owes the student (THEO-4: a withheld mark is explained, never just applied).
+ * It names the two numbers, says which mark moved, and says explicitly that the изпитен лист did
+ * not — because "slower costs a star" and "slower is an offence" are different claims and only the
+ * first one is true.
+ */
+const PAR_STAR_CAP_BG = (drivingSec: number, parSec: number) =>
+  `Маршрутът отне ${drivingSec} с при ориентир ${parSec} с — над три пъти повече. ` +
+  `Изпитният лист не се променя от това: няма такова нарушение и не са начислени точки. ` +
+  `Но за качество на маневрата звезда не се дава — на изпита маневрата се кара в разумен темп, ` +
+  `а прекалено бавното каране пречи на другите и само по себе си е предпоставка за грешки.`;
 
 /**
  * The parkInBay measurement channel, WITH the objective's own `done` flag —
@@ -595,9 +638,20 @@ export function scoreRubric(
   // spent lawfully stationary at a yield (finish.ts `stepYieldWait`) and it
   // comes out of the comparison. Absent (server-rebuilt results, curriculum
   // lessons, any drive with no wait) ⇒ 0 ⇒ byte-identical to what shipped.
+  // ADR-010: the star cap reads these two, so they are hoisted out of the block
+  // that prints them. `null` whenever the lesson authors no ориентир, which is
+  // also the only state in which the cap can never fire.
+  let parCapDrivingSec: number | null = null;
+  let parCapParSec: number | null = null;
   if (rubric.parTimeSec !== undefined) {
     const waitSec = Math.max(0, Math.min(result.yieldWaitSec ?? 0, result.durationSec));
     const drivingSec = result.durationSec - waitSec;
+    // The waiting is already out of `drivingSec` — a student held at a red for
+    // 40 s of a 60 s lesson has not driven slowly, and the cap must not say he
+    // has. `aborted` is excluded below for the reason PAR_TIME_ABORTED_BG gives:
+    // a part-driven route cannot be compared to a whole-lesson guideline.
+    parCapDrivingSec = drivingSec;
+    parCapParSec = rubric.parTimeSec;
     const waitRounded = Math.round(waitSec);
     const over = drivingSec > rubric.parTimeSec;
     // Only spoken when it actually moved the reading — a 1 s twitch at a red
@@ -841,6 +895,45 @@ export function scoreRubric(
   }
   // Caps: quality never outranks legality.
   if (result.score > 0 && stars > 2) stars = 2;
+
+  // ── ADR-010 (founder ruling, 2026-09-21, registered decision 21): PAR TIME
+  //    GATES THE STARS, NEVER THE VERDICT.
+  //
+  // A drive three times over the ориентир does not collect full marks for the
+  // manoeuvre. Nothing else moves: not `result.score`, not the verdict, not a
+  // fault code — Наредба 38 contains no pace offence and this invents none.
+  //
+  // WHY IT IS A CEILING AND NOT A COMPONENT. Making par a scoring component
+  // would change `measuredCount` on the 128-of-162 rubrics that author nothing
+  // else, which re-scales `ratio` for the whole catalogue — a far larger change
+  // than the ruling asks for, and one that would move stars on drives that are
+  // perfectly paced. A ceiling touches only the drives the ruling is about.
+  //
+  // ABORTED IS EXCLUDED for the reason `PAR_TIME_ABORTED_BG` gives: a route the
+  // student stopped part-way through cannot be compared to a whole-lesson
+  // guideline, and this file already repaired that exact mis-comparison once.
+  // Waiting for priority is already out of `parCapDrivingSec`, so a student held
+  // at a red is not called slow for obeying it.
+  if (
+    !result.aborted &&
+    parCapDrivingSec !== null &&
+    parCapParSec !== null &&
+    parCapDrivingSec > PAR_STAR_CAP_RATIO * parCapParSec
+  ) {
+    if (stars > 2) stars = 2;
+    // THEO-4: the withheld mark is explained, in the lesson's own voice, on the
+    // row that already carries both numbers. It is appended rather than given a
+    // row of its own because `RubricBreakdownLine["id"]` is pinned by
+    // `s-w5-bot-completion.test.ts`'s exact `toEqual` on the id list, and a new
+    // member there would red suites that have nothing to do with this ruling.
+    const parRow = breakdownBg.find((r) => r.id === "parTime");
+    if (parRow) {
+      parRow.detailBg = `${parRow.detailBg} ${PAR_STAR_CAP_BG(
+        Math.round(parCapDrivingSec),
+        Math.round(parCapParSec),
+      )}`;
+    }
+  }
   // ── ADR-009 (founder Ruling A, doc 92 §5.7): A LESSON THAT WAS NOT TAKEN
   //    CANNOT READ „взето".
   //

@@ -453,8 +453,10 @@ describe("scoreRubric", () => {
   // the 50 disc live — got the same congratulation: „48 с — в ориентира от
   // 55 с".
   //
-  // The number is untouched (doc 76 §6: time never moves a star, and it still
-  // does not — `points` stays null and the fold ignores it). What is asserted
+  // The number is untouched on this side (doc 76 §6: time never RAISES a star —
+  // `points` stays null and the fold ignores it). SINCE ADR-010 (2026-09-21) it
+  // can LOWER one: a finished drive more than 3× over the guideline is held to
+  // two stars and told why — see `adr010-par-gates-stars.test.ts`. What is asserted
   // here is that the UNDER-par side is no longer a bare verdict pointing at
   // speed, and that the OVER-par side — the half that was already right — is
   // byte-identical to what shipped.
@@ -467,11 +469,25 @@ describe("scoreRubric", () => {
       // THEO-4: the reason, not just the refusal — the card names what sets a
       // safe speed instead of leaving „не е цел" as another bare verdict.
       expect(par.detailBg).toContain("Безопасната скорост я определя пътят");
-      // And it is still informational: no points, no star.
+      // Still not a scoring component: par carries no points of its own.
       expect(par.points).toBeNull();
+      // BEATING the ориентир earns nothing — the half of «not a target» that
+      // this case is named for. The same 75 s drive under a 90 s and under a
+      // generous 200 s guideline gets the same stars: going faster than the
+      // guideline is never rewarded.
       expect(scoreRubric(makeResult(), RUBRIC).stars).toBe(
-        scoreRubric(makeResult(), { ...RUBRIC, parTimeSec: 1 }).stars,
+        scoreRubric(makeResult(), { ...RUBRIC, parTimeSec: 200 }).stars,
       );
+      // RE-DERIVED 2026-09-21 FOR ADR-010, AND THE OLD LINE IS NAMED HERE SO NOBODY
+      // PUTS IT BACK. It read `{ ...RUBRIC, parTimeSec: 1 }` and asserted the stars
+      // did not change — i.e. it proved «par never moves a star» by making this
+      // 75 s drive SEVENTY-FIVE TIMES over its guideline. That is precisely the
+      // drive the founder ruled (registered decision 21, option C) may not collect
+      // full marks. So the contract this line pinned is the one ADR-010 retires,
+      // deliberately, and the line is replaced rather than relaxed. The new rule is
+      // ONE-SIDED — it can withhold a star far over par, never award one under it —
+      // and both halves are asserted: the equality above, the cap below.
+      expect(scoreRubric(makeResult(), { ...RUBRIC, parTimeSec: 1 }).stars).toBeLessThanOrEqual(2);
     });
 
     it("over the ориентир the line is byte-identical to what shipped", () => {

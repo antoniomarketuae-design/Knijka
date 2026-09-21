@@ -205,3 +205,50 @@
   - the three follow-ups above.
 
   Bringing curriculum lessons into scope would need its own ADR amendment, because F2 keeps them out.
+
+## ADR-010: Par time gates the STARS, never the verdict (Founder ruling, 2026-09-21)
+
+**Status:** accepted 2026-09-21. Supersedes the "full stars from cleanliness" contract for the
+unmeasured case only.
+
+**The question, as registered.** Decision 21 of `docs/development/92_FOUNDER_DECISIONS.md`: *"May a
+drive that takes 3.2× the reference time still be ИЗДЪРЖАН with three stars?"* Options were: leave it
+and let Наредба 38's own pass test govern (A); author a quality component that can move stars without
+inventing an offence (B); or let par gate the stars but never the verdict (C).
+
+**The ruling: C.** The verdict stays exactly what the regulation makes it — a lawful drive is
+ИЗДЪРЖАН however slow it was, and no offence is invented that Наредба 38 does not contain. What a
+far-over-par drive may not do is collect FULL MARKS for the manoeuvre.
+
+**Why this needed an ADR and not a one-file edit.** `scenario/rubric.ts` folds stars from measured
+components; when `measuredCount === 0` it returns 3★. That is not an oversight — the file says so:
+*"«Full stars from cleanliness» is a stated contract… ~141 assertions across the bot-completion
+suites encode it, 72 of them in tests NAMED «earns full stars from cleanliness»."* And
+`parTimeSec`-only rubrics are the majority (128 of 162 shipped), so `measuredCount` is 0 on most
+lessons. The consequence is recorded in the same file and in the audit corpus: **every ИЗДЪРЖАН lane
+printed "3 от 3 звезди"**, including `sc-pk-move-off/pc-wrong` — the lane the harness drives WRONG on
+purpose, with a speeding card on the glass at 59 км/ч in a 50 zone and three filled gold stars beside
+it. Changing what the star scale means is a strategy change, and CLAUDE.md requires an ADR first.
+
+**What changes.** Par time becomes a scoring component when it is the only thing authored, so a drive
+far over the guideline cannot print 3★. It contributes to STARS only.
+
+**What does not change, and these are the guardrails:**
+- **The verdict never moves.** ИЗДЪРЖАН / НЕИЗДЪРЖАН / НЕ Е ВЗЕТ stay derived from the изпитен лист
+  alone. Par time may not add a наказателна точка, a fault code, or a `lawRef`.
+- **No invented offence.** Наредба 38 has no pace fault; this creates none.
+- **Faster is still not better.** `PAR_TIME_NOT_A_TARGET_BG` stands: beating the guideline adds
+  nothing. The term is one-sided — it can only withhold, never reward.
+- **Unfinished and aborted drives keep their existing branches** (`PAR_TIME_ABORTED_BG`,
+  `PAR_TIME_UNFINISHED_BG`): a drive that did not reach the end is not compared to a whole-lesson
+  guideline, which is a defect this file already repaired once.
+- **THEO-4.** A withheld star must be explained on the card in the lesson's own voice — a bare star
+  count is exactly what requirement-zero forbids.
+
+**Migration.** Stored sessions are not re-scored. The bot-completion suites that assert 3★ on drives
+INSIDE par are unaffected by construction; those asserting 3★ on a far-over-par drive are asserting
+the behaviour this ADR retires and must be re-derived against it, not relaxed.
+
+**Rows it bears on:** `sc-vu-emergency:9e72c8bd` ("the crawling drive still collects ИЗДЪРЖАН"),
+`sc-vu-emergency-junction:853790f7`, `sc-rb-busy-gap:8f50287b` — none of which retire until a sweep
+photographs the new behaviour.

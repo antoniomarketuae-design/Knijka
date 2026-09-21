@@ -1052,8 +1052,27 @@ export const SC_ED_REVERSE_LINE: ScenarioSpec = {
     },
     {
       n: 4,
+      // FOUNDER RULING 2026-09-21 (decision 18, option B): the missing rear camera
+      // is DELIBERATE — a camera would perform the very duty this drill grades —
+      // «and the product must say so on the glass». The second sentence is that
+      // saying-so: it names the absence, matches it to the exam, and points at
+      // what replaces it. It rides on step 4 instead of becoming a seventh step
+      // because a briefing row is the thing that overflows on a 780x360 phone
+      // (4209dad shortened two of them for exactly that).
+      //
+      // THE THIRD SENTENCE EXISTS BECAUSE THE FIRST VERSION OF THE SECOND LIED.
+      // It read «Камера и датчици за заден ход няма», and an adversarial verifier
+      // showed the «датчици» half false: `hud/RearProximityCue.tsx` is mounted
+      // in every lesson and prints «Кола отзад · X м» (a rider: «Велосипедист
+      // отзад · X м») whenever one is in the corridor behind. What the product lacks is not a sensor but a
+      // sensor that sees everything — `RearCueKind` is "vehicle" | "cyclist", so
+      // a pedestrian or a wall behind the student is SILENCE, and silence on that
+      // chip reads as «clear». That limit is the most dangerous thing on this
+      // glass, so the sentence now says it, and says why the look over the
+      // shoulder is still the whole duty. If `RearCueKind` ever grows a kind,
+      // `reverse-aids-absence-is-taught.test.ts` is where that must be met.
       textBg:
-        "Включи на задна и се убеди, че пътят ЗАД теб е свободен: обърни се и гледай през рамо назад, не разчитай само на огледалото (чл. 40).",
+        "Включи на задна и се убеди, че пътят ЗАД теб е свободен: обърни се и гледай през рамо назад, не разчитай само на огледалото (чл. 40). Камера за заден ход няма — както и на изпита: оценява се твоят оглед. Табелката за разстояние отзад отчита само коли и велосипедисти — пешеходец или стена не показва.",
     },
     {
       n: 5,
