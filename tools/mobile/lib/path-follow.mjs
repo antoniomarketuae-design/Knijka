@@ -130,7 +130,11 @@ export const PATH_TUNE = Object.freeze({
   // — half the product's 0.5 m lengthwise tolerance for these bays (policy.mjs PRODUCT
   // centerTolM; path-follow productBoxPrediction lonTol), and 2.5× the brake model's
   // worst stop error (+0.09 m, DESIGN-v2 §6.4).
-  stops: Object.freeze({ noRestReleaseMs: 11_000, acceptDwellMaxS: 1.0, creepAttempts: 2, creepKmh: 3.0, microSkipM: 0.2, captureKmh: 0.2, captureS: 0.5, captureHoldMinS: 1.5, settleKmh: 0.3, settleS: 0.2, settleMaxS: 1.5, overrunM: 0.25 }),
+  // yawCreep*: THE HEADING RE-APPROACH (yawReapproach, 2026-09-22). A gear-change rest whose along
+  // and lat are accepted but whose yaw lies outside the arm band by at most yawCreepMaxDeg creeps
+  // forward about yawCreepM (never within yawCreepEndMarginM of the acceptance's far edge, never
+  // less than yawCreepMinM) steering toward the band's centre heading, and is judged again.
+  stops: Object.freeze({ noRestReleaseMs: 11_000, acceptDwellMaxS: 1.0, creepAttempts: 2, creepKmh: 3.0, microSkipM: 0.2, captureKmh: 0.2, captureS: 0.5, captureHoldMinS: 1.5, settleKmh: 0.3, settleS: 0.2, settleMaxS: 1.5, overrunM: 0.25, yawCreepMaxDeg: 2.0, yawCreepM: 0.6, yawCreepMinM: 0.3, yawCreepEndMarginM: 0.25 }),
   // IMPACT: a deceleration no pedal the harness holds can produce. Coast measures
   // 0.20–0.25 m/s² and the band throttle cycle ±1.4 m/s² on the four canary drives
   // (pathFollow.aCoastMeas; _audit-path.json v); the product's crawl-capped brake is
@@ -1571,6 +1575,7 @@ export function createPathState(plan, tune = PATH_TUNE) {
     creeps: 0,
     creepTarget: null,
     creepFrame: null,
+    creepYaw: null,
     latch: { brake: false, coast: false, wBrake: false, hold: false },
     mod: createModulator(),
     yaw: createYawState(),
@@ -1699,8 +1704,47 @@ function arcOfNearest(poly, point, fromS = 0) {
   return best;
 }
 
-function buildStops(seg, poly, nextSeg = null) {
+/**
+ * WHERE A MID-SEGMENT STOP SITS ON THE WITNESS. The authored stop is a PLACE on the
+ * authored line: `arcM` metres of AUTHORED arc from the segment start. The witness is
+ * not the authored line's length — sc-park-judge F0's witness is 121.2 m against an
+ * authored 119.16 m, because its tail is re-planned (aim «planned tail … from row 1042,
+ * pre-aim 5 m») and all of the extra 2.04 m lies AFTER the stop. `frac × witness span`
+ * spread that tail over the whole segment and put the authored stop (arc 100.95, frac
+ * 0.8472) at witness 102.68 m, 1.68 m past the place the authored pose projects onto
+ * (101.00 m, 0.05 m off the witness): every judge drive rested ~1.56 m long of the
+ * authored pose and canary G7 (path-evidence.mjs stopsFromSamples, measured against the
+ * trace's own stop pose) read NOT SERVED (canary-path-91e5a51: 1.563 m; bench seeds
+ * 1–20: 19/20 beyond G7's 1.5 m). The witness follows the authored line from its start
+ * up to where its tail was re-planned, so the authored arc offset (less the witness's
+ * own startAlongM) is the stop's arc in the witness's own ROW arc (column `s`, which
+ * the planner lays along the authored line: judge's stop pose projects onto row s
+ * 101.00 for authored 100.95, gap-long's onto 96.60 for 96.6). That row arc is then
+ * read on THIS polyline's arc S, which is not the row column (gap-long: polyline span
+ * 105.78 m against a last row s of 105.6 m — the polyline sums every 0.1 m chord). The
+ * segment-END stop (frac 1: routeEnd, inserted) stays the witness end, which is where
+ * the witness was planned to stop; `frac` remains the fallback for a stop with no arc
+ * or a witness with no rows.
+ */
+export function stopArcOnWitness(seg, st, poly, witness = null) {
   const span = poly.sEnd - poly.sStart;
+  const byFrac = poly.sStart + clamp(st.frac, 0, 1) * span;
+  if (!(st.frac < 1 - 1e-9)) return byFrac;
+  const a0 = seg.arcM?.[0];
+  const rows = witness?.rows;
+  if (!Number.isFinite(st.arcM) || !Number.isFinite(a0) || !Array.isArray(rows) || rows.length < 2 || rows.length !== poly.endIdx - poly.startIdx + 1) return byFrac;
+  const rowS = st.arcM - a0 - (witness.startAlongM ?? 0);
+  if (rowS <= rows[0][0]) return poly.sStart;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] < rowS) continue;
+    const f = (rowS - rows[i - 1][0]) / Math.max(1e-9, rows[i][0] - rows[i - 1][0]);
+    const sA = poly.S[poly.startIdx + i - 1];
+    return sA + f * (poly.S[poly.startIdx + i] - sA);
+  }
+  return poly.sEnd;
+}
+
+function buildStops(seg, poly, nextSeg = null, witness = null) {
   return (seg.stops ?? []).map((st) => {
     const gc = st.tag === "gearChange" && nextSeg?.gearChangePose ? nextSeg.gearChangePose : null;
     // Where the gear-change pose sits on THIS witness, searched over its tail only:
@@ -1712,7 +1756,7 @@ function buildStops(seg, poly, nextSeg = null) {
       tag: st.tag,
       frac: st.frac,
       dwellS: st.dwellS,
-      sM: st.tag === "gearChange" ? null : poly.sStart + clamp(st.frac, 0, 1) * span,
+      sM: st.tag === "gearChange" ? null : stopArcOnWitness(seg, st, poly, witness),
       gcPose: gc,
       gcArcM: near ? near.s : null,
       targetAlongM: st.tag === "gearChange" ? nextSeg?.stopTarget?.alongM ?? null : null,
@@ -1738,7 +1782,7 @@ function enterForward(state, pose, psi, { acquire = true } = {}) {
     poly,
     cursor,
     leadM: 0,
-    stops: buildStops(seg, poly, next?.gear === -1 ? next : null),
+    stops: buildStops(seg, poly, next?.gear === -1 ? next : null, w),
     currentStop: null,
     yaw: resetYawHistory(state.yaw),
     lostCount: 0,
@@ -2102,6 +2146,9 @@ export function pathStep(state0, obs) {
       const over = inR ? overrunRefusal(state, pose, vAbs) : null;
       if (over) return refusedStep(over, obs, cmd, row, vAbs, keys, now);
       const hp = inR ? holdPedalsR(state, obs, vAbs, keys) : null;
+      // a forward route end reached without the hold-stop dwell (a skipped micro, or a dwell
+      // shorter than the capture) is still the rest the product grades
+      if (!inR) state = captureForwardRestEndPose(state, pose, vAbs, now, { tag: "routeEnd" });
       return out(release(state), { ...cmd, W: inR ? hp.W : false, S: inR ? false : keys.S, why: `route end — holding${inR ? ` (${hp.why})` : ""}` }, { ...row, why: "route-end" });
     }
     default:
@@ -2331,6 +2378,18 @@ function forwardStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys,
     const sq = squareUpSteer(state, obs, pose, psi, vAbs, creep ? "creep" : "follow");
     u = sq.u;
     k = sq.k;
+  } else if (creep && state.creepYaw && Number.isFinite(psi)) {
+    // THE HEADING RE-APPROACH STEERS (yawReapproach): the square-up law toward the arm band's
+    // centre heading over the distance left to the creep's target along.
+    const law = squareUpCommand({ psi, targetPsi: state.creepYaw.targetPsi, dGoM: Math.max(0, toStopM), kmh: vAbs }, tune.squareUp ?? PATH_TUNE.squareUp);
+    u = law.u;
+    k = steerCommand(state, u, obs, v);
+    const yb = state.books.yawCreeps?.[state.books.yawCreeps.length - 1];
+    if (yb) {
+      yb.subTicks += 1;
+      if (k !== 0) yb.keyTicks += 1;
+      yb.errEndDeg = law.errDeg === null ? null : r2(law.errDeg);
+    }
   } else k = steerCommand(state, u, obs, v);
   state.sign = foldPathSign(state.sign, { u, v, stepM, psi });
   if (state.sign.verdict === "contradicts") return refusedStep(refusePathState(state, "sign-contradicts", state.sign.why), obs, cmd, row, vAbs, keys, now);
@@ -2350,7 +2409,7 @@ function forwardStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys,
   // bound from above can only lift early.
   const aCoastNow = state.aCoastMeas ?? tune.pedals.aCoastMps2;
   let anticipateM = 0;
-  if (creep && seg.micro === true && Number.isFinite(toStopM) && !state.latch.brake && !state.latch.coast) {
+  if (creep && (seg.micro === true || state.creepYaw) && Number.isFinite(toStopM) && !state.latch.brake && !state.latch.coast) {
     const pedal = Number.isFinite(state.creepWAt) ? clamp((now - state.creepWAt) / 1000 / CREEP_THROTTLE.attackS, 0, 1) : 0;
     const runOut = creepLiftRunOutM({ vKmh: vAbs, pedal, aCoast: aCoastNow, landS: tune.runner.pollMs / 1000, aMax: tune.pedals.aMaxMps2 });
     const trig = stopTrigger({ gear: 1, vAbs, vGate: Math.min(vAbs, Number.isFinite(obs.dialKmh) && obs.dialKmh >= 0 ? obs.dialKmh : vAbs), aBrake: state.aBrakeMeas, aCoast: aCoastNow, landS: tune.pedals.landS, pressMin: pressMinFor(tune.pedals) }, tune.pedals);
@@ -2361,7 +2420,7 @@ function forwardStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys,
     gear: 1, vAbs, dialKmh: obs.dialKmh, vT, toStopM, aBrake: state.aBrakeMeas,
     aCoast: aCoastNow, keys, release: releaseLatch, anticipateM,
   }, tune.pedals);
-  if (creep && seg.micro === true && g.W && !Number.isFinite(state.creepWAt)) state.creepWAt = now;
+  if (creep && (seg.micro === true || state.creepYaw) && g.W && !Number.isFinite(state.creepWAt)) state.creepWAt = now;
   if (g.latch.brake !== state.latch.brake || g.latch.coast !== state.latch.coast) {
     if ((g.latch.brake || g.latch.coast) && bk) {
       bk.branch = g.trigger?.branch ?? null;
@@ -2419,6 +2478,108 @@ function forwardStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys,
   return out(state, { steer: k, W: g.W, S: g.S, returnNow: state.flags.wantStop, why: g.why }, row);
 }
 
+/**
+ * THE FINAL FORWARD REST'S END POSE (2026-09-22, sc-park-gap-long), pure.
+ *
+ * WHY. `endPoses` — the camera yaw canary G6 validates against the product's «ъгъл» — was
+ * written ONLY by `captureStep`, which only a REVERSE reaches («reverse-capture»). A plan whose
+ * last rest is FORWARD never wrote one, so a forward-entry park (sc-park-gap-long, one forward
+ * segment, credited 2/2 at «ъгъл 7.8°» on the 91e5a51 canary) could never have its end yaw
+ * validated: G6 read «cam yaw UNMEASURED» with 505 rows of `src: "cam"` in the ledger, the
+ * last 20 of them at rest in the route-end hold at 8.18–8.28°.
+ *
+ * WHEN. The product grades a park at a rest INSIDE the bay that it holds for `holdSec`
+ * (platform/src/modules/sim/lessons/objectives.ts:5779-5797: `stopped`, `stoppedSinceT`,
+ * `heldFor >= holdSec`, `headingOffsetDeg = axisAngleDiffDeg(tick.headingDeg, bay.headingDeg)`)
+ * and then ends the lesson — the gap-long drive's rows stop mid-dwell, 1.0 s into a 2.23 s
+ * authored route-end dwell, so a capture taken when the DWELL completes (holdStopStep's
+ * route-end branch) would never have run. It is taken instead after the same
+ * `PATH_TUNE.stops.captureS` of rest that `captureStep` waits (0.5 s, inside the product's
+ * 1.5 s hold on sc-pgl-park, templates-parking3.ts:909), from the circular median of the cam
+ * yaw over the SETTLED (later) half of the current rest window (`state.restYaw`, cam-sourced
+ * reads only): the early half still carries the braking pitch leak (path-bench.mjs models
+ * 1.7°/° of body pitch through a 0.15 s lag), which put the whole-window median +0.2…0.7° off
+ * the plant on sc-park-gap-long seeds 1–6 and the settled half 0.04…0.17° — and the 91e5a51
+ * ledger's own rest reads fall 8.28 → 8.18° the same way. Then it goes through the same
+ * `captureEndPose` — so a latched `camYawSuspect` still reads UNMEASURED, never a number.
+ *
+ * WHICH REST. Only the LAST segment's, only a FORWARD one, and only the route's final stop:
+ * an authored stop earlier on the same segment (gap-long's at arc 96.6) is not the pose the
+ * product grades. Written once per segment; a reverse's capture is never overwritten.
+ */
+export function captureForwardRestEndPose(state, pose, vAbs, now, stop = state.currentStop) {
+  const tune = state.tune ?? PATH_TUNE;
+  const seg = segOf(state);
+  if (!seg || seg.gear !== 1 || state.segIndex !== state.plan.segments.length - 1) return state;
+  if (state.endPoses?.[seg.k]) return state;
+  const finalStop = stop?.tag === "routeEnd" || (stop && !stop.hazard && (state.stops ?? []).every((st) => st === stop || st.consumed || st.hazard));
+  if (!finalStop) return state;
+  if (!(vAbs <= tune.stops.captureKmh) || state.restSince === null || state.restSince === undefined) return state;
+  if (now - state.restSince < tune.stops.captureS * 1000) return state;
+  const med = circularMedianDeg((state.restYaw ?? []).slice(Math.floor((state.restYaw ?? []).length / 2)));
+  const wEnd = state.witness?.rows?.[state.witness.rows.length - 1] ?? null;
+  const ep = captureEndPose({
+    pose, camPsiMedian: med, yawSource: med === null ? "none" : "cam", camYawSuspect: state.yaw?.suspect === true,
+    witnessEnd: wEnd ? { x: wEnd[1], z: wEnd[2], psi: wEnd[5] } : null, authoredEnd: seg.authoredEnd ?? null, park: seg.productPark ?? null,
+  });
+  const next = { ...state, endPoses: { ...state.endPoses, [seg.k]: ep } };
+  const bk = bookOf(next);
+  if (bk && bk.k === seg.k) bk.endPose = ep;
+  return next;
+}
+
+/**
+ * THE HEADING RE-APPROACH (2026-09-22), pure: may a gear-change rest that missed ONLY on yaw be
+ * corrected by a bounded forward creep that steers toward the arm band's centre heading?
+ *
+ * WHY THE APPROACH ENDS THERE. The product steers from a TERNARY key (engine/input.ts:248
+ * `out.steer = (left ? 1 : 0) - (right ? 1 : 0)`) through a low-pass (vehicle/difficulty.ts:466-471)
+ * and a rate-limited wheel (vehicle/VehicleSim.ts:394-397), so the follower reaches a small
+ * curvature only through the sigma-delta modulator, which presses nothing until |e + u| > 0.5.
+ * On canary-path-91e5a51 sc-park-45-rev's last 3 m of F0 the pursuit asked |u| ≤ 0.03–0.09 on
+ * every sub-tick and not one steer key went down: ψ held flat at ≈ +0.5° while the witness's gentle
+ * S swept from +1.0° to −1.1° (lat 0.17 → 0.12 m), so the car came to rest at yaw +0.43° against
+ * a ONE-SIDED band (yaw −2.5…0, lat 0…0.25 — the builder's screen, not ours to widen). The same
+ * shape, a symmetric band, refused sc-park-left in w55 at +1.55° against ±1.5°. Before this, the
+ * only correction was the SHORT creep (along < accept min with lat AND yaw already in band), so a
+ * yaw-only miss was refused with 0 creeps however small it was.
+ *
+ * WHAT STAYS A REFUSAL (fail closed): a lat miss; a rest past the acceptance's far edge; a yaw
+ * miss larger than `yawCreepMaxDeg`; less than `yawCreepMinM` of room before the far edge (less
+ * the `yawCreepEndMarginM` the creep's own stop needs); a heading change the square-up law could
+ * only ask for at FULL lock over that room; and the attempts `creepAttempts` shares with the short
+ * creep. The re-approach never accepts anything itself: the rest it ends in is judged by the same
+ * band, and every pose it holds is screened by the live body guard (bodyClearanceRefusal runs
+ * before every mode, creep included).
+ */
+export function yawReapproach({ fr, band, acceptAlongM, stopTargetAlongM, gcPsi, latOk, creeps }, tune = PATH_TUNE) {
+  const t = tune?.stops ?? PATH_TUNE.stops;
+  const no = (why) => ({ fire: false, why });
+  if (!fr || !band || !Array.isArray(acceptAlongM)) return no("no acceptance band");
+  if (!Number.isFinite(fr.yawErrDeg)) return no("no yaw read");
+  const [lo, hi] = band.yawDeg;
+  const excessDeg = fr.yawErrDeg < lo ? lo - fr.yawErrDeg : fr.yawErrDeg > hi ? fr.yawErrDeg - hi : 0;
+  if (!(excessDeg > 1e-9)) return no(null);
+  if (!(Number.isFinite(t.yawCreepMaxDeg) && Number.isFinite(t.yawCreepM))) return no("the heading re-approach is not tuned");
+  if (!latOk) return no(`lat ${r3(fr.latM)} m is outside ${band.latM.join("…")} — a heading creep cannot correct a lateral miss`);
+  if (excessDeg > t.yawCreepMaxDeg + 1e-9) return no(`yaw is ${r2(excessDeg)}° outside the band, more than the ${t.yawCreepMaxDeg}° a re-approach may correct`);
+  if (creeps >= t.creepAttempts) return no(`${creeps} of ${t.creepAttempts} creeps spent`);
+  const [accMin, accMax] = acceptAlongM;
+  if (fr.alongM > accMax + 1e-9) return no(`along ${r2(fr.alongM)} m is past the acceptance's far edge`);
+  // …AND SHORT OF ITS NEAR EDGE IS NOT A HEADING MISS EITHER (w-adversary, 2026-09-22): a rest metres
+  // short with lat in band and yaw a little off would otherwise become a steered creep of any length.
+  // This creep corrects YAW over a bounded distance inside an accepted rest; distance is the along-creep's job.
+  if (fr.alongM < accMin - 1e-9) return no(`along ${r2(fr.alongM)} m is short of the acceptance's near edge — a heading creep corrects yaw, never distance`);
+  const far = accMax - t.yawCreepEndMarginM;
+  const targetAlongM = Math.min(far, Math.max(Number.isFinite(stopTargetAlongM) ? stopTargetAlongM : accMin, fr.alongM + t.yawCreepM));
+  const dGoM = targetAlongM - fr.alongM;
+  if (!(dGoM >= t.yawCreepMinM - 1e-9)) return no(`only ${r2(Math.max(0, far - fr.alongM))} m of room before the acceptance's far edge (${t.yawCreepMinM} m needed)`);
+  const targetYawErrDeg = (lo + hi) / 2;
+  const law = squareUpCommand({ psi: fr.yawErrDeg, targetPsi: targetYawErrDeg, dGoM, kmh: t.creepKmh }, tune?.squareUp ?? PATH_TUNE.squareUp);
+  if (law.saturated) return no(`closing ${r2(law.errDeg)}° over ${r2(dGoM)} m needs full lock`);
+  return { fire: true, why: null, excessDeg, targetAlongM, dGoM, targetYawErrDeg, targetPsi: wrap360(gcPsi + targetYawErrDeg) };
+}
+
 function holdStopStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
   const tune = state.tune ?? PATH_TUNE;
   const hold = (why) => out(release(state), { ...cmd, W: false, S: keys.S, why }, { ...row, why });
@@ -2451,6 +2612,8 @@ function holdStopStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
   state.notRestSince = null;
   state.dwellFrom ??= state.restSince;
   const stop = state.currentStop ?? { tag: "authored", dwellS: 1.0 };
+  // the final forward rest is captured DURING the dwell: the product ends the lesson inside it
+  state = captureForwardRestEndPose(state, pose, vAbs, now, state.currentStop);
   if (now - state.dwellFrom < (stop.dwellS ?? 1) * 1000) return hold(`stop «${stop.tag}» — dwell`);
   state.dwellFrom = null;
   const bk = bookOf(state);
@@ -2478,10 +2641,12 @@ function holdStopStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
       state.flags.atGearChange = true;
       state.armRestPose = { x: r3(pose.x), z: r3(pose.z), psi: r2(psi), alongM: r3(fr.alongM), latM: r3(fr.latM), yawErrDeg: r2(fr.yawErrDeg) };
       state.mode = "hold-for-arm";
+      state.creepYaw = null;
       return hold(`at the gear change: along ${r2(fr.alongM)} m inside ${accMin}…${accMax}`);
     }
     if (fr.alongM < accMin && latOk && yawOk && state.creeps < tune.stops.creepAttempts) {
       state.creeps += 1;
+      state.creepYaw = null;
       state.creepTarget = next.stopTarget.alongM;
       state.creepFrame = next.gearChangePose;
       state.flags.stopRelease = true;
@@ -2491,7 +2656,22 @@ function holdStopStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
       state.pendingMode = "creep";
       return hold(`short of the acceptance band (${r2(fr.alongM)} < ${accMin}) — creep ${state.creeps}/${tune.stops.creepAttempts}`);
     }
-    state = refusePathState(state, "gear-change-missed", `the approach came to rest at along ${r2(fr.alongM)} m / lat ${r2(fr.latM)} m / yaw ${r2(fr.yawErrDeg)}° after ${state.creeps} creep(s) — acceptance along ${accMin}…${accMax}, lat ${band.latM.join("…")}, yaw ${band.yawDeg.join("…")}`);
+    const ya = yawReapproach({ fr, band, acceptAlongM: next.stopTarget.acceptAlongM, stopTargetAlongM: next.stopTarget.alongM, gcPsi: next.gearChangePose.psi, latOk, creeps: state.creeps }, tune);
+    if (ya.fire) {
+      state.creeps += 1;
+      state.creepTarget = ya.targetAlongM;
+      state.creepFrame = next.gearChangePose;
+      state.creepYaw = { targetPsi: ya.targetPsi };
+      state.creepWAt = null;
+      (state.books.yawCreeps ??= []).push({ k: segOf(state)?.k ?? null, attempt: state.creeps, fromAlongM: r3(fr.alongM), fromLatM: r3(fr.latM), fromYawErrDeg: r2(fr.yawErrDeg), excessDeg: r2(ya.excessDeg), targetAlongM: r3(ya.targetAlongM), targetYawErrDeg: r2(ya.targetYawErrDeg), subTicks: 0, keyTicks: 0, errEndDeg: null });
+      state.flags.stopRelease = true;
+      state.flags.wantStop = false;
+      state.latch = { ...state.latch, coast: false };
+      state.mode = "await-roll";
+      state.pendingMode = "creep";
+      return hold(`heading ${r2(fr.yawErrDeg)}° is ${r2(ya.excessDeg)}° outside ${band.yawDeg.join("…")} — heading re-approach ${state.creeps}/${tune.stops.creepAttempts} to along ${r2(ya.targetAlongM)} m`);
+    }
+    state = refusePathState(state, "gear-change-missed", `the approach came to rest at along ${r2(fr.alongM)} m / lat ${r2(fr.latM)} m / yaw ${r2(fr.yawErrDeg)}° after ${state.creeps} creep(s) — acceptance along ${accMin}…${accMax}, lat ${band.latM.join("…")}, yaw ${band.yawDeg.join("…")}${ya.why ? ` (no heading re-approach: ${ya.why})` : ""}`);
     return refusedStep(state, obs, cmd, row, vAbs, keys, now);
   }
   if (bk && Number.isFinite(stop.sM) && state.cursor) {
@@ -2878,6 +3058,7 @@ function forwardSettleStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
     state.mode = "creep";
     state.creepTarget = 0;
     state.creepFrame = { x: end.x, z: end.z, psi: end.psi };
+    state.creepYaw = null;
     state.currentStop = routeEndStop;
     state.creepWAt = null;
     // the square-up keeps the wheel it built up through the disarm roll: a released key here
@@ -3473,6 +3654,9 @@ export function pathFollowBooks(state) {
     // it decided, how many held a steer key, over how many metres, and the heading error to the
     // micro's authored end heading when it started and when it last decided
     squareUp: (state.books.squareUp ?? []).map(({ last, ...b }) => b),
+    // the heading re-approaches (yawReapproach): each attempt, the rest it started from, its target, and how the
+    // square-up law ended — so a test can see the branch FIRED and steered, not merely that it exists
+    yawCreeps: state.books.yawCreeps ?? [],
     stopHeldWithoutBrake: state.books.stopHeldWithoutBrake,
     nearLock: { metres: state.books.nearLockM, budgetEntries: state.books.nearLockBudgetEntries, budgetMs: (state.tune ?? PATH_TUNE).runner.nearLockBudgetMs },
     impacts: state.books.impacts,

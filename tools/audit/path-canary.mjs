@@ -104,6 +104,34 @@ export function stopServedBasis(s, { allCredited, reachedVerdict, stopFaultBooke
   return allCredited === true && stopFaultBooked !== true ? "short lower bound · product credited every objective, no stop fault" : null;
 }
 
+/**
+ * WHETHER THE PLAN HAS NO REVERSE AT ALL — AND ONLY THEN (2026-09-22, sc-park-gap-long).
+ *
+ * G2 (the arm) and G3 (the reverse corridor) are questions about a reverse. A FORWARD-ENTRY
+ * park has none to ask about: sc-park-gap-long's authored manoeuvre is one forward segment
+ * (its trace's gear segmentation is [F0]; every committed pathref segment is gear 1 — the only
+ * such plan among the eleven), and the product credits it on a forward entry («Задача 2: влез
+ * НАПРЕД в мястото …»). Failing it on «no arm» / «no reverse segment» refused a drive the
+ * product credited 2/2 on a gate that has no subject.
+ *
+ * The plan is read where every other gate reads it — the TRACE's gear segments, through
+ * `path-evidence.mjs routeBySegment`, which lists EVERY planned segment whether or not it was
+ * measured — never the pathref (the header's independence rule). N/A is decided by the PLAN,
+ * never by what the drive happened to measure:
+ *   · a reverse plan whose reverse went unmeasured still lists its R segment → FAIL (45-rev);
+ *   · no trace, or a plan with no segments → not N/A → FAIL, as before;
+ *   · a forward-only plan whose drive nevertheless wrote reverse samples → FAIL (the drive did
+ *     something the plan never asked for, and nothing here can grade it).
+ * Returns null when the gates apply, or the reason they do not.
+ */
+export function noReversePlanReason(ev, samples) {
+  const segs = ev?.routeBySegment ?? [];
+  if (!segs.length) return null;
+  if (segs.some((s) => s.gear === -1)) return null;
+  if ((samples ?? []).some((s) => s?.phase === "reverse")) return null;
+  return `N/A — the plan has no reverse: the trace's gear segments are ${segs.map((s) => `${s.gear === 1 ? "F" : "R"}${s.k}`).join(" ")} (a forward-entry park), and the drive wrote no reverse sample`;
+}
+
 const axisDiff = (a, b) => {
   const raw = Math.abs(((a - b) % 360) + 360) % 360;
   const d = raw > 180 ? 360 - raw : raw;
@@ -118,6 +146,9 @@ const axisDiff = (a, b) => {
 export function evaluateCanary({ status, debrief, runLog = "", frameNames = [], trace, lesson, platformDiffEmpty = null, driveClearance = null }) {
   const gates = [];
   const gate = (id, pass, why) => gates.push({ id, pass: pass === true, why });
+  // NOT APPLICABLE is never a silent PASS: it carries `na: true` and its reason, and the CLI
+  // prints «N/A», not «PASS». It does not block the canary, because there is nothing to fail.
+  const notApplicable = (id, why) => gates.push({ id, pass: true, na: true, why });
   const samples = status?.guidance?.samples ?? [];
   const ev = trace
     ? computePathEvidence({
@@ -144,8 +175,10 @@ export function evaluateCanary({ status, debrief, runLog = "", frameNames = [], 
 
   // G2 — each arm: the reverse STARTS in the screened band, the roll ≤ allowance, the approach chord ≤ 2.5°
   const arms = ev?.arms ?? [];
+  const noReverse = noReversePlanReason(ev, samples);
   const armOk = (a) => a.measured && a.startInBand === true && (a.designedNegative || (a.rollWithinAllow === true && (a.chordYawDeg === null || Math.abs(a.chordYawDeg) <= 2.5)));
-  gate("G2", arms.length > 0 && arms.every(armOk),
+  if (noReverse) notApplicable("G2", noReverse);
+  else gate("G2", arms.length > 0 && arms.every(armOk),
     arms.map((a) => (a.measured ? `R${a.k} start ${a.startAlongM}/${a.startLatM} inBand ${a.startInBand} roll ${a.armRollM} chord ${a.chordYawDeg}°` : `R${a.k} UNMEASURED`)).join(" · ") || "no arm");
 
   // G3 — each R segment inside its corridor. PLAUSIBILITY, not safety: see the header.
@@ -159,7 +192,8 @@ export function evaluateCanary({ status, debrief, runLog = "", frameNames = [], 
   // itself. A car standing 0.55 m off the bay axis beside a parked neighbour is G10's to fail
   // now, and path-canary.test.mjs pins exactly that hand-over.
   const rev = (ev?.routeBySegment ?? []).filter((s) => s.gear === -1);
-  gate("G3", rev.length > 0 && rev.every((s) => s.measured && s.maxM <= s.corridorM),
+  if (noReverse) notApplicable("G3", noReverse);
+  else gate("G3", rev.length > 0 && rev.every((s) => s.measured && s.maxM <= s.corridorM),
     rev.map((s) => (s.measured ? `R${s.k} max ${s.maxM}/corr ${s.corridorM}` : `R${s.k} unmeasured`)).join(" · ") || "no reverse segment");
 
   // G4 — the product credits it (debrief)
@@ -180,7 +214,7 @@ export function evaluateCanary({ status, debrief, runLog = "", frameNames = [], 
     const park = ev?.product?.park ?? null;
     const endPoses = Object.values(status?.pathFollow?.endPoses ?? {});
     const lastYaw = endPoses.map((p) => p?.camYawDeg).filter((v) => Number.isFinite(v)).at(-1);
-    if (!park) gate("G6", true, "no parkInBay target on this lesson — not applicable");
+    if (!park) notApplicable("G6", "N/A — no parkInBay target on this lesson");
     else if (!Number.isFinite(lastYaw) || !Number.isFinite(pp.headingOffsetDeg)) gate("G6", false, `cam yaw ${lastYaw ?? "UNMEASURED"} · product «ъгъл» ${pp.headingOffsetDeg ?? "not printed"} — END POSE yaw is not validated`);
     else {
       const predicted = axisDiff(lastYaw, park.bay.headingDeg);
@@ -263,7 +297,7 @@ if (isMain) {
   if (args.includes("--json")) console.log(JSON.stringify({ ...out, evidence: undefined }, null, 2));
   else {
     console.log(`pc-path canary · ${lesson} · ${legDir}`);
-    for (const g of out.gates) console.log(`  ${g.pass ? "PASS" : "FAIL"} ${g.id}  ${g.why}`);
+    for (const g of out.gates) console.log(`  ${g.na ? "N/A " : g.pass ? "PASS" : "FAIL"} ${g.id}  ${g.why}`);
     console.log(out.pass ? "CANARY PASSED — set canaryPassed: true on this lesson's rows in tools/audit/path-routing.json (a commit)" : "CANARY FAILED — no row of this lesson may be routed");
   }
   process.exitCode = out.pass ? 0 : 1;

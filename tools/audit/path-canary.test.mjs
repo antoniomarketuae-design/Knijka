@@ -11,7 +11,7 @@ import test from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { evaluateCanary, FORBIDDEN_LINES, STOP_FAULT_RE, stopServedBasis } from "./path-canary.mjs";
+import { evaluateCanary, FORBIDDEN_LINES, STOP_FAULT_RE, noReversePlanReason, stopServedBasis } from "./path-canary.mjs";
 import { loadPathRef, productBoxPrediction } from "../mobile/lib/path-follow.mjs";
 import { runBench, plantCentre } from "../mobile/lib/path-bench.mjs";
 import { driveClearance, driveClearanceFromSidecar, driveClearanceGate, DRIVE_CLEARANCE_FLOOR_M } from "../mobile/lib/drive-clearance.mjs";
@@ -535,4 +535,120 @@ test("IMPORT PIN (transitive): drive-clearance reaches no pathref and no control
   const badNamed = [...bad.matchAll(/^import\s*\{([\s\S]*?)\}\s*from\s+"\.\/path-plan\/body-screen\.mjs";/gm)].flatMap((m) => m[1].split(",").map((x) => x.trim()));
   assert.ok(badNamed.includes("screenLesson"));
   assert.match(bad, /path-follow/);
+});
+
+/* ═══════════ A FORWARD-ENTRY PARK (2026-09-22, sc-park-gap-long) ═══════════
+ *
+ * sc-park-gap-long is the one committed plan with no reverse (its trace's gear segmentation
+ * is [F0]; every pathref segment is gear 1). The 91e5a51 canary drive was credited 2/2 by the
+ * product («влез НАПРЕД в мястото … подравняване: приемливо», «ъгъл 7.8°») and still failed
+ * G2 «no arm» and G3 «no reverse segment» — gates with no subject on this plan — and G6
+ * «cam yaw UNMEASURED», because only a reverse ever wrote an end pose.
+ *
+ * The fixture is a bench drive of the committed gap-long plan (NO WORLD: arithmetic, not a
+ * browser), its end yaw captured by the follower's final forward rest
+ * (path-follow.mjs captureForwardRestEndPose), and the product's «ъгъл» taken from the bench
+ * plant's true pose — so G6 compares the SELF-REPORT cam yaw against a heading it did not
+ * write, as it does in the browser. */
+const FWD = "sc-park-gap-long";
+const fwdTrace = JSON.parse(fs.readFileSync(path.join(REPO, "content", "traces", FWD, "shadow-correct.trace.json"), "utf8"));
+const fwdPlan = loadPathRef(FWD, REPO);
+const fwdBench = runBench({ plan: fwdPlan, seed: 7 });
+const fwdEndPsi = ((fwdBench.plant.psi % 360) + 360) % 360;
+const fwdBox = productBoxPrediction(fwdPlan.product.park, plantCentre(fwdBench.plant), fwdEndPsi);
+const fwdLedger = fwdPlan.segments[0].witnesses[0].rows.map((row, i) => ({ f: i, x: row[1], z: row[2], psi: row[5], v: 5, mode: "follow", seg: 0, src: "cam" }));
+const fwdPassing = () => ({
+  driveClearance: driveClearance(FWD, fwdLedger),
+  status: {
+    mode: "path", exit: 0, phase: "complete", scenario: FWD,
+    guidance: { samples: fwdBench.books.samples.map((s) => ({ ...s })), routeHold: { crashPinnedTicks: 0, offRoadTicks: 0 } },
+    pathFollow: { state: "followed", endPoses: JSON.parse(JSON.stringify(fwdBench.state.endPoses)) },
+  },
+  debrief: {
+    routeHold: { crashPinnedTicks: 0 },
+    debrief: {
+      objectives: [
+        { titleBg: "Задача 1: спри срещу свободното място", done: true },
+        { titleBg: "Задача 2: влез НАПРЕД в мястото и спри успоредно на бордюра · подравняване: приемливо", done: true },
+      ],
+      sections: {
+        'section[aria-label="Оценка на маневрата"]': { text: `В очертанията (отместване 0,3 м, ъгъл ${String(fwdBox.headingOffsetDeg).replace(".", ",")}°).` },
+        'section[aria-label="Грешки"]': { items: [] },
+      },
+    },
+  },
+  runLog: "STEERED BY: THE LESSON'S AUTHORED LINE …\n",
+  frameNames: ["01-arrival.png", "05-stopped.png", "07-end.png"],
+  trace: fwdTrace,
+  lesson: FWD,
+  platformDiffEmpty: true,
+});
+
+test("FORWARD ENTRY: the fixture's plan really has no reverse, and it is the only committed plan that doesn't", () => {
+  assert.deepEqual(fwdPlan.segments.map((s) => s.gear), [1]);
+  assert.equal(fwdBench.state.refusals.length, 0, JSON.stringify(fwdBench.state.refusals));
+  const dir = path.join(REPO, "tools", "mobile", "path-refs");
+  const forwardOnly = fs.readdirSync(dir).filter((f) => f.endsWith(".pathref.json"))
+    .filter((f) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")).segments.every((s) => s.gear === 1));
+  assert.deepEqual(forwardOnly, [`${FWD}.pathref.json`]);
+});
+
+test("FORWARD ENTRY: G2 and G3 are N/A WITH A REASON — never a silent PASS — and the drive passes every other gate", () => {
+  const out = evaluateCanary(fwdPassing());
+  for (const id of ["G2", "G3"]) {
+    const g = gate(out, id);
+    assert.equal(g.na, true, `${id} must be marked N/A, got ${JSON.stringify(g)}`);
+    assert.match(g.why, /^N\/A — the plan has no reverse: the trace's gear segments are F0 \(a forward-entry park\)/, g.why);
+  }
+  // nothing else is N/A: the forward park's G6 is REQUIRED, and it validates
+  assert.deepEqual(out.gates.filter((g) => g.na).map((g) => g.id), ["G2", "G3"]);
+  assert.deepEqual(out.gates.filter((g) => !g.pass).map((g) => `${g.id}: ${g.why}`), []);
+  assert.equal(out.pass, true);
+});
+
+test("FORWARD ENTRY: G6 validates the FINAL FORWARD REST's cam yaw against the product's «ъгъл», and still fails without it", () => {
+  const ep = fwdBench.state.endPoses[0];
+  assert.ok(ep, `the final forward rest wrote no end pose: ${JSON.stringify(fwdBench.state.endPoses)}`);
+  assert.equal(ep.yawMeasured, true, JSON.stringify(ep));
+  const g6 = gate(evaluateCanary(fwdPassing()), "G6");
+  assert.equal(g6.pass, true, g6.why);
+  assert.notEqual(g6.na, true);
+  assert.match(g6.why, /^cam yaw [\d.]+° → [\d.]+° off the bay axis against the product's «ъгъл»/, g6.why);
+  // the artefact shape of the 91e5a51 drive: no end pose → G6 FAILS, it is not N/A
+  const c = fwdPassing();
+  c.status.pathFollow.endPoses = {};
+  const bare = gate(evaluateCanary(c), "G6");
+  assert.equal(bare.pass, false, bare.why);
+  assert.match(bare.why, /cam yaw UNMEASURED/);
+  // and it compares: a product «ъгъл» 5° away from the captured yaw fails
+  const d = fwdPassing();
+  d.debrief.debrief.sections['section[aria-label="Оценка на маневрата"]'].text = `В очертанията (отместване 0,3 м, ъгъл ${String(Math.round((fwdBox.headingOffsetDeg + 5) * 10) / 10).replace(".", ",")}°).`;
+  assert.equal(gate(evaluateCanary(d), "G6").pass, false);
+});
+
+test("A REVERSE PLAN whose reverse went unmeasured still FAILS G2 and G3 — N/A is the plan's, never the drive's (45-rev)", () => {
+  const c = passing();
+  c.status.guidance.samples = c.status.guidance.samples.filter((s) => s.phase !== "reverse");
+  const out = evaluateCanary(c);
+  for (const id of ["G2", "G3"]) {
+    const g = gate(out, id);
+    assert.equal(g.pass, false, `${id}: ${g.why}`);
+    assert.notEqual(g.na, true);
+  }
+  assert.equal(noReversePlanReason(out.evidence, c.status.guidance.samples), null);
+});
+
+test("N/A is refused when the forward-only plan's drive REVERSED, and when there is no trace to read the plan from", () => {
+  const c = fwdPassing();
+  const i = c.status.guidance.samples.findIndex((s) => s.phase === "roll-path");
+  c.status.guidance.samples.splice(i + 1, 0, { ...c.status.guidance.samples[i], phase: "reverse" });
+  const out = evaluateCanary(c);
+  for (const id of ["G2", "G3"]) assert.equal(gate(out, id).pass, false, `${id}: ${gate(out, id).why}`);
+  const d = fwdPassing();
+  d.trace = null;
+  const noTrace = evaluateCanary(d);
+  for (const id of ["G2", "G3"]) {
+    assert.equal(gate(noTrace, id).pass, false, `${id}: ${gate(noTrace, id).why}`);
+    assert.notEqual(gate(noTrace, id).na, true);
+  }
 });

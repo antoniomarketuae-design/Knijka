@@ -323,3 +323,23 @@ The six that passed every gate are routed (`canaryPassed: true`, 9 rows). judge,
 stay unrouted until their canaries pass; sc-ed-poligon-chain was not canaried; sc-park-bay-exit-rev
 is refused by design. **Routing closes nothing**: every routed row still has to be swept and judged,
 and gap-short's credited heading has 0.5° of bench margin (T9.k), so one canary is one sample.
+
+## RULING-2 — the forward half: extend the probe to a forward-steered leg, route position on the tick — **RATIFIED 2026-09-22**
+
+Put to the founder the same day the parking half retired its first rows, as the two policy points
+W59-STEERING-SPEC §9.2 reserved for him (`handoff-2026-09-20/reports/W59-STEERING-SPEC.md`):
+
+1. **«Extend it».** The dev-only position readout may steer a NEW forward-steered leg (lane and curve
+   holding on roads and roundabouts), under the same kind of printed testimony limits as pc-path:
+   it may testify only whether the product GRADES a correct road drive fairly — never that guidance
+   leads a student there, never lane choice or route-keeping as a student skill, never a wrong drive,
+   never mobile or production. RULING-1 is not widened to any other leg by this.
+2. **«On the grading tick».** Position along the route (`sM`) is published as an optional, additive
+   `SimTick` field beside `laneOffsetM` — the precedent is the 2026-09-20 edge-alignment signal
+   (eb0e016) — with a test pinning that no rule or detector reads it. Not a separate channel, not
+   `/dev/drive-rig` only.
+
+**Nothing is built yet.** The spec's two stop rules bind it: increment 1 must prove an oncoming-lane
+pose is separable in the published record (`opposingBank`; `laneOffsetM` alone reads 0.0000 on both
+banks), and increment 3 must make the unsteered negative control FAIL (AC-1) within budget, or the
+work is parked with the measurement kept. Acceptance is `tools/mobile/lib/road-criteria.mjs`.

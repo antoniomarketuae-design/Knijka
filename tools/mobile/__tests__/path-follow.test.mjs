@@ -38,6 +38,7 @@ import {
   brakeCapMps2,
   brakeCeil,
   captureEndPose,
+  captureForwardRestEndPose,
   contactEvidence,
   centrePursuit,
   chainPulseHeading,
@@ -87,11 +88,13 @@ import {
   rightUnit,
   selectWitness,
   speedTarget,
+  stopArcOnWitness,
   stopTrigger,
   toBodyFrame,
   witnessPolyline,
   wrapDeg,
   yawFromCamOffset,
+  yawReapproach,
 } from "../lib/path-follow.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -2497,7 +2500,7 @@ const { DRIVE_CLEARANCE_FLOOR_M, bodyClearanceGuard } = await import("../lib/dri
 const { BODY_FLOOR_M, clearanceAtPose } = await import("../lib/path-plan/body-screen.mjs");
 const wallGuard = bodyClearanceGuard("sc-park-wall");
 const leftGuard = bodyClearanceGuard("sc-park-left");
-const { computePathEvidence } = await import("../lib/path-evidence.mjs");
+const { computePathEvidence, plannedStops, stopsFromSamples } = await import("../lib/path-evidence.mjs");
 const { productBoxPrediction } = await import("../lib/path-follow.mjs");
 const traceJson = (l) => JSON.parse(readFileSync(resolve(REPO, "content", "traces", l, "shadow-correct.trace.json"), "utf8"));
 const p90 = (a) => {
@@ -2898,6 +2901,123 @@ describe("T9 closed-loop benches", () => {
     }
   });
 
+  /* T9.m THE HEADING RE-APPROACH (yawReapproach, 2026-09-22).
+   *
+   * canary-path-91e5a51 sc-park-45-rev refused gear-change-missed at the end of F0: «rest at along 0.96 m /
+   * lat 0.07 m / yaw 0.44° after 0 creep(s) — acceptance along 0.7…2, lat 0…0.25, yaw -2.5…0». Along and lat
+   * were accepted; the yaw missed a ONE-SIDED band by 0.44°. Its _audit-path.json shows why: over the last
+   * 3 m the pursuit asked |u| ≤ 0.03–0.09 and not one steer key went down (the product's keyboard steer is
+   * ternary, engine/input.ts:248, so a small curvature exists only as sigma-delta presses), ψ held ≈ +0.5°
+   * while the witness swept +1.0° → −1.1°. w55 sc-park-left is the same shape on a symmetric band (+1.55°
+   * vs ±1.5°). And the follower had no correction for it: the only creep required yaw ALREADY in band.
+   *
+   * THE BENCH REPRODUCES IT when the forward steering answers 60 % of what the chain predicts (plant
+   * kappaScale 0.6, the reverse kept at its calibration): 11 of 12 45-rev seeds rest at along 0.91–1.14 /
+   * lat 0.06–0.10 / yaw +0.13…+0.65 — the browser's signature — and every one was refused with 0 creeps.
+   * With the re-approach: 0 of 12 gear-change-missed; left 11 → 7 and van 5 → 1, every remaining one a
+   * LATERAL miss or a yaw miss beyond yawCreepMaxDeg, which must stay refusals. Across S2, W47 and a
+   * stressed timing at nominal steering (9 lessons × 12 seeds each) no re-approach fires and every drive
+   * is pose-for-pose the drive it was. */
+  const FWD_WEAK = { kappaScale: 0.6, revKappaScale: 0.92 / 0.6 };
+  it("T9.m.1 yawReapproach: fires for the two browser refusals, and stays a refusal for a lateral miss, a big yaw miss, no room, a rest past the band, spent creeps or a full-lock demand", () => {
+    const r45 = plan("sc-park-45-rev").segments.find((s) => s.gear === -1);
+    const rLeft = plan("sc-park-left").segments.find((s) => s.gear === -1);
+    const ask = (seg, fr, extra = {}, tune = PATH_TUNE) => yawReapproach({ fr, band: seg.armBand, acceptAlongM: seg.stopTarget.acceptAlongM, stopTargetAlongM: seg.stopTarget.alongM, gcPsi: seg.gearChangePose.psi, latOk: true, creeps: 0, ...extra }, tune);
+    const t = PATH_TUNE.stops;
+    // canary-path-91e5a51 sc-park-45-rev__pc-path.drive.log:185
+    const a = ask(r45, { alongM: 0.96, latM: 0.07, yawErrDeg: 0.44 });
+    assert.equal(a.fire, true, a.why);
+    near(a.excessDeg, 0.44, 1e-9);
+    near(a.targetYawErrDeg, -1.25, 1e-9, "the band's centre heading, not its edge");
+    assert.ok(a.targetAlongM >= r45.stopTarget.acceptAlongM[0] && a.targetAlongM <= r45.stopTarget.acceptAlongM[1] - t.yawCreepEndMarginM + 1e-9, `target ${a.targetAlongM}`);
+    assert.ok(a.dGoM >= t.yawCreepMinM - 1e-9);
+    angNear(a.targetPsi, r45.gearChangePose.psi - 1.25, 1e-9);
+    // w55 sc-park-left__pc-path/run.log
+    const b = ask(rLeft, { alongM: -0.08, latM: 0.04, yawErrDeg: 1.55 });
+    assert.equal(b.fire, true, b.why);
+    near(b.targetYawErrDeg, 0, 1e-9);
+    assert.ok(b.targetAlongM <= rLeft.stopTarget.acceptAlongM[1] - t.yawCreepEndMarginM + 1e-9);
+    // a rest inside the yaw band is not a heading miss
+    assert.deepEqual(ask(r45, { alongM: 0.96, latM: 0.07, yawErrDeg: -0.5 }), { fire: false, why: null });
+    // the fail-closed cases
+    assert.equal(ask(r45, { alongM: 0.96, latM: -0.02, yawErrDeg: 0.44 }, { latOk: false }).fire, false, "a lateral miss");
+    assert.equal(ask(r45, { alongM: 0.96, latM: 0.07, yawErrDeg: t.yawCreepMaxDeg + 0.01 }).fire, false, "a yaw miss beyond yawCreepMaxDeg");
+    assert.equal(ask(rLeft, { alongM: -0.08, latM: 0.04, yawErrDeg: -1.5 - t.yawCreepMaxDeg - 0.01 }).fire, false, "the other side too");
+    assert.equal(ask(r45, { alongM: 2.05, latM: 0.07, yawErrDeg: 0.44 }).fire, false, "past the acceptance's far edge");
+    {
+      const nearEdge = r45.stopTarget.acceptAlongM[0];
+      const short = ask(r45, { alongM: nearEdge - 0.5, latM: 0.07, yawErrDeg: 0.44 });
+      assert.equal(short.fire, false, "short of the acceptance's near edge — a heading creep corrects yaw, never distance");
+      assert.match(short.why, /near edge/);
+      assert.equal(ask(r45, { alongM: nearEdge + 0.01, latM: 0.07, yawErrDeg: 0.44 }).fire, true, "just inside the near edge it still fires");
+    }
+    assert.equal(ask(r45, { alongM: 1.6, latM: 0.07, yawErrDeg: 0.44 }).fire, false, "0.15 m of room before the far edge's margin");
+    assert.equal(ask(r45, { alongM: 0.96, latM: 0.07, yawErrDeg: 0.44 }, { creeps: t.creepAttempts }).fire, false, "creeps spent");
+    const wide = { ...PATH_TUNE, stops: { ...PATH_TUNE.stops, yawCreepMaxDeg: 30 } };
+    const sat = ask(r45, { alongM: 1.4, latM: 0.07, yawErrDeg: 12 }, {}, wide);
+    assert.equal(sat.fire, false);
+    assert.match(sat.why, /full lock/);
+    assert.equal(ask(r45, { alongM: 0.96, latM: 0.07, yawErrDeg: null }).fire, false, "no yaw read");
+  });
+
+  it("T9.m.2 a heading near-miss at the gear change is CORRECTED, not refused — 45-rev under a weak forward wheel: 0 of 12 refused (11 without the re-approach), every re-approach steered, ended in band and held the drive floor", () => {
+    const lesson = "sc-park-45-rev";
+    const r1 = plan(lesson).segments.find((s) => s.gear === -1);
+    const off = { ...PATH_TUNE, stops: { ...PATH_TUNE.stops, yawCreepMaxDeg: 0 } };
+    let fired = 0;
+    let refusedOff = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const r = runBench({ plan: plan(lesson), seed, plantOpts: FWD_WEAK });
+      const codes = r.state.refusals.map((x) => x.code);
+      assert.ok(!codes.includes("gear-change-missed"), `seed ${seed}: ${JSON.stringify(r.state.refusals)}`);
+      const gcs = r.books.follow.segments.flatMap((sg) => (sg.stops ?? []).filter((x) => x.tag === "gearChange"));
+      for (const yc of r.books.follow.yawCreeps) {
+        fired += 1;
+        // the rest it corrected is the browser's signature: along and lat accepted, yaw just past the one-sided edge
+        assert.ok(yc.fromYawErrDeg > r1.armBand.yawDeg[1] && yc.excessDeg <= PATH_TUNE.stops.yawCreepMaxDeg, `seed ${seed}: ${JSON.stringify(yc)}`);
+        assert.ok(yc.targetAlongM <= r1.stopTarget.acceptAlongM[1] - PATH_TUNE.stops.yawCreepEndMarginM + 1e-9, `seed ${seed}: target ${yc.targetAlongM}`);
+        assert.ok(yc.keyTicks >= 1, `seed ${seed}: the re-approach never pressed a steer key — ${JSON.stringify(yc)}`);
+        // and the rest it ended in was judged by the SAME band and accepted
+        const after = gcs[gcs.length - 1];
+        assert.ok(after.creep >= 1 && after.alongM >= r1.stopTarget.acceptAlongM[0] && after.alongM <= r1.stopTarget.acceptAlongM[1] && after.yawErrDeg >= r1.armBand.yawDeg[0] && after.yawErrDeg <= r1.armBand.yawDeg[1], `seed ${seed}: rest after the re-approach ${JSON.stringify(after)}`);
+      }
+      for (const bc of r.books.follow.bodyClearance) assert.ok(bc.worstHeldM >= DRIVE_CLEARANCE_FLOOR_M, `seed ${seed} ${bc.gear === -1 ? "R" : "F"}${bc.k}: held ${bc.worstHeldM} m from ${bc.body}`);
+      const rOff = runBench({ plan: plan(lesson), seed, plantOpts: FWD_WEAK, tune: off });
+      if (rOff.state.refusals.some((x) => x.code === "gear-change-missed")) refusedOff += 1;
+      assert.equal(rOff.books.follow.yawCreeps.length, 0);
+    }
+    assert.ok(fired >= 10, `only ${fired} re-approaches fired`);
+    assert.ok(refusedOff >= 10, `without the re-approach only ${refusedOff}/12 refused — the stress no longer reproduces the browser refusal`);
+  });
+
+  it("T9.m.3 what the re-approach will NOT correct stays refused — left and van under the weak wheel: every remaining gear-change-missed is a lateral miss or a yaw miss past yawCreepMaxDeg, and there are fewer of them", () => {
+    const off = { ...PATH_TUNE, stops: { ...PATH_TUNE.stops, yawCreepMaxDeg: 0 } };
+    for (const lesson of ["sc-park-left", "sc-park-van"]) {
+      let on = 0;
+      let wasOff = 0;
+      for (let seed = 1; seed <= 12; seed++) {
+        const r = runBench({ plan: plan(lesson), seed, plantOpts: FWD_WEAK });
+        const band = plan(lesson).segments.find((s) => s.gear === -1).armBand;
+        for (const x of r.state.refusals.filter((q) => q.code === "gear-change-missed")) {
+          on += 1;
+          // either the re-approach declined and says why, or the rest it ended in is a LATERAL miss the same band refuses
+          const lat = Number(x.why.match(/lat (-?[\d.]+) m/)[1]);
+          const latMiss = lat <= band.latM[0] + 0.005 || lat >= band.latM[1] - 0.005;
+          assert.ok(/no heading re-approach: (lat .* outside|yaw is .* more than|\d+ of \d+ creeps spent)/.test(x.why) || latMiss, `${lesson} seed ${seed}: ${x.why}`);
+        }
+        if (runBench({ plan: plan(lesson), seed, plantOpts: FWD_WEAK, tune: off }).state.refusals.some((q) => q.code === "gear-change-missed")) wasOff += 1;
+        for (const bc of r.books.follow.bodyClearance) if (bc.gear === 1) assert.ok(bc.worstHeldM >= DRIVE_CLEARANCE_FLOOR_M, `${lesson} seed ${seed} F${bc.k}: ${bc.worstHeldM}`);
+      }
+      assert.ok(on < wasOff, `${lesson}: ${on} refusals with the re-approach vs ${wasOff} without`);
+    }
+  });
+
+  it("T9.m.4 at the bench's calibrated steering the re-approach never fires on any of the nine parking lessons (seeds 7–10): the six lessons the browser passes drive exactly as before", () => {
+    for (const lesson of [...PARKS, "sc-park-45-rev", "sc-park-gap-short"]) {
+      for (const seed of [7, 8, 9, 10]) assert.deepEqual(bench(lesson, seed).books.follow.yawCreeps, [], `${lesson} seed ${seed}`);
+    }
+  });
+
   it("T9.c sc-ed-poligon-chain end to end", { todo: "bench: F4's lock-limited turn reaches the R5 gear change 0.3 m / 4° off (gear-change-missed) — the yield contract's steering loss" }, () => {
     const r = bench("sc-ed-poligon-chain", 7);
     assert.deepEqual(r.state.refusals, []);
@@ -2955,6 +3075,100 @@ describe("T9 closed-loop benches", () => {
       assert.equal(rev[rev.length - 1].kmh, 0, `${lesson}: the reverse ends at rest before the disarm`);
       assert.equal(r.books.disarms.length, 1);
     }
+  });
+
+  /* T9.fwd A FORWARD-ENTRY PARK'S END POSE (2026-09-22). `endPoses` — the camera yaw canary G6
+   * validates against the product's «ъгъл» — was written only by captureStep, which only a
+   * reverse reaches, so sc-park-gap-long (one forward segment; the product grades its rest in the
+   * bay, platform/src/modules/sim/lessons/objectives.ts:5779-5797) could never be validated:
+   * the 91e5a51 canary read «cam yaw UNMEASURED» on a drive the product credited 2/2 at 7.8°.
+   * The final forward rest now writes one, 0.5 s into the rest (the product ends the lesson inside
+   * the 2.23 s authored dwell, so the dwell's completion is too late), from the settled half of
+   * the rest window. */
+  it("T9.fwd sc-park-gap-long: the final FORWARD rest writes a measured end pose within 0.3° of the plant, on every seed", () => {
+    for (const seed of [7, 8, 9, 10]) {
+      const r = bench("sc-park-gap-long", seed);
+      assert.deepEqual(r.state.refusals, [], `seed ${seed}`);
+      const ep = r.state.endPoses[0];
+      assert.ok(ep, `seed ${seed}: no end pose for F0 — ${JSON.stringify(r.state.endPoses)}`);
+      assert.equal(ep.yawMeasured, true, JSON.stringify(ep));
+      const err = Math.abs(((ep.camYawDeg - psiOf(r.plant) + 540) % 360) - 180);
+      assert.ok(err <= 0.3, `seed ${seed}: captured cam yaw ${ep.camYawDeg}° against the plant's ${psiOf(r.plant).toFixed(2)}° (${err.toFixed(2)}°)`);
+      assert.equal(r.state.books.segments.find((b) => b.k === 0)?.endPose, ep, "the segment book carries the same end pose");
+    }
+  });
+
+  /* THE PRODUCT ENDS THE LESSON INSIDE THE DWELL. sc-pgl-park credits after a 1.5 s hold at rest
+   * in the bay (templates-parking3.ts:909 holdSec; objectives.ts:5797 `heldFor >= holdSec`) and the
+   * lesson ends on that credit; the 91e5a51 drive's rows stop 1.0 s into the 2.23 s authored
+   * route-end dwell. The bench keeps driving past the dwell, so on it a capture taken only at
+   * the route end would still land — this case pins that the capture happens in the hold-stop,
+   * before the product's hold elapses, which is the only capture the browser will ever see. */
+  it("T9.fwd sc-park-gap-long: the end pose is written INSIDE the route-end hold, before the product's 1.5 s credit hold elapses", () => {
+    for (const seed of [7, 8, 9, 10]) {
+      let at = null;
+      runBench({
+        plan: plan("sc-park-gap-long"), seed,
+        onSubTick: ({ state }) => {
+          if (at || !state.endPoses?.[0]) return;
+          at = { mode: state.mode, restMs: state.last.t - state.restSince };
+        },
+      });
+      assert.ok(at, `seed ${seed}: no end pose was ever written`);
+      assert.equal(at.mode, "hold-stop", `seed ${seed}: written in «${at.mode}» — after the dwell the product has already ended the lesson`);
+      assert.ok(at.restMs >= PATH_TUNE.stops.captureS * 1000 && at.restMs < 1500, `seed ${seed}: written ${at.restMs} ms into the rest`);
+    }
+  });
+
+  it("T9.fwd a forward route end reached WITHOUT the hold-stop dwell (a skipped micro square-up) still writes its end pose", () => {
+    const p = plan("sc-park-gap-long");
+    const seg = p.segments[0];
+    const end = seg.authoredEnd;
+    const st = { ...createPathState(p, PATH_TUNE), mode: "route-end", segIndex: 0, witness: seg.witnesses[0], restSince: 0, restYaw: [8.2, 8.2, 8.2, 8.2], stops: [], last: { x: end.x, z: end.z, v: 0, t: 900, psi: 8.2 } };
+    const r = pathStep(st, { wallMs: 1000, v: 0, x: end.x, z: end.z, f: 5, phase: "stop", keys: { W: false, S: true, steer: 0 } });
+    assert.equal(r.state.mode, "route-end");
+    assert.equal(r.state.endPoses[0]?.camYawDeg, 8.2, JSON.stringify(r.state.endPoses));
+    assert.equal(r.state.endPoses[0]?.yawMeasured, true);
+  });
+
+  it("T9.fwd a REVERSE plan's end poses are unchanged: only its reverse writes one, and no forward rest overwrites it", () => {
+    for (const lesson of ["sc-park-wall", "sc-park-left"]) {
+      const r = bench(lesson, 7);
+      assert.deepEqual(Object.keys(r.state.endPoses), ["1"], `${lesson}: ${JSON.stringify(Object.keys(r.state.endPoses))}`);
+    }
+  });
+
+  it("T9.fwd captureForwardRestEndPose: only the LAST segment, only forward, only the route's final stop, only after the capture rest, never twice", () => {
+    const p = plan("sc-park-gap-long");
+    const seg = p.segments[0];
+    const auth = { tag: "authored", consumed: false };
+    const end = { tag: "routeEnd", consumed: false };
+    const base = {
+      tune: PATH_TUNE, plan: p, segIndex: 0, endPoses: {}, restSince: 0, restYaw: [9, 9, 8.2, 8.2, 8.2, 8.2],
+      yaw: { suspect: false }, witness: seg.witnesses[0], stops: [auth, end], books: { segments: [{ k: 0 }] },
+    };
+    const pose = { x: 6.3, z: 0.1 };
+    const at = PATH_TUNE.stops.captureS * 1000;
+    // the authored stop at arc 96.6 is not the pose the product grades
+    assert.deepEqual(captureForwardRestEndPose(base, pose, 0, at, auth).endPoses, {});
+    // too early in the rest, or still moving
+    assert.deepEqual(captureForwardRestEndPose(base, pose, 0, at - 1, end).endPoses, {});
+    assert.deepEqual(captureForwardRestEndPose(base, pose, 0.5, at, end).endPoses, {});
+    // the final stop, rested: captured from the SETTLED half of the rest window (8.2, not the braking 9)
+    const got = captureForwardRestEndPose(base, pose, 0, at, end);
+    assert.equal(got.endPoses[0].camYawDeg, 8.2);
+    assert.equal(got.endPoses[0].yawMeasured, true);
+    // the authored stop consumed → the route end is the only stop left, whatever its tag
+    assert.equal(captureForwardRestEndPose({ ...base, stops: [{ ...auth, consumed: true }, end] }, pose, 0, at, end).endPoses[0].camYawDeg, 8.2);
+    // never twice, never over an existing one
+    const again = captureForwardRestEndPose({ ...got, restYaw: [1, 1, 1] }, pose, 0, at + 1000, end);
+    assert.equal(again.endPoses[0].camYawDeg, 8.2);
+    // a suspect camera stays UNMEASURED
+    assert.equal(captureForwardRestEndPose({ ...base, yaw: { suspect: true } }, pose, 0, at, end).endPoses[0].yawMeasured, false);
+    // a reverse last segment, and a forward segment that is not the last, write nothing here
+    const wall = plan("sc-park-wall");
+    assert.deepEqual(captureForwardRestEndPose({ ...base, plan: wall, segIndex: 1, witness: wall.segments[1].witnesses[0] }, pose, 0, at, end).endPoses, {});
+    assert.deepEqual(captureForwardRestEndPose({ ...base, plan: wall, segIndex: 0, witness: wall.segments[0].witnesses[0] }, pose, 0, at, end).endPoses, {});
   });
 
   it("T9.f blackouts × 3: no steer key is ever down across a yield", () => {
@@ -4005,6 +4219,83 @@ describe("SQD the micro square-up and the terminal heading law together", () => 
       const box = productBoxPrediction(plan(lesson).product.park, plantCentre(r.plant), psiOf(r.plant));
       assert.equal(box.inBox, true, `${lesson} seed ${seed}: ${JSON.stringify(box)}`);
       assert.ok(box.headingOffsetDeg <= 5.0, `${lesson} seed ${seed}: rests ${box.headingOffsetDeg}° off the bay heading (bar 5.0°; both mechanisms on measured 4.15° worst) — ${JSON.stringify(box)}`);
+    }
+  });
+});
+
+/* ═══════════════════════════ T9.i the authored mid-route stop ═══════════════════════════
+ * canary-path-91e5a51 sc-park-judge G7: «authored 1.08–4s/1.75 at 1.563 m [NOT SERVED]». The follower put
+ * the authored stop at `frac × witness span` — 0.8472 × 121.2 m = 102.68 m — but the F0 witness is 2.04 m
+ * longer than the authored 119.16 m only because its TAIL was re-planned (after the stop), so the stop landed
+ * 1.68 m past the place the trace's own stop pose projects onto the witness (101.00 m). Every judge drive
+ * rested ~1.56 m long; the bench reproduced it on 19 of 20 seeds (median 1.570 m, max 1.619 m). G7 measures
+ * against the TRACE's stop pose (path-evidence.mjs plannedStops/stopsFromSamples), which is the right
+ * reference, so the fix is in the follower (stopArcOnWitness), not the gate. */
+describe("T9.i the authored mid-route stop sits where the trace put it", () => {
+  it("T9.i.0 the row→polyline mapping, pinned on a synthetic witness: the ROW arc (less startAlongM) is read on the polyline's OWN arc, and a witness whose rows do not match its polyline falls back to frac", () => {
+    // The row column `s` advances 0.1 m a row while the chords are 0.2 m, so the row arc and the
+    // polyline arc differ by 2× — reading the row arc as a polyline arc (sStart + rowS) lands at 5,
+    // dropping startAlongM lands at 14, the correct mapping lands at 10.
+    const rows = [];
+    for (let i = 0; i <= 100; i++) rows.push([0.1 * i, 0.2 * i, 0, 0.2 * i, 0, 90, 0, 0, 5]);
+    const w = { startAlongM: 2, rows };
+    const poly = witnessPolyline(w, { gear: 1 });
+    const seg = { arcM: [10] };
+    const st = { tag: "authored", frac: 0.3, arcM: 17 }; // rowS = 17 − 10 − 2 = 5 → row 50 → polyline arc 10
+    near(stopArcOnWitness(seg, st, poly, w), poly.sStart + 10, 1e-6, "row arc read on the polyline arc");
+    const byFrac = poly.sStart + 0.3 * (poly.sEnd - poly.sStart);
+    near(stopArcOnWitness(seg, st, poly, { startAlongM: 2, rows: rows.slice(0, 100) }), byFrac, 1e-9, "rows that do not match the polyline fall back to frac, never index past it");
+    near(stopArcOnWitness(seg, { ...st, frac: 1 }, poly, w), poly.sEnd, 1e-9, "a segment-END stop stays the witness end");
+  });
+  const MID = ["sc-park-judge", "sc-park-gap-long"];
+  it("T9.i.1 every mid-segment authored stop maps onto the witness within 0.1 m of where the TRACE's stop pose projects (independent of the builder)", () => {
+    let seen = 0;
+    for (const lesson of LESSONS) {
+      const p = plan(lesson);
+      let trace;
+      try { trace = traceJson(lesson); } catch { continue; }
+      const planned = plannedStops(trace, lesson);
+      for (const seg of p.segments) {
+        if (seg.gear !== 1 || seg.micro) continue;
+        const w = seg.witnesses[0];
+        const poly = witnessPolyline(w, { gear: 1, extendM: 3 });
+        for (const st of seg.stops ?? []) {
+          if (st.tag !== "authored" || !(st.frac < 1)) continue;
+          const ref = planned.find((x) => x.tag === "authored" && x.seg === seg.k && Math.abs(x.arcM - st.arcM) < 0.05);
+          assert.ok(ref, `${lesson} F${seg.k}: the trace carries no authored stop at ${st.arcM}`);
+          let best = null;
+          for (let i = poly.startIdx; i < poly.endIdx; i++) {
+            const a = poly.pts[i];
+            const b = poly.pts[i + 1];
+            const vx = b.x - a.x;
+            const vz = b.z - a.z;
+            const l2 = vx * vx + vz * vz;
+            const t = l2 > 0 ? Math.min(1, Math.max(0, ((ref.ref.x - a.x) * vx + (ref.ref.z - a.z) * vz) / l2)) : 0;
+            const d = Math.hypot(ref.ref.x - (a.x + t * vx), ref.ref.z - (a.z + t * vz));
+            if (!best || d < best.d) best = { d, s: poly.S[i] + t * Math.sqrt(l2) };
+          }
+          if (best.d > 0.3) continue; // a pose the witness does not pass is not a place on it
+          const sM = stopArcOnWitness(seg, st, poly, w);
+          near(sM, best.s, 0.1, `${lesson} F${seg.k} authored stop @${st.arcM} (projects ${best.d.toFixed(3)} m off the witness):`);
+          seen += 1;
+        }
+      }
+    }
+    assert.ok(seen >= 2, `only ${seen} mid-segment authored stops checked — judge and gap-long must both be`);
+  });
+
+  it("T9.i.2 on the bench the drive rests at the authored stop — judge and gap-long seeds 1–10, measured by stopsFromSamples (canary G7's own measurement) within 0.5 m", () => {
+    for (const lesson of MID) {
+      for (let seed = 1; seed <= 10; seed++) {
+        const r = bench(lesson, seed);
+        assert.deepEqual(r.state.refusals, [], `${lesson} seed ${seed}`);
+        const st = stopsFromSamples(r.books.samples, traceJson(lesson), lesson).filter((s) => s.tag === "authored");
+        assert.ok(st.length >= 1, `${lesson} seed ${seed}: no authored stop planned`);
+        for (const s of st) {
+          assert.equal(s.measured, true, `${lesson} seed ${seed}: authored stop unmeasured (${s.why})`);
+          assert.ok(s.distToTargetM <= 0.5, `${lesson} seed ${seed}: rested ${s.distToTargetM} m from the authored stop (stopErr ${s.stopErrM} m, + long)`);
+        }
+      }
     }
   });
 });
