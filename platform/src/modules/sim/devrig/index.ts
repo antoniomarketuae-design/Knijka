@@ -42,3 +42,26 @@ export {
   type DriveRigSample,
   type DriveRigStatus,
 } from "./rig";
+
+// `window.__roadProbe` (W59 steering spec §2.3, founder RULING-2) — the road
+// fields off each SimTick, the product's own guidance route and the grader's
+// output as three separate objects. Unlike the rig above it IS mounted on
+// /simulator (dev builds only), by LessonPlayShell and RouteGuidance.
+export {
+  ROAD_PROBE_RING,
+  ROAD_PROBE_VERSION,
+  createRoadProbe,
+  publishRoadProbeRoute,
+  publishRoadProbeTick,
+  recordRoadProbeRoute,
+  recordRoadProbeTick,
+  roadProbeEnabled,
+  roadRecordOf,
+  stepRecordOf,
+  type RoadProbe,
+  type RoadProbeHost,
+  type RoadProbeRecord,
+  type RoadProbeRoute,
+  type RoadProbeRouteSource,
+  type RoadProbeStepRecord,
+} from "./roadProbe";

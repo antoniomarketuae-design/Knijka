@@ -2371,6 +2371,18 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         wrongWay,
         events,
       };
+      // WHERE ALONG THE EDGE (SimTick.sM / distM) — founder RULING-2,
+      // 2026-09-22: published for the audit harness's forward-steered leg and
+      // graded by NOTHING (`runtime/__tests__/road-position-not-graded.test.ts`
+      // fails by execution the moment a rule reads either). Off the SAME
+      // committed fix as laneOffsetM above, and only when the tick names an
+      // edge: an arclength without the segment it is measured along is not a
+      // position. `fix` is the locator's internally reused object — these are
+      // number copies, never the reference.
+      if (tick.edgeId != null) {
+        tick.sM = fix.sM;
+        tick.distM = fix.distM;
+      }
       // WHICH WAY THE CAR FACES, EVERY TICK — the observation behind the
       // verdict above, on the same additive seam but set UNCONDITIONALLY: an
       // observation that only appears when there is something to convict is the

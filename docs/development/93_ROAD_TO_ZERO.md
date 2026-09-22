@@ -83,6 +83,22 @@ new instrument: `guidance.samples[].wx/wz` and the authored trace have both
 been on disk for weeks, in the same frame, and were discarded at the reporting
 layer. The planned `__roadProbe` product change is therefore **cancelled**.
 
+> **2026-09-22 — `__roadProbe` RE-OPENED, under founder RULING-2**
+> (`docs/simulation/93_INSTRUMENT_GAPS.md`; W59 steering spec §2.3, increment 1).
+> The cancellation above stands for what it was about — *measurement after the
+> fact* — and does not reach the new case, on two grounds: **(a)** a
+> *controller* needs the road signal **live**, at control rate, and an artefact
+> folded after the drive cannot steer anything; **(b)** the artefact this
+> cancellation rested on is the **authored trace**, which is a referent for
+> "did the car follow the demonstration", not for "where was the car on the
+> road" — the product's own `Locator` fix is the road. It is superseded on
+> those grounds, not because anyone changed their mind. What landed: a
+> dev-only (`NODE_ENV !== "production"`, gated like `__camProbe`) ring buffer
+> of copied tick fields on `/simulator` (`modules/sim/devrig/roadProbe.ts`,
+> three objects `road` / `route` / `step`), and `SimTick.sM` / `distM` as
+> additive, ungraded fields beside `laneOffsetM`, proved inert by execution in
+> `runtime/__tests__/road-position-not-graded.test.ts`. No controller.
+
 Over w43's 79 `right` legs: **39 (49 %) put the car more than 8 m from its own
 lesson's correct line**, only 11 (14 %) never left 3 m, and the worst reached
 185.7 m. Every one of those legs reported `TRACKING` and none reported this.

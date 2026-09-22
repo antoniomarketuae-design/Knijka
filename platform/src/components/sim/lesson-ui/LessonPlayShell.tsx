@@ -198,6 +198,7 @@ import {
   type StuckStartReason,
 } from "@/modules/sim/engine";
 import { worldEdgeWarning } from "@/modules/sim/runtime";
+import { publishRoadProbeTick, type RoadProbeHost } from "@/modules/sim/devrig";
 import {
   DEFAULT_DIFFICULTY,
   transmissionModeFor,
@@ -5433,8 +5434,17 @@ export function LessonPlayShell({
       const { state, hudEvents, teachMoments, mistakeMoment } = step;
       sessionRef.current = state;
       lastTickRef.current = tick;
-      // Dev drive rig: read-only, undefined everywhere but /dev/drive-rig.
+      // DEV TAPS — read-only, written AFTER applyTick, never read back.
+      // `onDevTelemetry` is passed by two dev routes, /dev/drive-rig and
+      // /dev/gw-shell, and is undefined everywhere else (incl. /simulator).
+      // `window.__roadProbe` (W59 steering spec §2.3, founder RULING-2) is
+      // published from the SAME point on every route, /simulator included —
+      // the same tick the rules saw and the step they produced, copied, in
+      // dev builds only (gated exactly like `__camProbe`).
       onDevTelemetry?.(tick, step);
+      if (process.env.NODE_ENV !== "production") {
+        publishRoadProbeTick(window as unknown as RoadProbeHost, tick, step);
+      }
 
       // THE RIM. Absent on a tick from a source with no district (replays,
       // fixtures, the dev rigs) — and absent means UNKNOWN, never "outside",

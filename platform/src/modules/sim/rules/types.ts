@@ -437,6 +437,51 @@ export interface SimTick {
    */
   edgeId?: string | null;
   /**
+   * WHERE ALONG THAT SEGMENT THE CAR IS — arclength, metres, measured along
+   * `edgeId`'s own polyline in its GEOMETRY direction (from → to), whichever
+   * way the car is travelling. The committed lane fix's `LocateFix.sM`
+   * (`runtime/locator.ts`), copied as a number off the same fix `laneOffsetM`
+   * and `laneId` are read from, on the same tick.
+   *
+   * PUBLISHED FOR THE AUDIT HARNESS ONLY (founder RULING-2, 2026-09-22,
+   * `docs/simulation/93_INSTRUMENT_GAPS.md`; W59 steering spec §2.3 option A).
+   * A forward-steered audit leg must know where on the edge it is, and
+   * `laneOffsetM` says only where in the lane. NO rule, objective, card, score
+   * or teach moment may read this field, now or later — proved by EXECUTION in
+   * `runtime/__tests__/road-position-not-graded.test.ts`, which folds real
+   * drives through the real reducers with it published, stripped and lied
+   * about and requires identical results.
+   *
+   * Present ONLY when `edgeId` is a string: the number is meaningless without
+   * the segment it is measured along, so off-road (edgeId null — including a
+   * car past the kerb whose lock ring still names an edge) it is ABSENT, and
+   * absent means UNKNOWN, never 0. Ids — and therefore arclengths — are only
+   * comparable within one `edgeId`.
+   *
+   * IT IS CLAMPED, AND A CLAMP IS NOT A POSITION. The locator projects onto the
+   * polyline's segments with the projection parameter clamped to each segment
+   * (`runtime/spatial.ts` `fillHit`), so `sM` lives in [0, edge length] and
+   * a car BEHIND the first vertex or PAST the last one reads exactly 0 or
+   * exactly the length — while the tick can still name this edge there (the
+   * locator's lock ring is 30 m, far longer than the carriageway is wide). The same
+   * holds on the outside of a bend, where a whole wedge of positions projects
+   * onto the one interior vertex. In all of those `sM` stops moving while the
+   * car does, and `distM` becomes the distance to the VERTEX, not to the line.
+   * A controller must not read an `sM` pinned at 0 / at the length (or
+   * frozen across frames while the car moves) as progress along the road:
+   * treat it as „at or beyond this end of the edge", and take along-track
+   * progress from the next edge the tick names.
+   */
+  sM?: number;
+  /**
+   * Distance from the car to `edgeId`'s CENTRELINE, metres, unsigned (the
+   * committed fix's `LocateFix.distM`). Same contract, same gate and the same
+   * RULING-2 constraint as `sM` beside it: harness only, never graded, absent
+   * whenever `edgeId` is not a string (so it is never `Infinity` on a tick).
+   * It carries no bank — `opposingBank` is the bank discriminator.
+   */
+  distM?: number;
+  /**
    * Metres of authored world left in front of the car — the distance to the
    * rectangle past which there is no ground, no props and no road
    * (`runtime/district.worldEdgeClearanceM`; negative outside it).
@@ -772,6 +817,20 @@ export interface SimTick {
    * nominal direction vs the vehicle heading — the same channel `wrongWay`
    * rides for one-ways). Kinematic world context, set only when true; legal
    * where the line is dashed — ONLY the solidCenterLine composite grades it.
+   *
+   * ⚠ IT OUTLIVES `edgeId` PAST THE KERB (measured 2026-09-22, recorded, NOT
+   * changed — changing it could move grading). This flag and `oneway` are
+   * resolved from the lock ring's edge, which survives the kerb, while
+   * `edgeId` is nulled there by the surface consult. So a car standing in the
+   * field beside a two-way road still publishes `opposingBank: true` /
+   * `oneway: false` with `edgeId: null`: the steering measurer saw it on
+   * 131 of 131 off-road ticks of sc-ov-keep-right, and in-process it is 29 of
+   * 29 off-road ticks 22 m left of district-v1 `e718268829.0`. Any NEW reader
+   * — the audit harness through `window.__roadProbe` above all — must gate on
+   * `edgeId != null` before believing either field. Whether the shipped
+   * readers (CROSSED_SOLID_LINE in rules/engine.ts, the overtake-corridor
+   * predicates in runtime/worldRuntime.ts) can be reached in that state was NOT
+   * examined in this increment — that is its own question, with its own tests.
    */
   opposingBank?: boolean;
   // -- RAIL PACK slice 1 (ADR-006 stage 3a; doc 72 §12 RX-01/RX-02/RX-03).

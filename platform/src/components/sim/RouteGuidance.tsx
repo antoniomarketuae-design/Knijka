@@ -55,6 +55,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { VehicleSample } from "@/modules/sim/contracts";
 import { shownObjectiveCapKmh, type LessonSpec } from "@/modules/sim/lessons";
+import { publishRoadProbeRoute, type RoadProbeHost } from "@/modules/sim/devrig";
 import {
   LOOKAHEAD_MAX_LEGS,
   ROUTE_MAX_SAMPLES,
@@ -1314,6 +1315,13 @@ export function RouteGuidance({
 
     const route = deriveGuidanceRoute(graph, start, goal, { lookahead });
     routeRef.current = route;
+    // `window.__roadProbe.route` (W59 steering spec §3.2, founder RULING-2):
+    // the route this effect just derived and is about to paint, copied, once
+    // per DERIVATION (mount, objective change, reroute) — never per frame.
+    // Dev builds only, gated exactly like `__camProbe`; nothing reads it back.
+    if (process.env.NODE_ENV !== "production") {
+      publishRoadProbeRoute(window as unknown as RoadProbeHost, route);
+    }
 
     // Re-arm the loss latch against the route the student is actually being
     // given. `baseLatM` is how far off it already is at the pose it was built
