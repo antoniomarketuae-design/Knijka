@@ -284,3 +284,42 @@ the suite rather than silently changing the answer:**
 
 **What to do with these rows:** nothing, unless L8 or L9 is being worked. They are a register, not
 a queue — a harness change closes no finding, and none of them was ever on the open list.
+
+## RULING-1 — the pc-path leg may steer on the dev pose probe — **RATIFIED 2026-09-22**
+
+**The question, as put to the founder.** To reverse into a bay the pc-path leg steers on
+`window.__camProbe`, a pose readout that exists in development builds only and never in a student's
+build. `lesson-audit.mjs`'s standing rule («WHY THE PIXELS, WHEN A CHEAPER SIGNAL EXISTS») is that the
+probe may WITNESS a drive and never STEER it, because a loop closed around it could pass a lesson
+whose visible guidance is broken. DESIGN-v2 §14.2 reserved the exception for him; the 2026-09-20
+ruling to build the instrument never asked it, and `path-routing.json` refused to route any lesson
+until it was answered.
+
+**The answer: «Ratify, pc-path only».** The exception holds on pc-path legs and nowhere else, under
+the limits `PATH_TESTIMONY` (`tools/mobile/lib/path-follow.mjs`) prints first on every artefact. A
+pc-path leg MAY testify to whether the product CREDITS a park along a witness of the authored line,
+the faults booked on that drive net of attribution, collisions as candidates, and the HUD /
+ReverseAssist / debrief during it. It MAY NOT testify to guidance, legibility, lane choice or
+route-keeping (the car is on the authored line by construction), the clearance of the authored line,
+pass rates, a wrong drive, mobile/touch, or production builds. Those stay with the normal legs. The
+rule text in `lesson-audit.mjs` is not rewritten; its five pointers now say «ratified».
+
+**What it unlocked, measured the same night.** Real-browser canaries at `91e5a51`
+(`.audit-frames/canary-path-91e5a51/frames/<lesson>__pc-path`, gated by `tools/audit/path-canary.mjs`):
+
+| lesson | gates | product's own verdict on the park |
+|---|---|---|
+| sc-park-wall | G0–G10 PASS | 2/2 objectives, «приемливо», «ъгъл 4°» |
+| sc-park-left | G0–G10 PASS | 2/2, «приемливо», 2° |
+| sc-park-van | G0–G10 PASS | 2/2, «приемливо», 1.5° |
+| sc-pk-driveway | G0–G10 PASS | 2/2, «приемливо», 0.5° |
+| sc-park-zebra | G0–G10 PASS | 2/2, «центрирано», 5.4° |
+| sc-park-gap-short | G0–G10 PASS | 2/2, «приемливо», 8.4° (cam yaw 7.97° agrees) |
+| sc-park-judge | G7 FAIL (an authored stop NOT SERVED) | 2/2, «центрирано», 5.6° |
+| sc-park-gap-long | G2/G3/G6 FAIL (no reverse arm found) | 2/2, «приемливо», 7.8° |
+| sc-park-45-rev | G2/G3/G4/G6/G7 FAIL | 1/2 — the reverse went unmeasured, park NOT credited |
+
+The six that passed every gate are routed (`canaryPassed: true`, 9 rows). judge, gap-long and 45-rev
+stay unrouted until their canaries pass; sc-ed-poligon-chain was not canaried; sc-park-bay-exit-rev
+is refused by design. **Routing closes nothing**: every routed row still has to be swept and judged,
+and gap-short's credited heading has 0.5° of bench margin (T9.k), so one canary is one sample.

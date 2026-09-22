@@ -4997,7 +4997,8 @@ if (STEER_BY === "authored-path") {
  * student could make.
  *
  * EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs;
- * pending founder ratification (DESIGN-v2 §14.2). This rule text is NOT rewritten.
+ * RATIFIED by the founder 2026-09-22, pc-path legs only (DESIGN-v2 §14.2; doc 93 RULING-1).
+ * This rule text is NOT rewritten.
  */
 const guidance = {
   /** what the loop closes around, named so a consumer never has to infer it */
@@ -5210,7 +5211,7 @@ const steeredBy =
         })(),
         mayTestify: PATH_TESTIMONY.mayTestify,
         mayNotTestify: PATH_TESTIMONY.mayNotTestify,
-        doctrine: "declared exception to lesson-audit.mjs's «WHY THE PIXELS» rule — pending founder ratification",
+        doctrine: "declared exception to lesson-audit.mjs's «WHY THE PIXELS» rule — ratified by the founder 2026-09-22, pc-path legs only (doc 93 RULING-1)",
       }
     : null;
 let pathEvidence = null;
@@ -5394,7 +5395,7 @@ const guideMasks = (band) =>
     .catch(() => []);
 
 /** The dev-only pose probe, read as a witness and never as a control input.
- *  EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs; pending founder ratification. */
+ *  EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs; ratified by the founder 2026-09-22 (doc 93 RULING-1). */
 const guideWitnessRead = () =>
   page
     .evaluate(() => {
@@ -6825,7 +6826,7 @@ const FLAT_REST_GIVEUP_MS = 15_000;
  * steers by it.
  *
  * EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs;
- * pending founder ratification. That leg never reads the tape (loadPaceTape).
+ * ratified by the founder 2026-09-22 (doc 93 RULING-1). That leg never reads the tape (loadPaceTape).
  *
  * The known error is named because it is not small. The liveness checks that
  * run BEFORE the control law — «POSITIVE CONTROL: 44 км/ч after 5 s of
@@ -9980,7 +9981,7 @@ if (MODE === "right") {
   pace.odoM = Number(paceOdoM.toFixed(1));
   if (paceTape !== null && guideWitness.length > 0) {
     // MEASURED, NOT USED. `__camProbe` is dev-only and may never enter the
-    // (EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs; pending founder ratification)
+    // (EXCEPTION: authored-path leg — see PATH_TESTIMONY in lib/path-follow.mjs; ratified by the founder 2026-09-22, doc 93 RULING-1)
     // control law (see THE PACE TAPE), but it can say how far from the trace's
     // own starting point this drive's odometer zero actually sat — the lag the
     // pre-drive liveness checks leave behind. `y = −z` (LessonScene.tsx:597).

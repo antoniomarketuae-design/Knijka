@@ -18,7 +18,8 @@
 // CONTROL INPUT. lesson-audit.mjs's rule that the probe is a witness and never a
 // control input (the blocks headed «WHY THE PIXELS, WHEN A CHEAPER SIGNAL EXISTS»
 // and «THE INDEX IS AN ODOMETER») is NOT rewritten: each carries a pointer here,
-// and the exception is pending founder ratification (DESIGN-v2 §14.2). The price
+// and the exception was RATIFIED by the founder on 2026-09-22, for pc-path legs
+// only (DESIGN-v2 §14.2; docs/simulation/93_INSTRUMENT_GAPS.md RULING-1). The price
 // is `PATH_TESTIMONY.mayNotTestify`, printed first on every artefact.
 //
 // ═══ FRAMES ══════════════════════════════════════════════════════════════════
