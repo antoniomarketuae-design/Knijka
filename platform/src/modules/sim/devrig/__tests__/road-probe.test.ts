@@ -78,10 +78,41 @@ const ROAD_FIELDS = [
   "laneLinesPainted",
   "worldEdgeClearanceM",
   "gear",
+  // THE FOUNDER-RULED DIRECTION SIGNAL, flattened (probe version 3). The tick
+  // carries it as ONE nested record, `edgeAlignment`; the probe copies its
+  // members out ONE BY ONE under prefixed names, which is this file's house
+  // style and the reason `edgeAlignment` itself is still asserted absent below.
+  // ALL of them: a subset is how a consumer ends up reading a bank-blind angle
+  // as a direction, or judging a tick it should have filtered off the kerb.
+  "alignDeg",
+  "wrongWayArmed",
+  "alignEdgeId",
+  "alignOffCarriageway",
+  "alignTravelDir",
+  "alignRoundabout",
 ].sort();
 
-/** The same fields, minus the probe's own join keys: what must equal the tick. */
-const FROM_TICK = ROAD_FIELDS.filter((k) => k !== "seq" && k !== "wallMs");
+/**
+ * The same fields, minus the probe's own join keys: what must equal the tick's
+ * member OF THE SAME NAME.
+ *
+ * The direction fields are excluded because they are the one place this record
+ * RENAMES: they come from the nested `tick.edgeAlignment`, not from a
+ * `tick.alignDeg`. A rename is exactly where a copy can silently pick
+ * up the wrong member, so they get their own executed assertion below rather
+ * than being dropped from the check.
+ */
+const RENAMED_FROM_EDGE_ALIGNMENT = [
+  "alignDeg",
+  "wrongWayArmed",
+  "alignEdgeId",
+  "alignOffCarriageway",
+  "alignTravelDir",
+  "alignRoundabout",
+];
+const FROM_TICK = ROAD_FIELDS.filter(
+  (k) => k !== "seq" && k !== "wallMs" && !RENAMED_FROM_EDGE_ALIGNMENT.includes(k),
+);
 
 /** A tick with EVERY road field present, each at a distinctive value (so a
  *  record that swapped two fields or defaulted one cannot match by accident),
@@ -107,6 +138,21 @@ function fullTick(t: number): SimTick {
     centreLinePainted: false,
     laneLinesPainted: false,
     worldEdgeClearanceM: 412.5,
+    // DISTINCTIVE AND MUTUALLY UNCONFUSABLE: `deg` is negative (a record that
+    // took its absolute value, or read `Math.abs`, survives a positive
+    // fixture), `wrongWayArmed` disagrees with `wrongWay: false` above (so a
+    // copy that read the boolean instead of the flag cannot match), and
+    // `edgeId` here DIFFERS from the tick's own `edgeId` — which is the real
+    // production case: past the kerb the tick's `edgeId` is nulled while the
+    // lane fix still names a road.
+    edgeAlignment: {
+      deg: -137.5,
+      wrongWayArmed: true,
+      edgeId: "e-align-9.1",
+      offCarriageway: true,
+      travelDir: -1,
+      roundabout: true,
+    },
     gear: 2,
     indicator: "left",
     headlights: "low",
@@ -174,9 +220,82 @@ describe("probe.road — the tick's own values", () => {
 
   it("copies no grading-only field off the tick (maxSpeedKmh, indicator, events …)", () => {
     const rec = roadRecordOf(fullTick(4), 1, 0) as unknown as Record<string, unknown>;
+    // `edgeAlignment` is in this list for a DIFFERENT reason than the others:
+    // they are not copied at all, while it is copied MEMBER BY MEMBER into the
+    // three flat fields below. The nested object must not also appear, or a
+    // reader would have two spellings of one value to keep in step.
     for (const k of ["maxSpeedKmh", "indicator", "headlights", "events", "edgeAlignment", "isNight"]) {
       expect(k in rec, k).toBe(false);
     }
+  });
+
+  it("THE RULED SIGNAL REACHES THE RECORD, and from the right member of it", () => {
+    // WHY THIS TEST EXISTS. `SimTick.edgeAlignment` — the founder-ruled signed
+    // direction value (2026-09-20) — was published by the runtime and copied
+    // into the drive-rig's sample, and `grep -rn edgeAlignment tools/` returned
+    // NOTHING: no harness file read either tap. The criteria that ASKED for it
+    // (`tools/mobile/lib/road-criteria.mjs`) went on judging one-way legs on
+    // `wrongWay`, whose `false` means «with the flow» OR «nobody asked», and
+    // the cheat that ambiguity funds stayed live. A value published and read by
+    // no one is the dead-predicate class, and this is the seam where it was
+    // dead.
+    const tick = fullTick(4);
+    const rec = roadRecordOf(tick, 1, 0);
+    expect(rec.alignDeg).toBe(-137.5);
+    expect(rec.wrongWayArmed).toBe(true);
+    expect(rec.alignEdgeId).toBe("e-align-9.1");
+
+    // NOT THE NEIGHBOURING SPELLINGS. Each of these would type-check and read
+    // plausibly at the call site, and each is a different claim.
+    expect(rec.alignEdgeId).not.toBe(rec.edgeId); // the lane fix's edge, not the tick's
+    expect(rec.wrongWayArmed).not.toBe(rec.wrongWay); // „was it asked", not „was it true"
+    expect(rec.alignDeg).toBe(tick.edgeAlignment!.deg); // signed, never |deg|
+
+    // THE TWO MEMBERS A SUBSET WOULD HAVE DROPPED, and what each one costs.
+    //
+    // `travelDir` is the record's ONLY bank discriminator: `laneOffsetM` is
+    // signed „+ = left of TRAVEL" on both banks, so without this member every
+    // opposing-bank car on a two-way road reads as facing the right way — the
+    // very defect the ruling was made to end. The fixture is −1, which can only
+    // occur on a two-way edge.
+    expect(rec.alignTravelDir).toBe(-1);
+    // `offCarriageway` is how a consumer filters to road-referenced ticks. The
+    // angle is published past the kerb ON PURPOSE (suppressing it would rebuild
+    // the same ambiguity one kerb over), so the filter has to travel with it.
+    expect(rec.alignOffCarriageway).toBe(true);
+    expect(rec.alignRoundabout).toBe(true);
+  });
+
+  it("THREE STATES THAT CANNOT COLLIDE: absent, measured-null, and a number", () => {
+    // The contract `rules/types.ts` states for this record, held at the probe.
+    // `deg: null` is „the runtime looked and could not measure"; ABSENT is „this
+    // tick did not come from the world runtime". Collapsing either into the
+    // other hands a consumer a `false`-shaped answer to a question nobody asked,
+    // which is the ambiguity the ruling exists to remove.
+    const absent = roadRecordOf(bareTick(1), 1, 0) as unknown as Record<string, unknown>;
+    expect("alignDeg" in absent).toBe(false);
+    expect("wrongWayArmed" in absent).toBe(false);
+    expect("alignEdgeId" in absent).toBe(false);
+
+    const looked = roadRecordOf(
+      { ...bareTick(2), edgeAlignment: { deg: null, reason: "no-edge-fix", wrongWayArmed: false, edgeId: null, offCarriageway: false } },
+      2,
+      0,
+    );
+    expect("alignDeg" in (looked as unknown as Record<string, unknown>)).toBe(true);
+    expect(looked.alignDeg).toBeNull();
+    expect(looked.wrongWayArmed).toBe(false);
+    expect(looked.alignEdgeId).toBeNull();
+
+    // AND ZERO IS A MEASUREMENT, NOT AN ABSENCE — it is the STRONGEST possible
+    // „aligned", the exact value `rules/types.ts` warns must never stand for
+    // „unmeasured".
+    const aligned = roadRecordOf(
+      { ...bareTick(3), edgeAlignment: { deg: 0, wrongWayArmed: true, edgeId: "e-0", offCarriageway: false, travelDir: 1, roundabout: false } },
+      3,
+      0,
+    );
+    expect(aligned.alignDeg).toBe(0);
   });
 
   it("ABSENCE PASSES THROUGH: no optional field is invented, and null stays null", () => {

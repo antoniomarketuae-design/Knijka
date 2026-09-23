@@ -39,11 +39,25 @@ import type { SimTick } from "../rules";
 import type { LessonStepResult } from "../lessons";
 
 /**
+ * 3 (founder ruling 2026-09-20, wired 2026-09-23): the road record carries the
+ * SIGNED direction value — `alignDeg`, `wrongWayArmed`, `alignEdgeId`, copied
+ * off `SimTick.edgeAlignment`.
+ *
+ * WHY IT IS A VERSION AND NOT JUST THREE MORE OPTIONAL FIELDS. In this record
+ * an absent field means „the tick did not say", and for every other field that
+ * is the whole truth. Here it is not: a reader that wants to know which way the
+ * car FACED must be able to tell „this build could not tell you" from „the
+ * runtime looked and could not measure" (`alignDeg: null`) — and a v2 record
+ * gives the first while looking exactly like the second. Bumping makes a v2
+ * sidecar UNMEASURED to a v3 reader instead of quietly judgeable on a signal it
+ * never carried, which is the failure this whole seam exists to remove. The
+ * cost is nil: no leg has yet been driven with the witness in anger.
+ *
  * 2 (W59 increment 2): `route.laneAlign` — where the product's lane-align
  * shift bent the route, so a reader stops guessing it from the turn markers.
  * A reader written against 1 must not read a 2 as if it were a 1.
  */
-export const ROAD_PROBE_VERSION = 2;
+export const ROAD_PROBE_VERSION = 3;
 
 /**
  * RING SIZE: 1024 ticks per ring (`road` and `step` alike).
@@ -87,6 +101,58 @@ export interface RoadProbeRecord {
   opposingBank?: boolean;
   oneway?: boolean;
   wrongWay?: boolean;
+  /**
+   * THE FOUNDER-RULED DIRECTION SIGNAL (ruling 2026-09-20, option 1), forwarded
+   * from `SimTick.edgeAlignment`. Without it `wrongWay: false` reaches the
+   * harness meaning EITHER „he faced the right way" OR „nobody asked", and a
+   * criterion that cannot tell those apart is armed only by the offence it
+   * exists to detect — which is the live cheat recorded as N15b
+   * (instrument-road-criteria, 2026-09-20): one declared wrong-way second buys
+   * the other 1240 ticks of a leg.
+   *
+   * The runtime has published `SimTick.edgeAlignment` since 2c6d3cb and NOTHING
+   * outside the browser could read it: this probe forwarded only the boolean.
+   * That is the dead-predicate shape — a measurement shipped and wired to no
+   * consumer — and it is why publishing the value did not, by itself, settle
+   * anything.
+   *
+   * `alignDeg` is the SIGNED rotation from the edge's geometry-forward bearing
+   * to the nose, (-180, +180], `null` when the runtime looked and could not
+   * measure. It is NEVER 0 for „unmeasured" — 0 is the strongest possible
+   * „aligned". It measures THE NOSE: on `gear === -1` the direction of travel
+   * is `alignDeg ± 180`, which is why a lawful reverse reads ≈180 and must not
+   * be convicted by a consumer that reads it as travel.
+   */
+  alignDeg?: number | null;
+  /** Was the `wrongWay` channel ASKED on this tick? `false` means the boolean
+   *  beside it carries NO claim about which way the car faced. Lifted out of
+   *  the same gate that arms the verdict — one boolean, two readers. */
+  wrongWayArmed?: boolean;
+  /** The edge `alignDeg` is measured against. Deliberately NOT `edgeId`, which
+   *  is nulled past the kerb while the lane fix still names a real edge. */
+  alignEdgeId?: string | null;
+  /**
+   * The predicate that disarms `wrongWay`: the car is more than
+   * OFF_CARRIAGEWAY_M past the drawn kerb. The angle is published anyway — the
+   * contract is explicit that suppressing it would recreate the same ambiguity
+   * one kerb over — so **a consumer that wants road-referenced ticks only must
+   * filter on this**, which it can only do if the record carries it.
+   */
+  alignOffCarriageway?: boolean;
+  /**
+   * THE RECORD'S ONLY BANK DISCRIMINATOR (`EdgeAlignment.travelDir`): the
+   * nominal travel direction of the lane bank the car occupies, +1 or −1, and
+   * what turns `alignDeg` into a BANK-relative angle. `laneOffsetM` is signed
+   * „+ = left of TRAVEL" on both banks and so carries no bank at all — without
+   * this member every opposing-bank car on a two-way road reads as facing the
+   * right way, which is precisely the defect the direction signal exists to
+   * end. Absent iff `alignDeg === null`.
+   */
+  alignTravelDir?: 1 | -1;
+  /** Is the committed edge a roundabout ring? Not otherwise published on the
+   *  tick, and the ring is the family whose rows wait on this instrument.
+   *  Absent iff `alignDeg === null`. */
+  alignRoundabout?: boolean;
   /** Clamped to [0, edge length] at the edge's vertices while the tick can
    *  still name the edge there — a pinned value is „at or past this end",
    *  never a position (see `SimTick.sM`). */
@@ -220,6 +286,27 @@ export function roadRecordOf(tick: SimTick, seq: number, wallMs: number): RoadPr
   if (tick.opposingBank !== undefined) r.opposingBank = tick.opposingBank;
   if (tick.oneway !== undefined) r.oneway = tick.oneway;
   if (tick.wrongWay !== undefined) r.wrongWay = tick.wrongWay;
+  // THE RECORD IS ABSENT ON A TICK THAT DID NOT COME FROM THE WORLD RUNTIME
+  // (a hand-built unit-test tick, a recorded trace, a clip plan), and absence
+  // asserts nothing — so all three fields stay undefined together rather than
+  // defaulting. `alignDeg` may legitimately be `null` WITH the record present:
+  // that is „the runtime looked and could not measure", which is a different
+  // state from „nobody published", and a consumer must be able to tell them
+  // apart or it recreates the ambiguity this forwarding exists to remove.
+  if (tick.edgeAlignment !== undefined) {
+    r.alignDeg = tick.edgeAlignment.deg;
+    r.wrongWayArmed = tick.edgeAlignment.wrongWayArmed;
+    r.alignEdgeId = tick.edgeAlignment.edgeId;
+    r.alignOffCarriageway = tick.edgeAlignment.offCarriageway;
+    // THE WHOLE RECORD OR NONE OF IT. `travelDir` and `roundabout` are present
+    // iff `deg !== null`, so they follow the record's own rule rather than this
+    // function's: absent here means the ANGLE was unmeasurable, never that this
+    // tap chose not to carry them. Forwarding a SUBSET is how a consumer ends
+    // up reading a bank-blind angle as a direction — the defect the signal was
+    // ruled for.
+    if (tick.edgeAlignment.travelDir !== undefined) r.alignTravelDir = tick.edgeAlignment.travelDir;
+    if (tick.edgeAlignment.roundabout !== undefined) r.alignRoundabout = tick.edgeAlignment.roundabout;
+  }
   if (tick.sM !== undefined) r.sM = tick.sM;
   if (tick.distM !== undefined) r.distM = tick.distM;
   if (tick.centreLinePainted !== undefined) r.centreLinePainted = tick.centreLinePainted;

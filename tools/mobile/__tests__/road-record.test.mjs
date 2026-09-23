@@ -243,8 +243,8 @@ test("a read that throws is booked with its text and the leg is UNMEASURED if ev
 });
 
 test("a probe of another version is UNMEASURED — its shape is not this reader's to guess", () => {
-  assert.equal(ROAD_PROBE_VERSION_READ, 2, "this reader is written against probe version 2 (route.laneAlign)");
-  for (const v of [1, 3]) {
+  assert.equal(ROAD_PROBE_VERSION_READ, 3, "this reader is written against probe version 3 (the ruled direction signal)");
+  for (const v of [1, 2, 4]) {
     const host = { __roadProbe: { ...createRoadProbe(), version: v } };
     const rec = createRoadRecord();
     poll(host, rec);
@@ -1213,4 +1213,70 @@ test("§SINK the module holds NO state: every export is a function or a primitiv
   for (const [k, v] of Object.entries(RR)) {
     assert.ok(typeof v === "function" || typeof v === "string" || typeof v === "number", `${k} is a ${typeof v} — a mutable export is a channel`);
   }
+});
+
+/* ── the ruled direction signal, end to end through this reader ───────────── */
+
+test("THE RULED SIGNAL SURVIVES THE WHOLE RECORD: probe → sidecar columns → criteria row", () => {
+  // WHAT THIS GUARDS. The founder ruled (2026-09-20) that the product publish a
+  // per-tick SIGNED travel-vs-edge value, because `wrongWay === false` means
+  // «with the flow» OR «nobody asked». The product published it and NO HARNESS
+  // FILE READ IT — `grep -rn edgeAlignment tools/` returned nothing — so the
+  // criteria that asked for it kept judging on the ambiguous boolean. This test
+  // is the whole path in one place: if any link stops carrying the three
+  // fields, or invents one where the tick was silent, it goes red here rather
+  // than being discovered as a cheat in the criteria six waves later.
+  const host = {};
+  publishRoadProbeTick(
+    host,
+    tick({ t: 1, edgeId: "e1", oneway: true, wrongWay: false, edgeAlignment: { deg: -12.5, wrongWayArmed: true, edgeId: "e1", offCarriageway: false, travelDir: 1, roundabout: false } }),
+    STEP,
+    1,
+  );
+  // The runtime LOOKED AND COULD NOT MEASURE — a different state from silence.
+  publishRoadProbeTick(
+    host,
+    tick({ t: 2, edgeId: null, oneway: true, wrongWay: false, edgeAlignment: { deg: null, reason: "no-edge-fix", wrongWayArmed: false, edgeId: null } }),
+    STEP,
+    2,
+  );
+  // A tick that never came from the world runtime at all: the record is ABSENT.
+  publishRoadProbeTick(host, tick({ t: 3, edgeId: "e1", oneway: true, wrongWay: false }), STEP, 3);
+
+  const raw = JSON.parse(JSON.stringify(host.__roadProbe.road));
+  const [a, b, c] = toCriteriaRows(raw);
+  assert.equal(a.alignDeg, -12.5, "the SIGN survives — not |deg|");
+  assert.equal(a.wrongWayArmed, true);
+  assert.equal(a.alignEdgeId, "e1");
+  // ALL SIX, NOT THE THREE THAT ARE EASY TO REMEMBER. Mutation M8 dropped
+  // exactly these three from the adapter and this test stayed GREEN — the bank
+  // discriminator and the kerb filter can go missing in silence otherwise, and
+  // a criterion without them reads an opposing-bank car as facing the right way
+  // and judges ticks it should have filtered off the kerb.
+  assert.equal(a.alignOffCarriageway, false);
+  assert.equal(a.alignTravelDir, 1);
+  assert.equal(a.alignRoundabout, false);
+  assert.equal(b.alignDeg, null, "measured-null stays null, never 0 and never dropped");
+  assert.equal(b.wrongWayArmed, false);
+  assert.equal("alignDeg" in c, false, "no record on the tick ⇒ ABSENT in the row");
+  assert.equal("wrongWayArmed" in c, false);
+
+  // …AND THROUGH THE COLUMN ENCODING THE SIDECAR ACTUALLY STORES, which is its
+  // own opportunity to collapse the three states into two.
+  const round = decodeRowColumns(encodeRowColumns(raw));
+  const [ra, rb, rc] = toCriteriaRows(round);
+  assert.equal(ra.alignDeg, -12.5);
+  assert.equal(rb.alignDeg, null);
+  assert.equal("alignDeg" in rc, false);
+  assert.equal(ra.wrongWayArmed, true);
+  assert.equal(rb.wrongWayArmed, false);
+  assert.equal("wrongWayArmed" in rc, false);
+});
+
+test("a v2 sidecar is UNMEASURED to this reader, rather than judged on a signal it never carried", () => {
+  // The version bump is the point: a v2 record has no direction fields, and
+  // „absent" there means „this build could not tell you", which looks exactly
+  // like „the runtime looked and could not measure". A reader that accepted it
+  // would hand the criteria a record whose silence it cannot interpret.
+  assert.equal(ROAD_PROBE_VERSION_READ, 3);
 });

@@ -283,8 +283,14 @@ describe("§4 no shift applied => laneAlign is null, never a zero-width span", (
 /* ── §5 ───────────────────────────────────────────────────────────────────── */
 
 describe("§5 the dev probe copies the span; production publishes nothing", () => {
-  it("the probe version moved to 2 with the new field", () => {
-    expect(ROAD_PROBE_VERSION).toBe(2);
+  it("the probe version is past the 2 this field arrived in", () => {
+    // `laneAlign` arrived in probe version 2 and this test is what pinned it.
+    // Version 3 (2026-09-23) added the founder-ruled direction fields, and the
+    // assertion is written as a FLOOR rather than moved to 3: what §5 is
+    // entitled to claim is that a reader old enough to miss `laneAlign` cannot
+    // read this record, not what every later increment did. Pinning the exact
+    // number here made an unrelated bump red in a file about lane-align spans.
+    expect(ROAD_PROBE_VERSION).toBeGreaterThanOrEqual(2);
   });
 
   it("the published route carries a COPY of laneAlign (a later edit of the source changes nothing)", () => {

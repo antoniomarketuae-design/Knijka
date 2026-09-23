@@ -89,7 +89,7 @@ export const ROAD_RECORD_SCHEMA = "road-record/3";
 /** The probe version this reader was written against (`ROAD_PROBE_VERSION`,
  *  platform/src/modules/sim/devrig/roadProbe.ts). Another version is recorded
  *  and makes the leg UNMEASURED — its row shape is not this file's to guess. */
-export const ROAD_PROBE_VERSION_READ = 2;
+export const ROAD_PROBE_VERSION_READ = 3;
 
 /** The sidecar lesson-audit writes per leg (gzip of JSON, rows as columns). */
 export const ROAD_SIDECAR_FILE = "_audit-road.json.gz";
@@ -553,6 +553,21 @@ const OPTIONAL = [
   "opposingBank",
   "oneway",
   "wrongWay",
+  // THE FOUNDER-RULED DIRECTION SIGNAL (2026-09-20). `wrongWay` alone is
+  // ambiguous by construction — «with the flow» and «nobody asked» share the
+  // value `false` — and every defence the criteria built against that ambiguity
+  // (the liveness gate, the witness floor) could only be armed by the offence
+  // itself. These three carry the unambiguous form: the SIGNED nose-vs-edge
+  // angle, whether the conviction channel was asked, and the edge it was
+  // measured against. Absent stays absent, and `alignDeg: null` WITH the record
+  // present means «the runtime looked and could not measure» — a third state
+  // that must not collapse into either of the others.
+  "alignDeg",
+  "wrongWayArmed",
+  "alignEdgeId",
+  "alignOffCarriageway",
+  "alignTravelDir",
+  "alignRoundabout",
   "sM",
   "distM",
   "centreLinePainted",
