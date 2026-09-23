@@ -36,6 +36,11 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  briefingRecallPillShown,
+  type BriefingRecallPillStage,
+} from "@/modules/sim/hud";
+
 const SHELL = readFileSync(resolve(__dirname, "../LessonPlayShell.tsx"), "utf8");
 
 /** Code only — a source assertion that cannot tell code from the paragraph
@@ -62,35 +67,113 @@ describe("the briefing's way back · one rule, two legs", () => {
     expect(callers.length).toBeGreaterThanOrEqual(3); // declaration + 2 callers
   });
 
-  it("the recall pill is NOT inside a compact gate — that was the whole defect", () => {
+  it("the recall pill is the ROOMY leg's — never withheld from it, never held on a phone", () => {
+    // ── WHY THIS ONE CASE IS EXECUTED AND NOT MATCHED ───────────────────────
+    //
+    // It read `expect(gate).not.toMatch(/\bcompact\b/)` for four waves — the
+    // intent written as a ban on a TOKEN, which also forbids saying out loud
+    // which stage the control belongs to. The pill's parent is the shell's own
+    // notify column and that column carries `hidden` on compact, so on a phone
+    // the pill was held in the tree and painted nowhere (every mobile leg of
+    // the w61 sweep prints «✗ NOT ON THE GLASS — briefing-recall: ⓘ Инструкции
+    // · 7 стъпки ▸», 11× on sc-signal-hesitation alone, and the audit probe
+    // tried to click it). Saying `!compact` out loud is what the ban forbade.
+    //
+    // The first rewrite swapped the ban for `toContain("!compact &&")` plus a
+    // bare-`compact` refusal, and a round-2 verifier walked through it: insert
+    // `compact === true &&` beside the `!compact &&` and the pill paints on NO
+    // stage at all — the original defect of sc-signal-hesitation:f5ffccf3, i.e.
+    // the roomy student loses the authored steps for the rest of the lesson —
+    // while every assertion above still passed. A gate and its opposite have
+    // the same tokens; only running it tells them apart.
+    //
+    // So the gate IS a function now (`briefingRecallPillShown`), and this case
+    // asserts the two directions by EXECUTING it, then holds the shell to
+    // calling it with nothing contradictory in front.
+    const roomy: BriefingRecallPillStage = {
+      compact: false,
+      recallOffered: true,
+      briefingSteps: 7,
+      mistakeMode: false,
+      ended: false,
+      quizUp: false,
+      teachQueued: 0,
+    };
+
+    // 1. THE ROOMY STAGE STILL PAINTS IT. Drop the `!`, or add any second
+    //    `compact` test, and this is the assertion that goes red.
+    expect(
+      briefingRecallPillShown(roomy),
+      "the roomy stage is the one that paints the pill — a gate that withholds " +
+        "it there is sc-signal-hesitation:f5ffccf3 restored.",
+    ).toBe(true);
+
+    // 2. THE PHONE CANNOT. Its route is the МЕНЮ row, pinned below and in
+    //    `hud/__tests__/briefing-auto-open.test.ts`; the numbers for why the
+    //    compact column cannot afford a 44 px tenant are beside the mount.
+    expect(briefingRecallPillShown({ ...roomy, compact: true })).toBe(false);
+
+    // 3. …AND THE SHELL REALLY CALLS IT, with `compact` passed straight in and
+    //    no gate of its own in front — a predicate the component stopped
+    //    calling is this programme's commonest failure wearing a repair's
+    //    clothes.
     const at = CODE.indexOf('data-hud="briefing-recall"');
     expect(at).toBeGreaterThan(-1);
-    // The 700 characters above the anchor are its own mount expression and the
-    // element opening. `compact` appearing there would put the repair back on
-    // the leg that never needed it.
     const gate = CODE.slice(Math.max(0, at - 700), at);
-    expect(gate).not.toMatch(/\bcompact\b/);
+    expect(gate).toContain("briefingRecallPillShown({");
+    expect(gate).toMatch(/briefingRecallPillShown\(\{\s*compact,/);
+    // One mention of the token in the whole gate: the one it hands over. A
+    // second is either a re-added stage gate or the verifier's `compact ===
+    // true &&`, and both are refusals to let the predicate decide.
+    expect(
+      gate.match(/\bcompact\b/g) ?? [],
+      "the pill's mount tests `compact` itself instead of handing it to " +
+        "`briefingRecallPillShown` — the gate and its opposite look alike in " +
+        "source, which is why this one is executed.",
+    ).toHaveLength(1);
+  });
+
+  it("every stand-down the panel obeys, the pill obeys — executed, one at a time", () => {
+    const roomy: BriefingRecallPillStage = {
+      compact: false,
+      recallOffered: true,
+      briefingSteps: 7,
+      mistakeMode: false,
+      ended: false,
+      quizUp: false,
+      teachQueued: 0,
+    };
+    // `recallOffered` is `briefingRecallOffered(briefingStart)`: the pill is the
+    // closed panel's stand-in, never a second copy of an open one, and never a
+    // stand-in for a card that has not been DECIDED yet (it painted for two
+    // committed frames before the roomy card arrived — lane E round 2).
+    expect(briefingRecallPillShown({ ...roomy, recallOffered: false })).toBe(false);
+    // Nothing authored is nothing to recall.
+    expect(briefingRecallPillShown({ ...roomy, briefingSteps: 0 })).toBe(false);
+    // THEO-3 sandbox: the assignment there IS the mistake.
+    expect(briefingRecallPillShown({ ...roomy, mistakeMode: true })).toBe(false);
+    // The end screen owns the glass.
+    expect(briefingRecallPillShown({ ...roomy, ended: true })).toBe(false);
+    // …as does a micro-quiz, and a teach moment.
+    expect(briefingRecallPillShown({ ...roomy, quizUp: true })).toBe(false);
+    expect(briefingRecallPillShown({ ...roomy, teachQueued: 1 })).toBe(false);
   });
 
   it("it renders exactly when the panel is gone, and stands down with it", () => {
     const at = CODE.indexOf('data-hud="briefing-recall"');
     const gate = CODE.slice(Math.max(0, at - 700), at);
-    // `briefingRecallShown` (= `briefingRecallOffered(briefingStart)`): the
-    // pill is the closed panel's stand-in, never a second copy of an open one —
-    // and, since round 2 of lane E, never a stand-in for a card that has not
-    // been DECIDED yet (it painted for two frames before the roomy card). The
-    // predicate is executed in `hud/__tests__/briefing-start.test.ts`; this
-    // holds the shell to calling it.
-    expect(gate).toContain("briefingRecallShown &&");
+    // The stand-downs are EXECUTED one case up; what is held here is that the
+    // shell feeds the predicate the live values rather than constants — a gate
+    // that always reads `mistakeMode: false` passes every executed case and
+    // still paints a recall pill over the THEO-3 sandbox.
+    expect(gate).toContain("recallOffered: briefingRecallShown");
+    expect(gate).toContain("briefingSteps: briefing.length");
+    expect(gate).toContain("mistakeMode,");
+    expect(gate).toContain("ended,");
+    expect(gate).toContain("quizUp: activeQuiz !== null");
+    expect(gate).toContain("teachQueued: teachQueue.length");
     expect(gate).not.toContain("{!briefingOpen &&");
     expect(CODE).toContain("const briefingRecallShown = briefingRecallOffered(briefingStart);");
-    // …and it obeys the same stand-downs the panel does: no briefing in the
-    // THEO-3 sandbox, none after the end, and none while a teach moment or a
-    // micro-quiz owns the glass.
-    expect(gate).toContain("!mistakeMode");
-    expect(gate).toContain("!ended");
-    expect(gate).toContain("activeQuiz === null");
-    expect(gate).toContain("teachQueue.length === 0");
   });
 
   it("a retry is an arrival again — the arrival contract `retry` already claimed", () => {

@@ -367,3 +367,29 @@ What would unpark it: a founder decision on the target (the product's Задач
 end), then a plan with a clearance margin that survives GLB-vs-table extents (planned ≥ 0.25 m
 held), a screened arm band, and a G7 rule for zone-graded ends. The row
 `sc-park-bay-exit-rev:49af2940` stays open.
+
+## GAP-5 — a source guard with a positional window cannot see an attribute
+
+**Found** 2026-09-23 by the adversarial verifier of lane F, as a sabotage of its own
+invention that SURVIVED a green 69/69.
+
+The briefing-recall pill's gate is now an executed predicate
+(`briefingRecallPillShown(stage)`), and every mutation of the gate itself dies. Both
+guards that hold the shell to calling it read `CODE.slice(at - 700, at)` — the 700
+characters before the `data-hud="briefing-recall"` anchor. So a suppression written
+OUTSIDE that window is invisible to them: inserting `hidden={!compact}` immediately
+AFTER the anchor leaves all 69 tests green.
+
+That is exactly the production defect this lane exists to prevent —
+`sc-signal-hesitation:f5ffccf3`, an element held in the tree and painted nowhere —
+restored under a passing suite. It is a gap in the INSTRUMENT, not in the repair: the
+round-1 finding was about the gate, and the gate is fixed. «Executed, not matched»
+answers whether the predicate decides; it says nothing about whether the element
+reaches the glass.
+
+What would close it: a DOM render of the shell (assert the pill's computed
+visibility, not its source), which needs a jsdom/testing-library the platform does
+not have — or the existing route, a mobile leg photographed with the pill on the
+glass. **Until then, no closure may rest on «the suite proves the pill paints».**
+The same positional-window weakness applies to every other `slice(at - N, at)` guard
+in the HUD tests; this is the first one measured.

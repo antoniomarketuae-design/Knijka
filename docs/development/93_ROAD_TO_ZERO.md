@@ -179,3 +179,48 @@ The roundabout finding survives the correction and is sharpened by it: those
 cars now demonstrably ENTER the roundabout (contradicting w42) and demonstrably
 stop between 28 % and 48 % of the way round. That is a measurement a next drive
 can be aimed at.
+
+## 2026-09-23 — the remaining list is PHOTOGRAPH-blocked, not repair-blocked
+
+Bucketing every open row by the sweep its evidence came from:
+
+| evidence sweep | rows | crit |
+|---|---|---|
+| **sweep161** (2026-08-17/18) | **54** | **23** |
+| wave-c | 3 | 1 |
+| w10-4 · w10-2 · w47 · det-2 · w46 · (none) | 10 | 3 |
+
+Five weeks of repairs have landed since sweep161, and the wrong-leg rows mostly
+cite a repair in `platform/src` **with a test named after the sweep that filed
+them** — `follow-tailgater-sweep161.test.ts`, `signals-sweep161.test.ts`,
+`speeding-teach-settlement.test.ts`. The cleanest case is `sc-vu-emergency`'s two
+criticals (no penalty / the debrief commending «Правилно отстъпено предимство» on
+the leg that did not yield): the cause was `EM_APPROACH.accelMps2 = 2.2` letting
+the ambulance out-accelerate a *launching* student, so `sawYield` latched at
+~22 км/ч on the way up from zero. It is 1.5 now, and
+`vru-title-truth-and-encounter.test.ts:376` pins that the flat-out 59 км/ч drive
+IS convicted `EMERGENCY_NOT_YIELDED` and is NOT commended.
+
+**This is not a claim that they are fixed.** A repair that ships a predicate
+nothing reads is the oldest failure in this programme. It is a claim about the
+ORDER OF WORK: frames first, because a repair lane started now would be
+re-repairing rows that may already be repaired, and because a cause is as stale
+as its report.
+
+### What a re-drive can and cannot settle
+
+| class | rows | crit | settleable by a sweep on today's harness |
+|---|---|---|---|
+| evidence leg is a `-wrong` leg | 17 | 7 | **yes** — flat throttle, no steering needed |
+| the claim is about a SURFACE (card, copy, mirror, legibility) | 13 | 5 | **yes** — any leg photographs it |
+| the claim is that the CORRECT drive was mis-graded | 36 | 15 | **no** — needs the forward half of the steering instrument |
+
+The third class is the reason the forward half (doc 93 GAP register, W59
+increments) is the programme's real lever and not the backlog.
+
+First row settled this way: `app-login:e2577ced` — re-probed in the harness's own
+WebKit at its own `iphone16-landscape` 852×393, where the login form now has both
+fields side by side inside the fold, `document.scrollHeight === innerHeight` (the
+page does not scroll at all) and `elementFromPoint` returns the submit button
+rather than `null`. A probe closure carries no route fidelity because there is no
+route; that exemption is written into the closure record in those words.

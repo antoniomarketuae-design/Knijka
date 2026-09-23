@@ -95,11 +95,13 @@ import {
 import {
   isUsableLineOrdinal,
   overlayCarriesMoment,
+  overlayLocallySuppressed,
   overlayMomentBg,
   OVERLAY_MOMENT_TICK_MS,
   OVERLAY_PEEK_HEIGHT_PX,
   overlayPeekBodyBg,
   whyIsReachable,
+  type OverlayLocalDismissal,
   type SimOverlayItem,
   type SimOverlayTone,
 } from "./overlayQueue";
@@ -1653,6 +1655,7 @@ export function SimOverlay({
   renderDetail,
   onOpenChange,
   onDismiss,
+  reofferKey = 0,
 }: {
   /** The ONE item selected by `selectOverlay`, or null for a clean screen. */
   item: SimOverlayItem | null;
@@ -1667,10 +1670,27 @@ export function SimOverlay({
   /**
    * A6: the student sent a non-blocking line away. The owner is told so it can
    * stop offering the item — a card that reappears on the next 150 ms HUD poll
-   * has not been dismissed, it has blinked. The local guard below covers the
-   * owner that does not care (the dev rig), so the ✕ is never a dead control.
+   * has not been dismissed, it has blinked. The local record below is what
+   * makes the ✕ work for the owner that does NOT act on this — the dev rig, and
+   * the five gallery mounts that pass `() => undefined` — so it is never a dead
+   * control on any mount. `reofferKey` is how an owner takes it back.
    */
   onDismiss?: (item: SimOverlayItem) => void;
+  /**
+   * THE UNDO FOR THAT ✕ — bump it and the local dismissal above stops holding.
+   *
+   * A6 gave the ✕ a memory and no way back, and on a phone that memory was the
+   * end of the lesson's instructions: МЕНЮ → «Инструкции» → ✕ → МЕНЮ →
+   * «Инструкции» reached the student with nothing (THEO-4; the sequence,
+   * the measurement and the rule are on `overlayLocallySuppressed`).
+   *
+   * An owner that RE-OFFERS an item the student may have sent away passes a
+   * value it changes on every offer — `LessonPlayShell` bumps one counter in
+   * `recallBriefing` and `recallPreDriveOverlay`. Default 0: an owner with no
+   * re-offer of its own (the dev rig) keeps exactly the old permanence, and its
+   * ✕ is still never a dead control.
+   */
+  reofferKey?: number;
 }) {
   // THE OPEN ITEM, not a boolean, and held as a COPY.
   //
@@ -1686,11 +1706,20 @@ export function SimOverlay({
   const [openItem, setOpenItem] = useState<SimOverlayItem | null>(null);
   const open = openItem !== null;
 
-  // A6: the id the student last sent away. Kept by ID and not as a boolean so a
-  // NEW line (the objective changed, another mistake fired) speaks immediately
+  // A6: the line the student last sent away. Kept by ID and not as a boolean so
+  // a NEW line (the objective changed, another mistake fired) speaks immediately
   // — dismissing „Задача 2/3" must not silence „Задача 3/3".
-  const [dismissedId, setDismissedId] = useState<string | null>(null);
-  const live = item !== null && item.id !== dismissedId ? item : null;
+  //
+  // …AND IT IS STAMPED WITH THE RE-OFFER KEY IT WAS WRITTEN UNDER — 2026-09-23,
+  // because A6 gave this memory no undo of any kind: it was written at one place
+  // and cleared at none, so one ✕ on the recalled briefing peek ended the phone's
+  // only painted route to the lesson's authored steps for the session (THEO-4).
+  // The stamp is the undo, and it is the owner's to spend — not a second guess at
+  // whether the owner „cares". `overlayLocallySuppressed` carries the sequence,
+  // the measurement and the rule; `briefing-reachable.test.ts` drives them.
+  const [dismissal, setDismissal] = useState<OverlayLocalDismissal | null>(null);
+  const live =
+    item !== null && !overlayLocallySuppressed(item.id, dismissal, reofferKey) ? item : null;
 
   // While a sheet is open it IS the one overlay; a newly arrived line waits.
   const shown = openItem ?? live;
@@ -1704,10 +1733,15 @@ export function SimOverlay({
   // the ✕ has a stable identity too.
   const dismissRef = useRef<((it: SimOverlayItem) => void) | null>(null);
   const shownRef = useRef<SimOverlayItem | null>(null);
+  // …and the key the record must be STAMPED with. Same reason as the two above:
+  // `dismiss` has a stable identity on purpose, so it cannot close over a prop
+  // that changes under the shell's 150 ms poll.
+  const reofferKeyRef = useRef(reofferKey);
   useEffect(() => {
     ackRef.current = shown?.onAck ?? null;
     shownRef.current = shown;
     dismissRef.current = onDismiss ?? null;
+    reofferKeyRef.current = reofferKey;
   });
 
   const acknowledge = useCallback(() => {
@@ -1719,7 +1753,9 @@ export function SimOverlay({
     const it = shownRef.current;
     if (it === null) return;
     setOpenItem(null);
-    setDismissedId(it.id);
+    // STAMPED with the key this offer arrived under: the card goes now, and it
+    // comes back the moment the owner offers it again under a new one.
+    setDismissal({ id: it.id, reofferKey: reofferKeyRef.current });
     dismissRef.current?.(it);
   }, []);
 

@@ -46,6 +46,7 @@ import {
   briefingAutoToggled,
   briefingIsOpen,
   briefingRecallOffered,
+  briefingRecallPillShown,
   briefingStartReducer,
   nextBriefingStartEvent,
   BRIEFING_AUTO_STORAGE_KEY,
@@ -4784,6 +4785,26 @@ export function LessonPlayShell({
   const [dismissedOverlayIds, setDismissedOverlayIds] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
   );
+  // …AND THE UNDO FOR THE COPY THIS SHELL CANNOT REACH — 2026-09-23.
+  //
+  // `SimOverlay` keeps its OWN record of the ✕ (A6: so the ✕ is never a dead
+  // control on a mount that ignores `onDismiss` — the five `/dev/popup-rig`
+  // fixtures do exactly that). It was written at one place and cleared at none,
+  // so clearing `dismissedOverlayIds` below re-offered an item the overlay then
+  // silently refused: МЕНЮ → «Инструкции» → ✕ → МЕНЮ → «Инструкции»
+  // reached the phone student with nothing, and on a phone that row is his only
+  // painted route to the lesson's authored steps (THEO-4).
+  //
+  // This counter is the word for „I am offering it AGAIN": every re-offer bumps
+  // it, `SimOverlay` compares it with the one its record was stamped under, and
+  // a stale stamp stops holding. A nonce, so it never runs out however many
+  // times the student asks. The rule is `overlayLocallySuppressed`
+  // (`hud/overlayQueue.ts`) and `hud/__tests__/briefing-reachable.test.ts`
+  // drives the whole sequence.
+  const [overlayReofferKey, setOverlayReofferKey] = useState(0);
+  const reofferOverlay = useCallback(() => {
+    setOverlayReofferKey((n) => n + 1);
+  }, []);
   const dismissOverlayItem = useCallback((it: SimOverlayItem) => {
     setDismissedOverlayIds((prev) => {
       if (prev.has(it.id)) return prev;
@@ -4810,13 +4831,16 @@ export function LessonPlayShell({
    * control that returns the checklist instead of „abort or reload".
    */
   const recallPreDriveOverlay = useCallback(() => {
+    // Both halves of the way back: this shell's list, and the overlay's own
+    // record of the ✕ — see `reofferOverlay` above.
+    reofferOverlay();
     setDismissedOverlayIds((prev) => {
       if (prev.size === 0) return prev;
       const next = new Set<string>();
       for (const id of prev) if (!id.startsWith("predrive:")) next.add(id);
       return next.size === prev.size ? prev : next;
     });
-  }, []);
+  }, [reofferOverlay]);
   // -- THE BRIEFING (2026-08-02) -----------------------------------------------
   //
   // `lesson.briefingBg` is the numbered „какво ще правиш" list every scenario
@@ -4969,7 +4993,11 @@ export function LessonPlayShell({
       next.delete("briefing");
       return next;
     });
-  }, []);
+    // …and the overlay's own copy of the same ✕, which this shell cannot reach
+    // by deleting from its list. Without this line the second МЕНЮ recall is
+    // silent and the phone has no route left to the steps — `reofferOverlay`.
+    reofferOverlay();
+  }, [reofferOverlay]);
 
   /**
    * ── THE PHONE'S HALF OF THE SAME LIFETIME (sc-signal-hesitation:f5ffccf3) ──
@@ -7938,6 +7966,11 @@ export function LessonPlayShell({
             onOpenChange={setOverlaySheetOpen}
             // A6 — „those pop ups need to be able to be removed when clicked."
             onDismiss={dismissOverlayItem}
+            // …and the way back from that removal. Bumped by `recallBriefing` and
+            // `recallPreDriveOverlay`, the two controls that RE-OFFER a line the
+            // student sent away; without it the ✕ is permanent inside the
+            // overlay whatever this shell does with its own list.
+            reofferKey={overlayReofferKey}
             renderDetail={(item) =>
               item.kind === "predrive" ? (
                 <PreDriveChecklist
@@ -8194,12 +8227,63 @@ export function LessonPlayShell({
               in the tree but never painted, and a recall that never reaches the
               glass is this programme's commonest failure wearing a repair's
               clothes. */}
-          {briefingRecallShown &&
-          briefing.length > 0 &&
-          !mistakeMode &&
-          !ended &&
-          activeQuiz === null &&
-          teachQueue.length === 0 ? (
+          {/* ── …AND IT IS THE ROOMY STAGE'S PILL, SAID IN CODE — 2026-09-23.
+
+              It always was one: this button is a child of the shell's own
+              notify column, and that column carries `hidden` on compact (see
+              its className, ~200 lines up). What the gate changes is that a
+              phone stops HOLDING a control it can never paint. The w61 sweep
+              is what asks for the difference — every mobile leg's census
+              prints «✗ NOT ON THE GLASS — briefing-recall: ⓘ Инструкции · 7
+              стъпки ▸», 11 times on sc-signal-hesitation alone, beside the
+              same line for `notify-column` and `objective-banner` that are its
+              hidden parent and its sibling. A named surface that is in the
+              tree and never on the glass is this programme's commonest failure
+              wearing a repair's clothes (the paragraph above says so), and the
+              audit probe `tools/mobile/sheet-fold.mjs` duly tried to CLICK it
+              and opened nothing.
+
+              AND IT CANNOT HONESTLY BE PAINTED ON A PHONE INSTEAD, measured on
+              the two profiles the sweep drives:
+
+                852 × 393   compact column top  max(8, 16.6 % + 8) = 73.24
+                            cap  40 % − top     = 157.2 − 73.24 = 83.96 px
+                780 × 360   top 67.76 · cap 144 − 67.76 = 76.24 px
+
+              The peek's own floor is OVERLAY_PEEK_HEIGHT_PX = 44 and the
+              column's gap is 6, so a 44 px pill in that column leaves the
+              authored steps 33.96 px (852) / 26.24 px (780) — under the thumb
+              floor, i.e. the pill would be bought with the text it points at.
+              Un-hiding THIS column on compact is worse: it is 255.6 px wide at
+              top 102.32 on the same 852 × 393 stage, i.e. a second stack inside
+              SimOverlay's own 73.24 → 157.2 band — the two-columns-in-one-corner
+              defect `notifyColumn.ts` exists to end. The road area and the
+              thumb bands are not available at any price.
+
+              SO THE PHONE'S WAY IN IS THE МЕНЮ ROW «Инструкции · N стъпки»
+              (`recallBriefing`, ~1,000 lines up), which is painted on every
+              mobile frame of the sweep, and the pill stays what it has been
+              since 0258c01: the ROOMY leg's recall. The gate is not a
+              withdrawal from a stage it was reaching — it is the same stage,
+              stated where a reader looks.
+
+              AND STATED WHERE A MUTATION CAN BE CAUGHT: the seven-term chain
+              that used to stand here is `briefingRecallPillShown`
+              (`hud/briefingStart.ts`), because a source assertion cannot tell
+              this gate from its opposite — a round-2 verifier restored the
+              original defect by inserting `compact === true &&` beside the
+              `!compact &&`, painting the pill on no stage at all, and the
+              suite stayed green. Executed for both values of `compact` it is
+              two assertions, and the predicate carries the reasoning. */}
+          {briefingRecallPillShown({
+            compact,
+            recallOffered: briefingRecallShown,
+            briefingSteps: briefing.length,
+            mistakeMode,
+            ended,
+            quizUp: activeQuiz !== null,
+            teachQueued: teachQueue.length,
+          }) ? (
             <button
               type="button"
               onClick={recallBriefing}

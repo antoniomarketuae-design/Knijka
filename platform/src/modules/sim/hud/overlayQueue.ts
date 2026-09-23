@@ -1206,6 +1206,94 @@ export function overlayHoldsDrive(
   return owners.length > 0 || selection.held;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A DISMISSAL NEEDS AN UNDO, NOT AN OWNER — the ✕ that killed the phone's only
+ * route back to the lesson's instructions (THEO-4), measured 2026-09-23 on
+ * a0a3ac7.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `SimOverlay` keeps a private record of the line the student last sent away
+ * with the ✕. Its own prop docstring says what it is for — „the local guard
+ * below covers the owner that does not care (the dev rig), so the ✕ is never a
+ * dead control" — and that half is right and stays. WHAT NOTHING HAD A WORD FOR
+ * IS THE UNDO: the record was written at exactly one place and cleared at none.
+ *
+ * THE SEQUENCE THAT LOSES THE INSTRUCTIONS, on a phone, after founder ruling
+ * 2026-09-20 (the briefing no longer opens by itself):
+ *
+ *   1. МЕНЮ → «Инструкции · 7 стъпки» → `recallBriefing` → the peek is back.
+ *      It is now NON-blocking (`blocking: !briefingRecalled`), so it paints a
+ *      ✕ (`closable = !blocking && …`) — which the first, arrival showing
+ *      never does.
+ *   2. The student presses that ✕. `SimOverlay.dismiss()` records "briefing"
+ *      privately AND calls `onDismiss`, so the shell also puts "briefing" into
+ *      `dismissedOverlayIds`. Two copies of one decision.
+ *   3. МЕНЮ → «Инструкции» again. The shell's `recallBriefing` deletes its own
+ *      copy — it is written to do exactly that, and its docblock says it undoes
+ *      „both of the phone's exits" — but it could not reach `SimOverlay`'s.
+ *      `live` stayed null, the peek never came back, and the МЕНЮ row was a
+ *      control that answered nothing for the rest of the session.
+ *
+ * On a phone that row is the ONLY painted route to the authored steps (the
+ * roomy recall pill lives in the shell's own notify column, which is `hidden`
+ * on compact), so step 3 is the ruling's THEO-4 condition — „hiding the card
+ * must not hide the instructions" — failing silently.
+ *
+ * ══ THE RULE, AND WHY IT IS NOT „THE OWNER WINS" ═══════════════════════════
+ *
+ * The first repair made the private record apply only to an owner that passes
+ * no `onDismiss`. That closes the sequence above and opens another one:
+ * `/dev/popup-rig` mounts `SimOverlay` FIVE times with `onDismiss={() =>
+ * undefined}` — an owner that IS told and does nothing with it — so the ✕ on
+ * every fixture in the ADR-009 gallery would become the dead control row A6
+ * exists to forbid. „Does an owner exist" is not the question. „Has the owner
+ * asked for this line again" is.
+ *
+ * So the record carries the RE-OFFER KEY it was written under, and it
+ * suppresses only while that key still stands:
+ *
+ *   · the ✕ always clears the card, for every owner, with no reset needed —
+ *     the key it stored is the one being passed now;
+ *   · an owner that re-offers the same item bumps the key (`recallBriefing`
+ *     and `recallPreDriveOverlay` in `LessonPlayShell`), the stored key is
+ *     stale on the next render, and the line speaks again — as many times as
+ *     the student asks, because a bump is a nonce and never runs out;
+ *   · an owner that re-offers nothing (the rig) never bumps, so its ✕ is
+ *     permanent exactly as it was.
+ *
+ * NOTHING IS LOST ON THE WAY OUT: the ✕ still clears the card in the same
+ * commit, because `dismiss()` calls the owner's handler in the same event and
+ * React batches the two `setState`s into one render. What the key adds is only
+ * who may put it back.
+ *
+ * AND NOTHING NEEDS AN EFFECT: the comparison is between a value STORED at the
+ * dismissal and the value the owner is passing NOW, so the undo is arithmetic
+ * during render rather than a `useEffect` racing the shell's 150 ms poll.
+ *
+ * PURE, so the sequence above is executable in the node suite rather than
+ * described in a comment — `__tests__/briefing-reachable.test.ts` drives it.
+ */
+export interface OverlayLocalDismissal {
+  /** The id the ✕ sent away. By ID, so a NEW line speaks immediately — A6. */
+  readonly id: string;
+  /** The owner's re-offer key as it stood AT THE MOMENT OF THE ✕. */
+  readonly reofferKey: number;
+}
+
+export function overlayLocallySuppressed(
+  offeredId: string,
+  dismissal: OverlayLocalDismissal | null,
+  reofferKey: number,
+): boolean {
+  if (dismissal === null) return false;
+  if (dismissal.id !== offeredId) return false;
+  // THE UNDO, and the whole repair. Replace this line with `return true` and
+  // the ✕ is permanent for every owner — which is the dead end above, and what
+  // „…and again after the ✕" in `briefing-reachable.test.ts` exists to say.
+  return dismissal.reofferKey === reofferKey;
+}
+
 export interface SelectOverlayOptions {
   /**
    * Which non-queue surfaces currently own the screen. Default `[]` — the

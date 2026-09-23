@@ -218,15 +218,91 @@ if (process.argv[1] && process.argv[1].endsWith("sheet-fold.mjs")) {
         // opens a different sheet — measured, and it is how a first run of this
         // probe reported a 21-character title and no overflow.
         await page.waitForTimeout(25_000);
-        const more = page
-          .locator('button:has-text("ПРОЧЕТИ"), button:has-text("Прочети")')
-          .first();
-        if (!(await more.count().catch(() => 0))) {
-          console.log("  !! no «ПРОЧЕТИ» on this frame — nothing to open");
+        // ── HOW A STUDENT OPENS IT NOW, AND IT IS THE МЕНЮ (2026-09-23) ─────
+        //
+        // Founder ruling 2026-09-20 — built for real in a0a3ac7 — stops the
+        // phone's briefing opening by itself, so the peek and its «ПРОЧЕТИ»
+        // are no longer on the glass at this beat. The first repair pointed
+        // this probe at the recall pill «ⓘ Инструкции · N стъпки ▸» and it
+        // STILL opened nothing, for a reason the run.log had been printing all
+        // along: «✗ NOT ON THE GLASS — briefing-recall», 11–31 times per mobile
+        // leg. That pill is a child of the shell's own notify column, and that
+        // column carries `hidden` on compact — it is the ROOMY leg's recall and
+        // the shell now says so in its gate, with the numbers for why the
+        // phone's own column cannot afford a second 44 px tenant.
+        //
+        // THE PHONE'S ROUTE IS THE МЕНЮ ROW «Инструкции · N стъпки», which is
+        // `recallBriefing` — the same callback the roomy pill calls — and the
+        // МЕНЮ button is painted on every mobile frame of the sweep. Two taps,
+        // both the student's own: the row brings the PEEK back, and «ПРОЧЕТИ»
+        // on it opens the read sheet this probe measures.
+        //
+        // ORDER: «ПРОЧЕТИ» first (a stage that opens by default — roomy, or a
+        // phone whose student opted in through «Показвай ги в началото»), then
+        // the МЕНЮ, then the pill for the roomy stage. The pill is asked for
+        // with `:visible` so a held-but-unpainted copy can never be "clicked"
+        // into a false negative again.
+        const readBtn = () =>
+          page.locator('button:has-text("ПРОЧЕТИ"), button:has-text("Прочети")').first();
+
+        const openTheSheet = async () => {
+          if (await readBtn().count().catch(() => 0)) {
+            await readBtn().click({ timeout: 6000 }).catch(() => {});
+            return "«ПРОЧЕТИ» was already on the glass";
+          }
+          // The МЕНЮ. The trigger is shell chrome with its own handle; the row
+          // is asked for by its ACCESSIBLE NAME («Инструкции за упражнението —
+          // N стъпки»), which is authored once in LessonPlayShell and cannot
+          // collide with the «Показвай ги в началото» toggle beneath it.
+          const menuBtn = page.locator('[data-hud="play-menu"] button').first();
+          const row = page
+            .locator('[role="menuitem"][aria-label^="Инструкции за упражнението"]')
+            .first();
+          if (await menuBtn.count().catch(() => 0)) {
+            await menuBtn.click({ timeout: 6000 }).catch(() => {});
+            await page.waitForTimeout(600);
+            if (await row.count().catch(() => 0)) {
+              await row.click({ timeout: 6000 }).catch(() => {});
+              await page.waitForTimeout(1200);
+              if (await readBtn().count().catch(() => 0)) {
+                await readBtn().click({ timeout: 6000 }).catch(() => {});
+                return "МЕНЮ → «Инструкции» → «ПРОЧЕТИ»";
+              }
+              return null; // the row was there and the peek never came back
+            }
+            // Leave nothing half-open behind us.
+            await page.keyboard.press("Escape").catch(() => {});
+            await page.waitForTimeout(300);
+          }
+          // The roomy stage's own pill, and ONLY if it is painted.
+          const pill = page.locator('[data-hud="briefing-recall"]:visible').first();
+          if (await pill.count().catch(() => 0)) {
+            await pill.click({ timeout: 6000 }).catch(() => {});
+            await page.waitForTimeout(1200);
+            if (await readBtn().count().catch(() => 0)) {
+              await readBtn().click({ timeout: 6000 }).catch(() => {});
+              return "the roomy recall pill → «ПРОЧЕТИ»";
+            }
+          }
+          return null;
+        };
+
+        const how = await openTheSheet();
+        if (how === null) {
+          // UNRESOLVED, not "fine". A probe that cannot reach its surface must
+          // say so in the words that stop a reader counting it as a pass — this
+          // file's own header names „nobody looked" as the recurring cause, and
+          // a tool that quietly reports nothing is the other half of it.
+          console.log(
+            "  !! UNRESOLVED — could not open the read sheet: no «ПРОЧЕТИ», no МЕНЮ row " +
+              "«Инструкции за упражнението — N стъпки», no PAINTED recall pill. Either the " +
+              "phone's route back to the authored steps is gone (THEO-4, founder ruling " +
+              "2026-09-20) or the anchors moved — read the frame before trusting this line.",
+          );
           await context.close();
           continue;
         }
-        await more.click({ timeout: 6000 }).catch(() => {});
+        console.log(`  opened via ${how}`);
         await page.waitForTimeout(2000);
         const d = await page.evaluate(PROBE);
         if (d.error) {

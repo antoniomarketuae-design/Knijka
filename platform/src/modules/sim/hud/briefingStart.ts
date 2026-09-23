@@ -143,6 +143,68 @@ export function briefingRecallOffered(state: BriefingStartState): boolean {
 }
 
 /**
+ * ── THE ROOMY RECALL PILL'S WHOLE GATE, AS A FUNCTION ───────────────────────
+ *
+ * The «ⓘ Инструкции · N стъпки ▸» pill is the ROOMY stage's way back to the
+ * authored steps; the phone's is the МЕНЮ row «Инструкции · N стъпки»
+ * (`recallBriefing`), and both call the same callback. This is the pill's
+ * condition, and it lives here rather than as a seven-term `&&` chain in the
+ * shell's JSX for a measured reason:
+ *
+ *   A SOURCE ASSERTION CANNOT TELL A GATE FROM ITS OPPOSITE. The suite that
+ *   guards this gate used to read `expect(gate).not.toMatch(/\bcompact\b/)` —
+ *   the intent written as a ban on a TOKEN — and a round-2 verifier killed the
+ *   replacement by inserting `compact === true &&` beside the `!compact &&`,
+ *   which paints the pill on NO stage at all and left the suite green. That is
+ *   the original defect of sc-signal-hesitation:f5ffccf3 restored under a
+ *   passing test. Executed, both directions are one line each:
+ *   compact ⇒ never, roomy ⇒ whenever the panel is gone.
+ *
+ * WHY `compact` IS IN IT AT ALL. The pill is a child of the shell's own notify
+ * column, and that column carries `hidden` on compact — so on a phone it was
+ * HELD IN THE TREE AND PAINTED NOWHERE (every mobile leg of the w61 sweep
+ * prints «✗ NOT ON THE GLASS — briefing-recall: ⓘ Инструкции · 7 стъпки ▸»,
+ * 11× on sc-signal-hesitation alone, and the audit probe duly tried to click
+ * it). `!compact` is not a withdrawal from a stage it was reaching; it is the
+ * same stage, stated where a reader — and a mutation — can see it. The numbers
+ * for why the phone's column cannot afford a second 44 px tenant are beside the
+ * mount in `LessonPlayShell`.
+ *
+ * THE OTHER FIVE TERMS are the panel's own stand-downs, so the stand-in obeys
+ * every rule the card it stands in for obeys: no briefing without steps, none
+ * in the THEO-3 sandbox, none after the end, and none while a teach moment or a
+ * micro-quiz owns the glass.
+ */
+export interface BriefingRecallPillStage {
+  /** The phone. Its route is the МЕНЮ row, not this pill. */
+  readonly compact: boolean;
+  /** `briefingRecallOffered(briefingStart)` — decided, and the card is down. */
+  readonly recallOffered: boolean;
+  /** `briefing.length` — nothing to recall is nothing to offer. */
+  readonly briefingSteps: number;
+  /** THEO-3 sandbox: the assignment there IS the mistake. */
+  readonly mistakeMode: boolean;
+  /** The session is over; the end screen owns the glass. */
+  readonly ended: boolean;
+  /** A micro-quiz owns the glass (`activeQuiz !== null`). */
+  readonly quizUp: boolean;
+  /** `teachQueue.length` — a teach moment owns the glass. */
+  readonly teachQueued: number;
+}
+
+export function briefingRecallPillShown(stage: BriefingRecallPillStage): boolean {
+  return (
+    !stage.compact &&
+    stage.recallOffered &&
+    stage.briefingSteps > 0 &&
+    !stage.mistakeMode &&
+    !stage.ended &&
+    !stage.quizUp &&
+    stage.teachQueued === 0
+  );
+}
+
+/**
  * THE SHELL'S EFFECT BODY, as a function of what that render saw.
  *
  * The shell runs `useEffect(() => { const e = nextBriefingStartEvent(state,
