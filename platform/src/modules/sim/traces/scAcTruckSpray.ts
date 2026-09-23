@@ -10,11 +10,14 @@
  * propagates to the live student session.
  *
  * THE PINNED GAP IS THE WHOLE DESIGN (the sc-follow-rain-gap recipe at motorway
- * scale): the rig paces 64 m of centers ahead, so tick.leadGapM sits at ~59.9 m
- * (leadGapFor subtracts the 4.1 m VEHICLE_LENGTH_M) for every drive — the ONLY
- * variable is the player's SPEED, which is exactly FO-04's lesson. 59.9 m is
- *   ~3.4 s at the shadow's 64 km/h  → wet-prudent (the wet rule wants 2.88 s)
- *   ~1.9 s at the mistake's 115 km/h → the FOLLOWING_TOO_CLOSE_FOR_RAIN band
+ * scale): the rig paces 64 m of centers ahead, so tick.leadGapM sits at ~58.2 m
+ * for every drive — leadGapFor subtracts `bumperSubtrahendM` (traffic/system.ts),
+ * which for a TRUCK lead is half the 4.1 m car + half the 7.5 m truck = 5.8 m
+ * (traffic/types.ts VEHICLE_PROFILE_LENGTH_M), not the car-only 4.1 m that gave
+ * the old 59.9 m. The ONLY variable is the player's SPEED, which is exactly
+ * FO-04's lesson. 58.2 m is
+ *   ~3.3 s at the shadow's 64 km/h  → wet-prudent (the wet rule wants 2.88 s)
+ *   ~1.8 s at the mistake's 115 km/h → the FOLLOWING_TOO_CLOSE_FOR_RAIN band
  * and never under the DRY band (0.7 × 1.8 s = 1.26 s ⇒ 40.2 m at 115), so the
  * base основна FOLLOWING_TOO_CLOSE can never double-bill.
  *
@@ -35,9 +38,9 @@
  * The trace gate replays exactly these through the production stack, in day
  * rain, with the rain-following drill ENABLED:
  *   - shadow: low beams ON (explicit — the recorder's DAY default is "off",
- *     which would itself grade AC-02), a wet-prudent ~64 km/h at ~3.4 s behind
+ *     which would itself grade AC-02), a wet-prudent ~64 km/h at ~3.3 s behind
  *     the rig → ZERO violations + CLEAN_DRIVING;
- *   - „Суха дистанция в мокрото": 115 km/h at the SAME 59.9 m (~1.9 s) →
+ *   - „Суха дистанция в мокрото": 115 km/h at the SAME 58.2 m (~1.8 s) →
  *     EXACTLY FOLLOWING_TOO_CLOSE_FOR_RAIN (never the base FOLLOWING_TOO_CLOSE,
  *     never a conditions/speeding code — 115 ≤ 119 ≤ 140);
  *   - „Дъжд без светлини": the shadow's exemplary gap and speed, {headlights:
@@ -85,7 +88,7 @@ export function scAcTruckSprayShadowScript(): DriveScript {
       // which would itself grade HEADLIGHTS_OFF_IN_RAIN (чл. 70).
       { kind: "headlights", setting: "low" },
       { kind: "glance", mirror: "rear" },
-      // ~64 km/h: the pinned 59.9 m is ~3.4 s — wet-prudent, so the FO-04
+      // ~64 km/h: the pinned 58.2 m is ~3.3 s — wet-prudent, so the FO-04
       // detector stays silent. Far under the 119 km/h rain envelope, and well
       // over the 50 km/h motorway floor.
       { kind: "drive", points: [[X_CRUISE, 15], [X_CRUISE, 250], [X_CRUISE, 450]], targetKmh: 64, stopAtEnd: false },
@@ -111,7 +114,7 @@ export function scAcTruckSprayMistakeDryGapScript(): DriveScript {
       { kind: "annotation", textBg: "Грешка: 115 км/ч зад камиона — „нали съм под 140“." },
       { kind: "headlights", setting: "low" },
       { kind: "glance", mirror: "rear" },
-      // 115 km/h at the SAME pinned 59.9 m = ~1.9 s — inside the wet band
+      // 115 km/h at the SAME pinned 58.2 m = ~1.8 s — inside the wet band
       // (< 0.7 × 2.88 s) and comfortably outside the dry one (> 0.7 × 1.8 s),
       // so EXACTLY the rain code bills. 115 ≤ the 119 rain envelope, so no
       // conditions code can attach: the gap is the whole fault.

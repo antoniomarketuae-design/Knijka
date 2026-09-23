@@ -268,6 +268,9 @@ export {
   type HintInput,
 } from "./controlPhrases";
 export { ObjectiveBanner, type ObjectiveFlash } from "./ObjectiveBanner";
+// Founder ruling 2026-09-22 «Say it in the banner»: the objective states its
+// own binding speed cap when it is stricter than the posted limit.
+export { objectiveLineWithTaskCap } from "./objectiveTaskLine";
 export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
 // Doc 86 L14/L15 — the DESKTOP half of the notification rework: a dismissible,
 // two-card, 240 px toast column with a „по-тихи известия" setting, and an
@@ -305,6 +308,21 @@ export {
   type DebriefVisibility,
   type HudToastKind,
 } from "./hudPreferences";
+export { readStoredFlagOrNull } from "./hudPreferences";
+// Founder ruling 2026-09-20, delivered: the start-open decision waits for the
+// RESOLVED compact flag instead of freezing the first render's guess.
+export {
+  briefingAutoSetting,
+  briefingAutoToggled,
+  briefingIsOpen,
+  briefingRecallOffered,
+  briefingStartReducer,
+  nextBriefingStartEvent,
+  BRIEFING_START_INITIAL,
+  type BriefingStartEvent,
+  type BriefingStartPhase,
+  type BriefingStartState,
+} from "./briefingStart";
 export {
   Minimap,
   MistakeMap,

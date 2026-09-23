@@ -3,7 +3,7 @@
  * FO-04 × FO-06 × AC-02), doc 76 §5/§9 stages 3+5. The rain-following detector
  * ships config-OFF; the recorder enables it via ruleConfig (the per-lesson drill
  * opt-in) and records in DAY RAIN, so the gate replays with the drill ON:
- *   1. SHADOW: ~64 km/h at the pinned ~3.4 s behind the rig → ZERO violations +
+ *   1. SHADOW: ~64 km/h at the pinned ~3.3 s (58.2 m) behind the rig → ZERO violations +
  *      CLEAN_DRIVING.
  *   2. MISTAKE DEMOS grade EXACTLY their codeRefs — the 115 km/h dry-habit gap
  *      bills FOLLOWING_TOO_CLOSE_FOR_RAIN and NOTHING else (not the base
@@ -155,7 +155,7 @@ describe("sc-ac-truck-spray — mistakes grade their exact codes (doc 76 §9 sta
 
   it("the dry-gap demo is convicted for the GAP alone — the motorway's whole point", () => {
     // 115 km/h is under the posted 140, under the 154 grace and under the 119
-    // rain envelope; the gap (~1.9 s) is above the dry fire threshold (1.26 s)
+    // rain envelope; the gap (~1.8 s — 58.2 m) is above the dry fire threshold (1.26 s)
     // and below the wet one (2.016 s). So exactly ONE code may attach. If a
     // re-tune ever let the base основна or a speed code in, the mistake card's
     // „скоростта беше в ограничението и въпреки това несъобразена" would become

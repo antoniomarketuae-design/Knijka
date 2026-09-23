@@ -1092,6 +1092,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     "law-junction",
     "law-crossing",
     "law-rail",
+    // Founder ruling 2026-09-22 (sc-pk-busstop-ban:b103c282): a halt at a
+    // spirka is convicted under ЗДвП чл. 69 — see rules/types.ts NoStopBasis.
+    "law-bus-stop",
   ]);
   const isNoStopBasis = (v: unknown): v is NoStopBasis =>
     typeof v === "string" && NO_STOP_BASES.has(v);

@@ -552,6 +552,16 @@ export interface LessonSpec {
    */
   actorLabels?: readonly ActorLabelSpec[];
   /**
+   * The lesson's TASK relies on the door mirrors (founder ruling 2026-09-22,
+   * «Live when the task uses it», row sc-vu-pass-clearance:d770323a). Written
+   * by compileScenario from `lessons/scenario/doorMirrorTask.ts` —
+   * render-only: MirrorRig keeps the door glass live on MEDIUM and HIGH quality
+   * for the whole drive instead of only while looked through. Grades nothing (the
+   * graded mirror check is the glance press, not the picture). Absent = the
+   * attention-gated doors every lesson had before.
+   */
+  doorMirrorsInTask?: true;
+  /**
    * A13 exam session mode („Пробен практически изпит"). Additive; absent =
    * training lesson. True flips the session to exam-strict behavior:
    *  - coach OFF — every violation grades at catalog points from the FIRST

@@ -398,10 +398,17 @@ const MW_X_CRUISE = 0;
  * LIVE actor and invalidates that template's committed traces.
  *
  * THE PINNED GAP IS THE DESIGN (the FO-04 recipe, verbatim): the rig paces at
- * a fixed 64 m of centers (bumper gap ≈ 59.9 m — leadGapFor subtracts the
- * 4.1 m VEHICLE_LENGTH_M), so the ONLY variable the student changes is SPEED.
- * 59.9 m is a wet-prudent ~3.4 s at the shadow's 64 km/h and an imprudent
- * ~1.9 s at the mistake's 115 km/h, where the wet rule wants 2.88 s.
+ * a fixed 64 m of centers, so the ONLY variable the student changes is SPEED.
+ * The bumper gap is 58.2 m, not the 59.9 m this comment used to state: that
+ * figure subtracted one 4.1 m CAR, but `leadGapFor` (traffic/system.ts,
+ * `bumperSubtrahendM`) subtracts the player's half plus the LEAD'S OWN half —
+ * PLAYER_HALF_LENGTH_M = car 4.1 / 2 = 2.05 (traffic/types.ts:216 `car: 4.1`,
+ * :270) plus truck 7.5 / 2 = 3.75 (traffic/types.ts:218 `truck: 7.5`) —
+ * so 64 − 5.8 = 58.2 m, 1.7 m shorter than the car-length figure.
+ * 58.2 m is ~3.3 s at the shadow's 64 km/h and ~1.8 s at the mistake's
+ * 115 km/h; the wet rule targets 2.88 s (1.6 × 1.8) and FOLLOWING_TOO_CLOSE_
+ * FOR_RAIN fires under 0.7 × 2.88 ≈ 2.0 s (rules/types.ts followRain*), so the
+ * shadow is clear of it and the mistake is inside it — the same two stories.
  * HONEST LIMIT (the sc-follow-truck precedent): matchPlayer slaves the rig to
  * the player, so in the 115 km/h demo the truck also runs 115 — a rig that
  * fast in a downpour is not a claim about real trucks, it is the price of
@@ -418,7 +425,7 @@ const ACTS_SPRAY_TRUCK: CutInLeadCarSpec = {
     colorIndex: 2,
     profile: "truck", // FO-06: the box-truck rig — the thing throwing the pelena
   },
-  paceAheadM: 64, // ~64 m of centers (bumper ≈ 59.9) — ~3.4 s at 64 km/h, ~1.9 s at 115
+  paceAheadM: 64, // 64 m of centers (truck bumper 58.2 m, see above) — ~3.3 s at 64 km/h, ~1.8 s at 115
   maxMatchSpeedMps: 33, // 118.8 km/h — holds the gap at the mistake's 115
   cutAt: { x: MW_X_CRUISE, y: 1400 }, // 400 m PAST the 1000 m road — the cut tier is out of reach…
   cutRadiusM: 2,
@@ -525,11 +532,14 @@ export const SC_AC_TRUCK_SPRAY: ScenarioSpec = {
     {
       id: "sc-acts-gap",
       titleBg: "Мини пелената със съобразена скорост и дистанция",
-      // Cap 80 is the gate that separates the two stories. The pinned 59.9 m
-      // gap is worth 2.7 s at 80 km/h — still inside the wet-prudent band — so
-      // the shadow's 64 km/h clears it with room, while the „законните" 115
-      // simply cannot be here slowly enough. The gap discipline is graded by
-      // the FO-04 detector; THIS gate grades the speed that makes it possible.
+      // Cap 80 is the gate that separates the two stories. The pinned 58.2 m
+      // truck-bumper gap (64 m of centers less the car's 2.05 m and the
+      // truck's 3.75 m halves — see ACTS_SPRAY_TRUCK) is worth ~2.6 s at
+      // 80 km/h: under the 2.88 s wet target, but clear of the ≈2.0 s line the
+      // FO-04 detector fires on. The shadow's 64 km/h clears it with room,
+      // while the „законните" 115 simply cannot be here slowly enough. The gap
+      // discipline is graded by the FO-04 detector; THIS gate grades the speed
+      // that makes it possible.
       params: { kind: "reachZone", x: MW_X_CRUISE, y: 450, radiusM: 12, maxSpeedKmh: 80 },
     },
     {

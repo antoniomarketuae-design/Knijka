@@ -119,6 +119,7 @@ import {
   type TapPointerLike,
   type TapRect,
 } from "./tapActivation";
+import { railChipText, SHEET_RAIL_PX } from "./sheetLayout";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -3638,9 +3639,29 @@ export function SimOverlay({
           aria-modal="true"
           aria-label={shown.lineBg}
         >
+          {/* ── LANDSCAPE: THE CHROME GOES INTO A RAIL — 2026-09-22.
+                 sc-ed-d2-priority-run:8a7372dd / sc-merge-accel-lane:2091c183.
+                 At L4/L5 the rung's complication is step 1 and the stacked
+                 sheet lost whole instructions on every audited phone held
+                 sideways (219 px of window for 274 px of text on an iPhone 16,
+                 186 px on the 780×360 Android). A scroll cue is a mitigation;
+                 the repair is SPACE: in landscape the header and «Разбрах»
+                 stand in an `SHEET_RAIL_PX` column beside the text (the text
+                 gets the section's whole height), and the section takes the
+                 whole width between the side safe areas instead of stopping
+                 at `max-w-2xl`. The text's face and leading are untouched.
+                 The arithmetic, and the test that holds it against the real
+                 L4/L5 briefings on every audited viewport, are
+                 `hud/sheetLayout.ts` + `sheet-layout.test.ts`. Portrait keeps
+                 the stacked sheet: there height is plentiful and width is
+                 the scarce axis. */}
           <section
-            className="pointer-events-auto flex w-full max-w-2xl flex-col gap-2 overflow-hidden rounded-t-2xl border-x border-t bg-background/95 px-3 pb-2 pt-2 backdrop-blur"
+            className="pointer-events-auto flex w-full max-w-2xl flex-col gap-2 overflow-hidden rounded-t-2xl border-x border-t bg-background/95 px-3 pb-2 pt-2 backdrop-blur landscape:max-w-[var(--sim-sheet-max-w)] landscape:flex-row"
+            data-sim-overlay-sheet=""
             style={{
+              ["--sim-sheet-max-w" as string]:
+                "calc(100vw - 2 * max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)))",
+              ["--sim-sheet-rail" as string]: `${SHEET_RAIL_PX}px`,
               borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
               // ── §I11, half 2 — THE CAP, AND THE `max()` IS THE HONEST PART.
               //
@@ -3668,128 +3689,6 @@ export function SimOverlay({
               maxHeight: "calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - 0.75rem)",
             }}
           >
-            {/* ══ THE READ MODE'S OWN HEADER WAS A FRAGMENT — 2026-08-14 ══════
-                This row used to carry the line as a `truncate`-d heading, and
-                on the deployed build it ate 146 of the 219 characters of the
-                instruction it was heading — «…По тъмно първо про…», one third
-                of the line, with an ellipsis. This is the surface a student is
-                SENT TO because the peek could not finish printing; a read mode
-                whose title is itself cut off is the defect one level deeper,
-                and it was in the frame nobody had opened.
-
-                So the title stops living in a fixed-height row and joins the
-                SCROLLING body below, where a 412-character exam complication
-                (the worst in the shipped corpus) is simply the first paragraph
-                of what the student came here to read. What stays here is the
-                tone glyph, the card's own chip — «ИНСТРУКЦИИ», a label, always
-                short — and the ✕. Nothing in this row can now be too long for
-                it, which is the only way a header row is honest.
-
-                The dialog keeps `aria-label={lineBg}`, so a screen reader still
-                announces the sheet by its sentence and loses nothing. ══════ */}
-            <div className="flex shrink-0 items-center gap-2">
-              <span style={{ color }}>
-                <ToneGlyph tone={shown.tone} frozen={false} />
-              </span>
-              {/* …AND THE CLASS COMES WITH IT ONTO THIS SURFACE TOO. The peek
-                  is 179 CSS px wide and had to ration the pair; this header is
-                  `max-w-2xl` with a `flex-1 truncate` chip, so the sheet a
-                  student opens FOR the reasoning has no excuse for printing the
-                  mark without the class приложение № 5, т. 10 prices it by. */}
-              <span
-                // A HANDLE, BECAUSE THE STRING STOPPED BEING ONE. `sim-overlay-
-                // fold.test.ts` pinned the fold counter's PLACE in this header
-                // by locating the chip's source expression verbatim, so the
-                // first copy edit here broke a test that is about position and
-                // not about copy. The attribute is what a probe — and that
-                // test — can hold on to across a rewrite of what the chip says.
-                data-sim-overlay-sheet-chip=""
-                className="min-w-0 flex-1 truncate text-[10px] font-black uppercase tracking-wider"
-                style={{ color }}
-              >
-                {shown.markClassBg
-                  ? `${shown.markClassBg}${shown.chipBg ? ` · ${shown.chipBg}` : ""}`
-                  : (shown.chipBg ?? "")}
-              </span>
-              {/* ── THE SHEET'S FOLD, IN WORDS AND WITH A NUMBER — 2026-08-17.
-                     The counterpart of row 2c on the peek. It lands in the
-                     HEADER, and the placement is the whole of the argument.
-
-                     IT COSTS NO AUTHORED BULGARIAN, WHICH IS WHY IT IS HERE.
-                     The section is a `flex-col gap-2` at its cap (341 of the
-                     341 px between the stage's top and the instrument band on
-                     an iPhone 16 sideways) and the scroller is its ONLY
-                     shrinkable child — so a fourth row would have taken its own
-                     10 px plus an 8 px gap straight out of the text it is
-                     counting, pushing the accident-scene fold from 36 px to 54
-                     and hiding a THIRD line to announce that two were hidden.
-                     Under THEO-4 the text is the lesson; this row is chrome. In
-                     this header it takes zero height: the row is 44 px of
-                     button already, the chip beside it is `flex-1 truncate` and
-                     yields the width, and on the narrowest stage the three
-                     items still lay out inside 369 px.
-
-                     AND THE BOTTOM STILL SAYS „CONTINUES", because the fade
-                     added to the scroller in the same commit is what a cut line
-                     needs — the filed frame's real damage is that the
-                     guillotined «6.» read as a rendering fault. Announcement at
-                     the top, continuation cue at the bottom, nothing deleted.
-
-                     ⚠ THAT LAST SENTENCE WAS TRUE FOR ONE COMMIT — 2026-08-28.
-                     `foldMaskCss` replaced the bottom fade with a HARD EDGE on
-                     the very next wave, whenever there IS a fold, and it was
-                     right to (a band that ends inside a line box ends inside
-                     its letters). So from that commit until this one the sheet
-                     had an announcement at the top and NOTHING at the cut, and
-                     `w14/…/sc-merge-accel-lane__mobile-right/02-briefing.png`
-                     is what that looks like: six complete-looking steps, the
-                     sixth ending flush and unfaded, and a solid blue «Разбрах»
-                     8 px under it. The cue is restored on the acknowledgement
-                     itself — see the block at `ackCarriesSheetFold` — which is
-                     also why THIS row now stands down while that button is up:
-                     one count per surface, the peek's own `chipCarriesFoldCount`
-                     rule.
-
-                     IT REACHES ZERO, which the peek's version could not: the
-                     rule at the top of this file has `scrollTop` in it and the
-                     window below is wired to `onScroll`, so a reader who has
-                     scrolled to the end sees the row disappear. A counter stuck
-                     at «↓ още 2 реда» while he is already at the bottom teaches
-                     him to ignore it.
-
-                     `aria-hidden`: assistive technology reads the whole body
-                     out of the DOM regardless of what is scrolled into view, so
-                     announcing a fold to a screen reader would describe a
-                     problem it does not have. */}
-              {sheetFold.lines > 0 ? (
-                ackCarriesSheetFold ? null : (
-                  <span
-                    data-sim-overlay-sheet-fold=""
-                    aria-hidden
-                    className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase leading-none tracking-wider"
-                    style={{ color }}
-                  >
-                    ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"}
-                  </span>
-                )
-              ) : null}
-              {/* «⤢ Разгъни панела» STOOD HERE AND IS DELETED, NOT MOVED.
-                  It was the escape hatch from a height cap, and the cap is
-                  gone: this surface is already the whole screen above the
-                  instrument band. A 44 px control that toggles between one
-                  size and the same size is the founder's own „a button that
-                  does nothing and says nothing about why", and it was costing
-                  the header a third of its width on a 360 px phone. */}
-              <button
-                type="button"
-                {...tapCloseSheet}
-                aria-label="Затвори"
-                className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border border-border text-sm font-black text-muted"
-              >
-                <span aria-hidden>✕</span>
-              </button>
-            </div>
-
             {/* `min-h-0` is what makes the cap above real: without it a flex
                 column item refuses to shrink below its content, so the section
                 overflows its own `max-height` and the box grows off the top of
@@ -3824,7 +3723,7 @@ export function SimOverlay({
               ref={sheetFold.ref}
               onScroll={sheetFold.onScroll}
               data-sim-overlay-sheet-text=""
-              className="min-h-0 min-w-0 shrink overflow-y-auto"
+              className="min-h-0 min-w-0 shrink overflow-y-auto landscape:flex-1"
               style={{
                 // The same rule as the peek's, from the same hook: the filed
                 // frame here is «6.» with its ascenders sliced flat 8 px above
@@ -3932,11 +3831,160 @@ export function SimOverlay({
               ) : null}
             </div>
 
+            {/* THE RAIL. `contents` in portrait, so the header (`order-first`)
+                and «Разбрах» stay the section's own flex items above and below
+                the text exactly as before; in landscape it is the
+                `--sim-sheet-rail` column beside the text, header at the top and
+                the acknowledgement at the foot. It comes AFTER the text in the
+                DOM, so a screen reader reads the instructions before the
+                controls that dismiss them.
+
+                KNOWN AND ACCEPTED (round-1 low finding): in PORTRAIT the ✕ is
+                lifted visually above the text by `order-first`, so where an
+                engine makes the scroller itself keyboard-focusable (Chromium
+                does for scrollable boxes) Tab visits text → ✕ → «Разбрах»
+                while the eye reads ✕ → text → «Разбрах». The two FOCUSABLE
+                controls keep their visual order relative to each other, and
+                the alternative — the ✕ first in the DOM — would make a screen
+                reader announce «Затвори» before the instructions it closes,
+                which is the worse failure for THEO-4. */}
+            <div
+              data-sim-overlay-sheet-rail=""
+              className="contents landscape:flex landscape:w-[var(--sim-sheet-rail)] landscape:shrink-0 landscape:flex-col landscape:justify-between landscape:gap-2"
+            >
+            {/* ══ THE READ MODE'S OWN HEADER WAS A FRAGMENT — 2026-08-14 ══════
+                This row used to carry the line as a `truncate`-d heading, and
+                on the deployed build it ate 146 of the 219 characters of the
+                instruction it was heading — «…По тъмно първо про…», one third
+                of the line, with an ellipsis. This is the surface a student is
+                SENT TO because the peek could not finish printing; a read mode
+                whose title is itself cut off is the defect one level deeper,
+                and it was in the frame nobody had opened.
+
+                So the title stops living in a fixed-height row and joins the
+                SCROLLING body below, where a 412-character exam complication
+                (the worst in the shipped corpus) is simply the first paragraph
+                of what the student came here to read. What stays here is the
+                tone glyph, the card's own chip — «ИНСТРУКЦИИ», a label, always
+                short — and the ✕. Nothing in this row can now be too long for
+                it, which is the only way a header row is honest.
+
+                The dialog keeps `aria-label={lineBg}`, so a screen reader still
+                announces the sheet by its sentence and loses nothing. ══════ */}
+            <div className="order-first flex shrink-0 items-center gap-2 landscape:flex-wrap landscape:content-start">
+              <span style={{ color }}>
+                <ToneGlyph tone={shown.tone} frozen={false} />
+              </span>
+              {/* …AND THE CLASS COMES WITH IT ONTO THIS SURFACE TOO. The peek
+                  is 179 CSS px wide and had to ration the pair; this header is
+                  `max-w-2xl` with a `flex-1 truncate` chip, so the sheet a
+                  student opens FOR the reasoning has no excuse for printing the
+                  mark without the class приложение № 5, т. 10 prices it by. */}
+              <span
+                // A HANDLE, BECAUSE THE STRING STOPPED BEING ONE. `sim-overlay-
+                // fold.test.ts` pinned the fold counter's PLACE in this header
+                // by locating the chip's source expression verbatim, so the
+                // first copy edit here broke a test that is about position and
+                // not about copy. The attribute is what a probe — and that
+                // test — can hold on to across a rewrite of what the chip says.
+                data-sim-overlay-sheet-chip=""
+                className="min-w-0 flex-1 truncate text-[10px] font-black uppercase tracking-wider landscape:order-last landscape:basis-full landscape:whitespace-normal landscape:break-words"
+                style={{ color }}
+              >
+                {/* `railChipText`: «второстепенна» gets a soft hyphen at its
+                    seam, so the 88 px landscape rail breaks it «ВТОРО- /
+                    СТЕПЕННА» instead of wherever the box ran out
+                    (`sheetLayout.ts`, round-1 low finding). Display only. */}
+                {railChipText(
+                  shown.markClassBg
+                    ? `${shown.markClassBg}${shown.chipBg ? ` · ${shown.chipBg}` : ""}`
+                    : (shown.chipBg ?? ""),
+                )}
+              </span>
+              {/* ── THE SHEET'S FOLD, IN WORDS AND WITH A NUMBER — 2026-08-17.
+                     The counterpart of row 2c on the peek. It lands in the
+                     HEADER, and the placement is the whole of the argument.
+
+                     IT COSTS NO AUTHORED BULGARIAN, WHICH IS WHY IT IS HERE.
+                     The section is a `flex-col gap-2` at its cap (341 of the
+                     341 px between the stage's top and the instrument band on
+                     an iPhone 16 sideways) and the scroller is its ONLY
+                     shrinkable child — so a fourth row would have taken its own
+                     10 px plus an 8 px gap straight out of the text it is
+                     counting, pushing the accident-scene fold from 36 px to 54
+                     and hiding a THIRD line to announce that two were hidden.
+                     Under THEO-4 the text is the lesson; this row is chrome. In
+                     this header it takes zero height: the row is 44 px of
+                     button already, the chip beside it is `flex-1 truncate` and
+                     yields the width, and on the narrowest stage the three
+                     items still lay out inside 369 px.
+
+                     AND THE BOTTOM STILL SAYS „CONTINUES", because the fade
+                     added to the scroller in the same commit is what a cut line
+                     needs — the filed frame's real damage is that the
+                     guillotined «6.» read as a rendering fault. Announcement at
+                     the top, continuation cue at the bottom, nothing deleted.
+
+                     ⚠ THAT LAST SENTENCE WAS TRUE FOR ONE COMMIT — 2026-08-28.
+                     `foldMaskCss` replaced the bottom fade with a HARD EDGE on
+                     the very next wave, whenever there IS a fold, and it was
+                     right to (a band that ends inside a line box ends inside
+                     its letters). So from that commit until this one the sheet
+                     had an announcement at the top and NOTHING at the cut, and
+                     `w14/…/sc-merge-accel-lane__mobile-right/02-briefing.png`
+                     is what that looks like: six complete-looking steps, the
+                     sixth ending flush and unfaded, and a solid blue «Разбрах»
+                     8 px under it. The cue is restored on the acknowledgement
+                     itself — see the block at `ackCarriesSheetFold` — which is
+                     also why THIS row now stands down while that button is up:
+                     one count per surface, the peek's own `chipCarriesFoldCount`
+                     rule.
+
+                     IT REACHES ZERO, which the peek's version could not: the
+                     rule at the top of this file has `scrollTop` in it and the
+                     window below is wired to `onScroll`, so a reader who has
+                     scrolled to the end sees the row disappear. A counter stuck
+                     at «↓ още 2 реда» while he is already at the bottom teaches
+                     him to ignore it.
+
+                     `aria-hidden`: assistive technology reads the whole body
+                     out of the DOM regardless of what is scrolled into view, so
+                     announcing a fold to a screen reader would describe a
+                     problem it does not have. */}
+              {sheetFold.lines > 0 ? (
+                ackCarriesSheetFold ? null : (
+                  <span
+                    data-sim-overlay-sheet-fold=""
+                    aria-hidden
+                    className="shrink-0 whitespace-nowrap landscape:whitespace-normal text-[10px] font-black uppercase leading-none tracking-wider"
+                    style={{ color }}
+                  >
+                    ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"}
+                  </span>
+                )
+              ) : null}
+              {/* «⤢ Разгъни панела» STOOD HERE AND IS DELETED, NOT MOVED.
+                  It was the escape hatch from a height cap, and the cap is
+                  gone: this surface is already the whole screen above the
+                  instrument band. A 44 px control that toggles between one
+                  size and the same size is the founder's own „a button that
+                  does nothing and says nothing about why", and it was costing
+                  the header a third of its width on a 360 px phone. */}
+              <button
+                type="button"
+                {...tapCloseSheet}
+                aria-label="Затвори"
+                className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border border-border text-sm font-black text-muted landscape:ml-auto"
+              >
+                <span aria-hidden>✕</span>
+              </button>
+            </div>
+
             {blocking ? (
               <button
                 type="button"
                 {...tapSheetAck}
-                className="btn-accent w-full shrink-0 justify-center py-3 text-sm"
+                className="btn-accent w-full shrink-0 justify-center py-3 text-sm landscape:flex-col landscape:gap-1 landscape:px-2"
               >
                 {shown.ackLabelBg ?? "Разбрах"}
                 {/* ── THE CONTINUATION CUE, AT THE CUT — 2026-08-28. The block
@@ -4038,13 +4086,14 @@ export function SimOverlay({
                   <span
                     data-sim-overlay-ack-fold=""
                     aria-hidden
-                    className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase leading-none tracking-wider"
+                    className="shrink-0 whitespace-nowrap landscape:whitespace-normal text-[10px] font-black uppercase leading-none tracking-wider"
                   >
                     ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"} — покажи
                   </span>
                 ) : null}
               </button>
             ) : null}
+            </div>
           </section>
         </div>
       ) : null}

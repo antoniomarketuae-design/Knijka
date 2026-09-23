@@ -108,12 +108,7 @@ import {
   examMarkCitationBg,
 } from "@/modules/sim/rules";
 import { OVERLAY_SCRIM_CLASS } from "./playArea";
-
-/** No Space bar, no hover: the card shows a big tap target instead of a key. */
-function isTouchDevice(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia?.("(hover: none)").matches === true || navigator.maxTouchPoints > 0;
-}
+import { useHintInput } from "./useHintInput";
 
 /* ───────────────────────────────────────────────────────────────────────────
    THE TEACHING CARDS SAY WHEN THEY CONTINUE BELOW THE FOLD
@@ -366,10 +361,25 @@ export function TeachMomentOverlay({
   }, [onAcknowledge]);
 
   // Touch devices have no Space bar; they get the big button instead of a key
-  // hint. Safe as a lazy initializer (the LessonPlayShell grammar): this
-  // overlay only ever mounts inside a client-only play session, so there is no
-  // SSR pass to mismatch.
-  const [touch] = useState(isTouchDevice);
+  // hint.
+  //
+  // NOT a lazy `useState(isTouchDevice)` any more (lane D, round 2). That read
+  // the device during render on the belief that this overlay „only ever mounts
+  // inside a client-only play session, so there is no SSR pass to mismatch" —
+  // the same false belief the shell held about itself: `LessonPlayShell` is
+  // server-rendered on every `/simulator?scenario=…` deep link, and whatever
+  // it renders, this card included, is hydrated against server HTML in which
+  // the device read `false`. `useHintInput` hydrates with the server's
+  // "keyboard" and switches once afterwards.
+  //
+  // It is also the SAME predicate as the shell's hint vocabulary now. The old
+  // private `isTouchDevice` (`(hover: none)` OR touch points) was a second
+  // convention beside `hasTouchScreen` (touch points OR `(any-pointer:
+  // coarse)`); on the rare device where they disagreed, the shell would name a
+  // key cap („Изкл. I") while this card hid „Space", or the reverse. One
+  // device, one vocabulary — the rule `controlPhrases.test.ts` holds for
+  // `hintInputFor`.
+  const touch = useHintInput() === "touch";
   // Compact only: „Повече" opens the rest of the authored text in place.
   //
   // The open state stores WHICH moment is expanded rather than a boolean, so

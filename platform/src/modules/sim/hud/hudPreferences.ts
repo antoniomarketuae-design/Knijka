@@ -141,6 +141,22 @@ export function readStoredFlag(key: string, fallback: boolean): boolean {
   }
 }
 
+/**
+ * Read a persisted flag WITHOUT a fallback: `null` = nothing stored, a foreign
+ * value, SSR, or a throwing store. For a setting whose default depends on a
+ * fact the first render does not know yet (the briefing's per-surface default,
+ * `briefingStart.ts`), the default must be applied LATER, against the resolved
+ * value — folding it in here would freeze the first render's guess.
+ */
+export function readStoredFlagOrNull(key: string): boolean | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return parseStoredFlag(window.localStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
 /** Persist a flag; a throwing store leaves the in-memory value in charge. */
 export function writeStoredFlag(key: string, on: boolean): void {
   try {

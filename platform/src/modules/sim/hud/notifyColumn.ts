@@ -299,6 +299,27 @@ export const NOTIFY_COLUMN_MIRROR_GUTTER_PX = 8;
  * `notify-column-mirror.test.ts`.
  */
 export const MIRROR_BAND_BOTTOM_FRACTION_ROOMY = 0.24;
+// ⚠ THIS LANE DID NOT MOVE WITH THE «RE-ANCHOR THE MIRROR» RULING, AND THAT IS
+// A MEASUREMENT — 2026-09-23. The ruling brings the interior mirror DOWN on wide
+// canvases, and «the mirror does not move, the HUD does» (B74/B76) cuts both
+// ways: a lower mirror is a lower lane, and a lower lane is a lower column. What
+// the corridor between this lane and the thumb controls has left, measured with
+// the numbers in this file and in mirror-lane-corridor.test.ts:
+//
+//     852 × 393  the first-run hint needs 124.5 px and the corridor holds 126.76
+//                → 2.26 px of slack
+//     780 × 340  the same hint must already SCROLL 20.94 px against a pinned
+//                bound of 21 → 0.06 px of slack
+//
+// A station drop of a tenth of a millimetre spends that, so the mirror's station
+// drop is CAPPED at 0 on the phones (`cabinLook.REAR_MIRROR_STATION_DROP_MAX_M`,
+// which carries the derivation and the other bar — B58's sign clearance) and the
+// lane below is unchanged, byte for byte. The header's own drop is what landed;
+// it costs this file nothing, because the header is not what the column hangs
+// below. Moving the CARD instead is a founder question, not an arithmetic one:
+// this stage has no third corridor (the left one is the rail, the open deck and
+// the left door mirror), which is the same sentence the flank-lane block below
+// already had to write about the right edge.
 export const MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE = 0.166;
 export const MIRROR_BAND_BOTTOM_FRACTION_COMPACT_PORTRAIT = 0.276;
 

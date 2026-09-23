@@ -1472,6 +1472,10 @@ export const SC_HZ_BREAKDOWN_PULLOFF: ScenarioSpec = {
   ],
   staged: [SC_HZ_BREAKDOWN_TELLTALE],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 3, and no structured channel carries it:
+  // «Провери огледалото, пусни десен мигач и започни плавно да намаляваш още в лентата за движение» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 

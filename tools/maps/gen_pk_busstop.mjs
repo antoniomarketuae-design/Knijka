@@ -1,15 +1,28 @@
 /**
- * gen_pk_busstop.mjs — pk-busstop-v1, the BUS-STOP ban map (doc 72 §11
- * archetype PK-06 „спиране в забранена зона", ЗДвП чл. 98, ал. 1). The
- * gen_ban_zones.mjs mold by way of gen_pk_banx.mjs (same `zones` layer, same
- * self-validating shape), with the one difference that IS the template:
+ * gen_pk_busstop.mjs — pk-busstop-v1, the BUS-STOP map (doc 72 §11 archetype
+ * PK-06 „спиране в забранена зона"). The gen_ban_zones.mjs mold by way of
+ * gen_pk_banx.mjs (same `zones` layer, same self-validating shape), with the
+ * one difference that IS the template:
  *
  *   pk-ban-v1  (shipped) bans by SIGN  — a В27 plate marks the span.
  *   pk-banx-v1 (shipped) bans by LAW   — the zebra and the corner ARE the ban.
- *   pk-busstop-v1 bans by the STOP ZONE — чл. 98, ал. 1 keeps а bus stop clear,
- *   and Наредба № 2/2001's зигзаг MARKS OUT how far that zone reaches. The
- *   drill is that the zone is BIGGER than the shelter you can see: the marked
- *   approach is already the spirka.
+ *   pk-busstop-v1 is governed by the STOP ZONE — ЗДвП чл. 69 lets other
+ *   vehicles stop at a spirka ONLY to let passengers alight and ONLY if they do
+ *   not hinder the bus, and чл. 98, ал. 2, т. 3 bans PARKING there; the зигзаг
+ *   marks out how far that zone reaches. The drill is that the zone is BIGGER
+ *   than the shelter you can see: the marked approach is already the spirka.
+ *
+ * FOUNDER RULINGS 2026-09-22 — «Convict under чл. 69» (sc-pk-busstop-ban:
+ * b103c282) and «Teach чл. 69 as written». This generator used to author both
+ * spans as «ЗДвП-98-1» (чл. 98, ал. 1 — a closed list of eight places with no
+ * spirka in it) and the note claimed ал. 1 bans «even a brief престой» here,
+ * which the act does not say. Both spans now carry `basis: "law-bus-stop"`,
+ * which (a) selects the card that quotes чл. 69 verbatim from the law bank,
+ * (b) tells builders/zoneSigns.ts to post NO В27 (чл. 69 needs no plate), and
+ * (c) gives the reducer its drop-off allowance — a brief stop to let a
+ * passenger out is lawful; a rest past `busStopDropOffMaxSec` is паркиране
+ * (чл. 93, ал. 2) and is what convicts. The zone KIND stays `noStopping`
+ * because that is the flag the detector reads; the basis is what relaxes it.
  *
  * Layout (x = east, y = north; the street runs south → north on x = 0, the
  * driver travels north — so edge arclength EQUALS district y along the street):
@@ -18,8 +31,8 @@
  *         │
  *         ·  legal curb bay          y = 250   (40 m past the zone — the goal)
  *         │
- *         ▓  z-stop-pocket  чл. 98   y = [180, 210]   the bay itself
- *         ▓  z-stop-marking чл. 98   y = [150, 180]   the зигзаг approach
+ *         ▓  z-stop-pocket  чл. 69   y = [180, 210]   the bay itself
+ *         ▓  z-stop-marking чл. 69   y = [150, 180]   the зигзаг approach
  *         │
  *     pkbs-spawn-start (4.06, 15)
  *         │
@@ -48,22 +61,15 @@
  * behind it queue-innocent by construction. The pocket is empty on purpose —
  * „свободна е, само за секунда" IS the misconception being taught.
  *
- * KNOWN GAPS (honest — the gen_ban_zones.mjs / gen_pk_banx.mjs header
- * precedent; both are RENDER-only, and grading reads the spans, never paint):
- *  - MARKING: builders/markings.ts does not read District.zones at all, so the
- *    зигзаг that marks this zone out in reality is not painted. The scenario
- *    copy and the objective carry that teaching; the grading is exact
- *    regardless (authored spans, not paint reads).
- *  - SIGN: builders/zoneSigns.ts posts a В27 face at the START of every
- *    `noStopping` span. A real spirka is posted with an INFORMATIONAL Д-group
- *    plate, not В27, and no such SignKind asset exists — so the two posts this
- *    map places are wrong-but-harmless furniture. Pinned in the battery.
- *  - SHELTER: builders/props.ts only places bus-stop shelters on primary/
- *    secondary edges anchored to a degree >= 3 node. Both are unavailable here
- *    BY DESIGN (arterial rank posts stop lines; a junction posts stop lines and
- *    arms nothing this drill wants), so the pocket renders as plain curb. The
- *    fix is a `busStop?: boolean` on DistrictZone that props.ts honours; not
- *    taken here — shared file, and the drill grades identically without it.
+ * FURNITURE (render-only; grading reads the spans, never paint). All three
+ * gaps this header used to list are closed downstream of this file, and none
+ * of them needed a change to the JSON it writes:
+ *  - MARKING: the зигзаг is painted from `meta.scenario.busStopPocketY` and the
+ *    `noStopping` spans (world/__tests__/pk-busstop-districts.test.ts).
+ *  - SIGN: builders/zoneSigns.ts posts NO В27 for a `law-bus-stop` span
+ *    (`zonePostsPlate`); strip the basis and both faces come back.
+ *  - SHELTER: props.ts's bus-stop pass reads `meta.scenario.busStopPocketY`
+ *    and places the навес at the pocket's midpoint.
  *
  * Deterministic: same params → byte-identical JSON. No randomness, no OSM.
  * Run:  node tools/maps/gen_pk_busstop.mjs
@@ -79,6 +85,16 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const SCALED_LANE_W = 3.25 * 2.5;
 
 const r2 = (v) => Math.round(v * 100) / 100;
+
+/**
+ * The spans' declared ground (rules/types.ts NoStopBasis). Founder rulings
+ * 2026-09-22: ЗДвП чл. 69 (stop only to let passengers alight, only if the bus
+ * is not hindered) + чл. 98, ал. 2, т. 3 (no parking at the stops).
+ */
+const BUS_STOP_BASIS = "law-bus-stop";
+/** What `meta.scenario.banZonesY` records per span — the same citation the
+ *  card prints (catalog.ts NO_STOP_BASIS_COPY["law-bus-stop"].lawRef). */
+const BUS_STOP_LAW_REF = "ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3";
 
 function polylineLength(pts) {
   let len = 0;
@@ -196,13 +212,14 @@ export function buildBusStopStreet(params) {
   const ZONES = [
     {
       // The зигзаг approach — the half of the spirka drivers do not count as
-      // "the stop" (Наредба № 2/2001 marks it; чл. 98, ал. 1 bans it).
+      // "the stop" (the зигзаг marks it; чл. 69 governs it like the bay).
       id: `${idPrefix}-z-stop-marking`,
       kind: "noStopping",
       edgeId,
       fromM: r2(markingFromM),
       toM: r2(pocketFromM),
-      signRef: "ЗДвП-98-1 / Наредба № 2/2001 — зигзаг",
+      signRef: "ЗДвП-69 / Наредба № 2/2001 — зигзаг",
+      basis: BUS_STOP_BASIS,
     },
     {
       // The bay itself — the obvious half.
@@ -211,7 +228,8 @@ export function buildBusStopStreet(params) {
       edgeId,
       fromM: r2(pocketFromM),
       toM: r2(pocketToM),
-      signRef: "ЗДвП-98-1 — спирка",
+      signRef: "ЗДвП-69 — спирка",
+      basis: BUS_STOP_BASIS,
     },
   ];
 
@@ -307,7 +325,7 @@ export function buildBusStopStreet(params) {
       pocketToM,
       legalBayY,
       banKind: "noStopping",
-      banBasis: "law", // чл. 98 — the spirka bans itself; В27 posts nothing here
+      banBasis: "law", // чл. 69 / чл. 98, ал. 2, т. 3 — the statute governs the spirka; no plate
     },
     lanesPerDirection: lanesPerDir,
     laneCenterRightM: laneRightM,
@@ -319,8 +337,8 @@ export function buildBusStopStreet(params) {
      *  arclength here (one edge, x = 0), and stated anyway so the template never
      *  has to know that. */
     banZonesY: [
-      { id: ZONES[0].id, lawRef: "ЗДвП чл. 98, ал. 1", fromY: r2(markingFromM), toY: r2(pocketFromM) },
-      { id: ZONES[1].id, lawRef: "ЗДвП чл. 98, ал. 1", fromY: r2(pocketFromM), toY: r2(pocketToM) },
+      { id: ZONES[0].id, lawRef: BUS_STOP_LAW_REF, fromY: r2(markingFromM), toY: r2(pocketFromM) },
+      { id: ZONES[1].id, lawRef: BUS_STOP_LAW_REF, fromY: r2(pocketFromM), toY: r2(pocketToM) },
     ],
   };
 
@@ -408,7 +426,14 @@ export function buildBusStopStreet(params) {
     if (z.kind !== "noStopping") {
       // В28 (noParking) deliberately does NOT convict in the reducer — престоят
       // под В28 е разрешен — so a noParking span here would grade nothing.
-      post.push(`${z.id}: every span here is a чл. 98 noStopping ban`);
+      post.push(`${z.id}: every span here is a noStopping span (the flag the detector reads)`);
+    }
+    if (z.basis !== BUS_STOP_BASIS) {
+      // Without the basis the span falls back to the pooled «под знак В27» card
+      // and zoneSigns posts a В27 the spirka does not carry — the defect the
+      // 2026-09-22 ruling closed — and the 4 s sustain convicts the lawful
+      // drop-off чл. 69 allows.
+      post.push(`${z.id}: must declare basis "${BUS_STOP_BASIS}" (founder ruling 2026-09-22)`);
     }
     if (!(z.fromM >= 0 && z.fromM < z.toM && z.toM <= host.length)) {
       post.push(`${z.id}: span [${z.fromM}, ${z.toM}] outside 0..${host.length} of ${z.edgeId}`);
@@ -472,7 +497,7 @@ const INSTANCES = [
     lengthM: 340,
     maxspeedKmh: 50,
     noteBg:
-      "Зоната на спирката започва на зигзага, не при табелата: чл. 98, ал. 1 забранява дори кратък престой от 150-ия до 210-ия метър. Разрешеното място е след зоната — на 250-ия метър.",
+      "Зоната на спирката започва на зигзага, не при навеса: от 150-ия до 210-ия метър другите коли могат да спират само за слизане на пътници и само ако не пречат на автобуса (ЗДвП чл. 69), а да чакаш там е паркиране, забранено на спирка (чл. 98, ал. 2, т. 3). Мястото за чакане е след зоната — на 250-ия метър.",
   },
 ];
 

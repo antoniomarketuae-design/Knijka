@@ -119,7 +119,8 @@ import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import { cullInstancedForMirror } from "@/modules/sim/scene/vitok/mirrorInstanceCull";
 import {
   MIRROR_BIT,
-  mirrorIsAttended,
+  doorMirrorsFollowTask,
+  mirrorGlassDecision,
   mirrorKindsFor,
   selectMirrorPass,
   type HeldLook,
@@ -398,33 +399,14 @@ const MIRROR_FOG_MIN_DENSITY = 1.5 / MIRROR_FAR;
 // door gate, are both recorded there.
 
 /**
- * Should this mirror's glass be showing LIVE WORLD at the end of this frame?
- * (Whether a PASS runs is `selectMirrorPass`'s question and a budget one; this
- * is the honesty question, and they are not the same. A `false` here means the
- * target is blanked to the authored glass colour — see `clearMirrorToInert`.)
- *
- * Pure and allocation-free so the rule is testable without a GPU, and called
- * from both places the frame loop decides it — the blanking sweep and the
- * post-pass promotion — so the two can never drift.
- *
- *  · rear   — always. It is in the picture at the driving pose, it is the
- *             tailgater instrument (doc 62 #44), and its phase-0 cadence
- *             primes it on frame 0, so it is never showing an empty buffer.
- *  · a door — only while ATTENDED, and only from the first pass that ran while
- *             it was. `wasLive` carries it across the frames between passes;
- *             losing attention blanks it again, which is what stops a
- *             spawn-moment reflection outliving the glance that produced it.
+ * The glass honesty rule (`mirrorGlassIsLive`) and the whole glass decision
+ * (`mirrorGlassDecision`, which is what the frame loop below calls at BOTH
+ * points it decides a door's glass) live in `scene/vitok/mirrorAttention.ts`,
+ * pure and allocation-free, so the rule — including the lesson's door-mirror
+ * task flag — is testable without a GPU. Re-exported so existing importers of
+ * this file keep working.
  */
-export function mirrorGlassIsLive(
-  kind: MirrorKind,
-  wasLive: boolean,
-  attended: boolean,
-  passedThisFrame: boolean,
-): boolean {
-  if (kind === "rear") return true;
-  if (!attended) return false;
-  return wasLive || passedThisFrame;
-}
+export { mirrorGlassIsLive } from "@/modules/sim/scene/vitok/mirrorAttention";
 
 /**
  * Which targets to arm for a PRIMING pass — the rear and nothing else.
@@ -829,9 +811,28 @@ export function MirrorRig({
   mirrors,
   active,
   cabinRef,
+  doorMirrorsInTask = false,
+  rearStationDropM = 0,
 }: {
   mirrors: MirrorMeshes;
   active: boolean;
+  /**
+   * `LessonSpec.doorMirrorsInTask` — the lesson's task relies on the door
+   * mirrors, so on MEDIUM and HIGH they stay live for the whole drive instead
+   * of only while looked through (founder ruling 2026-09-22, «Live when the task uses
+   * it»; the rule is `mirrorAttention.doorMirrorsFollowTask`). Absent = false =
+   * exactly the behaviour before the ruling.
+   */
+  doorMirrorsInTask?: boolean;
+  /**
+   * How far the interior mirror station is re-anchored DOWN on this canvas's
+   * aspect, metres (`cabinLook.rearMirrorStationDropM` — founder ruling
+   * 2026-09-22, «Re-anchor the mirror»). 0 at 16:9 and every squarer window,
+   * so the reference build is byte-identical. Applied to the rear glass on top
+   * of the REF 8 lift and MIRROR_DROP_M, so the housing parented into the glass
+   * comes with it.
+   */
+  rearStationDropM?: number;
   /**
    * The cabin, for the ONE question this rig asks it: which mirror is the
    * driver looking through right now (`glanceMirror` + `glanceStrength`). A
@@ -851,6 +852,9 @@ export function MirrorRig({
   // Read once on mount: the quality selector lives on the lesson-select
   // screen, so the preset cannot change while this scene is alive.
   const [preset] = useState(() => loadQualityPreset());
+  // Derived every render from the two values it depends on — never seeded
+  // into state — so a lesson flag that arrives after mount is honoured.
+  const doorsFollowTask = doorMirrorsFollowTask(preset, doorMirrorsInTask);
 
   const entries = useMemo<MirrorRigEntry[]>(() => {
     return mirrorKindsFor(preset).flatMap((kind) => {
@@ -945,12 +949,12 @@ export function MirrorRig({
 
   // Swap the RTT material onto the glass and lift the quad clear of its
   // authored casing (see MIRROR_DEFS / REF 8); restore the authored material,
-  // position AND scale, and dispose everything we created, when the rig (or
-  // the GLB) goes away.
+  // position AND scale when the rig (or the GLB) goes away — or when the
+  // canvas aspect changes the re-anchor drop (a phone turned sideways), in
+  // which case the same effect re-applies from the AUTHORED transform, so the
+  // lift direction never depends on the drop. Disposal lives in the effect
+  // below, keyed on `entries` alone: a rotation must not dispose live targets.
   useEffect(() => {
-    liveRef.current = 0;
-    inertRef.current = 0;
-    inertNeedsAtmosphereRef.current = 0;
     const restores = entries.map((e) => {
       const previous = e.mesh.material;
       const previousPosition = new Vector3().copy(e.mesh.position);
@@ -975,6 +979,11 @@ export function MirrorRig({
           if (e.kind === "rear") e.mesh.position.y -= MIRROR_DROP_M;
         }
       }
+      // «Re-anchor the mirror» (founder, 2026-09-22): on a wide canvas the
+      // whole station comes down so it hangs from the header the camera can
+      // actually see. A pure translation, AFTER the REF 8 lift, so the lift's
+      // eye-ray geometry is the authored one at every aspect; 0 at 16:9.
+      if (e.kind === "rear" && rearStationDropM > 0) e.mesh.position.y -= rearStationDropM;
       return () => {
         e.mesh.material = previous;
         e.mesh.position.copy(previousPosition);
@@ -983,6 +992,14 @@ export function MirrorRig({
     });
     return () => {
       for (const restore of restores) restore();
+    };
+  }, [entries, rearStationDropM]);
+
+  useEffect(() => {
+    liveRef.current = 0;
+    inertRef.current = 0;
+    inertNeedsAtmosphereRef.current = 0;
+    return () => {
       liveRef.current = 0;
       inertRef.current = 0;
       inertNeedsAtmosphereRef.current = 0;
@@ -1071,8 +1088,11 @@ export function MirrorRig({
       if (e.kind === "rear") continue;
       const bit = MIRROR_BIT[e.kind];
       const wasLive = (liveRef.current & bit) !== 0;
-      const attended = mirrorIsAttended(e.kind, glanceMirror, glanceStrength, lookPose);
-      if (mirrorGlassIsLive(e.kind, wasLive, attended, false)) continue;
+      if (
+        mirrorGlassDecision(e.kind, wasLive, false, doorsFollowTask, glanceMirror, glanceStrength, lookPose)
+      ) {
+        continue;
+      }
       liveRef.current &= ~bit;
       // The world's own atmosphere, read per clear rather than authored, so a
       // night or a fog lesson gets the mirror its own sky implies (see
@@ -1109,6 +1129,7 @@ export function MirrorRig({
       glanceStrength,
       lookPose,
       unprimedRef.current,
+      doorsFollowTask,
     );
     if (kind === null) return;
     const entry = entries.find((e) => e.kind === kind) ?? null;
@@ -1165,11 +1186,14 @@ export function MirrorRig({
     // pass, which by definition happens while nobody is looking.
     const passedBit = MIRROR_BIT[kind];
     if (
-      mirrorGlassIsLive(
+      mirrorGlassDecision(
         kind,
         (liveRef.current & passedBit) !== 0,
-        mirrorIsAttended(kind, glanceMirror, glanceStrength, lookPose),
         true,
+        doorsFollowTask,
+        glanceMirror,
+        glanceStrength,
+        lookPose,
       )
     ) {
       liveRef.current |= passedBit;

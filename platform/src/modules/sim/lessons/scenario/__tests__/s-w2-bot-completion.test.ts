@@ -202,7 +202,7 @@ describe("wave-2 bot completion — sc-ov-night-gap at L3", () => {
 });
 
 // ---------------------------------------------------------------------------
-// sc-pk-busstop-ban — the spirka is bigger than the shelter (чл. 98, ал. 1)
+// sc-pk-busstop-ban — the spirka is bigger than the shelter (ЗДвП чл. 69; waiting there is паркиране, чл. 98, ал. 2, т. 3)
 // ---------------------------------------------------------------------------
 
 describe("wave-2 bot completion — sc-pk-busstop-ban at L3", () => {

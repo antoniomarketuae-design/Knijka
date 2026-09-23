@@ -38,7 +38,12 @@
 import type { SimTick } from "../rules";
 import type { LessonStepResult } from "../lessons";
 
-export const ROAD_PROBE_VERSION = 1;
+/**
+ * 2 (W59 increment 2): `route.laneAlign` — where the product's lane-align
+ * shift bent the route, so a reader stops guessing it from the turn markers.
+ * A reader written against 1 must not read a 2 as if it were a 1.
+ */
+export const ROAD_PROBE_VERSION = 2;
 
 /**
  * RING SIZE: 1024 ticks per ring (`road` and `step` alike).
@@ -118,6 +123,25 @@ export interface RoadProbeRouteSource {
   totalLen: number;
   goalS: number;
   turns: readonly { s: number; x: number; y: number; side: "left" | "right"; dirX: number; dirY: number }[];
+  /** `DerivedRoute.laneAlign` (`scene/guidanceRoute.ts` `LaneAlignSpan`):
+   *  `null` = no shift applied; ABSENT = the source did not say. */
+  laneAlign?: RoadProbeLaneAlign | null;
+}
+
+/** Where the product's lane-align shift bent the route, in the route's own
+ *  arclength — copied verbatim off `DerivedRoute.laneAlign`, never computed
+ *  here. `legStartS`→`rampEndS` is the ease-in and `holdToS`→`decayEndS` the
+ *  decay (the two stretches whose heading the shift manufactures); between
+ *  them the shift is a parallel offset. */
+export interface RoadProbeLaneAlign {
+  legStartS: number;
+  rampEndS: number;
+  rampInM: number;
+  goalS: number;
+  holdToS: number;
+  decayEndS: number;
+  offsetM: number;
+  w0: number;
 }
 
 /** The route as published: typed arrays become plain arrays (so it survives a
@@ -138,6 +162,10 @@ export interface RoadProbeRoute {
   totalLen: number;
   goalS: number;
   turns: { s: number; x: number; y: number; side: "left" | "right"; dirX: number; dirY: number }[];
+  /** The lane-align span the product APPLIED (`null` = none). ABSENT only
+   *  when the source route did not carry the field — a reader must then treat
+   *  the span as unknown, never as „no shift". */
+  laneAlign?: RoadProbeLaneAlign | null;
 }
 
 export interface RoadProbe {
@@ -233,6 +261,22 @@ export function recordRoadProbeTick(
   pushBounded(probe.step, stepRecordOf(step, seq, wallMs), probe.ringSize);
 }
 
+/** Pure: a copy of the route's lane-align span, field by field (`null` stays
+ *  `null`). */
+export function laneAlignRecordOf(a: RoadProbeLaneAlign | null): RoadProbeLaneAlign | null {
+  if (a === null) return null;
+  return {
+    legStartS: a.legStartS,
+    rampEndS: a.rampEndS,
+    rampInM: a.rampInM,
+    goalS: a.goalS,
+    holdToS: a.holdToS,
+    decayEndS: a.decayEndS,
+    offsetM: a.offsetM,
+    w0: a.w0,
+  };
+}
+
 /** Replace the probe's route with a copy of this derivation (or `null`). */
 export function recordRoadProbeRoute(
   probe: RoadProbe,
@@ -241,20 +285,24 @@ export function recordRoadProbeRoute(
 ): void {
   const derivation = probe.routeDerivations + 1;
   probe.routeDerivations = derivation;
-  probe.route =
-    route === null
-      ? null
-      : {
-          derivation,
-          afterSeq: probe.seq,
-          wallMs,
-          pts: Array.from(route.pts),
-          arc: Array.from(route.arc),
-          count: route.count,
-          totalLen: route.totalLen,
-          goalS: route.goalS,
-          turns: route.turns.map((t) => ({ s: t.s, x: t.x, y: t.y, side: t.side, dirX: t.dirX, dirY: t.dirY })),
-        };
+  if (route === null) {
+    probe.route = null;
+    return;
+  }
+  const r: RoadProbeRoute = {
+    derivation,
+    afterSeq: probe.seq,
+    wallMs,
+    pts: Array.from(route.pts),
+    arc: Array.from(route.arc),
+    count: route.count,
+    totalLen: route.totalLen,
+    goalS: route.goalS,
+    turns: route.turns.map((t) => ({ s: t.s, x: t.x, y: t.y, side: t.side, dirX: t.dirX, dirY: t.dirY })),
+  };
+  // Absent stays absent — a source that did not say is not a source that said „none".
+  if (route.laneAlign !== undefined) r.laneAlign = laneAlignRecordOf(route.laneAlign);
+  probe.route = r;
 }
 
 /** Where the probe lives. `window` in the browser; any object in a test. */

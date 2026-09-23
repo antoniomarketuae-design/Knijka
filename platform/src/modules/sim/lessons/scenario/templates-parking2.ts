@@ -201,13 +201,38 @@ const PKBS_POCKET_TO_Y = 210;
 const PKBS_BAY_Y = 250;
 
 /**
- * „Спирка не е паркинг" — the THIRD cue of the same чл. 98 detector, and the
+ * „Спирка не е паркинг" — the THIRD cue of the same ban-zone detector, and the
  * one that costs learners the most: pk-ban-v1 bans by a В27 PLATE, pk-banx-v1
  * bans by geometry you can see (a zebra, a corner), and this map bans by a ZONE
  * whose real extent is invisible unless you read the зигзаг. „Аз не съм на
  * спирката, аз съм малко преди нея" is the sentence this template exists to
- * refute: the marked approach IS the spirka (Наредба № 2/2001 marks it out;
- * ЗДвП чл. 98, ал. 1 bans even а momentary престой across all of it).
+ * refute: the marked approach IS the spirka (the зигзаг marks it out), and at a
+ * spirka ЗДвП чл. 69 lets other vehicles stop ONLY to let passengers alight and
+ * ONLY if they do not hinder the bus.
+ *
+ * FOUNDER RULING 2026-09-22 — «Convict under чл. 69» (sc-pk-busstop-ban:
+ * b103c282). This drill used to cite чл. 98, ал. 1 and claim it bans «even a
+ * momentary престой» at a spirka; the retrieved ал. 1 names no spirka at all,
+ * and the district's spans printed the pooled «под знак В27» card under a В27
+ * the world builder had derived from the zone kind. The spans now declare
+ * `basis: "law-bus-stop"` (card: ЗДвП чл. 69, quoted verbatim from the law
+ * bank), the world posts no plate at the spirka, and every student-facing line
+ * below states чл. 69's two conditions rather than a blanket ban the act does
+ * not contain.
+ *
+ * FOUNDER FOLLOW-UP RULING 2026-09-22 — «Teach чл. 69 as written». The article
+ * ALLOWS the stop the drill used to convict: a brief drop-off that hinders no
+ * bus is lawful. So the drill is now about the act the law DOES forbid at a
+ * spirka — WAITING there, which is паркиране (чл. 93, ал. 2: stopped beyond
+ * «ограничено време, необходимо за качване и слизане на пътници») and which
+ * чл. 98, ал. 2, т. 3 bans «на спирките на превозните средства от редовните
+ * линии за обществен превоз на пътници». The task is „ще чакаш приятел", the
+ * two ❌ demos WAIT (past `RuleEngineConfig.busStopDropOffMaxSec`, the
+ * product's drop-off allowance — the act names no number, and no line here
+ * pretends it does), and the reducer bills a `law-bus-stop` rest only after
+ * that allowance, so what the cards quote and what the engine convicts agree.
+ * The other half of чл. 69 — hindering a bus — is taught but NOT graded: no
+ * bus is staged (see below) and nothing on the tick reports one.
  *
  * WHY THE POCKET IS EMPTY (and stays empty). A staged bus in the bay would be a
  * lead vehicle within banZoneStopQueueGapM, which makes every rest behind it
@@ -217,11 +242,13 @@ const PKBS_BAY_Y = 250;
  * world/__tests__/pk-busstop-districts.test.ts („the SAME rest behind a queue
  * lead stays innocent").
  *
- * WHERE THE TWO DEMOS REST (the §9 stage-5 auto-assert). Both grade EXACTLY
- * ILLEGAL_STOP_IN_BAN_ZONE (основна, чл. 98) and rest in DIFFERENT authored
- * spans — one continuous ban, two different excuses:
- *   - „Само да сваля пътник" върху спирката      → pkbs-z-stop-pocket  (y 195);
- *   - „Престой в зоната на маркировката преди"   → pkbs-z-stop-marking (y 165).
+ * WHERE THE TWO DEMOS REST (the §9 stage-5 auto-assert). Both WAIT past the
+ * drop-off allowance, grade EXACTLY ILLEGAL_STOP_IN_BAN_ZONE (основна; card
+ * «Паркиране на автобусна спирка», чл. 69 / чл. 93, ал. 2 / чл. 98, ал. 2,
+ * т. 3) and rest in DIFFERENT authored spans — one continuous zone, two
+ * different excuses:
+ *   - „Само за минутка" — чакане в джоба       → pkbs-z-stop-pocket  (y 195);
+ *   - Чакане върху зигзага преди спирката      → pkbs-z-stop-marking (y 165).
  *
  * WHY THIS MAP GRADES WHAT pk-banx-v1 COULD NOT. sc-pk-crossing-ban's zebra
  * span is structurally acquitted (ILLEGAL_STOP_IN_BAN_ZONE requires
@@ -233,10 +260,10 @@ const PKBS_BAY_Y = 250;
 export const SC_PK_BUSSTOP_BAN: ScenarioSpec = {
   id: "sc-pk-busstop-ban",
   family: "parking",
-  tagsBg: ["престой", "паркиране", "автобусна спирка", "зигзаг", "чл. 98"],
+  tagsBg: ["престой", "паркиране", "автобусна спирка", "зигзаг", "чл. 69", "чл. 93"],
   titleBg: "Спирка не е паркинг",
   objectiveBg:
-    "Не спирай върху автобусна спирка „само за секунда“ — намери легалното място след зоната на спирката.",
+    "Спирката е за слизане на пътници, не за чакане — щом ще чакаш, намери легалното място след зоната на спирката.",
   archetypeIds: ["PK-06"],
   conceptIds: [
     "c-parking-prohibitions",
@@ -264,17 +291,17 @@ export const SC_PK_BUSSTOP_BAN: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата. Задачата е „остави ме тук“ — а ти решаваш къде спирането е позволено." },
+    { n: 1, textBg: "Потегли по улицата. Задачата: ще чакаш приятел, който идва след няколко минути — а ти решаваш къде колата може да остане." },
     { n: 2, textBg: "Напред вдясно има автобусна спирка. Зоната ѝ не започва при навеса — започва там, където започва зигзагът по платното." },
-    { n: 3, textBg: "Не намалявай към джоба на спирката: там престоят е забранен от закона, дори за секунда (чл. 98, ал. 1)." },
+    { n: 3, textBg: "На спирката другите коли могат да спрат само за слизане на пътници и само ако не пречат на автобуса (чл. 69). Да чакаш там вече е паркиране — а на спирка паркирането е забранено (чл. 98, ал. 2, т. 3)." },
     { n: 4, textBg: "Джобът е празен — това не го прави свободен. Автобусът идва след минута и трябва да намери мястото си празно." },
     { n: 5, textBg: "Подмини цялата зона на спирката, подай десен мигач и спри плътно вдясно на свободното място след нея." },
-    { n: 6, textBg: "Задръж колата спряна — това е правилният отговор на „само за секунда“." },
+    { n: 6, textBg: "Задръж колата спряна — тук, извън спирката, можеш да чакаш. Това е правилният отговор на „само за минутка“." },
   ],
   success: [
     {
       id: "sc-pkbs-past-zone",
-      titleBg: "Подмини цялата зона на спирката, без да спираш в нея",
+      titleBg: "Подмини цялата зона на спирката, без да чакаш в нея",
       // A checkpoint on the clear road past the pocket's end (y = 210) — plus
       // the ban-zone conviction the banner claims did not happen
       // (objectives.ts `requireRestClean`, the sc-pk-rail-ban:84bce2a3 census).
@@ -290,7 +317,7 @@ export const SC_PK_BUSSTOP_BAN: ScenarioSpec = {
       id: "sc-pkbs-legal-stop",
       titleBg: "Спри на разрешеното място след зоната на спирката",
       // Completable ONLY at near-stop speed at the legal mark (the
-      // pk-smooth-stop mark discipline) — 40 m past every чл. 98 span.
+      // pk-smooth-stop mark discipline) — 40 m past every bus-stop span.
       params: { kind: "reachZone", x: PKBS_LANE, y: PKBS_BAY_Y, radiusM: 4, maxSpeedKmh: 6 },
     },
   ],
@@ -302,27 +329,27 @@ export const SC_PK_BUSSTOP_BAN: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-pk-busstop-ban/mistake-stop-on-pocket.trace.json" },
-      titleBg: "„Само да сваля пътник“ върху спирката",
+      titleBg: "„Само за минутка“ — чакане в джоба на спирката",
       whatWentWrongBg:
-        "Джобът беше празен и колата влезе в него — „нали автобус няма, за секунда е“. Чл. 98, ал. 1 забранява на спирката дори краткия престой: спирката е работното място на автобуса. Зает джоб принуждава автобуса да спре на платното, а пътниците му — баби, деца, хора с колички — да слизат между движещите се коли. Секундата ти е чужда опасност.",
+        "Джобът беше празен и колата влезе в него — „нали автобус няма, ще го изчакам тук“ — и остана да чака. Ако само беше свалил пътник, без да пречиш на автобуса, законът щеше да го позволи (чл. 69). Но колата стоя много по-дълго, отколкото отнема едно слизане, а спирането извън това време е паркиране (чл. 93, ал. 2) — и на спирка то е забранено (чл. 98, ал. 2, т. 3). Зает джоб принуждава автобуса да спре на платното, а пътниците му — баби, деца, хора с колички — да слизат между движещите се коли. Твоята минутка е чужда опасност.",
       codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE"],
     },
     {
       traceRef: { path: "content/traces/sc-pk-busstop-ban/mistake-stop-on-marking.trace.json" },
-      titleBg: "Престой в зоната на маркировката преди спирката",
+      titleBg: "Чакане върху зигзага преди спирката",
       whatWentWrongBg:
-        "Водачът спря преди навеса и реши, че е извън спирката. Не е: зоната на спирката е тази, която зигзагът очертава по платното (Наредба № 2/2001), и тя започва десетки метри преди табелата. Спрялата тук кола отнема на автобуса пътя, по който той влиза в джоба — затова той спира накриво или изобщо не влиза. „Аз съм преди спирката“ не е място, а извинение.",
+        "Водачът спря преди навеса, реши, че е извън спирката, и остана да чака. Не е извън нея: зоната на спирката е тази, която зигзагът очертава по платното, и тя започва десетки метри преди навеса. В нея важат същите правила — спиране само за слизане на пътници и само ако не пречиш на автобуса (чл. 69), и никакво паркиране (чл. 98, ал. 2, т. 3). Колата, която чака тук, отнема на автобуса пътя, по който той влиза в джоба — затова той спира накриво или изобщо не влиза. „Аз съм преди спирката“ не е място, а извинение.",
       codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE"],
     },
   ],
   teach: {
     whenBg:
-      "Всеки път, когато спирката е „точно там, където ти трябва“ — пред мола, пред блока, пред гарата. Джобът е широк, празен и примамлив, а автобусът още не се вижда. Точно тогава се решава дали си от водачите, които го заемат „само за секунда“.",
+      "Всеки път, когато трябва да изчакаш някого, а спирката е „точно там, където ти трябва“ — пред мола, пред блока, пред гарата. Джобът е широк, празен и примамлив, а автобусът още не се вижда. Точно тогава се решава дали си от водачите, които го заемат „само за минутка“.",
     whyBg:
-      "Спирката е единственото място, където автобусът може да опре вратите си до бордюра. Заемеш ли я, той спира във втората лента — и тогава пътниците му слизат не на тротоара, а между колите: там, където никой не ги очаква. Зоната на спирката е по-голяма от навеса и е очертана със зигзаг по платното, защото автобусът има нужда от място да влезе и да излезе, не само да стои. Затова законът забранява тук дори престоя, а изпитът го брои като основна грешка — за разлика от В28, където престоят за слизане е позволен.",
-    lawRef: "ЗДвП чл. 98, ал. 1",
+      "Спирката е единственото място, където автобусът може да опре вратите си до бордюра. Заемеш ли я, той спира във втората лента — и тогава пътниците му слизат не на тротоара, а между колите: там, където никой не ги очаква. Зоната на спирката е по-голяма от навеса и е очертана със зигзаг по платното, защото автобусът има нужда от място да влезе и да излезе, не само да стои. Затова законът позволява на другите коли да спрат там само за слизане на пътници и само ако не пречат на автобуса (чл. 69) — пътникът слиза и потегляш. Да чакаш там вече е паркиране (чл. 93, ал. 2), а на спирка паркирането е забранено (чл. 98, ал. 2, т. 3). Знак за това не трябва — спирката я пази самият закон.",
+    lawRef: "ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3",
     examinerBg:
-      "Изпитващият казва „спри някъде тук“ и мълчи — изборът на място Е изпитът. Престой на спирката на превозните средства за обществен превоз, включително в очертаната със зигзаг зона преди нея, е основна грешка, независимо колко кратък е и дали има автобус. Очаква се да разпознаеш зоната по маркировката, да я подминеш без да намаляваш към джоба, да подадеш десен мигач и да спреш плътно вдясно на първото разрешено място след нея.",
+      "Изпитващият казва „спри някъде тук, ще чакаме“ и мълчи — изборът на място Е изпитът. На спирката на превозните средства за обществен превоз, включително в очертаната със зигзаг зона преди нея, другите коли могат да спрат само за слизане на пътници и само ако не пречат на автобуса (чл. 69); да чакаш там е паркиране, а то на спирка е забранено (чл. 98, ал. 2, т. 3). Очаква се да разпознаеш зоната по маркировката, да я подминеш, да подадеш десен мигач и да спреш плътно вдясно на първото разрешено място след нея.",
   },
   levels: [
     { level: 1 },

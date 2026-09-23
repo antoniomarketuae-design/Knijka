@@ -968,6 +968,10 @@ export const SC_PARK_GAP_LONG: ScenarioSpec = {
     },
   ],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 4, and no structured channel carries it:
+  // «Провери огледалото, погледни през дясното рамо и подай десен мигач.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 

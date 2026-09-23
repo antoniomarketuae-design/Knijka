@@ -666,9 +666,11 @@ export function sprayActiveSlabs(density: number): number {
  *
  * AND „IT WILL LOOK RIGHT WHEN HE CLOSES IN" IS NOT AVAILABLE HERE, because
  * the drill pins the gap and then GRADES him for holding it: ACTS_SPRAY_TRUCK
- * paces at `paceAheadM: 64` (≈59.9 m bumper) on `cruiseSpeedMps: 18`, and the
+ * paces at `paceAheadM: 64` (58.2 m bumper to bumper — `bumperSubtrahendM`
+ * takes half of each body, 2.05 + 3.75 m; the eye-to-tail distance
+ * `sprayDensity` actually reads is ~60 m) on `cruiseSpeedMps: 18`, and the
  * second success gate is „стигни края на отсечката, БЕЗ да си влизал в
- * пелената". At rain 1.0 that is `sprayDensity` 0.645 → `sprayActiveSlabs` 3,
+ * пелената". At rain 1.0 that is `sprayDensity` ≈0.64 → `sprayActiveSlabs` 3,
  * for the whole drive. Slab 2 IS the crown of the curtain this lesson is
  * about, so slab 2 is the slab that has to do the work.
  *

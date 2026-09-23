@@ -1,6 +1,6 @@
 /**
  * sc-pk-busstop-ban — the authored drives (doc 76 §5/§9): ONE correct shadow +
- * TWO mistake demos for „Спирка не е паркинг" (PK-06, ЗДвП чл. 98, ал. 1) on
+ * TWO mistake demos for „Спирка не е паркинг" (PK-06, ЗДвП чл. 69 — founder ruling 2026-09-22) on
  * the committed pk-busstop-v1 district. No staged actor, ambient traffic ZERO
  * (the harness law): the trap is the ZONE, not traffic — so the ONLY thing the
  * rule engine can grade is where the driver chooses to rest.
@@ -14,10 +14,20 @@
  *   - shadow: transits the WHOLE stop zone without slowing into the pocket,
  *     indicates right and rests at the LEGAL bay 40 m past it (y = 250) →
  *     ZERO violations;
- *   - „Само да сваля пътник" върху спирката: a casual 5 s rest at y = 195,
- *     inside pkbs-z-stop-pocket → EXACTLY ILLEGAL_STOP_IN_BAN_ZONE (основна);
- *   - „Престой в зоната на маркировката": the same casual rest at y = 165,
- *     inside pkbs-z-stop-marking → EXACTLY ILLEGAL_STOP_IN_BAN_ZONE.
+ *   - „Само за минутка" — чакане в джоба: a 24 s WAIT at y = 195, inside
+ *     pkbs-z-stop-pocket → EXACTLY ILLEGAL_STOP_IN_BAN_ZONE (основна);
+ *   - чакане върху зигзага: the same wait at y = 165, inside
+ *     pkbs-z-stop-marking → EXACTLY ILLEGAL_STOP_IN_BAN_ZONE.
+ *
+ * WHY 24 s AND NOT THE OLD 5 s — founder follow-up ruling 2026-09-22, «Teach
+ * чл. 69 as written». чл. 69 PERMITS a brief stop at a spirka to let passengers
+ * alight (if it hinders no bus), so a 5 s rest is no longer an offence and the
+ * reducer does not bill it. What the act bans there is parking (чл. 98, ал. 2,
+ * т. 3; чл. 93, ал. 2 — stopped beyond the time a drop-off needs), and the
+ * reducer bills a `law-bus-stop` rest after `busStopDropOffMaxSec` (20 s, the
+ * product's allowance). 24 s clears it with margin and stays short of the
+ * re-grade (20 + 6 s), so each demo bills exactly once. Both traces were
+ * RE-RECORDED for this — the product now grades the 5 s rests as innocent.
  *
  * Both demos rest in DIFFERENT authored spans — one continuous ban, two
  * different excuses. Unlike sc-pk-crossing-ban (whose zebra span is acquitted
@@ -58,7 +68,7 @@ export function scPkBusstopBanShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Задачата: „остави ме тук“. Напред вдясно е автобусна спирка — а зоната ѝ е по-голяма от навеса." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 100], [X_LANE, 140]], targetKmh: 40, stopAtEnd: false },
-      { kind: "annotation", textBg: "Зигзагът по платното започва тук: оттук нататък сме в зоната на спирката и престоят е забранен (чл. 98, ал. 1)." },
+      { kind: "annotation", textBg: "Зигзагът по платното започва тук: оттук нататък сме в зоната на спирката. Тук можеш само да свалиш пътник, без да пречиш на автобуса (чл. 69) — а ние ще чакаме, значи не спираме тук." },
       { kind: "drive", points: [[X_LANE, 140], [X_LANE, 180], [X_LANE, 215]], targetKmh: 40, stopAtEnd: false },
       { kind: "annotation", textBg: "Джобът беше празен — но не намалихме към него. Празен джоб не значи свободен: автобусът идва след минута." },
       { kind: "drive", points: [[X_LANE, 215], [X_LANE, 225]], targetKmh: 35, stopAtEnd: false },
@@ -68,55 +78,60 @@ export function scPkBusstopBanShadowScript(): DriveScript {
       { kind: "drive", points: [[X_LANE, 225], [X_LANE, 250]], targetKmh: 20 },
       { kind: "pause", sec: 3, brake: true },
       { kind: "indicator", setting: "off" },
-      { kind: "annotation", textBg: "Готово: подмина цялата спирка и спря 40 метра след нея, където престоят е позволен." },
+      { kind: "annotation", textBg: "Готово: подмина цялата спирка и спря 40 метра след нея — тук можем да чакаме, колкото трябва." },
     ],
   };
 }
 
 // ---------------------------------------------------------------------------
-// Mistake demo 1 — „само за секунда" IN the pocket (pkbs-z-stop-pocket)
+// Mistake demo 1 — „само за минутка": WAITING in the pocket (pkbs-z-stop-pocket)
 // ---------------------------------------------------------------------------
+
+/** The demos' wait, s: past `busStopDropOffMaxSec` (20), short of its re-grade (26). */
+const WAIT_SEC = 24;
 
 export function scPkBusstopBanMistakeOnPocketScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: „нали автобус няма, за секунда е“ — и колата влиза право в джоба на спирката." },
+      { kind: "annotation", textBg: "Грешка: „нали автобус няма, ще го изчакам тук“ — и колата влиза право в джоба на спирката." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 100], [X_LANE, 160], [X_LANE, 195]], targetKmh: 30 },
-      // A casual 5 s rest inside pkbs-z-stop-pocket (y ∈ [180, 210]) — past the
-      // 4 s sustain. No lead in the bay, no stop line, no crossing anywhere on
-      // this map: every structural innocent context is absent, so the authored
-      // fault convicts and nothing else.
-      { kind: "pause", sec: 5, brake: true },
-      { kind: "annotation", textBg: "На спирката престой няма — дори кратък, дори когато е празна (чл. 98, ал. 1)." },
+      // A WAIT inside pkbs-z-stop-pocket (y ∈ [180, 210]) — past the drop-off
+      // allowance, so the stop is паркиране (чл. 93, ал. 2). No lead in the bay,
+      // no stop line, no crossing anywhere on this map: every structural
+      // innocent context is absent, so the authored fault convicts and nothing
+      // else.
+      { kind: "pause", sec: WAIT_SEC, brake: true },
+      { kind: "annotation", textBg: "Да свалиш пътник тук е позволено (чл. 69). Да чакаш тук е паркиране (чл. 93, ал. 2) — а на спирка паркирането е забранено (чл. 98, ал. 2, т. 3)." },
       { kind: "drive", points: [[X_LANE, 195], [X_LANE, 225]], targetKmh: 30 },
       { kind: "annotation", textBg: "Зает джоб праща автобуса във втората лента — и пътниците му слизат между движещите се коли." },
       { kind: "drive", points: [[X_LANE, 225], [X_LANE, 250]], targetKmh: 20 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Разрешеното място беше на 40 метра напред — по-малко от една секунда шофиране." },
+      { kind: "annotation", textBg: "Мястото, където можеше да чакаш, беше на 40 метра напред — на няколко секунди път." },
     ],
   };
 }
 
 // ---------------------------------------------------------------------------
-// Mistake demo 2 — a rest on the зигзаг BEFORE the bay (pkbs-z-stop-marking)
+// Mistake demo 2 — WAITING on the зигзаг BEFORE the bay (pkbs-z-stop-marking)
 // ---------------------------------------------------------------------------
 
 export function scPkBusstopBanMistakeOnMarkingScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: „аз не съм на спирката, аз съм преди нея“ — и колата спира върху зигзага." },
+      { kind: "annotation", textBg: "Грешка: „аз не съм на спирката, аз съм преди нея“ — и колата спира върху зигзага, за да чака." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 100], [X_LANE, 165]], targetKmh: 30 },
       // Still the spirka: pkbs-z-stop-marking covers y ∈ [150, 180]. The zone is
-      // what the зигзаг outlines (Наредба № 2/2001), not what the navesut covers.
-      { kind: "pause", sec: 5, brake: true },
-      { kind: "annotation", textBg: "„Преди спирката“ не значи „извън зоната ѝ“ — зоната е тази, която зигзагът очертава по платното." },
+      // what the зигзаг outlines, not what the навес covers — and the car WAITS
+      // there, past the drop-off allowance.
+      { kind: "pause", sec: WAIT_SEC, brake: true },
+      { kind: "annotation", textBg: "„Преди спирката“ не значи „извън зоната ѝ“ — зоната е тази, която зигзагът очертава по платното, и чакането в нея е паркиране на спирка." },
       { kind: "drive", points: [[X_LANE, 165], [X_LANE, 195], [X_LANE, 225]], targetKmh: 30 },
-      { kind: "annotation", textBg: "Спрялата тук кола отнема на автобуса пътя, по който той влиза в джоба — затова той спира накриво или изобщо не влиза." },
+      { kind: "annotation", textBg: "Колата, която чака тук, отнема на автобуса пътя, по който той влиза в джоба — затова той спира накриво или изобщо не влиза." },
       { kind: "drive", points: [[X_LANE, 225], [X_LANE, 250]], targetKmh: 20 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Едно и също правило, две различни извинения — и едно разрешено място, само на 40 м след зоната." },
+      { kind: "annotation", textBg: "Едни и същи правила, две различни извинения — и едно място за чакане, само на 40 м след зоната." },
     ],
   };
 }

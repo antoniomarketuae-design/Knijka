@@ -62,41 +62,25 @@ function noStopSpans(): { district: string; zone: Zone }[] {
 }
 
 /**
- * THE ONE DOCUMENTED EXCEPTION, and it is named here rather than skipped so it
- * cannot quietly become two.
+ * THERE IS NO EXCEPTION ANY MORE — founder ruling 2026-09-22, «Convict under
+ * чл. 69» (audit row sc-pk-busstop-ban:b103c282).
  *
- * pk-busstop-v1 authors two `noStopping` (ПРЕСТОЙ) spans citing «ЗДвП чл. 98,
- * ал. 1». Against the retrieved text, ал. 1 is a closed list of eight places
- * and NONE of them is a bus stop; чл. 98's only spirka clause is ал. 2, т. 3,
- * and ал. 2 opens «Освен в посочените в ал. 1 случаи ПАРКИРАНЕТО е
- * забранено» — it bans parking, not престой. So as authored the map may be
- * convicting a legal престой, and there is no чл. 98 клауза to re-cite it to.
- *
- * ⚠ CORRECTED 2026-09-19, AND THE CORRECTION CHANGES WHAT IS BEING RULED ON.
- * This docblock used to say «the only spirka clause in the act is ал. 2, т. 3»
- * and that «what really bans престой at a spirka is the ЗИГЗАГ МАРКИРОВКА».
- * BOTH ARE REFUTED BY THE ACT. Retrieved from content/law/acts/zdvp.json, NINE
- * units mention спирк — чл. 65, 66, 67, 68, 69, 80а, 98, 115, 183 — and чл. 69
- * is the one that restricts OTHER vehicles at a spirka, with no plate and no
- * marking in its text at all:
+ * pk-busstop-v1's two spans (`pkbs-z-stop-marking`, `pkbs-z-stop-pocket`)
+ * used to be held here by name, AWAITING_FOUNDER_RULING: they cited «ЗДвП чл.
+ * 98, ал. 1», which names no spirka (ал. 1 is a closed list of eight places;
+ * ал. 2, т. 3 names the спирки under a chapeau about ПАРКИРАНЕТО), and the
+ * ground was contested between чл. 69, the зигзаг marking and re-authoring as
+ * `noParking`. The founder chose чл. 69, which the retrieved act states with
+ * no plate and no marking in its text:
  *
  *   «Чл. 69. (…) На спирка на превозните средства от редовните линии за
  *    обществен превоз на пътници други пътни превозни средства могат да спират
  *    само за слизане на пътници само ако не пречат на превозните средства, за
- *    които е предназначена спирката. Престоят на таксиметрови автомобили с цел
- *    очакване на пътници е забранен.»
+ *    които е предназначена спирката. …»
  *
- * So the founder is NOT choosing whether a ground exists — he is choosing WHICH
- * ground is right: чл. 69, or the unpainted зигзаг, or re-authoring the spans
- * as `noParking`. The earlier wording would have had him rule on a negative the
- * act refutes. THIS DOCBLOCK IS WHAT HE READS WHEN HE RULES, which is why the
- * correction is here and not only in the question filed with him.
- *
- * That is a CONTENT-TRUTH RULING for the founder, not an engineering choice —
- * so the map keeps
- * the pooled row until it is made, and this list is the reminder.
+ * Both spans now declare `basis: "law-bus-stop"`, so the list that held them is
+ * gone and every law-implied span in the corpus must declare its clause.
  */
-const AWAITING_FOUNDER_RULING = new Set(["pkbs-z-stop-marking", "pkbs-z-stop-pocket"]);
 
 describe("every law-implied no-stopping span declares WHICH rule bans it", () => {
   it("the walk found the corpus — an empty scan would pass everything", () => {
@@ -110,7 +94,6 @@ describe("every law-implied no-stopping span declares WHICH rule bans it", () =>
     const undeclared = noStopSpans()
       .filter(({ zone }) => !(zone.signRef ?? "").startsWith("В"))
       .filter(({ zone }) => zone.basis === undefined)
-      .filter(({ zone }) => !AWAITING_FOUNDER_RULING.has(zone.id))
       .map(({ district, zone }) => `${district}/${zone.id} (signRef "${zone.signRef}")`);
     expect(
       undeclared,
@@ -139,6 +122,10 @@ describe("every law-implied no-stopping span declares WHICH rule bans it", () =>
     // т. 4 — върху/в такава близост до релсите.
     expect(byZone.get("pkr-z-ban-before")).toBe("law-rail");
     expect(byZone.get("pkr-z-ban-after")).toBe("law-rail");
+    // чл. 69 — the spirka (founder ruling 2026-09-22). BOTH spans: the зигзаг
+    // approach and the pocket are one continuous zone of the same stop.
+    expect(byZone.get("pkbs-z-stop-marking")).toBe("law-bus-stop");
+    expect(byZone.get("pkbs-z-stop-pocket")).toBe("law-bus-stop");
   });
 
   it("the В27-plate districts declare NOTHING, so their card is byte-identical", () => {
@@ -161,22 +148,29 @@ describe("every law-implied no-stopping span declares WHICH rule bans it", () =>
     );
   });
 
-  it("the founder-ruling exception is still exactly one district", () => {
-    // If pk-busstop is ever re-authored, this fails and the list gets cleaned
-    // up rather than quietly growing a second permanent exemption.
-    const stillUndeclared = noStopSpans()
-      .filter(({ zone }) => AWAITING_FOUNDER_RULING.has(zone.id))
-      .filter(({ zone }) => zone.basis === undefined);
-    expect(stillUndeclared.map(({ district }) => district)).toEqual([
-      "pk-busstop-v1",
-      "pk-busstop-v1",
+  it("the bus-stop basis is declared by the bus-stop map and by nothing else", () => {
+    // The ruling was about a spirka. A second district quietly borrowing the
+    // basis would print чл. 69 over a span that is not a bus stop — and would
+    // lose its plate with it (zoneSigns posts none for this basis).
+    const users = noStopSpans().filter(({ zone }) => zone.basis === "law-bus-stop");
+    expect(users.map(({ district, zone }) => `${district}/${zone.id}`)).toEqual([
+      "pk-busstop-v1/pkbs-z-stop-marking",
+      "pk-busstop-v1/pkbs-z-stop-pocket",
     ]);
   });
 
-  it("the catalogue's law rows cite чл. 98, ал. 1 and the sign row does not", () => {
+  it("the catalogue's law rows cite their article, and the sign row cites the sign duty", () => {
     for (const basis of Object.keys(NO_STOP_BASIS_COPY) as NoStopBasis[]) {
       const ref = NO_STOP_BASIS_COPY[basis].lawRef;
       if (basis === "sign") expect(ref).toContain("чл. 6, т. 1");
+      // The spirka is the one statutory ground OUTSIDE чл. 98, ал. 1 (founder
+      // rulings 2026-09-22): ал. 1 names no bus stop, чл. 69 governs the stop
+      // there, and what convicts is PARKING (чл. 93, ал. 2), which чл. 98 bans
+      // at the stops in ал. 2, т. 3 — never ал. 1.
+      else if (basis === "law-bus-stop") {
+        expect(ref).toBe("ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3");
+        expect(ref).not.toContain("ал. 1");
+      }
       else expect(ref).toMatch(/^ЗДвП чл\. 98, ал\. 1, т\. \d$/);
     }
   });

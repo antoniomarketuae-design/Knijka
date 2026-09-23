@@ -16,6 +16,8 @@
  *
  * Kinds:
  *  - noOvertaking -> "noOvertaking" (В24), noStopping -> "noStopping" (В27)
+ *    — except a noStopping span whose basis is "law-bus-stop" (ЗДвП чл. 69 needs
+ *    no plate; founder ruling 2026-09-22 — see `zonePostsPlate`)
  *  - waterPatch/icePatch -> "slippery" (А15)
  *  - curveAdvisory -> "curve" (А1 — the shipped sign_warning_bend face)
  *  - railCrossing -> the full crossing furniture: the guarded/unguarded
@@ -28,7 +30,7 @@
  */
 
 import { speedLimitSignKind } from "../types";
-import type { District, DistrictZoneKind, SignKind, SignPlacement } from "../types";
+import type { District, DistrictZone, DistrictZoneKind, SignKind, SignPlacement } from "../types";
 import { ROAD_Y, SCENARIO_SIGN_SCALE } from "./constants";
 import { add, mul, perpRight, pointAlong, polylineLength, type Vec2 } from "./math2d";
 import { toWorld, yawFromFacing } from "./mesh";
@@ -209,6 +211,32 @@ const ZONE_SIGN_KIND: Partial<Record<DistrictZoneKind, SignKind>> = {
   curveAdvisory: "curve",
 };
 
+/**
+ * Does this span get a post at all? Every zone kind in ZONE_SIGN_KIND does —
+ * EXCEPT a no-stopping span whose declared basis is `"law-bus-stop"`.
+ *
+ * FOUNDER RULING 2026-09-22, «Convict under чл. 69» (audit row
+ * sc-pk-busstop-ban:b103c282). The placing loop below used to branch on
+ * `zone.kind` alone, so pk-busstop-v1 got a round В27 at the kerb of its
+ * spirka (two of them — one per authored span), and the debrief then convicted
+ * «под знак В27». A real Sofia bus stop is not marked that way, and the rule
+ * that governs a car at a spirka — ЗДвП чл. 69 — needs no sign or marking: it
+ * is in the statute. So a span that declares that basis posts NOTHING; the
+ * painted зигзаг (markings.ts) and the modelled навес (props.ts) are what the
+ * street shows.
+ *
+ * ONLY THE BUS-STOP CASE. The other law bases (law-junction, law-crossing,
+ * law-rail, law-alongside) keep their В27 posts byte-identically: whether those
+ * are right is a separate question nobody has ruled on, and this pass must not
+ * answer it on the side. Exported so `world/referents.ts` counts the same
+ * spans this pass posts — a second, drifting copy of the rule is how a gate
+ * starts calling a deliberate absence «the ban is invisible».
+ */
+export function zonePostsPlate(zone: Pick<DistrictZone, "kind" | "basis">): boolean {
+  if (ZONE_SIGN_KIND[zone.kind] === undefined) return false;
+  return !(zone.kind === "noStopping" && zone.basis === "law-bus-stop");
+}
+
 /** Which of those are WARNINGS (posted in advance) rather than prohibitions
  *  (posted at the first metre they govern). Doc 86 T14. */
 const HAZARD_WARNING_AHEAD_OF: Partial<Record<DistrictZoneKind, number>> = {
@@ -374,7 +402,7 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
     }
 
     const kind = ZONE_SIGN_KIND[zone.kind];
-    if (kind) {
+    if (kind && zonePostsPlate(zone)) {
       // A PROHIBITION starts where it starts (В24/В27 mark the first metre of
       // the ban); a WARNING has to arrive in advance of the hazard or it
       // teaches nothing (doc 86 T14) — and when its own edge cannot give that

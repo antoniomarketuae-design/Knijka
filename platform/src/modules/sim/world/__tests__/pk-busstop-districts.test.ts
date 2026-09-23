@@ -1,6 +1,7 @@
 /**
  * pk-busstop-v1 contract battery (the pk-banx-districts.test.ts pattern) — the
- * BUS-STOP ban map behind sc-pk-busstop-ban (PK-06, ЗДвП чл. 98, ал. 1).
+ * BUS-STOP ban map behind sc-pk-busstop-ban (PK-06, ЗДвП чл. 69 — founder
+ * ruling 2026-09-22, «Convict under чл. 69», row sc-pk-busstop-ban:b103c282).
  *
  * pk-ban-v1 bans by SIGN (a В27 plate). pk-banx-v1 bans by LAW (the zebra and
  * the corner ARE the ban). This map bans by the STOP ZONE, and its whole claim
@@ -15,16 +16,25 @@
  *    abutting into ONE continuous ban but attributable to different zones —
  *    which is what lets the two mistake demos mean different things;
  *  - the archetype's reason to exist end-to-end through the REAL reducer: a
- *    casual rest on the зигзаг OR in the pocket grades exactly
- *    ILLEGAL_STOP_IN_BAN_ZONE, while the SAME rest behind a queue lead stays
- *    innocent (which is exactly why no bus is staged in the pocket) and the
- *    legal bay never bills.
+ *    WAIT on the зигзаг OR in the pocket (past the drop-off allowance — that
+ *    is паркиране, чл. 93, ал. 2, banned at the stops by чл. 98, ал. 2, т. 3)
+ *    grades exactly ILLEGAL_STOP_IN_BAN_ZONE, while a brief drop-off stays
+ *    innocent (чл. 69 allows it — founder follow-up ruling 2026-09-22, «Teach
+ *    чл. 69 as written»), the SAME wait behind a queue lead stays innocent
+ *    (which is exactly why no bus is staged in the pocket) and the legal bay
+ *    never bills.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { VehicleSample } from "../../contracts";
-import { createRuleEngine, reduceTick, type RuleEvent } from "../../rules";
+import {
+  DEFAULT_RULE_CONFIG,
+  createRuleEngine,
+  reduceTick,
+  type RuleEvent,
+  type ViolationEvent,
+} from "../../rules";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
 import { PLAYER_HALF_LENGTH_M } from "../../collision/bodies";
 import { buildLaneGraph } from "../../traffic/graph";
@@ -44,6 +54,11 @@ const BAY_Y = 250;
 /** Where the two mistake demos rest — one per span. */
 const REST_MARKING_Y = 165;
 const REST_POCKET_Y = 195;
+/** A WAIT — past the spirka's drop-off allowance (20 s), short of its re-grade. */
+const WAIT_SEC = DEFAULT_RULE_CONFIG.busStopDropOffMaxSec + 5;
+/** A drop-off — longer than the 4 s every other ban zone convicts at, and lawful here. */
+const DROP_OFF_SEC = 12;
+const BUS_STOP_REF = "ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3";
 
 function loadRaw(id: string): unknown {
   const candidates = [
@@ -77,7 +92,7 @@ describe(`${ID} through the world builder`, () => {
     world = buildWorldGeometry(district, { seed: 7 });
   });
 
-  it("is a structurally valid district-v1 document carrying TWO чл. 98 bus-stop spans", () => {
+  it("is a structurally valid district-v1 document carrying TWO чл. 69 bus-stop spans", () => {
     expect(district.meta.attribution.text).toContain("оригинален");
     expect(district.meta.zonesVersion).toBe(1);
     expect(district.roads.nodes.length).toBe(2);
@@ -95,6 +110,9 @@ describe(`${ID} through the world builder`, () => {
       // В28 (noParking) would grade NOTHING — престоят под В28 е разрешен.
       expect(z.kind).toBe("noStopping");
       expect(z.edgeId).toBe("pkbs-e-street");
+      // The founder's ruling, as data: the spirka is governed by ЗДвП чл. 69,
+      // which is what selects the card and withholds the В27 post.
+      expect(z.basis, z.id).toBe("law-bus-stop");
     }
     expect(district.zones!.map((z) => z.id)).toEqual(["pkbs-z-stop-marking", "pkbs-z-stop-pocket"]);
     const [marking, pocket] = district.zones!;
@@ -148,7 +166,7 @@ describe(`${ID} through the world builder`, () => {
     expect(s.busStopPocketY).toEqual({ fromY: POCKET_FROM_Y, toY: POCKET_TO_Y });
     expect(s.legalBayY).toBe(BAY_Y);
     expect(s.banZonesY).toHaveLength(2);
-    for (const z of s.banZonesY) expect(z.lawRef).toMatch(/^ЗДвП чл\. 98/);
+    for (const z of s.banZonesY) expect(z.lawRef).toBe(BUS_STOP_REF);
     // The backlog's contract: the legal bay sits 40 m past the stop zone.
     expect(s.legalBayY - s.params.pocketToM).toBe(40);
   });
@@ -242,11 +260,12 @@ describe(`${ID} through the world runtime — the FP-armor precondition`, () => 
     // `toBeUndefined()` while the runtime tested the lane fix — a POINT — against
     // the span. It now tests the vehicle's own reach along the edge
     // (PLAYER_HALF_LENGTH_M = CHASSIS_HALF_EXTENTS.z = 2.02 m, headingDeg 0 on a
-    // north-running edge ⇒ exactly 2.02 m), because чл. 98, ал. 2, т. 3 bans
-    // престоя «на спирките на превозните средства от редовните линии за
-    // обществен превоз на пътници» (retrieved: content/law/acts/zdvp.json, unit
-    // ref "чл. 98") — the СПИРКА is ground, and a car is on it when its BODY is,
-    // not when its midpoint is.
+    // north-running edge ⇒ exactly 2.02 m), because ЗДвП чл. 69 governs a car
+    // «на спирка на превозните средства от редовните линии за обществен превоз
+    // на пътници» (retrieved: content/law/acts/zdvp.json, unit ref "чл. 69";
+    // founder ruling 2026-09-22 — this comment used to cite чл. 98, ал. 2, т. 3,
+    // which bans PARKING there, not престой) — the СПИРКА is ground, and a car
+    // is on it when its BODY is, not when its midpoint is.
     //
     // TIGHTENED, NOT RELAXED: the boundary is now pinned from BOTH sides, which
     // the single `-2` probe never did. At centre y = 148 the nose sits 0.02 m
@@ -283,7 +302,7 @@ describe(`${ID} through the world runtime — the FP-armor precondition`, () => 
 /** Drive north from y=15 to restY at 30 km/h, rest `restSec` there (with the
  *  given AT-REST lead-gap channel — a queue lead materializes as the car pulls
  *  up), then drive on to the end. */
-function restDrive(restY: number, restLeadGapM: number = Infinity, restSec = 6): RuleEvent[] {
+function restDrive(restY: number, restLeadGapM: number = Infinity, restSec = WAIT_SEC): RuleEvent[] {
   const rt = createWorldRuntime(loadRaw(ID));
   let rules = createRuleEngine();
   const out: RuleEvent[] = [];
@@ -306,14 +325,76 @@ function restDrive(restY: number, restLeadGapM: number = Infinity, restSec = 6):
 const violations = (events: RuleEvent[]) =>
   [...new Set(events.filter((e) => e.kind === "violation").map((e) => e.code))];
 
-describe(`${ID} — чл. 98 rest adjudication through the real reducer`, () => {
-  it("a casual 6 s rest ON THE ЗИГЗАГ approach grades exactly ILLEGAL_STOP_IN_BAN_ZONE", () => {
+describe(`${ID} — чл. 69 rest adjudication through the real reducer`, () => {
+  it("a WAIT ON THE ЗИГЗАГ approach grades exactly ILLEGAL_STOP_IN_BAN_ZONE", () => {
     // „Аз не съм на спирката, аз съм ПРЕД нея" — the misconception, convicted.
     expect(violations(restDrive(REST_MARKING_Y))).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
   });
 
-  it("a casual 6 s rest IN THE POCKET grades exactly ILLEGAL_STOP_IN_BAN_ZONE", () => {
+  it("a WAIT IN THE POCKET grades exactly ILLEGAL_STOP_IN_BAN_ZONE", () => {
     expect(violations(restDrive(REST_POCKET_Y))).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
+  });
+
+  it("a brief DROP-OFF on either span is lawful — чл. 69 allows it (founder follow-up ruling)", () => {
+    // «Teach чл. 69 as written»: «други пътни превозни средства могат да
+    // спират само за слизане на пътници само ако не пречат…». A 12 s stop is
+    // three times the 4 s that convicts at every other ban zone, and here it is
+    // the stop the act permits — driven through the REAL runtime, so the
+    // authored basis has to reach the tick for the allowance to apply.
+    expect(DROP_OFF_SEC).toBeGreaterThan(DEFAULT_RULE_CONFIG.banZoneStopRestSec);
+    expect(DROP_OFF_SEC).toBeLessThan(DEFAULT_RULE_CONFIG.busStopDropOffMaxSec);
+    expect(violations(restDrive(REST_MARKING_Y, Infinity, DROP_OFF_SEC))).toEqual([]);
+    expect(violations(restDrive(REST_POCKET_Y, Infinity, DROP_OFF_SEC))).toEqual([]);
+  });
+
+  it("…and it is the BASIS that grants it: strip it and the same drop-off convicts", () => {
+    // The control that makes the acquittal above mean something. Same map,
+    // same spans, basis removed ⇒ the pooled sustain (4 s) ⇒ billed.
+    const raw = loadRaw(ID) as District;
+    const unruled = {
+      ...raw,
+      zones: raw.zones!.map((z) => {
+        const copy = { ...z };
+        delete (copy as { basis?: unknown }).basis;
+        return copy;
+      }),
+    };
+    const rt = createWorldRuntime(unruled);
+    let rules = createRuleEngine();
+    const out: RuleEvent[] = [];
+    let t = 0;
+    const step = (y: number, v: number) => {
+      t += 0.1;
+      rt.update(0.1);
+      const r = reduceTick(rules, rt.sample(sample(LANE, y, 0, v), t, false));
+      rules = r.state;
+      out.push(...r.events);
+    };
+    for (let y = 15; y < REST_POCKET_Y; y += (30 / 3.6) * 0.1) step(y, 30);
+    for (let i = 0; i < DROP_OFF_SEC / 0.1; i++) step(REST_POCKET_Y, 0);
+    expect(violations(out)).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
+  });
+
+  it("the conviction CITES the spirka's law — never «под знак В27» — on both spans (founder rulings)", () => {
+    // THE ROW (sc-pk-busstop-ban:b103c282): the debrief convicted «под знак
+    // В27» at a spirka that carries no such plate. Driven through the REAL
+    // world runtime so the authored basis has to survive the parse, reach the
+    // tick and select the row — a fixture tick could not catch a dropped field.
+    for (const y of [REST_MARKING_Y, REST_POCKET_Y]) {
+      const bills = restDrive(y).filter(
+        (e): e is ViolationEvent => e.kind === "violation" && e.code === "ILLEGAL_STOP_IN_BAN_ZONE",
+      );
+      expect(bills, `y=${y}`).toHaveLength(1);
+      const [v] = bills;
+      expect(v.detail, `y=${y}`).toBe("law-bus-stop");
+      expect(v.lawRef, `y=${y}`).toBe(BUS_STOP_REF);
+      expect(v.titleBg, `y=${y}`).toBe("Паркиране на автобусна спирка");
+      expect(v.explanationBg, `y=${y}`).not.toContain("В27");
+      expect(v.explanationBg, `y=${y}`).toContain("чл. 69");
+      // …and the charge itself did not move: this ruling changes words, not points.
+      expect(v.severityClass).toBe("osnovna");
+      expect(v.points).toBe(3);
+    }
   });
 
   it("the two demos really do rest in DIFFERENT authored spans", () => {
@@ -323,7 +404,7 @@ describe(`${ID} — чл. 98 rest adjudication through the real reducer`, () => 
     expect(zoneAt(REST_POCKET_Y)).toBe("pkbs-z-stop-pocket");
   });
 
-  it("the SAME rest behind a queue lead (gap 6 m) stays innocent — WHY no bus is staged", () => {
+  it("the SAME wait behind a queue lead (gap 6 m) stays innocent — WHY no bus is staged", () => {
     // The backlog's note, proven rather than asserted: a held bus in the pocket
     // would be a lead within banZoneStopQueueGapM, and every rest behind it
     // would read as queue-shaped. The empty pocket IS the drill.
@@ -369,13 +450,33 @@ describe(`${ID} — чл. 98 rest adjudication through the real reducer`, () => 
 // ---------------------------------------------------------------------------
 
 describe(`${ID} — bus-stop furniture (KNOWN GAPS, pinned)`, () => {
-  it("posts one В27 face per span, though a real spirka is posted with a Д-group plate", () => {
-    // builders/zoneSigns.ts places a В27 at every noStopping span start. Here
-    // the ban is law+marking implied, so these two posts are wrong-but-harmless
-    // furniture: render-only, and grading reads the spans, never the posts.
-    // FIX: a `posted?: boolean` on DistrictZone (default true ⇒ every shipped
-    // map byte-identical) that zoneSigns honours; then this expects 0.
+  it("posts NO В27 at the spirka — чл. 69 needs no plate (founder ruling 2026-09-22)", () => {
+    // CLOSED 2026-09-22 (sc-pk-busstop-ban:b103c282). This test used to pin
+    // `signs.noStopping` at 2 — builders/zoneSigns.ts placed a В27 at every
+    // noStopping span start, on the zone kind alone — and called the posts
+    // «wrong-but-harmless furniture». They were not harmless: the card then
+    // charged the student «под знак В27», so the plate the builder invented was
+    // holding up the citation. The founder ruled «Convict under чл. 69»; the
+    // spans declare `basis: "law-bus-stop"` and zoneSigns posts nothing for it.
     const world = buildWorldGeometry(assertDistrict(loadRaw(ID)), { seed: 7 });
+    expect(world.stats.signs.noStopping ?? 0).toBe(0);
+    expect(world.signs.filter((p) => p.kind === "noStopping")).toEqual([]);
+  });
+
+  it("…and it is the BASIS that withholds the plate: strip it and both В27 faces come back", () => {
+    // The control that makes the zero above mean something. Same map, same
+    // spans, basis removed ⇒ the pooled В27 branch ⇒ zoneSigns posts one face
+    // per span again. So the absence is the ruling's, not a broken builder's.
+    const raw = loadRaw(ID) as District;
+    const unruled = {
+      ...raw,
+      zones: raw.zones!.map((z) => {
+        const copy = { ...z };
+        delete (copy as { basis?: unknown }).basis;
+        return copy;
+      }),
+    };
+    const world = buildWorldGeometry(assertDistrict(unruled), { seed: 7 });
     expect(world.stats.signs.noStopping).toBe(2);
   });
 

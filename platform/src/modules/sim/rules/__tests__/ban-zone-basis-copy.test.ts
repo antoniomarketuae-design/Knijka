@@ -33,8 +33,10 @@
 
 import { describe, expect, it } from "vitest";
 import { NO_STOP_BASIS_COPY, VIOLATIONS, actCopy, violationPeekBg } from "../catalog";
+import { DEFAULT_RULE_CONFIG } from "../types";
 import type { NoStopBasis, RuleEvent, ViolationEvent } from "../types";
 import { cruise, drive, tick } from "./fixtures";
+import { resolveLawRef } from "@/lib/content/law";
 
 function billsOf(events: RuleEvent[]): ViolationEvent[] {
   return events.filter(
@@ -186,5 +188,143 @@ describe("the strings read BY CODE must be true of both bases", () => {
     // read this by code with no event in hand, so it cannot be about В27 alone.
     expect(c).toContain("В27");
     expect(c).toMatch(/кръстовищ|пътек|релси|спряла/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. THE SPIRKA — founder ruling 2026-09-22, «Convict under чл. 69»
+//    (audit row sc-pk-busstop-ban:b103c282)
+// ---------------------------------------------------------------------------
+
+describe("a halt at a bus stop is convicted under ЗДвП чл. 69, and the words come from the bank", () => {
+  /** The unit the row claims to quote, RETRIEVED — not a string held here. */
+  const art69 = resolveLawRef({ act: "ЗДвП", ref: "чл. 69" });
+
+  it("the bank holds чл. 69 (if this fails, the row has nothing to quote — do not invent it)", () => {
+    expect(art69.found).toBe(true);
+    if (!art69.found) return;
+    expect(art69.unit.textBg).toContain("спирка");
+  });
+
+  /** The two further units the parking conviction rests on, RETRIEVED. */
+  const art93 = resolveLawRef({ act: "ЗДвП", ref: "чл. 93" });
+  const art98 = resolveLawRef({ act: "ЗДвП", ref: "чл. 98" });
+  const BUS_STOP_REF = "ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3";
+
+  /** A rest of `restSec` whole seconds in a `law-bus-stop` span. */
+  function restAtBusStop(restSec: number): ViolationEvent[] {
+    const { events } = drive([
+      tick(0, { speedKmh: 25, noStopZone: true, noStopBasis: "law-bus-stop" }),
+      ...cruise(1, 1 + restSec, { speedKmh: 0, noStopZone: true, noStopBasis: "law-bus-stop" }),
+    ]);
+    return billsOf(events);
+  }
+
+  it("pk-busstop-v1's spans convict PARKING — чл. 69 / чл. 93, ал. 2 / чл. 98, ал. 2, т. 3; no В27, no ал. 1", () => {
+    const v = restAtBusStop(DEFAULT_RULE_CONFIG.busStopDropOffMaxSec + 2);
+    expect(v).toHaveLength(1);
+    expect(v[0]!.lawRef).toBe(BUS_STOP_REF);
+    expect(v[0]!.detail).toBe("law-bus-stop");
+    expect(v[0]!.titleBg).toBe("Паркиране на автобусна спирка");
+    for (const s of [v[0]!.titleBg, v[0]!.explanationBg, v[0]!.lawRef]) {
+      expect(s).not.toContain("В27");
+      // чл. 98 may appear only as its PARKING clause (ал. 2, т. 3), never as
+      // the престой list (ал. 1) the drill used to misattribute.
+      expect(s).not.toContain("чл. 98, ал. 1");
+    }
+    // The charge is the same act on the same scale: words move, points do not.
+    expect(v[0]!.severityClass).toBe("osnovna");
+    expect(v[0]!.points).toBe(3);
+  });
+
+  it("every «…» the row quotes is a VERBATIM substring of the retrieved unit it cites", () => {
+    // ADR-002: the article's text may only come from content/law. If the bank's
+    // text ever changes (or someone "tidies" a quote), this goes red.
+    expect(art69.found && art93.found && art98.found).toBe(true);
+    if (!art69.found || !art93.found || !art98.found) return;
+    const text = NO_STOP_BASIS_COPY["law-bus-stop"].explanationBg;
+    const quotes = [...text.matchAll(/„([^“]+)“/g)].map((m) => m[1]!);
+    // чл. 69: the two conditions must be IN the quote, not paraphrased around it.
+    const q69 = quotes.filter((q) => q.includes("слизане на пътници само ако"));
+    expect(q69).toHaveLength(1);
+    expect(q69[0]).toContain("само ако не пречат");
+    expect(art69.unit.textBg).toContain(q69[0]);
+    // чл. 93, ал. 1: the definition of престой the «parking» verdict leans on.
+    const q93 = quotes.filter((q) => q.startsWith("за ограничено време"));
+    expect(q93).toHaveLength(1);
+    expect(art93.unit.textBg).toContain(q93[0]);
+    // чл. 98, ал. 2: the ban on parking at the stops.
+    const q98 = quotes.filter((q) => q.includes("паркирането"));
+    expect(q98).toHaveLength(1);
+    expect(art98.unit.textBg).toContain(q98[0]);
+    expect(art98.unit.textBg).toContain(
+      "3. на спирките на превозните средства от редовните линии за обществен превоз на пътници",
+    );
+    // …and nothing is quoted that is not accounted for above.
+    expect(quotes.length).toBe(3 + quotes.filter((q) => q === "за минутка").length);
+  });
+
+  it("a brief drop-off at the spirka is NOT an offence — чл. 69 allows it (founder follow-up ruling)", () => {
+    // «Teach чл. 69 as written»: other vehicles may stop at a bus stop to let
+    // passengers alight. The 4 s sustain every other basis uses would convict
+    // exactly that stop, so this basis waits `busStopDropOffMaxSec`.
+    const allowance = DEFAULT_RULE_CONFIG.busStopDropOffMaxSec;
+    expect(allowance).toBeGreaterThan(DEFAULT_RULE_CONFIG.banZoneStopRestSec);
+    expect(restAtBusStop(allowance - 2)).toEqual([]);
+    // …the same rest under any other basis IS billed — the allowance is the
+    // spirka's alone.
+    const { events } = drive([
+      tick(0, { speedKmh: 25, noStopZone: true, noStopBasis: "law-rail" }),
+      ...cruise(1, allowance - 1, { speedKmh: 0, noStopZone: true, noStopBasis: "law-rail" }),
+    ]);
+    expect(billsOf(events).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("…and a rest that outlasts the drop-off IS billed, once, then re-graded on the same law", () => {
+    const allowance = DEFAULT_RULE_CONFIG.busStopDropOffMaxSec;
+    // Just past the allowance: the first bill, no re-grade yet.
+    const first = restAtBusStop(allowance + 2);
+    expect(first).toHaveLength(1);
+    expect(first[0]!.regrade).toBeUndefined();
+    expect(first[0]!.t).toBeGreaterThanOrEqual(1 + allowance);
+    // Held on: the re-grade rides the SAME allowance (+6 s), not the 4 s one.
+    const held = restAtBusStop(allowance + 10);
+    expect(held.map((e) => e.regrade === true)).toEqual([false, true]);
+    expect(new Set(held.map((e) => e.lawRef))).toEqual(new Set([BUS_STOP_REF]));
+  });
+
+  it("the row never names the product's allowance as if the act wrote it", () => {
+    const { explanationBg } = NO_STOP_BASIS_COPY["law-bus-stop"];
+    const n = String(DEFAULT_RULE_CONFIG.busStopDropOffMaxSec);
+    // (No `\b`: JS word boundaries are ASCII-only and never fire after «с».)
+    expect(explanationBg).not.toMatch(new RegExp(`(^|[^0-9])${n}\\s*(с\\.|с |сек)`));
+    expect(explanationBg).not.toMatch(/\d+\s*секунд/);
+    // …and never tells the student he hindered a bus: nothing on the tick can see one.
+    expect(explanationBg).not.toMatch(/попречи|пречеше|затрудни автобуса/);
+  });
+
+  it("the row never claims a blanket ban the article does not contain", () => {
+    // чл. 69 is a permission with two conditions (only to let passengers
+    // alight; only if the bus is not hindered). The drill used to say the stop
+    // is banned «дори за секунда» and attribute it to чл. 98, ал. 1 — which
+    // names no spirka. The card must not repeat either half.
+    const { explanationBg, peekBg } = NO_STOP_BASIS_COPY["law-bus-stop"];
+    expect(explanationBg).not.toMatch(/дори за секунда|дори краткия престой|изобщо не спираш/);
+    expect(explanationBg.length).toBeGreaterThan(120); // THEO-4: a reason, not a verdict
+    expect(violationPeekBg("ILLEGAL_STOP_IN_BAN_ZONE", "law-bus-stop")).toBe(peekBg);
+    // THEO-4, the other half: the card says what the student MAY do there.
+    expect(explanationBg).toMatch(/пусни пътника/);
+  });
+
+  it("the pooled corrective (read by code, no detail) now walks the bus-stop branch too", () => {
+    const c = VIOLATIONS.ILLEGAL_STOP_IN_BAN_ZONE.correctiveBg;
+    expect(c).toContain("автобусна спирка");
+    expect(c).toContain("ЗДвП чл. 69");
+  });
+
+  it("the server rebuild resolves the same sentence from `detail` alone", () => {
+    const copy = actCopy("ILLEGAL_STOP_IN_BAN_ZONE", "law-bus-stop");
+    expect(copy).not.toBeNull();
+    expect(copy!.lawRef).toBe("ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3");
   });
 });

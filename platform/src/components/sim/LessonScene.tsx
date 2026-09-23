@@ -2514,9 +2514,13 @@ export function ReadyScene({
   // camera view; instruction mode pulses the pending step's hotspot(s).
   // (The old QW5 "checklist click forces cabin state" effect is gone: state
   // transitions now COMPLETE steps, never the reverse.)
+  // …and it carries the lesson's door-mirror declaration to MirrorRig (founder
+  // ruling 2026-09-22, «Live when the task uses it»): render-only, read off the
+  // compiled lesson, never re-derived here.
+  const doorMirrorsInTask = lesson.doorMirrorsInTask === true;
   const cockpitInteraction = useMemo(
-    () => ({ enabled: cockpit, highlightStepId: preDriveHighlightStepId }),
-    [cockpit, preDriveHighlightStepId],
+    () => ({ enabled: cockpit, highlightStepId: preDriveHighlightStepId, doorMirrorsInTask }),
+    [cockpit, preDriveHighlightStepId, doorMirrorsInTask],
   );
 
   // S1 (doc 62): the lamp render callback consumes the GRADED signal state —

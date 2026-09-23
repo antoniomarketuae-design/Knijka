@@ -341,6 +341,13 @@ import {
 } from "./lib/path-follow.mjs";
 import { computePathEvidence } from "./lib/path-evidence.mjs";
 import { driveClearanceFromSidecar, driveClearanceGate } from "./lib/drive-clearance.mjs";
+// THE ROAD PROBE, READ AS A WITNESS (W59 increment 2). A SINK: the one object
+// this file holds is `roadWitness`, and the only things it does with it are
+// `await roadWitness.poll()` and `await roadWitness.finish(OUT)` — pinned by
+// road-witness-wiring.test.mjs; what the sink can and cannot leak is proven by
+// executing it in road-record.test.mjs. `roadProbePageRead` is named ONCE, in
+// the frozen reader handed to the sink — the page itself never is.
+import { createRoadWitness, roadProbePageRead } from "./lib/road-record.mjs";
 // THE BRAKE THAT HAS A REASON — same contract as guidance.mjs above: the
 // control law is pure and lives in the lib, the page side (`hazardRead`, and
 // the fold in the roll phase) lives here. `hazard.mjs`'s header carries the
@@ -8294,6 +8301,48 @@ if (STEER_BY === "authored-path") {
     note(`  PATH: the first segment is R — the gear change is at spawn (${inSpawnBand ? "inside" : "OUTSIDE"} the 0.3 m / 3° spawn band); the arm gate's path arm is open from the first tick.`);
   }
 }
+/* ── THE ROAD PROBE, AS A WITNESS ON EVERY RIBBON / NONE LEG (W59 inc. 2) ──
+ *
+ * `window.__roadProbe` (devrig/roadProbe.ts, DEV BUILDS ONLY) is read as a
+ * WITNESS and nothing else — the same class of signal as `__camProbe` and the
+ * same rule, «WHY THE PIXELS» above: dev-only, so a loop closed around it would
+ * drive by something no student's build publishes. The RULING-1 exception for the
+ * pc-path leg's pose input is NOT widened to it.
+ *
+ * IT IS A SINK, AND IT NEVER SEES THE PAGE. It is handed ONE frozen function —
+ * the page read — and a frozen options object whose `log` is a fresh frozen
+ * arrow; nothing this file reads is reachable from it. It returns a frozen
+ * { poll, finish } whose calls resolve to undefined; the only outputs are
+ * `_audit-road.json.gz` and one ROAD line.
+ *
+ * NOT ON AN AUTHORED-PATH LEG. `roadWitness` is null there — the witness is
+ * never constructed, so the ratified pc-path parking instrument's loop runs
+ * exactly the statements it ran before, and its run.log says so in one line.
+ *
+ * WHERE IT IS POLLED — OFF THE CONTROL PATH, INSIDE THE TICK. Once per outer
+ * tick, started after this tick's last actuation and run CONCURRENTLY with its
+ * idle wait, then awaited: the read spends idle time instead of adding to it,
+ * so the control period stays TICK_MS with the witness on or off (the idle
+ * line itself is the one the pc-path instrument pins, unchanged). A poll that
+ * outlasts the whole budget is booked by the sink (and bars the leg from the
+ * freeze) — never absorbed silently. Once
+ * more when the loop exits, BEFORE the keys are released: that poll's seq is
+ * the drive-end watermark, and `finish` books every later tick as post-drive.
+ *
+ * THE KILL SWITCH. `KNIJKA_ROAD_WITNESS=0` reads nothing (the sidecar and the
+ * ROAD line say OFF), so the same leg can be driven with and without it. */
+const roadWitness =
+  STEER_BY === "authored-path"
+    ? null
+    : createRoadWitness(
+        Object.freeze((arg) => page.evaluate(roadProbePageRead, arg)),
+        Object.freeze({
+          enabled: process.env.KNIJKA_ROAD_WITNESS !== "0",
+          meta: Object.freeze({ scenario: SCENARIO, platform: PLATFORM, mode: LEG_MODE, steerBy: STEER_BY }),
+          log: Object.freeze((line) => note(line)),
+          tickBudgetMs: TICK_MS,
+        }),
+      );
 const medianTick = () => {
   if (tickMs.length < 6) return 0;
   const v = [...tickMs].sort((a, b) => a - b);
@@ -9768,8 +9817,17 @@ while (!ended && Date.now() - t0 < budgetMs) {
   prevKmh = p.kmh;
   tickMs.push(Date.now() - tickStart);
   lastTickAt = Date.now();
+  // THE WITNESS READ, INSIDE THIS TICK'S IDLE BUDGET: started after the tick's
+  // last actuation and run DURING the idle wait below (a timer on the ribbon
+  // leg), so the wait is not lengthened by it — the read eats into the idle, the
+  // control period stays TICK_MS. Awaited after the wait: a read longer than the
+  // whole budget does extend that one tick, and the sink BOOKS it
+  // (pollBudget.overBudget, which bars the leg from the freeze). Null on an
+  // authored-path leg: nothing starts, nothing is awaited.
+  const roadRead = roadWitness === null ? null : roadWitness.poll();
   // pc-path: the runner replaces ONLY this idle wait (§5.2); right and wrong legs wait as before.
   await timed("idle", () => (STEER_BY === "authored-path" && !pathState.done ? pathRun(TICK_MS) : page.waitForTimeout(TICK_MS)));
+  if (roadRead !== null) await roadRead;
   if (STEER_BY === "authored-path" && pathState.done) {
     // A refusal is final for the leg's remaining segments (§7.7): the car is at
     // rest, the runner has stopped, and nothing further can be driven.
@@ -9778,6 +9836,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
     if (pathFollow.refusedRestTicks * TICK_MS >= 10_000) break;
   }
 }
+if (roadWitness !== null) await roadWitness.poll();
 await throttle(false);
 await brake(false);
 const driveSec = Math.round((Date.now() - t0) / 1000);
@@ -9794,6 +9853,8 @@ note(
     (refusedReversePress ? ` · refused ${refusedReversePress} standstill brake press${refusedReversePress === 1 ? "" : "es"} (would have selected R)` : "") +
     (lostKeys ? ` · re-asserted the brake ${lostKeys}× after the sim lost the key` : ""),
 );
+if (roadWitness !== null) await roadWitness.finish(OUT);
+else note("  ROAD (witness, baseline — not a verdict): OFF — not constructed on an authored-path (pc-path) leg: the parking instrument runs untouched and no _audit-road.json.gz is written");
 /* ── WHICH FRAMES WERE TAKEN FOR A FAULT CARD, ON EVERY PC LANE ─────────────
  * Unconditional on pc for the hazard line's reason: „no extra frame" read off
  * silence is indistinguishable from „no card". The names are the files. */

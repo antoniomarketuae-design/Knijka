@@ -98,10 +98,18 @@ describe("the authored ban basis reaches the tick on the shipped maps", () => {
     expect(t.noStopBasis).toBeUndefined();
   });
 
-  it("pk-busstop-v1 publishes no basis either — it awaits a founder ruling", () => {
-    const t = tickAt("pk-busstop-v1", 4.06, 165);
-    expect(t.noStopZone).toBe(true);
-    expect(t.noStopBasis).toBeUndefined();
+  it("pk-busstop-v1: both spans of the spirka publish law-bus-stop (founder ruling, чл. 69)", () => {
+    // 165 = the зигзаг approach (pkbs-z-stop-marking), 195 = the pocket
+    // (pkbs-z-stop-pocket). Until 2026-09-22 both published NOTHING and the
+    // card fell back to «под знак В27»; the founder ruled «Convict under
+    // чл. 69», so the authored basis has to reach the tick at both.
+    for (const y of [165, 195]) {
+      const t = tickAt("pk-busstop-v1", 4.06, y);
+      expect(t.noStopZone, `y=${y}`).toBe(true);
+      expect(t.noStopBasis, `y=${y}`).toBe("law-bus-stop");
+    }
+    // …and the legal bay 40 m past the zone publishes nothing.
+    expect(tickAt("pk-busstop-v1", 4.06, 250).noStopZone).toBeUndefined();
   });
 
   it("OUTSIDE every span there is no zone and no basis", () => {

@@ -71,6 +71,7 @@ import {
 } from "./builders/constants";
 import { offsetPolyline, polylineLength, trimPolyline, type Vec2 } from "./builders/math2d";
 import { analyzeNetwork } from "./builders/network";
+import { zonePostsPlate } from "./builders/zoneSigns";
 import {
   assertDistrict,
   signKindSpeedKmh,
@@ -1732,6 +1733,14 @@ function banZoneRule(zoneKind: string, label: string): ReferentRule {
     check(f) {
       const zones = routeZones(f, [zoneKind]);
       if (zones.length === 0) return inert(`no ${label} zone on any route edge`);
+      // A span whose rule needs no plate (a spirka under ЗДвП чл. 69 — founder
+      // ruling 2026-09-22) is posted by NOTHING on purpose; zoneSigns decides
+      // that with the same predicate, so this gate cannot call the deliberate
+      // absence «the ban is invisible».
+      const plated = zones.filter((z) => zonePostsPlate(z));
+      if (plated.length === 0) {
+        return ok(`${label} spans = ${zones.length}, none needs a plate (the law itself governs them) — posts = 0 by design`);
+      }
       const posts = f.world.signs.filter((s) => s.kind === SIGN_FOR[zoneKind]);
       return posts.length > 0
         ? ok(`${label} spans = ${zones.length}, posts = ${posts.length}`)

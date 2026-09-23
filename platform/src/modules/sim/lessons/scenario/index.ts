@@ -115,6 +115,15 @@ export {
   type ScenarioLevelProgress,
 } from "./progress";
 export { parkingObservationFromTrace } from "./observation";
+// Founder ruling 2026-09-22 — does a drill's task rely on the door mirrors
+// (the render-only MEDIUM door-mirror decision; LessonSpec.doorMirrorsInTask).
+export {
+  MIRROR_CHECK_CODE,
+  doorMirrorTaskSource,
+  momentNamesDoorMirror,
+  scenarioUsesDoorMirrors,
+  type DoorMirrorTaskSource,
+} from "./doorMirrorTask";
 
 // „Следващ сценарий" — the next-target resolver behind the end-screen CTA
 // (catalog order = SCENARIO_TEMPLATES order; the star gate mirrors doc 76 §8).

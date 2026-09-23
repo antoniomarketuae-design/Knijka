@@ -230,26 +230,31 @@ export type SimTickEvent =
  * break four DIFFERENT точки. The author already knows which one — they
  * hand-wrote it into the span's `signRef` prose.
  *
- * "law-busstop" IS DELIBERATELY ABSENT. pk-busstop-v1 authors two `noStopping`
- * spans citing «чл. 98, ал. 1», but ал. 1 contains no bus-stop clause at all,
- * and чл. 98's own spirka clause — ал. 2, т. 3 — sits under a chapeau
- * that bans ПАРКИРАНЕТО, not престоя.
+ * "law-bus-stop" — FOUNDER RULING 2026-09-22, «Convict under чл. 69» (audit
+ * row sc-pk-busstop-ban:b103c282). pk-busstop-v1 used to author its two
+ * `noStopping` spans citing «чл. 98, ал. 1», which contains no bus-stop clause
+ * (ал. 1 is a closed list of eight places; the spirka clause is ал. 2, т. 3,
+ * under a chapeau that bans ПАРКИРАНЕТО, not престоя), so the map declared no
+ * basis and printed the pooled «под знак В27» card — under a В27 face that
+ * `world/builders/zoneSigns.ts` had derived from the zone kind and that a real
+ * Sofia spirka does not carry. The retrieved act names the rule that governs a
+ * car that is not the bus AT a spirka, with no plate and no marking in its
+ * text: чл. 69 (quoted verbatim beside the row in `catalog.ts
+ * NO_STOP_BASIS_COPY`). The founder picked it from the three contested
+ * grounds (чл. 69 · the зигзаг marking · re-authoring as `noParking`).
  *
- * ⚠ CORRECTED 2026-09-19. This block used to add «the only spirka clause in the
- * act» and name the зигзаг МАРКИРОВКА as the real basis. Both are refuted by
- * the retrieved act: NINE units mention спирк (чл. 65, 66, 67, 68, 69, 80а, 98,
- * 115, 183), and чл. 69 restricts OTHER vehicles at a spirka to stopping only
- * for passengers to alight, only if they do not obstruct — with no знак and no
- * маркировка in its text. So a ground DOES exist without paint; what is open is
- * WHICH ground is right (чл. 69 / the unpainted зигзаг / re-authoring as
- * `noParking`). See the docblock in
- * world/__tests__/no-stop-basis-declared.test.ts, which is what the founder
- * reads when he rules, for the verbatim quote.
+ * AND IT IS THE ONE BASIS WITH ITS OWN SUSTAIN — founder follow-up ruling
+ * 2026-09-22, «Teach чл. 69 as written». чл. 69 PERMITS a brief stop to let
+ * passengers alight, so a rest in such a span convicts only once it outlasts
+ * `RuleEngineConfig.busStopDropOffMaxSec` — once it is паркиране (чл. 93,
+ * ал. 2), which чл. 98, ал. 2, т. 3 bans at the stops. The 4 s
+ * `banZoneStopRestSec` every other basis uses would convict the drop-off the
+ * act allows.
  *
- * That is a content-truth ruling for the
- * founder, not an engineering choice, so the map keeps the pooled row until it
- * is made — see the report accompanying this change. The union is left open to
- * gain "law-marking" without a schema break.
+ * IT IS THE ONE BASIS THAT POSTS NO PLATE. чл. 69 needs no sign, so
+ * `zoneSigns.ts` (`zonePostsPlate`) places no В27 at such a span — the only
+ * change to the furniture, and the other law bases keep their posts untouched
+ * (they are a separate question nobody has ruled on).
  */
 export type NoStopBasis =
   /** A real В27 plate governs the span (чл. 6, т. 1 — the duty to obey it). */
@@ -261,7 +266,13 @@ export type NoStopBasis =
   /** чл. 98, ал. 1, т. 5 — на пешеходна пътека и на 5 м преди нея. */
   | "law-crossing"
   /** чл. 98, ал. 1, т. 4 — върху/в близост до релсите. pk-rail-v1. */
-  | "law-rail";
+  | "law-rail"
+  /** чл. 69 — на спирка на обществения превоз другите ППС спират само за
+   *  слизане на пътници и само ако не пречат на автобуса; паркирането там е
+   *  забранено (чл. 98, ал. 2, т. 3). pk-busstop-v1. Founder rulings
+   *  2026-09-22; the one basis that posts no plate, and the one with its own
+   *  sustain (`busStopDropOffMaxSec`). */
+  | "law-bus-stop";
 
 /**
  * WHICH WAY THE CAR FACES ALONG THE ROAD IT IS ON — the OBSERVATION behind the
@@ -1707,6 +1718,37 @@ export interface RuleEngineConfig {
    *  hesitations); a deliberate „пусни ме тук за малко" curb stop holds far
    *  longer. */
   banZoneStopRestSec: number;
+  /**
+   * THE SPIRKA'S OWN SUSTAIN, s — replaces `banZoneStopRestSec` for a rest in a
+   * span whose basis is `"law-bus-stop"`, and ONLY there.
+   *
+   * FOUNDER FOLLOW-UP RULING 2026-09-22, «Teach чл. 69 as written». The act
+   * (content/law/acts/zdvp.json, retrieved) PERMITS the stop the 4 s sustain
+   * used to convict: чл. 69 — «други пътни превозни средства могат да спират
+   * само за слизане на пътници само ако не пречат на превозните средства, за
+   * които е предназначена спирката». What the act bans at a spirka is PARKING —
+   * чл. 98, ал. 2, т. 3 («…паркирането е забранено: … на спирките на
+   * превозните средства от редовните линии за обществен превоз на пътници») —
+   * and чл. 93 draws the line: ал. 1, a car is в престой when stopped «за
+   * ограничено време, необходимо за качване и слизане на пътници…»; ал. 2,
+   * stopped beyond that circumstance, it is паркирано.
+   *
+   * SO THE PRODUCT HAS TO PUT A NUMBER ON «ограничено време, необходимо за …
+   * слизане», AND THE NUMBER IS OURS, NOT THE LAW'S. The act names none, and no
+   * sentence the student reads may claim it does. 20 s is a generous drop-off:
+   * stop, door open, a passenger steps out with a bag, door shut is ~10–15 s,
+   * and the margin keeps a slow passenger from convicting the driver. Held
+   * longer at the stop, the car is no longer letting someone out — it is
+   * WAITING, which is паркиране under ал. 2, and that is the act convicted.
+   *
+   * WHAT THIS DOES NOT GRADE, stated rather than hidden: the other half of
+   * чл. 69 — a drop-off that HINDERS a bus. No channel on the tick reports a
+   * bus approaching or wanting the bay (and a bus staged in the pocket would
+   * read as a queue lead and acquit by construction), so a brief drop-off is
+   * acquitted whether or not a bus was due. The copy never tells the student
+   * he hindered one.
+   */
+  busStopDropOffMaxSec: number;
   /** A lead at rest within this gap = a QUEUE — the stop has a traffic cause
    *  and never convicts (the standstill-lead context of the harsh-brake
    *  cause ledger, m). */
@@ -2190,6 +2232,7 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // innocent (the FP battery locks them in).
   banZoneStopEnabled: true,
   banZoneStopRestSec: 4,
+  busStopDropOffMaxSec: 20, // чл. 93, ал. 1's «ограничено време» — OUR number, see the interface
   banZoneStopQueueGapM: 8,
   banZoneVruAheadM: 20, // a person, not a bumper — see the interface note
   banZoneStopLineClearM: 25,

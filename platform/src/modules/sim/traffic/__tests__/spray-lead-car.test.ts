@@ -48,7 +48,11 @@ import {
  *  (`FR_LEAD_CAR.paceSpeedMps` = 7 m/s), at the gap the lesson teaches. */
 const RAIN = 1;
 const LEAD_MPS = 7;
-/** `sc-ac-truck-spray` paces its student at ~59.9 m of bumper gap. */
+/** `sc-ac-truck-spray` paces its student 64 m of centres behind the truck:
+ *  58.2 m bumper to bumper (`bumperSubtrahendM`, half of each body), ~60 m
+ *  from the cockpit eye to the truck's tail — the distance `sprayDensity`
+ *  is handed (TrafficLayer's `eyeGapM`). 59 sits between the two and both
+ *  give the same slab count (3) for the truck. */
 const TRUCK_DRILL_GAP_M = 59;
 
 const slabsFor = (v: Parameters<typeof sprayStrength>[0], mps: number, gapM: number) =>

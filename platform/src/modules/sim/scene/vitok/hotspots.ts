@@ -257,6 +257,13 @@ export interface CockpitInteraction {
   /** Instruction mode: the pending procedure step whose hotspot(s) pulse, or
    *  null (practice/assess/driving — no hand-holding). */
   highlightStepId: PreDriveStepId | null;
+  /**
+   * `LessonSpec.doorMirrorsInTask` — the lesson's task relies on the door
+   * mirrors, so MirrorRig keeps them live on MEDIUM and HIGH (founder ruling
+   * 2026-09-22, `mirrorAttention.doorMirrorsFollowTask`). Optional so every
+   * existing provider and the inert default mean "no".
+   */
+  doorMirrorsInTask?: boolean;
 }
 
 /** Default = inert: a cockpit mounted outside LessonScene (legacy stacks,

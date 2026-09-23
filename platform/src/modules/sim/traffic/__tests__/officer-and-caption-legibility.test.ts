@@ -234,13 +234,9 @@ describe("FR-OFC-CARD — the caption is readable where the decision is made, an
     // measured ≈ 12 px of cap height under the old 16 m reference and read as
     // "mush"; the headline measured ≈ 30 px and read crisp.
     const D = 27;
-    const smallestBody = Math.min(
-      BUBBLE_LINE_PX.pose,
-      BUBBLE_LINE_PX.go,
-      BUBBLE_LINE_PX.stop,
-      BUBBLE_LINE_PX.priority,
-      BUBBLE_LINE_PX.law,
-    );
+    // The L1 card is the SHORT card since the founder's 2026-09-22 ruling:
+    // name, one answer line, law. Its body is the answer and the law.
+    const smallestBody = Math.min(BUBBLE_LINE_PX.answer, BUBBLE_LINE_PX.law);
     // THE FLOORS MOVED UP WITH THE CARD (sc-sig-controller-postures:ef0e821c).
     // 14 and 16 were what the 1024 px card could reach, and the row filed
     // against that card says plainly what those numbers buy: ≈4.7 and ≈5.3 CSS
@@ -249,11 +245,13 @@ describe("FR-OFC-CARD — the caption is readable where the decision is made, an
     // sizes to 18.75 and 21.0 device px, and the floors follow so the gain
     // cannot be given back by a later edit to `BUBBLE_LINE_PX` alone.
     expect(bodyCapPx(smallestBody, D)).toBeGreaterThan(18);
-    expect(bodyCapPx(BUBBLE_LINE_PX.go, D)).toBeGreaterThan(20);
-    // The headline was never the problem and must not have been shrunk to buy
-    // the body lines.
-    expect(bodyCapPx(BUBBLE_LINE_PX.headline, D)).toBeGreaterThan(
-      bodyCapPx(BUBBLE_LINE_PX.go, D) * 2,
+    // The answer line carries the rule now, and it is bigger than the 56 px
+    // body line whose ≈21 px floor this used to hold.
+    expect(bodyCapPx(BUBBLE_LINE_PX.answer, D)).toBeGreaterThan(24);
+    // The header was never the problem and must not have been shrunk to buy
+    // the answer line.
+    expect(bodyCapPx(BUBBLE_LINE_PX.name, D)).toBeGreaterThan(
+      bodyCapPx(BUBBLE_LINE_PX.answer, D) * 1.5,
     );
   });
 

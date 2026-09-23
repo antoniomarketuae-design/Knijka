@@ -1,6 +1,7 @@
 /**
  * Trace gate — „Спирка не е паркинг" (sc-pk-busstop-ban on pk-busstop-v1,
- * doc 72 PK-06; ЗДвП чл. 98, ал. 1), doc 76 §5/§9 stages 3+5:
+ * doc 72 PK-06; ЗДвП чл. 69 — waiting there is паркиране, banned by чл. 98,
+ * ал. 2, т. 3; founder rulings 2026-09-22), doc 76 §5/§9 stages 3+5:
  *   1. SHADOW transits the WHOLE stop zone without resting and stops at the
  *      LEGAL bay 40 m past it → ZERO violations.
  *   2. MISTAKE DEMOS grade EXACTLY ILLEGAL_STOP_IN_BAN_ZONE, ONCE each (the
@@ -62,14 +63,14 @@ describe("sc-pk-busstop-ban — the shadow gate (doc 76 §5)", () => {
   it("rests at the legal bay (~y = 250), 40 m past the zone, with Bulgarian annotations", () => {
     const last = shadow.trace.samples[shadow.trace.samples.length - 1];
     expect(Math.abs(last.y - BAY_Y)).toBeLessThan(3);
-    expect(last.y).toBeGreaterThan(POCKET.toY); // OUTSIDE the чл. 98 stop zone
+    expect(last.y).toBeGreaterThan(POCKET.toY); // OUTSIDE the spirka's zone
     expect(Math.abs(last.speedKmh)).toBeLessThan(1);
     const annotations = shadow.trace.events.filter((e) => e.kind === "annotation");
     expect(annotations.length).toBeGreaterThanOrEqual(4);
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);
   });
 
-  it("never comes to rest inside the чл. 98 stop zone (the shadow earns its zero the honest way)", () => {
+  it("never comes to rest inside the spirka's zone (the shadow earns its zero the honest way)", () => {
     const inBan = (y: number) => y >= MARKING.fromY && y <= POCKET.toY;
     const restingInBan = shadow.trace.samples.filter((s) => Math.abs(s.speedKmh) < 1 && inBan(s.y));
     expect(restingInBan).toHaveLength(0);
@@ -102,6 +103,22 @@ describe("sc-pk-busstop-ban — mistakes grade their exact codes (doc 76 §9 sta
       expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
     });
   }
+
+  it("each demo's conviction is the spirka's own card — PARKING, not the pooled В27 row", () => {
+    // Founder follow-up ruling 2026-09-22, «Teach чл. 69 as written»: the demos
+    // must show an ACTUAL offence. A brief drop-off is lawful; these recordings
+    // WAIT, and the bill they carry says so.
+    for (const name of ["mistake-stop-on-pocket", "mistake-stop-on-marking"] as const) {
+      const bill = drives
+        .get(name)!
+        .ruleEvents.find((e) => e.kind === "violation" && e.code === "ILLEGAL_STOP_IN_BAN_ZONE");
+      expect(bill, name).toBeDefined();
+      const v = bill as { detail?: string; lawRef: string; titleBg: string };
+      expect(v.detail, name).toBe("law-bus-stop");
+      expect(v.titleBg, name).toBe("Паркиране на автобусна спирка");
+      expect(v.lawRef, name).toBe("ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3");
+    }
+  });
 
   it("the two demos rest in DIFFERENT authored spans (in the pocket / on the зигзаг)", () => {
     /** The y of the first rest the DRIVE demonstrates — i.e. after the car has

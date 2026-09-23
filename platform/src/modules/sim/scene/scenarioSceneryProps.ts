@@ -812,7 +812,8 @@ const WALK_CLEAR_RADIUS_M = WALKER_HALF_W_M + PARKED_HALF_DIAG_M;
 /** Circle pitch along the walk — ≤ radius, so the union has no gaps. */
 const WALK_CLEAR_PITCH_M = WALK_CLEAR_RADIUS_M;
 /** Kerb kept clear either side of an authored bus stop, m past the frontage's
- *  own half-diagonal. ЗДвП чл. 98 bans stopping AT the spirka; the extra
+ *  own half-diagonal. ЗДвП чл. 98, ал. 2, т. 3 bans PARKING at the spirka
+ *  (and чл. 69 lets other cars stop there only to let passengers alight); the extra
  *  metres are the bay a bus needs to pull in and out of, which is exactly the
  *  span that has to be empty for the shelter to be visible from the road. */
 const BUS_STOP_NO_PARK_MARGIN_M = 6;
@@ -1087,8 +1088,14 @@ export function parkedClearZonesFor(
   const zones: ParkedClearZone[] = [];
   // ── RULE 2 (doc 87 B64): NOBODY PARKS AT A BUS STOP. ─────────────────────
   //
-  // ЗДвП чл. 98, ал. 1, т. 4 — спиране и престой на спирка на превозно средство
-  // от редовните линии е забранено. The curb pass did not know that, so on
+  // ЗДвП чл. 98, ал. 2, т. 3 — паркирането е забранено „на спирките на
+  // превозните средства от редовните линии за обществен превоз на пътници“,
+  // and чл. 69 lets another car stop there only to let passengers alight
+  // (retrieved: content/law/acts/zdvp.json). This comment used to cite
+  // «чл. 98, ал. 1, т. 4 — спиране и престой на спирка … е забранено»; ал. 1,
+  // т. 4 is the rails clause and ал. 1 names no spirka at all (founder rulings
+  // 2026-09-22, sc-pk-busstop-ban:b103c282). A decorative body is a PARKED car,
+  // so ал. 2, т. 3 is exactly its ground. The curb pass did not know that, so on
   // `sp-creep-v1` the decorative row ran unbroken straight past the frontage
   // the drill points at, and the shelter that now stands there was behind a
   // parked car from the driving seat: „I stopped at my bus stop" with the bus
@@ -1137,8 +1144,12 @@ export function parkedClearZonesFor(
     // `computeParkedCars`: SIX decoration bodies stand inside the authored bay
     // (y = 129.8, 136.4, 149.6, 156.2, 162.8, 169.4 at the x = 18.25 kerb),
     // i.e. six private cars parked in the bus stop the drill is about, on a
-    // street whose every metre is also a `busLane` zone (ЗДвП чл. 98, ал. 1 —
-    // спиране и престой на спирка е забранено).
+    // street whose every metre is also a `busLane` zone — and a parked car is
+    // exactly what ЗДвП чл. 98, ал. 2, т. 3 bans at a spirka («паркирането е
+    // забранено … на спирките на превозните средства от редовните линии за
+    // обществен превоз на пътници»; чл. 69 allows another car only a stop to
+    // let passengers alight). This comment used to attribute the ban to чл. 98,
+    // ал. 1, which names no spirka (founder rulings 2026-09-22).
     //
     // Derived, no list, same doctrine as rules 2/3: the span and the kerb both
     // come from the district's OWN authored numbers. The kerb line is where the

@@ -408,6 +408,56 @@ export interface DerivedRoute extends ArcSampledPath {
    * BEFORE the current waypoint, but it is not yet the task).
    */
   goalS: number;
+  /**
+   * WHERE `alignRawToGoalLane` BENT THIS ROUTE, or `null` when it applied no
+   * shift (goal on the centreline, off-road, a gate, a ring). Optional in the
+   * type so a hand-built route need not carry it; `deriveGuidanceRoute`
+   * always sets it. See `LaneAlignSpan`.
+   *
+   * DEV-PROBE DATA ONLY (W59 steering spec §3.2, founder RULING-2): it is
+   * computed AFTER every painted value above is final, from inputs it does not
+   * mutate, and nothing that paints or grades reads it —
+   * `guidance-lane-align-span.test.ts` pins both (the painted geometry of
+   * every shipped district's routes is byte-identical to 2c6d3cb, and no file
+   * but this one and `devrig/roadProbe.ts` names the field).
+   */
+  laneAlign?: LaneAlignSpan | null;
+}
+
+/**
+ * The lane-align shift as `alignRawToGoalLane` APPLIED it, in THIS route's
+ * own arclength (the `arc` array above), so a reader never has to guess it
+ * from the turn markers. The weight the shift is multiplied by is
+ *
+ *   w = w0 → 1 over [legStartS, rampEndS]   (the EASE-IN: heading manufactured)
+ *   w = 1      over [rampEndS, holdToS]     (a parallel offset: none manufactured)
+ *   w = 1 → 0  over [holdToS, decayEndS]    (the DECAY: heading manufactured)
+ *   w = 0      everywhere else              (the route as the graph gave it)
+ *
+ * Each mark is a raw-route sample carried to the final route exactly as
+ * `finalizeRoute` carries the ACTIVE waypoint to `goalS`: through
+ * `roundCorners`' kept index, then the rounded arclength's nearest
+ * DENSIFY_STEP_M sample. The final 3-tap smoothing pass is NOT folded in — it
+ * spreads each kink one sample either side, and that reach is the reader's to
+ * apply (it is `DENSIFY_STEP_M`, a constant it can pin).
+ */
+export interface LaneAlignSpan {
+  /** Where the ease-in opens: the last junction before the goal (0 when none). */
+  legStartS: number;
+  /** Where w reaches 1: legStartS + rampInM, carried to this route's arc. */
+  rampEndS: number;
+  /** `min(LANE_ALIGN_RAMP_M, goal − legStart)`, raw metres — the product's own number. */
+  rampInM: number;
+  /** The goal's projection, where the offset was measured. */
+  goalS: number;
+  /** How far past the goal w = 1 is held (the goal, or a same-lane look-ahead waypoint). */
+  holdToS: number;
+  /** Where the decay reaches w = 0 (holdToS + LANE_ALIGN_RAMP_M, or the route's end). */
+  decayEndS: number;
+  /** The signed offset along the route's right normal, metres. */
+  offsetM: number;
+  /** The ease-in's opening weight (the driver's own offset; 0 after a junction). */
+  w0: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -2248,7 +2298,7 @@ function alignRawToGoalLane(
   splitIdx?: number,
   start?: { x: number; y: number },
   next?: { x: number; y: number },
-): { offset: number; splitIdx: number | undefined } {
+): { offset: number; splitIdx: number | undefined; span?: RawLaneAlignSpan } {
   if (raw.points.length < 2) return { offset: 0, splitIdx };
   // A shortest path over a single edge comes back as TWO points, and
   // densification happens later in finalizeRoute — so a ramp applied to the
@@ -2355,7 +2405,63 @@ function alignRawToGoalLane(
       src[i][1] + (-(b[0] - a[0]) / len) * offset * w,
     ];
   }
-  return { offset, splitIdx: newSplitIdx };
+  // WHERE THE SHIFT WAS APPLIED — read-only over `s`, after every point above
+  // is written, so it cannot change one of them. Each mark is the OUTERMOST
+  // sample of its weight change: the last sample at or before a span's start,
+  // the first at or after its end — the vertices that carry the kink.
+  const lastAtOrBefore = (x: number): number => {
+    let k = 0;
+    for (let i = 1; i < s.length; i++) if (s[i] <= x + EPS) k = i;
+    return k;
+  };
+  const firstAtOrAfter = (x: number): number => {
+    for (let i = 0; i < s.length; i++) if (s[i] >= x - EPS) return i;
+    return s.length - 1;
+  };
+  const span: RawLaneAlignSpan = {
+    legStartIdx: lastAtOrBefore(legStartS),
+    rampEndIdx: firstAtOrAfter(legStartS + rampIn),
+    goalIdx: gi,
+    holdToIdx: lastAtOrBefore(holdToS),
+    decayEndIdx: firstAtOrAfter(holdToS + LANE_ALIGN_RAMP_M),
+    rampInM: rampIn,
+    offsetM: offset,
+    w0,
+  };
+  return { offset, splitIdx: newSplitIdx, span };
+}
+
+/** `alignRawToGoalLane`'s applied span, as indices into the (subdivided,
+ *  shifted) raw points — `finalizeRoute` carries them to the final arc. */
+interface RawLaneAlignSpan {
+  legStartIdx: number;
+  rampEndIdx: number;
+  goalIdx: number;
+  holdToIdx: number;
+  decayEndIdx: number;
+  rampInM: number;
+  offsetM: number;
+  w0: number;
+}
+
+/**
+ * A raw-route sample → the final route's arclength, by the SAME steps
+ * `finalizeRoute` takes the active waypoint to `goalS`: `roundCorners`' kept
+ * index (it is pure over `points`), the rounded arclength up to it, the
+ * nearest DENSIFY_STEP_M sample. Reads; writes nothing.
+ */
+function finalArcOfRawIndex(
+  points: readonly [number, number][],
+  idx: number,
+  arc: Float32Array,
+  count: number,
+): number {
+  const { points: rounded, keptAt } = roundCorners(points as [number, number][], idx);
+  let len = 0;
+  for (let i = 1; i <= Math.min(keptAt, rounded.length - 1); i++) {
+    len += Math.hypot(rounded[i][0] - rounded[i - 1][0], rounded[i][1] - rounded[i - 1][1]);
+  }
+  return arc[Math.max(0, Math.min(count - 1, Math.round(len / DENSIFY_STEP_M)))];
 }
 
 /**
@@ -2427,7 +2533,11 @@ function concatRaw(a: RawRoute, b: RawRoute): { raw: RawRoute; splitIdx: number 
   return { raw: { points, jointIdx }, splitIdx };
 }
 
-function finalizeRoute(raw: RawRoute, splitIdx?: number): DerivedRoute | null {
+function finalizeRoute(
+  raw: RawRoute,
+  splitIdx?: number,
+  alignSpan?: RawLaneAlignSpan,
+): DerivedRoute | null {
   const pending = turnsFromRaw(raw);
   const keepIdx = splitIdx ?? raw.points.length - 1;
   const { points: rounded, keptAt } = roundCorners(raw.points, keepIdx);
@@ -2520,7 +2630,24 @@ function finalizeRoute(raw: RawRoute, splitIdx?: number): DerivedRoute | null {
   );
   const goalS = splitIdx === undefined ? totalLen : arc[splitSample];
 
-  return { pts, arc, count, totalLen, turns, goalS };
+  // THE LANE-ALIGN SPAN, for the dev probe only (see `LaneAlignSpan`). Every
+  // painted value above is final before this line; it reads `raw.points` and
+  // `arc` and writes neither.
+  const at = (idx: number) => finalArcOfRawIndex(raw.points, idx, arc, count);
+  const laneAlign: LaneAlignSpan | null = alignSpan
+    ? {
+        legStartS: at(alignSpan.legStartIdx),
+        rampEndS: at(alignSpan.rampEndIdx),
+        rampInM: alignSpan.rampInM,
+        goalS: at(alignSpan.goalIdx),
+        holdToS: at(alignSpan.holdToIdx),
+        decayEndS: at(alignSpan.decayEndIdx),
+        offsetM: alignSpan.offsetM,
+        w0: alignSpan.w0,
+      }
+    : null;
+
+  return { pts, arc, count, totalLen, turns, goalS, laneAlign };
 }
 
 // ---------------------------------------------------------------------------
@@ -2679,6 +2806,7 @@ export function deriveGuidanceRoute(
   // all. The `LANE_ALIGN_MAX_M` bound already refused it (the ribbon rides
   // 17.85–25.78 m from the centre, an order of magnitude past two lane
   // pitches), so this is a statement of intent rather than a behaviour change.
+  let alignSpan: RawLaneAlignSpan | undefined;
   if (
     goal.kind === "point" &&
     goal.shape?.kind !== "gate" &&
@@ -2702,9 +2830,11 @@ export function deriveGuidanceRoute(
       firstAhead.offRoad !== true
         ? { x: firstAhead.x, y: firstAhead.y }
         : undefined;
-    splitIdx = alignRawToGoalLane(acc, goal.x, goal.y, splitIdx, start, nextInLane).splitIdx;
+    const aligned = alignRawToGoalLane(acc, goal.x, goal.y, splitIdx, start, nextInLane);
+    splitIdx = aligned.splitIdx;
+    alignSpan = aligned.span;
   }
-  return finalizeRoute(acc, splitIdx);
+  return finalizeRoute(acc, splitIdx, alignSpan);
 }
 
 // ---------------------------------------------------------------------------

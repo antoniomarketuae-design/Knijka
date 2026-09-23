@@ -521,6 +521,10 @@ export const SC_VU_CYCLIST_HOOK: ScenarioSpec = {
   ],
   staged: [VU_CYCLIST],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 2, and no structured channel carries it:
+  // «Още преди завоя провери дясното огледало и погледни през дясното рамо в мъртвата зона.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -826,6 +830,10 @@ export const SC_VU_EMERGENCY: ScenarioSpec = {
   ],
   staged: [EM_APPROACH],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in the objective, and no structured channel carries it:
+  // «провери огледалото, мигач надясно, отдръпни се към десния край и намали» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1475,6 +1483,17 @@ export const SC_VU_PASS_CLEARANCE: ScenarioSpec = {
     l5Wet(),
   ],
   staged: [VU_PASS_CYCLIST],
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» (row
+  // sc-vu-pass-clearance:d770323a): the judge saw the left door glass blank «in
+  // any frame» on MEDIUM, in a lesson whose step 3 is «Огледало, мигач наляво и
+  // се отмести осезаемо наляво» and whose examiner line grades «огледало и
+  // мигач преди отместването». Neither demand reaches a structured channel —
+  // this drill authors no observation rubric and its two mistake demos are
+  // coded VULNERABLE_PASS_TOO_CLOSE, not the mirror-check code — so the task's
+  // reliance on the door mirror is DECLARED here rather than read out of the
+  // prose (doorMirrorTask.ts says why prose is not a signal). Render-only:
+  // MirrorRig keeps the door glass live on MEDIUM for this drill.
+  doorMirrorsInTask: true,
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

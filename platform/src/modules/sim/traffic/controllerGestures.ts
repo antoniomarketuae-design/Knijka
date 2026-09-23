@@ -35,8 +35,10 @@
  *
  * The long-form teaching text — `poseBg` / `goBg` / `stopBg` / `priorityBg` in
  * `CONTROLLER_GESTURES` — stays where it is and is what the debrief and the
- * lesson copy use. These strings are its caption: the same three answers, cut
- * to what stays readable on a billboard 30–60 m away in a moving cockpit.
+ * lesson copy use. These strings are its caption, cut to what stays readable
+ * on a billboard 30–60 m away in a moving cockpit — and since the founder's
+ * «short card» ruling (2026-09-22, see `CONTROLLER_BUBBLES`) that means three
+ * lines: the posture's name, who goes / who stops, and the law.
  *
  * THE FOURTH CATALOGUE (2026-08-09). Three surveys of „where does the simulator
  * cite law" named the scenario templates and the 58-entry rule catalogue and
@@ -79,7 +81,9 @@ export type ControllerBubblePosture = "sideProfile" | "chestOrBack" | "armRaised
  * (`scenario/types.ts` SCENARIO_LEVEL_NAMES_BG). The rungs that promise LESS
  * help now deliver less of it:
  *
- *   L1 «Пълна помощ»      `"full"`     six lines — the answer, as authored.
+ *   L1 «Пълна помощ»      `"full"`     the SHORT card (founder, 2026-09-22):
+ *                                      posture name, who goes / who stops in
+ *                                      one line, the law. Still the answer.
  *   L2 «Частична помощ»   `"posture"`  the POSE, named and legible; the rule is
  *                                      the student's to apply. Partial help is
  *                                      exactly this split — the product does
@@ -108,18 +112,15 @@ export function controllerCaptionDetailForLevel(
 
 export interface ControllerBubbleCopy {
   posture: ControllerBubblePosture;
-  /** The verdict for the driver reading it, in two or three words. */
-  headlineBg: string;
   /**
-   * WHAT HE IS DOING, not what you should do — the whole card at `"posture"`
-   * detail, and the line the reading exercise is built on.
+   * WHAT HE IS DOING, not what you should do — the header of the L1 card and
+   * the whole card at `"posture"` detail, the line the reading exercise is
+   * built on.
    *
-   * It is a NAME and not a sentence on purpose: two words at 84 px of a 540 px
-   * canvas is ≈11 CSS px of cap height on a 3× phone, against the ≈5.5 px the
-   * six-line card's body lines measure (`TrafficLayer.tsx`, the mip-chain
-   * block). `poseBg` cannot be enlarged into that slot — at 44 px it already
-   * paints 939 texture px into a 936 px ink box, i.e. it is AT the shrink clamp
-   * — which is why this is its own field rather than a reuse.
+   * It is a NAME and not a sentence on purpose: two words at 112 px of a 540 px
+   * canvas is ≈2× the cap height the old six-line card's body lines measured
+   * (`TrafficLayer.tsx`, `BUBBLE_POSTURE_LINE_PX`), which is the size half of
+   * `sc-sig-controller-postures:ef0e821c`.
    *
    * The words are the law's own vocabulary, retrieved from the ППЗДвП text
    * quoted verbatim in `lessons/scenario/templates-signals.ts`
@@ -127,100 +128,78 @@ export interface ControllerBubbleCopy {
    * («страничен профил … гърди или гръб … вдигната ръка»), never invented here.
    */
   postureNameBg: string;
-  /** What the student is physically looking at. */
-  poseBg: string;
-  /** Who may go. */
-  goBg: string;
-  /** Who must stop. */
-  stopBg: string;
   /**
-   * WHOSE PRIORITY IT IS — his third question, and the one the card was
-   * missing (B41, 2026-08-10).
+   * WHO GOES AND WHO STOPS, IN ONE SHORT LINE — the answer the L1 card still
+   * gives (founder ruling 2026-09-20) on the short card he ruled on 2026-09-22.
    *
-   * „who is he letting go" and „whos turn its to pass" are not the same
-   * question and the drill is built on the difference: `goBg` says which
-   * direction is moving, this says who OUTRANKS whom, and on every one of the
-   * three postures the answer turns on the same clause — the officer beats the
-   * lamp (ЗДвП чл. 7). Without it the card can be read as „the green light and
-   * the officer agree", which is exactly the belief the authored mistake
-   * `mistake-barge-chest` grades as an опасна грешка. The authored long form is
-   * `CONTROLLER_GESTURES[i].priorityBg`; this is that answer cut to a line.
+   * Cut from the authored bank's own words (`CONTROLLER_GESTURES[i].goBg` /
+   * `.stopBg`: «Минаваш ТИ…», «Спира напречното направление…», «Спираш ТИ…»,
+   * «Спират ВСИЧКИ посоки…», «Никой.»), never re-worded into something the
+   * bank does not say. ≤ 30 characters so it paints at its authored size on
+   * the painter test's unforgiving 0.62 em/char stub.
+   *
+   * It says nothing about the ARMS, on purpose — `officerArmTarget` is
+   * posture-blind, so an arm cue would teach the halt posture as permission
+   * (`mistake-barge-chest`); the name line above carries the body, which is the
+   * discriminator the law gives («срещу лявото или дясното рамо»).
    */
-  priorityBg: string;
-  /** Accent colour for the headline + border: red = spri, green = minavaj,
-   *  amber = vnimanie. */
+  answerBg: string;
+  /** Accent colour for the posture name + border: red = spri, green = minavaj,
+   *  amber = vnimanie. L1 gives the answer, so it may give it in colour too;
+   *  the `"posture"` card drops it (`BUBBLE_POSTURE_BORDER`). */
   accent: string;
+  /** The citation, RETRIEVED — equal to `CONTROLLER_GESTURES[i].lawRef`
+   *  (ADR-002, pinned by `controller-bubble.test.ts`). */
   lawRef: string;
 }
 
+/**
+ * ── 2026-09-22 · FOUNDER RULING «SHORT CARD» (sc-sig-controller-postures:ef0e821c)
+ *
+ * „The controller's speech billboard is five lines of tiny multi-coloured text,
+ * unreadable at native phone size." The ladder above fixed L2+ and left L1 on
+ * the six-line card — headline, pose, «Минава:», «Спира:», «Предимството…», law
+ * — in five inks, because L1 is «Пълна помощ» and must give the answer. The
+ * ruling keeps that (the 2026-09-20 ruling: L1 GIVES THE ANSWER) and changes
+ * its shape: posture name, ONE short line of who goes / who stops, and the law
+ * reference. Three lines, two inks plus the accent.
+ *
+ * WHAT LEFT THE CARD, and where it still lives. `headlineBg`, `poseBg`, `goBg`,
+ * `stopBg` and `priorityBg` were painted only here; with the card short they
+ * would be exported copy nothing reads — the dead-data class this tree has
+ * learned to refuse — so they are removed, not parked. Their long forms stay in
+ * the authored bank (`CONTROLLER_GESTURES`, which the lessons and debrief own),
+ * and the priority clause — the officer outranks the lamp — stays on the card
+ * as its citation, ЗДвП чл. 7, and in the three drills' `instructionsBg`.
+ *
+ * L2 («Частична помощ», `"posture"`) and L3+ (`"off"`) are NOT touched: they
+ * never painted the six-line card, and the short card is `"full"` only.
+ */
 export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
   {
     posture: "sideProfile",
-    headlineBg: "МИНАВАШ ТИ",
     postureNameBg: "СТРАНИЧЕН ПРОФИЛ",
-    /**
-     * THE ARMS THE CAPTION NAMED WERE NEVER THE ARMS ON SCREEN (sweep161,
-     * `sc-signal-controller/mobile-right/04-t076s.png`).
-     *
-     * This line shipped as „Виждаш го СТРАНИЧНО, ръцете долу". Cropped at 2×
-     * out of that frame the officer holds BOTH arms straight out horizontally,
-     * and he has to: `TrafficLayer.officerArmTarget` sets
-     * `lat = ±OFC_ARM_OUT_RAD` (1.47 rad) for every posture that is not
-     * „внимание", and `OFC_ARM_FWD_RAD` (0.44) was added by FR-OFC-ARMS
-     * precisely so those arms have a silhouette when the driver sees the
-     * PROFILE — i.e. the engine spent a fix making the arms visible in exactly
-     * the pose whose caption told the student they would be down.
-     *
-     * THE MESH IS RIGHT AND THE COPY WAS WRONG, which is why the repair is
-     * here and not in the renderer. ППЗДвП, retrieved verbatim in
-     * `templates-signals.ts`: „ръка или ръце, протегнати хоризонтално встрани
-     * — след като е подал този сигнал, регулировчикът МОЖЕ да свали ръката или
-     * ръцете си". Extended is the signal; lowered is a permitted follow-on.
-     * A caption may name either, but it may not name the one the frame is not
-     * showing.
-     *
-     * SO WHY DOES THE NEW LINE NOT SAY „ръцете настрани" EITHER? Because the
-     * arms are not the discriminator, and naming them would hand the student
-     * the wrong cue in the more dangerous direction. `officerArmTarget` does
-     * not take a posture — the SAME officer with the SAME arms out is
-     * „минавай" for the drivers at his shoulders and „спри" for the drivers at
-     * his chest and back. A student who learns „arms out = go" reads the halt
-     * posture as permission, which is `mistake-barge-chest`. The law puts it
-     * on the shoulder, not the limb — „за водачите, които се намират срещу
-     * лявото или дясното рамо" — so the line names the shoulder and keeps the
-     * СТРАНИЧНО / анфас pairing with `chestOrBack`'s pose line, which is the
-     * contrast the drill is actually built on.
-     *
-     * 37 characters against the 40-char billboard cap.
-     * `controller-bubble.test.ts` drives `officerArmTarget` and fails this
-     * caption if it ever describes an arm state the renderer does not hold.
-     */
-    poseBg: "Виждаш го СТРАНИЧНО — срещу рамото му",
-    goBg: "Минава: ти и цялата твоя посока",
-    stopBg: "Спира: напречното направление",
-    priorityBg: "Предимството е ТВОЕ — дори на червено",
+    // goBg «Минаваш ТИ и всички по твоята посока…» + stopBg «Спира напречното
+    // направление…».
+    answerBg: "Минаваш ТИ, напречното спира",
     accent: "#3ddc84",
     lawRef: "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7",
   },
   {
     posture: "chestOrBack",
-    headlineBg: "СПРИ",
     postureNameBg: "ГЪРДИ ИЛИ ГРЪБ",
-    poseBg: "Обърнат е с ГЪРДИ или ГРЪБ към теб",
-    goBg: "Минава: напречното направление",
-    stopBg: "Спираш: ти, преди стоп-линията",
-    priorityBg: "Предимството НЕ е твое — и на зелено",
+    // stopBg «Спираш ТИ, преди стоп-линията…» + goBg «Минава напречното
+    // направление…».
+    answerBg: "Спираш ТИ, напречното минава",
     accent: "#ff6a5a",
     lawRef: "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7",
   },
   {
     posture: "armRaised",
-    headlineBg: "ВНИМАНИЕ",
     postureNameBg: "ВДИГНАТА РЪКА",
-    poseBg: "Ръката му е ВДИГНАТА нагоре",
-    goBg: "Минава: никой — това не е „тръгвай“",
-    stopBg: "Спират: всички посоки — сменя фазите",
-    priorityBg: "Предимството не е ничие — чакат всички",
+    // stopBg «Спират ВСИЧКИ посоки…» + goBg «Никой. Вдигнатата ръка не пуска
+    // никого…».
+    answerBg: "Спират ВСИЧКИ, никой не минава",
     accent: "#ffb020",
     lawRef: "ППЗДвП сигнали на регулировчика",
   },

@@ -486,6 +486,10 @@ export const SC_OV_NIGHT_GAP: ScenarioSpec = {
   ],
   staged: [OVN_LEAD_CAR, OVN_STREAM],
   conditions: { weather: "dry", night: true },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 5, and no structured channel carries it:
+  // «Чак когато насрещната лента остане СЪВСЕМ тъмна: огледало, ляв мигач и решително изпреварване» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1286,6 +1290,10 @@ export const SC_OV_CREST_CURVE: ScenarioSpec = {
   ],
   staged: [OVCC_LEAD_TRUCK, OVCC_STREAM],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 5, and no structured channel carries it:
+  // «Чак когато видиш свободен насрещен участък за ЦЯЛАТА маневра: огледало, ляв мигач, решително изпреварване.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1574,6 +1582,10 @@ export const SC_OV_SOLID_RETURN: ScenarioSpec = {
   ],
   staged: [OVS2_LEAD_CAR, OVS2_STREAM],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 4, and no structured channel carries it:
+  // «Щом насрещното платно се изчисти, ЗАПОЧНИ ВЕДНАГА: огледало, ляв мигач, решително излизане.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1822,6 +1834,10 @@ export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
   ],
   staged: [LNBD_CRAWLER],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 3, and no structured channel carries it:
+  // «По реда: огледало, ляв мигач, поглед през рамо, после плавно излизане в лявата лента.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 

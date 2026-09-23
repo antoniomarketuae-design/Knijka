@@ -292,7 +292,9 @@ describe("§I11 + §W2 the read mode stops the car, and that is what earns it th
     // flex column item refuses to shrink below its content without it).
     const section = OVERLAY.slice(OVERLAY.indexOf("pointer-events-auto flex w-full max-w-2xl"));
     expect(section.slice(0, 200)).toContain("overflow-hidden");
-    expect(OVERLAY).toMatch(/className="min-h-0 min-w-0 shrink overflow-y-auto"/);
+    // (`landscape:flex-1` may follow since 2026-09-22 — the landscape rail
+    // lays the sheet out as a row; `min-h-0` is still the first token.)
+    expect(OVERLAY).toMatch(/className="min-h-0 min-w-0 shrink overflow-y-auto(?: [^"]*)?"/);
   });
 
   it("the «⤢» expand is gone, with the cap it was the escape hatch from", () => {

@@ -4843,13 +4843,23 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // same breach, so it must not be able to drift apart from the bill on the
   // predicate that decides whether the car may stand here at all.
   const banZoneRestReset = tick.noStopZone !== true || speed > cfg.movingSpeedKmh;
+  // AT A SPIRKA THE LAW ALLOWS THE DROP-OFF (founder follow-up ruling
+  // 2026-09-22, «Teach чл. 69 as written»). чл. 69 lets other vehicles stop at a
+  // bus stop «само за слизане на пътници», so a rest there is an offence only
+  // once it is no longer one — паркиране (чл. 93, ал. 2), which чл. 98, ал. 2,
+  // т. 3 bans at the stops. Every other basis keeps the 4 s sustain unchanged;
+  // `RuleEngineConfig.busStopDropOffMaxSec` carries the number and says whose
+  // it is (ours, not the act's). The re-grade below rides the same sustain, so
+  // it stays strictly later than the bill.
+  const banZoneRestSec =
+    tick.noStopBasis === "law-bus-stop" ? cfg.busStopDropOffMaxSec : cfg.banZoneStopRestSec;
   if (
     stepEpisode(
       s.banZoneStop,
       illegalBanRest,
       banZoneRestReset,
       t,
-      cfg.banZoneStopRestSec,
+      banZoneRestSec,
     )
   ) {
     events.push(makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t, { detail: tick.noStopBasis }));
@@ -4866,7 +4876,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       illegalBanRest,
       banZoneRestReset,
       t,
-      cfg.banZoneStopRestSec + BAN_ZONE_REST_REGRADE_SEC,
+      banZoneRestSec + BAN_ZONE_REST_REGRADE_SEC,
     )
   ) {
     // THE SAME `detail` AS THE BILL ABOVE, and it is not optional garnish: the

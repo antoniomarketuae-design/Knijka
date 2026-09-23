@@ -1322,80 +1322,21 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // rest the law on authoring provenance — the defect `rules/types.ts`
     // NoStopBasis was written to avoid, one field over from `signRef`.
     //
-    // WHAT IS STILL TRUE, AND IT IS ONE MAP: sc-pk-busstop-ban. pk-busstop-v1's
-    // two spans (`pkbs-z-stop-marking`, `pkbs-z-stop-pocket`) declare no basis,
-    // so that drive still convicts «под знак В27».
+    // THE BUS-STOP MAP NO LONGER RESOLVES HERE — founder ruling 2026-09-22,
+    // «Convict under чл. 69» (sc-pk-busstop-ban:b103c282). Until then
+    // pk-busstop-v1's two spans (`pkbs-z-stop-marking`, `pkbs-z-stop-pocket`)
+    // declared no basis, so the drive convicted «под знак В27» under a В27 face
+    // that `world/builders/zoneSigns.ts` derived from the zone kind alone — a
+    // plate a real Sofia spirka does not carry — while чл. 98, ал. 1 (the
+    // span's authored ref) names no spirka at all. Both spans now declare
+    // `basis: "law-bus-stop"`, resolve to NO_STOP_BASIS_COPY["law-bus-stop"]
+    // (ЗДвП чл. 69, quoted verbatim there from content/law/acts/zdvp.json), and
+    // zoneSigns posts no plate for that basis (`zonePostsPlate`). The history
+    // of the contested grounds is in the NO_STOP_BASIS_COPY docblock.
     //
-    // AND THE WORLD AGREES WITH THE CARD — CORRECTED 2026-09-18, because what
-    // stood here said the opposite and said it as a measurement. It claimed the
-    // district „ships `signs: []` and no `markings` — zero В27 plates". Three
-    // things are wrong with that, in rising order of consequence.
-    //   (1) NEITHER FIELD EXISTS. Walking content/world: a top-level `signs` key
-    //       appears in 0 of 106 documents, and the string „markings" in 0 of
-    //       106. There is no array to be empty, and „no markings" was true of
-    //       every map in the corpus, so it said nothing about this one. Both are
-    //       BUILT, not authored (`WorldGeometry.markings`, `world/types.ts`:912).
-    //   (2) THE POSTS ARE DERIVED FROM THE ZONE KIND. `world/builders/
-    //       zoneSigns.ts` — `ZONE_SIGN_KIND` (:199-201) maps
-    //       `noStopping: "noStopping"`, which is the В27 face
-    //       (`world/types.ts`:504), and the placing loop (:376-384) branches on
-    //       `zone.kind` alone: the strings `zone.signRef` and `zone.basis` occur
-    //       ZERO times in that file. A В27 goes up at every noStopping span
-    //       start whatever the map says the ban rests on.
-    //   (3) SO THIS MAP GETS TWO, NOT ZERO.
-    //       `world/__tests__/pk-busstop-districts.test.ts`:379 pins exactly
-    //       that — `expect(world.stats.signs.noStopping).toBe(2)` — and passes
-    //       at HEAD.
-    //
-    // WHICH MAKES THE REAL DEFECT THE SUBTLER ONE, and worse than a card talking
-    // about a plate that is not there. The card and the world AGREE — both say
-    // В27 — and they are agreeing on furniture the test beside them already
-    // calls wrong. Its own words, :372-375: „posts one В27 face per span, though
-    // a real spirka is posted with a Д-group plate … Here the ban is law+marking
-    // implied, so these two posts are wrong-but-harmless furniture: render-only,
-    // and grading reads the spans, never the posts." Harmless while nothing
-    // cites them — but this row's `explanationBg` and `lawRef` DO cite them, so
-    // the student is shown a В27, charged under a В27, and the plate holding the
-    // whole account up is one the builder invented. The map's own authoring even
-    // names the true ground and the builder discards it: both spans carry a
-    // `signRef` — „ЗДвП-98-1 / Наредба № 2/2001 — зигзаг" and „ЗДвП-98-1 —
-    // спирка" — and zoneSigns never reads the field.
-    //
-    // THE EXIT IS ALREADY NAMED IN THE TREE, at pk-busstop-districts.test.ts
-    // :376-377: „a `posted?: boolean` on DistrictZone (default true ⇒ every
-    // shipped map byte-identical) that zoneSigns honours; then this expects 0."
-    // No such field exists today (`runtime/district.ts`:253, `world/types.ts`
-    // :292) and the default is what makes it safe: every other map keeps its
-    // posts unchanged.
-    //
-    // AND THE FLAG ALONE WOULD MAKE THIS CARD WORSE, not better. Take the face
-    // away and «под знак В27» cites a plate that then truly does not exist —
-    // today at least the student can see the thing he is being charged under.
-    // The pair only works if the removal is accompanied by a GROUND for the
-    // bus-stop ban, and that half is blocked on content truth, not engineering.
-    // Read back from content/law/acts/zdvp.json: чл. 98, ал. 1 is a closed list
-    // of eight places and none of them is a спирка; ал. 2, т. 3 does name the
-    // спирки, but ал. 2 opens «Освен в посочените в ал. 1 случаи ПАРКИРАНЕТО е
-    // забранено» — a chapeau about ПАРКИРАНЕТО, while these spans are
-    // `noStopping` (ПРЕСТОЙ). So no чл. 98 клауза fits these two spans AS
-    // AUTHORED.
-    //
-    // ⚠ CORRECTED 2026-09-19. This paragraph used to continue «the act's only
-    // spirka clause is ал. 2, т. 3» and «the real ban is a зигзаг МАРКИРОВКА
-    // this map does not paint» — two claims about what the act does NOT contain,
-    // made without enumerating it, which is itself the ADR-002 breach it was
-    // warning against. Enumerated: NINE units of zdvp.json mention «спирк»
-    // (чл. 65, 66, 67, 68, 69, 80а, 98, 115, 183), and чл. 69 is a statutory
-    // restriction on OTHER vehicles stopping at a spirka that needs no plate and
-    // no marking — see the NO_STOP_BASIS_COPY docblock, which quotes it verbatim
-    // and records the corroborating чл. 183, ал. 4, т. 8. The ground is
-    // CONTESTED (чл. 69 · the unpainted зигзаг · re-authoring as `noParking`),
-    // not absent; PICKING one is still not this lane's to do, and inventing one
-    // would be authored law — ADR-002's exact prohibition. It is
-    // FOUNDER-GATED: `world/__tests__/no-stop-basis-declared.test.ts` holds both
-    // span ids in AWAITING_FOUNDER_RULING, records the two options (re-cite to
-    // the marking and paint it, or re-author the spans as `noParking`), and goes
-    // red if the exception ever becomes two districts.
+    // THIS STRING STAYS В27-WORDED, and now it is true everywhere it prints:
+    // every span that still resolves to the pooled row is one of the 7 plated
+    // spans of the six В27 districts.
     //
     // AND SOFTENING *THIS* STRING WAS WEIGHED AND REFUSED. Walking both bases
     // here, the way `correctiveBg` below had to, would cost the 7 plated spans
@@ -1416,9 +1357,12 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // about phone controls), exactly as RAIL_CROSSING_ACT_COPY's docblock
     // records for its own corrective. So it has to be true of BOTH bases, and
     // the way to do that is the way the rail row did it: walk every branch.
+    // The bus-stop branch (founder ruling 2026-09-22, чл. 69) joined the walk
+    // the day its basis was added — its wording restates the article's two
+    // conditions and no more (see NO_STOP_BASIS_COPY["law-bus-stop"]).
     peekBg: "Спрялата кола закрива видимостта.",
     correctiveBg:
-      "Преди да спреш, огледай участъка: под знак В27 не спираш изобщо. Но забраната често не е закачена на стълб — законът сам забранява престоя на кръстовище и до 5 м от него, на пешеходна пътека и до 5 м преди нея, върху и до релси, и до вече спряла кола от страната на движението (ЗДвП чл. 98, ал. 1). Подмини участъка и спри чак след края му — на разрешено място, плътно вдясно до бордюра.",
+      "Преди да спреш, огледай участъка: под знак В27 не спираш изобщо. Но забраната често не е закачена на стълб — законът сам забранява престоя на кръстовище и до 5 м от него, на пешеходна пътека и до 5 м преди нея, върху и до релси, и до вече спряла кола от страната на движението (ЗДвП чл. 98, ал. 1). А на автобусна спирка другите коли спират само за слизане на пътници и само ако не пречат на автобуса (ЗДвП чл. 69). Подмини участъка и спри чак след края му — на разрешено място, плътно вдясно до бордюра.",
     // CITATION CORRECTED 2026-08-09. This cited чл. 98, and чл. 98, ал. 1 was
     // read in full: it is a CLOSED list of eight places where the LAW ITSELF
     // bans stopping (junctions, crossings, bridges, tram rails, …) and it
@@ -2980,23 +2924,15 @@ export const HANDBRAKE_ACT_COPY: Record<
  * for a sign. That is ADR-002's core prohibition, in the direction that costs
  * the student: a citation the runtime never establishes.
  *
- * AND THERE IS A FIFTH STATUTE-GROUNDED DISTRICT THIS ENUM DOES NOT SERVE —
- * corrected 2026-09-19. This block read «Five shipped districts» and then named
- * four, and the number was not a typo for the list: pk-busstop-v1 authors two
- * more law-implied spans («ЗДвП-98-1 / Наредба № 2/2001 — зигзаг» and
- * «ЗДвП-98-1 — спирка»), so counted by AUTHORING the statute the districts
- * really are five. What makes it four is the predicate this table turns on —
- * DECLARING a `basis` — and pk-busstop-v1 declares none, deliberately. It is
- * the one documented exception, held by name (`pkbs-z-stop-marking`,
- * `pkbs-z-stop-pocket`) in `world/__tests__/no-stop-basis-declared.test.ts`
- * AWAITING_FOUNDER_RULING — AND THE GROUND IS CONTESTED, NOT ABSENT.
- *
- * CORRECTED 2026-09-19. What stood here said «the act's only spirka клауза is
- * ал. 2, т. 3» and «what really bans престой there is the зигзаг маркировка,
- * which this district does not paint». Both are claims about what the act does
- * NOT contain, written without enumerating it — the one thing ADR-002 forbids —
- * and the act refutes both. Enumerated rather than recalled, NINE units of
- * `content/law/acts/zdvp.json` mention «спирк»:
+ * THE FIFTH STATUTE-GROUNDED DISTRICT — pk-busstop-v1 — IS NOW SERVED, BY
+ * FOUNDER RULING 2026-09-22 («Convict under чл. 69», row
+ * sc-pk-busstop-ban:b103c282). Its two spans used to declare no basis and were
+ * held by name in `world/__tests__/no-stop-basis-declared.test.ts`
+ * AWAITING_FOUNDER_RULING, because the ground was contested between three
+ * options: чл. 69, the зигзаг маркировка (Наредба № 2/2001 — index-only in
+ * content/law/sources.json, so no clause of it can be cited), or re-authoring
+ * the spans as `noParking`. The founder chose чл. 69. Enumerated, not
+ * recalled, NINE units of `content/law/acts/zdvp.json` mention «спирк»:
  *
  *   node -e 'const a=JSON.parse(require("fs").readFileSync(
  *     "content/law/acts/zdvp.json","utf8"));
@@ -3004,9 +2940,8 @@ export const HANDBRAKE_ACT_COPY: Record<
  *     console.log(h.length, h.map(u=>u.ref).join(" "))'
  *   → 9 · чл. 65 чл. 66 чл. 67 чл. 68 чл. 69 чл. 80а чл. 98 чл. 115 чл. 183
  *
- * Of those, чл. 98 is the престой/паркиране article this span cites, and чл. 69
- * is the act's own rule for a car that is NOT the bus, at the spirka, with no
- * plate and no marking anywhere in it — retrieved verbatim:
+ * and чл. 69 is the act's own rule for a car that is NOT the bus, at the
+ * spirka, with no plate and no marking anywhere in it — retrieved verbatim:
  *
  *   «Чл. 69. (…) На спирка на превозните средства от редовните линии за обществен
  *    превоз на пътници други пътни превозни средства могат да спират само за
@@ -3014,31 +2949,32 @@ export const HANDBRAKE_ACT_COPY: Record<
  *    предназначена спирката. Престоят на таксиметрови автомобили с цел
  *    очакване на пътници е забранен.»
  *
- * The repo's own audited bank already reads it that way — `content/audits/
- * manevri-i-izprevarvane.audit.json`:19, on q-manevri-036, moves the ref OFF
- * чл. 68 with «the duty of OTHER drivers … is чл. 69 ЗДвП; чл. 68 regulates the
- * route vehicle's own stopping duties». And чл. 183, ал. 4, т. 8 fines a driver
- * who «неправилно престоява или паркира в зоната на … спирка за обществен
- * превоз на пътници» — the act sanctions an unlawful престой at a spirka, so it
- * cannot be that none is defined.
+ * чл. 183, ал. 4, т. 8 corroborates that the act knows a «зона» of the spirka:
+ * it fines a driver who «неправилно престоява или паркира в зоната на …
+ * спирка за обществен превоз на пътници». And чл. 98 stays out of it: ал. 1 is
+ * a closed list of eight places without a спирка, and ал. 2, т. 3 names the
+ * спирки under «Освен в посочените в ал. 1 случаи ПАРКИРАНЕТО е забранено» —
+ * parking, not престой.
  *
- * WHAT IS TRUE OF чл. 98 STAYS TRUE: ал. 1 is a closed list of eight places and
- * a спирка is not among them, and ал. 2, т. 3 does name «спирките на превозните
- * средства от редовните линии за обществен превоз на пътници» but under a
- * chapeau reading «Освен в посочените в ал. 1 случаи ПАРКИРАНЕТО е забранено» —
- * parking, not престой. That is why the bare «ЗДвП чл. 98, ал. 1» these two
- * spans carry cannot stand as authored.
+ * WHAT THE ROW MAY AND MAY NOT SAY. чл. 69 is a permission with two
+ * conditions, not a blanket ban: a car may stop at a spirka ONLY to let
+ * passengers alight, and ONLY if it does not hinder the bus. The row therefore
+ * quotes the article's own words (`ban-zone-basis-copy.test.ts` checks the
+ * quote is a verbatim substring of the retrieved unit) and never claims the
+ * stop is banned «дори за секунда» — that sentence, which the lesson used to
+ * attribute to чл. 98, ал. 1, is not in the act.
  *
- * SO THE OPEN QUESTION IS WHICH GROUND, NOT WHETHER ONE EXISTS: чл. 69; or the
- * зигзаг маркировка, which this district does not paint (pk-busstop-v1.json
- * carries NO `markings` key at all — the test's note calls it `markings: null`;
- * the key is absent, `"markings" in doc` is false); or re-authoring the spans
- * as `noParking`, which convicts nothing today. It keeps the pooled В27 row
- * until the founder picks one. Do not "fix" it by adding a basis: choosing
- * among grounds is the ruling's job, and this table may only select a row that
- * has already been reviewed.
+ * AND WHAT IT CONVICTS IS PARKING — founder follow-up ruling 2026-09-22,
+ * «Teach чл. 69 as written». A brief drop-off that hinders no bus is lawful,
+ * so the reducer bills a rest in a `law-bus-stop` span only once it outlasts
+ * `RuleEngineConfig.busStopDropOffMaxSec`: stopped beyond «ограничено време,
+ * необходимо за качване и слизане на пътници» (чл. 93, ал. 1) the car is
+ * паркирано (ал. 2), and that is the one act at a spirka чл. 98 does ban —
+ * ал. 2, т. 3. So чл. 98 comes back into this row, but as ал. 2, т. 3 (parking)
+ * and never as ал. 1 (престой). The hinder-the-bus half of чл. 69 is NOT graded:
+ * no channel on the tick reports a bus.
  *
- * THE CENSUS BEHIND BOTH NUMBERS, re-run 2026-09-19 over content/world — node,
+ * THE CENSUS BEHIND BOTH NUMBERS, re-run 2026-09-22 over content/world — node,
  * one pass, counting only authored `zones[]` entries with `kind: "noStopping"`:
  *
  *   node -e 'const fs=require("fs"),p=require("path"),d="content/world";
@@ -3049,8 +2985,11 @@ export const HANDBRAKE_ACT_COPY: Record<
  *     console.log(s.length,new Set(s.map(z=>z.f)).size,s.length-L.length,
  *       L.length,s.filter(z=>z.basis!=null).length,
  *       new Set(L.map(z=>z.f)).size)'
- *   → 16 spans · 11 districts · 7 plated · 9 law-implied · 7 declaring a basis
+ *   → 16 spans · 11 districts · 7 plated · 9 law-implied · 9 declaring a basis
  *     · 5 districts holding at least one law-implied span
+ *   (it read «7 declaring a basis» until the 2026-09-22 ruling added
+ *   pk-busstop-v1's two `law-bus-stop` spans — every law-implied span now
+ *   declares its clause.)
  *
  * Run it from the REPO ROOT, not platform/. And count `zones[]` only: a naive
  * recursive walk reports 18, because hz-accident-v1 and pk-ban-v1 each mirror
@@ -3197,6 +3136,33 @@ export const NO_STOP_BASIS_COPY: Record<
       "Спря на по-малко от два метра от релсите — толкова близо, че спрялата кола вече пречи на релсовото движение. Забранява го самият закон, без никакъв знак, и обърни внимание КАК: ЗДвП чл. 98, ал. 1, т. 4 не дава мярка в метри, а тест — „върху трамвайни и железопътни линии или в такава близост до тях, която може да затрудни движението на релсовите превозни средства“. Разстоянията, които законът наистина пише за прелез, са две — и стоят в едно изречение: „Ако няма други указания, дадени с пътни знаци или с пътна маркировка, пред железопътния прелез пътните превозни средства спират на разстояние не по-малко от 2 метра преди първата релса, а когато има бариери – на 1 метър от тях“ (чл. 51, ал. 4). И двете мерят МЯСТОТО, на което ЧАКАШ: при бариера — на метър пред нея; без бариера — на два метра пред първата релса. Ти обаче не си чакал, а си оставил колата, и за спряла кола двата метра до релсите са подът, който важи независимо от бариерите: по-близо от два метра не започваш преминаване (чл. 53, ал. 2), а спреш ли принудително там, това вече е авария — изваждаш пътниците и предупреждаваш влака (чл. 54, ал. 1). Прословутите „50 метра от двете страни на прелеза“ не са нито едното от двете и ги няма в нито един член: мит са от стари помагала. Мярката е влакът — той не може нито да завие, нито да спре навреме.",
     lawRef: "ЗДвП чл. 98, ал. 1, т. 4",
     peekBg: "Влакът не може да завие.",
+  },
+  // FOUNDER RULINGS 2026-09-22 — «Convict under чл. 69» (sc-pk-busstop-ban:
+  // b103c282) and its follow-up, «Teach чл. 69 as written». Every «…» below is
+  // a VERBATIM substring of a retrieved unit of `content/law/acts/zdvp.json`
+  // (чл. 69, чл. 93, чл. 98), and `__tests__/ban-zone-basis-copy.test.ts` fails
+  // if one ever stops being — the words the student is charged under come from
+  // the bank, not from here.
+  //
+  // WHAT IT CONVICTS, AND WHY THAT IS PARKING, NOT THE STOP. чл. 69 PERMITS a
+  // car to stop at a spirka to let passengers alight, if it does not hinder the
+  // bus. So the reducer bills this basis only after
+  // `RuleEngineConfig.busStopDropOffMaxSec` (rules/engine.ts, the ban-zone
+  // block) — a rest that has outlasted a drop-off, which чл. 93 calls
+  // паркиране (ал. 1 defines престой as the stop «за ограничено време,
+  // необходимо за качване и слизане на пътници»; ал. 2 makes everything beyond
+  // it паркирано), and чл. 98, ал. 2, т. 3 bans parking «на спирките на
+  // превозните средства от редовните линии за обществен превоз на пътници».
+  // The row says exactly that and nothing wider: it never calls the brief stop
+  // an offence, never names the product's 20 s as if the act wrote it, and
+  // never claims the student hindered a bus (nothing on the tick can see one).
+  // No plate is named either — none is needed, and zoneSigns posts none.
+  "law-bus-stop": {
+    titleBg: "Паркиране на автобусна спирка",
+    explanationBg:
+      "Колата остана на спирката по-дълго, отколкото отнема да слезе пътник — а това вече не е престой, а паркиране. Законът позволява на другите коли на спирка само едно: „други пътни превозни средства могат да спират само за слизане на пътници само ако не пречат на превозните средства, за които е предназначена спирката“ (ЗДвП чл. 69). Престоят е спиране „за ограничено време, необходимо за качване и слизане на пътници“ (чл. 93, ал. 1); спреш ли за повече — да чакаш някого, да изтичаш „за минутка“ до магазина — колата вече е паркирана (чл. 93, ал. 2), а на спирките на обществения превоз „паркирането е забранено“ (чл. 98, ал. 2, т. 3). Автобусът няма друго място: заета спирка го праща във втората лента, а пътниците му слизат между движещите се коли. Затова: пусни пътника бързо, без да пречиш на автобуса, и потегли — а ако трябва да чакаш, подмини цялата зона на спирката и спри на разрешено място след нея.",
+    lawRef: "ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3",
+    peekBg: "Спирката не е за чакане.",
   },
 };
 

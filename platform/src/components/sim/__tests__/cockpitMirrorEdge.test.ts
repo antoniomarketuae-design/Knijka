@@ -25,7 +25,12 @@ import { describe, expect, it } from "vitest";
 
 import { cockpitMirrorBottomFraction, idleMirrorEdgePx } from "../CameraRig";
 import { COCKPIT_HFOV_RAD, cockpitVFovForAspect } from "@/modules/sim/vehicle";
-import { hotspotScreenRect, projectCockpitPoint } from "@/modules/sim/scene/vitok/cabinLook";
+import {
+  hotspotScreenRect,
+  projectCockpitPoint,
+  rearMirrorStationDropM,
+  rearMirrorStationDropUncappedM,
+} from "@/modules/sim/scene/vitok/cabinLook";
 
 /**
  * The founder's handset, landscape: 2556×1179 device px at dpr 3 → 852×393 CSS.
@@ -100,12 +105,44 @@ describe("cockpitMirrorBottomFraction — the edge the DOM rail steps below", ()
     // published edge would be the at-rest one at every speed — too high, i.e.
     // the rail stops short and the glass stays covered exactly when the student
     // is moving fastest. The two must differ, and in this direction.
-    const atRest = cockpitMirrorBottomFraction("forward", HIS_FOV);
-    const atSpeed = cockpitMirrorBottomFraction("forward", HIS_FOV + SPEED_WIDEN_DEG);
+    // The re-anchor drop is the MESH's (founder ruling 2026-09-22): the real
+    // canvas aspect's, which is what CameraRig passes. See the next case.
+    const drop = rearMirrorStationDropM(HIS_ASPECT);
+    const atRest = cockpitMirrorBottomFraction("forward", HIS_FOV, drop);
+    const atSpeed = cockpitMirrorBottomFraction("forward", HIS_FOV + SPEED_WIDEN_DEG, drop);
     expect(atSpeed).toBeGreaterThan(atRest);
     // And it is not a rounding difference: on a 393 CSS-px window this is worth
     // real pixels, which is the whole reason the raw aspect is not good enough.
     expect((atSpeed - atRest) * 393).toBeGreaterThan(4);
+  });
+
+  it("takes the re-anchor drop from the REAL aspect — the equivalent one would breathe", () => {
+    // «Re-anchor the mirror» (founder ruling 2026-09-22) moves the glass by a
+    // function of the canvas aspect. The equivalent aspect above is a fiction
+    // of the speed-widened fov: asking IT for the drop shrinks the drop as the
+    // throttle opens and publishes an edge HIGHER than the glass the mesh still
+    // carries — the reassuring direction, the rail stops short, the card covers
+    // the glass. MUTATION THAT MATTERS: CameraRig passing no drop.
+    //
+    // ASKED WITH THE COMPOSITION-TRUE DROP, not the shipped one: the shipped
+    // station drop is capped at 0 on the phones (cabinLook's cap block — the
+    // HUD corridor has 0.06 px of slack on the smallest sideways stage), so a
+    // case written against the shipped value would assert 0 === 0 and would go
+    // on passing if the parameter were deleted. The property under test is the
+    // plumbing, and it must hold for whatever the cap is next set to.
+    const real = rearMirrorStationDropUncappedM(HIS_ASPECT);
+    expect(real).toBeGreaterThan(0.03);
+    const atSpeedFov = HIS_FOV + SPEED_WIDEN_DEG;
+    const withReal = cockpitMirrorBottomFraction("forward", atSpeedFov, real);
+    const breathing = cockpitMirrorBottomFraction("forward", atSpeedFov);
+    expect(withReal - breathing).toBeGreaterThan(4 / 393);
+    // …and idleMirrorEdgePx carries it through to the px CameraRig publishes.
+    expect(idleMirrorEdgePx("cockpit", "forward", atSpeedFov, 393, real)).toBeCloseTo(withReal * 393, 9);
+    // At rest the two agree: the equivalent aspect IS the real one.
+    expect(cockpitMirrorBottomFraction("forward", HIS_FOV)).toBeCloseTo(
+      cockpitMirrorBottomFraction("forward", HIS_FOV, rearMirrorStationDropM(HIS_ASPECT)),
+      9,
+    );
   });
 
   it("inverts the authored formula exactly — the equivalent aspect is not a fudge", () => {
@@ -221,13 +258,44 @@ describe("idleMirrorEdgePx — the case analysis the cockpit branch was missing"
  * three lessons grade a glance at.
  */
 describe("the mirror's TOP edge — why a header lip cannot be the fix", () => {
-  it("puts the whole mirror proxy off the top of the canvas on both phones", () => {
+  it("puts the whole mirror proxy off the top of the canvas on both phones (AUTHORED geometry)", () => {
     // `top` is a fraction from the canvas TOP, so negative = above the canvas.
     // The mirror is not merely high on these profiles; it is PAST the edge.
+    // Asked with the re-anchor drop forced to 0 — the geometry as authored,
+    // which is what this block's arithmetic is about. The shipped cockpit now
+    // carries `rearMirrorStationDropM` (founder ruling 2026-09-22); the next
+    // case holds what that buys.
     for (const aspect of [HIS_ASPECT, SMALL_ASPECT]) {
-      const rect = hotspotScreenRect("hotspot_mirror_rear", "forward", aspect);
+      const rect = hotspotScreenRect("hotspot_mirror_rear", "forward", aspect, 0);
       expect(rect).not.toBeNull();
       expect(rect!.top).toBeLessThan(-0.12);
+    }
+  });
+
+  it("…and the RE-ANCHORED station is CAPPED, so today it brings back nothing", () => {
+    // The honest state of the ruling, 2026-09-23. The station drop the
+    // composition asks for would bring the proxy a hand's width back onto the
+    // canvas and put the glass top inside the frame — and it is refused by the
+    // two bars in cabinLook's cap block (B58's sign clearance, worth 12.2 mm;
+    // the phone HUD corridor, worth 0.1 mm). What landed is the HEADER drop,
+    // which is behind the glass and costs neither bar.
+    for (const aspect of [HIS_ASPECT, SMALL_ASPECT]) {
+      const authored = hotspotScreenRect("hotspot_mirror_rear", "forward", aspect, 0)!;
+      const shipped = hotspotScreenRect("hotspot_mirror_rear", "forward", aspect)!;
+      const wanted = hotspotScreenRect(
+        "hotspot_mirror_rear",
+        "forward",
+        aspect,
+        rearMirrorStationDropUncappedM(aspect),
+      )!;
+      expect(shipped.top).toBeCloseTo(authored.top, 9);
+      expect(wanted.top - authored.top).toBeGreaterThan(0.07);
+      // The glass top edge: still off the canvas as shipped, inside it at the
+      // drop the ruling asks for. This is the residue the row still owes.
+      const near = (d: number) =>
+        projectCockpitPoint([GLASS_TOP_NEAR[0], GLASS_TOP_NEAR[1] - d, GLASS_TOP_NEAR[2]], "forward", aspect).y;
+      expect(near(rearMirrorStationDropM(aspect))).toBeGreaterThan(1);
+      expect(near(rearMirrorStationDropUncappedM(aspect))).toBeLessThan(0.98);
     }
   });
 

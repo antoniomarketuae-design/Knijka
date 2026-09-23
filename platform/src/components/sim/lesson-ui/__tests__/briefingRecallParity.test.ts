@@ -75,9 +75,15 @@ describe("the briefing's way back · one rule, two legs", () => {
   it("it renders exactly when the panel is gone, and stands down with it", () => {
     const at = CODE.indexOf('data-hud="briefing-recall"');
     const gate = CODE.slice(Math.max(0, at - 700), at);
-    // `!briefingOpen`: the pill is the closed panel's stand-in, never a second
-    // copy of an open one.
-    expect(gate).toContain("!briefingOpen");
+    // `briefingRecallShown` (= `briefingRecallOffered(briefingStart)`): the
+    // pill is the closed panel's stand-in, never a second copy of an open one —
+    // and, since round 2 of lane E, never a stand-in for a card that has not
+    // been DECIDED yet (it painted for two frames before the roomy card). The
+    // predicate is executed in `hud/__tests__/briefing-start.test.ts`; this
+    // holds the shell to calling it.
+    expect(gate).toContain("briefingRecallShown &&");
+    expect(gate).not.toContain("{!briefingOpen &&");
+    expect(CODE).toContain("const briefingRecallShown = briefingRecallOffered(briefingStart);");
     // …and it obeys the same stand-downs the panel does: no briefing in the
     // THEO-3 sandbox, none after the end, and none while a teach moment or a
     // micro-quiz owns the glass.
@@ -87,14 +93,21 @@ describe("the briefing's way back · one rule, two legs", () => {
     expect(gate).toContain("teachQueue.length === 0");
   });
 
-  it("a retry re-opens the panel — the arrival contract `retry` already claimed", () => {
+  it("a retry is an arrival again — the arrival contract `retry` already claimed", () => {
     // `briefingOpen` had no reset in `retry`, so attempt 2 and every attempt
     // after it started with no briefing on the glass — on BOTH legs, which is
     // why no parity sweep could see it. The three siblings around it were
     // already reset; this one was the omission.
+    //
+    // Since the founder's 2026-09-20 ruling an ARRIVAL is per-surface (open on
+    // the roomy stage, open on a phone only if the student opted in), so the
+    // retry dispatches the start machine's `arrive` with the resolved surface
+    // and the stored choice; `briefing-start.test.ts` executes what it yields.
     const at = CODE.indexOf("setBriefingRecalled(false)");
     expect(at).toBeGreaterThan(-1);
-    expect(CODE.slice(at, at + 400)).toContain("setBriefingOpen(true)");
+    expect(CODE.slice(at, at + 400)).toContain(
+      'dispatchBriefingStart({ type: "arrive", compact, stored: briefingAutoStored })',
+    );
   });
 
   it("the ✕ keeps its meaning — this adds a way back, it does not retire a control", () => {

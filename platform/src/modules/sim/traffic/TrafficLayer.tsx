@@ -1358,38 +1358,37 @@ const HUD_TOP_NDC = 1 - 2 * HUD_TOP_RESERVED_FRAC;
  *  clear of the rounded accent frame rather than merely inside the bitmap. */
 export const BUBBLE_PAD_X = 44;
 
+/** The posture's NAME, px — the header both the L1 short card and the L2
+ *  «Частична помощ» card paint, so the card keeps one shape across rungs. */
+const BUBBLE_POSTURE_NAME_PX = 112;
+
 /**
  * Authored type size of each card line, px of the BUBBLE_TEX_H-tall canvas.
  *
  * Exported and read by the painter rather than written inline, because the
- * FR-OFC-CARD measurement is stated in these numbers: the finding is that the
- * headline resolves on the approach and the five body lines do not, and a
+ * FR-OFC-CARD measurement is stated in these numbers: the finding was that the
+ * headline resolved on the approach and the five body lines did not, and a
  * legibility gate that quoted 46 from its own copy of the layout would keep
  * passing after someone edited the painter. One source, both readers.
  */
 export const BUBBLE_LINE_PX = {
-  headline: 116,
-  // RAISED on the widened ink box (`BUBBLE_W_M`), which is the whole of the
-  // size half of `sc-sig-controller-postures:ef0e821c`. Cap height at the range
-  // the drill grades (27 m) goes 16.5 → 21.0 device px for the four body lines
-  // and 14.25 → 18.75 for the citation, on the audited 2556 × 1179 frame —
-  // ≈5.5 → ≈7.0 CSS px at 3×, and the citation, which was the smallest and
-  // dimmest line on a card ADR-002 will not let the лекция drop, gains the most.
+  // ── 2026-09-22 · THE SHORT CARD (founder ruling, sc-sig-controller-postures:
+  // ef0e821c). The L1 card was six lines — a 116 px headline over five 50–56 px
+  // body lines in five inks — and the row says what that buys: ≈5.5–7 CSS px
+  // of cap on a 3× phone, „tiny multi-coloured text". Cap height here is the
+  // plane's height shared out among the line slots and the plane cannot grow
+  // (`BUBBLE_H_M`), so the only lever is FEWER LINES — which is the ruling:
+  // posture name, one line of who goes / who stops, the law.
   //
-  // THE HEADLINE DOES NOT MOVE. It was never the illegible half, and the
-  // legibility gate forbids buying the body with it (`bodyCapPx(headline) >
-  // 2 × bodyCapPx(go)`): 116/56 = 2.07 keeps that true with the body raised.
-  //
-  // AND NOTHING SHRINKS ANY MORE, which is a second gain the numbers hide.
-  // Against `controller-bubble.test.ts`' deliberately unforgiving 0.62 em/char
-  // stub the shipped card had THREE of six lines over the 936 px box —
-  // `poseBg` 1009, `priorityBg` 982, `lawRef` 989 — so they rendered a size or
-  // two below what is authored here. On the 1320 px box the longest of each is
-  // 1285 / 1285 / 1302: every line now paints at the size below it.
-  pose: 56,
-  go: 56,
-  stop: 56,
-  priority: 56,
+  // `name` IS THE «ЧАСТИЧНА ПОМОЩ» CARD'S NAME SIZE, on purpose: the two rungs
+  // share a header, so the card does not change shape between L1 and L2 — L2
+  // simply loses the answer line. `answer` is 68 → the 56 px body line it
+  // replaces gains 21 % of cap height, and the longest answer (30 characters)
+  // paints 1265 px on the painter test's unforgiving 0.62 em/char stub inside
+  // the 1320 px ink box, i.e. at its authored size, never shrunk. `law` keeps
+  // the 50 px both cards already use: ADR-002 will not let the card drop it.
+  name: BUBBLE_POSTURE_NAME_PX,
+  answer: 68,
   law: 50,
 } as const;
 
@@ -1418,7 +1417,7 @@ export const BUBBLE_POSTURE_LINE_PX = {
   // line at ≥1.8× the largest body line, pinned by `controller-bubble.test.ts`
   // — is a ratio, so raising the body without raising this would have quietly
   // undone the «Частична помощ» card's own repair. 112/56 = 2.0.
-  name: 112,
+  name: BUBBLE_POSTURE_NAME_PX,
   law: 50,
 } as const;
 
@@ -1503,8 +1502,8 @@ export function drawControllerBubble(
   c: HTMLCanvasElement,
   copy: ControllerBubbleCopy,
   /** How much of the card this rung gets — see `controllerGestures.ts`.
-   *  `"full"` is the shipped six-line card and the default, so every mount that
-   *  does not ask paints byte-identically to what it painted before. */
+   *  `"full"` is the L1 short card (founder, 2026-09-22) and the default, so
+   *  every mount that does not ask gets the помощ, never the exam. */
   detail: ControllerCaptionDetail = "full",
 ): void {
   const g = c.getContext("2d");
@@ -1558,64 +1557,31 @@ export function drawControllerBubble(
     bubbleLine(g, copy.lawRef, 700, BUBBLE_POSTURE_LINE_PX.law, 430, W);
     return;
   }
-  // The six answers, each in its own colour so the SLOT is learnable: a student
-  // who has read one bubble knows where „who goes" lives on the next one.
-  // Green = movement, red = the halt, WHITE-ON-ACCENT = whose priority it is —
-  // deliberately the accent, because that line is the one that decides whether
-  // he moves, and it is the one the card used not to carry at all.
-  // Six lines in the 540 px card the five used to rattle around in: the old
-  // rhythm put the law line's baseline at 404 and the body's edge at 506, i.e.
-  // ~60 px of nothing. The gaps tighten from 68/78/66/70 to an even
-  // 66/64/64/62/64 and every type size is untouched, so nothing that was
-  // legible in a shipped frame got smaller.
+  // ── THE «ПЪЛНА ПОМОЩ» CARD, SHORT (founder ruling 2026-09-22) ────────────
+  // Posture name, who goes / who stops in ONE line, the law — the answer is
+  // still given (ruling 2026-09-20), in three lines where six used to be. It
+  // replaced a six-line card in five inks (headline, pose, «Минава:»,
+  // «Спира:», «Предимството…», law) whose body lines landed at ≈5.5–7 CSS px
+  // of cap on a 3× phone — `sc-sig-controller-postures:ef0e821c`.
   //
-  // THE BODY LINES CARRY THEIR CONTRAST IN THEIR STEMS, not in their size
-  // (sc-sig-controller-postures:ef0e821c). Measured on the current tree's own
-  // frame (`.audit-frames/w22/.../04-t042s.png`, native 2556 × 1179): the
-  // headline lands ≈47 device px of cap height and the five body lines
-  // ≈16–17 px — ≈5.5 CSS px on a 3× phone. At that height a line's stems are
-  // ~2 device px, so WEIGHT is the only lever left that is not the ink box,
-  // and the ink box is at its clamp (the widths below). Regular → Bold is
-  // roughly twice the stem ink for the same cap height; on a card that is a
-  // teaching surface rather than chrome, that is the trade to make.
+  // TWO INKS AND THE ACCENT, and the accent spends itself once: on the name,
+  // which is the verdict at a glance (green минавай / red спри / amber
+  // внимание) and which L1 is allowed to give. The answer is the neutral
+  // reading ink, the citation the cool grey both cards already use (≈13:1 on
+  // the near-black body).
   //
-  // WHICH LINES MOVE AND WHICH DO NOT, from the same frame's measurement of
-  // each line's ink against the 936 px box: headline 88.1 %, poseBg 100.3 %,
-  // goBg 76.7 %, stopBg 76.9 %, priorityBg 93.4 %, lawRef 91.0 %. A heavier
-  // face is ≈3–5 % wider in Cyrillic, and `bubbleLine` answers overflow by
-  // SHRINKING — so on a line already at the clamp a bolder weight buys stem
-  // width by spending cap height, which is a net loss. `poseBg` WAS that line
-  // and was left at 600; the widened box (`BUBBLE_W_M`) took it off the clamp —
-  // 1285 px of ink in a 1320 px box — so it now takes the weight too.
-  //
-  // `lawRef` also moves colour. It is the smallest line on the card AND the
-  // dimmest: #8ea3bd on the near-black body is ≈8.2:1 where every other line
-  // sits at 14–17:1, and it is the one line ADR-002 will not let the лекция do
-  // without — the citation is how the card proves it retrieved the rule rather
-  // than recalled it. #b9c9de keeps the same cool-grey slot (the colours are a
-  // learnable layout, per the note above) at ≈13:1.
-  //
-  // THE BASELINES RE-SPACE WITH THE TYPE (ef0e821c). 44–46 px lines sat on a
-  // 62–66 px rhythm — a line height of 1.39, i.e. a third of the body's height
-  // spent on air. At 56 px the same rhythm would collide, so the body drops to
-  // an even 66 px pitch starting at 198: ascender 0.8 em + descender 0.3 em is
-  // 61.6 px against 66, the headline's descender ends at 152.8 against the
-  // first body ascender at 153.2, and the law line's descender ends at 478.8
-  // against the body edge at 506 (`BUBBLE_TAIL_PX` reserved). Metrics are the
-  // painter test's own 0.8/0.3 em, which round away from the card in both
-  // directions.
+  // THE BASELINES SHARE THE «ЧАСТИЧНА ПОМОЩ» CARD'S FOOT (430) so the two
+  // rungs do not change shape, and spend the body evenly: name 112 px at 170
+  // (ascender 0.8 em → top at 80.4; descender 0.3 em → 203.6), answer 68 px at
+  // 300 (245.6 … 320.4), law 50 px at 430 (390 … 445) against the body edge at
+  // 506 (`BUBBLE_TAIL_PX` reserved) — the painter test's own 0.8/0.3 em,
+  // which round away from the card in both directions.
   g.fillStyle = copy.accent;
-  bubbleLine(g, copy.headlineBg, 700, BUBBLE_LINE_PX.headline, 118, W);
-  g.fillStyle = "#dbe5f2";
-  bubbleLine(g, copy.poseBg, 700, BUBBLE_LINE_PX.pose, 198, W);
-  g.fillStyle = "#9ff0c4";
-  bubbleLine(g, copy.goBg, 700, BUBBLE_LINE_PX.go, 264, W);
-  g.fillStyle = "#ffc9c2";
-  bubbleLine(g, copy.stopBg, 700, BUBBLE_LINE_PX.stop, 330, W);
-  g.fillStyle = copy.accent;
-  bubbleLine(g, copy.priorityBg, 700, BUBBLE_LINE_PX.priority, 396, W);
+  bubbleLine(g, copy.postureNameBg, 700, BUBBLE_LINE_PX.name, 170, W);
+  g.fillStyle = BUBBLE_POSTURE_INK;
+  bubbleLine(g, copy.answerBg, 700, BUBBLE_LINE_PX.answer, 300, W);
   g.fillStyle = "#b9c9de";
-  bubbleLine(g, copy.lawRef, 700, BUBBLE_LINE_PX.law, 462, W);
+  bubbleLine(g, copy.lawRef, 700, BUBBLE_LINE_PX.law, 430, W);
 }
 
 /** Structural slice of the runtime's JU-18 read model (module boundary: the
@@ -1702,9 +1668,9 @@ export interface TrafficLayerProps {
    * the two rows that forced it: `sc-sig-controller-postures:ef0e821c` and
    * `:3936550e`).
    *
-   * Absent = `"full"`, the six-line card exactly as it shipped, so the
-   * clip-capture rig and every headless mount are byte-identical. `LessonScene`
-   * reads the rung off the compiled lesson id and passes the rest.
+   * Absent = `"full"`, the L1 short card (founder ruling 2026-09-22), so the
+   * clip-capture rig and every headless mount get the помощ, never the exam.
+   * `LessonScene` reads the rung off the compiled lesson id and passes the rest.
    */
   controllerCaption?: ControllerCaptionDetail;
   /**

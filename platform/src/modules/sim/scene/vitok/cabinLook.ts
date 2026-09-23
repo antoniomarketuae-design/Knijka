@@ -256,6 +256,213 @@ export function projectCockpitPoint(
 }
 
 // ---------------------------------------------------------------------------
+// «Re-anchor the mirror» — the interior mirror on WIDE canvases
+// (founder ruling 2026-09-22, row sc-mw-emergency-lane:3ffb0692)
+// ---------------------------------------------------------------------------
+//
+// THE DEFECT, IN THE CAMERA'S OWN UNITS. hFOV is locked (`cockpitVFovForAspect`),
+// so a wider canvas gets a NARROWER vertical field: 47° at 16:9, 39.25° on the
+// audited phones in landscape (iphone16-landscape 852×393 → 2.168,
+// small-landscape 780×360 → 2.167 — `tools/mobile/lib/devices.mjs`). The cabin
+// geometry is authored against one window shape, so on the phones the header's
+// front edge projects at fy 1.058 — above the frame — while the mirror glass
+// top sits at fy ~1.0 and nothing that attaches it to the car is on screen:
+// „a black housing floating detached in open sky … clipped by the top edge".
+//
+// THE RULING'S TWO CONSTRAINTS, and why they leave exactly one lever:
+//   · „keep the cockpit camera and road-sign sizes as they are" — so the vFOV
+//     floor `VitokCockpit.tsx` once routed (Math.max(…, COCKPIT_FOV)) is OUT;
+//   · „pin the mirror to the VISIBLE windscreen header" — so the header must
+//     be on screen and the mirror must hang below it.
+// A header drawn above the glass has no room on the phones (the glass itself
+// touches row 0 — `cockpitMirrorEdge.test.ts` holds the arithmetic), so BOTH
+// come down, and only on the canvases that need it:
+//
+//   1. the header's front edge is lowered until it sits `HEADER_VISIBLE_BAND`
+//      of frame height inside the top edge (`cockpitHeaderDropM`);
+//   2. the whole mirror station follows so its glass keeps EXACTLY the angular
+//      offset below that edge it has at 16:9, where the founder signed the
+//      composition off (`rearMirrorStationDropM`).
+//
+// Both are pure functions of the canvas ASPECT — never of the live, speed-
+// widened fov, or the header would breathe with the throttle — and both are 0
+// at 16:9 and at every squarer window (PC 1440×900, phones upright), so the
+// reference build does not move by a millimetre.
+//
+// WHAT IT COSTS, STATED, because a lever is never free:
+//   · the mirror sits LOWER in the phone frame, so the DOM rail that steps
+//     below it (`--sim-mirror-h`, notifyColumn's mirror band) steps further
+//     down — they read this same projection, so they follow;
+//   · B58 raised the station 105 mm so the В26 «50» on the speeding drill clears
+//     the housing (threshold 92.8 mm at the lane centre — an ANGULAR fact,
+//     identical at every aspect). A station drop spends that raise back, so the
+//     drop is CAPPED at what B58 can afford — see
+//     `REAR_MIRROR_STATION_DROP_MAX_M` below, and read it before reading the
+//     composition figure: on the phones the cap binds, and the mirror therefore
+//     does NOT reach the offset below the header that 16:9 has.
+
+/** The interior mirror's raycast proxy — the node the station drop moves. */
+const REAR_MIRROR_HOTSPOT: CockpitHotspotName = "hotspot_mirror_rear";
+
+/**
+ * The windscreen header's front edge, chassis-local — VitokCockpit's
+ * `ROOF_Y` / `ROOF_FRONT_Z` (the B58 re-solve). Its projected row does not
+ * depend on x in the forward pose (the camera only pitches), so one (y, z)
+ * pair is the whole edge.
+ */
+export const COCKPIT_HEADER_EDGE = { y: 0.945, z: 0.481 } as const;
+
+/**
+ * The HIGHEST-projecting point of the rigged interior-mirror glass's top edge,
+ * chassis-local: the GLB quad corner (local (+0.1125, +0.0375)) carried through
+ * the node (GLB (0, 1.458, −0.5), the shipped quaternion, scale 0.84 — read off
+ * hero_interior.glb), MirrorRig's REF 8 eye-ray lift (60 mm, shrink
+ * (d − lift)/d) and its 14 mm MIRROR_DROP_M. Cross-check: y 0.9086 is B58's
+ * own published glass-top figure, reproduced to four places.
+ */
+export const REAR_MIRROR_GLASS_TOP: readonly [number, number, number] = [-0.0671, 0.9086, 0.4223];
+
+/**
+ * How far inside the top of the frame the header's edge must sit to be a
+ * VISIBLE header, as a fraction of frame height: 2 % = 7.9 CSS px on the
+ * 393 px iPhone-16 landscape canvas, 7.2 px on the 360 px Android. Deliberately
+ * the smallest band that reads as a rail rather than a stray line — every
+ * extra point of band is another point the mirror has to come down, and B58's
+ * sign clearance is what that comes out of (see the block above).
+ */
+export const HEADER_VISIBLE_BAND = 0.02;
+
+/** tan(elevation) of a chassis point in the FORWARD pose's camera space —
+ *  aspect-independent, so it can be compared against any canvas's frame top. */
+function forwardTanElevation(point: readonly [number, number, number]): number {
+  const p = projectCockpitPoint(point, "forward", COCKPIT_ASPECT_REF);
+  if (!p.ahead) return Number.NaN;
+  return (2 * p.y - 1) * Math.tan((cockpitVFovForAspect(COCKPIT_ASPECT_REF) * Math.PI) / 360);
+}
+
+/**
+ * THE CAP ON THE STATION DROP — AND IT BINDS AT ZERO TODAY, 2026-09-23.
+ *
+ * The composition-true station drop (`rearMirrorStationDropUncappedM`: 36.4 mm
+ * on both audited phones, 48.6 mm on the 780 × 340 stage) is what «the glass
+ * keeps the 16:9 offset below the header» asks for. It is not affordable, and
+ * neither bar that refuses it is a preference:
+ *
+ *  1. B58, the founder's own earlier ruling — worth 12.2 mm. The station was
+ *     RAISED 105 mm so the В26 «50» the speeding drill tells the student to read
+ *     clears the assembly; the measured threshold is 92.8 mm at the lane centre
+ *     (`tools/glb/raise_interior_mirror.mjs`, swept at 50 mm steps along
+ *     ov-keepright-v1). Occlusion is a ray question, identical at every aspect,
+ *     so a station drop of d leaves 105 − d mm: d ≤ 12.2 mm. (And that spends
+ *     the margin B58 bought on top: the same sweep needs 104.6 mm for a student
+ *     drifting 0.75 m right, toward the plate.)
+ *
+ *  2. THE PHONE HUD — worth 0.1 mm, which is why this constant is 0. The
+ *     notification column, the first-run touch hint and the audio prompt all
+ *     hang below the mirror's projected floor
+ *     (`hud/notifyColumn.MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE`), and
+ *     that floor moves down with this drop — 0.0018 of stage height per mm. The
+ *     corridor left between it and the thumb controls, measured:
+ *       852 × 393  the hint needs 124.5 px, the corridor holds 126.76 → 2.26 px
+ *       780 × 340  the hint already scrolls 20.94 px against a bound of 21
+ *                  → 0.06 px
+ *     At the B58 bar (12.2 mm) the hint would clip 6.4 px on the handset the
+ *     catalogue was shot on — the one stage where the pinned answer is «clips
+ *     NOTHING» — and at the composition-true 36.4 mm the 780 × 360 card's floor
+ *     lands 9 px INSIDE the 0.53 hazard band.
+ *
+ * SO WHAT LANDED IS THE HEADER, WHICH COSTS NEITHER BAR: it comes down until it
+ * is visible, and because the header pad sits BEHIND the glass (chassis z 0.481
+ * vs 0.4223, with the eye behind both) the mirror now reads against a header
+ * instead of against open sky — the first half of the founder's sentence. The
+ * half this cap does NOT buy is the second: the glass top stays at fy 1.0199,
+ * i.e. the housing is still cut by the top edge on the phones.
+ *
+ * THE REMAINING LEVER IS THE CARD, AND IT IS A FOUNDER QUESTION. Freeing the
+ * corridor means moving the notification column out of the mirror's x band
+ * (0.574 → 0.866 of the stage at every landscape aspect); the right edge has
+ * 43 px of width beside it on a notched handset and the left corridor already
+ * holds the «Меню» rail, the open demonstration deck and the LEFT DOOR MIRROR —
+ * the instrument lane B has just made live. Once that ruling exists, this
+ * constant is the one number that changes, and `mirrorAnchor.test.ts` holds what
+ * each value of it costs.
+ */
+export const REAR_MIRROR_STATION_DROP_MAX_M = 0;
+
+/** Smallest drop d in [0, hi] with f(d) <= limit, for f decreasing in d. */
+function solveDrop(f: (d: number) => number, limit: number, hi = 0.3): number {
+  if (!(f(0) > limit)) return 0;
+  if (f(hi) > limit) return hi;
+  let lo = 0;
+  let top = hi;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + top) / 2;
+    if (f(mid) > limit) lo = mid;
+    else top = mid;
+  }
+  // Rounded UP to 0.1 mm: a mesh never re-uploads for float noise on resize,
+  // and rounding up can only put the edge further inside the frame.
+  return Math.ceil(top * 1e4) / 1e4;
+}
+
+function validAspect(aspect: number): boolean {
+  return Number.isFinite(aspect) && aspect > 0;
+}
+
+let headerMemo: { aspect: number; drop: number } | null = null;
+let stationMemo: { aspect: number; drop: number } | null = null;
+
+/**
+ * How far the windscreen header's front edge comes DOWN on a canvas of this
+ * aspect so it is visible (`HEADER_VISIBLE_BAND` inside the top edge), metres.
+ * 0 wherever it already is — 16:9, every squarer window, phones upright.
+ */
+export function cockpitHeaderDropM(aspect: number): number {
+  if (!validAspect(aspect)) return 0;
+  if (headerMemo !== null && headerMemo.aspect === aspect) return headerMemo.drop;
+  const frameTop = Math.tan((cockpitVFovForAspect(aspect) * Math.PI) / 360);
+  const limit = frameTop * (1 - 2 * HEADER_VISIBLE_BAND);
+  const { y, z } = COCKPIT_HEADER_EDGE;
+  const drop = solveDrop((d) => forwardTanElevation([0, y - d, z]), limit);
+  headerMemo = { aspect, drop };
+  return drop;
+}
+
+/**
+ * How far the WHOLE interior-mirror station (glass, housing, authored casing,
+ * the mount's lower end, the click proxy) comes DOWN on a canvas of this
+ * aspect, metres: enough that the glass top keeps the angular offset below the
+ * (lowered) header edge that it has at 16:9 — or `REAR_MIRROR_STATION_DROP_MAX_M`,
+ * whichever is SMALLER, because that offset is not affordable on the phones (the
+ * cap's own block says by which two bars). 0 wherever the header needed no drop,
+ * so it is 0 at 16:9 by construction.
+ */
+export function rearMirrorStationDropM(aspect: number): number {
+  return Math.min(rearMirrorStationDropUncappedM(aspect), REAR_MIRROR_STATION_DROP_MAX_M);
+}
+
+/**
+ * …and the SAME drop before the cap — the composition-true one, which is what
+ * «the glass keeps its 16:9 offset below the header» would need. Published so
+ * the cost of the cap is a number a test can hold, not a sentence.
+ */
+export function rearMirrorStationDropUncappedM(aspect: number): number {
+  if (!validAspect(aspect)) return 0;
+  if (stationMemo !== null && stationMemo.aspect === aspect) return stationMemo.drop;
+  const headerDrop = cockpitHeaderDropM(aspect);
+  let drop = 0;
+  if (headerDrop > 0) {
+    const { y, z } = COCKPIT_HEADER_EDGE;
+    const [gx, gy, gz] = REAR_MIRROR_GLASS_TOP;
+    const gap = forwardTanElevation([0, y, z]) - forwardTanElevation(REAR_MIRROR_GLASS_TOP);
+    const limit = forwardTanElevation([0, y - headerDrop, z]) - gap;
+    drop = solveDrop((d) => forwardTanElevation([gx, gy - d, gz]), limit);
+  }
+  stationMemo = { aspect, drop };
+  return drop;
+}
+
+// ---------------------------------------------------------------------------
 // Hotspot screen rects
 // ---------------------------------------------------------------------------
 
@@ -278,9 +485,19 @@ export function hotspotScreenRect(
   name: CockpitHotspotName,
   poseId: CabinLookPoseId,
   aspect: number = COCKPIT_ASPECT_REF,
+  /**
+   * The interior-mirror re-anchor drop the RENDERED cockpit carries, metres.
+   * Defaults to the drop for `aspect`, which is right whenever `aspect` is the
+   * canvas's real aspect. A caller that passes a SPEED-EQUIVALENT aspect
+   * (CameraRig inverts the widened fov) must pass the real canvas's drop here,
+   * or the projection would move the mirror with the throttle while the mesh
+   * does not. Only `hotspot_mirror_rear` reads it.
+   */
+  rearStationDropM: number = rearMirrorStationDropM(aspect),
 ): FrameRect | null {
   const spec = HOTSPOT_BY_NAME.get(name);
   if (spec === undefined) return null;
+  const dropY = name === REAR_MIRROR_HOTSPOT ? rearStationDropM : 0;
   let left = Number.POSITIVE_INFINITY;
   let right = Number.NEGATIVE_INFINITY;
   let topFromBottom = Number.NEGATIVE_INFINITY;
@@ -291,7 +508,7 @@ export function hotspotScreenRect(
         const p = projectCockpitPoint(
           [
             spec.pos[0] + sx * spec.size[0],
-            spec.pos[1] + sy * spec.size[1],
+            spec.pos[1] - dropY + sy * spec.size[1],
             spec.pos[2] + sz * spec.size[2],
           ],
           poseId,

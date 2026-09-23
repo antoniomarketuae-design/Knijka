@@ -153,6 +153,54 @@ export function mirrorKindsFor(_preset: MirrorQuality): readonly MirrorKind[] {
   return MIRROR_KINDS;
 }
 
+/**
+ * FOUNDER RULING 2026-09-22 «Live when the task uses it» — row
+ * `sc-vu-pass-clearance:d770323a`. On MEDIUM — and therefore on HIGH — do the
+ * door mirrors keep a live picture for the whole drive, attended or not?
+ *
+ * Yes exactly when the LESSON declares that its task relies on them
+ * (`LessonSpec.doorMirrorsInTask`, derived at compile time by
+ * `lessons/scenario/doorMirrorTask.ts` — never string-matched here, and never
+ * guessed from the district). Otherwise the attention gate above decides, as
+ * before.
+ *
+ *  · `medium` — the preset every phone is hard-capped at
+ *               (`autoQualityCeiling()`), i.e. the preset the founder plays on.
+ *  · `high`   — ALSO yes, because tiers never lose a feature a lower tier has.
+ *               High free-runs the door PASSES (`selectMirrorPass`), but its
+ *               GLASS still follows the attention rule: an unattended door on
+ *               high is blanked by `mirrorGlassIsLive` exactly like on medium.
+ *               So without this clause a tasked lesson would be live on medium
+ *               and blank on high — the round-1 comment here claimed high
+ *               „has always free-run the doors", which was true of the passes
+ *               and false of the glass. Cost on high: none — the passes it keeps
+ *               current were already being rendered every 4th frame.
+ *  · `low`    — untouched: the ruling names medium, and `low` is the tier whose
+ *               whole GPU budget one rear pass already takes 25–34 % of.
+ *
+ * WHY „FOR THE WHOLE DRIVE" AND NOT „WHILE LOOKED THROUGH". The judge's frames
+ * are the unattended state, and the unattended state is REAL: ~47 % of the left
+ * door glass is on screen at the `forward` pose (cabinLook), so in a lesson
+ * whose briefing says «Огледало, мигач наляво…» that half-mirror is on screen
+ * for the whole lesson, and it was blank.
+ *
+ * COST, stated. The doors keep their medium cadence (every 4th frame each, on
+ * phases 1 and 3), which is disjoint from the rear's even frames — so the
+ * PEAK frame still carries at most ONE mirror pass (the invariant the tests
+ * sweep). The AVERAGE rises from 0.5 mirror passes per frame (rear only) to
+ * 1.0: two more 160×96 reduced-scene passes every four frames, i.e. roughly
+ * the rear pass's own average cost added again (the rear measured 0.61–1.13 ms
+ * per pass at phone dimensions on tier low; its per-frame average at medium is
+ * half that). Memory: nothing — the door targets already exist on every tier.
+ * Only lessons that declare the task pay it.
+ */
+export function doorMirrorsFollowTask(
+  preset: MirrorQuality,
+  taskUsesDoorMirrors: boolean,
+): boolean {
+  return (preset === "medium" || preset === "high") && taskUsesDoorMirrors;
+}
+
 /** The cabin-look pose that aims the head at a door mirror. Mirrors
  *  `cabinLook.CABIN_LOOK_FOR_HOTSPOT`'s entries for the two door hotspots. */
 export function doorLookPose(kind: "left" | "right"): CabinLookPoseId {
@@ -194,6 +242,85 @@ export function mirrorIsAttended(
   return lookPose === doorLookPose(kind);
 }
 
+/**
+ * May this mirror's glass show LIVE WORLD right now — i.e. is it being kept
+ * current? Either the driver is looking through it (`mirrorIsAttended`), or
+ * the lesson's task relies on the door mirrors on a tier where that keeps them
+ * free-running (`doorMirrorsFollowTask` — its passes then land every 4th
+ * frame, so the picture can never be the stale spawn-moment reflection the
+ * blanking rule exists to prevent). MirrorRig asks this in BOTH places it
+ * decides the glass (the blanking sweep and the post-pass promotion), so the
+ * pass schedule and the glass can never disagree about a tasked door.
+ */
+export function mirrorGlassIsWatched(
+  kind: MirrorKind,
+  doorsFollowTask: boolean,
+  glanceMirror: HeldLook | null,
+  glanceStrength: number,
+  lookPose: CabinLookPoseId,
+): boolean {
+  if (doorsFollowTask) return true;
+  return mirrorIsAttended(kind, glanceMirror, glanceStrength, lookPose);
+}
+
+/**
+ * Should this mirror's glass be showing LIVE WORLD at the end of this frame?
+ * (Whether a PASS runs is `selectMirrorPass`'s question and a budget one; this
+ * is the honesty question, and they are not the same. A `false` here means the
+ * target is blanked to the authored glass colour — MirrorRig's
+ * `clearMirrorToInert`.)
+ *
+ *  · rear   — always. It is in the picture at the driving pose, it is the
+ *             tailgater instrument (doc 62 #44), and its phase-0 cadence
+ *             primes it on frame 0, so it is never showing an empty buffer.
+ *  · a door — only while WATCHED, and only from the first pass that ran while
+ *             it was. `wasLive` carries it across the frames between passes;
+ *             losing attention blanks it again, which is what stops a
+ *             spawn-moment reflection outliving the glance that produced it.
+ *
+ * Moved here from MirrorRig.tsx (which re-exports it) so the whole glass
+ * decision — `mirrorGlassDecision` below — is one importable pure function.
+ */
+export function mirrorGlassIsLive(
+  kind: MirrorKind,
+  wasLive: boolean,
+  attended: boolean,
+  passedThisFrame: boolean,
+): boolean {
+  if (kind === "rear") return true;
+  if (!attended) return false;
+  return wasLive || passedThisFrame;
+}
+
+/**
+ * THE GLASS DECISION, WHOLE — the one call MirrorRig makes at BOTH points it
+ * decides a door's glass (the blanking sweep, `passedThisFrame = false`, and
+ * the post-pass promotion, `passedThisFrame = true`). It composes the honesty
+ * rule (`mirrorGlassIsLive`) with the watch rule (`mirrorGlassIsWatched`, which
+ * is where the lesson's task flag enters), so the component holds no rule of its
+ * own and a call site that stops forwarding `doorsFollowTask` is a visible
+ * argument change a source pin can see (`mirrorTaskLive.test.ts`).
+ *
+ * Argument ORDER is part of the contract the wiring test pins: the task flag is
+ * the 4th argument.
+ */
+export function mirrorGlassDecision(
+  kind: MirrorKind,
+  wasLive: boolean,
+  passedThisFrame: boolean,
+  doorsFollowTask: boolean,
+  glanceMirror: HeldLook | null,
+  glanceStrength: number,
+  lookPose: CabinLookPoseId,
+): boolean {
+  return mirrorGlassIsLive(
+    kind,
+    wasLive,
+    mirrorGlassIsWatched(kind, doorsFollowTask, glanceMirror, glanceStrength, lookPose),
+    passedThisFrame,
+  );
+}
+
 /** Bit per kind, so `selectMirrorPass` can be told which targets have never
  *  been rendered without the caller allocating a Set every frame. */
 export const MIRROR_BIT: Record<MirrorKind, number> = { rear: 1, left: 2, right: 4 };
@@ -219,6 +346,9 @@ export function selectMirrorPass(
   glanceStrength: number,
   lookPose: CabinLookPoseId,
   unprimedMask: number,
+  /** `LessonSpec.doorMirrorsInTask` — see `doorMirrorsFollowTask`. Last and
+   *  defaulted so every existing caller keeps its exact behaviour. */
+  taskUsesDoorMirrors: boolean = false,
 ): MirrorKind | null {
   for (const kind of MIRROR_KINDS) {
     const c = mirrorCadenceFor(preset, kind);
@@ -250,6 +380,10 @@ export function selectMirrorPass(
     // wrong. That is a rig change (VitokCockpit's material swap), it needs its
     // own frame to verify by eye, and it is recorded rather than rushed.
     if (preset === "high") return kind;
+    // The founder ruling of 2026-09-22 (`doorMirrorsFollowTask`): on medium, a
+    // lesson whose task relies on the door mirrors free-runs them like `high`
+    // (on high the line above already returned — the flag changes no pass there).
+    if (doorMirrorsFollowTask(preset, taskUsesDoorMirrors)) return kind;
     if ((unprimedMask & MIRROR_BIT[kind]) !== 0) return kind;
     if (mirrorIsAttended(kind, glanceMirror, glanceStrength, lookPose)) return kind;
   }

@@ -62,6 +62,7 @@ import { SKY_DOME_NAME } from "@/modules/sim/environment";
 import {
   CABIN_LOOK_POSES,
   hotspotScreenRect,
+  rearMirrorStationDropM,
   type CabinLookPoseId,
 } from "@/modules/sim/scene/vitok/cabinLook";
 import { getCabinLook, resetCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
@@ -411,12 +412,28 @@ const COCKPIT_MIRROR_HOTSPOT = "hotspot_mirror_rear" as const;
  * it through a mounted rig would need a WebGL context and would test three's
  * matrix stack instead of this decision.
  */
-export function cockpitMirrorBottomFraction(poseId: CabinLookPoseId, vFovDeg: number): number {
+export function cockpitMirrorBottomFraction(
+  poseId: CabinLookPoseId,
+  vFovDeg: number,
+  /**
+   * The re-anchor drop the MESH carries (`rearMirrorStationDropM` of the
+   * canvas's REAL aspect — founder ruling 2026-09-22). The equivalent aspect
+   * below is a speed-widened fiction; asking it for the drop would move the
+   * published edge with the throttle while the glass stays put. Defaults to
+   * the equivalent aspect's drop, which equals the real one at rest.
+   */
+  rearStationDropM?: number,
+): number {
   if (!Number.isFinite(vFovDeg) || vFovDeg <= 0) return 0;
   // Invert cockpitVFovForAspect: the aspect at which the authored formula would
   // have produced the fov the camera is ACTUALLY carrying this frame.
   const equivalentAspect = Math.tan(COCKPIT_HFOV_RAD / 2) / Math.tan((vFovDeg * Math.PI) / 360);
-  const rect = hotspotScreenRect(COCKPIT_MIRROR_HOTSPOT, poseId, equivalentAspect);
+  const rect = hotspotScreenRect(
+    COCKPIT_MIRROR_HOTSPOT,
+    poseId,
+    equivalentAspect,
+    rearStationDropM ?? rearMirrorStationDropM(equivalentAspect),
+  );
   if (rect === null || !Number.isFinite(rect.bottom)) return 0;
   // Off the bottom of the canvas is not an edge the rail can step below, and a
   // mirror whose lower edge is above the top edge is not on screen at all.
@@ -445,10 +462,12 @@ export function idleMirrorEdgePx(
   poseId: CabinLookPoseId,
   vFovDeg: number,
   viewportHeightPx: number,
+  /** See `cockpitMirrorBottomFraction` — the drop of the REAL canvas aspect. */
+  rearStationDropM?: number,
 ): number {
   if (mode !== "cockpit") return 0;
   if (!Number.isFinite(viewportHeightPx) || viewportHeightPx <= 0) return 0;
-  return cockpitMirrorBottomFraction(poseId, vFovDeg) * viewportHeightPx;
+  return cockpitMirrorBottomFraction(poseId, vFovDeg, rearStationDropM) * viewportHeightPx;
 }
 
 /**
@@ -1320,7 +1339,19 @@ export function CameraRig({
       // applied to the POV the student actually drives in; see
       // `cockpitMirrorBottomFraction` for the frames and the fov inversion.
       // Top-down has no cabin in frame, so it keeps publishing "no mirror".
-      publishRearView(null, idleMirrorEdgePx(mode, getCabinLook(), cam.fov, state.size.height), 0);
+      publishRearView(
+        null,
+        idleMirrorEdgePx(
+          mode,
+          getCabinLook(),
+          cam.fov,
+          state.size.height,
+          // The glass is re-anchored by the canvas's REAL aspect (VitokCockpit
+          // reads the same size), never by the speed-widened fov.
+          rearMirrorStationDropM(state.size.width / Math.max(1, state.size.height)),
+        ),
+        0,
+      );
     } else {
       // Smoothstepped with the same envelope the head turn uses, so the window
       // opens and closes on exactly the glance's rhythm. `env` is 0 for the

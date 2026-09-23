@@ -240,6 +240,16 @@ export function validateScenarioSpec(
     });
   }
 
+  // -- The door-mirror task declaration (founder ruling 2026-09-22). `true` or
+  // absent: a `false` would read as a decision while meaning exactly what
+  // absence means, and the derived channels (doorMirrorTask.ts) would still
+  // answer yes over it — a flag that looks like an opt-out and is not one.
+  if (spec.doorMirrorsInTask !== undefined && spec.doorMirrorsInTask !== true) {
+    errors.push(
+      `doorMirrorsInTask must be true or absent (got ${String(spec.doorMirrorsInTask)})`,
+    );
+  }
+
   // -- Start.
   const hasSpawnId = typeof spec.start?.spawnPointId === "string" && spec.start.spawnPointId.length > 0;
   const hasPose = spec.start?.position !== undefined;

@@ -90,6 +90,7 @@
 import type { LessonAidsSpec, LessonObjective, LessonSpec, ParkingBaySpec } from "../../contracts";
 import { REACH_ZONE_GRACE_M, deriveFullStopDemand, parseObjectiveParams } from "../objectives";
 import { L5_LADDER_FLOOR_CONDITIONS } from "./complications";
+import { scenarioUsesDoorMirrors } from "./doorMirrorTask";
 import { deriveLessonMistakeTargets } from "./lessonMistakeTargets";
 import { serializeObjectiveParams } from "./params";
 import { assertScenarioSpec } from "./validate";
@@ -1511,6 +1512,12 @@ export function compileScenario(
     // `actorLabels` gets a caption over a staged actor. Denormalised by value
     // like every other spec field so nothing at runtime reads the template.
     ...(spec.actorLabels ? { actorLabels: spec.actorLabels.map((a) => ({ ...a })) } : {}),
+    // Founder ruling 2026-09-22 «Live when the task uses it»: a drill whose
+    // task relies on the door mirrors keeps them live on MEDIUM and HIGH. Same
+    // opt-in shape (absent = today's lesson, byte for byte); derived from the
+    // template's structured channels + its explicit flag — see doorMirrorTask.ts
+    // for which channels and why the briefing prose is not one of them.
+    ...(scenarioUsesDoorMirrors(spec) ? { doorMirrorsInTask: true as const } : {}),
   };
 
   const aids = mergeAids(level, rung.aids);

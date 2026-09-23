@@ -469,11 +469,20 @@ describe("hintInputFor — one predicate, no second convention", () => {
   });
 
   it("the shell reads it from that predicate and freezes it for the session", () => {
+    // Lane D 2026-09-22: the read moved out of a lazy `useState` (which
+    // mismatched on hydration — see __tests__/hintInputHydration.test.tsx) into
+    // `useHintInput`, which still derives it from this one predicate and
+    // samples it once per page.
     const shell = readFileSync(
       join(process.cwd(), "src/components/sim/lesson-ui/LessonPlayShell.tsx"),
       "utf8",
     );
-    expect(shell).toContain("useState<HintInput>(() => hintInputFor(hasTouchScreen()))");
+    const hook = readFileSync(
+      join(process.cwd(), "src/components/sim/lesson-ui/useHintInput.ts"),
+      "utf8",
+    );
+    expect(shell).toContain("const hintInput = useHintInput();");
+    expect(hook).toContain("hintInputFor(hasTouchScreen())");
     for (const i of INPUTS) expect(["keyboard", "touch"]).toContain(i);
   });
 });

@@ -373,6 +373,21 @@ const FRESH: AdvisorTaskFreshness = {
   flash: null,
 };
 
+/**
+ * THE SIGN-BOUND READING — the zebra rung under a 40 disc, so the task's 40 is
+ * no longer STRICTER than the sign.
+ *
+ * Founder ruling 2026-09-22 («Say it in the banner», `objectiveLineWithTaskCap`)
+ * puts a binding stricter cap into the task's own sentence, on the phone's task
+ * row as on the banner. On the zebra rung's default 50 street that is exactly
+ * this rung: the row now READS «… — дръж под 40 км/ч», and the advisor's capped
+ * card — byte for byte that sentence — is a pure echo with no detail left. A cap
+ * AT the sign is the case the ruling leaves to the coaching, so it is the case
+ * where the fold still hands the row a detail, and it is what the O54 gate and
+ * key blocks below use to have something to close.
+ */
+const signBoundSnap = () => ({ ...snapshotOf(zebraSession(), null), limitKmh: 40 });
+
 /** The render's own two lines: bind, then build the rows from the binding. */
 function shell(over: Partial<LessonQueueState> = {}, fresh: Partial<AdvisorTaskFreshness> = {}) {
   const binding = lessonQueueBinding(state(over));
@@ -409,7 +424,11 @@ describe("the phone reads the task row, with the counter and the coaching on it"
     const title = state().snap.objectiveTitle!;
     // The row itself: not hidden, not out-ranked — absent.
     expect(rows[0]).toBeNull();
-    expect(binding.fold.taskDetailBg).toBe("дръж под 40 км/ч");
+    // Founder ruling 2026-09-22: the 40 is stricter than the 50 street, so it is
+    // part of the TASK'S sentence — the line — and the capped card is then a
+    // pure echo of it, with nothing left over for a detail.
+    expect(binding.taskLineBg).toBe(`${title} — дръж под 40 км/ч`);
+    expect(binding.fold.taskDetailBg).toBeNull();
     const seen = glass(rows);
     expect(seen.kind).toBe("task");
     // The three things the student loses when the advisor row comes back.
@@ -506,15 +525,18 @@ describe("the shell's own state reaches the gate, one condition at a time", () =
     ["the session is over", { ended: true }],
   ];
 
+  // On the sign-bound reading (`signBoundSnap`): the one where the cap is
+  // coaching rather than part of the task's sentence, so there IS a detail for
+  // each condition to withhold.
   it("open: the coaching rides on the task row", () => {
-    const { binding } = shell();
+    const { binding } = shell({ snap: signBoundSnap() });
     expect(binding.fold.taskDetailBg).toBe("дръж под 40 км/ч");
     expect(binding.fold.advisorSpeaks).toBe(false);
   });
 
   for (const [name, over] of CLOSES) {
     it(`…and nothing arrives by the side door once ${name}`, () => {
-      const { binding } = shell(over);
+      const { binding } = shell({ snap: signBoundSnap(), ...over });
       expect(binding.fold.taskDetailBg).toBeNull();
       expect(binding.fold.advisorSpeaks).toBe(false);
     });
@@ -538,9 +560,9 @@ describe("the shell's own state reaches the gate, one condition at a time", () =
  * this drives it.
  */
 describe("the detail is a remainder of the line it is printed under", () => {
-  it("holds on the ordinary rung", () => {
+  it("holds on the ordinary rung, where the cap is coaching (at the sign)", () => {
     const title = state().snap.objectiveTitle!;
-    const { binding, rows } = shell();
+    const { binding, rows } = shell({ snap: signBoundSnap() });
     const row = rows[1];
     expect(binding.taskLineBg).toBe(title);
     expect(row?.lineBg).toBe(title);
@@ -548,8 +570,22 @@ describe("the detail is a remainder of the line it is printed under", () => {
     expect(itemEchoesLine(row!)).toBe(false);
   });
 
+  it("…and where the cap is part of the task's sentence, the line carries it ONCE", () => {
+    // Founder ruling 2026-09-22 on the phone: the line and the fold read the
+    // SAME sentence (`bannerObjectiveLineBg`). Were the fold still trimming
+    // against the bare title, the row would say «… — дръж под 40 км/ч» and then
+    // «дръж под 40 км/ч» again under it.
+    const title = state().snap.objectiveTitle!;
+    const { binding, rows } = shell();
+    const row = rows[1];
+    expect(row?.lineBg).toBe(`${title} — дръж под 40 км/ч`);
+    expect(row?.lineBg).toBe(state().snap.advisorPrompt?.textBg);
+    expect(row?.detailBg ?? null).toBeNull();
+    expect(binding.taskKey).not.toContain(":дръж под 40 км/ч:");
+  });
+
   it("…and in the mistake sandbox, where the two producers name different things", () => {
-    const { binding, rows } = shell({ mistakeMode: true });
+    const { binding, rows } = shell({ snap: signBoundSnap(), mistakeMode: true });
     const row = rows[1];
     // The line is the lesson's description; the coaching was trimmed against a
     // DIFFERENT sentence, so it must not be printed under this one.
@@ -604,9 +640,12 @@ describe("a coaching change re-announces the card that carries it", () => {
     // TypeScript-clean and left four suites green. The field is derived inside
     // `lessonQueueBinding` now, and this is the assertion that fails if the
     // derivation stops feeding it: two states that differ ONLY in the coaching
-    // must produce two different keys.
-    const coached = lessonQueueBinding(state()).taskKey;
-    const silent = lessonQueueBinding(state({ advisorOn: false })).taskKey;
+    // must produce two different keys. (Sign-bound: the reading where the cap
+    // is coaching and not already part of the line — `signBoundSnap`.)
+    const coached = lessonQueueBinding(state({ snap: signBoundSnap() })).taskKey;
+    const silent = lessonQueueBinding(
+      state({ snap: signBoundSnap(), advisorOn: false }),
+    ).taskKey;
     expect(coached).not.toBeNull();
     expect(silent).not.toBeNull();
     expect(coached).not.toBe(silent);
@@ -861,56 +900,72 @@ describe("MUTATION — the reader rejects each pin the substring accepted", () =
 });
 
 /**
- * ── §2.5 · O51 RESIDUAL (3), THE PHONE'S HALF, THROUGH THE WHOLE WIRE ───────
- * (sc-signal-hesitation:826bc3d5, major, re-judged STILL on the w24 re-drive.)
+ * ── §2.5 · O51 RESIDUAL (3), THE PHONE'S HALF — AND WHAT THE RULING CHANGED ──
+ * (sc-signal-hesitation:826bc3d5; founder ruling 2026-09-22 «Say it in the
+ * banner», sc-ac-truck-spray:d1119d8f.)
  *
- * The desktop leg was gated at the `AdvisorCard` mount and the phone was left
- * carrying the same figure on the same glass: no card exists there, so the
- * coaching rides the TASK ROW as its detail and the consolidated strip is under
- * it either way. `w24/frames/sc-signal-hesitation__mobile-wrong/run.log` at
- * 04-t027s, on the build that ALREADY carried the desktop fix — rail «Задача
- * 1/2 … дръж под 35 км/ч Защо», strip «… · задачата иска ≤35 — по-строгото
- * важи». `taskCapThread.test.ts` owns the predicate and its two exceptions;
- * these two drive the WIRE — the binding, the announce key and the row the
- * phone paints — because a decision the binding never asks for is the dead
- * predicate this programme measured at 51 of 82 repairs.
+ * WHAT THIS BLOCK USED TO PIN: with a governor printing a ceiling, the phone's
+ * task row dropped its «дръж под 40 км/ч» detail because the strip already said
+ * «задачата иска ≤40» (`w24/frames/sc-signal-hesitation__mobile-wrong/run.log`
+ * @ 04-t027s — the same 35 twice, in two phrasings). The line was left as the
+ * bare title.
  *
- * `governorCapKmh: null` is the default in `state()`, i.e. every block above is
- * the shipped behaviour untouched, and the residual is only ever asked about on
- * a stage where the bar is genuinely printing a ceiling.
+ * WHY THAT IS NO LONGER THE SHAPE. The founder ruled that when an objective's
+ * own cap is stricter than the sign and gates the credit, the TASK states it —
+ * the number the student is graded on appears where the task is stated. On the
+ * phone the task row IS that place (there is no banner), and the old shape was
+ * exactly the defect on a mobile leg of sc-ac-truck-spray: the strip's 80 beside
+ * a 140 disc, and a task row that never named it. So the figure now lives in
+ * the LINE (`bannerObjectiveLineBg`), the fold trims against that line, and the
+ * duplicate the residual was filed on still cannot happen INSIDE the row: the
+ * detail is empty because the line already said it. The strip may keep its
+ * «задачата иска ≤N» — that is the half of «don't show it twice» the ruling
+ * overrode.
+ *
+ * `governorCapKmh: null` is the default in `state()`.
  */
-describe("§2.5 the phone's task row drops a detail the strip is already printing", () => {
-  it("with a governor above the sign, the duplicate detail never reaches the row", () => {
+describe("§2.5 the phone's task row states a binding stricter cap, whatever the strip prints", () => {
+  const title = () => state().snap.objectiveTitle!;
+
+  it("with a governor above the sign, the row still names the 40 — in the line, once", () => {
     const quiet = shell({ governorCapKmh: 60 });
     // The zebra rung's cap is 40 against a 50 street, so `readSpeedContract`
     // makes the TASK the binding number and `GovernorCapMark` prints it.
     expect(state().snap.taskCapKmh).toBe(40);
-    expect(quiet.binding.fold.taskDetailBg).toBeNull();
     const taskRow = quiet.rows[1];
     expect(taskRow?.kind).toBe("task");
+    expect(taskRow?.lineBg).toBe(`${title()} — дръж под 40 км/ч`);
     expect(taskRow?.detailBg ?? null).toBeNull();
-    // …and the ROW ITSELF is untouched: the objective, its counter and its line
-    // are exactly what they were. Only the second copy of the speed is gone.
-    expect(taskRow?.lineBg).toBe(ZEBRA_TITLE);
+    const seen = glass(quiet.rows);
+    expect(seen.html.split("дръж под 40 км/ч").length - 1).toBeGreaterThanOrEqual(1);
+    expect(seen.html).toContain("Задача 1/2");
   });
 
-  it("the announce key follows it, so no card re-announces a line that did not change", () => {
-    // `taskAnnounceKey` carries the detail (a coaching change under an unchanged
-    // objective must re-announce). Suppressing the detail without the key would
-    // leave the phone re-announcing the task every time the cap sentence moved
-    // behind a row that no longer shows it.
-    expect(lessonQueueBinding(state({ governorCapKmh: 60 })).taskKey).not.toBe(
+  it("…and with «Съветник» off: the threshold is the task's, not the coaching's", () => {
+    // The banner is not gated on the advisor switch and neither is this: a
+    // switch that hid the graded figure would turn the task into a bare verdict.
+    const off = shell({ governorCapKmh: 60, advisorOn: false });
+    expect(off.rows[1]?.lineBg).toBe(`${title()} — дръж под 40 км/ч`);
+    expect(off.binding.fold.taskDetailBg).toBeNull();
+  });
+
+  it("the strip's governor no longer changes what the row says, so it cannot re-announce it", () => {
+    // `taskAnnounceKey` carries line and detail; with the figure in the line and
+    // no detail, the governor's arrival or departure moves neither.
+    expect(lessonQueueBinding(state({ governorCapKmh: 60 })).taskKey).toBe(
       lessonQueueBinding(state()).taskKey,
     );
-    expect(lessonQueueBinding(state({ governorCapKmh: 60 })).taskKey).toContain(ZEBRA_TITLE);
+    expect(lessonQueueBinding(state({ governorCapKmh: 60 })).taskKey).toContain(
+      `${title()} — дръж под 40 км/ч`,
+    );
   });
 
-  it("no governor: the strip prints no ceiling and the phone keeps its only copy", () => {
-    // The negative control, and the reason this is not an unconditional
-    // suppression: on „Напреднал" the bar draws no mark at all, so this detail
-    // is the only place the drill's demand is stated on a phone.
-    const loud = shell({ governorCapKmh: null });
-    expect(loud.binding.fold.taskDetailBg).toBe("дръж под 40 км/ч");
-    expect(loud.rows[1]?.detailBg).toBe("дръж под 40 км/ч");
+  it("the NEGATIVE CONTROL — a cap at the sign stays coaching, and the residual still governs it", () => {
+    // Not stricter ⇒ the ruling says nothing and the line is the bare title;
+    // `advisorCapEchoesStrip`'s B58 exception keeps the coaching detail, since
+    // the strip will not make a cap at the sign the binding number.
+    const atSign = shell({ snap: signBoundSnap(), governorCapKmh: 60 });
+    expect(atSign.rows[1]?.lineBg).toBe(title());
+    expect(atSign.rows[1]?.detailBg).toBe("дръж под 40 км/ч");
   });
 });

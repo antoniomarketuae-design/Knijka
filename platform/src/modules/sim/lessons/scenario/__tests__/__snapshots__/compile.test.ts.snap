@@ -38,6 +38,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
     "c-mirrors-blind-spots",
   ],
   "descriptionBg": "Две задачи, в този ред: първо спри в изходната позиция покрай свободното място — подминал го, на около метър и половина странично; после паркирай на заден ход точно в очертанията, с оглеждане преди и по време на маневрата и с възможно най-малко корекции.",
+  "doorMirrorsInTask": true,
   "id": "sc-park-perp-rev@L1",
   "objectives": [
     {
@@ -132,6 +133,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
     "c-mirrors-blind-spots",
   ],
   "descriptionBg": "Две задачи, в този ред: първо спри в изходната позиция покрай свободното място — подминал го, на около метър и половина странично; после паркирай на заден ход точно в очертанията, с оглеждане преди и по време на маневрата и с възможно най-малко корекции.",
+  "doorMirrorsInTask": true,
   "id": "sc-park-perp-rev@L2",
   "objectives": [
     {
@@ -224,6 +226,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
     "c-mirrors-blind-spots",
   ],
   "descriptionBg": "Две задачи, в този ред: първо спри в изходната позиция покрай свободното място — подминал го, на около метър и половина странично; после паркирай на заден ход точно в очертанията, с оглеждане преди и по време на маневрата и с възможно най-малко корекции.",
+  "doorMirrorsInTask": true,
   "id": "sc-park-perp-rev@L3",
   "objectives": [
     {
@@ -320,6 +323,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
     "c-mirrors-blind-spots",
   ],
   "descriptionBg": "Две задачи, в този ред: първо спри в изходната позиция покрай свободното място — подминал го, на около метър и половина странично; после паркирай на заден ход точно в очертанията, с оглеждане преди и по време на маневрата и с възможно най-малко корекции.",
+  "doorMirrorsInTask": true,
   "examMode": true,
   "id": "sc-park-perp-rev@L4",
   "objectives": [
@@ -417,6 +421,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
     "c-mirrors-blind-spots",
   ],
   "descriptionBg": "Две задачи, в този ред: първо спри в изходната позиция покрай свободното място — подминал го, на около метър и половина странично; после паркирай на заден ход точно в очертанията, с оглеждане преди и по време на маневрата и с възможно най-малко корекции.",
+  "doorMirrorsInTask": true,
   "environment": {
     "rain": true,
     "timeOfDay": "night",

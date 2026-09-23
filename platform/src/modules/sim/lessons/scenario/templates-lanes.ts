@@ -225,6 +225,10 @@ export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
     l5Wet(),
   ],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in the objective, and no structured channel carries it:
+  // «Огледало, десен мигач, престрой се в дясната лента и я дръж до края» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1057,6 +1061,10 @@ export const SC_OV_BAN_OVERTAKE: ScenarioSpec = {
   ],
   staged: [OVB_LEAD_CAR],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 4, and no structured channel carries it:
+  // «След края на забраната: огледало, мигач наляво и плавно излез в лявата лента за изпреварване.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1287,6 +1295,10 @@ export const SC_OV_BUS_LANE: ScenarioSpec = {
     l5Wet(),
   ],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 2, and no structured channel carries it:
+  // «Преди началото на бус лентата: огледало, мигач наляво и се престрой в общата лента.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1949,6 +1961,10 @@ export const SC_OV_ONCOMING_GAP: ScenarioSpec = {
   ],
   staged: [ovgLeadCar("sc-ovg-lead"), OVG_STREAM],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 4, and no structured channel carries it:
+  // «След последната насрещна кола: огледало, мигач наляво и излез решително» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -2320,6 +2336,10 @@ export const SC_OV_RETURN_GAP: ScenarioSpec = {
   ],
   staged: [ovgLeadCar("sc-ovr-lead")],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 2, and no structured channel carries it:
+  // «Огледало, мигач наляво и излез решително — подмини бавната кола без бавене.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 

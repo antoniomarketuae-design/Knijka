@@ -411,6 +411,10 @@ export const SC_PK_MOVE_OFF: ScenarioSpec = {
   // to the LessonSpec; the recorder passes the same override for the §9 assert.
   ruleConfig: { moveOffObservationEnabled: true },
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 3, and no structured channel carries it:
+  // «Погледни в лявото огледало и прецени идва ли кола или колоездач отзад.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -924,6 +928,10 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
   ],
   staged: [VP_POLICE_OFFICER],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 3, and no structured channel carries it:
+  // «Без паника: провери огледалото, пусни десен мигач и започни плавно да намаляваш отрано.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1133,6 +1141,10 @@ export const SC_VP_TELLTALE: ScenarioSpec = {
   ],
   staged: [VP_TELLTALE_LAMP],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in the objective, and no structured channel carries it:
+  // «огледало, десен мигач, плавно намаляване и спиране плътно вдясно» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 

@@ -233,8 +233,15 @@ describe("§5 the compiled rung carries the demand", () => {
 //      a time.
 // ---------------------------------------------------------------------------
 
-/** The three ways a Bulgarian banner claims „and you did not stand still". */
-const CLAIMS_NO_REST = /без престой|без да спираш|без спиране/;
+/**
+ * The ways a Bulgarian banner claims „and you did not stand still" — plus
+ * «без да чакаш», which sc-pkbs-past-zone reads since the founder follow-up
+ * ruling 2026-09-22 («Teach чл. 69 as written»): at a spirka a brief drop-off
+ * is lawful, so that banner now claims only that the driver did not WAIT
+ * (паркиране) in the zone — and it measures exactly that, because the
+ * `law-bus-stop` bill it reads fires only past the drop-off allowance.
+ */
+const CLAIMS_NO_REST = /без престой|без да спираш|без спиране|без да чакаш/;
 
 describe("§6 the census — every banner that claims it, measures it", () => {
   it("no reachZone title claims a rest-free stretch without a requireRestClean key", () => {

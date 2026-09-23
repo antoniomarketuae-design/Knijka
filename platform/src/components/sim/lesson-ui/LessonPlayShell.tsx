@@ -14,7 +14,7 @@
  * actually fire.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   armedTelltaleWarnings,
   briefingBodyBg,
@@ -31,7 +31,6 @@ import {
   gearUpActBg,
   gearUpWithBg,
   HAZARD_BAND_TOP_FRACTION,
-  hintInputFor,
   HudStyles,
   HudToasts,
   Minimap,
@@ -40,11 +39,19 @@ import {
   NOTIFY_COLUMN_WIDTH_CSS_ROOMY,
   leverActBg,
   ObjectiveBanner,
+  objectiveLineWithTaskCap,
   parkingBrakeActBg,
   PreDriveChecklist,
-  briefingAutoDefault,
+  briefingAutoSetting,
+  briefingAutoToggled,
+  briefingIsOpen,
+  briefingRecallOffered,
+  briefingStartReducer,
+  nextBriefingStartEvent,
   BRIEFING_AUTO_STORAGE_KEY,
+  BRIEFING_START_INITIAL,
   readStoredFlag,
+  readStoredFlagOrNull,
   selectOverlay,
   SessionEndScreen,
   SESSION_END_AUTO_DEFAULT,
@@ -103,7 +110,6 @@ import {
 } from "@/modules/sim/hud/SessionEndScreen";
 import {
   abortSession,
-  ADVISOR_STORAGE_KEY,
   advisorPromptForSession,
   applyNearMiss,
   applyPreDriveStep,
@@ -113,7 +119,6 @@ import {
   buildLessonResult,
   createLessonSession,
   createQuizTriggerState,
-  defaultAdvisorEnabled,
   EXAM_TERMINATION_TEXT_BG,
   finishSession,
   isDriveLocked,
@@ -130,12 +135,10 @@ import {
   parkingObservationFromTrace,
   parseMistakeExperienceLessonId,
   parseScenarioLessonId,
-  parseStoredAdvisorSetting,
   resolveScenarioNextSteps,
   routeHoldForSession,
   scenarioById,
   scoreRubric,
-  serializeAdvisorSetting,
   serializeCoachedMistakes,
   serializeNearMisses,
   serializeRuleEvents,
@@ -193,7 +196,6 @@ import {
   type ViolationCode,
 } from "@/modules/sim/rules";
 import {
-  hasTouchScreen,
   type ReverseStuckDirection,
   type StuckStartReason,
 } from "@/modules/sim/engine";
@@ -231,6 +233,8 @@ import { soundAriaLabelBg, soundHintBg, soundValueBg } from "./soundChoice";
 // the scene barrel would pull the R3F half into this client bundle.
 import { toggleSimAudioMuted, useSimAudioMuted } from "@/modules/sim/scene/simAudioMuteStore";
 import { useQualitySelection } from "./QualityPresetSelector";
+import { useHintInput } from "./useHintInput";
+import { useAdvisorChoice, useMinimapChoice, useQuizFrequency } from "./storedChoices";
 import { CalibrationGate, CalibrationPendingCard } from "./CalibrationGate";
 import { HudCloseButton } from "./HudCloseButton";
 // The one floor in this lane for „the car is genuinely under way", borrowed
@@ -279,7 +283,6 @@ import { SceneSlot } from "./SceneSlot";
 import { TeachMomentOverlay } from "./TeachMomentOverlay";
 import {
   MICRO_QUIZ_FREQUENCIES,
-  MICRO_QUIZ_STORAGE_KEY,
   type FinishLessonActionResult,
   type QualityPreset,
 } from "./types";
@@ -664,16 +667,12 @@ export function transmissionSwitchHint(
 // and the top-down camera (key C) is the real map when one is wanted. So the
 // map becomes an on-demand instrument, and the choice is remembered per
 // browser: a student who wants it never has to ask twice.
-const MINIMAP_STORAGE_KEY = "aidrive.sim.minimap.v1";
-
-function readStoredMinimapOn(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(MINIMAP_STORAGE_KEY) === "on";
-  } catch {
-    return false;
-  }
-}
+//
+// The remembered choice (key, default, read, write) lives in
+// `./storedChoices.ts` — `useMinimapChoice`. It used to be a lazy `useState`
+// reading localStorage during render, which on a server-rendered deep link
+// printed „Карта изкл." on the server and „Карта вкл." (plus the disc) in a
+// returning student's hydration render. See that module's header.
 
 // -- The overlay budget (founder review 2026-07-29) ---------------------------
 // „not acceptable it is not playable at all" — his screenshots show a „ЗАДАЧА"
@@ -772,6 +771,12 @@ export interface HudSnapshot {
    *  a lawful wait), and the bar then prints the two-number reading it always
    *  printed. */
   taskCapKmh: number | undefined;
+  /** The ACTIVE objective's authored lower speed edge (`reachZone.minSpeedKmh`),
+   *  read straight off the objective exactly as the advisor reads it — a floor
+   *  is authored, never laddered, so it has no spoken twin. Only the banner's
+   *  task line reads it (`bannerObjectiveLineBg`). Optional so a hand-built
+   *  snapshot without one means „no floor". */
+  taskFloorKmh?: number;
   vehicle: { x: number; y: number; headingDeg: number } | null;
   /** A13: live official tally (exam sessions only, null otherwise). */
   examTally: { totalPoints: number; osnovniPoints: number; opasniCount: number } | null;
@@ -1053,6 +1058,38 @@ export function advisorCapEchoesStrip(
  */
 
 /**
+ * THE BANNER'S SENTENCE, WITH THE TASK'S OWN NUMBER — founder ruling
+ * 2026-09-22 «Say it in the banner» (sc-ac-truck-spray:d1119d8f). The rule and
+ * its three silences live at `hud/objectiveTaskLine.ts`; this is only the join
+ * to the snapshot, kept in one function so the banner mount and the advisor
+ * card's echo trim read the SAME string: the banner now prints
+ * «… — дръж под 80 км/ч», which is the advisor's whole capped card, so the trim
+ * must see it or the roomy stage would print the figure twice, 30 px apart.
+ *
+ * It overrides «don't show the task speed twice» (O51 residual 3) WHEREVER
+ * THE TASK IS STATED — the roomy banner, and on the phone (which has no
+ * banner) the task row and the micro-menu's «Задача» recall row, both of which
+ * print `lessonQueueBinding`'s `taskLineBg`, built from THIS function. Round 1
+ * of the repair reached the banner only, and a mobile leg of sc-ac-truck-spray
+ * still stated the task without the 80: `advisorTaskFold` cleared the row's
+ * «дръж под 80 км/ч» detail because the strip printed the same number — the
+ * grade against an unstated threshold the ruling exists to end.
+ * `advisorCapEchoesStrip` still governs the COACHING (the roomy advisor card
+ * and the phone row's detail); it simply never meets this figure any more,
+ * because the line already carries it and the fold trims against the line.
+ */
+export function bannerObjectiveLineBg(
+  snap: Pick<HudSnapshot, "objectiveTitle" | "taskCapKmh" | "limitKmh" | "taskFloorKmh">,
+): string | null {
+  return objectiveLineWithTaskCap(
+    snap.objectiveTitle,
+    snap.taskCapKmh,
+    snap.limitKmh,
+    snap.taskFloorKmh,
+  );
+}
+
+/**
  * The banner's sentence under a hold — the authored objective, with the thing
  * that has to happen first in front of it.
  *
@@ -1313,6 +1350,10 @@ export function snapshotOf(
       active?.spec.id ?? null,
       prev,
     ),
+    taskFloorKmh:
+      s.phase === "driving" && active && active.params.kind === "reachZone"
+        ? active.params.minSpeedKmh
+        : undefined,
     vehicle: lastTick
       ? {
           x: lastTick.position.x,
@@ -1368,53 +1409,13 @@ export function hudPollUpdate(
   return (prev) => snapshotOf(s, lastTick, driveline, prev);
 }
 
-const DEFAULT_QUIZ_FREQUENCY: QuizFrequency = "occasional";
-
-function isQuizFrequency(v: unknown): v is QuizFrequency {
-  return v === "off" || v === "occasional" || v === "frequent";
-}
-
-function readStoredQuizFrequency(): QuizFrequency {
-  // Safe as a lazy useState initializer: this shell mounts client-side only
-  // (after the student picks a lesson), so there is no SSR/hydration pass to
-  // mismatch — no effect + setState dance needed.
-  if (typeof window === "undefined") return DEFAULT_QUIZ_FREQUENCY;
-  try {
-    const stored = window.localStorage.getItem(MICRO_QUIZ_STORAGE_KEY);
-    return isQuizFrequency(stored) ? stored : DEFAULT_QUIZ_FREQUENCY;
-  } catch {
-    return DEFAULT_QUIZ_FREQUENCY;
-  }
-}
-
-/** Persisted micro-quiz difficulty (localStorage). */
-function useQuizFrequency(): [QuizFrequency, (f: QuizFrequency) => void] {
-  const [freq, setFreq] = useState<QuizFrequency>(readStoredQuizFrequency);
-  const update = (f: QuizFrequency) => {
-    setFreq(f);
-    try {
-      window.localStorage.setItem(MICRO_QUIZ_STORAGE_KEY, f);
-    } catch {
-      // Private mode etc. — the in-memory value still applies this session.
-    }
-  };
-  return [freq, update];
-}
-
-/**
- * Persisted „Съветник" preference; nothing stored → the lesson-level default
- * (ON for beginner rungs, OFF for level 3+ — advisor.ts). Same lazy-init
- * safety as readStoredQuizFrequency: this shell mounts client-side only.
- */
-function readStoredAdvisorOn(lesson: LessonSpec): boolean {
-  if (typeof window === "undefined") return defaultAdvisorEnabled(lesson);
-  try {
-    const stored = parseStoredAdvisorSetting(window.localStorage.getItem(ADVISOR_STORAGE_KEY));
-    return stored ?? defaultAdvisorEnabled(lesson);
-  } catch {
-    return defaultAdvisorEnabled(lesson);
-  }
-}
+// The micro-quiz frequency and the „Съветник" preference are remembered per
+// browser through `./storedChoices.ts` (`useQuizFrequency`, `useAdvisorChoice`).
+// Both used to be lazy `useState` initializers reading localStorage under the
+// comment „safe: this shell mounts client-side only, so there is no
+// SSR/hydration pass to mismatch". That is false on every server-rendered deep
+// link: the top bar's „Съветник вкл./изкл." and the frequency selector's
+// pressed segment are in the server HTML, and the server cannot read storage.
 
 // ---------------------------------------------------------------------------
 // Viewport hooks — all effect-resolved, never guessed during render.
@@ -2094,7 +2095,8 @@ export function foldAdvisorIntoTask(
 export interface AdvisorTaskGate {
   /** The session's own next-action prompt — `snap.advisorPrompt`. */
   advisorPrompt: AdvisorPrompt | null;
-  /** What the banner/task line is already saying — `snap.objectiveTitle`. */
+  /** What the banner/task line is already saying — `bannerObjectiveLineBg(snap)`,
+   *  the title plus the task's binding cap when it is stricter than the sign. */
   objectiveTitleBg: string | null;
   /** «Съветник» вкл./изкл. */
   advisorOn: boolean;
@@ -2480,17 +2482,30 @@ export function lessonQueueBinding(s: LessonQueueState): LessonQueueBinding {
   // (sc-junction-blind:c5ba8f17). The phone has no banner, so this line IS the
   // demand there; a chip that keeps ordering a manoeuvre into a facade is the
   // bare-verdict crime pointing the other way (doc 64 THEO-4).
+  // …and WITH THE TASK'S OWN BINDING CAP when it is stricter than the sign —
+  // founder ruling 2026-09-22 «Say it in the banner», whose reason (the number
+  // the student is graded on appears where the task is stated) holds for this
+  // row exactly as for the banner: it is the phone's only statement of the
+  // task. Same function, same wording, same «title already states it»
+  // exception (`bannerObjectiveLineBg`). NOT gated on «Съветник»: the banner
+  // is not either, and a switch that hid the graded threshold would turn the
+  // task into a bare verdict. Length: the composed line is the advisor's own
+  // capped sentence, held under the 95-character phone band
+  // (`objective-banner-task-cap.test.ts`, «the phone's task row»).
   const taskLineBg = s.mistakeMode
     ? s.lessonDescriptionBg
-    : objectiveTitleUnderHold(s.snap.objectiveTitle, s.snap.objectiveHold);
+    : objectiveTitleUnderHold(bannerObjectiveLineBg(s.snap), s.snap.objectiveHold);
 
   // The gate and the fold — one place, and a pure one, so the four conditions
   // can be driven one at a time. It is NOT the gate the roomy `AdvisorCard` is
   // mounted behind (that one has nine); the correction and the per-condition
   // measurement are at `advisorTaskFold`.
+  // The fold trims against the SAME sentence the line prints (cap included),
+  // so the advisor's capped card — byte for byte that sentence — is a pure echo
+  // and leaves no «дръж под N км/ч» detail saying the figure twice in one row.
   const fold = advisorTaskFold({
     advisorPrompt: s.snap.advisorPrompt,
-    objectiveTitleBg: s.snap.objectiveTitle,
+    objectiveTitleBg: bannerObjectiveLineBg(s.snap),
     advisorOn: s.advisorOn,
     examMode: s.examMode,
     mistakeMode: s.mistakeMode,
@@ -4451,12 +4466,18 @@ export function LessonPlayShell({
    * `hasTouchScreen()` is the SAME predicate `LessonScene` mounts
    * `TouchControls` on, so the copy names on-screen cells exactly when those
    * cells exist — including on a touch laptop, where both are true and both
-   * are right. Read once, in a lazy initializer: this shell is client-only
-   * (the whole play route is), so there is no SSR pass to mismatch, and a card
-   * whose wording changed mid-lesson because a matchMedia flipped would be a
-   * worse defect than the one being fixed.
+   * are right.
+   *
+   * NOT a lazy `useState` any more. This shell IS server-rendered on every
+   * deep link (`/simulator?scenario=…`), and reading the device during render
+   * wrote the keyboard copy on the server and the touch copy in the phone's
+   * hydration render — „Изкл. I" vs „Изкл." in the dashboard's engine cell —
+   * so React discarded and regenerated the tree on every mobile lesson
+   * arrival. `useHintInput` hydrates with the server's "keyboard" and switches
+   * once after hydration; it still samples the device only once per page, so a
+   * card's wording never changes mid-lesson. See `./useHintInput.ts`.
    */
-  const [hintInput] = useState<HintInput>(() => hintInputFor(hasTouchScreen()));
+  const hintInput = useHintInput();
   // Engine state: ref-resident, frame-rate mutations, zero re-renders.
   const [initialSession] = useState(() => createLessonSession(lesson));
   const sessionRef = useRef<LessonSessionState>(initialSession);
@@ -4818,23 +4839,56 @@ export function LessonPlayShell({
   // МЕНЮ row «Инструкции · N стъпки» below (`recallBriefing`), which is what
   // keeps hiding the card from costing the student the lesson's instructions.
   const briefing = lesson.briefingBg ?? [];
-  const [briefingAutoOpen, setBriefingAutoOpen] = useState<boolean>(() =>
-    readStoredFlag(BRIEFING_AUTO_STORAGE_KEY, briefingAutoDefault(compact)),
+  //
+  // ── AND THE RULING DID NOT SHIP UNTIL THE DECISION WAITED FOR ITS ANSWER.
+  // Both states below used to be LAZY `useState` initialisers — the setting
+  // read with the surface default folded in, and the card seeded from the
+  // setting's first value. A lazy initialiser reads the FIRST render only, and
+  // on the first render `useCompactHud()` is still its own `useState(false)`:
+  // every phone is a desktop there, so the roomy default (OPEN) was frozen on
+  // every phone and the w60 arrival frames show the card holding the drive.
+  // So now:
+  //   · what is persisted and held is the student's CHOICE (or null), never a
+  //     default;
+  //   · the setting's value is derived on every render from the RESOLVED
+  //     `compact` (`briefingAutoSetting`), so the МЕНЮ row cannot print the
+  //     desktop default on a phone;
+  //   · whether the card is up is a state machine (`hud/briefingStart.ts`) that
+  //     decides nothing until the render after mount — the one carrying the
+  //     resolved compact value — and is closed until then, so a phone never
+  //     sees it flash open. The effect body is `nextBriefingStartEvent`, the
+  //     same function `briefing-start.test.ts` drives through React's render
+  //     sequence. The setting answers „open it next time"; the ✕ answers „be
+  //     rid of it now" (`dismiss`); folding them into one state would make a
+  //     dismissal rewrite a preference — the distinction `endSkipped` keeps
+  //     beside `endAutoOpen` a few lines up.
+  const [briefingAutoStored, setBriefingAutoStored] = useState<boolean | null>(() =>
+    readStoredFlagOrNull(BRIEFING_AUTO_STORAGE_KEY),
   );
+  const briefingAutoOpen = briefingAutoSetting(compact, briefingAutoStored);
+  // The tap writes the opposite of what the row PRINTS (the effective
+  // setting), not of the raw stored choice — with nothing stored those differ,
+  // and `!briefingAutoStored` would turn a roomy «вкл.» row «on» again.
+  // `briefingAutoToggled` is the executed rule (briefing-start.test.ts).
   const toggleBriefingAutoOpen = useCallback(() => {
-    setBriefingAutoOpen((on) => {
-      const next = !on;
-      writeStoredFlag(BRIEFING_AUTO_STORAGE_KEY, next);
-      return next;
-    });
-  }, []);
-  // Reads `briefingAutoOpen`'s FIRST value and then goes its own way: the
-  // setting answers „open it next time", the card's own ✕ answers „be rid of it
-  // now", and folding them into one state would make a dismissal rewrite a
-  // preference — the same distinction `endSkipped` keeps beside
-  // `endAutoOpen` a few lines up.
-  const [briefingOpen, setBriefingOpen] = useState(() => briefingAutoOpen);
-  const closeBriefing = useCallback(() => setBriefingOpen(false), []);
+    const next = briefingAutoToggled(compact, briefingAutoStored);
+    writeStoredFlag(BRIEFING_AUTO_STORAGE_KEY, next);
+    setBriefingAutoStored(next);
+  }, [compact, briefingAutoStored]);
+  const [briefingStart, dispatchBriefingStart] = useReducer(
+    briefingStartReducer,
+    BRIEFING_START_INITIAL,
+  );
+  useEffect(() => {
+    const event = nextBriefingStartEvent(briefingStart, compact, briefingAutoStored);
+    if (event !== null) dispatchBriefingStart(event);
+  }, [briefingStart, compact, briefingAutoStored]);
+  const briefingOpen = briefingIsOpen(briefingStart);
+  // The roomy pill waits for the decision too — see `briefingRecallOffered`:
+  // before it, «closed» means «not decided yet», and a pill painted there sat on
+  // the glass for two frames under the card that was about to arrive.
+  const briefingRecallShown = briefingRecallOffered(briefingStart);
+  const closeBriefing = useCallback(() => dispatchBriefingStart({ type: "dismiss" }), []);
   /**
    * THE BRIEFING'S FOLD, HELD WHERE IT CANNOT BE UNMOUNTED — the derivation,
    * the two census beats and the row it closes are all in `BriefingCard`'s own
@@ -4902,7 +4956,7 @@ export function LessonPlayShell({
   const [briefingRecalled, setBriefingRecalled] = useState(false);
   const recallBriefing = useCallback(() => {
     setBriefingRecalled(true);
-    setBriefingOpen(true);
+    dispatchBriefingStart({ type: "recall" });
     // …AND THE STAND-DOWN LATCH IS SPENT BY THE ASK. Same sentence the roomy
     // card's `unfold` writes: a student who asks for the steps back while the
     // car is moving has answered the question the speed rule is guessing at, so
@@ -4981,8 +5035,11 @@ export function LessonPlayShell({
     () =>
       snap.advisorPrompt === null
         ? null
-        : advisorEchoTrim(snap.advisorPrompt.textBg, snap.objectiveTitle),
-    [snap.advisorPrompt, snap.objectiveTitle],
+        : // The banner's OWN sentence, cap included (`bannerObjectiveLineBg`):
+          // with the task's number on the banner the capped card is a pure
+          // echo and does not render.
+          advisorEchoTrim(snap.advisorPrompt.textBg, bannerObjectiveLineBg(snap)),
+    [snap.advisorPrompt, snap.objectiveTitle, snap.taskCapKmh, snap.limitKmh, snap.taskFloorKmh],
   );
 
   /** The difficulty governor as the bottom strip has it — see the mirror in the
@@ -5071,18 +5128,9 @@ export function LessonPlayShell({
   }, [immersive]);
 
   // -- Minimap: on demand, not always-on (founder 2026-07-28) ------------------
-  const [minimapOn, setMinimapOn] = useState<boolean>(readStoredMinimapOn);
-  const toggleMinimap = useCallback(() => {
-    setMinimapOn((on) => {
-      const next = !on;
-      try {
-        window.localStorage.setItem(MINIMAP_STORAGE_KEY, next ? "on" : "off");
-      } catch {
-        // Private mode etc. — the in-memory value still applies this session.
-      }
-      return next;
-    });
-  }, []);
+  // Hydration-safe: the server's default until hydration, the remembered
+  // choice after it (`./storedChoices.ts`).
+  const [minimapOn, toggleMinimap] = useMinimapChoice();
 
   // -- Sound: the ⚙ sheet's «Звук» row (sweep w10, nine rows) -----------------
   //
@@ -5118,18 +5166,9 @@ export function LessonPlayShell({
   // „Съветник" (advisor) toggle: persisted preference wins; otherwise ON for
   // the beginner rungs, OFF from level 3 up. Hidden & inert entirely on exam
   // sessions (the pure module also returns null there — defense in depth).
-  const [advisorOn, setAdvisorOn] = useState<boolean>(() => readStoredAdvisorOn(lesson));
-  const toggleAdvisor = useCallback(() => {
-    setAdvisorOn((on) => {
-      const next = !on;
-      try {
-        window.localStorage.setItem(ADVISOR_STORAGE_KEY, serializeAdvisorSetting(next));
-      } catch {
-        // Private mode etc. — the in-memory value still applies this session.
-      }
-      return next;
-    });
-  }, []);
+  // Hydration-safe (`./storedChoices.ts`): the lesson default until hydration,
+  // the remembered choice after it.
+  const [advisorOn, toggleAdvisor] = useAdvisorChoice(lesson);
 
   // A2: pre-drive mode (Instruction→Practice→Assess). The machine applies the
   // matching order-scoring; the shell derives the presentation from it.
@@ -5688,7 +5727,11 @@ export function LessonPlayShell({
     // up; this is the writer that makes it true. It is also what keeps the new
     // roomy recall pill honest: without it a retry would open on the pill
     // instead of on the steps.
-    setBriefingOpen(true);
+    //
+    // …ON THIS SURFACE'S TERMS (founder ruling 2026-09-20): an arrival on a
+    // phone opens the card only if the student opted in, so a retry does too;
+    // the roomy stage's arrival still opens it.
+    dispatchBriefingStart({ type: "arrive", compact, stored: briefingAutoStored });
     // …AND THE FOLD LATCH BELONGS TO ONE ATTEMPT FOR THE SAME REASON. It was
     // never reset, which on the roomy leg handed a retry its briefing already
     // folded — the previous run's answer to a question this run has not been
@@ -7058,9 +7101,11 @@ export function LessonPlayShell({
         //    §I26(c) added for exactly this, „a setting that changes the
         //    experience without saying what it costs is the bare verdict
         //    requirement zero forbids". Here the bare verdict IS the fraction.
-        //    `taskLineBg` is `snap.objectiveTitle` outside mistake mode, i.e.
-        //    the same sentence the banner would be carrying if it were still up,
-        //    so the row now says WHICH task rather than only how many.
+        //    `taskLineBg` is the banner's own sentence outside mistake mode
+        //    (`bannerObjectiveLineBg`: the title, plus the task's binding cap
+        //    when it is stricter than the sign — founder ruling 2026-09-22), so
+        //    the row says WHICH task, and the number it is graded on, rather
+        //    than only how many.
         //
         // THE HEIGHT IS PAID, not ignored: a hinted row costs 56.5 px against
         // 43.5 (the arithmetic is on `PlayMenuRow`), which in portrait is the
@@ -7079,7 +7124,9 @@ export function LessonPlayShell({
         // shorten; this one is the student's task, and the longest objective
         // title in the catalogue is 76 characters («Премини стоп-линията по
         // разрешение на регулировчика — въпреки червената лампа», censused over
-        // every `titleBg:` in `templates-*.ts`). At ~35 characters to a 10 px
+        // every `titleBg:` in `templates-*.ts`); the ruling's «— дръж под N км/ч»
+        // tail keeps the longest composed line under the 95-character phone
+        // band (`objective-banner-task-cap.test.ts`). At ~35 characters to a 10 px
         // line in 208 px that is three lines in the worst case — one line and
         // ~12.5 px more than the budgeted two, absorbed by the same cap-and-
         // scroll pair. Cutting it instead would put half a sentence in the ONLY
@@ -8049,7 +8096,9 @@ export function LessonPlayShell({
               // every drive whose route is still reachable; on the ones where it
               // is not, the condition goes in front of the demand instead of the
               // demand standing over a car that cannot obey it.
-              titleBg={objectiveTitleUnderHold(snap.objectiveTitle, snap.objectiveHold)}
+              // …and with the task's own binding cap when it is stricter than
+              // the sign (founder ruling 2026-09-22, `bannerObjectiveLineBg`).
+              titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold)}
               index={Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}
               total={snap.objectiveTotal}
               progress={snap.objectiveProgress}
@@ -8145,7 +8194,7 @@ export function LessonPlayShell({
               in the tree but never painted, and a recall that never reaches the
               glass is this programme's commonest failure wearing a repair's
               clothes. */}
-          {!briefingOpen &&
+          {briefingRecallShown &&
           briefing.length > 0 &&
           !mistakeMode &&
           !ended &&

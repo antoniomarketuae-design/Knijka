@@ -343,3 +343,27 @@ W59-STEERING-SPEC §9.2 reserved for him (`handoff-2026-09-20/reports/W59-STEERI
 pose is separable in the published record (`opposingBank`; `laneOffsetM` alone reads 0.0000 on both
 banks), and increment 3 must make the unsteered negative control FAIL (AC-1) within budget, or the
 work is parked with the measurement kept. Acceptance is `tools/mobile/lib/road-criteria.mjs`.
+
+## GAP-4 — sc-park-bay-exit-rev cannot be planned robustly — **PARKED 2026-09-22**
+
+The one pathref W59 §4.2.2 left unscreened. A re-plan (workflow `wf_0919eec8-6df`, scratch only,
+NOT landed) found why it is refused: the authored reverse ends on a 3.03 m quarter arc this car
+cannot turn (tightest reverse ≈ 4.2 m), and nothing inside the Slice 0 1.0 m / 15° end box clears
+the 0.15 m body floor. Re-planned against what the product actually grades — Задача 1 is
+`reachZone(1.0, −3.03) r 2.5` in reverse (templates-parking2.ts:989-994), then Задача 2 — it drove
+20/20 bench seeds with both tasks credited in order. **It was refuted and parked anyway**, on
+evidence:
+- **Not reproducible, and ill-conditioned.** The committed pathref was built from a pinned fleet
+  table; the repo's builder (`build-pathrefs.mjs`) sizes bodies from the shipped GLBs, which differ
+  by ≤ 4.8e-5 m — and rebuilt that way the witness touches `lot-bay-4` on the bench. A 0.05 mm
+  change in body extents moves the planned clearance 16 mm and flips F1 to contact on a seed.
+- **The arm band fails its own screen**: 5 of 8 R0 corners, three into `lot-bay-4` (to −0.53 m),
+  yet it is emitted at full width.
+- **A policy change the planner may not make.** The 2026-09-16 policy note rejected a zone-only
+  target as «satisfied without performing the manoeuvre … none of which a planner may decide».
+- **The canary would refuse it by construction** (G7 measures the reverse end against the
+  unreachable authored end, > 2 m away).
+What would unpark it: a founder decision on the target (the product's Задача 1 zone vs the authored
+end), then a plan with a clearance margin that survives GLB-vs-table extents (planned ≥ 0.25 m
+held), a screened arm band, and a G7 rule for zone-graded ends. The row
+`sc-park-bay-exit-rev:49af2940` stays open.

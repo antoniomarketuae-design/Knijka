@@ -39,14 +39,24 @@
  *                                         ADR-009: НЕ Е ВЗЕТ, uncharged hit
  *   L4 exam      mistake-stop-on-pocket   scored [BAN_ZONE] osnovni 3
  *                                         sc-pkbs-past-zone REFUSED
- *   L1 training  8 s held rest            coached only — the free lesson
- *   L1 training  11 s held rest           coached only; the re-bill is DROPPED
+ *   L1 training  allowance + 4 s wait     coached only — the free lesson
+ *   L1 training  allowance + 7 s wait     coached only; the re-bill is DROPPED
  *                                         …targets stripped: scored, `regrade`
+ *   L1 training  12 s drop-off            nothing — чл. 69 allows it
  *
  * So the fail path DOES bite, on both channels, and the escalation the debrief
- * promises is real: `BAN_ZONE_REST_REGRADE_SEC` (6 s on top of the 4 s
- * `banZoneStopRestSec`) turns a held rest into the charge the free mini-lesson
- * consumed. None of it was pinned anywhere. Now it is.
+ * promises is real: `BAN_ZONE_REST_REGRADE_SEC` (6 s on top of the spirka's
+ * `busStopDropOffMaxSec`) turns a held wait into the charge the free
+ * mini-lesson consumed. None of it was pinned anywhere. Now it is.
+ *
+ * THE ALLOWANCE — founder follow-up ruling 2026-09-22, «Teach чл. 69 as
+ * written». This file's rests used to be 8 s / 11 s against the 4 s sustain
+ * every ban zone shares. чл. 69 PERMITS a brief stop at a spirka to let
+ * passengers alight, so the reducer now bills a `law-bus-stop` rest only past
+ * `RuleEngineConfig.busStopDropOffMaxSec` (the product's drop-off allowance —
+ * the act names no number): what convicts is WAITING, i.e. паркиране (чл. 93,
+ * ал. 2), which чл. 98, ал. 2, т. 3 bans at the stops. Every duration below is
+ * derived from that config value, so the file cannot drift from the product.
  *
  * WHAT ADR-009 CHANGED HERE, 2026-09-18 (founder Ruling A, doc 92 §3.4b b/g and
  * §8.1 T4). Stopping on the spirka is the mistake THIS lesson exists to teach,
@@ -57,15 +67,14 @@
  * machinery itself stays measured through a strip control that removes only
  * `lessonMistakeTargets` and watches the −3 come back.
  *
- * THE HALF THIS FILE DELIBERATELY DOES NOT ASSERT, and it is REPORTED, NOT
- * PATCHED. The card the student reads on this map is the POOLED
- * `ILLEGAL_STOP_IN_BAN_ZONE` row: «Спря в участък, в който престоят е забранен
- * — ПОД ЗНАК В27 …», lawRef «ЗДвП чл. 6, т. 1 …», on a district that carries no
- * plate at all and whose entire subject is a зигзаг. `rules/types.ts
- * NoStopBasis` records why («"law-busstop" IS DELIBERATELY ABSENT … a
- * content-truth ruling for the founder»). Freezing that sentence in an
- * assertion here would make the miscitation harder to remove, so this suite
- * stays silent about the copy and says so out loud instead.
+ * THE COPY — founder ruling 2026-09-22, «Convict under чл. 69» (row
+ * sc-pk-busstop-ban:b103c282). This header used to say the file DELIBERATELY
+ * did not assert the card, because the card was the pooled «под знак В27» row
+ * on a district that carries no plate, and freezing a miscitation makes it
+ * harder to remove. The ruling removed it: both spans declare
+ * `basis: "law-bus-stop"`, the card cites ЗДвП чл. 69 (quoted verbatim from
+ * the law bank), and the world posts no В27 at the spirka. §7 pins that card
+ * through this same production drive.
  *
  * THE MUTATIONS THAT REDDEN IT — every section has one:
  *  §1 drop the coached arm of `banZoneRestCoached` (lessons/engine.ts:1755) and
@@ -104,6 +113,13 @@ import { compileScenario } from "../scenario/compile";
 import { SC_PK_BUSSTOP_BAN } from "../scenario/templates-parking2";
 import type { ScenarioLevel } from "../scenario/types";
 import type { LessonSessionState } from "../types";
+import { DEFAULT_RULE_CONFIG, type ViolationEvent } from "../../rules";
+import { lessonMistakeCopy } from "../lessonMistake";
+
+/** The spirka's drop-off allowance, s — a rest shorter than this is lawful. */
+const ALLOWANCE = DEFAULT_RULE_CONFIG.busStopDropOffMaxSec;
+/** The card's citation since the founder follow-up ruling. */
+const BUS_STOP_REF = "ЗДвП чл. 69; чл. 93, ал. 2; чл. 98, ал. 2, т. 3";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
@@ -164,7 +180,7 @@ function playRecorded(name: ScPkBusstopBanTraceName, level: ScenarioLevel): Driv
 
 /**
  * The same session, driven by a script this file owns — the ONLY way to ask the
- * escalation question, because both committed demos rest ~5 s and stop short of
+ * escalation question, because both committed demos wait 24 s and stop short of
  * the re-grade by design (they are teaching demonstrations, not stress tests).
  * Nothing is written: `recordScriptedDrive` returns a recording, and the
  * committed traces are untouched by anything here.
@@ -336,11 +352,11 @@ describe("§2 L4 examMode — «Спиране в забранена зона» 
 // ---------------------------------------------------------------------------
 
 describe("§3 the escalation is real — and ADR-009 withholds it on this lesson's OWN act", () => {
-  it("8 s of standing on the spirka: taught, and only taught", () => {
-    // Past `banZoneStopRestSec` (4 s) so the first bill exists, short of the
-    // 4 + `BAN_ZONE_REST_REGRADE_SEC` (10 s) that re-grades it. This is the
-    // state the w37 debrief photographed, and it is CORRECT.
-    const out = playHeldRest(8);
+  it("waiting on the spirka past the drop-off allowance: taught, and only taught", () => {
+    // Past `busStopDropOffMaxSec` so the first bill exists, short of the
+    // allowance + `BAN_ZONE_REST_REGRADE_SEC` (6 s) that re-grades it. This is
+    // the state the w37 debrief photographed, and it is CORRECT.
+    const out = playHeldRest(ALLOWANCE + 4);
     expect(out.coached).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(out.scored).toEqual([]);
     expect(out.score.totalPoints).toBe(0);
@@ -355,7 +371,7 @@ describe("§3 the escalation is real — and ADR-009 withholds it on this lesson
    *
    * It was written to prove the debrief's promise — «Първата среща не се
    * наказва … При повторение вече влиза в изпитния лист» — was not a lie, by
-   * showing that an 11 s rest reached the изпитен лист through
+   * showing that a rest past the re-grade reached the изпитен лист through
    * `BAN_ZONE_REST_REGRADE_SEC`. But that re-bill is not a second offence: it
    * is the FIRST one billed late, marked `regrade: true`, and it exists only to
    * reach the charge the free mini-lesson consumed.
@@ -381,8 +397,8 @@ describe("§3 the escalation is real — and ADR-009 withholds it on this lesson
    * at all, the control would red while the ADR-009 case stayed green — and a
    * pair that can only ever agree is not a measurement.
    */
-  it("11 s: the re-bill is DROPPED, because this is the lesson's own mistake", () => {
-    const out = playHeldRest(11);
+  it("past the re-grade: the re-bill is DROPPED, because this is the lesson's own mistake", () => {
+    const out = playHeldRest(ALLOWANCE + 7);
     expect(out.coached).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(out.scored).toEqual([]);
     expect(out.score.totalPoints).toBe(0);
@@ -395,7 +411,7 @@ describe("§3 the escalation is real — and ADR-009 withholds it on this lesson
   });
 
   it("…and it is ADR-009 that drops it: strip the targets and the −3 comes back", () => {
-    const out = playHeldRest(11, stripLessonMistakeTargets);
+    const out = playHeldRest(ALLOWANCE + 7, stripLessonMistakeTargets);
     expect(out.coached).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(out.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(out.score).toEqual({ totalPoints: 3, osnovniPoints: 3, osnovniCount: 1 });
@@ -413,8 +429,8 @@ describe("§3 the escalation is real — and ADR-009 withholds it on this lesson
     // produce a third bill. Under ADR-009 the lesson's own act reaches the sheet
     // at ZERO bills; the strip control shows the ceiling underneath is still the
     // same 3 точки Наредба № 38 prices the offence at, once.
-    expect(playHeldRest(30).scored).toEqual([]);
-    const control = playHeldRest(30, stripLessonMistakeTargets);
+    expect(playHeldRest(3 * ALLOWANCE).scored).toEqual([]);
+    const control = playHeldRest(3 * ALLOWANCE, stripLessonMistakeTargets);
     expect(control.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(control.score.osnovniPoints).toBe(3);
   });
@@ -438,13 +454,31 @@ describe("§4 the shadow is untouched at every rung", () => {
   }
 
   it("a rest 2 s short of the sustain is not a fault (the detector's own floor)", () => {
-    // `banZoneStopRestSec` is 4 s, and a driver who touches the brake in the
-    // zone and moves on has not left his car standing on the spirka. If this
-    // ever reddens, the drill has started convicting hesitation.
+    // A driver who touches the brake in the zone and moves on has not left his
+    // car standing on the spirka. If this ever reddens, the drill has started
+    // convicting hesitation.
     const out = playHeldRest(2);
     expect(out.scored).toEqual([]);
     expect(out.coached).toEqual([]);
     expect(out.done[PAST_ZONE]).toBe(true);
+  });
+
+  it("a DROP-OFF on the spirka is not a fault — чл. 69 allows it (founder follow-up ruling)", () => {
+    // «Teach чл. 69 as written». 12 s — three times the 4 s that convicts at
+    // every other ban zone — is a passenger getting out, which the act
+    // permits. No card, no refusal, the lesson is taken: the drill may not
+    // punish the lawful stop it now teaches.
+    const out = playHeldRest(12);
+    expect(12).toBeLessThan(ALLOWANCE);
+    expect(out.scored).toEqual([]);
+    expect(out.coached).toEqual([]);
+    expect(out.lessonMistakes).toEqual([]);
+    expect(out.done[PAST_ZONE]).toBe(true);
+  });
+
+  it("…and the boundary is the allowance: 2 s short is lawful, 2 s past is a wait", () => {
+    expect(playHeldRest(ALLOWANCE - 2).coached).toEqual([]);
+    expect(playHeldRest(ALLOWANCE + 2).coached).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
   });
 });
 
@@ -541,5 +575,100 @@ describe("§6 the demand is load-bearing — strip it and the drill certifies it
     expect(out.scored).toEqual(["ILLEGAL_STOP_IN_BAN_ZONE"]);
     expect(out.score.osnovniPoints).toBe(3);
     expect(out.done[PAST_ZONE]).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §7 — THE WORDS ON THE CARD: founder ruling 2026-09-22, «Convict under чл. 69»
+//      (audit row sc-pk-busstop-ban:b103c282). Until this ruling the file
+//      deliberately stayed silent about the copy (see the header): the card was
+//      the pooled «под знак В27» row and freezing it would have made the
+//      miscitation harder to remove. Now the card is right, so it is pinned —
+//      through the SAME production drive, not a fixture.
+// ---------------------------------------------------------------------------
+
+describe("§7 the debrief convicts under ЗДвП чл. 69 — never «под знак В27»", () => {
+  for (const name of DEMOS) {
+    it(`L1 ${name}: the taught card and the «Грешката на този урок» row both cite чл. 69`, () => {
+      const out = playRecorded(name, 1);
+      // What the student was SHOWN (the coached teach card)…
+      const coached = (out.session.coachedMistakes ?? []).filter(
+        (m) => m.code === "ILLEGAL_STOP_IN_BAN_ZONE",
+      );
+      expect(coached).toHaveLength(1);
+      expect(coached[0]!.detail).toBe("law-bus-stop");
+      expect(coached[0]!.titleBg).toBe("Паркиране на автобусна спирка");
+      // …and the reason the lesson was not taken, as the debrief retitles it
+      // from `(code, detail)` — the path a stored history row also takes.
+      const hit = buildLessonResult(out.session).lessonMistakes!.find(
+        (h) => h.code === "ILLEGAL_STOP_IN_BAN_ZONE",
+      )!;
+      expect(hit.detail).toBe("law-bus-stop");
+      const copy = lessonMistakeCopy(hit)!;
+      expect(copy.lawRef).toBe(BUS_STOP_REF);
+      expect(copy.titleBg).not.toContain("В27");
+      expect(copy.explanationBg).not.toContain("В27");
+      expect(copy.explanationBg).toContain("ЗДвП чл. 69");
+      expect(copy.correctiveBg).toContain("ЗДвП чл. 69");
+    });
+  }
+
+  it("L4 exam: the charged row on the sheet carries чл. 69 as its law", () => {
+    const out = playRecorded("mistake-stop-on-pocket", 4);
+    const charged = out.session.events.filter(
+      (e): e is ViolationEvent => e.kind === "violation" && e.code === "ILLEGAL_STOP_IN_BAN_ZONE",
+    );
+    expect(charged).toHaveLength(1);
+    expect(charged[0]!.lawRef).toBe(BUS_STOP_REF);
+    expect(charged[0]!.detail).toBe("law-bus-stop");
+    expect(charged[0]!.explanationBg).not.toContain("В27");
+  });
+
+  it("the drill's OWN teaching cites чл. 69 and no longer attributes a blanket ban to чл. 98", () => {
+    // THEO-4 + ADR-002: the template's instructions, both mistake cards and the
+    // teach block are what the student reads before and after the card above.
+    const spec = SC_PK_BUSSTOP_BAN;
+    expect(spec.teach!.lawRef).toBe(BUS_STOP_REF);
+    const prose = [
+      spec.objectiveBg,
+      ...spec.instructionsBg.map((i) => i.textBg),
+      ...spec.mistakes.map((m) => m.titleBg + "\n" + m.whatWentWrongBg),
+      spec.teach!.whenBg,
+      spec.teach!.whyBg,
+      spec.teach!.examinerBg,
+    ].join("\n");
+    // чл. 98 may appear only as its PARKING clause; the престой list (ал. 1)
+    // names no spirka.
+    expect(prose).not.toContain("чл. 98, ал. 1");
+    expect(prose).not.toMatch(/дори за секунда|дори краткия престой|само за секунда/);
+    expect(prose).toContain("чл. 69");
+    // Both of the article's conditions are taught, not only the prohibition.
+    expect(prose).toContain("само за слизане на пътници");
+    expect(prose).toContain("само ако не пречат на автобуса");
+    // And what the drill convicts is named for what it is: waiting = паркиране.
+    expect(prose).toContain("паркиране");
+    expect(prose).toContain("чл. 98, ал. 2, т. 3");
+  });
+
+  it("the ❌ demos show an ACTUAL offence: each WAITS past the allowance (founder follow-up ruling)", () => {
+    // The mistake cards say «остана да чака»; this pins that the recordings
+    // do — the longest rest inside the zone outlasts the drop-off allowance, so
+    // the card and the conviction describe the same act. A demo that only
+    // dropped a passenger off would now grade nothing and fail its own gate.
+    for (const name of DEMOS) {
+      let restStart: number | null = null;
+      let longest = 0;
+      recordScPkBusstopBanDrive(district, name, {
+        onTick: (tick) => {
+          const atRest = tick.speedKmh <= 1 && tick.noStopZone === true;
+          if (atRest && restStart === null) restStart = tick.t;
+          if (!atRest) restStart = null;
+          if (restStart !== null) longest = Math.max(longest, tick.t - restStart);
+        },
+      });
+      expect(longest, name).toBeGreaterThan(ALLOWANCE);
+      expect(longest, name).toBeLessThan(ALLOWANCE + 6);
+    }
+    expect(SC_PK_BUSSTOP_BAN.mistakes.map((m) => m.titleBg).join(" ")).toMatch(/чакане/i);
   });
 });

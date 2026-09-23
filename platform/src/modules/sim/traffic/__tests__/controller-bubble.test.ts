@@ -73,51 +73,67 @@ describe("controller bubble copy (B42)", () => {
     }
   });
 
-  it("answers his three questions on every posture, in Bulgarian (THEO-4)", () => {
+  it("answers who goes and who stops on every posture, in Bulgarian (THEO-4)", () => {
+    // The L1 short card (founder ruling 2026-09-22) still GIVES THE ANSWER
+    // (ruling 2026-09-20): one line naming both the moving and the halted side.
     for (const b of CONTROLLER_BUBBLES) {
-      // What am I looking at / who goes / who stops / whose priority it is —
-      // never a bare verdict. His sentence names all four.
-      expect(b.poseBg.length, b.posture).toBeGreaterThan(12);
-      expect(b.goBg, b.posture).toMatch(/^Минава:/);
-      expect(b.stopBg, b.posture).toMatch(/^Спира(ш|т)?:/);
-      expect(b.priorityBg, b.posture).toMatch(/^Предимството /);
-      for (const s of [b.headlineBg, b.poseBg, b.goBg, b.stopBg, b.priorityBg]) {
+      expect(b.answerBg, b.posture).toMatch(/[Мм]инава/);
+      expect(b.answerBg, b.posture).toMatch(/[Сс]пира/);
+      for (const s of [b.postureNameBg, b.answerBg]) {
         expect(s, `${b.posture}: "${s}" must be Bulgarian`).toMatch(/[А-Яа-я]/);
         expect(s, `${b.posture}: "${s}" must have no latin letters`).not.toMatch(/[A-Za-z]/);
       }
     }
   });
 
-  it("the PRIORITY line answers a different question from the GO line (B41)", () => {
-    // The row this file exists for was closed on „all three of his questions
-    // are answered" while the card carried three of FOUR. The failure mode if
-    // someone ever collapses them again is that `priorityBg` becomes a restated
-    // `goBg` — true, and useless, because the mistake the drill grades is a
-    // student who read „who goes" right and drove anyway.
-    for (const b of CONTROLLER_BUBBLES) {
-      expect(b.priorityBg, b.posture).not.toBe(b.goBg);
-      expect(b.priorityBg, b.posture).not.toBe(b.stopBg);
+  it("the answer is the authored bank's, never a re-wording of its own (ADR-002)", () => {
+    // Each half of the one line is the bank's own opening: who goes and who
+    // stops, cut from `CONTROLLER_GESTURES[i].goBg` / `.stopBg`. Compared on
+    // the stem so case and the trailing clause the card drops cannot hide a
+    // line that says something the bank does not.
+    const lower = (x: string) => x.toLocaleLowerCase("bg");
+    const side = CONTROLLER_GESTURES[BUBBLE_SIDE_PROFILE];
+    const chest = CONTROLLER_GESTURES[BUBBLE_CHEST_OR_BACK];
+    const arm = CONTROLLER_GESTURES[BUBBLE_ARM_RAISED];
+    expect(lower(side.goBg)).toContain("минаваш ти");
+    expect(lower(CONTROLLER_BUBBLES[BUBBLE_SIDE_PROFILE].answerBg)).toContain("минаваш ти");
+    expect(lower(side.stopBg)).toContain("спира напречното");
+    expect(lower(CONTROLLER_BUBBLES[BUBBLE_SIDE_PROFILE].answerBg)).toContain("напречното спира");
+    expect(lower(chest.stopBg)).toContain("спираш ти");
+    expect(lower(CONTROLLER_BUBBLES[BUBBLE_CHEST_OR_BACK].answerBg)).toContain("спираш ти");
+    expect(lower(chest.goBg)).toContain("минава напречното");
+    expect(lower(CONTROLLER_BUBBLES[BUBBLE_CHEST_OR_BACK].answerBg)).toContain("напречното минава");
+    expect(lower(arm.stopBg)).toContain("спират всички");
+    expect(lower(CONTROLLER_BUBBLES[BUBBLE_ARM_RAISED].answerBg)).toContain("спират всички");
+    expect(lower(arm.goBg)).toMatch(/^никой/);
+    expect(lower(CONTROLLER_BUBBLES[BUBBLE_ARM_RAISED].answerBg)).toContain("никой не минава");
+  });
+
+  it("the two body-facing answers are opposites, not the same line twice", () => {
+    // The drill's whole subject: the SAME arms-out officer releases one side and
+    // halts the other. If the two lines ever read alike, the card is no longer
+    // telling them apart.
+    expect(CONTROLLER_BUBBLES[BUBBLE_SIDE_PROFILE].answerBg).toMatch(/^Минаваш ТИ/);
+    expect(CONTROLLER_BUBBLES[BUBBLE_CHEST_OR_BACK].answerBg).toMatch(/^Спираш ТИ/);
+  });
+
+  it("the priority clause survives as the citation — the officer outranks the lamp", () => {
+    // The priority LINE left with the short card; ЗДвП чл. 7 — the clause that
+    // puts the officer above the lamp — did not. The two postures that decide
+    // whether the student moves both still print it.
+    for (const i of [BUBBLE_SIDE_PROFILE, BUBBLE_CHEST_OR_BACK]) {
+      expect(CONTROLLER_BUBBLES[i].lawRef).toMatch(/ЗДвП чл\. 7/);
     }
-    // Two of the three name the LAMP, because the confusion is never abstract:
-    // it is always „but the light was green". The raised-arm posture is the
-    // exception on purpose — there the answer is that priority is nobody's.
-    const lampAware = CONTROLLER_BUBBLES.filter((b) => /червено|зелено/.test(b.priorityBg));
-    expect(lampAware.map((b) => b.posture)).toEqual(["sideProfile", "chestOrBack"]);
-    expect(CONTROLLER_BUBBLES[BUBBLE_ARM_RAISED].priorityBg).toMatch(/ничие/);
   });
 
   it("stays short enough to read on a billboard from the approach", () => {
-    // The bubble canvas is 1408 px wide and these are drawn at 56 px; past
-    // ~38 characters a line starts running off the card. A hard cap is cheaper
-    // than discovering it in a frame. (The 40 below is the standing contract
-    // and is 2 characters loose of that — the painter's shrink clamp is what
-    // catches the difference, which is what it is there for.)
+    // The ink box is 1320 px (1408 − 2 × 44). The answer is drawn at 68 px, so
+    // on the 0.62 em/char stub 31 characters is the most that paints at its
+    // authored size; the name at 112 px has room for 19. The caps below are
+    // one under each, so the shrink clamp is a backstop and never the layout.
     for (const b of CONTROLLER_BUBBLES) {
-      expect(b.headlineBg.length, b.posture).toBeLessThanOrEqual(12);
-      expect(b.poseBg.length, b.posture).toBeLessThanOrEqual(40);
-      expect(b.goBg.length, b.posture).toBeLessThanOrEqual(40);
-      expect(b.stopBg.length, b.posture).toBeLessThanOrEqual(40);
-      expect(b.priorityBg.length, b.posture).toBeLessThanOrEqual(40);
+      expect(b.postureNameBg.length, b.posture).toBeLessThanOrEqual(18);
+      expect(b.answerBg.length, b.posture).toBeLessThanOrEqual(30);
       // `lawRef` HAD NO CAP, and on 2026-08-09 it grew: the article numbers came
       // off the two acts `content/law/acts` does not hold, so
       // „ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7" (32) became
@@ -140,9 +156,13 @@ describe("controller bubble copy (B42)", () => {
     }
   });
 
-  it("the три headlines are distinct verdicts, not the same word", () => {
-    const set = new Set(CONTROLLER_BUBBLES.map((b) => b.headlineBg));
-    expect(set.size).toBe(CONTROLLER_BUBBLES.length);
+  it("the three names and the three answers are distinct, not the same words", () => {
+    expect(new Set(CONTROLLER_BUBBLES.map((b) => b.postureNameBg)).size).toBe(
+      CONTROLLER_BUBBLES.length,
+    );
+    expect(new Set(CONTROLLER_BUBBLES.map((b) => b.answerBg)).size).toBe(
+      CONTROLLER_BUBBLES.length,
+    );
   });
 });
 
@@ -232,15 +252,18 @@ describe("the pose caption matches the arms the renderer holds", () => {
       CONTROLLER_BUBBLES[BUBBLE_SIDE_PROFILE],
       CONTROLLER_BUBBLES[BUBBLE_CHEST_OR_BACK],
     ];
+    // Every line the card PAINTS (the short card: name + answer; the law line
+    // is a citation, not a description of the figure).
+    const painted = (b: (typeof CONTROLLER_BUBBLES)[number]) => `${b.postureNameBg}. ${b.answerBg}`;
     for (const b of bodyFacing) {
       if (armsOut(false)) {
-        expect(b.poseBg, `${b.posture}: the mesh holds the arms OUT`).not.toMatch(SAYS_ARMS_DOWN);
+        expect(painted(b), `${b.posture}: the mesh holds the arms OUT`).not.toMatch(SAYS_ARMS_DOWN);
       } else {
-        expect(b.poseBg, `${b.posture}: the mesh holds the arms DOWN`).not.toMatch(SAYS_ARMS_OUT);
+        expect(painted(b), `${b.posture}: the mesh holds the arms DOWN`).not.toMatch(SAYS_ARMS_OUT);
       }
     }
     // The внимание pose has lat = 0 — nothing is out sideways there.
-    expect(CONTROLLER_BUBBLES[BUBBLE_ARM_RAISED].poseBg).not.toMatch(SAYS_ARMS_OUT);
+    expect(painted(CONTROLLER_BUBBLES[BUBBLE_ARM_RAISED])).not.toMatch(SAYS_ARMS_OUT);
   });
 
   // -------------------------------------------------------------------------
@@ -305,10 +328,10 @@ describe("the pose caption matches the arms the renderer holds", () => {
     // so „arms out = минавай" would grade the halt posture as permission —
     // authored as the опасна грешка `mistake-barge-chest`. Whatever the pose
     // lines say, they must differ on the BODY, not on the limbs.
-    const side = CONTROLLER_BUBBLES[BUBBLE_SIDE_PROFILE].poseBg;
-    const chest = CONTROLLER_BUBBLES[BUBBLE_CHEST_OR_BACK].poseBg;
+    const side = CONTROLLER_BUBBLES[BUBBLE_SIDE_PROFILE].postureNameBg;
+    const chest = CONTROLLER_BUBBLES[BUBBLE_CHEST_OR_BACK].postureNameBg;
     expect(side, "side profile must name the side you are on").toMatch(
-      /СТРАНИЧНО|профил|рамо/,
+      /СТРАНИЧ|ПРОФИЛ|профил|рамо/,
     );
     expect(chest, "the halt pose must name the chest or the back").toMatch(/ГЪРДИ|ГРЪБ/);
     // Neither may lean on an arm word to carry the difference.
@@ -335,6 +358,8 @@ interface PaintedLine {
   y: number;
   maxWidth: number | undefined;
   width: number;
+  /** The `fillStyle` in force when the line was painted. */
+  ink: string;
 }
 
 /** Monospace-ish stand-in: every glyph is 0.62 em. Real Cyrillic in Segoe UI
@@ -376,6 +401,7 @@ function recordingCanvas(): {
         y,
         maxWidth,
         width: maxWidth === undefined ? natural : Math.min(natural, maxWidth),
+        ink: String(ctx.fillStyle),
       });
     },
     clearRect: () => undefined,
@@ -402,18 +428,11 @@ function recordingCanvas(): {
 describe("the bubble PAINTER clamps its own ink (B41)", () => {
   const INK_BUDGET = BUBBLE_TEX_W - 2 * BUBBLE_PAD_X;
 
-  it("paints all six authored lines for every posture", () => {
+  it("paints the three lines of the short card for every posture", () => {
     for (const b of CONTROLLER_BUBBLES) {
       const { canvas, lines } = recordingCanvas();
       drawControllerBubble(canvas, b);
-      expect(lines.map((l) => l.text), b.posture).toEqual([
-        b.headlineBg,
-        b.poseBg,
-        b.goBg,
-        b.stopBg,
-        b.priorityBg,
-        b.lawRef,
-      ]);
+      expect(lines.map((l) => l.text), b.posture).toEqual([b.postureNameBg, b.answerBg, b.lawRef]);
     }
   });
 
@@ -461,7 +480,7 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
     const grown = "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7 и чл. 6";
     const { canvas, lines } = recordingCanvas();
     drawControllerBubble(canvas, { ...CONTROLLER_BUBBLES[1], lawRef: grown });
-    const law = lines[5];
+    const law = lines.at(-1)!;
     expect(law.text).toBe(grown); // no ellipsis, no cut — ADR-002
     expect(law.width).toBeLessThanOrEqual(INK_BUDGET);
     // AGAINST THE CONSTANT, NOT A LITERAL. This read `38` — the authored law
@@ -484,17 +503,21 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
       "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7; ЗДвП чл. 6; ППЗДвП чл. 66; ЗДвП чл. 50";
     const { canvas, lines } = recordingCanvas();
     drawControllerBubble(canvas, { ...CONTROLLER_BUBBLES[1], lawRef: absurd });
-    const law = lines[5];
+    const law = lines.at(-1)!;
     expect(law.text).toBe(absurd);
     expect(law.sizePx).toBe(Math.floor(BUBBLE_LINE_PX.law * BUBBLE_MIN_FONT_SCALE));
     expect(law.width).toBeLessThanOrEqual(INK_BUDGET);
   });
 
-  it("a line that already fits is painted at its authored size (no silent shrink)", () => {
-    const { canvas, lines } = recordingCanvas();
-    drawControllerBubble(canvas, CONTROLLER_BUBBLES[2]); // „ВНИМАНИЕ" — the short one
-    expect(lines[0].sizePx).toBe(BUBBLE_LINE_PX.headline);
-    expect(lines[1].sizePx).toBe(BUBBLE_LINE_PX.pose);
+  it("every name and answer is painted at its authored size (no silent shrink)", () => {
+    // The whole point of the short card is cap height; a line the clamp
+    // shrinks would hand some of it back without anybody seeing it.
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b);
+      expect(lines[0].sizePx, b.posture).toBe(BUBBLE_LINE_PX.name);
+      expect(lines[1].sizePx, b.posture).toBe(BUBBLE_LINE_PX.answer);
+    }
   });
 
   it("NON-VACUITY: the pre-fix painter would have overflowed on today's copy", () => {
@@ -569,7 +592,7 @@ describe("how much of the card a rung gets (§7 ladder)", () => {
 });
 
 describe("the «Частична помощ» card names the POSE and answers nothing", () => {
-  const VERDICT_FIELDS = ["headlineBg", "goBg", "stopBg", "priorityBg"] as const;
+  const VERDICT_FIELDS = ["answerBg"] as const;
 
   it("paints exactly two lines — the posture and the law", () => {
     for (const b of CONTROLLER_BUBBLES) {
@@ -579,7 +602,7 @@ describe("the «Частична помощ» card names the POSE and answers no
     }
   });
 
-  it("says none of the four answers the full card gives away (3936550e)", () => {
+  it("says none of the answer the full card gives away (3936550e)", () => {
     for (const b of CONTROLLER_BUBBLES) {
       const { canvas, lines } = recordingCanvas();
       drawControllerBubble(canvas, b, "posture");
@@ -587,7 +610,7 @@ describe("the «Частична помощ» card names the POSE and answers no
       for (const field of VERDICT_FIELDS) {
         expect(painted, `${b.posture}.${field}`).not.toContain(b[field]);
       }
-      // NON-VACUITY: the same four ARE on the full card, so the `not`s above
+      // NON-VACUITY: the answer IS on the full card, so the `not`s above
       // are refusing something that genuinely exists rather than passing on a
       // set of empty strings.
       const full = recordingCanvas();
@@ -619,13 +642,14 @@ describe("the «Частична помощ» card names the POSE and answers no
     // device px. The six-line card's body runs 44–46 px → ≈17 device px of cap
     // → ≈5.5 CSS px at 3x. This asserts the RATIO rather than the constants, so
     // it keeps its meaning if the canvas is ever resized.
-    const fullBodyMax = Math.max(
-      BUBBLE_LINE_PX.pose,
-      BUBBLE_LINE_PX.go,
-      BUBBLE_LINE_PX.stop,
-      BUBBLE_LINE_PX.priority,
-    );
-    expect(BUBBLE_POSTURE_LINE_PX.name / fullBodyMax).toBeGreaterThanOrEqual(1.8);
+    // The six-line card's body was 56 px on the widened box (the size the
+    // row's frame was re-measured against); stated here as history because
+    // that card no longer exists to import it from.
+    const SIX_LINE_BODY_PX = 56;
+    expect(BUBBLE_POSTURE_LINE_PX.name / SIX_LINE_BODY_PX).toBeGreaterThanOrEqual(1.8);
+    // …and the L1 short card wears the SAME header, so the card does not
+    // change shape between L1 and L2 — L2 only loses the answer line.
+    expect(BUBBLE_LINE_PX.name).toBe(BUBBLE_POSTURE_LINE_PX.name);
     // …and it is not bought back by the shrink clamp: every posture name is
     // painted at the AUTHORED size on the unforgiving 0.62 em/char stub, so on
     // the shipped face (≈0.5–0.6 em) it cannot be shrinking either.
@@ -663,14 +687,81 @@ describe("the «Частична помощ» card names the POSE and answers no
     }
   });
 
-  it("`full` is byte-identical to what shipped — the default and the explicit", () => {
+  it("`full` is the default — an unasked mount gets the помощ, never the exam", () => {
     for (const b of CONTROLLER_BUBBLES) {
       const implicit = recordingCanvas();
       drawControllerBubble(implicit.canvas, b);
       const explicit = recordingCanvas();
       drawControllerBubble(explicit.canvas, b, "full");
       expect(implicit.lines, b.posture).toEqual(explicit.lines);
-      expect(implicit.lines).toHaveLength(6);
+      expect(implicit.lines).toHaveLength(3);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FOUNDER RULING 2026-09-22 «SHORT CARD» — sc-sig-controller-postures:ef0e821c,
+// „The controller's speech billboard is five lines of tiny multi-coloured text,
+// unreadable at native phone size." L1 still gives the answer; it gives it as
+// posture name + one line of who goes / who stops + the law.
+// ---------------------------------------------------------------------------
+describe("the «Пълна помощ» card is the short card the founder ruled", () => {
+  it("is three lines, not six — the size lever is fewer lines", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "full");
+      expect(lines, b.posture).toHaveLength(3);
+    }
+  });
+
+  it("is not multi-coloured text: the accent once, on the name; two neutral inks", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "full");
+      expect(lines[0].ink, b.posture).toBe(b.accent);
+      expect(lines[1].ink, b.posture).not.toBe(b.accent);
+      expect(lines[2].ink, b.posture).not.toBe(b.accent);
+      expect(new Set(lines.map((l) => l.ink)).size, b.posture).toBe(3);
+    }
+  });
+
+  it("the answer line is BIGGER than the body line it replaces (ef0e821c)", () => {
+    // The six-line card's body lines were 56 px; the one answer line now
+    // carries what four of them did, at ≥ 1.2x the cap height.
+    expect(BUBBLE_LINE_PX.answer / 56).toBeGreaterThanOrEqual(1.2);
+  });
+
+  it("every line stays inside the card body and inside its ink box", () => {
+    const INK = BUBBLE_TEX_W - 2 * BUBBLE_PAD_X;
+    const bodyH = BUBBLE_TEX_H - BUBBLE_TAIL_PX;
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "full");
+      let prevBottom = 0;
+      for (const l of lines) {
+        expect(l.width, `${b.posture} ${l.text}`).toBeLessThanOrEqual(INK);
+        expect(l.y - 0.8 * l.sizePx, `${b.posture} ${l.text}`).toBeGreaterThan(prevBottom);
+        expect(l.y + 0.3 * l.sizePx, `${b.posture} ${l.text}`).toBeLessThan(bodyH);
+        prevBottom = l.y + 0.3 * l.sizePx;
+      }
+    }
+  });
+
+  it("ADR-002 — it still ends on the retrieved citation", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "full");
+      expect(lines.at(-1)?.text, b.posture).toBe(b.lawRef);
+    }
+  });
+
+  it("L2+ is untouched: «Частична помощ» still names the posture and answers nothing", () => {
+    expect(controllerCaptionDetailForLevel(1)).toBe("full");
+    expect(controllerCaptionDetailForLevel(2)).toBe("posture");
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "posture");
+      expect(lines.map((l) => l.text), b.posture).toEqual([b.postureNameBg, b.lawRef]);
     }
   });
 });

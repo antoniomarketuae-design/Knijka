@@ -941,7 +941,7 @@ describe("sweep161 · a conditions claim is answered by the district it is stage
 // ⚠ AND NOT ONE WORD MORE THAN THAT. The first draft of this header said „there
 // is no branch in which an authored briefing could name the right control for a
 // phone and for a desktop", and that is false. The branch exists at the RENDER
-// site: `LessonPlayShell.tsx` holds `hintInputFor(hasTouchScreen())`, reads
+// site: `LessonPlayShell.tsx` holds `useHintInput()` (= `hintInputFor(hasTouchScreen())`), reads
 // `lesson.briefingBg`, and already imports `withSheetLocatorBg` for its own
 // hints. „Authored once" and „rendered input-blind" are different claims. The
 // rule this section enforces survives the correction — the bank still cannot

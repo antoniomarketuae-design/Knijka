@@ -636,6 +636,10 @@ export const SC_ED_D2_PRIORITY_RUN: ScenarioSpec = {
   // Route order: the left turn resolves 267 m before the equal junction arms.
   staged: [SC_ED_D2_PRIORITY_ONCOMING, SC_ED_D2_PRIORITY_RIGHT],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 5, and no structured channel carries it:
+  // «Преди левия завой към „Златовръх“ се престрой в лявата лента — първо огледало, после мигач, чак тогава маневрата.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -950,6 +954,10 @@ export const SC_ED_D2_STOP_ADDRESS: ScenarioSpec = {
     // 4a) and the drill's fault is a cockpit habit, not a conditions skill.
   ],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 1, and no structured channel carries it:
+  // «но първо огледът: огледало и поглед през ЛЯВОТО рамо, чак после мигач наляво.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1167,6 +1175,10 @@ export const SC_ED_REVERSE_LINE: ScenarioSpec = {
     // opt-in the dry-tuned ghost cannot honour.
   ],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 2, and no structured channel carries it:
+  // «Преди колелата да се завъртят: поглед в огледалото и през ЛЯВОТО рамо.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 
@@ -1421,6 +1433,10 @@ export const SC_ED_POLIGON_CHAIN: ScenarioSpec = {
     l5Wet(),
   ],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 1, and no structured channel carries it:
+  // «Първо огледът — огледало и през ЛЯВОТО рамо, чак после потегляш.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 

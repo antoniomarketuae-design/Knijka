@@ -572,6 +572,20 @@ export interface ScenarioSpec {
    * `actorId` that no staged event on this template declares.
    */
   actorLabels?: readonly ActorLabelSpec[];
+  /**
+   * EXPLICIT declaration that this drill's TASK relies on the student's own
+   * DOOR mirrors, for the templates whose demand lives only in the briefing
+   * (objective / numbered steps / examiner line) and in no structured channel
+   * `doorMirrorTask.ts` can read — i.e. no rubric observation moment naming a
+   * mirror and no mistake demo coded LANE_CHANGE_WITHOUT_MIRROR_CHECK.
+   * Founder ruling 2026-09-22 «Live when the task uses it»: the flag is what
+   * keeps the door glass live on MEDIUM and HIGH quality (MirrorRig), and it is
+   * authored, never string-matched out of prose — the catalogue's prose says
+   * «огледало» about OTHER drivers' mirrors and about the interior mirror as
+   * often as about the door glass. Render-only; grades nothing. Absent =
+   * derived from the structured channels alone.
+   */
+  doorMirrorsInTask?: true;
   /** Template-wide base conditions (levels may override). */
   conditions?: ConditionAxis;
   /**

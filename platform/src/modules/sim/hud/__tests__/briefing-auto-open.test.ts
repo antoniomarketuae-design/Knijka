@@ -131,54 +131,88 @@ describe("the phone keeps a route back to the steps (THEO-4)", () => {
 });
 
 /**
- * THE WIRING, HELD — because a mutation proved nothing was holding it.
+ * THE WIRING, HELD — because a mutation proved nothing was holding it, and then
+ * because the wiring it held was itself the defect.
  *
- * Every case above passes against a shell that has stopped consulting the
- * setting entirely: the mutation `useState(() => briefingAutoOpen)` ->
- * `useState(true)` — which is the whole ruling undone, the card back on every
- * phone — SURVIVED a green 41/41 on 2026-09-20. That is this repo's most
- * expensive recurring shape: a predicate built, tested and wired to nothing.
+ * Round one (2026-09-20): `useState(() => briefingAutoOpen)` -> `useState(true)`
+ * SURVIVED a green 41/41, so this block pinned the lazy initialiser. Round two
+ * (w60): the pinned initialiser WAS the bug. It read the first render, where
+ * `useCompactHud()` is still `useState(false)`, so every phone got the roomy
+ * default and the card opened at arrival — the ruling never shipped, under a
+ * green gate that asserted the very shape that broke it.
  *
- * It cannot be closed by execution here (the shell is a 9,000-line component
- * with a live R3F canvas; jsdom will not mount it), so it is closed the only
- * other honest way — by reading the shell for BOTH halves: the initializer must
- * consult the setting, and the literal it replaced must be gone. The pair
- * matters: asserting only the presence of the good shape passes against a file
- * that contains both, and asserting only the absence of the bad one passes
- * against a file that contains neither.
+ * The decision is now `hud/briefingStart.ts`, and `briefing-start.test.ts`
+ * EXECUTES it through React's render sequence (first render → effects → the
+ * render that carries the resolved compact value). What that file cannot see is
+ * whether the shell still calls those functions, in that order — so this block
+ * reads the shell for it, and REPORTS WHAT IT CANNOT READ: a matcher that finds
+ * nothing fails with the reason instead of passing.
  */
-describe("the shell actually consults the setting (the mutation that survived)", () => {
+describe("the shell decides against the RESOLVED surface (w60: the ruling did not ship)", () => {
   const SHELL = resolve(__dirname, "../../../../components/sim/lesson-ui/LessonPlayShell.tsx");
   const src = readFileSync(SHELL, "utf8");
+  const CODE = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-  it("`briefingOpen` is seeded from the stored preference, not from a literal", () => {
-    const decl = /const \[briefingOpen, setBriefingOpen\] = useState\(([^;]*)\);/.exec(src);
+  it("`briefingOpen` is derived from the start machine, never a lazy useState", () => {
     expect(
-      decl,
-      "unresolved: could not find the `briefingOpen` useState declaration in " +
-        "LessonPlayShell.tsx. Re-anchor this test — do not assume it still reads the setting.",
-    ).not.toBeNull();
-    const init = decl![1];
+      /const briefingOpen = briefingIsOpen\(briefingStart\);/.test(CODE),
+      "unresolved: `const briefingOpen = briefingIsOpen(briefingStart)` is gone from " +
+        "LessonPlayShell.tsx. Re-anchor — do not assume the card still waits for the viewport.",
+    ).toBe(true);
     expect(
-      init,
-      `the briefing's initial state is \`useState(${init})\` — it no longer consults ` +
-        "`briefingAutoOpen`, so the founder's hide-on-phone ruling is not in effect " +
-        "whatever hudPreferences.ts says",
-    ).toContain("briefingAutoOpen");
-    expect(init.trim()).not.toBe("true");
+      /\[briefingOpen,\s*setBriefingOpen\]\s*=\s*useState/.test(CODE),
+      "`briefingOpen` is a useState again — a lazy initialiser reads the first render, " +
+        "where every phone is a desktop (the w60 defect)",
+    ).toBe(false);
   });
 
-  it("the setting itself is read from the store under the right key and surface", () => {
+  it("the machine is the reducer from hud/briefingStart, seeded closed", () => {
+    expect(CODE).toMatch(
+      /const \[briefingStart, dispatchBriefingStart\] = useReducer\(\s*briefingStartReducer,\s*BRIEFING_START_INITIAL,?\s*\)/,
+    );
+  });
+
+  it("its effect body is nextBriefingStartEvent over THIS render's compact + stored choice", () => {
     const hit =
-      /const \[briefingAutoOpen, setBriefingAutoOpen\][\s\S]{0,300}?readStoredFlag\(\s*BRIEFING_AUTO_STORAGE_KEY,\s*briefingAutoDefault\(compact\)/.exec(
-        src,
+      /useEffect\(\(\) => \{\s*const event = nextBriefingStartEvent\(briefingStart, compact, briefingAutoStored\);\s*if \(event !== null\) dispatchBriefingStart\(event\);\s*\}, \[briefingStart, compact, briefingAutoStored\]\);/.exec(
+        CODE,
       );
     expect(
       hit,
-      "unresolved: `briefingAutoOpen` is no longer initialised from " +
-        "`readStoredFlag(BRIEFING_AUTO_STORAGE_KEY, briefingAutoDefault(compact))`. Either " +
-        "it stopped being per-surface, or it stopped being persisted — both undo half the ruling.",
+      "unresolved: the start machine's effect changed shape. It must dispatch " +
+        "`nextBriefingStartEvent(briefingStart, compact, briefingAutoStored)` and re-run on " +
+        "all three — a missing `compact` dep is a decision that never sees the resolved value.",
     ).not.toBeNull();
+  });
+
+  it("the machine is declared AFTER useCompactHud (hook order is what the model relies on)", () => {
+    const compactAt = CODE.indexOf("const compact = useCompactHud();");
+    const machineAt = CODE.indexOf("const [briefingStart, dispatchBriefingStart]");
+    expect(compactAt, "unresolved: `const compact = useCompactHud();` not found").toBeGreaterThan(-1);
+    expect(machineAt, "unresolved: the start machine's declaration not found").toBeGreaterThan(-1);
+    expect(machineAt).toBeGreaterThan(compactAt);
+  });
+
+  it("what is stored is the student's CHOICE, and the setting is derived per render", () => {
+    expect(CODE).toMatch(
+      /useState<boolean \| null>\(\(\) =>\s*readStoredFlagOrNull\(BRIEFING_AUTO_STORAGE_KEY\),?\s*\)/,
+    );
+    expect(CODE).toMatch(
+      /const briefingAutoOpen = briefingAutoSetting\(compact, briefingAutoStored\);/,
+    );
+    // …and the frozen-default shape is gone everywhere, not just moved.
+    expect(CODE).not.toMatch(/briefingAutoDefault\(compact\)/);
+  });
+
+  it("✕/«Разбрах», the МЕНЮ recall and a retry all go through the machine", () => {
+    expect(CODE).toMatch(/const closeBriefing = useCallback\(\(\) => dispatchBriefingStart\(\{ type: "dismiss" \}\)/);
+    const recall = CODE.slice(CODE.indexOf("const recallBriefing = useCallback"));
+    expect(recall.slice(0, 200)).toContain('dispatchBriefingStart({ type: "recall" })');
+    const at = CODE.indexOf("setBriefingRecalled(false)");
+    expect(at, "unresolved: the retry's recall-latch reset is gone").toBeGreaterThan(-1);
+    expect(CODE.slice(at, at + 400)).toContain(
+      'dispatchBriefingStart({ type: "arrive", compact, stored: briefingAutoStored })',
+    );
   });
 
   it("the student can reach the toggle — «optional» that no one can switch is not optional", () => {
@@ -189,6 +223,31 @@ describe("the shell actually consults the setting (the mutation that survived)",
         "is gone. Hiding the card by default without a way to turn it back on is not the " +
         "ruling that was given.",
     ).not.toBeNull();
+  });
+
+  it("the toggle's next value is briefingAutoToggled over (compact, stored) — never `!stored`", () => {
+    // Round 2 of lane E: `!briefingAutoOpen` and the wrong `!briefingAutoStored`
+    // were indistinguishable to the suite. The rule is now executed in
+    // briefing-start.test.ts; this holds the shell to calling it.
+    const at = CODE.indexOf("const toggleBriefingAutoOpen = useCallback");
+    expect(at, "unresolved: `toggleBriefingAutoOpen` declaration not found").toBeGreaterThan(-1);
+    const body = CODE.slice(at);
+    const decl = body.slice(0, body.indexOf("]);") + 3);
+    expect(decl).toMatch(/const next = briefingAutoToggled\(compact, briefingAutoStored\);/);
+    expect(decl).toMatch(/writeStoredFlag\(BRIEFING_AUTO_STORAGE_KEY, next\);/);
+    expect(decl).toMatch(/setBriefingAutoStored\(next\);/);
+    expect(decl).toMatch(/\}, \[compact, briefingAutoStored\]\);$/);
+    expect(decl).not.toMatch(/!briefingAutoStored|!briefingAutoOpen/);
+  });
+
+  it("the stored choice is read with readStoredFlagOrNull and handed to the start machine", () => {
+    // stored-flag-read.test.ts executes the read; this pins the chain
+    // read → `briefingAutoStored` → the machine's effect and the retry's arrive.
+    expect(CODE).toMatch(
+      /const \[briefingAutoStored, setBriefingAutoStored\] = useState<boolean \| null>\(\(\) =>\s*readStoredFlagOrNull\(BRIEFING_AUTO_STORAGE_KEY\)/,
+    );
+    expect(CODE).toContain("nextBriefingStartEvent(briefingStart, compact, briefingAutoStored)");
+    expect(CODE).toContain('dispatchBriefingStart({ type: "arrive", compact, stored: briefingAutoStored })');
   });
 
   it("the toggle persists the choice rather than only holding it for this drive", () => {

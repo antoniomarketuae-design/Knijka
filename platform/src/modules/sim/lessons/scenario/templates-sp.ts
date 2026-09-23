@@ -1898,6 +1898,10 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
   // (traces/__tests__/sc-mw-discipline-traces.test.ts §5/§9).
   staged: [MWD_FLOW_LEAD],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in the examiner line, and no structured channel carries it:
+  // «Лентите се сменят само с огледало и мигач, с ясна причина.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 

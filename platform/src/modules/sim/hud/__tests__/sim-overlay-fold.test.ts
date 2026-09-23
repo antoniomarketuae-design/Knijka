@@ -191,7 +191,17 @@ describe("the sheet carries the affordances the peek has had since 2026-08-14", 
     expect(chip).toBeGreaterThan(-1);
     expect(foldRow, "the counter is not beside the chip").toBeGreaterThan(chip);
     expect(foldRow, "the counter is past the header's ✕").toBeLessThan(closeX);
-    expect(foldRow, "the counter is inside the window it counts").toBeLessThan(scroller);
+    // ── THE HEADER NOW FOLLOWS THE TEXT IN THE DOM — 2026-09-22. The
+    //    landscape rail (`hud/sheetLayout.ts`) moved the header row and
+    //    «Разбрах» into `data-sim-overlay-sheet-rail` AFTER the scroller
+    //    (`order-first` keeps it on top in portrait). The claim is unchanged:
+    //    the counter is NOT inside the window it counts — it is either before
+    //    the scroller or inside the rail that follows it.
+    const rail = SHEET_CODE.indexOf("data-sim-overlay-sheet-rail");
+    expect(
+      foldRow < scroller || (rail > scroller && foldRow > rail),
+      "the counter is inside the window it counts",
+    ).toBe(true);
   });
 
   it("fades its own cut instead of guillotining it, with the peek's own number", () => {

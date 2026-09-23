@@ -525,6 +525,10 @@ export const SC_VP_TELLTALE_RED: ScenarioSpec = {
   // Authored in the order the driver meets them: amber first, then red.
   staged: [VP_TELLTALE_RED_AMBER, VP_TELLTALE_RED_LAMP],
   conditions: { weather: "dry" },
+  // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
+  // DOOR-mirror check in step 3, and no structured channel carries it:
+  // «Огледало, десен мигач, плавно намаляване, спиране плътно вдясно.» (catalogue audit: __tests__/door-mirror-task.test.ts).
+  doorMirrorsInTask: true,
   localeBg: "bg-BG",
 };
 

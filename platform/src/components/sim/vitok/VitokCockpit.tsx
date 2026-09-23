@@ -14,6 +14,7 @@ import { Html, useGLTF } from "@react-three/drei";
 import {
   Box3,
   BufferAttribute,
+  Matrix3,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -38,7 +39,19 @@ import {
   hotspotMouseVerbBg,
   type HotspotAction,
 } from "@/modules/sim/scene/vitok/hotspots";
-import { hotspotIsReachable, hotspotLabelPoint } from "@/modules/sim/scene/vitok/cabinLook";
+import {
+  cockpitHeaderDropM,
+  hotspotIsReachable,
+  hotspotLabelPoint,
+  rearMirrorStationDropM,
+} from "@/modules/sim/scene/vitok/cabinLook";
+import {
+  headerPadSpan,
+  inRearMirrorCasing,
+  reanchoredStalk,
+  stalkRun,
+  type StalkAxis,
+} from "@/modules/sim/scene/vitok/mirrorStation";
 import { useCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
 import { MirrorRig, type MirrorMeshes } from "./MirrorRig";
 
@@ -668,10 +681,6 @@ const STALK = {
   /** Half-section of the authored bar (19.8 mm square). */
   half: 0.0099,
 } as const;
-/** Slope of the stalk axis, m of drop per m of z. */
-const STALK_SLOPE = (STALK.root.y - STALK.tip.y) / (STALK.tip.z - STALK.root.z);
-/** Rotation about X that points a box's local +Z down the stalk axis. */
-const POD_PITCH = Math.atan2(STALK.root.y - STALK.tip.y, STALK.tip.z - STALK.root.z);
 /**
  * Mount extent and section, all offsets measured from the stalk axis. Offsets,
  * not heights: B58 raised the axis, and every one of them came with it.
@@ -722,21 +731,23 @@ const POD = {
   arm: { halfX: 0.017, yLo: -0.017, yHi: 0.017 },
   nose: { halfX: 0.018, yLo: 0.01, yHi: 0.026 },
 } as const;
-/** Axis height at a given z. */
-function stalkY(z: number): number {
-  return STALK.root.y - STALK_SLOPE * (z - STALK.root.z);
-}
-/** Length + midpoint of a box running along the stalk axis between two z. */
-function podRun(zBack: number, zFront: number): { len: number; y: number; z: number } {
+/**
+ * The mount's three runs for a given station drop (founder ruling 2026-09-22,
+ * «Re-anchor the mirror» — see scene/vitok/mirrorStation.ts). At drop 0 this is
+ * the authored axis exactly, so the 16:9 build is unchanged; on a wide canvas
+ * the mirror end comes down with the glass while the root stays in the roof,
+ * so the sleeve keeps hugging the (tilted) authored bar. Every front stop only
+ * gains clearance: the glass drops by the full amount, the sleeve's front
+ * (z 0.385) by 73 % of it and the nose's front (z 0.44) by 91 %.
+ */
+function podRuns(stationDropM: number) {
+  const axis: StalkAxis = reanchoredStalk(STALK, stationDropM);
   return {
-    len: Math.hypot(stalkY(zFront) - stalkY(zBack), zFront - zBack),
-    y: stalkY((zBack + zFront) / 2),
-    z: (zBack + zFront) / 2,
+    pad: stalkRun(axis, POD.zBack, POD.padZFront),
+    arm: stalkRun(axis, POD.zBack, POD.armZFront),
+    nose: stalkRun(axis, POD.noseZBack, POD.noseZFront),
   };
 }
-const POD_PAD_RUN = podRun(POD.zBack, POD.padZFront);
-const POD_ARM_RUN = podRun(POD.zBack, POD.armZFront);
-const POD_NOSE_RUN = podRun(POD.noseZBack, POD.noseZFront);
 
 /**
  * The ceiling is UNLIT on purpose (`meshBasicMaterial`, `toneMapped={false}`),
@@ -777,9 +788,21 @@ const POD_NOSE_COLOR = "#343941";
  * it. Chassis-local (this renders inside VitokCockpit's own group, the same
  * frame the doc-69 hotspot positions use), INTERIOR_LAYER, cockpit view only.
  */
-function CabinRoof() {
+function CabinRoof({
+  headerDropM = 0,
+  stationDropM = 0,
+}: {
+  /** `cabinLook.cockpitHeaderDropM(aspect)` —the pad's front edge comes down
+   *  this far so it is on screen on a wide canvas. 0 at 16:9. */
+  headerDropM?: number;
+  /** `cabinLook.rearMirrorStationDropM(aspect)` —the mirror end of the mount
+   *  follows the glass down. 0 at 16:9. */
+  stationDropM?: number;
+}) {
   const padLen = ROOF_FRONT_Z - ROOF_PAD_BACK_Z;
   const bodyLen = ROOF_PAD_BACK_Z - ROOF_BACK_Z;
+  const pad = headerPadSpan(ROOF_Y, ROOF_THICKNESS, headerDropM);
+  const { pad: POD_PAD_RUN, arm: POD_ARM_RUN, nose: POD_NOSE_RUN } = podRuns(stationDropM);
   const setLayer = (m: Mesh) => m.layers.set(INTERIOR_LAYER);
   return (
     <group>
@@ -794,11 +817,14 @@ function CabinRoof() {
       {/* Windscreen header pad — the band the driver actually looks at. Butts
           against the headliner (shared face, no overlap) so the two tones meet
           on a clean line instead of z-fighting. */}
+      {/* On a wide canvas its underside comes down by the header drop (founder
+          ruling 2026-09-22) — the top stays, so it stays one slab with the
+          headliner. At 16:9 the span is the shipped (ROOF_Y, ROOF_THICKNESS). */}
       <mesh
-        position={[0, ROOF_Y + ROOF_THICKNESS / 2, ROOF_PAD_BACK_Z + padLen / 2]}
+        position={[0, pad.centerY, ROOF_PAD_BACK_Z + padLen / 2]}
         onUpdate={setLayer}
       >
-        <boxGeometry args={[ROOF_HALF_W * 2, ROOF_THICKNESS, padLen]} />
+        <boxGeometry args={[ROOF_HALF_W * 2, pad.height, padLen]} />
         <meshBasicMaterial color={ROOF_PAD_COLOR} toneMapped={false} />
       </mesh>
 
@@ -812,7 +838,7 @@ function CabinRoof() {
           ROOF_Y so pad and headliner are one silhouette; it ends at z 0.19,
           behind the headliner's front edge in screen, so it costs nothing in
           frame and is free to be as generous as a real one. */}
-      <group position={[0, POD_PAD_RUN.y, POD_PAD_RUN.z]} rotation={[POD_PITCH, 0, 0]}>
+      <group position={[0, POD_PAD_RUN.y, POD_PAD_RUN.z]} rotation={[POD_PAD_RUN.pitch, 0, 0]}>
         <mesh position={[0, (POD.pad.yLo + POD.pad.yHi) / 2, 0]} onUpdate={setLayer}>
           <boxGeometry
             args={[POD.pad.halfX * 2, POD.pad.yHi - POD.pad.yLo, POD_PAD_RUN.len]}
@@ -823,7 +849,7 @@ function CabinRoof() {
       {/* Arm — the sleeve over the authored bar: 34 mm square around a 19.8 mm
           bar, 7.1 mm of cover all round. This is the piece in frame, and the
           whole of round 4's slimming. Stops short of the glass (see POD). */}
-      <group position={[0, POD_ARM_RUN.y, POD_ARM_RUN.z]} rotation={[POD_PITCH, 0, 0]}>
+      <group position={[0, POD_ARM_RUN.y, POD_ARM_RUN.z]} rotation={[POD_ARM_RUN.pitch, 0, 0]}>
         <mesh position={[0, (POD.arm.yLo + POD.arm.yHi) / 2, 0]} onUpdate={setLayer}>
           <boxGeometry
             args={[POD.arm.halfX * 2, POD.arm.yHi - POD.arm.yLo, POD_ARM_RUN.len]}
@@ -838,7 +864,7 @@ function CabinRoof() {
           underside at its front face (z 0.44) is chassis y 0.836, 19 mm clear
           of the glass's top edge line y 0.8165 — pre-raise figures; B58 widened
           that clearance to 27 mm (y 0.941 against a glass top of 0.9086). */}
-      <group position={[0, POD_NOSE_RUN.y, POD_NOSE_RUN.z]} rotation={[POD_PITCH, 0, 0]}>
+      <group position={[0, POD_NOSE_RUN.y, POD_NOSE_RUN.z]} rotation={[POD_NOSE_RUN.pitch, 0, 0]}>
         <mesh position={[0, (POD.nose.yLo + POD.nose.yHi) / 2, 0]} onUpdate={setLayer}>
           <boxGeometry
             args={[POD.nose.halfX * 2, POD.nose.yHi - POD.nose.yLo, POD_NOSE_RUN.len]}
@@ -1534,6 +1560,100 @@ function recessDemisterSlots(root: Object3D): number {
   return moved;
 }
 
+/** The authored mirror casing's vertices, on private geometry copies, with
+ *  their authored Y — what `applyRearMirrorCasingDrop` writes from. */
+interface RearMirrorCasing {
+  parts: {
+    position: BufferAttribute;
+    indices: Uint32Array;
+    /** Authored x, y, z of each captured vertex, interleaved. */
+    base: Float32Array;
+    /** One metre of chassis-DOWN in the mesh's own frame (identity mount: (0, -1, 0)). */
+    down: Vector3;
+  }[];
+  /** The drop currently written into the buffers, metres. */
+  applied: number;
+}
+
+/**
+ * «RE-ANCHOR THE MIRROR» — THE AUTHORED HALF (founder ruling 2026-09-22).
+ *
+ * B58 learned that moving the glass alone „does nothing: the authored casing
+ * then becomes the occluder", which is why its raise was an ASSET edit. The
+ * re-anchor cannot be one: it exists only on wide canvases and is 0 at 16:9,
+ * so the casing is moved here, at runtime, on a private copy of the shell
+ * geometry — the same clone-before-edit rule {@link recessDemisterSlots} keeps,
+ * so the cached GLTF every other mount (and the clip rig) receives is never
+ * touched.
+ *
+ * Which vertices: every `interior_shell` vertex inside
+ * `mirrorStation.REAR_MIRROR_CASING_BOX` — the MIRROR END of the station B58
+ * raised (156 of its 168 vertices, measured on the shipped GLB; the 12-vertex
+ * stalk root stays in the roof). Captured ONCE at clone time, while the root
+ * still has an identity transform, so root space is GLB space and the chassis
+ * point is (−x, y − 0.55, −z) — the mount documented at INTERIOR_YAW.
+ */
+function captureRearMirrorCasing(root: Object3D): RearMirrorCasing {
+  root.updateMatrixWorld(true);
+  const v = new Vector3();
+  const parts: RearMirrorCasing["parts"] = [];
+  root.traverse((o) => {
+    if (!o.name.startsWith(SHELL_NODE_NAME)) return;
+    const mesh = asMesh(o);
+    if (!mesh) return;
+    const source = mesh.geometry.getAttribute("position");
+    if (!(source instanceof BufferAttribute)) return;
+    const hits: number[] = [];
+    for (let i = 0; i < source.count; i++) {
+      v.fromBufferAttribute(source, i).applyMatrix4(mesh.matrixWorld);
+      if (inRearMirrorCasing(-v.x, v.y + INTERIOR_Y_OFFSET, -v.z)) hits.push(i);
+    }
+    if (hits.length === 0) return;
+    // Private copy — never write the cached GLTF's buffers.
+    mesh.geometry = mesh.geometry.clone();
+    const position = mesh.geometry.getAttribute("position") as BufferAttribute;
+    const indices = Uint32Array.from(hits);
+    const base = new Float32Array(indices.length * 3);
+    for (let k = 0; k < indices.length; k++) {
+      base[k * 3] = position.getX(indices[k]);
+      base[k * 3 + 1] = position.getY(indices[k]);
+      base[k * 3 + 2] = position.getZ(indices[k]);
+    }
+    // Chassis Y is root Y (the mount is a yaw and a y offset), so chassis-down
+    // in the mesh frame is root-down through the inverse of its world matrix.
+    // L = A⁻¹·(0, −1, 0) for the linear part A — NOT transformDirection, which
+    // normalises and would mis-size the move under a scaled node.
+    const down = new Vector3(0, -1, 0).applyMatrix3(new Matrix3().setFromMatrix4(mesh.matrixWorld).invert());
+    parts.push({ position, indices, base, down });
+  });
+  return { parts, applied: 0 };
+}
+
+/**
+ * Write the casing at `dropM` below its authored height. Absolute, from the
+ * captured base, so it is idempotent and a return to a narrow canvas restores
+ * the authored vertices exactly. The drop is applied along chassis-down as
+ * seen in the mesh's own frame, so a node transform on the shell cannot turn
+ * it into a sideways or scaled move.
+ */
+function applyRearMirrorCasingDrop(casing: RearMirrorCasing, dropM: number): void {
+  const drop = Number.isFinite(dropM) && dropM > 0 ? dropM : 0;
+  if (drop === casing.applied) return;
+  for (const part of casing.parts) {
+    const { base, down } = part;
+    for (let k = 0; k < part.indices.length; k++) {
+      part.position.setXYZ(
+        part.indices[k],
+        base[k * 3] + down.x * drop,
+        base[k * 3 + 1] + down.y * drop,
+        base[k * 3 + 2] + down.z * drop,
+      );
+    }
+    part.position.needsUpdate = true;
+  }
+  casing.applied = drop;
+}
+
 /**
  * „Виток" cockpit, A3 edition: the authored GT-E interior GLB replaces the
  * old procedural box shell. Kept live on top of it:
@@ -1572,7 +1692,14 @@ export function VitokCockpit({
   /** N11 (VP-06): the AMBER twin — lights the check-engine lamp instead. */
   telltaleCautionLitRef?: RefObject<boolean>;
 }) {
-  const { enabled: cockpitView } = useContext(CockpitInteractionContext);
+  const { enabled: cockpitView, doorMirrorsInTask = false } = useContext(CockpitInteractionContext);
+  // «Re-anchor the mirror» (founder ruling 2026-09-22): the canvas ASPECT —
+  // never the speed-widened fov — decides how far the header and the mirror
+  // station come down. A number selector, so a resize re-renders this cockpit
+  // only when the aspect really changes; CameraRig reads the same size.
+  const canvasAspect = useThree((s) => (s.size.height > 0 ? s.size.width / s.size.height : 16 / 9));
+  const headerDropM = cockpitHeaderDropM(canvasAspect);
+  const stationDropM = rearMirrorStationDropM(canvasAspect);
   const camera = useThree((s) => s.camera);
   const raycaster = useThree((s) => s.raycaster);
   const { scene } = useGLTF(INTERIOR_URL, DRACO_PATH);
@@ -1589,7 +1716,7 @@ export function VitokCockpit({
     };
   }, [camera, raycaster]);
 
-  const { model, wheelNode, clusterMesh, mirrorMeshes, ambientLineMaterials } = useMemo(() => {
+  const { model, wheelNode, clusterMesh, mirrorMeshes, ambientLineMaterials, casing } = useMemo(() => {
     const root = scene.clone(true);
     root.traverse((o) => {
       o.layers.set(INTERIOR_LAYER);
@@ -1645,8 +1772,16 @@ export function VitokCockpit({
     const ambientLineMaterials = splitAmbientLightLine(root);
 
     const wheelNode = root.getObjectByName("steering_wheel") ?? null;
-    return { model: root, wheelNode, clusterMesh, mirrorMeshes, ambientLineMaterials };
+    const casing = captureRearMirrorCasing(root);
+    return { model: root, wheelNode, clusterMesh, mirrorMeshes, ambientLineMaterials, casing };
   }, [scene]);
+
+  // The authored casing follows the glass down on a wide canvas (see
+  // captureRearMirrorCasing). Absolute writes from the captured base, so a
+  // rotation back to a narrow canvas restores the authored vertices exactly.
+  useEffect(() => {
+    applyRearMirrorCasingDrop(casing, stationDropM);
+  }, [casing, stationDropM]);
 
   // The authored quad becomes the cluster's dark backing: the 3D cluster
   // (portalled onto it below) covers it, and this stops any authored screen
@@ -1791,7 +1926,7 @@ export function VitokCockpit({
           windscreen header pad and the fairing that carries the mirror down
           from it, so the cabin closes at the top and the interior mirror is
           visibly mounted to something. */}
-      <CabinRoof />
+      <CabinRoof headerDropM={headerDropM} stationDropM={stationDropM} />
 
       {/* A4: functional render-to-texture mirrors on the GLB mirror glass.
           `cabinRef` is what lets the two DOOR mirrors render at all below
@@ -1799,7 +1934,13 @@ export function VitokCockpit({
           instead of being cut entirely, which is what made the left door
           mirror a matte-black pod on every preset a student can reach —
           measured median luminance 0, 73.9 % near-black, 2026-08-16. */}
-      <MirrorRig mirrors={mirrorMeshes} active={cockpitView} cabinRef={cabinRef} />
+      <MirrorRig
+        mirrors={mirrorMeshes}
+        active={cockpitView}
+        cabinRef={cabinRef}
+        doorMirrorsInTask={doorMirrorsInTask}
+        rearStationDropM={stationDropM}
+      />
 
       {/* Rear-mirror shell + bezel, portalled INTO the glass quad so it rides
           every transform MirrorRig applies to it (see MirrorHousing). */}
@@ -1882,6 +2023,11 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
   // checklist) turns the head: neither is a per-frame subscription.
   const pose = useCabinLook();
   const canvas = useThree((s) => s.size);
+  // The rear-mirror click proxy rides the re-anchored station (founder ruling
+  // 2026-09-22), exactly as `cabinLook.hotspotScreenRect` assumes it does.
+  const rearProxyDropM = rearMirrorStationDropM(
+    canvas.height > 0 ? canvas.width / canvas.height : 16 / 9,
+  );
   // Ref twin of `hovered` for the frame loop (written only in handlers/effects
   // — render stays pure per the project lint rules).
   const hoveredRef = useRef<CockpitHotspotName | null>(null);
@@ -2073,7 +2219,11 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
             <mesh
               key={spec.name}
               name={spec.name}
-              position={spec.pos as [number, number, number]}
+              position={
+                spec.name === "hotspot_mirror_rear"
+                  ? [spec.pos[0], spec.pos[1] - rearProxyDropM, spec.pos[2]]
+                  : (spec.pos as [number, number, number])
+              }
               onUpdate={(m: Mesh) => m.layers.set(INTERIOR_LAYER)}
               onPointerOver={(e: ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
