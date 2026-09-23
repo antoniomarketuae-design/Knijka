@@ -104,6 +104,7 @@ import type {
   ObjectiveProgress,
   ObjectiveOutcome,
   SessionNearMiss,
+  SpeedingSettleTick,
   TeachMoment,
 } from "./types";
 
@@ -1394,6 +1395,174 @@ export function isDriveLocked(state: LessonSessionState): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// End-of-drive settlement (one rule, every ending)
+// ---------------------------------------------------------------------------
+
+/** The coach flags `applyTick` derives per tick; rebuilt identically at a
+ *  manual ending so the settlement is coached the same way on both paths. */
+type CoachModeOpts = { examMode: true } | { learnOnly: true } | undefined;
+
+function coachModeFor(lesson: LessonSpec): CoachModeOpts {
+  const examMode = lesson.examMode === true;
+  const mistakeXp = examMode ? undefined : lesson.mistakeExperience;
+  return examMode ? { examMode: true } : mistakeXp !== undefined ? { learnOnly: true } : undefined;
+}
+
+/**
+ * THE WITHHELD SPEEDING CHARGE, SETTLED — one implementation, asked by every
+ * way a drive can end (`sc-signal-flashing:0d68b149`, critical).
+ *
+ * ── WHY IT IS A FUNCTION AND NOT A BLOCK INSIDE `applyTick` ─────────────────
+ * It was a block, and the block could only be reached by a route that
+ * completed BY ITSELF: `applyTick` opens with
+ *     if (prev.phase === "completed" || prev.phase === "aborted") return …
+ * so a session already ended cannot re-enter it, and `finishSession` /
+ * `abortSession` set the phase from OUTSIDE it. A student who parked and
+ * pressed «Край», and every student who quit, therefore had the charge the A12
+ * free mini-lesson consumed silently forgiven — the audited leg is
+ * `.audit-frames/w61/.../sc-signal-flashing__mobile-wrong`: 51, 56, peak
+ * 58 км/ч under a posted 50, the teach card «Стигна точката, но твърде бързо»
+ * on the glass, and a sheet reading «0 наказателни точки · MISTAKES (0)» over
+ * a debrief saying «Изпитният лист остана чист».
+ *
+ * `settleUnpaidSpeedingTeach`'s own argument already covers that student —
+ * «granting the six seconds to a drive that has ENDED is not mercy, it is an
+ * acquittal» — and a drive ended early has ended just as hard as a drive that
+ * ran out of route. So NO policy moves here and no threshold is touched
+ * (`speedingGraceRatio` 0.1, `speedingGraceMaxKmh` 5, `dangerousSpeedOverKmh`
+ * 10 — «do not change without an ADR»). What moves is reach.
+ *
+ * ── ONE ADDRESS, BECAUSE THIS FILE HAS ALREADY PAID FOR TWO ────────────────
+ * The site this replaces carries a warning in its own comment: the ADR-009
+ * target drop «had to be written twice or this path would keep charging», and
+ * it was nearly missed the first time. A settlement copied into three endings
+ * would be that failure three times over, so the coaching, the two guards and
+ * the escalation live HERE and the callers supply only what differs.
+ *
+ * ── THE GUARDS, AND WHAT EACH ONE IS FOR ───────────────────────────────────
+ *  · `alreadyCharged` — the anti-double-bill. The settlement is `regrade`-
+ *    marked by construction and does NOT travel through the `regrade` guard at
+ *    the top of `applyTick`, so this is the only thing standing between a
+ *    student and paying twice for one continuing breach. It matters most in
+ *    EXAM mode, where teach-first is bypassed and the first bill was already
+ *    charged in the moment.
+ *  · `settledIsTarget` — ADR-009 / founder Ruling A: no exam points are taken
+ *    for the first occurrence of the lesson's OWN mistake, and this bill exists
+ *    only to reach the charge the free teach consumed, which for a target code
+ *    is exactly what the ruling forbids.
+ *
+ * The coach is ASKED rather than bypassed (`coachStep`) so the escalation
+ * ladder and the encounter counters keep describing what actually happened,
+ * and so a future teach-first policy moves this bill with every other one.
+ */
+function settleSpeedingTeach(args: {
+  rules: RuleEngineState;
+  /**
+   * Only what the settlement reads — `settleUnpaidSpeedingTeach` re-checks the
+   * band off `t`/`speedKmh`/`maxSpeedKmh`, and `position` pins the bill on the
+   * A15 mistake map. A full `SimTick` satisfies it structurally, so
+   * `applyTick`'s caller is unchanged; the hand-ended caller can hand over the
+   * four scalars a session is allowed to keep (`types.ts SpeedingSettleTick`).
+   */
+  tick: SpeedingSettleTick;
+  encounters: Record<string, number>;
+  coachOpts: CoachModeOpts;
+  lessonTargets: ReadonlyMap<string, unknown> | null;
+  alreadyCharged: (code: string) => boolean;
+}): {
+  encounters: Record<string, number>;
+  scored: ViolationEvent | null;
+  escalation: PenaltyEscalation | null;
+} {
+  const none = { encounters: args.encounters, scored: null, escalation: null };
+  const settled = settleUnpaidSpeedingTeach(args.rules, args.tick);
+  if (settled === null) return none;
+  const settledIsTarget = args.lessonTargets?.has(settled.code) === true;
+  if (args.alreadyCharged(settled.code) || settledIsTarget) return none;
+  const step = coachStep(
+    args.encounters,
+    {
+      code: settled.code,
+      severityClass: settled.severityClass,
+      terminateSession: settled.terminateSession,
+      detail: settled.detail,
+    },
+    args.coachOpts,
+  );
+  if (!step.decision.scored) {
+    return { encounters: step.encounters, scored: null, escalation: null };
+  }
+  return {
+    encounters: step.encounters,
+    scored: settled,
+    escalation:
+      step.decision.penaltyMultiplier > 1
+        ? { code: settled.code, t: settled.t, multiplier: step.decision.penaltyMultiplier }
+        : null,
+  };
+}
+
+/**
+ * The same settlement, run on a session that has JUST been ended by hand —
+ * the half `applyTick` structurally cannot reach.
+ *
+ * It folds the bill into exactly the channels `applyTick` folds it into, and
+ * for the same reasons: `events` is the изпитен лист and the debrief's «Грешки»
+ * row, `penaltyEscalations` the A9 training ladder, `eventPositions` the A15
+ * mistake map (positioned from the last tick, which is where the car was when
+ * the drive ended). Nothing else on the state moves — the phase, `endedAtSec`
+ * and `lastT` are the caller's, and this never changes them.
+ *
+ * NO TICK, NO SETTLEMENT: a session ended before the car ever ticked has no
+ * measurement to re-check the band against, and a charge without one would be
+ * a conviction on a number nobody read.
+ */
+function settleEndedSession(ended: LessonSessionState): LessonSessionState {
+  const tick = ended.lastTick;
+  if (tick === undefined) return ended;
+  // Built the same way and read the same way as `applyTick`'s closure, minus
+  // the in-flight `scoredEvents` half: at a manual ending there is no tick in
+  // progress, so `events` IS the whole ledger.
+  let chargedCodes: Set<string> | undefined;
+  const alreadyCharged = (code: string): boolean =>
+    (chargedCodes ??= new Set(
+      ended.events.filter((x) => x.kind === "violation").map((x) => x.code as string),
+    )).has(code);
+  const out = settleSpeedingTeach({
+    rules: ended.rules,
+    tick,
+    encounters: ended.scenarioEncounters,
+    coachOpts: coachModeFor(ended.lesson),
+    lessonTargets: lessonMistakeTargetCodes(ended.lesson),
+    alreadyCharged,
+  });
+  if (out.scored === null) {
+    // Identity on the overwhelmingly common answer (nothing was withheld), so
+    // an ordinary ending allocates nothing at all.
+    return out.encounters === ended.scenarioEncounters
+      ? ended
+      : { ...ended, scenarioEncounters: out.encounters };
+  }
+  const position: EventPosition = {
+    kind: out.scored.kind,
+    code: out.scored.code,
+    t: out.scored.t,
+    x: tick.position.x,
+    y: tick.position.y,
+  };
+  return {
+    ...ended,
+    events: [...ended.events, out.scored],
+    scenarioEncounters: out.encounters,
+    penaltyEscalations:
+      out.escalation !== null
+        ? [...ended.penaltyEscalations, out.escalation]
+        : ended.penaltyEscalations,
+    eventPositions: [...(ended.eventPositions ?? []), position],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Driving phase
 // ---------------------------------------------------------------------------
 
@@ -1415,11 +1584,11 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // assignment, so nothing scores and nothing terminates (coach.ts learnOnly).
   const examMode = prev.lesson.examMode === true;
   const mistakeXp = examMode ? undefined : prev.lesson.mistakeExperience;
-  const coachOpts = examMode
-    ? { examMode: true }
-    : mistakeXp !== undefined
-      ? { learnOnly: true }
-      : undefined;
+  // ONE ADDRESS for the coach-mode rule: `coachModeFor` (above) is the same
+  // expression, and a manual ending re-derives it there so the settlement is
+  // coached exactly as a tick-time bill would be. Two copies of this ternary
+  // would be two teach-first policies waiting to drift apart.
+  const coachOpts = coachModeFor(prev.lesson);
   // S1 pauseOnError (doc 76 §7 L1 „Пълна помощ"): in a guided scenario drill
   // EVERY graded violation ALSO freezes into a teach card — including codes
   // the coach normally only toasts (опасна/terminating like COLLISION: at
@@ -2852,25 +3021,13 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   /**
    * THE LAST TICK IS THE LAST MOMENT ANYTHING CAN ASK — the withheld speeding
    * charge, settled on the frame the drive ends (finding
-   * `sc-signal-flashing:0d68b149`; `rules/engine.ts settleUnpaidSpeedingTeach`
-   * carries the measurement and the A12 argument).
-   *
-   * It runs HERE, after every arm above that can set `phase`, and before the
-   * A15 position pass, so a settled bill is placed on the map like any other
-   * and the coach's counters stay coherent. `alreadyCharged` is the same guard
-   * the six-second re-grade passes through at the top of this function, so exam
-   * mode and repeat offences are byte-identical: the settlement exists ONLY to
-   * reach the charge the free mini-lesson consumed.
-   *
-   * The coach is asked rather than bypassed. This is the SECOND encounter of a
-   * code it has already taught, so `resolveEncounter` grades it — but routing
-   * it through `coachStep` is what keeps the escalation ladder and the
-   * encounter counters describing what actually happened, and it is what makes
-   * a future policy change move this bill too instead of leaving one hard-coded
-   * charge behind. No HUD event: the drive is over on this frame and the column
-   * is gone — the debrief's «Грешки» row carries the catalogue's explanation
-   * and its «✔ Правилното действие» (THEO-4), and the card was already shown in
-   * the moment it happened.
+   * `sc-signal-flashing:0d68b149`). The measurement and the A12 argument are
+   * `rules/engine.ts settleUnpaidSpeedingTeach`'s; the coaching, the two
+   * guards and the reason this is a shared function rather than a block are
+   * `settleSpeedingTeach`'s, above. No HUD event: the drive is over on this
+   * frame and the column is gone — the debrief's «Грешки» row carries the
+   * catalogue's explanation and its «✔ Правилното действие» (THEO-4), and the
+   * card was already shown in the moment it happened.
    */
   // `prev.phase !== "completed"` was here to mean "the drive ends on THIS
   // frame, not a later one" — but applyTick opens with
@@ -2880,49 +3037,36 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // it changes no behaviour; the early return is what enforces the intent, and
   // `phase === "completed"` alone is the edge this block wants.
   if (phase === "completed") {
-    const settled = settleUnpaidSpeedingTeach(rules, tick);
     /**
-     * ADR-009 — AND THE SAME DROP APPLIES HERE (founder Ruling A; doc 92 §3.4b
-     * b names this site among the re-bills).
+     * THE BODY OF THIS BLOCK NOW LIVES IN `settleSpeedingTeach` (above), and
+     * the move IS the repair rather than a tidy-up: the rule used to exist only
+     * here, where `applyTick`'s own early return made it unreachable for any
+     * drive the student ended himself. `finishSession` and `abortSession` ask
+     * the same function, so the two guards — `alreadyCharged` (the
+     * anti-double-bill) and ADR-009's target drop (founder Ruling A; doc 92
+     * §3.4b) — are one clause each instead of one clause per ending. The
+     * comment this replaces recorded that the target drop "had to be written
+     * twice or this path would keep charging the first occurrence of
+     * SPEEDING_OVER_LIMIT, which 11 lessons carry as their own mistake"; it is
+     * now written once, and a third ending cannot miss it.
      *
-     * THIS IS A SECOND ADDRESS FOR ONE RULE, and it was nearly missed: the
-     * settlement does not travel through the `regrade` guard at the top of this
-     * function — it is built here, `regrade: true` by construction
-     * (`rules/engine.ts settleUnpaidSpeedingTeach`), and asks only
-     * `alreadyCharged`. So the clause that drops a target's re-bill had to be
-     * written twice or this path would keep charging the first occurrence of
-     * SPEEDING_OVER_LIMIT, which 11 lessons carry as their own mistake.
-     *
-     * NOT REACHABLE FROM THE COMMITTED TAPE BANK, MEASURED: 0 regrade-marked
-     * target bills survive on 1,213 targeted practice drives, so this closes a
-     * hole rather than moving a number. It is reachable by a REAL student —
-     * start speeding inside the last six seconds and still be over the limit
-     * when the finish gate fires, and the settlement is the only bill of that
-     * episode. Ruling A forbids exactly that point.
+     * The call sits HERE, after every arm above that can set `phase` and before
+     * the A15 position pass, so a settled bill is placed on the map like any
+     * other and the coach's counters stay coherent. `alreadyCharged` is the
+     * in-flight closure, so a bill scored earlier on THIS same frame still
+     * blocks the settlement.
      */
-    const settledIsTarget = settled !== null && lessonTargets?.has(settled.code) === true;
-    if (settled !== null && !alreadyCharged(settled.code) && !settledIsTarget) {
-      const step = coachStep(
-        encounters,
-        {
-          code: settled.code,
-          severityClass: settled.severityClass,
-          terminateSession: settled.terminateSession,
-          detail: settled.detail,
-        },
-        coachOpts,
-      );
-      encounters = step.encounters;
-      if (step.decision.scored) {
-        scoredEvents.push(settled);
-        if (step.decision.penaltyMultiplier > 1) {
-          escalations = [
-            ...escalations,
-            { code: settled.code, t: settled.t, multiplier: step.decision.penaltyMultiplier },
-          ];
-        }
-      }
-    }
+    const out = settleSpeedingTeach({
+      rules,
+      tick,
+      encounters,
+      coachOpts,
+      lessonTargets,
+      alreadyCharged,
+    });
+    encounters = out.encounters;
+    if (out.scored !== null) scoredEvents.push(out.scored);
+    if (out.escalation !== null) escalations = [...escalations, out.escalation];
   }
 
   // A15: record WHERE each scored event happened — the tick in hand at
@@ -2956,6 +3100,18 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       lastTeachMomentAtSec: lastTeachAt,
       coachedMistakes: coachedNew.length > 0 ? [...coachedPrev, ...coachedNew] : coachedPrev,
       lastT: Math.max(prev.lastT, tick.t),
+      // THE DRIVE'S LAST TESTIMONY, kept so the endings that carry no tick can
+      // still ask it one question (types.ts `lastTick`, and
+      // `settleEndedSession` above is its only reader). Written
+      // unconditionally — `...prev` cannot express "always the newest" — and
+      // never read by anything that grades geometry.
+      //
+      // THREE FIELDS, NOT THE TICK. Storing it whole put `edgeAlignment`, `sM`
+      // and `distM` into session state, and the two `*-not-graded` suites —
+      // which prove those fields are not graded by stripping them and asserting
+      // the state does not move — went red, correctly. The settlement reads
+      // only these three.
+      lastTick: { t: tick.t, speedKmh: tick.speedKmh, maxSpeedKmh: tick.maxSpeedKmh, position: tick.position },
       ...(posedAtSec !== undefined ? { posedAtSec } : {}),
       ...(eventPositions !== undefined ? { eventPositions } : {}),
       ...(examTermination !== undefined ? { examTermination } : {}),
@@ -3085,13 +3241,31 @@ export function applyNearMiss(
  */
 export function finishSession(prev: LessonSessionState, tSec: number): LessonSessionState {
   if (prev.phase === "completed" || prev.phase === "aborted") return prev;
-  return { ...prev, phase: "completed", endedAtSec: tSec, lastT: Math.max(prev.lastT, tSec) };
+  // …AND THE DRIVE IS OVER, SO THE WITHHELD CHARGE IS ASKED FOR (see
+  // `settleEndedSession`). A student who parks and ends early has ended his
+  // drive exactly as hard as one whose route ran out, and until this call
+  // existed only the second of them was ever settled.
+  return settleEndedSession({
+    ...prev,
+    phase: "completed",
+    endedAtSec: tSec,
+    lastT: Math.max(prev.lastT, tSec),
+  });
 }
 
 /** Quit without finishing — the attempt is recorded but can never pass. */
 export function abortSession(prev: LessonSessionState, tSec: number): LessonSessionState {
   if (prev.phase === "completed" || prev.phase === "aborted") return prev;
-  return { ...prev, phase: "aborted", endedAtSec: tSec, lastT: Math.max(prev.lastT, tSec) };
+  // Same settlement, same reason, and quitting is not an acquittal either: the
+  // attempt is recorded and can never pass, but what it recorded must be true.
+  // A drive that quit mid-overspeed used to reach its debrief on «Изпитният
+  // лист остана чист».
+  return settleEndedSession({
+    ...prev,
+    phase: "aborted",
+    endedAtSec: tSec,
+    lastT: Math.max(prev.lastT, tSec),
+  });
 }
 
 // ---------------------------------------------------------------------------

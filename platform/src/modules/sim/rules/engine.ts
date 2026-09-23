@@ -2698,7 +2698,16 @@ export function speedingBands(
  */
 export function settleUnpaidSpeedingTeach(
   state: RuleEngineState,
-  tick: SimTick,
+  // THE THREE FIELDS IT ACTUALLY READS, not the whole tick — `t`, `speedKmh`
+  // and `maxSpeedKmh`. A full `SimTick` still satisfies this structurally, so
+  // every existing caller is unchanged; what it buys is that a session which
+  // has to KEEP this measurement for a hand-ended drive can keep three scalars
+  // instead of the tick entire. That matters beyond tidiness: session state
+  // carrying the whole tick would carry `edgeAlignment`, `sM` and `distM`, and
+  // the two `*-not-graded` suites prove those are ungraded by asserting that
+  // stripping them moves not one byte of state. See `lessons/types.ts`
+  // `SpeedingSettleTick`.
+  tick: Pick<SimTick, "t" | "speedKmh" | "maxSpeedKmh">,
 ): ViolationEvent | null {
   // He was never billed → nothing was withheld → nothing to settle.
   if (!state.speedingMinor.emitted) return null;

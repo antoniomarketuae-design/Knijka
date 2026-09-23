@@ -20,10 +20,24 @@ import type {
   ScorableEvent,
   SessionSummary,
   SeverityClass,
+  SimTick,
   Vec2,
 } from "../rules";
 import type { PreDriveMachine } from "../procedures";
 import type { EscalatedMistake, PenaltyEscalation } from "./escalation";
+
+/**
+ * The FOUR fields the end-of-drive speeding settlement needs — and the WHOLE
+ * of what a session keeps from the last tick. Three re-check the band (`t`,
+ * `speedKmh`, `maxSpeedKmh`); `position` is where the bill is pinned on the A15
+ * mistake map, which every other violation gets and this one may not be denied.
+ *
+ * It is a `Pick` rather than a hand-written shape so it cannot drift from the
+ * tick it is taken from, and it is deliberately not widened: every field added
+ * here becomes a field the session state carries, which is measured by the two
+ * `*-not-graded` guard suites as a change in state. See `lastTick`.
+ */
+export type SpeedingSettleTick = Pick<SimTick, "t" | "speedKmh" | "maxSpeedKmh" | "position">;
 
 // ---------------------------------------------------------------------------
 // Objective parameters (typed views over LessonObjective.params)
@@ -1700,6 +1714,50 @@ export interface LessonSessionState {
   coachedMistakes: CoachedMistake[];
   /** Session time of the last processed tick, seconds. */
   lastT: number;
+  /**
+   * THE LAST TICK `applyTick` ACTUALLY PROCESSED — the drive's final testimony
+   * about the car, kept so that the paths which end a session WITHOUT a tick in
+   * hand can still ask it a question (`sc-signal-flashing:0d68b149`).
+   *
+   * WHY IT EXISTS. `finishSession` / `abortSession` are `(prev, tSec)` — the
+   * student pressed «Край» or «Откажи», and nothing about the car travels with
+   * that press. But the end-of-drive speeding settlement
+   * (`rules/engine.ts settleUnpaidSpeedingTeach`) must RE-CHECK the band
+   * against a real speed and a real posted limit before it charges anything,
+   * and `lastT` is a number, not a measurement. Until this field existed the
+   * settlement lived only inside `applyTick`, so it could fire only on a drive
+   * that completed its route BY ITSELF; every student who parked and ended
+   * early, or quit, had the charge the A12 free mini-lesson consumed silently
+   * forgiven, and read «Изпитният лист остана чист» over a drive that sped.
+   *
+   * WHY ON THE STATE rather than a new parameter on those two functions. An
+   * optional argument is forgettable, and a caller that forgets it reproduces
+   * the exact defect this field was added to close — silently, with no type
+   * error, on whichever of the two live call sites
+   * (`LessonPlayShell.finishNow` / `abortNow`) was missed. Written by
+   * `applyTick` itself, the measurement cannot be absent on any drive that ever
+   * ticked, and no caller has to know the rule exists.
+   *
+   * ABSENT until the first `applyTick` (a session ended before the car ever
+   * ticked has nothing to measure and settles nothing), and read by NOTHING
+   * that grades geometry: it is a measurement channel of last resort, not a
+   * pose store — `eventPositions` owns positions and the objective chain owns
+   * progress.
+   *
+   * THREE FIELDS, NOT THE WHOLE TICK, AND THE GATE IS WHY. The first cut of
+   * this stored the `SimTick` entire, and `runtime/__tests__/
+   * edge-alignment-not-graded.test.ts` and `road-position-not-graded.test.ts`
+   * went red — 14 of them. Those suites prove the founder-ruled direction
+   * signal and the road-position fields are NOT GRADED by stripping and
+   * corrupting them and asserting that not one byte of session state moves. A
+   * state that carries the whole tick fails that by construction: it now
+   * CONTAINS `edgeAlignment`, `sM` and `distM`, so the comparison moves even
+   * though nothing reads them. The honest fix is the narrow one — the
+   * settlement's only consumer, `settleUnpaidSpeedingTeach`, reads exactly
+   * `t`, `speedKmh` and `maxSpeedKmh` — and it keeps those guards sharp
+   * instead of teaching them to ignore a field.
+   */
+  lastTick?: SpeedingSettleTick;
   /**
    * FRAME-ZERO POSE GUARD (doc 87 B3/B10/B11 — „it states 2 tasks and it is
    * only 1 task"). Session time of the first tick that DESCRIBED THE VEHICLE:

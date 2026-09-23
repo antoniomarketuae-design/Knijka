@@ -132,7 +132,14 @@ import { createTrafficSystem, DEFAULT_TRAFFIC_CONFIG } from "../../../traffic";
 import type { TrafficDistrict } from "../../../traffic/types";
 import { recordScriptedDrive, type DriveScript } from "../../../traces/recorder";
 import { buildDebrief } from "../../debrief";
-import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
+import {
+  abortSession,
+  applyTick,
+  buildLessonResult,
+  createLessonSession,
+  finishSession,
+} from "../../engine";
+import type { LessonSessionState } from "../../types";
 import { compileScenario } from "../compile";
 import {
   SC_SIGNAL_CONTROLLER,
@@ -145,6 +152,7 @@ import {
   SC_SIGNAL_HESITATION_SLEEPER,
   SCENARIO_TEMPLATES_SIGNALS,
 } from "../templates-signals";
+import type { LessonSpec } from "../../../contracts";
 import type { ScenarioSpec } from "../types";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -376,6 +384,19 @@ interface DriveOutcome {
   /** Codes the LESSON SESSION billed — what the debrief and the score read. */
   sessionCodes: string[];
   /**
+   * The same bills WITH the second each was stamped at. `sessionCodes` alone
+   * cannot say WHEN a charge landed, and for the settlement that is the whole
+   * claim: it is the LAST tick's bill, not an early one. Measured, not assumed
+   * — a settlement wired to run on every tick instead of only the drive's last
+   * one still produces `["SPEEDING_OVER_LIMIT"]` here, because
+   * `lessons/engine.ts alreadyCharged` collapses the repeats into the first.
+   * §7's timestamp pin is the assertion that separates the two wirings.
+   */
+  sessionBills: Array<{ code: string; tSec: number; regrade: boolean }>;
+  /** The graded session itself — §8 ends it a second time to prove it cannot
+   *  be billed twice, which no derived list can express. */
+  session: LessonSessionState;
+  /**
    * The second the SESSION stopped grading. The recorder's own engine keeps
    * reducing every tick the script produces, so the two lists above can and do
    * diverge past this instant — see §3's re-grade assertion, which is entirely
@@ -394,14 +415,51 @@ interface DriveOutcome {
   crossings: Array<{ tSec: number; controller?: "halt" | "proceed" }>;
 }
 
+/**
+ * HOW THIS DRIVE ENDS, and it is the whole subject of §8.
+ *
+ * The default is the product's own ending: keep ticking until something in
+ * `applyTick` sets the phase — the route finish gate, the objective chain, an
+ * exam termination. `endAtSec` is the OTHER half, and the one the audited leg
+ * took: the student stops driving and ends the session himself, which in the
+ * shipped app is `LessonPlayShell`'s «Край» / «Откажи» buttons calling
+ * `finishSession` / `abortSession` with no tick in hand at all.
+ */
+interface DriveOpts {
+  /** Session second at which the student presses the button. Ticks stop being
+   *  fed to the engine at that instant, exactly as they do when the shell
+   *  finalizes: the 3D scene is unmounted and the session is already graded. */
+  endAtSec?: number;
+  /** Which button. Default «Край» (finish). */
+  endVia?: "finish" | "abort";
+  /**
+   * Applied to the COMPILED lesson before the session is created — the only
+   * way to reach a rung SHAPE this drill does not itself compile to, on this
+   * drill's geometry (which is the part the clock numbers above depend on).
+   *
+   * Used for exactly three shapes, each of which the product really ships:
+   * `examMode` (A13 — teach-first bypassed, so the first bill is charged in
+   * the moment), `mistakeExperience` (THEO-3's learn-only sandbox) and
+   * `lessonMistakeTargets` (ADR-009 — 11 shipped templates carry
+   * SPEEDING_OVER_LIMIT as their own mistake). The last is normally written
+   * only by `compileScenario`'s `deriveLessonMistakeTargets`; it is set here
+   * because the derivation is a different subject with its own tests, and what
+   * §8 needs to pin is what the SETTLEMENT does once a rung carries one.
+   */
+  lessonPatch?: Partial<LessonSpec>;
+}
+
 function drive(
   spec: ScenarioSpec,
   script: DriveScript,
   staged: readonly unknown[] = spec.staged ?? [],
   level: 1 | 2 | 3 | 4 | 5 = 1,
+  opts: DriveOpts = {},
 ): DriveOutcome {
-  const lesson = compileScenario(spec, level);
+  const compiled = compileScenario(spec, level);
+  const lesson = opts.lessonPatch !== undefined ? { ...compiled, ...opts.lessonPatch } : compiled;
   let session = createLessonSession(lesson);
+  let endedByHand = false;
   const crossings: DriveOutcome["crossings"] = [];
   const rec = recordScriptedDrive(district(spec.map.districtId), script, {
     scenarioId: spec.id,
@@ -416,6 +474,18 @@ function drive(
           crossings.push({ tSec: tick.t, controller: e.controller });
         }
       }
+      if (endedByHand) return;
+      if (opts.endAtSec !== undefined && tick.t >= opts.endAtSec) {
+        // THE PRODUCT'S OWN ENDING, not a test shortcut: `LessonPlayShell`
+        // line ~5722 is `finalize(finishSession(sessionRef.current, nowSec()))`
+        // and the line under it is the abort. Neither passes a tick, and the
+        // ticks stop arriving the moment the shell finalizes — which is why
+        // this stops feeding them rather than driving on with a dead session.
+        endedByHand = true;
+        session =
+          opts.endVia === "abort" ? abortSession(session, tick.t) : finishSession(session, tick.t);
+        return;
+      }
       session = applyTick(session, tick).state;
     },
   });
@@ -427,6 +497,14 @@ function drive(
     sessionCodes: session.events
       .filter((e) => e.kind === "violation")
       .map((e) => (e as { code: string }).code),
+    sessionBills: session.events
+      .filter((e) => e.kind === "violation")
+      .map((e) => ({
+        code: (e as { code: string }).code,
+        tSec: e.t,
+        regrade: (e as { regrade?: boolean }).regrade === true,
+      })),
+    session,
     endedAtSec: session.endedAtSec ?? null,
     score: result.score,
     passed: result.passed,
@@ -1064,6 +1142,53 @@ describe("§7 sc-signal-flashing — the 59-in-a-50 the audit filmed, at HEAD", 
     expect(speeding[1].tSec).toBeGreaterThan(out.endedAtSec!);
   });
 
+  it("…and it is the LAST TICK's bill: the settlement is stamped at the end, not early", () => {
+    /**
+     * THE PIN THIS SECTION WAS MISSING, and a mutation found the hole rather
+     * than a reading of the code (2026-09-23).
+     *
+     * Every assertion above reads `sessionCodes`, which carries no clock. So
+     * they are all GREEN on a settlement wired to `if (true)` — asked on every
+     * tick instead of only the frame the drive ends — because the bill then
+     * lands at ≈8,9 s and `lessons/engine.ts alreadyCharged` drops the rest,
+     * leaving the same one-element list. That wiring is a different product:
+     * it charges a student the instant the teach card is shown, deleting the
+     * A12 free mini-lesson the founder ratified, and it bills a driver who
+     * would have lifted off two seconds later and been acquitted.
+     *
+     * The timestamp is what tells the two apart. `settleUnpaidSpeedingTeach`
+     * stamps `tick.t` and `lessons/engine.ts` calls it under
+     * `phase === "completed"`, so the charge lands ON the closing frame —
+     * the same second `endedAtSec` records, and strictly after the reducer's
+     * own first bill.
+     */
+    const bill = out.sessionBills.find((b) => b.code === "SPEEDING_OVER_LIMIT");
+    expect(bill).toBeDefined();
+    expect(out.endedAtSec).not.toBeNull();
+    // Stamped at the closing frame itself.
+    expect(bill!.tSec).toBe(out.endedAtSec!);
+    // …and therefore strictly after the reducer's ≈8,9 s bill, which is the
+    // one the free mini-lesson spent. If these ever coincide, the teach has
+    // stopped being free and A12 has been repealed by a wiring change.
+    const firstEngineBill = out.engineCodes.filter((e) => e.code === "SPEEDING_OVER_LIMIT")[0];
+    expect(bill!.tSec).toBeGreaterThan(firstEngineBill.tSec);
+    /**
+     * …AND THE BILL IS MARKED AS WHAT IT IS, asserted where the student's own
+     * sheet carries it rather than only in `rules/__tests__`.
+     *
+     * `regrade: true` is the settlement's declaration that this is THE SAME
+     * BREACH, not a new act (`lessons/engine.ts`: «`regrade: true` means „this
+     * is the same breach, not a new act"»), and every drop rule in the product
+     * keys off it — the `applyTick` guard that refuses a second charge for one
+     * continuing episode, and ADR-009's refusal to re-bill a lesson's own
+     * mistake. Flip it to `false` and this bill silently becomes a fresh
+     * offence: it stops being droppable, and the next policy that routes
+     * re-bills through that guard charges it twice. The rules-level unit test
+     * knew; the live path did not, and a mutation proved the gap.
+     */
+    expect(bill!.regrade).toBe(true);
+  });
+
   it("the fault is on the RECORD, so the drive can no longer read as a clean one", () => {
     // ba51c50's producer, on the live path: the card was SHOWN in the moment
     // and the run recorded that it was, which is what the settlement then
@@ -1100,5 +1225,365 @@ describe("§7 sc-signal-flashing — the 59-in-a-50 the audit filmed, at HEAD", 
     // string to look for — the block is).
     expect(clean.debriefText).toContain("Какво се получи добре:");
     expect(clean.debriefText).not.toContain("чистият лист не значи чисто каране");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §8 — THE DRIVE THE STUDENT ENDS HIMSELF (sc-signal-flashing:0d68b149, w61)
+// ---------------------------------------------------------------------------
+
+/**
+ * §7 proved the settlement on a drive that ran out of ROUTE. This section is
+ * the half §7 could not see, and it is the one the w61 frames photographed.
+ *
+ * ── WHAT WAS BROKEN ────────────────────────────────────────────────────────
+ * The mobile-wrong leg drove 51, 56, peak 58 км/ч in a posted 50 —
+ * `speedingBands(50)` grades above 55, so it is billable — and the teach card
+ * «Стигна точката, но твърде бързо / Отчита се и скоростта» fired, spending the
+ * first bill on the founder-ratified A12 free mini-lesson. The leg then ended
+ * НЕЗАВЪРШЕН: the route was never completed. The sheet read «0 наказателни
+ * точки», `MISTAKES (0): (none convicted)`, and the debrief said «Изпитният
+ * лист остана чист» — which is false, and the charge was consumed and never
+ * settled.
+ *
+ * THE MECHANISM, and it is structural rather than a threshold: `applyTick`
+ * early-returns on `prev.phase === "completed" | "aborted"`, and the
+ * settlement lived INSIDE `applyTick`. So it could only ever fire on the tick
+ * where the route completed BY ITSELF. `finishSession` (the student parks and
+ * presses «Край») and `abortSession` (he quits) set the phase from outside it,
+ * and every such drive forgave the consumed charge in silence.
+ *
+ * ── WHY THESE TESTS DRIVE THE PRODUCT INSTEAD OF CALLING THE RULE ──────────
+ * `compileScenario → createLessonSession → applyTick … → finishSession /
+ * abortSession → buildLessonResult → buildDebrief` is the shell's own order
+ * (`LessonPlayShell`: `finalize(finishSession(sessionRef.current, nowSec()))`,
+ * and the abort on the line below it). A settlement that reached only
+ * `settleUnpaidSpeedingTeach`'s unit test is exactly the defect this repair
+ * was filed against, so nothing below asserts on that function.
+ *
+ * ── THE CLOCK THESE NUMBERS SIT ON, measured on this drill at HEAD ─────────
+ *   8.93 s  the reducer's first SPEEDING_OVER_LIMIT — the bill A12 spends
+ *  12.55 s  the route completes by itself (§7's ending)
+ *  14.93 s  the six-second re-grade, which this drive never lives to see
+ * So 10.5 s is squarely in between: the student has been TAUGHT, he is still
+ * doing it, and the route is not finished. That is the audited leg.
+ */
+describe("§8 sc-signal-flashing — a drive ENDED BY THE STUDENT settles the same charge", () => {
+  /** The button is pressed here: after the teach (8.93 s) and before the route
+   *  could have ended on its own (12.55 s). */
+  const ENDS_AT_SEC = 10.5;
+  const stillSpeeding = recklessScript([[LANE, 124]]);
+
+  describe("«Край» — he parks and ends early (finishSession)", () => {
+    const out = drive(SC_SIGNAL_FLASHING, stillSpeeding, undefined, 1, {
+      endAtSec: ENDS_AT_SEC,
+      endVia: "finish",
+    });
+
+    it("the route was NOT completed — this is the НЕЗАВЪРШЕН leg the audit filmed", () => {
+      expect(out.objectivesDone.every(Boolean)).toBe(false);
+      expect(out.passed).toBe(false);
+      // …and it ended before the finish gate could have done it for him, which
+      // is what makes this a different path from §7 rather than the same one.
+      expect(out.endedAtSec).not.toBeNull();
+      expect(out.endedAtSec!).toBeLessThan(12.5);
+    });
+
+    it("THE FIX: the изпитен лист carries the speeding bill", () => {
+      // WAS «0 наказателни точки · MISTAKES (0): (none convicted)».
+      expect(out.sessionCodes).toEqual(["SPEEDING_OVER_LIMIT"]);
+      expect(out.score).toBe(1);
+    });
+
+    it("…and it is the LAST TICK's measurement, marked as the same breach", () => {
+      const bill = out.sessionBills.find((b) => b.code === "SPEEDING_OVER_LIMIT");
+      expect(bill).toBeDefined();
+      // Stamped at the final tick the engine saw — after the teach's own bill,
+      // and at or before the second the button was pressed. A settlement asked
+      // on every tick instead of only at the end would stamp ≈8.9 s here and
+      // repeal A12's free mini-lesson.
+      const firstEngineBill = out.engineCodes.filter((e) => e.code === "SPEEDING_OVER_LIMIT")[0];
+      expect(bill!.tSec).toBeGreaterThan(firstEngineBill.tSec);
+      expect(bill!.tSec).toBeLessThanOrEqual(out.endedAtSec!);
+      expect(bill!.regrade).toBe(true);
+    });
+
+    it("…and it is PLACED on the A15 mistake map, where the car was when he ended", () => {
+      // The other half of "the same path every other violation takes": a bill
+      // that reaches the sheet but not the map is a row the end screen cannot
+      // plot, and the manual ending is the one place the position could have
+      // been dropped (there is no tick in the caller's hand — it comes off the
+      // session's own last tick).
+      const placed = (out.session.eventPositions ?? []).filter(
+        (r) => r.code === "SPEEDING_OVER_LIMIT",
+      );
+      expect(placed).toHaveLength(1);
+      const bill = out.sessionBills.find((r) => r.code === "SPEEDING_OVER_LIMIT");
+      expect(placed[0].t).toBe(bill!.tSec);
+      // Northbound in the sxf-v1 boulevard's own lane, well past the south
+      // spawn — i.e. where he actually was, not the district origin.
+      expect(placed[0].y).toBeGreaterThan(SPAWN_Y + 50);
+      expect(Math.abs(placed[0].x - LANE)).toBeLessThan(2);
+    });
+
+    it("…and the debrief stops telling him the sheet stayed clean", () => {
+      // The student was TAUGHT first — the coached record is the evidence —
+      // and then charged once, which is requirement-zero's order (THEO-4).
+      expect(out.coachedCodes).toContain("SPEEDING_OVER_LIMIT");
+      expect(out.debriefText).not.toContain("чисто каране без нито едно нарушение");
+      expect(out.debriefText).toContain("Превишена скорост");
+      expect(out.debriefText).toContain("Правилното действие");
+    });
+  });
+
+  describe("«Откажи» — he quits mid-offence (abortSession)", () => {
+    const out = drive(SC_SIGNAL_FLASHING, stillSpeeding, undefined, 1, {
+      endAtSec: ENDS_AT_SEC,
+      endVia: "abort",
+    });
+
+    it("quitting is not an acquittal: the bill is on the sheet", () => {
+      expect(out.session.phase).toBe("aborted");
+      expect(out.sessionCodes).toEqual(["SPEEDING_OVER_LIMIT"]);
+      expect(out.score).toBe(1);
+      expect(out.passed).toBe(false);
+      const bill = out.sessionBills.find((b) => b.code === "SPEEDING_OVER_LIMIT");
+      expect(bill!.regrade).toBe(true);
+    });
+  });
+
+  // -- the directions a settlement must NOT move ----------------------------
+
+  it("NEGATIVE — a driver who LIFTED OFF is still acquitted on a hand-ended drive", () => {
+    // He sped, was taught at 8.93 s, and was back under the posted 50 by
+    // ≈12.3 s. One frame at or under the limit runs the episode reset, so
+    // there is nothing left withheld and the settlement must find nothing —
+    // this is the A12 half the repair may never touch.
+    const out = drive(
+      SC_SIGNAL_FLASHING,
+      {
+        steps: [
+          { kind: "drive", points: [[LANE, SPAWN_Y], [LANE, 20]], targetKmh: 59 },
+          { kind: "drive", points: [[LANE, 20], [LANE, 124]], targetKmh: 35 },
+        ],
+      },
+      undefined,
+      1,
+      { endAtSec: 12.45, endVia: "finish" },
+    );
+    // He WAS shown the fault…
+    expect(out.coachedCodes).toContain("SPEEDING_OVER_LIMIT");
+    // …and he corrected it, so no charge follows him to the sheet.
+    expect(out.sessionCodes).toEqual([]);
+    expect(out.score).toBe(0);
+  });
+
+  it("NEGATIVE — a drive that never sped is billed nothing, on either button", () => {
+    const script = carefulScript([[LANE, 0], [LANE, 30], [LANE, 48]]);
+    for (const endVia of ["finish", "abort"] as const) {
+      const out = drive(SC_SIGNAL_FLASHING, script, undefined, 1, { endAtSec: 20, endVia });
+      expect(out.sessionCodes, endVia).toEqual([]);
+      expect(out.score, endVia).toBe(0);
+      expect(out.coachedCodes, endVia).toEqual([]);
+    }
+  });
+
+  it("NEGATIVE — a route that completes normally is billed EXACTLY ONCE", () => {
+    // §7's drive, then both buttons pressed on top of it — which is what the
+    // shell does when a student taps «Край» on a session the finish gate has
+    // already closed. Each ending is a no-op, so the settlement cannot run a
+    // second time and the ledger cannot grow.
+    const out = drive(SC_SIGNAL_FLASHING, stillSpeeding);
+    expect(out.sessionCodes).toEqual(["SPEEDING_OVER_LIMIT"]);
+    const again = finishSession(out.session, 99);
+    const andAgain = abortSession(again, 100);
+    expect(again.events).toBe(out.session.events);
+    expect(andAgain.events).toBe(out.session.events);
+    expect(
+      andAgain.events.filter((e) => e.kind === "violation" && e.code === "SPEEDING_OVER_LIMIT"),
+    ).toHaveLength(1);
+  });
+
+  it("NEGATIVE — INSIDE THE GRACE is still innocent: 54 км/ч in a 50 settles nothing", () => {
+    /**
+     * WHAT THIS PINS IS THE OUTCOME, NOT ONE GUARD — corrected 2026-09-23,
+     * after a verifier measured the claim that used to stand here.
+     *
+     * Cut at 11.6 s on a drive coasting down from 59: he reads 54,5 км/ч — over
+     * the posted 50 and UNDER `speedingBands(50)`'s graded line of 55 — and he
+     * is billed nothing.
+     *
+     * The comment here used to say the episode was still open and that "the
+     * ONLY thing acquitting him is the band". That is false, and measurably so:
+     * `stepEpisode` nulls `activeSince` on its `!cond` arm, and
+     * `speedingMinorCond` IS the band (`speed > gradedAbove && speed <=
+     * dangerousAbove`), so at 54,5 BOTH guards fire on the same frame. They are
+     * two readings of one measurement — which is exactly what the M12/M13
+     * mutations showed: removing either changes nothing anywhere, removing BOTH
+     * is caught here and by the lift-off negative above. Defence in depth, not
+     * one guard under test. The grace is speedometer/physics slack and it
+     * does not stop applying because the drive ended; a settlement that billed
+     * here would be `speedingGraceRatio` repealed by a wiring change, which
+     * its own config note forbids without an ADR.
+     */
+    const out = drive(
+      SC_SIGNAL_FLASHING,
+      {
+        steps: [
+          { kind: "drive", points: [[LANE, SPAWN_Y], [LANE, 20]], targetKmh: 59 },
+          { kind: "drive", points: [[LANE, 20], [LANE, 124]], targetKmh: 35 },
+        ],
+      },
+      undefined,
+      1,
+      { endAtSec: 11.6, endVia: "finish" },
+    );
+    expect(out.coachedCodes).toContain("SPEEDING_OVER_LIMIT");
+    expect(out.sessionCodes).toEqual([]);
+    expect(out.score).toBe(0);
+  });
+
+  it("ADR-009 — the settlement never bills the LESSON'S OWN mistake", () => {
+    // Founder Ruling A: no exam points are taken for the first occurrence of a
+    // target code. This bill exists only to reach the charge the free teach
+    // consumed, which for a target IS that first occurrence — so it is dropped,
+    // and the verdict carries the refusal instead (doc 92 §3.4b).
+    const out = drive(SC_SIGNAL_FLASHING, stillSpeeding, undefined, 1, {
+      endAtSec: ENDS_AT_SEC,
+      endVia: "finish",
+      lessonPatch: {
+        lessonMistakeTargets: [{ code: "SPEEDING_OVER_LIMIT", source: "demo" }],
+      },
+    });
+    expect(out.sessionCodes).toEqual([]);
+    expect(out.score).toBe(0);
+    // …and he is still TAUGHT and still refused the pass: the drop is about
+    // points, never about telling him what he did (THEO-4).
+    expect(out.coachedCodes).toContain("SPEEDING_OVER_LIMIT");
+    expect(out.passed).toBe(false);
+  });
+
+  it("THEO-3 — in the mistake sandbox the settlement is asked and scores NOTHING", () => {
+    // The learn-only channel: the wrong action is the assignment, so nothing
+    // scores and nothing terminates. The settlement goes through `coachStep`
+    // precisely so this stays true without the sandbox having to know it
+    // exists — a settlement that bypassed the coach would bill the student for
+    // doing the exercise he was told to do.
+    const out = drive(SC_SIGNAL_FLASHING, stillSpeeding, undefined, 1, {
+      endAtSec: ENDS_AT_SEC,
+      endVia: "finish",
+      lessonPatch: { mistakeExperience: { mistakeIndex: 0, codes: ["SPEEDING_OVER_LIMIT"] } },
+    });
+    expect(out.sessionCodes).toEqual([]);
+    expect(out.score).toBe(0);
+  });
+
+  it("A SESSION WITH NO LAST TICK cannot be billed, and cannot crash the ending", () => {
+    /**
+     * SYNTHETIC BY NECESSITY, and it is worth saying why rather than dressing
+     * it up as a drive. The measurement the settlement re-checks comes off the
+     * session's own last tick, so on every state a real drive can produce the
+     * two travel together: an open, billed speeding episode implies ticks, and
+     * ticks imply `lastTick`. The pair can only come apart in a state that was
+     * BUILT rather than driven — a future rehydration, a replay that seeds the
+     * rules from stored events, a test fixture.
+     *
+     * So the state below is a real driven one with the measurement taken away:
+     * the rule engine still holds the open episode, the ledger is empty, and
+     * the endings must find nothing rather than read a field that is not there.
+     */
+    const driven = drive(SC_SIGNAL_FLASHING, stillSpeeding, undefined, 1, {
+      endAtSec: ENDS_AT_SEC,
+      endVia: "finish",
+    });
+    const { lastTick: _measurement, ...blind } = driven.session;
+    expect(_measurement).toBeDefined();
+    for (const end of [finishSession, abortSession]) {
+      const ended = end(
+        { ...blind, phase: "driving", endedAtSec: null, events: [], eventPositions: undefined },
+        ENDS_AT_SEC,
+      );
+      expect(ended.events).toEqual([]);
+    }
+  });
+
+  it("A REPEAT carries its ×1.5 to the sheet when the drive is ended by hand", () => {
+    /**
+     * THE A9 LADDER, on the settlement's own path — and spliced, for a reason
+     * this drill's geometry makes unavoidable.
+     *
+     * The settlement can only fire when the reducer's first minor bill was
+     * TAUGHT (free), and `coachStep` grades it as that family's first graded
+     * pass, i.e. ×1.0. The one state that produces more is a student who was
+     * taught the minor, then went ОПАСНА — which grades on sight and shares the
+     * speeding repeat family — and then fell back into the graded band and
+     * ended the drive there. MEASURED on this drill: teaching the minor costs
+     * ≈9 s and an опасна sustain another ≈3, and sxf-v1's drivable run is 145 m
+     * — the route finishes at 12,55 s, before the third phase can begin. The
+     * profile is real; this map is too short for it.
+     *
+     * So the encounter counters are transplanted from a drive that really did
+     * grade an опасна on the same map (they are the product's own counters, not
+     * a hand-written key), onto the taught state with an empty ledger. If the
+     * ladder is ever dropped from the hand-ended path this goes red.
+     */
+    const dangerous = drive(SC_SIGNAL_FLASHING, {
+      steps: [
+        { kind: "drive", points: [[LANE, SPAWN_Y], [LANE, -10]], targetKmh: 70 },
+        { kind: "drive", points: [[LANE, -10], [LANE, 124]], targetKmh: 58 },
+      ],
+    });
+    expect(dangerous.sessionCodes).toContain("SPEEDING_DANGEROUS");
+    const taught = drive(SC_SIGNAL_FLASHING, stillSpeeding, undefined, 1, {
+      endAtSec: ENDS_AT_SEC,
+      endVia: "finish",
+    });
+    const ended = finishSession(
+      {
+        ...taught.session,
+        phase: "driving",
+        endedAtSec: null,
+        events: [],
+        eventPositions: undefined,
+        penaltyEscalations: [],
+        scenarioEncounters: dangerous.session.scenarioEncounters,
+      },
+      ENDS_AT_SEC,
+    );
+    const bill = ended.events.filter(
+      (e) => e.kind === "violation" && e.code === "SPEEDING_OVER_LIMIT",
+    );
+    expect(bill).toHaveLength(1);
+    const esc = ended.penaltyEscalations.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
+    expect(esc).toHaveLength(1);
+    expect(esc[0].multiplier).toBeGreaterThan(1);
+    expect(esc[0].t).toBe(bill[0].t);
+  });
+
+  it("NO DOUBLE BILL — an EXAM drive already charged in the moment is not charged again", () => {
+    /**
+     * THE GUARD NOTHING KILLED, pinned on the path it protects (2026-09-23).
+     *
+     * In exam mode (A13) teach-first is bypassed, so the reducer's 8.93 s bill
+     * is CHARGED THERE AND THEN. The rule engine's state is unchanged by that —
+     * `speedingMinor.emitted` is set, the episode is still open — so
+     * `settleUnpaidSpeedingTeach` still returns an event at the end, and the
+     * ONLY thing standing between this candidate and paying twice for one
+     * continuing overspeed is `!alreadyCharged(settled.code)`. Removing that
+     * clause left every other test in this file green.
+     */
+    const out = drive(SC_SIGNAL_FLASHING, stillSpeeding, undefined, 1, {
+      endAtSec: ENDS_AT_SEC,
+      endVia: "finish",
+      lessonPatch: { examMode: true },
+    });
+    // Charged in the moment, as an exam does — not withheld, not taught.
+    expect(out.coachedCodes).toEqual([]);
+    const speeding = out.sessionBills.filter((b) => b.code === "SPEEDING_OVER_LIMIT");
+    expect(speeding).toHaveLength(1);
+    // …and it is the reducer's own bill, not the settlement's: stamped at the
+    // offence, not at the ending.
+    expect(speeding[0].tSec).toBeLessThan(9.5);
+    expect(speeding[0].regrade).toBe(false);
   });
 });
