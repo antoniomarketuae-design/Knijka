@@ -9994,3 +9994,61 @@ accepted as evidence for any row.
 Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
 its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
 a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave w61 and its re-judge — 2026-09-23/24
+
+43 lessons re-driven over 4 shards at `54c02a86d253`, 82 drives, every one on a still
+tree. **The merge refused twice before any of it was judged, and both refusals were
+right**: the name `w61` had been used by a partial run at `a0a3ac7`, so the corpus held
+two builds at once, and `wave-c-merge` named the ten files under `platform/` that differ
+between them. A corpus that mixes builds looks complete while some frames came from code
+that no longer exists. The older set is preserved whole at
+`.audit-frames/w61-superseded-a0a3ac7/` with its provenance; nothing was deleted.
+
+### What the wave itself settled: nothing
+
+| verdict | count |
+|---|---|
+| CLOSED (survived an adversarial verifier) | 0 |
+| STILL (symptom reproduces on the fresh frame) | 9 |
+| UNJUDGED (the drive did not exercise it) | 15 |
+| PARTIAL (some clauses only) | 7 |
+
+Six closures were proposed and all six were refuted. The recurring reason is not stale
+evidence — it is that a `-wrong` leg holds flat throttle and never commits the offence,
+so the camera photographs a different fault. Universal first-fault grace suppressed one
+card outright; another row's "missing ✓" was a drive accident rather than a repair.
+
+### Then six rows retired, and three of them overturned this wave's own judges
+
+The judging brief gave the judges the frames and the judging rules and **not the founder's
+rulings**, so a judge had no way to tell a surface he had ORDERED from a defect:
+
+- `sc-ov-solid-return:5cb8eb40` — the judge read the building's pillars through the card's
+  action row. That is the CARD, which ruling 19 keeps see-through. The row is about the
+  CONTROL: measured sd 1.73 inside «ЗАЩО» against 70.07 for bare world, ~97 % removed.
+- `sc-vu-emergency-junction:853790f7` — the par line IS on the sheet («163 с при ориентир
+  60 с»), the ratio is 2.72× and ruling 21's cap fires above 3×; billing the crawl is the
+  one thing that ruling forbids.
+- `sc-junction-gap:e87d5be1` — the КОЛАН disc's fill exists BECAUSE the founder filed the
+  opposite complaint, his own note naming "a parked car" as what it stands over.
+- `sc-signal-hesitation:f5ffccf3` — the phone briefing is absent from all 40 mobile legs
+  and the PC panel folds to a pill after arrival (panel band 5.2 % bright → 0.42 %).
+- `sc-ed-d2-priority-run:8a7372dd` and `sc-merge-accel-lane:2091c183` — the read sheet was
+  OPENED and measured for the first time (lane F's «МЕНЮ → Инструкции → ПРОЧЕТИ» route):
+  100 % of title and body visible on all eight device/level combinations the rows name.
+
+A ruling-aware re-judge then closed one more row and **refuted a sibling making the
+identical claim**, so the rulings did not become a rubber stamp.
+
+**Open list: 67 → 61**, out of 1523 filed. STILL 4 · UNJUDGED 42 · PARTIAL 15.
+
+### What the remainder waits on, measured rather than described
+
+    19  (9 crit)  steer: the leg must HOLD A LANE or a line
+     8  (4 crit)  the wrong leg must COMMIT the named act
+     5  (2 crit)  steer: reach a place / complete the route
+     6  (0 crit)  a probe that OPENS something — two of these retired above
+     3  (2 crit)  unclassified, read by hand
+
+UNJUDGED is now ~70 % of the open list. It is an instrument problem, not a backlog.
