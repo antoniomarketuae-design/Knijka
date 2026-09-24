@@ -425,3 +425,44 @@ rather than re-filed, which is the whole of «a cause is as stale as its report�
 It is recorded because the evidence had to survive somewhere or the next attempt
 at this instrument rediscovers all of it — which is the reason the rows were
 filed in the first place.
+
+## W59 increment 2 — where it got to, 2026-09-24
+
+**The witness contract passes, measured directly rather than inferred.** An A/B on
+`sc-ln-boulevard-discipline / pc-right`, four runs per arm, compared on VERDICTS
+was underpowered and nearly produced a false conclusion — the off arm read
+НЕИЗДЪРЖАН 9 · 9 · 19 · 21 and the on arm НЕ Е ВЗЕТ 3 · НЕИЗДЪРЖАН 9 · 9 · НЕ Е
+ВЗЕТ 3, which LOOKS like interference and is p ≈ 0.43 on the split. The contract
+is «the control period stays TICK_MS with the witness on or off», and the witness
+books its own violation of it: `pollBudget {tickBudgetMs 500, polls 49,
+overBudget 0, maxMs 40}`, `gaps 0`, `overruns 0`, 1,994 rows. With the witness off
+the sidecar is a 684-byte stub saying `unmeasured: the witness was switched off;
+the probe was not read`, `reads 0` — unmeasured is not zero.
+
+**The off arm's own spread is the more useful finding**: the same leg on identical
+code scored 9, 9, 19 and 21. A row whose evidence is one drive's SCORE is weaker
+than it looks; fault TITLES are stable, totals are not.
+
+**The AC-2 freeze is NOT achievable yet, and the reason moved once already.** The
+first attempt found every candidate leg reporting «curved sample 0 below its
+floor», which turned out to be a real defect in the bucket itself — the
+lane-align exclusion blanked the road's own turn (fixed at `1e7661f`; two routes
+at 91 and 338 deg/100 m had been yielding zero curved ticks). With that repaired,
+live drives now carry real buckets:
+
+| leg | curved ticks | p90 curved | why still ineligible |
+|---|---|---|---|
+| `sc-rb-busy-gap` | 0 → 2 634 | 0.12 m | AC-6: 77.4 % of curved excluded, longest excluded run 28.0 s |
+| `sc-turn-left-oncoming` | 0 → 3 379 | 1.76 m | AC-6: 87.1 % excluded, run 46.1 s, sample 435 < floor 536, a curved tick 33.3 m off route |
+
+The exclusions are `notMoving`, `unpainted` and `opposingBank` — that is the
+DRIVE, not the criterion. **So the freeze waits on a leg that can hold a curve
+while moving, on its own bank, on painted lane lines**, which is the forward
+steering half (increment 3) that the baseline was supposed to precede. The
+dependency runs the other way round from the way the spec ordered it, and that is
+worth knowing before anybody plans on freezing AC-2 first.
+
+Note the shape of the p90s that ARE measured: 0.12 m on the roundabout's graded
+ticks and 1.76 m on the turn, against a ceiling of 2.40 m. If those survive a leg
+that resolves AC-6, the threshold is likely to be set by the ceiling rather than
+by the distribution.
