@@ -32,6 +32,7 @@ import * as RR from "../lib/road-record.mjs";
 import {
   CURVED_DEG_PER_100M,
   CURVATURE_WINDOW_M,
+  GUIDANCE_LANE_ALIGN_RAMP_M,
   ROAD_PROBE_VERSION_READ,
   ROAD_RECORD_SCHEMA,
   ROAD_SIDECAR_FILE,
@@ -43,7 +44,7 @@ import {
   curvedSeqSpans,
   decodeRowColumns,
   encodeRowColumns,
-  laneAlignExclusion,
+  laneAlignKinks,
   markDriveEnd,
   mergeRoadRead,
   parseRoadSidecar,
@@ -136,7 +137,7 @@ const JUNCTION_S = ARC_TO + 60;
  * goal. 2 m spacing. The final leg — junction → goal — is where the product
  * may bake its lane-align shift in.
  */
-function buildRoute() {
+function buildRoute({ cornerAtJunction = true } = {}) {
   const xy = [];
   for (let s = 0; s < 100; s += 2) xy.push([0, s]);
   const R = 60;
@@ -145,7 +146,10 @@ function buildRoute() {
     xy.push([60 - R * Math.cos(a), 100 + R * Math.sin(a)]);
   }
   for (let s = 0; s < 60; s += 2) xy.push([60 + s, 160]);
-  for (let s = 0; s <= 100; s += 2) xy.push([120, 160 - s]);
+  // …then either a real right-angle corner at the junction, or straight on
+  // through it — same length either way, so the lane-align marks land alike.
+  if (cornerAtJunction) for (let s = 0; s <= 100; s += 2) xy.push([120, 160 - s]);
+  else for (let s = 0; s <= 100; s += 2) xy.push([120 + s, 160]);
   const r = polyline(xy);
   // anchor the turn to the nearest sample, as finalizeRoute does
   let best = 0;
@@ -610,26 +614,131 @@ test("SIDECAR SIZE: a synthetic 4-minute leg at 60 Hz, gzip + columns, is stated
 
 /* ── the route-derived bucket ─────────────────────────────────────────────── */
 
-test("the curved bucket is the BEND and only the bend: the product's lane-align span is excluded and lends no junction kink", () => {
+test("the curved bucket is the BEND and only the bend: the product's lane-align kinks are debited and lend no junction turn", () => {
   const route = buildRoute();
-  const { intervals, exclusion, unknownSpan } = curvedIntervals({ ...route, pts: [...route.pts], arc: [...route.arc] });
+  const { intervals, shift, unknownSpan } = curvedIntervals({ ...route, pts: [...route.pts], arc: [...route.arc] });
   const junctionS = route.turns[0].s;
   assert.ok(Math.abs(junctionS - JUNCTION_S) < 2.5);
   assert.equal(unknownSpan, false);
-  assert.equal(exclusion.known, true);
-  assert.deepEqual(exclusion.excluded[0], { fromS: junctionS - SPAN_KINK_REACH_M, toS: junctionS + 40 + SPAN_KINK_REACH_M }, "the ease-in, widened by the kink reach");
+  assert.equal(shift.known, true);
+  assert.deepEqual(shift.kinks.map((k) => k.mark), ["legStartS", "rampEndS"], "the ease-in's two slope changes, and no decay (holdToS === decayEndS)");
+  assert.ok(Math.abs(shift.kinks[0].s - junctionS) < 1e-9 && Math.abs(shift.kinks[1].s - (junctionS + 40)) < 1e-9, JSON.stringify(shift.kinks));
   assert.equal(intervals.length, 1, JSON.stringify(intervals));
   // The 100 m window reaches 50 m either side, so the bucket may start up to
   // 50 m before the bend; it must not start beyond that, and must cover the bend.
   assert.ok(intervals[0].fromS >= ARC_FROM - 50 - 2 && intervals[0].fromS <= ARC_FROM + 2, JSON.stringify(intervals));
   assert.ok(intervals[0].toS >= ARC_TO - 2, JSON.stringify(intervals));
-  // …and it ENDS where the bend's own vertices leave the window, not at the
-  // exclusion: the last curved segment is the one whose window still holds 15°
-  // of the bend (15/90 of its 94 m), i.e. mid ≤ ARC_TO − 15.7 + 50 ≈ 228.5 m.
-  // Summing the junction's 90° (inside the span) would run it on to ~244 m.
+  // This route's junction is a REAL right-angle corner in the road, and the
+  // lane-align ease-in happens to open on it. Under the fix the corner is kept
+  // (it is road) and only the ramp's own atan(Δslope) comes off — so the bucket
+  // reads the same as it would if the route had declared no shift at all.
+  assert.deepEqual(intervals, curvedIntervals({ ...route, pts: [...route.pts], arc: [...route.arc], laneAlign: null }).intervals,
+    "the 5° ease-in changed the bucket of a 90° corner");
+  // THE EASE-IN ITSELF LENDS NOTHING. Run the same road STRAIGHT ON through the
+  // junction, with the shift still opening there: the bucket must now end where
+  // the BEND's own vertices leave the window — the last segment whose window
+  // still holds 15° of the bend (15/90 of its 94 m), mid ≤ ARC_TO − 15.7 + 50.
+  const straightOn = buildRoute({ cornerAtJunction: false });
   const lastMid = ARC_TO - (15 / 90) * (Math.PI / 2) * 60 + CURVATURE_WINDOW_M / 2;
-  assert.ok(intervals[0].toS <= lastMid + 2, `the bucket reached ${intervals[0].toS} — it summed a vertex inside the lane-align span`);
+  const si = curvedIntervals(straightOn).intervals;
+  assert.equal(si.length, 1, JSON.stringify(si));
+  assert.ok(si[0].toS <= lastMid + 2, `the bucket reached ${si[0].toS} — it kept a vertex the lane-align shift made`);
   assert.ok(CURVED_DEG_PER_100M === 15);
+});
+
+/* ── THE W63 DEFECT: the debit, on the routes the PROBE ITSELF PUBLISHED ─────
+ *
+ * Until w63 the lane-align span was BLANKED between its marks rather than
+ * debited at them. `legStartS` is the last junction before the goal — on a
+ * turning lesson, the very place the road turns — and ease-in + decay are 80 m
+ * of a ~100 m route, so the blanking threw the road's own bend away with the
+ * shift's kinks and road-baseline.mjs reported «curved sample 0 below its floor
+ * 539» for legs carrying 6× and 22× the threshold.
+ *
+ * These three routes are the last derivation the probe published on a real
+ * drive at 082b10d (`_audit-road.json.gz` → `route[].route`), byte-for-byte.
+ * ──────────────────────────────────────────────────────────────────────────*/
+const LIVE_ROUTES = JSON.parse(fs.readFileSync(new URL("./fixtures/road-routes-w63-live.json", import.meta.url), "utf8"));
+
+/** Σ|Δheading| over a route's own vertices — the raw, undebited turning. */
+function rawTurningDeg(route) {
+  const { pts, count } = route;
+  let prev = null;
+  let tot = 0;
+  for (let i = 0; i + 1 < count; i++) {
+    const h = (Math.atan2(pts[2 * i + 2] - pts[2 * i], pts[2 * i + 3] - pts[2 * i + 1]) * 180) / Math.PI;
+    if (prev !== null) {
+      let d = ((h - prev + 180) % 360 + 360) % 360 - 180;
+      tot += Math.abs(d);
+    }
+    prev = h;
+  }
+  return tot;
+}
+
+const coveredM = (ivs) => ivs.reduce((s, iv) => s + (iv.toS - iv.fromS), 0);
+
+test("W63 · a route that plainly curves yields a curved bucket: the two live turning routes, at 91° and 338°/100 m", () => {
+  for (const [key, floorDegPer100m] of [["turnLeftOncoming", 90], ["rbBusyGap", 330]]) {
+    const { route, lesson } = LIVE_ROUTES[key];
+    const raw = rawTurningDeg(route);
+    assert.ok((raw / route.totalLen) * 100 >= floorDegPer100m, `${lesson} turns ${raw.toFixed(0)}° over ${route.totalLen.toFixed(0)} m`);
+    const { intervals, unknownSpan, shift } = curvedIntervals(route);
+    assert.equal(unknownSpan, false, `${lesson} publishes its shift`);
+    assert.ok(intervals.length >= 1, `${lesson}: EMPTY curved bucket on a route carrying ${(raw / route.totalLen * 100).toFixed(0)}°/100 m — the w63 defect`);
+    // The bend itself is in the bucket, not merely some segment of the route.
+    assert.ok(coveredM(intervals) >= 0.7 * route.totalLen, `${lesson} covered only ${coveredM(intervals).toFixed(1)} of ${route.totalLen.toFixed(1)} m`);
+    // …and the debit really did come off: it is bounded by what the shift can
+    // manufacture, never by the road's turn.
+    const debitable = shift.kinks.reduce((s, k) => s + k.deg, 0);
+    assert.ok(debitable < 0.2 * raw, `${lesson}: the shift's ${debitable.toFixed(1)}° is not a small correction to ${raw.toFixed(0)}°`);
+  }
+});
+
+test("W63 · a genuinely straight boulevard stays EMPTY — and it is the DEBIT that holds it, not a blind detector", () => {
+  const { route, lesson } = LIVE_ROUTES.boulevard;
+  const raw = rawTurningDeg(route);
+  // Every degree this road turns was put there by the lane-align shift: the two
+  // decay kinks alone are atan(12.19/40) each = 33.9°, and that is the whole of it.
+  const kinks = laneAlignKinks(route).kinks;
+  assert.deepEqual(kinks.map((k) => k.mark), ["holdToS", "decayEndS"]);
+  const manufactured = kinks.reduce((s, k) => s + k.deg, 0);
+  assert.ok(Math.abs(manufactured - raw) < 0.05, `the shift accounts for ${manufactured.toFixed(2)}° of the road's ${raw.toFixed(2)}°`);
+  // Undebited it reads 21°/100 m — over the 15 bar. A fix that marks everything
+  // curved would pass the two tests above and fail here.
+  assert.ok((raw / route.totalLen) * 100 > CURVED_DEG_PER_100M, `${lesson} reads ${(raw / route.totalLen * 100).toFixed(1)}°/100 m raw`);
+  assert.ok(curvedIntervals({ ...route, laneAlign: null }).intervals.length >= 1, "with the shift undeclared the boulevard IS curved — the debit is the only thing removing it");
+  assert.deepEqual(curvedIntervals(route).intervals, [], `${lesson} must have an EMPTY curved bucket`);
+});
+
+test("W63 · the kink amplitudes are the product's own atan(Δslope), reproduced on live derivations to 0.01°", () => {
+  const { route } = LIVE_ROUTES.boulevard;
+  const la = route.laneAlign;
+  assert.equal(la.w0, 1, "w0 = 1 — the ease-in is a no-op and manufactures nothing");
+  const expect = (Math.atan(Math.abs(la.offsetM) / GUIDANCE_LANE_ALIGN_RAMP_M) * 180) / Math.PI;
+  for (const k of laneAlignKinks(route).kinks) assert.ok(Math.abs(k.deg - expect) < 1e-9, `${k.mark} ${k.deg} != ${expect}`);
+  // …and the ease-in's own denominator is the PUBLISHED rampInM, not the mirror.
+  const t = LIVE_ROUTES.turnLeftOncoming.route.laneAlign;
+  const ease = (Math.atan((Math.abs(t.offsetM) * (1 - t.w0)) / t.rampInM) * 180) / Math.PI;
+  for (const k of laneAlignKinks(LIVE_ROUTES.turnLeftOncoming.route).kinks) assert.ok(Math.abs(k.deg - ease) < 1e-9);
+  assert.equal(GUIDANCE_LANE_ALIGN_RAMP_M, 40);
+});
+
+test("W63 · the debit can only SHRINK a rate: it is capped by the heading the window actually summed there", () => {
+  // A mark placed on dead-straight road, with an offset big enough to claim a
+  // 40° debit that is not there: the window must not go negative, and a real
+  // bend 60 m away must still be curved.
+  const xy = [];
+  for (let s = 0; s <= 300; s += 2.5) xy.push([s <= 150 ? 0 : (s - 150) * 0.5, s <= 150 ? s : 150 + (s - 150) * 0.866]);
+  const r = polyline(xy);
+  r.goalS = 60;
+  r.laneAlign = { legStartS: 20, rampEndS: 60, rampInM: 40, goalS: 60, holdToS: 60, decayEndS: 60, offsetM: 34, w0: 0 };
+  const route = { ...r, pts: [...r.pts], arc: [...r.arc] };
+  const kinks = laneAlignKinks(route).kinks;
+  assert.ok(kinks.every((k) => k.deg > 35), `the claim is ${JSON.stringify(kinks.map((k) => k.deg))}`);
+  const { intervals } = curvedIntervals(route);
+  assert.ok(intervals.length >= 1, "a 30° bend at s = 150 survives a debit claimed 60 m away on straight road");
+  assert.ok(intervals.every((iv) => iv.toS > iv.fromS), JSON.stringify(intervals));
 });
 
 /**
@@ -657,14 +766,14 @@ function laneAlignedStraight(declare = "full", amp = 8.125) {
   return { ...r, pts: [...r.pts], arc: [...r.arc] };
 }
 
-test("the lane-align ease-in AND decay on a straight road are excluded exactly — and they ARE curved when not declared", () => {
-  assert.deepEqual(curvedIntervals(laneAlignedStraight()).intervals, [], "the published span covers both kinks of the ease-in and both of the decay");
+test("the lane-align ease-in AND decay on a straight road are debited exactly — and they ARE curved when not declared", () => {
+  assert.deepEqual(curvedIntervals(laneAlignedStraight()).intervals, [], "the published shift accounts for both kinks of the ease-in and both of the decay");
   // The same geometry with a route that says "no shift applied" is curved: the
-  // exclusion, not a blind detector, is what removes the ramp.
+  // debit, not a blind detector, is what removes the ramp.
   assert.ok(curvedIntervals(laneAlignedStraight("none")).intervals.length >= 1);
-  // …and the DECAY is its own stretch: at a 16.25 m offset (22° kinks), declare
-  // the ease-in but a decay that ends where it starts, and the decay's far kink
-  // at s = 320 comes back as a curved interval around it.
+  // …and the DECAY is its own pair of marks: at a 16.25 m offset (22° kinks),
+  // declare the ease-in but a decay that ends where it starts, and the decay's
+  // undeclared kinks at s = 280 and s = 320 come back as curved intervals.
   assert.deepEqual(curvedIntervals(laneAlignedStraight("full", 16.25)).intervals, []);
   const easeOnly = curvedIntervals(laneAlignedStraight("ease-only", 16.25)).intervals;
   assert.ok(easeOnly.length >= 1 && easeOnly.every((iv) => iv.fromS > 200) && easeOnly.some((iv) => iv.fromS <= 326 && iv.toS >= 326), JSON.stringify(easeOnly));
@@ -677,9 +786,9 @@ test("THE VERIFIER'S ROUTE A, as the PRODUCT derives it: a straight-through junc
   const out = curvedIntervals(A);
   assert.equal(out.unknownSpan, false);
   assert.deepEqual(out.intervals, []);
-  assert.equal(out.exclusion.excluded[0].fromS, A.laneAlign.legStartS - SPAN_KINK_REACH_M, "the exclusion starts at the product's legStartS, less the kink reach — no conservative guess");
+  assert.equal(out.shift.clusters[0].fromS, A.laneAlign.legStartS - SPAN_KINK_REACH_M, "the first kink sits at the product's legStartS — no conservative guess");
   // The product's ramp IS curved when the route does not declare it.
-  assert.ok(curvedIntervals({ ...A, laneAlign: null }).intervals.length >= 1, "the exclusion is what removes the ramp");
+  assert.ok(curvedIntervals({ ...A, laneAlign: null }).intervals.length >= 1, "the debit is what removes the ramp");
 });
 
 test("THE VERIFIER'S ROUTE B, as the PRODUCT derives it: the 90° r=15 bend IS curved — before the ease-in (B2) and inside the w = 1 hold (B1)", () => {
@@ -690,22 +799,29 @@ test("THE VERIFIER'S ROUTE B, as the PRODUCT derives it: the 90° r=15 bend IS c
   assert.equal(B1.laneAlign.legStartS, 0);
   const i1 = curvedIntervals(B1).intervals;
   assert.ok(covers(i1, 95, 108), `the bend is not in the bucket: ${JSON.stringify(i1)}`);
-  assert.ok(i1.every((iv) => iv.fromS >= B1.laneAlign.rampEndS + SPAN_KINK_REACH_M - 1e-6), "nothing inside the ease-in is curved");
+  // The ease-in's own kinks are debited away, so nothing in it is curved on the
+  // shift's account; a window that reaches the bend from inside the ease-in is
+  // curved on the ROAD's account, which is the point of debiting rather than
+  // blanking. That is bounded by the window's half-width from the bend.
+  assert.ok(i1.every((iv) => iv.toS >= 95 - CURVATURE_WINDOW_M / 2), `a curved interval is out of the bend's window reach: ${JSON.stringify(i1)}`);
   // B2: a junction at s ≈ 130, after the bend — the bend is before the span.
   const B2 = PRODUCT_ROUTES.B2;
   assert.ok(Math.abs(B2.laneAlign.legStartS - 130) < 1.5, JSON.stringify(B2.laneAlign));
   const i2 = curvedIntervals(B2).intervals;
   assert.ok(covers(i2, 97, 118), `the bend is not in the bucket: ${JSON.stringify(i2)}`);
-  const lo = B2.laneAlign.legStartS - SPAN_KINK_REACH_M;
-  const hi = B2.laneAlign.rampEndS + SPAN_KINK_REACH_M;
-  assert.ok(i2.every((iv) => iv.toS <= lo + 1e-6 || iv.fromS >= hi - 1e-6), `a curved interval reaches into the ease-in: ${JSON.stringify(i2)}`);
+  // Same reading as B1: the ease-in past the bend may be curved only while the
+  // BEND is still inside the window, never on the ramp's own manufactured kinks.
+  assert.ok(i2.every((iv) => iv.fromS <= 118 + CURVATURE_WINDOW_M / 2), `a curved interval outran the bend's window: ${JSON.stringify(i2)}`);
 });
 
 test("a route that does NOT publish its span has an UNKNOWN span: its ticks join no bucket, are booked, and are never guessed", () => {
   const route = buildRoute();
   delete route.laneAlign;
-  assert.equal(laneAlignExclusion(route).known, false);
-  assert.equal(laneAlignExclusion({ laneAlign: { ...span(1, 2, 3), rampEndS: Number.NaN } }).known, false, "a mark that is not finite is not a span");
+  assert.equal(laneAlignKinks(route).known, false);
+  assert.equal(laneAlignKinks({ laneAlign: { ...span(1, 2, 3), rampEndS: Number.NaN } }).known, false, "a mark that is not finite is not a span");
+  for (const k of ["offsetM", "w0", "rampInM"]) {
+    assert.equal(laneAlignKinks({ laneAlign: { ...span(1, 2, 3), [k]: undefined } }).known, false, `${k} is needed to size the kink — a shift that does not say it is UNKNOWN, never zero`);
+  }
   const { rec } = driveLeg({ route });
   const base = baselineOf(rec);
   assert.equal(base.ac2.curvedTicksTotal, 0);
@@ -714,10 +830,55 @@ test("a route that does NOT publish its span has an UNKNOWN span: its ticks join
   assert.match(roadBaselineLine(roadRecordSidecar(rec), base), /unknown-span ticks \d{3,}/);
 });
 
-test("laneAlign: null excludes nothing; an ease-in that runs into the decay is one merged stretch", () => {
-  assert.deepEqual(laneAlignExclusion({ laneAlign: null }), { known: true, excluded: [], span: null });
-  const ex = laneAlignExclusion({ laneAlign: span(0, 40, 50, 50, 90) }).excluded;
-  assert.deepEqual(ex, [{ fromS: 0, toS: 90 + SPAN_KINK_REACH_M }]);
+test("laneAlign: null debits nothing; kinks within a reach of each other merge into ONE cluster so no vertex is debited twice", () => {
+  assert.deepEqual(laneAlignKinks({ laneAlign: null }), { kinks: [], clusters: [], known: true, span: null });
+  // legStartS at s = 0 has no road before it, so it carries no kink; rampEndS
+  // and holdToS are 1 m apart, inside 2·SPAN_KINK_REACH_M, so they merge.
+  const r = { totalLen: 200, laneAlign: span(0, 40, 41, 41, 81) };
+  const out = laneAlignKinks(r);
+  assert.deepEqual(out.kinks.map((k) => k.mark), ["rampEndS", "holdToS", "decayEndS"]);
+  assert.equal(out.clusters.length, 2, JSON.stringify(out.clusters));
+  assert.deepEqual(out.clusters[0], { fromS: 40 - SPAN_KINK_REACH_M, toS: 41 + SPAN_KINK_REACH_M, deg: out.kinks[0].deg + out.kinks[1].deg });
+  // A mark past the route's end carries no kink — there is no road to bend.
+  assert.deepEqual(laneAlignKinks({ totalLen: 50, laneAlign: span(0, 40, 41, 41, 81) }).kinks.map((k) => k.mark), ["rampEndS", "holdToS"]);
+  // A decay that ends where it starts never ran: it manufactures NOTHING, and a
+  // route whose goal is its last metre must not be debited for a skipped ramp.
+  assert.deepEqual(laneAlignKinks({ totalLen: 200, laneAlign: span(0, 40, 50, 50, 50) }).kinks.map((k) => k.mark), ["rampEndS"]);
+});
+
+test("W63 · each kink is sized by the mark's OWN denominator: the published rampInM for the ease-in, the product's ramp for the decay", () => {
+  const deg = (x) => (Math.atan(x) * 180) / Math.PI;
+  // rampIn = min(LANE_ALIGN_RAMP_M, hit.s − legStartS), so a short leg publishes
+  // a rampInM well under the mirror — and the ease-in kink is steeper for it.
+  const short = laneAlignKinks({ totalLen: 200, laneAlign: { ...span(10, 22, 60, 60, 100), rampInM: 12 } });
+  assert.deepEqual(short.kinks.map((k) => k.mark), ["legStartS", "rampEndS", "holdToS", "decayEndS"]);
+  for (const k of short.kinks.slice(0, 2)) assert.ok(Math.abs(k.deg - deg(3.5 / 12)) < 1e-12, `${k.mark} ${k.deg} != atan(3.5/12)`);
+  for (const k of short.kinks.slice(2)) assert.ok(Math.abs(k.deg - deg(3.5 / GUIDANCE_LANE_ALIGN_RAMP_M)) < 1e-12, `${k.mark} ${k.deg} != atan(3.5/40)`);
+  assert.ok(short.kinks[0].deg > 3 * short.kinks[3].deg, "a 12 m ease-in and a 40 m decay cannot carry the same kink");
+  // A LEFT-hand shift bends the road exactly as much as a right-hand one.
+  const mirrored = laneAlignKinks({ totalLen: 200, laneAlign: { ...span(10, 22, 60, 60, 100), rampInM: 12, offsetM: -3.5 } });
+  assert.deepEqual(mirrored.kinks, short.kinks, "a negative offsetM is a shift the other way, not an absent one");
+});
+
+test("W63 · the debit is CAPPED by the window's own heading: a claim made on straight road cannot eat a bend 40 m away", () => {
+  // A 30° bend at s = 150, and a lane-align ease-in over [110, 118] on the dead
+  // straight road before it: two 20.6° kinks that merge into ONE 41.2° cluster,
+  // claiming more than the bend is worth. Uncapped, 30 − 41.2 < 0 and the bend
+  // vanishes; capped by what the window actually summed there (zero — the road
+  // is straight at 110–118), the bend stands.
+  const xy = [];
+  for (let s = 0; s <= 150; s += 2.5) xy.push([0, s]);
+  const a = (30 * Math.PI) / 180;
+  for (let s = 2.5; s <= 150; s += 2.5) xy.push([s * Math.sin(a), 150 + s * Math.cos(a)]);
+  const r = polyline(xy);
+  r.goalS = 118;
+  r.laneAlign = { legStartS: 110, rampEndS: 118, rampInM: 8, goalS: 118, holdToS: 118, decayEndS: 118, offsetM: 3, w0: 0 };
+  const route = { ...r, pts: [...r.pts], arc: [...r.arc] };
+  const { shift, intervals } = curvedIntervals(route);
+  assert.equal(shift.clusters.length, 1, JSON.stringify(shift.clusters));
+  assert.ok(shift.clusters[0].deg > 40 && shift.clusters[0].deg < 42, `the claim is ${shift.clusters[0].deg}`);
+  assert.ok(intervals.some((iv) => iv.fromS <= 150 && iv.toS >= 150),
+    `the 30° bend was eaten by a debit claimed on straight road: ${JSON.stringify(intervals)}`);
 });
 
 test("the 15°/100 m rate is measured over a 100 m window: a lone 10° kink is straight, a lone 20° kink is a ~100 m bucket", () => {

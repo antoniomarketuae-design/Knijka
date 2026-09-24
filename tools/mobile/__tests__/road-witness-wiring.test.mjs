@@ -36,6 +36,7 @@ import {
   ROAD_SIDECAR_FILE,
   ROAD_WITNESS_ENV,
   SPAN_KINK_REACH_M,
+  GUIDANCE_LANE_ALIGN_RAMP_M,
   createRoadWitness,
   parseRoadSidecar,
 } from "../lib/road-record.mjs";
@@ -294,6 +295,20 @@ describe("§E the product facts the reader relies on have not drifted", () => {
     assert.match(GUIDANCE, /return \{ pts, arc, count, totalLen, turns, goalS, laneAlign \};/);
     assert.match(GUIDANCE, /legStartIdx: lastAtOrBefore\(legStartS\),\n {4}rampEndIdx: firstAtOrAfter\(legStartS \+ rampIn\),/);
     assert.match(GUIDANCE, /holdToIdx: lastAtOrBefore\(holdToS\),\n {4}decayEndIdx: firstAtOrAfter\(holdToS \+ LANE_ALIGN_RAMP_M\),/);
+  });
+
+  it("the lane-align RAMP LENGTH and the LINEAR weight the kink debit is sized from are the product's", () => {
+    const m = GUIDANCE.match(/export const LANE_ALIGN_RAMP_M = (\d+(?:\.\d+)?);/);
+    assert.ok(m, "LANE_ALIGN_RAMP_M is no longer declared in guidanceRoute.ts");
+    assert.equal(Number(m[1]), GUIDANCE_LANE_ALIGN_RAMP_M, "the decay kink's denominator drifted from the product's ramp");
+    // The debit is atan(Δslope) ONLY because both ramps are LINEAR in s — a
+    // smoothstep would spread manufactured heading across the whole stretch and
+    // no per-mark debit could stand.
+    assert.match(GUIDANCE, /w = w0 \+ \(1 - w0\) \* Math\.min\(1, \(s\[i\] - legStartS\) \/ rampIn\);/, "the ease-in is no longer a linear ramp");
+    assert.match(GUIDANCE, /w = Math\.max\(0, 1 - \(s\[i\] - holdToS\) \/ LANE_ALIGN_RAMP_M\);/, "the decay is no longer a linear ramp");
+    // …and the shift is applied along a SNAPSHOT normal, so each vertex's
+    // displacement is offset·w(s)·n̂ and nothing compounds into the next.
+    assert.match(GUIDANCE, /const src = pts\.map\(\(p\) => \[p\[0\], p\[1\]\] as \[number, number\]\);/);
   });
 
   it("the probe copies laneAlign onto the published route, absent staying absent", () => {

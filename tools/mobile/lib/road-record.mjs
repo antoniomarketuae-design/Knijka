@@ -117,6 +117,16 @@ export const GUIDANCE_DENSIFY_STEP_M = 2.5;
  * heading change lies within this reach of the published span.
  */
 export const SPAN_KINK_REACH_M = 2 * GUIDANCE_DENSIFY_STEP_M;
+/**
+ * guidanceRoute.ts `export const LANE_ALIGN_RAMP_M = 40;` — the length the
+ * lane-align weight DECAYS over past `holdToS`. Mirrored (the wiring test
+ * re-reads it from source) because it is the decay kink's own denominator and
+ * the probe does not publish it: `decayEndS − holdToS` is NOT a substitute,
+ * since that mark is the first SAMPLE at or after `holdToS + LANE_ALIGN_RAMP_M`
+ * in the route's stretched arclength, and it is clamped to the last sample when
+ * the route ends inside the decay.
+ */
+export const GUIDANCE_LANE_ALIGN_RAMP_M = 40;
 /** Spec AC-2: "curved = route segments carrying ≥ 15°/100 m of heading change". */
 export const CURVED_DEG_PER_100M = 15;
 /**
@@ -602,23 +612,40 @@ export function toCriteriaRows(probeRows) {
  * vertices inside the CURVATURE_WINDOW_M centred on its midpoint reaches
  * CURVED_DEG_PER_100M per 100 m.
  *
- * THE LANE-ALIGN SPAN IS EXCLUDED EXACTLY WHERE THE PRODUCT APPLIED IT.
+ * THE LANE-ALIGN SHIFT IS DEBITED AT ITS KINKS, NOT BLANKED OVER ITS SPAN.
  * guidanceRoute.ts `alignRawToGoalLane` slides the route sideways into the
  * goal's lane with a weight that eases in over [legStartS, rampEndS], holds 1
  * to holdToS and decays over [holdToS, decayEndS]; the probe publishes those
- * marks per derivation (`route.laneAlign`, in the route's own arclength). Only
- * the EASE-IN and the DECAY manufacture heading — between them the shift is a
- * parallel offset, and a bend there keeps the road's own heading change — so
- * exactly those two stretches, each widened by SPAN_KINK_REACH_M, are
- * excluded. `laneAlign: null` (no shift applied) excludes nothing.
+ * marks per derivation (`route.laneAlign`, in the route's own arclength).
  *
- * A route that does NOT SAY (`laneAlign` absent or a mark not finite — a
- * contract breach, since probe version 2 always sets it) has an UNKNOWN span:
- * its ticks are booked `rowsUnderUnknownSpan`, join no bucket, and the freeze
- * refuses the leg. Never a guess.
+ * THE RAMPS ARE LINEAR, so each one adds a CONSTANT lateral slope, not
+ * curvature: the shift manufactures |Δheading| only where that slope CHANGES,
+ * which is at the four published marks and nowhere else. Measured on a straight
+ * road driven through the product's own shift, 100.0% of the manufactured
+ * heading lands within SPAN_KINK_REACH_M of a mark, and each mark carries
+ * exactly `atan(Δslope)`:
+ *   ease-in  |offsetM| · (1 − w0) / rampInM              at legStartS, rampEndS
+ *   decay    |offsetM| / GUIDANCE_LANE_ALIGN_RAMP_M      at holdToS,   decayEndS
+ * A mark with no route on one side of it (legStartS at s = 0, a mark past the
+ * route's end) carries no kink, and a zero-length ease-in or decay carries none.
  *
- * Vertices inside the exclusion are NOT SUMMED by any window either: a segment
- * 30 m before the span must not borrow the ramp's kinks into its own rate.
+ * So each window SUMS EVERY VERTEX and then DEBITS what the shift put there:
+ * per kink cluster, `min(atan(Δslope), the heading this window actually summed
+ * inside that cluster's reach)`. The cap is what makes the debit safe — it can
+ * only ever SHRINK a window's rate, so it cannot manufacture a curved verdict,
+ * and on a straight road it cancels the shift to within 0.01°.
+ *
+ * EXCLUDING THE STRETCH INSTEAD WAS THE DEFECT (fixed w63). `legStartS` is the
+ * last junction before the goal — which on a turning lesson is the very place
+ * the ROAD turns — and ease-in + decay are 80 m of a ~100 m route, so blanking
+ * both stretches threw the road's own bend away with the shift's kinks:
+ * sc-turn-left-oncoming (90° of turn) and sc-rb-busy-gap (364°) both produced
+ * an EMPTY curved bucket and could never be eligible for the AC-2 freeze.
+ *
+ * A route that does NOT SAY (`laneAlign` absent, or a mark or shift parameter
+ * not finite — a contract breach, since probe version 2 always sets it) has an
+ * UNKNOWN shift: its ticks are booked `rowsUnderUnknownSpan`, join no bucket,
+ * and the freeze refuses the leg. Never a guess.
  *
  * A TICK joins the bucket when its nearest point on the route live for it lies
  * in a curved interval. There is NO distance gate on that projection, on
@@ -633,60 +660,84 @@ function wrap180(d) {
   return x;
 }
 
-const SPAN_FIELDS = ["legStartS", "rampEndS", "holdToS", "decayEndS"];
+const SPAN_FIELDS = ["legStartS", "rampEndS", "holdToS", "decayEndS", "rampInM", "offsetM", "w0"];
+
+const MARK_EPS = 1e-6;
+const atanDeg = (slope) => (Math.atan(slope) * 180) / Math.PI;
 
 /**
- * The stretches of this derivation the lane-align shift manufactured heading
- * on, from the product's own `route.laneAlign`: `{ known, excluded, span }`.
+ * The kinks this derivation's lane-align shift manufactured, from the product's
+ * own `route.laneAlign` alone: `{ known, kinks, clusters, span }`, where a kink
+ * is `{ s, deg, mark }` and a cluster is `{ fromS, toS, deg }` — kinks whose
+ * SPAN_KINK_REACH_M neighbourhoods touch, merged so no vertex is debited twice.
  * `known: false` (with `why`) when the route does not say.
+ *
+ * `totalLen` bounds which marks can carry a kink: a slope change needs route on
+ * BOTH sides of it. Verified against four live derivations of
+ * sc-ln-boulevard-discipline, where the amplitudes below reproduce every
+ * vertex of a perfectly straight road's heading change to within 0.01°.
  */
-export function laneAlignExclusion(route) {
+export function laneAlignKinks(route) {
   const la = route?.laneAlign;
-  if (la === undefined) return { known: false, why: "route.laneAlign absent", excluded: [], span: undefined };
-  if (la === null) return { known: true, excluded: [], span: null };
-  if (typeof la !== "object") return { known: false, why: "route.laneAlign is not an object", excluded: [], span: undefined };
+  const none = (extra) => ({ kinks: [], clusters: [], ...extra });
+  if (la === undefined) return none({ known: false, why: "route.laneAlign absent", span: undefined });
+  if (la === null) return none({ known: true, span: null });
+  if (typeof la !== "object") return none({ known: false, why: "route.laneAlign is not an object", span: undefined });
   const bad = SPAN_FIELDS.filter((k) => !Number.isFinite(la[k]));
-  if (bad.length) return { known: false, why: `route.laneAlign.${bad.join(", ")} not finite`, excluded: [], span: la };
-  const R = SPAN_KINK_REACH_M;
-  const raw = [
-    [Math.max(0, la.legStartS - R), la.rampEndS + R],
-    [Math.max(0, la.holdToS - R), la.decayEndS + R],
-  ].sort((a, b) => a[0] - b[0]);
-  const excluded = [];
-  for (const [a, b] of raw) {
-    const last = excluded[excluded.length - 1];
-    if (last && a <= last.toS) last.toS = Math.max(last.toS, b);
-    else excluded.push({ fromS: a, toS: b });
+  if (bad.length) return none({ known: false, why: `route.laneAlign.${bad.join(", ")} not finite`, span: la });
+  const end = Number.isFinite(route?.totalLen) ? route.totalLen : Infinity;
+  const inside = (s) => s > MARK_EPS && s < end - MARK_EPS;
+  const kinks = [];
+  const add = (s, deg, mark) => {
+    if (deg > MARK_EPS && inside(s)) kinks.push({ s, deg, mark });
+  };
+  if (la.rampInM > MARK_EPS && la.rampEndS > la.legStartS + MARK_EPS) {
+    const deg = atanDeg((Math.abs(la.offsetM) * Math.max(0, 1 - la.w0)) / la.rampInM);
+    add(la.legStartS, deg, "legStartS");
+    add(la.rampEndS, deg, "rampEndS");
   }
-  return { known: true, excluded, span: la };
+  if (la.decayEndS > la.holdToS + MARK_EPS) {
+    const deg = atanDeg(Math.abs(la.offsetM) / GUIDANCE_LANE_ALIGN_RAMP_M);
+    add(la.holdToS, deg, "holdToS");
+    add(la.decayEndS, deg, "decayEndS");
+  }
+  kinks.sort((a, b) => a.s - b.s);
+  const R = SPAN_KINK_REACH_M;
+  const clusters = [];
+  for (const k of kinks) {
+    const last = clusters[clusters.length - 1];
+    if (last && k.s - R <= last.toS) {
+      last.toS = Math.max(last.toS, k.s + R);
+      last.deg += k.deg;
+    } else clusters.push({ fromS: Math.max(0, k.s - R), toS: k.s + R, deg: k.deg });
+  }
+  return { known: true, kinks, clusters, span: la };
 }
 
-const inExcluded = (s, excluded) => excluded.some((e) => s >= e.fromS && s <= e.toS);
-
-/** [{ fromS, toS }] curved intervals of one route, outside its lane-align span. */
+/** [{ fromS, toS }] curved intervals of one route, net of its lane-align kinks. */
 export function curvedIntervals(route, opts = {}) {
   const degPer100m = opts.degPer100m ?? CURVED_DEG_PER_100M;
   const windowM = opts.windowM ?? CURVATURE_WINDOW_M;
   const n = route?.count ?? 0;
   const pts = route?.pts ?? [];
   const arc = route?.arc ?? [];
-  const exclusion = laneAlignExclusion(route);
-  if (!exclusion.known) return { intervals: [], unknownSpan: true, exclusion };
-  if (n < 3) return { intervals: [], unknownSpan: false, exclusion };
-  const ex = exclusion.excluded;
+  const shift = laneAlignKinks(route);
+  if (!shift.known) return { intervals: [], unknownSpan: true, shift };
+  if (n < 3) return { intervals: [], unknownSpan: false, shift };
+  const clusters = shift.clusters;
   const hdg = [];
   for (let i = 0; i + 1 < n; i++) {
     const dx = pts[2 * (i + 1)] - pts[2 * i];
     const dy = pts[2 * (i + 1) + 1] - pts[2 * i + 1];
     hdg.push(Math.hypot(dx, dy) > 1e-9 ? (Math.atan2(dx, dy) * 180) / Math.PI : null);
   }
-  // turn at vertex i (between segment i-1 and i), located at arc[i] — only the
-  // vertices OUTSIDE the lane-align span; the span's own kinks are never summed.
+  // turn at vertex i (between segment i-1 and i), located at arc[i]. EVERY
+  // vertex is summed; what the shift manufactured comes off as a debit below.
   const turns = [];
   let prev = null;
   for (let i = 0; i < hdg.length; i++) {
     if (hdg[i] === null) continue;
-    if (prev !== null && !inExcluded(arc[i], ex)) turns.push({ s: arc[i], deg: Math.abs(wrap180(hdg[i] - prev)) });
+    if (prev !== null) turns.push({ s: arc[i], deg: Math.abs(wrap180(hdg[i] - prev)) });
     prev = hdg[i];
   }
   const intervals = [];
@@ -698,20 +749,23 @@ export function curvedIntervals(route, opts = {}) {
   };
   for (let i = 0; i + 1 < n; i++) {
     const mid = (arc[i] + arc[i + 1]) / 2;
+    const lo = mid - windowM / 2;
+    const hi = mid + windowM / 2;
     let sum = 0;
-    for (const t of turns) if (t.s >= mid - windowM / 2 && t.s <= mid + windowM / 2) sum += t.deg;
-    if ((sum / windowM) * 100 < degPer100m) continue;
-    // The segment, less every excluded stretch it overlaps.
-    let a = arc[i];
-    const b = arc[i + 1];
-    for (const e of ex) {
-      if (e.toS <= a || e.fromS >= b) continue;
-      push(a, Math.min(b, e.fromS));
-      a = Math.max(a, e.toS);
+    for (const t of turns) if (t.s >= lo && t.s <= hi) sum += t.deg;
+    // THE DEBIT. Clusters are disjoint, so their `local` sums are disjoint
+    // subsets of `sum` and the total debit can never exceed it.
+    let debit = 0;
+    for (const c of clusters) {
+      if (c.toS < lo || c.fromS > hi) continue;
+      let local = 0;
+      for (const t of turns) if (t.s >= Math.max(lo, c.fromS) && t.s <= Math.min(hi, c.toS)) local += t.deg;
+      debit += Math.min(c.deg, local);
     }
-    push(a, b);
+    if (((sum - debit) / windowM) * 100 < degPer100m) continue;
+    push(arc[i], arc[i + 1]);
   }
-  return { intervals, unknownSpan: false, exclusion };
+  return { intervals, unknownSpan: false, shift };
 }
 
 /** Nearest point on the route polyline: { s, distM }. */
@@ -799,16 +853,18 @@ export function curvedSeqSpans(rows, routes, opts = {}) {
       derivationsUsed: [...byDerivation.keys()],
       derivationsWithUnknownSpan: [...byDerivation.entries()].filter(([, v]) => v.unknownSpan).map(([k]) => k),
       curvedIntervals: Object.fromEntries(
-        [...byDerivation.entries()].map(([k, v]) => [k, { unknownSpan: v.unknownSpan, exclusion: v.exclusion, intervals: v.intervals }]),
+        [...byDerivation.entries()].map(([k, v]) => [k, { unknownSpan: v.unknownSpan, shift: v.shift, intervals: v.intervals }]),
       ),
       projectionDistM: distBook(dists),
       curvedProjectionDistM: distBook(curvedDists),
       method:
         `route-derived, pre-drive: a route segment is curved when |Δheading| of the route vertices inside the ` +
         `${opts.windowM ?? CURVATURE_WINDOW_M} m centred on it reaches ${opts.degPer100m ?? CURVED_DEG_PER_100M}°/100 m; ` +
-        "the product's published lane-align span (route.laneAlign: the ease-in [legStartS, rampEndS] and the decay " +
-        `[holdToS, decayEndS], each widened by ${SPAN_KINK_REACH_M} m) is excluded and no window sums a vertex inside it; ` +
-        "a route that does not publish its span joins no bucket; a tick joins by its nearest route point, with no distance gate",
+        "every vertex is summed and the product's own lane-align shift (route.laneAlign) is then DEBITED at the four " +
+        `marks where its linear ramps change slope — atan(|offsetM|·(1−w0)/rampInM) at legStartS and rampEndS, ` +
+        `atan(|offsetM|/${GUIDANCE_LANE_ALIGN_RAMP_M}) at holdToS and decayEndS, each capped by the heading the window ` +
+        `actually summed within ${SPAN_KINK_REACH_M} m of it, so the debit can only shrink a rate and never raise one; ` +
+        "a route that does not publish its shift joins no bucket; a tick joins by its nearest route point, with no distance gate",
     },
   };
 }
