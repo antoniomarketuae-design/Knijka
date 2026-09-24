@@ -95,10 +95,19 @@
 //     so `wrongWay === false` means EITHER "travelling with the flow" OR "this
 //     district states no one-way streets and this is not a ring, so nobody
 //     asked". Two meanings, one value, and the probe row cannot tell them
-//     apart. A criterion that acquits on it is fail-open. Hence: the one-way
-//     surface may only ACQUIT on a leg where the channel was PROVEN LIVE —
-//     at least one `wrongWay === true` row in the record, which a declared
-//     witness excursion produces on purpose. Otherwise UNRESOLVED.
+//     apart. A criterion that acquits on it is fail-open.
+//
+//     THE REMEDY IN THIS PARAGRAPH IS RETIRED, and the paragraph said otherwise
+//     for a revision after it stopped being true. It used to read: "Hence: the
+//     one-way surface may only ACQUIT on a leg where the channel was PROVEN
+//     LIVE — at least one `wrongWay === true` row in the record". That was the
+//     LIVENESS GATE, and R18 deleted it together with the witness floor,
+//     because both could only ever be armed BY THE OFFENCE THEY EXIST TO
+//     DETECT. What stands in their place is the founder-ruled signed angle
+//     (R18) plus ONE rule: a tick that cannot state its direction is UNKNOWN,
+//     and the unknown-fraction ceiling refuses a denominator too dark to
+//     ACQUIT. It does not refuse a CONVICTION — see R21, which is the repair
+//     of the regression the early return caused.
 //
 // MEASURED THIS SESSION (every number in this file that is not a product
 // constant, with the command that produced it):
@@ -220,12 +229,16 @@
 //       inside a 63 s leg (an implied 1 200 Hz against a 20 Hz median) with
 //       impliedDropBlindSec 2.95 s and LEG = pass. `dropBlindWallSec` is that
 //       count at the record's own cadence, bounded cumulatively.
-//   R12 THE WITNESS FLOOR MEASURES CONTIGUOUS TICKS. `flowRuns` BRIDGES, on
-//       purpose, so R7 was reading a bridged SPAN: two true ticks 1.45 s apart
-//       with UNKNOWN between them produced a 1.50 s "witness" on 0.10 s of
-//       channel evidence, and LEG = pass. The bridge is free — unknown and
-//       off-surface ticks are billed to no ceiling — so the budget argument
-//       that bounds witness LENGTH never bounded it.
+//   R12 RETIRED BY R18 — it repaired the witness floor and the floor is gone.
+//       It read: the floor must count CONTIGUOUS ticks, because `flowRuns`
+//       BRIDGES on purpose, so R7 was reading a bridged SPAN — two true ticks
+//       1.45 s apart with UNKNOWN between them produced a 1.50 s "witness" on
+//       0.10 s of channel evidence, and LEG = pass. It is recorded here because
+//       the bridge is still free (unknown and off-surface ticks are billed to
+//       no ceiling), so any future rule that measures a RUN'S SPAN as evidence
+//       of anything inherits the same hole. The CONVICTION rules read the span
+//       deliberately — a bridged offence is still one offence — and that
+//       direction was never the cheat.
 //   R13 N14 IN BOTH DIRECTIONS. `opposingBank` is set only inside
 //       `if (!edgeRt.edge.oneway)`, so it is exactly as impossible on a one-way
 //       row as `wrongWay` is on a two-way one, and had no rule: 600 wrong-bank
@@ -250,6 +263,126 @@
 //       bought an exemption from the excursion census. The bound is the file's
 //       own saturation constant, LANE_WIDTH_M/2 = 4.0625 m, past which AC-LANE
 //       already treats the value as not a measurement.
+//   R18 THE ONE-WAY DISCRIMINATOR READS THE SIGNED ANGLE, AND TWO DEFENCES
+//       RETIRE WITH THE AMBIGUITY THEY DEFENDED (founder ruling 2026-09-20,
+//       landed 2026-09-24). `againstFlow` on the one-way surface now reads
+//       `row.alignDeg` — the UNTHRESHOLDED nose-vs-edge angle the product
+//       reduces to `wrongWay` — against the product's own
+//       `WRONG_WAY_ANGLE_DEG` (worldRuntime.ts:279, mirrored in PRODUCT and
+//       read back out of platform/src by the drift test). Three consequences,
+//       and the third is the point:
+//         · `alignDeg` states the LAWFUL case positively. `wrongWay: false`
+//           never could — worldRuntime.ts:2306-2312 publishes it both for
+//           „travelling with the flow" and for „nobody asked" — so `false`
+//           alone is now UNKNOWN, not with-the-flow.
+//         · IT MEASURES THE NOSE. `SimTick.speedKmh` is unsigned, so `gear` is
+//           the only channel that says WHICH WAY along its own axis the car is
+//           going, and `speedKmh` the only one that says whether it is going
+//           anywhere at all; a lawful reverse reads |deg| ≈ 180 on every frame,
+//           and a car that is actually reversing has the angle rotated by 180°
+//           before the threshold. A consumer that skips that rotation convicts
+//           every correct reverse manoeuvre — and a consumer that applies it on
+//           the GEAR ALONE convicts every car stopped in reverse, which is R20
+//           and was live in the revision that shipped this bullet. Both matter
+//           because the instrument this record was published for covers the
+//           reverse/park half (rules/types.ts `EdgeAlignment.deg`, measured in
+//           runtime/__tests__/edge-alignment.test.ts §7).
+//         · THE LIVENESS GATE AND THE WITNESS FLOOR (R7, R12) ARE DELETED, with
+//           `longestWitnessRunSec` and `longestContiguousWitnessSec`. Both
+//           existed only because the only proof an ambiguous channel was live
+//           was the OFFENCE ITSELF, which is what funded N15b and what L7/L9
+//           disclosed as still live. N15b is now RE-MEASURED rather than
+//           deleted: a leg whose 1240 ticks are armed and aligned is HONEST,
+//           and passing is the right answer — the cheat suite asserts those
+//           ticks count as with-the-flow POSITIVELY, and asserts that STRIPPING
+//           the signal from the same rows sends them unknown and the leg
+//           unresolved. Nothing was loosened: the non-zero denominator rule and
+//           R13 both stand, and the unknown-fraction ceiling is what now
+//           refuses a record that cannot say which way the car faced.
+//   R19 THE TWO DIRECTION CHANNELS MUST AGREE, and this rule is here because
+//       R18 OPENED THE HOLE IT CLOSES — which is the honest reason to write a
+//       rule and the one this file has most often had to discover from the
+//       outside. Reading the angle FIRST means a tap that writes `alignDeg: 0`
+//       on every tick acquits the surface while `wrongWay: true` is sitting on
+//       600 of its rows. MEASURED with R18 and without R19: againstFlowTicks 0,
+//       discriminatorUnknownTicks 0, oneWay = pass, LEG = pass, mayTestify
+//       ["lane position on oneWay"]. The rule is the PRODUCT'S OWN INVARIANT —
+//       `wrongWay === (armed && deg !== null && |deg| > 120)`, both measured off
+//       the same lane fix and heading — so a row where they disagree is R13's
+//       shape and gets R13's verdict. It compares the NOSE, UNROTATED: the
+//       product's boolean is a heading verdict and fires on a lawful reverse
+//       around a ring, while the discriminator rotates for TRAVEL, and a rule
+//       that compared the rotated value would file every correct reverse-park
+//       as a broken record.
+//
+// THE TWO RULES ADDED IN THE REVISION AFTER R18/R19, because an adversarial
+// verifier reproduced that revision and refuted it on four findings. Both are
+// defects R18 INTRODUCED — the new discriminator's own holes, found from
+// outside — which is the honest place for them and the reason they are numbered
+// after it rather than folded into it.
+//
+//   R20 THE REVERSE ROTATION NEEDS TRAVEL, NOT A GEAR LEVER, and reading the
+//       gear alone was A LIVE FALSE CONVICTION. R18's discriminator rotated the
+//       nose angle by 180° whenever `gear === -1`, with no reference to MOTION,
+//       so a car STANDING STILL in reverse on a one-way surface with its nose
+//       perfectly along the edge read |travel| ≈ 180° and was counted against
+//       the flow on every tick. MEASURED on a 25 Hz ring record whose every
+//       tick carried `wrongWay: false`, `wrongWayArmed: true`, `alignDeg: 0.4`:
+//       a window of 38 ticks at `gear: -1, speedKmh: 0` — 1.52 s, one frame
+//       past `wrongWaySustainSec` — convicted the surface, "longest 1.52 s over
+//       38 tick(s) … (slow 38, reverse 38, bridged 0)". The census already knew
+//       all 38 were slow and in reverse and no rule read it. That window is the
+//       OPENING STATE OF EVERY REVERSE MANOEUVRE, and the reverse/park half is
+//       what this instrument was ruled for; the PRODUCT convicts nothing on
+//       those ticks, because `wrongWay` is a heading verdict and the nose is at
+//       0.4°. `travellingBackwards` is `gear === -1 AND the record says the car
+//       is moving`, and the invariant it restores is the one to mutate against:
+//       WHILE THE CAR IS STOPPED, ITS DIRECTION VERDICT MUST NOT DEPEND ON
+//       WHICH GEAR IS SELECTED.
+//
+//       THE PREDICATE IS `speedKmh > 0` AND DELIBERATELY NOT `engineMoving`.
+//       The engine's 5 km/h threshold answers "would the product have GRADED
+//       this tick", which is AC-LANE's question; putting it in this numerator
+//       is C1 and C2 exactly, and a controller backing the wrong way down a
+//       one-way street at 4.9 km/h would leave the numerator BY SPECIFICATION.
+//       And the exclusion is from the ROTATION only, never from surface
+//       membership: membership is a POSITION and is true of a stopped car, so
+//       making it speed-dependent would empty the denominator the crawl has to
+//       be measured against. The withheld ticks are counted and published as
+//       `stationaryReverseTicks`. Reds N18 and N18b plus two named controls in
+//       the module's own suite.
+//   R21 THE UNKNOWN-FRACTION CEILING REFUSES AN ACQUITTAL AND NOT A CONVICTION,
+//       which repairs an UNDISCLOSED REGRESSION R18 shipped. The ceiling
+//       early-returned `unresolved` from the middle of `assessSurface`, so it
+//       refused convictions too — and on a record in the RETIRED DIALECT
+//       (`wrongWay` and no `alignDeg` at all) every tick that is not a positive
+//       `true` is UNKNOWN, so the unknown fraction is 1 − (offence density).
+//       Clearing a 0.1 ceiling would have taken a leg that spent NINE TENTHS of
+//       its one-way surface driving the wrong way. MEASURED on a 1500-row 25 Hz
+//       pre-signal ring record: 750 contiguous `wrongWay: true` ticks — THIRTY
+//       SECONDS of undeclared wrong-way driving, twenty times
+//       `wrongWaySustainSec` — read `discriminatorUnknownFrac 0.500`, oneWay
+//       UNRESOLVED, and `convictingRuns` was never computed at all. Meanwhile
+//       the comment at the site stated the opposite mechanism in as many words
+//       ("a record that predates the signal … can still CONVICT on
+//       `wrongWay === true`, because true is unambiguous"), which is the
+//       long-half-life defect this repo names. The ceiling is now decided where
+//       it was and SPENT at the bottom through `worstVerdict`, so `fail`
+//       outranks it; the reason is pushed either way, so a reader of a failing
+//       dark record still learns the record was dark. The asymmetry is this
+//       file's own doctrine: the claim that needs evidence is that the car was
+//       FINE in the dark. A conviction is read off ticks that POSITIVELY say
+//       true, and the fraction rule can only be DILUTED by unknowns, never
+//       inflated by them, because they land in its denominator. Reds N19 and
+//       one named control in the module's own suite.
+//
+//       AND ITS VALUE AT THAT SITE IS NOW COVERED. The ceiling replaced BOTH
+//       the liveness gate and the witness floor, so it is the only defence left
+//       against a dark one-way record — and loosening it fivefold at this one
+//       use site left both suites green, a survivor that was not among the two
+//       disclosed. N20 and its twin in the module's suite pin it at the
+//       boundary from both sides: exactly `EXCLUDED_FRACTION_CEILING` of a
+//       denominator passes and one tick more is UNRESOLVED.
 //
 // THE THREE RULES ADDED IN THE REVISION BEFORE THOSE, each because an adversary
 // rebuilt the twelve cheating legs OUTSIDE this module's own suite
@@ -271,17 +404,18 @@
 //      of the excursion they happen to carry — the clock fraud raised nothing.
 //      This is row 63's THIRD remedy, which the two earlier rules left undone
 //      while the header described it as done.
-//   R7 THE ONE-WAY WITNESS FLOOR, in AC-FLOW. Reds N15b. The liveness gate asks
-//      whether `wrongWay` can say true; it did not ask for how long, and a
-//      channel armed by a blip acquits everything else for free. 20 ticks
-//      (1.0 s) of declared wrong-way carried a 1260-tick one-way denominator to
-//      LEG = pass. The floor is the product's own arming clock,
-//      `wrongWaySustainSec` 1.5 s, and it is not widenable: lengthening the
-//      witness spends declared-removal budget, and on N15b's own leg the two
-//      bounds meet with nothing between them (measured: 1.25 s clears the
-//      budget and fails the floor; 1.30 s breaks the budget; 1.50 s clears the
-//      floor and convicts as an undeclared run — the cheat suite executes the
-//      whole range 1..40 ticks and asserts not one of them passes).
+//   R7 RETIRED BY R18, together with the liveness gate it propped up. It was
+//      the ONE-WAY WITNESS FLOOR: the gate asked whether `wrongWay` COULD say
+//      true, the floor asked for how LONG, because a channel armed by a blip
+//      acquits everything else for free (20 ticks of declared wrong-way carried
+//      a 1260-tick denominator to LEG = pass). Both were workarounds for a
+//      value that could not state the lawful case, and both could only ever be
+//      armed BY THE OFFENCE THEY EXIST TO DETECT. L7 measured the floor
+//      diluting with leg length and with a shorter calibration park, and L9
+//      pinned that as live; the signed value retires the question instead of
+//      bounding it. What replaced it is not a looser rule — it is a different
+//      one: a tick that carries no direction is UNKNOWN, and the unknown-
+//      fraction ceiling refuses a denominator too dark to judge.
 //   R8 THE RE-ARM HALF OF THE FRACTION CEILING IS THE SURFACE'S OWN, via
 //      `surfaceRearmSec`. No verdict moves today — `WRONG_WAY_REARM_SEC` and
 //      `speedingRearmSec` are both 4 s, and engine.ts:1258-1259 says the first
@@ -328,7 +462,10 @@
 //     `simGainedWallSec` → 0                                reds 1
 //     `cadenceLostWallSec` → 0                              reds 2
 //     `dropBlindWallSec` → 0                                reds 1
-//     `longestContiguousWitnessSec` → the bridged span      reds 3
+//     `longestContiguousWitnessSec` → the bridged span      reds 3  (RETIRED
+//                                                            with R7/R12 —
+//                                                            the metric no
+//                                                            longer exists)
 //     `legP90AbsOffsetM` → 0                                reds 1
 //     `legExcludedFrac` → 0                                 reds 2
 //     `legAgainstFlowFracCeiling` → Infinity                reds 2
@@ -342,8 +479,87 @@
 //                              `gapBlindWallMs`.
 //     `nonMonotonicWallSteps`  `wallMs` gets `seq`'s own refusal (R10).
 //     `dropBlindWallSec`       what `droppedTicks` costs (R11).
-//     `longestContiguousWitnessSec`  the one-way witness floor (R12).
+//     `row.alignDeg` / `PRODUCT.WRONG_WAY_ANGLE_DEG` / `row.gear` /
+//     `row.speedKmh`           the one-way discriminator (R18) and the travel
+//                              gate on its rotation (R20, `travellingBackwards`
+//                              — the gear says which way, the speed says
+//                              whether). It replaced
+//                              `longestContiguousWitnessSec`, which gated the
+//                              witness floor (R12) and is gone with it.
+//                              MUTATION-VERIFIED TWENTY-SEVEN WAYS (R18 + R19
+//                              + R20 + R21), TWENTY-FIVE KILLED, each redding a
+//                              NAMED assertion: read `wrongWay`
+//                              again (24 tests red), read a missing signal as
+//                              `false` (6), read `alignDeg: null` as `false`
+//                              (4), read a non-finite angle as `false` (1),
+//                              drop the reverse rotation (5), drop the WRAP
+//                              around it (3), rotate on any gear but −1 (2),
+//                              use 90° here (3), move 120 IN platform/src
+//                              (1 — the drift test), make the threshold
+//                              inclusive (3), drop the non-zero denominator
+//                              (1), drop R13 (4), drop the unknown-fraction
+//                              ceiling (11), drop unknown ticks OUT of the
+//                              denominator (15), drop R19 (1), make R19 compare
+//                              the ROTATED angle (4), let R19 accept a
+//                              conviction on a disarmed channel (1), rotate on
+//                              the GEAR ALONE with no motion (4 — R20's own
+//                              false conviction), gate the rotation on the
+//                              engine's 5 km/h `moving` instead of `> 0`
+//                              (2 — C1/C2 reopened), read a missing `speedKmh`
+//                              as NOT MOVING rather than UNKNOWN (2), move the
+//                              motion boundary to `>= 0` (4), drop stationary
+//                              reverse ticks out of SURFACE MEMBERSHIP (4),
+//                              make a stationary tick UNKNOWN instead of
+//                              reading its heading (4), restore the ceiling's
+//                              EARLY RETURN so a dark record cannot convict
+//                              (2 — the R18 regression), let the ceiling
+//                              OVERRIDE a conviction (2), loosen the ceiling's
+//                              value 5x AT THAT SITE (2 — the survivor the
+//                              verifier found), and make the ceiling inclusive
+//                              (2).
+//
+//                              ONE MORE DIES ONLY ON A VALUE ASSERTION, and is
+//                              recorded as such rather than counted as covered,
+//                              because "grep and mutation cannot tell a verdict
+//                              consumer from a string consumer" is this file's
+//                              own warning: miscounting
+//                              `stationaryReverseTicks` (`< 0` for `<= 0`) reds
+//                              4 tests, ALL of which assert the number. No
+//                              verdict reads it — see its entry under PUBLISHED
+//                              AND READ BY NO VERDICT for why that is
+//                              deliberate, and note that the ROTATION it
+//                              records is covered five ways above.
+//
+//                              TWO SURVIVED AND ARE DISCLOSED, because a
+//                              survivor with no explanation is how this file
+//                              got its ledger wrong twice:
+//                                · `Math.abs(alignDeg)` before the rotation —
+//                                  an EQUIVALENT MUTANT. The threshold is
+//                                  symmetric and the rotation is exactly 180°,
+//                                  so the sign cannot change a verdict on this
+//                                  surface. Proved over 3 600 000 (angle, gear)
+//                                  pairs in the cheat suite, and disclosed as
+//                                  L10 with the one place the sign WOULD be
+//                                  read. R20 does not move it: a stationary
+//                                  reverse tick reads the UNROTATED nose
+//                                  against the same symmetric threshold, which
+//                                  L10 now samples too. Dropping the wrap and
+//                                  rotating on the wrong gear both DIE, so the
+//                                  arithmetic around it is covered; only the
+//                                  sign is not.
+//                                · a literal `120` in place of this mirror —
+//                                  the same shape as `WRONG_WAY_REARM_SEC`
+//                                  below: identical figures today, so no
+//                                  behaviour moves, and only the drift test can
+//                                  tell them apart once the product's does.
 //     `contradictoryRows`      on BOTH surfaces now (R13).
+//     `directionContradictionRows`  the two direction channels must agree
+//                              (R19) — the hole R18 would otherwise have
+//                              opened. Three mutations die on it: delete it,
+//                              compare the ROTATED angle (which files every
+//                              lawful reverse-park as a broken record), and
+//                              accept `wrongWayArmed: false` beside a
+//                              conviction.
 //     `unclassifiedWallSec`    the cumulative unclassified census (R14).
 //     `legAgainstFlowFrac` / `legAgainstFlowFracCeiling`  the leg-wide flow
 //                              bound (R15).
@@ -380,6 +596,16 @@
 //     `slow/reverseAgainstFlowTicks`  named by the fraction refusal: they are
 //                             the two classes this file COUNTS and refuses to
 //                             exclude, which is C1 and C2.
+//     `stationaryReverseTicks`  the ticks whose TRAVEL rotation was withheld
+//                             because the record says the car was not moving
+//                             (R20). Named by the fraction refusal so a reader
+//                             can see how much of a surface was standing still.
+//                             It gates nothing ON PURPOSE: those ticks are not
+//                             excluded from anything — they stay in the
+//                             denominator and can still be convicted on their
+//                             heading — so there is no verdict for it to gate.
+//                             What a mutation must red instead is the ROTATION
+//                             it records, and four do (R20's own controls).
 //     `impliedDropBlindSec`   the CONTIGUOUS drop rule still gates on it; the
 //                             cumulative one (R11) is what the cheat needed.
 //                             (This one is genuinely consumed — listed here
@@ -407,14 +633,24 @@
 //      of from the harness's own clock. A leg that declares NO such duration is
 //      now UNRESOLVED rather than `pass`, which is the one part of this that
 //      got better; the rest of L1 stands.
-//   L2 THE TWO-WAY SURFACE HAS NO LIVENESS WITNESS. The one-way surface must
-//      prove its channel can say true; the two-way surface is trusted because
-//      `opposingBank` is set-only-when-true on a resolved two-way edge. If the
-//      probe tap simply never copies the field, the only thing standing between
-//      that and a clean pass is `declared.channels` — a claim the harness makes
-//      about itself. The symmetric fix is a declared wrong-bank witness
-//      excursion on every leg, which costs a deliberate excursion per leg and
-//      was NOT paid here.
+//   L2 THE TWO-WAY SURFACE HAS NO DIRECTION SIGNAL, AND R18 WIDENED THE GAP
+//      RATHER THAN CLOSING IT. `opposingBank` is set-only-when-true on a
+//      resolved two-way edge, so absence is read as own-bank; if the probe tap
+//      simply never copies the field, the only thing standing between that and
+//      a clean pass is `declared.channels` — a claim the harness makes about
+//      itself. The one-way surface used to share that shape and no longer does:
+//      `alignDeg` states its lawful case POSITIVELY, so a one-way tick that
+//      says nothing is UNKNOWN and costs against the ceiling. The record now
+//      carries what would close this — `alignTravelDir` is the bank the car
+//      occupies, and `alignDeg` rotated by it is a BANK-relative angle — and it
+//      is deliberately NOT read here: the two-way discriminator would then be a
+//      harness-derived bank verdict standing beside the product's own
+//      `opposingBank`, with no product invariant tying the two together the way
+//      `wrongWay === (armed && |deg| > 120)` ties the one-way pair. That is a
+//      product-contract question and it is not answered, so the hole is
+//      disclosed rather than papered over. The cheaper symmetric fix — a
+//      declared wrong-bank witness excursion on every leg — costs a deliberate
+//      excursion per leg and was NOT paid here either.
 //   L3 THE INJECTION CERTIFIES MAGNITUDE, NOT SIGN. `laneOffsetM` is positive on
 //      both banks, so no injection can prove the referent's sign is bank-
 //      correct. AC-FLOW is the only thing that can, and only where a
@@ -425,52 +661,26 @@
 //      share of a discriminator — so the one judgement in this file carries
 //      more weight than it did, not less. Everything else new in this revision
 //      is derived from a product constant.
-//   L7 THE WITNESS FLOOR BOUNDS THE BLIP, NOT THE AMBIGUITY, AND IT DILUTES
-//      TWO WAYS — WITH LEG LENGTH, AND WITH A SHORTER CALIBRATION. R7 closes
-//      N15b on N15b's own 62.95 s leg because the floor and the declared-removal
-//      budget meet there. THEY MEET ONLY BECAUSE THAT LEG'S CALIBRATION PARK
-//      HAPPENS TO BE 5.00 s, and this file discovered that one revision late:
-//      the budget is (calibration + witness) / leg, so SHORTENING THE
-//      CALIBRATION — which no product constant fixes and no rule here bounds
-//      from below — buys the witness room again on the very leg the argument
-//      was made on. MEASURED this session, row 71's leg with its 30-tick
-//      (1.50 s) contiguous witness and nothing else changed:
-//
-//        calibration 5.00 s → fail  (6.50/62.95 = 0.10326 > 0.1)
-//        calibration 4.50 s → pass  (6.00/62.95 = 0.09531)
-//        calibration 4.00 s → pass  (5.50/62.95 = 0.08737)
-//        calibration 3.00 s → pass  (4.50/62.95 = 0.07149)
-//
-//      ROW 71 IS THEREFORE NOT RETIRED, and the cheat suite pins all four lines
-//      above as L9. A floor on the calibration LENGTH was considered and not
-//      written: AC-LANE's sample floor would set it at 3 × laneKeepSustainSec
-//      = 9 s, which is longer than the known-good leg's own 5.00 s park, so it
-//      would red the control. There is no derivable lower bound here, only a
-//      chosen one.
-//
-//      IT ALSO DILUTES WITH LENGTH, which is the half this file knew first: the
-//      budget is a FRACTION of the leg and the floor is an absolute 1.5 s, so a
-//      long enough leg affords a lawful witness and still acquits an arbitrary
-//      amount of ambiguous `wrongWay: false`. MEASURED on the same leg with a
-//      5.00 s calibration and nothing changed but its length:
-//
-//        1 260 ticks ( 62.95 s) → fail  (budget 0.1033 > 0.1, run convicts)
-//        2 000 ticks ( 99.95 s) → pass  (budget 0.0650), 30 of 2 000 ticks
-//        5 000 ticks (249.95 s) → pass  (budget 0.0260), 30 of 5 000 ticks
-//       12 000 ticks (599.95 s) → pass  (budget 0.0108), 30 of 12 000 ticks
-//
-//      and each `pass` certifies `mayTestify ["lane position on oneWay"]`. NO
-//      PRODUCT CONSTANT BOUNDS THIS. The engine says how long a wrong-way state
-//      must last to be believed; it says nothing about how long one
-//      demonstration proves a channel stays live, so any ceiling written here
-//      would be a chosen number wearing a derivation. A per-EDGE liveness rule
-//      is derivable from the gate's own terms (`oneWayStreetsStated` is
-//      per-district, `roundabout` per-edge, `offCarriageway` per-tick,
-//      worldRuntime.ts:2306-2312) and was considered — it would NOT close this,
-//      because the diluting leg above never leaves one edge. What closes it is
-//      the founder-ruled signed travel-direction-vs-edge value: once `false`
-//      stops meaning "nobody asked", the liveness gate and this floor are BOTH
-//      deleted. The seam test in the cheat suite names the replacement.
+//   L7 RETIRED BY R18, and it is the reason R18 exists. It read: THE WITNESS
+//      FLOOR BOUNDS THE BLIP, NOT THE AMBIGUITY, AND IT DILUTES TWO WAYS —
+//      with leg length, and with a shorter calibration park. The floor and
+//      the declared-removal budget met on N15b's own 62.95 s leg ONLY because
+//      that leg's calibration happens to be 5.00 s: at 4.50 s the budget is
+//      0.09531 and the same witness passes. And the budget is a FRACTION of
+//      the leg while the floor is an absolute 1.5 s, so a 2 000-tick leg
+//      affords a lawful witness and still acquits an arbitrary amount of
+//      ambiguous `wrongWay: false` (measured: 1 260 ticks fail, 2 000 / 5 000
+//      / 12 000 all pass, each certifying mayTestify ["lane position on
+//      oneWay"]). NO PRODUCT CONSTANT BOUNDED EITHER DIRECTION — the engine
+//      says how long a wrong-way state must last to be believed, and nothing
+//      about how long one demonstration proves a channel stays live — so any
+//      ceiling written here would have been a chosen number wearing a
+//      derivation. THE FIX WAS NEVER A TIGHTER NUMBER. What closed it is the
+//      founder-ruled signed value: once `false` stops meaning "nobody asked",
+//      the demonstration is not needed, so neither is the budget that bought
+//      it. The whole family — gate, floor, both witness metrics, this note and
+//      L9 — went together, which is the shape to look for elsewhere: a
+//      scaffold whose every strut is load-bearing only for the others.
 //   L8 A LEG CAN SPEND TWO SURFACES' BUDGETS. The fraction ceiling is derived
 //      PER SURFACE, and R15 adds the only leg-wide bound that is also derived —
 //      each surface's ceiling weighted by the ticks the leg spent on it. A leg
@@ -489,35 +699,64 @@
 //      derivation, which is what L4 already declares this file has exactly one
 //      of. The cheat suite pins it at `pass` with a control beside it proving
 //      the leg-wide bound DOES bite when the mix cannot afford the total.
-//   L9 THE WITNESS FLOOR IS DEFEATED BY SHRINKING THE CALIBRATION — see L7,
-//      where the four measured lines are. It is called out separately here
-//      because it is a LIVE CHEAT on row 71's own leg, not a limit that only
-//      appears on a longer one, and because the previous revision's suite
-//      asserted row 71 CLOSED on the strength of the 5.00 s figure.
+//   L9 RETIRED BY R18 — it was the LIVE half of L7 (the witness floor
+//      defeated by shrinking the calibration park, on row 71's own leg), and
+//      it is gone with the floor. It is recorded, not deleted, because of what
+//      it cost to find: the previous revision's suite asserted row 71 CLOSED
+//      on the strength of a 5.00 s figure that was a property of one fixture,
+//      not of any rule. A bound that holds only at the fixture's own numbers
+//      is not a bound.
+//   L10 THE SIGN IS CARRIED AND NOT READ — BY THIS SURFACE. The founder ruled
+//      a SIGNED value and the record carries the sign end to end, but the
+//      one-way discriminator cannot be made to depend on it: the threshold is
+//      symmetric (`|deg| > 120`) and the reverse rotation is exactly 180°, so
+//      replacing `alignDeg` with `|alignDeg|` changes NO verdict. MEASURED, not
+//      argued: 720 001 angles at 0.0005° across (-180, +180] × five gears =
+//      3 600 000 pairs, ZERO differences (the executable form is in the cheat
+//      suite). It is recorded as a disclosure because the mutation "take the
+//      absolute value" therefore SURVIVES this file's mutation battery and
+//      always will — an equivalent mutant, not an untested line — and because
+//      someone reading "signed" in the ruling will otherwise assume the sign is
+//      doing work here.
+//
+//      WHERE THE SIGN WOULD BE READ IS THE TWO-WAY SURFACE, via
+//      `alignTravelDir`: rotate `deg` by 180° when the occupied bank is −1 and
+//      the angle becomes bank-relative, which is the only thing in the record
+//      that could tell an opposing-bank car from a correctly-placed one
+//      (`laneOffsetM` is "+ = left of TRAVEL" on both banks). That is NOT done
+//      — see L2 — so the sign is presently carried by the record, forwarded by
+//      the probe, and read by nothing. Two mutations DO die on the arithmetic
+//      around it and are the ones to keep: dropping the WRAP (a lawful reverse
+//      reads +179 as often as −179, and 179 + 180 = 359 convicts the frame it
+//      just cleared) and rotating on any gear other than −1.
 //   L5 NOTHING HERE PROVES A PROBE EXISTS. Every row in the test file is
 //      synthetic. These criteria are proven against fixtures, which is what let
 //      them be written before any drive — and it means increment 1 owes a run of
 //      the same functions over a REAL record, plus the tick cadence and read
 //      cost measured on the product headless.
-//   L6 THE RING SURFACE STILL CANNOT ACQUIT, AND THIS FILE CANNOT FIX IT. R1
-//      and R5 make N15 red, and that is worth doing — but N15's ROOT CAUSE is
-//      the referent, not the rule. `wrongWay === false` is published under
-//      three gates (worldRuntime.ts:2306-2312) and is ambiguous BY
-//      CONSTRUCTION: it means EITHER with-the-flow OR nobody-asked. So the only
-//      witness that can prove the channel live is the OFFENCE ITSELF, and the
-//      N15 control asserts that byte-identity in the repo
-//      (`discriminatorTrueTicks === againstFlowTicks`) rather than describing
-//      it. A criterion cannot invent a signal the product does not publish:
-//      what a ring leg needs is a disarming referent on the tick — the doc 86
-//      T1 pattern, `rules/types.ts` + `runtime/worldRuntime.ts` — and that is a
-//      PRODUCT-CONTRACT question, already escalated to the founder AND RULED ON
-//      (2026-09-20: the product will publish a per-tick SIGNED
-//      travel-direction-vs-edge value; that work belongs to another lane and
-//      nothing here depends on its field name). Until it lands, a one-way
-//      surface may be CONVICTED freely and may be CLEARED only on a leg
-//      carrying a declared witness that reaches the product's own clock — see
-//      R7, and see L7 for what that witness still fails to bound.
-//      `surfacesJudged` is what carries the scope.
+//   L6 CLOSED BY R18, AND IT WAS NEVER CLOSEABLE FROM THIS SIDE. It read: THE
+//      RING SURFACE CANNOT ACQUIT, AND THIS FILE CANNOT FIX IT — because
+//      `wrongWay === false` is published under three gates
+//      (worldRuntime.ts:2306-2312) and is ambiguous BY CONSTRUCTION, so the
+//      only witness that could prove the channel live was the OFFENCE ITSELF.
+//      A criterion cannot invent a signal the product does not publish. What a
+//      ring leg needed was a disarming referent on the tick, and that was a
+//      PRODUCT-CONTRACT question, escalated to the founder and RULED ON
+//      (2026-09-20). The product now publishes `SimTick.edgeAlignment`, the
+//      probe forwards it and the record carries it, so a one-way surface is
+//      cleared by what the ticks SAY rather than by a demonstration of the
+//      offence. `surfacesJudged` still carries the scope, and a leg whose
+//      one-way ticks do not carry `alignDeg` still cannot acquit — it reads
+//      UNRESOLVED on the unknown-fraction ceiling, which is the honest verdict
+//      for a record that was never asked.
+//
+//      THE LESSON IS THE ESCALATION, NOT THE RULE. This entry sat here for five
+//      revisions naming exactly what was missing, while four rules (R1, R5, R7,
+//      R12) were written AROUND it, each one measurably better than the last
+//      and none of them able to close it. Every one of those four is now
+//      retired or unchanged by the thing that did. A limit that names a missing
+//      PRODUCT signal should be escalated on the revision it is found, not
+//      defended against.
 //
 // WHAT THIS FILE IS NOT. It is not a controller, it does not drive, it does not
 // read `.audit-frames`, and nothing it returns closes a finding. It is pure: an
@@ -546,6 +785,24 @@ export const PRODUCT = Object.freeze({
   WRONG_WAY_SUSTAIN_SEC: 1.5,
   /** engine.ts:1000 — the one-way episode's re-arm. */
   WRONG_WAY_REARM_SEC: 4,
+  /**
+   * worldRuntime.ts:279 `export const WRONG_WAY_ANGLE_DEG = 120;` — the angle
+   * the PRODUCT reduces to the `wrongWay` boolean (worldRuntime.ts:705,
+   * `Math.abs(signedDeltaDeg(headingDeg, forwardDeg)) > WRONG_WAY_ANGLE_DEG`).
+   *
+   * MIRRORED BECAUSE THE DISCRIMINATOR NOW READS THE UNTHRESHOLDED ANGLE. The
+   * founder-ruled signed value (`SimTick.edgeAlignment.deg`, ruling 2026-09-20)
+   * is the same quantity before the threshold, measured off the same lane fix,
+   * the same tangent and the same heading, so applying THIS number to it
+   * reproduces the product's own verdict exactly — `wrongWay === (armed &&
+   * deg !== null && |deg| > 120)` is an invariant the product asserts over a
+   * real drive in `runtime/__tests__/edge-alignment.test.ts`. Choosing any
+   * other number here would make the criteria disagree with the engine about
+   * what against-flow MEANS, which is the one thing a mirrored constant exists
+   * to prevent — and it would do it silently, because a harness that convicts
+   * at 90° still looks like it is reading the product's signal.
+   */
+  WRONG_WAY_ANGLE_DEG: 120,
   /**
    * rules/types.ts:1784. engine.ts:1155 calls it, in its own words, "this
    * engine's declared unit of „a correction that counts"", and engine.ts:1258-
@@ -751,6 +1008,89 @@ export function engineForwardGear(row) {
   return row.gear >= 0;
 }
 
+/**
+ * IS THE CAR TRAVELLING BACKWARDS ON THIS TICK — as the RECORD states it, not
+ * as the gear lever suggests. Returns true / false / null, where NULL MEANS
+ * UNKNOWN.
+ *
+ * `gear === -1` IS THE TRANSMISSION, NOT THE MOTION, AND READING IT AS MOTION
+ * WAS A LIVE FALSE CONVICTION. The one-way discriminator rotates the nose angle
+ * by 180° in reverse because it wants TRAVEL (see `againstFlow`), and that
+ * rotation is the claim that the car is going the opposite way from where it
+ * points. On a car STANDING STILL that claim is not merely unproven, it is
+ * false: nothing is travelling anywhere. MEASURED against the revision that
+ * read the gear alone, on a 25 Hz ring record whose every tick carried
+ * `wrongWay: false`, `wrongWayArmed: true`, `alignDeg: 0.4` — a window of 38
+ * ticks (1.52 s) at `gear: -1, speedKmh: 0`, nose perfectly along the edge,
+ * CONVICTED the surface: convictingRuns 1, "1 undeclared against-flow run(s) at
+ * or above wrongWaySustainSec (1.5 s); longest 1.52 s over 38 tick(s) … (slow
+ * 38, reverse 38, bridged 0)". The census already knew all 38 were slow and in
+ * reverse, and no rule read it. That window is THE OPENING STATE OF EVERY
+ * REVERSE MANOEUVRE — stop, select R, then move — and the reverse/park half is
+ * what this instrument was ruled for (founder ruling 2026-09-22). The PRODUCT
+ * convicts nothing on those ticks: `wrongWay` is a heading verdict and the nose
+ * is at 0.4°.
+ *
+ * THE INVARIANT IT RESTORES, and the one to mutate against: WHILE THE CAR IS
+ * STOPPED, ITS DIRECTION VERDICT MUST NOT DEPEND ON WHICH GEAR IS SELECTED.
+ * Before this, `gear: 0, speedKmh: 0, alignDeg: 0.4` read with-the-flow and
+ * `gear: -1, speedKmh: 0, alignDeg: 0.4` read against it — the same car, in the
+ * same place, facing the same way.
+ *
+ * THE PREDICATE IS `speedKmh > 0`, AND IT IS DELIBERATELY NOT `engineMoving`
+ * (`speed > movingSpeedKmh`, 5 km/h). The engine's threshold answers "would the
+ * product have GRADED this tick", which is the right question for the lane-
+ * holding statistic — AC-LANE carries it, in `isGradable` — and the WRONG one
+ * here: a 5 km/h floor inside the flow discriminator is C1 and C2 exactly, and
+ * a controller backing the wrong way down a one-way street at 4.9 km/h would
+ * leave the numerator BY SPECIFICATION, which is the draft defect this whole
+ * file exists to refuse. A car at 4.9 km/h in reverse IS travelling backwards
+ * and the rotation is owed to it. A car at 0 is not travelling at all.
+ *
+ * SO THE EXCLUSION IS FROM THE NUMERATOR'S ROTATION ONLY, NEVER FROM SURFACE
+ * MEMBERSHIP. Membership is `edgeId != null && oneway === true` — a POSITION,
+ * true of a stopped car as much as a moving one — and making it depend on speed
+ * would empty the denominator the crawl has to be measured against. The
+ * stationary tick stays counted, stays in `denominator`, and is published
+ * separately as `stationaryReverseTicks`.
+ *
+ * `speedKmh` NOT FINITE IS UNKNOWN, NOT ZERO. A record that does not say how
+ * fast it was going cannot be asked which way it was travelling, and the
+ * unknown-fraction ceiling is what makes that cost. The asymmetry with a
+ * forward tick is the honest one: a forward tick needs no speed, because its
+ * travel direction is its heading whether it moves or not, so nothing is
+ * withheld from it.
+ *
+ * WHAT STOPS A STOPPED LEG TESTIFYING — and it is NOT this function. A
+ * stationary tick still gets a verdict here (the product's own unrotated
+ * heading reading), so a leg parked on a one-way edge with its nose along it
+ * reads a clean AC-FLOW. It still cannot testify, and the rule that refuses it
+ * is AC-LANE's: `isGradable` carries `engineMoving`, so a leg that never moved
+ * has legGradedTicks 0, legExcludedFrac 1.0 against a 0.1 ceiling, and a graded
+ * sample under the floor. That is PINNED BY A NAMED TEST rather than left to be
+ * inferred, because "a parked car is 0 m from its route" has caught this
+ * programme twice.
+ */
+export function travellingBackwards(row) {
+  if (row.gear !== -1) return false;
+  if (!Number.isFinite(row.speedKmh)) return null;
+  // A NEGATIVE SPEED IS OUT OF CONTRACT, AND OUT OF CONTRACT IS UNKNOWN — not
+  // "not moving". `SimTick.speedKmh` is UNSIGNED by its own contract (gear is
+  // what says the car is going backwards), so a negative value is a record this
+  // file cannot read, exactly like `alignDeg: null`, a non-finite angle or a
+  // non-finite speed.
+  //
+  // IT WAS A DEFINITE `false` FOR ONE REVISION, and that is a fail-open worth
+  // naming: `speedKmh > 0` answers "no" to −3 km/h, so a car reversing the
+  // wrong way down a one-way street with a sign-flipped speed channel acquitted
+  // AND the leg went on to certify `mayTestify`. Before R20 the rotation ran on
+  // the gear alone and that same record convicted. Every other unreadable value
+  // here yields UNKNOWN and is then accounted for by the unknown-fraction
+  // ceiling; this one now does too.
+  if (row.speedKmh < 0) return null;
+  return row.speedKmh > 0;
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * SMALL PURE HELPERS
  * ──────────────────────────────────────────────────────────────────────────*/
@@ -875,8 +1215,60 @@ function againstFlow(row, surface) {
     return row.opposingBank === true;
   }
   if (surface === SURFACE.ONE_WAY) {
+    // ── THE SIGNED VALUE, WHERE THE RECORD CARRIES IT (founder ruling
+    // 2026-09-20, landed here 2026-09-24). `alignDeg` is the UNTHRESHOLDED
+    // nose-vs-edge angle the product reduces to `wrongWay`, so reading it with
+    // the product's own `WRONG_WAY_ANGLE_DEG` reproduces the engine's verdict —
+    // and, unlike the boolean, it is never ambiguous: a tick that carries it
+    // says which way the car faced whether or not the conviction channel was
+    // armed. That is what retires the liveness gate and the witness floor.
+    //
+    // IT MEASURES THE NOSE, AND A LAWFUL REVERSE FACES BACKWARDS. `SimTick`
+    // publishes UNSIGNED speed, so `gear` is the only channel that says WHICH
+    // WAY along its own axis the car is going — and `speedKmh` is the only one
+    // that says whether it is going anywhere at all. Both are needed, and
+    // reading the gear without the speed was a live false conviction on every
+    // stopped-in-reverse tick (see `travellingBackwards`). A car backing
+    // correctly along its own lane reads |deg| ≈ 180 on every frame and MUST
+    // NOT be convicted. Travel direction is the nose rotated by 180° while the
+    // car is actually reversing (`rules/types.ts` `EdgeAlignment.deg`, and
+    // measured in `runtime/__tests__/edge-alignment.test.ts` §7).
+    if (row.alignDeg !== undefined) {
+      // `null` is «the runtime looked and could not measure» (no committed edge
+      // fix), which is a THIRD state — not absence, not a direction. It is
+      // UNKNOWN, and the unknown-fraction ceiling is what makes it cost.
+      if (row.alignDeg === null) return null;
+      if (!Number.isFinite(row.alignDeg)) return null;
+      // …AND THE ROTATION NEEDS TRAVEL, NOT A GEAR LEVER. `travellingBackwards`
+      // is `gear === -1 AND the record says the car is moving`; a stopped car
+      // in reverse is read exactly as the product reads it — the unrotated nose
+      // — so a tick's direction verdict cannot change with the gear while the
+      // car stands still. See that function for the false conviction this cost.
+      const backwards = travellingBackwards(row);
+      if (backwards === null) return null;
+      const travelDeg = backwards ? row.alignDeg + 180 : row.alignDeg;
+      const norm = ((((travelDeg + 180) % 360) + 360) % 360) - 180;
+      return Math.abs(norm) > PRODUCT.WRONG_WAY_ANGLE_DEG;
+    }
+    // ── WITHOUT IT, `false` IS NOT A STATEMENT. A record that predates the
+    // signal (or a hand-built row) can still CONVICT on `wrongWay === true`,
+    // because true is unambiguous — only the engine's armed chain produces it.
+    // Its `false`, though, means EITHER «with the flow» OR «nobody asked»
+    // (worldRuntime.ts:2306-2312), and reading that as with-the-flow is the
+    // fail-open this whole seam exists to remove. It is UNKNOWN, and the
+    // unknown-fraction ceiling that already guards this surface is what then
+    // refuses a record too dark to ACQUIT.
+    //
+    // THAT FIRST SENTENCE WAS FALSE FOR A REVISION, and it is recorded here
+    // rather than quietly corrected. R18 gave the unknown-fraction ceiling an
+    // EARLY RETURN, which made it refuse convictions as well as acquittals — so
+    // on this dialect, where the unknown fraction is 1 − (offence density), no
+    // realistic amount of wrong-way driving could reach the conviction rules.
+    // Measured: 750 contiguous `wrongWay: true` ticks, 30.00 s at 25 Hz, read
+    // UNRESOLVED with `convictingRuns` never computed. R21 spends the ceiling
+    // at the bottom of `assessSurface` instead, so a conviction outranks it and
+    // the sentence above is true again.
     if (row.wrongWay === true) return true;
-    if (row.wrongWay === false) return false; // ambiguous — see the liveness gate
     return null;
   }
   return null;
@@ -1726,6 +2118,20 @@ function assessSurface(rows, surface, declared, periodSec) {
     // let an unrelated row acquit a ring.
     discriminatorTrueTicks: member.filter((r) => againstFlow(r, surface) === true).length,
     discriminatorUnknownTicks: member.filter((r) => againstFlow(r, surface) === null).length,
+    // THE TICKS WHOSE TRAVEL ROTATION WAS WITHHELD. `travellingBackwards` reads
+    // `gear === -1` as backwards travel only where the record also says the car
+    // was moving, so these rows were judged on their HEADING alone, exactly as
+    // the product judges them. They are counted here because a tick this file
+    // treats specially and does not count is the silent-exclusion shape the
+    // whole file is built against — they are NOT excluded from anything: they
+    // stay in `denominator`, they can still be convicted (a stopped car facing
+    // the wrong way up a one-way street is against the flow), and no verdict
+    // reads this counter. It is named in the fraction refusal so a reader can
+    // see how much of a surface was standing still, and it is listed under
+    // PUBLISHED AND READ BY NO VERDICT in the header for that reason.
+    stationaryReverseTicks: member.filter(
+      (r) => r.gear === -1 && Number.isFinite(r.speedKmh) && r.speedKmh <= 0,
+    ).length,
   };
   // N14 — THE CONTRADICTORY ROW. `wrongWay` is set on ONE-WAY edges only
   // (worldRuntime.ts:2306-2312 gates it `edgeRt.edge.oneway && …`), so a row
@@ -1791,6 +2197,57 @@ function assessSurface(rows, surface, declared, periodSec) {
     return { surface, verdict: "fail", reasons, counts, metrics, runs: [] };
   }
 
+  /* ── R19 — THE TWO DIRECTION CHANNELS MUST AGREE, and this rule exists
+   * because R18 OPENED THE HOLE IT CLOSES. Before R18 a `wrongWay: true` tick
+   * always convicted; now the signed angle is read FIRST and the boolean is
+   * read only where the angle is absent, so a tap that writes a lawful
+   * `alignDeg` on every tick acquits the surface while the record's own
+   * conviction channel is shouting. That is the dead-referent shape (control 4)
+   * one field over, and it would have been introduced by this revision.
+   *
+   * IT IS THE PRODUCT'S OWN INVARIANT, NOT A CHOSEN RULE. rules/types.ts pins
+   *
+   *   tick.wrongWay === (armed && deg !== null && |deg| > WRONG_WAY_ANGLE_DEG)
+   *
+   * on every tick, asserted over a real drive in
+   * runtime/__tests__/edge-alignment.test.ts, because both are measured off the
+   * same lane fix, the same tangent and the same heading. So `wrongWay: true`
+   * beside a nose inside the threshold, or beside a `null` angle, or beside
+   * `wrongWayArmed: false`, is a record that contradicts the runtime — exactly
+   * R13's shape, and it gets R13's verdict for R13's reason.
+   *
+   * IT READS THE NOSE, UNROTATED, AND THAT IS THE WHOLE CARE REQUIRED HERE. The
+   * discriminator rotates by 180° in reverse because it wants TRAVEL; the
+   * product's boolean does not, and the docs are explicit that `wrongWay` DOES
+   * fire on a lawful reverse around a ring. That divergence is designed, so
+   * comparing the rotated value here would file every correct reverse-park as a
+   * broken record.
+   *
+   * ONE-WAY ONLY: `wrongWay` on a two-way row is already R13's business.
+   * ────────────────────────────────────────────────────────────────────────*/
+  if (surface === SURFACE.ONE_WAY) {
+    counts.directionContradictionRows = member.filter((r) => {
+      if (r.wrongWay !== true) return false;
+      if (r.wrongWayArmed === false) return true; // convicted while disarmed
+      if (r.alignDeg === undefined) return false; // pre-signal record: nothing to compare
+      if (r.alignDeg === null || !Number.isFinite(r.alignDeg)) return true;
+      return Math.abs(r.alignDeg) <= PRODUCT.WRONG_WAY_ANGLE_DEG;
+    }).length;
+    if (counts.directionContradictionRows > 0) {
+      reasons.push(
+        `${counts.directionContradictionRows} row(s) carry \`wrongWay: true\` beside a signed ` +
+          `angle that cannot have produced it: the product pins ` +
+          `\`wrongWay === (wrongWayArmed && deg !== null && |deg| > ${PRODUCT.WRONG_WAY_ANGLE_DEG})\`, ` +
+          `both measured off the same lane fix and the same heading, so the two cannot disagree ` +
+          `on a tick the runtime wrote. The angle is compared UNROTATED here — the discriminator's ` +
+          `reverse rotation is this file's reading of TRAVEL and the product's boolean is a ` +
+          `heading verdict, so a lawful reverse is not this. A record whose two direction ` +
+          `channels contradict each other is not this record's to report either way`,
+      );
+      return { surface, verdict: "fail", reasons, counts, metrics, runs: [] };
+    }
+  }
+
   // A surface whose discriminator was never answered for a large share of its
   // own denominator has not been asked. `null` is UNKNOWN and is never read as
   // with-the-flow (see `againstFlow`); this is the counter that makes the
@@ -1798,28 +2255,74 @@ function assessSurface(rows, surface, declared, periodSec) {
   // `opposingBank` is set-only-when-true, so "unknown" is not expressible there
   // — and the check is kept on both surfaces so a future tap that starts
   // publishing a tri-state cannot land on a rule that was never written.
-  if (metrics.discriminatorUnknownFrac > EXCLUDED_FRACTION_CEILING) {
-    reasons.push(
-      `\`${channel}\` is unknown on ${counts.discriminatorUnknownTicks} of ${member.length} ticks ` +
-        `= ${metrics.discriminatorUnknownFrac.toFixed(3)} > ${EXCLUDED_FRACTION_CEILING}: the ` +
-        `discriminator was not answered often enough for this denominator to mean anything`,
-    );
-    return { surface, verdict: "unresolved", reasons, counts, metrics, runs: [] };
-  }
+  /* ── THE UNKNOWN-FRACTION CEILING IS DECIDED HERE AND APPLIED AT THE BOTTOM,
+   * AND THE ORDER IS THE RULE, NOT HOUSEKEEPING.
+   *
+   * WHAT IT REFUSES. A surface whose discriminator was never answered for a
+   * large share of its own denominator has not been asked. `null` is UNKNOWN
+   * and is never read as with-the-flow (see `againstFlow`); this is the counter
+   * that makes the unknowns cost something, and since R18 deleted BOTH the
+   * liveness gate and the witness floor it is the only thing standing between a
+   * dark one-way record and a clean acquittal. On the two-way surface it is
+   * structurally zero — `opposingBank` is set-only-when-true, so "unknown" is
+   * not expressible there — and the check is kept on both surfaces so a future
+   * tap that starts publishing a tri-state cannot land on a rule that was never
+   * written.
+   *
+   * WHY IT NO LONGER RETURNS FROM HERE, which was an UNDISCLOSED REGRESSION
+   * shipped by R18 and is repaired in this revision. An early return made the
+   * ceiling refuse CONVICTIONS as well as acquittals, and on a record written
+   * in the retired dialect — `wrongWay` and no `alignDeg` at all — every tick
+   * that is not a positive `true` is UNKNOWN, so the unknown fraction is
+   * 1 − (offence density). Clearing a 0.1 ceiling would take a leg that spent
+   * NINE TENTHS of its one-way surface driving the wrong way. MEASURED on a
+   * 1500-row 25 Hz pre-signal ring record: 750 contiguous `wrongWay: true`
+   * ticks — THIRTY SECONDS of undeclared wrong-way driving, twenty times
+   * `wrongWaySustainSec` — read `discriminatorUnknownFrac 0.500`, oneWay
+   * UNRESOLVED, and `convictingRuns` was never even computed. The old dialect
+   * had lost the ability to convict at any realistic offence density, while the
+   * comment at this site said in as many words that it could still convict on
+   * `wrongWay === true` "because true is unambiguous".
+   *
+   * THE ASYMMETRY IS THE WHOLE POINT, and it is this file's own doctrine: the
+   * claim that needs evidence is that the car was FINE in the dark. A
+   * conviction is read off ticks that POSITIVELY say `true`; the fraction rule
+   * can only be diluted by unknowns, never inflated by them, because they land
+   * in its denominator. So an unknown-heavy record may still FAIL, and may
+   * still not PASS — `worstVerdict` at the bottom does exactly that, since
+   * `fail` outranks `unresolved`. The reason is pushed either way, so a reader
+   * of a failing dark record still learns the record was dark.
+   * ────────────────────────────────────────────────────────────────────────*/
+  const unknownOverCeiling = metrics.discriminatorUnknownFrac > EXCLUDED_FRACTION_CEILING;
 
-  // THE ONE-WAY LIVENESS GATE. See the header: `wrongWay === false` is two
-  // meanings on one value (worldRuntime.ts:2306-2312), so this surface may only
-  // acquit on a leg that proved the channel can say true.
-  if (surface === SURFACE.ONE_WAY && counts.discriminatorTrueTicks === 0) {
-    reasons.push(
-      `\`wrongWay\` never reads true anywhere in this record, so its \`false\` cannot be told apart ` +
-        `from "not evaluated" (worldRuntime.ts:2306-2312 publishes false when the district states ` +
-        `no one-way streets and the edge is not a ring, and when the car is off the carriageway). ` +
-        `The one-way surface needs its own declared witness excursion, exactly as the referent ` +
-        `needs its injection`,
-    );
-    return { surface, verdict: "unresolved", reasons, counts, metrics, runs: [] };
-  }
+  /* ── THE ONE-WAY LIVENESS GATE IS GONE, AND SO IS THE WITNESS FLOOR THAT
+   * PROPPED IT UP (founder ruling 2026-09-20, landed 2026-09-24).
+   *
+   * The gate used to sit here and read: "`wrongWay` never reads true anywhere
+   * in this record, so its `false` cannot be told apart from 'not evaluated'".
+   * It was true, and it was only ever a WORKAROUND FOR A MISSING SIGNAL: the
+   * only witness that could arm an ambiguous channel was THE OFFENCE ITSELF, so
+   * the surface could acquit only on a leg that had committed the thing the
+   * surface exists to detect. That is what funded N15b — one declared wrong-way
+   * second bought the other 1240 ticks — and R7/R12's witness floor only
+   * bounded how SHORT that self-arming demonstration could be. L7 measured the
+   * floor diluting two ways (with leg length, and with a shorter calibration
+   * park) and L9 pinned it as live.
+   *
+   * `alignDeg` ends the ambiguity at the source. A tick that carries it states
+   * which way the car faced whether or not the conviction channel was armed, so
+   * absence of `true` is no longer evidence of a dead channel — it is evidence
+   * of a lawful leg. A surface whose ticks DO NOT carry the signal does not
+   * silently acquit either: `againstFlow` returns `null` for them, and the
+   * unknown-fraction ceiling above refuses a denominator too dark to judge.
+   * That one rule now does what the gate, the floor and their two metrics did
+   * between them, without needing an offence to arm it.
+   *
+   * WHAT DID NOT GO WITH THEM: the NON-ZERO denominator rule (a surface with no
+   * ticks is UNRESOLVED, never a clean pass) and the contradiction rule R13 —
+   * both are above, both are unaffected by the discriminator, because a row
+   * filed under the wrong surface is wrong whatever the discriminator says.
+   * ────────────────────────────────────────────────────────────────────────*/
 
   const spans = declared.manoeuvreSpans ?? [];
   const runs = flowRuns(rows, surface, periodSec);
@@ -1833,17 +2336,12 @@ function assessSurface(rows, surface, declared, periodSec) {
   counts.declaredManoeuvreTicks = declaredRuns.reduce((a, r) => a + r.ticks, 0);
   counts.undeclaredRuns = undeclaredRuns.length;
   metrics.longestUndeclaredRunSec = undeclaredRuns.reduce((a, r) => Math.max(a, r.sec), 0);
-  // THE WITNESS, and it is every run — declared or not. The liveness gate below
-  // asks how LONG the channel said true, and a declared run is still the
-  // channel speaking; the declaration excuses the offence, it does not unsay it.
-  //
-  // TWO MEASURES, AND THE FLOOR READS THE SECOND. `r.sec` is the run's SPAN,
-  // which `flowRuns` deliberately BRIDGES across unknown and off-surface ticks;
-  // `r.contiguousSec` is the longest unbroken stretch of `true` inside it.
-  // The span is published because it is what the conviction rules use. The
-  // floor may not use it — see the BRIDGE paragraph in the floor below.
-  metrics.longestWitnessRunSec = runs.reduce((a, r) => Math.max(a, r.sec), 0);
-  metrics.longestContiguousWitnessSec = runs.reduce((a, r) => Math.max(a, r.contiguousSec), 0);
+  // `longestWitnessRunSec` and `longestContiguousWitnessSec` USED TO BE
+  // PUBLISHED HERE, and their only consumer was the witness floor. Both went
+  // with it: they measured how convincingly a leg had committed the offence,
+  // which is a question only an ambiguous channel has to ask. `flowRuns` still
+  // computes `contiguousSec` — the CONVICTION rules read the bridged `sec`, and
+  // the bridge census `bridgedTicks` is still reported on the run that convicts.
 
   // THE SURFACE'S OWN CLOCK. `solidLineCrossSustainSec` is CROSSED_SOLID_LINE's,
   // and that composite's condition is gated `tick.oneway === false`
@@ -1890,92 +2388,36 @@ function assessSurface(rows, surface, declared, periodSec) {
         `${metrics.longestUndeclaredRunSec.toFixed(3)} s; of the ${against.length} against-flow ` +
         `ticks ${counts.declaredManoeuvreTicks} were acquitted by a declared manoeuvre, ` +
         `${counts.slowAgainstFlowTicks} were under movingSpeedKmh and ` +
-        `${counts.reverseAgainstFlowTicks} were in reverse — all three COUNTED, none excluded`,
+        `${counts.reverseAgainstFlowTicks} were in reverse — all three COUNTED, none excluded; ` +
+        `${counts.stationaryReverseTicks} of the ${member.length} ticks on this surface were ` +
+        `stopped in reverse and were judged on their heading alone`,
     );
     verdict = "fail";
   }
 
-  /* ── THE WITNESS FLOOR (one-way only) ─────────────────────────────────────
-   * WHAT IT CLOSES. The liveness gate above asks whether `wrongWay` can ever
-   * say true. It does not ask whether it said true for long enough to MEAN
-   * anything, and a channel armed by a blip acquits everything else in the
-   * record for free. Measured this session on the cheat suite's N15b: 1260
-   * one-way ticks, 20 of them (1.0 s) declared wrong-way at seq 200..219, the
-   * other 1240 carrying the ambiguous `wrongWay: false` — againstFlowFrac
-   * 0.0159 against a ceiling of 0.2727, declaredRemovedWallSec 6.00 s of 62.95
-   * = 0.0953 against a ceiling of 0.1, convictingRuns 0, LEG = pass, and the
-   * leg then certified `mayTestify ["lane position on oneWay"]`.
-   *
-   * THE RULE, AND IT IS THE PRODUCT'S OWN NUMBER. A witness the PRODUCT WOULD
-   * NOT ITSELF HAVE BILLED is not a demonstration that the channel answers: the
-   * engine arms WRONG_WAY on `wrongWaySustainSec` (1.5 s, rules/types.ts
-   * `wrongWaySustainSec: 1.5`) and "dies on the first lawful frame"
-   * (engine.ts:4036-4043), so a run shorter than that clock is a state the
-   * engine never believed either. A leg whose longest against-flow run is under
-   * its surface's own sustain has proven the channel can flicker, not that it
-   * can report.
-   *
-   * WHY IT IS NOT A NUMBER THAT CAN BE WIDENED AROUND. Lengthening the witness
-   * costs declared-removal budget, and §DECLARED already bounds that by
-   * EXCLUDED_FRACTION_CEILING. On N15b's own leg the two rules meet with no gap
-   * between them, measured: a witness of 1.25 s passes the budget (6.25 s of
-   * 62.95 = 0.0993) and fails this floor, and a witness of 1.30 s clears this
-   * floor's neighbourhood but breaks the budget (6.30 s of 62.95 = 0.1001), so
-   * the declaration is stripped, the run reads undeclared, and it convicts on
-   * length. There is no witness length that passes that leg. The cheat suite
-   * asserts both ends.
-   *
-   * WHY ONE-WAY ONLY. `opposingBank` is set-only-when-true on a resolved
-   * two-way edge (worldRuntime.ts:2416-2420), so its absence is a positive
-   * statement and the two-way surface needs no witness to acquit. That
-   * asymmetry is this file's oldest, and L2 in the header discloses the hole it
-   * leaves on the two-way side rather than papering over it here.
-   *
-   * WHY IT IS THE LAST CHECK. It only ever DOWNGRADES a pass: `fail` dominates
-   * `unresolved`, so a leg whose witness is long enough to convict stays
-   * convicted, and does not get reclassified as merely unmeasurable.
-   *
-   * WHY IT MEASURES CONTIGUOUS TICKS AND NOT THE RUN'S SPAN, and this is the
-   * hole the floor shipped with. `flowRuns` BRIDGES up to laneKeepSustainSec of
-   * unknown or off-surface ticks, on purpose — without it a flickering
-   * `edgeId` dissolves any offence. So the run's `sec` is a BRIDGED span, and
-   * for one revision the floor tested that. Measured this session on the same
-   * 1260-tick 62.95 s one-way leg the disclosure below argues over: TWO ticks
-   * of `wrongWay: true` at seq 200 and seq 229 with the 28 ticks between them
-   * carrying `wrongWay: null` produced a 1.50 s "witness" — exactly the
-   * wrongWaySustainSec the floor asks for — on 0.10 s of channel evidence.
-   * LEG = pass, mayTestify ["lane position on oneWay"], discriminatorTrueTicks
-   * 2, convictingRuns 0, discriminatorUnknownFrac 0.0222 against a 0.1 ceiling,
-   * declaredRemovedFrac 0.0397 against a 0.1 ceiling. A bridge made of
-   * `edgeId: null` rows instead reads identically. The IDENTICAL leg with those
-   * 28 ticks set to `wrongWay: false` reads unresolved, which is what shows the
-   * bridge — and not the witness — was doing the work.
-   *
-   * AND THE BRIDGE IS FREE, which is why the budget argument above did not
-   * bound it. Lengthening a witness costs declared-removal budget; unknown and
-   * off-surface ticks are billed to no ceiling at all, so the bridged span
-   * could be stretched to the sustain clock at no cost. The floor's own
-   * justification — "a run shorter than the clock the engine arms WRONG_WAY on
-   * is a state the product never believed either" — is a statement about
-   * CONTIGUOUS frames: the engine's wrong-way state "dies on the first lawful
-   * frame" (engine.ts:4036-4043), and two frames 1.45 s apart is exactly a
-   * state it never held. So the floor reads `contiguousSec`.
-   * ────────────────────────────────────────────────────────────────────────*/
-  if (surface === SURFACE.ONE_WAY && metrics.longestContiguousWitnessSec < sustainSec) {
+  // THE UNKNOWN-FRACTION CEILING, DECIDED ABOVE AND SPENT HERE. It comes AFTER
+  // the conviction rules on purpose: a dark record may not ACQUIT, and that is
+  // all this rule says. `worstVerdict` keeps a conviction above it, because
+  // `fail` outranks `unresolved` and a run of positively-stated against-flow
+  // ticks is evidence whatever the rest of the record failed to say.
+  if (unknownOverCeiling) {
     reasons.push(
-      `the only witness that \`wrongWay\` can say true in this record is ` +
-        `${counts.discriminatorTrueTicks} tick(s), longest CONTIGUOUS run ` +
-        `${metrics.longestContiguousWitnessSec.toFixed(3)} s (bridged span ` +
-        `${metrics.longestWitnessRunSec.toFixed(3)} s) < ${clockName} ${sustainSec} s ` +
-        `(${counts.declaredManoeuvreTicks} of those ticks were acquitted by a declared ` +
-        `manoeuvre): a run shorter than the clock the engine arms WRONG_WAY on is a state the ` +
-        `product never believed either, so it cannot stand as proof that the channel answers ` +
-        `for the other ${member.length - counts.discriminatorTrueTicks} tick(s), whose ` +
-        `\`wrongWay: false\` worldRuntime.ts:2306-2312 publishes both for "travelling with the ` +
-        `flow" and for "nobody asked"`,
+      `\`${channel}\` is unknown on ${counts.discriminatorUnknownTicks} of ${member.length} ticks ` +
+        `= ${metrics.discriminatorUnknownFrac.toFixed(3)} > ${EXCLUDED_FRACTION_CEILING}: the ` +
+        `discriminator was not answered often enough for this denominator to mean anything`,
     );
     verdict = worstVerdict([verdict, "unresolved"]);
   }
+
+  // THE WITNESS FLOOR (R7, repaired as R12) STOOD HERE AND IS GONE. It asked
+  // whether the leg had demonstrated `wrongWay` saying TRUE for at least the
+  // clock the engine arms WRONG_WAY on, because an ambiguous channel had no
+  // other proof that it was live. Its whole justification was that ambiguity —
+  // and the ambiguity is what `alignDeg` removes. Keeping it would mean a leg
+  // that drove its whole one-way surface correctly, with the signed value on
+  // every tick, still could not be cleared unless it had ALSO driven the wrong
+  // way for 1.5 s. See the block above `declared.manoeuvreSpans` for the full
+  // argument, and L7 in the header for what the floor could not bound.
   return { surface, verdict, reasons, counts, metrics, runs: undeclaredRuns };
 }
 

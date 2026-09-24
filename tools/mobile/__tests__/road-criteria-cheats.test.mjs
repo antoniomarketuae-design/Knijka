@@ -51,26 +51,43 @@
 // the MECHANISM descriptions and the fixture recipe; nothing here trusts one of
 // their line numbers, and `node --test` is what says whether it is current.
 //
-// TWO CHEATS IN THIS FILE ARE STILL LIVE, AND THEY ARE ASSERTED AT THE VERDICT
-// THEY GET. The previous revision of this header said "NO CHEAT IN THIS FILE IS
-// STILL LIVE" and it was not true even of the legs already in the file: a third
-// adversarial pass rebuilt them from outside and got FOURTEEN more to read
-// `LEG = pass`, including one on the very leg L7's "not widenable" argument is
-// made on. Twelve are closed and are below; the two that are not are pinned as
-// L8 and L9 — a `pass` is asserted on purpose, so a later repair REDS THIS
-// FILE and makes whoever writes it come back and rewrite the disclosure. A
-// suite that quietly starts passing a cheat is how the last claim survived.
+// ONE CHEAT IN THIS FILE IS STILL LIVE, AND IT IS ASSERTED AT THE VERDICT IT
+// GETS. An earlier header said "NO CHEAT IN THIS FILE IS STILL LIVE" and it was
+// not true even of the legs already in the file: a third adversarial pass
+// rebuilt them from outside and got FOURTEEN more to read `LEG = pass`. Twelve
+// were closed then; the two that were not were pinned as L8 and L9, with a
+// `pass` asserted on purpose so that a later repair REDS THIS FILE and makes
+// whoever writes it come back and rewrite the disclosure. That is exactly what
+// happened to L9.
 //
-//   L9, the one that matters most here, is ROW 71 REOPENED. The previous
-//   revision retired N15b on the strength of "the floor and the budget meet
-//   with no gap" — which is true only for a 5.00 s calibration park. Shorten
-//   the park to 4.50 s and the same 1.50 s witness passes the same leg. Row 71
-//   must NOT be retired on the N15b tests above.
+//   L9 IS RETIRED (2026-09-24, module R18). It was ROW 71 REOPENED: the witness
+//   floor was defeated by SHORTENING THE CALIBRATION PARK, because the floor
+//   and the declared-removal budget met only at that leg's own 5.00 s figure.
+//   The founder-ruled signed travel-direction value retired the floor itself,
+//   and with it the thing the trade bought — an acquittal of 1230 ticks nobody
+//   had measured. The four measured lines are still RUN, in the test that now
+//   records the retirement, together with the arithmetic that makes the trade
+//   zero-sum. L7 in the module header went the same way.
+//
+//   L8 IS STILL LIVE: a leg can spend two surfaces' budgets and stay under the
+//   ceiling its own surface mix affords. It is disclosed rather than closed
+//   because the arithmetic is honest — every run really is separately lawful —
+//   and redding it would take a chosen number wearing a derivation.
+//
+// AND N15b IS NOT "FIXED", IT IS RE-MEASURED. Its leg — 1240 ambiguous ticks
+// bought by one declared wrong-way second — now PASSES, and that is the right
+// answer, because with the signed value those 1240 ticks state their own
+// direction and the leg is honest. The test asserts the re-measurement in BOTH
+// directions: with the signal they count as with-the-flow positively, and with
+// the signal STRIPPED the very same rows go UNKNOWN and the leg cannot testify.
+// A cheat that stops being a cheat because the evidence arrived is not a
+// loosened rule, but it looks exactly like one from a diff, which is why the
+// stripped half is in the same test rather than somewhere else.
 //
 // WHAT ELSE IS STILL LIVE IS DISCLOSED IN THE MODULE: L1-L9 of
-// road-criteria.mjs. The founder-ruled signed travel-direction value is what
-// closes L7 and L9 together, and the SEAM test at the bottom of this file names
-// what it replaces.
+// road-criteria.mjs, of which L6, L7 and L9 are now marked retired. The SEAM
+// test at the bottom of this file has been rewritten as the record of what the
+// signal replaced — it was written to fail when the value landed, and it did.
 // -----------------------------------------------------------------------------
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -127,6 +144,48 @@ function goodRows() {
     worldEdgeClearanceM: 2,
     laneOffsetM: laneOffsetAt(i),
   }));
+}
+
+/* ── THE FOUNDER-RULED DIRECTION SIGNAL, IN FIXTURE FORM (ruling 2026-09-20,
+ *    read by the criteria since R18). Every one-way fixture below states which
+ *    way the car faced with a SIGNED nose-vs-edge angle instead of leaning on
+ *    `wrongWay: false`, which means «with the flow» OR «nobody asked» and is
+ *    therefore not a statement at all. ─────────────────────────────────────*/
+
+/** Well inside the product's WRONG_WAY_ANGLE_DEG (120°): facing along the edge. */
+const ALIGNED_DEG = 4.0;
+/** Well past it — and NEGATIVE on purpose, so a reader that loses the sign by
+ *  taking a raw magnitude somewhere reads it as the most aligned tick there is. */
+const OPPOSED_DEG = -172.0;
+
+/**
+ * Stamp the direction record onto a one-way row, IN PLACE.
+ *
+ * `wrongWay` is set beside it because a real probe publishes both and they
+ * agree where the channel is armed (`wrongWay === (armed && |deg| > 120)`,
+ * rules/types.ts `EdgeAlignment.deg`). Tests that need them to DISAGREE — the
+ * whole point of the ruling — say so themselves.
+ */
+function faceRow(row, against) {
+  row.wrongWay = against;
+  row.alignDeg = against ? OPPOSED_DEG : ALIGNED_DEG;
+  row.wrongWayArmed = true;
+  row.alignEdgeId = row.edgeId;
+  row.alignTravelDir = 1; // locator returns +1 unconditionally on a one-way
+  row.alignRoundabout = true;
+  row.alignOffCarriageway = false;
+  return row;
+}
+
+/** Strip the signal back out, leaving the RETIRED DIALECT: `wrongWay` alone. */
+function unfaceRow(row) {
+  delete row.alignDeg;
+  delete row.wrongWayArmed;
+  delete row.alignEdgeId;
+  delete row.alignTravelDir;
+  delete row.alignRoundabout;
+  delete row.alignOffCarriageway;
+  return row;
 }
 
 /**
@@ -304,13 +363,19 @@ test("N1 (row 62, two-way): 11-on/1-off alternation is convicted by the FRACTION
 });
 
 test("N15a (rows 62 and 68, one-way ring): the same alternation is convicted against the ONE-WAY clock", () => {
-  const rows = goodRows().map((r) => ({ ...r, oneway: true, wrongWay: false }));
+  const rows = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
   // Row 62: "every row oneway true, wrongWay chopped 11-on/1-off across seq
   // 400..1199, declared channels [\"wrongWay\"]".
+  //
+  // THE LAWFUL TICK IN EACH BLOCK SAYS SO, and must. `flowRuns` bridges UNKNOWN
+  // ticks on purpose, so a fixture that gave the offending ticks a signed angle
+  // and left the lawful one speaking the retired dialect would fuse 67 lawful
+  // runs into one bridged run and convict on LENGTH — retiring the fraction
+  // ceiling this control exists to exercise without anyone noticing.
   let marked = 0;
   for (let i = 400; i < 1200; i++) {
     if (i % 12 !== 11) {
-      rows[i].wrongWay = true;
+      faceRow(rows[i], true);
       marked++;
     }
   }
@@ -342,11 +407,15 @@ test("N15a (rows 62 and 68, one-way ring): the same alternation is convicted aga
   near(j.oneWay.metrics.longestUndeclaredRunSec, 0.55, 1e-9);
   assert.equal(j.oneWay.counts.convictingRuns, 0);
 
-  // ROW 68's IDENTITY, ASSERTED RATHER THAN DESCRIBED: the predicate that ARMS
-  // the one-way channel and the predicate that COUNTS the offence are the same
-  // filter, so the channel can only ever be armed by the offence it exists to
-  // detect. This is what the founder ruling is about.
-  assert.equal(j.oneWay.counts.discriminatorTrueTicks, j.oneWay.counts.againstFlowTicks);
+  // ROW 68 IS CLOSED HERE, and this is what it looks like closed. It read: the
+  // predicate that ARMS the one-way channel and the predicate that COUNTS the
+  // offence are the same filter, so the channel can only ever be armed by the
+  // offence it exists to detect. Under the ruling every tick states its own
+  // direction, so the arming question is gone — NOTHING on this surface is
+  // unknown, and the 67 lawful ticks are lawful POSITIVELY rather than by
+  // failing to be an offence.
+  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0);
+  assert.equal(j.oneWay.counts.denominator - j.oneWay.counts.againstFlowTicks, 527);
 
   assert.deepEqual(j.flow.surfacesJudged, []);
   assert.deepEqual(j.leg.testimony.mayTestify, []);
@@ -364,12 +433,17 @@ test("N15a (rows 62 and 68, one-way ring): the same alternation is convicted aga
  * squeeze below is arithmetic between two budgets: the calibration park and the
  * witness are both declared REMOVALS, and they share one ceiling.
  */
-function ringLeg(witnessTicks, calTo = 99) {
-  const rows = goodRows().map((r) => ({ ...r, oneway: true, wrongWay: false }));
+function ringLeg(witnessTicks, calTo = 99, { signal = true } = {}) {
+  const rows = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
   // Row 71's REPAIRED fixture: the witness is moved clear of the calibration
   // park (lane B's first attempt overlapped it at seq 0..19 and the module
   // refused the overlap, which row 70 mis-read as the criteria catching this).
-  for (let i = 200; i < 200 + witnessTicks; i++) rows[i].wrongWay = true;
+  for (let i = 200; i < 200 + witnessTicks; i++) faceRow(rows[i], true);
+  // `signal: false` is the RETIRED DIALECT — `wrongWay` and nothing else, which
+  // is every record written before probe version 3. It is kept so the same leg
+  // can be judged both ways, which is what shows the pass is bought by the
+  // SIGNAL and not by a rule that was loosened.
+  if (!signal) for (const r of rows) unfaceRow(r);
   return {
     rows,
     declared: {
@@ -381,147 +455,536 @@ function ringLeg(witnessTicks, calTo = 99) {
   };
 }
 
-test("N15b (row 71): ONE DECLARED WRONG-WAY SECOND NO LONGER BUYS THE LEG — the WITNESS FLOOR refuses it", () => {
+test("N15b (row 71) RE-MEASURED: the 1240 ticks are with-the-flow POSITIVELY, and the leg is HONESTLY a pass", () => {
+  // WHAT ROW 71 WAS. 1260 one-way ticks, 20 of them (1.0 s) declared wrong-way
+  // at seq 200..219, the other 1240 carrying `wrongWay: false`. It read
+  // LEG = pass and certified mayTestify ["lane position on oneWay"], and that
+  // WAS a cheat: `false` meant «with the flow» OR «nobody asked»
+  // (worldRuntime.ts:2306-2312), so one declared second of the offence bought
+  // 62 s nobody had measured.
+  //
+  // WHAT IT IS NOW, AND WHY THE ANSWER CHANGED WITHOUT THE RULE BEING LOOSENED.
+  // The founder ruled the signed value on 2026-09-20; the probe carries it and
+  // R18 reads it. The same 1240 ticks now SAY they faced along the edge, so the
+  // leg is honest and pass is the correct verdict. The old defences — the
+  // liveness gate and R7/R12's witness floor — refused it only because nobody
+  // could tell those ticks from unmeasured ones, and every one of them could be
+  // satisfied by the offence itself (N15a's row-68 identity).
+  //
+  // THIS TEST IS THEREFORE NOT "N15b DELETED". It is N15b RE-MEASURED, and it
+  // asserts the re-measurement IN BOTH DIRECTIONS: with the signal the 1240
+  // count as with-the-flow POSITIVELY, and with the signal STRIPPED the very
+  // same rows go UNKNOWN and the leg cannot testify. The second half is what
+  // keeps the first from being a fixture edited until it passed.
   const { rows, declared } = ringLeg(20);
   const j = judge(rows, declared);
 
-  // ── THE VERDICT ROW 71 ASKED FOR. It used to read `pass` here, and this
-  // file used to assert that on purpose with the acceptance test parked in a
-  // `{ todo: true }` case beside it. Both are now one assertion.
-  assert.equal(j.verdict, "unresolved");
-  assert.equal(j.flow.verdict, "unresolved");
-  assert.equal(j.oneWay.verdict, "unresolved");
-  assert.deepEqual(j.flow.surfacesJudged, []);
-  assert.deepEqual(j.leg.testimony.mayTestify, []);
-
-  // THE CHEAT IS INTACT — every number row 71 measured is still exactly what it
-  // was. What changed is that a rule now reads them.
+  // ── THE 1240, COUNTED. Not one of them is unknown, and not one is against
+  // the flow — which is a statement the record MAKES, not one it fails to deny.
+  assert.equal(rows.filter((r) => r.wrongWay === false).length, 1240);
+  assert.equal(
+    rows.filter((r) => r.wrongWay === false && Math.abs(r.alignDeg) <= PRODUCT.WRONG_WAY_ANGLE_DEG)
+      .length,
+    1240,
+    "every one of the 1240 carries a signed angle inside the product's own threshold",
+  );
   assert.equal(j.oneWay.counts.denominator, 1260);
   assert.equal(j.oneWay.counts.againstFlowTicks, 20);
-  assert.equal(j.oneWay.counts.discriminatorTrueTicks, 20);
+  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0);
+  assert.equal(j.oneWay.metrics.discriminatorUnknownFrac, 0);
+  assert.equal(
+    j.oneWay.counts.denominator - j.oneWay.counts.againstFlowTicks,
+    1240,
+    "the 1240 are IN the denominator and OUT of the numerator, positively",
+  );
+
+  // ── THE VERDICT: pass, on the one-way surface and on the leg.
+  assert.equal(j.oneWay.verdict, "pass", j.oneWay.reasons.join("\n"));
+  assert.equal(j.verdict, "pass", j.reasons.join("\n"));
+  assert.deepEqual(j.flow.surfacesJudged, [SURFACE.ONE_WAY]);
+  assert.deepEqual(j.leg.testimony.mayTestify, ["lane position on oneWay"]);
+
+  // ── AND EVERY NUMBER ROW 71 MEASURED IS UNCHANGED, so this is the same leg
+  // and not a fixture that quietly moved. The declaration still acquits the
+  // offence; nothing convicts on length; both standing ceilings are still slack
+  // and are asserted slack, so a later edit that reds this by widening one of
+  // them fails here rather than passing quietly.
   near(j.oneWay.metrics.againstFlowFrac, 0.015873015873015872, 1e-12);
   assert.equal(j.oneWay.counts.declaredManoeuvreRuns, 1);
   assert.equal(j.oneWay.counts.declaredManoeuvreTicks, 20);
+  assert.equal(j.oneWay.counts.undeclaredRuns, 0);
   assert.equal(j.oneWay.counts.convictingRuns, 0);
-  assert.equal(rows.filter((r) => r.wrongWay === false).length, 1240);
-
-  // ── WIDENING-PROOF, THE SAME SHAPE N12 CARRIES. Neither pre-existing ceiling
-  // binds on this leg, and both are asserted NOT to bind, so a later edit that
-  // reds N15b by moving one of them fails here instead of passing quietly.
-  //  · the FRACTION ceiling does not: 20/1260 = 0.0159 is two orders under
-  //    0.2727, and it is under it BECAUSE the offence is one second long.
-  assert.ok(
-    j.oneWay.metrics.againstFlowFrac < j.oneWay.metrics.againstFlowFracCeiling,
-    "the fraction ceiling must NOT be what convicts N15b",
-  );
-  //  · the DECLARED-REMOVAL ceiling does not: 6.00 s of a 62.95 s leg = 0.0953,
-  //    0.0047 under the 0.1 ceiling.
+  assert.ok(j.oneWay.metrics.againstFlowFrac < j.oneWay.metrics.againstFlowFracCeiling);
   near(j.flow.metrics.declaredRemovedWallSec, 6.0, 1e-9);
   near(j.flow.metrics.declaredRemovedFrac, 0.09531374106433677, 1e-12);
-  assert.ok(
-    j.flow.metrics.declaredRemovedFrac < EXCLUDED_FRACTION_CEILING,
-    "the declared-removal ceiling must NOT be what convicts N15b",
-  );
-  assert.equal(j.oneWay.counts.undeclaredRuns, 0, "and no run is convicted on length either");
+  assert.ok(j.flow.metrics.declaredRemovedFrac < EXCLUDED_FRACTION_CEILING);
 
-  // ── WHAT DOES CONVICT: the witness is 1.000 s of a channel the engine only
-  // believes after wrongWaySustainSec 1.5 s (rules/types.ts `wrongWaySustainSec: 1.5`).
-  near(j.oneWay.metrics.longestWitnessRunSec, 1.0, 1e-9);
-  assert.ok(j.oneWay.metrics.longestWitnessRunSec < PRODUCT.WRONG_WAY_SUSTAIN_SEC);
-  const why = reasonMentioning(j.reasons, "is a state the product never believed either");
-  assert.ok(
-    why.includes("20 tick(s), longest CONTIGUOUS run 1.000 s (bridged span 1.000 s) < wrongWaySustainSec 1.5 s"),
-    why,
+  // ── THE METRICS THE FLOOR READ ARE GONE, not merely unread. A published
+  // number with no consumer is the defect this whole programme is named for.
+  assert.equal(j.oneWay.metrics.longestWitnessRunSec, undefined);
+  assert.equal(j.oneWay.metrics.longestContiguousWitnessSec, undefined);
+
+  // ── STRIP THE SIGNAL AND THE SAME LEG CANNOT TESTIFY. This is the half that
+  // makes the pass above mean something: the rows are identical except for the
+  // direction record, and without it 1240 of 1260 ticks are UNKNOWN.
+  const stripped = ringLeg(20, 99, { signal: false });
+  const k = judge(stripped.rows, stripped.declared);
+  assert.equal(
+    stripped.rows.filter((r) => r.alignDeg !== undefined).length,
+    0,
+    "the retired dialect: the boolean and nothing else",
   );
-  // The two measures agree HERE because this witness is contiguous, and that is
-  // the control for the bridged-witness cheat below: the floor reads the second
-  // number, and on this leg the first would have done just as well.
-  near(j.oneWay.metrics.longestContiguousWitnessSec, 1.0, 1e-9);
-  // …and the reason NAMES the declared acquittal, which is the counter that had
-  // no consumer before this revision.
-  assert.ok(why.includes("20 of those ticks were acquitted by a declared manoeuvre"));
+  assert.equal(k.oneWay.counts.denominator, 1260);
+  assert.equal(
+    k.oneWay.counts.againstFlowTicks,
+    20,
+    "`true` is still unambiguous and still convicts",
+  );
+  assert.equal(k.oneWay.counts.discriminatorUnknownTicks, 1240);
+  near(k.oneWay.metrics.discriminatorUnknownFrac, 1240 / 1260, 1e-12);
+  assert.ok(k.oneWay.metrics.discriminatorUnknownFrac > EXCLUDED_FRACTION_CEILING);
+  assert.equal(k.oneWay.verdict, "unresolved");
+  assert.equal(k.verdict, "unresolved");
+  assert.deepEqual(k.flow.surfacesJudged, []);
+  assert.deepEqual(k.leg.testimony.mayTestify, []);
+  reasonMentioning(k.reasons, "the discriminator was not answered often enough");
 });
 
-test("N15b MUST be refused: NO witness length passes this leg — the floor and the budget meet with no gap", () => {
-  // THE OBJECTION ROW 71 RAISED, ANSWERED BY ARITHMETIC RATHER THAN BY A
-  // PROMISE: "lowering the removal ceiling only shortens the witness, which
-  // needs one tick to arm the channel." The witness floor pushes the other way,
-  // and on this leg the two meet. The calibration park already spends 5.00 s of
-  // a 6.295 s declared-removal budget (0.1 × 62.95 s), so the witness may be at
-  // most 1.295 s — and the floor will not accept one under 1.5 s.
+test("N15b's squeeze is RETIRED, and what is left is the budget and the product's clock", () => {
+  // WHAT STOOD HERE: "NO witness length passes this leg — the floor and the
+  // budget meet with no gap". It swept 1..40 witness ticks and asserted not one
+  // of them passed. That was true, and it was the RIGHT answer only while the
+  // surrounding 1240 ticks were unreadable. With the signal the leg is honest,
+  // so most of that sweep must now pass — and the sweep is kept, run and
+  // asserted TICK BY TICK rather than deleted, because two rules do still bound
+  // the declaration and the boundary between them is worth pinning.
   //
-  // Every row below was RUN, not reasoned about.
+  // EVERY LINE BELOW WAS RUN, not reasoned about. The calibration park spends
+  // 5.00 s of the 6.295 s declared-removal budget (0.1 × 62.95 s), so:
+  //
+  //   1..25  (≤1.25 s)     the declaration holds                    → pass
+  //   26..29 (1.30-1.45 s) budget broken, spans STRIPPED, but the exposed run
+  //                        is under wrongWaySustainSec, so the SURFACE passes
+  //                        and §DECLARED refuses the LEG          → unresolved
+  //   30..40 (≥1.50 s)     stripped AND at or above the product's clock → fail
   const at = (n) => {
     const { rows, declared } = ringLeg(n);
     return judge(rows, declared);
   };
 
-  // 25 ticks = 1.25 s. INSIDE the budget (6.25/62.95 = 0.0993 < 0.1) and under
-  // the floor: the witness floor alone refuses it.
+  // 25 ticks = 1.25 s. Inside the budget (6.25/62.95 = 0.0993 < 0.1), declared,
+  // acquitted — and the leg PASSES, which under the floor it could not.
   const w25 = at(25);
   near(w25.flow.metrics.declaredRemovedFrac, 0.09928514694201747, 1e-12);
   assert.ok(w25.flow.metrics.declaredRemovedFrac < EXCLUDED_FRACTION_CEILING);
   assert.equal(w25.oneWay.counts.declaredManoeuvreRuns, 1, "the declaration still stands");
-  assert.equal(w25.oneWay.verdict, "unresolved");
-  assert.notEqual(w25.verdict, "pass");
-  reasonMentioning(w25.reasons, "longest CONTIGUOUS run 1.250 s (bridged span 1.250 s) < wrongWaySustainSec 1.5 s");
+  assert.equal(w25.oneWay.verdict, "pass", w25.oneWay.reasons.join("\n"));
+  assert.equal(w25.verdict, "pass", w25.reasons.join("\n"));
 
   // 26 ticks = 1.30 s. The first length PAST the budget (6.30/62.95 = 0.10008),
-  // so §DECLARED strips the spans — and the witness is still under the floor.
+  // so §DECLARED strips the spans. THE BUDGET STILL BITES — that rule was never
+  // about the direction signal, and if a later edit lets an over-budget
+  // declaration through, this is where it is caught.
   const w26 = at(26);
   near(w26.flow.metrics.declaredRemovedFrac, 0.1000794281175536, 1e-12);
   assert.ok(w26.flow.metrics.declaredRemovedFrac > EXCLUDED_FRACTION_CEILING);
   assert.equal(w26.oneWay.counts.declaredManoeuvreRuns, 0, "the declaration is stripped");
   assert.equal(w26.oneWay.counts.undeclaredRuns, 1);
+  assert.equal(w26.oneWay.counts.convictingRuns, 0, "1.30 s is under the product's clock");
   assert.notEqual(w26.verdict, "pass");
+  reasonMentioning(w26.reasons, "gets no larger allowance");
 
-  // 30 ticks = 1.50 s. Long enough to clear the floor, and therefore long
-  // enough to be an UNDECLARED run at or above wrongWaySustainSec — it
-  // convicts. This is the top of the squeeze.
+  // 30 ticks = 1.50 s. Stripped AND at the product's own arming clock, so it
+  // convicts as an undeclared run. The conviction rule is untouched by R18.
   const w30 = at(30);
   assert.equal(w30.oneWay.verdict, "fail");
   assert.equal(w30.oneWay.counts.convictingRuns, 1);
   near(w30.oneWay.metrics.longestUndeclaredRunSec, 1.5, 1e-9);
   assert.equal(w30.verdict, "fail");
 
-  // THE WHOLE RANGE, executed: 1..40 ticks, and not one of them passes.
-  //
-  // AND HERE IS THE AXIS THIS SWEEP DOES NOT VARY, said out loud because its
-  // absence cost a revision. Every leg here has a CONTIGUOUS witness, and
-  // contiguous length is the one axis the declared-removal budget already
-  // squeezes — which is exactly why the sweep was convincing. Nothing in this
-  // file varied what the ticks BETWEEN two true ticks carry until the BRIDGE
-  // block below, and until it did, changing the module's witness measure from
-  // the bridged span to the contiguous one redded 0 of 58 tests: the rule the
-  // module CLAIMED to have shipped and the rule it HAD shipped were
-  // indistinguishable to this entire suite.
-  //
-  // It also does not vary the calibration length — see L9 at the bottom, which
-  // is this same leg passing at a 4.50 s park.
+  // THE WHOLE RANGE, executed, at the verdict each one GETS.
   for (let n = 1; n <= 40; n++) {
-    assert.notEqual(at(n).verdict, "pass", `witness of ${n} tick(s) must not buy this leg`);
+    const j = at(n);
+    const expected = n <= 25 ? "pass" : n <= 29 ? "unresolved" : "fail";
+    assert.equal(j.verdict, expected, `witness of ${n} tick(s): ${j.reasons.join(" | ")}`);
+  }
+
+  // …AND THE SAME SWEEP WITH THE SIGNAL STRIPPED CANNOT CLEAR THE LEG AT ANY
+  // LENGTH, which is the pre-ruling answer and is still the right one for a
+  // record that cannot say which way the car faced.
+  for (let n = 1; n <= 40; n++) {
+    const { rows, declared } = ringLeg(n, 99, { signal: false });
+    assert.notEqual(
+      judge(rows, declared).verdict,
+      "pass",
+      `a ${n}-tick witness must not buy a leg that never states its direction`,
+    );
   }
 });
 
-test("…AND THE ONE-WAY SURFACE CAN STILL BE ACQUITTED: a 1.5 s witness inside budget passes", () => {
-  // A criterion set that reds everything is not a criterion set. The same leg
-  // with the calibration park shortened from 5.00 s to 3.00 s leaves room for a
-  // witness that clears wrongWaySustainSec inside the declared-removal ceiling:
-  // 3.00 + 1.50 = 4.50 s of 62.95 = 0.0715 < 0.1.
+test("…AND THE ONE-WAY SURFACE CAN STILL BE CONVICTED: the offence is read off the SIGNAL", () => {
+  // A criterion set that passes everything is not a criterion set either. The
+  // same fixture with the witness UNDECLARED and long enough to reach the
+  // engine's own arming clock is a conviction, and the numerator it is
+  // convicted on comes from `alignDeg` — 30 ticks whose nose is 172° off the
+  // edge, in a forward gear.
   const { rows, declared } = ringLeg(30, 59);
+  const bare = { ...declared, manoeuvreSpans: [] };
+  const j = judge(rows, bare);
+
+  assert.equal(j.oneWay.counts.againstFlowTicks, 30);
+  assert.equal(j.oneWay.counts.declaredManoeuvreRuns, 0);
+  assert.equal(j.oneWay.counts.convictingRuns, 1);
+  near(j.oneWay.metrics.longestUndeclaredRunSec, 1.5, 1e-9);
+  assert.equal(j.oneWay.verdict, "fail", j.oneWay.reasons.join("\n"));
+  assert.equal(j.verdict, "fail");
+  reasonMentioning(j.reasons, "wrongWaySustainSec");
+
+  // …and DECLARED, the same 30 ticks are acquitted and the leg passes, so the
+  // declaration is what excludes them and not the discriminator going quiet.
+  const k = judge(rows, declared);
+  assert.equal(k.verdict, "pass", k.reasons.join("\n"));
+  assert.equal(k.oneWay.counts.declaredManoeuvreRuns, 1);
+  assert.equal(k.oneWay.counts.declaredManoeuvreTicks, 30);
+  assert.equal(k.oneWay.counts.convictingRuns, 0);
+  near(k.flow.metrics.declaredRemovedWallSec, 4.5, 1e-9);
+  near(k.flow.metrics.declaredRemovedFrac, 0.07148530579825257, 1e-12);
+  assert.deepEqual(k.flow.surfacesJudged, [SURFACE.ONE_WAY]);
+  assert.deepEqual(k.leg.testimony.mayTestify, ["lane position on oneWay"]);
+});
+
+test("THE PRODUCT'S 120° IS THE THRESHOLD, AND A LAWFUL REVERSE IS NOT AN OFFENCE", () => {
+  // Two things the boolean could never have been asked, both now load-bearing.
+  //
+  // 1. THE ANGLE IS THE PRODUCT'S. worldRuntime.ts:279
+  //    `export const WRONG_WAY_ANGLE_DEG = 120`, applied at worldRuntime.ts:705
+  //    as `Math.abs(signedDeltaDeg(…)) > WRONG_WAY_ANGLE_DEG` — STRICTLY
+  //    greater, so the boundary tick is lawful. A harness that picked 90 would
+  //    convict a leg the engine clears, while still looking like it was reading
+  //    the product's own signal. The drift test reads the number back out of
+  //    platform/src; this asserts the criteria APPLY the number they mirror.
+  const face = (deg, gear = 1) => {
+    const rows = goodRows().map((r) => faceRow({ ...r, oneway: true, gear }, false));
+    for (const r of rows) r.alignDeg = deg;
+    return judge(rows, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  };
+  const at = PRODUCT.WRONG_WAY_ANGLE_DEG;
+  assert.equal(face(at).oneWay.counts.againstFlowTicks, 0, "exactly 120° is not against the flow");
+  assert.equal(face(-at).oneWay.counts.againstFlowTicks, 0);
+  assert.equal(face(95).oneWay.counts.againstFlowTicks, 0, "and 95° is lawful under 120");
+  assert.equal(face(95).oneWay.verdict, "pass");
+  assert.equal(face(at + 0.5).oneWay.counts.againstFlowTicks, 1260);
+  assert.equal(face(-(at + 0.5)).oneWay.counts.againstFlowTicks, 1260);
+  assert.equal(face(at + 0.5).oneWay.verdict, "fail");
+
+  // 2. IT MEASURES THE NOSE. `SimTick.speedKmh` is unsigned, so `gear` is the
+  //    only channel that says WHICH WAY along its own axis the car is going —
+  //    and `speedKmh` is the only one that says whether it is going anywhere at
+  //    all. Both are needed: reading the gear without the speed convicted every
+  //    stopped-in-reverse tick, which is N18 below. A car backing
+  //    lawfully along its own lane reads |deg| ≈ 180 on EVERY frame
+  //    (rules/types.ts `EdgeAlignment.deg`, measured in edge-alignment.test.ts
+  //    §7). A criterion that reads the angle as a direction of travel convicts
+  //    every correct reverse manoeuvre — and the instrument this record exists
+  //    for covers the reverse/park half.
+  const rev = face(-179.0, -1);
+  assert.equal(rev.oneWay.counts.againstFlowTicks, 0, "the NOSE is backwards; the TRAVEL is not");
+  assert.equal(rev.oneWay.counts.discriminatorUnknownTicks, 0);
+  assert.equal(rev.oneWay.verdict, "pass", rev.oneWay.reasons.join("\n"));
+  // …the same angle in a forward gear IS the offence…
+  assert.equal(face(-179.0, 1).oneWay.counts.againstFlowTicks, 1260);
+  // …and a reverse that is genuinely against the flow — nose along the edge
+  // while backing down it — is convicted, so the rotation is a rotation and not
+  // a blanket amnesty for gear −1.
+  assert.equal(face(2.0, -1).oneWay.counts.againstFlowTicks, 1260);
+  assert.equal(face(2.0, -1).oneWay.verdict, "fail");
+
+  // 3. THE ROTATION MUST WRAP, and BOTH SIGNS of a lawful reverse must survive
+  //    it. `deg` is (-180, +180], so a car backing along its lane reads −179 on
+  //    one frame and +179 on the next as the nose jitters across antiparallel.
+  //    `+179 + 180 = 359`, and a consumer that thresholds that raw — no modulo —
+  //    convicts the frame it just cleared, from a half-degree of steering. This
+  //    line is why the normalisation is there and not an ornament.
+  const revPlus = face(179.0, -1);
+  assert.equal(revPlus.oneWay.counts.againstFlowTicks, 0, "+179 in reverse is the SAME frame");
+  assert.equal(revPlus.oneWay.verdict, "pass", revPlus.oneWay.reasons.join("\n"));
+  assert.equal(face(140.0, -1).oneWay.counts.againstFlowTicks, 0, "140 in reverse travels at −40");
+  assert.equal(face(-140.0, -1).oneWay.counts.againstFlowTicks, 0);
+
+  // 4. ONLY `gear === -1` ROTATES. `rules/types.ts` says it in one line —
+  //    „`gear === -1` ⇒ the car TRAVELS at `deg ± 180`" — and says nothing about
+  //    any other gear, so nothing else may rotate. A car STOPPED facing the
+  //    wrong way up a one-way street is against the flow, and this file counts
+  //    slow and stationary against-flow ticks rather than excluding them (C1,
+  //    C2). A consumer that rotated on `gear !== 1` would acquit it silently,
+  //    and the acquittal would look exactly like the lawful reverse above.
+  const parked = face(-172.0, 0);
+  assert.equal(parked.oneWay.counts.againstFlowTicks, 1260, "gear 0 is not reverse");
+  assert.equal(parked.oneWay.counts.slowAgainstFlowTicks, 0, "…and the fixture is still moving");
+  assert.equal(parked.oneWay.verdict, "fail", parked.oneWay.reasons.join("\n"));
+  const neutralish = face(-172.0, 2);
+  assert.equal(neutralish.oneWay.counts.againstFlowTicks, 1260, "nor is any forward gear");
+});
+
+/**
+ * N18's leg: the whole record one-way and lawful, with a window in the middle
+ * where the car is STOPPED WITH REVERSE SELECTED and its nose still along the
+ * edge. That is the opening state of every reverse manoeuvre — stop, select R,
+ * then move — and nothing else about the leg changes.
+ *
+ * 40 ticks = 2.00 s, chosen between two clocks so the window cannot be excused
+ * by either: it is past `wrongWaySustainSec` 1.5 s, so a discriminator that
+ * convicts it produces a REAL conviction rather than a sub-threshold blip, and
+ * it is under `laneKeepSustainSec` 3.0 s, so AC-LANE's contiguous-excluded-run
+ * rule does not fire and the leg's verdict is AC-FLOW's to give.
+ */
+function stoppedInReverseLeg(fromSeq = 600, ticks = 40) {
+  const rows = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
+  for (let i = fromSeq; i < fromSeq + ticks; i++) {
+    rows[i].gear = -1;
+    rows[i].speedKmh = 0;
+  }
+  return { rows, declared: { ...GOOD_DECLARED, channels: ["wrongWay"] } };
+}
+
+test("N18: a car STOPPED in reverse was convicted of driving against the flow", () => {
+  // THE DEFECT, REBUILT FROM OUTSIDE THE MODULE. The one-way discriminator
+  // rotated the nose angle by 180° whenever `gear === -1`, with no reference to
+  // MOTION. A car standing still in reverse with its nose 4° off the edge
+  // therefore read |travel| = 176° > 120° on every tick, and 2.00 s of it
+  // convicted the surface at the product's own 1.5 s clock — while the run's
+  // own census sat there saying all 40 ticks were slow and all 40 in reverse,
+  // read by nothing.
+  //
+  // THE PRODUCT CONVICTS NOTHING ON THOSE TICKS. `wrongWay` is a heading
+  // verdict (`armed && |deg| > 120`), and the heading is 4°.
+  const { rows, declared } = stoppedInReverseLeg();
   const j = judge(rows, declared);
 
-  assert.equal(j.verdict, "pass", j.reasons.join("\n"));
-  assert.equal(j.oneWay.verdict, "pass", j.oneWay.reasons.join("\n"));
-  near(j.oneWay.metrics.longestWitnessRunSec, 1.5, 1e-9);
-  assert.equal(j.oneWay.metrics.longestWitnessRunSec >= PRODUCT.WRONG_WAY_SUSTAIN_SEC, true);
-  assert.equal(j.oneWay.counts.declaredManoeuvreRuns, 1);
-  assert.equal(j.oneWay.counts.declaredManoeuvreTicks, 30);
+  assert.equal(j.oneWay.counts.stationaryReverseTicks, 40);
+  assert.equal(j.oneWay.counts.againstFlowTicks, 0, "a stopped car travels in no direction");
   assert.equal(j.oneWay.counts.convictingRuns, 0);
-  near(j.flow.metrics.declaredRemovedWallSec, 4.5, 1e-9);
-  near(j.flow.metrics.declaredRemovedFrac, 0.07148530579825257, 1e-12);
+  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0, "ANSWERED, not shrugged at");
+  assert.equal(j.oneWay.verdict, "pass", j.oneWay.reasons.join("\n"));
+  assert.equal(j.verdict, "pass", j.reasons.join("\n"));
+
+  // THE DENOMINATOR IS UNTOUCHED. Surface membership is `edgeId != null &&
+  // oneway === true`, a POSITION, and it is true of a stopped car; making it
+  // depend on speed would be C1 with one more step, emptying the very
+  // denominator the crawl has to be measured against.
+  assert.equal(j.oneWay.counts.denominator, 1260);
+
+  // WHILE THE CAR IS STOPPED, THE VERDICT MUST NOT MOVE WITH THE GEAR LEVER.
+  for (const gear of [-1, 0, 1]) {
+    const g = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
+    for (let i = 600; i < 640; i++) {
+      g[i].gear = gear;
+      g[i].speedKmh = 0;
+    }
+    const k = judge(g, declared);
+    assert.equal(k.oneWay.counts.againstFlowTicks, 0, "gear " + gear + " stopped");
+    assert.equal(k.oneWay.verdict, "pass");
+  }
+
+  // AND IT IS NOT AN AMNESTY FOR gear −1. A car stopped FACING the wrong way up
+  // a one-way street is against the flow: the heading is read unrotated, which
+  // is what the product reads too. Slow and reverse ticks are COUNTED (C1, C2).
+  const back = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
+  for (let i = 600; i < 640; i++) {
+    faceRow(back[i], true); // nose 172° off the edge, and `wrongWay` agrees
+    back[i].gear = -1;
+    back[i].speedKmh = 0;
+  }
+  const b = judge(back, declared);
+  assert.equal(b.oneWay.counts.directionContradictionRows, 0, "the record is self-consistent");
+  assert.equal(b.oneWay.counts.againstFlowTicks, 40);
+  assert.equal(b.oneWay.counts.slowAgainstFlowTicks, 40);
+  assert.equal(b.oneWay.counts.reverseAgainstFlowTicks, 40);
+  assert.equal(b.oneWay.counts.convictingRuns, 1);
+  assert.equal(b.oneWay.verdict, "fail", b.oneWay.reasons.join("\n"));
+
+  // THE PREDICATE IS `speedKmh > 0`, NOT THE ENGINE'S `moving` (5 km/h). A
+  // controller backing the wrong way down a one-way street at 4.9 km/h IS
+  // travelling backwards and the rotation is owed to it — a 5 km/h floor in
+  // this numerator is C1 and C2 exactly, the draft defect this file exists for.
+  const crawl = goodRows().map((r) => {
+    const q = faceRow({ ...r, oneway: true }, false);
+    q.gear = -1;
+    q.speedKmh = 4.9;
+    q.alignDeg = 1.5;
+    return q;
+  });
+  const c = judge(crawl, declared);
+  assert.equal(c.oneWay.counts.stationaryReverseTicks, 0, "4.9 km/h is moving, just not GRADED");
+  assert.equal(c.oneWay.counts.againstFlowTicks, 1260);
+  assert.equal(c.oneWay.counts.slowAgainstFlowTicks, 1260);
+  assert.equal(c.oneWay.verdict, "fail", c.oneWay.reasons.join("\n"));
+
+  // A REVERSE TICK WITH NO SPEED IS UNKNOWN, NOT ZERO — the record cannot be
+  // asked which way it travelled. A FORWARD tick never needed the speed.
+  const noSpeed = goodRows().map((r) => {
+    const q = faceRow({ ...r, oneway: true }, false);
+    q.gear = -1;
+    delete q.speedKmh;
+    return q;
+  });
+  const n = judge(noSpeed, declared);
+  assert.equal(n.oneWay.counts.discriminatorUnknownTicks, 1260);
+  assert.equal(n.oneWay.counts.againstFlowTicks, 0);
+  assert.equal(n.oneWay.verdict, "unresolved", n.oneWay.reasons.join("\n"));
+  reasonMentioning(n.oneWay.reasons, "is unknown on");
+});
+
+test("N18b: a leg that NEVER MOVED still may not testify, and AC-LANE is what says so", () => {
+  // The rule above reads a stopped car's HEADING, so a leg parked on a one-way
+  // edge with its nose along it reads a genuinely clean AC-FLOW. A parked car
+  // is also 0 m from its route, and this programme has twice drawn a false
+  // conclusion from exactly that. The refusal is AC-LANE's — `isGradable`
+  // carries the engine's own `moving` — and it is asserted here so a later edit
+  // to AC-LANE reds this file too.
+  const rows = goodRows().map((r) => {
+    const q = faceRow({ ...r, oneway: true }, false);
+    q.speedKmh = 0;
+    q.gear = -1;
+    return q;
+  });
+  const j = judge(rows, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+
+  assert.equal(j.oneWay.counts.stationaryReverseTicks, 1260);
+  assert.equal(j.oneWay.counts.againstFlowTicks, 0);
+  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0);
+  assert.equal(j.oneWay.verdict, "pass", "AC-FLOW is honestly clean, and that is not enough");
+
+  assert.equal(j.lane.counts.legGradedTicks, 0);
+  assert.equal(j.lane.metrics.legExcludedFrac, 1);
+  assert.equal(j.lane.verdict, "unresolved", j.lane.reasons.join("\n"));
+  assert.notEqual(j.verdict, "pass");
+  assert.deepEqual(j.leg.testimony.mayTestify, []);
+});
+
+test("N19: the RETIRED DIALECT can still convict — the ceiling refuses an acquittal, not a conviction", () => {
+  // THE UNDISCLOSED REGRESSION R18 SHIPPED. The unknown-fraction ceiling
+  // early-returned `unresolved`, so it refused CONVICTIONS as well as
+  // acquittals. On a pre-signal record — `wrongWay` and no `alignDeg` at all —
+  // every tick that is not a positive `true` is UNKNOWN, so the unknown
+  // fraction is 1 − (offence density), and clearing a 0.1 ceiling would have
+  // taken a leg that spent NINE TENTHS of its one-way surface driving the wrong
+  // way. The old dialect had lost the ability to convict at any realistic
+  // offence density, while the comment at the site said the opposite.
+  //
+  // The asymmetry is this file's own doctrine: the claim that needs evidence is
+  // that the car was FINE in the dark. A conviction is read off ticks that
+  // POSITIVELY say `true`, and the fraction rule can only be DILUTED by
+  // unknowns, never inflated by them, because they land in its denominator.
+  const { rows, declared } = ringLeg(30, 99, { signal: false });
+  const bare = { ...declared, manoeuvreSpans: [] };
+  const j = judge(rows, bare);
+
+  assert.equal(rows.filter((r) => r.alignDeg !== undefined).length, 0, "the pre-signal dialect");
+  assert.equal(j.oneWay.counts.againstFlowTicks, 30, "1.50 s, at the product's own clock");
+  assert.ok(j.oneWay.metrics.discriminatorUnknownFrac > EXCLUDED_FRACTION_CEILING);
+  assert.equal(j.oneWay.counts.convictingRuns, 1);
+  assert.equal(j.oneWay.verdict, "fail", j.oneWay.reasons.join("\n"));
+  // BOTH reasons are published: a reader of a failing dark record still learns
+  // the record was dark.
+  reasonMentioning(j.oneWay.reasons, "is unknown on");
+  reasonMentioning(j.oneWay.reasons, "undeclared against-flow run");
+
+  // …and the SAME dark record with the offence taken out cannot ACQUIT, which
+  // is the half of the rule that was never in question.
+  const lawful = rows.map((r) => ({ ...r, wrongWay: false }));
+  const k = judge(lawful, bare);
+  assert.equal(k.oneWay.counts.againstFlowTicks, 0);
+  assert.equal(k.oneWay.counts.discriminatorUnknownTicks, 1260);
+  assert.equal(k.oneWay.verdict, "unresolved", k.oneWay.reasons.join("\n"));
+  assert.deepEqual(k.flow.surfacesJudged, []);
+  assert.deepEqual(k.leg.testimony.mayTestify, []);
+});
+
+test("N20: the unknown-fraction ceiling applies EXCLUDED_FRACTION_CEILING, at the boundary", () => {
+  // THE CEILING'S VALUE AT THIS USE SITE. Since R18 deleted the liveness gate
+  // and the witness floor this rule is the ONLY defence against a dark one-way
+  // record, and loosening it fivefold here left both suites green. The constant
+  // is a declared JUDGEMENT (module L4) and nothing can derive it; what a test
+  // can do is prove the rule applies THIS number, strictly, on both sides.
+  const mk = (nUnknown) => {
+    const rows = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
+    for (let i = 0; i < nUnknown; i++) rows[i].alignDeg = null;
+    return judge(rows, { ...GOOD_DECLARED, channels: ["wrongWay"] }).oneWay;
+  };
+  const denominator = mk(0).counts.denominator;
+  assert.equal(denominator, ROWS);
+
+  const at = Math.round(EXCLUDED_FRACTION_CEILING * denominator);
+  assert.equal(at, 126);
+  const atCeiling = mk(at);
+  assert.equal(atCeiling.counts.discriminatorUnknownTicks, at);
+  near(atCeiling.metrics.discriminatorUnknownFrac, EXCLUDED_FRACTION_CEILING, 1e-12);
+  assert.equal(atCeiling.verdict, "pass", "exactly AT the ceiling is not OVER it");
+
+  const over = mk(at + 1);
+  assert.ok(over.metrics.discriminatorUnknownFrac > EXCLUDED_FRACTION_CEILING);
+  assert.equal(over.verdict, "unresolved", over.reasons.join("\n"));
+  reasonMentioning(over.reasons, "> " + EXCLUDED_FRACTION_CEILING);
+});
+
+test("THE SIGNAL ANSWERS WHERE THE BOOLEAN WAS NEVER ARMED — the founder's own sentence, executed", () => {
+  // `wrongWay === false` means «correct OR nobody asked», and the ruling was to
+  // publish the direction ANYWAY so that a tick on which the conviction channel
+  // is DISARMED still says which way the car faced. This leg carries the signed
+  // value and carries NO `wrongWay` at all — which is not contrived:
+  // worldRuntime.ts disarms the channel when the district states no one-way
+  // streets and the edge is not a ring, and when the car is off the
+  // carriageway, and `roadRecordOf` copies the boolean only when the tick
+  // defines it.
+  //
+  // UNDER THE RETIRED DIALECT THIS LEG WAS UNRESOLVED and could never be
+  // anything else: the liveness gate had no way to tell a silent channel from a
+  // clean drive, so the only leg it could clear was one that had driven the
+  // wrong way. THIS is the test that dies if someone puts the boolean back as
+  // the discriminator.
+  const rows = goodRows().map((r) => {
+    const q = faceRow({ ...r, oneway: true }, false);
+    q.wrongWayArmed = false;
+    delete q.wrongWay;
+    return q;
+  });
+  const j = judge(rows, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+
+  assert.equal(rows.filter((r) => r.wrongWay !== undefined).length, 0, "the boolean is absent");
+  assert.equal(j.oneWay.counts.denominator, 1260);
+  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0, "and yet nothing is unknown");
+  assert.equal(j.oneWay.counts.againstFlowTicks, 0);
+  assert.equal(j.oneWay.counts.discriminatorTrueTicks, 0, "the channel never says true");
+  assert.equal(j.oneWay.verdict, "pass", j.oneWay.reasons.join("\n"));
   assert.deepEqual(j.flow.surfacesJudged, [SURFACE.ONE_WAY]);
-  assert.deepEqual(j.leg.testimony.mayTestify, ["lane position on oneWay"]);
+
+  // …AND THE SAME LEG WITH THE ANGLE `null` — «the runtime looked and could not
+  // measure» — is UNRESOLVED, because that is a THIRD state and must not
+  // collapse into either of the others.
+  const blind = rows.map((r) => ({ ...r, alignDeg: null }));
+  const k = judge(blind, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  assert.equal(k.oneWay.counts.discriminatorUnknownTicks, 1260);
+  assert.equal(k.oneWay.verdict, "unresolved");
+  reasonMentioning(k.reasons, "the discriminator was not answered often enough");
+
+  // …AND A FOURTH STATE NOBODY MEANT TO PUBLISH. `NaN` is not JSON, so it
+  // cannot reach here from a written record — but it CAN reach here from a
+  // hand-built row, a parse that produced `Number(undefined)`, or an arithmetic
+  // slip upstream, and `NaN > 120` is `false`, which is the fail-open direction.
+  // It is UNKNOWN, like every other angle the record cannot state.
+  const nan = rows.map((r) => ({ ...r, alignDeg: Number.NaN }));
+  const q = judge(nan, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  assert.equal(q.oneWay.counts.discriminatorUnknownTicks, 1260, "NaN is not with-the-flow");
+  assert.equal(q.oneWay.counts.againstFlowTicks, 0);
+  assert.equal(q.oneWay.verdict, "unresolved");
+  // …and a handful of them, under the ceiling, is survivable and still not
+  // counted as lawful — the census is what makes them cost, not a refusal.
+  const few = rows.map((r, i) => (i % 40 === 0 ? { ...r, alignDeg: Number.NaN } : r));
+  const f = judge(few, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  assert.equal(f.oneWay.counts.discriminatorUnknownTicks, 32);
+  assert.ok(f.oneWay.metrics.discriminatorUnknownFrac < EXCLUDED_FRACTION_CEILING);
+  assert.equal(f.oneWay.verdict, "pass", f.oneWay.reasons.join("\n"));
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -985,75 +1448,218 @@ test("N14 (row 67): `wrongWay: true` on a row classified TWO-WAY refuses the leg
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
- * THE SEAM FOR THE PRODUCT SIGNAL THAT IS BEING BUILT IN PARALLEL.
+ * THE SEAM, CLOSED. The product signal landed and this is what it replaced.
  * ──────────────────────────────────────────────────────────────────────────*/
 
-test("SEAM: what a signed travel-direction-vs-edge value will replace — today's `wrongWay === false` is read as with-the-flow", () => {
-  // THE FOUNDER RULED (2026-09-20) that the PRODUCT will publish a per-tick
-  // SIGNED travel-direction-vs-edge-direction value, because `wrongWay ===
-  // false` means «correct OR nobody asked» (worldRuntime.ts:2306-2312, quoted
-  // in row 68). THAT CHANGE IS BEING IMPLEMENTED BY ANOTHER RUN. Nothing here
-  // implements it and nothing here depends on its field name.
+test("R19: a tap that writes a LAWFUL angle over a convicting boolean is refused, not believed", () => {
+  // THE HOLE R18 WOULD HAVE OPENED. Before R18 a `wrongWay: true` tick always
+  // convicted. Now the signed angle is read FIRST and the boolean only where
+  // the angle is absent — so a probe tap that writes `alignDeg: 0` on every
+  // tick acquits the whole surface while the record's own conviction channel is
+  // shouting. That is control 4's dead referent one field over, it would have
+  // been INTRODUCED by this revision, and R19 is what closes it.
   //
-  // This test is the seam: it pins, executably, the behaviour the new signal
-  // must REPLACE, so that when the signed value lands this is the test that
-  // fails and names what to rewrite. Two things are pinned:
+  // MEASURED WITHOUT THE RULE: 1260 one-way ticks, 600 of them carrying
+  // `wrongWay: true`, every one carrying `alignDeg: 0` — againstFlowTicks 0,
+  // discriminatorUnknownTicks 0, oneWay = pass, LEG = pass, mayTestify
+  // ["lane position on oneWay"].
+  const rows = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
+  for (let i = 300; i < 900; i++) {
+    rows[i].wrongWay = true; // the engine convicted
+    rows[i].alignDeg = 0; // …and the tap says the nose was perfectly aligned
+  }
+  const j = judge(rows, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+
+  assert.equal(j.oneWay.counts.directionContradictionRows, 600);
+  assert.equal(j.oneWay.verdict, "fail", j.oneWay.reasons.join("\n"));
+  assert.equal(j.verdict, "fail");
+  assert.deepEqual(j.flow.surfacesJudged, []);
+  assert.deepEqual(j.leg.testimony.mayTestify, []);
+  reasonMentioning(j.reasons, "cannot have produced it");
+
+  // THE THRESHOLD IT COMPARES AGAINST IS THE PRODUCT'S. At exactly 120 the
+  // product's own `>` is false, so `wrongWay: true` there is still impossible;
+  // half a degree past it the two channels agree and the record stands.
+  const at = (deg) => {
+    const r2 = goodRows().map((q) => faceRow({ ...q, oneway: true }, false));
+    for (let i = 300; i < 900; i++) {
+      r2[i].wrongWay = true;
+      r2[i].alignDeg = deg;
+    }
+    return judge(r2, { ...GOOD_DECLARED, channels: ["wrongWay"] }).oneWay;
+  };
+  assert.equal(at(PRODUCT.WRONG_WAY_ANGLE_DEG).counts.directionContradictionRows, 600);
+  assert.equal(at(PRODUCT.WRONG_WAY_ANGLE_DEG + 0.5).counts.directionContradictionRows, 0);
+  assert.equal(at(-(PRODUCT.WRONG_WAY_ANGLE_DEG + 0.5)).counts.directionContradictionRows, 0);
+
+  // IT COMPARES THE NOSE, UNROTATED. A LAWFUL REVERSE IS NOT A BROKEN RECORD:
+  // the product's boolean is a heading verdict and DOES fire on a lawful
+  // reverse around a ring (docs/simulation/93, GAP-2), while this file's
+  // discriminator rotates by 180° because it wants TRAVEL. That divergence is
+  // designed. A rule that compared the ROTATED value would file every correct
+  // reverse-park as a contradiction — which is the single most likely way to
+  // get this rule wrong, and the reverse/park half is what the instrument this
+  // record exists for is FOR.
+  const reverse = goodRows().map((q) => faceRow({ ...q, oneway: true, gear: -1 }, true));
+  for (const q of reverse) q.alignDeg = -178.0; // nose backwards, travel forwards
+  const rev = judge(reverse, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  assert.equal(reverse.filter((q) => q.wrongWay === true).length, 1260);
+  assert.equal(rev.oneWay.counts.directionContradictionRows, 0, "a lawful reverse is not a lie");
+  assert.equal(rev.oneWay.counts.againstFlowTicks, 0);
+  assert.equal(rev.oneWay.verdict, "pass", rev.oneWay.reasons.join("\n"));
+
+  // THE OTHER TWO SHAPES OF THE SAME LIE. `wrongWay: true` requires
+  // `wrongWayArmed` and a measurable angle; neither can be absent under it.
+  const disarmed = goodRows().map((q) => faceRow({ ...q, oneway: true }, true));
+  for (const q of disarmed) q.wrongWayArmed = false;
+  assert.equal(
+    judge(disarmed, { ...GOOD_DECLARED, channels: ["wrongWay"] }).oneWay.counts
+      .directionContradictionRows,
+    1260,
+    "convicted while the channel was never asked",
+  );
+  const blind = goodRows().map((q) => faceRow({ ...q, oneway: true }, true));
+  for (const q of blind) q.alignDeg = null;
+  assert.equal(
+    judge(blind, { ...GOOD_DECLARED, channels: ["wrongWay"] }).oneWay.counts
+      .directionContradictionRows,
+    1260,
+    "convicted off an angle the runtime says it could not measure",
+  );
+
+  // AND A RECORD THAT PREDATES THE SIGNAL IS NOT ACCUSED OF ANYTHING. There is
+  // nothing to compare `wrongWay` against, so R19 says nothing and the tick
+  // convicts on the boolean exactly as it did before R18.
+  const old = goodRows().map((q) => unfaceRow(faceRow({ ...q, oneway: true }, true)));
+  const o = judge(old, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  assert.equal(o.oneWay.counts.directionContradictionRows, 0);
+  assert.equal(o.oneWay.counts.againstFlowTicks, 1260, "`true` still convicts without the signal");
+  assert.equal(o.oneWay.verdict, "fail");
+
+  // …AND THE HONEST VERSION OF THE CHEAT LEG PASSES, so R19 is a contradiction
+  // rule and not a ban on `wrongWay` appearing beside an angle.
+  const honest = goodRows().map((q) => faceRow({ ...q, oneway: true }, false));
+  for (let i = 300; i < 320; i++) faceRow(honest[i], true);
+  const h = judge(honest, {
+    ...GOOD_DECLARED,
+    channels: ["wrongWay"],
+    manoeuvreSpans: [{ fromSeq: 300, toSeq: 319 }],
+  });
+  assert.equal(h.oneWay.counts.directionContradictionRows, 0);
+  assert.equal(h.oneWay.counts.againstFlowTicks, 20);
+  assert.equal(h.oneWay.verdict, "pass", h.oneWay.reasons.join("\n"));
+});
+
+test("THE SEAM IS CLOSED: the signed travel-direction-vs-edge value replaced `wrongWay === false`", () => {
+  // THIS TEST USED TO BE THE SEAM. It pinned, executably, the behaviour the
+  // founder-ruled signal had to REPLACE, so that when the signed value landed
+  // this would be the test that failed and named what to rewrite. It did
+  // exactly that on 2026-09-24, and this is the rewrite. What it pinned, in its
+  // own words, and what each line became:
   //
-  //   1. `wrongWay: false` is currently read as a POSITIVE with-the-flow
-  //      statement: 1240 such rows produce againstFlowTicks 20, not 1260.
-  //   2. The only things standing between that and a fail-open acquittal are
-  //      the liveness GATE and the witness FLOOR — and both are satisfied by
-  //      the offence itself, which N15a asserts by byte-identity. The floor
-  //      bounds how short that self-arming witness may be; it does not make the
-  //      value unambiguous, and only the product can do that.
+  //   · "`wrongWay: false` is currently read as a POSITIVE with-the-flow
+  //     statement: 1240 such rows produce againstFlowTicks 20, not 1260."
+  //     → GONE. `false` alone is UNKNOWN. The count only stays 20 when the
+  //       record SAYS the other 1240 faced along the edge, which is asserted
+  //       both ways below.
+  //   · "the only things standing between that and a fail-open acquittal are
+  //     the liveness GATE and the witness FLOOR — and both are satisfied by the
+  //     offence itself."
+  //     → BOTH DELETED (module R18), with `longestWitnessRunSec`,
+  //       `longestContiguousWitnessSec`, L7's dilution note and L9.
+  //   · "the replacement is: `againstFlow` on the one-way surface reads the
+  //     sign instead of `wrongWay`, a tick with no signed value is `null`
+  //     (unknown) rather than `false`."
+  //     → BUILT. `PRODUCT.WRONG_WAY_ANGLE_DEG` is mirrored from
+  //       worldRuntime.ts:279 and read back out of platform/src by the drift
+  //       test; `gear === -1` rotates the nose angle by 180° so a lawful
+  //       reverse is not convicted.
+  //   · "What does NOT go: the one-way surface still needs a NON-ZERO
+  //     denominator and the contradiction rule (R13) still applies."
+  //     → KEPT, and asserted here rather than left to be assumed.
   //
-  // WHEN THE SIGNED VALUE ARRIVES, the replacement is: `againstFlow` on the
-  // one-way surface reads the sign instead of `wrongWay`, a tick with no signed
-  // value is `null` (unknown) rather than `false`, and the liveness gate at
-  // "`wrongWay` never reads true anywhere in this record" is DELETED because
-  // absence stops being ambiguous. Until then, do not weaken the gate.
-  //
-  // THREE MORE THINGS GO WITH IT, added after the third adversarial pass, so
-  // that whoever lands the signed value knows the full extent of what it
-  // retires rather than deleting the gate and leaving its scaffolding behind:
-  //
-  //   · THE WITNESS FLOOR (module R7, repaired to read CONTIGUOUS ticks as R12)
-  //     exists only to stop a blip arming an ambiguous channel. An unambiguous
-  //     channel needs no witness at all, so the floor, `longestWitnessRunSec`
-  //     and `longestContiguousWitnessSec` all go.
-  //   · L9 GOES WITH IT, and L9 is the reason this matters: the floor is
-  //     currently bounded from the other side only by the declared-removal
-  //     budget, and that budget is defeated by shortening the calibration park.
-  //     The signed value removes the need for the witness, which removes the
-  //     declaration that buys it, which removes the cheat.
-  //   · L7's DILUTION WITH LEG LENGTH goes too, for the same reason.
-  //
-  // What does NOT go: the one-way surface still needs a NON-ZERO denominator
-  // and the contradiction rule (R13) still applies, because a row filed under
-  // the wrong surface is wrong whatever the discriminator says.
-  const rows = goodRows().map((r) => ({ ...r, oneway: true, wrongWay: false }));
-  for (let i = 200; i <= 219; i++) rows[i].wrongWay = true;
-  const j = judge(rows, {
+  // The leg is the seam's own leg, unchanged in shape: 1260 one-way ticks, 20
+  // of them declared wrong-way at seq 200..219.
+  const rows = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
+  for (let i = 200; i <= 219; i++) faceRow(rows[i], true);
+  const declared = {
     ...GOOD_DECLARED,
     channels: ["wrongWay"],
     manoeuvreSpans: [{ fromSeq: 200, toSeq: 219 }],
-  });
+  };
+  const j = judge(rows, declared);
 
+  // 1. THE 1240 ARE WITH THE FLOW POSITIVELY. The seam asserted the same three
+  //    numbers; what changed is WHY they hold.
   assert.equal(rows.filter((r) => r.wrongWay === false).length, 1240);
   assert.equal(j.oneWay.counts.denominator, 1260);
   assert.equal(j.oneWay.counts.againstFlowTicks, 20);
-  // Not one of the 1240 ambiguous rows is counted as UNKNOWN today.
   assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0);
   assert.equal(j.oneWay.metrics.discriminatorUnknownFrac, 0);
+  assert.equal(j.oneWay.verdict, "pass", j.oneWay.reasons.join("\n"));
 
-  // And the gate does still refuse a leg that never saw the offence: strip the
-  // witness and the same record reads UNRESOLVED rather than pass.
-  const noWitness = goodRows().map((r) => ({ ...r, oneway: true, wrongWay: false }));
-  const k = judge(noWitness, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  // 2. THE SAME 1240 WITHOUT THE SIGNAL ARE UNKNOWN — every one of them. The
+  //    seam's own sentence («not one of the 1240 ambiguous rows is counted as
+  //    UNKNOWN today») is now false in exactly the way it asked to be.
+  const bare = rows.map((r) => unfaceRow({ ...r }));
+  const k = judge(bare, declared);
+  assert.equal(k.oneWay.counts.denominator, 1260);
+  assert.equal(k.oneWay.counts.againstFlowTicks, 20);
+  assert.equal(k.oneWay.counts.discriminatorUnknownTicks, 1240);
   assert.equal(k.oneWay.verdict, "unresolved");
-  assert.equal(k.oneWay.counts.discriminatorTrueTicks, 0);
   assert.equal(k.verdict, "unresolved");
-  reasonMentioning(k.reasons, "needs its own declared witness excursion");
+
+  // 3. THE GATE AND THE FLOOR ARE GONE. The seam's leg with NO witness at all
+  //    used to read UNRESOLVED and name "needs its own declared witness
+  //    excursion"; it now passes, and that phrase appears nowhere in the leg's
+  //    reasons — nor does the floor's.
+  const noWitness = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
+  const m = judge(noWitness, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  assert.equal(m.oneWay.counts.discriminatorTrueTicks, 0);
+  assert.equal(m.oneWay.verdict, "pass", m.oneWay.reasons.join("\n"));
+  assert.equal(m.verdict, "pass", m.reasons.join("\n"));
+  const allReasons = [...m.reasons, ...j.reasons].join(" ");
+  assert.ok(
+    !allReasons.includes("needs its own declared witness excursion"),
+    "the liveness gate's refusal must not exist any more",
+  );
+  assert.ok(
+    !allReasons.includes("is a state the product never believed either"),
+    "nor the witness floor's",
+  );
+  assert.equal(m.oneWay.metrics.longestWitnessRunSec, undefined);
+  assert.equal(m.oneWay.metrics.longestContiguousWitnessSec, undefined);
+
+  // 4. …AND THE SAME LEG WITHOUT THE SIGNAL IS STILL REFUSED, which is the
+  //    seam's `k` case with its reason rewritten: it is UNRESOLVED on the
+  //    unknown census rather than on a missing demonstration of the offence.
+  const noWitnessBare = noWitness.map((r) => unfaceRow({ ...r }));
+  const n = judge(noWitnessBare, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  assert.equal(n.oneWay.verdict, "unresolved");
+  assert.equal(n.oneWay.counts.discriminatorTrueTicks, 0);
+  assert.equal(n.oneWay.counts.discriminatorUnknownTicks, 1260);
+  assert.equal(n.verdict, "unresolved");
+  reasonMentioning(n.reasons, "the discriminator was not answered often enough");
+
+  // 5. WHAT THE SEAM SAID MUST NOT GO, AND DID NOT. A zero denominator is
+  //    UNRESOLVED, never a clean pass…
+  const twoWayOnly = goodRows();
+  const z = judge(twoWayOnly, { ...GOOD_DECLARED, channels: ["wrongWay"] });
+  assert.equal(z.oneWay.counts.denominator, 0);
+  assert.equal(z.oneWay.verdict, "unresolved");
+  reasonMentioning(z.oneWay.reasons, "zero denominator is UNRESOLVED");
+
+  // …and R13 still refuses a row filed under a surface that cannot hold it,
+  // whatever the discriminator says. These rows carry a PERFECTLY LAWFUL signed
+  // angle, so the only thing that can red them is the contradiction rule.
+  const contradictory = rows.map((r, i) =>
+    i >= 300 && i < 900 ? { ...r, opposingBank: true } : r,
+  );
+  const c = judge(contradictory, declared);
+  assert.equal(c.oneWay.counts.contradictoryRows, 600);
+  assert.equal(c.oneWay.verdict, "fail", c.oneWay.reasons.join("\n"));
+  assert.equal(c.verdict, "fail");
+  reasonMentioning(c.reasons, "contradicts the runtime's own contract");
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -1093,18 +1699,35 @@ test("SEAM: what a signed travel-direction-vs-edge value will replace — today'
 /* ── 1. THE BRIDGED WITNESS — it defeated R7, the rule the last revision was
  *      written for. ────────────────────────────────────────────────────────*/
 
-/** A one-way leg whose witness is TWO true ticks with `gap` ticks between them. */
-function bridgedWitnessLeg(gap, fill) {
-  const rows = goodRows().map((r) => ({ ...r, oneway: true, wrongWay: false }));
+/**
+ * A one-way leg whose two against-flow ticks are `gap` ticks apart, with the
+ * ticks between them carrying `fill`.
+ *
+ *   "null"    the runtime LOOKED AND COULD NOT MEASURE — `alignDeg: null`
+ *   "noEdge"  no edge fix at all, so the tick is not on this surface and is
+ *             billed to no census here
+ *   "lawful"  the car faced along the edge, and says so
+ *
+ * `declare: false` leaves the two ticks undeclared, which is the direction the
+ * bridge was BUILT for: an offence interrupted by ticks nobody could measure is
+ * still one offence, and the run's SPAN is what the conviction clock reads.
+ */
+function bridgedWitnessLeg(gap, fill, { declare = true } = {}) {
+  const rows = goodRows().map((r) => faceRow({ ...r, oneway: true }, false));
   const span = gap + 2;
   for (let k = 0; k < span; k++) {
     const i = 200 + k;
-    if (k === 0 || k === span - 1) rows[i].wrongWay = true;
-    else if (fill === "null") rows[i].wrongWay = null;
-    else if (fill === "noEdge") {
+    if (k === 0 || k === span - 1) faceRow(rows[i], true);
+    else if (fill === "null") {
+      rows[i].alignDeg = null;
+      rows[i].wrongWay = null;
+      delete rows[i].alignTravelDir;
+      delete rows[i].alignRoundabout;
+    } else if (fill === "noEdge") {
+      unfaceRow(rows[i]);
       rows[i].edgeId = null;
       delete rows[i].wrongWay;
-    } else rows[i].wrongWay = false;
+    } else faceRow(rows[i], false);
   }
   return {
     rows,
@@ -1112,84 +1735,130 @@ function bridgedWitnessLeg(gap, fill) {
       ...GOOD_DECLARED,
       channels: ["wrongWay"],
       calibration: { fromSeq: 0, toSeq: 89, offsetM: 1.0 },
-      manoeuvreSpans: [{ fromSeq: 200, toSeq: 200 + span - 1 }],
+      ...(declare ? { manoeuvreSpans: [{ fromSeq: 200, toSeq: 200 + span - 1 }] } : {}),
     },
   };
 }
 
-test("BRIDGE (defeats R7): two true ticks 1.45 s apart with UNKNOWN between them are not a 1.5 s witness", () => {
-  // MEASURED AGAINST THE PREVIOUS REVISION: LEG = pass, mayTestify
-  // ["lane position on oneWay"], longestWitnessRunSec 1.500 s,
-  // discriminatorTrueTicks 2 (0.10 s of channel evidence), convictingRuns 0,
-  // discriminatorUnknownFrac 0.0222 of a 0.1 ceiling, declaredRemovedFrac
-  // 0.0953 of a 0.1 ceiling. `flowRuns` BRIDGES unknown ticks up to
-  // laneKeepSustainSec on purpose, and the floor tested the BRIDGED SPAN.
+test("BRIDGE: the leg that defeated R7 is now judged on what its ticks SAY", () => {
+  // WHAT THIS LEG WAS FOR. Two against-flow ticks 1.45 s apart with 28 ticks
+  // between them that nobody could measure. `flowRuns` BRIDGES those, on
+  // purpose, so the run's SPAN read 1.50 s — exactly the witness R7 asked for —
+  // on 0.10 s of channel evidence, and the leg read pass. R12 repaired the
+  // floor to count CONTIGUOUS ticks instead, and this test asserted the repair.
   //
-  // THE BRIDGE COSTS NOTHING, which is why the header's "lengthening the
-  // witness spends declared-removal budget" argument did not bound it: unknown
-  // and off-surface ticks are billed to no ceiling in this file at all.
+  // R7 AND R12 ARE BOTH GONE (module R18), so the question "is this a witness?"
+  // is not asked any more. The fixture is kept because the BRIDGE is not gone,
+  // and it is worth pinning what it does now, in both directions.
+  //
+  // DECLARED, this leg is a PASS, and it should be: the car faced along the
+  // edge on 1230 ticks and says so, the runtime could not measure 28, and the
+  // two against-flow ticks are inside a pinned manoeuvre span.
   const { rows, declared } = bridgedWitnessLeg(28, "null");
   const j = judge(rows, declared);
-
-  // The bridged span is still 1.50 s — the quantity the floor used to read.
-  near(j.oneWay.metrics.longestWitnessRunSec, 1.5, 1e-9);
-  assert.ok(j.oneWay.metrics.longestWitnessRunSec >= PRODUCT.WRONG_WAY_SUSTAIN_SEC);
-  // The CONTIGUOUS witness is one tick, which is what the channel actually said.
-  near(j.oneWay.metrics.longestContiguousWitnessSec, 0.05, 1e-9);
-  assert.equal(j.oneWay.counts.discriminatorTrueTicks, 2);
-
-  // Neither pre-existing ceiling binds — asserted, so a later "fix" that reds
-  // this by widening one of them fails here.
+  assert.equal(j.oneWay.counts.denominator, 1260);
+  assert.equal(j.oneWay.counts.againstFlowTicks, 2);
+  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 28, "the unmeasurable ticks are COUNTED");
   assert.ok(j.oneWay.metrics.discriminatorUnknownFrac < EXCLUDED_FRACTION_CEILING);
-  assert.ok(j.flow.metrics.declaredRemovedFrac < EXCLUDED_FRACTION_CEILING);
+  assert.equal(j.oneWay.counts.declaredManoeuvreRuns, 1);
   assert.equal(j.oneWay.counts.convictingRuns, 0);
+  assert.equal(j.oneWay.verdict, "pass", j.oneWay.reasons.join("\n"));
 
-  assert.equal(j.oneWay.verdict, "unresolved");
-  assert.equal(j.verdict, "unresolved");
-  assert.deepEqual(j.leg.testimony.mayTestify, []);
-  reasonMentioning(j.reasons, "longest CONTIGUOUS run 0.050 s (bridged span 1.500 s)");
+  // UNDECLARED, THE BRIDGE DOES THE JOB IT WAS BUILT FOR: an offence
+  // interrupted by ticks nobody could measure is still ONE offence, its span
+  // reaches wrongWaySustainSec, and it convicts. This is the direction the old
+  // floor inverted — it read the same span as evidence of INNOCENCE elsewhere.
+  const bare = bridgedWitnessLeg(28, "null", { declare: false });
+  const k = judge(bare.rows, bare.declared);
+  assert.equal(k.oneWay.counts.undeclaredRuns, 1, "two ticks and a blind patch are ONE run");
+  assert.equal(k.oneWay.counts.convictingRuns, 1);
+  near(k.oneWay.runs[0].sec, 1.5, 1e-9);
+  assert.equal(k.oneWay.runs[0].ticks, 2);
+  assert.equal(k.oneWay.runs[0].bridgedTicks, 28, "and the bridge is REPORTED, not hidden");
+  assert.equal(k.oneWay.verdict, "fail", k.oneWay.reasons.join("\n"));
+
+  // AND THE BRIDGE ONLY SPANS SILENCE. Fill the same 28 ticks with ticks that
+  // SAY the car faced along the edge and the run breaks in two — 0.05 s each,
+  // neither convicting. Under the retired dialect those 28 ticks would have
+  // carried `wrongWay: false`, which is the same value an unasked channel
+  // publishes, so the record could not tell this leg from the one above.
+  const spoken = bridgedWitnessLeg(28, "lawful", { declare: false });
+  const m = judge(spoken.rows, spoken.declared);
+  assert.equal(m.oneWay.counts.discriminatorUnknownTicks, 0);
+  assert.equal(m.oneWay.counts.undeclaredRuns, 2, "a tick that SPEAKS breaks the run");
+  assert.equal(m.oneWay.counts.convictingRuns, 0);
+  near(m.oneWay.runs[0].sec, 0.05, 1e-9);
+  assert.equal(m.oneWay.verdict, "pass", m.oneWay.reasons.join("\n"));
 });
 
-test("BRIDGE, second filling: a bridge made of `edgeId: null` rows reads identically", () => {
-  // The same leg with the 28 intervening rows off-surface instead of unknown,
-  // which is the filling that does not even register as a discriminator
-  // unknown: discriminatorUnknownTicks 0.
+test("BRIDGE, second filling: off-surface rows are bridged too, and are billed to NO census", () => {
+  // The same leg with the 28 intervening rows carrying no edge fix at all.
+  // They leave the one-way denominator entirely — 1232, not 1260 — so unlike
+  // the `null` filling they are not even counted as unknowns. THE BRIDGE IS
+  // FREE, and that was true before this revision and is still true: nothing in
+  // this file bills off-surface ticks to any ceiling. It is harmless now only
+  // because no rule reads a bridged span as evidence of innocence; if one is
+  // ever written again, this is the shape that defeats it.
   const { rows, declared } = bridgedWitnessLeg(28, "noEdge");
   const j = judge(rows, declared);
-  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0);
-  near(j.oneWay.metrics.longestWitnessRunSec, 1.5, 1e-9);
-  near(j.oneWay.metrics.longestContiguousWitnessSec, 0.05, 1e-9);
-  assert.notEqual(j.verdict, "pass");
+  assert.equal(j.oneWay.counts.denominator, 1232, "28 ticks left the surface");
+  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0, "and cost the unknown census nothing");
+  assert.equal(j.oneWay.verdict, "pass", j.oneWay.reasons.join("\n"));
+
+  // …and the offence still convicts through them when it is not declared.
+  const bare = bridgedWitnessLeg(28, "noEdge", { declare: false });
+  const k = judge(bare.rows, bare.declared);
+  assert.equal(k.oneWay.counts.convictingRuns, 1);
+  near(k.oneWay.runs[0].sec, 1.5, 1e-9);
+  assert.equal(k.oneWay.runs[0].bridgedTicks, 28);
+  assert.equal(k.oneWay.verdict, "fail");
 });
 
-test("BRIDGE, THE WHOLE BRIDGE AXIS: no gap length turns two ticks into a witness", () => {
-  // THE CONTROL THE SUITE DID NOT HAVE, and its absence is why the hole lived.
-  // The 1..40 sweep above varies CONTIGUOUS witness length, which is the one
-  // axis the declared-removal budget already squeezes. Nothing anywhere varied
-  // what the ticks BETWEEN two true ticks carry — so the suite could not tell
-  // the rule it claimed to have shipped from the one it actually shipped, and
-  // changing the witness measure to the contiguous one redded 0 of 58 tests.
-  for (let gap = 0; gap <= 60; gap++) {
-    for (const fill of ["null", "noEdge"]) {
-      const { rows, declared } = bridgedWitnessLeg(gap, fill);
-      assert.notEqual(
-        judge(rows, declared).verdict,
-        "pass",
-        `a ${gap}-tick ${fill} bridge between two true ticks must not buy this leg`,
+test("BRIDGE, THE WHOLE BRIDGE AXIS: the span convicts at the product's clock, and the bridge ends", () => {
+  // THE CONTROL THE SUITE DID NOT HAVE, and its absence is why the R7 hole
+  // lived: the 1..40 sweep varied CONTIGUOUS witness length, and nothing
+  // anywhere varied what the ticks BETWEEN two against-flow ticks carry.
+  //
+  // IT IS KEPT, AND IT ASSERTS THE VERDICT EACH GAP GETS rather than asserting
+  // that none of them passes. Undeclared, two against-flow ticks `gap` apart:
+  //
+  //   gap ≤ 27   the bridged span is under wrongWaySustainSec  → pass
+  //   28..59     the span reaches the product's clock          → fail
+  //   60         the bridge is longer than laneKeepSustainSec (3.00 s = 60
+  //              ticks), so it is NOT bridged and the run is two ticks → pass
+  //
+  // The last line is the one worth having: the bridge has an end, it is the
+  // product's own constant, and a test that only asserted "nothing passes"
+  // could not have seen it.
+  for (const fill of ["null", "noEdge"]) {
+    for (let gap = 0; gap <= 60; gap++) {
+      const { rows, declared } = bridgedWitnessLeg(gap, fill, { declare: false });
+      const j = judge(rows, declared);
+      const expected = gap >= 28 && gap <= 59 ? "fail" : "pass";
+      assert.equal(
+        j.oneWay.verdict,
+        expected,
+        `a ${gap}-tick ${fill} bridge: ${j.oneWay.reasons.join(" | ")}`,
       );
+      assert.equal(j.oneWay.counts.convictingRuns, expected === "fail" ? 1 : 0);
     }
   }
+  // The boundary, stated as the product's arithmetic rather than as 28: the
+  // span is (gap + 2) ticks at the record's median period.
+  const boundary = Math.round(PRODUCT.WRONG_WAY_SUSTAIN_SEC / 0.05) - 2;
+  assert.equal(boundary, 28);
 });
 
-test("BRIDGE CONTROL: a CONTIGUOUS witness of the same length still passes", () => {
-  // The other half of every rule in this file. 30 contiguous true ticks =
-  // 1.50 s = wrongWaySustainSec exactly, on a calibration short enough to keep
-  // the declaration inside its budget — this leg MUST pass, or the floor has
-  // stopped being a floor and started being a wall.
+test("BRIDGE CONTROL: a CONTIGUOUS declared excursion of the same length still passes", () => {
+  // The other half of every rule in this file. 30 contiguous against-flow ticks
+  // = 1.50 s = wrongWaySustainSec exactly, declared, on a calibration short
+  // enough to keep the declaration inside its budget — this leg MUST pass.
   const { rows, declared } = ringLeg(30, 89);
   const j = judge(rows, declared);
-  near(j.oneWay.metrics.longestContiguousWitnessSec, 1.5, 1e-9);
-  near(j.oneWay.metrics.longestWitnessRunSec, 1.5, 1e-9);
+  assert.equal(j.oneWay.counts.againstFlowTicks, 30);
+  assert.equal(j.oneWay.counts.declaredManoeuvreRuns, 1);
+  assert.equal(j.oneWay.counts.convictingRuns, 0);
+  assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0);
   assert.equal(j.verdict, "pass", j.reasons.join("\n"));
   assert.deepEqual(j.leg.testimony.mayTestify, ["lane position on oneWay"]);
 });
@@ -1656,14 +2325,14 @@ test("L8 (STILL LIVE, disclosed): a leg can spend two surfaces' budgets and stay
   const rows = goodRows();
   for (let i = 630; i < rows.length; i++) {
     rows[i].oneway = true;
-    rows[i].wrongWay = false;
+    faceRow(rows[i], false);
   }
   let tw = 0;
   for (let b = 0; b < 7; b++) for (let k = 0; k < 11; k++, tw++) rows[100 + b * 70 + k].opposingBank = true;
   let ow = 0;
-  for (let k = 0; k < 30; k++, ow++) rows[640 + k].wrongWay = true;
+  for (let k = 0; k < 30; k++, ow++) faceRow(rows[640 + k], true);
   for (let b = 0; b < 4 && ow < 146; b++) {
-    for (let k = 0; k < 29 && ow < 146; k++, ow++) rows[700 + b * 120 + k].wrongWay = true;
+    for (let k = 0; k < 29 && ow < 146; k++, ow++) faceRow(rows[700 + b * 120 + k], true);
   }
   assert.equal(tw, 77);
   assert.equal(ow, 146);
@@ -1705,34 +2374,52 @@ test("L8 CONTROL: the leg-wide bound DOES bite when the mix cannot afford the to
   assert.notEqual(j.verdict, "pass");
 });
 
-test("L9 (STILL LIVE, disclosed): the witness floor is defeated by SHRINKING the calibration", () => {
-  // ROW 71 IS NOT RETIRED BY R7, and this suite said it was. The floor and the
-  // declared-removal budget meet on row 71's leg only because that leg's
-  // calibration park happens to be 5.00 s: the budget is
-  // (calibration + witness) / leg, so shortening the calibration — which no
-  // product constant fixes and no rule in this file bounds from below — buys
-  // the witness room again. Every line below was RUN.
+test("L9 IS RETIRED: the calibration/witness trade is zero-sum inside one ceiling", () => {
+  // WHAT L9 WAS. "The witness floor is defeated by SHRINKING the calibration."
+  // R7's argument for not being widenable was that lengthening the witness
+  // spends declared-removal budget, and that on row 71's leg the floor and the
+  // budget met with nothing between them. THEY MET ONLY BECAUSE THAT LEG'S
+  // CALIBRATION PARK HAPPENS TO BE 5.00 s: the budget is
+  // (calibration + witness) / leg, and no product constant fixes the park's
+  // length and no rule here bounded it from below. Four measured lines, which
+  // this test ran and asserted at their CHEATING verdict on purpose:
   //
   //   calibration 5.00 s → LEG=fail    (6.50/62.95 = 0.10326 > 0.1)
   //   calibration 4.50 s → LEG=pass    (6.00/62.95 = 0.09531)
   //   calibration 4.00 s → LEG=pass    (5.50/62.95 = 0.08737)
   //   calibration 3.00 s → LEG=pass    (4.50/62.95 = 0.07149)
   //
-  // The 1.50 s witness is CONTIGUOUS, so R7 as repaired this revision does not
-  // touch it either. What closes this is the founder-ruled signed
-  // travel-direction-vs-edge value: once `wrongWay: false` stops meaning
-  // "nobody asked", the liveness gate and the floor are both deleted and the
-  // budget stops being the only thing bounding the witness.
+  // THE SAME FOUR LINES STILL HOLD, and they are still run below — but they are
+  // no longer a cheat, and the reason is not that a number moved. What the
+  // trade used to BUY was an acquittal of 1230 ticks nobody had measured: the
+  // witness was the only thing that could arm an ambiguous channel, so a park
+  // shortened by half a second bought the whole rest of the leg. With the
+  // signed value those ticks state their own direction, so the trade buys
+  // exactly one thing — the removal of the DECLARED ticks themselves — and that
+  // is bounded, because the budget is a FRACTION of the leg and the park and
+  // the witness spend the same one. Moving budget between them cannot increase
+  // the total, and the total is what §DECLARED caps.
+  //
+  // THIS TEST IS THEREFORE THE DISCLOSURE'S FUNERAL, kept executable so that a
+  // later revision which re-introduces a witness-like rule reds here.
   const at = (calTo) => {
     const { rows, declared } = ringLeg(30, calTo);
     return judge(rows, declared);
   };
 
+  // 5.00 s park: the declaration is over budget, so it is STRIPPED, and the
+  // 1.50 s run it would have covered convicts on the product's own clock. The
+  // budget rule is untouched by R18 and is what refuses this.
   const five = at(99);
   near(five.flow.metrics.declaredRemovedFrac, 0.10325655281969817, 1e-12);
   assert.ok(five.flow.metrics.declaredRemovedFrac > EXCLUDED_FRACTION_CEILING);
+  assert.equal(five.oneWay.counts.declaredManoeuvreRuns, 0, "stripped");
+  assert.equal(five.oneWay.counts.convictingRuns, 1);
   assert.equal(five.verdict, "fail");
 
+  // The three shorter parks buy the declaration room, exactly as L9 measured —
+  // and a pass is now the RIGHT answer, because every tick outside the declared
+  // span says it faced along the edge.
   for (const [calTo, frac] of [
     [89, 0.09531374106433677],
     [79, 0.08737092930897537],
@@ -1741,16 +2428,150 @@ test("L9 (STILL LIVE, disclosed): the witness floor is defeated by SHRINKING the
     const j = at(calTo);
     near(j.flow.metrics.declaredRemovedFrac, frac, 1e-12);
     assert.ok(j.flow.metrics.declaredRemovedFrac < EXCLUDED_FRACTION_CEILING);
-    near(j.oneWay.metrics.longestContiguousWitnessSec, 1.5, 1e-9);
-    assert.equal(j.oneWay.counts.discriminatorTrueTicks, 30);
-    assert.equal(
-      j.verdict,
-      "pass",
-      "L9 is a DISCLOSED LIVE CHEAT: if this goes red the module header must be rewritten",
-    );
+    assert.equal(j.oneWay.counts.declaredManoeuvreTicks, 30);
+    assert.equal(j.oneWay.counts.discriminatorUnknownTicks, 0, "nothing is bought on trust");
+    assert.equal(j.verdict, "pass", j.reasons.join("\n"));
     assert.deepEqual(j.leg.testimony.mayTestify, ["lane position on oneWay"]);
   }
+
+  // AND THE TRADE IS ZERO-SUM, which is the sentence that retires L9. Shrink
+  // the park to nothing and the declared-removal budget does not grow: the
+  // ceiling is a fraction of the LEG, so the most a declaration can ever remove
+  // is EXCLUDED_FRACTION_CEILING of it, park and excursions together. A witness
+  // long enough to matter is still paid for out of the same purse.
+  const short = ringLeg(30, 19); // a 1.00 s park
+  const s = judge(short.rows, short.declared);
+  near(s.flow.metrics.declaredRemovedWallSec, 2.5, 1e-9);
+  assert.ok(s.flow.metrics.declaredRemovedFrac < EXCLUDED_FRACTION_CEILING);
+  const huge = ringLeg(200, 19); // 10.00 s of declared excursion on a 1.00 s park
+  const h = judge(huge.rows, huge.declared);
+  assert.ok(
+    h.flow.metrics.declaredRemovedFrac > EXCLUDED_FRACTION_CEILING,
+    "the freed budget does not buy an unbounded declaration",
+  );
+  assert.equal(h.oneWay.counts.declaredManoeuvreRuns, 0, "stripped, and it convicts");
+  assert.equal(h.oneWay.counts.convictingRuns, 1);
+  assert.equal(h.verdict, "fail");
+
+  // …AND WITH THE SIGNAL STRIPPED, NONE OF THE FOUR CAN CLEAR THE LEG, which is
+  // what shows the passes above are bought by the record and not by the park.
+  for (const calTo of [99, 89, 79, 59]) {
+    const { rows, declared } = ringLeg(30, calTo, { signal: false });
+    assert.notEqual(judge(rows, declared).verdict, "pass", `calTo ${calTo}`);
+  }
 });
+
+test("L10 (DISCLOSED): the sign is carried and NOT read by the one-way surface — proved, not asserted", () => {
+  // THE MUTATION THAT SURVIVES, AND WHY IT ALWAYS WILL. The founder ruled a
+  // SIGNED value; the tick publishes it signed, the probe forwards it signed
+  // and the record carries it signed. But the ONE-WAY DISCRIMINATOR cannot be
+  // made to depend on the sign: its threshold is symmetric (|deg| > 120) and
+  // its reverse rotation is exactly 180°, so replacing `alignDeg` with
+  // `|alignDeg|` changes no verdict anywhere. That is an EQUIVALENT MUTANT —
+  // not an untested line — and this test exists so nobody spends a session
+  // hunting for the fixture that would kill it.
+  //
+  // PROVED BY EXHAUSTION over the published range, both gears, at a step far
+  // finer than any angle the runtime produces. `norm` and the threshold are
+  // restated here deliberately: this is a claim about the ARITHMETIC, and a
+  // version of it that imported the module's own helper would only prove the
+  // module agrees with itself. The model below rotates on `gear === -1`; the
+  // module additionally requires the record to say the car MOVES (R20), and the
+  // stationary case is checked separately at the bottom of this test — it reads
+  // the UNROTATED nose, against the same symmetric threshold, so the sign
+  // cannot matter there either.
+  const T = PRODUCT.WRONG_WAY_ANGLE_DEG;
+  const norm = (x) => ((((x + 180) % 360) + 360) % 360) - 180;
+  const verdict = (deg, gear) => Math.abs(norm(gear === -1 ? deg + 180 : deg)) > T;
+  const signBlind = (deg, gear) =>
+    Math.abs(norm(gear === -1 ? Math.abs(deg) + 180 : Math.abs(deg))) > T;
+
+  let pairs = 0;
+  for (let i = -360000; i <= 360000; i++) {
+    const deg = i / 2000;
+    if (deg <= -180 || deg > 180) continue; // the published range, exactly
+    for (const gear of [1, -1, 0, 2, 3]) {
+      pairs++;
+      if (verdict(deg, gear) !== signBlind(deg, gear)) {
+        assert.fail(`the sign changes the verdict at deg=${deg} gear=${gear}`);
+      }
+    }
+  }
+  assert.equal(pairs, 3600000, "720 001 angles × five gears");
+
+  // …AND THE CLOSED FORM, so the arithmetic above is not just self-consistent:
+  // forwards it is |deg| > 120, in reverse it is (180 − |deg|) > 120.
+  for (let i = -3600; i <= 3600; i++) {
+    const deg = i / 20;
+    if (deg <= -180 || deg > 180) continue;
+    assert.equal(verdict(deg, 1), Math.abs(deg) > T, `forward at ${deg}`);
+    assert.equal(verdict(deg, -1), 180 - Math.abs(deg) > T, `reverse at ${deg}`);
+  }
+
+  // WHAT THE MODULE ACTUALLY DOES AGREES WITH THAT CLOSED FORM. Sampled through
+  // the public API at the points where a sign error would show if one existed.
+  const face = (deg, gear) => {
+    const rows = goodRows().map((r) => faceRow({ ...r, oneway: true, gear }, false));
+    for (const r of rows) r.alignDeg = deg;
+    return judge(rows, { ...GOOD_DECLARED, channels: ["wrongWay"] }).oneWay.counts
+      .againstFlowTicks;
+  };
+  for (const deg of [-179, -140, -120.5, -120, -4, 0, 4, 120, 120.5, 140, 179, 180]) {
+    for (const gear of [1, -1]) {
+      assert.equal(
+        face(deg, gear) > 0,
+        verdict(deg, gear),
+        `the module disagrees with the closed form at deg=${deg} gear=${gear}`,
+      );
+    }
+  }
+
+  // …AND R20 DOES NOT MOVE THE EQUIVALENCE. The rotation is additionally gated
+  // on the record saying the car is MOVING, so a stationary reverse tick reads
+  // the UNROTATED nose — and `|deg| > 120` is symmetric, so taking the absolute
+  // value cannot change that reading either. Sampled where it would show, and
+  // beside it the R20 invariant itself: while the car is stopped the verdict
+  // does not move with the gear lever.
+  const faceStopped = (deg, gear) => {
+    const rows = goodRows().map((r) =>
+      faceRow({ ...r, oneway: true, gear, speedKmh: 0 }, false),
+    );
+    for (const r of rows) r.alignDeg = deg;
+    return judge(rows, { ...GOOD_DECLARED, channels: ["wrongWay"] }).oneWay.counts
+      .againstFlowTicks;
+  };
+  for (const deg of [-179, -140, -120.5, -120, -4, 4, 120, 120.5, 140, 179]) {
+    assert.equal(faceStopped(deg, -1) > 0, Math.abs(deg) > T, "stopped in reverse at " + deg);
+    assert.equal(
+      faceStopped(deg, -1),
+      faceStopped(deg, 1),
+      "the gear lever is not a direction of travel while stopped, at " + deg,
+    );
+  }
+
+  // WHERE THE SIGN WOULD BE READ, AND IS NOT: the TWO-WAY surface, via
+  // `alignTravelDir`. Rotating `deg` by 180° on the bank the car occupies turns
+  // it into a bank-relative angle, which is the only thing in the record that
+  // could tell an opposing-bank car from a correctly-placed one — `laneOffsetM`
+  // is "+ = left of TRAVEL" on both banks and carries no bank at all. This file
+  // does NOT do that (module L2): the two-way discriminator is still
+  // `opposingBank`, and a two-way row's `alignTravelDir` is read by nothing.
+  const twoWay = goodRows().map((r) => ({
+    ...r,
+    alignDeg: 178,
+    alignTravelDir: -1,
+    wrongWayArmed: false,
+  }));
+  const j = judge(twoWay, GOOD_DECLARED);
+  assert.equal(j.twoWay.counts.denominator, 1260);
+  assert.equal(
+    j.twoWay.counts.againstFlowTicks,
+    0,
+    "a two-way row facing 178° off the geometry on the −1 bank is NOT read as against the flow",
+  );
+  assert.equal(j.twoWay.verdict, "pass", "and the surface passes — that is L2, disclosed");
+});
+
 
 /* ────────────────────────────────────────────────────────────────────────────
  * THE SUITE'S OWN CONTROL. A fixture that has drifted from the recipe in the
@@ -1780,4 +2601,29 @@ test("the fixture still matches the recipe rows 62-67 carry", () => {
   const b = declaredSpansHash({ ...GOOD_DECLARED, manoeuvreSpans: [{ fromSeq: 1, toSeq: 2 }] });
   assert.equal(a, declaredSpansHash({ ...GOOD_DECLARED }));
   assert.notEqual(a, b);
+});
+
+test("the direction-signal fixture helpers say what they claim, in both directions", () => {
+  // THE FAILURE MODE THIS STAGE IS MOST EXPOSED TO IS A FIXTURE EDITED UNTIL IT
+  // PASSES, and every one-way fixture above now runs through two helpers. So
+  // the helpers get a control of their own: `faceRow` must write an angle the
+  // PRODUCT'S OWN THRESHOLD agrees with, and `unfaceRow` must remove the whole
+  // record and nothing else.
+  const lawful = faceRow({ edgeId: "e1", gear: 1 }, false);
+  assert.ok(Math.abs(lawful.alignDeg) <= PRODUCT.WRONG_WAY_ANGLE_DEG, "aligned is inside 120°");
+  assert.equal(lawful.wrongWay, false);
+  const against = faceRow({ edgeId: "e1", gear: 1 }, true);
+  assert.ok(Math.abs(against.alignDeg) > PRODUCT.WRONG_WAY_ANGLE_DEG, "opposed is past 120°");
+  assert.equal(against.wrongWay, true);
+  // The opposed angle is SIGNED NEGATIVE on purpose: a reader that loses the
+  // sign somewhere must not be able to mistake it for the most aligned tick in
+  // the record, so the fixture makes the mistake visible rather than benign.
+  assert.ok(against.alignDeg < 0);
+
+  // `unfaceRow` removes the direction record and leaves the rest untouched —
+  // including `wrongWay`, because the retired dialect IS the boolean alone.
+  const stripped = unfaceRow({ ...against });
+  assert.deepEqual(Object.keys(stripped).sort(), ["edgeId", "gear", "wrongWay"]);
+  assert.equal(stripped.wrongWay, true);
+  assert.equal(stripped.alignDeg, undefined);
 });

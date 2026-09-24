@@ -117,10 +117,10 @@ a roundabout ring. Everything those gates do not arm publishes `wrongWay: false`
 `false` meant **either** „the car faced the right way" **or** „nobody asked", and a reader
 outside the rule engine could convict a drive on that channel but could never clear one.
 
-`tools/mobile/lib/road-criteria.mjs` says the same thing from the other side (cheat L6, and
-`againstFlow()` returns `false` for `wrongWay === false` with the comment „ambiguous"): *„A
+`tools/mobile/lib/road-criteria.mjs` said the same thing from the other side (cheat L6, and
+`againstFlow()` returned `false` for `wrongWay === false` with the comment „ambiguous"): *„A
 criterion cannot invent a signal the product does not publish… that is a PRODUCT-CONTRACT
-question."*
+question."* **That half is now done too — see „The harness reads it" below.**
 
 The ring is where it cost the most: **34 of 34 roundabout ring edges across all 106
 `content/world/*.json` are `oneway`**, and on the two OSM districts `worldStatesOneWayStreets`
@@ -223,9 +223,15 @@ mean „an older shape" rather than „the runtime published nothing".
 - It publishes a **signal**, not a judgement. No open row closes on this change. What it
   removes is the reason ~30 rows — and the roundabout family in particular — could not be
   judged either way.
-- The harness still has to **read** it: a drive record must be captured off `/dev/drive-rig`
-  and the flow criteria pointed at `edgeAlignment` instead of at the ambiguous `wrongWay`.
-  Until that happens the rows stay open, per the standing rule at the top of this file.
+- The harness now **reads** it (2026-09-24, road-criteria R18), and that still closes no row.
+  `againstFlow()` on the one-way surface reads `row.alignDeg` against the product's own mirrored
+  `WRONG_WAY_ANGLE_DEG`, rotated 180° on `gear === -1`; a tick with no signed value is `null`
+  (UNKNOWN), never `false`; and the two defences that existed only because the boolean was
+  ambiguous — the liveness gate and the witness floor (R7/R12, with `longestWitnessRunSec` and
+  `longestContiguousWitnessSec`) — are DELETED, retiring disclosures L6, L7 and L9. What still
+  has to happen before a row moves is a real capture off `/dev/drive-rig`: every fixture in
+  both criteria suites is synthetic (module L5), so the criteria are proven against rows this
+  harness wrote, not against a drive.
 - `tangentAt` fabricates a due-north tangent on a zero-length segment and that is
   indistinguishable from a real one. Unreachable on shipped content today (measured), but it is
   a silent fail-open the moment a district gains a duplicate vertex.
