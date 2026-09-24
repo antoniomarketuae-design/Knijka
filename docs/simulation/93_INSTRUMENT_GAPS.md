@@ -399,3 +399,29 @@ not have — or the existing route, a mobile leg photographed with the pill on t
 glass. **Until then, no closure may rest on «the suite proves the pill paints».**
 The same positional-window weakness applies to every other `slice(at - N, at)` guard
 in the HUD tests; this is the first one measured.
+
+## The ten INSTRUMENT rows (chunk-wavec-new 62–71), verified 2026-09-24
+
+They were filed 2026-09-20 against `road-criteria.mjs` at sha `2e31e3df` (1,548
+lines) and `2b8601c4` (915 lines). The file is now 2,600+ lines and has been
+rewritten twice since — so these were re-measured against the CURRENT file
+rather than re-filed, which is the whole of «a cause is as stale as its report».
+
+| row | mechanism | state at 27ec02e |
+|---|---|---|
+| 62 | the only conviction path is one contiguous run, so chopping the offence buys unlimited amounts of it | **closed** — `againstFlowFrac` is consumed by a verdict (`:2381`) against a per-surface ceiling derived as sustain/(sustain+rearm) |
+| 63 | every duration is taken from `tSec`, a field the record under test supplies | **closed** — the file now declares `wallMs` "THE CLOCK EVERY DURATION IN THIS FILE IS MEASURED ON"; runs, bridges and excursions all compute from it |
+| 64 | the blindness census measures the longest single gap and never the total | **closed** — the excursion census is leg-wide, ungated and cumulative, with the R9/R11/R14 cumulative censuses beside it |
+| 65 | AC-LANE counts six exclusion classes and its ceiling divides only two | **closed** — `:2666` "ALL SIX PUBLISHED EXCLUSION CLASSES", one predicate over two scopes |
+| 66 | the record declares its own exemptions and nothing bounds them | **closed** — `declaredSpansHash` pins the spans by content before the drive, and `:1430` bounds the removal: "a declaration is an exclusion and gets no larger allowance for being written down" |
+| 67 | a row may contradict itself and the file resolves it in the acquitting direction | **closed** — R13, and R19 now adds the angle-vs-boolean contradiction against the product's own invariant |
+| 68 | `wrongWay === false` is ambiguous by construction — AWAITING A FOUNDER RULING | **answered and built** — ruled 2026-09-20; the signal ships (54c02a8) and the criteria read it (27ec02e) |
+| 69 | no test catches a CONSUMER-SIDE widening of the pill guard | **closed** — `tools/mobile/__tests__/canary-pills.test.mjs` exists for exactly this class and records its own before/after: three of four mutations formerly left the file at 28p/0f, all four now red. Independently re-checked here: widening `PILL_WORDS` with a fourth word reds 2 tests, restored byte-identical |
+| 70 | addendum: "every one of the ten reads RED" | **superseded** — it was measured on a file two rewrites ago, and row 71 already corrected its N15b line |
+| 71 | correction: one cheat (N15b) is still live | **closed** — N15b is re-measured rather than deleted: with the signed value its 1,240 ticks count as with-the-flow POSITIVELY, and with the signal stripped the same rows go unknown and the leg testifies to nothing |
+
+**None of these was on the open product list** (`bucket: "INSTRUMENT"`, and
+`finding-reader.mjs` counts only `BROKEN`), so this verification moves no count.
+It is recorded because the evidence had to survive somewhere or the next attempt
+at this instrument rediscovers all of it — which is the reason the rows were
+filed in the first place.
