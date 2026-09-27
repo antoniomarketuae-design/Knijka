@@ -50,7 +50,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { splitParents, corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
-import { auditKey, buildOfFrame, findReclosures, headMaps } from "./reclosure.mjs";
+import { auditKey, buildOfFrame, findReclosures, headMaps, provenanceOf } from "./reclosure.mjs";
 import { commentOnlyChange } from "./comment-blind.mjs";
 
 /** (rev:path) -> source, so one blob is fetched once per posting run. */
@@ -76,7 +76,11 @@ const flag = (f, d = null) => {
 };
 
 const VERDICTS = flag("--verdicts", path.join(REPO, ".audit-frames", "wave-c", "verdicts.jsonl"));
-const CLOSURES = path.join(REPO, ".audit-frames", "wave-c", "closures.jsonl");
+// --closures exists so a posting can be DRY-RUN end to end into scratch files
+// (2026-09-27: the provenance fix was checked that way). The open list is
+// still computed from the real closures ledger through finding-reader; this
+// only redirects where THIS run appends.
+const CLOSURES = flag("--closures", path.join(REPO, ".audit-frames", "wave-c", "closures.jsonl"));
 const LEDGER = flag("--ledger", path.join(REPO, "docs", "simulation", "88_LESSON_AUDIT.md"));
 
 // --- the corpus ---------------------------------------------------------------
@@ -426,26 +430,21 @@ const postedAt = (() => {
  * provenance that was simply false: it named 14f529a for drives measured at
  * 70d8651. A record that misstates which build it measured is the one thing
  * this whole wave exists to prevent, and it had it backwards in its own summary.
+ *
+ * AND THE FIX STILL READ THE WRONG LEDGER — 2026-09-27. It read the build off
+ * `.audit-frames/wave-c/wave-c-results.jsonl`, which holds whatever wave was
+ * last MERGED into `wave-c/`, not the wave being judged. Four rows judged on
+ * `.audit-frames/w65-pedal` (every drive attested 0e810ad) were written into
+ * closures.jsonl as measured at 70d8651. Each retirement is now attributed
+ * through its OWN evidence frame (provenanceOf in reclosure.mjs, tested
+ * there), and the run's summary is that build, «MIXED:…», or a count of the
+ * frames no drive ledger names — never a build borrowed from a neighbour.
  */
-const drivenAt = (() => {
-  const p = path.join(REPO, ".audit-frames", "wave-c", "wave-c-results.jsonl");
-  if (!fs.existsSync(p)) return "(drive ledger not found)";
-  const heads = new Set();
-  for (const l of fs.readFileSync(p, "utf8").split("\n")) {
-    if (!l.trim()) continue;
-    try {
-      const j = JSON.parse(l);
-      if (j.head) heads.add(String(j.head));
-    } catch {
-      /* a torn tail line does not change which build was measured */
-    }
-  }
-  if (heads.size === 1) return [...heads][0];
-  if (heads.size === 0) return "(no drives read)";
-  // More than one build in one corpus is not something to summarise away.
-  return "MIXED:" + [...heads].map((h) => h.slice(0, 12)).join("+");
-})();
-const head = drivenAt;
+const provenance = provenanceOf(
+  retire.map((r) => r.row.evidenceFrame),
+  (f) => buildOfFrame(f, sweepHead, evidenceIo),
+);
+const drivenAt = provenance.summary;
 
 // Lines that ARE joinable but are about findings a previous wave already
 // retired. Counting them anywhere in this run's tally would re-report banked
@@ -629,7 +628,7 @@ if (unknown.length) {
 
 fs.mkdirSync(path.dirname(CLOSURES), { recursive: true });
 const stamp = new Date().toISOString();
-const lines = retire.map((r) =>
+const lines = retire.map((r, i) =>
   JSON.stringify({
     findingId: r.finding.findingId,
     lesson: r.finding.scenario,
@@ -637,8 +636,10 @@ const lines = retire.map((r) =>
     verdict: r.verdict,
     closedBy: "wave-c",
     // Two different commits, and conflating them is how a record ends up
-    // claiming it measured a build it never saw.
-    drivenAt: drivenAt,
+    // claiming it measured a build it never saw. drivenAt is THIS row's own
+    // evidence frame's build (provenanceOf); a frame no drive ledger names is
+    // recorded as unattributable, never as the run's summary.
+    drivenAt: provenance.per[i] ?? "(unattributable)",
     postedAt: postedAt,
     // The RESOLVED absolute path, never the raw one. A closure is read by
     // tools running from several directories and by sessions on other
@@ -662,13 +663,19 @@ if (fs.existsSync(LEDGER)) {
     "",
     "## Wave C verdicts — " + stamp.slice(0, 10),
     "",
-    "Every lesson carrying a standing BROKEN finding was re-driven on a still tree at",
-    "`" + drivenAt.slice(0, 12) + "` — the commit the harness itself attested on every drive, not the" +
-      " commit HEAD happened to be on when these verdicts were posted (`" + postedAt.slice(0, 12) + "`)." +
-      " Each finding",
+    // WHAT THIS SECTION MAY CLAIM — 2026-09-27. It used to open «Every lesson
+    // carrying a standing BROKEN finding was re-driven», true of the full
+    // Wave C sweep and false of every targeted wave posted since (w65-pedal
+    // drove four lessons). It now states only what the tool knows: how many
+    // rows this run retired, and the build of the drives their frames came from.
+    "This run retired " + retire.length + " row(s). Their evidence frames were driven at " +
+      (drivenAt.startsWith("MIXED:") || drivenAt.startsWith("(") ? drivenAt : "`" + drivenAt.slice(0, 12) + "`") +
+      " — the commit the harness attested on the drive that produced each frame, not the",
+    "commit HEAD was on when these verdicts were posted (`" + postedAt.slice(0, 12) + "`). Each finding",
     "was adjudicated against its own re-drive by a judge and then attacked by an adversarial",
     "verifier. Retirement required a NEW frame and a quote from it; the tests passing was not",
-    "accepted as evidence for any row.",
+    "accepted as evidence for any row. The other verdict counts below are the standing split of",
+    "the open list, not a claim that every open row was re-driven.",
     "",
     "| verdict | count |",
     "|---|---|",

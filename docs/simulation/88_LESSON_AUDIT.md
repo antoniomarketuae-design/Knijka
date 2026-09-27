@@ -10087,3 +10087,26 @@ pinned. The accepted conditions are in doc 93 GAP-6.
 **Nothing closes by this landing.** The four rows close only when their wrong legs are
 re-driven on the product and a judge, told the founder's rulings, finds the act committed
 on the frames.
+
+## Wave w65-pedal verdicts — 2026-09-27
+
+The wrong-leg pedal profiles (above) were re-driven on the four lessons they were built for, at
+`0e810ad086bb` on a still tree: 6 drives, every one exit 0, ended naturally, attested `0e810ad`, no tree
+movement (`.audit-frames/w65-pedal/`). Five rows were judged, each with the founder rulings in the brief
+(16, Ruling A, 19, 21, the 2026-09-22 batch incl. «Say it» and «Teach чл. 69 as written»), the dial profile
+read and the bill timed against the route fidelity; every proposed CLOSED was attacked by an adversarial
+verifier, and none was refuted.
+
+| row | verdict | what the frames show |
+|---|---|---|
+| `sc-signal-flashing:0d68b149` (critical) | CLOSED | no rest from the teach card to the end; «Превишена скорост −1 изпитна т.», 58,8 km/h against 50, billed at 0:46 with the car on its line (median 0 m) |
+| `sc-ov-keep-right:64391c6a` | CLOSED | «Грешката на този урок ✗ Движение в лявата лента без причина · 0:44», ЗДвП чл. 15, ал. 1, billed as the lesson mistake (Ruling A); the car held the left lane on the road throughout |
+| `sc-pk-busstop-ban:b103c282` | CLOSED | the leg rested inside the stop zone (route s≈177 m of [135, 195]) and «✗ Паркиране на автобусна спирка · 1:03», ЗДвП чл. 69 / чл. 93 / чл. 98, ал. 2, т. 3, was billed while the car was on its line; it left the map only after the route ended |
+| `sc-ac-truck-spray:d1119d8f` | CLOSED | the objective banner now reads «Мини пелената със съобразена скорост и дистанция — дръж под 80 км/ч» on both legs (the 2026-09-22 «Say it» repair) |
+| `sc-ac-truck-spray:3f5a3ef3` | STILL | the wrong leg now closes on the truck in SECONDS (2.7 → 1.9 s, and the lesson mistake «Несъобразена с дъжда дистанция» is billed), but in METRES the gap never fell below 58 m, far outside the 22 m spray the product models, so the car never entered the curtain the row is about |
+
+**Open list: 61 → 57**, out of 1523 filed. Not judged in this wave: the two truck rows about BILLING the task cap
+(`990e5f64` critical, `8ed4d8b3`), which wait on the task-cap lane. Retirements are in
+`.audit-frames/wave-c/closures.jsonl`. Their `drivenAt` was corrected by hand from `70d8651` to `0e810ad`:
+`wave-c-post.mjs` reads the build from `.audit-frames/wave-c/wave-c-results.jsonl`, which these drives were never
+merged into, so the tool stated a build it did not measure. That is a defect in the posting tool, recorded to fix.

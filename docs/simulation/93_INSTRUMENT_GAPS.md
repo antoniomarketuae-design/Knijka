@@ -518,3 +518,65 @@ new SPELLING of a banned mechanism refuted again.
   computed key, a literal-receiver access or a scenario read turns `wrong-leg-profiles`
   red until re-pinned with the command the failure prints. That is the design, not a
   defect; the W59 road-frame integration will need one.
+
+## GAP-7 — W59 increment 3, the forward half's AC-2 road frame — **PARKED 2026-09-27**
+
+Increment 3 of the steering instrument (founder ruling 2026-09-22, «build the forward half»)
+was ONE lesson, `sc-rb-busy-gap`, right leg: a road-referenced criterion (`§AC-2-ROAD` in
+`tools/mobile/lib/road-criteria.mjs`) that no unsteered drive can pass and every lawful drive
+does. It ran eleven adversarially verified rounds. Round 11 was declared the last, under the
+spec's own stop rule (W59 spec §7: pass AC-1 within budget, or park with the measurement kept).
+All three of its verifiers refuted it, so it is parked. **Nothing of it is on `scenario-engine`.**
+
+### What held, and is kept as measurement
+
+- AC-1 on real product records: from round 7 on, the plain unsteered control FAILS on all 45
+  armed variants (405/405) and 0 of 47,497 prefixes pass; the corpus re-judge never moved a verdict.
+- The lane channel does not separate a weave from a lawful follower on the ring: four independent
+  measurements put the margin between −2.67 m and −3.72 m (round 9's «separation» was a population
+  artefact of drivers who never used the lane's edges).
+- A steered weave that stays on its own carriageway is judged by AC-2 lane holding at LEG level
+  (the integrator's scope ruling, read from the spec's governing requirement: «none of these may be
+  satisfiable by a harness that has not actually steered, or by one that steered into the oncoming
+  lane»). On the product's lane channel no weave passed the LEG in more than 54,000 weave legs.
+
+### Why it is parked
+
+1. **Structural: no lawful right leg of `sc-rb-busy-gap` can pass the LEG without moving a protected
+   threshold.** Given the same calibration park the witness twins get, AC-RECORD, AC-REFERENT and
+   AC-FLOW pass and AC-LANE p90 is 1.70–2.22 m (under 2.40) — but AC-LANE excludes 0.31–0.38 of the
+   curved bucket (364–518 unpainted ticks, 37–101 saturated, excluded runs of 5.1–7.4 s) against the
+   protected `EXCLUDED_FRACTION_CEILING` 0.1. With a 5 s park: 0 of 54 lawful legs pass.
+2. **The road clause's attack surface did not converge.** Each round from 7 to 11 closed its
+   predecessor's AC-1-class constructs and was refuted on new ones: a flickering nose, zig-zag
+   slips, sub-creep, the crawl, the sawtooth, rows that withhold the nose or the clock (roll-backs,
+   teleports), a nose turned at rest in 3.9° pieces between jolts, and — new in round 11 — one
+   solver-creep step at go-live that zeroes the owed turn so an unsteered straight line passes.
+3. The road clause never reads `opposingBank`; the LEG catches the oncoming bank (AC-FLOW), the
+   clause alone does not.
+
+### Where it is kept
+
+- Parking branch **`backup/w59-inc3-r11-parked`** (`dcdfd3e`, local): 4112566 + round 11,
+  34 files, tools/ only. Cherry-pick files, **never merge**.
+- Patches and every verifier's scripts: `S/r5`…`S/r11`, `S/r5v`…`S/r11v` in the old session's
+  scratchpad (see HANDOFF-2026-09-26).
+
+### What it would take — and the one question that may reach the founder
+
+- **Measure first, on the BUILT world** (a finding once stood four waves on authored content the built world contradicted): are the
+  roundabout arm entries of `rb-mini` actually unpainted, or does the product publish
+  `laneLinesPainted === false` on paint it draws? If the product mislabels, that is a product repair
+  and the blocker may dissolve.
+- If they are genuinely unpainted, lane holding cannot be measured there and the choice is the
+  founder's: exempt unpainted roundabout arm ticks from the 0.1 excluded-fraction ceiling (moving a
+  protected threshold), or keep the roundabout family instrument-blocked.
+- A next attempt at the road clause should not be a twelfth round of the same design: refuse any
+  record the product's vehicle could not have produced (blind rows inside the task, yaw at rest,
+  sub-creep go-live steps) as UNREADABLE up front, instead of judging it.
+
+### Rows that stay blocked
+
+`sc-rb-busy-gap:5ee56710` (C), `:a6f83f6b` (C), `:8f50287b`, `sc-rb-ped-exit:5f1217f9` (C),
+`sc-rb-lane-choice:ffdffd55` (C), `sc-roundabout-entry:4ab693eb` (C), `:8be266cf` (C),
+`:7b747c15`, `:08a0b701` — 9 rows, 6 critical (11 open roundabout-family rows in all).

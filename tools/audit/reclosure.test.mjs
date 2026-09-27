@@ -436,3 +436,35 @@ test("§4 the old single-Map call still works, so nothing that had one map is qu
     readFile: () => res("w17", "sc-x", "pc-right", W17),
   }).get("w17"), W17);
 });
+
+// ── §5 PROVENANCE — the build each retirement was MEASURED at (2026-09-27) ──
+// wave-c-post stamped closures from wave-c/wave-c-results.jsonl, so four rows
+// judged on w65-pedal (all drives at 0e810ad) were recorded as measured at
+// 70d8651. provenanceOf reads each retirement's OWN evidence frame instead.
+import { provenanceOf } from "./reclosure.mjs";
+
+test("§5 every retirement carries the build of ITS OWN frame, not the last merged ledger", () => {
+  const p = provenanceOf([frame("w15"), frame("w15")], buildOf);
+  assert.deepEqual(p.per, [W15, W15]);
+  assert.equal(p.summary, W15, "one build when every retirement agrees");
+});
+
+test("§5 two builds in one posting are reported, never summarised to one of them", () => {
+  const p = provenanceOf([frame("w15"), frame("w17")], buildOf);
+  assert.deepEqual(p.per, [W15, W17]);
+  assert.equal(p.summary, "MIXED:" + W15.slice(0, 12) + "+" + W17.slice(0, 12));
+});
+
+test("§5 an unattributable frame stays null and is COUNTED — no build is borrowed for it", () => {
+  const p = provenanceOf([frame("w15"), frame("mixed"), frame("nowhere")], buildOf);
+  assert.deepEqual(p.per, [W15, null, null], "neither the summary nor a neighbour fills the hole");
+  assert.equal(p.summary, "MIXED:" + W15.slice(0, 12) + " (+2 unattributable)");
+  const none = provenanceOf([frame("mixed")], buildOf);
+  assert.deepEqual(none.per, [null]);
+  assert.equal(none.summary, "(unattributable: 1 of 1)");
+});
+
+test("§5 an empty posting says so, and an empty string from buildOf is not a build", () => {
+  assert.deepEqual(provenanceOf([], buildOf), { per: [], summary: "(nothing retired)" });
+  assert.deepEqual(provenanceOf(["x"], () => "").per, [null]);
+});

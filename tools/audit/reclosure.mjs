@@ -382,3 +382,45 @@ export function findReclosures(rows, { buildOf, productDiff, fileOf = null }) {
   }
   return { refused, unattributable };
 }
+
+/**
+ * THE BUILD EACH RETIREMENT WAS MEASURED AT — read off the drive that produced
+ * its OWN evidence frame. 2026-09-27.
+ *
+ * wave-c-post.mjs stamped every closure with one `drivenAt` read from
+ * `.audit-frames/wave-c/wave-c-results.jsonl`. That is the ledger of whatever
+ * wave was last merged into `wave-c/`, not of the wave being judged: four rows
+ * judged on `.audit-frames/w65-pedal` (every drive attested 0e810ad) were
+ * written into closures.jsonl as measured at 70d8651, a build none of their
+ * frames came from. A retirement that misstates the build it measured is the
+ * one record this ledger exists to keep true, and it failed in the reassuring
+ * direction: nothing looked wrong.
+ *
+ * So each retirement is attributed through `buildOf` (buildOfFrame over
+ * headMaps — the frame's own drive directory first), and the run's summary is
+ * the single build when every retirement agrees, «MIXED:…» when they do not,
+ * and says how many could not be attributed rather than borrowing a build for
+ * them. An unattributable frame stays `null`; it is never filled from the
+ * summary, because a guessed provenance is the defect this replaces.
+ *
+ * @param {string[]} frames evidenceFrame of each retirement, in order
+ * @param {(frame: string) => string | null} buildOf
+ * @returns {{ per: (string | null)[], summary: string }}
+ */
+export function provenanceOf(frames, buildOf) {
+  const per = frames.map((f) => {
+    const h = buildOf(f);
+    return typeof h === "string" && h.length > 0 ? h : null;
+  });
+  const known = [...new Set(per.filter((h) => h !== null))];
+  const unattributed = per.filter((h) => h === null).length;
+  let summary;
+  if (per.length === 0) summary = "(nothing retired)";
+  else if (known.length === 0) summary = "(unattributable: " + unattributed + " of " + per.length + ")";
+  else if (known.length === 1 && unattributed === 0) summary = known[0];
+  else
+    summary =
+      "MIXED:" + known.map((h) => h.slice(0, 12)).join("+") +
+      (unattributed ? " (+" + unattributed + " unattributable)" : "");
+  return { per, summary };
+}
