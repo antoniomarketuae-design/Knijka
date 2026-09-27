@@ -48,6 +48,7 @@ import {
   ERROR_BOUNDARY_RETRY_LABEL,
   errorBoundaryVerdict,
   elapsedSec,
+  flatRestDue,
   holdCeilingFeeds,
   overLimitLedgerStep,
   overLimitNoteLine,
@@ -1678,11 +1679,26 @@ describe("§J the drive path actually calls all of it", () => {
   });
 
   it("the hold GUARDS the rest transition — a flag nothing reads is the dead-predicate class", () => {
+    /* RE-PINNED, NOT RELAXED (2026-09-25, §5 wrong-leg profiles). The
+     * transition moved into `flatRestDue` so a profile can hold it back or book
+     * it; the inline `if (!holdRest && (flatM >= FLAT_REST_EVERY_M …` became a
+     * call. Two halves now, and both are needed: the call site must hand it
+     * `holdRest` and the harness's own two cadence constants, AND the function
+     * must actually refuse on `holdRest` — executed, not grepped. (Round 8:
+     * the profile step's local is `wrongProfileStep`, so every name the
+     * harness gives a profile value starts `wrongProfile` and one scan reads
+     * them all — wrong-leg-profiles.test.mjs, the harness gate.) */
     assert.match(
       CODE,
-      /if \(!holdRest && \(flatM >= FLAT_REST_EVERY_M/,
+      /if \(\s*flatRestDue\(\{\s*holdRest,\s*suppress: wrongProfileStep\.suppressRest,\s*force: wrongProfileStep\.forceRest,\s*flatM,\s*sincePhaseMs: now - phaseAt,\s*phaseTicks,\s*everyM: FLAT_REST_EVERY_M,\s*maxMs: FLAT_REST_MAX_MS,\s*\}\)\s*\) \{\s*phase = "flat-rest";/,
       "`holdRest` no longer guards the flat→flat-rest transition, so the wrong leg still rests at 45 m and still tops out under every task cap",
     );
+    assert.equal(
+      flatRestDue({ holdRest: true, flatM: 10_000, sincePhaseMs: 10_000_000, phaseTicks: 5, everyM: 45, maxMs: 20_000 }),
+      false,
+      "flatRestDue rests through a held rest — `holdRest` is read by nothing",
+    );
+    assert.equal(flatRestDue({ holdRest: false, flatM: 45, sincePhaseMs: 0, phaseTicks: 1, everyM: 45, maxMs: 20_000 }), true);
   });
 
   it("does not `continue` past the frame block — an antecedent bought with no photographs is not evidence", () => {

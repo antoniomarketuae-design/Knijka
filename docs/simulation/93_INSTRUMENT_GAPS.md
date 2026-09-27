@@ -466,3 +466,55 @@ Note the shape of the p90s that ARE measured: 0.12 m on the roundabout's graded
 ticks and 1.76 m on the turn, against a ceiling of 2.40 m. If those survive a leg
 that resolves AC-6, the threshold is likely to be set by the ceiling rather than
 by the distribution.
+
+> **Correction, 2026-09-25 — the paragraph above is withdrawn.** 0.12 m and
+> 1.76 m are not curve measurements. At `4112566` the curved bucket was a ±50 m
+> window CENTRED on each curvature peak, so it labelled up to 42.5 m of straight
+> approach arm «curved»; no leg in the table graded a single tick under a real
+> bend — the turn itself is exactly where the `notMoving` / `unpainted` /
+> `opposingBank` exclusions fell. The same bucket gave the UNSTEERED control on
+> `sc-rb-busy-gap` a p90 of 0.0076 m, better than either steered leg, which is
+> how AC-1 caught it at the start of W59 increment 3. So the two p90s say how well a car
+> held a STRAIGHT lane on the approach and nothing about the shape of a
+> curved-lane distribution; «set by the ceiling rather than by the distribution»
+> has no evidence under it. The «curved ticks» column counts the window, not
+> turning road, and is inflated by the same arm. What stands is the dependency:
+> the freeze waits on a leg that can hold a curve.
+
+## GAP-6 — the wrong-leg emission gate stops accidents, not authors — **ACCEPTED 2026-09-27**
+
+The pedal profiles (doc 88, «Wrong-leg pedal profiles — landed 2026-09-27») carry a gate
+over everything the harness prints about a profile: a harness must report what it OBSERVED
+and never state what the product did or will do. Rounds 7–9 each found a claim that
+reached the log one layer deeper than the last gate, and round 9's own brief kept the loop
+open by counting «a banned mechanism the ban failed to catch» as a refutation, so every
+new SPELLING of a banned mechanism refuted again.
+
+### The threat model, as signed off
+
+- **Caught (in model):** any claim an honest edit can reach — a literal, a keyed line, a
+  line keyed on a fragment of a lesson id or on an effect of the profile, a direct print,
+  an edit to a sink, a banned mechanism written the way an honest author writes it, and
+  every false sentence the harness prints about itself.
+- **Structurally banned:** eval, `Function`, computed access naming a profile key, builtin
+  redefinition, caller introspection. In the library, which can be imported, a child
+  process snapshots every builtin, drives every export and fails on any change or any
+  output, however it was spelt. In `lesson-audit.mjs`, which cannot be imported (GAP-1),
+  every line that could carry the class is pinned, so a new one is a visible red needing a
+  re-pin.
+- **Out of model, a condition:** a bypass that needs intent to evade — a name or a claim
+  assembled from pieces at runtime — when neither the runtime check nor a census sees it.
+
+### Accepted conditions
+
+- **R10V-02.** An unkeyed claim literal worded with none of the watched words (the author's
+  own example: «the lesson marks the stop») is not caught. Closing it would pin every
+  printed literal, which turns every honest string edit red. The defence that remains is
+  the one that always mattered: judges read the product's frames, not harness prose.
+- **C13.** Lanes with no profile keep the pre-existing «each held 8s» note, which is false
+  when a drive ends mid-hold. It is byte-identical to 4112566 by design; it belongs to the
+  harness owner.
+- **Re-pin.** Any honest `lesson-audit.mjs` edit that adds a claim literal, a non-literal
+  computed key, a literal-receiver access or a scenario read turns `wrong-leg-profiles`
+  red until re-pinned with the command the failure prints. That is the design, not a
+  defect; the W59 road-frame integration will need one.

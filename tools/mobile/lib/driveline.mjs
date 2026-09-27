@@ -2045,3 +2045,2018 @@ export function errorBoundaryVerdict({ text = "", shell = false, retryPresent = 
       ". This folder cannot hold evidence about a driving lesson.",
   };
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 5 · WRONG-LEG PROFILES — WHEN A `wrong` LEG RESTS, DECLARED PER LESSON,
+ *     PEDALS ONLY
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Four open rows cannot be judged because the `wrong` leg never COMMITS the
+ * antecedent the row is about, and in every case the thing standing in the way
+ * is the leg's own careless-rest cadence (`FLAT_REST_EVERY_M` = 45 m,
+ * `FLAT_REST_HOLD_MS` = 8 s, `FLAT_REST_MAX_MS` = 20 s in `lesson-audit.mjs`).
+ * (Each bullet is the ROW's reasoning, kept here as the reason the profile
+ * exists. No line a profile prints repeats it — see THE LINES below.)
+ *
+ *   · sc-signal-flashing:0d68b149 — the row says every rest is a frame at or
+ *     under the posted limit held for 8 s, which ends the speeding episode
+ *     before the drive does. TAKING THE RESTS AWAY IS THE WHOLE PROFILE. The
+ *     plain flat throttle every `wrong` leg uses already sits inside the minor
+ *     band on this map (the round-1 verifier's `verify/longsim.mjs`: 58.9 км/ч
+ *     terminal; the 35 archived wrong legs topped out at 56–59). ROUND 1 put a
+ *     bang-bang throttle governor on the leg on a false premise; it was
+ *     DELETED. Nothing in this section touches the throttle.
+ *   · sc-ov-keep-right:64391c6a — the 8 s rests cut the left-lane run into
+ *     stints of 9, 8, 9 and 7 s, shorter than the keep-right sustain.
+ *   · sc-ac-truck-spray:3f5a3ef3 — the staged truck holds its gap by matching
+ *     the player, so the only way to close on it in SECONDS is speed, and
+ *     every 45 m the leg is returned to zero.
+ *   · sc-pk-busstop-ban:b103c282 — the rest lands wherever 45 m says; on
+ *     `.audit-frames/w61/frames/sc-pk-busstop-ban__pc-wrong` the second rest
+ *     landed inside the зона and stood 8 s — but the zone's basis is
+ *     `law-bus-stop` (founder follow-up ruling 2026-09-22 «Teach чл. 69 as
+ *     written»), whose hold is the drop-off, not the 4 s ban-zone rest.
+ *
+ * ── ROUND 7 — NOTHING IN THIS SECTION READS PRODUCT SOURCE ─────────────────
+ * Rounds 2–5 predicted what the engine bills, and each round's verifier found
+ * a product edit under which the printed prediction was false; round 6 stopped
+ * predicting, but still READ product source at drive time to SIZE the
+ * behaviour, behind pins that refused on drift. The round-6 verifier (journal
+ * wf_4869c413-09a, «verify», REFUTED) showed that chase does not converge
+ * either: six comment-only or whitespace-only product edits refused a profile
+ * and turned 25–27 tests red (V6-C1…C6), and five exotic edits (a quoted and a
+ * computed spread key, `Object.defineProperty`, two destructuring shadows)
+ * changed a sizing constant with every pin holding (V6-D1…D5). So — the
+ * integrator's decision, round 7, binding:
+ *   · every sizing number (the band, the sustains, the drop-off hold, the
+ *     poll, the stint length, the gap bands, the HUD's rounding) is a DECLARED
+ *     HARNESS DESIGN CONSTANT in `PROFILE_DESIGN` below. Each carries the
+ *     product source it was sized from and the commit (`PROFILE_SIZED_AT`),
+ *     in a `// sized from … at 4112566` comment above its declaration and in
+ *     its record;
+ *   · nothing here opens a product file, at drive time or ever — no reader, no
+ *     pin, no refusal on drift. The lines print the numbers «sized at
+ *     4112566»; the one input a line says is read at drive time is the zone's
+ *     AUTHORED content (round 8: the SIZING label names it);
+ *   · if the product later changes, a leg may commit its antecedent less
+ *     aptly, and its OBSERVED readings will show it. No line depends on the
+ *     product's current code, so no drift detection is needed.
+ * The doctrine is unchanged: pedals only, no pose, no prediction of any
+ * engine outcome, lessons without a profile byte-identical.
+ *
+ * ── THE LINES ARE STRUCTURAL (round 7) ─────────────────────────────────────
+ * Every line a profile can emit — start, mid-drive, rest, outcome, and the three
+ * clauses `lesson-audit.mjs` prints about it — is rendered by ONE function
+ * (`renderProfileText`) from ONE enumerated table of observation templates
+ * (`PROFILE_LINE_TEMPLATES`). A template's slots are TYPED: a finite number, an
+ * identifier-shaped token, one of the table's own `name` / `told` / `row`
+ * texts, or another template. No free text can reach a line, so a test can
+ * enumerate every sentence a profile is able to say and check each one — it
+ * does, against a closed vocabulary with no product actor, no product action,
+ * no modal and no causal connective in it — and another test checks that no
+ * other code path in this section or in the harness emits profile text.
+ *
+ * ── THE READINGS ARE WHAT THE HARNESS READ (round 7, from the round-6
+ *    verifier's OBS-* findings) ───────────────────────────────────────────
+ *   · REST OPPORTUNITIES held back are counted per stretch of the ordinary
+ *     cadence (each time its 45 m / 20 s point came due while the profile
+ *     held the rest, counted once from the last), never per tick;
+ *   · the LONGEST INTERVAL between two flat readings is the WALL clock the
+ *     possible-in-band tally and the end gap use, each tick's own work
+ *     included, never capped;
+ *   · the END GAP (last flat reading → the finish's clock) is measured, and
+ *     the finish-open HELD needs it inside that longest interval;
+ *   · a posted disc left UNREAD after its first reading is counted, and the
+ *     finish-open HELD needs the disc read on every flat tick.
+ *
+ * ── ROUND 8 (the round-7 verifier's conditions, journal wf_aba0687f-0d8) ────
+ *   · the truck drill's taught 3 s is a DESIGN CONSTANT (`drillTaughtGapSec`,
+ *     sized from the lesson content at 4112566) and its reading says so; the
+ *     zone braking model names only what the MODEL holds, no product physics;
+ *   · the SIZING label says exactly what is read to size a profile: nothing,
+ *     or — for the zone profile — the authored world file and the lesson's
+ *     authored trace (content JSON), and no other file;
+ *   · the harness's rest summary says the profile CHANGED WHEN RESTS FELL only
+ *     when it held a due rest back or booked one; and on a lane whose zone rest
+ *     was booked, the harness's older «each held 8s» is replaced by the true
+ *     holds (`wrongLegRestHoldsClause`);
+ *   · ONE EMISSION PATH, STRUCTURALLY: every text a profile hands the harness is
+ *     `renderProfileText(spec)` for a spec the same module can hand back — each
+ *     text function is a two-line wrapper over its `…Spec` twin, and every
+ *     mid-drive line is a FROZEN `{ loud, line, spec }` from `sayLine`; the
+ *     test re-renders every one with its own renderer;
+ *   · an authored zone whose basis is not an identifier, or whose span has no
+ *     finite bounds, is REFUSED (it used to throw inside the renderer).
+ *
+ * ── ROUND 9 (the round-8 verifier's findings, journal wf_db205df2-0a4) ──────
+ *   · EVERY SENTENCE ABOUT THE HARNESS ITSELF IS TRUE OF ITS CODE: the harness
+ *     DOES read the dev pose probe — `guidePose` on every flat and flat-rest
+ *     tick, into its guidance samples — so no line says it does not; what is
+ *     true, and what the lines now say, is that NO PROFILE DECISION reads it
+ *     and nothing on a wrong leg's flat phase turns a wheel. The road witness
+ *     records the lane on a wrong leg too, and the keep-right line says so.
+ *     The test checks each such sentence against facts read off the harness's
+ *     code (`harnessFacts`), never against an older sentence;
+ *   · the mobile refusal names the population its number is over
+ *     (`ODO_CENSUS_ALL_WRONG_LEGS`), not one lesson's own minimum;
+ *   · the rest-opportunity stretch is summed from zero, on the harness's own
+ *     arithmetic, and a new flat phase is read off `phaseTicks` as well;
+ *   · the emission gates ban the MECHANISMS an obfuscated bypass needs, in the
+ *     whole lib and the whole harness (the threat model is in the test file).
+ *
+ * ── ROUND 10 (the round-9 verifier's findings, journal wf_9db04348-e1b) ──────
+ *   · EVERY SENTENCE THAT CITES A CENSUS NAMES ITS POPULATION, and every bound
+ *     it cites is a declared record's own number: the odometer band is sized
+ *     on a census of 12 of this lesson's archived pc wrong legs (0.935–1.028,
+ *     `ODO_CENSUS_ZONE_PC`) with its low end WIDENED to 0.911, a
+ *     sc-signal-flashing MOBILE leg's reading (`ODO_RATIO_LOW_END`) — round 9's
+ *     refusal said «sized on this lesson's archived pc legs only», which its
+ *     own low end contradicts; the reaction band names its 322 transitions
+ *     (`REACTION_CENSUS`), the creep its twelve legs (`ZONE_CREEP_CENSUS`), the
+ *     long-frame allowance its tick-cost census (`TICKCOST_CENSUS`);
+ *   · five imprecise sentences made true: the braking line BOOKS braking (the
+ *     brake goes down on a later, flat-rest tick); the truck row says how the
+ *     w61 leg's first stretch ran; every declared lane's rest summary says the
+ *     drive's end ended any hold still open; a zone rest that never came to
+ *     rest says braking was booked and whether the harness gave it up or the
+ *     drive ended; the cadence clauses name the harness's own task-cap and
+ *     over-limit holds;
+ *   · NO PRINT IN THE LIB: nothing here names `console`, `process`, `stdout` or
+ *     `stderr`, and the lib's claim literals are a pinned census; and the lib's
+ *     builtins are checked AT RUNTIME, in a child process, around its import
+ *     and its export calls (the test file: each export's first 40 calls and every 200th after them).
+ *
+ * ── WHAT A PROFILE MAY DO, AND WHAT IT MAY NOT ─────────────────────────────
+ *   · PEDALS ONLY, AND NOT EVEN THE THROTTLE: a profile changes WHEN the leg
+ *     rests, and one profile books one brake. No wheel on any `wrong` leg, no
+ *     governed throttle, and no decision here reads the dev pose probe
+ *     (founder RULING-1 / RULING-2: never a wrong drive). The inputs are what
+ *     a `wrong` leg already reads — the dial, the dial-integrated odometer
+ *     (the SAME increment `FLAT_REST_EVERY_M` is measured in), the HUD's own
+ *     DOM (the follow-gap chip, the В26 disc) — plus AUTHORED content geometry
+ *     (`content/world`, `content/traces`: JSON data, not product source)
+ *     through dead reckoning.
+ *   · IT CHANGES WHEN RESTS HAPPEN, NEVER WHETHER THEY ARE RECORDED: every
+ *     rest still goes through the `flat-rest` phase and its «came to REST»
+ *     line, so WHERE the car rested stays readable.
+ *   · HARD CEILINGS: every profile has a distance and a clock ceiling measured
+ *     from its first flat tick, after which the ordinary cadence resumes.
+ *   · EVERY OTHER LESSON IS BYTE-IDENTICAL: a scenario with no row here gets a
+ *     state with `declared:false`, every function below returns the neutral
+ *     answer (the same state object, no line), and `flatRestDue` reduces to
+ *     the transition that stood in `lesson-audit.mjs`.
+ *   · ONE PROFILE CLOCK, PAUSED TIME EXCLUDED: the profile clock is the sum of
+ *     the harness's own `now - lastTickAt` intervals — which the pause drain
+ *     resets, and which leave out each tick's own work — each clamped at the
+ *     per-frame cap, so a frozen world or a stalled tick is never credited.
+ *   · THE HUD'S ROUNDING IS PART OF THE MEASUREMENT: a band edge is only
+ *     called crossed when the reading is past it by the half quantum, and an
+ *     opening gap only when it grew by more than the rounding can fake.
+ *
+ * ── ONE PROFILE WAS WITHDRAWN — DO NOT RE-ADD IT ───────────────────────────
+ * sc-fo-motorway-gap:d18105c7 had a `lead-close` profile in round 1. The
+ * round-1 verifier (`verify/motorway.mjs`) showed neither route is reachable
+ * with pedals on that geometry and that the profile REAR-ENDED THE BRAKING
+ * LEAD at y ≈ 852 on a leg that PASSED before it existed.
+ * `WITHDRAWN_WRONG_LEG_PROFILES` carries the evidence, and a test refuses the
+ * row if it comes back into the table.
+ *
+ * ── AND ONE ROW IS DECLINED, ON PURPOSE ────────────────────────────────────
+ * sc-jx-priority-confidence:9c987e7b is NOT in the table: its antecedent is
+ * the RIGHT leg's old roll cadence, every frame it was judged on is a `-right`
+ * leg, and a `wrong` leg governed down to 15–19 км/ч with needless stops is
+ * the careful leg under another name. It needs a RIGHT-leg variant.
+ *
+ * ── HISTORY ─────────────────────────────────────────────────────────────────
+ *   · round 3: the finish-open verdict reads the UPPER tally; a disc change
+ *     is followed and counted (N13); the curtain route is WITHDRAWN
+ *     (`WITHDRAWN_PROFILE_ROUTES`); the zone's numbers are census BANDS and
+ *     the zone profile runs on pc only (R-F9);
+ *   · round 4: a disc increase is a fixture (V3-03); the upper tally credits
+ *     each band entry's reading age (N-REGRADE-STALE);
+ *   · round 6: no line predicts an engine outcome; verdict words
+ *     `HELD_AS_SIZED` / `NOT_HELD_AS_SIZED` are statements about readings;
+ *   · round 7: the design constants replace every product read and pin; the
+ *     template table replaces the round-6 forbidden-word scan.
+ */
+
+/* ── THE DESIGN CONSTANTS (round 7) ──────────────────────────────────────── */
+
+/** The commit every product-derived design constant below was sized at. */
+export const PROFILE_SIZED_AT = "4112566";
+
+/** One declared design constant: its value, its unit, the product source it
+ *  was sized from and the commit — frozen. Pure. */
+function sizedAt(value, unit, from) {
+  return Object.freeze({ value, unit, from, at: PROFILE_SIZED_AT });
+}
+
+/**
+ * THE HARNESS'S DESIGN CONSTANTS. Every number a profile is sized from, each
+ * copied ONCE from the product source its comment names, at `PROFILE_SIZED_AT`.
+ * Nothing reads them back from the product: they are the harness's own
+ * numbers from here on, and a line prints them as «sized at 4112566».
+ */
+export const PROFILE_DESIGN = Object.freeze({
+  // sized from engine.ts speedingBands, types.ts DEFAULT_RULE_CONFIG.speedingGraceRatio at 4112566
+  speedingGraceRatio: sizedAt(0.1, "", "engine.ts speedingBands, types.ts DEFAULT_RULE_CONFIG.speedingGraceRatio"),
+  // sized from engine.ts speedingBands, types.ts DEFAULT_RULE_CONFIG.speedingGraceMaxKmh at 4112566
+  speedingGraceMaxKmh: sizedAt(5, "км/ч", "engine.ts speedingBands, types.ts DEFAULT_RULE_CONFIG.speedingGraceMaxKmh"),
+  // sized from engine.ts speedingBands, types.ts DEFAULT_RULE_CONFIG.dangerousSpeedOverKmh at 4112566
+  dangerousSpeedOverKmh: sizedAt(10, "км/ч", "engine.ts speedingBands, types.ts DEFAULT_RULE_CONFIG.dangerousSpeedOverKmh"),
+  // sized from engine.ts stepSustainedEpisode(s.speedingMinor), types.ts DEFAULT_RULE_CONFIG.speedingMinorSustainSec at 4112566
+  speedingMinorSustainSec: sizedAt(2, "s", "engine.ts stepSustainedEpisode(s.speedingMinor), types.ts DEFAULT_RULE_CONFIG.speedingMinorSustainSec"),
+  // sized from engine.ts SPEED_REGRADE_SEC at 4112566
+  SPEED_REGRADE_SEC: sizedAt(6, "s", "engine.ts SPEED_REGRADE_SEC"),
+  // sized from StatusDashboard.tsx DASHBOARD_POLL_MS at 4112566
+  DASHBOARD_POLL_MS: sizedAt(100, "ms", "StatusDashboard.tsx DASHBOARD_POLL_MS"),
+  // sized from dashboardStatus.ts displaySpeedKmh at 4112566
+  dialHalfQuantumKmh: sizedAt(0.5, "км/ч", "dashboardStatus.ts displaySpeedKmh"),
+  // sized from sessionClock.ts PHYSICS_MAX_FRAME_DT at 4112566
+  physicsMaxFrameMs: sizedAt(500, "ms", "sessionClock.ts PHYSICS_MAX_FRAME_DT"),
+  // sized from types.ts DEFAULT_RULE_CONFIG.movingSpeedKmh at 4112566
+  movingSpeedKmh: sizedAt(5, "км/ч", "types.ts DEFAULT_RULE_CONFIG.movingSpeedKmh"),
+  // sized from engine.ts stepEpisode(s.keepRight), types.ts DEFAULT_RULE_CONFIG.keepRightSustainSec at 4112566
+  keepRightSustainSec: sizedAt(12, "s", "engine.ts stepEpisode(s.keepRight), types.ts DEFAULT_RULE_CONFIG.keepRightSustainSec"),
+  // sized from engine.ts safeGapM, types.ts DEFAULT_RULE_CONFIG.followSafeSeconds at 4112566
+  followSafeSeconds: sizedAt(1.8, "s", "engine.ts safeGapM, types.ts DEFAULT_RULE_CONFIG.followSafeSeconds"),
+  // sized from engine.ts tailgating, types.ts DEFAULT_RULE_CONFIG.followFireRatio at 4112566
+  followFireRatio: sizedAt(0.7, "", "engine.ts tailgating, types.ts DEFAULT_RULE_CONFIG.followFireRatio"),
+  // sized from engine.ts stepEpisode(s.following), types.ts DEFAULT_RULE_CONFIG.followSustainSec at 4112566
+  followSustainSec: sizedAt(2, "s", "engine.ts stepEpisode(s.following), types.ts DEFAULT_RULE_CONFIG.followSustainSec"),
+  // sized from engine.ts tailgating, types.ts DEFAULT_RULE_CONFIG.followMinSpeedKmh at 4112566
+  followMinSpeedKmh: sizedAt(20, "км/ч", "engine.ts tailgating, types.ts DEFAULT_RULE_CONFIG.followMinSpeedKmh"),
+  // sized from engine.ts tailgating, types.ts DEFAULT_RULE_CONFIG.followRecoveryRateMps at 4112566
+  followRecoveryRateMps: sizedAt(0.5, "m/s", "engine.ts tailgating, types.ts DEFAULT_RULE_CONFIG.followRecoveryRateMps"),
+  // sized from engine.ts rainSafeGapM, types.ts DEFAULT_RULE_CONFIG.followRainSecondsFactor at 4112566
+  followRainSecondsFactor: sizedAt(1.6, "", "engine.ts rainSafeGapM, types.ts DEFAULT_RULE_CONFIG.followRainSecondsFactor"),
+  // sized from engine.ts stepEpisode(s.followingRain), types.ts DEFAULT_RULE_CONFIG.followRainSustainSec at 4112566
+  followRainSustainSec: sizedAt(3, "s", "engine.ts stepEpisode(s.followingRain), types.ts DEFAULT_RULE_CONFIG.followRainSustainSec"),
+  // sized from followGap.ts stepFollowCue at 4112566
+  chipMetreQuantumM: sizedAt(1, "m", "followGap.ts stepFollowCue"),
+  // sized from followGap.ts stepFollowCue at 4112566
+  chipSecondsHalfQuantum: sizedAt(0.05, "s", "followGap.ts stepFollowCue"),
+  // sized from engine.ts banZoneRestSec, types.ts DEFAULT_RULE_CONFIG.banZoneStopRestSec at 4112566
+  banZoneStopRestSec: sizedAt(4, "s", "engine.ts banZoneRestSec, types.ts DEFAULT_RULE_CONFIG.banZoneStopRestSec"),
+  // sized from engine.ts banZoneRestSec, types.ts DEFAULT_RULE_CONFIG.busStopDropOffMaxSec at 4112566
+  busStopDropOffMaxSec: sizedAt(20, "s", "engine.ts banZoneRestSec, types.ts DEFAULT_RULE_CONFIG.busStopDropOffMaxSec"),
+  // sized from engine.ts BAN_ZONE_REST_REGRADE_SEC at 4112566
+  BAN_ZONE_REST_REGRADE_SEC: sizedAt(6, "s", "engine.ts BAN_ZONE_REST_REGRADE_SEC"),
+  // sized from engine.ts illegalBanRest, types.ts DEFAULT_RULE_CONFIG.fullStopMaxSpeedKmh at 4112566
+  fullStopMaxSpeedKmh: sizedAt(1, "км/ч", "engine.ts illegalBanRest, types.ts DEFAULT_RULE_CONFIG.fullStopMaxSpeedKmh"),
+  // sized from tuning.ts BRAKE_FORCE_N at 4112566
+  BRAKE_FORCE_N: sizedAt(11000, "N", "tuning.ts BRAKE_FORCE_N"),
+  // sized from tuning.ts CHASSIS_MASS at 4112566
+  CHASSIS_MASS: sizedAt(1220, "kg", "tuning.ts CHASSIS_MASS"),
+  // sized from templates-conditions2.ts SC_AC_TRUCK_SPRAY.instructionsBg(5) at 4112566
+  drillTaughtGapSec: sizedAt(3, "s", "templates-conditions2.ts SC_AC_TRUCK_SPRAY.instructionsBg(5)"),
+});
+
+/** The dial is `Math.round(|speed|)`, so a reading N covers [N − 0.5, N + 0.5):
+ *  a band edge is called crossed only when the reading is past it by this. */
+export const DIAL_HALF_QUANTUM_KMH = PROFILE_DESIGN.dialHalfQuantumKmh.value;
+/** The most sim time ONE frame can add, in ms, however long it blocked. */
+export const PHYSICS_MAX_FRAME_MS = PROFILE_DESIGN.physicsMaxFrameMs.value;
+/** The chip's metres are whole metres: the DIFFERENCE of two readings can be
+ *  off by one whole metre with the true gap standing still. */
+export const FOLLOW_CHIP_METRE_QUANTUM_M = PROFILE_DESIGN.chipMetreQuantumM.value;
+/** The chip's seconds are tenths: ±0.05 s. */
+export const FOLLOW_CHIP_SECONDS_HALF_QUANTUM = PROFILE_DESIGN.chipSecondsHalfQuantum.value;
+
+/** The harness's own sampling margin on a SECONDS window — the same +1 s
+ *  `OVER_LIMIT_SUSTAIN_SEC` adds, for the same reason (~2 Hz ticks, a measured
+ *  worst tick of 1,155 ms). The harness's number. */
+export const PROFILE_SUSTAIN_MARGIN_SEC = 1;
+
+/** The most ONE interval may add to any profile clock, in ms — §2's
+ *  `OVER_LIMIT_STEP_CAP_SEC` (its provenance is there). A second defence behind
+ *  the pause drain's `lastTickAt` reset. */
+export const PROFILE_STEP_CAP_MS = OVER_LIMIT_STEP_CAP_SEC * 1000;
+
+/* ── HOW OLD A DIAL READING CAN BE (round 4, N-REGRADE-STALE) ───────────────
+ * The dial a `wrong` leg reads is the dashboard's DOM, committed on the poll
+ * interval, and `lesson-audit.mjs` takes `now` AFTER `await probe`. The age of
+ * a reading is bounded term by term: `now − probeAt` (MEASURED per tick), the
+ * poll (`DASHBOARD_POLL_MS`, a design constant), two frames
+ * (`DIAL_FRAME_ALLOWANCE_MS`) and a census-sized long-frame allowance per
+ * platform — the one term no measurement on the leg covers, so SIZED, not a
+ * bound. No allowance above one clamped frame buys anything. */
+
+/** Two frames at a 20 fps floor. The harness's allowance. */
+export const DIAL_FRAME_ALLOWANCE_MS = 100;
+
+/** THE TICK-COST CENSUS the long-frame allowance is sized on (round 10: named,
+ *  as every census a line cites is): `r4/tickcost-census.mjs` over the TICK
+ *  COST line of every archived sc-signal-flashing wrong leg, re-run in round 10
+ *  (`pedal/r10/tickcost-census-r10.txt`, the same legs): pc 5 legs, the
+ *  longest probe wait on each 34–99 ms; mobile 30 legs, the longest probe wait
+ *  on each 190–923 ms. An evidence record, frozen. */
+export const TICKCOST_CENSUS = Object.freeze({
+  lesson: "sc-signal-flashing",
+  pc: Object.freeze({ legs: 5, longestMinMs: 34, longestMaxMs: 99 }),
+  mobile: Object.freeze({ legs: 30, longestMinMs: 190, longestMaxMs: 923 }),
+});
+
+/** The unmeasured long frame, by platform, off `TICKCOST_CENSUS`: pc's 5
+ *  archived legs never kept a probe waiting past 99 ms → 100; mobile's 30 did
+ *  on every one (190–923 ms), and the only allowance that census justifies is
+ *  the clamp itself, which collapses the sizing — so mobile gets 0, stated
+ *  rather than hidden. A platform the census does not name gets the larger. */
+export const DIAL_LONG_FRAME_ALLOWANCE_MS = Object.freeze({ pc: 100, mobile: 0 });
+
+/** The part of a reading's age no probe on this leg measures — poll + two
+ *  frames + the platform's long-frame allowance, in ms. `null` without a
+ *  poll. Pure. */
+export function dialLagAllowanceMs(platform, pollMs) {
+  if (typeof pollMs !== "number" || !Number.isFinite(pollMs) || pollMs <= 0) return null;
+  const lf = Object.hasOwn(DIAL_LONG_FRAME_ALLOWANCE_MS, platform ?? "")
+    ? DIAL_LONG_FRAME_ALLOWANCE_MS[platform]
+    : Math.max(...Object.values(DIAL_LONG_FRAME_ALLOWANCE_MS));
+  return pollMs + DIAL_FRAME_ALLOWANCE_MS + Math.min(lf, PHYSICS_MAX_FRAME_MS);
+}
+
+/** How far back the opening-gap test looks: the rate is measured against the
+ *  newest reading at least this old, so the one-metre rounding quantum is
+ *  spread over ≥ 2 s (round-1 verifier, F7). */
+export const OPENING_WINDOW_MS = 2000;
+
+/** The keep-right run's margin over `keepRightSustainSec` — larger than the
+ *  one above because the profile clock leaves out each tick's own work (the
+ *  safe direction) and a pause can land mid-run. The harness's number. */
+export const STINT_MARGIN_SEC = 4;
+
+/** The zone hold's margin over drop-off + re-grade window: a sim clock up to
+ *  ~23 % behind the wall on a loaded box, plus one tick either side of the
+ *  pause that lands on the first threshold. The harness's number. */
+export const ZONE_REST_MARGIN_SEC = 8;
+
+/* ── THE ZONE REST'S DEAD RECKONING, SIZED FROM THE CENSUS (round 3, R-F9) ──
+ * Every number below is a CENSUS BAND and none is called a bound on a new leg:
+ * the printed rest interval is the band the census puts the rest in. */
+
+/** THE REACTION CENSUS — the population the reaction band below is sized on
+ *  (round 10: every sentence that cites a census names its population, from
+ *  the round-9 verifier's FALSE-SELF-STATEMENT-REFUSAL-SIZING). The round-2
+ *  verifier's `verify2/reaction.mjs` over every archived wrong leg (pc and
+ *  mobile) in the named waves: each flat → flat-rest transition whose decision
+ *  tick read over 20 км/ч and that reached rest, the travel from the decision
+ *  tick's pose to the rest pose less the braking part, over the decision
+ *  speed. 322 transitions; its 5th percentile (index 16 of the sorted 322) is
+ *  0.48 s and its maximum 1.90 s (`verify2/reaction-census.txt`). An evidence
+ *  record, frozen; a line prints its numbers, nothing else. */
+export const REACTION_CENSUS = Object.freeze({
+  transitions: 322,
+  p5: 0.48,
+  max: 1.9,
+  waves: "w47 w52 w61 w62 w62-signal",
+  method: "travel from the decision tick's pose to the rest pose, less v²/(2 × 11000/1220), over v — every flat to flat-rest transition of an archived wrong leg whose decision tick read over 20 км/ч and that reached rest",
+});
+
+/** Seconds from the DECISION tick to rest beyond the braking distance, as a
+ *  band: `REACTION_CENSUS`, p5 0.48 → max 1.90 s. 16 of the 322 reacted
+ *  faster; the room for them is `ZONE_REST_RESIDUAL_M`. */
+export const ZONE_REST_REACT_MIN_S = 0.48;
+export const ZONE_REST_REACT_MAX_S = 1.9;
+
+/** THE ODOMETER CENSUS THE ZONE'S BAND IS SIZED ON (round 10): twelve of this
+ *  lesson's archived pc wrong legs — every one of the 42 folders on disk that
+ *  recorded pose samples (`pedal/r10/busstop-legs-r10.txt`; the other 30 carry
+ *  none) — the flat odometer over the pose path —
+ *  `r3/odo-census.mjs` (the same method as `ODO_CENSUS_ALL_WRONG_LEGS` below),
+ *  re-run in round 10 (`pedal/r10/odo-census-r10.txt`): 0.935 (w41) to 1.028
+ *  (canary-54c02a8-152435). An evidence record, frozen. */
+export const ODO_CENSUS_ZONE_PC = Object.freeze({
+  lesson: "sc-pk-busstop-ban",
+  platform: "pc",
+  legs: 12,
+  min: 0.935,
+  max: 1.028,
+  waves: "w41 w42 w43 w45 w46 w47 w51 w52 w61 w62 canary-54c02a8-152043 canary-54c02a8-152435",
+});
+
+/** …AND WHERE THE BAND'S LOW END COMES FROM (round 10): not this lesson, and
+ *  not a pc leg. Round 2's `ODO_RATIO_MIN` took the lowest of seven archived
+ *  legs (the round-1 verifier's `verify/odo-ratio.mjs`: «w62 signal 0.911»),
+ *  and the round-10 re-run of the census names that reading: the
+ *  sc-signal-flashing MOBILE wrong leg, 0.911 in both w61 and w62-signal. The
+ *  low end was kept, WIDENED below this lesson's own 0.935, and a line says so.
+ *  An evidence record, frozen. */
+export const ODO_RATIO_LOW_END = Object.freeze({
+  ratio: 0.911,
+  leg: "sc-signal-flashing__mobile-wrong",
+  waves: "w61 w62-signal",
+  from: "round 2's ODO_RATIO_MIN, the lowest of the round-1 verifier's seven legs (verify/odo-ratio.mjs, «w62 signal 0.911»)",
+});
+
+/** THE FLAT ODOMETER AGAINST THE TRUE PATH, as a census band: a census of
+ *  twelve of this lesson's archived pc wrong legs read 0.935–1.028 (`ODO_CENSUS_ZONE_PC`); the
+ *  low end is WIDENED to round 2's 0.911, which is a sc-signal-flashing MOBILE
+ *  leg's reading (`ODO_RATIO_LOW_END`) — every line that prints the band says
+ *  both. Mobile flat odometers read far lower (`ODO_CENSUS_ALL_WRONG_LEGS`),
+ *  so the zone profile runs on `ZONE_REST_PLATFORMS` only. */
+export const ODO_RATIO_MIN = 0.911;
+export const ODO_RATIO_MAX = 1.028;
+/** The platforms the zone census covers — the only ones the zone profile runs on. */
+export const ZONE_REST_PLATFORMS = Object.freeze(["pc"]);
+
+/** THE HARNESS'S ODOMETER CENSUS OVER EVERY ARCHIVED WRONG LEG — the population the mobile refusal's number is
+ *  over (round 9, from the round-8 verifier's CENSUS-0729: the refusal used to print 0.729, which is only
+ *  sc-signal-flashing's own minimum). Round 3's `r3/odo-census.mjs`, re-run unchanged in round 9
+ *  (`r9/odo-census-rerun.txt`, the same 328 legs): per leg, the flat odometer — the dial integrated over the
+ *  harness's own tick intervals — over the pose path, on consecutive flat → flat samples, legs with ≥ 50 m of path.
+ *  An evidence record, frozen; a line prints its numbers and its date, nothing else. */
+export const ODO_CENSUS_ALL_WRONG_LEGS = Object.freeze({
+  legs: 328,
+  mobileLegs: 158,
+  mobileMinRatio: 0.524,
+  mobileMinLeg: "sc-park-gap-long__mobile-wrong in w41",
+  measured: "2026-09-25",
+  waves: "w41 w42 w43 w45 w46 w47 w51 w52 w61 w62 w62-signal canary-54c02a8-152043 canary-54c02a8-152435",
+  method: "flat odometer (dial / 3.6 × the harness's own dtMs) over the pose path (hypot of wx, wz) on consecutive flat samples, legs with at least 50 m of pose path",
+});
+
+/** THE CREEP CENSUS (round 10: named, as every census a line cites is): the
+ *  same twelve pc legs, the first guidance sample's pose against the authored
+ *  spawn — `r3/creep-census.mjs`, re-run in round 10
+ *  (`pedal/r10/creep-census-r10.txt`): 0.84–2.01 m. An evidence record. */
+export const ZONE_CREEP_CENSUS = Object.freeze({ legs: 12, min: 0.84, max: 2.01 });
+
+/** The creep before the flat odometer starts (`ZONE_CREEP_CENSUS`, 0.84–2.01
+ *  m, rounded up). Added to the far end of the interval only. */
+export const ZONE_REST_CREEP_M = 2.1;
+
+/** Room kept between the rest interval and each zone edge for what the census
+ *  bands leave out. The harness's margin, stated as such. */
+export const ZONE_REST_RESIDUAL_M = 5;
+
+/* ── THE LINES — ONE TEMPLATE TABLE, ONE RENDERER (round 7) ─────────────────
+ *
+ * EVERY sentence a profile can put in `run.log` is one of these templates. A
+ * slot is `{name:kind}` or `{name:kind|FALLBACK}` — the fallback is printed
+ * when the value is null — and its kind is one of:
+ *   n · n1 · n2 · n3 · r   a finite number: as is, to 1 / 2 / 3 decimals,
+ *                           rounded to a whole number;
+ *   tok                     an identifier-shaped token (no whitespace);
+ *   toks                    a non-empty list of tokens, joined « + »;
+ *   txt                     one of the declared table's own `name` / `told`
+ *                           / `row` texts, and nothing else;
+ *   frag · opt · frags      another template (`opt`: or nothing; `frags`: a
+ *                           non-empty list, joined «; »).
+ * `renderProfileText` refuses anything else, so a line can carry no text that
+ * is not in this table or in the profile table. The test file enumerates
+ * every template and checks its words against a closed observation
+ * vocabulary. */
+export const PROFILE_LINE_TEMPLATES = Object.freeze({
+  // ── the verdict words, and the sizing label ──
+  "verdict.held": "ANTECEDENT HELD AS SIZED",
+  "verdict.notHeld": "ANTECEDENT NOT HELD AS SIZED",
+  "sizing.label": "SIZING (the harness's design constants, sized at {at:tok}; no file is read to size them, and nothing here is a prediction)",
+  "sizing.labelZone": "SIZING (the harness's design constants, sized at {at:tok}, and the zone's span and basis, read at drive time from authored content: the world file {world:tok} and the lesson's trace file {trace:tok}; no other file is read to size them, and nothing here is a prediction)",
+  // ── the start line ──
+  "start.on": "WRONG-LEG PROFILE: {name:txt} — {told:txt}. For {row:txt}. Ceilings {maxM:n} m / {maxS:n} s from its first flat tick, after which the ordinary{every:opt} cadence resumes.{zone:opt} {sizing:frag}.",
+  "start.refused": "WRONG-LEG PROFILE: {name:txt} — REFUSED, NOT RUN: {why:frag}. This leg drives the ordinary{every:opt} cadence and holds nothing back for {row:txt}.",
+  "start.every": " {m:n} m",
+  "start.zone": " Zone {zones:toks} ({basis:tok}) lies at [{from:n1}, {to:n1}] m of route (authored geometry); the hold is {hold:n} s.",
+  // ── the two refusals left: nothing is read, so nothing else can refuse ──
+  "refused.span": "the authored zone was not placed on the route — {why:frag|the span is unknown}",
+  "refused.platform": "the dead reckoning's {odo:frag}; this leg is «{platform:tok|unknown}», and in the harness's odometer census of {legs:n} archived wrong legs ({mobile:n} of them mobile, measured {at:tok}) a mobile flat odometer read as low as {min:n} of the true path, far outside {rmin:n}–{rmax:n}",
+  // ── the census bands, each with the population it is sized on (round 10) ──
+  "census.odo": "census odometer ratio {rmin:n}–{rmax:n}, sized on a census of {legs:n} of this lesson's archived pc wrong legs ({lo:n}–{hi:n}) with its low end widened to {rmin:n}, the reading of a sc-signal-flashing mobile wrong leg",
+  "census.creep": "creep up to {creep:n} m, over the same {legs:n} legs' {lo:n}–{hi:n} m",
+  "census.react": "census reaction {min:n}–{max:n} s, from percentile 5 to the maximum of a census of {n:n} flat to flat-rest transitions on archived wrong legs",
+  "census.lfPc": "sized on a census of {legs:n} of this lesson's archived pc wrong legs, whose longest probe waits read at most {max:n} ms",
+  "census.lfMobile": "none for mobile, stated: in a census of {legs:n} of this lesson's archived mobile wrong legs, each kept a probe waiting {lo:n}–{hi:n} ms at its longest",
+  "census.lfOther": "the larger of the pc and mobile allowances, for a platform this lesson's tick-cost census does not name",
+  "span.noWorld": "the world file was not readable",
+  "span.shortTrace": "the authored trace has fewer than two samples",
+  "span.noZone": "zone «{id:tok}» is not in the world file",
+  "span.noIds": "no zone ids were declared",
+  "span.edges": "the declared zones are on different edges",
+  "span.bases": "the declared zones carry different bases, and no one hold applies",
+  "span.basis": "the declared zones carry no basis that is an identifier, and no hold was sized from one",
+  "span.bounds": "the placed span has no finite bounds",
+  "span.kind": "a declared zone is not a noStopping span",
+  "span.gap": "the declared zones are not contiguous ({a:n} m → {b:n} m)",
+  "span.noGeom": "edge «{id:tok}» has no geometry",
+  "span.offEdge": "the authored start is {off:n1|?} m off edge «{id:tok}» — it is not on this road",
+  "span.still": "the authored trace never moves 5 m from its start",
+  "span.behind": "the span starts {m:n1} m from the authored start — it is not ahead of it",
+  "span.noHeading": "the authored trace carries no heading, and its straightness was not checked",
+  "span.turns": "the authored route turns {deg:n1}° before the far edge of the span, and a wrong leg turns no wheel on its flat phase",
+  "span.unreadable": "the authored geometry was not readable ({code:tok|unknown})",
+  // ── mid-drive lines ──
+  "say.held": "      WRONG-LEG PROFILE {name:txt}: ANTECEDENT HELD AS SIZED ({how:tok}) at t={at:n}s — OBSERVED: {obs:frag}",
+  "say.notHeld": "WRONG-LEG PROFILE {name:txt}: ANTECEDENT NOT HELD AS SIZED — OBSERVED: {obs:frag}; the ordinary cadence resumes.",
+  "say.notHeldEnd": "WRONG-LEG PROFILE {name:txt}: ANTECEDENT NOT HELD AS SIZED — OBSERVED: {obs:frag}.",
+  "say.braking": "      WRONG-LEG PROFILE {name:txt}: braking BOOKED at t={at:n}s — the throttle stays down to the end of this tick; each flat-rest tick after it lets the throttle up, and the first one whose dial does not read 0–{fs:n} км/ч puts the brake down. HARNESS ESTIMATE (dead reckoning over the census bands named here, each with the population it is sized on; not a measured position): flat odometer {odo:n} m → true path {tlo:n}–{thi:n} m ({odoBand:frag}; {creepBand:frag}) + a stop of {near:n}–{far:n} m at {kmh:n} км/ч ({reactBand:frag}; {model:frag}) → rest estimated at [{lo:n}, {hi:n}] m of route against the authored span [{from:n1}, {to:n1}] m ({place:frag}). No profile decision reads the pose: the harness reads the dev pose probe on every flat and flat-rest tick and records what it returns among its guidance samples, and this estimate does not use it.",
+  "ceiling.metres": "{m:r} m of flat after the profile started reached its {max:n} m ceiling",
+  "ceiling.clock": "{s:r} s after the profile started reached its {max:n} s ceiling",
+  "obs.ceiling": "{why:frag} before the readings met the sizing",
+  "obs.stint": "one moving run of {run:n1} s on the profile clock — every reading above movingSpeedKmh {moving:n} км/ч, no rest held, no dip, {unread:n} unread tick(s) inside it not credited — against the sized {target:n} s (keepRightSustainSec {keep:n} + {margin:n}); which lane the car ran in is no profile input, and the harness's road witness, when it is on, records the lane the dev road probe publishes in _audit-road.json.gz",
+  "obs.gapBase": "the chip's seconds read under {line:n2} s (by its {h:n} s rounding) on every reading of a {run:n1} s run on the profile clock, with the dial at ≥ followMinSpeedKmh {min:n} км/ч by its {hq:n} км/ч rounding and the chip's metres not opening, against the sized {target:n} s (followSustainSec {sus:n} + {margin:n}); chip minimum {minSec:n|-} с / {minM:n|-} м",
+  "obs.gapRain": "the chip's seconds read inside [{base:n2}, {rain:n3}) s (by its {h:n} s rounding) on every reading of a {run:n1} s run on the profile clock, with the dial at ≥ followMinSpeedKmh {min:n} км/ч by its {hq:n} км/ч rounding and the chip's metres not opening, against the sized {target:n} s (followRainSustainSec {sus:n} + {margin:n}); chip minimum {minSec:n|-} с / {minM:n|-} м",
+  "obs.zoneBlind": "the dial was unreadable on the approach at t={at:n}s with the flat odometer at {odo:n1} m — the dead reckoning has a gap of unknown length from here, and no rest was booked from it",
+  "obs.zoneMissed": "the flat odometer read {odo:n1} m (at least {trueLo:n1} m of true path by the census odometer ratio's high end {rmax:n}, the highest of a census of {legs:n} of this lesson's archived pc wrong legs) — past the far edge of the zone ({to:n1} m) with no braking booked",
+  "zone.inside": "inside, ≥ {res:n} m from both edges",
+  "zone.unverified": "NOT verified inside",
+  "zone.model": "braking model v²/(2 × {decel:n2|?} m/s²), BRAKE_FORCE_N / CHASSIS_MASS (design constants sized at {at:tok}): the whole brake force at the road on a level surface at grip 1, with no lower grip, no slope and no front/rear split in the model",
+  // ── the zone rest's end ──
+  "zone.stood": "the dial read ≤ fullStopMaxSpeedKmh {fs:n} км/ч continuously for {held:n1} s on the profile clock ({stirs:n} stir(s), {breaks:n} break(s), {unread:n} unread tick(s) not credited), against the sized {bar:n} s",
+  "zone.est": "braking was booked at t={at:n}s at {kmh:n} км/ч with the flat odometer at {odo:n} m (true path {tlo:n}–{thi:n} m), and the HARNESS ESTIMATE of the rest is [{lo:n}, {hi:n}] m of route (a stop of {near:n}–{far:n} m; dead reckoning over census bands sized on {legs:n} of this lesson's archived pc wrong legs and {n:n} flat to flat-rest transitions on archived wrong legs, not a measured position; {model:frag})",
+  "zone.estNone": "no braking was booked, and the harness has no estimate",
+  "obs.zoneNoRest": "braking was booked for the zone rest, and no flat-rest tick after it read the dial at 0–{fs:n} км/ч before {end:frag} — the car was not seen at rest on the dial; {est:frag}",
+  "zone.endGaveUp": "the harness gave the rest up",
+  "zone.endDrive": "the drive ended",
+  "obs.zoneHeld": "{stood:frag}; {est:frag} — inside the authored {basis:tok} span [{from:n1}, {to:n1}] m by ≥ {res:n} m",
+  "obs.zoneUnverified": "{stood:frag}; {est:frag} — not inside the authored span [{from:n1}, {to:n1}] m by {res:n} m, and the harness's dead reckoning did not place the car inside it",
+  "obs.midHold": "the drive ended mid-hold — {obs:frag}",
+  "obs.open": "the drive ended with the profile still open ({kind:tok})",
+  // ── the finish-open end ──
+  "obs.finishHeld": "no careless rest was taken on {ticks:n} flat tick(s), the posted disc read {disc:n} on every one of them, and the drive reached its end screen; the first flat reading, {first:n} км/ч, was certainly below the band ({lo:n}, {hi:n}] and the last, {last:n} км/ч, certainly inside it (by the dial's {hq:n} км/ч rounding); the in-band tally read {inBand:n1} s on the profile clock (sized ≥ {sizedIn:n} s) and the possible-in-band tally {poss:n1} s of wall clock (sized < {sizedWin:n} s; {age:n1} s of it the reading-age allowance); the last flat reading was taken {gap:r} ms of wall clock before the finish's clock, inside the longest wall interval between two flat readings ({maxWall:r} ms), and by the harness's estimate up to {prevAge:r|?} ms before its tick",
+  "obs.finishUnmet": "the readings did not meet the finish-open sizing: {unmet:frags}",
+  "unmet.noRecord": "no band record",
+  "unmet.notEnded": "the drive did not reach its end screen",
+  "unmet.released": "a ceiling had released the profile before the end, and its last reading is not the drive's last",
+  "unmet.noDisc": "no posted disc was read, and no band was sized",
+  "unmet.discUnread": "the posted disc was unread on {n:n} of {t:n} flat tick(s) ({after:n} of them after its first reading), and the profile is sized on one disc read on every tick",
+  "unmet.discChanged": "the posted disc changed {n:n} time(s) while the profile held (last disc {disc:n}), and the profile is sized on one disc",
+  "unmet.first": "the first flat reading ({first:n|UNREAD} км/ч) was not certainly below the band's floor {lo:n|?} by the dial's {hq:n} км/ч rounding",
+  "unmet.last": "the last flat reading ({last:n|UNREAD} км/ч) was not inside ({lo:n|?}, {hi:n|?}] by the dial's {hq:n} км/ч rounding",
+  "unmet.inBand": "the in-band tally read {v:n1} s against the sized {s:n} s (speedingMinorSustainSec {m:n} + {margin:n})",
+  "unmet.window": "the possible-in-band tally read {v:n1} s, not under the sized {s:n} s (speedingMinorSustainSec {m:n} + SPEED_REGRADE_SEC {r:n})",
+  "unmet.endGap": "the last flat reading was taken {gap:r|?} ms of wall clock before the finish's clock, and the longest wall interval between two flat readings was {maxWall:r|NONE} ms",
+  // ── the outcome line ──
+  "outcome.refused": "WRONG-LEG PROFILE OUTCOME: {name:txt} — ANTECEDENT NOT HELD AS SIZED (REFUSED, NOT RUN): {why:frag}. This leg drove the ordinary cadence.",
+  "outcome.noTicks": "WRONG-LEG PROFILE OUTCOME: {name:txt} — ANTECEDENT NOT HELD AS SIZED: not one flat tick ran, and the harness has no readings. {sizing:frag}.",
+  "outcome.held": "WRONG-LEG PROFILE OUTCOME: {name:txt} — ANTECEDENT HELD AS SIZED ({how:tok}) at t={at:n}s — OBSERVED: {obs:frag} · READINGS: {readings:frag} · {rests:frag} · {end:frag}. {clock:frag} {sizing:frag}.",
+  "outcome.notHeld": "WRONG-LEG PROFILE OUTCOME: {name:txt} — ANTECEDENT NOT HELD AS SIZED ({done:tok|open}) — OBSERVED: {obs:frag|-} · READINGS: {readings:frag} · {rests:frag} · {end:frag}. {clock:frag} {sizing:frag}.",
+  "outcome.clock": "The profile clock sums the harness's own tick intervals, paused time and each tick's own work left out, each interval capped at {cap:n} s.",
+  "rests": "{opp:n} rest opportunity(ies) held back (the {every:n|?} m / {maxS:n|?} s cadence came due {opp:n} time(s) while the harness's own task-cap and over-limit holds were not holding and the profile held it, each stretch counted once) on {held:n} held flat tick(s), {forced:n} rest(s) booked by the profile",
+  "end.reached": "the drive reached its end screen",
+  "end.notReached": "the drive did NOT reach its end screen",
+  "end.unknown": "the drive's end not yet recorded",
+  "readings.finish": "disc {disc:n|NOT SEEN} ({changes:n} change(s)), read on {discRead:n} of {ticks:n} flat tick(s) ({unreadAfter:n} unread after its first reading, {unreadBefore:n} before it) · band ({lo:n|?}, {hi:n|?}] sized over that disc · in-band tally {inBand:n1} s on the profile clock ({dips:n} dip(s) to ≤ the disc wiped it) · possible-in-band tally {poss:n1} s of wall clock ({age:n1} s of it reading-age allowance; allowance {lag:n|?} ms beyond each probe's wait; {unmeasured:n} tick(s) without a probe clock) · {inTicks:n} in-band / {aboveTicks:n} above-band / {unread:n} unread dial reading(s) of {ticks:n} flat tick(s) · first {first:n|UNREAD} · top {top:n|NOT RECORDED} · last {last:n|UNREAD} км/ч · longest wall interval between two flat readings {maxWall:r|NONE} ms (each tick's own work in it, not capped) · end gap {gap:r|NOT RECORDED} ms",
+  "readings.stint": "best moving run {best:n1} s on the profile clock (sized {target:n} s) · {dips:n} dip(s) to ≤ movingSpeedKmh · {unread:n} unread tick(s), {unreadBest:n} of them inside the best run",
+  "readings.lead": "lead on the chip {lead:n} tick(s), absent {absent:n}, unparsed {unparsed:n}, on a band edge {edge:n}, opening {opening:n} · chip minimum {minSec:n|-} с / {minM:n|-} м · best run under {base:n2} s: {baseBest:n1} s (sized {baseSus:n} s){rain:opt}{rule:opt} · top {top:n|NOT RECORDED} км/ч",
+  "readings.leadRain": " · best run in [{base:n2}, {rain:n3}) s: {best:n1} s (sized {sus:n} s)",
+  "readings.leadRule": " · {sec:n1} s under the drill's taught {rule:n} s (a design constant sized at {at:tok})",
+  "readings.zone": "{braking:frag} · longest continuous rest {best:n1} s of the {hold:n} s hold (sized {sized:n} s) · {stirs:n} stir(s), {breaks:n} break(s), {unread:n} unread tick(s)",
+  "zone.brakingBooked": "braking booked at t={at:n}s at {kmh:n} км/ч, flat odometer {odo:n} m, estimated rest [{lo:n}, {hi:n}] m (harness estimate)",
+  "zone.brakingNever": "braking NEVER BOOKED",
+  // ── the sizing, per kind ──
+  "sizing": "{label:frag}: {detail:frag}",
+  "sizing.finish": "band over a disc D = (D + min(D × speedingGraceRatio {gr:n}, speedingGraceMaxKmh {gm:n}), D + dangerousSpeedOverKmh {dg:n}]; in-band target ≥ speedingMinorSustainSec {ms:n} s + the harness's {margin:n} s = {tin:n} s; possible-in-band target < speedingMinorSustainSec {ms:n} s + SPEED_REGRADE_SEC {rg:n} s = {tw:n} s; reading-age allowance {lag:n|?} ms = DASHBOARD_POLL_MS {poll:n} ms + two frames {frames:n} ms + this platform's long-frame allowance {lf:n|?} ms ({lfBasis:frag}), beside each probe's measured wait",
+  "sizing.stint": "one moving run sized to keepRightSustainSec {keep:n} s + the harness's {margin:n} s = {target:n} s; moving line movingSpeedKmh {moving:n} км/ч",
+  "sizing.lead": "base line followSafeSeconds {safe:n} × followFireRatio {fire:n} = {base:n2} s{rain:opt}; runs sized to followSustainSec {sus:n} s{rainSus:opt} + the harness's {margin:n} s; speed floor followMinSpeedKmh {min:n} км/ч; opening rate followRecoveryRateMps {rate:n} m/s{drill:opt}",
+  "sizing.leadDrill": "; the drill's taught gap drillTaughtGapSec {rule:n} s, a reading only (no run is sized to it)",
+  "sizing.leadRain": "; rain line × followRainSecondsFactor {factor:n} = {rain:n3} s",
+  "sizing.leadRainSus": " / followRainSustainSec {sus:n} s",
+  "sizing.zone": "{drop:frag}; BAN_ZONE_REST_REGRADE_SEC {rg:n} s; hold = {thr:n} + {rg:n} + the harness's {zm:n} s = {hold:n} s; sized hold = {thr:n} + {rg:n} + {margin:n} s = {sized:n} s; rest line fullStopMaxSpeedKmh {fs:n} км/ч, moving line movingSpeedKmh {moving:n} км/ч; deceleration BRAKE_FORCE_N {force:n} N / CHASSIS_MASS {mass:n} kg = {decel:n2} m/s²",
+  "sizing.dropBus": "drop-off busStopDropOffMaxSec {bus:n} s for the {basis:tok} basis (banZoneStopRestSec {ban:n} s for any other)",
+  "sizing.dropOther": "banZoneStopRestSec {ban:n} s for the {basis:tok|?} basis (busStopDropOffMaxSec {bus:n} s for law-bus-stop)",
+  // ── the clauses lesson-audit.mjs prints about a declared profile ──
+  "rest.zone": "{hold:n}s on the profile clock — WRONG-LEG PROFILE {name:txt}: a hold sized from {thr:n} s (the {basis:tok} basis) + BAN_ZONE_REST_REGRADE_SEC {rg:n} s + the harness's {margin:n} s, sized at {at:tok}. The profile placed this rest by DEAD RECKONING, not by the pose: the harness reads the dev pose probe on every flat and flat-rest tick and records what it returns among its guidance samples, and no profile decision reads it.",
+  "rest.plain": "{hold:n|?}s, the harness's ordinary hold (WRONG-LEG PROFILE {name:txt} is declared on this lane). The harness reads the dev pose probe on every flat and flat-rest tick and records what it returns among its guidance samples; no profile decision reads it.",
+  "summary": " AND A WRONG-LEG PROFILE ({name:txt}) CHANGED WHEN THESE RESTS FELL: {rests:frag}{zone:opt}. Each rest above has its own «came to REST» line, the harness reads the dev pose probe on every flat and flat-rest tick and records what it returns among its guidance samples, and every stop is still this instrument's act.",
+  "summary.unchanged": " AND A WRONG-LEG PROFILE ({name:txt}) WAS ON FOR THIS LANE AND HELD NO DUE REST BACK AND BOOKED NONE: {rests:frag}. Every rest above fell on a tick where the {every:n|?} m / {maxS:n|?} s cadence was due and the harness's own task-cap and over-limit holds were not holding, and every stop is still this instrument's act.",
+  "summary.zoneRest": " (the zone rest's longest continuous run was {best:n1} s on the profile clock, against a {hold:n} s hold and a sized {sized:n} s)",
+  "summary.zoneNone": " (no zone rest was booked)",
+  // ── the true holds, in place of the harness's older «each held 8s», on a lane whose zone rest was booked ──
+  "rest.holds": "{plain:n} held on the ordinary {hold:n|?}s hold of wall clock and {zone:n} held on the zone profile's own tally (a {zhold:n} s hold of continuous rest on the profile clock, with a wall ceiling of {wall:n} s; its longest continuous run read {best:n1} s); the drive's end ended any hold still open",
+  // ── …and on every other DECLARED lane (round 10: «each held 8s» is false when the drive ends mid-hold) ──
+  "rest.holdsPlain": "each held on the ordinary {hold:n|?}s hold of wall clock, and the drive's end ended any hold still open",
+});
+
+/** A slot: `{name:kind}` or `{name:kind|fallback}`. */
+const PROFILE_SLOT_RE = /\{([A-Za-z][A-Za-z0-9]*):([a-z0-9]+)(?:\|([^{}]*))?\}/g;
+/** An identifier-shaped token: no whitespace, so no sentence. */
+const PROFILE_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9_.:\-]*$/;
+let profileTableTexts = null;
+
+/**
+ * THE ONE RENDERER. Turns a template spec `{tpl, f}` into its text, checking
+ * every slot against its kind — and refusing a missing slot, an extra field,
+ * an unknown template, a string where a number belongs, a token with
+ * whitespace in it, or a `txt` that is not one of the profile table's own
+ * texts. Pure.
+ */
+export function renderProfileText(spec) {
+  if (!spec || typeof spec !== "object" || typeof spec.tpl !== "string" || !Object.hasOwn(PROFILE_LINE_TEMPLATES, spec.tpl)) {
+    throw new TypeError(`renderProfileText: not a profile template spec (${spec && typeof spec === "object" ? spec.tpl : typeof spec})`);
+  }
+  const f = spec.f && typeof spec.f === "object" ? spec.f : {};
+  const used = new Set();
+  const bad = (name, why) => new TypeError(`renderProfileText: ${spec.tpl} slot «${name}» ${why}`);
+  const text = PROFILE_LINE_TEMPLATES[spec.tpl].replace(PROFILE_SLOT_RE, (all, name, kind, fallback) => {
+    used.add(name);
+    const v = f[name];
+    if (v === null || v === undefined) {
+      if (kind === "opt") return "";
+      if (fallback !== undefined) return fallback;
+      throw bad(name, "is empty");
+    }
+    switch (kind) {
+      case "n":
+      case "n1":
+      case "n2":
+      case "n3":
+      case "r":
+        if (typeof v !== "number" || !Number.isFinite(v)) throw bad(name, `is not a finite number (${typeof v})`);
+        return kind === "n" ? String(v) : kind === "r" ? String(Math.round(v)) : v.toFixed(Number(kind.slice(1)));
+      case "tok":
+        if (typeof v !== "string" || !PROFILE_TOKEN_RE.test(v)) throw bad(name, "is not a token");
+        return v;
+      case "toks":
+        if (!Array.isArray(v) || v.length === 0 || v.some((t) => typeof t !== "string" || !PROFILE_TOKEN_RE.test(t))) throw bad(name, "is not a list of tokens");
+        return v.join(" + ");
+      case "txt":
+        profileTableTexts ??= new Set([...WRONG_LEG_PROFILES.values()].flatMap((p) => [p.name, p.told, p.row]));
+        if (typeof v !== "string" || !profileTableTexts.has(v)) throw bad(name, "is not one of the profile table's own texts");
+        return v;
+      case "frag":
+      case "opt":
+        return renderProfileText(v);
+      case "frags":
+        if (!Array.isArray(v) || v.length === 0) throw bad(name, "is not a list of templates");
+        return v.map(renderProfileText).join("; ");
+      default:
+        throw bad(name, `has an unknown kind «${kind}»`);
+    }
+  });
+  for (const k of Object.keys(f)) if (!used.has(k)) throw bad(k, "is not in the template");
+  return text;
+}
+
+/** A template spec — validated by rendering it once, frozen, JSON-safe (it
+ *  rides the sidecar). A null field is kept as null, never undefined. */
+export function profileText(tpl, f = {}) {
+  const fields = {};
+  for (const [k, v] of Object.entries(f ?? {})) fields[k] = v === undefined ? null : v;
+  const spec = Object.freeze({ tpl, f: Object.freeze(fields) });
+  renderProfileText(spec);
+  return spec;
+}
+
+/** The verdict words and the sizing label, rendered from the table. */
+export const HELD_AS_SIZED = renderProfileText(profileText("verdict.held"));
+export const NOT_HELD_AS_SIZED = renderProfileText(profileText("verdict.notHeld"));
+export const SIZING_LABEL = renderProfileText(profileText("sizing.label", { at: PROFILE_SIZED_AT }));
+
+/** The braking model the zone rest's dead reckoning ASSUMES — what the MODEL
+ *  holds, from design constants — as a line prints it. Pure. */
+export function zoneBrakingModel(decel) {
+  return renderProfileText(zoneModelSpec(decel));
+}
+function zoneModelSpec(decel) {
+  return profileText("zone.model", { decel: typeof decel === "number" && Number.isFinite(decel) ? decel : null, at: PROFILE_SIZED_AT });
+}
+
+/* ── THE CENSUS BANDS, EACH WITH THE POPULATION IT IS SIZED ON (round 10) ──
+ * The round-9 verifier's FALSE-SELF-STATEMENT-REFUSAL-SIZING: the refusal said
+ * the odometer band was «sized on this lesson's archived pc legs only» while
+ * its low end is a sc-signal-flashing MOBILE leg. Every line that cites a band
+ * now prints it through one of these, so the band, the population it is sized
+ * on and every bound are the declared records' own numbers, and the test file
+ * checks each cited bound against the declared constant. Pure. */
+function odoBandSpec() {
+  return profileText("census.odo", { rmin: ODO_RATIO_MIN, rmax: ODO_RATIO_MAX, legs: ODO_CENSUS_ZONE_PC.legs, lo: ODO_CENSUS_ZONE_PC.min, hi: ODO_CENSUS_ZONE_PC.max });
+}
+function creepBandSpec() {
+  return profileText("census.creep", { creep: ZONE_REST_CREEP_M, legs: ZONE_CREEP_CENSUS.legs, lo: ZONE_CREEP_CENSUS.min, hi: ZONE_CREEP_CENSUS.max });
+}
+function reactBandSpec() {
+  return profileText("census.react", { min: ZONE_REST_REACT_MIN_S, max: ZONE_REST_REACT_MAX_S, n: REACTION_CENSUS.transitions });
+}
+/** The long-frame allowance's population, by platform (`TICKCOST_CENSUS`). */
+function longFrameBasisSpec(platform) {
+  if (platform === "pc") return profileText("census.lfPc", { legs: TICKCOST_CENSUS.pc.legs, max: TICKCOST_CENSUS.pc.longestMaxMs });
+  if (platform === "mobile") return profileText("census.lfMobile", { legs: TICKCOST_CENSUS.mobile.legs, lo: TICKCOST_CENSUS.mobile.longestMinMs, hi: TICKCOST_CENSUS.mobile.longestMaxMs });
+  return profileText("census.lfOther");
+}
+
+/** The name of the lesson's authored trace file the zone span is read from
+ *  (`readZoneRouteSpan`), as the zone profile's SIZING label names it. */
+export const ZONE_TRACE_FILE = "shadow-correct.trace.json";
+
+/**
+ * THE TABLE. One row per lesson, and a row is a statement that an OPEN row on
+ * that lesson needs an antecedent the 45 m cadence is chopping — the same kind
+ * of per-lane statement `SUSTAINED_OVER_LIMIT_LANES` makes. `told` is printed
+ * on the drive verbatim, so a judge never meets the changed cadence without
+ * meeting what it was for; `row` names the finding and the antecedent it
+ * needs, in the harness's own words (round 7: no row text quotes a claim about
+ * the product any more). `sizedBy` lists the design constants
+ * (`PROFILE_DESIGN`) the profile is sized from.
+ */
+export const WRONG_LEG_PROFILES = new Map([
+  [
+    "sc-signal-flashing",
+    Object.freeze({
+      name: "no-careless-rest-to-the-finish",
+      kind: "finish-open",
+      row: "sc-signal-flashing:0d68b149 (critical) — its antecedent: a wrong leg that takes no careless rest from its first flat tick to the end screen",
+      told: "take no careless rest from the first flat tick to the end screen, at the plain flat throttle every wrong leg uses (no governor), and tally every dial reading against the band the harness sized over the posted disc",
+      sizedBy: Object.freeze(["speedingGraceRatio", "speedingGraceMaxKmh", "dangerousSpeedOverKmh", "speedingMinorSustainSec", "SPEED_REGRADE_SEC", "DASHBOARD_POLL_MS", "dialHalfQuantumKmh", "physicsMaxFrameMs"]),
+      maxM: 400,
+      maxMs: 60_000,
+    }),
+  ],
+  [
+    "sc-ov-keep-right",
+    Object.freeze({
+      name: "one-run-past-the-keep-right-sustain",
+      kind: "stint",
+      row: "sc-ov-keep-right:64391c6a — its antecedent: this lesson's wrong leg with its careless rests held back, in one moving run longer than the 45 m cadence leaves it",
+      told: "hold every careless rest back until ONE moving run (the dial above movingSpeedKmh on every reading, no rest, no dip) has lasted keepRightSustainSec + a margin on the profile clock, then rest on the ordinary cadence",
+      sizedBy: Object.freeze(["keepRightSustainSec", "movingSpeedKmh"]),
+      maxM: 600,
+      maxMs: 60_000,
+    }),
+  ],
+  [
+    "sc-ac-truck-spray",
+    Object.freeze({
+      name: "close-on-the-truck-into-its-spray",
+      kind: "lead-close",
+      line: "rain",
+      // (The drill's taught gap — recorded as a reading, nothing more — is the
+      // design constant `drillTaughtGapSec`, with its provenance, round 8.)
+      // (Round 10, the round-9 verifier's IMPRECISE-SELF-STATEMENTS b: the w61 leg did NOT rest every 45 m — its first
+      // flat stretch ran t=0–13 s, 162.8 m of flat odometer, under the harness's task-cap hold (its run.log: «BEAT ITS
+      // TASK CAP at t=13s … over 163 m»); then 7 stops, each «holds it for 8s», every later stretch 49.5–52.5 m.)
+      row: "sc-ac-truck-spray:3f5a3ef3 — its antecedent: a wrong leg that closes on the truck at flat throttle; the w61 wrong leg's first flat stretch ran 13 s and 163 m under the harness's task-cap hold, after which it came to rest 7 times on the 45 m cadence and held each rest for the ordinary 8 s hold, and its last frame read «Дистанция · 47 м · 3,1 с» on the chip",
+      told: "hold every careless rest back while the follow-gap chip reads a lead, at flat throttle, until the chip's own seconds have read inside the rain band (followSafeSeconds × followFireRatio × [1, followRainSecondsFactor]) for followRainSustainSec + 1 s, or under its base line for followSustainSec + 1 s",
+      sizedBy: Object.freeze([
+        "followSafeSeconds",
+        "followFireRatio",
+        "followSustainSec",
+        "followMinSpeedKmh",
+        "followRecoveryRateMps",
+        "followRainSecondsFactor",
+        "followRainSustainSec",
+        "dialHalfQuantumKmh",
+        "chipMetreQuantumM",
+        "chipSecondsHalfQuantum",
+        "drillTaughtGapSec",
+      ]),
+      maxM: 1000,
+      maxMs: 75_000,
+    }),
+  ],
+  [
+    "sc-pk-busstop-ban",
+    Object.freeze({
+      name: "come-to-rest-inside-the-bus-stop-zone",
+      kind: "zone-rest",
+      zone: Object.freeze({ world: "pk-busstop-v1", zoneIds: Object.freeze(["pkbs-z-stop-marking", "pkbs-z-stop-pocket"]) }),
+      row: "sc-pk-busstop-ban:b103c282 — its antecedent: a wrong leg that comes to rest inside the authored bus-stop zone and stands there",
+      // (Round 10: «brake on the tick» was «braking NOW»'s sibling — the brake goes down on a later, flat-rest tick —
+      // and «the census» named no population; the told now books the braking and names both populations.)
+      told: "hold every careless rest back from the start, then book braking on the tick whose dead-reckoned rest INTERVAL (the flat odometer over the odometer ratio band sized on a census of 12 of this lesson's archived pc wrong legs with its low end widened to the reading of a sc-signal-flashing mobile wrong leg, plus a stop over the reaction band of a census of 322 flat to flat-rest transitions on archived wrong legs and the braking model) is centred on the middle of the authored зона на спирката, and stand there — the throttle kept off through any pause layer — for the hold sized from the zone basis's drop-off, BAN_ZONE_REST_REGRADE_SEC and a margin",
+      sizedBy: Object.freeze(["banZoneStopRestSec", "busStopDropOffMaxSec", "BAN_ZONE_REST_REGRADE_SEC", "movingSpeedKmh", "fullStopMaxSpeedKmh", "BRAKE_FORCE_N", "CHASSIS_MASS"]),
+      maxM: 400,
+      maxMs: 60_000,
+    }),
+  ],
+]);
+
+/** Profiles that were in the table and were TAKEN OUT on evidence, with the
+ *  evidence. A test refuses any id here that is also in `WRONG_LEG_PROFILES`.
+ *  An evidence record: no template reads it, and no line prints it. */
+export const WITHDRAWN_WRONG_LEG_PROFILES = new Map([
+  [
+    "sc-fo-motorway-gap",
+    Object.freeze({
+      name: "close-on-the-lead-without-resting",
+      withdrawn: "2026-09-25 (pedal-profile lane, round 2)",
+      why:
+        "unreachable with pedals on this geometry, and it caused a crash: FMG_LEAD matches the player up to 34 m/s, so at y 720 (where it brakes) the gap is still 2.08 s; during its ~4.5 m/s² stop the chip is under 1.26 s for only ~1.6–1.8 s of harness run against the 3.0 s needed; the cap route needs 145 км/ч and the car is at ~135; nothing released the suppression, so the leg rear-ended the braking lead at y ≈ 852 with ~96 км/ч closing speed — a leg that PASSED before (w47). Round-1 verifier, verify/motorway.mjs.",
+    }),
+  ],
+]);
+
+/** ROUTES inside a profile that were TAKEN OUT on evidence, with the evidence —
+ *  the same discipline one level down. An evidence record: no line prints it. */
+export const WITHDRAWN_PROFILE_ROUTES = new Map([
+  [
+    "sc-ac-truck-spray/curtain",
+    Object.freeze({
+      withdrawn: "2026-09-25 (pedal-profile lane, round 3, N-CURTAIN)",
+      why:
+        "WRONG REFERENT, IN THE FALSE-ACHIEVED DIRECTION, AND NO HONEST CONVERSION CAN FIRE FIRST. " +
+        "The chip's metres are leadGapFor's nose-to-tail gap on the PLAYER's forward axis (centre distance − (PLAYER_HALF_LENGTH_M 2.05 + truck half 3.75)), for any lead within LEAD_CORRIDOR_M 4.0 m laterally; " +
+        "the product applies SPRAY_NEAR_M 22 to eyeGapM — the straight-line distance from the CAMERA to the truck rig's tail (TrafficLayer.tsx, the ВОДНАТА ПЕЛЕНА block) — and the cockpit camera sits at COCKPIT_EYE z −0.255 (2.305 m behind the nose), " +
+        "moves up to 1.2 × COCKPIT_LEAN_LONGITUDINAL 0.03 m further aft under acceleration, follows through a damped lerp (B67 contract < 0.15 m), and is somewhere else entirely in the chase and top-down views and the crash exterior cut. " +
+        "So round 2's «chip 21 м = IN the pelena» was an eye gap of 22.8–23.8 m: outside the plume. " +
+        "The only conversion that can only under-claim (triangle inequality over any truck heading, lateral up to the corridor, lean and follow error, the chip's half-metre rounding) puts the line at chip ≤ 10 m. " +
+        "The truck is pinned at a 58.2 m gap up to 33 m/s and never brakes (cut tier locked), so at ≤ ~1.2 m/s of closing that is ≥ 40 s away — past the 1000 m ceiling (~29 s at 34 m/s) and the y 860 finish — while gap-base (3 s under the chip's 1.21 s) fires first, and gap-rain came first in 100 % of the round-2 verifier's 1000 modelled runs (verify2/truck-v2.mjs). " +
+        "A route that cannot fire first measures nothing (the dead-predicate class), so it is removed rather than converted.",
+    }),
+  ],
+]);
+
+/** The declared row for a scenario, or `null`. */
+export function wrongLegProfileFor(scenario) {
+  return typeof scenario === "string" ? WRONG_LEG_PROFILES.get(scenario) ?? null : null;
+}
+
+/** The hold a rest in a no-stopping span of this basis was sized from: the
+ *  drop-off for `law-bus-stop`, the ban-zone rest for any other basis (design
+ *  constants). `null` when a number is missing. */
+export function banZoneRestThresholdSec(basis, c) {
+  const k = basis === "law-bus-stop" ? c?.busStopDropOffMaxSec : c?.banZoneStopRestSec;
+  return typeof k === "number" && Number.isFinite(k) && k > 0 ? k : null;
+}
+
+/** Metres from the DECISION tick to rest at `kmh` after a reaction of
+ *  `reactS`: `v·reactS + v²/(2·decel)`. `null` for a dial that is not a speed,
+ *  or a reaction or deceleration that is not a number. */
+export function stopDistanceM(kmh, { reactS = null, decel = null } = {}) {
+  if (typeof kmh !== "number" || !Number.isFinite(kmh) || kmh < 0) return null;
+  if (typeof decel !== "number" || !Number.isFinite(decel) || decel <= 0) return null;
+  if (typeof reactS !== "number" || !Number.isFinite(reactS)) return null;
+  const v = kmh / 3.6;
+  return v * reactS + (v * v) / (2 * decel);
+}
+
+/**
+ * WHERE THE CENSUS PUTS THE REST IF THE CAR BRAKES NOW — an INTERVAL in route
+ * metres from the authored start, never a point, and never called a bound. Pure.
+ *
+ *   lo = odoM / ratioMax          + v·reactMinS + v²/(2·decel)
+ *   hi = odoM / ratioMin + creepM + v·reactMaxS + v²/(2·decel)
+ *
+ * @returns {null|{lo:number, hi:number, mid:number, nearStopM:number, farStopM:number}}
+ */
+export function zoneRestInterval(odoM, kmh, {
+  reactMinS = ZONE_REST_REACT_MIN_S,
+  reactMaxS = ZONE_REST_REACT_MAX_S,
+  decel = null,
+  ratioMin = ODO_RATIO_MIN,
+  ratioMax = ODO_RATIO_MAX,
+  creepM = ZONE_REST_CREEP_M,
+} = {}) {
+  const nearStopM = stopDistanceM(kmh, { reactS: reactMinS, decel });
+  const farStopM = stopDistanceM(kmh, { reactS: reactMaxS, decel });
+  if (nearStopM === null || farStopM === null || typeof odoM !== "number" || !Number.isFinite(odoM) || odoM < 0) return null;
+  const lo = odoM / ratioMax + nearStopM;
+  const hi = odoM / ratioMin + creepM + farStopM;
+  return { lo, hi, mid: (lo + hi) / 2, nearStopM, farStopM };
+}
+
+/* ── THE ZONE, IN ROUTE METRES FROM THE AUTHORED START ───────────────────── */
+
+/**
+ * Where an authored no-stopping span lies ALONG THE ROUTE, measured from the
+ * authored start — pure. Refuses rather than guesses on every shape the dead
+ * reckoning cannot survive (a missing zone, zones on different edges or bases,
+ * a gap between them, a start off the edge, a span behind the start, and —
+ * because a `wrong` leg never steers — a route that is not straight to the far
+ * edge). `why` is a template spec (`renderProfileText`).
+ *
+ * @returns {{ok:boolean, fromM:null|number, toM:null|number, basis:null|string, edgeId:null|string, startEdgeM:null|number, why:null|object}}
+ */
+export function zoneRouteSpanFrom({ world = null, zoneIds = [], trace = [] } = {}) {
+  const no = (tpl, f) => ({ ok: false, fromM: null, toM: null, basis: null, edgeId: null, startEdgeM: null, why: profileText(tpl, f) });
+  if (!world || typeof world !== "object") return no("span.noWorld");
+  if (!Array.isArray(trace) || trace.length < 2) return no("span.shortTrace");
+  const zones = [];
+  for (const id of zoneIds) {
+    const z = Array.isArray(world.zones) ? world.zones.find((q) => q && q.id === id) : null;
+    if (!z) return no("span.noZone", { id });
+    zones.push(z);
+  }
+  if (zones.length === 0) return no("span.noIds");
+  const edgeId = zones[0].edgeId;
+  const basis = zones[0].basis ?? null;
+  if (zones.some((z) => z.edgeId !== edgeId)) return no("span.edges");
+  if (zones.some((z) => (z.basis ?? null) !== basis)) return no("span.bases");
+  // THE BASIS SIZES THE HOLD, and a line prints it as a token: an authored basis
+  // that is not an identifier is refused here, never thrown by the renderer
+  // (round 8, from the round-7 verifier's CONTENT-BASIS-THROW).
+  if (typeof basis !== "string" || !PROFILE_TOKEN_RE.test(basis)) return no("span.basis");
+  if (zones.some((z) => z.kind !== "noStopping")) return no("span.kind");
+  zones.sort((a, b) => a.fromM - b.fromM);
+  for (let i = 1; i < zones.length; i++) {
+    if (zones[i].fromM !== zones[i - 1].toM) return no("span.gap", { a: zones[i - 1].toM, b: zones[i].fromM });
+  }
+  const edge = Array.isArray(world.roads?.edges) ? world.roads.edges.find((e) => e && e.id === edgeId) : null;
+  const geom = edge && Array.isArray(edge.geometry) ? edge.geometry : null;
+  if (!geom || geom.length < 2) return no("span.noGeom", { id: edgeId });
+  // Project a point onto the polyline: arclength and lateral offset.
+  const project = (p) => {
+    let best = null;
+    let run = 0;
+    for (let i = 1; i < geom.length; i++) {
+      const [ax, ay] = geom[i - 1];
+      const [bx, by] = geom[i];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const L = Math.hypot(dx, dy);
+      if (L === 0) continue;
+      const u = Math.max(0, Math.min(1, ((p.x - ax) * dx + (p.y - ay) * dy) / (L * L)));
+      const off = Math.hypot(p.x - (ax + u * dx), p.y - (ay + u * dy));
+      if (best === null || off < best.off) best = { s: run + u * L, off };
+      run += L;
+    }
+    return best;
+  };
+  const start = project(trace[0]);
+  if (!start || start.off > 10) return no("span.offEdge", { off: start ? start.off : null, id: edgeId });
+  const lo = zones[0].fromM;
+  const hi = zones[zones.length - 1].toM;
+  // Which way the route runs along the edge — off the first sample ≥ 5 m on.
+  const ahead = trace.find((q) => Math.hypot(q.x - trace[0].x, q.y - trace[0].y) >= 5);
+  if (!ahead) return no("span.still");
+  const fwd = project(ahead).s >= start.s;
+  const fromM = fwd ? lo - start.s : start.s - hi;
+  const toM = fwd ? hi - start.s : start.s - lo;
+  if (!(fromM > 0)) return no("span.behind", { m: fromM });
+  // THE CAR CANNOT STEER, SO THE ROUTE MUST BE STRAIGHT UP TO THE FAR EDGE.
+  let travelled = 0;
+  const h0 = typeof trace[0].headingDeg === "number" ? trace[0].headingDeg : null;
+  for (let i = 1; i < trace.length && travelled <= toM; i++) {
+    travelled += Math.hypot(trace[i].x - trace[i - 1].x, trace[i].y - trace[i - 1].y);
+    const h = trace[i].headingDeg;
+    if (h0 === null || typeof h !== "number") return no("span.noHeading");
+    const d = Math.abs(((h - h0 + 540) % 360) - 180);
+    if (d > 2) return no("span.turns", { deg: d });
+  }
+  return { ok: true, fromM, toM, basis, edgeId, startEdgeM: start.s, why: null };
+}
+
+/** …off disk: `content/world/<world>.json` and the lesson's own shipped
+ *  `shadow-correct.trace.json` — AUTHORED CONTENT (JSON data), never product
+ *  source. A file that cannot be read refuses the profile, naming the error
+ *  code only. */
+export function readZoneRouteSpan(scenario, zone) {
+  const root = fileURLToPath(new URL("../../../", import.meta.url));
+  try {
+    const world = JSON.parse(readFileSync(root + "content/world/" + zone.world + ".json", "utf8"));
+    const tr = JSON.parse(readFileSync(root + "content/traces/" + scenario + "/shadow-correct.trace.json", "utf8"));
+    return zoneRouteSpanFrom({ world, zoneIds: zone.zoneIds, trace: tr.samples });
+  } catch (e) {
+    const code = e && typeof e.code === "string" && PROFILE_TOKEN_RE.test(e.code) ? e.code : e && e.name === "SyntaxError" ? "SyntaxError" : null;
+    return { ok: false, fromM: null, toM: null, basis: null, edgeId: null, startEdgeM: null, why: profileText("span.unreadable", { code }) };
+  }
+}
+
+/* ── THE STATE ─────────────────────────────────────────────────────────── */
+
+const fin = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/** A profile's design values — the `sizedBy` constants' numbers, by name. */
+function designValues(decl) {
+  return Object.fromEntries(decl.sizedBy.map((k) => [k, PROFILE_DESIGN[k].value]));
+}
+
+/** The SIZING label — exactly what is read to size the profile: no file for
+ *  a profile sized from design constants alone; for the zone profile, the
+ *  authored world file and the lesson's authored trace (content JSON) its span
+ *  and basis come from, and no other file (round 8). */
+function sizingLabelSpec(decl) {
+  if (decl.kind === "zone-rest") {
+    return profileText("sizing.labelZone", { at: PROFILE_SIZED_AT, world: decl.zone.world + ".json", trace: ZONE_TRACE_FILE });
+  }
+  return profileText("sizing.label", { at: PROFILE_SIZED_AT });
+}
+
+/** The SIZING clause a line prints: the design constants the profile was
+ *  sized from and the targets built from them, labelled «sized at 4112566». */
+function sizingSpec(decl, own, extra = {}) {
+  const m = PROFILE_SUSTAIN_MARGIN_SEC;
+  let detail = null;
+  if (decl.kind === "finish-open") {
+    const lag = extra.dialLagMs ?? null;
+    detail = profileText("sizing.finish", {
+      gr: own.speedingGraceRatio,
+      gm: own.speedingGraceMaxKmh,
+      dg: own.dangerousSpeedOverKmh,
+      ms: own.speedingMinorSustainSec,
+      margin: m,
+      tin: own.speedingMinorSustainSec + m,
+      rg: own.SPEED_REGRADE_SEC,
+      tw: own.speedingMinorSustainSec + own.SPEED_REGRADE_SEC,
+      lag,
+      poll: own.DASHBOARD_POLL_MS,
+      frames: DIAL_FRAME_ALLOWANCE_MS,
+      lf: lag === null ? null : lag - own.DASHBOARD_POLL_MS - DIAL_FRAME_ALLOWANCE_MS,
+      lfBasis: longFrameBasisSpec(extra.platform ?? null),
+    });
+  } else if (decl.kind === "stint") {
+    detail = profileText("sizing.stint", { keep: own.keepRightSustainSec, margin: STINT_MARGIN_SEC, target: own.keepRightSustainSec + STINT_MARGIN_SEC, moving: own.movingSpeedKmh });
+  } else if (decl.kind === "lead-close") {
+    const base = own.followSafeSeconds * own.followFireRatio;
+    const rain = decl.line === "rain";
+    detail = profileText("sizing.lead", {
+      safe: own.followSafeSeconds,
+      fire: own.followFireRatio,
+      base,
+      rain: rain ? profileText("sizing.leadRain", { factor: own.followRainSecondsFactor, rain: base * own.followRainSecondsFactor }) : null,
+      sus: own.followSustainSec,
+      rainSus: rain ? profileText("sizing.leadRainSus", { sus: own.followRainSustainSec }) : null,
+      margin: m,
+      min: own.followMinSpeedKmh,
+      rate: own.followRecoveryRateMps,
+      drill: typeof own.drillTaughtGapSec === "number" ? profileText("sizing.leadDrill", { rule: own.drillTaughtGapSec }) : null,
+    });
+  } else if (decl.kind === "zone-rest") {
+    const thr = extra.thresholdSec;
+    const drop =
+      extra.basis === "law-bus-stop"
+        ? profileText("sizing.dropBus", { bus: own.busStopDropOffMaxSec, basis: extra.basis, ban: own.banZoneStopRestSec })
+        : profileText("sizing.dropOther", { ban: own.banZoneStopRestSec, basis: extra.basis ?? null, bus: own.busStopDropOffMaxSec });
+    detail = profileText("sizing.zone", {
+      drop,
+      rg: own.BAN_ZONE_REST_REGRADE_SEC,
+      thr,
+      zm: ZONE_REST_MARGIN_SEC,
+      hold: thr + own.BAN_ZONE_REST_REGRADE_SEC + ZONE_REST_MARGIN_SEC,
+      margin: m,
+      sized: thr + own.BAN_ZONE_REST_REGRADE_SEC + m,
+      fs: own.fullStopMaxSpeedKmh,
+      moving: own.movingSpeedKmh,
+      force: own.BRAKE_FORCE_N,
+      mass: own.CHASSIS_MASS,
+      decel: own.BRAKE_FORCE_N / own.CHASSIS_MASS,
+    });
+  }
+  return profileText("sizing", { label: sizingLabelSpec(decl), detail });
+}
+
+/** Why a zone span the profile was handed cannot be used, as a template spec —
+ *  or `null` when it can. A span that is `ok` must still carry finite bounds
+ *  and an identifier basis (round 8: these used to throw in the renderer). */
+function zoneSpanRefusal(span) {
+  if (!span || typeof span !== "object") return profileText("refused.span", { why: null });
+  if (span.ok !== true) return profileText("refused.span", { why: span.why && typeof span.why === "object" ? span.why : null });
+  if (typeof span.basis !== "string" || !PROFILE_TOKEN_RE.test(span.basis)) return profileText("refused.span", { why: profileText("span.basis") });
+  if (fin(span.fromM) === null || fin(span.toM) === null || !(span.toM > span.fromM)) return profileText("refused.span", { why: profileText("span.bounds") });
+  return null;
+}
+
+/**
+ * The per-leg state. `declared:false` for every scenario not in the table and
+ * for every `right` leg (pass `scenario: null`), and then nothing below ever
+ * changes a decision. Nothing here reads a product file: the numbers are the
+ * design constants (`PROFILE_DESIGN`).
+ *
+ * @param {string|null} scenario
+ * @param {{zoneSpan?:object, platform?:string|null}} deps — `platform` is
+ *   lesson-audit's PLATFORM («pc» | «mobile»); the zone profile refuses off
+ *   its census's platform, and the finish-open profile sizes its long-frame
+ *   allowance by it.
+ */
+export function createWrongLegProfile(scenario, { zoneSpan = null, platform = null } = {}) {
+  const decl = wrongLegProfileFor(scenario);
+  const base = {
+    declared: decl !== null,
+    on: false,
+    scenario: typeof scenario === "string" ? scenario : null,
+    name: decl ? decl.name : null,
+    kind: decl ? decl.kind : null,
+    row: decl ? decl.row : null,
+    told: decl ? decl.told : null,
+    maxM: decl ? decl.maxM : null,
+    maxMs: decl ? decl.maxMs : null,
+    sizedAt: decl ? PROFILE_SIZED_AT : null,
+    refused: null,
+    flatTicks: 0,
+    startedAt: null,
+    odoM: 0,
+    ms: 0,
+    clockMs: 0,
+    // THE WALL CLOCK between two flat readings (round 7): `now` to `now`, each
+    // tick's own work in it, never capped — the clock the end gap is on.
+    prevFlatAt: null,
+    maxWallMs: null,
+    heldTicks: 0,
+    // REST OPPORTUNITIES held back (round 7): each time the ordinary
+    // cadence came due while the profile held the rest, counted once per
+    // stretch (`wrongLegRestOpportunity`). Round 9: the stretch's metres
+    // (`sinceM`) are SUMMED FROM ZERO over each flat tick's own step
+    // (`tickM`), the arithmetic of the harness's `flatM` after a rest, and a
+    // new flat phase is also read off `phaseTicks` (`lastTicks`).
+    opportunities: { count: 0, atM: null, atMs: null, lastM: null, lastMs: null, everyM: null, maxMs: null, sinceM: null, tickM: null, lastTicks: null },
+    restsForced: 0,
+    active: false,
+    done: null,
+    heldAsSized: false,
+    heldAtSec: null,
+    how: null,
+    observed: null,
+    driveEnded: null,
+    sizedFrom: null,
+    c: null,
+  };
+  if (!decl) return base;
+  const own = designValues(decl);
+  const st = { ...base, on: true, active: true, c: own };
+  if (decl.kind === "finish-open") {
+    st.finish = {
+      postedKmh: null, gradedAboveKmh: null, dangerousAboveKmh: null, limitChanges: 0,
+      // The disc, tick by tick (round 7): read, or unread before / after its first reading.
+      discReadTicks: 0, discUnreadBefore: 0, discUnreadAfter: 0,
+      // THE IN-BAND TALLY (the lower ledger, certain readings, the profile
+      // clock), and the dips to ≤ the disc that wiped it.
+      inBandSec: 0, dips: 0, qualAt: null,
+      // THE POSSIBLE-IN-BAND TALLY (the upper ledger) — WALL time over every
+      // interval a reading could have been in the band, never reset — and its
+      // READING-AGE allowance.
+      possibleSec: 0, prevSide: null, prevNow: null, finalMs: null,
+      uncreditedMs: 0, prevAgeMs: null, ageCreditSec: 0, probeUnmeasured: 0,
+      dialLagMs: dialLagAllowanceMs(platform, own.DASHBOARD_POLL_MS),
+      firstSeen: false, firstKmh: null,
+      inBandTicks: 0, aboveBandTicks: 0, unreadTicks: 0,
+      topKmh: -1, lastKmh: null, lastInBand: null,
+      // The sizing targets, from the design constants.
+      minorSustainSec: own.speedingMinorSustainSec,
+      regradeSec: own.SPEED_REGRADE_SEC,
+      sizedInBandSec: own.speedingMinorSustainSec + PROFILE_SUSTAIN_MARGIN_SEC,
+      sizedWindowSec: own.speedingMinorSustainSec + own.SPEED_REGRADE_SEC,
+    };
+    st.sizedFrom = sizingSpec(decl, own, { dialLagMs: st.finish.dialLagMs, platform });
+  } else if (decl.kind === "stint") {
+    st.stint = { curSec: 0, bestSec: 0, targetSec: own.keepRightSustainSec + STINT_MARGIN_SEC, dips: 0, unreadTicks: 0, unreadInRun: 0, unreadInBest: 0 };
+    st.sizedFrom = sizingSpec(decl, own);
+  } else if (decl.kind === "lead-close") {
+    const baseLine = own.followSafeSeconds * own.followFireRatio;
+    const rainLine = decl.line === "rain" ? baseLine * own.followRainSecondsFactor : null;
+    st.lead = {
+      line: decl.line,
+      baseLineSec: baseLine,
+      rainLineSec: rainLine,
+      baseSustainSec: own.followSustainSec + PROFILE_SUSTAIN_MARGIN_SEC,
+      rainSustainSec: rainLine === null ? null : own.followRainSustainSec + PROFILE_SUSTAIN_MARGIN_SEC,
+      // The drill's taught gap: a design constant (round 8), read as a tally only.
+      lessonRuleSec: own.drillTaughtGapSec ?? null,
+      leadTicks: 0, noLeadTicks: 0, unparsedTicks: 0, edgeTicks: 0,
+      minSec: null, minM: null, underLessonRuleSec: 0,
+      baseRunSec: 0, baseBestSec: 0, baseQual: false,
+      rainRunSec: 0, rainBestSec: 0, rainQual: false,
+      openingTicks: 0, recent: [], topKmh: -1,
+    };
+    st.sizedFrom = sizingSpec(decl, own);
+  } else if (decl.kind === "zone-rest") {
+    const span = zoneSpan && typeof zoneSpan === "object" ? zoneSpan : null;
+    const unusable = zoneSpanRefusal(span);
+    if (unusable !== null) return { ...st, on: false, active: false, refused: unusable };
+    // THE CENSUS IS pc LEGS (R-F9): a platform it does not cover is refused
+    // rather than dead-reckoned on an odometer nobody has measured there.
+    if (!ZONE_REST_PLATFORMS.includes(platform)) {
+      return {
+        ...st, on: false, active: false,
+        refused: profileText("refused.platform", {
+          odo: odoBandSpec(),
+          platform: typeof platform === "string" && PROFILE_TOKEN_RE.test(platform) ? platform : null,
+          legs: ODO_CENSUS_ALL_WRONG_LEGS.legs,
+          mobile: ODO_CENSUS_ALL_WRONG_LEGS.mobileLegs,
+          at: ODO_CENSUS_ALL_WRONG_LEGS.measured,
+          min: ODO_CENSUS_ALL_WRONG_LEGS.mobileMinRatio,
+          rmin: ODO_RATIO_MIN,
+          rmax: ODO_RATIO_MAX,
+        }),
+      };
+    }
+    const thr = banZoneRestThresholdSec(span.basis, own);
+    const holdSec = thr + own.BAN_ZONE_REST_REGRADE_SEC + ZONE_REST_MARGIN_SEC;
+    st.zone = {
+      world: decl.zone.world, zoneIds: [...decl.zone.zoneIds], basis: span.basis,
+      fromM: span.fromM, toM: span.toM, aimM: (span.fromM + span.toM) / 2, residualM: ZONE_REST_RESIDUAL_M,
+      thresholdSec: thr, regradeSec: own.BAN_ZONE_REST_REGRADE_SEC, holdSec,
+      // THE SIZED HOLD carries the same +1 s sampling margin every other
+      // sizing here carries.
+      sizedHoldSec: thr + own.BAN_ZONE_REST_REGRADE_SEC + PROFILE_SUSTAIN_MARGIN_SEC,
+      decel: own.BRAKE_FORCE_N / own.CHASSIS_MASS, reactMinS: ZONE_REST_REACT_MIN_S, reactMaxS: ZONE_REST_REACT_MAX_S,
+      ratioMin: ODO_RATIO_MIN, ratioMax: ODO_RATIO_MAX, creepM: ZONE_REST_CREEP_M,
+      phase: "approach", decision: null, heldMs: 0, bestHeldMs: 0, restQual: false,
+      breaks: 0, stirs: 0, unreadTicks: 0, restAtSec: null,
+    };
+    st.sizedFrom = sizingSpec(decl, own, { thresholdSec: thr, basis: span.basis });
+  }
+  return st;
+}
+
+/** The neutral answer — what every lane without a profile gets, every tick. */
+export const NEUTRAL_PROFILE_STEP = Object.freeze({ suppressRest: false, forceRest: false, say: null });
+
+/** A line to print: rendered from the template table, and nowhere else —
+ *  FROZEN, and carrying the spec it was rendered from, so nothing can append
+ *  to it after rendering and a reader can re-render it (round 8). */
+function sayLine(loud, tpl, f) {
+  const spec = profileText(tpl, f);
+  return Object.freeze({ loud, line: renderProfileText(spec), spec });
+}
+
+/**
+ * ONE FLAT TICK of the profile — pure. `tick`:
+ *   now, t0         — this tick's clock and the drive's
+ *   kmh             — the dial (−1 when unreadable)
+ *   flatStepM       — the SAME metres the caller adds to `flatM` this tick
+ *   dtMs            — the same interval (`now - lastTickAt`, which the pause
+ *                     drain resets, so it holds no frozen time)
+ *   postedKmh       — `postedLimitKmh(p.postedLabels)`
+ *   follow          — `parseHazard(p.hazard).follow` (null = no lead chip)
+ *   probeAt         — the wall clock taken immediately BEFORE the probe that
+ *                     read `kmh` (lesson-audit's `tickStart`); only the
+ *                     finish-open profile reads it
+ *
+ * @returns {{state:object, suppressRest:boolean, forceRest:boolean, say:null|{loud:boolean,line:string}}}
+ */
+export function wrongLegFlatStep(state, tick = {}) {
+  if (!state || state.on !== true || state.active !== true) return { state, ...NEUTRAL_PROFILE_STEP };
+  const s = structuredClone(state);
+  const now = fin(tick.now) ?? 0;
+  const kmh = fin(tick.kmh);
+  const dial = kmh !== null && kmh >= 0 ? kmh : null;
+  const dtMs = Math.min(Math.max(0, fin(tick.dtMs) ?? 0), PROFILE_STEP_CAP_MS);
+  const dtSec = dtMs / 1000;
+  s.flatTicks += 1;
+  s.startedAt ??= now;
+  s.clockMs += dtMs;
+  // THE WALL INTERVAL since the last flat reading — each tick's own work in
+  // it, never capped (round 7, from OBS-END-GAP-AND-INTERVAL).
+  if (s.prevFlatAt !== null) {
+    const wall = Math.max(0, now - s.prevFlatAt);
+    if (s.maxWallMs === null || wall > s.maxWallMs) s.maxWallMs = wall;
+  }
+  s.prevFlatAt = now;
+  const stepM = fin(tick.flatStepM);
+  if (stepM !== null && stepM > 0) s.odoM += stepM;
+  // THIS TICK'S OWN STEP, exactly as the harness adds it to `flatM` — the rest
+  // opportunity's stretch is summed from these (round 9, P4-FLOAT-TIE).
+  s.opportunities.tickM = stepM ?? 0;
+  s.ms = Math.max(0, now - s.startedAt);
+  const atSec = elapsedSec({ now, from: fin(tick.t0) });
+  const out = { suppressRest: false, forceRest: false, say: null };
+  const held = (how, obs) => {
+    s.heldAsSized = true;
+    s.heldAtSec = atSec;
+    s.how = how;
+    s.observed = obs;
+    out.say = sayLine(false, "say.held", { name: s.name, how, at: atSec, obs });
+  };
+
+  if (s.kind === "finish-open") {
+    // NO GOVERNOR, NOTHING HELD MID-DRIVE. The profile holds every rest back
+    // and tallies its readings; which verdict word the drive gets is decided
+    // at its end, by `wrongLegProfileFinish`.
+    const f = s.finish;
+    const posted = fin(tick.postedKmh) !== null && tick.postedKmh > 0 ? tick.postedKmh : null;
+    // THE DISC, EVERY TICK (round 7, from OBS-DISC-UNREAD): unread before its
+    // first reading, or AFTER it — the second kind used to be silent.
+    if (posted === null) {
+      if (f.postedKmh === null) f.discUnreadBefore += 1;
+      else f.discUnreadAfter += 1;
+    } else {
+      f.discReadTicks += 1;
+    }
+    if (posted !== null && posted !== f.postedKmh) {
+      // THE BAND FOLLOWS THE DISC (round 3, N13) — and a CHANGE, as opposed to
+      // the first disc, is counted.
+      if (f.postedKmh !== null) f.limitChanges += 1;
+      const bands = speedingBandsKmh(posted, {
+        speedingGraceRatio: s.c.speedingGraceRatio,
+        speedingGraceMaxKmh: s.c.speedingGraceMaxKmh,
+        dangerousSpeedOverKmh: s.c.dangerousSpeedOverKmh,
+      });
+      f.postedKmh = posted;
+      f.gradedAboveKmh = bands ? bands.gradedAbove : null;
+      f.dangerousAboveKmh = bands ? bands.dangerousAbove : null;
+    }
+    if (s.flatTicks === 1) {
+      f.firstSeen = true;
+      f.firstKmh = dial;
+    }
+    if (dial === null) f.unreadTicks += 1;
+    if (dial !== null && dial > f.topKmh) f.topKmh = dial;
+    f.lastKmh = dial;
+    // IN THE BAND AT THE DIAL'S RESOLUTION: the reading must be past each edge
+    // by the half quantum.
+    const lo = f.gradedAboveKmh === null ? null : f.gradedAboveKmh + DIAL_HALF_QUANTUM_KMH;
+    const hi = f.dangerousAboveKmh === null ? null : f.dangerousAboveKmh - DIAL_HALF_QUANTUM_KMH;
+    if (lo !== null && dial !== null) {
+      const inBand = dial > lo && dial <= hi;
+      f.lastInBand = inBand;
+      if (inBand) f.inBandTicks += 1;
+      if (dial > f.dangerousAboveKmh) f.aboveBandTicks += 1;
+    } else {
+      f.lastInBand = null;
+    }
+    // THE IN-BAND TALLY — the §2b ledger on the profile clock, with the band
+    // narrowed to the dial's certain readings.
+    const led = overLimitLedgerStep({
+      kmh: dial,
+      now: s.clockMs,
+      postedKmh: f.postedKmh,
+      needKmh: lo,
+      dangerousAboveKmh: hi,
+      overSec: f.inBandSec,
+      resets: f.dips,
+      qualAt: f.qualAt,
+    });
+    f.inBandSec = led.overSec;
+    f.dips = led.resets;
+    f.qualAt = led.qualAt;
+    // THE POSSIBLE-IN-BAND TALLY (rounds 3–4) — a tally of the harness's OWN
+    // readings in WALL time between flat ticks: an interval is credited unless
+    // BOTH its readings sit certainly outside the band on the SAME side; an
+    // unread dial or an unknown band is credited; never reset, never capped;
+    // the interval before the first reading is credited unless that reading is
+    // certainly below; the one after the last is added by the finish; a
+    // credited interval that ends an uncredited run also credits the closing
+    // reading's AGE BOUND (measured probe wait + `dialLagMs`), capped at the
+    // run. Its two limits, stated with it: an excursion hidden between two
+    // certainly-below readings, and a reading older than its age bound.
+    const lo2 = f.gradedAboveKmh;
+    const hi2 = f.dangerousAboveKmh;
+    const side =
+      lo2 === null || hi2 === null || dial === null
+        ? 0
+        : dial + DIAL_HALF_QUANTUM_KMH <= lo2
+          ? -1
+          : dial - DIAL_HALF_QUANTUM_KMH > hi2
+            ? 1
+            : 0;
+    const wallMs = f.prevNow === null ? Math.max(0, fin(tick.dtMs) ?? 0) : Math.max(0, now - f.prevNow);
+    const outside = side !== 0 && (f.prevSide === null ? side === -1 : f.prevSide === side);
+    if (!outside) {
+      f.possibleSec += wallMs / 1000;
+      if (f.uncreditedMs > 0) {
+        const tail = Math.min(f.uncreditedMs, f.prevAgeMs ?? f.uncreditedMs);
+        f.possibleSec += tail / 1000;
+        f.ageCreditSec += tail / 1000;
+      }
+      f.uncreditedMs = 0;
+    } else {
+      f.uncreditedMs += wallMs;
+    }
+    // THIS reading's age bound, for the interval after it.
+    const probeAt = fin(tick.probeAt);
+    const measuredMs = probeAt !== null && probeAt <= now ? now - probeAt : fin(tick.dtMs);
+    if (!(probeAt !== null && probeAt <= now)) f.probeUnmeasured += 1;
+    f.prevAgeMs = measuredMs !== null && f.dialLagMs !== null ? Math.max(0, measuredMs) + f.dialLagMs : null;
+    f.prevSide = side;
+    f.prevNow = now;
+    out.suppressRest = true;
+  } else if (s.kind === "stint") {
+    const t = s.stint;
+    if (dial === null) {
+      // No dial is no reading: the run neither grows nor breaks — but the
+      // tick is COUNTED, inside the run when there is one (round 7).
+      t.unreadTicks += 1;
+      if (t.curSec > 0) t.unreadInRun += 1;
+    } else if (dial > s.c.movingSpeedKmh) {
+      t.curSec += dtSec;
+    } else {
+      if (t.curSec > 0) t.dips += 1;
+      t.curSec = 0;
+      t.unreadInRun = 0;
+    }
+    if (t.curSec > t.bestSec) {
+      t.bestSec = t.curSec;
+      t.unreadInBest = t.unreadInRun;
+    }
+    if (t.curSec >= t.targetSec) {
+      held(
+        "stint",
+        profileText("obs.stint", { run: t.curSec, moving: s.c.movingSpeedKmh, unread: t.unreadInRun, target: t.targetSec, keep: s.c.keepRightSustainSec, margin: STINT_MARGIN_SEC }),
+      );
+      s.active = false;
+      s.done = "held-as-sized";
+    } else {
+      out.suppressRest = true;
+    }
+  } else if (s.kind === "lead-close") {
+    const L = s.lead;
+    if (dial !== null && dial > L.topKmh) L.topKmh = dial;
+    const f = tick.follow && typeof tick.follow === "object" ? tick.follow : null;
+    const lead = f !== null && f.present === true && f.parsed === true && fin(f.meters) !== null;
+    if (f !== null && f.present === true && f.parsed !== true) L.unparsedTicks += 1;
+    if (!lead) {
+      L.noLeadTicks += 1;
+      L.baseRunSec = 0; L.baseQual = false;
+      L.rainRunSec = 0; L.rainQual = false;
+      L.recent = [];
+    } else {
+      L.leadTicks += 1;
+      const m = f.meters;
+      const sec = fin(f.heldSec);
+      if (L.minM === null || m < L.minM) L.minM = m;
+      if (sec !== null && (L.minSec === null || sec < L.minSec)) L.minSec = sec;
+      // THE OPENING GUARD at the chip's resolution: the rate is taken against
+      // the newest reading at least OPENING_WINDOW_MS old on the profile clock,
+      // and the rounding of the two readings is subtracted first.
+      L.recent.push({ m, at: s.clockMs });
+      while (L.recent.length >= 2 && L.recent[1].at <= s.clockMs - OPENING_WINDOW_MS) L.recent.shift();
+      let opening = false;
+      const anchor = L.recent.length >= 2 ? L.recent[0] : null;
+      if (anchor !== null && s.clockMs > anchor.at) {
+        opening = (m - anchor.m - FOLLOW_CHIP_METRE_QUANTUM_M) / ((s.clockMs - anchor.at) / 1000) >= s.c.followRecoveryRateMps;
+      }
+      if (opening) L.openingTicks += 1;
+      // «Fast enough» at the DIAL's resolution.
+      const fast = dial !== null && dial - DIAL_HALF_QUANTUM_KMH >= s.c.followMinSpeedKmh;
+      const h = FOLLOW_CHIP_SECONDS_HALF_QUANTUM;
+      // Inside a band only when the tenth-of-a-second reading is inside it by
+      // the half quantum; a reading on an edge is neither, and breaks both runs.
+      const underBase = sec !== null && sec + h < L.baseLineSec;
+      const underRain = L.rainLineSec !== null && sec !== null && sec - h >= L.baseLineSec && sec + h < L.rainLineSec;
+      if (sec !== null && !underBase && !underRain && sec - h < (L.rainLineSec ?? L.baseLineSec)) L.edgeTicks += 1;
+      if (L.lessonRuleSec !== null && sec !== null && sec < L.lessonRuleSec) L.underLessonRuleSec += dtSec;
+      // Consecutive: the first qualifying tick after a break credits nothing.
+      const qb = fast && underBase && !opening;
+      L.baseRunSec = qb ? (L.baseQual ? L.baseRunSec + dtSec : 0) : 0;
+      L.baseQual = qb;
+      if (L.baseRunSec > L.baseBestSec) L.baseBestSec = L.baseRunSec;
+      const qr = fast && underRain && !opening;
+      L.rainRunSec = qr ? (L.rainQual ? L.rainRunSec + dtSec : 0) : 0;
+      L.rainQual = qr;
+      if (L.rainRunSec > L.rainBestSec) L.rainBestSec = L.rainRunSec;
+      const common = { h, min: s.c.followMinSpeedKmh, hq: DIAL_HALF_QUANTUM_KMH, margin: PROFILE_SUSTAIN_MARGIN_SEC, minSec: L.minSec, minM: L.minM };
+      if (!s.heldAsSized && L.baseRunSec >= L.baseSustainSec) {
+        held("gap-base", profileText("obs.gapBase", { ...common, line: L.baseLineSec, run: L.baseRunSec, target: L.baseSustainSec, sus: s.c.followSustainSec }));
+      } else if (!s.heldAsSized && L.rainSustainSec !== null && L.rainRunSec >= L.rainSustainSec) {
+        held("gap-rain", profileText("obs.gapRain", { ...common, base: L.baseLineSec, rain: L.rainLineSec, run: L.rainRunSec, target: L.rainSustainSec, sus: s.c.followRainSustainSec }));
+      }
+      // (No third route: the chip's METRES alone hold nothing —
+      // WITHDRAWN_PROFILE_ROUTES carries why.)
+    }
+    if (s.heldAsSized) {
+      s.active = false;
+      s.done = "held-as-sized";
+    } else {
+      out.suppressRest = lead;
+    }
+  } else if (s.kind === "zone-rest") {
+    const z = s.zone;
+    if (z.phase === "approach") {
+      out.suppressRest = true;
+      if (dial === null) {
+        // AN UNREAD DIAL ON THE APPROACH BREAKS THE DEAD RECKONING: the car
+        // kept moving while the odometer stood still. Neither advanced nor
+        // skipped: REFUSED, here, loudly.
+        z.unreadTicks += 1;
+        z.phase = "done";
+        s.active = false;
+        s.done = "blind";
+        s.observed = profileText("obs.zoneBlind", { at: atSec, odo: s.odoM });
+        out.suppressRest = false;
+        out.say = sayLine(true, "say.notHeld", { name: s.name, obs: s.observed });
+      } else if (s.odoM / z.ratioMax > z.toM) {
+        z.phase = "done";
+        s.active = false;
+        s.done = "missed";
+        s.observed = profileText("obs.zoneMissed", { odo: s.odoM, trueLo: s.odoM / z.ratioMax, rmax: z.ratioMax, legs: ODO_CENSUS_ZONE_PC.legs, to: z.toM });
+        out.suppressRest = false;
+        out.say = sayLine(true, "say.notHeld", { name: s.name, obs: s.observed });
+      } else if (dial > s.c.fullStopMaxSpeedKmh) {
+        const iv = zoneRestInterval(s.odoM, dial, { reactMinS: z.reactMinS, reactMaxS: z.reactMaxS, decel: z.decel, ratioMin: z.ratioMin, ratioMax: z.ratioMax, creepM: z.creepM });
+        const halfStep = (dial / 3.6) * dtSec * 0.5;
+        if (iv !== null && iv.mid + halfStep >= z.aimM) {
+          z.decision = {
+            atSec,
+            odoM: Number(s.odoM.toFixed(1)),
+            kmh: dial,
+            // THE HARNESS'S ESTIMATE, as intervals: where the car is now and
+            // where it rests.
+            trueLoM: Number((s.odoM / z.ratioMax).toFixed(1)),
+            trueHiM: Number((s.odoM / z.ratioMin + z.creepM).toFixed(1)),
+            nearStopM: Number(iv.nearStopM.toFixed(1)),
+            farStopM: Number(iv.farStopM.toFixed(1)),
+            restLoM: Number(iv.lo.toFixed(1)),
+            restHiM: Number(iv.hi.toFixed(1)),
+            inside: iv.lo >= z.fromM + z.residualM && iv.hi <= z.toM - z.residualM,
+          };
+          z.phase = "braking";
+          s.restsForced += 1;
+          out.forceRest = true;
+          out.suppressRest = false;
+          const d = z.decision;
+          out.say = sayLine(false, "say.braking", {
+            name: s.name, at: atSec, fs: s.c.fullStopMaxSpeedKmh, odo: d.odoM, tlo: d.trueLoM, thi: d.trueHiM, odoBand: odoBandSpec(), creepBand: creepBandSpec(),
+            near: d.nearStopM, far: d.farStopM, kmh: dial, reactBand: reactBandSpec(), model: zoneModelSpec(z.decel),
+            lo: d.restLoM, hi: d.restHiM, from: z.fromM, to: z.toM,
+            place: d.inside ? profileText("zone.inside", { res: z.residualM }) : profileText("zone.unverified"),
+          });
+        }
+      }
+    }
+  }
+
+  // THE CEILINGS — after the tick's readings, so a target met on the ceiling
+  // tick still counts. (A profile whose readings held as sized is no longer
+  // active — every kind stops there — so a ceiling only ever ends one that
+  // did not.)
+  if (s.active && s.done === null && !out.forceRest) {
+    const why =
+      s.odoM >= s.maxM
+        ? profileText("ceiling.metres", { m: s.odoM, max: s.maxM })
+        : s.ms >= s.maxMs
+          ? profileText("ceiling.clock", { s: s.ms / 1000, max: s.maxMs / 1000 })
+          : null;
+    if (why !== null) {
+      s.active = false;
+      s.done = s.odoM >= s.maxM ? "metres" : "clock";
+      if (s.zone) s.zone.phase = "done";
+      out.suppressRest = false;
+      s.observed = profileText("obs.ceiling", { why });
+      out.say = sayLine(true, "say.notHeld", { name: s.name, obs: s.observed });
+    }
+  }
+  // A HELD flat tick is one whose rest the profile actually held back — counted
+  // after the ceiling, which releases the rest on its own tick (round 7).
+  if (out.suppressRest) s.heldTicks += 1;
+  return { state: s, ...out };
+}
+
+/**
+ * THE FLAT → FLAT-REST TRANSITION. With no profile (`suppress` and `force`
+ * both false) this is, clause for clause, the condition that stood in
+ * `lesson-audit.mjs`:
+ *   `!holdRest && (flatM >= FLAT_REST_EVERY_M || now - phaseAt >= FLAT_REST_MAX_MS) && phaseTicks >= 1`
+ * A profile can hold it back (`suppress`) or book it now (`force`, the zone
+ * rest); `phaseTicks >= 1` binds both.
+ */
+export function flatRestDue({ holdRest = false, suppress = false, force = false, flatM = 0, sincePhaseMs = 0, phaseTicks = 0, everyM, maxMs } = {}) {
+  const due = flatM >= everyM || sincePhaseMs >= maxMs;
+  return (force === true || (!holdRest && suppress !== true && due)) && phaseTicks >= 1;
+}
+
+/**
+ * REST OPPORTUNITIES HELD BACK (round 7, from OBS-RESTS-HELD-BACK) — pure.
+ * Called on EVERY flat tick with the transition's own inputs. When the
+ * ORDINARY cadence (`flatRestDue` with no profile) is due, the profile held
+ * the rest back and booked none, that is an opportunity held back — counted
+ * ONCE per stretch: the next one needs another `everyM` of flat metres, or
+ * another `maxMs` of the phase clock, after the last one counted — exactly
+ * when the ordinary cadence would have come due again had it rested there.
+ * The stretch's metres are SUMMED FROM ZERO over each flat tick's own step
+ * (round 9): the harness's `flatM` restarts at 0 after a rest and adds each
+ * step to it, and a difference of two running sums lands on the other side
+ * of an exact 45 m about one leg in three thousand (the round-8 verifier's
+ * P4-FLOAT-TIE). Every call also watches for a restart: a new flat phase (a
+ * rest ran) — `flatM` falling, or `phaseTicks` not advancing — restarts the
+ * whole stretch; the phase clock falling alone is the pause drain's reset,
+ * which restarts its time half from the drain (the drain always comes after
+ * the last count). Never counted per tick. The same state object comes back
+ * on every lane without a running profile, and once the profile has stopped
+ * holding.
+ */
+export function wrongLegRestOpportunity(state, { holdRest = false, suppress = false, force = false, flatM = 0, sincePhaseMs = 0, phaseTicks = 0, everyM, maxMs } = {}) {
+  if (!state || state.on !== true || state.active !== true || !state.opportunities) return state;
+  const s = structuredClone(state);
+  const q = s.opportunities;
+  q.everyM = fin(everyM);
+  q.maxMs = fin(maxMs);
+  // A NEW FLAT PHASE — a rest ran: `flatM` fell, or (round 9) the phase's tick
+  // count did not advance, which also catches a rest taken on an odometer
+  // smaller than the next phase's first step, where `flatM` never falls.
+  if ((q.lastM !== null && flatM < q.lastM) || (q.lastTicks !== null && phaseTicks <= q.lastTicks)) {
+    q.atM = null;
+    q.atMs = null;
+  } else if (q.lastMs !== null && sincePhaseMs < q.lastMs && q.atMs !== null) {
+    q.atMs = 0;
+  }
+  // THE STRETCH'S METRES, summed from zero over the flat ticks' own steps
+  // since the last count — the same additions, in the same order, that the
+  // harness's `flatM` makes after a rest. A difference of two running sums
+  // (`flatM - atM`) can land either side of a tie the harness's own sum is on
+  // (round 9, from the round-8 verifier's P4-FLOAT-TIE).
+  q.sinceM = q.atM === null ? null : (q.sinceM ?? 0) + (q.tickM ?? 0);
+  q.lastTicks = phaseTicks;
+  q.lastM = flatM;
+  q.lastMs = sincePhaseMs;
+  const ordinary = flatRestDue({ holdRest, flatM, sincePhaseMs, phaseTicks, everyM, maxMs });
+  if (ordinary && suppress === true && force !== true) {
+    if (q.atM === null || q.sinceM >= everyM || sincePhaseMs - q.atMs >= maxMs) {
+      q.count += 1;
+      q.atM = flatM;
+      q.atMs = sincePhaseMs;
+      q.sinceM = 0;
+    }
+  }
+  return s;
+}
+
+/** Is the profile holding a zone rest (braking into it or standing in it)? */
+export function zoneRestEngaged(state) {
+  return !!(state && state.on === true && state.kind === "zone-rest" && state.zone && (state.zone.phase === "braking" || state.zone.phase === "holding"));
+}
+
+/** After a pause drain a `wrong` leg re-presses the throttle. Not while it is
+ *  standing out a zone rest. `true` on every other lane. */
+export function resumeThrottleAfterPause(state) {
+  return !zoneRestEngaged(state);
+}
+
+/**
+ * The car has just come to rest in `flat-rest`. How long is THIS rest held?
+ * The default `holdMs` unless this is the profile's zone rest. `kmh` is the
+ * booking tick's dial (round 7): the continuous rest is credited from the
+ * next tick only when that reading is at or under `fullStopMaxSpeedKmh`.
+ * @returns {{state:object, holdMs:number, zone:boolean}}
+ */
+export function wrongLegRestBooked(state, { now = 0, t0 = null, holdMs, kmh = null } = {}) {
+  if (!state || state.on !== true || state.kind !== "zone-rest" || state.zone?.phase !== "braking") return { state, holdMs, zone: false };
+  const s = structuredClone(state);
+  s.zone.phase = "holding";
+  s.zone.restAtSec = elapsedSec({ now, from: fin(t0) });
+  s.zone.heldMs = 0;
+  const dial = fin(kmh);
+  s.zone.restQual = dial !== null && dial >= 0 && dial <= s.c.fullStopMaxSpeedKmh;
+  return { state: s, holdMs: s.zone.holdSec * 1000, zone: true };
+}
+
+/**
+ * One `flat-rest` tick after the rest was booked:
+ *   · at or under `fullStopMaxSpeedKmh` the continuous run grows by the tick's
+ *     interval (clamped);
+ *   · over it but not over `movingSpeedKmh` the run is ZEROED and the next
+ *     at-rest tick credits nothing (a STIR);
+ *   · over `movingSpeedKmh` it is zeroed as well (a BREAK).
+ * A dial of −1 is no reading: nothing is credited, nothing is broken, and
+ * the tick is counted.
+ */
+export function wrongLegRestTick(state, { kmh = null, dtMs = 0 } = {}) {
+  if (!state || state.on !== true || state.kind !== "zone-rest" || state.zone?.phase !== "holding") return state;
+  const s = structuredClone(state);
+  const z = s.zone;
+  const dial = fin(kmh);
+  if (dial === null || dial < 0) {
+    z.unreadTicks += 1;
+  } else if (dial <= s.c.fullStopMaxSpeedKmh) {
+    if (z.restQual) z.heldMs += Math.min(Math.max(0, fin(dtMs) ?? 0), PROFILE_STEP_CAP_MS);
+    z.restQual = true;
+  } else {
+    if (dial > s.c.movingSpeedKmh) z.breaks += 1;
+    else z.stirs += 1;
+    z.heldMs = 0;
+    z.restQual = false;
+  }
+  if (z.heldMs > z.bestHeldMs) z.bestHeldMs = z.heldMs;
+  return s;
+}
+
+/** The WALL-CLOCK ceiling on one zone hold, so a hold whose tally keeps being
+ *  zeroed cannot pin the leg in `flat-rest` for the rest of its budget. Twice
+ *  the 34 s hold plus 20 s for a pause's drain ≈ 90 s. */
+export const ZONE_REST_WALL_CEILING_MS = 90_000;
+
+/** Is the current rest over? The default is the wall clock since the rest was
+ *  booked, exactly as it stood; a zone hold is its own paused-excluded tally,
+ *  bounded by `ZONE_REST_WALL_CEILING_MS`. */
+export function flatRestHoldDone({ now = 0, restAt = 0, holdMs, state = null } = {}) {
+  if (state && state.on === true && state.kind === "zone-rest" && state.zone?.phase === "holding") {
+    return state.zone.heldMs >= state.zone.holdSec * 1000 || now - restAt >= ZONE_REST_WALL_CEILING_MS;
+  }
+  return now - restAt >= holdMs;
+}
+
+/** Where the zone rest's dead reckoning put the car, as a template spec. */
+function zoneEstimateSpec(z) {
+  const d = z.decision;
+  if (!d) return profileText("zone.estNone");
+  return profileText("zone.est", {
+    at: d.atSec, kmh: d.kmh, odo: d.odoM, tlo: d.trueLoM, thi: d.trueHiM, lo: d.restLoM, hi: d.restHiM,
+    near: d.nearStopM, far: d.farStopM, legs: ODO_CENSUS_ZONE_PC.legs, n: REACTION_CENSUS.transitions, model: zoneModelSpec(z.decel),
+  });
+}
+
+/** The rest ended — held out, or given up because the car never came to rest.
+ *  `atDriveEnd` is `wrongLegProfileFinish`'s own call (round 10, the round-9
+ *  verifier's IMPRECISE-SELF-STATEMENTS d): a zone rest still braking when the
+ *  drive ended — even on the booking tick itself, before any flat-rest tick
+ *  pressed the brake — says the DRIVE ended, and one the harness gave up says
+ *  THAT; neither says the brake was pressed.
+ *  @returns {{state:object, say:null|{loud:boolean,line:string}}} */
+export function wrongLegRestEnded(state, { now = 0, t0 = null, gaveUp = false, atDriveEnd = false } = {}) {
+  if (!zoneRestEngaged(state)) return { state, say: null };
+  const s = structuredClone(state);
+  const z = s.zone;
+  const atSec = elapsedSec({ now, from: fin(t0) });
+  s.active = false;
+  if (gaveUp || z.phase === "braking") {
+    z.phase = "done";
+    s.done = "no-rest";
+    s.observed = profileText("obs.zoneNoRest", { fs: s.c.fullStopMaxSpeedKmh, end: profileText(atDriveEnd === true ? "zone.endDrive" : "zone.endGaveUp"), est: zoneEstimateSpec(z) });
+    return { state: s, say: sayLine(true, "say.notHeldEnd", { name: s.name, obs: s.observed }) };
+  }
+  z.phase = "done";
+  const held = z.heldMs / 1000;
+  const bar = z.sizedHoldSec;
+  const stood = profileText("zone.stood", { fs: s.c.fullStopMaxSpeedKmh, held, stirs: z.stirs, breaks: z.breaks, unread: z.unreadTicks, bar });
+  if (z.decision?.inside === true && held >= bar) {
+    s.done = "held-as-sized";
+    s.heldAsSized = true;
+    s.heldAtSec = atSec;
+    s.how = "zone-rest";
+    s.observed = profileText("obs.zoneHeld", { stood, est: zoneEstimateSpec(z), basis: z.basis, from: z.fromM, to: z.toM, res: z.residualM });
+    return { state: s, say: sayLine(false, "say.held", { name: s.name, how: "zone-rest", at: atSec, obs: s.observed }) };
+  }
+  // «unverified-place», never «outside»: the leg did not SHOW the car away
+  // from the span, it failed to place it inside.
+  s.done = z.decision?.inside === true ? "short-hold" : "unverified-place";
+  s.observed = z.decision?.inside === true ? stood : profileText("obs.zoneUnverified", { stood, est: zoneEstimateSpec(z), from: z.fromM, to: z.toM, res: z.residualM });
+  return { state: s, say: sayLine(true, "say.notHeldEnd", { name: s.name, obs: s.observed }) };
+}
+
+/**
+ * THE FINISH-OPEN SIZING — did the leg's readings meet what the profile was
+ * sized to? Pure. A statement about the READINGS only. Each target, and the
+ * template when it is unmet:
+ *   · the drive reached its END SCREEN (the harness's `ended` flag);
+ *   · no ceiling had released the profile before the end;
+ *   · a posted disc was read, and READ ON EVERY FLAT TICK (round 7);
+ *   · one disc throughout (round 3, N13);
+ *   · the FIRST flat reading certainly below the band;
+ *   · the LAST flat reading certainly inside the band;
+ *   · the in-band tally ≥ its sized target;
+ *   · the possible-in-band tally < its sized target;
+ *   · the END GAP (last flat reading → the finish's clock, wall) inside the
+ *     longest wall interval between two flat readings (round 7).
+ * @returns {{held:boolean, unmet:object[]}} — `unmet` are template specs.
+ */
+export function finishOpenSizing(f, { active = false, driveEnded = false, maxWallMs = null } = {}) {
+  const unmet = [];
+  if (!f || typeof f !== "object") return { held: false, unmet: [profileText("unmet.noRecord")] };
+  const hq = DIAL_HALF_QUANTUM_KMH;
+  if (driveEnded !== true) unmet.push(profileText("unmet.notEnded"));
+  if (active !== true) unmet.push(profileText("unmet.released"));
+  if (f.gradedAboveKmh === null) unmet.push(profileText("unmet.noDisc"));
+  const discUnread = (f.discUnreadBefore ?? 0) + (f.discUnreadAfter ?? 0);
+  if (discUnread !== 0) {
+    unmet.push(profileText("unmet.discUnread", { n: discUnread, t: discUnread + (f.discReadTicks ?? 0), after: f.discUnreadAfter ?? 0 }));
+  }
+  if (f.limitChanges !== 0) unmet.push(profileText("unmet.discChanged", { n: f.limitChanges, disc: f.postedKmh }));
+  if (!(f.firstSeen === true && f.firstKmh !== null && f.gradedAboveKmh !== null && f.firstKmh + hq <= f.gradedAboveKmh)) {
+    unmet.push(profileText("unmet.first", { first: f.firstKmh, lo: f.gradedAboveKmh, hq }));
+  }
+  if (f.lastInBand !== true) {
+    unmet.push(profileText("unmet.last", { last: f.lastKmh, lo: f.gradedAboveKmh, hi: f.dangerousAboveKmh, hq }));
+  }
+  if (!(f.inBandSec >= f.sizedInBandSec)) {
+    unmet.push(profileText("unmet.inBand", { v: f.inBandSec, s: f.sizedInBandSec, m: f.minorSustainSec, margin: PROFILE_SUSTAIN_MARGIN_SEC }));
+  }
+  if (!(f.possibleSec < f.sizedWindowSec)) {
+    unmet.push(profileText("unmet.window", { v: f.possibleSec, s: f.sizedWindowSec, m: f.minorSustainSec, r: f.regradeSec }));
+  }
+  const gap = fin(f.finalMs);
+  const wall = fin(maxWallMs);
+  if (!(gap !== null && wall !== null && gap <= wall)) unmet.push(profileText("unmet.endGap", { gap, maxWall: wall }));
+  return { held: unmet.length === 0, unmet };
+}
+
+/**
+ * The drive is over. Closes whatever is still open, records whether the drive
+ * reached its end screen, and gives the finish-open profile its verdict word
+ * (`finishOpenSizing`). The end gap is MEASURED: the finish's clock less the
+ * last flat reading's, on the wall clock.
+ */
+export function wrongLegProfileFinish(state, { now = 0, t0 = null, driveEnded = false } = {}) {
+  if (!state || state.declared !== true) return { state, say: null };
+  const s = structuredClone(state);
+  if (s.on !== true) return { state: s, say: null };
+  const atSec = elapsedSec({ now, from: fin(t0) });
+  s.driveEnded = driveEnded === true;
+  if (s.kind === "finish-open" && !s.heldAsSized && s.done === null) {
+    const f = s.finish;
+    // THE LAST INTERVAL of the possible-in-band tally: from the last flat
+    // reading to the finish's own clock — credited whole — and THE END GAP.
+    if (f.prevNow !== null) {
+      f.finalMs = Math.max(0, now - f.prevNow);
+      f.possibleSec += f.finalMs / 1000;
+      // …and, as on every credited interval, the reading-age tail of an
+      // uncredited run it closes (round 4).
+      if (f.uncreditedMs > 0) {
+        const tail = Math.min(f.uncreditedMs, f.prevAgeMs ?? f.uncreditedMs);
+        f.possibleSec += tail / 1000;
+        f.ageCreditSec += tail / 1000;
+        f.uncreditedMs = 0;
+      }
+      f.prevNow = now;
+    }
+    const v = finishOpenSizing(f, { active: s.active, driveEnded, maxWallMs: s.maxWallMs });
+    if (v.held) {
+      s.heldAsSized = true;
+      s.heldAtSec = atSec;
+      s.how = "finish-in-band";
+      s.done = "held-as-sized";
+      s.observed = profileText("obs.finishHeld", {
+        ticks: s.flatTicks, disc: f.postedKmh, first: f.firstKmh, lo: f.gradedAboveKmh, hi: f.dangerousAboveKmh, last: f.lastKmh,
+        hq: DIAL_HALF_QUANTUM_KMH, inBand: f.inBandSec, sizedIn: f.sizedInBandSec, poss: f.possibleSec, sizedWin: f.sizedWindowSec,
+        age: f.ageCreditSec, gap: f.finalMs, maxWall: s.maxWallMs, prevAge: f.prevAgeMs,
+      });
+    } else {
+      s.done = "ended";
+      s.observed = profileText("obs.finishUnmet", { unmet: v.unmet });
+    }
+  }
+  if (zoneRestEngaged(s)) {
+    const r = wrongLegRestEnded(s, { now, t0, gaveUp: s.zone.phase === "braking", atDriveEnd: true });
+    Object.assign(s, r.state);
+    if (s.done === "short-hold") {
+      s.done = "ended";
+      s.observed = profileText("obs.midHold", { obs: s.observed });
+    }
+  }
+  if (s.done === null) s.done = s.heldAsSized ? "held-as-sized" : "ended";
+  if (!s.heldAsSized && s.observed === null) s.observed = profileText("obs.open", { kind: s.kind });
+  s.active = false;
+  return { state: s, say: null };
+}
+
+/* ── THE TEXTS THE HARNESS PRINTS — each one `renderProfileText(spec)` ──────
+ * Round 8 (the round-7 verifier's GATE-BYPASS): every text function below is
+ * a two-line wrapper over its `…Spec` twin, and the test pins each wrapper's
+ * body and re-renders every text the battery produces from the twin's spec —
+ * so no text can be appended after rendering without a test going red. */
+
+/** The start line's spec: «WRONG-LEG PROFILE: <name> — <what it will do>», or
+ *  the refusal. `null` for a lane with no profile. */
+export function wrongLegProfileStartSpec(state, { everyM = null } = {}) {
+  if (!state || state.declared !== true) return null;
+  const every = fin(everyM) === null ? null : profileText("start.every", { m: everyM });
+  if (state.on !== true) return profileText("start.refused", { name: state.name, why: state.refused, every, row: state.row });
+  const zone =
+    state.kind === "zone-rest" && state.zone
+      ? profileText("start.zone", { zones: state.zone.zoneIds, basis: state.zone.basis, from: state.zone.fromM, to: state.zone.toM, hold: state.zone.holdSec })
+      : null;
+  return profileText("start.on", { name: state.name, told: state.told, row: state.row, maxM: state.maxM, maxS: state.maxMs / 1000, every, zone, sizing: state.sizedFrom });
+}
+
+/** The start line, rendered — `null` for a lane with no profile (the silence
+ *  it printed before). */
+export function wrongLegProfileStartLine(state, opts) {
+  const spec = wrongLegProfileStartSpec(state, opts);
+  return spec === null ? null : renderProfileText(spec);
+}
+
+/** The REST OPPORTUNITIES clause: counted per stretch, never per tick. */
+function restsSpec(state) {
+  const o = state.opportunities ?? {};
+  return profileText("rests", {
+    opp: o.count ?? 0,
+    every: fin(o.everyM),
+    maxS: fin(o.maxMs) === null ? null : o.maxMs / 1000,
+    held: state.heldTicks ?? 0,
+    forced: state.restsForced ?? 0,
+  });
+}
+
+/** The READINGS clause of the outcome line — the harness's own tallies, by kind. */
+function readingsSpec(state) {
+  if (state.kind === "finish-open") {
+    const f = state.finish;
+    return profileText("readings.finish", {
+      disc: f.postedKmh, changes: f.limitChanges, discRead: f.discReadTicks, ticks: state.flatTicks,
+      unreadAfter: f.discUnreadAfter, unreadBefore: f.discUnreadBefore, lo: f.gradedAboveKmh, hi: f.dangerousAboveKmh,
+      inBand: f.inBandSec, dips: f.dips, poss: f.possibleSec, age: f.ageCreditSec, lag: f.dialLagMs, unmeasured: f.probeUnmeasured,
+      inTicks: f.inBandTicks, aboveTicks: f.aboveBandTicks, unread: f.unreadTicks,
+      first: f.firstKmh, top: f.topKmh >= 0 ? f.topKmh : null, last: f.lastKmh, maxWall: state.maxWallMs, gap: f.finalMs,
+    });
+  }
+  if (state.kind === "stint") {
+    const t = state.stint;
+    return profileText("readings.stint", { best: t.bestSec, target: t.targetSec, dips: t.dips, unread: t.unreadTicks, unreadBest: t.unreadInBest });
+  }
+  if (state.kind === "lead-close") {
+    const L = state.lead;
+    return profileText("readings.lead", {
+      lead: L.leadTicks, absent: L.noLeadTicks, unparsed: L.unparsedTicks, edge: L.edgeTicks, opening: L.openingTicks,
+      minSec: L.minSec, minM: L.minM, base: L.baseLineSec, baseBest: L.baseBestSec, baseSus: L.baseSustainSec,
+      rain: L.rainLineSec === null ? null : profileText("readings.leadRain", { base: L.baseLineSec, rain: L.rainLineSec, best: L.rainBestSec, sus: L.rainSustainSec }),
+      rule: L.lessonRuleSec === null ? null : profileText("readings.leadRule", { sec: L.underLessonRuleSec, rule: L.lessonRuleSec, at: PROFILE_SIZED_AT }),
+      top: L.topKmh >= 0 ? L.topKmh : null,
+    });
+  }
+  const z = state.zone;
+  const d = z.decision;
+  return profileText("readings.zone", {
+    braking: d ? profileText("zone.brakingBooked", { at: d.atSec, kmh: d.kmh, odo: d.odoM, lo: d.restLoM, hi: d.restHiM }) : profileText("zone.brakingNever"),
+    best: z.bestHeldMs / 1000, hold: z.holdSec, sized: z.sizedHoldSec, stirs: z.stirs, breaks: z.breaks, unread: z.unreadTicks,
+  });
+}
+
+/** The outcome line's spec — what the harness OBSERVED, its readings, and the
+ *  design constants the profile was sized from. `HELD_AS_SIZED` only when the
+ *  readings met the sizing; otherwise `NOT_HELD_AS_SIZED`. `null` for a lane
+ *  with no profile. */
+export function wrongLegProfileOutcomeSpec(state) {
+  if (!state || state.declared !== true) return null;
+  // A DECLARED profile that never ran is said again at the END, where a judge
+  // reads outcomes.
+  if (state.on !== true) return profileText("outcome.refused", { name: state.name, why: state.refused });
+  if (state.flatTicks === 0) return profileText("outcome.noTicks", { name: state.name, sizing: state.sizedFrom });
+  const end = profileText(state.driveEnded === true ? "end.reached" : state.driveEnded === false ? "end.notReached" : "end.unknown");
+  const common = {
+    name: state.name, obs: state.observed, readings: readingsSpec(state), rests: restsSpec(state), end,
+    clock: profileText("outcome.clock", { cap: PROFILE_STEP_CAP_MS / 1000 }), sizing: state.sizedFrom,
+  };
+  return state.heldAsSized
+    ? profileText("outcome.held", { ...common, how: state.how, at: state.heldAtSec })
+    : profileText("outcome.notHeld", { ...common, done: state.done });
+}
+
+/** The outcome line, rendered — `null` for a lane with no profile. */
+export function wrongLegProfileOutcomeLine(state) {
+  const spec = wrongLegProfileOutcomeSpec(state);
+  return spec === null ? null : renderProfileText(spec);
+}
+
+/**
+ * `lesson-audit.mjs`'s rest note, after «…holds it for », on a DECLARED lane —
+ * or `null` on every lane without one, which keeps the sentence that always
+ * stood there. The zone rest names its sized hold; every other rest on a
+ * declared lane names the harness's ordinary hold and nothing about the
+ * product (round 7: the «ban-zone sustain» sentence is not printed on a
+ * declared lane). This is the spec; `wrongLegRestHoldNote` renders it.
+ */
+export function wrongLegRestHoldNoteSpec(state, booked, { holdMs } = {}) {
+  if (!state || state.declared !== true) return null;
+  if (booked && booked.zone === true && state.zone) {
+    return profileText("rest.zone", {
+      hold: booked.holdMs / 1000, name: state.name, thr: state.zone.thresholdSec, basis: state.zone.basis,
+      rg: state.zone.regradeSec, margin: ZONE_REST_MARGIN_SEC, at: PROFILE_SIZED_AT,
+    });
+  }
+  return profileText("rest.plain", { hold: fin(holdMs) === null ? null : holdMs / 1000, name: state.name });
+}
+
+/** The rest note, rendered — `null` on every lane without a declared profile. */
+export function wrongLegRestHoldNote(state, booked, opts) {
+  const spec = wrongLegRestHoldNoteSpec(state, booked, opts);
+  return spec === null ? null : renderProfileText(spec);
+}
+
+/**
+ * `lesson-audit.mjs`'s rest summary clause for a RUNNING profile — the rest
+ * opportunities it held back (per stretch) and the rests it booked, and, for
+ * the zone profile, what the zone rest's hold actually read (or that none was
+ * booked). `null` on every other lane.
+ *
+ * «CHANGED WHEN THESE RESTS FELL» only when the profile held a due rest back
+ * or booked one (round 8, from the round-7 verifier's FALSE-SELF-CLAIMS): with
+ * neither, every rest fell on a tick where the ordinary cadence was due and
+ * the profile did not hold it — `wrongLegRestOpportunity` counts the FIRST such
+ * tick of any stretch, so a count of 0 means there was none — and the clause
+ * says exactly that.
+ */
+export function wrongLegRestSummarySpec(state) {
+  if (!state || state.on !== true) return null;
+  const rests = restsSpec(state);
+  if ((state.opportunities?.count ?? 0) === 0 && (state.restsForced ?? 0) === 0) {
+    const o = state.opportunities ?? {};
+    return profileText("summary.unchanged", { name: state.name, rests, every: fin(o.everyM), maxS: fin(o.maxMs) === null ? null : o.maxMs / 1000 });
+  }
+  const zone =
+    state.kind === "zone-rest" && state.zone
+      ? state.restsForced > 0
+        ? profileText("summary.zoneRest", { best: state.zone.bestHeldMs / 1000, hold: state.zone.holdSec, sized: state.zone.sizedHoldSec })
+        : profileText("summary.zoneNone")
+      : null;
+  return profileText("summary", { name: state.name, rests, zone });
+}
+
+/** The rest summary clause, rendered — "" on every lane without a running profile. */
+export function wrongLegRestSummary(state) {
+  const spec = wrongLegRestSummarySpec(state);
+  return spec === null ? "" : renderProfileText(spec);
+}
+
+/**
+ * THE TRUE HOLDS, in place of the harness's older «each held 8s» (round 8, from
+ * the round-7 verifier's FALSE-SELF-CLAIMS): on a lane whose zone rest was
+ * BOOKED (the car came to rest for it, `wrongLegRestBooked`), that rest was held
+ * on the zone profile's own tally, not for `holdMs`. `stops` is the harness's
+ * count of rests the car came to rest in (`stopsMade`), the zone rest among
+ * them.
+ *
+ * ROUND 10 (the round-9 verifier's IMPRECISE-SELF-STATEMENTS c): on EVERY OTHER
+ * DECLARED lane — the profile on or refused — «each held 8s» is not true either
+ * when the drive ends mid-hold: the loop's end lifts the brake on a hold still
+ * open. Those lanes get `rest.holdsPlain` (the ordinary hold of wall clock, and
+ * the drive's end ending any hold still open). `null` only on a lane with NO
+ * declared profile, which keeps the 4112566 words byte for byte.
+ */
+export function wrongLegRestHoldsSpec(state, { stops = null, holdMs = null } = {}) {
+  if (!state || state.declared !== true) return null;
+  const n = fin(stops);
+  if (n === null || n < 1) return null;
+  const hold = fin(holdMs) === null ? null : holdMs / 1000;
+  if (state.on !== true || state.kind !== "zone-rest" || !state.zone || state.zone.restAtSec === null) return profileText("rest.holdsPlain", { hold });
+  return profileText("rest.holds", {
+    plain: n - 1,
+    hold,
+    zone: 1,
+    zhold: state.zone.holdSec,
+    wall: ZONE_REST_WALL_CEILING_MS / 1000,
+    best: state.zone.bestHeldMs / 1000,
+  });
+}
+
+/** The holds clause, rendered — `null` where the older words stand (a lane with no declared profile). */
+export function wrongLegRestHoldsClause(state, opts) {
+  const spec = wrongLegRestHoldsSpec(state, opts);
+  return spec === null ? null : renderProfileText(spec);
+}

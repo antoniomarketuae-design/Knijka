@@ -10052,3 +10052,38 @@ identical claim**, so the rulings did not become a rubber stamp.
      3  (2 crit)  unclassified, read by hand
 
 UNJUDGED is now ~70 % of the open list. It is an instrument problem, not a backlog.
+
+## Wrong-leg pedal profiles — landed 2026-09-27
+
+Four open rows could not be judged because the `-wrong` leg never COMMITTED the act the
+row is about, and in each case what stood in the way was the leg's own careless-rest
+cadence (a rest every 45 m, held 8 s): the rest put the car back at or under the limit and
+the engine's acquittal arm cleared the episode before it could be billed. The rows are
+`sc-signal-flashing:0d68b149` (critical), `sc-ov-keep-right:64391c6a`,
+`sc-ac-truck-spray:3f5a3ef3` and `sc-pk-busstop-ban:b103c282`.
+
+`tools/mobile/lib/driveline.mjs` §5 now declares, for exactly those four lessons, WHEN the
+wrong leg rests — pedals only, never the wheel, never a pose, never a prediction of what
+the engine will bill. Every other lesson's wrong leg is byte-identical to before
+(`neutral-167`: 167 lessons, 4 declared, 990 combinations, all neutral). A fifth profile
+(`sc-fo-motorway-gap`) was withdrawn on evidence in round 1.
+
+It took ten rounds, and the lesson of them is recorded rather than hidden:
+
+| rounds | what the verifier refuted | what changed |
+|---|---|---|
+| 1–5 | the harness PREDICTED what the engine bills; each round a product edit made the printed prediction false | round 6 stopped predicting |
+| 6 | the harness READ product source to size the profile; comment-only edits refused it, exotic edits slipped past every pin | round 7: every sizing number is a declared design constant, «sized at 4112566»; nothing reads product source |
+| 7–9 | claims the harness printed about the product reached the log by one layer deeper each round (a direct print, eval, patched builtins, caller sniffing, spellings) | round 9 wrote a threat model; round 10 answered the class structurally |
+| 10 | — | SIGNED OFF WITH CONDITIONS |
+
+What round 10 guarantees, verified independently: 876 pass over 21 tool suites (the 8
+worktree-only reds pass on the main tree); 0 decision differences against round 9 over
+3,304 legs; every sentence the harness prints about itself checked against the code, the
+w61 archive and re-run censuses; the library changes no builtin and prints nothing when
+every export is driven in a child process; every harness line that could carry a claim is
+pinned. The accepted conditions are in doc 93 GAP-6.
+
+**Nothing closes by this landing.** The four rows close only when their wrong legs are
+re-driven on the product and a judge, told the founder's rulings, finds the act committed
+on the frames.

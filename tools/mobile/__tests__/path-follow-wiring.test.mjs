@@ -1124,3 +1124,107 @@ describe("REFUSAL_CODES is the reducer's own list, and something reads it", () =
     assert.equal(REFUSAL_CODES.includes("brand-new-refusal"), false, "…and it is not in the list, which is what the test above would report");
   });
 });
+
+describe("W-21 pathGearProbe's dial read is the digit class, EXECUTED on a real aria-label", () => {
+  // Until 2026-09-26 the probe matched `/Скорост (d+)/` — no backslash — which
+  // matches no dial label, so on every authored-path leg `dial` was -1 and the
+  // stop-first loop (`const v = read !== null ? read.dial : await speedNow();
+  // if (v === 0 || v < 0) break;`) broke on its first 600 ms wait instead of
+  // waiting for rest. This test EXECUTES the pattern the probe carries, as the
+  // probe applies it, on the labels StatusDashboard renders.
+  const LABELS = [
+    ["Скорост 23 км/ч", 23],
+    ["Скорост 23 километра в час", 23],
+    ["Скорост 0 километра в час", 0],
+    ["Скорост 117 км/ч", 117],
+  ];
+  /** The regex literal(s) inside a source that read the dial's «Скорост N» label. */
+  const dialRegexes = (body) =>
+    [...stripCode(body).matchAll(/\.match\(\/(Скорост [^/]*)\/([a-z]*)\)/gu)].map((m) => new RegExp(m[1], m[2]));
+  /** The probe's own expression: `Number((label.match(re) || [0, -1])[1])`. */
+  const probeDial = (re, label) => Number((label.match(re) || [0, -1])[1]);
+
+  it("the probe's pattern reads 23 from «Скорост 23 км/ч» (and every dial label) — the old `(d+)` reads -1", () => {
+    const body = fnBody("pathGearProbe");
+    assert.ok(body, "UNREADABLE: pathGearProbe");
+    const res = dialRegexes(body);
+    assert.equal(res.length, 1, `UNREADABLE: pathGearProbe carries ${res.length} dial patterns, not one`);
+    for (const [label, want] of LABELS) assert.equal(probeDial(res[0], label), want, `pathGearProbe reads «${label}» as ${probeDial(res[0], label)}`);
+    // THE CONTROL: the pattern that stood here must fail this very check, or
+    // the check proves nothing.
+    const old = /Скорост (d+)/;
+    assert.equal(probeDial(old, "Скорост 23 км/ч"), -1, "the old pattern no longer reads -1 — the control is not a control");
+    assert.notEqual(probeDial(old, "Скорост 23 км/ч"), 23);
+  });
+
+  it("every dial read in lesson-audit.mjs uses ONE pattern, and it is the probe's", () => {
+    const all = dialRegexes(SRC).map((r) => r.source);
+    assert.ok(all.length >= 4, `UNREADABLE: only ${all.length} dial patterns found`);
+    assert.deepEqual([...new Set(all)], ["Скорост (\\d+)"], `the dial is read by more than one pattern: ${[...new Set(all)].join(" | ")}`);
+  });
+
+  /* ROUND 7 (the round-6 verifier's REGEX-FIX gaps V6-A1 / V6-A2): the test
+   * above re-implements the probe's `|| [0, -1]`, so a fallback of `[0, 0]`
+   * (a missing number read as «at rest») and a selector that lost its trailing
+   * space (`[aria-label^="Скорост"]` also matches «Скоростен лост: D», which
+   * the dashboard renders FIRST) both survived it. This one EXECUTES the
+   * probe's own in-page callback — the whole function the harness hands to
+   * `page.evaluate`, extracted from `pathGearProbe` — against a small DOM
+   * built in the dashboard's document order. */
+  /** The callback `pathGearProbe` passes to `page.evaluate`, as a function of (document, window). */
+  const probeCallback = (src = SRC) => {
+    const at = src.search(/async function pathGearProbe\(/);
+    assert.ok(at > 0, "UNREADABLE: pathGearProbe");
+    const arrow = src.indexOf(".evaluate((sel) => {", at);
+    assert.ok(arrow > at && arrow - at < 600, "UNREADABLE: pathGearProbe's evaluate callback");
+    const open = src.indexOf("{", arrow + ".evaluate(".length);
+    const scan = src === SRC ? SCAN : scanBlocks(src);
+    const b = scan.blocks.find((x) => x.open === open);
+    assert.ok(b, "UNREADABLE: the callback's block");
+    const text = `(sel) => ${src.slice(b.open, b.close + 1)}`;
+    return (doc, win) => new Function("document", "window", `return (${text});`)(doc, win);
+  };
+  /** A DOM of aria-labelled elements in document order, answering the two selector shapes the probe uses. */
+  const fakeDom = (labels) => {
+    const els = labels.map((l) => ({ getAttribute: (a) => (a === "aria-label" ? l : null) }));
+    const matcher = (sel) => {
+      const m = /^\[aria-label\^="([^"]*)"\]$/.exec(sel);
+      return m ? (el) => el.getAttribute("aria-label").startsWith(m[1]) : () => false;
+    };
+    const root = { querySelectorAll: (sel) => els.filter(matcher(sel)), querySelector: (sel) => els.find(matcher(sel)) ?? null };
+    return { body: root, querySelectorAll: root.querySelectorAll, querySelector: (sel) => (sel === "[data-sim-shell]" ? null : root.querySelector(sel)) };
+  };
+  const GEAR_SEL_SRC = (() => {
+    const m = SRC.match(/const GEAR_SEL = '([^']+)';/);
+    assert.ok(m, "UNREADABLE: GEAR_SEL");
+    return m[1];
+  })();
+
+  it("EXECUTED: the probe's own callback reads the DIAL, not the gear lever the dashboard renders first — and reads a label with no number as -1, never «at rest»", () => {
+    const run = (labels, win = { __camProbe: { speedKmh: 12.5 } }) => probeCallback()(fakeDom(labels), win)(GEAR_SEL_SRC);
+    // The dashboard's own order: the gear lever (StatusDashboard's «Скоростен лост: D») comes BEFORE the dial.
+    assert.deepEqual(run(["Скоростен лост: D", "Скорост 23 километра в час"]), { gear: ["D"], v: 12.5, dial: 23 }, "the probe read the gear lever as the dial (a selector that lost its trailing space)");
+    assert.equal(run(["Скоростен лост: R", "Скорост 0 километра в час"]).dial, 0);
+    assert.equal(run(["Скорост 117 км/ч"]).dial, 117);
+    // A dial label with no number, and no dial at all: -1 (the readout is gone) — never 0, which the stop-first loop reads as REST.
+    assert.equal(run(["Скоростен лост: D", "Скорост — километра в час"]).dial, -1, "a label with no number was read as a speed — the stop-first loop would take it for rest");
+    assert.equal(run(["Скоростен лост: D"]).dial, -1);
+    assert.equal(run([]).dial, -1);
+    assert.equal(run(["Скорост 23 км/ч"], {}).v, null);
+    // THE CONTROLS: each neighbour of the fix, planted in a copy of the harness, fails this very check.
+    // (Placed inside pathGearProbe only: five other dial reads in the harness share the selector.)
+    const planted = (from, to) => {
+      const at = SRC.search(/async function pathGearProbe\(/);
+      const win = SRC.slice(at, at + 1800);
+      assert.equal(win.split(from).length - 1, 1, `UNREADABLE: «${from}» is not unique inside pathGearProbe`);
+      const i = at + win.indexOf(from);
+      return probeCallback(SRC.slice(0, i) + to + SRC.slice(i + from.length));
+    };
+    const noSpace = planted(`document.querySelector('[aria-label^="Скорост "]')`, `document.querySelector('[aria-label^="Скорост"]')`);
+    assert.equal(noSpace(fakeDom(["Скоростен лост: D", "Скорост 23 километра в час"]), {})(GEAR_SEL_SRC).dial, -1, "the no-space control read the dial anyway — the fixture no longer separates them");
+    const zeroFallback = planted("|| [0, -1])[1]) : -1;\n      return { gear: seen,", "|| [0, 0])[1]) : -1;\n      return { gear: seen,");
+    assert.equal(zeroFallback(fakeDom(["Скорост — километра в час"]), {})(GEAR_SEL_SRC).dial, 0, "the [0, 0] control did not read a missing number as 0");
+    const noBackslash = planted("match(/Скорост (\\d+)/) || [0, -1])[1]) : -1;\n      return { gear: seen,", "match(/Скорост (d+)/) || [0, -1])[1]) : -1;\n      return { gear: seen,");
+    assert.equal(noBackslash(fakeDom(["Скорост 23 километра в час"]), {})(GEAR_SEL_SRC).dial, -1, "the pre-fix `(d+)` control read 23");
+  });
+});

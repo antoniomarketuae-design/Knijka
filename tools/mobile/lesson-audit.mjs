@@ -376,6 +376,9 @@ import {
 // `evaluate`s and the presses) is here. `lib/driveline.mjs`'s header carries
 // the measurement behind each one, and `__tests__/driveline.test.mjs` pins
 // both halves — the arithmetic AND the fact that this file still calls it.
+// §5 of lib/driveline.mjs — the per-lesson WRONG-LEG PROFILES (pedals only).
+// A separate statement so the long import below stays byte-identical.
+import { createWrongLegProfile, flatRestDue, flatRestHoldDone, readZoneRouteSpan, resumeThrottleAfterPause, wrongLegFlatStep, wrongLegProfileFinish, wrongLegProfileFor, wrongLegProfileOutcomeLine, wrongLegProfileStartLine, wrongLegRestBooked, wrongLegRestEnded, wrongLegRestHoldNote, wrongLegRestHoldsClause, wrongLegRestOpportunity, wrongLegRestSummary, wrongLegRestTick } from "./lib/driveline.mjs";
 import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, OVER_LIMIT_MAX_MS, OVER_LIMIT_SUSTAIN_SEC, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, POSTED_LIMIT_SEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, admitDraw, cabinActuationSafe, drawWitnesses, elapsedSec, errorBoundaryVerdict, holdCeilingFeeds, overCapHold, overCapScanStep, overLimitHold, overLimitLedgerStep, overLimitNoteLine, overLimitScanStep, overLimitSearchCeiling, overLimitSearchClock, parkingBrakeRoute, parkingBrakeVerdict, parseClaim, passRate, postedLimitKmh, rateVerdict, readSpeedingConfig, releaseVerdict, sustainedOverLimitLane, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
@@ -6323,7 +6326,12 @@ async function pathGearProbe() {
       }
       const p = window.__camProbe;
       const sp = document.querySelector('[aria-label^="Скорост "]');
-      const dial = sp ? Number((sp.getAttribute("aria-label").match(/Скорост (d+)/) || [0, -1])[1]) : -1;
+      // `\d+` — the digit class, exactly as speedNow() reads the dial. Until
+      // 2026-09-26 this read `(d+)` (no backslash), which never matches «Скорост
+      // 23 км/ч», so on every authored-path leg this dial was -1 and the
+      // stop-first loop below broke on its first 600 ms wait instead of
+      // waiting for rest (path-follow-wiring.test.mjs executes the pattern).
+      const dial = sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\d+)/) || [0, -1])[1]) : -1;
       return { gear: seen, v: p && Number.isFinite(p.speedKmh) ? p.speedKmh : null, dial };
     }, GEAR_SEL)
     .catch(() => ({ gear: [], v: null, dial: -1 }));
@@ -8120,6 +8128,38 @@ let overLimitSearchFrom = null;
 /** When that rest was BOOKED — which is not when the phase began, because the
  *  car spends the first seconds of the phase still braking. */
 let flatRestAt = 0;
+/* ── THE WRONG-LEG PROFILE — lib/driveline.mjs §5 owns every clause ─────────
+ *
+ * ONE declared table (`WRONG_LEG_PROFILES`) of per-lesson profiles that change
+ * WHEN this leg rests — and for one lesson book one brake — to commit an
+ * antecedent the 45 m cadence chops. Pedals only: no wheel, no governed
+ * throttle, and no decision reads the dev pose probe. A `right` leg, and every
+ * lesson with no row, gets `declared:false`: every decision below is then the
+ * neutral answer and `flatRestDue` is the transition that stood here, so those
+ * lanes drive byte-for-byte as they did (pinned in
+ * __tests__/wrong-leg-profiles.test.mjs). The start line is LOUD. Every
+ * profile line — and the three clauses this file prints about a profile (the
+ * rest note, the rest summary and the rest holds) — is rendered by §5's ONE
+ * renderer from its template table; nothing here composes profile text, and
+ * every line that names a profile value is one of the forms
+ * __tests__/wrong-leg-profiles.test.mjs enumerates (round 8: EVERY `wrongProfile*`
+ * name and every §5 function, not only the state object). A line states what this
+ * harness OBSERVED and the harness's design constants it was SIZED from
+ * («sized at 4112566» — round 7: NOTHING reads product source, at drive time
+ * or ever), «ANTECEDENT HELD AS SIZED» or «ANTECEDENT NOT HELD AS SIZED» —
+ * never what the product did with it. The state rides the sidecar. */
+const wrongProfileDecl = MODE === "right" ? null : wrongLegProfileFor(SCENARIO);
+let wrongProfile = createWrongLegProfile(wrongProfileDecl === null ? null : SCENARIO, {
+  // Authored CONTENT geometry (JSON), not product source.
+  zoneSpan: wrongProfileDecl !== null && wrongProfileDecl.kind === "zone-rest" ? readZoneRouteSpan(SCENARIO, wrongProfileDecl.zone) : null,
+  // The zone profile's odometer census is pc legs; it refuses elsewhere. The
+  // finish-open profile sizes its long-frame allowance by it (round 4).
+  platform: PLATFORM,
+});
+const wrongProfileStart = wrongLegProfileStartLine(wrongProfile, { everyM: FLAT_REST_EVERY_M });
+// Not on a STEERING PROOF lane: that lane exits before the drive and never
+// reaches the flat phase, so a profile announced there would be one that ran.
+if (wrongProfileStart !== null && !STEER_PROOF) loud(wrongProfileStart);
 let prevKmh = -1;
 let lostKeys = 0;
 let lastTickAt = Date.now();
@@ -8509,7 +8549,11 @@ while (!ended && Date.now() - t0 < budgetMs) {
       }
       note(`      (a pause layer «${p.pause}» cleared itself before the drain reached it)`);
     }
-    if (MODE !== "right") await throttle(true);
+    // …EXCEPT WHILE A WRONG-LEG PROFILE STANDS OUT A ZONE REST: the teach card
+    // for the very bill it is waiting for lands mid-hold, and a re-pressed
+    // throttle would carry the car over `movingSpeedKmh` and reset the episode.
+    // `true` on every other lane — lib/driveline.mjs `resumeThrottleAfterPause`.
+    if (MODE !== "right" && resumeThrottleAfterPause(wrongProfile)) await throttle(true);
     tickMs.push(Date.now() - tickStart);
     continue;
   }
@@ -9362,10 +9406,33 @@ while (!ended && Date.now() - t0 < budgetMs) {
       // whole job is to leave the correct line. `guidePose` records the pose
       // and turns no wheel; the leg drives exactly as it did.
       await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "flat"));
+      /* THE SAME METRES `flatM` HAS ALWAYS BEEN CHARGED, computed once so the
+       * wrong-leg profile's odometer is the one FLAT_REST_EVERY_M is measured
+       * in (§5 of lib/driveline.mjs). Then the profile's tick — pure, and the
+       * neutral answer on every lane without a profile: no suppression and no
+       * forced rest. It never touches the throttle: the line below is the flat
+       * throttle every wrong leg has always held. */
+      const flatStepM = (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
+      const wrongProfileStep = wrongLegFlatStep(wrongProfile, {
+        now,
+        t0,
+        kmh: p.kmh,
+        flatStepM,
+        dtMs: now - lastTickAt,
+        postedKmh: wrongProfile.on ? postedLimitKmh(p.postedLabels) : null,
+        follow: wrongProfile.on ? parseHazard(p.hazard).follow : null,
+        // The wall clock taken right BEFORE the probe that read `p.kmh`, so
+        // the profile can bound how old that reading is by `now` (round 4,
+        // N-REGRADE-STALE: the dial is the dashboard's DOM, and `now` is taken
+        // after `await probe`). A timestamp, not a pose.
+        probeAt: tickStart,
+      });
+      wrongProfile = wrongProfileStep.state;
+      if (wrongProfileStep.say !== null) (wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line);
       await timed("pedals", () => throttle(true));
       drivingTicks++;
       phaseTicks++;
-      flatM += (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
+      flatM += flatStepM;
       /* ── HOLD THE FIRST REST UNTIL THE CAP IS BEATEN ────────────────────
        * The cap comes off the product's own glass every tick (a task can be
        * credited and the next one posted mid-leg, and the cap moves with it);
@@ -9688,7 +9755,37 @@ while (!ended && Date.now() - t0 < budgetMs) {
           }
         }
       }
-      if (!holdRest && (flatM >= FLAT_REST_EVERY_M || now - phaseAt >= FLAT_REST_MAX_MS) && phaseTicks >= 1) {
+      /* THE REST OPPORTUNITY A PROFILE HELD BACK (§5 `wrongLegRestOpportunity`,
+       * round 7): on the transition's own inputs, counted once per stretch of
+       * the ordinary cadence, never per tick. It decides nothing, and it hands
+       * back the very same state object on every lane without a running
+       * profile. */
+      wrongProfile = wrongLegRestOpportunity(wrongProfile, {
+        holdRest,
+        suppress: wrongProfileStep.suppressRest,
+        force: wrongProfileStep.forceRest,
+        flatM,
+        sincePhaseMs: now - phaseAt,
+        phaseTicks,
+        everyM: FLAT_REST_EVERY_M,
+        maxMs: FLAT_REST_MAX_MS,
+      });
+      /* THE TRANSITION — `holdRest` still guards it, and with no profile
+       * (`suppress` and `force` false) `flatRestDue` is, clause for clause,
+       * `!holdRest && (flatM >= FLAT_REST_EVERY_M || now - phaseAt >=
+       * FLAT_REST_MAX_MS) && phaseTicks >= 1` — the condition that stood here. */
+      if (
+        flatRestDue({
+          holdRest,
+          suppress: wrongProfileStep.suppressRest,
+          force: wrongProfileStep.forceRest,
+          flatM,
+          sincePhaseMs: now - phaseAt,
+          phaseTicks,
+          everyM: FLAT_REST_EVERY_M,
+          maxMs: FLAT_REST_MAX_MS,
+        })
+      ) {
         phase = "flat-rest";
         phaseAt = now;
         phaseTicks = 0;
@@ -9719,15 +9816,36 @@ while (!ended && Date.now() - t0 < budgetMs) {
         restLogged = true;
         flatRestAt = now;
         stopsMade++;
+        /* HOW LONG THIS REST IS HELD: FLAT_REST_HOLD_MS, unless it is the
+         * wrong-leg profile's zone rest (§5 `wrongLegRestBooked`), which stands
+         * for a hold SIZED from design constants (the zone basis's hold, the
+         * re-grade window, a margin), counted without paused time — credited
+         * from the next tick only if THIS tick's dial is at the full-stop line.
+         * On a DECLARED lane the rest note is §5's (`wrongLegRestHoldNote`,
+         * rendered from its template table); on every other lane it is `null`
+         * and the sentence below is the one that always stood here. */
+        const wrongProfileRest = wrongLegRestBooked(wrongProfile, { now, t0, holdMs: FLAT_REST_HOLD_MS, kmh: p.kmh });
+        wrongProfile = wrongProfileRest.state;
+        const wrongProfileRestNote = wrongLegRestHoldNote(wrongProfile, wrongProfileRest, { holdMs: FLAT_REST_HOLD_MS });
         note(
           `      the wrong leg came to REST at t=${Math.round((now - t0) / 1000)}s (stop ${stopsMade}) and holds it for ` +
-            `${FLAT_REST_HOLD_MS / 1000}s — twice the engine's 4 s ban-zone sustain. Where it stopped is the product's ` +
-            `question, not this harness's.` +
+            (wrongProfileRestNote ??
+              `${FLAT_REST_HOLD_MS / 1000}s — twice the engine's 4 s ban-zone sustain. Where it stopped is the product's ` +
+                `question, not this harness's.`) +
             (p.lawfulWait === null ? "" : ` A LAWFUL WAIT is declared here («${p.lawfulWait}») and this leg does not honour it — it is the reckless leg, and driving off is its own act, not an instrument fault.`),
         );
         if (!shotStopped) { shotStopped = true; await shot("05-stopped"); }
+      } else if (restLogged) {
+        // The zone hold's own tally (a no-op for every other rest): the tick's
+        // interval while at rest, zeroed by any reading over the full-stop line
+        // (a stir or a break — design constants, §5).
+        wrongProfile = wrongLegRestTick(wrongProfile, { kmh: p.kmh, dtMs: now - lastTickAt });
       }
-      if (restLogged && now - flatRestAt >= FLAT_REST_HOLD_MS) {
+      if (restLogged && flatRestHoldDone({ now, restAt: flatRestAt, holdMs: FLAT_REST_HOLD_MS, state: wrongProfile })) {
+        // `wrongProfileRestEnd`, never `ended`: that name is the drive loop's own flag.
+        const wrongProfileRestEnd = wrongLegRestEnded(wrongProfile, { now, t0 });
+        wrongProfile = wrongProfileRestEnd.state;
+        if (wrongProfileRestEnd.say !== null) (wrongProfileRestEnd.say.loud ? loud : note)(wrongProfileRestEnd.say.line);
         await brake(false);
         phase = "flat";
         phaseAt = now;
@@ -9742,6 +9860,10 @@ while (!ended && Date.now() - t0 < budgetMs) {
             `${holdS ? "down" : "UP"}, throttle ${holdW ? "DOWN" : "up"}) — rolling on, and no „stopping where forbidden" ` +
             `finding may be drawn from this stretch.`,
         );
+        // A zone rest that never came to rest was NOT HELD AS SIZED, and says so.
+        const wrongProfileRestEnd = wrongLegRestEnded(wrongProfile, { now, t0, gaveUp: true });
+        wrongProfile = wrongProfileRestEnd.state;
+        if (wrongProfileRestEnd.say !== null) (wrongProfileRestEnd.say.loud ? loud : note)(wrongProfileRestEnd.say.line);
         await brake(false);
         phase = "flat";
         phaseAt = now;
@@ -9839,6 +9961,15 @@ while (!ended && Date.now() - t0 < budgetMs) {
 if (roadWitness !== null) await roadWitness.poll();
 await throttle(false);
 await brake(false);
+// THE WRONG-LEG PROFILE CLOSES HERE — whatever is still open is closed, and the
+// finish-open profile gets its one end-of-drive verdict word (§5
+// `wrongLegProfileFinish`): its readings are held as sized only for a drive
+// that reached its end screen (`ended`), and only when the end gap — this
+// `Date.now()` less the last flat reading's `now`, on the wall clock — is
+// inside the longest wall interval between two flat readings. `Date.now()`
+// here is after the end frame, so the upper ledger's last interval can only
+// over-count.
+wrongProfile = wrongLegProfileFinish(wrongProfile, { now: Date.now(), t0, driveEnded: ended }).state;
 const driveSec = Math.round((Date.now() - t0) / 1000);
 if (!ended) {
   loud(
@@ -10010,9 +10141,15 @@ if (enteredLoopKmh !== null) {
 // a regression in the product — it is a leg that finally does something the
 // product has always been able to see.
 if (MODE !== "right" && stopsMade > 0) {
+  /* «each held 8s» IS FALSE on a lane whose wrong-leg profile BOOKED its zone
+   * rest: that rest is held on the profile's own tally. §5
+   * `wrongLegRestHoldsClause` then renders the true holds (round 8); it is
+   * `null` on every other lane, which keeps the words that always stood. */
+  const wrongProfileRestHolds = wrongLegRestHoldsClause(wrongProfile, { stops: stopsMade, holdMs: FLAT_REST_HOLD_MS });
   note(
-    `  WRONG-LEG RESTS: ${stopsMade} careless full stop${stopsMade === 1 ? "" : "s"}, each held ${FLAT_REST_HOLD_MS / 1000}s ` +
-      `(FLAT_REST_EVERY_M = ${FLAT_REST_EVERY_M} m). Any «Рязко спиране без причина» or «Спиране в забранена зона» below is ` +
+    `  WRONG-LEG RESTS: ${stopsMade} careless full stop${stopsMade === 1 ? "" : "s"}, ` +
+      (wrongProfileRestHolds ?? `each held ${FLAT_REST_HOLD_MS / 1000}s`) +
+      ` (FLAT_REST_EVERY_M = ${FLAT_REST_EVERY_M} m). Any «Рязко спиране без причина» or «Спиране в забранена зона» below is ` +
       `the product judging THOSE stops — the instrument's behaviour, not the lesson script's. AND IT CUTS THE OTHER WAY: a ` +
       `careless rest can land on a „спри на разрешеното място" mark and CREDIT it, so a wrong leg that PASSES may have ` +
       `stopped by luck rather than by driving well — measured on sc-pk-ban-stop/mobile/wrong, 2026-08-28.` +
@@ -10027,8 +10164,26 @@ if (MODE !== "right" && stopsMade > 0) {
       (overLimit.on
         ? ` AND THE FIRST STOP ON THIS LANE IS LATER THAN 45 m: SUSTAINED_OVER_LIMIT_LANES held the cadence back (${overLimit.why ?? "-"}). ` +
           `That changes WHEN the first rest fell, not WHOSE act it is — every stop above is still this instrument's, the first one included.`
-        : ""),
+        : "") +
+      // …AND THE SAME CLAUSE FOR A RUNNING WRONG-LEG PROFILE (§5
+      // `wrongLegRestSummary`, rendered from its template table), "" on every
+      // lane without one: the rest OPPORTUNITIES it held back (per stretch of
+      // the cadence, never per tick), the rests it booked, and what the zone
+      // rest's hold read, if one was booked — or, when it held no due rest back
+      // and booked none, exactly that (round 8).
+      wrongLegRestSummary(wrongProfile),
   );
+}
+/* ── …AND WHAT THE WRONG-LEG PROFILE'S READINGS SHOWED ─────────────────────
+ * Printed whenever a profile was declared for this lane — refused, held as
+ * sized or not — and never on a lane without one (`null` is the silence it
+ * printed before). LOUD unless the readings held as sized. The line states
+ * only what this harness observed and the design constants it was sized from
+ * («sized at 4112566»); what the product made of the drive is on the
+ * product's own frames. */
+{
+  const wrongProfileOutcome = wrongLegProfileOutcomeLine(wrongProfile);
+  if (wrongProfileOutcome !== null) (wrongProfile.heldAsSized ? note : loud)(wrongProfileOutcome);
 }
 /* ── AND WHAT PACED THIS DRIVE, ON EVERY `right` LANE ──────────────────────
  *
@@ -12240,6 +12395,16 @@ saveStatus({
   // state reading as a MEASUREMENT, and that is now prevented in all three
   // places rather than hidden in one.
   overLimit: MODE === "right" || !overLimit.on ? null : overLimit,
+  // …AND THE WRONG-LEG PROFILE (lib/driveline.mjs §5): what this leg was TOLD
+  // to do (`told`), the row it was for, what its readings showed
+  // (`heldAsSized`, `how`, `done`, `observed`, `driveEnded` and the per-kind
+  // readings) and what it was sized from (`sizedFrom`). A declared profile that
+  // was REFUSED is published with `on:false` and its `refused` reason, so a
+  // judge never meets an unexplained ordinary cadence.
+  // ABSENT — a spread, not `null` — on every `right` leg and every lane with no
+  // declared profile: those sidecars carry no such key at all, so their bytes
+  // are the bytes they wrote before this field existed.
+  ...(MODE !== "right" && wrongProfile.declared ? { wrongLegProfile: wrongProfile } : {}),
   // …and where the rest of the debrief went. `sidecar` is the claim a reader
   // checks first: if it is false, the sections below the fold are gone.
   debrief: {
