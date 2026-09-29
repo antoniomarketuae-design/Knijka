@@ -9,6 +9,9 @@ import {
   TOP_RAIL_ROW_CSS,
   TOUCH_BAND_CSS_VARS,
   TOUCH_CONTROLS_FLOOR,
+  TOUCH_HINT_LANDSCAPE_LEFT_CSS,
+  TOUCH_HINT_LANDSCAPE_TOP_CSS,
+  touchHintLandscapeFloorCss,
 } from "../TouchControls";
 import { ROOMY_HUD_FLOOR_PX, ROOMY_MINIMAP_LANE_PX } from "./immersive";
 import {
@@ -1968,6 +1971,11 @@ ${TOUCH_BAND_CSS_VARS}
            780 × 360  67.76   172     120.24   124.5   76.24       4.3 px
            780 × 340  64.44   172     103.56   124.5   71.56      20.9 px
 
+         ⚠ SUPERSEDED SIDEWAYS, 2026-09-27: that table is the lane BEFORE the
+         mirror's re-anchor. With the lane at 0.188 this rule would clip 6.4 px
+         on the handset, so on a landscape stage the card leaves this corridor
+         (the @media block after this rule). This rule is now the UPRIGHT arm.
+
          So on the handset this whole catalogue was photographed on the card
          keeps every line it had AND leaves the mirror; the peek's own fraction
          would have deleted 40.5 px of it. On a 340 px stage there are only
@@ -1986,6 +1994,42 @@ ${TOUCH_BAND_CSS_VARS}
           NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
           HAZARD_BAND_TOP_FRACTION,
         )};
+      }
+      /* …AND SIDEWAYS IT LEAVES THIS CORRIDOR — 2026-09-27, founder ruling
+         2026-09-22 (follow-up): «re-anchor the mirror AND move the
+         notification card», row sc-mw-emergency-lane:3ffb0692.
+
+         The interior mirror now comes down 11.3 mm on wide canvases
+         (cabinLook.REAR_MIRROR_STATION_DROP_MAX_M) so its glass is inside the
+         frame, and the right corridor steps below it
+         (notifyColumn.MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE 0.166 →
+         0.188). Under that lane the rule above would hold 118.5 px on the
+         founder's handset against the 124.5 this card needs, and this card
+         CLIPS — so it is the card that moves, as ruled: to the LEFT corridor,
+         under the rail, on the rail's own left edge, with the ceiling
+         measured from the same top against the steering pad and the hazard
+         band. Same 180 px measure, so it wraps as it was measured; left-aligned
+         because it now reads from the left edge. Why that corner is free while
+         the hint is up, and the resolved numbers (148.3 / 130.8 / 120.2 px),
+         are in TouchControls beside touchHintLandscapeRectPx.
+
+         Upright keeps the rule above: this block is landscape only, and it is
+         AFTER that rule on purpose — equal specificity, so source order is the
+         whole of the override. */
+      @media (orientation: landscape) {
+        [data-sim-compact="on"] [data-hud="touch-hint"] {
+          top: ${TOUCH_HINT_LANDSCAPE_TOP_CSS};
+          left: ${TOUCH_HINT_LANDSCAPE_LEFT_CSS};
+          right: auto;
+          width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR});
+          max-height: ${notifyColumnMaxHeightCss(
+            touchHintLandscapeFloorCss(),
+            TOUCH_HINT_LANDSCAPE_TOP_CSS,
+            HAZARD_BAND_TOP_FRACTION,
+          )};
+          align-items: flex-start;
+          text-align: left;
+        }
       }
       /* …AND IT STANDS DOWN FOR THE ⚙ SHEET — measured 2026-08-12, kept in
          2026-08-16, and the REASON changed with the hint's corridor.

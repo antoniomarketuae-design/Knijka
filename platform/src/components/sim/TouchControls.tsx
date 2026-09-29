@@ -127,10 +127,12 @@ import {
   type TouchInputSource,
 } from "@/modules/sim/engine";
 import {
+  HAZARD_BAND_TOP_FRACTION,
   NOTIFY_COLUMN_GUTTER_PX,
   NOTIFY_COLUMN_RIGHT_CSS,
   NOTIFY_COLUMN_TOP_CSS_COMPACT,
   NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
+  PEEK_SCRIM_FEATHER_PX,
   notifyColumnWidthPx,
   useTapActivation,
 } from "@/modules/sim/hud";
@@ -1562,6 +1564,92 @@ export function topRailBandPx(stage: StageBox): {
   return { x, w: Math.max(0, columnLeftPx - 8 - x), columnLeftPx };
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE FIRST-RUN TOUCH HINT'S SIDEWAYS CORRIDOR — 2026-09-27, founder ruling
+   2026-09-22 (follow-up): «re-anchor the mirror AND move the notification
+   card», row sc-mw-emergency-lane:3ffb0692.
+
+   Re-anchoring brings the interior mirror down on wide phones, and the right
+   corridor hangs below it. The one tenant of that corridor that could not
+   afford the step is this card: it CLIPS what it cannot hold (`overflow:
+   hidden`, its words in a scroller no thumb can reach), it is 124.5 px on the
+   catalogue's frames, and under the lowered mirror the right corridor holds
+   118.5 px on the founder's own handset. So on a sideways stage it moves to
+   the LEFT corridor the founder drew on 2026-08-03: directly under the rail,
+   on the rail's own left edge (`PLAY_MENU_LEFT_CSS` — the card's padding
+   box starts there and its 26 px feather is inside it, so the ink starts 26 px
+   in and nothing reaches the left flank's stations).
+
+   WHY THAT CORNER IS FREE WHEN THE HINT IS UP, and only then: the rank ladder
+   in `PlayAreaStyles` hides the demonstration deck, the audio card and the
+   three chips while the hint is on the glass, and hides the hint while the
+   overlay column speaks. The left door mirror is below it (y ≥ 0.68 of the
+   stage on every ladder phone) and the interior mirror starts at 0.573 of the
+   width; this box ends before 0.41. Its floor is the same law the right arm
+   obeyed — it may not ENTER the hazard band (`HAZARD_BAND_TOP_FRACTION`) —
+   and it also clears the steering pad by the gap every other floor keeps.
+
+   Resolved (`touchHintLandscapeRectPx`):  852 × 393 → 148.3 px for a 124.5 px
+   card · 780 × 360 → 130.8 · 780 × 340 → 120.2, i.e. the smallest stage
+   scrolls 4.3 px where the right corridor made it scroll 20.9 before the
+   mirror moved at all. Same 180 px measure as before, so the card wraps as it
+   was measured. Upright is untouched: the stylesheet scopes this to
+   `orientation: landscape`, where these lengths resolve.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/** The hint's top on a sideways stage — the rail's top plus the rail's row. */
+export const TOUCH_HINT_LANDSCAPE_TOP_CSS = `calc(${TOP_RAIL_TOP_CSS} + ${TOP_RAIL_ROW_CSS})`;
+/** …and its left edge: the rail's own (the «Меню» button's). */
+export const TOUCH_HINT_LANDSCAPE_LEFT_CSS = PLAY_MENU_LEFT_CSS;
+/** The floor it hangs above there: the steering pad plus the shared gap. */
+export function touchHintLandscapeFloorCss(heightToken = "100%"): string {
+  return `calc(${bandLiftCss(heightToken)} + ${STEER_PAD_H} + ${INSET_B} + ${rem(
+    TOUCH_CONTROLS_FLOOR_GAP_PX,
+  )})`;
+}
+/** …resolved, px from the stage's bottom edge. */
+export function touchHintLandscapeFloorPx(stage: StageBox): number {
+  return (
+    bandLiftPx(stage) +
+    padHeightPx("left", stage) +
+    (stage.insetBottom ?? 0) +
+    TOUCH_CONTROLS_FLOOR_GAP_PX
+  );
+}
+/**
+ * The hint's box on a sideways stage, px. `x`/`y`/`width`/`maxHeight` are the
+ * CONTENT box (the card is `box-sizing: content-box` — LessonScene); the
+ * `box*` edges are its padding box, i.e. the published feather around it,
+ * which is what can overlap anything.
+ */
+export function touchHintLandscapeRectPx(stage: StageBox): {
+  x: number;
+  y: number;
+  width: number;
+  maxHeight: number;
+  boxLeft: number;
+  boxRight: number;
+  boxBottom: number;
+} {
+  const menu = playMenuRectPx(stage);
+  const y = menu.y + TOUCH_MIN_PX + 8;
+  const width = notifyColumnWidthPx(stage.width, true) - FLANK_LANE_PX;
+  const maxHeight = Math.min(
+    stage.height - touchHintLandscapeFloorPx(stage) - y,
+    stage.height * HAZARD_BAND_TOP_FRACTION - y,
+  );
+  const boxLeft = menu.x;
+  const x = boxLeft + PEEK_SCRIM_FEATHER_PX.left;
+  return {
+    x,
+    y,
+    width,
+    maxHeight,
+    boxLeft,
+    boxRight: x + width + PEEK_SCRIM_FEATHER_PX.right,
+    boxBottom: y + maxHeight + PEEK_SCRIM_FEATHER_PX.bottom,
+  };
+}
+
 /* ── THE CENTRE CORRIDOR — the strip between the two thumb pads ──────────────
    The pads are the only two things on this screen that are wide, and they are
    at the two bottom corners. Everything BETWEEN them is road on every profile
@@ -2505,7 +2593,8 @@ export function TouchControls({
    * It is the FOURTH CLOCK, and it is a sibling of the three
    * `lesson-ui/sessionClock.ts` was written to reconcile („three clocks that
    * only agreed above 10 fps"). `engine/input.ts` ramps the KEYBOARD pedals
-   * against wall time and clamped each `read()` to `MAX_RAMP_DT_S = 0.1`, while
+   * against wall time and clamped each `read()` to what was THEN
+   * `MAX_RAMP_DT_S = 0.1` (0.5 since the 2026-08-24 fix described below), while
    * the world advances on rapier's own `PHYSICS_MAX_FRAME_DT = 0.5` — and
    * `read()` writes `lastReadMs` on every call, so the FIRST read of a frame
    * takes the whole elapsed and the rest of that frame's reads take nothing.

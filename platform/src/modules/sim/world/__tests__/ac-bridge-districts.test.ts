@@ -133,8 +133,10 @@ describe(`${ID} through the world builder`, () => {
   });
 
   it("THE VOID: both banks are dressed on both sides, and nothing stands beside the deck", () => {
-    // The district-v1 schema has no bridge primitive — the ABSENCE of buildings
-    // across the deck window is the entire visual channel that says „мост".
+    // The ABSENCE of buildings across the deck window was once the only channel
+    // that said „мост"; the edge now also declares the deck (`bridges`), and
+    // bridge-deck-is-a-bridge.test.ts proves the parapets on the BUILT world.
+    // The void stays a contract: a block beside a deck would still read wrong.
     expect(district.buildings.length).toBe(4);
     const ids = district.buildings.map((b) => b.id).sort();
     expect(ids).toEqual([

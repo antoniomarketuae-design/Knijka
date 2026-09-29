@@ -242,6 +242,102 @@ describe("ln-merge-v1 through the world builder", () => {
     }
   });
 
+  /**
+   * THE MERGE ARROWS — the third thing sc-merge-lane-end:ae6166e2 names („no
+   * merge arrow on the tarmac"), and the founder's 2026-09-27 ruling: the
+   * lane-drop drill REQUIRES merge arrows in the dying lane.
+   *
+   * Read off the MESH, in the one region no other paint on this street may
+   * occupy: the OPEN part of the dying lane — right of the lane boundary on
+   * the axis, left of whatever closes the lane at that y (the kerb-side edge
+   * line before the taper, the converging line inside it). The hatch lives on
+   * the far side of the converging line, so it can never be counted here.
+   */
+  describe("paints merge arrows in the dying lane, pointing at the lane that survives", () => {
+    /** The closing paint's x at world y: the М1 edge line (x = LANE_WIDTH_M)
+     *  before the taper, a straight line to the axis across it, gone after. */
+    const closingX = (y: number): number =>
+      LANE_WIDTH_M * Math.min(1, Math.max(0, (TAPER_TO_Y - y) / (TAPER_TO_Y - TAPER_FROM_Y)));
+    /** Clearance kept from the boundary strokes on either side (their half
+     *  widths are 0.125 / 0.15 m; 0.4 m keeps every stroke vertex out). */
+    const CLEAR_M = 0.4;
+
+    type P = { x: number; y: number };
+    let inLane: P[];
+    let stations: P[][];
+
+    beforeAll(() => {
+      const p = world.markings.positions;
+      inLane = [];
+      for (let i = 0; i + 2 < p.length; i += 3) {
+        const x = p[i] as number;
+        const y = -(p[i + 2] as number);
+        if (y < SPAWN_Y || y > END_Y) continue;
+        if (x > CLEAR_M && x < closingX(y) - CLEAR_M) inLane.push({ x, y });
+      }
+      // One station = one glyph: vertices closer than 4 m along travel.
+      const sorted = [...inLane].sort((a, b) => a.y - b.y);
+      stations = [];
+      for (const v of sorted) {
+        const cur = stations[stations.length - 1];
+        if (cur && v.y - (cur[cur.length - 1] as P).y < 4) cur.push(v);
+        else stations.push([v]);
+      }
+    });
+
+    it("stands a glyph at every station, before and INSIDE the taper, and none where the lane is gone", () => {
+      expect(stations.length, "no arrow paint in the open dying lane").toBeGreaterThanOrEqual(4);
+      const centres = stations.map((st) => st.reduce((s, v) => s + v.y, 0) / st.length);
+      // Inside the authored 180–240 span, where the lane is already closing…
+      expect(centres.filter((y) => y >= TAPER_FROM_Y && y <= TAPER_TO_Y).length).toBeGreaterThanOrEqual(2);
+      // …and ahead of it, where a driver still has time to act on them.
+      expect(centres.some((y) => y < TAPER_FROM_Y)).toBe(true);
+      // Never past the point the lane has closed to less than a glyph.
+      for (const y of centres) expect(y).toBeLessThan(TAPER_TO_Y);
+    });
+
+    it("every station is ONE arrow of glyph size, not a stray vertex", () => {
+      // Not vacuous: a loop over no stations proves nothing.
+      expect(stations.length).toBeGreaterThanOrEqual(4);
+      for (const st of stations) {
+        const ys = st.map((v) => v.y);
+        const xs = st.map((v) => v.x);
+        const len = Math.max(...ys) - Math.min(...ys);
+        const wide = Math.max(...xs) - Math.min(...xs);
+        expect(len, `station @ y≈${ys[0]?.toFixed(1)}`).toBeGreaterThan(5);
+        expect(len).toBeLessThan(9);
+        expect(wide).toBeGreaterThan(1.5);
+        expect(wide).toBeLessThan(LANE_WIDTH_M - 2 * CLEAR_M);
+      }
+    });
+
+    it("every arrow LEANS toward the surviving lane (the axis side), never along or away from it", () => {
+      // Not vacuous: a loop over no stations proves nothing.
+      expect(stations.length).toBeGreaterThanOrEqual(4);
+      for (const st of stations) {
+        const yMin = Math.min(...st.map((v) => v.y));
+        const yMax = Math.max(...st.map((v) => v.y));
+        const tail = st.filter((v) => v.y < yMin + 0.5);
+        const tip = st.filter((v) => v.y > yMax - 0.05);
+        const tailX = tail.reduce((s, v) => s + v.x, 0) / tail.length;
+        const tipX = tip.reduce((s, v) => s + v.x, 0) / tip.length;
+        // The tip stands at least a metre nearer the survivor than the tail.
+        expect(tailX - tipX, `station @ y≈${yMin.toFixed(1)}`).toBeGreaterThan(1);
+      }
+    });
+
+    it("paints nothing of the kind in the lane that survives", () => {
+      const p = world.markings.positions;
+      let n = 0;
+      for (let i = 0; i + 2 < p.length; i += 3) {
+        const x = p[i] as number;
+        const y = -(p[i + 2] as number);
+        if (y > SPAWN_Y && y < TAPER_TO_Y && x < -CLEAR_M && x > -LANE_WIDTH_M + CLEAR_M) n++;
+      }
+      expect(n).toBe(0);
+    });
+  });
+
   it("produces no NaN/infinite coordinates in any buffer or placement", () => {
     const buffers = [
       world.roadSurface,

@@ -268,6 +268,8 @@ interface WorldGeometries {
   waterDecals: THREE.BufferGeometry;
   railDeck: THREE.BufferGeometry;
   railRails: THREE.BufferGeometry;
+  bridgeDeck: THREE.BufferGeometry;
+  bridgeParapets: THREE.BufferGeometry;
   terrain: THREE.BufferGeometry;
   terrainPaved: THREE.BufferGeometry;
   roundaboutIslands: THREE.BufferGeometry;
@@ -287,6 +289,8 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
       waterDecals: meshDataToGeometry(world.waterDecals),
       railDeck: meshDataToGeometry(world.railTracks.deck),
       railRails: meshDataToGeometry(world.railTracks.rails),
+      bridgeDeck: meshDataToGeometry(world.bridgeDecks.deck),
+      bridgeParapets: meshDataToGeometry(world.bridgeDecks.parapets),
       terrain: meshDataToGeometry(world.terrain),
       terrainPaved: meshDataToGeometry(world.terrainPaved),
       roundaboutIslands: meshDataToGeometry(world.roundaboutIslands),
@@ -307,6 +311,8 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
         geometries.waterDecals,
         geometries.railDeck,
         geometries.railRails,
+        geometries.bridgeDeck,
+        geometries.bridgeParapets,
         geometries.terrain,
         geometries.terrainPaved,
         geometries.roundaboutIslands,
@@ -750,6 +756,23 @@ export function StaticWorld({
             metalness={0.7}
             envMapIntensity={0.55}
           />
+        </mesh>
+      ) : null}
+      {/* BRIDGES over declared edge `bridges` spans (builders/bridgeDeck.ts):
+          the deck (expansion joints + concrete footway slab and cornice) and
+          the two parapet walls with their abutment pylons — the same walls
+          `colliders.buildings` carries. Empty on every district that declares
+          no bridge, so those maps mount neither mesh. */}
+      {geometries.bridgeDeck.getAttribute("position") &&
+      geometries.bridgeDeck.getAttribute("position").count > 0 ? (
+        <mesh geometry={geometries.bridgeDeck} receiveShadow={receive}>
+          <meshStandardMaterial vertexColors roughness={0.9} metalness={0.02} />
+        </mesh>
+      ) : null}
+      {geometries.bridgeParapets.getAttribute("position") &&
+      geometries.bridgeParapets.getAttribute("position").count > 0 ? (
+        <mesh geometry={geometries.bridgeParapets} castShadow={buildingsCast} receiveShadow={receive}>
+          <meshStandardMaterial vertexColors roughness={0.88} metalness={0} />
         </mesh>
       ) : null}
       {/* Mid-rise facade prisms: real OSM footprints at district-data heights

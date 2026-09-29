@@ -1032,9 +1032,10 @@ export const PEEK_SCRIM_ALPHA = 0.8;
  *    2026-08-19, second pass. It was 12, and 12 was a gutter that is not ours.
  *
  * `NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN` puts the column's top EXACTLY on the
- * interior mirror's lane — `max(0.5rem, 16.6% + 0.5rem)` and the lane is
- * `16.6% + 8px`, the same number, so the slack is zero on all three sideways
- * profiles (852 × 393 → 73.238 px, 780 × 360 → 67.755, 780 × 340 → 64.440).
+ * interior mirror's lane — `max(0.5rem, 18.8% + 0.5rem)` and the lane is
+ * `18.8% + 8px`, the same number, so the slack is zero on all three sideways
+ * profiles (852 × 393 → 81.884 px, 780 × 360 → 75.68, 780 × 340 → 71.92; the
+ * lane was 16.6 % until the 2026-09-27 re-anchor brought the mirror down).
  * A top overhang is therefore not „a ramp over the stage's edge", it is shade
  * on the mirror: at 12 px it spent all 8 px of the gutter
  * `NOTIFY_COLUMN_MIRROR_GUTTER_PX` owns and then 4 px of the mirror's own

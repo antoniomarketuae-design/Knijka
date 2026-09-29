@@ -215,7 +215,7 @@
  *     skew clamp markings.ts keeps private, the 1/cos span widening, the refuge
  *     island's kerbed gap and the staggered half's walk along the street.
  * The catalogue now grades
- * 4,309 of the corpus's 11,038 marking quads — 39.04%, up from one in 6.7. It
+ * 4,324 of the corpus's 11,053 marking quads — 39.12%, up from one in 6.7. It
  * is 84% of the DISTRICTS and 39% of the PAINT because the 17 still outside are
  * the biggest maps in the corpus. They are attributed one by one, as before: 6
  * painted numerals, 5 roundabout rings, 3 arrow maps, 2 bus-lane legends, 1
@@ -2494,6 +2494,89 @@ function laneDropLicences(built: Built): QuadLicence[] {
   if (length - sTo > 1) {
     out.push(...ribbonLicences(strand(sTo, length, false), EDGE_LINE_WIDTH_M, `М1drop@${edgeId}`));
   }
+  out.push(...laneDropArrowLicences(drop));
+  return out;
+}
+
+/**
+ * The MERGE ARROWS of a lane drop — `paintLaneDropArrows`' arithmetic,
+ * restated (sc-merge-lane-end:ae6166e2 „no merge arrow on the tarmac"; the
+ * founder's 2026-09-27 ruling REQUIRES them).
+ *
+ *   · the glyph, in a u = right-of-travel / v = along-travel frame, is a 2.5 m
+ *     stem, then a 3.0 m leg and a 1.8 m head (half width 1.1 m) turned 30°
+ *     off travel TOWARD the survivor; strokes 0.9 m wide; the whole glyph
+ *     re-centred on its own bounding box;
+ *   · stations every 20 m from 60 m ahead of the taper, each glyph centred on
+ *     the OPEN lane at its station (midway between the surviving boundary and
+ *     the closing line), kept only while every corner stays 0.5 m clear of
+ *     both — and the first station inside the taper that fails ends the walk.
+ *
+ * Head quads are the glyph passes' degenerate `[a, b, apex, apex]`, licensed
+ * as exactly that: four corners, two of them the same point.
+ */
+function laneDropArrowLicences(drop: LaneDropRead): QuadLicence[] {
+  const { edgeId, line, length, sFrom, sTo, outerOff, survivorOff } = drop;
+  const STEM_W = 0.9;
+  const STEM = 2.5;
+  const LEG = 3.0;
+  const HEAD_L = 1.8;
+  const HEAD_HALF = 1.1;
+  const LEAN = (30 * Math.PI) / 180;
+  const PITCH = 20;
+  const LEAD = 60;
+  const CLEAR = 0.5;
+  const toward = Math.sign(survivorOff - outerOff); // + = the survivor is to the RIGHT
+  if (toward === 0) return [];
+  const dying = -toward;
+
+  const perp = (e: Vec2): Vec2 => [e[1], -e[0]];
+  const stroke = (b: Vec2, e: Vec2, len: number, w: number): Vec2[] => {
+    const pe = perp(e);
+    const a0 = add(b, mul(pe, -w / 2));
+    const b0 = add(b, mul(pe, w / 2));
+    return [a0, b0, add(b0, mul(e, len)), add(a0, mul(e, len))];
+  };
+  const up: Vec2 = [0, 1];
+  const diag: Vec2 = [toward * Math.sin(LEAN), Math.cos(LEAN)];
+  const base: Vec2 = [-0.8 * toward, 0];
+  const bend = add(base, mul(up, STEM));
+  const legEnd = add(bend, mul(diag, LEG));
+  const apex = add(legEnd, mul(diag, HEAD_L));
+  const pd = perp(diag);
+  const raw: Vec2[][] = [
+    stroke(base, up, STEM, STEM_W),
+    stroke(bend, diag, LEG, STEM_W),
+    [add(legEnd, mul(pd, -HEAD_HALF)), add(legEnd, mul(pd, HEAD_HALF)), apex, apex],
+  ];
+  const all = raw.flat();
+  const cu = (Math.min(...all.map((p) => p[0])) + Math.max(...all.map((p) => p[0]))) / 2;
+  const cv = (Math.min(...all.map((p) => p[1])) + Math.max(...all.map((p) => p[1]))) / 2;
+  const glyph = raw.map((q) => q.map(([u, v]) => [u - cu, v - cv] as Vec2));
+
+  const out: QuadLicence[] = [];
+  let n = 0;
+  for (let sc = sFrom - LEAD; sc < sTo; sc += PITCH) {
+    const centre = (survivorOff + laneDropOffAt(drop, sc)) / 2;
+    const fits = glyph.flat().every(([u, v]) => {
+      const s = sc + v;
+      if (s < 0 || s > length) return false;
+      const d = (centre + u) * dying;
+      return d > survivorOff * dying + CLEAR && d < laneDropOffAt(drop, s) * dying - CLEAR;
+    });
+    if (!fits) {
+      if (sc >= sFrom) break;
+      continue;
+    }
+    for (const q of glyph) {
+      const corners = q.map(([u, v]) => {
+        const at = pointAlong(line, sc + v);
+        return add(at.point, mul(perpRight(at.tangent), centre + u));
+      }) as [Vec2, Vec2, Vec2, Vec2];
+      out.push({ corners, what: `merge-arrow${n}@${edgeId}` });
+    }
+    n++;
+  }
   return out;
 }
 
@@ -2899,7 +2982,7 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
  * a feature: the district simply leaves the domain and says so.
  *
  * 88 districts of 105 — and
- * 4,309 of the corpus's 11,038 marking quads — 39.04%, which is the number that
+ * 4,324 of the corpus's 11,053 marking quads — 39.12%, which is the number that
  * matters, because a district is not a unit of paint. This block was titled
  * „every quad the world paints is a quad the world was authored to paint" while
  * it graded one quad in 6.7. It is now titled what it does, and the fraction is
@@ -3937,14 +4020,21 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
       // `living_street` on exactly that ground; pe-zone spells its home zone
       // as the чл. 62 tag on a `residential` class, so the ruling could not
       // reach it. One quad per side on a two-vertex line = 2.
-    }).toEqual({ districts: 106, booked: 11146, triangles: 108 });
+      //
+      // +15 over 11,146, all of it ln-merge-v1's, the same row a second time:
+      // „no merge arrow on the tarmac". `paintLaneDropArrows` stands five
+      // glyphs of three quads (stem, leg, head) in the open part of the dying
+      // lane — three ahead of the taper, two inside it — and
+      // `laneDropArrowLicences` licences every one of the 15.
+    }).toEqual({ districts: 106, booked: 11161, triangles: 108 });
     expect({
       districts: domain.length,
       booked: booked(domain),
       triangles: bookedTriangles(domain),
       // …and the same +24: ln-merge-v1 is INSIDE the domain, so the lane drop's
-      // paint is licensed rather than excused by an exclusion.
-    }).toEqual({ districts: 89, booked: 4323, triangles: 14 });
+      // paint is licensed rather than excused by an exclusion — and the same
+      // +15 for its merge arrows, for the same reason.
+    }).toEqual({ districts: 89, booked: 4338, triangles: 14 });
     // The mesh, and the booking it is supposed to equal. 59% of the denominator
     // below still sits in the 14 excluded districts — they are the biggest maps
     // in the corpus, which is why 87% of the DISTRICTS is only 41% of the PAINT
@@ -3966,7 +4056,11 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
     // 39.03 → 39.04, and it is the same mechanism a second time: the two М1
     // edge lines the same predicate now also withholds are two more quads off
     // the denominator alone (4,309 / 11,038). Nothing entered the domain.
-    expect(share).toBe("39.04");
+    //
+    // 39.04 → 39.12: the lane drop's 15 merge-arrow quads are INSIDE the
+    // domain and licensed, so they grew numerator and denominator together
+    // (4,324 / 11,053).
+    expect(share).toBe("39.12");
     // „NOT CLAIMED IN A COMMENT" IS NOW ITSELF A CHECK. The line this replaces
     // — `expect(share.toFixed(1)).toBe("14.8")` — could not fail: with both
     // totals pinned exactly two lines above it, the ratio was arithmetic, and

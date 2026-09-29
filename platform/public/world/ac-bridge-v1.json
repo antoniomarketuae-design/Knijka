@@ -6,9 +6,9 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_ac_bridge.mjs",
   "boundsLocalMeters": {
-   "minX": -28.13,
+   "minX": -42.13,
    "minY": 0,
-   "maxX": 28.13,
+   "maxX": 42.13,
    "maxY": 520
   },
   "zonesVersion": 1,
@@ -79,6 +79,14 @@
       0,
       520
      ]
+    ],
+    "bridges": [
+     {
+      "fromM": 250,
+      "toM": 340,
+      "approachFromM": 0,
+      "approachToM": 380
+     }
     ]
    }
   ]
@@ -93,19 +101,19 @@
    "heightSource": "default",
    "footprint": [
     [
-     -16.13,
+     -30.13,
      110
     ],
     [
-     -28.13,
+     -42.13,
      110
     ],
     [
-     -28.13,
+     -42.13,
      200
     ],
     [
-     -16.13,
+     -30.13,
      200
     ]
    ]
@@ -116,19 +124,19 @@
    "heightSource": "default",
    "footprint": [
     [
-     16.13,
+     30.13,
      110
     ],
     [
-     28.13,
+     42.13,
      110
     ],
     [
-     28.13,
+     42.13,
      200
     ],
     [
-     16.13,
+     30.13,
      200
     ]
    ]

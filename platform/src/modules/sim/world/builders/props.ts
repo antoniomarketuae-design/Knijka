@@ -48,7 +48,6 @@ import {
   isExtraUrbanCarriageway,
   isMotorwayCarriageway,
   LINDEN_BOULEVARD_COUNT,
-  livingZoneCarriageway,
   paintsZebra,
   PARK_TREE_GRID_M,
   RAILING_CROSSING_CLEAR_M,
@@ -92,6 +91,7 @@ import {
   norm,
   type Vec2,
 } from "./math2d";
+import { livingZoneMouths } from "./zoneGateway";
 import { toWorld, yawFromFacing } from "./mesh";
 import {
   isBareVergeSide,
@@ -1348,51 +1348,46 @@ export function buildProps(
   // a way tagged living_street IS, by чл. 61, a signed one — but measured over
   // the whole corpus only pe-zone-v1 carries such an edge, so every other
   // district still builds byte-identically.
-  for (const eb of network.edges) {
-    if (!livingZoneCarriageway(eb.edge)) continue;
-    for (const nodeId of [eb.edge.from, eb.edge.to]) {
-      const info = network.nodes.get(nodeId);
-      if (!info) continue;
-      const others = info.approaches.filter((a) => a.edgeId !== eb.edge.id);
-      if (!others.some((a) => !livingZoneCarriageway(a.edge))) continue;
-      const ap = info.approaches.find((a) => a.edgeId === eb.edge.id);
-      if (!ap) continue;
-      // `ap.cut` is the junction-trimmed cross-section, so the post is clear of
-      // the mouth at the degree-3 exit (setback 24.13 m there) as well as at the
-      // degree-2 entry seam (3.03 m) — one station, both shapes.
-      const into = ap.dir; // away from the node, i.e. INTO the zone
-      const out = mul(into, -1);
-      // Step deeper into the zone until BOTH kerbs are a readable distance from
-      // every post already placed. MIN_POST_SEPARATION_M (0.75 m) is the
-      // anti-z-fighting floor, not a legibility bar: at the base station the
-      // Д15 on pe-zone-v1's exit boundary landed 2.0 m from the В26 «20» that
-      // the junction-repeat pass had already put on that kerb facing the same
-      // driver, which is one silhouette, not two signs. Same nudge discipline as
-      // zoneSigns.ts (ZONE_POST_NUDGE_STEP_M); deterministic, and it gives up
-      // rather than walking a plate away from the boundary it names.
-      let station = add(ap.cut, mul(into, LIVING_ZONE_POST_ALONG_M));
-      for (let tries = 0; tries < ZONE_PLATE_NUDGE_TRIES; tries++) {
-        const kerbs = [
-          add(station, mul(perpRight(into), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
-          add(station, mul(perpRight(out), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
-        ];
-        if (!postAnchors.some((q) => kerbs.some((k) => dist(q, k) < ZONE_PLATE_READABLE_M))) break;
-        station = add(station, mul(into, ZONE_PLATE_NUDGE_STEP_M));
-      }
-      if (ap.outgoing) {
-        pushSignAt(
-          add(station, mul(perpRight(into), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
-          yawFromFacing(out),
-          "livingZoneStart",
-        );
-      }
-      if (ap.incoming) {
-        pushSignAt(
-          add(station, mul(perpRight(out), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
-          yawFromFacing(into),
-          "livingZoneEnd",
-        );
-      }
+  //
+  // The boundary rule itself lives in zoneGateway.livingZoneMouths, because the
+  // жилищна-зона GATEWAY stands at the same mouths and the gate and the plate
+  // must never disagree about where the zone begins.
+  for (const ap of livingZoneMouths(network)) {
+    // `ap.cut` is the junction-trimmed cross-section, so the post is clear of
+    // the mouth at the degree-3 exit (setback 24.13 m there) as well as at the
+    // degree-2 entry seam (3.03 m) — one station, both shapes.
+    const into = ap.dir; // away from the node, i.e. INTO the zone
+    const out = mul(into, -1);
+    // Step deeper into the zone until BOTH kerbs are a readable distance from
+    // every post already placed. MIN_POST_SEPARATION_M (0.75 m) is the
+    // anti-z-fighting floor, not a legibility bar: at the base station the
+    // Д15 on pe-zone-v1's exit boundary landed 2.0 m from the В26 «20» that
+    // the junction-repeat pass had already put on that kerb facing the same
+    // driver, which is one silhouette, not two signs. Same nudge discipline as
+    // zoneSigns.ts (ZONE_POST_NUDGE_STEP_M); deterministic, and it gives up
+    // rather than walking a plate away from the boundary it names.
+    let station = add(ap.cut, mul(into, LIVING_ZONE_POST_ALONG_M));
+    for (let tries = 0; tries < ZONE_PLATE_NUDGE_TRIES; tries++) {
+      const kerbs = [
+        add(station, mul(perpRight(into), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
+        add(station, mul(perpRight(out), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
+      ];
+      if (!postAnchors.some((q) => kerbs.some((k) => dist(q, k) < ZONE_PLATE_READABLE_M))) break;
+      station = add(station, mul(into, ZONE_PLATE_NUDGE_STEP_M));
+    }
+    if (ap.outgoing) {
+      pushSignAt(
+        add(station, mul(perpRight(into), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
+        yawFromFacing(out),
+        "livingZoneStart",
+      );
+    }
+    if (ap.incoming) {
+      pushSignAt(
+        add(station, mul(perpRight(out), ap.halfWidth + ZONE_PLATE_LATERAL_M)),
+        yawFromFacing(into),
+        "livingZoneEnd",
+      );
     }
   }
 

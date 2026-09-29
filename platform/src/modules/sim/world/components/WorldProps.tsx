@@ -2393,6 +2393,64 @@ function Furniture({
 }
 
 // ---------------------------------------------------------------------------
+// The жилищна-зона GATEWAY (builders/zoneGateway.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Planters and bollards at every mouth of a living zone — sc-pe-zone-living:
+ * 37bbb618 and the founder's 2026-09-27 ruling that the zone gets a visible
+ * gateway. WHERE they stand is decided in the builder (business logic out of
+ * components); this only instances the kit the lamp-derived furniture already
+ * loads. One instanced mesh per kind present, nothing at all on a district
+ * without a living-zone boundary — the `zone-gateway` term in drawSlots.ts
+ * charges exactly that.
+ */
+function ZoneGateway({
+  world,
+  assets,
+  preset,
+}: {
+  world: WorldGeometry;
+  assets: PropAssets;
+  preset: QualityPreset;
+}) {
+  const meshes = useMemo(() => {
+    const castShadow = preset.castShadows === "full";
+    const mat = assets.materials.furniture;
+    const planters = world.zoneGateways.filter((g) => g.kind === "planter");
+    const bollards = world.zoneGateways.filter((g) => g.kind === "bollard");
+    const out: THREE.InstancedMesh[] = [];
+    if (planters.length > 0) {
+      out.push(
+        createInstancedMesh(assets.furniture.planter, mat, planters, {
+          castShadow,
+          name: "zone-gateway-planter",
+        }),
+      );
+    }
+    if (bollards.length > 0) {
+      out.push(
+        createInstancedMesh(assets.furniture.bollard, mat, bollards, {
+          castShadow,
+          name: "zone-gateway-bollard",
+        }),
+      );
+    }
+    return out;
+  }, [assets, world.zoneGateways, preset.castShadows]);
+  useEffect(() => () => disposeAll(meshes), [meshes]);
+
+  if (meshes.length === 0) return null;
+  return (
+    <group name="zone-gateway">
+      {meshes.map((m, i) => (
+        <primitive key={i} object={m} />
+      ))}
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // B65 street furniture — the overhead line and the pavement parapet
 // ---------------------------------------------------------------------------
 
@@ -2651,6 +2709,7 @@ export function WorldPropsGroup({
           <Streetlights world={world} assets={assets} preset={preset} night={night} />
           <Trees world={world} assets={assets} preset={preset} />
           <Furniture world={world} assets={assets} preset={preset} />
+          <ZoneGateway world={world} assets={assets} preset={preset} />
           <B65Furniture world={world} assets={assets} preset={preset} />
           <StreetscapeV2 world={world} assets={assets} preset={preset} night={night} />
         </>

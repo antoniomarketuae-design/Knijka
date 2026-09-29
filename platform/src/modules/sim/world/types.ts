@@ -103,6 +103,19 @@ export interface DistrictEdge {
    * pool. Selection only: the SAME bodies stand at the SAME stations.
    */
   parkingMix?: string;
+  /**
+   * BRIDGE spans along this edge's polyline arclength, m (row
+   * sc-ac-ice:86eab7e9). Each is built as a deck with two parapets
+   * (builders/bridgeDeck.ts) and parks nobody (traffic/TrafficLayer — ЗДвП
+   * чл. 98, ал. 1, т. 3). Absent ⇒ no bridge: every map written before the tag
+   * builds byte-identical geometry and placement.
+   *
+   * `approachFromM` (≤ fromM) / `approachToM` (≥ toM), optional: where the
+   * road runs on the BRIDGEHEAD EMBANKMENT either side of the deck — a
+   * continuous edge railing, paired lamps, no parked row, no street trees or
+   * overhead line (bridgeDeck.ts, THE BRIDGEHEAD). Absent ⇒ the deck only.
+   */
+  bridges?: { fromM: number; toM: number; approachFromM?: number; approachToM?: number }[];
 }
 
 export interface DistrictIntersection {
@@ -660,6 +673,15 @@ export function signKindSpeedKmh(kind: SignKind): number | null {
   return SPEED_LIMIT_KMH_BY_KIND.get(kind) ?? null;
 }
 
+/** What stands in a жилищна-зона gateway (builders/zoneGateway.ts). Both ride
+ *  the streetscape kit the lamp-derived furniture already instances. */
+export type ZoneGatewayKind = "planter" | "bollard";
+
+/** One gateway item; local +X runs along the kerb, into the zone. */
+export interface ZoneGatewayPlacement extends StaticTransform {
+  kind: ZoneGatewayKind;
+}
+
 export interface SignPlacement extends StaticTransform {
   kind: SignKind;
   /**
@@ -824,6 +846,11 @@ export interface WorldStats {
   /** Rail-track deck quads over railCrossing spans (ballast band + sleeper
    *  ties + the two steel rails); 0 on every map without a railCrossing zone. */
   railTrackQuads: number;
+  /** Bridge decks built over declared edge `bridges` spans
+   *  (builders/bridgeDeck.ts); 0 on every district that declares none. */
+  bridgeDecks: number;
+  /** Parapet walls built along those decks (two per deck). */
+  bridgeParapets: number;
   /** Kerbed central islands actually drawn (doc 87 FR-22). Lower than
    *  `roundabouts` exactly when a registration's interior is not free — see
    *  builders/roundabout.ts on why a token disc over a live carriageway is a
@@ -879,6 +906,9 @@ export interface WorldStats {
   busStops: number;
   /** Surface-parking dressing clusters (kiosk + barrier + wheel stops). */
   parkingKits: number;
+  /** Planters + bollards of the жилищна-зона gateways (builders/zoneGateway.ts).
+   *  0 on every district without a living-zone boundary. */
+  zoneGatewayItems: number;
   vertices: number;
   /** Triangles in the merged STATIC surfaces only — not the frame's triangles.
    *  The frame also carries the cockpit, the aids, traffic, props and the
@@ -927,6 +957,14 @@ export interface WorldGeometry {
    *  across the carriageway (metallic). BOTH empty on every map without a
    *  railCrossing zone — the additive/bit-identity contract. */
   railTracks: { deck: MeshData; rails: MeshData };
+  /** BRIDGES over every declared edge `bridges` span
+   *  (builders/bridgeDeck.ts): `deck` = the expansion joints at both
+   *  abutments + the concrete footway slab and cornice; `parapets` = the two
+   *  concrete walls and their abutment pylons (also written into
+   *  `colliders.buildings` — the wall that is drawn is the wall the car
+   *  meets). BOTH empty on every district that declares no bridge — the
+   *  additive/bit-identity contract. */
+  bridgeDecks: { deck: MeshData; parapets: MeshData };
   /** Open ground (grass): parks, verges, district edges. Subtle off-road relief. */
   terrain: MeshData;
   /** Paved ground (concrete): courtyards/parking in the built-up fabric.
@@ -997,6 +1035,13 @@ export interface WorldGeometry {
   terminusClosures: TerminusClosurePlacement[];
   /** Surface-parking dressing clusters (one transform per pre-merged kit). */
   parkingKits: StaticTransform[];
+  /**
+   * The GATEWAY at every mouth of a жилищна зона (builders/zoneGateway.ts):
+   * planters and bollards on the pavement framing the Д15/Д16. Render-only —
+   * no collider, nothing on the carriageway, so no grading reads it. Empty on
+   * every district without a living-zone boundary.
+   */
+  zoneGateways: ZoneGatewayPlacement[];
   colliders: WorldColliderSet;
   /** ODbL attribution text from meta — must stay user-visible. */
   attribution: { text: string; copyrightUrl: string };

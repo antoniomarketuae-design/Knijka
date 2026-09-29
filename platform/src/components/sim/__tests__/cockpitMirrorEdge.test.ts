@@ -125,11 +125,10 @@ describe("cockpitMirrorBottomFraction — the edge the DOM rail steps below", ()
     // the glass. MUTATION THAT MATTERS: CameraRig passing no drop.
     //
     // ASKED WITH THE COMPOSITION-TRUE DROP, not the shipped one: the shipped
-    // station drop is capped at 0 on the phones (cabinLook's cap block — the
-    // HUD corridor has 0.06 px of slack on the smallest sideways stage), so a
-    // case written against the shipped value would assert 0 === 0 and would go
-    // on passing if the parameter were deleted. The property under test is the
-    // plumbing, and it must hold for whatever the cap is next set to.
+    // station drop is capped (11.3 mm since 2026-09-27, B58's bar — cabinLook's
+    // cap block), and a case written against a cap would weaken whenever the
+    // cap moves. The property under test is the plumbing, and it must hold for
+    // whatever the cap is next set to.
     const real = rearMirrorStationDropUncappedM(HIS_ASPECT);
     expect(real).toBeGreaterThan(0.03);
     const atSpeedFov = HIS_FOV + SPEED_WIDEN_DEG;
@@ -272,13 +271,15 @@ describe("the mirror's TOP edge — why a header lip cannot be the fix", () => {
     }
   });
 
-  it("…and the RE-ANCHORED station is CAPPED, so today it brings back nothing", () => {
-    // The honest state of the ruling, 2026-09-23. The station drop the
-    // composition asks for would bring the proxy a hand's width back onto the
-    // canvas and put the glass top inside the frame — and it is refused by the
-    // two bars in cabinLook's cap block (B58's sign clearance, worth 12.2 mm;
-    // the phone HUD corridor, worth 0.1 mm). What landed is the HEADER drop,
-    // which is behind the glass and costs neither bar.
+  it("…and the RE-ANCHORED station brings the GLASS back inside the frame", () => {
+    // The state of the ruling since 2026-09-27. The station drop the
+    // composition asks for (~36 mm) is still refused by B58's sign clearance
+    // (worth 11.35 mm at the glass, measured on MirrorRig's placement —
+    // mirrorStation.rearMirrorB58ClearanceM); the phone HUD corridor stopped
+    // refusing it when the ruling moved the card that clipped (the first-run
+    // hint, now in the left corridor sideways). The 11.3 mm that ships is enough for the GLASS top on
+    // both phones — the conservative near corner included — and not for the
+    // proxy box's top, which is the housing and the mount.
     for (const aspect of [HIS_ASPECT, SMALL_ASPECT]) {
       const authored = hotspotScreenRect("hotspot_mirror_rear", "forward", aspect, 0)!;
       const shipped = hotspotScreenRect("hotspot_mirror_rear", "forward", aspect)!;
@@ -288,13 +289,14 @@ describe("the mirror's TOP edge — why a header lip cannot be the fix", () => {
         aspect,
         rearMirrorStationDropUncappedM(aspect),
       )!;
-      expect(shipped.top).toBeCloseTo(authored.top, 9);
-      expect(wanted.top - authored.top).toBeGreaterThan(0.07);
-      // The glass top edge: still off the canvas as shipped, inside it at the
-      // drop the ruling asks for. This is the residue the row still owes.
+      expect(shipped.top - authored.top).toBeGreaterThan(0.02);
+      expect(wanted.top - shipped.top).toBeGreaterThan(0.04);
+      expect(shipped.top).toBeLessThan(0);
+      // The glass top edge: off the canvas as authored, inside it as shipped.
       const near = (d: number) =>
         projectCockpitPoint([GLASS_TOP_NEAR[0], GLASS_TOP_NEAR[1] - d, GLASS_TOP_NEAR[2]], "forward", aspect).y;
-      expect(near(rearMirrorStationDropM(aspect))).toBeGreaterThan(1);
+      expect(near(0)).toBeGreaterThan(1);
+      expect(near(rearMirrorStationDropM(aspect))).toBeLessThan(1);
       expect(near(rearMirrorStationDropUncappedM(aspect))).toBeLessThan(0.98);
     }
   });

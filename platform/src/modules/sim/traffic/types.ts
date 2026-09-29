@@ -55,6 +55,10 @@ export interface DistrictEdge {
   /** Curbside parking-band opt-in, mirrored from world/types (the curb pass
    *  reads it through `parkingOptedOut`). */
   parkingBand?: boolean;
+  /** BRIDGE spans, mirrored from world/types — the curb pass parks nobody on
+   *  the deck (ЗДвП чл. 98, ал. 1, т. 3) nor on its bridgehead embankment
+   *  (world/builders/bridgeDeck.edgeBridgeSpans). */
+  bridges?: { fromM: number; toM: number; approachFromM?: number; approachToM?: number }[];
   /**
    * АВТОМАГИСТРАЛА, mirrored from world/types — the typed flag the world pass
    * grades on (`world/builders/constants.isMotorwayCarriageway`), NOT the class

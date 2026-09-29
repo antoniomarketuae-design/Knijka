@@ -87,4 +87,6 @@ export type {
   WorldGeometry,
   WorldQuality,
   WorldStats,
+  ZoneGatewayKind,
+  ZoneGatewayPlacement,
 } from "./types";

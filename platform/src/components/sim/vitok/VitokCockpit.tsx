@@ -14,7 +14,6 @@ import { Html, useGLTF } from "@react-three/drei";
 import {
   Box3,
   BufferAttribute,
-  Matrix3,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -46,8 +45,10 @@ import {
   rearMirrorStationDropM,
 } from "@/modules/sim/scene/vitok/cabinLook";
 import {
+  REAR_MIRROR_HOUSING_BOXES,
+  applyRearMirrorCasingDrop,
+  captureRearMirrorCasing,
   headerPadSpan,
-  inRearMirrorCasing,
   reanchoredStalk,
   stalkRun,
   type StalkAxis,
@@ -900,131 +901,44 @@ function CabinRoof({
 // completely, flap included.
 // ---------------------------------------------------------------------------
 
-/** Authored `hotspot_mirror_rear` quad half-extents, quad-local units. */
-const GLASS_HALF = { x: 0.1125, y: 0.0375 } as const;
-/** Bezel/front-shell half-extents — a ~12 mm rim around the glass. */
-const HOUSING_HALF = { x: 0.124, y: 0.05 } as const;
-/** How far the bezel ring stands proud of the glass, quad-local units. */
-const BEZEL_PROUD = 0.014;
-/**
- * Front-shell depth behind the glass, before the housing steps out. Kept to a
- * lip: the authored casing's DRIVER-FACING face is at chassis z 0.467–0.483 —
- * i.e. immediately behind the lifted glass — so the tall rear shell has to
- * begin there. A first pass gave the slim front shell 50 mm of depth and a
- * rendered frame put the casing's lit corner straight back over the mirror.
- */
-const HOUSING_FRONT_DEPTH = 0.004;
-/**
- * REAR SHELL — the bulky half of the housing, and the part that does the
- * hiding. A first render with a single slim box left a lit tan flap above the
- * mirror; raycasting those exact pixels put it on interior_shell at chassis
- * (0.06, 0.848, 0.475) — the authored casing's own TOP FACE, whose elevation
- * from COCKPIT_EYE (0.189 rad) just beat the slim shell's (0.188). Rather than
- * fatten the visible bezel to cover it, the housing steps UP and OUT behind
- * the glass, which is what a real mirror body does anyway: at half-height
- * 0.082 the rear shell sits at elevation 0.180–0.213 along its length against
- * the authored casing's 0.172–0.191, so the old top face is behind it from
- * every point of the shipped cockpit pose.
- */
-const HOUSING_REAR_HALF = { x: 0.128, y: 0.045 } as const;
-/** Rear shell depth — its far face passes the authored casing's (chassis
- *  z 0.560, i.e. ~0.125 m behind the lifted glass). */
-const HOUSING_REAR_DEPTH = 0.16;
-/**
- * Rear-shell rise, quad-local. The assembly now also drops 14 mm
- * (MirrorRig.MIRROR_DROP_M) while the authored casing stays put, so the shell
- * has to grow back UP by at least that much or the casing's top face reappears
- * over the mirror — which is exactly what the next rendered frame showed.
- * 0.030 local ≈ 23 mm of rise: the drop plus margin, added upward only so the
- * housing does not also grow downward into the frame.
- */
-const HOUSING_REAR_RISE = 0.05;
-/**
- * MIRROR HOOD (R0 round 3) — the moulded lip over the glass, and the ONLY
- * thing that can legally cover the last stretch of the authored stalk.
- *
- * The stalk's underside crosses the lifted glass's top edge (the constant
- * chassis-height line y 0.8165 from (0.119, z 0.470) to (−0.083, z 0.417)) at
- * about z 0.449 — it physically penetrates the reflection. A chassis-space
- * fairing that follows it that far therefore lands ON the glass, which is what
- * round 1 did and what a first round-3 render reproduced exactly (first bright
- * row 230 → 239 in columns 1010…1080).
- *
- * This piece lives in the GLASS QUAD'S OWN FRAME, so it is defined against the
- * glass, not against the car: its lower edge is `GLASS_HALF.y` — the glass's
- * top edge itself — and it can never eat a millimetre of reflection no matter
- * what MirrorRig does to the quad. Standing 0.035 local PROUD of the glass
- * plane it is nearer the eye than the stalk from chassis z 0.4145 back, so it
- * occludes the stalk's last centimetres. And because the glass rakes away from
- * the driver as it rises, a proud lip at the same local height projects ABOVE
- * the glass's top edge (row 215 vs 224 at 1440×900), not over it.
- */
-const HOUSING_HOOD = { halfX: 0.124, yTop: 0.095, zFront: 0.035, zBack: -0.02 } as const;
+// The housing's dimensions — GLASS_HALF (now REAR_GLASS_HALF), HOUSING_HALF,
+// BEZEL_PROUD, HOUSING_FRONT_DEPTH, HOUSING_REAR_HALF, HOUSING_REAR_DEPTH,
+// HOUSING_REAR_RISE and HOUSING_HOOD, each with the measurement that set it —
+// live in `@/modules/sim/scene/vitok/mirrorStation` since 2026-09-27, so the
+// B58 sign clearance is measured on the boxes this component renders.
 
-/** One bezel bar: [half-width, half-height, centre-x, centre-y]. */
-const BEZEL_BARS: readonly (readonly [number, number, number, number])[] = [
-  // top / bottom run the full housing width; the sides fill between them.
-  [HOUSING_HALF.x, (HOUSING_HALF.y - GLASS_HALF.y) / 2, 0, (HOUSING_HALF.y + GLASS_HALF.y) / 2],
-  [HOUSING_HALF.x, (HOUSING_HALF.y - GLASS_HALF.y) / 2, 0, -(HOUSING_HALF.y + GLASS_HALF.y) / 2],
-  [(HOUSING_HALF.x - GLASS_HALF.x) / 2, GLASS_HALF.y, -(HOUSING_HALF.x + GLASS_HALF.x) / 2, 0],
-  [(HOUSING_HALF.x - GLASS_HALF.x) / 2, GLASS_HALF.y, (HOUSING_HALF.x + GLASS_HALF.x) / 2, 0],
-];
-
-/** Rear-mirror shell + bezel, in the glass quad's local frame. */
+/** Rear-mirror shell + bezel, in the glass quad's local frame — every box
+ *  from `mirrorStation.REAR_MIRROR_HOUSING_BOXES`, the same boxes B58's
+ *  clearance is measured on (`rearMirrorB58ClearanceM`). */
+const BOX = REAR_MIRROR_HOUSING_BOXES;
 function MirrorHousing() {
   const setLayer = (m: Mesh) => m.layers.set(INTERIOR_LAYER);
   return (
     <group>
       {/* Front shell: starts 3 mm behind the glass plane so it never covers
           the reflection. */}
-      <mesh position={[0, 0, -0.003 - HOUSING_FRONT_DEPTH / 2]} onUpdate={setLayer}>
-        <boxGeometry args={[HOUSING_HALF.x * 2, HOUSING_HALF.y * 2, HOUSING_FRONT_DEPTH]} />
+      <mesh position={BOX.front.position} onUpdate={setLayer}>
+        <boxGeometry args={BOX.front.size} />
         <meshStandardMaterial color="#262a31" roughness={0.6} metalness={0.1} />
       </mesh>
       {/* Rear shell: the body proper — steps out to swallow the authored
           casing (see HOUSING_REAR_HALF). */}
-      <mesh
-        position={[
-          0,
-          HOUSING_REAR_RISE / 2,
-          -0.003 - HOUSING_FRONT_DEPTH - HOUSING_REAR_DEPTH / 2,
-        ]}
-        onUpdate={setLayer}
-      >
-        <boxGeometry
-          args={[
-            HOUSING_REAR_HALF.x * 2,
-            HOUSING_REAR_HALF.y * 2 + HOUSING_REAR_RISE,
-            HOUSING_REAR_DEPTH,
-          ]}
-        />
+      <mesh position={BOX.rear.position} onUpdate={setLayer}>
+        <boxGeometry args={BOX.rear.size} />
         <meshStandardMaterial color="#1e2229" roughness={0.65} metalness={0.1} />
       </mesh>
       {/* Hood — see HOUSING_HOOD. Bottom pinned to the glass's own top edge, so
           it cannot clip the reflection; proud of the glass, so it hides the
           stalk stub the chassis-space pod has to stop short of. */}
-      <mesh
-        position={[
-          0,
-          (GLASS_HALF.y + HOUSING_HOOD.yTop) / 2,
-          (HOUSING_HOOD.zFront + HOUSING_HOOD.zBack) / 2,
-        ]}
-        onUpdate={setLayer}
-      >
-        <boxGeometry
-          args={[
-            HOUSING_HOOD.halfX * 2,
-            HOUSING_HOOD.yTop - GLASS_HALF.y,
-            HOUSING_HOOD.zFront - HOUSING_HOOD.zBack,
-          ]}
-        />
+      <mesh position={BOX.hood.position} onUpdate={setLayer}>
+        <boxGeometry args={BOX.hood.size} />
         <meshStandardMaterial color="#2b2f37" roughness={0.55} metalness={0.12} />
       </mesh>
       {/* Bezel ring, proud of the glass — the lip that makes the glass read as
           set INTO something instead of floating in front of it. */}
-      {BEZEL_BARS.map(([hw, hh, cx, cy], i) => (
-        <mesh key={i} position={[cx, cy, BEZEL_PROUD / 2 - 0.002]} onUpdate={setLayer}>
-          <boxGeometry args={[hw * 2, hh * 2, BEZEL_PROUD]} />
+      {BOX.bezel.map((bar, i) => (
+        <mesh key={i} position={bar.position} onUpdate={setLayer}>
+          <boxGeometry args={bar.size} />
           <meshStandardMaterial color="#2b2f37" roughness={0.5} metalness={0.15} />
         </mesh>
       ))}
@@ -1560,99 +1474,10 @@ function recessDemisterSlots(root: Object3D): number {
   return moved;
 }
 
-/** The authored mirror casing's vertices, on private geometry copies, with
- *  their authored Y — what `applyRearMirrorCasingDrop` writes from. */
-interface RearMirrorCasing {
-  parts: {
-    position: BufferAttribute;
-    indices: Uint32Array;
-    /** Authored x, y, z of each captured vertex, interleaved. */
-    base: Float32Array;
-    /** One metre of chassis-DOWN in the mesh's own frame (identity mount: (0, -1, 0)). */
-    down: Vector3;
-  }[];
-  /** The drop currently written into the buffers, metres. */
-  applied: number;
-}
-
-/**
- * «RE-ANCHOR THE MIRROR» — THE AUTHORED HALF (founder ruling 2026-09-22).
- *
- * B58 learned that moving the glass alone „does nothing: the authored casing
- * then becomes the occluder", which is why its raise was an ASSET edit. The
- * re-anchor cannot be one: it exists only on wide canvases and is 0 at 16:9,
- * so the casing is moved here, at runtime, on a private copy of the shell
- * geometry — the same clone-before-edit rule {@link recessDemisterSlots} keeps,
- * so the cached GLTF every other mount (and the clip rig) receives is never
- * touched.
- *
- * Which vertices: every `interior_shell` vertex inside
- * `mirrorStation.REAR_MIRROR_CASING_BOX` — the MIRROR END of the station B58
- * raised (156 of its 168 vertices, measured on the shipped GLB; the 12-vertex
- * stalk root stays in the roof). Captured ONCE at clone time, while the root
- * still has an identity transform, so root space is GLB space and the chassis
- * point is (−x, y − 0.55, −z) — the mount documented at INTERIOR_YAW.
- */
-function captureRearMirrorCasing(root: Object3D): RearMirrorCasing {
-  root.updateMatrixWorld(true);
-  const v = new Vector3();
-  const parts: RearMirrorCasing["parts"] = [];
-  root.traverse((o) => {
-    if (!o.name.startsWith(SHELL_NODE_NAME)) return;
-    const mesh = asMesh(o);
-    if (!mesh) return;
-    const source = mesh.geometry.getAttribute("position");
-    if (!(source instanceof BufferAttribute)) return;
-    const hits: number[] = [];
-    for (let i = 0; i < source.count; i++) {
-      v.fromBufferAttribute(source, i).applyMatrix4(mesh.matrixWorld);
-      if (inRearMirrorCasing(-v.x, v.y + INTERIOR_Y_OFFSET, -v.z)) hits.push(i);
-    }
-    if (hits.length === 0) return;
-    // Private copy — never write the cached GLTF's buffers.
-    mesh.geometry = mesh.geometry.clone();
-    const position = mesh.geometry.getAttribute("position") as BufferAttribute;
-    const indices = Uint32Array.from(hits);
-    const base = new Float32Array(indices.length * 3);
-    for (let k = 0; k < indices.length; k++) {
-      base[k * 3] = position.getX(indices[k]);
-      base[k * 3 + 1] = position.getY(indices[k]);
-      base[k * 3 + 2] = position.getZ(indices[k]);
-    }
-    // Chassis Y is root Y (the mount is a yaw and a y offset), so chassis-down
-    // in the mesh frame is root-down through the inverse of its world matrix.
-    // L = A⁻¹·(0, −1, 0) for the linear part A — NOT transformDirection, which
-    // normalises and would mis-size the move under a scaled node.
-    const down = new Vector3(0, -1, 0).applyMatrix3(new Matrix3().setFromMatrix4(mesh.matrixWorld).invert());
-    parts.push({ position, indices, base, down });
-  });
-  return { parts, applied: 0 };
-}
-
-/**
- * Write the casing at `dropM` below its authored height. Absolute, from the
- * captured base, so it is idempotent and a return to a narrow canvas restores
- * the authored vertices exactly. The drop is applied along chassis-down as
- * seen in the mesh's own frame, so a node transform on the shell cannot turn
- * it into a sideways or scaled move.
- */
-function applyRearMirrorCasingDrop(casing: RearMirrorCasing, dropM: number): void {
-  const drop = Number.isFinite(dropM) && dropM > 0 ? dropM : 0;
-  if (drop === casing.applied) return;
-  for (const part of casing.parts) {
-    const { base, down } = part;
-    for (let k = 0; k < part.indices.length; k++) {
-      part.position.setXYZ(
-        part.indices[k],
-        base[k * 3] + down.x * drop,
-        base[k * 3 + 1] + down.y * drop,
-        base[k * 3 + 2] + down.z * drop,
-      );
-    }
-    part.position.needsUpdate = true;
-  }
-  casing.applied = drop;
-}
+/* The authored mirror casing's capture and drop live in
+ * `mirrorStation.captureRearMirrorCasing` / `applyRearMirrorCasingDrop` —
+ * pure over the Object3D graph so `mirrorCasing.test.ts` runs them on the
+ * decoded GLB (lane mirror round 3). */
 
 /**
  * „Виток" cockpit, A3 edition: the authored GT-E interior GLB replaces the
@@ -1772,7 +1597,7 @@ export function VitokCockpit({
     const ambientLineMaterials = splitAmbientLightLine(root);
 
     const wheelNode = root.getObjectByName("steering_wheel") ?? null;
-    const casing = captureRearMirrorCasing(root);
+    const casing = captureRearMirrorCasing(root, SHELL_NODE_NAME);
     return { model: root, wheelNode, clusterMesh, mirrorMeshes, ambientLineMaterials, casing };
   }, [scene]);
 

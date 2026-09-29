@@ -10110,3 +10110,94 @@ verifier, and none was refuted.
 `.audit-frames/wave-c/closures.jsonl`. Their `drivenAt` was corrected by hand from `70d8651` to `0e810ad`:
 `wave-c-post.mjs` reads the build from `.audit-frames/wave-c/wave-c-results.jsonl`, which these drives were never
 merged into, so the tool stated a build it did not measure. That is a defect in the posting tool, recorded to fix.
+
+## Wave C verdicts — 2026-09-27
+
+This run retired 2 row(s). Their evidence frames were driven at `54c02a86d253` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`01de885a0a87`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 13 |
+| STILL (symptom reproduces) | 4 |
+| UNJUDGED (re-drive did not exercise it) | 38 |
+
+**Open list: 57 → 55**, out of 1523 filed across the whole programme (1466 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-09-27
+
+This run retired 1 row(s). Their evidence frames were driven at `0e810ad086bb` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`01de885a0a87`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 13 |
+| STILL (symptom reproduces) | 3 |
+| UNJUDGED (re-drive did not exercise it) | 38 |
+
+**Open list: 55 → 54**, out of 1523 filed across the whole programme (1468 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-09-27
+
+This run retired 1 row(s). Their evidence frames were driven at `5d562964f8f1` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`01de885a0a87`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 0 |
+| REFUTED (finding was never true) | 1 |
+| PARTIAL (some clauses gone, some not) | 13 |
+| STILL (symptom reproduces) | 2 |
+| UNJUDGED (re-drive did not exercise it) | 38 |
+
+**Open list: 54 → 53**, out of 1523 filed across the whole programme (1469 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave-1 product repairs — landed 2026-09-29
+
+Five repair lanes, each built in its own scratch copy and signed off by an adversarial verifier
+(the task-cap lane is still in its rounds and is NOT in this landing):
+
+| lane | rows | what landed | rounds |
+|---|---|---|---|
+| copy | `sc-follow-rain-gap` (guard), `sc-ac-truck-spray` finish title | the finish objective now reads only «Стигни края на отсечката» (founder ruling 2026-09-27: the offence is the TIME gap); a guard test proves «мокрото платно поглъща светлината» appears in no tier of the rain lesson — the founder confirmed 2026-09-28 that nothing more is needed | 1 |
+| furniture | `sc-pe-zone-living:37bbb618`, `sc-merge-lane-end:ae6166e2` | merge arrows in the dying lane; a visible GATEWAY at the living zone's mouth (founder ruling 2026-09-27) | 1 |
+| mirror | `sc-mw-emergency-lane:3ffb0692` | the phone rear mirror re-anchored and the notification column moved on wide phones (ruling 2026-09-22), B58 «50» clearance kept; the casing drop and the three live cockpit inputs are now pinned by a live R3F mount | 4 |
+| bridge | `sc-ac-ice:86eab7e9` | `sc-ac-bridge-ice` reads as a bridge approach on the BUILT world (no kerbside parked row on the span, abutments ahead); the ghost clears the parapet; every replay caption is true on every frame of its 4 s window, including «Блоковете край платното свършват… градът остава далеч встрани»; `tools/maps/gen_ac_bridge.mjs` now emits the `bridges` tag | 5 |
+| input | `sc-sig-controller-live:f3984089` (already REFUTED as a harness false positive) | `engine/__tests__/throttle-to-brake.test.ts` kills the two held-key mutants that survived `input.test.ts` | 1 |
+
+**Nothing closes by this landing.** Each row closes only on a re-drive of its lesson on the product and a judge
+told the founder's rulings. Residuals, stated so nobody reads them as closed:
+- `sc-merge-lane-end:ae6166e2` stays PARTIAL: the A-group narrowing SIGN the founder required needs the text of
+  Наредба № РД-02-21-1, which the law bank lacks; the founder dismissed the download question (2026-09-27).
+- `sc-mw-emergency-lane:3ffb0692` can close at most PARTIAL: on phones of aspect ≥ 2.19 (every 20:9 Android) the glass
+  top stays cut by 3–8 px, and braking beyond ~0.06 g tips the view past the air the cap leaves (a founder trade).
+- `sc-ac-ice:86eab7e9`: the railings, lamps and walls-drawn checks are settled only by the `sc-ac-bridge-ice` pc-right
+  03-ready frame, driven at the same commit as `sc-ac-ice`.

@@ -106,14 +106,12 @@ import {
   HalfFloatType,
   MeshBasicMaterial,
   PerspectiveCamera,
-  Vector3,
   WebGLRenderTarget,
   type Mesh,
   type Object3D,
   type WebGLRenderer,
 } from "three";
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
-import { COCKPIT_EYE } from "@/modules/sim/vehicle";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
 import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import { cullInstancedForMirror } from "@/modules/sim/scene/vitok/mirrorInstanceCull";
@@ -127,15 +125,12 @@ import {
   type MirrorKind,
 } from "@/modules/sim/scene/vitok/mirrorAttention";
 import { getCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
+import {
+  REAR_GLASS_ASSEMBLY_DROP_M,
+  REAR_GLASS_LIFT_M,
+  placeRigGlassNode,
+} from "@/modules/sim/scene/vitok/mirrorStation";
 import { loadQualityPreset } from "../lesson-ui/QualityPresetSelector";
-
-/**
- * The interior GLB's mount offset along +Y, i.e. `-VitokCockpit.INTERIOR_Y_OFFSET`
- * (chassis y = authored y − 0.55). Duplicated as a literal rather than imported
- * because VitokCockpit imports THIS module — the pair would be a cycle. The
- * mount also carries yaw π, which is why x and z flip sign below.
- */
-const INTERIOR_MOUNT_Y_OFFSET = 0.55;
 
 /**
  * Extra drop of the rear-mirror assembly, metres (REF 8, second half). The
@@ -156,7 +151,7 @@ const INTERIOR_MOUNT_Y_OFFSET = 0.55;
  * generous. Left alone: re-tuning a verified 14 mm to save 7 is how a fixed
  * frame becomes an unfixed one.)
  */
-const MIRROR_DROP_M = 0.014;
+const MIRROR_DROP_M = REAR_GLASS_ASSEMBLY_DROP_M;
 
 export interface MirrorMeshes {
   left: Mesh | null;
@@ -308,7 +303,7 @@ const MIRROR_DEFS: Record<MirrorKind, MirrorDef> = {
     // 60 mm clears the authored casing, whose driver-facing face was measured
     // (raycast on the shipped GLB) at chassis z 0.467 — 33 mm in front of the
     // glass plane — with the dress reaching chassis x ±0.096 / y 0.759–0.850.
-    glassLiftM: 0.06,
+    glassLiftM: REAR_GLASS_LIFT_M,
   },
   left: {
     width: 160,
@@ -957,37 +952,32 @@ export function MirrorRig({
   useEffect(() => {
     const restores = entries.map((e) => {
       const previous = e.mesh.material;
-      const previousPosition = new Vector3().copy(e.mesh.position);
-      const previousScale = new Vector3().copy(e.mesh.scale);
       e.mesh.material = e.material;
       // REF 8: slide the quad along the ray to the driver's eye and shrink it
       // by the distance ratio — same pixels, 60 mm nearer than the casing.
       // Both vectors are in the mesh's parent (GLB) frame, which the cabin
       // mount reaches from chassis space by (−x, y + 0.55, −z).
-      const lift = MIRROR_DEFS[e.kind].glassLiftM;
-      if (lift !== 0) {
-        const toEye = new Vector3(
-          -COCKPIT_EYE.x,
-          COCKPIT_EYE.y + INTERIOR_MOUNT_Y_OFFSET,
-          -COCKPIT_EYE.z,
-        ).sub(e.mesh.position);
-        const distance = toEye.length();
-        if (distance > lift * 2) {
-          e.mesh.position.addScaledVector(toEye.divideScalar(distance), lift);
-          e.mesh.scale.multiplyScalar((distance - lift) / distance);
-          // Chassis +Y is GLB +Y (the mount's yaw-π only flips x and z).
-          if (e.kind === "rear") e.mesh.position.y -= MIRROR_DROP_M;
-        }
-      }
+      // Chassis +Y is GLB +Y (the mount's yaw-π only flips x and z), so both
+      // drops are straight down in this frame.
+      //
       // «Re-anchor the mirror» (founder, 2026-09-22): on a wide canvas the
       // whole station comes down so it hangs from the header the camera can
       // actually see. A pure translation, AFTER the REF 8 lift, so the lift's
-      // eye-ray geometry is the authored one at every aspect; 0 at 16:9.
-      if (e.kind === "rear" && rearStationDropM > 0) e.mesh.position.y -= rearStationDropM;
+      // eye-ray geometry is the authored one at every aspect; 0 at 16:9. The
+      // placement is `mirrorStation.rigMirrorGlass` — ONE function, so the B58
+      // clearance `mirrorAnchor.test.ts` asks of the lowered glass is asked of
+      // the placement this rig really applies (rearMirrorB58ClearanceM) — run
+      // through `placeRigGlassNode`, which also owns the position/scale undo
+      // (mirrorCasing.test.ts turns the phone sideways and back through it).
+      const restoreTransform = placeRigGlassNode(
+        e.mesh,
+        MIRROR_DEFS[e.kind].glassLiftM,
+        e.kind === "rear" ? MIRROR_DROP_M : 0,
+        e.kind === "rear" ? rearStationDropM : 0,
+      );
       return () => {
         e.mesh.material = previous;
-        e.mesh.position.copy(previousPosition);
-        e.mesh.scale.copy(previousScale);
+        restoreTransform();
       };
     });
     return () => {

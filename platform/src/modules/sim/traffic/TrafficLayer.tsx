@@ -86,6 +86,7 @@ import {
 } from "../contracts";
 import { edgeTravelHalfWidth, isMotorwayEdge, nodeOpenRadiusM } from "../world/builders/network";
 import { isExtraUrbanCarriageway } from "../world/builders/constants";
+import { edgeBridgeSpans } from "../world/builders/bridgeDeck";
 // B40(a) — the EXTRACTED world-label channel (doc 87 B35). This layer keeps its
 // own painter for the B42 officer bubble on purpose (that row is closed and
 // photographed; moving it would put it back at risk for nothing the founder can
@@ -951,6 +952,23 @@ export function computeParkedCars(
       if (zone.edgeId !== edge.id) continue;
       if (!PARK_BAN_ZONE_KINDS.has(zone.kind)) continue;
       banSpans.push([zone.fromM - PARKED_HALF_LEN_M, zone.toM + PARKED_HALF_LEN_M]);
+    }
+    // …and NOBODY PARKS ON A BRIDGE OR ITS BRIDGEHEAD. On the deck this is
+    // law, RETRIEVED, not recalled — `content/law/acts/zdvp.json`, ЗДвП
+    // чл. 98, ал. 1, т. 3: «Престоят и паркирането са забранени: … в тунели и
+    // подлези, на мостове, надлези …». On the embankment either side of it
+    // (`approachFromM` / `approachToM`, world/builders/bridgeDeck.ts, THE
+    // BRIDGEHEAD) it is the road's shape, not a cited rule: an embankment
+    // carriageway has a railed footway and a slope beside it, no parking lane.
+    // Row sc-ac-ice:86eab7e9: ac-bridge-v1 carried the same unbroken kerbside
+    // row as the street-with-ice beside it from the spawn to the abutment (the
+    // same 28 bodies at the same stations in the 03-ready frame), which is half
+    // of why the two lessons read as one street. The extent is the edge's own
+    // `bridges` declaration (bridgeDeck.edgeBridgeSpans — the reader the deck
+    // builder uses), widened by the body half-length so a FOOTPRINT stays off
+    // it. Absent on every other district: no body anywhere else moves.
+    for (const span of edgeBridgeSpans(edge)) {
+      banSpans.push([span.approachFromM - PARKED_HALF_LEN_M, span.approachToM + PARKED_HALF_LEN_M]);
     }
 
     const offset = laneWidthM * Math.max(1, edge.lanes) * 0.5 + PARK_BAND_CENTER_M;

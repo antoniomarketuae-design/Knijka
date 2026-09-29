@@ -41,6 +41,8 @@ import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/type
 import { facadeTint, facadeVariant } from "../builders/buildings";
 import { resolveBuildingHeightM } from "../builders/cityBuildings";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
+import { SIDEWALK_TOP_Y } from "../builders/constants";
+import { staticDrawSlotInputFromWorld, staticDrawSlotTerms } from "../builders/drawSlots";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
 const ID = "pe-zone-v1";
@@ -355,6 +357,123 @@ describe(`${ID} through the world builder`, () => {
     expect(world.stats.signs.pedestrianCrossing).toBe(0);
   });
 
+  /**
+   * THE MOUTH READS AS A ЖИЛИЩНА ЗОНА — sc-pe-zone-living:37bbb618 („the world
+   * is not a home zone … nothing about the geometry signals the zone the rule
+   * depends on") and the founder's 2026-09-27 ruling: the living zone gets a
+   * visible GATEWAY at its mouth.
+   *
+   * Planters and bollards on the pavement at every boundary, both kerbs,
+   * framing the Д15 the entering driver reads. Built on the WORLD (the
+   * placements the renderer instances), never on the carriageway: the lane
+   * graph, the kerb colliders and every graded surface stay where they were,
+   * which is the ruling's other half — it must not change grading anywhere.
+   */
+  describe("builds a GATEWAY at the zone's mouth — planters and bollards on the pavement", () => {
+    /** Kerb face of pz-e-zone: 2 lanes × 8.125 m / 2, no parking band. */
+    const KERB_X = 8.125;
+    const PAVEMENT_M = 3.5;
+    /** Half the planter's depth across the kerb (streetscape/planter.glb). */
+    const PLANTER_HALF_DEPTH_M = 0.28;
+    /** The zone-side window of each boundary: past its junction cut, near it. */
+    const windows: Array<{ name: string; lo: number; hi: number }> = [
+      { name: "entry", lo: ZONE_ENTRY_Y, hi: ZONE_ENTRY_Y + 16 },
+      { name: "exit", lo: ZONE_EXIT_Y - 45, hi: ZONE_EXIT_Y },
+    ];
+    const yOf = (p: { position: readonly number[] }) => -(p.position[2] as number);
+
+    it("stands at BOTH boundaries, on BOTH kerbs — planters and a bollard row each", () => {
+      const g = world.zoneGateways;
+      expect(g.length, "no gateway items at all").toBeGreaterThan(0);
+      expect(world.stats.zoneGatewayItems).toBe(g.length);
+      for (const w of windows) {
+        for (const side of [1, -1] as const) {
+          const here = g.filter(
+            (p) => yOf(p) > w.lo && yOf(p) < w.hi && Math.sign(p.position[0]) === side,
+          );
+          const tag = `${w.name} boundary, ${side > 0 ? "east" : "west"} kerb`;
+          expect(here.filter((p) => p.kind === "planter").length, tag).toBeGreaterThanOrEqual(2);
+          expect(here.filter((p) => p.kind === "bollard").length, tag).toBeGreaterThanOrEqual(3);
+        }
+      }
+      // …and nowhere else: every item belongs to one of the two mouths.
+      for (const p of g) {
+        expect(
+          windows.some((w) => yOf(p) > w.lo && yOf(p) < w.hi),
+          `${p.kind} at y=${yOf(p).toFixed(1)}`,
+        ).toBe(true);
+      }
+    });
+
+    it("every item stands ON THE PAVEMENT — never on the carriageway a car is graded on", () => {
+      expect(world.zoneGateways.length).toBeGreaterThan(0);
+      for (const p of world.zoneGateways) {
+        const ax = Math.abs(p.position[0]);
+        const tag = `${p.kind} at (${p.position[0].toFixed(2)}, ${yOf(p).toFixed(1)})`;
+        expect(ax - PLANTER_HALF_DEPTH_M, tag).toBeGreaterThanOrEqual(KERB_X);
+        expect(ax + PLANTER_HALF_DEPTH_M, tag).toBeLessThanOrEqual(KERB_X + PAVEMENT_M);
+        expect(p.position[1], tag).toBeCloseTo(SIDEWALK_TOP_Y, 6);
+        expect(Number.isFinite(p.yaw), tag).toBe(true);
+      }
+    });
+
+    it("FRAMES the Д15: every entering driver's plate has the gateway round it, on its own kerb", () => {
+      const d15 = world.signs.filter((s) => s.kind === "livingZoneStart");
+      expect(d15.length).toBe(2);
+      for (const s of d15) {
+        const near = world.zoneGateways.filter(
+          (p) =>
+            Math.sign(p.position[0]) === Math.sign(s.position[0]) &&
+            Math.abs(yOf(p) - yOf(s)) < 12,
+        );
+        expect(near.length, `Д15 at y=${yOf(s).toFixed(1)}`).toBeGreaterThanOrEqual(4);
+        // …and the plate is the gate's POST: a planter stands close on EACH
+        // side of it along the kerb, not merely somewhere in the cluster.
+        const planters = near.filter((p) => p.kind === "planter").map((p) => yOf(p) - yOf(s));
+        expect(planters.some((d) => d > 0.9 && d < 3), `Д15 at y=${yOf(s).toFixed(1)}`).toBe(true);
+        expect(planters.some((d) => d < -0.9 && d > -3), `Д15 at y=${yOf(s).toFixed(1)}`).toBe(true);
+      }
+    });
+
+    it("is charged as what the renderer mounts: one instanced mesh per gateway kind", () => {
+      const terms = staticDrawSlotTerms(staticDrawSlotInputFromWorld(world));
+      expect(terms.find((t) => t.id === "zone-gateway")).toEqual({ id: "zone-gateway", slots: 2 });
+    });
+
+    it("keeps clear of every post, lamp, tree and pole already standing there", () => {
+      const others: Array<{ what: string; position: readonly number[] }> = [
+        ...world.signs.map((s) => ({ what: s.kind, position: s.position })),
+        ...world.streetlights.map((s) => ({ what: "streetlight", position: s.position })),
+        ...world.trees.map((s) => ({ what: "tree", position: s.position })),
+        ...world.utilityPoles.map((s) => ({ what: "pole", position: s.position })),
+      ];
+      expect(world.zoneGateways.length).toBeGreaterThan(0);
+      for (const p of world.zoneGateways) {
+        for (const o of others) {
+          const d = Math.hypot(
+            (p.position[0] as number) - (o.position[0] as number),
+            (p.position[2] as number) - (o.position[2] as number),
+          );
+          expect(d, `${p.kind} vs ${o.what}`).toBeGreaterThanOrEqual(0.9);
+        }
+      }
+    });
+
+    it("is the ZONE's doing: the same street without the чл. 62 tag builds none, and no collider moves", () => {
+      // The control is this district with `zone: "residential"` taken off the
+      // one edge that carries it — the home-zone-has-no-lane-division pattern.
+      const raw = loadRaw(ID) as { roads: { edges: Array<Record<string, unknown>> } };
+      const copy = JSON.parse(JSON.stringify(raw)) as typeof raw;
+      for (const e of copy.roads.edges) delete e.zone;
+      const control = buildWorldGeometry(assertDistrict(copy), { seed: 7 });
+      expect(control.zoneGateways).toEqual([]);
+      expect(world.zoneGateways.length).toBeGreaterThan(0);
+      // Render-only: the kerb and building colliders are byte-for-byte the
+      // control's, so nothing a car can touch was added.
+      expect(JSON.stringify(world.colliders)).toBe(JSON.stringify(control.colliders));
+    });
+  });
+
   it("produces no NaN/infinite coordinates in any buffer or placement", () => {
     const buffers = [
       world.roadSurface,
@@ -374,7 +493,7 @@ describe(`${ID} through the world builder`, () => {
         if (!Number.isFinite(mesh.positions[i])) nonFinite++;
       }
     }
-    for (const list of [world.signs, world.streetlights, world.trees, world.busStops]) {
+    for (const list of [world.signs, world.streetlights, world.trees, world.busStops, world.zoneGateways]) {
       for (const t of list) {
         if (!t.position.every(Number.isFinite) || !Number.isFinite(t.yaw)) nonFinite++;
       }

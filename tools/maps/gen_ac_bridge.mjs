@@ -31,6 +31,21 @@
  *      sustain fits inside it at road speed) and 180 m of dry far side to
  *      demonstrate that acceleration belongs PAST the abutment, not on it.
  *
+ * 4. THE BRIDGE AND ITS BRIDGEHEAD (row sc-ac-ice:86eab7e9). The street edge
+ *    now DECLARES the structure: `bridges: [{ fromM, toM, approachFromM,
+ *    approachToM }]` — the deck is the icePatch span, and the road runs on the
+ *    bridgehead embankment from approachFromM (the map's start, so the spawn's
+ *    03-ready frame already looks down it) to the deck, and from the deck to
+ *    approachToM (10 m short of the far blocks, where the street resumes).
+ *    platform/src/modules/sim/world/builders/bridgeDeck.ts builds the deck,
+ *    both parapets and their pylons, the continuous edge railing and paired
+ *    lamps along the embankments; TrafficLayer parks nobody over the whole
+ *    extent; no street tree or overhead line stands within 20 m of it. The
+ *    APPROACH blocks stand back at the foot of the embankment — their inner
+ *    face is BLOCK_SETBACK_M past the carriageway instead of 8 m — and still
+ *    end at y = 200, where the shadow says „сградите свършват". The far blocks
+ *    keep the street setback: past approachToM the city resumes.
+ *
  * The span is consumed by the PHYSICS RIG (runtime/surface.ts → VehicleRig →
  * VehicleSim.setSurfaceGripFactor), NOT by the rule-engine tick — worldRuntime
  * ignores the kind (unknown-kind tolerance), so this map adds NO grading
@@ -82,6 +97,10 @@ const SCALED_LANE_W = 3.25 * 2.5;
  *  come within this many meters of the abutments (the gorge IS the visual). */
 const DECK_VOID_PAD_M = 40;
 
+/** Approach blocks: inner face this far past the carriageway edge — the foot
+ *  of the bridgehead embankment (the street's blocks stand 8 m off). */
+const BLOCK_SETBACK_M = 22;
+
 const r2 = (v) => Math.round(v * 100) / 100;
 
 function polylineLength(pts) {
@@ -110,6 +129,8 @@ function polylineLength(pts) {
  *     fromM: number, toM: number,     // the bridge deck = the icePatch span
  *     patchGripFactor: number,        // tuning.ICE_PATCH_GRIP_FACTOR copy
  *     signRef: string,                // provenance ("А15" — Опасност от хлъзгане)
+ *     approachFromM: number,          // bridgehead embankment start (0 <= it <= fromM)
+ *     approachToM: number,            // far embankment end (toM <= it < the far blocks)
  *     noteBg: string,                 // meta provenance note
  *   },
  * }} params
@@ -140,6 +161,12 @@ export function buildBridgeStreet(params) {
     }
     if (!(deck.patchGripFactor > 0 && deck.patchGripFactor < 1)) {
       errors.push(`deck.patchGripFactor must be in (0, 1), got ${deck.patchGripFactor}`);
+    }
+    if (!(deck.approachFromM >= 0 && deck.approachFromM <= deck.fromM)) {
+      errors.push(`deck.approachFromM must be within [0, fromM], got ${deck.approachFromM}`);
+    }
+    if (!(deck.approachToM >= deck.toM && deck.approachToM <= lengthM)) {
+      errors.push(`deck.approachToM must be within [toM, lengthM], got ${deck.approachToM}`);
     }
     if (deck.aquaplaneAboveKmh !== undefined) {
       errors.push(`an icePatch must NOT carry aquaplaneAboveKmh (ice bites at any speed)`);
@@ -180,6 +207,16 @@ export function buildBridgeStreet(params) {
       maxspeedSource: "tag",
       length: polylineLength(geometry),
       geometry,
+      // THE STRUCTURE (world/builders/bridgeDeck.ts): the deck is the icePatch
+      // span; the bridgehead embankments run out to either side of it.
+      bridges: [
+        {
+          fromM: deck.fromM,
+          toM: deck.toM,
+          approachFromM: deck.approachFromM,
+          approachToM: deck.approachToM,
+        },
+      ],
     },
   ];
 
@@ -240,9 +277,13 @@ export function buildBridgeStreet(params) {
   });
   const APPROACH_Y = [110, 200];
   const FAR_Y = [390, 465];
+  // The approach blocks stand at the foot of the bridgehead embankment, the
+  // far ones on the street that resumes past it.
+  const setbackNearX = r2(halfRoadM + BLOCK_SETBACK_M);
+  const setbackFarX = r2(halfRoadM + BLOCK_SETBACK_M + 12);
   const BUILDINGS = [
-    bank("approach-w", r2(-blockNearX), r2(-blockFarX), APPROACH_Y[0], APPROACH_Y[1]),
-    bank("approach-e", blockNearX, blockFarX, APPROACH_Y[0], APPROACH_Y[1]),
+    bank("approach-w", r2(-setbackNearX), r2(-setbackFarX), APPROACH_Y[0], APPROACH_Y[1]),
+    bank("approach-e", setbackNearX, setbackFarX, APPROACH_Y[0], APPROACH_Y[1]),
     bank("far-w", r2(-blockNearX), r2(-blockFarX), FAR_Y[0], FAR_Y[1]),
     bank("far-e", blockNearX, blockFarX, FAR_Y[0], FAR_Y[1]),
   ];
@@ -369,6 +410,17 @@ export function buildBridgeStreet(params) {
       if (Math.abs(x) <= halfRoadM + 4) post.push(`${bl.id}: footprint point (${x}, ${y}) overlaps the carriageway/sidewalk`);
     }
   }
+  // THE BRIDGEHEAD: no block within BLOCK_SETBACK_M of the carriageway while
+  // the road is on the embankment, and the embankment ends before the far
+  // blocks (past it the street — and its blocks — resume).
+  for (const bl of BUILDINGS) {
+    const ys = bl.footprint.map(([, y]) => y);
+    const onHead = Math.max(...ys) > deck.approachFromM && Math.min(...ys) < deck.approachToM;
+    if (onHead && bl.footprint.some(([x]) => Math.abs(x) < halfRoadM + BLOCK_SETBACK_M - 0.01)) {
+      post.push(`${bl.id}: stands within ${BLOCK_SETBACK_M} m of the carriageway beside the bridgehead embankment`);
+    }
+  }
+  if (!(deck.approachToM < FAR_Y[0])) post.push(`approachToM ${deck.approachToM} must end before the far blocks (${FAR_Y[0]})`);
   // Both banks, both sides — a bridge with a city on one side only is a cliff.
   for (const side of ["approach", "far"]) {
     for (const dir of ["w", "e"]) {
@@ -408,6 +460,11 @@ const INSTANCES = [
       // by-value discipline: tuning.ts stays the single documented truth).
       patchGripFactor: 0.15,
       signRef: "А15",
+      // The bridgehead: the whole approach from the map's start (so the spawn
+      // frame already looks down the embankment) and the far ramp to 10 m short
+      // of the far blocks.
+      approachFromM: 0,
+      approachToM: 380,
       noteBg:
         "Права улица (50 км/ч) с мост при [250, 340] м: улицата е суха, но настилката на съоръжението е заледена — под нея няма топла земя. Сцеплението на моста е ~15% от сухото при всяка скорост; знакът А15 „Опасност от хлъзгане“ стои на близкия устой.",
     },
@@ -432,6 +489,7 @@ for (const params of INSTANCES) {
   line("length / limit", `${params.lengthM} m / ${params.maxspeedKmh} km/h`);
   line("deck (icePatch)", `[${params.deck.fromM}, ${params.deck.toM}] grip ${params.deck.patchGripFactor}`);
   line("deck void", `[${params.deck.fromM - DECK_VOID_PAD_M}, ${params.deck.toM + DECK_VOID_PAD_M}] — asserted empty`);
+  line("bridgehead", `[${params.deck.approachFromM}, ${params.deck.approachToM}] — railed, unparked`);
   line("right-lane center", `${district.meta.scenario.laneCenterRightM} m east`);
   line("banks", district.buildings.map((b) => b.id).join(", "));
   line("spawns", district.spawnPoints.map((s) => s.id).join(", "));

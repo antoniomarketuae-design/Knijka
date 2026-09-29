@@ -39,6 +39,7 @@ import type {
   TreeKind,
   TreePlacement,
   WorldGeometry,
+  ZoneGatewayPlacement,
 } from "../types";
 import { CITY_MODELS } from "./cityBuildings";
 
@@ -62,6 +63,8 @@ export interface StaticDrawSlotInput {
   billboards: readonly { size: "large" | "small" }[];
   busStops: readonly StaticTransform[];
   parkingKits: readonly StaticTransform[];
+  /** Жилищна-зона gateway items — one instanced mesh per kind present. */
+  zoneGateways: readonly ZoneGatewayPlacement[];
   utilityPoles: readonly { spanM: number }[];
   railings: readonly StaticTransform[];
   medianBarriers: readonly StaticTransform[];
@@ -72,6 +75,8 @@ export interface StaticDrawSlotInput {
   /** Conditional single-mesh surfaces: water sheet, rail deck+rails, island. */
   waterSheet: boolean;
   railDeck: boolean;
+  /** Bridge deck + parapets (builders/bridgeDeck.ts) — two meshes. */
+  bridgeDeck: boolean;
   roundaboutIsland: boolean;
 }
 
@@ -110,6 +115,7 @@ export function staticDrawSlotTerms(input: StaticDrawSlotInput): DrawSlotTerm[] 
   add("city-models", input.cityModels);
   add("water-sheet", input.waterSheet ? 1 : 0);
   add("rail-deck", input.railDeck ? 2 : 0);
+  add("bridge-deck", input.bridgeDeck ? 2 : 0);
   add("roundabout-island", input.roundaboutIsland ? 1 : 0);
 
   // Signals: housing + lens glass + lit lamps, per head family that exists.
@@ -148,6 +154,9 @@ export function staticDrawSlotTerms(input: StaticDrawSlotInput): DrawSlotTerm[] 
   // Wave 8 — the motorway median barrier is its own instanced mesh, on its own
   // list, for the reason WorldGeometry.medianBarriers states.
   add("median-barrier", input.medianBarriers.length > 0 ? 1 : 0);
+  // The жилищна-зона gateway: WorldProps.ZoneGateway mounts one instanced mesh
+  // per kind it places (planter, bollard) and nothing on a district with none.
+  add("zone-gateway", new Set(input.zoneGateways.map((g) => g.kind)).size);
 
   return terms;
 }
@@ -174,6 +183,7 @@ export function staticDrawSlotInputFromWorld(world: WorldGeometry): StaticDrawSl
     billboards: world.billboards,
     busStops: world.busStops,
     parkingKits: world.parkingKits,
+    zoneGateways: world.zoneGateways,
     utilityPoles: world.utilityPoles,
     railings: world.railings,
     medianBarriers: world.medianBarriers,
@@ -181,6 +191,7 @@ export function staticDrawSlotInputFromWorld(world: WorldGeometry): StaticDrawSl
     cityModels: CITY_MODELS.length,
     waterSheet: world.waterDecals.positions.length > 0,
     railDeck: world.railTracks.deck.positions.length > 0,
+    bridgeDeck: world.bridgeDecks.parapets.positions.length > 0,
     roundaboutIsland: world.roundaboutIslands.positions.length > 0,
   };
 }

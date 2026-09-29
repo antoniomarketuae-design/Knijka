@@ -341,53 +341,91 @@ function forwardTanElevation(point: readonly [number, number, number]): number {
 }
 
 /**
- * THE CAP ON THE STATION DROP — AND IT BINDS AT ZERO TODAY, 2026-09-23.
+ * THE CAP ON THE STATION DROP — 11.3 mm, B58's bar and nothing else
+ * (2026-09-27, founder ruling 2026-09-22 follow-up «move the notification card»).
  *
  * The composition-true station drop (`rearMirrorStationDropUncappedM`: 36.4 mm
  * on both audited phones, 48.6 mm on the 780 × 340 stage) is what «the glass
  * keeps the 16:9 offset below the header» asks for. It is not affordable, and
- * neither bar that refuses it is a preference:
+ * the bar that refuses it is the founder's own earlier ruling:
  *
- *  1. B58, the founder's own earlier ruling — worth 12.2 mm. The station was
- *     RAISED 105 mm so the В26 «50» the speeding drill tells the student to read
- *     clears the assembly; the measured threshold is 92.8 mm at the lane centre
- *     (`tools/glb/raise_interior_mirror.mjs`, swept at 50 mm steps along
- *     ov-keepright-v1). Occlusion is a ray question, identical at every aspect,
- *     so a station drop of d leaves 105 − d mm: d ≤ 12.2 mm. (And that spends
- *     the margin B58 bought on top: the same sweep needs 104.6 mm for a student
- *     drifting 0.75 m right, toward the plate.)
+ *  B58. The station was RAISED 105 mm so the В26 «50» the speeding drill tells
+ *  the student to read clears the assembly; the measured threshold is 92.8 mm
+ *  of NODE raise at the lane centre (`tools/glb/raise_interior_mirror.mjs`,
+ *  swept at 50 mm steps along ov-keepright-v1, WITH MirrorRig's eye-ray lift,
+ *  clearing the glass and the authored casing). Occlusion is a ray question,
+ *  identical at every aspect.
  *
- *  2. THE PHONE HUD — worth 0.1 mm, which is why this constant is 0. The
- *     notification column, the first-run touch hint and the audio prompt all
- *     hang below the mirror's projected floor
- *     (`hud/notifyColumn.MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE`), and
- *     that floor moves down with this drop — 0.0018 of stage height per mm. The
- *     corridor left between it and the thumb controls, measured:
- *       852 × 393  the hint needs 124.5 px, the corridor holds 126.76 → 2.26 px
- *       780 × 340  the hint already scrolls 20.94 px against a bound of 21
- *                  → 0.06 px
- *     At the B58 bar (12.2 mm) the hint would clip 6.4 px on the handset the
- *     catalogue was shot on — the one stage where the pinned answer is «clips
- *     NOTHING» — and at the composition-true 36.4 mm the 780 × 360 card's floor
- *     lands 9 px INSIDE the 0.53 hazard band.
+ *  THE BAR IS THE GLASS'S, NOT THE CASING'S — the first cut of this cap got
+ *  that wrong. «105 − d ≥ 92.8», i.e. d ≤ 12.2 mm, is true of the authored
+ *  casing, which the raise and the drop both move as a straight vertex
+ *  translation. The glass is placed by MirrorRig (`mirrorStation.
+ *  rigMirrorGlass`): the REF 8 lift runs along the ray to the eye, a node
+ *  raise tilts that ray, and 105 mm of raise delivers only 97.45 mm at the
+ *  glass; the station drop is then applied AFTER the lift, as a pure
+ *  translation. So the glass — and the housing portalled into it — can come
+ *  down only 11.35 mm before it sits lower than it did at the 92.8 mm
+ *  threshold (12.0 mm put it where a 92.10 mm raise does: 0.7 mm under).
+ *  11.3 mm ships, the largest 0.1 mm step that holds for every part:
+ *  `mirrorStation.rearMirrorB58ClearanceM` leaves 0.9 mm on the casing,
+ *  0.044 mm on the glass and 0.040 mm on the housing, and
+ *  `mirrorAnchor.test.ts` fails if any one of the three goes under — or if
+ *  one step more would still hold.
  *
- * SO WHAT LANDED IS THE HEADER, WHICH COSTS NEITHER BAR: it comes down until it
- * is visible, and because the header pad sits BEHIND the glass (chassis z 0.481
- * vs 0.4223, with the eye behind both) the mirror now reads against a header
- * instead of against open sky — the first half of the founder's sentence. The
- * half this cap does NOT buy is the second: the glass top stays at fy 1.0199,
- * i.e. the housing is still cut by the top edge on the phones.
+ *  What that check is NOT: a fresh eye-to-plate ray sweep. The sweep that set
+ *  92.8 did not record which part hides the «50» at the threshold, so the
+ *  claim is the conservative one — no point of any part sits lower than it did
+ *  at the height the sweep measured as clear.
  *
- * THE REMAINING LEVER IS THE CARD, AND IT IS A FOUNDER QUESTION. Freeing the
- * corridor means moving the notification column out of the mirror's x band
- * (0.574 → 0.866 of the stage at every landscape aspect); the right edge has
- * 43 px of width beside it on a notched handset and the left corridor already
- * holds the «Меню» rail, the open demonstration deck and the LEFT DOOR MIRROR —
- * the instrument lane B has just made live. Once that ruling exists, this
- * constant is the one number that changes, and `mirrorAnchor.test.ts` holds what
- * each value of it costs.
+ *  ⚠ WHAT THAT SPENDS, STATED: B58 shipped 105 and not 92.8 to cover a student
+ *  drifting 0.75 m right, toward the plate (that sweep needs 104.6 mm). On the
+ *  wide phones — and only there; the drop is 0 at 16:9 and every squarer window
+ *  — that drift margin is gone: at the lane centre the plate clears, drifting
+ *  right it can be clipped by the housing for part of the approach. That is the
+ *  trade the ruling's «re-verify the B58 clearance» is asking to have named.
+ *
+ * WHAT 11.3 mm BUYS, projected through the shipped camera: the rigged glass
+ * top (`REAR_MIRROR_GLASS_TOP`) moves from fy 1.0199 to 0.9954 on 852 × 393
+ * and from 1.0196 to 0.9951 on 780 × 360 — the glass is inside the frame
+ * (~1.8 CSS px below the top), and the band above it is the lowered header pad
+ * (its edge at fy 0.98), which by geometry also swallows the housing's hood
+ * (chassis y 0.9551) — the pad box is nearer the eye than every hood point
+ * above its own underside. By arithmetic, row 0 over the mirror is now header;
+ * the re-drive is what photographs it.
+ *
+ * ⚠ ALL OF THAT IS THE HEAD AT REST (0 g: pitch COCKPIT_PITCH_BASE, eye
+ * COCKPIT_EYE — what `projectCockpitPoint` models). Under braking CameraRig
+ * tips the view by COCKPIT_PITCH_GAIN rad per g and leans the eye forward
+ * COCKPIT_LEAN_LONGITUDINAL m per g, so the car-fixed cabin rises in the
+ * frame: on 852 × 393 the ~1.8 CSS px of air over the glass is spent at
+ * ~0.062 g of braking, the lowered header leaves the frame at ~0.283 g, and
+ * at 0.5 g the glass is cut by ~12.8 px again with sky above it. B58 leaves
+ * no drop to buy that back. Braking frames (the row's w61 04-t042s /
+ * 04-t053s) are therefore EXPECTED to stay cut — a founder residual, not
+ * closed by this cap (`mirrorAnchor.test.ts` «THE BRAKING RESIDUAL, STATED»).
+ *
+ * THE RESIDUAL THIS CAP HANDS BACK TO THE FOUNDER, precisely: the glass top is
+ * still above the frame on EVERY canvas of aspect ≥ 2.18796 (the conservative
+ * authored corner: ≥ 2.17393) — every 20:9 Android at full screen, not only
+ * the gesture-bar stage. Cut by: 800 × 360 2.8 CSS px, 915 × 412 3.1 px,
+ * 780 × 340 8.3 px, and 5.99 % of the height at the ladder's 2.45 end. Across
+ * stage heights 340–430 the first cut width is ⌈2.18796 · h⌉ (744 × 340,
+ * 788 × 360, 860 × 393, 902 × 412, 941 × 430). Inside: 852 × 393, 844 × 390,
+ * 932 × 430, 780 × 360 and everything squarer. `mirrorAnchor.test.ts`
+ * enumerates it.
+ *
+ * THE PHONE HUD NO LONGER BINDS IT, and that is the other half of the ruling.
+ * Until 2026-09-27 this constant was 0 because the right-edge corridor hangs
+ * below the mirror (`hud/notifyColumn.MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE`)
+ * and its first-run touch hint — a card that CLIPS, 124.5 px — had 2.26 px of
+ * slack on the handset. The ruling moved the card: on sideways phones the hint
+ * now stands in the LEFT corridor under the rail (`TouchControls.
+ * touchHintLandscapeRectPx`), which no mirror drop can reach, and the peek
+ * column that stays under the mirror folds rather than clips and still keeps
+ * its shortest card out of the hazard band at this drop. The lane follows this
+ * number; `notify-column-mirror.test.ts` turns red if it does not.
  */
-export const REAR_MIRROR_STATION_DROP_MAX_M = 0;
+export const REAR_MIRROR_STATION_DROP_MAX_M = 0.0113;
 
 /** Smallest drop d in [0, hi] with f(d) <= limit, for f decreasing in d. */
 function solveDrop(f: (d: number) => number, limit: number, hi = 0.3): number {
@@ -638,13 +676,23 @@ export function hotspotLabelPoint(
   name: CockpitHotspotName,
   poseId: CabinLookPoseId,
   aspect: number = COCKPIT_ASPECT_REF,
+  /**
+   * The interior-mirror re-anchor drop, metres — `hotspotScreenRect`'s own
+   * parameter, same default. The returned `lift` is the chip's offset from the
+   * AUTHORED `spec.pos` (which is what VitokCockpit renders it from), so for
+   * the rear mirror the drop is folded into it: a chip that ignored it would
+   * hang off where the glass used to be. Dormant while the drop was capped at
+   * 0; live since the 2026-09-27 re-anchor. Only `hotspot_mirror_rear` reads it.
+   */
+  rearStationDropM: number = rearMirrorStationDropM(aspect),
 ): { x: number; y: number; side: "above" | "below"; lift: number } | null {
   const spec = HOTSPOT_BY_NAME.get(name);
   if (spec === undefined) return null;
   const half = spec.size[1] / 2;
+  const dropY = name === REAR_MIRROR_HOTSPOT ? rearStationDropM : 0;
   for (const [side, lift] of [
-    ["above", half + HOTSPOT_LABEL_LIFT_M],
-    ["below", -half - HOTSPOT_LABEL_LIFT_M],
+    ["above", half + HOTSPOT_LABEL_LIFT_M - dropY],
+    ["below", -half - HOTSPOT_LABEL_LIFT_M - dropY],
   ] as const) {
     const p = projectCockpitPoint(
       [spec.pos[0], spec.pos[1] + lift, spec.pos[2]],

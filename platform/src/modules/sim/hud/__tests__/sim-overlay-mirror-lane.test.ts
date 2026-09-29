@@ -159,10 +159,12 @@ describe("what the pair resolves to, and what each half alone would do", () => {
     // reason it could not be left to another file to land later. `PlayAreaStyles`
     // computes the compact `max-height` from the DATUM; with the top at the
     // mirror lane and that ceiling unchanged the card's floor lands at
-    //   73.23 + 149 = 222.2 px of a 393 px stage = 0.565
+    //   81.88 + 149 = 230.9 px of a 393 px stage = 0.5875
     // which is past `HAZARD_BAND_TOP_FRACTION` and well past the cockpit
     // horizon at 0.402 — i.e. on the road (notifyColumn.ts). (161 / 0.596 until
-    // 2026-09-02, when the column's ceiling was corrected 0.43 → 0.40.)
+    // 2026-09-02, when the column's ceiling was corrected 0.43 → 0.40; 73.23 /
+    // 0.565 until 2026-09-27, when the lane followed the re-anchored mirror down,
+    // 0.166 → 0.188 of the stage.)
     for (const p of PHONES) {
       const top = notifyColumnTopPx(p, true);
       const staleCeiling = notifyColumnMaxHeightPx(p.height, notifyColumnFloorPx(p), 8);
@@ -171,7 +173,7 @@ describe("what the pair resolves to, and what each half alone would do", () => {
         `${p.id}: the half-landed pair is somehow safe?`,
       ).toBeGreaterThan(HAZARD_BAND_TOP_FRACTION);
     }
-    expect((notifyColumnTopPx(PHONES[0], true) + 149) / 393).toBeCloseTo(0.565, 3);
+    expect((notifyColumnTopPx(PHONES[0], true) + 149) / 393).toBeCloseTo(0.5875, 3);
   });
 
   it("…and ACCEPTS the pair, which stops exactly on the hazard band's ceiling", () => {
@@ -185,12 +187,14 @@ describe("what the pair resolves to, and what each half alone would do", () => {
     // The cost, stated in the numbers the sibling test predicted before the
     // swap was made: the peek loses about five of its eleven visible lines, and
     // they are not deleted — «↓ още N реда» beside «ПРОЧЕТИ» is what they join.
+    // The 2026-09-27 re-anchor (the mirror comes down 11.3 mm; the lane follows,
+    // 0.166 → 0.188) takes about one more line: ~8.6 px on each phone.
     expect(
       notifyColumnMaxHeightPx(393, notifyColumnFloorPx(PHONES[0]), notifyColumnTopPx(PHONES[0], true)),
-    ).toBeCloseTo(83.96, 1); // 95.76 until the 0.43 → 0.40 ceiling correction
+    ).toBeCloseTo(75.32, 1); // 95.76 until the 0.43 → 0.40 ceiling correction, 83.96 until the re-anchor
     expect(
       notifyColumnMaxHeightPx(360, notifyColumnFloorPx(PHONES[1]), notifyColumnTopPx(PHONES[1], true)),
-    ).toBeCloseTo(76.24, 1); // 87.04 until the 0.43 → 0.40 ceiling correction
+    ).toBeCloseTo(68.32, 1); // 87.04 until the 0.43 → 0.40 ceiling correction, 76.24 until the re-anchor
   });
 
   it("leaves a card that is still a card, and never clips its own controls", () => {
@@ -199,9 +203,10 @@ describe("what the pair resolves to, and what each half alone would do", () => {
     // `overflow`, so a card that needs more than the ceiling PAINTS PAST IT
     // rather than losing the one control that opens the full text. That is the
     // module's own stated behaviour and it is not hypothetical: on the 780 × 340
-    // Samsung gesture-bar profile the ceiling resolves to 71.56 px against
+    // Samsung gesture-bar profile the ceiling resolves to 64.08 px against
     // 86 px of chrome, so the chrome wins there and the card's real floor is
-    // 64.44 + 86 = 150.4 px = 0.443 of the stage. The invariant is therefore
+    // 71.92 + 86 = 157.9 px = 0.464 of the stage (64.44 / 0.443 before the
+    // 2026-09-27 re-anchor moved the lane down). The invariant is therefore
     // about the FLOOR, not about the ceiling, and the hazard band is what it
     // has to clear.
     // chip row · fold row · the wrapped class line · the 44 px control row ·
@@ -227,7 +232,7 @@ describe("what the pair resolves to, and what each half alone would do", () => {
     }
     expect(
       notifyColumnMaxHeightPx(340, notifyColumnFloorPx(PHONES[2]), notifyColumnTopPx(PHONES[2], true)),
-    ).toBeCloseTo(71.56, 1); // 81.76 until the 0.43 → 0.40 ceiling correction
+    ).toBeCloseTo(64.08, 1); // 81.76 until the 0.43 → 0.40 ceiling correction, 71.56 until the re-anchor
   });
 });
 

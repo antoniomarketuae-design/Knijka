@@ -613,18 +613,23 @@ describe("T6 — the graded yield pose can SEE the staged conflict actor", () =>
  * The residual, named with its measurement so it can only shrink (doc 86 §10's
  * escape-hatch discipline — an entry that starts passing FAILS the gate).
  *
- * Both are loss-of-control MISTAKE demos whose whole subject is leaving the
- * carriageway: they slide onto the verge, where the curb pass legitimately
+ * It is a loss-of-control MISTAKE demo whose whole subject is leaving the
+ * carriageway: it slides onto the verge, where the curb pass legitimately
  * seats bodies. Removing the scenery would delete the street; the real fix is
  * the consequence (a collider on the body, or a re-record that stops on the
  * asphalt), and that is a trace re-record — Lane 9/11's file ownership, not
  * Lane 4's. Recorded here so it is a reviewed decision, not an oversight.
+ *
+ * RETIRED (row sc-ac-ice:86eab7e9): sc-ac-bridge-ice/mistake-brake-on-deck was
+ * admitted at 0.00 m against the body at (10.13, 294.80). ac-bridge-v1 now
+ * declares its deck (`bridges: [250, 340]`) and the bridgehead embankment
+ * either side of it ([0, 380]); the curb pass parks nobody on the deck (ЗДвП
+ * чл. 98, ал. 1, т. 3) nor on the embankment, and the parapet the demo slides
+ * into is built — the re-recorded demo stops AGAINST it at y = 291.3. The
+ * nearest parked body is now past the far embankment, so the gate demanded the
+ * entry go.
  */
 const TRACE_EXEMPT: Record<string, { worstM: number; why: string }> = {
-  "sc-ac-bridge-ice/mistake-brake-on-deck.trace.json": {
-    worstM: 0.0,
-    why: "the demo brakes on an icy deck and slides to x=9.21, 0.04 m past the flank of the verge body at (10.13, 294.80)",
-  },
   "sc-sign-warning/mistake-hold-speed.trace.json": {
     worstM: 0.44,
     why: "the demo holds speed into the ice and runs wide to x=8.73, grazing the verge body at (10.13, 235.40)",
@@ -632,7 +637,7 @@ const TRACE_EXEMPT: Record<string, { worstM: number; why: string }> = {
 };
 
 describe("D10 — committed ghost lines do not drive through parked decoration", () => {
-  it("holds for every trace of every template, save the two named residuals", () => {
+  it("holds for every trace of every template, save the named residuals", () => {
     const districtByTemplate = new Map(
       SCENARIO_TEMPLATES.map((s) => [s.id, s.map.districtId] as const),
     );

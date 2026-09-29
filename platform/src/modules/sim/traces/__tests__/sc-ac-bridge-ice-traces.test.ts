@@ -204,8 +204,26 @@ describe("sc-ac-bridge-ice — geometry pins against the committed map", () => {
     }
     // Brake-on-deck demo: reaches the wall, and is off-line and MOVING for far
     // less than the 3 s sustain — the parapet arrives before the paperwork.
+    // "Reaches" is the FOOTPRINT's reach, as the recorder's SAT test sees it:
+    // the rotated chassis corner, not centre + half-width. Since the polyline
+    // was cut to end AT the wall (row sc-ac-ice:86eab7e9, round-2 F3) the
+    // centre stops at x = 8.56 and it is the ~8.9° heading that carries the
+    // front-right corner across the face — by millimetres, which is the point:
+    // the ghost ends against the wall, not inside it.
     const slide = drives.get("mistake-brake-on-deck")!;
-    expect(Math.max(...slide.trace.samples.map((s) => s.x)) + CHASSIS_HALF_EXTENTS.x).toBeGreaterThan(faceX);
+    const reach = (s: { x: number; headingDeg: number }) => {
+      const h = (s.headingDeg * Math.PI) / 180;
+      return Math.max(
+        ...[1, -1].flatMap((a) =>
+          [1, -1].map(
+            (b) => s.x + a * CHASSIS_HALF_EXTENTS.z * Math.sin(h) + b * CHASSIS_HALF_EXTENTS.x * Math.cos(h),
+          ),
+        ),
+      );
+    };
+    const deepest = Math.max(...slide.trace.samples.map(reach));
+    expect(deepest).toBeGreaterThan(faceX);
+    expect(deepest).toBeLessThan(faceX + 0.05);
     expect(longestMovingSustainSec(slide, (x) => x > curbSideX)).toBeLessThan(
       DEFAULT_RULE_CONFIG.laneKeepSustainSec,
     );

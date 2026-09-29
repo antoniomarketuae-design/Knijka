@@ -147,13 +147,15 @@ describe("cabin look · ALL THIRTEEN answer a mouse click", () => {
     ]);
   });
 
-  it("a WIDE window costs three more — the reason the console pose exists", () => {
+  it("a WIDE window costs two more — the reason the console pose exists", () => {
     // The cockpit holds its horizontal FOV across window shapes (doc 71 §4.9),
     // so width is bought with vertical field: at 21:9 the vFOV is 36.7° and the
     // lower console leaves the picture. „Ten of thirteen" was a 16:9 number.
-    // The three ADDED here by the centre test are the two stalks (centre at
-    // y 1.071) and the INTERIOR mirror (centre at y −0.021 — it leaves off the
-    // TOP, which is §L10's «Вътрешно огледало» at y −83).
+    // The two ADDED here by the centre test are the two stalks (centre at
+    // y 1.071). The INTERIOR mirror used to be a third (centre at y −0.021 — it
+    // left off the TOP, §L10's «Вътрешно огледало» at y −83); the 2026-09-27
+    // re-anchor brings its station down 11.3 mm on wide canvases
+    // (`REAR_MIRROR_STATION_DROP_MAX_M`) and its centre back inside the frame.
     const wide = COCKPIT_HOTSPOT_NAMES.filter((n) => !hotspotIsReachable(n, "forward", 21 / 9));
     expect(wide.sort()).toEqual([
       "hotspot_belt",
@@ -161,11 +163,13 @@ describe("cabin look · ALL THIRTEEN answer a mouse click", () => {
       "hotspot_horn",
       "hotspot_indicator_stalk",
       "hotspot_mirror_left",
-      "hotspot_mirror_rear",
       "hotspot_mirror_right",
       "hotspot_parking_brake",
       "hotspot_wiper_stalk",
     ]);
+    // …and it is the drop that did it, not a change of the predicate.
+    const authored = hotspotScreenRect("hotspot_mirror_rear", "forward", 21 / 9, 0)!;
+    expect((authored.top + authored.bottom) / 2).toBeLessThan(0);
     // …and the console pose puts every lower-console control back.
     for (const n of [
       "hotspot_gear_selector",

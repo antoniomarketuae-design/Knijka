@@ -544,7 +544,16 @@ export const SC_AC_TRUCK_SPRAY: ScenarioSpec = {
     },
     {
       id: "sc-acts-finish",
-      titleBg: "Стигни края на отсечката, без да си влизал в пелената",
+      // TITLE-TRUTH (founder ruling 2026-09-27, «The time gap»). This read
+      // «…, без да си влизал в пелената» over a bare reachZone that never
+      // reads the truck, the lead gap or SPRAY_NEAR_M — a car 3 m off the
+      // tailboard collected it exactly like one 58 m back. The offence this
+      // lesson bills is the SECONDS gap (FOLLOWING_TOO_CLOSE_FOR_RAIN), and
+      // the pinned rig keeps every lawful drive ~58 m out of the curtain, so a
+      // plume check here could never fire. The title now claims only what the
+      // row checks; the curtain's WHY stays in steps 3/4/9 and the teach card.
+      // Pinned: __tests__/wet-copy-truth.test.ts §A.
+      titleBg: "Стигни края на отсечката",
       params: { kind: "reachZone", x: MW_X_CRUISE, y: 860, radiusM: 12 },
     },
   ],
@@ -664,11 +673,15 @@ const DECK_TO_M = 340;
  *    so the code's absence is the honest outcome, not a gap. sc-ac-ice's gate
  *    asserts the same thing in the negative („0.69 m/s² is anything but harsh").
  *
- * Like sc-ac-ice / sc-ac-aquaplane, the bridge PARAPETS are RECORDER obstacle
- * rects (trace channel), not live props: the live student's graded skill is the
- * three-gate anticipation, and the consequence of getting it wrong — the wall
- * that is always exactly there on a bridge and nowhere else — is demonstrated
- * by the red ghosts.
+ * The bridge PARAPETS are RECORDER obstacle rects on the trace channel (the
+ * sc-ac-ice / sc-ac-aquaplane mold) AND, since row sc-ac-ice:86eab7e9, BUILT at
+ * exactly those faces: ac-bridge-v1's street edge declares the structure
+ * (`bridges`), and world/builders/bridgeDeck.ts draws the deck, both walls
+ * with their abutment pylons, and the railed bridgehead embankment the whole
+ * approach runs on — all in the wall collider. The live student's graded skill
+ * is still the three-gate anticipation; the wall the red ghosts meet is now the
+ * wall in front of him, and the brake-on-deck ghost ends against its face
+ * (traces/__tests__/sc-ac-bridge-ice-ghost-meets-built-wall.test.ts).
  */
 export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
   id: "sc-ac-bridge-ice",
@@ -703,6 +716,17 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
   // where it is a statement about the RULE and true on every map.
   //
   // The claim gate is __tests__/lane-world-claims.test.ts §1/§3.
+  //
+  // THE BRIDGE IS THERE NOW (row sc-ac-ice:86eab7e9, 2026-09-27). The deck,
+  // its parapets, the abutment pylons at 250 and 340 and the railed
+  // bridgehead embankment from the spawn are BUILT (world/builders/
+  // bridgeDeck.ts), and the claim gate credits deictic bridge wording on this
+  // map through the edge's `bridges` tag. The ravine is still not built, so
+  // „над дерето" stays refused. Two sentences the built bridge made FALSE were
+  // rewritten: step 10 said the end of the ice is marked by nothing (the far
+  // abutment now stands exactly there), and both demo cards sent the car onto
+  // a «банкет» over a replay on the deck, where the teach text itself says
+  // there is none — only the parapet.
   objectiveBg:
     "При температури около нулата настилката заледява там, където няма топла земя отдолу: вдигни крака от газта ОЩЕ преди знака А15, мини цялата хлъзгава отсечка с равна скорост и прав волан, и дай газ чак когато е зад теб.",
   archetypeIds: ["AC-08"],
@@ -783,9 +807,12 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
     { n: 9, textBg: "Не бързай да даваш газ — ускорението е също толкова рязка команда." },
     // 66 ch
     // Was „Чакай отсрещния устой: там свършва ледът и чак там свършва мостът."
-    // The span is 90 m long (250→340) and its end is not marked by anything the
-    // student can see — which is the point, and is now what the line says.
-    { n: 10, textBg: "Брой метрите: хлъзгавото е около 90 и краят му не е обозначен с нищо." },
+    // then „…краят му не е обозначен с нищо" while no deck was built. The far
+    // abutment IS built now (pylons, the end of both parapets and the
+    // expansion joint at 340 — exactly where the ice ends), so the line names
+    // it again; no SIGN marks the end, and the line does not claim one.
+    // 72 ch
+    { n: 10, textBg: "Брой метрите: хлъзгавото е целият мост, около 90 м — до отсрещния устой." },
   ],
   success: [
     {
@@ -831,19 +858,25 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
   // traces/scAcBridgeIce.ts; gates in traces/__tests__/
   // sc-ac-bridge-ice-traces.test.ts (re-record with RECORD_TRACES=1).
   shadow: { path: "content/traces/sc-ac-bridge-ice/shadow-correct.trace.json" },
+  // The cards' distances are the RECORDINGS' (row sc-ac-ice:86eab7e9, round 4):
+  // the shadow starts its ease-down at y ≈ 180.6, i.e. ~70 m before the ice at
+  // 250, and the brake-on-deck driver first brakes at y ≈ 255.7 — 75 m later.
+  // They used to say «200 метра по-рано» and «закъснение от 90 метра», which no
+  // recording gives. traces/__tests__/sc-ac-bridge-ice-caption-windows.test.ts
+  // measures both off the shipped traces.
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-ac-bridge-ice/mistake-road-speed.trace.json" },
       titleBg: "Мостът с пътна скорост — задницата тръгва",
       whatWentWrongBg:
-        "Колата влезе в хлъзгавия участък с разрешените 50 — „нали е в ограничението, пътят е сух“. Само че сухо беше зад теб, не под теб: на първите метри лед задницата тръгна настрани и колата се понесе към банкета, олюлявайки се през половината платно. Никой не я е карал в тези секунди — воланът върху 15% сцепление не води, а моли. Ограничението е таван за платно в добро състояние; чл. 20, ал. 2 връзва скоростта със СЪСТОЯНИЕТО на пътя, а в мразовита сутрин състоянието е лед, докато не се докаже обратното. Решението е взето 200 метра по-рано или изобщо не е взето.",
+        "Колата влезе в хлъзгавия участък с разрешените 50 — „нали е в ограничението, пътят е сух“. Само че сухо беше зад теб, не под теб: на първите метри лед задницата тръгна настрани и колата се понесе към парапета, олюлявайки се през половината платно. Никой не я е карал в тези секунди — воланът върху 15% сцепление не води, а моли. Ограничението е таван за платно в добро състояние; чл. 20, ал. 2 връзва скоростта със СЪСТОЯНИЕТО на пътя, а в мразовита сутрин състоянието е лед, докато не се докаже обратното. Правилният водач взе решението около 70 метра преди леда — тук то изобщо не беше взето.",
       codeRefs: ["POOR_LANE_KEEPING"],
     },
     {
       traceRef: { path: "content/traces/sc-ac-bridge-ice/mistake-brake-on-deck.trace.json" },
       titleBg: "Спирачка ВЪРХУ леда",
       whatWentWrongBg:
-        "Този водач поне разбра, че отсечката е лед — но разбра го със закъснение от 90 метра и натисна спирачката ВЪРХУ самия лед. При 15% сцепление педалът не спира колата, а само ѝ отнема посоката: за 40 метра с натисната докрай спирачка скоростта падна от 50 на 42 км/ч — на сух асфалт същата спирачка щеше да е спряла колата в 24 метра. Вместо това колата се понесе по инерцията си и намери единственото нещо, което на такъв път е винаги там — банкета. Забележи какво НЕ се случи: няма рязко спиране, защото рязко спиране на лед е физически невъзможно. Точно затова намаляването не е реакция, а предвиждане — то се прави преди леда, на чист асфалт (чл. 20, ал. 2).",
+        "Този водач поне разбра, че отсечката е лед — но го разбра 75 метра по-късно от правилния водач и натисна спирачката ВЪРХУ самия лед. При 15% сцепление педалът не спира колата, а само ѝ отнема посоката: за 36 метра с натисната докрай спирачка скоростта падна от 50 на 43 км/ч — на сух асфалт същата спирачка щеше да е спряла колата в 24 метра. Вместо това колата се понесе по инерцията си и намери единственото нещо, което на моста е винаги там — парапета. Забележи какво НЕ се случи: няма рязко спиране, защото рязко спиране на лед е физически невъзможно. Точно затова намаляването не е реакция, а предвиждане — то се прави преди леда, на чист асфалт (чл. 20, ал. 2).",
       codeRefs: ["COLLISION"],
     },
   ],

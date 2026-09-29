@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  HAZARD_BAND_TOP_FRACTION,
   notifyColumnMaxHeightPx,
   notifyColumnMirrorLanePx,
   notifyColumnTopPx,
@@ -71,7 +72,7 @@ const mirrorBottomFraction = (width: number, height: number): number => {
 
 describe("the lane is derived from the cockpit, not chosen", () => {
   it("covers the mirror's floor on every landscape phone in the ladder", () => {
-    // 0.1649 · 0.1651 · 0.1454 — the three sideways profiles in
+    // 0.1853 · 0.1855 · 0.1670 at the shipped 11.3 mm re-anchor drop (0.1649 · 0.1651 · 0.1454 undropped) — the three sideways profiles in
     // tools/mobile/lib/devices.mjs. If the GLB node moves (it already moved
     // once, B58's 105 mm mirror-station raise), this is the line that says so
     // instead of the founder's screenshot.
@@ -207,7 +208,7 @@ describe("the COMPACT datum stays put, and the column gets its own top", () => {
   it("the datum is unchanged — the rail and the deck stand on it", () => {
     // `TouchControls.TOP_RAIL_TOP_CSS` IS this constant, and PlayAreaStyles
     // writes the sideways deck as `calc(<datum> + TOP_RAIL_ROW_CSS)`. Adding
-    // 0.166 of the stage here moves that deck 60 → 125 px on a 393 px stage,
+    // the lane (0.188 of the stage) here moves that deck 60 → 134 px on a 393 px stage,
     // against a control band that starts at 135.5. This test is what stops the
     // next pass from taking the one-line shortcut.
     expect(NOTIFY_COLUMN_TOP_CSS_COMPACT).toBe("calc(0.5rem + env(safe-area-inset-top, 0px))");
@@ -249,20 +250,29 @@ describe("the COMPACT datum stays put, and the column gets its own top", () => {
     // was found to have been read in the wrong direction. 161/95.75/147/87.04
     // were that ceiling's numbers.
     expect(Math.round(before(iphone))).toBe(149);
-    expect(after(iphone)).toBeCloseTo(83.96, 1);
     expect(Math.round(before(android))).toBe(136);
-    expect(after(android)).toBeCloseTo(76.24, 1);
+    // EXPECTATIONS CHANGED 2026-09-27 (founder ruling 2026-09-22, «re-anchor the
+    // mirror AND move the card»): the mirror's station comes down 11.3 mm on
+    // the phones and the lane follows it, 0.166 → 0.188. 83.96 / 76.24 were the
+    // undropped lane's numbers; the ~8.6 px each lost joins the fold.
+    expect(after(iphone)).toBeCloseTo(75.32, 1);
+    expect(after(android)).toBeCloseTo(68.32, 1);
     // …and a peek is still a peek: 44 px is the pill's own minimum, and the
     // card paints past the ceiling rather than clipping «ПРОЧЕТИ» (the compact
     // column sets no `overflow`). What that costs is now the honest residue of
-    // this row: the CHROME, not the ceiling, is what still reaches the road —
-    // 0.405 on the iPhone and 0.427 on the Android against a horizon at 0.402,
-    // i.e. one to nine pixels, and no ceiling can take them back.
+    // this row: the CHROME, not the ceiling, is what still reaches past the
+    // horizon (0.402). It was 0.405 on the iPhone and 0.427 on the Android; the
+    // 2026-09-27 re-anchor steps the column down with the mirror and makes it
+    // 0.427 and 0.449 — ten and seventeen pixels, still short of the HAZARD
+    // band (0.53), which is the bar the ruling itself measured «covers road»
+    // against (its 780 × 360 figure, 200 vs 190.8, is 0.53 of the stage). Pinned
+    // so the cost cannot grow quietly.
     for (const s of [iphone, android]) {
       expect(after(s)).toBeGreaterThan(OVERLAY_PEEK_HEIGHT_PX);
       const chrome = 14 + 12 + 44 + 16; // chip · fold line · «ПРОЧЕТИ» row · padding
       const worstFloor = (notifyColumnTopPx(s, true) + Math.max(after(s), chrome)) / s.height;
-      expect(worstFloor).toBeLessThan(0.43);
+      expect(worstFloor).toBeLessThan(0.45);
+      expect(worstFloor).toBeLessThan(HAZARD_BAND_TOP_FRACTION);
     }
   });
 });
@@ -273,7 +283,7 @@ describe("the shipped lengths are generated from the constants above", () => {
       "calc(max(3.25rem, 24% + 0.5rem) + env(safe-area-inset-top, 0px))",
     );
     expect(NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN).toBe(
-      "calc(max(0.5rem, 16.6% + 0.5rem) + env(safe-area-inset-top, 0px))",
+      "calc(max(0.5rem, 18.8% + 0.5rem) + env(safe-area-inset-top, 0px))",
     );
     // The percentage is the fraction and the rem is the gutter — written from
     // the constants, so a change to either cannot leave the CSS behind.
@@ -330,6 +340,9 @@ describe("what this row knowingly does NOT close", () => {
       expect(shipped).toBeLessThan(required);
     }
     expect(notifyColumnMirrorLanePx(PHONES_PORTRAIT[0], true)).toBeCloseTo(243.15, 1);
-    expect(notifyColumnTopPx(PHONES_PORTRAIT[0], true)).toBeCloseTo(149.43, 1);
+    // 149.43 until 2026-09-27; the sideways lane moved with the re-anchored
+    // mirror and this static percentage moves with it (the mirror itself does
+    // not drop upright — its station drop is 0 below aspect ~1.8).
+    expect(notifyColumnTopPx(PHONES_PORTRAIT[0], true)).toBeCloseTo(168.18, 1);
   });
 });

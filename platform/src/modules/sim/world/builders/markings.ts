@@ -93,8 +93,8 @@ export interface MarkingBuildResult {
    *  own citation: „ЗДвП-98-1 / Наредба № 2/2001 — зигзаг"). 0 on the 103
    *  districts that author no stop span. */
   busStopZigzagQuads: number;
-  /** Closing line + hatch + the survivor's new edge line of an authored
-   *  lane drop (`meta.scenario` archetype "merge-lane", `lanesAfter` 1).
+  /** Closing line + hatch + the survivor's new edge line + the merge arrows
+   *  in the dying lane of an authored lane drop (`meta.scenario` archetype "merge-lane", `lanesAfter` 1).
    *  0 on every district that authors none. */
   laneDropQuads: number;
   /** М18 „триъгълник" symbols painted before an М7 линия за изчакване
@@ -941,11 +941,19 @@ function paintLaneArrows(acc: MeshAccumulator, district: District, network: Road
 //      paint that invites the manoeuvre the lesson grades, here a broken line
 //      into a lane that no longer exists.
 //
+//   4. merge arrows in the OPEN part of the dying lane, leaning toward the
+//      survivor, from 60 m ahead of the taper into it for as long as a whole
+//      glyph still fits (`paintLaneDropArrows`, below).
+//
 // WHAT IS NOT PAINTED, stated so the row is not read as finished. The А-group
-// „пътно стеснение" plate has no face in the kit and no row in
-// `content/signs/signs.json`, so there is no `SignKind` to place and writing a
-// law citation for one is exactly what ADR-002 forbids. The sign half stays
-// open and its prerequisite is content, not code.
+// „Стесняване на пътя" plate the founder ruled REQUIRED (2026-09-27) has no
+// face in the kit and no row in `content/signs/signs.json`. The bank does name
+// the sign — q-signs-059 teaches „Стесняване на пътя" (the both-sides face)
+// under ЗДвП чл. 6, чл. 20 and „Наредба № РД-02-21-1, група А" — but it
+// carries no sign CODE for it, no ordinance article, and no right-hand
+// variant, which is the only face that is true over a lane that ends on the
+// right. Minting any of the three is exactly what ADR-002 forbids, so the
+// plate stays open and its prerequisite is content, not code.
 //
 // THE ASPHALT ITSELF IS UNCHANGED, deliberately. `roads.ts` sweeps the surface
 // from `edgeHalfWidth`, which the runtime's lane graph, the traffic system and
@@ -1132,6 +1140,144 @@ function paintLaneDrop(acc: MeshAccumulator, plan: LaneDropPlan): number {
       tail.push(add(at.point, mul(perpRight(at.tangent), plan.survivorOff)));
     }
     quads += paintSolidLine(acc, tail, EDGE_LINE_WIDTH_M);
+  }
+
+  // 4. The merge arrows in the dying lane.
+  quads += paintLaneDropArrows(acc, plan);
+  return quads;
+}
+
+// ---------------------------------------------------------------------------
+// THE MERGE ARROWS in the dying lane — sc-merge-lane-end:ae6166e2 („no merge
+// arrow on the tarmac") and the founder's 2026-09-27 ruling that the lane-drop
+// drill REQUIRES them.
+//
+// One glyph per station, standing in the OPEN part of the dying lane and
+// leaning toward the lane that survives: a short straight stem, then a
+// diagonal leg and its head turned LANE_DROP_ARROW_LEAN_DEG off the direction
+// of travel. It is deliberately NOT the lane-intent `left`/`right` glyph above:
+// that one bends 45° and means „this lane turns", and a driver in a dying lane
+// is not being told to turn anywhere — he is being told to move over.
+//
+// Stations run at LANE_DROP_ARROW_PITCH_M from LANE_DROP_ARROW_LEAD_M before
+// the taper and walk into it for as long as the whole glyph still fits the
+// open lane with LANE_DROP_ARROW_CLEAR_M to spare on each side. The fit is
+// checked on every corner against the SAME closing-line offset the taper is
+// painted with (`laneDropOffsetAt`), so an arrow can never stand on the hatch
+// or across the converging line — the lane decides where its last arrow goes,
+// not a hand-typed list.
+//
+// No marking number is claimed for this glyph: the content bank carries no
+// article that names it, and the paint needs none to be read.
+// ---------------------------------------------------------------------------
+
+/** Glyph stem width (the lane-intent glyph's own stroke). */
+const LANE_DROP_ARROW_STEM_W_M = ARROW_STEM_W * 0.9;
+/** Straight stem before the lean, m. */
+const LANE_DROP_ARROW_STEM_M = 2.5;
+/** The diagonal leg, m. */
+const LANE_DROP_ARROW_LEG_M = 3.0;
+/** Arrowhead length along the lean / half width, m. */
+const LANE_DROP_ARROW_HEAD_L_M = 1.8;
+const LANE_DROP_ARROW_HEAD_HALF_M = 1.1;
+/** How far off the direction of travel the leg and head lean, degrees. */
+const LANE_DROP_ARROW_LEAN_DEG = 30;
+/** Station pitch, and how far ahead of the taper the first one stands, m. */
+const LANE_DROP_ARROW_PITCH_M = 20;
+const LANE_DROP_ARROW_LEAD_M = 60;
+/** Clearance every corner keeps from the paint that bounds the open lane. */
+const LANE_DROP_ARROW_CLEAR_M = 0.5;
+
+/**
+ * The merge glyph in the lane-intent glyphs' own local frame (u = RIGHT of
+ * travel, v = along travel), leaning toward `toSurvivor` (+1 = right), centred
+ * on its own extent, as `GlyphQuad`s in emission order. Built per lean the way
+ * `turn(s)` builds the turn glyphs — never by mirroring, because a mirrored
+ * quad is a quad wound the other way, i.e. one facing into the asphalt.
+ */
+function buildLaneDropArrowQuads(toSurvivor: 1 | -1): readonly GlyphQuad[] {
+  const lean = (LANE_DROP_ARROW_LEAN_DEG * Math.PI) / 180;
+  const up: Vec2 = [0, 1];
+  const diag: Vec2 = [toSurvivor * Math.sin(lean), Math.cos(lean)];
+  const stemBase: Vec2 = [-0.8 * toSurvivor, 0];
+  const bend = add(stemBase, mul(up, LANE_DROP_ARROW_STEM_M));
+  const legEnd = add(bend, mul(diag, LANE_DROP_ARROW_LEG_M));
+  const raw: GlyphQuad[] = [
+    glyphStroke(stemBase, up, LANE_DROP_ARROW_STEM_M, LANE_DROP_ARROW_STEM_W_M),
+    glyphStroke(bend, diag, LANE_DROP_ARROW_LEG_M, LANE_DROP_ARROW_STEM_W_M),
+    glyphHead(legEnd, diag, LANE_DROP_ARROW_HEAD_L_M, LANE_DROP_ARROW_HEAD_HALF_M),
+  ];
+  // Centre the glyph on its own bounding box so a station's origin is its middle.
+  let uLo = Infinity;
+  let uHi = -Infinity;
+  let vLo = Infinity;
+  let vHi = -Infinity;
+  for (const q of raw) {
+    for (const [u, v] of q) {
+      uLo = Math.min(uLo, u);
+      uHi = Math.max(uHi, u);
+      vLo = Math.min(vLo, v);
+      vHi = Math.max(vHi, v);
+    }
+  }
+  const cu = (uLo + uHi) / 2;
+  const cv = (vLo + vHi) / 2;
+  return raw.map((q) => q.map(([u, v]) => [u - cu, v - cv] as Vec2) as GlyphQuad);
+}
+const LANE_DROP_ARROW_QUADS: Readonly<Record<1 | -1, readonly GlyphQuad[]>> = {
+  [1]: buildLaneDropArrowQuads(1),
+  [-1]: buildLaneDropArrowQuads(-1),
+};
+
+/** Paint the merge glyphs of one lane drop. Returns the quads it added. */
+function paintLaneDropArrows(acc: MeshAccumulator, plan: LaneDropPlan): number {
+  // Which way is „toward the survivor" in the lane-offset frame (+ = right).
+  const sign = Math.sign(plan.survivorOff - plan.outerOff);
+  if (sign === 0) return 0;
+  const toSurvivor = sign as 1 | -1;
+  const dyingSide = -toSurvivor;
+  const glyph = LANE_DROP_ARROW_QUADS[toSurvivor];
+  let quads = 0;
+  for (
+    let sc = plan.sFrom - LANE_DROP_ARROW_LEAD_M;
+    sc < plan.sTo;
+    sc += LANE_DROP_ARROW_PITCH_M
+  ) {
+    // The open lane at the station: from the survivor boundary to the line
+    // that closes it, in dying-side-positive offsets.
+    const openCentre = (plan.survivorOff + laneDropOffsetAt(plan, sc)) / 2;
+    const corners: Array<{ s: number; off: number }> = [];
+    for (const q of glyph) {
+      for (const [u, v] of q) corners.push({ s: sc + v, off: openCentre + u });
+    }
+    const fits = corners.every(({ s, off }) => {
+      if (s < 0 || s > plan.lineLen) return false;
+      const d = off * dyingSide;
+      return (
+        d > plan.survivorOff * dyingSide + LANE_DROP_ARROW_CLEAR_M &&
+        d < laneDropOffsetAt(plan, s) * dyingSide - LANE_DROP_ARROW_CLEAR_M
+      );
+    });
+    // The lane narrows monotonically, so the first station that does not fit
+    // inside the taper is the last one that ever could.
+    if (!fits) {
+      if (sc >= plan.sFrom) break;
+      continue;
+    }
+    for (const q of glyph) {
+      const idx = [0, 0, 0, 0];
+      for (let i = 0; i < 4; i++) {
+        const [u, v] = q[i] as Vec2;
+        const at = pointAlong(plan.line, sc + v);
+        const p = add(at.point, mul(perpRight(at.tangent), openCentre + u));
+        idx[i] = acc.vertex(toWorld(p[0], p[1], MARKING_Y), UP, [
+          i === 1 || i === 2 ? 1 : 0,
+          i >= 2 ? 1 : 0,
+        ]);
+      }
+      acc.quad(idx[0] as number, idx[1] as number, idx[2] as number, idx[3] as number);
+      quads++;
+    }
   }
   return quads;
 }

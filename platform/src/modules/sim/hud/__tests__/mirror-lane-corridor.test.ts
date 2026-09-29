@@ -51,6 +51,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   HAZARD_BAND_TOP_FRACTION,
+  MIRROR_BAND_LEFT_FRACTION,
   NOTIFY_COLUMN_MAX_STAGE_FRACTION,
   NOTIFY_COLUMN_TOP_CSS_COMPACT,
   NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
@@ -59,7 +60,10 @@ import {
   notifyColumnMirrorLanePx,
   notifyColumnTopPx,
 } from "../notifyColumn";
-import { notifyColumnFloorPx } from "../../../../components/sim/TouchControls";
+import {
+  notifyColumnFloorPx,
+  touchHintLandscapeRectPx,
+} from "../../../../components/sim/TouchControls";
 
 const nl = (s: string): string => s.replace(/\r\n/g, "\n");
 const CSS = nl(
@@ -94,6 +98,21 @@ const PHONES = [
  */
 const CORNER_DATUM_TENANTS = ["demo-deck", "deck-caption"] as const;
 
+/**
+ * …and the surfaces that LEAVE this corridor sideways — 2026-09-27, founder
+ * ruling 2026-09-22 (follow-up), «re-anchor the mirror AND move the card». The
+ * first-run hint CLIPS what it cannot hold, and under the re-anchored (lower)
+ * mirror the right corridor holds 118.5 px of the 124.5 it needs on the
+ * handset, so on a landscape stage it stands in the LEFT corridor under the
+ * rail. A rule in that state writes `right: auto` and its `left` from
+ * TouchControls, and it is judged by x — its box must end before the mirror's
+ * band begins — not by the column's top. Listed so a further tenant cannot
+ * escape the scan by writing `right: auto`.
+ */
+const LEFT_CORRIDOR_TENANTS = ["touch-hint"] as const;
+const isLeftCorridorRule = (d: CompactTop): boolean =>
+  d.right === "auto" && d.left === "«TOUCH_HINT_LANDSCAPE_LEFT_CSS»";
+
 /** The card measured on the frames this round was judged against, CSS px. */
 const TOUCH_HINT_CARD_PX = 124.5;
 
@@ -101,6 +120,10 @@ const TOUCH_HINT_CARD_PX = 124.5;
 interface CompactTop {
   hud: string;
   top: string;
+  /** The rule's own `left:` and `right:`, when it writes them — how a rule
+   *  that has LEFT the right corridor says so (see LEFT_CORRIDOR_TENANTS). */
+  left?: string;
+  right?: string;
 }
 /**
  * EVERY LENGTH IN THIS STYLESHEET IS A `${…}` INTERPOLATION, i.e. the source
@@ -152,7 +175,17 @@ function compactTopDeclarations(css: string): CompactTop[] {
     if (!top) continue;
     // Every `data-hud` the head names — a rule may list two surfaces.
     const huds = [...head.matchAll(/\[data-hud="([^"]+)"\]/g)].map((h) => h[1]);
-    for (const hud of huds) out.push({ hud, top: top[1].replace(/\s+/g, " ").trim() });
+    const decl = (name: string): string | undefined => {
+      const m = new RegExp(`(?:^|\\n)\\s*${name}:\\s*([^;]+);`).exec(body);
+      return m ? m[1].replace(/\s+/g, " ").trim() : undefined;
+    };
+    for (const hud of huds)
+      out.push({
+        hud,
+        top: top[1].replace(/\s+/g, " ").trim(),
+        left: decl("left"),
+        right: decl("right"),
+      });
   }
   return out;
 }
@@ -168,13 +201,30 @@ describe("the corridor's tops — enumerated, not sampled", () => {
   });
 
   it("every right-corridor surface is written from the COLUMN constant", () => {
-    for (const { hud, top } of compactTopDeclarations(CODE)) {
+    for (const d of compactTopDeclarations(CODE)) {
+      const { hud, top } = d;
       if ((CORNER_DATUM_TENANTS as readonly string[]).includes(hud)) continue;
+      if (isLeftCorridorRule(d)) continue; // judged by x, in the next case
       // A held glance steps a surface further DOWN from wherever it starts, so
       // those rules are judged by the datum they add to, not by the sum.
       expect(top, `[data-hud="${hud}"] stands on the corner datum, i.e. on the mirror`)
         .toContain("NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN");
     }
+  });
+
+  it("…the rules that LEFT it are exactly the listed tenants, and clear the mirror by x", () => {
+    const left = compactTopDeclarations(CODE).filter(isLeftCorridorRule);
+    expect(left.map((d) => d.hud)).toEqual([...LEFT_CORRIDOR_TENANTS]);
+    for (const d of left) expect(d.top).toBe("«TOUCH_HINT_LANDSCAPE_TOP_CSS»");
+    for (const p of PHONES) {
+      expect(touchHintLandscapeRectPx(p).boxRight, p.id).toBeLessThan(
+        p.width * MIRROR_BAND_LEFT_FRACTION,
+      );
+    }
+    // …and the portrait arm of the same surface did NOT leave: upright the hint
+    // still reads the column constant (the case above holds that rule to it).
+    const hint = compactTopDeclarations(CODE).filter((d) => d.hud === "touch-hint");
+    expect(hint.some((d) => !isLeftCorridorRule(d))).toBe(true);
   });
 
   it("…and the corner datum still has exactly the tenants that argued for it", () => {
@@ -228,73 +278,41 @@ describe("what the swapped tops resolve to on the three sideways phones", () => 
     }
   });
 
-  it("…and on the handset the catalogue was shot on, it clips NOTHING", () => {
+  it("…and on the handset the catalogue was shot on, it clips NOTHING — in the corridor it now stands in", () => {
     // 124.5 px is the card measured off `03-ready.png` at dpr 3 (ink 11.0 →
-    // 82.0, «РАЗБРАХ» 88.7 → 132.3 from a box top of 8). The peek's own 0.43
-    // ceiling leaves 95.8 px here — and this card CLIPS, inside a
-    // `pointer-events-none` parent, so 28.7 px of it would be two lines of the
-    // founder's reverse-gear sentence deleted with no gesture to get them back.
+    // 82.0, «РАЗБРАХ» 88.7 → 132.3 from a box top of 8). THE RIGHT CORRIDOR NO
+    // LONGER HOLDS IT sideways: under the re-anchored mirror (lane 0.188) it
+    // would clip ~6 px here — which is why the card moved (founder ruling
+    // 2026-09-22, follow-up). The left corridor under the rail holds it whole.
     const p = PHONES[0];
-    const top = notifyColumnTopPx(p, true);
-    const band = notifyColumnMaxHeightPx(
+    const rightTop = notifyColumnTopPx(p, true);
+    const right = notifyColumnMaxHeightPx(
       p.height,
       notifyColumnFloorPx(p),
-      top,
+      rightTop,
       HAZARD_BAND_TOP_FRACTION,
     );
-    const peek = notifyColumnMaxHeightPx(p.height, notifyColumnFloorPx(p), top);
+    expect(right).toBeLessThan(TOUCH_HINT_CARD_PX);
+    expect(touchHintLandscapeRectPx(p).maxHeight).toBeGreaterThanOrEqual(TOUCH_HINT_CARD_PX);
+    // The peek's own fraction would clip it anywhere — the reason the hint has
+    // its own, band-bounded ceiling at all.
+    const peek = notifyColumnMaxHeightPx(p.height, notifyColumnFloorPx(p), rightTop);
     expect(peek).toBeLessThan(TOUCH_HINT_CARD_PX);
-    expect(band).toBeGreaterThanOrEqual(TOUCH_HINT_CARD_PX);
   });
 
   it("…and what the two SMALLER phones must SCROLL is pinned, not hoped", () => {
-    // STATE WHAT WAS NOT FIXED — and state it accurately, which the first
-    // version of this comment did not.
-    //
-    // On a 340 px stage there are only 103.56 px between the mirror's lane and
-    // the thumb pads, and this card wants 124.5. It said "the tail of the
-    // reverse-gear sentence is CLIPPED there", and a lane verifier read that as
-    // deleted teaching text and held the whole patch over it — correctly, on
-    // those words: a repair that trades a layout overlap for a lost sentence
-    // would not be a repair.
-    //
-    // NOTHING IS LOST. LessonScene's card says so in its own voice — "THE WORDS
-    // SCROLL, THE BUTTON DOES NOT": the text sits in a `min-h-0 shrink`
-    // `overflow-y-auto` window with «РАЗБРАХ» `shrink-0` beneath it at its
-    // natural 44 px, which is SimOverlay's shape and was chosen precisely so the
-    // control that clears the card can never fall below its own fold.
-    //
-    // So this number is HOW MUCH MUST BE SCROLLED, not how much is deleted. It
-    // is still a cost — a first-run hint the student has to scroll is worse than
-    // one they do not — so it stays pinned and cannot grow quietly, and the day
-    // the copy is short enough to need no scroll, this line says so.
-    const clipped = PHONES.map((p) => {
-      const top = notifyColumnTopPx(p, true);
-      const cap = notifyColumnMaxHeightPx(
-        p.height,
-        notifyColumnFloorPx(p),
-        top,
-        HAZARD_BAND_TOP_FRACTION,
-      );
-      // Overflow, i.e. scroll distance — not deletion. See the note above.
-      return Math.max(0, TOUCH_HINT_CARD_PX - cap);
-    });
+    // Overflow, i.e. scroll distance — not deletion: LessonScene's card puts the
+    // words in a `min-h-0 shrink` `overflow-y-auto` window with «РАЗБРАХ»
+    // `shrink-0` beneath it, so the control that clears the card never falls
+    // below its own fold. Measured in the corridor the card stands in sideways.
+    // It was 0 / 4.3 / 20.9 in the right corridor before the mirror moved; the
+    // left one is 0 / 0 / 4.3.
+    const clipped = PHONES.map((p) =>
+      Math.max(0, TOUCH_HINT_CARD_PX - touchHintLandscapeRectPx(p).maxHeight),
+    );
     expect(clipped[0]).toBe(0);
-    expect(clipped[1]).toBeLessThan(5);
-    expect(clipped[2]).toBeLessThan(21);
-    // …and every one of them is BETTER than what the peek's fraction would do,
-    // which is the whole reason this surface got its own bound.
-    for (const p of PHONES) {
-      const top = notifyColumnTopPx(p, true);
-      const peek = notifyColumnMaxHeightPx(p.height, notifyColumnFloorPx(p), top);
-      const band = notifyColumnMaxHeightPx(
-        p.height,
-        notifyColumnFloorPx(p),
-        top,
-        HAZARD_BAND_TOP_FRACTION,
-      );
-      expect(band, p.id).toBeGreaterThan(peek);
-    }
+    expect(clipped[1]).toBe(0);
+    expect(clipped[2]).toBeLessThan(5);
   });
 
   it("the hint's ceiling is the BAND's and the peek's is still the 0.43 margin", () => {

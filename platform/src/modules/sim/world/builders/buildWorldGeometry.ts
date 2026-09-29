@@ -22,6 +22,7 @@ import {
   TERMINUS_CLOSE_NEAR_M,
   TERRAIN_MARGIN_M,
 } from "./constants";
+import { buildBridgeDecks, dressBridgeheads } from "./bridgeDeck";
 import { buildBuildings } from "./buildings";
 import { buildBuildingInstances, CITY_MODELS } from "./cityBuildings";
 import { buildRoadDecals } from "./decals";
@@ -38,6 +39,7 @@ import { buildTerminusClosure } from "./terminus";
 import { buildTerrain } from "./terrain";
 import { buildWaterDecals } from "./waterDecals";
 import { buildWorldRim } from "./worldRim";
+import { buildZoneGateways } from "./zoneGateway";
 
 export const DEFAULT_SEED = 1337;
 
@@ -505,11 +507,17 @@ export function buildWorldGeometry(
   // boundary end, which is inside the belt, and a tree growing out of a wall is
   // the one thing worse than no wall.
   const nonRimAabbs = buildings.aabbs.slice(0, buildings.aabbs.length - worldRim.length);
+  // BRIDGES (builders/bridgeDeck.ts, row sc-ac-ice:86eab7e9): a deck + two
+  // parapets over every edge `bridges` span. The parapet and pylon volumes go
+  // into the building-wall collider, so the wall that is drawn is the wall the
+  // car meets. Zero quads — and nothing written into the collider — on every
+  // district that declares no bridge.
+  const bridgeDecks = buildBridgeDecks(district, network, buildings.collider);
   // School dressing — name board + yard railing per `kind: "school"` footprint
   // (founder item 61). Empty on every district that authors none, so this is
   // additive: no existing map's geometry moves by a vertex.
   const schools = buildSchools(district.buildings, network);
-  const props = buildProps(district, network, buildings.aabbs, {
+  const propsBuilt = buildProps(district, network, buildings.aabbs, {
     treeDensity: options.treeDensity ?? 1,
     // THE PROP RNG IS THIS DISTRICT'S, NOT THE CATALOGUE'S (sc-junction-stop
     // :5d3cc55e — „separately-named junction lessons render as one and the same
@@ -528,6 +536,14 @@ export function buildWorldGeometry(
     // of it (props.ts, the Г9 pass).
     rings,
   });
+  // …dressed as a BRIDGEHEAD where a bridge declares one (bridgeDeck.ts, THE
+  // BRIDGEHEAD): no trees or overhead line on the deck's flanks and its
+  // embankments, the street's kerb parapet and lamp row replaced by a
+  // continuous edge railing and paired lamps. Half of why the frozen-bridge
+  // lesson read as a street was a tree line and a lamp row running unbroken
+  // from the spawn across the span. The SAME object on every district that
+  // declares no bridge, so no other map's dressing moves.
+  const props = dressBridgeheads(district, network, propsBuilt, bridgeDecks.approachRailings);
   // Lesson-authored painted bays (L7) by default — the same curriculum-drives-
   // the-world pattern as the L2 stop-sign placement. Pass [] for a bare build.
   // The default is district-scoped since sweep161; see `defaultParkingBays`.
@@ -584,6 +600,25 @@ export function buildWorldGeometry(
   const centerY = (b.minY + b.maxY) / 2;
   const groundThickness = 1;
 
+  // The жилищна-зона GATEWAY (sc-pe-zone-living:37bbb618, founder ruling
+  // 2026-09-27): planters and bollards on the pavement at every living-zone
+  // mouth, framing the Д15/Д16 props just posted and kept clear of every post,
+  // lamp, tree and pole already standing. Render-only, and empty on every
+  // district without a living-zone boundary.
+  const flat = (p: readonly number[]): Vec2 => [p[0] as number, -(p[2] as number)];
+  const zoneGateways = buildZoneGateways({
+    network,
+    plates: props.signs
+      .filter((s) => s.kind === "livingZoneStart" || s.kind === "livingZoneEnd")
+      .map((s) => ({ at: flat(s.position) })),
+    avoid: [
+      ...props.signs.map((s) => flat(s.position)),
+      ...props.streetlights.map((s) => flat(s.position)),
+      ...props.trees.map((s) => flat(s.position)),
+      ...props.utilityPoles.map((s) => flat(s.position)),
+    ],
+  });
+
   // Built from SIGN_KINDS, not a hand-written literal: the В26 numeral set
   // (doc 86 T4) turned one speed kind into thirteen, and a Record literal is
   // exactly the thing that goes stale when a kind is added.
@@ -606,6 +641,8 @@ export function buildWorldGeometry(
     water.water,
     rail.deck,
     rail.rails,
+    bridgeDecks.deck,
+    bridgeDecks.parapets,
     terrain.grass,
     terrain.paved,
     roundabouts.islandPlanting,
@@ -634,6 +671,8 @@ export function buildWorldGeometry(
     junctionDecals: decals.junctionCount,
     waterDecals: water.count,
     railTrackQuads: rail.deckQuads + rail.railQuads,
+    bridgeDecks: bridgeDecks.decks,
+    bridgeParapets: bridgeDecks.parapetWalls,
     roundaboutIslands: roundabouts.islands,
     /** doc 87 B50/B53/B54 — kerbed pedestrian refuge islands / median noses. */
     crossingIslands: crossingFurniture.islands,
@@ -664,6 +703,7 @@ export function buildWorldGeometry(
     skidMarks: decals.skidCount,
     busStops: props.busStops.length,
     parkingKits: props.parkingKits.length,
+    zoneGatewayItems: zoneGateways.length,
     vertices,
     triangles,
     // HOW MANY STATIC MESH SLOTS THIS DISTRICT MOUNTS — counted from the
@@ -689,6 +729,7 @@ export function buildWorldGeometry(
       billboards: props.billboards,
       busStops: props.busStops,
       parkingKits: props.parkingKits,
+      zoneGateways,
       utilityPoles: props.utilityPoles,
       railings: props.railings,
       medianBarriers: props.medianBarriers,
@@ -698,6 +739,7 @@ export function buildWorldGeometry(
       cityModels: CITY_MODELS.length,
       waterSheet: water.count > 0,
       railDeck: rail.deckQuads > 0,
+      bridgeDeck: bridgeDecks.decks > 0,
       roundaboutIsland: roundabouts.islands > 0,
     }),
   };
@@ -711,6 +753,10 @@ export function buildWorldGeometry(
     roadDecals: decals.decals.toMeshData(),
     waterDecals: water.water.toMeshData(),
     railTracks: { deck: rail.deck.toMeshData(), rails: rail.rails.toMeshData() },
+    bridgeDecks: {
+      deck: bridgeDecks.deck.toMeshData(),
+      parapets: bridgeDecks.parapets.toMeshData(),
+    },
     terrain: terrain.grass.toMeshData(),
     terrainPaved: terrain.paved.toMeshData(),
     roundaboutIslands: roundabouts.islandPlanting.toMeshData(),
@@ -727,6 +773,7 @@ export function buildWorldGeometry(
     medianBarriers: props.medianBarriers,
     busStops: props.busStops,
     parkingKits: props.parkingKits,
+    zoneGateways,
     schools,
     terminusClosures: terminusClosures.map((c) => c.placement),
     colliders: {

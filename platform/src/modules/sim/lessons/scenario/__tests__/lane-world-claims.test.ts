@@ -24,6 +24,11 @@
  *     «Стигни отсрещния устой…». `DistrictZoneKind` has no deck/abutment member
  *     and no builder draws one, so no map could have made them true. The А15
  *     the copy now reads off IS built, 60 m ahead of the ice.
+ *     SINCE row sc-ac-ice:86eab7e9 (2026-09-27) the street edge declares
+ *     `bridges` and world/builders/bridgeDeck.ts BUILDS the deck, its
+ *     parapets and abutment pylons, so the bridge claim below is carried on
+ *     this map — and ONLY the ravine („над дерето") is still refused, as its
+ *     own claim, because no builder draws one.
  *
  *   mv-uturn-v1   { stop: 1, priorityRoad: 2, limit50: 5, limit30: 2 }
  *     sc-mv-uturn-ban told the student to read „знак В23" and carried it as a
@@ -89,6 +94,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ARTERIAL_CLASSES } from "../../../world/builders/constants";
 import { buildWorldGeometry } from "../../../world/builders/buildWorldGeometry";
+import { edgeBridgeSpans } from "../../../world/builders/bridgeDeck";
 import { assertDistrict } from "../../../world";
 import { recordScAcNightOverdriveDrive } from "../../../traces/scAcNightOverdrive";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
@@ -123,7 +129,9 @@ const LANE_TEMPLATES: readonly ScenarioSpec[] = [
  *  JSON, not from a parser that might normalise the very field in question. */
 interface DistrictJson {
   meta?: { scenario?: { params?: Record<string, unknown> } & Record<string, unknown> };
-  roads?: { edges?: { id: string; class?: string; maxspeed?: number }[] };
+  roads?: {
+    edges?: { id: string; class?: string; maxspeed?: number; bridges?: unknown }[];
+  };
   buildings?: { id: string; kind?: string }[];
   zones?: { id: string; kind?: string }[];
   roundabouts?: { id: string }[];
@@ -172,18 +180,38 @@ interface WorldClaim {
 
 const WORLD_CLAIMS: readonly WorldClaim[] = [
   {
-    noun: "мост / устой / дере (пътно съоръжение)",
+    noun: "мост / устой / парапет (пътно съоръжение)",
     // DEICTIC ONLY, and that distinction is the whole design. „мост, надлез,
     // сянка заледява пръв" is the LAW and is legal on every map; „ето мост",
-    // „отсрещния устой", „над дерето", „по моста", „върху съоръжението" point
-    // at geometry in front of the student. `DistrictZoneKind` (world/types.ts)
-    // has no deck member, so the predicate answers `false` on every district in
-    // the catalogue today — honestly rather than rhetorically: the day a
-    // `bridgeDeck` kind is authored it starts crediting it with no edit here.
-    // (The мантинела claim in sp-world-claims.test.ts has exactly this shape.)
-    re: /устой|устоя|над дерето|това е мост|съоръжението|по моста|на моста|мостът е/iu,
-    carriedBy: (d) => (d.zones ?? []).some((z) => z.kind === "bridgeDeck"),
-    how: 'zone with kind "bridgeDeck" — no such kind exists yet (world/types.ts DistrictZoneKind)',
+    // „отсрещния устой", „по моста", „върху съоръжението", „парапета" point at
+    // geometry in front of the student.
+    //
+    // CARRIED since row sc-ac-ice:86eab7e9 (bridge lane, round 2): an edge may
+    // declare `bridges: [{ fromM, toM }]` and world/builders/bridgeDeck.ts
+    // BUILDS it — deck, expansion joints, two parapet walls with abutment
+    // pylons, in the wall collider. The predicate reads the same edge tag
+    // through the same reader the builder uses (`edgeBridgeSpans`), so a
+    // sentence is credited exactly where a deck is drawn. „парапет" joined the
+    // spelling list with it: this header's own history is a card that had the
+    // car finding „парапета" on a street with none, and the regex never named
+    // the word. (A zone of kind "bridgeDeck" is still honoured — no such kind
+    // exists; the clause keeps the §3 „grows a deck" row meaningful.)
+    re: /устой|устоя|това е мост|съоръжението|по моста|на моста|мостът е|парапет/iu,
+    carriedBy: (d) =>
+      (d.roads?.edges ?? []).some((e) => edgeBridgeSpans(e).length > 0) ||
+      (d.zones ?? []).some((z) => z.kind === "bridgeDeck"),
+    how: "edge `bridges` span (world/builders/bridgeDeck.ts builds the deck and its parapets)",
+  },
+  {
+    noun: "дере (дол под моста)",
+    // Split from the bridge claim when the deck was built: the deck is real,
+    // the GORGE is not. bridgeDeck.ts's header says why — the ground backdrop
+    // disc sits between −1 and −0.01 m under every world, so carved terrain
+    // would render as the flat backdrop. Nothing in the catalogue carries a
+    // ravine, so „над дерето" stays refused everywhere.
+    re: /дере/iu,
+    carriedBy: () => false,
+    how: "ravine terrain — no builder draws one (bridgeDeck.ts: the ground backdrop would cover it)",
   },
   {
     noun: "мантинела",
@@ -453,12 +481,44 @@ describe("§3 the struck sentences are refused by this gate, and only where they
   const STRUCK_LAMPS = "Включи късите светлини — нощ е и по този път няма нито една лампа.";
   const STRUCK_BARRIER = "Изненадан от порива — към мантинелата";
 
-  it("„над дерето — това е мост“ on ac-bridge-v1 → refused (one icePatch, no deck)", () => {
+  /** ac-bridge-v1 as it shipped before the deck was built: no edge `bridges`. */
+  const withoutDeck = (): DistrictJson => {
+    const d = DISTRICTS.get("ac-bridge-v1")!;
+    return {
+      ...d,
+      roads: { ...d.roads, edges: (d.roads?.edges ?? []).map(({ bridges: _b, ...e }) => e) },
+    };
+  };
+
+  it("„над дерето — това е мост“ on the deck-less ac-bridge-v1 → refused twice (no deck, no ravine)", () => {
+    const rolledBack = withInstruction(specById("sc-ac-bridge-ice"), 3, STRUCK_BRIDGE);
+    // (The deck-less map also refuses the shipped copy's own bridge words —
+    // step 10's „отсрещния устой", the cards' „парапета"; those are pinned by
+    // the next rows. Here: the struck sentence, and only it.)
+    const misses = unbackedClaims(rolledBack, withoutDeck()).filter((m) => m.includes(" instruction 3 "));
+    expect(misses).toHaveLength(2);
+    expect(misses.some((m) => m.includes("bridgeDeck.ts builds the deck"))).toBe(true);
+    expect(misses.some((m) => m.includes("ravine"))).toBe(true);
+    // The shipped copy is clean on BOTH maps — it points at nothing unbuilt.
+    expect(unbackedClaims(specById("sc-ac-bridge-ice"), DISTRICTS.get("ac-bridge-v1")!)).toEqual([]);
+  });
+
+  it("the SAME sentence on the shipped ac-bridge-v1 (deck built) → only the ravine is refused", () => {
+    // Same words, the map that now draws a deck: „това е мост" is credited,
+    // „над дерето" is not — the ground under the deck is still flat.
     const rolledBack = withInstruction(specById("sc-ac-bridge-ice"), 3, STRUCK_BRIDGE);
     const misses = unbackedClaims(rolledBack, DISTRICTS.get("ac-bridge-v1")!);
     expect(misses).toHaveLength(1);
-    expect(misses[0]).toContain("bridgeDeck");
-    expect(unbackedClaims(specById("sc-ac-bridge-ice"), DISTRICTS.get("ac-bridge-v1")!)).toEqual([]);
+    expect(misses[0]).toContain("ravine");
+  });
+
+  it("the cards' «парапета» is credited on the built deck and refused on the deck-less map", () => {
+    const spec = specById("sc-ac-bridge-ice");
+    expect(shownToTheStudent(spec).some((s) => /парапет/iu.test(s.text))).toBe(true);
+    expect(unbackedClaims(spec, DISTRICTS.get("ac-bridge-v1")!)).toEqual([]);
+    const misses = unbackedClaims(spec, withoutDeck());
+    expect(misses.length).toBeGreaterThan(0);
+    expect(misses.some((m) => /парапет/iu.test(m) && m.includes("mistake["))).toBe(true);
   });
 
   it("the GRADED TITLE «…ПРЕДИ близкия устой» is refused too — a gate is a claim", () => {
@@ -470,20 +530,28 @@ describe("§3 the struck sentences are refused by this gate, and only where they
       "sc-acbi-before",
       STRUCK_ABUTMENT_GATE,
     );
-    const misses = unbackedClaims(rolledBack, DISTRICTS.get("ac-bridge-v1")!);
+    const misses = unbackedClaims(rolledBack, withoutDeck()).filter((m) =>
+      m.includes("success sc-acbi-before"),
+    );
     expect(misses).toHaveLength(1);
-    expect(misses[0]).toContain("success sc-acbi-before");
+    // …and the abutment it names is BUILT on the shipped map, so there the
+    // title is a true sentence.
+    expect(unbackedClaims(rolledBack, DISTRICTS.get("ac-bridge-v1")!)).toEqual([]);
   });
 
   it("the SAME bridge sentence on a district that grows a deck → accepted", () => {
     // Same words, a district with the feature, opposite verdict. This is the
     // row that makes the предикат a question about the world.
+    // (The deck-less map, grown a deck through the zone spelling: the bridge
+    // half is credited; the ravine half is refused on every map.)
     const asIfBuilt: DistrictJson = {
-      ...DISTRICTS.get("ac-bridge-v1")!,
+      ...withoutDeck(),
       zones: [...(DISTRICTS.get("ac-bridge-v1")!.zones ?? []), { id: "x", kind: "bridgeDeck" }],
     };
     const rolledBack = withInstruction(specById("sc-ac-bridge-ice"), 3, STRUCK_BRIDGE);
-    expect(unbackedClaims(rolledBack, asIfBuilt)).toEqual([]);
+    const misses = unbackedClaims(rolledBack, asIfBuilt);
+    expect(misses).toHaveLength(1);
+    expect(misses[0]).toContain("ravine");
   });
 
   it("„знак В23“ on mv-uturn-v1 → refused (the map declares it; nothing builds it)", () => {

@@ -669,8 +669,9 @@ export function sprayActiveSlabs(density: number): number {
  * paces at `paceAheadM: 64` (58.2 m bumper to bumper — `bumperSubtrahendM`
  * takes half of each body, 2.05 + 3.75 m; the eye-to-tail distance
  * `sprayDensity` actually reads is ~60 m) on `cruiseSpeedMps: 18`, and the
- * second success gate is „стигни края на отсечката, БЕЗ да си влизал в
- * пелената". At rain 1.0 that is `sprayDensity` ≈0.64 → `sprayActiveSlabs` 3,
+ * lesson grades the TIME gap he keeps behind it (founder ruling 2026-09-27;
+ * the finish objective now reads only „Стигни края на отсечката"). At rain
+ * 1.0 that gap is `sprayDensity` ≈0.64 → `sprayActiveSlabs` 3,
  * for the whole drive. Slab 2 IS the crown of the curtain this lesson is
  * about, so slab 2 is the slab that has to do the work.
  *
@@ -709,9 +710,11 @@ export function sprayActiveSlabs(density: number): number {
  * against the dark trailer (84) and the wet tarmac (110), which is where a
  * white curtain actually has contrast — so the fan is spent there and
  * sideways, over the markings. The truck is still never lost: the roof reads
- * 0.031 at k = 3, and 0.468 at k = 5 — inside SPRAY_NEAR_M, where he has
- * already failed the „без да си влизал в пелената" gate and briefing 9 is
- * being demonstrated on him — against 0.609 and 0.776 at the lamps.
+ * 0.031 at k = 3, and 0.468 at k = 5 — inside SPRAY_NEAR_M, where briefing 9
+ * («колкото по-близо си, толкова по-малко виждаш») is being demonstrated on
+ * him — against 0.609 and 0.776 at the lamps. (No objective grades entering
+ * the curtain: the finish gate used to claim it and was reworded 2026-09-27,
+ * see templates-conditions2.ts `sc-acts-finish`.)
  *
  * KNOWN AND NOT FIXED HERE, so the next lane does not re-derive it: the
  * curtain is an UNLIT `MeshBasicMaterial` at 0xdfe6ea in a scene the sun never

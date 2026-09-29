@@ -118,7 +118,7 @@ export const NOTIFY_COLUMN_MIN_LEFT_FRACTION = 0.6;
 
    SO THE TWO AXES ANSWER DIFFERENT HALVES, and only the y half is a keep-out
    this column can honour. A hazard FACE lives at 0.18–0.39, i.e. ABOVE this
-   column's own top (0.166 of the stage + gutter, the mirror lane below), so no
+   column's own top (0.188 of the stage + gutter, the mirror lane below), so no
    ceiling a 393 px phone can hold clears it and pretending otherwise is what
    the old number did. What clears it is x: at the ≥27 m where the cap still has
    to be READ (reaction plus braking at the 50 km/h limit) the sign is at 0.58,
@@ -171,14 +171,16 @@ export const NOTIFY_COLUMN_MIN_LEFT_FRACTION = 0.6;
  * 0.53 IS KEPT AND IT IS NOT THE HAZARD BAND. With the horizon read correctly
  * (0.402, above) this line is 0.13 of the frame ONTO THE ROAD, and the reason
  * it stays there is measured, not conceded: the hint's own content needs
- * 124.5 px, its top is the mirror lane's 73.2 px, and the corridor left above
- * the horizon is 84.7 px — so a horizon-true ceiling would clip 40 px of the
+ * 124.5 px, its top was the mirror lane's 73.2 px, and the corridor left above
+ * the horizon was 84.7 px — so a horizon-true ceiling would clip 40 px of the
  * control tutorial inside an `overflow: hidden`, `pointer-events-none` box that
  * no thumb can scroll (`mirror-lane-corridor.test.ts` pins both numbers). What
  * makes that survivable is the hint's LIFETIME and not its box: it is first-run
  * only and stands down the first time the car passes 5 km/h
  * (`lesson-ui/touchHintLifetime.ts`), i.e. it is never on the glass while the
- * student is driving at the road it covers.
+ * student is driving at the road it covers. (Since 2026-09-27 the hint stands
+ * in the LEFT corridor sideways — `TouchControls.touchHintLandscapeRectPx` —
+ * and the same band is its ceiling there; its top is the rail's 60 px.)
  */
 export const HAZARD_BAND_TOP_FRACTION = 0.53;
 
@@ -284,43 +286,52 @@ export const NOTIFY_COLUMN_MIRROR_GUTTER_PX = 8;
  * of top and leaves the tallest measured column 15 px from the instrument
  * band, which is a new defect bought to close a rarer one.
  *
- * COMPACT_LANDSCAPE 0.166 covers all three sideways phone profiles in
- * `tools/mobile/lib/devices.mjs` (0.1649, 0.1651, 0.1454) — the orientation
- * every frame in this catalogue was photographed in, and the one anybody
- * drives in.
+ * COMPACT_LANDSCAPE 0.188 covers all three sideways phone profiles in
+ * `tools/mobile/lib/devices.mjs` (0.1865, 0.1867, 0.1683 with the mirror's
+ * re-anchor drop; 0.1649, 0.1651, 0.1454 before it) — the orientation every
+ * frame in this catalogue was photographed in, and the one anybody drives in.
+ * See the block beside the constant for what the 2026-09-27 step cost.
  *
  * COMPACT_PORTRAIT 0.276 is the clamp plateau, and it is the one number here
  * that NO SHIPPED LENGTH USES. `notifyColumnMirrorLanePx()` reads it so the
  * predicate below tells the truth upright — the mirror really is 243 px down
- * on a 393 × 852 phone — but one static percentage cannot serve 0.166 sideways
+ * on a 393 × 852 phone — but one static percentage cannot serve 0.188 sideways
  * and 0.276 upright, and the orientation question is answered by a media query
  * in `PlayAreaStyles`, exactly as it already is for the deck's caption. The gap
  * that leaves is asserted rather than implied, in the last block of
  * `notify-column-mirror.test.ts`.
  */
 export const MIRROR_BAND_BOTTOM_FRACTION_ROOMY = 0.24;
-// ⚠ THIS LANE DID NOT MOVE WITH THE «RE-ANCHOR THE MIRROR» RULING, AND THAT IS
-// A MEASUREMENT — 2026-09-23. The ruling brings the interior mirror DOWN on wide
-// canvases, and «the mirror does not move, the HUD does» (B74/B76) cuts both
-// ways: a lower mirror is a lower lane, and a lower lane is a lower column. What
-// the corridor between this lane and the thumb controls has left, measured with
-// the numbers in this file and in mirror-lane-corridor.test.ts:
+// ⚠ THIS LANE MOVED WITH THE MIRROR — 2026-09-27, founder ruling 2026-09-22
+// (follow-up): «re-anchor the mirror AND move the notification card». The
+// interior mirror's station now comes down 11.3 mm on wide canvases
+// (`cabinLook.REAR_MIRROR_STATION_DROP_MAX_M`, capped by B58's sign clearance),
+// and «the mirror does not move, the HUD does» (B74/B76) cuts both ways: a lower
+// mirror is a lower lane. Its floor, projected at the shipped drop:
 //
-//     852 × 393  the first-run hint needs 124.5 px and the corridor holds 126.76
-//                → 2.26 px of slack
-//     780 × 340  the same hint must already SCROLL 20.94 px against a pinned
-//                bound of 21 → 0.06 px of slack
+//     852 × 393  0.1853     780 × 360  0.1855     780 × 340  0.1670
+//     (844 × 390, the other common iPhone sideways, 0.1858)
 //
-// A station drop of a tenth of a millimetre spends that, so the mirror's station
-// drop is CAPPED at 0 on the phones (`cabinLook.REAR_MIRROR_STATION_DROP_MAX_M`,
-// which carries the derivation and the other bar — B58's sign clearance) and the
-// lane below is unchanged, byte for byte. The header's own drop is what landed;
-// it costs this file nothing, because the header is not what the column hangs
-// below. Moving the CARD instead is a founder question, not an arithmetic one:
-// this stage has no third corridor (the left one is the rail, the open deck and
-// the left door mirror), which is the same sentence the flank-lane block below
-// already had to write about the right edge.
-export const MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE = 0.166;
+// 0.188 was the worst rounded UP when the cap was first set at 12.0 mm (floors
+// 0.1865 / 0.1867 / 0.1683 / 0.1871); the cap then came down to 11.3 mm, the
+// glass's own B58 bar, and the lane was left where it was — it now fails safe
+// by 0.002 of the stage (~0.8 px on 393), which the peek pays, rather than
+// move every HUD number the round-1 verification confirmed. What the
+// step costs, and why it is now affordable:
+//
+//   · THE FIRST-RUN TOUCH HINT LEFT THIS CORRIDOR on sideways phones — it is
+//     the tenant that CLIPS (124.5 px, no thumb can scroll it), and under the
+//     lowered mirror it would have had 118.5 px on the handset. It stands in the
+//     LEFT corridor under the rail now (`TouchControls.touchHintLandscapeRectPx`,
+//     PlayAreaStyles' landscape rule), which is the card move the ruling asked
+//     for. Upright it keeps this corridor; that arm is unchanged.
+//   · THE PEEK STAYS and folds rather than clips: its 0.40 ceiling leaves it
+//     ~8.6 px less text window at 852 × 393 (84.0 → 75.3), the lines join the
+//     «↓ още N реда» fold, and its shortest card still ends above the hazard
+//     band (0.478 / 0.505 / 0.523 of the stage) — it does not cover road.
+//   · The audio card and the three chips step down with it; none writes a
+//     max-height, so each keeps every line it had.
+export const MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE = 0.188;
 export const MIRROR_BAND_BOTTOM_FRACTION_COMPACT_PORTRAIT = 0.276;
 
 /**
