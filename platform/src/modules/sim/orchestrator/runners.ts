@@ -38,6 +38,7 @@ import type {
   TrainPassSpec,
 } from "../contracts";
 import type { ContactCastMember } from "./contact";
+import { playerOverLaneReachM } from "../collision";
 import type { SimTickEvent } from "../rules";
 import type { Rng } from "../traffic/rng";
 import type { StagedActorView, VehicleProfile } from "../traffic/types";
@@ -3933,6 +3934,38 @@ export class CutInLeadCarRunner implements EventRunner {
 //     proportional law backs off as the gap error flips, and the authored
 //     decel cap (12 m/s²) out-brakes any player slam, so the actor stops
 //     inside its own cushion even against a 12 m/s² brake-check.
+//
+//     …BUT ONLY FOR THE GLUED POSE (sc-merge-lane-end:0487bcec, 2026-09-29).
+//     The structural argument above is an argument about `matchPlayer`, and
+//     the pass is not `matchPlayer`: it is `cruise passSpeedMps`, a car at a
+//     fixed speed with no gap law at all. With `passShiftM` 0 (the actor's
+//     own lane is the one that continues — sc-merge-lane-end, sc-merge-
+//     roadworks-shift, sc-ln-decisive-change) that cruise ran THROUGH a
+//     student who had merged into its lane ahead of it: measured on the w66
+//     road record, +24.8 км/ч in one tick on a coasting car at y 88.8, then
+//     shoves to 77 км/ч and into the railing, billed −10 to the student by
+//     the physics shell. So the pass now carries two guards:
+//       · the PASS GUARD (StagedCommand `passGuard`) is armed the moment the
+//         pass is commanded — the staged player guard, measured in the lane
+//         the pass is heading to, so an overtaker going round the student in
+//         his own lane is not braked for him and one whose lane he is in
+//         stops short of him;
+//       · and with `passShiftM` 0, while the student is AHEAD IN ITS LANE the
+//         pass DEGRADES TO KEEPING STATION — back to `matchPlayer` at
+//         `followBehindM`, the glued pose with its structural safety (and its
+//         exemption: the guard is disarmed again there) — and resumes the
+//         cruise the frame he is no longer in its way. A pass with nowhere to
+//         pass is a car following you, which is what a real one does.
+//     „In its lane" is any part of his body over the lane the product drew
+//     (round 2: `playerOverLaneReachM` of the published lane width — a fixed
+//     3 m corridor on an 8.125 m lane let the pass overtake a student inside
+//     his own lane); the pass guard brakes for his CENTRE in the lane it is
+//     heading for (half the same lane — staged.ts step 2 says why it is the
+//     narrower of the two). What neither guard
+//     does is stop a student who steers across into the car while it is
+//     already beside him: that cut-in is still a contact and is still billed
+//     by the physics shell, and whether it should be is a founder ruling,
+//     not a runner decision.
 // ---------------------------------------------------------------------------
 
 /** The tailgater's driveline caps — authored constants (not spec surface):
@@ -3942,6 +3975,38 @@ const TAILGATER_DECEL_MPS2 = 12;
 const TAILGATER_ACCEL_MPS2 = 3.5;
 /** Latch window: glued once within followBehindM + this many meters, m. */
 const TAILGATER_LATCH_SLACK_M = 4;
+/**
+ * Is the player AHEAD of the actor and IN ITS LANE? Both halves are measured,
+ * not tuned (sc-merge-lane-end:0487bcec, round 2):
+ *
+ *   · IN ITS LANE — any part of his body over the lane the actor drives: his
+ *     centre within `playerOverLaneReachM(laneWidthM)` of the actor's line
+ *     (half the drawn lane + his own half-width), with the lane width the
+ *     traffic system published for this actor. Round 1 used a fixed 3 m on an
+ *     8.125 m lane: a student riding 3.2 m off the lane centre — inside it —
+ *     was overtaken inside his own lane, and one mid-merge was only „in" once
+ *     the pass had already closed on him. The actor rides its lane's centre
+ *     line on every lesson that stages this runner (asserted by the census in
+ *     tailgater-pass-guard.test.ts), so its line IS the lane centre.
+ *   · AHEAD — his centre in front of the actor's centre along the actor's
+ *     heading. Behind that point the actor has already drawn level with more
+ *     than half of him, and braking would only put its tail across his path.
+ *
+ * A view that publishes no lane width (a fake port) answers false: the runner
+ * does not guess a lane, and the staged pass guard — which always knows its
+ * own lane — still stands between the pass and the student.
+ */
+function playerAheadInActorLane(
+  actor: { x: number; y: number; dirX: number; dirY: number; laneWidthM?: number },
+  input: DirectorInput,
+): boolean {
+  if (actor.laneWidthM === undefined) return false;
+  const relX = input.x - actor.x;
+  const relY = input.y - actor.y;
+  const along = relX * actor.dirX + relY * actor.dirY;
+  const lateral = Math.abs(relX * actor.dirY - relY * actor.dirX);
+  return along > 0 && lateral < playerOverLaneReachM(actor.laneWidthM);
+}
 
 export class RearTailgaterRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
@@ -3955,6 +4020,10 @@ export class RearTailgaterRunner implements EventRunner {
   private latchedAt: number | null = null;
   private latchSpeedKmh = 0;
   private passCommanded = false;
+  /** Which longitudinal law the pass is under once commanded: the authored
+   *  cruise, or keeping station behind a student who is in its lane (the
+   *  passShiftM-0 degrade — see the class block). */
+  private passMode: "cruise" | "station" = "cruise";
   private sawYield = false;
   /** L6 indicator bookkeeping (the pass is a lane change and owes a lamp). */
   private indicatorOn = false;
@@ -4007,9 +4076,42 @@ export class RearTailgaterRunner implements EventRunner {
     this.latchedAt = null;
     this.latchSpeedKmh = 0;
     this.passCommanded = false;
+    this.passMode = "cruise";
     this.sawYield = false;
     this.indicatorOn = false;
     this.indicatorOffAtSec = null;
+  }
+
+  /**
+   * Put the pass under the law the road allows RIGHT NOW: the authored cruise
+   * with the pass guard armed, or — passShiftM 0 and the student ahead in the
+   * actor's lane — keeping station at followBehindM with the guard disarmed
+   * (the glued pose, whose exemption this is). Commands only on a change, so a
+   * pass that never meets the student issues exactly the commands it always
+   * did plus the one `passGuard`.
+   */
+  private applyPassLaw(
+    traffic: StagedTrafficPort,
+    actor: { x: number; y: number; dirX: number; dirY: number; laneWidthM?: number },
+    input: DirectorInput,
+    first: boolean,
+  ): void {
+    const s = this.spec;
+    const mode: "cruise" | "station" =
+      s.passShiftM === 0 && playerAheadInActorLane(actor, input) ? "station" : "cruise";
+    if (!first && mode === this.passMode) return;
+    this.passMode = mode;
+    if (mode === "cruise") {
+      traffic.stagedCommand(s.id, { type: "passGuard", on: true });
+      traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.passSpeedMps });
+    } else {
+      traffic.stagedCommand(s.id, { type: "passGuard", on: false });
+      traffic.stagedCommand(s.id, {
+        type: "matchPlayer",
+        gapM: -this.followBehindM,
+        maxSpeedMps: s.maxMatchSpeedMps,
+      });
+    }
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
@@ -4084,8 +4186,12 @@ export class RearTailgaterRunner implements EventRunner {
         });
         this.indicatorOn = true;
       }
-      if (!this.passCommanded && input.tSec - this.latchedAt >= this.pressureSec) {
-        traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.passSpeedMps });
+      if (this.passCommanded) {
+        // The pass is running: re-read the road every frame (passShiftM 0 can
+        // meet the student in its lane at any point of it).
+        this.applyPassLaw(traffic, actor, input, false);
+      } else if (input.tSec - this.latchedAt >= this.pressureSec) {
+        this.applyPassLaw(traffic, actor, input, true);
         traffic.stagedCommand(s.id, {
           type: "laneShift",
           toOffsetM: s.passShiftM,

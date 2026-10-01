@@ -331,8 +331,8 @@ export function applySignalModes(
 }
 
 /**
- * Wire the traffic system's telemetry queries into the runtime — the seven
- * hookups LessonScene ran inline (and recordScriptedDrive's exact set), so
+ * Wire the traffic system's telemetry queries into the runtime — the eight
+ * hookups LessonScene runs (and recordScriptedDrive's exact set), so
  * the rule engine's proximity detectors see the same world in every mount.
  */
 export function wireTrafficQueries(
@@ -350,4 +350,8 @@ export function wireTrafficQueries(
   );
   runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
   runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));
+  // Founder ruling 2026-09-30 («bill the forced braking»): the lane-entry
+  // tracker judges a lane entry against the vehicle already travelling behind
+  // him in that lane, so it needs every same-direction vehicle, not the nearest.
+  runtime.setSameDirVehiclesQuery((px, py, h, r) => traffic.sameDirVehiclesNear(px, py, h, r));
 }

@@ -88,6 +88,7 @@ export const DETECTOR_OPT_IN_CODES: Readonly<
   needlessStopEnabled: ["STOPPED_WITHOUT_CAUSE"],
   junctionScanObservationEnabled: ["JUNCTION_SCAN_INCOMPLETE"],
   turnObservationEnabled: ["TURN_WITHOUT_OBSERVATION"],
+  laneEntryForcedBrakingEnabled: ["LANE_ENTRY_FORCED_BRAKING"],
 };
 
 /**

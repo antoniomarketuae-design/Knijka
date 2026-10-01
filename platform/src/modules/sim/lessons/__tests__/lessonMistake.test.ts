@@ -451,7 +451,9 @@ describe("lessonMistakeCopy — retrieval only (ADR-002)", () => {
     // on reading true while the catalogue grows past it. A 59th code is not a
     // defect — it is a reason to come back here, re-measure which codes carry no
     // concept, and move both halves together.
-    expect(Object.keys(VIOLATIONS).length).toBe(58);
+    // 59 since LANE_ENTRY_FORCED_BRAKING (founder ruling 2026-09-30); it carries
+    // a conceptId (c-lane-change), so the null set above is unchanged.
+    expect(Object.keys(VIOLATIONS).length).toBe(59);
   });
 });
 

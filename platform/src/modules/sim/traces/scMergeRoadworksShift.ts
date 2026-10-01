@@ -7,6 +7,19 @@
  * SimTick events by contract (pressure scenery, doc 72 FO-07). Everything the
  * gate asserts therefore comes from the PLAYER's own channels + the CONES.
  *
+ * ROUND 3 OF sc-merge-lane-end:0487bcec — THE SHADOW WAS RE-TIMED AGAINST THE
+ * CAR IT NAMES. Replayed through the production stack (round 2's verifier, F6)
+ * the old shadow reached its merge with the open-lane car still behind it, cut
+ * in front of it and forced it from 45 to 20 км/ч — and it painted «кола в
+ * лявата лента, почти наравно с нас» while that car was 40 m back. Founder
+ * ruling 2026-09-30 («bill the forced braking») makes that the lesson's own
+ * mistake, in the drive the L1 aid tells a student to copy, and this lesson's
+ * ruleConfig now arms the rule (the recorder is handed it below). The lift now
+ * starts at y 75 while the car is still coming up, at 24 км/ч, so the car
+ * closes, keeps station for its pressure window and goes BY: at the signal it
+ * is ~12 m ahead, at the entry ~16 m, and it never slows. Every caption is
+ * checked frame by frame against the replay (__tests__/merge-demo-truth).
+ *
  * THE CONES are recorder obstacle rects (the scHazardObstacle pattern), pinned
  * BY VALUE from the district's meta.scenario.cones and fed with
  * collisionMinKmh 0 — doc 76 §0's low-speed collider ruling, so brushing one
@@ -22,12 +35,12 @@
  * objective gates are engine/objective channels — only the contact is missing.
  *
  * The trace gate replays exactly these through the production stack:
- *   - shadow: rolls the closed lane at 45 → mirror → EASES to 30 and lets the
- *     open-lane car go by → indicator + mirror + shoulder → merges into the
- *     пролука behind it, 34 m of commit finished 10 m before the taper even
- *     starts → cancels → holds 28 through the site's temporary 30 → runs out.
- *     ZERO violations + CLEAN_DRIVING + SAFE_LANE_CHANGE, and it never touches
- *     a cone;
+ *   - shadow: rolls the closed lane at 45 → mirror → EASES to 24 while the
+ *     open-lane car comes up and goes by → back up to 35 behind it → indicator
+ *     + mirror + shoulder → merges into the пролука behind it, 34 m of commit
+ *     finished just before the taper's first cone → cancels → holds 28 through
+ *     the site's temporary 30 → runs out. ZERO violations + CLEAN_DRIVING +
+ *     SAFE_LANE_CHANGE, and it never touches a cone;
  *   - „Вливане в последния момент без мигач": mirror checked, NO indicator
  *     ever, wheel over at the last usable metres → EXACTLY
  *     LANE_CHANGE_WITHOUT_INDICATOR (the glance is real — the demo is about the
@@ -87,7 +100,7 @@ const SPAWN: readonly [number, number] = [X_CLOSED, 12];
 const CRUISE_KMH = 45;
 /** Shed in the CLOSED lane to let the open-lane car go by — the taught beat.
  *  4.6 m/s² of recorder decel from 45 is far under the harsh-brake threshold. */
-const EASE_KMH = 30;
+const EASE_KMH = 24;
 /** The speed every merge is committed at. */
 const MERGE_KMH = 35;
 /** The pace held through the site, under its temporary 30. */
@@ -141,26 +154,31 @@ export function scMergeRoadworksShiftShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Караме в дясната лента. Напред знаците и конусите казват едно: тази лента е затворена за ремонт." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [SPAWN, [X_CLOSED, 120]], targetKmh: CRUISE_KMH, stopAtEnd: false },
+      { kind: "drive", points: [SPAWN, [X_CLOSED, 70]], targetKmh: CRUISE_KMH, stopAtEnd: false },
       // The observation pair the rubric names: mirror first (where is the gap,
       // and how fast is it coming?), then the indicator, then the blind spot —
       // wheel last.
       { kind: "glance", mirror: "left" },
-      { kind: "annotation", textBg: "В огледалото: кола в лявата лента, почти наравно с нас. Нейната лента продължава — нашата свършва след конусите." },
-      { kind: "drive", points: [[X_CLOSED, 120], [X_CLOSED, 164]], targetKmh: EASE_KMH, stopAtEnd: false },
+      { kind: "annotation", textBg: "В лявото огледало: зад нас в лявата лента има кола. Нейната лента продължава — нашата свършва след конусите." },
+      { kind: "drive", points: [[X_CLOSED, 70], [X_CLOSED, 75]], targetKmh: CRUISE_KMH, stopAtEnd: false },
+      // THE TAUGHT BEAT, timed against the car it names (round 3 of
+      // sc-merge-lane-end:0487bcec — see the file header): the lift starts
+      // while the open-lane car is still coming up from behind, so it closes,
+      // keeps station for its pressure window and goes BY before the wheel turns.
       { kind: "annotation", textBg: "Отпускаме газта и я пускаме да мине. Пролуката ЗАД нея е нашата — не тази пред нея." },
-      { kind: "drive", points: [[X_CLOSED, 164], [X_CLOSED, 196]], targetKmh: MERGE_KMH, stopAtEnd: false },
+      { kind: "drive", points: [[X_CLOSED, 75], [X_CLOSED, 150]], targetKmh: EASE_KMH, stopAtEnd: false },
+      { kind: "drive", points: [[X_CLOSED, 150], [X_CLOSED, 180]], targetKmh: MERGE_KMH, stopAtEnd: false },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "left" },
       { kind: "annotation", textBg: "Ляв мигач, още веднъж огледало и поглед през рамо в мъртвата зона — чак тогава воланът." },
       // The merge: 8.125 m of lateral over 34 m of arc — the laneId flip lands
-      // at y ≈ 213, on the APPROACH edge, 27 m (≈ 2.8 s) before the works joint
-      // and 3 m before the taper even begins.
-      { kind: "drive", points: [[X_CLOSED, 196], [X_OPEN, 230]], targetKmh: MERGE_KMH, stopAtEnd: false },
+      // before the taper's first cone at y = 216, in the gap the open-lane car
+      // has just left behind it, and the arc is finished before the works joint.
+      { kind: "drive", points: [[X_CLOSED, 180], [X_OPEN, 214]], targetKmh: MERGE_KMH, stopAtEnd: false },
       { kind: "indicator", setting: "off" },
-      { kind: "annotation", textBg: "Вписахме се с едно движение, много преди първия конус. Мигачът се изключва." },
+      { kind: "annotation", textBg: "Вписахме се в пролуката зад нея с едно движение, много преди първия конус — никой в лявата лента не спря и не отби заради нас. Мигачът се изключва." },
       // Into the site at its OWN limit: 28 under the temporary 30.
-      { kind: "drive", points: [[X_OPEN, 230], [X_OPEN, 276]], targetKmh: WORKS_KMH, stopAtEnd: false },
+      { kind: "drive", points: [[X_OPEN, 214], [X_OPEN, 276]], targetKmh: WORKS_KMH, stopAtEnd: false },
       { kind: "annotation", textBg: "Временното ограничение е закон: 30 през целия участък. Между конусите работят хора — там тясното е за всички." },
       { kind: "drive", points: [[X_OPEN, 276], [X_OPEN, 294]], targetKmh: EXIT_KMH },
       { kind: "pause", sec: 1.5, brake: true },
@@ -276,6 +294,10 @@ export function recordScMergeRoadworksShiftDrive(
     obstacles: roadworksConeRects(),
     collisionMinKmh: 0,
     stagedEvents: [...(SC_MERGE_ROADWORKS_SHIFT.staged ?? [])] as StagedEventSpec[],
+    // The lesson's own rule config — it arms LANE_ENTRY_FORCED_BRAKING (founder
+    // ruling 2026-09-30), so a recorded demo is graded by the rules the student
+    // is graded by: the push-out must bill it, the shadow must not.
+    ...(SC_MERGE_ROADWORKS_SHIFT.ruleConfig ? { ruleConfig: SC_MERGE_ROADWORKS_SHIFT.ruleConfig } : {}),
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });
 }

@@ -368,6 +368,57 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     realWorldRefs: ["ЗДвП чл. 183, ал. 4, т. 14", "ЗДвП чл. 179, ал. 1, т. 5"],
     conceptId: "c-mirrors-blind-spots",
   },
+  LANE_ENTRY_FORCED_BRAKING: {
+    // FOUNDER RULING 2026-09-30 — «BILL THE FORCED BRAKING» (sc-merge-lane-end:
+    // 0487bcec round 3). „A cut-in so close that the vehicle already in the
+    // lane the student enters must brake hard IS the lane-drop lesson's own
+    // push-out mistake («Изтласкване на кола от съседната лента»), billed even
+    // with NO contact." Measured by the runtime's lane-entry tracker (the
+    // deceleration the entry demands of the follower after a driver's reaction
+    // time), judged against harshBrakeDecelMps2, armed per lesson.
+    //
+    // опасна, and not by analogy: both lane-drop templates' own examinerBg
+    // already say „принуждаването на движещ се в съседната лента да спира …
+    // е опасна", and the founder ruled on that sentence. Наредба № 38 case 5
+    // („създаде предпоставка за допускане на ПТП") with MEASURED evidence —
+    // a real vehicle, a measured gap and closing speed, a demand above the
+    // product's own emergency-grade braking line (n38.ts). That is also what
+    // separates it from OVERTAKE_RETURN_TOO_EARLY (основна): that code bills a
+    // time gap under 1 s and says the victim's braking is „a reaction, not an
+    // established precondition"; this one bills only once the victim must
+    // brake HARD. Not session-terminating: no contact has happened (чл. 48,
+    // ал. 3 ends an exam on a ПТП, and a forced hard stop is not one).
+    //
+    // THE COPY IS TRUE FOR A CUT-IN, and that is the point of a separate row
+    // (round 2's verifier, F8): the forward-collision card of COLLISION tells a
+    // student he left himself too little room to stop, which is false for a
+    // student whose entry left the car BEHIND him too little room. Every
+    // sentence below is established by the measurement that bills it: a vehicle
+    // was already travelling in that lane behind him, and after a one-second
+    // reaction it needs a hard stop's deceleration or more.
+    //
+    // LAW, RETRIEVED from content/law/acts/zdvp.json (ADR-002): чл. 25, ал. 2 —
+    // „При извършване на маневра, която е свързана с навлизане изцяло или
+    // частично в съседна пътна лента, водачът е длъжен да пропусне пътните
+    // превозни средства, които се движат по нея." The fines, also retrieved:
+    // чл. 183, ал. 4, т. 14 („…неправилно се престроява или не спазва
+    // предимството на друг участник в движението", 100 лв.) and чл. 179, ал. 1,
+    // т. 5 (the priority rules, „ако от това е създадена непосредствена
+    // опасност за движението", 200 лв.).
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Вмъкване твърде близо пред кола",
+    explanationBg:
+      "Влезе в съседната лента толкова близо пред кола, която вече се движеше по нея, че след нормалната секунда за реакция водачът ѝ трябва да спира рязко, за да не те удари. Който навлиза изцяло или частично в съседна лента, пропуска движещите се по нея (чл. 25, ал. 2). Лентата не става твоя, когато мигачът светне, а когато зад теб има достатъчно място колата в нея да продължи, без да спира заради теб.",
+    peekBg: "Принуди я да спира рязко.",
+    correctiveBg:
+      "Преди волана: огледало от страната на маневрата и поглед през рамо — колко близо е колата в лентата и колко бързо идва? Ако не може да продължи, без да намали заради теб, отпусни газта, пусни я да мине и влез в пролуката ЗАД нея. Мигачът обявява, но не отваря място.",
+    lawRef: "ЗДвП чл. 25, ал. 2",
+    realWorldBg:
+      "Извън изпита: глоба 100 лв. по ЗДвП чл. 183, ал. 4 — водач, който „неправилно се престроява или не спазва предимството на друг участник в движението“. Създадена ли е с това непосредствена опасност за движението, вече е чл. 179, ал. 1, т. 5 — глоба в размер 200 лв.",
+    realWorldRefs: ["ЗДвП чл. 183, ал. 4, т. 14", "ЗДвП чл. 179, ал. 1, т. 5"],
+    conceptId: "c-lane-change",
+  },
   SEATBELT_OFF_WHILE_MOVING: {
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
@@ -2675,7 +2726,7 @@ export const RAIL_CROSSING_ACT_COPY: Record<
  * and the bicycle each get their own paragraph.
  */
 export const COLLISION_CONTACT_COPY: Record<
-  "vehicle" | "pedestrian" | "cyclist" | "staticObject",
+  "vehicle" | "pedestrian" | "cyclist" | "staticObject" | "vehicleCutIn",
   // `peekBg` is REQUIRED here and optional on `ViolationSpec`: this table is
   // four rows and every one of them is the −10 card a student meets mid-drive
   // on a phone, which is the exact surface `sc-pk-driveway:fa602d10` was filed
@@ -2711,6 +2762,27 @@ export const COLLISION_CONTACT_COPY: Record<
     // през» — sc-junction-gap:9d7f5535, the footway crash this row was filed
     // from. The clause it keeps is the explanation's own first one.
     peekBg: "Не се появи внезапно.",
+  },
+  // A VEHICLE CONTACT THAT IS THE TAIL OF A BILLED CUT-IN (founder ruling
+  // 2026-09-30; sc-merge-lane-end:0487bcec round 3). Not a fifth struck body —
+  // the same "vehicle" contact — but the one case where the vehicle row above is
+  // FALSE: «Между вас е имало точно толкова път, колкото ти е трябвал, за да
+  // спреш» describes a student who ran into something, and round 2's verifier
+  // (F8) photographed it on students struck from behind seconds after cutting
+  // in front of the car that struck them. The engine stamps this detail only
+  // when LANE_ENTRY_FORCED_BRAKING has just been billed and the contact lands
+  // inside the follower's react-and-stop time (engine.ts, the `laneEntered`
+  // case), so every clause below is already established when it prints: he
+  // entered that lane too close in front of a car travelling in it, that car
+  // had priority, and a vehicle contact followed within seconds. It does NOT
+  // say which vehicle he touched or who struck whom — the contact channel does
+  // not know — and it cites no article of its own (the citation does not split,
+  // see the block above; чл. 25, ал. 2 is named in the prose, retrieved).
+  vehicleCutIn: {
+    titleBg: "Удар след вмъкване пред кола",
+    explanationBg:
+      "Удар с друго превозно средство секунди след като влезе в съседната лента твърде близо пред кола, която вече се движеше по нея. Тя имаше предимство (чл. 25, ал. 2), а ти ѝ остави по-малко място, отколкото ѝ трябваше, за да спре спокойно. Пролуката се избира в огледалото и през рамото, преди воланът да тръгне — не с надеждата, че другият ще спре.",
+    peekBg: "Тя имаше предимство.",
   },
 };
 

@@ -1157,7 +1157,7 @@ describe("wave-2 bot completion — sc-merge-lane-end at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: the blind merge grades MIRROR_CHECK + COLLISION, not passed, 1★", () => {
+  it("counter-proof: the blind merge grades MIRROR_CHECK + the forced braking, not passed, 1★", () => {
     let s = createLessonSession(compileScenario(SC_MERGE_LANE_END, 3));
     recordScMergeLaneEndDrive(loadDistrict("ln-merge-v1"), "mistake-push-out", {
       onTick: (tick) => {
@@ -1165,9 +1165,13 @@ describe("wave-2 bot completion — sc-merge-lane-end at L3", () => {
       },
     });
     const r = buildLessonResult(s);
-    // COLLISION is an опасна (terminating) fault — it scores immediately rather
-    // than landing on the teach-moment channel.
-    expect(s.events.some((e) => e.kind === "violation" && e.code === "COLLISION")).toBe(true);
+    // Founder ruling 2026-09-30 («bill the forced braking»): the push-out is the
+    // hard stop it forces on the through car — an опасна that scores
+    // immediately rather than landing on the teach-moment channel. The car
+    // brakes and misses, so there is no COLLISION any more (the demo's authored
+    // crash beat is gone).
+    expect(s.events.some((e) => e.kind === "violation" && e.code === "LANE_ENTRY_FORCED_BRAKING")).toBe(true);
+    expect(s.events.some((e) => e.kind === "violation" && e.code === "COLLISION")).toBe(false);
     expect(r.passed).toBe(false);
     expect(scoreRubric(r, SC_MERGE_LANE_END.rubric!).stars).toBe(1);
   });

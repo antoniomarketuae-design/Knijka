@@ -176,6 +176,35 @@ export type SimTickEvent =
    *  hover / click / key: the input layer decides. */
   | { kind: "mirrorGlance"; mirror: GlanceKind }
   /**
+   * The player's BODY has just gone over a lane of his carriageway that it was
+   * not over on the previous frame — „навлизане изцяло или частично в
+   * съседна пътна лента" (ЗДвП чл. 25, ал. 2), measured on the road
+   * (runtime/worldRuntime.ts, the lane-entry tracker) — and, when a vehicle is
+   * already travelling in that lane behind him, what his entry demands of it.
+   *
+   * THE WORLD'S HALF OF FOUNDER RULING 2026-09-30, «bill the forced braking»
+   * (sc-merge-lane-end:0487bcec round 3): a cut-in so close that the vehicle
+   * already in the lane must brake hard is the lane-drop lesson's push-out
+   * mistake, contact or not. The runtime MEASURES (which lane, which vehicle,
+   * how far, how fast, what deceleration it now needs); the rule engine JUDGES
+   * (whether that deceleration is „hard" — `harshBrakeDecelMps2` — and whether
+   * the lesson armed the rule at all — `laneEntryForcedBrakingEnabled`).
+   *
+   * Emitted on the entry frame only, and only on a lane of the SAME carriageway
+   * and bank the body was already on (a joint on a straight keeps the lane; a
+   * turn onto another road, a lost lane fix and a reverse manoeuvre re-baseline
+   * silently — A12, a locator artefact is not a manoeuvre). Every crossing is
+   * published (no deadband since round 4); that one crossing back and forth in
+   * front of the same vehicle is one act is the engine's judgement. `follower` is null when nothing travels behind him in that lane
+   * within the probe, or when no traffic query is wired (a hand-built stack).
+   */
+  | {
+      kind: "laneEntered";
+      /** The lane entered — the SimTick.laneId numbering (0 = rightmost). */
+      laneId: number;
+      follower: LaneEntryFollower | null;
+    }
+  /**
    * RESERVED for v2 (right-of-way detectors): the engine adjudicates a
    * priority situation (right-hand rule, left turn vs oncoming, roundabout
    * entry, emergency vehicle...). `violated` grades FAILED_TO_YIELD; `yielded`
@@ -194,6 +223,45 @@ export type SimTickEvent =
       yielded?: boolean;
       gapSec?: number;
     };
+
+/**
+ * The vehicle already travelling in a lane the player has just entered, behind
+ * him, and what his entry asks of it — see the `laneEntered` event.
+ *
+ * THE QUANTITY THE RULING NAMES. „Must brake hard" is a statement about what
+ * the vehicle behind NEEDS, not about how a scripted car happens to respond,
+ * so `forcedDecelMps2` is the constant deceleration a driver in that vehicle
+ * must reach — after a reaction time — to shed the closing speed before the
+ * nose-to-tail gap is gone, with the player holding his pace:
+ *
+ *     rem = gapM − closingMps × reactionSec
+ *     forcedDecelMps2 = closingMps² / (2 × rem)         (closingMps > 0, rem > 0)
+ *                     = 0                               (closingMps ≤ 0: it is not catching him)
+ *                     = LANE_ENTRY_UNAVOIDABLE_MPS2      (closingMps > 0 and gapM ≤ 0 or rem ≤ 0: no brake prevents it)
+ *
+ * The not-closing case is decided FIRST (round 4): a stopped, slower or
+ * level-pegging vehicle alongside him is not forced to brake, however close.
+ *
+ * Read off the published states on the entry frame, independent of the
+ * vehicle's own controller — a staged car that over-brakes cannot convict the
+ * student, and one that reacts instantly cannot acquit him.
+ */
+export interface LaneEntryFollower {
+  /** The follower's published vehicle-state id (traffic TrafficVehicleState.id). */
+  vehicleId: number;
+  /** Road distance from the follower's nose to the player's tail, m (≤ 0 = it
+   *  was already alongside him when his body crossed the line). */
+  gapM: number;
+  /** Follower speed minus player speed along the road, m/s (+ = catching him). */
+  closingMps: number;
+  /** The follower's own speed, m/s. */
+  speedMps: number;
+  /** The reaction time `forcedDecelMps2` was computed with, s — published so
+   *  the number is self-describing and a reader can re-derive it. */
+  reactionSec: number;
+  /** The deceleration the follower now needs, m/s² — see the interface doc. */
+  forcedDecelMps2: number;
+}
 
 /**
  * One frame of simulation state. Emitted every physics/render tick (any rate;
@@ -1000,6 +1068,13 @@ export type ViolationCode =
   | "PEDESTRIAN_CROSSING_TOO_FAST" // опасна: accident precondition (official list)
   | "PEDESTRIAN_NOT_YIELDED" // опасна
   | "COLLISION" // опасна + session terminate flag (official: exam terminated)
+  // FOUNDER RULING 2026-09-30 — «bill the forced braking» (sc-merge-lane-end:
+  // 0487bcec round 3). Entering a lane so close ahead of a vehicle already in
+  // it that the vehicle must brake hard — ЗДвП чл. 25, ал. 2, „длъжен е да
+  // пропусне пътните превозни средства, които се движат по нея" — billed with
+  // or without contact. Measured by the runtime (`laneEntered`), judged against
+  // `harshBrakeDecelMps2`, armed per lesson (`laneEntryForcedBrakingEnabled`).
+  | "LANE_ENTRY_FORCED_BRAKING" // опасна: cut in so close the vehicle in the lane had to brake hard (чл. 25, ал. 2; config-gated)
   // B1a Wave-1 detector pack (doc 72 capability 1 + N2)
   | "ENGINE_STALLED" // второстепенна: „загасване" (VP-04)
   | "MOVE_OFF_WITHOUT_OBSERVATION" // основна: no mirror check before first move-off (PK-05; config-gated, see moveOffObservationEnabled)
@@ -1414,6 +1489,27 @@ export interface RuleEngineConfig {
    * the student still has room to stop.
    */
   leadClosingSustainSec: number;
+
+  // -- LANE_ENTRY_FORCED_BRAKING (founder ruling 2026-09-30) ----------------
+  //
+  // «Bill the forced braking»: a cut-in so close that the vehicle already in
+  // the lane the student enters must brake hard IS the lane-drop lesson's
+  // push-out mistake (sc-merge-lane-end «Изтласкване на кола от съседната
+  // лента»), billed even with no contact. The runtime publishes what the entry
+  // demands of the follower (`SimTick` event `laneEntered`,
+  // `LaneEntryFollower.forcedDecelMps2`); the engine bills it when that is
+  // HARD — above `harshBrakeDecelMps2`, the SAME line the product already uses
+  // to call the student's own braking harsh, so „you made him brake hard" and
+  // „you braked hard" are one measurement of one word, not two tunings of it.
+  //
+  // SHIPPED OFF and armed per lesson, because the ruling is scoped to the
+  // lane-drop lessons and a network-wide cut-in rule would change what every
+  // other lesson can fail a student for — which is a founder call, not an
+  // engineer's (the item-17 shape). Every other template and every exam bot
+  // grades byte-for-byte as before.
+
+  /** Master switch — enabled per lesson (`ruleConfig`), never by default. */
+  laneEntryForcedBrakingEnabled: boolean;
 
   /** Seconds against a one-way's flow before WRONG_WAY fires. */
   wrongWaySustainSec: number;
@@ -2157,6 +2253,9 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   leadClosingEnabled: false,
   leadClosingMinRateMps: 0.8,
   leadClosingSustainSec: 1,
+
+  // Founder ruling 2026-09-30 — OFF, opted into by the lane-drop lessons.
+  laneEntryForcedBrakingEnabled: false,
 
   wrongWaySustainSec: 1.5,
   // A12: was 8 — a real overtake of a slower vehicle runs 10-15 s in the left

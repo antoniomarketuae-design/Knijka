@@ -580,3 +580,21 @@ All three of its verifiers refuted it, so it is parked. **Nothing of it is on `s
 `sc-rb-busy-gap:5ee56710` (C), `:a6f83f6b` (C), `:8f50287b`, `sc-rb-ped-exit:5f1217f9` (C),
 `sc-rb-lane-choice:ffdffd55` (C), `sc-roundabout-entry:4ab693eb` (C), `:8be266cf` (C),
 `:7b747c15`, `:08a0b701` — 9 rows, 6 critical (11 open roundabout-family rows in all).
+
+## GAP-8 — three harness faults that produced false product failures on the w66 re-drive — **OPEN 2026-09-29**
+
+Found by `triage-w66-collisions` (wf_28f1432d-80b; each triage adversarially verified, all `refuted=false`) on the
+re-drive of 9792cd4. None is a product defect; each made a correct drive look failed. They are recorded here so no
+judge files them against the product and so the next harness round fixes them.
+
+| # | harness file | what it did | the false failure it caused | fix |
+| --- | --- | --- | --- | --- |
+| 8a | `tools/mobile/lib/guidance.mjs:663-743` (`readAim` / `chevronAim`) | treats any arrow-shaped teal object as the TURN CHEVRON and ranks it above the ribbon; the objective's acceptance ring (radius 10, `markerRingRadii`) passed the gate at 164–1111 px and the sustained-turn law confirmed a 30° right turn | `sc-ac-bridge-ice` pc-right steered off an unbroken straight (x 4.06 → 9.55) into the new bridgehead railing at t≈39 s: «Удар в неподвижно препятствие», 13 т. The same ring was misread on w52 (61 px, not confident) and the ribbon corrected it | only let a chevron outrank the ribbon when the product can show one (a junction ahead on the derived route; `ac-bridge-v1` has none), reject ring arcs, forbid presses > 65 ms while line and «chevron» disagree |
+| 8b | `tools/mobile/lesson-audit.mjs` pace/roll loop + hazard loop | held the throttle across a long screenshot tick and overshot the pace tape (12–18 → 25.3 km/h); the hazard loop does not see pedestrians, so nothing capped the speed | `sc-pe-zone-living` mobile-right hit a crossing pedestrian ~90 m inside the zone at t≈89 s: «Удар в пешеходец», 10 т. (pc-right at the same commit: 0 т.) | release the throttle before any tick longer than the pace step; read pedestrians in the hazard loop |
+| 8c | `tools/mobile/lib/insets.mjs:397-425` (safe-area emulation) | rewrites `env()` in inline styles and stamps `data-sa-*` on `<html>` BEFORE hydration | Next dev paints «A tree hydrated but some attributes … didn't match» over 01-arrival on mobile legs; the harness strips the overlay and logs it as a runtime error | stamp after hydration (wait for the app's hydrated marker) or keep the emulation out of attributes React owns |
+
+Also measured: route fidelity counts only MOVING samples, so a car pinned 5.5 m off its line after a crash reads
+«ON (worst 1.32 m)» (8a's drive). Report the at-rest offset separately.
+
+A related product nit, cosmetic and NOT a cause: the radius-10 acceptance ring at a lane-centre zone paints across
+the footway and through the bridgehead railing (`RouteGuidance.tsx` `markerRingRadii`).

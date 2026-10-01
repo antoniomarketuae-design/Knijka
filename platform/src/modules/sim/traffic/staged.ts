@@ -19,7 +19,7 @@
  */
 
 import { offsetPolyline, projectOntoPolyline, sampleLane, type LaneGraph } from "./graph";
-import { vehicleHalfLengthM } from "./types";
+import { DEFAULT_TRAFFIC_CONFIG, vehicleHalfLengthM } from "./types";
 import type {
   StagedCommand,
   StagedPedestrianSpec,
@@ -459,6 +459,11 @@ interface MutableView {
   lateralOffsetM: number;
   /** FR-B5-RETURN re-entry count — see StagedActorView.returns. */
   returns: number;
+  /** Drawn width of the lane the path was resolved on — see
+   *  StagedActorView.laneWidthM. Vehicles only (a walker has no lane). */
+  laneWidthM?: number;
+  /** Is the pass guard armed — see StagedActorView.passGuardArmed. Vehicles only. */
+  passGuardArmed?: boolean;
 }
 
 export interface StagedVehicleAgent {
@@ -516,6 +521,21 @@ export interface StagedVehicleAgent {
   playerDirY: number;
   playerLastX: number;
   playerLastY: number;
+  /**
+   * The PASS GUARD (StagedCommand `passGuard`): the player guard for an actor
+   * whose spec opts out of it, measured in the lane the actor is heading to.
+   * False for every actor never commanded — byte-identical guarding.
+   */
+  passGuard: boolean;
+  /**
+   * Drawn width of the lanes this actor's path was resolved on, m — the
+   * traffic system's `laneWidthM`, i.e. the lane the world builder drew
+   * (LANE_WIDTH_M). The pass guard's corridor is half of it (step 2), and it
+   * is published on the view (`StagedActorView.laneWidthM`) so a runner can
+   * ask „is the student in my lane?" against the same lane
+   * (RearTailgaterRunner's station law).
+   */
+  laneWidthM: number;
 }
 
 export interface StagedPedestrianAgent {
@@ -950,6 +970,9 @@ export function createStagedVehicle(
   spec: StagedVehicleSpec,
   path: StagedPath,
   stateId: number,
+  /** The traffic system's lane width (TrafficSystem.stage passes its own
+   *  `cfg.laneWidthM`); direct callers get the product default. */
+  laneWidthM: number = DEFAULT_TRAFFIC_CONFIG.laneWidthM,
 ): StagedVehicleAgent {
   const nodeIdx = Math.min(Math.max(spec.hold.nodeIndex, 0), path.nodeS.length - 1);
   const holdS = clampArc(path, path.nodeS[nodeIdx] + spec.hold.offsetM);
@@ -987,6 +1010,8 @@ export function createStagedVehicle(
       indicator: "off",
       lateralOffsetM: 0,
       returns: 0,
+      laneWidthM,
+      passGuardArmed: false,
     },
     command: { type: "hold", speedMps: 0, gapM: 0, maxSpeedMps: 0, minSpeedMps: 0, decelMps2: 0 },
     holdS,
@@ -1007,6 +1032,8 @@ export function createStagedVehicle(
     playerDirY: 0,
     playerLastX: NaN,
     playerLastY: NaN,
+    passGuard: false,
+    laneWidthM,
   };
   publishVehicle(agent);
   return agent;
@@ -1115,10 +1142,14 @@ export function applyStagedCommand(
         v.state.indicator = command.indicator;
         v.view.indicator = command.indicator;
         break;
+      case "passGuard":
+        v.passGuard = command.on;
+        break;
       case "reset":
         v.command.type = "hold";
         rewindTo(v, v.holdS);
         v.indicator = "off";
+        v.passGuard = false;
         publishVehicle(v);
         break;
     }
@@ -1141,7 +1172,7 @@ export function applyStagedCommand(
       publishPedestrian(p, 0);
       break;
     default:
-      break; // matchPlayer / brake / laneShift / setIndicator are vehicle-only
+      break; // matchPlayer / brake / laneShift / setIndicator / passGuard are vehicle-only
   }
 }
 
@@ -1238,12 +1269,68 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
 
   // 2) Player guard — never ram the player from behind (skip while slamming:
   //    a brake command is already the strongest stop available).
-  if (cmd.type !== "brake" && playerGuarded(agent) && env.hasPlayer) {
+  //
+  //     …OR, for an actor whose spec opts out, while its PASS GUARD is armed
+  //     (StagedCommand `passGuard`, sc-merge-lane-end:0487bcec): the same
+  //     window, profile and brake, but measured on the LANE the actor is
+  //     heading TO — centred on its pose shifted by the laneShift still to run
+  //     (latTarget − lat, positive = right, which is also the sign of the
+  //     cross product below) — and braking for a student whose CENTRE is in
+  //     that lane: half the drawn lane the traffic system built
+  //     (`laneWidthM / 2`), the lane-membership every lane reading in the
+  //     product uses. A pass that goes round a student who keeps to his own
+  //     lane is a lane pitch off him on every frame and is untouched; a
+  //     student who moves into the lane the pass is heading for is braked for
+  //     from the frame his centre crosses its line.
+  //
+  //     WHY NOT HIS WHOLE BODY, as the runner's station law uses (round 2 of
+  //     0487bcec, measured). The station law asks „may I overtake inside a
+  //     lane he occupies any part of?" and the answer is no. This guard also
+  //     serves the OVERTAKERS, whose pass goes into a lane he is only
+  //     brushing: with a body-wide corridor the overtaker of
+  //     sc-ov-being-overtaken braked from 90 to 28 км/ч and fell 30 m back
+  //     behind a student riding the centre line in the mistake demo — a pass
+  //     with 2.6 m of air between the bodies that the demo's annotations
+  //     («точно там, където минава той») are written over. And not the bodies
+  //     alone (1.77 m): a student gliding into the target lane ahead of the
+  //     pass is then only seen once he is in its path, too late for the brake
+  //     (round-1 test B2 drove into him). Round 1's fixed 3 m was neither
+  //     number. Spec-guarded actors keep GUARD_LATERAL_M exactly: theirs is a
+  //     following guard for bodies authored in the student's own line, and
+  //     changing it would re-time every lead car in the catalogue.
+  const specGuarded = playerGuarded(agent);
+  if (cmd.type !== "brake" && (specGuarded || agent.passGuard) && env.hasPlayer) {
     const relX = env.playerX - agent.state.x;
     const relY = env.playerY - agent.state.y;
-    const along = relX * agent.state.dirX + relY * agent.state.dirY;
-    const lateral = Math.abs(relX * agent.state.dirY - relY * agent.state.dirX);
-    if (along > 0 && along < guardWindowM(agent) && lateral < GUARD_LATERAL_M) {
+    // THE PASS GUARD MEASURES IN THE ROAD'S FRAME (sc-merge-lane-end:0487bcec
+    // round 3). The published heading tilts toward the glide while a laneShift
+    // runs — publishVehicle noses the rig into the lane change — by
+    // atan(latRate / speed): ~21° for a pass gliding one 8.125 m lane in 1.5 s
+    // at 50 км/ч, and far more for a pass launched from rest. Measured in that
+    // tilted frame, „the lane it is heading for" swung metres off the lane on
+    // the road: an actor gliding from rest into a lane with a student standing
+    // in its far half accelerated at him for the whole glide and only saw him
+    // once the glide was over (tailgater-pass-guard.test.ts A8; round 2's
+    // verifier mutant V3, which halved the shift, survived because of it). The
+    // corridor is a statement about lanes, so it is measured along the path
+    // tangent — the frame latTarget and lat are offsets in. Spec-guarded actors
+    // keep the published frame exactly (their following corridor is unchanged).
+    let fx = agent.state.dirX;
+    let fy = agent.state.dirY;
+    if (!specGuarded) {
+      sampleLane(agent.path, agent.s, agent.segHint, samp);
+      if (samp.dirX !== 0 || samp.dirY !== 0) {
+        fx = samp.dirX;
+        fy = samp.dirY;
+      }
+    }
+    const along = relX * fx + relY * fy;
+    const cross = relX * fy - relY * fx;
+    const lateral = specGuarded
+      ? Math.abs(cross)
+      : Math.abs(cross - (agent.latTarget - agent.lat));
+    const corridorM = specGuarded ? GUARD_LATERAL_M : agent.laneWidthM / 2;
+    if (along > 0 && along < guardWindowM(agent) && lateral < corridorM) {
       const guardTarget = Math.max(0, (along - GUARD_STOP_SHORT_M) * GUARD_APPROACH_GAIN);
       if (guardTarget < target) {
         target = guardTarget;
@@ -1564,6 +1651,7 @@ function publishVehicle(agent: StagedVehicleAgent): void {
   view.indicator = agent.indicator;
   view.lateralOffsetM = agent.lat;
   view.returns = agent.returns;
+  view.passGuardArmed = agent.passGuard;
 }
 
 function setPedOnRoad(

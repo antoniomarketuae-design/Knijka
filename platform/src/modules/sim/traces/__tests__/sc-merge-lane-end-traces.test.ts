@@ -8,8 +8,12 @@
  *   2. MISTAKE DEMOS grade EXACTLY their authored codeRefs — once each: the
  *      silent last-metre merge grades LANE_CHANGE_WITHOUT_INDICATOR and NOTHING
  *      else (the mirror really was checked); the blind merge grades
- *      LANE_CHANGE_WITHOUT_MIRROR_CHECK + COLLISION and NEVER
- *      LANE_CHANGE_WITHOUT_INDICATOR — signalling without looking is the demo.
+ *      LANE_CHANGE_WITHOUT_MIRROR_CHECK + LANE_ENTRY_FORCED_BRAKING and NEVER
+ *      LANE_CHANGE_WITHOUT_INDICATOR — signalling without looking is the demo —
+ *      and never COLLISION: since founder ruling 2026-09-30 («bill the forced
+ *      braking») the push-out is billed on the road, by the hard stop it forces
+ *      on the car in the lane, and that car brakes and misses (sc-merge-lane-end:
+ *      0487bcec round 3; the demo's authored crash beat is gone).
  *   3. THE MAP'S OWN LAW: no drive ever grades NOT_KEEPING_RIGHT (every merge
  *      commits at or after the taper, and the street is sized so the survivor
  *      lane can never be held for keepRightSustainSec — see gen_ln_merge.mjs),
@@ -29,7 +33,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { SC_MERGE_LANE_END } from "../../lessons/scenario/templates-merging";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
-import { recordScMergeLaneEndDrive, type ScMergeLaneEndTraceName } from "../scMergeLaneEnd";
+import {
+  recordScMergeLaneEndDrive,
+  scMergeLaneEndMistakePushOutScript,
+  type ScMergeLaneEndTraceName,
+} from "../scMergeLaneEnd";
 import type { RecordedDrive } from "../recorder";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +75,10 @@ describe("sc-merge-lane-end — the shadow gate (doc 76 §5)", () => {
   const shadow = drives.get("shadow-correct")!;
 
   it("replays with ZERO violations and earns CLEAN_DRIVING + SAFE_LANE_CHANGE", () => {
+    // …graded under the lesson's own rule config, so this is also the proof
+    // that the drive the L1 aid tells him to copy forces nobody to brake
+    // (LANE_ENTRY_FORCED_BRAKING is armed on this lesson).
+    expect(SC_MERGE_LANE_END.ruleConfig?.laneEntryForcedBrakingEnabled).toBe(true);
     expect(violationCodes(shadow)).toEqual([]);
     expect(commendationCodes(shadow)).toContain("CLEAN_DRIVING");
     expect(commendationCodes(shadow)).toContain("SAFE_LANE_CHANGE");
@@ -171,12 +183,19 @@ describe("sc-merge-lane-end — mistake demos grade their exact codes (doc 76 §
     expect(Math.max(...stillInEndingLane.map((s) => s.y))).toBeGreaterThan(TAPER_FROM_Y + 20);
   });
 
-  it("„Изтласкване на кола от съседната лента“: exactly the mirror code + COLLISION — the indicator does NOT excuse", () => {
+  it("„Изтласкване на кола от съседната лента“: exactly the mirror code + the forced braking — the indicator does NOT excuse", () => {
     const drive = drives.get("mistake-push-out")!;
     const codes = violationCodes(drive);
+    // The card fires on the ruling's code, not on a crash (founder ruling
+    // 2026-09-30): the push-out is the hard stop forced on the car in the lane.
+    expect(SC_MERGE_LANE_END.mistakes[1].codeRefs).toContain("LANE_ENTRY_FORCED_BRAKING");
+    expect(SC_MERGE_LANE_END.mistakes[1].codeRefs).not.toContain("COLLISION");
     expect([...new Set(codes)].sort()).toEqual([...SC_MERGE_LANE_END.mistakes[1].codeRefs].sort());
     expect(codes.filter((c) => c === "LANE_CHANGE_WITHOUT_MIRROR_CHECK")).toHaveLength(1);
-    expect(codes.filter((c) => c === "COLLISION")).toHaveLength(1);
+    expect(codes.filter((c) => c === "LANE_ENTRY_FORCED_BRAKING")).toHaveLength(1);
+    // No authored crash and no physical one: the car brakes and misses.
+    expect(codes).not.toContain("COLLISION");
+    expect(scMergeLaneEndMistakePushOutScript().steps.some((st) => st.kind === "collision")).toBe(false);
     // The signal really was on — the demo's own irony.
     expect(codes).not.toContain("LANE_CHANGE_WITHOUT_INDICATOR");
     expect(drive.trace.events.some((e) => e.kind === "signal-on" && e.detail === "left")).toBe(true);

@@ -260,6 +260,9 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
       "followRainAwareEnabled",
       "handbrakeMoveOffEnabled",
       "junctionScanObservationEnabled",
+      // founder ruling 2026-09-30 («bill the forced braking») — arms
+      // LANE_ENTRY_FORCED_BRAKING on the two lane-drop lessons
+      "laneEntryForcedBrakingEnabled",
       "leadClosingEnabled",
       "moveOffObservationEnabled",
       "needlessStopEnabled",
@@ -305,7 +308,9 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
         `codes it puts in play; anything else TUNES or DISARMS one — add it to NON_ARMING_RULE_CONFIG_KEYS. ` +
         `Do not decide by how it is spelled.`,
     ).toEqual([]);
-    // The 11 keys the 167 templates actually author (doc 92 §3.3 meta.ruleConfigKeysAuthored).
+    // The 11 keys the 167 templates actually author (doc 92 §3.3 meta.ruleConfigKeysAuthored),
+    // plus laneEntryForcedBrakingEnabled (founder ruling 2026-09-30; sc-merge-lane-end
+    // and sc-merge-roadworks-shift) — 12.
     expect([...authored.keys()].sort()).toEqual([
       "conditionSpeedNightFactor",
       "followMinSpeedKmh",
@@ -314,6 +319,7 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
       "harshBrakeDecelMps2",
       "hesitationClearGapM",
       "junctionScanObservationEnabled",
+      "laneEntryForcedBrakingEnabled",
       "leadClosingEnabled",
       "moveOffObservationEnabled",
       "needlessStopEnabled",

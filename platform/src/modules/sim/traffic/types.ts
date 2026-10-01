@@ -376,6 +376,34 @@ export interface CyclistApproach {
   speedMps: number;
 }
 
+/**
+ * One SAME-DIRECTION vehicle near the player, as returned by
+ * TrafficSystem.sameDirVehiclesNear — the lane-entry adjudicator's telemetry
+ * (founder ruling 2026-09-30, «bill the forced braking»; sc-merge-lane-end:
+ * 0487bcec round 3). The CyclistApproach point, plus the two facts a
+ * following-distance computation cannot do without and a point cannot carry:
+ * WHICH vehicle (so the rule engine can say one follower is one encounter) and
+ * HOW LONG it is (the gap that matters is nose to tail, and a bus's nose is
+ * six metres further forward of its centre than a car's). Everything about
+ * lanes, "behind" and required braking is the RUNTIME's to measure on the road
+ * it knows — this is only what the traffic system knows.
+ */
+export interface SameDirVehicle {
+  /** The published vehicle state's id (TrafficVehicleState.id) — stable for
+   *  the life of the agent, staged or ambient. */
+  id: number;
+  /** Center, district space. */
+  x: number;
+  y: number;
+  /** Unit travel direction, district space. */
+  dirX: number;
+  dirY: number;
+  /** Its own speed along `dir`, m/s. */
+  speedMps: number;
+  /** Half its body length, m — vehicleHalfLengthM(profile). */
+  halfLengthM: number;
+}
+
 // ---------------------------------------------------------------------------
 // Update context — what the integrator feeds the system each frame.
 // ---------------------------------------------------------------------------
@@ -715,6 +743,43 @@ export type StagedCommand =
    * glide. Pedestrians ignore it. `reset` returns it to "off".
    */
   | { type: "setIndicator"; indicator: VehicleIndicator }
+  /**
+   * Vehicles only: arm (or disarm) the PASS GUARD — the player guard for an
+   * actor whose spec opts out of it (`playerGuard: false`), scoped to the lane
+   * the actor is GOING TO (its current pose shifted to the `laneShift` target).
+   *
+   * Why it exists (sc-merge-lane-end:0487bcec, 2026-09-29). The лепка is staged
+   * `playerGuard: false` because the guard's stop-6-m-short corridor forbids
+   * its sub-6 m GLUED pose. That exemption was carried into its PASS, which is
+   * a car at the pass speed with no clamp against the one body it must never
+   * touch: with `passShiftM` 0 the pass drove at 50 км/ч through a student who
+   * had merged early into its lane, and the physics shell billed him −10. The
+   * runner raises this when the pass starts and lowers it when it returns to a
+   * glued pose, so the exemption covers the pose it was written for and
+   * nothing else.
+   *
+   * WHAT IT MEASURES. The lane the pass is heading for (the actor's pose
+   * shifted by the laneShift still to run): a student ahead of the actor,
+   * inside the guard's approach window, whose CENTRE is in that lane — half
+   * the lane width the traffic system built its lanes with
+   * (`StagedActorView.laneWidthM`) — is braked for, with the same window,
+   * approach profile and 8 m/s² brake the `playerGuard: true` actors use
+   * (their own corridor stays the older 3 m following corridor). Why the
+   * centre and not his whole body is measured in staged.ts step 2.
+   *
+   * WHAT IT DOES NOT DO. It does not decide whether a pass may go on while
+   * the student is in the actor's LANE — that is `RearTailgaterRunner`'s
+   * station law, measured on the lane the product drew. It watches AHEAD only
+   * (along > 0, inside the window): a student who steers across into the
+   * actor while it is already beside him is not something a brake can
+   * prevent, and it is not suppressed or billed differently here — who is at
+   * fault for that cut-in is not a traffic-layer decision. A pass that goes
+   * round a student who keeps to his own lane (passShiftM ≠ 0 — the
+   * overtakers) is a lane pitch off that path on every frame of the glide, so
+   * their choreography is unchanged. Actors whose spec already guards the
+   * player, and FR-B5-RETURN laps, ignore it. `reset` disarms it.
+   */
+  | { type: "passGuard"; on: boolean }
   /** Teleport back to the dormant hold pose (re-stage on retry). */
   | { type: "reset" };
 
@@ -759,6 +824,31 @@ export interface StagedActorView {
    * fake-port reason as the two fields above; absent reads as 0.
    */
   readonly returns?: number;
+  /**
+   * Drawn width of the lane this actor's path was resolved on, m — the traffic
+   * system's `laneWidthM` (the world builder's LANE_WIDTH_M: every drawn lane
+   * in this product is that wide). Published so a RUNNER can ask „is the
+   * student in my lane?" against the lane the product built rather than a
+   * number of its own (`RearTailgaterRunner`'s station law, with
+   * sim/collision `playerOverLaneReachM`). Optional for the same fake-port
+   * reason as the fields above; the real TrafficSystem always publishes it for
+   * vehicles, and a runner that finds it absent must not guess a lane.
+   */
+  readonly laneWidthM?: number;
+  /**
+   * Is the actor's PASS GUARD armed right now (StagedCommand `passGuard`)?
+   * Vehicles only; false for every actor never commanded.
+   *
+   * Published, not only held, because „the guard is disarmed while the car
+   * keeps station" is a promise RearTailgaterRunner makes and the staged layer
+   * keeps — and the only way a test can check that the two agree is to read
+   * what the staged layer actually did (sc-merge-lane-end:0487bcec round 3: a
+   * staged layer that could never DISARM the guard left its 8 m/s² cap in
+   * charge of a second station episode, and every command the runner sent
+   * still read correctly). Grades nothing and steers nothing; optional for the
+   * same fake-port reason as the fields above.
+   */
+  readonly passGuardArmed?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -927,6 +1017,21 @@ export interface TrafficSystem {
    * py, h, r))`. District space; headingDeg 0 = north, clockwise.
    */
   overtakenNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null;
+  /**
+   * EVERY same-direction vehicle within `radiusM` of the player (founder
+   * ruling 2026-09-30, «bill the forced braking» — the lane-entry
+   * adjudicator's seam; sc-merge-lane-end:0487bcec round 3). The
+   * overtakenNear filter exactly — cyclist proxies never qualify (their pass is
+   * VU-02's act), oncoming/crossing traffic is heading-filtered out — but ALL
+   * of them, not the nearest: the vehicle a lane entry is judged against is the
+   * one BEHIND the player IN THE LANE HE ENTERED, and the nearest same-direction
+   * body is as often the car ahead in his own lane. The runtime picks it on the
+   * road (runtime/worldRuntime.ts, the lane-entry tracker). Wire into the
+   * runtime: `runtime.setSameDirVehiclesQuery((px, py, h, r) =>
+   * traffic.sameDirVehiclesNear(px, py, h, r))`. District space; headingDeg 0
+   * = north, clockwise.
+   */
+  sameDirVehiclesNear(px: number, py: number, headingDeg: number, radiusM: number): readonly SameDirVehicle[];
   /**
    * Deploy a scripted actor, dormant at its hold pose (A8). MUST be called
    * before the presentation layer mounts — TrafficLayer sizes its instanced

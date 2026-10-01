@@ -380,6 +380,22 @@ export interface RuleEngineState {
    */
   contactEpisodes: Record<string, ContactEpisode>;
   /**
+   * Founder ruling 2026-09-30 («bill the forced braking»): until when a vehicle
+   * contact is the tail of a BILLED cut-in and reads as one
+   * (COLLISION_CONTACT_COPY.vehicleCutIn) rather than as the forward-collision
+   * card — see the `laneEntered` case. null = no cut-in open.
+   */
+  cutInContactUntil: number | null;
+  /**
+   * ONE CUT-IN, ONE ACT (round 4): per follower vehicleId, until when that
+   * vehicle is still answering a cut-in already billed — its reaction plus its
+   * own hard stop from its speed at that entry. A forced crossing in front of
+   * the same vehicle before then is the same act and is not billed again. See
+   * the `laneEntered` case. Copied whole by cloneState; entries are assigned,
+   * never mutated.
+   */
+  cutInActUntil: Record<string, number>;
+  /**
    * Path length driven since the session began, metres — a monotone odometer
    * clamped per frame, never reset. Each episode remembers its own reading, so
    * "travel since THAT contact" is a subtraction and one body's report cannot
@@ -2214,6 +2230,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     keepRight: { ...IDLE_EPISODE },
     crossing: null,
     contactEpisodes: {},
+    cutInContactUntil: null,
+    cutInActUntil: {},
     contactOdometerM: 0,
     contactReverseOdometerM: 0,
     actBills: {},
@@ -2311,6 +2329,8 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     // Same argument as contactEpisodes above: an entry is assigned whole at
     // each bill and never mutated, so the copied record may share them.
     actBills: { ...s.actBills },
+    // Same argument again: a follower's act window is assigned whole.
+    cutInActUntil: { ...s.cutInActUntil },
     laneChange: { pending: s.laneChange.pending.map((p) => ({ ...p })), lastBasisChangeAt: s.laneChange.lastBasisChangeAt },
     stall: { ...s.stall },
     stopOvershoot: { ...s.stopOvershoot },
@@ -6234,7 +6254,11 @@ function handleTickEvent(
       };
       if (!cameApart) break;
       s.terminated = true;
-      out.push(makeViolation("COLLISION", t, { detail: e.withWhat }));
+      // …and a VEHICLE contact that is the tail of a billed cut-in reads as the
+      // cut-in (see the `laneEntered` case) — same charge, the true sentence.
+      const cutInTail =
+        e.withWhat === "vehicle" && s.cutInContactUntil !== null && t <= s.cutInContactUntil;
+      out.push(makeViolation("COLLISION", t, { detail: cutInTail ? "vehicleCutIn" : e.withWhat }));
       break;
     }
 
@@ -6356,5 +6380,56 @@ function handleTickEvent(
 
     case "mirrorGlance": // handled in the tracker pass
       break;
+
+    case "laneEntered": {
+      // FOUNDER RULING 2026-09-30 — «BILL THE FORCED BRAKING» (sc-merge-lane-end:
+      // 0487bcec round 3). „A cut-in so close that the vehicle already in the
+      // lane the student enters must brake hard IS the lane-drop lesson's own
+      // push-out mistake, billed even with NO contact" — ЗДвП чл. 25, ал. 2.
+      //
+      // The runtime measured the entry and what it demands of the follower
+      // (`LaneEntryFollower.forcedDecelMps2` — the kinematics of the entry frame,
+      // never the follower's own controller); this is only the judgement:
+      //   · armed per lesson (`laneEntryForcedBrakingEnabled`) — the ruling is
+      //     scoped to the lane-drop lessons, and everything else grades exactly
+      //     as before;
+      //   · „brake hard" is `harshBrakeDecelMps2`, the line the product already
+      //     calls the student's own braking harsh at — EXCLUSIVE, the tie
+      //     acquits, by the same tolerance and for the same reason
+      //     (HARSH_BRAKE_TIE_TOLERANCE);
+      //   · no follower, no bill: an entry into an empty lane, or behind the
+      //     car, is the lesson's own taught drive.
+      //
+      // ONE CUT-IN, ONE ACT (round 4). The runtime publishes every crossing —
+      // it has no lane-switch deadband any more, because a deadband with no
+      // limit let a student who hovered 23 cm clear of the line dart in front
+      // of the car unbilled (round 3 verifier, F3). So a body riding the line
+      // in front of a car crosses it again and again, and the car is answering
+      // ONE cut-in for its reaction plus its own hard stop from the speed it
+      // had (the window below). A forced crossing in front of THAT vehicle
+      // inside that window is the same act: billed once. After it, or in front
+      // of another vehicle, it is a new act and bills again.
+      if (!cfg.laneEntryForcedBrakingEnabled) break;
+      const f = e.follower;
+      if (f === null) break;
+      if (f.forcedDecelMps2 <= cfg.harshBrakeDecelMps2 * (1 + HARSH_BRAKE_TIE_TOLERANCE)) break;
+      const answeringSec = f.reactionSec + f.speedMps / cfg.harshBrakeDecelMps2;
+      const actKey = String(f.vehicleId);
+      const openUntil = s.cutInActUntil[actKey];
+      if (openUntil === undefined || t > openUntil) {
+        out.push(makeViolation("LANE_ENTRY_FORCED_BRAKING", t));
+        s.cutInActUntil[actKey] = t + answeringSec;
+      }
+      // A contact inside the follower's react-and-stop time — its reaction plus
+      // shedding its own speed at the hard line — is this cut-in's tail, and
+      // the forward-collision card («…колкото ти е трябвал, за да спреш») would
+      // be false about it (round 2's verifier, F8). Every FORCED crossing opens
+      // it, billed or the same act, because each one is a cut-in the contact can
+      // be the tail of. Nothing about the CHARGE moves: COLLISION still bills,
+      // terminates and prices exactly as it did; only which true sentence the
+      // student reads.
+      s.cutInContactUntil = Math.max(s.cutInContactUntil ?? -Infinity, t + answeringSec);
+      break;
+    }
   }
 }

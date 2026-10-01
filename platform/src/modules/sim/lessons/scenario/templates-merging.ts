@@ -557,6 +557,54 @@ const LNM_END_Y = 280;
  * exemption — the exemption exists so the лепка may sit sub-6 m BEHIND the
  * student, which the pass is not — i.e. orchestrator/runners.ts, not a number
  * here.
+ *
+ * REPAIRED THERE, 2026-09-29 (sc-merge-lane-end:0487bcec — the w66 re-drive:
+ * merged early by y ≈ 54, coasting at 28.5 км/ч, rammed at y 88.8 and billed
+ * −10). `RearTailgaterRunner` now arms the staged PASS GUARD when the pass
+ * starts, and with passShiftM 0 a pass that finds the student ahead in its
+ * lane keeps STATION at followBehindM instead of cruising through him, and
+ * resumes the moment he is out of its way. The two grids above are therefore
+ * the PRE-REPAIR measurement: an early merge no longer closes to 0.01–0.13 m.
+ * What they still say correctly is the lift half — a limit-holding student in
+ * the dying lane is never passed. The early-merge drive is pinned at the
+ * product level in __tests__/merge-lane-end-rear-strike.test.ts (zero contact,
+ * zero COLLISION, a car length of centres at 20/28.5/30/40 км/ч), the runner
+ * halves in orchestrator/__tests__/tailgater-pass-guard.test.ts.
+ *
+ * ROUND 2 (the same row, after its adversarial verifier): round 1 counted the
+ * student „in its lane" only within a fixed 3 m of the car's line, and this
+ * lane is 8.125 m wide — a student riding 3.2 m off its centre was overtaken
+ * INSIDE his own lane, and a zip merge begun 11–18 m ahead of the glued car at
+ * matched speed, crossing at 1–2 m/s, was still struck from behind and billed.
+ * The runner's station law now counts him in the lane when ANY of his body is
+ * over the lane the product drew (sim/collision playerOverLaneReachM on the
+ * lane width the traffic system publishes), and the staged pass guard brakes
+ * for his centre in the lane it is heading for (half that lane — staged.ts
+ * step 2 measures why it is the narrower one). Measured in __tests__/merge-
+ * lane-end-body-in-lane.test.ts: riding the lane at every offset measured
+ * from 4.0 m left to 4.5 m right of its centre, the car stays behind him; 144
+ * glue-then-merge-ahead drives (20–45 км/ч × 1–4 m/s × 0–1.5 s) touch nothing;
+ * and 300 early merges at 0.5–4 m/s on this lesson and on
+ * sc-merge-roadworks-shift are never struck from behind by a car that had
+ * room to stop when his body entered the lane.
+ *
+ * WHAT IS STILL PHYSICAL: a student who steers across into the car once it has
+ * drawn level with him, or who cuts in front of it inside its stopping
+ * distance (e.g. starting the cut with the moving car 5–8 m behind his centre
+ * at 30 км/ч), can still make contact and is still billed COLLISION by the
+ * physics shell — a contact the student causes is his.
+ *
+ * ROUND 3 — THE FOUNDER RULED (2026-09-30, «bill the forced braking»): a cut-in
+ * so close that this car must brake hard IS the push-out mistake, contact or
+ * not. The runtime's lane-entry tracker measures what his entry demands of the
+ * car behind him (runtime/worldRuntime.ts), the rule engine bills
+ * LANE_ENTRY_FORCED_BRAKING when that is harder than the product's own
+ * harsh-braking line (armed by this template's ruleConfig), and a contact that
+ * follows reads the cut-in's card instead of the forward-collision one. The
+ * shadow and the push-out demo were re-recorded against it (traces/
+ * scMergeLaneEnd.ts), and __tests__/merge-census.test.ts drives thousands of
+ * generated programmes against an oracle written from the law: an entry with
+ * the car's stopping distance ahead of it is never struck and never billed.
  */
 const LNM_THROUGH_CAR: RearTailgaterSpec = {
   id: "sc-mle-through-car",
@@ -579,6 +627,23 @@ const LNM_THROUGH_CAR: RearTailgaterSpec = {
   passAheadM: 24, // …and once it is this far by, the пролука behind it is yours
   easeKmh: 8,
 };
+
+/**
+ * sc-merge-lane-end L5's second through car is released this much later (in
+ * metres of the student's progress) than round 2 released it, so the пролука
+ * behind the first car admits a lawful merge (0487bcec round 4, F5 — see the
+ * L5 rung). Measured over the instruction sweep (paces 20–50 км/ч, easing by
+ * easeKmh or by 15, gliding at 1.5–3 m/s, merging the moment car 1's tail
+ * clears his nose; 56 drives): with no lag 11 drives forced car 2 (the pair
+ * ran 13–16 m of centres apart); from a lag of 36 m none did; at 46 m none do
+ * and the pair runs 52–84 m apart at 50 км/ч. 46 rather than 36 because the
+ * station law (runners.ts) brakes car 2 back to its 30 m followBehind when a
+ * student merges in front of it, and the further back car 2 is when he does,
+ * the gentler that is: its hardest brake over the sweep is 7.9 m/s² at 46 m
+ * against 10.4 at 36 m. Its glue distance is NOT widened for the same reason —
+ * a 50 m station gap made it stop dead from 50 км/ч behind a lawful merger.
+ */
+const L5_RELEASE_LAG_M = 46;
 
 /**
  * OV-16 — цип-принцип при край на лента (ЗДвП чл. 25: маневрата се извършва,
@@ -752,8 +817,22 @@ export const SC_MERGE_LANE_END: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-merge-lane-end/mistake-push-out.trace.json" },
       titleBg: "Изтласкване на кола от съседната лента",
       whatWentWrongBg:
-        "Мигачът светна и воланът тръгна веднага след него — без нито един поглед в огледалото и без проверка на мъртвата зона. В лявата лента обаче вече имаше кола: тя се движи по своята лента, а твоята свършва — значи ти си този, който се съобразява. „Ще ме пуснат“ не е маневра. Мигачът обявява намерението ти, но не проверява дали лентата е свободна — това правят огледалото и рамото, ПРЕДИ волана.",
-      codeRefs: ["LANE_CHANGE_WITHOUT_MIRROR_CHECK", "COLLISION"],
+        "Мигачът светна и воланът тръгна веднага след него — без нито един поглед в огледалото и без проверка на мъртвата зона. В лявата лента обаче вече имаше кола, която идваше отзад съвсем близо: тя се движи по своята лента, а твоята свършва — значи ти си този, който се съобразява (чл. 25, ал. 2). Вмъкна се толкова близо пред нея, че водачът ѝ трябваше да спира рязко, за да не те удари. „Ще ме пуснат“ не е маневра. Мигачът обявява намерението ти, но не проверява дали лентата е свободна — това правят огледалото и рамото, ПРЕДИ волана.",
+      // FOUNDER RULING 2026-09-30 — «BILL THE FORCED BRAKING» (sc-merge-lane-end:
+      // 0487bcec round 3). This card used to fire only on LANE_CHANGE_WITHOUT_
+      // MIRROR_CHECK + COLLISION, and its demo's contact was an AUTHORED beat
+      // (DriveStep.collision): the through car could not touch anyone, so the
+      // push-out existed only as a scripted crash. Rounds 1–2 made the car keep
+      // station and brake instead of driving through a student, which removed
+      // the only way the lesson's own mistake could fire. The founder ruled that
+      // a cut-in forcing the car in the lane to brake hard IS this mistake,
+      // contact or not: it now fires on LANE_ENTRY_FORCED_BRAKING, measured on
+      // the road (the runtime's lane-entry tracker) and billed by the rule
+      // engine this template arms below. The demo was re-recorded to commit it
+      // physically — it cuts in beside the car as the car comes past, the car
+      // brakes hard and avoids him — so its recording grades exactly these two
+      // codes, with no authored crash (traces/scMergeLaneEnd.ts).
+      codeRefs: ["LANE_CHANGE_WITHOUT_MIRROR_CHECK", "LANE_ENTRY_FORCED_BRAKING"],
     },
   ],
   teach: {
@@ -772,16 +851,51 @@ export const SC_MERGE_LANE_END: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
     // L5: a SECOND through-lane car — denser pressure in the lane you must
     // join, so the пролука has to be chosen, not just taken. It rides the same
-    // path one pitch left of the graph lane and is released later, so the two
-    // cars arrive as a pair. Learn-only scenery, exactly like the first.
+    // path one pitch left of the graph lane, glues further back (30 m against
+    // the first car's 14) and presses longer, so the two cars arrive as a pair,
+    // first car first. Learn-only scenery, exactly like the first.
+    //
+    // THE GAP BEHIND THE FIRST CAR IS A REAL ПРОЛУКА (0487bcec round 4, F5).
+    // Instruction 4, shown on every rung, says «…отпусни газта и я пусни да
+    // мине; пролуката зад нея е твоята». Until round 4 that was false here: the
+    // pair passed at 50 км/ч ~16 m of centres apart, so the gap behind car 1
+    // ended ~1.7 m in front of car 2, and taking it was billed −10
+    // LANE_ENTRY_FORCED_BRAKING under the founder's 2026-09-30 ruling. Car 2
+    // is now released L5_RELEASE_LAG_M later, so it comes up and starts its
+    // pass well after car 1 and the pair runs 52–84 m of centres apart at
+    // 50 км/ч (measured over the instruction sweep). That is the threshold the rule bills on, not a feel: a student
+    // who eases off by the lesson's own easeKmh (or more, down to a crawl) and
+    // takes the gap behind car 1 with one glide leaves car 2 more than its
+    // 1 s + 7 m/s² stopping distance — merge-census.test.ts drives the
+    // instruction at L1–L5 and none of it is billed. L5 still teaches what it
+    // is for: there are TWO cars and the gap between them closes at car 2's
+    // speed, so a student who dawdles and cuts in once car 2 is on him is
+    // billed against car 2 (same file). Kept as a spacing rather than a
+    // separate L5 instruction because the sentence is right and the world was
+    // wrong.
+    //
+    // HELD BEHIND THE FIRST CAR, NOT AHEAD OF THE STUDENT (0487bcec round 2,
+    // verifier F7). It used to stand dormant at arc 44 — IN the through lane,
+    // 32 m ahead of the spawn — until the student was 8 m past it. Instruction
+    // 2 tells him to merge early, and a student who did drove into a parked car
+    // (1 COLLISION at 20/30/40 км/ч, y ≈ 40), while one careful enough to stop
+    // behind it waited forever: it only moves once he is PAST it, which from
+    // its own lane he can never be (measured 84 s standing). It also started
+    // ahead of the first car on the same line, so the first car drove through
+    // it on every L5 drive measured (−1.84 m of overlap, in the student's mirror). Now
+    // it stands at the start of the path, one car length behind the first car,
+    // and was released on the same frame as the first car (the release gap
+    // moved by exactly the hold's 8 m); since round 4 it is released
+    // L5_RELEASE_LAG_M later still (above), so the pair comes up from behind
+    // in the order the gaps say.
     {
       level: 5,
       stagedAdd: [
         {
           ...LNM_THROUGH_CAR,
           id: "sc-mle-through-car-2",
-          actor: { ...LNM_THROUGH_CAR.actor, hold: { nodeIndex: 0, offsetM: 44 }, colorIndex: 5 },
-          releaseGapM: 8,
+          actor: { ...LNM_THROUGH_CAR.actor, hold: { nodeIndex: 0, offsetM: 0 }, colorIndex: 5 },
+          releaseGapM: LNM_THROUGH_CAR.releaseGapM + LNM_THROUGH_CAR.actor.hold.offsetM + L5_RELEASE_LAG_M,
           followBehindM: 30,
           pressureSec: 4,
           passAheadM: 40,
@@ -790,6 +904,15 @@ export const SC_MERGE_LANE_END: ScenarioSpec = {
     },
   ],
   staged: [LNM_THROUGH_CAR],
+  // FOUNDER RULING 2026-09-30 — «bill the forced braking». A cut-in so close that
+  // the through car must brake hard is this lesson's push-out mistake, billed
+  // with or without contact (rules/engine.ts, the `laneEntered` case; ЗДвП
+  // чл. 25, ал. 2). Armed here and on sc-merge-roadworks-shift only — the ruling
+  // is about the lane-drop lessons, and the rule ships OFF everywhere else.
+  // Early, correct merges are never billed: the rule needs a vehicle behind him
+  // in the lane he enters AND a hard stop demanded of it (the census in
+  // __tests__/merge-census.test.ts drives thousands of programmes against that).
+  ruleConfig: { laneEntryForcedBrakingEnabled: true },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -851,6 +974,18 @@ const HZR_WORKS_TO_Y = 276; // the site ends; 50 resumes
  * has two lanes and the surviving one is where both cars must be. The fix is to
  * player-guard the PASS phase while the glued pose keeps its exemption —
  * orchestrator/runners.ts, not a number here.
+ *
+ * LANDED THERE (sc-merge-lane-end:0487bcec, rounds 1–2, 2026-09-29/30): this
+ * actor goes through the same RearTailgaterRunner, so its pass is now guarded —
+ * with passShiftM 0 it keeps STATION at followBehindM while any of the
+ * student's body is over its lane ahead of it, and resumes the moment he is
+ * out of its way. The grid above is therefore the PRE-REPAIR measurement. The
+ * early merges are pinned in __tests__/merge-lane-end-rear-strike.test.ts (30
+ * км/ч at y 40 and 120, 20 at 80, 12 at 40: zero contact, zero COLLISION) and in
+ * merge-lane-end-body-in-lane.test.ts's lateral-rate sweep (150 early merges,
+ * never struck from behind by a car that had room to stop when his body
+ * entered the lane). The 45 км/ч „never latches" half is unchanged — the
+ * repair does not touch the glue.
  */
 const HZR_THROUGH_CAR: RearTailgaterSpec = {
   id: "sc-mrs-through-car",
@@ -1008,6 +1143,14 @@ export const SC_MERGE_ROADWORKS_SHIFT: ScenarioSpec = {
     { level: 5, conditions: { weather: "rain", night: true } },
   ],
   staged: [HZR_THROUGH_CAR],
+  // FOUNDER RULING 2026-09-30 — «bill the forced braking», the same rule and the
+  // same reason as sc-merge-lane-end: this lane closes too, the car in the open
+  // lane is the same staged through car, and this template's own examinerBg
+  // already calls „принуждаването на движещ се в съседната лента да спира"
+  // опасна. It has no push-out demo of its own, so the student reads the
+  // catalogue card (rules/catalog.ts LANE_ENTRY_FORCED_BRAKING) — the owed
+  // demo is recorded in the row's hand-off, not invented here.
+  ruleConfig: { laneEntryForcedBrakingEnabled: true },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

@@ -547,6 +547,10 @@ export function recordScriptedDrive(
   );
   runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
   runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));
+  // The lane-entry tracker's traffic seam (founder ruling 2026-09-30) — the
+  // same hookup scene/lessonWorldRecipe.ts wireTrafficQueries gives the live
+  // lesson, so a recorded demo is graded on the same world the student is.
+  runtime.setSameDirVehiclesQuery((px, py, h, r) => traffic.sameDirVehiclesNear(px, py, h, r));
   const staged = options.stagedEvents ?? [];
   const director =
     staged.length > 0

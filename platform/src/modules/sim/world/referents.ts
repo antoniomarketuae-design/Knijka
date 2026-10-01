@@ -15,9 +15,9 @@
  * and asserts a REQUIRED-REFERENT predicate per fault code: if the code can
  * fire on this rung, the world must contain the thing the code is about.
  *
- * 50 codes carry a referent. The other 15 are listed in `NO_WORLD_REFERENT`,
- * so the exemption is a reviewed decision rather than an oversight. 50 + 15 =
- * 65 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
+ * 51 codes carry a referent. The other 15 are listed in `NO_WORLD_REFERENT`,
+ * so the exemption is a reviewed decision rather than an oversight. 51 + 15 =
+ * 66 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
  * itself, so a new code cannot ship unchecked and unexempted. (The pin the tree
  * ENFORCES lives in `world/__tests__/world-referent.gate.test.ts`; this
  * paragraph tracks it and is not a second source of truth.)
@@ -152,6 +152,7 @@ const CONFIG_GATED: ReadonlyArray<readonly [FaultCode, keyof RuleEngineConfig]> 
   ["TURN_WITHOUT_OBSERVATION", "turnObservationEnabled"],
   ["FOLLOWING_TOO_CLOSE_FOR_RAIN", "followRainAwareEnabled"],
   ["CLOSING_ON_LEAD_TOO_FAST", "leadClosingEnabled"],
+  ["LANE_ENTRY_FORCED_BRAKING", "laneEntryForcedBrakingEnabled"],
   ["ILLEGAL_STOP_IN_BAN_ZONE", "banZoneStopEnabled"],
   ["DRIVING_TOO_SLOW_FOR_MOTORWAY", "motorwayMinSpeedEnabled"],
   ["DRIVING_TOO_SLOW_IN_TOWN", "townCrawlEnabled"],
@@ -1618,6 +1619,10 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
     ["brakingLeadCar", "cutInLeadCar", "oncomingStream"],
     "a vehicle to cut back in front of",
   ),
+  // Founder ruling 2026-09-30: a cut-in is only a cut-in in front of a vehicle
+  // ALREADY travelling in the lane he enters — on the lane-drop lessons, the
+  // staged through car (a rearTailgater actor in the continuing lane).
+  LANE_ENTRY_FORCED_BRAKING: stagedActorRule(["rearTailgater"], "a vehicle already in the lane he enters"),
 
   // -- observation -----------------------------------------------------------
   JUNCTION_SCAN_INCOMPLETE: junctionNodeRule(),

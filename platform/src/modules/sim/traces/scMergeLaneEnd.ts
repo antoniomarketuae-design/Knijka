@@ -5,28 +5,52 @@
  * ONLY staged actor is the through-lane car of SC_MERGE_LANE_END.staged — the
  * rearTailgater runner, which emits ZERO SimTick events by contract (pressure
  * scenery, doc 72 FO-07). Everything the gate asserts therefore comes from the
- * PLAYER's own channels.
+ * PLAYER's own channels — including, since round 3 of sc-merge-lane-end:
+ * 0487bcec, the lane-entry measurement the runtime makes of HIS cut-in in front
+ * of that car (the lesson's ruleConfig arms LANE_ENTRY_FORCED_BRAKING, and the
+ * recorder is handed it below).
  *
- * HONEST PROXY (flagged, the scMergeAccelLane precedent): the „изтласкване"
- * consequence is an AUTHORED contact (DriveStep.collision — the scJunctions2
- * „скритата кола удря носа" beat) rather than a physical overlap: the
- * rearTailgater runner cannot collide, and an authored beat is honest demo
- * data, never a silent detector. The trace gate proves the geometry the beat
- * depicts (the wheel goes over into an occupied lane with no glance behind it).
+ * THE AUTHORED CRASH IS GONE (founder ruling 2026-09-30, «bill the forced
+ * braking»). The push-out's consequence used to be an AUTHORED contact
+ * (DriveStep.collision — the scJunctions2 „скритата кола удря носа" beat),
+ * flagged here as an honest proxy because the through car could not touch
+ * anyone. Rounds 1–2 made that car keep station and brake instead of driving
+ * through a student, so the replayed demo showed a car stopping short under a
+ * «Удар» it never made. The founder ruled that forcing the car in the lane to
+ * brake hard IS the push-out, contact or not; the demo now COMMITS it on the
+ * road — it swerves in a few metres in front of the car as the car comes past,
+ * the car brakes hard (50 → ~21 км/ч) and does not hit it — and the recording
+ * bills it physically (LANE_ENTRY_FORCED_BRAKING), with no scripted crash.
+ *
+ * THE SHADOW WAS RE-TIMED AGAINST THE CAR IT NAMES (round 2's verifier, F6).
+ * Replayed through the production stack, the old shadow reached the merge
+ * with the through car still 11 m behind it at 50 км/ч, cut in front of it and
+ * forced it from 50 to 19 км/ч — under «никой в лявата лента не спря … заради
+ * нас» — and painted «кола в лявата лента, почти наравно с нас» while that car
+ * was 40 m back. Under the ruling that is the lesson's own mistake, in the demo
+ * the L1 aid tells the student to copy. The lift now starts while the car is
+ * still coming up from behind (y 80), at 26 км/ч, so the car closes, keeps
+ * station for its pressure window and goes BY before the wheel turns: at the
+ * signal (y 186) it is already ahead, at the entry ~12 m ahead, and it never
+ * slows again.
+ * Every caption is checked frame by frame against the replay in
+ * __tests__/merge-demo-truth.test.ts.
  *
  * The trace gate replays exactly these through the production stack:
- *   - shadow: rolls the ending lane at 45 → mirror → EASES to 30 and lets the
- *     through-lane car go by → indicator + mirror + shoulder → merges into the
- *     пролука behind it, 34 m of commit inside the taper → cancels → runs the
- *     survivor lane out. ZERO violations + CLEAN_DRIVING + SAFE_LANE_CHANGE;
+ *   - shadow: rolls the ending lane at 45 → mirror → EASES to 26 while the
+ *     through-lane car comes up and goes by → back up to 35 behind it →
+ *     indicator + mirror + shoulder → merges into the пролука behind it, 34 m
+ *     of commit inside the taper → cancels → runs the survivor lane out. ZERO
+ *     violations + CLEAN_DRIVING + SAFE_LANE_CHANGE;
  *   - „Вливане без мигач в последния метър": mirror checked, NO indicator ever,
  *     wheel over at the last usable metres → EXACTLY LANE_CHANGE_WITHOUT_
  *     INDICATOR (the glance is real — the demo is about the missing signal, and
  *     the recovery run is clean);
  *   - „Изтласкване на кола от съседната лента": indicator ON, no glance at all,
- *     wheel straight into the occupied lane → EXACTLY LANE_CHANGE_WITHOUT_
- *     MIRROR_CHECK + COLLISION (never LANE_CHANGE_WITHOUT_INDICATOR —
- *     signalling without looking is the whole point of the demo).
+ *     wheel over a few metres in front of the car coming past → EXACTLY
+ *     LANE_CHANGE_WITHOUT_MIRROR_CHECK + LANE_ENTRY_FORCED_BRAKING (never
+ *     LANE_CHANGE_WITHOUT_INDICATOR — signalling without looking is the whole
+ *     point of the demo — and never COLLISION: the car brakes and misses).
  *
  * Geometry pinned to content/world/ln-merge-v1.json (meta.scenario): the
  * one-way street runs on x = 0 — ending/curb lane (laneId 0) x = 4.06, the
@@ -50,7 +74,10 @@
  *    never grades POOR_LANE_KEEPING;
  *  - nothing brakes harder than the recorder's default 4.6 m/s², which is under
  *    harshBrakeDecelMps2 (7): the ease that lets the through car by can never
- *    read as a causeless slam.
+ *    read as a causeless slam;
+ *  - the shadow's lift sits at 26 км/ч, above the gate's 20 км/ч floor („the
+ *    lift is a lift, not a stop"), and ends at y 145 — as the car goes past —
+ *    so the merge is committed at 35 in the gap behind it.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * „THE REFERENCE DRIVE CRAWLS AT 9–11 КМ/Ч" — THAT IS THE HARNESS, NOT THIS
@@ -201,8 +228,10 @@ const SPAWN: readonly [number, number] = [X_ENDING, 12];
 /** Approach + post-merge cruise, under the posted 50. */
 const CRUISE_KMH = 45;
 /** Shed in the ENDING lane to let the through-lane car go by — the taught beat.
- *  4.6 m/s² of recorder decel from 45 is far under the harsh-brake threshold. */
-const EASE_KMH = 30;
+ *  4.6 m/s² of recorder decel from 45 is far under the harsh-brake threshold.
+ *  26, not the 30 it was: at 30 the car was still beside the ghost when the
+ *  wheel turned (round 3 — see the header); at 26 it has gone by. */
+const EASE_KMH = 26;
 /** The speed every merge is committed at. */
 const MERGE_KMH = 35;
 
@@ -215,24 +244,30 @@ export function scMergeLaneEndShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Караме в дясната лента — тя свършва след около 180 метра. Стеснението е наше: ние се съобразяваме." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [SPAWN, [X_ENDING, 108]], targetKmh: CRUISE_KMH, stopAtEnd: false },
+      { kind: "drive", points: [SPAWN, [X_ENDING, 70]], targetKmh: CRUISE_KMH, stopAtEnd: false },
       // The observation pair the rubric names: mirror first (where is the gap,
       // and how fast is it coming?), then the indicator, then the blind spot —
       // wheel last.
       { kind: "glance", mirror: "left" },
-      { kind: "annotation", textBg: "В огледалото: кола в лявата лента, почти наравно с нас. Нейната лента продължава — нашата свършва." },
-      { kind: "drive", points: [[X_ENDING, 108], [X_ENDING, 152]], targetKmh: EASE_KMH, stopAtEnd: false },
+      { kind: "annotation", textBg: "В лявото огледало: зад нас в лявата лента има кола. Нейната лента продължава — нашата свършва." },
+      { kind: "drive", points: [[X_ENDING, 70], [X_ENDING, 80]], targetKmh: CRUISE_KMH, stopAtEnd: false },
+      // THE TAUGHT BEAT, and it is timed against the car it names (round 3 of
+      // sc-merge-lane-end:0487bcec — see the file header): the lift starts while
+      // the car is still closing from behind, so it comes up, keeps station for
+      // its pressure window and goes BY well before the wheel turns.
       { kind: "annotation", textBg: "Отпускаме газта и я пускаме да мине. Пролуката ЗАД нея е нашата — не тази пред нея." },
-      { kind: "drive", points: [[X_ENDING, 152], [X_ENDING, 182]], targetKmh: MERGE_KMH, stopAtEnd: false },
+      { kind: "drive", points: [[X_ENDING, 80], [X_ENDING, 145]], targetKmh: EASE_KMH, stopAtEnd: false },
+      { kind: "drive", points: [[X_ENDING, 145], [X_ENDING, 186]], targetKmh: MERGE_KMH, stopAtEnd: false },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "left" },
       { kind: "annotation", textBg: "Ляв мигач, още веднъж огледало и поглед през рамо в мъртвата зона — чак тогава воланът." },
       // The merge: 8.125 m of lateral over 34 m of arc — the laneId flip lands
-      // at y ≈ 200, inside the taper and 80 m before the street ends.
-      { kind: "drive", points: [[X_ENDING, 182], [X_THROUGH, 216]], targetKmh: MERGE_KMH, stopAtEnd: false },
+      // at y ≈ 204, inside the taper and 76 m before the street ends, in the
+      // gap the through car has just left behind it.
+      { kind: "drive", points: [[X_ENDING, 186], [X_THROUGH, 220]], targetKmh: MERGE_KMH, stopAtEnd: false },
       { kind: "indicator", setting: "off" },
-      { kind: "annotation", textBg: "Вписахме се в пролуката с едно движение — никой в лявата лента не спря и не отби заради нас. Мигачът се изключва." },
-      { kind: "drive", points: [[X_THROUGH, 216], [X_THROUGH, 276]], targetKmh: CRUISE_KMH },
+      { kind: "annotation", textBg: "Вписахме се в пролуката зад нея с едно движение — никой в лявата лента не спря и не отби заради нас. Мигачът се изключва." },
+      { kind: "drive", points: [[X_THROUGH, 220], [X_THROUGH, 276]], targetKmh: CRUISE_KMH },
       { kind: "pause", sec: 1.5, brake: true },
       { kind: "annotation", textBg: "Готово: ранно решение, пълна проверка, вливане в пролука. Твоята лента свършва — значи ти се съобразяваш." },
     ],
@@ -277,17 +312,23 @@ export function scMergeLaneEndMistakePushOutScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешка: мигач — и веднага волан. Нито огледало, нито поглед през рамо." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [SPAWN, [X_ENDING, 152]], targetKmh: CRUISE_KMH, stopAtEnd: false },
-      { kind: "drive", points: [[X_ENDING, 152], [X_ENDING, 182]], targetKmh: MERGE_KMH, stopAtEnd: false },
+      { kind: "drive", points: [SPAWN, [X_ENDING, 120]], targetKmh: CRUISE_KMH, stopAtEnd: false },
+      // Holds a steady 35 in the ending lane: the through car comes up, keeps
+      // station for its pressure window, then comes past at the posted 50.
+      { kind: "drive", points: [[X_ENDING, 120], [X_ENDING, 196]], targetKmh: MERGE_KMH, stopAtEnd: false },
       // Politely signalled — and still blind: the indicator declares, it does
       // not check. NO left glance anywhere near this merge.
       { kind: "indicator", setting: "left" },
-      { kind: "annotation", textBg: "В лявата лента вече има кола. Тя е в своята лента — нашата свършва. А водачът дори не е погледнал." },
-      { kind: "drive", points: [[X_ENDING, 182], [X_THROUGH, 216]], targetKmh: MERGE_KMH, stopAtEnd: false },
-      // The authored consequence: the through-lane car is where the wheel went.
-      { kind: "collision", withWhat: "vehicle" },
+      { kind: "annotation", textBg: "В лявата лента вече има кола — идва отзад, съвсем близо. Тя е в своята лента, нашата свършва. А водачът дори не е погледнал." },
+      // THE PUSH-OUT, committed on the road rather than scripted (founder ruling
+      // 2026-09-30): the wheel goes over as the car comes past, a few metres
+      // behind, so it must brake hard to keep off us — which is what bills
+      // LANE_ENTRY_FORCED_BRAKING, contact or not. The car does brake, and it
+      // does not hit us.
+      { kind: "drive", points: [[X_ENDING, 196], [X_THROUGH, 222]], targetKmh: MERGE_KMH, stopAtEnd: false },
+      { kind: "annotation", textBg: "Колата в лявата лента трябваше да спира рязко, за да не ни удари. „Ще ме пуснат“ не е маневра. Огледалото и рамото са ПРЕДИ волана — винаги." },
+      { kind: "drive", points: [[X_THROUGH, 222], [X_THROUGH, 252]], targetKmh: MERGE_KMH, stopAtEnd: false },
       { kind: "pause", sec: 2.6, brake: true },
-      { kind: "annotation", textBg: "„Ще ме пуснат“ не е маневра. Огледалото и рамото са ПРЕДИ волана — винаги." },
     ],
   };
 }
@@ -326,6 +367,10 @@ export function recordScMergeLaneEndDrive(
     kind,
     seed: 7,
     stagedEvents: [...(SC_MERGE_LANE_END.staged ?? [])] as StagedEventSpec[],
+    // The lesson's own rule config — it arms LANE_ENTRY_FORCED_BRAKING (founder
+    // ruling 2026-09-30), so a recorded demo is graded by the rules the student
+    // is graded by: the push-out must bill it, the shadow must not.
+    ...(SC_MERGE_LANE_END.ruleConfig ? { ruleConfig: SC_MERGE_LANE_END.ruleConfig } : {}),
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });
 }

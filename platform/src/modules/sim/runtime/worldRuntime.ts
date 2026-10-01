@@ -27,7 +27,7 @@ import type {
   VehicleSample,
   WorldRuntime,
 } from "../contracts";
-import type { NoStopBasis, SimTick, SimTickEvent } from "../rules/types";
+import type { LaneEntryFollower, NoStopBasis, SimTick, SimTickEvent } from "../rules/types";
 import {
   BG_URBAN_DEFAULT_KMH,
   parseDistrict,
@@ -36,7 +36,7 @@ import {
 } from "./district";
 import { PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M } from "../collision/bodies";
 import { Locator } from "./locator";
-import { DistrictIndex, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
+import { DistrictIndex, LANE_WIDTH_M, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
 import { bearingDeg, signedDeltaDeg } from "./geometry";
 import {
   SignalController,
@@ -260,6 +260,89 @@ const surfaceByDistrict = new WeakMap<object, DrivableSurface | null>();
 export const AMBER_REACTION_SEC = 1.0;
 export const AMBER_COMFORT_DECEL_MPS2 = 3.0;
 export const AMBER_STOP_MARGIN = 1.15;
+
+/**
+ * LANE ENTRY — founder ruling 2026-09-30, «bill the forced braking»
+ * (sc-merge-lane-end:0487bcec round 3). „A cut-in so close that the vehicle
+ * already in the lane the student enters must brake hard IS the lane-drop
+ * lesson's own push-out mistake, billed even with no contact" — ЗДвП чл. 25,
+ * ал. 2: „водачът е длъжен да пропусне пътните превозни средства, които се
+ * движат по нея". The runtime MEASURES the half the rule engine cannot see —
+ * which lane his body just went into, which vehicle already travels in it
+ * behind him, and what his entry now demands of it — and publishes it as the
+ * `laneEntered` tick event. Whether that demand is „hard" is the engine's
+ * judgement (`harshBrakeDecelMps2`), and whether the lesson asked is its
+ * ruleConfig's.
+ *
+ * WHAT IT DEMANDS, and why it is computed rather than read off the follower's
+ * brake lights. The ruling's word is MUST: a statement about what the vehicle
+ * behind needs, not about how a scripted actor happens to respond. The staged
+ * through car of sc-merge-lane-end brakes bang-bang at its authored 12 m/s²
+ * whenever it brakes at all, and reacts on the very next frame; reading its
+ * deceleration would convict every student it over-brakes for and acquit every
+ * one its zero reaction time saves. So the number is the kinematics of the
+ * entry frame, from the published states alone:
+ *
+ *   gap = the follower's nose to his tail along the road, closing c = its speed
+ *   minus his; after a driver's reaction time it must shed c before the gap is
+ *   gone, i.e. reach   c² / 2(gap − c·LANE_ENTRY_REACTION_SEC).
+ *
+ * LANE_ENTRY_REACTION_SEC IS AMBER_REACTION_SEC, the product's one driver
+ * reaction time (the C3 comfortable-stop model the amber adjudicator already
+ * judges the student by). A follower is a driver too, and judging the gap he
+ * was left by a different human than the one the student is judged as would be
+ * two tunings of one fact.
+ *
+ * A VEHICLE THAT IS NOT CLOSING ON HIM IS NOT FORCED TO DO ANYTHING (round 4,
+ * F6a): closing ≤ 0 — it is stopped, slower than him, or level-pegging — gives
+ * 0, however close it is, and that is decided FIRST. Round 3 called every gap
+ * ≤ 0 „unavoidable" before asking, so a student who entered beside a parked or
+ * slower car was billed for a hard stop nobody had to make.
+ *
+ * LANE_ENTRY_UNAVOIDABLE_MPS2 stands for „no brake prevents it": a CLOSING
+ * vehicle whose gap was already gone (it was alongside him when his body
+ * crossed the line) or whose reaction distance alone closes it. It is
+ * published finite (a tick may be serialised) and far above anything a road
+ * vehicle can do (~10 g), so no threshold can mistake it for a measurement.
+ *
+ * LANE_ENTRY_PROBE_RADIUS_M reaches every follower the rule could bill at the
+ * speeds this product posts: a vehicle at 140 км/ч behind a student standing in
+ * the lane is forced past the engine's 7 m/s² line from gap < v·t + v²/2·7 ≈
+ * 147 m; with his half-length and a bus's half-length on top that is ≈ 155 m.
+ * Nothing further away can be forced hard by an entry, so nothing is lost.
+ *
+ * HIS BODY is the chassis rectangle turned to his heading (round 4): the entry
+ * frame is the first one any corner of it is over the line (a gliding car's
+ * front corner, before its flank), and the gap runs to its rearmost point.
+ *
+ * WHAT IT DOES NOT MEASURE, deliberately (A12 — the ambiguity is spent on the
+ * acquittal): a vehicle on another piece of road (it must be on his
+ * carriageway — his edge, or one that continues it behind him across a joint
+ * on a straight), one travelling against his lane's direction, and a
+ * follower's lateral reaction (a swerve is not modelled; the demand is the
+ * braking it would need if it held its lane).
+ */
+export const LANE_ENTRY_REACTION_SEC = AMBER_REACTION_SEC;
+export const LANE_ENTRY_UNAVOIDABLE_MPS2 = 100;
+export const LANE_ENTRY_PROBE_RADIUS_M = 160;
+
+/**
+ * The deceleration a follower needs after a lane entry — see the block above.
+ * `gapM` nose-to-tail (≤ 0 = alongside), `closingMps` follower minus player.
+ * Not closing → 0 first, whatever the gap; only a closing follower with no
+ * room is unavoidable.
+ */
+export function laneEntryForcedDecelMps2(
+  gapM: number,
+  closingMps: number,
+  reactionSec: number = LANE_ENTRY_REACTION_SEC,
+): number {
+  if (closingMps <= 0) return 0;
+  if (gapM <= 0) return LANE_ENTRY_UNAVOIDABLE_MPS2;
+  const rem = gapM - closingMps * reactionSec;
+  if (rem <= 0) return LANE_ENTRY_UNAVOIDABLE_MPS2;
+  return Math.min(LANE_ENTRY_UNAVOIDABLE_MPS2, (closingMps * closingMps) / (2 * rem));
+}
 
 /** Could the driver have stopped comfortably before the line? (exported for tests) */
 export function comfortableStopPossible(distToLineM: number, speedKmh: number): boolean {
@@ -831,6 +914,30 @@ export type CyclistQuery = (
   radiusM: number,
 ) => CyclistConflict | null;
 
+/**
+ * One same-direction vehicle near the player, for the LANE-ENTRY tracker —
+ * structurally the traffic module's SameDirVehicle (no cross-module type
+ * import, the OncomingConflict discipline).
+ */
+export interface SameDirVehicleConflict {
+  id: number;
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  speedMps: number;
+  halfLengthM: number;
+}
+
+/** EVERY same-direction vehicle within radiusM (cyclist proxies excluded at
+ *  the source) — TrafficSystem.sameDirVehiclesNear. */
+export type SameDirVehiclesQuery = (
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+) => readonly SameDirVehicleConflict[];
+
 /** Phase + seconds-to-change read model (B1a N2 director API). */
 export interface SignalPhaseInfo {
   phase: SignalPhase;
@@ -947,6 +1054,11 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    *  cyclist proxies excluded at the source). Default: none — the tracker
    *  stays structurally silent. */
   setOvertakenQuery(fn: CyclistQuery | null): void;
+  /** Install the traffic module's EVERY-same-direction-vehicle lookup for the
+   *  LANE-ENTRY tracker (founder ruling 2026-09-30, «bill the forced braking»;
+   *  see LANE_ENTRY_REACTION_SEC). Default: none — every `laneEntered` event
+   *  then carries `follower: null` and nothing can be billed from it. */
+  setSameDirVehiclesQuery(fn: SameDirVehiclesQuery | null): void;
   /**
    * Physics layer reports a contact; drained into the next sample().
    *
@@ -1058,6 +1170,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let circulatingQuery: CirculatingQuery = () => false;
   let cyclistQuery: CyclistQuery = () => null;
   let overtakenQuery: CyclistQuery = () => null;
+  let sameDirQuery: SameDirVehiclesQuery = () => [];
 
   // Junction node positions (district space) for priority conflict lookups.
   const nodePos = new Map<string, { x: number; y: number }>();
@@ -1367,6 +1480,137 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let orForced = false; // the cut has entered the forcing window
   let orRefSpeedMps = 0; // live-tracked until forced, then frozen
   let orCorridorBilled = false; // corridor billed THIS excursion → stand down
+
+  // LANE-ENTRY tracker (founder ruling 2026-09-30 — see LANE_ENTRY_REACTION_SEC).
+  // The lanes of the carriageway the player's BODY is over, as a bit set, on
+  // the carriageway it was measured on. `leKnown` false = no baseline yet (the
+  // first fix, a lost fix, off the asphalt, reversing): the next measurable
+  // frame re-baselines SILENTLY — a locator artefact is not a manoeuvre (A12).
+  let leKnown = false;
+  let leEdgeIdx = -1;
+  let leLanes = 0;
+  let leBank: 1 | -1 = 1;
+  let leTravelSign: 1 | -1 = 1;
+  const leHit = makeEdgeHit();
+  /** laneEntryLocate's answer slot: road distance BEHIND him (+) and the
+   *  offset from his bank's inner boundary, in the tracker's d coordinate. */
+  const leLoc = { along: 0, dc: 0 };
+
+  /**
+   * Does edge `nextIdx` CONTINUE edge `prevIdx`'s carriageway, for a car
+   * travelling `sign` along `prevIdx` (+1 = its drawn direction)? A joint on a
+   * straight, which is bookkeeping and not a change of road: the car leaves
+   * `prev` at the node `next` starts from in the same drawn direction (so lanes
+   * and banks keep their numbering), the two carry the same lane count and the
+   * same oneway-ness, and the road turns by no more than LANE_JOINT_MAX_TURN_DEG
+   * there. Anything else — a turn at a junction onto a road that happens to
+   * share the node — is another road, and the lane-entry tracker neither
+   * carries its baseline onto it nor looks for a follower on it (A12).
+   */
+  const LANE_JOINT_MAX_TURN_DEG = 15;
+  const laneJointCos = Math.cos((LANE_JOINT_MAX_TURN_DEG * Math.PI) / 180);
+  function laneContinuesAcross(prevIdx: number, nextIdx: number, sign: 1 | -1): boolean {
+    const a = index.edgeRt(prevIdx);
+    const b = index.edgeRt(nextIdx);
+    const node = sign > 0 ? a.edge.to : a.edge.from;
+    if ((sign > 0 ? b.edge.from : b.edge.to) !== node) return false;
+    if (a.lanesPerDir !== b.lanesPerDir || a.edge.oneway !== b.edge.oneway) return false;
+    const [ax, ay] = index.tangentAt(prevIdx, sign > 0 ? a.totalLen : 0);
+    const [bx, by] = index.tangentAt(nextIdx, sign > 0 ? 0 : b.totalLen);
+    return ax * bx + ay * by >= laneJointCos;
+  }
+
+  /** How many joints back along his lane the follower search walks (a
+   *  straight carriageway cut into short pieces is still one lane). */
+  const LANE_ENTRY_MAX_JOINTS = 8;
+  /**
+   * Is the vehicle on piece `edgeIdx` of HIS lane's road, and where? `u0` puts
+   * the piece in his TRAVEL coordinate (u = u0 + s·travelSign grows the way he
+   * drives), so its distance behind him is uMe − u. Writes `leLoc` and returns
+   * true when it projects strictly inside the piece, travels his lane's way and
+   * is on his bank; false otherwise (and false for any piece it is not on).
+   */
+  function laneEntryOnPiece(
+    c: SameDirVehicleConflict,
+    edgeIdx: number,
+    u0: number,
+    uMe: number,
+    travelSign: 1 | -1,
+    bank: 1 | -1,
+    L: number,
+  ): boolean {
+    const rt = index.edgeRt(edgeIdx);
+    index.projectOnEdge(edgeIdx, c.x, c.y, leHit);
+    if (!(leHit.sM > 0 && leHit.sM < rt.totalLen)) return false;
+    // travelling along this lane's direction — the query's cone is the
+    // traffic system's filter; this one is the road's
+    const [tx, ty] = index.tangentAt(edgeIdx, leHit.sM);
+    if ((c.dirX * tx + c.dirY * ty) * travelSign <= 0.5) return false;
+    if (rt.edge.oneway) leLoc.dc = -leHit.latSignedM + (L * LANE_WIDTH_M) / 2;
+    else {
+      const cBank: 1 | -1 = leHit.latSignedM <= 0 ? 1 : -1;
+      if (cBank !== bank) return false;
+      leLoc.dc = Math.abs(leHit.latSignedM);
+    }
+    leLoc.along = uMe - (u0 + leHit.sM * travelSign);
+    return true;
+  }
+  /**
+   * Locate a same-direction vehicle ON HIS LANE'S ROAD (round 4, F4: the lane
+   * continues across a joint; the edge id is bookkeeping): on his edge
+   * `edgeIdx`, on the pieces that continue his carriageway BEHIND him
+   * (laneContinuesAcross, walked back while still inside
+   * LANE_ENTRY_PROBE_RADIUS_M), or on the one piece that continues it AHEAD —
+   * the locator's lane lock is hysteretic and keeps him on an edge a few metres
+   * past its end node, so a car just past the joint can still be behind him.
+   * `uMe` is his UNCLAMPED position in his travel coordinate on his edge (see
+   * the tracker). Writes `leLoc`: `along` = road distance from him back to it
+   * (+ = behind him), `dc` = its offset from his bank's inner boundary (the
+   * tracker's d coordinate, so lane membership is the same test as his). False
+   * when it is not travelling his lane's way, sits on the other bank of a
+   * two-way road, or is on another piece of road altogether — none of which a
+   * lane entry is judged against (A12).
+   */
+  function laneEntryLocate(
+    c: SameDirVehicleConflict,
+    edgeIdx: number,
+    uMe: number,
+    travelSign: 1 | -1,
+    bank: 1 | -1,
+    L: number,
+  ): boolean {
+    if (laneEntryOnPiece(c, edgeIdx, 0, uMe, travelSign, bank, L)) return true;
+    // behind him, piece by piece
+    let cur = edgeIdx;
+    let u0 = 0;
+    for (let hop = 0; hop < LANE_ENTRY_MAX_JOINTS; hop++) {
+      const rt = index.edgeRt(cur);
+      const behindEndU = travelSign > 0 ? u0 : u0 - rt.totalLen;
+      if (uMe - behindEndU >= LANE_ENTRY_PROBE_RADIUS_M) break;
+      const node = travelSign > 0 ? rt.edge.from : rt.edge.to;
+      let prev = -1;
+      for (const k of index.edgesAtNode.get(node) ?? []) {
+        if (k !== cur && laneContinuesAcross(k, cur, travelSign)) {
+          prev = k;
+          break;
+        }
+      }
+      if (prev < 0) break;
+      u0 = travelSign > 0 ? u0 - index.edgeRt(prev).totalLen : u0 - rt.totalLen;
+      cur = prev;
+      if (laneEntryOnPiece(c, cur, u0, uMe, travelSign, bank, L)) return true;
+    }
+    // …and the one piece ahead of his edge
+    const own = index.edgeRt(edgeIdx);
+    const aheadNode = travelSign > 0 ? own.edge.to : own.edge.from;
+    for (const k of index.edgesAtNode.get(aheadNode) ?? []) {
+      if (k !== edgeIdx && laneContinuesAcross(edgeIdx, k, travelSign)) {
+        const u0n = travelSign > 0 ? own.totalLen : index.edgeRt(k).totalLen;
+        return laneEntryOnPiece(c, k, u0n, uMe, travelSign, bank, L);
+      }
+    }
+    return false;
+  }
 
   const orReset = () => {
     orExcursion = false;
@@ -2952,6 +3196,155 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         }
         orReset();
       }
+      // 6a''. LANE-ENTRY tracker (founder ruling 2026-09-30, «bill the forced
+      // braking» — constants and the demanded-deceleration model documented at
+      // LANE_ENTRY_REACTION_SEC). ЗДвП чл. 25, ал. 2 speaks of „навлизане изцяло
+      // или ЧАСТИЧНО в съседна пътна лента", so the event is the first frame any
+      // part of his BODY is over a lane of his carriageway it was not over on the
+      // previous frame — not the frame his centre flips the (hysteretic) laneId,
+      // which is up to half a car later, when the forcing has already happened.
+      //
+      // HIS BODY is the chassis rectangle turned to his heading (round 4): a car
+      // gliding across a line at ψ off the lane's direction reaches
+      //   h·|cos ψ| + l·|sin ψ|
+      // across the road (h, l the chassis half-width and half-length), so its
+      // front corner is over the line before its flank is — and that corner is
+      // the „частично". Round 3 used the flank alone, which judged a gliding
+      // car a few tenths of a second LATE, on a frame where the car behind was
+      // already closer: the convicting direction.
+      //
+      // Measured in the locator's own lateral coordinate: d grows from the
+      // bank's inner boundary, lane j spans d ∈ [(L−1−j)·W, (L−j)·W], and its
+      // centre is where the locator measured laneOffsetM from, so
+      //   d = centre(laneId) − laneOffsetM
+      // whatever the hysteresis chose. His body spans d ± that reach.
+      //
+      // NO DEADBAND (round 4, F3). A lane he was over is his only while some of
+      // his body is still over it; a body wholly back in the lane he came from
+      // has left, by however little. Round 3 kept the lane his until he was
+      // 0.35 m clear (the locator's lane-switch deadband), with no limit in time
+      // or distance — so a student who entered lawfully, came back to hug the
+      // line 23 cm clear of it for four seconds and then darted in front of the
+      // car was never entered at all, while the car made the hard stop the
+      // ruling bills. Flicker on the line is now real crossings, each published;
+      // that one crossing back and forth in front of the same car is ONE cut-in
+      // is the engine's judgement (rules/engine.ts, the same-act window), not a
+      // measurement to suppress here.
+      //
+      // Only a lane of the SAME carriageway and bank: a new edge that continues
+      // the carriageway (laneContinuesAcross — a joint on a straight) keeps the
+      // baseline; any other change — a turn onto another road, the opposing bank
+      // of a two-way road (that excursion is the overtake trackers' act; one act,
+      // one code), a lost fix, the kerb, a reverse manoeuvre — re-baselines
+      // without a word.
+      {
+        const measurable =
+          fix.edgeIdx >= 0 && edgeRt !== null && !offCarriageway && v.gear >= 0 && v.speedKmh >= 0;
+        if (!measurable) {
+          leKnown = false;
+        } else {
+          const rt = edgeRt!;
+          const L = rt.lanesPerDir;
+          const W = LANE_WIDTH_M;
+          const d = (L - 1 - fix.laneId + 0.5) * W - fix.laneOffsetM;
+          const [tx, ty] = index.tangentAt(fix.edgeIdx, fix.sM);
+          const travelSign: 1 | -1 =
+            Math.abs(signedDeltaDeg(v.headingDeg, bearingDeg(tx, ty))) <= 90 ? 1 : -1;
+          const oneway = rt.edge.oneway;
+          // the lane's own bearing in his direction of travel, and his yaw off it
+          const laneBearing = bearingDeg(tx * travelSign, ty * travelSign);
+          const yawRad = (signedDeltaDeg(laneBearing, v.headingDeg) * Math.PI) / 180;
+          const cosY = Math.abs(Math.cos(yawRad));
+          const sinY = Math.abs(Math.sin(yawRad));
+          /** how far his body reaches across the road from his centre */
+          const reachAcross = PLAYER_HALF_WIDTH_M * cosY + PLAYER_HALF_LENGTH_M * sinY;
+          /** …and how far back along it (his rearmost point) */
+          const reachBack = PLAYER_HALF_LENGTH_M * cosY + PLAYER_HALF_WIDTH_M * sinY;
+          let continues = leKnown && leEdgeIdx === fix.edgeIdx && leBank === fix.travelDir;
+          if (leKnown && !continues && leEdgeIdx >= 0 && leEdgeIdx !== fix.edgeIdx) {
+            continues =
+              leBank === fix.travelDir &&
+              leTravelSign === travelSign &&
+              laneContinuesAcross(leEdgeIdx, fix.edgeIdx, leTravelSign);
+          }
+          let lanes = 0;
+          let entered = 0;
+          for (let j = 0; j < L; j++) {
+            const lo = (L - 1 - j) * W;
+            const hi = lo + W;
+            const was = continues && ((leLanes >> j) & 1) === 1;
+            const over = d + reachAcross > lo && d - reachAcross < hi;
+            if (over) lanes |= 1 << j;
+            if (over && continues && !was) entered |= 1 << j;
+          }
+          if (entered !== 0) {
+            // The follower: the NEAREST vehicle behind him, travelling his lane's
+            // way, whose centre is in the entered lane — located ALONG THE LANE
+            // (laneEntryLocate): on this edge, or on an edge that continues his
+            // carriageway behind him across a joint (round 4, F4 — on
+            // hz-roadworks-v1 a cut-in just past a joint, with the car still on
+            // the edge before it, used to find nobody; the edge id is
+            // bookkeeping, the lane is the road). A vehicle that is on another
+            // piece of road is not judged (A12).
+            // Asked along the LANE, not along his nose: a car creeping and steering
+            // hard across a line can point 60°+ off the road, and the query's
+            // same-direction cone would then drop the very car in the lane.
+            const cands = sameDirQuery(v.position.x, v.position.y, laneBearing, LANE_ENTRY_PROBE_RADIUS_M);
+            const vPlayer = Math.max(0, v.speedKmh) / 3.6;
+            // HIS position along his edge, UNCLAMPED: the locator holds its lane
+            // lock a few metres past an edge's end node (hysteresis), where the
+            // projection clamps to the node — measured from that node along the
+            // road it would put a car behind him up to that much too close (a
+            // fresh-seed census drive, round 4: 1.35 m where it was 1.88).
+            let sMe = fix.sM;
+            if (sMe <= 0 || sMe >= rt.totalLen) {
+              const s0 = sMe <= 0 ? 0 : rt.totalLen;
+              const [ex, ey] = index.pointAt(fix.edgeIdx, s0);
+              const [etx, ety] = index.tangentAt(fix.edgeIdx, s0);
+              sMe = s0 + (v.position.x - ex) * etx + (v.position.y - ey) * ety;
+            }
+            const uMe = sMe * travelSign;
+            for (let j = 0; j < L; j++) {
+              if (((entered >> j) & 1) === 0) continue;
+              const lo = (L - 1 - j) * W;
+              const hi = lo + W;
+              let best: SameDirVehicleConflict | null = null;
+              let bestAlong = Infinity;
+              for (const c of cands) {
+                if (!laneEntryLocate(c, fix.edgeIdx, uMe, travelSign, fix.travelDir, L)) continue;
+                const dc = leLoc.dc;
+                const along = leLoc.along;
+                if (dc < lo || dc >= hi) continue;
+                if (along <= 0) continue; // ahead of him or level: he entered BEHIND it
+                if (along < bestAlong) {
+                  best = c;
+                  bestAlong = along;
+                }
+              }
+              let follower: LaneEntryFollower | null = null;
+              if (best !== null) {
+                const gapM = bestAlong - reachBack - best.halfLengthM;
+                const closingMps = best.speedMps - vPlayer;
+                follower = {
+                  vehicleId: best.id,
+                  gapM,
+                  closingMps,
+                  speedMps: best.speedMps,
+                  reactionSec: LANE_ENTRY_REACTION_SEC,
+                  forcedDecelMps2: laneEntryForcedDecelMps2(gapM, closingMps),
+                };
+              }
+              events.push({ kind: "laneEntered", laneId: j, follower });
+            }
+          }
+          leKnown = true;
+          leEdgeIdx = fix.edgeIdx;
+          leLanes = lanes;
+          leBank = fix.travelDir;
+          leTravelSign = travelSign;
+        }
+      }
+
       // 6b. VULNERABLE-PASS tracker (doc 72 VU-02 — bands/stand-downs at
       // VULNERABLE_PASS_PROBE_RADIUS_M). Mid-block only: a junction area
       // DISCARDS the episode wholesale — the right-hook family there is the
@@ -3214,6 +3607,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setOvertakenQuery(fn: CyclistQuery | null): void {
       overtakenQuery = fn ?? (() => null);
+    },
+
+    setSameDirVehiclesQuery(fn: SameDirVehiclesQuery | null): void {
+      sameDirQuery = fn ?? (() => []);
     },
 
     debugUncontrolledJunctions() {

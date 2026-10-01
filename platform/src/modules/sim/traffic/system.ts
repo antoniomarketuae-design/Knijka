@@ -78,6 +78,7 @@ import {
   type DistrictEdge,
   type OncomingApproach,
   type RearBodyBehind,
+  type SameDirVehicle,
   type StagedActorSpec,
   type StagedActorView,
   type StagedCommand,
@@ -338,6 +339,10 @@ class TrafficSystemImpl implements TrafficSystem {
   private readonly stagedPeds: StagedPedestrianAgent[] = [];
   private readonly stagedById = new Map<string, StagedVehicleAgent | StagedPedestrianAgent>();
   private readonly stagedEnv: StagedEnv;
+  /** The drawn lane width every lane of this system was resolved with — handed
+   *  to each staged vehicle so its pass guard (and the runner reading its view)
+   *  measure „in the lane" against the lane the product built. */
+  private readonly laneWidthM: number;
   /** A11: state ids of staged cyclist proxies (extraRightOffsetM > 0). */
   private readonly cyclistStateIds = new Set<number>();
   /**
@@ -356,6 +361,7 @@ class TrafficSystemImpl implements TrafficSystem {
 
   constructor(district: TrafficDistrict, cfg: TrafficConfig) {
     const rng = mulberry32(cfg.seed);
+    this.laneWidthM = cfg.laneWidthM;
     this.staticBodies = occupiedBayBodies(district);
     this.graph = buildLaneGraph(district, {
       laneWidthM: cfg.laneWidthM,
@@ -707,7 +713,7 @@ class TrafficSystemImpl implements TrafficSystem {
           ? buildStagedVehiclePolylinePath(spec.railPath)
           : resolveStagedVehiclePath(this.graph, spec.pathNodes, spec.extraRightOffsetM ?? 0);
       if (!path) return null;
-      const agent = createStagedVehicle(spec, path, stateId);
+      const agent = createStagedVehicle(spec, path, stateId, this.laneWidthM);
       this.stagedVehicles.push(agent);
       this.vehicles.push(agent.state);
       // FR-27: the ambient env holds this array by reference, so every agent
@@ -900,6 +906,68 @@ class TrafficSystemImpl implements TrafficSystem {
       radiusM,
     );
   }
+
+  sameDirVehiclesNear(px: number, py: number, headingDeg: number, radiusM: number): readonly SameDirVehicle[] {
+    return sameDirVehiclesWithinFor(
+      this.vehicles,
+      (stateId) => this.cyclistStateIds.has(stateId),
+      px,
+      py,
+      headingDeg,
+      radiusM,
+    );
+  }
+}
+
+/**
+ * Pure "EVERY same-direction vehicle near the player" query — the lane-entry
+ * adjudicator's seam (founder ruling 2026-09-30, «bill the forced braking»;
+ * sc-merge-lane-end:0487bcec round 3). `sameDirVehicleNearFor`'s filter
+ * exactly — cyclist proxies never qualify (their pass is VU-02's act), a
+ * vehicle heading more than the same-direction cone off the player's own
+ * heading is oncoming/crossing traffic and never returns — but every vehicle
+ * inside the radius rather than the nearest: which one a lane entry is judged
+ * against (behind him, in the lane he entered) is the runtime's to decide on
+ * the road it knows. Published order is state order, deterministic.
+ */
+export function sameDirVehiclesWithinFor(
+  vehicles: readonly {
+    id: number;
+    x: number;
+    y: number;
+    dirX: number;
+    dirY: number;
+    speedMps: number;
+    profile?: VehicleProfile;
+  }[],
+  isCyclist: (stateId: number) => boolean,
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+): SameDirVehicle[] {
+  const r2 = radiusM * radiusM;
+  const out: SameDirVehicle[] = [];
+  for (const v of vehicles) {
+    if (isCyclist(v.id)) continue; // the cyclist pass is VU-02's act
+    const dx = v.x - px;
+    const dy = v.y - py;
+    if (dx * dx + dy * dy > r2) continue;
+    const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
+    // Folded angular difference, 0 = same direction … 180 = head-on oncoming.
+    const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
+    if (delta > CYCLIST_SAME_DIR_DEG) continue; // oncoming/crossing → not in his stream
+    out.push({
+      id: v.id,
+      x: v.x,
+      y: v.y,
+      dirX: v.dirX,
+      dirY: v.dirY,
+      speedMps: v.speedMps,
+      halfLengthM: vehicleHalfLengthM(v.profile),
+    });
+  }
+  return out;
 }
 
 /**

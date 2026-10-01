@@ -43,6 +43,26 @@ export const PLAYER_HALF_WIDTH_M = CHASSIS_HALF_EXTENTS.x;
 export const PLAYER_HALF_LENGTH_M = CHASSIS_HALF_EXTENTS.z;
 
 /**
+ * How far the player's CENTRE can be from a lane's centre line while some of
+ * his BODY is still over that lane, m: half the drawn lane plus his own
+ * half-width. Both terms are measured off what the product ships — the lane
+ * width the traffic system resolved its lanes with (the world builder's
+ * LANE_WIDTH_M, published per staged actor as `StagedActorView.laneWidthM`)
+ * and the rapier chassis above — so „he is in that lane" is a fact about the
+ * road and the car, not a tuned tolerance.
+ *
+ * Read by `RearTailgaterRunner`'s station law (orchestrator/runners.ts): a
+ * car whose lane a student has any part of his body in must not overtake him
+ * inside it (sc-merge-lane-end:0487bcec, round 2 — a fixed 3 m corridor on an
+ * 8.125 m lane let the pass overtake a student 3.2 m off the lane centre,
+ * INSIDE his own lane, with 1.43 m of clearance, and strike one who was
+ * half-way into it).
+ */
+export function playerOverLaneReachM(laneWidthM: number): number {
+  return laneWidthM / 2 + PLAYER_HALF_WIDTH_M;
+}
+
+/**
  * Ground-plane radius of a pedestrian, m — the NPC pedestrian capsule's own
  * radius (NpcColliders PED_CAPSULE_RADIUS). Child figures render at 0.72 scale
  * but the shell does not shrink and StagedActorView does not publish the

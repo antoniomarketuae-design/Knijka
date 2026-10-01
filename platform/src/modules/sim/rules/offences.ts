@@ -239,9 +239,10 @@ export const SEPARATE_ACTS: readonly SeparateActsSpec[] = [
       "MOVE_OFF_WITHOUT_OBSERVATION",
       "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
       "WRONG_LANE_FOR_DIRECTION",
+      "LANE_ENTRY_FORCED_BRAKING",
     ],
     reason:
-      "ЗДвП чл. 183, ал. 4 prices five different точки and т. 14 alone holds FOUR distinct деяния in one sentence. Two of them (not stopping at Б2, not giving way) can be produced by one junction, but they are different deeds under different предложения, and whether that is one акт or two is a legal question no act in content/law/acts answers. NOT grouped: an ungrounded merge would understate a real double penalty, which is the same class of error as the belt in the other direction. Needs the founder's ruling.",
+      "ЗДвП чл. 183, ал. 4 prices five different точки and т. 14 alone holds FOUR distinct деяния in one sentence. Two of them (not stopping at Б2, not giving way) can be produced by one junction, but they are different deeds under different предложения, and whether that is one акт or two is a legal question no act in content/law/acts answers. The same holds for LANE_ENTRY_FORCED_BRAKING (founder ruling 2026-09-30) beside LANE_CHANGE_WITHOUT_MIRROR_CHECK: one blind cut-in raises both — «неправилно се престроява» and «не спазва предимството», two предложения of this точка — and they do not share a `t` (the cut-in bills when his body crosses the line, the no-look when his centre does). NOT grouped: an ungrounded merge would understate a real double penalty, which is the same class of error as the belt in the other direction. Needs the founder's ruling.",
   },
   {
     codes: ["NOT_KEEPING_RIGHT", "CROSSED_SOLID_LINE"],
@@ -308,7 +309,7 @@ export const GATED_SHARED_PROVISIONS: readonly GatedSharedProvision[] = [
   {
     citationBg: "ЗДвП чл. 179, ал. 1, т. 5",
     amountBgn: 200,
-    codeCount: 13,
+    codeCount: 14,
     noteBg:
       "Условната надстройка на почти целия каталог: 200 лв., но само „ако от това е създадена непосредствена опасност“. Симулаторът не установява такава опасност, затова редът винаги стои с условието си.",
   },

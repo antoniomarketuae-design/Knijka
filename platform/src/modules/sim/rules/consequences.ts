@@ -1717,6 +1717,13 @@ const D_CHECK_BEFORE_MANOEUVRE = DUTY(
   "ЗДвП чл. 25, ал. 1",
   "преди да започне маневрата, трябва да се убеди, че няма да създаде опасност за участниците в движението, които се движат след него, преди него или минават покрай него",
 );
+/** ЗДвП чл. 25, ал. 2 — the duty LANE_ENTRY_FORCED_BRAKING bills (founder
+ *  ruling 2026-09-30, «bill the forced braking»). */
+const D_YIELD_TO_LANE = DUTY(
+  "чл. 25",
+  "ЗДвП чл. 25, ал. 2",
+  "При извършване на маневра, която е свързана с навлизане изцяло или частично в съседна пътна лента, водачът е длъжен да пропусне пътните превозни средства, които се движат по нея.",
+);
 /** ЗДвП чл. 101, ал. 1 — the duty a lit RED telltale puts on the driver. */
 const D_STOP_ON_FAULT = DUTY(
   "чл. 101",
@@ -1833,6 +1840,10 @@ const CP_NOT_LISTED_PLACEMENT = notListed(
 const CP_NOT_LISTED_T14 = notListed(
   "Чл. 183, ал. 4, т. 14 не фигурира в изчерпателния списък по чл. 6, ал. 1: нито едно от четирите деяния в тази точка не носи контролни точки. За сравнение съседната т. 7 от същата алинея — коланът — носи 10.",
 );
+/** Same retrieval as CP_NOT_LISTED_MARKING_DANGER below, for the предложение a
+ *  forced cut-in falls in — „правилата за предимство". */
+const CP_NOT_LISTED_PRIORITY_DANGER =
+  "От петте предложения на чл. 179, ал. 1, т. 5 наредбата взима само две: изпреварването (т. 9 — 13 к.т.) и неспирането на знак „Спри!“ (т. 15 — 10 к.т.). Неспазването на правилата за предимство при престрояване не е сред тях, затова тук точки не падат.";
 const CP_NOT_LISTED_MARKING_DANGER =
   "От петте предложения на чл. 179, ал. 1, т. 5 наредбата взима само две: изпреварването (т. 9 — 13 к.т.) и неспирането на знак „Спри!“ (т. 15 — 10 к.т.). Неспазването на знак или маркировка извън тези два случая не е в списъка, затова тук точки не падат.";
 const CP_NOT_LISTED_LIGHTS = notListed(
@@ -1935,6 +1946,24 @@ const MANOEUVRE_AND_JUDGEMENT_ROADS: Partial<Record<ViolationCode, RoadConsequen
     escalation: [DANGER_179_1_5(CP_NOT_LISTED_MARKING_DANGER)],
     noteBg:
       "Двойно повече от мигача, и логиката е ясна: непогледнатото огледало Е маневрата, мигачът е само съобщението за нея.",
+  },
+  // FOUNDER RULING 2026-09-30 («bill the forced braking»). A cut-in that makes
+  // the vehicle already in the lane brake hard is the second deed of the same
+  // точка — „не спазва предимството на друг участник в движението" — and the
+  // danger branch climbs to чл. 179, ал. 1, т. 5 like its neighbours. Priced
+  // separately from the no-look (LANE_CHANGE_WITHOUT_MIRROR_CHECK) — one
+  // престрояване can raise both, and whether that is one акт or two is the same
+  // open question offences.ts SEPARATE_ACTS records for this точка.
+  LANE_ENTRY_FORCED_BRAKING: {
+    kind: "single",
+    offenceBg: "неспазено предимство при престрояване",
+    offenceQuote: T_MERGE_LANE_PRIORITY,
+    duties: [D_YIELD_TO_LANE],
+    fine: fine(100, null, F183("ал. 4", "т. 14", 100)),
+    controlPoints: CP_NOT_LISTED_T14,
+    escalation: [DANGER_179_1_5(CP_NOT_LISTED_PRIORITY_DANGER)],
+    noteBg:
+      "Същата точка като престрояването без поглед, но друго деяние от нея: не „неправилно се престроява“, а „не спазва предимството“ — колата, която вече е в лентата, е тази с предимството.",
   },
   MOVE_OFF_WITHOUT_OBSERVATION: {
     kind: "single",

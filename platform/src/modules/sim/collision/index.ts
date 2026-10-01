@@ -286,6 +286,7 @@ export {
   playerObb,
   PLAYER_HALF_LENGTH_M,
   PLAYER_HALF_WIDTH_M,
+  playerOverLaneReachM,
   type ActorPose,
 } from "./bodies";
 

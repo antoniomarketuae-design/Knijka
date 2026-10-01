@@ -529,9 +529,20 @@ describe("scenario-world-referent gate", () => {
     // curb-parked row and invisible) is exactly why that difference is worth
     // gating. `stagedActorRule(["policeStop"])`, so every lesson without an
     // officer is INERT on it. `NO_WORLD_REFERENT` does NOT move: 15 again.
-    expect(checked.size).toBe(50);
+    //
+    // 50 → 51 / 65 → 66 (2026-09-30, founder ruling «bill the forced braking»,
+    // sc-merge-lane-end:0487bcec round 3): LANE_ENTRY_FORCED_BRAKING, ЗДвП
+    // чл. 25, ал. 2 — a cut-in so close that the vehicle already in the lane
+    // must brake hard. It is CHECKED, not exempted: a cut-in exists only in
+    // front of a vehicle travelling in the lane he enters, which on the two
+    // lane-drop lessons is the staged through car —
+    // `stagedActorRule(["rearTailgater"])`, config-gated on
+    // laneEntryForcedBrakingEnabled like CLOSING_ON_LEAD_TOO_FAST, so every
+    // lesson that does not arm it is outside its fault surface.
+    // `NO_WORLD_REFERENT` does NOT move: 15 again.
+    expect(checked.size).toBe(51);
     expect(NO_WORLD_REFERENT.size).toBe(15);
-    expect(all.length).toBe(65);
+    expect(all.length).toBe(66);
   });
 
   it("never exceeds doc 86 on the four classes §10 counts to ±0 (T1 90 · T2 31 · T3 9 · T4 83)", () => {

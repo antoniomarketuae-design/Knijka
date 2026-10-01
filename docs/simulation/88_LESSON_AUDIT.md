@@ -10201,3 +10201,51 @@ told the founder's rulings. Residuals, stated so nobody reads them as closed:
   top stays cut by 3–8 px, and braking beyond ~0.06 g tips the view past the air the cap leaves (a founder trade).
 - `sc-ac-ice:86eab7e9`: the railings, lamps and walls-drawn checks are settled only by the `sc-ac-bridge-ice` pc-right
   03-ready frame, driven at the same commit as `sc-ac-ice`.
+
+## Wave C verdicts — 2026-09-29
+
+This run retired 3 row(s). Their evidence frames were driven at `9792cd45b242` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`9792cd45b242`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 3 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 11 |
+| STILL (symptom reproduces) | 2 |
+| UNJUDGED (re-drive did not exercise it) | 37 |
+
+**Open list: 53 → 50**, out of 1523 filed across the whole programme (1470 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Tailgater repair (`sc-merge-lane-end:0487bcec`) — landed 2026-10-01
+
+The lane-drop lesson's staged through-car (`sc-mle-through-car`, a `RearTailgaterSpec`) drove into students who had merged early
+and correctly, and the lesson failed them with «Удар в друго превозно средство». Filed 2026-09-29 from the w66 re-drive and
+confirmed pre-existing on w47/w52/w61/w66. Four adversarial rounds; round 4 SIGNED OFF WITH CONDITIONS.
+
+What landed:
+- the pass is player-guarded once commanded; a pass whose lane the student is in keeps station behind them instead of driving
+  through (the corridor is the lane the product built, not a fixed width);
+- **founder ruling 2026-09-30 «Bill the forced braking»**: a new rule `LANE_ENTRY_FORCED_BRAKING` (опасна, ЗДвП чл. 25, ал. 2,
+  retrieved from the law bank) bills a student whose body enters a lane so close ahead of a closing vehicle that it must brake
+  harder than the product's own harsh-brake line (7 m/s², after the product's 1 s reaction). It is armed only on the two lane-drop
+  lessons (sc-merge-lane-end, sc-merge-roadworks-shift); one cut-in is one act; a stopped or slower vehicle is never «forced»;
+- the push-out mistake card now fires on that code (contact no longer needed) and a contact right after a cut-in reads a cut-in
+  explanation instead of the forward-collision text;
+- both shadow-correct demos were re-authored so the ghost no longer forces the through car to brake; at L5 the second car is
+  released 46 m later so the instruction «пролуката зад нея е твоята» is true on every rung;
+- a generated merge census (2,250 seeded drives, an independent oracle that accounts for every contact) is the acceptance test.
+
+Nothing closes by this landing: `0487bcec` closes only on a re-drive frame of sc-merge-lane-end. Owed (verifier conditions):
+the engine's same-act and contact windows and four lane-geometry predicates are unpinned (they matter only once the rule is armed
+on another road); the L5 46 m lag has no pinned rationale; after a lawful merge the staged car still brakes harder than needed
+(the staged controller brakes at its authored 12 m/s²), which can look abrupt on screen; extending the rule network-wide is a
+founder call.
