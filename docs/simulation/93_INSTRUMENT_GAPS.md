@@ -598,3 +598,18 @@ Also measured: route fidelity counts only MOVING samples, so a car pinned 5.5 m 
 
 A related product nit, cosmetic and NOT a cause: the radius-10 acceptance ring at a lane-centre zone paints across
 the footway and through the bridgehead railing (`RouteGuidance.tsx` `markerRingRadii`).
+
+### GAP-8 addendum (2026-10-01, triage-w67-mobile wf_eadb478e-bd7, verified refuted=false)
+
+The sc-merge-lane-end mobile-right drive at 0daca33 (НЕИЗДЪРЖАН 37, «Удар в неподвижно препятствие») is the harness, not the
+product — the product guidance is identical to 9792cd4:
+
+| # | harness file | what it did |
+| --- | --- | --- |
+| 8d | `tools/mobile/lib/guidance.mjs:1574` (sustained-turn branch) | accepted a steady −20…−23° bearing toward a ribbon 4 m to one side — a LATERAL OFFSET at 7 km/h — as a confirmed turn and held 800 ms left on a phone viewport whose steer lean is 2× the pc one (151 vs 70 px); the sign-flipped correction got only a 65 ms pulse (`:1627`) |
+| 8e | `tools/mobile/lesson-audit.mjs` (frame back-off near :9904) | an ~8 s gap between steering scans while teach layers drained and a frame was captured, with the throttle still down (26 → 42 km/h) |
+| 8f | `tools/mobile/lesson-audit.mjs` after `guidance.mjs:2435` | kept rolling the pace tape open-loop for ~34 s after it logged «RECOVERY REFUSED … past the ceiling of 3», until a building stopped it; the collision billed is the instrument's act |
+
+Fix (harness-only): gate the sustained-turn law on a CHANGING bearing or on route curvature and scale its hold by the measured
+lean; let a sign-flipped error inherit the sustain magnitude for one tick; never let a scan gap exceed ~1.5× the period with a pedal
+down; on RECOVERY REFUSED brake to a stop and end the drive phase. Then re-drive mobile-right three times.

@@ -331,6 +331,18 @@ export function serializeObjectiveParams(
       // road while „did you pull over, or did you stop in the roadway" keeps the
       // same answer at L1 as at L5.
       if (p.requireKerbwardM !== undefined) params.requireKerbwardM = p.requireKerbwardM;
+      // …AND THE GUIDANCE TERM (`laneChange`, sc-merge-lane-end:112be4ef),
+      // on this whitelist for the same measured reason: the ribbon reads it off
+      // the COMPILED objective (`guidanceGoalFor` → `parseObjectiveParams`), so
+      // a key not named here would never reach the line the student follows.
+      // Copied, not shared, so no rung can mutate the template's points. NOT
+      // LADDERED — where the lesson merges is not a precision.
+      if (p.laneChange !== undefined) {
+        params.laneChange = {
+          from: { x: p.laneChange.from.x, y: p.laneChange.from.y },
+          to: { x: p.laneChange.to.x, y: p.laneChange.to.y },
+        };
+      }
       return { kind: "reachZone", params };
     }
     case "passSignal": {

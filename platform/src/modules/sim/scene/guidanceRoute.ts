@@ -327,6 +327,16 @@ export interface GuidancePointGoal {
    * destination; see the OFF-ROAD TARGETS bound at `alignRawToGoalLane`.
    */
   offRoad?: boolean;
+  /**
+   * The objective's authored `laneChange` (`ReachZoneParams`): `from`, a point
+   * in the lane the student holds where the lesson's taught lane change into
+   * this goal's lane BEGINS, and `to`, a point in the goal's lane where it has
+   * ENDED. Present ⇒ the ribbon keeps that lane up to `from` and changes lanes
+   * over exactly that stretch instead of easing over from the spawn; see THE
+   * LESSON SAYS WHERE IT MERGES at `alignRawToGoalLane`. Routing only —
+   * nothing in the marker vocabulary reads it.
+   */
+  laneChange?: { from: { x: number; y: number }; to: { x: number; y: number } };
 }
 
 export type GuidanceGoal = GuidancePointGoal | { kind: "ahead"; meters: number };
@@ -349,6 +359,9 @@ export type RouteTarget =
       /** See `GuidancePointGoal.offRoad` — set ⇒ (x, y) is a parking bay or a
        *  driveway, not a lane, so the ribbon stays on the tarmac. */
       offRoad?: boolean;
+      /** See `GuidancePointGoal.laneChange` — where the taught lane change into
+       *  the goal's lane begins and ends; the ribbon changes lanes over it. */
+      laneChange?: { from: { x: number; y: number }; to: { x: number; y: number } };
     }
   | { kind: "ahead"; meters: number };
 
@@ -442,7 +455,8 @@ export interface DerivedRoute extends ArcSampledPath {
  * apply (it is `DENSIFY_STEP_M`, a constant it can pin).
  */
 export interface LaneAlignSpan {
-  /** Where the ease-in opens: the last junction before the goal (0 when none). */
+  /** Where the ease-in opens: the last junction before the goal (0 when none),
+   *  or the goal's authored `laneChange.from` when that is honoured. */
   legStartS: number;
   /** Where w reaches 1: legStartS + rampInM, carried to this route's arc. */
   rampEndS: number;
@@ -456,7 +470,9 @@ export interface LaneAlignSpan {
   decayEndS: number;
   /** The signed offset along the route's right normal, metres. */
   offsetM: number;
-  /** The ease-in's opening weight (the driver's own offset; 0 after a junction). */
+  /** The ease-in's opening weight (the driver's own offset; 0 after a junction;
+   *  the held lane's offset over the goal's under `laneChange` — negative
+   *  when that lane lies across the centreline from the goal's). */
   w0: number;
 }
 
@@ -1042,6 +1058,15 @@ export function guidanceGoalFor(
         labelBg: halt ? "Спри тук" : "Карай дотук",
       };
       if (params.maxSpeedKmh !== undefined) goal.maxSpeedKmh = params.maxSpeedKmh;
+      // Only on the ZONE form: a gate's coordinates are the driver's own offset
+      // and lane alignment refuses a gate outright (see `deriveGuidanceRoute`),
+      // so carrying the term onto one would be a field nothing can honour.
+      if (params.laneChange !== undefined) {
+        goal.laneChange = {
+          from: { x: params.laneChange.from.x, y: params.laneChange.from.y },
+          to: { x: params.laneChange.to.x, y: params.laneChange.to.y },
+        };
+      }
       return goal;
     }
     case "passSignal": {
@@ -2159,6 +2184,51 @@ function nearestOnRaw(raw: RawRoute, x: number, y: number): { s: number; latM: n
   return { s: bestS, latM: bestD };
 }
 
+/**
+ * Where (x, y) lies along a sampled route, EXACTLY: its foot on the nearest
+ * segment (arclength `s`, from the samples' own `s`) and its signed offset
+ * along that segment's right normal — the convention `alignRawToGoalLane`
+ * uses for the goal. Unlike `nearestOnRaw` it does not snap to a sample: an
+ * authored lane change must start and end where it was drawn, not up to half
+ * a `DENSIFY_STEP_M` away. The two end segments are extended: before the
+ * first sample a point the driver has already passed comes back with a
+ * NEGATIVE `s` (its distance behind him) instead of being clamped onto his
+ * wheels, and past the last sample a point beyond the route comes back with
+ * an `s` beyond its length instead of being clamped onto its end — where its
+ * offset would be measured partly ALONG the road instead of across it. Null
+ * for a route with no length.
+ */
+function projectOnSamples(
+  pts: readonly (readonly [number, number])[],
+  s: readonly number[],
+  x: number,
+  y: number,
+): { s: number; offset: number } | null {
+  let best: { s: number; offset: number } | null = null;
+  let bestD = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const ax = pts[i - 1][0];
+    const ay = pts[i - 1][1];
+    const dx = pts[i][0] - ax;
+    const dy = pts[i][1] - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < EPS) continue;
+    const tx = dx / len;
+    const ty = dy / len;
+    let u = (x - ax) * tx + (y - ay) * ty;
+    if (i > 1) u = Math.max(0, u);
+    if (i < pts.length - 1) u = Math.min(len, u);
+    const fx = ax + tx * u;
+    const fy = ay + ty * u;
+    const d = Math.hypot(x - fx, y - fy);
+    if (d < bestD) {
+      bestD = d;
+      best = { s: s[i - 1] + u, offset: (x - fx) * ty + (y - fy) * -tx };
+    }
+  }
+  return best;
+}
+
 // ---------------------------------------------------------------------------
 // LANE ALIGNMENT (sweep 161, `sc-ov-keep-right/mobile-right/04-t118s.png`).
 //
@@ -2280,6 +2350,56 @@ export const LANE_ALIGN_SAME_LANE_M = LANE_WIDTH_M / 2;
 //     active one AND no junction lies between them; past it the decay is
 //     unchanged. The junction clause keeps the „confined to the final leg" bound
 //     intact — the shift still never crosses a joint.
+//
+// THE LESSON SAYS WHERE IT MERGES (sc-merge-lane-end:112be4ef)
+//
+// Edge 1 above stopped the ramp dragging a student OUT of the goal's lane. Its
+// mirror image was still open: a student who is correctly NOT in the goal's
+// lane yet, on a lesson that teaches him to stay out of it for a while. The
+// ramp opens at the last junction before the goal, so on a junction-free leg
+// it opens under his wheels and puts him in the goal's lane within 40 m —
+// whatever the lesson says.
+//
+// MEASURED on sc-merge-lane-end / ln-merge-v1 (one edge, spawn (4.06, 12),
+// goal (−4.06, 236)): the ribbon read (0, 12) → (−4.06, 52) → (−4.06, 270)
+// on every rung. The lesson's text, demo and blue shadow line hold x = 4.06 to
+// y ≈ 186, let the through car pass and merge into the gap BEHIND it
+// (instruction 4; «Пролуката ЗАД нея е нашата — не тази пред нея»), and the
+// green line — the only guidance from L3 — put the student in front of that
+// car instead. Driven in-process, 160 of 160 ribbon-following drives (L1–L5,
+// 15–50 км/ч) were convicted NOT_KEEPING_RIGHT («Движение в лявата лента без
+// причина»): the line kept him in the through lane for ~236 m against a 12 s
+// sustain. sc-merge-roadworks-shift / hz-roadworks-v1 had the same ribbon
+// against a demo that merges at y 180–214.
+//
+// The road cannot say where a lesson's lane change belongs — both streets are
+// two lanes for their whole length — so the LESSON says it: an objective may
+// author `laneChange` (`ReachZoneParams.laneChange`): `from`, a point in the
+// lane the student holds where its taught change begins, and `to`, a point in
+// the goal's lane where it has ended. When it is present, on the goal's own
+// junction-free leg, `from` before `to` and `to` no later than the goal,
+// `from` in a lane that is not the goal's and `to` in the goal's, and the
+// driver is in the lane `from` is in, the ease-in runs over EXACTLY that
+// stretch: the ribbon holds his lane up to `from` (w0 = its offset over the
+// goal's, so the weight loop's „w0 before legStartS" is exactly that lane) and
+// is in the goal's lane at `to`. A driver already past `from` in that lane is
+// led over from under his wheels over the same authored length, cut short only
+// by the goal. Each condition that fails leaves the shipped ramp untouched, so
+// no other lesson moves: the census over every template rung is byte-identical
+// outside the two that declare it. The span published below keeps its meaning
+// unchanged — w0 may now be negative, and |offsetM|·(1 − w0)/rampInM is still
+// the ease-in slope.
+//
+// BOTH ENDS, AND PROJECTED EXACTLY (round 2). Round 1 authored only the start
+// and kept the 40 m ramp: the demo changes lanes over 34 m, so the ribbon
+// crossed the lane line at y ≈ 207 against the demo's 203, and a faithful
+// follower's body reached the through lane ~3 m later than a blue-line
+// follower's — with the through car 6.6–7.3 m behind him instead of 7.7–8.1 m,
+// which the 2026-09-30 forced-braking rule billed in 22 of 160 drives (seed
+// 7) where the blue line was billed in none. The start also landed on the
+// nearest 2.5 m sample (`nearestOnRaw`), a further metre late. Both ends are
+// therefore projected onto the route's segments, not snapped to a sample
+// (`projectOnSamples`), and the ramp's length is the authored one.
 // ---------------------------------------------------------------------------
 
 /**
@@ -2289,7 +2409,9 @@ export const LANE_ALIGN_SAME_LANE_M = LANE_WIDTH_M / 2;
  *
  * `start` is the driver's pose (seeds the ease-in) and `next` the first
  * look-ahead waypoint (holds the lane between two waypoints in one lane); both
- * optional, and absent both this is the behaviour that shipped.
+ * optional, and absent both this is the behaviour that shipped. `change` is
+ * the goal's authored `laneChange` (THE LESSON SAYS WHERE IT MERGES, above);
+ * absent, nothing below reads it.
  */
 function alignRawToGoalLane(
   raw: RawRoute,
@@ -2298,6 +2420,7 @@ function alignRawToGoalLane(
   splitIdx?: number,
   start?: { x: number; y: number },
   next?: { x: number; y: number },
+  change?: { from: { x: number; y: number }; to: { x: number; y: number } },
 ): { offset: number; splitIdx: number | undefined; span?: RawLaneAlignSpan } {
   if (raw.points.length < 2) return { offset: 0, splitIdx };
   // A shortest path over a single edge comes back as TWO points, and
@@ -2339,21 +2462,56 @@ function alignRawToGoalLane(
   for (const j of raw.jointIdx) {
     if (j < pts.length && s[j] < hit.s - EPS && s[j] > legStartS) legStartS = s[j];
   }
-  const rampIn = Math.min(LANE_ALIGN_RAMP_M, Math.max(EPS, hit.s - legStartS));
+  let rampIn = Math.min(LANE_ALIGN_RAMP_M, Math.max(EPS, hit.s - legStartS));
 
   // (1) Where the ease-in OPENS, as a fraction of the goal's own offset. Only
   // when the ramp opens at the ribbon's first sample is the driver the thing
   // standing there; clamped into [0, 1] so the ribbon can start under his
   // wheels but never further out than the lane it is leading him to.
   let w0 = 0;
+  let startOffset: number | null = null;
   if (start && legStartS <= EPS) {
     const b0 = pts[Math.min(pts.length - 1, 1)];
     const l0 = Math.hypot(b0[0] - pts[0][0], b0[1] - pts[0][1]);
     if (l0 > EPS) {
-      const startOffset =
+      startOffset =
         (start.x - pts[0][0]) * ((b0[1] - pts[0][1]) / l0) +
         (start.y - pts[0][1]) * (-(b0[0] - pts[0][0]) / l0);
       w0 = Math.max(0, Math.min(1, startOffset / offset));
+    }
+  }
+
+  // (0) THE LESSON SAYS WHERE IT MERGES — see the block above this function.
+  // Honoured only when every condition holds; any one failing leaves the
+  // shipped ease-in above untouched, so a goal without the term is
+  // byte-identical by construction.
+  if (change && startOffset !== null) {
+    const from = projectOnSamples(pts, s, change.from.x, change.from.y);
+    const to = projectOnSamples(pts, s, change.to.x, change.to.y);
+    if (
+      from !== null &&
+      to !== null &&
+      // it runs FORWARD along the goal's own leg and is over by the goal…
+      to.s > from.s + EPS &&
+      to.s <= hit.s + EPS &&
+      // …starts in a lane, not off the road…
+      Math.abs(from.offset) <= LANE_ALIGN_MAX_M &&
+      // …that is not the goal's lane (else there is no change to place)…
+      Math.abs(from.offset - offset) > LANE_ALIGN_SAME_LANE_M &&
+      // …and ends in the goal's lane…
+      Math.abs(to.offset - offset) <= LANE_ALIGN_SAME_LANE_M &&
+      // …and the driver is IN the lane it starts from: guidance never drags a
+      // student into a lane he is not in — one who already changed is left there.
+      Math.abs(startOffset - from.offset) <= LANE_ALIGN_SAME_LANE_M
+    ) {
+      // A driver already past `from` (from.s < 0) is led over from under his
+      // wheels; the ramp keeps the authored length, cut short only by the goal.
+      legStartS = Math.max(0, from.s);
+      rampIn = Math.min(to.s - from.s, Math.max(EPS, hit.s - legStartS));
+      // The held lane, as a fraction of the goal's offset: the weight loop
+      // below holds w0 before legStartS, so shift = from.offset there. It is
+      // negative when the held lane lies across the centreline from the goal.
+      w0 = from.offset / offset;
     }
   }
 
@@ -2393,7 +2551,10 @@ function alignRawToGoalLane(
     else if (s[i] < hit.s) w = w0 + (1 - w0) * Math.min(1, (s[i] - legStartS) / rampIn);
     else if (s[i] <= holdToS) w = 1;
     else w = Math.max(0, 1 - (s[i] - holdToS) / LANE_ALIGN_RAMP_M);
-    if (w <= 0) continue;
+    // Zero is „the route as the graph gave it". A NEGATIVE weight is real: it
+    // is the held lane across the centreline under `laneChange` (w0 < 0),
+    // so it shifts like any other — every other path keeps w in [0, 1].
+    if (w === 0) continue;
     // Local normal, so the shift follows the road rather than a fixed compass
     // direction — the same reason the gate bar uses the edge's own tangent.
     const a = src[Math.max(0, i - 1)];
@@ -2830,7 +2991,15 @@ export function deriveGuidanceRoute(
       firstAhead.offRoad !== true
         ? { x: firstAhead.x, y: firstAhead.y }
         : undefined;
-    const aligned = alignRawToGoalLane(acc, goal.x, goal.y, splitIdx, start, nextInLane);
+    const aligned = alignRawToGoalLane(
+      acc,
+      goal.x,
+      goal.y,
+      splitIdx,
+      start,
+      nextInLane,
+      goal.laneChange,
+    );
     splitIdx = aligned.splitIdx;
     alignSpan = aligned.span;
   }

@@ -518,6 +518,39 @@ export interface ReachZoneParams {
    * where that is spelled out.
    */
   requireKerbwardM?: number;
+  /**
+   * GUIDANCE ONLY — THE TAUGHT LANE CHANGE INTO THIS ZONE'S LANE
+   * (sc-merge-lane-end:112be4ef). `from` is a point IN THE LANE THE STUDENT
+   * HOLDS where the lesson's own correct drive starts the change; `to` is a
+   * point IN THIS ZONE'S LANE where that drive has finished it. Nothing grades
+   * it: the evaluator never reads it.
+   *
+   * The green route ribbon (`scene/guidanceRoute.ts alignRawToGoalLane`) eases
+   * into the goal's lane over the 40 m AFTER the last junction before the
+   * goal — and on a district with no junction that is the spawn. On the two
+   * lane-drop lessons that put the ribbon in the through lane in front of the
+   * through car, while their text, demo and blue shadow line hold the right
+   * lane, let that car pass and merge into the gap behind it: a student who
+   * followed the green line was convicted NOT_KEEPING_RIGHT on every rung. A
+   * template that teaches a LATE lane change declares it here, and the ribbon
+   * keeps the student's lane up to `from` and is in the goal's lane at `to`.
+   *
+   * BOTH ENDS, not a start and a fixed ramp (round 2 of 112be4ef): a start
+   * alone left the ribbon's change 40 m long against the demo's 34, so it
+   * crossed the lane line ~4 m behind the demo and put a faithful follower's
+   * body into the through lane later than the blue line does — late enough
+   * that the 2026-09-30 forced-braking rule billed him where a shadow follower
+   * was not billed.
+   *
+   * Authored from the lesson's own story, never tuned: each pair IS the shadow
+   * script's merge drive step, and `__tests__/merge-ribbon-follow.test.ts`
+   * pins it to that step and the ribbon to the committed shadow recording.
+   *
+   * NOT LADDERED (`params.ts serializeObjectiveParams` carries it through
+   * untouched): where the lesson merges is not a precision the aid ladder
+   * forgives.
+   */
+  laneChange?: { from: { x: number; y: number }; to: { x: number; y: number } };
 }
 
 /**

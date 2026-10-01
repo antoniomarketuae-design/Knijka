@@ -435,6 +435,14 @@ const LNM_X_THROUGH = -4.06; // laneId 1 — the lane that survives the taper
 const LNM_TAPER_FROM_Y = 180; // the 60 m taper begins
 const LNM_TAPER_TO_Y = 240; // …and the ending lane is gone from here
 const LNM_END_Y = 280;
+/** Where this lesson's correct drive begins and ends its merge: the shadow
+ *  script's merge step `[X_ENDING, 186] → [X_THROUGH, 220]`
+ *  (traces/scMergeLaneEnd.ts), inside the taper and after its start
+ *  (LNM_TAPER_FROM_Y) — the lesson's own rule that „every merge commits at or
+ *  after the taper start". The green ribbon's lane change runs over exactly
+ *  this stretch too (`sc-mle-merge.laneChange`). */
+const LNM_MERGE_FROM_Y = 186;
+const LNM_MERGE_TO_Y = 220;
 
 /**
  * THE CAR YOU MUST NOT CUT OFF: the shipped rearTailgater actor armed in the
@@ -745,7 +753,33 @@ export const SC_MERGE_LANE_END: ScenarioSpec = {
       // riding the dying lane at y = 236 misses it entirely. THIS is what
       // grades „did you actually get out" (the lane-drop world zone does not
       // exist yet — see gen_ln_merge.mjs's header).
-      params: { kind: "reachZone", x: LNM_X_THROUGH, y: 236, radiusM: 3.5 },
+      //
+      // THE GREEN LINE MERGES WHERE THE LESSON MERGES (sc-merge-lane-end:
+      // 112be4ef). Without `laneChange` the route ribbon eased into the
+      // through lane over the first 40 m — ln-merge-v1 is one edge, so the
+      // lane-align ramp opened at the spawn — and put the student IN FRONT of
+      // the through car, the opposite of instruction 4 and of the demo («Пролука
+      // ЗАД нея е нашата — не тази пред нея»). A student who followed it was
+      // convicted NOT_KEEPING_RIGHT on every rung and pace. The change now runs
+      // over exactly the stretch the lesson's own correct drive uses
+      // (LNM_MERGE_FROM_Y → LNM_MERGE_TO_Y, the shadow's 186 → 220, inside the
+      // taper): the ribbon holds the ending lane to y 186, crosses the lane line
+      // where the demo does (y ≈ 203) and is in the through lane by y 220,
+      // sixteen metres short of this gate. Both ends, not a start plus a fixed
+      // ramp: a 40 m ramp crossed ~4 m behind the demo and put a faithful
+      // follower in front of the through car late enough to be billed for
+      // forcing it to brake (round 2). Pinned to the shadow script's merge step
+      // and the committed recording in __tests__/merge-ribbon-follow.test.ts.
+      params: {
+        kind: "reachZone",
+        x: LNM_X_THROUGH,
+        y: 236,
+        radiusM: 3.5,
+        laneChange: {
+          from: { x: LNM_X_ENDING, y: LNM_MERGE_FROM_Y },
+          to: { x: LNM_X_THROUGH, y: LNM_MERGE_TO_Y },
+        },
+      },
     },
     {
       id: "sc-mle-finish",
@@ -928,6 +962,13 @@ const HZR_X_OPEN = -4.06; // laneId 1 — the lane that survives the closure
 /** hz-roadworks-v1 story arclengths in district y (meta.scenario). */
 const HZR_TAPER_FROM_Y = 216; // the 24 m cone taper begins
 const HZR_WORKS_FROM_Y = 240; // …the lane is gone, and the ВРЕМЕННО 30 starts here
+/** Where this lesson's correct drive begins and ends its merge: the shadow
+ *  script's merge step `[X_CLOSED, 180] → [X_OPEN, 214]`
+ *  (traces/scMergeRoadworksShift.ts), finished before the cones begin at
+ *  HZR_TAPER_FROM_Y. The green ribbon's lane change runs over exactly this
+ *  stretch too (`sc-mrs-merged.laneChange`). */
+const HZR_MERGE_FROM_Y = 180;
+const HZR_MERGE_TO_Y = 214;
 const HZR_WORKS_TO_Y = 276; // the site ends; 50 resumes
 
 /**
@@ -1074,7 +1115,26 @@ export const SC_MERGE_ROADWORKS_SHIFT: ScenarioSpec = {
       // a car still riding the closed lane at y = 234 misses it entirely. THIS
       // is what grades „did you actually get out" (see gen_hz_roadworks.mjs's
       // header: the lane-closure world zone does not exist yet).
-      params: { kind: "reachZone", x: HZR_X_OPEN, y: 234, radiusM: 3.5 },
+      //
+      // THE GREEN LINE MERGES WHERE THE LESSON MERGES — the sc-merge-lane-end:
+      // 112be4ef defect on its twin. hz-roadworks-v1 is one edge too, so the
+      // ribbon eased into the open lane over the first 40 m, in front of the
+      // through car instruction 4 says to let by («пролуката ЗАД нея е
+      // твоята»), and kept the student there for ~230 m. `laneChange` is the
+      // stretch over which this lesson's own correct drive merges
+      // (HZR_MERGE_FROM_Y → HZR_MERGE_TO_Y, finished before the cones start at
+      // HZR_TAPER_FROM_Y) — pinned to the shadow script's merge step and the
+      // committed recording in __tests__/merge-ribbon-follow.test.ts.
+      params: {
+        kind: "reachZone",
+        x: HZR_X_OPEN,
+        y: 234,
+        radiusM: 3.5,
+        laneChange: {
+          from: { x: HZR_X_CLOSED, y: HZR_MERGE_FROM_Y },
+          to: { x: HZR_X_OPEN, y: HZR_MERGE_TO_Y },
+        },
+      },
     },
     {
       id: "sc-mrs-works-pace",

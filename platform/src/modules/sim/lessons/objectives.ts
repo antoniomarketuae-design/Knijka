@@ -454,6 +454,28 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         }
         out.requireKerbwardM = p.requireKerbwardM;
       }
+      // GUIDANCE ONLY (`ReachZoneParams.laneChange`, sc-merge-lane-end:
+      // 112be4ef): where the lesson's taught lane change into this zone's lane
+      // begins and ends. No evaluator reads it; it is parsed here because the
+      // ribbon resolves every objective through this function
+      // (`guidanceGoalFor`). Malformed is refused loudly, like every other
+      // authored term — a half-authored pair would put the ribbon's change
+      // somewhere the lesson never drew it.
+      if (p.laneChange !== undefined) {
+        const lc = p.laneChange as Record<string, unknown> | null;
+        const pt = (v: unknown): v is { x: number; y: number } =>
+          typeof v === "object" && v !== null && num((v as { x?: unknown }).x) && num((v as { y?: unknown }).y);
+        if (typeof lc !== "object" || lc === null || !pt(lc.from) || !pt(lc.to)) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "reachZone laneChange must be { from: { x: number, y: number }, to: { x: number, y: number } }",
+          );
+        }
+        if (lc.from.x === lc.to.x && lc.from.y === lc.to.y) {
+          throw new ObjectiveSpecError(objective.id, "reachZone laneChange from and to are the same point");
+        }
+        out.laneChange = { from: { x: lc.from.x, y: lc.from.y }, to: { x: lc.to.x, y: lc.to.y } };
+      }
       return out;
     }
     case "passSignal": {

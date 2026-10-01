@@ -10249,3 +10249,45 @@ the engine's same-act and contact windows and four lane-geometry predicates are 
 on another road); the L5 46 m lag has no pinned rationale; after a lawful merge the staged car still brakes harder than needed
 (the staged controller brakes at its authored 12 m/s²), which can look abrupt on screen; extending the rule network-wide is a
 founder call.
+
+## Wave C verdicts — 2026-10-01
+
+This run retired 1 row(s). Their evidence frames were driven at `0daca3395efd` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`0daca3395efd`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 11 |
+| STILL (symptom reproduces) | 2 |
+| UNJUDGED (re-drive did not exercise it) | 37 |
+
+**Open list: 51 → 50**, out of 1524 filed across the whole programme (1473 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Ribbon repair (`sc-merge-lane-end:112be4ef`) — landed 2026-10-01
+
+The lane-drop lesson taught two opposite merges: its text, demo and blue shadow line hold the right lane and merge behind the
+through car, while the green route line swung into the left lane within ~40 m of the start (a route with no junction opened the
+lane-align ramp at the spawn). Filed 2026-10-01 from the w67 re-drive; two adversarial rounds, round 2 SIGNED OFF WITH CONDITIONS.
+
+What landed: `ReachZoneParams.laneChange {from, to}` — guidance only, authored from each lesson's own shadow merge step
+(sc-merge-lane-end 186 → 220, sc-merge-roadworks-shift 180 → 214) — and `guidanceRoute.ts` opens the lane-align ramp over exactly that
+span (exact projection, no sample snapping). The green line now crosses the lane line where the demo does (y 203.00 vs 203.00);
+a faithful follower is never graded worse than a blue-line follower (2,560 paired drives, four seeds); every other lesson's ribbon is
+byte-identical (6,788 of 6,873; the 85 that move are the two lane-drop lessons).
+
+Nothing closes by this landing: `112be4ef` closes on a re-drive frame. Owed (verifier conditions): on sc-merge-roadworks-shift the next
+objective's ribbon falls back to the centreline after the merge (pre-existing, not this patch); four bounds in the new projection are
+untested (none moves a ribbon or a bill today); a driver already past `from` off the held lane's centre gets a ribbon that opens at the
+lane centre (not reachable in the product today); the merge lands behind the through car only at 25–35 km/h for a constant-pace driver
+(the staged car's timing — a coach/cue feature, not geometry). The keep-right bill that both lines still draw at 15 km/h after the merge
+is answered by the founder ruling of 2026-10-01 (a separate lane).
