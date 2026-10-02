@@ -378,7 +378,7 @@ import {
 // both halves — the arithmetic AND the fact that this file still calls it.
 // §5 of lib/driveline.mjs — the per-lesson WRONG-LEG PROFILES (pedals only).
 // A separate statement so the long import below stays byte-identical.
-import { createWrongLegProfile, flatRestDue, flatRestHoldDone, readZoneRouteSpan, resumeThrottleAfterPause, wrongLegFlatStep, wrongLegProfileFinish, wrongLegProfileFor, wrongLegProfileOutcomeLine, wrongLegProfileStartLine, wrongLegRestBooked, wrongLegRestEnded, wrongLegRestHoldNote, wrongLegRestHoldsClause, wrongLegRestOpportunity, wrongLegRestSummary, wrongLegRestTick } from "./lib/driveline.mjs";
+import { createWrongLegProfile, flatRestDue, flatRestHoldDone, h1ProbeReads, parseRearProximity, readZoneRouteSpan, resumeThrottleAfterPause, wrongLegFlatStep, wrongLegProfileFinish, wrongLegProfileFor, wrongLegProfileOutcomeLine, wrongLegProfileStartLine, wrongLegRestBooked, wrongLegRestEnded, wrongLegRestHoldNote, wrongLegRestHoldsClause, wrongLegRestOpportunity, wrongLegRestSummary, wrongLegRestTick } from "./lib/driveline.mjs";
 import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, OVER_LIMIT_MAX_MS, OVER_LIMIT_SUSTAIN_SEC, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, POSTED_LIMIT_SEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, admitDraw, cabinActuationSafe, drawWitnesses, elapsedSec, errorBoundaryVerdict, holdCeilingFeeds, overCapHold, overCapScanStep, overLimitHold, overLimitLedgerStep, overLimitNoteLine, overLimitScanStep, overLimitSearchCeiling, overLimitSearchClock, parkingBrakeRoute, parkingBrakeVerdict, parseClaim, passRate, postedLimitKmh, rateVerdict, readSpeedingConfig, releaseVerdict, sustainedOverLimitLane, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
@@ -1115,6 +1115,507 @@ const shot = async (n) => {
   saveStatus();
   return ok;
 };
+
+/* ── HARNESS STAGE H1 · P1 — EVENT-KEYED SHOTS AND DOM DUMPS ────────────────
+ *
+ * The periodic beat is ~5 s apart, a pc frame was measured at up to 12 s, and
+ * the impact flash is on the page for 700 ms (ImpactCut.tsx IMPACT_FLASH_MS):
+ * a cadence cannot promise a frame of either. So a page-side WITNESS, installed
+ * before the page's own scripts, watches the DOM for two mounts —
+ *   · a toast card body (`[data-hud-toast-body]`, the same surface the probe's
+ *     `faultCards` reads), the first mount of each distinct title, PAINTED OR
+ *     NOT by its own box, visibility, display and opacity — a NECESSARY test,
+ *     not a sufficient one: an ancestor's opacity, a layer over the card and
+ *     clipping are not read, so the frames, not the flag, say what was on the
+ *     glass;
+ *   · the impact flash (`[data-hud="impact-flash"]`), every mount counted —
+ * and records, AT THE MOUNT, the overlay stack (every `[data-sim-overlay]`
+ * layer, every painted `[data-hud]` surface, the dialogs, and
+ * `html[data-sim-camera]`). It then calls the harness through a binding, and
+ * the harness SCHEDULES shots at +0, +1 and +3 s after the mount, each with a
+ * DOM dump: the card's innerText and every text row's computed visibility,
+ * display, opacity and box against the card's own box (or the flash's box),
+ * plus the camera attribute that shows the chase cut. A +0 shot on a 12 s pc
+ * frame is not a +0 frame: the line before the series says «scheduled», and
+ * the line after it prints when each shot really started.
+ *
+ * H1 ROUND 2 (the round-1 verifier's C3): ARMED ON THE DECLARED LESSONS ONLY —
+ * `h1ProbeReads(SCENARIO).eventShots`, from §5's `EVENT_SHOT_LESSONS` (both legs of
+ * each). Every other lane installs no witness, registers no binding, arms
+ * nothing, waits for nothing at its end and prints no event-shot line: the
+ * three calls at the foot of this block, and the one at the drive's clock and
+ * the one after the profile's finish, are each behind that flag.
+ *
+ * OBSERVATION ONLY: nothing here drives, and no decision reads it except the
+ * one §5 profile that counts impact-flash mounts (through the probe's
+ * `impactMounts`). Bounded: at most EVENT_SHOT_MAX_SERIES series a drive,
+ * every refusal counted in the sidecar `_audit-event-shots.json`. The two
+ * card selectors are this witness's own copies of FAULT_TOAST_BODY_SEL and
+ * FAULT_TOAST_COLUMN_SEL (declared further down, after the page is loaded);
+ * __tests__/wrong-leg-profiles.test.mjs pins the two pairs equal.
+ *
+ * H1 ROUND 15 (the round-14 verifier's V14-P1-TITLE-AND-SUBTREE) — WHAT THE
+ * WITNESS REPORTS OF AN ADDED NODE, said so a census can check each clause:
+ *   · EVERY ADDED ELEMENT: of every record the observer's callback is handed,
+ *     every added node that is an element (a text node is not one), in the
+ *     order handed;
+ *   · EVERY ONE: each impact flash — the added node when it is one, else
+ *     every one under it, in document order — and then each toast body, the
+ *     same way. The toast column is not in the document until there is a card
+ *     to hold (read at 01de885: LessonPlayShell.tsx «`HudToasts` returns null
+ *     with nothing to show»), so two cards added together arrive as ONE added
+ *     subtree, and each of them is examined;
+ *   · A CARD'S TITLE is the text of the first <p> under the card, with every
+ *     run of white space written as ONE U+0020 and none left at either end.
+ *     White space is what ECMAScript's \s matches and its trim removes:
+ *     U+0009–U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029,
+ *     U+202F, U+205F, U+3000 and U+FEFF — and nothing else (U+0085, U+180E,
+ *     U+200B and U+2060 are not white space, and stay);
+ *   · THE FIRST MOUNT OF EACH DISTINCT TITLE: a card whose title is empty, or
+ *     whose card is not under the toast column, is not reported; two titles
+ *     are one title only when they are the same UTF-16 code units in the same
+ *     order (letter case is not folded, nothing is normalised);
+ *   · THE MOUNT LINE prints the title JSON-quoted, as JSON.stringify writes
+ *     it: the quote, the backslash and every control U+0000–U+001F escaped, a
+ *     surrogate that is not half of a pair escaped, every other code unit as
+ *     itself (so a U+007F–U+009F in a title is printed as it is). */
+const EVENT_FLASH_SEL = '[data-hud="impact-flash"]';
+const EVENT_CARD_BODY_SEL = "[data-hud-toast-body]";
+const EVENT_CARD_COLUMN_SEL = '[data-hud="toasts"]';
+/** Shots after each mount, in ms — a SCHEDULE: each shot's real start is recorded and printed after the series. */
+const EVENT_SHOT_OFFSETS_MS = [0, 1000, 3000];
+/** Series a drive may take (each is three shots and three dumps). */
+const EVENT_SHOT_MAX_SERIES = 8;
+/** What this lane reads beyond the pre-H1 probe (§5, pure): the event witness and its shots, and the rear badge. */
+const H1_READS = h1ProbeReads(SCENARIO);
+/** Install the page-side witness (before the page's own scripts) and the binding it calls. */
+const installEventWitness = async () => {
+  await page.addInitScript(({ flashSel, bodySel, columnSel }) => {
+    const w = /** @type {any} */ (window);
+    const wit = { impacts: 0, cards: 0, events: [] };
+    w.__eventWitness = wit;
+    const seenTitles = new Set();
+    // H1 ROUND 12 (the round-11 verifier's V11-WITNESS-COLLAPSE): the computed visibility is one of three values, and only
+    // «visible» paints — CSS 2.1 §11.2 and CSS Display 3 §4: «hidden» paints nothing, and «collapse» paints nothing either
+    // (outside table rows, row groups, columns and column groups it is «hidden»; on those it removes the row or column).
+    // Round 11's `!== "hidden"` called a collapsed element painted.
+    const painted = (el) => {
+      const r = el.getBoundingClientRect();
+      const st = getComputedStyle(el);
+      return r.width > 1 && r.height > 1 && st.visibility === "visible" && st.display !== "none" && Number(st.opacity) > 0;
+    };
+    const overlayNow = () => {
+      const layers = [];
+      for (const el of document.querySelectorAll("[data-sim-overlay]")) layers.push({ layer: el.getAttribute("data-sim-overlay"), painted: painted(el) });
+      const huds = [];
+      for (const el of document.querySelectorAll("[data-hud]")) if (painted(el)) huds.push(el.getAttribute("data-hud"));
+      return { layers, huds, dialogs: document.querySelectorAll('[role="dialog"]').length, camera: document.documentElement.getAttribute("data-sim-camera") };
+    };
+    const report = (kind, title, headLine, cardPainted) => {
+      const ev = { n: wit.events.length + 1, kind, title, head: headLine, cardPainted, at: Date.now(), overlay: overlayNow() };
+      wit.events.push(ev);
+      const bound = w.__auditEvent;
+      if (typeof bound === "function") {
+        try {
+          const r = bound(ev);
+          if (r && typeof r.catch === "function") r.catch(() => {});
+        } catch {
+          /* the harness is not listening — the witness keeps its own record */
+        }
+      }
+    };
+    const scan = (node) => {
+      const flashes = node.matches(flashSel) ? [node] : node.querySelectorAll(flashSel);
+      for (const f of flashes) {
+        if (f) {
+          wit.impacts += 1;
+          report("impact", null, null, null);
+        }
+      }
+      const bodies = node.matches(bodySel) ? [node] : node.querySelectorAll(bodySel);
+      for (const body of bodies) {
+        let card = body;
+        while (card.parentElement !== null && !card.parentElement.matches(columnSel)) card = card.parentElement;
+        if (card.parentElement === null) continue;
+        const t = card.querySelector("p");
+        const title = (t ? t.textContent || "" : "").replace(/\s+/g, " ").trim();
+        const head = t && t.previousElementSibling ? (t.previousElementSibling.textContent || "").replace(/\s+/g, " ").trim() : "";
+        if (title === "" || seenTitles.has(title)) continue;
+        seenTitles.add(title);
+        wit.cards += 1;
+        report("card", title, head, painted(card));
+      }
+    };
+    new MutationObserver((recs) => {
+      for (const r of recs) for (const n of r.addedNodes) if (n.nodeType === 1) scan(n);
+    }).observe(document, { childList: true, subtree: true });
+  }, { flashSel: EVENT_FLASH_SEL, bodySel: EVENT_CARD_BODY_SEL, columnSel: EVENT_CARD_COLUMN_SEL });
+  await page.exposeBinding("__auditEvent", (_source, ev) => {
+    eventRunsOpen += 1;
+    // H1 ROUND 8: nothing is counted here — `eventSeries` classifies every throw of its own, once (`eventSeriesThrew`). A
+    // rejection reaches this catch only from a series' own line (its bounds line, or its thrown line), printed after the
+    // series is marked ended, so the catch only keeps it from going unhandled; round 7 filed a thrown series here as a
+    // refusal as well, counting one mount twice.
+    const run = eventSeries(ev).catch(() => {});
+    run.then(() => { eventRunsOpen -= 1; });
+    eventShots.pending.push(run);
+  });
+};
+
+/** What the harness did with each mount the witness reported. */
+const eventShots = { armed: false, t0: null, seen: 0, series: [], refused: [], pending: [] };
+/** H1 ROUND 7: the binding runs not yet settled — a series still taking its shots, or a refusal not yet returned. The
+ *  sidecar's `pendingAtWrite` is this count at the write (the writing run's own included); round 6 wrote
+ *  `pending.length`, every run ever started, which is not what the field's name says. */
+let eventRunsOpen = 0;
+const writeEventShots = () => {
+  const { pending, ...rest } = eventShots;
+  try { writeFileSync(`${OUT}/_audit-event-shots.json`, `${JSON.stringify({ offsetsMs: EVENT_SHOT_OFFSETS_MS, maxSeries: EVENT_SHOT_MAX_SERIES, pendingAtWrite: eventRunsOpen, ...rest }, null, 2)}\n`); } catch { /* best effort, as everywhere else on this disk */ }
+};
+/** The DOM at one shot: the camera attribute, and the card (by its title) with every text row, or the flash.
+ *  H1 ROUND 7 (the round-6 verifier's V6-31): the dump is of the FIRST element in document order its selector matches —
+ *  the first impact flash, or the first card under the toast column whose title is the series' title — and `matched`
+ *  says how many it matched. Over 1, the dump cannot say which of them the witness reported (a flash of another mount,
+ *  or a later card with the same title), so the frames, not the dump, are the evidence. */
+const eventDump = (kind, title) =>
+  page
+    .evaluate(({ kind, title, flashSel, bodySel, columnSel }) => {
+      const box = (el) => {
+        const st = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return { visibility: st.visibility, display: st.display, opacity: st.opacity, w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom) };
+      };
+      const out = { at: Date.now(), camera: document.documentElement.getAttribute("data-sim-camera"), card: null, flash: null, matched: 0 };
+      if (kind === "impact") {
+        const flashes = document.querySelectorAll(flashSel);
+        out.matched = flashes.length;
+        out.flash = flashes.length > 0 ? box(flashes[0]) : null;
+        return out;
+      }
+      const cards = [];
+      for (const body of document.querySelectorAll(bodySel)) {
+        let el = body;
+        while (el.parentElement !== null && !el.parentElement.matches(columnSel)) el = el.parentElement;
+        if (el.parentElement === null || cards.includes(el)) continue;
+        const t = el.querySelector("p");
+        if ((t ? t.textContent || "" : "").replace(/\s+/g, " ").trim() === title) cards.push(el);
+      }
+      out.matched = cards.length;
+      const card = cards[0];
+      if (card) {
+        const cb = box(card);
+        const rows = [];
+        for (const el of card.querySelectorAll("*")) {
+          let own = "";
+          for (const n of el.childNodes) if (n.nodeType === 3) own += n.textContent;
+          own = own.replace(/\s+/g, " ").trim();
+          if (own === "") continue;
+          const b = box(el);
+          rows.push({ tag: el.tagName.toLowerCase(), text: own.slice(0, 200), ...b, insideCard: b.top >= cb.top - 1 && b.bottom <= cb.bottom + 1 });
+        }
+        out.card = { innerText: card.innerText, box: cb, rows };
+      }
+      return out;
+    }, { kind, title, flashSel: EVENT_FLASH_SEL, bodySel: EVENT_CARD_BODY_SEL, columnSel: EVENT_CARD_COLUMN_SEL })
+    .catch((e) => ({ unread: String(e && e.message ? e.message : e) }));
+/** H1 ROUND 8 (the round-7 verifier's P1-THREW-DOUBLE-COUNT): A THROW IS CLASSIFIED ONCE, WHERE IT HAPPENS. Before the
+ *  series is recorded (a malformed report), the report is a refusal «threw: …» and began no series. After it, the series
+ *  is marked `ended: "threw"` with its `why`, keeps the steps that ran, prints its own line and is NOT also a refusal —
+ *  round 7's binding filed it as a refusal too, so the end line counted a mount shot twice as «not shot». A series whose
+ *  every scheduled step ran is marked `ended: "every-step"`; a series with no `ended` is still running. */
+/*  H1 ROUND 12 (the round-11 verifier's V11-LENGTH-CEILING, V11-LINECOUNT-CEILING and V11-READ-TWICE): THE HARNESS'S OWN
+ *  CEILINGS, declared, so a census can cross them. A generator always has a largest draw, and a silent cap past it cannot be
+ *  seen; so the harness cuts at a ceiling of its own, says so in the text it prints, and the census draws at 0, 1, just
+ *  under, at, just over and far past each one. A cap below a ceiling then cuts a text the census expects whole, and a cap
+ *  above it cannot exist, because the harness has already cut there.
+ *    · THE PRINTED LINE carries at most EVENT_THROWN_LINE_MAX_UNITS UTF-16 code units of a text (a thrown string, a
+ *      one-line message, or a message's first line). Every line goes to run.log through stdout and is held in memory for
+ *      _audit-transcript.log, both on the 7200 rpm HDD that once filled (ENOSPC, above); a drive prints at most
+ *      EVENT_SHOT_MAX_SERIES thrown lines, so the ceiling bounds them at 8 × 8,192 code units (under 400 KB even when every
+ *      unit is a six-character \uXXXX escape), while the first lines of the errors Playwright throws at a shot or a wait
+ *      («page.screenshot: Timeout 30000ms exceeded.», «Target page, context or browser has been closed») are tens of
+ *      code units, so no such line is cut.
+ *    · THE SIDECAR'S WHY carries at most EVENT_THROWN_WHY_MAX_UNITS of a thrown string or a message. _audit-event-shots.json
+ *      is rewritten whole at every step and every refusal (writeEventShots), so a why is written up to once per step; the
+ *      ceiling holds a «Call log:» of over a hundred lines of 100 code units whole. (H1 round 13, the round-12 verifier's
+ *      V12-SIDECAR-SIZE-SENTENCE:) ON DISK a carried code unit takes at most 7 bytes — q() writes it as at most a
+ *      six-character \uXXXX escape, and writeEventShots' JSON.stringify escapes that escape's backslash again (a code unit
+ *      q() leaves as itself takes at most 3 bytes of UTF-8) — so one why at the ceiling takes at most 7 × 16,384 = 114,688
+ *      bytes for its carried text and under 200 for its words, and the EVENT_SHOT_MAX_SERIES series' whys together are
+ *      under 920 KB a rewrite (8 × 114,888 = 919,104 bytes). A refusal's why (a throw before its series) is bounded the
+ *      same way, one by one, but refusals are not counted by the series cap: each report that throws before its series
+ *      adds one more why, of at most 114,888 bytes, to every later rewrite.
+ *    · THE LINE COUNT is exact up to EVENT_THROWN_LINES_COUNTED_MAX, the most lines a message the sidecar carries whole can
+ *      have (a why of 16,384 code units holds at most 16,385 lines, when every one of its code units ends a line); a
+ *      message with more lines than that is said to have «more than» it. The count is never capped silently.
+ *  A text past a ceiling is cut at that code unit (a surrogate pair at the cut is split, and its high half is escaped
+ *  like any lone surrogate), and the cut is announced with what was carried and what was not. */
+/** The most UTF-16 code units of a text the printed thrown-series line carries. */
+const EVENT_THROWN_LINE_MAX_UNITS = 8192;
+/** The most UTF-16 code units of a thrown string or a message the sidecar's why carries. */
+const EVENT_THROWN_WHY_MAX_UNITS = 16384;
+/** The most lines of a message the printed line counts exactly (a why at its ceiling holds at most this many). */
+const EVENT_THROWN_LINES_COUNTED_MAX = EVENT_THROWN_WHY_MAX_UNITS + 1;
+/*  H1 ROUND 15 (the round-14 verifier's V14-ESCAPE-SYNTAX-CUT and V14-EMOJI-PROPERTY-PAIR) — THE HARNESS CHECKS WHAT IT IS
+ *  ABOUT TO SAY. Rounds 12 to 14 answered «a cut that looks at what it cuts» by PLACING content at every cut in a census, and
+ *  each verifier then found content no census had placed (an ANSI control sequence, an emoji tag sequence): a census has only
+ *  the texts it draws. So the truth of what is said about a text no longer rests on a census. After the description of a
+ *  thrown string, or of a message that is a string, is built, and BEFORE it is returned, the harness reads its own two texts
+ *  back and compares each with the value:
+ *    · THE QUOTED TEXT, decoded by a decoder written here for this (eventThrownCarried: JSON's two-character escapes, a
+ *      \uXXXX of four hex digits, any other code unit as itself; no JSON.parse), must be, code unit for code unit, the RAW
+ *      SLICE of the text — its first n code units, n its whole length or, past a ceiling, that ceiling; for the printed line
+ *      of a message of several lines, its first line's length or, past the printed line's ceiling, that ceiling — and must
+ *      write none of the code units the specification below says are escaped as itself (U+0000–U+001F, U+007F–U+009F,
+ *      U+2028, U+2029, and a surrogate that is not one half of a pair written whole);
+ *    · EVERY COUNT is counted again from the text (its length; its lines, by a scan of its own code units — a CR LF, a lone
+ *      CR and a lone LF each end one; its first line's length), and what follows the quoted text must be, character for
+ *      character, the sentence the specification gives for those counts — and nothing at all when nothing was cut;
+ *    · THE WORDS BEFORE the quoted text must be the specification's, with the kind the description named.
+ *  On ANY disagreement — or when the check itself throws — nothing that was built is returned: the line and the why are both
+ *  the fallback «(the thrown value could not be described)», which is true. So an edit to how a description is BUILT (a cut
+ *  that looks at what it cuts, a quoting that changes a character, a count that slips) cannot print a false sentence about
+ *  the text, whatever the text holds: at worst it prints the fallback.
+ *  WHAT THE CHECK RESTS ON, said plainly: the text it compares with — the thrown string itself, or the message as it was
+ *  read, once — the kind named (decided by the tests of the specification below, which the check does not make again), and
+ *  its own code. An edit that changes the VALUE before it is described (at the read, or at the function's entry) describes
+ *  another value, and the check, comparing with that value, does not see it: that, the kind, and an edit to the check itself
+ *  are held by __tests__/wrong-leg-profiles.test.mjs — every line of this path is PINNED there (an edit is red until it is
+ *  re-read and re-pinned), the check is run on its own against sentences made false one piece at a time, and the P1 block
+ *  is run with the building sabotaged, which must print the fallback. */
+/** The code units the quoting never writes as themselves inside the quotes — the quote and the backslash, a control
+ *  U+0000–U+001F, U+007F–U+009F, U+2028, U+2029, and a surrogate that is not one half of a pair written whole (a high one
+ *  with no low one after it, a low one with no high one before it). */
+const EVENT_THROWN_NEVER_ITSELF = /["\\\x00-\x1f\x7f-\x9f\u2028\u2029]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+/** The JSON string literal that starts at `text[at]`, read back against `x`: the index just past its closing quote when it
+ *  decodes, code unit for code unit, to exactly the first `n` code units of `x` and writes as itself no code unit of
+ *  EVENT_THROWN_NEVER_ITSELF; -1 otherwise (no opening quote, an escape JSON does not have, a code unit that is not x's,
+ *  one written as itself that the quoting escapes, or no closing quote after the n-th). It reads a RUN of code units
+ *  written as themselves at once — the run must be x's own run at the same place — and an escape one at a time. */
+const eventThrownCarried = (text, at, x, n) => {
+  if (text.charCodeAt(at) !== 0x22) return -1;
+  let i = at + 1;
+  let k = 0;
+  while (k < n) {
+    if (text.charCodeAt(i) !== 0x5c) {
+      // A RUN written as itself, up to the next backslash or to the n-th code unit: x's own, and none of it a code unit the
+      // quoting escapes (so it does not hold the closing quote either)
+      const stop = text.indexOf("\\", i);
+      const length = Math.min(stop < 0 ? text.length - i : stop - i, n - k);
+      const run = text.slice(i, i + length);
+      if (length < 1 || run !== x.slice(k, k + length) || EVENT_THROWN_NEVER_ITSELF.test(run)) return -1;
+      i += length;
+      k += length;
+      continue;
+    }
+    // AN ESCAPE — one of JSON's two-character escapes, or \u and four hex digits: one code unit, x's k-th
+    const c = text.charCodeAt(i + 1);
+    let unit = c === 0x22 || c === 0x5c || c === 0x2f ? c : c === 0x62 ? 0x08 : c === 0x66 ? 0x0c : c === 0x6e ? 0x0a : c === 0x72 ? 0x0d : c === 0x74 ? 0x09 : -1;
+    i += 2;
+    if (c === 0x75) {
+      unit = 0;
+      for (let h = 0; h < 4; h += 1) {
+        const d = text.charCodeAt(i + h);
+        const v = d >= 0x30 && d <= 0x39 ? d - 0x30 : d >= 0x61 && d <= 0x66 ? d - 0x57 : d >= 0x41 && d <= 0x46 ? d - 0x37 : -1;
+        if (v < 0) return -1;
+        unit = unit * 16 + v;
+      }
+      i += 4;
+    }
+    if (unit !== x.charCodeAt(k)) return -1;
+    k += 1;
+  }
+  return text.charCodeAt(i) === 0x22 ? i + 1 : -1;
+};
+/** IS WHAT WAS BUILT WHAT THE SPECIFICATION SAYS OF `x`? `x` is the text described — a thrown string (`kind` null) or a
+ *  message that is a string, of the kind named; `said` is { why, line } as built. True only when each text is the
+ *  specification's words for that kind, then x's raw slice quoted (eventThrownCarried), then the sentence the specification
+ *  gives for the counts counted HERE from x — and nothing after it. */
+const eventThrownHolds = (x, kind, said) => {
+  const W = EVENT_THROWN_WHY_MAX_UNITS;
+  const L = EVENT_THROWN_LINE_MAX_UNITS;
+  const n = x.length;
+  const head = kind === null ? "a string, not an Error: " : `${kind}, its message `;
+  // THE WHY: the whole text up to its ceiling; past it, the first W code units and the cut's three counts
+  if (!said.why.startsWith(head)) return false;
+  const whyEnd = eventThrownCarried(said.why, head.length, x, n <= W ? n : W);
+  if (whyEnd < 0 || said.why.slice(whyEnd) !== (n <= W ? "" : ` (cut at the sidecar's ceiling: the first ${W} of its ${n} UTF-16 code units are carried, the last ${n - W} are not recorded)`)) return false;
+  // THE LINES of a message, counted here: a CR LF, a lone CR and a lone LF each end one (a thrown string is printed whole)
+  let count = 1;
+  let firstLength = n;
+  for (let k = 0; kind !== null && k < n; k += 1) {
+    const u = x.charCodeAt(k);
+    if (u !== 0x0a && u !== 0x0d) continue;
+    if (count === 1) firstLength = k;
+    count += 1;
+    if (u === 0x0d && x.charCodeAt(k + 1) === 0x0a) k += 1;
+  }
+  const whyCarries = n <= W ? "all of them" : `the first ${W} of them`;
+  if (count === 1) {
+    // THE LINE of a thrown string or a one-line message: the whole text up to its ceiling; past it, the first L and its counts
+    if (!said.line.startsWith(head)) return false;
+    const lineEnd = eventThrownCarried(said.line, head.length, x, n <= L ? n : L);
+    return lineEnd >= 0 && said.line.slice(lineEnd) === (n <= L ? "" : ` (cut at the printed line's ceiling: the first ${L} of its ${n} UTF-16 code units are printed, the last ${n - L} are not; the series' why in the sidecar carries ${whyCarries})`);
+  }
+  // THE LINE of a message of several lines: its first line up to the line's ceiling, which line it is of how many, and the counts
+  const firstHead = `${kind}, its message's first line `;
+  const kept = firstLength <= L ? firstLength : L;
+  if (!said.line.startsWith(firstHead)) return false;
+  const lineEnd = eventThrownCarried(said.line, firstHead.length, x, kept);
+  return lineEnd >= 0 && said.line.slice(lineEnd) === ` (line 1 of ${count > EVENT_THROWN_LINES_COUNTED_MAX ? `more than ${EVENT_THROWN_LINES_COUNTED_MAX}` : count}, ${kept} of its ${n} UTF-16 code units${kept < firstLength ? `, the first line cut at the printed line's ceiling from its ${firstLength}` : ""}; ${n <= W ? "the whole message is in the series' why in the sidecar" : `the series' why in the sidecar carries ${whyCarries}`})`;
+};
+/*  H1 ROUND 10 (the round-9 verifier's V9-35/37/38/39/50/51/52/54 and its «[object Object]» condition): WHAT WAS THROWN,
+ *  from ONE total function, each clause of which states the result of a test the code has just made. Round 9 printed a
+ *  message that was not a string through String() («[object Object]», or nothing at all for []), named kinds no test had
+ *  established, and printed message text raw; every spelling the verifiers found was one of those three.
+ *    · THE KIND, by a primitive test: null and undefined by identity; a primitive by its typeof, with «not an Error» (no
+ *      primitive is one); anything else is «a function» by typeof, else «an array» by Array.isArray, else «an Error» by
+ *      instanceof Error, else «an object». The first test that holds names it, so a kind is never read off a name or a
+ *      shape; a test that throws names nothing, and the kind typeof gave stays. «An Error» means an instance of this
+ *      realm's Error: an Error made in another realm is «an object», which is true of it.
+ *    · THE VALUE of a number, a bigint or a boolean as the runtime spells it, -0 as «-0»; a symbol's text is not printed.
+ *    · THE MESSAGE of anything else, read ONCE (round 12: one property read, whose value every later clause uses — the
+ *      census throws messages that answer each read differently and counts the reads): a string is printed only
+ *      JSON-quoted (U+007F–U+009F, U+2028 and U+2029 escaped as well, so the quoted text carries no line break and no
+ *      terminal control); null and undefined are named; any other message is named by its typeof and never rendered;
+ *      a read that throws is said to have thrown.
+ *    · THE CUT (round 9's decision, kept): the printed line carries a multi-line message's FIRST line (\r\n, \r and \n each
+ *      end a line) and says which line it is of how many, and how many of the message's UTF-16 code units it carries; the
+ *      sidecar's `why` carries the whole message. A thrown string is printed whole on both. Round 12: each up to its
+ *      ceiling above — a text past one is cut there and the cut announced, the line saying how much of it the why carries.
+ *    · THE CHECK (round 15; its comment is above eventThrownCarried): the description of a thrown string or of a string
+ *      message is built by the lines below inside one inner function, and what that returns is compared with the text —
+ *      a thrown string itself, or the message as it was read — by eventThrownHolds before anything is returned. A
+ *      description that does not hold of its text is not returned.
+ *  It returns { why, line }: the sidecar's text and the printed line's. The last catch is reached when a builtin throws, or
+ *  when the check finds that what was built is not what this specification says of the text; it says no more than that
+ *  the value could not be described. */
+const eventThrownText = (e) => {
+  try {
+    // (H1 round 15) the message a description is built from and the kind it named, kept for the check after it (a thrown
+    // string is the check's text itself). The inner function's lines keep their round-10 indentation, so every earlier
+    // round's mutant still anchors on its own line.
+    let described = null;
+    const built = (() => {
+    const q = (s) => JSON.stringify(s).replace(/[\u007f-\u009f\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+    const one = (d) => ({ why: d, line: d });
+    const W = EVENT_THROWN_WHY_MAX_UNITS;
+    const L = EVENT_THROWN_LINE_MAX_UNITS;
+    // (round 12) how much of a text of `n` code units the series' why carries, for the printed line to say
+    const inWhy = (n) => (n <= W ? "the series' why in the sidecar carries all of them" : `the series' why in the sidecar carries the first ${W} of them`);
+    const forWhy = (s) => (s.length <= W ? q(s) : `${q(s.slice(0, W))} (cut at the sidecar's ceiling: the first ${W} of its ${s.length} UTF-16 code units are carried, the last ${s.length - W} are not recorded)`);
+    const forLine = (s) => (s.length <= L ? q(s) : `${q(s.slice(0, L))} (cut at the printed line's ceiling: the first ${L} of its ${s.length} UTF-16 code units are printed, the last ${s.length - L} are not; ${inWhy(s.length)})`);
+    const t = typeof e;
+    if (e === null) return one("null, not an Error");
+    if (e === undefined) return one("undefined, not an Error");
+    if (t === "string") return { why: `a string, not an Error: ${forWhy(e)}`, line: `a string, not an Error: ${forLine(e)}` };
+    if (t === "number") return one(`a number, not an Error: ${Object.is(e, -0) ? "-0" : String(e)}`);
+    if (t === "bigint" || t === "boolean") return one(`a ${t}, not an Error: ${String(e)}`);
+    if (t === "symbol") return one("a symbol, not an Error");
+    let kind = t === "function" ? "a function" : "an object";
+    try {
+      if (t === "object" && Array.isArray(e)) kind = "an array";
+      else if (t === "object" && e instanceof Error) kind = "an Error";
+    } catch {
+      /* the test threw: it names nothing */
+    }
+    let m;
+    try {
+      m = e.message;
+    } catch {
+      return one(`${kind}; reading its message threw`);
+    }
+    if (m === null || m === undefined) return one(`${kind}, its message ${String(m)}`);
+    if (typeof m !== "string") return one(`${kind}, its message ${typeof m === "object" ? "an" : "a"} ${typeof m}, not a string`);
+    described = { text: m, kind };
+    const why = `${kind}, its message ${forWhy(m)}`;
+    const lines = m.split(/\r\n|\r|\n/, EVENT_THROWN_LINES_COUNTED_MAX + 1);
+    if (lines.length === 1) return { why, line: `${kind}, its message ${forLine(m)}` };
+    const first = lines[0];
+    const kept = first.length <= L ? first : first.slice(0, L);
+    const count = lines.length > EVENT_THROWN_LINES_COUNTED_MAX ? `more than ${EVENT_THROWN_LINES_COUNTED_MAX}` : String(lines.length);
+    return { why, line: `${kind}, its message's first line ${q(kept)} (line 1 of ${count}, ${kept.length} of its ${m.length} UTF-16 code units${kept.length < first.length ? `, the first line cut at the printed line's ceiling from its ${first.length}` : ""}; ${m.length <= W ? "the whole message is in the series' why in the sidecar" : inWhy(m.length)})` };
+    })();
+    // THE CHECK (round 15): what was built about a text is returned only when it holds of that text
+    if (typeof e === "string" ? !eventThrownHolds(e, null, built) : described !== null && !eventThrownHolds(described.text, described.kind, built)) throw new Error("the description built does not hold of its text");
+    return built;
+  } catch {
+    return { why: "(the thrown value could not be described)", line: "(the thrown value could not be described)" };
+  }
+};
+const eventSeriesThrew = (ev, rec, e) => {
+  const said = eventThrownText(e);
+  const why = `threw: ${said.why}`;
+  if (rec === null) eventShots.refused.push({ n: ev?.n ?? null, kind: ev?.kind ?? null, why });
+  else {
+    rec.ended = "threw";
+    rec.why = why;
+  }
+  writeEventShots();
+  if (rec !== null) note(`      EVENT SHOT ${rec.n}: a throw ended this series after ${rec.shots.length} of its ${EVENT_SHOT_OFFSETS_MS.length} scheduled steps had run (threw: ${said.line})${rec.shots.length > 0 ? ` — frame written by those steps: ${rec.shots.map((x) => (x.ok ? "yes" : "NO")).join("/")}` : ""}; whatever the work it interrupted left on disk is not among the frames written — _audit-event-shots.json`);
+};
+/** One mount: a series of shots SCHEDULED at EVENT_SHOT_OFFSETS_MS after it, each with its dump and its real start. */
+const eventSeries = async (ev) => {
+  eventShots.seen += 1;
+  let rec = null;
+  // (the try's body keeps its round-7 indentation, so every earlier round's mutant still anchors on its own line)
+  try {
+  if (!eventShots.armed) { eventShots.refused.push({ n: ev.n, kind: ev.kind, title: ev.title, why: "not-driving" }); writeEventShots(); return; }
+  if (eventShots.series.length >= EVENT_SHOT_MAX_SERIES) { eventShots.refused.push({ n: ev.n, kind: ev.kind, title: ev.title, why: "series-cap" }); writeEventShots(); return; }
+  rec = { n: ev.n, kind: ev.kind, title: ev.title, head: ev.head, cardPainted: ev.cardPainted, tSec: Math.round((ev.at - eventShots.t0) / 100) / 10, overlayAtMount: ev.overlay, shots: [] };
+  eventShots.series.push(rec);
+  note(`      EVENT SHOT ${rec.n}: a${ev.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${rec.tSec}s${ev.kind === "card" ? ` (${JSON.stringify(ev.title)}, painted at mount by its own box and computed style only: ${ev.cardPainted} — necessary, not sufficient: its ancestors' opacity, a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(ev.overlay.layers)}, camera ${ev.overlay.camera ?? "(unset)"}; shots scheduled at +${EVENT_SHOT_OFFSETS_MS.map((o) => o / 1000).join("/+")} s after the witness reported the mount`);
+  for (const off of EVENT_SHOT_OFFSETS_MS) {
+    const wait = ev.at + off - Date.now();
+    if (wait > 0) await page.waitForTimeout(wait);
+    const name = `05-ev${String(rec.n).padStart(2, "0")}-${ev.kind}-p${off / 1000}s`;
+    const startedMs = Date.now() - ev.at;
+    const dump = await eventDump(ev.kind, ev.title);
+    const ok = await shot(name);
+    rec.shots.push({ offsetMs: off, name, ok, startedMs, doneMs: Date.now() - ev.at, dump });
+    writeEventShots();
+  }
+  } catch (e) {
+    eventSeriesThrew(ev, rec, e);
+    return;
+  }
+  rec.ended = "every-step";
+  writeEventShots();
+  // H1 ROUND 3 (C4): each frame is bounded by its step — the DOM dump, then the frame — from the step's start to its end,
+  // the sidecar's startedMs and doneMs, floored and ceiled so each printed bound is a true one.
+  note(`      EVENT SHOT ${rec.n}: each shot's step (its DOM dump, then its frame) ran inside ${rec.shots.map((x) => `[+${(Math.floor(x.startedMs / 100) / 10).toFixed(1)}, +${(Math.ceil(x.doneMs / 100) / 10).toFixed(1)}]`).join(" / ")} s after the witness reported the mount, so each frame written was taken inside its own bounds — startedMs and doneMs in _audit-event-shots.json, floored and ceiled to 0.1 s (frame written: ${rec.shots.map((x) => (x.ok ? "yes" : "NO")).join("/")})`);
+};
+/** Arm the series at the drive's clock: a mount before it is recorded, not shot. */
+const armEventShots = (at) => {
+  eventShots.armed = true;
+  eventShots.t0 = at;
+};
+/** H1 ROUND 8: THE END LINE says what the harness DID with each report it had received, in classes that add up to that
+ *  count — a series that ran every scheduled step, a series a throw ended early, a series still running (only when the
+ *  20 s bound ended first), or no series (a report before arming or past the cap, or a throw before its series was
+ *  recorded) — with the frames the camera confirmed written per series class (a step that threw confirmed none). Round 7
+ *  printed «N series taken, M mount(s) not shot» and counted a thrown series in both. */
+const eventShotsEndLine = () => {
+  const frames = (list) => list.reduce((a, r) => a + r.shots.filter((x) => x.ok).length, 0);
+  const full = eventShots.series.filter((r) => r.ended === "every-step");
+  const cut = eventShots.series.filter((r) => r.ended === "threw");
+  const running = eventShots.series.filter((r) => r.ended === undefined);
+  const refusedFor = (why) => eventShots.refused.filter((x) => x.why === why).length;
+  const threwFirst = eventShots.refused.filter((x) => x.why.startsWith("threw: ")).length;
+  return `  EVENT SHOTS: of ${eventShots.seen} report(s) the harness had received from the page-side witness, ${full.length} led to a series that ran every scheduled step (${frames(full)} frame(s) written), ${cut.length} to a series a throw ended early (${frames(cut)} frame(s) written before it)${running.length > 0 ? `, ${running.length} to a series still running when this line was written (${frames(running)} frame(s) written so far)` : ""} and ${eventShots.refused.length} to no series (not-driving ${refusedFor("not-driving")} · series-cap ${refusedFor("series-cap")} · a throw before its series ${threwFirst})${running.length > 0 ? "; these figures are as of this line" : ""} — _audit-event-shots.json`;
+};
+/** After the drive: no series starts; the ones running get their later shots (bounded), then the sidecar is written whole. */
+const finishEventShots = async () => {
+  eventShots.armed = false;
+  await Promise.race([Promise.allSettled(eventShots.pending), page.waitForTimeout(20_000)]);
+  writeEventShots();
+  // H1 ROUND 7: the count is of the reports the harness had RECEIVED (a report still in flight when the drive ends is
+  // not in it), and a series still running when the 20 s bound ends is said so — the counts are as of this line.
+  // H1 ROUND 8: «still running» is a series not marked ended, not the open-run count (a settled run's decrement is a
+  // microtask behind its series), and every class is `eventShotsEndLine`'s.
+  note(eventShotsEndLine());
+};
+if (H1_READS.eventShots) await installEventWitness();
 
 // ── the reading surface ────────────────────────────────────────────────────
 const read = () =>
@@ -1855,6 +2356,16 @@ const throttle = async (on) => {
   await page.keyboard[on ? "down" : "up"]("KeyW").catch(() => {});
   inputChannel.driveKeyEvents += 1;
   holdW = on;
+};
+/** HARNESS STAGE H1 — THE PACE GOVERNOR'S COMMAND, APPLIED (§5 `pacePedal`): the throttle held down for the
+ *  tick, let up for the tick, or pressed for `ms` of wall clock and let up again inside the tick. The throttle
+ *  only: this helper never touches the brake. */
+const paceThrottle = async (cmd) => {
+  if (cmd.act === "down") return throttle(true);
+  if (cmd.act !== "pulse") return throttle(false);
+  await throttle(true);
+  await page.waitForTimeout(cmd.ms);
+  await throttle(false);
 };
 let refusedReversePress = 0;
 /**
@@ -7473,6 +7984,9 @@ const PAUSE_SEL = '[data-sim-overlay="teach"], [role="dialog"][aria-modal="true"
 const PAUSE_VISIBLE =
   '[data-sim-overlay="teach"]:visible, [role="dialog"][aria-modal="true"]:visible';
 
+/** HARNESS STAGE H1 — the PROX badge's container (RearProximityCue.tsx, `data-hud="rear-proximity"`). */
+const REAR_PROX_SEL = '[data-hud="rear-proximity"]';
+
 const probe = () =>
   page
     .evaluate(
@@ -7485,7 +7999,7 @@ const probe = () =>
       // while printing a tidy blind line nobody had a reason to open. It
       // degraded toward the OLD DRIVE, exactly as the module promises, which
       // is why it was survivable — and it is also why nothing went red.
-      ({ waitSrc, waitCardSrc, advisorSel, faultBodySel, faultColumnSel, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, capStripSel, postedSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg }) => {
+      ({ waitSrc, waitCardSrc, advisorSel, faultBodySel, faultColumnSel, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, capStripSel, postedSel, gearSel, hazGlanceSel, hazFollowSel, hazGlanceMark, holdOffRoadBg, holdCrashPinnedBg, rearSel, witnessOn }) => {
         const sp = document.querySelector('[aria-label^="Скорост "]');
         const paused = [...document.querySelectorAll(pauseSel)].find((e) => {
           const r = e.getBoundingClientRect();
@@ -7753,6 +8267,31 @@ const probe = () =>
               return { ok: false, why: `the hazard chips threw: ${String(e && e.message ? e.message : e)}` };
             }
           })(),
+          /* ── HARNESS STAGE H1 · THE REAR PROXIMITY BADGE, ON THE SAME TRIP ──
+           * The PROX badge (RearProximityCue) as the page carries it: the
+           * aria-label of the badge or of its labelled child, or `label: null`
+           * when no badge is mounted. `ok:false` is a read that did not come
+           * back, and it is NOT „nothing behind": §5's brake-check refuses on
+           * it. One querySelector and two getAttribute — no innerText. */
+          rearProx: rearSel === null ? undefined : (() => {
+            try {
+              const b = document.querySelector(rearSel);
+              if (!b) return { ok: true, label: null };
+              const owner = b.getAttribute("aria-label") !== null ? b : b.querySelector("[aria-label]");
+              const l = owner ? owner.getAttribute("aria-label") : null;
+              return { ok: true, label: typeof l === "string" && l.trim() !== "" ? l.trim() : "(badge on the page, no aria-label)" };
+            } catch (e) {
+              return { ok: false, why: `the rear badge read threw: ${String(e && e.message ? e.message : e)}` };
+            }
+          })(),
+          /* ── …AND THE PAGE-SIDE COUNT OF IMPACT-FLASH MOUNTS (P1's witness,
+           * installed before the page's own scripts), so a 700 ms flash
+           * between two probes is still counted. `null` when the witness is
+           * not there. */
+          impactMounts: !witnessOn ? undefined : (() => {
+            const w = window.__eventWitness;
+            return w && typeof w.impacts === "number" ? w.impacts : null;
+          })(),
         };
       },
       {
@@ -7776,6 +8315,10 @@ const probe = () =>
         gearSel: GEAR_SEL,
         holdOffRoadBg: ROUTE_HOLD_OFF_ROAD_BG,
         holdCrashPinnedBg: ROUTE_HOLD_CRASH_PINNED_BG,
+        // H1 ROUND 2 (C3): read only on a lane whose H1 reads ask for them (§5 `h1ProbeReads`) — the rear badge on a
+        // wrong leg only, the one leg whose profile reads it.
+        rearSel: H1_READS.rear && MODE !== "right" ? REAR_PROX_SEL : null,
+        witnessOn: H1_READS.eventShots,
       },
     )
     .catch((e) => ({
@@ -7810,6 +8353,9 @@ const probe = () =>
       // successful read of a car with no yield line; this field refuses to be
       // ambiguous in the same way.
       hazard: { ok: false, why: `the whole probe evaluate rejected: ${String(e && e.message ? e.message : e)}` },
+      // H1: unread, which is neither „nothing behind" nor „no impact" — see the two fields.
+      rearProx: { ok: false, why: `the whole probe evaluate rejected: ${String(e && e.message ? e.message : e)}` },
+      impactMounts: null,
     }));
 
 /**
@@ -7974,6 +8520,9 @@ let waitsHonoured = 0;
 let waitSeconds = 0;
 let stopsMade = 0;
 const t0 = Date.now();
+// P1: on a lane that takes event shots, the witness's mounts are shot from here on (a mount before the drive is
+// recorded, not shot).
+if (H1_READS.eventShots) armEventShots(t0);
 let phase = MODE === "right" ? "roll" : "flat";
 let phaseAt = t0;
 let waitStartedAt = null;
@@ -8131,9 +8680,10 @@ let flatRestAt = 0;
 /* ── THE WRONG-LEG PROFILE — lib/driveline.mjs §5 owns every clause ─────────
  *
  * ONE declared table (`WRONG_LEG_PROFILES`) of per-lesson profiles that change
- * WHEN this leg rests — and for one lesson book one brake — to commit an
- * antecedent the 45 m cadence chops. Pedals only: no wheel, no governed
- * throttle, and no decision reads the dev pose probe. A `right` leg, and every
+ * WHEN this leg rests — and for two lessons book one brake — to commit an
+ * antecedent the 45 m cadence chops. Pedals only: no wheel, the throttle
+ * governed on the two H1 `pace` profiles alone (`paceThrottle`, never the
+ * brake), and no decision reads the dev pose probe. A `right` leg, and every
  * lesson with no row, gets `declared:false`: every decision below is then the
  * neutral answer and `flatRestDue` is the transition that stood here, so those
  * lanes drive byte-for-byte as they did (pinned in
@@ -9410,8 +9960,9 @@ while (!ended && Date.now() - t0 < budgetMs) {
        * wrong-leg profile's odometer is the one FLAT_REST_EVERY_M is measured
        * in (§5 of lib/driveline.mjs). Then the profile's tick — pure, and the
        * neutral answer on every lane without a profile: no suppression and no
-       * forced rest. It never touches the throttle: the line below is the flat
-       * throttle every wrong leg has always held. */
+       * forced rest, and no `pedal`, so the line below is the flat throttle
+       * every wrong leg has always held. Only a running H1 `pace` profile
+       * hands out a throttle command, and only the throttle. */
       const flatStepM = (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
       const wrongProfileStep = wrongLegFlatStep(wrongProfile, {
         now,
@@ -9426,10 +9977,17 @@ while (!ended && Date.now() - t0 < budgetMs) {
         // N-REGRADE-STALE: the dial is the dashboard's DOM, and `now` is taken
         // after `await probe`). A timestamp, not a pose.
         probeAt: tickStart,
+        // HARNESS STAGE H1: the PROX badge as the page carries it (the brake-check reads it; OBSERVED, never a
+        // pose), and the page-side count of impact-flash mounts (the no-rest-into-the-obstacle profile reads it).
+        rear: wrongProfile.on ? parseRearProximity(p.rearProx) : null,
+        impact: wrongProfile.on ? p.impactMounts : null,
       });
       wrongProfile = wrongProfileStep.state;
       if (wrongProfileStep.say !== null) (wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line);
-      await timed("pedals", () => throttle(true));
+      // The plain flat throttle — unless a `pace` profile (§5, H1) hands out the governor's command for this
+      // tick, which `paceThrottle` applies: the throttle only, never the brake.
+      if (!wrongProfileStep.pedal) await timed("pedals", () => throttle(true));
+      else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));
       drivingTicks++;
       phaseTicks++;
       flatM += flatStepM;
@@ -9970,6 +10528,9 @@ await brake(false);
 // here is after the end frame, so the upper ledger's last interval can only
 // over-count.
 wrongProfile = wrongLegProfileFinish(wrongProfile, { now: Date.now(), t0, driveEnded: ended }).state;
+// P1: on a lane that takes event shots, no series starts after the drive; the ones already running get their later
+// shots (bounded), then the sidecar is written whole.
+if (H1_READS.eventShots) await finishEventShots();
 const driveSec = Math.round((Date.now() - t0) / 1000);
 if (!ended) {
   loud(

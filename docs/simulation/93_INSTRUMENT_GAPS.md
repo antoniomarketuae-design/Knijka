@@ -613,3 +613,32 @@ product — the product guidance is identical to 9792cd4:
 Fix (harness-only): gate the sustained-turn law on a CHANGING bearing or on route curvature and scale its hold by the measured
 lean; let a sign-flipped error inherit the sustain magnitude for one tick; never let a scan gap exceed ~1.5× the period with a pedal
 down; on RECOVERY REFUSED brake to a stop and end the drive phase. Then re-drive mobile-right three times.
+
+## GAP-9 — harness H1 landed with conditions after fifteen adversarial rounds — **ACCEPTED 2026-10-02**
+
+H1 adds four pedal-only wrong-leg profiles (`sc-vp-telltale-red`, `sc-vu-emergency`, `sc-hz-brake-dont-swerve`, `sc-follow-tailgater`),
+event-keyed shots (`EVENT_SHOT_LESSONS`: sc-sp-curve, sc-hz-brake-dont-swerve, sc-vu-emergency, sc-roundabout-entry) and the rear-gap read,
+under the emission gate (a harness reports what it OBSERVED; pedals only; lessons without a profile byte-identical).
+
+Rounds 9–15 argued only over the P1 thrown-series line and the P1 witness's tests. Round 15's verifier: the runtime self-check is
+«sound on every input I could construct», and the witness as written reports the cards correctly on the product's own markup. It
+refuted on mutation coverage. The integrator landed it on these recorded conditions (a lane lands when its behaviour is verified
+correct and no surviving sabotage changes anything on committed lessons):
+
+1. **The P1 witness tests mount a card shape the product does not use.** The census card is a div holding a head span, the title `p`
+   and the body as children; `HudToasts.tsx` renders the body as a `p` inside a div inside the card, with a div before the title. Mutants
+   that break the witness on the product's markup survive (V15-W01, W02B, W34, W04), and the fake `MutationObserver` ignores its options
+   (V15-W08). **Owed: run the witness census on the product's real markup** — queued with the GAP-8 harness lane.
+2. **A description built on an early-return line bypasses the runtime check** (V15-B01…B04): `described` is set after the two early
+   returns, so one edit there that also takes a string message is not compared with the message.
+3. **Check weakenings keyed on sizes or contents no battery value holds** survive (V15-C03, C21–C24, C18), and an edit AFTER the check
+   or at the read is outside what the check sees (V15-A01, A05, A06, A09, A12, A14).
+4. Seven cut rules can only degrade a line to the declared fallback (never a false sentence): V15-K04…K07, V14-K23, V14-K24, B14-01.
+
+None of these is a known wrong sentence on a real drive; each is a sabotage a future edit could make without a test noticing.
+5. **The P1 witness's own `painted` is the box-size test §7 rejected for the HUD census.** It reads the element's own rect (> 1 px),
+   `visibility`, `display` and `opacity` — not the ancestor chain — so a card under an `opacity: 0` ancestor reads painted, and a
+   `display: contents` or baseline-aligned inline card with a degenerate rect reads unpainted. On the product's `HudToasts` markup the
+   witness reports the cards correctly (round-15 verifier). Found by the gate: `reverseAssist-audit-harness.test.ts` §7 pinned the
+   FIRST `const painted` in the file, and H1's came first; the pin now anchors on the census's own root line and must match exactly
+   once. **Owed with item 1: give the witness the census's ancestor-chain test.**

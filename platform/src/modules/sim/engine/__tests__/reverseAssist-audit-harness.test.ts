@@ -1120,7 +1120,18 @@ describe("§7 the HUD census names what it drops", () => {
     // `display: contents` and baseline-aligned inline boxes report a degenerate
     // rect while painting; the ancestor chain is the reason, not a proxy for it.
     expect(SRC).not.toMatch(/if \(r\.width < 4 \|\| r\.height < 4\) continue;/);
-    const painted = SRC.match(/const painted = \(el\) => \{[\s\S]*?\n {4}\};/);
+    // The census's OWN `painted` — the one `read()` declares right after its
+    // root. Harness H1 (2026-10-02) put a second `const painted` earlier in the
+    // file, for its card witness, and a first-match pin then read that one. The
+    // anchor is the census's root line, and it must name exactly one function:
+    // a pin that cannot say which function it read is not a pin.
+    const censusPainted = [
+      ...SRC.matchAll(
+        /const root = document\.querySelector\("\[data-sim-shell\]"\) \?\? document\.body;\n {4}(const painted = \(el\) => \{[\s\S]*?\n {4}\};)/g,
+      ),
+    ];
+    expect(censusPainted.length, "the HUD census's own visibility test must be found exactly once").toBe(1);
+    const painted = [censusPainted[0][1]];
     expect(painted, "the visibility test is gone").not.toBeNull();
     expect(painted![0]).toMatch(/cs\.display === "none"/);
     expect(painted![0]).toMatch(/cs\.visibility === "hidden"/);

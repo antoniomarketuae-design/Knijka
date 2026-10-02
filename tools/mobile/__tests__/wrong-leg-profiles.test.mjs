@@ -38,6 +38,56 @@
  * code tokens; the harness's spelling-evading constructs, its reads of the
  * scenario id and its claim literals are censuses; its leg-mode guards are
  * derived from its own code.
+ *
+ * H1 ROUND 10 (§W20, the round-9 H1 verifier's eight error-text survivors): the
+ * harness describes a thrown value from ONE total function, and a seeded
+ * generative census over every JavaScript kind checks each printed line and
+ * sidecar why against an oracle written here from the value alone.
+ *
+ * H1 ROUND 12 (§W20, the round-11 H1 verifier's census CEILINGS): the harness
+ * declares its own length and line-count ceilings and announces every cut past
+ * them, and the census crosses each (0, 1, just under, at, just over, four times,
+ * a million); the oracle reads no `.message` — a witness accessor that answers
+ * every read differently logs the harness's reads, and exactly one is allowed;
+ * the P1 censuses draw `visibility: collapse`, which the specification does not
+ * paint.
+ *
+ * H1 ROUND 13 (§W20, the round-12 H1 verifier's V12-CUT-CONTENT): the census
+ * now places the CONTENT at every cut — every code unit 0x0000–0xFFFF at the
+ * last carried and at the first cut position of every cut site, and runs of
+ * every white-space, control, surrogate and other class ending at, starting at
+ * and straddling each cut, on every path — so an edit that looks at what it
+ * cuts prints a text the oracle's round trip and counts refute; the ceilings
+ * comment's sidecar sizes are re-derived (7 bytes a carried unit on disk) and
+ * measured; V12-C17 is recorded OUT OF MODEL.
+ *
+ * H1 ROUND 14 (§W20, the round-13 H1 verifier's V13-CUT-PAIR-CONTENT and
+ * V13-K23T): the census places PAIRS at every cut — one for every ordered pair
+ * of the grapheme, word and sentence break classes (derived from the runtime's
+ * ICU over every code unit and the astral emoji members, their counts pinned)
+ * and of the general categories, each script and each binary property doubled,
+ * every context of the break rules that looks past a pair, and every
+ * emoji-presentation, JSON-escape and
+ * repeated-punctuation pair — at (c−2, c−1), (c−1, c) and (c, c+1) of every
+ * cut site; a raw-slice differential checks each such value's printed line and
+ * why against an independent rendering of the raw slice; a line-count boundary
+ * row throws messages of 16,384 to 16,387 lines with the empty lines where a
+ * count could slip; and the threat model above §W11 says a cut rule keyed on
+ * specific code points with no property-level function is OUT of model.
+ *
+ * H1 ROUND 15 (§W20, §W17 and §W18; the round-14 H1 verifier's
+ * V14-ESCAPE-SYNTAX-CUT, V14-EMOJI-PROPERTY-PAIR and V14-P1-TITLE-AND-SUBTREE):
+ * the cut class is answered by a RUNTIME CHECK in the harness — it reads its
+ * own description back against the thrown text before returning it and prints
+ * the declared fallback on any disagreement — and the tests pin that the check
+ * exists and bites: the check run alone against sentences made false one piece
+ * at a time, the P1 block run with the building sabotaged fifty ways (fallback,
+ * never a false sentence), and every code line of the error-text path pinned;
+ * the pair census gains the ANSI, emoji-sequence and escape-syntax families;
+ * the P1 censuses draw card titles from the thrown census's text generator and
+ * several cards a subtree, against oracles that state the title rule from the
+ * harness's P1 comment (white space code unit by code unit, titles one only
+ * when they are the same code units, JSON's quoting written out).
  */
 import fs, { readFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
@@ -45,6 +95,10 @@ import { createHash } from "node:crypto";
 import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
+import vm from "node:vm";
+import os from "node:os";
+import { Worker } from "node:worker_threads";
+import { isDeepStrictEqual } from "node:util";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -74,6 +128,8 @@ import {
   PROFILE_DESIGN,
   PROFILE_LINE_TEMPLATES,
   PROFILE_SIZED_AT,
+  PROFILE_SIZED_AT_H1,
+  PROFILE_SIZED_COMMITS,
   PROFILE_STEP_CAP_MS,
   PROFILE_SUSTAIN_MARGIN_SEC,
   profileText,
@@ -156,7 +212,12 @@ const D = (k) => PROFILE_DESIGN[k].value;
 /** The zone profile's SIZING label (round 8): it names the two authored content files its span and basis are read from. */
 const ZONE_SIZING_LABEL = R(profileText("sizing.labelZone", { at: PROFILE_SIZED_AT, world: "pk-busstop-v1.json", trace: "shadow-correct.trace.json" }));
 /** The label a profile's sizing starts with, by kind. */
-const labelFor = (kind) => (kind === "zone-rest" ? ZONE_SIZING_LABEL : SIZING_LABEL);
+/** (H1: and a profile sized at more than one commit names each of them, in order — `sizing.labelAt`.) */
+const labelFor = (kind, id = null) => {
+  if (kind === "zone-rest") return ZONE_SIZING_LABEL;
+  const ats = id === null ? [PROFILE_SIZED_AT] : PROFILE_SIZED_COMMITS.filter((c) => WRONG_LEG_PROFILES.get(id).sizedBy.some((k) => PROFILE_DESIGN[k].at === c));
+  return ats.length === 1 && ats[0] === PROFILE_SIZED_AT ? SIZING_LABEL : R(profileText("sizing.labelAt", { at: ats }));
+};
 
 /** THE DIAL A FLAT THROTTLE PRODUCES on a domain-50 map under the Нормален
  *  governor, at the archived median flat tick (516 ms) from the 8 км/ч the
@@ -299,6 +360,27 @@ const VOCABULARY = new Set([
   "finish-in-band", "gap-rain", "gap-base", "zone-rest", "stint", "lead-close", "held-as-sized", "metres", "blind", "missed", "no-rest",
   "short-hold", "unverified-place", "pkbs-z-stop-marking", "pkbs-z-stop-pocket", "pc", "tablet", "enoent", "syntaxerror",
   "дистанция", "зона", "км", "м", "на", "с", "спирката", "ч",
+  // HARNESS STAGE H1 — the four H1 rows, their kinds (pace governor, impact count, rear badge), their design
+  // constants and their ids (and «c», the letter tail of the finding id 4056508c); none a product actor, action,
+  // modal or connective
+  "all", "badge", "behind", "brake-check-the-tailgater", "brakes", "breaks", "broke", "broken", "c", "calm", "closed", "come",
+  "commands", "commit", "count", "credits", "debrisroutem", "drop", "element", "em_closing_min_kmh", "em_speed_margin_kmh", "page",
+  "emergency", "emresponsewindowsec", "emyieldslowkmh", "ends", "fastest", "ftgcalmzonenearroutem", "full", "guess", "halt",
+  "harshbrakeminspeedkmh", "harshbrakesustainsec", "ignore", "impact-flash", "into", "keeps", "kerb-side", "label", "lamp", "largest",
+  "less", "let", "live", "lowest", "mistake-late-brake", "more", "mounts", "names", "nearest", "no-rest-into-the-obstacle", "obstacle",
+  "pace", "pace-over-the-yield-floor-through-the-approach", "pacedutybase", "parse", "per", "point", "presses", "proximity", "pulsed",
+  "rear_cue_warn_m", "red", "response", "sc-follow-tailgater", "sc-hz-brake-dont-swerve", "sc-vp-telltale-red", "sc-vu-emergency",
+  "short", "steady", "steady-pace-past-the-red-lamp", "such", "their", "touched", "twice", "views", "warning_lamp_comply_drop_kmh",
+  "warning_lamp_regrade_sec", "warninglampbillsec", "warninglampheldpacekmh", "window",
+  // …and the H1 tokens a slot can carry (`how`, `done`)
+  "impact", "brake-check", "run-broken", "unreadable", "to-impact",
+  // H1 ROUND 2: the commands the harness applied, the run's one disc and its top, the impact count's base taken after
+  // unread ticks or refused, the brake-check ceiling's arithmetic, and their done tokens — none a product actor, action,
+  // modal or connective
+  "applied", "emruntopkmh", "lag", "restarted", "base-unread", "count-fell", "along", "reaches", "bound", "room",
+  // H1 ROUND 3: the lamp run's start past the launch (a design constant's name) — none a product actor, action, modal or
+  // connective
+  "warninglamprunstartkmh",
 ]);
 
 /** The word classes no line may use: a product ACTOR, a product ACTION, a
@@ -503,7 +585,35 @@ describe("§W1 THE DESIGN CONSTANTS — every sizing number declared, sized at 4
       BRAKE_FORCE_N: 11000,
       CHASSIS_MASS: 1220,
       drillTaughtGapSec: 3,
+      // HARNESS STAGE H1, each sized at PROFILE_SIZED_AT_H1 (01de885) — the four H1 profiles' numbers
+      WARNING_LAMP_REGRADE_SEC: 6,
+      WARNING_LAMP_COMPLY_DROP_KMH: 5,
+      warningLampBillSec: 23.7,
+      warningLampHeldPaceKmh: 45,
+      warningLampRunStartKmh: 40,
+      emYieldSlowKmh: 38,
+      EM_SPEED_MARGIN_KMH: 2,
+      EM_CLOSING_MIN_KMH: 3,
+      emRunTopKmh: 50,
+      emActorAccelMps2: 1.5,
+      emResponseWindowSec: 7,
+      emResponseJitterSec: 0.4,
+      harshBrakeMinSpeedKmh: 35,
+      harshBrakeDecelMps2: 7,
+      harshBrakeSustainSec: 0.4,
+      REAR_CUE_WARN_M: 8,
+      rearBadgeHalfQuantumM: 0.5,
+      ftgCalmZoneNearRouteM: 175,
+      debrisRouteM: 175,
+      paceDutyBase: 0.15,
     });
+    // H1: the commits, in order, and which constants each one sized — the first 26 at 4112566, the H1 20 at 01de885
+    // (round 2: + emRunTopKmh, the posted 50 on ln-v1 the emergency run's arm is sized on; round 3: + warningLampRunStartKmh,
+    // where the lamp run starts past the launch).
+    assert.deepEqual([...PROFILE_SIZED_COMMITS], [PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1]);
+    assert.equal(PROFILE_SIZED_AT_H1, "01de885");
+    const byAt = Object.groupBy(Object.entries(PROFILE_DESIGN), ([, r]) => r.at);
+    assert.deepEqual(Object.fromEntries(Object.entries(byAt).map(([a, v]) => [a, v.length])), { [PROFILE_SIZED_AT]: 26, [PROFILE_SIZED_AT_H1]: 20 });
   });
 
   it("each constant carries its PROVENANCE — the product source it was sized from and the commit — in its record AND in a «// sized from … at 4112566» comment on its line", () => {
@@ -514,14 +624,17 @@ describe("§W1 THE DESIGN CONSTANTS — every sizing number declared, sized at 4
       assert.deepEqual(Object.keys(r).sort(), ["at", "from", "unit", "value"], `${k}: ${JSON.stringify(r)}`);
       assert.ok(typeof r.value === "number" && Number.isFinite(r.value), `${k} is not a number`);
       assert.equal(typeof r.unit, "string", k);
-      assert.equal(r.at, PROFILE_SIZED_AT, `${k} was sized at ${r.at}, not ${PROFILE_SIZED_AT}`);
-      // A reference, never a sentence: «file.ts identifier[, file.ts identifier]».
-      assert.match(r.from, /^[A-Za-z][\w-]*\.tsx? [\w$.()]+(?:, [A-Za-z][\w-]*\.tsx? [\w$.()]+)*$/, `${k}'s provenance is not a source reference: «${r.from}»`);
-      // …and the comment on its line says the same, verbatim.
+      // (H1: a record is sized at one of the declared commits, and names which; the round-7 constants all at 4112566.)
+      assert.ok(PROFILE_SIZED_COMMITS.includes(r.at), `${k} was sized at ${r.at}, not a declared commit (${PROFILE_SIZED_COMMITS.join(", ")})`);
+      // A reference, never a sentence: «file.ts identifier[, file.ts identifier]» (H1: or an AUTHORED content file, «world.json key»).
+      assert.match(r.from, /^[A-Za-z][\w-]*\.(?:tsx?|json) [\w$.()]+(?:, [A-Za-z][\w-]*\.(?:tsx?|json) [\w$.()]+)*$/, `${k}'s provenance is not a source reference: «${r.from}»`);
+      // …and the comment on its line says the same, verbatim — its own commit included.
       const decl = lines.findIndex((l) => new RegExp(`^  ${k}: sizedAt\\(`).test(l));
       assert.ok(decl > 0, `${k} is not declared as \`${k}: sizedAt(\` in §5`);
-      assert.equal(lines[decl - 1], `  // sized from ${r.from} at ${PROFILE_SIZED_AT}`, `${k}'s provenance comment is missing or does not match its record`);
+      assert.equal(lines[decl - 1], `  // sized from ${r.from} at ${r.at}`, `${k}'s provenance comment is missing or does not match its record`);
       assert.ok(lines[decl].includes(`"${r.from}"`), `${k}'s record and its declaration disagree`);
+      // …and an H1 record says so in its declaration (the fourth argument), a round-7 one does not.
+      assert.equal(lines[decl].includes(", PROFILE_SIZED_AT_H1)"), r.at === PROFILE_SIZED_AT_H1, `${k}'s declaration and its commit disagree`);
     }
     // One provenance comment per constant, and no stray ones.
     assert.equal(lines.filter((l) => /^ {2}\/\/ sized from .+ at \w+$/.test(l)).length, Object.keys(PROFILE_DESIGN).length);
@@ -574,10 +687,12 @@ describe("§W1 THE DESIGN CONSTANTS — every sizing number declared, sized at 4
   it("…and THIS TEST FILE opens no product file either (so a product comment or re-indent can turn nothing here red)", () => {
     assert.ok(!/["'`][^"'`\n]*platform\/(?:src|modules|components)|resolve\([^)]*["']platform["']/.test(SELF_CODE), "this test file names a product path in its code");
     // Its only file reads: the harness, the lib, itself — and (round 9, `harnessFacts`) the harness's own road-record
-    // lib, tools/ code whose columns the keep-right line's sentence about the lane is checked against.
+    // lib, tools/ code whose columns the keep-right line's sentence about the lane is checked against — and (H1 round 7,
+    // §W18) the AUTHORED district files under content/world, which the posted-disc domain is derived from.
     // (A Set: the expected forms below are themselves string literals in this file.)
     assert.deepEqual([...new Set(SELF_CODE.match(/\breadFileSync\((?:resolve|fileURLToPath)\([^)]*\)/g) ?? [])].sort(), [
       "readFileSync(fileURLToPath(import.meta.url)",
+      'readFileSync(resolve(HERE, "..", "..", "..", "content", "world", f)',
       'readFileSync(resolve(HERE, "..", "lesson-audit.mjs")',
       'readFileSync(resolve(HERE, "..", "lib", "driveline.mjs")',
       'readFileSync(resolve(HERE, "..", "lib", "road-record.mjs")',
@@ -609,7 +724,7 @@ describe("§W1 THE DESIGN CONSTANTS — every sizing number declared, sized at 4
           const decl = wrongLegProfileFor(id);
           let st = createWrongLegProfile(id, { zoneSpan: decl.kind === "zone-rest" ? readZoneRouteSpan(id, decl.zone) : null, platform });
           wrongLegProfileStartLine(st, { everyM: EVERY_M });
-          if (st.on) labels.push([st.kind, R(st.sizedFrom.f.label)]);
+          if (st.on) labels.push([st.kind, R(st.sizedFrom.f.label), id]);
           st = driveCadence(st, FLAT_SERIES, { dtMs: FLAT_TICK_MS, extra: () => ({ follow: { present: true, parsed: true, meters: 40, heldSec: 1.1 } }) }).state;
           const b = wrongLegRestBooked(st, { now: 50_000, t0: 10_000, holdMs: HOLD_MS, kmh: 0 });
           wrongLegRestHoldNote(b.state, b, { holdMs: HOLD_MS });
@@ -635,18 +750,20 @@ describe("§W1 THE DESIGN CONSTANTS — every sizing number declared, sized at 4
     // from design constants alone says no file is read; the zone profile names the two files the spy just saw.
     const readNames = [...new Set(reads.map((p) => p.replace(/\\/g, "/").split("/").pop()))].sort();
     assert.deepEqual(readNames, ["pk-busstop-v1.json", ZONE_TRACE_FILE].sort());
-    for (const [kind, label] of labels) {
+    for (const [kind, label, id] of labels) {
       if (kind === "zone-rest") {
         assert.equal(label, ZONE_SIZING_LABEL);
         for (const n of readNames) assert.ok(label.includes(` ${n}`), `the zone's SIZING label does not name ${n}, a file it was read from: ${label}`);
         assert.match(label, /read at drive time from authored content: the world file pk-busstop-v1\.json and the lesson's trace file shadow-correct\.trace\.json; no other file is read to size them/);
       } else {
-        assert.equal(label, SIZING_LABEL, `${kind}: ${label}`);
+        // (H1: a profile sized at more than one commit names each, in order; one sized at 4112566 alone keeps the label.)
+        const ats = PROFILE_SIZED_COMMITS.filter((c) => WRONG_LEG_PROFILES.get(id).sizedBy.some((k) => PROFILE_DESIGN[k].at === c));
+        assert.equal(label, ats.length === 1 && ats[0] === PROFILE_SIZED_AT ? SIZING_LABEL : R(profileText("sizing.labelAt", { at: ats })), `${kind}: ${label}`);
         assert.match(label, /no file is read to size them/);
       }
       assert.ok(!/nothing is read at drive time/.test(label), `the round-7 label is back: ${label}`);
     }
-    assert.deepEqual([...new Set(labels.map(([k]) => k))].sort(), ["finish-open", "lead-close", "stint", "zone-rest"]);
+    assert.deepEqual([...new Set(labels.map(([k]) => k))].sort(), ["brake-check", "finish-open", "lead-close", "pace", "stint", "to-impact", "zone-rest"]);
   });
 
   it("AT RUNTIME, ON A FRESH COPY OF THE LIB EVALUATED UNDER THE SPY (round 8 finish — V7-E1's class by BEHAVIOUR, not by name): every fs reader is spied before the copy is evaluated, so an alias it takes at load time IS the spy; the copy reads only the two authored content files, and prints exactly the lines the lib prints", async () => {
@@ -810,6 +927,9 @@ describe("§W3 finish-open (sc-signal-flashing) — rest suppression only; the v
     const { steps } = sxf();
     assert.ok(steps.every((s) => s.suppressRest === true && s.forceRest === false));
     assert.ok(steps.every((s) => !("throttle" in s)), "a profile step carries a throttle again — the round-1 governor is back");
+    // (H1: nor the pace governor's `pedal` — that command exists for the two declared `pace` profiles only, and
+    // §W12 executes that no other profile, and no lane without one, ever carries it.)
+    assert.ok(steps.every((s) => !("pedal" in s)), "a finish-open step carries the pace governor's pedal");
     assert.equal(WRONG_LEG_PROFILES.get("sc-signal-flashing").kind, "finish-open");
     assert.match(WRONG_LEG_PROFILES.get("sc-signal-flashing").told, /plain flat throttle every wrong leg uses \(no governor\)/);
     assert.ok(!/\bthrottle\s*:/.test(SEC5), "a `throttle:` field reached §5's code");
@@ -1919,7 +2039,7 @@ const squash = (s) => stripComments(s).replace(/\s+/g, " ").trim();
 const SEC5_EXPORTS = [...SEC5.matchAll(/^export (?:const|function|let) (\w+)/gm)].map((m) => m[1]);
 /** The §5 functions the harness imports — the whole list, in its order. */
 const HARNESS_SEC5_IMPORTS = [
-  "createWrongLegProfile", "flatRestDue", "flatRestHoldDone", "readZoneRouteSpan", "resumeThrottleAfterPause", "wrongLegFlatStep", "wrongLegProfileFinish",
+  "createWrongLegProfile", "flatRestDue", "flatRestHoldDone", "h1ProbeReads", "parseRearProximity", "readZoneRouteSpan", "resumeThrottleAfterPause", "wrongLegFlatStep", "wrongLegProfileFinish",
   "wrongLegProfileFor", "wrongLegProfileOutcomeLine", "wrongLegProfileStartLine", "wrongLegRestBooked", "wrongLegRestEnded", "wrongLegRestHoldNote",
   "wrongLegRestHoldsClause", "wrongLegRestOpportunity", "wrongLegRestSummary", "wrongLegRestTick",
 ];
@@ -1938,6 +2058,12 @@ const HARNESS_ALLOWED_LINES = [
   [/^const wrongProfileStep = wrongLegFlatStep\(wrongProfile, \{$/, 1],
   [/^postedKmh: wrongProfile\.on \? postedLimitKmh\(p\.postedLabels\) : null,$/, 1],
   [/^follow: wrongProfile\.on \? parseHazard\(p\.hazard\)\.follow : null,$/, 1],
+  // HARNESS STAGE H1: the rear badge and the impact count handed to the flat tick (observations, no pose), and the
+  // flat tick's throttle — the plain one, or a pace profile's governor command applied by `paceThrottle`.
+  [/^rear: wrongProfile\.on \? parseRearProximity\(p\.rearProx\) : null,$/, 1],
+  [/^impact: wrongProfile\.on \? p\.impactMounts : null,$/, 1],
+  [/^if \(!wrongProfileStep\.pedal\) await timed\("pedals", \(\) => throttle\(true\)\);$/, 1],
+  [/^else await timed\("pedals", \(\) => paceThrottle\(wrongProfileStep\.pedal\)\);$/, 1],
   [/^wrongProfile = wrongProfileStep\.state;$/, 1],
   [/^if \(wrongProfileStep\.say !== null\) \(wrongProfileStep\.say\.loud \? loud : note\)\(wrongProfileStep\.say\.line\);$/, 1],
   [/^wrongProfile = wrongLegRestOpportunity\(wrongProfile, \{$/, 1],
@@ -1961,19 +2087,34 @@ const HARNESS_ALLOWED_LINES = [
   [/^const wrongProfileOutcome = wrongLegProfileOutcomeLine\(wrongProfile\);$/, 1],
   [/^if \(wrongProfileOutcome !== null\) \(wrongProfile\.heldAsSized \? note : loud\)\(wrongProfileOutcome\);$/, 1],
   [/^\.\.\.\(MODE !== "right" && wrongProfile\.declared \? \{ wrongLegProfile: wrongProfile \} : \{\}\),$/, 1],
+  // H1 ROUND 2 (C3): the lane's H1 reads, taken once from §5, and every line that names them — the three P1 calls, each
+  // behind the flag, and the probe's two gated reads.
+  [/^const H1_READS = h1ProbeReads\(SCENARIO\);$/, 1],
+  [/^if \(H1_READS\.eventShots\) await installEventWitness\(\);$/, 1],
+  [/^if \(H1_READS\.eventShots\) armEventShots\(t0\);$/, 1],
+  [/^if \(H1_READS\.eventShots\) await finishEventShots\(\);$/, 1],
+  [/^rearSel: H1_READS\.rear && MODE !== "right" \? REAR_PROX_SEL : null,$/, 1],
+  [/^witnessOn: H1_READS\.eventShots,$/, 1],
 ];
 /** EVERY statement a condition naming a profile value controls (its consequent
  *  and any `else` chain), whitespace-squashed and comments stripped — and the
  *  one bare block that exists only for the outcome line. The text found is
  *  printed when one differs. */
 const HARNESS_CONTROLLED = [
+  // H1 ROUND 2 (C3): the P1 witness installed, and its series armed, only on a lane whose H1 reads ask for event shots.
+  ["the P1 witness's install", { text: "await installEventWitness();" }],
+  ["the P1 series' arming", { text: "armEventShots(t0);" }],
   ["the start line's sink", { text: "loud(wrongProfileStart);" }],
   ["the pause drain's guarded re-press", { text: "await throttle(true);" }],
   ["the flat tick's say sink", { text: "(wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line);" }],
+  // HARNESS STAGE H1: the flat tick's throttle — the plain flat throttle, or a pace profile's command (the throttle only).
+  ["the flat tick's throttle", { text: 'await timed("pedals", () => throttle(true)); else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));' }],
   ["the transition", { text: '{ phase = "flat-rest"; phaseAt = now; phaseTicks = 0; flatM = 0; flatRestAt = 0; restLogged = false; }' }],
   ["the rest's end and the give-up", { text: "{ const wrongProfileRestEnd = wrongLegRestEnded(wrongProfile, { now, t0 }); wrongProfile = wrongProfileRestEnd.state; if (wrongProfileRestEnd.say !== null) (wrongProfileRestEnd.say.loud ? loud : note)(wrongProfileRestEnd.say.line); await brake(false); phase = \"flat\"; phaseAt = now; phaseTicks = 0; flatM = 0; } else if (!restLogged && now - phaseAt >= FLAT_REST_GIVEUP_MS) { loud( `the wrong leg would not come to rest in ${FLAT_REST_GIVEUP_MS / 1000}s (${p.kmh} км/ч, brake ` + `${holdS ? \"down\" : \"UP\"}, throttle ${holdW ? \"DOWN\" : \"up\"}) — rolling on, and no „stopping where forbidden\" ` + `finding may be drawn from this stretch.`, ); const wrongProfileRestEnd = wrongLegRestEnded(wrongProfile, { now, t0, gaveUp: true }); wrongProfile = wrongProfileRestEnd.state; if (wrongProfileRestEnd.say !== null) (wrongProfileRestEnd.say.loud ? loud : note)(wrongProfileRestEnd.say.line); await brake(false); phase = \"flat\"; phaseAt = now; phaseTicks = 0; flatM = 0; }" }],
   ["the rest end's say sink", { text: "(wrongProfileRestEnd.say.loud ? loud : note)(wrongProfileRestEnd.say.line);" }],
   ["the give-up's say sink", { text: "(wrongProfileRestEnd.say.loud ? loud : note)(wrongProfileRestEnd.say.line);" }],
+  // H1 ROUND 2 (C3): …and finished after the profile's finish, on that lane only.
+  ["the P1 series' finish", { text: "await finishEventShots();" }],
   ["the outcome sink", { text: "(wrongProfile.heldAsSized ? note : loud)(wrongProfileOutcome);" }],
   ["the outcome's bare block", { text: "{ const wrongProfileOutcome = wrongLegProfileOutcomeLine(wrongProfile); if (wrongProfileOutcome !== null) (wrongProfile.heldAsSized ? note : loud)(wrongProfileOutcome); }" }],
 ];
@@ -2000,14 +2141,22 @@ const DECLARED_IDS = () => [
  *  centreline», «right» as the right leg, «keep» in «keeping», «stop» in a hundred notes). Every OTHER segment of
  *  four letters or more is DISTINCTIVE: no harness literal carries it, and one that does is keyed on a lesson. The
  *  test below checks each generic one IS carried today — an exemption with no evidence is not an exemption. */
-const GENERIC_ID_SEGMENTS = ["signal", "keep", "right", "stop"];
+const GENERIC_ID_SEGMENTS = ["signal", "keep", "right", "stop", "brake", "follow"];
 const DISTINCTIVE_ID_SEGMENTS = () =>
   [...new Set(DECLARED_IDS().flatMap((id) => id.split("-")).filter((s) => s.length >= 4 && !GENERIC_ID_SEGMENTS.includes(s)))].sort();
 /** A harness identifier that names a profile value: every `wrongProfile*` local, the sidecar's `wrongLegProfile`
  *  key and anything else spelled `wrongLegProfile*` (round 8 finish: a line keyed on the sidecar key passed the
  *  round-8 partial's gate), and every §5 export. */
-const PROFILE_NAME_ALT = () => `wrong(?:Leg)?Profile\\w*|${SEC5_EXPORTS.map(reEsc).join("|")}`;
+/** H1 ROUND 2 (C3): every harness binding initialised from a call of a §5 export (`const H1_READS = h1ProbeReads(SCENARIO);`)
+ *  holds a profile value by another name — DERIVED from the source, never hand-listed, so the lines that name it are
+ *  enumerated (H1) and the statements it guards are pinned (H4) like any other profile value's. */
+const sec5BoundNames = (src = SRC) => [...stripComments(src).matchAll(/\bconst (\w+) = (\w+)\(/g)].filter((m) => SEC5_EXPORTS.includes(m[2]) && !/^wrong(?:Leg)?Profile/.test(m[1])).map((m) => m[1]);
+const PROFILE_NAME_ALT = (src = SRC) => `wrong(?:Leg)?Profile\\w*|${[...SEC5_EXPORTS, ...sec5BoundNames(src)].map(reEsc).join("|")}`;
 const isProfileNameWord = (w) => /^wrong(?:Leg)?Profile\w*$/.test(w) || SEC5_EXPORTS.includes(w);
+const isProfileNameWordIn = (src) => {
+  const bound = new Set(sec5BoundNames(src));
+  return (w) => isProfileNameWord(w) || bound.has(w);
+};
 /** THE SINKS every profile line reaches the log through, as they stand at 4112566: `note` pushes the line into
  *  the transcript and prints it, `loud` prefixes it. A sink that edits what it is handed is text added after
  *  rendering, in the harness (round 8 finish). `loud` is compared RAW — its template literal's spaces are the
@@ -2039,8 +2188,8 @@ function harnessControlled(src, isProfileName) {
 function harnessGateViolations(src) {
   const v = [];
   const code = stripComments(src);
-  const names = new RegExp(`\\b(?:${PROFILE_NAME_ALT()})\\b`);
-  const isProfileName = isProfileNameWord;
+  const names = new RegExp(`\\b(?:${PROFILE_NAME_ALT(src)})\\b`);
+  const isProfileName = isProfileNameWordIn(src);
   // H1 — every line naming a profile value is an enumerated form, each the pinned number of times.
   const touching = code.split("\n").map((l) => l.trim()).filter((l) => names.test(l));
   for (const l of touching) if (!HARNESS_ALLOWED_LINES.some(([re]) => re.test(l))) v.push(`H1 a line names a profile value outside the enumerated forms: «${l}»`);
@@ -2526,6 +2675,15 @@ function round9HarnessViolations(src) {
 }
 /** ROUND 9, the lib: the mechanism bans over the WHOLE lib, the renderer's own text pinned (L10 — V8-L1 edited the
  *  one function L1 does not read), and no declared lesson, profile or zone id in §1–§4's code (L11). */
+/** HARNESS STAGE H1 — THE ONE §1–§4 TABLE THAT NAMES A NOW-DECLARED LESSON, ENUMERATED: §2's
+ *  `SUSTAINED_OVER_LIMIT_LANES` row for sc-follow-tailgater (the over-limit lane, which predates its H1 brake-check
+ *  profile and is a per-lane statement of its own, not a profile line) — its key literal and its row literal, each
+ *  pinned by the sha256 of its lower-cased text and allowed ONCE. A changed row, a second copy, or any other §1–§4
+ *  literal naming a declared id stays red (L11). */
+const SEC1_4_DECLARED_ID_ALLOWANCE = new Map([
+  ["67804e6111c7", 1], // "sc-follow-tailgater" (the lane's key)
+  ["6e5dd3c2dc09", 1], // "sc-follow-tailgater:63c0c28c (critical, PARTIAL on its fourth overturn) — …" (the lane's row, 276 chars)
+]);
 function round9LibViolations(lib) {
   const v = [...mechanismViolations(lib, "lib")];
   const head = lib.indexOf(" * 5 · WRONG-LEG PROFILES");
@@ -2534,7 +2692,20 @@ function round9LibViolations(lib) {
   for (const d of RENDERER_PINNED) if (!sq.includes(d)) v.push(`L10 the renderer is not its pinned text any more: ${d.slice(0, 90)}…`);
   if ((sq.match(/\bfunction renderProfileText\(/g) ?? []).length !== 1 || (sq.match(/\bfunction profileText\(/g) ?? []).length !== 1) v.push("L10 the renderer or profileText is declared other than once");
   const before = stripComments(lib.slice(0, lib.lastIndexOf("/*", head)));
-  const lits = lexTokens(before).filter((t) => t.type === "str" || t.type === "tpl").map((t) => t.text.toLowerCase());
+  // (H1: the §2 over-limit lane row for sc-follow-tailgater is allowed by its content hash, each literal once — see
+  // SEC1_4_DECLARED_ID_ALLOWANCE; every other §1–§4 literal is read exactly as round 9 read it.)
+  const allowLeft = new Map(SEC1_4_DECLARED_ID_ALLOWANCE);
+  const lits = lexTokens(before)
+    .filter((t) => t.type === "str" || t.type === "tpl")
+    .map((t) => t.text.toLowerCase())
+    .filter((l) => {
+      const h = createHash("sha256").update(l).digest("hex").slice(0, 12);
+      if ((allowLeft.get(h) ?? 0) > 0) {
+        allowLeft.set(h, allowLeft.get(h) - 1);
+        return false;
+      }
+      return true;
+    });
   for (const id of DECLARED_NAMES()) if (lits.some((l) => l.includes(id.toLowerCase()))) v.push(`L11 §1–§4 of the lib name «${id}», a declared or withdrawn profile's id, name or zone`);
   for (const seg of DISTINCTIVE_ID_SEGMENTS()) if (lits.some((l) => l.includes(seg))) v.push(`L11 §1–§4 of the lib carry «${seg}», a distinctive segment of a declared id`);
   return v;
@@ -3227,6 +3398,14 @@ const SIZING_CLAIMS = [
   ["sizing.finish", "beside each probe's measured wait", "each probe's"],
   ["unmet.discUnread", "the profile is sized on one disc read on every tick", "one disc"],
   ["unmet.discChanged", "the profile is sized on one disc", "one disc"],
+  // HARNESS STAGE H1: the lamp's bill time is the product's own measurement on ONE drive (engine.ts's comment on
+  // WARNING_LAMP_COMPLY_DROP_KMH: «held 45 to the end of the road», the ignore at 23,7 s); the brake-check's reaction
+  // is the reaction census's maximum
+  ["pace.whyLamp", "measured on a drive held at warningLampHeldPaceKmh {pace:n} км/ч", "a drive held at warningLampHeldPaceKmh {pace:n} км/ч"],
+  ["brake.room", "the reaction maximum {react:n} s of a census of {n:n} flat to flat-rest transitions on archived wrong legs", "a census of {n:n} flat to flat-rest transitions on archived wrong legs"],
+  // H1 ROUND 2 (F4): the brake-check's ceiling ratio is the lowest reading of the harness's whole odometer census, and the
+  // sentence names that population and this lesson's own legs in it
+  ["brake.ceiling", "{ratio:n} is the lowest reading in the harness's odometer census of {legs:n} archived wrong legs ({mobile:n} of them mobile, measured {at:tok}), where this lesson's {pcLegs:n} pc legs read {pcLo:n}–{pcHi:n} and its {mLegs:n} mobile legs {mLo:n}–{mHi:n} — a census band, not a bound", "the harness's odometer census of {legs:n} archived wrong legs ({mobile:n} of them mobile"],
 ];
 /** …and in the profile table's printed texts: [lesson, field, the sentence, the population]. */
 const TABLE_SIZING_CLAIMS = [
@@ -3492,21 +3671,26 @@ describe("§W7 THE LINES ARE STRUCTURAL — one template table, one renderer, a 
     // THE GATE, on the harness as it is: nothing.
     assert.deepEqual(harnessGateViolations(SRC), [], "the harness composes, keys or prints a profile line outside §5's renderer");
     // …and it can see: every line it scans exists (a moved wiring is a violation too, not a silent pass).
-    const touching = CODE.split("\n").filter((l) => new RegExp(`\\b(?:${PROFILE_NAME_ALT()})\\b`).test(l));
+    const touching = CODE.split("\n").filter((l) => new RegExp(`\\b(?:${PROFILE_NAME_ALT(SRC)})\\b`).test(l));
     assert.equal(touching.length, HARNESS_ALLOWED_LINES.reduce((a, [, n]) => a + n, 0), "UNREADABLE: the lines naming a profile value are not the enumerated ones");
-    assert.equal(harnessControlled(SRC, isProfileNameWord).length, HARNESS_CONTROLLED.length);
+    assert.equal(harnessControlled(SRC, isProfileNameWordIn(SRC)).length, HARNESS_CONTROLLED.length);
+    // (H1 round 2: the one derived binding is the lane's H1 reads.)
+    assert.deepEqual(sec5BoundNames(SRC), ["H1_READS"]);
     // …the sidecar key is one of the names it reads (round 8 finish), and it occurs on exactly one line — the spread.
     assert.deepEqual(touching.filter((l) => /\bwrongLegProfile\b/.test(l)).map((l) => l.trim()), ['...(MODE !== "right" && wrongProfile.declared ? { wrongLegProfile: wrongProfile } : {}),']);
     // …every generic id segment it exempts IS carried by a harness literal today, and no distinctive one is.
     const lits = lexTokens(SRC).filter((t) => t.type === "str" || t.type === "tpl").map((t) => t.text.toLowerCase());
     for (const seg of GENERIC_ID_SEGMENTS) assert.ok(lits.some((l) => l.includes(seg)), `«${seg}» is exempted as generic, and no harness literal carries it`);
-    assert.deepEqual(DISTINCTIVE_ID_SEGMENTS(), ["busstop", "flashing", "marking", "motorway", "pkbs", "pocket", "spray", "truck"]);
+    // (H1: «brake» and «follow» are generic now — the harness's own literals carry both, checked above — and the
+    // four H1 ids add five distinctive segments.)
+    assert.deepEqual(DISTINCTIVE_ID_SEGMENTS(), ["busstop", "dont", "emergency", "flashing", "marking", "motorway", "pkbs", "pocket", "spray", "swerve", "tailgater", "telltale", "truck"]);
     // …and the sinks it pins are the ones every profile line is printed through.
     assert.equal(CODE.split("\n").filter((l) => l === HARNESS_LOUD_SINK).length, 1);
     assert.equal(squash(CODE).split(HARNESS_NOTE_SINK).length - 1, 1);
     // The fields the harness reads off the state: three flags, nothing a line could print.
     assert.deepEqual([...new Set([...CODE.matchAll(/\bwrongProfile\.(\w+)/g)].map((m) => m[1]))].sort(), ["declared", "heldAsSized", "on"]);
-    assert.deepEqual([...new Set([...CODE.matchAll(/\bwrongProfileStep\.(\w+)/g)].map((m) => m[1]))].sort(), ["forceRest", "say", "state", "suppressRest"]);
+    // (H1: and the pace governor's command, `pedal` — the throttle only, applied by `paceThrottle`.)
+    assert.deepEqual([...new Set([...CODE.matchAll(/\bwrongProfileStep\.(\w+)/g)].map((m) => m[1]))].sort(), ["forceRest", "pedal", "say", "state", "suppressRest"]);
     assert.deepEqual([...new Set([...CODE.matchAll(/\bwrongProfileRest\.(\w+)/g)].map((m) => m[1]))].sort(), ["state"]);
     assert.deepEqual([...new Set([...CODE.matchAll(/\bwrongProfileRestEnd\.(\w+)/g)].map((m) => m[1]))].sort(), ["say", "state"]);
     // No template interpolates a profile value — except the pinned fallback of the holds clause, which is the old words.
@@ -3696,7 +3880,9 @@ describe("§W7 THE LINES ARE STRUCTURAL — one template table, one renderer, a 
     for (const [label, line] of lines.filter(([l, x]) => / outcome$/.test(l) && !x.includes("REFUSED, NOT RUN") && !x.includes("not one flat tick ran"))) {
       assert.match(line, / — OBSERVED: /, label);
       assert.match(line, / · READINGS: /, label);
-      assert.ok(line.includes(`${SIZING_LABEL}: `) || line.includes(`${ZONE_SIZING_LABEL}: `), `${label}: no sizing — ${line}`);
+      // (H1: or the label that names both commits, on a profile sized at both.)
+      const H1_LABEL = R(profileText("sizing.labelAt", { at: [PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1] }));
+      assert.ok(line.includes(`${SIZING_LABEL}: `) || line.includes(`${ZONE_SIZING_LABEL}: `) || line.includes(`${H1_LABEL}: `), `${label}: no sizing — ${line}`);
       assert.ok(!/product source|read from source|source read/.test(line), `${label}: ${line}`);
     }
   });
@@ -3966,9 +4152,13 @@ describe("§W7 THE LINES ARE STRUCTURAL — one template table, one renderer, a 
 });
 
 // ---------------------------------------------------------------------------
-describe("§W7b the table's rows — four declared, one declined, one withdrawn", () => {
-  it("four rows; sc-jx-priority-confidence is declined on purpose; sc-fo-motorway-gap is WITHDRAWN with its evidence and cannot come back silently", () => {
-    assert.deepEqual([...WRONG_LEG_PROFILES.keys()].sort(), ["sc-ac-truck-spray", "sc-ov-keep-right", "sc-pk-busstop-ban", "sc-signal-flashing"]);
+describe("§W7b the table's rows — eight declared (four since harness stage H1), one declined, one withdrawn", () => {
+  it("eight rows; sc-jx-priority-confidence is declined on purpose; sc-fo-motorway-gap is WITHDRAWN with its evidence and cannot come back silently", () => {
+    assert.deepEqual([...WRONG_LEG_PROFILES.keys()].sort(), [
+      "sc-ac-truck-spray", "sc-follow-tailgater", "sc-hz-brake-dont-swerve", "sc-ov-keep-right", "sc-pk-busstop-ban", "sc-signal-flashing", "sc-vp-telltale-red", "sc-vu-emergency",
+    ]);
+    // H1: the rows the plan names NOT pedal-reachable are not in the table (the truck row's round-7 profile stays as it stood).
+    for (const id of ["sc-roundabout-entry", "sc-mv-uturn-ban", "sc-ov-solid-line", "sc-fo-motorway-gap"]) assert.equal(wrongLegProfileFor(id), null, `${id} is not pedal-reachable and has a profile`);
     assert.equal(wrongLegProfileFor("sc-jx-priority-confidence"), null);
     for (const id of WITHDRAWN_WRONG_LEG_PROFILES.keys()) {
       assert.equal(WRONG_LEG_PROFILES.has(id), false, `${id} was WITHDRAWN on evidence and is back in the table`);
@@ -3993,7 +4183,7 @@ describe("§W7b the table's rows — four declared, one declined, one withdrawn"
       assert.ok(line.startsWith(`WRONG-LEG PROFILE: ${st.name} — ${st.told}. For ${st.row}.`), line);
       assert.match(line, /Ceilings \d+ m \/ \d+ s from its first flat tick, after which the ordinary 45 m cadence resumes\./);
       assert.ok(line.endsWith(` ${R(st.sizedFrom)}.`), line);
-      assert.ok(R(st.sizedFrom).startsWith(`${labelFor(st.kind)}: `));
+      assert.ok(R(st.sizedFrom).startsWith(`${labelFor(st.kind, id)}: `));
       assertObservationLine(line, `${id} start`);
     }
   });
@@ -4031,7 +4221,7 @@ describe("§W8 the harness actually wires it — and no profile steers or reads 
     const imp = CODE.match(/import \{([^}]*\bwrongLegFlatStep\b[^}]*)\} from "\.\/lib\/driveline\.mjs";/);
     assert.ok(imp, "the §5 import is gone");
     assert.deepEqual(imp[1].split(",").map((s) => s.trim()).filter(Boolean).sort(), [
-      "createWrongLegProfile", "flatRestDue", "flatRestHoldDone", "readZoneRouteSpan", "resumeThrottleAfterPause", "wrongLegFlatStep", "wrongLegProfileFinish",
+      "createWrongLegProfile", "flatRestDue", "flatRestHoldDone", "h1ProbeReads", "parseRearProximity", "readZoneRouteSpan", "resumeThrottleAfterPause", "wrongLegFlatStep", "wrongLegProfileFinish",
       "wrongLegProfileFor", "wrongLegProfileOutcomeLine", "wrongLegProfileStartLine", "wrongLegRestBooked", "wrongLegRestEnded", "wrongLegRestHoldNote",
       "wrongLegRestHoldsClause", "wrongLegRestOpportunity", "wrongLegRestSummary", "wrongLegRestTick",
     ]);
@@ -4047,7 +4237,11 @@ describe("§W8 the harness actually wires it — and no profile steers or reads 
     const call = flat.match(/const wrongProfileStep = wrongLegFlatStep\(wrongProfile, \{([\s\S]*?)\}\);/);
     assert.ok(call, "the flat tick no longer calls wrongLegFlatStep");
     const keys = call[1].split(",").map((s) => s.trim().split(":")[0].trim()).filter(Boolean);
-    assert.deepEqual(keys, ["now", "t0", "kmh", "flatStepM", "dtMs", "postedKmh", "follow", "probeAt"]);
+    assert.deepEqual(keys, ["now", "t0", "kmh", "flatStepM", "dtMs", "postedKmh", "follow", "probeAt", "rear", "impact"]);
+    // (H1: the rear badge and the impact count are OBSERVATIONS off the page — the badge's label, parsed by §5; the
+    // page-side count of impact-flash mounts — and neither names a pose.)
+    assert.match(call[1], /rear: wrongProfile\.on \? parseRearProximity\(p\.rearProx\) : null/);
+    assert.match(call[1], /impact: wrongProfile\.on \? p\.impactMounts : null/);
     assert.match(call[1], /dtMs: now - lastTickAt/);
     assert.match(call[1], /follow: wrongProfile\.on \? parseHazard\(p\.hazard\)\.follow : null/);
     assert.match(call[1], /^\s*probeAt: tickStart,?\s*$/m);
@@ -4058,7 +4252,10 @@ describe("§W8 the harness actually wires it — and no profile steers or reads 
     const nowAt = CODE.indexOf("const now = Date.now();", pauseEnd);
     assert.ok(nowAt > pauseEnd && nowAt < CODE.indexOf('if (phase === "flat") {', pauseEnd), "the loop's `now` is no longer the wall clock read after the pause block");
     assert.match(flat, /wrongProfile = wrongProfileStep\.state;/);
-    once(flat, 'await timed("pedals", () => throttle(true));', "flat throttle");
+    // (H1: the flat throttle is `throttle(true)` on every step without a `pedal` — every lane without a profile and
+    // every profile but the two `pace` ones — and a pace step's command goes through `paceThrottle`, nowhere else.)
+    once(flat, 'if (!wrongProfileStep.pedal) await timed("pedals", () => throttle(true));\n      else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));', "flat throttle");
+    assert.equal((CODE.match(/\bpaceThrottle\(/g) ?? []).length, 1, "the pace governor's command is applied outside the flat tick");
     assert.ok(!/wrongProfileStep\.throttle/.test(CODE));
     assert.match(flat, /flatM \+= flatStepM;/);
     assert.ok(!/flatM \+= \(Math\.max/.test(CODE), "flatM is charged from a second copy of the expression");
@@ -4546,6 +4743,35 @@ function blankLiterals(src) {
   return out + src.slice(at);
 }
 
+/** HARNESS STAGE H1 — A STEP THAT BOOKS A REST CARRIES NO PEDAL, EXECUTED: every declared profile, on both platforms,
+ *  driven over a stream that makes each booking kind book (the zone's flat series; the brake-check's closed-up badge
+ *  at speed) and over a pace series — every step whose `forceRest` is true hands out no truthy `pedal`, and at least
+ *  two such steps were seen (the zone rest and the brake-check), so the check is not empty. */
+function forcedStepsCarryNoPedal() {
+  let forced = 0;
+  for (const platform of ["pc", "mobile"]) {
+    for (const id of WRONG_LEG_PROFILES.keys()) {
+      let st = createWrongLegProfile(id, { zoneSpan: id === "sc-pk-busstop-ban" ? SPAN : null, platform });
+      let now = 10_000;
+      for (const kmh of [...FLAT_SERIES, ...FLAT_SERIES]) {
+        now += FLAT_TICK_MS;
+        const r = wrongLegFlatStep(st, {
+          now, t0: 10_000, kmh, flatStepM: (kmh / 3.6) * (FLAT_TICK_MS / 1000), dtMs: FLAT_TICK_MS, postedKmh: 50, probeAt: now,
+          rear: { ok: true, present: true, parsed: true, meters: 5, kind: "vehicle" }, impact: 0,
+        });
+        if (r.forceRest) {
+          forced += 1;
+          if (r.pedal) return false;
+        }
+        st = r.state;
+      }
+    }
+  }
+  return forced >= 2;
+}
+
+/** H1 ROUND 2 (C1): the harness's throttle helper, as squashed code. */
+const THROTTLE_HELPER = (sq) => sq.includes('const throttle = async (on) => { if (on === holdW) return; await page.keyboard[on ? "down" : "up"]("KeyW").catch(() => {}); inputChannel.driveKeyEvents += 1; holdW = on; };');
 /** THE HARNESS'S OWN READINGS AND ACTS, MEASURED FROM ITS CODE (round 9, FALSE-SELF-STATEMENT-POSE) — every sentence
  *  a template says about what the harness reads, records or turns is checked against these facts, never against an
  *  older sentence. `src` is the harness source (a planted copy in the tests that prove the check can fail). */
@@ -4601,11 +4827,27 @@ function harnessFacts(src = SRC) {
     // ── ROUND 10: the pedal acts, the holds and the cadence the templates now describe (IMPRECISE-SELF-STATEMENTS) ──
     // THE BOOKING TICK KEEPS THE THROTTLE DOWN: in the flat branch the profile's say line is printed, the throttle is
     // pressed (`throttle(true)`), and nothing in the branch lifts it or presses the brake.
+    // (H1: the step's `pedal` decides between the plain throttle and the pace governor's command — and a step that books
+    // a rest carries no pedal, executed on every declared kind below — so the booking tick is the plain branch.)
     throttleHeldOnBookingTick:
-      flat !== null && flat.includes("(wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line); await timed(\"pedals\", () => throttle(true));") && !/throttle\(false\)|brake\(true/.test(flat),
+      THROTTLE_HELPER(sq) &&
+      flat !== null &&
+      flat.includes("(wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line); if (!wrongProfileStep.pedal) await timed(\"pedals\", () => throttle(true)); else await timed(\"pedals\", () => paceThrottle(wrongProfileStep.pedal));") &&
+      !/throttle\(false\)|brake\(true/.test(flat) &&
+      forcedStepsCarryNoPedal(),
+    // THE PACE GOVERNOR IS APPLIED AS §5 HANDS IT OUT, AND IT IS THE THROTTLE ONLY (H1): `paceThrottle` holds the throttle
+    // down on «down», lets it up on anything but «down» and «pulse», and on «pulse» presses it for the command's ms and
+    // lets it up — and nothing in it names the brake; the flat tick calls it with the step's own `pedal`.
+    paceApplied:
+      THROTTLE_HELPER(sq) &&
+      sq.includes('const paceThrottle = async (cmd) => { if (cmd.act === "down") return throttle(true); if (cmd.act !== "pulse") return throttle(false); await throttle(true); await page.waitForTimeout(cmd.ms); await throttle(false); };') &&
+      flat !== null &&
+      flat.includes('else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));') &&
+      (sq.match(/\bpaceThrottle\(/g) ?? []).length === 1,
     // EACH FLAT-REST TICK LETS THE THROTTLE UP AND PUTS THE BRAKE DOWN: `throttle(false)` right after the pose read, and
     // `brake(true, p.kmh)` at the branch's top level (after the lost-key re-assert block, before the rest is judged).
     flatRestPedals:
+      THROTTLE_HELPER(sq) &&
       rest !== null &&
       rest.startsWith('} else if (phase === "flat-rest") { phaseTicks++; await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "flat-rest")); await throttle(false); if (holdS && p.kmh > 1 && prevKmh >= 0 && p.kmh > prevKmh + 2) { loud(') &&
       rest.includes("holdS = false; lostKeys += 1; } await brake(true, p.kmh); const atRest = p.kmh >= 0 && p.kmh <= 1;"),
@@ -4636,6 +4878,21 @@ function harnessFacts(src = SRC) {
     // §5's `flatRestHoldDone` over that clock (its default arm is `now - restAt >= holdMs`, executed in the test).
     plainHoldIsWallClock:
       rest !== null && rest.includes("if (restLogged && flatRestHoldDone({ now, restAt: flatRestAt, holdMs: FLAT_REST_HOLD_MS, state: wrongProfile })) {") && flatRestHoldDone({ now: 8000, restAt: 0, holdMs: 8000 }) === true && flatRestHoldDone({ now: 7999, restAt: 0, holdMs: 8000 }) === false,
+    // H1 ROUND 2 (the round-1 verifier's C1): THE THROTTLE HELPER every pedal sentence rests on — `throttle(on)` sends
+    // W down or up whenever its state differs, and nothing else; a helper that never lets W up leaves every «lets the
+    // throttle up» false.
+    throttleHelper: THROTTLE_HELPER(sq),
+    // H1 ROUND 2 (C2): THE DIAL every governor and profile reading is: the probe reads the element whose aria-label starts
+    // «Скорост », once, with no narrowing selector (the product side — that the dashboard carries that label — needs the page).
+    // (every other read of that label in the harness carries no narrowing selector either)
+    // H1 ROUND 3 (the round-2 verifier's W15): …and a probe that did not read the dial hands §5 −1, never a reading — the
+    // element absent, the label unparsed and the whole evaluate rejected each give −1, which §5 counts unread (a 0 would
+    // be a READ standstill, and the governor would hold the throttle down on it).
+    dialRead:
+      sq.includes(`holdCrashPinnedBg, rearSel, witnessOn }) => { const sp = document.querySelector('[aria-label^="Скорост "]');`) &&
+      sq.split('return { kmh: sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\\d+)/) || [0, -1])[1]) : -1, overlay: document.querySelector("[data-sim-overlay]")').length === 2 &&
+      sq.split('.catch((e) => ({ kmh: -1, overlay: "?", pause: null, end: false, lawfulWait: null,').length === 2 &&
+      (sq.match(/aria-label\^="Скорост "\]/g) ?? []).length === (sq.match(/aria-label\^="Скорост "\]'/g) ?? []).length,
     // THE DRIVE'S END ENDS ANY HOLD STILL OPEN: after the loop the brake is lifted, before the profile is finished.
     driveEndReleasesBrake: sq.includes("await throttle(false); await brake(false); wrongProfile = wrongLegProfileFinish(wrongProfile, { now: Date.now(), t0, driveEnded: ended }).state;"),
   };
@@ -4666,6 +4923,16 @@ const HARNESS_SELF_CLAIMS = [
   ["rest.holds", "the drive's end ended any hold still open", ["driveEndReleasesBrake"]],
   ["rest.holdsPlain", "each held on the ordinary {hold:n|?}s hold of wall clock", ["plainHoldIsWallClock"]],
   ["rest.holdsPlain", "the drive's end ended any hold still open", ["driveEndReleasesBrake"]],
+  // ── HARNESS STAGE H1: the pace governor's pedal acts, and the brake-check's booking (the braking line's own clause) ──
+  [
+    "pace.governor",
+    "under {full:n} км/ч the harness holds the throttle down for the whole tick, at or over the target it lets the throttle up for the whole tick, and between them it presses the throttle for (paceDutyBase {base:n2} + {gain:n2} per км/ч under the target) of the tick's own interval, from {pulseLoMs:n} to {pulseHiMs:n} ms, then lets it up; an unread dial lets the throttle up; the brake is never touched by it",
+    ["paceApplied", "dialRead"],
+  ],
+  // H1 ROUND 2 (F1): the governor's tally is the commands the harness applied — §5 counts a command only once it rides
+  // out, and the harness applies every truthy `pedal` through `paceThrottle`.
+  ["readings.pace", "governor commands the harness applied", ["paceApplied"]],
+  ["obs.brakeCheck", "the throttle stays down to the end of this tick; each flat-rest tick after it lets the throttle up, and the first one whose dial does not read 0–{fs:n} км/ч puts the brake down", ["throttleHeldOnBookingTick", "flatRestPedals", "brakeRefusedAtRest"]],
 ];
 /** What makes a sentence a claim about the harness itself (round 10: its pedal acts, its holds and its cadence too). */
 const SELF_CLAIM_WORDS = /\bpose\b|\bposition\b|\bwheel\b|\bsteer\w*|\bwhere (?:it|the car|each) (?:stopped|rested|fell)\b|\bwhich lane\b|\broad (?:probe|witness)\b|\bthrottle (?:stays|is|up|down)\b|\blets the throttle\b|\bbrake (?:was|is|goes)\b|\bputs the brake\b|\bpress(?:es|ed)?\b|\bflat-rest tick\b|\bgave the rest up\b|\bhold of wall clock\b|\bdrive's end ended\b|\bcadence (?:came|was) due\b|\bholds were not holding\b/gi;
@@ -4796,7 +5063,7 @@ describe("§W10 ROUND 9 — the round-8 verifier's findings, each ported as a te
     const facts = harnessFacts();
     // The facts themselves, measured from the harness as it is: the pose IS read (the round-8 verifier's evidence),
     // the road witness DOES record the lane, and a wrong leg's flat phase turns no wheel.
-    assert.deepEqual(facts, { poseRead: true, sec5ReadsNoPose: true, sec5ReadsNoLane: true, laneRecorded: true, noWheelOnFlat: true, restLinePerStop: true, throttleHeldOnBookingTick: true, flatRestPedals: true, brakeRefusedAtRest: true, atRestBooksTheRest: true, holdRestIsTaskCapOrOverLimit: true, plainHoldIsWallClock: true, driveEndReleasesBrake: true }, "the harness's own readings and acts are not what the templates were checked against");
+    assert.deepEqual(facts, { poseRead: true, sec5ReadsNoPose: true, sec5ReadsNoLane: true, laneRecorded: true, noWheelOnFlat: true, restLinePerStop: true, throttleHeldOnBookingTick: true, paceApplied: true, flatRestPedals: true, brakeRefusedAtRest: true, atRestBooksTheRest: true, holdRestIsTaskCapOrOverLimit: true, plainHoldIsWallClock: true, throttleHelper: true, dialRead: true, driveEndReleasesBrake: true }, "the harness's own readings and acts are not what the templates were checked against");
     assert.deepEqual(selfClaimViolations(), [], "a template says something about the harness itself that its code does not bear out");
   });
 
@@ -5015,6 +5282,62 @@ describe("§W10 ROUND 9 — the round-8 verifier's findings, each ported as a te
  *         claim assembled from pieces at runtime (join, concatenation, fromCharCode, template pieces, file names in
  *         parts), a builtin reached through a chain no honest author writes — when it is not caught by the lib's
  *         runtime check or a harness census. The verifier must argue in or out for every bypass.
+ *   (iii, extended by the integrator for H1 round 14 — the cut content) A cut rule keyed on a UNICODE PROPERTY or on
+ *         ESCAPE SYNTAX is IN model, and §W20's BREAK-PROPERTY PAIR CENSUS covers it, at (c−2, c−1), (c−1, c) and (c, c+1)
+ *         of every cut: the break classes of UAX #29 (Grapheme_Cluster_Break with Extended_Pictographic and
+ *         Indic_Conjunct_Break, Word_Break, Sentence_Break — derived from the runtime's ICU), every ordered pair of them and
+ *         every context of their rules that looks past a pair; every ordered pair of the General_Category values; each
+ *         Script doubled; each binary property ECMA-262 names doubled and beside a code point without it; every emoji with
+ *         U+FE0E, U+FE0F and the ZWJ after it, every emoji modifier base with every modifier, and the emoji components (the
+ *         keycap's and the tag sequence's) in every ordered pair and around U+FE0F; the backslash and the quote beside every
+ *         printable ASCII unit, «\u» with 0–4 hex digits and a surrogate pair written as two escapes; every ASCII
+ *         punctuation or symbol doubled, three and four times over, beside a space, a digit and an upper-case letter, and
+ *         every ordered pair of them. THE BOUNDARY IS THE PINNED CENSUS (THROWN_BREAK_PIN): a rule is covered when what it
+ *         keys on holds of a placed pair — and a rule keyed on a property holds of that property's placed representative
+ *         (its first member: beside itself and beside the text's lower-case letters always; beside every other class's first
+ *         member for the break classes and the general categories; beside the first code point without it for a binary
+ *         property). A rule keyed on SPECIFIC CODE POINTS with no property-level function — a code point or a range no
+ *         property singles out, chosen where no class representative stands — is written to evade the census and is OUT of
+ *         model: a CONDITION, never a refutation. So is a rule keyed on a CONJUNCTION of properties chosen so that no
+ *         placed pair meets it (a script AND a category at once on each side of the cut, say), and a rule that looks ONLY
+ *         at units further from the cut than the placements stand (a window that leaves out c − 2 … c + 1): neither is
+ *         claimed covered, each singles out texts where no representative stands, and each is answered — when a real
+ *         truncation rule is shown to need it — by adding its pairs and re-pinning. (This last sentence, on conjunctions
+ *         and far windows, is the round-14 builder's reading of the integrator's line, flagged for its ruling.)
+ *   (iii, restated by the integrator for H1 round 15 — the runtime check) THE TRUTH OF THE CUT SENTENCE RESTS ON THE RUNTIME
+ *         CHECK, not on a census. Round 14's line above closed the cut class at a census boundary, and the round-14 verifier
+ *         found content inside that boundary that no census value held (an ANSI control sequence, «\u{…}», a percent-escape,
+ *         «%uXXXX», a ZWJ before a person, a tag after a pictograph). The class is no longer chased by input regions: the
+ *         harness's eventThrownText VERIFIES ITS OWN OUTPUT before it returns it — the quoted text, decoded by a decoder of its
+ *         own, is the raw slice of the input at the declared ceiling; every count it is about to print is counted again from
+ *         the input; the words are the specification's — and on ANY disagreement prints the declared fallback «(the thrown
+ *         value could not be described)». So a cut rule keyed on ANY content — a Unicode property, escape syntax, specific
+ *         code points, a conjunction, a far window; placed in a census or not — can no longer print a false sentence: at
+ *         worst it degrades the line to the fallback, which is true. Hence:
+ *         · IN model, a refutation: an edit after which the harness prints a FALSE sentence about a thrown text — past the
+ *           check, or by removing or weakening the check and surviving the suite;
+ *         · a CONDITION, never a refutation: an edit to the BUILDING that survives the suite and, where it fires, prints the
+ *           fallback (a degraded line, and a true one). (This reading of a fallback-only survivor is the round-15 builder's,
+ *           from the integrator's «at worst it degrades the line to the fallback, which is true», flagged for its ruling.)
+ *         THE CENSUSES PIN THAT THE CHECK EXISTS AND BITES (§W20, the round-15 rows): the check's two functions are run alone
+ *         against the specification's sentence made false one piece at a time; the P1 block is run with the building
+ *         sabotaged fifty ways (the round-14 survivors as written among them) and must print the fallback and never a false
+ *         sentence, and a false sentence once the check's line is taken out — so a mutant that removes or weakens the check
+ *         dies to those rows (A CHECK REMOVED OR WEAKENED TURNS THE ROWS RED runs twenty-eight of them in this file). WHAT THE
+ *         CHECK ITSELF RESTS ON is its inputs (the thrown string; the message as it was read, once; the kind named) and its
+ *         own code, which no runtime check guards: every code line of the error-text path is PINNED (THROWN_PATH_PIN), as
+ *         clause (ii) pins the harness's lines, so an edit there — the read, the function's entry, the kind's tests, the
+ *         check, the building — is CAUGHT: a red that stands until a person re-reads the edit against the specification
+ *         comment and re-pins. Re-pinning is the deliberate act the pin exists to force; it is not a step of a mutant. With
+ *         the pin re-pinned, the rows above still kill every weakening of the check and every sabotage of the building; what
+ *         the pin ALONE holds, said plainly, is an edit that rewrites the VALUE before it is described (at the read, or at
+ *         the function's entry) keyed on content no census places — the check compares with the rewritten value and does
+ *         not see it (WHAT THE CHECK RESTS ON, EXECUTED runs one, and shows the false sentence past the check). (That an
+ *         edit of a pinned line is caught by the pin, as under clause ii, is the round-15 builder's reading of the
+ *         integrator's «the censuses pin that the check exists and bites», flagged for its ruling.) The round-14 pair census
+ *         stays, with the two realistic families added (ANSI CSI/OSC sequences from real Playwright call-log text; the ZWJ
+ *         and tag-sequence emoji pairs) and escape syntax beyond JSON's, as the census of what the harness PRINTS when it
+ *         does not fall back.
  *
  * Every finding below is a test that was RED on round 9 (scratchpad/pedal/r10/testfirst-r9.log) before anything was
  * fixed. */
@@ -5175,7 +5498,13 @@ describe("§W11 ROUND 10 — the round-9 verifier's findings, each ported as a t
     for (const [label, src, fact] of [
       ["the flat-rest branch no longer lifts the throttle", plantIn(SRC, "throttle up", FLAT_REST_PEDALS, "      // THE SAME STANDSTILL DISCIPLINE", "replace"), "flatRestPedals"],
       ["the brake pressed only under a condition", plantIn(SRC, "brake", "      await brake(true, p.kmh);\n      const atRest", "      if (phaseTicks > 1) await brake(true, p.kmh);\n      const atRest", "replace"), "flatRestPedals"],
-      ["the booking tick lifts the throttle", plantIn(SRC, "booking lift", '      await timed("pedals", () => throttle(true));\n', '      await timed("pedals", () => throttle(true));\n      if (wrongProfileStep.forceRest) await throttle(false);\n', "replace"), "throttleHeldOnBookingTick"],
+      // (H1: the anchor is the flat tick's else-branch now — the plain throttle's branch and the pace command's.)
+      ["the booking tick lifts the throttle", plantIn(SRC, "booking lift", '      else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));\n', '      else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));\n      if (wrongProfileStep.forceRest) await throttle(false);\n', "replace"), "throttleHeldOnBookingTick"],
+      // H1: the pace governor's application stops being what the governor sentence says — a brake in it, a pulse that
+      // never lets the throttle up, or the flat tick no longer applying the step's own command.
+      ["the pace helper presses the brake", plantIn(SRC, "pace brake", "  await throttle(false);\n};\nlet refusedReversePress = 0;\n", "  await throttle(false);\n  await brake(true);\n};\nlet refusedReversePress = 0;\n", "replace"), "paceApplied"],
+      ["the pace pulse never lets the throttle up", plantIn(SRC, "pace no-lift", "  await page.waitForTimeout(cmd.ms);\n  await throttle(false);\n};\n", "  await page.waitForTimeout(cmd.ms);\n};\n", "replace"), "paceApplied"],
+      ["the flat tick ignores the pace command", plantIn(SRC, "pace ignored", '      else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));\n', '      else await timed("pedals", () => throttle(true));\n', "replace"), "paceApplied"],
       ["the brake refused over a wider band", plantIn(SRC, "refusal", "if (on && kmh !== null && kmh >= 0 && kmh <= 1) {", "if (on && kmh !== null && kmh >= 0 && kmh <= 3) {", "replace"), "brakeRefusedAtRest"],
       ["the rest booked on a wider band", plantIn(SRC, "at rest", "      await brake(true, p.kmh);\n      const atRest = p.kmh >= 0 && p.kmh <= 1;", "      await brake(true, p.kmh);\n      const atRest = p.kmh >= 0 && p.kmh <= 2;", "replace"), "atRestBooksTheRest"],
       ["a third harness hold", plantIn(SRC, "third hold", "      let holdRest = false;\n", "      let holdRest = false;\n      if (p.kmh > 200) holdRest = true;\n", "replace"), "holdRestIsTaskCapOrOverLimit"],
@@ -5278,7 +5607,7 @@ describe("§W11 ROUND 10 — the round-9 verifier's findings, each ported as a t
 
   it("C · THE CENSUSES HOLD WHAT THEY HOLD, AND EACH CAN FAIL: every construct a spelling-evading mechanism needs is pinned in the harness (M8, M9, M10) and the lib (L15, L16, L17) — each census is its pin, item for item, and not empty — and a sibling of each kind, planted, is a new census entry", () => {
     // (Counted against the PINS, not against numbers written here, so the one re-pin command is all a sibling lane's
-    // honest edit needs. At this lane's hand-off: M8 89, M9 2, M10 66, H3d 41, H8 181; L15 21, L16 1, L17 8, L14 83.)
+    // honest edit needs. At the round-10 hand-off: M8 89, M9 2, M10 66, H3d 41, H8 181; L15 21, L16 1, L17 8, L14 83 — and at harness stage H1: M10 68, L15 22, L14 96, the rest unchanged; H1 round 2: H3d 42, the rest unchanged.)
     const pinned = (pin) => pin.split(/\s+/).filter(Boolean).length;
     for (const [label, items, pin] of [
       ["M8", computedKeyCensus(SRC), CENSUS_COMPUTED_PIN], ["M9", builtinDestructuringCensus(SRC), CENSUS_DESTRUCTURE_PIN], ["M10", literalReceiverCensus(SRC), CENSUS_RECEIVER_PIN],
@@ -5482,6 +5811,45 @@ const TEMPLATE_SNAPSHOT = Object.freeze({
   "summary.zoneNone": "ce9e2f40f987",
   "rest.holds": "4aac58d4ed70",
   "rest.holdsPlain": "441ae2d4c092",
+  // HARNESS STAGE H1 — the new templates (none of the round-10 ones changed)
+  "sizing.labelAt": "2a3d8fd45e98",
+  "sizing.pace": "556a6e6fd201",
+  "pace.startLamp": "bf9617b1e52e", // H1 round 5: «its first reading it credits that is at or over» (a reading over the disc or after a drop does not start it)
+  "pace.governor": "88129bbe9793",
+  "pace.drop": "bd150a938181", // H1 round 5: the drop test gates the start too, and the window holds readings from before the run
+  "pace.whyLamp": "c7cc9ee9783e",
+  "pace.whyEm": "0113c283ee6e",
+  "obs.paceHeld": "37209073ff03",
+  "pace.dropHeld": "8300bc3e8be8",
+  "obs.paceBroken": "7d8260f50706",
+  "pace.brokeFloor": "c1d1fa948391",
+  "pace.brokeDisc": "121ad6cc667a",
+  "pace.brokeDrop": "c40ad1e0c914",
+  "readings.pace": "039a7ce39204", // H1 round 5 (R4-READINGS-GAP-EXCLUDES-BREAK): whose readings the lowest and the largest gap are
+  "pace.brokeAt": "44becb5bd461",
+  "pace.gapRead": "8132c8e8ced2",
+  "sizing.impact": "4913c6d0588e",
+  "obs.impact": "a01916a18b10",
+  "readings.impact": "db8b6c645d17",
+  "sizing.brake": "8450c6c48a41",
+  "brake.room": "df19f187c502",
+  "obs.brakeCheck": "d5e59c23eabb",
+  "obs.rearBlind": "dce6997317f5",
+  "obs.rearUnread": "1810428983ae",
+  "readings.brake": "1c1c88110177",
+  "brake.booked": "d77bfe00fd4c",
+  // H1 ROUND 2 — the new templates (the changed ones above, each re-read)
+  "pace.capSized": "a745d837b4da",
+  "pace.capHeld": "262cccf8f48b",
+  "pace.brokeDiscChange": "5733fc96ee96",
+  "pace.brokeCap": "92b0b8348009",
+  "impact.baseFirst": "500dc2d99f81",
+  "impact.baseZero": "8adc3286e1ea",
+  "obs.impactBaseUnread": "309636513e7d",
+  "obs.impactFell": "5093aaa61e41",
+  "brake.ceiling": "f7693163ac4c",
+  // H1 ROUND 5 — the new template (the changed ones above, each re-read)
+  "pace.notBroke": "19a1a3eea0e3",
 });
 /** …and the profile table's printed texts (`name`, `told`, `row`), the same way. */
 const TABLE_TEXT_SNAPSHOT = Object.freeze({
@@ -5489,6 +5857,11 @@ const TABLE_TEXT_SNAPSHOT = Object.freeze({
   "sc-ov-keep-right": "a00cceeb8894",
   "sc-ac-truck-spray": "dc9a69512f2a",
   "sc-pk-busstop-ban": "ea3f2f1fdfbd",
+  // HARNESS STAGE H1
+  "sc-vp-telltale-red": "d459161c6bf3", // (H1 round 6: the start rule, by the dial's rounding)
+  "sc-vu-emergency": "6821688d05e4", // (H1 round 6: the floor by the dial's rounding, started on the first such reading)
+  "sc-hz-brake-dont-swerve": "72348f1b9cdb",
+  "sc-follow-tailgater": "de8999447a0c",
 });
 
 /* ═══ ROUND 9 PINS (begin) — computed by scratchpad/pedal/r9/make-pins.mjs (round 10: re-computed by
@@ -5538,43 +5911,43 @@ const HARNESS_MECHANISM_ALLOWANCES = Object.freeze({
     "process.exitCode assign =": 1
   }
 });
-/** H7a — the wrong-leg cadence block, line for line (244 code lines). */
+/** H7a — the wrong-leg cadence block, line for line (247 code lines at harness stage H1; 244 at round 10). */
 const CADENCE_BLOCK_PIN = `
   64ac0b48fc5a 140702af1bc7 eb6f427b5aaa 235f985d9beb a7809a9f9a40 cde927fe59fa 3c180b795e2c b24707756d57 15d25ee834fe f29b273bc453
-  de1f505942e1 b75e8806e3ed 0e072fc4bd55 29576b54e255 7e9e1267c40f a0ed0af1fa77 47880f386b31 55d019123b35 c41f37e2eb88 5ccfc725266f
-  b751b3915560 f8c21eb227eb 4e445b59a491 b24707756d57 65a844785539 c98496c2569f cde927fe59fa 8aede30e182c 29576b54e255 7d9ce50b3f2b
-  581a1c573ec8 09970aef6a2d 37d508c307c4 3554b17c241e 7655f71db20d cb4a91abf8cf 68e1cc8ab276 01a9273b8721 2995ba2acdff 14463a9d5ab0
-  254130777413 d3039c128d72 5c896edd09bd cb86a5fd8bff a6640e96baec 29576b54e255 32389aea3312 92af52e247c3 2bff5259df08 4d27571394a6
-  985045f1c057 8a5b133c639a 4d27571394a6 2a8440e0c7a9 f1c560d1de2d ac0236ee97e9 48e50935d86e aed9556e36ff 686eaf5d223a 0262e6d8220b
-  11a4e96dad19 9afb2f3950c5 9d8b2b5670d1 35a5cd811cdd 92e83d16fe39 71454b752602 8df08256cc36 9d8b2b5670d1 d10b36aa74a5 d10b36aa74a5
-  d10b36aa74a5 6c41070fd8f8 41cc730e2162 b24707756d57 b9f40a56fb42 440db01a66d4 cde927fe59fa df00e11ff333 29576b54e255 29fe3d1f5704
-  4fb54fc9e221 b6522511e11e 630531dcfe08 024106880a2d b2ac42e26cd1 c981d845f4a9 281c3b54d1fa 4c40449c00d9 0a116e38cf3c af8bc6859cf2
-  b24707756d57 cde927fe59fa 926b15174656 b0e47438fc0d 2a36cc9dd244 c3dcc2451fa2 85df2ae9ead0 bc0dc1f00fe1 29576b54e255 a65e7950a0a8
-  5abcfda004bd 432740256e5a b751a73ec66e 72ac35b78127 0658c8c7672c 3b887a389be3 065aca268de9 926b15174656 c3dcc2451fa2 ed41d50a3f70
-  55c923bc9d29 a892688153dc 26b46659f201 29576b54e255 329cfe5fd42a 92af52e247c3 afd3e9d9a4c4 73a0e8e43d9f 926e69a8b3cf 73a0e8e43d9f
-  62bdfc1e1821 1b9d522c3962 13df507392e6 d835169996cb b79a349fc049 486fcbc2df7e 8b0555552a7d 9a9191a49a3e a1fd02caa5e8 92e83d16fe39
-  1f27eb7495d1 573e8a3ed1da 8aa66f661659 bf2287c58023 9d8b2b5670d1 d10b36aa74a5 985045f1c057 c0df3a87c8c9 73a0e8e43d9f 14dd959a116e
-  469983c7b7ad 81589b920e6d aed9556e36ff 39acae332d80 4827dc0e4176 824c1d5feadf 3a8b3f5cd679 1aeb894848a8 183d7706b426 9d8b2b5670d1
-  ca9488f6c59e 92e83d16fe39 5bd86f836ae5 6a95ad5c0453 9d8b2b5670d1 d10b36aa74a5 d10b36aa74a5 d10b36aa74a5 e234864d7e48 a8a802f4943f
-  1bb12f4ed754 8e145d63aed7 cd28bba2914b 3a308589673d 4a902d20ca3b 5cd01f628358 eee65012e486 29576b54e255 933ffa4c2bb3 3523a5ed18d5
-  a8a802f4943f 1bb12f4ed754 8e145d63aed7 cd28bba2914b 3a308589673d 4a902d20ca3b 5cd01f628358 eee65012e486 2c58b0f2b094 abfa59370983
-  790e877c8143 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0 49b326eafbaf eb5206d6875b d10b36aa74a5 be3e34217755 c41f37e2eb88 92cffa71c81f
-  fc149f826841 91708c727750 ac2bc63b0800 fb4e004cfcb6 44e30893a23f 4c6ffcd63126 5785108f2f21 d10b36aa74a5 702657670fa8 b43cbe5fb430
-  b02972ca89a8 94a38a1cfaab c8849f2d31b3 7b2c052e1f7a 9c95d34e136f 8fde04a415e1 52b34a87367a aed9556e36ff 249025cb5081 126a9cec8e39
-  e413ed18c650 302fe3968337 1e43030a1a38 9d8b2b5670d1 fb9c8cb7c115 e7b0b4abb0a7 da04658e5130 d10b36aa74a5 99a1318a4e7c b7a3d37362ea
-  9729669ead87 3e929c591152 c423802c3a38 9d0196732bc0 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0 71eab2ade725 92e83d16fe39 f1ad5b299898
-  25638a2500c3 d9c2c3642d85 9d8b2b5670d1 911e4a282b3c 9729669ead87 3e929c591152 c423802c3a38 9d0196732bc0 a6a7c1eeba8a 9d74c58d8dd0
-  4efbe75d22a0 d10b36aa74a5 d10b36aa74a5 d10b36aa74a5
+  de1f505942e1 b75e8806e3ed 0e072fc4bd55 552642cea5d7 c359a34ac0fe 29576b54e255 7e9e1267c40f a0ed0af1fa77 2cc59ab0072b 462a74d82d46
+  55d019123b35 c41f37e2eb88 5ccfc725266f b751b3915560 f8c21eb227eb 4e445b59a491 b24707756d57 65a844785539 c98496c2569f cde927fe59fa
+  8aede30e182c 29576b54e255 7d9ce50b3f2b 581a1c573ec8 09970aef6a2d 37d508c307c4 3554b17c241e 7655f71db20d cb4a91abf8cf 68e1cc8ab276
+  01a9273b8721 2995ba2acdff 14463a9d5ab0 254130777413 d3039c128d72 5c896edd09bd cb86a5fd8bff a6640e96baec 29576b54e255 32389aea3312
+  92af52e247c3 2bff5259df08 4d27571394a6 985045f1c057 8a5b133c639a 4d27571394a6 2a8440e0c7a9 f1c560d1de2d ac0236ee97e9 48e50935d86e
+  aed9556e36ff 686eaf5d223a 0262e6d8220b 11a4e96dad19 9afb2f3950c5 9d8b2b5670d1 35a5cd811cdd 92e83d16fe39 71454b752602 8df08256cc36
+  9d8b2b5670d1 d10b36aa74a5 d10b36aa74a5 d10b36aa74a5 6c41070fd8f8 41cc730e2162 b24707756d57 b9f40a56fb42 440db01a66d4 cde927fe59fa
+  df00e11ff333 29576b54e255 29fe3d1f5704 4fb54fc9e221 b6522511e11e 630531dcfe08 024106880a2d b2ac42e26cd1 c981d845f4a9 281c3b54d1fa
+  4c40449c00d9 0a116e38cf3c af8bc6859cf2 b24707756d57 cde927fe59fa 926b15174656 b0e47438fc0d 2a36cc9dd244 c3dcc2451fa2 85df2ae9ead0
+  bc0dc1f00fe1 29576b54e255 a65e7950a0a8 5abcfda004bd 432740256e5a b751a73ec66e 72ac35b78127 0658c8c7672c 3b887a389be3 065aca268de9
+  926b15174656 c3dcc2451fa2 ed41d50a3f70 55c923bc9d29 a892688153dc 26b46659f201 29576b54e255 329cfe5fd42a 92af52e247c3 afd3e9d9a4c4
+  73a0e8e43d9f 926e69a8b3cf 73a0e8e43d9f 62bdfc1e1821 1b9d522c3962 13df507392e6 d835169996cb b79a349fc049 486fcbc2df7e 8b0555552a7d
+  9a9191a49a3e a1fd02caa5e8 92e83d16fe39 1f27eb7495d1 573e8a3ed1da 8aa66f661659 bf2287c58023 9d8b2b5670d1 d10b36aa74a5 985045f1c057
+  c0df3a87c8c9 73a0e8e43d9f 14dd959a116e 469983c7b7ad 81589b920e6d aed9556e36ff 39acae332d80 4827dc0e4176 824c1d5feadf 3a8b3f5cd679
+  1aeb894848a8 183d7706b426 9d8b2b5670d1 ca9488f6c59e 92e83d16fe39 5bd86f836ae5 6a95ad5c0453 9d8b2b5670d1 d10b36aa74a5 d10b36aa74a5
+  d10b36aa74a5 e234864d7e48 a8a802f4943f 1bb12f4ed754 8e145d63aed7 cd28bba2914b 3a308589673d 4a902d20ca3b 5cd01f628358 eee65012e486
+  29576b54e255 933ffa4c2bb3 3523a5ed18d5 a8a802f4943f 1bb12f4ed754 8e145d63aed7 cd28bba2914b 3a308589673d 4a902d20ca3b 5cd01f628358
+  eee65012e486 2c58b0f2b094 abfa59370983 790e877c8143 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0 49b326eafbaf eb5206d6875b d10b36aa74a5
+  be3e34217755 c41f37e2eb88 92cffa71c81f fc149f826841 91708c727750 ac2bc63b0800 fb4e004cfcb6 44e30893a23f 4c6ffcd63126 5785108f2f21
+  d10b36aa74a5 702657670fa8 b43cbe5fb430 b02972ca89a8 94a38a1cfaab c8849f2d31b3 7b2c052e1f7a 9c95d34e136f 8fde04a415e1 52b34a87367a
+  aed9556e36ff 249025cb5081 126a9cec8e39 e413ed18c650 302fe3968337 1e43030a1a38 9d8b2b5670d1 fb9c8cb7c115 e7b0b4abb0a7 da04658e5130
+  d10b36aa74a5 99a1318a4e7c b7a3d37362ea 9729669ead87 3e929c591152 c423802c3a38 9d0196732bc0 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0
+  71eab2ade725 92e83d16fe39 f1ad5b299898 25638a2500c3 d9c2c3642d85 9d8b2b5670d1 911e4a282b3c 9729669ead87 3e929c591152 c423802c3a38
+  9d0196732bc0 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0 d10b36aa74a5 d10b36aa74a5 d10b36aa74a5
 `;
-/** H7b — outside it, the 64 lines naming the cadence's state, a wrong-leg phase literal or a leg-mode test (round 10: the leg-mode tests derived from the code). */
+/** H7b — outside it, the 65 lines naming the cadence's state, a wrong-leg phase literal or a leg-mode test (round 10: the leg-mode tests derived from the code; H1 round 2: + the probe's rear-badge read, gated to a wrong leg). */
 const EFFECT_LINES_PIN = `
   20e9a1df206e d47864293df8 254c8589123a 619e6d9231ec 357d8f8753b9 64ac0b48fc5a 708e6bded5bb af7bb837fad0 c2e331b8bf44 50b207dc4bbf
-  0d2ed8b628f7 64ac0b48fc5a 64ac0b48fc5a fcb13a0a4384 08e38737ee15 97ee2d2536c8 165433c2c261 d59a7ff22aca b8d54a751d08 aec5999e4ebe
-  7f7e1e9c38c1 8f919965974c 44dc0d0850c0 a357386843e5 621e8f982818 eb5206d6875b eb5206d6875b 688ebe1054b2 330755fef94d 5ffc64a372c1
-  13b56a9b2f17 a0f7e579028f 7d5a7cd19b04 eb5206d6875b b02972ca89a8 94a38a1cfaab 7b2c052e1f7a fb9c8cb7c115 eb5206d6875b df228cb15808
-  9ac9dc686bd1 2f920a9cab19 72f57923e6b0 331064656919 bf9d76a2fafb 87e28ed8172b e1b0247d6c9e 34092c84093d 10d930de035c 288ff5f014c9
-  c00a0ce178d8 b0954baeb11d 621e8f982818 2d352a962961 2f27648a28c1 562c56f5044f 3cfe7f09f61a 4913972cd8ae 4e09e9df9da4 1a5a6f18fe38
-  051316388198 0ea61e021539 dd71e454a031 0e64ba293849
+  0d2ed8b628f7 64ac0b48fc5a 64ac0b48fc5a de8669ee9a07 fcb13a0a4384 08e38737ee15 97ee2d2536c8 165433c2c261 d59a7ff22aca b8d54a751d08
+  aec5999e4ebe 7f7e1e9c38c1 8f919965974c 44dc0d0850c0 a357386843e5 621e8f982818 eb5206d6875b eb5206d6875b 688ebe1054b2 330755fef94d
+  5ffc64a372c1 13b56a9b2f17 a0f7e579028f 7d5a7cd19b04 eb5206d6875b b02972ca89a8 94a38a1cfaab 7b2c052e1f7a fb9c8cb7c115 eb5206d6875b
+  df228cb15808 9ac9dc686bd1 2f920a9cab19 72f57923e6b0 331064656919 bf9d76a2fafb 87e28ed8172b e1b0247d6c9e 34092c84093d 10d930de035c
+  288ff5f014c9 c00a0ce178d8 b0954baeb11d 621e8f982818 2d352a962961 2f27648a28c1 562c56f5044f 3cfe7f09f61a 4913972cd8ae 4e09e9df9da4
+  1a5a6f18fe38 051316388198 0ea61e021539 dd71e454a031 0e64ba293849
 `;
 /** H7c — outside it, the 17 statements a condition on that state, or on the leg being wrong, controls (round 10: and the else of a guard that always holds on a right leg). */
 const EFFECT_CONTROLLED_PIN = `
@@ -5605,11 +5978,11 @@ const CLAIM_LITERALS_PIN = `
 `;
 /** H10 — the distinctive keys of the profile's state that the harness names (on its enumerated profile lines). */
 const HARNESS_NAMED_STATE_KEYS = Object.freeze(["dangerousAboveKmh","driveEnded","everyM","flatTicks","forceRest","gradedAboveKmh","heldAsSized","heldMs","holdMs","maxMs","postedKmh","qualAt","startedAt","suppressRest","topKmh"]);
-/** H11 — the 21 direct prints. */
+/** H11 — the 22 direct prints (H1: + the event-shot sidecar; H1 round 7: its pendingAtWrite is the runs still open, 2f9c37b56c2d → a4b215529efb). */
 const DIRECT_PRINTS_PIN = `
   ed1e3728ee12 acdb7c59c5d8 a06b54887a9e 607a161b21fd 38007986c9fb 1d84e8d82bda 581bb6df8390 5df780d312be fb2db5d30970 69b5ecf7b261
-  21ee2c46d4fd 059a971e9003 3aa8bc73751b 6d3fdd626046 d96962796cbd d96962796cbd d96962796cbd 390d96202f62 69b5ecf7b261 69b5ecf7b261
-  d96962796cbd
+  21ee2c46d4fd 059a971e9003 3aa8bc73751b 6d3fdd626046 d96962796cbd d96962796cbd a4b215529efb d96962796cbd 390d96202f62 69b5ecf7b261
+  69b5ecf7b261 d96962796cbd
 `;
 /** H12 — how the status object is reached, and the 8 lines naming the status file or its path. */
 const STATUS_FORMS_PIN = Object.freeze({"const status =":1,"( status ,":2,"( status .phase":1,"= status .phase":1,"... status ,":1});
@@ -5645,41 +6018,42 @@ const CENSUS_COMPUTED_PIN = `
 const CENSUS_DESTRUCTURE_PIN = `
   8a5f788a88ef 8f73c6bc72ee
 `;
-/** M10 — every member access in the harness on a literal or constructed receiver (66). */
+/** M10 — every member access in the harness on a literal or constructed receiver (68; H1: + the page-side MutationObserver and the event frame name). */
 const CENSUS_RECEIVER_PIN = `
   03919f833ce5 055da5ca8505 05aacbd3d6bf 064be8dd0ff3 09b7a8362314 09b7a8362314 1215954722ae 148781071cd3 1530138a709c 214a185fe431
-  22851b98a319 22ed4374ad91 24bcaefd0dba 25489f43e5df 291172ffba19 2dc11d682b68 31eff366193b 35ab061c4a7d 3a83798c6fb4 3f5c99009a2c
-  4101b32f6923 4399517e5fc7 4ca5bf8e0a55 4d22080061ed 4d22080061ed 4d22080061ed 4d22080061ed 4e3ef4467fde 59e355bb646f 5effeda9627a
-  5f9730fe9d1e 6499136bd134 64d16d8fec66 64d16d8fec66 682d9f5b21ea 6f20228bf428 7f0e44df998c 7f0e44df998c 7f0e44df998c 8180de79ac26
-  868a986f6689 868a986f6689 87140baa81b2 9b3347b94959 9b756d19cec2 9c1195f3b196 9d1fb3d6a570 9e4a3759c79e 9e69329cfd8f b1292a86017e
-  b325ed24b4fd b860cd41ac8b bbcecb1fb54d c0b6356b1396 d55864c20f3c d9f7644b498b dab85c101eb8 dc2d625ebd61 e06cdeca19bb e17729279a63
-  e66e1565c795 e66e1565c795 f07946c36fe1 f4563d1791f1 f9cd7ae8a86f fa5359db9cc8
+  22851b98a319 22ed4374ad91 24bcaefd0dba 25489f43e5df 291172ffba19 2ab274f0c9e6 2dc11d682b68 31eff366193b 35ab061c4a7d 3a83798c6fb4
+  3f5c99009a2c 4101b32f6923 4399517e5fc7 4ca5bf8e0a55 4d22080061ed 4d22080061ed 4d22080061ed 4d22080061ed 4e3ef4467fde 59e355bb646f
+  5effeda9627a 5f9730fe9d1e 6010c602da5b 6499136bd134 64d16d8fec66 64d16d8fec66 682d9f5b21ea 6f20228bf428 7f0e44df998c 7f0e44df998c
+  7f0e44df998c 8180de79ac26 868a986f6689 868a986f6689 87140baa81b2 9b3347b94959 9b756d19cec2 9c1195f3b196 9d1fb3d6a570 9e4a3759c79e
+  9e69329cfd8f b1292a86017e b325ed24b4fd b860cd41ac8b bbcecb1fb54d c0b6356b1396 d55864c20f3c d9f7644b498b dab85c101eb8 dc2d625ebd61
+  e06cdeca19bb e17729279a63 e66e1565c795 e66e1565c795 f07946c36fe1 f4563d1791f1 f9cd7ae8a86f fa5359db9cc8
 `;
-/** H3d — every harness code line that reads the scenario id (or the out dir as a receiver or comparand, or the page's URL) (41). */
+/** H3d — every harness code line that reads the scenario id (or the out dir as a receiver or comparand, or the page's URL) (42; H1 round 2: + the lane's H1 reads, `const H1_READS = h1ProbeReads(SCENARIO);`, which gates the P1 witness and the rear read and prints nothing). */
 const SCENARIO_READS_PIN = `
   007256b529e3 066ce66b740d 08aa8b1a7709 08fd5478aab4 0ccf487ffa63 1606f049408f 16e32f0f6c00 187e660aaa04 1ed830244195 3036906e1f9d
   372dad712335 390d96202f62 3b7f2534bcf6 40bc61b095c8 40bc61b095c8 420735f1d42d 44f65007dbe0 47f3a85e4c6a 539029965b5d 56f9dbd1d022
-  597a10e2a5a2 648221597d62 7328bcf51139 94ddc7b1299a 9619f067b5d3 a4643742d111 a6f74ada4f0e bb3f2216b8da bc5ca2aae17b c2f56f8bb8d3
-  c6e9d8fc681e c6e9d8fc681e c954fe065af3 c954fe065af3 c9b8a4f4f2ba d4324d9a9780 d59a7ff22aca e140b6ce7d64 e676f54efde3 ec474b3dc0af
-  f0c00c957720
+  597a10e2a5a2 648221597d62 6b5ba62b8628 7328bcf51139 94ddc7b1299a 9619f067b5d3 a4643742d111 a6f74ada4f0e bb3f2216b8da bc5ca2aae17b
+  c2f56f8bb8d3 c6e9d8fc681e c6e9d8fc681e c954fe065af3 c954fe065af3 c9b8a4f4f2ba d4324d9a9780 d59a7ff22aca e140b6ce7d64 e676f54efde3
+  ec474b3dc0af f0c00c957720
 `;
-/** L14 — every lib literal carrying a product actor, action or verdict word, «sim», or a quoted Cyrillic title (83). */
+/** L14 — every lib literal carrying a product actor, action or verdict word, «sim», or a quoted Cyrillic title (96; H1: + 13 — four provenance references naming engine.ts, and the H1 templates, template key and brake-check told that say the harness BOOKED braking; H1 round 2: the sizing.brake template and the brake-check told re-worded in place — each now says the booking is never made on a tick that reaches a ceiling (the template: nor over the speed its stop room is sized at) — 96 still). */
 const LIB_CLAIM_LITERALS_PIN = `
-  036551469de9 06f729e0ddff 0c668d290428 14a45384dc21 15ec7d0ea698 17c10a86a281 17de592ceca6 198b97c1a29b 223d7a57311d 23dc351fd331
-  23deb105ccec 24ef4cbe8e6a 281aee39f620 2bdac95d78bc 2de4d8014338 2fbf8e3f0d77 30f219446632 31fbab700060 3438d0a03e9e 3533032ba71e
-  3533032ba71e 35812f0af13d 398ff2db538b 3a34acd5b16f 40803c63c176 446ae4838a34 4cfb6bf679ec 4f19b5dfded8 52a95b443d18 554033f2b48c
-  5d1ef6d3e289 5ee3a0d712e1 5f6046e4a863 6ed7ede70ce5 7119ccb72cc6 7270e89961b0 76a6caae0d2d 775b538ac9ad 7dabcb8468f6 7dc2bc17cd42
-  8003b44157d5 8003b44157d5 84a59d4c93ad 84a75da47c55 8605443568ca 87f1cac089ba 88bf0e10f01a 88f0f6837254 8ffe5228a775 91a0c2dff3c4
-  9281f4b5c965 9281f4b5c965 94ebd86e9e2f 954d6285cce7 9bc26a0e29af a079724ba555 a09440465f07 a42290ce13d8 a765936bdec5 aa9b14fb2ff6
-  ab39874ffd76 ad665c6e413e ade099b12bb6 ae02ab8a7fde b245dc0130ce b9ea5960685f bb95a0625c3c bc565f983152 c78716497bb2 c9a1e0c67eaf
-  c9abbbc1793f ce9e2f40f987 cfa81d2254fc db1fb12113bb de152c506d4d de89f502dd32 df24fe364d2f e05be562c34d e12cbfee1fcd e4c6f69fd322
-  ee0da3e5f027 ef77c9fcb4bc f447412f2c99
+  036551469de9 04b1ca94f1c6 06f729e0ddff 0c668d290428 14a45384dc21 15ec7d0ea698 17c10a86a281 17de592ceca6 1810428983ae 198b97c1a29b
+  1c1c88110177 223d7a57311d 23dc351fd331 23deb105ccec 24ef4cbe8e6a 281aee39f620 2bdac95d78bc 2de4d8014338 2fbf8e3f0d77 30f219446632
+  316115f26883 31fbab700060 3438d0a03e9e 3533032ba71e 3533032ba71e 35812f0af13d 398ff2db538b 3a34acd5b16f 40803c63c176 446ae4838a34
+  4cfb6bf679ec 4f19b5dfded8 52a95b443d18 554033f2b48c 5d1ef6d3e289 5df97fb143bf 5df97fb143bf 5df97fb143bf 5df97fb143bf 5ee3a0d712e1
+  5f6046e4a863 6ed7ede70ce5 7119ccb72cc6 7270e89961b0 76a6caae0d2d 775b538ac9ad 7dabcb8468f6 7dc2bc17cd42 8003b44157d5 8003b44157d5
+  8450c6c48a41 84a59d4c93ad 84a75da47c55 8605443568ca 87f1cac089ba 88bf0e10f01a 88f0f6837254 8ffe5228a775 91a0c2dff3c4 9281f4b5c965
+  9281f4b5c965 94ebd86e9e2f 954d6285cce7 9bc26a0e29af a079724ba555 a09440465f07 a42290ce13d8 a765936bdec5 aa9b14fb2ff6 ab39874ffd76
+  ad665c6e413e ade099b12bb6 ae02ab8a7fde b245dc0130ce b9ea5960685f bb95a0625c3c bc565f983152 c78716497bb2 c9a1e0c67eaf c9abbbc1793f
+  ce9e2f40f987 cfa81d2254fc d5e59c23eabb d77bfe00fd4c daf7df3fcf3e daf7df3fcf3e db1fb12113bb dce6997317f5 de152c506d4d de89f502dd32
+  df24fe364d2f e05be562c34d e12cbfee1fcd e4c6f69fd322 ee0da3e5f027 ef77c9fcb4bc f447412f2c99
 `;
-/** L15 — every computed member access in the lib whose key is not a string or number literal (21). */
+/** L15 — every computed member access in the lib whose key is not a string or number literal (22; H1: + PROFILE_DESIGN[k] in the sizing label). */
 const LIB_CENSUS_COMPUTED_PIN = `
   0b5e4a298331 0cba230d5035 252b047e0065 3498fb0d3762 3498fb0d3762 5d7e7111a2c2 7b75c3967f93 8806b1ae3794 94a13c63b45b 94a13c63b45b
-  aadcc4bf94e0 ad0992749090 bafc33897db1 bcd12c110421 bec5f8c629f3 e549523bb28c e549523bb28c e549523bb28c ef16032d0e25 ef16032d0e25
-  f12237a4de6d
+  aadcc4bf94e0 ad0992749090 bafc33897db1 bcd12c110421 bec5f8c629f3 bec5f8c629f3 e549523bb28c e549523bb28c e549523bb28c ef16032d0e25
+  ef16032d0e25 f12237a4de6d
 `;
 /** L16 — every destructuring in the lib whose right-hand side or target is rooted in a builtin (1). */
 const LIB_CENSUS_DESTRUCTURE_PIN = `
@@ -5690,3 +6064,7639 @@ const LIB_CENSUS_RECEIVER_PIN = `
   1905ffb7767f 611f1eeb9230 611f1eeb9230 a94e5328e116 b77c0cec60c8 b77c0cec60c8 b77c0cec60c8 f3d71bb1b8b1
 `;
 /* ═══ ROUND 10 PINS (end) ═══ */
+
+// ---------------------------------------------------------------------------
+/* ── §W12 HARNESS STAGE H1 — the four pedal profiles, the rear badge, the impact count and the event shots ──────
+ *
+ * plan57 pedalLane 1–4 and probeLane P1. Every decision each H1 profile takes is driven here on SYNTHETIC tick
+ * streams (no browser, no product), every line it prints is checked against the template table and the closed
+ * vocabulary, every sizing bound it cites against the declared constant, and the harness's wiring of the rear badge,
+ * the impact count, the pace command and the page-side event witness is read off its code. */
+const H1 = {
+  lamp: "sc-vp-telltale-red",
+  em: "sc-vu-emergency",
+  impact: "sc-hz-brake-dont-swerve",
+  brake: "sc-follow-tailgater",
+};
+/** A tick of an H1 profile: the flat tick's own arguments, the observations defaulted. */
+const h1Tick = (now, kmh, over = {}) => ({
+  now, t0: 10_000, kmh, flatStepM: (Math.max(0, kmh) / 3.6) * 0.5, dtMs: 500, postedKmh: 50, follow: null, probeAt: now,
+  rear: { ok: true, present: false, parsed: false, meters: null, kind: null }, impact: 0, ...over,
+});
+/** Drive a profile over a dial series (500 ms ticks), recording every step. `over(i)` adds tick fields. */
+function h1Drive(id, series, over = () => ({}), platform = "pc") {
+  let st = createWrongLegProfile(id, { platform });
+  let now = 10_000;
+  const steps = [];
+  for (let i = 0; i < series.length; i++) {
+    now += 500;
+    const r = wrongLegFlatStep(st, h1Tick(now, series[i], over(i, now)));
+    st = r.state;
+    steps.push(r);
+  }
+  return { state: st, steps, now };
+}
+/** A plant the pace governor steers in closed loop: a flat-throttle launch, then +11.3 км/ч/s while the throttle is
+ *  down and −1.9 км/ч/s while it is up (tuning.ts at 45 км/ч, `paceDutyBase`'s own arithmetic, engine braking left
+ *  out). A MODEL for fixtures, never a claim about the product. */
+function paceLoop(id, ticks, { platform = "pc", disturb = () => 0 } = {}) {
+  let st = createWrongLegProfile(id, { platform });
+  let now = 10_000;
+  let v = 0;
+  const steps = [];
+  const dial = [];
+  for (let i = 0; i < ticks; i++) {
+    now += 500;
+    const kmh = Math.round(v);
+    dial.push(kmh);
+    const r = wrongLegFlatStep(st, h1Tick(now, kmh, { flatStepM: (v / 3.6) * 0.5 }));
+    st = r.state;
+    steps.push(r);
+    const p = r.pedal;
+    if (!p) v = Math.min(59, v + 5);
+    else if (p.act === "down") v += 5.65;
+    else if (p.act === "pulse") v += (11.3 * p.ms) / 1000 - (1.9 * (500 - p.ms)) / 1000;
+    else v -= 0.95;
+    v += disturb(i);
+  }
+  return { state: st, steps, dial, now };
+}
+const linesOf = (steps) => steps.filter((s) => s.say).map((s) => s.say.line);
+
+describe("§W12 HARNESS STAGE H1 — four pedal profiles, the rear badge, the impact count, the event shots", () => {
+  it("THE TABLE: four H1 rows, each declaring its row, what it is told, what it was sized by and two ceilings — sized at 01de885 and, for the constants it shares, 4112566", () => {
+    const want = {
+      [H1.lamp]: ["pace", "sc-vp-telltale-red:c172d48b"],
+      [H1.em]: ["pace", "sc-vu-emergency:155903c1"],
+      [H1.impact]: ["to-impact", "sc-hz-brake-dont-swerve:f0023997"],
+      [H1.brake]: ["brake-check", "sc-follow-tailgater:63c0c28c"],
+    };
+    for (const [id, [kind, finding]] of Object.entries(want)) {
+      const p = wrongLegProfileFor(id);
+      assert.ok(p && Object.isFrozen(p) && Object.isFrozen(p.sizedBy), `${id} is not a frozen declared row`);
+      assert.equal(p.kind, kind);
+      assert.ok(p.row.startsWith(`${finding} `), `${id}'s row does not name ${finding}: ${p.row}`);
+      assert.ok(p.maxM > 0 && p.maxMs > 0 && typeof p.told === "string" && p.told.length > 40);
+      assert.ok(p.sizedBy.some((k) => PROFILE_DESIGN[k].at === PROFILE_SIZED_AT_H1), `${id} is sized from no H1 constant`);
+    }
+    assert.ok(wrongLegProfileFor(H1.em).row.includes("sc-vu-emergency:4056508c"), "the emergency row does not name its second finding");
+    assert.equal(wrongLegProfileFor(H1.lamp).pace, "lamp");
+    assert.equal(wrongLegProfileFor(H1.em).pace, "em");
+    for (const id of WITHDRAWN_WRONG_LEG_PROFILES.keys()) assert.equal(WRONG_LEG_PROFILES.has(id), false);
+  });
+
+  it("THE PACE PEDAL (pacePedal): an unread dial, or one at or over the target, lets the throttle up; under target − PACE_FULL_BAND_KMH it is down for the tick; between, a pulse of (paceDutyBase + gain × shortfall) × the tick's interval, clamped", () => {
+    const P = LIBNS.pacePedal;
+    const t = 45;
+    assert.deepEqual({ ...P(-1, { targetKmh: t, dtMs: 500 }) }, { act: "up", ms: null });
+    assert.deepEqual({ ...P(null, { targetKmh: t, dtMs: 500 }) }, { act: "up", ms: null });
+    assert.deepEqual({ ...P(30, { targetKmh: null, dtMs: 500 }) }, { act: "up", ms: null });
+    assert.deepEqual({ ...P(45, { targetKmh: t, dtMs: 500 }) }, { act: "up", ms: null });
+    assert.deepEqual({ ...P(52, { targetKmh: t, dtMs: 500 }) }, { act: "up", ms: null });
+    assert.deepEqual({ ...P(38, { targetKmh: t, dtMs: 500 }) }, { act: "down", ms: null });
+    assert.equal(LIBNS.PACE_FULL_BAND_KMH, 6);
+    assert.deepEqual({ ...P(39, { targetKmh: t, dtMs: 500 }) }, { act: "pulse", ms: Math.round((0.15 + 0.05 * 6) * 500) });
+    assert.deepEqual({ ...P(44, { targetKmh: t, dtMs: 500 }) }, { act: "pulse", ms: Math.round((0.15 + 0.05 * 1) * 500) });
+    assert.deepEqual({ ...P(44, { targetKmh: t, dtMs: 100 }) }, { act: "pulse", ms: LIBNS.PACE_MIN_PULSE_MS }, "the pulse is not clamped at its floor");
+    assert.deepEqual({ ...P(40, { targetKmh: t, dtMs: 3000 }) }, { act: "pulse", ms: LIBNS.PACE_MAX_PULSE_MS }, "the pulse is not clamped at its ceiling");
+    assert.deepEqual({ ...P(44, { targetKmh: t, dtMs: 0 }) }, { act: "pulse", ms: LIBNS.PACE_MIN_PULSE_MS });
+    assert.equal(D("paceDutyBase"), 0.15);
+    assert.equal(LIBNS.PACE_DUTY_GAIN_PER_KMH, 0.05);
+    assert.ok(Object.isFrozen(P(44, { targetKmh: t, dtMs: 500 })));
+    // …and the duty base IS the model's arithmetic at 45 км/ч (tuning.ts at 01de885): throttle 4200 N, drag
+    // 0.42·v² + 0.02·1220·v, rolling 280 N on the coast.
+    const v = 45 / 3.6;
+    const R0 = 0.42 * v * v + 0.02 * 1220 * v;
+    const up = (4200 - R0) / 1220;
+    const down = (R0 + 280) / 1220;
+    assert.equal(Number((down / (up + down)).toFixed(2)), 0.15);
+  });
+
+  it("THE LAMP PACE (sc-vp-telltale-red:c172d48b): in closed loop the governor holds one steady run — no rest, no brake, never over the disc, no 4 км/ч gap under the fastest of the 6 s before — and it holds AS SIZED at warningLampBillSec + WARNING_LAMP_REGRADE_SEC + 1 s", () => {
+    const run = paceLoop(H1.lamp, 90);
+    const st = run.state;
+    // (H1 round 3, N5a: + the 7 s lag allowance — §W14 checks it against its ratio.)
+    assert.equal(st.pace.sizedRunSec, 23.7 + 6 + 7 + 1);
+    assert.equal(st.pace.goalKmh, 45);
+    assert.equal(st.pace.floorKmh, 5);
+    assert.equal(st.pace.dropLimitKmh, 4);
+    assert.equal(st.heldAsSized, true, `the lamp pace did not hold: ${R(st.observed)}`);
+    assert.equal(st.how, "pace");
+    assert.equal(st.active, false);
+    // every step up to the held one held the rest back and handed out a throttle command, never a brake
+    const heldAt = run.steps.findIndex((s) => s.say && s.say.line.includes("ANTECEDENT HELD AS SIZED (pace)"));
+    assert.ok(heldAt > 0);
+    for (const s of run.steps.slice(0, heldAt)) {
+      assert.equal(s.suppressRest, true);
+      assert.equal(s.forceRest, false);
+      assert.ok(s.pedal && ["down", "up", "pulse"].includes(s.pedal.act), `a pace step carried ${JSON.stringify(s.pedal)}`);
+      assert.equal("brake" in s.pedal, false);
+    }
+    // the held tick hands the leg back to the plain flat throttle, and the next ones are neutral
+    assert.equal(run.steps[heldAt].pedal, null);
+    assert.equal(run.steps[heldAt].suppressRest, false);
+    for (const s of run.steps.slice(heldAt + 1)) assert.deepEqual([s.suppressRest, s.forceRest, s.say, "pedal" in s], [false, false, null, false]);
+    // the dial the model produced stayed at or under the disc and over the floor once launched
+    assert.ok(Math.max(...run.dial.slice(0, heldAt + 1)) <= 50, `the model's dial topped ${Math.max(...run.dial.slice(0, heldAt + 1))} while governed`);
+    const line = run.steps[heldAt].say.line;
+    assertObservationLine(line, "lamp held");
+    assert.match(line, /one run of 3\d\.\d s on the profile clock from its first reading at t=\d+s \(flat odometer [\d.]+ m there\): every read dial over 5 км\/ч by its rounding and at or under the posted 50, the disc it started under \(no other disc read inside it; 0 tick\(s\) inside it with the disc unread\), and no reading 4 км\/ч or more under the fastest of the 6 s before it \(the largest such gap read \d+ км\/ч\), no rest held, 0 unread tick\(s\) inside it not credited — against the sized 37\.7 s/);
+    const out = wrongLegProfileOutcomeLine(wrongLegProfileFinish(st, { now: run.now, t0: 10_000, driveEnded: true }).state);
+    assertObservationLine(out, "lamp outcome");
+    // (H1 round 2, F1: the commands the harness APPLIED — §W13 checks each number against the steps' own pedals.)
+    assert.match(out, /governor commands the harness applied: throttle held down \d+ tick\(s\), pulsed \d+ \(\d+ ms in all\), let up \d+/);
+  });
+
+  it("THE LAMP PACE BREAKS on a reading 4 км/ч under the fastest of the 6 s before it — loud, NOT HELD, released on that tick (no pedal, no suppression) — and NOT on a 3 км/ч dip", () => {
+    const series = [8, 16, 24, 32, 40, 45, ...Array(10).fill(45), 41, ...Array(60).fill(45)];
+    const r = h1Drive(H1.lamp, series);
+    const i = r.steps.findIndex((s) => s.say);
+    assert.equal(series[i], 41, "the run did not break on the 4 км/ч gap");
+    const s = r.steps[i];
+    assert.deepEqual([s.say.loud, s.suppressRest, s.pedal], [true, false, null]);
+    assertNotHeldLine(s.say.line, "lamp gap");
+    assert.match(s.say.line, /the first run broke at t=\d+s after [\d.]+ s on the profile clock, against the sized 37\.7 s: the dial read 41 км\/ч, 4 км\/ч under the fastest reading of the 6 s before it/);
+    assert.deepEqual([r.state.done, r.state.active, r.state.heldAsSized], ["run-broken", false, false]);
+    const ok = h1Drive(H1.lamp, [8, 16, 24, 32, 40, 45, ...Array(10).fill(45), 42, ...Array(80).fill(45)]);
+    assert.equal(ok.state.heldAsSized, true, "a 3 км/ч dip broke the run");
+    // a gap older than the 6 s window is no gap: 45 then 44 ×13 (6.5 s) then 41 is still inside the run
+    const old = h1Drive(H1.lamp, [8, 16, 24, 32, 40, 45, ...Array(13).fill(44), 41, 41, ...Array(80).fill(41)]);
+    assert.equal(old.state.heldAsSized, true, `a gap outside the window broke the run: ${R(old.state.observed)}`);
+  });
+
+  it("THE LAMP PACE BREAKS on a reading over the posted disc, credits nothing before its first qualifying reading, and counts an unread dial inside the run without crediting or breaking it", () => {
+    const over = h1Drive(H1.lamp, [8, 20, 40, 45, 45, 51, 45]);
+    assert.equal(over.state.done, "run-broken");
+    assert.match(R(over.state.observed), /the dial read 51 км\/ч, over the posted 50/);
+    const blind = h1Drive(H1.lamp, [8, 20, 40, 45, -1, -1, 45, ...Array(80).fill(45)]);
+    assert.equal(blind.state.heldAsSized, true);
+    assert.match(R(blind.state.observed), / 2 unread tick\(s\) inside it not credited/);
+    // (H1 round 3, N5a: a launch reading — 6 — no longer starts the lamp run; its first reading past the launch does.)
+    const launch = h1Drive(H1.lamp, [0, 0, 0, 6, 41]);
+    assert.deepEqual([launch.state.pace.started, launch.state.pace.runSec], [true, 0], "the run's first reading credited time, or a standstill started it");
+    assert.equal(launch.steps.findIndex((x) => x.state.pace.started), 4, "a launch reading started the lamp run");
+    const noDisc = h1Drive(H1.lamp, [8, 20, 40, 45, 45], () => ({ postedKmh: null }));
+    assert.deepEqual([noDisc.state.pace.started, noDisc.state.pace.discUnread], [false, 5], "a run started with no disc read");
+  });
+
+  it("THE EMERGENCY PACE (sc-vu-emergency:155903c1 / :4056508c): target 45 between the floor emYieldSlowKmh + EM_SPEED_MARGIN_KMH = 40 and the disc; a reading of 40 is not over the floor by the rounding and breaks the run; the run is sized to the arm estimate + the window + its spread + 1 s", () => {
+    const st = createWrongLegProfile(H1.em, { platform: "mobile" });
+    assert.deepEqual([st.pace.goalKmh, st.pace.floorKmh, st.pace.dropLimitKmh], [45, 40, null]);
+    // (H1 round 2, N5: the arm is sized on the run's top emRunTopKmh 50 + the dial's rounding, and a 4 s lag allowance
+    // is added — §W13 N5 re-derives it.)
+    const arm = (50 + 0.5 + 3) / 3.6 / 1.5;
+    assert.equal(st.pace.sizedRunSec, arm + 7 + 0.4 + 4 + 1);
+    const run = paceLoop(H1.em, 70, { platform: "mobile" });
+    assert.equal(run.state.heldAsSized, true, R(run.state.observed));
+    assert.ok(run.state.pace.lowKmh > 40, `the model's run dipped to ${run.state.pace.lowKmh}`);
+    const line = linesOf(run.steps)[0];
+    assertObservationLine(line, "em held");
+    assert.match(line, /every read dial over 40 км\/ч by its rounding and at or under the posted 50, the disc it started under \(no other disc read inside it; 0 tick\(s\) inside it with the disc unread\), and at or under emRunTopKmh 50 км\/ч, no rest held/);
+    const floor = h1Drive(H1.em, [10, 20, 30, 41, 45, 45, 40, 45]);
+    assert.equal(floor.state.done, "run-broken");
+    assert.match(R(floor.state.observed), /the dial read 40 км\/ч, not over 40 км\/ч by its 0\.5 км\/ч rounding/);
+    // the launch below the floor starts nothing and breaks nothing
+    const launch = h1Drive(H1.em, [0, 5, 12, 20, 28, 36, 40]);
+    assert.deepEqual([launch.state.pace.started, launch.state.done, launch.state.active], [false, null, true]);
+  });
+
+  it("A PACE PROFILE's ceilings release it loudly (NOT HELD), and while it runs the pause drain does not re-press the throttle; every other lane still does", () => {
+    const stuck = h1Drive(H1.em, Array(90).fill(30));
+    assert.equal(stuck.state.done, "clock");
+    const rel = stuck.steps.find((s) => s.say);
+    assert.equal(rel.say.loud, true);
+    assert.equal(rel.pedal, null);
+    assertNotHeldLine(rel.say.line, "em ceiling");
+    assert.equal(resumeThrottleAfterPause(createWrongLegProfile(H1.em, { platform: "pc" })), false);
+    assert.equal(resumeThrottleAfterPause(createWrongLegProfile(H1.lamp, { platform: "pc" })), false);
+    assert.equal(resumeThrottleAfterPause(stuck.state), true, "a stopped pace profile still holds the pause re-press");
+    for (const id of [H1.impact, H1.brake, "sc-signal-flashing", "sc-pk-ban-stop"]) assert.equal(resumeThrottleAfterPause(createWrongLegProfile(id, { platform: "pc" })), true, id);
+  });
+
+  it("NO REST INTO THE OBSTACLE (sc-hz-brake-dont-swerve:f0023997): every rest held back at the plain flat throttle (no pedal) until the impact-flash mount count reads over its first reading — HELD there, released; an unread count is counted, not guessed", () => {
+    const series = [8, 16, 24, 32, 40, 48, 55, 58, 58, 58, 58, 58];
+    const r = h1Drive(H1.impact, series, (i) => ({ impact: i === 2 ? null : i >= 9 ? 3 : 2 }));
+    const i = r.steps.findIndex((s) => s.say);
+    assert.equal(i, 9);
+    for (const s of r.steps.slice(0, 9)) assert.deepEqual([s.suppressRest, s.forceRest, "pedal" in s], [true, false, false]);
+    assert.deepEqual([r.steps[9].suppressRest, r.state.heldAsSized, r.state.how, r.state.active], [false, true, "impact", false]);
+    assert.equal(r.state.impact.unread, 1);
+    assert.equal(r.state.impact.base, 2, "the base is not the first reading");
+    const line = r.steps[9].say.line;
+    assertObservationLine(line, "impact held");
+    assert.match(line, /the harness's count of impact-flash element mounts read 3 at t=\d+s, over 2 at the first flat tick, with the flat odometer at [\d.]+ m and the dial at 58 км\/ч \(the reading before it 58 км\/ч\); no rest was taken from the first flat tick/);
+    const never = h1Drive(H1.impact, Array(60).fill(58), () => ({ impact: 0 }));
+    assert.equal(never.state.done, "metres", "the obstacle profile held past its metre ceiling");
+    const blind = h1Drive(H1.impact, [20, 30, 40], () => ({ impact: null }));
+    assert.deepEqual([blind.state.impact.base, blind.state.impact.unread, blind.state.active], [null, 3, true]);
+  });
+
+  it("THE BRAKE-CHECK (sc-follow-tailgater:63c0c28c): no booking while the badge is absent, reads 8 м (not certainly under 8 by its rounding) or the dial reads 35 (not certainly 35); booked — forceRest, no pedal, HELD — on the first tick reading 7 м and 36 км/ч", () => {
+    const badge = (m) => ({ rear: { ok: true, present: true, parsed: true, meters: m, kind: "vehicle" } });
+    const absent = { rear: { ok: true, present: false, parsed: false, meters: null, kind: null } };
+    const ticks = [[20, absent], [30, badge(8)], [40, badge(8)], [35, badge(7)], [36, badge(7)], [40, badge(5)]];
+    const r = h1Drive(H1.brake, ticks.map(([k]) => k), (i) => ticks[i][1]);
+    const i = r.steps.findIndex((s) => s.forceRest);
+    assert.equal(i, 4, "the brake was booked on the wrong tick");
+    for (const s of r.steps.slice(0, 4)) assert.deepEqual([s.suppressRest, s.forceRest, "pedal" in s], [true, false, false]);
+    assert.deepEqual([r.steps[4].suppressRest, "pedal" in r.steps[4], r.state.heldAsSized, r.state.how, r.state.restsForced], [false, false, true, "brake-check", 1]);
+    const line = r.steps[4].say.line;
+    assertObservationLine(line, "brake-check held");
+    assert.match(line, /the rear proximity badge read 7 м \(under REAR_CUE_WARN_M 8 m by its 0\.5 m rounding\) and the dial read 36 км\/ч \(at or over harshBrakeMinSpeedKmh 35 by its 0\.5 км\/ч rounding\) at t=\d+s with the flat odometer at [\d.]+ m; braking BOOKED — the throttle stays down to the end of this tick; each flat-rest tick after it lets the throttle up, and the first one whose dial does not read 0–1 км\/ч puts the brake down/);
+    // the transition books it, and the harness's own holds cannot hold it back
+    assert.equal(flatRestDue({ holdRest: true, suppress: false, force: true, flatM: 3, sincePhaseMs: 100, phaseTicks: 5, everyM: EVERY_M, maxMs: MAX_MS }), true);
+    const out = wrongLegProfileOutcomeLine(wrongLegProfileFinish(r.state, { now: r.now, t0: 10_000, driveEnded: true }).state);
+    assertObservationLine(out, "brake-check outcome");
+    // (H1 round 3, R2-F5: each tally prints the line it is counted against — §W14 fuzzes the counts against those lines.)
+    assert.match(out, /rear badge read on 4 tick\(s\), absent on 1 · nearest 7 м · 2 tick\(s\) whose badge read at or under 7\.5 m \(REAR_CUE_WARN_M 8 less the badge's 0\.5 m rounding\) · 2 tick\(s\) whose dial read at or over 35\.5 км\/ч \(harshBrakeMinSpeedKmh 35 plus the dial's 0\.5 км\/ч rounding\) · top 40 км\/ч · braking booked at t=\d+s at 36 км\/ч with the badge at 7 м/);
+  });
+
+  it("THE BRAKE-CHECK REFUSES LOUDLY on a rear read that did not come back, or a badge label it does not parse — nothing booked, released on that tick — and releases NOT HELD at its ceilings", () => {
+    for (const [label, rear, done, re] of [
+      ["no read", null, "blind", /the rear proximity read did not come back from the probe at t=\d+s, and nothing was booked from a guess/],
+      ["ok:false", { ok: false }, "blind", /did not come back/],
+      ["unparsed", { ok: true, present: true, parsed: false, meters: null, kind: null }, "unreadable", /the rear proximity badge was on the page at t=\d+s with a label the harness does not parse, and nothing was booked from a guess/],
+    ]) {
+      const r = h1Drive(H1.brake, [40], () => ({ rear }));
+      const s = r.steps[0];
+      assert.deepEqual([s.forceRest, s.suppressRest, s.say.loud, r.state.done, r.state.heldAsSized], [false, false, true, done, false], label);
+      assert.match(s.say.line, re, label);
+      assertNotHeldLine(s.say.line, `brake-check ${label}`);
+    }
+    const late = h1Drive(H1.brake, Array(30).fill(58), () => ({ rear: { ok: true, present: false, parsed: false, meters: null, kind: null } }));
+    assert.ok(["metres", "clock"].includes(late.state.done), `the brake-check did not release at a ceiling: ${late.state.done}`);
+    assert.equal(late.state.restsForced, 0);
+  });
+
+  it("THE REAR BADGE, PARSED (parseRearProximity): «Кола отзад · N м» and «Велосипедист отзад · N м» are readings; the reverse-travel twin and a label-less badge are NOT parsed; no badge is `present:false`; a read that did not come back is `ok:false`", () => {
+    const p = LIBNS.parseRearProximity;
+    assert.deepEqual({ ...p({ ok: true, label: "Кола отзад · 5 м" }) }, { ok: true, present: true, parsed: true, meters: 5, kind: "vehicle" });
+    assert.deepEqual({ ...p({ ok: true, label: "Велосипедист отзад · 12 м" }) }, { ok: true, present: true, parsed: true, meters: 12, kind: "cyclist" });
+    for (const label of ["Заден ход · 3 м", "Изминал си 3 метра на заден ход", "(badge on the page, no aria-label)", "Кола отзад · м", "Кола отзад · 5 м ", "кола отзад · 5 м"]) {
+      const r = p({ ok: true, label });
+      assert.equal(r.parsed, label === "Кола отзад · 5 м " ? true : false, label);
+    }
+    assert.deepEqual({ ...p({ ok: true, label: null }) }, { ok: true, present: false, parsed: false, meters: null, kind: null });
+    for (const raw of [null, undefined, {}, { ok: false, why: "x" }, "Кола отзад · 5 м"]) assert.equal(p(raw).ok, false, JSON.stringify(raw));
+    assert.equal(LIBNS.REAR_PROX_LABEL_RE.source, "^(Кола|Велосипедист) отзад · (\\d+) м$");
+  });
+
+  it("EVERY OTHER PROFILE, AND EVERY LANE WITHOUT ONE, HANDS OUT NO PEDAL — only the two pace profiles carry the key", () => {
+    for (const id of [...WRONG_LEG_PROFILES.keys(), "sc-pk-ban-stop", null]) {
+      const decl = id === null ? null : wrongLegProfileFor(id);
+      let st = createWrongLegProfile(id, { zoneSpan: id === "sc-pk-busstop-ban" ? SPAN : null, platform: "pc" });
+      let now = 10_000;
+      for (const kmh of FLAT_SERIES) {
+        now += 500;
+        const r = wrongLegFlatStep(st, h1Tick(now, kmh, { follow: { present: true, parsed: true, meters: 40, heldSec: 1.1 } }));
+        if (decl && decl.kind === "pace" && st.active) assert.ok("pedal" in r, `${id}: a running pace step carried no pedal`);
+        else assert.equal("pedal" in r, false, `${id}: a step carried a pedal`);
+        st = r.state;
+      }
+    }
+  });
+
+  it("THE H1 SIZING BOUNDS ARE THE DECLARED CONSTANTS: the brake-check's room is BRAKE_CHECK_ROOM_KMH over the model's full brake after REACTION_CENSUS.max, and its metre ceiling on the census's lowest pc odometer lies short of the calm zone by that room; the obstacle's metre ceiling lies past the debris on the census's highest odometer", () => {
+    const b = createWrongLegProfile(H1.brake, { platform: "pc" });
+    const det = b.sizedFrom.f.detail;
+    assert.equal(det.tpl, "sizing.brake");
+    // (H1 round 2, F4: the ceiling sentence is its own fragment, sized on the whole odometer census — §W13 F4b/c checks
+    // every bound in it; round 1 checked it on another lesson's pc census, 0.935.)
+    const ceil = det.f.ceiling;
+    assert.equal(ceil.tpl, "brake.ceiling");
+    const room = ceil.f.room;
+    const decel = D("BRAKE_FORCE_N") / D("CHASSIS_MASS");
+    const v = LIBNS.BRAKE_CHECK_ROOM_KMH / 3.6;
+    assert.equal(room, Number((v * LIBNS.REACTION_CENSUS.max + (v * v) / (2 * decel)).toFixed(1)));
+    assert.equal(ceil.f.model.f.react, LIBNS.REACTION_CENSUS.max);
+    assert.equal(ceil.f.model.f.n, LIBNS.REACTION_CENSUS.transitions);
+    assert.equal(ceil.f.zone, D("ftgCalmZoneNearRouteM"));
+    const decl = wrongLegProfileFor(H1.brake);
+    assert.ok(decl.maxM / LIBNS.BRAKE_CHECK_ODO_RATIO + room + LIBNS.BRAKE_CHECK_RESIDUAL_M <= D("ftgCalmZoneNearRouteM"), `the metre ceiling ${decl.maxM} on a ${LIBNS.BRAKE_CHECK_ODO_RATIO} odometer is inside the room`);
+    assert.ok(LIBNS.BRAKE_CHECK_ODO_RATIO <= ODO_RATIO_MIN && LIBNS.BRAKE_CHECK_ODO_RATIO <= LIBNS.ODO_CENSUS_ALL_WRONG_LEGS.mobileMinRatio);
+    const hz = wrongLegProfileFor(H1.impact);
+    assert.ok(hz.maxM / LIBNS.ODO_RATIO_MAX >= D("debrisRouteM"), "the obstacle's metre ceiling can release before the debris");
+    assert.equal(createWrongLegProfile(H1.impact, { platform: "pc" }).sizedFrom.f.detail.f.ratio, Number((hz.maxM / D("debrisRouteM")).toFixed(3)));
+    assert.deepEqual(sizingClaimViolations(), []);
+    assert.deepEqual(selfClaimViolations(), []);
+  });
+
+  it("EVERY LINE an H1 profile prints, in every outcome, is a template line in the closed vocabulary (start, held, not held, refused, outcome, summary)", () => {
+    const lines = [];
+    for (const id of Object.values(H1)) {
+      for (const platform of ["pc", "mobile"]) lines.push(wrongLegProfileStartLine(createWrongLegProfile(id, { platform }), { everyM: EVERY_M }));
+    }
+    const runs = [
+      paceLoop(H1.lamp, 90), paceLoop(H1.em, 70), h1Drive(H1.lamp, [8, 20, 40, 45, 51]), h1Drive(H1.em, Array(90).fill(30)),
+      h1Drive(H1.impact, [20, 40, 58], (i) => ({ impact: i })), h1Drive(H1.impact, Array(60).fill(58)),
+      h1Drive(H1.brake, [40], () => ({ rear: null })), h1Drive(H1.brake, [40], () => ({ rear: { ok: true, present: true, parsed: false } })),
+      h1Drive(H1.brake, [40], () => ({ rear: { ok: true, present: true, parsed: true, meters: 4, kind: "vehicle" } })),
+      h1Drive(H1.lamp, [8, 20, 40]),
+    ];
+    for (const r of runs) {
+      lines.push(...linesOf(r.steps));
+      const fin = wrongLegProfileFinish(r.state, { now: r.now, t0: 10_000, driveEnded: true }).state;
+      lines.push(wrongLegProfileOutcomeLine(fin));
+      const sum = wrongLegRestSummary(fin);
+      if (sum !== "") lines.push(sum);
+    }
+    assert.ok(lines.length >= 30, `the battery has gone thin: ${lines.length}`);
+    for (const l of lines) assertObservationLine(l, "H1 battery");
+    for (const w of [HELD_AS_SIZED, NOT_HELD_AS_SIZED]) assert.ok(lines.some((l) => l.includes(w)), `the battery never printed «${w}»`);
+  });
+
+  it("THE HARNESS WIRES P1 — a page-side witness installed before the page's scripts, its two card selectors the probe's own, a binding the witness calls, shots at +0/+1/+3 s bounded at eight series, armed at the drive's clock and disarmed at its end — and the probe carries the rear badge and the impact count", () => {
+    const sel = (name) => {
+      const m = CODE.match(new RegExp(`const ${name} = (['"])(.*?)\\1;`));
+      assert.ok(m, `${name} is not declared`);
+      return m[2];
+    };
+    assert.equal(sel("EVENT_CARD_BODY_SEL"), sel("FAULT_TOAST_BODY_SEL"), "the witness's card body selector drifted from the probe's");
+    assert.equal(sel("EVENT_CARD_COLUMN_SEL"), sel("FAULT_TOAST_COLUMN_SEL"), "the witness's card column selector drifted from the probe's");
+    assert.equal(sel("EVENT_FLASH_SEL"), '[data-hud="impact-flash"]');
+    assert.equal(sel("REAR_PROX_SEL"), '[data-hud="rear-proximity"]');
+    assert.match(CODE, /const EVENT_SHOT_OFFSETS_MS = \[0, 1000, 3000\];/);
+    assert.match(CODE, /const EVENT_SHOT_MAX_SERIES = 8;/);
+    // installed before the first navigation, and the binding is registered before it too
+    const firstGoto = CODE.indexOf("await page.goto(");
+    const init = CODE.indexOf("w.__eventWitness = wit;");
+    const bind = CODE.indexOf('await page.exposeBinding("__auditEvent", ');
+    assert.ok(init > 0 && bind > 0 && init < firstGoto && bind < firstGoto, "the witness or its binding is installed after the page loads");
+    assert.match(CODE, /const bound = w\.__auditEvent;/);
+    assert.match(CODE, /wit\.impacts \+= 1;\s*report\("impact", null, null, null\);/);
+    assert.match(CODE, /report\("card", title, head, painted\(card\)\);/);
+    // armed right after the drive's clock starts, disarmed after the profile's finish, the pending series awaited (bounded)
+    // (H1 round 2, C3: on a lane that takes event shots only — §W13 C3 checks every P1 act is behind the flag.)
+    assert.match(CODE, /const t0 = Date\.now\(\);\s*if \(H1_READS\.eventShots\) armEventShots\(t0\);/);
+    assert.match(CODE, /const armEventShots = \(at\) => \{\s*eventShots\.armed = true;\s*eventShots\.t0 = at;\s*\};/);
+    assert.match(CODE, /eventShots\.armed = false;\s*await Promise\.race\(\[Promise\.allSettled\(eventShots\.pending\), page\.waitForTimeout\(20_000\)\]\);\s*writeEventShots\(\);/);
+    // a mount before the drive, or past the cap, is recorded and not shot
+    assert.match(CODE, /if \(!eventShots\.armed\) \{ eventShots\.refused\.push\(\{ n: ev\.n, kind: ev\.kind, title: ev\.title, why: "not-driving" \}\);/);
+    assert.match(CODE, /if \(eventShots\.series\.length >= EVENT_SHOT_MAX_SERIES\) \{ eventShots\.refused\.push\(\{ n: ev\.n, kind: ev\.kind, title: ev\.title, why: "series-cap" \}\);/);
+    // every shot: its dump taken, its frame through the one `shot` helper, its real offset recorded
+    assert.match(CODE, /const dump = await eventDump\(ev\.kind, ev\.title\);\s*const ok = await shot\(name\);\s*rec\.shots\.push\(\{ offsetMs: off, name, ok, startedMs, doneMs: Date\.now\(\) - ev\.at, dump \}\);/);
+    // the dump reads every text row's computed visibility, display and opacity and the camera attribute
+    assert.match(CODE, /return \{ visibility: st\.visibility, display: st\.display, opacity: st\.opacity,/);
+    assert.match(CODE, /camera: document\.documentElement\.getAttribute\("data-sim-camera"\)/);
+    // the probe: the badge's label (or null when no badge), ok:false when the read threw; the witness's count
+    assert.match(CODE, /if \(!b\) return \{ ok: true, label: null \};/);
+    assert.match(CODE, /return \{ ok: false, why: `the rear badge read threw: /);
+    assert.match(CODE, /impactMounts: !witnessOn \? undefined : \(\(\) => \{\s*const w = window\.__eventWitness;\s*return w && typeof w\.impacts === "number" \? w\.impacts : null;/);
+    assert.match(CODE, /rearSel: H1_READS\.rear && MODE !== "right" \? REAR_PROX_SEL : null,/);
+    assert.match(CODE, /rearProx: \{ ok: false, why: `the whole probe evaluate rejected: /);
+    assert.match(CODE, /impactMounts: null,\s*\}\)\);/);
+    // P1 is an observation: nothing it records reaches a decision except the one profile that counts impact mounts
+    assert.equal((CODE.match(/\beventShots\b/g) ?? []).filter(Boolean).length > 0, true);
+    assert.ok(!/eventShots[\s\S]{0,40}(?:throttle|brake|steer)\(/.test(CODE), "the event shots touch a pedal");
+  });
+  it("THE LAMP PACE's WINDOW IS SIX SECONDS: a slow drift of 1 км/ч a tick breaks the run where the fastest reading of the 6 s before is 4 км/ч above; a fractional reading is over the floor only by the dial's half quantum; the brake-check's room is sized from a speed at least the flat throttle's terminal", () => {
+    const drift = h1Drive(H1.lamp, [8, 16, 24, 32, 40, 45, ...Array(6).fill(45), 44, 43, 42, 41, ...Array(60).fill(41)]);
+    assert.equal(drift.state.done, "run-broken", "a 4 км/ч drift over 2 s did not break the run");
+    assert.match(R(drift.state.observed), /the dial read 41 км\/ч, 4 км\/ч under the fastest reading of the 6 s before it/);
+    const frac = h1Drive(H1.em, [10, 20, 30, 40.3]);
+    assert.equal(frac.state.pace.started, false, "a reading of 40.3 started the run over a floor of 40 without the half quantum");
+    const frac2 = h1Drive(H1.em, [10, 20, 30, 40.6]);
+    assert.equal(frac2.state.pace.started, true);
+    // the round-1 verifier's longsim terminal on a posted-50 map is 58.9 км/ч (§5's header); the room is sized over it
+    assert.ok(LIBNS.BRAKE_CHECK_ROOM_KMH >= 58.9, `the brake-check's room is sized at ${LIBNS.BRAKE_CHECK_ROOM_KMH} км/ч, under the flat throttle's 58.9 terminal`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+/* ── §W13 H1 ROUND 2 — THE ROUND-1 VERIFIER'S FINDINGS, EACH PORTED AS A TEST (journal wf_2e2514cf-8e0, «verify») ──
+ *
+ * Round 1 (h1-result.patch, sha256 e78b8a80…) was REFUTED on four false sentences (F1–F4), with five conditions
+ * (C1–C5) and a sizing note (N5). Every test below was RED on round 1 (scratchpad/harness-h1/builder2/testfirst-r1.log)
+ * before anything was fixed. The threat model above §W11 binds: a false sentence the harness prints is always in model. */
+/** The pedal acts a run of steps handed the harness — exactly what the flat tick applies (`paceThrottle` on a truthy
+ *  `pedal`, the plain throttle otherwise). */
+const appliedPedals = (steps) => {
+  const a = { down: 0, up: 0, pulse: 0, pulseMs: 0 };
+  for (const s of steps) {
+    if (!s.pedal) continue;
+    a[s.pedal.act] += 1;
+    if (s.pedal.act === "pulse") a.pulseMs += s.pedal.ms;
+  }
+  return a;
+};
+/** Drive an H1 profile over explicit ticks `{ kmh, dtMs?, posted?, rear?, impact? }`. */
+function h1Ticks(id, ticks, platform = "pc") {
+  let st = createWrongLegProfile(id, { platform });
+  let now = 10_000;
+  const steps = [];
+  for (const t of ticks) {
+    const dt = t.dtMs ?? 500;
+    now += dt;
+    const r = wrongLegFlatStep(st, {
+      now, t0: 10_000, kmh: t.kmh, flatStepM: (Math.max(0, t.kmh ?? 0) / 3.6) * (dt / 1000), dtMs: dt, postedKmh: "posted" in t ? t.posted : 50, follow: null, probeAt: now,
+      rear: "rear" in t ? t.rear : { ok: true, present: false, parsed: false, meters: null, kind: null }, impact: "impact" in t ? t.impact : 0,
+    });
+    st = r.state;
+    steps.push(r);
+  }
+  return { state: st, steps, now };
+}
+const outcomeOf = (r) => wrongLegProfileOutcomeLine(wrongLegProfileFinish(r.state, { now: r.now + 500, t0: 10_000, driveEnded: true }).state);
+const badgeAt = (m) => ({ ok: true, present: true, parsed: true, meters: m, kind: "vehicle" });
+/** The harness's P1 block, as code: from its first selector to the end of `finishEventShots`. */
+function p1Block(src = SRC) {
+  const code = stripComments(src);
+  const a = code.indexOf("const EVENT_FLASH_SEL = ");
+  const f = code.indexOf("const finishEventShots = async () => {");
+  if (a < 0 || f < 0) return null;
+  const T = lexTokens(code);
+  const k = T.findIndex((t) => t.at === f + "const finishEventShots = async () => ".length);
+  if (k < 0) return null;
+  return { code, from: a, to: T[closeOf(T, k)].end };
+}
+
+describe("§W13 H1 ROUND 2 — the round-1 verifier's findings, each ported as a test that was red on round 1", () => {
+  it("F1 · readings.pace counts ONLY the pedal acts the harness applied — never the command computed on the tick the profile stops (held, broken or at a ceiling), which the harness discards for the plain throttle", () => {
+    const runs = [
+      ["lamp held (the verifier's series)", h1Drive(H1.lamp, [8, 16, 24, 32, 40, 44, ...Array(80).fill(44)]), "held-as-sized"],
+      ["emergency broken on the floor (the verifier's series)", h1Drive(H1.em, [10, 20, 30, 41, 44, 44, 44, 44, 38]), "run-broken"],
+      ["emergency at its clock ceiling", h1Drive(H1.em, Array(90).fill(30)), "clock"],
+      ["lamp in closed loop", paceLoop(H1.lamp, 90), "held-as-sized"],
+      ["emergency in closed loop", paceLoop(H1.em, 70, { platform: "mobile" }), "held-as-sized"],
+    ];
+    for (const [label, r, done] of runs) {
+      assert.equal(r.state.done, done, `${label}: ${R(r.state.observed)}`);
+      const P = r.state.pace;
+      const applied = appliedPedals(r.steps);
+      assert.deepEqual({ down: P.down, up: P.up, pulse: P.pulse, pulseMs: P.pulseMs }, applied, `${label}: the governor's tally is not the acts the harness applied`);
+      const m = outcomeOf(r).match(/governor commands the harness applied: throttle held down (\d+) tick\(s\), pulsed (\d+) \((\d+) ms in all\), let up (\d+)/);
+      assert.ok(m, `${label}: the outcome does not say the commands are the ones the harness applied`);
+      assert.deepEqual(m.slice(1).map(Number), [applied.down, applied.pulse, applied.pulseMs, applied.up], `${label}: the printed commands are not the applied ones`);
+    }
+    // …and the sentence «applied» is registered against the harness's own wiring of the command.
+    assert.ok(HARNESS_SELF_CLAIMS.some(([tpl, says, needs]) => tpl === "readings.pace" && says.includes("governor commands the harness applied") && needs.includes("paceApplied")), "the applied-commands sentence is not registered against paceApplied");
+  });
+
+  it("F2 · the impact count's base is what the line says it is: read on the first flat tick, or a certain 0 read after unread ticks — and a first reading OVER 0 after unread ticks, or a count that falls, is refused LOUDLY, never absorbed into the base", () => {
+    // (a) the first flat tick unread, then 0: the base is a certain 0, and the line says when it was read
+    const a = h1Ticks(H1.impact, [{ kmh: 20, impact: null }, { kmh: 30, impact: 0 }, { kmh: 40, impact: 0 }, { kmh: 45, impact: 1 }]);
+    const la = linesOf(a.steps).at(-1);
+    assert.equal(a.state.heldAsSized, true, R(a.state.observed));
+    assert.ok(!/over 0 at the first flat tick/.test(la), `the base is said to be the first flat tick's reading, and that tick was unread: ${la}`);
+    assert.match(la, /over 0, its first reading, at t=\d+s after 1 unread flat tick\(s\): a count that reads 0 had no mounts before it/);
+    assertObservationLine(la, "impact base after unread");
+    assert.match(outcomeOf(a), /impact-flash element mounts 1 \(first flat tick UNREAD, base 0\)/);
+    // (b) an impact among the unread ticks: refused on the first reading, loud, nothing held, the rest released
+    const b = h1Ticks(H1.impact, [{ kmh: 20, impact: null }, { kmh: 30, impact: null }, { kmh: 45, impact: 1 }, ...Array(40).fill({ kmh: 45, impact: 1 })]);
+    const sb = b.steps[2];
+    assert.deepEqual([b.state.done, b.state.heldAsSized, b.state.active, sb.suppressRest, sb.say?.loud], ["base-unread", false, false, false, true], `an impact on the unread ticks was absorbed: ${R(b.state.observed)}`);
+    assertNotHeldLine(sb.say.line, "impact base unread");
+    assert.match(sb.say.line, /was unread on the first 2 flat tick\(s\), and its first reading at t=\d+s read 1, over 0: mounts on the unread tick\(s\) and mounts before the first flat tick read the same, and nothing was held from a guess/);
+    // (c) a count that falls (the page's count restarted) is refused, not read as «no impact yet»
+    const c = h1Ticks(H1.impact, [{ kmh: 20, impact: 2 }, { kmh: 30, impact: 2 }, { kmh: 40, impact: 0 }, { kmh: 45, impact: 1 }]);
+    assert.deepEqual([c.state.done, c.state.heldAsSized], ["count-fell", false]);
+    assert.match(linesOf(c.steps)[0], /read 0 at t=\d+s, under the 2 it read before: the count restarted, and nothing was held from a guess/);
+    assertNotHeldLine(linesOf(c.steps)[0], "impact count fell");
+    // (d) read on the first flat tick: the base is that reading, and the line says so
+    const d = h1Ticks(H1.impact, [{ kmh: 20, impact: 2 }, { kmh: 30, impact: null }, { kmh: 40, impact: 3 }]);
+    assert.match(linesOf(d.steps)[0], /read 3 at t=\d+s, over 2 at the first flat tick, with the flat odometer/);
+    // …and every line the impact profile prints, in every one of these, is a template line in the vocabulary
+    for (const r of [a, b, c, d]) for (const l of [...linesOf(r.steps), outcomeOf(r)]) assertObservationLine(l, "impact round 2");
+  });
+
+  it("F3 · a pace run is held under ONE disc, and the held line prints that disc — a disc read inside the run other than the one it started under breaks the run loudly; no held line ever says «at or under the posted D» over a reading above D", () => {
+    // the lamp (no top): 53 under a disc of 60, then the disc reads 50 — round 1 held this and printed «…at or under the posted 50»
+    const lamp = h1Ticks(H1.lamp, [...[8, 16, 24, 32, 40, 44, 48, 51, 53].map((k) => ({ kmh: k, posted: 60 })), ...Array(20).fill({ kmh: 53, posted: 60 }), ...Array(70).fill({ kmh: 50, posted: 50 })]);
+    assert.equal(lamp.state.done, "run-broken", `a run across a disc change held: ${R(lamp.state.observed)}`);
+    assert.match(R(lamp.state.observed), /the posted disc read 50 км\/ч, not the 60 the run started under/);
+    // …a disc change read on a tick whose DIAL was unread breaks it too, and ticks inside the run with the disc unread are
+    // counted in the held line
+    const blindChange = h1Ticks(H1.lamp, [...[8, 16, 24, 32, 40, 45].map((k) => ({ kmh: k })), { kmh: -1, posted: 60 }, ...Array(70).fill({ kmh: 45 })]);
+    assert.equal(blindChange.state.done, "run-broken", `a disc change on an unread-dial tick held: ${R(blindChange.state.observed)}`);
+    assert.match(R(blindChange.state.observed), /the posted disc read 60 км\/ч, not the 50 the run started under/);
+    const discBlind = h1Ticks(H1.lamp, [...[8, 16, 24, 32, 40, 45].map((k) => ({ kmh: k })), { kmh: 45, posted: null }, { kmh: 45, posted: null }, ...Array(80).fill({ kmh: 45 })]);
+    assert.equal(discBlind.state.heldAsSized, true, R(discBlind.state.observed));
+    assert.match(R(discBlind.state.observed), /at or under the posted 50, the disc it started under \(no other disc read inside it; 2 tick\(s\) inside it with the disc unread\)/);
+    // the emergency (the verifier's series) holds nothing either
+    const em = h1Ticks(H1.em, [...[10, 20, 30, 41, 44].map((k) => ({ kmh: k, posted: 60 })), ...Array(30).fill({ kmh: 53, posted: 60 }), ...Array(40).fill({ kmh: 50, posted: 50 })]);
+    assert.notEqual(em.state.heldAsSized, true, `the verifier's disc series held: ${R(em.state.observed)}`);
+    // THE PROPERTY, fuzzed: whenever a pace profile holds, every reading of its run is at or under the disc (and the top) it prints,
+    // and every disc read inside the run is that disc.
+    let held = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const rnd = mulberry32(seed);
+      const id = seed % 2 ? H1.lamp : H1.em;
+      const ticks = [];
+      let disc = rnd() < 0.5 ? 50 : 60;
+      let v = 0;
+      for (let i = 0; i < 130; i++) {
+        if (rnd() < 0.02) disc = [40, 50, 60, 70][Math.floor(rnd() * 4)];
+        v = Math.max(0, Math.min(70, v + (i < 8 ? 6 : Math.round((rnd() - 0.5) * 3))));
+        ticks.push({ kmh: rnd() < 0.03 ? -1 : v, posted: rnd() < 0.05 ? null : disc });
+      }
+      const r = h1Ticks(id, ticks);
+      if (!r.state.heldAsSized) continue;
+      held += 1;
+      const line = R(r.state.observed);
+      const printed = Number(line.match(/at or under the posted (\d+)/)[1]);
+      const top = line.match(/at or under emRunTopKmh (\d+)/);
+      const from = r.steps.findIndex((s) => s.state.pace.started);
+      const at = r.steps.findIndex((s) => s.state.heldAsSized);
+      for (let i = from; i <= at; i++) {
+        if (ticks[i].kmh >= 0) assert.ok(ticks[i].kmh <= printed && (!top || ticks[i].kmh <= Number(top[1])), `seed ${seed}: reading ${ticks[i].kmh} in a run held «at or under the posted ${printed}»`);
+        if (ticks[i].posted !== null) assert.equal(ticks[i].posted, printed, `seed ${seed}: disc ${ticks[i].posted} read inside a run held under ${printed}`);
+      }
+    }
+    assert.ok(held >= 20, `the fuzz held only ${held} run(s) — the property went untested`);
+  });
+
+  it("F4a · the brake-check never books on a tick that reaches a ceiling — the booking's flat odometer is under maxM and its clock under maxMs, whatever the tick length", () => {
+    const decl = wrongLegProfileFor(H1.brake);
+    // the verifier's shape: 1 s ticks at 58 км/ч, the badge closing on the tick whose odometer first reaches maxM
+    const n = Math.ceil(decl.maxM / (58 / 3.6));
+    const ticks = Array.from({ length: n }, (_, i) => ({ kmh: 58, dtMs: 1000, rear: i === n - 1 ? badgeAt(7) : undefined })).map((t) => (t.rear === undefined ? { kmh: t.kmh, dtMs: t.dtMs } : t));
+    const r = h1Ticks(H1.brake, ticks, "mobile");
+    assert.equal(r.state.brake.booked, null, `booked on the ceiling tick: ${JSON.stringify(r.state.brake.booked)} against maxM ${decl.maxM}`);
+    assert.equal(r.steps.some((s) => s.forceRest), false);
+    assert.equal(r.state.done, "metres");
+    // …and the CLOCK ceiling the same way: a slow start under the metre ceiling, the badge closing on the tick that
+    // reaches maxMs — nothing booked, released at the clock
+    // (the profile clock starts at the first flat tick, so the (maxMs/1000 + 1)-th one-second tick is the one at maxMs)
+    const slowN = Math.ceil(decl.maxMs / 1000) + 1;
+    const slow = h1Ticks(H1.brake, Array.from({ length: slowN }, (_, i) => (i === slowN - 1 ? { kmh: 36, dtMs: 1000, rear: badgeAt(3) } : { kmh: 12, dtMs: 1000 })), "pc");
+    assert.ok(slow.state.odoM < decl.maxM, `the slow start reached the metre ceiling first (${slow.state.odoM} m)`);
+    assert.deepEqual([slow.state.brake.booked, slow.state.done], [null, "clock"], `booked on the clock-ceiling tick: ${JSON.stringify(slow.state.brake.booked)}`);
+    // …and never at a dial over the speed the stop room is sized at (BRAKE_CHECK_ROOM_KMH, by the dial's rounding): 60 books
+    // nothing, 59 books
+    const room60 = h1Ticks(H1.brake, [{ kmh: 40 }, { kmh: 60, rear: badgeAt(4) }, { kmh: 60, rear: badgeAt(4) }]);
+    assert.equal(room60.state.brake.booked, null, `booked at a dial of 60 against a room sized at ${LIBNS.BRAKE_CHECK_ROOM_KMH}`);
+    const room59 = h1Ticks(H1.brake, [{ kmh: 40 }, { kmh: 59, rear: badgeAt(4) }]);
+    assert.equal(room59.state.brake.booked?.kmh, 59);
+    assert.match(R(createWrongLegProfile(H1.brake, { platform: "pc" }).sizedFrom), /at or over harshBrakeMinSpeedKmh 35 км\/ч and at or under the 60 км\/ч its stop room is sized at, each by its 0\.5 км\/ч rounding, and never on a tick that reaches a ceiling/);
+    // fuzzed: random tick lengths up to 2 s, the badge closing at a random tick
+    let booked = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const rnd = mulberry32(seed * 7);
+      const closeAt = Math.floor(rnd() * 14);
+      const ts = Array.from({ length: 20 }, (_, i) => ({ kmh: 36 + Math.round(rnd() * 23), dtMs: 200 + Math.round(rnd() * 1800), rear: i >= closeAt ? badgeAt(Math.floor(rnd() * 7)) : { ok: true, present: false, parsed: false, meters: null, kind: null } }));
+      for (const platform of ["pc", "mobile"]) {
+        const x = h1Ticks(H1.brake, ts, platform);
+        const i = x.steps.findIndex((s) => s.forceRest);
+        if (i < 0) continue;
+        booked += 1;
+        assert.ok(x.state.brake.booked.odoM < decl.maxM, `seed ${seed} ${platform}: booked at ${x.state.brake.booked.odoM} m, not under the ${decl.maxM} m ceiling`);
+        assert.ok(x.steps[i].state.ms < decl.maxMs, `seed ${seed} ${platform}: booked at ${x.steps[i].state.ms} ms, not under the ${decl.maxMs} ms ceiling`);
+      }
+    }
+    assert.ok(booked >= 50, `the fuzz booked only ${booked} time(s)`);
+  });
+
+  it("F4b/c · the brake-check's metre ceiling is sized on a census that covers BOTH platforms and this lesson's own legs — ODO_RATIO_MIN is not a bound here (this lesson's w43 pc leg read 0.577) — and the sentence it prints is that arithmetic, bound for bound", () => {
+    const AW = LIBNS.ODO_CENSUS_ALL_WRONG_LEGS;
+    const OWN = LIBNS.ODO_CENSUS_BRAKE_CHECK;
+    const ratio = LIBNS.BRAKE_CHECK_ODO_RATIO;
+    assert.ok(OWN && typeof ratio === "number", "no census the brake-check's ceiling is sized on");
+    assert.equal(OWN.lesson, H1.brake);
+    // the sizing ratio is at or under every reading any census names for this lesson, the widened band's low end, and the
+    // whole census's lowest mobile and pc readings
+    for (const [what, r] of [["ODO_RATIO_MIN", ODO_RATIO_MIN], ["the census's mobile minimum", AW.mobileMinRatio], ["the census's pc minimum", OWN.allPcMin], ["this lesson's pc legs", OWN.pc.min], ["this lesson's mobile legs", OWN.mobile.min]]) {
+      assert.ok(ratio <= r, `the ceiling's ratio ${ratio} is over ${what} ${r}`);
+    }
+    assert.equal(ratio, Math.min(AW.mobileMinRatio, OWN.allPcMin), "the ratio is not the census's lowest reading");
+    assert.ok(OWN.pc.min < ODO_RATIO_MIN, "this lesson's own pc census reads under ODO_RATIO_MIN — the round-1 basis — and the record no longer says so");
+    const decl = wrongLegProfileFor(H1.brake);
+    const decel = D("BRAKE_FORCE_N") / D("CHASSIS_MASS");
+    const room = stopDistanceM(LIBNS.BRAKE_CHECK_ROOM_KMH, { reactS: ZONE_REST_REACT_MAX_S, decel });
+    // the residual is the harness's 5 m, and it covers at least the creep before the flat odometer starts (the creep
+    // census, 0.84–2.01 m) — the one term its comment says it holds
+    assert.equal(LIBNS.BRAKE_CHECK_RESIDUAL_M, 5);
+    assert.ok(LIBNS.BRAKE_CHECK_RESIDUAL_M >= LIBNS.ZONE_CREEP_CENSUS.max, "the residual does not cover the creep census");
+    assert.ok(decl.maxM / ratio + room + LIBNS.BRAKE_CHECK_RESIDUAL_M <= D("ftgCalmZoneNearRouteM"), `${decl.maxM} m / ${ratio} + ${room.toFixed(1)} + ${LIBNS.BRAKE_CHECK_RESIDUAL_M} is past the calm zone`);
+    // …on BOTH platforms: the same profile, the same sizing, and no platform is refused
+    const specs = ["pc", "mobile"].map((platform) => createWrongLegProfile(H1.brake, { platform }));
+    for (const st of specs) assert.equal(st.on, true, `the brake-check is off on a platform: ${R(st.refused)}`);
+    assert.equal(R(specs[0].sizedFrom), R(specs[1].sizedFrom));
+    const c = specs[1].sizedFrom.f.detail.f.ceiling;
+    assert.equal(c?.tpl, "brake.ceiling");
+    const f = c.f;
+    assert.deepEqual([f.maxM, f.ratio, f.room, f.resid, f.zone, f.maxS], [decl.maxM, ratio, Number(room.toFixed(1)), LIBNS.BRAKE_CHECK_RESIDUAL_M, D("ftgCalmZoneNearRouteM"), decl.maxMs / 1000]);
+    assert.equal(f.routeM, decl.maxM / ratio);
+    assert.equal(f.total, f.routeM + f.room + f.resid);
+    assert.ok(f.total <= f.zone);
+    assert.deepEqual([f.legs, f.mobile, f.at], [AW.legs, AW.mobileLegs, AW.measured]);
+    assert.deepEqual([f.pcLegs, f.pcLo, f.pcHi, f.mLegs, f.mLo, f.mHi], [OWN.pc.legs, OWN.pc.min, OWN.pc.max, OWN.mobile.legs, OWN.mobile.min, OWN.mobile.max]);
+    assert.equal(f.model.f.react, LIBNS.REACTION_CENSUS.max);
+    // the round-1 sentence is gone, and every sizing sentence is registered with its population
+    for (const l of [wrongLegProfileStartLine(specs[0], { everyM: EVERY_M }), wrongLegProfileStartLine(specs[1], { everyM: EVERY_M })]) {
+      assert.ok(!/are sized to book it short of/.test(l), `the round-1 sizing sentence is back: ${l}`);
+      assertObservationLine(l, "brake-check start");
+    }
+    assert.deepEqual(sizingClaimViolations(), []);
+  });
+
+  it("C3 · P1 is armed on the DECLARED lessons only (sc-sp-curve, sc-hz-brake-dont-swerve, sc-vu-emergency, sc-roundabout-entry — both legs): every other lane installs no witness, registers no binding, takes no event shot, waits for none, prints no event-shot line, and its probe reads neither the rear badge nor the witness", () => {
+    assert.deepEqual([...(LIBNS.EVENT_SHOT_LESSONS ?? [])], ["sc-sp-curve", "sc-hz-brake-dont-swerve", "sc-vu-emergency", "sc-roundabout-entry"]);
+    const reads = LIBNS.h1ProbeReads;
+    assert.equal(typeof reads, "function");
+    for (const id of LIBNS.EVENT_SHOT_LESSONS) assert.equal(reads(id).eventShots, true, id);
+    for (const id of [...WRONG_LEG_PROFILES.keys(), ...WITHDRAWN_WRONG_LEG_PROFILES.keys(), "sc-pk-ban-stop", "sc-sp-curve-2", "", null, undefined]) {
+      if (LIBNS.EVENT_SHOT_LESSONS.includes(id)) continue;
+      assert.equal(reads(id).eventShots, false, `${id} takes event shots`);
+    }
+    for (const id of [...WRONG_LEG_PROFILES.keys(), "sc-pk-ban-stop", null]) assert.equal(reads(id).rear, id === H1.brake, `${id}: the rear read`);
+    assert.ok(Object.isFrozen(reads("sc-sp-curve")));
+    // THE HARNESS: one flag, read once, and every P1 act behind it
+    const code = stripComments(SRC);
+    assert.equal((code.match(/^const H1_READS = h1ProbeReads\(SCENARIO\);$/gm) ?? []).length, 1, "the lane's H1 reads are not taken once from the lib");
+    const blk = p1Block();
+    assert.ok(blk, "the P1 block (EVENT_FLASH_SEL … finishEventShots) is not in the harness");
+    const inside = (at) => at >= blk.from && at < blk.to;
+    // the three guarded calls, each once, and each P1 helper called nowhere else
+    for (const [call, guard] of [["installEventWitness()", /^if \(H1_READS\.eventShots\) await installEventWitness\(\);$/m], ["armEventShots(t0)", /^if \(H1_READS\.eventShots\) armEventShots\(t0\);$/m], ["finishEventShots()", /^if \(H1_READS\.eventShots\) await finishEventShots\(\);$/m]]) {
+      assert.equal((code.match(new RegExp(guard.source, "gm")) ?? []).length, 1, `«${call}» is not called once, behind the flag`);
+      const name = call.slice(0, call.indexOf("("));
+      const uses = [...code.matchAll(new RegExp(`\\b${name}\\b`, "g"))].filter((m) => !inside(m.index));
+      assert.equal(uses.length, 1, `${name} is named outside the P1 block other than by its guarded call`);
+    }
+    // every P1 surface is named only inside the block — the guarded calls and the probe's two gated reads excepted
+    for (const re of [/(?<![.\w$])eventShots\b/g, /\beventSeries\b/g, /\bwriteEventShots\b/g, /\beventDump\b/g, /\bEVENT_SHOT_\w+/g, /__auditEvent/g, /w\.__eventWitness = wit;/g, /\bpage\.exposeBinding\(/g]) {
+      for (const m of code.matchAll(re)) assert.ok(inside(m.index), `${m[0]} is named outside the P1 block: ${codeLineAt(code, m.index)}`);
+    }
+    assert.ok(/const installEventWitness = async \(\) => \{\s*await page\.addInitScript\(/.test(code), "the witness is not installed by installEventWitness");
+    assert.ok(/await page\.exposeBinding\("__auditEvent", /.test(code.slice(code.indexOf("const installEventWitness = async () => {"), code.indexOf("const eventShots = {"))), "the binding is not registered by installEventWitness");
+    assert.ok(/const armEventShots = \(at\) => \{\s*eventShots\.armed = true;\s*eventShots\.t0 = at;\s*\};/.test(code));
+    assert.ok(/const finishEventShots = async \(\) => \{\s*eventShots\.armed = false;\s*await Promise\.race\(\[Promise\.allSettled\(eventShots\.pending\), page\.waitForTimeout\(20_000\)\]\);\s*writeEventShots\(\);\s*note\(/.test(code));
+    // installed before the first navigation; armed right after the drive's clock starts; finished after the profile's finish
+    assert.ok(code.indexOf("if (H1_READS.eventShots) await installEventWitness();") < code.indexOf("await page.goto("));
+    assert.match(code, /const t0 = Date\.now\(\);\s*if \(H1_READS\.eventShots\) armEventShots\(t0\);/);
+    assert.match(code, /wrongProfile = wrongLegProfileFinish\(wrongProfile, \{ now: Date\.now\(\), t0, driveEnded: ended \}\)\.state;\s*if \(H1_READS\.eventShots\) await finishEventShots\(\);/);
+    // THE PROBE: the rear badge and the witness are read only on a lane whose flag is on
+    assert.match(code, /rearSel: H1_READS\.rear && MODE !== "right" \? REAR_PROX_SEL : null,/);
+    assert.match(code, /witnessOn: H1_READS\.eventShots,/);
+    assert.match(code, /rearProx: rearSel === null \? undefined : \(\(\) => \{/);
+    assert.match(code, /impactMounts: !witnessOn \? undefined : \(\(\) => \{\s*const w = window\.__eventWitness;/);
+    // …and the gate reads the flag as a profile value: its lines enumerated, its guarded statements pinned (H1/H4)
+    assert.deepEqual(harnessGateViolations(SRC), []);
+    assert.ok(harnessGateViolations(plantIn(SRC, "ungated arm", "if (H1_READS.eventShots) armEventShots(t0);", "armEventShots(t0);", "replace")).length > 0, "an ungated arm passed the gate");
+  });
+
+  it("C4/C5 · the event-shot lines say what was OBSERVED: the offsets are «scheduled» before any shot, the real per-shot offsets are printed after the series, and «painted at mount» says it is necessary, not sufficient", () => {
+    const blk = p1Block();
+    assert.ok(blk);
+    const code = blk.code.slice(blk.from, blk.to);
+    assert.ok(!/; shots at \+/.test(code), "the round-1 «shots at +0/+1/+3 s» (stated as fact before any shot) is back");
+    // (H1 round 3, C4: measured from the witness's report of the mount, `ev.at` — §W14 C4.)
+    assert.match(code, /shots scheduled at \+\$\{EVENT_SHOT_OFFSETS_MS\.map\(\(o\) => o \/ 1000\)\.join\("\/\+"\)\} s after the witness reported the mount/);
+    // the offsets line comes AFTER the loop that takes the shots, and prints each shot's own start
+    const loop = code.indexOf("for (const off of EVENT_SHOT_OFFSETS_MS) {");
+    // (H1 round 3, C4: the per-shot line prints each step's [start, end] — §W14 C4 checks its arithmetic and its words.)
+    const after = code.indexOf("each shot's step (its DOM dump, then its frame) ran inside ");
+    assert.ok(loop > 0 && after > loop, "the real offsets are not printed after the series");
+    assert.match(code, /\n\s*note\(`      EVENT SHOT \$\{rec\.n\}: each shot's step \(its DOM dump, then its frame\) ran inside \$\{rec\.shots\.map\(\(x\) => `\[\+\$\{\(Math\.floor\(x\.startedMs \/ 100\) \/ 10\)\.toFixed\(1\)\}/);
+    assert.match(code, /painted at mount by its own box and computed style only: \$\{ev\.cardPainted\} — necessary, not sufficient: its ancestors' opacity, a layer over it and clipping are not read, so the frames are the evidence/);
+  });
+
+  it("C1/C2 · the pace sentence rests on the throttle helper's own body and on the probe's dial read — a throttle() that never lets W up, or a narrowed dial selector, turns the self-claims red (the round-1 verifier's V21 and V24)", () => {
+    const facts = harnessFacts();
+    assert.equal(facts.throttleHelper, true, "the harness's throttle() is not the pinned helper");
+    assert.equal(facts.dialRead, true, "the probe's dial read is not the pinned selector");
+    const v21 = plantIn(SRC, "V21", "  if (on === holdW) return;\n  await page.keyboard[on ? \"down\" : \"up\"](\"KeyW\")", "  if (on === holdW || !on) return;\n  await page.keyboard[on ? \"down\" : \"up\"](\"KeyW\")", "replace");
+    const f21 = harnessFacts(v21);
+    assert.deepEqual([f21.throttleHelper, f21.paceApplied, f21.flatRestPedals], [false, false, false]);
+    assert.ok(selfClaimViolations(PROFILE_LINE_TEMPLATES, f21).length > 0, "V21: a throttle() that never lets W up left every self-claim standing");
+    const v24 = plantIn(SRC, "V24", "holdCrashPinnedBg, rearSel, witnessOn }) => {\n        const sp = document.querySelector('[aria-label^=\"Скорост \"]');\n", "holdCrashPinnedBg, rearSel, witnessOn }) => {\n        const sp = document.querySelector('[aria-label^=\"Скорост \"]:not([data-hud])');\n", "replace");
+    const f24 = harnessFacts(v24);
+    assert.equal(f24.dialRead, false);
+    assert.ok(selfClaimViolations(PROFILE_LINE_TEMPLATES, f24).length > 0, "V24: a narrowed dial read left every self-claim standing");
+  });
+
+  it("N5 · the emergency run is sized on the run's TOP (emRunTopKmh, the posted 50 on ln-v1) plus the dial's rounding, not on the governor's target — the arm is 9.91 s, not 8.9 — with a lag allowance, so it covers the verifier's ~11 s estimate with the window, its spread and a margin; a reading over the top breaks the run", () => {
+    assert.equal(D("emRunTopKmh"), 50);
+    assert.equal(PROFILE_DESIGN.emRunTopKmh.from, "ln-v1.json maxspeed");
+    assert.ok(wrongLegProfileFor(H1.em).sizedBy.includes("emRunTopKmh"));
+    const arm = (D("emRunTopKmh") + DIAL_HALF_QUANTUM_KMH + D("EM_CLOSING_MIN_KMH")) / 3.6 / D("emActorAccelMps2");
+    const st = createWrongLegProfile(H1.em, { platform: "pc" });
+    assert.equal(st.pace.sizedRunSec, arm + D("emResponseWindowSec") + D("emResponseJitterSec") + LIBNS.EM_RUN_LAG_MARGIN_SEC + PROFILE_SUSTAIN_MARGIN_SEC);
+    assert.ok(arm > (st.pace.goalKmh + D("EM_CLOSING_MIN_KMH")) / 3.6 / D("emActorAccelMps2"), "the arm is sized on the target again");
+    assert.ok(st.pace.sizedRunSec >= 11 + D("emResponseWindowSec") + D("emResponseJitterSec") + PROFILE_SUSTAIN_MARGIN_SEC, `the run ${st.pace.sizedRunSec} s does not cover an 11 s arm + the window + its spread + 1 s`);
+    const why = st.sizedFrom.f.detail.f.why;
+    assert.equal(why.tpl, "pace.whyEm");
+    assert.deepEqual([why.f.top, why.f.hq, why.f.closing, why.f.accel, why.f.win, why.f.jit, why.f.lag, why.f.margin], [50, DIAL_HALF_QUANTUM_KMH, 3, 1.5, 7, 0.4, LIBNS.EM_RUN_LAG_MARGIN_SEC, PROFILE_SUSTAIN_MARGIN_SEC]);
+    assert.equal(why.f.arm, arm);
+    // the ceilings leave room for the run: the launch plus the sized run at the target inside maxM and maxMs
+    const decl = wrongLegProfileFor(H1.em);
+    assert.ok((st.pace.sizedRunSec + 6) * 1000 < decl.maxMs && (st.pace.sizedRunSec + 6) * (D("emRunTopKmh") / 3.6) < decl.maxM, "the emergency ceilings are inside the sized run");
+    // a reading over the top (under a higher disc) breaks the run, and the line says so
+    const over = h1Ticks(H1.em, [10, 20, 30, 41, 44, 51, 44].map((k) => ({ kmh: k, posted: 60 })));
+    assert.equal(over.state.done, "run-broken");
+    assert.match(R(over.state.observed), /the dial read 51 км\/ч, over emRunTopKmh 50 км\/ч/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+/* ── §W14 H1 ROUND 3 — THE ROUND-2 VERIFIER'S FINDINGS AND CONDITIONS, EACH PORTED AS A TEST (harness-h1-r2.json [1]) ──
+ *
+ * Round 2 (h1-r2-result.patch, sha256 ef06437e…) was REFUTED on one false sentence (R2-F5, readings.brake) and one
+ * decision-changing survivor on an unpinned seam (W15, the probe's reject fallback), with the conditions W10 (the done
+ * token), C4 (each event frame's bounds) and N5a (the lamp run's start past the launch, and its lag margin). Every test
+ * below was RED on round 2 (D:/knijka-lanes/scratch/harness-h1/builder3/testfirst-r2.log) before anything was fixed.
+ * The threat model above §W11 binds: a false sentence the harness prints is always in model. */
+const NO_BADGE = Object.freeze({ ok: true, present: false, parsed: false, meters: null, kind: null });
+/** The two tallies readings.brake prints, each with the line it says it was counted against. */
+function brakeTallies(line) {
+  const fast = line.match(/(\d+) tick\(s\) whose dial read at or over ([\d.]+) км\/ч \(harshBrakeMinSpeedKmh 35 plus the dial's 0\.5 км\/ч rounding\)/);
+  const close = line.match(/(\d+) tick\(s\) whose badge read at or under ([\d.]+) m \(REAR_CUE_WARN_M 8 less the badge's 0\.5 m rounding\)/);
+  assert.ok(fast && close, `the brake readings do not print the line each tally is counted against: ${line}`);
+  return { fast: Number(fast[1]), fastAt: Number(fast[2]), close: Number(close[1]), closeAt: Number(close[2]) };
+}
+
+describe("§W14 H1 ROUND 3 — the round-2 verifier's findings, each ported as a test that was red on round 2", () => {
+  it("R2-F5 · readings.brake counts what its words say — each tally prints the exact line it was counted against — and on the verifier's leg (12 ticks at 35 км/ч, badge 5 м) it no longer prints «0 tick(s) at or over 35 км/ч · top 35 км/ч»", () => {
+    const leg = h1Ticks(H1.brake, Array.from({ length: 12 }, () => ({ kmh: 35, rear: badgeAt(5) })));
+    assert.equal(leg.state.brake.booked, null, "a dial of 35 booked (it is not certainly 35 by the dial's rounding)");
+    const out = outcomeOf(leg);
+    assert.ok(!/\d+ tick\(s\) at or over 35 км\/ч · top/.test(out), `the round-2 false sentence is back: ${out}`);
+    assertObservationLine(out, "brake readings, the verifier's leg");
+    const t = brakeTallies(out);
+    assert.deepEqual(t, { fast: 0, fastAt: 35.5, close: 12, closeAt: 7.5 }, `the verifier's leg: ${out}`);
+    assert.match(out, /· top 35 км\/ч/);
+    // THE PROPERTY, fuzzed on and around both lines (fractional dials and badges too — §5 takes whatever rear reading it is
+    // handed, though the badge label itself carries whole metres — both platforms): every tally the readings print
+    // equals the ticks the profile read whose reading meets the line the same words print, and a booking always met both.
+    let booked = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const rnd = mulberry32(seed * 13 + 5);
+      const ticks = Array.from({ length: 24 }, () => ({
+        kmh: rnd() < 0.05 ? -1 : 30 + Math.floor(rnd() * 12) + (rnd() < 0.2 ? [0.3, 0.5, 0.6][Math.floor(rnd() * 3)] : 0),
+        dtMs: 200 + Math.floor(rnd() * 300),
+        rear: rnd() < 0.2 ? NO_BADGE : badgeAt(6 + Math.floor(rnd() * 5) + (rnd() < 0.2 ? [0.3, 0.5, 0.6][Math.floor(rnd() * 3)] : 0)),
+      }));
+      for (const platform of ["pc", "mobile"]) {
+        const r = h1Ticks(H1.brake, ticks, platform);
+        const seen = ticks.filter((_, i) => i === 0 || r.steps[i - 1].state.active === true);
+        const x = brakeTallies(outcomeOf(r));
+        assert.equal(x.fast, seen.filter((k) => k.kmh >= 0 && k.kmh >= x.fastAt).length, `seed ${seed} ${platform}: the dial tally is not the ticks at or over ${x.fastAt}`);
+        assert.equal(x.close, seen.filter((k) => k.rear.present === true && k.rear.meters <= x.closeAt).length, `seed ${seed} ${platform}: the badge tally is not the ticks at or under ${x.closeAt}`);
+        const b = r.state.brake.booked;
+        if (b !== null) {
+          booked += 1;
+          assert.ok(b.kmh >= x.fastAt && b.m <= x.closeAt, `seed ${seed} ${platform}: booked at ${b.kmh} км/ч / ${b.m} м, outside the printed lines`);
+        }
+      }
+    }
+    assert.ok(booked >= 30, `the fuzz booked only ${booked} time(s)`);
+  });
+
+  it("W15 · a failed probe can never reach §5 as a reading: the drive probe's reject fallback, its absent-element value and its parse default are each −1, pinned in the dialRead fact the governor's sentence needs — and that −1 through §5 lets the throttle up and is counted unread, where a 0 would hold it down", () => {
+    assert.equal(harnessFacts().dialRead, true);
+    const sq = stripComments(SRC).replace(/\s+/g, " ");
+    const fb = sq.match(/\.catch\(\(e\) => \(\{ kmh: (-?\d+), overlay: "\?", pause: null, end: false, lawfulWait: null,/g) ?? [];
+    assert.equal(fb.length, 1, "the drive probe's reject fallback is not the one object the facts pin");
+    const failedKmh = Number(fb[0].match(/kmh: (-?\d+)/)[1]);
+    // …through §5, mid-run on each pace profile: the throttle up, the tick counted unread, the run neither grown nor broken
+    for (const id of [H1.lamp, H1.em]) {
+      const pre = h1Ticks(id, [10, 20, 30, 41, 45, 45].map((k) => ({ kmh: k })));
+      assert.equal(pre.state.pace.started, true, `${id}: the fixture's run did not start`);
+      const r = wrongLegFlatStep(pre.state, h1Tick(pre.now + 500, failedKmh));
+      assert.deepEqual({ ...r.pedal }, { act: "up", ms: null }, `${id}: a failed probe (kmh ${failedKmh}) pressed the throttle`);
+      assert.equal(r.state.pace.unreadTicks, pre.state.pace.unreadTicks + 1, `${id}: a failed probe was read as a dial`);
+      assert.deepEqual([r.state.pace.runSec, r.state.pace.broken], [pre.state.pace.runSec, false], `${id}: a failed probe credited or broke the run`);
+    }
+    // THE VERIFIER'S W15, and its two siblings, each planted: the fact goes false, and the governor's sentence with it
+    for (const [label, from, to] of [
+      ["W15 · the reject fallback reads 0", "    .catch((e) => ({\n      kmh: -1,\n", "    .catch((e) => ({\n      kmh: 0,\n"],
+      ["the absent dial reads 0", '[0, -1])[1]) : -1,\n          overlay: document.querySelector("[data-sim-overlay]")', '[0, -1])[1]) : 0,\n          overlay: document.querySelector("[data-sim-overlay]")'],
+      ["the unparsed label reads 0", '|| [0, -1])[1]) : -1,\n          overlay: document.querySelector("[data-sim-overlay]")', '|| [0, 0])[1]) : -1,\n          overlay: document.querySelector("[data-sim-overlay]")'],
+    ]) {
+      const f = harnessFacts(plantIn(SRC, label, from, to, "replace"));
+      assert.equal(f.dialRead, false, `${label}: the dial-read fact still holds`);
+      assert.ok(selfClaimViolations(PROFILE_LINE_TEMPLATES, f).length > 0, `${label}: the governor's sentence still stands`);
+    }
+  });
+
+  it("W10 · the done token is pinned against heldAsSized: a profile still open at the drive's end is «ended», never «held-as-sized», and its outcome line says so — on every declared profile, and fuzzed", () => {
+    for (const id of WRONG_LEG_PROFILES.keys()) {
+      let st = make(id);
+      let now = 10_000;
+      for (const kmh of [8, 16, 20]) {
+        now += 500;
+        st = wrongLegFlatStep(st, h1Tick(now, kmh)).state;
+      }
+      assert.deepEqual([st.on, st.active, st.done], [true, true, null], `${id} is not open after three slow ticks`);
+      const fin = wrongLegProfileFinish(st, { now: now + 500, t0: 10_000, driveEnded: true }).state;
+      assert.deepEqual([fin.heldAsSized, fin.done], [false, "ended"], `${id}: an open profile finished as ${fin.done}`);
+      const out = wrongLegProfileOutcomeLine(fin);
+      assert.ok(out.includes("ANTECEDENT NOT HELD AS SIZED (ended)"), `${id}: ${out}`);
+      assert.ok(!out.includes("(held-as-sized)"), `${id}: an open profile printed the held token: ${out}`);
+    }
+    const ids = [...WRONG_LEG_PROFILES.keys()];
+    const lead = { present: true, parsed: true, meters: 20, heldSec: 1.1, needSec: 2, short: true, label: "x" };
+    let held = 0;
+    for (let seed = 1; seed <= 240; seed++) {
+      const rnd = mulberry32(seed * 31 + 7);
+      const id = ids[seed % ids.length];
+      let st = make(id);
+      let now = 10_000;
+      const len = 5 + Math.floor(rnd() * 110);
+      for (let i = 0; i < len && st.active; i++) {
+        now += 300 + Math.floor(rnd() * 400);
+        const kmh = rnd() < 0.05 ? -1 : Math.min(i * 6, 30 + Math.floor(rnd() * 25));
+        st = wrongLegFlatStep(st, h1Tick(now, kmh, { impact: i > 20 && rnd() < 0.1 ? 1 : 0, rear: rnd() < 0.3 ? badgeAt(Math.floor(rnd() * 10)) : NO_BADGE, follow: rnd() < 0.5 ? lead : null })).state;
+      }
+      const fin = wrongLegProfileFinish(st, { now: now + 500, t0: 10_000, driveEnded: rnd() < 0.7 }).state;
+      if (fin.heldAsSized) held += 1;
+      assert.equal(fin.done === "held-as-sized", fin.heldAsSized === true, `seed ${seed} ${id}: done «${fin.done}» against heldAsSized ${fin.heldAsSized}`);
+      assert.notEqual(fin.done, null, `seed ${seed} ${id}: no done token after the finish`);
+      if (!fin.heldAsSized) assert.ok(!wrongLegProfileOutcomeLine(fin).includes("(held-as-sized)"), `seed ${seed} ${id}: an unheld profile printed the held token`);
+    }
+    assert.ok(held >= 10 && held <= 230, `the fuzz held ${held} of 240 — the property went untested on one side`);
+  });
+
+  it("C4 · each event frame is bounded by its step's [startedMs, doneMs] in the sidecar, and the line says so: after the series, each bound floored and ceiled to 0.1 s, the step being its DOM dump then its frame, measured from the witness's report of the mount", () => {
+    const blk = p1Block();
+    assert.ok(blk);
+    const code = blk.code.slice(blk.from, blk.to);
+    assert.match(code, /const startedMs = Date\.now\(\) - ev\.at;\s*const dump = await eventDump\(ev\.kind, ev\.title\);\s*const ok = await shot\(name\);\s*rec\.shots\.push\(\{ offsetMs: off, name, ok, startedMs, doneMs: Date\.now\(\) - ev\.at, dump \}\);/);
+    const loop = code.indexOf("for (const off of EVENT_SHOT_OFFSETS_MS) {");
+    const line = code.indexOf("each shot's step (its DOM dump, then its frame) ran inside ");
+    assert.ok(loop > 0 && line > loop, "each frame's bounds are not printed after the series");
+    assert.ok(code.includes("${rec.shots.map((x) => `[+${(Math.floor(x.startedMs / 100) / 10).toFixed(1)}, +${(Math.ceil(x.doneMs / 100) / 10).toFixed(1)}]`).join(\" / \")} s after the witness reported the mount, so each frame written was taken inside its own bounds — startedMs and doneMs in _audit-event-shots.json, floored and ceiled to 0.1 s (frame written: "), "the bounds line is not the floored start and the ceiled end of each step, or does not say what they are");
+    assert.ok(!/the shots started at \+/.test(code), "the round-2 start-only line is back");
+    // …and the schedule before the series is measured from the same report (`ev.at`, the witness's clock at the mount it saw)
+    assert.ok(code.includes("shots scheduled at +${EVENT_SHOT_OFFSETS_MS.map((o) => o / 1000).join(\"/+\")} s after the witness reported the mount"), "the schedule line does not say what its offsets are measured from");
+    assert.match(code, /const wait = ev\.at \+ off - Date\.now\(\);/);
+  });
+
+  it("N5a · the lamp run starts on the dial PAST THE LAUNCH — its first reading at or over warningLampRunStartKmh (warningLampHeldPaceKmh less WARNING_LAMP_COMPLY_DROP_KMH) by the dial's rounding, a declared design constant with its provenance — and no launch reading under it starts, credits or breaks the run", () => {
+    assert.equal(D("warningLampRunStartKmh"), 40);
+    assert.equal(D("warningLampRunStartKmh"), D("warningLampHeldPaceKmh") - D("WARNING_LAMP_COMPLY_DROP_KMH"), "the start is not the held pace less the product's comply drop");
+    assert.deepEqual({ ...PROFILE_DESIGN.warningLampRunStartKmh }, { value: 40, unit: "км/ч", from: "engine.ts WARNING_LAMP_COMPLY_DROP_KMH", at: PROFILE_SIZED_AT_H1 });
+    assert.ok(wrongLegProfileFor(H1.lamp).sizedBy.includes("warningLampRunStartKmh"));
+    assert.ok(!wrongLegProfileFor(H1.em).sizedBy.includes("warningLampRunStartKmh"));
+    // the launch: every reading under 40.5 starts nothing, credits nothing and breaks nothing
+    const launch = h1Drive(H1.lamp, [0, 6, 12, 20, 28, 36, 40, 40.4]);
+    assert.deepEqual([launch.state.pace.started, launch.state.pace.runSec, launch.state.done, launch.state.active], [false, 0, null, true], "a launch reading started the lamp run");
+    const start = h1Drive(H1.lamp, [0, 6, 12, 20, 28, 36, 40, 41, 43]);
+    assert.equal(start.state.pace.started, true);
+    assert.equal(start.steps.findIndex((s) => s.state.pace.started), 7, "the run did not start on the first reading at or over 40.5");
+    assert.equal(start.state.pace.runSec, 0.5);
+    // …the floor inside the run is still movingSpeedKmh (the product's own «is he complying» floor)
+    assert.equal(start.state.pace.floorKmh, D("movingSpeedKmh"));
+    // …and the sizing line says where the run starts, and the held line's «from its first reading» is that reading's tick
+    const sizing = R(createWrongLegProfile(H1.lamp, { platform: "pc" }).sizedFrom);
+    assert.match(sizing, /the run starts on its first reading it credits that is at or over warningLampRunStartKmh 40 км\/ч by its 0\.5 км\/ч rounding \(warningLampHeldPaceKmh 45 less WARNING_LAMP_COMPLY_DROP_KMH 5\), and a reading under it before the run starts does not start or break it/);
+    const held = h1Drive(H1.lamp, [0, 6, 12, 20, 28, 36, 40, 41, ...Array(90).fill(44)]);
+    assert.equal(held.state.heldAsSized, true, R(held.state.observed));
+    assert.match(R(held.state.observed), /from its first reading at t=4s /, "the held line's run start is not the first reading past the launch (tick 8, 4 s after t0)");
+    // the emergency run is untouched: its floor, 40 by the rounding, is where it starts
+    const em = h1Drive(H1.em, [10, 20, 30, 41, 45]);
+    assert.equal(em.steps.findIndex((s) => s.state.pace.started), 3);
+  });
+
+  it("N5a · the lamp run carries a LAG ALLOWANCE, a declared harness constant with its provenance: ceil(PRODUCT_CLOCK_LAG_RATIO × (warningLampBillSec + WARNING_LAMP_REGRADE_SEC)) = 7 s — the same ratio the emergency run's 4 s is — printed in the sizing, and the lamp's ceilings leave room for the run", () => {
+    assert.equal(LIBNS.PRODUCT_CLOCK_LAG_RATIO, 0.23);
+    assert.equal(LIBNS.LAMP_RUN_LAG_MARGIN_SEC, Math.ceil(LIBNS.PRODUCT_CLOCK_LAG_RATIO * (D("warningLampBillSec") + D("WARNING_LAMP_REGRADE_SEC"))));
+    assert.equal(LIBNS.LAMP_RUN_LAG_MARGIN_SEC, 7);
+    const arm = (D("emRunTopKmh") + DIAL_HALF_QUANTUM_KMH + D("EM_CLOSING_MIN_KMH")) / 3.6 / D("emActorAccelMps2");
+    assert.equal(LIBNS.EM_RUN_LAG_MARGIN_SEC, Math.ceil(LIBNS.PRODUCT_CLOCK_LAG_RATIO * (arm + D("emResponseWindowSec") + D("emResponseJitterSec"))), "the emergency's lag allowance is not the same ratio");
+    const st = createWrongLegProfile(H1.lamp, { platform: "pc" });
+    assert.equal(st.pace.sizedRunSec, D("warningLampBillSec") + D("WARNING_LAMP_REGRADE_SEC") + LIBNS.LAMP_RUN_LAG_MARGIN_SEC + PROFILE_SUSTAIN_MARGIN_SEC);
+    const why = st.sizedFrom.f.detail.f.why;
+    assert.equal(why.tpl, "pace.whyLamp");
+    assert.deepEqual([why.f.lampSec, why.f.rg, why.f.lag, why.f.margin, why.f.pace], [23.7, 6, 7, PROFILE_SUSTAIN_MARGIN_SEC, 45]);
+    assert.match(R(st.sizedFrom), /one run sized to 37\.7 s \(warningLampBillSec 23\.7 \+ WARNING_LAMP_REGRADE_SEC 6 \+ the harness's 7 s lag allowance \+ the harness's 1 s, measured on a drive held at warningLampHeldPaceKmh 45 км\/ч\)/);
+    // the ceilings leave room for a 6 s launch and the sized run at the disc (the emergency's own check, N5)
+    const decl = wrongLegProfileFor(H1.lamp);
+    assert.ok((st.pace.sizedRunSec + 6) * 1000 < decl.maxMs, `the lamp's clock ceiling ${decl.maxMs} ms is inside the sized run`);
+    assert.ok((st.pace.sizedRunSec + 6) * (50 / 3.6) < decl.maxM, `the lamp's metre ceiling ${decl.maxM} m is inside the sized run at the posted 50`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+/* ── §W15 H1 ROUND 4 — THE ROUND-3 VERIFIER'S SURVIVORS, EACH PORTED AS A TEST (harness-h1-r3-verifier) ──────────
+ *
+ * Round 3 (h1-r3-result.patch) was REFUTED on one survivor on its own new seam: V3-01 — the lamp run's start test
+ * (`startOk`) also gating the readings INSIDE a started run — survived every suite, and on a slow sag under 40.5 it
+ * breaks a run the sizing holds and prints a drop-limit reason at a gap under the printed limit (a false sentence).
+ * Its conditions V3-10 (obs.paceHeld's «flat odometer X m there» unpinned: a 0 would print «flat odometer 0 m there»)
+ * and V3-09 (the printed mount time unpinned against `ev.at`) are pinned here too, and so is V3-03 («at or over»
+ * becoming «over»), which the verifier ruled equivalent on the product's whole-км/ч dials: it is pinned on the
+ * printed WORDS, since §5 takes any reading. Each test below was RED on its mutant
+ * (D:/knijka-lanes/scratch/harness-h1/builder4/testfirst.log, testfirst-v303.log).
+ * The threat model above §W11 binds: a false sentence the harness prints is always in model. */
+/** A lamp dial series that starts the run, holds 45, then SAGS 1 км/ч per four 500 ms ticks (1 км/ч per 2 s — at most
+ *  3 км/ч inside any trailing 6 s, under the 4 км/ч drop limit) from 44 down to `low`, then holds `low`. */
+function lampSag(low, hold = 80) {
+  const seq = [0, 10, 20, 30, 41, 45, 45, 45, 45];
+  for (let k = 44; k >= low; k--) for (let i = 0; i < 4; i++) seq.push(k);
+  for (let i = 0; i < hold; i++) seq.push(low);
+  return seq;
+}
+
+describe("§W15 H1 ROUND 4 — the round-3 verifier's survivors, each ported as a test that was red on its mutant", () => {
+  it("V3-01 · a STARTED lamp run whose dial sags slowly under warningLampRunStartKmh (never WARNING_LAMP_COMPLY_DROP_KMH or more under the fastest of the trailing window) keeps crediting every reading and does not break — the start gates only the run's START", () => {
+    const start = D("warningLampRunStartKmh");
+    const hq = DIAL_HALF_QUANTUM_KMH;
+    const seq = lampSag(36);
+    const r = h1Drive(H1.lamp, seq);
+    const k0 = r.steps.findIndex((s) => s.state.pace.started);
+    assert.equal(k0, 4, "the run did not start on the first reading at or over 40.5 (41, the fifth tick)");
+    // every tick after the start: the run grows by the tick's interval, whatever the reading's side of the start
+    let under = 0;
+    for (let i = k0 + 1; i < r.steps.length; i++) {
+      const prev = r.steps[i - 1].state.pace;
+      const cur = r.steps[i].state.pace;
+      assert.equal(cur.broken, false, `tick ${i} (dial ${seq[i]}) broke the started run: ${cur.broke ? R(cur.broke) : ""}`);
+      if (!r.steps[i].state.active) break;
+      if (seq[i] - hq < start) under += 1;
+      assert.ok(Math.abs(cur.runSec - prev.runSec - 0.5) < 1e-9, `tick ${i} (dial ${seq[i]}, ${seq[i] - hq < start ? "under" : "at or over"} the start) was not credited`);
+    }
+    assert.ok(under >= 20, `the fixture credited only ${under} reading(s) under the start inside the run`);
+    assert.equal(r.state.done, "held-as-sized", `the slow sag did not hold: ${R(r.state.observed)}`);
+    assert.equal(r.state.heldAsSized, true);
+    assert.equal(r.state.pace.lowKmh, 36, "the run's lowest reading is not the sag's floor");
+    assert.equal(r.state.pace.maxGapKmh, 3, `the sag read a largest gap of ${r.state.pace.maxGapKmh}, not its 3`);
+    assert.ok(r.state.pace.maxGapKmh < D("WARNING_LAMP_COMPLY_DROP_KMH") - 1 + 1e-9, "the fixture's sag reaches the drop limit");
+    const heldAt = r.steps.findIndex((s) => s.state.done === "held-as-sized");
+    const line = r.steps[heldAt].say.line;
+    assertObservationLine(line, "lamp held on a slow sag");
+    assertObservationLine(outcomeOf(r), "lamp outcome on a slow sag");
+    assert.match(line, /one run of 3\d\.\d s on the profile clock from its first reading at t=\d+s \(flat odometer [\d.]+ m there\)/);
+    assert.match(line, /no reading 4 км\/ч or more under the fastest of the 6 s before it \(the largest such gap read 3 км\/ч\)/);
+    assert.ok(!/under the fastest reading of the 6 s before it/.test(line), `a drop-limit break reason is in the held line: ${line}`);
+    // THE PROPERTY, fuzzed: on any started lamp run whose readings stay over the floor, at or under the disc and move
+    // down at most 1 км/ч per four ticks, every reading inside the run credits — under the start as much as over it.
+    let underCredited = 0;
+    for (let seed = 1; seed <= 120; seed++) {
+      const rnd = mulberry32(seed * 17 + 3);
+      const s = [0, 12, 24, 36, 41 + Math.floor(rnd() * 5)];
+      let v = s[s.length - 1];
+      let since = 0;
+      while (s.length < 110) {
+        since += 1;
+        const down = rnd() < 0.7;
+        if (down && since >= 4 && v > 20) {
+          v -= 1;
+          since = 0;
+        } else if (!down && v < 48 && rnd() < 0.3) v += 1;
+        s.push(v);
+      }
+      const d = h1Drive(H1.lamp, s);
+      const j0 = d.steps.findIndex((x) => x.state.pace.started);
+      assert.equal(j0, 4, `seed ${seed}: the run did not start on its first reading past the launch`);
+      for (let i = j0 + 1; i < d.steps.length && d.steps[i - 1].state.active; i++) {
+        const cur = d.steps[i].state.pace;
+        assert.equal(cur.broken, false, `seed ${seed} tick ${i} (dial ${s[i]}): ${cur.broke ? R(cur.broke) : ""}`);
+        if (d.steps[i].state.active && s[i] - hq < start) {
+          underCredited += 1;
+          assert.ok(cur.runSec > d.steps[i - 1].state.pace.runSec, `seed ${seed} tick ${i}: a reading of ${s[i]} under the start was not credited`);
+        }
+      }
+      assert.equal(d.state.done, "held-as-sized", `seed ${seed}: ${R(d.state.observed)}`);
+    }
+    assert.ok(underCredited >= 500, `the fuzz credited only ${underCredited} reading(s) under the start`);
+    // …and the start still gates the START: a sag with no reading at or over 40.5 never starts a run
+    const never = h1Drive(H1.lamp, [0, 10, 20, 30, 40, ...Array(90).fill(38)]);
+    assert.deepEqual([never.state.pace.started, never.state.pace.runSec, never.state.pace.broken], [false, 0, false]);
+  });
+
+  it("V3-03 · the start's printed «at or over warningLampRunStartKmh by its rounding» is its boundary: §5 takes whatever reading it is handed, so a reading of exactly 40.5 starts the lamp run and one a hair under it does not (the product dial reads whole км/ч, where «at or over» and «over» agree — this pins the WORDS)", () => {
+    const start = D("warningLampRunStartKmh") + DIAL_HALF_QUANTUM_KMH;
+    const at = h1Drive(H1.lamp, [0, 10, 20, 30, start, 44]);
+    assert.equal(at.steps.findIndex((s) => s.state.pace.started), 4, `a reading of exactly ${start} did not start the run «at or over» the start by its rounding`);
+    const under = h1Drive(H1.lamp, [0, 10, 20, 30, start - 0.01, 44]);
+    assert.equal(under.steps.findIndex((s) => s.state.pace.started), 5, `a reading under ${start} started the run`);
+    assert.match(R(createWrongLegProfile(H1.lamp, { platform: "pc" }).sizedFrom), /the run starts on its first reading it credits that is at or over warningLampRunStartKmh 40 км\/ч by its 0\.5 км\/ч rounding/);
+  });
+
+  it("V3-10 · obs.paceHeld's «flat odometer X m there» is the flat odometer AT THE RUN'S START TICK — the sum of every flat step up to and including that tick — never 0 and never a later tick's, on both pace profiles and fuzzed tick lengths", () => {
+    // the lamp: 183 км/ч of readings × 0.5 s up to the start tick (41, the eighth) = 25.41… m; the next tick adds 6.1 m
+    const lamp = h1Drive(H1.lamp, [0, 6, 12, 20, 28, 36, 40, 41, ...Array(90).fill(44)]);
+    const k = lamp.steps.findIndex((s) => s.state.pace.started);
+    assert.equal(k, 7);
+    const want = (0 + 6 + 12 + 20 + 28 + 36 + 40 + 41) / 3.6 * 0.5;
+    assert.ok(Math.abs(lamp.state.pace.fromOdoM - want) < 1e-9, `the run's start odometer is ${lamp.state.pace.fromOdoM}, not the ${want} m flat odometer at its start tick`);
+    assert.equal(lamp.state.pace.fromOdoM, lamp.steps[k].state.odoM, "the run's start odometer is not the flat odometer on its start tick");
+    assert.equal(lamp.state.heldAsSized, true, R(lamp.state.observed));
+    assert.match(R(lamp.state.observed), /from its first reading at t=4s \(flat odometer 25\.4 m there\)/);
+    // the emergency: the same line, the same read (its run starts at 41, the fourth tick)
+    const em = h1Drive(H1.em, [10, 20, 30, 41, ...Array(60).fill(45)]);
+    const j = em.steps.findIndex((s) => s.state.pace.started);
+    assert.equal(j, 3);
+    assert.ok(Math.abs(em.state.pace.fromOdoM - (10 + 20 + 30 + 41) / 7.2) < 1e-9, `the emergency run's start odometer is ${em.state.pace.fromOdoM}`);
+    assert.equal(em.state.heldAsSized, true, R(em.state.observed));
+    assert.match(R(em.state.observed), /\(flat odometer 14\.0 m there\)/);
+    // fuzzed tick lengths and dials, both profiles: the printed odometer is the start tick's, to its 0.1 m
+    let printed = 0;
+    for (let seed = 1; seed <= 80; seed++) {
+      const rnd = mulberry32(seed * 29 + 11);
+      const id = seed % 2 ? H1.lamp : H1.em;
+      const ticks = [0, 8, 16, 24, 33].map((kmh) => ({ kmh, dtMs: 300 + Math.floor(rnd() * 400) }));
+      for (let i = 0; i < 140; i++) ticks.push({ kmh: 42 + Math.floor(rnd() * 3), dtMs: 300 + Math.floor(rnd() * 400) });
+      const d = h1Ticks(id, ticks);
+      const s0 = d.steps.findIndex((x) => x.state.pace.started);
+      assert.equal(s0, 5, `seed ${seed} ${id}: the run did not start on the first reading past the launch`);
+      let odo = 0;
+      for (let i = 0; i <= s0; i++) odo += (Math.max(0, ticks[i].kmh) / 3.6) * (ticks[i].dtMs / 1000);
+      assert.ok(odo > 0 && Math.abs(d.state.pace.fromOdoM - odo) < 1e-9, `seed ${seed} ${id}: start odometer ${d.state.pace.fromOdoM} against ${odo}`);
+      if (d.state.heldAsSized) {
+        printed += 1;
+        assert.ok(R(d.state.observed).includes(`(flat odometer ${odo.toFixed(1)} m there)`), `seed ${seed} ${id}: ${R(d.state.observed)}`);
+      }
+    }
+    assert.ok(printed >= 40, `only ${printed} fuzzed run(s) printed the held line`);
+  });
+
+  it("V3-09 · «EVENT SHOT n: … mounted at t=Xs» is the WITNESS's mount time — `ev.at`, its own Date.now() at the mount it saw — less the drive's clock origin the series was armed with, never the harness's clock when the binding runs", () => {
+    const blk = p1Block();
+    assert.ok(blk);
+    const sq = blk.code.slice(blk.from, blk.to).replace(/\s+/g, " ");
+    // the record's mount time: one key, one expression, from ev.at and the armed origin
+    const keys = sq.match(/\btSec: [^,]+,/g) ?? [];
+    assert.deepEqual(keys, ["tSec: Math.round((ev.at - eventShots.t0) / 100) / 10,"], `the record's mount time is not ev.at less the armed origin: ${JSON.stringify(keys)}`);
+    // (H1 round 8: `rec` is declared null before eventSeries' try, so its throw can be classified — and assigned once, here)
+    assert.ok(sq.includes(" rec = { n: ev.n, kind: ev.kind, title: ev.title, head: ev.head, cardPainted: ev.cardPainted, tSec: Math.round((ev.at - eventShots.t0) / 100) / 10, overlayAtMount: ev.overlay, shots: [] };"), "the series record is not built from the witness's report");
+    assert.deepEqual(sq.match(/(?<![.\w])rec = [^;]+;/g), ["rec = null;", "rec = { n: ev.n, kind: ev.kind, title: ev.title, head: ev.head, cardPainted: ev.cardPainted, tSec: Math.round((ev.at - eventShots.t0) / 100) / 10, overlayAtMount: ev.overlay, shots: [] };"], "the series record is assigned somewhere else too");
+    assert.equal((sq.match(/\.tSec\s*=[^=]/g) ?? []).length, 0, "the record's mount time is rewritten after it is built");
+    // …the printed «mounted at t=» is that field and nothing else
+    const mounted = sq.match(/mounted at t=\$\{[^}]+\}s/g) ?? [];
+    assert.deepEqual(mounted, ["mounted at t=${rec.tSec}s"], `the printed mount time is not the record's: ${JSON.stringify(mounted)}`);
+    // …the witness stamps `at` with its own clock at the mount it saw, in its one mount record
+    const wit = sq.match(/const ev = \{ n: wit\.events\.length \+ 1, kind, title, head: headLine, cardPainted, at: ([^,]+), overlay: overlayNow\(\) \};/g) ?? [];
+    assert.deepEqual(wit, ["const ev = { n: wit.events.length + 1, kind, title, head: headLine, cardPainted, at: Date.now(), overlay: overlayNow() };"], "the witness's mount record is not stamped with its own clock at the mount");
+    // …and the origin is the drive's own clock, armed once with it
+    assert.ok(sq.includes("const armEventShots = (at) => { eventShots.armed = true; eventShots.t0 = at; };"), "the series is not armed with the clock it is handed");
+    const flat = stripComments(SRC).replace(/\s+/g, " ");
+    assert.equal((flat.match(/\barmEventShots\(/g) ?? []).length, 1, "armEventShots is called other than once");
+    assert.ok(flat.includes("const t0 = Date.now(); if (H1_READS.eventShots) armEventShots(t0);"), "the series is not armed with the drive's clock origin t0");
+    assert.equal((flat.match(/eventShots\.t0 = /g) ?? []).length, 1, "the event series' clock origin is set outside armEventShots");
+  });
+});
+
+// ---------------------------------------------------------------------------
+/* ── §W16 H1 ROUND 5 — THE EXECUTION CENSUS OF THE PACE PROFILES AND OF THE P1 EVENT CLOCK (harness-h1-r4-verifier) ──
+ *
+ * Round 4 (h1-r4-result.patch) was REFUTED on 13 surviving mutants of H1's own pace and P1 code: V4-24 (the drop window
+ * forgetting the readings before the run: a false ANTECEDENT HELD AS SIZED, the UNSAFE direction), V4-22 (V3-01's sibling
+ * on the start seam), V4-06 (a reading AT the disc breaking the run), seven printed values falsified with no decision
+ * change (V4-01 02 03 08 10 16 18) and two re-spellings of V3-09 (V4-19, V4-20). Rounds 3 and 4 each killed the named
+ * mutants and the next verifier re-spelt them, so this round answers the CLASS, not the spellings:
+ *
+ *   A · PACE_ORACLE is an independent recomputation of the pace profiles from their DECLARED constants only (never from
+ *       the lib's code): the profile clock, the trailing window, the floor, the disc, the run top, the drop limit, the
+ *       lamp start, the sized run, the ceilings and the governor's pulse. It computes, per programme, the DECISION (held /
+ *       broken / not started / started and not held / a ceiling), the break reason, the tick of each, and EVERY value the
+ *       say lines and the outcome line print — rendered through the ONE template table, so each line the lib prints is
+ *       compared with the line the oracle's own values render, byte for byte.
+ *   B · PACE_PROGRAMMES is the table of dial programmes, each built from those constants at a boundary of one comparison
+ *       (the value AT the boundary and one a hair past it), and the census asserts every comparison the oracle makes was
+ *       met AT EQUALITY by some programme — so a mutant that turns any `<` into `<=` (or the reverse), swaps a printed
+ *       value, or reorders a reason changes some row. Each row also names the decision it was written for, which checks
+ *       the oracle itself.
+ *   C · THE P1 EVENT CLOCK BY EXECUTION: the harness's own P1 block (lesson-audit.mjs, `p1Block`) is RUN — the page-side
+ *       witness included — with a stubbed page, a harness clock and a DIFFERENT page clock, and a frozen copy of the
+ *       witness's report handed to the binding. `ev.at` must flow unchanged into the record's mount time, the printed
+ *       «mounted at t=», every scheduled wait and every shot's start and end; any other writer of the mount time (the
+ *       harness clock, a copy, a rewrite) changes a number here, and a write to the report throws on the frozen copy.
+ *
+ * R4-READINGS-GAP-EXCLUDES-BREAK, decided: readings.pace now says whose readings its lowest and its largest gap are —
+ * «the first run's own readings (its start reading and each reading it credited, not the reading that broke it)» — and
+ * the largest gap is taken over exactly those readings (round 4 left the start reading out of it while the lowest kept
+ * it in); a reading at or over every reading of the window is 0 км/ч under its fastest, never a negative gap. The
+ * threat model above §W11 binds: a false sentence the harness prints is always in model. */
+
+/** THE HARNESS'S OWN PACE NUMBERS, written down here as the oracle's literals (round 6): the governor's band, gain and pulse
+ *  clamps, the emergency target over its floor, the two lag allowances, the step cap, the sustain margin, and each pace
+ *  row's two ceilings. The oracle reads THESE, never the lib's exports, so a change to any of them in the lib disagrees
+ *  with the census — and §W17 pins each against the lib's export (a deliberate change is a visible re-pin here). */
+const PACE_HARNESS_NUMBERS = Object.freeze({
+  PACE_FULL_BAND_KMH: 6, PACE_DUTY_GAIN_PER_KMH: 0.05, PACE_MIN_PULSE_MS: 40, PACE_MAX_PULSE_MS: 600, EM_PACE_ABOVE_FLOOR_KMH: 5,
+  LAMP_RUN_LAG_MARGIN_SEC: 7, EM_RUN_LAG_MARGIN_SEC: 4, OVER_LIMIT_STEP_CAP_SEC: 2, PROFILE_SUSTAIN_MARGIN_SEC: 1,
+  ceilings: Object.freeze({ "sc-vp-telltale-red": Object.freeze({ maxM: 610, maxMs: 60_000 }), "sc-vu-emergency": Object.freeze({ maxM: 400, maxMs: 40_000 }) }),
+});
+/** The pace profiles' numbers, from the DECLARED constants (PROFILE_DESIGN), the harness's own numbers written down above and
+ *  the profile table read as DATA (its name and sizedBy) — never through a lib function (round 6: not even the lookup). */
+function paceK(id) {
+  const HN = PACE_HARNESS_NUMBERS;
+  const lamp = id === H1.lamp;
+  const hq = D("dialHalfQuantumKmh");
+  const floor = lamp ? D("movingSpeedKmh") : D("emYieldSlowKmh") + D("EM_SPEED_MARGIN_KMH");
+  const arm = (D("emRunTopKmh") + hq + D("EM_CLOSING_MIN_KMH")) / 3.6 / D("emActorAccelMps2");
+  const decl = WRONG_LEG_PROFILES.get(id);
+  return {
+    id, lamp, hq, floor, arm, name: decl.name, maxM: HN.ceilings[id].maxM, maxMs: HN.ceilings[id].maxMs, sizedBy: decl.sizedBy,
+    target: lamp ? D("warningLampHeldPaceKmh") : floor + HN.EM_PACE_ABOVE_FLOOR_KMH,
+    lim: lamp ? D("WARNING_LAMP_COMPLY_DROP_KMH") - 2 * hq : null,
+    win: lamp ? D("WARNING_LAMP_REGRADE_SEC") : null,
+    cap: lamp ? null : D("emRunTopKmh"),
+    start: lamp ? D("warningLampRunStartKmh") : null,
+    lag: lamp ? HN.LAMP_RUN_LAG_MARGIN_SEC : HN.EM_RUN_LAG_MARGIN_SEC,
+    margin: HN.PROFILE_SUSTAIN_MARGIN_SEC,
+    sized: lamp
+      ? D("warningLampBillSec") + D("WARNING_LAMP_REGRADE_SEC") + HN.LAMP_RUN_LAG_MARGIN_SEC + HN.PROFILE_SUSTAIN_MARGIN_SEC
+      : arm + D("emResponseWindowSec") + D("emResponseJitterSec") + HN.EM_RUN_LAG_MARGIN_SEC + HN.PROFILE_SUSTAIN_MARGIN_SEC,
+    band: HN.PACE_FULL_BAND_KMH, base: D("paceDutyBase"), gain: HN.PACE_DUTY_GAIN_PER_KMH,
+    pulseLo: HN.PACE_MIN_PULSE_MS, pulseHi: HN.PACE_MAX_PULSE_MS, stepCapMs: HN.OVER_LIMIT_STEP_CAP_SEC * 1000,
+  };
+}
+/** A programme tick: the dial (−1 unread), the interval, the posted disc (null or 0: unread), and (round 6) optionally the
+ *  flat step itself, so a programme can land the flat odometer EXACTLY on a metre ceiling. */
+const pt = (kmh, o = {}) => ({ kmh, dt: o.dt ?? 500, posted: "posted" in o ? o.posted : 50, ...("step" in o ? { step: o.step } : {}) });
+const pts = (n, kmh, o) => Array.from({ length: n }, () => pt(kmh, o));
+/** The flat step the census hands each tick: its own `step` when it has one, else the dial's metres over its own interval. */
+const ptStep = (t) => ("step" in t ? t.step : (Math.max(0, t.kmh) / 3.6) * (t.dt / 1000));
+
+/* ── THE DECLARED RULES OF THE TWO PACE PROFILES (round 6) — what the oracle below is written from ────────────────────
+ * The sizing sentence (sizing.pace, pace.drop, pace.startLamp), the two `told` texts and the §5 header, read as rules;
+ * each number from PROFILE_DESIGN or the harness's declared constants (paceK):
+ *   R1  the profile clock credits each interval as min(max(0, the interval — 0 when not a finite number), 2 s);
+ *   R2  the flat odometer adds the tick's flat step when it is a finite number over 0;
+ *   R3  t= is the drive's clock in whole seconds, rounded, never negative; the profile's wall clock runs from its FIRST
+ *       flat tick, never negative;
+ *   R4  the disc is read when it is a finite number over 0 (else unread, counted); a read disc other than the last read
+ *       disc is a change (the first read disc is not);
+ *   R5  the dial is read when it is a finite number at or over 0 (else unread, counted); the top is the fastest read;
+ *   R6  the governor, on the dial and the tick's own interval (0 when not a finite number over 0): unread or at/over the
+ *       target → up; under target − band → down; else a pulse of round(clamp((base + gain·(target − dial))·interval,
+ *       40, 600)) ms; a command is counted — and handed out — only on a tick after which the profile is still running;
+ *   R7  (lamp) before a read dial is tested, every reading more than WIN s older on the profile clock leaves the window
+ *       (a reading exactly WIN s old stays); the gap is the fastest window reading less the dial, 0 when none is faster
+ *       or the window is empty; then the reading joins the window — whether or not the run has started;
+ *   R8  a read dial is tested, IN THE DECLARED PRIORITY ORDER `PACE_BREAK_ORDER` (below); outside the run, a dial
+ *       passing every test (and, on the lamp, at or over the start line by the dial's rounding) STARTS the run (its
+ *       start reading credits no seconds; the run's disc is the last read disc); inside it, a dial passing every test
+ *       credits the tick's interval, and the FIRST failing test is the break reason; an unread dial inside the run with a
+ *       read disc other than the run's is a disc-change break;
+ *   R9  the run holds as sized on the tick its credited seconds reach the sized run (after the break test);
+ *   R10 otherwise the ceilings: the flat odometer at or over maxM (metres), else the wall clock at or over maxMs (clock);
+ *   R11 the rest is held back on every tick after which the profile is still running, and on no other.
+ * Every value a line prints is then rendered from THE ONE TEMPLATE TABLE by THIS FILE's own renderer (`referenceRender`),
+ * and every spec here is a plain object built here — no lib function builds, validates or renders any of it. */
+
+/** THE BREAK-REASON PRIORITY, written down (round 6, from the round-5 verifier's V5-05..08): when a reading inside the run
+ *  fails several tests at once, the break reason printed is the FIRST of these it fails. Pinned below by its hash and by
+ *  one named programme per ordered pair the profiles can reach. */
+const PACE_BREAK_ORDER = Object.freeze([
+  Object.freeze(["disc-change", "pace.brokeDiscChange"]),
+  Object.freeze(["floor", "pace.brokeFloor"]),
+  Object.freeze(["disc", "pace.brokeDisc"]),
+  Object.freeze(["cap", "pace.brokeCap"]),
+  Object.freeze(["drop", "pace.brokeDrop"]),
+]);
+const PACE_BREAK_ORDER_PIN = "f83bf678a590";
+/** A finite number? (the oracle's own, not the lib's `fin`) */
+const finNum = (v) => typeof v === "number" && Number.isFinite(v);
+/** A template spec, as a plain object: every undefined slot is null (the table's own convention for an empty slot). */
+const S = (tpl, f = {}) => ({ tpl, f: Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v === undefined ? null : v])) });
+
+/** The SIZING clause of a pace profile, from the declared constants (R: sizing.pace's own slots), as a plain spec. */
+function paceSizingOracle(K) {
+  const ats = PROFILE_SIZED_COMMITS.filter((c) => K.sizedBy.some((k) => PROFILE_DESIGN[k].at === c));
+  const label = ats.length === 1 && ats[0] === PROFILE_SIZED_AT ? S("sizing.label", { at: PROFILE_SIZED_AT }) : S("sizing.labelAt", { at: ats });
+  const hq = K.hq;
+  const detail = S("sizing.pace", {
+    governor: S("pace.governor", { target: K.target, full: K.target - K.band, base: K.base, gain: K.gain, pulseLoMs: K.pulseLo, pulseHiMs: K.pulseHi }),
+    floor: K.floor,
+    hq,
+    cap: K.cap === null ? null : S("pace.capSized", { cap: K.cap }),
+    drop: K.lim === null ? null : S("pace.drop", { win: K.win, lim: K.lim, drop: D("WARNING_LAMP_COMPLY_DROP_KMH") }),
+    start: K.start === null ? null : S("pace.startLamp", { start: K.start, hq, pace: D("warningLampHeldPaceKmh"), drop: D("WARNING_LAMP_COMPLY_DROP_KMH") }),
+    run: K.sized,
+    why: K.lamp
+      ? S("pace.whyLamp", { lampSec: D("warningLampBillSec"), rg: D("WARNING_LAMP_REGRADE_SEC"), lag: K.lag, margin: K.margin, pace: D("warningLampHeldPaceKmh") })
+      : S("pace.whyEm", {
+        top: D("emRunTopKmh"), hq, closing: D("EM_CLOSING_MIN_KMH"), accel: D("emActorAccelMps2"), arm: K.arm, win: D("emResponseWindowSec"),
+        jit: D("emResponseJitterSec"), lag: K.lag, margin: K.margin,
+      }),
+  });
+  return S("sizing", { label, detail });
+}
+
+/**
+ * THE ORACLE (round 6) — the pace profile recomputed from the DECLARED RULES above, apart from the lib: one read of the
+ * programme, tick by tick. `source` is a programme (an array of ticks) or a GENERATOR `(i, o) => tick | null` that may
+ * look at the oracle's own state to aim its next tick at a boundary (it chooses inputs only; every comparison is still
+ * the lib against this). Returns the decision, the break reason (and every test the breaking reading failed), each
+ * tick's command, and every line — the say line and the whole outcome line — rendered by this file's renderer. `edges`
+ * records every comparison met AT EQUALITY (and each clamp met); `feat` the input shapes the census must reach.
+ */
+function paceOracle(id, source, { lead = 0 } = {}) {
+  const K = paceK(id);
+  const next = Array.isArray(source) ? (i) => (i < source.length ? source[i] : null) : source;
+  const edges = new Set();
+  const feat = new Set();
+  const o = {
+    K, done: null, startIdx: null, endIdx: null, at: null, why: null, fails: null, sayObs: null, loud: null,
+    clockMs: 0, odo: 0, lastDisc: null, discChanges: 0, discUnread: 0, top: -1, dialUnread: 0,
+    run: null, win: [], down: 0, up: 0, pulse: 0, pulseMs: 0, cmds: [], heldTicks: 0, prog: [], now: 10_000 + lead, firstNow: null,
+  };
+  const order = PACE_BREAK_ORDER.map(([k]) => k);
+  for (let i = 0; ; i++) {
+    const t = next(i, o);
+    if (t === null || t === undefined) break;
+    o.prog.push(t);
+    o.now += t.dt;
+    if (o.done !== null) {
+      o.cmds.push(undefined); // a stopped profile answers neutrally: no command key at all
+      continue;
+    }
+    o.firstNow ??= o.now;
+    // R1 · R2 · R3
+    const dtFin = finNum(t.dt) ? t.dt : 0;
+    const dtEff = Math.min(Math.max(0, dtFin), K.stepCapMs);
+    if (t.dt === K.stepCapMs) edges.add("stepCap");
+    if (t.dt < 0) feat.add("dt<0");
+    if (t.dt === 0) feat.add("dt=0");
+    if (t.dt > K.stepCapMs) feat.add("dt>cap");
+    o.clockMs += dtEff;
+    const step = ptStep(t);
+    if (finNum(step) && step > 0) o.odo += step;
+    const atSec = Math.round(Math.max(0, o.now - 10_000) / 1000);
+    // R4
+    const disc = finNum(t.posted) && t.posted > 0 ? t.posted : null;
+    if (disc === null) o.discUnread += 1;
+    else {
+      if (o.lastDisc !== null && disc !== o.lastDisc) o.discChanges += 1;
+      o.lastDisc = disc;
+    }
+    // R5 · R6
+    const dial = finNum(t.kmh) && t.kmh >= 0 ? t.kmh : null;
+    let cmd;
+    if (dial === null || dial >= K.target) cmd = { act: "up", ms: null };
+    else if (dial < K.target - K.band) cmd = { act: "down", ms: null };
+    else {
+      const dtG = finNum(t.dt) && t.dt > 0 ? t.dt : 0;
+      const raw = (K.base + K.gain * (K.target - dial)) * dtG;
+      if (raw < K.pulseLo) edges.add("pulseLo");
+      if (raw > K.pulseHi) edges.add("pulseHi");
+      if (Math.abs(raw - Math.floor(raw) - 0.5) < 1e-9) edges.add("pulseHalf");
+      cmd = { act: "pulse", ms: Math.round(Math.min(K.pulseHi, Math.max(K.pulseLo, raw))) };
+    }
+    if (dial !== null && dial === K.target) edges.add("govTarget");
+    if (dial !== null && dial === K.target - K.band) edges.add("govFull");
+    if (dial !== null && dial > o.top) o.top = dial;
+    const inRun = o.run !== null;
+    let failed = [];
+    if (dial === null) {
+      o.dialUnread += 1;
+      if (inRun) o.run.dialUnread += 1;
+      if (inRun && disc !== null && disc !== o.run.disc) {
+        failed = ["disc-change"];
+        feat.add("unreadDialDiscChange");
+      }
+    } else {
+      // R7
+      let gap = null;
+      let fastest = null;
+      if (K.lamp) {
+        for (const r of o.win) if (o.clockMs - r.at === K.win * 1000) edges.add("window");
+        o.win = o.win.filter((r) => o.clockMs - r.at <= K.win * 1000);
+        for (const r of o.win) if (fastest === null || r.kmh > fastest.kmh) fastest = r;
+        gap = fastest === null || fastest.kmh <= dial ? 0 : fastest.kmh - dial;
+        if (gap === K.lim) edges.add("drop");
+      }
+      const ref = inRun ? o.run.disc : o.lastDisc;
+      if (dial - K.hq === K.floor) edges.add("floor");
+      if (ref !== null && dial === ref) edges.add("disc");
+      if (K.cap !== null && dial === K.cap) edges.add("cap");
+      if (K.start !== null && dial - K.hq === K.start) edges.add("start");
+      // R8 — every test, then the first failing one in the declared order
+      const passes = {
+        "disc-change": !(inRun && disc !== null && disc !== o.run.disc),
+        floor: dial - K.hq > K.floor,
+        disc: ref !== null && dial <= ref,
+        cap: K.cap === null || dial <= K.cap,
+        drop: gap === null || gap < K.lim,
+      };
+      const failing = order.filter((k) => !passes[k]);
+      if (!inRun) {
+        if (failing.length === 0 && (K.start === null || dial - K.hq >= K.start)) {
+          o.run = { from: atSec, fromOdo: o.odo, disc: o.lastDisc, sec: 0, low: dial, startKmh: dial, maxGap: gap, dialUnread: 0, discUnread: 0 };
+          o.startIdx = i;
+          if (K.lamp && o.win.some((r) => r.kmh > o.lastDisc)) feat.add("preStartOverDiscInWindowAtStart");
+          if (gap !== null && gap > 0) feat.add("startGapOver0");
+        }
+      } else if (failing.length === 0) {
+        o.run.sec += dtEff / 1000;
+        if (dial < o.run.startKmh) feat.add("creditedUnderStart");
+        o.run.low = Math.min(o.run.low, dial);
+        if (gap !== null) o.run.maxGap = Math.max(o.run.maxGap, gap);
+      } else {
+        failed = failing;
+        if (failing.includes("drop") && fastest !== null && fastest.pre) feat.add("dropAgainstPreStartReading");
+      }
+      if (K.lamp) o.win.push({ at: o.clockMs, kmh: dial, pre: o.run === null });
+      o.lastGap = gap;
+      o.lastRef = ref;
+    }
+    if (inRun && failed.length > 0) {
+      o.done = "run-broken";
+      o.fails = failed;
+      const k = failed[0];
+      o.why =
+        k === "disc-change" ? S("pace.brokeDiscChange", { disc, was: o.run.disc })
+        : k === "floor" ? S("pace.brokeFloor", { kmh: dial, floor: K.floor, hq: K.hq })
+        : k === "disc" ? S("pace.brokeDisc", { kmh: dial, disc: o.lastRef })
+        : k === "cap" ? S("pace.brokeCap", { kmh: dial, cap: K.cap })
+        : S("pace.brokeDrop", { kmh: dial, gap: o.lastGap, win: K.win });
+      feat.add(`break:${failed.join("+")}`);
+      for (let a = 0; a < failed.length; a++) for (let b = a + 1; b < failed.length; b++) feat.add(`pair:${failed[a]}+${failed[b]}`);
+    }
+    if (o.done === null && o.run !== null && disc === null) o.run.discUnread += 1;
+    // R9 · R10
+    if (o.done === "run-broken") {
+      o.at = atSec;
+      o.loud = true;
+      o.sayObs = S("obs.paceBroken", { at: atSec, run: o.run.sec, target: K.sized, why: o.why });
+    } else if (o.run !== null && o.run.sec >= K.sized) {
+      if (o.run.sec === K.sized) edges.add("sustain");
+      o.done = "held-as-sized";
+      o.at = atSec;
+      o.loud = false;
+      o.sayObs = S("obs.paceHeld", {
+        run: o.run.sec, from: o.run.from, odo: o.run.fromOdo, floor: K.floor, disc: o.run.disc, discUnread: o.run.discUnread,
+        cap: K.cap === null ? null : S("pace.capHeld", { cap: K.cap }),
+        drop: K.lim === null ? null : S("pace.dropHeld", { lim: K.lim, win: K.win, max: o.run.maxGap }),
+        unread: o.run.dialUnread, target: K.sized,
+      });
+    } else {
+      const ms = Math.max(0, o.now - o.firstNow);
+      if (o.odo >= K.maxM || ms >= K.maxMs) {
+        o.done = o.odo >= K.maxM ? "metres" : "clock";
+        // (round 6, the round-5 verifier's CENSUS-EQUALITY-CLAIM-OVERSTATED: an edge is recorded only AT equality)
+        if (o.done === "metres" && o.odo === K.maxM) edges.add("ceilingM");
+        if (o.done === "clock" && ms === K.maxMs) edges.add("ceilingS");
+        if (o.odo >= K.maxM && ms >= K.maxMs) feat.add("bothCeilings");
+        o.at = atSec;
+        o.loud = true;
+        o.sayObs = S("obs.ceiling", {
+          why: o.done === "metres" ? S("ceiling.metres", { m: o.odo, max: K.maxM }) : S("ceiling.clock", { s: ms / 1000, max: K.maxMs / 1000 }),
+        });
+      }
+    }
+    // R6 · R11 — the command rides out, is counted and the rest is held back only while the profile is still running
+    if (o.done === null) {
+      if (cmd.act === "pulse") {
+        o.pulse += 1;
+        o.pulseMs += cmd.ms;
+      } else o[cmd.act] += 1;
+      o.heldTicks += 1;
+      o.cmds.push(cmd);
+    } else {
+      o.endIdx = i;
+      o.cmds.push(null);
+    }
+  }
+  if (o.top === 0) feat.add("top0");
+  if (o.top < 0) feat.add("noRead");
+  if (o.done === null) feat.add(o.run === null ? "open:notStarted" : "open:started");
+  const broken = o.done === "run-broken";
+  const held = o.done === "held-as-sized";
+  o.readings = S("readings.pace", {
+    disc: o.lastDisc, changes: o.discChanges, unreadDisc: o.discUnread, first: o.run ? o.run.sec : 0, target: K.sized,
+    broke: broken ? S("pace.brokeAt", { at: o.at }) : null,
+    top: o.top >= 0 ? o.top : null, notBroke: broken ? S("pace.notBroke") : null, low: o.run ? o.run.low : null,
+    gap: K.lamp ? S("pace.gapRead", { win: K.win, gap: o.run ? o.run.maxGap : null }) : null,
+    down: o.down, pulse: o.pulse, pulseMs: o.pulseMs, up: o.up, unread: o.dialUnread,
+  });
+  o.say = o.done === null ? null : held ? S("say.held", { name: K.name, how: "pace", at: o.at, obs: o.sayObs }) : S("say.notHeld", { name: K.name, obs: o.sayObs });
+  o.sayLine = o.say === null ? null : referenceRender(o.say);
+  o.finalObs = o.done === null ? S("obs.open", { kind: "pace" }) : o.sayObs;
+  const common = {
+    name: K.name, obs: o.finalObs, readings: o.readings,
+    rests: S("rests", { opp: 0, every: null, maxS: null, held: o.heldTicks, forced: 0 }),
+    end: S("end.reached"), clock: S("outcome.clock", { cap: K.stepCapMs / 1000 }), sizing: paceSizingOracle(K),
+  };
+  o.outcome = held ? S("outcome.held", { ...common, how: "pace", at: o.at }) : S("outcome.notHeld", { ...common, done: o.done ?? "ended" });
+  o.outcomeLine = referenceRender(o.outcome);
+  o.edges = edges;
+  o.feat = feat;
+  return o;
+}
+
+/** Drive the REAL §5 functions over a programme: every step, the finish, the outcome spec and line. */
+function paceReal(id, prog, { lead = 0, platform = "pc" } = {}) {
+  let st = createWrongLegProfile(id, { platform });
+  let now = 10_000 + lead;
+  const steps = [];
+  for (const t of prog) {
+    now += t.dt;
+    const r = wrongLegFlatStep(st, {
+      now, t0: 10_000, kmh: t.kmh, flatStepM: ptStep(t), dtMs: t.dt, postedKmh: t.posted, follow: null, probeAt: now,
+      rear: { ok: true, present: false, parsed: false, meters: null, kind: null }, impact: 0,
+    });
+    st = r.state;
+    steps.push(r);
+  }
+  const fin = wrongLegProfileFinish(st, { now: now + 500, t0: 10_000, driveEnded: true }).state;
+  return { steps, state: st, fin, spec: wrongLegProfileOutcomeSpec(fin), line: wrongLegProfileOutcomeLine(fin) };
+}
+
+/** THE COMPARISON (round 6) — the lib against the oracle on one programme; the first disagreement, or null. Every
+ *  per-tick answer (the command handed out, the rest held back, the booking, the say line and its loudness) and every
+ *  byte of the outcome line are compared. */
+function paceDisagreement(o, r) {
+  const want = o.done ?? "ended";
+  if (r.fin.done !== want) return `the decision: the lib ${r.fin.done}, the oracle ${want}`;
+  const libStart = r.steps.findIndex((s) => s.state.pace && s.state.pace.started);
+  if ((libStart < 0 ? null : libStart) !== o.startIdx) return `the run's start tick: the lib ${libStart}, the oracle ${o.startIdx}`;
+  const libEnd = r.steps.findIndex((s) => s.state.active !== true);
+  if ((libEnd < 0 ? null : libEnd) !== o.endIdx) return `the stopping tick: the lib ${libEnd}, the oracle ${o.endIdx}`;
+  if ((r.fin.heldAsSized === true) !== (o.done === "held-as-sized")) return "heldAsSized";
+  try {
+    assert.deepEqual(r.fin.pace.broke, o.done === "run-broken" ? o.why : null);
+  } catch {
+    return `the break reason: the lib ${JSON.stringify(r.fin.pace.broke)}, the oracle ${JSON.stringify(o.why)} (failed: ${o.fails})`;
+  }
+  for (let i = 0; i < r.steps.length; i++) {
+    const s = r.steps[i];
+    const c = o.cmds[i];
+    if (c === undefined ? "pedal" in s : !("pedal" in s) || (c === null ? s.pedal !== null : s.pedal === null || s.pedal.act !== c.act || s.pedal.ms !== c.ms)) {
+      return `tick ${i}: the command handed out ${JSON.stringify(s.pedal)}, the oracle's ${JSON.stringify(c)}`;
+    }
+    if (s.suppressRest !== (c !== null && c !== undefined)) return `tick ${i}: the rest held back ${s.suppressRest}`;
+    if (s.forceRest !== false) return `tick ${i}: a rest booked`;
+    const said = s.say ? s.say.line : null;
+    const wantSay = i === o.endIdx ? o.sayLine : null;
+    if (said !== wantSay) return `tick ${i}: the say line — the lib «${said}», the oracle «${wantSay}»`;
+    if (said !== null && s.say.loud !== o.loud) return `tick ${i}: the say line's loudness ${s.say.loud}`;
+  }
+  if (r.line !== o.outcomeLine) return `the outcome line —\n  the lib:    ${r.line}\n  the oracle: ${o.outcomeLine}`;
+  return null;
+}
+
+/** The final tick of a run whose credited seconds land EXACTLY on the sized run (an interval searched on the float). */
+function exactFinalDt(runSec, sized) {
+  const want = sized - runSec;
+  for (const base of [want * 1000, Math.round(want * 1e6) / 1e3]) {
+    for (let k = -64; k <= 64; k++) {
+      const dt = base + k * Number.EPSILON * Math.max(1, Math.abs(base));
+      if (runSec + Math.min(Math.max(0, dt), OVER_LIMIT_STEP_CAP_SEC * 1000) / 1000 === sized) return dt;
+    }
+  }
+  return null;
+}
+/** Credited seconds of a programme's run, the way both sides sum them (to find the exact-sustain interval). */
+function creditedAfter(prog, startIdx) {
+  let s = 0;
+  for (let i = startIdx + 1; i < prog.length; i++) s += Math.min(Math.max(0, prog[i].dt), OVER_LIMIT_STEP_CAP_SEC * 1000) / 1000;
+  return s;
+}
+
+/** THE PROGRAMME TABLE — every row built from the declared constants at one comparison's boundary. `want` is the
+ *  decision (and, when broken, the reason's template) the row was written for. */
+function pacePrograms() {
+  const L = paceK(H1.lamp);
+  const E = paceK(H1.em);
+  const S0 = L.start + L.hq; // the lamp start, AT its boundary
+  const F0 = L.floor + L.hq; // the lamp floor, AT its boundary
+  const EF0 = E.floor + E.hq; // the emergency floor (and start), AT its boundary
+  const ε = 0.01;
+  const hold = (n, kmh = 44, o) => pts(n, kmh, o);
+  const launchL = [pt(0), pt(10), pt(20), pt(30)];
+  const launchE = [pt(10), pt(20), pt(30)];
+  const blind = Math.ceil((L.win * 1000) / 500) + 1; // unread ticks that age every reading out of the window
+  const rows = [];
+  const row = (name, id, prog, want) => rows.push({ name, id, prog, want });
+  // ── the lamp: the start ──
+  row("L start AT warningLampRunStartKmh + rounding", H1.lamp, [...launchL, pt(S0), ...hold(90)], "held-as-sized");
+  row("L start a hair under", H1.lamp, [...launchL, pt(S0 - ε), ...hold(90)], "held-as-sized");
+  row("L the FIRST reading after the start under the start credits (V4-22)", H1.lamp, [...launchL, pt(S0 + 0.5), pt(L.start), ...hold(90)], "held-as-sized");
+  row("L every reading after the start under it, for a while", H1.lamp, [...launchL, pt(S0 + 0.5), ...pts(4, L.start), ...pts(4, L.start - 1), ...hold(90, L.start - 2)], "held-as-sized");
+  // ── the lamp: the floor (the window aged out by unread ticks first) ──
+  row("L floor AT its boundary breaks", H1.lamp, [...launchL, pt(41), pt(44), ...pts(blind, -1), pt(F0), ...hold(10)], "run-broken:pace.brokeFloor");
+  row("L floor a hair over credits", H1.lamp, [...launchL, pt(41), pt(44), ...pts(blind, -1), pt(F0 + ε), ...hold(90)], "held-as-sized");
+  // ── the lamp: the disc ──
+  row("L a reading AT the disc credits (V4-06)", H1.lamp, [...launchL, pt(41), pt(44), pt(48), ...hold(90, 50)], "held-as-sized");
+  row("L a hair over the disc breaks", H1.lamp, [...launchL, pt(41), pt(44), pt(48), pt(50 + ε), ...hold(10)], "run-broken:pace.brokeDisc");
+  row("L before the run, a reading over the disc does not start it", H1.lamp, [...launchL, pt(50 + ε), pt(50 + ε), ...hold(90, 47)], "held-as-sized");
+  // ── the lamp: the drop limit ──
+  row("L a gap AT the drop limit breaks (V4-01: the gap printed is the one read)", H1.lamp, [...launchL, pt(41), pt(45), pt(45), pt(45), pt(45 - L.lim), ...hold(10)], "run-broken:pace.brokeDrop");
+  row("L a gap well past the limit prints its own gap", H1.lamp, [...launchL, pt(41), pt(45), pt(45), pt(45), pt(38), ...hold(10)], "run-broken:pace.brokeDrop");
+  row("L a gap a hair under the limit credits", H1.lamp, [...launchL, pt(41), pt(45), pt(45), pt(45), pt(45 - L.lim + ε), ...hold(90)], "held-as-sized");
+  row("L a slow sag: the largest gap is the one read (V4-16)", H1.lamp, lampSag(36).map((k) => pt(k)), "held-as-sized");
+  row("L a steady run reads a largest gap of 0 (V4-16)", H1.lamp, [...launchL, pt(41), ...hold(90, 41)], "held-as-sized");
+  row("L broken on the tick after the start: the start reading alone, its gap 0 (never negative)", H1.lamp, [...launchL, pt(41), pt(50 + ε), ...hold(5)], "run-broken:pace.brokeDisc");
+  // ── the lamp: the window's edge ──
+  row("L a reading exactly WIN s old is in the window", H1.lamp, [...launchL, pt(41), pt(45), ...pts(blind - 2, -1), pt(45 - L.lim), ...hold(10)], "run-broken:pace.brokeDrop");
+  row("L a reading one tick past WIN s is out of it", H1.lamp, [...launchL, pt(41), pt(45), ...pts(blind - 1, -1), pt(45 - L.lim), ...hold(90)], "held-as-sized");
+  // ── the lamp: the window holds the readings from BEFORE the run (V4-24) ──
+  row("L a reading over the disc before the run holds the start back until it ages out", H1.lamp, [...launchL, pt(55), ...hold(90, 45)], "held-as-sized");
+  row("L a pre-start reading WIN s old still holds the start back", H1.lamp, [...launchL, pt(54), ...pts(blind - 2, -1), pt(54 - L.lim), ...hold(90, 54 - L.lim)], "held-as-sized");
+  row("L the start reading after a pre-start sag is not credited early", H1.lamp, [pt(0), pt(20), pt(38), pt(51), pt(46), pt(47), ...hold(90, 46)], "held-as-sized");
+  // ── the lamp: the disc inside the run ──
+  row("L a disc change on a read tick breaks", H1.lamp, [...launchL, pt(41), pt(44), pt(44, { posted: 60 }), ...hold(10)], "run-broken:pace.brokeDiscChange");
+  row("L a disc change on an unread tick breaks", H1.lamp, [...launchL, pt(41), pt(44), pt(-1, { posted: 60 }), ...hold(10)], "run-broken:pace.brokeDiscChange");
+  row("L a disc change before the run is counted, and the run holds under the new disc", H1.lamp, [pt(0), pt(10, { posted: 60 }), pt(20, { posted: 60 }), pt(30, { posted: 60 }), ...hold(90, 44, { posted: 60 })], "held-as-sized");
+  row("L the disc unread inside the run is counted (the start tick included) (V4-03)", H1.lamp, [...launchL, pt(41, { posted: null }), ...hold(3, 44, { posted: null }), pt(44, { posted: 0 }), ...hold(90)], "held-as-sized");
+  row("L the disc unread before the run is the leg's, not the run's (V4-03)", H1.lamp, [pt(0, { posted: null }), pt(10, { posted: null }), pt(20), pt(30, { posted: null }), ...hold(90)], "held-as-sized");
+  // ── the lamp: the dial unread ──
+  row("L the dial unread inside the run is counted and not credited (V4-02)", H1.lamp, [...launchL, pt(41), pt(44), ...pts(3, -1), ...hold(90)], "held-as-sized");
+  row("L the dial unread before the run is the leg's, not the run's (V4-02)", H1.lamp, [pt(0), pt(-1), pt(-1), pt(20), pt(-1), pt(30), ...hold(90)], "held-as-sized");
+  // ── the lamp: the lowest reading ──
+  row("L the start reading is the lowest (V4-18)", H1.lamp, [...launchL, pt(41), ...hold(90, 46)], "held-as-sized");
+  row("L the lowest is a later reading, not the floor (V4-08)", H1.lamp, [...launchL, pt(44), pt(42), pt(43), ...hold(90, 45)], "held-as-sized");
+  // ── the lamp: the step cap, the governor's clamps and its bands ──
+  row("L governor: bands and clamps, the step cap AT and past its bound", H1.lamp, [
+    pt(0), pt(L.target - L.band - ε), pt(L.target - L.band), pt(L.target - L.band, { dt: L.stepCapMs }), pt(40),
+    pt(44, { dt: 100 }), pt(44, { dt: 502.5 }), pt(L.target - ε), pt(L.target), pt(-1), pt(44, { dt: 5000 }), ...hold(80),
+  ], "held-as-sized");
+  row("L not started: the drive ends with no run", H1.lamp, [...launchL, pt(35), pt(38), pt(40)], "open");
+  row("L started and not held: the drive ends mid-run", H1.lamp, [...launchL, pt(41), ...hold(20)], "open");
+  row("L the flat-odometer ceiling", H1.lamp, pts(130, 38), "metres");
+  row("L the wall-clock ceiling", H1.lamp, pts(130, 30), "clock");
+  row("L the flat-odometer ceiling landed EXACTLY on maxM (round 6)", H1.lamp, pts(L.maxM / 10, 38, { step: 10 }), "metres");
+  // ── the emergency ──
+  row("E floor (its start) AT its boundary does not start", H1.em, [...launchE, pt(EF0), pt(EF0), ...hold(60)], "held-as-sized");
+  row("E floor a hair over starts", H1.em, [...launchE, pt(EF0 + ε), ...hold(60)], "held-as-sized");
+  row("E floor AT its boundary inside the run breaks", H1.em, [...launchE, pt(41), pt(45), pt(45), pt(EF0), ...hold(5)], "run-broken:pace.brokeFloor");
+  row("E a reading AT the disc credits (V4-06)", H1.em, [...launchE, pt(41), pt(45), ...hold(60, 50)], "held-as-sized");
+  row("E a hair over the disc (and the top) breaks on the disc", H1.em, [...launchE, pt(41), pt(45), pt(50 + ε), ...hold(5)], "run-broken:pace.brokeDisc");
+  row("E a reading AT emRunTopKmh under a posted 60 credits", H1.em, [...launchE, pt(41), pt(45), ...hold(60, E.cap)].map((t) => ({ ...t, posted: 60 })), "held-as-sized");
+  row("E a hair over emRunTopKmh under a posted 60 breaks on the top", H1.em, [...launchE, pt(41), pt(45), pt(E.cap + ε), ...hold(5)].map((t) => ({ ...t, posted: 60 })), "run-broken:pace.brokeCap");
+  row("E a posted 45: a hair over it breaks on the disc", H1.em, [...launchE, pt(41), pt(45), pt(45 + ε), ...hold(5)].map((t) => ({ ...t, posted: 45 })), "run-broken:pace.brokeDisc");
+  row("E before the run, a reading over the top does not start it", H1.em, [...launchE, pt(55), ...hold(60, 45)].map((t) => ({ ...t, posted: 60 })), "held-as-sized");
+  row("E no drop limit: a sag of any size credits", H1.em, [...launchE, pt(41), pt(50), pt(41), ...hold(60, 41)], "held-as-sized");
+  row("E a disc change inside the run breaks", H1.em, [...launchE, pt(41), pt(45), pt(45, { posted: 60 }), ...hold(5)], "run-broken:pace.brokeDiscChange");
+  row("E the dial and the disc unread inside the run", H1.em, [...launchE, pt(41), pt(-1), pt(45, { posted: null }), pt(-1, { posted: null }), ...hold(60)], "held-as-sized");
+  row("E not started", H1.em, [...launchE, pt(35), pt(40)], "open");
+  row("E the flat-odometer ceiling", H1.em, pts(90, 38), "metres");
+  row("E the wall-clock ceiling", H1.em, pts(90, 30), "clock");
+  row("E the flat-odometer ceiling landed EXACTLY on maxM (round 6)", H1.em, pts(E.maxM / 10, 38, { step: 10 }), "metres");
+  // ── the sized run, AT its boundary and a hair short, both profiles (the final interval searched on the float) ──
+  for (const [tag, id, pre] of [["L", H1.lamp, [...launchL, pt(41)]], ["E", H1.em, [...launchE, pt(41)]]]) {
+    const K = id === H1.lamp ? L : E;
+    const body = pts(Math.floor(K.sized / 0.5) - 1, 44);
+    const prog = [...pre, ...body];
+    const dt = exactFinalDt(creditedAfter(prog, pre.length - 1), K.sized);
+    assert.ok(dt !== null && dt > 0 && dt < 1000, `${tag}: no final interval lands the run exactly on the sized ${K.sized} s`);
+    row(`${tag} the run AT the sized seconds holds on that tick`, id, [...prog, pt(44, { dt })], "held-as-sized");
+    row(`${tag} the run a hair short of the sized seconds is still open`, id, [...prog, pt(44, { dt: dt - 1 })], "open");
+  }
+  return rows;
+}
+
+describe("§W16 H1 ROUND 5 — the execution census: every pace comparison at its boundary, every printed value recomputed, the P1 event clock run", () => {
+  it("THE CENSUS — for every programme, the real §5 functions take the oracle's DECISION (held / broken / not started / open / a ceiling) on the oracle's tick, for the oracle's reason, and print, byte for byte, the say line and the outcome line's OBSERVED and READINGS the oracle's own values render", () => {
+    const rows = pacePrograms();
+    assert.ok(rows.length >= 50, `only ${rows.length} programmes`);
+    const edges = { [H1.lamp]: new Set(), [H1.em]: new Set() };
+    const decisions = new Set();
+    for (const { name, id, prog, want } of rows) {
+      const o = paceOracle(id, prog);
+      for (const e of o.edges) edges[id].add(e);
+      // the oracle agrees with the decision the row was written for
+      const got = o.done === null ? "open" : o.done === "run-broken" ? `run-broken:${o.why.tpl}` : o.done;
+      assert.equal(got, want, `${name}: the oracle decided ${got}, the row was written for ${want}`);
+      decisions.add(want.split(":")[0]);
+      // (round 6) THE ONE COMPARISON the generative census uses too: the decision on its tick, the break reason (template
+      // and every value), every command handed out, the say line and its loudness, and every byte of the outcome line
+      const r = paceReal(id, prog);
+      const bad = paceDisagreement(o, r);
+      assert.equal(bad, null, `${name}: ${bad}`);
+      assert.ok(r.line.includes(` — OBSERVED: ${referenceRender(o.finalObs)} · READINGS: ${referenceRender(o.readings)} · `), `${name}: the printed outcome line does not carry the oracle's OBSERVED and READINGS`);
+      assertObservationLine(r.line, name);
+      if (o.sayLine) assertObservationLine(o.sayLine, name);
+    }
+    // EVERY COMPARISON WAS MET AT EQUALITY (and each clamp met) by some programme, on the profile that makes it — the two
+    // ceilings (round 6) with the flat odometer EXACTLY at maxM and the wall clock EXACTLY at maxMs
+    const want = {
+      [H1.lamp]: ["start", "floor", "disc", "drop", "window", "sustain", "govTarget", "govFull", "pulseLo", "pulseHi", "pulseHalf", "stepCap", "ceilingM", "ceilingS"],
+      [H1.em]: ["floor", "disc", "cap", "sustain", "ceilingM", "ceilingS"],
+    };
+    for (const id of [H1.lamp, H1.em]) {
+      const missing = want[id].filter((e) => !edges[id].has(e));
+      assert.deepEqual(missing, [], `${id}: comparisons no programme met at their boundary: ${missing.join(", ")}`);
+    }
+    assert.deepEqual([...decisions].sort(), ["clock", "held-as-sized", "metres", "open", "run-broken"]);
+    const reasons = new Set(rows.filter((x) => x.want.startsWith("run-broken:")).map((x) => x.want.slice(11)));
+    assert.deepEqual([...reasons].sort(), ["pace.brokeCap", "pace.brokeDisc", "pace.brokeDiscChange", "pace.brokeDrop", "pace.brokeFloor"]);
+  });
+
+  it("THE ORACLE IS NOT THE LIB — it reads no lib function but the template table, the profile table as data and the declared constants, renders with this file's own renderer, and a planted change to one of its own comparisons turns the census red (the census can fail)", () => {
+    const src = [paceOracle, paceK, paceSizingOracle, S].map((f) => f.toString()).join("\n");
+    for (const f of ["wrongLegFlatStep", "pacePedal", "paceNumbers", "createWrongLegProfile", "wrongLegProfileFinish", "profileText", "renderProfileText", "wrongLegProfileFor"]) {
+      assert.ok(!new RegExp(`\\b${f}\\b`).test(src), `the oracle calls ${f}`);
+    }
+    // a sabotaged oracle (its drop test at `<=` instead of `<`) disagrees with the lib on some row — so agreement is evidence
+    const from = "drop: gap === null || gap < K.lim,";
+    assert.equal(paceOracle.toString().split(from).length, 2);
+    const bad = new Function("paceK", "PACE_BREAK_ORDER", "finNum", "S", "ptStep", "referenceRender", "paceSizingOracle", `return (${paceOracle.toString().replace(from, "drop: gap === null || gap <= K.lim,")});`)(
+      paceK, PACE_BREAK_ORDER, finNum, S, ptStep, referenceRender, paceSizingOracle);
+    let disagree = 0;
+    for (const { id, prog } of pacePrograms()) if (paceDisagreement(bad(id, prog), paceReal(id, prog)) !== null) disagree += 1;
+    assert.ok(disagree >= 1, "a sabotaged oracle agrees with the lib on every row — the census could not fail");
+  });
+
+  it("R4-READINGS-GAP-EXCLUDES-BREAK · the readings line says whose readings its lowest and its largest gap are — the first run's own (its start reading and each reading it credited), and «not the reading that broke it» only when one did; the largest gap is never negative", () => {
+    const broken = paceReal(H1.lamp, [pt(0), pt(10), pt(20), pt(30), pt(41), pt(45), pt(45), pt(45), pt(38), pt(40)]);
+    const line = broken.line;
+    assert.match(line, /the dial read 38 км\/ч, 7 км\/ч under the fastest reading of the 6 s before it · READINGS: /);
+    assert.match(line, /· top 45 км\/ч · the first run's own readings \(its start reading and each reading it credited, not the reading that broke it\): lowest 41 км\/ч, largest gap under the fastest reading of the 6 s before it 0 км\/ч · /);
+    const held = paceReal(H1.lamp, [pt(0), pt(10), pt(20), pt(30), pt(41), ...pts(90, 44)]);
+    assert.match(held.line, /· the first run's own readings \(its start reading and each reading it credited\): lowest 41 км\/ч, largest gap under the fastest reading of the 6 s before it 0 км\/ч · /);
+    const em = paceReal(H1.em, [pt(10), pt(20), pt(30), pt(41), pt(45), pt(50.5)]);
+    assert.match(em.line, /· the first run's own readings \(its start reading and each reading it credited, not the reading that broke it\): lowest 41 км\/ч · governor/);
+    for (const r of [broken, held, em]) {
+      assert.ok(r.fin.pace.maxGapKmh === null || r.fin.pace.maxGapKmh >= 0, `a negative largest gap: ${r.fin.pace.maxGapKmh}`);
+      assert.ok(!/-\d/.test(R(r.spec.f.readings)), `a negative value in the readings: ${R(r.spec.f.readings)}`);
+    }
+  });
+
+  it("THE P1 EVENT CLOCK, BY EXECUTION — the harness's P1 block and its page-side witness run on a harness clock and a DIFFERENT page clock: the witness's `ev.at` flows unchanged into the record's mount time, the printed «mounted at t=», every scheduled wait and every shot's start and end; the report the binding is handed is frozen; before arming a mount is refused, past the cap it is refused", async () => {
+    const blk = p1Block();
+    assert.ok(blk, "the P1 block was not found");
+    const code = blk.code.slice(blk.from, blk.to);
+    const hc = { now: 2_000_000 }; // the harness's clock
+    const pc = { now: 0 }; // the page's clock
+    const log = { notes: [], waits: [], shots: [], inits: [], bindings: {}, writes: 0 };
+    const page = {
+      addInitScript: async (fn, arg) => void log.inits.push({ fn, arg }),
+      exposeBinding: async (name, fn) => void (log.bindings[name] = fn),
+      waitForTimeout: async (ms) => {
+        log.waits.push(ms);
+        hc.now += ms;
+      },
+      evaluate: async () => {
+        hc.now += 3;
+        return { at: hc.now, camera: null, card: null, flash: null };
+      },
+    };
+    const shot = async (name) => {
+      log.shots.push(name);
+      hc.now += 7;
+      return true;
+    };
+    const api = new Function("page", "note", "shot", "writeFileSync", "OUT", "SCENARIO", "h1ProbeReads", "Date",
+      `"use strict";\n${code}\nreturn { installEventWitness, armEventShots, finishEventShots, eventShots, H1_READS };`)(
+      page, (s) => log.notes.push(s), shot, () => void (log.writes += 1), "OUT", H1.em, LIBNS.h1ProbeReads, { now: () => hc.now });
+    assert.equal(api.H1_READS.eventShots, true);
+    await api.installEventWitness();
+    assert.equal(log.inits.length, 1);
+    assert.equal(typeof log.bindings.__auditEvent, "function");
+    // THE PAGE SIDE, run: the witness's own init script, on a fake document, its clock the PAGE clock
+    const obs = [];
+    const win = {};
+    const doc = { querySelectorAll: () => [], documentElement: { getAttribute: () => null } };
+    const init = new Function("window", "document", "MutationObserver", "getComputedStyle", "Date", `"use strict"; return (${log.inits[0].fn.toString()});`)(
+      win, doc, class { constructor(cb) { obs.push(cb); } observe() {} }, () => ({ visibility: "visible", display: "block", opacity: "1" }), { now: () => pc.now });
+    init(log.inits[0].arg);
+    assert.equal(obs.length, 1);
+    // the binding as Playwright hands it: a serialised copy of the report — frozen here, so a write to it throws
+    const pending = [];
+    win.__auditEvent = (ev) => {
+      hc.now += 260; // the binding's latency: the harness clock is 260 ms past the witness's report when it runs
+      log.bindings.__auditEvent(null, Object.freeze(structuredClone(ev)));
+    };
+    const flash = { nodeType: 1, matches: (sel) => sel === log.inits[0].arg.flashSel, querySelectorAll: () => [] };
+    const mount = (pageAt) => {
+      pc.now = pageAt;
+      hc.now = Math.max(hc.now, pageAt); // the harness is never behind the page's report
+      obs[0]([{ addedNodes: [flash] }]);
+    };
+    // a mount BEFORE the drive's clock is armed: refused, not shot
+    mount(2_000_100);
+    await Promise.allSettled(api.eventShots.pending);
+    assert.deepEqual(api.eventShots.refused.map((x) => x.why), ["not-driving"]);
+    const T0 = 2_001_000;
+    api.armEventShots(T0);
+    const reports = [2_006_300, 2_020_040, 2_031_950];
+    for (const at of reports) {
+      mount(at);
+      await Promise.allSettled(api.eventShots.pending);
+    }
+    assert.deepEqual(api.eventShots.refused.map((x) => x.why), ["not-driving"], `a mount was refused: ${JSON.stringify(api.eventShots.refused)}`);
+    assert.equal(api.eventShots.series.length, reports.length);
+    for (let k = 0; k < reports.length; k++) {
+      const at = reports[k];
+      const rec = api.eventShots.series[k];
+      const tSec = Math.round((at - T0) / 100) / 10;
+      assert.equal(rec.tSec, tSec, `series ${k + 1}: the mount time is ${rec.tSec}, the witness's report less the armed origin is ${tSec}`);
+      assert.ok(log.notes.some((s) => s.startsWith(`      EVENT SHOT ${rec.n}: an impact-flash element mounted at t=${tSec}s — `)), `series ${k + 1}: the printed mount time is not ${tSec}`);
+      // each shot's step starts AT the report + its offset (after the binding's 260 ms for the first), and ends 10 ms later
+      assert.deepEqual(rec.shots.map((x) => x.startedMs), [260, 1000, 3000], `series ${k + 1}: the shots' starts, from the witness's report`);
+      assert.deepEqual(rec.shots.map((x) => x.doneMs), [270, 1010, 3010], `series ${k + 1}: the shots' ends, from the witness's report`);
+      assert.ok(log.notes.some((s) => s.startsWith(`      EVENT SHOT ${rec.n}: each shot's step (its DOM dump, then its frame) ran inside [+0.2, +0.3] / [+1.0, +1.1] / [+3.0, +3.1] s after the witness reported the mount`)), `series ${k + 1}: the printed bounds`);
+    }
+    // every scheduled wait is the report + its offset less the harness's clock at that moment: 1000 − 270 and 3000 − 1010
+    assert.deepEqual(log.waits, [730, 1990, 730, 1990, 730, 1990]);
+    assert.equal(log.shots.length, 9);
+    // …and past the cap, a mount is refused
+    for (let k = reports.length; k < 9; k++) {
+      mount(hc.now + 50_000);
+      await Promise.allSettled(api.eventShots.pending);
+    }
+    assert.equal(api.eventShots.series.length, 8);
+    assert.deepEqual(api.eventShots.refused.map((x) => x.why), ["not-driving", "series-cap"]);
+    await api.finishEventShots();
+    // (H1 round 7: the count is of the reports the harness had RECEIVED — §W18 generates a report still in flight at the end)
+    // (H1 round 8: what was done with each report, the classes adding up to the reports received — §W19)
+    assert.equal(log.notes.at(-1), "  EVENT SHOTS: of 10 report(s) the harness had received from the page-side witness, 8 led to a series that ran every scheduled step (24 frame(s) written), 0 to a series a throw ended early (0 frame(s) written before it) and 2 to no series (not-driving 1 · series-cap 1 · a throw before its series 0) — _audit-event-shots.json");
+  });
+});
+
+/* ── §W17 H1 ROUND 6 — THE GENERATIVE CENSUS (harness-h1-r5-verifier) ───────────────────────────────────────────────────
+ *
+ * Round 5 (h1-r5-result.patch) was REFUTED on 15 surviving mutants: V5-01 (a new spelling of the drop-window seam — a false
+ * ANTECEDENT HELD AS SIZED, the UNSAFE direction), V5-31 (V3-09's class at a binding latency over 1 s), V5-05..08 (the
+ * break-reason PRIORITY: no programme failed two tests at once) and nine falsified printed values (V5-11 a top of 0, V5-15 a
+ * negative interval, V5-21..28 the P1 values). WHY: a FIXED table of 53 programmes never combines the inputs a mutant
+ * needs. So round 6 is GENERATIVE:
+ *
+ *   A · THE PACE CENSUS draws thousands of programmes per profile from reproducible seeds (`PACE_CENSUS_SEEDS`), each
+ *       aimed around EVERY declared boundary — the start line, the floor, the disc, the run top, the drop limit and its
+ *       window (its exact edge included), the metre and clock ceilings (each landed on EXACTLY), 0, negative and
+ *       over-cap intervals, unread dials and discs, disc changes on read and unread ticks — and DELIBERATELY builds
+ *       readings that fail several break tests at once. Each is compared, tick by tick and byte by byte, against the
+ *       INDEPENDENT ORACLE above (written from the declared rules R1–R11, sharing no code with the lib): the decision, the
+ *       break reason by the written-down priority `PACE_BREAK_ORDER`, every command handed out, every say line and every
+ *       value of the outcome line. The census then asserts it REACHED what it was built to reach: every decision, every
+ *       reason, every reachable ordered pair of reasons, every comparison at equality, and every input shape a round-5
+ *       survivor needed.
+ *   B · THE P1 CENSUS runs the harness's own P1 block and its page-side witness over hundreds of generated drives on a
+ *       fake document: binding latencies swept across [0, 3] s (with a tail to 12 s), waits under 50 ms, failed and
+ *       throwing shots, refused dumps, set, empty and unset camera attributes, painted and unpainted overlay layers and HUD
+ *       surfaces, opaque and transparent cards, repeated, empty and column-less card titles, mounts before arming and past
+ *       the cap — and compares every printed note, every wait, every shot name, the sidecar and its writes against an
+ *       oracle written from the P1 block's own stated rules.
+ *   C · The fixed §W16 table stays, as named regression rows, compared by the same function.
+ * ITS LIMITS, stated: the pace census drives the profile's step and finish alone, so the outcome line's rest-opportunity
+ * count is 0 on every programme (that count is the §W10 shadow's, not this census's); the P1 census's series are SERIAL —
+ * each ends before the next mount is reported — so overlapping series are not generated here (round 7: §W18 generates
+ * them, on one shared document and one clock); and every draw is bounded by the shapes the generators below list (a
+ * value those shapes never draw is not in the census — round 7: the posted disc is drawn from §W18's declared domain).
+ * The threat model above §W11 binds: a false sentence the harness prints is always in model. */
+
+/** The census's seeds, per profile — every programme is reproducible from (profile, seed, index). */
+const PACE_CENSUS_SEEDS = Object.freeze([20260928, 5150, 271828, 1618033, 99991, 4242]);
+/** Programmes drawn per seed and profile. */
+const PACE_CENSUS_PER_SEED = 500;
+/** The P1 census's seeds, and the drives drawn per seed. */
+const P1_CENSUS_SEEDS = Object.freeze([20260928, 777, 31337]);
+const P1_CENSUS_PER_SEED = 400;
+
+/**
+ * THE GENERATOR — a source for `paceOracle`, aimed at the declared boundaries. A STYLE is drawn per programme:
+ *   chaos       short, every tick a boundary value, a value relative to the window's fastest reading or the last one, an
+ *               unread reading, or (inside the run) a reading built to fail SEVERAL break tests at once;
+ *   steady      a launch, then a level with small noise, long enough to hold as sized, with sparse chaos events;
+ *   near-start  (the V4-24 / V5-01 class) readings over the disc before the run, then a start while they are still in the
+ *               window, then readings measured against THEM, not against the start reading;
+ *   degenerate  all 0, all unread, all under the floor, all over the disc, the disc never read, a constant on a boundary;
+ *   ceiling     a flat odometer or a wall clock landed EXACTLY on its ceiling (or a hair short), or both on one tick;
+ *   disc        (round 7, the round-6 verifier's V6-14) a run started under a disc drawn from THE POSTED-DISC DOMAIN (§W18:
+ *               every disc the content authors and builds, the renderer's floor, the low zones and every profile
+ *               boundary), then a disc change to a value of that domain — or one `postedLimitKmh` parses and the
+ *               renderer never prints — on a read or an unread dial, after unread-disc ticks, unread-dial ticks or none
+ *               (so the change can land on the 2nd or 3rd unread dial of a row: V6-11's class);
+ *   window      (round 7, lamp; the V5-01 / V6-01 class by construction, not by luck) a reading P, unread dials that age it
+ *               to A ms (A across the whole window: 1.6, 2.6, 3.1, 4.6, 5.51, 5.75 and exactly 6 s), a start reading that
+ *               passes the drop test against P, then a reading the drop limit under P while P is still in the window — a
+ *               window that forgot P at the start (for ANY cut under 6 s) credits it; the declared one breaks.
+ * Round 7: every style's disc changes, and a share of every style's first disc, are drawn from that domain too (round 6
+ * drew only 30–70, so a disc of 20 or under — a disc the content authors — never reached the profile).
+ * It only chooses inputs; it reads the oracle's state to aim, and never the lib's.
+ */
+function paceSource(K, rnd) {
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  const ε = 0.01;
+  const F0 = K.floor + K.hq;
+  const S0 = K.start === null ? null : K.start + K.hq;
+  const DOM = POSTED_DISC_DOMAIN;
+  const OFF = POSTED_DISC_DECLARED.offDomain;
+  const style = pick(["chaos", "chaos", "chaos", "steady", "steady", "near-start", "near-start", "degenerate", "ceiling", "disc", "disc", ...(K.lamp ? ["window"] : [])]);
+  let posted = rnd() < 0.15 ? pick(DOM) : pick([50, 50, 50, 60, 45, K.lamp ? 50 : 60]);
+  const odd = () => pick([0, 1, 250, 499, 501, 1000, 1999, 2000, 2001, 3500, 5000, -1, -400, -2600]);
+  const dtFor = (p) => (rnd() < p ? odd() : 500);
+  const credit = (dt) => Math.min(Math.max(0, dt), K.stepCapMs);
+  const unreadDial = () => pick([-1, -1, -1, null, NaN, Infinity, -0.01]);
+  const discTick = (pUnread, pSwitch) => {
+    const r = rnd();
+    if (r < pUnread) return pick([null, null, 0, -5, NaN, Infinity]);
+    if (r < pUnread + pSwitch) posted = rnd() < 0.5 ? pick([50, 60, 45, 70, 40, 30, 55]) : rnd() < 0.9 ? pick(DOM) : pick(OFF);
+    return posted;
+  };
+  /** The window's fastest reading at the profile clock this tick would reach (lamp), or null. */
+  const fastestAfter = (o, dt) => {
+    if (!K.lamp) return null;
+    const c = o.clockMs + credit(dt);
+    let m = null;
+    for (const r of o.win) if (c - r.at <= K.win * 1000 && (m === null || r.kmh > m)) m = r.kmh;
+    return m;
+  };
+  /** An interval that puts the oldest window reading EXACTLY at the window's edge (or one ms past it), if one fits. */
+  const edgeDt = (o) => {
+    if (!K.lamp || o.win.length === 0) return null;
+    const oldest = o.win.find((r) => o.clockMs - r.at <= K.win * 1000);
+    if (!oldest) return null;
+    const dt = oldest.at + K.win * 1000 - o.clockMs + pick([0, 0, 1]);
+    return dt > 0 && dt <= K.stepCapMs ? dt : null;
+  };
+  const absolute = (disc) => pick([
+    0, F0, F0 - ε, F0 + ε, disc, disc - ε, disc + ε, K.target, K.target - ε, K.target - K.band, K.target - K.band - ε, K.target - K.band + ε,
+    ...(S0 === null ? [] : [S0, S0 - ε, S0 + ε, K.start]), ...(K.cap === null ? [] : [K.cap, K.cap + ε, K.cap - ε]),
+  ]);
+  /** A reading built to fail SEVERAL break tests at once (inside the run). */
+  const combo = (o, dt) => {
+    const rd = o.run.disc;
+    const fastest = fastestAfter(o, dt);
+    const dc = rnd() < 0.55;
+    const kinds = ["floor", "disc", "good", ...(K.lamp ? ["drop", "floor+drop", "floor+drop"] : ["cap", "disc+cap", "disc+cap"])];
+    const kind = pick(kinds);
+    let kmh;
+    if (kind === "floor") kmh = pick([F0, F0 - ε, F0 - 6, 0]);
+    else if (kind === "disc") kmh = rd + pick([ε, 3]);
+    else if (kind === "cap") kmh = K.cap + pick([ε, 2]);
+    else if (kind === "disc+cap") kmh = Math.max(rd, K.cap) + pick([ε, 1]);
+    else if (kind === "drop" && fastest !== null) kmh = fastest - K.lim - pick([0, ε, 1]);
+    else if (kind === "floor+drop" && fastest !== null) kmh = Math.min(F0, fastest - K.lim) - pick([0, ε]);
+    else kmh = Math.min(rd, fastest === null ? rd : fastest) - pick([0, 0.5, 1]);
+    const other = rnd() < 0.5 ? pick([rd + 10, rd - 5, rd + 0.5, rd - 10]) : pick(DOM);
+    return { kmh: Math.max(0, kmh), dt, posted: dc && other > 0 ? other : rd };
+  };
+  const chaosTick = (o) => {
+    let dt = dtFor(0.25);
+    if (rnd() < 0.08) dt = edgeDt(o) ?? dt;
+    const r = rnd();
+    if (o.run !== null && r < 0.2) return combo(o, dt);
+    const posted = discTick(0.06, 0.07);
+    const disc = finNum(posted) && posted > 0 ? posted : 50;
+    if (r < 0.32) return { kmh: unreadDial(), dt, posted };
+    if (r < 0.55) return { kmh: absolute(disc), dt, posted };
+    const fastest = fastestAfter(o, dt);
+    if (r < 0.72 && fastest !== null) return { kmh: Math.max(0, fastest - K.lim + pick([0, ε, -ε, 0.5, -0.5, 1, K.lim, K.lim + 0.5])), dt, posted };
+    const prev = o.prog.length ? o.prog[o.prog.length - 1].kmh : 30;
+    if (r < 0.85 && finNum(prev) && prev >= 0) return { kmh: Math.max(0, prev + pick([0, 0.5, -0.5, 1, -1, 3, -3, 3.5, -3.5, 4, -4, 4.5, -4.5, 8, -8])), dt, posted };
+    return { kmh: Math.round(rnd() * 130) / 2, dt, posted };
+  };
+  const launch = K.lamp ? pick([[0, 10, 20, 30], [0, 20, 38], [8, 16, 24, 32, 40], []]) : pick([[10, 20, 30], [20, 35], []]);
+  const len = style === "chaos" ? 6 + Math.floor(rnd() * 50) : style === "degenerate" ? 3 + Math.floor(rnd() * 140) : 60 + Math.floor(rnd() * 110);
+  const level = pick([K.target, K.target, F0 + 1 + rnd() * (50 - F0 - 1), 50, F0 + ε + 0.5]);
+  const trail = Math.floor(rnd() * 4);
+  let trailed = 0;
+  // near-start: the readings over the disc before the run, the would-be start reading, then readings against them
+  const pre = Array.from({ length: 1 + Math.floor(rnd() * 4) }, () => posted + pick([0.5, 1, 2, 3.5, 4, 6, ε]));
+  const preTop = Math.max(...pre);
+  const starter = pick([preTop - K.hq * 8 + ε, preTop - 3.5, preTop - 3, posted, S0 ?? F0 + ε, posted - 1, preTop - (K.lim ?? 4) + ε]);
+  const after = Array.from({ length: 1 + Math.floor(rnd() * 5) }, () => pick([starter - 1, preTop - (K.lim ?? 4), preTop - (K.lim ?? 4) - ε, preTop - (K.lim ?? 4) + ε, starter, starter - 0.5, S0 ?? F0]));
+  const degenerate = pick(["zeros", "unread", "zeros+unread", "under-floor", "over-disc", "no-disc", "on-start", "on-floor"]);
+  const ceilingKind = pick(["metres", "metres", "metres-short", "clock", "clock-short", "both"]);
+  const ceilingDial = pick([30, 35, 38, 20, K.target]);
+  // disc: the run's disc (one a reading over the floor — and, on the lamp, at the start line — by the rounding fits under),
+  // its start reading, how long it is held, the unread-disc ticks, and the disc it changes to
+  const runnable = DOM.filter((v) => (K.lamp ? v - K.hq >= K.start : v - K.hq > K.floor));
+  const runDisc = pick(runnable);
+  const startR = K.lamp
+    ? pick([Math.min(runDisc, K.target), S0, runDisc])
+    : pick([Math.min(runDisc, K.target, K.cap), Math.min(runDisc, K.cap), F0 + ε]);
+  const heldN = Math.floor(rnd() * 7);
+  const blindN = Math.floor(rnd() * 3);
+  const blindDialN = Math.floor(rnd() * 3);
+  const changeTo = rnd() < 0.9 ? pick(DOM) : pick(OFF);
+  const changeDialUnread = rnd() < 0.3;
+  const discLaunch = K.lamp ? [0, 10, 20, 30] : [10, 20, 30];
+  // window (lamp): the disc, P, its age at the start, the start reading (under P by less than the drop limit, at or over
+  // the start line by the rounding, at or under the disc), and R (the drop limit or more under P, under S by less)
+  const wLaunch = [0, 10, 20, 30];
+  const wDisc = pick([50, 50, 60]);
+  const wP = pick([48, 50, 52, 46, wDisc + 2]);
+  const wS = Math.min(wDisc, Math.max(S0 ?? 0, wP - (K.lim ?? 4) + pick([0.5, ε, 1])));
+  const wAge = pick([1600, 2600, 3100, 4600, 5510, 5750, 6000]);
+  const wUnread = Math.floor((wAge - 1) / 500);
+  const wRdt = pick([0, 1, 100, 6000 - wAge]);
+  const wR = wP - (K.lim ?? 4) - pick([0, ε, 1]);
+  return {
+    style,
+    windowAgeMs: style === "window" ? wAge : null,
+    source: (i, o) => {
+      if (o.done !== null) return trailed++ < trail ? { kmh: Math.round(rnd() * 100) / 2, dt: 500, posted } : null;
+      if (style === "disc") {
+        const k = i - discLaunch.length;
+        if (k < 0) return { kmh: discLaunch[i], dt: 500, posted: runDisc };
+        if (k <= heldN) return { kmh: startR, dt: 500, posted: runDisc };
+        if (k <= heldN + blindN) return { kmh: startR, dt: 500, posted: null };
+        if (k <= heldN + blindN + blindDialN) return { kmh: -1, dt: 500, posted: rnd() < 0.5 ? runDisc : null };
+        if (k === heldN + blindN + blindDialN + 1) return { kmh: changeDialUnread ? -1 : startR, dt: dtFor(0.1), posted: changeTo };
+        return k <= heldN + blindN + blindDialN + 4 ? { kmh: startR, dt: 500, posted: changeTo } : null;
+      }
+      if (style === "window") {
+        // [launch…, P, unread × u, the start S (P now wAge ms old), R (P still in the window), S held]
+        const k = i - wLaunch.length;
+        if (k < 0) return { kmh: wLaunch[i], dt: 500, posted: wDisc };
+        if (k === 0) return { kmh: wP, dt: 500, posted: wDisc };
+        if (k <= wUnread) return { kmh: -1, dt: 500, posted: wDisc };
+        if (k === wUnread + 1) return { kmh: wS, dt: wAge - wUnread * 500, posted: wDisc };
+        if (k === wUnread + 2) return { kmh: wR, dt: wRdt, posted: wDisc };
+        return k <= wUnread + 6 ? { kmh: wS, dt: 500, posted: wDisc } : null;
+      }
+      if (i >= len && style !== "ceiling") return null;
+      if (style === "chaos") return i < launch.length ? { kmh: launch[i], dt: 500, posted } : chaosTick(o);
+      if (style === "steady") {
+        if (i < launch.length) return { kmh: launch[i], dt: dtFor(0.05), posted };
+        if (rnd() < 0.03) return chaosTick(o);
+        let dt = dtFor(0.05);
+        // the sized run landed EXACTLY on its seconds (an interval searched on the float), or a millisecond short of them
+        if (o.run !== null && K.sized - o.run.sec <= 1.9 && rnd() < 0.5) dt = (exactFinalDt(o.run.sec, K.sized) ?? dt) - pick([0, 0, 1]);
+        return { kmh: Math.max(0, level + pick([0, 0, 0, 0.5, -0.5, 1, -1, 1.5, -1.5])), dt, posted: discTick(0.02, 0.005) };
+      }
+      if (style === "near-start") {
+        const k = i - launch.length;
+        let dt = dtFor(0.08);
+        if (rnd() < 0.15) dt = edgeDt(o) ?? dt;
+        if (k < 0) return { kmh: launch[i], dt: 500, posted };
+        if (k < pre.length) return { kmh: pre[k], dt, posted };
+        if (k === pre.length) return { kmh: starter, dt, posted };
+        if (k <= pre.length + after.length) return { kmh: after[k - pre.length - 1], dt, posted };
+        if (rnd() < 0.03) return chaosTick(o);
+        return { kmh: Math.max(0, Math.min(posted, level) + pick([0, 0, -0.5, 0.5, -1])), dt: dtFor(0.03), posted };
+      }
+      if (style === "degenerate") {
+        const dt = dtFor(0.1);
+        if (degenerate === "zeros") return { kmh: 0, dt, posted };
+        if (degenerate === "unread") return { kmh: unreadDial(), dt, posted };
+        if (degenerate === "zeros+unread") return { kmh: rnd() < 0.5 ? 0 : unreadDial(), dt, posted };
+        if (degenerate === "under-floor") return { kmh: rnd() < 0.3 ? F0 : Math.round(rnd() * F0 * 2) / 2, dt, posted };
+        if (degenerate === "over-disc") return { kmh: posted + ε + Math.round(rnd() * 40) / 2, dt, posted };
+        if (degenerate === "no-disc") return { kmh: i < launch.length ? launch[i] : level, dt, posted: pick([null, 0, -5, NaN]) };
+        if (degenerate === "on-start") return { kmh: S0 ?? F0 + ε, dt, posted };
+        return { kmh: F0, dt, posted };
+      }
+      // ceiling: the flat odometer or the wall clock landed EXACTLY on its ceiling (or a hair short), from its first flat tick
+      const ms = o.firstNow === null ? 0 : o.now - o.firstNow;
+      if (i > 400) return null;
+      if (ceilingKind === "clock" || ceilingKind === "clock-short") {
+        const left = K.maxMs - ms;
+        const dt = left <= 2000 && left > 0 ? left - (ceilingKind === "clock-short" && left > 1 ? 1 : 0) : pick([500, 1000, 2000]);
+        return { kmh: ceilingDial, dt, posted, step: 1 };
+      }
+      const left = K.maxM - o.odo;
+      let step = 9;
+      if (left <= 18 && o.odo >= K.maxM / 2) step = ceilingKind === "metres-short" && left > 0.002 ? left - 0.001 : left;
+      if (ceilingKind === "both") {
+        // both ceilings on ONE tick: the wall clock is paced so it reaches maxMs on the tick the odometer reaches maxM
+        const ticksLeft = Math.max(1, Math.ceil(left / 9));
+        const dt = Math.max(1, Math.floor((K.maxMs - ms) / ticksLeft));
+        return ticksLeft === 1 ? { kmh: ceilingDial, dt: K.maxMs - ms, posted, step: left } : { kmh: ceilingDial, dt, posted, step: 9 };
+      }
+      return { kmh: ceilingDial, dt: 500, posted, step };
+    },
+  };
+}
+
+/* ── THE P1 CENSUS'S FAKE DOCUMENT — just enough DOM for the witness and the dump: attribute selectors, tag names, «*» ── */
+class FakeEl {
+  constructor(tag, attrs = {}, box = {}, text = "") {
+    this.nodeType = 1;
+    this.tagName = tag.toUpperCase();
+    this.attrs = attrs;
+    this.box = box;
+    this.own = text;
+    this.kids = [];
+    this.parentElement = null;
+  }
+  add(...els) {
+    for (const e of els) {
+      e.parentElement = this;
+      this.kids.push(e);
+    }
+    return this;
+  }
+  detach() {
+    if (this.parentElement) this.parentElement.kids = this.parentElement.kids.filter((k) => k !== this);
+    this.parentElement = null;
+  }
+  get childNodes() { return [...(this.own ? [{ nodeType: 3, textContent: this.own }] : []), ...this.kids]; }
+  getAttribute(n) { return Object.hasOwn(this.attrs, n) ? this.attrs[n] : null; }
+  matches(sel) { return fakeMatch(this, sel); }
+  *walk() { for (const k of this.kids) { yield k; yield* k.walk(); } }
+  querySelectorAll(sel) { return [...this.walk()].filter((e) => fakeMatch(e, sel)); }
+  querySelector(sel) { return this.querySelectorAll(sel)[0] ?? null; }
+  get textContent() { return this.own + this.kids.map((k) => k.textContent).join(""); }
+  get innerText() { return this.box.innerText ?? this.textContent; }
+  get previousElementSibling() {
+    const p = this.parentElement;
+    if (!p) return null;
+    const i = p.kids.indexOf(this);
+    return i > 0 ? p.kids[i - 1] : null;
+  }
+  getBoundingClientRect() {
+    const b = this.box;
+    return { width: b.w ?? 100, height: b.h ?? 20, top: b.top ?? 0, bottom: (b.top ?? 0) + (b.h ?? 20) };
+  }
+}
+function fakeMatch(el, sel) {
+  if (sel === "*") return true;
+  const m = sel.match(/^\[([\w-]+)(?:="([^"]*)")?\]$/);
+  if (m) return m[2] === undefined ? Object.hasOwn(el.attrs, m[1]) : el.attrs[m[1]] === m[2];
+  if (/^[a-z]+$/.test(sel)) return el.tagName === sel.toUpperCase();
+  throw new Error(`the fake document has no selector «${sel}»`);
+}
+const fakeStyle = (el) => ({ visibility: el.box.visibility ?? "visible", display: el.box.display ?? "block", opacity: el.box.opacity ?? "1" });
+const deepFreeze = (v) => {
+  if (v && typeof v === "object" && !Object.isFrozen(v)) {
+    Object.freeze(v);
+    for (const x of Object.values(v)) deepFreeze(x);
+  }
+  return v;
+};
+
+/* ── THE P1 BLOCK'S STATED RULES (round 6) — what the P1 oracle is written from (its comment and its note texts) ──────
+ *   P-a the witness reports every impact-flash mount, and the FIRST mount of each distinct, non-empty card title (collapsed
+ *       whitespace) whose card sits under the toast column — round 15, as the P1 comment now states it: of an added node EVERY
+ *       flash and then EVERY card is examined, in document order; white space is ECMAScript's (P1_TITLE_WHITE_SPACE), each
+ *       run written as one U+0020 and none left at either end; two titles are one only when they are the same code units;
+ *       the mount line prints the title JSON-quoted (p1TitleOf, p1JsonQuoted; THE TITLE RULE IS THE SPECIFICATION'S) —
+ *       a report carries n (the witness's own count), the kind, the
+ *       title and head, the card's painted flag (box over 1 px each way, visibility «visible» — round 12: not «hidden» and not «collapse», by
+ *       the CSS specification — not display:none, opacity over 0),
+ *       the page clock AT the mount, and the overlay stack: every overlay layer with its painted flag, every PAINTED
+ *       [data-hud] surface in document order, the dialog count and the camera attribute (null when unset);
+ *   P-b a report before arming is refused «not-driving», one past EVENT_SHOT_MAX_SERIES «series-cap»;
+ *   P-c the mount time is the report's clock less the armed origin, in tenths of a second, rounded;
+ *   P-d each shot is scheduled at the report's clock + its offset; the harness waits only when that is still ahead of it;
+ *       each step's start and end are measured from the report's clock, the start before the DOM dump and the end after
+ *       the frame; the bounds printed are the start floored and the end ceiled to 0.1 s;
+ *   P-e the end line counts the reports seen (round 7: «the reports the harness had received», and the series still running
+ *       when it is written — §W18's P-h; in this serial census every series has settled by then, and the sidecar's
+ *       pendingAtWrite is 0). ROUND 8 (the round-7 verifier's P1-THREW-DOUBLE-COUNT): it says what the harness DID with each
+ *       report, in classes that add up to that count — a series that ran every scheduled step, a series a throw ended early,
+ *       a series still running, or no series (not-driving, series-cap, or a throw before its series was recorded) — with
+ *       the frames WRITTEN per series class. A throw is classified ONCE, where it happens: a series a throw ended is marked
+ *       `ended: "threw"` with its `why`, keeps the steps that ran, is written, prints its own line (the steps run, the frames
+ *       they wrote) and is NOT also a refusal; a series whose every step ran is marked `ended: "every-step"`, written, and
+ *       prints its bounds. A step throws at its wait (never step 1's: the binding runs at or after the report, so step 1 has
+ *       nothing to wait for) or at its frame (the DOM dump never throws: its read is caught).
+ * The census's own clock model (not a rule of the harness): a binding runs `latency` ms after its report on a harness
+ * clock never behind the page's, a wait advances the harness clock by its ms plus the tape's jitter, a dump by the tape's
+ * dump ms and a shot by the tape's shot ms. */
+
+/** H1 ROUND 12 (the round-11 verifier's V11-WITNESS-COLLAPSE) — WHICH COMPUTED VISIBILITY PAINTS, by the CSS specification
+ *  (CSS 2.1 §11.2 «visibility»; CSS Display 3 §4): «visible» paints; «hidden» does not; «collapse» does not either (on table
+ *  rows, row groups, columns and column groups it removes them; on any other element it means «hidden»). A computed
+ *  visibility is always one of the three. Round 11's censuses drew only «visible» and «hidden», so the witness's
+ *  `!== "hidden"` (a collapsed card «painted») and `=== "visible"` could not be told apart; the P1 censuses now draw all three
+ *  and the oracles decide by this table. */
+const P1_VISIBILITY_PAINTS = Object.freeze({ visible: true, hidden: false, collapse: false });
+
+/* ── H1 ROUND 15 (the round-14 verifier's V14-P1-TITLE-AND-SUBTREE) — THE TITLE RULE AND THE SUBTREE RULE, FROM THE SPECIFICATION ──
+ * Round 14's P1 censuses drew a card's title from five fixed strings and mounted one card a subtree, and both oracles
+ * collapsed white space and quoted the title with the harness's own expressions — so four witness edits survived with no
+ * test edit: the loop over an added subtree's cards stopped after the first it reported (V14-Q24B), the title printed between
+ * plain quotes (V14-Q16), titles compared without their letter case (V14-Q17), only ASCII white space collapsed (V14-Q18).
+ * The rule is now written in the harness's P1 comment (its round-15 paragraph), and the oracles state it from there:
+ *   · WHITE SPACE is the code units of P1_TITLE_WHITE_SPACE and no others; p1TitleOf writes each run of them as one U+0020
+ *     and leaves none at either end, one code unit at a time (no regular expression, no trim) — and THE TITLE RULE IS THE
+ *     SPECIFICATION'S checks the list against what the runtime's own \s and trim do over all 65,536 code units;
+ *   · TWO TITLES ARE ONE only when they are the same code units (a Set of the collapsed titles: no case folding, no
+ *     normalisation); an empty title is not reported;
+ *   · THE MOUNT LINE prints the title as p1JsonQuoted writes it — JSON's quoting, written here code unit by code unit
+ *     (checked against the runtime's over every code unit);
+ *   · EVERY flash and then EVERY card of an added subtree is examined, in document order.
+ * And the censuses DRAW what the rule decides on (p1TitleSource): titles from the thrown census's text generator (the whole
+ * UTF-16 code-unit space, quotes and backslashes, controls, lone surrogates, lengths past 1,200), titles that are an earlier
+ * title's copy, its case variant, its white-space variant (every white-space code unit) and its look-alike variant (a code
+ * unit that looks like white space and is not), titles of white space only; and subtrees of several cards — the serial
+ * census one card that may be new among copies and empty titles, the overlap census any number of new ones, with flashes. */
+/** The white space of a title — the P1 comment's list: ECMAScript's WhiteSpace and LineTerminator code units. */
+const P1_TITLE_WHITE_SPACE = Object.freeze([0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x20, 0xa0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff]);
+/** Code units that look like white space and are NOT (the P1 comment names four; the information separators and the two
+ *  joiners beside them): a title keeps each. */
+const P1_TITLE_LOOK_ALIKES = Object.freeze([0x1c, 0x1f, 0x85, 0x180e, 0x200b, 0x200c, 0x200d, 0x2060]);
+/** What the fake document gives as an element's RENDERED text (its innerText): never its textContent — upper-cased, as a CSS
+ *  text-transform renders it, and marked — so a title or a head read off the rendered text is not the title the rule names
+ *  (the rule reads the <p>'s text, its textContent). The dump's `innerText` is the CARD's, which each spec sets itself. */
+const p1Rendered = (text) => `(as rendered) ${text.toUpperCase()}`;
+/** A CARD'S TITLE, BY THE RULE: `text` with every run of white space written as one U+0020 and none at either end. */
+function p1TitleOf(text) {
+  let out = "";
+  let gap = false;
+  for (let i = 0; i < text.length; i++) {
+    const u = text.charCodeAt(i);
+    if (P1_TITLE_WHITE_SPACE.includes(u)) { gap = true; continue; }
+    if (gap && out !== "") out += " ";
+    gap = false;
+    out += text[i];
+  }
+  return out;
+}
+/** JSON'S QUOTING, written here: the quote and the backslash escaped, the short escapes, every other control U+0000–U+001F as
+ *  a lower-case \uXXXX, a surrogate that is not half of a pair as a lower-case \uXXXX, every other code unit as itself. */
+function p1JsonQuoted(s) {
+  const SHORT = { 0x22: "\\\"", 0x5c: "\\\\", 0x08: "\\b", 0x0c: "\\f", 0x0a: "\\n", 0x0d: "\\r", 0x09: "\\t" };
+  const esc = (u) => `\\${"u"}${u.toString(16).padStart(4, "0")}`;
+  let out = "\"";
+  for (let i = 0; i < s.length; i++) {
+    const u = s.charCodeAt(i);
+    if (SHORT[u] !== undefined) out += SHORT[u];
+    else if (u < 0x20) out += esc(u);
+    else if (u >= 0xd800 && u <= 0xdbff) {
+      const w = i + 1 < s.length ? s.charCodeAt(i + 1) : -1;
+      if (w >= 0xdc00 && w <= 0xdfff) { out += s[i] + s[i + 1]; i += 1; } else out += esc(u);
+    } else if (u >= 0xdc00 && u <= 0xdfff) out += esc(u);
+    else out += s[i];
+  }
+  return `${out}"`;
+}
+/** THE TITLES A P1 CENSUS DRAWS — returns draw(): the next card title of one drive, as its <p> carries it (not yet
+ *  collapsed). A title is FRESH — a fixed fault title (two with a quote or a backslash), white space only (an empty title),
+ *  words joined by runs of any white space with a look-alike among them, a long text, or a string of the thrown census's
+ *  generator — or, four times in ten once the drive has one, a VARIANT of an earlier one: the same text, its lower- or
+ *  upper-case form, its white space respelt with other white-space code units (the same title), a look-alike put into it
+ *  (another title), a word more, the same text in another normalisation form (another title), or a combining mark more. */
+function p1TitleSource(rnd) {
+  const T = thrownTextSource(rnd);
+  const { int, pick } = T;
+  const run = () => String.fromCharCode(...Array.from({ length: int(1, 3) }, () => pick(P1_TITLE_WHITE_SPACE)));
+  const FIXED = ["Скорост над ограничението", "  Не  спря\nна знака ", "Сблъсък", "Опасно доближаване", "Спри на \"СТОП\"", "Път A\\B", "Не спря на знака"];
+  const WORDS = ["Спри", "знак", "A", "b", "\"", "\\", "ж", "É", "ß", "50 км/ч"];
+  const earlier = [];
+  const fresh = () => {
+    const r = rnd();
+    if (r < 0.22) return pick(FIXED);
+    if (r < 0.3) return Array.from({ length: int(0, 4) }, () => CH(pick(P1_TITLE_WHITE_SPACE))).join("");
+    if (r < 0.48) return `${rnd() < 0.3 ? run() : ""}${Array.from({ length: int(1, 5) }, () => (rnd() < 0.2 ? CH(pick(P1_TITLE_LOOK_ALIKES)) : pick(WORDS))).join(run())}${rnd() < 0.3 ? run() : ""}`;
+    if (r < 0.56) return T.classText(int(701, 1300));
+    return T.str();
+  };
+  const variant = (base) => {
+    const how = pick(["same", "same", "case", "case", "white space", "white space", "white space", "look-alike", "more", "normal form", "normal form", "mark"]);
+    if (how === "normal form") {
+      // another normalisation form of the same text (canonically or compatibly equivalent, other code units): another title
+      for (const form of [pick(["NFD", "NFC", "NFKC", "NFKD"]), "NFD", "NFC", "NFKD"]) if (base.normalize(form) !== base) return base.normalize(form);
+      return `${base}e${CH(0x301)}`;
+    }
+    if (how === "mark") {
+      const at = int(1, Math.max(1, base.length));
+      return `${base.slice(0, at)}${CH(pick([0x301, 0x308, 0x306]))}${base.slice(at)}`;
+    }
+    if (how === "case") {
+      const lower = base.toLowerCase();
+      const upper = base.toUpperCase();
+      return lower !== base ? lower : upper !== base ? upper : `${base}a`;
+    }
+    if (how === "white space") {
+      let out = rnd() < 0.5 ? run() : "";
+      for (let i = 0; i < base.length; i++) out += P1_TITLE_WHITE_SPACE.includes(base.charCodeAt(i)) ? run() : base[i];
+      return `${out}${rnd() < 0.5 ? run() : ""}`;
+    }
+    if (how === "look-alike") {
+      const at = int(0, base.length);
+      return `${base.slice(0, at)}${CH(pick(P1_TITLE_LOOK_ALIKES))}${base.slice(at)}`;
+    }
+    if (how === "more") return `${base} ${pick(WORDS)}`;
+    return base;
+  };
+  return () => {
+    const t = earlier.length > 0 && rnd() < 0.4 ? variant(pick(earlier)) : fresh();
+    earlier.push(t);
+    return t;
+  };
+}
+/** What a census's coverage floor reads off a card the rule examined: `raw` its <p>'s text, `title` its title by the rule,
+ *  `how` what the rule did with it ("empty", "repeat" or "new"), `seen` the titles reported before it with the text each was
+ *  first carried as. Returns the features, each read off the texts. */
+function p1TitleFeats(raw, title, how, seen) {
+  const f = [];
+  const has = (re) => re.test(title);
+  for (let i = 0; i < raw.length; i++) if (P1_TITLE_WHITE_SPACE.includes(raw.charCodeAt(i))) f.push(`title:white-space:${raw.charCodeAt(i).toString(16)}`);
+  if (how === "empty") { if (raw !== "") f.push("title:white-space-only"); return f; }
+  if (how === "repeat") { f.push(seen.get(title) === raw ? "title:repeat:the-same-text" : "title:repeat:other-white-space"); return f; }
+  const lower = title.toLowerCase();
+  for (const t of seen.keys()) if (t !== title && t.length === title.length && t.toLowerCase() === lower) { f.push("title:new:differs-only-by-case"); break; }
+  // (round 15, resumed) …and from a reported title that is the same text in another normalisation form
+  const forms = ["NFC", "NFKC"].map((form) => title.normalize(form));
+  for (const t of seen.keys()) if (t !== title && Math.abs(t.length - title.length) < 64 && (t.normalize("NFC") === forms[0] || t.normalize("NFKC") === forms[1])) { f.push("title:new:differs-only-by-normal-form"); break; }
+  if (title.includes("\"")) f.push("title:new:a-quote");
+  if (title.includes("\\")) f.push("title:new:a-backslash");
+  if (title.length > 1000) f.push("title:new:longer-than-1000");
+  if (P1_TITLE_LOOK_ALIKES.some((u) => title.includes(CH(u)))) f.push("title:new:a-look-alike-kept");
+  if (has(/[\u0000-\u0008\u000e-\u001f]/)) f.push("title:new:a-control-JSON-escapes");
+  if (has(/[\u007f-\u009f]/)) f.push("title:new:DEL-or-C1");
+  if (has(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/)) f.push("title:new:a-lone-surrogate");
+  if (has(/[\ud800-\udbff][\udc00-\udfff]/)) f.push("title:new:an-astral-pair");
+  if (raw !== title) f.push("title:new:white-space-collapsed");
+  if (title.normalize("NFC") !== title) f.push("title:new:not-NFC");
+  return f;
+}
+/** What every P1 census must have drawn of the title rule (each at least P1_TITLE_MIN times): every white-space code unit in
+ *  a card's text, a title of white space only, a repeat carried as the same text and as other white space, and a NEW title
+ *  that differs from a reported one only by case, or only by its normalisation form, carries a quote, a backslash, a look-alike, a control, a C1, a lone
+ *  surrogate, an astral pair, is longer than 1,000, had white space to collapse, is not in NFC. */
+const P1_TITLE_MIN = 3;
+const P1_TITLE_FLOOR = Object.freeze([
+  ...P1_TITLE_WHITE_SPACE.map((u) => `title:white-space:${u.toString(16)}`), "title:white-space-only", "title:repeat:the-same-text", "title:repeat:other-white-space",
+  ...["differs-only-by-case", "differs-only-by-normal-form", "a-quote", "a-backslash", "longer-than-1000", "a-look-alike-kept", "a-control-JSON-escapes", "DEL-or-C1", "a-lone-surrogate", "an-astral-pair", "white-space-collapsed", "not-NFC"].map((x) => `title:new:${x}`),
+]);
+
+/** One generated P1 drive: its mounts (each with its document), its arming, and the environment's tapes. */
+function p1DriveSpec(rnd) {
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  const int = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+  const box = () => ({ w: pick([0, 1, 1.4, 2, 280, 280.6]), h: pick([0, 1, 2, 40, 39.5]), top: pick([0, 10, 10.5, 300, -5]), visibility: pick(["visible", "visible", "hidden", "collapse"]), display: pick(["block", "block", "none", "flex"]), opacity: pick(["1", "1", "0", "0.5", "0.001", ""]) });
+  // (round 15) the titles are drawn by p1TitleSource — the thrown census's text generator, and variants of the drive's earlier
+  // titles — and a card's column may hold OTHER cards before and after it. This census is serial (one report a mount at most),
+  // so each of those is drawn to be a card the rule does not report: a copy of a title already reported (the same text, or
+  // its white space respelt), or a title of white space only; `reported` is the generator's own count by the rule.
+  const title = p1TitleSource(rnd);
+  const reported = new Map();
+  const respelt = (raw) => {
+    let out = "";
+    for (let i = 0; i < raw.length; i++) out += P1_TITLE_WHITE_SPACE.includes(raw.charCodeAt(i)) ? CH(pick(P1_TITLE_WHITE_SPACE)) : raw[i];
+    return `${rnd() < 0.5 ? CH(pick(P1_TITLE_WHITE_SPACE)) : ""}${out}${rnd() < 0.5 ? CH(pick(P1_TITLE_WHITE_SPACE)) : ""}`;
+  };
+  const beside = (pool) => Array.from({ length: pick([0, 0, 1, 1, 2, 3]) }, () => ({
+    title: pool.length > 0 && rnd() < 0.75 ? (rnd() < 0.5 ? pick(pool) : respelt(pick(pool))) : Array.from({ length: int(0, 3) }, () => CH(pick(P1_TITLE_WHITE_SPACE))).join(""),
+    box: box(),
+  }));
+  const m = int(0, 12);
+  const armAt = rnd() < 0.06 ? Infinity : int(0, m);
+  const mounts = Array.from({ length: m }, () => {
+    const kind = rnd() < 0.5 ? "impact" : "card";
+    const r = rnd();
+    const latency = r < 0.7 ? int(0, 3000) : r < 0.9 ? pick([0, 1, 50, 260, 950, 980, 990, 999, 1000, 1001, 1010, 1500, 1999, 2000, 2001, 2999, 3000]) : int(3001, 12_000);
+    const card = {
+      title: title(), head: rnd() < 0.7 ? pick(["Нарушение", "  Грешка ", "!", `Гре${CH(0xa0)}шка`, `${CH(0x3000)}Внимание${CH(0x2028)}`]) : null, column: rnd() < 0.9, columnBox: box(), box: box(),
+      innerText: pick(["Скорост над ограничението\nНамали", "Сблъсък", "x"]),
+      rows: Array.from({ length: int(0, 3) }, () => ({ text: pick(["Намали", "  до 50 км/ч ", "", "x".repeat(210), `до${CH(0xa0)}50${CH(0x202f)}км/ч`, CH(0x2003)]), box: box(), tag: pick(["span", "span", "span", "p"]) })),
+      bodyText: pick(["", "тяло"]),
+      added: pick(["column", "column", "card", "body"]),
+      before: [], after: [],
+    };
+    if (kind === "card" && card.column) {
+      const t = p1TitleOf(card.title);
+      card.before = beside([...reported.values()]);
+      card.after = beside([...reported.values(), ...(t === "" ? [] : [card.title])]);
+      if (t !== "" && !reported.has(t)) reported.set(t, card.title);
+    }
+    return {
+      kind, latency,
+      gap: rnd() < 0.3 ? pick([-400, -1, 0, 1, 100]) : int(0, 20_000),
+      layers: Array.from({ length: int(0, 3) }, () => ({ name: pick(["cockpit", "debrief", "pause", "teach"]), box: box() })),
+      huds: Array.from({ length: int(0, 3) }, () => ({ name: pick(["speed", "mirror", "prox", "task"]), box: box() })),
+      dialogs: int(0, 2),
+      camera: pick([null, null, "chase", "cockpit", ""]),
+      flash: { box: box(), wrapped: rnd() < 0.5 },
+      card,
+      // (round 15) what else the observer's one callback is handed with the mount's node: nothing, or an INERT node (an empty
+      // element under which nothing is, or a text node) — in a record of its own before or after, or beside it in its record
+      noise: pick(["none", "none", "record-before", "record-after", "node-before", "node-after", "text-before"]),
+    };
+  });
+  return {
+    t0Offset: pick([0, 300, 1000, -2000]),
+    mounts,
+    armAt,
+    jitter: Array.from({ length: 64 }, () => pick([0, 0, 0, 1, 4, 16, 120])),
+    dumps: Array.from({ length: 64 }, () => ({ ms: rnd() < 0.3 ? pick([0, 3, 40, 260, 999]) : int(0, 1500), fail: rnd() < 0.08, remove: rnd() < 0.15 })),
+    shots: Array.from({ length: 64 }, () => ({ ms: rnd() < 0.4 ? pick([0, 7, 10, 90, 100, 314, 651, 1096]) : int(0, 1500), ok: rnd() >= 0.15, throws: rnd() < 0.03 })),
+    // (round 8) a wait that throws after its time (a page closed mid-wait), per wait, on the jitter tape's index — never
+    // the end's 20 s bound (a throw there rejects the end itself: no end line is printed, so none can be false)
+    waitFails: ((wf) => Array.from({ length: 64 }, () => rnd() < wf))(rnd() < 0.2 ? 0.3 : 0.02),
+  };
+}
+
+/** THE END LINE FROM A LEDGER (round 8) — the expected end line, rendered from an oracle's OWN per-report ledger: one
+ *  entry per report the harness received, `{ n, series, ended, frames, why }` (`ended` "every-step", "threw", or null while
+ *  running; `frames` the oracle's own tally of the frames each series wrote, counted as each of its shots returned, never
+ *  read off a harness record; `why` the reason a report began no series). */
+function p1EndLineFrom(ledger) {
+  const began = ledger.filter((x) => x.series);
+  const none = ledger.filter((x) => !x.series);
+  const framesOf = (a) => a.reduce((s, x) => s + x.frames, 0);
+  const full = began.filter((x) => x.ended === "every-step");
+  const cut = began.filter((x) => x.ended === "threw");
+  const run = began.filter((x) => x.ended === null);
+  const why = (w) => none.filter((x) => x.why === w).length;
+  const thr = none.filter((x) => x.why.startsWith("threw: ")).length;
+  return `  EVENT SHOTS: of ${ledger.length} report(s) the harness had received from the page-side witness, ${full.length} led to a series that ran every scheduled step (${framesOf(full)} frame(s) written), ${cut.length} to a series a throw ended early (${framesOf(cut)} frame(s) written before it)${run.length > 0 ? `, ${run.length} to a series still running when this line was written (${framesOf(run)} frame(s) written so far)` : ""} and ${none.length} to no series (not-driving ${why("not-driving")} · series-cap ${why("series-cap")} · a throw before its series ${thr})${run.length > 0 ? "; these figures are as of this line" : ""} — _audit-event-shots.json`;
+}
+
+/** (round 8, P-e) the line a series a throw ended prints: the steps that ran of those scheduled, the throw's first line, and
+ *  each of those steps' frame (none when no step ran). */
+function p1ThrownNote(n, steps, total, why, oks) {
+  // (round 9: the oracle renders ONE-line errors only — every error the censuses throw is one line. A multi-line error's
+  // cut line is spelt out, character for character, by §W19's round-9 fixed rows; this oracle never mirrors the harness's
+  // cut, so it cannot agree with a wrong one.)
+  if (/[\r\n]/.test(why)) throw new Error(`p1ThrownNote renders one-line errors only: ${JSON.stringify(why)}`);
+  return `      EVENT SHOT ${n}: a throw ended this series after ${steps} of its ${total} scheduled steps had run (${why.split("\n")[0]})${steps > 0 ? ` — frame written by those steps: ${oks.map((ok) => (ok ? "yes" : "NO")).join("/")}` : ""}; whatever the work it interrupted left on disk is not among the frames written — _audit-event-shots.json`;
+}
+
+/** THE END LINE IS TRUE (round 8) — the HARNESS's printed end line read by its NUMBERS and checked against an oracle's own
+ *  ledger (as of the line) and against itself: its classes add up to the reports received, its refusal reasons add up to
+ *  its no-series class, each class and each frame count is the ledger's, and the «still running» clause and «as of this
+ *  line» come together; the final sidecar files each report it saw in exactly one class. Round 7's line counted a thrown
+ *  series in two classes and both oracles printed the same words, so a comparison of TEXT could not see it; these rules are
+ *  about what happened, not about wording. An end line it cannot read is a violation, never a pass. */
+const P1_END_RE = /^ {2}EVENT SHOTS: of (\d+) report\(s\) the harness had received from the page-side witness, (\d+) led to a series that ran every scheduled step \((\d+) frame\(s\) written\), (\d+) to a series a throw ended early \((\d+) frame\(s\) written before it\)(?:, (\d+) to a series still running when this line was written \((\d+) frame\(s\) written so far\))? and (\d+) to no series \(not-driving (\d+) · series-cap (\d+) · a throw before its series (\d+)\)(; these figures are as of this line)? — _audit-event-shots\.json$/;
+function p1EndLineTruth(notes, ledger, final) {
+  const lines = notes.filter((s) => s.startsWith("  EVENT SHOTS: "));
+  if (lines.length !== 1) return [`${lines.length} end lines were printed, not one`];
+  const m = lines[0].match(P1_END_RE);
+  if (!m) return [`the end line cannot be read: ${lines[0]}`];
+  const g = (i) => (m[i] === undefined ? 0 : Number(m[i]));
+  const got = { seen: g(1), full: g(2), fullFrames: g(3), cut: g(4), cutFrames: g(5), running: g(6), runningFrames: g(7), none: g(8), notDriving: g(9), cap: g(10), threwFirst: g(11) };
+  const v = [];
+  if (got.full + got.cut + got.running + got.none !== got.seen) v.push(`its classes add up to ${got.full + got.cut + got.running + got.none}, not to the ${got.seen} report(s) it says were received`);
+  if (got.notDriving + got.cap + got.threwFirst !== got.none) v.push(`its no-series reasons add up to ${got.notDriving + got.cap + got.threwFirst}, not to ${got.none}`);
+  if ((m[6] !== undefined) !== (m[12] !== undefined)) v.push("the «still running» clause and «as of this line» do not come together");
+  if (m[6] !== undefined && got.running === 0) v.push("a «still running» clause with 0 series");
+  const began = ledger.filter((x) => x.series);
+  const none = ledger.filter((x) => !x.series);
+  const fr = (a) => a.reduce((s, x) => s + x.frames, 0);
+  const cls = (e) => began.filter((x) => x.ended === e);
+  const want = {
+    seen: ledger.length, full: cls("every-step").length, fullFrames: fr(cls("every-step")), cut: cls("threw").length, cutFrames: fr(cls("threw")),
+    running: cls(null).length, runningFrames: fr(cls(null)), none: none.length, notDriving: none.filter((x) => x.why === "not-driving").length,
+    cap: none.filter((x) => x.why === "series-cap").length, threwFirst: none.filter((x) => x.why.startsWith("threw: ")).length,
+  };
+  for (const k of Object.keys(want)) if (got[k] !== want[k]) v.push(`${k}: the line says ${got[k]}, what happened is ${want[k]}`);
+  if (none.some((x) => x.frames > 0)) v.push("the oracle's own ledger has a report with a frame and no series");
+  if (final) {
+    const ns = [...final.series.map((r) => r.n), ...final.refused.map((r) => r.n)];
+    if (new Set(ns).size !== ns.length) v.push(`a report is filed in two classes of the sidecar: ${JSON.stringify(ns)}`);
+    if (ns.length !== final.seen) v.push(`the sidecar files ${ns.length} report(s) of the ${final.seen} it saw`);
+  }
+  return v;
+}
+
+/** The document a mount is made in (fresh per mount), and the node the witness's observer is handed. */
+function p1Document(mt) {
+  const html = new FakeEl("html", mt.camera === null ? {} : { "data-sim-camera": mt.camera });
+  const body = new FakeEl("body");
+  html.add(body);
+  for (const l of mt.layers) body.add(new FakeEl("div", { "data-sim-overlay": l.name }, l.box));
+  for (const h of mt.huds) body.add(new FakeEl("div", { "data-hud": h.name }, h.box));
+  for (let k = 0; k < mt.dialogs; k++) body.add(new FakeEl("div", { role: "dialog" }));
+  let added;
+  if (mt.kind === "impact") {
+    const flash = new FakeEl("div", { "data-hud": "impact-flash" }, mt.flash.box);
+    added = mt.flash.wrapped ? new FakeEl("div").add(flash) : flash;
+    body.add(added);
+  } else {
+    const c = mt.card;
+    const card = new FakeEl("div", {}, { ...c.box, innerText: c.innerText });
+    if (c.head !== null) card.add(new FakeEl("span", {}, { innerText: p1Rendered(c.head) }, c.head));
+    card.add(new FakeEl("p", {}, { innerText: p1Rendered(c.title) }, c.title));
+    const bodyEl = new FakeEl("div", { "data-hud-toast-body": "" }, {}, c.bodyText);
+    for (const r of c.rows) bodyEl.add(new FakeEl(r.tag ?? "span", {}, r.box, r.text));
+    card.add(bodyEl);
+    // (round 15) the column's other cards — a <p> and a toast body each — before and after the card, in document order
+    const other = (s) => new FakeEl("div", {}, s.box).add(new FakeEl("p", {}, { innerText: p1Rendered(s.title) }, s.title), new FakeEl("div", { "data-hud-toast-body": "" }));
+    const column = c.column ? new FakeEl("div", { "data-hud": "toasts" }, c.columnBox).add(...(c.before ?? []).map(other), card, ...(c.after ?? []).map(other)) : null;
+    body.add(column ?? card);
+    added = c.added === "column" && column ? column : c.added === "body" ? bodyEl : card;
+  }
+  return { html, added, root: body.kids[body.kids.length - 1] };
+}
+
+/** Run the HARNESS's P1 block (lesson-audit.mjs, `p1Block`) over one generated drive, on the fake document. */
+async function p1Run(spec, block = p1Block()) {
+  const hc = { now: 2_000_000 };
+  const pc = { now: 2_000_000 };
+  const env = { notes: [], waits: [], shots: [], writes: [], inits: [], bindings: {}, ji: 0, di: 0, si: 0, doc: null, lat: 0 };
+  const doc = {
+    get documentElement() { return env.doc.html; },
+    querySelectorAll: (s) => env.doc.html.querySelectorAll(s),
+    querySelector: (s) => env.doc.html.querySelector(s),
+  };
+  const compiled = new Map();
+  const page = {
+    addInitScript: async (fn, arg) => void env.inits.push({ fn, arg }),
+    exposeBinding: async (name, fn) => void (env.bindings[name] = fn),
+    waitForTimeout: async (ms) => {
+      env.waits.push(ms);
+      const i = env.ji++;
+      hc.now += ms + spec.jitter[i % spec.jitter.length];
+      // (round 8) the wait throws after its time on the tape's index — never the end's bound (`finishing`)
+      if (!env.finishing && (spec.waitFails ?? [false])[i % (spec.waitFails ?? [false]).length]) throw new Error("the fake page's wait threw");
+    },
+    evaluate: async (fn, arg) => {
+      const d = spec.dumps[env.di++ % spec.dumps.length];
+      if (d.remove) env.doc.root.detach();
+      hc.now += d.ms;
+      pc.now = hc.now;
+      if (d.fail) throw new Error("the fake page refused the dump");
+      if (!compiled.has(fn)) compiled.set(fn, new Function("document", "getComputedStyle", "Date", `"use strict"; return (${fn.toString()});`)(doc, fakeStyle, { now: () => pc.now }));
+      return structuredClone(compiled.get(fn)(arg));
+    },
+  };
+  const shot = async (name) => {
+    const s = spec.shots[env.si++ % spec.shots.length];
+    env.shots.push(name);
+    hc.now += s.ms;
+    if (s.throws) throw new Error("the fake shot threw");
+    return s.ok;
+  };
+  const api = new Function("page", "note", "shot", "writeFileSync", "OUT", "SCENARIO", "h1ProbeReads", "Date",
+    `"use strict";\n${block.code.slice(block.from, block.to)}\nreturn { installEventWitness, armEventShots, finishEventShots, eventShots };`)(
+    page, (s) => env.notes.push(s), shot, (path, text) => void env.writes.push({ path, text }), "OUT", H1.em, LIBNS.h1ProbeReads, { now: () => hc.now });
+  await api.installEventWitness();
+  const obs = [];
+  const win = {};
+  new Function("window", "document", "MutationObserver", "getComputedStyle", "Date", `"use strict"; return (${env.inits[0].fn.toString()});`)(
+    win, doc, class { constructor(cb) { obs.push(cb); } observe() {} }, fakeStyle, { now: () => pc.now })(env.inits[0].arg);
+  win.__auditEvent = (ev) => {
+    hc.now += env.lat;
+    env.bindings.__auditEvent(null, deepFreeze(structuredClone(ev)));
+  };
+  for (let k = 0; k < spec.mounts.length; k++) {
+    if (k === spec.armAt) api.armEventShots(hc.now + spec.t0Offset);
+    const mt = spec.mounts[k];
+    env.doc = p1Document(mt);
+    const pageAt = hc.now + mt.gap;
+    pc.now = pageAt;
+    hc.now = Math.max(hc.now, pageAt);
+    env.lat = mt.latency;
+    // (round 15) the callback's records: the mount's node, and the inert node or record the spec puts around it
+    const inert = new FakeEl("div");
+    const added = env.doc.added;
+    obs[0]({
+      none: [{ addedNodes: [added] }], "record-before": [{ addedNodes: [inert] }, { addedNodes: [added] }], "record-after": [{ addedNodes: [added] }, { addedNodes: [inert] }],
+      "node-before": [{ addedNodes: [inert, added] }], "node-after": [{ addedNodes: [added, inert] }], "text-before": [{ addedNodes: [{ nodeType: 3 }, added] }],
+    }[mt.noise ?? "none"]);
+    await Promise.allSettled(api.eventShots.pending);
+  }
+  if (spec.armAt === spec.mounts.length) api.armEventShots(hc.now + spec.t0Offset);
+  env.finishing = true;
+  const fin = api.finishEventShots(); // (its synchronous part calls the end's 20 s wait)
+  env.finishing = false;
+  await fin;
+  return { env, final: env.writes.length ? JSON.parse(env.writes[env.writes.length - 1].text) : null, paths: [...new Set(env.writes.map((w) => w.path))] };
+}
+
+/** THE P1 ORACLE — the same drive, from the P1 block's stated rules (P-a … P-e) and the census's clock model. */
+function p1Oracle(spec) {
+  const OFFSETS = [0, 1000, 3000];
+  const MAX = 8;
+  const painted = (b) => (b.w ?? 100) > 1 && (b.h ?? 20) > 1 && P1_VISIBILITY_PAINTS[b.visibility ?? "visible"] === true && (b.display ?? "block") !== "none" && Number(b.opacity ?? "1") > 0;
+  // (round 15) white space by the P1 comment's rule, written out (p1TitleOf) — never the harness's own expression
+  const collapse = p1TitleOf;
+  const box = (b) => ({ visibility: b.visibility ?? "visible", display: b.display ?? "block", opacity: b.opacity ?? "1", w: Math.round(b.w ?? 100), h: Math.round(b.h ?? 20), top: Math.round(b.top ?? 0), bottom: Math.round((b.top ?? 0) + (b.h ?? 20)) });
+  const feat = new Set();
+  let h = 2_000_000;
+  let ji = 0, di = 0, si = 0, n = 0, seen = 0, writes = 0;
+  let armed = false, t0 = null;
+  // (round 15) the titles reported so far, each with the text it was first carried as: two titles are one only when they are
+  // the same code units
+  const seenTitles = new Map();
+  const series = [], refused = [], notes = [], waits = [], shots = [];
+  // (round 8) THE ORACLE'S OWN LEDGER — one entry per report received: what was done with it, and the frames it wrote,
+  // tallied as each shot returned. The end line's numbers come from here, never from `series` or `refused`.
+  const ledger = [];
+  const arm = () => { armed = true; t0 = h + spec.t0Offset; };
+  for (let k = 0; k < spec.mounts.length; k++) {
+    if (k === spec.armAt) arm();
+    const mt = spec.mounts[k];
+    const pageAt = h + mt.gap;
+    h = Math.max(h, pageAt);
+    let title = null, head = null, cardPainted = null;
+    if (mt.kind === "card") {
+      const c = mt.card;
+      title = collapse(c.title);
+      if (!c.column) { feat.add("card:no-column"); continue; }
+      // (round 15, P-a) EVERY card of the added subtree is examined, in document order: the column's other cards too when the
+      // column is what was added (when the card or its body is, only the card is under the added node). An empty title is
+      // not reported; a title reported before is not reported again; the generator draws the other cards so that none is new
+      const examined = c.added === "column" ? [...(c.before ?? []).map((s) => [s.title, false]), [c.title, true], ...(c.after ?? []).map((s) => [s.title, false])] : [[c.title, true]];
+      if (examined.length > 1) feat.add("subtree:several-cards");
+      let isNew = false;
+      for (const [raw, main] of examined) {
+        const t = collapse(raw);
+        const how = t === "" ? "empty" : seenTitles.has(t) ? "repeat" : "new";
+        for (const f of p1TitleFeats(raw, t, how, seenTitles)) feat.add(f);
+        if (how === "empty") { feat.add("card:empty-title"); continue; }
+        if (how === "repeat") { feat.add(main ? "card:repeat-title" : isNew ? "subtree:a-copy-after-the-new-card" : "subtree:a-copy-before-the-card"); continue; }
+        if (!main) throw new Error("the P1 generator drew a card with a new title beside the mount's own");
+        seenTitles.set(t, raw);
+        isNew = true;
+        if (examined.length > 1) feat.add("subtree:the-new-card-among-others");
+      }
+      if (!isNew) continue;
+      head = c.head === null ? "" : collapse(c.head);
+      cardPainted = painted(c.box);
+      feat.add(`card:painted=${cardPainted}`);
+      // (round 12) the card's own box, display and opacity all pass, so its visibility alone decides the flag
+      if ((c.box.w ?? 100) > 1 && (c.box.h ?? 20) > 1 && (c.box.display ?? "block") !== "none" && Number(c.box.opacity ?? "1") > 0) feat.add(`card:visibility-decides=${c.box.visibility ?? "visible"}`);
+    }
+    n += 1;
+    feat.add(`callback:${mt.noise ?? "none"}:the-mount-reported`);
+    const huds = [
+      ...mt.huds.filter((x) => painted(x.box)).map((x) => x.name),
+      ...(mt.kind === "impact" ? (painted(mt.flash.box) ? ["impact-flash"] : []) : painted(mt.card.columnBox) ? ["toasts"] : []),
+    ];
+    const layers = mt.layers.map((l) => ({ layer: l.name, painted: painted(l.box) }));
+    const ev = { n, kind: mt.kind, title, head, cardPainted, at: pageAt, overlay: { layers, huds, dialogs: mt.dialogs, camera: mt.camera } };
+    for (const l of layers) feat.add(`layer:painted=${l.painted}`);
+    feat.add(`camera:${mt.camera === null ? "unset" : mt.camera === "" ? "empty" : "set"}`);
+    if (huds.length) feat.add("huds");
+    h += mt.latency;
+    feat.add(mt.latency > 3000 ? "latency>3s" : mt.latency > 1000 ? "latency>1s" : "latency<=1s");
+    seen += 1;
+    if (!armed || series.length >= MAX) {
+      refused.push({ n, kind: mt.kind, title, why: armed ? "series-cap" : "not-driving" });
+      ledger.push({ n, series: false, ended: null, frames: 0, why: armed ? "series-cap" : "not-driving" });
+      feat.add(armed ? "series-cap" : "not-driving");
+      writes += 1;
+      continue;
+    }
+    const tSec = Math.round((ev.at - t0) / 100) / 10;
+    if (tSec < 0) feat.add("tSec<0");
+    const rec = { n, kind: mt.kind, title, head, cardPainted, tSec, overlayAtMount: ev.overlay, shots: [] };
+    series.push(rec);
+    const out = { n, series: true, ended: null, frames: 0, why: null };
+    ledger.push(out);
+    notes.push(`      EVENT SHOT ${n}: a${mt.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${tSec}s${mt.kind === "card" ? ` (${p1JsonQuoted(title)}, painted at mount by its own box and computed style only: ${cardPainted} — necessary, not sufficient: its ancestors' opacity, a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(layers)}, camera ${mt.camera ?? "(unset)"}; shots scheduled at +0/+1/+3 s after the witness reported the mount`);
+    let removed = false;
+    let threw = null;
+    let steps = 0;
+    for (const off of OFFSETS) {
+      const wait = ev.at + off - h;
+      if (wait > 0) {
+        waits.push(wait);
+        if (wait <= 50) feat.add("wait<=50ms");
+        const i = ji++;
+        h += wait + spec.jitter[i % spec.jitter.length];
+        if ((spec.waitFails ?? [false])[i % (spec.waitFails ?? [false]).length]) {
+          threw = "an Error, its message \"the fake page's wait threw\"";
+          feat.add(`threw@${steps}:wait`);
+          break;
+        }
+      } else feat.add("wait<=0");
+      const name = `05-ev${String(n).padStart(2, "0")}-${mt.kind}-p${off / 1000}s`;
+      const startedMs = h - ev.at;
+      if (startedMs % 100 === 0) feat.add("start%100");
+      const d = spec.dumps[di++ % spec.dumps.length];
+      if (d.remove) removed = true;
+      h += d.ms;
+      let dump;
+      if (d.fail) { dump = { unread: "the fake page refused the dump" }; feat.add("dump:refused"); }
+      else {
+        // (round 7, P-f: `matched` — here each mount has its own document, so it is 1, or 0 once the mount is removed; round 15:
+        // and one more for each card after it in its column that carries its title — the dump is of the first, the card itself)
+        dump = { at: h, camera: mt.camera, card: null, flash: null, matched: removed ? 0 : 1 + (mt.kind === "card" ? (mt.card.after ?? []).filter((s) => collapse(s.title) === title).length : 0) };
+        if (dump.matched > 1) feat.add("dump:matched>1");
+        if (mt.kind === "impact") dump.flash = removed ? null : box(mt.flash.box);
+        else if (!removed) {
+          const c = mt.card;
+          const cb = box(c.box);
+          const rows = [];
+          const els = [...(c.head === null ? [] : [{ tag: "span", own: c.head, b: {} }]), { tag: "p", own: c.title, b: {} }, { tag: "div", own: c.bodyText, b: {} }, ...c.rows.map((r) => ({ tag: r.tag ?? "span", own: r.text, b: r.box }))];
+          for (const e of els) {
+            const own = collapse(e.own);
+            if (own === "") continue;
+            const b = box(e.b);
+            rows.push({ tag: e.tag, text: own.slice(0, 200), ...b, insideCard: b.top >= cb.top - 1 && b.bottom <= cb.bottom + 1 });
+          }
+          dump.card = { innerText: c.innerText, box: cb, rows };
+        }
+        if (removed) feat.add("dump:removed");
+      }
+      const s = spec.shots[si++ % spec.shots.length];
+      shots.push(name);
+      h += s.ms;
+      if (s.throws) {
+        // (round 8, P-e: the thrown series is marked where the throw happens, and is NOT also a refusal)
+        threw = "an Error, its message \"the fake shot threw\"";
+        feat.add("shot:threw");
+        feat.add(`threw@${steps}:shot`);
+        break;
+      }
+      if (!s.ok) feat.add("shot:failed");
+      const doneMs = h - ev.at;
+      if (doneMs % 100 === 0) feat.add("done%100");
+      rec.shots.push({ offsetMs: off, name, ok: s.ok, startedMs, doneMs, dump });
+      steps += 1;
+      if (s.ok) out.frames += 1;
+      writes += 1;
+    }
+    if (threw === null) {
+      rec.ended = "every-step";
+      out.ended = "every-step";
+      writes += 1;
+      notes.push(`      EVENT SHOT ${n}: each shot's step (its DOM dump, then its frame) ran inside ${rec.shots.map((x) => `[+${(Math.floor(x.startedMs / 100) / 10).toFixed(1)}, +${(Math.ceil(x.doneMs / 100) / 10).toFixed(1)}]`).join(" / ")} s after the witness reported the mount, so each frame written was taken inside its own bounds — startedMs and doneMs in _audit-event-shots.json, floored and ceiled to 0.1 s (frame written: ${rec.shots.map((x) => (x.ok ? "yes" : "NO")).join("/")})`);
+    } else {
+      rec.ended = "threw";
+      rec.why = `threw: ${threw}`;
+      out.ended = "threw";
+      writes += 1;
+      notes.push(p1ThrownNote(n, steps, OFFSETS.length, `threw: ${threw}`, rec.shots.map((x) => x.ok)));
+    }
+  }
+  if (spec.armAt === spec.mounts.length) arm();
+  armed = false;
+  waits.push(20_000);
+  h += 20_000 + spec.jitter[ji++ % spec.jitter.length];
+  writes += 1;
+  // (round 7, P-e: every series here has settled before the end, so no «still running» clause, and pendingAtWrite is 0 —
+  // the runs still open at the write, not round 6's every run ever started; round 8: the line from the oracle's own ledger)
+  if (ledger.length !== seen) throw new Error("the P1 oracle's ledger lost a report");
+  notes.push(p1EndLineFrom(ledger));
+  const final = JSON.parse(JSON.stringify({ offsetsMs: OFFSETS, maxSeries: MAX, pendingAtWrite: 0, armed: false, t0, seen, series, refused })); // (the sidecar is JSON: -0 is written 0)
+  return { notes, waits, shots, final, writes, feat, ledger: structuredClone(ledger) };
+}
+
+/** A named pair row: a reading inside the run that fails BOTH tests, on the profile that can reach them. */
+function pacePairRows() {
+  const L = paceK(H1.lamp);
+  const E = paceK(H1.em);
+  const F0 = L.floor + L.hq;
+  const launchL = [pt(0), pt(10), pt(20), pt(30)];
+  const launchE = [pt(10), pt(20), pt(30)];
+  return [
+    // the lamp: disc-change > floor > disc > drop
+    ["L disc-change + floor, the window aged out by unread ticks → disc-change", H1.lamp, [...launchL, pt(41), pt(44), ...pts(Math.ceil((L.win * 1000) / 500) + 1, -1), pt(F0, { posted: 60 }), ...pts(3, 44)], ["disc-change", "floor"]],
+    ["L disc-change + disc → disc-change", H1.lamp, [...launchL, pt(41), pt(44), pt(55, { posted: 60 }), ...pts(3, 44)], ["disc-change", "disc"]],
+    ["L disc-change + drop → disc-change", H1.lamp, [...launchL, pt(41), pt(45), pt(45), pt(38, { posted: 60 }), ...pts(3, 44)], ["disc-change", "drop"]],
+    ["L floor + drop → floor (V5-05)", H1.lamp, [...launchL, pt(41), pt(44), pt(44), pt(5), ...pts(3, 44)], ["floor", "drop"]],
+    ["L disc-change + floor + drop → disc-change", H1.lamp, [...launchL, pt(41), pt(45), pt(45), pt(F0, { posted: 60 }), ...pts(3, 44)], ["disc-change", "floor", "drop"]],
+    // the emergency: disc-change > floor > disc > cap
+    ["E disc-change + floor → disc-change (V5-06)", H1.em, [...launchE, pt(41), pt(45), pt(5, { posted: 60 }), ...pts(3, 44)], ["disc-change", "floor"]],
+    ["E disc-change + disc → disc-change (V5-07)", H1.em, [...launchE, pt(41), pt(45), pt(55, { posted: 60 }), ...pts(3, 44)], ["disc-change", "disc", "cap"]],
+    ["E disc-change + cap → disc-change", H1.em, [...launchE, pt(41, { posted: 60 }), pt(45, { posted: 60 }), pt(E.cap + 2, { posted: 70 }), ...pts(3, 44, { posted: 60 })], ["disc-change", "cap"]],
+    ["E disc + cap → disc", H1.em, [...launchE, pt(41), pt(45), pt(E.cap + 1), ...pts(3, 44)], ["disc", "cap"]],
+    // (V5-08's pair, disc-change + drop, is the lamp's third row: the emergency has no drop test)
+  ];
+}
+
+describe("§W17 H1 ROUND 6 — the generative census: thousands of programmes per profile against an independent oracle, the break-reason priority written down, the P1 block over generated drives", () => {
+  it("THE ORACLE'S OWN NUMBERS ARE PINNED — each harness number the oracle writes down (the governor's band, gain and pulse clamps, the emergency target over its floor, the two lag allowances, the step cap, the sustain margin, each pace row's ceilings) is the lib's own; a change to one is a visible re-pin here", () => {
+    const HN = PACE_HARNESS_NUMBERS;
+    for (const k of ["PACE_FULL_BAND_KMH", "PACE_DUTY_GAIN_PER_KMH", "PACE_MIN_PULSE_MS", "PACE_MAX_PULSE_MS", "EM_PACE_ABOVE_FLOOR_KMH", "LAMP_RUN_LAG_MARGIN_SEC", "EM_RUN_LAG_MARGIN_SEC", "OVER_LIMIT_STEP_CAP_SEC", "PROFILE_SUSTAIN_MARGIN_SEC"]) {
+      assert.equal(LIBNS[k], HN[k], `the lib's ${k} is ${LIBNS[k]}, the oracle's ${HN[k]}`);
+    }
+    for (const id of [H1.lamp, H1.em]) {
+      const decl = WRONG_LEG_PROFILES.get(id);
+      assert.deepEqual({ maxM: decl.maxM, maxMs: decl.maxMs }, { ...HN.ceilings[id] }, `${id}: the table's ceilings`);
+    }
+  });
+
+  it("THE BREAK-REASON PRIORITY IS WRITTEN DOWN AND PINNED — disc-change, then floor, then disc, then cap, then drop; and one named programme per reachable ordered pair (and a triple) breaks for the FIRST of its reasons, on the lib", () => {
+    const h = createHash("sha256").update(JSON.stringify(PACE_BREAK_ORDER)).digest("hex").slice(0, 12);
+    assert.equal(h, PACE_BREAK_ORDER_PIN, `PACE_BREAK_ORDER changed — re-read the lib's reason chain, then re-pin: ${h}`);
+    assert.deepEqual(PACE_BREAK_ORDER.map(([k]) => k), ["disc-change", "floor", "disc", "cap", "drop"]);
+    for (const [name, id, prog, fails] of pacePairRows()) {
+      const o = paceOracle(id, prog);
+      assert.deepEqual(o.fails, fails, `${name}: the oracle's breaking reading fails ${o.fails}, the row was written for ${fails}`);
+      const r = paceReal(id, prog);
+      const tpl = PACE_BREAK_ORDER.find(([k]) => k === fails[0])[1];
+      assert.equal(r.fin.pace.broke?.tpl, tpl, `${name}: the lib printed ${r.fin.pace.broke?.tpl}`);
+      assert.equal(paceDisagreement(o, r), null, `${name}: ${paceDisagreement(o, r)}`);
+    }
+  });
+
+  it("THE GENERATIVE PACE CENSUS — every drawn programme (seeds × profiles) agrees with the oracle on the decision, the start and stop ticks, the break reason by the declared priority, every command, every say line and every byte of the outcome line; and the census reached every decision, reason, reachable pair, equality edge and input shape it was built for", (t) => {
+    const t0 = Date.now();
+    const stats = {};
+    for (const id of [H1.lamp, H1.em]) {
+      const K = paceK(id);
+      const seen = { edges: new Set(), feat: new Map(), decisions: new Map(), styles: new Map(), n: 0, ticks: 0, discRead: new Set(), discChangeTo: new Set(), runDisc: new Set(), windowDrop: new Set() };
+      const bump = (m, k) => m.set(k, (m.get(k) ?? 0) + 1);
+      for (const seed of PACE_CENSUS_SEEDS) {
+        const rnd = mulberry32(seed ^ (id === H1.lamp ? 0x1a1a : 0x2b2b));
+        for (let k = 0; k < PACE_CENSUS_PER_SEED; k++) {
+          // (a drive clock that ran before the first flat tick, and the platform — neither changes a pace rule, so the oracle takes neither)
+          const lead = [0, 0, 3000, 12_345, 499][Math.floor(rnd() * 5)];
+          const platform = ["pc", "pc", "mobile", "tablet", null][Math.floor(rnd() * 5)];
+          const g = paceSource(K, rnd);
+          const o = paceOracle(id, g.source, { lead });
+          const r = paceReal(id, o.prog, { lead, platform });
+          const bad = paceDisagreement(o, r);
+          if (bad !== null) assert.fail(`${id} seed ${seed} programme ${k} (${g.style}, lead ${lead} ms, platform ${platform}): ${bad}\n  programme: ${JSON.stringify(o.prog)}`);
+          seen.n += 1;
+          seen.ticks += o.prog.length;
+          for (const e of o.edges) seen.edges.add(e);
+          for (const f of o.feat) bump(seen.feat, f);
+          bump(seen.decisions, o.done === "run-broken" ? `run-broken:${o.fails[0]}` : o.done ?? (o.run === null ? "open:notStarted" : "open:started"));
+          bump(seen.styles, g.style);
+          // (round 7) THE POSTED-DISC DOMAIN — every disc read, every disc a run broke on changing to, every disc a run started under
+          for (const tk of o.prog) if (finNum(tk.posted) && tk.posted > 0) seen.discRead.add(tk.posted);
+          if (o.done === "run-broken" && o.fails[0] === "disc-change") seen.discChangeTo.add(o.why.f.disc);
+          if (o.run !== null) seen.runDisc.add(o.run.disc);
+          // (round 7) the window style: a drop break against the reading P, at each age P had when the run started
+          if (g.windowAgeMs !== null && o.done === "run-broken" && o.fails.includes("drop")) seen.windowDrop.add(g.windowAgeMs);
+          if (k < 3) {
+            assertObservationLine(r.line, `${id} seed ${seed} programme ${k}`);
+            if (o.sayLine) assertObservationLine(o.sayLine, `${id} seed ${seed} programme ${k}`);
+          }
+        }
+      }
+      stats[id] = seen;
+      // WHAT THE CENSUS MUST HAVE REACHED — each a count the seeds above produce; a floor under it is a census that stopped reaching
+      const want = K.lamp
+        ? {
+          decisions: ["held-as-sized", "run-broken:disc-change", "run-broken:floor", "run-broken:disc", "run-broken:drop", "open:notStarted", "open:started", "metres", "clock"],
+          pairs: ["pair:disc-change+floor", "pair:disc-change+disc", "pair:disc-change+drop", "pair:floor+drop"],
+          feat: ["dt<0", "dt=0", "dt>cap", "top0", "noRead", "unreadDialDiscChange", "preStartOverDiscInWindowAtStart", "dropAgainstPreStartReading", "startGapOver0", "creditedUnderStart", "bothCeilings", "break:disc-change+floor+drop"],
+          edges: ["start", "floor", "disc", "drop", "window", "sustain", "govTarget", "govFull", "pulseLo", "pulseHi", "stepCap", "ceilingM", "ceilingS"],
+        }
+        : {
+          decisions: ["held-as-sized", "run-broken:disc-change", "run-broken:floor", "run-broken:disc", "run-broken:cap", "open:notStarted", "open:started", "metres", "clock"],
+          pairs: ["pair:disc-change+floor", "pair:disc-change+disc", "pair:disc-change+cap", "pair:disc+cap"],
+          feat: ["dt<0", "dt=0", "dt>cap", "top0", "noRead", "unreadDialDiscChange", "creditedUnderStart", "bothCeilings"],
+          edges: ["floor", "disc", "cap", "govTarget", "govFull", "pulseLo", "pulseHi", "stepCap", "ceilingM", "ceilingS"],
+        };
+      const short = [
+        ...want.decisions.filter((d) => (seen.decisions.get(d) ?? 0) < 10).map((d) => `decision ${d}: ${seen.decisions.get(d) ?? 0}`),
+        ...want.pairs.filter((p) => (seen.feat.get(p) ?? 0) < 10).map((p) => `${p}: ${seen.feat.get(p) ?? 0}`),
+        ...want.feat.filter((f) => (seen.feat.get(f) ?? 0) < 1).map((f) => `${f}: 0`),
+        ...want.edges.filter((e) => !seen.edges.has(e)).map((e) => `edge ${e} never met at equality`),
+      ];
+      assert.deepEqual(short, [], `${id}: the census did not reach — ${short.join("; ")}`);
+      // the pairs no reading can reach, by the declared rules (so none is asked for): floor + disc (the run's disc is over the
+      // floor + its rounding, which the start reading was), disc + drop (every window reading is at or under the run's disc
+      // + the drop limit − its rounding), floor + cap (the top is over the floor)
+      for (const p of ["pair:floor+disc", "pair:disc+drop", "pair:floor+cap"]) assert.equal(seen.feat.get(p) ?? 0, 0, `${id}: ${p} was reached — the reachability note above is wrong`);
+      // (round 7, the round-6 verifier's V6-14) EVERY VALUE OF THE POSTED-DISC DOMAIN was read as a disc, and was the disc a run
+      // broke on changing to; every value off the domain that postedLimitKmh parses was read; every value a run CAN start under
+      // (a reading over the floor — on the lamp, at the start line — by the rounding fits under it) is one a run started under,
+      // and no run started under any other disc
+      const canRun = (v) => (K.lamp ? v - K.hq >= K.start : v - K.hq > K.floor);
+      const discShort = [
+        ...[...POSTED_DISC_DOMAIN, ...POSTED_DISC_DECLARED.offDomain].filter((v) => !seen.discRead.has(v)).map((v) => `disc ${v} never read`),
+        ...POSTED_DISC_DOMAIN.filter((v) => !seen.discChangeTo.has(v)).map((v) => `disc ${v} never the disc a run broke on changing to`),
+        ...POSTED_DISC_DOMAIN.filter((v) => canRun(v) && !seen.runDisc.has(v)).map((v) => `disc ${v} never the disc a run started under`),
+        ...[...seen.runDisc].filter((v) => !canRun(v)).map((v) => `a run started under ${v}, which no reading can start under`),
+      ];
+      assert.deepEqual(discShort, [], `${id}: the posted-disc domain was not reached — ${discShort.join("; ")}`);
+      // (round 7) THE WINDOW AT THE START, BY CONSTRUCTION: on the lamp, a drop break measured against a reading from before
+      // the run at every age the window style draws — so a window cut at the start to ANY length under 6 s is seen
+      if (K.lamp) {
+        const ages = [1600, 2600, 3100, 4600, 5510, 5750, 6000];
+        assert.deepEqual(ages.filter((a) => !seen.windowDrop.has(a)), [], `${id}: no drop break against a pre-start reading of these ages at the start`);
+      }
+    }
+    const ms = Date.now() - t0;
+    for (const id of [H1.lamp, H1.em]) {
+      const s = stats[id];
+      t.diagnostic(`${id}: discs read ${[...s.discRead].sort((a, b) => a - b).join(",")}; runs started under ${[...s.runDisc].sort((a, b) => a - b).join(",")}`);
+      t.diagnostic(`${id}: ${s.n} programmes (${s.ticks} ticks), seeds ${PACE_CENSUS_SEEDS.join(",")} × ${PACE_CENSUS_PER_SEED}; styles ${JSON.stringify(Object.fromEntries(s.styles))}; decisions ${JSON.stringify(Object.fromEntries(s.decisions))}; pairs ${JSON.stringify(Object.fromEntries([...s.feat].filter(([k]) => k.startsWith("pair:") || k.startsWith("break:"))))}`);
+    }
+    t.diagnostic(`the pace census ran in ${ms} ms`);
+  });
+
+  it("THE CENSUS CAN FAIL — the oracle reads no lib function, and the oracle with each round-5 survivor's change planted in IT disagrees with the lib on the first seed's programmes (agreement is evidence, not two copies of one mistake)", () => {
+    const helpers = [paceOracle, paceK, paceSizingOracle, S, finNum, ptStep, referenceRender].map((f) => f.toString()).join("\n");
+    for (const f of ["wrongLegFlatStep", "pacePedal", "paceNumbers", "createWrongLegProfile", "wrongLegProfileFinish", "profileText", "renderProfileText", "wrongLegProfileFor", "sizingSpec", "readingsSpec"]) {
+      assert.ok(!new RegExp(`\\b${f}\\b`).test(helpers), `the oracle (or a helper it uses) calls ${f}`);
+    }
+    const src = paceOracle.toString();
+    const plants = [
+      ["V5-01's class: the window forgets the readings before the run at its start", "o.startIdx = i;", "o.startIdx = i; o.win = [];"],
+      ["V5-05's class: the drop before the floor", "const order = PACE_BREAK_ORDER.map(([k]) => k);", 'const order = ["disc-change", "drop", "floor", "disc", "cap"];'],
+      ["V5-06's class: the floor before the disc change", "const order = PACE_BREAK_ORDER.map(([k]) => k);", 'const order = ["floor", "disc-change", "disc", "cap", "drop"];'],
+      ["V5-07's class: the disc before the disc change", "const order = PACE_BREAK_ORDER.map(([k]) => k);", 'const order = ["disc", "disc-change", "floor", "cap", "drop"];'],
+      ["V5-11's class: a top of 0 not recorded", "top: o.top >= 0 ? o.top : null", "top: o.top > 0 ? o.top : null"],
+      ["V5-15's class: a negative interval credited", "const dtEff = Math.min(Math.max(0, dtFin), K.stepCapMs);", "const dtEff = Math.min(Math.abs(dtFin), K.stepCapMs);"],
+      ["V5-21's class: the lowest tracked on the lamp only", "o.run.low = Math.min(o.run.low, dial);", "if (gap !== null) o.run.low = Math.min(o.run.low, dial);"],
+      ["V4-06's class: a reading AT the disc breaks", "disc: ref !== null && dial <= ref,", "disc: ref !== null && dial < ref,"],
+      ["V5-09's class: the metre ceiling only PAST maxM", "if (o.odo >= K.maxM || ms >= K.maxMs) {", "if (o.odo > K.maxM || ms >= K.maxMs) {"],
+    ];
+    for (const [label, from, to] of plants) {
+      assert.equal(src.split(from).length, 2, `${label}: the plant's anchor is not unique in the oracle`);
+      const bad = new Function("paceK", "PACE_BREAK_ORDER", "finNum", "S", "ptStep", "referenceRender", "paceSizingOracle", `return (${src.replace(from, to)});`)(
+        paceK, PACE_BREAK_ORDER, finNum, S, ptStep, referenceRender, paceSizingOracle);
+      let disagree = 0;
+      for (const id of [H1.lamp, H1.em]) {
+        const K = paceK(id);
+        const rnd = mulberry32(PACE_CENSUS_SEEDS[0] ^ (id === H1.lamp ? 0x1a1a : 0x2b2b));
+        for (let j = 0; j < PACE_CENSUS_PER_SEED && disagree === 0; j++) {
+          const o = bad(id, paceSource(K, rnd).source);
+          if (paceDisagreement(o, paceReal(id, o.prog)) !== null) disagree += 1;
+        }
+      }
+      assert.ok(disagree > 0, `${label}: the planted oracle agreed with the lib on every programme of seed ${PACE_CENSUS_SEEDS[0]} — the census could not see it`);
+    }
+  });
+
+  it("THE GENERATIVE P1 CENSUS — the harness's P1 block and its page-side witness, run over generated drives on a fake document (binding latency swept over [0, 3] s and a tail to 12 s), print every note, wait every wait, take every shot and write the sidecar exactly as the P1 oracle's stated rules say", async (t) => {
+    const t0 = Date.now();
+    const block = p1Block();
+    assert.ok(block, "the P1 block was not found");
+    const feat = new Map();
+    let drives = 0, seriesN = 0;
+    for (const seed of P1_CENSUS_SEEDS) {
+      const rnd = mulberry32(seed);
+      for (let k = 0; k < P1_CENSUS_PER_SEED; k++) {
+        const spec = p1DriveSpec(rnd);
+        const got = await p1Run(spec, block);
+        const o = p1Oracle(spec);
+        const where = `P1 seed ${seed} drive ${k}`;
+        assert.deepEqual(got.env.notes, o.notes, `${where}: the printed notes`);
+        assert.deepEqual(got.env.waits, o.waits, `${where}: the waits`);
+        assert.deepEqual(got.env.shots, o.shots, `${where}: the shots taken`);
+        assert.equal(got.env.writes.length, o.writes, `${where}: the sidecar writes`);
+        assert.deepEqual(got.paths, ["OUT/_audit-event-shots.json"], `${where}: the sidecar's path`);
+        assert.deepEqual(got.final, o.final, `${where}: the sidecar`);
+        // (round 8) the end line is TRUE by what happened — its numbers against the oracle's own ledger, and against itself
+        assert.deepEqual(p1EndLineTruth(got.env.notes, o.ledger, got.final), [], `${where}: the end line`);
+        // (round 8) every sidecar write files each report it has seen in exactly one class — series or refusal, never both, never neither
+        for (const w of got.env.writes) { const x = JSON.parse(w.text); assert.equal(x.series.length + x.refused.length, x.seen, `${where}: a sidecar write files ${x.series.length} series and ${x.refused.length} refusals of ${x.seen} reports seen`); }
+        for (const f of o.feat) feat.set(f, (feat.get(f) ?? 0) + 1);
+        drives += 1;
+        seriesN += o.final.series.length;
+      }
+    }
+    const want = [
+      "latency<=1s", "latency>1s", "latency>3s", "wait<=50ms", "wait<=0", "shot:failed", "shot:threw", "dump:refused", "dump:removed",
+      "camera:unset", "camera:empty", "camera:set", "layer:painted=true", "layer:painted=false", "huds", "card:painted=true", "card:painted=false",
+      // (round 12) each computed visibility the specification has decides a card's painted flag on some drive
+      "card:visibility-decides=visible", "card:visibility-decides=hidden", "card:visibility-decides=collapse",
+      "card:no-column", "card:empty-title", "card:repeat-title", "not-driving", "series-cap", "tSec<0", "start%100", "done%100",
+      // (round 8) a thrown step at EVERY step index it can happen at: the frame of step 1, 2 and 3, the wait of step 2 and 3
+      "threw@0:shot", "threw@1:shot", "threw@2:shot", "threw@1:wait", "threw@2:wait",
+      // (round 15) the title rule — every white-space code unit in a card's text, a repeat by the same text and by other white
+      // space, a new title that differs from a reported one only by case, with a quote, a backslash, a look-alike, a control,
+      // a lone surrogate, longer than 1,000 — and a column added with several cards: the new one among copies before and after it
+      ...P1_TITLE_FLOOR, "subtree:several-cards", "subtree:the-new-card-among-others", "subtree:a-copy-before-the-card", "subtree:a-copy-after-the-new-card", "dump:matched>1",
+      // (round 15) the observer's callback handed an inert node or record before, after or beside the mount's own, and the mount reported
+      "callback:none:the-mount-reported", "callback:record-before:the-mount-reported", "callback:record-after:the-mount-reported", "callback:node-before:the-mount-reported", "callback:node-after:the-mount-reported", "callback:text-before:the-mount-reported",
+    ];
+    assert.equal(P1_TITLE_MIN, 3, "the title floor's count is the census's");
+    const short = want.filter((f) => (feat.get(f) ?? 0) < 3).map((f) => `${f}: ${feat.get(f) ?? 0}`);
+    assert.deepEqual(short, [], `the P1 census did not reach — ${short.join("; ")}`);
+    // (round 8, P-e) step 1 never waits (the binding runs at or after the report), so its wait never throws
+    assert.equal(feat.get("threw@0:wait") ?? 0, 0, "step 1 waited and threw — the census's clock model broke its own rule");
+    t.diagnostic(`P1: ${drives} drives (${seriesN} series), seeds ${P1_CENSUS_SEEDS.join(",")} × ${P1_CENSUS_PER_SEED}, in ${Date.now() - t0} ms; shapes ${JSON.stringify(Object.fromEntries(feat))}`);
+  });
+
+  it("THE TOLD TEXTS STATE THE START RULE TRUTHFULLY — the lamp run starts on the first reading it credits that is at or over warningLampRunStartKmh by the dial's rounding, the emergency run's readings are each over its floor by that rounding; the number printed is the declared dialHalfQuantumKmh, and the rule it states is the one the lib runs", () => {
+    const hq = D("dialHalfQuantumKmh");
+    const lamp = WRONG_LEG_PROFILES.get(H1.lamp).told;
+    const em = WRONG_LEG_PROFILES.get(H1.em).told;
+    assert.ok(lamp.includes(`started on the first reading it credits that is at or over warningLampRunStartKmh by the dial's ${hq} км/ч rounding`), lamp);
+    assert.ok(!/started on the first reading at or over/.test(lamp), "the lamp told still says «the first reading at or over» — a reading over the disc or after a drop does not start the run");
+    assert.ok(em.includes(`each over that floor by the dial's ${hq} км/ч rounding and at or under the disc and emRunTopKmh, started on the first such reading`), em);
+    for (const text of [lamp, em]) {
+      const nums = [...text.matchAll(/(\d+(?:\.\d+)?) км\/ч/g)].map((m) => Number(m[1]));
+      assert.deepEqual(nums, [hq], `a number in a told text that is not the declared dialHalfQuantumKmh: ${nums}`);
+    }
+    // …and the rule, run: AT the line by the rounding starts, a hair under does not; AT the floor by the rounding is not credited
+    const L = paceK(H1.lamp);
+    const E = paceK(H1.em);
+    const startTick = (id, prog) => paceReal(id, prog).steps.findIndex((s) => s.state.pace.started);
+    assert.equal(startTick(H1.lamp, [pt(0), pt(20), pt(L.start + hq), pt(44)]), 2, "a reading at warningLampRunStartKmh + the rounding does not start the lamp run");
+    assert.equal(startTick(H1.lamp, [pt(0), pt(20), pt(L.start), pt(L.start + hq - 0.01), pt(44)]), 4, "a reading AT warningLampRunStartKmh (or a hair under the line by the rounding) started the lamp run");
+    assert.equal(startTick(H1.em, [pt(10), pt(E.floor + hq), pt(E.floor + hq + 0.01)]), 2, "a reading AT the emergency floor + the rounding started (was credited in) the run");
+  });
+
+  it("THE FIXED TABLE'S «MET AT EQUALITY» CLAIM IS TRUE — the metre and clock ceilings are each met with the flat odometer EXACTLY at maxM and the wall clock EXACTLY at maxMs, and one step short releases nothing", () => {
+    for (const id of [H1.lamp, H1.em]) {
+      const K = paceK(id);
+      const n = K.maxM / 10;
+      assert.ok(Number.isInteger(n), `${id}: maxM ${K.maxM} is not a whole number of 10 m steps`);
+      const atM = [...pts(n, 38, { step: 10 })];
+      const o = paceOracle(id, atM);
+      assert.equal(o.done, "metres");
+      assert.equal(o.odo, K.maxM, `${id}: the odometer is ${o.odo}, not exactly ${K.maxM}`);
+      assert.ok(o.edges.has("ceilingM"));
+      assert.equal(paceDisagreement(o, paceReal(id, atM)), null);
+      const short = [...pts(n - 1, 38, { step: 10 }), pt(38, { step: 9.999 })];
+      const os = paceOracle(id, short);
+      assert.equal(os.done, null, `${id}: a hair short of maxM released the profile`);
+      assert.equal(paceDisagreement(os, paceReal(id, short)), null);
+      const ticks = K.maxMs / 500 + 1;
+      const atS = pts(ticks, 30, { step: 1 });
+      const oc = paceOracle(id, atS);
+      assert.equal(oc.done, "clock");
+      assert.ok(oc.edges.has("ceilingS"));
+      assert.equal(paceDisagreement(oc, paceReal(id, atS)), null);
+    }
+  });
+});
+
+/* ── §W18 H1 ROUND 7 — THE POSTED-DISC DOMAIN AND THE OVERLAPPING P1 SERIES (harness-h1-r6-verifier) ───────────────────
+ *
+ * Round 6 (h1-r6-result.patch) was REFUTED on 3 surviving mutants of its 40:
+ *   V6-14  `tick.postedKmh > 0` read as `> 20` in the pace block: a run broken by a disc change to 20 km/h printed
+ *          ANTECEDENT HELD AS SIZED (the UNSAFE direction). The generator drew discs of 30–70 only, while the content
+ *          authors 20 km/h streets (34 edges at 20, and 14 districts whose urban default is 20) and the renderer prints any whole
+ *          number of at least 1.
+ *   V6-26b each shot filed under, and named for, the LAST series: only visible when two series OVERLAP — an impact flash
+ *          and its fault card mounting together, the ordinary collision shape — and round 6's P1 census was serial.
+ *   V6-31  the sidecar's DOM dump took the LAST card with the series' title, not the first: two cards with one title
+ *          never shared a document in the census, and the P1 rules did not say which card the dump reads.
+ * WHAT ROUND 7 DOES:
+ *   A · THE POSTED-DISC DOMAIN (`POSTED_DISC_DOMAIN`) is declared below from where the disc comes from (sized at 01de885,
+ *       the product read by the builder, never by code here) and from the CONTENT, which one test here derives again
+ *       from content/world/*.json and compares with the pin; §W17's generator draws every disc from it and its census
+ *       asserts every value was read, was the disc a run broke on changing to, and — where a reading can start a run
+ *       under it — was the disc a run started under. The domain is also checked to hold every other speed a lesson's
+ *       recipe carries (zone, works, ring, exit, advisory `…Kmh` params). Beyond the domain, a fixed SWEEP drives every
+ *       whole number 1…200 the renderer could print (past the content's highest, 140) as a disc change and as the disc
+ *       of a whole drive, against the oracle — so no threshold on the disc, at any whole number, can hide between draws.
+ *   B · THE OVERLAP CENSUS runs the harness's P1 block over drives whose mounts share ONE document and ONE clock, each
+ *       binding `latency` ms after its report, every page act (a wait, a dump, a frame) an event on that clock — so
+ *       series overlap, bindings arrive out of report order, a mount reported before arming is bound after it, the
+ *       drive can end with a report still in flight or a series still running, flashes of two mounts and two cards with
+ *       one title share the document — and compares every note, wait, shot name, write and the final sidecar with an
+ *       oracle that simulates the same clock from the P1 rules P-a … P-h.
+ *   C · V6-31, DECIDED: the harness's dump says what it reads — the FIRST element in document order its selector matches
+ *       — and `matched`, how many it matched (the harness change is in lesson-audit.mjs's `eventDump`); the census draws
+ *       twin cards and two flashes in one document, and the oracle models the first-in-order rule and the count.
+ *   D · TWO FALSE STATEMENTS the overlap model exposed, fixed in the harness: the sidecar's `pendingAtWrite` was
+ *       `pending.length` — every run ever started — and is now the runs not yet settled; and the end line said «of S the
+ *       page-side witness reported» while S counts the reports the harness had RECEIVED (one in flight when the drive
+ *       ends is not in it) and a series still running when the 20 s bound ends went unsaid. It now says «of S report(s)
+ *       the harness had received from the page-side witness», and, when a series is still running, says so.
+ * ITS LIMITS, stated: the overlap census's page clock IS its harness clock (the page-ahead and negative-gap shapes are
+ * §W17's serial census's); a mount adds one element (a flash, a card, or a card in its own column) — round 15: or ONE
+ * SUBTREE of 1 to 5 flashes and cards under a new toast column or a plain wrapper, every one of which the witness examines
+ * (the round-14 verifier's V14-Q24B: the product's column is made by its first fault, so two faults in one commit arrive
+ * as one subtree with two cards), and one observer callback may be handed two or three added nodes, as a record each or as
+ * one record listing them, a text node among them (the same commit once the column stands); a card has one
+ * toast body; page acts of different series run concurrently on the census's clock (the real page may serialise some,
+ * which moves the times, not the rules). The threat model above §W11 binds: a false sentence the harness prints is
+ * always in model. */
+
+/** WHERE THE В26 DISC THE HARNESS READS COMES FROM — declared, sized at 01de885 (the product read by the builder, never by
+ *  code here): the dashboard prints «Ограничение N км/ч» with N = Math.max(1, Math.round(limitKmh)) in both of its
+ *  variants (StatusDashboard.tsx), limitKmh is the last tick's maxSpeedKmh or 50 (LessonPlayShell.tsx), and maxSpeedKmh
+ *  is the `maxspeed` of the edge under the car, else the district's meta.defaults.maxspeedUrbanKmh, else
+ *  BG_URBAN_DEFAULT_KMH 50 (worldRuntime.ts, district.ts). So a disc on the glass is a WHOLE number of at least 1. */
+const POSTED_DISC_SOURCE = Object.freeze({
+  at: "01de885",
+  renderFloorKmh: 1,
+  whole: true,
+  fallbackKmh: 50,
+  from: "StatusDashboard.tsx limit · LessonPlayShell.tsx limitKmh · worldRuntime.ts maxSpeedKmh, defaultLimit · district.ts BG_URBAN_DEFAULT_KMH",
+});
+/** THE DISCS THE CONTENT AUTHORS AND BUILDS (01de885) — every edge's `maxspeed`, every district default the builder fills an
+ *  untagged edge from (meta.defaults: urban, living street, service), and every lesson's own recipe limit (the
+ *  generators mirror each template's `maxspeedKmh` into meta.scenario.params, and its route limits into
+ *  meta.scenario.routeLimitsKmh), each as the renderer prints it. A test below derives it again from content/world. */
+const POSTED_DISC_CONTENT_PIN = Object.freeze([20, 30, 40, 50, 70, 90, 140]);
+/** THE DECLARED VALUES beyond the content (round 7), each a whole number the renderer prints unchanged:
+ *   renderFloor  the renderer's floor, 1, and the whole number over it;
+ *   lowZones     zone discs under 20 that no district authors at 01de885 and the renderer would print as they are;
+ *   spread       whole numbers round 6's census drew (45, 55, 60);
+ *   offDomain    values `postedLimitKmh` parses but the renderer never prints (a fraction, under 1): drawn so the lib's
+ *                rule «read when a finite number over 0» is executed off the domain too — never claimed publishable. */
+const POSTED_DISC_DECLARED = Object.freeze({
+  renderFloor: Object.freeze([1, 2]),
+  lowZones: Object.freeze([5, 10, 15]),
+  spread: Object.freeze([45, 55, 60]),
+  offDomain: Object.freeze([0.5, 20.5, 40.5, 49.9]),
+});
+/** Every profile boundary as a disc (from the declared constants): for the floor and the lamp's start line, the whole
+ *  number AT it and the first whole number a reading over it by the dial's rounding fits under; for the emergency's run
+ *  top and each profile's governor target, the whole numbers one under, at and one over. */
+function postedDiscBoundaries() {
+  const out = [];
+  for (const id of [H1.lamp, H1.em]) {
+    const K = paceK(id);
+    for (const b of [K.floor, ...(K.start === null ? [] : [K.start])]) out.push(b, Math.floor(b + K.hq) + 1);
+    for (const b of [...(K.cap === null ? [] : [K.cap]), K.target]) out.push(b - 1, b, b + 1);
+  }
+  return out;
+}
+/** THE POSTED-DISC DOMAIN — the content's discs, the declared values and every profile boundary, sorted, each once. */
+const POSTED_DISC_DOMAIN = Object.freeze([...new Set([
+  ...POSTED_DISC_CONTENT_PIN, ...POSTED_DISC_DECLARED.renderFloor, ...POSTED_DISC_DECLARED.lowZones, ...POSTED_DISC_DECLARED.spread,
+  ...(() => {
+    // (the boundaries postedDiscBoundaries() lists, from the declared constants alone — a test checks the two agree)
+    const D0 = (k) => PROFILE_DESIGN[k].value;
+    const hq = D0("dialHalfQuantumKmh");
+    const lampFloor = D0("movingSpeedKmh"), lampStart = D0("warningLampRunStartKmh"), lampTarget = D0("warningLampHeldPaceKmh");
+    const emFloor = D0("emYieldSlowKmh") + D0("EM_SPEED_MARGIN_KMH"), emTop = D0("emRunTopKmh"), emTarget = emFloor + PACE_HARNESS_NUMBERS.EM_PACE_ABOVE_FLOOR_KMH;
+    return [
+      ...[lampFloor, lampStart, emFloor].flatMap((b) => [b, Math.floor(b + hq) + 1]),
+      ...[emTop, lampTarget, emTarget].flatMap((b) => [b - 1, b, b + 1]),
+    ];
+  })(),
+])].sort((a, b) => a - b));
+
+/** The discs content/world authors and builds, as the renderer prints them (a read of AUTHORED CONTENT, not product source). */
+function postedDiscsFromContent() {
+  const dir = resolve(HERE, "..", "..", "..", "content", "world");
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+  const out = new Set();
+  const recipeSpeeds = new Set();
+  const sources = { edges: 0, defaults: 0, recipe: 0, routeLimits: 0 };
+  const add = (v, k) => {
+    if (typeof v !== "number" || !Number.isFinite(v)) return;
+    out.add(Math.max(POSTED_DISC_SOURCE.renderFloorKmh, Math.round(v)));
+    sources[k] += 1;
+  };
+  for (const f of files) {
+    const w = JSON.parse(readFileSync(resolve(HERE, "..", "..", "..", "content", "world", f), "utf8"));
+    for (const e of w.roads?.edges ?? []) add(e.maxspeed, "edges");
+    const d = w.meta?.defaults ?? {};
+    for (const k of ["maxspeedUrbanKmh", "maxspeedLivingStreetKmh", "maxspeedServiceKmh"]) add(d[k], "defaults");
+    add(w.meta?.scenario?.params?.maxspeedKmh, "recipe");
+    for (const v of w.meta?.scenario?.routeLimitsKmh ?? []) add(v, "routeLimits");
+    // (round 7, resume) every OTHER speed a lesson's recipe carries (a zone, works, ring, exit, advisory … `…Kmh` param): not
+    // a disc source on its own (the builder already folded the ones that limit a road into the edges' maxspeed), collected
+    // so the domain can be checked to hold them too
+    for (const [k, v] of Object.entries(w.meta?.scenario?.params ?? {})) {
+      if (/Kmh$/.test(k) && typeof v === "number" && Number.isFinite(v)) recipeSpeeds.add(Math.max(POSTED_DISC_SOURCE.renderFloorKmh, Math.round(v)));
+    }
+  }
+  add(POSTED_DISC_SOURCE.fallbackKmh, "defaults");
+  return { files: files.length, sources, discs: [...out].sort((a, b) => a - b), recipeSpeeds: [...recipeSpeeds].sort((a, b) => a - b) };
+}
+
+/* ── THE P1 RULES FOR OVERLAPPING SERIES (round 7) — P-a … P-e above hold; these are added ────────────────────────────
+ *   P-f the dump at each shot reads the FIRST element in document order its selector matches — the first impact flash,
+ *       or the first card under a toast column whose collapsed title is the series' title — and records `matched`, how
+ *       many it matched (0 when none: flash / card null);
+ *   P-g each binding runs its own series: its own record, its own shot names, its own waits measured from ITS report,
+ *       its own step bounds, whatever else runs meanwhile; a report is checked against the arming when its binding
+ *       runs, not when the mount happened;
+ *   P-h the end: arming ends; the harness waits for the runs it had received until they settle or 20 s pass, whichever
+ *       is first, then writes the sidecar and the end line — the counts as of that moment, and, when series are still
+ *       running, how many; `pendingAtWrite` in every sidecar write is the runs not yet settled (the writer's included).
+ * The census's clock model (not a rule of the harness): ONE clock; a mount is reported the moment it mounts; its binding
+ * runs `latency` ms later; a wait resolves after its ms plus the tape's jitter, a dump after the tape's ms (the page
+ * read at that moment; a «remove» dump first detaches the element the dump would read), a frame after the tape's ms;
+ * acts of different series run concurrently; events at one moment run in the order they were scheduled. */
+
+const P1_OVERLAP_BASE = 3_000_000;
+const P1_OVERLAP_SEEDS = Object.freeze([20260929, 4099, 8675309]);
+const P1_OVERLAP_PER_SEED = 300;
+const TOAST_COLUMN_ATTR = "toasts";
+
+/** One overlap drive: the document's standing layers, its mounts (a share of them the collision shape — an impact flash
+ *  and its fault card 0–200 ms apart), the arming, the end, and the environment's tapes (a few waits, dumps and frames
+ *  long enough that a series outlasts the 20 s end bound). */
+function p1OverlapSpec(rnd) {
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  const int = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+  const box = () => ({ w: pick([0, 1, 1.4, 2, 280, 280.6]), h: pick([0, 1, 2, 40, 39.5]), top: pick([0, 10, 10.5, 300, -5]), visibility: pick(["visible", "visible", "hidden", "collapse"]), display: pick(["block", "block", "none", "flex"]), opacity: pick(["1", "1", "0", "0.5", "0.001", ""]) });
+  // (round 15) the titles are drawn by p1TitleSource — the thrown census's text generator, and variants of the drive's earlier
+  // titles (the same text, a case variant, its white space respelt, a look-alike, a word more)
+  const title = p1TitleSource(rnd);
+  const latency = () => {
+    const r = rnd();
+    return r < 0.7 ? int(0, 3000) : r < 0.9 ? pick([0, 0, 1, 120, 200, 999, 1000, 1001, 2999, 3000]) : int(3001, 12_000);
+  };
+  const card = (text) => ({
+    title: text, head: rnd() < 0.7 ? pick(["Нарушение", "  Грешка ", "!", `Гре${CH(0xa0)}шка`, `${CH(0x3000)}Внимание${CH(0x2028)}`]) : null, column: pick(["shared", "shared", "shared", "own", "none"]),
+    where: pick(["append", "append", "first"]), columnBox: box(), box: box(), innerText: pick(["Сблъсък\nСпри", "Скорост над ограничението\nНамали", "x"]),
+    rows: Array.from({ length: int(0, 3) }, () => ({ text: pick(["Намали", "  до 50 км/ч ", "", "x".repeat(210), `до${CH(0xa0)}50${CH(0x202f)}км/ч`, CH(0x2003)]), box: box(), tag: pick(["span", "span", "span", "p"]) })), bodyText: pick(["", "тяло"]),
+  });
+  const flash = () => ({ box: box(), wrapped: rnd() < 0.5, where: pick(["append", "append", "first"]) });
+  const camera = () => pick([undefined, undefined, undefined, null, "", "chase", "cockpit"]);
+  const n = rnd() < 0.15 ? int(9, 14) : int(1, 10);
+  const mounts = [];
+  let t = int(0, 3000);
+  while (mounts.length < n) {
+    if (mounts.length > 0) t += rnd() < 0.6 ? pick([0, 0, 1, 50, 120, 300, 699, 700, 701, 1000, 1999, 3000]) : int(0, 8000);
+    if (rnd() < 0.3) {
+      // the ordinary collision shape: the impact flash (on the page ~700 ms), then its fault card
+      mounts.push({ kind: "impact", at: t, latency: latency(), camera: camera(), removeAfter: pick([700, 700, null, int(0, 1500)]), flash: flash(), card: null });
+      t += pick([0, 1, 50, 120, 200]);
+      mounts.push({ kind: "card", at: t, latency: latency(), camera: undefined, removeAfter: pick([null, null, int(1000, 6000)]), flash: null, card: card(pick(["Сблъсък", "Сблъсък", "Опасно доближаване"])) });
+    } else {
+      const one = () => {
+        if (rnd() < 0.36) {
+          // (round 15, the round-14 verifier's V14-Q24B) ONE ADDED SUBTREE HOLDING SEVERAL: 1 to 5 flashes and cards under one
+          // root — a new toast column (the product's shape: the column is made by the first fault, so two faults in one commit
+          // arrive as one subtree with two cards), or a plain wrapper whose cards each sit in a column of their own or in none
+          const isColumn = rnd() < 0.6;
+          return {
+            kind: "subtree", camera: camera(), removeAfter: rnd() < 0.5 ? null : pick([0, 1, 700, 1000, 3000, int(0, 6000)]),
+            where: pick(["append", "append", "first"]), isColumn, columnBox: box(),
+            items: Array.from({ length: int(1, 5) }, () => (rnd() < 0.25 ? { flash: flash() } : { card: card(title()), under: isColumn || rnd() < 0.8 })),
+          };
+        }
+        const kind = rnd() < 0.5 ? "impact" : "card";
+        return {
+          kind, camera: camera(), removeAfter: rnd() < 0.5 ? null : pick([0, 1, 699, 700, 701, 1000, 3000, int(0, 6000)]),
+          flash: kind === "impact" ? flash() : null, card: kind === "card" ? card(title()) : null,
+        };
+      };
+      const mt = { ...one(), at: t, latency: latency() };
+      // (round 15) ONE OBSERVER CALLBACK FOR SEVERAL ADDED NODES: a commit that adds two or three nodes hands the observer all of
+      // them in one callback — a record for each (`deliver` "records": what appendChild and insertBefore make), or one record
+      // listing them (`deliver` "nodes": what one append of several, or a fragment, makes); and a text node may be among the
+      // nodes added, which is not an element and is not examined
+      if (rnd() < 0.3) {
+        mt.also = Array.from({ length: int(1, 2) }, one);
+        mt.deliver = pick(["records", "records", "nodes"]);
+      }
+      mt.textNode = rnd() < 0.2;
+      mounts.push(mt);
+    }
+  }
+  const last = t;
+  const ar = rnd();
+  return {
+    layers: Array.from({ length: int(0, 3) }, () => ({ name: pick(["cockpit", "debrief", "pause", "teach"]), box: box() })),
+    huds: Array.from({ length: int(0, 3) }, () => ({ name: pick(["speed", "mirror", "prox", "task"]), box: box() })),
+    dialogs: int(0, 2),
+    camera: pick([null, null, "chase", ""]),
+    columnBox: box(),
+    mounts,
+    armAt: ar < 0.06 ? null : ar < 0.5 ? 0 : int(0, last + 4000),
+    t0Offset: pick([0, 300, 1000, -2000]),
+    finishAt: last + (rnd() < 0.7 ? pick([0, 1, 50, 1000, 3000, 6000, 12_000, 20_000]) : int(0, 30_000)),
+    jitter: Array.from({ length: 64 }, () => pick([0, 0, 0, 1, 4, 16, 120])),
+    dumps: Array.from({ length: 64 }, () => ({ ms: rnd() < 0.04 ? int(4000, 16_000) : rnd() < 0.3 ? pick([0, 3, 40, 260, 999]) : int(0, 1500), fail: rnd() < 0.08, remove: rnd() < 0.12 })),
+    shots: Array.from({ length: 64 }, () => ({ ms: rnd() < 0.1 ? int(6000, 14_000) : rnd() < 0.4 ? pick([0, 7, 10, 90, 100, 314, 651, 1096]) : int(0, 1500), ok: rnd() >= 0.15, throws: rnd() < 0.03 })),
+    // (round 8) a wait that throws when its time is up, per wait on the jitter tape's index — never the end's 20 s bound
+    waitFails: Array.from({ length: 64 }, () => rnd() < 0.04),
+  };
+}
+
+/** THE SHARED DOCUMENT (the environment, built fresh for each side): the standing layers, HUD surfaces, dialogs and the
+ *  toast column; `place` mounts one element (its camera change first) and returns the node the observer is handed and
+ *  the element a removal detaches. Each card is tagged `isCard` and each placed element carries its `mountRoot`, for
+ *  the environment's own use (the harness reads attributes, never these). */
+function p1SharedDoc(spec) {
+  const html = new FakeEl("html", spec.camera === null ? {} : { "data-sim-camera": spec.camera });
+  const body = new FakeEl("body");
+  html.add(body);
+  for (const l of spec.layers) body.add(new FakeEl("div", { "data-sim-overlay": l.name }, l.box));
+  for (const h of spec.huds) body.add(new FakeEl("div", { "data-hud": h.name }, h.box));
+  for (let k = 0; k < spec.dialogs; k++) body.add(new FakeEl("div", { role: "dialog" }));
+  const column = new FakeEl("div", { "data-hud": TOAST_COLUMN_ATTR }, spec.columnBox);
+  body.add(column);
+  const put = (parent, el, where) => {
+    el.parentElement = parent;
+    if (where === "first") parent.kids.unshift(el);
+    else parent.kids.push(el);
+  };
+  const place = (mt) => {
+    if (mt.camera !== undefined) {
+      if (mt.camera === null) delete html.attrs["data-sim-camera"];
+      else html.attrs["data-sim-camera"] = mt.camera;
+    }
+    if (mt.kind === "impact") {
+      const f = new FakeEl("div", { "data-hud": "impact-flash" }, mt.flash.box);
+      const root = mt.flash.wrapped ? new FakeEl("div").add(f) : f;
+      f.mountRoot = root;
+      put(body, root, mt.flash.where);
+      return { added: root, root, flashes: [f], cards: [] };
+    }
+    const cardOf = (c) => {
+      const cardEl = new FakeEl("div", {}, { ...c.box, innerText: c.innerText });
+      cardEl.isCard = true;
+      if (c.head !== null) cardEl.add(new FakeEl("span", {}, { innerText: p1Rendered(c.head) }, c.head));
+      cardEl.add(new FakeEl("p", {}, { innerText: p1Rendered(c.title) }, c.title));
+      const bodyEl = new FakeEl("div", { "data-hud-toast-body": "" }, {}, c.bodyText);
+      for (const r of c.rows) bodyEl.add(new FakeEl(r.tag ?? "span", {}, r.box, r.text));
+      cardEl.add(bodyEl);
+      // (round 8, V7-53 decided) a fixed row may give a card more toast bodies; the census's cards have one, as the product's do
+      for (let k = 1; k < (c.bodies ?? 1); k++) cardEl.add(new FakeEl("div", { "data-hud-toast-body": "" }));
+      return cardEl;
+    };
+    if (mt.kind === "subtree") {
+      // (round 15) ONE ADDED SUBTREE: the root — a new toast column, or a plain wrapper — and under it, in the order drawn (which
+      // is their document order), each flash (wrapped or not) and each card: in a column root as its child; in a wrapper, in a
+      // column of its own (`under`) or as the wrapper's child, under no column
+      const root = mt.isColumn ? new FakeEl("div", { "data-hud": TOAST_COLUMN_ATTR }, mt.columnBox) : new FakeEl("div");
+      const flashes = [];
+      const cards = [];
+      for (const it of mt.items) {
+        if (it.flash) {
+          const f = new FakeEl("div", { "data-hud": "impact-flash" }, it.flash.box);
+          f.mountRoot = root;
+          root.add(it.flash.wrapped ? new FakeEl("div").add(f) : f);
+          flashes.push(f);
+          continue;
+        }
+        const cardEl = cardOf(it.card);
+        cardEl.mountRoot = root;
+        root.add(mt.isColumn || !it.under ? cardEl : new FakeEl("div", { "data-hud": TOAST_COLUMN_ATTR }, it.card.columnBox).add(cardEl));
+        cards.push({ el: cardEl, card: it.card });
+      }
+      put(body, root, mt.where);
+      return { added: root, root, flashes, cards };
+    }
+    const c = mt.card;
+    const cardEl = cardOf(c);
+    let root = cardEl;
+    if (c.column === "shared") put(column, cardEl, c.where);
+    else if (c.column === "own") {
+      root = new FakeEl("div", { "data-hud": TOAST_COLUMN_ATTR }, c.columnBox).add(cardEl);
+      put(body, root, c.where);
+    } else put(body, cardEl, c.where);
+    cardEl.mountRoot = root;
+    return { added: root, root, flashes: [], cards: [{ el: cardEl, card: c }] };
+  };
+  return { html, body, column, place };
+}
+
+/** Run the HARNESS's P1 block (lesson-audit.mjs, `p1Block`) over one overlap drive: every page act an event on one clock. */
+async function p1RunOverlap(spec, block = p1Block()) {
+  let T = P1_OVERLAP_BASE;
+  const queue = [];
+  let seq = 0;
+  const at = (time, fn) => void queue.push({ time, seq: seq++, fn });
+  const env = { notes: [], waits: [], shots: [], writes: [], inits: [], bindings: {}, ji: 0, di: 0, si: 0 };
+  const sd = p1SharedDoc(spec);
+  const doc = { get documentElement() { return sd.html; }, querySelectorAll: (s) => sd.html.querySelectorAll(s), querySelector: (s) => sd.html.querySelector(s) };
+  const clock = { now: () => T };
+  const compiled = new Map();
+  // the element a «remove» dump detaches: the one the dump's selector would read first (the environment's own search)
+  const firstRead = (kind, title) => {
+    if (kind === "impact") return sd.html.querySelector('[data-hud="impact-flash"]');
+    for (const b of sd.html.querySelectorAll("[data-hud-toast-body]")) {
+      let el = b;
+      while (el.parentElement !== null && el.parentElement.attrs["data-hud"] !== TOAST_COLUMN_ATTR) el = el.parentElement;
+      if (el.parentElement === null) continue;
+      const p = el.querySelector("p");
+      if (p1TitleOf(p ? p.textContent : "") === title) return el;
+    }
+    return null;
+  };
+  const page = {
+    addInitScript: async (fn, arg) => void env.inits.push({ fn, arg }),
+    exposeBinding: async (name, fn) => void (env.bindings[name] = fn),
+    waitForTimeout: (ms) => {
+      env.waits.push(ms);
+      const i = env.ji++;
+      const j = spec.jitter[i % spec.jitter.length];
+      // (round 8) the wait throws when its time is up, on the tape's index — never the end's bound (`finishing`)
+      const fails = !env.finishing && (spec.waitFails ?? [false])[i % (spec.waitFails ?? [false]).length];
+      return new Promise((res, rej) => at(T + ms + j, fails ? () => rej(new Error("the fake page's wait threw")) : res));
+    },
+    evaluate: (fn, arg) => {
+      const d = spec.dumps[env.di++ % spec.dumps.length];
+      if (d.remove) {
+        const el = firstRead(arg.kind, arg.title);
+        if (el) el.mountRoot.detach();
+      }
+      return new Promise((res, rej) => at(T + d.ms, () => {
+        if (d.fail) return rej(new Error("the fake page refused the dump"));
+        if (!compiled.has(fn)) compiled.set(fn, new Function("document", "getComputedStyle", "Date", `"use strict"; return (${fn.toString()});`)(doc, fakeStyle, clock));
+        res(structuredClone(compiled.get(fn)(arg)));
+      }));
+    },
+  };
+  const shot = (name) => {
+    const s = spec.shots[env.si++ % spec.shots.length];
+    env.shots.push(name);
+    return new Promise((res, rej) => at(T + s.ms, () => (s.throws ? rej(new Error("the fake shot threw")) : res(s.ok))));
+  };
+  const api = new Function("page", "note", "shot", "writeFileSync", "OUT", "SCENARIO", "h1ProbeReads", "Date",
+    `"use strict";\n${block.code.slice(block.from, block.to)}\nreturn { installEventWitness, armEventShots, finishEventShots, eventShots };`)(
+    page, (s) => env.notes.push(s), shot, (path, text) => void env.writes.push({ path, text }), "OUT", H1.em, LIBNS.h1ProbeReads, clock);
+  await api.installEventWitness();
+  const obs = [];
+  const win = {};
+  new Function("window", "document", "MutationObserver", "getComputedStyle", "Date", `"use strict"; return (${env.inits[0].fn.toString()});`)(
+    win, doc, class { constructor(cb) { obs.push(cb); } observe() {} }, fakeStyle, clock)(env.inits[0].arg);
+  let mounting = null;
+  win.__auditEvent = (ev) => {
+    const copy = deepFreeze(structuredClone(ev));
+    at(T + mounting.latency, () => env.bindings.__auditEvent(null, copy));
+  };
+  if (spec.armAt !== null) at(P1_OVERLAP_BASE + spec.armAt, () => api.armEventShots(T + spec.t0Offset));
+  for (const mt of spec.mounts) {
+    // (round 15) the nodes one commit adds are all in the document before the observer's one callback, which is handed a record
+    // for each, or one record listing them; a text node (nodeType 3) stands first among the added nodes when the spec says so
+    const parts = [mt, ...(mt.also ?? [])];
+    const placed = [];
+    at(P1_OVERLAP_BASE + mt.at, () => {
+      for (const part of parts) placed.push(sd.place(part));
+      const nodes = placed.map((x) => x.added);
+      const text = { nodeType: 3 };
+      mounting = mt;
+      obs[0](mt.deliver === "nodes" ? [{ addedNodes: mt.textNode ? [text, ...nodes] : nodes }] : nodes.map((nd, k) => ({ addedNodes: mt.textNode && k === 0 ? [text, nd] : [nd] })));
+      mounting = null;
+    });
+    for (const [k, part] of parts.entries()) if (part.removeAfter !== null) at(P1_OVERLAP_BASE + mt.at + part.removeAfter, () => placed[k].root.detach());
+  }
+  let fin = null;
+  at(P1_OVERLAP_BASE + spec.finishAt, () => {
+    env.finishing = true;
+    fin = api.finishEventShots(); // (its synchronous part calls the end's 20 s wait)
+    env.finishing = false;
+  });
+  while (queue.length > 0) {
+    let bi = 0;
+    for (let i = 1; i < queue.length; i++) if (queue[i].time < queue[bi].time || (queue[i].time === queue[bi].time && queue[i].seq < queue[bi].seq)) bi = i;
+    const e = queue.splice(bi, 1)[0];
+    T = e.time;
+    e.fn();
+    await new Promise((r) => setImmediate(r)); // every continuation this event released runs before the next event
+  }
+  await fin;
+  return { env, final: env.writes.length ? JSON.parse(env.writes[env.writes.length - 1].text) : null, paths: [...new Set(env.writes.map((w) => w.path))] };
+}
+
+/** THE OVERLAP ORACLE — the same drive, simulated on the census's clock from the P1 rules (P-a … P-h). It builds its own
+ *  copy of the environment's document and reads it with its OWN walk (document order), its own paint test, its own
+ *  column and title rule; it never runs the harness's witness or dump. */
+function p1OverlapOracle(spec) {
+  const OFFSETS = [0, 1000, 3000];
+  const MAX = 8;
+  const B = P1_OVERLAP_BASE;
+  let T = B;
+  const queue = [];
+  let seq = 0;
+  const at = (time, fn) => void queue.push({ time, seq: seq++, fn });
+  const tape = (a, i) => a[i % a.length];
+  let ji = 0, di = 0, si = 0, writes = 0, witN = 0, last = null;
+  const notes = [], waits = [], shots = [], feat = new Set();
+  const S0 = { armed: false, t0: null, seen: 0, series: [], refused: [] };
+  // (round 8) THE ORACLE'S OWN LEDGER — one entry per report received, what was done with it and the frames it wrote,
+  // tallied as each shot returned; the end line's numbers come from it (as of the line), never from S0's arrays
+  const ledger = [];
+  let ledgerAtEnd = null;
+  const runs = [];
+  let open = 0, finishing = null, finished = false;
+  const write = () => {
+    writes += 1;
+    last = JSON.parse(JSON.stringify({ offsetsMs: OFFSETS, maxSeries: MAX, pendingAtWrite: open, ...S0 }));
+  };
+  const sd = p1SharedDoc(spec);
+  const painted = (b) => (b.w ?? 100) > 1 && (b.h ?? 20) > 1 && P1_VISIBILITY_PAINTS[b.visibility ?? "visible"] === true && (b.display ?? "block") !== "none" && Number(b.opacity ?? "1") > 0;
+  // (round 15) white space by the P1 comment's rule, written out (p1TitleOf) — never the harness's own expression
+  const collapse = p1TitleOf;
+  // (round 15) the mount line's title, in JSON's quoting written out (p1JsonQuoted) — never the harness's own call
+  const quoted = p1JsonQuoted;
+  const box = (b) => ({ visibility: b.visibility ?? "visible", display: b.display ?? "block", opacity: b.opacity ?? "1", w: Math.round(b.w ?? 100), h: Math.round(b.h ?? 20), top: Math.round(b.top ?? 0), bottom: Math.round((b.top ?? 0) + (b.h ?? 20)) });
+  const walk = () => {
+    const out = [];
+    const rec = (e) => { for (const k of e.kids) { out.push(k); rec(k); } };
+    rec(sd.html);
+    return out;
+  };
+  const isColumn = (e) => e !== null && e.attrs["data-hud"] === TOAST_COLUMN_ATTR;
+  const titleOf = (cardEl) => collapse(cardEl.kids.find((k) => k.tagName === "P").own);
+  const flashesNow = () => walk().filter((e) => e.attrs["data-hud"] === "impact-flash");
+  const cardsNow = (title) => walk().filter((e) => e.isCard && isColumn(e.parentElement) && titleOf(e) === title);
+  const camera = () => (Object.hasOwn(sd.html.attrs, "data-sim-camera") ? sd.html.attrs["data-sim-camera"] : null);
+  const overlayNow = () => {
+    const all = walk();
+    return {
+      layers: all.filter((e) => Object.hasOwn(e.attrs, "data-sim-overlay")).map((e) => ({ layer: e.attrs["data-sim-overlay"], painted: painted(e.box) })),
+      huds: all.filter((e) => Object.hasOwn(e.attrs, "data-hud") && painted(e.box)).map((e) => e.attrs["data-hud"]),
+      dialogs: all.filter((e) => e.attrs.role === "dialog").length,
+      camera: camera(),
+    };
+  };
+  const dumpNow = (kind, title) => {
+    const out = { at: T, camera: camera(), card: null, flash: null, matched: 0 };
+    if (kind === "impact") {
+      const fl = flashesNow();
+      out.matched = fl.length;
+      out.flash = fl.length > 0 ? box(fl[0].box) : null;
+      return out;
+    }
+    const cards = cardsNow(title);
+    out.matched = cards.length;
+    if (cards.length > 0) {
+      const c = cards[0];
+      const cb = box(c.box);
+      const rows = [];
+      const rec = (e) => {
+        for (const k of e.kids) {
+          const own = collapse(k.own);
+          if (own !== "") {
+            const b = box(k.box);
+            rows.push({ tag: k.tagName.toLowerCase(), text: own.slice(0, 200), ...b, insideCard: b.top >= cb.top - 1 && b.bottom <= cb.bottom + 1 });
+          }
+          rec(k);
+        }
+      };
+      rec(c);
+      out.card = { innerText: c.box.innerText, box: cb, rows };
+    }
+    return out;
+  };
+  const openRuns = () => runs.filter((r) => !r.settled).length;
+  const complete = () => {
+    finished = true;
+    if (open > 0) feat.add("race-won");
+    write();
+    if (ledger.length !== S0.seen) throw new Error("the overlap oracle's ledger lost a report");
+    ledgerAtEnd = structuredClone(ledger);
+    notes.push(p1EndLineFrom(ledger));
+  };
+  const settle = (run) => {
+    run.settled = true;
+    open -= 1;
+    if (finishing !== null && !finished && finishing.every((r) => r.settled)) complete();
+  };
+  const bound = [];
+  const binding = (ev, mt) => () => {
+    open += 1;
+    const run = { settled: false, n: ev.n };
+    runs.push(run);
+    bound.push(ev.n);
+    if (finished) feat.add("late-binding");
+    if (openRuns() > 1) feat.add("overlap");
+    S0.seen += 1;
+    if (!S0.armed) {
+      S0.refused.push({ n: ev.n, kind: ev.kind, title: ev.title, why: "not-driving" });
+      ledger.push({ n: ev.n, series: false, ended: null, frames: 0, why: "not-driving" });
+      write();
+      settle(run);
+      return;
+    }
+    if (S0.series.length >= MAX) {
+      S0.refused.push({ n: ev.n, kind: ev.kind, title: ev.title, why: "series-cap" });
+      ledger.push({ n: ev.n, series: false, ended: null, frames: 0, why: "series-cap" });
+      feat.add("series-cap");
+      write();
+      settle(run);
+      return;
+    }
+    if (ev.reportedUnarmed) feat.add("armed-after-report");
+    const rec = { n: ev.n, kind: ev.kind, title: ev.title, head: ev.head, cardPainted: ev.cardPainted, tSec: Math.round((ev.at - S0.t0) / 100) / 10, overlayAtMount: ev.overlay, shots: [] };
+    S0.series.push(rec);
+    const out = { n: ev.n, series: true, ended: null, frames: 0, why: null };
+    ledger.push(out);
+    run.kind = ev.kind;
+    run.mountedAt = ev.at;
+    if (ev.kind === "card" && runs.some((r) => r !== run && !r.settled && r.kind === "impact" && ev.at - r.mountedAt <= 200)) feat.add("collision-overlap");
+    notes.push(`      EVENT SHOT ${ev.n}: a${ev.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${rec.tSec}s${ev.kind === "card" ? ` (${quoted(ev.title)}, painted at mount by its own box and computed style only: ${ev.cardPainted} — necessary, not sufficient: its ancestors' opacity, a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(ev.overlay.layers)}, camera ${ev.overlay.camera ?? "(unset)"}; shots scheduled at +0/+1/+3 s after the witness reported the mount`);
+    // (round 8, P-e) a throw ends the series where it happens: marked, written, its own line, and NOT a refusal
+    const threw = (msg, where) => {
+      feat.add(`threw@${rec.shots.length}:${where}`);
+      rec.ended = "threw";
+      rec.why = `threw: ${msg}`;
+      out.ended = "threw";
+      write();
+      notes.push(p1ThrownNote(ev.n, rec.shots.length, OFFSETS.length, `threw: ${msg}`, rec.shots.map((x) => x.ok)));
+      settle(run);
+    };
+    const step = (j) => {
+      if (j === OFFSETS.length) {
+        rec.ended = "every-step";
+        out.ended = "every-step";
+        write();
+        notes.push(`      EVENT SHOT ${ev.n}: each shot's step (its DOM dump, then its frame) ran inside ${rec.shots.map((x) => `[+${(Math.floor(x.startedMs / 100) / 10).toFixed(1)}, +${(Math.ceil(x.doneMs / 100) / 10).toFixed(1)}]`).join(" / ")} s after the witness reported the mount, so each frame written was taken inside its own bounds — startedMs and doneMs in _audit-event-shots.json, floored and ceiled to 0.1 s (frame written: ${rec.shots.map((x) => (x.ok ? "yes" : "NO")).join("/")})`);
+        settle(run);
+        return;
+      }
+      const wait = ev.at + OFFSETS[j] - T;
+      if (wait > 0) {
+        waits.push(wait);
+        const i = ji++;
+        const fails = tape(spec.waitFails ?? [false], i);
+        at(T + wait + tape(spec.jitter, i), () => (fails ? threw("an Error, its message \"the fake page's wait threw\"", "wait") : dump(j)));
+      } else {
+        feat.add("wait<=0");
+        dump(j);
+      }
+    };
+    const dump = (j) => {
+      const off = OFFSETS[j];
+      const name = `05-ev${String(ev.n).padStart(2, "0")}-${ev.kind}-p${off / 1000}s`;
+      const startedMs = T - ev.at;
+      const d = tape(spec.dumps, di++);
+      if (d.remove) {
+        const first = ev.kind === "impact" ? flashesNow()[0] : cardsNow(ev.title)[0];
+        if (first) {
+          first.mountRoot.detach();
+          feat.add("dump:removed");
+        }
+      }
+      at(T + d.ms, () => {
+        let got;
+        if (d.fail) {
+          got = { unread: "the fake page refused the dump" };
+          feat.add("dump:refused");
+        } else {
+          got = dumpNow(ev.kind, ev.title);
+          if (got.matched > 1) feat.add(`matched>1:${ev.kind}`);
+          if (got.matched === 0) feat.add(`matched0:${ev.kind}`);
+        }
+        const s = tape(spec.shots, si++);
+        shots.push(name);
+        at(T + s.ms, () => {
+          if (s.throws) {
+            feat.add("shot:threw");
+            threw("an Error, its message \"the fake shot threw\"", "shot");
+            return;
+          }
+          rec.shots.push({ offsetMs: off, name, ok: s.ok, startedMs, doneMs: T - ev.at, dump: got });
+          if (s.ok) out.frames += 1;
+          write();
+          step(j + 1);
+        });
+      });
+    };
+    step(0);
+  };
+  if (spec.armAt !== null) at(B + spec.armAt, () => { S0.armed = true; S0.t0 = T + spec.t0Offset; });
+  // (round 15) the titles reported so far, each with the text it was first carried as: two titles are one only when they are
+  // the same code units, in the same order
+  const seenTitles = new Map();
+  for (const mt of spec.mounts) {
+    // (round 15) every node one commit adds is in the document before any of them is examined; they are examined in the order
+    // added, each WHOLE
+    const parts = [mt, ...(mt.also ?? [])];
+    const placedAll = [];
+    at(B + mt.at, () => {
+      for (const part of parts) placedAll.push(sd.place(part));
+      let nodesReporting = 0;
+      for (const [pk, placed] of placedAll.entries()) {
+      const part = parts[pk];
+      let reportsOfNode = 0;
+      // (round 15, P-a) what was added is examined WHOLE: every flash under it is reported, in document order, and then every
+      // card under it, in document order — each card under a toast column whose title, by the rule, is not empty and was not
+      // reported before; every report of one added node carries the same clock and the same overlay stack, and is bound
+      // `latency` ms later, in the order reported
+      const report = (kind, title, head, cardPainted) => {
+        witN += 1;
+        reportsOfNode += 1;
+        at(T + mt.latency, binding({ n: witN, kind, title, head, cardPainted, at: T, overlay: overlayNow(), reportedUnarmed: !S0.armed }, mt));
+      };
+      for (let k = 0; k < placed.flashes.length; k++) report("impact", null, null, null);
+      let cardReports = 0;
+      const here = new Set();
+      for (const { el, card } of placed.cards) {
+        if (!isColumn(el.parentElement)) { feat.add("card:no-column"); if (part.kind === "subtree") feat.add("subtree:a-card-under-no-column"); continue; }
+        const title = collapse(card.title);
+        const how = title === "" ? "empty" : seenTitles.has(title) ? "repeat" : "new";
+        for (const f of p1TitleFeats(card.title, title, how, seenTitles)) feat.add(f);
+        if (how === "empty") { feat.add("card:empty-title"); continue; }
+        if (how === "repeat") { feat.add("card:twin"); if (here.has(title)) feat.add("subtree:a-repeat-of-a-card-of-the-same-subtree"); continue; }
+        seenTitles.set(title, card.title);
+        here.add(title);
+        cardReports += 1;
+        if (cardReports >= 2) feat.add(`subtree:a-later-card-reported:painted=${painted(card.box)}`);
+        report("card", title, card.head === null ? "" : collapse(card.head), painted(card.box));
+      }
+      if (part.kind === "subtree") {
+        feat.add(part.isColumn ? "subtree:a-column" : "subtree:a-wrapper");
+        if (placed.flashes.length >= 2) feat.add("subtree:two-or-more-flashes");
+        if (cardReports >= 2) feat.add("subtree:two-or-more-cards-reported");
+        if (cardReports >= 3) feat.add("subtree:three-or-more-cards-reported");
+        if (placed.flashes.length >= 1 && cardReports >= 1) feat.add("subtree:a-flash-and-a-card-reported");
+        if (part.isColumn && cardReports >= 2) feat.add("subtree:a-column-mounted-with-two-new-cards");
+      }
+      if (reportsOfNode > 0) nodesReporting += 1;
+      if (pk > 0 && reportsOfNode > 0) feat.add(`callback:${mt.deliver}:a-later-node-reported`);
+      }
+      if (nodesReporting >= 2) feat.add(`callback:${mt.deliver}:two-or-more-nodes-reported`);
+      if (mt.textNode) feat.add(nodesReporting > 0 ? "callback:a-text-node-before-a-node-that-reported" : "callback:a-text-node");
+    });
+    for (const [pk, part] of parts.entries()) if (part.removeAfter !== null) at(B + mt.at + part.removeAfter, () => { if (placedAll[pk].root.parentElement !== null) feat.add("removed-by-page"); placedAll[pk].root.detach(); });
+  }
+  at(B + spec.finishAt, () => {
+    S0.armed = false;
+    finishing = runs.slice();
+    waits.push(20_000);
+    at(T + 20_000 + tape(spec.jitter, ji++), () => { if (!finished) complete(); });
+    if (finishing.every((r) => r.settled)) complete();
+  });
+  while (queue.length > 0) {
+    let bi = 0;
+    for (let i = 1; i < queue.length; i++) if (queue[i].time < queue[bi].time || (queue[i].time === queue[bi].time && queue[i].seq < queue[bi].seq)) bi = i;
+    const e = queue.splice(bi, 1)[0];
+    T = e.time;
+    e.fn();
+  }
+  if (bound.some((n, i) => i > 0 && n < bound[i - 1])) feat.add("reorder");
+  const final = last === null ? null : JSON.parse(JSON.stringify(last)); // (the sidecar is JSON: -0 is written 0)
+  return { notes, waits, shots, final, writes, feat, ledger: ledgerAtEnd };
+}
+
+/** The verifier's collision (p1overlap.mjs, round 6): an impact flash and its fault card 120 ms apart, each binding 200 ms
+ *  after its report, armed 10 s before — a fixed named row of the overlap census. */
+function p1CollisionRow() {
+  const b0 = { w: 280, h: 40, top: 10, visibility: "visible", display: "block", opacity: "1" };
+  const card = { title: "Сблъсък", head: "Нарушение", column: "shared", where: "append", columnBox: b0, box: b0, innerText: "Сблъсък\nСпри", rows: [{ text: "Спри", box: b0 }], bodyText: "" };
+  return {
+    layers: [], huds: [], dialogs: 0, camera: null, columnBox: b0,
+    mounts: [
+      { kind: "impact", at: 10_000, latency: 200, camera: undefined, removeAfter: 700, flash: { box: b0, wrapped: false, where: "append" }, card: null },
+      { kind: "card", at: 10_120, latency: 200, camera: undefined, removeAfter: null, flash: null, card },
+    ],
+    armAt: 0, t0Offset: 0, finishAt: 20_000,
+    jitter: [0], dumps: [{ ms: 40, fail: false, remove: false }], shots: [{ ms: 300, ok: true, throws: false }],
+  };
+}
+
+describe("§W18 H1 ROUND 7 — the posted-disc domain the product can publish, and the P1 block over overlapping series on one document and one clock", () => {
+  it("THE POSTED-DISC DOMAIN IS DERIVED, NOT CHOSEN — the content's discs (every edge's maxspeed, every district default, every lesson's recipe and route limits, as the renderer prints them) are the pinned list; the domain holds them, the renderer's floor 1, the 10 and 20 km/h zones and every profile boundary; every value in it is a whole number of at least 1", () => {
+    const got = postedDiscsFromContent();
+    assert.ok(got.files >= 100, `only ${got.files} district file(s) read from content/world — the domain would be derived from a partial copy`);
+    assert.ok(got.sources.edges > 800 && got.sources.defaults > 100 && got.sources.recipe > 40, `the content sources were not all read: ${JSON.stringify(got.sources)}`);
+    assert.deepEqual(got.discs, [...POSTED_DISC_CONTENT_PIN], `the content's discs changed — re-read content/world, then re-pin POSTED_DISC_CONTENT_PIN: ${got.discs.join(", ")}`);
+    for (const v of POSTED_DISC_CONTENT_PIN) assert.ok(POSTED_DISC_DOMAIN.includes(v), `the domain lacks the content's ${v}`);
+    // (round 7, resume) every speed ANY lesson recipe carries (zone, works, ring, exit, advisory …) is in the domain as well
+    assert.ok(got.recipeSpeeds.length >= 5, `only ${got.recipeSpeeds.length} recipe speed(s) read: ${got.recipeSpeeds.join(", ")}`);
+    for (const v of got.recipeSpeeds) assert.ok(POSTED_DISC_DOMAIN.includes(v), `the domain lacks the recipe speed ${v}`);
+    for (const v of [POSTED_DISC_SOURCE.renderFloorKmh, 10, 20, POSTED_DISC_SOURCE.fallbackKmh]) assert.ok(POSTED_DISC_DOMAIN.includes(v), `the domain lacks ${v}`);
+    for (const v of postedDiscBoundaries()) assert.ok(POSTED_DISC_DOMAIN.includes(v), `the domain lacks the profile boundary ${v}`);
+    for (const v of POSTED_DISC_DOMAIN) assert.ok(Number.isInteger(v) && v >= POSTED_DISC_SOURCE.renderFloorKmh, `${v} is not a disc the renderer prints`);
+    for (const v of POSTED_DISC_DECLARED.offDomain) {
+      assert.ok(!POSTED_DISC_DOMAIN.includes(v) && (!Number.isInteger(v) || v < 1), `${v} is declared off the domain but the renderer could print it`);
+      assert.equal(postedLimitKmh([`Ограничение ${String(v).replace(".", ",")} км/ч`]), v, `postedLimitKmh does not parse the off-domain ${v} — drawing it would not reach the lib's rule`);
+    }
+    // the floor boundaries: a reading can start a run under the first whole disc over each start rule, and under none at it
+    const L = paceK(H1.lamp), E = paceK(H1.em);
+    const startsUnder = (id, disc, r) => paceReal(id, [pt(10, { posted: disc }), pt(20, { posted: disc }), pt(30, { posted: disc }), pt(r, { posted: disc }), pt(r, { posted: disc })]).steps.some((s) => s.state.pace.started);
+    assert.equal(startsUnder(H1.lamp, L.start + 1, L.start + L.hq), true, "the lamp run does not start under the first whole disc over its start line");
+    assert.equal(startsUnder(H1.lamp, L.start, L.start), false, "the lamp run started under a disc AT its start line");
+    assert.equal(startsUnder(H1.em, E.floor + 1, E.floor + E.hq + 0.01), true, "the emergency run does not start under the first whole disc over its floor");
+    assert.equal(startsUnder(H1.em, E.floor, E.floor), false, "the emergency run started under a disc AT its floor");
+  });
+
+  it("V6-14, BY NAME — a run broken by a disc change to 20 км/ч (and to 10, 5, 1, and to a fraction the renderer never prints) prints the break, on both pace profiles, and the oracle agrees; a disc of 20 read on every tick is read, never «NOT SEEN»", () => {
+    for (const id of [H1.lamp, H1.em]) {
+      const launch = id === H1.lamp ? [pt(0), pt(10), pt(20), pt(30)] : [pt(10), pt(20), pt(30)];
+      for (const to of [20, 10, 5, 1, 0.5]) {
+        const prog = [...launch, pt(41), pt(44), pt(44, { posted: to }), ...pts(3, 44, { posted: to })];
+        const o = paceOracle(id, prog);
+        assert.equal(o.done, "run-broken", `${id} → ${to}: the oracle`);
+        assert.deepEqual(o.fails[0], "disc-change");
+        const r = paceReal(id, prog);
+        assert.equal(r.fin.done, "run-broken", `${id}: a disc change to ${to} did not break the run: ${r.line}`);
+        assert.equal(paceDisagreement(o, r), null, `${id} → ${to}: ${paceDisagreement(o, r)}`);
+        assert.notEqual(r.fin.heldAsSized, true, `${id} → ${to}: the outcome says held`);
+      }
+      // a disc of 20 all along: read, 0 changes, no unread ticks
+      const low = paceReal(id, pts(20, 15, { posted: 20 }));
+      assert.equal(low.fin.pace.postedKmh, 20, `${id}: a disc of 20 was not read`);
+      assert.equal(low.fin.pace.discUnread, 0, `${id}: a disc of 20 was counted unread`);
+    }
+  });
+
+  it("THE WHOLE-NUMBER SWEEP (round 7, resume) — beyond the domain, EVERY whole number 1…200 the renderer could print (its floor 1, up past the content's highest disc 140): a run broken by a disc change to it, and a drive read under it all along, are compared with the oracle on both pace profiles; the run starts under it exactly when a reading over the start rule by the dial's rounding fits under it; the disc is read, never unread", () => {
+    const SWEEP_TOP = 200;
+    for (const id of [H1.lamp, H1.em]) {
+      const K = paceK(id);
+      const canRun = (v) => (K.lamp ? v - K.hq >= K.start : v - K.hq > K.floor);
+      const launch = (posted) => (K.lamp ? [0, 10, 20, 30] : [10, 20, 30]).map((x) => pt(x, { posted }));
+      let broke = 0, ran = 0;
+      for (let v = POSTED_DISC_SOURCE.renderFloorKmh; v <= SWEEP_TOP; v++) {
+        // (a) the run starts under 50, then the disc changes to v
+        if (v !== 50) {
+          const prog = [...launch(50), pt(41), pt(44), pt(44, { posted: v }), ...pts(3, 44, { posted: v })];
+          const o = paceOracle(id, prog);
+          const r = paceReal(id, prog);
+          assert.equal(paceDisagreement(o, r), null, `${id} → ${v}: ${paceDisagreement(o, r)}`);
+          assert.equal(r.fin.done, "run-broken", `${id}: a disc change to ${v} did not break the run: ${r.line}`);
+          assert.equal(r.fin.pace.broke.f.disc, v, `${id} → ${v}: the break names another disc`);
+          broke += 1;
+        }
+        // (b) the disc is v all along, the dial at a pace a run can hold under it (or at v when none can)
+        const dial = canRun(v) ? Math.min(v, K.target, K.cap ?? Infinity) : v;
+        const prog = [...launch(v), ...pts(24, dial, { posted: v })];
+        const o = paceOracle(id, prog);
+        const r = paceReal(id, prog);
+        assert.equal(paceDisagreement(o, r), null, `${id} under ${v}: ${paceDisagreement(o, r)}`);
+        assert.equal(r.steps.some((s) => s.state.pace.started), canRun(v), `${id} under ${v}: the run ${canRun(v) ? "did not start" : "started"}`);
+        assert.equal(r.fin.pace.postedKmh, v, `${id}: a disc of ${v} was not read`);
+        assert.equal(r.fin.pace.discUnread, 0, `${id}: a disc of ${v} was counted unread`);
+        if (canRun(v)) ran += 1;
+      }
+      assert.equal(broke, SWEEP_TOP - 1);
+      assert.ok(ran > 100, `${id}: only ${ran} discs a run started under`);
+    }
+  });
+
+  it("THE OVERLAP CENSUS — the harness's P1 block over generated drives whose mounts share ONE document and ONE clock (series overlapping, an impact flash and its fault card together, bindings out of order, arming and the end between a report and its binding, twin cards and two flashes in one document, a series outlasting the 20 s end bound) prints every note, waits every wait, takes every shot and writes the sidecar exactly as the oracle simulates from P-a … P-h", async (t) => {
+    const t0 = Date.now();
+    const block = p1Block();
+    assert.ok(block, "the P1 block was not found");
+    const feat = new Map();
+    let drives = 0, seriesN = 0;
+    const check = async (spec, where) => {
+      const got = await p1RunOverlap(spec, block);
+      const o = p1OverlapOracle(spec);
+      assert.deepEqual(got.env.notes, o.notes, `${where}: the printed notes`);
+      assert.deepEqual(got.env.waits, o.waits, `${where}: the waits`);
+      assert.deepEqual(got.env.shots, o.shots, `${where}: the shots taken`);
+      assert.equal(got.env.writes.length, o.writes, `${where}: the sidecar writes`);
+      assert.deepEqual(got.paths, o.writes > 0 ? ["OUT/_audit-event-shots.json"] : [], `${where}: the sidecar's path`);
+      assert.deepEqual(got.final, o.final, `${where}: the sidecar`);
+      // (round 8) the end line is TRUE by what happened — its numbers against the oracle's own ledger, and against itself
+      assert.deepEqual(p1EndLineTruth(got.env.notes, o.ledger, got.final), [], `${where}: the end line`);
+      // (round 8) every sidecar write files each report it has seen in exactly one class — series or refusal, never both, never neither
+      for (const w of got.env.writes) { const x = JSON.parse(w.text); assert.equal(x.series.length + x.refused.length, x.seen, `${where}: a sidecar write files ${x.series.length} series and ${x.refused.length} refusals of ${x.seen} reports seen`); }
+      return o;
+    };
+    // the fixed row: the verifier's collision — each series its own three steps, its own names, its own bounds
+    const row = await check(p1CollisionRow(), "the collision row");
+    assert.deepEqual(row.shots, ["05-ev01-impact-p0s", "05-ev02-card-p0s", "05-ev01-impact-p1s", "05-ev02-card-p1s", "05-ev01-impact-p3s", "05-ev02-card-p3s"]);
+    assert.deepEqual(row.final.series.map((r) => r.shots.map((x) => [x.name, x.startedMs, x.doneMs])), [
+      [["05-ev01-impact-p0s", 200, 540], ["05-ev01-impact-p1s", 1000, 1340], ["05-ev01-impact-p3s", 3000, 3340]],
+      [["05-ev02-card-p0s", 200, 540], ["05-ev02-card-p1s", 1000, 1340], ["05-ev02-card-p3s", 3000, 3340]],
+    ]);
+    assert.ok(row.feat.has("overlap") && row.feat.has("collision-overlap"), "the collision row does not overlap");
+    for (const seed of P1_OVERLAP_SEEDS) {
+      const rnd = mulberry32(seed);
+      for (let k = 0; k < P1_OVERLAP_PER_SEED; k++) {
+        const spec = p1OverlapSpec(rnd);
+        const o = await check(spec, `P1 overlap seed ${seed} drive ${k}`);
+        for (const f of o.feat) feat.set(f, (feat.get(f) ?? 0) + 1);
+        drives += 1;
+        seriesN += o.final === null ? 0 : o.final.series.length;
+      }
+    }
+    const want = [
+      "overlap", "collision-overlap", "reorder", "armed-after-report", "late-binding", "race-won", "series-cap", "shot:threw", "dump:refused",
+      "dump:removed", "removed-by-page", "matched>1:impact", "matched>1:card", "matched0:impact", "matched0:card", "card:twin", "card:no-column",
+      "card:empty-title", "wait<=0",
+      // (round 8) a thrown step at EVERY step index it can happen at: the frame of step 1, 2 and 3, the wait of step 2 and 3
+      "threw@0:shot", "threw@1:shot", "threw@2:shot", "threw@1:wait", "threw@2:wait",
+      // (round 15) the title rule (as the serial census's floor), and ONE ADDED SUBTREE HOLDING SEVERAL: a column and a wrapper,
+      // two or more flashes, two and three or more cards reported from one added node — a later one painted, and not — a flash
+      // and a card reported together, a column mounted with two new cards (the product's shape), a card under no column, and a
+      // card that repeats a title first reported by an earlier card of the same subtree
+      ...P1_TITLE_FLOOR, "subtree:a-column", "subtree:a-wrapper", "subtree:two-or-more-flashes", "subtree:two-or-more-cards-reported", "subtree:three-or-more-cards-reported",
+      "subtree:a-flash-and-a-card-reported", "subtree:a-column-mounted-with-two-new-cards", "subtree:a-card-under-no-column", "subtree:a-repeat-of-a-card-of-the-same-subtree",
+      "subtree:a-later-card-reported:painted=true", "subtree:a-later-card-reported:painted=false",
+      // (round 15) ONE CALLBACK FOR SEVERAL ADDED NODES: a later node of the callback reported, and two or more nodes of one
+      // callback reported — as a record each and as one record listing them — and a text node standing before a node that reported
+      "callback:records:a-later-node-reported", "callback:nodes:a-later-node-reported", "callback:records:two-or-more-nodes-reported", "callback:nodes:two-or-more-nodes-reported",
+      "callback:a-text-node-before-a-node-that-reported",
+    ];
+    const short = want.filter((f) => (feat.get(f) ?? 0) < 3).map((f) => `${f}: ${feat.get(f) ?? 0}`);
+    assert.deepEqual(short, [], `the overlap census did not reach — ${short.join("; ")}`);
+    // (round 8, P-e) step 1 never waits (the binding runs at or after the report), so its wait never throws
+    assert.equal(feat.get("threw@0:wait") ?? 0, 0, "step 1 waited and threw — the census's clock model broke its own rule");
+    t.diagnostic(`P1 overlap: ${drives} drives (${seriesN} series), seeds ${P1_OVERLAP_SEEDS.join(",")} × ${P1_OVERLAP_PER_SEED}, in ${Date.now() - t0} ms; shapes ${JSON.stringify(Object.fromEntries(feat))}`);
+  });
+
+  it("THE OVERLAP CENSUS CAN FAIL — the oracle runs no harness code, and the oracle with each round-6 overlap survivor's class planted in IT (shots filed under the last series, the dump of the last same-title card, round 6's pendingAtWrite, the end line without its «still running» clause, a report checked against the arming at its mount; round 8: round 7's thrown series filed as a refusal too, a thrown series counted as no series) disagrees with the harness on the first seed's drives — and the unplanted oracle agrees on every one of them, byte for byte", async () => {
+    const src = p1OverlapOracle.toString();
+    for (const f of ["installEventWitness", "eventSeries", "eventDump", "p1Block", "querySelectorAll", "querySelector", "evaluate"]) {
+      assert.ok(!new RegExp(`\\b${f}\\b`).test(src), `the overlap oracle calls ${f}`);
+    }
+    const block = p1Block();
+    const plants = [
+      ["V6-26b's class: each shot filed under the LAST series", "rec.shots.push({ offsetMs: off, name, ok: s.ok, startedMs, doneMs: T - ev.at, dump: got });", "S0.series[S0.series.length - 1].shots.push({ offsetMs: off, name, ok: s.ok, startedMs, doneMs: T - ev.at, dump: got });"],
+      ["V6-31's class: the dump reads the LAST card with the title", "const c = cards[0];", "const c = cards[cards.length - 1];"],
+      ["round 6's pendingAtWrite: every run ever started", "pendingAtWrite: open, ...S0", "pendingAtWrite: runs.length, ...S0"],
+      // (round 8: the line is rendered from the ledger, so the clause is dropped there — a running series counted as done)
+      ["the end line without its «still running» clause", "    notes.push(p1EndLineFrom(ledger));", "    notes.push(p1EndLineFrom(ledger.map((x) => (x.series && x.ended === null ? { ...x, ended: \"every-step\" } : x))));"],
+      ["a report checked against the arming at its mount", "    if (!S0.armed) {\n      S0.refused.push", "    if (ev.reportedUnarmed) {\n      S0.refused.push"],
+      // (round 8, P1-THREW-DOUBLE-COUNT) round 7's sidecar: a thrown series left unmarked and filed as a refusal as well
+      ["round 7's class: a thrown series is also a refusal", "      rec.ended = \"threw\";\n      rec.why = `threw: ${msg}`;", "      S0.refused.push({ n: ev.n, kind: ev.kind, why: `threw: ${msg}` });"],
+      // …and its end line: the thrown series counted where no series began
+      ["round 7's class: a thrown series counted as no series", "      out.ended = \"threw\";", "      out.series = false;\n      out.why = `threw: ${msg}`;"],
+      // (round 15, the round-14 verifier's V14-P1-TITLE-AND-SUBTREE) the four witness edits that survived round 14, each as its class
+      ["V14-Q24B's class: one card report for each added subtree", "        report(\"card\", title, card.head === null ? \"\" : collapse(card.head), painted(card.box));\n", "        report(\"card\", title, card.head === null ? \"\" : collapse(card.head), painted(card.box));\n        break;\n"],
+      ["V14-Q23's class: one flash report for each added subtree", "      for (let k = 0; k < placed.flashes.length; k++) report(\"impact\", null, null, null);", "      for (let k = 0; k < Math.min(1, placed.flashes.length); k++) report(\"impact\", null, null, null);"],
+      ["V14-Q16's class: the title between plain quotes", "  const quoted = p1JsonQuoted;", "  const quoted = (s) => `\"${s}\"`;"],
+      ["V14-Q17's class: titles compared without their letter case", "        const how = title === \"\" ? \"empty\" : seenTitles.has(title) ? \"repeat\" : \"new\";", "        const how = title === \"\" ? \"empty\" : [...seenTitles.keys()].some((x) => x.toLowerCase() === title.toLowerCase()) ? \"repeat\" : \"new\";"],
+      ["V14-Q18's class: only ASCII white space collapsed", "  const collapse = p1TitleOf;", "  const collapse = (s) => s.replace(/[ \\t\\r\\n]+/g, \" \").trim();"],
+      ["a title compared after NFC", "        const title = collapse(card.title);\n        const how", "        const title = collapse(card.title).normalize(\"NFC\");\n        const how"],
+      ["only the first node of an observer callback examined", "      for (const [pk, placed] of placedAll.entries()) {", "      for (const [pk, placed] of placedAll.slice(0, 1).entries()) {"],
+    ];
+    // (round 12: + P1_VISIBILITY_PAINTS, the specification's painted table the oracle now decides by; round 15: + the title
+    // rule, JSON's quoting and the title features, each written out in this file)
+    const OV = (text) => new Function("P1_OVERLAP_BASE", "p1SharedDoc", "TOAST_COLUMN_ATTR", "p1EndLineFrom", "p1ThrownNote", "P1_VISIBILITY_PAINTS", "p1TitleOf", "p1JsonQuoted", "p1TitleFeats", `return (${text});`)(P1_OVERLAP_BASE, p1SharedDoc, TOAST_COLUMN_ATTR, p1EndLineFrom, p1ThrownNote, P1_VISIBILITY_PAINTS, p1TitleOf, p1JsonQuoted, p1TitleFeats);
+    // the control: the oracle, compiled the same way and unplanted, agrees with the harness on every drive the plants use
+    {
+      const good = OV(src);
+      const rnd = mulberry32(P1_OVERLAP_SEEDS[0]);
+      for (let k = 0; k < P1_OVERLAP_PER_SEED; k++) {
+        const spec = p1OverlapSpec(rnd);
+        const got = await p1RunOverlap(spec, block);
+        const o = good(spec);
+        assert.equal(JSON.stringify([got.env.notes, got.final]), JSON.stringify([o.notes, o.final]), `the unplanted oracle disagrees on drive ${k}`);
+      }
+    }
+    for (const [label, from, to] of plants) {
+      assert.equal(src.split(from).length, 2, `${label}: the plant's anchor is not unique in the oracle`);
+      const bad = OV(src.replace(from, to));
+      const rnd = mulberry32(P1_OVERLAP_SEEDS[0]);
+      let disagree = 0;
+      for (let k = 0; k < P1_OVERLAP_PER_SEED && disagree === 0; k++) {
+        const spec = p1OverlapSpec(rnd);
+        const got = await p1RunOverlap(spec, block);
+        const o = bad(spec);
+        if (JSON.stringify([got.env.notes, got.final]) !== JSON.stringify([o.notes, o.final])) disagree += 1;
+      }
+      assert.ok(disagree > 0, `${label}: the planted oracle agreed with the harness on every drive of seed ${P1_OVERLAP_SEEDS[0]} — the census could not see it`);
+    }
+  });
+
+  it("THE TITLE RULE IS THE SPECIFICATION'S (round 15) — the P1 comment states the rule (every flash and every card of an added node; a title's white space, code unit by code unit; titles one only when they are the same code units; the title printed JSON-quoted), the white-space list it gives is exactly what the runtime's \\s matches and its trim removes over all 65,536 code units, the oracles' written-out collapse and quoting are that rule on every code unit and on seeded texts, and the title source draws every kind of title the floors read", () => {
+    const doc = SRC.slice(SRC.indexOf(" * H1 ROUND 15 (the round-14 verifier's V14-P1-TITLE-AND-SUBTREE)"), SRC.indexOf("const EVENT_FLASH_SEL = ")).replace(/\n \*\s*/g, " ");
+    for (const said of ["EVERY ADDED ELEMENT: of every record the observer's callback is handed, every added node that is an element (a text node is not one), in the order handed",
+      "EVERY ONE: each impact flash — the added node when it is one, else every one under it, in document order — and then each toast body, the same way", "arrive as ONE added subtree, and each of them is examined",
+      "A CARD'S TITLE is the text of the first <p> under the card, with every run of white space written as ONE U+0020 and none left at either end",
+      "U+0009–U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 and U+FEFF — and nothing else (U+0085, U+180E, U+200B and U+2060 are not white space, and stay)",
+      "a card whose title is empty, or whose card is not under the toast column, is not reported", "two titles are one title only when they are the same UTF-16 code units in the same order (letter case is not folded, nothing is normalised)",
+      "THE MOUNT LINE prints the title JSON-quoted, as JSON.stringify writes it: the quote, the backslash and every control U+0000–U+001F escaped, a surrogate that is not half of a pair escaped, every other code unit as itself"]) {
+      assert.ok(doc.includes(said), `the P1 comment does not say «${said}»`);
+    }
+    // the white-space list IS the comment's, and IS the runtime's: \s matches a code unit, and trim removes it, exactly when it is listed
+    const listed = [...thrownCutRange(0x09, 0x0d), 0x20, 0xa0, 0x1680, ...thrownCutRange(0x2000, 0x200a), 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff];
+    assert.deepEqual([...P1_TITLE_WHITE_SPACE], listed, "P1_TITLE_WHITE_SPACE is not the comment's list");
+    const off = [];
+    for (let u = 0; u <= 0xffff; u++) {
+      const is = P1_TITLE_WHITE_SPACE.includes(u);
+      if (/\s/.test(CH(u)) !== is || (CH(u).trim() === "") !== is) off.push(thrownHex(u));
+    }
+    assert.deepEqual(off, [], "code units the runtime's \\s or trim treat otherwise than the list");
+    assert.ok(P1_TITLE_LOOK_ALIKES.every((u) => !P1_TITLE_WHITE_SPACE.includes(u)) && [0x85, 0x180e, 0x200b, 0x2060].every((u) => P1_TITLE_LOOK_ALIKES.includes(u)), "the look-alikes are white space, or the comment's four are not among them");
+    // the written-out rule and quoting, against the runtime's, on every code unit (alone, between letters, doubled, at each end)
+    // and on seeded texts of the title source and of the whole code-unit space
+    const texts = ["", " ", "a  b", " a ", "a\n\tb", `a${CH(0xd83d, 0xde00)}b`, `${CH(0xde00, 0xd83d)}`, "\"\\/"];
+    for (let u = 0; u <= 0xffff; u++) texts.push(CH(u), `a${CH(u)}b`, `a${CH(u, u)}b`, `${CH(u)}a`, `a${CH(u)}`);
+    const rnd = mulberry32(1515);
+    const draw = p1TitleSource(rnd);
+    for (let i = 0; i < 3000; i++) texts.push(draw());
+    for (let i = 0; i < 2000; i++) texts.push(Array.from({ length: Math.floor(rnd() * 40) }, () => CH(Math.floor(rnd() * 0x10000))).join(""));
+    const bad = [];
+    for (const s of texts) {
+      if (p1TitleOf(s) !== s.replace(/\s+/g, " ").trim() && bad.length < 6) bad.push(`the title of ${JSON.stringify(s.slice(0, 60))}`);
+      if (p1JsonQuoted(s) !== JSON.stringify(s) && bad.length < 6) bad.push(`the quoting of ${JSON.stringify(s.slice(0, 60))}`);
+    }
+    assert.deepEqual(bad, [], "the oracles' written-out rule is not the stated one");
+    // what the title source draws, read off 800 titles of one seed: every kind the floors read
+    const kinds = new Set();
+    const seen = new Map();
+    const src = p1TitleSource(mulberry32(77));
+    for (let i = 0; i < 800; i++) {
+      const raw = src();
+      const t = p1TitleOf(raw);
+      const how = t === "" ? "empty" : seen.has(t) ? "repeat" : "new";
+      for (const f of p1TitleFeats(raw, t, how, seen)) kinds.add(f);
+      if (how === "new") seen.set(t, raw);
+    }
+    assert.deepEqual(P1_TITLE_FLOOR.filter((f) => !kinds.has(f)), [], "the title source never drew these");
+    assert.equal(P1_TITLE_FLOOR.length, 25 + 3 + 12, "the title floor's entries");
+  });
+
+  it("V6-31, DECIDED — the dump says what it reads: the FIRST element in document order its selector matches, and `matched`, how many; the harness's comment says so, and a twin card mounted FIRST in the column is the one dumped, with matched 2", async () => {
+    assert.match(SRC, /the dump is of the FIRST element in document order its selector matches/);
+    assert.match(SRC, /`matched`\s*\n?\s*\*?\s*says how many it matched/);
+    const b0 = { w: 280, h: 40, top: 10, visibility: "visible", display: "block", opacity: "1" };
+    const card = (innerText, where) => ({ title: "Сблъсък", head: null, column: "shared", where, columnBox: b0, box: b0, innerText, rows: [], bodyText: "" });
+    const spec = {
+      layers: [], huds: [], dialogs: 0, camera: null, columnBox: b0,
+      mounts: [
+        { kind: "card", at: 1000, latency: 0, camera: undefined, removeAfter: null, flash: null, card: card("first mounted", "append") },
+        { kind: "card", at: 1500, latency: 0, camera: undefined, removeAfter: null, flash: null, card: card("mounted later, placed first", "first") },
+      ],
+      armAt: 0, t0Offset: 0, finishAt: 9000, jitter: [0], dumps: [{ ms: 10, fail: false, remove: false }], shots: [{ ms: 10, ok: true, throws: false }],
+    };
+    const got = await p1RunOverlap(spec);
+    assert.deepEqual(got.final, p1OverlapOracle(spec).final);
+    const dumps = got.final.series[0].shots.map((x) => x.dump);
+    assert.deepEqual(dumps.map((d) => [d.matched, d.card.innerText]), [[1, "first mounted"], [2, "mounted later, placed first"], [2, "mounted later, placed first"]]);
+  });
+
+  it("D · THE END LINE AND pendingAtWrite ARE TRUE — a series still running when the 20 s bound ends is said so and counted open in the sidecar written then; a report bound after the end is not in the line's count, and is in the sidecar as a refusal", async () => {
+    const b0 = { w: 280, h: 40, top: 10, visibility: "visible", display: "block", opacity: "1" };
+    const spec = {
+      layers: [], huds: [], dialogs: 0, camera: null, columnBox: b0,
+      mounts: [
+        { kind: "impact", at: 1000, latency: 0, camera: undefined, removeAfter: null, flash: { box: b0, wrapped: false, where: "append" }, card: null },
+        { kind: "impact", at: 1100, latency: 30_000, camera: undefined, removeAfter: null, flash: { box: b0, wrapped: false, where: "append" }, card: null },
+      ],
+      armAt: 0, t0Offset: 0, finishAt: 1200, jitter: [0], dumps: [{ ms: 10, fail: false, remove: false }], shots: [{ ms: 12_000, ok: true, throws: false }],
+    };
+    const got = await p1RunOverlap(spec);
+    const o = p1OverlapOracle(spec);
+    assert.deepEqual(got.env.notes, o.notes);
+    assert.deepEqual(got.final, o.final);
+    const end = got.env.notes.find((s) => s.startsWith("  EVENT SHOTS: "));
+    // (round 8: the classes, the running series among them, adding up to the one report received)
+    assert.equal(end, "  EVENT SHOTS: of 1 report(s) the harness had received from the page-side witness, 0 led to a series that ran every scheduled step (0 frame(s) written), 0 to a series a throw ended early (0 frame(s) written before it), 1 to a series still running when this line was written (1 frame(s) written so far) and 0 to no series (not-driving 0 · series-cap 0 · a throw before its series 0); these figures are as of this line — _audit-event-shots.json");
+    assert.deepEqual(p1EndLineTruth(got.env.notes, o.ledger, null), [], "the end line is not true to what happened");
+    const atEnd = JSON.parse(got.env.writes[got.env.writes.findIndex((w, i) => i > 0 && JSON.parse(w.text).armed === false && JSON.parse(w.text).series[0].shots.length === 1)].text);
+    assert.equal(atEnd.pendingAtWrite, 1, "the sidecar written at the end does not count the series still running");
+    assert.deepEqual(got.final.refused.map((r) => r.why), ["not-driving"], "the report bound after the end is not a refusal in the final sidecar");
+    assert.equal(got.final.pendingAtWrite, 1, "the last write (the running series' final frame) does not count its writer's own run");
+  });
+});
+
+/* ── §W19 H1 ROUND 8 — THE END LINE ADDS UP (harness-h1-r7-verifier, P1-THREW-DOUBLE-COUNT) ───────────────────────────────
+ *
+ * Round 7 (h1-r7-result.patch) was REFUTED on ONE printed sentence. When a series' step THREW, the binding's catch pushed a
+ * «threw» refusal for a mount already in `series`, and the end line printed both counts: «1 series taken (2 frames), 1
+ * mount(s) not shot, of 1 report(s)» for a mount shot twice. Both oracles pushed the same refusal and printed the same
+ * words, so no comparison of text could see it (the census drew the thrown shape 207 times).
+ * WHAT ROUND 8 DOES:
+ *   A · THE HARNESS classifies a throw ONCE, where it happens (lesson-audit.mjs `eventSeries` / `eventSeriesThrew`): before
+ *       the series is recorded the report is a «threw» refusal and began no series; after it the series is marked
+ *       `ended: "threw"` with its `why`, keeps the steps that ran, prints its own line, and is NOT also a refusal. A series
+ *       whose every step ran is marked `ended: "every-step"` and written. The end line (`eventShotsEndLine`) says what was
+ *       done with each report received, in classes that ADD UP to that count, with the frames written per series class.
+ *   B · THE ORACLES keep their OWN per-report ledger (what was done, the frames each series wrote, tallied as each shot
+ *       returned) and render the end line from it (`p1EndLineFrom`); and EVERY census drive reads the harness's printed
+ *       line by its NUMBERS and checks them against that ledger and against themselves (`p1EndLineTruth`) — rules about
+ *       what happened, not about wording. Both censuses draw a thrown step at EVERY step index it can happen at (the frame
+ *       of steps 1–3, the wait of steps 2–3; step 1 never waits), and the fixed rows below throw before the series, in the
+ *       mount line before any step, with an unreadable error, and in the bounds line after every step.
+ *   C · The round-7 verifier's two survivors, DECIDED: V7-53 (the dump's `cards.includes(el)` de-duplication) is now killed
+ *       by a fixed row whose card carries two toast bodies; V7-06 (the floor and disc break reasons swapped) is EQUIVALENT —
+ *       a run starts only on a reading over the floor by the half quantum and at or under the disc, so the run's disc is
+ *       over floor + half quantum and no reading can fail both — and a test executes that over the whole pace census.
+ * The threat model above §W11 binds: a false sentence the harness prints is always in model. */
+
+/** The harness's P1 block, compiled with a controllable page, frame, note and clock; armed at the clock's start.
+ *  (round 9, resumed: `arm: false` leaves it unarmed, and `onWait(ms)` is called at the start of every page wait — both
+ *  default to what every earlier row ran.) */
+async function p1Direct({ shot = async () => true, note = null, arm = true, onWait = null } = {}) {
+  const blk = p1Block();
+  const clock = { now: 5_000_000 };
+  const env = { notes: [], writes: [], bindings: {}, rejections: [] };
+  const page = {
+    addInitScript: async () => {},
+    exposeBinding: async (name, fn) => void (env.bindings[name] = fn),
+    waitForTimeout: async (ms) => { if (onWait) onWait(ms); clock.now += ms; },
+    evaluate: async () => ({ at: clock.now, camera: null, card: null, flash: null, matched: 1 }),
+  };
+  const api = new Function("page", "note", "shot", "writeFileSync", "OUT", "SCENARIO", "h1ProbeReads", "Date",
+    `"use strict";\n${blk.code.slice(blk.from, blk.to)}\nreturn { installEventWitness, armEventShots, finishEventShots, eventShots };`)(
+    page, note ?? ((s) => env.notes.push(s)), shot, (path, text) => void env.writes.push(text), "OUT", H1.em, LIBNS.h1ProbeReads, { now: () => clock.now });
+  await api.installEventWitness();
+  if (arm) api.armEventShots(clock.now);
+  const report = (n) => ({ n, kind: "impact", title: null, head: null, cardPainted: null, at: clock.now, overlay: { layers: [], huds: [], dialogs: 0, camera: null } });
+  const bind = async (ev) => {
+    env.bindings.__auditEvent(null, ev);
+    const st = await Promise.allSettled(api.eventShots.pending);
+    for (const s of st) if (s.status === "rejected") env.rejections.push(String(s.reason));
+  };
+  const finish = async () => {
+    await api.finishEventShots();
+    return { end: env.notes.filter((s) => s.startsWith("  EVENT SHOTS: ")), final: JSON.parse(env.writes[env.writes.length - 1]) };
+  };
+  return { api, env, clock, report, bind, finish };
+}
+/** A ledger as the harness's own sidecar records it — for the fixed rows, whose truth is checked against their own asserts. */
+const sidecarLedger = (final) => [
+  ...final.series.map((r) => ({ n: r.n, series: true, ended: r.ended ?? null, frames: r.shots.filter((x) => x.ok).length, why: null })),
+  ...final.refused.map((r) => ({ n: r.n, series: false, ended: null, frames: 0, why: r.why })),
+];
+/** One impact mount, armed, bound 200 ms after its report; the frame and wait tapes given. */
+function p1OneMount({ shots, waitFails = [false], finishAt = 30_000 }) {
+  const b0 = { w: 280, h: 40, top: 10, visibility: "visible", display: "block", opacity: "1" };
+  return {
+    layers: [], huds: [], dialogs: 0, camera: null, columnBox: b0,
+    mounts: [{ kind: "impact", at: 1000, latency: 200, camera: undefined, removeAfter: null, flash: { box: b0, wrapped: false, where: "append" }, card: null }],
+    armAt: 0, t0Offset: 0, finishAt, jitter: [0], dumps: [{ ms: 40, fail: false, remove: false }], shots, waitFails,
+  };
+}
+const OKS = { ms: 300, ok: true, throws: false };
+const THROWS = { ms: 300, ok: true, throws: true };
+
+describe("§W19 H1 ROUND 8 — the end line adds up: a throw is classified once, the oracles count from their own ledger, and every census drive checks the line by what happened", () => {
+  it("P1-THREW-DOUBLE-COUNT, BY NAME — one mount whose frame throws at step 1, 2 or 3, or whose wait throws at step 2 or 3: the harness prints one series a throw ended early with the frames its steps wrote, no mount «not shot», the classes adding up to the ONE report; the sidecar files it once, marked `ended: \"threw\"`, and the oracle agrees", async () => {
+    // (round 10: what the harness says of each thrown Error — its kind, then its one-line message JSON-quoted)
+    const SHOT = "an Error, its message \"the fake shot threw\"", WAIT = "an Error, its message \"the fake page's wait threw\"";
+    const rows = [
+      ["the frame of step 1 throws", { shots: [THROWS] }, 0, SHOT],
+      ["the frame of step 2 throws", { shots: [OKS, THROWS] }, 1, SHOT],
+      ["the frame of step 3 throws (the verifier's «(2 frames), 1 mount(s) not shot»)", { shots: [OKS, OKS, THROWS] }, 2, SHOT],
+      ["the wait of step 2 throws", { shots: [OKS], waitFails: [true] }, 1, WAIT],
+      ["the wait of step 3 throws", { shots: [OKS], waitFails: [false, true] }, 2, WAIT],
+    ];
+    for (const [label, tapes, k, msg] of rows) {
+      const spec = p1OneMount(tapes);
+      const got = await p1RunOverlap(spec);
+      const o = p1OverlapOracle(spec);
+      assert.deepEqual(got.env.notes, o.notes, `${label}: the notes`);
+      assert.deepEqual(got.final, o.final, `${label}: the sidecar`);
+      const end = got.env.notes.filter((s) => s.startsWith("  EVENT SHOTS: "));
+      assert.deepEqual(end, [`  EVENT SHOTS: of 1 report(s) the harness had received from the page-side witness, 0 led to a series that ran every scheduled step (0 frame(s) written), 1 to a series a throw ended early (${k} frame(s) written before it) and 0 to no series (not-driving 0 · series-cap 0 · a throw before its series 0) — _audit-event-shots.json`], label);
+      assert.ok(!got.env.notes.some((s) => /not shot/.test(s)), `${label}: a line still says «not shot»`);
+      assert.ok(got.env.notes.includes(p1ThrownNote(1, k, 3, `threw: ${msg}`, Array(k).fill(true))), `${label}: the thrown series' own line`);
+      assert.ok(!got.env.notes.some((s) => s.startsWith("      EVENT SHOT 1: each shot's step")), `${label}: a bounds line for a series that did not run every step`);
+      assert.deepEqual(got.final.refused, [], `${label}: the thrown series is filed as a refusal as well`);
+      assert.deepEqual([got.final.series.length, got.final.series[0].ended, got.final.series[0].why, got.final.series[0].shots.length], [1, "threw", `threw: ${msg}`, k], label);
+      assert.deepEqual(p1EndLineTruth(got.env.notes, o.ledger, got.final), [], `${label}: the end line`);
+      assert.deepEqual(p1EndLineTruth(got.env.notes, sidecarLedger(got.final), got.final), [], `${label}: the end line against the sidecar`);
+    }
+    // and a series whose every step ran is marked so, and written once more when it ends
+    const spec = p1OneMount({ shots: [OKS] });
+    const got = await p1RunOverlap(spec);
+    assert.equal(got.final.series[0].ended, "every-step");
+    assert.equal(JSON.parse(got.env.writes[3].text).series[0].ended, "every-step", "the write after the last step does not mark the series ended");
+    assert.equal(JSON.parse(got.env.writes[2].text).series[0].ended, undefined, "the series was marked ended before its last step");
+  });
+
+  it("A THROW BEFORE THE SERIES, AND A THROW BEFORE ITS FIRST STEP — a malformed report throws before its series is recorded: it began no series and is counted as «a throw before its series»; a report whose mount line throws began a series that a throw ended after 0 of its 3 steps; each is filed once, and the line adds up", async () => {
+    {
+      const d = await p1Direct();
+      await d.bind(null);
+      const { end, final } = await d.finish();
+      assert.deepEqual(end, ["  EVENT SHOTS: of 1 report(s) the harness had received from the page-side witness, 0 led to a series that ran every scheduled step (0 frame(s) written), 0 to a series a throw ended early (0 frame(s) written before it) and 1 to no series (not-driving 0 · series-cap 0 · a throw before its series 1) — _audit-event-shots.json"]);
+      assert.deepEqual([final.series.length, final.refused.length, final.refused[0].n, final.refused[0].kind], [0, 1, null, null]);
+      assert.match(final.refused[0].why, /^threw: /);
+      assert.deepEqual(d.env.rejections, [], "a run rejected");
+      assert.deepEqual(p1EndLineTruth(d.env.notes, sidecarLedger(final), final), []);
+    }
+    {
+      const d = await p1Direct();
+      await d.bind({ ...d.report(1), overlay: null });
+      const { end, final } = await d.finish();
+      assert.deepEqual(end, ["  EVENT SHOTS: of 1 report(s) the harness had received from the page-side witness, 0 led to a series that ran every scheduled step (0 frame(s) written), 1 to a series a throw ended early (0 frame(s) written before it) and 0 to no series (not-driving 0 · series-cap 0 · a throw before its series 0) — _audit-event-shots.json"]);
+      assert.deepEqual([final.refused.length, final.series.length, final.series[0].ended, final.series[0].shots.length], [0, 1, "threw", 0]);
+      const line = d.env.notes.find((s) => s.startsWith("      EVENT SHOT 1: a throw ended this series after 0 of its 3 scheduled steps had run (threw: "));
+      assert.ok(line && !line.includes("frame written by those steps"), `the mount-line throw's own line: ${line}`);
+      assert.deepEqual(p1EndLineTruth(d.env.notes, sidecarLedger(final), final), []);
+    }
+  });
+
+  it("AN ERROR WHOSE MESSAGE CANNOT BE READ is still classified once — «threw: an object; reading its message threw» on the series (round 10's words; round 8's were «(the error could not be read)»), never a rejected run or a lost count", async () => {
+    const d = await p1Direct({ shot: async () => { throw { get message() { throw new Error("unreadable"); } }; } });
+    await d.bind(d.report(1));
+    const { end, final } = await d.finish();
+    assert.deepEqual(d.env.rejections, []);
+    assert.deepEqual([final.series[0].ended, final.series[0].why, final.refused.length], ["threw", "threw: an object; reading its message threw", 0]);
+    assert.match(end[0], /, 1 to a series a throw ended early \(0 frame\(s\) written before it\) and 0 to no series /);
+  });
+
+  it("THE BOUNDS LINE THROWING, AFTER EVERY STEP RAN — the series is already marked «every-step», is not filed again, no run rejects unhandled, and the end line adds up", async () => {
+    const notes = [];
+    const note = (s) => {
+      if (s.includes("each shot's step (its DOM dump, then its frame) ran inside")) throw new Error("the log refused the bounds line");
+      notes.push(s);
+    };
+    const d = await p1Direct({ note });
+    await d.bind(d.report(1));
+    await d.bind(d.report(2));
+    await d.api.finishEventShots();
+    const final = JSON.parse(d.env.writes[d.env.writes.length - 1]);
+    assert.deepEqual(d.env.rejections, []);
+    assert.deepEqual(final.series.map((r) => r.ended), ["every-step", "every-step"]);
+    assert.deepEqual(final.refused, []);
+    const end = notes.filter((s) => s.startsWith("  EVENT SHOTS: "));
+    assert.deepEqual(end, ["  EVENT SHOTS: of 2 report(s) the harness had received from the page-side witness, 2 led to a series that ran every scheduled step (6 frame(s) written), 0 to a series a throw ended early (0 frame(s) written before it) and 0 to no series (not-driving 0 · series-cap 0 · a throw before its series 0) — _audit-event-shots.json"]);
+  });
+
+  it("THE END-LINE CENSUS CAN FAIL — round 7's own P1 code (a thrown series left unmarked and filed as a refusal by the binding's catch), planted back into the harness, and a thrown series marked as if every step ran, are each caught by the TRUTH rules on the serial census's drives — rules about what happened, which no shared wording can satisfy", async () => {
+    const plants = [
+      ["round 7's binding catch and unmarked series", [
+        ["    eventSeriesThrew(ev, rec, e);\n    return;", "    throw e;"],
+        ["const run = eventSeries(ev).catch(() => {});", "const run = eventSeries(ev).catch((e) => eventShots.refused.push({ n: ev?.n ?? null, kind: ev?.kind ?? null, why: `threw: ${String(e && e.message ? e.message : e)}` }));"],
+      ]],
+      ["a thrown series marked as if every step ran", [["    rec.ended = \"threw\";", "    rec.ended = \"every-step\";"]]],
+    ];
+    for (const [label, edits] of plants) {
+      let src = SRC;
+      for (const [from, to] of edits) {
+        assert.equal(src.split(from).length, 2, `${label}: the plant's anchor «${from}» is not unique in the harness`);
+        src = src.replace(from, () => to);
+      }
+      const block = p1Block(src);
+      const rnd = mulberry32(P1_CENSUS_SEEDS[0]);
+      let caught = 0;
+      for (let k = 0; k < P1_CENSUS_PER_SEED && caught === 0; k++) {
+        const spec = p1DriveSpec(rnd);
+        const got = await p1Run(spec, block);
+        if (p1EndLineTruth(got.env.notes, p1Oracle(spec).ledger, got.final).length > 0) caught += 1;
+      }
+      assert.ok(caught > 0, `${label}: the truth rules passed the planted harness on every drive of seed ${P1_CENSUS_SEEDS[0]}`);
+    }
+  });
+
+  it("V7-53, DECIDED — the dump counts each card ONCE: a card carrying two toast bodies (the product renders one; this fixed row gives it two) is one card, matched 1, and the oracle agrees", async () => {
+    const b0 = { w: 280, h: 40, top: 10, visibility: "visible", display: "block", opacity: "1" };
+    const spec = {
+      layers: [], huds: [], dialogs: 0, camera: null, columnBox: b0,
+      mounts: [{ kind: "card", at: 1000, latency: 0, camera: undefined, removeAfter: null, flash: null, card: { title: "Сблъсък", head: null, column: "shared", where: "append", columnBox: b0, box: b0, innerText: "Сблъсък", rows: [], bodyText: "тяло", bodies: 2 } }],
+      armAt: 0, t0Offset: 0, finishAt: 9000, jitter: [0], dumps: [{ ms: 10, fail: false, remove: false }], shots: [OKS],
+    };
+    const got = await p1RunOverlap(spec);
+    const o = p1OverlapOracle(spec);
+    assert.deepEqual(got.final, o.final);
+    assert.deepEqual(got.final.series[0].shots.map((x) => x.dump.matched), [1, 1, 1], "a card with two toast bodies was counted twice");
+  });
+
+  it("V7-06, DECIDED — EQUIVALENT: the floor and the disc never fail on one reading inside a run (a run starts over the floor by the half quantum and at or under its disc, so its disc is over floor + half quantum), executed over the whole generative pace census on both profiles; both reasons are reached, never together", () => {
+    for (const id of [H1.lamp, H1.em]) {
+      const K = paceK(id);
+      let floor = 0, disc = 0, both = 0;
+      for (const seed of PACE_CENSUS_SEEDS) {
+        const rnd = mulberry32(seed ^ (id === H1.lamp ? 0x1a1a : 0x2b2b));
+        for (let k = 0; k < PACE_CENSUS_PER_SEED; k++) {
+          // (the same draws, in the same order, as §W17's census)
+          const lead = [0, 0, 3000, 12_345, 499][Math.floor(rnd() * 5)];
+          void ["pc", "pc", "mobile", "tablet", null][Math.floor(rnd() * 5)];
+          const g = paceSource(K, rnd);
+          const o = paceOracle(id, g.source, { lead });
+          if (o.done !== "run-broken") continue;
+          if (o.fails.includes("floor")) floor += 1;
+          if (o.fails.includes("disc")) disc += 1;
+          if (o.fails.includes("floor") && o.fails.includes("disc")) both += 1;
+        }
+      }
+      assert.equal(both, 0, `${id}: a breaking reading failed the floor AND the disc`);
+      assert.ok(floor > 0 && disc > 0, `${id}: the census broke on the floor ${floor} and on the disc ${disc} times`);
+    }
+  });
+
+  /* ── H1 ROUND 9 (harness-h1-r8-verifier: V8-45 and V8-46 REFUTED, V8-47 a condition) ─────────────────────────────────
+   * Round 8's thrown-series line was pinned only for one-line Errors, so two mutants that change a printed value lived:
+   * V8-45 printed the WHOLE multi-line error on the line (a Playwright error carries a «Call log» on its later lines), and
+   * V8-46 read every thrown value through `.message`, printing «(threw: undefined)» for a thrown string — a false
+   * sentence. V8-47 filed a throw before its series as «threw: » with no text, and the fixed row asserted only /^threw: /.
+   * Each row below spells out, character for character, the line and the sidecar `why` the harness must write — the
+   * expected texts are this table's, written by hand, never computed by harness code. */
+
+  it("V8-45 · A MULTI-LINE ERROR — the thrown series' line prints the error's FIRST line only and says, truly, how many lines it had and where every one of them is; no printed line carries a line break or a word of a later line; the sidecar's `why` keeps the whole text", async () => {
+    // (round 10: the message is JSON-quoted on both; the cut says which line of how many, and how many of the message's
+    // UTF-16 code units the line carries — the three numbers are this table's, counted by hand)
+    const TAIL = (k, kept, all) => ` (line 1 of ${k}, ${kept} of its ${all} UTF-16 code units; the whole message is in the series' why in the sidecar)`;
+    const rows = [
+      ["new Error(\"a\\nb\") (the verifier's row)", () => new Error("a\nb"), `an Error, its message's first line "a"${TAIL(2, 1, 3)}`, "threw: an Error, its message \"a\\nb\"", []],
+      ["a two-line Error whose second line has a word of its own", () => new Error("the first line\nLATERWORD"), `an Error, its message's first line "the first line"${TAIL(2, 14, 24)}`, "threw: an Error, its message \"the first line\\nLATERWORD\"", ["LATERWORD"]],
+      ["a Playwright-shaped error with its call log", () => new Error("page.screenshot: Timeout 30000ms exceeded.\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load..."),
+        `an Error, its message's first line "page.screenshot: Timeout 30000ms exceeded."${TAIL(4, 42, 112)}`, "threw: an Error, its message \"page.screenshot: Timeout 30000ms exceeded.\\nCall log:\\n  - taking page screenshot\\n  - waiting for fonts to load...\"", ["Call log", "fonts"]],
+      ["\\r\\n and a bare \\r are line breaks too", () => new Error("a\r\nSECONDWORD\rTHIRDWORD"), `an Error, its message's first line "a"${TAIL(3, 1, 23)}`, "threw: an Error, its message \"a\\r\\nSECONDWORD\\rTHIRDWORD\"", ["SECONDWORD", "THIRDWORD"]],
+      ["a trailing line break is a second, empty line", () => new Error("first\n"), `an Error, its message's first line "first"${TAIL(2, 5, 6)}`, "threw: an Error, its message \"first\\n\"", []],
+      ["a one-line error is printed whole, with nothing added", () => new Error("one line only"), "an Error, its message \"one line only\"", "threw: an Error, its message \"one line only\"", []],
+    ];
+    for (const [label, make, printed, why, later] of rows) {
+      for (const at of [1, 2]) {
+        let k = 0;
+        const d = await p1Direct({ shot: async () => { k += 1; if (k === at) throw make(); return true; } });
+        await d.bind(d.report(1));
+        const { end, final } = await d.finish();
+        const tag = `${label}, the frame of step ${at} throwing`;
+        assert.deepEqual(d.env.rejections, [], `${tag}: a run rejected`);
+        assert.deepEqual([final.series.length, final.series[0].ended, final.series[0].why, final.series[0].shots.length, final.refused.length], [1, "threw", why, at - 1, 0], `${tag}: the sidecar`);
+        const want = `      EVENT SHOT 1: a throw ended this series after ${at - 1} of its 3 scheduled steps had run (threw: ${printed})${at === 2 ? " — frame written by those steps: yes" : ""}; whatever the work it interrupted left on disk is not among the frames written — _audit-event-shots.json`;
+        const line = d.env.notes.find((s) => s.startsWith("      EVENT SHOT 1: a throw ended this series"));
+        assert.equal(line, want, `${tag}: the thrown series' line`);
+        for (const s of d.env.notes) assert.ok(!/[\r\n]/.test(s), `${tag}: a printed line carries a line break: ${JSON.stringify(s)}`);
+        for (const w of later) assert.ok(!line.includes(w), `${tag}: the line carries «${w}», a word of a later line of the error`);
+        assert.deepEqual(end, [`  EVENT SHOTS: of 1 report(s) the harness had received from the page-side witness, 0 led to a series that ran every scheduled step (0 frame(s) written), 1 to a series a throw ended early (${at - 1} frame(s) written before it) and 0 to no series (not-driving 0 · series-cap 0 · a throw before its series 0) — _audit-event-shots.json`], tag);
+        assert.deepEqual(p1EndLineTruth(d.env.notes, sidecarLedger(final), final), [], `${tag}: the end line`);
+      }
+    }
+  });
+
+  it("V8-46 · WHAT WAS THROWN, SAID TRULY — a thrown string, number, boolean, symbol, null, undefined, an object or a function with no message text, and an Error with none: each series' line and `why` name the value for what it is (never «undefined» for a value that is not undefined, never «[object Object]», never a bare string passed off as an error's message)", async () => {
+    const rows = [
+      ["a thrown string (the verifier's row)", () => "plain string thrown", "a string, not an Error: \"plain string thrown\""],
+      ["a thrown string with a line break, quoted so it stays one line", () => "x\ny", "a string, not an Error: \"x\\ny\""],
+      ["a thrown empty string", () => "", "a string, not an Error: \"\""],
+      ["a thrown string that reads «undefined»", () => "undefined", "a string, not an Error: \"undefined\""],
+      ["a thrown number", () => 42, "a number, not an Error: 42"],
+      ["a thrown 0", () => 0, "a number, not an Error: 0"],
+      ["a thrown false", () => false, "a boolean, not an Error: false"],
+      // (round 10: a symbol's text is not printed; anything not a primitive is named by kind, then its message as read)
+      ["a thrown symbol", () => Symbol("s"), "a symbol, not an Error"],
+      ["a thrown null", () => null, "null, not an Error"],
+      ["a thrown undefined", () => undefined, "undefined, not an Error"],
+      ["an object without a message", () => ({ code: 5 }), "an object, its message undefined"],
+      ["an object whose message is empty", () => ({ message: "" }), "an object, its message \"\""],
+      ["a thrown function", () => function thrownFunction() {}, "a function, its message undefined"],
+      ["an Error with an empty message", () => new Error(""), "an Error, its message \"\""],
+      ["a TypeError with no message", () => new TypeError(), "an Error, its message \"\""],
+      ["an object with a message", () => ({ message: "a message on a plain object" }), "an object, its message \"a message on a plain object\""],
+    ];
+    for (const [label, make, said] of rows) {
+      let k = 0;
+      const d = await p1Direct({ shot: async () => { k += 1; if (k === 2) throw make(); return true; } });
+      await d.bind(d.report(1));
+      const { end, final } = await d.finish();
+      assert.deepEqual(d.env.rejections, [], `${label}: a run rejected`);
+      assert.deepEqual([final.series[0].ended, final.series[0].why, final.refused.length], ["threw", `threw: ${said}`, 0], `${label}: the sidecar`);
+      assert.ok(d.env.notes.includes(`      EVENT SHOT 1: a throw ended this series after 1 of its 3 scheduled steps had run (threw: ${said}) — frame written by those steps: yes; whatever the work it interrupted left on disk is not among the frames written — _audit-event-shots.json`), `${label}: the thrown series' line: ${d.env.notes.find((s) => s.includes("a throw ended"))}`);
+      assert.match(end[0], /, 1 to a series a throw ended early \(1 frame\(s\) written before it\) and 0 to no series /, label);
+      assert.deepEqual(p1EndLineTruth(d.env.notes, sidecarLedger(final), final), [], `${label}: the end line`);
+    }
+  });
+
+  it("V8-47 · A THROW BEFORE ITS SERIES IS FILED WITH ITS WHOLE ERROR — a null and an undefined report each throw reading the report's number before any series is recorded; each is refused with `why` «threw: » followed by exactly the runtime's own message for that read (taken here from the runtime, not from the harness), never an empty reason", async () => {
+    const runtimeMessage = (v) => { try { void v.n; } catch (e) { return e.message; } return null; };
+    for (const [label, report] of [["a null report", null], ["an undefined report", undefined]]) {
+      const msg = runtimeMessage(report);
+      assert.ok(typeof msg === "string" && msg.length > 0, `${label}: the runtime gave no message to compare with`);
+      const d = await p1Direct();
+      await d.bind(report);
+      const { end, final } = await d.finish();
+      assert.deepEqual(d.env.rejections, [], `${label}: a run rejected`);
+      assert.deepEqual(final.series, [], label);
+      assert.deepEqual(final.refused, [{ n: null, kind: null, why: `threw: an Error, its message ${JSON.stringify(msg)}` }], `${label}: the refusal`);
+      assert.deepEqual(end, ["  EVENT SHOTS: of 1 report(s) the harness had received from the page-side witness, 0 led to a series that ran every scheduled step (0 frame(s) written), 0 to a series a throw ended early (0 frame(s) written before it) and 1 to no series (not-driving 0 · series-cap 0 · a throw before its series 1) — _audit-event-shots.json"], label);
+      assert.ok(!d.env.notes.some((s) => s.includes("a throw ended this series")), `${label}: a report that began no series printed a series' thrown line`);
+      assert.deepEqual(p1EndLineTruth(d.env.notes, sidecarLedger(final), final), [], `${label}: the end line`);
+    }
+  });
+
+  /* ── H1 ROUND 9, RESUMED — THE FIVE SURVIVORS OF ROUND 9'S OWN MUTATION RUN (213 of 218 killed) ─────────────────────────
+   * A survivor that can change a decision, a reason or a printed value is KILLED by a row here; one that cannot is DECIDED
+   * by a row that executes the argument. The harness is not changed by any of them.
+   *   V8-48 (a throw before its series filed with no report number) — KILLED. The round-8 verifier called it equivalent
+   *         (a pre-series throw needs the report to be null or undefined), but a report with a readable number also throws before its series
+   *         when computing its mount time throws: a clock that is a BigInt (the deserializer the binding's arguments pass
+   *         through, playwright-core 1.61.1 `parseSerializedValue`, builds one from `bi`), or an object with no callable
+   *         valueOf or toString. The witness sends neither (its clock is Date.now()); the refusal must still keep the
+   *         number and the kind it was sent.
+   *   V8-50 («as of this line» keyed to the open-run count) — KILLED. A report the binding receives after the end's wait
+   *         has returned and before the end line is written is a refusal whose run has not settled yet; no series is
+   *         running, so the line must not say its figures are as of this line. The row asserts its own precondition (the
+   *         end's write counts that run open), so it cannot pass by missing the window.
+   *   V8-61 (of several flashes in one added subtree only the first counted) — KILLED. One added subtree carrying two
+   *         impact-flash elements is two mounts, counted and reported, whether or not a flash was counted before it. This
+   *         is the count the probe's `impactMounts` reads (`window.__eventWitness.impacts`) — a decision input.
+   *   V6-32 (the end line's received count spelt series + refusals) — DECIDED, EQUIVALENT on every value the binding can
+   *         receive: `seen` is incremented only at the top of `eventSeries`, and in the same synchronous run, before any
+   *         await, exactly one of `series` or `refused` gains an entry (the refusal lines; the series push; or the catch,
+   *         whose `eventSeriesThrew` reads the report only as `ev?.n` / `ev?.kind`, which cannot throw on the plain values
+   *         the deserializer builds). The row executes that over every kind of value the deserializer can build, unarmed,
+   *         armed and past the cap, checking the two counts right after the binding returns and after its run settles. (A
+   *         handle is refused by the deserializer itself — «Unexpected handle» — before the binding runs; no other code
+   *         calls `eventSeries`.)
+   *   V7-06 — DECIDED, EQUIVALENT in round 8 (the row above executes it); unchanged. */
+
+  it("V8-48 · KILLED — A THROW BEFORE ITS SERIES KEEPS THE REPORT'S NUMBER AND KIND: a report whose mount time cannot be computed (its clock a BigInt, or an object with no callable valueOf or toString) throws before its series is recorded; it is refused with the number and kind it was sent and `why` «threw: » plus exactly the runtime's own message for that subtraction (taken here from the runtime, not from the harness)", async () => {
+    const runtimeMessage = (f) => { try { f(); } catch (e) { return e.message; } return null; };
+    const rows = [
+      ["a report whose clock is a BigInt", 7, 5_000_000n],
+      ["a report whose clock is an object with no callable valueOf or toString", 8, { valueOf: 1, toString: 2 }],
+    ];
+    for (const [label, n, at] of rows) {
+      const d = await p1Direct();
+      const msg = runtimeMessage(() => at - d.clock.now);
+      assert.ok(typeof msg === "string" && msg.length > 0, `${label}: the runtime gave no message to compare with`);
+      await d.bind({ ...d.report(n), at });
+      const { end, final } = await d.finish();
+      assert.deepEqual(d.env.rejections, [], `${label}: a run rejected`);
+      assert.deepEqual(final.series, [], `${label}: a series was recorded`);
+      assert.deepEqual(final.refused, [{ n, kind: "impact", why: `threw: an Error, its message ${JSON.stringify(msg)}` }], `${label}: the refusal`);
+      assert.deepEqual(end, ["  EVENT SHOTS: of 1 report(s) the harness had received from the page-side witness, 0 led to a series that ran every scheduled step (0 frame(s) written), 0 to a series a throw ended early (0 frame(s) written before it) and 1 to no series (not-driving 0 · series-cap 0 · a throw before its series 1) — _audit-event-shots.json"], label);
+      assert.ok(!d.env.notes.some((s) => s.includes("a throw ended this series")), `${label}: a report that began no series printed a series' thrown line`);
+      assert.deepEqual(p1EndLineTruth(d.env.notes, sidecarLedger(final), final), [], `${label}: the end line`);
+    }
+  });
+
+  it("V8-50 · KILLED — «AS OF THIS LINE» ONLY WITH A SERIES STILL RUNNING: a report the binding receives after the end's wait has returned and before the end line is written is a refusal whose run has not yet settled (the end's write counts it open — asserted); no series is running, so the end line carries neither the «still running» clause nor «these figures are as of this line»", async () => {
+    const box = { d: null };
+    const d = await p1Direct({ onWait: (ms) => { if (ms === 20_000) queueMicrotask(() => box.d.env.bindings.__auditEvent(null, box.d.report(1))); } });
+    box.d = d;
+    const { end, final } = await d.finish();
+    assert.equal(final.pendingAtWrite, 1, "the precondition failed: the late refusal's run was not open when the end wrote the sidecar, so this row did not reach the window it is about");
+    assert.deepEqual(final.series, []);
+    assert.deepEqual(final.refused, [{ n: 1, kind: "impact", title: null, why: "not-driving" }]);
+    assert.deepEqual(end, ["  EVENT SHOTS: of 1 report(s) the harness had received from the page-side witness, 0 led to a series that ran every scheduled step (0 frame(s) written), 0 to a series a throw ended early (0 frame(s) written before it) and 1 to no series (not-driving 1 · series-cap 0 · a throw before its series 0) — _audit-event-shots.json"]);
+    assert.deepEqual(p1EndLineTruth(d.env.notes, sidecarLedger(final), final), [], "the end line");
+  });
+
+  it("V8-61 · KILLED — EVERY FLASH IN ONE ADDED SUBTREE IS A MOUNT: an added subtree carrying two impact-flash elements is counted twice and reported twice, before any other flash and after one; the witness's count (what the probe's impactMounts reads) and its reports agree with the flashes added", async () => {
+    const blk = p1Block();
+    const env = { inits: [], bindings: {} };
+    const page = {
+      addInitScript: async (fn, arg) => void env.inits.push({ fn, arg }),
+      exposeBinding: async (name, fn) => void (env.bindings[name] = fn),
+      waitForTimeout: async () => {},
+      evaluate: async () => ({}),
+    };
+    const api = new Function("page", "note", "shot", "writeFileSync", "OUT", "SCENARIO", "h1ProbeReads", "Date",
+      `"use strict";\n${blk.code.slice(blk.from, blk.to)}\nreturn { installEventWitness };`)(
+      page, () => {}, async () => true, () => {}, "OUT", H1.em, LIBNS.h1ProbeReads, { now: () => 0 });
+    await api.installEventWitness();
+    assert.equal(env.inits.length, 1, "the witness was not installed");
+    const html = new FakeEl("html");
+    const body = new FakeEl("body");
+    html.add(body);
+    const doc = { get documentElement() { return html; }, querySelectorAll: (s) => html.querySelectorAll(s), querySelector: (s) => html.querySelector(s) };
+    const obs = [];
+    const win = {};
+    new Function("window", "document", "MutationObserver", "getComputedStyle", "Date", `"use strict"; return (${env.inits[0].fn.toString()});`)(
+      win, doc, class { constructor(cb) { obs.push(cb); } observe() {} }, fakeStyle, { now: () => 1000 })(env.inits[0].arg);
+    const reports = [];
+    win.__auditEvent = (ev) => void reports.push(ev);
+    const b0 = { w: 280, h: 40, top: 10, visibility: "visible", display: "block", opacity: "1" };
+    const flash = () => new FakeEl("div", { "data-hud": "impact-flash" }, b0);
+    const steps = [
+      ["a subtree carrying two flashes, before any other flash", () => new FakeEl("div").add(flash(), flash()), 2],
+      ["one flash", () => flash(), 3],
+      ["a subtree carrying two flashes, after flashes were counted", () => new FakeEl("div").add(new FakeEl("div").add(flash()), flash()), 5],
+    ];
+    for (const [label, make, total] of steps) {
+      const tree = make();
+      body.add(tree);
+      obs[0]([{ addedNodes: [tree] }]);
+      assert.equal(win.__eventWitness.impacts, total, `${label}: the witness counted ${win.__eventWitness.impacts} flash mount(s), not the ${total} added`);
+      assert.deepEqual(reports.map((r) => [r.n, r.kind]), Array.from({ length: total }, (_, i) => [i + 1, "impact"]), `${label}: the reports`);
+      assert.equal(win.__eventWitness.events.length, total, `${label}: the witness's own record`);
+    }
+  });
+
+  it("V6-32, DECIDED — EQUIVALENT: every kind of value the binding's deserializer can build (playwright-core 1.61.1 parseSerializedValue: undefined, null, NaN, ±Infinity, -0, a number, a string, a boolean, a BigInt, a Date, a URL, an Error, a RegExp, a typed array, an array, an object, a repeated reference, an object whose prototype a «__proto__» key set), bound unarmed, armed and past the cap: right after the binding returns and after its run settles, the reports received equal the series plus the refusals, so the end line's received count cannot differ from series + refusals", async () => {
+    const kinds = (d, base) => {
+      const cyc = { ...d.report(base + 1) };
+      cyc.self = cyc;
+      const proto = {};
+      proto["__proto__"] = d.report(base + 2);
+      return [
+        ["undefined", undefined], ["null", null], ["NaN", NaN], ["Infinity", Infinity], ["-Infinity", -Infinity], ["-0", -0],
+        ["a number", 5], ["a string", "s"], ["a boolean", true], ["a BigInt", 5n], ["a Date", new Date(0)],
+        ["a URL", new URL("https://example.test/")], ["an Error", Object.assign(new Error("m"), { name: "TypeError" })],
+        ["a RegExp", /r/g], ["a typed array", new Uint8Array(2)], ["an empty array", []], ["an array", [1, "a"]], ["an empty object", {}],
+        ["a report", d.report(base + 3)], ["a report without its overlay", { ...d.report(base + 4), overlay: undefined }],
+        ["a report whose clock is a BigInt", { ...d.report(base + 5), at: 1n }], ["a report that refers to itself", cyc],
+        ["a report inherited through a «__proto__» key", proto],
+      ];
+    };
+    for (const [state, arm, capFirst] of [["unarmed", false, false], ["armed", true, false], ["armed, past the cap", true, true]]) {
+      const d = await p1Direct({ arm });
+      const E = d.api.eventShots;
+      const holds = (when) => assert.equal(E.seen, E.series.length + E.refused.length, `${state}, ${when}: ${E.seen} received, ${E.series.length} series + ${E.refused.length} refusal(s)`);
+      if (capFirst) for (let k = 1; k <= 8; k++) await d.bind(d.report(100 + k));
+      let bound = E.seen;
+      for (const [label, ev] of kinds(d, 200)) {
+        d.env.bindings.__auditEvent(null, ev);
+        bound += 1;
+        holds(`${label}, as the binding returns`);
+        await Promise.allSettled(E.pending);
+        holds(`${label}, after its run settled`);
+      }
+      const { end, final } = await d.finish();
+      assert.equal(final.seen, bound, `${state}: the sidecar's received count`);
+      const m = end[0].match(P1_END_RE);
+      assert.ok(m, `${state}: the end line cannot be read: ${end[0]}`);
+      assert.equal(Number(m[1]), final.series.length + final.refused.length, `${state}: the printed received count is not series + refusals`);
+      assert.deepEqual(p1EndLineTruth(d.env.notes, sidecarLedger(final), null), [], `${state}: the end line`);
+    }
+  });
+});
+
+/* ═══ §W20 H1 ROUND 10 — WHAT WAS THROWN: ONE TOTAL FUNCTION, AND A GENERATIVE CENSUS OVER EVERY JAVASCRIPT KIND ═══
+ *
+ * The round-9 verifier killed round 9's error text eight ways (V9-35 a bare \r not a break, V9-37 a message 42 called no
+ * message, V9-38 a {name} object called an Error, V9-39 a long string cut silently, V9-50 a BigInt called a number, V9-51
+ * a function's message dropped, V9-52 the cut line's trailing blanks lost, V9-54 NaN printed as 0) and found round 9
+ * printing «[object Object]» and an empty reason unmutated. Rounds 8 and 9 each answered the named spellings and the next
+ * verifier found the next one. Round 10 answers the CLASS:
+ *   · the harness describes a thrown value from ONE total function, `eventThrownText`, each clause of which states the
+ *     result of a test it has just made (its comment is the specification this census reads);
+ *   · THE CENSUS draws thrown values of every JavaScript kind from declared seeds, throws each through the harness's real
+ *     P1 path (the frame of step 1, 2 or 3, or the report's mount time before its series is recorded), and checks the
+ *     printed line and the sidecar's `why` against an ORACLE written here, which imports and copies no harness code: it
+ *     states the properties the task names (one line, non-empty, no line break, never «[object Object]», the kind named
+ *     truly, the message carried exactly up to an announced cut) and renders the one text the specification allows with
+ *     its own quoting and its own line scan. Any disagreement fails with its seed, its index and the value's label.
+ * The expected texts of the rows above (V8-45 … V8-48) are hand-written; the census is what binds the class.
+ *
+ * H1 ROUND 11 (the round-10 verifier's CENSUS-ALPHABET-GAP): round 10's generator drew text from 31 fixed atoms, none of
+ * which Unicode normalisation or a white-space / zero-width clean-up changes, so five mutants that altered the characters
+ * carried (V10-E04 NFC, E05 NFKC, E23 U+00A0 → space, E24 combining marks dropped from the cut line — its printed count
+ * then false — and E25 U+200D dropped) survived. The class «any change to the characters carried» is answered by:
+ *   · text drawn ALSO from the whole UTF-16 code-unit space — uniform code units 0x0000–0xFFFF, lone surrogates included,
+ *     mixed with weighted classes of the characters such transforms touch — with lengths from 0 to past 1,200, and a
+ *     character floor that counts each class in thrown strings, messages and the first line of a multi-line message;
+ *   · «carried exactly» checked by a ROUND TRIP the oracle owns: the quoted text in the printed line and in the sidecar
+ *     why is decoded by thrownUnquote (code unit by code unit, no JSON.parse) and must equal the input code unit for code
+ *     unit — the thrown string, the whole message, or its first line exactly as thrownLineScan splits it — and the cut
+ *     line's counts must be the oracle's own, the kept count the decoded text's length;
+ *   · (resumed) a deterministic CODE-UNIT SWEEP after the seeds (thrownSweepValues), so every one of the 65,536 code units
+ *     is carried as a thrown string, as a whole message and (all but CR and LF) as a printed first line, and the census
+ *     fails unless all were.
+ *
+ * H1 ROUND 12 (the round-11 verifier's V11-LENGTH-CEILING, V11-LINECOUNT-CEILING, V11-READ-TWICE and V11-WITNESS-COLLAPSE):
+ * the census carried every code unit, but its INPUT SPACE had ceilings — no drawn text past 3,368 code units, no message
+ * past 45 lines, an oracle that read `.message` itself, and no `visibility: collapse` — so a cap past the largest draw, a
+ * second read and a painted rule off by one value each survived. A generator always has a largest draw, so each is
+ * answered as a CLASS:
+ *   · LENGTH and LINE COUNT: the harness DECLARES its ceilings (EVENT_THROWN_LINE_MAX_UNITS, EVENT_THROWN_WHY_MAX_UNITS,
+ *     EVENT_THROWN_LINES_COUNTED_MAX) and announces every cut past them; the oracle holds the same three numbers (pinned
+ *     against the harness's declarations by THE CEILINGS ARE DECLARED), and THE CEILING CENSUS (thrownCeilingValues) draws
+ *     texts of 0, 1, just under, at, just over and four times each length ceiling and a million code units, and messages
+ *     of 1 up to a million lines (99, 100, 999, 1000 and each side of the line-count ceiling among them), as thrown
+ *     strings, one-line messages, first lines and whole messages, on every path. A cap below a ceiling then cuts a text the
+ *     oracle expects whole, and a cap above one cannot exist, because the harness has already cut there.
+ *   · READ ONCE: the oracle reads no `.message` — what a read gives is handed to it, from the generator's own record of
+ *     what it put there, or, in THE READ-ONCE CENSUS (thrownWitnessValue), from a WITNESS: a message accessor (an own or
+ *     inherited getter, or a proxy's get trap) that logs each read and answers every read differently. The oracle takes the
+ *     first answer from the witness's log, and requires exactly one read and that the printed line and the why both carry
+ *     that answer.
+ *   · VISIBILITY: the P1 censuses draw every computed visibility, and the oracles' painted rule is the specification's
+ *     (P1_VISIBILITY_PAINTS, above §W17's generator).
+ *
+ * H1 ROUND 13 (the round-12 verifier's V12-CUT-CONTENT, V12-SIDECAR-SIZE-SENTENCE and V12-WITNESS-LENGTH-BAND):
+ *   · CUT CONTENT: the ceiling census drew every LENGTH at each cut but never the CONTENT there, so four edits that tidy
+ *     what they cut survived; THE CUT-CONTENT CENSUS (after THE CEILING CENSUS's floor; its comment says how) places every
+ *     code unit at both sides of every cut and runs of every class against it, and THE CUT-CONTENT FLOOR requires it;
+ *   · THE CEILINGS' SIZES: the harness's comment said 8 whys at the ceiling were under 800 KB a rewrite, counting six bytes
+ *     a carried unit; writeEventShots escapes q()'s backslash again, so it is seven, and refusal whys are not capped by the
+ *     series cap; and it called the line-count ceiling one more than the most lines a why at the why's ceiling can hold,
+ *     which it IS. Both sentences are re-derived, and THE CEILINGS ARE DECLARED measures them;
+ *   · the oracle's scans now skip from one code unit they decide on to the next (a quarter of a million texts past the why's
+ *     ceiling), and round 11's unit-by-unit scans are kept as the references THE ORACLE'S FAST SCANS ARE ITS UNIT-BY-UNIT
+ *     SCANS checks them against;
+ *   · V12-C17 — a second read of the message only when 100 < m.length < 8000, a length band the witness census's first
+ *     answers skip — is DECIDED OUT OF MODEL, as the verifier argued and the integrator kept: a band with no function in
+ *     the harness is a read written to evade the census's drawn lengths, clause (iii) of the threat model above §W11
+ *     (intent to evade), a CONDITION and not a refutation. The read-once census is not re-shaped around it.
+ *
+ * H1 ROUND 14 (the round-13 verifier's V13-CUT-PAIR-CONTENT and V13-K23T): round 13's sweep placed every code unit at c − 1
+ * and at c, one at a time, among lower-case letters, so 19 cut edits keyed on a PAIR across the cut or on the unit two before
+ * it survived, and an edit that counted an empty last piece past the split's limit at the line-count ceiling survived with no
+ * test edit at all. Answered at a finite, principled boundary:
+ *   · THE BREAK-PROPERTY PAIR CENSUS (after the cut-content census; its comment says how): the grapheme, word and sentence
+ *     break classes DERIVED from the runtime's ICU (never typed; counts, first members and sizes pinned, the classes UCD
+ *     properties expose checked equal to them), each ordered pair of them and every context of their rules that looks past a
+ *     pair; the general categories (derived), each ordered pair of them; each script (derived) doubled; each binary property
+ *     ECMA-262 names doubled and beside a code point without it; and every emoji-presentation, JSON-escape and
+ *     repeated-punctuation pair — placed at (c−2, c−1), (c−1, c) and (c, c+1) of all six cut
+ *     sites — the class pairs, the escape and punctuation pairs and each emoji property's first member's presentation pairs
+ *     on every path, the rest on the series paths in turn — and THE PAIR FLOOR, read off the texts, requires it;
+ *   · THE RAW-SLICE DIFFERENTIAL: every pair-census value and line-count row must print and write, character for character,
+ *     an independent rendering of String.prototype.slice at the declared ceiling through the reference quoting — so no
+ *     transformation can stand between the slice and the quoting (pinned by execution, not by reading the harness);
+ *   · THE LINE-COUNT BOUNDARY ROW: messages of exactly 16,384, 16,385, 16,386 and 16,387 lines (LF, CR, CRLF), with every line
+ *     empty, only the last, only the 16,386th (the last, in a message with fewer), or none, each counted by the oracle's own
+ *     scan, on every path;
+ *   · the threat model above §W11 is extended (clause iii): a cut rule keyed on a Unicode property or on escape syntax is IN
+ *     model and covered here; one keyed on specific code points with no property-level function is OUT of model.
+ *
+ * H1 ROUND 15 (the round-14 verifier's V14-ESCAPE-SYNTAX-CUT and V14-EMOJI-PROPERTY-PAIR): eleven cut edits keyed on content
+ * the pair census had not placed (an ANSI control sequence — which every Call-log line Playwright throws here carries —
+ * «\u{…}», a percent-escape, «%uXXXX», a ZWJ before a person, a tag after a pictograph) printed a false count and survived.
+ * The integrator's decision: STOP CHASING INPUT REGIONS — the class is answered by a RUNTIME CHECK in the harness (clause iii
+ * of the threat model above §W11, as restated for round 15), and these rows pin that the check exists and bites:
+ *   · THE RUNTIME CHECK, ALONE; THE P1 BLOCK WITH THE BUILDING SABOTAGED; WHAT THE CHECK RESTS ON; THE ERROR-TEXT PATH IS PINNED
+ *     (their comment is above THROWN_FALLBACK, after this region);
+ *   · the three plant rows that show a census sees a FALSE SENTENCE (the cut-content census's, the raw-slice differential's, the
+ *     pair census's) now plant with the check's line taken out, and require the disagreement they find not to be the fallback;
+ *     with the check in, the same plants print the fallback (THE P1 BLOCK WITH THE BUILDING SABOTAGED; THE PAIR CENSUS SEES THE
+ *     ROUND-14 SURVIVORS);
+ *   · THE REALISTIC FAMILIES are added to the pair census all the same (their comment is above THROWN_PLAYWRIGHT_MESSAGES):
+ *     ANSI control sequences from real Playwright call-log text and ECMA-48's grammar, the emoji sequences the two survivors
+ *     keyed on with every ordered pair of the emoji properties' first members, and escape syntax beyond JSON's. */
+
+const CH = (...codes) => String.fromCharCode(...codes);
+/** Every character that ends a line somewhere: LF, VT, FF, CR, NEL, LINE SEPARATOR, PARAGRAPH SEPARATOR. */
+const THROWN_LINE_BREAKS = [0x0a, 0x0b, 0x0c, 0x0d, 0x85, 0x2028, 0x2029].map((c) => CH(c));
+const hasLineBreak = (s) => THROWN_LINE_BREAKS.some((c) => s.includes(c));
+/** THE ORACLE'S QUOTING — a JSON string literal built code unit by code unit (no JSON.stringify): the two characters JSON
+ *  must escape, the short escapes, every other C0 control and every C1 control, DEL, U+2028, U+2029 and a lone surrogate as
+ *  a lowercase \uXXXX, everything else as itself.
+ *  H1 ROUND 13: the cut-content census quotes a quarter of a million texts past the why's ceiling, so the scan no longer
+ *  appends one code unit at a time: one pass finds each code unit that is NOT written as itself (THROWN_QUOTE_STOPS: the
+ *  two JSON must escape, every C0 control, DEL and every C1 control, U+2028, U+2029 and every surrogate), the run of code
+ *  units before it is copied whole, and the found unit is decided by the same tests in the same order as round 11's
+ *  unit-by-unit scan (kept below as thrownQuotedByUnit; THE ORACLE'S FAST SCANS ARE ITS UNIT-BY-UNIT SCANS checks the
+ *  two agree on every code unit, every pair of the units the tests decide, and seeded texts). */
+const THROWN_QUOTE_STOPS = /["\\\u0000-\u001f\u007f-\u009f\u2028\u2029\ud800-\udfff]/g;
+function thrownQuoted(s) {
+  const SHORT = new Map([[0x22, "\\\""], [0x5c, "\\\\"], [0x08, "\\b"], [0x0c, "\\f"], [0x0a, "\\n"], [0x0d, "\\r"], [0x09, "\\t"]]);
+  const esc = (u) => `\\${"u"}${u.toString(16).padStart(4, "0")}`;
+  const stops = new RegExp(THROWN_QUOTE_STOPS.source, "g");
+  let out = "\"";
+  let from = 0;
+  for (let m = stops.exec(s); m !== null; m = stops.exec(s)) {
+    const i = m.index;
+    out += s.slice(from, i);
+    const u = s.charCodeAt(i);
+    let next = i + 1;
+    if (SHORT.has(u)) out += SHORT.get(u);
+    else if (u < 0x20 || (u >= 0x7f && u <= 0x9f) || u === 0x2028 || u === 0x2029) out += esc(u);
+    else if (u >= 0xd800 && u <= 0xdbff) {
+      const v = i + 1 < s.length ? s.charCodeAt(i + 1) : -1;
+      if (v >= 0xdc00 && v <= 0xdfff) { out += s[i] + s[i + 1]; next = i + 2; } else out += esc(u);
+    } else out += esc(u); // (the one class left among the stops: a low surrogate no high one before it took)
+    from = next;
+    stops.lastIndex = next;
+  }
+  return `${out}${s.slice(from)}"`;
+}
+/** Round 11's quoting, one code unit at a time — the reference the fast scan above is checked against. */
+function thrownQuotedByUnit(s) {
+  const SHORT = new Map([[0x22, "\\\""], [0x5c, "\\\\"], [0x08, "\\b"], [0x0c, "\\f"], [0x0a, "\\n"], [0x0d, "\\r"], [0x09, "\\t"]]);
+  const esc = (u) => `\\${"u"}${u.toString(16).padStart(4, "0")}`;
+  let out = "\"";
+  for (let i = 0; i < s.length; i++) {
+    const u = s.charCodeAt(i);
+    if (SHORT.has(u)) out += SHORT.get(u);
+    else if (u < 0x20 || (u >= 0x7f && u <= 0x9f) || u === 0x2028 || u === 0x2029) out += esc(u);
+    else if (u >= 0xd800 && u <= 0xdbff) {
+      const v = i + 1 < s.length ? s.charCodeAt(i + 1) : -1;
+      if (v >= 0xdc00 && v <= 0xdfff) { out += s[i] + s[i + 1]; i += 1; } else out += esc(u);
+    } else if (u >= 0xdc00 && u <= 0xdfff) out += esc(u);
+    else out += s[i];
+  }
+  return `${out}"`;
+}
+/** THE ORACLE'S LINE SCAN — a CR followed by an LF is one break, a lone CR or a lone LF is one each.
+ *  H1 ROUND 13: the scan jumps from break to break (the next CR and the next LF, each looked up again only once passed),
+ *  deciding each break by round 11's test; thrownLineScanByUnit, round 11's, is the reference it is checked against. */
+function thrownLineScan(s) {
+  let count = 1;
+  let firstEnd = -1;
+  let nextCr = s.indexOf("\r");
+  let nextLf = s.indexOf("\n");
+  for (;;) {
+    const i = nextCr < 0 ? nextLf : nextLf < 0 ? nextCr : Math.min(nextCr, nextLf);
+    if (i < 0) break;
+    if (firstEnd < 0) firstEnd = i;
+    count += 1;
+    const after = s[i] === "\r" && s[i + 1] === "\n" ? i + 2 : i + 1;
+    if (nextCr >= 0 && nextCr < after) nextCr = s.indexOf("\r", after);
+    if (nextLf >= 0 && nextLf < after) nextLf = s.indexOf("\n", after);
+  }
+  return { count, first: firstEnd < 0 ? s : s.slice(0, firstEnd) };
+}
+/** Round 11's line scan, one code unit at a time — the reference. */
+function thrownLineScanByUnit(s) {
+  let count = 1;
+  let firstEnd = -1;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] !== "\r" && s[i] !== "\n") continue;
+    if (firstEnd < 0) firstEnd = i;
+    count += 1;
+    if (s[i] === "\r" && s[i + 1] === "\n") i += 1;
+  }
+  return { count, first: firstEnd < 0 ? s : s.slice(0, firstEnd) };
+}
+/** H1 ROUND 11 — THE ORACLE'S DECODER: reads the one JSON string literal that starts at `text[at]`, code unit by code unit
+ *  (no JSON.parse, no regular expression): the two-character escapes JSON has, a \uXXXX of four hex digits, and any other
+ *  code unit at or above U+0020 as itself. Returns { units, end } (end = the index just past the closing quote) or
+ *  { error } — a raw control character, an escape JSON does not have, or no closing quote.
+ *  H1 ROUND 13: one pass finds each code unit that is not read as itself (THROWN_UNQUOTE_STOPS: the quote, the backslash
+ *  and every C0 control), the run before it is taken whole, and the found unit is decided as round 11's decoder decides it
+ *  (thrownUnquoteByUnit, the reference). The stops are found by a regular expression; every decision is the decoder's own. */
+const THROWN_UNQUOTE_STOPS = /["\\\u0000-\u001f]/g;
+function thrownUnquote(text, at) {
+  if (typeof text !== "string" || text.charCodeAt(at) !== 0x22) return { error: `no opening quote at ${at}` };
+  const SHORT = new Map([[0x22, 0x22], [0x5c, 0x5c], [0x2f, 0x2f], [0x62, 0x08], [0x66, 0x0c], [0x6e, 0x0a], [0x72, 0x0d], [0x74, 0x09]]);
+  const hexValue = (u) => (u >= 0x30 && u <= 0x39 ? u - 0x30 : u >= 0x61 && u <= 0x66 ? u - 0x57 : u >= 0x41 && u <= 0x46 ? u - 0x37 : -1);
+  const stops = new RegExp(THROWN_UNQUOTE_STOPS.source, "g");
+  let units = "";
+  let from = at + 1;
+  stops.lastIndex = from;
+  for (let m = stops.exec(text); m !== null; m = stops.exec(text)) {
+    const i = m.index;
+    units += text.slice(from, i);
+    const u = text.charCodeAt(i);
+    if (u === 0x22) return { units, end: i + 1 };
+    if (u < 0x20) return { error: `a raw control character U+${u.toString(16).padStart(4, "0")} inside the quotes, at ${i}` };
+    const c = i + 1 < text.length ? text.charCodeAt(i + 1) : -1;
+    if (SHORT.has(c)) { units += String.fromCharCode(SHORT.get(c)); from = i + 2; stops.lastIndex = from; continue; }
+    if (c !== 0x75) return { error: `an escape JSON does not have (\\ then code unit ${c}), at ${i}` };
+    let v = 0;
+    for (let k = 2; k < 6; k++) {
+      const d = i + k < text.length ? hexValue(text.charCodeAt(i + k)) : -1;
+      if (d < 0) return { error: `a \\u escape without four hex digits, at ${i}` };
+      v = v * 16 + d;
+    }
+    units += String.fromCharCode(v);
+    from = i + 6;
+    stops.lastIndex = from;
+  }
+  return { error: "no closing quote" };
+}
+/** Round 11's decoder, one code unit at a time — the reference. */
+function thrownUnquoteByUnit(text, at) {
+  if (typeof text !== "string" || text.charCodeAt(at) !== 0x22) return { error: `no opening quote at ${at}` };
+  const SHORT = new Map([[0x22, 0x22], [0x5c, 0x5c], [0x2f, 0x2f], [0x62, 0x08], [0x66, 0x0c], [0x6e, 0x0a], [0x72, 0x0d], [0x74, 0x09]]);
+  const hexValue = (u) => (u >= 0x30 && u <= 0x39 ? u - 0x30 : u >= 0x61 && u <= 0x66 ? u - 0x57 : u >= 0x41 && u <= 0x46 ? u - 0x37 : -1);
+  let units = "";
+  for (let i = at + 1; i < text.length; i++) {
+    const u = text.charCodeAt(i);
+    if (u === 0x22) return { units, end: i + 1 };
+    if (u < 0x20) return { error: `a raw control character U+${u.toString(16).padStart(4, "0")} inside the quotes, at ${i}` };
+    if (u !== 0x5c) { units += String.fromCharCode(u); continue; }
+    const c = i + 1 < text.length ? text.charCodeAt(i + 1) : -1;
+    if (SHORT.has(c)) { units += String.fromCharCode(SHORT.get(c)); i += 1; continue; }
+    if (c !== 0x75) return { error: `an escape JSON does not have (\\ then code unit ${c}), at ${i}` };
+    let v = 0;
+    for (let k = 2; k < 6; k++) {
+      const d = i + k < text.length ? hexValue(text.charCodeAt(i + k)) : -1;
+      if (d < 0) return { error: `a \\u escape without four hex digits, at ${i}` };
+      v = v * 16 + d;
+    }
+    units += String.fromCharCode(v);
+    i += 5;
+  }
+  return { error: "no closing quote" };
+}
+/** The index of the first raw lone surrogate in `text`, or -1 (round 13: round 11's left-to-right pairing walk,
+ *  thrownLoneSurrogateAtByUnit, stepping from surrogate to surrogate — the walk does nothing at any other code unit). */
+function thrownLoneSurrogateAt(text) {
+  const sur = /[\ud800-\udfff]/g;
+  for (let m = sur.exec(text); m !== null; m = sur.exec(text)) {
+    const i = m.index;
+    if (text.charCodeAt(i) <= 0xdbff) {
+      const w = i + 1 < text.length ? text.charCodeAt(i + 1) : -1;
+      if (w >= 0xdc00 && w <= 0xdfff) { sur.lastIndex = i + 2; continue; }
+    }
+    return i;
+  }
+  return -1;
+}
+/** Round 11's walk — the reference. */
+function thrownLoneSurrogateAtByUnit(text) {
+  for (let i = 0; i < text.length; i++) {
+    const u = text.charCodeAt(i);
+    if (u >= 0xd800 && u <= 0xdbff) {
+      const w = i + 1 < text.length ? text.charCodeAt(i + 1) : -1;
+      if (w >= 0xdc00 && w <= 0xdfff) { i += 1; continue; }
+    }
+    if (u >= 0xd800 && u <= 0xdfff) return i;
+  }
+  return -1;
+}
+/** Code-unit equality, said where it first breaks: null when `got` and `want` carry the same UTF-16 code units in the same
+ *  order, else the first index they differ at, with both code units (or the length each has). (Round 13: two equal strings
+ *  are the same code units in the same order, so equality answers null at once; the walk runs only when they differ.) */
+function thrownSameUnits(got, want) {
+  if (got === want) return null;
+  const n = Math.min(got.length, want.length);
+  for (let i = 0; i < n; i++) {
+    const a = got.charCodeAt(i);
+    const b = want.charCodeAt(i);
+    if (a !== b) return `code unit ${i} is U+${a.toString(16).padStart(4, "0")}, not U+${b.toString(16).padStart(4, "0")}`;
+  }
+  return got.length === want.length ? null : `${got.length} code units, not ${want.length}`;
+}
+/** THE ROUND TRIP — the quoted text that follows `prefix` at the start of `text`, decoded by the oracle's own decoder,
+ *  must be `want` code unit for code unit, and what follows the closing quote must be what `rest` accepts (a function of
+ *  the tail and the decoded units that returns the violations, or [] when the tail is right). */
+function thrownRoundTrip(text, prefix, want, rest, what) {
+  if (!text.startsWith(prefix)) return [`${what}: the description does not begin «${prefix}»`];
+  const d = thrownUnquote(text, prefix.length);
+  if (d.error !== undefined) return [`${what}: the quoted text cannot be decoded (${d.error})`];
+  const out = [];
+  const diff = thrownSameUnits(d.units, want);
+  if (diff !== null) out.push(`${what}: the quoted text, decoded, is not the input exactly — ${diff}`);
+  for (const x of rest(text.slice(d.end), d.units)) out.push(`${what}: ${x}`);
+  return out;
+}
+/** H1 ROUND 12 — THE HARNESS'S DECLARED CEILINGS, held as the oracle's own numbers (the round-11 verifier's V11-LENGTH-CEILING
+ *  and V11-LINECOUNT-CEILING): the most UTF-16 code units of a text the printed line carries, the most of a thrown string or
+ *  a message the sidecar's why carries, and the most lines the printed line counts exactly. THE CEILINGS ARE DECLARED pins
+ *  each against the harness's own declaration (a change to one is a visible re-pin there); the oracle renders every cut
+ *  from these, never from the harness. */
+const THROWN_LINE_MAX = 8192;
+const THROWN_WHY_MAX = 16384;
+const THROWN_LINES_MAX = 16385;
+/** What follows a quoted text the oracle expects cut past the why's ceiling, and past the printed line's (round 12). */
+const THROWN_WHY_CUT_RE = /^ \(cut at the sidecar's ceiling: the first (\d+) of its (\d+) UTF-16 code units are carried, the last (\d+) are not recorded\)$/;
+const THROWN_LINE_CUT_RE = /^ \(cut at the printed line's ceiling: the first (\d+) of its (\d+) UTF-16 code units are printed, the last (\d+) are not; the series' why in the sidecar carries (?:(all of them)|the first (\d+) of them)\)$/;
+/** What the cut line must say after its quoted first line, checked against the oracle's own counts (round 12: the count
+ *  may be «more than» the line-count ceiling, the first line may itself be cut, and the why may carry only the message's
+ *  first part). */
+const THROWN_CUT_TAIL_RE = /^ \(line 1 of (more than )?(\d+), (\d+) of its (\d+) UTF-16 code units(?:, the first line cut at the printed line's ceiling from its (\d+))?; (?:(the whole message is in the series' why in the sidecar)|the series' why in the sidecar carries the first (\d+) of them)\)$/;
+/** The kinds of a value that is not a primitive, in the specification's order: the first whose test holds names it (a
+ *  test that throws does not hold). */
+const THROWN_KIND_ORDER = Object.freeze([
+  ["a function", (v) => typeof v === "function"],
+  ["an array", (v) => Array.isArray(v)],
+  ["an Error", (v) => v instanceof Error],
+  ["an object", () => true],
+]);
+const holdsSafely = (test, v) => { try { return test(v) === true; } catch { return false; } };
+/* H1 ROUND 12 (the round-11 verifier's V11-READ-TWICE): THE ORACLE READS NO MESSAGE. Round 11's oracle read the value's
+ * message itself (in thrownSpecText, thrownProperties, thrownCensusValue and thrownCarried), so a harness that read it twice
+ * gave the oracle the same second value it printed. Now what a read gave — `{ threw: true }` or `{ threw: false, value }` —
+ * is HANDED to every oracle function as `read`: from the generator's own record of what it put there (thrownCensusValue,
+ * the sweep, the ceiling census), or from the first entry of a witness's log of the reads the harness made (the read-once
+ * census). THE ORACLE IS INDEPENDENT checks that no oracle function spells a read of `message`. */
+/** The oracle's rendering of a text for the sidecar's why: whole up to its ceiling, past it cut there with the cut said. */
+const thrownWhyQuoted = (s) => (s.length <= THROWN_WHY_MAX ? thrownQuoted(s) : `${thrownQuoted(s.slice(0, THROWN_WHY_MAX))} (cut at the sidecar's ceiling: the first ${THROWN_WHY_MAX} of its ${s.length} UTF-16 code units are carried, the last ${s.length - THROWN_WHY_MAX} are not recorded)`);
+/** How much of a text of `n` code units the series' why carries, as the printed line says it. */
+const thrownInWhy = (n) => (n <= THROWN_WHY_MAX ? "the series' why in the sidecar carries all of them" : `the series' why in the sidecar carries the first ${THROWN_WHY_MAX} of them`);
+/** The oracle's rendering of a text for the printed line: whole up to its ceiling, past it cut there with the cut said. */
+const thrownLineQuoted = (s) => (s.length <= THROWN_LINE_MAX ? thrownQuoted(s) : `${thrownQuoted(s.slice(0, THROWN_LINE_MAX))} (cut at the printed line's ceiling: the first ${THROWN_LINE_MAX} of its ${s.length} UTF-16 code units are printed, the last ${s.length - THROWN_LINE_MAX} are not; ${thrownInWhy(s.length)})`);
+/** THE ONE TEXT THE SPECIFICATION ALLOWS for a thrown value `v` — `mode` "why" (the sidecar: a message whole, up to its
+ *  ceiling) or "line" (the printed line: a multi-line message's first line, the cut announced) — given `read`, what a read of
+ *  its message gave (never read here). */
+function thrownSpecText(v, mode, read) {
+  if (v === null) return "null, not an Error";
+  if (v === undefined) return "undefined, not an Error";
+  switch (typeof v) {
+    case "string": return `a string, not an Error: ${mode === "why" ? thrownWhyQuoted(v) : thrownLineQuoted(v)}`;
+    case "number": return `a number, not an Error: ${v === 0 && 1 / v < 0 ? "-0" : `${v}`}`;
+    case "bigint": return `a bigint, not an Error: ${v.toString()}`;
+    case "boolean": return `a boolean, not an Error: ${v ? "true" : "false"}`;
+    case "symbol": return "a symbol, not an Error";
+    default: break;
+  }
+  const [kind] = THROWN_KIND_ORDER.find(([, test]) => holdsSafely(test, v));
+  if (read.threw) return `${kind}; reading its message threw`;
+  const m = read.value;
+  if (m === undefined || m === null) return `${kind}, its message ${m === null ? "null" : "undefined"}`;
+  if (typeof m !== "string") return `${kind}, its message ${typeof m === "object" ? "an" : "a"} ${typeof m}, not a string`;
+  if (mode === "why") return `${kind}, its message ${thrownWhyQuoted(m)}`;
+  const scan = thrownLineScan(m);
+  if (scan.count === 1) return `${kind}, its message ${thrownLineQuoted(m)}`;
+  const kept = scan.first.length <= THROWN_LINE_MAX ? scan.first : scan.first.slice(0, THROWN_LINE_MAX);
+  const count = scan.count > THROWN_LINES_MAX ? `more than ${THROWN_LINES_MAX}` : `${scan.count}`;
+  return `${kind}, its message's first line ${thrownQuoted(kept)} (line 1 of ${count}, ${kept.length} of its ${m.length} UTF-16 code units${kept.length < scan.first.length ? `, the first line cut at the printed line's ceiling from its ${scan.first.length}` : ""}; ${m.length <= THROWN_WHY_MAX ? "the whole message is in the series' why in the sidecar" : thrownInWhy(m.length)})`;
+}
+/** THE PROPERTIES the task names, each checked on its own (so a disagreement says WHICH truth broke, not only that the
+ *  text differs): one line, non-empty, no «[object Object]» outside a quoted string, the kind it names true of the value,
+ *  «not an Error» only of a primitive, and a string carried exactly — whole up to its ceiling, past it cut there with the
+ *  cut announced in the oracle's own counts, or a message's first line with the cut announced. `read` is what a read of
+ *  the value's message gave (never read here). */
+function thrownProperties(v, text, mode, read) {
+  const out = [];
+  if (typeof text !== "string" || text.trim() === "") return ["the description is empty"];
+  if (hasLineBreak(text)) out.push("the description carries a line break");
+  // (round 13: blanking the quoted strings only puts «""» where a string was, which cannot make «[object Object]» where
+  // there was none, so a text without the words is not scanned)
+  const unquoted = text.includes("[object Object]") ? text.replace(/"(?:[^"\\]|\\.)*"/g, "\"\"") : text;
+  if (unquoted.includes("[object Object]")) out.push("the description says «[object Object]»");
+  const prim = v === null || (typeof v !== "object" && typeof v !== "function");
+  if (/\bnot an Error\b/.test(text) && !prim) out.push("a value that is not a primitive is said to be «not an Error»");
+  const named = text.match(/^(a function|an array|an Error|an object|a string|a number|a bigint|a boolean|a symbol|null|undefined)\b/);
+  if (named) {
+    const k = named[1];
+    const PRIMS = { "a string": "string", "a number": "number", "a bigint": "bigint", "a boolean": "boolean", "a symbol": "symbol" };
+    const truth = k === "null" ? v === null : k === "undefined" ? v === undefined : PRIMS[k] ? typeof v === PRIMS[k] : !prim && holdsSafely(THROWN_KIND_ORDER.find(([n]) => n === k)[1], v);
+    if (!truth) out.push(`the description names the value «${k}», which is not true of it`);
+  }
+  // H1 ROUND 11: no raw lone surrogate anywhere in the text (every one the value carried is escaped, so the text is well formed)
+  const lone = thrownLoneSurrogateAt(text);
+  if (lone >= 0) out.push(`the description carries a raw lone surrogate at ${lone}`);
+  // H1 ROUND 11 — «CARRIED EXACTLY» BY A ROUND TRIP the oracle owns: the quoted text is decoded by thrownUnquote and must be
+  // the thrown string, the whole message, or the message's first line as thrownLineScan splits it, code unit for code unit.
+  // H1 ROUND 12: up to the ceiling of the text it is printed in — past it, exactly the first THROWN_LINE_MAX or THROWN_WHY_MAX
+  // code units, followed by the cut's announcement with the oracle's own counts; under it, followed by nothing.
+  const end = (tail) => (tail === "" ? [] : [`after the quoted text comes «${tail.slice(0, 300)}», not the end of the description`]);
+  const whyTail = (n) => (tail, units) => {
+    if (n <= THROWN_WHY_MAX) return end(tail);
+    const c = tail.match(THROWN_WHY_CUT_RE);
+    if (!c) return [`a text of ${n} code units, past the sidecar's ceiling of ${THROWN_WHY_MAX}, is not followed by its cut's announcement: «${tail.slice(0, 300)}»`];
+    const bad = [];
+    if (Number(c[1]) !== THROWN_WHY_MAX || Number(c[1]) !== units.length) bad.push(`the cut says ${c[1]} carried; the ceiling is ${THROWN_WHY_MAX} and the quoted text carries ${units.length}`);
+    if (Number(c[2]) !== n) bad.push(`the cut says the text has ${c[2]} code units; it has ${n}`);
+    if (Number(c[3]) !== n - THROWN_WHY_MAX) bad.push(`the cut says ${c[3]} are not recorded; ${n - THROWN_WHY_MAX} are not`);
+    return bad;
+  };
+  const lineTail = (n) => (tail, units) => {
+    if (n <= THROWN_LINE_MAX) return end(tail);
+    const c = tail.match(THROWN_LINE_CUT_RE);
+    if (!c) return [`a text of ${n} code units, past the printed line's ceiling of ${THROWN_LINE_MAX}, is not followed by its cut's announcement: «${tail.slice(0, 300)}»`];
+    const bad = [];
+    if (Number(c[1]) !== THROWN_LINE_MAX || Number(c[1]) !== units.length) bad.push(`the cut says ${c[1]} printed; the ceiling is ${THROWN_LINE_MAX} and the quoted text carries ${units.length}`);
+    if (Number(c[2]) !== n) bad.push(`the cut says the text has ${c[2]} code units; it has ${n}`);
+    if (Number(c[3]) !== n - THROWN_LINE_MAX) bad.push(`the cut says ${c[3]} are not printed; ${n - THROWN_LINE_MAX} are not`);
+    if (n <= THROWN_WHY_MAX ? c[4] === undefined : Number(c[5]) !== THROWN_WHY_MAX) bad.push(`the cut says the why carries ${c[4] ?? `the first ${c[5]}`}; it carries ${n <= THROWN_WHY_MAX ? "all of them" : `the first ${THROWN_WHY_MAX}`}`);
+    return bad;
+  };
+  if (typeof v === "string") {
+    out.push(...thrownRoundTrip(text, "a string, not an Error: ", v.slice(0, mode === "why" ? THROWN_WHY_MAX : THROWN_LINE_MAX), mode === "why" ? whyTail(v.length) : lineTail(v.length), "the thrown string"));
+  } else if (!prim && !read.threw && typeof read.value === "string") {
+    const m = read.value;
+    const scan = thrownLineScan(m);
+    const k = named ? named[1] : "(no kind)";
+    if (mode === "why") out.push(...thrownRoundTrip(text, `${k}, its message `, m.slice(0, THROWN_WHY_MAX), whyTail(m.length), "the whole message"));
+    else if (scan.count === 1) out.push(...thrownRoundTrip(text, `${k}, its message `, m.slice(0, THROWN_LINE_MAX), lineTail(m.length), "the one-line message"));
+    else {
+      out.push(...thrownRoundTrip(text, `${k}, its message's first line `, scan.first.slice(0, THROWN_LINE_MAX), (tail, units) => {
+        const c = tail.match(THROWN_CUT_TAIL_RE);
+        if (!c) return [`the cut is not announced after the quoted first line: «${tail.slice(0, 300)}»`];
+        const bad = [];
+        const over = scan.count > THROWN_LINES_MAX;
+        if ((c[1] !== undefined) !== over || Number(c[2]) !== (over ? THROWN_LINES_MAX : scan.count)) bad.push(`it says line 1 of ${c[1] ?? ""}${c[2]}; the message has ${scan.count} lines (the line-count ceiling is ${THROWN_LINES_MAX})`);
+        const keptWant = Math.min(scan.first.length, THROWN_LINE_MAX);
+        if (Number(c[3]) !== keptWant) bad.push(`it says ${c[3]} code units carried; the first line has ${scan.first.length}, of which the line carries ${keptWant}`);
+        if (Number(c[3]) !== units.length) bad.push(`it says ${c[3]} code units carried; the quoted text carries ${units.length}`);
+        if (Number(c[4]) !== m.length) bad.push(`it says the message has ${c[4]} code units; it has ${m.length}`);
+        if (scan.first.length > THROWN_LINE_MAX ? Number(c[5]) !== scan.first.length : c[5] !== undefined) bad.push(`it says ${c[5] === undefined ? "nothing of" : `${c[5]} code units for`} the first line's cut; the first line has ${scan.first.length} against a ceiling of ${THROWN_LINE_MAX}`);
+        if (m.length <= THROWN_WHY_MAX ? c[6] === undefined : Number(c[7]) !== THROWN_WHY_MAX) bad.push(`it says the why carries ${c[6] === undefined ? `the first ${c[7]}` : "the whole message"}; the message has ${m.length} code units against the why's ceiling of ${THROWN_WHY_MAX}`);
+        return bad;
+      }, "the message's first line"));
+    }
+  }
+  return out;
+}
+/** Every disagreement of `text` with the oracle for `v`, given what a read of its message gave. */
+const thrownViolations = (v, text, mode, read) => {
+  const out = thrownProperties(v, text, mode, read);
+  const spec = thrownSpecText(v, mode, read);
+  if (text !== spec) out.push(`the ${mode} is not the one text the specification allows: expected «${spec.length > 600 ? `${spec.slice(0, 600)}… (${spec.length} code units)` : spec}», got «${text.length > 600 ? `${text.slice(0, 600)}… (${text.length} code units)` : text}»`);
+  return out;
+};
+
+/** H1 ROUND 11 — the character classes the coverage floor reads off a drawn text: each is a class some transform of the
+ *  characters carried would change (normalisation, a white-space or control clean-up, case mapping, trimming, surrogate
+ *  repair, a length cap). Coverage only: the oracle never reads these. */
+const thrownCharClassTests = (s) => [
+  ["a combining mark", /\p{M}/u.test(s)],
+  ["NFC changes it", s.normalize("NFC") !== s],
+  ["NFD changes it", s.normalize("NFD") !== s],
+  ["NFKC changes it beyond NFC", s.normalize("NFKC") !== s.normalize("NFC")],
+  ["U+00A0", s.includes(CH(0xa0))],
+  ["a Unicode space other than U+0020 and U+00A0", /[\u1680\u2000-\u200a\u202f\u205f\u3000]/.test(s)],
+  ["U+200D", s.includes(CH(0x200d))],
+  ["another zero-width character", /[\u200b\u200c\u2060\ufeff]/.test(s)],
+  ["a soft hyphen or a bidi control", /[\u00ad\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(s)],
+  ["a C0 control other than tab, LF and CR", /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(s)],
+  ["DEL or a C1 control", /[\u007f-\u009f]/.test(s)],
+  ["an astral pair", /[\ud800-\udbff][\udc00-\udfff]/.test(s)],
+  ["a lone surrogate", /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(s)],
+  ["Cyrillic", /[Ѐ-ӿ]/.test(s)],
+  ["lower-casing changes it", s.toLowerCase() !== s],
+  ["upper-casing changes it", s.toUpperCase() !== s],
+  ["trimming changes it", s.trim() !== s],
+  ["a character JSON escapes", /["\\\u0000-\u001f]/.test(s)],
+  ["a code unit in U+E000–U+FFFF", /[\ue000-\uffff]/.test(s)],
+  ["longer than 300", s.length > 300],
+  ["longer than 600", s.length > 600],
+  ["longer than 1000", s.length > 1000],
+];
+const THROWN_CENSUS_SEEDS = Object.freeze([20260930, 4242, 90210]);
+const THROWN_CENSUS_PER_SEED = 3000; // (round 11: 1000 → 3000, so each new character class is reached many times over; the census runs in ~3 s)
+/** H1 ROUND 15 — THE TEXT GENERATOR of the thrown census, on its own (its lines are round 11's, moved out of thrownCensusValue
+ *  unchanged and in the same order, so every seeded draw is the draw it was): `str()` draws a string of one of the families —
+ *  plain atoms, line breaks, the whole UTF-16 code-unit space, weighted character classes, long texts — and records its family
+ *  in `famOf`. The P1 censuses draw their card titles from it too (p1TitleSource). */
+function thrownTextSource(rnd) {
+  const int = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  const famOf = new Map(); // (each drawn string's family, for the coverage floor)
+  const PLAIN = ["a", "Z", "0", " ", "  ", "\t", "é", "Ж", "中", CH(0xd83d, 0xde00), CH(0xd800), CH(0xdc00), "\"", "\\", "'", "`", "[object Object]",
+    "undefined", "null", CH(0), CH(0x1b) + "[31m", CH(0x7f), CH(0x85), CH(0x9b), CH(0x200b), CH(0xfeff), CH(0x2028), CH(0x2029), "threw: ", "its message",
+    " (line 1 of 2, 1 of its 3 UTF-16 code units; the whole message is in the series' why in the sidecar)", "WORD"];
+  const BREAKS = ["\n", "\r", "\r\n", "\n\r", " \n", "  \r\n", "\t\r"];
+  const plain = (n) => Array.from({ length: n }, () => pick(PLAIN)).join("");
+  /* H1 ROUND 11 (the round-10 verifier's CENSUS-ALPHABET-GAP: V10-E04/E05/E23/E24/E25 survived because the 31 atoms above
+   * hold no character normalisation or clean-up changes). Text is now ALSO drawn from the whole UTF-16 code-unit space:
+   * uniform code units 0x0000–0xFFFF (lone surrogates included) and weighted classes of the characters a transform of the
+   * characters carried would touch — combining marks and decomposed letters, compatibility characters, every Unicode
+   * space, zero-width and bidi characters, the separators, C0 and C1 controls, astral pairs, lone surrogates, Cyrillic,
+   * letters whose case mapping is irregular, the characters JSON escapes — with lengths from 0 to past 1,200. */
+  const unit = () => CH(int(0, 0xffff));
+  const CLASS = {
+    combining: () => CH(pick([int(0x300, 0x36f), int(0x483, 0x489), int(0x591, 0x5bd), int(0x20d0, 0x20f0), int(0xfe20, 0xfe2f), 0x301, 0x306, 0x308])),
+    decomposed: () => pick([CH(0x438, 0x306), CH(0x418, 0x306), CH(0x435, 0x308), CH(0x65, 0x301), CH(0x41, 0x30a), CH(0x55, 0x308, 0x301)]),
+    compatibility: () => CH(pick([0xfb01, 0xfb02, 0xfb00, 0x212b, 0x2126, 0x212a, int(0xff01, 0xff5e), 0x2460, 0xb5, 0x1e9b, 0x2167, 0xb2, 0x2075, 0x132, 0x17f, 0xbd, 0x2122, 0x3300, 0xfdfa, 0x33a1, 0xaa, 0x2024, 0x2026, 0x2102])),
+    space: () => CH(pick([0x20, 0xa0, 0xa0, 0x1680, int(0x2000, 0x200a), 0x202f, 0x205f, 0x3000])),
+    zeroWidth: () => CH(pick([0x200b, 0x200c, 0x200d, 0x200d, 0x2060, 0xfeff, 0xad, 0x180e, 0x34f, 0x2061, 0x2064])),
+    bidi: () => CH(pick([0x200e, 0x200f, 0x61c, int(0x202a, 0x202e), int(0x2066, 0x2069)])),
+    separator: () => CH(pick([0x2028, 0x2029, 0x85, 0x0b, 0x0c])),
+    c0: () => CH(int(0, 0x1f)),
+    c1: () => CH(int(0x7f, 0x9f)),
+    astral: () => CH(int(0xd800, 0xdbff), int(0xdc00, 0xdfff)),
+    lone: () => CH(int(0xd800, 0xdfff)),
+    cyrillic: () => CH(int(0x400, 0x4ff)),
+    cased: () => CH(pick([0x41, 0x5a, 0x61, 0x7a, 0xdf, 0x130, 0x131, 0x3c2, 0x3a3, 0x1c5, 0x149, 0x1f0, 0x390])),
+    jsonEscaped: () => CH(pick([0x22, 0x5c, 0x2f, 0x08, 0x09, 0x0a, 0x0c, 0x0d])),
+    ascii: () => CH(int(0x20, 0x7e)),
+    unit,
+  };
+  const CLASS_WEIGHTED = ["combining", "combining", "decomposed", "compatibility", "compatibility", "space", "space", "zeroWidth", "zeroWidth", "bidi", "separator", "c0", "c1", "astral", "lone", "cyrillic", "cyrillic", "cased", "jsonEscaped", "ascii", "ascii", "ascii", "unit", "unit"];
+  const classText = (n) => Array.from({ length: n }, () => CLASS[pick(CLASS_WEIGHTED)]()).join("");
+  const length = () => pick([int(0, 3), int(4, 40), int(41, 200), int(201, 700), int(701, 1300)]);
+  const blanks = () => Array.from({ length: int(0, 3) }, () => CLASS.space()).join("") + pick(["", "\t", CH(0xfeff), CH(0x2028)]);
+  const STR_FAMILIES = ["plain", "plain", "breaks", "cr-only", "trail-break", "long", "empty", "units", "units", "classes", "classes", "classes", "class-lines", "class-lines", "unit-lines", "blank-ends", "long-first-line"];
+  const str = () => {
+    const fam = pick(STR_FAMILIES);
+    const s = strFrom(fam);
+    famOf.set(s, fam);
+    return s;
+  };
+  const strFrom = (fam) => {
+    if (fam === "units") return Array.from({ length: length() }, unit).join("");
+    if (fam === "classes") return classText(length());
+    if (fam === "class-lines") return Array.from({ length: int(2, 4) }, () => classText(pick([int(0, 6), int(1, 40), int(41, 400), int(401, 1300)]))).map((s, i) => (i === 0 ? s : pick(BREAKS) + s)).join("");
+    if (fam === "unit-lines") return Array.from({ length: int(2, 3) }, () => Array.from({ length: pick([int(0, 8), int(9, 350), int(351, 1300)]) }, unit).join("")).join(pick(["\n", "\r", "\r\n"]));
+    if (fam === "long-first-line") return `${classText(int(301, 1600)).replace(/[\r\n]/g, "")}${pick(BREAKS)}${classText(int(0, 20))}`;
+    if (fam === "blank-ends") return `${blanks()}${classText(int(1, 30))}${blanks()}${rnd() < 0.5 ? pick(BREAKS) + classText(int(0, 10)) : ""}`;
+    if (fam === "empty") return "";
+    if (fam === "plain") return plain(int(1, pick([3, 12, 60])));
+    if (fam === "cr-only") return Array.from({ length: int(2, 4) }, () => plain(int(0, 5))).join("\r");
+    if (fam === "trail-break") return `${plain(int(1, 6))}${pick([" ", "  ", "\t", " \t "])}${pick(["\n", "\r", "\r\n"])}${plain(int(0, 6))}`;
+    if (fam === "long") return `${plain(int(20, 160))}TAILWORD-${int(0, 999)}`;
+    let s = plain(int(0, 4));
+    for (let k = int(1, 5); k > 0; k--) s += pick(BREAKS) + plain(int(0, 6));
+    return s;
+  };
+  return { int, pick, famOf, str, strFrom, classText, CLASS };
+}
+/** One drawn thrown value: `{ label, value, feats }` — `feats` are what the census's coverage floor reads, computed from
+ *  the value and how it was built, never from the harness. `realm` is a vm context (another realm's builtins). */
+function thrownCensusValue(rnd, realm) {
+  const { int, pick, famOf, str } = thrownTextSource(rnd);
+  const feats = new Set();
+  const num = () => pick([NaN, Infinity, -Infinity, -0, 0, 1, -1, 42, 0.1, 1e21, 1e-7, 5e-324, Number.MAX_VALUE, 2 ** 53 + 2, -123.456, rnd() * 1e6 - 5e5, int(-1e9, 1e9)]);
+  const big = () => pick([0n, 1n, -1n, 5n, 2n ** 64n, -(10n ** 30n), BigInt(int(-1e9, 1e9))]);
+  const sym = () => pick([Symbol(), Symbol(""), Symbol(str()), Symbol.iterator, Symbol.for("k")]);
+  /** A value of ANY kind, for a message, a name or what a getter throws. */
+  const anyValue = () => {
+    const w = int(0, 18);
+    if (w <= 4) return str();
+    return [() => "", num, big, () => rnd() < 0.5, sym, () => null, () => undefined, () => ({}), () => [], () => [1, "a"], () => ({ message: "inner" }), () => function inner() {}, () => new Error("inner"), () => vm.runInContext("({})", realm)][w - 5]();
+  };
+  // (round 12) what each attached property gives a read, by key — the generator's record; the oracle reads no message
+  const attached = new Map();
+  const attach = (o, key) => {
+    const how = pick(["absent", "absent", "data", "data", "data", "getter", "getter-throws"]);
+    if (how === "absent") return how;
+    if (how === "getter-throws") {
+      const x = anyValue();
+      Object.defineProperty(o, key, { get() { throw x; }, configurable: true, enumerable: true });
+      attached.set(key, { threw: true });
+      return how;
+    }
+    const x = anyValue();
+    attached.set(key, { threw: false, value: x });
+    if (how === "getter") Object.defineProperty(o, key, { get() { return x; }, configurable: true, enumerable: true });
+    else Object.defineProperty(o, key, { value: x, configurable: true, writable: true, enumerable: true });
+    return `${how}:${x === null ? "null" : typeof x}`;
+  };
+  const w = rnd();
+  let label;
+  let value;
+  let read = null; // (round 12) what a read of the value's message gives, as the generator built it (null for a primitive)
+  if (w < 0.36) {
+    const k = pick(["string", "string", "string", "number", "number", "bigint", "boolean", "symbol", "null", "undefined"]);
+    value = { string: str, number: num, bigint: big, boolean: () => rnd() < 0.5, symbol: sym, null: () => null, undefined: () => undefined }[k]();
+    label = `a thrown ${k}`;
+  } else {
+    // H1 ROUND 12: each builder returns the value AND what a read of its message gives as built (the oracle reads no
+    // message): a message the constructor was handed, the "" every Error prototype carries, a revoked proxy's throw, or
+    // undefined. An attached message (below) replaces it.
+    const NONE = { threw: false, value: undefined };
+    const said = (m) => ({ threw: false, value: m });
+    const C = [
+      ["a plain object", () => [{}, NONE]],
+      ["an object with no prototype", () => [Object.create(null), NONE]],
+      ["an object shaped like an Error (name and stack, no prototype link)", () => [{ name: "TypeError", stack: "TypeError: x\n    at f" }, NONE]],
+      ["an object whose toStringTag is «Error»", () => [{ [Symbol.toStringTag]: "Error" }, NONE]],
+      ["a function", () => [function thrownFn() {}, NONE]],
+      ["an arrow function", () => [() => {}, NONE]],
+      ["a class", () => [class Thrown {}, NONE]],
+      ["an async function", () => [async function thrownAsync() {}, NONE]],
+      ["an array", () => [[], NONE]],
+      ["an array with items", () => [[1, "a"], NONE]],
+      ["an array whose prototype is Error.prototype", () => [Object.setPrototypeOf([], Error.prototype), said("")]],
+      ["a function whose prototype is Error.prototype", () => [Object.setPrototypeOf(function errFn() {}, Error.prototype), said("")]],
+      ["an Error", () => { const m = str(); return [new Error(m), said(m)]; }],
+      ["a TypeError", () => { const m = str(); return [new TypeError(m), said(m)]; }],
+      ["a RangeError with no message", () => [new RangeError(), said("")]],
+      ["an AggregateError", () => { const m = str(); return [new AggregateError([], m), said(m)]; }],
+      ["an instance of a subclass of Error", () => { const m = str(); return [new (class SubError extends Error {})(m), said(m)]; }],
+      ["an object made from Error.prototype", () => [Object.create(Error.prototype), said("")]],
+      ["an Error from another realm", () => { const m = str(); realm.m = m; return [vm.runInContext("new Error(m)", realm), said(m)]; }],
+      ["a TypeError from another realm", () => { const m = str(); realm.m = m; return [vm.runInContext("new TypeError(m)", realm), said(m)]; }],
+      ["an object from another realm", () => [vm.runInContext("({})", realm), NONE]],
+      ["an array from another realm", () => [vm.runInContext("[]", realm), NONE]],
+      ["a function from another realm", () => [vm.runInContext("(function realmFn() {})", realm), NONE]],
+      ["a revoked proxy of an object", () => { const r = Proxy.revocable({}, {}); r.revoke(); return [r.proxy, { threw: true }]; }, true],
+      ["a revoked proxy of a function", () => { const r = Proxy.revocable(function revoked() {}, {}); r.revoke(); return [r.proxy, { threw: true }]; }, true],
+      ["a proxy of an Error", () => { const m = str(); return [new Proxy(new Error(m), {}), said(m)]; }],
+      ["a proxy of an array", () => [new Proxy([], {}), NONE]],
+      ["a proxy whose prototype trap throws", () => [new Proxy({}, { getPrototypeOf() { throw new Error("trap"); } }), NONE]],
+      ["a Date", () => [new Date(0), NONE]],
+      ["a RegExp", () => [/r/g, NONE]],
+      ["a Map", () => [new Map(), NONE]],
+      ["a Promise", () => [Promise.resolve(1), NONE]],
+      ["a typed array", () => [new Uint8Array(2), NONE]],
+      ["a boxed string", () => [new String(str()), NONE]],
+      ["a boxed symbol", () => [Object(Symbol("boxed")), NONE]],
+      ["a boxed bigint", () => [Object(5n), NONE]],
+    ];
+    const [name, make, sealed] = pick(C);
+    let built;
+    [value, built] = make();
+    const msg = sealed ? "none" : attach(value, "message");
+    const nm = sealed ? "none" : attach(value, "name");
+    read = attached.get("message") ?? built;
+    label = `${name} (message ${msg}, name ${nm})`;
+    feats.add(`built:${name}`);
+    if (typeof value === "function" && msg.startsWith("data:string")) feats.add("a function with a string message");
+    if (nm !== "absent" && nm !== "none" && msg === "absent" && name === "a plain object") feats.add("a plain object with a name and no message");
+    if (name.includes("another realm")) feats.add("another realm");
+  }
+  // (coverage read off the value itself)
+  const t = value === null ? "null" : typeof value;
+  feats.add(`typeof:${t}`);
+  if (t === "number") for (const [f, is] of [["NaN", Number.isNaN(value)], ["-0", Object.is(value, -0)], ["Infinity", value === Infinity], ["-Infinity", value === -Infinity]]) if (is) feats.add(`number:${f}`);
+  // (round 12: the message's text is the generator's own record, `read` — never a read of the value)
+  const strOf = t === "string" ? value : (t === "object" || t === "function") && !read.threw && typeof read.value === "string" ? read.value : null;
+  if (t === "object" || t === "function") {
+    feats.add(`kind:${THROWN_KIND_ORDER.find(([, test]) => holdsSafely(test, value))[0]}`);
+    feats.add(`message:${read.threw ? "threw" : read.value === null ? "null" : typeof read.value}`);
+  }
+  if (strOf !== null) {
+    const tag = t === "string" ? "string" : "message";
+    if (strOf.length > 40) feats.add(`${tag}:longer than 40`);
+    if (strOf === "") feats.add(`${tag}:empty`);
+    if (/\r(?!\n)/.test(strOf) && !strOf.includes("\n")) feats.add(`${tag}:a bare CR its only break`);
+    if (/[ \t]\r?\n|[ \t]\r/.test(strOf)) feats.add(`${tag}:blanks before a break`);
+    if (strOf.includes("\r\n")) feats.add(`${tag}:CRLF`);
+    if ([CH(0x85), CH(0x2028), CH(0x2029)].some((c) => strOf.includes(c))) feats.add(`${tag}:NEL, LS or PS`);
+    if (/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(strOf)) feats.add(`${tag}:a lone surrogate`);
+    if (strOf.includes("[object Object]")) feats.add(`${tag}:[object Object] as text`);
+    if (thrownLineScan(strOf).count > 1) feats.add(`${tag}:more than one line`);
+    // H1 ROUND 11 — the character classes, read off the text itself (and, for a message of several lines, off the first
+    // line the printed line carries)
+    if (famOf.has(strOf)) feats.add(`${tag}:drawn as ${famOf.get(strOf)}`);
+    const classes = (s, where) => {
+      for (const [f, is] of thrownCharClassTests(s)) if (is) feats.add(`${tag}:${where}${f}`);
+    };
+    classes(strOf, "");
+    const scan = thrownLineScan(strOf);
+    if (tag === "message" && scan.count > 1) classes(scan.first, "first of several lines: ");
+  }
+  return { label, value, read, feats, carried: thrownCarried(value, read) };
+}
+/** H1 ROUND 11 (resumed) — THE TEXTS A VALUE CARRIES INTO A DESCRIPTION, by where the printed text puts them: a thrown
+ *  string (printed whole), a string message (the why prints it whole), and a multi-line message's first line (what the
+ *  printed line carries). Coverage only: the census counts which code units reached each; the oracle never reads this.
+ *  (Round 12: the message is `read`, the generator's record of what a read gives — this reads no message.) */
+function thrownCarried(value, read) {
+  const t = value === null ? "null" : typeof value;
+  if (t === "string") return [["string", value]];
+  if (t !== "object" && t !== "function") return [];
+  if (read === null || read.threw || typeof read.value !== "string") return [];
+  const scan = thrownLineScan(read.value);
+  return scan.count > 1 ? [["message", read.value], ["first line", scan.first]] : [["message", read.value]];
+}
+/** H1 ROUND 11 (resumed) — THE CODE-UNIT SWEEP: the random draws reach most of the 65,536 code units but not provably all,
+ *  so a transform of ONE code unit no weighted class holds (U+2047 written «??», say) could pass the random draws. After
+ *  the seeds, the census throws 256 blocks of 256 consecutive code units (block b holds U+b·256 … U+b·256+255, lone
+ *  surrogates included), each three ways: as a thrown string, as an Error's whole message, and — its CR and LF moved out —
+ *  as the FIRST line of a two-line message (on a series path, so the printed line carries it); the paths rotate. So every
+ *  code unit is carried by every text kind, deterministically, and the character floor requires it (65,536 code units in
+ *  thrown strings and in messages, 65,534 — all but CR and LF — in first lines). */
+const THROWN_SWEEP_BLOCKS = 256;
+function thrownSweepValues() {
+  const out = [];
+  for (let b = 0; b < THROWN_SWEEP_BLOCKS; b++) {
+    const units = Array.from({ length: 256 }, (_, k) => b * 256 + k);
+    const block = String.fromCharCode(...units);
+    const noBreak = String.fromCharCode(...units.filter((u) => u !== 0x0a && u !== 0x0d));
+    const tag = `block U+${(b * 256).toString(16).padStart(4, "0")}`;
+    const firstOf = `${noBreak}\n${b % 2 === 0 ? "\r" : "\n"}tail`;
+    out.push({ label: `the code-unit sweep: ${tag} thrown as a string`, value: block, read: null, path: THROWN_PATHS[b % 4] });
+    out.push({ label: `the code-unit sweep: ${tag} as an Error's whole message`, value: new Error(block), read: { threw: false, value: block }, path: THROWN_PATHS[(b + 1) % 4] });
+    out.push({ label: `the code-unit sweep: ${tag} (CR and LF moved out) as the first line of an Error's message`, value: new Error(firstOf), read: { threw: false, value: firstOf }, path: THROWN_PATHS[b % 3] });
+  }
+  return out;
+}
+/** THE PATHS a thrown value reaches the description by: the frame of step 1, 2 or 3 throwing it (a series a throw ended),
+ *  or the report's mount time throwing it before its series is recorded (a refusal). */
+const THROWN_PATHS = Object.freeze(["series@1", "series@2", "series@3", "pre-series"]);
+/** The harness's P1 block compiled ONCE, as §W19's p1Direct compiles it; each call runs it afresh. */
+function p1Factory(src = SRC) {
+  return p1FactoryOfCode(p1BlockCode(src));
+}
+/** (round 13) The P1 block's code, as p1Factory compiles it — handed as text to the cut-content census's workers. */
+function p1BlockCode(src = SRC) {
+  const blk = p1Block(src);
+  return blk.code.slice(blk.from, blk.to);
+}
+/** (round 13) p1Factory's compilation, of the block's code. */
+function p1FactoryOfCode(code) {
+  return new Function("page", "note", "shot", "writeFileSync", "OUT", "SCENARIO", "h1ProbeReads", "Date",
+    `"use strict";\n${code}\nreturn { installEventWitness, armEventShots, finishEventShots, eventShots };`);
+}
+/** One thrown value through the harness's real P1 path: the notes it printed, its final sidecar and any rejected run. */
+async function p1ThrownRun(factory, value, path) {
+  return p1ThrownRunOf(factory, value, path, { h1ProbeReads: LIBNS.h1ProbeReads, scenario: H1.em });
+}
+/** (round 13) p1ThrownRun with the scenario and the lib's h1ProbeReads handed in (`ctx`), so a cut-content census worker,
+ *  which has neither name, runs the same steps. */
+async function p1ThrownRunOf(factory, value, path, ctx) {
+  const clock = { now: 5_000_000 };
+  const env = { notes: [], writes: [], bindings: {}, rejections: [] };
+  const at = path.startsWith("series@") ? Number(path.slice("series@".length)) : 0;
+  let k = 0;
+  const page = {
+    addInitScript: async () => {},
+    exposeBinding: async (name, fn) => void (env.bindings[name] = fn),
+    waitForTimeout: async (ms) => { clock.now += ms; },
+    evaluate: async () => ({ at: clock.now, camera: null, card: null, flash: null, matched: 1 }),
+  };
+  const shot = async () => { k += 1; if (k === at) throw value; return true; };
+  const api = factory(page, (s) => env.notes.push(s), shot, (p, text) => void env.writes.push(text), "OUT", ctx.scenario, ctx.h1ProbeReads, { now: () => clock.now });
+  await api.installEventWitness();
+  api.armEventShots(clock.now);
+  const ev = { n: 1, kind: "impact", title: null, head: null, cardPainted: null, at: clock.now, overlay: { layers: [], huds: [], dialogs: 0, camera: null } };
+  if (path === "pre-series") ev.at = { [Symbol.toPrimitive]() { throw value; } };
+  env.bindings.__auditEvent(null, ev);
+  for (const s of await Promise.allSettled(api.eventShots.pending)) if (s.status === "rejected") env.rejections.push(String(s.reason));
+  await api.finishEventShots();
+  return { env, final: JSON.parse(env.writes[env.writes.length - 1]) };
+}
+/** The thrown series' printed line around a description, as §W19's rows spell it (hand-written, not the harness's). */
+const thrownNoteFor = (steps, said) => `      EVENT SHOT 1: a throw ended this series after ${steps} of its 3 scheduled steps had run (threw: ${said})${steps > 0 ? ` — frame written by those steps: ${Array(steps).fill("yes").join("/")}` : ""}; whatever the work it interrupted left on disk is not among the frames written — _audit-event-shots.json`;
+/** Every disagreement of one run with the oracle (`read`: what a read of the value's message gave — never read here). */
+function thrownRunViolations(value, path, got, read) {
+  const v = [];
+  if (got.env.rejections.length > 0) v.push(`a run rejected: ${got.env.rejections.join(" | ")}`);
+  for (const s of got.env.notes) if (hasLineBreak(s)) v.push(`a printed note carries a line break: ${JSON.stringify(s)}`);
+  const f = got.final;
+  if (path === "pre-series") {
+    if (f.series.length !== 0 || f.refused.length !== 1) return [...v, `${f.series.length} series and ${f.refused.length} refusal(s), not 0 and 1`];
+    const r = f.refused[0];
+    if (r.n !== 1 || r.kind !== "impact") v.push(`the refusal lost its report: n ${r.n}, kind ${r.kind}`);
+    if (typeof r.why !== "string" || !r.why.startsWith("threw: ")) return [...v, `the refusal's why is not «threw: …»: ${JSON.stringify(r.why)}`];
+    for (const x of thrownViolations(value, r.why.slice("threw: ".length), "why", read)) v.push(`the refusal's why: ${x}`);
+    if (got.env.notes.some((s) => s.includes("a throw ended this series"))) v.push("a report that began no series printed a series' thrown line");
+    return v;
+  }
+  const steps = Number(path.slice("series@".length)) - 1;
+  if (f.series.length !== 1 || f.refused.length !== 0) return [...v, `${f.series.length} series and ${f.refused.length} refusal(s), not 1 and 0`];
+  const rec = f.series[0];
+  if (rec.ended !== "threw" || rec.shots.length !== steps) v.push(`the series is marked ${rec.ended} after ${rec.shots.length} step(s), not threw after ${steps}`);
+  if (typeof rec.why !== "string" || !rec.why.startsWith("threw: ")) return [...v, `the series' why is not «threw: …»: ${JSON.stringify(rec.why)}`];
+  for (const x of thrownViolations(value, rec.why.slice("threw: ".length), "why", read)) v.push(`the sidecar's why: ${x}`);
+  const lines = got.env.notes.filter((s) => s.startsWith("      EVENT SHOT 1: a throw ended this series"));
+  if (lines.length !== 1) return [...v, `${lines.length} thrown-series lines were printed, not one`];
+  const head = `      EVENT SHOT 1: a throw ended this series after ${steps} of its 3 scheduled steps had run (threw: `;
+  const tail = thrownNoteFor(steps, "\u0000").split("\u0000")[1];
+  const line = lines[0];
+  if (!line.startsWith(head) || !line.endsWith(tail) || line.length < head.length + tail.length) return [...v, `the thrown-series line is not the template around a description: ${JSON.stringify(line)}`];
+  for (const x of thrownViolations(value, line.slice(head.length, line.length - tail.length), "line", read)) v.push(`the printed line: ${x}`);
+  return v;
+}
+/** H1 ROUND 12 — THE CEILING CENSUS's texts: `n` code units drawn uniformly from 0x0000–0xFFFF (CR and LF moved out unless
+ *  `breaks`), seeded by `seed`; with `straddle`, a surrogate pair sits across each length ceiling the text crosses (its high
+ *  half the last code unit kept), so a cut that moved to keep the pair whole would show. Built in chunks (a million
+ *  arguments is past what one call may take). */
+function thrownCeilingText(n, seed, { breaks = false, straddle = false } = {}) {
+  const rnd = mulberry32(seed);
+  const units = new Uint16Array(n);
+  for (let i = 0; i < n; i++) {
+    let u = Math.floor(rnd() * 0x10000);
+    if (!breaks && (u === 0x0a || u === 0x0d)) u = 0x41 + (u & 7);
+    units[i] = u;
+  }
+  if (straddle) for (const c of [THROWN_LINE_MAX, THROWN_WHY_MAX]) if (n > c) { units[c - 1] = 0xd83d; units[c] = 0xde00; }
+  let s = "";
+  for (let i = 0; i < n; i += 8192) s += String.fromCharCode.apply(null, units.subarray(i, Math.min(n, i + 8192)));
+  return s;
+}
+/** A message of exactly `n` lines: a 24-code-unit first line, then breaks cycling LF, CRLF and a lone CR followed by «x» (so
+ *  no two breaks merge into one); the oracle's own scan counts them again. */
+function thrownManyLines(n, seed) {
+  const SEPS = ["\n", "\r\n", "\rx"];
+  const parts = [thrownCeilingText(24, seed)];
+  for (let i = 1; i < n; i++) parts.push(SEPS[i % 3]);
+  return parts.join("");
+}
+const THROWN_FAR = 1_000_000;
+/** The lengths drawn against BOTH length ceilings: 0, 1, just under, at, just over and four times each, and a million. */
+const THROWN_LENGTH_DRAWS = Object.freeze([0, 1, THROWN_LINE_MAX - 1, THROWN_LINE_MAX, THROWN_LINE_MAX + 1, 4 * THROWN_LINE_MAX, THROWN_WHY_MAX - 1, THROWN_WHY_MAX, THROWN_WHY_MAX + 1, 4 * THROWN_WHY_MAX, THROWN_FAR]);
+/** The line counts drawn: 1 up to a million — 99, 100, 999 and 1000, the powers of two and of ten around them, and just
+ *  under, at, just over and four times the line-count ceiling. */
+const THROWN_LINE_COUNT_DRAWS = Object.freeze([1, 2, 3, 98, 99, 100, 101, 255, 256, 257, 998, 999, 1000, 1001, 4095, 4096, 4097, 9999, 10000, 10001, THROWN_LINES_MAX - 1, THROWN_LINES_MAX, THROWN_LINES_MAX + 1, 65535, 65536, 65537, 4 * THROWN_LINES_MAX, 99999, 100000, 100001, THROWN_FAR]);
+let thrownCeilingCache = null;
+/** H1 ROUND 12 — THE CEILING CENSUS (the round-11 verifier's V11-LENGTH-CEILING and V11-LINECOUNT-CEILING): every text kind
+ *  at every length the ceilings make interesting, and messages of every line count above, each thrown on EVERY path. Each
+ *  carries `read`, the generator's record of what reading its message gives. Deterministic (built once, then reused: the
+ *  harness changes none of them). */
+function thrownCeilingValues() {
+  if (thrownCeilingCache !== null) return thrownCeilingCache;
+  const out = [];
+  const said = (m) => ({ threw: false, value: m });
+  const each = (label, value, read) => { for (const path of THROWN_PATHS) out.push({ label, value, read, path }); };
+  for (const [j, n] of THROWN_LENGTH_DRAWS.entries()) {
+    each(`a thrown string of ${n} code units (CR and LF among them)`, thrownCeilingText(n, 1000 + j, { breaks: true, straddle: j % 2 === 0 }), null);
+    const m = thrownCeilingText(n, 2000 + j, { straddle: j % 2 === 1 });
+    each(`an Error whose one-line message has ${n} code units`, new Error(m), said(m));
+  }
+  for (const [j, n] of [0, 1, THROWN_LINE_MAX - 1, THROWN_LINE_MAX, THROWN_LINE_MAX + 1, 4 * THROWN_LINE_MAX, THROWN_WHY_MAX + 1].entries()) {
+    const m = `${thrownCeilingText(n, 3000 + j, { straddle: j % 2 === 0 })}\n${thrownCeilingText(5, 3100 + j)}\r\n${thrownCeilingText(3, 3200 + j)}`;
+    each(`an Error whose first line has ${n} code units, of three lines`, new Error(m), said(m));
+  }
+  for (const [j, n] of [THROWN_WHY_MAX - 1, THROWN_WHY_MAX, THROWN_WHY_MAX + 1, 4 * THROWN_WHY_MAX, THROWN_FAR].entries()) {
+    const m = `${thrownCeilingText(40, 4000 + j)}\n${thrownCeilingText(n - 42, 4100 + j, { straddle: j % 2 === 0 })}\r`;
+    each(`an Error whose message of three lines has ${n} code units in all`, new Error(m), said(m));
+  }
+  for (const [j, n] of THROWN_LINE_COUNT_DRAWS.entries()) {
+    const m = thrownManyLines(n, 5000 + j);
+    each(`an Error whose message has ${n} line(s)`, new Error(m), said(m));
+  }
+  thrownCeilingCache = out;
+  return out;
+}
+/** Where a length sits against a ceiling `c`: "0", "1", "c-1", "c", "c+1", "4c+" (four times or more) or null. */
+const thrownAgainst = (n, c) => (n === 0 ? "0" : n === 1 ? "1" : n === c - 1 ? "c-1" : n === c ? "c" : n === c + 1 ? "c+1" : n >= 4 * c ? "4c+" : null);
+/** The ceiling census's coverage, read off the TEXTS (never the labels): the printed line's text (a thrown string, a one-line
+ *  message, or a first line) against the line ceiling, the why's text against the why ceiling, the line count against the
+ *  line-count ceiling and the named counts — each per path. */
+function thrownCeilingFeats(value, read, path) {
+  const f = [];
+  const add = (what, n, c) => { const k = thrownAgainst(n, c); if (k !== null) f.push(`${what}:${k}:${path}`); };
+  if (typeof value === "string") {
+    add("line", value.length, THROWN_LINE_MAX);
+    add("why", value.length, THROWN_WHY_MAX);
+    if (value.length >= THROWN_FAR) f.push(`why:far:${path}`);
+    return f;
+  }
+  if (read === null || read.threw || typeof read.value !== "string") return f;
+  const m = read.value;
+  const scan = thrownLineScan(m);
+  add("why", m.length, THROWN_WHY_MAX);
+  if (m.length >= THROWN_FAR) f.push(`why:far:${path}`);
+  add("line", scan.count === 1 ? m.length : scan.first.length, THROWN_LINE_MAX);
+  add("lines", scan.count, THROWN_LINES_MAX);
+  for (const k of [99, 100, 999, 1000]) if (scan.count === k) f.push(`lines:${k}:${path}`);
+  if (scan.count >= THROWN_FAR) f.push(`lines:far:${path}`);
+  return f;
+}
+/** What the ceiling census must reach, on every path: the line ceiling at 0, 1, just under, at, just over and four times;
+ *  the why ceiling just under, at, just over, four times and a million; the line count at 1, just under, at, just over and
+ *  four times the line-count ceiling, at 99, 100, 999 and 1000, and at a million. */
+const THROWN_CEILING_FLOOR = Object.freeze(THROWN_PATHS.flatMap((p) => [
+  ...["0", "1", "c-1", "c", "c+1", "4c+"].map((k) => `line:${k}:${p}`),
+  ...["c-1", "c", "c+1", "4c+", "far"].map((k) => `why:${k}:${p}`),
+  ...["1", "c-1", "c", "c+1", "4c+", "99", "100", "999", "1000", "far"].map((k) => `lines:${k}:${p}`),
+]));
+/* ── H1 ROUND 13 (the round-12 verifier's V12-CUT-CONTENT) — THE CUT-CONTENT CENSUS ─────────────────────────────────────────
+ * Round 12's ceiling census drew every LENGTH at, below, over and far past each ceiling, but the CONTENT at a cut was random
+ * code units (about 25 in 65,536 of them white space) and a surrogate pair straddling it, so four honest-looking edits that
+ * look at what they cut — the printed line's cut, the first line's cut and the why's cut tidied of trailing white space
+ * (V12-C01, C03, C27, C28) — printed a false count and survived. The class «any edit that looks at the content at the cut»
+ * is answered by PLACING the content there:
+ *   · THE CUT SITES (THROWN_CUT_SITES): every cut the harness makes — the printed line's ceiling on a thrown string, on a
+ *     one-line message and on a message's first line (the first-line cut), and the why's ceiling on a thrown string, on a
+ *     one-line message and on a message of several lines — each on every path it exists on (a line cut on the three series
+ *     paths, which print a line; a why cut on all four);
+ *   · THE CUT-UNIT SWEEP (thrownCutSweepValues): every code unit 0x0000–0xFFFF at the LAST carried position (c − 1) and at
+ *     the FIRST cut position (c) of every site. Three value shapes each carry both their cuts (a line cut and a why cut);
+ *     each shape is thrown 65,536 times, in 256 blocks of 256 as round 11's sweep, its four slots filled by four different
+ *     bijections of the value's index (so each slot holds every code unit once, and the two sides of a cut and the two cuts
+ *     hold different units); the blocks rotate over the three series paths, and every fourth block is thrown again on the
+ *     pre-series path, whose why is cut too;
+ *   · THE CUT-RUN CENSUS (thrownCutRunValues): RUNS of every white-space, control, zero-width, bidi, combining, surrogate,
+ *     JSON-escaped, punctuation, special, compatibility, Cyrillic and word class ENDING exactly at the last carried
+ *     position, STARTING exactly at the first cut position, and straddling the cut, of 1, 2, 3, 8 and 64 code units, and
+ *     filling the whole text — on every site and every path, through the harness's whole P1 path;
+ *   · the ORACLE is unchanged: its round trip (the decoded units are exactly input.slice(0, ceiling)) and its own counts
+ *     catch any change that depends on what sits at the cut; THE CUT-CONTENT FLOOR, read off the texts, requires every code
+ *     unit at both positions of every site (65,536; 65,534 where a CR or an LF would end the line instead) and every class,
+ *     run and length on every site and path.
+ * The sweep drives the harness's own eventSeriesThrew — compiled from its own P1 block, as p1Factory compiles it; the
+ * function the series' ONE catch hands every throw to, unchanged, on every path (pinned in THE CUT-CONTENT CENSUS's row) —
+ * with the state each path has at that catch: the series' record after 0, 1 or 2 steps, or no record before the series. A
+ * quarter of a million runs of the whole P1 path would take minutes, so the sweep starts at that catch, and every 64th block
+ * is ALSO thrown through the whole path, which must print and write byte for byte what the catch-entry run did. The
+ * values are shared among worker threads (thrownCutCensus, after this region), each evaluating these same functions from
+ * this file's own text. */
+const THROWN_CUT_SITES = Object.freeze([
+  "a thrown string at the printed line's ceiling", "a thrown string at the why's ceiling",
+  "a one-line message at the printed line's ceiling", "a one-line message at the why's ceiling",
+  "a message's first line at the printed line's ceiling", "a message of several lines at the why's ceiling",
+]);
+/** Is `site` a cut of the printed line (so it exists only on a series path)? */
+const thrownCutIsLine = (site) => site.endsWith("the printed line's ceiling");
+/** THE CUTS A VALUE'S TEXTS REACH, read off the texts (never a label): [site, the text cut, its ceiling] for each text past
+ *  its ceiling — the thrown string, or the message (one line, or its first line and the whole) as `read` records it. */
+function thrownCutSitesOf(value, read) {
+  const out = [];
+  if (typeof value === "string") {
+    if (value.length > THROWN_LINE_MAX) out.push([THROWN_CUT_SITES[0], value, THROWN_LINE_MAX]);
+    if (value.length > THROWN_WHY_MAX) out.push([THROWN_CUT_SITES[1], value, THROWN_WHY_MAX]);
+    return out;
+  }
+  if (read === null || read.threw || typeof read.value !== "string") return out;
+  const m = read.value;
+  const scan = thrownLineScan(m);
+  if (scan.count === 1) {
+    if (m.length > THROWN_LINE_MAX) out.push([THROWN_CUT_SITES[2], m, THROWN_LINE_MAX]);
+    if (m.length > THROWN_WHY_MAX) out.push([THROWN_CUT_SITES[3], m, THROWN_WHY_MAX]);
+  } else {
+    if (scan.first.length > THROWN_LINE_MAX) out.push([THROWN_CUT_SITES[4], scan.first, THROWN_LINE_MAX]);
+    if (m.length > THROWN_WHY_MAX) out.push([THROWN_CUT_SITES[5], m, THROWN_WHY_MAX]);
+  }
+  return out;
+}
+/** The value shapes the sweep and the runs throw, each carrying a line cut and a why cut. A thrown string and a one-line
+ *  message of THROWN_CUT_LENGTH code units; a message whose first line is THROWN_CUT_FIRST code units, then an LF, then
+ *  text to THROWN_CUT_LENGTH in all (the why's cut falls in its second line). The base text is the 26 lower-case letters
+ *  in turn, which no tidying changes; only what is placed differs. */
+const THROWN_CUT_SHAPES = Object.freeze(["a thrown string", "an Error with a one-line message", "an Error with a message of two lines"]);
+const THROWN_CUT_LENGTH = THROWN_WHY_MAX + 72;
+const THROWN_CUT_FIRST = THROWN_LINE_MAX + 72;
+const thrownCutBaseUnit = (k) => 0x61 + (k % 26);
+/** The sweep's four slots — the line cut's last carried and first cut positions, then the why cut's — and, for value `i`
+ *  (0 … 65,535), the code unit each slot holds: four bijections of 0 … 65,535 (odd multipliers mod 2^16), so each slot
+ *  holds every code unit exactly once over the 65,536 values. */
+const THROWN_CUT_SLOTS = Object.freeze([THROWN_LINE_MAX - 1, THROWN_LINE_MAX, THROWN_WHY_MAX - 1, THROWN_WHY_MAX]);
+const thrownCutSlotUnits = (i) => [i, (i * 0x6f27 + 0x3c1d) & 0xffff, (i * 0x9e35 + 0x1f3b) & 0xffff, (i * 0x2b69 + 0xa70f) & 0xffff];
+/** Where a CR or an LF cannot stand (it would end the line the slot is in, and the cut would not be there): every slot of
+ *  the one-line message, and the first line's two; such a unit is replaced there by U+002D. */
+const thrownCutNoBreak = (shape, slot) => shape === THROWN_CUT_SHAPES[1] || (shape === THROWN_CUT_SHAPES[2] && slot < 2);
+/** A shape's text with `place(k)` — a code unit, or -1 for the base — at each position k, built in chunks. */
+function thrownCutText(shape, place) {
+  const units = new Uint16Array(THROWN_CUT_LENGTH);
+  for (let k = 0; k < THROWN_CUT_LENGTH; k++) {
+    const p = place(k);
+    units[k] = p >= 0 ? p : thrownCutBaseUnit(k);
+  }
+  if (shape === THROWN_CUT_SHAPES[2]) units[THROWN_CUT_FIRST] = 0x0a;
+  let s = "";
+  for (let k = 0; k < THROWN_CUT_LENGTH; k += 8192) s += String.fromCharCode.apply(null, units.subarray(k, Math.min(THROWN_CUT_LENGTH, k + 8192)));
+  return s;
+}
+/** The shape's value thrown, and `read`, the generator's record of what reading its message gives. */
+const thrownCutValue = (shape, s) => (shape === THROWN_CUT_SHAPES[0] ? { value: s, read: null } : { value: new Error(s), read: { threw: false, value: s } });
+/** THE CUT-UNIT SWEEP — for each shape, values 0 … 65,535 (block b = i >> 8), each with its four slot units placed: thrown
+ *  on the series path b mod 3, and, when b mod 4 is 3, on the pre-series path as well. The base text is cut into the
+ *  pieces between the slots once, so each value is four code units joined to them. Yields { key, shape, i, units, value,
+ *  read, path } (a generator: a quarter of a million values are never held at once); with `parts` > 1, only the blocks
+ *  whose number (shape · 256 + b) is `part` mod `parts` — the share of one of the census's workers. `key` orders every
+ *  value of the census. */
+function* thrownCutSweepValues(part = 0, parts = 1) {
+  for (const [si, shape] of THROWN_CUT_SHAPES.entries()) {
+    const base = thrownCutText(shape, () => -1);
+    const [a, b, c, d] = THROWN_CUT_SLOTS;
+    const pieces = [base.slice(0, a), base.slice(b + 1, c), base.slice(d + 1)];
+    for (let blk = 0; blk < 256; blk++) {
+      if ((si * 256 + blk) % parts !== part) continue;
+      for (let i = blk * 256; i < blk * 256 + 256; i++) {
+        const units = thrownCutSlotUnits(i).map((u, slot) => ((u === 0x0a || u === 0x0d) && thrownCutNoBreak(shape, slot) ? 0x2d : u));
+        const s = pieces[0] + String.fromCharCode(units[0], units[1]) + pieces[1] + String.fromCharCode(units[2], units[3]) + pieces[2];
+        const { value, read } = thrownCutValue(shape, s);
+        const key = (si * 0x10000 + i) * 2;
+        yield { key, shape, i, units, value, read, path: THROWN_PATHS[blk % 3] };
+        if (blk % 4 === 3) yield { key: key + 1, shape, i, units, value, read, path: "pre-series" };
+      }
+    }
+  }
+}
+/** The sweep's values that are ALSO thrown through the whole P1 path (every 64th block), whose printing and writing must be
+ *  byte for byte what the run entered at the catch printed and wrote. */
+const thrownCutAlsoWhole = (i) => (i >> 8) % 64 === 7;
+const thrownCutRange = (a, b) => Array.from({ length: b - a + 1 }, (_, k) => a + k);
+/** THE CUT-RUN CLASSES — each a list of code units a run cycles through. */
+const THROWN_CUT_CLASSES = Object.freeze([
+  ["U+0020", [0x20]],
+  ["a tab", [0x09]],
+  ["every Unicode white space (JavaScript's white space and line terminators, and NEL)", [0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x20, 0x85, 0xa0, 0x1680, ...thrownCutRange(0x2000, 0x200a), 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff]],
+  ["a CR", [0x0d]],
+  ["an LF", [0x0a]],
+  ["CRLF", [0x0d, 0x0a]],
+  ["every C0 control", thrownCutRange(0x00, 0x1f)],
+  ["DEL and every C1 control", thrownCutRange(0x7f, 0x9f)],
+  ["zero-width and bidi characters and the soft hyphen", [0xad, 0x61c, 0x180e, 0x200b, 0x200c, 0x200d, 0x200e, 0x200f, ...thrownCutRange(0x202a, 0x202e), 0x2060, ...thrownCutRange(0x2066, 0x2069), 0xfeff]],
+  ["combining marks", [...thrownCutRange(0x300, 0x36f), ...thrownCutRange(0x1ab0, 0x1abe), ...thrownCutRange(0x20d0, 0x20f0), 0x3099, 0x309a, ...thrownCutRange(0xfe20, 0xfe2f)]],
+  ["high surrogates", [0xd800, 0xd801, 0xd83d, 0xdb7f, 0xdb80, 0xdbff]],
+  ["low surrogates", [0xdc00, 0xdc01, 0xde00, 0xdfff]],
+  ["surrogate pairs (a high and a low in turn)", [0xd83d, 0xde00]],
+  ["a low then a high surrogate in turn", [0xdc00, 0xd800]],
+  ["JSON's two escapes", [0x22, 0x5c]],
+  ["punctuation", [0x2e, 0x2c, 0x3b, 0x3a, 0x21, 0x3f, 0x2d, 0x2013, 0x2014, 0x2026, 0x27, 0x60, 0x29, 0x5d]],
+  ["noncharacters and specials", [0xfdd0, 0xfdef, 0xfff9, 0xfffa, 0xfffb, 0xfffc, 0xfffd, 0xfffe, 0xffff]],
+  ["private use", [0xe000, 0xe001, 0xf8ff]],
+  ["compatibility characters NFKC changes", [0xfb01, 0x2126, 0x212b, 0xff21, 0x2460, 0xb5, 0x17f, 0x2002]],
+  ["Cyrillic", thrownCutRange(0x410, 0x44f)],
+  ["a word and a space in turn", [0x77, 0x6f, 0x72, 0x64, 0x20]],
+]);
+/** A run's shape: where it sits against a cut at c. */
+const THROWN_CUT_RUN_SHAPES = Object.freeze(["ending at the last carried position", "starting at the first cut position", "straddling the cut"]);
+const THROWN_CUT_RUN_LENGTHS = Object.freeze([1, 2, 3, 8, 64]);
+const THROWN_CUT_WHOLE = "filling the whole text";
+/** The positions [from, to) a run of `len` takes against a cut at `c`. */
+const thrownCutRunSpan = (shape, len, c) => (shape === THROWN_CUT_RUN_SHAPES[0] ? [c - len, c] : shape === THROWN_CUT_RUN_SHAPES[1] ? [c, c + len] : [c - len, c + len]);
+/** The members of a class a run may use at a site of `shape`: all of them, but a CR or an LF where it would end the line
+ *  the cut is in (thrownCutNoBreak's places: the one-line message, and the first line of the two-line message). */
+const thrownCutMembers = (members, noBreak) => (noBreak ? members.filter((u) => u !== 0x0a && u !== 0x0d) : members);
+/** THE CUT-RUN CENSUS — for each shape, class, run shape and length (and the whole text), the run placed against BOTH cuts
+ *  of the value (the line's at THROWN_LINE_MAX, the why's at THROWN_WHY_MAX), on every path; the class's cycle starts at the
+ *  path's index, so different members land at the cut on different paths. A class with no member a site may use is not
+ *  placed there. Deterministic; yields { key, label, value, read, path, runs } — `runs`, what was placed: [cut, class, run
+ *  shape, length, from, to, members], which THE CUT-CONTENT FLOOR checks against the text before it counts it; with
+ *  `parts` > 1, only the values whose number is `part` mod `parts`. */
+function* thrownCutRunValues(part = 0, parts = 1) {
+  let j = -1;
+  const plans = [...THROWN_CUT_RUN_SHAPES.flatMap((rs) => THROWN_CUT_RUN_LENGTHS.map((len) => [rs, len])), [THROWN_CUT_WHOLE, THROWN_CUT_LENGTH]];
+  for (const shape of THROWN_CUT_SHAPES) {
+    for (const [cls, members] of THROWN_CUT_CLASSES) {
+      for (const [p, path] of THROWN_PATHS.entries()) {
+        for (const [rs, len] of plans) {
+          j += 1;
+          if (j % parts !== part) continue;
+          const place = new Int32Array(THROWN_CUT_LENGTH).fill(-1);
+          const runs = [];
+          for (const [cut, c] of [["line", THROWN_LINE_MAX], ["why", THROWN_WHY_MAX]]) {
+            const noBreak = shape === THROWN_CUT_SHAPES[1] || (shape === THROWN_CUT_SHAPES[2] && cut === "line");
+            const use = thrownCutMembers(members, noBreak);
+            if (use.length === 0) continue;
+            const [from, to] = rs === THROWN_CUT_WHOLE ? (cut === "line" ? [0, shape === THROWN_CUT_SHAPES[2] ? THROWN_CUT_FIRST : THROWN_CUT_LENGTH] : [shape === THROWN_CUT_SHAPES[2] ? THROWN_CUT_FIRST + 1 : 0, THROWN_CUT_LENGTH]) : thrownCutRunSpan(rs, len, c);
+            for (let k = from; k < to; k++) place[k] = use[(p + k - from) % use.length];
+            runs.push([cut, cls, rs, rs === THROWN_CUT_WHOLE ? "all" : len, from, to, use]);
+          }
+          if (runs.length === 0) continue;
+          const s = thrownCutText(shape, (k) => place[k]);
+          const { value, read } = thrownCutValue(shape, s);
+          yield { key: 0x100000 + j, label: `the cut-run census: ${shape}, ${cls}, ${rs}${rs === THROWN_CUT_WHOLE ? "" : ` (${len})`}`, value, read, path, runs };
+        }
+      }
+    }
+  }
+}
+/** H1 ROUND 13 — the harness's eventSeriesThrew, compiled from its own P1 block's code as p1Factory compiles it (its returned
+ *  names are the block's own): the function the series' one catch hands every throw to. */
+function p1ThrewFactoryOfCode(code) {
+  return new Function("page", "note", "shot", "writeFileSync", "OUT", "SCENARIO", "h1ProbeReads", "Date",
+    `"use strict";\n${code}\nreturn { eventSeriesThrew, eventShots, armEventShots };`);
+}
+/** One thrown value handed to the harness's eventSeriesThrew in the state `path` has at the series' catch: armed, one
+ *  report seen, and — on series@k — its record with the k − 1 steps that ran (each frame written), or — before the series —
+ *  no record. Returns what p1ThrownRun returns: the notes printed and the sidecar last written. (`ctx`: the scenario and
+ *  the lib's h1ProbeReads, which p1ThrownRun hands its factory.) */
+function p1ThrewAt(factory, value, path, ctx) {
+  const env = { notes: [], writes: [], rejections: [] };
+  const clock = { now: 5_000_000 };
+  const page = { addInitScript: async () => {}, exposeBinding: async () => {}, waitForTimeout: async () => {}, evaluate: async () => null };
+  const api = factory(page, (s) => env.notes.push(s), async () => true, (p, text) => void env.writes.push(text), "OUT", ctx.scenario, ctx.h1ProbeReads, { now: () => clock.now });
+  api.armEventShots(clock.now);
+  api.eventShots.seen = 1;
+  const ev = Object.freeze({ n: 1, kind: "impact", title: null, head: null, cardPainted: null, at: clock.now, overlay: { layers: [], huds: [], dialogs: 0, camera: null } });
+  let rec = null;
+  if (path !== "pre-series") {
+    const steps = Number(path.slice("series@".length)) - 1;
+    rec = { n: 1, kind: "impact", title: null, head: null, cardPainted: null, tSec: 0, overlayAtMount: ev.overlay, shots: Array.from({ length: steps }, (_, k) => ({ offsetMs: k, name: `05-ev01-impact-p${k}s`, ok: true, startedMs: k, doneMs: k, dump: null })) };
+    api.eventShots.series.push(rec);
+  }
+  api.eventSeriesThrew(ev, rec, value);
+  return { env, final: JSON.parse(env.writes[env.writes.length - 1]) };
+}
+/** One worker's share of THE CUT-CONTENT CENSUS (`part` of `parts`): the sweep's values entered at the series' catch (every
+ *  64th block also through the whole P1 path, which must print the same thrown line and write the same why), then the
+ *  runs through the whole P1 path — every one checked by thrownRunViolations, the census's oracle. A worker stops at its
+ *  CAP-th disagreement (the census has failed by then). Returns the violations, each with its key, how many, and the coverage
+ *  it read off the texts. `code` is the harness's P1 block.
+ *  H1 ROUND 14: then THE PAIR CENSUS (`ctx.pairs`, the placements thrownBreakData derived, handed in): each value entered at
+ *  the series' catch (every 64th also through the whole P1 path, which must print and write the same), checked by the oracle
+ *  AND by THE RAW-SLICE DIFFERENTIAL. `phases` picks the phases a plant check runs; `oracle: false` leaves only the
+ *  differential (THE CARRIED TEXT IS THE RAW SLICE shows it fails alone). */
+async function thrownCutCensusPart(code, part, parts, ctx, { stopAtFirst = false, phases = ["sweep", "runs", "pairs"], oracle = true, families = null } = {}) {
+  const CAP = 40;
+  const threw = p1ThrewFactoryOfCode(code);
+  const factory = p1FactoryOfCode(code);
+  const cuts = thrownCutCoverage();
+  const violations = [];
+  let count = 0;
+  const hex = (u) => `U+${u.toString(16).padStart(4, "0")}`;
+  const thrownLineOf = (got) => got.env.notes.filter((s) => s.startsWith("      EVENT SHOT 1: a throw ended this series"));
+  const whyOf = (got) => (got.final.series.length > 0 ? got.final.series[0].why : got.final.refused[0]?.why);
+  const said = (key, text) => { count += 1; if (violations.length < CAP) violations.push([key, text]); };
+  for (const { key, shape, i, units, value, read, path } of phases.includes("sweep") ? thrownCutSweepValues(part, parts) : []) {
+    cuts.markSites(value, read, path);
+    const got = p1ThrewAt(threw, value, path, ctx);
+    const v = thrownRunViolations(value, path, got, read);
+    if (thrownCutAlsoWhole(i)) {
+      const whole = await p1ThrownRunOf(factory, value, path, ctx);
+      v.push(...thrownRunViolations(value, path, whole, read).map((x) => `(through the whole P1 path) ${x}`));
+      const [lw, lg] = [thrownLineOf(whole), thrownLineOf(got)];
+      if (lw.length !== lg.length || lw.some((x, k) => x !== lg[k]) || whyOf(whole) !== whyOf(got)) v.push("the whole P1 path printed or wrote a different thrown line or why than the run entered at the series' catch");
+    }
+    for (const x of v) said(key, `cut sweep (${path}, ${shape}, value ${i}: ${units.map(hex).join(" ")} at ${THROWN_CUT_SLOTS.join("/")}): ${x}`);
+    if ((stopAtFirst && count > 0) || count >= CAP) return { violations, count, coverage: cuts.export() };
+  }
+  for (const { key, label, value, read, path, runs } of phases.includes("runs") ? thrownCutRunValues(part, parts) : []) {
+    cuts.markRuns(value, read, path, runs);
+    const got = await p1ThrownRunOf(factory, value, path, ctx);
+    for (const x of thrownRunViolations(value, path, got, read)) said(key, `cut run ${key - 0x100000} (${path}, ${label}): ${x}`);
+    if ((stopAtFirst && count > 0) || count >= CAP) return { violations, count, coverage: cuts.export() };
+  }
+  // H1 ROUND 14: THE PAIR CENSUS
+  // (round 15: `families`, for a plant check only — the pair values of those families alone, under the keys they have in the whole census)
+  for (const { key, label, value, read, path, placed } of phases.includes("pairs") && Array.isArray(ctx.pairs) ? thrownPairValues(ctx.pairs, part, parts, families) : []) {
+    cuts.markPairs(value, read, path, placed, ctx.pairs);
+    const got = p1ThrewAt(threw, value, path, ctx);
+    const v = [...(oracle ? thrownRunViolations(value, path, got, read) : []), ...thrownRawSliceViolations(value, path, got, read)];
+    if (key % 64 === 7) {
+      const whole = await p1ThrownRunOf(factory, value, path, ctx);
+      v.push(...(oracle ? thrownRunViolations(value, path, whole, read) : []).map((x) => `(through the whole P1 path) ${x}`));
+      const [lw, lg] = [thrownLineOf(whole), thrownLineOf(got)];
+      if (lw.length !== lg.length || lw.some((x, k) => x !== lg[k]) || whyOf(whole) !== whyOf(got)) v.push("the whole P1 path printed or wrote a different thrown line or why than the run entered at the series' catch");
+    }
+    for (const x of v) said(key, `pair ${key - 0x200000} (${path}, ${label}): ${x}`);
+    if ((stopAtFirst && count > 0) || count >= CAP) break;
+  }
+  return { violations, count, coverage: cuts.export() };
+}
+/** THE CUT-CONTENT FLOOR's counts: which code units stood at each site's last carried and first cut positions (read off
+ *  the texts), how many values reached each site on each path, and each run placed — counted only when the text carries,
+ *  at its span, only the class's members. */
+function thrownCutCoverage() {
+  const units = Object.fromEntries(THROWN_CUT_SITES.flatMap((s) => [[`${s}:last`, new Uint8Array(0x10000)], [`${s}:cut`, new Uint8Array(0x10000)]]));
+  const feats = new Map();
+  const count = (f) => feats.set(f, (feats.get(f) ?? 0) + 1);
+  const markSites = (value, read, path) => {
+    for (const [site, text, c] of thrownCutSitesOf(value, read)) {
+      if (thrownCutIsLine(site) && path === "pre-series") continue;
+      units[`${site}:last`][text.charCodeAt(c - 1)] = 1;
+      units[`${site}:cut`][text.charCodeAt(c)] = 1;
+      count(`site:${site}:${path}`);
+    }
+  };
+  const markRuns = (value, read, path, runs) => {
+    const sites = thrownCutSitesOf(value, read);
+    for (const [cut, cls, rs, len, from, to, use] of runs) {
+      const ok = new Set(use);
+      for (const [site, text] of sites) {
+        if ((cut === "line") !== thrownCutIsLine(site) || (thrownCutIsLine(site) && path === "pre-series")) continue;
+        // (every site text is a prefix of the thrown text, so a run's span is in the same positions)
+        let held = to <= text.length;
+        for (let k = from; held && k < to; k++) held = ok.has(text.charCodeAt(k));
+        if (held) count(`run:${site}:${cls}:${rs}:${len}:${path}`);
+      }
+    }
+  };
+  // H1 ROUND 14: a pair placed, counted only when the text carries its units at its place and its boundary stands at c + d
+  const markPairs = (value, read, path, placed, placements) => {
+    const sites = thrownCutSitesOf(value, read);
+    for (const [cut, pi, d, from] of placed) {
+      const u = placements[pi].units;
+      for (const [site, text, c] of sites) {
+        if ((cut === "line") !== thrownCutIsLine(site) || (thrownCutIsLine(site) && path === "pre-series")) continue;
+        let held = from + placements[pi].at === c + d && from + u.length <= text.length;
+        for (let k = 0; held && k < u.length; k++) held = text.charCodeAt(from + k) === u[k];
+        if (held) count(`pair:${site}:${pi}:${d}:${path}`);
+      }
+    }
+  };
+  const exportIt = () => ({ units, feats: [...feats] });
+  const absorb = (x) => {
+    for (const [k, a] of Object.entries(x.units)) for (let u = 0; u < 0x10000; u++) if (a[u]) units[k][u] = 1;
+    for (const [f, n] of x.feats) feats.set(f, (feats.get(f) ?? 0) + n);
+  };
+  const reached = () => Object.fromEntries(Object.entries(units).map(([k, a]) => [k, a.reduce((n, x) => n + x, 0)]));
+  return { feats, markSites, markRuns, markPairs, reached, export: exportIt, absorb };
+}
+/** What THE CUT-CONTENT FLOOR requires: every code unit at both positions of every site — 65,534 (all but CR and LF) at the
+ *  one-line message's and the first line's — and each site reached on every path it exists on by at least
+ *  THROWN_CUT_SITE_MIN sweep values; and every run of every class a site may use, in every run shape and length and the
+ *  whole text, on every site and every path it exists on. */
+const THROWN_CUT_UNITS_FLOOR = Object.freeze(Object.fromEntries(THROWN_CUT_SITES.flatMap((s) => {
+  const n = s.startsWith("a one-line message") || s.startsWith("a message's first line") ? 0x10000 - 2 : 0x10000;
+  return [[`${s}:last`, n], [`${s}:cut`, n]];
+})));
+const THROWN_CUT_SITE_MIN = 16384;
+const THROWN_CUT_RUN_FLOOR = Object.freeze(THROWN_CUT_SITES.flatMap((site) => {
+  const noBreak = site.startsWith("a one-line message") || site.startsWith("a message's first line");
+  const paths = thrownCutIsLine(site) ? THROWN_PATHS.filter((p) => p !== "pre-series") : THROWN_PATHS;
+  return THROWN_CUT_CLASSES.filter(([, members]) => thrownCutMembers(members, noBreak).length > 0).flatMap(([cls]) => [
+    ...THROWN_CUT_RUN_SHAPES.flatMap((rs) => THROWN_CUT_RUN_LENGTHS.map((len) => `${rs}:${len}`)), `${THROWN_CUT_WHOLE}:all`,
+  ].flatMap((rl) => paths.map((p) => `run:${site}:${cls}:${rl}:${p}`)));
+}));
+/* ── H1 ROUND 14 (the round-13 verifier's V13-CUT-PAIR-CONTENT and V13-K23T) — THE BREAK-PROPERTY PAIR CENSUS ──────────────
+ * Round 13's sweep put every code unit at c − 1 and at c of every cut, one at a time, in a text of lower-case letters, so a
+ * rule keyed on a PAIR across a cut (an emoji and its presentation selector, a flag's two regional indicators, a Hangul L
+ * and V, a virama and a consonant) or on the unit two before it («..», «. », «\u») only ever met letters beside the unit it
+ * tested, and 19 such edits printed a false count and survived. Every pair of 65,536 code units at every cut is out of
+ * reach, so the class is closed at a FINITE, PRINCIPLED boundary: a real truncation or tidy-up rule keys on a Unicode
+ * property — a break property of UAX #29, an emoji property, or the escape syntax of the text it writes — so the census
+ * places at every cut one pair for every ordered pair of those properties' CLASSES (and of the general categories):
+ *   · THE CLASSES (thrownBreakClasses) are derived, never typed. For each of grapheme, word and sentence segmentation, every
+ *     code point of THE DOMAIN (every code unit 0x0000–0xFFFF, and every astral code point of an emoji or regional-indicator
+ *     property, the classes with astral-only members) is put through Intl.Segmenter — the runtime's ICU, which implements
+ *     UAX #29 from the UCD's Grapheme_Cluster_Break, Word_Break, Sentence_Break, Extended_Pictographic and
+ *     Indic_Conjunct_Break — in every context of THE BATTERY (each a rule of UAX #29 that decides by the neighbours it names:
+ *     GB3–GB13 with GB9c, WB3–WB16, SB3–SB11), and two code points are of one class when ICU breaks around them alike in
+ *     every context. The anchors of the contexts are derived too (thrownBreakAnchors). The class counts and every class's
+ *     first member and size are PINNED (THROWN_BREAK_CLASS_PIN), so a runtime with other Unicode data turns the census red
+ *     until it is re-pinned, and the named classes of each property are checked to be distinct classes;
+ *   · THE PAIRS (thrownPairPlacements): every ordered pair of the classes of each segmentation, by their first members;
+ *     THE CONTEXTS: every context of the battery (the rules that decide by more than a pair) with every class of its
+ *     segmentation in x's place, each of its boundaries at the cut; GENERAL CATEGORY: every ordered pair of the 30 general
+ *     categories (derived), by their first members; SCRIPT and BINARY PROPERTY: each script's first member doubled (the
+ *     scripts derived), and the first member of each binary property ECMA-262 names doubled and beside the first code point
+ *     without it — these first members over the whole code space; EMOJI PRESENTATION: every \p{Emoji} code point followed
+ *     by U+FE0E, U+FE0F and the ZWJ, and every \p{Emoji_Modifier_Base} followed by every \p{Emoji_Modifier}; THE EMOJI
+ *     COMPONENTS (the keycap and tag sequences of UTS #51): the first member of each general category among Emoji_Component's
+ *     members, among the code units and beyond them (thrownEmojiComponents, pinned) — every ordered pair of these, and each
+ *     of them, U+FE0F, each of them, with its boundary after the first and after the selector; JSON'S ESCAPE SYNTAX: the
+ *     backslash and the quote before and after every printable ASCII unit, «\u» then 0–4 hex digits with its boundary after
+ *     each of its units, and a surrogate written as an escape — the first high surrogate's, the first low one's and the two
+ *     together, in each hex case, the boundary after each unit; REPEATED PUNCTUATION: every ASCII punctuation or symbol
+ *     unit doubled, three and four times over (the boundary after each unit), before and after the first space separator,
+ *     the first digit and the first upper-case letter, and every ordered pair of these units (the two-unit tokens of any
+ *     syntax written in ASCII);
+ *   · each pair is placed with its boundary at c − 1, at c and at c + 1 — the pairs at (c−2, c−1), (c−1, c) and (c, c+1) —
+ *     at BOTH cuts of each of the three shapes, so on all six cut sites; ON EVERY PATH (the placements marked `every`): each
+ *     class pair, each JSON-escape placement, each punctuation unit doubled, in its runs and beside a space, and the
+ *     emoji-presentation pairs of the first member of
+ *     each emoji property (Emoji, Emoji_Presentation, Extended_Pictographic with U+FE0E, U+FE0F and the ZWJ; Emoji_Modifier_Base
+ *     with every Emoji_Modifier); every other placement (the contexts, the category, script and binary-property pairs, the
+ *     rest of the emoji, the emoji components and the punctuation pairs — a punctuation unit beside a digit or an upper-case
+ *     letter, and every ordered pair of them) on the series path its index picks (every fourth before the series as well); where a CR or an LF
+ *     would end the line the cut is in, it is not placed at that cut;
+ *   · THE RAW-SLICE DIFFERENTIAL (thrownRawSliceViolations) runs beside the oracle on every value: the printed line and the
+ *     why must be, character for character, an independent rendering of the RAW SLICE of the input at the declared ceiling
+ *     (String.prototype.slice and nothing else, quoted by the oracle's unit-by-unit reference quoting), so nothing can stand
+ *     between the slice and the quoting; THE CARRIED TEXT IS THE RAW SLICE shows that it fails alone;
+ *   · THE PAIR FLOOR, read off the texts: every placement marked `every` at every boundary of every site on every path the
+ *     site exists on, every other placement at every boundary of every site.
+ * A cut rule keyed on specific code points with no property-level function is written to evade this census and is OUT of
+ * model (clause iii of the threat model above §W11, as extended for round 14). */
+/** The paragraph separator: every segmentation breaks after it (a grapheme Control, a word Newline, a sentence ParaSep), so
+ *  each context below is one piece of one long text ended by it, and ICU segments a whole context for the domain in a pass. */
+const THROWN_PAIR_SEP = CH(0x2029);
+/** The locale the segmenters are made for — fixed, so the classes never follow the machine's locale. */
+const THROWN_PAIR_LOCALE = "en";
+/** THE DOMAIN's astral part: the astral code points of the emoji and regional-indicator properties — the break classes whose
+ *  members are all (Regional_Indicator, the emoji modifiers) or mostly astral. Every other class has members among the 65,536
+ *  code units, all of which are in the domain. */
+const THROWN_PAIR_ASTRAL = /[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}\p{Emoji}\p{Emoji_Component}]/u;
+/** THE DOMAIN: every code unit 0x0000–0xFFFF (a surrogate as its lone unit), then the astral code points above, ascending. */
+function thrownPairDomain() {
+  const d = [];
+  for (let c = 0; c <= 0xffff; c++) d.push(c);
+  for (let c = 0x10000; c <= 0x10ffff; c++) if (THROWN_PAIR_ASTRAL.test(String.fromCodePoint(c))) d.push(c);
+  return d;
+}
+/** A code point's text (a surrogate code point is its lone unit), and its UTF-16 code units. */
+const thrownCpText = (c) => String.fromCodePoint(c);
+const thrownCpUnits = (c) => (c > 0xffff ? [0xd800 + ((c - 0x10000) >> 10), 0xdc00 + ((c - 0x10000) & 0x3ff)] : [c]);
+const thrownHex = (c) => `U+${c.toString(16).toUpperCase().padStart(4, "0")}`;
+/** One segmenter per granularity, made once. */
+const thrownSegmenters = new Map();
+function thrownSegmenter(g) {
+  if (!thrownSegmenters.has(g)) thrownSegmenters.set(g, new Intl.Segmenter(THROWN_PAIR_LOCALE, { granularity: g }));
+  return thrownSegmenters.get(g);
+}
+/** How many segments ICU makes of `s` at granularity `g`. */
+function thrownSegmentCount(g, s) {
+  const it = thrownSegmenter(g).segment(s)[Symbol.iterator]();
+  let n = 0;
+  while (!it.next().done) n += 1;
+  return n;
+}
+/** THE BATTERY'S ANCHORS — each derived from the Unicode data the runtime has, never typed, but for the two line-break units
+ *  UAX #29 defines its CR and LF classes as (the units the oracle's line scan already names):
+ *    Ll Lu Nd Zs Pe Pc Cc Mc — the first code point of that General_Category; GE, RI, EP — of Grapheme_Extend,
+ *    Regional_Indicator and Extended_Pictographic; ZWJ — the Join_Control member that joins two pictographs into one grapheme
+ *    (GB11); AT and ST — the first Sentence_Terminal members that do and that do not join a digit after them (SB6); LV and
+ *    LVT — the first Hangul-script syllables whose canonical decomposition has two and three code points, and L, V, T — its
+ *    parts; HE — the first Hebrew-script other letter; SQ — the Quotation_Mark member a Hebrew letter joins (WB7a); C and LK —
+ *    GB9c's consonant and linker: the first nonspacing mark that, after the last other letter before it that attaches to
+ *    nothing on either side, makes letter·mark·letter one grapheme. A derivation that finds nothing throws. */
+function thrownBreakAnchors(domain) {
+  const must = (c, what) => {
+    if (c === undefined || c === null) throw new Error(`the break census could not derive its anchor ${what}`);
+    return thrownCpText(c);
+  };
+  const allOf = (re) => domain.filter((x) => re.test(thrownCpText(x)));
+  const firstOf = (re) => domain.find((x) => re.test(thrownCpText(x)));
+  const A = { LF: CH(0x0a), CR: CH(0x0d) };
+  for (const [k, p] of [["Ll", "Ll"], ["Lu", "Lu"], ["Nd", "Nd"], ["Zs", "Zs"], ["Pe", "Pe"], ["Pc", "Pc"], ["Cc", "Cc"], ["Mc", "Mc"], ["GE", "Grapheme_Extend"], ["RI", "Regional_Indicator"], ["EP", "Extended_Pictographic"]]) {
+    A[k] = must(firstOf(new RegExp(`\\p{${p}}`, "u")), k);
+  }
+  A.ZWJ = must(allOf(/\p{Join_Control}/u).find((j) => thrownSegmentCount("grapheme", A.EP + thrownCpText(j) + A.EP) === 1), "ZWJ");
+  const st = allOf(/\p{Sentence_Terminal}/u);
+  A.AT = must(st.find((x) => thrownSegmentCount("sentence", A.Ll + thrownCpText(x) + A.Nd) === 1), "AT");
+  A.ST = must(st.find((x) => thrownSegmentCount("sentence", A.Ll + thrownCpText(x) + A.Nd) === 2), "ST");
+  const hangul = allOf(/\p{Script=Hangul}/u);
+  const nfd = (c) => [...thrownCpText(c).normalize("NFD")];
+  A.LV = must(hangul.find((c) => nfd(c).length === 2), "LV");
+  A.LVT = must(hangul.find((c) => nfd(c).length === 3), "LVT");
+  [A.L, A.V] = [...A.LV.normalize("NFD")];
+  A.T = [...A.LVT.normalize("NFD")][2];
+  A.HE = must(firstOf(/[\p{Script=Hebrew}&&\p{Lo}]/v), "HE");
+  A.SQ = must(allOf(/\p{Quotation_Mark}/u).find((q) => thrownSegmentCount("word", A.HE + thrownCpText(q)) === 1), "SQ");
+  const lo = allOf(/\p{Lo}/u);
+  let k = -1;
+  for (const x of allOf(/\p{Mn}/u)) {
+    while (k + 1 < lo.length && lo[k + 1] < x) k += 1;
+    let y = -1;
+    for (let i = k; i >= 0 && y < 0; i--) {
+      const t = thrownCpText(lo[i]);
+      if (thrownSegmentCount("grapheme", A.Ll + t) === 2 && thrownSegmentCount("grapheme", t + A.Ll) === 2) y = lo[i];
+    }
+    if (y >= 0 && thrownSegmentCount("grapheme", thrownCpText(y) + thrownCpText(x) + thrownCpText(y)) === 1) {
+      A.C = thrownCpText(y);
+      A.LK = thrownCpText(x);
+      break;
+    }
+  }
+  if (A.C === undefined) throw new Error("the break census could not derive its anchors C and LK");
+  return A;
+}
+/** THE BATTERY — for each segmentation, the contexts a code point x is tried in, each a rule of UAX #29 that decides by the
+ *  neighbours it names (cited), its anchors thrownBreakAnchors's. Every boundary inside a context is read, and two code
+ *  points whose every reading agrees are of one class. */
+const THROWN_BREAK_BATTERY = Object.freeze({
+  grapheme: Object.freeze([
+    "Ll x", "x Ll", // GB9, GB9a: x attaches to the letter before it (Extend, ZWJ, SpacingMark); GB9b: the letter after it attaches to x (Prepend)
+    "x LF", "CR x", "x GE", // GB3: CR × LF; GB4, GB5, GB9: Control, CR and LF take no extending mark
+    "x L", "x V", "x T", "L x", "V x", "T x", // GB6–GB8: the Hangul syllable types L, V, T, LV and LVT
+    "x RI", "RI RI x", // GB12, GB13: a flag is two regional indicators
+    "x ZWJ EP", "EP x EP", "EP x ZWJ EP", // GB11: a pictograph, its extending marks and a ZWJ, then a pictograph
+    "C LK x", "C x C", "C x LK C", // GB9c: Indic_Conjunct_Break's consonants, linkers and extenders
+  ]),
+  word: Object.freeze([
+    "Ll x", "x Ll", "Nd x", "x Nd", // WB5, WB8–WB10: letters and numbers side by side
+    "Ll x Ll", "x AT Ll", // WB6, WB7: a letter, a mid-letter, a letter
+    "Nd x Nd", "x AT Nd", // WB11, WB12: a number, a mid-number, a number
+    "HE x", "HE x HE", "x SQ", // WB7a–WB7c: the Hebrew letter and the two quotes
+    "Pc x", "x Pc", // WB13a, WB13b: the extending connector (and Katakana)
+    "Zs x", "x Zs", // WB3d: white-space segments
+    "x GE", "x LF", "CR x", // WB3–WB4: the line breaks, and the marks that extend whatever precedes them
+    "x RI", "RI RI x", // WB15, WB16: regional indicators in pairs
+    "ZWJ x", "x EP", // WB3c: ZWJ × a pictograph (x as the pictograph, and x as the ZWJ)
+  ]),
+  sentence: Object.freeze([
+    "x Lu", "x Nd", // SB6, SB11: x as a terminator
+    "AT x", "ST x", "AT Zs x", "AT Pe x", "AT x Ll", "AT x Pe", "ST x Lu", "AT x Lu", // SB8–SB11: what may follow a terminator
+    "x AT Lu", // SB7: an upper- or lower-case letter, a full stop, an upper-case letter
+    "x LF", "CR x", "x Ll", "x GE", // SB3–SB5: the paragraph separators, and the marks that extend whatever precedes them
+  ]),
+});
+/** THE CLASSES of each segmentation over the domain: { reps, sizes, of } — `reps` each class's first member in the domain's
+ *  order (the classes are so ordered), `sizes` their sizes, `of` a Map from code point to class index. */
+function thrownBreakClasses(domain, A) {
+  const out = {};
+  for (const [g, contexts] of Object.entries(THROWN_BREAK_BATTERY)) {
+    const seg = thrownSegmenter(g);
+    const sig = new Array(domain.length).fill("");
+    const xs = domain.map(thrownCpText);
+    for (const context of contexts) {
+      const toks = context.split(" ");
+      for (const t of toks) if (t !== "x" && typeof A[t] !== "string") throw new Error(`the battery's anchor ${t} was not derived`);
+      const pieces = new Array(domain.length);
+      const starts = new Int32Array(domain.length);
+      let len = 0;
+      for (let i = 0; i < domain.length; i++) {
+        const piece = toks.map((t) => (t === "x" ? xs[i] : A[t])).join("") + THROWN_PAIR_SEP;
+        pieces[i] = piece;
+        starts[i] = len;
+        len += piece.length;
+      }
+      const text = pieces.join("");
+      const at = new Uint8Array(text.length + 1);
+      for (const s of seg.segment(text)) at[s.index] = 1;
+      for (let i = 0; i < domain.length; i++) {
+        let off = starts[i];
+        let bits = "";
+        for (let t = 0; t < toks.length - 1; t++) {
+          off += toks[t] === "x" ? xs[i].length : A[toks[t]].length;
+          bits += at[off] === 1 ? "1" : "0";
+        }
+        sig[i] += `${bits}|`;
+      }
+    }
+    const byKey = new Map();
+    for (let i = 0; i < domain.length; i++) {
+      let c = byKey.get(sig[i]);
+      if (c === undefined) byKey.set(sig[i], (c = []));
+      c.push(domain[i]);
+    }
+    const classes = [...byKey.values()];
+    const of = new Map();
+    classes.forEach((m, k) => { for (const c of m) of.set(c, k); });
+    out[g] = { reps: classes.map((m) => m[0]), sizes: classes.map((m) => m.length), of };
+  }
+  return out;
+}
+/** THE CODE SPACE a property's first member is found in: every code point but the surrogates, in order, as one well-formed
+ *  string (so a search with a /u property escape reads code points), and the code point each index starts. The surrogates,
+ *  U+D800–U+DFFF, are tried one by one as lone units. Built once in a process. */
+let thrownCodeSpaceMemo = null;
+function thrownCodeSpace() {
+  if (thrownCodeSpaceMemo !== null) return thrownCodeSpaceMemo;
+  const parts = [];
+  for (let c = 0; c <= 0x10ffff; c++) if (c < 0xd800 || c > 0xdfff) parts.push(String.fromCodePoint(c));
+  const text = parts.join("");
+  const at = (i) => (i < 0xd800 ? i : i < 0xd800 + 0x2000 ? i + 0x800 : 0x10000 + ((i - 0xd800 - 0x2000) >> 1));
+  thrownCodeSpaceMemo = { text, at };
+  return thrownCodeSpaceMemo;
+}
+/** The first of all 1,114,112 code points with the property of `re` (a /u property escape), or undefined. */
+function thrownFirstCodePoint(re) {
+  const { text, at } = thrownCodeSpace();
+  const one = new RegExp(re.source, re.flags.replace("g", ""));
+  const i = text.search(one);
+  const main = i < 0 ? undefined : at(i);
+  if (main !== undefined && main < 0xd800) return main;
+  for (let c = 0xd800; c <= 0xdfff; c++) if (one.test(String.fromCharCode(c))) return c;
+  return main;
+}
+const THROWN_AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const THROWN_az = "abcdefghijklmnopqrstuvwxyz";
+/** THE GENERAL CATEGORIES — derived: the two-letter values (an upper-case and a lower-case letter) a \p{General_Category=…}
+ *  escape accepts, which are the 30 leaves (the one-letter values are their unions). */
+function thrownCategoryValues() {
+  const out = [];
+  for (const x of THROWN_AZ) for (const y of THROWN_az) {
+    try {
+      new RegExp(`\\p{General_Category=${x}${y}}`, "u");
+      out.push(x + y);
+    } catch {
+      /* not a value */
+    }
+  }
+  return out;
+}
+/** THE SCRIPTS — derived: the four-letter codes the runtime's script display names know (ISO 15924) that a \p{Script=…}
+ *  escape accepts, with their first members; a code whose first member another code already has is an alias of that script
+ *  (Script is single-valued) and is dropped, and a script with no member is dropped. THE BREAK-PROPERTY CLASSES row checks
+ *  that every code point has one of these scripts. */
+function thrownScriptValues() {
+  const dn = new Intl.DisplayNames("en", { type: "script", fallback: "none" });
+  const out = [];
+  const seen = new Set();
+  for (const a of THROWN_AZ) for (const b of THROWN_az) for (const c of THROWN_az) for (const d of THROWN_az) {
+    const code = a + b + c + d;
+    if (dn.of(code) === undefined) continue;
+    let re;
+    try {
+      re = new RegExp(`\\p{Script=${code}}`, "u");
+    } catch {
+      continue;
+    }
+    const f = thrownFirstCodePoint(re);
+    if (f === undefined || seen.has(f)) continue;
+    seen.add(f);
+    out.push([code, f]);
+  }
+  return out;
+}
+/** ECMA-262's binary Unicode properties (its table «Binary Unicode property aliases», by their canonical names). */
+const THROWN_BINARY_PROPERTIES = Object.freeze([
+  "ASCII", "ASCII_Hex_Digit", "Alphabetic", "Any", "Assigned", "Bidi_Control", "Bidi_Mirrored", "Case_Ignorable", "Cased", "Changes_When_Casefolded",
+  "Changes_When_Casemapped", "Changes_When_Lowercased", "Changes_When_NFKC_Casefolded", "Changes_When_Titlecased", "Changes_When_Uppercased", "Dash",
+  "Default_Ignorable_Code_Point", "Deprecated", "Diacritic", "Emoji", "Emoji_Component", "Emoji_Modifier", "Emoji_Modifier_Base", "Emoji_Presentation",
+  "Extended_Pictographic", "Extender", "Grapheme_Base", "Grapheme_Extend", "Hex_Digit", "IDS_Binary_Operator", "IDS_Trinary_Operator", "ID_Continue",
+  "ID_Start", "Ideographic", "Join_Control", "Logical_Order_Exception", "Lowercase", "Math", "Noncharacter_Code_Point", "Pattern_Syntax",
+  "Pattern_White_Space", "Quotation_Mark", "Radical", "Regional_Indicator", "Sentence_Terminal", "Soft_Dotted", "Terminal_Punctuation", "Unified_Ideograph",
+  "Uppercase", "Variation_Selector", "White_Space", "XID_Continue", "XID_Start",
+]);
+/** THE EMOJI COMPONENTS' representatives — derived: for each general category, the first member of Emoji_Component with it
+ *  among the code units, and the first beyond them (the keycap base, the digit, the ZWJ and the first tag character, the
+ *  enclosing keycap, the presentation selector, the regional indicator, the modifier — as the runtime's data has them). */
+function thrownEmojiComponents(domain) {
+  const out = [];
+  for (const gc of thrownCategoryValues()) {
+    const re = new RegExp(`[\\p{Emoji_Component}&&\\p{General_Category=${gc}}]`, "v");
+    const of = domain.filter((c) => re.test(thrownCpText(c)));
+    for (const c of [of.find((x) => x <= 0xffff), of.find((x) => x > 0xffff)]) if (c !== undefined) out.push(c);
+  }
+  return out;
+}
+/** The first high surrogate and the first low one — derived: the first code unit of General_Category Cs, and the first Cs
+ *  code unit that completes a pair after it. */
+function thrownSurrogateFirsts(domain) {
+  const cs = domain.filter((c) => c <= 0xffff && /\p{Cs}/u.test(thrownCpText(c)));
+  const hi = cs[0];
+  const lo = cs.find((c) => String.fromCharCode(hi, c).codePointAt(0) > 0xffff);
+  if (hi === undefined || lo === undefined) throw new Error("the break census could not derive the first surrogates");
+  return [hi, lo];
+}
+/* ── H1 ROUND 15 — THE REALISTIC FAMILIES (the round-14 verifier's V14-ESCAPE-SYNTAX-CUT and V14-EMOJI-PROPERTY-PAIR) ──────────
+ * Round 14's escape family was JSON's own, and its emoji pairs each started from an emoji; nine cut rules keyed on an ANSI
+ * control sequence, on «\u{…}», on a percent-escape or on «%uXXXX», and two keyed on a ZWJ BEFORE a person and on a tag AFTER
+ * a pictograph, met no placed text. Since round 15 the truth of the cut's sentence rests on the harness's own runtime check
+ * (the threat model above §W11, clause iii as restated), so these families are not what keeps such a rule from printing a
+ * false sentence; they are placed because they are what the harness really carries, so that what it PRINTS of them is pinned:
+ *   · THE PLAYWRIGHT MESSAGES (THROWN_PLAYWRIGHT_MESSAGES): the messages the Playwright under tools/clips/headless throws at a
+ *     click, a screenshot and a wait that time out — MEASURED (Playwright 1.61.1; the round-14 verifier's
+ *     verifier14/ansi-evidence.txt and the round-15 builder's builder15/ansi-evidence.txt agree code unit for code unit), typed
+ *     here from that measurement: every «Call log:» line is wrapped in ESC [ 2 m … ESC [ 2 2 m;
+ *   · ECMA-48's grammar (thrownAnsiTexts): a control sequence is CSI — ESC [ or the one unit U+009B — then parameter bytes
+ *     (digits and «;»), then a final byte; an operating-system command is ESC ], its text, then BEL or ST (ESC \);
+ *   · UTS #51's sequences (THROWN_EMOJI_SEQUENCES): a ZWJ sequence joins emoji with U+200D; a tag sequence is a base, tag
+ *     characters and the cancel tag; typed from emoji-zwj-sequences.txt and emoji-sequences.txt, and each checked by the
+ *     runtime's own grapheme segmentation to be ONE grapheme. */
+/** What the Playwright under tools/clips/headless throws (measured; see above): [what was called, its message]. ESC is U+001B. */
+const THROWN_PLAYWRIGHT_MESSAGES = Object.freeze([
+  ["page.click", `page.click: Timeout 300ms exceeded.\nCall log:\n${CH(0x1b)}[2m  - waiting for locator('#nope')${CH(0x1b)}[22m\n`],
+  ["locator.screenshot", `locator.screenshot: Timeout 300ms exceeded.\nCall log:\n${CH(0x1b)}[2m  - waiting for locator('#nope')${CH(0x1b)}[22m\n`],
+  ["page.waitForSelector", `page.waitForSelector: Timeout 300ms exceeded.\nCall log:\n${CH(0x1b)}[2m  - waiting for locator('#nope') to be visible${CH(0x1b)}[22m\n`],
+]);
+/** The parameter strings and final bytes the CSI grammar is placed with (none, one, two digits; two and three parameters). */
+const THROWN_ANSI_PARAMS = Object.freeze(["", "2", "22", "1;31", "38;5;196"]);
+const THROWN_ANSI_FINALS = Object.freeze(["m", "K"]);
+/** THE ANSI TEXTS: [what, text] — the first Playwright message whole (it carries LF, so it is placed where a line break may
+ *  stand; the others differ from it only in the words before «Call log:» and in the line below), each distinct Call-log line of them alone (no line break: placed at every site), each distinct control sequence
+ *  in them, and the grammar: every CSI of THROWN_ANSI_PARAMS × THROWN_ANSI_FINALS after ESC [, the first parameters after the
+ *  one-unit CSI U+009B, an OSC ended by BEL and one ended by ST. */
+function thrownAnsiTexts() {
+  const ESC = CH(0x1b);
+  const out = [];
+  const seen = new Set();
+  const add = (what, text) => { if (!seen.has(text)) { seen.add(text); out.push([what, text]); } };
+  for (const [k, [call, message]] of THROWN_PLAYWRIGHT_MESSAGES.entries()) {
+    if (k === 0) add(`Playwright's ${call} timeout message, whole`, message);
+    for (const line of message.split("\n")) if (line.includes(ESC)) add(`the Call-log line of Playwright's ${call} timeout message`, line);
+    for (const seq of message.match(new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, "g")) ?? []) add(`the control sequence ESC ${seq.slice(1)} of Playwright's call log`, seq);
+  }
+  for (const p of THROWN_ANSI_PARAMS) for (const f of THROWN_ANSI_FINALS) add(`a CSI: ESC [ ${p} ${f}`, `${ESC}[${p}${f}`);
+  for (const p of THROWN_ANSI_PARAMS.slice(0, 2)) add(`a one-unit CSI: U+009B ${p} m`, `${CH(0x9b)}${p}m`);
+  add("an OSC ended by BEL: ESC ] 0 ; t BEL", `${ESC}]0;t${CH(0x07)}`);
+  add("an OSC ended by ST, a hyperlink: ESC ] 8 ; ; http://x ESC \\", `${ESC}]8;;http://x${ESC}${CH(0x5c)}`);
+  return out;
+}
+/** The emoji properties ECMA-262 names, and the two properties their sequences are joined by (UTS #51 ED-15, ED-17). */
+const THROWN_EMOJI_PROPERTIES = Object.freeze(["Emoji", "Emoji_Presentation", "Emoji_Modifier", "Emoji_Modifier_Base", "Emoji_Component", "Extended_Pictographic", "Regional_Indicator", "Variation_Selector", "Join_Control"]);
+/** The code points the emoji-sequence pairs are made of — derived: the first member of each of THROWN_EMOJI_PROPERTIES, the
+ *  ZWJ (the battery's anchor), the two presentation selectors, and the first and the last tag character (the astral
+ *  Emoji_Component members of category Cf: a tag sequence's tags and its cancel tag). Distinct, ascending. */
+function thrownEmojiJoinReps(domain, A) {
+  const firstOf = (name) => { const re = new RegExp(`\\p{${name}}`, "u"); return domain.find((c) => re.test(thrownCpText(c))); };
+  const tags =domain.filter((c) => c > 0xffff && /[\p{Emoji_Component}&&\p{Cf}]/v.test(thrownCpText(c)));
+  const reps = [...THROWN_EMOJI_PROPERTIES.map(firstOf), A.ZWJ.codePointAt(0), 0xfe0e, 0xfe0f, tags[0], tags[tags.length - 1]];
+  if (reps.some((c) => c === undefined)) throw new Error("the break census could not derive an emoji-sequence representative");
+  return [...new Set(reps)].sort((a, b) => a - b);
+}
+/** Real emoji sequences (UTS #51; typed from emoji-zwj-sequences.txt and emoji-sequences.txt): [what, its code points]. */
+const THROWN_EMOJI_SEQUENCES = Object.freeze([
+  ["a family (man, ZWJ, woman, ZWJ, girl)", [0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467]],
+  ["a couple with heart (woman, ZWJ, heart, U+FE0F, ZWJ, man)", [0x1f469, 0x200d, 0x2764, 0xfe0f, 0x200d, 0x1f468]],
+  ["a handshake of two skin tones (hand, tone, ZWJ, hand, tone)", [0x1faf1, 0x1f3fb, 0x200d, 0x1faf2, 0x1f3ff]],
+  ["a subdivision flag (the black flag, the tags g b e n g, the cancel tag)", [0x1f3f4, 0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f]],
+]);
+/** ESCAPE SYNTAX BEYOND JSON'S: [what, text] — ECMAScript's «\u{…}» with 0 to 6 hex digits, open and closed; its «\x» with 0
+ *  to 2; the legacy «%uXXXX» with 0 to 4; a percent-encoded three-byte character in each hex case; a decimal and a
+ *  hexadecimal character reference. `d` is the hex digit placed. */
+function thrownEscapeTexts(d) {
+  const B = CH(0x5c);
+  const out = [];
+  for (const k of [0, 1, 4, 5, 6]) out.push([`«\\u{» then ${k} hex digit(s) and «}»`, `${B}u{${d.repeat(k)}}`]);
+  for (const k of [0, 1, 2]) out.push([`«\\x» then ${k} hex digit(s)`, `${B}x${d.repeat(k)}`]);
+  for (const k of [0, 1, 2, 3, 4]) out.push([`«%u» then ${k} hex digit(s)`, `%u${d.repeat(k)}`]);
+  out.push(["a percent-encoded three-byte character (upper-case hex)", "%E2%82%AC"], ["a percent-encoded three-byte character (lower-case hex)", "%e2%82%ac"]);
+  out.push(["a decimal character reference", "&#8364;"], ["a hexadecimal character reference", "&#x20AC;"]);
+  return out;
+}
+/** THE PAIRS the census places at every cut: { family, label, units, at, every } — `units` the code units placed, `at` how
+ *  many of them stand before the boundary, `every` whether a family that asked for it is thrown on every path (class pairs,
+ *  escape and punctuation pairs, the presentation pairs of each emoji property's first member). One entry for each distinct
+ *  placement, its label naming every family that asked for it:
+ *  "class pair" (every ordered pair of classes of each segmentation, by their first members), "context" (every context of
+ *  the battery — the rules that decide by more than a pair: GB9c's conjuncts, GB11's pictograph sequences, a flag after a
+ *  flag, SB7–SB11's terminators — with each class's first member of that segmentation in x's place, its boundary after
+ *  each of its code points but the last), "category pair" (every ordered pair of the general categories), "script pair"
+ *  (each script's first member doubled), "binary pair" (each binary property's first member doubled, before and after the
+ *  first code point without it) — these by first members over the whole code space — and "emoji", "emoji component",
+ *  "escape", "punctuation" and "punctuation pair" (as the region's comment says). U+FE0E and U+FE0F are UTS #51's text and emoji presentation selectors,
+ *  which no ECMAScript property tells apart from the other variation selectors; «u» is the letter of JSON's «\u» escape. */
+function thrownPairPlacements(domain, A, classes) {
+  const out = [];
+  const seen = new Map();
+  const add = (family, label, units, at, every = false) => {
+    const key = `${units.join(",")}@${at}`;
+    const had = seen.get(key);
+    if (had !== undefined) {
+      out[had].label += `; ${family} ${label}`;
+      out[had].every = out[had].every || every;
+      return;
+    }
+    seen.set(key, out.length);
+    out.push({ family, label, units, at, every });
+  };
+  const unitsOf = (s) => Array.from({ length: s.length }, (_, i) => s.charCodeAt(i));
+  for (const [g, { reps }] of Object.entries(classes)) {
+    for (const [i, a] of reps.entries()) for (const [j, b] of reps.entries()) add("class pair", `${g} class ${i} (${thrownHex(a)}) then class ${j} (${thrownHex(b)})`, [...thrownCpUnits(a), ...thrownCpUnits(b)], thrownCpUnits(a).length, true);
+  }
+  for (const [g, contexts] of Object.entries(THROWN_BREAK_BATTERY)) {
+    for (const context of contexts) {
+      const toks = context.split(" ");
+      for (const r of classes[g].reps) {
+        const cps = toks.map((t) => (t === "x" ? thrownCpText(r) : A[t]));
+        const units = cps.flatMap(unitsOf);
+        let at = 0;
+        for (let k = 0; k < cps.length - 1; k++) {
+          at += cps[k].length;
+          add("context", `${g} «${context}», x ${thrownHex(r)}, the boundary after its code point ${k + 1}`, units, at);
+        }
+      }
+    }
+  }
+  const has = (re) => domain.filter((c) => re.test(thrownCpText(c)));
+  const cats = thrownCategoryValues().map((gc) => thrownFirstCodePoint(new RegExp(`\\p{General_Category=${gc}}`, "u")));
+  for (const a of cats) for (const b of cats) add("category pair", `${thrownHex(a)} then ${thrownHex(b)}`, [...thrownCpUnits(a), ...thrownCpUnits(b)], thrownCpUnits(a).length);
+  for (const [code, f] of thrownScriptValues()) add("script pair", `${code}: ${thrownHex(f)} doubled`, [...thrownCpUnits(f), ...thrownCpUnits(f)], thrownCpUnits(f).length);
+  for (const name of THROWN_BINARY_PROPERTIES) {
+    const p = thrownFirstCodePoint(new RegExp(`\\p{${name}}`, "u"));
+    const q = thrownFirstCodePoint(new RegExp(`\\P{${name}}`, "u"));
+    for (const [x, y, what] of [[p, p, "doubled"], [p, q, "then a code point without it"], [q, p, "after a code point without it"]]) {
+      if (x !== undefined && y !== undefined) add("binary pair", `${name}: ${thrownHex(x)} then ${thrownHex(y)} (${what})`, [...thrownCpUnits(x), ...thrownCpUnits(y)], thrownCpUnits(x).length);
+    }
+  }
+  // (the emoji-presentation pairs of the FIRST member of each emoji property, and every "escape" and "punctuation" placement,
+  // are marked `every`: they are thrown on every path, as the class pairs are)
+  const followers = [CH(0xfe0e), CH(0xfe0f), A.ZWJ];
+  const emojiFirst = new Set([/\p{Emoji}/u, /\p{Emoji_Presentation}/u, /\p{Extended_Pictographic}/u].map((re) => has(re)[0]));
+  for (const c of has(/\p{Emoji}/u)) for (const f of followers) add("emoji", `${thrownHex(c)} then ${thrownHex(f.codePointAt(0))}`, [...thrownCpUnits(c), ...unitsOf(f)], thrownCpUnits(c).length, emojiFirst.has(c));
+  const mods = has(/\p{Emoji_Modifier}/u);
+  const bases = has(/\p{Emoji_Modifier_Base}/u);
+  for (const c of bases) for (const m of mods) add("emoji", `${thrownHex(c)} then ${thrownHex(m)}`, [...thrownCpUnits(c), ...thrownCpUnits(m)], thrownCpUnits(c).length, c === bases[0]);
+  // THE EMOJI COMPONENTS (UTS #51's sequences beyond a selector, a modifier and a ZWJ: a keycap is a base, U+FE0F and the
+  // enclosing keycap; a tag sequence is a base and tag characters): every ordered pair of thrownEmojiComponents' code points,
+  // and each of them, the emoji presentation selector, then each of them, its boundary after its first and after its second
+  const comps = thrownEmojiComponents(domain);
+  for (const a of comps) for (const b of comps) {
+    add("emoji component", `${thrownHex(a)} then ${thrownHex(b)}`, [...thrownCpUnits(a), ...thrownCpUnits(b)], thrownCpUnits(a).length);
+    const u = [...thrownCpUnits(a), 0xfe0f, ...thrownCpUnits(b)];
+    add("emoji component", `${thrownHex(a)}, U+FE0F, ${thrownHex(b)}, the boundary after the first`, u, thrownCpUnits(a).length);
+    add("emoji component", `${thrownHex(a)}, U+FE0F, ${thrownHex(b)}, the boundary after the selector`, u, thrownCpUnits(a).length + 1);
+  }
+  const [BSL, QUOTE] = [0x5c, 0x22];
+  for (const e of [BSL, QUOTE]) for (const y of has(/[\p{ASCII}--\p{Cc}]/v)) {
+    add("escape", `${thrownHex(e)} then ${thrownHex(y)}`, [e, y], 1, true);
+    add("escape", `${thrownHex(y)} then ${thrownHex(e)}`, [y, e], 1, true);
+  }
+  const digit = has(/\p{ASCII_Hex_Digit}/u)[0];
+  for (let k = 0; k <= 4; k++) {
+    const u = [BSL, "u".charCodeAt(0), ...Array(k).fill(digit)];
+    for (let at = 1; at <= u.length; at++) add("escape", `«\\u» then ${k} hex digit(s), the boundary after its unit ${at}`, u, at, true);
+  }
+  // a surrogate WRITTEN AS AN ESCAPE — the one place JSON's escape syntax has a pair: the first high surrogate's escape, the
+  // first low surrogate's, and the two together, in each hex case, the boundary after each unit
+  const [hi, lo] = thrownSurrogateFirsts(domain);
+  for (const [caseName, hexOf] of [["lower-case", (c) => c.toString(16)], ["upper-case", (c) => c.toString(16).toUpperCase()]]) {
+    const esc = (c) => [BSL, "u".charCodeAt(0), ...unitsOf(hexOf(c))];
+    for (const [what, u] of [["a high surrogate's escape", esc(hi)], ["a low surrogate's escape", esc(lo)], ["a surrogate pair's two escapes", [...esc(hi), ...esc(lo)]]]) {
+      for (let at = 1; at <= u.length; at++) add("escape", `${what} (${caseName} hex), the boundary after its unit ${at}`, u, at, true);
+    }
+  }
+  const sp = A.Zs.charCodeAt(0);
+  const punct = has(/[\p{ASCII}&&[\p{P}\p{S}]]/v);
+  for (const c of punct) {
+    add("punctuation", `${thrownHex(c)} doubled`, [c, c], 1, true);
+    add("punctuation", `${thrownHex(c)} then ${thrownHex(sp)}`, [c, sp], 1, true);
+    add("punctuation", `${thrownHex(sp)} then ${thrownHex(c)}`, [sp, c], 1, true);
+    // a run of three and of four of it (an ellipsis written as full stops, a rule of dashes), its boundary after each unit
+    for (const n of [3, 4]) for (let at = 1; at <= n; at++) add("punctuation", `${thrownHex(c)} ${n} times, the boundary after its unit ${at}`, Array(n).fill(c), at, true);
+  }
+  // THE PUNCTUATION PAIRS (on the series paths in turn): each of those units beside the first digit and the first upper-case
+  // letter (the text's own letters are lower-case), and every ordered pair of them — the two-unit tokens of any syntax
+  // written in ASCII
+  for (const c of punct) for (const y of [A.Nd.charCodeAt(0), A.Lu.charCodeAt(0)]) {
+    add("punctuation pair", `${thrownHex(c)} then ${thrownHex(y)}`, [c, y], 1);
+    add("punctuation pair", `${thrownHex(y)} then ${thrownHex(c)}`, [y, c], 1);
+  }
+  for (const a of punct) for (const b of punct) add("punctuation pair", `${thrownHex(a)} then ${thrownHex(b)}`, [a, b], 1);
+  // ── H1 ROUND 15 (the round-14 verifier's V14-ESCAPE-SYNTAX-CUT and V14-EMOJI-PROPERTY-PAIR) — the realistic families ──
+  // ANSI: every text of thrownAnsiTexts (real Playwright call-log text, and ECMA-48's CSI and OSC grammar), its boundary
+  // after each of its code units, on every path
+  for (const [what, text] of thrownAnsiTexts()) {
+    const u = unitsOf(text);
+    for (let at = 1; at <= u.length; at++) add("ansi", `${what}, the boundary after its unit ${at}`, u, at, true);
+  }
+  // EMOJI SEQUENCES: (a) the ZWJ before, and the first tag character after, the first member of every emoji property — the
+  // two pairs the round-14 survivors keyed on — on every path; (b) every ordered pair of thrownEmojiJoinReps (those first
+  // members, the ZWJ, the two presentation selectors, the first and the last tag character); (c) the real sequences of
+  // THROWN_EMOJI_SEQUENCES, the boundary after each of their code units, on every path
+  const tagFirst = domain.find((c) => c > 0xffff && /[\p{Emoji_Component}&&\p{Cf}]/v.test(thrownCpText(c)));
+  const zwj = A.ZWJ.codePointAt(0);
+  const propFirsts = THROWN_EMOJI_PROPERTIES.map((name) => { const re = new RegExp(`\\p{${name}}`, "u"); return [name, domain.find((c) => re.test(thrownCpText(c)))]; });
+  for (const [name, f] of propFirsts) {
+    add("emoji sequence", `the ZWJ then ${name}'s first member ${thrownHex(f)}`, [zwj, ...thrownCpUnits(f)], 1, true);
+    add("emoji sequence", `${name}'s first member ${thrownHex(f)} then the first tag character ${thrownHex(tagFirst)}`, [...thrownCpUnits(f), ...thrownCpUnits(tagFirst)], thrownCpUnits(f).length, true);
+  }
+  const joinReps = thrownEmojiJoinReps(domain, A);
+  for (const a of joinReps) for (const b of joinReps) add("emoji sequence", `${thrownHex(a)} then ${thrownHex(b)}`, [...thrownCpUnits(a), ...thrownCpUnits(b)], thrownCpUnits(a).length);
+  for (const [what, cps] of THROWN_EMOJI_SEQUENCES) {
+    const u = cps.flatMap(thrownCpUnits);
+    for (let at = 1; at <= u.length; at++) add("emoji sequence", `${what}, the boundary after its unit ${at}`, u, at, true);
+  }
+  // ESCAPE SYNTAX BEYOND JSON'S (what the round-14 survivors V14-K07, K08S and K11 keyed on, and the two it found killed by
+  // the punctuation pairs): every text of thrownEscapeTexts, the boundary after each of its units, on every path
+  for (const [what, text] of thrownEscapeTexts(String.fromCharCode(digit))) {
+    const u = unitsOf(text);
+    for (let at = 1; at <= u.length; at++) add("escape syntax", `${what}, the boundary after its unit ${at}`, u, at, true);
+  }
+  return out;
+}
+/** The domain, the anchors, the classes and the placements — derived once in a process (the census's workers are handed the
+ *  placements). */
+let thrownBreakMemo = null;
+function thrownBreakData() {
+  if (thrownBreakMemo !== null) return thrownBreakMemo;
+  const domain = thrownPairDomain();
+  const anchors = thrownBreakAnchors(domain);
+  const classes = thrownBreakClasses(domain, anchors);
+  thrownBreakMemo = { domain, anchors, classes, placements: thrownPairPlacements(domain, anchors, classes) };
+  return thrownBreakMemo;
+}
+/** Where a pair's boundary stands against a cut at c: at c − 1, c or c + 1. */
+const THROWN_PAIR_BOUNDARIES = Object.freeze([-1, 0, 1]);
+/** The paths a placement is thrown on: one marked `every` (a class pair, an escape or punctuation pair, an emoji property's
+ *  first member's presentation pairs) on every path; any other on the series path its index and boundary pick, and, for every
+ *  fourth placement, before the series as well. */
+const thrownPairPaths = (p, pi, d) => (p.every === true ? THROWN_PATHS : [THROWN_PATHS[(pi + d + 1) % 3], ...(pi % 4 === 3 ? ["pre-series"] : [])]);
+/** THE PAIR CENSUS's values — for each shape, placement, boundary and path, the shape's text with the placement at BOTH its
+ *  cuts (the boundary unit at c + d), but not at a cut where a CR or an LF would end the line it is in (thrownCutNoBreak's
+ *  places). Yields { key, label, value, read, path, placed } — `placed`: [cut, placement index, d, from] for each cut it is
+ *  placed at; with `parts` > 1, only the values whose number is `part` mod `parts`. (Round 15: with `families`, only the
+ *  placements of those families — a plant check's short census; every value keeps the key it has in the whole one.) */
+function* thrownPairValues(placements, part = 0, parts = 1, families = null) {
+  let j = -1;
+  for (const shape of THROWN_CUT_SHAPES) {
+    const base = thrownCutText(shape, () => -1);
+    for (const [pi, p] of placements.entries()) {
+      const breaks = p.units.includes(0x0a) || p.units.includes(0x0d);
+      const skipped = families !== null && !families.includes(p.family);
+      for (const d of THROWN_PAIR_BOUNDARIES) {
+        for (const path of thrownPairPaths(p, pi, d)) {
+          j += 1;
+          if (skipped || j % parts !== part) continue;
+          const placed = [];
+          let s = "";
+          let from = 0;
+          for (const [slot, cut, c] of [[0, "line", THROWN_LINE_MAX], [2, "why", THROWN_WHY_MAX]]) {
+            if (breaks && thrownCutNoBreak(shape, slot)) continue;
+            const at = c + d - p.at;
+            s += base.slice(from, at) + String.fromCharCode(...p.units);
+            from = at + p.units.length;
+            placed.push([cut, pi, d, at]);
+          }
+          if (placed.length === 0) continue;
+          s += base.slice(from);
+          const { value, read } = thrownCutValue(shape, s);
+          yield { key: 0x200000 + j, label: `${shape}, ${p.family} ${p.label.length > 160 ? `${p.label.slice(0, 160)}…` : p.label}, its boundary at c${d < 0 ? " − 1" : d > 0 ? " + 1" : ""}`, value, read, path, placed };
+        }
+      }
+    }
+  }
+}
+/** THE PAIR FLOOR's entries a set of placements must reach, read off the texts: a placement marked `every` at every boundary
+ *  of every site on every path the site exists on; any other placement at every boundary of every site, on some path. A placement with a
+ *  CR or an LF is not owed at a site where it would end the line (the one-line message's, and the first line's). */
+function thrownPairFloor(placements) {
+  const every = [];
+  const some = [];
+  for (const site of THROWN_CUT_SITES) {
+    const noBreak = site.startsWith("a one-line message") || site.startsWith("a message's first line");
+    const paths = thrownCutIsLine(site) ? THROWN_PATHS.filter((p) => p !== "pre-series") : THROWN_PATHS;
+    for (const [pi, p] of placements.entries()) {
+      if (noBreak && (p.units.includes(0x0a) || p.units.includes(0x0d))) continue;
+      for (const d of THROWN_PAIR_BOUNDARIES) {
+        if (p.every === true) for (const path of paths) every.push(`pair:${site}:${pi}:${d}:${path}`);
+        else some.push([`pair:${site}:${pi}:${d}:`, paths]);
+      }
+    }
+  }
+  return { every, some };
+}
+/** The oracle's unit-by-unit reference quoting (thrownQuotedByUnit) of `s`, taken in chunks of THROWN_RAW_CHUNK code units,
+ *  each chunk's quoting remembered (the census's texts share most of their chunks). A chunk never ends on a high surrogate —
+ *  the chunk is shortened by one and the high surrogate begins the next — so no surrogate pair is split between two chunks,
+ *  and every other code unit is quoted on its own, so the chunks' quotings joined ARE the quoting of the whole (THE
+ *  ORACLE'S FAST SCANS ARE ITS UNIT-BY-UNIT SCANS checks the two agree). */
+const THROWN_RAW_CHUNK = 512;
+const thrownRawQuoteMemo = new Map();
+function thrownRawQuoted(s) {
+  let out = "\"";
+  for (let i = 0; i < s.length;) {
+    let j = Math.min(s.length, i + THROWN_RAW_CHUNK);
+    const last = s.charCodeAt(j - 1);
+    if (j < s.length && last >= 0xd800 && last <= 0xdbff) j -= 1;
+    const chunk = s.slice(i, j);
+    let q = thrownRawQuoteMemo.get(chunk);
+    if (q === undefined) {
+      q = thrownQuotedByUnit(chunk).slice(1, -1);
+      if (chunk.length === THROWN_RAW_CHUNK && thrownRawQuoteMemo.size < 4096) thrownRawQuoteMemo.set(chunk, q);
+    }
+    out += q;
+    i = j;
+  }
+  return `${out}"`;
+}
+/** THE RAW-SLICE DIFFERENTIAL (round 14): the printed line and the why rendered here, apart from thrownSpecText, from the RAW
+ *  SLICE of the text at each declared ceiling — the thrown string or the message cut by String.prototype.slice and nothing
+ *  else, quoted by the oracle's unit-by-unit reference quoting (thrownQuotedByUnit, in remembered chunks: thrownRawQuoted),
+ *  its first line found by the unit-by-unit reference scan (thrownLineScanByUnit) — and every disagreement of what the
+ *  harness wrote and printed with them. For a thrown string, or an Error whose message is a string (what the pair census
+ *  and the line-count row throw). */
+function thrownRawSliceViolations(value, path, got, read) {
+  const isString = typeof value === "string";
+  const m = isString ? value : read !== null && read.threw === false && typeof read.value === "string" ? read.value : null;
+  if (m === null) return [];
+  const [W, L, N] = [THROWN_WHY_MAX, THROWN_LINE_MAX, THROWN_LINES_MAX];
+  const head = isString ? "a string, not an Error: " : "an Error, its message ";
+  const inWhy = m.length <= W ? "the series' why in the sidecar carries all of them" : `the series' why in the sidecar carries the first ${W} of them`;
+  const why = `threw: ${head}${thrownRawQuoted(m.slice(0, W))}${m.length > W ? ` (cut at the sidecar's ceiling: the first ${W} of its ${m.length} UTF-16 code units are carried, the last ${m.length - W} are not recorded)` : ""}`;
+  const scan = thrownLineScanByUnit(m);
+  let line;
+  if (isString || scan.count === 1) line = `${head}${thrownRawQuoted(m.slice(0, L))}${m.length > L ? ` (cut at the printed line's ceiling: the first ${L} of its ${m.length} UTF-16 code units are printed, the last ${m.length - L} are not; ${inWhy})` : ""}`;
+  else {
+    const kept = scan.first.slice(0, L);
+    line = `an Error, its message's first line ${thrownRawQuoted(kept)} (line 1 of ${scan.count > N ? `more than ${N}` : `${scan.count}`}, ${kept.length} of its ${m.length} UTF-16 code units${kept.length < scan.first.length ? `, the first line cut at the printed line's ceiling from its ${scan.first.length}` : ""}; ${m.length <= W ? "the whole message is in the series' why in the sidecar" : inWhy})`;
+  }
+  const v = [];
+  const differ = (a, b) => {
+    if (typeof a !== "string") return `is ${a === undefined ? "missing" : "not a string"}`;
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+    return `differs from the raw slice's rendering at code unit ${i} of its ${a.length} (the rendering has ${b.length}): «${a.slice(Math.max(0, i - 24), i + 48)}» where the rendering has «${b.slice(Math.max(0, i - 24), i + 48)}»`;
+  };
+  const f = got.final;
+  const gotWhy = path === "pre-series" ? f.refused[0]?.why : f.series[0]?.why;
+  if (gotWhy !== why) v.push(`the raw-slice differential: the ${path === "pre-series" ? "refusal's" : "sidecar's"} why ${differ(gotWhy, why)}`);
+  if (path !== "pre-series") {
+    const want = thrownNoteFor(Number(path.slice("series@".length)) - 1, line);
+    const lines = got.env.notes.filter((s) => s.startsWith("      EVENT SHOT 1: a throw ended this series"));
+    if (lines.length !== 1) v.push(`the raw-slice differential: ${lines.length} thrown-series lines were printed, not one`);
+    else if (lines[0] !== want) v.push(`the raw-slice differential: the printed line ${differ(lines[0], want)}`);
+  }
+  return v;
+}
+/** H1 ROUND 14 — THE LINE-COUNT BOUNDARY ROW (the round-13 verifier's V13-K23T): messages of exactly 16,384, 16,385, 16,386
+ *  and 16,387 lines, every line break an LF, a CR or a CRLF, whose lines are all empty, all non-empty but the last (the
+ *  message ends in a break), all non-empty but the first line past the ceiling's last (the 16,386th, where the harness's
+ *  split stops; in a message with fewer lines, its last), or all non-empty — each counted by the oracle's own scan, which must find the number asked for before the
+ *  value is thrown, on every path. A count that treats an empty piece past the split's limit differently prints «line 1 of
+ *  16385» for a message of 16,386 lines. */
+const THROWN_LINE_BOUNDARY_COUNTS = Object.freeze([THROWN_LINES_MAX - 1, THROWN_LINES_MAX, THROWN_LINES_MAX + 1, THROWN_LINES_MAX + 2]);
+const THROWN_LINE_BOUNDARY_BREAKS = Object.freeze([["an LF", CH(0x0a)], ["a CR", CH(0x0d)], ["a CRLF", CH(0x0d, 0x0a)]]);
+const THROWN_LINE_BOUNDARY_EMPTIES = Object.freeze(["every line empty", "only the last line empty", "only the line after the ceiling's last (in a message with none, its last line) empty", "no line empty"]);
+function thrownLineBoundaryText(n, br, empties) {
+  const empty = (k) => empties === THROWN_LINE_BOUNDARY_EMPTIES[0] || (empties === THROWN_LINE_BOUNDARY_EMPTIES[1] && k === n - 1) || (empties === THROWN_LINE_BOUNDARY_EMPTIES[2] && k === Math.min(THROWN_LINES_MAX, n - 1));
+  return Array.from({ length: n }, (_, k) => (empty(k) ? "" : `l${k}`)).join(br);
+}
+/** The row's values: { label, value, read, path, n, text }, every count, break, emptiness and path. */
+function thrownLineBoundaryValues() {
+  const out = [];
+  for (const n of THROWN_LINE_BOUNDARY_COUNTS) for (const [brName, br] of THROWN_LINE_BOUNDARY_BREAKS) for (const empties of THROWN_LINE_BOUNDARY_EMPTIES) {
+    const text = thrownLineBoundaryText(n, br, empties);
+    for (const path of THROWN_PATHS) out.push({ label: `the line-count boundary row: ${n} lines, each break ${brName}, ${empties}`, value: new Error(text), read: { threw: false, value: text }, path, n, feat: `line-boundary:${n}:${brName}:${empties}:${path}` });
+  }
+  return out;
+}
+/** H1 ROUND 12 — THE READ-ONCE CENSUS's values (the round-11 verifier's V11-READ-TWICE): a value whose message is a WITNESS,
+ *  an accessor that appends each answer it gives to `log` and gives a DIFFERENT answer on every read. Its first answer is
+ *  drawn — a string of any shape (past each length ceiling among them, and a message of more lines than the line-count
+ *  ceiling), a non-string, or a throw — and every later answer is a fresh text: longer than the one before it, and one
+ *  line where the one before had two or the reverse. It sits on the value's own property, on its prototype, on an Error
+ *  subclass's prototype, on another realm's Error, or in a proxy's get trap. The oracle reads only `log`. */
+const THROWN_WITNESS_SEEDS = Object.freeze([20261001, 31337]);
+const THROWN_WITNESS_PER_SEED = 260;
+const THROWN_WITNESS_HOSTS = Object.freeze([
+  "an Error, its own accessor", "a plain object, its own accessor", "an array, its own accessor", "a function, its own accessor",
+  "an object inheriting the accessor from its prototype", "an instance of an Error subclass whose prototype holds the accessor",
+  "an Error from another realm, its own accessor", "a proxy of an Error whose get trap answers", "a proxy of an array whose get trap answers",
+  "a proxy of a function whose get trap answers",
+]);
+const THROWN_WITNESS_FIRSTS = Object.freeze([
+  "a short string", "a multi-line string", "a string around the line ceiling", "a string around the why ceiling", "a first line past the line ceiling",
+  "more lines than the line-count ceiling", "an empty string", "undefined", "null", "a number", "an object", "a symbol", "a throw",
+]);
+function thrownWitnessValue(rnd, realm) {
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  const int = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+  const firstKind = pick(THROWN_WITNESS_FIRSTS);
+  const seed = int(1, 2 ** 30);
+  const text = (value) => ({ threw: false, value });
+  const first = (() => {
+    switch (firstKind) {
+      case "a short string": return text(thrownCeilingText(int(1, 60), seed));
+      case "a multi-line string": return text(`${thrownCeilingText(int(0, 40), seed)}\n${thrownCeilingText(int(0, 40), seed + 1)}\r\n${thrownCeilingText(int(0, 9), seed + 2)}`);
+      case "a string around the line ceiling": return text(thrownCeilingText(THROWN_LINE_MAX + int(-1, 2), seed, { straddle: rnd() < 0.5 }));
+      case "a string around the why ceiling": return text(thrownCeilingText(pick([THROWN_WHY_MAX - 1, THROWN_WHY_MAX, THROWN_WHY_MAX + 1, 4 * THROWN_WHY_MAX]), seed, { straddle: rnd() < 0.5 }));
+      case "a first line past the line ceiling": return text(`${thrownCeilingText(THROWN_LINE_MAX + int(1, 3), seed)}\n${thrownCeilingText(int(0, 9), seed + 1)}`);
+      case "more lines than the line-count ceiling": return text(thrownManyLines(THROWN_LINES_MAX + int(0, 2), seed));
+      case "an empty string": return text("");
+      case "undefined": return text(undefined);
+      case "null": return text(null);
+      case "a number": return text(int(-1e6, 1e6));
+      case "an object": return text({ first: true });
+      case "a symbol": return text(Symbol("first"));
+      default: return { threw: true, thrown: pick([new Error("the first read throws"), "the first read throws", 7]) };
+    }
+  })();
+  const log = [];
+  // every later read (k = the reads before it, so k >= 1): a fresh text, k «·» longer than read k's, two lines when k is odd
+  const later = (k) => text(`«the harness's read ${k + 1}» ${"·".repeat(k)}${k % 2 === 1 ? "\nand a second line" : ""}`);
+  const answer = () => {
+    const a = log.length === 0 ? first : later(log.length);
+    log.push(a);
+    if (a.threw) throw a.thrown;
+    return a.value;
+  };
+  const host = pick(THROWN_WITNESS_HOSTS);
+  const own = (o) => Object.defineProperty(o, "message", { get: answer, configurable: true });
+  const trap = (target) => new Proxy(target, { get: (t, k, r) => (k === "message" ? answer() : Reflect.get(t, k, r)) });
+  let value;
+  if (host === "an Error, its own accessor") value = own(new Error("the constructor's text, which the accessor replaces"));
+  else if (host === "a plain object, its own accessor") value = own({});
+  else if (host === "an array, its own accessor") value = own([]);
+  else if (host === "a function, its own accessor") value = own(function witnessed() {});
+  else if (host === "an object inheriting the accessor from its prototype") value = Object.create(own({}));
+  else if (host === "an instance of an Error subclass whose prototype holds the accessor") { const Sub = class extends Error {}; own(Sub.prototype); value = new Sub(); }
+  else if (host === "an Error from another realm, its own accessor") value = own(vm.runInContext("new Error('the other realm')", realm));
+  else if (host === "a proxy of an Error whose get trap answers") value = trap(new Error("the target's text"));
+  else if (host === "a proxy of an array whose get trap answers") value = trap([]);
+  else value = trap(function witnessedTarget() {});
+  return { label: `${host}, first answering ${firstKind}`, value, log, feats: [`host:${host}`, `first:${firstKind}`] };
+}
+/** What the read-once census must reach: every host, every first answer and every path, each THROWN_WITNESS_MIN times. */
+const THROWN_WITNESS_MIN = 3;
+const THROWN_WITNESS_FLOOR = Object.freeze([
+  ...THROWN_WITNESS_HOSTS.map((h) => `host:${h}`), ...THROWN_WITNESS_FIRSTS.map((f) => `first:${f}`), ...THROWN_PATHS.map((p) => `witness-path:${p}`),
+]);
+/** One witness's answers, as a violation names them. */
+const thrownAnswers = (log) => log.map((a) => (a.threw ? "(threw)" : typeof a.value === "string" ? `${a.value.length} code units «${a.value.slice(0, 40)}»` : typeof a.value === "symbol" ? "a symbol" : `${a.value}`)).join(" | ");
+/** THE CENSUS — every seed's draws through the given harness source, then the code-unit sweep, the ceiling census and the
+ *  read-once census; returns the violations (each with its seed or index, path and label) and the coverage features
+ *  reached. `stopAtFirst` ends at the first disagreement (the plant checks). */
+async function thrownCensus(src = SRC, { stopAtFirst = false, seeds = THROWN_CENSUS_SEEDS, perSeed = THROWN_CENSUS_PER_SEED, sweep = true, ceilings = true, lineBoundary = true, cutContent = true, cutPhases = ["sweep", "runs", "pairs"], witness = true } = {}) {
+  const factory = p1Factory(src);
+  const realm = vm.createContext({});
+  const out = [];
+  const feats = new Map();
+  const count = (f) => feats.set(f, (feats.get(f) ?? 0) + 1);
+  // H1 ROUND 11 (resumed): which code units reached each text kind (the random draws and the sweep together)
+  const reached = { string: new Uint8Array(0x10000), message: new Uint8Array(0x10000), "first line": new Uint8Array(0x10000) };
+  const mark = (carried) => { for (const [kind, s] of carried) for (let i = 0; i < s.length; i++) reached[kind][s.charCodeAt(i)] = 1; };
+  const unitsReached = () => Object.fromEntries(Object.entries(reached).map(([k, a]) => [k, a.reduce((n, x) => n + x, 0)]));
+  // H1 ROUND 13: what the cut-content census placed at each cut, read off its texts
+  const cuts = thrownCutCoverage();
+  const done = () => ({ violations: out, feats, unitsReached: unitsReached(), cutFeats: cuts.feats, cutUnits: cuts.reached() });
+  for (const seed of seeds) {
+    const rnd = mulberry32(seed);
+    for (let i = 0; i < perSeed; i++) {
+      const { label, value, read, feats: f, carried } = thrownCensusValue(rnd, realm);
+      const path = THROWN_PATHS[Math.floor(rnd() * THROWN_PATHS.length)];
+      f.add(`path:${path}`);
+      for (const x of f) count(x);
+      mark(carried);
+      const got = await p1ThrownRun(factory, value, path);
+      for (const x of thrownRunViolations(value, path, got, read)) {
+        out.push(`seed ${seed} draw ${i} (${path}, ${label}): ${x}`);
+        if (stopAtFirst) return done();
+      }
+    }
+  }
+  if (sweep) {
+    for (const [j, { label, value, read, path }] of thrownSweepValues().entries()) {
+      mark(thrownCarried(value, read));
+      const got = await p1ThrownRun(factory, value, path);
+      for (const x of thrownRunViolations(value, path, got, read)) {
+        out.push(`sweep ${j} (${path}, ${label}): ${x}`);
+        if (stopAtFirst) return done();
+      }
+    }
+  }
+  // H1 ROUND 12: the ceiling census — every length each ceiling makes interesting, and every line count, on every path
+  if (ceilings) {
+    for (const [j, { label, value, read, path }] of thrownCeilingValues().entries()) {
+      for (const f of thrownCeilingFeats(value, read, path)) count(f);
+      const got = await p1ThrownRun(factory, value, path);
+      for (const x of thrownRunViolations(value, path, got, read)) {
+        out.push(`ceiling ${j} (${path}, ${label}): ${x}`);
+        if (stopAtFirst) return done();
+      }
+    }
+  }
+  // H1 ROUND 14: THE LINE-COUNT BOUNDARY ROW — 16,384 to 16,387 lines, every break kind, the empty lines where a count could
+  // treat them differently, on every path; each text's line count is the oracle's scan's, and must be the number asked for
+  if (lineBoundary) {
+    for (const { label, value, read, path, n, feat } of thrownLineBoundaryValues()) {
+      const scanned = thrownLineScan(read.value).count;
+      if (scanned === n) count(feat);
+      else out.push(`line-count boundary (${path}, ${label}): the row's text has ${scanned} lines by the oracle's scan, not ${n}`);
+      const got = await p1ThrownRun(factory, value, path);
+      for (const x of [...thrownRunViolations(value, path, got, read), ...thrownRawSliceViolations(value, path, got, read)]) {
+        out.push(`line-count boundary (${path}, ${label}): ${x}`);
+        if (stopAtFirst) return done();
+      }
+    }
+  }
+  // H1 ROUND 12: the read-once census — the oracle takes the witness's FIRST answer from its log, requires exactly one read,
+  // and checks that it read nothing itself (the log does not grow while the oracle runs)
+  if (witness) {
+    for (const seed of THROWN_WITNESS_SEEDS) {
+      const rnd = mulberry32(seed);
+      for (let i = 0; i < THROWN_WITNESS_PER_SEED; i++) {
+        const w = thrownWitnessValue(rnd, realm);
+        const path = THROWN_PATHS[Math.floor(rnd() * THROWN_PATHS.length)];
+        for (const f of [...w.feats, `witness-path:${path}`]) count(f);
+        const got = await p1ThrownRun(factory, w.value, path);
+        const reads = w.log.length;
+        const v = [];
+        if (reads !== 1) v.push(`the harness read the message ${reads} time(s), not once${reads > 0 ? ` — the witness's answers, in order: ${thrownAnswers(w.log)}` : ""}`);
+        if (reads > 0) {
+          const a = w.log[0];
+          v.push(...thrownRunViolations(w.value, path, got, a.threw ? { threw: true } : { threw: false, value: a.value }));
+        }
+        if (w.log.length !== reads) v.push(`the ORACLE read the message (${w.log.length - reads} time(s)) — it must read only the witness's log`);
+        for (const x of v) {
+          out.push(`witness seed ${seed} draw ${i} (${path}, ${w.label}): ${x}`);
+          if (stopAtFirst) return done();
+        }
+      }
+    }
+  }
+  // H1 ROUND 13: THE CUT-CONTENT CENSUS — every code unit at both sides of every cut, entered at the series' catch with each
+  // path's state there (every 64th block ALSO through the whole P1 path, which must print the same thrown line and write the
+  // same why), then runs of every class against every cut through the whole P1 path, on every path. It runs LAST, and only
+  // when nothing before it disagreed: a census that already disagrees has failed, and the quarter of a million values would
+  // only lengthen its list.
+  if (cutContent && out.length === 0) {
+    const r = await thrownCutCensus(src, { stopAtFirst, phases: cutPhases });
+    cuts.absorb(r.coverage);
+    out.push(...r.violations);
+  }
+  return done();
+}
+/** The coverage floor: each of these is reached by at least one draw across the seeds (read off the values, above). */
+const THROWN_CENSUS_FLOOR = Object.freeze([
+  "typeof:string", "typeof:number", "typeof:bigint", "typeof:boolean", "typeof:symbol", "typeof:null", "typeof:undefined", "typeof:object", "typeof:function",
+  "number:NaN", "number:-0", "number:Infinity", "number:-Infinity",
+  "kind:a function", "kind:an array", "kind:an Error", "kind:an object",
+  "message:threw", "message:undefined", "message:null", "message:string", "message:number", "message:bigint", "message:boolean", "message:symbol", "message:object", "message:function",
+  "string:longer than 40", "string:empty", "string:a bare CR its only break", "string:blanks before a break", "string:CRLF", "string:NEL, LS or PS", "string:a lone surrogate", "string:[object Object] as text", "string:more than one line",
+  "message:longer than 40", "message:empty", "message:a bare CR its only break", "message:blanks before a break", "message:CRLF", "message:NEL, LS or PS", "message:a lone surrogate", "message:more than one line",
+  "a function with a string message", "a plain object with a name and no message", "another realm",
+  "built:an array whose prototype is Error.prototype", "built:a revoked proxy of an object", "built:a revoked proxy of a function", "built:a proxy whose prototype trap throws", "built:an object shaped like an Error (name and stack, no prototype link)",
+  "path:series@1", "path:series@2", "path:series@3", "path:pre-series",
+]);
+/** H1 ROUND 11 — THE CHARACTER FLOOR: every character class of thrownCharClassTests, reached in a thrown string, in a
+ *  message, and in the FIRST line of a message of several lines (the text the cut line carries), and every string family,
+ *  each by at least THROWN_CENSUS_CLASS_MIN draws across the seeds. The class list itself is pinned at 22 names, so the
+ *  floor cannot shrink by a class being dropped from the tests. */
+const THROWN_CHAR_CLASS_NAMES = Object.freeze(thrownCharClassTests("").map(([f]) => f));
+const THROWN_STRING_FAMILIES = Object.freeze(["plain", "breaks", "cr-only", "trail-break", "long", "empty", "units", "classes", "class-lines", "unit-lines", "blank-ends", "long-first-line"]);
+const THROWN_CENSUS_CLASS_MIN = 25; // (the least-reached entry is reached 39 times at round 11)
+const THROWN_CENSUS_CLASS_FLOOR = Object.freeze([
+  ...THROWN_CHAR_CLASS_NAMES.flatMap((f) => [`string:${f}`, `message:${f}`, `message:first of several lines: ${f}`]),
+  ...THROWN_STRING_FAMILIES.flatMap((f) => [`string:drawn as ${f}`, `message:drawn as ${f}`]),
+]);
+
+/* ═══ END OF THE §W20 REGION — the text from THROWN_REGION_FROM to here is what each cut-content census worker evaluates ═══ */
+/** THE CUT-CONTENT CENSUS's workers: a quarter of a million values past the why's ceiling take minutes on one thread, so the
+ *  census shares them among worker threads, each running thrownCutCensusPart — this file's own §W20 functions, evaluated in
+ *  the worker from this file's text (THROWN_REGION_FROM … THROWN_REGION_TO), on the harness's P1 block's code handed to it —
+ *  and merges what they found in the census's own order (each worker stops at its 40th disagreement). */
+const THROWN_CUT_WORKERS = Math.max(1, Math.min(6, (typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length) - 2));
+const THROWN_REGION_FROM = "const CH = (...codes) => String.fromCharCode(...codes);";
+const THROWN_REGION_TO = "/* ═══ END OF THE §W20 REGION";
+const THROWN_CUT_WORKER = [
+  "const { parentPort, workerData } = require(\"node:worker_threads\");",
+  "(async () => {",
+  "  try {",
+  "    const lib = await import(workerData.libUrl);",
+  "    const fns = new Function(\"vm\", \"\\\"use strict\\\";\\n\" + workerData.region + \"\\nreturn { thrownCutCensusPart };\")(require(\"node:vm\"));",
+  "    const r = await fns.thrownCutCensusPart(workerData.code, workerData.part, workerData.parts, { h1ProbeReads: lib.h1ProbeReads, scenario: workerData.scenario, pairs: workerData.pairs }, workerData.opts);",
+  "    parentPort.postMessage({ ok: true, r });",
+  "  } catch (e) {",
+  "    parentPort.postMessage({ ok: false, error: String((e && e.stack) || e) });",
+  "  }",
+  "})();",
+].join("\n");
+/** THE CUT-CONTENT CENSUS through the harness source `src`: every worker's share, merged — the violations in the census's
+ *  order and the coverage each read off its texts (with stopAtFirst, only the share of the first worker to disagree).
+ *  (round 14: the pair census's placements, derived here once, are handed to every worker; `phases` and `oracle` as
+ *  thrownCutCensusPart takes them.) */
+async function thrownCutCensus(src = SRC, { stopAtFirst = false, parts = THROWN_CUT_WORKERS, phases = ["sweep", "runs", "pairs"], oracle = true, families = null } = {}) {
+  const code = p1BlockCode(src);
+  const pairs = thrownBreakData().placements;
+  const ctx = { h1ProbeReads: LIBNS.h1ProbeReads, scenario: H1.em, pairs };
+  const opts = { stopAtFirst, phases, oracle, families };
+  const shares = parts === 1 ? [await thrownCutCensusPart(code, 0, 1, ctx, opts)] : await (() => {
+    const self = readFileSync(fileURLToPath(import.meta.url), "utf8");
+    const region = self.slice(self.indexOf(THROWN_REGION_FROM), self.indexOf(THROWN_REGION_TO));
+    const libUrl = pathToFileURL(resolve(HERE, "..", "lib", "driveline.mjs")).href;
+    // (with stopAtFirst, the first worker to report a disagreement ends the others: one is all a plant check needs)
+    const workers = [];
+    const done = [];
+    return new Promise((resolveAll, rejectAll) => {
+      const finish = () => { for (const w of workers) void w.terminate(); };
+      for (let part = 0; part < parts; part++) {
+        const w = new Worker(THROWN_CUT_WORKER, { eval: true, workerData: { region, code, part, parts, opts, libUrl, scenario: ctx.scenario, pairs } });
+        workers.push(w);
+        w.once("message", (m) => {
+          if (!m.ok) { finish(); rejectAll(new Error(`a cut-content census worker failed: ${m.error}`)); return; }
+          done.push(m.r);
+          if (stopAtFirst && m.r.count > 0) { finish(); resolveAll([m.r]); } else if (done.length === parts) resolveAll(done);
+        });
+        w.once("error", (e) => { finish(); rejectAll(e); });
+      }
+    });
+  })();
+  const cuts = thrownCutCoverage();
+  for (const s of shares) cuts.absorb(s.coverage);
+  const all = shares.flatMap((s) => s.violations).sort((a, b) => a[0] - b[0]);
+  return { violations: all.map(([, text]) => text), count: shares.reduce((n, s) => n + s.count, 0), coverage: cuts.export() };
+}
+
+/** H1 ROUND 14 — THE BREAK CENSUS PINNED, as derived on Node 24.18.0 (ICU 78.3, Unicode 17.0): the domain's size, the
+ *  battery's anchors, every class's first member and size for each segmentation, the placements by family, the counts of
+ *  the derived general categories, scripts and binary properties, the emoji components, the first surrogates, how many
+ *  placements are thrown on every path, and the pair floor's entries. A runtime with other Unicode data turns THE BREAK-PROPERTY CLASSES red here until this is re-pinned —
+ *  a visible change, never a silent one. */
+const THROWN_BREAK_PIN = Object.freeze({
+  domain: 68341,
+  anchors: {
+    LF: "U+000A", CR: "U+000D", Ll: "U+0061", Lu: "U+0041", Nd: "U+0030", Zs: "U+0020", Pe: "U+0029", Pc: "U+005F", Cc: "U+0000", Mc: "U+0903", GE: "U+0300", RI: "U+1F1E6", EP: "U+00A9",
+    ZWJ: "U+200D", AT: "U+002E", ST: "U+0021", LV: "U+AC00", LVT: "U+AC01", L: "U+1100", V: "U+1161", T: "U+11A8", HE: "U+05D0", SQ: "U+0027", C: "U+102A", LK: "U+1039",
+  },
+  classes: {
+    grapheme: ["U+0000:105", "U+000A:1", "U+000D:1", "U+0020:51760", "U+00A9:2848", "U+0300:1228", "U+0600:12", "U+0903:201", "U+0915:615", "U+094D:13", "U+1100:125", "U+1160:95", "U+11A8:137", "U+200C:1", "U+200D:1", "U+AC00:399", "U+AC01:10773", "U+1F1E6:26"],
+    word: ["U+0000:53536", "U+000A:1", "U+000B:5", "U+000D:1", "U+0020:14", "U+0022:1", "U+0027:1", "U+002C:13", "U+002E:7", "U+0030:382", "U+003A:9", "U+0041:9602", "U+005F:11", "U+00A9:2842", "U+00AD:1499", "U+05D0:75", "U+200D:1", "U+2139:6", "U+3031:309", "U+1F1E6:26"],
+    sentence: ["U+0000:17021", "U+0009:20", "U+000A:1", "U+000D:1", "U+0021:87", "U+0022:192", "U+002C:31", "U+002E:4", "U+0030:383", "U+0041:1166", "U+0061:1596", "U+0085:3", "U+00AD:1497", "U+01BB:46339"],
+  },
+  // (round 15: + the realistic families — ansi, emoji sequence, escape syntax — and with them the every-path count and the floor)
+  placements: { "class pair": 790, context: 797, "category pair": 819, "script pair": 169, "binary pair": 49, emoji: 4980, "emoji component": 175, escape: 422, punctuation: 277, "punctuation pair": 860, ansi: 270, "emoji sequence": 145, "escape syntax": 97 },
+  propertyValues: [30, 175, 53],
+  components: ["U+200D", "U+E0020", "U+20E3", "U+FE0F", "U+0030", "U+0023", "U+1F3FB", "U+1F1E6"],
+  surrogates: ["U+D800", "U+DC00"],
+  everyPath: 1942,
+  floor: { every: 115506, some: 141588 },
+  // (round 15) the ANSI texts — all, those with a line break, the 7-bit control sequences, the OSCs, the one-unit CSIs — and
+  // the emoji-sequence representatives
+  ansiTexts: [17, 1, 10, 2, 2],
+  joinReps: ["U+0023", "U+00A9", "U+180B", "U+200C", "U+200D", "U+231A", "U+261D", "U+FE0E", "U+FE0F", "U+1F1E6", "U+1F3FB", "U+E0020", "U+E007F"],
+});
+
+/* ── H1 ROUND 15 — THE RUNTIME CHECK, PINNED BY EXECUTION (the integrator's decision after the round-14 verifier's REFUTED) ───
+ * Rounds 12–14 placed content at every cut and each verifier found content that was not placed (round 14: an ANSI control
+ * sequence, «\u{…}», a percent-escape, «%uXXXX», a ZWJ before a person, a tag after a pictograph). The class is no longer
+ * chased by input regions: the HARNESS verifies its own output before printing it (lesson-audit.mjs, the comment above
+ * eventThrownCarried) and prints the declared fallback on any disagreement, so a cut rule keyed on ANY content can at worst
+ * degrade the line to the fallback, which is true. What these rows pin is that the check EXISTS AND BITES:
+ *   · THE CHECK, ALONE (thrownCheckFalsifications): the harness's own eventThrownHolds and eventThrownCarried, compiled from
+ *     its P1 block and called directly, accept the specification's sentence for every text of a battery (short, of each
+ *     ceiling's length and one each side of it, of several lines, of more lines than the line-count ceiling, with every kind
+ *     of content at the cuts) and REJECT that sentence made false one piece at a time — each word group before the quoted
+ *     text, the quoted text (a code unit fewer, one more, one changed at the start, the middle and the end, another slice,
+ *     a normal form, a code unit the specification escapes written as itself, no closing quote), every number after it
+ *     (one more, one fewer), every clause after it (dropped, added, swapped), the two texts exchanged, a text that is not
+ *     a string; and the decoder alone, over every one of the 65,536 code units written as itself and escaped;
+ *   · THE P1 BLOCK WITH THE BUILDING SABOTAGED (THROWN_SABOTAGES): the harness's P1 block compiled with one edit to the lines
+ *     that BUILD the description — the quoting, each slice (the round-14 verifier's eleven survivors among them, as it wrote
+ *     them), each count, each clause — prints, on every value of a battery and every path, either the specification's text
+ *     or the fallback, the fallback at least once, and NEVER a false sentence; and the same edit with the check's line
+ *     taken out prints a false sentence — so each sabotage is real, and a check that is removed or weakened turns this row
+ *     red;
+ *   · A CHECK REMOVED OR WEAKENED TURNS THE ROWS RED (thrownCheckWeakenings): twenty-eight edits to the check itself — removed,
+ *     made of one kind of value only, skipped for short, uncut or long texts, its verdict ignored, the why or the line not
+ *     compared, the decoder comparing lengths only or letting escaped code units stand — each planted in a copy of the
+ *     harness and caught by the row named for it, so «the check bites» is itself executed;
+ *   · THE ERROR-TEXT PATH IS PINNED (THROWN_PATH_PIN): what the check rests on — the thrown value at the function's entry,
+ *     the one read of its message, the kind's tests, the check's call and the check itself — is code no runtime check
+ *     guards, so every code line from the ceilings to the end of eventSeriesThrew is pinned, in order; an edit is a visible
+ *     red that prints its re-pin string, to be pasted only after the edit is re-read against the specification comment;
+ *   · WHAT THE CHECK DOES NOT SEE is executed too, so the harness's own sentence about it is true: an edit that rewrites the
+ *     message AT THE READ describes another value, and prints it past the check — the pin is what holds that line. */
+const THROWN_FALLBACK = "(the thrown value could not be described)";
+/** The harness's check line, as written — taken out by thrownCheckOff (the plant rows that show a census sees a FALSE
+ *  SENTENCE plant with the check out; with it in, the same plant prints the fallback). */
+const THROWN_CHECK_LINE = "    if (typeof e === \"string\" ? !eventThrownHolds(e, null, built) : described !== null && !eventThrownHolds(described.text, described.kind, built)) throw new Error(\"the description built does not hold of its text\");\n";
+function thrownCheckOff(src = SRC) {
+  assert.equal(src.split(THROWN_CHECK_LINE).length - 1, 1, "the runtime check's line is not in the harness once");
+  return src.replace(THROWN_CHECK_LINE, "");
+}
+/** The harness's two check functions, compiled from its own P1 block's code as p1Factory compiles it. */
+function p1CheckOfCode(code) {
+  const page = { addInitScript: async () => {}, exposeBinding: async () => {}, waitForTimeout: async () => {}, evaluate: async () => null };
+  return new Function("page", "note", "shot", "writeFileSync", "OUT", "SCENARIO", "h1ProbeReads", "Date",
+    `"use strict";\n${code}\nreturn { eventThrownCarried, eventThrownHolds };`)(page, () => {}, async () => true, () => {}, "OUT", H1.em, LIBNS.h1ProbeReads, Date);
+}
+/** A value of each kind the harness names, to hand the oracle (which names the kind by its own tests). */
+const THROWN_KIND_VALUES = Object.freeze({ "a function": () => function thrownKindFn() {}, "an array": () => [], "an Error": () => new Error("unused"), "an object": () => ({}) });
+/** THE ORACLE'S SENTENCE FOR A TEXT, IN ITS THREE PIECES — for the text `x` thrown as a string (`kind` null) or as the string
+ *  message of a value of `kind`: { why, line }, each { text, head, lit, units, tail } — the oracle's whole text
+ *  (thrownSpecText), the words before its quoted text, the quoted text as written, its code units decoded by the oracle's
+ *  decoder, and what follows it. */
+function thrownSpecPieces(x, kind) {
+  const v = kind === null ? x : THROWN_KIND_VALUES[kind]();
+  const read = kind === null ? null : { threw: false, value: x };
+  const pieces = (mode) => {
+    const text = thrownSpecText(v, mode, read);
+    const head = kind === null ? "a string, not an Error: " : mode === "line" && text.startsWith(`${kind}, its message's first line `) ? `${kind}, its message's first line ` : `${kind}, its message `;
+    if (!text.startsWith(head)) throw new Error(`the oracle's ${mode} does not begin «${head}»`);
+    const d = thrownUnquote(text, head.length);
+    if (d.error !== undefined) throw new Error(`the oracle's ${mode} cannot be decoded: ${d.error}`);
+    return { text, head, lit: text.slice(head.length, d.end), units: d.units, tail: text.slice(d.end) };
+  };
+  return { why: pieces("why"), line: pieces("line") };
+}
+/** THE SENTENCE MADE FALSE ONE PIECE AT A TIME — for the oracle's pieces `P` of the text `x`: [what, { why, line }], each
+ *  differing from the oracle's sentence in ONE piece of ONE text (or with the two exchanged, or not a string at all). Every
+ *  one says something that is not true of `x`, or is not a sentence of the specification; none is the oracle's own. */
+function thrownCheckFalsifications(x, kind, P) {
+  const out = [];
+  const W = THROWN_WHY_MAX, L = THROWN_LINE_MAX;
+  const said = (which, text) => (which === "why" ? { why: text, line: P.line.text } : { why: P.why.text, line: text });
+  const push = (what, which, text) => { if (text !== P[which].text) out.push([`${which}: ${what}`, said(which, text)]); };
+  const otherKinds = ["a function", "an array", "an Error", "an object"].filter((k) => k !== kind);
+  for (const which of ["why", "line"]) {
+    const { head, lit, units, tail } = P[which];
+    const ceiling = which === "why" ? W : L;
+    // THE WORDS BEFORE: another kind's, the other form's, a thrown string's for a message and the reverse, a letter lost, a space added
+    for (const k of otherKinds) push(`the kind named «${k}»`, which, `${k}, its message ${lit}${tail}`);
+    if (kind !== null) {
+      push("the thrown string's words before a message", which, `a string, not an Error: ${lit}${tail}`);
+      push("the other form's words before it", which, `${head.endsWith("first line ") ? `${kind}, its message ` : `${kind}, its message's first line `}${lit}${tail}`);
+    } else push("a message's words before a thrown string", which, `an Error, its message ${lit}${tail}`);
+    // (the same words with another kind in them, and with one letter changed: as many code units as the true ones, so only a
+    // comparison of the words themselves tells them apart)
+    if (kind !== null) for (const k of otherKinds) push(`the kind named «${k}» in the same words`, which, `${head.replace(kind, k)}${lit}${tail}`);
+    const letter = head.search(/[a-z](?=[^a-z]*$)/);
+    push("the last letter of the words before changed", which, `${head.slice(0, letter)}${head[letter] === "x" ? "y" : "x"}${head.slice(letter + 1)}${lit}${tail}`);
+    push("a letter lost from the words before", which, `${head.slice(1)}${lit}${tail}`);
+    push("a space before the words", which, ` ${head}${lit}${tail}`);
+    // THE QUOTED TEXT: other code units than the raw slice
+    const Q = (s) => `${head}${thrownQuoted(s)}${tail}`;
+    if (units.length > 0) {
+      push("the quoted text without its last code unit", which, Q(units.slice(0, -1)));
+      push("the quoted text without its first code unit", which, Q(units.slice(1)));
+      push("an empty quoted text", which, Q(""));
+      for (const [where, i] of [["first", 0], ["middle", units.length >> 1], ["last", units.length - 1]]) {
+        const other = units.charCodeAt(i) === 0x7a ? "y" : "z";
+        push(`the quoted text with its ${where} code unit changed`, which, Q(units.slice(0, i) + other + units.slice(i + 1)));
+        push(`the quoted text with its ${where} code unit doubled`, which, Q(units.slice(0, i + 1) + units.slice(i)));
+      }
+    }
+    push("the quoted text with one more code unit, a letter", which, Q(`${units}a`));
+    if (x.length > units.length) push("the quoted text carrying one code unit past where it is cut", which, Q(x.slice(0, units.length + 1)));
+    if (x.length > ceiling + 1 && units.length === ceiling) push("the quoted text another slice of the text (from its second code unit)", which, Q(x.slice(1, ceiling + 1)));
+    for (const [form, t] of [["NFC", units.normalize("NFC")], ["NFD", units.normalize("NFD")], ["lower case", units.toLowerCase()], ["upper case", units.toUpperCase()], ["trimmed", units.trim()], ["its white space collapsed", units.replace(/\s+/g, " ")]]) push(`the quoted text in ${form}`, which, Q(t));
+    // …and the same code units, one the specification escapes written as itself; a literal that does not close, or open
+    const esc = lit.match(/\\(?:u([0-9a-f]{4})|([bfnrt]))/);
+    if (esc) {
+      const u = esc[1] !== undefined ? parseInt(esc[1], 16) : { b: 8, f: 12, n: 10, r: 13, t: 9 }[esc[2]];
+      push(`the quoted text with ${thrownHex(u)} written as itself`, which, `${head}${lit.slice(0, esc.index)}${CH(u)}${lit.slice(esc.index + esc[0].length)}${tail}`);
+    }
+    push("the quoted text without its closing quote", which, `${head}${lit.slice(0, -1)}${tail}`);
+    push("the quoted text without its opening quote", which, `${head}${lit.slice(1)}${tail}`);
+    // WHAT FOLLOWS: every number one more and one fewer («UTF-16» is a word, not a count), every clause dropped, added or swapped
+    for (const m of tail.matchAll(/(?<![-\d])\d+/g)) {
+      for (const d of [1, -1]) if (Number(m[0]) + d >= 0) push(`the number ${m[0]} at ${m.index} of what follows written ${Number(m[0]) + d}`, which, `${head}${lit}${tail.slice(0, m.index)}${Number(m[0]) + d}${tail.slice(m.index + m[0].length)}`);
+    }
+    push("a letter after what follows", which, `${head}${lit}${tail}x`);
+    push("a space after what follows", which, `${head}${lit}${tail} `);
+    if (tail !== "") push("what follows dropped", which, `${head}${lit}`);
+    else {
+      push("a cut announced that was not made (the why's)", which, `${head}${lit} (cut at the sidecar's ceiling: the first ${units.length} of its ${units.length} UTF-16 code units are carried, the last 0 are not recorded)`);
+      push("a cut announced that was not made (the line's)", which, `${head}${lit} (cut at the printed line's ceiling: the first ${units.length} of its ${units.length} UTF-16 code units are printed, the last 0 are not; the series' why in the sidecar carries all of them)`);
+    }
+    for (const [a, b] of [["are carried", "are printed"], ["are printed", "are carried"], ["the first ", "the last "], ["are not recorded", "are recorded"], ["are not;", "are;"], ["line 1 of ", "line 1 of more than "], ["line 1 of more than ", "line 1 of "], ["carries all of them", `carries the first ${W} of them`], [`carries the first ${W} of them`, "carries all of them"],
+      ["the whole message is in the series' why in the sidecar", `the series' why in the sidecar carries the first ${W} of them`], [`the series' why in the sidecar carries the first ${W} of them`, "the whole message is in the series' why in the sidecar"], ["sidecar's ceiling", "printed line's ceiling"], ["code units", "characters"], ["line 1 of", "line 2 of"]]) {
+      if (tail.includes(a)) push(`what follows with «${a}» written «${b}»`, which, `${head}${lit}${tail.replace(a, b)}`);
+    }
+    const cutNote = tail.match(/, the first line cut at the printed line's ceiling from its \d+/);
+    if (cutNote) push("the first line's cut not said", which, `${head}${lit}${tail.replace(cutNote[0], "")}`);
+    else if (tail.startsWith(" (line 1 of ")) push("a first-line cut said that was not made", which, `${head}${lit}${tail.replace(" UTF-16 code units;", ` UTF-16 code units, the first line cut at the printed line's ceiling from its ${units.length};`)}`);
+    // not a string at all
+    for (const bad of [undefined, null, 5, {}, [P[which].text]]) out.push([`${which}: not a string (${bad === null ? "null" : Array.isArray(bad) ? "an array" : typeof bad})`, said(which, bad)]);
+  }
+  if (P.why.text !== P.line.text) out.push(["the why and the line exchanged", { why: P.line.text, line: P.why.text }]);
+  return out;
+}
+/** THE SAME SENTENCE, SPELT ANOTHER WAY — true of `x`, and not the oracle's text: the first letter of the quoted text written
+ *  as its \uXXXX escape (in each hex case), and a «/» written «\/». The check accepts these (they decode to the raw slice);
+ *  the census, which compares texts, is what holds the spelling. */
+function thrownCheckRespellings(P) {
+  const out = [];
+  for (const which of ["why", "line"]) {
+    const { head, lit, tail } = P[which];
+    const said = (text) => (which === "why" ? { why: text, line: P.line.text } : { why: P.why.text, line: text });
+    // the first code unit written as itself that `is` holds of (an escape is stepped over whole: \uXXXX is six, any other two)
+    const plainAt = (is) => {
+      for (let k = 1; k < lit.length - 1; k++) {
+        if (lit.charCodeAt(k) === 0x5c) { k += lit.charCodeAt(k + 1) === 0x75 ? 5 : 1; continue; }
+        if (is(lit.charCodeAt(k))) return k;
+      }
+      return -1;
+    };
+    const i = plainAt((u) => u >= 0x61 && u <= 0x7a);
+    if (i > 0) {
+      const hex = lit.charCodeAt(i).toString(16).padStart(4, "0");
+      for (const h of [hex, hex.toUpperCase()]) out.push([`${which}: «${lit[i]}» written \\u${h}`, said(`${head}${lit.slice(0, i)}${CH(0x5c)}u${h}${lit.slice(i + 1)}${tail}`)]);
+    }
+    const s = plainAt((u) => u === 0x2f);
+    if (s > 0) out.push([`${which}: «/» written «\\/»`, said(`${head}${lit.slice(0, s)}${CH(0x5c)}/${lit.slice(s + 1)}${tail}`)]);
+  }
+  return out;
+}
+/** A text of `n` lower-case letters in turn (the cut census's base text), with `place` — [index, text] pairs — written over it. */
+function thrownLetters(n, place = []) {
+  let s = "";
+  for (let k = 0; k < n; k += 8192) s += String.fromCharCode(...Array.from({ length: Math.min(8192, n - k) }, (_, j) => thrownCutBaseUnit(k + j)));
+  for (const [at, text] of place) s = s.slice(0, at) + text + s.slice(at + text.length);
+  if (s.length !== n) throw new Error("thrownLetters: a placed text runs past the end");
+  return s;
+}
+/** THE CHECK'S BATTERY — the texts the check is run on alone: [label, text]. Short texts with every kind of content the
+ *  specification escapes; texts of several lines with each break; the Playwright messages; texts of each ceiling's length and
+ *  one each side of it, twice and four times it, with a surrogate pair, an escape and a control sequence across each cut;
+ *  first lines of each length around the printed line's ceiling; and messages of as many lines as the line-count ceiling,
+ *  one fewer and one more. */
+function thrownCheckBattery() {
+  const W = THROWN_WHY_MAX, L = THROWN_LINE_MAX;
+  const ESC = CH(0x1b);
+  const out = [
+    ["empty", ""], ["one letter", "a"], ["two letters", "Ab"], ["a quote, a backslash and a slash", "a\"b\\c/d"], ["a tab", "tab\there"], ["blanks at both ends", "  a b  "],
+    ["U+0000", `a${CH(0)}b`], ["U+001F", `a${CH(0x1f)}b`], ["DEL", `a${CH(0x7f)}b`], ["NEL", `a${CH(0x85)}b`], ["U+009F", `a${CH(0x9f)}b`], ["a line separator", `a${CH(0x2028)}b`], ["a paragraph separator", `a${CH(0x2029)}b`],
+    ["a lone high surrogate", `a${CH(0xd83d)}b`], ["a lone low surrogate", `a${CH(0xde00)}b`], ["a surrogate pair", `a${CH(0xd83d, 0xde00)}b`], ["a low then a high surrogate", `a${CH(0xde00, 0xd83d)}b`], ["a decomposed letter", `e${CH(0x301)}x`],
+    ["two lines (LF)", "a\nb"], ["two lines (CRLF)", "a\r\nb"], ["two lines (CR)", "a\rb"], ["an LF then a CR (three lines)", "a\n\rb"], ["only a line break", "\n"], ["a text ending in a break", "a/b\n"], ["two CRLFs", "\r\n\r\n"], ["an empty first line", "\nab"],
+    ["a control sequence", `${ESC}[2mdim${ESC}[22m`],
+    ...THROWN_PLAYWRIGHT_MESSAGES.map(([call, m]) => [`Playwright's ${call} message`, m]),
+  ];
+  for (const [what, c] of [["the printed line's ceiling", L], ["the why's ceiling", W]]) {
+    for (const d of [-1, 0, 1]) out.push([`${c + d} letters (${what}${d < 0 ? " less one" : d > 0 ? " and one" : ""})`, thrownLetters(c + d)]);
+    out.push([`a surrogate pair across ${what}`, thrownLetters(c + 40, [[c - 1, CH(0xd83d, 0xde00)]])]);
+    out.push([`a control sequence across ${what}`, thrownLetters(c + 40, [[c - 3, `${ESC}[22m`]])]);
+    out.push([`blanks ending at ${what}`, thrownLetters(c + 40, [[c - 3, " \t "]])]);
+    out.push([`a quote and a backslash at ${what}`, thrownLetters(c + 40, [[c - 1, "\"\\"]])]);
+    out.push([`a line separator each side of ${what}`, thrownLetters(c + 40, [[c - 1, CH(0x2028, 0x2029)]])]);
+    for (const d of [-1, 0, 1]) out.push([`a first line of ${c + d} letters, then two short lines`, `${thrownLetters(c + d)}\nxy\r\nz`]);
+  }
+  out.push([`${2 * L} letters`, thrownLetters(2 * L)], [`${4 * W} letters`, thrownLetters(4 * W)]);
+  out.push([`a message of three lines and ${W} code units in all`, `${thrownLetters(40)}\n${thrownLetters(W - 42)}\r`], [`a message of three lines and ${W + 1} code units in all`, `${thrownLetters(40)}\n${thrownLetters(W - 41)}\r`]);
+  out.push([`a first line of ${L + 9} letters in a message of ${W + 90} code units`, `${thrownLetters(L + 9)}\n${thrownLetters(W + 90 - L - 10)}`]);
+  for (const n of [THROWN_LINES_MAX - 1, THROWN_LINES_MAX, THROWN_LINES_MAX + 1]) out.push([`${n} lines`, thrownLineBoundaryText(n, "\n", THROWN_LINE_BOUNDARY_EMPTIES[3])], [`${n} empty lines`, thrownLineBoundaryText(n, "\r\n", THROWN_LINE_BOUNDARY_EMPTIES[0])]);
+  return out;
+}
+/** The harness's building lines the sabotages are planted on (each must occur in it exactly once). */
+const THROWN_BUILD = Object.freeze({
+  q: "const q = (s) => JSON.stringify(s).",
+  escaped: "/[\\u007f-\\u009f\\u2028\\u2029]/g",
+  line: "${q(s.slice(0, L))} (cut at the printed line's",
+  why: "${q(s.slice(0, W))} (cut at the sidecar's",
+  kept: "    const kept = first.length <= L ? first : first.slice(0, L);\n",
+  count: "    const count = lines.length > EVENT_THROWN_LINES_COUNTED_MAX ? `more than ${EVENT_THROWN_LINES_COUNTED_MAX}` : String(lines.length);\n",
+  split: "    const lines = m.split(/\\r\\n|\\r|\\n/, EVENT_THROWN_LINES_COUNTED_MAX + 1);\n",
+  message: "    const why = `${kind}, its message ${forWhy(m)}`;\n",
+  string: "    if (t === \"string\") return { why: `a string, not an Error: ${forWhy(e)}`, line: `a string, not an Error: ${forLine(e)}` };\n",
+  oneLine: "    if (lines.length === 1) return { why, line: `${kind}, its message ${forLine(m)}` };\n",
+  forWhy: "const forWhy = (s) => (s.length <= W ? q(s) : ",
+  forLine: "const forLine = (s) => (s.length <= L ? q(s) : ",
+  inWhy: "const inWhy = (n) => (n <= W ? ",
+  whyCounts: "the first ${W} of its ${s.length} UTF-16 code units are carried, the last ${s.length - W} are not recorded)",
+  lineCounts: "the first ${L} of its ${s.length} UTF-16 code units are printed, the last ${s.length - L} are not; ${inWhy(s.length)})",
+  firstCounts: "(line 1 of ${count}, ${kept.length} of its ${m.length} UTF-16 code units${kept.length < first.length ? `, the first line cut at the printed line's ceiling from its ${first.length}` : \"\"}; ${m.length <= W ? \"the whole message is in the series' why in the sidecar\" : inWhy(m.length)})",
+  firstHead: "its message's first line ${q(kept)}",
+  described: "    described = { text: m, kind };\n",
+  read: "      m = e.message;\n",
+});
+/** THE SABOTAGES — one edit each to a line that BUILDS the description: [id, what it does, the line (a key of THROWN_BUILD),
+ *  what replaces it]. The first eleven are the round-14 verifier's cut survivors as it wrote them (its set-v14-cut.mjs and
+ *  set-v14-cut2.mjs; K08, K09 and K10 in their String.prototype.search spellings). */
+function thrownSabotages() {
+  const B = CH(0x5c);
+  const T = THROWN_BUILD;
+  const line = (e) => `\${q(${e})} (cut at the printed line's`;
+  const why = (e) => `\${q(${e})} (cut at the sidecar's`;
+  const kept = (e) => `    const kept = first.length <= L ? first : ${e};\n`;
+  const q = (e) => `const q = (s) => JSON.stringify(${e}).`;
+  const csiBack = (v, C) => `((t, c) => { let k = c; while (k > 0 && ((t.charCodeAt(k - 1) >= 0x30 && t.charCodeAt(k - 1) <= 0x39) || t.charCodeAt(k - 1) === 0x3b)) k -= 1; return k >= 2 && t.charCodeAt(k - 1) === 0x5b && t.charCodeAt(k - 2) === 0x1b ? k - 2 : c; })(${v}, ${C})`;
+  const EMB = `/^${B}p{Emoji_Modifier_Base}/u`;
+  const EXP = `/^${B}p{Extended_Pictographic}/u`;
+  const tagBack = (v, C) => `((t, c) => { const tag = (k) => t.charCodeAt(k) === 0xdb40 && t.charCodeAt(k + 1) >= 0xdc20 && t.charCodeAt(k + 1) <= 0xdc7f; if (!tag(c)) return c; let k = c; while (k >= 2 && tag(k - 2)) k -= 2; const b = k >= 2 && t.charCodeAt(k - 2) >= 0xd800 && t.charCodeAt(k - 2) <= 0xdbff ? k - 2 : k - 1; return b >= 0 && t.slice(b, k).search(${EXP}) === 0 ? b : c; })(${v}, ${C})`;
+  const counts = (key, from, to) => [key, T[key].replace(from, to)];
+  return [
+    // the round-14 verifier's survivors
+    ["V14-K01", "the why's cut drops an ANSI control sequence it cut through", "why", why(`s.slice(0, W).replace(/${B}x1b${B}[[0-9;]*$/, "")`)],
+    ["V14-K02", "the line's cut backs off before an ANSI control sequence it would cut through", "line", line(`s.slice(0, ${csiBack("s", "L")})`)],
+    ["V14-K03", "the first line's cut does not end on ESC [", "kept", kept("first.slice(0, first.charCodeAt(L - 2) === 0x1b && first.charCodeAt(L - 1) === 0x5b ? L - 2 : L)")],
+    ["V14-K04", "the why's cut backs off before an ANSI control sequence it would cut through", "why", why(`s.slice(0, ${csiBack("s", "W")})`)],
+    ["V14-K05", "the why's cut does not split ESC from its «[»", "why", why("s.slice(0, s.charCodeAt(W - 1) === 0x1b && s.charCodeAt(W) === 0x5b ? W - 1 : W)")],
+    ["V14-K06", "the line's cut drops an OSC sequence it cut through", "line", line(`s.slice(0, L).replace(/${B}x1b${B}][^${B}x07${B}x1b]{0,256}$/, "")`)],
+    ["V14-K07", "the line's cut drops a «\\u{…}» escape it cut through", "line", line(`s.slice(0, L).replace(/${B}${B}u${B}{[0-9a-fA-F]{0,6}$/, "")`)],
+    ["V14-K08S", "the why's cut does not split a percent-encoded character between its bytes", "why", why("s.slice(0, s.slice(W, W + 3).search(/^%[89ABab][0-9A-Fa-f]/) === 0 ? W - ((t) => { const k = t.search(/(?:%[C-Fc-f][0-9A-Fa-f])(?:%[89ABab][0-9A-Fa-f]){0,2}$/); return k < 0 ? 0 : t.length - k; })(s.slice(W - 9, W)) : W)")],
+    ["V14-K09S", "the line's cut does not leave a ZWJ before the person it joins", "line", line(`s.slice(0, s.charCodeAt(L - 1) === 0x200d && s.slice(L, L + 2).search(${EMB}) === 0 ? L - 1 : L)`)],
+    ["V14-K10S", "the why's cut does not split an emoji tag sequence", "why", why(`s.slice(0, ${tagBack("s", "W")})`)],
+    ["V14-K11", "the first line's cut drops a «%uXXXX» escape it cut through", "kept", kept("first.slice(0, L).replace(/%u[0-9a-fA-F]{0,3}$/, \"\")")],
+    // the earlier rounds' cut survivors, one of each kind
+    ["V12-C01", "the line's cut trimmed", "line", line("s.slice(0, L).trimEnd()")],
+    ["V12-C03", "the first line's cut trimmed", "kept", kept("first.slice(0, L).trimEnd()")],
+    ["V12-C28", "the why's cut's trailing spaces and tabs dropped", "why", why(`s.slice(0, W).replace(/[ ${B}t]+$/, "")`)],
+    ["V13-NFC", "the why's cut normalised to NFC", "why", why("s.slice(0, W).normalize(\"NFC\")")],
+    // each slice moved by one
+    ["S15-01", "the why carries one code unit fewer than it says", "why", why("s.slice(0, W - 1)")],
+    ["S15-02", "the line carries one code unit more than it says", "line", line("s.slice(0, L + 1)")],
+    ["S15-03", "the first line carries one code unit fewer than its ceiling", "kept", kept("first.slice(0, L - 1)")],
+    ["S15-04", "the why carries the text from its second code unit", "why", why("s.slice(1, W + 1)")],
+    // the quoting
+    ["S15-05", "the quoting lower-cases", "q", q("s.toLowerCase()")],
+    ["S15-06", "the quoting drops the last code unit of a text of more than three", "q", q("s.length > 3 ? s.slice(0, -1) : s")],
+    ["S15-07", "the quoting normalises to NFC", "q", q("s.normalize(\"NFC\")")],
+    ["S15-08", "the quoting strips ANSI colour sequences", "q", q(`s.replace(/${B}x1b${B}[[0-9;]*m/g, "")`)],
+    ["S15-09", "the quoting collapses white space", "q", q(`s.replace(/${B}s+/g, " ")`)],
+    ["S15-10", "the quoting trims", "q", q("s.trim()")],
+    ["S15-11", "U+009F is written as itself", "escaped", `/[${B}u007f-${B}u009e${B}u2028${B}u2029]/g`],
+    ["S15-12", "a line separator is written as itself", "escaped", `/[${B}u007f-${B}u009f${B}u2029]/g`],
+    // each count
+    ["S15-13", "the why's cut says one code unit more than the text has", ...counts("whyCounts", "of its ${s.length} UTF-16", "of its ${s.length + 1} UTF-16")],
+    ["S15-14", "the why's cut says one fewer not recorded", ...counts("whyCounts", "the last ${s.length - W} are", "the last ${s.length - W - 1} are")],
+    ["S15-15", "the why's cut says one fewer carried", ...counts("whyCounts", "the first ${W} of", "the first ${W - 1} of")],
+    ["S15-16", "the line's cut says one code unit fewer than the text has", ...counts("lineCounts", "of its ${s.length} UTF-16", "of its ${s.length - 1} UTF-16")],
+    ["S15-17", "the line's cut says one more not printed", ...counts("lineCounts", "the last ${s.length - L} are", "the last ${s.length - L + 1} are")],
+    ["S15-18", "the line's cut says one more printed", ...counts("lineCounts", "the first ${L} of", "the first ${L + 1} of")],
+    ["S15-19", "a text of exactly the why's ceiling is said to be carried in part", "inWhy", "const inWhy = (n) => (n < W ? "],
+    ["S15-20", "the line count is one fewer", "count", T.count.replace("String(lines.length)", "String(lines.length - 1)")],
+    ["S15-21", "a message of exactly the line-count ceiling's lines is said to have «more than» it", "count", T.count.replace("lines.length > EVENT_THROWN_LINES_COUNTED_MAX ?", "lines.length >= EVENT_THROWN_LINES_COUNTED_MAX ?")],
+    ["S15-22", "the first line's carried count is one more", ...counts("firstCounts", "${kept.length} of its", "${kept.length + 1} of its")],
+    ["S15-23", "the message's length is one fewer", ...counts("firstCounts", "of its ${m.length} UTF-16", "of its ${m.length - 1} UTF-16")],
+    ["S15-24", "the first line's length is one more", ...counts("firstCounts", "from its ${first.length}`", "from its ${first.length + 1}`")],
+    ["S15-25", "every first line is said to be cut", ...counts("firstCounts", "${kept.length < first.length ?", "${kept.length <= first.length ?")],
+    ["S15-26", "a message of exactly the why's ceiling is said to be carried in part", ...counts("firstCounts", "${m.length <= W ? ", "${m.length < W ? ")],
+    // each form and each clause
+    ["S15-27", "a message of two lines is printed whole, as one line", "oneLine", T.oneLine.replace("lines.length === 1", "lines.length <= 2")],
+    ["S15-28", "a CR does not end a line", "split", T.split.replace(`/${B}r${B}n|${B}r|${B}n/`, `/${B}n/`)],
+    ["S15-29", "a why one code unit past its ceiling is written whole", "forWhy", "const forWhy = (s) => (s.length <= W + 1 ? q(s) : "],
+    ["S15-30", "a line one code unit past its ceiling is printed whole", "forLine", "const forLine = (s) => (s.length <= L + 1 ? q(s) : "],
+    ["S15-31", "the first line is called «its message's line»", "firstHead", "its message's line ${q(kept)}"],
+    ["S15-32", "a thrown string's line says «a string: »", "string", T.string.replace("line: `a string, not an Error: ", "line: `a string: ")],
+    ["S15-33", "a thrown string's why is cut at the line's ceiling", "string", T.string.replace("${forWhy(e)}", "${forLine(e)}")],
+    ["S15-34", "the why of an object's message names it «an Error»", "message", "    const why = `${kind === \"an object\" ? \"an Error\" : kind}, its message ${forWhy(m)}`;\n"],
+    ["S15-35", "the why's cut says «are printed»", ...counts("whyCounts", "are carried", "are printed")],
+  ];
+}
+/** THE SABOTAGE BATTERY — the values each sabotaged block describes: { label, value, read, path }. The check battery's short
+ *  texts as a thrown string, as an Error's message and as a plain object's; and the cut shapes (a thrown string, a one-line
+ *  message, a message of two lines whose first is past the line's ceiling) with each of THROWN_SABOTAGE_ITEMS at both cuts,
+ *  and with nothing placed; texts of exactly each ceiling and one past it; messages of the line-count ceiling's lines and one
+ *  more. The paths rotate; every fourth value is thrown before the series as well. */
+function thrownSabotageBattery() {
+  const W = THROWN_WHY_MAX, L = THROWN_LINE_MAX;
+  const ESC = CH(0x1b);
+  const out = [];
+  let j = 0;
+  const add = (label, value, read) => {
+    out.push({ label, value, read, path: THROWN_PATHS[j % 3] });
+    if (j % 4 === 3) out.push({ label, value, read, path: "pre-series" });
+    j += 1;
+  };
+  const said = (m) => ({ threw: false, value: m });
+  for (const [label, x] of thrownCheckBattery()) {
+    if (x.length > 200 && !label.startsWith("Playwright")) continue;
+    add(`${label}, thrown as a string`, x, null);
+    add(`${label}, an Error's message`, new Error(x), said(x));
+    add(`${label}, a plain object's message`, { message: x }, said(x));
+  }
+  // [what, the code units placed, how many of them stand before the cut]
+  const items = [
+    ["nothing", [], 0],
+    ["ESC [ 2 2 m, the cut after its «[»", [0x1b, 0x5b, 0x32, 0x32, 0x6d], 2], ["ESC [ 2 2 m, the cut after its first parameter", [0x1b, 0x5b, 0x32, 0x32, 0x6d], 3], ["ESC [ 2 2 m, the cut after its ESC", [0x1b, 0x5b, 0x32, 0x32, 0x6d], 1],
+    ["an OSC, the cut inside its text", [0x1b, 0x5d, 0x30, 0x3b, 0x74, 0x07], 4],
+    ["«\\u{0000}», the cut inside it", [0x5c, 0x75, 0x7b, 0x30, 0x30, 0x30, 0x30, 0x7d], 5],
+    ["%E2%82%AC, the cut before its last byte", [...Array.from("%E2%82%AC", (c) => c.charCodeAt(0))], 6],
+    ["«%u00», the cut after it", [0x25, 0x75, 0x30, 0x30], 4],
+    ["a ZWJ, then U+261D after the cut", [0x200d, 0x261d], 1],
+    ["U+00A9, then a tag character after the cut", [0xa9, 0xdb40, 0xdc20], 1],
+    ["three blanks ending at the cut", [0x20, 0x09, 0x20], 3],
+    ["a decomposed letter across the cut", [0x65, 0x301], 1], ["a decomposed letter before the cut", [0x65, 0x301], 2],
+    ["upper-case letters", [0x41, 0x42], 1],
+    ["a surrogate pair across the cut", [0xd83d, 0xde00], 1],
+    ["U+009F and a line separator", [0x9f, 0x2028], 1],
+  ];
+  for (const shape of THROWN_CUT_SHAPES) {
+    const base = thrownCutText(shape, () => -1);
+    for (const [what, units, at] of items) {
+      let s = "";
+      let from = 0;
+      for (const c of [L, W]) {
+        const i = c - at;
+        s += base.slice(from, i) + String.fromCharCode(...units);
+        from = i + units.length;
+      }
+      s += base.slice(from);
+      const { value, read } = thrownCutValue(shape, s);
+      add(`${shape}, ${what} at both cuts`, value, read);
+    }
+  }
+  for (const n of [L, L + 1, W, W + 1]) {
+    add(`a thrown string of ${n} letters`, thrownLetters(n), null);
+    add(`an Error whose one-line message has ${n} letters`, new Error(thrownLetters(n)), said(thrownLetters(n)));
+  }
+  for (const n of [L, L + 1]) add(`an Error whose first line has ${n} letters, of two lines`, new Error(`${thrownLetters(n)}\nz`), said(`${thrownLetters(n)}\nz`));
+  for (const n of [W, W + 1]) { const m = `${thrownLetters(40)}\n${thrownLetters(n - 41)}`; add(`an Error whose message of two lines has ${n} code units`, new Error(m), said(m)); }
+  for (const n of [THROWN_LINES_MAX - 1, THROWN_LINES_MAX, THROWN_LINES_MAX + 1]) { const m = thrownLineBoundaryText(n, "\n", THROWN_LINE_BOUNDARY_EMPTIES[3]); add(`an Error whose message has ${n} lines`, new Error(m), said(m)); }
+  for (const [kind, make] of [["a function", () => Object.assign(function thrownFn() {}, { message: "Ab cd" })], ["an array", () => Object.assign([], { message: "Ab cd" })]]) add(`${kind} whose message is a string`, make(), said("Ab cd"));
+  return out;
+}
+/** What one sabotaged (or unsabotaged) block says of every value of the battery: for each, "spec" (the oracle's text, why
+ *  and line), "fallback" (both the fallback) or a description of the FALSE SENTENCE it printed or wrote. `code` is a P1
+ *  block's code. */
+function thrownSabotageRun(code, battery) {
+  const threw = p1ThrewFactoryOfCode(code);
+  const ctx = { h1ProbeReads: LIBNS.h1ProbeReads, scenario: H1.em };
+  const out = [];
+  for (const { label, value, read, path } of battery) {
+    const got = p1ThrewAt(threw, value, path, ctx);
+    const why = (path === "pre-series" ? got.final.refused[0] : got.final.series[0])?.why;
+    const head = "      EVENT SHOT 1: a throw ended this series after ";
+    const notes = got.env.notes.filter((s) => s.startsWith(head));
+    const steps = path === "pre-series" ? 0 : Number(path.slice("series@".length)) - 1;
+    const wantWhy = `threw: ${thrownSpecText(value, "why", read)}`;
+    const wantNote = path === "pre-series" ? null : thrownNoteFor(steps, thrownSpecText(value, "line", read));
+    const fallNote = path === "pre-series" ? null : thrownNoteFor(steps, THROWN_FALLBACK);
+    const note = notes.length === 1 ? notes[0] : notes.length === 0 ? null : `(${notes.length} thrown lines)`;
+    let verdict;
+    if (why === wantWhy && note === wantNote) verdict = "spec";
+    else if (why === `threw: ${THROWN_FALLBACK}` && note === fallNote) verdict = "fallback";
+    else {
+      const which = why !== wantWhy && why !== `threw: ${THROWN_FALLBACK}` ? ["why", why, wantWhy] : note !== wantNote && note !== fallNote ? ["line", note, wantNote] : ["why and line (one the fallback, the other not)", `${why} | ${note}`, `${wantWhy} | ${wantNote}`];
+      let i = 0;
+      while (typeof which[1] === "string" && typeof which[2] === "string" && i < which[1].length && which[1][i] === which[2][i]) i += 1;
+      verdict = `FALSE ${which[0]} at ${i}: «${String(which[1]).slice(Math.max(0, i - 30), i + 60)}» where the specification has «${String(which[2]).slice(Math.max(0, i - 30), i + 60)}»`;
+    }
+    out.push({ label, path, verdict });
+  }
+  return out;
+}
+/** THE RUNTIME CHECK, ALONE — the check of the harness source `src`, compiled from its P1 block and called directly:
+ *  { anchors, bad, stats } — `anchors`: where the check stands in the code (its line once, before the description's only
+ *  return and the fallback's catch; its two functions' calls; nothing of the building in it); `bad`: every disagreement —
+ *  of the decoder alone over every code unit and a table of literals, and of the check over the battery (the
+ *  specification's sentence must hold; each falsification of it must not; each true respelling must; no sentence holds of
+ *  another kind); `stats`: what was run. */
+function thrownCheckAlone(src = SRC, { stopAtFirst = false } = {}) {
+  const code = stripComments(src);
+  const anchors = [];
+  const bad = [];
+  const stats = { texts: 0, held: 0, refused: 0, respelt: 0, pieces: new Set() };
+  const need = (ok, what) => { if (!ok) anchors.push(what); };
+  // the check is called once, on what was built, before the only return of a description of a text; and it shares nothing
+  // with the building: no quoting of its own making, no split, no replace — its one regular expression is its own
+  need(code.split(THROWN_CHECK_LINE).length - 1 === 1, "the check's line is not in the harness's code once");
+  need(code.includes(`${THROWN_CHECK_LINE}    return built;\n  } catch {\n    return { why: "${THROWN_FALLBACK}", line: "${THROWN_FALLBACK}" };\n  }\n};`), "the check's line is not followed by the description's only return and the fallback's catch");
+  need(isDeepStrictEqual([code.split("eventThrownHolds(").length - 1, code.split("eventThrownCarried(").length - 1, code.split("return built;").length - 1, code.split("const built = (() => {").length - 1], [2, 3, 1, 1]), "the check's calls (eventThrownHolds from the check's line twice, eventThrownCarried from eventThrownHolds three times), the one return and the one inner function are not as counted");
+  const checkCode = code.slice(code.indexOf("const EVENT_THROWN_NEVER_ITSELF = "), code.indexOf("const eventThrownText = (e) => {"));
+  need(checkCode.includes("const eventThrownCarried = (text, at, x, n) => {") && checkCode.includes("const eventThrownHolds = (x, kind, said) => {"), "the check's two functions could not be located");
+  for (const shared of ["JSON", "q(", ".split(", ".replace(", ".match(", "RegExp", "forWhy", "forLine", "inWhy", ".normalize(", "/g"]) need(!checkCode.includes(shared), `the check uses «${shared}», which the building uses`);
+  need(isDeepStrictEqual([checkCode.split(".test(").length - 1, checkCode.split("EVENT_THROWN_NEVER_ITSELF").length - 1], [1, 2]), "the check's one regular expression is not declared once and used once");
+  let fns;
+  try { fns = p1CheckOfCode(p1BlockCode(src)); } catch (e) { return { anchors, bad: [`the check could not be compiled from the P1 block: ${e && e.message}`], stats }; }
+  const { eventThrownCarried, eventThrownHolds } = fns;
+  const say = (text) => { if (bad.length < 12) bad.push(text); else if (bad.length === 12) bad.push("…and more"); };
+  const safely = (fn) => { try { return fn(); } catch (e) { return `threw ${e && e.message}`; } };
+  // THE DECODER, ALONE: every code unit escaped as \uXXXX (both hex cases) is read back; written as itself, it is read back
+  // exactly when the specification does not escape it — not the quote or the backslash, not a control, U+007F–U+009F,
+  // U+2028, U+2029, and not a surrogate (which is written as itself only as half of a pair written whole)
+  const B = CH(0x5c);
+  const notAsItself = (u) => u < 0x20 || u === 0x22 || u === 0x5c || (u >= 0x7f && u <= 0x9f) || u === 0x2028 || u === 0x2029 || (u >= 0xd800 && u <= 0xdfff);
+  const stop = () => stopAtFirst && bad.length > 0;
+  for (let u = 0; u <= 0xffff && bad.length < 6 && !stop(); u++) {
+    const x = CH(u);
+    const hex = u.toString(16).padStart(4, "0");
+    for (const esc of [`"${B}u${hex}"`, `"${B}u${hex.toUpperCase()}"`]) if (safely(() => eventThrownCarried(`${esc}tail`, 0, x, 1)) !== esc.length) say(`the decoder: ${thrownHex(u)} escaped as ${esc} is not read back`);
+    const raw = safely(() => eventThrownCarried(`"${x}"`, 0, x, 1));
+    if ((raw === 3) === notAsItself(u) || (raw !== 3 && raw !== -1)) say(`the decoder: ${thrownHex(u)} written as itself is ${raw === 3 ? "read back" : `answered ${raw}`}`);
+    if (safely(() => eventThrownCarried(`"${B}u${hex}"`, 0, CH(u ^ 1), 1)) !== -1) say(`the decoder: ${thrownHex(u)} escaped is read back as ${thrownHex(u ^ 1)}`);
+    for (const [a, b] of [["a", "b"], ["", ""], [x, x]]) {
+      const text = `${a}${x}${b}`;
+      if (safely(() => eventThrownCarried(thrownQuoted(text), 0, text, text.length)) !== thrownQuoted(text).length) say(`the decoder: the oracle's quoting of ${thrownHex(u)} (${a === "a" ? "between letters" : a === "" ? "alone" : "three times"}) is not read back`);
+    }
+  }
+  // (a pair written whole is read back, in the text and in x at the same place; half a pair, the halves reversed, a pair where
+  // x has other units, a pair across the n-th code unit, JSON's short escapes, an escape JSON does not have, a count that is
+  // not the literal's, a literal that does not open or close, a run cut short by the text's end)
+  const PAIR = CH(0xd83d, 0xde00);
+  for (const [what, text, x, n, want, at = 0] of [
+    ["a pair written whole", `"${PAIR}"`, PAIR, 2, 4], ["a pair whose low half x does not have", `"${PAIR}"`, CH(0xd83d, 0xde01), 2, -1], ["a pair across the n-th code unit", `"${PAIR}"`, PAIR, 1, -1],
+    ["a high surrogate as itself, then a letter", `"${CH(0xd83d)}a"`, `${CH(0xd83d)}a`, 2, -1], ["a low surrogate as itself", `"${CH(0xde00)}"`, CH(0xde00), 1, -1], ["the halves reversed", `"${CH(0xde00, 0xd83d)}"`, CH(0xde00, 0xd83d), 2, -1],
+    ["a high surrogate as itself, its low half escaped", `"${CH(0xd83d)}${B}ude00"`, PAIR, 2, -1], ["a high surrogate escaped, its low half as itself", `"${B}ud83d${CH(0xde00)}"`, PAIR, 2, -1],
+    ["a pair between letters", `"a${PAIR}b"`, `a${PAIR}b`, 4, 6], ["two pairs", `"${PAIR}${PAIR}"`, `${PAIR}${PAIR}`, 4, 6],
+    ["a pair written as two escapes", `"${B}ud83d${B}ude00"`, PAIR, 2, 14], ["JSON's short escapes", `"${B}"${B}${B}${B}/${B}b${B}f${B}n${B}r${B}t"`, `"${B}/${CH(8, 12, 10, 13, 9)}`, 8, 18],
+    ["an escape JSON does not have", `"${B}v"`, CH(0x0b), 1, -1], ["a \\x escape", `"${B}x41"`, "A", 1, -1], ["a short \\u", `"${B}u004"`, "A", 1, -1], ["a \\u with a letter that is no hex digit", `"${B}u00g1"`, "A", 1, -1],
+    ["a backslash at the text's end", `"ab${B}`, `ab${B}`, 3, -1], ["an escape, then a run, then an escape", `"${B}na${B}tb"`, "\na\tb", 4, 8], ["an escaped quote inside", `"a${B}"b"`, "a\"b", 3, 6],
+    ["fewer code units than the literal has", "\"abc\"", "abc", 2, -1], ["more code units than the literal has", "\"abc\"", "abcd", 4, -1], ["exactly the literal", "\"abc\"", "abcd", 3, 5], ["the empty literal", "\"\"", "abc", 0, 2],
+    ["the empty literal where the text has more", "\"a\"", "a", 0, -1], ["a quote inside the run", "\"a\"b\"", "a\"b", 3, -1],
+    ["no opening quote", "abc\"", "abc", 3, -1], ["no closing quote", "\"abc", "abc", 3, -1], ["a literal that starts later", "x\"abc\"", "abc", 3, -1], ["the same literal read from where it starts", "x\"abc\"", "abc", 3, 6, 1],
+    ["a code unit of x changed", "\"abc\"", "abd", 3, -1], ["x shorter than the count", "\"abc\"", "ab", 3, -1],
+    ["an opening that is not a quote", "Xabc\"", "abc", 3, -1], ["a literal cut short by the text's end", "\"ab", "abc", 3, -1], ["a literal cut short inside an escape", `"ab${B}u00`, `ab${CH(0)}`, 3, -1],
+    ["a run that ends at the n-th code unit, a letter after it", "\"abcd\"", "abcd", 3, -1], ["an escape for a code unit x has as another", `"${B}n"`, "\r", 1, -1], ["an upper-case short escape", `"${B}N"`, "\n", 1, -1],
+  ]) {
+    const got = safely(() => eventThrownCarried(text, at, x, n));
+    if (got !== want) say(`the decoder on ${what}: ${got}, not ${want}`);
+  }
+  // THE CHECK: the specification's sentence holds; each falsification of it does not; each true respelling does
+  for (const [j, [label, x]] of thrownCheckBattery().entries()) {
+    if (stop()) break;
+    const kinds = x.length > 4 * THROWN_LINE_MAX ? [null, "an Error"] : [null, "an Error", ["a function", "an array", "an object"][j % 3]];
+    for (const kind of kinds) {
+      const P = thrownSpecPieces(x, kind);
+      const where = `${label}, ${kind === null ? "a thrown string" : `the message of ${kind}`}`;
+      stats.texts += 1;
+      const own = safely(() => eventThrownHolds(x, kind, { why: P.why.text, line: P.line.text }));
+      if (own !== true) say(`${where}: the specification's own sentence does not hold (${own})`);
+      else stats.held += 1;
+      for (const [what, said] of thrownCheckFalsifications(x, kind, P)) {
+        stats.pieces.add(what.replace(/\d+/g, "N").replace(/U\+[0-9A-F]+/g, "U+X"));
+        // (a text that is not a string may make the check throw: the harness's last catch then prints the fallback, so a throw
+        // refuses as `false` does)
+        const got = safely(() => eventThrownHolds(x, kind, said));
+        if (got === true) say(`${where}: a FALSE sentence holds (${what})`);
+        else stats.refused += 1;
+      }
+      for (const [what, said] of thrownCheckRespellings(P)) {
+        if (safely(() => eventThrownHolds(x, kind, said)) !== true) say(`${where}: a TRUE sentence does not hold (${what})`);
+        else stats.respelt += 1;
+      }
+      // …and the kind is the check's too: the same sentence, asked of another kind (or of a thrown string), does not hold
+      for (const other of [null, "a function", "an array", "an Error", "an object"]) if (other !== kind && safely(() => eventThrownHolds(x, other, { why: P.why.text, line: P.line.text })) === true) say(`${where}: its sentence holds when the kind handed in is ${other}`);
+    }
+  }
+  return { anchors, bad, stats };
+}
+/** THE SABOTAGE CENSUS of the harness source `src`: { anchors, bad, fired, battery, sabotages } — `anchors`: a building line
+ *  of THROWN_BUILD (or the check's line) that is not in `src` once; `bad`: every disagreement — unsabotaged, the block must
+ *  print the specification's text on every value of the battery, the check in or out; each sabotage, with the check, must
+ *  print the specification's text or the fallback on every value (the fallback at least once, and never a false sentence),
+ *  and with the check's line taken out must print a false sentence, on values the check stopped; `fired`: per sabotage,
+ *  [values the check stopped, values false without it]. A sabotage whose line is not in `src` once is not run. */
+function thrownSabotageCensus(src = SRC, { stopAtFirst = false } = {}) {
+  const battery = thrownSabotageBattery();
+  const anchors = [];
+  const bad = [];
+  const fired = new Map();
+  const tally = (rows) => ({ spec: rows.filter((r) => r.verdict === "spec").length, fallback: rows.filter((r) => r.verdict === "fallback").length, false: rows.filter((r) => r.verdict.startsWith("FALSE")) });
+  const run = (text) => { try { return thrownSabotageRun(p1BlockCode(text), battery); } catch (e) { return battery.map((b) => ({ label: b.label, path: b.path, verdict: `FALSE (the block threw: ${e && e.message})` })); } };
+  const checkOnce = src.split(THROWN_CHECK_LINE).length - 1 === 1;
+  if (!checkOnce) anchors.push("the runtime check's line is not in the harness once");
+  const off = (text) => text.replace(THROWN_CHECK_LINE, "");
+  // unsabotaged: the specification's text on every value — with the check, and without it
+  for (const [what, text] of [["as written", src], ...(checkOnce ? [["with the check's line taken out", off(src)]] : [])]) {
+    const t = tally(run(text));
+    if (t.spec !== battery.length) bad.push(`the harness ${what} does not print the specification's text on every value of the battery: ${t.spec} of ${battery.length}, ${t.fallback} the fallback, ${t.false.length} false — ${[...t.false.map((r) => `${r.label} (${r.path}): ${r.verdict}`), ...run(text).filter((r) => r.verdict === "fallback").map((r) => `${r.label} (${r.path}): the fallback`)].slice(0, 2).join(" | ")}`);
+  }
+  const sabotages = thrownSabotages();
+  if (new Set(sabotages.map(([id]) => id)).size !== sabotages.length) bad.push("two sabotages have one name");
+  for (const [key, anchor] of Object.entries(THROWN_BUILD)) if (src.split(anchor).length - 1 !== 1) anchors.push(`the building line «${key}» is not in the harness once`);
+  for (const [id, what, key, to] of sabotages) {
+    if (stopAtFirst && bad.length > 0) break;
+    const from = THROWN_BUILD[key];
+    if (typeof from !== "string" || to === from) { bad.push(`${id}: its line «${key}» is not a building line, or the edit changes nothing`); continue; }
+    if (src.split(from).length - 1 !== 1) continue;
+    const text = src.replace(from, () => to);
+    // WITH THE CHECK: never a false sentence; the fallback at least once
+    const onRows = run(text);
+    const on = tally(onRows);
+    if (on.false.length > 0) bad.push(`${id} (${what}): the sabotaged block printed a FALSE SENTENCE past the check — ${on.false.slice(0, 2).map((r) => `${r.label} (${r.path}): ${r.verdict}`).join(" | ")}`);
+    if (on.fallback < 1) bad.push(`${id} (${what}): the sabotage never fired on the battery (the specification's text on all ${on.spec} values)`);
+    // (when the check's line is not in `src` as written, the half above is all that can be run — and it is the half a check
+    // that was removed or weakened fails)
+    if (!checkOnce) { fired.set(id, [on.fallback, null]); continue; }
+    // WITHOUT IT: the same edit prints a false sentence — and every value it is false on is a value the check stopped (the
+    // check may stop more: before the series no line is printed, so a description whose LINE is false is false in nothing
+    // that is written there, and the check, which holds the two texts together, still withholds it)
+    const offRows = run(off(text));
+    const offT = tally(offRows);
+    if (offT.false.length < 1 || offT.fallback !== 0) bad.push(`${id} (${what}): with the check's line taken out the sabotage printed ${offT.false.length} false sentence(s) and ${offT.fallback} fallback(s) — it is not a sabotage`);
+    const unstopped = offRows.filter((r, i) => r.verdict.startsWith("FALSE") && onRows[i].verdict !== "fallback");
+    if (unstopped.length > 0) bad.push(`${id} (${what}): a value the unchecked block is false on is not one the check stopped — ${unstopped.slice(0, 2).map((r) => `${r.label} (${r.path})`).join(" | ")}`);
+    const extra = onRows.filter((r, i) => r.verdict === "fallback" && !offRows[i].verdict.startsWith("FALSE") && r.path !== "pre-series");
+    if (extra.length > 0) bad.push(`${id} (${what}): the check stopped a value the unchecked block is right on, on a path that prints a line: ${extra[0].label}`);
+    fired.set(id, [on.fallback, offT.false.length]);
+  }
+  return { anchors, bad, fired, battery: battery.length, sabotages: sabotages.length };
+}
+/** THE CHECK, WEAKENED — one edit each to the check's call, to eventThrownHolds or to eventThrownCarried: [id, what it does,
+ *  the row that must turn red ("sabotage": THE P1 BLOCK WITH THE BUILDING SABOTAGED — the harness as written prints nothing
+ *  false, so only a sabotaged building shows a check that no longer stops it; "alone": THE RUNTIME CHECK, ALONE), the text
+ *  edited, what replaces it]. A CHECK REMOVED OR WEAKENED TURNS THE ROWS RED runs each. */
+function thrownCheckWeakenings() {
+  const C = THROWN_CHECK_LINE;
+  const COND = "typeof e === \"string\" ? !eventThrownHolds(e, null, built) : described !== null && !eventThrownHolds(described.text, described.kind, built)";
+  const cond = (c) => C.replace(COND, () => c);
+  const TEXT = "(typeof e === \"string\" ? e : described === null ? \"\" : described.text)";
+  const RUN = "      if (length < 1 || run !== x.slice(k, k + length) || EVENT_THROWN_NEVER_ITSELF.test(run)) return -1;\n";
+  const WHY = "  if (whyEnd < 0 || said.why.slice(whyEnd) !== (n <= W ? \"\" : ` (cut at the sidecar's ceiling: the first ${W} of its ${n} UTF-16 code units are carried, the last ${n - W} are not recorded)`)) return false;\n";
+  return [
+    ["the check removed", "sabotage", C, ""],
+    ["the check not made of a thrown string", "sabotage", C, cond("typeof e === \"string\" ? false : described !== null && !eventThrownHolds(described.text, described.kind, built)")],
+    ["the check not made of a message", "sabotage", C, cond("typeof e === \"string\" ? !eventThrownHolds(e, null, built) : false")],
+    ["the check skipped for a text of 64 code units or fewer", "sabotage", C, cond(`${TEXT}.length > 64 && (${COND})`)],
+    ["the check made only of a text past the printed line's ceiling", "sabotage", C, cond(`${TEXT}.length > EVENT_THROWN_LINE_MAX_UNITS && (${COND})`)],
+    ["the check skipped for a text past the why's ceiling", "sabotage", C, cond(`${TEXT}.length <= EVENT_THROWN_WHY_MAX_UNITS && (${COND})`)],
+    ["the check skipped for a text that carries an ESC", "sabotage", C, cond(`!${TEXT}.includes(String.fromCharCode(27)) && (${COND})`)],
+    ["the check made only of an Error's message", "sabotage", C, cond("typeof e === \"string\" ? !eventThrownHolds(e, null, built) : described !== null && described.kind === \"an Error\" && !eventThrownHolds(described.text, described.kind, built)")],
+    ["the check's verdict ignored", "sabotage", C, C.replace("throw new Error(\"the description built does not hold of its text\");", "void 0;")],
+    ["the message never handed to the check", "sabotage", THROWN_BUILD.described, ""],
+    ["the check reads only the line (the why is never compared)", "alone", WHY, ""],
+    ["the check reads only the why (the line is never compared)", "alone", "  let count = 1;\n  let firstLength = n;\n", "  return true;\n  let count = 1;\n  let firstLength = n;\n"],
+    ["the why's words before its quoted text not compared", "alone", "  if (!said.why.startsWith(head)) return false;\n", ""],
+    ["the line's words before its quoted text not compared", "alone", "    if (!said.line.startsWith(head)) return false;\n", ""],
+    ["the line's words before its quoted first line not compared", "alone", "  if (!said.line.startsWith(firstHead)) return false;\n", ""],
+    ["what follows the why's quoted text need only begin as the sentence", "alone", "said.why.slice(whyEnd) !== (n <= W ? \"\" : ", "!(said.why.slice(whyEnd)).startsWith(n <= W ? \"\" : "],
+    ["what follows the line's quoted text need only begin as the sentence", "alone", "said.line.slice(lineEnd) === (n <= L ? \"\" : ", "said.line.slice(lineEnd).startsWith(n <= L ? \"\" : "],
+    ["the decoder compares lengths only", "alone", RUN, RUN.replace("run !== x.slice(k, k + length)", "run.length !== x.slice(k, k + length).length")],
+    ["the decoder compares only the first 4,096 code units of a run", "alone", RUN, RUN.replace("run !== x.slice(k, k + length)", "run.slice(0, 4096) !== x.slice(k, k + length).slice(0, 4096)")],
+    ["the decoder lets any code unit be written as itself", "alone", RUN, RUN.replace(" || EVENT_THROWN_NEVER_ITSELF.test(run)", "")],
+    ["the decoder does not compare an escape's code unit", "alone", "    if (unit !== x.charCodeAt(k)) return -1;\n", ""],
+    ["the decoder does not require the closing quote", "alone", "  return text.charCodeAt(i) === 0x22 ? i + 1 : -1;\n", "  return i + 1;\n"],
+    ["the decoder does not require the opening quote", "alone", "  if (text.charCodeAt(at) !== 0x22) return -1;\n", ""],
+    ["the decoder lets a lone low surrogate be written as itself", "alone", "|(?<![\\ud800-\\udbff])[\\udc00-\\udfff]/;", "/;"],
+    ["the decoder lets U+2028 and U+2029 be written as themselves", "alone", "\\x9f\\u2028\\u2029]|", "\\x9f]|"],
+    ["the decoder lets DEL and the C1 controls be written as themselves", "alone", "\\x1f\\x7f-\\x9f", "\\x1f"],
+    ["the check counts a CR LF as two line breaks", "alone", "    if (u === 0x0d && x.charCodeAt(k + 1) === 0x0a) k += 1;\n", ""],
+    ["the check counts the lines of a thrown string", "alone", "  for (let k = 0; kind !== null && k < n; k += 1) {\n", "  for (let k = 0; k < n; k += 1) {\n"],
+  ].map(([what, by, from, to], i) => [`W15-${String(i + 1).padStart(2, "0")}`, what, by, from, to]);
+}
+/** THE ERROR-TEXT PATH's code lines (comments stripped, each trimmed, the empty ones dropped) — from the ceilings to the
+ *  line before `eventSeries`: the ceilings, the check (eventThrownCarried, eventThrownHolds), eventThrownText and
+ *  eventSeriesThrew. */
+function thrownPathLines(code = CODE) {
+  const a = code.indexOf("const EVENT_THROWN_LINE_MAX_UNITS = ");
+  const b = code.indexOf("const eventSeries = async (ev) => {");
+  assert.ok(a > 0 && b > a, "the error-text path could not be located in lesson-audit.mjs");
+  return code.slice(a, b).split("\n").map((l) => l.trim()).filter((l) => l !== "");
+}
+/** H1 ROUND 15 — THE ERROR-TEXT PATH, PINNED: the 12-hex sha256 prefix of each of its code lines, in order. An edit to any
+ *  line of it — the value at the function's entry, the kind's tests, the one read of the message, what the check is
+ *  handed, the check's call, the check itself, where the description goes — turns THE ERROR-TEXT PATH IS PINNED red, and the
+ *  failure prints the new string: paste it ONLY after re-reading the edit against the specification comment above
+ *  eventThrownText (what was thrown is described from the value itself, read once, and checked before it is returned). */
+const THROWN_PATH_PIN = "959a600b6b49 987701b7d3a9 2ffaf706cc3a 593265ded99d 1d0fee053d1d 67baa778222b 43779b76faad 3c1731ae4f5d 890c48b5da8a bc3a81184400 59b3d62ff5ac 8cc2a90a685a 78cc176d0ad1 c011c8bebf11 b683df14783d ef2031641aa2 0bf37874b7af d10b36aa74a5 b514fc56cea7 3d4fc743bd60 3f4e5968e63f 0b000743d61d 95b00aea3eef cb23228ad5e3 99c0119194e0 0e71f5639bf4 74fd762618d9 c26b3ff2a3bc d10b36aa74a5 817fc5bb5c57 d10b36aa74a5 748068edf327 b90bbac9201f d10b36aa74a5 a03cf41c6a35 df3982fd6101 a4171883816d 77e7dc20ca0e 55624eaabaa4 9a00cee2ceba 9f321c349547 fe992d125075 bfb0eba06371 4930345cda5b 40e116ae04dc 5547bc73fe1b d1da3371a8d2 3d296286a36f a64ce03c173b 5eef1a36c1e5 462e142a41d9 fb04cec81a54 d10b36aa74a5 730da8de2575 74214b69e3c4 b73fcb78116d 310bb5c7fa5d fbfe39296dfc d10b36aa74a5 8e3ddd3a74dc bbef80c161ee f85b02c55b65 11905058086b e3cf9745cfdd df3982fd6101 280fb64845df 03d9aba63511 cc91b6658abc c621fa8c1ccd 6cd17b4474e0 5b3006d1614f 77e7dc20ca0e 55624eaabaa4 2d2e37c434da a07ff54c8579 4aee2db16492 3ece16bff48c 196d414b6a16 d48325775ef0 b9294516479b 66c40edfcc88 810821134929 a8e84a3af740 0d942f46cbd5 03d9aba63511 fde1585c2dd2 e5f635c8156d 95bc545467a5 d10b36aa74a5 43d014bd0c0c 03d9aba63511 cd10bc016ed7 95bc545467a5 4685800b489b d10b36aa74a5 e4d72224b0f1 ddf4d10856d5 7e2c8f7c2ba2 26283faa1fe8 21125530cf9c 3f63867f1fad ea407759068e eaea65f5c71a 73f1eebca8f1 6f52da5e1001 9f49d5ddded3 5fd8db81c9f8 8f36d4ddf5dc 95bc545467a5 49159d9a25e8 d10b36aa74a5 df3982fd6101 a60a1090d8f4 09dc13e85bea 7ab156443f77 9e9c965d63de 45d645723aed 836f2daf637f a98291a56202 d10b36aa74a5 ad1a1041bfc0 ce1eb0e74884 df3982fd6101";
+
+describe("§W20 H1 ROUND 10 — what was thrown, from one total function, bound by a generative census over every JavaScript kind against an independent oracle", () => {
+  it("THE ORACLE IS INDEPENDENT — it imports and copies no harness code: its functions name no harness function, never call JSON.stringify (its quoting is its own) and never read the harness source; round 12: no oracle, generator or census function spells a read of a thrown value's message (what a read gave is handed in, from the generator's record or a witness's log)", () => {
+    // (round 13: + the lone-surrogate scan, and round 11's unit-by-unit scans the fast ones are checked against)
+    const ORACLE = [thrownQuoted, thrownLineScan, thrownSpecText, thrownProperties, thrownViolations, holdsSafely, thrownUnquote, thrownSameUnits, thrownRoundTrip, thrownWhyQuoted, thrownInWhy, thrownLineQuoted, thrownLoneSurrogateAt, thrownQuotedByUnit, thrownLineScanByUnit, thrownUnquoteByUnit, thrownLoneSurrogateAtByUnit,
+      // round 14: the raw-slice differential and its chunked reference quoting
+      thrownRawSliceViolations, thrownRawQuoted];
+    for (const fn of ORACLE) {
+      const text = fn.toString();
+      for (const bad of ["eventThrownText", "eventSeriesThrew", "p1Block", "p1Factory", "SRC", "CODE", "JSON.stringify", "JSON.parse", "lesson-audit"]) {
+        assert.ok(!new RegExp(`\\b${bad.replace(".", "\\.")}\\b`).test(text), `the oracle's ${fn.name} names ${bad}`);
+      }
+    }
+    // H1 ROUND 12 (the round-11 verifier's V11-READ-TWICE): a property read of `message` spelt any way — `.message`, a
+    // computed ["message"], or Reflect.get / Object.getOwnPropertyDescriptor naming it — appears in none of these (the
+    // witness's own accessor and trap ANSWER reads, and attach DEFINES the property; neither reads it)
+    const READS = /\.message\b|\[\s*["'`]message["'`]\s*\]|Reflect\.get\([^)]*["'`]message|getOwnPropertyDescriptors?\([^)]*["'`]message/;
+    for (const fn of [...ORACLE, thrownCensusValue, thrownCarried, thrownSweepValues, thrownCeilingText, thrownManyLines, thrownCeilingValues, thrownCeilingFeats, thrownWitnessValue, thrownAnswers, thrownRunViolations, p1ThrownRun, p1ThrownRunOf, thrownCensus,
+      // round 13: the cut-content census
+      thrownCutSitesOf, thrownCutText, thrownCutValue, thrownCutSweepValues, thrownCutRunValues, thrownCutCoverage, p1ThrewAt, thrownCutCensusPart, thrownCutCensus,
+      // round 14: the break-property pair census and the line-count boundary row
+      thrownPairDomain, thrownSegmentCount, thrownCodeSpace, thrownFirstCodePoint, thrownCategoryValues, thrownScriptValues, thrownEmojiComponents, thrownSurrogateFirsts, thrownBreakAnchors, thrownBreakClasses, thrownPairPlacements, thrownBreakData, thrownPairValues, thrownPairFloor, thrownLineBoundaryText, thrownLineBoundaryValues,
+      // round 15: the realistic families, and the runtime check's rows
+      thrownTextSource, thrownAnsiTexts, thrownEmojiJoinReps, thrownEscapeTexts, thrownSpecPieces, thrownCheckFalsifications, thrownCheckRespellings, thrownLetters, thrownCheckBattery, thrownSabotages, thrownSabotageBattery, thrownSabotageRun]) {
+      assert.ok(!READS.test(fn.toString()), `${fn.name} reads a message: ${fn.toString().match(READS)?.[0]}`);
+    }
+    // (and the specification's words are the harness's comment's: each clause the oracle renders is stated there)
+    const doc = SRC.slice(SRC.indexOf("H1 ROUND 12 (the round-11 verifier's V11-LENGTH-CEILING"), SRC.indexOf("const eventThrownText = (e) => {"));
+    for (const clause of ["«a function» by typeof", "«an array» by", "Array.isArray", "«an Error» by", "instanceof Error", "«an object»", "-0 as «-0»", "a symbol's text is not printed", "read ONCE", "JSON-quoted", "U+007F–U+009F, U+2028 and U+2029", "null and undefined are named", "named by its typeof and never rendered", "a read that throws is said to have thrown", "\\r\\n, \\r and \\n each", "UTF-16 code units", "A thrown string is printed whole on both",
+      // round 12
+      "one property read, whose value every later clause uses", "THE PRINTED LINE carries at most EVENT_THROWN_LINE_MAX_UNITS", "THE SIDECAR'S WHY carries at most EVENT_THROWN_WHY_MAX_UNITS", "THE LINE COUNT is exact up to EVENT_THROWN_LINES_COUNTED_MAX", "is said to have «more than» it", "The count is never capped silently", "the cut is announced with what was carried and what was not", "a text past one is cut there and the cut announced",
+      // round 15: the check, and what the last catch now says
+      "THE CHECK (round 15", "is compared with the text", "by eventThrownHolds before anything is returned", "A\n *      description that does not hold of its text is not returned", "The last catch is reached when a builtin throws, or\n *  when the check finds that what was built is not what this specification says of the text"]) {
+      assert.ok(doc.includes(clause), `the harness's specification comment does not state «${clause}»`);
+    }
+  });
+
+  it("THE CEILINGS ARE DECLARED — the harness declares its three ceilings (the printed line's 8,192 code units, the sidecar why's 16,384, the line count exact to 16,385), its cut uses each of them, the oracle's own numbers are the same, and the sizes its comment gives for them are its arithmetic and, round 13, MEASURED (8 lines of 8,192 six-character escapes under 400 KB; a carried code unit at most 7 bytes in the sidecar, measured over every code unit and on the harness's own why at its ceiling, so 8 series' whys under 920 KB and a refusal's why bounded one by one, not by the series cap; a why at its ceiling holding at most 16,385 lines, which IS the line-count ceiling); a change to one is a visible re-pin here", () => {
+    const decl = (name) => CODE.match(new RegExp(`^const ${name} = ([^;\\n]+);$`, "m"))?.[1] ?? null;
+    assert.deepEqual([decl("EVENT_THROWN_LINE_MAX_UNITS"), decl("EVENT_THROWN_WHY_MAX_UNITS"), decl("EVENT_THROWN_LINES_COUNTED_MAX"), decl("EVENT_SHOT_MAX_SERIES")], ["8192", "16384", "EVENT_THROWN_WHY_MAX_UNITS + 1", "8"], "the harness's declared ceilings (and its series cap, which bounds the thrown lines a drive prints)");
+    assert.deepEqual([THROWN_LINE_MAX, THROWN_WHY_MAX, THROWN_LINES_MAX], [8192, 16384, 16385], "the oracle's own ceilings");
+    // the cut reads each declaration (so the declared number is the one the printed text is cut at)
+    const fn = CODE.slice(CODE.indexOf("const eventThrownText = (e) => {"), CODE.indexOf("const eventSeriesThrew = "));
+    for (const [name, use] of [["EVENT_THROWN_WHY_MAX_UNITS", "const W = EVENT_THROWN_WHY_MAX_UNITS;"], ["EVENT_THROWN_LINE_MAX_UNITS", "const L = EVENT_THROWN_LINE_MAX_UNITS;"], ["EVENT_THROWN_LINES_COUNTED_MAX", "m.split(/\\r\\n|\\r|\\n/, EVENT_THROWN_LINES_COUNTED_MAX + 1)"]]) {
+      assert.ok(fn.includes(use), `eventThrownText does not use ${name} as «${use}»`);
+    }
+    // the comment's sizes are its arithmetic (round 13, the round-12 verifier's V12-SIDECAR-SIZE-SENTENCE: the sidecar's
+    // JSON.stringify escapes q()'s backslash again, so a carried unit is 7 bytes on disk at most, not 6; and the line-count
+    // ceiling IS the most lines a why at its ceiling can hold, not one more)
+    assert.ok(8 * THROWN_LINE_MAX * 6 < 400_000, "8 printed lines of 8,192 six-byte escapes");
+    assert.deepEqual([7 * THROWN_WHY_MAX, 7 * THROWN_WHY_MAX + 200, 8 * (7 * THROWN_WHY_MAX + 200)], [114_688, 114_888, 919_104], "the why's bytes: carried text, with its words, and 8 of them");
+    assert.ok(8 * (7 * THROWN_WHY_MAX + 200) < 920_000, "8 series' whys under 920 KB");
+    assert.equal(thrownLineScan("\n".repeat(THROWN_WHY_MAX)).count, THROWN_LINES_MAX, "a why of 16,384 code units, every one an LF, holds 16,385 lines — the line-count ceiling itself");
+    assert.equal(THROWN_WHY_MAX + 1, THROWN_LINES_MAX);
+    // MEASURED: each code unit's bytes in the sidecar — the oracle's quoting (which the census holds equal to the harness's,
+    // code unit for code unit) JSON-stringified as writeEventShots writes a why, in UTF-8: at most 7 for every one of the
+    // 65,536 (a lone surrogate included), 7 reached; a surrogate pair 4 for its two
+    const onDisk = (s) => Buffer.byteLength(JSON.stringify(thrownQuoted(s).slice(1, -1)), "utf8") - 2;
+    let worst = 0;
+    for (let u = 0; u <= 0xffff; u++) worst = Math.max(worst, onDisk(CH(u)));
+    assert.equal(worst, 7, "the most bytes a carried code unit takes in the sidecar");
+    assert.equal(onDisk(CH(0xd83d, 0xde00)), 4, "a surrogate pair's bytes in the sidecar");
+    // MEASURED on the harness: its own why for a thrown string and a one-line message of 16,385 U+0001 (each written as
+    // \u0001), as its sidecar write JSON-stringifies it, is at most 7 × 16,384 bytes of carried text and under 200 of words
+    const threw = p1ThrewFactoryOfCode(p1BlockCode(SRC));
+    const worstText = CH(1).repeat(THROWN_WHY_MAX + 1);
+    for (const [label, value] of [["a thrown string", worstText], ["an Error", new Error(worstText)]]) {
+      for (const path of THROWN_PATHS) {
+        const got = p1ThrewAt(threw, value, path, { h1ProbeReads: LIBNS.h1ProbeReads, scenario: H1.em });
+        const why = path === "pre-series" ? got.final.refused[0].why : got.final.series[0].why;
+        const bytes = Buffer.byteLength(JSON.stringify(why), "utf8");
+        assert.ok(bytes <= 7 * THROWN_WHY_MAX + 200 && bytes - 7 * THROWN_WHY_MAX < 200, `${label} on ${path}: its why takes ${bytes} bytes in the sidecar`);
+        assert.ok(bytes > 7 * THROWN_WHY_MAX, `${label} on ${path}: its why is not at the worst case it was built to be (${bytes} bytes)`);
+      }
+    }
+    // the words, at their longest: every kind's prefix and the why's cut announcement with numbers of ten digits (more than
+    // any string's length can have), JSON-stringified — under 200 bytes
+    for (const prefix of ["a string, not an Error: ", ...THROWN_KIND_ORDER.map(([k]) => `${k}, its message `)]) {
+      const words = `threw: ${prefix}"" (cut at the sidecar's ceiling: the first ${THROWN_WHY_MAX} of its ${"9".repeat(10)} UTF-16 code units are carried, the last ${"9".repeat(10)} are not recorded)`;
+      assert.ok(Buffer.byteLength(JSON.stringify(words), "utf8") < 200, `the words of a why («${prefix}…») take ${Buffer.byteLength(JSON.stringify(words), "utf8")} bytes`);
+    }
+    // (the comment's lines joined, so a phrase the wrapping split is still one phrase)
+    const doc = SRC.slice(SRC.indexOf("H1 ROUND 12 (the round-11 verifier's V11-LENGTH-CEILING"), SRC.indexOf("const eventThrownText = (e) => {")).replace(/\n\s*\*\s*/g, " ");
+    for (const said of ["8 × 8,192 code units (under 400 KB even when every", "a «Call log:» of over a hundred lines of 100 code units",
+      // round 13
+      "ON DISK a carried code unit takes at most 7 bytes", "writeEventShots' JSON.stringify escapes that escape's backslash again", "7 × 16,384 = 114,688 bytes for its carried text and under 200 for its words", "under 920 KB a rewrite (8 × 114,888 = 919,104 bytes)", "refusals are not counted by the series cap", "adds one more why, of at most 114,888 bytes, to every later rewrite",
+      "EVENT_THROWN_LINES_COUNTED_MAX, the most lines a message the sidecar carries whole can have (a why of 16,384 code units holds at most 16,385 lines, when every one of its code units ends a line)"]) {
+      assert.ok(doc.includes(said), `the ceilings' comment does not say «${said}»`);
+    }
+    for (const gone of ["under 800 KB", "one more than the most lines"]) assert.ok(!doc.includes(gone), `the ceilings' comment still says «${gone}» (round 12's false sentences)`);
+    assert.ok(100 * 100 < THROWN_WHY_MAX * 0.7, "a hundred 100-code-unit lines fit the why's ceiling with room to spare");
+  });
+
+  it("THE THROWN CENSUS — seeded draws of every JavaScript kind (strings with \\r, \\n, \\r\\n, trailing blanks, NEL/LS/PS, lone surrogates and «[object Object]» as text; round 11: text from the whole UTF-16 code-unit space, uniform code units and weighted classes — combining marks, compatibility characters, every Unicode space, zero-width and bidi characters, C0/C1 controls, astral pairs, Cyrillic, irregular case — of lengths 0 to past 1,200, then a sweep carrying every one of the 65,536 code units as a thrown string and a whole message, and all but CR and LF as a first line; NaN, ±Infinity, -0; BigInt; booleans; symbols; null; undefined; functions, arrays, plain and prototype-less objects, Errors and look-alikes with a message and a name of every type, a getter that throws; cross-realm values; revoked and trapping proxies; round 12: THE CEILING CENSUS — texts of 0, 1, just under, at, just over and four times each declared length ceiling and of a million code units, and messages of 1 to a million lines, as thrown strings, one-line messages, first lines and whole messages on every path; and THE READ-ONCE CENSUS — messages that are witnesses answering every read differently, on own, inherited, subclass, cross-realm and proxy hosts; round 13: THE CUT-CONTENT CENSUS — every code unit 0x0000–0xFFFF at the last carried and at the first cut position of every cut — the printed line's on a thrown string, a one-line message and a first line, the why's on a thrown string, a one-line message and a message of several lines — and runs of every white-space, control, zero-width, bidi, combining, surrogate, escape, punctuation and special class ending at, starting at and straddling every cut and filling the whole text, on every path; round 14: THE BREAK-PROPERTY PAIR CENSUS — one pair for every ordered pair of the grapheme, word and sentence break classes (derived from the runtime's ICU) and of the general categories, every emoji-presentation, JSON-escape and repeated-punctuation pair, at (c−2, c−1), (c−1, c) and (c, c+1) of every cut site, each value also checked by the raw-slice differential — and THE LINE-COUNT BOUNDARY ROW — messages of 16,384 to 16,387 lines with every break kind and the empty lines where a count could slip, on every path) thrown through the harness's real P1 path: every printed line and every sidecar why is one line, non-empty, never «[object Object]», names the kind truly, carries a string exactly up to its ceiling and an announced cut (decoded by the oracle's own decoder and compared code unit for code unit, every count checked against the oracle's own), reads the message once, and is the one text the specification allows — a disagreement fails with its seed", async () => {
+    const { violations, feats, unitsReached, cutFeats, cutUnits } = await thrownCensus();
+    assert.deepEqual(violations.slice(0, 12), [], `${violations.length} disagreement(s); the first: ${violations[0]}`);
+    // H1 ROUND 11 (resumed): EVERY code unit was carried by every text kind (the sweep makes this deterministic)
+    assert.deepEqual(unitsReached, { string: 0x10000, message: 0x10000, "first line": 0x10000 - 2 }, "the code units the census carried, by text kind");
+    const missing = THROWN_CENSUS_FLOOR.filter((f) => !feats.has(f));
+    assert.deepEqual(missing, [], "the census's draws never reached these (its coverage floor)");
+    // H1 ROUND 11: the character floor, by count
+    assert.equal(THROWN_CHAR_CLASS_NAMES.length, 22, "the character classes the floor reads");
+    const thin = THROWN_CENSUS_CLASS_FLOOR.filter((f) => (feats.get(f) ?? 0) < THROWN_CENSUS_CLASS_MIN).map((f) => `${f} (${feats.get(f) ?? 0})`);
+    assert.deepEqual(thin, [], `the census's draws reached these character classes fewer than ${THROWN_CENSUS_CLASS_MIN} times (its character floor)`);
+    // H1 ROUND 12: the ceiling census crossed every ceiling on every path, read off the texts themselves
+    assert.equal(THROWN_CEILING_FLOOR.length, 4 * 21, "the ceiling floor's entries");
+    const uncrossed = THROWN_CEILING_FLOOR.filter((f) => !feats.has(f));
+    assert.deepEqual(uncrossed, [], "the ceiling census never reached these (a length or a line count against a ceiling, on a path)");
+    // H1 ROUND 12: the read-once census reached every host, every first answer and every path
+    const unwitnessed = THROWN_WITNESS_FLOOR.filter((f) => (feats.get(f) ?? 0) < THROWN_WITNESS_MIN).map((f) => `${f} (${feats.get(f) ?? 0})`);
+    assert.deepEqual(unwitnessed, [], `the read-once census reached these fewer than ${THROWN_WITNESS_MIN} times`);
+    // H1 ROUND 13: THE CUT-CONTENT FLOOR, read off the texts — every code unit at both positions of every cut site (65,534 where
+    // a CR or an LF would end the line instead), each site reached on every path it exists on by THROWN_CUT_SITE_MIN sweep
+    // values, and every run of every class a site may use, in every run shape and length and the whole text, on every path
+    assert.deepEqual(cutUnits, THROWN_CUT_UNITS_FLOOR, "the code units the cut-content census placed at each cut's last carried (:last) and first cut (:cut) position");
+    const thinSites = THROWN_CUT_SITES.flatMap((s) => (thrownCutIsLine(s) ? THROWN_PATHS.filter((p) => p !== "pre-series") : THROWN_PATHS).map((p) => `site:${s}:${p}`)).filter((f) => (cutFeats.get(f) ?? 0) < THROWN_CUT_SITE_MIN).map((f) => `${f} (${cutFeats.get(f) ?? 0})`);
+    assert.deepEqual(thinSites, [], `the cut-unit sweep reached these sites on these paths fewer than ${THROWN_CUT_SITE_MIN} times`);
+    assert.deepEqual([THROWN_CUT_SITES.length, THROWN_CUT_CLASSES.length, THROWN_CUT_RUN_SHAPES.length, THROWN_CUT_RUN_LENGTHS.length, THROWN_CUT_RUN_FLOOR.length], [6, 21, 3, 5, 6576], "the cut sites, the run classes, shapes and lengths, and the run floor's entries (so the floor cannot shrink by an entry being dropped)");
+    const unrun = THROWN_CUT_RUN_FLOOR.filter((f) => !cutFeats.has(f));
+    assert.deepEqual(unrun.slice(0, 10), [], `the cut-run census never placed ${unrun.length} of these (a class's run against a cut, on a path)`);
+    // H1 ROUND 14: THE PAIR FLOOR, read off the texts — every placement marked `every` (class, escape and punctuation pairs,
+    // each emoji property's first member's presentation pairs) at every boundary of every site on every path it exists on,
+    // every other placement at every boundary of every site on some path — and THE LINE-COUNT BOUNDARY ROW's
+    // texts, each of the line count asked for by the oracle's scan, on every path (the raw-slice differential ran on every one)
+    const floor = thrownPairFloor(thrownBreakData().placements);
+    assert.deepEqual({ every: floor.every.length, some: floor.some.length }, THROWN_BREAK_PIN.floor, "the pair floor's entries (so the floor cannot shrink by an entry being dropped)");
+    const unplaced = floor.every.filter((f) => !cutFeats.has(f));
+    assert.deepEqual(unplaced.slice(0, 10), [], `the pair census never placed ${unplaced.length} every-path pair(s) (class, escape, punctuation, first-member emoji) at a boundary of a site on a path`);
+    const reachedSome = new Set();
+    for (const [f] of cutFeats) if (f.startsWith("pair:")) reachedSome.add(f.slice(0, f.lastIndexOf(":") + 1));
+    const unplacedSome = floor.some.filter(([k]) => !reachedSome.has(k)).map(([k]) => k);
+    assert.deepEqual(unplacedSome.slice(0, 10), [], `the pair census never placed ${unplacedSome.length} context, category, script, binary-property, emoji or punctuation pair(s) at a boundary of a site`);
+    const lineFloor = THROWN_LINE_BOUNDARY_COUNTS.flatMap((n) => THROWN_LINE_BOUNDARY_BREAKS.flatMap(([b]) => THROWN_LINE_BOUNDARY_EMPTIES.flatMap((e) => THROWN_PATHS.map((p) => `line-boundary:${n}:${b}:${e}:${p}`))));
+    assert.equal(lineFloor.length, 4 * 3 * 4 * 4, "the line-count boundary row's entries");
+    assert.deepEqual(lineFloor.filter((f) => !feats.has(f)), [], "the line-count boundary row never threw these (a line count, a break, the empty lines, a path)");
+  });
+
+  it("THE ORACLE'S DECODER ROUND-TRIPS ITS OWN QUOTING, AND AGREES WITH JSON.parse — over every single code unit 0x0000–0xFFFF, every surrogate pair shape and seeded random texts, thrownUnquote(thrownQuoted(s)) is s code unit for code unit, JSON.parse reads the same units, and the decoder refuses what JSON refuses (a raw control, an unknown escape, a short \\u, no closing quote)", () => {
+    const texts = [];
+    for (let u = 0; u <= 0xffff; u++) texts.push(CH(u), `a${CH(u)}b`);
+    texts.push(CH(0xd83d, 0xde00), CH(0xde00, 0xd83d), CH(0xd83d, 0xd83d), CH(0xdbff, 0xdfff, 0xdc00), "", "\"\\/");
+    const rnd = mulberry32(11);
+    for (let i = 0; i < 2000; i++) texts.push(Array.from({ length: Math.floor(rnd() * 40) }, () => CH(Math.floor(rnd() * 0x10000))).join(""));
+    const bad = [];
+    for (const s of texts) {
+      const q = thrownQuoted(s);
+      const d = thrownUnquote(`${q}tail`, 0);
+      if (d.error !== undefined || thrownSameUnits(d.units, s) !== null || d.end !== q.length) bad.push(`${JSON.stringify(s)}: ${d.error ?? thrownSameUnits(d.units, s) ?? `end ${d.end}`}`);
+      else if (thrownSameUnits(JSON.parse(q), s) !== null) bad.push(`${JSON.stringify(s)}: JSON.parse reads the oracle's quoting differently`);
+      if (bad.length > 5) break;
+    }
+    assert.deepEqual(bad, []);
+    assert.equal(thrownUnquote(String.raw`"é\/\b"`, 0).units, `${CH(0xe9)}/${CH(8)}`, "an upper-case \\u and the escapes JSON allows decode");
+    for (const refused of [`"a${CH(0x0a)}b"`, `"${CH(0x1f)}"`, String.raw`"\v"`, String.raw`"\x41"`, String.raw`"\u12"`, String.raw`"\u12G4"`, `"abc`, `abc"`, String.raw`"\"`]) {
+      assert.ok(thrownUnquote(refused, 0).error !== undefined, `the decoder read ${JSON.stringify(refused)}`);
+      assert.throws(() => JSON.parse(refused), undefined, `JSON.parse read ${JSON.stringify(refused)}`);
+    }
+    assert.deepEqual([thrownSameUnits("ab", "ab"), thrownSameUnits("ab", "ac"), thrownSameUnits("ab", "abc")], [null, "code unit 1 is U+0062, not U+0063", "2 code units, not 3"]);
+  });
+
+  it("THE ORACLE'S FAST SCANS ARE ITS UNIT-BY-UNIT SCANS (round 13) — the quoting, the line scan, the decoder and the lone-surrogate scan that skip from one deciding code unit to the next give exactly what round 11's unit-by-unit scans give, over every single code unit 0x0000–0xFFFF alone, between letters and doubled, every ordered pair of the code units the scans decide on, seeded texts of those units and of the whole code-unit space, texts past every ceiling, and malformed literals for the decoder (its errors and their positions included)", () => {
+    const DECIDING = [...thrownCutRange(0x00, 0x20), 0x22, 0x2f, 0x30, 0x39, 0x41, 0x46, 0x47, 0x5c, 0x61, 0x62, 0x66, 0x67, 0x6e, 0x72, 0x74, 0x75, 0x7e, 0x7f, 0x80, 0x9f, 0xa0, 0x2027, 0x2028, 0x2029, 0x202a, 0xd7ff, 0xd800, 0xd801, 0xdbff, 0xdc00, 0xdc01, 0xdfff, 0xe000, 0xfffe, 0xffff];
+    const units = [];
+    for (let u = 0; u <= 0xffff; u++) units.push(CH(u), `a${CH(u)}b`, CH(u, u));
+    const texts = ["", "\"\\/"];
+    for (const a of DECIDING) for (const b of DECIDING) texts.push(CH(a, b));
+    const rnd = mulberry32(1313);
+    for (let i = 0; i < 6000; i++) texts.push(Array.from({ length: Math.floor(rnd() * 40) }, () => CH(DECIDING[Math.floor(rnd() * DECIDING.length)])).join(""));
+    for (let i = 0; i < 2000; i++) texts.push(Array.from({ length: Math.floor(rnd() * 200) }, () => CH(Math.floor(rnd() * 0x10000))).join(""));
+    for (const n of [THROWN_LINE_MAX + 1, THROWN_WHY_MAX + 1, 4 * THROWN_WHY_MAX]) texts.push(thrownCeilingText(n, n, { breaks: true, straddle: true }));
+    texts.push(thrownManyLines(5000, 9), "\r".repeat(300), "\n".repeat(300), "\r\n".repeat(300), "\n\r".repeat(300));
+    const bad = [];
+    const same = (what, s, a, b) => { if (!isDeepStrictEqual(a, b) && bad.length < 8) bad.push(`${what} of ${JSON.stringify(s.length > 80 ? `${s.slice(0, 80)}…` : s)}: ${JSON.stringify(a).slice(0, 160)} ≠ ${JSON.stringify(b).slice(0, 160)}`); };
+    // every code unit three ways: each scan, and the decoder on its quoting, on it raw between quotes, unclosed, and from 1
+    for (const s of units) {
+      same("the quoting", s, thrownQuoted(s), thrownQuotedByUnit(s));
+      same("the line scan", s, thrownLineScan(s), thrownLineScanByUnit(s));
+      same("the lone-surrogate scan", s, thrownLoneSurrogateAt(s), thrownLoneSurrogateAtByUnit(s));
+      for (const [lit, at] of [[`${thrownQuotedByUnit(s)}tail`, 0], [`"${s}"`, 0], [`"${s}`, 0], [`x"${s}"`, 1]]) same("the decoder", lit, thrownUnquote(lit, at), thrownUnquoteByUnit(lit, at));
+    }
+    // the pairs, the seeded texts and the long ones: every scan, and the decoder on seven literals each, at 0 and at 1
+    for (const s of texts) {
+      same("the quoting", s, thrownQuoted(s), thrownQuotedByUnit(s));
+      same("the line scan", s, thrownLineScan(s), thrownLineScanByUnit(s));
+      same("the lone-surrogate scan", s, thrownLoneSurrogateAt(s), thrownLoneSurrogateAtByUnit(s));
+      for (const lit of [`${thrownQuotedByUnit(s)}tail`, `"${s}"`, `"${s}`, `"\\${s}"`, `"\\u${s}"`, `"\\u00${s}"`, `x"${s}"`]) {
+        same("the decoder", lit, thrownUnquote(lit, 0), thrownUnquoteByUnit(lit, 0));
+        same("the decoder (at 1)", lit, thrownUnquote(lit, 1), thrownUnquoteByUnit(lit, 1));
+      }
+    }
+    // (round 14) the raw-slice differential's chunked reference quoting IS the reference quoting: on the whole corpus, and on
+    // texts that put a surrogate pair, a lone high surrogate and a lone low one across each chunk boundary
+    const chunked = [];
+    for (const k of [1, 2, 3]) for (const tail of [CH(0xd83d, 0xde00), CH(0xd83d, 0x61), CH(0xde00, 0x61), CH(0xd83d), CH(0xdbff, 0xdfff, 0xdc00)]) chunked.push("a".repeat(k * THROWN_RAW_CHUNK - 1) + tail + "b".repeat(5), "a".repeat(k * THROWN_RAW_CHUNK) + tail);
+    for (const s of [...units, ...texts, ...chunked]) if (thrownRawQuoted(s) !== thrownQuotedByUnit(s) && bad.length < 8) bad.push(`the chunked reference quoting of ${JSON.stringify(s.length > 80 ? `${s.slice(0, 80)}…` : s)} is not the reference quoting`);
+    assert.deepEqual(bad, [], "a fast scan disagrees with round 11's unit-by-unit scan");
+    assert.equal(units.length, 3 * 0x10000, "the corpus holds every code unit three ways");
+  });
+
+  it("THE CUT-CONTENT CENSUS ENTERS AT THE ONE CATCH, AND CAN FAIL (round 13) — the series' only catch hands every throw to eventSeriesThrew unchanged, and eventSeriesThrew is the only caller of eventThrownText (so the sweep's catch-entry runs are what every path runs from the throw on); and the round-12 verifier's four cut-content survivors (V12-C01 the line's cut trimmed, V12-C03 the first line's cut trimmed, V12-C27 its trailing spaces and tabs dropped, V12-C28 the why's cut's), planted in the harness source, are each caught by the census's first slice (block 0 of every shape and every 256th run) where the harness as written agrees on every value", async () => {
+    assert.ok(CODE.includes("  } catch (e) {\n    eventSeriesThrew(ev, rec, e);\n    return;\n  }"), "the series' catch hands the throw to eventSeriesThrew unchanged, and returns");
+    assert.equal(CODE.split("eventSeriesThrew(").length - 1, 1, "eventSeriesThrew is called once, from the series' catch");
+    assert.ok(CODE.includes("const eventSeriesThrew = (ev, rec, e) => {\n  const said = eventThrownText(e);\n"), "eventSeriesThrew describes the throw it was handed, first");
+    assert.equal(CODE.split("eventThrownText(").length - 1, 1, "eventThrownText is called once, from eventSeriesThrew");
+    const ctx = { h1ProbeReads: LIBNS.h1ProbeReads, scenario: H1.em };
+    const slice = async (src) => thrownCutCensusPart(p1BlockCode(src), 0, 256, ctx, { stopAtFirst: true });
+    const base = await slice(SRC);
+    assert.deepEqual([base.count, base.violations], [0, []], "the harness as written disagrees on the slice");
+    const BSL = String.fromCharCode(92);
+    for (const [id, from, to] of [
+      ["V12-C01", "${q(s.slice(0, L))} (cut at the printed line's", "${q(s.slice(0, L).trimEnd())} (cut at the printed line's"],
+      ["V12-C03", "    const kept = first.length <= L ? first : first.slice(0, L);\n", "    const kept = first.length <= L ? first : first.slice(0, L).trimEnd();\n"],
+      ["V12-C27", "${q(kept)} (line 1 of ${count}", `\${q(kept.length < first.length ? kept.replace(/[ ${BSL}t]+$/, "") : kept)} (line 1 of \${count}`],
+      ["V12-C28", "${q(s.slice(0, W))} (cut at the sidecar's", `\${q(s.slice(0, W).replace(/[ ${BSL}t]+$/, ""))} (cut at the sidecar's`],
+    ]) {
+      assert.equal(SRC.split(from).length - 1, 1, `${id}: its anchor is not in the harness once`);
+      // (round 15) planted with the runtime check's line taken out, so what the census must see is the FALSE SENTENCE itself;
+      // with the check in, the same plant prints the fallback, which the census sees as well
+      const got = await slice(thrownCheckOff(SRC.replace(from, to)));
+      assert.ok(got.count > 0, `${id} planted: the census's first slice found no disagreement`);
+      assert.ok(!got.violations[0][1].includes(THROWN_FALLBACK), `${id} planted with the check out: the first disagreement is about the fallback, not a false sentence — ${got.violations[0][1].slice(0, 300)}`);
+      const checked = await slice(SRC.replace(from, to));
+      assert.ok(checked.count > 0 && checked.violations.every(([, x]) => x.includes(THROWN_FALLBACK) || x.includes("does not begin")), `${id} planted with the check in: a disagreement that is not the fallback — ${checked.violations.find(([, x]) => !x.includes(THROWN_FALLBACK) && !x.includes("does not begin"))?.[1].slice(0, 300)}`);
+    }
+  });
+
+  it("THE BREAK-PROPERTY CLASSES ARE DERIVED FROM THE RUNTIME'S UNICODE DATA, AND PINNED (round 14) — the domain is every code unit and the astral members of the emoji and regional-indicator properties; the battery's anchors are derived from property escapes, canonical decomposition and ICU's own answers; grapheme, word and sentence segmentation each part the domain into classes by ICU's breaks in every context of the battery (18, 20 and 14 classes, every first member and size pinned); where ECMAScript exposes the UCD property the classes are that property exactly; the classes UAX #29 names are distinct classes; the general categories and the scripts, derived from the property escapes the runtime accepts, cover every one of the 1,114,112 code points, and every binary property ECMA-262 names is accepted; and the placements are counted and pinned", () => {
+    const { domain, anchors: A, classes, placements } = thrownBreakData();
+    const T = thrownCpText;
+    // the domain: every code unit, then the astral members of the emoji and regional-indicator properties, ascending
+    assert.equal(domain.length, THROWN_BREAK_PIN.domain, "the domain's size");
+    assert.ok(domain.slice(0, 0x10000).every((c, i) => c === i), "the domain does not begin with every code unit, in order");
+    assert.ok(domain.slice(0x10000).every((c, i, a) => c > 0xffff && THROWN_PAIR_ASTRAL.test(T(c)) && (i === 0 || c > a[i - 1])), "the domain's astral part is not the emoji and regional-indicator members, ascending");
+    let astral = 0;
+    for (let c = 0x10000; c <= 0x10ffff; c++) if (THROWN_PAIR_ASTRAL.test(T(c))) astral += 1;
+    assert.equal(domain.length - 0x10000, astral, "an astral emoji or regional-indicator member is missing from the domain");
+    // the anchors, as derived
+    const hexes = (s) => [...s].map((c) => thrownHex(c.codePointAt(0))).join(" ");
+    assert.deepEqual(Object.fromEntries(Object.entries(A).map(([k, v]) => [k, hexes(v)])), THROWN_BREAK_PIN.anchors, "the battery's anchors, as derived");
+    // the classes, pinned — and each partitions the domain
+    assert.deepEqual(Object.fromEntries(Object.entries(classes).map(([g, c]) => [g, c.reps.map((r, i) => `${thrownHex(r)}:${c.sizes[i]}`)])), THROWN_BREAK_PIN.classes, "the classes' first members and sizes, for each segmentation");
+    for (const [g, c] of Object.entries(classes)) {
+      assert.equal(c.of.size, domain.length, `${g}: a code point of the domain is in no class`);
+      assert.equal(c.sizes.reduce((a, b) => a + b, 0), domain.length, `${g}: the classes' sizes do not add up to the domain`);
+      assert.ok(c.reps.every((r, k) => c.of.get(r) === k), `${g}: a class's first member is not in it`);
+    }
+    // where ECMAScript exposes the UCD property, the classes ARE it: the property is a union of classes, and these exactly
+    const set = (re) => domain.filter((c) => re.test(T(c)));
+    const cls = (g, ...ws) => domain.filter((x) => ws.some((w) => classes[g].of.get(x) === classes[g].of.get(w.codePointAt(0))));
+    const same = (a, b, what) => {
+      const B = new Set(b);
+      const onlyA = a.filter((x) => !B.has(x));
+      const AA = new Set(a);
+      const onlyB = b.filter((x) => !AA.has(x));
+      assert.deepEqual([onlyA.slice(0, 6).map(thrownHex), onlyB.slice(0, 6).map(thrownHex)], [[], []], `${what}: ${onlyA.length} code point(s) only in the classes, ${onlyB.length} only in the property`);
+    };
+    const meeting = (g, re) => { const ks = new Set(set(re).map((c) => classes[g].of.get(c))); return domain.filter((x) => ks.has(classes[g].of.get(x))); };
+    same(cls("grapheme", A.RI), set(/\p{Regional_Indicator}/u), "grapheme: the regional-indicator class and Regional_Indicator");
+    same(cls("word", A.RI), set(/\p{Regional_Indicator}/u), "word: the regional-indicator class and Regional_Indicator");
+    same(cls("grapheme", A.EP), set(/\p{Extended_Pictographic}/u), "grapheme: the pictograph class and Extended_Pictographic");
+    same(meeting("word", /\p{Extended_Pictographic}/u), set(/\p{Extended_Pictographic}/u), "word: the classes meeting Extended_Pictographic and Extended_Pictographic");
+    same(meeting("grapheme", /[\p{Grapheme_Extend}\p{Emoji_Modifier}]/u), set(/[\p{Grapheme_Extend}\p{Emoji_Modifier}]/u), "grapheme: the classes meeting Grapheme_Extend or Emoji_Modifier and those properties");
+    same(cls("grapheme", A.LV), domain.filter((c) => /\p{Script=Hangul}/u.test(T(c)) && [...T(c).normalize("NFD")].length === 2), "grapheme: the LV class and the Hangul syllables of two jamo");
+    same(cls("grapheme", A.LVT), domain.filter((c) => /\p{Script=Hangul}/u.test(T(c)) && [...T(c).normalize("NFD")].length === 3), "grapheme: the LVT class and the Hangul syllables of three jamo");
+    same(cls("word", A.HE), set(/[\p{Script=Hebrew}&&\p{Lo}]/v), "word: the Hebrew-letter class and the Hebrew-script other letters");
+    same(cls("sentence", A.AT, A.ST), set(/\p{Sentence_Terminal}/u), "sentence: the two terminator classes and Sentence_Terminal");
+    same(meeting("sentence", /\p{White_Space}/u), set(/\p{White_Space}/u), "sentence: the classes meeting White_Space and White_Space");
+    // the classes UAX #29 names are distinct classes (witnesses derived as the anchors are; Format is Extend's class in word and
+    // sentence segmentation, whose rules WB4 and SB5 treat the two alike)
+    const firstOf = (re) => T(domain.find((c) => re.test(T(c))));
+    const findOf = (test) => T(domain.find((c) => test(T(c))));
+    const witnesses = {
+      grapheme: { Control: A.Cc, CR: A.CR, LF: A.LF, Other: A.Ll, Extend: A.GE, ZWJ: A.ZWJ, SpacingMark: A.Mc, Prepend: findOf((x) => thrownSegmentCount("grapheme", x + A.Ll) === 1), L: A.L, V: A.V, T: A.T, LV: A.LV, LVT: A.LVT, Regional_Indicator: A.RI, Extended_Pictographic: A.EP, "Indic_Conjunct_Break Consonant": A.C, "Indic_Conjunct_Break Linker": A.LK },
+      word: { CR: A.CR, LF: A.LF, Newline: firstOf(/\p{Zl}/u), Extend: A.GE, ZWJ: A.ZWJ, Regional_Indicator: A.RI, Katakana: firstOf(/[\p{Script=Katakana}&&\p{Lo}]/v), Hebrew_Letter: A.HE, ALetter: A.Ll, Single_Quote: A.SQ, Double_Quote: firstOf(/\p{Quotation_Mark}/u), MidNumLet: A.AT,
+        MidLetter: findOf((x) => thrownSegmentCount("word", A.Ll + x + A.Ll) === 1 && thrownSegmentCount("word", A.Nd + x + A.Nd) === 3), MidNum: findOf((x) => thrownSegmentCount("word", A.Nd + x + A.Nd) === 1 && thrownSegmentCount("word", A.Ll + x + A.Ll) === 3), Numeric: A.Nd, ExtendNumLet: A.Pc, WSegSpace: A.Zs, Extended_Pictographic: A.EP, Other: A.Cc },
+      sentence: { CR: A.CR, LF: A.LF, Sep: firstOf(/\p{Zp}/u), Sp: A.Zs, Lower: A.Ll, Upper: A.Lu, OLetter: firstOf(/[\p{Lo}--\p{Lowercase}]/v), Numeric: A.Nd, ATerm: A.AT, STerm: A.ST, Close: A.Pe, SContinue: findOf((x) => thrownSegmentCount("sentence", A.ST + x + A.Lu) === 1), Extend: A.GE, Other: A.Cc },
+    };
+    for (const [g, w] of Object.entries(witnesses)) {
+      const ks = Object.entries(w).map(([name, c]) => [name, classes[g].of.get(c.codePointAt(0))]);
+      const byClass = new Map();
+      for (const [name, k] of ks) byClass.set(k, [...(byClass.get(k) ?? []), name]);
+      assert.deepEqual([...byClass.values()].filter((names) => names.length > 1), [], `${g}: named classes that are one class`);
+    }
+    assert.deepEqual([Object.keys(witnesses.grapheme).length, Object.keys(witnesses.word).length, Object.keys(witnesses.sentence).length], [17, 19, 14], "the named classes witnessed");
+    for (const g of ["word", "sentence"]) assert.equal(classes[g].of.get(firstOf(/\p{Cf}/u).codePointAt(0)), classes[g].of.get(A.GE.codePointAt(0)), `${g}: Format is not Extend's class`);
+    // THE GENERAL CATEGORIES and THE SCRIPTS, derived, are complete — every one of the 1,114,112 code points has one of the
+    // categories and one of the scripts — and every binary property ECMA-262 names is a property escape the runtime accepts
+    const cats = thrownCategoryValues();
+    const scripts = thrownScriptValues();
+    assert.deepEqual([cats.length, scripts.length, THROWN_BINARY_PROPERTIES.length], THROWN_BREAK_PIN.propertyValues, "the general categories, the scripts (by first member) and the binary properties");
+    const { text } = thrownCodeSpace();
+    const outside = (codes, key) => new RegExp(`[^${codes.map((c) => `\\p{${key}=${c}}`).join("")}]`, "u");
+    for (const [what, re] of [["general category", outside(cats, "General_Category")], ["script", outside(scripts.map(([c]) => c), "Script")]]) {
+      const i = text.search(re);
+      assert.equal(i, -1, `a code point has no ${what} of the derived list (the first at index ${i})`);
+      const lone = thrownCutRange(0xd800, 0xdfff).filter((c) => re.test(CH(c)));
+      assert.deepEqual(lone.map(thrownHex), [], `a surrogate has no ${what} of the derived list`);
+    }
+    for (const name of THROWN_BINARY_PROPERTIES) assert.doesNotThrow(() => new RegExp(`\\p{${name}}`, "u"), `the runtime does not accept \\p{${name}}`);
+    // the placements: counted by family and pinned; every ordered pair of classes of each segmentation, and of the general
+    // categories, is among them by its units
+    const fam = {};
+    for (const p of placements) fam[p.family] = (fam[p.family] ?? 0) + 1;
+    assert.deepEqual(fam, THROWN_BREAK_PIN.placements, "the placements, by family");
+    // the placements thrown on EVERY path: every class, escape and punctuation pair, and the presentation pairs of the first
+    // member of each emoji property — counted and pinned
+    assert.equal(placements.filter((p) => p.every === true).length, THROWN_BREAK_PIN.everyPath, "the placements thrown on every path");
+    assert.deepEqual(placements.filter((p) => p.every !== true && ["class pair", "escape", "punctuation"].includes(p.family)).map((p) => p.label).slice(0, 6), [], "a class, escape or punctuation pair is not thrown on every path");
+    const everyOf = (units, at) => placements.find((p) => p.units.join(",") === units.join(",") && p.at === at)?.every;
+    for (const re of [/\p{Emoji}/u, /\p{Emoji_Presentation}/u, /\p{Extended_Pictographic}/u]) {
+      const c = domain.find((x) => re.test(T(x)));
+      for (const f of [0xfe0e, 0xfe0f, A.ZWJ.codePointAt(0)]) assert.equal(everyOf([...thrownCpUnits(c), f], thrownCpUnits(c).length), true, `${re}: its first member ${thrownHex(c)} then ${thrownHex(f)} is not thrown on every path`);
+    }
+    const base0 = domain.find((x) => /\p{Emoji_Modifier_Base}/u.test(T(x)));
+    for (const m of domain.filter((x) => /\p{Emoji_Modifier}/u.test(T(x)))) assert.equal(everyOf([...thrownCpUnits(base0), ...thrownCpUnits(m)], thrownCpUnits(base0).length), true, `the first modifier base ${thrownHex(base0)} then ${thrownHex(m)} is not thrown on every path`);
+    for (const [units, at, what] of [[[0x2e, 0x2e], 1, "«..»"], [[0x2e, 0x20], 1, "«. »"], [[0x2c, 0x2c], 1, "«,,»"], [[0x5c, 0x75], 1, "a backslash then u, the boundary between"], [[0x5c, 0x75], 2, "a backslash then u, the boundary after"], [[0x5c, 0x22], 1, "a backslash then a quote"], [[0x22, 0x22], 1, "two quotes"], [[0x2e, 0x2e, 0x2e], 3, "«...» before the boundary"], [[0x2e, 0x2e, 0x2e], 1, "«...» from its second unit after the boundary"], [[0x2d, 0x2d, 0x2d, 0x2d], 4, "«----» before the boundary"]]) {
+      assert.equal(everyOf(units, at), true, `${what} is not thrown on every path`);
+    }
+    const held = new Set(placements.map((p) => `${p.units.join(",")}@${p.at}`));
+    // the emoji components and the first surrogates, as derived and pinned; a keycap sequence (the first Emoji_Component of
+    // category Po, U+FE0F, the one of category Me) stands with its boundary after each code point, a tag character (the first
+    // astral Emoji_Component of category Cf) after and before a component, and a surrogate pair's two escapes with the
+    // boundary between them
+    const comps = thrownEmojiComponents(domain);
+    assert.deepEqual([comps.map(thrownHex), thrownSurrogateFirsts(domain).map(thrownHex)], [THROWN_BREAK_PIN.components, THROWN_BREAK_PIN.surrogates], "the emoji components and the first surrogates, as derived");
+    const compOf = (re, astral) => domain.find((c) => (c > 0xffff) === astral && re.test(T(c)));
+    const [keyBase, keycap, tag] = [compOf(/[\p{Emoji_Component}&&\p{Po}]/v, false), compOf(/[\p{Emoji_Component}&&\p{Me}]/v, false), compOf(/[\p{Emoji_Component}&&\p{Cf}]/v, true)];
+    for (const at of [1, 2]) assert.ok(held.has(`${[keyBase, 0xfe0f, keycap].join(",")}@${at}`), `the keycap sequence ${thrownHex(keyBase)} U+FE0F ${thrownHex(keycap)} with its boundary after code point ${at} is not placed`);
+    assert.ok(held.has(`${[keyBase, ...thrownCpUnits(tag)].join(",")}@1`) && held.has(`${[...thrownCpUnits(tag), keyBase].join(",")}@2`), `the tag character ${thrownHex(tag)} after and before a component is not placed`);
+    const [hi, lo] = thrownSurrogateFirsts(domain);
+    const escUnits = (c) => [0x5c, 0x75, ...[...c.toString(16)].map((x) => x.charCodeAt(0))];
+    for (const at of [5, 6, 7]) assert.equal(everyOf([...escUnits(hi), ...escUnits(lo)], at), true, `a surrogate pair's two escapes with the boundary after unit ${at} are not thrown on every path`);
+    for (const [g, { reps }] of Object.entries(classes)) for (const a of reps) for (const b of reps) assert.ok(held.has(`${[...thrownCpUnits(a), ...thrownCpUnits(b)].join(",")}@${thrownCpUnits(a).length}`), `${g}: the pair ${thrownHex(a)} then ${thrownHex(b)} is not placed`);
+    const pairHeld = (a, b) => held.has(`${[...thrownCpUnits(a), ...thrownCpUnits(b)].join(",")}@${thrownCpUnits(a).length}`);
+    const gcFirst = cats.map((gc) => thrownFirstCodePoint(new RegExp(`\\p{General_Category=${gc}}`, "u")));
+    assert.equal(gcFirst.filter((c) => c !== undefined).length, cats.length, "a general category has no member");
+    for (const a of gcFirst) for (const b of gcFirst) assert.ok(pairHeld(a, b), `the category pair ${thrownHex(a)} then ${thrownHex(b)} is not placed`);
+    for (const [code, f] of scripts) assert.ok(pairHeld(f, f), `the script ${code}'s first member ${thrownHex(f)} doubled is not placed`);
+    for (const name of THROWN_BINARY_PROPERTIES) {
+      const p = thrownFirstCodePoint(new RegExp(`\\p{${name}}`, "u"));
+      const q = thrownFirstCodePoint(new RegExp(`\\P{${name}}`, "u"));
+      assert.ok(pairHeld(p, p) && (q === undefined || (pairHeld(p, q) && pairHeld(q, p))), `${name}: its first member doubled, and beside the first code point without it, are not placed`);
+    }
+    // H1 ROUND 15 — THE REALISTIC FAMILIES. The Playwright messages are what was measured (an Error's message of four lines,
+    // «Call log:» its second, the third wrapped in ESC [ 2 m … ESC [ 2 2 m); every ANSI text — the first message whole, each
+    // Call-log line, each control sequence, the CSI and OSC grammar — stands with its boundary after each of its code units,
+    // on every path
+    const ESC = CH(0x1b);
+    for (const [call, message] of THROWN_PLAYWRIGHT_MESSAGES) {
+      assert.ok(message.startsWith(`${call}: Timeout 300ms exceeded.\nCall log:\n${ESC}[2m  - waiting for locator('#nope')`) && message.endsWith(`${ESC}[22m\n`), `${call}: not the measured message`);
+      assert.deepEqual([message.split(`${ESC}[`).length - 1, thrownLineScan(message).count], [2, 4], `${call}: its control sequences and its lines`);
+    }
+    const textUnits = (s) => Array.from({ length: s.length }, (_, i) => s.charCodeAt(i));
+    const ansi = thrownAnsiTexts();
+    assert.deepEqual([ansi.length, ansi.filter(([, t]) => t.includes("\n")).length, ansi.filter(([, t]) => t.startsWith(`${ESC}[`) && t.length <= 11).length, ansi.filter(([, t]) => t.startsWith(`${ESC}]`)).length, ansi.filter(([, t]) => t.startsWith(CH(0x9b))).length], THROWN_BREAK_PIN.ansiTexts, "the ANSI texts: all, those with a line break (the whole message), the 7-bit control sequences, the OSCs, the one-unit CSIs");
+    for (const [what, text] of [...ansi, ...thrownEscapeTexts(A.Nd)]) for (let at = 1; at <= text.length; at++) assert.equal(everyOf(textUnits(text), at), true, `${what}: its boundary after unit ${at} is not thrown on every path`);
+    assert.equal(A.Nd, T(domain.find((c) => /\p{ASCII_Hex_Digit}/u.test(T(c)))), "the hex digit the escape texts are written with is the first ASCII_Hex_Digit");
+    // the two pairs the round-14 survivors keyed on — the ZWJ BEFORE the first member of every emoji property (V14-K09: the
+    // first Emoji_Modifier_Base among them), and the first tag character AFTER it (V14-K10: the first Extended_Pictographic
+    // among them) — on every path; every ordered pair of the emoji-sequence representatives; and each real sequence, ONE
+    // grapheme by the runtime's own segmentation, its boundary after each of its code units, on every path
+    const zwjCp = A.ZWJ.codePointAt(0);
+    for (const name of THROWN_EMOJI_PROPERTIES) {
+      const re = new RegExp(`\\p{${name}}`, "u");
+      const f = domain.find((c) => re.test(T(c)));
+      assert.equal(everyOf([zwjCp, ...thrownCpUnits(f)], 1), true, `the ZWJ then ${name}'s first member ${thrownHex(f)} is not thrown on every path`);
+      assert.equal(everyOf([...thrownCpUnits(f), ...thrownCpUnits(tag)], thrownCpUnits(f).length), true, `${name}'s first member ${thrownHex(f)} then the tag character ${thrownHex(tag)} is not thrown on every path`);
+    }
+    const joinReps = thrownEmojiJoinReps(domain, A);
+    assert.deepEqual(joinReps.map(thrownHex), THROWN_BREAK_PIN.joinReps, "the emoji-sequence representatives, as derived");
+    for (const a of joinReps) for (const b of joinReps) assert.ok(pairHeld(a, b), `the emoji-sequence pair ${thrownHex(a)} then ${thrownHex(b)} is not placed`);
+    for (const [what, cps] of THROWN_EMOJI_SEQUENCES) {
+      assert.equal(thrownSegmentCount("grapheme", cps.map(T).join("")), 1, `${what}: the runtime does not segment it as one grapheme`);
+      const u = cps.flatMap(thrownCpUnits);
+      for (let at = 1; at <= u.length; at++) assert.equal(everyOf(u, at), true, `${what}: its boundary after unit ${at} is not thrown on every path`);
+    }
+    const floor = thrownPairFloor(placements);
+    assert.deepEqual({ every: floor.every.length, some: floor.some.length }, THROWN_BREAK_PIN.floor, "the pair floor's entries");
+  });
+
+  it("THE CARRIED TEXT IS THE RAW SLICE, BY EXECUTION (round 14) — the raw-slice differential renders the printed line and the why from String.prototype.slice at each declared ceiling and the oracle's unit-by-unit reference quoting, and THE THROWN CENSUS requires every pair-census value and every line-count row to match it character for character; here, with the oracle switched OFF, a transformation planted between the slice and the quoting at each kind of cut (the why's cut normalised to NFC, a trailing format character dropped from the line's cut, the first line's cut moved back to a grapheme boundary) is caught by the differential alone", async () => {
+    // (its pieces: the chunked reference quoting is the reference quoting — THE ORACLE'S FAST SCANS checks it; on the harness
+    // as written the census row finds no difference over the whole pair census)
+    const BSL = String.fromCharCode(92);
+    for (const [id, from, to] of [
+      ["the why's cut normalised to NFC", "${q(s.slice(0, W))} (cut at the sidecar's", "${q(s.slice(0, W).normalize(\"NFC\"))} (cut at the sidecar's"],
+      ["a trailing format character dropped from the line's cut", "${q(s.slice(0, L))} (cut at the printed line's", `\${q(s.slice(0, L).replace(/${BSL}p{Cf}$/u, ""))} (cut at the printed line's`],
+      ["the first line's cut moved back to a grapheme boundary", "    const kept = first.length <= L ? first : first.slice(0, L);\n", "    const kept = first.length <= L ? first : first.slice(0, (() => { let b = 0; for (const g of new Intl.Segmenter(\"en\", { granularity: \"grapheme\" }).segment(first.slice(0, L + 8))) { if (g.index > L) break; b = g.index; } return b; })());\n"],
+    ]) {
+      assert.equal(SRC.split(from).length - 1, 1, `${id}: its anchor is not in the harness once`);
+      // (round 15) planted with the runtime check's line taken out: the differential must see the transformed text itself
+      const got = await thrownCutCensus(thrownCheckOff(SRC.replace(from, to)), { stopAtFirst: true, phases: ["pairs"], oracle: false });
+      assert.ok(got.count > 0, `${id}, planted: the raw-slice differential alone found no disagreement over the pair census`);
+      assert.ok(got.violations.every((x) => x.includes("the raw-slice differential")), `${id}: a disagreement not the differential's — ${got.violations[0]}`);
+      assert.ok(!got.violations[0].includes(THROWN_FALLBACK), `${id}, planted with the check out: the differential's first disagreement is about the fallback — ${got.violations[0].slice(0, 300)}`);
+    }
+  });
+
+  it("THE PAIR CENSUS AND THE LINE-COUNT ROW CAN FAIL (round 14) — the round-13 verifier's pair-keyed cut survivors, planted in the harness source as it wrote them (V13-K01T a BMP emoji kept with U+FE0F at the line's cut, V13-K05T a flag kept whole at the why's cut, V13-K07R an LV syllable kept with its T at the first line's cut, V13-K08R a Devanagari conjunct kept whole at the line's cut, V13-K11T the space after a full stop dropped at the first line's cut, V13-K16T a trailing «\\u» dropped at the line's cut, V13-K17R an emoji kept with its skin tone at the first line's cut), are each caught by the pair census, and V13-K23T (an empty last piece past the split's limit counted at the line-count ceiling) by the line-count boundary row", async () => {
+    const S_LINE = "${q(s.slice(0, L))} (cut at the printed line's";
+    const S_WHY = "${q(s.slice(0, W))} (cut at the sidecar's";
+    const S_KEPT = "    const kept = first.length <= L ? first : first.slice(0, L);\n";
+    const line = (e) => `\${q(${e})} (cut at the printed line's`;
+    const why = (e) => `\${q(${e})} (cut at the sidecar's`;
+    const kept = (e) => `    const kept = first.length <= L ? first : ${e};\n`;
+    for (const [id, from, to] of [
+      ["V13-K01T", S_LINE, line("s.slice(0, s.charCodeAt(L) === 0xfe0f && s.charCodeAt(L - 1) >= 0x2600 && s.charCodeAt(L - 1) <= 0x27bf ? L - 1 : L)")],
+      ["V13-K05T", S_WHY, why("s.slice(0, s.charCodeAt(W - 2) === 0xd83c && s.charCodeAt(W - 1) >= 0xdde6 && s.charCodeAt(W - 1) <= 0xddff && s.charCodeAt(W) === 0xd83c && s.charCodeAt(W + 1) >= 0xdde6 && s.charCodeAt(W + 1) <= 0xddff ? W - 2 : W)")],
+      ["V13-K07R", S_KEPT, kept("first.slice(0, first.charCodeAt(L - 1) >= 0xac00 && first.charCodeAt(L - 1) <= 0xd7a3 && (first.charCodeAt(L - 1) - 0xac00) % 28 === 0 && first.charCodeAt(L) >= 0x11a8 && first.charCodeAt(L) <= 0x11ff ? L - 1 : L)")],
+      ["V13-K08R", S_LINE, line("s.slice(0, s.charCodeAt(L - 1) === 0x094d && s.charCodeAt(L) >= 0x0915 && s.charCodeAt(L) <= 0x0939 ? L - 2 : L)")],
+      ["V13-K11T", S_KEPT, kept("first.slice(0, first.charCodeAt(L - 1) === 0x20 && first.charCodeAt(L - 2) === 0x2e ? L - 1 : L)")],
+      ["V13-K16T", S_LINE, line("s.slice(0, s.charCodeAt(L - 2) === 0x5c && s.charCodeAt(L - 1) === 0x75 ? L - 2 : L)")],
+      ["V13-K17R", S_KEPT, kept("first.slice(0, first.charCodeAt(L) === 0xd83c && first.charCodeAt(L + 1) >= 0xdffb && first.charCodeAt(L + 1) <= 0xdfff && first.charCodeAt(L - 1) >= 0xdc00 && first.charCodeAt(L - 1) <= 0xdfff ? L - 2 : L)")],
+    ]) {
+      assert.equal(SRC.split(from).length - 1, 1, `${id}: its anchor is not in the harness once`);
+      // (round 15) planted with the runtime check's line taken out: the pair census must see the false sentence itself
+      const got = await thrownCutCensus(thrownCheckOff(SRC.replace(from, to)), { stopAtFirst: true, phases: ["pairs"] });
+      assert.ok(got.count > 0 && got.violations[0].startsWith("pair "), `${id}, planted: the pair census found no disagreement`);
+      assert.ok(!got.violations[0].includes(THROWN_FALLBACK), `${id}, planted with the check out: the pair census's first disagreement is about the fallback — ${got.violations[0].slice(0, 300)}`);
+    }
+    const S_COUNT = "    const count = lines.length > EVENT_THROWN_LINES_COUNTED_MAX ? `more than ${EVENT_THROWN_LINES_COUNTED_MAX}` : String(lines.length);\n";
+    assert.equal(SRC.split(S_COUNT).length - 1, 1, "V13-K23T: its anchor is not in the harness once");
+    const k23 = thrownCheckOff(SRC.replace(S_COUNT, "    const count = lines.length > EVENT_THROWN_LINES_COUNTED_MAX && lines.at(-1) !== \"\" ? `more than ${EVENT_THROWN_LINES_COUNTED_MAX}` : String(Math.min(lines.length, EVENT_THROWN_LINES_COUNTED_MAX));\n"));
+    const row = await thrownCensus(k23, { stopAtFirst: true, seeds: [], sweep: false, ceilings: false, witness: false, cutContent: false, lineBoundary: true });
+    assert.ok(row.violations.length > 0 && row.violations[0].startsWith("line-count boundary") && !row.violations[0].includes(THROWN_FALLBACK), `V13-K23T, planted: the line-count boundary row found no false sentence`);
+  });
+
+  it("THE PAIR CENSUS SEES THE ROUND-14 SURVIVORS (round 15) — the round-14 verifier's eleven cut survivors (V14-K01 … K11: an ANSI control sequence at each cut, an OSC, «\\u{…}», a percent-encoded character, «%uXXXX», a ZWJ before a person, a tag sequence), planted in the harness as it wrote them: with the runtime check's line taken out the pair census finds the FALSE SENTENCE each prints (the ansi, emoji-sequence and escape-syntax families place what each keys on), and with the check in it finds only the fallback", async () => {
+    const survivors = thrownSabotages().filter(([id]) => id.startsWith("V14-"));
+    assert.equal(survivors.length, 11, "the round-14 verifier's survivors");
+    for (const [id, what, key, to] of survivors) {
+      const src = SRC.replace(THROWN_BUILD[key], () => to);
+      const FAMILIES = ["ansi", "emoji sequence", "escape syntax"];
+      const off = await thrownCutCensus(thrownCheckOff(src), { stopAtFirst: true, phases: ["pairs"], families: FAMILIES });
+      assert.ok(off.count > 0 && off.violations[0].startsWith("pair ") && !off.violations[0].includes(THROWN_FALLBACK), `${id} (${what}), planted with the check out: the pair census found no false sentence — ${off.violations[0]?.slice(0, 300)}`);
+      const on = await thrownCutCensus(src, { stopAtFirst: true, phases: ["pairs"], families: FAMILIES });
+      assert.ok(on.count > 0 && on.violations.every((x) => x.includes(THROWN_FALLBACK) || x.includes("does not begin") || x.includes("the raw-slice differential")), `${id} (${what}), planted with the check in: ${on.count} disagreement(s), one of them not the fallback — ${on.violations.find((x) => !x.includes(THROWN_FALLBACK) && !x.includes("does not begin"))?.slice(0, 300)}`);
+    }
+  });
+
+  it("THE LAST CATCH — when a builtin the description uses throws (JSON.stringify refused, for this row only, on one marker string), the thrown series is still classified once and its line and why say only «(the thrown value could not be described)»", async () => {
+    const MARK = "round-10 builtin refusal marker";
+    const orig = JSON.stringify;
+    const factory = p1Factory();
+    for (const [label, value] of [["an Error whose message is the marker", new Error(MARK)], ["the marker thrown as a string", MARK]]) {
+      JSON.stringify = function (x, ...rest) {
+        if (x === MARK) throw new Error("refused for this row");
+        return orig.call(this, x, ...rest);
+      };
+      let got;
+      try { got = await p1ThrownRun(factory, value, "series@2"); } finally { JSON.stringify = orig; }
+      assert.deepEqual(got.env.rejections, [], `${label}: a run rejected`);
+      assert.deepEqual([got.final.series[0].ended, got.final.series[0].why, got.final.refused.length], ["threw", "threw: (the thrown value could not be described)", 0], label);
+      assert.ok(got.env.notes.includes(thrownNoteFor(1, "(the thrown value could not be described)")), `${label}: ${got.env.notes.find((s) => s.includes("a throw ended"))}`);
+    }
+  });
+
+  it("THE RUNTIME CHECK, ALONE (round 15) — the harness's own eventThrownHolds and eventThrownCarried, compiled from its P1 block and called directly: they accept the specification's sentence for every text of the battery, as a thrown string and as the message of every kind (and the same sentence spelt with another true escape), and reject it made false one piece at a time — the words before the quoted text, the quoted text (a code unit fewer, more or changed, another slice, a normal form, an escaped code unit written as itself, a quote missing), every number and every clause after it, the two texts exchanged, a text that is not a string; and the decoder alone accepts each of the 65,536 code units escaped, and written as itself exactly when the specification does not escape it", (t) => {
+    const r = thrownCheckAlone(SRC);
+    assert.deepEqual(r.anchors, [], "the check is not where, or what, the rows take it to be");
+    assert.deepEqual(r.bad, [], `${r.bad.length} disagreement(s) of the check, alone`);
+    const stats = r.stats;
+    t.diagnostic(`the check, alone: ${stats.texts} texts, ${stats.refused} falsifications refused, ${stats.respelt} respellings held, ${stats.pieces.size} kinds of falsification`);
+    assert.deepEqual([stats.held, stats.texts >= 150, stats.refused >= 12_000, stats.respelt >= 300, stats.pieces.size >= 90], [stats.texts, true, true, true, true], `the check's battery is thin: ${stats.texts} texts, ${stats.refused} falsifications refused, ${stats.respelt} respellings held, ${stats.pieces.size} kinds of falsification`);
+    // every kind of piece was falsified somewhere
+    for (const piece of ["the kind named", "the other form's words", "a letter lost from the words before", "without its last code unit", "carrying one code unit past where it is cut", "another slice of the text", "in NFC", "in lower case", "trimmed", "written as itself", "without its closing quote", "without its opening quote", "of what follows written", "what follows dropped", "a cut announced that was not made (the why's)", "«are carried» written", "«line N of » written «line N of more than »", "«carries all of them» written", "«the whole message is in the series' why in the sidecar» written", "the first line's cut not said", "a first-line cut said that was not made", "not a string (undefined)", "the why and the line exchanged"]) {
+      assert.ok([...stats.pieces].some((p) => p.includes(piece)), `no falsification of the kind «${piece}» was drawn`);
+    }
+  });
+
+  it("THE P1 BLOCK WITH THE BUILDING SABOTAGED PRINTS THE FALLBACK, NEVER A FALSE SENTENCE (round 15) — the harness's P1 block compiled with ONE edit to the lines that build the description (the round-14 verifier's eleven cut survivors as it wrote them — an ANSI control sequence dropped or backed off at each cut, an OSC, «\\u{…}», a percent-encoded character, «%uXXXX», a ZWJ before a person, a tag sequence — the earlier rounds' trims and normal forms, each slice moved by one, the quoting changed seven ways, every count off by one, every clause's condition moved, each form's words changed): on every value of the battery and every path it prints and writes either the specification's text or the fallback — the fallback at least once — and never a false sentence; with the check's line taken out the same edit prints a false sentence; unsabotaged, the block prints the specification's text on every value, the check in or out", (t) => {
+    const r = thrownSabotageCensus(SRC);
+    assert.deepEqual(r.anchors, [], "a building line the sabotages are planted on is not in the harness once — an edit of a building line is a visible red here and in THE ERROR-TEXT PATH IS PINNED: re-read it against the specification comment, then re-anchor THROWN_BUILD and re-pin");
+    assert.deepEqual(r.bad.slice(0, 6), [], `${r.bad.length} disagreement(s) of the sabotaged blocks`);
+    assert.ok(r.battery >= 190 && r.sabotages >= 50 && r.fired.size === r.sabotages, `the sabotage census is thin: ${r.battery} values, ${r.sabotages} sabotages, ${r.fired.size} run`);
+    t.diagnostic(`the sabotages, as [values the check stopped, values false without it] of ${r.battery}: ${[...r.fired].map(([id, n]) => `${id} ${n.join("/")}`).join(", ")}`);
+  });
+
+  it("WHAT THE CHECK RESTS ON, EXECUTED (round 15) — what the check is handed is the text itself: handed a trimmed message, or another kind, the block prints the fallback where they differ and never a false sentence (the building is untouched); and the harness's sentence about the check's limit is true — an edit that rewrites the message AT THE READ describes another value and prints it past the check, which is why that line is held by the pin", () => {
+    const battery = thrownSabotageBattery();
+    const run = (from, to) => {
+      assert.equal(SRC.split(from).length - 1, 1, `the anchor «${from.trim()}» is not in the harness once`);
+      const rows = thrownSabotageRun(p1BlockCode(SRC.replace(from, () => to)), battery);
+      return { spec: rows.filter((r) => r.verdict === "spec").length, fallback: rows.filter((r) => r.verdict === "fallback").length, false: rows.filter((r) => r.verdict.startsWith("FALSE")) };
+    };
+    for (const [what, to] of [["a trimmed message", "    described = { text: m.trimEnd(), kind };\n"], ["a message without its first code unit", "    described = { text: m.slice(1), kind };\n"], ["another kind", "    described = { text: m, kind: kind === \"an Error\" ? \"an object\" : \"an Error\" };\n"]]) {
+      const t = run(THROWN_BUILD.described, to);
+      assert.deepEqual(t.false.map((r) => `${r.label}: ${r.verdict}`).slice(0, 2), [], `the check handed ${what}: a false sentence`);
+      assert.ok(t.fallback >= 10 && t.spec >= 10, `the check handed ${what}: ${t.fallback} fallbacks and ${t.spec} specification texts`);
+    }
+    // THE LIMIT, as the harness's comment states it: the message rewritten at the read
+    const B = CH(0x5c);
+    const atRead = run(THROWN_BUILD.read, `      m = e.message;\n      if (typeof m === "string") m = m.replace(/${B}x1b${B}[[0-9;]*m/g, "");\n`);
+    assert.ok(atRead.false.length >= 3 && atRead.fallback === 0, `the message rewritten at the read: ${atRead.false.length} false sentence(s) and ${atRead.fallback} fallback(s) — the harness's comment says the check does not see this edit`);
+    assert.ok(atRead.false.every((r) => r.label.includes("Playwright") || r.label.includes("control sequence") || r.label.includes("ESC")), `the message rewritten at the read is false on a value with no control sequence: ${atRead.false.find((r) => !r.label.includes("Playwright"))?.label}`);
+    const doc = SRC.slice(SRC.indexOf("/*  H1 ROUND 15 (the round-14 verifier's V14-ESCAPE-SYNTAX-CUT"), SRC.indexOf("const eventThrownCarried = (text, at, x, n) => {")).replace(/\n\s*\*\s*/g, " ");
+    for (const said of ["BEFORE it is returned, the harness reads its own two texts back and compares each with the value", "must be, code unit for code unit, the RAW SLICE of the text", "EVERY COUNT is counted again from the text", "THE WORDS BEFORE the quoted text must be the specification's", "the line and the why are both the fallback «(the thrown value could not be described)», which is true", "at worst it prints the fallback",
+      "An edit that changes the VALUE before it is described (at the read, or at the function's entry) describes another value, and the check, comparing with that value, does not see it", "every line of this path is PINNED there"]) {
+      assert.ok(doc.includes(said), `the check's comment does not say «${said}»`);
+    }
+    // …and the read's line, the function's entry, the check's line and what it is handed are among the pinned lines
+    const lines = thrownPathLines();
+    for (const held of ["const eventThrownText = (e) => {", "m = e.message;", "described = { text: m, kind };", THROWN_CHECK_LINE.trim(), "const said = eventThrownText(e);", "const eventThrownHolds = (x, kind, said) => {", "const eventThrownCarried = (text, at, x, n) => {"]) {
+      assert.equal(lines.filter((l) => l === held).length, 1, `the pinned path does not hold the line «${held}» once`);
+    }
+  });
+
+  it("A CHECK REMOVED OR WEAKENED TURNS THE ROWS RED (round 15) — each of twenty-eight edits to the check (its call removed, made of thrown strings only or of messages only, skipped for short texts, for uncut ones, for long ones, for a text with an ESC, for a kind; its verdict ignored; the message not handed to it; the why or the line not compared; the words before not compared; what follows compared by its beginning only; the decoder comparing lengths only, the start of a run only, letting escaped code units stand as themselves, not comparing an escape, not requiring a quote; the line count miscounted), planted in a copy of the harness, is caught by the row named for it — THE P1 BLOCK WITH THE BUILDING SABOTAGED for an edit to the check's call (the harness as written prints nothing false, so only a sabotaged building shows it), THE RUNTIME CHECK, ALONE for an edit to the check's two functions", () => {
+    const weakenings = thrownCheckWeakenings();
+    assert.deepEqual([weakenings.length, weakenings.filter(([, , by]) => by === "sabotage").length], [28, 10], "the weakenings, and those of the check's call");
+    for (const [id, what, by, from, to] of weakenings) {
+      assert.equal(SRC.split(from).length - 1, 1, `${id} (${what}): its anchor is not in the harness once`);
+      const weak = SRC.replace(from, () => to);
+      assert.notEqual(weak, SRC, `${id}: the edit changes nothing`);
+      const r = by === "alone" ? thrownCheckAlone(weak, { stopAtFirst: true }) : thrownSabotageCensus(weak, { stopAtFirst: true });
+      assert.ok(r.bad.length > 0, `${id} (${what}): ${by === "alone" ? "THE RUNTIME CHECK, ALONE" : "THE P1 BLOCK WITH THE BUILDING SABOTAGED"} found nothing wrong with the weakened check`);
+      // (an edit to the check's call is one a false sentence must show: the harness as written, the check weakened, still prints
+      // the specification's text — it is a SABOTAGED building that gets past)
+      if (by === "sabotage") assert.ok(r.bad.some((x) => x.includes("FALSE SENTENCE past the check")), `${id} (${what}): no false sentence past the weakened check was found — ${r.bad[0].slice(0, 300)}`);
+    }
+  });
+
+  it("THE ERROR-TEXT PATH IS PINNED (round 15) — every code line from the declared ceilings to the end of eventSeriesThrew (the ceilings, the check's two functions, eventThrownText with the one read of the message and the check's call, eventSeriesThrew) is pinned, in order: an edit to any of them is red here and prints the string to re-pin with, after the edit has been re-read against the specification comment", () => {
+    const lines = thrownPathLines();
+    const got = lines.map((l) => pinHash(l));
+    const want = THROWN_PATH_PIN.split(/\s+/).filter(Boolean);
+    const changed = lines.filter((l, i) => !want.includes(got[i]));
+    assert.ok(lines.length >= 100, `only ${lines.length} lines of the error-text path were found`);
+    assert.equal(got.join(" "), want.join(" "), `the error-text path is not the pinned code — ${got.length} line(s) against ${want.length} pinned; ${changed.length} new or changed${changed.length ? `: ${changed.slice(0, 3).map((t) => JSON.stringify(t.slice(0, 140))).join(" | ")}` : ""}; ${want.filter((h) => !got.includes(h)).length} pinned gone. Re-read every changed line against the specification comment above eventThrownText — the value described is the thrown value itself, its message is read ONCE, what the check is handed is that text and the kind named, and nothing is returned that the check did not hold — then re-pin THROWN_PATH_PIN: ${got.join(" ")}`);
+    // the pin can fail: one character changed in the read's line, in a copy of the harness's code
+    const edited = thrownPathLines(CODE.replace("m = e.message;", "m = e.message ;")).map((l) => pinHash(l));
+    assert.notEqual(edited.join(" "), got.join(" "), "an edited read is the pinned path");
+  });
+});

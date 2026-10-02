@@ -10291,3 +10291,10 @@ untested (none moves a ribbon or a bill today); a driver already past `from` off
 lane centre (not reachable in the product today); the merge lands behind the through car only at 25–35 km/h for a constant-pace driver
 (the staged car's timing — a coach/cue feature, not geometry). The keep-right bill that both lines still draw at 15 km/h after the merge
 is answered by the founder ruling of 2026-10-01 (a separate lane).
+
+## Harness H1 — landed 2026-10-02 (tools only)
+
+Four pedal-only wrong-leg profiles (`sc-vp-telltale-red` → c172d48b; `sc-vu-emergency` → 155903c1, 4056508c; `sc-hz-brake-dont-swerve` →
+f0023997; `sc-follow-tailgater`), event-keyed shots and the rear-gap read. Fifteen adversarial rounds; landed WITH CONDITIONS recorded as
+GAP-9 in doc 93. **Nothing closes by this landing**: `platform/` and `content/` are byte-identical, so no closure may rest on «the product
+now passes» — the rows above become JUDGEABLE on a re-drive whose wrong leg commits the lesson's own act.

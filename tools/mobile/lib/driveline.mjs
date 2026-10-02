@@ -2186,14 +2186,41 @@ export function errorBoundaryVerdict({ text = "", shell = false, retryPresent = 
  *     builtins are checked AT RUNTIME, in a child process, around its import
  *     and its export calls (the test file: each export's first 40 calls and every 200th after them).
  *
+ * ── HARNESS STAGE H1 (plan57 pedalLane 1–4, 2026-09-27) ─────────────────────
+ * Four more rows, each an antecedent the 45 m cadence (or the flat throttle)
+ * keeps a `wrong` leg from committing:
+ *   · sc-vp-telltale-red:c172d48b — a STEADY pace at or under the disc past
+ *     the red lamp: every rest is a full stop, and a full stop (or any 5 км/ч
+ *     shed inside 6 s) is the drive the product acquits (`pace`, lamp);
+ *   · sc-vu-emergency:155903c1 / :4056508c — a pace over the yield floor
+ *     through the approach: the first 45 m rest stands the car (`pace`, em);
+ *   · sc-hz-brake-dont-swerve:f0023997 — no rest into the obstacle, at the
+ *     plain flat throttle, until the impact-flash element mounts (`to-impact`);
+ *   · sc-follow-tailgater:63c0c28c — brake to rest from ≥ 35 км/ч with the car
+ *     behind closed up on the PROX badge (`brake-check`), the badge OBSERVED
+ *     on the page, never predicted from a pose.
+ * Their constants were sized at 01de885 (`PROFILE_SIZED_AT_H1`), and each
+ * record names its own commit; a label prints every commit its profile's
+ * constants were sized at. The plan names these NOT pedal-reachable, and they
+ * get no H1 profile: sc-roundabout-entry:08a0b701, sc-mv-uturn-ban,
+ * sc-ov-solid-line and sc-fo-motorway-gap (withdrawn below);
+ * sc-ac-truck-spray:3f5a3ef3 is retired by ruling, and its round-7 profile
+ * above is left exactly as it stands.
+ *
  * ── WHAT A PROFILE MAY DO, AND WHAT IT MAY NOT ─────────────────────────────
- *   · PEDALS ONLY, AND NOT EVEN THE THROTTLE: a profile changes WHEN the leg
- *     rests, and one profile books one brake. No wheel on any `wrong` leg, no
- *     governed throttle, and no decision here reads the dev pose probe
- *     (founder RULING-1 / RULING-2: never a wrong drive). The inputs are what
- *     a `wrong` leg already reads — the dial, the dial-integrated odometer
- *     (the SAME increment `FLAT_REST_EVERY_M` is measured in), the HUD's own
- *     DOM (the follow-gap chip, the В26 disc) — plus AUTHORED content geometry
+ *   · PEDALS ONLY: a profile changes WHEN the leg rests, and two profiles book
+ *     one brake each (the zone rest, the brake-check). No wheel on any `wrong`
+ *     leg, and no decision here reads the dev pose probe (founder RULING-1 /
+ *     RULING-2: never a wrong drive). The throttle is governed on exactly the
+ *     two `pace` profiles of harness stage H1 (`pacePedal`, declared in the
+ *     table as `kind: "pace"`, its command handed out as `pedal` and applied
+ *     by the harness); every other profile, and every lane without one, keeps
+ *     the plain flat throttle, and no governor ever touches the brake. The
+ *     inputs are what a `wrong` leg already reads — the dial, the
+ *     dial-integrated odometer (the SAME increment `FLAT_REST_EVERY_M` is
+ *     measured in), the HUD's own DOM (the follow-gap chip, the В26 disc, and
+ *     since H1 the rear proximity badge and a page-side count of impact-flash
+ *     element mounts) — plus AUTHORED content geometry
  *     (`content/world`, `content/traces`: JSON data, not product source)
  *     through dead reckoning.
  *   · IT CHANGES WHEN RESTS HAPPEN, NEVER WHETHER THEY ARE RECORDED: every
@@ -2245,10 +2272,18 @@ export function errorBoundaryVerdict({ text = "", shell = false, retryPresent = 
 /** The commit every product-derived design constant below was sized at. */
 export const PROFILE_SIZED_AT = "4112566";
 
+/** The commit the harness stage H1 constants below were sized at (the four
+ *  H1 profiles). Every record names its own commit; a line prints the commits
+ *  of the constants its profile is sized from, never one it was not. */
+export const PROFILE_SIZED_AT_H1 = "01de885";
+
+/** Every commit a design constant below was sized at, in order. */
+export const PROFILE_SIZED_COMMITS = Object.freeze([PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1]);
+
 /** One declared design constant: its value, its unit, the product source it
  *  was sized from and the commit — frozen. Pure. */
-function sizedAt(value, unit, from) {
-  return Object.freeze({ value, unit, from, at: PROFILE_SIZED_AT });
+function sizedAt(value, unit, from, at = PROFILE_SIZED_AT) {
+  return Object.freeze({ value, unit, from, at });
 }
 
 /**
@@ -2310,6 +2345,51 @@ export const PROFILE_DESIGN = Object.freeze({
   CHASSIS_MASS: sizedAt(1220, "kg", "tuning.ts CHASSIS_MASS"),
   // sized from templates-conditions2.ts SC_AC_TRUCK_SPRAY.instructionsBg(5) at 4112566
   drillTaughtGapSec: sizedAt(3, "s", "templates-conditions2.ts SC_AC_TRUCK_SPRAY.instructionsBg(5)"),
+  // ── harness stage H1 (the four profiles below the first four), each sized at PROFILE_SIZED_AT_H1 ──
+  // sized from engine.ts WARNING_LAMP_REGRADE_SEC at 01de885
+  WARNING_LAMP_REGRADE_SEC: sizedAt(6, "s", "engine.ts WARNING_LAMP_REGRADE_SEC", PROFILE_SIZED_AT_H1),
+  // sized from engine.ts WARNING_LAMP_COMPLY_DROP_KMH at 01de885
+  WARNING_LAMP_COMPLY_DROP_KMH: sizedAt(5, "км/ч", "engine.ts WARNING_LAMP_COMPLY_DROP_KMH", PROFILE_SIZED_AT_H1),
+  // sized from engine.ts WARNING_LAMP_COMPLY_DROP_KMH at 01de885
+  warningLampBillSec: sizedAt(23.7, "s", "engine.ts WARNING_LAMP_COMPLY_DROP_KMH", PROFILE_SIZED_AT_H1),
+  // sized from engine.ts WARNING_LAMP_COMPLY_DROP_KMH at 01de885
+  warningLampHeldPaceKmh: sizedAt(45, "км/ч", "engine.ts WARNING_LAMP_COMPLY_DROP_KMH", PROFILE_SIZED_AT_H1),
+  // (H1 round 3, N5a: where the lamp run STARTS — past the launch. warningLampBillSec was measured on a drive held at
+  // warningLampHeldPaceKmh; a reading WARNING_LAMP_COMPLY_DROP_KMH or more under that pace is, by the product's own
+  // comply test, a car that is not holding it, so the run starts on the first reading at or over 45 − 5 = 40 by the
+  // dial's rounding and never on a launch reading over movingSpeedKmh.)
+  // sized from engine.ts WARNING_LAMP_COMPLY_DROP_KMH at 01de885
+  warningLampRunStartKmh: sizedAt(40, "км/ч", "engine.ts WARNING_LAMP_COMPLY_DROP_KMH", PROFILE_SIZED_AT_H1),
+  // sized from templates-vru.ts EM_APPROACH.yieldSlowKmh at 01de885
+  emYieldSlowKmh: sizedAt(38, "км/ч", "templates-vru.ts EM_APPROACH.yieldSlowKmh", PROFILE_SIZED_AT_H1),
+  // sized from runners.ts EM_SPEED_MARGIN_KMH at 01de885
+  EM_SPEED_MARGIN_KMH: sizedAt(2, "км/ч", "runners.ts EM_SPEED_MARGIN_KMH", PROFILE_SIZED_AT_H1),
+  // sized from runners.ts EM_CLOSING_MIN_KMH at 01de885
+  EM_CLOSING_MIN_KMH: sizedAt(3, "км/ч", "runners.ts EM_CLOSING_MIN_KMH", PROFILE_SIZED_AT_H1),
+  // sized from ln-v1.json maxspeed at 01de885
+  emRunTopKmh: sizedAt(50, "км/ч", "ln-v1.json maxspeed", PROFILE_SIZED_AT_H1),
+  // sized from templates-vru.ts EM_APPROACH.actor.accelMps2 at 01de885
+  emActorAccelMps2: sizedAt(1.5, "m/s²", "templates-vru.ts EM_APPROACH.actor.accelMps2", PROFILE_SIZED_AT_H1),
+  // sized from templates-vru.ts EM_APPROACH.responseWindowSec at 01de885
+  emResponseWindowSec: sizedAt(7, "s", "templates-vru.ts EM_APPROACH.responseWindowSec", PROFILE_SIZED_AT_H1),
+  // sized from runners.ts EmergencyApproachRunner.stage at 01de885
+  emResponseJitterSec: sizedAt(0.4, "s", "runners.ts EmergencyApproachRunner.stage", PROFILE_SIZED_AT_H1),
+  // sized from types.ts DEFAULT_RULE_CONFIG.harshBrakeMinSpeedKmh at 01de885
+  harshBrakeMinSpeedKmh: sizedAt(35, "км/ч", "types.ts DEFAULT_RULE_CONFIG.harshBrakeMinSpeedKmh", PROFILE_SIZED_AT_H1),
+  // sized from types.ts DEFAULT_RULE_CONFIG.harshBrakeDecelMps2 at 01de885
+  harshBrakeDecelMps2: sizedAt(7, "m/s²", "types.ts DEFAULT_RULE_CONFIG.harshBrakeDecelMps2", PROFILE_SIZED_AT_H1),
+  // sized from types.ts DEFAULT_RULE_CONFIG.harshBrakeSustainSec at 01de885
+  harshBrakeSustainSec: sizedAt(0.4, "s", "types.ts DEFAULT_RULE_CONFIG.harshBrakeSustainSec", PROFILE_SIZED_AT_H1),
+  // sized from rearProximity.ts REAR_CUE_WARN_M at 01de885
+  REAR_CUE_WARN_M: sizedAt(8, "m", "rearProximity.ts REAR_CUE_WARN_M", PROFILE_SIZED_AT_H1),
+  // sized from rearProximity.ts stepRearCue at 01de885
+  rearBadgeHalfQuantumM: sizedAt(0.5, "m", "rearProximity.ts stepRearCue", PROFILE_SIZED_AT_H1),
+  // sized from templates-following.ts SC_FOLLOW_TAILGATER.success, ln-v1.json spawnPoints at 01de885
+  ftgCalmZoneNearRouteM: sizedAt(175, "m", "templates-following.ts SC_FOLLOW_TAILGATER.success, ln-v1.json spawnPoints", PROFILE_SIZED_AT_H1),
+  // sized from templates-hazards2.ts DEBRIS_Y, hz-debris-v1.json spawnPoints at 01de885
+  debrisRouteM: sizedAt(175, "m", "templates-hazards2.ts DEBRIS_Y, hz-debris-v1.json spawnPoints", PROFILE_SIZED_AT_H1),
+  // sized from tuning.ts ENGINE_FORCE_CURVE, tuning.ts ROLLING_RESISTANCE_N, tuning.ts AERO_DRAG, tuning.ts CHASSIS_LINEAR_DAMPING, tuning.ts CHASSIS_MASS at 01de885
+  paceDutyBase: sizedAt(0.15, "", "tuning.ts ENGINE_FORCE_CURVE, tuning.ts ROLLING_RESISTANCE_N, tuning.ts AERO_DRAG, tuning.ts CHASSIS_LINEAR_DAMPING, tuning.ts CHASSIS_MASS", PROFILE_SIZED_AT_H1),
 });
 
 /** The dial is `Math.round(|speed|)`, so a reading N covers [N − 0.5, N + 0.5):
@@ -2489,6 +2569,161 @@ export const ZONE_REST_CREEP_M = 2.1;
  *  bands leave out. The harness's margin, stated as such. */
 export const ZONE_REST_RESIDUAL_M = 5;
 
+/* ── HARNESS STAGE H1 — THE PACE GOVERNOR, THE REAR BADGE, THE IMPACT COUNT ──
+ *
+ * Two of the H1 profiles hold a PACE: a wrong leg's plain flat throttle tops
+ * 58–59 км/ч on a posted 50 (the round-1 verifier's longsim), which is not the
+ * antecedent either row needs (a steady pace at or under the disc; a pace over
+ * a floor and under the disc). The throttle is the only pedal a governor
+ * touches — it never presses the brake — and the keyboard throttle is ON or
+ * OFF, so a pace is held by PULSES: on a tick whose dial reads under the
+ * target, the throttle goes down for a fraction of the tick's own interval and
+ * comes up again inside the same tick.
+ *
+ * WHY PULSES, AND NOT ROUND 1'S BANG-BANG: held down for a whole ~0.5 s tick
+ * at 45 км/ч the car gains ~5.6 км/ч (3.14 m/s², `paceDutyBase`'s own
+ * arithmetic below), which is more than WARNING_LAMP_COMPLY_DROP_KMH on its
+ * own — a bang-bang ripple would read as a driver shedding speed on every
+ * cycle. The DUTY BASE is the fraction of time the throttle must be down to
+ * hold 45 км/ч in the model (`paceDutyBase`, sized from tuning.ts at
+ * 01de885): throttle 4200 N less R = AERO_DRAG·v² + LINEAR_DAMPING·MASS·v =
+ * 370.6 N → +3.139 m/s²; coast R + ROLLING_RESISTANCE_N 280 N → −0.533 m/s²;
+ * 0.533 / (3.139 + 0.533) = 0.145 → 0.15. The model holds no engine braking;
+ * the gain below closes what it leaves out. None of this is a prediction: the
+ * READINGS say what the pace was, and a profile holds as sized only on them. */
+
+/** Under `target − this` the throttle is down for the whole tick (the launch). The harness's number. */
+export const PACE_FULL_BAND_KMH = 6;
+/** Duty added per км/ч the dial reads under the target. The harness's number. */
+export const PACE_DUTY_GAIN_PER_KMH = 0.05;
+/** The shortest and longest throttle pulse, in ms of wall clock. The harness's numbers. */
+export const PACE_MIN_PULSE_MS = 40;
+export const PACE_MAX_PULSE_MS = 600;
+/** The emergency profile's target, over its run floor (emYieldSlowKmh + EM_SPEED_MARGIN_KMH): half the
+ *  10 км/ч between that floor (40) and the posted 50 on ln-v1. The harness's number. */
+export const EM_PACE_ABOVE_FLOOR_KMH = 5;
+
+/* ── H1 ROUND 2 — THE EMERGENCY RUN'S SIZING, RE-DERIVED (the round-1 verifier's N5) ──
+ * runners.ts EmergencyApproachRunner at 01de885 arms the duty on the first
+ * frame the ambulance is behind by 2–armBehindM 60 m AND its speed is over the
+ * car's by EM_CLOSING_MIN_KMH; the ambulance ramps from rest at
+ * emActorAccelMps2 from its release, which falls before the run's first
+ * reading (release needs the car at most releaseGapM 14 + 4 m ahead of the
+ * ambulance's hold, 15 m behind the spawn — 3 m of travel — and the run's
+ * first reading is over 40 км/ч). Round 1 sized the arm on the governor's
+ * TARGET (45 → 8.9 s); a run may read up to its top (`emRunTopKmh`, the posted
+ * 50 on ln-v1), so the arm is sized on that top plus the dial's rounding:
+ * (50 + 0.5 + 3) / 3.6 / 1.5 = 9.91 s. The 60 m gate does not bind a paced car
+ * (the gap peaks near 43 m for a car held at 50 from a 5 s launch). What the
+ * readings cannot see is the product's own clock falling behind the profile
+ * clock on a loaded box — the ~23 % figure `ZONE_REST_MARGIN_SEC`'s comment names, taken as a ratio of the
+ * 17.3 s of arm + window + spread: the harness's lag allowance below (a declared judgement; its direction is stated
+ * under the lamp run's allowance). */
+/** The emergency run's allowance for a product clock behind the profile clock, in seconds. The harness's number. */
+export const EM_RUN_LAG_MARGIN_SEC = 4;
+/* ── H1 ROUND 3 — THE LAMP RUN'S LAG ALLOWANCE (the round-1 verifier's N5a, owed by round 2) ──
+ * The same allowance, on the same ratio: 0.23 — the «~23 % behind» figure `ZONE_REST_MARGIN_SEC`'s comment (the
+ * constant is sized at 4112566) names — of the product seconds the run must cover.
+ * The emergency run: ceil(0.23 × (9.91 + 7 + 0.4)) = ceil(3.98) = 4 s (above).
+ * The lamp run: ceil(0.23 × (warningLampBillSec 23.7 + WARNING_LAMP_REGRADE_SEC 6))
+ * = ceil(6.83) = 7 s.
+ * H1 ROUND 5 (the round-3/4 verifiers' LAMP-VERDICT-AND-LAG-RATIO) — A DECLARED JUDGEMENT, NOT A MEASUREMENT. No
+ * measurement file backs 0.23: `ZONE_REST_MARGIN_SEC`'s own «~23 %» names none either (it entered at 0e810ad with no
+ * archive), and a repo-wide search finds the figure only in these comments. Its DIRECTION, stated: the allowance is
+ * ratio × the product seconds S the run must cover, so a profile run of S + allowance covers a product clock running at
+ * S / (S + allowance) of the profile clock — 29.7 / 36.7 = 81 % (lamp), 17.31 / 21.31 = 81 % (emergency), i.e. up to ~19 %
+ * behind, NOT a product clock 23 % behind (that reading needs ratio / (1 − ratio) × S: 9 s and 6 s). No printed line
+ * states the ratio or either coverage — they print only «the harness's N s lag allowance» — and a profile holds as
+ * sized only on its own readings; a measured product-vs-profile clock ratio on the P1 lanes is still owed. */
+/** The fraction of the product seconds a run must cover that it adds as its lag allowance — a declared judgement (above), not a measurement. The harness's number. */
+export const PRODUCT_CLOCK_LAG_RATIO = 0.23;
+/** The lamp run's allowance for a product clock behind the profile clock, in seconds. The harness's number. */
+export const LAMP_RUN_LAG_MARGIN_SEC = 7;
+
+/* ── H1 ROUND 2 — THE BRAKE-CHECK'S METRE CEILING, SIZED ON A CENSUS THAT COVERS IT (the round-1 verifier's F4) ──
+ * Round 1 sized the ceiling on another lesson's pc census (sc-pk-busstop-ban,
+ * 0.935) and ran it on mobile too. The harness's own odometer census
+ * (`ODO_CENSUS_ALL_WRONG_LEGS`, r9/odo-census-rerun.txt) holds this lesson's
+ * own 18 archived wrong legs, and they read FAR under `ODO_RATIO_MIN`: its w43
+ * pc leg 0.577, the lowest pc leg in the whole census. The ceiling is therefore
+ * sized on the census's lowest reading of ANY leg, pc or mobile (0.524), so one
+ * ceiling serves both platforms, and the booking is refused on a tick that
+ * reaches a ceiling (a booking never lands past it). */
+/** This lesson's own legs in the harness's odometer census (the same file and method as
+ *  `ODO_CENSUS_ALL_WRONG_LEGS`), and the census's lowest pc reading. An evidence record, frozen. */
+export const ODO_CENSUS_BRAKE_CHECK = Object.freeze({
+  lesson: "sc-follow-tailgater",
+  pc: Object.freeze({ legs: 9, min: 0.577, max: 1.009, minWave: "w43" }),
+  mobile: Object.freeze({ legs: 9, min: 0.826, max: 1.004, minWave: "w52" }),
+  allPcLegs: 170,
+  allPcMin: 0.577,
+});
+/** The ratio the brake-check's metre ceiling is sized on: the lowest reading of the whole census, any platform. */
+export const BRAKE_CHECK_ODO_RATIO = Math.min(
+  ODO_RATIO_MIN,
+  ODO_CENSUS_ALL_WRONG_LEGS.mobileMinRatio,
+  ODO_CENSUS_BRAKE_CHECK.allPcMin,
+  ODO_CENSUS_BRAKE_CHECK.pc.min,
+  ODO_CENSUS_BRAKE_CHECK.mobile.min,
+);
+/** Room kept past the stop for what the census bands leave out (the creep before the flat odometer starts among it). The harness's number. */
+export const BRAKE_CHECK_RESIDUAL_M = 5;
+
+/* ── H1 ROUND 2 · P1 — THE LESSONS WHOSE LANES TAKE EVENT SHOTS (the round-1 verifier's C3) ──
+ * Round 1 armed the page-side witness and its shots on EVERY lane. They are
+ * armed on these lessons' lanes only (both legs: plan57 probeLane P1 and the
+ * L-CARD re-drives); every other lane installs no witness, registers no
+ * binding, takes no event shot, waits for none at its end and prints no
+ * event-shot line, and its probe reads neither the rear badge nor the witness. */
+export const EVENT_SHOT_LESSONS = Object.freeze(["sc-sp-curve", "sc-hz-brake-dont-swerve", "sc-vu-emergency", "sc-roundabout-entry"]);
+/** What a lane of `scenario` reads beyond the pre-H1 probe — pure: the event witness and its shots
+ *  (`EVENT_SHOT_LESSONS`), and the rear badge (a lesson whose declared profile is a brake-check). */
+export function h1ProbeReads(scenario) {
+  const decl = typeof scenario === "string" ? wrongLegProfileFor(scenario) : null;
+  return Object.freeze({
+    eventShots: typeof scenario === "string" && EVENT_SHOT_LESSONS.includes(scenario),
+    rear: decl !== null && decl.kind === "brake-check",
+  });
+}
+
+/** THE PACE PEDAL FOR ONE TICK — pure. `down`: the throttle held the whole tick;
+ *  `up`: held up the whole tick; `pulse`: down for `ms`, then up, inside the tick.
+ *  An unread dial lets the throttle up (no reading, no acceleration). */
+export function pacePedal(dial, { targetKmh, dtMs } = {}) {
+  if (typeof dial !== "number" || !Number.isFinite(dial) || dial < 0) return Object.freeze({ act: "up", ms: null });
+  if (typeof targetKmh !== "number" || !Number.isFinite(targetKmh)) return Object.freeze({ act: "up", ms: null });
+  if (dial >= targetKmh) return Object.freeze({ act: "up", ms: null });
+  if (dial < targetKmh - PACE_FULL_BAND_KMH) return Object.freeze({ act: "down", ms: null });
+  const dt = typeof dtMs === "number" && Number.isFinite(dtMs) && dtMs > 0 ? dtMs : 0;
+  const duty = PROFILE_DESIGN.paceDutyBase.value + PACE_DUTY_GAIN_PER_KMH * (targetKmh - dial);
+  const ms = Math.round(Math.min(PACE_MAX_PULSE_MS, Math.max(PACE_MIN_PULSE_MS, duty * dt)));
+  return Object.freeze({ act: "pulse", ms });
+}
+
+/** THE REAR PROXIMITY BADGE's label, as the product prints it (rearProximity.ts
+ *  `rearCueLabelBg` at 01de885): «Кола отзад · N м» / «Велосипедист отзад · N м».
+ *  The reverse-travel twin in the same box («Заден ход · N м») is metres DRIVEN,
+ *  not a body behind, and is deliberately not matched. */
+export const REAR_PROX_LABEL_RE = /^(Кола|Велосипедист) отзад · (\d+) м$/u;
+
+/**
+ * THE REAR GAP, OBSERVED — the harness's read of the PROX badge off the page
+ * (`[data-hud="rear-proximity"] [role="status"]`'s aria-label), parsed. Pure.
+ *   · `raw` not an object, or `ok !== true` → `{ ok:false }`: the read did not
+ *     come back, and nothing may be decided from it;
+ *   · `label === null` → `{ ok:true, present:false }`: no badge on the glass
+ *     (nothing within the badge's range behind);
+ *   · a label → `{ ok:true, present:true, parsed, meters, kind }`, `parsed`
+ *     false for any label `REAR_PROX_LABEL_RE` does not match.
+ */
+export function parseRearProximity(raw) {
+  if (!raw || typeof raw !== "object" || raw.ok !== true) return Object.freeze({ ok: false, present: null, parsed: false, meters: null, kind: null });
+  if (raw.label === null || raw.label === undefined) return Object.freeze({ ok: true, present: false, parsed: false, meters: null, kind: null });
+  const m = typeof raw.label === "string" ? raw.label.trim().match(REAR_PROX_LABEL_RE) : null;
+  if (!m) return Object.freeze({ ok: true, present: true, parsed: false, meters: null, kind: null });
+  return Object.freeze({ ok: true, present: true, parsed: true, meters: Number(m[2]), kind: m[1] === "Кола" ? "vehicle" : "cyclist" });
+}
+
 /* ── THE LINES — ONE TEMPLATE TABLE, ONE RENDERER (round 7) ─────────────────
  *
  * EVERY sentence a profile can put in `run.log` is one of these templates. A
@@ -2614,6 +2849,44 @@ export const PROFILE_LINE_TEMPLATES = Object.freeze({
   "sizing.zone": "{drop:frag}; BAN_ZONE_REST_REGRADE_SEC {rg:n} s; hold = {thr:n} + {rg:n} + the harness's {zm:n} s = {hold:n} s; sized hold = {thr:n} + {rg:n} + {margin:n} s = {sized:n} s; rest line fullStopMaxSpeedKmh {fs:n} км/ч, moving line movingSpeedKmh {moving:n} км/ч; deceleration BRAKE_FORCE_N {force:n} N / CHASSIS_MASS {mass:n} kg = {decel:n2} m/s²",
   "sizing.dropBus": "drop-off busStopDropOffMaxSec {bus:n} s for the {basis:tok} basis (banZoneStopRestSec {ban:n} s for any other)",
   "sizing.dropOther": "banZoneStopRestSec {ban:n} s for the {basis:tok|?} basis (busStopDropOffMaxSec {bus:n} s for law-bus-stop)",
+  // ── harness stage H1: the label that names each commit, and the three new kinds ──
+  "sizing.labelAt": "SIZING (the harness's design constants, each sized at the commit its own record names — {at:toks}; no file is read to size them, and nothing here is a prediction)",
+  "sizing.pace": "{governor:frag}; the run credits a reading when the dial reads over {floor:n} км/ч by its {hq:n} км/ч rounding and at or under the posted disc{cap:opt}, and a disc read inside the run other than the one it started under breaks it{drop:opt}{start:opt}; one run sized to {run:n1} s ({why:frag})",
+  "pace.startLamp": "; the run starts on its first reading it credits that is at or over warningLampRunStartKmh {start:n} км/ч by its {hq:n} км/ч rounding (warningLampHeldPaceKmh {pace:n} less WARNING_LAMP_COMPLY_DROP_KMH {drop:n}), and a reading under it before the run starts does not start or break it",
+  "pace.governor": "a pace governor on the dial, target {target:n} км/ч: under {full:n} км/ч the harness holds the throttle down for the whole tick, at or over the target it lets the throttle up for the whole tick, and between them it presses the throttle for (paceDutyBase {base:n2} + {gain:n2} per км/ч under the target) of the tick's own interval, from {pulseLoMs:n} to {pulseHiMs:n} ms, then lets it up; an unread dial lets the throttle up; the brake is never touched by it",
+  "pace.drop": "; a reading breaks the run, and does not start it, when the fastest reading of the {win:n} s before it on the profile clock (readings before the run started among them) is {lim:n} км/ч or more above it (WARNING_LAMP_COMPLY_DROP_KMH {drop:n} less twice the dial's rounding, over WARNING_LAMP_REGRADE_SEC {win:n} s)",
+  "pace.whyLamp": "warningLampBillSec {lampSec:n} + WARNING_LAMP_REGRADE_SEC {rg:n} + the harness's {lag:n} s lag allowance + the harness's {margin:n} s, measured on a drive held at warningLampHeldPaceKmh {pace:n} км/ч",
+  "pace.whyEm": "(emRunTopKmh {top:n} + the dial's {hq:n} км/ч rounding + EM_CLOSING_MIN_KMH {closing:n}) / 3.6 / emActorAccelMps2 {accel:n} = {arm:n2} s + emResponseWindowSec {win:n} s + its {jit:n} s spread + the harness's {lag:n} s lag allowance + the harness's {margin:n} s",
+  "pace.capSized": " and at or under emRunTopKmh {cap:n} км/ч",
+  "obs.paceHeld": "one run of {run:n1} s on the profile clock from its first reading at t={from:n}s (flat odometer {odo:n1} m there): every read dial over {floor:n} км/ч by its rounding and at or under the posted {disc:n}, the disc it started under (no other disc read inside it; {discUnread:n} tick(s) inside it with the disc unread){cap:opt}{drop:opt}, no rest held, {unread:n} unread tick(s) inside it not credited — against the sized {target:n1} s",
+  "pace.capHeld": ", and at or under emRunTopKmh {cap:n} км/ч",
+  "pace.dropHeld": ", and no reading {lim:n} км/ч or more under the fastest of the {win:n} s before it (the largest such gap read {max:n} км/ч)",
+  "obs.paceBroken": "the first run broke at t={at:n}s after {run:n1} s on the profile clock, against the sized {target:n1} s: {why:frag}",
+  "pace.brokeFloor": "the dial read {kmh:n} км/ч, not over {floor:n} км/ч by its {hq:n} км/ч rounding",
+  "pace.brokeDisc": "the dial read {kmh:n} км/ч, over the posted {disc:n}",
+  "pace.brokeDiscChange": "the posted disc read {disc:n} км/ч, not the {was:n} the run started under",
+  "pace.brokeCap": "the dial read {kmh:n} км/ч, over emRunTopKmh {cap:n} км/ч",
+  "pace.brokeDrop": "the dial read {kmh:n} км/ч, {gap:n} км/ч under the fastest reading of the {win:n} s before it",
+  "readings.pace": "disc {disc:n|NOT SEEN} ({changes:n} change(s), {unreadDisc:n} unread tick(s)) · first run {first:n1} s (sized {target:n1} s){broke:opt} · top {top:n|NOT RECORDED} км/ч · the first run's own readings (its start reading and each reading it credited{notBroke:opt}): lowest {low:n|-} км/ч{gap:opt} · governor commands the harness applied: throttle held down {down:n} tick(s), pulsed {pulse:n} ({pulseMs:r} ms in all), let up {up:n} · {unread:n} unread dial reading(s)",
+  "pace.brokeAt": ", broken at t={at:n}s",
+  "pace.gapRead": ", largest gap under the fastest reading of the {win:n} s before it {gap:n|-} км/ч",
+  // H1 ROUND 5 (R4-READINGS-GAP-EXCLUDES-BREAK): the readings line says whose readings its lowest and its largest gap are.
+  "pace.notBroke": ", not the reading that broke it",
+  "sizing.impact": "no rest from the first flat tick until the harness's count of impact-flash element mounts reads over its base — its reading on the first flat tick, or 0 when its first reading after unread flat tick(s) is 0 — at the plain flat throttle every wrong leg uses (no governor); a first reading over 0 after unread flat tick(s), or a count under its reading before, ends the profile with nothing held; the flat odometer ceiling lies past debrisRouteM {route:n} m of route on any odometer ratio up to {ratio:n}",
+  "obs.impact": "the harness's count of impact-flash element mounts read {n:n} at t={at:n}s, over {base:frag}, with the flat odometer at {odo:n1} m and the dial at {kmh:n|UNREAD} км/ч (the reading before it {prev:n|UNREAD} км/ч); no rest was taken from the first flat tick",
+  "impact.baseFirst": "{base:n} at the first flat tick",
+  "impact.baseZero": "0, its first reading, at t={at:n}s after {k:n} unread flat tick(s): a count that reads 0 had no mounts before it",
+  "obs.impactBaseUnread": "the harness's count of impact-flash element mounts was unread on the first {k:n} flat tick(s), and its first reading at t={at:n}s read {n:n}, over 0: mounts on the unread tick(s) and mounts before the first flat tick read the same, and nothing was held from a guess",
+  "obs.impactFell": "the harness's count of impact-flash element mounts read {n:n} at t={at:n}s, under the {was:n} it read before: the count restarted, and nothing was held from a guess",
+  "readings.impact": "impact-flash element mounts {n:n|UNREAD} (first flat tick {first:n|UNREAD}, base {base:n|UNREAD}), {unread:n} unread count(s) · top {top:n|NOT RECORDED} км/ч · last {last:n|UNREAD} км/ч",
+  "sizing.brake": "braking to rest is booked on the first tick whose rear proximity badge reads under REAR_CUE_WARN_M {warn:n} m by its {rq:n} m rounding and whose dial reads at or over harshBrakeMinSpeedKmh {min:n} км/ч and at or under the {roomKmh:n} км/ч its stop room is sized at, each by its {dq:n} км/ч rounding, and never on a tick that reaches a ceiling; the full brake in the model is BRAKE_FORCE_N {force:n} N / CHASSIS_MASS {mass:n} kg = {full:n2} m/s², against harshBrakeDecelMps2 {decel:n} m/s² over harshBrakeSustainSec {sus:n} s; {ceiling:frag}",
+  "brake.ceiling": "at the {maxM:n} m flat odometer ceiling, a flat odometer reading {ratio:n} of the true path is {routeM:n1} m along the route, and {routeM:n1} + a stop of up to {room:n} m ({model:frag}) + the harness's {resid:n} m = {total:n1} m, under ftgCalmZoneNearRouteM {zone:n} m; {ratio:n} is the lowest reading in the harness's odometer census of {legs:n} archived wrong legs ({mobile:n} of them mobile, measured {at:tok}), where this lesson's {pcLegs:n} pc legs read {pcLo:n}–{pcHi:n} and its {mLegs:n} mobile legs {mLo:n}–{mHi:n} — a census band, not a bound; the wall clock ceiling is {maxS:n} s",
+  "brake.room": "{kmh:n} км/ч over the model's full brake, after the reaction maximum {react:n} s of a census of {n:n} flat to flat-rest transitions on archived wrong legs",
+  "obs.brakeCheck": "the rear proximity badge read {m:n} м (under REAR_CUE_WARN_M {warn:n} m by its {rq:n} m rounding) and the dial read {kmh:n} км/ч (at or over harshBrakeMinSpeedKmh {min:n} by its {dq:n} км/ч rounding) at t={at:n}s with the flat odometer at {odo:n1} m; braking BOOKED — the throttle stays down to the end of this tick; each flat-rest tick after it lets the throttle up, and the first one whose dial does not read 0–{fs:n} км/ч puts the brake down",
+  "obs.rearBlind": "the rear proximity read did not come back from the probe at t={at:n}s, and nothing was booked from a guess",
+  "obs.rearUnread": "the rear proximity badge was on the page at t={at:n}s with a label the harness does not parse, and nothing was booked from a guess",
+  "readings.brake": "rear badge read on {reads:n} tick(s), absent on {absent:n} · nearest {min:n|-} м · {close:n} tick(s) whose badge read at or under {closeM:n} m (REAR_CUE_WARN_M {warn:n} less the badge's {rq:n} m rounding) · {fast:n} tick(s) whose dial read at or over {fastKmh:n} км/ч (harshBrakeMinSpeedKmh {minKmh:n} plus the dial's {dq:n} км/ч rounding) · top {top:n|NOT RECORDED} км/ч{booked:opt}",
+  "brake.booked": " · braking booked at t={at:n}s at {kmh:n} км/ч with the badge at {m:n} м and the flat odometer at {odo:n1} m",
   // ── the clauses lesson-audit.mjs prints about a declared profile ──
   "rest.zone": "{hold:n}s on the profile clock — WRONG-LEG PROFILE {name:txt}: a hold sized from {thr:n} s (the {basis:tok} basis) + BAN_ZONE_REST_REGRADE_SEC {rg:n} s + the harness's {margin:n} s, sized at {at:tok}. The profile placed this rest by DEAD RECKONING, not by the pose: the harness reads the dev pose probe on every flat and flat-rest tick and records what it returns among its guidance samples, and no profile decision reads it.",
   "rest.plain": "{hold:n|?}s, the harness's ordinary hold (WRONG-LEG PROFILE {name:txt} is declared on this lane). The harness reads the dev pose probe on every flat and flat-rest tick and records what it returns among its guidance samples; no profile decision reads it.",
@@ -2818,6 +3091,59 @@ export const WRONG_LEG_PROFILES = new Map([
       maxMs: 60_000,
     }),
   ],
+  // ── HARNESS STAGE H1 (plan57 pedalLane 1–4): four more rows, pedals only ──
+  [
+    "sc-vp-telltale-red",
+    Object.freeze({
+      name: "steady-pace-past-the-red-lamp",
+      kind: "pace",
+      pace: "lamp",
+      row: "sc-vp-telltale-red:c172d48b — its antecedent: a wrong leg that takes no careless rest and keeps one steady pace at or under the posted disc past the red lamp and the kerb-side halt zone, for longer than WARNING_LAMP_REGRADE_SEC after the lamp's ignore point",
+      told: "take no careless rest from the first flat tick, pace the throttle on the dial to warningLampHeldPaceKmh at or under the posted disc, and count ONE run of readings under one disc, started on the first reading it credits that is at or over warningLampRunStartKmh by the dial's 0.5 км/ч rounding, with no drop of WARNING_LAMP_COMPLY_DROP_KMH inside WARNING_LAMP_REGRADE_SEC until it has lasted warningLampBillSec + WARNING_LAMP_REGRADE_SEC + a lag allowance + a margin on the profile clock, then rest on the ordinary cadence",
+      sizedBy: Object.freeze(["WARNING_LAMP_REGRADE_SEC", "WARNING_LAMP_COMPLY_DROP_KMH", "warningLampBillSec", "warningLampHeldPaceKmh", "warningLampRunStartKmh", "dialHalfQuantumKmh", "movingSpeedKmh", "paceDutyBase"]),
+      // (H1 round 3: 450 → 610, so the metre ceiling lies past a 6 s launch and the sized 37.7 s run at the posted 50:
+      // 43.7 × 50 / 3.6 = 606.9 m — the emergency row's own check.)
+      maxM: 610,
+      maxMs: 60_000,
+    }),
+  ],
+  [
+    "sc-vu-emergency",
+    Object.freeze({
+      name: "pace-over-the-yield-floor-through-the-approach",
+      kind: "pace",
+      pace: "em",
+      row: "sc-vu-emergency:155903c1 (critical) and sc-vu-emergency:4056508c (critical) — their antecedent: a wrong leg that takes no careless rest and holds a pace over emYieldSlowKmh + EM_SPEED_MARGIN_KMH and at or under the posted disc from its first flat tick through the emergency approach's response window",
+      told: "take no careless rest from the first flat tick, pace the throttle on the dial to a target between emYieldSlowKmh + EM_SPEED_MARGIN_KMH and the posted disc, and count ONE run of readings under one disc, each over that floor by the dial's 0.5 км/ч rounding and at or under the disc and emRunTopKmh, started on the first such reading, until it has lasted the sized run on the profile clock, then rest on the ordinary cadence",
+      sizedBy: Object.freeze(["emYieldSlowKmh", "EM_SPEED_MARGIN_KMH", "EM_CLOSING_MIN_KMH", "emActorAccelMps2", "emResponseWindowSec", "emResponseJitterSec", "emRunTopKmh", "dialHalfQuantumKmh", "paceDutyBase"]),
+      maxM: 400,
+      maxMs: 40_000,
+    }),
+  ],
+  [
+    "sc-hz-brake-dont-swerve",
+    Object.freeze({
+      name: "no-rest-into-the-obstacle",
+      kind: "to-impact",
+      row: "sc-hz-brake-dont-swerve:f0023997 — its antecedent: the drill's own mistake-late-brake, a wrong leg that takes no rest into the obstacle at the plain flat throttle; its frames are the impact-flash element and the views after it",
+      told: "hold every careless rest back from the first flat tick, at the plain flat throttle every wrong leg uses (no governor), until the harness's count of impact-flash element mounts reads over its base, then rest on the ordinary cadence; a first reading over 0 after unread flat tick(s), or a count under its reading before, ends the profile with nothing held",
+      sizedBy: Object.freeze(["debrisRouteM", "dialHalfQuantumKmh"]),
+      maxM: 185,
+      maxMs: 45_000,
+    }),
+  ],
+  [
+    "sc-follow-tailgater",
+    Object.freeze({
+      name: "brake-check-the-tailgater",
+      kind: "brake-check",
+      row: "sc-follow-tailgater:63c0c28c (critical) — its antecedent: a wrong leg that brakes to rest in the live lane from harshBrakeMinSpeedKmh or more, with the car behind closed up on the rear proximity badge, short of the calm zone",
+      told: "hold every careless rest back at the plain flat throttle every wrong leg uses (no governor) until one tick reads the rear proximity badge under REAR_CUE_WARN_M and the dial at harshBrakeMinSpeedKmh or more, then book braking to rest on that tick when it has not reached a ceiling; the badge is read off the page on every tick, and a read that did not come back, or a label that does not parse, ends the profile with nothing booked",
+      sizedBy: Object.freeze(["REAR_CUE_WARN_M", "rearBadgeHalfQuantumM", "harshBrakeMinSpeedKmh", "harshBrakeDecelMps2", "harshBrakeSustainSec", "ftgCalmZoneNearRouteM", "dialHalfQuantumKmh", "fullStopMaxSpeedKmh", "BRAKE_FORCE_N", "CHASSIS_MASS"]),
+      maxM: 64,
+      maxMs: 10_000,
+    }),
+  ],
 ]);
 
 /** Profiles that were in the table and were TAKEN OUT on evidence, with the
@@ -3018,7 +3344,88 @@ function sizingLabelSpec(decl) {
   if (decl.kind === "zone-rest") {
     return profileText("sizing.labelZone", { at: PROFILE_SIZED_AT, world: decl.zone.world + ".json", trace: ZONE_TRACE_FILE });
   }
-  return profileText("sizing.label", { at: PROFILE_SIZED_AT });
+  // HARNESS STAGE H1: a profile sized from constants of more than one commit names every one of them, in the
+  // order `PROFILE_SIZED_COMMITS` lists them; one sized at a single commit keeps the label that stood.
+  const ats = PROFILE_SIZED_COMMITS.filter((c) => decl.sizedBy.some((k) => PROFILE_DESIGN[k].at === c));
+  if (ats.length === 1 && ats[0] === PROFILE_SIZED_AT) return profileText("sizing.label", { at: PROFILE_SIZED_AT });
+  return profileText("sizing.labelAt", { at: ats });
+}
+
+/** The sized run of a `pace` profile, in seconds, and the template that says
+ *  where it comes from — from the design constants and the governor's target. Pure. */
+function paceRunSizing(decl, own) {
+  const m = PROFILE_SUSTAIN_MARGIN_SEC;
+  if (decl.pace === "lamp") {
+    return {
+      // H1 ROUND 3 (N5a): + the lag allowance, on the ratio the emergency run's is.
+      runSec: own.warningLampBillSec + own.WARNING_LAMP_REGRADE_SEC + LAMP_RUN_LAG_MARGIN_SEC + m,
+      why: profileText("pace.whyLamp", { lampSec: own.warningLampBillSec, rg: own.WARNING_LAMP_REGRADE_SEC, lag: LAMP_RUN_LAG_MARGIN_SEC, margin: m, pace: own.warningLampHeldPaceKmh }),
+    };
+  }
+  // H1 ROUND 2 (N5): the arm is sized on the run's TOP — the fastest a credited reading may be — plus the dial's
+  // rounding, never on the governor's target; then the window, its spread, the lag allowance and the margin.
+  const top = own.emRunTopKmh;
+  const hq = own.dialHalfQuantumKmh;
+  const arm = (top + hq + own.EM_CLOSING_MIN_KMH) / 3.6 / own.emActorAccelMps2;
+  return {
+    runSec: arm + own.emResponseWindowSec + own.emResponseJitterSec + EM_RUN_LAG_MARGIN_SEC + m,
+    why: profileText("pace.whyEm", { top, hq, closing: own.EM_CLOSING_MIN_KMH, accel: own.emActorAccelMps2, arm, win: own.emResponseWindowSec, jit: own.emResponseJitterSec, lag: EM_RUN_LAG_MARGIN_SEC, margin: m }),
+  };
+}
+
+/** A `pace` profile's numbers: the governor's target, the run's floor, the drop
+ *  limit (the lamp only) and the sized run. Pure. */
+function paceNumbers(decl, own) {
+  const hq = own.dialHalfQuantumKmh;
+  const lamp = decl.pace === "lamp";
+  const floor = lamp ? own.movingSpeedKmh : own.emYieldSlowKmh + own.EM_SPEED_MARGIN_KMH;
+  const target = lamp ? own.warningLampHeldPaceKmh : floor + EM_PACE_ABOVE_FLOOR_KMH;
+  const { runSec, why } = paceRunSizing(decl, own);
+  return {
+    targetKmh: target,
+    floorKmh: floor,
+    dropLimitKmh: lamp ? own.WARNING_LAMP_COMPLY_DROP_KMH - 2 * hq : null,
+    dropWindowSec: lamp ? own.WARNING_LAMP_REGRADE_SEC : null,
+    // H1 ROUND 2 (N5): the emergency run credits no reading over the top its arm is sized on.
+    runTopKmh: lamp ? null : own.emRunTopKmh,
+    // H1 ROUND 3 (N5a): the lamp run starts past the launch; the emergency run starts on its floor (null: no other start).
+    startKmh: lamp ? own.warningLampRunStartKmh : null,
+    runSec,
+    why,
+  };
+}
+
+/** The brake-check's metre ceiling, as the arithmetic its sizing sentence prints (H1 round 2, F4): the route a
+ *  booking under the ceiling can lie at on a flat odometer reading `BRAKE_CHECK_ODO_RATIO` of the true path, plus the
+ *  stop and the harness's residual, against the calm zone. Pure. */
+function brakeCeilingSpec(decl, own) {
+  const room = Number(brakeCheckRoomM(own).toFixed(1));
+  const routeM = decl.maxM / BRAKE_CHECK_ODO_RATIO;
+  const AW = ODO_CENSUS_ALL_WRONG_LEGS;
+  const OWN = ODO_CENSUS_BRAKE_CHECK;
+  return profileText("brake.ceiling", {
+    maxM: decl.maxM, ratio: BRAKE_CHECK_ODO_RATIO, routeM, room, resid: BRAKE_CHECK_RESIDUAL_M, total: routeM + room + BRAKE_CHECK_RESIDUAL_M, zone: own.ftgCalmZoneNearRouteM,
+    model: profileText("brake.room", { kmh: BRAKE_CHECK_ROOM_KMH, react: ZONE_REST_REACT_MAX_S, n: REACTION_CENSUS.transitions }),
+    legs: AW.legs, mobile: AW.mobileLegs, at: AW.measured,
+    pcLegs: OWN.pc.legs, pcLo: OWN.pc.min, pcHi: OWN.pc.max, mLegs: OWN.mobile.legs, mLo: OWN.mobile.min, mHi: OWN.mobile.max,
+    maxS: decl.maxMs / 1000,
+  });
+}
+
+/** The stop the brake-check's ceilings leave room for: the fastest the flat throttle is seen to reach on a
+ *  posted-50 map (the round-1 verifier's 58.9 km/h terminal, rounded up to 60) over the model's full brake,
+ *  after the reaction census's maximum. Pure. */
+export const BRAKE_CHECK_ROOM_KMH = 60;
+/** H1 ROUND 3 (R2-F5): the brake-check's two lines, each the one its booking tests AND its readings tally print — a badge
+ *  reading at or under REAR_CUE_WARN_M less its rounding, a dial reading at or over harshBrakeMinSpeedKmh plus its. Pure. */
+function brakeCloseAtM(c) {
+  return c.REAR_CUE_WARN_M - c.rearBadgeHalfQuantumM;
+}
+function brakeFastAtKmh(c) {
+  return c.harshBrakeMinSpeedKmh + DIAL_HALF_QUANTUM_KMH;
+}
+function brakeCheckRoomM(own) {
+  return stopDistanceM(BRAKE_CHECK_ROOM_KMH, { reactS: ZONE_REST_REACT_MAX_S, decel: own.BRAKE_FORCE_N / own.CHASSIS_MASS });
 }
 
 /** The SIZING clause a line prints: the design constants the profile was
@@ -3079,6 +3486,29 @@ function sizingSpec(decl, own, extra = {}) {
       force: own.BRAKE_FORCE_N,
       mass: own.CHASSIS_MASS,
       decel: own.BRAKE_FORCE_N / own.CHASSIS_MASS,
+    });
+  } else if (decl.kind === "pace") {
+    const P = paceNumbers(decl, own);
+    detail = profileText("sizing.pace", {
+      governor: profileText("pace.governor", {
+        target: P.targetKmh, full: P.targetKmh - PACE_FULL_BAND_KMH, base: own.paceDutyBase, gain: PACE_DUTY_GAIN_PER_KMH, pulseLoMs: PACE_MIN_PULSE_MS, pulseHiMs: PACE_MAX_PULSE_MS,
+      }),
+      floor: P.floorKmh,
+      hq: own.dialHalfQuantumKmh,
+      cap: P.runTopKmh === null ? null : profileText("pace.capSized", { cap: P.runTopKmh }),
+      drop: P.dropLimitKmh === null ? null : profileText("pace.drop", { win: P.dropWindowSec, lim: P.dropLimitKmh, drop: own.WARNING_LAMP_COMPLY_DROP_KMH }),
+      start: P.startKmh === null ? null : profileText("pace.startLamp", { start: P.startKmh, hq: own.dialHalfQuantumKmh, pace: own.warningLampHeldPaceKmh, drop: own.WARNING_LAMP_COMPLY_DROP_KMH }),
+      run: P.runSec,
+      why: P.why,
+    });
+  } else if (decl.kind === "to-impact") {
+    detail = profileText("sizing.impact", { route: own.debrisRouteM, ratio: Number((decl.maxM / own.debrisRouteM).toFixed(3)) });
+  } else if (decl.kind === "brake-check") {
+    const decel = own.BRAKE_FORCE_N / own.CHASSIS_MASS;
+    detail = profileText("sizing.brake", {
+      warn: own.REAR_CUE_WARN_M, rq: own.rearBadgeHalfQuantumM, min: own.harshBrakeMinSpeedKmh, roomKmh: BRAKE_CHECK_ROOM_KMH, dq: own.dialHalfQuantumKmh,
+      force: own.BRAKE_FORCE_N, mass: own.CHASSIS_MASS, full: decel, decel: own.harshBrakeDecelMps2, sus: own.harshBrakeSustainSec,
+      ceiling: brakeCeilingSpec(decl, own),
     });
   }
   return profileText("sizing", { label: sizingLabelSpec(decl), detail });
@@ -3233,6 +3663,35 @@ export function createWrongLegProfile(scenario, { zoneSpan = null, platform = nu
       breaks: 0, stirs: 0, unreadTicks: 0, restAtSec: null,
     };
     st.sizedFrom = sizingSpec(decl, own, { thresholdSec: thr, basis: span.basis });
+  } else if (decl.kind === "pace") {
+    const P = paceNumbers(decl, own);
+    st.pace = {
+      mode: decl.pace,
+      goalKmh: P.targetKmh, floorKmh: P.floorKmh, dropLimitKmh: P.dropLimitKmh, dropWindowSec: P.dropWindowSec, sizedRunSec: P.runSec, runTopKmh: P.runTopKmh, startKmh: P.startKmh,
+      // The disc, tick by tick: the last one read, how often it changed, how often it was unread.
+      postedKmh: null, discChanges: 0, discUnread: 0,
+      // H1 ROUND 2 (F3): the ONE disc the run is held under — the disc read when it started — and the ticks inside
+      // the run whose disc was unread.
+      runDiscKmh: null, runDiscUnread: 0,
+      // The readings of the trailing window on the profile clock (the lamp profile only).
+      recent: [],
+      // THE FIRST RUN — the only one that counts: started on its first qualifying reading (which credits nothing),
+      // grown on every later one, broken on the first reading that does not qualify.
+      started: false, runSec: 0, fromSec: null, fromOdoM: null, broken: false, brokeAtSec: null, broke: null,
+      runUnread: 0, lowKmh: null, maxGapKmh: null, topKmh: -1, unreadTicks: 0,
+      // The governor's commands, counted.
+      down: 0, up: 0, pulse: 0, pulseMs: 0,
+    };
+    st.sizedFrom = sizingSpec(decl, own);
+  } else if (decl.kind === "to-impact") {
+    // H1 ROUND 2 (F2): the first flat tick's reading (`first`, null when unread — `firstSeen` says the tick has run),
+    // the base and how it was taken (`baseAtSec`/`baseAfter`: the tick and the unread flat ticks before it when the base
+    // is a first reading of 0 after unread ones), and the last reading (`lastN`) a falling count is measured against.
+    st.impact = { base: null, n: null, unread: 0, topKmh: -1, lastKmh: null, heldAt: null, firstSeen: false, first: null, baseAtSec: null, baseAfter: 0, lastN: null };
+    st.sizedFrom = sizingSpec(decl, own);
+  } else if (decl.kind === "brake-check") {
+    st.brake = { reads: 0, absent: 0, minM: null, close: 0, fast: 0, topKmh: -1, booked: null };
+    st.sizedFrom = sizingSpec(decl, own);
   }
   return st;
 }
@@ -3260,8 +3719,15 @@ function sayLine(loud, tpl, f) {
  *   probeAt         — the wall clock taken immediately BEFORE the probe that
  *                     read `kmh` (lesson-audit's `tickStart`); only the
  *                     finish-open profile reads it
+ *   rear            — `parseRearProximity(p.rearProx)` (H1: the brake-check)
+ *   impact          — the page-side count of impact-flash element mounts, or
+ *                     null when unread (H1: no rest into the obstacle)
  *
- * @returns {{state:object, suppressRest:boolean, forceRest:boolean, say:null|{loud:boolean,line:string}}}
+ * A `pace` profile's step also carries `pedal` — the governor's throttle
+ * command for this tick (`pacePedal`), or `null` on the tick it stops; no
+ * other step carries the key, so every other lane keeps the plain throttle.
+ *
+ * @returns {{state:object, suppressRest:boolean, forceRest:boolean, say:null|{loud:boolean,line:string}, pedal?:null|{act:string,ms:null|number}}}
  */
 export function wrongLegFlatStep(state, tick = {}) {
   if (!state || state.on !== true || state.active !== true) return { state, ...NEUTRAL_PROFILE_STEP };
@@ -3542,7 +4008,218 @@ export function wrongLegFlatStep(state, tick = {}) {
         }
       }
     }
+  } else if (s.kind === "pace") {
+    // HARNESS STAGE H1 — THE PACE. The governor's command for this tick
+    // (`pacePedal`, the throttle only), and ONE run of readings: each reading
+    // over the floor by the dial's rounding, at or under the last disc read,
+    // and — on the lamp profile — not `dropLimitKmh` or more under the fastest
+    // reading of the trailing window on the profile clock.
+    const P = s.pace;
+    const hq = DIAL_HALF_QUANTUM_KMH;
+    const posted = fin(tick.postedKmh) !== null && tick.postedKmh > 0 ? tick.postedKmh : null;
+    if (posted === null) {
+      P.discUnread += 1;
+    } else {
+      if (P.postedKmh !== null && posted !== P.postedKmh) P.discChanges += 1;
+      P.postedKmh = posted;
+    }
+    // H1 ROUND 2 (F1): the command is COUNTED only once it is handed out — after the ceilings, below — never on the
+    // tick the profile stops, where the harness applies the plain flat throttle instead.
+    out.pedal = pacePedal(dial, { targetKmh: P.goalKmh, dtMs: fin(tick.dtMs) });
+    if (dial !== null && dial > P.topKmh) P.topKmh = dial;
+    if (dial === null) {
+      // No dial is no reading: the run neither grows nor breaks, and the tick is counted.
+      P.unreadTicks += 1;
+      if (P.started && !P.broken) P.runUnread += 1;
+    } else {
+      let gap = null;
+      if (P.dropWindowSec !== null) {
+        while (P.recent.length > 0 && P.recent[0].at < s.clockMs - P.dropWindowSec * 1000) P.recent.shift();
+        // H1 ROUND 5: a reading at or over every reading of the window is 0 км/ч under its fastest, never a negative gap.
+        gap = P.recent.length > 0 ? Math.max(0, Math.max(...P.recent.map((r) => r.kmh)) - dial) : 0;
+        P.recent.push({ at: s.clockMs, kmh: dial });
+      }
+      // H1 ROUND 2 (F3): inside the run a reading is tested against the ONE disc the run started under, and a disc read
+      // inside it that is not that disc breaks it; before the run, against the disc last read. (N5: the emergency
+      // run also credits no reading over its top, runTopKmh.)
+      const disc = P.started ? P.runDiscKmh : P.postedKmh;
+      const floorOk = dial - hq > P.floorKmh;
+      const discSame = !P.started || posted === null || posted === P.runDiscKmh;
+      const discOk = disc !== null && dial <= disc;
+      const capOk = P.runTopKmh === null || dial <= P.runTopKmh;
+      const dropOk = gap === null || gap < P.dropLimitKmh;
+      const qualifies = floorOk && discSame && discOk && capOk && dropOk;
+      // H1 ROUND 3 (N5a): …and the lamp run starts only on a reading past the launch — at or over its start by the dial's
+      // rounding; a qualifying reading under it before the run starts neither starts nor breaks it.
+      const startOk = P.startKmh === null || dial - hq >= P.startKmh;
+      if (!P.started) {
+        if (qualifies && startOk) {
+          P.started = true;
+          P.fromSec = atSec;
+          P.fromOdoM = s.odoM;
+          P.lowKmh = dial;
+          // H1 ROUND 5 (R4-READINGS-GAP-EXCLUDES-BREAK): the run's own readings are its start reading and each reading it
+          // credits — the lowest and the largest gap are taken over the same readings (the reading that breaks it is not one).
+          P.maxGapKmh = gap;
+          P.runDiscKmh = P.postedKmh;
+        }
+      } else if (!P.broken) {
+        if (qualifies) {
+          P.runSec += dtSec;
+          if (dial < P.lowKmh) P.lowKmh = dial;
+          if (gap !== null && gap > P.maxGapKmh) P.maxGapKmh = gap;
+        } else {
+          P.broken = true;
+          P.brokeAtSec = atSec;
+          P.broke = !discSame
+            ? profileText("pace.brokeDiscChange", { disc: posted, was: P.runDiscKmh })
+            : !floorOk
+              ? profileText("pace.brokeFloor", { kmh: dial, floor: P.floorKmh, hq })
+              : !discOk
+                ? profileText("pace.brokeDisc", { kmh: dial, disc })
+                : !capOk
+                  ? profileText("pace.brokeCap", { kmh: dial, cap: P.runTopKmh })
+                  : profileText("pace.brokeDrop", { kmh: dial, gap, win: P.dropWindowSec });
+        }
+      }
+    }
+    // …and a disc read inside the run on a tick whose dial was unread breaks it too, and a tick inside the run whose
+    // disc was unread is counted.
+    if (P.started && !P.broken && dial === null && posted !== null && posted !== P.runDiscKmh) {
+      P.broken = true;
+      P.brokeAtSec = atSec;
+      P.broke = profileText("pace.brokeDiscChange", { disc: posted, was: P.runDiscKmh });
+    }
+    if (P.started && !P.broken && posted === null) P.runDiscUnread += 1;
+    if (P.broken) {
+      s.active = false;
+      s.done = "run-broken";
+      s.observed = profileText("obs.paceBroken", { at: P.brokeAtSec, run: P.runSec, target: P.sizedRunSec, why: P.broke });
+      out.say = sayLine(true, "say.notHeld", { name: s.name, obs: s.observed });
+    } else if (P.started && P.runSec >= P.sizedRunSec) {
+      held(
+        "pace",
+        profileText("obs.paceHeld", {
+          run: P.runSec, from: P.fromSec, odo: P.fromOdoM, floor: P.floorKmh, disc: P.runDiscKmh, discUnread: P.runDiscUnread,
+          cap: P.runTopKmh === null ? null : profileText("pace.capHeld", { cap: P.runTopKmh }),
+          drop: P.dropLimitKmh === null ? null : profileText("pace.dropHeld", { lim: P.dropLimitKmh, win: P.dropWindowSec, max: P.maxGapKmh }),
+          unread: P.runUnread, target: P.sizedRunSec,
+        }),
+      );
+      s.active = false;
+      s.done = "held-as-sized";
+    } else {
+      out.suppressRest = true;
+    }
+  } else if (s.kind === "to-impact") {
+    // HARNESS STAGE H1 — NO REST INTO THE OBSTACLE. The harness's count of
+    // impact-flash element mounts (a page-side witness, so a 700 ms flash
+    // between two probes is still counted) — its first reading is the base.
+    const I = s.impact;
+    if (dial !== null && dial > I.topKmh) I.topKmh = dial;
+    const prev = I.lastKmh;
+    I.lastKmh = dial;
+    const n0 = fin(tick.impact);
+    const n = n0 === null || n0 < 0 ? null : n0;
+    // H1 ROUND 2 (F2): the base is the FIRST FLAT TICK's reading. When that tick is unread, a first reading of 0 is a
+    // certain base (a count that reads 0 had no mounts before it); a first reading over 0 cannot tell a mount on the
+    // unread ticks from one before the first flat tick, and is refused loudly — never absorbed into the base. A
+    // reading under the one before it (the page's count restarted) is refused the same way.
+    const firstTick = !I.firstSeen;
+    I.firstSeen = true;
+    if (firstTick) I.first = n;
+    const stop = (done, obs) => {
+      s.active = false;
+      s.done = done;
+      s.observed = obs;
+      out.say = sayLine(true, "say.notHeld", { name: s.name, obs });
+    };
+    if (n === null) {
+      I.unread += 1;
+      if (I.base === null) I.baseAfter += 1;
+      out.suppressRest = true;
+    } else if (I.lastN !== null && n < I.lastN) {
+      I.n = n;
+      stop("count-fell", profileText("obs.impactFell", { n, at: atSec, was: I.lastN }));
+    } else if (I.base === null && !firstTick && n > 0) {
+      I.n = n;
+      I.lastN = n;
+      stop("base-unread", profileText("obs.impactBaseUnread", { k: I.baseAfter, at: atSec, n }));
+    } else {
+      if (I.base === null) {
+        I.base = n;
+        if (!firstTick) I.baseAtSec = atSec;
+      }
+      I.n = n;
+      I.lastN = n;
+      if (n > I.base) {
+        I.heldAt = atSec;
+        const base = I.baseAtSec === null ? profileText("impact.baseFirst", { base: I.base }) : profileText("impact.baseZero", { at: I.baseAtSec, k: I.baseAfter });
+        held("impact", profileText("obs.impact", { n, at: atSec, base, odo: s.odoM, kmh: dial, prev }));
+        s.active = false;
+        s.done = "held-as-sized";
+      } else {
+        out.suppressRest = true;
+      }
+    }
+  } else if (s.kind === "brake-check") {
+    // HARNESS STAGE H1 — BRAKE-CHECK THE CAR BEHIND. The rear gap is the PROX
+    // badge OBSERVED on the page (`parseRearProximity`); a read that did not
+    // come back, or a label that does not parse, ends the profile loudly and
+    // books nothing — no guess, and no pose.
+    const B = s.brake;
+    if (dial !== null && dial > B.topKmh) B.topKmh = dial;
+    const r = tick.rear && typeof tick.rear === "object" ? tick.rear : null;
+    if (r === null || r.ok !== true) {
+      s.active = false;
+      s.done = "blind";
+      s.observed = profileText("obs.rearBlind", { at: atSec });
+      out.say = sayLine(true, "say.notHeld", { name: s.name, obs: s.observed });
+    } else if (r.present === true && (r.parsed !== true || fin(r.meters) === null)) {
+      s.active = false;
+      s.done = "unreadable";
+      s.observed = profileText("obs.rearUnread", { at: atSec });
+      out.say = sayLine(true, "say.notHeld", { name: s.name, obs: s.observed });
+    } else {
+      out.suppressRest = true;
+      if (r.present === true) {
+        B.reads += 1;
+        if (B.minM === null || r.meters < B.minM) B.minM = r.meters;
+      } else {
+        B.absent += 1;
+      }
+      // H1 ROUND 3 (R2-F5): each test is the ONE line readings.brake prints for its tally — the badge at or under
+      // REAR_CUE_WARN_M less its rounding, the dial at or over harshBrakeMinSpeedKmh plus its rounding (the same tests as
+      // before, written as the lines they are, so a tally can never be counted against a line other than the one it names).
+      const closed = r.present === true && r.meters <= brakeCloseAtM(s.c);
+      const fast = dial !== null && dial >= brakeFastAtKmh(s.c);
+      // H1 ROUND 2 (F4): …and no faster than the speed its stop room is sized at, by the dial's rounding — a booking
+      // over it would outrun the room the ceiling sentence prints.
+      const inRoom = dial !== null && dial + DIAL_HALF_QUANTUM_KMH <= BRAKE_CHECK_ROOM_KMH;
+      if (closed) B.close += 1;
+      if (fast) B.fast += 1;
+      // H1 ROUND 2 (F4): the ceilings are checked BEFORE the booking — a tick that reaches one books nothing, and the
+      // ceiling below releases the profile on it.
+      const underCeilings = s.odoM < s.maxM && s.ms < s.maxMs;
+      if (closed && fast && inRoom && underCeilings) {
+        B.booked = { atSec, kmh: dial, m: r.meters, odoM: Number(s.odoM.toFixed(1)) };
+        s.restsForced += 1;
+        out.forceRest = true;
+        out.suppressRest = false;
+        held(
+          "brake-check",
+          profileText("obs.brakeCheck", {
+            m: r.meters, warn: s.c.REAR_CUE_WARN_M, rq: s.c.rearBadgeHalfQuantumM, kmh: dial, min: s.c.harshBrakeMinSpeedKmh, dq: DIAL_HALF_QUANTUM_KMH,
+            at: atSec, odo: s.odoM, fs: s.c.fullStopMaxSpeedKmh,
+          }),
+        );
+        s.active = false;
+        s.done = "held-as-sized";
+      }
+    }
   }
+  // HARNESS STAGE H1: the governor's command rides out only while the profile is still running after this
+  // tick; a profile that stops here hands the leg back to the plain flat throttle on this very tick.
 
   // THE CEILINGS — after the tick's readings, so a target met on the ceiling
   // tick still counts. (A profile whose readings held as sized is no longer
@@ -3562,6 +4239,18 @@ export function wrongLegFlatStep(state, tick = {}) {
       out.suppressRest = false;
       s.observed = profileText("obs.ceiling", { why });
       out.say = sayLine(true, "say.notHeld", { name: s.name, obs: s.observed });
+    }
+  }
+  if (out.pedal !== undefined && s.active !== true) out.pedal = null;
+  // H1 ROUND 2 (F1): THE GOVERNOR'S TALLY IS THE ACTS THE HARNESS APPLIES — a command is counted here, once it rides
+  // out; the harness applies every truthy `pedal` through `paceThrottle`, and the plain flat throttle otherwise.
+  if (out.pedal) {
+    const P = s.pace;
+    if (out.pedal.act === "down") P.down += 1;
+    else if (out.pedal.act === "up") P.up += 1;
+    else {
+      P.pulse += 1;
+      P.pulseMs += out.pedal.ms;
     }
   }
   // A HELD flat tick is one whose rest the profile actually held back — counted
@@ -3645,8 +4334,11 @@ export function zoneRestEngaged(state) {
 }
 
 /** After a pause drain a `wrong` leg re-presses the throttle. Not while it is
- *  standing out a zone rest. `true` on every other lane. */
+ *  standing out a zone rest, and not while a `pace` profile governs it (H1:
+ *  its next flat tick hands out the throttle command; a re-press would add a
+ *  whole-tick surge to the pace). `true` on every other lane. */
 export function resumeThrottleAfterPause(state) {
+  if (state && state.on === true && state.active === true && state.kind === "pace") return false;
   return !zoneRestEngaged(state);
 }
 
@@ -3928,6 +4620,29 @@ function readingsSpec(state) {
       rain: L.rainLineSec === null ? null : profileText("readings.leadRain", { base: L.baseLineSec, rain: L.rainLineSec, best: L.rainBestSec, sus: L.rainSustainSec }),
       rule: L.lessonRuleSec === null ? null : profileText("readings.leadRule", { sec: L.underLessonRuleSec, rule: L.lessonRuleSec, at: PROFILE_SIZED_AT }),
       top: L.topKmh >= 0 ? L.topKmh : null,
+    });
+  }
+  if (state.kind === "pace") {
+    const P = state.pace;
+    return profileText("readings.pace", {
+      disc: P.postedKmh, changes: P.discChanges, unreadDisc: P.discUnread, first: P.runSec, target: P.sizedRunSec,
+      broke: P.broken ? profileText("pace.brokeAt", { at: P.brokeAtSec }) : null,
+      top: P.topKmh >= 0 ? P.topKmh : null, notBroke: P.broken ? profileText("pace.notBroke") : null, low: P.lowKmh,
+      gap: P.dropWindowSec === null ? null : profileText("pace.gapRead", { win: P.dropWindowSec, gap: P.maxGapKmh }),
+      down: P.down, pulse: P.pulse, pulseMs: P.pulseMs, up: P.up, unread: P.unreadTicks,
+    });
+  }
+  if (state.kind === "to-impact") {
+    const I = state.impact;
+    return profileText("readings.impact", { n: I.n, first: I.first, base: I.base, unread: I.unread, top: I.topKmh >= 0 ? I.topKmh : null, last: I.lastKmh });
+  }
+  if (state.kind === "brake-check") {
+    const B = state.brake;
+    return profileText("readings.brake", {
+      reads: B.reads, absent: B.absent, min: B.minM, close: B.close, closeM: brakeCloseAtM(state.c), warn: state.c.REAR_CUE_WARN_M, rq: state.c.rearBadgeHalfQuantumM,
+      fast: B.fast, fastKmh: brakeFastAtKmh(state.c), minKmh: state.c.harshBrakeMinSpeedKmh, dq: DIAL_HALF_QUANTUM_KMH,
+      top: B.topKmh >= 0 ? B.topKmh : null,
+      booked: B.booked === null ? null : profileText("brake.booked", { at: B.booked.atSec, kmh: B.booked.kmh, m: B.booked.m, odo: B.booked.odoM }),
     });
   }
   const z = state.zone;
