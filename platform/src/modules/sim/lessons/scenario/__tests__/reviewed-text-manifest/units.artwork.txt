@@ -1,0 +1,88 @@
+content/signs/svg/a1.svg	57f03509cd81 eb9615c4dcdb
+content/signs/svg/a12.svg	57f03509cd81 95f8a1dae751
+content/signs/svg/a15.svg	57f03509cd81 ace8c95235d5
+content/signs/svg/a18.svg	57f03509cd81 b7234e561236
+content/signs/svg/a19.svg	57f03509cd81 52031b831452
+content/signs/svg/a2.svg	57f03509cd81 393e6d192d65
+content/signs/svg/a20.svg	57f03509cd81 684996563d9e
+content/signs/svg/a23.svg	57f03509cd81 238a626d0dd3
+content/signs/svg/a25.svg	57f03509cd81 d0f4d3be7900
+content/signs/svg/a26.svg	57f03509cd81 f10ff8a17358
+content/signs/svg/a28.svg	57f03509cd81 86e9fcc9b41a
+content/signs/svg/a29.svg	57f03509cd81 4e6de7ae99f7
+content/signs/svg/a3.svg	57f03509cd81 15c0d80bac33
+content/signs/svg/a30.svg	57f03509cd81 5fd76e36de8b
+content/signs/svg/a32.svg	57f03509cd81 54b40d16f3a6
+content/signs/svg/a33.svg	57f03509cd81 1936f86d99d2
+content/signs/svg/a39.svg	57f03509cd81 caba36f5dd2e
+content/signs/svg/a4.svg	57f03509cd81 b3be4adebe38
+content/signs/svg/a5.svg	0a465f66efe9 3b07bc0ecce7 3ccce1f4da94
+content/signs/svg/b1.svg	57f03509cd81 1956af33d4e5
+content/signs/svg/b2.svg	0a465f66efe9 2a130135c8d3 04dedf8afeb8
+content/signs/svg/b3.svg	57f03509cd81 f15d1a1a860e
+content/signs/svg/b4.svg	57f03509cd81 16bf9231639c
+content/signs/svg/b5.svg	57f03509cd81 12440ed29227
+content/signs/svg/b6.svg	57f03509cd81 c3b7e768b698
+content/signs/svg/d1.svg	57f03509cd81 35b0da40afda
+content/signs/svg/d11.svg	0a465f66efe9 0eb27c32150b 8f2d1e58f370
+content/signs/svg/d12.svg	0a465f66efe9 e71753e8e383 8f2d1e58f370
+content/signs/svg/d13.svg	189a257ec1ec fc7fdb8532ea b1c2143633af 624b60c58c9d
+content/signs/svg/d14.svg	189a257ec1ec 12eda11a8133 b1c2143633af 624b60c58c9d
+content/signs/svg/d15.svg	57f03509cd81 98624f97679f
+content/signs/svg/d16.svg	57f03509cd81 cc78364e3ce4
+content/signs/svg/d17.svg	57f03509cd81 2136b22b1d0d
+content/signs/svg/d19.svg	0a465f66efe9 74ae673deb84 5c62e091b8c0
+content/signs/svg/d24.svg	0a465f66efe9 d7b716a764cb 39cd750a8f43
+content/signs/svg/d4.svg	57f03509cd81 b0a50bcc5309
+content/signs/svg/d5.svg	57f03509cd81 d853abcd8f1e
+content/signs/svg/d6.svg	57f03509cd81 dcb312d487f1
+content/signs/svg/d9.svg	57f03509cd81 72b0bbf93d28
+content/signs/svg/e1.svg	57f03509cd81 9b53cd1cedc0
+content/signs/svg/e21.svg	57f03509cd81 8a8bb0526b3a
+content/signs/svg/e22.svg	6abbee1b037e cb6b9e7ba366 1c14f9e84498 1a6562590ef1 69f59c273b6e 2abaca4911e6 dbae772db290
+content/signs/svg/e7.svg	57f03509cd81 fb337806350a
+content/signs/svg/g1.svg	57f03509cd81 aeba48546cfe
+content/signs/svg/g12.svg	57f03509cd81 3d30091b47dc
+content/signs/svg/g15a.svg	57f03509cd81 7fad15a582b0
+content/signs/svg/g15b.svg	57f03509cd81 37067f9c911c
+content/signs/svg/g17.svg	0a465f66efe9 a026f89e7b81 1a6562590ef1
+content/signs/svg/g18.svg	0a465f66efe9 5e82fa570b95 1a6562590ef1
+content/signs/svg/g19.svg	57f03509cd81 5a5d616d7996
+content/signs/svg/g2.svg	57f03509cd81 96cdc29dc2a1
+content/signs/svg/g3.svg	57f03509cd81 593a85d4e001
+content/signs/svg/g4.svg	57f03509cd81 06127f1407fd
+content/signs/svg/g7.svg	57f03509cd81 20dc528c5151
+content/signs/svg/g9.svg	57f03509cd81 873be5de8836
+content/signs/svg/t1.svg	0a465f66efe9 b8fd3323f6ea 6c0310bcab30
+content/signs/svg/t10.svg	0a465f66efe9 c7a1186c2666 1ebaf2d668d3
+content/signs/svg/t13.svg	57f03509cd81 949b81c54c7e
+content/signs/svg/t15.svg	189a257ec1ec a91e50bbf91a e21dd4588621 da7b0ba8757e
+content/signs/svg/t2.svg	0a465f66efe9 2d94bf2fb560 e0cd417750e3
+content/signs/svg/v1.svg	57f03509cd81 7a21a2e92da7
+content/signs/svg/v12.svg	57f03509cd81 7eb212b057c9
+content/signs/svg/v14.svg	57f03509cd81 8a9725476bc9
+content/signs/svg/v2.svg	57f03509cd81 678612e8d750
+content/signs/svg/v21.svg	57f03509cd81 d271d1b52db0
+content/signs/svg/v22.svg	57f03509cd81 42a342852aea
+content/signs/svg/v23.svg	57f03509cd81 10fb3c448cb4
+content/signs/svg/v24.svg	57f03509cd81 c49f7798b51e
+content/signs/svg/v25.svg	57f03509cd81 cf5c89f3364b
+content/signs/svg/v26.svg	0a465f66efe9 c9bfe6554cab 39fa9ec190ee
+content/signs/svg/v27.svg	57f03509cd81 6d9ba2cef71c
+content/signs/svg/v28.svg	57f03509cd81 ce7a0d9a4cdc
+content/signs/svg/v3.svg	57f03509cd81 7e57dcd24e0f
+content/signs/svg/v31.svg	57f03509cd81 2cad8f07e901
+content/signs/svg/v33.svg	0a465f66efe9 aa7831d8b0c8 39fa9ec190ee
+content/signs/svg/v34.svg	57f03509cd81 900dddc354d4
+content/signs/svg/zh19.svg	0a465f66efe9 bc032997eaee ff5a1ae012af
+platform/public/sim/signs/faces/a19.svg	57f03509cd81 52031b831452
+platform/public/sim/signs/faces/d15.svg	57f03509cd81 98624f97679f
+platform/public/sim/signs/faces/d16.svg	57f03509cd81 cc78364e3ce4
+platform/public/sim/signs/faces/d4.svg	57f03509cd81 b0a50bcc5309
+platform/public/sim/signs/faces/d5.svg	57f03509cd81 d853abcd8f1e
+platform/public/sim/signs/faces/g2.svg	57f03509cd81 96cdc29dc2a1
+platform/public/sim/signs/faces/g3.svg	57f03509cd81 593a85d4e001
+platform/public/sim/signs/faces/g9.svg	57f03509cd81 873be5de8836
+platform/public/sim/signs/faces/v26.svg	0a465f66efe9 c9bfe6554cab 39fa9ec190ee
+platform/public/sim/signs/faces/v28.svg	57f03509cd81 ce7a0d9a4cdc
+platform/public/sim/signs/faces/v33.svg	0a465f66efe9 aa7831d8b0c8 39fa9ec190ee

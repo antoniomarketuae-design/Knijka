@@ -1,0 +1,19 @@
+{
+ "total": 566,
+ "duty": 83,
+ "exemption": 15,
+ "both": 6,
+ "other": 462,
+ "distractors": 43,
+ "bySurface": {
+  "catalog": 15,
+  "consequences": 4,
+  "concept": 32,
+  "n38": 3,
+  "template": 202,
+  "caption": 85,
+  "theory": 79,
+  "question": 139,
+  "source": 11
+ }
+}

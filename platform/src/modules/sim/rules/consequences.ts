@@ -2003,7 +2003,16 @@ const MANOEUVRE_AND_JUDGEMENT_ROADS: Partial<Record<ViolationCode, RoadConsequen
   POOR_LANE_KEEPING: {
     kind: "conditional",
     offenceBg: "неправилно разположение на превозното средство върху платното за движение",
-    duties: [D_KEEP_RIGHT],
+    // THE DUTY SHOWN IS THE ONE THE BANK HOLDS FOR THIS ACT (founder ruling
+    // 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW», round 3). This row used to show
+    // чл. 15, ал. 1 — «използва най-дясната свободна лента» — as the duty the
+    // student broke. That is the keep-right duty, which ал. 2, т. 2 switches off
+    // in a settlement on two or more marked lanes one way at ≤ 80 km/h, and this
+    // row is shown on exactly such streets (sc-ln-boulevard-discipline, 13.07,
+    // a town boulevard posted 40). Riding the line is a failure of CONTROL —
+    // чл. 20, ал. 1 binds on every road. The catalogue card cites the same
+    // article (rules/catalog.ts POOR_LANE_KEEPING).
+    duties: [D_CONTINUOUS_CONTROL],
     headlineBg:
       "На изпита това е грешка при всяко трайно излизане от средата на лентата. На пътя глоба има само ако разположението наистина нарушава правилата за разположение — а самите тези правила, къде минава колелото спрямо маркировката, са в ППЗДвП, който този продукт още не съдържа дословно. Затова съставът е показан, а не обещан.",
     controlPoints: CP_NOT_LISTED_PLACEMENT,
@@ -2502,13 +2511,9 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
       "т. 2",
       "нарушава правилата за разположение на пътно превозно средство върху платното за движение;",
     ),
-    duties: [
-      DUTY(
-        "чл. 15",
-        "ЗДвП чл. 15, ал. 1",
-        "На пътя водачът на пътно превозно средство се движи възможно най-вдясно по платното за движение, а когато пътните ленти са очертани с пътна маркировка, използва най-дясната свободна лента.",
-      ),
-    ],
+    // The keep-right duty, shown ONLY on this row: the engine bills this code
+    // only where ал. 1 binds (rules/engine.ts, `keepRightBinds`).
+    duties: [D_KEEP_RIGHT],
     fine: fine(50, null, F183("ал. 2", "т. 2", 50)),
     controlPoints: notListed(
       "Не е в изчерпателния списък по чл. 6, ал. 1. Една от най-евтините глоби в закона — и въпреки това причината за голяма част от задръстванията и за изпреварванията отдясно.",

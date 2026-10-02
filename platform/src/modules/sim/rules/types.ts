@@ -963,6 +963,25 @@ export interface SimTick {
    */
   motorway?: boolean;
   /**
+   * THE SETTLEMENT SIGNAL (founder ruling 2026-10-01 «KEEP-RIGHT FOLLOWS THE
+   * LAW»). `true` when the current edge is built as an ИЗВЪНГРАДСКИ ПЪТ —
+   * outside a settlement — by the SAME predicate the world builder dresses the
+   * road with (`world/builders/constants.isExtraUrbanCarriageway`: an
+   * AUTHORED posted limit of ≥ 90 km/h, the чл. 21 category-В ceiling outside
+   * a settlement). The map carries no Д11/Д12 placement and no settlement tag,
+   * and the posted limit is the term every map already has; reading the
+   * builder's predicate means the runtime says «outside» exactly where the
+   * student sees open road and not one edge more.
+   *
+   * Published ONLY in the true direction (`worldRuntime.ts`), so every town
+   * tick, recorded trace and hand-built fixture stays byte-identical. ABSENT
+   * means «inside a settlement or not known» — and the only reader,
+   * NOT_KEEPING_RIGHT (ЗДвП чл. 15, ал. 1 vs ал. 2, т. 2), acquits on it: a
+   * duty the law switches off in town is never billed on a road nobody showed
+   * to be out of town.
+   */
+  outsideSettlement?: boolean;
+  /**
    * Inside an authored "emergencyLane" zone span: the CURB lane (laneId 0 of
    * the vehicle's bank) is the лента за принудително спиране (ЗДвП чл. 58,
    * т. 3 — движение по нея е забранено освен при принудително спиране).
@@ -1006,6 +1025,18 @@ export type SeverityClass = "opasna" | "osnovna" | "vtorostepenna";
 export type ViolationPoints = 1 | 3 | 10;
 
 /** Official points per severity class — single source of truth. */
+/**
+ * ЗДвП чл. 15, ал. 2, т. 2 — the speed ceiling of the town exemption, km/h.
+ * RETRIEVED, not recalled: content/law/acts/zdvp.json, чл. 15, ал. 2, т. 2
+ * reads «в населените места, на пътно платно с две и повече пътни ленти за
+ * движение в една посока … по които е разрешено движението … със скорост не
+ * по-голяма от 80 кm/h». At or below it, inside a settlement, the driver «може
+ * да използва за движение най-удобната за него пътна лента» and
+ * NOT_KEEPING_RIGHT stands down (rules/engine.ts); above it ал. 1 binds again.
+ * `rules/__tests__/keep-right-law-pins.test.ts` pins this number to the bank.
+ */
+export const KEEP_RIGHT_TOWN_MAX_KMH = 80;
+
 export const SEVERITY_POINTS: Record<SeverityClass, ViolationPoints> = {
   opasna: 10,
   osnovna: 3,

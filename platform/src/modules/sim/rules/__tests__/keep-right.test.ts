@@ -7,8 +7,10 @@ import { codes, drive, tick } from "./fixtures";
 // lane for a clearly-guilty 17 s instead.)
 describe("keep-right detector", () => {
   it("fires after a prolonged stint in a left lane on a multi-lane road", () => {
+    // Outside a settlement — where чл. 15, ал. 1 binds (founder ruling
+    // 2026-10-01; the town case is keep-right-follows-the-law.test.ts).
     const ticks = Array.from({ length: 18 }, (_, t) =>
-      tick(t, { speedKmh: 40, laneId: 1, laneCount: 2 }),
+      tick(t, { speedKmh: 40, laneId: 1, laneCount: 2, outsideSettlement: true }),
     );
     expect(codes(drive(ticks).events)).toContain("NOT_KEEPING_RIGHT");
   });

@@ -1,0 +1,518 @@
+content/law/acts/naredba-24.json	77bb7f09229d 309509fe7b82 584f5c578529 00c4b7b9c4ff bf5dc362ed77
+content/law/acts/naredba-24.json · § 1 [12]	e4764eb0da69 c9497cff1e32 2bf763536314 7a4ee06867fd
+content/law/acts/naredba-24.json · § 13 [14]	e4764eb0da69 f550ea763dc5 2bf763536314 19b87e2e1aea
+content/law/acts/naredba-24.json · § 2 [13]	e4764eb0da69 bbe708b77ab5 2bf763536314 9e6c9e0215ee
+content/law/acts/naredba-24.json · приложение № 1 към чл. 2, ал. 2 [15]	e4764eb0da69 a1202961fe3f 39c4b42c8d11 6090fce75fe1
+content/law/acts/naredba-24.json · приложение № 2 към чл. 12 [16]	e4764eb0da69 eae2ccf99c86 39c4b42c8d11 07cc849c851a
+content/law/acts/naredba-24.json · чл. 1 [0]	c847a59db33c 0f6c9b7d025b 4f2d696ff46b
+content/law/acts/naredba-24.json · чл. 10 [9]	c847a59db33c 77508e031e4b 3ef336c0734c
+content/law/acts/naredba-24.json · чл. 11 [10]	c847a59db33c 932a3adf620a 671ce70c9231
+content/law/acts/naredba-24.json · чл. 12 [11]	c847a59db33c cadde49767f8 72d1051bb90f
+content/law/acts/naredba-24.json · чл. 2 [1]	c847a59db33c f529865919d5 cd61458360f1
+content/law/acts/naredba-24.json · чл. 3 [2]	c847a59db33c 7361d7c74ee6 a8c1657f9916
+content/law/acts/naredba-24.json · чл. 4 [3]	c847a59db33c 8cba974e8767 17368006a456
+content/law/acts/naredba-24.json · чл. 5 [4]	c847a59db33c 75f54ad9414d be882fc38a72
+content/law/acts/naredba-24.json · чл. 6 [5]	c847a59db33c c061006f898a 7de8d0572c5f
+content/law/acts/naredba-24.json · чл. 7 [6]	c847a59db33c cce3576e421d d218be57b71c
+content/law/acts/naredba-24.json · чл. 8 [7]	c847a59db33c 06ac9c551db9 fca800437cf7
+content/law/acts/naredba-24.json · чл. 9 [8]	c847a59db33c 47b82b4d9905 143ae827e339
+content/law/acts/naredba-38.json	a35303696fcc 032f27517ea6 e77be86b3099 d5006d2f6372
+content/law/acts/naredba-38.json · приложение № 1 [66]	e4764eb0da69 65ce906d438b 9c2fbf14f1ff 103e54903466
+content/law/acts/naredba-38.json · приложение № 2 [67]	e4764eb0da69 91bf86ee8276 340fbec8717c 998655be64a1
+content/law/acts/naredba-38.json · приложение № 2а [68]	e4764eb0da69 bfe9c9b85d2b f8eaf8b9bdc2 6ac10c32cb39
+content/law/acts/naredba-38.json · приложение № 3 [69]	e4764eb0da69 be086a020c54 5036f45209e6 746b2499256c
+content/law/acts/naredba-38.json · приложение № 3а [70]	e4764eb0da69 f7f34e4a3070 fdca55ded218 052769dbe112
+content/law/acts/naredba-38.json · приложение № 3б [71]	e4764eb0da69 0043ab3e2b1f 1e3428265568 0dfdbfa2e8e9
+content/law/acts/naredba-38.json · приложение № 4 [72]	e4764eb0da69 5ebf7a5276e3 f069f1211edf e355da95770e
+content/law/acts/naredba-38.json · приложение № 4а [73]	e4764eb0da69 d099b0b339c3 f069f1211edf e3ffd8996a40
+content/law/acts/naredba-38.json · приложение № 5 [74]	e4764eb0da69 2fe3164c02b3 5914cd808dd0 804c4fab9a0b
+content/law/acts/naredba-38.json · приложение № 6 [75]	e4764eb0da69 6ad995eef1e6 6e4d054b0535 1e6dd7c7874a
+content/law/acts/naredba-38.json · приложение № 7 [76]	e4764eb0da69 08ba3b15ef21 eef4d04b8794 1b5aaa33958e
+content/law/acts/naredba-38.json · приложение № 8 [77]	e4764eb0da69 d2789ded75e2 130d7653eba6 14562617312c
+content/law/acts/naredba-38.json · чл. 1 [0]	c847a59db33c 0f6c9b7d025b 2d7fa772f28e
+content/law/acts/naredba-38.json · чл. 10 [9]	c847a59db33c 77508e031e4b c76d876cc379
+content/law/acts/naredba-38.json · чл. 11 [10]	c847a59db33c 932a3adf620a 2754a74b9cc8
+content/law/acts/naredba-38.json · чл. 12 [11]	c847a59db33c cadde49767f8 76c491d84074
+content/law/acts/naredba-38.json · чл. 13 [12]	c847a59db33c 051072acc73d 18d786d4ea63
+content/law/acts/naredba-38.json · чл. 14 [13]	c847a59db33c d3fba48c61b8 215e526800b2
+content/law/acts/naredba-38.json · чл. 15 [14]	c847a59db33c bf61954e58ca 76db507079eb
+content/law/acts/naredba-38.json · чл. 16 [15]	c847a59db33c 963780e44954 9dc50876bf40
+content/law/acts/naredba-38.json · чл. 17 [16]	c847a59db33c d488e66fd794 b9ef7c974091
+content/law/acts/naredba-38.json · чл. 18 [17]	c847a59db33c a8a21696447c e78df8390698
+content/law/acts/naredba-38.json · чл. 18а [18]	3d36eff94640 e9edea1fa281 823c4eb3e895 89a6dd2ce95f
+content/law/acts/naredba-38.json · чл. 19 [19]	c847a59db33c fb5c5b540979 2a4cbfe6da60
+content/law/acts/naredba-38.json · чл. 2 [1]	c847a59db33c f529865919d5 ae0f1079a6af
+content/law/acts/naredba-38.json · чл. 20 [20]	c847a59db33c 86c7f0ec35f4 4d087c2f4209
+content/law/acts/naredba-38.json · чл. 21 [21]	c847a59db33c 5e5a96b4701a 23ee4a2351e1
+content/law/acts/naredba-38.json · чл. 22 [22]	c847a59db33c 9f50f0885e1b 6937856f6066
+content/law/acts/naredba-38.json · чл. 23 [23]	c847a59db33c 5197e61186f2 b4189d08e16b
+content/law/acts/naredba-38.json · чл. 24 [24]	c847a59db33c f526450a7c4a 1507328205e6
+content/law/acts/naredba-38.json · чл. 25 [25]	c847a59db33c c738a0105cbb 2a219725f729
+content/law/acts/naredba-38.json · чл. 26 [26]	c847a59db33c 439b6713e9a3 7bb38f74ea91
+content/law/acts/naredba-38.json · чл. 26а [27]	3d36eff94640 42d4ac3bd3cc 823c4eb3e895 54347f29f041
+content/law/acts/naredba-38.json · чл. 27 [28]	c847a59db33c 8e2c46b6c1ad c6a8f2ec9efc
+content/law/acts/naredba-38.json · чл. 28 [29]	c847a59db33c b703182ef2d9 edb90adc3c0d
+content/law/acts/naredba-38.json · чл. 29 [30]	c847a59db33c f5470321420b 87726836c63d
+content/law/acts/naredba-38.json · чл. 29а [31]	3d36eff94640 8b6de715d0f6 823c4eb3e895 3f78e88d9811
+content/law/acts/naredba-38.json · чл. 3 [2]	c847a59db33c 7361d7c74ee6 1a0112a3c33a
+content/law/acts/naredba-38.json · чл. 30 [32]	c847a59db33c 8b8c22ad2460 47defb98997f
+content/law/acts/naredba-38.json · чл. 31 [33]	c847a59db33c a8e8c0414170 fb0fd595a654
+content/law/acts/naredba-38.json · чл. 32 [34]	c847a59db33c d6cd3c5a2d5a f6ecda401d4f
+content/law/acts/naredba-38.json · чл. 33 [35]	c847a59db33c b1a65117e1d5 0725e1e4490a
+content/law/acts/naredba-38.json · чл. 34 [36]	c847a59db33c bc16583782bb 87d49a6b9450
+content/law/acts/naredba-38.json · чл. 35 [37]	c847a59db33c ad6c6bae71a7 9360ddfeded7
+content/law/acts/naredba-38.json · чл. 35а [38]	3d36eff94640 125f213f2f69 823c4eb3e895 81f7477426c6
+content/law/acts/naredba-38.json · чл. 36 [39]	c847a59db33c cdc2e5734943 8c4059c87d77
+content/law/acts/naredba-38.json · чл. 37 [40]	c847a59db33c 437a625d2601 9b3cf131bee7
+content/law/acts/naredba-38.json · чл. 38 [41]	c847a59db33c 1a102b0631b2 9f68ae027a14
+content/law/acts/naredba-38.json · чл. 39 [42]	c847a59db33c 27d92ddb6363 08ea47c31ad3
+content/law/acts/naredba-38.json · чл. 4 [3]	c847a59db33c 8cba974e8767 efd6fd1d8237
+content/law/acts/naredba-38.json · чл. 40 [43]	c847a59db33c 9cf48471d3d8 2969bbc22ab6
+content/law/acts/naredba-38.json · чл. 41 [44]	c847a59db33c 301a76d77942 08f715e420f2
+content/law/acts/naredba-38.json · чл. 42 [45]	c847a59db33c 067134fdedd2 adeffd9b0531
+content/law/acts/naredba-38.json · чл. 43 [46]	c847a59db33c 969d66c68b2e f3a19093d876
+content/law/acts/naredba-38.json · чл. 44 [47]	c847a59db33c 26a27730b765 52300dd98503
+content/law/acts/naredba-38.json · чл. 45 [48]	c847a59db33c 7f48a86c32df f4043e07ae2d
+content/law/acts/naredba-38.json · чл. 46 [49]	c847a59db33c 9f190704c364 3e81bc7c6b08
+content/law/acts/naredba-38.json · чл. 47 [50]	c847a59db33c e054f89c42ea 8d89e1aff72b
+content/law/acts/naredba-38.json · чл. 48 [51]	c847a59db33c 072e158aa4d2 680be7896677
+content/law/acts/naredba-38.json · чл. 48а [52]	3d36eff94640 0c1258f45af1 823c4eb3e895 f95475be3c38
+content/law/acts/naredba-38.json · чл. 49 [53]	c847a59db33c c6700965c630 85fc3bf135c1
+content/law/acts/naredba-38.json · чл. 5 [4]	c847a59db33c 75f54ad9414d 40e47f1f85ec
+content/law/acts/naredba-38.json · чл. 50 [54]	c847a59db33c 783d85c8f63f a6fe0d4d9508
+content/law/acts/naredba-38.json · чл. 51 [55]	c847a59db33c 9aebbe7114ef bca86cb86d4b
+content/law/acts/naredba-38.json · чл. 52 [56]	c847a59db33c 2b32a7524f6d ab34c53d4c34
+content/law/acts/naredba-38.json · чл. 53 [57]	c847a59db33c b42c2250bc34 d57755de2229
+content/law/acts/naredba-38.json · чл. 53а [58]	3d36eff94640 1ab19f753e93 823c4eb3e895 396f7d9abcb3
+content/law/acts/naredba-38.json · чл. 54 [59]	c847a59db33c 66d3d9acdd52 85401d37eab3
+content/law/acts/naredba-38.json · чл. 55 [60]	c847a59db33c 4f3189a94fbc 268e240aea95
+content/law/acts/naredba-38.json · чл. 55а [61]	3d36eff94640 eb3f50a38db6 823c4eb3e895 30699936bf5b
+content/law/acts/naredba-38.json · чл. 56 [62]	c847a59db33c c215fcdc40df a2452a7d797d
+content/law/acts/naredba-38.json · чл. 57 [63]	c847a59db33c 1c49b476ba35 2a037bb82cc8
+content/law/acts/naredba-38.json · чл. 58 [64]	c847a59db33c 056c49323671 1a0d36d32663
+content/law/acts/naredba-38.json · чл. 59 [65]	c847a59db33c f512368a075d 572fdf6c5635
+content/law/acts/naredba-38.json · чл. 6 [5]	c847a59db33c c061006f898a a725fdf991a3
+content/law/acts/naredba-38.json · чл. 7 [6]	c847a59db33c cce3576e421d 94d877a74be5
+content/law/acts/naredba-38.json · чл. 8 [7]	c847a59db33c 06ac9c551db9 1470d5fec31b
+content/law/acts/naredba-38.json · чл. 9 [8]	c847a59db33c 47b82b4d9905 8e3b6a918ab6
+content/law/acts/naredba-8121z-532.json	77bb7f09229d e4f028c42253 5e8d9b0864c3 3fe1f02be5bb 407f6b792de0
+content/law/acts/naredba-8121z-532.json · приложение [17]	e4764eb0da69 2919f56a7912 69d9fc9c205c f97ad789a19e
+content/law/acts/naredba-8121z-532.json · чл. 1 [0]	c847a59db33c 0f6c9b7d025b 506d954654ed
+content/law/acts/naredba-8121z-532.json · чл. 10 [9]	c847a59db33c 77508e031e4b efd1b9bbabd6
+content/law/acts/naredba-8121z-532.json · чл. 11 [10]	c847a59db33c 932a3adf620a 38c113192be1
+content/law/acts/naredba-8121z-532.json · чл. 12 [11]	c847a59db33c cadde49767f8 f68d5ed8bce8
+content/law/acts/naredba-8121z-532.json · чл. 13 [12]	c847a59db33c 051072acc73d 003b870fd7e1
+content/law/acts/naredba-8121z-532.json · чл. 14 [13]	c847a59db33c d3fba48c61b8 b710e15c9549
+content/law/acts/naredba-8121z-532.json · чл. 15 [14]	c847a59db33c bf61954e58ca 1d812ebddfad
+content/law/acts/naredba-8121z-532.json · чл. 16 [15]	c847a59db33c 963780e44954 7ea085d95bf7
+content/law/acts/naredba-8121z-532.json · чл. 17 [16]	c847a59db33c d488e66fd794 251481d875df
+content/law/acts/naredba-8121z-532.json · чл. 2 [1]	c847a59db33c f529865919d5 988eb51d8e33
+content/law/acts/naredba-8121z-532.json · чл. 3 [2]	c847a59db33c 7361d7c74ee6 22a7b1789aa8
+content/law/acts/naredba-8121z-532.json · чл. 4 [3]	c847a59db33c 8cba974e8767 2811bfd768b5
+content/law/acts/naredba-8121z-532.json · чл. 5 [4]	c847a59db33c 75f54ad9414d 3fd2bf4ede51
+content/law/acts/naredba-8121z-532.json · чл. 6 [5]	c847a59db33c c061006f898a 579d50e6f075
+content/law/acts/naredba-8121z-532.json · чл. 7 [6]	c847a59db33c cce3576e421d 38cef36de052
+content/law/acts/naredba-8121z-532.json · чл. 8 [7]	c847a59db33c 06ac9c551db9 e76ca6fc5e42
+content/law/acts/naredba-8121z-532.json · чл. 9 [8]	c847a59db33c 47b82b4d9905 4e3b56ef6511
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json	77bb7f09229d 1e92e683105a b82a8129551e 4a4e67195157 9e57c4204fa1
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 1 [30]	e4764eb0da69 65ce906d438b f32c98d0df6c 7b7ddaddb850
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 10 [39]	e4764eb0da69 c80b54f9db88 a83bb508b726 b2411adbbad7
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 2 [31]	e4764eb0da69 91bf86ee8276 8fb38d4bf573 b8c12077cc48
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 3 [32]	e4764eb0da69 be086a020c54 692aae51f2e4 ebc5afe47e8c
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 4 [33]	e4764eb0da69 5ebf7a5276e3 76a4108a558d 39d7a8280ab3
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 5 [34]	e4764eb0da69 2fe3164c02b3 1f4da90070b3 16ccc11bf804
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 6 [35]	e4764eb0da69 6ad995eef1e6 f12dca7baa42 3bbc1830b969
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 7 [36]	e4764eb0da69 08ba3b15ef21 9346d1403a7b aa8bc1ad1157
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 8 [37]	e4764eb0da69 d2789ded75e2 e111b86ba950 4e3ceb0fcb4d
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · приложение № 9 [38]	e4764eb0da69 bb4ede69df1f 2049a4a1840c e6a669f50d97
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 1 [0]	c847a59db33c 0f6c9b7d025b bfc86083027e
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 10 [9]	c847a59db33c 77508e031e4b c72c06491924
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 11 [10]	c847a59db33c 932a3adf620a 55a4d8c9127b
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 12 [11]	c847a59db33c cadde49767f8 8d29f33176e6
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 13 [12]	c847a59db33c 051072acc73d ecfb2aefc65d
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 14 [13]	c847a59db33c d3fba48c61b8 2ae0d4c70452
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 15 [14]	c847a59db33c bf61954e58ca b6602cf28b00
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 16 [15]	c847a59db33c 963780e44954 42198f30a242
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 17 [16]	c847a59db33c d488e66fd794 68c550826717
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 18 [17]	c847a59db33c a8a21696447c 327a186b72da
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 19 [18]	c847a59db33c fb5c5b540979 1bbb48c2b731
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 2 [1]	c847a59db33c f529865919d5 13dada2dffde
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 20 [19]	c847a59db33c 86c7f0ec35f4 47e88730b9b4
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 21 [20]	c847a59db33c 5e5a96b4701a ff7dd3dd1c59
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 22 [21]	c847a59db33c 9f50f0885e1b f228ce326485
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 23 [22]	c847a59db33c 5197e61186f2 1b1588421540
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 24 [23]	c847a59db33c f526450a7c4a 494da77c5535
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 25 [24]	c847a59db33c c738a0105cbb ceba372f03af
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 26 [25]	c847a59db33c 439b6713e9a3 0b27588a9dd0
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 27 [26]	c847a59db33c 8e2c46b6c1ad 9f199310ee8f
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 28 [27]	c847a59db33c b703182ef2d9 a9a51dabe01f
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 29 [28]	c847a59db33c f5470321420b afbb7b1469e5
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 3 [2]	c847a59db33c 7361d7c74ee6 2c1031544afa
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 30 [29]	c847a59db33c 8b8c22ad2460 25bb5538c98a
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 4 [3]	c847a59db33c 8cba974e8767 2169a69f7ba9
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 5 [4]	c847a59db33c 75f54ad9414d ffb972f48481
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 6 [5]	c847a59db33c c061006f898a 63c8aaebdd18
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 7 [6]	c847a59db33c cce3576e421d 191331e3ecaf
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 8 [7]	c847a59db33c 06ac9c551db9 6ff194138ad0
+content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json · чл. 9 [8]	c847a59db33c 47b82b4d9905 ee8b9f8a5947
+content/law/acts/naredba-iz-2539-izm-dv22-2026.json	77bb7f09229d 4c49c4b7110d 6ccc05912bb7 3ed9d74923f6 cc85318c8de2
+content/law/acts/naredba-iz-2539-izm-dv22-2026.json · § 1 [0]	e4764eb0da69 c9497cff1e32 949b495b2896 301ae5b7aa6e
+content/law/acts/naredba-iz-2539-izm-dv22-2026.json · § 2 [1]	e4764eb0da69 bbe708b77ab5 949b495b2896 e51587341ded
+content/law/acts/naredba-iz-2539-izm-dv22-2026.json · § 3 [2]	e4764eb0da69 6ced100935b0 949b495b2896 f7834a60c374
+content/law/acts/naredba-iz-2539-izm-dv22-2026.json · § 4 [3]	e4764eb0da69 891ede9a800f 949b495b2896 79bdbe459f96
+content/law/acts/naredba-iz-2539-izm-dv49-2026.json	a35303696fcc 633c2112fdc7 6ccc05912bb7 2fb7da2e262b
+content/law/acts/naredba-iz-2539-izm-dv49-2026.json · § 1 [0]	e4764eb0da69 c9497cff1e32 949b495b2896 8705d84f59fe
+content/law/acts/naredba-iz-2539-izm-dv49-2026.json · § 2 [1]	e4764eb0da69 bbe708b77ab5 949b495b2896 8308c0ac7502
+content/law/acts/naredba-iz-2539-izm-dv49-2026.json · § 3 [2]	e4764eb0da69 6ced100935b0 949b495b2896 d4df0fc70c4c
+content/law/acts/naredba-iz-2539.json	a35303696fcc b5f96d95787a 243506fce411 74493b448d9e
+content/law/acts/naredba-iz-2539.json · приложение № 1 [30]	e4764eb0da69 65ce906d438b f32c98d0df6c 3ab3506cd6fd
+content/law/acts/naredba-iz-2539.json · приложение № 10 [39]	e4764eb0da69 c80b54f9db88 7231d979030d 544c1498bb33
+content/law/acts/naredba-iz-2539.json · приложение № 2 [31]	e4764eb0da69 91bf86ee8276 8fb38d4bf573 44029ae70bdb
+content/law/acts/naredba-iz-2539.json · приложение № 3 [32]	e4764eb0da69 be086a020c54 692aae51f2e4 5e6a0cc01621
+content/law/acts/naredba-iz-2539.json · приложение № 4 [33]	e4764eb0da69 5ebf7a5276e3 76a4108a558d a27c3c2f6745
+content/law/acts/naredba-iz-2539.json · приложение № 5 [34]	e4764eb0da69 2fe3164c02b3 1f4da90070b3 ad833223f1a3
+content/law/acts/naredba-iz-2539.json · приложение № 6 [35]	e4764eb0da69 6ad995eef1e6 099421f08703 925cca6f8967
+content/law/acts/naredba-iz-2539.json · приложение № 7 [36]	e4764eb0da69 08ba3b15ef21 8bff1c3219a5 3069c278682b
+content/law/acts/naredba-iz-2539.json · приложение № 8 [37]	e4764eb0da69 d2789ded75e2 e111b86ba950 11661b9121b6
+content/law/acts/naredba-iz-2539.json · приложение № 9 [38]	e4764eb0da69 bb4ede69df1f 2049a4a1840c 6a3a41b73534
+content/law/acts/naredba-iz-2539.json · чл. 1 [0]	c847a59db33c 0f6c9b7d025b 74ec4e9a624e
+content/law/acts/naredba-iz-2539.json · чл. 10 [9]	c847a59db33c 77508e031e4b 28e21481225e
+content/law/acts/naredba-iz-2539.json · чл. 11 [10]	c847a59db33c 932a3adf620a 0c074cf8756c
+content/law/acts/naredba-iz-2539.json · чл. 12 [11]	c847a59db33c cadde49767f8 8d29f33176e6
+content/law/acts/naredba-iz-2539.json · чл. 13 [12]	c847a59db33c 051072acc73d ecfb2aefc65d
+content/law/acts/naredba-iz-2539.json · чл. 14 [13]	c847a59db33c d3fba48c61b8 bdbcc32cf099
+content/law/acts/naredba-iz-2539.json · чл. 15 [14]	c847a59db33c bf61954e58ca 47f742e36173
+content/law/acts/naredba-iz-2539.json · чл. 16 [15]	c847a59db33c 963780e44954 cc62ed47271f
+content/law/acts/naredba-iz-2539.json · чл. 17 [16]	c847a59db33c d488e66fd794 6c095d23de3f
+content/law/acts/naredba-iz-2539.json · чл. 18 [17]	c847a59db33c a8a21696447c ffea18eff19a
+content/law/acts/naredba-iz-2539.json · чл. 19 [18]	c847a59db33c fb5c5b540979 28f54d63f855
+content/law/acts/naredba-iz-2539.json · чл. 2 [1]	c847a59db33c f529865919d5 13033a9b3149
+content/law/acts/naredba-iz-2539.json · чл. 20 [19]	c847a59db33c 86c7f0ec35f4 06cb255b1f26
+content/law/acts/naredba-iz-2539.json · чл. 21 [20]	c847a59db33c 5e5a96b4701a ff7dd3dd1c59
+content/law/acts/naredba-iz-2539.json · чл. 22 [21]	c847a59db33c 9f50f0885e1b f228ce326485
+content/law/acts/naredba-iz-2539.json · чл. 23 [22]	c847a59db33c 5197e61186f2 1b1588421540
+content/law/acts/naredba-iz-2539.json · чл. 24 [23]	c847a59db33c f526450a7c4a f76acb6d08e8
+content/law/acts/naredba-iz-2539.json · чл. 25 [24]	c847a59db33c c738a0105cbb 2fa79855ba7d
+content/law/acts/naredba-iz-2539.json · чл. 26 [25]	c847a59db33c 439b6713e9a3 b1919fa35602
+content/law/acts/naredba-iz-2539.json · чл. 27 [26]	c847a59db33c 8e2c46b6c1ad 9f199310ee8f
+content/law/acts/naredba-iz-2539.json · чл. 28 [27]	c847a59db33c b703182ef2d9 33db20fd0605
+content/law/acts/naredba-iz-2539.json · чл. 29 [28]	c847a59db33c f5470321420b a0688614dc76
+content/law/acts/naredba-iz-2539.json · чл. 3 [2]	c847a59db33c 7361d7c74ee6 8262b73d999c
+content/law/acts/naredba-iz-2539.json · чл. 30 [29]	c847a59db33c 8b8c22ad2460 a5cef8725b2c
+content/law/acts/naredba-iz-2539.json · чл. 4 [3]	c847a59db33c 8cba974e8767 2169a69f7ba9
+content/law/acts/naredba-iz-2539.json · чл. 5 [4]	c847a59db33c 75f54ad9414d 3ea725145c6b
+content/law/acts/naredba-iz-2539.json · чл. 6 [5]	c847a59db33c c061006f898a 899aefe46668
+content/law/acts/naredba-iz-2539.json · чл. 7 [6]	c847a59db33c cce3576e421d 191331e3ecaf
+content/law/acts/naredba-iz-2539.json · чл. 8 [7]	c847a59db33c 06ac9c551db9 279bd195dd91
+content/law/acts/naredba-iz-2539.json · чл. 9 [8]	c847a59db33c 47b82b4d9905 d484605a85e2
+content/law/acts/naredba-sredstva-za-izmervane.json	77bb7f09229d f834ea447920 8590bcfd47b0 3737329a58ab 4a5a67651587
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 416 [0]	e4764eb0da69 61dc02b2101c 6a9d8dd4b6ea 3cd13e301a17
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 417 [1]	e4764eb0da69 036768a8c55f 6a9d8dd4b6ea 5201b4eb3125
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 418 [2]	e4764eb0da69 f177738dd185 6a9d8dd4b6ea 38b8d69f9b49
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 419 [3]	e4764eb0da69 2070a69c7e82 6a9d8dd4b6ea b4bee6f5e717
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 420 [4]	e4764eb0da69 c944af96037f 6a9d8dd4b6ea edfb321971d5
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 421 [5]	e4764eb0da69 d8a9e566e9f1 6a9d8dd4b6ea 7e73102efbc9
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 422 [6]	e4764eb0da69 f3c2ec50e6c8 6a9d8dd4b6ea 795d8dd10c2a
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 423 [7]	e4764eb0da69 484060bcaa81 6a9d8dd4b6ea 4f5e341e4279
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 424 [8]	e4764eb0da69 2a0890a39c9b 6a9d8dd4b6ea c8b2935fb2c1
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 425 [9]	e4764eb0da69 4c1a780a3381 6a9d8dd4b6ea c358a954e991
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 426 [10]	e4764eb0da69 e0d13bd08c24 6a9d8dd4b6ea 51e6e4b60997
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 427 [11]	e4764eb0da69 0eae5a9a466b 6a9d8dd4b6ea 07ca4abfc807
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 428 [12]	e4764eb0da69 834e9c5abad9 6a9d8dd4b6ea 1dd6328ebe2b
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 429 [13]	e4764eb0da69 012e6a35df5e 6a9d8dd4b6ea 1fa6e0d274ed
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 430 [14]	e4764eb0da69 ddc0dbfc3db2 6a9d8dd4b6ea ef2ea5d404c0
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 431 [15]	e4764eb0da69 4e59a0d87631 6a9d8dd4b6ea 7d9b01100959
+content/law/acts/naredba-sredstva-za-izmervane.json · чл. 432 [16]	e4764eb0da69 988b6694a3ce 6a9d8dd4b6ea 826af70ab876
+content/law/acts/zdvp.json	77bb7f09229d 0ad4fce89ae2 1e2c019d2bb2 7f763084006c ddba99fcfe7e
+content/law/acts/zdvp.json · § 1 [277]	e4764eb0da69 c9497cff1e32 ce89d12917b9 977972e5104f
+content/law/acts/zdvp.json · § 1а [278]	560a2ba4d1ee a935d1fa435b 823c4eb3e895 ce89d12917b9 97d0bfcf433a
+content/law/acts/zdvp.json · § 2 [279]	e4764eb0da69 bbe708b77ab5 ce89d12917b9 d61ed8c1564a
+content/law/acts/zdvp.json · § 3 [280]	e4764eb0da69 6ced100935b0 ce89d12917b9 3d58f0e0d808
+content/law/acts/zdvp.json · § 4 [281]	e4764eb0da69 891ede9a800f ce89d12917b9 c6f61f3cbc15
+content/law/acts/zdvp.json · § 5 [282]	e4764eb0da69 e141d839cdb4 ce89d12917b9 9500d3b0364b
+content/law/acts/zdvp.json · § 6 [283]	e4764eb0da69 8840cbf554b7 ce89d12917b9 0836fbe77d59
+content/law/acts/zdvp.json · § 6а [284]	560a2ba4d1ee 1202a8232540 823c4eb3e895 ce89d12917b9 96b44684c09e
+content/law/acts/zdvp.json · § 6б [285]	560a2ba4d1ee 87f940310514 9aa032336a8e ce89d12917b9 2453c8756ee9
+content/law/acts/zdvp.json · § 6в [286]	560a2ba4d1ee 9c248925395e b8012cb642c8 ce89d12917b9 ff6d771fd3a1
+content/law/acts/zdvp.json · § 6г [287]	560a2ba4d1ee 3eeb2c6fa018 ab1f4be7e5d6 ce89d12917b9 402f1bf9f4bf
+content/law/acts/zdvp.json · чл. 1 [0]	c847a59db33c 0f6c9b7d025b 4f50e1d2c3b0
+content/law/acts/zdvp.json · чл. 10 [9]	e4764eb0da69 77508e031e4b 7fcd1da0cf31 cde071d58a65
+content/law/acts/zdvp.json · чл. 100 [110]	e4764eb0da69 d15191e0e243 fcda04072fe1 f6ed64032b2c
+content/law/acts/zdvp.json · чл. 101 [111]	e4764eb0da69 26f47254fb3a fcda04072fe1 4108f91fbb89
+content/law/acts/zdvp.json · чл. 102 [112]	e4764eb0da69 a6ac8675cfb3 fcda04072fe1 71052aa49c49
+content/law/acts/zdvp.json · чл. 103 [113]	e4764eb0da69 6444c886eee5 fcda04072fe1 af9285ac1d06
+content/law/acts/zdvp.json · чл. 104 [114]	e4764eb0da69 fce27f1b7783 fcda04072fe1 3f78ce222a84
+content/law/acts/zdvp.json · чл. 104а [115]	560a2ba4d1ee 6add2e9ac67e 823c4eb3e895 fcda04072fe1 c0a8de7ae298
+content/law/acts/zdvp.json · чл. 104б [116]	560a2ba4d1ee 2f81af251b8f 9aa032336a8e fcda04072fe1 41c628d1afd9
+content/law/acts/zdvp.json · чл. 105 [117]	e4764eb0da69 e0793f8f73b6 fcda04072fe1 1f05c4eddd7f
+content/law/acts/zdvp.json · чл. 106 [118]	e4764eb0da69 792f1eac8aab fcda04072fe1 ac795c702a19
+content/law/acts/zdvp.json · чл. 106а [119]	560a2ba4d1ee de960869d1ed 823c4eb3e895 fcda04072fe1 734748f8491a
+content/law/acts/zdvp.json · чл. 107 [120]	e4764eb0da69 dd71365876fc 42a718f8d0a3 946ef2e18389
+content/law/acts/zdvp.json · чл. 108 [121]	e4764eb0da69 34058bcdb4cd 42a718f8d0a3 4efa3a0246ea
+content/law/acts/zdvp.json · чл. 109 [122]	e4764eb0da69 062f1c228820 42a718f8d0a3 0ccf04fd49ba
+content/law/acts/zdvp.json · чл. 11 [10]	e4764eb0da69 932a3adf620a 7fcd1da0cf31 e7232abdc76c
+content/law/acts/zdvp.json · чл. 110 [123]	e4764eb0da69 d235749d4aea 42a718f8d0a3 8f1b8e28133d
+content/law/acts/zdvp.json · чл. 111 [124]	e4764eb0da69 ef093ad445d6 42a718f8d0a3 56448f0c28e6
+content/law/acts/zdvp.json · чл. 112 [125]	e4764eb0da69 7a900134e0b4 42a718f8d0a3 f6b0d44409ab
+content/law/acts/zdvp.json · чл. 113 [126]	e4764eb0da69 e7691029a06d 42a718f8d0a3 2bbc7cab8f6e
+content/law/acts/zdvp.json · чл. 114 [127]	e4764eb0da69 8bfaeaa6d8a8 42a718f8d0a3 b57a3a7526c4
+content/law/acts/zdvp.json · чл. 115 [128]	e4764eb0da69 8ac9e6131647 42a718f8d0a3 651b8d2d7919
+content/law/acts/zdvp.json · чл. 116 [129]	e4764eb0da69 68a992f97af4 3e47cf798e30 cfc73c43a5a0
+content/law/acts/zdvp.json · чл. 117 [130]	e4764eb0da69 8d0b4bac6b0c 3e47cf798e30 eeab0442b561
+content/law/acts/zdvp.json · чл. 118 [131]	e4764eb0da69 51d97a57fa13 3e47cf798e30 2233719e2483
+content/law/acts/zdvp.json · чл. 119 [132]	e4764eb0da69 94ff0715600e 3e47cf798e30 df4ddd095537
+content/law/acts/zdvp.json · чл. 12 [11]	e4764eb0da69 cadde49767f8 7fcd1da0cf31 cd947d771ded
+content/law/acts/zdvp.json · чл. 120 [133]	e4764eb0da69 e4db9afaa216 3e47cf798e30 38d818379e83
+content/law/acts/zdvp.json · чл. 121 [134]	e4764eb0da69 e36f8d17a2d7 3e47cf798e30 631876b60a96
+content/law/acts/zdvp.json · чл. 122 [135]	e4764eb0da69 e21143e9fc0d 3e47cf798e30 c3668884d476
+content/law/acts/zdvp.json · чл. 123 [136]	e4764eb0da69 770ff72e5bab 9981dd7bb7ef 9a5a7bb9c50a
+content/law/acts/zdvp.json · чл. 124 [137]	e4764eb0da69 68c8784e5e35 9981dd7bb7ef 81cc349d6b9d
+content/law/acts/zdvp.json · чл. 125 [138]	e4764eb0da69 e78b15321b7b 9981dd7bb7ef daead268709f
+content/law/acts/zdvp.json · чл. 125а [139]	560a2ba4d1ee b4c74bb99cc4 823c4eb3e895 9981dd7bb7ef 079921024a2b
+content/law/acts/zdvp.json · чл. 126 [140]	e4764eb0da69 2131ea530937 cdf2d371ec44 dc6052365c2d
+content/law/acts/zdvp.json · чл. 127 [141]	e4764eb0da69 5b3478003dae cdf2d371ec44 1a80e237c186
+content/law/acts/zdvp.json · чл. 128 [142]	e4764eb0da69 e30645453020 cdf2d371ec44 3014f6e4db44
+content/law/acts/zdvp.json · чл. 129 [143]	e4764eb0da69 a1704f4ec47c cdf2d371ec44 8a55d212e82e
+content/law/acts/zdvp.json · чл. 13 [12]	e4764eb0da69 051072acc73d 7fcd1da0cf31 333f57d6807d
+content/law/acts/zdvp.json · чл. 130 [144]	e4764eb0da69 3dc7048b2fc1 cdf2d371ec44 bda01520f26e
+content/law/acts/zdvp.json · чл. 131 [145]	e4764eb0da69 3689c7fddb70 cdf2d371ec44 6824fe069968
+content/law/acts/zdvp.json · чл. 132 [146]	e4764eb0da69 88910f01e18d cdf2d371ec44 eef70cb8bdab
+content/law/acts/zdvp.json · чл. 133 [147]	e4764eb0da69 cffb65e632a7 cdf2d371ec44 1d2f80637590
+content/law/acts/zdvp.json · чл. 134 [148]	e4764eb0da69 d3cfdaceb5e9 cdf2d371ec44 af01b04bc17b
+content/law/acts/zdvp.json · чл. 135 [149]	e4764eb0da69 1ead4abfd7b9 cdf2d371ec44 15ed193e2462
+content/law/acts/zdvp.json · чл. 136 [150]	e4764eb0da69 a95b5318b062 cdf2d371ec44 8afd5b709408
+content/law/acts/zdvp.json · чл. 137 [151]	e4764eb0da69 43910696751e cdf2d371ec44 0177c8e6cfc7
+content/law/acts/zdvp.json · чл. 137а [152]	560a2ba4d1ee 49bd034109fb 823c4eb3e895 0eeb5724c2e6 3746646434d7
+content/law/acts/zdvp.json · чл. 137б [153]	560a2ba4d1ee b356e55a6039 9aa032336a8e 0eeb5724c2e6 6141d46a45e8
+content/law/acts/zdvp.json · чл. 137в [154]	560a2ba4d1ee 91196642ce70 b8012cb642c8 0eeb5724c2e6 e5430cbacee5
+content/law/acts/zdvp.json · чл. 137г [155]	560a2ba4d1ee 152f71679c1a ab1f4be7e5d6 0eeb5724c2e6 23877468503c
+content/law/acts/zdvp.json · чл. 137д [156]	560a2ba4d1ee 0e60433a24fc 1cc10a3947f7 0eeb5724c2e6 9357b8b42e74
+content/law/acts/zdvp.json · чл. 137е [157]	560a2ba4d1ee b4f0afb78a0a 259f56cb715b 0eeb5724c2e6 f1bdd04f73c1
+content/law/acts/zdvp.json · чл. 138 [158]	e4764eb0da69 baacd84a2528 d13f6009e61a 9c1cf9976700
+content/law/acts/zdvp.json · чл. 138а [159]	560a2ba4d1ee 1d106bf4b6a4 823c4eb3e895 d13f6009e61a afb018d33351
+content/law/acts/zdvp.json · чл. 138б [160]	560a2ba4d1ee b8afbf84ac06 9aa032336a8e d13f6009e61a 099e3e7aab50
+content/law/acts/zdvp.json · чл. 138в [161]	560a2ba4d1ee cd7c3d5243d3 b8012cb642c8 d13f6009e61a b1f9f45aac44
+content/law/acts/zdvp.json · чл. 138г [162]	560a2ba4d1ee 6c143bd9bc61 ab1f4be7e5d6 d13f6009e61a 870b7f3abc3b
+content/law/acts/zdvp.json · чл. 139 [163]	e4764eb0da69 5fb0cb7a8053 d13f6009e61a d40a615fc43d
+content/law/acts/zdvp.json · чл. 14 [13]	e4764eb0da69 d3fba48c61b8 7fcd1da0cf31 9caef54d7e92
+content/law/acts/zdvp.json · чл. 140 [164]	e4764eb0da69 e1936b4b00ff d13f6009e61a 0876e0cbe92f
+content/law/acts/zdvp.json · чл. 141 [165]	e4764eb0da69 f1aa5b0c3bc6 d13f6009e61a 7458ca3d36ba
+content/law/acts/zdvp.json · чл. 141а [166]	560a2ba4d1ee ad3341691564 823c4eb3e895 d13f6009e61a d4642d9c26e3
+content/law/acts/zdvp.json · чл. 142 [167]	e4764eb0da69 d8dd700890c5 d13f6009e61a d7539cab002c
+content/law/acts/zdvp.json · чл. 143 [168]	e4764eb0da69 6dd7c5d7b8a2 d13f6009e61a b162542142fa
+content/law/acts/zdvp.json · чл. 144 [169]	e4764eb0da69 53dd0450586f d13f6009e61a 7075ac60a1fe
+content/law/acts/zdvp.json · чл. 145 [170]	e4764eb0da69 6c8e3c748525 d13f6009e61a 12e029306bb7
+content/law/acts/zdvp.json · чл. 145а [171]	560a2ba4d1ee 203a3750685d 823c4eb3e895 d13f6009e61a 969fa86f2269
+content/law/acts/zdvp.json · чл. 146 [172]	e4764eb0da69 1ec6964eb37a d13f6009e61a 76d5fdcc123f
+content/law/acts/zdvp.json · чл. 147 [173]	e4764eb0da69 c3cd1164ad81 d13f6009e61a 1a156139ee1e
+content/law/acts/zdvp.json · чл. 148 [174]	e4764eb0da69 10765154f3d4 d13f6009e61a b48001133865
+content/law/acts/zdvp.json · чл. 148а [175]	560a2ba4d1ee 5d8b41faf4f6 823c4eb3e895 d13f6009e61a 4cd3928a3d0e
+content/law/acts/zdvp.json · чл. 148б [176]	560a2ba4d1ee 9711ba30634e 9aa032336a8e d13f6009e61a 1a90a0398326
+content/law/acts/zdvp.json · чл. 148в [177]	560a2ba4d1ee 2946dda68748 b8012cb642c8 d13f6009e61a 8c5bbba19224
+content/law/acts/zdvp.json · чл. 149 [178]	e4764eb0da69 d1fcf5c13693 d13f6009e61a ea259c391293
+content/law/acts/zdvp.json · чл. 15 [14]	e4764eb0da69 bf61954e58ca 67fa348069ff efaf9b538936
+content/law/acts/zdvp.json · чл. 150 [179]	e4764eb0da69 49d59dd39c71 382df09fee2f c856d77cbeb0
+content/law/acts/zdvp.json · чл. 150а [180]	560a2ba4d1ee ca8fb24db47c 823c4eb3e895 382df09fee2f f9eed69621b1
+content/law/acts/zdvp.json · чл. 151 [181]	e4764eb0da69 a19958f074e4 382df09fee2f 87b8b9d35412
+content/law/acts/zdvp.json · чл. 151а [182]	560a2ba4d1ee edd8ef25a3dd 823c4eb3e895 382df09fee2f fea87236c4d6
+content/law/acts/zdvp.json · чл. 152 [183]	e4764eb0da69 c98ae751f503 382df09fee2f 810483377d94
+content/law/acts/zdvp.json · чл. 152а [184]	560a2ba4d1ee 4e97b8fed3df 823c4eb3e895 382df09fee2f 078e8805abb6
+content/law/acts/zdvp.json · чл. 153 [185]	e4764eb0da69 277adc6f2e19 382df09fee2f 8e9b8b7ec8e1
+content/law/acts/zdvp.json · чл. 153а [186]	560a2ba4d1ee 18d34e9df1cb 823c4eb3e895 382df09fee2f caf73c719abf
+content/law/acts/zdvp.json · чл. 153б [187]	560a2ba4d1ee 739b277669eb 9aa032336a8e 382df09fee2f fe2093d6dce4
+content/law/acts/zdvp.json · чл. 153в [188]	560a2ba4d1ee 33f5a49765c6 b8012cb642c8 382df09fee2f 7c4a5eb86f82
+content/law/acts/zdvp.json · чл. 153г [189]	560a2ba4d1ee 6efe158073a8 ab1f4be7e5d6 382df09fee2f 6691a7f34bf1
+content/law/acts/zdvp.json · чл. 154 [190]	e4764eb0da69 d06c692d82fe 382df09fee2f 12a9cc9c74ab
+content/law/acts/zdvp.json · чл. 154а [191]	560a2ba4d1ee 08ece8c027b6 823c4eb3e895 382df09fee2f 751f88777fd4
+content/law/acts/zdvp.json · чл. 155 [192]	e4764eb0da69 9e99f78e071f 382df09fee2f 8711ebecb1c7
+content/law/acts/zdvp.json · чл. 156 [193]	e4764eb0da69 226643b9a368 382df09fee2f 8b173b78faa3
+content/law/acts/zdvp.json · чл. 157 [194]	e4764eb0da69 f0739b83b45c 382df09fee2f ac6e67a2d4b1
+content/law/acts/zdvp.json · чл. 157а [195]	560a2ba4d1ee 464fa36761dc 823c4eb3e895 382df09fee2f 8b712b9f6de6
+content/law/acts/zdvp.json · чл. 158 [196]	e4764eb0da69 0708a90adc4f 382df09fee2f 1a923111bc4c
+content/law/acts/zdvp.json · чл. 159 [197]	e4764eb0da69 6045c5fe0553 382df09fee2f e67fa4baee1a
+content/law/acts/zdvp.json · чл. 16 [15]	e4764eb0da69 963780e44954 67fa348069ff 783bc3250038
+content/law/acts/zdvp.json · чл. 160 [198]	e4764eb0da69 81d136d2640f 382df09fee2f 8dc389a627d7
+content/law/acts/zdvp.json · чл. 161 [199]	e4764eb0da69 c7254f00329d 382df09fee2f 2cfb6a94d0cd
+content/law/acts/zdvp.json · чл. 162 [200]	e4764eb0da69 89dc97c289fe 382df09fee2f d749a7c72cce
+content/law/acts/zdvp.json · чл. 163 [201]	e4764eb0da69 1e84d6377302 382df09fee2f 60b714342647
+content/law/acts/zdvp.json · чл. 164 [202]	e4764eb0da69 df6d7b10a4ff 382df09fee2f d01068c949ca
+content/law/acts/zdvp.json · чл. 164а [203]	560a2ba4d1ee 47bf482bbd45 823c4eb3e895 ce7ddc127a15 11444c8773f8
+content/law/acts/zdvp.json · чл. 164б [204]	560a2ba4d1ee d32f24347010 9aa032336a8e ce7ddc127a15 be6c3f7b8cb3
+content/law/acts/zdvp.json · чл. 164в [205]	560a2ba4d1ee 0aa717da0b43 b8012cb642c8 ce7ddc127a15 9070b8bc8da3
+content/law/acts/zdvp.json · чл. 164г [206]	560a2ba4d1ee f47a8f9dfefc ab1f4be7e5d6 ce7ddc127a15 7b786289fe82
+content/law/acts/zdvp.json · чл. 164д [207]	560a2ba4d1ee b83b82f661a6 1cc10a3947f7 ce7ddc127a15 8ef75aa48593
+content/law/acts/zdvp.json · чл. 164е [208]	560a2ba4d1ee e13f522ed0fc 259f56cb715b ce7ddc127a15 b43b557013ad
+content/law/acts/zdvp.json · чл. 165 [209]	e4764eb0da69 cdb741cfa0da ce7ddc127a15 de97a36cf398
+content/law/acts/zdvp.json · чл. 166 [210]	e4764eb0da69 f7baf4a80575 ce7ddc127a15 dcb9983a0ad7
+content/law/acts/zdvp.json · чл. 1661 [276]	e4764eb0da69 b4aa1bc812d2 ce7ddc127a15 c2a57482c91a
+content/law/acts/zdvp.json · чл. 166а [211]	560a2ba4d1ee 3304ee4e2a5f 823c4eb3e895 ce7ddc127a15 50cc7aa94887
+content/law/acts/zdvp.json · чл. 166б [212]	560a2ba4d1ee 38585d10884a 9aa032336a8e ce7ddc127a15 157fe531ff94
+content/law/acts/zdvp.json · чл. 167 [213]	e4764eb0da69 2655960535eb ce7ddc127a15 b353b9c8d78a
+content/law/acts/zdvp.json · чл. 167а [214]	560a2ba4d1ee 33bac1bc48c4 823c4eb3e895 ce7ddc127a15 5aa7d67699cf
+content/law/acts/zdvp.json · чл. 167а1 [215]	560a2ba4d1ee e91a912b7193 1f6a0a6a16d9 ce7ddc127a15 ad1aafd6f3e9
+content/law/acts/zdvp.json · чл. 167а2 [216]	560a2ba4d1ee f80a3d29edb5 30f6619b624e ce7ddc127a15 a787bdd26d70
+content/law/acts/zdvp.json · чл. 167б [217]	560a2ba4d1ee c871f159c664 9aa032336a8e ce7ddc127a15 7e735ed091a2
+content/law/acts/zdvp.json · чл. 167в [218]	560a2ba4d1ee 5a87bf108e1d b8012cb642c8 ce7ddc127a15 e18baf638ea7
+content/law/acts/zdvp.json · чл. 167г [219]	560a2ba4d1ee cf890c4751ed ab1f4be7e5d6 ce7ddc127a15 510048c0b549
+content/law/acts/zdvp.json · чл. 168 [220]	e4764eb0da69 05030be741da ce7ddc127a15 5cd13b80501f
+content/law/acts/zdvp.json · чл. 169 [221]	e4764eb0da69 c4e7fca70d05 ce7ddc127a15 54ac8ce68c32
+content/law/acts/zdvp.json · чл. 17 [16]	e4764eb0da69 d488e66fd794 67fa348069ff 3b6e4b6e36e9
+content/law/acts/zdvp.json · чл. 170 [222]	e4764eb0da69 089f75964b45 ce7ddc127a15 db9efc86a5a2
+content/law/acts/zdvp.json · чл. 170а [223]	560a2ba4d1ee b6e88504d012 823c4eb3e895 ce7ddc127a15 116b714a499c
+content/law/acts/zdvp.json · чл. 170б [224]	560a2ba4d1ee 850ecccc10d2 9aa032336a8e ce7ddc127a15 89c58cc093c0
+content/law/acts/zdvp.json · чл. 170в [225]	560a2ba4d1ee 9e6fc4c87861 b8012cb642c8 ce7ddc127a15 ae542dd3fc1e
+content/law/acts/zdvp.json · чл. 170г [226]	560a2ba4d1ee 182c34251cc3 ab1f4be7e5d6 360e005ae250 18b5718e5cb2
+content/law/acts/zdvp.json · чл. 170д [227]	560a2ba4d1ee 00d0dc562cb1 1cc10a3947f7 360e005ae250 8c4d8a5edf59
+content/law/acts/zdvp.json · чл. 171 [228]	e4764eb0da69 66a5525d4c78 669c183e6f70 74d2683f17a1
+content/law/acts/zdvp.json · чл. 172 [229]	e4764eb0da69 60350aa785d7 669c183e6f70 879b2be08827
+content/law/acts/zdvp.json · чл. 172а [230]	560a2ba4d1ee 34034efaec2b 823c4eb3e895 669c183e6f70 58abad9c5db0
+content/law/acts/zdvp.json · чл. 173 [231]	e4764eb0da69 1238e4bde5d1 669c183e6f70 24c2d84029b4
+content/law/acts/zdvp.json · чл. 173а [232]	560a2ba4d1ee ae401badca37 823c4eb3e895 669c183e6f70 109c0fd457ce
+content/law/acts/zdvp.json · чл. 174 [233]	e4764eb0da69 ae8893dee1db 2961da76e60f a7dc5020f067
+content/law/acts/zdvp.json · чл. 175 [234]	e4764eb0da69 803ed30781d4 2961da76e60f ed1ca071ba18
+content/law/acts/zdvp.json · чл. 175а [235]	560a2ba4d1ee d8f367104c0e 823c4eb3e895 2961da76e60f f68363d5bb52
+content/law/acts/zdvp.json · чл. 176 [236]	e4764eb0da69 daa973f8353e 2961da76e60f ba7c8764bbc4
+content/law/acts/zdvp.json · чл. 177 [237]	e4764eb0da69 3848c94cfca1 2961da76e60f 92ebfb6353f9
+content/law/acts/zdvp.json · чл. 178 [238]	e4764eb0da69 153c8352d88f 2961da76e60f 9e136a045705
+content/law/acts/zdvp.json · чл. 178а [239]	560a2ba4d1ee ada0b9c3ba99 823c4eb3e895 2961da76e60f 6350d626a40c
+content/law/acts/zdvp.json · чл. 178б [240]	560a2ba4d1ee 18f6cd33f0aa 9aa032336a8e 2961da76e60f 035a63a86622
+content/law/acts/zdvp.json · чл. 178в [241]	560a2ba4d1ee 6c1865e619a5 b8012cb642c8 2961da76e60f 3b475aa12f3f
+content/law/acts/zdvp.json · чл. 178г [242]	560a2ba4d1ee d54ca930e3e5 ab1f4be7e5d6 2961da76e60f 69621cd95735
+content/law/acts/zdvp.json · чл. 178д [243]	560a2ba4d1ee 661a665989c0 1cc10a3947f7 2961da76e60f c9738e0d3b7f
+content/law/acts/zdvp.json · чл. 178е [244]	560a2ba4d1ee 97660baac52f 259f56cb715b 2961da76e60f 80b46cada25c
+content/law/acts/zdvp.json · чл. 178ж [245]	560a2ba4d1ee 1675cd0ca8cb dd591284d827 2961da76e60f 1e1b02480be4
+content/law/acts/zdvp.json · чл. 178з [246]	560a2ba4d1ee 48be18bc7c17 3051067c6324 2961da76e60f a78a7c75ab84
+content/law/acts/zdvp.json · чл. 179 [247]	e4764eb0da69 a8d7a8cbdc0c 2961da76e60f d7fafed6a753
+content/law/acts/zdvp.json · чл. 18 [17]	e4764eb0da69 a8a21696447c 67fa348069ff 7521d50a2c9a
+content/law/acts/zdvp.json · чл. 180 [248]	e4764eb0da69 6af7b218abf0 2961da76e60f d3b11ac16aea
+content/law/acts/zdvp.json · чл. 181 [249]	e4764eb0da69 6da84a6fc644 2961da76e60f ba87dab49399
+content/law/acts/zdvp.json · чл. 182 [250]	e4764eb0da69 0dd5daf3e710 2961da76e60f 031c3ec34b04
+content/law/acts/zdvp.json · чл. 183 [251]	e4764eb0da69 a32c96ced525 2961da76e60f f6763efff4ce
+content/law/acts/zdvp.json · чл. 183а [252]	560a2ba4d1ee 27cff2d7337c 823c4eb3e895 2961da76e60f 2c5831963401
+content/law/acts/zdvp.json · чл. 184 [253]	e4764eb0da69 09d0a6b764a8 2961da76e60f 8afec2cd7696
+content/law/acts/zdvp.json · чл. 185 [254]	e4764eb0da69 11eba4f445be 2961da76e60f fd7f713af262
+content/law/acts/zdvp.json · чл. 186 [255]	e4764eb0da69 e142433416d2 2961da76e60f ba698276c273
+content/law/acts/zdvp.json · чл. 186а [256]	560a2ba4d1ee cba1a98e37d1 823c4eb3e895 2961da76e60f f4da55a96dac
+content/law/acts/zdvp.json · чл. 187 [257]	e4764eb0da69 b0b1d809a277 2961da76e60f c56edd39bb5f
+content/law/acts/zdvp.json · чл. 187а [258]	560a2ba4d1ee 0e23807fc3fd 823c4eb3e895 2961da76e60f 3c7ba4facde4
+content/law/acts/zdvp.json · чл. 187б [259]	560a2ba4d1ee 3034c435a4da 9aa032336a8e 2961da76e60f e28ff93bb013
+content/law/acts/zdvp.json · чл. 188 [260]	e4764eb0da69 cb6538cda2fa 2961da76e60f 4fe8454a2615
+content/law/acts/zdvp.json · чл. 188а [261]	560a2ba4d1ee 7038e44179fe 823c4eb3e895 2961da76e60f b6a283b652ac
+content/law/acts/zdvp.json · чл. 188б [262]	560a2ba4d1ee de8b186798fa 9aa032336a8e 2961da76e60f 86279fa67ece
+content/law/acts/zdvp.json · чл. 188в [263]	560a2ba4d1ee 1de74ac7b81b b8012cb642c8 2961da76e60f 4dc6a6544582
+content/law/acts/zdvp.json · чл. 188г [264]	560a2ba4d1ee 5cc0b8139145 ab1f4be7e5d6 2961da76e60f 84ec646eb085
+content/law/acts/zdvp.json · чл. 189 [265]	e4764eb0da69 8a4902e4075c 2961da76e60f fd2cc7ad68a8
+content/law/acts/zdvp.json · чл. 189а [266]	560a2ba4d1ee f370cdba17a4 823c4eb3e895 2961da76e60f bfa914af860f
+content/law/acts/zdvp.json · чл. 189б [267]	560a2ba4d1ee f0109c7c7392 9aa032336a8e 2961da76e60f 9abd57a0fd0d
+content/law/acts/zdvp.json · чл. 189в [268]	560a2ba4d1ee d4ff60ac65d7 b8012cb642c8 2961da76e60f a32f687c799e
+content/law/acts/zdvp.json · чл. 189г [269]	560a2ba4d1ee de2a82de3990 ab1f4be7e5d6 2961da76e60f 7495f20555db
+content/law/acts/zdvp.json · чл. 189д [270]	560a2ba4d1ee fcdf61291e76 1cc10a3947f7 2961da76e60f f537a0b832e4
+content/law/acts/zdvp.json · чл. 189е [271]	560a2ba4d1ee 910c830d3fc6 259f56cb715b 2961da76e60f a8d8e1929326
+content/law/acts/zdvp.json · чл. 189ж [272]	560a2ba4d1ee 18275a931e89 dd591284d827 2961da76e60f b16ef865292d
+content/law/acts/zdvp.json · чл. 189з [273]	560a2ba4d1ee 9ad4ffa3d5e3 3051067c6324 2961da76e60f 2ffe1a1b946f
+content/law/acts/zdvp.json · чл. 189и [274]	560a2ba4d1ee f68bfe73ea8e eead37caf818 2961da76e60f de6dc48cde6c
+content/law/acts/zdvp.json · чл. 19 [18]	e4764eb0da69 fb5c5b540979 67fa348069ff a366167aaa03
+content/law/acts/zdvp.json · чл. 190 [275]	e4764eb0da69 30e1ca210fc9 2961da76e60f f7416fc40375
+content/law/acts/zdvp.json · чл. 2 [1]	c847a59db33c f529865919d5 6af8b211ba36
+content/law/acts/zdvp.json · чл. 20 [19]	e4764eb0da69 86c7f0ec35f4 d68651687737 463ed1984af9
+content/law/acts/zdvp.json · чл. 21 [20]	e4764eb0da69 5e5a96b4701a d68651687737 1ce9ea5eb941
+content/law/acts/zdvp.json · чл. 22 [21]	e4764eb0da69 9f50f0885e1b d68651687737 23e16164448d
+content/law/acts/zdvp.json · чл. 23 [22]	e4764eb0da69 5197e61186f2 d68651687737 909834f51e4f
+content/law/acts/zdvp.json · чл. 24 [23]	e4764eb0da69 f526450a7c4a d68651687737 ab359e672ab3
+content/law/acts/zdvp.json · чл. 24а [24]	560a2ba4d1ee 61909efbbc73 823c4eb3e895 d68651687737 2d8f06e6bf03
+content/law/acts/zdvp.json · чл. 25 [25]	e4764eb0da69 c738a0105cbb 0be14709e34c 1f63f956a2f2
+content/law/acts/zdvp.json · чл. 26 [26]	e4764eb0da69 439b6713e9a3 0be14709e34c f46fb9e3a799
+content/law/acts/zdvp.json · чл. 27 [27]	e4764eb0da69 8e2c46b6c1ad 0be14709e34c 670c06890063
+content/law/acts/zdvp.json · чл. 28 [28]	e4764eb0da69 b703182ef2d9 890f74429425 86110c355394
+content/law/acts/zdvp.json · чл. 29 [29]	e4764eb0da69 f5470321420b 890f74429425 b50c616d6511
+content/law/acts/zdvp.json · чл. 3 [2]	c847a59db33c 7361d7c74ee6 731f29ba523f
+content/law/acts/zdvp.json · чл. 30 [30]	e4764eb0da69 8b8c22ad2460 890f74429425 5d6ffba24128
+content/law/acts/zdvp.json · чл. 31 [31]	e4764eb0da69 a8e8c0414170 890f74429425 e8c6b9a59bd4
+content/law/acts/zdvp.json · чл. 32 [32]	e4764eb0da69 d6cd3c5a2d5a 890f74429425 a2fe96f48de6
+content/law/acts/zdvp.json · чл. 33 [33]	e4764eb0da69 b1a65117e1d5 890f74429425 c6fa523ae259
+content/law/acts/zdvp.json · чл. 34 [34]	e4764eb0da69 bc16583782bb 890f74429425 ca4f0ce5a234
+content/law/acts/zdvp.json · чл. 35 [35]	e4764eb0da69 ad6c6bae71a7 25f93ca95f6c e00105f28ff8
+content/law/acts/zdvp.json · чл. 36 [36]	e4764eb0da69 cdc2e5734943 25f93ca95f6c 0fb519dd8378
+content/law/acts/zdvp.json · чл. 37 [37]	e4764eb0da69 437a625d2601 25f93ca95f6c db017c2374d9
+content/law/acts/zdvp.json · чл. 38 [38]	e4764eb0da69 1a102b0631b2 bb2bad1f1b67 5a9e538b4d7b
+content/law/acts/zdvp.json · чл. 39 [39]	e4764eb0da69 27d92ddb6363 bb2bad1f1b67 3b8342c348ac
+content/law/acts/zdvp.json · чл. 4 [3]	c847a59db33c 8cba974e8767 e2300a565af1
+content/law/acts/zdvp.json · чл. 40 [40]	e4764eb0da69 9cf48471d3d8 bb2bad1f1b67 737e39c8df86
+content/law/acts/zdvp.json · чл. 41 [41]	e4764eb0da69 301a76d77942 4b52c4d04a96 15648be96b98
+content/law/acts/zdvp.json · чл. 42 [42]	e4764eb0da69 067134fdedd2 4b52c4d04a96 1e478d6580c2
+content/law/acts/zdvp.json · чл. 43 [43]	e4764eb0da69 969d66c68b2e 4b52c4d04a96 419462ab9263
+content/law/acts/zdvp.json · чл. 43а [44]	560a2ba4d1ee b38c449bfe2a 823c4eb3e895 4b52c4d04a96 f1d4c5f86832
+content/law/acts/zdvp.json · чл. 43б [45]	560a2ba4d1ee 146d0c3e326f 9aa032336a8e c128622214f0 b15d3db6a596
+content/law/acts/zdvp.json · чл. 44 [46]	e4764eb0da69 26a27730b765 b683eefe675a ee2689daff03
+content/law/acts/zdvp.json · чл. 45 [47]	e4764eb0da69 7f48a86c32df b683eefe675a 54c2d006c4ca
+content/law/acts/zdvp.json · чл. 46 [48]	e4764eb0da69 9f190704c364 b683eefe675a 15775291245f
+content/law/acts/zdvp.json · чл. 47 [49]	e4764eb0da69 e054f89c42ea bdf0190300f6 647b231c51f2
+content/law/acts/zdvp.json · чл. 48 [50]	e4764eb0da69 072e158aa4d2 bdf0190300f6 5efaae49c357
+content/law/acts/zdvp.json · чл. 49 [51]	e4764eb0da69 c6700965c630 bdf0190300f6 dbd453f59d31
+content/law/acts/zdvp.json · чл. 5 [4]	e4764eb0da69 75f54ad9414d 06711028344e d80dbbc7a33e
+content/law/acts/zdvp.json · чл. 50 [52]	e4764eb0da69 783d85c8f63f bdf0190300f6 dd9c05591dab
+content/law/acts/zdvp.json · чл. 50а [53]	560a2ba4d1ee f0266a0b6949 823c4eb3e895 bdf0190300f6 12da0b391095
+content/law/acts/zdvp.json · чл. 51 [54]	e4764eb0da69 9aebbe7114ef d15f95461fae ec88c2c77977
+content/law/acts/zdvp.json · чл. 52 [55]	e4764eb0da69 2b32a7524f6d d15f95461fae c3f342a9ed7e
+content/law/acts/zdvp.json · чл. 53 [56]	e4764eb0da69 b42c2250bc34 d15f95461fae 80f4288e1c96
+content/law/acts/zdvp.json · чл. 54 [57]	e4764eb0da69 66d3d9acdd52 d15f95461fae db0c2373af03
+content/law/acts/zdvp.json · чл. 55 [58]	e4764eb0da69 4f3189a94fbc 7805e4acaaed 4869da1d82ad
+content/law/acts/zdvp.json · чл. 56 [59]	e4764eb0da69 c215fcdc40df 7805e4acaaed e9543c629cc5
+content/law/acts/zdvp.json · чл. 57 [60]	e4764eb0da69 1c49b476ba35 7805e4acaaed 6e2b1166fea4
+content/law/acts/zdvp.json · чл. 58 [61]	e4764eb0da69 056c49323671 7805e4acaaed d7e44b3f76f2
+content/law/acts/zdvp.json · чл. 58а [62]	560a2ba4d1ee 71af1293d972 823c4eb3e895 7805e4acaaed cf932dec1ce9
+content/law/acts/zdvp.json · чл. 59 [63]	e4764eb0da69 f512368a075d 7805e4acaaed 87ae8fefa495
+content/law/acts/zdvp.json · чл. 59а [64]	560a2ba4d1ee a8d7e1cfaeab 823c4eb3e895 7805e4acaaed 8aa87512ef93
+content/law/acts/zdvp.json · чл. 6 [5]	e4764eb0da69 c061006f898a 06711028344e 74377f530bea
+content/law/acts/zdvp.json · чл. 60 [65]	e4764eb0da69 ee99ebb7912d 7805e4acaaed d0ed0808c72b
+content/law/acts/zdvp.json · чл. 61 [66]	e4764eb0da69 03c8401eb677 4d9f3e322dc1 1d649a631f86
+content/law/acts/zdvp.json · чл. 62 [67]	e4764eb0da69 0494164b70f1 4d9f3e322dc1 7f663b8a1703
+content/law/acts/zdvp.json · чл. 62а [68]	560a2ba4d1ee 7e6848b006cd 823c4eb3e895 4d9f3e322dc1 239b684699f8
+content/law/acts/zdvp.json · чл. 63 [69]	e4764eb0da69 b39e89dbc033 cc5559d6d608 5273ac938564
+content/law/acts/zdvp.json · чл. 64 [70]	e4764eb0da69 ab13b32ef13a cc5559d6d608 6215a1162181
+content/law/acts/zdvp.json · чл. 65 [71]	e4764eb0da69 fd7e4bd6b058 334d5845c190 a63a856eab63
+content/law/acts/zdvp.json · чл. 66 [72]	e4764eb0da69 8ca61d315a89 334d5845c190 d0008d4a0a40
+content/law/acts/zdvp.json · чл. 67 [73]	e4764eb0da69 01755ad2d991 334d5845c190 4e3635a623b0
+content/law/acts/zdvp.json · чл. 68 [74]	e4764eb0da69 0c9a3d02812c 334d5845c190 7641ec8157b5
+content/law/acts/zdvp.json · чл. 69 [75]	e4764eb0da69 171808f2e6a6 334d5845c190 7248c6b61bd7
+content/law/acts/zdvp.json · чл. 7 [6]	e4764eb0da69 cce3576e421d 06711028344e 8c2528c14ef6
+content/law/acts/zdvp.json · чл. 70 [76]	e4764eb0da69 a09ff52b9a42 da4f50c68b8d 514cc41db261
+content/law/acts/zdvp.json · чл. 71 [77]	e4764eb0da69 b897566ad14b da4f50c68b8d 5ec032535add
+content/law/acts/zdvp.json · чл. 72 [78]	e4764eb0da69 8cac778d53db da4f50c68b8d 1e323c1e7379
+content/law/acts/zdvp.json · чл. 73 [79]	e4764eb0da69 f2bd221bf863 da4f50c68b8d fbae2b9dcf39
+content/law/acts/zdvp.json · чл. 74 [80]	e4764eb0da69 5c16639b39c9 da4f50c68b8d c5033ae39e67
+content/law/acts/zdvp.json · чл. 74а [81]	560a2ba4d1ee 091510238a71 823c4eb3e895 da4f50c68b8d 42191718349f
+content/law/acts/zdvp.json · чл. 75 [82]	e4764eb0da69 2bf075b75744 da4f50c68b8d e4b8dc20b72b
+content/law/acts/zdvp.json · чл. 76 [83]	e4764eb0da69 5bdb83262aaa da4f50c68b8d 019853f3184e
+content/law/acts/zdvp.json · чл. 77 [84]	e4764eb0da69 98acee3643ba da4f50c68b8d 92bafccfe4a5
+content/law/acts/zdvp.json · чл. 78 [85]	e4764eb0da69 76d1ee1e499d da4f50c68b8d 7da5d30b97fd
+content/law/acts/zdvp.json · чл. 79 [86]	e4764eb0da69 41a6d757fed2 58031905a09e 28e2fb04dc70
+content/law/acts/zdvp.json · чл. 8 [7]	e4764eb0da69 06ac9c551db9 06711028344e 3d1504314bd8
+content/law/acts/zdvp.json · чл. 80 [87]	e4764eb0da69 f7bf07f48080 58031905a09e a00c2bab561e
+content/law/acts/zdvp.json · чл. 80а [88]	560a2ba4d1ee 3d8ea99af737 823c4eb3e895 58031905a09e e66006fbae9d
+content/law/acts/zdvp.json · чл. 81 [89]	e4764eb0da69 f86acba326ef 58031905a09e 4df582073eac
+content/law/acts/zdvp.json · чл. 82 [90]	e4764eb0da69 d69afd5561da 58031905a09e fe381f9abd21
+content/law/acts/zdvp.json · чл. 83 [91]	e4764eb0da69 27d02c4eb132 58031905a09e 4fed69bcd66a
+content/law/acts/zdvp.json · чл. 84 [92]	e4764eb0da69 495967252755 58031905a09e 50a6432e3dce
+content/law/acts/zdvp.json · чл. 85 [93]	e4764eb0da69 60b9c9316178 58031905a09e cc75831884a1
+content/law/acts/zdvp.json · чл. 86 [94]	e4764eb0da69 c8194136e4b4 58031905a09e c86225517f45
+content/law/acts/zdvp.json · чл. 87 [95]	e4764eb0da69 4cd5650a3d47 58031905a09e 0c0327fedd7d
+content/law/acts/zdvp.json · чл. 88 [96]	e4764eb0da69 7392865b2695 58031905a09e b5838bd3909e
+content/law/acts/zdvp.json · чл. 89 [97]	e4764eb0da69 4891f96108b9 58031905a09e e07acee00086
+content/law/acts/zdvp.json · чл. 9 [8]	e4764eb0da69 47b82b4d9905 06711028344e 0db820308bfd
+content/law/acts/zdvp.json · чл. 90 [98]	e4764eb0da69 0c214b0841f8 58031905a09e fabec8721435
+content/law/acts/zdvp.json · чл. 91 [99]	e4764eb0da69 7d3f3100558c 58031905a09e 2334e5a3603a
+content/law/acts/zdvp.json · чл. 92 [100]	e4764eb0da69 42ba9b2e7a40 58031905a09e 2e20170b5771
+content/law/acts/zdvp.json · чл. 92а [101]	560a2ba4d1ee 533ed70e2fe7 823c4eb3e895 a26d142836cb 222952dd4de3
+content/law/acts/zdvp.json · чл. 93 [102]	e4764eb0da69 033afaf7c45a a26d142836cb aedcc4f1fdf7
+content/law/acts/zdvp.json · чл. 94 [103]	e4764eb0da69 f3cad39edbfe a26d142836cb 44f07bf1872e
+content/law/acts/zdvp.json · чл. 95 [104]	e4764eb0da69 9b79626f8313 a26d142836cb 7b538532e7a1
+content/law/acts/zdvp.json · чл. 96 [105]	e4764eb0da69 703b68677798 a26d142836cb 4ffafd69b562
+content/law/acts/zdvp.json · чл. 97 [106]	e4764eb0da69 ccd7ccd2666e a26d142836cb 12e0d8422969
+content/law/acts/zdvp.json · чл. 98 [107]	e4764eb0da69 0a6c08e86a94 a26d142836cb 01a75d4e8d48
+content/law/acts/zdvp.json · чл. 99 [108]	e4764eb0da69 ba63fed31131 a26d142836cb c71a228c5222
+content/law/acts/zdvp.json · чл. 99а [109]	560a2ba4d1ee c111878da544 823c4eb3e895 a26d142836cb abf3527d467b
+content/law/claim-ledger.json	75f19c2e7d9a 296f5880911e 6118f7b12dfd c476e7cc8326 b3508f4ee5bd 171909b181ac 8d51cd1b02c0 bf6359ca3ccb 9ee7711b7537 9bd6bdc7f61d 5478da35bd63 b7e25e78dbb0 88bbcd47d34b 5478da35bd63 96d06a9b2f14 2a3201c3cc9b 5d9925c279f3 043eb2656aae e7315958a12f 8f03bfe8090b 4e35060a0cca 797725484b09 07ce7e2398fc 3d0d5368e4bd 7e0ecb457875 e18a8ef26565 5dbfaeb2baf4 52354dc2086e 26719f3c9881 bfe8134889d0 960b44990327 2790a577be1d e62edce6143e cb9ded37ea3d c948455bdc22 2ea341afcf95 65cc29e91073 63c448e08d08 e96e20be34d6 34795cd53eb3 56aa0aebecd3 909802d7de74 18a6b6740540 5bccc6db93b0 f459758a0669 b17d07c397c1 9e2bc91f4559 65452eb49ca0 97b9e73a926e 804f74a1cb1c 54d666b2a960 21ac00553fc2 1d925a5d8e66 8bf0b4957c2e 8408787d392d 623b509a493f 0a00218e1017 8530e8a43e90 d907f8b079ab eee8cc2c84f7 e4ded13f1cda 0f456814db00 7df59e1c6d67 fff0cb383fa3 02a5097d1f4b 4670d1974e28 2d8b96f52bc3 afb80afd8887 3f371a1d2dde 6e246820c9c3 178eaa544039 14944ae64cfa e51e0082ca51 63bb46216f13 edf6419d1a99 61b85e289a07 5e1e5634037e 67b0b3eae4bc b7417b719659 c3de85b7f822 5efbe6465611 fa66972290c9 ffc7c6dccd4c 17d1915d4dbc ac836469138b c73aff037b9f ebceab5b6229 9023026e31c9 9ac8b4030d9c e04c8d54263b 2b75450ffb73 d70843883408 dbabc91fea5b 46fe2bb649a4 85befc7eece6 82cd72e3b340 64ff777dac41 3d3879a9b0a2 22ec1f5f499e 5c13995f0f39 58b7dcfa2dfb 864005033821 85ef6f9c83cb 4eb34f8b4015 6bd2d6ec1868 f2a01d80b56d 69bcaeb3f7ec 0b2b4e06bde0 fc975c1a15cc 27d3dd48f7cc b1fb629d831d d1d1804900dc 62aef0d17846 9d12193d02b0 fdea787c272c 4a2e8b8f965a dccbc24db385 1cb7141fbb27 fe8cded57a48 1eeda14e795c 11e9d6721055 f07baec6f920 a3c8f04b44a0 39105522e6f3 931df1c976be 508a6567f23c 1998ad972909 de6781b335df 50e5ddeef178 f712cc1a578e 0617667055bb 5d4113f31bbc 6671f91978b2 a2aa46634162 cf49a2f2a009 bc81d82d04cb 20bd89885490 4398a24ed18e df4fb301d113 a0ebecab7a9e fc47817ecbae 4fde44739359 b48ceddbba82 93b8a55b31bf aed21ed48841 4b9f0f5af42a 075453b9c1ec 79b68e10f738 463134d4c534 dc8e4487d19f eec208735039 072527c54827 87be1aa9efb7 578dab7e5273 758f32e99713 6611b17273c1 359998f68b98 16f37b5e5a24 1d26b59ae3c9 160f612ea39d 953b82210793 07fe6cc58c36 cf97feb4cb83 daac2beb5d69 bc48962cd24c bf40d18a1318 723d46739f83 d904084a079b a728656e6a0e 6b51f1d8f731 01b81723dd10 f06e01f5124b 3e31266ea125 159643b5accb 32233191b27a 2acda10c662e 3ecc50f48f4a 618db67890b1 df73ae8b2bf5 3184257f840a 3a80505fa80d 0adf82032261 d16a0c8eaed6 bc891df6498d 760eedb1dde6 11a540f34626 b1388fc63c97 0a8568ed3a3f 589514dd6515 b5b88c929bc1 652c2ece0a28 996f7a3aed75 34f8b55fac95 d326f1590552 6464024a5061 36044564a3cd 9e2c891bb81c 4702d8f3225e efbd010354ce ab72767e5aaa ccf328421fb5 439e81d145dd 904d2e0d5ebf 016e554e6a62 584840d405f1 44096e83b3c4 e9de3bbe3f64 49589f332d3f 3c8617104be1 60f34435208e 99cc0fb3cb76 3fa85de15a45 8c94851a9a49 a3d9174042af 48594262080c c9e1b835cb7d 447e9f03e554 2eceaf74bcd4 c48fac2f5d71 f8954f932b95 e60a2ebaef82 9d33077a4d09 5d40ed9aa955 cc3273ac045a 7f3fe19417cb c6bb73e2f6da b6c5f75abcbd def3f5a0cbbf cdbbb20e9a13 f3f78daca364 a7c70fa25631 e44ee368f831 950122c8acd3 baedd20976f2 2be2b47ec697 3e31266ea125 159643b5accb 3e31266ea125 159643b5accb e3d95ff662e0 72705f6eeac2 541c705777c0 d6da821dc071 3742e856740d d139e86a1c4b d9076f54df12 f279487fc6ee f78eb56209ef f2436ceaaaac 68f21f2937c3 98225704adb0 76c696d45f19 05cdc6e80d3d 0c48e27bbeae ba4288ca2a42 1e6372217eb3 225bee08d115 0063c1fa1e8f 514b2997498a 2612cbfa08bd d625025bf1b5 70b9bdc12745 962288266159 f687f9fc1af2 ef1e95361b21 edaa0ef78af1 fcae3c30ba19 92896b99cf9f 1cfb610adcb1 3e5c62e6a936 d9640a813f03 be94e7a366b1 c94c9a83d649 afc4c0dcc28b d99f491d5435 e06d2e7e1c29 9a7144bd0c53 7832f78afce6 ea97fcfc68c7 3f15d22f8143 366152c75d84 baa538f6b219 acc5d9c824a5 b059294a8de8 2ff7393ce75c 206d63f138ff 20de0ea60668 4ead99ce717d 81a8d8aa6255 20de0ea60668 e84983ca66e4 9ad8e4207832 7dc8b057cf20 21f56752a364 a0d4468c58f8 daf98eeb11c8 95a8f8dd84f4 8dd3daedb7ad daf98eeb11c8 95a8f8dd84f4 8dd3daedb7ad daf98eeb11c8 95a8f8dd84f4 8dd3daedb7ad
+content/law/penalties.json	1488d2594623 ded3000dca7c 5ae77eb698e0 f6dd07058fa6 6dea1be28680 4cebd34bbbc7 b33e81f6eefb b8ffc63db1cb 7a97be830165 c855f1844799 e142433416d2 bb2482f0ab8a 28e60e75da7d a32c96ced525 7ca88434eb88 2a5b007e822d 5cb895fe5b6e 6935ee86de02 def426ce9fb5 872dd1b92823 c061006f898a bb2482f0ab8a 151362f5222e ebae87eda4ba a32c96ced525 7ca88434eb88 5cb895fe5b6e 7d8d1afecd62 d7f686965038 2fe3164c02b3 757ad3728a0f 068fe8a77888 073d98a7092e a487b52fa713 75ab7074c3c9 0ad4fce89ae2 a32c96ced525 666a657a846d f69861bafd48 cab771dd6eec 6dea1be28680 ff47642405e2 8b2dabcf5569 e71fe1fa7429 7a97be830165 c855f1844799 e142433416d2 bb2482f0ab8a 28e60e75da7d a8d7a8cbdc0c bb2482f0ab8a 8a5670b59528 06e5bbf29c21 b1e0795e75ef 8c32f39a3527 e180b012bd8f c061006f898a bb2482f0ab8a fbd9d8aabdc8 d71b265b27ab 1809da419ea9 97bdc58c7afa a8d7a8cbdc0c bb2482f0ab8a 06e5bbf29c21 f0d19678edc3 d7f686965038 2fe3164c02b3 757ad3728a0f 068fe8a77888 073d98a7092e a487b52fa713 57232c9c6695 0ad4fce89ae2 a8d7a8cbdc0c 17ce46437562 87594aa9be1e 207c94521812 a53e9a3fb6e4 bb2c549c7d80 c855f1844799 e142433416d2 bb2482f0ab8a 28e60e75da7d a32c96ced525 efba49e3f780 e824d101cbe5 b767bb510881 94a75635d01e 03655ef90f75 1517bb08855c c061006f898a bb2482f0ab8a b14f51258f17 adf5625e384f 48408b426394 97bdc58c7afa a32c96ced525 efba49e3f780 b767bb510881 4fe6191ff4bb d7f686965038 2fe3164c02b3 757ad3728a0f 068fe8a77888 77e756834b99 37d743ac0da5 28903a9eeab2 0ad4fce89ae2 a32c96ced525 033edfcb8d1a 5662d44a6f4a 87d5c88ccb77 79ca7c952602 e73111b1c2e1 c855f1844799 e142433416d2 bb2482f0ab8a 28e60e75da7d a32c96ced525 efba49e3f780 c1b29674bc40 b767bb510881 66ee7a579963 e2e7fc36cd29 600e609f313c c061006f898a bb2482f0ab8a a3c52a4ad306 68f690496aff 19f2726d1986 97bdc58c7afa a32c96ced525 efba49e3f780 b767bb510881 4fe6191ff4bb 2fe3164c02b3 757ad3728a0f 068fe8a77888 c03be404d973 bf8642467255 94eae8b53ba5 0ad4fce89ae2 a32c96ced525 9a6dace2e4d8 49bdef657600 60ff3d504052 52bddead30c1 6da7ee3ba0a5 9c5716cce407 0c0228ab8c62 112c12731fc9 8a4902e4075c 7ca88434eb88 3cfcc8fff3d5 0dd5daf3e710 bb2482f0ab8a c1b29674bc40 55988f0d4e95 f313e90f8954 fcf20c7170f6 3f917099f8d8 c061006f898a bb2482f0ab8a 151362f5222e 6db522ca30de 0dd5daf3e710 bb2482f0ab8a c1b29674bc40 55988f0d4e95 f313e90f8954 fcf20c7170f6 3a1e6db67fd7 d7f686965038 2fe3164c02b3 757ad3728a0f 068fe8a77888 3ecb0b729bbf f9eecc22db4e 8c431d85ca32 0ad4fce89ae2 0dd5daf3e710 b580cbe85733 e88719e8d6f7 bf6853b0092c d6cfc16efa64 cda6b7bffae8 58ae780242a7 cd4e4d3c8871 8a4902e4075c bb2482f0ab8a e360684cc0f6 ae8893dee1db bb2482f0ab8a e824d101cbe5 b1733937ecf2 a4a4ae51b3c0 aa4a822f5d94 c061006f898a bb2482f0ab8a 83c327e0287f 79162c53a332 a4a4ae51b3c0 b3f9f060a2cc 5e3ecc11836a ae8893dee1db bb2482f0ab8a e824d101cbe5 b1733937ecf2 50faec28cc58 a4a4ae51b3c0 c24cf8a84bcb 0ad4fce89ae2 ae8893dee1db dde20be773a6 f14bece5b2a5 070ec42da8ef 52bddead30c1 6da7ee3ba0a5 c3dcd9940299 0c0228ab8c62 112c12731fc9 8a4902e4075c 7ca88434eb88 3cfcc8fff3d5 0dd5daf3e710 bb2482f0ab8a 578a854c1b27 8d0f5295fa0d f313e90f8954 dfa397ea6308 16e5833de12c c061006f898a bb2482f0ab8a 151362f5222e 66891bc40242 0dd5daf3e710 bb2482f0ab8a 578a854c1b27 8d0f5295fa0d f313e90f8954 dfa397ea6308 eb1d48e68a93 d7f686965038 2fe3164c02b3 757ad3728a0f 068fe8a77888 3ecb0b729bbf f9eecc22db4e 09131704d219 0ad4fce89ae2 0dd5daf3e710
+content/law/sources.json	de662662b606 1e2c019d2bb2 19fbbbdc5e92 15b678a61cff cf0488d2b994 b53ae0a7d18a 9ae8a5b569a8 335614c2f0c8 b53ae0a7d18a 6bc550c2c907 b53ae0a7d18a 9dc18cb0dff5 b53ae0a7d18a 4e0d182bd040 b53ae0a7d18a 9456e2912b83 b53ae0a7d18a 00e160fed6f4 b53ae0a7d18a bb5f89b242cb b53ae0a7d18a d1c4f4a4dae9 b53ae0a7d18a 51cc89fb1317 b53ae0a7d18a 0c1d8629bc10 b53ae0a7d18a aec5a5fe3170 b53ae0a7d18a 0d1b0a03e072 b53ae0a7d18a 8ba4a134edb2 b53ae0a7d18a 91fcc42e05dd b53ae0a7d18a 6d126f7fcdb9 b53ae0a7d18a 85dd5440709b b53ae0a7d18a a5203a355d84 b53ae0a7d18a a258cf68e6a8 b53ae0a7d18a 42a3447e5da6 b53ae0a7d18a 9ed75d03850b b53ae0a7d18a d5fd84858fdb b53ae0a7d18a b4c06ac55909 b53ae0a7d18a 90a7fb06f48a b53ae0a7d18a b668080217dc b53ae0a7d18a 41afef286288 b53ae0a7d18a 4e26da08f4e2 b53ae0a7d18a 3f803296a4d4 b53ae0a7d18a 76e9e43fcf27 ac4ac69722a1 3518d564a371 76e9e43fcf27 ecb0f7d1072e b06159f0c802 3aa53691da79 9a07e888ed59 3445427a9e5c 907fc5a73573 b1677728616a d0918cc9c5f1 d056aca46586 9d062355fc57 c0d04e1fde98 9a07e888ed59 1604b0966820 907fc5a73573
+content/law/tools/sars-index.json	5be2c993c2fd 6bc550c2c907 9dc18cb0dff5 4e0d182bd040 9456e2912b83 00e160fed6f4 bb5f89b242cb d1c4f4a4dae9 51cc89fb1317 0c1d8629bc10 aec5a5fe3170 0d1b0a03e072 8ba4a134edb2 91fcc42e05dd 6d126f7fcdb9 85dd5440709b a5203a355d84 a258cf68e6a8 42a3447e5da6 9ed75d03850b d5fd84858fdb b4c06ac55909 90a7fb06f48a b668080217dc 41afef286288 4e26da08f4e2 3f803296a4d4

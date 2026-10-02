@@ -493,11 +493,29 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     peekBg: "Ставаш непредвидим.",
     correctiveBg:
       "Гледай далеч напред по средата на лентата, не в предния капак — колата отива там, където гледаш. Малки корекции с волана, рано и плавно.",
-    // чл. 15, ал. 1 is about WHICH lane („използва най-дясната свободна лента"),
-    // not about how straight you hold it inside one — so on its own it does not
-    // carry this fault. чл. 20, ал. 1 („длъжни да контролират непрекъснато
-    // пътните превозни средства") is the half that does; both are named.
-    lawRef: "ЗДвП чл. 15, ал. 1; чл. 20, ал. 1",
+    // ONE CITATION, AND WHY THE OTHER ONE WENT (founder ruling 2026-10-01
+    // «KEEP-RIGHT FOLLOWS THE LAW», round 3). This slot used to read «ЗДвП
+    // чл. 15, ал. 1; чл. 20, ал. 1». чл. 15, ал. 1 is about WHICH lane
+    // („използва най-дясната свободна лента"), not about how straight you hold
+    // it inside one — and ал. 2, т. 2 switches it off altogether in a
+    // settlement on two or more marked lanes one way at ≤ 80 km/h, which is
+    // exactly where this card is shown most: `sc-ln-boulevard-discipline`
+    // coaches/bills it at 13.07 on wb-boulevard-v1, a town boulevard posted
+    // 40. A card must be true on every frame it shows on, so the keep-right
+    // article is gone from it.
+    //
+    // What the BANK holds for this fault (content/law/acts/zdvp.json,
+    // retrieved, not recalled): чл. 20, ал. 1 — „Водачите са длъжни да
+    // контролират непрекъснато пътните превозни средства, които управляват" —
+    // binds on every road and is the duty a car left hanging on a lane line
+    // breaches. The rule for WHERE the wheel may run relative to the marking is
+    // in ППЗДвП, which the bank does not contain (rules/consequences.ts says so
+    // to the student), so nothing more specific can be cited without inventing
+    // it. (The bank's чл. 5, ал. 2, т. 4 — successive sudden lane changes — is
+    // the WEAVING duty, a different act from the sustained off-centre ride this
+    // code detects; it is not this card's.) Pinned to the bank by
+    // lessons/scenario/__tests__/keep-right-lessons-citations.test.ts.
+    lawRef: "ЗДвП чл. 20, ал. 1",
     realWorldBg:
       "Извън изпита разположението на колата върху платното си има цена: глоба 50 лв. по ЗДвП чл. 183, ал. 2 — водач, който „нарушава правилата за разположение на пътно превозно средство върху платното за движение“.",
     realWorldRefs: ["ЗДвП чл. 183, ал. 2, т. 2"],
@@ -655,8 +673,25 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,
     titleBg: "Движение в лявата лента без причина",
+    // FOUNDER RULING 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW». The engine bills
+    // this ONLY where чл. 15, ал. 1 binds — outside a settlement, on a
+    // motorway, or above 80 km/h — so the card names those three cases and
+    // the town exemption it is NOT in (ал. 2, т. 2), and is true on every
+    // frame it can show on. The old text («Извън изпреварване се движи във
+    // възможно най-дясната свободна лента») stated ал. 1 as if it bound on
+    // every road, which in town on two marked lanes at ≤ 80 is false.
+    // Citations and the 80 are pinned to content/law/acts/zdvp.json by
+    // __tests__/keep-right-law-pins.test.ts. Round 2: the town case is NOT the
+    // only exemption — ал. 2, т. 3 frees a lane a light signal admits — so the
+    // card names both and says this was no such case (worded «такъв случай»,
+    // not «нито един …»: the claim gate reads the latter as a universal
+    // negative about the LAW, which this is not). That is true on every frame
+    // the card can show on: no built district has a light-signal-admitted lane
+    // on a multi-lane carriageway (runtime/__tests__/settlement-signal.test.ts
+    // §4), and the engine never bills a т. 2 street. The full text is pinned
+    // verbatim in lessons/scenario/__tests__/keep-right-lessons-reviewed-text.json.
     explanationBg:
-      "Дълго време се движеше в лявата лента, без да изпреварваш. Извън изпреварване се движи във възможно най-дясната свободна лента — лявата се освобождава за по-бързите.",
+      "Дълго време се движеше в лявата лента, без да изпреварваш, на път, където законът изисква най-дясната свободна лента: извън населено място, на магистрала или където е разрешено над 80 km/h (ЗДвП чл. 15, ал. 1). Най-удобната лента можеш да избираш в населено място, на платно с две и повече ленти в посока и ограничение до 80 km/h (ал. 2, т. 2), и в лента, в която те пуска светлинен сигнал (ал. 2, т. 3) — тук не беше такъв случай. Лявата е за изпреварване: прибери се вдясно, щом маневрата свърши.",
     peekBg: "Лявата е за по-бързите.",
     correctiveBg:
       "След изпреварване се прибери вдясно веднага щом видиш изпреварания в огледалото за обратно виждане — лявата лента е за маневри, не за пътуване.",

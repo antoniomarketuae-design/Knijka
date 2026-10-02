@@ -34,6 +34,9 @@
  *
  * Runs against the REAL /content repo and the real scenario templates.
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
@@ -45,6 +48,7 @@ import {
   LAWREF_MISMATCH_ALLOW,
   MISSING_DRILLS,
   PAIRINGS_DELIBERATELY_DENIED,
+  QUESTION_CLIP_WITHHELD,
   QUESTION_SCENARIO_CORRECTION,
   pairKey,
   pairingVerdict,
@@ -53,6 +57,9 @@ import {
 } from "./whyPanelPairing";
 
 /** The five bank questions sc-vu-bikelane-turn was authored against. */
+/** content/world — the committed maps (this file is platform/src/modules/clips/…). */
+const WORLD_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../content/world");
+
 const RIGHT_HOOK_QUESTIONS = [
   "q-predimstvo-062",
   "q-uyazvimi-011",
@@ -163,7 +170,13 @@ describe("the guard: no question is shown a drill that argues from another law",
     // article number from every ref naming an act content/law does not hold,
     // and ППЗДвП is one, so the shared key is gone. See the long note on the
     // same count in whyPanel.test.ts: ingesting ППЗДвП restores all six.
-    expect(refused).toBe(63);
+    //
+    // 63 → 64 on 2026-10-02 (founder ruling «KEEP-RIGHT FOLLOWS THE LAW»):
+    // q-manevri-032, the TOWN lane-choice question, no longer gets the
+    // motorway keep-right mistake. It is not refused by the citation guard —
+    // both sides cite чл. 15 — but by QUESTION_CLIP_WITHHELD, a reviewer's
+    // veto for a duty and its exemption sharing one article.
+    expect(refused).toBe(64);
   });
 
   it("CANARY: the original defective pairing is caught by the guard, not just by the correction", () => {
@@ -230,6 +243,119 @@ describe("the guard: no question is shown a drill that argues from another law",
     expect(payload.sim).toBeUndefined();
     expect(payload.explanationBg.length).toBeGreaterThan(0);
     expect(whyPanelCandidateSimRef("q-signs-054")?.templateId).toBe("sc-jx-priority-confidence");
+  });
+});
+
+describe("the town lane-choice question never gets the keep-right mistake (founder ruling 2026-10-01)", () => {
+  const LANE_DISCIPLINE = Object.entries(QUESTION_EVENT_TYPE)
+    .filter(([, event]) => event === "ev-lane-discipline")
+    .map(([id]) => id);
+
+  it("q-manevri-032 („в населено място по булевард с две ленти… Задължен ли си… само в дясната?“) ships text + citations, no clip", () => {
+    const payload = resolveWhyPanel("q-manevri-032")!;
+    expect(payload.sim).toBeUndefined();
+    expect(payload.explanationBg).toContain("най-удобната лента");
+    expect(payload.lawRefs.map((r) => `${r.act} ${r.ref}`)).toEqual(["ЗДвП чл. 15"]);
+    // …and it is the veto that withheld it: the pick it would otherwise get is
+    // the motorway keep-right mistake, which the citation guard lets through.
+    const candidate = whyPanelCandidateSimRef("q-manevri-032")!;
+    expect(candidate.templateId).toBe("sc-mw-discipline");
+    expect(candidate.mistake.titleBg).toBe("Висене в лявата лента при 130");
+    expect(candidate.mistake.districtId).toBe("mw-v1");
+    const drill = scenarioById("sc-mw-discipline")!;
+    expect(
+      pairingVerdict({
+        questionId: "q-manevri-032",
+        event: "ev-lane-discipline",
+        templateId: drill.id,
+        questionLawRefs: getContentRepo().questionById("q-manevri-032")!.lawRefs,
+        scenarioLawRef: drill.teach.lawRef,
+      }).verdict,
+    ).toBe("law-match");
+  });
+
+  it("the veto is surgical: the other eight lane-discipline questions — motorway, out of town, the two-way road — keep the motorway drill", () => {
+    expect(LANE_DISCIPLINE).toHaveLength(9);
+    for (const id of LANE_DISCIPLINE) {
+      if (id === "q-manevri-032") continue;
+      expect(resolveWhyPanel(id)?.sim?.templateId, id).toBe("sc-mw-discipline");
+    }
+  });
+
+  it("no served question whose STEM puts it in a settlement, and which cites чл. 15, is illustrated on a road where ал. 1 binds", () => {
+    // The class, not the one id: чл. 15 holds the duty (ал. 1) and its town
+    // exemption (ал. 2, т. 2), so «shares an article» cannot tell a town
+    // lane-choice question from a motorway keep-right drill. Where ал. 1 binds
+    // is measured on the drill's own committed map: a bank of two or more lanes
+    // one way that is a motorway or is posted above 80.
+    const repo = getContentRepo();
+    const bindsCache = new Map<string, boolean>();
+    const binds = (districtId: string): boolean => {
+      const hit = bindsCache.get(districtId);
+      if (hit !== undefined) return hit;
+      const doc = JSON.parse(readFileSync(path.join(WORLD_DIR, `${districtId}.json`), "utf-8")) as {
+        roads: { edges: { lanes: number; oneway: boolean; maxspeed: number; motorway?: boolean }[] };
+      };
+      const out = doc.roads.edges.some(
+        (e) => (e.oneway ? e.lanes : Math.floor(e.lanes / 2)) >= 2 && (e.motorway === true || e.maxspeed > 80),
+      );
+      bindsCache.set(districtId, out);
+      return out;
+    };
+    const TOWN_SCENE = /населен\p{L}*\s+м[яе]ст|(?<!\p{L})в\s+града|градск|булевард/iu;
+    const NOT_TOWN = /извън\s+населен|извънградск|магистрал/iu;
+    const offenders: string[] = [];
+    let served15 = 0;
+    for (const questionId of Object.keys(QUESTION_EVENT_TYPE)) {
+      const question = repo.questionById(questionId)!;
+      if (!question.lawRefs.some((r) => /чл\. ?15(?!\d)/u.test(r.ref))) continue;
+      const sim = resolveWhyPanel(questionId)?.sim;
+      if (sim === undefined) continue;
+      served15++;
+      if (TOWN_SCENE.test(question.textBg) && !NOT_TOWN.test(question.textBg) && binds(sim.mistake.districtId)) {
+        offenders.push(`${questionId} („${question.textBg}“) → ${sim.templateId} on ${sim.mistake.districtId}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+    // Not vacuous: questions citing чл. 15 ARE served, and the motorway map binds.
+    expect(served15).toBeGreaterThan(5);
+    expect(binds("mw-v1")).toBe(true);
+    expect(binds("wb-boulevard-v1")).toBe(false);
+  });
+
+  it("every withheld entry is real, reasoned, and its fitting drill is a recorded demo that still cannot be served", () => {
+    const repo = getContentRepo();
+    expect(Object.keys(QUESTION_CLIP_WITHHELD)).toEqual(["q-manevri-032"]);
+    for (const [questionId, entry] of Object.entries(QUESTION_CLIP_WITHHELD)) {
+      const question = repo.questionById(questionId);
+      expect(question, questionId).toBeDefined();
+      expect(Object.hasOwn(QUESTION_EVENT_TYPE, questionId), questionId).toBe(true);
+      // A veto and a correction on the same question would be two answers.
+      expect(Object.hasOwn(QUESTION_SCENARIO_CORRECTION, questionId), questionId).toBe(false);
+      expect(entry.reason.trim().length, questionId).toBeGreaterThan(120);
+      // The veto still has something to veto.
+      expect(whyPanelCandidateSimRef(questionId), questionId).not.toBeNull();
+      if (entry.fittingDrill === null) continue;
+      const spec = scenarioById(entry.fittingDrill.templateId);
+      const mistake = spec?.mistakes[entry.fittingDrill.mistakeIndex];
+      expect(mistake, questionId).toBeDefined();
+      expect(mistake!.traceRef.pending, questionId).not.toBe(true);
+      expect(entry.fittingDrill.blockedBy.trim().length, questionId).toBeGreaterThan(80);
+      // The day this is „law-match“, make it a QUESTION_SCENARIO_CORRECTION and delete the veto.
+      expect(
+        pairingVerdict({
+          questionId,
+          event: QUESTION_EVENT_TYPE[questionId],
+          templateId: spec!.id,
+          questionLawRefs: question!.lawRefs,
+          scenarioLawRef: spec!.teach.lawRef,
+        }).verdict,
+        `${questionId}: the fitting drill law-matches now — convert the veto into a correction`,
+      ).toBe("suspect");
+    }
+    const fit = QUESTION_CLIP_WITHHELD["q-manevri-032"].fittingDrill!;
+    expect(scenarioById(fit.templateId)!.mistakes[fit.mistakeIndex].titleBg).toBe("Лутане между лентите без мигач");
+    expect(scenarioById(fit.templateId)!.map.districtId).toBe("wb-boulevard-v1");
   });
 });
 

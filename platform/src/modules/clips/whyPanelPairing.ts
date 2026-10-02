@@ -24,7 +24,10 @@
  * confident, the resolver serves NO `sim` rather than the nearest clip in the
  * topic.
  *
- * The three layers, in the order `resolveWhyPanel` applies them:
+ * The layers, in the order `resolveWhyPanel` applies them (1b —
+ * `QUESTION_CLIP_WITHHELD` — is a reviewer's per-question veto for the one
+ * thing the citation guard cannot see: a duty and its exemption living in the
+ * same article):
  *
  *   1. CORRECTION  — `QUESTION_SCENARIO_CORRECTION` / `EVENT_SCENARIO_CORRECTION`:
  *      the ev-* bucket is coarser than the manoeuvre (one `ev-cyclist` covers
@@ -204,6 +207,63 @@ export const EVENT_SCENARIO_CORRECTION: Readonly<Record<string, PairingCorrectio
 };
 
 /* ------------------------------------------------------------------ *
+ * Layer 1b — a clip WITHHELD from one question by a reviewer
+ * ------------------------------------------------------------------ */
+
+/**
+ * A question that gets NO clip although the citation guard below would pass
+ * its pairing — because the guard compares ARTICLES, and one article can hold
+ * a duty and its own exemption.
+ *
+ * THE CASE THIS EXISTS FOR (founder ruling 2026-10-01 «KEEP-RIGHT FOLLOWS THE
+ * LAW»). ЗДвП чл. 15 is both the keep-right duty (ал. 1) and the town choice
+ * of lane that switches it off (ал. 2, т. 2: in a settlement, two or more
+ * marked lanes one way, a limit of at most 80 km/h). `q-manevri-032` asks the
+ * exemption — „Караш … в населено място по булевард с две ленти в твоята
+ * посока. Задължен ли си да се движиш само в дясната?" — and its answer is NO.
+ * Its event (`ev-lane-discipline`) is wired to sc-mw-discipline „Висене в
+ * лявата лента при 130": a MOTORWAY, where ал. 1 binds, showing the left lane
+ * held as the MISTAKE. Both sides cite „чл. 15", so the guard read them as
+ * arguing from the same law and served it: the town lane-choice question was
+ * illustrated by the keep-right mistake — the opposite paragraph of the
+ * article, on the one kind of road where the answer flips.
+ *
+ * WHY WITHHELD AND NOT RE-POINTED. A correction must law-match the question it
+ * serves (whyPanelPairing.test.ts — „a correction that had to be excused by
+ * the allow-list would be a guess"). The recorded demo that DOES fit is
+ * `fittingDrill` below, and it cites the manoeuvre article (чл. 25), not
+ * чл. 15 — so it cannot be a correction today. Showing nothing is better than
+ * showing the wrong thing; the stored explanation is correct and cited.
+ * `fittingDrill` is checked by the test to be a real recorded demo that is
+ * STILL not servable: the day it law-matches, the test says to turn this entry
+ * into a QUESTION_SCENARIO_CORRECTION and delete it.
+ */
+export interface WithheldClip {
+  /** Why the pick the question would get is the wrong lesson. Required. */
+  readonly reason: string;
+  /** The recorded demo that depicts the question's road and rule, and what
+   *  keeps it from being served — or null when no demo in the catalogue fits. */
+  readonly fittingDrill: {
+    readonly templateId: string;
+    readonly mistakeIndex: number;
+    readonly blockedBy: string;
+  } | null;
+}
+
+export const QUESTION_CLIP_WITHHELD: Readonly<Record<string, WithheldClip>> = {
+  "q-manevri-032": {
+    reason:
+      "The TOWN lane-choice question (ЗДвП чл. 15, ал. 2, т. 2 — the answer is „Не, можеш да избереш“) was illustrated by sc-mw-discipline „Висене в лявата лента при 130“, the motorway keep-right MISTAKE (чл. 15, ал. 1). Same article, opposite paragraph: the clip shows as a fault exactly what the question says is allowed in town.",
+    fittingDrill: {
+      templateId: "sc-ln-boulevard-discipline",
+      mistakeIndex: 1,
+      blockedBy:
+        "„Лутане между лентите без мигач“ is a town boulevard with two lanes one way whose lesson is the question's — the lane is yours to choose, so choose one and hold it. Its teach.lawRef is „ЗДвП чл. 25“ and the question cites „ЗДвП чл. 15“: no shared article, and a correction may not lean on the allow-list.",
+    },
+  },
+};
+
+/* ------------------------------------------------------------------ *
  * Layer 2 — the law-citation guard
  * ------------------------------------------------------------------ */
 
@@ -309,7 +369,7 @@ export const LAWREF_MISMATCH_ALLOW: Readonly<Record<string, LawRefMismatchAllowa
   "ev-parking-maneuver→sc-park-parallel": { reason: "Parallel parking and what you owe after it (doors, handbrake, wheels to the kerb) — the questions cite чл. 94-96, the drill чл. 40. Same manoeuvre, adjacent duties." },
   "ev-ped-crossing-marked→sc-zebra-approach": { reason: "Approaching a marked crossing; the questions cite the pedestrian-priority articles (чл. 116, чл. 120) or the speed duty (чл. 20), the drill чл. 119." },
   "ev-ped-unmarked-hazard→sc-pe-parked-row-scan": { reason: "A pedestrian appearing from behind a parked row — the questions cite the vulnerable-user care articles (чл. 116-117), the drill the speed/anticipation duties (чл. 20, чл. 21)." },
-  "ev-police-stop-signal→sc-vp-police-stop": { reason: "Stopping on a police signal — the questions cite the officer's power (чл. 103), the drill the driver's duty to comply (чл. 170)." },
+  "ev-police-stop-signal→sc-vp-police-stop": { reason: "Stopping on a police signal — the drill cites the driver's duty to stop on the signal (чл. 103); the questions left unmatched cite the article on how the control organs give that signal (чл. 170). One situation, two ends of it." },
   "ev-railway-crossing→sc-rx-unguarded": { reason: "Unguarded level crossing; the questions cite чл. 50/52 individually, the drill the range чл. 51-53 (the article-range parse is exact, so 52 matches — what remains here cites чл. 50/20)." },
   "ev-speed-limit→sc-speed-creep": { reason: "Creeping over the limit; the questions cite the sign hierarchy or the zone article (чл. 6, чл. 7, чл. 62), the drill the limit article (чл. 21)." },
   "ev-traffic-controller→sc-signal-controller": { reason: "The controller outranks the light — the questions cite the controller's signals (чл. 10), the drill the hierarchy article (чл. 7). The drill's fault IS that hierarchy." },

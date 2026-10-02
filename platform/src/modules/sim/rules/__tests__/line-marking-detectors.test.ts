@@ -236,13 +236,18 @@ describe("keep-right ↔ bus-lane interplay (SN-05 — the exemption)", () => {
   });
 
   it("control: the same cruise WITHOUT the span still grades NOT_KEEPING_RIGHT", () => {
-    const { events } = drive(cruise(0, 18, { speedKmh: 40, laneId: 1, laneCount: 2 }));
+    // Outside a settlement, where чл. 15, ал. 1 binds (founder ruling
+    // 2026-10-01): on a town street at ≤ 80 there is no keep-right bill to
+    // be the control for, span or no span.
+    const { events } = drive(
+      cruise(0, 18, { speedKmh: 40, laneId: 1, laneCount: 2, outsideSettlement: true }),
+    );
     expect(codes(events)).toContain("NOT_KEEPING_RIGHT");
   });
 
   it("on a 3-lane bank, hogging the FAR-LEFT lane past a bus span still grades (only the bus lane is excused)", () => {
     const { events } = drive(
-      cruise(0, 18, { speedKmh: 40, laneId: 2, laneCount: 3, busLaneRight: true }),
+      cruise(0, 18, { speedKmh: 40, laneId: 2, laneCount: 3, busLaneRight: true, outsideSettlement: true }),
     );
     expect(codes(events)).toContain("NOT_KEEPING_RIGHT");
   });

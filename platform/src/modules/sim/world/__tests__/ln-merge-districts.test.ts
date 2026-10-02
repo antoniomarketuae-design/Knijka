@@ -481,13 +481,17 @@ describe("ln-merge-v1 — the lane drop through the real reducer", () => {
     expect(violations(events)).toEqual([]);
   });
 
-  it("THE HONEST GAP (doc 72 OV-16 🔴): the engine cannot know the curb lane dies — 12 s in laneId 1 grades NOT_KEEPING_RIGHT", () => {
-    // The counter-proof that pins WHY the street is short: no lane-drop zone
-    // kind exists, so rightmostRequiredLane stays 0 and a long dawdle in the
-    // survivor lane convicts a driver doing exactly what the drop demands.
-    // 270 m at 45 km/h ≈ 21 s — past the sustain window.
+  it("THE HONEST GAP CLOSED BY LAW (doc 72 OV-16): 21 s in the survivor lane of this town street bills NOTHING", () => {
+    // This used to pin the gap: no lane-drop zone kind exists, so
+    // rightmostRequiredLane stays 0, and a long stint in the survivor lane
+    // graded NOT_KEEPING_RIGHT against a driver doing exactly what the drop
+    // demands. Since the founder ruling of 2026-10-01 «KEEP-RIGHT FOLLOWS THE
+    // LAW» ln-merge-v1 — two marked lanes one way, posted 50, a town street —
+    // is ЗДвП чл. 15, ал. 2, т. 2, and the left lane is the driver's choice.
+    // The engine still cannot know the curb lane dies; on this street it no
+    // longer needs to. 270 m at 45 km/h ≈ 21 s — past the sustain window.
     const events = dropDrive(() => ({ x: X_THROUGH, kmh: 45 }), 5, END_Y - 3);
-    expect(violations(events)).toEqual(["NOT_KEEPING_RIGHT"]);
+    expect(violations(events)).toEqual([]);
   });
 
   it("the авторед merge line is a lane change, not a swerve: the 34 m commit never grades POOR_LANE_KEEPING", () => {

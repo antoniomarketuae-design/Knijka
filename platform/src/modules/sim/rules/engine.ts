@@ -81,6 +81,7 @@ import {
 import { encodeSpeedMeasurement } from "./consequences";
 import {
   DEFAULT_RULE_CONFIG,
+  KEEP_RIGHT_TOWN_MAX_KMH,
   type LaneArrow,
   type GlanceKind,
   type RuleEngineConfig,
@@ -4137,9 +4138,38 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // the instant you change lane, in both), so no threshold separates them: the
   // demo has to hog for longer before the rule can be widened, and that is a
   // trace/content edit, not this file's.
+  //
+  // FOUNDER RULING 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW». чл. 15, ал. 1 is
+  // the duty this code bills, and ал. 2 switches it off: т. 2 — «в населените
+  // места, на пътно платно с две и повече пътни ленти за движение в една
+  // посока, обозначени с пътна маркировка …, по които е разрешено движението
+  // … със скорост не по-голяма от 80 кm/h» — the driver «може да използва за
+  // движение най-удобната за него пътна лента»; т. 3 — a lane whose entry a
+  // light signal admits (т. 1 is repealed). Text retrieved from
+  // content/law/acts/zdvp.json; keep-right-law-pins.test.ts holds it.
+  //
+  // So the duty binds only OUTSIDE a settlement (SimTick.outsideSettlement —
+  // the world builder's own extra-urban predicate), on a MOTORWAY, or where
+  // the posted limit is ABOVE 80. The rest of т. 2 is already in the arming
+  // below: `laneLinesPainted` is «обозначени с пътна маркировка» and
+  // `laneCount > 1` is «две и повече … в една посока». An absent settlement
+  // flag acquits (see the field's doc): a town street at ≤ 80 with two marked
+  // lanes one way bills nothing, while чл. 25's lane-change duties keep
+  // grading through their own codes.
+  //
+  // т. 3 IS NOT A CHANNEL: no district carries a per-lane admission signal on
+  // a multi-lane carriageway — the one lane-control gantry (lc-gantry-v1)
+  // stands over single-lane one-way edges, where `laneCount > 1` keeps this
+  // silent (measured in runtime/__tests__/settlement-signal.test.ts). A future
+  // signal channel lands with its own exemption here.
+  const keepRightBinds =
+    tick.outsideSettlement === true ||
+    tick.motorway === true ||
+    tick.maxSpeedKmh > KEEP_RIGHT_TOWN_MAX_KMH;
   const rightmostRequiredLane =
     tick.busLaneRight === true || tick.emergencyLaneRight === true ? 1 : 0;
   const hoggingLeft =
+    keepRightBinds &&
     laneLinesPainted &&
     tick.laneId > rightmostRequiredLane &&
     (tick.laneCount ?? 1) > 1 &&

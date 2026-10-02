@@ -190,7 +190,15 @@ describe("T8a — the derived target table is pinned", () => {
     expect(counts.lessonsEmpty).toBe(62);
     expect(counts.practiceRungs).toBe(646);
     expect(counts.examRungs).toBe(162);
-    expect(counts.practiceSizeHistogram).toEqual({ 0: 243, 1: 260, 2: 120, 3: 19, 4: 4 });
+    // Doc 92 §2.2 measured { 0: 243, 1: 260, 2: 120, 3: 19, 4: 4 }. The founder
+    // ruling of 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW» moved exactly four
+    // practice rungs from one target to two: sc-ov-keep-right L1/L2/L3/L5 were
+    // [NOT_KEEPING_RIGHT] (lawful on its town street — ЗДвП чл. 15, ал. 2,
+    // т. 2) and now teach the two ways the move home goes wrong,
+    // [LANE_CHANGE_WITHOUT_INDICATOR, LANE_CHANGE_WITHOUT_MIRROR_CHECK].
+    // (sc-ln-boulevard-discipline swapped NOT_KEEPING_RIGHT for
+    // LANE_CHANGE_WITHOUT_MIRROR_CHECK and kept three targets.)
+    expect(counts.practiceSizeHistogram).toEqual({ 0: 243, 1: 256, 2: 124, 3: 19, 4: 4 });
     expect(counts.distinctTargetCodes).toBe(38);
   });
 
@@ -347,7 +355,7 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
 // T8c — THE THREE MARKERS
 // ---------------------------------------------------------------------------
 
-describe("T8c — incidentalCodeRefs is exactly three demos and four codes", () => {
+describe("T8c — incidentalCodeRefs is exactly two demos and three codes", () => {
   const authored: Record<string, string[]> = {};
   for (const spec of SCENARIO_TEMPLATES) {
     for (const demo of spec.mistakes ?? []) {
@@ -357,18 +365,22 @@ describe("T8c — incidentalCodeRefs is exactly three demos and four codes", () 
     }
   }
 
-  it("the markers are the three doc 92 §2.3 R2 names, and no others", () => {
+  it("the markers are the doc 92 §2.3 R2 names, and no others", () => {
     expect(
       authored,
       "a marker was added or removed. Each one is a decision that a code the author put on a mistake demo does " +
         "NOT cost the lesson, and doc 92 §2.3 R2 admits it only where the template's own source says the code is " +
         "a side effect. Add the sentence that justifies it beside the field, then update this pin.",
     ).toEqual({
-      "sc-vp-police-stop/mistake-drive-past": ["NOT_KEEPING_RIGHT"],
+      // «sc-vp-police-stop/mistake-drive-past»: ["NOT_KEEPING_RIGHT"] was the
+      // third marker until the founder ruling of 2026-10-01 «KEEP-RIGHT FOLLOWS
+      // THE LAW». ln-v1 is a town street, two marked lanes one way at 50 —
+      // ЗДвП чл. 15, ал. 2, т. 2 — so the left-lane stay is no offence there,
+      // the demo no longer bills it, and the code left codeRefs with its marker.
       "sc-vp-telltale/mistake-ignore": ["SPEEDING_OVER_LIMIT"],
       "sc-ln-turn-lane-arrows/mistake-left-from-through": ["TURN_WITHOUT_INDICATOR", "POOR_LANE_KEEPING"],
     });
-    expect(Object.values(authored).flat()).toHaveLength(4);
+    expect(Object.values(authored).flat()).toHaveLength(3);
   });
 
   it("each marked code is really gone from its lesson's targets, and the act beside it is not", () => {

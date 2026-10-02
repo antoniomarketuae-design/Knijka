@@ -154,8 +154,18 @@ export const SC_ED_D2_CITY_RUN: ScenarioSpec = {
     },
     {
       n: 4,
+      // FOUNDER RULING 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW», round 3. This
+      // step used to end «Лявата лента не е за движение „по принцип“ — тя е за
+      // изпреварване и завой наляво.» On the BUILT road that is false: the
+      // d2-v1 boulevard this stretch runs on is 4–5 lanes two-way (two or more
+      // marked lanes one way) posted 50 by tag, inside a settlement — ЗДвП
+      // чл. 15, ал. 2, т. 2, where the driver may use the most convenient lane
+      // (text retrieved from content/law/acts/zdvp.json). The right lane is
+      // this segment's TASK (the `sc-edcr-keep-right` waypoint sits in the curb
+      // lane), so the step says so and states the law as it is. Found by the
+      // product-wide census, `__tests__/keep-right-claim-census.test.ts`.
       textBg:
-        "По булеварда дръж ДЯСНАТА лента и 50 км/ч. Лявата лента не е за движение „по принцип“ — тя е за изпреварване и завой наляво.",
+        "По булеварда дръж ДЯСНАТА лента и 50 км/ч — това е задачата на сегмента. Тук, в града, на две и повече ленти в посока до 80 км/ч, лентата е по твой избор (чл. 15, ал. 2, т. 2); извън населено място и над 80 км/ч дясната е задължителна (ал. 1).",
     },
     {
       n: 5,

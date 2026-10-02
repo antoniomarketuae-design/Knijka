@@ -437,6 +437,10 @@ describe("no paint, no conviction", () => {
           gear: 1,
           isNight: false,
           events: [],
+          // Outside a settlement, where чл. 15, ал. 1 binds (founder ruling
+          // 2026-10-01) — on a town street at 50 the control below could not
+          // fire at all, and this test is about the PAINT clause.
+          outsideSettlement: true,
           ...over,
         });
         state = r.state;

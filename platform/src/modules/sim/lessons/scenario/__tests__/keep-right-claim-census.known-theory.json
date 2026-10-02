@@ -1,0 +1,24 @@
+{
+ "duty": {
+  "В България движението е дясностранно: използваш дясната половина на пътя и се придържаш възможно най-вдясно по платното.": "q-osnovni-010 (approved), explanation. Scene: which HALF of a two-way road. States ал. 1's general rule without the town exception (ал. 2, т. 2). Question-bank content with its own review ledger — reported, not rewritten here.",
+  "Възможно най-вдясно в дясната половина на платното": "q-osnovni-010 (approved), the correct option of the same question. Same reason.",
+  "В България се движим от дясната страна на пътя и се придържаме възможно най-вдясно в платното.": "concept c-right-side-rule, summary. The general rule with no exception stated; the exception lives in c-lane-choice. Reported, not rewritten here.",
+  "В дясната лента, възможно най-вдясно (отбелязаното място).": "q-osnovni-065 (approved, served), correct option. Scene: an empty TWO-WAY street, the car in the oncoming lane — the claim is about returning to one's own half. «Възможно най-вдясно» is said without the town exception, but the stem's street has one lane each way, where ал. 2, т. 2 (two or more lanes ONE way) does not apply: true in its scene (see dutyOnTownSceneWhereAl1Binds).",
+  "Насрещна кола може да се появи иззад следващия завой и тя очаква да те намери в твоята половина, възможно най-вдясно.": "q-osnovni-065 (approved, served), explanation. Same scene, same reason.",
+  "Всичко останало в списъка е точно това, което се очаква от теб: гледаш в огледалата, държиш скоростта си и се придържаш вдясно, а при нужда дори намаляваш, за да му отвориш място да се прибере.": "q-manevri-015 (approved), explanation. The OVERTAKEN driver keeps right inside his own lane (чл. 42, ал. 3 «да не пречи»); stated with no road scope.",
+  "Като изпреварван помагаш пасивно: дясно в лентата, без ускоряване, а при опасност намаляваш, за да се прибере изпреварващият (чл. 42 ЗДвП) — да „режисираш“ маневрата му с мигачи е подвеждащо и не е твоя работа.": "q-manevri-043 (approved), explanation. The overtaken driver on a two-way road keeps right inside his lane; stated with no road scope.",
+  "Придържаш се възможно най-вдясно в лентата": "q-manevri-043 (approved), correct option of the same question. Same reason.",
+  "Когато те изпреварват, не ускоряваш и не пречиш — а при нужда се придържаш още по-вдясно.": "concept c-overtaken-duties, summary (lawRef чл. 42, ал. 3). The overtaken driver's part; stated with no road scope."
+ },
+ "exemption": {
+  "В населено място с две и повече ленти в посоката можеш да избираш лентата си; извън населено място се движиш в дясната, а лявата е за изпреварване.": "concept c-lane-choice, summary. The town choice with the two-lanes condition but WITHOUT «до 80 км/ч». Its duty half is bounded («извън населено място»).",
+  "Не — в населено място можеш да избереш която лента в твоята посока ти е по-удобна": "q-manevri-032 (approved), correct option. Scene: a town boulevard with two lanes one way; the 80 km/h condition is not stated.",
+  "Правилото „дръж дясно“ се смекчава в населено място — там чл. 15 ЗДвП позволява на лекия автомобил да ползва най-удобната лента в своята посока, по всяко време на денонощието.": "q-manevri-032 (approved), explanation. Same scene; the 80 km/h condition is not stated.",
+  "Правилото за дясната половина важи, „освен когато с пътен знак е указано друго“ — а знакът за еднопосочен път е точно такъв случай: насрещни няма, значи цялото платно е за твоята посока, а в населено място с очертани ленти избираш най-удобната за теб.": "q-osnovni-054 (approved), explanation. «В населено място с очертани ленти избираш най-удобната» — neither the two-lanes-one-way count nor the 80 km/h condition.",
+  "Свободният избор на лента важи само в населено място, а карането отляво „за по-равна настилка“ реално блокира изпреварващите зад теб.": "q-manevri-004 (approved), explanation. No conditions, and «само» leaves out ал. 2, т. 3 (a lane a light signal admits)."
+ },
+ "dutyOnTownSceneWhereAl1Binds": {
+  "В дясната лента, възможно най-вдясно (отбелязаното място).": "q-osnovni-065 (approved, served). The stem is a TWO-WAY street with the car «в лявата (насрещната) лента» and the answer names «дясната лента» in the singular: one lane each way. ал. 2, т. 2 needs two or more lanes ONE way, so it does not apply and ал. 1 binds on this street — the sentence is true in its scene.",
+  "Насрещна кола може да се появи иззад следващия завой и тя очаква да те намери в твоята половина, възможно най-вдясно.": "q-osnovni-065 (approved, served), explanation. Same two-way, one-lane-each-way street: ал. 2, т. 2 does not apply, ал. 1 binds — true in its scene."
+ }
+}

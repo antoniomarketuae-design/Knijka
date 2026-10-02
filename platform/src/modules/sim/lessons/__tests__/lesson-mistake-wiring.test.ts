@@ -189,7 +189,12 @@ describe("T1d incidental first, then the TARGET of the same topic", () => {
     const engine = await import("../engine");
     const compile = await import("../scenario/compile");
     const templates = await import("../scenario/templates");
-    const base = compile.compileScenario(templates.scenarioById("sc-ov-keep-right")!, 3);
+    // sc-mw-discipline, not sc-ov-keep-right: since the founder ruling of
+    // 2026-10-01 NOT_KEEPING_RIGHT is a target only on the motorway lessons
+    // (sc-ov-keep-right's town street now teaches the lane-change codes). The
+    // two ticks are scripted, so the road under them does not matter — only
+    // which codes the lesson targets.
+    const base = compile.compileScenario(templates.scenarioById("sc-mw-discipline")!, 3);
     const lesson = tweak === undefined ? base : tweak(base);
     // The two codes share `ev-lane-discipline`, which is the premise of the
     // whole case — asserted, not assumed, so a mapping change reds here rather
@@ -197,7 +202,7 @@ describe("T1d incidental first, then the TARGET of the same topic", () => {
     const mapping = await import("../../scenarios/mapping");
     expect(mapping.scenarioForCode(INCIDENTAL)).toBe(mapping.scenarioForCode(TARGET));
     expect((lesson.lessonMistakeTargets ?? []).map((t) => t.code)).toEqual(
-      tweak === undefined ? [TARGET] : [],
+      tweak === undefined ? ["DRIVING_TOO_SLOW_FOR_MOTORWAY", TARGET] : [],
     );
 
     let session = engine.createLessonSession(lesson);

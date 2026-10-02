@@ -695,18 +695,36 @@ const VP_POLICE_OFFICER: PoliceStopSpec = {
 };
 
 /**
- * VP-11 — спиране по полицейски сигнал (ЗДвП чл. 170: разпорежданията на
- * органите за контрол са задължителни за участниците в движението; сигналът
- * за спиране изисква БЕЗОПАСНО спиране плътно вдясно — не паническо спиране
- * насред лентата и не подминаване).
+ * VP-11 — спиране по полицейски сигнал. THE LAW, RETRIEVED from
+ * content/law/acts/zdvp.json (never recalled — ADR-002):
+ *   чл. 6, т. 2  — участниците в движението «изпълняват разпорежданията на
+ *                  лицата, упълномощени да регулират или да контролират
+ *                  движението по пътищата» (the duty to OBEY);
+ *   чл. 103      — «При подаден сигнал за спиране от контролните органи
+ *                  водачът … е длъжен да спре плавно в най-дясната част на
+ *                  платното за движение … и да изпълнява неговите указания»
+ *                  (the driver's STOP duty — БЕЗОПАСНО спиране плътно вдясно,
+ *                  не паническо спиране насред лентата и не подминаване);
+ *   чл. 170, ал. 3 — how the OFFICER gives the signal (стоп-палка; «униформен
+ *                  полицай може да спира … и чрез подаване на сигнал само с
+ *                  ръка»). It is the officer's article and is cited nowhere in
+ *                  this lesson's shown text since round 3 of the 2026-10-01
+ *                  repair: the three «(чл. 170)» the briefing, step 2 and the
+ *                  shadow's 14.70 caption used to carry attached the officer's
+ *                  article to the DRIVER's duties.
  *
  * COMPLETION DRILL (the stage-1c mandate): graded through EXISTING objective
  * kinds only — a low-speed curb-side reachZone (the sc-pk-smooth-stop
  * stop-mark pattern) IS the pull-over-and-stop duty.
  *   - „Подминаване на сигнала" — swerves LEFT around the officer and drives
  *     on: since 2026-09-04 the act itself grades, POLICE_STOP_SIGNAL_IGNORED
- *     (ЗДвП чл. 103), beside the left-lane hog's NOT_KEEPING_RIGHT (чл. 15),
- *     and the drill still never completes (the stop zone stays unreached);
+ *     (ЗДвП чл. 103), and the drill still never completes (the stop zone
+ *     stays unreached). The left-lane stay that used to grade beside it as
+ *     NOT_KEEPING_RIGHT (чл. 15) does not since the founder ruling of
+ *     2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW»: ln-v1 is a town street with two
+ *     marked lanes one way at 50 km/h, which is ЗДвП чл. 15, ал. 2, т. 2 —
+ *     the driver may use the most convenient lane there, so the card no
+ *     longer calls it «висене» and the demo bills the pass-by alone;
  *   - „Паника в лентата" — the doc-72 mistake verbatim (panic-brake in-lane
  *     instead of pulling right): the ≥ 8 m/s² slam on an empty street grades
  *     HARSH_BRAKING_NO_CAUSE, and the early mid-lane rest never reaches the
@@ -779,10 +797,10 @@ const VP_POLICE_OFFICER: PoliceStopSpec = {
 export const SC_VP_POLICE_STOP: ScenarioSpec = {
   id: "sc-vp-police-stop",
   family: "cockpit",
-  tagsBg: ["полицейски сигнал", "спиране", "проверка", "чл. 170"],
+  tagsBg: ["полицейски сигнал", "спиране", "проверка", "чл. 103"],
   titleBg: "Спиране по полицейски сигнал",
   objectiveBg:
-    "Полицай на тротоара ти подава сигнал за спиране. Изпълни го правилно: мигач надясно, плавно намаляване и спиране плътно вдясно при полицая — без паническо спиране насред лентата и без подминаване. Разпорежданията на контролните органи са задължителни (чл. 170).",
+    "Полицай на тротоара ти подава сигнал за спиране. Изпълни го правилно: мигач надясно, плавно намаляване и спиране плътно вдясно при полицая — без паническо спиране насред лентата и без подминаване. Разпорежданията на контролните органи се изпълняват (чл. 6, т. 2).",
   archetypeIds: ["VP-11"],
   conceptIds: ["c-general-care-duty", "c-vehicle-controls", "c-braking-distance"],
   map: {
@@ -801,7 +819,7 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Напред вдясно на тротоара стои полицай с вдигната ръка — сигналът за спиране е за теб и е задължителен (чл. 170).",
+        "Вдясно на тротоара стои полицай с вдигната ръка — сигналът за спиране е за теб: длъжен си да спреш (чл. 103).",
     },
     { n: 3, textBg: "Без паника: провери огледалото, пусни десен мигач и започни плавно да намаляваш отрано." },
     {
@@ -867,32 +885,32 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-vp-police-stop/mistake-drive-past.trace.json" },
       titleBg: "Подминаване на сигнала",
       whatWentWrongBg:
-        "Водачът видя сигнала, измести се в лявата лента и просто отмина полицая. При подаден сигнал за спиране водачът е ДЛЪЖЕН да спре плавно в най-дясната част на платното и да изчака указанията (чл. 103) — подминаването е отказ да изпълниш нареждане на органите за контрол и струва три месеца без книжка. А оставането в лявата лента при свободна дясна е и „висене“ в лентата за изпреварване (чл. 15).",
-      // Two acts, two codes, two lessons — the stage-2b rule. The pass-by is
-      // чл. 103's own offence and grades from the runner; the left-lane hog is
-      // чл. 15 and grades from the keep-right tracker. Before 2026-09-04 only
-      // the second existed and had to stand in for both.
+        "Водачът видя сигнала, измести се в лявата лента и просто отмина полицая. При подаден сигнал за спиране водачът е ДЛЪЖЕН да спре плавно в най-дясната част на платното и да изчака указанията (чл. 103) — подминаването е отказ да изпълниш нареждане на органите за контрол и струва три месеца без книжка. Коя лента заемаш, докато подминаваш, не променя нищо: сигналът те иска спрял вдясно при полицая.",
+      // ONE act, one code since the founder ruling of 2026-10-01 «KEEP-RIGHT
+      // FOLLOWS THE LAW». The pass-by is чл. 103's own offence and grades from
+      // the runner. The left-lane stay used to grade beside it as
+      // NOT_KEEPING_RIGHT (чл. 15, ал. 1), but on this town street — two
+      // marked lanes one way, 50 km/h — чл. 15, ал. 2, т. 2 lets the driver use
+      // the most convenient lane, so it is no offence here and the card no
+      // longer says it is (it now says the lane does not matter: the signal
+      // wants him stopped on the right). Before 2026-09-04 the keep-right code
+      // had to stand in for the pass-by; that stand-in is gone too.
       //
-      // WHY THIS CARD SAYS чл. 103 WHILE THE BRIEFING ABOVE SAYS чл. 170, and
-      // both are right: чл. 170 is the article about the CHECK — who exercises
-      // control, how the signal is given (ал. 3), what the officer must show
-      // (ал. 6) — and it is what the objective and the recorded demo
-      // annotations cite. The DRIVER's own obligation, and therefore the
-      // offence this code convicts, is чл. 103: „е длъжен да спре плавно в
-      // най-дясната част на платното… и да изпълнява неговите указания". The
-      // briefing copy is left as recorded (the committed traces narrate the
-      // same чл. 170 line, and a half-swap would put two citations for one act
-      // on one screen); unifying them is a re-recording job, noted rather than
-      // half-done.
-      codeRefs: ["POLICE_STOP_SIGNAL_IGNORED", "NOT_KEEPING_RIGHT"],
-      // ADR-009 (doc 92 §2.3 R2): the act this lesson exists to teach is the
-      // чл. 103 pass-by; the left-lane hog is what the driver did WHILE doing it.
-      // The comment eight lines up says so in the template's own words — «the
-      // pass-by is чл. 103's own offence… the left-lane hog is чл. 15» — and the
-      // card's own sentence marks it as the second thing: «А оставането в лявата
-      // лента… е и „висене"». Staying left is graded teach-first as today; it
-      // does not cost the lesson.
-      incidentalCodeRefs: ["NOT_KEEPING_RIGHT"],
+      // ONE CITATION FOR ONE ACT, EVERYWHERE (round 3 of the 2026-10-01
+      // repair). The briefing, step 2 and the shadow's 14.70 caption used to
+      // cite «(чл. 170)» for the driver's duty while this card cited чл. 103.
+      // чл. 170 is the article about the CHECK — who exercises control, how
+      // the OFFICER gives the signal (ал. 3), what he must show (ал. 6); it
+      // puts no duty on the driver. The bank's two driver-side provisions are
+      // чл. 6, т. 2 (obey the orders of those who control traffic) and чл. 103
+      // („е длъжен да спре плавно в най-дясната част на платното… и да
+      // изпълнява неговите указания"). So: the objective's «разпорежданията …
+      // се изпълняват» cites чл. 6, т. 2; step 2, the shadow caption, both
+      // mistake demos' closing captions and this card cite чл. 103 — each
+      // derived from the bank by keep-right-lessons-citations.test.ts, which
+      // no longer carries a known-unaccepted exemption. The shadow was
+      // re-recorded for its caption (samples and events byte-identical).
+      codeRefs: ["POLICE_STOP_SIGNAL_IGNORED"],
     },
     {
       traceRef: { path: "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json" },
@@ -907,7 +925,7 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
       "Когато униформен полицай (или контролен орган със стоп-палка) ти подаде сигнал за спиране — при проверка, при произшествие напред, при отклоняване на движението. Сигналът е задължителен винаги и навсякъде.",
     whyBg:
       "Паническото спиране насред лентата е толкова опасно, колкото и подминаването: движещият се зад теб не очаква аварийно спиране без причина. Спокойната процедура — огледало, мигач, плавно вдясно, спиране при полицая — пази и теб, и колоната зад теб, и показва контрол над колата.",
-    lawRef: "ЗДвП чл. 170",
+    lawRef: "ЗДвП чл. 103",
     examinerBg:
       "Изпитващият (и полицаят) гледа: навременно забелязване на сигнала, огледало и десен мигач, плавно намаляване и спиране плътно вдясно на посоченото място, двигател работещ и изчакване на указания. Рязко спиране в лентата или подминаване на сигнала е грешка.",
   },

@@ -326,8 +326,15 @@ describe("ov-bus-v1 — bus-lane adjudication through the real reducer", () => {
     expect(violationsOf(laneCruise(OVBUS_LEFT, 15, 360))).toEqual([]);
   });
 
-  it("control: the SAME left-lane cruise outside the span grades NOT_KEEPING_RIGHT (the exemption is the span)", () => {
-    expect(violationsOf(laneCruise(OVBUS_LEFT, 335, 490))).toEqual(["NOT_KEEPING_RIGHT"]);
+  it("outside the span the SAME left-lane cruise bills nothing either — a town street at 50 (founder ruling 2026-10-01)", () => {
+    // This used to be the control that proved the span was the exemption: the
+    // same cruise past the span graded NOT_KEEPING_RIGHT. Since the founder
+    // ruling of 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW», ov-bus-v1 — two marked
+    // lanes one way, posted 50, a town street — is ЗДвП чл. 15, ал. 2, т. 2: the
+    // lane is the driver's choice and nothing bills, span or no span. The span
+    // exemption itself is still pinned where ал. 1 binds, on hand-built ticks
+    // outside a settlement (rules/__tests__/line-marking-detectors.test.ts).
+    expect(violationsOf(laneCruise(OVBUS_LEFT, 335, 490))).toEqual([]);
   });
 
   it("a signalled brief transit into the bus lane (right-turn shape) stays innocent", () => {

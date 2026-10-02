@@ -9,8 +9,8 @@
     "examRungsWithTargets": 0,
     "practiceSizeHistogram": {
       "0": 243,
-      "1": 260,
-      "2": 120,
+      "1": 256,
+      "2": 124,
       "3": 19,
       "4": 4
     },
@@ -19,9 +19,9 @@
       "HARSH_BRAKING_NO_CAUSE": 13,
       "POOR_LANE_KEEPING": 11,
       "SPEEDING_OVER_LIMIT": 11,
+      "LANE_CHANGE_WITHOUT_MIRROR_CHECK": 10,
+      "LANE_CHANGE_WITHOUT_INDICATOR": 9,
       "ILLEGAL_STOP_IN_BAN_ZONE": 8,
-      "LANE_CHANGE_WITHOUT_INDICATOR": 8,
-      "LANE_CHANGE_WITHOUT_MIRROR_CHECK": 8,
       "SPEED_TOO_FAST_FOR_CONDITIONS": 8,
       "FOLLOWING_TOO_CLOSE": 7,
       "CENTER_LINE_TOUCHED": 5,
@@ -29,7 +29,6 @@
       "HEADLIGHTS_OFF_AT_NIGHT": 5,
       "MOVE_OFF_WITHOUT_OBSERVATION": 5,
       "TURN_WITHOUT_INDICATOR": 5,
-      "NOT_KEEPING_RIGHT": 4,
       "FOLLOWING_TOO_CLOSE_FOR_RAIN": 3,
       "HESITATION_AT_GREEN": 3,
       "JUNCTION_SCAN_INCOMPLETE": 3,
@@ -42,6 +41,7 @@
       "HANDBRAKE_LEFT_ON": 2,
       "HEADLIGHTS_OFF_IN_RAIN": 2,
       "HIGH_BEAM_NOT_DIPPED": 2,
+      "NOT_KEEPING_RIGHT": 2,
       "OVERTAKE_RETURN_TOO_EARLY": 2,
       "STOPPED_WITHOUT_CAUSE": 2,
       "STOP_LINE_OVERSHOOT": 2,
@@ -905,27 +905,51 @@
     ],
     "sc-ov-keep-right@L1": [
       {
-        "code": "NOT_KEEPING_RIGHT",
-        "source": "demo"
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване надясно без мигач"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без поглед в огледалото"
       }
     ],
     "sc-ov-keep-right@L2": [
       {
-        "code": "NOT_KEEPING_RIGHT",
-        "source": "demo"
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване надясно без мигач"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без поглед в огледалото"
       }
     ],
     "sc-ov-keep-right@L3": [
       {
-        "code": "NOT_KEEPING_RIGHT",
-        "source": "demo"
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване надясно без мигач"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без поглед в огледалото"
       }
     ],
     "sc-ov-keep-right@L4": null,
     "sc-ov-keep-right@L5": [
       {
-        "code": "NOT_KEEPING_RIGHT",
-        "source": "demo"
+        "code": "LANE_CHANGE_WITHOUT_INDICATOR",
+        "source": "demo",
+        "demoTitleBg": "Престрояване надясно без мигач"
+      },
+      {
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "source": "demo",
+        "demoTitleBg": "Престрояване без поглед в огледалото"
       }
     ],
     "sc-ov-lane-keeping@L1": [
@@ -2254,9 +2278,9 @@
         "demoTitleBg": "Лутане между лентите без мигач"
       },
       {
-        "code": "NOT_KEEPING_RIGHT",
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
         "source": "demo",
-        "demoTitleBg": "Постоянно каране в лявата лента"
+        "demoTitleBg": "Излизане без поглед в огледалото"
       },
       {
         "code": "POOR_LANE_KEEPING",
@@ -2271,9 +2295,9 @@
         "demoTitleBg": "Лутане между лентите без мигач"
       },
       {
-        "code": "NOT_KEEPING_RIGHT",
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
         "source": "demo",
-        "demoTitleBg": "Постоянно каране в лявата лента"
+        "demoTitleBg": "Излизане без поглед в огледалото"
       },
       {
         "code": "POOR_LANE_KEEPING",
@@ -2288,9 +2312,9 @@
         "demoTitleBg": "Лутане между лентите без мигач"
       },
       {
-        "code": "NOT_KEEPING_RIGHT",
+        "code": "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
         "source": "demo",
-        "demoTitleBg": "Постоянно каране в лявата лента"
+        "demoTitleBg": "Излизане без поглед в огледалото"
       },
       {
         "code": "POOR_LANE_KEEPING",

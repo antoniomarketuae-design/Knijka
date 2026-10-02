@@ -7,9 +7,11 @@
  *      outcome records "yielded").
  *   2. MISTAKE DEMOS grade EXACTLY their shipped codes — the runner itself
  *      emits NOTHING (A12: no new detector, no new code):
- *      - „Подминаване на сигнала" → NOT_KEEPING_RIGHT (the clean-lane-change-
- *        then-hog evasion; the ignored signal shows as the unreached stop
- *        zone + the "passedWithoutStopping" outcome);
+ *      - „Подминаване на сигнала" → POLICE_STOP_SIGNAL_IGNORED (the clean
+ *        lane change, then the pass-by; also the unreached stop zone + the
+ *        "passedWithoutStopping" outcome). Its left-lane stay grades nothing
+ *        since the founder ruling of 2026-10-01: ln-v1 is a town street with
+ *        two marked lanes one way at 50 km/h (ЗДвП чл. 15, ал. 2, т. 2);
  *      - „Паника в лентата" → HARSH_BRAKING_NO_CAUSE (the doc-72 mistake
  *        verbatim: panic-brake in-lane instead of pulling right).
  *   3. COMMITTED FILES under content/traces/sc-vp-police-stop/ ARE the
@@ -76,7 +78,7 @@ describe("sc-vp-police-stop — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-vp-police-stop — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Подминаване на сигнала“: exactly NOT_KEEPING_RIGHT; the signal itself convicts NOTHING", () => {
+  it("„Подминаване на сигнала“: exactly its codeRefs (the pass-by), and no keep-right bill on this town street", () => {
     const drive = drives.get("mistake-drive-past")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_VP_POLICE_STOP.mistakes[0].codeRefs].sort());
@@ -84,8 +86,10 @@ describe("sc-vp-police-stop — mistake demos grade their exact codes (doc 76 §
     expect(codes).not.toContain("LANE_CHANGE_WITHOUT_INDICATOR");
     expect(codes).not.toContain("LANE_CHANGE_WITHOUT_MIRROR_CHECK");
     expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
-    // The ignored signal is measurement + failed completion, never a code
-    // (the A12 law — the policeStop runner emits no events).
+    // FOUNDER RULING 2026-10-01: a town street, two marked lanes one way, 50
+    // km/h — чл. 15, ал. 2, т. 2. The left-lane stay is lawful here.
+    expect(codes).not.toContain("NOT_KEEPING_RIGHT");
+    // The ignored signal also shows as measurement + failed completion.
     expect(drive.outcomes).toHaveLength(1);
     expect(drive.outcomes[0]).toMatchObject({ success: false, detail: "passedWithoutStopping" });
     const last = drive.trace.samples[drive.trace.samples.length - 1];

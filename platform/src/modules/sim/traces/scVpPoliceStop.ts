@@ -66,7 +66,7 @@ export function scVpPoliceStopShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Карай спокойно в дясната лента — и гледай далеч напред." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[RIGHT, 15], [RIGHT, 90], [RIGHT, 150]], targetKmh: 40, stopAtEnd: false },
-      { kind: "annotation", textBg: "Полицай на тротоара с вдигната ръка — сигналът е за нас и е задължителен (чл. 170)." },
+      { kind: "annotation", textBg: "Полицай на тротоара с вдигната ръка — сигналът за спиране е за нас: длъжни сме да спрем (чл. 103)." },
       { kind: "glance", mirror: "rear" },
       { kind: "indicator", setting: "right" },
       { kind: "glance", mirror: "right" },
@@ -94,7 +94,7 @@ export function scVpPoliceStopShadowScript(): DriveScript {
 }
 
 // ---------------------------------------------------------------------------
-// Mistake demo 1 — „Подминаване на сигнала" (NOT_KEEPING_RIGHT + failed stop)
+// Mistake demo 1 — „Подминаване на сигнала" (POLICE_STOP_SIGNAL_IGNORED + failed stop)
 // ---------------------------------------------------------------------------
 
 export function scVpPoliceStopMistakeDrivePastScript(): DriveScript {
@@ -104,8 +104,10 @@ export function scVpPoliceStopMistakeDrivePastScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[RIGHT, 15], [RIGHT, 70], [RIGHT, 120]], targetKmh: 38, stopAtEnd: false },
       // The evasion is a CLEAN lane change (mirror → indicator → shoulder) —
-      // the isolated fault is what follows: ignoring the officer and hogging
-      // the left lane past him.
+      // the isolated fault is what follows: driving on past the officer. The
+      // lane he does it in is no offence on this town street (чл. 15, ал. 2,
+      // т. 2 — founder ruling 2026-10-01), so the closing line names the
+      // signal duty alone.
       { kind: "glance", mirror: "left" },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "left" },
@@ -128,7 +130,7 @@ export function scVpPoliceStopMistakeDrivePastScript(): DriveScript {
       {
         kind: "annotation",
         textBg:
-          "Сигналът на контролния орган е задължителен (чл. 170) — а „висенето“ вляво при празна дясна лента е отделна грешка (чл. 15).",
+          "При сигнал за спиране водачът е длъжен да спре плавно в най-дясната част на платното (чл. 103) — а не да продължи покрай полицая, в която и да е лента.",
       },
     ],
   };
@@ -144,7 +146,7 @@ export function scVpPoliceStopMistakePanicScript(): DriveScript {
       { kind: "annotation", textBg: "Грешката: сигналът стряска — и кракът се забива в спирачката още в лентата." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[RIGHT, 15], [RIGHT, 100]], targetKmh: 46, stopAtEnd: false },
-      { kind: "annotation", textBg: "Полицаят вдига палката — а колата не отбива: кормилото трепва и спирачката се забива насред платното." },
+      { kind: "annotation", textBg: "Полицаят вдига палката — а колата не отбива към тротоара: кормилото трепва в ръцете на стреснатия водач." },
       // The panic slam, now with the PANIC IN IT (founder review 2026-07-27:
       // „it says panic in the lane but panic about what … there is no panic
       // just a car driving straight"). Two changes, both purely in the ghost's
@@ -185,7 +187,7 @@ export function scVpPoliceStopMistakePanicScript(): DriveScript {
       {
         kind: "annotation",
         textBg:
-          "Никой зад теб не очаква аварийно спиране без причина. Сигналът иска СПОКОЙНО спиране плътно вдясно при полицая — огледало, мигач, плавно (чл. 170).",
+          "Аварийното спиране насред лентата изненадва движещия се зад теб. Сигналът иска СПОКОЙНО спиране плътно вдясно при полицая — огледало, мигач, плавно (чл. 103).",
       },
     ],
   };

@@ -1612,14 +1612,29 @@ export const SC_OV_SOLID_RETURN: ScenarioSpec = {
 // (brakingLeadCar with its slam tier authored out of reach), the house pattern
 // for „deterministic slow traffic you overtake", never a braking drill.
 //
+// FOUNDER RULING 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW» — RE-SCOPED. This
+// boulevard is a TOWN street, 2+2 posted 40 by tag (the world builder dresses
+// it as a street), so ЗДвП чл. 15, ал. 2, т. 2 — retrieved: «в населените
+// места, на пътно платно с две и повече пътни ленти за движение в една посока
+// … със скорост не по-голяма от 80 кm/h» — lets the driver use the most
+// convenient lane, and NOT_KEEPING_RIGHT no longer bills here. The «left-lane
+// hog» mistake and every sentence that called the curb lane the place the
+// law puts you stopped being true. MOVING the lesson was weighed and refused:
+// the repo's only 2+-lane roads where ал. 1 binds are the motorway maps
+// (settlement-signal.test.ts §5), and a crawler pass at 40 is not a motorway
+// lesson. What this drill teaches that IS law on this street is the pass
+// itself — every lane change announced and looked for (чл. 26; чл. 25, ал.
+// 1), the overtaken car given room, one lane held at a time — and the return
+// stays the TASK (gate 3), not a legal claim; the copy says where the return
+// IS the law (outside a settlement, on a motorway, above 80 — ал. 1).
+//
 // WHY THE MISTAKES GRADE WHAT THEY GRADE. Both faults have shipped detectors
 // and this map arms them cleanly — no honest-proxy footnote needed:
-//   - „Постоянно каране в лявата лента" → NOT_KEEPING_RIGHT (чл. 15), the 12 s
-//     keep-right sustain in laneId 1 with the left indicator OFF. The demo
-//     enters the left lane BY THE BOOK (mirror → indicator → move, so no
-//     lane-change code can leak) and then simply never comes home: the isolated
-//     fault is the STAY, which is exactly the урбанистичен грях this template
-//     exists for;
+//   - „Излизане без поглед в огледалото" → LANE_CHANGE_WITHOUT_MIRROR_CHECK
+//     (чл. 25, ал. 1). The demo drives the shadow's own pass with the left
+//     indicator ON and NO left glance before the pull-out (the return is by
+//     the book), so the isolated fault is the look this lesson's step 3
+//     teaches — the act the replaced hog demo never touched;
 //   - „Лутане между лентите без мигач" → LANE_CHANGE_WITHOUT_INDICATOR +
 //     POOR_LANE_KEEPING. The weave glances every time (mirrorOk holds, so the
 //     _MIRROR_CHECK code never leaks) and signals never — three crossings, one
@@ -1735,21 +1750,23 @@ const LNBD_CRAWLER: BrakingLeadCarSpec = {
   resumeAfterSec: 3,
 };
 
-/** OV-11 × OV-02 × OV-12 — лентова дисциплина на многолентов път в населено
- *  място (ЗДвП чл. 15, ал. 1: извън изпреварване и ляв завой водачът се движи
- *  възможно най-вдясно; чл. 25: маневрата се обявява и се прави след оглед).
- *  Bank-verified: q-manevri-032 и q-manevri-004 (дясната лента е лентата за
- *  движение; лявата — за изпреварване), q-magistrali-i-izvangradsko-003
- *  („възможно най-вдясно"), q-manevri-005 и q-manevri-058 (престрояването е
- *  маневра: огледало, мигач, оглед). */
+/** OV-01 × OV-02 × OV-12 — лентова дисциплина на многолентов път в населено
+ *  място: всяко престрояване се обявява и се прави след оглед (ЗДвП чл. 26;
+ *  чл. 25, ал. 1), лентата се заема докрай, без лутане. Изборът на лента тук е
+ *  свободен (чл. 15, ал. 2, т. 2 — в населено място, две и повече ленти в
+ *  посока, до 80 km/h); извън населено място, на магистрала и над 80 km/h
+ *  важи ал. 1 — най-дясната свободна лента. Bank-verified: q-manevri-032 (в
+ *  населено място — най-удобната лента), q-magistrali-i-izvangradsko-056
+ *  (изключението важи само в населените места), q-manevri-005 и
+ *  q-manevri-058 (престрояването е маневра: огледало, мигач, оглед). */
 export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
   id: "sc-ln-boulevard-discipline",
   family: "lanes",
-  tagsBg: ["ленти", "лентова дисциплина", "булевард", "дръж вдясно", "изпреварване в града"],
+  tagsBg: ["ленти", "лентова дисциплина", "булевард", "престрояване", "изпреварване в града"],
   titleBg: "Лентова дисциплина на булеварда",
   objectiveBg:
-    "На многолентов булевард се движиш в дясната лента, лявата е за изпреварване и ляв завой — без лутане между лентите.",
-  archetypeIds: ["OV-11", "OV-02", "OV-12"],
+    "Изпревари бавната кола по градския булевард по реда на маневрата: огледало, мигач, поглед през рамо — излизане, изпреварване и прибиране в дясната лента, без лутане между лентите.",
+  archetypeIds: ["OV-01", "OV-02", "OV-12"],
   conceptIds: ["c-right-side-rule", "c-lane-choice", "c-lane-change", "c-overtaking-procedure"],
   map: {
     archetype: "straight-street",
@@ -1764,12 +1781,12 @@ export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Градски булевард с две ленти в посока, ограничение 40. Потегли и се установи в ДЯСНАТА лента — тя е лентата ти за движение." },
-    { n: 2, textBg: "Пред теб пълзи бавна кола с около 20 км/ч. Ето сега лявата лента ти трябва — и точно за това е тя." },
+    { n: 1, textBg: "Градски булевард с две ленти в посока, ограничение 40. Потегли и се установи в ДЯСНАТА лента." },
+    { n: 2, textBg: "Пред теб пълзи бавна кола с около 20 км/ч — ще я изпревариш през лявата лента." },
     { n: 3, textBg: "По реда: огледало, ляв мигач, поглед през рамо, после плавно излизане в лявата лента." },
-    { n: 4, textBg: "Изпревари решително и без да превишаваш 40 — лявата лента е за маневра, а не за скорост." },
-    { n: 5, textBg: "Щом видиш ЦЯЛАТА изпреварена кола в огледалото: десен мигач и веднага се прибери вдясно. Тук свършва маневрата — не „като стане нужда“." },
-    { n: 6, textBg: "Продължи в дясната лента до края на отсечката. Едно излизане, едно прибиране — без лутане между лентите." },
+    { n: 4, textBg: "Изпревари решително и без да превишаваш 40 — изпреварването не е повод за скорост." },
+    { n: 5, textBg: "Задачата завършва в дясната лента: щом видиш ЦЯЛАТА изпреварена кола в огледалото — огледало, десен мигач и плавно прибиране." },
+    { n: 6, textBg: "Тук, в града, на две ленти в посока до 80 км/ч, лентата е по избор (чл. 15, ал. 2, т. 2) — но всяка смяна е маневра: обявена, огледана и докрай. Едно излизане, едно прибиране — без лутане." },
   ],
   success: [
     {
@@ -1782,7 +1799,6 @@ export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
     {
       id: "sc-lnbd-pass",
       titleBg: "Изпревари бавната кола през лявата лента",
-      // The other half of чл. 15: the ban is „не живей там", not „не влизай".
       // Radius 4 on the LEFT-lane center — reachable only by actually committing
       // the pass. maxSpeedKmh 45 keeps it a MANEUVER, not a sprint.
       params: { kind: "reachZone", x: LNBD_LEFT, y: 115, radiusM: 4, maxSpeedKmh: 45 },
@@ -1790,9 +1806,10 @@ export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
     {
       id: "sc-lnbd-home",
       titleBg: "Прибери се вдясно и завърши в своята лента",
-      // THE drill, in one gate: a driver still in laneId 1 at y = 175 is a full
-      // 8.125 m lane pitch away from it and fails — which is precisely the
-      // left-lane hog's verdict.
+      // The TASK's last step: a driver still in laneId 1 at y = 175 is a full
+      // 8.125 m lane pitch away from it and does not finish the drill. Since
+      // the 2026-10-01 ruling that is an unfinished task, never a чл. 15
+      // offence — on this town street the lane is the driver's choice.
       params: { kind: "reachZone", x: LNBD_RIGHT, y: 175, radiusM: 4 },
     },
   ],
@@ -1803,28 +1820,40 @@ export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
   shadow: { path: "content/traces/sc-ln-boulevard-discipline/shadow-correct.trace.json" },
   mistakes: [
     {
-      traceRef: { path: "content/traces/sc-ln-boulevard-discipline/mistake-left-lane-hog.trace.json" },
-      titleBg: "Постоянно каране в лявата лента",
+      traceRef: { path: "content/traces/sc-ln-boulevard-discipline/mistake-no-mirror.trace.json" },
+      titleBg: "Излизане без поглед в огледалото",
       whatWentWrongBg:
-        "Излизането беше учебникарско — огледало, мигач, плавно — и точно затова грешката личи толкова ясно: този водач не сгреши маневрата, а забрави, че тя има край. Бавната кола остана далеч назад, дясната лента е празна цялата отсечка, а колата продължава вляво „за всеки случай“, „и без това пак ще изпреварвам“. Не пак: сега. Лявата лента не е по-бърза, а по-подредена — тя е празното място, което другите ползват, за да минат. Като стоиш в нея, зад теб се събира колона, която няма законен изход, и рано или късно някой ще те подмине отдясно — най-опасното изпреварване, което съществува. Извън изпреварване и ляв завой мястото ти е във възможно най-дясната свободна лента (чл. 15).",
-      codeRefs: ["NOT_KEEPING_RIGHT"],
+        "Бавната кола беше видяна и левият мигач светна навреме — но воланът тръгна наляво без нито един поглед в лявото огледало и през рамо. На булевард с две ленти в посока в лявата лента може да идва кола, която те настига по-бързо, отколкото предполагаш, а мигачът само обявява намерението ти — не проверява дали лентата е свободна. Прибирането после беше по реда, но излизането е моментът, в който се решава дали някой ще трябва да спира заради теб. Преди всяка маневра се убеждаваш, че няма да създадеш опасност за движещите се след теб и покрай теб (чл. 25, ал. 1): огледало, мигач, поглед през рамо — и чак тогава волан.",
+      codeRefs: ["LANE_CHANGE_WITHOUT_MIRROR_CHECK"],
     },
     {
       traceRef: { path: "content/traces/sc-ln-boulevard-discipline/mistake-weaving.trace.json" },
       titleBg: "Лутане между лентите без мигач",
       whatWentWrongBg:
-        "Наляво, надясно, пак наляво — и нито един мигач. Водачът дори се оглеждаше: проблемът не е, че не гледа, а че никой друг не знае какво е видял. Мигачът не е за теб, а за останалите: той е единственият начин колата ти да обяви решение, преди да го изпълни. Между двете дръпвания колата увисна на самата линия между лентите — нито в едната, нито в другата, тоест в двете едновременно: в лявата някой те изпреварва, в дясната някой те подминава, и двамата се оказват до колa, която не заема нито едно място докрай. На булевард лентата е обещание — заеми една, обяви я и я дръж; смяната е отделно решение, не навик на волана.",
+        "Наляво, надясно, пак наляво — и нито един мигач. Водачът дори се оглеждаше: проблемът не е, че не гледа, а че никой друг не знае какво е видял. Мигачът не е за теб, а за останалите: той е единственият начин колата ти да обяви решение, преди да го изпълни. Между двете дръпвания колата увисна на самата линия между лентите — нито в едната, нито в другата, тоест в двете едновременно: в лявата някой те изпреварва, в дясната някой те подминава, и двамата се оказват до кола, която не заема нито едно място докрай. На булевард лентата е обещание — заеми една, обяви я и я дръж; смяната е отделно решение, не навик на волана. Законът го казва два пъти: преди всяко отклонение встрани се подава своевременен и ясен сигнал (чл. 26), а водачът е длъжен да не извършва маневри с последователно внезапно преминаване в лентите за движение (чл. 5, ал. 2, т. 4).",
+      // THE TWO DUTIES WEAVING BREACHES, RETRIEVED (round 3 of the 2026-10-01
+      // repair, W6a). Until now this card cited nothing, and the only article a
+      // student saw beside the weave was the POOR_LANE_KEEPING card's «чл. 15,
+      // ал. 1» — the keep-right duty, which ал. 2, т. 2 switches off on this
+      // very street (a town boulevard, two lanes one way, posted 40). The bank
+      // (content/law/acts/zdvp.json) holds the weave itself: чл. 5, ал. 2, т. 4
+      // — the driver «е длъжен … да не извършва маневри, изразяващи се в
+      // последователно внезапно преминаване в лентите за движение» — and the
+      // unsignalled change: чл. 26. Both bind on every road. The catalogue card
+      // for the car left hanging on the line now cites чл. 20, ал. 1 alone
+      // (rules/catalog.ts). What is BILLED is unchanged: the same two codes.
+      // Cites derived from the bank in keep-right-lessons-citations.test.ts.
       codeRefs: ["LANE_CHANGE_WITHOUT_INDICATOR", "POOR_LANE_KEEPING"],
     },
   ],
   teach: {
     whenBg:
-      "На всеки градски булевард с две и повече ленти в посока — тоест по цялата „Цариградско“, по всяко околовръстно, на всеки изход от квартала към голямата улица. Правилото работи всяка секунда, а не само когато има трафик: пътуваш в най-дясната свободна лента, влизаш в лявата само за да изпревариш или да завиеш наляво, и се прибираш веднага щом маневрата свърши.",
+      "На всеки градски булевард с две и повече ленти в посока, когато пред теб пълзи по-бавна кола. В града при ограничение до 80 км/ч можеш да пътуваш в лентата, която ти е удобна (чл. 15, ал. 2, т. 2), но всяко минаване от една лента в друга е маневра с едни и същи правила: огледало, мигач, поглед през рамо, плавно — и докрай. Извън населено място, на магистрала и където е разрешено над 80 км/ч същото изпреварване завършва задължително в най-дясната свободна лента (чл. 15, ал. 1).",
     whyBg:
-      "Многолентовият булевард е по-безопасен от еднолентовата улица само докато лентите значат нещо. Значението е просто: дясната е за пътуване, лявата е свободното място, през което другите минават. Който се настани вляво, изяжда точно това свободно място — зад него се трупа колона без законен изход, а натискът намира най-лошия: изпреварване отдясно, през лентата, в която никой не очаква изпреварващ. Втората половина на същия закон е връщането: маневрата не е „излизане“, а излизане И прибиране, и незавършената маневра оставя колата ти легнала върху чуждото решение. А лутането между лентите без мигач е третата страна на същата монета — то не нарушава лентата, а обещанието: другите планират спрямо мястото, което заемаш, и когато то се мени без предупреждение, планът им е грешен, преди да си направил нещо забранено.",
-    lawRef: "ЗДвП чл. 15",
+      "Многолентовият булевард е по-безопасен от еднолентовата улица само докато другите могат да предвидят какво ще направиш. Мигачът обявява решението (чл. 26), а огледалото и погледът през рамо проверяват дали лентата е свободна — който навлиза в съседна лента, пропуска движещите се по нея (чл. 25, ал. 2). Излизането без поглед е класическата причина за страничен удар в градския поток. А лутането между лентите без мигач чупи обещанието, по което другите планират: те разчитат на мястото, което заемаш, и когато то се мени без предупреждение, планът им е грешен, преди да си направил нещо забранено.",
+    lawRef: "ЗДвП чл. 25",
     examinerBg:
-      "Изпитващият следи лентовата ти дисциплина през целия маршрут: движение в дясната лента, ползване на лявата само за изпреварване или ляв завой, огледало и мигач преди всяко престрояване и своевременно прибиране вдясно веднага след маневрата. Продължителното движение в лявата лента без причина е второстепенна грешка; престрояването без мигач е основна; непрекъснатото местене между лентите се отбелязва като липса на лентова дисциплина.",
+      "Изпитващият следи лентовата ти дисциплина през целия маршрут: огледало и мигач преди всяко престрояване, контролен поглед към мъртвата зона, плавна траектория и изпреварване, завършено без засичане на изпреварения. Престрояването без мигач или без проверка в огледалото е основна грешка; непрекъснатото местене между лентите се отбелязва като липса на лентова дисциплина. Извън населено място, на магистрала и над 80 км/ч продължителното движение в лявата лента без изпреварване е второстепенна грешка (чл. 15, ал. 1).",
   },
   levels: [
     { level: 1 },
@@ -1835,9 +1864,11 @@ export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
   staged: [LNBD_CRAWLER],
   conditions: { weather: "dry" },
   // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
-  // DOOR-mirror check in step 3, and no structured channel carries it:
-  // «По реда: огледало, ляв мигач, поглед през рамо, после плавно излизане в лявата лента.» (catalogue audit: __tests__/door-mirror-task.test.ts).
-  doorMirrorsInTask: true,
+  // DOOR-mirror check in step 3 («По реда: огледало, ляв мигач, поглед през
+  // рамо…»), and since the 2026-10-01 re-scope a STRUCTURED channel carries
+  // it: mistake 1 cites LANE_CHANGE_WITHOUT_MIRROR_CHECK (doorMirrorTask.ts
+  // «mistakeCode»), so the explicit `doorMirrorsInTask` flag is redundant and
+  // is removed (the door-mirror audit refuses a redundant flag).
   localeBg: "bg-BG",
 };
 

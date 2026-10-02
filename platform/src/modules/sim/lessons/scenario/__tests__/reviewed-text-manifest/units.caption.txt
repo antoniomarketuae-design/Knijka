@@ -1,0 +1,503 @@
+sc-ac-aquaplane/mistake-float-drift	4a5570d5e490 085c89599ab7 52efdaef4137 ebcfa4cf24b1 dbaa1b0d762e
+sc-ac-aquaplane/mistake-full-speed	4a5570d5e490 e8f5b58e245f 609615db0eb2 d56dd26ddc8f 0f84d068fadb
+sc-ac-aquaplane/shadow-correct	2f6aa1d43999 1e0f3986737f 4b9216462a7a edaea187a5e9 d22d24db0f0a abc0bb7655ad 7ef2500f6d00
+sc-ac-bridge-ice/mistake-brake-on-deck	e26fb342f6fa d43eed32b3ca 0d7370041e24 550c8497b134
+sc-ac-bridge-ice/mistake-road-speed	4a5570d5e490 566ddb5b00f7 a41924d10e29 e659c1db1cd7 f9e1209a31f8
+sc-ac-bridge-ice/shadow-correct	2f6aa1d43999 90a61555fe9c c52991559dc9 1b0d8ad1cea9 e3ed11285205 d2f6ba06097a c2a7af9796c6
+sc-ac-crosswind/mistake-full-speed	4a5570d5e490 a40d472a250e 322ca348ec50 ef56bcb8d66e beb4ae141a03
+sc-ac-crosswind/mistake-overcorrect	4a5570d5e490 bb3539448d4a 66ab32c04f03 255a404aa451 c3989f06cd3a
+sc-ac-crosswind/shadow-correct	919e03742642 fa2615e93980 368ad8acb2a5 04705cd1e0e8 849c93b31335 81d561cd0c1c
+sc-ac-fog/mistake-dry-speed	e26fb342f6fa 9ccc759bab3e 367d25188cc4 ff6427753507
+sc-ac-fog/mistake-no-fog-lights	e26fb342f6fa 04459692a370 75b46b049ebb 394ddaa65f68
+sc-ac-fog/shadow-correct	4a5570d5e490 67840401bc25 cebe1bfe0be5 91a77a330694 1763cd420ec1
+sc-ac-highbeam-lead/mistake-highs-all-way	e26fb342f6fa e885e3bc64b3 50e142f76dd3 a906fefe067d
+sc-ac-highbeam-lead/mistake-late-dip	e26fb342f6fa cc15e8dd77b2 514c144848a4 0473f07770d6
+sc-ac-highbeam-lead/shadow-correct	4a5570d5e490 b5b88f6b9905 d941c7f334f6 459004b4bd89 77bec1cdad09
+sc-ac-ice/mistake-brake-on-ice	e26fb342f6fa aa749e99e291 2d3f38a2f694 20963ba71019
+sc-ac-ice/mistake-harsh-steer	4a5570d5e490 d4acce74d5e2 97a7e6c66a58 e5f7181b9ffe bb9780266dc3
+sc-ac-ice/shadow-correct	919e03742642 e7df08bf1473 19efcfaf9754 55ae2a3ef16e 9734e26fc2de c511013dba56
+sc-ac-night-lights/mistake-never-on	e26fb342f6fa 1cc1c6206b9b 6decd67e748b 71c3e399566a
+sc-ac-night-lights/mistake-turned-off	e26fb342f6fa e3821f45e58a 81aa7991da79 dc5a3ee9623a
+sc-ac-night-lights/shadow-correct	4a5570d5e490 06f8af672ad9 3acad95d77b4 53214c9f91fd ce692c23beaa
+sc-ac-night-overdrive/mistake-lights-off	e26fb342f6fa 1adfc0d9a21c 48c011ab3240 f401a5633605
+sc-ac-night-overdrive/mistake-posted-limit	e26fb342f6fa b4cbdaab92a8 2cf64a426e45 2ac32320061e
+sc-ac-night-overdrive/shadow-correct	919e03742642 216144d559c3 e74481cb0d9e 86cb918ec5f3 0ee77a2c287b a52ce37b1075
+sc-ac-rain-lights/mistake-never-on	e26fb342f6fa f497b9e01c3e e9de8db23c37 b69d5e559a27
+sc-ac-rain-lights/mistake-wipers-only	e26fb342f6fa 1ed2f55728d8 c3e21cfd4a2e 270e2281c02d
+sc-ac-rain-lights/shadow-correct	4a5570d5e490 70a91c5493b2 46a168b9e474 f88aed96eabd 83c6a259e9ff
+sc-ac-snow/mistake-dry-speed	e26fb342f6fa cf9462c39a01 cf88bc5bbbb2 b4725d2c87b6
+sc-ac-snow/mistake-late-brake	e26fb342f6fa 7a4506772d4e f7a4b7bcfcd9 61e388fdb784
+sc-ac-snow/shadow-correct	4a5570d5e490 2730b01f4c82 d47397c03933 15b382935a27 329d0b19cf81
+sc-ac-truck-spray/mistake-dry-gap	4a5570d5e490 ddf173710a37 2a85428d52f4 b6421d194a4a 85da35012806
+sc-ac-truck-spray/mistake-lights-off	e26fb342f6fa e73ee5f80c32 0dde9935308d b997fbae6a27
+sc-ac-truck-spray/shadow-correct	4a5570d5e490 af90b5e8b1cf 92a5164fe885 dab6b885800c 06979017eceb
+sc-ac-wet-braking/mistake-dry-point	e26fb342f6fa 94b21cca4478 97abce9e7135 a0c5c52b7b2c
+sc-ac-wet-braking/mistake-dry-speed	e26fb342f6fa b671db76d2d5 9792564405ca 4bcc5954d199
+sc-ac-wet-braking/shadow-correct	4a5570d5e490 51014d383d0c 7c1df36bf49a 5b54a13544ff 4b7462d3bb95
+sc-ac-wind-truck-pass/mistake-blown-out	d51f2d1fb857 16bc2b269b0b ca06b0d50eb5 23630dedc5dc 3069444e3106
+sc-ac-wind-truck-pass/mistake-clip-truck	0e62475a21f8 8655d09ced1e abd0ba2913c7 3c3e4004a9e3
+sc-ac-wind-truck-pass/shadow-correct	61c26283571c 8e190544a622 1da640cae2c7 cf3bf7bde2e8 f885434417cf 437dda981125
+sc-accident-own-conduct/mistake-clip-continue	1e458e3c9303 58ee56b2a42a ee9025b985bf b2e5f4c74dec
+sc-accident-own-conduct/mistake-hit-and-flee	3445ff91f351 c4d7cb0901ad 34509a55ffab fda408f89fb7 3c889b5513b7
+sc-accident-own-conduct/shadow-correct	2753822eb992 b01ea56fd433 6a611eda29b9
+sc-animal-hazard/mistake-cross-line	2753822eb992 8caf4323756d 4ddb6e0044e9
+sc-animal-hazard/mistake-swerve-oncoming	1e458e3c9303 4b66e03d0abc 1e6611d2ee83 f87f3cd496d7
+sc-animal-hazard/shadow-correct	1e458e3c9303 bce616b0daa8 995354cf7cfa f08e68f10309
+sc-crossing-bus-shadow/mistake-collision	e26fb342f6fa 41a951c41172 bb0c5590467d 6dfdb5718dd5
+sc-crossing-bus-shadow/mistake-not-yielded	e26fb342f6fa 6136ce28f122 3c2dea2cfb12 1b66ce5c14f1
+sc-crossing-bus-shadow/shadow-correct	8e7b76da0cad cab25218a02f 7c681dace3d1 83a0d6a51f40 f053c51f4d6f e64c4833d15d
+sc-crossing-child-ball/mistake-collision	e26fb342f6fa d92edbd02e2c c2ac7f3d568b 9d74d2e122f0
+sc-crossing-child-ball/mistake-too-fast	6596cb096f36 13c454e13d87 fa7def22af78 f5df7b6f6455
+sc-crossing-child-ball/shadow-correct	4a5944fa869c fe2579f82a25 3fb70c6765cf 5ca258f700e1 0924ee4a059f f053c51f4d6f 2922ab7f90d6
+sc-crossing-dart/mistake-collision	e26fb342f6fa 8a681c219f5d 870afe0e7b66 0da14bcd28c5
+sc-crossing-dart/mistake-not-yielded	e26fb342f6fa 5bf14e2ff6bf 3c2dea2cfb12 44eb9081a6d7
+sc-crossing-dart/shadow-correct	8e7b76da0cad df5c26c2979b 09e68956f9be 83a0d6a51f40 f053c51f4d6f a25ecdec74b2
+sc-crossing-let-pass/mistake-not-yielded	e26fb342f6fa b22c69267c37 79ea9ffa7d39 0d2b46f0f185
+sc-crossing-let-pass/mistake-too-fast	6596cb096f36 ea2ef4d4fe6f fa7def22af78 9da6581a77f1
+sc-crossing-let-pass/shadow-correct	8e7b76da0cad 35ba7e9f9921 cb7869f36450 a5e9bec69c21 f053c51f4d6f bba4d640965d
+sc-crossing-rain-sprint/mistake-lights-off	e26fb342f6fa 8e905e1ac04a 7963badb297c 2ba6f2720663
+sc-crossing-rain-sprint/mistake-not-yielded	e26fb342f6fa 0ce45eb5b235 1958a2e1b4d5 ace86299e2e1
+sc-crossing-rain-sprint/mistake-too-fast	6596cb096f36 344ca954d815 489cebf09806 bafdec8f45d1
+sc-crossing-rain-sprint/shadow-correct	8e7b76da0cad 252b77035c27 998e062dc610 f06bb739ec81 f053c51f4d6f f3c7ec3327f4
+sc-crossing-slow-crosser/mistake-not-yielded	e26fb342f6fa d7d0e433fe05 c6e1574821ae 152cc06ba4da
+sc-crossing-slow-crosser/mistake-too-fast	6596cb096f36 15d11b5a86a4 fa7def22af78 43b081704a10
+sc-crossing-slow-crosser/shadow-correct	8e7b76da0cad 125f6babb673 89ee03970ee2 f55b800876d9 5c91a60aecb0 f37a5140921c
+sc-crossing-white-cane/mistake-not-yielded	e26fb342f6fa 36d49b815bea 99d1a27d65a1 025f44db9765
+sc-crossing-white-cane/mistake-too-fast	6596cb096f36 8ae299f3e792 fa7def22af78 a6c0fa89b34f
+sc-crossing-white-cane/shadow-correct	8e7b76da0cad b9b31c9ee9f7 17540ec2143b b72872feeecc 5c91a60aecb0 e2dab098c96c
+sc-driver-distraction/mistake-late-react	1e458e3c9303 ef116cd05215 2414cfff7252 a88fe86a375f
+sc-driver-distraction/mistake-no-brake	2753822eb992 af29f0dd43a7 9ca41ed8ddfb
+sc-driver-distraction/shadow-correct	1e458e3c9303 3cf3d4e6d508 47f9494304b4 01c24c269584
+sc-ed-d2-city-run/mistake-no-yield	4546929d7543 c873ea69ed38 38eed9304a44
+sc-ed-d2-city-run/mistake-red-light	4546929d7543 c2a89cede9cb 28b6e596d57d
+sc-ed-d2-city-run/shadow-correct	891edb4971e3 665e7b0db69b ac5c8a32305a 2ac33a2cc9de a10b76c75d91 60b4a8367005 6feb9b42eb29 41ad9393f318
+sc-ed-d2-priority-run/mistake-partial-scan	8dfb74402f7f 17a9fe2fc60e 76b82db3d920 938860a2005b
+sc-ed-d2-priority-run/mistake-rolling-stop	a9d77cc6657c 400d2356a2d2 0636ec3ecadd
+sc-ed-d2-priority-run/shadow-correct	bde10e22bac5 678914f9659f f8c1d0af66c1 9c7dc77bb68f 5bd19dbd4df3 87fa817eac30 239f8209badb 2c7dd98f31d3 3f2251d96c25 b6231224ac59 fff3dad4a748 25de1d8a0215
+sc-ed-d2-stop-address/mistake-first-spot-dive	3524b332ea27 0f795ed9324d bbcff58fc0e1 913f660a21b4
+sc-ed-d2-stop-address/mistake-no-observation	d8e5e36e1448 3de02baa2cd8 7a93f5a01999 66552ba74fc8
+sc-ed-d2-stop-address/shadow-correct	040991332710 86323f456796 3b88c1f06d6a d295be75f18e 710c44d44d74 a0829187a94d
+sc-ed-poligon-chain/mistake-cone	a9d77cc6657c 99165816b201 f2dc14fd2d45
+sc-ed-poligon-chain/mistake-stall	d51f2d1fb857 d10b5d2d91b6 47ebf0efb68b 15ae73d22909 fae6d3e10497
+sc-ed-poligon-chain/shadow-correct	24e9c6553ce0 b546220c90b9 b0aebf529d53 e9d73477b2cf 261d4c958215 9da8580d2e31 60488516da27 7e645e1954f5 4369fd10483b 3fa532d76ec9
+sc-ed-reverse-line/mistake-curb	a9d77cc6657c 6df92265018c 21f0685bf2be
+sc-ed-reverse-line/mistake-no-look	2753822eb992 2925cda6abfb 55c469c1f6da
+sc-ed-reverse-line/shadow-correct	89ea9dd90eb4 9cc20ba3f5cd 14335b0fb344 e77bb7b5c17b 7d8181319eaa
+sc-fo-brakelight-chain/mistake-bumper-stare	4546929d7543 b1a9d55929d9 4d191e654df9
+sc-fo-brakelight-chain/mistake-late-brake	e26fb342f6fa 9e6974d0ef02 9d303ac03d27 e57f9ab59daa
+sc-fo-brakelight-chain/shadow-correct	4a5570d5e490 80167573f16b 3457a2a53ee8 6d475b85a674 598c955638c7
+sc-fo-motorway-gap/mistake-bumper-crash	e26fb342f6fa 54bfe7d3d435 47b97fee1daa 2d69e1c666c4
+sc-fo-motorway-gap/mistake-one-second	4546929d7543 fc6f76f12dd2 1a2d7af53031
+sc-fo-motorway-gap/shadow-correct	e26fb342f6fa 5961e9c44eb2 3fb6eb63ce6d 69604a1d162f
+sc-follow-brake/mistake-late-reaction	e26fb342f6fa bc9e653ad077 c6504ba8f0d8 0ecae87b5640
+sc-follow-brake/mistake-no-reaction	4546929d7543 36968bbc2266 53938d4d14ff
+sc-follow-brake/shadow-correct	4a5570d5e490 9360d21807e6 065a06073890 7911d66a0f61 f5199f757015
+sc-follow-cutin/mistake-hold-gap	e26fb342f6fa 0d083b21d739 72e21c8a62d8 251a66645a40
+sc-follow-cutin/mistake-squeeze	4a5570d5e490 b44dfd764a74 b9af1159cefc 6d636218e434 98bbab2a5ca4
+sc-follow-cutin/shadow-correct	4a5570d5e490 6c26b83096be 9f93535fc1b8 125f82923afb 27169e15ba07
+sc-follow-distance/mistake-gap-melts	e26fb342f6fa ca7f313f53b4 058b7e787c18 45d5b348fb17
+sc-follow-distance/mistake-tailgate	e26fb342f6fa 0306572bf74c ae51d1dc646f 1fdedbd3a0fa
+sc-follow-distance/shadow-correct	4a5570d5e490 961fde32d1fa 081cd1167ffe fe8c0feac1d0 aabfbd08eef7
+sc-follow-rain-gap/mistake-dry-habit	e26fb342f6fa c73a673c4a07 fe5801f5b6e7 765a6ac61ead
+sc-follow-rain-gap/mistake-gap-melts	e26fb342f6fa 2cacb3a529d9 75e8b0043ece ea230813e063
+sc-follow-rain-gap/shadow-correct	e26fb342f6fa 8f623abab5fc 6817650095ba 843a23bf468f
+sc-follow-standstill/mistake-bumper-kiss	e26fb342f6fa 874fdddc8365 8ab488e08d9f 55b9cd606aec
+sc-follow-standstill/mistake-creep-up	4a5570d5e490 33cdaae0662e a77f25109156 de19a441ef5b 54f154238db0
+sc-follow-standstill/shadow-correct	919e03742642 d8aa595d6178 57bcdb5b4dce f859323890f0 f14e8b5d99ba a2a700faf9e0
+sc-follow-tailgater/mistake-brake-check	1e458e3c9303 bd050d5cdca1 ca5ce4ee66f3 933e6df25613
+sc-follow-tailgater/mistake-speed-up	e26fb342f6fa 87190c31da3c 844818de1426 824c19b3b9dd
+sc-follow-tailgater/shadow-correct	8d3040f1089e 6fe73cc3a269 0a91cded4b41 d05abe1b87fa fa9c636e705a
+sc-follow-truck/mistake-peek	e26fb342f6fa f0a968f57691 2f68f461d897 9ad5019d1ad0
+sc-follow-truck/mistake-tailgate	e26fb342f6fa 9b680e460d84 86f5f9185e12 5adfdd728f54
+sc-follow-truck/shadow-correct	2f6aa1d43999 864603ac328d 0cbfd103c522 48fe2794d38e e56384f4e675 297d51ea206d fd506b7a5059
+sc-hazard-obstacle/mistake-hold-line	e26fb342f6fa 9f33e2ce1ab2 f8e81605e6cf 9672a0c2be24
+sc-hazard-obstacle/mistake-late-swerve	e26fb342f6fa 2a9328286fe7 ea2581a51226 8537fb352f5f
+sc-hazard-obstacle/shadow-correct	4a5570d5e490 23fa08e76659 ef21ec606969 d52c8e517e2f 7e7932242d9b
+sc-hz-accident-scene/mistake-gawk-stop	e26fb342f6fa 28bcbc4f25fb a780c265ef41 b6b4ab9326cd
+sc-hz-accident-scene/mistake-squeeze	4a5570d5e490 e40ed5d40a81 90f08d30b62e d6b1f3f64776 c5f240f01f13
+sc-hz-accident-scene/shadow-correct	5e253f6f09cc 5bcfd829a6a2 a1ed47155a76 29facd8b4f3c 9a5348ca61e7 58c45b28b9fe
+sc-hz-brake-dont-swerve/mistake-blind-swerve	d51f2d1fb857 8ad3cf088e41 ccef05a39de0 c9162c8dd187 d23419d6b2d3
+sc-hz-brake-dont-swerve/mistake-late-brake	e26fb342f6fa 112bf75c302d 5c6dc373c556 130237700c08
+sc-hz-brake-dont-swerve/shadow-correct	9aa49b02e808 f21d1df31234 359772c18f52 8928d067009c c4496926790d ff11cdc1806b
+sc-hz-breakdown-pulloff/mistake-lane-stop	e26fb342f6fa d502e290b218 e3b462976771 77f226c8ac28
+sc-hz-breakdown-pulloff/mistake-shoulder-drive	9163e17bcf89 c8be6b442b6f 175421910ebf f8ad6dabd120 8941d51b30ad eb3e3f11a688
+sc-hz-breakdown-pulloff/shadow-correct	e925b9f89323 d45478326e71 51301b443b8f 0ceafbe6ab8d 7e2f4c1131a6
+sc-hz-emergency-stop/mistake-late-reaction	e26fb342f6fa 3c26c0a59fd6 ca2faaeb3807 b51575d5e8bf
+sc-hz-emergency-stop/mistake-swerve	919e03742642 9355c52cab14 d31ba41432fc 16360eaa0760 cf7e9b7b4265 a40dab0ae672
+sc-hz-emergency-stop/shadow-correct	72766a8e3a9a 54a7903aced8 81736cbff085 f09fdf6a52b8 b72af5410ea8 9e889eb0dc68 9c942483c708
+sc-junction-blind/mistake-barge	26350c829702 3bcca1321d2b 8e0217d7999a
+sc-junction-blind/mistake-no-look	e26fb342f6fa a82204fb4caf 398e104d20ca 5b251d318a96
+sc-junction-blind/shadow-correct	bb703f3acc2d 115a6f12e0c3 c381f3255109 f8dce134ea1e 1b95c586e00c 6cc55fab69b8
+sc-junction-gap/mistake-creep-out	374f7e7539ec 8f56a0f7b50e b0b08f043915 327cae9168c4
+sc-junction-gap/mistake-cut-gap	374f7e7539ec 3d28594279d9 903f806011b5 5c7e7bb4d1a9
+sc-junction-gap/shadow-correct	0697d8e9dcc6 3ed3c038cec1 52ef92eb2942 a57f68b94914 21f94da29a87 037f6d567fec
+sc-junction-left/mistake-creep-out	374f7e7539ec 8f56a0f7b50e b0b08f043915 327cae9168c4
+sc-junction-left/mistake-cut-gap	374f7e7539ec 05ce35e9a64f 0e79154a25a8 277989699438
+sc-junction-left/shadow-correct	0697d8e9dcc6 5a15afef0e66 54595a633e76 6fb46f3ad471 15c92f619a40 3a58e6c7b83f
+sc-junction-rhr/mistake-barge	26350c829702 44a7ff374246 05628769f14e
+sc-junction-rhr/mistake-no-look	e26fb342f6fa 5a294e422f0a 2ecad76cbcf1 b06e8b6b6889
+sc-junction-rhr/shadow-correct	bb703f3acc2d d8216dd0593e f3261c8adad4 1eeab4499619 1b95c586e00c 85b4fcbd17e5
+sc-junction-scan/mistake-no-scan	374f7e7539ec 13e98b9f339d 7af632b1f8c5 9a971631db01
+sc-junction-scan/mistake-single-glance	a191e965b503 c39e84d53dcb aa1ea8a468b2 a1adc354f51a
+sc-junction-scan/shadow-correct	9dc89bfa2380 64dd421d5761 52ef92eb2942 5faee4cc58cd ec2adb15bfc2 c5a5b9a4de0d cc34abe8fead
+sc-junction-stop/mistake-past-line	4546929d7543 2970489d5f8b 97d6e7dfa19b
+sc-junction-stop/mistake-rolling-stop	26350c829702 a307b267712f fc31b4cd79fd
+sc-junction-stop/shadow-correct	3bf5d6165f83 c1863e2d6dd5 52ef92eb2942 87618ca627cf 9435c5e896b8 099373f619c3
+sc-jx-blocked-exit/mistake-enter-full-box	4a5570d5e490 91399833b8e9 f35ff8a7bfdd 1645281b4471 664d75d356a2
+sc-jx-blocked-exit/mistake-impatient-red	4a5570d5e490 d8c08e787649 304ba7dd80d9 9cf90a55e5cf 82429f625ba3
+sc-jx-blocked-exit/shadow-correct	9d3dbc7a052c e30cfe344862 5a56e7e6a981 61237ce88202 def7341e66b3 df178569cb3f 8c70d013e828
+sc-jx-equal-left/mistake-cut-oncoming	303578f3c115 162b54baba85 03249de179be 20339a517046 a0812307af90
+sc-jx-equal-left/mistake-cut-right	26350c829702 27253f49d9f1 92c1aaedaae4
+sc-jx-equal-left/shadow-correct	9728e46957a1 a69ec7f0594c 216f9eb9685c 7b48a47cf612 ab5c6b407241 615a8a294771 fb71d2e83bde
+sc-jx-giveway-b1/mistake-barge-priority	6276c167ab4e 4c16d474b2a3 bb34dc5cabb9 dda753f61cb5
+sc-jx-giveway-b1/mistake-no-scan	e26fb342f6fa ad3c54710f44 8a083f85a87b 6db3834f4115
+sc-jx-giveway-b1/shadow-correct	713bc3d0c890 51d53273b675 83c4d79d4f4b 54f2cc4f0218 469901d6c959 ac62fc5755db fedc6ef80ef2 38ef72af7646
+sc-jx-priority-confidence/mistake-blind-priority	e26fb342f6fa 6b09c7a726ca e6f69e6b1c71 815b2ca9b961
+sc-jx-priority-confidence/mistake-phantom-brake	d51f2d1fb857 b31d3b8b32d8 ed3f0a9f8f14 593276925ec4 f47c10458ec1
+sc-jx-priority-confidence/shadow-correct	9d3dbc7a052c 212804aa0f12 fee61181dbe5 25d9e142d6c6 02f00e9d053d a8a75d13b192 54790815507c
+sc-lane-change/mistake-no-indicator	232421672a07 89018c017649 e36e4f89fa97 d5084111e129
+sc-lane-change/mistake-no-mirror	374f7e7539ec 9595bea12924 8b12ee22a9c4 e01b168fd5a7
+sc-lane-change/shadow-correct	2bede517d24f ce6db0fc98d0 23bed06ddbc8 5839864cea7b 72e5a55681d4 ee528f167f7a 9317ae8cf1ca a2c9b2337f91
+sc-lane-control-signal/mistake-closed-lane	3445ff91f351 bed9f00ab9de 1423656d2120 3fa459203318 834378f0db6e
+sc-lane-control-signal/mistake-wrong-way	2753822eb992 042fe1e0033f c0a937352002
+sc-lane-control-signal/shadow-correct	2753822eb992 ae899cebc553 06b6dbb6b291
+sc-ln-boulevard-discipline/mistake-no-mirror	7ac2c1e5ab8a 521e6002e123 c7f6b9971dd8 fd626cb1d6cb
+sc-ln-boulevard-discipline/mistake-weaving	946664fd01a4 68c013ece19d 91519973b190 2900fbad47b9 37a1402ca272
+sc-ln-boulevard-discipline/shadow-correct	e17d92f16e06 adaa27a26517 aed20e20d117 edb090171fe8 e6cc0309b1be 6a06a539e59d
+sc-ln-decisive-change/mistake-blind-spot	232421672a07 8f086bf4d87e 2a58d357ac51 a2e5421fbd37
+sc-ln-decisive-change/mistake-half-merge	9e2b4f00f8e3 7543293f3243 c1a908e84c9d fe68e05cc2b8 9394370c4564
+sc-ln-decisive-change/shadow-correct	2fa44a0ee2a4 ae83d44b7d79 c6cd45556a92 ffe5cd1479eb d4de30b0bd92 2a4c23b97d08 a4af673de302
+sc-ln-obstacle-meeting/mistake-pull-out	8dfb74402f7f 91f08703d011 1f78b8b30555 a6d9a2fe8182
+sc-ln-obstacle-meeting/mistake-squeeze	4a5570d5e490 6e49b9225cca 33c72c32e3d1 1abd8a17ec5a cc8cd63cf27f
+sc-ln-obstacle-meeting/shadow-correct	75e386215255 cca1e6680ca5 cb41d45b170c 1a058ed56694 f4ed06b925d8 d4221b8c2294
+sc-ln-turn-lane-arrows/mistake-late-two-lanes	d56768d30402 45e703243936 21acb5472fe8 c2d2938d7d58 eedbd7dee98d
+sc-ln-turn-lane-arrows/mistake-left-from-through	b414fd9b28f9 017b1e0619fe b7fb14ae403b 70d940f808cd be5aa481da32
+sc-ln-turn-lane-arrows/shadow-correct	5b0fd03c33e8 b5fe57bf7f87 5c4a31fb3771 6a45a5a75b30 a9f56eea1310 b5ea8dfd501d
+sc-maneuver-3point/mistake-shunt	e26fb342f6fa de816ebc9681 033a62fc1b19 ffef1eaa12f3
+sc-maneuver-3point/mistake-wide	e26fb342f6fa 8fa97b45d774 b5f2f4e5d01c f56bfa4e1dc3
+sc-maneuver-3point/shadow-correct	2a2f7b754d7b a1ce8e3a6362 8924f0c7fe81 44afd75a13f2 aa47c87d06d9 e9f1e09c9e1c ddb45571db18
+sc-maneuver-uturn/mistake-swing	e26fb342f6fa 9bd78068bb5e 79ba20bbe6b7 a5e9049e1633
+sc-maneuver-uturn/mistake-wide	e26fb342f6fa 416639254c38 404e81bb35bf ce2ebd8ca1bf
+sc-maneuver-uturn/shadow-correct	8d3040f1089e 9a6277ad1235 9982a8f74e20 83f57a04ccb9 738357c5c962
+sc-merge-accel-lane/mistake-blind-merge	0e62475a21f8 2e9e26779a9f 0f61d4854de2 d10e95a9ce73
+sc-merge-accel-lane/mistake-stop-at-end	dd7b1aa50dde 58b782fddb7c 7e9cf15835fb c64a8b4323f2 a5ef9c338f4f
+sc-merge-accel-lane/shadow-correct	07d79bab0053 80ad967dba6e a45898b183cb 6d72f04a419a 531d9b927cb3 9614f8eee851 d4824cdc0217 7b8b45c94ec2
+sc-merge-bus-pullout/mistake-force-past	4a5570d5e490 2eddb14b9062 efab6ff7b2e0 bcc4b7225f6a 03e294f086e7
+sc-merge-bus-pullout/mistake-glue-behind	919e03742642 9a0fadbfba2b 3ab2c48e073b c4dde45a0a29 31aacc4e89eb 6a3f0a80f62b
+sc-merge-bus-pullout/shadow-correct	ec6af92141e6 e0f11d011606 66bd071e2ec9 9a8e4ba1ec5c 15e8a3802778 65f21eff6f7a 67cb69523193
+sc-merge-from-property/mistake-signal-and-go	5218f2f39674 342f51c30eaf 53dc36619709 0bbab092b62a 395313b81fab
+sc-merge-from-property/mistake-walk-through	4546929d7543 56ad68a7acbd dbdbf025ae5b
+sc-merge-from-property/shadow-correct	90cf04a2ae86 4ab5a4539094 259f9c228219 db322f00f0f5 a657b45bc2af 60d6948a9817 57a177883e30 bebfd93c5f0b
+sc-merge-lane-end/mistake-no-indicator	5e253f6f09cc 42888e6f1225 cb5e0d0c9337 5a84c271bd89 6c3e374c7f59 f82ab75db2f1
+sc-merge-lane-end/mistake-push-out	0e62475a21f8 2e9e26779a9f fc883e4222a2 15a23eb3985f
+sc-merge-lane-end/shadow-correct	b7062f73fca9 d0dcf208afe7 2a87d63d268a 5d1caf01334b 531d9b927cb3 6df4b42e1d57 d1eacad2102c
+sc-merge-motorway-exit/mistake-brake-on-carriageway	6439df366603 e3a9e42b1c73 ba21908916ed 43dde5901691 206f2e7a27d8 96d2c8ca4b00
+sc-merge-motorway-exit/mistake-ramp-too-fast	3b6d6dd42d16 e1eeb9cec2e8 6932374344b3 121cad165ce4 eca7cceeec76
+sc-merge-motorway-exit/shadow-correct	b3580ecc0b27 8cb13f540fea 3d5abd240924 3b99397eaa7c 7424c9fd2444 921cdeee92fd 8dccf601052b 8254f253d918 b0d08e50e030
+sc-merge-roadworks-shift/mistake-no-indicator	5e253f6f09cc d843216f6e3b 55357986fa70 5a84c271bd89 6c3e374c7f59 9d0ba79c625c
+sc-merge-roadworks-shift/mistake-squeeze-cones	477acf81742f 119f96add0b6 d6a7eb72b7c2 aca3bb0fc9c8 f732bb85fee5 e766b47efeb0
+sc-merge-roadworks-shift/shadow-correct	c55004e77a00 c49563aec348 66c0d72d9450 5d1caf01334b 531d9b927cb3 e9123a1d8b22 506d329a20c8 7dfda85abb69
+sc-mv-uturn-ban/mistake-cross-solid	0964ed9e8a7a bfe8f2081df3 e66a2997f7bc 4b966f96d579
+sc-mv-uturn-ban/mistake-into-stream	303578f3c115 6411873bf525 736eb016fb11 d98292f44369 241c6ba49d4b
+sc-mv-uturn-ban/shadow-correct	ada29204c81b df1e2b1e1025 6e37f78e7c15 9dda1465ec3e 1b414e145cf8 7e4bfc70f919 d4a14e8eccb4
+sc-mw-discipline/mistake-crawl	e26fb342f6fa eebe9c9e2166 36fa5f4a006d 223bf3699b27
+sc-mw-discipline/mistake-left-hog	e26fb342f6fa a603b43fe4ec 41b1b527887e 71b21a5ab3a5
+sc-mw-discipline/shadow-correct	4a5570d5e490 ee627a93dd69 1abdf8546a45 df35aad87427 54804678d0a5
+sc-mw-emergency-lane/mistake-shoulder-cruise	575f3e56a8cb 2c4e743e36a6 fb7d48d3cf42 bc23d06eaba0 371e3a0d4ccd
+sc-mw-emergency-lane/mistake-undertake	79eb805c0d5d a52a9fe033b7 e0f4fb4969d2 e2e3fa04241e
+sc-mw-emergency-lane/shadow-correct	4a5570d5e490 54aec1e4c0c4 89b9ab6dc4b1 4630961dd8ab c39e7b34a7d1
+sc-mw-min-speed/mistake-crawl-left	e26fb342f6fa 5a29166d5f9a 16d321cbff21 9a8506dac8a2
+sc-mw-min-speed/mistake-crawl-right	4a5570d5e490 2466e17037a2 f7c59a9e3d9e 80c5d539670b 5747e19fa018
+sc-mw-min-speed/shadow-correct	8d3040f1089e e65323fc24df 7413b1e3cd1f 8325cc77a9cc e36198db9ee3
+sc-ov-abort/mistake-head-on	3524b332ea27 fcaf9710fb05 2dcc74132440 cf4fa8abb204
+sc-ov-abort/mistake-push-on	0c4fc471951d d4c7a3481e8b 79433250cf69 b22014e47303
+sc-ov-abort/shadow-correct	bdd84a227311 873164f67c7f 52f523dec762 dc18a0c8f2aa b1c8f8f8b6b3 12c5a1712627
+sc-ov-ban-overtake/mistake-early-jump	d0fab523e4f7 4a06410f0791 e7eb42baf3e2 a3fb6d2dc4fc
+sc-ov-ban-overtake/mistake-overtake-in-zone	d0fab523e4f7 ae097725bbe7 bac8e9892c9c 8d6b7dc42c92
+sc-ov-ban-overtake/shadow-correct	d88c9e742a7c 3466768f4d28 dd3d61037823 322b0273b6bb 438ba045e21a
+sc-ov-being-overtaken/mistake-accelerating	c3de63b038ce 679b9bf433ff 72ad6bdc60b7 cb105c3553a5 10da6cc351c1 23f427797264
+sc-ov-being-overtaken/mistake-drifting-left	d51f2d1fb857 f8ed9216d5e1 461f2773f81e dcb36bf7a0be 8340cf732311
+sc-ov-being-overtaken/shadow-correct	ec6af92141e6 903d3465142b 3d351c7cf4f8 f2f3e05e28df 3cd8bd84a74e 7b23e2817b29 cacb03133df4
+sc-ov-bus-lane/mistake-cruise	e26fb342f6fa caf304372bf4 a4250ba2636e 9142e316eaf0
+sc-ov-bus-lane/mistake-dip-in	a14989bbc07c fae5b8bc8b39 255afcafcc2a 77175c0f48b2
+sc-ov-bus-lane/shadow-correct	79eb805c0d5d 71106f22a9e0 4827c9e2691a f0cf8a34765b
+sc-ov-crest-curve/mistake-blind-pass	9163e17bcf89 ac3b37bdfa21 e44c14c69815 fd92ed8db687 624d5e7e8f42 de79a484e1af
+sc-ov-crest-curve/mistake-curve-speed	4a5570d5e490 d9627f64443a 9da399ed94b2 1f67c8ac3af1 36ac7089262e
+sc-ov-crest-curve/shadow-correct	63d18dc30972 23222bbfff45 a90b3b413aac d17ca9a8c502 34e5b8b93eb9 77c6f9649cf1 d91d64932fe5 d4deb3841595
+sc-ov-crossing-overtake/mistake-late-swerve	d0fab523e4f7 b79894f697fa d700f1a84df6 c1aef4e61525
+sc-ov-crossing-overtake/mistake-overtake-in-zone	d0fab523e4f7 583b88f92515 04608048a4e9 d55ee8b28a9c
+sc-ov-crossing-overtake/shadow-correct	e26fb342f6fa 6010c0e0b970 9ca8d992eab9 2888cc3a770d
+sc-ov-keep-right/mistake-no-indicator	0e62475a21f8 5f7c44fcd11d 7899d6def7e9 e0f16f3eb535
+sc-ov-keep-right/mistake-no-mirror	0e62475a21f8 52c1822fc166 1c00b5ac33de fd626cb1d6cb
+sc-ov-keep-right/shadow-correct	9163e17bcf89 69195fe4e034 49567a8e5dc5 d415da52bad0 a76a02a99eed 2215e0b6f463
+sc-ov-lane-keeping/mistake-center-line	e26fb342f6fa b9467a51ada6 f30a86a61526 60247f4fa321
+sc-ov-lane-keeping/mistake-straddle	e26fb342f6fa 33eb78012b93 76f13245b6fe bd068ea2565d
+sc-ov-lane-keeping/shadow-correct	4a5570d5e490 a21f51c11a9e db3dcd429978 b810d4e062f0 b742a6188ea7
+sc-ov-narrow/mistake-barge	8dfb74402f7f 4283bb438a89 151de21a4c6c 15d6d069c92d
+sc-ov-narrow/mistake-force	8dfb74402f7f 2c2961abcf74 02b1acbf993a af40c41d4920
+sc-ov-narrow/shadow-correct	46eb89b5e4f6 372187303bc2 0f0265452cee 7b3787862311 e43ca9e97282
+sc-ov-night-gap/mistake-far-headlights	0c4fc471951d 5a6a4d4f3178 ba5be9265998 25a9e93402fe
+sc-ov-night-gap/mistake-high-beams	4a5570d5e490 bc704247a3ab 50e142f76dd3 c7bab62b6293 11bd36e9c168
+sc-ov-night-gap/shadow-correct	e0c3499e6b52 63f3d4dbf135 22324e387e25 81916f7c521e 35eef90503e4 6563f1e1ec0a
+sc-ov-oncoming-gap/mistake-overstay	0c4fc471951d 60f1120ffe93 f89b11de35bf 7d2b2ddd6acf
+sc-ov-oncoming-gap/mistake-tight-gap	0c4fc471951d 5bfd81559e99 dee424675213 d1fe1b25554a
+sc-ov-oncoming-gap/shadow-correct	d88c9e742a7c 47e7bc63353b fd254f32e600 4c917fb248a3 9f71ab99ad4c
+sc-ov-oneway/mistake-wrong-way	3524b332ea27 c11e864d02a8 6cef3d9eb06d 3b94b0e3b827
+sc-ov-oneway/mistake-wrong-way-short	3524b332ea27 c8267875e3e8 1e2edd94cbbb 2268f2dc2993
+sc-ov-oneway/shadow-correct	ca14b948204f 4724122a1fab df054c91c056 001172f13aa1 5d12d9276006 0eef5652e28e
+sc-ov-return-gap/mistake-early-cut	0c4fc471951d b96c37700eba 93db9376f482 4a98e11f97f1
+sc-ov-return-gap/mistake-fast-cut	0c4fc471951d 1c68ae77a10e 9572d05ca323 f28d26a637aa
+sc-ov-return-gap/shadow-correct	cc14992f8f8b 82f51029ee37 7d2017e0bc97 d2b5c7077708 e4e72d95217d
+sc-ov-solid-line/mistake-drift	e26fb342f6fa f817d2a64ae7 7ac36aa407db 17661c9bcabd
+sc-ov-solid-line/mistake-pullout	79eb805c0d5d 38696ed35ad4 5b7302b5b06d 1f7988e220b8
+sc-ov-solid-line/shadow-correct	e26fb342f6fa 4fa99cd73578 36f0dc7d99e4 2f387eaa1cd6
+sc-ov-solid-return/mistake-late-cut	ce9d67c3589e 5e0b613d57a6 142020012b8a 4f034ce37d26 f9cfc9f67607
+sc-ov-solid-return/mistake-return-on-solid	8b450b3b4303 085df5f84be0 57afd7a1ca15 135f6627c564 9ac2fd427b86 650186fb1e0c
+sc-ov-solid-return/shadow-correct	d2d96b08322d bf86430c14d3 6b97ca4cd609 d5933c2f7447 f31ffad41e73 e82bb5ac6b8f b3911d427df7 817706123423
+sc-park-45-rev/mistake-nose-in	0e62475a21f8 c5b2e41caa34 45523cee009d d37469f4696b
+sc-park-45-rev/mistake-shallow-swing	a9d77cc6657c a889aab13c71 f49a8e11189e
+sc-park-45-rev/shadow-correct	de08fcd69e2c 8e92b2b57bd6 fe2a86866a38 c9bc03121921 4493979aa113 c7271469184f
+sc-park-45/mistake-corner-cut	232421672a07 6e1679e61d4f cc1ddb7978be 72ae09700394
+sc-park-45/mistake-overshoot	232421672a07 0bf6d8a53bc7 ef23d66ed16e 5f781bdcbd82
+sc-park-45/shadow-correct	e0c3499e6b52 8b1b326bb554 e744c8105efe 2a552430b9ab 74c4a36c86ab 07d3df84d13c
+sc-park-bay-exit-rev/mistake-blind-reverse	1e458e3c9303 a0b4884a758d bcc51901f001 d65561fa7899
+sc-park-bay-exit-rev/mistake-swing-out	2753822eb992 600968b229e1 c748bb89cf2b
+sc-park-bay-exit-rev/shadow-correct	efb8c483b358 2d2314a7da0e 4b979357a486 a68b773c282e e0b03f7a3232 88240c7b582c baa71356e4fa 69be09add510 d99cbdd8d30d 8ea3bc50a754
+sc-park-double/mistake-correct-backwards	232421672a07 6df8da43bb45 5744e5c95c8a 05d73adfd9e0
+sc-park-double/mistake-wide-run-up	26350c829702 0b7594346181 41ca6d8f42e3
+sc-park-double/shadow-correct	5ebe0bec96e0 8a02c51c8648 1a11c995521d ad85f8cac63a 47c9a7f8bc02
+sc-park-gap-long/mistake-blind-reverse	0e62475a21f8 ce4583e2ea2f 9ceeac5a2cbb c922dc42d761
+sc-park-gap-long/mistake-overrun	26350c829702 6225fe9da66d 3e27bddca91e
+sc-park-gap-long/shadow-correct	1ac3d4c23a6e 4ca3907251fa 692277e2d8d9 ae146c3250c4 e66287971975 ed5a4bc8a469
+sc-park-gap-short/mistake-forward-hit	2fa52f1456a7 dd501352db60 ec143e25f2fc 1830d71b82f0
+sc-park-gap-short/mistake-shallow-angle	232421672a07 826d8c0622ff 56a9f73011ea 9ed19fc97159
+sc-park-gap-short/shadow-correct	c873959d2fd1 5b468b126781 ef6dab310a04 27360aac65aa 9024c297e8b6 f88a421ab119 a37879bf03c3
+sc-park-judge/mistake-short-forward	0e62475a21f8 8bb92686cfa6 e7b0294c716c 9ead3faf0a60
+sc-park-judge/mistake-try-short	a9d77cc6657c 06e255cb88c5 41f86534fab8
+sc-park-judge/shadow-correct	749e3aa7169e 7ff1528bf505 a2fc20d906c7 05b648c1826f 1503ec227a14 95270914ccc6
+sc-park-left/mistake-cross-blind	4546929d7543 336d0bc43480 971e03335dcc
+sc-park-left/mistake-mirrored-habit	a9d77cc6657c 8400b216e3a0 1c7bcd3756d5
+sc-park-left/shadow-correct	c933b7f4b12f cda4f53e2480 dac467bb4b84 7a473e409de4 afa32bf7c3a3 b7c0373dedea 31fb617a3762
+sc-park-narrow/mistake-no-observation	0e62475a21f8 6807c9b0906c 02ce25766422 49d491491aa3
+sc-park-narrow/mistake-wide-swing	6276c167ab4e 3d5888e1fefe 319ba5a03814 5cfc5c879f1a
+sc-park-narrow/shadow-correct	ad16c480a6de 8b1b326bb554 da0c891fbada 320c8e9b5387 1b18502a6c87 9a1aff73bec9 bca0c183f984
+sc-park-night/mistake-no-lights	959a4e23e6cc bea53895a1be f57a28c5b616
+sc-park-night/mistake-too-deep	a9d77cc6657c 08f785f57d8d c396972886fd
+sc-park-night/shadow-correct	e0c0f71fd11d 5f7ccec38c9d 2c70d1483039 1906de7409ff a32146fcc81e
+sc-park-parallel-exit/mistake-no-look	0e62475a21f8 74591fed3630 5d3dbaabca42 60b4055cafcf
+sc-park-parallel-exit/mistake-no-room	0e62475a21f8 b4de36b01ba7 f4ac8f0dc263 082e31c7aab6
+sc-park-parallel-exit/shadow-correct	d56720200ec7 59e1888a1ea6 7e7dc6dadd81 ab7ed38d236e a77656d786f8 f69dd4f3a806
+sc-park-parallel/mistake-far-from-lead	6276c167ab4e a2aba3b3f51a 195a32e5c136 b7b1d14bd302
+sc-park-parallel/mistake-no-observation	0e62475a21f8 6807c9b0906c 02ce25766422 49d491491aa3
+sc-park-parallel/shadow-correct	c098c818c01a 8b1b326bb554 2b97afa5028a 5a45bdcc0e09 e79c8d26f324 6752ef2bd076 5977086a3011 a6a583d7368c
+sc-park-perp-forward/mistake-blind-exit	232421672a07 d7425ac07884 a84c696be13c 66fa41caf0cb
+sc-park-perp-forward/mistake-early-turn	0e62475a21f8 1534dbac1c9a 0734f79493da f32311fb1003
+sc-park-perp-forward/shadow-correct	426cd4c462ba 8b1b326bb554 190bffcae97c ce6e2d21f4f1 69e59fc73730 7fedb6e1d6b5
+sc-park-perp-rev/mistake-no-observation	0e62475a21f8 6807c9b0906c 02ce25766422 49d491491aa3
+sc-park-perp-rev/mistake-wide-approach	6276c167ab4e fc6c70958991 4a780317199a 3ea822dff1f2
+sc-park-perp-rev/shadow-correct	ad16c480a6de 8b1b326bb554 a9062a45ad34 320c8e9b5387 6218897198fa e6cd6b88b35b 1e5707b678c4
+sc-park-van/mistake-blind-reverse	26350c829702 e6e73ad600ef 13a6e7979307
+sc-park-van/mistake-early-turn	a9d77cc6657c 751af080ee2e abf31433c798
+sc-park-van/shadow-correct	de08fcd69e2c 31f155fbfdca ec54dff98af5 edf8f1835177 578d10e890cf bff6da3d753d
+sc-park-wall/mistake-clip-neighbour	a9d77cc6657c 33612ba17a23 28ec74138722
+sc-park-wall/mistake-into-wall	0e62475a21f8 25389ef0c600 a836f45e62a3 b607ac41ef91
+sc-park-wall/shadow-correct	429259435e4d 746822f80a81 6fb95bcd72d3 e2d0c64d4980 c40de831e231
+sc-park-zebra/mistake-hidden-pedestrian	232421672a07 7a7ef4d4e753 885daec5ebf9 c79aa6e3a29b
+sc-park-zebra/mistake-park-after	26350c829702 30ec99bc4844 b72f06baa163
+sc-park-zebra/shadow-correct	63649efcd2d8 ee0400248e43 a16d512c2ef0 c46f7693dba6 1d85d2c018c9
+sc-pe-jaywalker/mistake-collision	4546929d7543 9a5819b18885 2f86213d87bd
+sc-pe-jaywalker/mistake-my-green	e26fb342f6fa 6300e02687fe f242700fedad a06f7a1535b4
+sc-pe-jaywalker/shadow-correct	b2b4a4f9e853 58828096e1de 6010fb36797e be491d99f0ea 63caecdadd82 f9cf170ace90
+sc-pe-night-unlit/mistake-city-speed	e26fb342f6fa d850815a33c0 3631b2138fa6 d0652342376e
+sc-pe-night-unlit/mistake-lights-off	e26fb342f6fa 9fbc75b1c50e 09febfa8f4a4 6945f65f274f
+sc-pe-night-unlit/shadow-correct	4a5944fa869c 7f6b5bcc9fcc 4eea31900545 06b515d3a07c cd3dad7d3eba f053c51f4d6f b65553b86caa
+sc-pe-parked-row-scan/mistake-fast-row	e26fb342f6fa 2e2e317e219e 7306d35d04fb 6cab28cfc6c2
+sc-pe-parked-row-scan/mistake-hug-row	e26fb342f6fa 15fedfd24d55 4eb60928cd9b 2cfc07964f71
+sc-pe-parked-row-scan/shadow-correct	c339b53338eb 947bf937fc1c f7bb52ffcfc4 3cbe511c93fe 0924ee4a059f f053c51f4d6f cf144c87938f
+sc-pe-school-patrol/mistake-fast-approach	eed7f91a6534 5bc48e952091 8f7ae906b66d c368b89a727b e394ff6667a7
+sc-pe-school-patrol/mistake-ignored-paddle	e26fb342f6fa 2e1df714a230 9919ad6b4a74 d38faf24cc23
+sc-pe-school-patrol/shadow-correct	c339b53338eb aa5dda4ff077 863fa1ad25a5 b7d212960230 43ac6b0f7f22 698eaade3d3c 1bd29f2f0827
+sc-pe-zone-living/mistake-city-speed	d56768d30402 4d9932b66919 d427565d5e7a 17027fbff8b6 e49a131df2c0
+sc-pe-zone-living/mistake-push-through	8dfb74402f7f 94bc487171dd f1d9cd4a09f9 f48fe1b9bb5c
+sc-pe-zone-living/shadow-correct	3a4a9b62c3d6 4af9ecd37cbb 17e371e8bbff b5404fca68e3 e5fe62740151 20523e177143 e2a8b5082a45 aed7db16e484 0448d401182d
+sc-pk-ban-stop/mistake-stop-at-edge	3524b332ea27 8b4b07fd9842 444570bb7358 2971dc4c9d54
+sc-pk-ban-stop/mistake-stop-in-zone	3524b332ea27 3b70f29a175c d2b75c190083 b6597b0ad100
+sc-pk-ban-stop/shadow-correct	d56768d30402 c6acc90b7965 f36618ee700f 528fbf790978 0e65cd37cdf9
+sc-pk-busstop-ban/mistake-stop-on-marking	4a5570d5e490 291d04c101bb fab503cf130d bc3b17a2c99a 200a46dfb3d6
+sc-pk-busstop-ban/mistake-stop-on-pocket	4a5570d5e490 a344fd17c87b b22969252831 d75ab3a3567b b53b4ff8cb92
+sc-pk-busstop-ban/shadow-correct	4bcc3e92e83c f4792e56ad82 93c8f522e92e 5441617d712d 42ee37213630 abcdd01ad6bf
+sc-pk-crossing-ban/mistake-stop-before-junction	4a5570d5e490 bff5e31cc6e3 843c848210eb da0c47f2be66 5f90ba41fd1b
+sc-pk-crossing-ban/mistake-stop-on-corner	4a5570d5e490 2e06cd32c463 ce8a3d2181f4 a6ed76d11e1c 2971dc4c9d54
+sc-pk-crossing-ban/shadow-correct	bec186952ef9 f2a2f6fb4e8b b3a017cc64d3 513c6ba8de08 e51e041dd7a8 5a41d32dda2d 026de0205958
+sc-pk-double-park/mistake-oncoming-squeeze	4a5570d5e490 47f5365a2ddc 0e54649adbb5 9dd76dad8848 d4848ffa754a
+sc-pk-double-park/mistake-second-line	4a5570d5e490 3e4c9b5b19f6 93c19a7c054b 56cc3d91f064 78ff229832aa
+sc-pk-double-park/shadow-correct	4bcc3e92e83c 1e21c913e8e2 c5a1cd08e1ad 2c87f85244bd cc6d4ef61718 a348009b380c
+sc-pk-driveway/mistake-deep	26350c829702 10c4e59bb545 5c174391be9e
+sc-pk-driveway/mistake-wide	0e62475a21f8 7a4d37b0745f 1851f11244fb 345cdcc948ad
+sc-pk-driveway/shadow-correct	fb13cfc3d624 9c88d82d2a85 d1a94e78d9de 3a4b7d21b268 f31add73c41d 935458a7439e
+sc-pk-move-off/mistake-curb-glance	e26fb342f6fa f3d3d0709188 9bbfd8c69153 95243e300d0c
+sc-pk-move-off/mistake-no-look	1e458e3c9303 05dc5b004c38 afa8ad640f93 bb4bc3b08ad2
+sc-pk-move-off/shadow-correct	8d3040f1089e a27c8729df43 f8533411996c f224ae6561b3 9eecfb2a0a75
+sc-pk-rail-ban/mistake-stop-before-crossing	4a5570d5e490 969d0dad714c 031f95a5f3b7 c3e456a35dd2 41ee58cad908
+sc-pk-rail-ban/mistake-stop-on-rails	4a5570d5e490 a6883748999f b7133f1e0c4d c2fcad84bb08 bd5f4aee7149
+sc-pk-rail-ban/shadow-correct	468f8a9a5726 0d7571803ab1 a5e36f223e1f ed519a7f52c7 3a6845591daa 775d19f07c9c 89a1768c3b76
+sc-pk-smooth-stop/mistake-overshoot	e26fb342f6fa 9d0766ab4a86 16bac78f3c7d 1a2398e8d218
+sc-pk-smooth-stop/mistake-too-fast	e26fb342f6fa 7a8ed80a5eaf b8fc69452171 a554e3c906f9
+sc-pk-smooth-stop/shadow-correct	4a5570d5e490 4375fe454881 ae9b56f5f13d 7a425f794bf2 4db15a729b9e
+sc-pk-stop-vs-park/mistake-minute-under-v27	e26fb342f6fa 5f5206ccb753 68222c215a0f 46f00c15c5e1
+sc-pk-stop-vs-park/mistake-permission-past-seam	e26fb342f6fa 38014b9af087 d17caf1a7e71 5c0b9e1e9a8c
+sc-pk-stop-vs-park/shadow-correct	67d93b1903a2 beefc601dbd1 54c213dd27ec d6ee3aa41e98 8f7c7d985539 1211348eb789 f9e28254df10
+sc-rb-busy-gap/mistake-barge-lead	374f7e7539ec d229f878d2b5 874dabce128e 17e8591f17e8
+sc-rb-busy-gap/mistake-short-gap	d51f2d1fb857 9bf5ff5ff6a6 45ceefdec01b bdb8113d25dc 5772b0edf016
+sc-rb-busy-gap/shadow-correct	e25ae67ce215 b0c594a437db 11a7afe6d2ca 52857941d44d f1ce4c97b031
+sc-rb-circulate-priority/mistake-panic-brake	6e058214f9db 8c3d58ee845d 36cce90c1552 d587232adc2a cbb3356845aa
+sc-rb-circulate-priority/mistake-wandering-line	d8e5e36e1448 21f16ca70ce9 ae77ed9dea83 b811a608436d
+sc-rb-circulate-priority/shadow-correct	a2a3c8c3bd53 4a9139f63a43 1fa651473e65 85ef9fd60e0c cd874d5ddff5
+sc-rb-exit-signal/mistake-barge-entry	374f7e7539ec d858a98a9a5b 6a5963f0002f 8d637dca9ff5
+sc-rb-exit-signal/mistake-exit-no-signal	ad4349933ccc c0cb041af016 db70c7d6dfc2 2abb54610a13 4a79a2cd86db 501d22f08a15
+sc-rb-exit-signal/shadow-correct	6de8ca60b58a fc03fab6585d db70c7d6dfc2 2abb54610a13 242aa40e1a21 9c9fb302a800
+sc-rb-lane-choice/mistake-exit-across-outer	3524b332ea27 f0fe6512e3e8 da89a39fcc34 3197b14a05ad
+sc-rb-lane-choice/mistake-outer-lane-far-exit	a2a3c8c3bd53 86f8d0763790 b65ec31f972f 92396e9b148b 28183e722376
+sc-rb-lane-choice/shadow-correct	1ac3d4c23a6e 7e20a38a4ab2 ffe594049048 6764e4496c99 8bd5e392f2f8 10c104f6d7e9
+sc-rb-ped-exit/mistake-exit-through-ped	3bf5d6165f83 d45af2adfc78 db70c7d6dfc2 2abb54610a13 a6332ef5c253 32e3c59722e3
+sc-rb-ped-exit/mistake-panic-brake	e26fb342f6fa b3d6f3aafe91 9ecb07601d11 4231919bcabb
+sc-rb-ped-exit/shadow-correct	f0fcc0c49464 d2aad19b4d08 db70c7d6dfc2 2abb54610a13 d5322f0119b0 d59b7b3a7151 a1cbb21ba6e9 049d78895a50 7f67bd7282b0
+sc-roundabout-entry/mistake-barge-entry	374f7e7539ec 1cbd1005c164 6a5963f0002f 3bdde37bd239
+sc-roundabout-entry/mistake-exit-no-signal	232421672a07 3f56d2e76c9c 4b5578fe61d9 2f91a32add96
+sc-roundabout-entry/shadow-correct	d3a0d7d3f086 a325345a090c 0ce1f99bd705 2abb54610a13 6a455f037b23 69e4ec353e54
+sc-rx-barrier-drop/mistake-dive-barrier	e26fb342f6fa 8cd9bedd5aa4 c2ad68a2fbe6 473714c12ae9
+sc-rx-barrier-drop/mistake-stop-on-track	e26fb342f6fa f020e48e46b0 8ac3c7efc836 3b4575647699
+sc-rx-barrier-drop/shadow-correct	d56768d30402 355314960396 9ba54e8001da 9ee32ae89d88 cf0c8799cb39
+sc-rx-guarded/mistake-creep-barred	e26fb342f6fa 299e0aa40b52 f35ce35e1292 b884cba1fb15
+sc-rx-guarded/mistake-run-barrier	e26fb342f6fa c425bd2aea46 c2ad68a2fbe6 3002d61b91a1
+sc-rx-guarded/shadow-correct	d56768d30402 0465bb22af21 c0fd52f34e67 9ee32ae89d88 0f72637951fa
+sc-rx-queue-clear/mistake-bumper-kiss	4a5570d5e490 8fcb43ebae0c 4b58da499a3a d91f607e430f aa513338b521
+sc-rx-queue-clear/mistake-stop-on-rails	919e03742642 7a247c569bd4 0b8ff0c85d1e 2ab62174e676 3bcfafb848cd e212a6000191
+sc-rx-queue-clear/shadow-correct	4670dddc749f 61099a1804fa b3e2c46f722b e9cfaa1a1e2e 0328b61bf809 5fba4e0700a6
+sc-rx-tram-island/mistake-collision	e26fb342f6fa 41d80570053a 2fc79553e61d 1867e70998af
+sc-rx-tram-island/mistake-squeeze-past	e26fb342f6fa a7aecccce079 47e4c4df038e 746ac9769a28
+sc-rx-tram-island/shadow-correct	8e7b76da0cad f2148081c3ca 810837e472ae 4d52dab8b54e f23ce1d6f1e1 435026c254d7
+sc-rx-tram-left/mistake-cut-tram	26350c829702 bb09fc8383a3 90be9f9e898e
+sc-rx-tram-left/mistake-no-indicator	84684f192b31 64082f69bd21 048c4f59b047
+sc-rx-tram-left/shadow-correct	7ade3ca7903f 19d9f28ab753 c6b4178e41b8 272cae594e03 04df685a170c
+sc-rx-tram-stop-doors/mistake-creep-through	e26fb342f6fa b1ae7316593f b28a944fb188 ffadedafc434
+sc-rx-tram-stop-doors/mistake-thread-doors	e26fb342f6fa 08535715b2b4 5972306af5df 0c89aef6fdb4
+sc-rx-tram-stop-doors/shadow-correct	8e7b76da0cad 5b22f659fe9b 9c964b31861f a49537c21655 49132f1fd21c 8c0136206df3
+sc-rx-unguarded/mistake-roll-through	e26fb342f6fa 68f06f31d976 aa36d52bdd7f 946de3d6596d
+sc-rx-unguarded/mistake-stop-on-track	232421672a07 a5e9678c6d88 3624c3751606 4612f2208e4d
+sc-rx-unguarded/shadow-correct	0571b2ea4fd3 314bfa57912e 60bab15a9436 3ee44ef6c508 7aaacf2bc63f
+sc-sig-controller-live/mistake-refuse-then-creep	4a5570d5e490 ebfc3301126a 7b8d177de906 eba7b8b907d3 c0eae065ba96
+sc-sig-controller-live/mistake-wait-for-green	4a5570d5e490 5d63e6c9147d 9223eb8fae12 3d6103078cc2 73bf514f63d1
+sc-sig-controller-live/shadow-correct	0571b2ea4fd3 bdd09dd51bbe a7528e2d5a96 3fe52dfe4e01 ce0747a066e5
+sc-sig-controller-postures/mistake-barge-chest	4546929d7543 7f6023de3eb1 4d8a35646111
+sc-sig-controller-postures/mistake-start-on-raised-arm	e26fb342f6fa f97701d46edf 776292ebff25 2b626e5073e6
+sc-sig-controller-postures/shadow-correct	8e58d87345d1 1624dc625a19 05d72721f2dd 28e2ba358324 fcfb4a10c6df 702e4fd5d5d0
+sc-sig-flash-amber-ped/mistake-hot-approach	4a5570d5e490 bb68e2794a8c bbcec0b6cc03 61070e658ced c735085edf44
+sc-sig-flash-amber-ped/mistake-no-yield	e26fb342f6fa c4732e6425d0 4b1bcf89d6b7 3e2b2020045f
+sc-sig-flash-amber-ped/shadow-correct	cdb51d3705b0 a2b7a3ea7a60 f4d3ce63c457 45ab4babd3b6 be491d99f0ea 63caecdadd82 46ade0184212
+sc-sig-green-wave/mistake-sleep-at-green	4a5570d5e490 411f9042a3b6 a1a093b4a39c 70e2a7f2ed63 6ffd6c0acb4a
+sc-sig-green-wave/mistake-sprint	919e03742642 5a8847077670 7cfb24317af1 fc925dae5bcc 855da09c7e82 53297f3f08eb
+sc-sig-green-wave/shadow-correct	4a5570d5e490 d4e06e893069 2ad349fba318 a7cac95ad322 c16792d55128
+sc-sign-warning/mistake-hold-speed	3445ff91f351 ccd53488a51c cf551a8c55fe 123134bf66d6 603850bbd81e
+sc-sign-warning/mistake-no-slowdown	2753822eb992 d40dbda182f4 e41ce516f520
+sc-sign-warning/shadow-correct	1e458e3c9303 920fbb05e274 9a9852657695 40a4ef33a410
+sc-signal-controller/mistake-creep	4546929d7543 ee3c681401e1 9913098df130
+sc-signal-controller/mistake-run	4546929d7543 46c1f694e753 7e836ed8c368
+sc-signal-controller/shadow-correct	8e58d87345d1 f02d549dad5f 64a770dc54f1 9a3dfaf2bd07 f89617c4c10f 7ac5fbc69e61
+sc-signal-dead/mistake-barge	26350c829702 a97536cddd6b ad1d7dd1eaf0
+sc-signal-dead/mistake-cut	26350c829702 9dd819bc9c4e 05e9c0990879
+sc-signal-dead/shadow-correct	bb703f3acc2d 265bd3b31962 f3261c8adad4 986622ade61f 1b95c586e00c 47902de7152b
+sc-signal-flashing/mistake-barge	4546929d7543 1d60111577bf de3cbaed9a48
+sc-signal-flashing/mistake-cut	4546929d7543 633c56fd35f2 459561879988
+sc-signal-flashing/shadow-correct	ca14b948204f 9819acbd4a80 0dbde363d001 986622ade61f b5c919b77d02 96e13f944024
+sc-signal-hesitation/mistake-filter	e26fb342f6fa 81fb4acf188e 6f447eea18f7 91f4ef3ebd45
+sc-signal-hesitation/mistake-freeze	e26fb342f6fa da585b0476f1 0594d9b50798 864fcc7cdaab
+sc-signal-hesitation/shadow-correct	6596cb096f36 c95e06bf7bb2 5b9f53d32d3c 352e0092b7bc
+sc-signal-redyellow/mistake-creep	e26fb342f6fa c3bcc462435f 601ad96f94d0 1accb350375a
+sc-signal-redyellow/mistake-jump	e26fb342f6fa fe14e6b165f9 1cc855315ed0 0f0d7594acb0
+sc-signal-redyellow/shadow-correct	0571b2ea4fd3 003952b678d5 f4f1648c6e24 f6f390186f07 c85929f3bcc1
+sc-signal-response/mistake-amber-gamble	4546929d7543 3e8fc6c46900 b570dc322103
+sc-signal-response/mistake-red-creep	4546929d7543 33c9b8690601 2c3553db1226
+sc-signal-response/shadow-correct	0571b2ea4fd3 867cef94c48d 0cb670e38c80 3a0c1a13ae59 77c313d5d7ac
+sc-sp-curve/mistake-brake-late	e26fb342f6fa d214436c8c28 5498b54f9d62 426eeb196fbf
+sc-sp-curve/mistake-hold-speed	e26fb342f6fa f05dc2acb8b8 1b4c5926c7b9 a8607f4bd3d4
+sc-sp-curve/shadow-correct	4a5570d5e490 5fa2c80dfcd4 2136bf35ac12 c3b03a171116 11f85b844d09
+sc-sp-eco-coast/mistake-late-brake	e26fb342f6fa 4fca1265558a 009d3de3517e 78258f5054c2
+sc-sp-eco-coast/mistake-sleep-at-green	e26fb342f6fa 9be89eb8ac06 f7f48f95867e cf35261cef8c
+sc-sp-eco-coast/shadow-correct	8e7b76da0cad bf16a1783461 779e5f53930a 6f065ed8f713 d3ee7e27f106 03655d7c3162
+sc-sp-harsh-brake/mistake-phantom-stop	1e458e3c9303 6d9e64839842 e410fdaea008 78f4bc4036aa
+sc-sp-harsh-brake/mistake-stab-crawl	1e458e3c9303 3bbaa5b7dc7c e5ab79647fc0 75f6b7875399
+sc-sp-harsh-brake/shadow-correct	8d3040f1089e e790bee40bd9 4c30155421ab b3c616bbc363 af5a62b449d2
+sc-sp-limit-end/mistake-big-overspeed	4a5570d5e490 d7a01582521e 652880b204c2 fb8b6f1f650a ae81b640c8c3
+sc-sp-limit-end/mistake-early-accel	4a5570d5e490 ffd14f5a6f9f c93086a2f8fa 8907bff31507 0cbb9f0c5aeb
+sc-sp-limit-end/shadow-correct	2f6aa1d43999 23ee385bd41d c2160b429911 2cfbfb717013 17cbec48cd3b ad743e6f02d1 ed8fbdd5d453
+sc-sp-wet-limit-plate/mistake-dry-speed-in-wet	e26fb342f6fa 0172a96e7302 b7172137ac33 0b43720590ab
+sc-sp-wet-limit-plate/mistake-over-limit-in-wet	e26fb342f6fa 582fdbb37ef7 a8583c27b209 1f3209529f60
+sc-sp-wet-limit-plate/shadow-correct	4a5570d5e490 fceb2352fff2 c71a771b40d8 1de7979eccab 4e9d642a09a1
+sc-speed-creep/mistake-flow-along	4a5570d5e490 c19016e184ab 326768524197 49803887b1a7 d384a0b537f3
+sc-speed-creep/mistake-zone-creep	e26fb342f6fa 8a5f20d52039 e58efdd30691 90d9d83c6359
+sc-speed-creep/shadow-correct	2f6aa1d43999 cc69b5b93a32 3b2855918808 fccdb61623bc 5974f15dc9be b987537017fa 0468e33d3531
+sc-speed-dangerous/mistake-chase-flow	e26fb342f6fa 0fa96506a3e5 6fa22dd26cba 2cc233ff33b0
+sc-speed-dangerous/mistake-pace-flow	e26fb342f6fa 17fef6e42966 caa2950d1ec6 ed35f6f4c9cd
+sc-speed-dangerous/shadow-correct	4a5570d5e490 b19505661da8 58756aa91f35 d8665315f17f 1351feea7a19
+sc-speed-rain/mistake-dry-speed	e26fb342f6fa 246713bbc35d 66ff19f2c3e3 564b1f4bf661
+sc-speed-rain/mistake-flow-along	e26fb342f6fa e3104eb20a14 e4722853a137 a11cb813bf7c
+sc-speed-rain/shadow-correct	4a5570d5e490 d3a179e23d52 fdac4ac3f5a9 f5e9d1a61652 f84a5366a46b
+sc-speed-transition/mistake-carry-speed	e26fb342f6fa f4987210b4f5 d3b6a1012d30 85d9c3e5dbba
+sc-speed-transition/mistake-half-slow	e26fb342f6fa e8b8747bfea2 906ded3af5e6 808f2494511c
+sc-speed-transition/shadow-correct	4a5570d5e490 b0d65ce55dfb ad16bf11b505 3266c992b565 4ec756b51236
+sc-speed-zone/mistake-boulevard-speed	e26fb342f6fa cb334a4aa454 5b5e5040bcad 88a642545e48
+sc-speed-zone/mistake-full-speed	e26fb342f6fa 26b6ac98d477 2bf9be8d8a14 bb92af491d77
+sc-speed-zone/shadow-correct	4a5570d5e490 d0c6adda5215 d0f11e6fec0f fd63d977e7a1 9edbac84edfc
+sc-turn-left-oncoming/mistake-cut-gap	26350c829702 85f52e2fa662 50ef7a731707
+sc-turn-left-oncoming/mistake-no-indicator	84684f192b31 535539af7a1b 489489a9f8dd
+sc-turn-left-oncoming/shadow-correct	7ade3ca7903f d1635c0bf5ac 2faae2cf7bd7 c11de217bd70 56251e29ebc5
+sc-vp-handbrake/mistake-handbrake-on	f91ca31c4be8 d21670d7c47b 863d217a2629 bc8d2e02f3cb
+sc-vp-handbrake/mistake-no-observation	1e458e3c9303 d04f04366100 bcfadcfb085f c313ae0fc1ad
+sc-vp-handbrake/shadow-correct	337488e56041 cd0a44b86dd0 99d4c054beb8 6ef81a747118 d63c33d69cd7 3f3ee9350181
+sc-vp-police-stop/mistake-drive-past	2fa52f1456a7 af3fc2fc5228 e56f7ad5e6ba 73f751b861ad
+sc-vp-police-stop/mistake-panic-stop	e26fb342f6fa c749fa961f64 f5ca192b7516 925fb7e52661
+sc-vp-police-stop/shadow-correct	2481c916e8ac 12d4e3839ca9 b6e8472d0245 ca5223672b11
+sc-vp-readiness/mistake-handbrake	e26fb342f6fa f920c4bf3da6 27136e630da3 a6131a2c4ee1
+sc-vp-readiness/mistake-no-belt	e26fb342f6fa e82a3b34f6dd 203d60962327 eccd13ae3903
+sc-vp-readiness/shadow-correct	4a5570d5e490 c5e2317c8cff d2db989005a9 500f45c85381 b32d2a408d86
+sc-vp-stall/mistake-stall-once	8dfb74402f7f dbb229dd4a56 9169c32316ba 8b343d80cfe9
+sc-vp-stall/mistake-stall-repeat	8dfb74402f7f 5c5329410e81 0dda8274be34 aae90be3d0b8
+sc-vp-stall/shadow-correct	4a5570d5e490 b7f26bd4cde4 587296c894b3 63fa90215b85 e18fceffad78
+sc-vp-telltale-red/mistake-drive-on	3445ff91f351 740636ae0809 3977452a9079 590512eaf976 4e7b85533a5b
+sc-vp-telltale-red/mistake-panic-lane	e26fb342f6fa 8599e3d26073 dd0a701326c8 40652f439ac9
+sc-vp-telltale-red/shadow-correct	efb5f39aca2f 24fb34d2d5c7 75387aa3499c bfcf54d9df8e a7eed7576c26
+sc-vp-telltale/mistake-ignore	1e458e3c9303 604192090a60 cdc9c496ef7c f8aed0cf895c
+sc-vp-telltale/mistake-panic-stop	e26fb342f6fa 8599e3d26073 db1d2c19bce0 01017d93d4a2
+sc-vp-telltale/shadow-correct	b6a2f3a49ddf 1f763ba6b978 f8d22d5930a2 27938af21ec5
+sc-vu-bikelane-turn/mistake-cut-path	374f7e7539ec e35d4a6f17d8 2ae5806777a7 5b20a94a7bd6
+sc-vu-bikelane-turn/mistake-only-behind	374f7e7539ec 0fa93e9af817 7f5ad9e62708 609a3cc71f84
+sc-vu-bikelane-turn/shadow-correct	76081d1ab2d5 6717e7c05344 89980ca047f2 b401f20621a3 4cbe160418a9
+sc-vu-blindspot-moto/mistake-mirror-only	232421672a07 8f086bf4d87e ea6d2cf9c16f 4cacf24bf7d2
+sc-vu-blindspot-moto/mistake-no-indicator	7ade3ca7903f 8727d74628a4 1302a78eedbc 141fb453ccd0 8d800b4ddba7
+sc-vu-blindspot-moto/shadow-correct	2aeced01140b 2a0ba67b6bdd 5dec3cb1c82f 57b0bc451ccb 82c3bc530250 7a68fd7e55fa 2a4c23b97d08 f8cc259d7bac
+sc-vu-child-cyclist/mistake-narrow	e26fb342f6fa 36c4813bc385 4136f172355e 981a056a4cdb
+sc-vu-child-cyclist/mistake-pass-in-wobble	4a5570d5e490 01e08d7bf4d6 70ee21cfeb70 c26569abd5e6 e75c182b3c82
+sc-vu-child-cyclist/shadow-correct	443495946f36 940afd1a3e09 4c230c7a4ffb cd91b9e7f202 042a376f988f a827403ac67e
+sc-vu-cyclist-group/mistake-cut-in	9e2b4f00f8e3 783437884616 f8e3e9a084ba 4d4b2d00d399 699fab523f34
+sc-vu-cyclist-group/mistake-narrow	e26fb342f6fa 1d540e6e8e1d 67379d2f8e74 42595d096f7f
+sc-vu-cyclist-group/shadow-correct	6fbf8603affe 8cba08dc2210 b98aecf0d978 25393cab4a3a 02257d8ae29b
+sc-vu-cyclist-hook/mistake-forced-brake	946664fd01a4 ed0767b813fb a11a2ca7035d 7e043b5f3282 5b1193fe78ac
+sc-vu-cyclist-hook/mistake-hook	374f7e7539ec 37daa5076a5c 1a282f772c38 4032f42a5a0c
+sc-vu-cyclist-hook/mistake-no-look	374f7e7539ec 2af6b0692448 22a41bcd317e fa973a008063
+sc-vu-cyclist-hook/shadow-correct	6a93c3da2534 5d2ef96d69ed ebf289692d91 175a488c836a f7f88732c9ae
+sc-vu-door-zone/mistake-hug	1e458e3c9303 3b5f25dd7258 a596f72481a9 64cc8f96b71e
+sc-vu-door-zone/mistake-swerve	1e458e3c9303 092edfc6efc3 b9101c9acc40 0c1dafe3b332
+sc-vu-door-zone/shadow-correct	4a5570d5e490 9250f2ab624e 4336579d3974 1be700346169 817d4384e970
+sc-vu-emergency-junction/mistake-barge	26350c829702 05cb722163f1 2b82f5cc86f3
+sc-vu-emergency-junction/mistake-race	0e62475a21f8 7937ab67bb91 0a0c9c287057 e68cc00b3f52
+sc-vu-emergency-junction/shadow-correct	bb703f3acc2d 49f4c6967218 2d41ed8b4e9d 9d97dad63411 a429035cb8c0 f54f9f340744
+sc-vu-emergency/mistake-block	e26fb342f6fa f789903870d1 e0f23b2dc067 817e9a51d598
+sc-vu-emergency/mistake-speed-up	e26fb342f6fa 76b5a5c53845 c320633cbe82 eb5af8f3a42e
+sc-vu-emergency/shadow-correct	57df7a926389 1b579bdaf936 db9023d9019b 0ec376a92e29 c12d971353e5
+sc-vu-pass-clearance/mistake-fast-close	a191e965b503 6c5b44ab203a ac13b9191eb3 fa08db5e09d9
+sc-vu-pass-clearance/mistake-squeeze	e26fb342f6fa ccac1f8230cc 1ad69a5c1a94 7172ef6f40ba
+sc-vu-pass-clearance/shadow-correct	946664fd01a4 9bee7e5e29ea f3fe4e23ee78 c9fafcfd9721 bc97bda938c3
+sc-zebra-approach/mistake-not-yielded	e26fb342f6fa c7d493dd5677 cc51ab3fd6c8 533c8901fe12
+sc-zebra-approach/mistake-too-fast	6596cb096f36 49b1e405c977 fa7def22af78 9da6581a77f1
+sc-zebra-approach/shadow-correct	8e7b76da0cad b4ad82d6e22c 34ec936c7196 1cfd36a38279 f053c51f4d6f 5ca72ebe9136

@@ -28,9 +28,12 @@
  * SHIPPED rules-catalog codes and grades EXACTLY them, with NO extra codes, when
  * replayed through the production stack (the §5/§9 gates, traces/__tests__/
  * sc-ov-*-traces.test.ts):
- *   - OV-11 → NOT_KEEPING_RIGHT (второстепенна: движение в лявата лента без
- *     причина — the keep-right detector, laneId > 0 on a multi-lane road for
- *     the 12 s sustain, left-indicator exempt);
+ *   - OV-11 «дръж вдясно» → since the founder ruling of 2026-10-01 «KEEP-RIGHT
+ *     FOLLOWS THE LAW» its demos grade the lane-change codes
+ *     (LANE_CHANGE_WITHOUT_INDICATOR / _MIRROR_CHECK): ov-keepright-v1 is a
+ *     town street at 50 with two marked lanes one way, where ЗДвП чл. 15, ал.
+ *     2, т. 2 frees the lane choice and NOT_KEEPING_RIGHT does not bill (see
+ *     the template's own block below);
  *   - OV-12 → POOR_LANE_KEEPING (второстепенна: trailing off-centre / on the
  *     lane edge — the lane-keep detector on |laneOffsetM|);
  *   - OV-04 → CENTER_LINE_TOUCHED (второстепенна: „настъпване на осевата линия"
@@ -125,30 +128,55 @@ const LANE_TRUE_RADIUS_M = 2.7;
 //    (360 m 2+2 boulevard, limit 50)
 //
 // FOUNDER R3 REDESIGN (doc 62 #45: „starts already right, straight road;
-// nothing to do"). The drill now SPAWNS IN THE LEFT LANE (ov-kr-spawn-left):
-// „дръж вдясно" is finally an ACT — mirror, right indicator, move over, come
-// home — and NOT doing it is finally a fault: staying left past the 12 s
-// keep-right sustain grades NOT_KEEPING_RIGHT on the live session exactly as
-// in the demos. The success gates (radius 4 < the 8.125 m lane pitch) are
-// satisfiable ONLY from the right lane center, so the lane change is required
-// to finish, and the change itself must be signalled (the shipped
-// lane-change observation detectors stay armed — the shadow shows the full
-// mirror-indicator-move discipline and earns SAFE_LANE_CHANGE).
+// nothing to do"). The drill SPAWNS IN THE LEFT LANE (ov-kr-spawn-left):
+// coming home is an ACT — mirror, right indicator, move over. The success
+// gates (radius 4 < the 8.125 m lane pitch) are satisfiable ONLY from the
+// right lane center, so the lane change is required to finish, and the change
+// itself is graded by the shipped lane-change observation detectors (the
+// shadow shows the full mirror-indicator-move discipline and earns
+// SAFE_LANE_CHANGE).
+//
+// FOUNDER RULING 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW» — RE-SCOPED, NOT MOVED.
+// This street is a town street: 2+2, posted 50 by tag, dressed as a street by
+// the world builder (isExtraUrbanCarriageway is false), and ЗДвП чл. 15, ал.
+// 2, т. 2 (retrieved: «в населените места, на пътно платно с две и повече
+// пътни ленти за движение в една посока … със скорост не по-голяма от 80
+// кm/h») lets the driver use the most convenient lane on it. Staying left
+// here is lawful, NOT_KEEPING_RIGHT no longer bills it, and the two «hog»
+// demos (and «Останеш ли вляво, това е отбелязана грешка») stopped being true.
+//   · MOVE was weighed and refused on evidence: the repo's only 2+-lane roads
+//     where ал. 1 binds are the three motorway maps (settlement-signal.test.ts
+//     §5), mw-v1 has no left-lane spawn, a cold start (L4) in a live motorway
+//     lane is not a lesson, and sc-mw-discipline already teaches the motorway
+//     left-lane hog.
+//   · RE-SCOPE keeps the act — coming home from the left lane, the drill the
+//     founder asked for — and makes every sentence true: the task asks for the
+//     right lane, the copy says when the law asks for it (outside a
+//     settlement, on a motorway, above 80 — ал. 1) and when it does not (here
+//     — ал. 2, т. 2), and the mistakes are the two ways the move itself goes
+//     wrong on ANY road: no signal (чл. 26) and no look (чл. 25, ал. 1).
+//   · ROUND 2: the TASK asks for mirror + right indicator, NOT a shoulder look.
+//     The product's only shoulder look is the LEFT one (rules/types.ts
+//     GlanceKind «shoulder»), so «поглед през рамо» before a move to the RIGHT
+//     would send the student's eyes the wrong way; step 2 names the real-car
+//     right-shoulder check as such, and the demo captions claim only what the
+//     recording does (__tests__/caption-truth.test.ts).
 // ---------------------------------------------------------------------------
 
-/** OV-11 + OV-02 — движение във възможно най-дясната свободна лента (ЗДвП
- *  чл. 15: извън изпреварване водачът се движи възможно най-вдясно) — но
- *  започнато от ГРЕШНАТА лента, така че прибирането вдясно е истинска
- *  маневра: огледало, мигач, престрояване. */
+/** OV-11 + OV-02 + OV-01 — прибиране от лявата в дясната лента като истинска
+ *  маневра: огледало, мигач, поглед през рамо, престрояване (ЗДвП чл. 25, ал.
+ *  1; чл. 26). Кога дясната лента е задължителна — извън населено място, на
+ *  магистрала, над 80 км/ч (чл. 15, ал. 1) — и кога не е: в града, на две и
+ *  повече ленти в посока до 80 км/ч (ал. 2, т. 2), какъвто е този булевард. */
 export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
   id: "sc-ov-keep-right",
   family: "lanes",
   tagsBg: ["ленти", "дръж вдясно", "лентова дисциплина", "престрояване", "булевард"],
   titleBg: "Дръж вдясно",
   objectiveBg:
-    "Започваш в ЛЯВАТА лента на булеварда — мястото ти не е там. Огледало, десен мигач, престрой се в дясната лента и я дръж до края: лявата е за изпреварване, не за пътуване. Останеш ли вляво, това е отбелязана грешка.",
-  archetypeIds: ["OV-11", "OV-02"],
-  conceptIds: ["c-right-side-rule", "c-lane-choice", "c-overtaking-procedure"],
+    "Започваш в ЛЯВАТА лента на булеварда. Задачата: огледало, десен мигач — престрой се в дясната лента и я дръж до края. Тук, в града, на две ленти в посока до 80 км/ч, лентата е по твой избор (чл. 15, ал. 2, т. 2); извън населено място, на магистрала и над 80 км/ч дясната е задължителна (ал. 1).",
+  archetypeIds: ["OV-11", "OV-02", "OV-01"],
+  conceptIds: ["c-right-side-rule", "c-lane-choice", "c-lane-change", "c-overtaking-procedure"],
   map: {
     archetype: "straight-street",
     // The generator recipe — mirrored in ov-keepright-v1.json meta.scenario.params
@@ -161,19 +189,18 @@ export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегляш в ЛЯВАТА лента — например след изпреварване. По чл. 15 мястото ти е във възможно най-дясната свободна лента." },
-    { n: 2, textBg: "Дясната е свободна: огледало, поглед през рамо, десен мигач." },
+    { n: 1, textBg: "Потегляш в ЛЯВАТА лента — например след изпреварване. Задачата е да се прибереш вдясно." },
+    { n: 2, textBg: "Дясната е свободна: огледало и десен мигач (в истинска кола — и поглед през дясното рамо)." },
     { n: 3, textBg: "Престрой се плавно в дясната лента и изключи мигача — това е цялата маневра „прибиране“." },
-    { n: 4, textBg: "Не отлагай: висенето в лявата лента без причина е грешка, която тече със секундите, а зад теб се събира колона." },
-    { n: 5, textBg: "Продължи в дясната лента до края на отсечката — лявата се посещава, в дясната се живее." },
+    { n: 4, textBg: "Тук, в града, на две ленти в посока до 80 км/ч, законът ти оставя избора на лента (чл. 15, ал. 2, т. 2). Извън населено място, на магистрала и над 80 км/ч най-дясната свободна лента е задължителна (ал. 1)." },
+    { n: 5, textBg: "Продължи в дясната лента до края на отсечката — така завършва задачата." },
   ],
   success: [
     {
       id: "sc-ovkr-move-right",
       titleBg: "Престрой се в дясната лента",
       // Radius 4 < the 8.125 m lane pitch: the zone is satisfiable ONLY from
-      // the RIGHT lane center — the lane change IS the drill. Reaching it
-      // needs the move to happen well inside the 12 s keep-right sustain.
+      // the RIGHT lane center — the lane change IS the drill.
       params: { kind: "reachZone", x: KR_RIGHT, y: 150, radiusM: 4, maxSpeedKmh: 55 },
     },
     {
@@ -189,28 +216,28 @@ export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
   shadow: { path: "content/traces/sc-ov-keep-right/shadow-correct.trace.json" },
   mistakes: [
     {
-      traceRef: { path: "content/traces/sc-ov-keep-right/mistake-hog.trace.json" },
-      titleBg: "Висене в лявата лента",
+      traceRef: { path: "content/traces/sc-ov-keep-right/mistake-no-indicator.trace.json" },
+      titleBg: "Престрояване надясно без мигач",
       whatWentWrongBg:
-        "Колата така и не се прибра: остана в лявата лента, в която тръгна, при съвсем свободна дясна — без да изпреварва никого. Лявата лента не е за пътуване: извън изпреварване се движиш във възможно най-дясната свободна лента (чл. 15), иначе събираш колона зад себе си.",
-      codeRefs: ["NOT_KEEPING_RIGHT"],
+        "Колата се прибра от лявата в дясната лента, без да подаде десен мигач. Огледалото беше проверено — но мигачът не е за теб, а за другите: той е единственият начин движещите се зад и до теб да научат за маневрата, преди тя да започне. Преди всяко отклонение встрани се подава своевременен и ясен сигнал, който свети през цялата маневра (чл. 26).",
+      codeRefs: ["LANE_CHANGE_WITHOUT_INDICATOR"],
     },
     {
-      traceRef: { path: "content/traces/sc-ov-keep-right/mistake-slow-hog.trace.json" },
-      titleBg: "Бавно в лявата лента",
+      traceRef: { path: "content/traces/sc-ov-keep-right/mistake-no-mirror.trace.json" },
+      titleBg: "Престрояване без поглед в огледалото",
       whatWentWrongBg:
-        "Водачът не само остана в лявата лента, но и кара по-бавно от потока, „за да е спокоен“ — и запуши бързата лента. По-бавното движение в лявата лента е същата грешка: мястото ти е вдясно, а лявата се освобождава за по-бързите.",
-      codeRefs: ["NOT_KEEPING_RIGHT"],
+        "Десният мигач светна, но воланът тръгна без поглед в дясното огледало и през рамо — а точно там, в мъртвата зона, може да се движи кола или мотор. Мигачът обявява намерението ти, но не проверява дали лентата е свободна. Преди маневрата се убеждаваш, че няма да създадеш опасност за движещите се след теб и покрай теб (чл. 25, ал. 1): огледало, мигач, рамо — и чак тогава волан.",
+      codeRefs: ["LANE_CHANGE_WITHOUT_MIRROR_CHECK"],
     },
   ],
   teach: {
     whenBg:
-      "На всеки булевард и многолентов път — най-често точно СЛЕД изпреварване или ляв завой, когато вече си в лявата лента и прибирането е твоя следваща маневра: огледало, мигач, вдясно.",
+      "При всяко прибиране от лявата в дясната лента — най-често СЛЕД изпреварване или ляв завой. Извън населено място, на магистрала и където е разрешено над 80 км/ч прибирането е задължително: там се движиш в най-дясната свободна лента (чл. 15, ал. 1). В града, на платно с две и повече ленти в посока до 80 км/ч, лентата е по избор (ал. 2, т. 2) — но и тогава смяната ѝ е маневра със същия ред: огледало, мигач, рамо.",
     whyBg:
-      "Висенето в лявата лента запушва потока и тласка другите да те изпреварват отдясно — най-опасния вид изпреварване. „Дръж вдясно“ не е учтивост, а закон (чл. 15): подредеността по ленти е това, което прави многолентовия път по-безопасен от еднолентовия.",
+      "Престрояването надясно изглежда по-безобидно от това наляво, но и отдясно има мъртва зона, в която се скриват коли и мотори. Мигачът казва на другите какво ще направиш, а огледалото и погледът през рамо ти казват дали можеш (чл. 26; чл. 25, ал. 1). А там, където законът те иска вдясно — извън населено място, на магистрала, над 80 км/ч, — продължителното движение в лявата лента запушва потока и тласка другите да изпреварват отдясно.",
     lawRef: "ЗДвП чл. 15",
     examinerBg:
-      "Изпитващият следи лентовата ти дисциплина: движение в дясната лента, ползване на лявата само за изпреварване или ляв завой и СВОЕВРЕМЕННО прибиране вдясно след маневрата — с огледало и мигач. Продължителното висене в лявата лента без причина е второстепенна грешка.",
+      "Изпитващият следи реда на престрояването: поглед в огледалото от страната на маневрата, своевременен мигач, контролен поглед към мъртвата зона и плавна траектория. Престрояването без мигач или без проверка в огледалото е основна грешка. Извън населено място, на магистрала и над 80 км/ч продължителното движение в лявата лента без изпреварване е второстепенна грешка (чл. 15, ал. 1).",
   },
   levels: [
     { level: 1 },
@@ -226,9 +253,11 @@ export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
   ],
   conditions: { weather: "dry" },
   // FOUNDER RULING 2026-09-22 «Live when the task uses it» — the task demands a
-  // DOOR-mirror check in the objective, and no structured channel carries it:
-  // «Огледало, десен мигач, престрой се в дясната лента и я дръж до края» (catalogue audit: __tests__/door-mirror-task.test.ts).
-  doorMirrorsInTask: true,
+  // DOOR-mirror check («огледало, десен мигач»), and since
+  // the 2026-10-01 re-scope a STRUCTURED channel carries it: mistake 2 cites
+  // LANE_CHANGE_WITHOUT_MIRROR_CHECK (doorMirrorTask.ts «mistakeCode»), so the
+  // explicit `doorMirrorsInTask` flag is redundant and is removed (the
+  // door-mirror audit refuses a redundant flag).
   localeBg: "bg-BG",
 };
 

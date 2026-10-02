@@ -10298,3 +10298,30 @@ Four pedal-only wrong-leg profiles (`sc-vp-telltale-red` → c172d48b; `sc-vu-em
 f0023997; `sc-follow-tailgater`), event-keyed shots and the rear-gap read. Fifteen adversarial rounds; landed WITH CONDITIONS recorded as
 GAP-9 in doc 93. **Nothing closes by this landing**: `platform/` and `content/` are byte-identical, so no closure may rest on «the product
 now passes» — the rows above become JUDGEABLE on a re-drive whose wrong leg commits the lesson's own act.
+
+## Keep-right follows the law — landed 2026-10-03 (founder ruling 2026-10-01)
+
+`NOT_KEEPING_RIGHT` cited only ЗДвП чл. 15, ал. 1 and had no settlement or speed-limit exemption, so it convicted lane use that ал. 2,
+т. 2 allows (a settlement, two or more marked lanes one way, a limit of 80 km/h or less). Five adversarial rounds; round 5 SIGNED OFF WITH
+CONDITIONS.
+
+What landed:
+- `SimTick.outsideSettlement` from the built world (the builder's own extra-urban predicate) and the rule armed only where ал. 1 binds:
+  outside a settlement, on a motorway, or where the posted limit is above 80. Re-grading all 2,434 recorded drives changes ONE bill
+  (sc-vp-police-stop drive-past loses it); it is still billed on the two motorway lessons. 213 of the 223 committed multi-lane edges
+  are town streets posted 30–70.
+- The card names where the duty binds and both exemptions (т. 2, т. 3). The three urban lessons that taught keep-right as their mistake
+  are re-scoped (sc-ov-keep-right, sc-ln-boulevard-discipline, sc-vp-police-stop); a false theory line and two practice questions
+  (q-manevri-031, q-uyazvimi-013) that stated the duty on town scenes are corrected; POOR_LANE_KEEPING cites чл. 20, ал. 1; the police lesson
+  cites чл. 6, т. 2 and чл. 103.
+- Two gates answer the classes: a generated ARMING CENSUS against an oracle written from the retrieved law (the limit decides, never the
+  car's speed), and a product-wide REVIEWED-TEXT MANIFEST (a fingerprint per surface over ~50,600 student-facing strings; any changed or
+  added sentence is red and printed until the manifest is re-recorded:
+  `RECORD_REVIEWED_TEXT_MANIFEST=1 npx vitest run --maxWorkers=1 src/modules/sim/lessons/scenario/__tests__/reviewed-text-manifest.test.ts`).
+  **Every later lane that changes shown text must re-record it and read the printed diff.**
+
+Owed (verifier conditions): OFF_CARRIAGEWAY still cites чл. 15, ал. 1 in town — the law bank holds no provision that itself forbids a car
+to travel off the carriageway there (a founder / legal reading); the two corrected questions stay needs-review and want the founder's
+read; arming mutants keyed on fractional dial speeds and on a night sample under 60 km/h survive the lattice (no committed drive is
+affected); q-manevri-032 ships without a clip. Integration: the manifest readers were made line-ending insensitive and skip the
+gitignored `src/generated/` (the main worktree holds 229 CRLF files and a generated Prisma client the lanes never had).

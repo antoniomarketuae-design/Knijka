@@ -1,0 +1,76 @@
+{
+ "note": "One fingerprint per surface over EVERY student-facing string (see studentText.ts for what is read). Recording is a reviewer's signature: read every sentence the generator prints against the law bank first.",
+ "command": "RECORD_REVIEWED_TEXT_MANIFEST=1 npx vitest run --maxWorkers=1 src/modules/sim/lessons/scenario/__tests__/reviewed-text-manifest.test.ts",
+ "surfaces": {
+  "catalog": {
+   "fingerprint": "eb75718250eee68c66853766b8523d7a971d13ff8afc33c31883fb87adf70d03",
+   "units": 12,
+   "strings": 558
+  },
+  "consequences": {
+   "fingerprint": "bc6c53ce4dc40688ee87d3da62d70804379b6024e53430cf80994edceafc53ec",
+   "units": 16,
+   "strings": 920
+  },
+  "n38": {
+   "fingerprint": "7b3022853613fe84f2141a886a64d52e9480218a60b000cb6746c6b30f162514",
+   "units": 11,
+   "strings": 136
+  },
+  "template": {
+   "fingerprint": "f5869317bd6d73c0ae3152b265c412103335ba2f4b1d11693d3506c08a19715a",
+   "units": 167,
+   "strings": 4294
+  },
+  "compiled": {
+   "fingerprint": "55dd08e539b7e7749f9cdc295c0f0f5fda280ca8af7bc87a5426712a3c9c7750",
+   "units": 808,
+   "strings": 9083
+  },
+  "caption": {
+   "fingerprint": "9b1e5260e98a06e8a419496032065a685bcef6f4e9465616f72b255c556264b7",
+   "units": 503,
+   "strings": 1870
+  },
+  "theory": {
+   "fingerprint": "150dc7d3b3c2858da8f3e32c3cf6df3d5ee0eefb52b781533344a75cc79ed0d4",
+   "units": 54,
+   "strings": 4712
+  },
+  "question": {
+   "fingerprint": "d3a8844d44770a0e9b900b26f6403a45efd11b35c08fbeb78f65e78891bb5802",
+   "units": 1089,
+   "strings": 10551
+  },
+  "concept": {
+   "fingerprint": "ad4fe2bfa3c812d1245ba2c36a9a1a69f6d1dc0bd9c162c73004940fac2795df",
+   "units": 9,
+   "strings": 1615
+  },
+  "source": {
+   "fingerprint": "60873c9d81da923fd84cea0c5240006bfb765b584354e0b82ec489c45a988b2d",
+   "units": 485,
+   "strings": 13111
+  },
+  "world": {
+   "fingerprint": "755b24e4dd706ac2025f5a5c71a781c93984d73f0c7a17bcf147fc61de1b69ba",
+   "units": 106,
+   "strings": 1391
+  },
+  "public": {
+   "fingerprint": "2c4e940d03296a4f1f0763367eebe2f8a0b749d4fa90e578335bd918a889603a",
+   "units": 14,
+   "strings": 105
+  },
+  "law": {
+   "fingerprint": "9b829b35f5c7b4bd9a4913320e9772d18c34a2b57c34da1a9b0f09f60c7faae3",
+   "units": 518,
+   "strings": 2145
+  },
+  "artwork": {
+   "fingerprint": "8e58fcdd4e681cd25142e09ed09e221adb69785930f2fea58e2178dc1c2e4d4c",
+   "units": 88,
+   "strings": 115
+  }
+ }
+}

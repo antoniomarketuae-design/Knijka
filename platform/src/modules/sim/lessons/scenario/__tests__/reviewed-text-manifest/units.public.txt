@@ -1,0 +1,14 @@
+platform/public/clips/manifest.json	c9856ae790fe 2c19d025b28a 8ce056845f71 c775c9813970 34eeae7b433f 0b5999a7a231 91a1f5d1d7a9 e5e67081b0dd 1dbc15bcc73d c185cbb8ca25 107ee6f3f35e 5e06f16145c5 d6a748df6bf4 c8643be21fe8 176789498aa0 2fb22669b0c0 57da0c1ca88d e64591224e0a 2fb22669b0c0 cb926d617c35 2fb22669b0c0 b04e1565a1aa 2fb22669b0c0 9d3de5fbc690 c501e4d5527d 91a1f5d1d7a9 123730182922 91a1f5d1d7a9 d0d51f8737f5 390b3472ac51 e04261a86824 6f6c9f9e08c8 aa88dd7205c8 91a1f5d1d7a9 ac7e298fe0ff 91a1f5d1d7a9 fa5968c504d4 5317899f8ce4 107ee6f3f35e 974cc29a4545 443bef30c114 8044ce72ad55 e673d0d92db4 71a5b47cc6cd e673d0d92db4 1f3b78915403 1dbc15bcc73d 4d62a75d28fb 1dbc15bcc73d fc796d5af1ea 49257a084b07 b45146da2daf 6a9d9e3f35b4 f2a932e1d0b2 756c9ec1fa9f 1b483d2755a4 5c395440093e cd99fc38b4df c1d8ec29409d cde19bf37aa7 f9ad47e60636 ddd6981c1ed4 94f83f005108 94f83f005108 b97082e08326 b9e52328064e 473f3e166d48 4f8bd7a3f316 180d098ee83a dd8c723f1b06 33ff7e1a6c9b f624b4223cdd 0e560426a319 05f0301b5d7e 33ff7e1a6c9b 5612d0512aa9 1dbc15bcc73d
+platform/public/offline.html	f6e22239c22d 56de7aed5544 78eea278240c 7428429e26ea a459d3ae9cc0 d790d45164fc 81ae5c45f2b8 612f69613876 f989ca8a45a4 c91af2af6ffe e91d15a8c8b0 2f419373f69d 35a46fe16135 90ea3f1ac648 7bcea0d562a0 eaf39e2a5c60
+platform/public/sim/signs/faces/a19.svg	9d0fd452285f 71a5e6955ef4
+platform/public/sim/signs/faces/d15.svg	9d0fd452285f 03dd5851b9ca
+platform/public/sim/signs/faces/d16.svg	9d0fd452285f efa15206b46c
+platform/public/sim/signs/faces/d4.svg	9d0fd452285f 7e546bf4f617
+platform/public/sim/signs/faces/d5.svg	9d0fd452285f 0adea7fe6ec8
+platform/public/sim/signs/faces/g2.svg	9d0fd452285f c193fda30096
+platform/public/sim/signs/faces/g3.svg	9d0fd452285f aa747742b0f6
+platform/public/sim/signs/faces/g9.svg	9d0fd452285f b7ed13cbac96
+platform/public/sim/signs/faces/v26.svg	9d0fd452285f e72ec017e021
+platform/public/sim/signs/faces/v28.svg	9d0fd452285f 6baa5bbacb6f
+platform/public/sim/signs/faces/v33.svg	9d0fd452285f c7b12a176118
+platform/public/sw.js	bd5b860a789e 2d4ce6aab610 fe3806e23084 7f338aba054e

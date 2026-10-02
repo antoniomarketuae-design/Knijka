@@ -170,7 +170,7 @@ describe("ov-keepright-v1 through the world runtime — the laneId/laneCount sur
     expect(Math.abs(left.laneOffsetM)).toBeLessThan(0.2);
   });
 
-  it("grades keep-right through the REAL reducer: left-lane hog = NOT_KEEPING_RIGHT; right-lane cruise = clean", () => {
+  it("grades keep-right through the REAL reducer: on this town street neither lane bills (founder ruling 2026-10-01)", () => {
     const cruise = (x: number): RuleEvent[] => {
       const rt = createWorldRuntime(loadRaw());
       let rules = createRuleEngine();
@@ -193,10 +193,14 @@ describe("ov-keepright-v1 through the world runtime — the laneId/laneCount sur
     const rightLane = cruise(LANE_RIGHT_X);
     expect(rightLane.filter((e) => e.kind === "violation")).toEqual([]);
 
+    // ov-keepright-v1 is 2+2 posted 50, a town street — ЗДвП чл. 15, ал. 2,
+    // т. 2: the driver may use the most convenient lane. 15 s in the left lane
+    // used to bill NOT_KEEPING_RIGHT; since the founder ruling of 2026-10-01
+    // «KEEP-RIGHT FOLLOWS THE LAW» it bills nothing. The same stint billed where
+    // ал. 1 binds is runtime/__tests__/settlement-signal.test.ts §3.
     const leftLane = cruise(LANE_LEFT_X);
     const codes = leftLane.filter((e) => e.kind === "violation").map((e) => e.code);
-    expect(codes).toContain("NOT_KEEPING_RIGHT");
-    expect([...new Set(codes)]).toEqual(["NOT_KEEPING_RIGHT"]);
+    expect(codes).toEqual([]);
   });
 });
 

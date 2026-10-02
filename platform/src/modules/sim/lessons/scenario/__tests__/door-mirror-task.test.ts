@@ -144,9 +144,12 @@ describe("the catalogue, both directions", () => {
 
   it("every EXPLICIT flag stands on such a sentence — it cannot be sprinkled", () => {
     const declared = SCENARIO_TEMPLATES.filter((s) => s.doorMirrorsInTask === true);
-    // 25: the audited row plus the 24 the class walk found. A new one is a
-    // content change and arrives with its own quoted sentence in the template.
-    expect(declared.length).toBe(25);
+    // 25: the audited row plus the 24 the class walk found, less the two the
+    // 2026-10-01 keep-right re-scope made redundant — sc-ov-keep-right and
+    // sc-ln-boulevard-discipline now cite LANE_CHANGE_WITHOUT_MIRROR_CHECK on a
+    // mistake demo, the structured channel. A new one is a content change and
+    // arrives with its own quoted sentence in the template.
+    expect(declared.length).toBe(23);
     const unearned = declared.filter((s) => demandingSentence(s) === null).map((s) => s.id);
     expect(unearned, "flagged with nothing in the briefing that asks for it").toEqual([]);
   });

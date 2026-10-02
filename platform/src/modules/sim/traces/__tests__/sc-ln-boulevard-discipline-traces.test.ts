@@ -1,17 +1,20 @@
 /**
  * Wave-6 trace gate — „Лентова дисциплина на булеварда" (sc-ln-boulevard-
- * discipline on wb-boulevard-v1, doc 72 OV-11 × OV-02 × OV-12), doc 76 §5/§9
+ * discipline on wb-boulevard-v1, doc 72 OV-01 × OV-02 × OV-12), doc 76 §5/§9
  * stages 3+5:
  *   1. SHADOW replays with ZERO violations and earns the TWO SAFE_LANE_CHANGE
  *      commendations of the arc (out and back). NOT CLEAN_DRIVING: the streak
  *      needs cleanDrivingDistanceM = 250 m and this boulevard is 200 m long —
  *      the map's ceiling, not the drive's fault (see the template header).
  *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs and nothing else:
- *      the left-lane hog never leaks a lane-change code (it moved BY THE BOOK —
- *      the isolated fault is the stay), and the weave never leaks
+ *      the no-mirror pull-out grades only the missing look (it signals, and
+ *      its return is by the book), and the weave never leaks
  *      LANE_CHANGE_WITHOUT_MIRROR_CHECK (it glances every time — the isolated
  *      fault is the silence) nor CENTER_LINE_TOUCHED (it straddles the 0/1 lane
  *      boundary, not the осева — the one-act-one-code seam of engine §4).
+ *   2b. FOUNDER RULING 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW»: this is a town
+ *      street, 2+2 posted 40 (ЗДвП чл. 15, ал. 2, т. 2) — no drive here may
+ *      bill NOT_KEEPING_RIGHT, which is why the old left-lane-hog demo is gone.
  *   3. COMMITTED FILES under content/traces/sc-ln-boulevard-discipline/ ARE the
  *      recordings of these scripts, byte-for-byte, with identical public copies.
  *
@@ -37,7 +40,7 @@ const RECORD = process.env.RECORD_TRACES === "1";
 const SCENARIO_ID = "sc-ln-boulevard-discipline";
 const NAMES: ScLnBoulevardDisciplineTraceName[] = [
   "shadow-correct",
-  "mistake-left-lane-hog",
+  "mistake-no-mirror",
   "mistake-weaving",
 ];
 
@@ -85,14 +88,20 @@ describe("sc-ln-boulevard-discipline — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-ln-boulevard-discipline — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Постоянно каране в лявата лента“: exactly NOT_KEEPING_RIGHT, never a lane-change code", () => {
-    const drive = drives.get("mistake-left-lane-hog")!;
+  it("„Излизане без поглед в огледалото“: exactly LANE_CHANGE_WITHOUT_MIRROR_CHECK, once — the pull-out", () => {
+    const drive = drives.get("mistake-no-mirror")!;
     const codes = [...new Set(violationCodes(drive))].sort();
+    expect(SC_LN_BOULEVARD_DISCIPLINE.mistakes[0].codeRefs).toEqual(["LANE_CHANGE_WITHOUT_MIRROR_CHECK"]);
     expect(codes).toEqual([...SC_LN_BOULEVARD_DISCIPLINE.mistakes[0].codeRefs].sort());
-    // The move was by the book — mirror, signal, glide. Only the STAY is billed.
+    expect(violationCodes(drive).filter((c) => c === "LANE_CHANGE_WITHOUT_MIRROR_CHECK").length).toBe(1);
+    // It signalled — the fault is the missing look, not the stalk.
     expect(codes).not.toContain("LANE_CHANGE_WITHOUT_INDICATOR");
-    expect(codes).not.toContain("LANE_CHANGE_WITHOUT_MIRROR_CHECK");
-    expect(commendationCodes(drive)).toContain("SAFE_LANE_CHANGE");
+    // …and the return home was by the book: one SAFE_LANE_CHANGE.
+    expect(commendationCodes(drive).filter((c) => c === "SAFE_LANE_CHANGE").length).toBe(1);
+  });
+
+  it("FOUNDER RULING 2026-10-01: nothing on this town street bills NOT_KEEPING_RIGHT", () => {
+    for (const name of NAMES) expect(violationCodes(drives.get(name)!), name).not.toContain("NOT_KEEPING_RIGHT");
   });
 
   it("„Лутане между лентите без мигач“: exactly LANE_CHANGE_WITHOUT_INDICATOR + POOR_LANE_KEEPING", () => {

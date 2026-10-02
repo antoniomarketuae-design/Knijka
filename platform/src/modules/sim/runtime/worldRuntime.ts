@@ -70,6 +70,10 @@ import { scenarioSignScale } from "../world/builders/zoneSigns";
 // card the shell raises at the rim has to describe the world the builder
 // actually built, not a world it was written against.
 import { districtHasWorldRimBelt } from "../world/builders/worldRim";
+// THE DRESSER'S OWN gate, for the same reason again: the settlement signal on
+// the tick must say «outside a settlement» exactly where the builder drew an
+// извънградски път (SimTick.outsideSettlement).
+import { isExtraUrbanCarriageway } from "../world/builders/constants";
 
 /** A stop line can re-fire only after this long (jitter at the line must not
  * spam RED_LIGHT_CROSSED; a genuine re-approach takes longer anyway). */
@@ -2711,6 +2715,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         // onto the tick exactly like the other surface tags — data, never a
         // heuristic; absent (every pre-slice map) sets nothing.
         if (edgeRt.edge.motorway !== undefined) tick.motorway = edgeRt.edge.motorway;
+        // THE SETTLEMENT SIGNAL (founder ruling 2026-10-01 «KEEP-RIGHT FOLLOWS
+        // THE LAW») — the world builder's own answer to «is this road outside
+        // a settlement?», `isExtraUrbanCarriageway`, the predicate that dresses
+        // the edge as an извънградски път. Published only when true, so a town
+        // tick is byte-identical to before (see SimTick.outsideSettlement).
+        if (isExtraUrbanCarriageway(edgeRt.edge)) tick.outsideSettlement = true;
         // N1 (doc 72 OV-14): one marked lane TOTAL on a two-way road = the
         // narrow-street-meeting context. Surface-only (see SimTick doc).
         if (!edgeRt.edge.oneway && edgeRt.edge.lanes <= 1) tick.narrowTwoWay = true;

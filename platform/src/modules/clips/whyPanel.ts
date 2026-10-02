@@ -50,6 +50,7 @@ import { scenarioForCode } from "@/modules/sim/scenarios";
 import { QUESTION_EVENT_TYPE } from "./whyPanelMap.generated";
 import {
   EVENT_SCENARIO_CORRECTION,
+  QUESTION_CLIP_WITHHELD,
   QUESTION_SCENARIO_CORRECTION,
   pairingVerdict,
 } from "./whyPanelPairing";
@@ -156,8 +157,9 @@ const EVENT_TO_SCENARIO: Readonly<
   "ev-warning-light": { templateId: "sc-vp-telltale-red", mistakeIndex: 0 },
   // The scenario-map event id is ev-police-stop-signal (there is no bare
   // ev-police-stop); sc-vp-police-stop is „Спиране от полицейски сигнал".
-  // mistakeIndex 1 (не 0): m0 „Подминаване на сигнала" faults (NOT_KEEPING_RIGHT)
-  // only once the ghost has driven ~100 m past the officer — m1 „Паника в
+  // mistakeIndex 1 (не 0): m0 „Подминаване на сигнала" faults only once the
+  // ghost has driven ~100 m past the officer (its bill is the ignored signal;
+  // the lane it holds is a town lane and is not billed) — m1 „Паника в
   // лентата" panic-stops SHORT of the officer, who is still in the fault frame
   // (~31 m ahead). The officer renders as a staged pedestrian (runners.ts
   // policeStop), so the R1 „police" row is satisfied by that framed pedestrian
@@ -411,6 +413,12 @@ export function resolveWhyPanel(questionId: string): WhyPanelPayload | null {
     : undefined;
   const candidate = whyPanelCandidateSimRef(questionId);
   if (eventType === undefined || candidate === null) return payload;
+
+  // A REVIEWER'S VETO (whyPanelPairing.ts QUESTION_CLIP_WITHHELD): the pick
+  // shares an article with the question and still teaches the opposite
+  // paragraph of it — the town lane-choice question beside the motorway
+  // keep-right mistake. Text + citations only.
+  if (Object.hasOwn(QUESTION_CLIP_WITHHELD, questionId)) return payload;
 
   // THE PAIRING GUARD (whyPanelPairing.ts). A drill whose STORED teach.lawRef
   // shares no article with the question's STORED lawRefs argues from a

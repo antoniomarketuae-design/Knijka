@@ -132,12 +132,26 @@ for (const { spec, record } of CORRECT) {
 }
 
 describe("S3-E counter-proofs — lane-discipline mistakes grade through the live pipeline", () => {
-  it("left-lane hog: NOT_KEEPING_RIGHT surfaces through the stack, clean-driving absent", () => {
+  // FOUNDER RULING 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW»: ov-keepright-v1 is
+  // a town street (2+2 at 50, ЗДвП чл. 15, ал. 2, т. 2), so the old left-lane
+  // hog demo graded nothing true and is gone; the drill's demos are now the two
+  // ways the move home goes wrong on any road.
+  it("move home without a signal: LANE_CHANGE_WITHOUT_INDICATOR surfaces through the stack, never NOT_KEEPING_RIGHT", () => {
     const outcome = driveThroughSession(SC_OV_KEEP_RIGHT, (d, onTick) =>
-      recordScOvKeepRightDrive(d, "mistake-hog", { onTick }),
+      recordScOvKeepRightDrive(d, "mistake-no-indicator", { onTick }),
     );
-    expect(driveViolationCodes(outcome)).toContain("NOT_KEEPING_RIGHT");
-    expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+    expect(driveViolationCodes(outcome)).toContain("LANE_CHANGE_WITHOUT_INDICATOR");
+    expect(driveViolationCodes(outcome)).not.toContain("NOT_KEEPING_RIGHT");
+    expect(driveCommendationCodes(outcome)).not.toContain("SAFE_LANE_CHANGE");
+  });
+
+  it("move home without a look: LANE_CHANGE_WITHOUT_MIRROR_CHECK surfaces through the stack, never NOT_KEEPING_RIGHT", () => {
+    const outcome = driveThroughSession(SC_OV_KEEP_RIGHT, (d, onTick) =>
+      recordScOvKeepRightDrive(d, "mistake-no-mirror", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("LANE_CHANGE_WITHOUT_MIRROR_CHECK");
+    expect(driveViolationCodes(outcome)).not.toContain("NOT_KEEPING_RIGHT");
+    expect(driveCommendationCodes(outcome)).not.toContain("SAFE_LANE_CHANGE");
   });
 
   it("curb-edge straddle: POOR_LANE_KEEPING surfaces, no center-line code, clean-driving absent", () => {

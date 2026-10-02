@@ -229,11 +229,14 @@ describe("S4 counter-proofs — cockpit mistakes grade through the live pipeline
   // ADR-006 stage 1c (VP-11) — the completion-drill counter-proofs: neither
   // wrong way reaches the curb-side stop zone, so the drill NEVER completes
   // (the honest capped outcome), and each grades its own shipped code.
-  it("police stop / drive-past: NOT_KEEPING_RIGHT surfaces, stop objective unmet, not passed", () => {
+  it("police stop / drive-past: POLICE_STOP_SIGNAL_IGNORED surfaces (no keep-right bill on this town street), stop objective unmet, not passed", () => {
     const outcome = driveThroughSession(SC_VP_POLICE_STOP, (d, onTick) =>
       recordScVpPoliceStopDrive(d, "mistake-drive-past", { onTick }),
     );
-    expect(driveViolationCodes(outcome)).toContain("NOT_KEEPING_RIGHT");
+    expect(driveViolationCodes(outcome)).toContain("POLICE_STOP_SIGNAL_IGNORED");
+    // FOUNDER RULING 2026-10-01: ln-v1 is a town street, two marked lanes one
+    // way at 50 (ЗДвП чл. 15, ал. 2, т. 2) — the left-lane stay is lawful.
+    expect(driveViolationCodes(outcome)).not.toContain("NOT_KEEPING_RIGHT");
     expect(outcome.result.completedAll).toBe(false);
     expect(outcome.result.objectives.find((o) => o.id === "sc-vpps-stop")!.done).toBe(false);
     expect(outcome.result.passed).toBe(false);

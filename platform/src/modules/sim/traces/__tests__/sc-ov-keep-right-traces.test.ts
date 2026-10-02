@@ -4,8 +4,11 @@
  * LEFT LANE), doc 76 §5/§9 stages 3+5:
  *   1. SHADOW replays with ZERO violations, STARTS in the LEFT lane, performs
  *      the signalled change and earns CLEAN_DRIVING + SAFE_LANE_CHANGE.
- *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs (NOT_KEEPING_RIGHT),
- *      and NEVER a lane-change code (the hog never leaves its lane).
+ *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs — since the founder
+ *      ruling of 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW» the two lane-change
+ *      codes (no indicator / no mirror). ov-keepright-v1 is a town street,
+ *      2+2 at 50 (ЗДвП чл. 15, ал. 2, т. 2): NO demo, and not the shadow, may
+ *      bill NOT_KEEPING_RIGHT here.
  *   3. COMMITTED FILES under content/traces/sc-ov-keep-right/ ARE the recordings
  *      of these scripts, byte-for-byte, with identical public copies.
  *
@@ -26,7 +29,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
 const RECORD = process.env.RECORD_TRACES === "1";
 const SCENARIO_ID = "sc-ov-keep-right";
-const NAMES: ScOvKeepRightTraceName[] = ["shadow-correct", "mistake-hog", "mistake-slow-hog"];
+const NAMES: ScOvKeepRightTraceName[] = ["shadow-correct", "mistake-no-indicator", "mistake-no-mirror"];
 
 function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"));
@@ -66,17 +69,30 @@ describe("sc-ov-keep-right — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-ov-keep-right — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Висене в лявата лента“: exactly NOT_KEEPING_RIGHT, never a lane-change code", () => {
-    const drive = drives.get("mistake-hog")!;
+  it("„Престрояване надясно без мигач“: exactly LANE_CHANGE_WITHOUT_INDICATOR (the mirror WAS checked)", () => {
+    const drive = drives.get("mistake-no-indicator")!;
     const codes = [...new Set(violationCodes(drive))].sort();
+    expect(SC_OV_KEEP_RIGHT.mistakes[0].codeRefs).toEqual(["LANE_CHANGE_WITHOUT_INDICATOR"]);
     expect(codes).toEqual([...SC_OV_KEEP_RIGHT.mistakes[0].codeRefs].sort());
-    expect(codes).not.toContain("LANE_CHANGE_WITHOUT_INDICATOR");
   });
 
-  it("„Бавно в лявата лента“: exactly NOT_KEEPING_RIGHT", () => {
-    const drive = drives.get("mistake-slow-hog")!;
+  it("„Престрояване без поглед в огледалото“: exactly LANE_CHANGE_WITHOUT_MIRROR_CHECK (the stalk WAS on)", () => {
+    const drive = drives.get("mistake-no-mirror")!;
     const codes = [...new Set(violationCodes(drive))].sort();
+    expect(SC_OV_KEEP_RIGHT.mistakes[1].codeRefs).toEqual(["LANE_CHANGE_WITHOUT_MIRROR_CHECK"]);
     expect(codes).toEqual([...SC_OV_KEEP_RIGHT.mistakes[1].codeRefs].sort());
+  });
+
+  it("each demo really is the move home: left lane at the start, right lane at the end", () => {
+    for (const name of ["mistake-no-indicator", "mistake-no-mirror"] as const) {
+      const s = drives.get(name)!.trace.samples;
+      expect(Math.abs(s[0].x - 4.06), name).toBeLessThan(1.5);
+      expect(Math.abs(s[s.length - 1].x - 12.19), name).toBeLessThan(1.5);
+    }
+  });
+
+  it("FOUNDER RULING 2026-10-01: nothing on this town street bills NOT_KEEPING_RIGHT", () => {
+    for (const name of NAMES) expect(violationCodes(drives.get(name)!), name).not.toContain("NOT_KEEPING_RIGHT");
   });
 });
 

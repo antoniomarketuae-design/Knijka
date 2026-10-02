@@ -457,10 +457,11 @@ describe("wave-6 bot completion — sc-rb-ped-exit at L3", () => {
 });
 
 // ---------------------------------------------------------------------------
-// sc-ln-boulevard-discipline — the drill is won by COMING BACK: чл. 15 is not
-//                              „stay right", it is „go left for a reason and
-//                              return", and only a map with a slow car in the
-//                              curb lane can ask the second half of that
+// sc-ln-boulevard-discipline — the drill is won by a pass done BY THE BOOK:
+//                              out, past and home, every change announced and
+//                              looked for. On this town street the return is
+//                              the TASK, not чл. 15 (founder ruling
+//                              2026-10-01: ал. 2, т. 2 frees the lane choice)
 // ---------------------------------------------------------------------------
 
 describe("wave-6 bot completion — sc-ln-boulevard-discipline at L3", () => {
@@ -553,17 +554,15 @@ describe("wave-6 bot completion — sc-ln-boulevard-discipline at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: the left-lane hog TEACHES чл. 15 — and reaches no homecoming gate", () => {
-    // The template's sharpest claim, made checkable on the student path. This
-    // driver's pull-out is the shadow's, verbatim: mirror, signal, glide — so he
-    // earns the SAME SAFE_LANE_CHANGE commendation and even clears the middle
-    // gate. The route was never the problem; the STAY was. NOT_KEEPING_RIGHT is
-    // второстепенна, so the first encounter PAUSES with a card instead of merely
-    // docking points (teach-first, doc 76 §0), and the sheet still fails on the
-    // gate he never reached — the homecoming.
+  it("counter-proof: the pull-out without a look TEACHES чл. 25 — and is the lesson's own mistake", () => {
+    // This driver's route is the shadow's, verbatim, and so is his return —
+    // the ONE thing missing is the left-mirror / shoulder look before the
+    // pull-out. He clears every gate, and the lesson still is not taken: the
+    // look is the act this lesson exists to teach (Ruling A — the first time
+    // costs no points, and the lesson does not count).
     let s = createLessonSession(compileScenario(SC_LN_BOULEVARD_DISCIPLINE, 3));
     const taught: string[] = [];
-    recordScLnBoulevardDisciplineDrive(loadDistrict("wb-boulevard-v1"), "mistake-left-lane-hog", {
+    recordScLnBoulevardDisciplineDrive(loadDistrict("wb-boulevard-v1"), "mistake-no-mirror", {
       onTick: (tick) => {
         const step = applyTick(s, tick);
         s = step.state;
@@ -571,10 +570,22 @@ describe("wave-6 bot completion — sc-ln-boulevard-discipline at L3", () => {
       },
     });
     const r = buildLessonResult(s);
-    expect(taught).toContain("NOT_KEEPING_RIGHT");
-    expect(r.objectives.find((o) => o.id === "sc-lnbd-home")!.done).toBe(false);
-    expect(r.completedAll).toBe(false);
+    expect(taught).toContain("LANE_CHANGE_WITHOUT_MIRROR_CHECK");
+    expect(taught).not.toContain("NOT_KEEPING_RIGHT");
     expect(r.passed).toBe(false);
+  });
+
+  it("FOUNDER RULING 2026-10-01: a left-lane stay on this town street is lawful — the weave and the shadow bill no keep-right", () => {
+    for (const name of ["shadow-correct", "mistake-weaving", "mistake-no-mirror"] as const) {
+      let s = createLessonSession(compileScenario(SC_LN_BOULEVARD_DISCIPLINE, 3));
+      recordScLnBoulevardDisciplineDrive(loadDistrict("wb-boulevard-v1"), name, {
+        onTick: (tick) => {
+          s = applyTick(s, tick).state;
+        },
+      });
+      const codes = s.events.filter((e) => e.kind === "violation").map((e) => e.code);
+      expect(codes, name).not.toContain("NOT_KEEPING_RIGHT");
+    }
   });
 
   it("counter-proof: the weave TEACHES the indicator — and completes NOTHING either", () => {

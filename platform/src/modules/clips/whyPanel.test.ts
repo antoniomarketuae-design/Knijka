@@ -265,6 +265,12 @@ describe("resolveWhyPanel — every resolvable drill ref is playable", () => {
     // „ev-*→sc-ov-solid-line" naming those six ids — deliberately NOT taken
     // here, because an allowance is a reviewer's written judgement and keeping
     // a count green is not a reason to mint one.
-    expect(shipped).toBe(522);
+    //
+    // 522 → 521 on 2026-10-02 (founder ruling «KEEP-RIGHT FOLLOWS THE LAW»):
+    // q-manevri-032, the TOWN lane-choice question, was served the motorway
+    // keep-right mistake — same article (чл. 15), opposite paragraph. It is
+    // now withheld by whyPanelPairing.ts QUESTION_CLIP_WITHHELD, which names
+    // the recorded demo that fits and what keeps it from being served.
+    expect(shipped).toBe(521);
   });
 });

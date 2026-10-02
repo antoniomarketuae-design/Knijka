@@ -47,6 +47,11 @@ export interface DistrictEdge {
   lanes: number;
   /** Resolved legal limit, km/h (tag or BG urban default). */
   maxspeed: number;
+  /** Where `maxspeed` came from — an authored tag or a class default (every
+   *  committed map carries it; world/types.ts mirrors it). Read through
+   *  `isExtraUrbanCarriageway` for SimTick.outsideSettlement: only an
+   *  AUTHORED limit can say a road is outside a settlement. */
+  maxspeedSource?: "tag" | "default" | string;
   /** Polyline length, meters. */
   length: number;
   /** Polyline [x, y][] in local meters; endpoints coincide with from/to nodes. */

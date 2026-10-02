@@ -1,14 +1,21 @@
 /**
  * sc-ln-boulevard-discipline — the authored drives (doc 76 §5/§9): ONE correct
- * shadow + TWO mistake demos for „Лентова дисциплина на булеварда" (OV-11 ×
+ * shadow + TWO mistake demos for „Лентова дисциплина на булеварда" (OV-01 ×
  * OV-02 × OV-12) on the committed wb-boulevard-v1 district, recorded with the
  * template's OWN staged crawler (single truth, imported from the template).
+ *
+ * FOUNDER RULING 2026-10-01 «KEEP-RIGHT FOLLOWS THE LAW»: wb-boulevard-v1 is a
+ * TOWN street, 2+2 posted 40 — ЗДвП чл. 15, ал. 2, т. 2 — so the left-lane
+ * stay that the first mistake demo used to show is lawful here and no longer
+ * bills NOT_KEEPING_RIGHT. That demo is replaced by the pull-out WITHOUT a
+ * look (чл. 25, ал. 1), the half of the pass this lesson's own step 3 teaches.
  *
  * The trace gate replays exactly these through the production stack:
  *   - shadow: ZERO violations + TWO SAFE_LANE_CHANGE commendations (out and
  *     back — the arc this whole template exists for);
- *   - „Постоянно каране в лявата лента": a BY-THE-BOOK move into laneId 1 that
- *     never comes home grades EXACTLY NOT_KEEPING_RIGHT;
+ *   - „Излизане без поглед в огледалото": the shadow's pass with the left
+ *     indicator but NO glance before the pull-out grades EXACTLY
+ *     LANE_CHANGE_WITHOUT_MIRROR_CHECK (the return is by the book);
  *   - „Лутане между лентите без мигач": three glanced-but-unsignalled crossings
  *     plus a long straddle of the lane boundary grade EXACTLY
  *     LANE_CHANGE_WITHOUT_INDICATOR + POOR_LANE_KEEPING.
@@ -19,9 +26,8 @@
  * heading north, limit 40 km/h.
  *
  * Rule envelope the scripts respect (rules/engine.ts §3/§4, cfg defaults):
- *  - NOT_KEEPING_RIGHT after keepRightSustainSec = 12 s in laneId > 0 while
- *    moving forward WITHOUT the left indicator (a declared overtake is exempt —
- *    which is why the hog demo CANCELS its indicator and then sits);
+ *  - NOT_KEEPING_RIGHT cannot arm on this town street at 40 (чл. 15, ал. 2,
+ *    т. 2 — the 2026-10-01 ruling), whatever lane a drive holds;
  *  - the lane-change codes ride the laneId delta at ≥ 10 km/h: indicatorOk = a
  *    matching-direction signal within 3 s, mirrorOk = a matching glance within
  *    5 s. The shadow arms both at every crossing; the weave arms only the
@@ -81,9 +87,9 @@ export function scLnBoulevardDisciplineShadowScript(): DriveScript {
         stopAtEnd: false,
       },
       { kind: "indicator", setting: "off" },
-      { kind: "annotation", textBg: "Изпреварвай решително и без да превишаваш 40 — лявата лента е за маневра, не за скорост." },
+      { kind: "annotation", textBg: "Изпреварвай решително и без да превишаваш 40 — изпреварването не е повод за скорост." },
       { kind: "drive", points: [[X_LEFT, 78], [X_LEFT, 140]], targetKmh: 40, stopAtEnd: false },
-      { kind: "annotation", textBg: "Цялата изпреварена кола се вижда в огледалото — десен мигач и веднага се прибираш." },
+      { kind: "annotation", textBg: "Цялата изпреварена кола се вижда в огледалото — огледало, десен мигач и плавно обратно вдясно." },
       { kind: "glance", mirror: "right" },
       { kind: "indicator", setting: "right" },
       {
@@ -95,42 +101,49 @@ export function scLnBoulevardDisciplineShadowScript(): DriveScript {
       { kind: "indicator", setting: "off" },
       { kind: "drive", points: [[X_RIGHT, 170], [X_RIGHT, 188]], targetKmh: 36 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Готово: едно излизане, едно прибиране — и пак вдясно, където ти е мястото." },
+      { kind: "annotation", textBg: "Готово: едно излизане, едно прибиране — всяко обявено и огледано, без лутане между лентите." },
     ],
   };
 }
 
 // ---------------------------------------------------------------------------
-// Mistake demo 1 — „Постоянно каране в лявата лента" (NOT_KEEPING_RIGHT)
+// Mistake demo 1 — „Излизане без поглед в огледалото" (LANE_CHANGE_WITHOUT_MIRROR_CHECK)
 // ---------------------------------------------------------------------------
 
-export function scLnBoulevardDisciplineMistakeHogScript(): DriveScript {
+export function scLnBoulevardDisciplineMistakeNoMirrorScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: излизането е по реда — но маневрата няма край." },
+      { kind: "annotation", textBg: "Грешка: бавната кола е видяна, левият мигач светва — но погледът остава напред." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[X_RIGHT, 15], [X_RIGHT, 30]], targetKmh: 38, stopAtEnd: false },
-      // By the book — mirror + indicator, so NO lane-change code can leak: the
-      // isolated fault is the STAY, not the move.
-      { kind: "glance", mirror: "left" },
+      // The shadow's own line and pace, so the pass meets the crawler the way
+      // the shadow does and nothing but the missing look can grade.
+      { kind: "drive", points: [[X_RIGHT, 15], [X_RIGHT, 45]], targetKmh: 38, stopAtEnd: false },
+      // Indicator ON, NO left glance (a "rear" one does not count for a
+      // leftward change, and it is ~3 s old by now anyway) — the isolated
+      // fault is the pull-out without a look.
       { kind: "indicator", setting: "left" },
-      { kind: "glance", mirror: "left" },
       {
         kind: "drive",
-        points: [[X_RIGHT, 30], [9.5, 39], [6.0, 47], [X_LEFT, 56]],
+        points: [[X_RIGHT, 45], [9.5, 55], [6.0, 66], [X_LEFT, 78]],
         targetKmh: 38,
         stopAtEnd: false,
       },
-      // Indicator OFF at y ≈ 56 — the driver himself declares the maneuver
-      // over, and the keep-right clock starts (the left signal is the
-      // detector's own exemption). 12 s later he is at y ≈ 182 with the
-      // crawler ~35 m behind him and the curb lane empty the whole way.
       { kind: "indicator", setting: "off" },
-      { kind: "drive", points: [[X_LEFT, 56], [X_LEFT, 120]], targetKmh: 38, stopAtEnd: false },
-      { kind: "annotation", textBg: "Бавната кола е изпреварена — тук маневрата свършва. Само че воланът не помръдва." },
-      { kind: "drive", points: [[X_LEFT, 120], [X_LEFT, 188]], targetKmh: 38 },
+      { kind: "annotation", textBg: "Воланът тръгна наляво без поглед в лявото огледало и през рамо — мигачът обявява, но не проверява дали лентата е свободна." },
+      { kind: "drive", points: [[X_LEFT, 78], [X_LEFT, 140]], targetKmh: 40, stopAtEnd: false },
+      // The return is by the book (glance + signal), so only the pull-out grades.
+      { kind: "glance", mirror: "right" },
+      { kind: "indicator", setting: "right" },
+      {
+        kind: "drive",
+        points: [[X_LEFT, 140], [6.0, 150], [9.5, 160], [X_RIGHT, 170]],
+        targetKmh: 38,
+        stopAtEnd: false,
+      },
+      { kind: "indicator", setting: "off" },
+      { kind: "drive", points: [[X_RIGHT, 170], [X_RIGHT, 188]], targetKmh: 36 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Дясната лента е празна цялата отсечка. Извън изпреварване и ляв завой мястото ти е вдясно (чл. 15)." },
+      { kind: "annotation", textBg: "Огледало, мигач, поглед през рамо — и чак тогава волан: преди маневрата се убеждаваш, че няма да създадеш опасност (чл. 25, ал. 1)." },
     ],
   };
 }
@@ -176,7 +189,7 @@ export function scLnBoulevardDisciplineMistakeWeavingScript(): DriveScript {
       {
         kind: "annotation",
         textBg:
-          "Заеми една лента, обяви я с мигач и я дръж — смяната е решение, а не навик на волана.",
+          "Заеми една лента и я дръж; смяната ѝ се обявява с мигач (чл. 26) — тя е решение, а не навик на волана.",
       },
     ],
   };
@@ -188,7 +201,7 @@ export function scLnBoulevardDisciplineMistakeWeavingScript(): DriveScript {
 
 export type ScLnBoulevardDisciplineTraceName =
   | "shadow-correct"
-  | "mistake-left-lane-hog"
+  | "mistake-no-mirror"
   | "mistake-weaving";
 
 const SCRIPTS: Record<
@@ -196,7 +209,7 @@ const SCRIPTS: Record<
   { kind: "shadow" | "mistake"; script: () => DriveScript }
 > = {
   "shadow-correct": { kind: "shadow", script: scLnBoulevardDisciplineShadowScript },
-  "mistake-left-lane-hog": { kind: "mistake", script: scLnBoulevardDisciplineMistakeHogScript },
+  "mistake-no-mirror": { kind: "mistake", script: scLnBoulevardDisciplineMistakeNoMirrorScript },
   "mistake-weaving": { kind: "mistake", script: scLnBoulevardDisciplineMistakeWeavingScript },
 };
 
