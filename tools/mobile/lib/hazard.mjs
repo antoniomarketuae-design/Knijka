@@ -756,9 +756,15 @@ export function hazardLine(books) {
  * reader adjudicating a pedestrian finding reads `pacedKmh`; a reader asking
  * why the car crawled reads `hazardCapKmh`.
  *
+ * H2 (GAP-8b) — AND A THIRD AUTHOR, NAMED THE SAME WAY. The right leg's roll now also folds in the strictest TASK
+ * CAP on the glass («дръж под 5 км/ч» in the banner, «задачата иска ≤5» on the cockpit strip — the lesson's own
+ * instruction to the student, read off the same text the wrong leg's over-cap hold reads). sc-pe-zone-living
+ * mobile-right was rolling 12–25 км/ч under a live «дръж под 5 км/ч» when it struck a pedestrian on w66. A row the
+ * task cap lowered says so (`taskCapKmh`, `src: "task-cap"`), exactly as a hazard-capped row does.
+ *
  * @param prev the previous row, or null/undefined.
- * @param at   `{ tSec, odoM, pacedKmh, capKmh }` — the clock, the odometer, the
- *             pace law's own target, and the hazard cap in force (or null).
+ * @param at   `{ tSec, odoM, pacedKmh, capKmh, taskCapKmh }` — the clock, the odometer, the
+ *             pace law's own target, the hazard cap in force (or null), and the strictest task cap on the glass (or null).
  * @returns the row to push, or `null` when nothing a reader cares about
  *          changed. NOTE the dedupe key includes the PROVENANCE: two
  *          consecutive 6 км/ч rows, one from the tape and one from a hazard
@@ -778,6 +784,10 @@ export function hazardPaceRow(prev, at) {
   // marked "hazard-cap" that the hazard loop did not lower would be the same
   // false attribution in the other direction.
   const lowered = cap !== null && cap < paced;
+  // H2: the task cap bites only when it is under what the pace law and the hazard cap left.
+  const task = typeof at?.taskCapKmh === "number" && Number.isFinite(at.taskCapKmh) && at.taskCapKmh > 0 ? at.taskCapKmh : null;
+  const beforeTask = lowered ? cap : paced;
+  const taskLowered = task !== null && task < beforeTask;
   const row = {
     // `|| 0` is fine HERE and only here: the clock and the odometer are
     // labels on the row, not the claim it makes, and a 0 in either is
@@ -785,20 +795,24 @@ export function hazardPaceRow(prev, at) {
     tSec: Math.round(Number(at?.tSec) || 0),
     odoM: Math.round(Number(at?.odoM) || 0),
     /** what the car was actually asked for on this tick */
-    kmh: Math.round(lowered ? cap : paced),
+    kmh: Math.round(taskLowered ? task : beforeTask),
     /** what the PACE LAW asked for, before any hazard cap. On a lane with a
      *  tape this is the authored target; on a lane without one it is the fixed
      *  creep, and `pace.used` / `pace.why` says which. */
     pacedKmh: Math.round(paced),
     /** non-null ⇒ THIS ROW IS THE HARNESS'S CAUTION, NOT THE TAPE'S */
     hazardCapKmh: lowered ? cap : null,
-    src: lowered ? "hazard-cap" : "pace",
+    src: taskLowered ? "task-cap" : lowered ? "hazard-cap" : "pace",
   };
+  // H2: …and the task cap's own field, only on a row it lowered (absent on every other row, so a row from a lane
+  // with no task cap is the row it always was).
+  if (taskLowered) row.taskCapKmh = task;
   if (
     prev &&
     prev.kmh === row.kmh &&
     prev.pacedKmh === row.pacedKmh &&
-    (prev.hazardCapKmh ?? null) === row.hazardCapKmh
+    (prev.hazardCapKmh ?? null) === row.hazardCapKmh &&
+    (prev.taskCapKmh ?? null) === (row.taskCapKmh ?? null)
   ) {
     return null;
   }
@@ -818,11 +832,19 @@ export function hazardPaceProvenance(targets) {
     return "no target row was recorded at all, so nothing here is evidence about the pace of this drive";
   }
   const lowered = rows.filter((r) => r && r.hazardCapKmh !== null && r.hazardCapKmh !== undefined);
+  // H2: rows the lesson's own task cap lowered — said first, and the sentence below is otherwise unchanged.
+  const tasked = rows.filter((r) => r && typeof r.taskCapKmh === "number");
+  const taskSaid =
+    tasked.length === 0
+      ? ""
+      : `${tasked.length} of ${rows.length} target row(s) were LOWERED TO THE TASK CAP ON THE GLASS (${[...new Set(tasked.map((r) => r.taskCapKmh))].sort((a, b) => a - b).join("/")} км/ч) and carry src:"task-cap" — on those rows kmh is the lesson's own instruction and pacedKmh is what the authored drive asked for. `;
   if (lowered.length === 0) {
+    if (tasked.length > 0) return `${taskSaid}The hazard loop lowered none of the ${rows.length} target row(s).`;
     return `all ${rows.length} target row(s) carry src:"pace" — the hazard loop lowered none of them, so kmh IS the pace law's target`;
   }
   const to = [...new Set(lowered.map((r) => r.hazardCapKmh))].sort((a, b) => a - b).join("/");
   return (
+    taskSaid +
     `${lowered.length} of ${rows.length} target row(s) were LOWERED BY THE HAZARD LOOP to ${to} км/ч and carry ` +
     `src:"hazard-cap" — on those rows kmh is THIS HARNESS being cautious at a scan chip and pacedKmh is what the ` +
     "authored drive asked for. A «Непропускане на пешеходец» read against this array must be read against pacedKmh."

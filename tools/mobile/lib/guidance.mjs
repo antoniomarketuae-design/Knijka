@@ -582,6 +582,17 @@ export const CHEVRON_MIN_LEAN_FRAC = 0.006;
  *  the case where perspective can make the near wings out-reach the far tip
  *  and invert the reading. Refused rather than guessed. */
 export const CHEVRON_MIN_AXIS_X = 0.8;
+/**
+ * …AND IT MAY NOT BE A SLIVER (H2, GAP-8a). The turn arrow measures elongation 1.71–2.01 on every pc lane sampled
+ * (perception.mjs §2), and the plate test admits up to OBJ_ELONGATION 3.0 so the class is not cut at a corpus edge.
+ * Between them live SLIVERS — a bar of teal with a point that is only perspective — and the one that steered
+ * sc-ac-bridge-ice pc-right into the bridgehead railing on w66 was one: the objective's radius-10 ground ring, cut into
+ * pieces by the railing's bars, whose pieces read elongation 2.91 and 2.97 (re-measured on that lane's own
+ * 04-t038s.png band, harness-h2/builder/band-shapes.mjs). A component past this ceiling is not read as the arrow. 2.5
+ * is 1.24 × the most elongated turn arrow measured, and under the slivers measured. NOT re-benched against the
+ * recorded corpus (perception-bench.mjs) — stated, not assumed.
+ */
+export const CHEVRON_MAX_ELONGATION = 2.5;
 
 /**
  * The aim point, read from a scan that kept its mask.
@@ -662,6 +673,7 @@ export function readAim(scan, o = {}) {
   let chev = null;
   for (const c of objects) {
     if (Math.abs(c.axisX) < (P.chevronMinAxisX ?? CHEVRON_MIN_AXIS_X)) continue;
+    if (c.elongation > (P.chevronMaxElongation ?? CHEVRON_MAX_ELONGATION)) continue;
     const r = chevronAim(c, { bandWidth: W, opts: P });
     if (!r.isChevron) continue;
     if (Math.abs(r.lean) < (P.chevronMinLeanFrac ?? CHEVRON_MIN_LEAN_FRAC) * W) continue;
@@ -677,6 +689,9 @@ export function readAim(scan, o = {}) {
     fixedPx,
     furnitureFrames: reg ? reg.frames() : 0,
     chevronPx: chev ? chev.comp.n : 0,
+    // H2 (GAP-8a): an arrow-shaped component read on a stretch whose authored route has no junction turn ahead is
+    // REFUSED — it is recorded here and outranks nothing (see `junctionAhead` below).
+    chevronRefused: null,
   };
 
   /* ── AND THE DECISION, IN ONE PLACE, WITH ITS REASON ─────────────────────
@@ -711,6 +726,19 @@ export function readAim(scan, o = {}) {
   if (legacy.seen === false) return { ...legacy, signal: "none", shape };
 
   const lineAim = lines.length ? aimFrom(rowsFromPixels(lines.map((c) => c.px), W, H), o) : null;
+
+  /* ── H2 (GAP-8a): THE ARROW OUTRANKS THE RIBBON ONLY WHERE THE PRODUCT CAN SHOW ONE ─────────────────────────
+   * The order above was measured, and its own justification names its limit: `RouteGuidance.tsx` paints the turn
+   * arrow only «before the next junction where the route turns». So where the lesson's own AUTHORED route
+   * (`content/traces/<id>/shadow-correct.trace.json`, content JSON) has no junction turn ahead, an arrow-shaped
+   * component is not the arrow, whatever its shape: on sc-ac-bridge-ice (one straight edge, no intersection) it was
+   * a piece of the objective's ground ring, and it outranked a 2,445 px ribbon. The caller says which it is
+   * (`o.junctionAhead`, from `routeTurnAhead` below); `undefined` — a caller that does not say, like the bench —
+   * keeps the order exactly as it was. */
+  if (chev && o.junctionAhead === false) {
+    shape.chevronRefused = `an arrow-shaped component (${chev.comp.n} px) on a stretch whose authored route has no junction turn ahead — not the turn arrow, and it outranks nothing`;
+    chev = null;
+  }
 
   if (chev) {
     const confident = chev.comp.n >= (P.confidentChevronPx ?? CONFIDENT_CHEVRON_PX);
@@ -1525,8 +1553,19 @@ export const TUNE = {
  * old behaviour, which is why the default is 0 and why every existing
  * assertion in `__tests__/guidance.test.mjs` §4 still describes this function.
  *
+ * H2 (GAP-8d) — TWO MORE INPUTS, both the caller's book like the others:
+ *   · `turnAhead` — `routeTurnAhead(…).ahead` for this tick, or `undefined`. `false` refuses the sustained-turn
+ *     branch: on sc-merge-lane-end mobile-right a steady −20…−23° bearing to a ribbon 4 m to one side was CONFIRMED
+ *     as a turn and pressed 800 ms on a stretch whose authored route turns 13.4° at most in any 30 m. A steady bearing
+ *     with no turn ahead is a lateral offset, and the bounded pulse is the law for it. `undefined` keeps the branch
+ *     exactly as it was;
+ *   · `flipFrom` — `{ dir, holdMs }` of the SUSTAINED press the previous tick made, or `null`. When this tick's
+ *     error has flipped sign past `SUSTAIN_DEG` on a confident sighting, the correction INHERITS that press's length
+ *     (bounded by the tick and the ceiling) for this one tick, instead of falling to a `MAX_HOLD_MS` pulse: the same
+ *     drive answered an 800 ms overshoot with 65 ms.
+ *
  * @param {{errDeg:number|null, prevErrDeg:number|null, kmh:number, dtMs?:number,
- *          sustainRun?:number, confident?:boolean, carryMs?:number, tune?:object}} a
+ *          sustainRun?:number, confident?:boolean, carryMs?:number, turnAhead?:boolean, flipFrom?:{dir:string,holdMs:number}|null, tune?:object}} a
  * @returns {{dir:"left"|"right"|null, holdMs:number, sustain:boolean, carryMs:number, why:string}}
  */
 export function steerCommand({
@@ -1537,6 +1576,8 @@ export function steerCommand({
   sustainRun = 0,
   confident = true,
   carryMs = 0,
+  turnAhead = undefined,
+  flipFrom = null,
   tune = TUNE,
 }) {
   if (errDeg === null || !Number.isFinite(errDeg)) {
@@ -1556,6 +1597,29 @@ export function steerCommand({
     return { dir: null, holdMs: 0, sustain: false, carryMs: 0, why: `inside the ${tune.DEAD_DEG}° deadband` };
   }
   const dir = errDeg > 0 ? "right" : "left";
+  /* H2 (GAP-8d): THE FLIP INHERITS. A confident error past SUSTAIN_DEG on the other side of the sustained press the
+   * last tick made is that press overshooting, and it is answered with that press's own length for one tick. */
+  if (
+    confident &&
+    flipFrom &&
+    typeof flipFrom === "object" &&
+    flipFrom.dir !== dir &&
+    (flipFrom.dir === "left" || flipFrom.dir === "right") &&
+    Number.isFinite(flipFrom.holdMs) &&
+    mag >= tune.SUSTAIN_DEG
+  ) {
+    const holdMs = Math.round(Math.max(0, Math.min(flipFrom.holdMs, tune.TURN_HOLD_MAX_MS, dtMs - FULL_RETURN_MS)));
+    if (holdMs >= tune.MIN_HOLD_MS) {
+      return {
+        dir,
+        holdMs,
+        sustain: true,
+        inherited: true,
+        carryMs: 0,
+        why: `the error flipped to ${errDeg.toFixed(1)}° after a ${Math.round(flipFrom.holdMs)} ms sustained ${flipFrom.dir} press — the correction inherits its length: ${holdMs} ms`,
+      };
+    }
+  }
   /* THE TURN DEMAND — the only path that may exceed `MAX_HOLD_MS`. It no
    * longer leaves the wheel down across the scan; see the SUSTAIN block in
    * TUNE for why that was the wrong rung and what replaced it. `sustainRun` is
@@ -1571,7 +1635,8 @@ export function steerCommand({
    * change is the other file in the same stash and has to land with this one;
    * `guidance.samples[].holdMs` on a `sustain: true` sample is the field to
    * check — if every one of them is 0, the caller is still the old one. */
-  if (confident && mag >= tune.SUSTAIN_DEG && sustainRun >= tune.SUSTAIN_CONFIRM && sustainRun < tune.SUSTAIN_CONFIRM + tune.SUSTAIN_MAX) {
+  const noTurnAhead = turnAhead === false;
+  if (!noTurnAhead && confident && mag >= tune.SUSTAIN_DEG && sustainRun >= tune.SUSTAIN_CONFIRM && sustainRun < tune.SUSTAIN_CONFIRM + tune.SUSTAIN_MAX) {
     /* ── THE CAR IS NOT A CONSTANT, AND THE FIRST DRAFT OF THIS BRANCH TREATED
      *    IT AS ONE ─────────────────────────────────────────────────────────
      * Two speed-dependent facts enter here, both measured on the product's own
@@ -1655,8 +1720,17 @@ export function steerCommand({
     };
   }
   const holdMs = Math.min(tune.MAX_HOLD_MS, Math.round(raw));
+  // H2 (GAP-8d): a demand the sustained branch WOULD have confirmed, refused for the route — said, not hidden.
+  const refusedTurn = noTurnAhead && confident && mag >= tune.SUSTAIN_DEG && sustainRun >= tune.SUSTAIN_CONFIRM && sustainRun < tune.SUSTAIN_CONFIRM + tune.SUSTAIN_MAX;
   // POSITIVE ERROR = the ribbon is RIGHT of the image centre = turn RIGHT.
-  return { dir, holdMs, sustain: false, carryMs: 0, why: `err ${errDeg.toFixed(1)}° d${dErr.toFixed(1)}°` };
+  return {
+    dir,
+    holdMs,
+    sustain: false,
+    carryMs: 0,
+    ...(refusedTurn ? { turnRefused: true } : {}),
+    why: `err ${errDeg.toFixed(1)}° d${dErr.toFixed(1)}°` + (refusedTurn ? " — a steady bearing with no junction turn ahead on the authored route: a lateral offset, not a turn (no sustained press)" : ""),
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2154,6 +2228,62 @@ export function authoredLinePolyline(trace) {
     poly.push([p.x, -p.y]);
   }
   return poly.length >= 2 ? poly : null;
+}
+
+/* ── THE TURN AHEAD ON THE AUTHORED ROUTE (H2, GAP-8a / 8d) ───────────────────────────────────────────────────
+ *
+ * Two parts of this loop act as if a turn is wanted — the arrow outranking the ribbon (`readAim`) and the
+ * sustained-turn press (`steerCommand`) — and both were fooled on a straight road: sc-ac-bridge-ice read the
+ * objective's ground ring as the arrow, and sc-merge-lane-end read a STEADY −20…−23° bearing to a ribbon 4 m to
+ * one side (a lateral offset seen from close, at 7 км/ч) as a turn. The lesson's own authored line knows where the
+ * route turns. It is CONTENT (the shadow trace), and it is indexed here by the harness's dial odometer — the same
+ * index the pace tape is read by — never by the dev pose probe.
+ *
+ * WHAT COUNTS AS A JUNCTION TURN: the authored heading changing by `JUNCTION_TURN_DEG` or more inside
+ * `JUNCTION_TURN_SPAN_M` of route. Measured over the 167 authored routes in content/traces: every lane change, merge
+ * and gentle curve stays under 21° in any 30 m (sc-vu-cyclist-group 20.7°, sc-ln-boulevard-discipline 19.3°,
+ * sc-sp-curve 12.5°, sc-merge-lane-end 13.4°); the junction and roundabout turns read 80–94°. WHERE: from
+ * `JUNCTION_LOOK_BACK_M` behind the odometer to `JUNCTION_LOOK_AHEAD_M` ahead of it — wide on purpose, because the
+ * dial odometer under-reads the road (see lesson-audit.mjs, THE ODOMETER GETS ITS OWN CLOCK) and a turn the car is
+ * already in must still count. `known: false` — no authored line, or no usable odometer — and the callers then
+ * behave exactly as they did. Pure. */
+export const JUNCTION_TURN_DEG = 30;
+export const JUNCTION_TURN_SPAN_M = 30;
+export const JUNCTION_LOOK_BACK_M = 30;
+export const JUNCTION_LOOK_AHEAD_M = 80;
+
+/** The authored polyline (`authoredLinePolyline`) as arc length and heading per segment: `[{ s, deg }]`, `s` at the
+ *  segment's start. Segments shorter than 5 cm (a standing trace) carry no heading. Pure. */
+export function routeHeadings(poly) {
+  if (!Array.isArray(poly) || poly.length < 2) return [];
+  const out = [];
+  let s = 0;
+  for (let i = 1; i < poly.length; i++) {
+    const dx = poly[i][0] - poly[i - 1][0];
+    const dz = poly[i][1] - poly[i - 1][1];
+    const len = Math.hypot(dx, dz);
+    if (len >= 0.05) out.push({ s, deg: (Math.atan2(dx, -dz) * 180) / Math.PI });
+    s += len;
+  }
+  return out;
+}
+
+/** Is there a junction turn on the authored route around this odometer reading? See THE TURN AHEAD above.
+ *  @returns {{known:boolean, ahead:boolean, maxDeg:number|null}} */
+export function routeTurnAhead(poly, odoM, { backM = JUNCTION_LOOK_BACK_M, aheadM = JUNCTION_LOOK_AHEAD_M, turnDeg = JUNCTION_TURN_DEG, spanM = JUNCTION_TURN_SPAN_M } = {}) {
+  const h = routeHeadings(poly);
+  if (h.length < 2 || typeof odoM !== "number" || !Number.isFinite(odoM)) return { known: false, ahead: false, maxDeg: null };
+  const lo = odoM - backM;
+  const hi = odoM + aheadM;
+  let maxDeg = 0;
+  for (let i = 0; i < h.length; i++) {
+    if (h[i].s < lo || h[i].s > hi) continue;
+    for (let j = i + 1; j < h.length && h[j].s - h[i].s <= spanM; j++) {
+      const d = Math.abs((((h[j].deg - h[i].deg) % 360) + 540) % 360 - 180);
+      if (d > maxDeg) maxDeg = d;
+    }
+  }
+  return { known: true, ahead: maxDeg >= turnDeg, maxDeg: Number(maxDeg.toFixed(1)) };
 }
 
 /** Deviation thresholds, in metres. `NEAR` is about a lane's worth of slack;

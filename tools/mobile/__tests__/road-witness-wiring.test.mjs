@@ -70,7 +70,10 @@ const TICK_BLOCK =
   "  // pc-path: the runner replaces ONLY this idle wait (§5.2); right and wrong legs wait as before.\n" +
   IDLE_AS_SHIPPED +
   "  if (roadRead !== null) await roadRead;\n";
-const DRIVE_END = "\n}\nif (roadWitness !== null) await roadWitness.poll();\nawait throttle(false);\nawait brake(false);\n";
+// (H2: a pace profile's throttle modulator is stopped first — `paceRelease()` returns once its last cycle has ended and is
+// a no-op on every lane where none runs — so the poll still follows the drive's LAST actuation and still precedes the
+// release of the keys, which is what this pin exists to hold.)
+const DRIVE_END = "\n}\nawait paceRelease();\nif (roadWitness !== null) await roadWitness.poll();\nawait throttle(false);\nawait brake(false);\n";
 const FINISH = "\nif (roadWitness !== null) await roadWitness.finish(OUT);\nelse note(";
 const PATH_OFF_LINE =
   'else note("  ROAD (witness, baseline — not a verdict): OFF — not constructed on an authored-path (pc-path) leg: the parking instrument runs untouched and no _audit-road.json.gz is written");';

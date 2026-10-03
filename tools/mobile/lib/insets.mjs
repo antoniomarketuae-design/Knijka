@@ -268,6 +268,27 @@ export function rewriteEnv(value, inset) {
  * React rewrites inline style attributes on every render, so a one-shot pass
  * would rewrite the shell and then have it put straight back.
  *
+ * H2 (GAP-8c) — IT NO LONGER TOUCHES WHAT REACT IS ABOUT TO HYDRATE. It used to
+ * stamp `data-sa-emulated` / `data-sa-rewrites` on <html> and rewrite env() in
+ * inline `style` attributes from document-start, and both are attributes of
+ * React-owned server markup: Next dev painted «A tree hydrated but some
+ * attributes of the server rendered HTML didn't match the client properties»
+ * over 01-arrival on every mobile leg (w61, w66 — the triage's A/B: insets
+ * "none" 0 errors, "real" 1, and every mismatched attribute was one this agent
+ * wrote). Now:
+ *   · the readback is on `window.__knijkaInsets` (`emulated`, `rewrites`) and
+ *     nowhere in the document;
+ *   · an inline style is rewritten only on an element React has already
+ *     HYDRATED — one carrying React's own `__reactProps$…` expando, which
+ *     react-dom sets in the same step that compares the server's attributes with
+ *     the client's (`prepareToHydrateHostInstance`), so the comparison has
+ *     already happened — and an element React never claims (no expando) is
+ *     rewritten once `INLINE_GRACE_MS` has passed. Stylesheets (the CSSOM, which
+ *     hydration does not compare) are rewritten from document-start as before.
+ *   A sweep re-walks the inline styles every 250 ms until every one has been
+ *   rewritten or `INLINE_SWEEP_MS` has passed, because an element skipped as
+ *   not-yet-hydrated gets no mutation record of its own when it hydrates.
+ *
  * @param {{inset:{top:number,right:number,bottom:number,left:number}, source:string}} config
  */
 function agent(config) {
@@ -279,8 +300,23 @@ function agent(config) {
     sheets: 0, // stylesheets successfully walked
     unreadableSheets: 0, // cross-origin / not-yet-loaded
     passes: 0,
+    // H2 (GAP-8c): the readback that used to be stamped on <html>, and the inline styles held back for hydration.
+    emulated: [inset.top, inset.right, inset.bottom, inset.left].join(","),
+    rewrites: 0,
+    inlineHeld: 0, // scans of an inline style left alone because React had not hydrated its element yet
+    inlineAfterGrace: 0, // inline styles rewritten on an element React never claimed, after the grace
   };
   window.__knijkaInsets = state;
+  const startedAt = Date.now();
+  const INLINE_GRACE_MS = 20000;
+  const INLINE_SWEEP_MS = 60000;
+  // React's own expando on a hydrated (or client-created) element. Own enumerable keys only: an element carries a
+  // handful, where a for…in walk would enumerate the whole DOM prototype chain.
+  const reactOwned = (el) => {
+    const keys = Object.keys(el);
+    for (let i = 0; i < keys.length; i += 1) if (keys[i].startsWith("__reactProps$")) return true;
+    return false;
+  };
 
   const rewrite = (value) => {
     if (typeof value !== "string" || value.indexOf("safe-area-inset") === -1) return value;
@@ -378,6 +414,14 @@ function agent(config) {
     const scan = (el) => {
       const attr = el.getAttribute && el.getAttribute("style");
       if (!attr || attr.indexOf("safe-area-inset") === -1) return;
+      // H2 (GAP-8c): not before React has compared this element's attributes with the server's.
+      if (!reactOwned(el)) {
+        if (Date.now() - startedAt < INLINE_GRACE_MS) {
+          state.inlineHeld += 1;
+          return;
+        }
+        state.inlineAfterGrace += 1;
+      }
       const before = state.declarations;
       doDeclaration(el.style);
       state.inlineDeclarations += state.declarations - before;
@@ -395,10 +439,8 @@ function agent(config) {
     const adopted = document.adoptedStyleSheets;
     if (adopted) for (let i = 0; i < adopted.length; i += 1) walkSheet(adopted[i]);
     walkInline(document.documentElement);
-    if (document.documentElement) {
-      document.documentElement.dataset.saEmulated = [inset.top, inset.right, inset.bottom, inset.left].join(",");
-      document.documentElement.dataset.saRewrites = String(state.declarations + state.inlineDeclarations);
-    }
+    // H2 (GAP-8c): the readback lives on the agent's own state, not on <html> (React owns <html>'s attributes).
+    state.rewrites = state.declarations + state.inlineDeclarations;
   };
 
   const start = () => {
@@ -447,6 +489,13 @@ function agent(config) {
       if (n < 40) setTimeout(tick, 100);
     };
     setTimeout(tick, 50);
+    // H2 (GAP-8c): …and the inline styles held back for hydration, re-walked until none is left or the sweep ends.
+    const sweep = () => {
+      walkInline(document.documentElement);
+      state.rewrites = state.declarations + state.inlineDeclarations;
+      if (Date.now() - startedAt < INLINE_SWEEP_MS && document.querySelector('[style*="safe-area-inset"]') !== null) setTimeout(sweep, 250);
+    };
+    setTimeout(sweep, 250);
   };
 
   if (document.documentElement) start();

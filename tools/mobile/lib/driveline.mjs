@@ -2207,14 +2207,44 @@ export function errorBoundaryVerdict({ text = "", shell = false, retryPresent = 
  * sc-ac-truck-spray:3f5a3ef3 is retired by ruling, and its round-7 profile
  * above is left exactly as it stands.
  *
+ * ── HARNESS STAGE H2 (2026-10-03) — THE TWO PACE PROFILES, ON A REAL DRIVE ──
+ * Neither pace run held live (.audit-frames/w69-h1-pc: sc-vp-telltale-red broke
+ * after 1.6 s of 37.7 s, sc-vu-emergency after 2.6 s of 22.3 s). Four causes,
+ * each read off those two legs and the product source at 9ab89b8:
+ *   · THE GOVERNOR'S MODEL LEFT OUT THE PEDAL. The keyboard throttle is not on
+ *     or off: input.ts ramps it (THROTTLE_ATTACK_S 0.35 s up, THROTTLE_RELEASE_S
+ *     0.25 s down), so H1's one 108 ms press a tick peaked at 0.31 of the pedal
+ *     and added 0.35 км/ч, against the 1.2 км/ч its arithmetic expected; the
+ *     lamp leg sagged 47 → 43 км/ч under it and the emergency leg 45 → 40;
+ *   · ONE PRESS A TICK IS OPEN-LOOP FOR THE REST OF THE TICK, and a tick is as
+ *     long as its own work (a frame is 410–530 ms on pc). The command is now a
+ *     fraction of a fixed CYCLE that the harness's throttle modulator keeps
+ *     running between ticks, whatever the tick is doing;
+ *   · THE LAUNCH OVERSHOT (38 → 46 → 47 км/ч in two ticks), and the lamp run
+ *     counts a reading 4 км/ч under the fastest of the 6 s before it as a
+ *     break. The command now also takes off for how fast the dial is rising;
+ *   · THE RUNS WERE SIZED PAST THE END OF THE ROAD. ln-v1 is 385 m from the
+ *     spawn to its end, and the profile clock leaves out each tick's own work
+ *     (5.6 s of clock in the lamp leg's first 7 s): 37.7 s of profile clock at
+ *     45 км/ч is over 470 m. The pace run is now timed on the harness's WALL
+ *     clock between flat readings (pause drains left out), and the lamp run is
+ *     sized on the ROUTE to the lamp's ignore point (`warningLampIgnoreRouteM`,
+ *     dead-reckoned on the harness's wall-clock dial odometer) and then
+ *     WARNING_LAMP_REGRADE_SEC + a margin more — no lag allowance, because the
+ *     road leaves no room for one, and the line says so.
+ * And the emergency lesson's encounter was over before the profile started
+ * (the staged car is released on the lesson's first frame): its row is declared
+ * `start: "reload"`, and the harness loads the lesson again after its checks at
+ * the spawn and keys the throttle from that load (lesson-audit.mjs).
+ *
  * ── WHAT A PROFILE MAY DO, AND WHAT IT MAY NOT ─────────────────────────────
  *   · PEDALS ONLY: a profile changes WHEN the leg rests, and two profiles book
  *     one brake each (the zone rest, the brake-check). No wheel on any `wrong`
  *     leg, and no decision here reads the dev pose probe (founder RULING-1 /
  *     RULING-2: never a wrong drive). The throttle is governed on exactly the
  *     two `pace` profiles of harness stage H1 (`pacePedal`, declared in the
- *     table as `kind: "pace"`, its command handed out as `pedal` and applied
- *     by the harness); every other profile, and every lane without one, keeps
+ *     table as `kind: "pace"`, its command handed out as `pedal` and set on
+ *     the harness's throttle modulator); every other profile, and every lane without one, keeps
  *     the plain flat throttle, and no governor ever touches the brake. The
  *     inputs are what a `wrong` leg already reads — the dial, the
  *     dial-integrated odometer (the SAME increment `FLAT_REST_EVERY_M` is
@@ -2277,8 +2307,13 @@ export const PROFILE_SIZED_AT = "4112566";
  *  of the constants its profile is sized from, never one it was not. */
 export const PROFILE_SIZED_AT_H1 = "01de885";
 
+/** The commit the harness stage H2 constants below were sized at (the pace
+ *  governor's duty base, re-sized with the pedal's ramps in the model, and the
+ *  lamp's ignore route). */
+export const PROFILE_SIZED_AT_H2 = "9ab89b8";
+
 /** Every commit a design constant below was sized at, in order. */
-export const PROFILE_SIZED_COMMITS = Object.freeze([PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1]);
+export const PROFILE_SIZED_COMMITS = Object.freeze([PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1, PROFILE_SIZED_AT_H2]);
 
 /** One declared design constant: its value, its unit, the product source it
  *  was sized from and the commit — frozen. Pure. */
@@ -2350,11 +2385,12 @@ export const PROFILE_DESIGN = Object.freeze({
   WARNING_LAMP_REGRADE_SEC: sizedAt(6, "s", "engine.ts WARNING_LAMP_REGRADE_SEC", PROFILE_SIZED_AT_H1),
   // sized from engine.ts WARNING_LAMP_COMPLY_DROP_KMH at 01de885
   WARNING_LAMP_COMPLY_DROP_KMH: sizedAt(5, "км/ч", "engine.ts WARNING_LAMP_COMPLY_DROP_KMH", PROFILE_SIZED_AT_H1),
-  // sized from engine.ts WARNING_LAMP_COMPLY_DROP_KMH at 01de885
-  warningLampBillSec: sizedAt(23.7, "s", "engine.ts WARNING_LAMP_COMPLY_DROP_KMH", PROFILE_SIZED_AT_H1),
+  // (H2: warningLampBillSec 23.7 s — the bill's second on a drive held at 45 км/ч from the spawn — sized the H1 lamp run, from
+  // its first reading, past the end of ln-v1; it sizes nothing now, and is not declared: the lamp run is sized on
+  // warningLampIgnoreRouteM below.)
   // sized from engine.ts WARNING_LAMP_COMPLY_DROP_KMH at 01de885
   warningLampHeldPaceKmh: sizedAt(45, "км/ч", "engine.ts WARNING_LAMP_COMPLY_DROP_KMH", PROFILE_SIZED_AT_H1),
-  // (H1 round 3, N5a: where the lamp run STARTS — past the launch. warningLampBillSec was measured on a drive held at
+  // (H1 round 3, N5a: where the lamp run STARTS — past the launch. The lamp's bill was measured on a drive held at
   // warningLampHeldPaceKmh; a reading WARNING_LAMP_COMPLY_DROP_KMH or more under that pace is, by the product's own
   // comply test, a car that is not holding it, so the run starts on the first reading at or over 45 − 5 = 40 by the
   // dial's rounding and never on a launch reading over movingSpeedKmh.)
@@ -2388,8 +2424,15 @@ export const PROFILE_DESIGN = Object.freeze({
   ftgCalmZoneNearRouteM: sizedAt(175, "m", "templates-following.ts SC_FOLLOW_TAILGATER.success, ln-v1.json spawnPoints", PROFILE_SIZED_AT_H1),
   // sized from templates-hazards2.ts DEBRIS_Y, hz-debris-v1.json spawnPoints at 01de885
   debrisRouteM: sizedAt(175, "m", "templates-hazards2.ts DEBRIS_Y, hz-debris-v1.json spawnPoints", PROFILE_SIZED_AT_H1),
-  // sized from tuning.ts ENGINE_FORCE_CURVE, tuning.ts ROLLING_RESISTANCE_N, tuning.ts AERO_DRAG, tuning.ts CHASSIS_LINEAR_DAMPING, tuning.ts CHASSIS_MASS at 01de885
-  paceDutyBase: sizedAt(0.15, "", "tuning.ts ENGINE_FORCE_CURVE, tuning.ts ROLLING_RESISTANCE_N, tuning.ts AERO_DRAG, tuning.ts CHASSIS_LINEAR_DAMPING, tuning.ts CHASSIS_MASS", PROFILE_SIZED_AT_H1),
+  // ── harness stage H2: re-sized, or new, each at PROFILE_SIZED_AT_H2 ──
+  // (H2: 0.15 → 0.42. H1's model pressed an on/off throttle at full force; the keyboard throttle is a pedal that ramps,
+  // and the default tier shapes it — see THE PACE GOVERNOR below for the model and its arithmetic.)
+  // sized from input.ts THROTTLE_ATTACK_S, input.ts THROTTLE_RELEASE_S, difficulty.ts DIFFICULTY_PRESETS.normal, tuning.ts ENGINE_FORCE_CURVE, tuning.ts ROLLING_RESISTANCE_N, tuning.ts AERO_DRAG, tuning.ts CHASSIS_LINEAR_DAMPING, tuning.ts CHASSIS_MASS at 9ab89b8
+  paceDutyBase: sizedAt(0.42, "", "input.ts THROTTLE_ATTACK_S, input.ts THROTTLE_RELEASE_S, difficulty.ts DIFFICULTY_PRESETS.normal, tuning.ts ENGINE_FORCE_CURVE, tuning.ts ROLLING_RESISTANCE_N, tuning.ts AERO_DRAG, tuning.ts CHASSIS_LINEAR_DAMPING, tuning.ts CHASSIS_MASS", PROFILE_SIZED_AT_H2),
+  // (H2: the route from the lesson's authored start to the red lamp's ignore point — the trigger's y 175 plus
+  // ignoreBeyondM 100, less the spawn's y 15 on ln-v1.)
+  // sized from templates-cockpit2.ts TTR_TRIGGER, templates-cockpit2.ts VP_TELLTALE_RED_LAMP.ignoreBeyondM, ln-v1.json spawnPoints at 9ab89b8
+  warningLampIgnoreRouteM: sizedAt(260, "m", "templates-cockpit2.ts TTR_TRIGGER, templates-cockpit2.ts VP_TELLTALE_RED_LAMP.ignoreBeyondM, ln-v1.json spawnPoints", PROFILE_SIZED_AT_H2),
 });
 
 /** The dial is `Math.round(|speed|)`, so a reading N covers [N − 0.5, N + 0.5):
@@ -2590,15 +2633,46 @@ export const ZONE_REST_RESIDUAL_M = 5;
  * 370.6 N → +3.139 m/s²; coast R + ROLLING_RESISTANCE_N 280 N → −0.533 m/s²;
  * 0.533 / (3.139 + 0.533) = 0.145 → 0.15. The model holds no engine braking;
  * the gain below closes what it leaves out. None of this is a prediction: the
- * READINGS say what the pace was, and a profile holds as sized only on them. */
+ * READINGS say what the pace was, and a profile holds as sized only on them.
+ *
+ * ── H2: THE PARAGRAPH ABOVE IS H1's, KEPT AS THE RECORD OF WHAT WAS WRONG ────
+ * Its arithmetic is right for an on/off throttle and the product does not have
+ * one. input.ts (9ab89b8) ramps the keyboard pedal against wall time — 0 → 1 in
+ * THROTTLE_ATTACK_S 0.35 s, 1 → 0 in THROTTLE_RELEASE_S 0.25 s — the default
+ * tier shapes it (difficulty.ts DIFFICULTY_PRESETS.normal: throttleMul 0.75 ×
+ * pedal ^ throttleExp 1.4), and VehicleSim applies ENGINE_FORCE × that;
+ * ROLLING_RESISTANCE_N acts only while the pedal is at 0. A press of t seconds
+ * from a pedal at rest peaks at p = t / 0.35: the 108 ms press the w69 lamp leg
+ * made peaked at 0.31 of the pedal — 0.75 × 0.31^1.4 = 0.15 of the engine force
+ * for an instant — where H1's arithmetic had the whole force for the whole
+ * 108 ms. So:
+ *   · THE COMMAND IS A FRACTION OF A FIXED CYCLE (`PACE_CYCLE_MS`), and the
+ *     harness's throttle modulator keeps that cycle running between flat ticks
+ *     — it does not wait for the next tick, and a tick that stops for a frame
+ *     does not leave the car coasting or pressing for its whole length;
+ *   · THE DUTY BASE IS THE MODEL'S EQUILIBRIUM WITH THE RAMPS AND THE TIER IN
+ *     IT: at 45 км/ч and a 500 ms cycle, the fraction of the cycle the key is
+ *     down at which the cycle's net speed change is zero (pedal ramped as
+ *     above, 4200 N × 0.75 × pedal^1.4, R = AERO_DRAG·v² + LINEAR_DAMPING·MASS·v
+ *     = 370.6 N, + 280 N while the pedal is at 0) is 0.415 → 0.42
+ *     (harness-h2/builder/duty-eq.mjs; the first H2 lamp drive, on a base of
+ *     0.31, settled at 42–44 км/ч under a duty of 0.39–0.43);
+ *   · THE RATE TERM takes duty off while the dial is rising: a launch gains
+ *     about 11 км/ч a second and a tick is 0.5–1 s, so a command that waits for
+ *     the reading to arrive at the target has already passed it.
+ * Still not a prediction: the READINGS say what the pace was. */
 
-/** Under `target − this` the throttle is down for the whole tick (the launch). The harness's number. */
-export const PACE_FULL_BAND_KMH = 6;
-/** Duty added per км/ч the dial reads under the target. The harness's number. */
-export const PACE_DUTY_GAIN_PER_KMH = 0.05;
-/** The shortest and longest throttle pulse, in ms of wall clock. The harness's numbers. */
+/** The throttle modulator's cycle, in ms of wall clock: a `pulse` command is the key's down time in each cycle. The harness's number. */
+export const PACE_CYCLE_MS = 500;
+/** Duty added per км/ч the dial reads under the target (taken off per км/ч over it). The harness's number. */
+export const PACE_DUTY_GAIN_PER_KMH = 0.04;
+/** Duty taken off per км/ч a second the dial rose since the reading before it (added while it fell). The harness's number. */
+export const PACE_RATE_GAIN_PER_KMH_S = 0.015;
+/** The shortest wall interval a rise is divided by, in ms: two readings closer than this are rated over it. The harness's number. */
+export const PACE_RATE_MIN_INTERVAL_MS = 250;
+/** The shortest and longest down time a cycle, in ms of wall clock. The harness's numbers. */
 export const PACE_MIN_PULSE_MS = 40;
-export const PACE_MAX_PULSE_MS = 600;
+export const PACE_MAX_PULSE_MS = PACE_CYCLE_MS - 40;
 /** The emergency profile's target, over its run floor (emYieldSlowKmh + EM_SPEED_MARGIN_KMH): half the
  *  10 км/ч between that floor (40) and the posted 50 on ln-v1. The harness's number. */
 export const EM_PACE_ABOVE_FLOOR_KMH = 5;
@@ -2625,8 +2699,10 @@ export const EM_RUN_LAG_MARGIN_SEC = 4;
  * The same allowance, on the same ratio: 0.23 — the «~23 % behind» figure `ZONE_REST_MARGIN_SEC`'s comment (the
  * constant is sized at 4112566) names — of the product seconds the run must cover.
  * The emergency run: ceil(0.23 × (9.91 + 7 + 0.4)) = ceil(3.98) = 4 s (above).
- * The lamp run: ceil(0.23 × (warningLampBillSec 23.7 + WARNING_LAMP_REGRADE_SEC 6))
- * = ceil(6.83) = 7 s.
+ * The lamp run (H1 round 3 to H2): ceil(0.23 × (the bill's 23.7 s + WARNING_LAMP_REGRADE_SEC 6)) = ceil(6.83) = 7 s —
+ * H2: NO LONGER ADDED, and no longer declared. The lamp run is sized on the route to the lamp's ignore point and the
+ * re-grade window after it, on the harness's wall clock, and ln-v1 ends 385 m from the spawn: a 7 s allowance at the held
+ * pace is 87 m the road does not have.
  * H1 ROUND 5 (the round-3/4 verifiers' LAMP-VERDICT-AND-LAG-RATIO) — A DECLARED JUDGEMENT, NOT A MEASUREMENT. No
  * measurement file backs 0.23: `ZONE_REST_MARGIN_SEC`'s own «~23 %» names none either (it entered at 0e810ad with no
  * archive), and a repo-wide search finds the figure only in these comments. Its DIRECTION, stated: the allowance is
@@ -2637,8 +2713,6 @@ export const EM_RUN_LAG_MARGIN_SEC = 4;
  * sized only on its own readings; a measured product-vs-profile clock ratio on the P1 lanes is still owed. */
 /** The fraction of the product seconds a run must cover that it adds as its lag allowance — a declared judgement (above), not a measurement. The harness's number. */
 export const PRODUCT_CLOCK_LAG_RATIO = 0.23;
-/** The lamp run's allowance for a product clock behind the profile clock, in seconds. The harness's number. */
-export const LAMP_RUN_LAG_MARGIN_SEC = 7;
 
 /* ── H1 ROUND 2 — THE BRAKE-CHECK'S METRE CEILING, SIZED ON A CENSUS THAT COVERS IT (the round-1 verifier's F4) ──
  * Round 1 sized the ceiling on another lesson's pc census (sc-pk-busstop-ban,
@@ -2686,17 +2760,25 @@ export function h1ProbeReads(scenario) {
   });
 }
 
-/** THE PACE PEDAL FOR ONE TICK — pure. `down`: the throttle held the whole tick;
- *  `up`: held up the whole tick; `pulse`: down for `ms`, then up, inside the tick.
- *  An unread dial lets the throttle up (no reading, no acceleration). */
-export function pacePedal(dial, { targetKmh, dtMs } = {}) {
+/** THE PACE PEDAL, SET ON EACH FLAT TICK — pure. The command the harness's throttle
+ *  modulator runs until the next one: `down` — the key held down; `up` — held
+ *  up; `pulse` — down for `ms` of every `PACE_CYCLE_MS` cycle, up for the rest.
+ *  The duty is `paceDutyBase` + the gain per км/ч the dial reads under the
+ *  target, less the rate gain per км/ч a second the dial rose since the read
+ *  dial before it (`prevKmh`, over `wallDtMs` of the harness's wall clock, never
+ *  under `PACE_RATE_MIN_INTERVAL_MS`; no reading before it, or no interval, is
+ *  no rate). At 1 or more it is `down`, at 0 or less `up`. An unread dial lets
+ *  the throttle up (no reading, no acceleration). */
+export function pacePedal(dial, { targetKmh, prevKmh = null, wallDtMs = null } = {}) {
   if (typeof dial !== "number" || !Number.isFinite(dial) || dial < 0) return Object.freeze({ act: "up", ms: null });
   if (typeof targetKmh !== "number" || !Number.isFinite(targetKmh)) return Object.freeze({ act: "up", ms: null });
-  if (dial >= targetKmh) return Object.freeze({ act: "up", ms: null });
-  if (dial < targetKmh - PACE_FULL_BAND_KMH) return Object.freeze({ act: "down", ms: null });
-  const dt = typeof dtMs === "number" && Number.isFinite(dtMs) && dtMs > 0 ? dtMs : 0;
-  const duty = PROFILE_DESIGN.paceDutyBase.value + PACE_DUTY_GAIN_PER_KMH * (targetKmh - dial);
-  const ms = Math.round(Math.min(PACE_MAX_PULSE_MS, Math.max(PACE_MIN_PULSE_MS, duty * dt)));
+  const prev = typeof prevKmh === "number" && Number.isFinite(prevKmh) && prevKmh >= 0 ? prevKmh : null;
+  const wall = typeof wallDtMs === "number" && Number.isFinite(wallDtMs) && wallDtMs > 0 ? wallDtMs : null;
+  const rate = prev === null || wall === null ? 0 : (dial - prev) / (Math.max(wall, PACE_RATE_MIN_INTERVAL_MS) / 1000);
+  const duty = PROFILE_DESIGN.paceDutyBase.value + PACE_DUTY_GAIN_PER_KMH * (targetKmh - dial) - PACE_RATE_GAIN_PER_KMH_S * rate;
+  if (duty >= 1) return Object.freeze({ act: "down", ms: null });
+  if (duty <= 0) return Object.freeze({ act: "up", ms: null });
+  const ms = Math.round(Math.min(PACE_MAX_PULSE_MS, Math.max(PACE_MIN_PULSE_MS, duty * PACE_CYCLE_MS)));
   return Object.freeze({ act: "pulse", ms });
 }
 
@@ -2751,6 +2833,9 @@ export const PROFILE_LINE_TEMPLATES = Object.freeze({
   "start.on": "WRONG-LEG PROFILE: {name:txt} — {told:txt}. For {row:txt}. Ceilings {maxM:n} m / {maxS:n} s from its first flat tick, after which the ordinary{every:opt} cadence resumes.{zone:opt} {sizing:frag}.",
   "start.refused": "WRONG-LEG PROFILE: {name:txt} — REFUSED, NOT RUN: {why:frag}. This leg drives the ordinary{every:opt} cadence and holds nothing back for {row:txt}.",
   "start.every": " {m:n} m",
+  // (H2: the reload start — what the harness did and read, on a lane whose declared row asks for it.)
+  "start.reload": "WRONG-LEG START (declared with the profile {name:txt}): after its checks at the lesson's authored start the harness loaded the lesson again and held the throttle down from that load, pressing its key again after each {poll:n} ms wait ({keys:n} time(s) in all), until the dial first read over 0 — {kmh:n} км/ч, {ms:r} ms after the load was asked for ({nav:r|NOT RECORDED} ms of that until the page reported its content loaded; {unread:n} unread dial reading(s) after it); the harness then pressed the belt key {belt:n} time(s). Every check and frame above this line is of the first load, and every flat tick, rest and frame below it is of the second.",
+  "start.reloadNone": "WRONG-LEG START (declared with the profile {name:txt}): after its checks at the lesson's authored start the harness loaded the lesson again and held the throttle down from that load, pressing its key again after each {poll:n} ms wait ({keys:n} time(s) in all), and the dial did not read over 0 in {max:n} s ({nav:r|NOT RECORDED} ms until the page reported its content loaded; {unread:n} unread dial reading(s) after it); the harness then pressed the belt key {belt:n} time(s). Every check and frame above this line is of the first load, and every flat tick, rest and frame below it is of the second.",
   "start.zone": " Zone {zones:toks} ({basis:tok}) lies at [{from:n1}, {to:n1}] m of route (authored geometry); the hold is {hold:n} s.",
   // ── the two refusals left: nothing is read, so nothing else can refuse ──
   "refused.span": "the authored zone was not placed on the route — {why:frag|the span is unknown}",
@@ -2826,6 +2911,8 @@ export const PROFILE_LINE_TEMPLATES = Object.freeze({
   "outcome.held": "WRONG-LEG PROFILE OUTCOME: {name:txt} — ANTECEDENT HELD AS SIZED ({how:tok}) at t={at:n}s — OBSERVED: {obs:frag} · READINGS: {readings:frag} · {rests:frag} · {end:frag}. {clock:frag} {sizing:frag}.",
   "outcome.notHeld": "WRONG-LEG PROFILE OUTCOME: {name:txt} — ANTECEDENT NOT HELD AS SIZED ({done:tok|open}) — OBSERVED: {obs:frag|-} · READINGS: {readings:frag} · {rests:frag} · {end:frag}. {clock:frag} {sizing:frag}.",
   "outcome.clock": "The profile clock sums the harness's own tick intervals, paused time and each tick's own work left out, each interval capped at {cap:n} s.",
+  // (H2: a pace run is not on the profile clock — its seconds and its odometer are on the harness's wall clock between flat readings.)
+  "outcome.clockPace": "The profile clock sums the harness's own tick intervals, paused time and each tick's own work left out, each interval capped at {cap:n} s. The pace run's seconds are on the harness's wall clock between its flat readings: each tick's own work in it, each interval capped at {cap:n} s, and an interval after a pause layer starts when the harness has drained it; the harness's wall-clock dial odometer sums each read dial over that interval, not capped, from the profile's first flat tick.",
   "rests": "{opp:n} rest opportunity(ies) held back (the {every:n|?} m / {maxS:n|?} s cadence came due {opp:n} time(s) while the harness's own task-cap and over-limit holds were not holding and the profile held it, each stretch counted once) on {held:n} held flat tick(s), {forced:n} rest(s) booked by the profile",
   "end.reached": "the drive reached its end screen",
   "end.notReached": "the drive did NOT reach its end screen",
@@ -2851,23 +2938,33 @@ export const PROFILE_LINE_TEMPLATES = Object.freeze({
   "sizing.dropOther": "banZoneStopRestSec {ban:n} s for the {basis:tok|?} basis (busStopDropOffMaxSec {bus:n} s for law-bus-stop)",
   // ── harness stage H1: the label that names each commit, and the three new kinds ──
   "sizing.labelAt": "SIZING (the harness's design constants, each sized at the commit its own record names — {at:toks}; no file is read to size them, and nothing here is a prediction)",
-  "sizing.pace": "{governor:frag}; the run credits a reading when the dial reads over {floor:n} км/ч by its {hq:n} км/ч rounding and at or under the posted disc{cap:opt}, and a disc read inside the run other than the one it started under breaks it{drop:opt}{start:opt}; one run sized to {run:n1} s ({why:frag})",
+  "sizing.pace": "{governor:frag}; the run credits a reading when the dial reads over {floor:n} км/ч by its {hq:n} км/ч rounding and at or under the posted disc{cap:opt}, and a disc read inside the run other than the one it started under breaks it{drop:opt}{start:opt}; {run:frag}",
+  // (H2: the pace run is on the harness's wall clock, and the lamp run is sized on the route to the lamp's ignore point.)
+  "pace.runEm": "one run sized to {run:n1} s on the harness's wall clock ({why:frag})",
+  "pace.runLamp": "one run, started with the harness's wall-clock dial odometer under warningLampIgnoreRouteM {gate:n} m of route, sized to last {after:n1} s on the harness's wall clock after the tick on which that odometer reads {gate:n} m or more ({why:frag})",
   "pace.startLamp": "; the run starts on its first reading it credits that is at or over warningLampRunStartKmh {start:n} км/ч by its {hq:n} км/ч rounding (warningLampHeldPaceKmh {pace:n} less WARNING_LAMP_COMPLY_DROP_KMH {drop:n}), and a reading under it before the run starts does not start or break it",
-  "pace.governor": "a pace governor on the dial, target {target:n} км/ч: under {full:n} км/ч the harness holds the throttle down for the whole tick, at or over the target it lets the throttle up for the whole tick, and between them it presses the throttle for (paceDutyBase {base:n2} + {gain:n2} per км/ч under the target) of the tick's own interval, from {pulseLoMs:n} to {pulseHiMs:n} ms, then lets it up; an unread dial lets the throttle up; the brake is never touched by it",
+  "pace.governor": "a pace governor on the dial, target {target:n} км/ч: each flat tick sets one command on the harness's throttle modulator, which keeps it until the next one is set or the modulator is stopped — the throttle is down for a fraction of each {cycle:n} ms cycle of wall clock, paceDutyBase {base:n2} + {gain:n2} per км/ч the dial reads under the target, less {rate:n3} per км/ч a second the dial rose from the tick before to this one when both read it (over this tick's interval of wall clock, counted as {rateFloorMs:n} ms when it is less), and nothing is taken off on the profile's first tick, on a tick after one whose dial was unread, or on a tick whose interval of wall clock is not over 0; at a fraction of 1 or more the throttle is held down, at 0 or less it is let up, and between them it is down for {pulseLoMs:n} to {pulseHiMs:n} ms of each cycle; an unread dial lets the throttle up; the brake is never touched by it",
   "pace.drop": "; a reading breaks the run, and does not start it, when the fastest reading of the {win:n} s before it on the profile clock (readings before the run started among them) is {lim:n} км/ч or more above it (WARNING_LAMP_COMPLY_DROP_KMH {drop:n} less twice the dial's rounding, over WARNING_LAMP_REGRADE_SEC {win:n} s)",
-  "pace.whyLamp": "warningLampBillSec {lampSec:n} + WARNING_LAMP_REGRADE_SEC {rg:n} + the harness's {lag:n} s lag allowance + the harness's {margin:n} s, measured on a drive held at warningLampHeldPaceKmh {pace:n} км/ч",
+  "pace.whyLamp": "WARNING_LAMP_REGRADE_SEC {rg:n} + the harness's {margin:n} s, with no lag allowance; warningLampIgnoreRouteM is the route from the lesson's authored start to the red lamp's ignore point",
   "pace.whyEm": "(emRunTopKmh {top:n} + the dial's {hq:n} км/ч rounding + EM_CLOSING_MIN_KMH {closing:n}) / 3.6 / emActorAccelMps2 {accel:n} = {arm:n2} s + emResponseWindowSec {win:n} s + its {jit:n} s spread + the harness's {lag:n} s lag allowance + the harness's {margin:n} s",
   "pace.capSized": " and at or under emRunTopKmh {cap:n} км/ч",
-  "obs.paceHeld": "one run of {run:n1} s on the profile clock from its first reading at t={from:n}s (flat odometer {odo:n1} m there): every read dial over {floor:n} км/ч by its rounding and at or under the posted {disc:n}, the disc it started under (no other disc read inside it; {discUnread:n} tick(s) inside it with the disc unread){cap:opt}{drop:opt}, no rest held, {unread:n} unread tick(s) inside it not credited — against the sized {target:n1} s",
+  "obs.paceHeld": "one run of {run:n1} s on the harness's wall clock from its first reading at t={from:n}s (flat odometer {odo:n1} m there){gate:opt}: every read dial over {floor:n} км/ч by its rounding and at or under the posted {disc:n}, the disc it started under (no other disc read inside it; {discUnread:n} tick(s) inside it with the disc unread){cap:opt}{drop:opt}, no rest held, {unread:n} unread tick(s) inside it not credited — against {sized:frag}",
+  // (H2: what the run's seconds are measured against — a whole run, or the seconds after the lamp's ignore route was read.)
+  "pace.sizedEm": "the sized {target:n1} s",
+  "pace.sizedLamp": "the sized {target:n1} s after the tick on which that odometer reads warningLampIgnoreRouteM {gate:n} m or more",
+  "pace.gateRead": ", {after:n1} s of it after the tick at t={at:n}s on which the harness's wall-clock dial odometer read {m:n1} m, its first reading at or over warningLampIgnoreRouteM {gate:n} m ({fromM:n1} m at the run's first reading)",
+  "pace.gateUnder": ", the harness's wall-clock dial odometer at {m:n1} m on the profile's last flat tick ({fromM:n1} m at the run's first reading), under warningLampIgnoreRouteM {gate:n} m",
+  "pace.gateLate": ", started with the harness's wall-clock dial odometer already at {fromM:n1} m, not under warningLampIgnoreRouteM {gate:n} m",
+  "pace.gateNoRun": ", the harness's wall-clock dial odometer at {m:n1} m on the profile's last flat tick with no run started",
   "pace.capHeld": ", and at or under emRunTopKmh {cap:n} км/ч",
   "pace.dropHeld": ", and no reading {lim:n} км/ч or more under the fastest of the {win:n} s before it (the largest such gap read {max:n} км/ч)",
-  "obs.paceBroken": "the first run broke at t={at:n}s after {run:n1} s on the profile clock, against the sized {target:n1} s: {why:frag}",
+  "obs.paceBroken": "the first run broke at t={at:n}s after {run:n1} s on the harness's wall clock{gate:opt}, against {sized:frag}: {why:frag}",
   "pace.brokeFloor": "the dial read {kmh:n} км/ч, not over {floor:n} км/ч by its {hq:n} км/ч rounding",
   "pace.brokeDisc": "the dial read {kmh:n} км/ч, over the posted {disc:n}",
   "pace.brokeDiscChange": "the posted disc read {disc:n} км/ч, not the {was:n} the run started under",
   "pace.brokeCap": "the dial read {kmh:n} км/ч, over emRunTopKmh {cap:n} км/ч",
   "pace.brokeDrop": "the dial read {kmh:n} км/ч, {gap:n} км/ч under the fastest reading of the {win:n} s before it",
-  "readings.pace": "disc {disc:n|NOT SEEN} ({changes:n} change(s), {unreadDisc:n} unread tick(s)) · first run {first:n1} s (sized {target:n1} s){broke:opt} · top {top:n|NOT RECORDED} км/ч · the first run's own readings (its start reading and each reading it credited{notBroke:opt}): lowest {low:n|-} км/ч{gap:opt} · governor commands the harness applied: throttle held down {down:n} tick(s), pulsed {pulse:n} ({pulseMs:r} ms in all), let up {up:n} · {unread:n} unread dial reading(s)",
+  "readings.pace": "disc {disc:n|NOT SEEN} ({changes:n} change(s), {unreadDisc:n} unread tick(s)) · first run {first:n1} s on the harness's wall clock{gate:opt} ({sized:frag}){broke:opt} · top {top:n|NOT RECORDED} км/ч · the first run's own readings (its start reading and each reading it credited{notBroke:opt}): lowest {low:n|-} км/ч{gap:opt} · governor commands the harness set on its throttle modulator, one on each flat tick the profile ran: throttle held down {down:n}, down for a fraction of each cycle {pulse:n} (those commands' down times a cycle sum to {pulseMs:r} ms), let up {up:n} · {unread:n} unread dial reading(s) · {wallUnread:n} flat tick(s) with no wall interval, credited nothing",
   "pace.brokeAt": ", broken at t={at:n}s",
   "pace.gapRead": ", largest gap under the fastest reading of the {win:n} s before it {gap:n|-} км/ч",
   // H1 ROUND 5 (R4-READINGS-GAP-EXCLUDES-BREAK): the readings line says whose readings its lowest and its largest gap are.
@@ -3099,10 +3196,14 @@ export const WRONG_LEG_PROFILES = new Map([
       kind: "pace",
       pace: "lamp",
       row: "sc-vp-telltale-red:c172d48b — its antecedent: a wrong leg that takes no careless rest and keeps one steady pace at or under the posted disc past the red lamp and the kerb-side halt zone, for longer than WARNING_LAMP_REGRADE_SEC after the lamp's ignore point",
-      told: "take no careless rest from the first flat tick, pace the throttle on the dial to warningLampHeldPaceKmh at or under the posted disc, and count ONE run of readings under one disc, started on the first reading it credits that is at or over warningLampRunStartKmh by the dial's 0.5 км/ч rounding, with no drop of WARNING_LAMP_COMPLY_DROP_KMH inside WARNING_LAMP_REGRADE_SEC until it has lasted warningLampBillSec + WARNING_LAMP_REGRADE_SEC + a lag allowance + a margin on the profile clock, then rest on the ordinary cadence",
-      sizedBy: Object.freeze(["WARNING_LAMP_REGRADE_SEC", "WARNING_LAMP_COMPLY_DROP_KMH", "warningLampBillSec", "warningLampHeldPaceKmh", "warningLampRunStartKmh", "dialHalfQuantumKmh", "movingSpeedKmh", "paceDutyBase"]),
+      // (H2: the run is no longer sized on warningLampBillSec + a lag allowance on the profile clock — 37.7 s, over 470 m
+      // at the held pace on a road that ends 385 m from the spawn. It is sized on the route to the lamp's ignore point,
+      // read on the harness's wall-clock dial odometer, and WARNING_LAMP_REGRADE_SEC + a margin after it.)
+      told: "take no careless rest from the first flat tick, pace the throttle on the dial to warningLampHeldPaceKmh at or under the posted disc, and count ONE run of readings under one disc, started on the first reading it credits that is at or over warningLampRunStartKmh by the dial's 0.5 км/ч rounding, with no drop of WARNING_LAMP_COMPLY_DROP_KMH inside WARNING_LAMP_REGRADE_SEC, until the harness's wall-clock dial odometer has read warningLampIgnoreRouteM inside the run and the run has lasted WARNING_LAMP_REGRADE_SEC + a margin more on the harness's wall clock, then rest on the ordinary cadence",
+      sizedBy: Object.freeze(["WARNING_LAMP_REGRADE_SEC", "WARNING_LAMP_COMPLY_DROP_KMH", "warningLampHeldPaceKmh", "warningLampRunStartKmh", "warningLampIgnoreRouteM", "dialHalfQuantumKmh", "movingSpeedKmh", "paceDutyBase"]),
       // (H1 round 3: 450 → 610, so the metre ceiling lies past a 6 s launch and the sized 37.7 s run at the posted 50:
-      // 43.7 × 50 / 3.6 = 606.9 m — the emergency row's own check.)
+      // 43.7 × 50 / 3.6 = 606.9 m — the emergency row's own check. H2: the run is shorter now, and 610 m of flat odometer
+      // is past the whole road; the ceiling is left where it stood.)
       maxM: 610,
       maxMs: 60_000,
     }),
@@ -3114,7 +3215,13 @@ export const WRONG_LEG_PROFILES = new Map([
       kind: "pace",
       pace: "em",
       row: "sc-vu-emergency:155903c1 (critical) and sc-vu-emergency:4056508c (critical) — their antecedent: a wrong leg that takes no careless rest and holds a pace over emYieldSlowKmh + EM_SPEED_MARGIN_KMH and at or under the posted disc from its first flat tick through the emergency approach's response window",
-      told: "take no careless rest from the first flat tick, pace the throttle on the dial to a target between emYieldSlowKmh + EM_SPEED_MARGIN_KMH and the posted disc, and count ONE run of readings under one disc, each over that floor by the dial's 0.5 км/ч rounding and at or under the disc and emRunTopKmh, started on the first such reading, until it has lasted the sized run on the profile clock, then rest on the ordinary cadence",
+      // (H2: THE START. The staged car is released on the lesson's first frame, and on .audit-frames/w69-h1-pc the
+      // encounter was over — the lesson's own make-way credit stamped at 0:07 — before this harness had finished its
+      // checks at the spawn. `start: "reload"`: after those checks the harness loads the lesson again and keys the
+      // throttle from that load (lesson-audit.mjs), so the profile's first flat tick is the lesson's first seconds. The
+      // run is on the harness's wall clock.)
+      start: "reload",
+      told: "after the harness's checks at the lesson's authored start, load the lesson again and keep its throttle key held until the dial first reads over 0, then take no careless rest from the first flat tick, pace the throttle on the dial to a target between emYieldSlowKmh + EM_SPEED_MARGIN_KMH and the posted disc, and count ONE run of readings under one disc, each over that floor by the dial's 0.5 км/ч rounding and at or under the disc and emRunTopKmh, started on the first such reading, until it has lasted the sized run on the harness's wall clock, then rest on the ordinary cadence",
       sizedBy: Object.freeze(["emYieldSlowKmh", "EM_SPEED_MARGIN_KMH", "EM_CLOSING_MIN_KMH", "emActorAccelMps2", "emResponseWindowSec", "emResponseJitterSec", "emRunTopKmh", "dialHalfQuantumKmh", "paceDutyBase"]),
       maxM: 400,
       maxMs: 40_000,
@@ -3184,6 +3291,40 @@ export const WITHDRAWN_PROFILE_ROUTES = new Map([
 /** The declared row for a scenario, or `null`. */
 export function wrongLegProfileFor(scenario) {
   return typeof scenario === "string" ? WRONG_LEG_PROFILES.get(scenario) ?? null : null;
+}
+
+/** THE RELOAD START'S OWN NUMBERS (H2) — how often the harness presses the throttle key again after it asked for the
+ *  load, in ms, and how long it waits for the dial to read over 0 before the drive loop starts anyway. A key-down sent
+ *  before the page's own key listener exists is not seen by it, and a repeated key-down is (input.ts at 9ab89b8 records
+ *  a repeat as a hold); 100 ms is under the 0.5 s in which the staged car's speed passes a standing car's by
+ *  EM_CLOSING_MIN_KMH at emActorAccelMps2. The harness's numbers. */
+export const RELOAD_START_POLL_MS = 100;
+export const RELOAD_START_MAX_MS = 90_000;
+
+/** The reload start's line, as a template spec — `null` on every lane whose declared row does not ask for the reload
+ *  start. `obs` is the harness's own record of it: `keyDowns`, `goKmh` / `goMs` (null when the dial never
+ *  read over 0), `navMs`, `unreadDial`, `beltPresses`. Pure. */
+export function wrongLegReloadStartSpec(state, obs = {}) {
+  if (!state || state.declared !== true || wrongLegStartFor(state.scenario) !== "reload") return null;
+  const o = obs && typeof obs === "object" ? obs : {};
+  const common = { name: state.name, poll: RELOAD_START_POLL_MS, keys: fin(o.keyDowns) ?? 0, nav: fin(o.navMs), unread: fin(o.unreadDial) ?? 0, belt: fin(o.beltPresses) ?? 0 };
+  if (fin(o.goKmh) === null || fin(o.goMs) === null) return profileText("start.reloadNone", { ...common, max: RELOAD_START_MAX_MS / 1000 });
+  return profileText("start.reload", { ...common, kmh: o.goKmh, ms: o.goMs });
+}
+
+/** The reload start's line, rendered — `null` on every lane without one. */
+export function wrongLegReloadStartLine(state, obs) {
+  const spec = wrongLegReloadStartSpec(state, obs);
+  return spec === null ? null : renderProfileText(spec);
+}
+
+/** HOW A DECLARED PROFILE'S WRONG LEG STARTS (H2) — `"reload"` for a row that
+ *  declares it (the harness loads the lesson again after its checks at the
+ *  spawn and keys the throttle from that load), `null` for every other row and
+ *  for every lesson with no row: those lanes start exactly as they did. Pure. */
+export function wrongLegStartFor(scenario) {
+  const decl = wrongLegProfileFor(scenario);
+  return decl !== null && decl.start === "reload" ? "reload" : null;
 }
 
 /** The hold a rest in a no-stopping span of this basis was sized from: the
@@ -3357,9 +3498,11 @@ function paceRunSizing(decl, own) {
   const m = PROFILE_SUSTAIN_MARGIN_SEC;
   if (decl.pace === "lamp") {
     return {
-      // H1 ROUND 3 (N5a): + the lag allowance, on the ratio the emergency run's is.
-      runSec: own.warningLampBillSec + own.WARNING_LAMP_REGRADE_SEC + LAMP_RUN_LAG_MARGIN_SEC + m,
-      why: profileText("pace.whyLamp", { lampSec: own.warningLampBillSec, rg: own.WARNING_LAMP_REGRADE_SEC, lag: LAMP_RUN_LAG_MARGIN_SEC, margin: m, pace: own.warningLampHeldPaceKmh }),
+      // H2: the seconds AFTER the tick on which the wall-clock dial odometer reads the lamp's ignore route — the
+      // re-grade window and the sampling margin, and no lag allowance (H1 round 3 added 7 s to the bill's 23.7 s, which
+      // sized the run past the end of the road; both are gone).
+      runSec: own.WARNING_LAMP_REGRADE_SEC + m,
+      why: profileText("pace.whyLamp", { rg: own.WARNING_LAMP_REGRADE_SEC, margin: m }),
     };
   }
   // H1 ROUND 2 (N5): the arm is sized on the run's TOP — the fastest a credited reading may be — plus the dial's
@@ -3390,9 +3533,27 @@ function paceNumbers(decl, own) {
     runTopKmh: lamp ? null : own.emRunTopKmh,
     // H1 ROUND 3 (N5a): the lamp run starts past the launch; the emergency run starts on its floor (null: no other start).
     startKmh: lamp ? own.warningLampRunStartKmh : null,
+    // H2: the lamp run's seconds are counted after its odometer reads this route (null: the emergency run is sized whole).
+    gateM: lamp ? own.warningLampIgnoreRouteM : null,
     runSec,
     why,
   };
+}
+
+/** H2 — what a pace run's seconds are measured against, as a template spec: the whole sized run, or (the lamp run) the
+ *  sized seconds after the tick on which the wall-clock dial odometer reads the lamp's ignore route. Pure. */
+function paceSizedSpec(P) {
+  return P.gateM === null ? profileText("pace.sizedEm", { target: P.sizedRunSec }) : profileText("pace.sizedLamp", { target: P.sizedRunSec, gate: P.gateM });
+}
+
+/** H2 — where the lamp run's wall-clock dial odometer stood against the lamp's ignore route, as a template spec, or
+ *  `null` for a run with no such route (the emergency run). Pure. */
+function paceGateSpec(P) {
+  if (P.gateM === null) return null;
+  if (!P.started) return profileText("pace.gateNoRun", { m: P.roadM });
+  if (P.gateRunSec !== null) return profileText("pace.gateRead", { after: P.runSec - P.gateRunSec, at: P.gateAtSec, m: P.gateRoadM, gate: P.gateM, fromM: P.fromRoadM });
+  if (!(P.fromRoadM < P.gateM)) return profileText("pace.gateLate", { fromM: P.fromRoadM, gate: P.gateM });
+  return profileText("pace.gateUnder", { m: P.roadM, fromM: P.fromRoadM, gate: P.gateM });
 }
 
 /** The brake-check's metre ceiling, as the arithmetic its sizing sentence prints (H1 round 2, F4): the route a
@@ -3491,15 +3652,15 @@ function sizingSpec(decl, own, extra = {}) {
     const P = paceNumbers(decl, own);
     detail = profileText("sizing.pace", {
       governor: profileText("pace.governor", {
-        target: P.targetKmh, full: P.targetKmh - PACE_FULL_BAND_KMH, base: own.paceDutyBase, gain: PACE_DUTY_GAIN_PER_KMH, pulseLoMs: PACE_MIN_PULSE_MS, pulseHiMs: PACE_MAX_PULSE_MS,
+        target: P.targetKmh, cycle: PACE_CYCLE_MS, base: own.paceDutyBase, gain: PACE_DUTY_GAIN_PER_KMH, rate: PACE_RATE_GAIN_PER_KMH_S, rateFloorMs: PACE_RATE_MIN_INTERVAL_MS,
+        pulseLoMs: PACE_MIN_PULSE_MS, pulseHiMs: PACE_MAX_PULSE_MS,
       }),
       floor: P.floorKmh,
       hq: own.dialHalfQuantumKmh,
       cap: P.runTopKmh === null ? null : profileText("pace.capSized", { cap: P.runTopKmh }),
       drop: P.dropLimitKmh === null ? null : profileText("pace.drop", { win: P.dropWindowSec, lim: P.dropLimitKmh, drop: own.WARNING_LAMP_COMPLY_DROP_KMH }),
       start: P.startKmh === null ? null : profileText("pace.startLamp", { start: P.startKmh, hq: own.dialHalfQuantumKmh, pace: own.warningLampHeldPaceKmh, drop: own.WARNING_LAMP_COMPLY_DROP_KMH }),
-      run: P.runSec,
-      why: P.why,
+      run: P.gateM === null ? profileText("pace.runEm", { run: P.runSec, why: P.why }) : profileText("pace.runLamp", { gate: P.gateM, after: P.runSec, why: P.why }),
     });
   } else if (decl.kind === "to-impact") {
     detail = profileText("sizing.impact", { route: own.debrisRouteM, ratio: Number((decl.maxM / own.debrisRouteM).toFixed(3)) });
@@ -3668,6 +3829,16 @@ export function createWrongLegProfile(scenario, { zoneSpan = null, platform = nu
     st.pace = {
       mode: decl.pace,
       goalKmh: P.targetKmh, floorKmh: P.floorKmh, dropLimitKmh: P.dropLimitKmh, dropWindowSec: P.dropWindowSec, sizedRunSec: P.runSec, runTopKmh: P.runTopKmh, startKmh: P.startKmh,
+      // H2 — THE WALL CLOCK AND THE ROUTE. `gateM`: the route the lamp run's odometer must read inside the run (null:
+      // the emergency run). `roadM`: the harness's wall-clock dial odometer, from the profile's first flat tick — each
+      // read dial over the wall interval the harness handed with it, not capped. `fromRoadM`: that odometer at the run's
+      // first reading. `gateRunSec` / `gateAtSec` / `gateRoadM`: the run's seconds,
+      // the drive's second and the odometer on the first tick of the run whose odometer read `gateM` or more (null until
+      // then, and for a run that started at or over it). `wallUnread`: ticks handed no wall interval — they credit nothing.
+      gateM: P.gateM, roadM: 0, fromRoadM: null, gateRunSec: null, gateAtSec: null, gateRoadM: null, wallUnread: 0,
+      // H2 — THE RATE TERM'S BOOK: the last read dial and the wall interval since it (null: no reading, or an interval
+      // the harness did not hand).
+      lastDialKmh: null, sinceLastDialMs: null,
       // The disc, tick by tick: the last one read, how often it changed, how often it was unread.
       postedKmh: null, discChanges: 0, discUnread: 0,
       // H1 ROUND 2 (F3): the ONE disc the run is held under — the disc read when it started — and the ticks inside
@@ -3722,6 +3893,11 @@ function sayLine(loud, tpl, f) {
  *   rear            — `parseRearProximity(p.rearProx)` (H1: the brake-check)
  *   impact          — the page-side count of impact-flash element mounts, or
  *                     null when unread (H1: no rest into the obstacle)
+ *   wallDtMs        — the harness's WALL interval since the tick before this
+ *                     one took its clock (each tick's own work in it; a pause
+ *                     drain restarts it) — H2: the pace run's seconds, its
+ *                     odometer and the governor's rate term are on it; no
+ *                     other profile reads it
  *
  * A `pace` profile's step also carries `pedal` — the governor's throttle
  * command for this tick (`pacePedal`), or `null` on the tick it stops; no
@@ -4014,6 +4190,10 @@ export function wrongLegFlatStep(state, tick = {}) {
     // over the floor by the dial's rounding, at or under the last disc read,
     // and — on the lamp profile — not `dropLimitKmh` or more under the fastest
     // reading of the trailing window on the profile clock.
+    // H2: the run's seconds are the harness's WALL interval between flat
+    // readings (`tick.wallDtMs`: each tick's own work in it, restarted by a
+    // pause drain), each capped; a tick handed none credits nothing and is
+    // counted. The lamp run's odometer sums each read dial over that interval.
     const P = s.pace;
     const hq = DIAL_HALF_QUANTUM_KMH;
     const posted = fin(tick.postedKmh) !== null && tick.postedKmh > 0 ? tick.postedKmh : null;
@@ -4025,7 +4205,16 @@ export function wrongLegFlatStep(state, tick = {}) {
     }
     // H1 ROUND 2 (F1): the command is COUNTED only once it is handed out — after the ceilings, below — never on the
     // tick the profile stops, where the harness applies the plain flat throttle instead.
-    out.pedal = pacePedal(dial, { targetKmh: P.goalKmh, dtMs: fin(tick.dtMs) });
+    const wall0 = fin(tick.wallDtMs);
+    const wallMs = wall0 !== null && wall0 >= 0 ? wall0 : null;
+    if (wallMs === null) P.wallUnread += 1;
+    const wallSec = wallMs === null ? 0 : Math.min(wallMs, PROFILE_STEP_CAP_MS) / 1000;
+    if (dial !== null && wallMs !== null) P.roadM += (dial / 3.6) * (wallMs / 1000);
+    // H2: the rate term reads the dial before this one and the wall interval between the two readings.
+    P.sinceLastDialMs = P.sinceLastDialMs === null || wallMs === null ? null : P.sinceLastDialMs + wallMs;
+    out.pedal = pacePedal(dial, { targetKmh: P.goalKmh, prevKmh: P.lastDialKmh, wallDtMs: P.sinceLastDialMs });
+    P.lastDialKmh = dial;
+    P.sinceLastDialMs = dial === null ? null : 0;
     if (dial !== null && dial > P.topKmh) P.topKmh = dial;
     if (dial === null) {
       // No dial is no reading: the run neither grows nor breaks, and the tick is counted.
@@ -4062,10 +4251,11 @@ export function wrongLegFlatStep(state, tick = {}) {
           // credits — the lowest and the largest gap are taken over the same readings (the reading that breaks it is not one).
           P.maxGapKmh = gap;
           P.runDiscKmh = P.postedKmh;
+          P.fromRoadM = P.roadM;
         }
       } else if (!P.broken) {
         if (qualifies) {
-          P.runSec += dtSec;
+          P.runSec += wallSec;
           if (dial < P.lowKmh) P.lowKmh = dial;
           if (gap !== null && gap > P.maxGapKmh) P.maxGapKmh = gap;
         } else {
@@ -4091,19 +4281,27 @@ export function wrongLegFlatStep(state, tick = {}) {
       P.broke = profileText("pace.brokeDiscChange", { disc: posted, was: P.runDiscKmh });
     }
     if (P.started && !P.broken && posted === null) P.runDiscUnread += 1;
+    // H2 — THE LAMP'S IGNORE ROUTE, READ INSIDE THE RUN: the first tick of an unbroken run, started under the route, on
+    // which the wall-clock dial odometer reads it or more. The run's sized seconds are counted from that tick.
+    if (P.gateM !== null && P.started && !P.broken && P.gateRunSec === null && P.fromRoadM < P.gateM && P.roadM >= P.gateM) {
+      P.gateRunSec = P.runSec;
+      P.gateAtSec = atSec;
+      P.gateRoadM = P.roadM;
+    }
+    const paceRunMet = P.gateM === null ? P.runSec >= P.sizedRunSec : P.gateRunSec !== null && P.runSec - P.gateRunSec >= P.sizedRunSec;
     if (P.broken) {
       s.active = false;
       s.done = "run-broken";
-      s.observed = profileText("obs.paceBroken", { at: P.brokeAtSec, run: P.runSec, target: P.sizedRunSec, why: P.broke });
+      s.observed = profileText("obs.paceBroken", { at: P.brokeAtSec, run: P.runSec, gate: paceGateSpec(P), sized: paceSizedSpec(P), why: P.broke });
       out.say = sayLine(true, "say.notHeld", { name: s.name, obs: s.observed });
-    } else if (P.started && P.runSec >= P.sizedRunSec) {
+    } else if (P.started && paceRunMet) {
       held(
         "pace",
         profileText("obs.paceHeld", {
-          run: P.runSec, from: P.fromSec, odo: P.fromOdoM, floor: P.floorKmh, disc: P.runDiscKmh, discUnread: P.runDiscUnread,
+          run: P.runSec, from: P.fromSec, odo: P.fromOdoM, gate: paceGateSpec(P), floor: P.floorKmh, disc: P.runDiscKmh, discUnread: P.runDiscUnread,
           cap: P.runTopKmh === null ? null : profileText("pace.capHeld", { cap: P.runTopKmh }),
           drop: P.dropLimitKmh === null ? null : profileText("pace.dropHeld", { lim: P.dropLimitKmh, win: P.dropWindowSec, max: P.maxGapKmh }),
-          unread: P.runUnread, target: P.sizedRunSec,
+          unread: P.runUnread, sized: paceSizedSpec(P),
         }),
       );
       s.active = false;
@@ -4336,7 +4534,8 @@ export function zoneRestEngaged(state) {
 /** After a pause drain a `wrong` leg re-presses the throttle. Not while it is
  *  standing out a zone rest, and not while a `pace` profile governs it (H1:
  *  its next flat tick hands out the throttle command; a re-press would add a
- *  whole-tick surge to the pace). `true` on every other lane. */
+ *  whole-tick surge to the pace — H2: and its throttle modulator was never
+ *  stopped for the pause). `true` on every other lane. */
 export function resumeThrottleAfterPause(state) {
   if (state && state.on === true && state.active === true && state.kind === "pace") return false;
   return !zoneRestEngaged(state);
@@ -4625,11 +4824,11 @@ function readingsSpec(state) {
   if (state.kind === "pace") {
     const P = state.pace;
     return profileText("readings.pace", {
-      disc: P.postedKmh, changes: P.discChanges, unreadDisc: P.discUnread, first: P.runSec, target: P.sizedRunSec,
+      disc: P.postedKmh, changes: P.discChanges, unreadDisc: P.discUnread, first: P.runSec, gate: paceGateSpec(P), sized: paceSizedSpec(P),
       broke: P.broken ? profileText("pace.brokeAt", { at: P.brokeAtSec }) : null,
       top: P.topKmh >= 0 ? P.topKmh : null, notBroke: P.broken ? profileText("pace.notBroke") : null, low: P.lowKmh,
       gap: P.dropWindowSec === null ? null : profileText("pace.gapRead", { win: P.dropWindowSec, gap: P.maxGapKmh }),
-      down: P.down, pulse: P.pulse, pulseMs: P.pulseMs, up: P.up, unread: P.unreadTicks,
+      down: P.down, pulse: P.pulse, pulseMs: P.pulseMs, up: P.up, unread: P.unreadTicks, wallUnread: P.wallUnread,
     });
   }
   if (state.kind === "to-impact") {
@@ -4666,7 +4865,7 @@ export function wrongLegProfileOutcomeSpec(state) {
   const end = profileText(state.driveEnded === true ? "end.reached" : state.driveEnded === false ? "end.notReached" : "end.unknown");
   const common = {
     name: state.name, obs: state.observed, readings: readingsSpec(state), rests: restsSpec(state), end,
-    clock: profileText("outcome.clock", { cap: PROFILE_STEP_CAP_MS / 1000 }), sizing: state.sizedFrom,
+    clock: profileText(state.kind === "pace" ? "outcome.clockPace" : "outcome.clock", { cap: PROFILE_STEP_CAP_MS / 1000 }), sizing: state.sizedFrom,
   };
   return state.heldAsSized
     ? profileText("outcome.held", { ...common, how: state.how, at: state.heldAtSec })

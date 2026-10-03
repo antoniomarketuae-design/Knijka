@@ -10325,3 +10325,40 @@ to travel off the carriageway there (a founder / legal reading); the two correct
 read; arming mutants keyed on fractional dial speeds and on a night sample under 60 km/h survive the lattice (no committed drive is
 affected); q-manevri-032 ships without a clip. Integration: the manifest readers were made line-ending insensitive and skip the
 gitignored `src/generated/` (the main worktree holds 229 CRLF files and a generated Prisma client the lanes never had).
+
+## Wave C verdicts — 2026-10-02
+
+This run retired 1 row(s). Their evidence frames were driven at `9ab89b8bb0c1` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`9ab89b8bb0c1`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 13 |
+| STILL (symptom reproduces) | 3 |
+| UNJUDGED (re-drive did not exercise it) | 34 |
+
+**Open list: 51 → 50**, out of 1525 filed across the whole programme (1474 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Harness H2 — landed 2026-10-03 (tools only)
+
+Two rounds (wf_34166290-916, wf_ccc58033-dc5) plus one integrator conjunct. Verified LIVE: the `sc-vp-telltale-red` and
+`sc-vu-emergency` pace profiles are timed on the harness's wall clock and keyed by a background PWM modulator, so the antecedent
+holds as sized (lamp 3/3 rounds 1–2; emergency 3/3 in round 1, 0/3 in round 2 — the governor overshoots to 51 km/h after the
+encounter, owed); `sc-vu-emergency`'s wrong leg starts from a fresh load of the lesson with the throttle held, so the leg now
+FAILS TO GIVE WAY and the product convicts «Непропускане на автомобил със специален режим» (−10) at t≈16 s; GAP-8a/8c/8d/8e/8f
+fixed and 8b's task cap folded into the pace target (doc 93); the P1 witness mounts the product's `HudToasts` markup and uses the
+HUD census's ancestor-chain paint test (GAP-9 items 1 and 5). The round-2 verifier's last finding — the «DOES THIS TASK WANT R?»
+gate runs before the phase branch, so a halted car at rest under an R banner was armed into reverse — is closed by
+`phase !== "halt"` in that gate with an executed test (sabotage red). **Nothing closes by this landing**: `platform/` and `content/`
+are byte-identical to 9ab89b8. Owed: the impact burst inside `IMPACT_SHAKE_MS` and the fault-card full text/clipping capture
+(item 5), pedestrians in the hazard loop, the lamp leg's post-release run into the road end.

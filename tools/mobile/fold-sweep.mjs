@@ -229,8 +229,9 @@ const PROBE = () => {
     // What the emulation actually did to this document, recorded in the row
     // rather than asserted once: a column can then be re-derived from raw and
     // still say which phone it describes.
-    saEmulated: document.documentElement.dataset.saEmulated ?? null,
-    saRewrites: Number(document.documentElement.dataset.saRewrites ?? 0),
+    // (H2: read off the agent's own state — lib/insets.mjs no longer stamps it on <html>, which React owns.)
+    saEmulated: window.__knijkaInsets?.emulated ?? null,
+    saRewrites: Number(window.__knijkaInsets?.rewrites ?? 0),
     bodyPad: {
       left: Math.round(parseFloat(cs.paddingLeft)) || 0,
       right: Math.round(parseFloat(cs.paddingRight)) || 0,

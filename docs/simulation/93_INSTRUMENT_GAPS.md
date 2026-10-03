@@ -581,7 +581,7 @@ All three of its verifiers refuted it, so it is parked. **Nothing of it is on `s
 `sc-rb-lane-choice:ffdffd55` (C), `sc-roundabout-entry:4ab693eb` (C), `:8be266cf` (C),
 `:7b747c15`, `:08a0b701` — 9 rows, 6 critical (11 open roundabout-family rows in all).
 
-## GAP-8 — three harness faults that produced false product failures on the w66 re-drive — **OPEN 2026-09-29**
+## GAP-8 — three harness faults that produced false product failures on the w66 re-drive — **FIXED 2026-10-03 (H2) except 8b's pedestrians**
 
 Found by `triage-w66-collisions` (wf_28f1432d-80b; each triage adversarially verified, all `refuted=false`) on the
 re-drive of 9792cd4. None is a product defect; each made a correct drive look failed. They are recorded here so no
@@ -642,3 +642,22 @@ None of these is a known wrong sentence on a real drive; each is a sabotage a fu
    witness reports the cards correctly (round-15 verifier). Found by the gate: `reverseAssist-audit-harness.test.ts` §7 pinned the
    FIRST `const painted` in the file, and H1's came first; the pin now anchors on the census's own root line and must match exactly
    once. **Owed with item 1: give the witness the census's ancestor-chain test.**
+
+### GAP-8 / GAP-9 status after harness H2 (2026-10-03)
+
+| item | status |
+| --- | --- |
+| 8a ring read as a chevron | FIXED — `readAim` refuses the arrow unless the authored route turns ≥ 30° within 30 m ahead; components elongated past 2.5 are skipped. Live: sc-ac-bridge-ice pc-right ИЗДЪРЖАН, chevronRefusals 6 |
+| 8b pace overshoot / pedestrians | PARTIAL — the strictest task cap on the glass is in the roll target (phone right leg under «дръж под 5 км/ч» now reads 7–10, was 25); **the hazard loop still does not see pedestrians** (k-zone-2 hit one at ≈160 s) |
+| 8c pre-hydration stamps | FIXED — nothing is stamped on `<html>`; inline `env()` is rewritten only once React owns the element or after 20 s |
+| 8d lateral offset read as a turn | FIXED — the sustained-turn branch needs a turn ahead on the authored route; a sign-flipped correction inherits the press length for one tick |
+| 8e scan gaps with the pedal down | FIXED — a roll tick more than 3 s after the steering loop's last tick does not press the throttle |
+| 8f open-loop roll after RECOVERY REFUSED | FIXED — a `halt` phase brakes to rest and ends the drive; neither the roll end (round 2) nor the R gate (integrator) can leave it |
+| GAP-9 item 1 (witness on non-product markup) | FIXED — the tests build the card from `HudToasts.tsx`; the fake observer honours `childList`/`subtree` |
+| GAP-9 item 5 (witness paint = box size) | FIXED — the witness uses the census's ancestor-chain test |
+| GAP-9 items 2–4 | unchanged (recorded conditions) |
+
+New, owed: the emergency pace profile held 3/3 in round 1 and 0/3 in round 2 (run broken at 51 km/h against the disc 50 after the
+encounter — the conviction still lands at t≈16 s, so rows 155903c1/4056508c are judgeable); the impact burst and the fault-card
+text/clipping capture (H2 item 5, designed in the round-1 builder's owed list); survivors V12 (30.0° boundary) and V14 (provenance
+text at cap == target) are on inputs no drive produced.

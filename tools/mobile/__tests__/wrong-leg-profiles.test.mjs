@@ -381,6 +381,13 @@ const VOCABULARY = new Set([
   // H1 ROUND 3: the lamp run's start past the launch (a design constant's name) — none a product actor, action, modal or
   // connective
   "warninglamprunstartkmh",
+  // HARNESS STAGE H2: the throttle modulator and its command (a fraction of a cycle, set on each flat tick), the rate term
+  // (how fast the dial rose, per second), the wall clock and its dial odometer, the lamp's ignore route (a design
+  // constant's name), the pause layer the harness drained, and the emergency lesson's reload start (the harness's checks,
+  // its second load, the throttle key it pressed again, the belt key, what the page reported) — every one a word about
+  // the harness's own acts and readings; none a product actor, action, modal or connective
+  "again", "asked", "belt", "check", "checks", "command", "cycle", "drained", "fraction", "key", "load", "loaded", "modulator",
+  "next", "press", "pressing", "reported", "rose", "second", "set", "sets", "sum", "those", "wall-clock", "warninglampignoreroutem", "keep",
 ]);
 
 /** The word classes no line may use: a product ACTOR, a product ACTION, a
@@ -412,7 +419,8 @@ function vocabularyViolations(text) {
 /** A template's printable words: its text with the slots removed, plus its fallbacks. */
 const templateText = (t) => `${t.replace(TEMPLATE_SLOT_RE, " ")} ${[...t.matchAll(TEMPLATE_SLOT_RE)].map((m) => m[3] ?? "").join(" ")}`;
 /** The templates a whole LINE starts from — a line is one of these, filled. */
-const TOP_TEMPLATES = ["start.on", "start.refused", "say.held", "say.notHeld", "say.notHeldEnd", "say.braking", "outcome.refused", "outcome.noTicks", "outcome.held", "outcome.notHeld", "rest.zone", "rest.plain", "rest.holds", "summary", "summary.unchanged", "rest.holdsPlain"];
+// (H2: + the reload start's two lines, which a lane whose row declares `start: "reload"` prints beside its start line.)
+const TOP_TEMPLATES = ["start.on", "start.refused", "start.reload", "start.reloadNone", "say.held", "say.notHeld", "say.notHeldEnd", "say.braking", "outcome.refused", "outcome.noTicks", "outcome.held", "outcome.notHeld", "rest.zone", "rest.plain", "rest.holds", "summary", "summary.unchanged", "rest.holdsPlain"];
 const templateLineRe = (id) =>
   new RegExp(
     `^${PROFILE_LINE_TEMPLATES[id]
@@ -588,7 +596,6 @@ describe("§W1 THE DESIGN CONSTANTS — every sizing number declared, sized at 4
       // HARNESS STAGE H1, each sized at PROFILE_SIZED_AT_H1 (01de885) — the four H1 profiles' numbers
       WARNING_LAMP_REGRADE_SEC: 6,
       WARNING_LAMP_COMPLY_DROP_KMH: 5,
-      warningLampBillSec: 23.7,
       warningLampHeldPaceKmh: 45,
       warningLampRunStartKmh: 40,
       emYieldSlowKmh: 38,
@@ -605,15 +612,21 @@ describe("§W1 THE DESIGN CONSTANTS — every sizing number declared, sized at 4
       rearBadgeHalfQuantumM: 0.5,
       ftgCalmZoneNearRouteM: 175,
       debrisRouteM: 175,
-      paceDutyBase: 0.15,
+      // HARNESS STAGE H2, each sized at PROFILE_SIZED_AT_H2 (9ab89b8): the duty base re-sized with the keyboard pedal's
+      // ramps and the default tier in the model (0.15 → 0.42), and the lamp's ignore route (warningLampBillSec, which
+      // sized the H1 lamp run past the end of the road, is no longer declared)
+      paceDutyBase: 0.42,
+      warningLampIgnoreRouteM: 260,
     });
     // H1: the commits, in order, and which constants each one sized — the first 26 at 4112566, the H1 20 at 01de885
     // (round 2: + emRunTopKmh, the posted 50 on ln-v1 the emergency run's arm is sized on; round 3: + warningLampRunStartKmh,
     // where the lamp run starts past the launch).
-    assert.deepEqual([...PROFILE_SIZED_COMMITS], [PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1]);
+    // (H2: + 9ab89b8 — paceDutyBase moved there, warningLampIgnoreRouteM is new, warningLampBillSec is gone.)
+    assert.deepEqual([...PROFILE_SIZED_COMMITS], [PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1, LIBNS.PROFILE_SIZED_AT_H2]);
     assert.equal(PROFILE_SIZED_AT_H1, "01de885");
+    assert.equal(LIBNS.PROFILE_SIZED_AT_H2, "9ab89b8");
     const byAt = Object.groupBy(Object.entries(PROFILE_DESIGN), ([, r]) => r.at);
-    assert.deepEqual(Object.fromEntries(Object.entries(byAt).map(([a, v]) => [a, v.length])), { [PROFILE_SIZED_AT]: 26, [PROFILE_SIZED_AT_H1]: 20 });
+    assert.deepEqual(Object.fromEntries(Object.entries(byAt).map(([a, v]) => [a, v.length])), { [PROFILE_SIZED_AT]: 26, [PROFILE_SIZED_AT_H1]: 18, [LIBNS.PROFILE_SIZED_AT_H2]: 2 });
   });
 
   it("each constant carries its PROVENANCE — the product source it was sized from and the commit — in its record AND in a «// sized from … at 4112566» comment on its line", () => {
@@ -635,6 +648,8 @@ describe("§W1 THE DESIGN CONSTANTS — every sizing number declared, sized at 4
       assert.ok(lines[decl].includes(`"${r.from}"`), `${k}'s record and its declaration disagree`);
       // …and an H1 record says so in its declaration (the fourth argument), a round-7 one does not.
       assert.equal(lines[decl].includes(", PROFILE_SIZED_AT_H1)"), r.at === PROFILE_SIZED_AT_H1, `${k}'s declaration and its commit disagree`);
+      // (H2: …and an H2 record by PROFILE_SIZED_AT_H2.)
+      assert.equal(lines[decl].includes(", PROFILE_SIZED_AT_H2)"), r.at === LIBNS.PROFILE_SIZED_AT_H2, `${k}'s declaration and its commit disagree`);
     }
     // One provenance comment per constant, and no stray ones.
     assert.equal(lines.filter((l) => /^ {2}\/\/ sized from .+ at \w+$/.test(l)).length, Object.keys(PROFILE_DESIGN).length);
@@ -2039,9 +2054,11 @@ const squash = (s) => stripComments(s).replace(/\s+/g, " ").trim();
 const SEC5_EXPORTS = [...SEC5.matchAll(/^export (?:const|function|let) (\w+)/gm)].map((m) => m[1]);
 /** The §5 functions the harness imports — the whole list, in its order. */
 const HARNESS_SEC5_IMPORTS = [
+  // (H2: the throttle modulator's cycle, the reload start's poll and ceiling, its line and its declaration)
+  "PACE_CYCLE_MS", "RELOAD_START_MAX_MS", "RELOAD_START_POLL_MS",
   "createWrongLegProfile", "flatRestDue", "flatRestHoldDone", "h1ProbeReads", "parseRearProximity", "readZoneRouteSpan", "resumeThrottleAfterPause", "wrongLegFlatStep", "wrongLegProfileFinish",
-  "wrongLegProfileFor", "wrongLegProfileOutcomeLine", "wrongLegProfileStartLine", "wrongLegRestBooked", "wrongLegRestEnded", "wrongLegRestHoldNote",
-  "wrongLegRestHoldsClause", "wrongLegRestOpportunity", "wrongLegRestSummary", "wrongLegRestTick",
+  "wrongLegProfileFor", "wrongLegProfileOutcomeLine", "wrongLegProfileStartLine", "wrongLegReloadStartLine", "wrongLegRestBooked", "wrongLegRestEnded", "wrongLegRestHoldNote",
+  "wrongLegRestHoldsClause", "wrongLegRestOpportunity", "wrongLegRestSummary", "wrongLegRestTick", "wrongLegStartFor",
 ];
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** EVERY line of the harness that names a profile value, and how many times each
@@ -2095,6 +2112,19 @@ const HARNESS_ALLOWED_LINES = [
   [/^if \(H1_READS\.eventShots\) await finishEventShots\(\);$/, 1],
   [/^rearSel: H1_READS\.rear && MODE !== "right" \? REAR_PROX_SEL : null,$/, 1],
   [/^witnessOn: H1_READS\.eventShots,$/, 1],
+  // HARNESS STAGE H2: the throttle modulator's two waits (its cycle, a §5 constant); the reload start — its declaration
+  // read once from §5 (a derived binding), its record, its ceiling and poll, its line and that line's sink; the flat
+  // tick's wall interval; and the modulator stopped on a tick the profile hands no command.
+  [/^await page\.waitForTimeout\(PACE_CYCLE_MS - cmd\.ms\);$/, 1],
+  [/^await page\.waitForTimeout\(PACE_CYCLE_MS\);$/, 1],
+  [/^const wrongLegStart = wrongLegStartFor\(MODE === "right" \|\| STEER_PROOF \? null : SCENARIO\);$/, 1],
+  [/^const reloadStart = \{ applies: wrongLegStart === "reload", navMs: null, keyDowns: 0, unreadDial: 0, goKmh: null, goMs: null, beltPresses: 0 \};$/, 1],
+  [/^while \(Date\.now\(\) - askedAt < RELOAD_START_MAX_MS\) \{$/, 1],
+  [/^await page\.waitForTimeout\(RELOAD_START_POLL_MS\);$/, 1],
+  [/^const wrongProfileReload = reloadStart\.applies \? wrongLegReloadStartLine\(wrongProfile, reloadStart\) : null;$/, 1],
+  [/^if \(wrongProfileReload !== null\) loud\(wrongProfileReload\);$/, 1],
+  [/^wallDtMs: wrongProfile\.on \? wallDtMs : null,$/, 1],
+  [/^if \(wrongProfileStep\.pedal === null\) await paceRelease\(\);$/, 1],
 ];
 /** EVERY statement a condition naming a profile value controls (its consequent
  *  and any `else` chain), whitespace-squashed and comments stripped — and the
@@ -2105,8 +2135,12 @@ const HARNESS_CONTROLLED = [
   ["the P1 witness's install", { text: "await installEventWitness();" }],
   ["the P1 series' arming", { text: "armEventShots(t0);" }],
   ["the start line's sink", { text: "loud(wrongProfileStart);" }],
+  // HARNESS STAGE H2: the reload start's line reaches the log at the same sink.
+  ["the reload start line's sink", { text: "loud(wrongProfileReload);" }],
   ["the pause drain's guarded re-press", { text: "await throttle(true);" }],
   ["the flat tick's say sink", { text: "(wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line);" }],
+  // HARNESS STAGE H2: a tick on which the profile hands no throttle command stops the modulator (the throttle only).
+  ["the modulator's stop", { text: "await paceRelease();" }],
   // HARNESS STAGE H1: the flat tick's throttle — the plain flat throttle, or a pace profile's command (the throttle only).
   ["the flat tick's throttle", { text: 'await timed("pedals", () => throttle(true)); else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));' }],
   ["the transition", { text: '{ phase = "flat-rest"; phaseAt = now; phaseTicks = 0; flatM = 0; flatRestAt = 0; restLogged = false; }' }],
@@ -2265,6 +2299,8 @@ const SEC5_PINNED_DECLS = [
   "export function wrongLegRestHoldNote(state, booked, opts) { const spec = wrongLegRestHoldNoteSpec(state, booked, opts); return spec === null ? null : renderProfileText(spec); }",
   'export function wrongLegRestSummary(state) { const spec = wrongLegRestSummarySpec(state); return spec === null ? "" : renderProfileText(spec); }',
   "export function wrongLegRestHoldsClause(state, opts) { const spec = wrongLegRestHoldsSpec(state, opts); return spec === null ? null : renderProfileText(spec); }",
+  // HARNESS STAGE H2: the reload start's line, over its twin.
+  "export function wrongLegReloadStartLine(state, obs) { const spec = wrongLegReloadStartSpec(state, obs); return spec === null ? null : renderProfileText(spec); }",
 ];
 function sec5GateViolations(lib) {
   const v = [];
@@ -2291,9 +2327,10 @@ function sec5GateViolations(lib) {
   const sq = squash(sec5);
   for (const d of SEC5_PINNED_DECLS) if (!sq.includes(d)) v.push(`L3 not pinned any more: ${d.slice(0, 90)}…`);
   // L4 — renderProfileText is called in exactly the pinned places: the wrappers, sayLine, zoneBrakingModel, the
-  //      three rendered constants and profileText's validation — and nowhere else outside the renderer.
+  //      three rendered constants and profileText's validation — and nowhere else outside the renderer. (H2: + the
+  //      reload start's wrapper, 12.)
   const calls = (rest.match(/\brenderProfileText\(/g) ?? []).length;
-  if (calls !== 11) v.push(`L4 renderProfileText is called ${calls} time(s) outside the renderer, not 11`);
+  if (calls !== 12) v.push(`L4 renderProfileText is called ${calls} time(s) outside the renderer, not 12`);
   // L5 — no alias of readFileSync the runtime spy cannot see (the verifier's V7-E1).
   if ((sec5.match(/\breadFileSync\b/g) ?? []).length !== 2) v.push("L5 readFileSync is named outside its two authored-content calls");
   // …nor anywhere else in the lib, where an alias taken at load time would reach §5 as another name: the whole
@@ -3401,7 +3438,8 @@ const SIZING_CLAIMS = [
   // HARNESS STAGE H1: the lamp's bill time is the product's own measurement on ONE drive (engine.ts's comment on
   // WARNING_LAMP_COMPLY_DROP_KMH: «held 45 to the end of the road», the ignore at 23,7 s); the brake-check's reaction
   // is the reaction census's maximum
-  ["pace.whyLamp", "measured on a drive held at warningLampHeldPaceKmh {pace:n} км/ч", "a drive held at warningLampHeldPaceKmh {pace:n} км/ч"],
+  // (H2: the lamp run is no longer sized on that one drive's bill time — it is the re-grade window + the margin after the
+  // lamp's ignore route, and pace.whyLamp says «measured» nowhere, so it registers nothing.)
   ["brake.room", "the reaction maximum {react:n} s of a census of {n:n} flat to flat-rest transitions on archived wrong legs", "a census of {n:n} flat to flat-rest transitions on archived wrong legs"],
   // H1 ROUND 2 (F4): the brake-check's ceiling ratio is the lowest reading of the harness's whole odometer census, and the
   // sentence names that population and this lesson's own legs in it
@@ -3675,7 +3713,8 @@ describe("§W7 THE LINES ARE STRUCTURAL — one template table, one renderer, a 
     assert.equal(touching.length, HARNESS_ALLOWED_LINES.reduce((a, [, n]) => a + n, 0), "UNREADABLE: the lines naming a profile value are not the enumerated ones");
     assert.equal(harnessControlled(SRC, isProfileNameWordIn(SRC)).length, HARNESS_CONTROLLED.length);
     // (H1 round 2: the one derived binding is the lane's H1 reads.)
-    assert.deepEqual(sec5BoundNames(SRC), ["H1_READS"]);
+    // (H2: and the lane's start, read once from §5's declaration.)
+    assert.deepEqual(sec5BoundNames(SRC).sort(), ["H1_READS", "wrongLegStart"]);
     // …the sidecar key is one of the names it reads (round 8 finish), and it occurs on exactly one line — the spread.
     assert.deepEqual(touching.filter((l) => /\bwrongLegProfile\b/.test(l)).map((l) => l.trim()), ['...(MODE !== "right" && wrongProfile.declared ? { wrongLegProfile: wrongProfile } : {}),']);
     // …every generic id segment it exempts IS carried by a harness literal today, and no distinctive one is.
@@ -3864,6 +3903,19 @@ describe("§W7 THE LINES ARE STRUCTURAL — one template table, one renderer, a 
       start(`zone no span ${JSON.stringify(why)}`, st, { everyM: 45 });
       outc(`zone no span ${JSON.stringify(why)} outcome`, st);
     }
+    // HARNESS STAGE H2: the reload start's line — the dial read over 0, never read over 0, and a record with holes
+    for (const platform of ["pc", "mobile"]) {
+      const st = createWrongLegProfile("sc-vu-emergency", { platform });
+      for (const [label, obs] of [
+        ["read over 0", { keyDowns: 32, goKmh: 4, goMs: 3174, navMs: 1210, unreadDial: 3, beltPresses: 1 }],
+        ["never over 0", { keyDowns: 900, goKmh: null, goMs: null, navMs: null, unreadDial: 0, beltPresses: 0 }],
+        ["a record with holes", { keyDowns: "x", goKmh: 2, goMs: NaN }],
+      ]) {
+        const line = LIBNS.wrongLegReloadStartLine(st, obs);
+        assert.ok(typeof line === "string", `reload start ${label}: no line`);
+        add(`reload start ${platform} ${label}`, line, LIBNS.wrongLegReloadStartSpec(st, obs));
+      }
+    }
     return lines;
   }
 
@@ -3882,7 +3934,9 @@ describe("§W7 THE LINES ARE STRUCTURAL — one template table, one renderer, a 
       assert.match(line, / · READINGS: /, label);
       // (H1: or the label that names both commits, on a profile sized at both.)
       const H1_LABEL = R(profileText("sizing.labelAt", { at: [PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1] }));
-      assert.ok(line.includes(`${SIZING_LABEL}: `) || line.includes(`${ZONE_SIZING_LABEL}: `) || line.includes(`${H1_LABEL}: `), `${label}: no sizing — ${line}`);
+      // (H2: or the label that names all three, on a pace profile re-sized at H2.)
+      const H2_LABEL = R(profileText("sizing.labelAt", { at: [PROFILE_SIZED_AT, PROFILE_SIZED_AT_H1, LIBNS.PROFILE_SIZED_AT_H2] }));
+      assert.ok(line.includes(`${SIZING_LABEL}: `) || line.includes(`${ZONE_SIZING_LABEL}: `) || line.includes(`${H1_LABEL}: `) || line.includes(`${H2_LABEL}: `), `${label}: no sizing — ${line}`);
       assert.ok(!/product source|read from source|source read/.test(line), `${label}: ${line}`);
     }
   });
@@ -4221,9 +4275,11 @@ describe("§W8 the harness actually wires it — and no profile steers or reads 
     const imp = CODE.match(/import \{([^}]*\bwrongLegFlatStep\b[^}]*)\} from "\.\/lib\/driveline\.mjs";/);
     assert.ok(imp, "the §5 import is gone");
     assert.deepEqual(imp[1].split(",").map((s) => s.trim()).filter(Boolean).sort(), [
+      // (H2: the modulator's cycle, the reload start's poll, ceiling, line and declaration)
+      "PACE_CYCLE_MS", "RELOAD_START_MAX_MS", "RELOAD_START_POLL_MS",
       "createWrongLegProfile", "flatRestDue", "flatRestHoldDone", "h1ProbeReads", "parseRearProximity", "readZoneRouteSpan", "resumeThrottleAfterPause", "wrongLegFlatStep", "wrongLegProfileFinish",
-      "wrongLegProfileFor", "wrongLegProfileOutcomeLine", "wrongLegProfileStartLine", "wrongLegRestBooked", "wrongLegRestEnded", "wrongLegRestHoldNote",
-      "wrongLegRestHoldsClause", "wrongLegRestOpportunity", "wrongLegRestSummary", "wrongLegRestTick",
+      "wrongLegProfileFor", "wrongLegProfileOutcomeLine", "wrongLegProfileStartLine", "wrongLegReloadStartLine", "wrongLegRestBooked", "wrongLegRestEnded", "wrongLegRestHoldNote",
+      "wrongLegRestHoldsClause", "wrongLegRestOpportunity", "wrongLegRestSummary", "wrongLegRestTick", "wrongLegStartFor",
     ]);
     assert.ok(!/readProfileConstants|consts:/.test(CODE), "the harness still hands the profile product numbers");
     assert.match(CODE, /const wrongProfileDecl = MODE === "right" \? null : wrongLegProfileFor\(SCENARIO\);/);
@@ -4237,7 +4293,10 @@ describe("§W8 the harness actually wires it — and no profile steers or reads 
     const call = flat.match(/const wrongProfileStep = wrongLegFlatStep\(wrongProfile, \{([\s\S]*?)\}\);/);
     assert.ok(call, "the flat tick no longer calls wrongLegFlatStep");
     const keys = call[1].split(",").map((s) => s.trim().split(":")[0].trim()).filter(Boolean);
-    assert.deepEqual(keys, ["now", "t0", "kmh", "flatStepM", "dtMs", "postedKmh", "follow", "probeAt", "rear", "impact"]);
+    assert.deepEqual(keys, ["now", "t0", "kmh", "flatStepM", "dtMs", "postedKmh", "follow", "probeAt", "rear", "impact", "wallDtMs"]);
+    // (H2: the wall interval this tick's dial reading closes — the harness's own clock, never a pose — on a lane with a
+    // profile only.)
+    assert.match(call[1], /wallDtMs: wrongProfile\.on \? wallDtMs : null/);
     // (H1: the rear badge and the impact count are OBSERVATIONS off the page — the badge's label, parsed by §5; the
     // page-side count of impact-flash mounts — and neither names a pose.)
     assert.match(call[1], /rear: wrongProfile\.on \? parseRearProximity\(p\.rearProx\) : null/);
@@ -4832,18 +4891,38 @@ function harnessFacts(src = SRC) {
     throttleHeldOnBookingTick:
       THROTTLE_HELPER(sq) &&
       flat !== null &&
-      flat.includes("(wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line); if (!wrongProfileStep.pedal) await timed(\"pedals\", () => throttle(true)); else await timed(\"pedals\", () => paceThrottle(wrongProfileStep.pedal));") &&
+      // (H2: a step whose pace profile stopped on this tick carries `pedal: null` and stops the modulator first; a booking
+      // step carries no `pedal` key, so the stop is not run on it)
+      flat.includes("(wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line); if (wrongProfileStep.pedal === null) await paceRelease(); if (!wrongProfileStep.pedal) await timed(\"pedals\", () => throttle(true)); else await timed(\"pedals\", () => paceThrottle(wrongProfileStep.pedal));") &&
       !/throttle\(false\)|brake\(true/.test(flat) &&
       forcedStepsCarryNoPedal(),
     // THE PACE GOVERNOR IS APPLIED AS §5 HANDS IT OUT, AND IT IS THE THROTTLE ONLY (H1): `paceThrottle` holds the throttle
     // down on «down», lets it up on anything but «down» and «pulse», and on «pulse» presses it for the command's ms and
     // lets it up — and nothing in it names the brake; the flat tick calls it with the step's own `pedal`.
+    // (H2: `paceThrottle` SETS the command on the throttle modulator, which runs it cycle after cycle of PACE_CYCLE_MS
+    // wall clock — «down» held down, «up» (anything but «down» and «pulse») held up, «pulse» down for the command's ms of
+    // each cycle and up for the rest — until the next command is set or `paceRelease` stops it; nothing in the three
+    // names the brake; the flat tick sets the step's own `pedal`, stops the modulator on a tick that hands `null`, and
+    // the drive's end stops it before anything else.)
     paceApplied:
       THROTTLE_HELPER(sq) &&
-      sq.includes('const paceThrottle = async (cmd) => { if (cmd.act === "down") return throttle(true); if (cmd.act !== "pulse") return throttle(false); await throttle(true); await page.waitForTimeout(cmd.ms); await throttle(false); };') &&
+      sq.includes('const paceMod = { cmd: null, run: null, stop: false }; const paceModRun = async () => { while (!paceMod.stop) { const cmd = paceMod.cmd; if (cmd.act === "pulse") { await throttle(true); await page.waitForTimeout(cmd.ms); await throttle(false); await page.waitForTimeout(PACE_CYCLE_MS - cmd.ms); } else { await throttle(cmd.act === "down"); await page.waitForTimeout(PACE_CYCLE_MS); } } }; const paceThrottle = async (cmd) => { paceMod.cmd = cmd; if (paceMod.run !== null) return; paceMod.stop = false; paceMod.run = paceModRun().catch(() => {}); }; const paceRelease = async () => { if (paceMod.run === null) return; paceMod.stop = true; await paceMod.run; paceMod.run = null; }; let refusedReversePress = 0;') &&
       flat !== null &&
-      flat.includes('else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));') &&
-      (sq.match(/\bpaceThrottle\(/g) ?? []).length === 1,
+      flat.includes('if (wrongProfileStep.pedal === null) await paceRelease(); if (!wrongProfileStep.pedal) await timed("pedals", () => throttle(true)); else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));') &&
+      sq.includes("} await paceRelease(); if (roadWitness !== null) await roadWitness.poll(); await throttle(false); await brake(false);") &&
+      (sq.match(/\bpaceThrottle\(/g) ?? []).length === 1 &&
+      (sq.match(/\bpaceMod\.cmd = /g) ?? []).length === 1 &&
+      (sq.match(/\bpaceModRun\(/g) ?? []).length === 1,
+    // THE RELOAD START IS WHAT ITS LINE SAYS (H2): on a lane whose row declares it, the lesson's own address is loaded
+    // again, the throttle key pressed down at once and again after each RELOAD_START_POLL_MS wait — each counted — until
+    // the dial (read only once the load reported its content) first reads over 0 or RELOAD_START_MAX_MS runs out; then
+    // the belt key, once, unless the lane drives unbelted; and the line is §5's, printed right after the start line.
+    reloadStart:
+      sq.includes(`const speedNow = () => page .evaluate(() => { const sp = document.querySelector('[aria-label^="Скорост "]'); return sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\\d+)/) || [0, -1])[1]) : -1; }) .catch(() => -1);`) &&
+      sq.includes('const wrongLegStart = wrongLegStartFor(MODE === "right" || STEER_PROOF ? null : SCENARIO); const reloadStart = { applies: wrongLegStart === "reload", navMs: null, keyDowns: 0, unreadDial: 0, goKmh: null, goMs: null, beltPresses: 0 }; if (reloadStart.applies) { const askedAt = Date.now(); let loaded = false; const nav = page .goto(`${BASE}/simulator?scenario=${SCENARIO}&level=1`, { waitUntil: "domcontentloaded", timeout: 300_000 }) .then(() => { loaded = true; reloadStart.navMs = Date.now() - askedAt; }) .catch(() => {}); while (Date.now() - askedAt < RELOAD_START_MAX_MS) { await page.keyboard.down("KeyW").catch(() => {}); reloadStart.keyDowns += 1; const kmh = loaded ? await speedNow() : -1; if (loaded && kmh < 0) reloadStart.unreadDial += 1; if (kmh > 0) { reloadStart.goKmh = kmh; reloadStart.goMs = Date.now() - askedAt; break; } await page.waitForTimeout(RELOAD_START_POLL_MS); } await nav; holdW = true; inputChannel.driveKeyEvents += reloadStart.keyDowns; if (!DRIVE_UNBELTED) { await page.keyboard.press("KeyB").catch(() => {}); reloadStart.beltPresses += 1; } saveStatus({ reloadStart }); }') &&
+      sq.includes("if (wrongProfileStart !== null && !STEER_PROOF) loud(wrongProfileStart); const wrongProfileReload = reloadStart.applies ? wrongLegReloadStartLine(wrongProfile, reloadStart) : null; if (wrongProfileReload !== null) loud(wrongProfileReload);") &&
+      (sq.match(/\breloadStart\.keyDowns \+= 1/g) ?? []).length === 1 &&
+      (sq.match(/\breloadStart\.beltPresses \+= 1/g) ?? []).length === 1,
     // EACH FLAT-REST TICK LETS THE THROTTLE UP AND PUTS THE BRAKE DOWN: `throttle(false)` right after the pose read, and
     // `brake(true, p.kmh)` at the branch's top level (after the lost-key re-assert block, before the rest is judged).
     flatRestPedals:
@@ -4926,12 +5005,18 @@ const HARNESS_SELF_CLAIMS = [
   // ── HARNESS STAGE H1: the pace governor's pedal acts, and the brake-check's booking (the braking line's own clause) ──
   [
     "pace.governor",
-    "under {full:n} км/ч the harness holds the throttle down for the whole tick, at or over the target it lets the throttle up for the whole tick, and between them it presses the throttle for (paceDutyBase {base:n2} + {gain:n2} per км/ч under the target) of the tick's own interval, from {pulseLoMs:n} to {pulseHiMs:n} ms, then lets it up; an unread dial lets the throttle up; the brake is never touched by it",
+    // (H2: the PD law on the throttle modulator)
+    "each flat tick sets one command on the harness's throttle modulator, which keeps it until the next one is set or the modulator is stopped — the throttle is down for a fraction of each {cycle:n} ms cycle of wall clock, paceDutyBase {base:n2} + {gain:n2} per км/ч the dial reads under the target, less {rate:n3} per км/ч a second the dial rose from the tick before to this one when both read it (over this tick's interval of wall clock, counted as {rateFloorMs:n} ms when it is less), and nothing is taken off on the profile's first tick, on a tick after one whose dial was unread, or on a tick whose interval of wall clock is not over 0; at a fraction of 1 or more the throttle is held down, at 0 or less it is let up, and between them it is down for {pulseLoMs:n} to {pulseHiMs:n} ms of each cycle; an unread dial lets the throttle up; the brake is never touched by it",
     ["paceApplied", "dialRead"],
   ],
   // H1 ROUND 2 (F1): the governor's tally is the commands the harness applied — §5 counts a command only once it rides
-  // out, and the harness applies every truthy `pedal` through `paceThrottle`.
-  ["readings.pace", "governor commands the harness applied", ["paceApplied"]],
+  // out, and the harness sets every truthy `pedal` on its modulator through `paceThrottle` (H2).
+  ["readings.pace", "governor commands the harness set on its throttle modulator, one on each flat tick the profile ran", ["paceApplied"]],
+  // HARNESS STAGE H2: the reload start's two lines — what the harness did between the two loads
+  ["start.reload", "the harness loaded the lesson again and held the throttle down from that load, pressing its key again after each {poll:n} ms wait ({keys:n} time(s) in all), until the dial first read over 0", ["reloadStart", "dialRead"]],
+  ["start.reload", "the harness then pressed the belt key {belt:n} time(s)", ["reloadStart"]],
+  ["start.reloadNone", "the harness loaded the lesson again and held the throttle down from that load, pressing its key again after each {poll:n} ms wait ({keys:n} time(s) in all), and the dial did not read over 0 in {max:n} s", ["reloadStart", "dialRead"]],
+  ["start.reloadNone", "the harness then pressed the belt key {belt:n} time(s)", ["reloadStart"]],
   ["obs.brakeCheck", "the throttle stays down to the end of this tick; each flat-rest tick after it lets the throttle up, and the first one whose dial does not read 0–{fs:n} км/ч puts the brake down", ["throttleHeldOnBookingTick", "flatRestPedals", "brakeRefusedAtRest"]],
 ];
 /** What makes a sentence a claim about the harness itself (round 10: its pedal acts, its holds and its cadence too). */
@@ -5042,7 +5127,8 @@ const H_LOUD = "const loud = (s) => note(`  !! ${s}`);\n";
 const H_FLAT_REST_POSE = '      await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "flat-rest"));\n';
 const H_FLAT_POSE = '      await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "flat"));\n';
 const H_FLAT_STEP = "      flatM += flatStepM;\n";
-const H_REST_BRAKE = "      await brake(true, p.kmh);\n";
+// (H2: the halt phase — GAP-8f — brakes with the same statement, so the flat-rest one is named with the line after it.)
+const H_REST_BRAKE = "      await brake(true, p.kmh);\n      const atRest = p.kmh >= 0 && p.kmh <= 1;\n      if (atRest && !restLogged) {\n";
 const H_PREV_KMH = "  prevKmh = p.kmh;\n";
 const H_STOP_WRONG = "        flatRestAt = now;\n        stopsMade++;\n";
 const H_SUMMARY_TAIL = "      wrongLegRestSummary(wrongProfile),\n  );\n";
@@ -5063,7 +5149,7 @@ describe("§W10 ROUND 9 — the round-8 verifier's findings, each ported as a te
     const facts = harnessFacts();
     // The facts themselves, measured from the harness as it is: the pose IS read (the round-8 verifier's evidence),
     // the road witness DOES record the lane, and a wrong leg's flat phase turns no wheel.
-    assert.deepEqual(facts, { poseRead: true, sec5ReadsNoPose: true, sec5ReadsNoLane: true, laneRecorded: true, noWheelOnFlat: true, restLinePerStop: true, throttleHeldOnBookingTick: true, paceApplied: true, flatRestPedals: true, brakeRefusedAtRest: true, atRestBooksTheRest: true, holdRestIsTaskCapOrOverLimit: true, plainHoldIsWallClock: true, throttleHelper: true, dialRead: true, driveEndReleasesBrake: true }, "the harness's own readings and acts are not what the templates were checked against");
+    assert.deepEqual(facts, { poseRead: true, sec5ReadsNoPose: true, sec5ReadsNoLane: true, laneRecorded: true, noWheelOnFlat: true, restLinePerStop: true, throttleHeldOnBookingTick: true, paceApplied: true, reloadStart: true, flatRestPedals: true, brakeRefusedAtRest: true, atRestBooksTheRest: true, holdRestIsTaskCapOrOverLimit: true, plainHoldIsWallClock: true, throttleHelper: true, dialRead: true, driveEndReleasesBrake: true }, "the harness's own readings and acts are not what the templates were checked against");
     assert.deepEqual(selfClaimViolations(), [], "a template says something about the harness itself that its code does not bear out");
   });
 
@@ -5502,8 +5588,14 @@ describe("§W11 ROUND 10 — the round-9 verifier's findings, each ported as a t
       ["the booking tick lifts the throttle", plantIn(SRC, "booking lift", '      else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));\n', '      else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));\n      if (wrongProfileStep.forceRest) await throttle(false);\n', "replace"), "throttleHeldOnBookingTick"],
       // H1: the pace governor's application stops being what the governor sentence says — a brake in it, a pulse that
       // never lets the throttle up, or the flat tick no longer applying the step's own command.
-      ["the pace helper presses the brake", plantIn(SRC, "pace brake", "  await throttle(false);\n};\nlet refusedReversePress = 0;\n", "  await throttle(false);\n  await brake(true);\n};\nlet refusedReversePress = 0;\n", "replace"), "paceApplied"],
-      ["the pace pulse never lets the throttle up", plantIn(SRC, "pace no-lift", "  await page.waitForTimeout(cmd.ms);\n  await throttle(false);\n};\n", "  await page.waitForTimeout(cmd.ms);\n};\n", "replace"), "paceApplied"],
+      // (H2: the modulator's cycle is the anchor now)
+      ["the pace modulator presses the brake", plantIn(SRC, "pace brake", "      await page.waitForTimeout(PACE_CYCLE_MS - cmd.ms);\n", "      await page.waitForTimeout(PACE_CYCLE_MS - cmd.ms);\n      await brake(true);\n", "replace"), "paceApplied"],
+      ["the pace pulse never lets the throttle up", plantIn(SRC, "pace no-lift", "      await page.waitForTimeout(cmd.ms);\n      await throttle(false);\n", "      await page.waitForTimeout(cmd.ms);\n", "replace"), "paceApplied"],
+      ["a held-down command lets the throttle up", plantIn(SRC, "pace down lifted", '      await throttle(cmd.act === "down");\n', "      await throttle(false);\n", "replace"), "paceApplied"],
+      ["the modulator keeps running after the profile stops", plantIn(SRC, "pace not stopped", "      if (wrongProfileStep.pedal === null) await paceRelease();\n", "", "replace"), "paceApplied"],
+      ["the modulator never runs (one press a tick, H1's)", plantIn(SRC, "pace no run", "  paceMod.run = paceModRun().catch(() => {});\n", "  paceMod.run = null;\n", "replace"), "paceApplied"],
+      ["the reload start presses the throttle once", plantIn(SRC, "reload once", "    await page.waitForTimeout(RELOAD_START_POLL_MS);\n  }\n", "    await page.waitForTimeout(RELOAD_START_POLL_MS);\n    break;\n  }\n", "replace"), "reloadStart"],
+      ["the reload start presses the belt key unasked", plantIn(SRC, "reload belt", "  if (!DRIVE_UNBELTED) { await page.keyboard.press(\"KeyB\").catch(() => {}); reloadStart.beltPresses += 1; }\n", "  await page.keyboard.press(\"KeyB\").catch(() => {}); reloadStart.beltPresses += 1;\n", "replace"), "reloadStart"],
       ["the flat tick ignores the pace command", plantIn(SRC, "pace ignored", '      else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));\n', '      else await timed("pedals", () => throttle(true));\n', "replace"), "paceApplied"],
       ["the brake refused over a wider band", plantIn(SRC, "refusal", "if (on && kmh !== null && kmh >= 0 && kmh <= 1) {", "if (on && kmh !== null && kmh >= 0 && kmh <= 3) {", "replace"), "brakeRefusedAtRest"],
       ["the rest booked on a wider band", plantIn(SRC, "at rest", "      await brake(true, p.kmh);\n      const atRest = p.kmh >= 0 && p.kmh <= 1;", "      await brake(true, p.kmh);\n      const atRest = p.kmh >= 0 && p.kmh <= 2;", "replace"), "atRestBooksTheRest"],
@@ -5813,19 +5905,19 @@ const TEMPLATE_SNAPSHOT = Object.freeze({
   "rest.holdsPlain": "441ae2d4c092",
   // HARNESS STAGE H1 — the new templates (none of the round-10 ones changed)
   "sizing.labelAt": "2a3d8fd45e98",
-  "sizing.pace": "556a6e6fd201",
+  "sizing.pace": "bd2e0e1a5855", // H2: the run's clause is a fragment (pace.runEm / pace.runLamp)
   "pace.startLamp": "bf9617b1e52e", // H1 round 5: «its first reading it credits that is at or over» (a reading over the disc or after a drop does not start it)
-  "pace.governor": "88129bbe9793",
+  "pace.governor": "5fcb2094772f", // H2: the PD law on the throttle modulator's cycle (H2 round 2: the rate term worded as the code takes it — from the tick before, and none after an unread dial)
   "pace.drop": "bd150a938181", // H1 round 5: the drop test gates the start too, and the window holds readings from before the run
-  "pace.whyLamp": "c7cc9ee9783e",
+  "pace.whyLamp": "fe109676f6e5", // H2: the re-grade window + the margin, no lag allowance, and what the route is
   "pace.whyEm": "0113c283ee6e",
-  "obs.paceHeld": "37209073ff03",
+  "obs.paceHeld": "fa5ecc9f3ee3", // H2: on the harness's wall clock, the gate clause, the sized fragment
   "pace.dropHeld": "8300bc3e8be8",
-  "obs.paceBroken": "7d8260f50706",
+  "obs.paceBroken": "b9c8b28a71d2", // H2: on the harness's wall clock, the gate clause, the sized fragment
   "pace.brokeFloor": "c1d1fa948391",
   "pace.brokeDisc": "121ad6cc667a",
   "pace.brokeDrop": "c40ad1e0c914",
-  "readings.pace": "039a7ce39204", // H1 round 5 (R4-READINGS-GAP-EXCLUDES-BREAK): whose readings the lowest and the largest gap are
+  "readings.pace": "702870267b09", // H1 round 5 (R4-READINGS-GAP-EXCLUDES-BREAK): whose readings the lowest and the largest gap are; H2: the wall clock, the gate, the commands set on the modulator, the ticks with no wall interval
   "pace.brokeAt": "44becb5bd461",
   "pace.gapRead": "8132c8e8ced2",
   "sizing.impact": "4913c6d0588e",
@@ -5850,6 +5942,18 @@ const TEMPLATE_SNAPSHOT = Object.freeze({
   "brake.ceiling": "f7693163ac4c",
   // H1 ROUND 5 — the new template (the changed ones above, each re-read)
   "pace.notBroke": "19a1a3eea0e3",
+  // HARNESS STAGE H2 — the new templates (the changed ones above, each re-read)
+  "start.reload": "cdf296ee8dd6",
+  "start.reloadNone": "92bfeb33fab8",
+  "outcome.clockPace": "c9910383c4a3",
+  "pace.runEm": "f0f72866bc77",
+  "pace.runLamp": "7dfd17eccf58",
+  "pace.sizedEm": "84e21865ce8c",
+  "pace.sizedLamp": "f46daaba856e",
+  "pace.gateRead": "b9b2146f2062",
+  "pace.gateUnder": "6fabaced7db2",
+  "pace.gateLate": "cda5f0467e46",
+  "pace.gateNoRun": "fb87a35ccb6d",
 });
 /** …and the profile table's printed texts (`name`, `told`, `row`), the same way. */
 const TABLE_TEXT_SNAPSHOT = Object.freeze({
@@ -5858,8 +5962,8 @@ const TABLE_TEXT_SNAPSHOT = Object.freeze({
   "sc-ac-truck-spray": "dc9a69512f2a",
   "sc-pk-busstop-ban": "ea3f2f1fdfbd",
   // HARNESS STAGE H1
-  "sc-vp-telltale-red": "d459161c6bf3", // (H1 round 6: the start rule, by the dial's rounding)
-  "sc-vu-emergency": "6821688d05e4", // (H1 round 6: the floor by the dial's rounding, started on the first such reading)
+  "sc-vp-telltale-red": "da57c8a7b1b7", // (H1 round 6: the start rule, by the dial's rounding; H2: the wall clock and the ignore route)
+  "sc-vu-emergency": "5e058a5d3c5e", // (H1 round 6: the floor by the dial's rounding, started on the first such reading; H2: the reload start and the wall clock)
   "sc-hz-brake-dont-swerve": "72348f1b9cdb",
   "sc-follow-tailgater": "de8999447a0c",
 });
@@ -5911,70 +6015,76 @@ const HARNESS_MECHANISM_ALLOWANCES = Object.freeze({
     "process.exitCode assign =": 1
   }
 });
-/** H7a — the wrong-leg cadence block, line for line (247 code lines at harness stage H1; 244 at round 10). */
+/** H7a — the wrong-leg cadence block, line for line (247 code lines at harness stage H1; 244 at round 10; H2: 249 — + the flat
+ *  tick's wall interval handed to §5 on a profile lane, and the modulator stopped on a tick whose profile hands `pedal: null`). */
 const CADENCE_BLOCK_PIN = `
   64ac0b48fc5a 140702af1bc7 eb6f427b5aaa 235f985d9beb a7809a9f9a40 cde927fe59fa 3c180b795e2c b24707756d57 15d25ee834fe f29b273bc453
-  de1f505942e1 b75e8806e3ed 0e072fc4bd55 552642cea5d7 c359a34ac0fe 29576b54e255 7e9e1267c40f a0ed0af1fa77 2cc59ab0072b 462a74d82d46
-  55d019123b35 c41f37e2eb88 5ccfc725266f b751b3915560 f8c21eb227eb 4e445b59a491 b24707756d57 65a844785539 c98496c2569f cde927fe59fa
-  8aede30e182c 29576b54e255 7d9ce50b3f2b 581a1c573ec8 09970aef6a2d 37d508c307c4 3554b17c241e 7655f71db20d cb4a91abf8cf 68e1cc8ab276
-  01a9273b8721 2995ba2acdff 14463a9d5ab0 254130777413 d3039c128d72 5c896edd09bd cb86a5fd8bff a6640e96baec 29576b54e255 32389aea3312
-  92af52e247c3 2bff5259df08 4d27571394a6 985045f1c057 8a5b133c639a 4d27571394a6 2a8440e0c7a9 f1c560d1de2d ac0236ee97e9 48e50935d86e
-  aed9556e36ff 686eaf5d223a 0262e6d8220b 11a4e96dad19 9afb2f3950c5 9d8b2b5670d1 35a5cd811cdd 92e83d16fe39 71454b752602 8df08256cc36
-  9d8b2b5670d1 d10b36aa74a5 d10b36aa74a5 d10b36aa74a5 6c41070fd8f8 41cc730e2162 b24707756d57 b9f40a56fb42 440db01a66d4 cde927fe59fa
-  df00e11ff333 29576b54e255 29fe3d1f5704 4fb54fc9e221 b6522511e11e 630531dcfe08 024106880a2d b2ac42e26cd1 c981d845f4a9 281c3b54d1fa
-  4c40449c00d9 0a116e38cf3c af8bc6859cf2 b24707756d57 cde927fe59fa 926b15174656 b0e47438fc0d 2a36cc9dd244 c3dcc2451fa2 85df2ae9ead0
-  bc0dc1f00fe1 29576b54e255 a65e7950a0a8 5abcfda004bd 432740256e5a b751a73ec66e 72ac35b78127 0658c8c7672c 3b887a389be3 065aca268de9
-  926b15174656 c3dcc2451fa2 ed41d50a3f70 55c923bc9d29 a892688153dc 26b46659f201 29576b54e255 329cfe5fd42a 92af52e247c3 afd3e9d9a4c4
-  73a0e8e43d9f 926e69a8b3cf 73a0e8e43d9f 62bdfc1e1821 1b9d522c3962 13df507392e6 d835169996cb b79a349fc049 486fcbc2df7e 8b0555552a7d
-  9a9191a49a3e a1fd02caa5e8 92e83d16fe39 1f27eb7495d1 573e8a3ed1da 8aa66f661659 bf2287c58023 9d8b2b5670d1 d10b36aa74a5 985045f1c057
-  c0df3a87c8c9 73a0e8e43d9f 14dd959a116e 469983c7b7ad 81589b920e6d aed9556e36ff 39acae332d80 4827dc0e4176 824c1d5feadf 3a8b3f5cd679
-  1aeb894848a8 183d7706b426 9d8b2b5670d1 ca9488f6c59e 92e83d16fe39 5bd86f836ae5 6a95ad5c0453 9d8b2b5670d1 d10b36aa74a5 d10b36aa74a5
-  d10b36aa74a5 e234864d7e48 a8a802f4943f 1bb12f4ed754 8e145d63aed7 cd28bba2914b 3a308589673d 4a902d20ca3b 5cd01f628358 eee65012e486
-  29576b54e255 933ffa4c2bb3 3523a5ed18d5 a8a802f4943f 1bb12f4ed754 8e145d63aed7 cd28bba2914b 3a308589673d 4a902d20ca3b 5cd01f628358
-  eee65012e486 2c58b0f2b094 abfa59370983 790e877c8143 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0 49b326eafbaf eb5206d6875b d10b36aa74a5
-  be3e34217755 c41f37e2eb88 92cffa71c81f fc149f826841 91708c727750 ac2bc63b0800 fb4e004cfcb6 44e30893a23f 4c6ffcd63126 5785108f2f21
-  d10b36aa74a5 702657670fa8 b43cbe5fb430 b02972ca89a8 94a38a1cfaab c8849f2d31b3 7b2c052e1f7a 9c95d34e136f 8fde04a415e1 52b34a87367a
-  aed9556e36ff 249025cb5081 126a9cec8e39 e413ed18c650 302fe3968337 1e43030a1a38 9d8b2b5670d1 fb9c8cb7c115 e7b0b4abb0a7 da04658e5130
-  d10b36aa74a5 99a1318a4e7c b7a3d37362ea 9729669ead87 3e929c591152 c423802c3a38 9d0196732bc0 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0
-  71eab2ade725 92e83d16fe39 f1ad5b299898 25638a2500c3 d9c2c3642d85 9d8b2b5670d1 911e4a282b3c 9729669ead87 3e929c591152 c423802c3a38
-  9d0196732bc0 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0 d10b36aa74a5 d10b36aa74a5 d10b36aa74a5
+  de1f505942e1 b75e8806e3ed 0e072fc4bd55 552642cea5d7 c359a34ac0fe a40ecf0d9ac6 29576b54e255 7e9e1267c40f a0ed0af1fa77 bd2150f135c5
+  2cc59ab0072b 462a74d82d46 55d019123b35 c41f37e2eb88 5ccfc725266f b751b3915560 f8c21eb227eb 4e445b59a491 b24707756d57 65a844785539
+  c98496c2569f cde927fe59fa 8aede30e182c 29576b54e255 7d9ce50b3f2b 581a1c573ec8 09970aef6a2d 37d508c307c4 3554b17c241e 7655f71db20d
+  cb4a91abf8cf 68e1cc8ab276 01a9273b8721 2995ba2acdff 14463a9d5ab0 254130777413 d3039c128d72 5c896edd09bd cb86a5fd8bff a6640e96baec
+  29576b54e255 32389aea3312 92af52e247c3 2bff5259df08 4d27571394a6 985045f1c057 8a5b133c639a 4d27571394a6 2a8440e0c7a9 f1c560d1de2d
+  ac0236ee97e9 48e50935d86e aed9556e36ff 686eaf5d223a 0262e6d8220b 11a4e96dad19 9afb2f3950c5 9d8b2b5670d1 35a5cd811cdd 92e83d16fe39
+  71454b752602 8df08256cc36 9d8b2b5670d1 d10b36aa74a5 d10b36aa74a5 d10b36aa74a5 6c41070fd8f8 41cc730e2162 b24707756d57 b9f40a56fb42
+  440db01a66d4 cde927fe59fa df00e11ff333 29576b54e255 29fe3d1f5704 4fb54fc9e221 b6522511e11e 630531dcfe08 024106880a2d b2ac42e26cd1
+  c981d845f4a9 281c3b54d1fa 4c40449c00d9 0a116e38cf3c af8bc6859cf2 b24707756d57 cde927fe59fa 926b15174656 b0e47438fc0d 2a36cc9dd244
+  c3dcc2451fa2 85df2ae9ead0 bc0dc1f00fe1 29576b54e255 a65e7950a0a8 5abcfda004bd 432740256e5a b751a73ec66e 72ac35b78127 0658c8c7672c
+  3b887a389be3 065aca268de9 926b15174656 c3dcc2451fa2 ed41d50a3f70 55c923bc9d29 a892688153dc 26b46659f201 29576b54e255 329cfe5fd42a
+  92af52e247c3 afd3e9d9a4c4 73a0e8e43d9f 926e69a8b3cf 73a0e8e43d9f 62bdfc1e1821 1b9d522c3962 13df507392e6 d835169996cb b79a349fc049
+  486fcbc2df7e 8b0555552a7d 9a9191a49a3e a1fd02caa5e8 92e83d16fe39 1f27eb7495d1 573e8a3ed1da 8aa66f661659 bf2287c58023 9d8b2b5670d1
+  d10b36aa74a5 985045f1c057 c0df3a87c8c9 73a0e8e43d9f 14dd959a116e 469983c7b7ad 81589b920e6d aed9556e36ff 39acae332d80 4827dc0e4176
+  824c1d5feadf 3a8b3f5cd679 1aeb894848a8 183d7706b426 9d8b2b5670d1 ca9488f6c59e 92e83d16fe39 5bd86f836ae5 6a95ad5c0453 9d8b2b5670d1
+  d10b36aa74a5 d10b36aa74a5 d10b36aa74a5 e234864d7e48 a8a802f4943f 1bb12f4ed754 8e145d63aed7 cd28bba2914b 3a308589673d 4a902d20ca3b
+  5cd01f628358 eee65012e486 29576b54e255 933ffa4c2bb3 3523a5ed18d5 a8a802f4943f 1bb12f4ed754 8e145d63aed7 cd28bba2914b 3a308589673d
+  4a902d20ca3b 5cd01f628358 eee65012e486 2c58b0f2b094 abfa59370983 790e877c8143 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0 49b326eafbaf
+  eb5206d6875b d10b36aa74a5 be3e34217755 c41f37e2eb88 92cffa71c81f fc149f826841 91708c727750 ac2bc63b0800 fb4e004cfcb6 44e30893a23f
+  4c6ffcd63126 5785108f2f21 d10b36aa74a5 702657670fa8 b43cbe5fb430 b02972ca89a8 94a38a1cfaab c8849f2d31b3 7b2c052e1f7a 9c95d34e136f
+  8fde04a415e1 52b34a87367a aed9556e36ff 249025cb5081 126a9cec8e39 e413ed18c650 302fe3968337 1e43030a1a38 9d8b2b5670d1 fb9c8cb7c115
+  e7b0b4abb0a7 da04658e5130 d10b36aa74a5 99a1318a4e7c b7a3d37362ea 9729669ead87 3e929c591152 c423802c3a38 9d0196732bc0 a6a7c1eeba8a
+  9d74c58d8dd0 4efbe75d22a0 71eab2ade725 92e83d16fe39 f1ad5b299898 25638a2500c3 d9c2c3642d85 9d8b2b5670d1 911e4a282b3c 9729669ead87
+  3e929c591152 c423802c3a38 9d0196732bc0 a6a7c1eeba8a 9d74c58d8dd0 4efbe75d22a0 d10b36aa74a5 d10b36aa74a5 d10b36aa74a5
 `;
-/** H7b — outside it, the 65 lines naming the cadence's state, a wrong-leg phase literal or a leg-mode test (round 10: the leg-mode tests derived from the code; H1 round 2: + the probe's rear-badge read, gated to a wrong leg). */
+/** H7b — outside it, the 65 lines naming the cadence's state, a wrong-leg phase literal or a leg-mode test (round 10: the leg-mode tests derived from the code; H1 round 2: + the probe's rear-badge read, gated to a wrong leg; H2: 69 — + the reload start's declaration read and its belt press, the
+ *  right leg's task-cap budget extension and its throttle beat, both on a ribbon roll). */
 const EFFECT_LINES_PIN = `
   20e9a1df206e d47864293df8 254c8589123a 619e6d9231ec 357d8f8753b9 64ac0b48fc5a 708e6bded5bb af7bb837fad0 c2e331b8bf44 50b207dc4bbf
-  0d2ed8b628f7 64ac0b48fc5a 64ac0b48fc5a de8669ee9a07 fcb13a0a4384 08e38737ee15 97ee2d2536c8 165433c2c261 d59a7ff22aca b8d54a751d08
-  aec5999e4ebe 7f7e1e9c38c1 8f919965974c 44dc0d0850c0 a357386843e5 621e8f982818 eb5206d6875b eb5206d6875b 688ebe1054b2 330755fef94d
-  5ffc64a372c1 13b56a9b2f17 a0f7e579028f 7d5a7cd19b04 eb5206d6875b b02972ca89a8 94a38a1cfaab 7b2c052e1f7a fb9c8cb7c115 eb5206d6875b
-  df228cb15808 9ac9dc686bd1 2f920a9cab19 72f57923e6b0 331064656919 bf9d76a2fafb 87e28ed8172b e1b0247d6c9e 34092c84093d 10d930de035c
-  288ff5f014c9 c00a0ce178d8 b0954baeb11d 621e8f982818 2d352a962961 2f27648a28c1 562c56f5044f 3cfe7f09f61a 4913972cd8ae 4e09e9df9da4
-  1a5a6f18fe38 051316388198 0ea61e021539 dd71e454a031 0e64ba293849
+  0d2ed8b628f7 64ac0b48fc5a 64ac0b48fc5a de8669ee9a07 98b32b0f5af7 13f72e47f444 fcb13a0a4384 08e38737ee15 97ee2d2536c8 165433c2c261
+  d59a7ff22aca b8d54a751d08 aec5999e4ebe 7f7e1e9c38c1 8f919965974c 44dc0d0850c0 e50e03eacb24 a357386843e5 621e8f982818 eb5206d6875b
+  eb5206d6875b 688ebe1054b2 330755fef94d 5ffc64a372c1 13b56a9b2f17 a0f7e579028f 7d5a7cd19b04 eb5206d6875b b02972ca89a8 94a38a1cfaab
+  7b2c052e1f7a fb9c8cb7c115 eb5206d6875b fd563c3de396 df228cb15808 9ac9dc686bd1 2f920a9cab19 72f57923e6b0 331064656919 bf9d76a2fafb
+  87e28ed8172b e1b0247d6c9e 34092c84093d 10d930de035c 288ff5f014c9 c00a0ce178d8 b0954baeb11d 621e8f982818 2d352a962961 2f27648a28c1
+  562c56f5044f 3cfe7f09f61a 4913972cd8ae 4e09e9df9da4 1a5a6f18fe38 051316388198 0ea61e021539 dd71e454a031 0e64ba293849
 `;
 /** H7c — outside it, the 17 statements a condition on that state, or on the leg being wrong, controls (round 10: and the else of a guard that always holds on a right leg). */
 const EFFECT_CONTROLLED_PIN = `
   7b4170f259d1 8bf30462062e bc14cf6a7346 c3d8dfa205dc 44dc0d0850c0 a357386843e5 73a850d08979 dfdedd1e6c7f fcc8b09fe637 83edb2d72393
   fb9c8cb7c115 d2914f052b9e 1a7a0e16b2ce eaf9bc823323 77076bc57464 91e69777fae0 6628beb0de6c
 `;
-/** H8 — the 181 harness literals that carry a product actor, action or verdict word, «sim», or a quoted Cyrillic title (a multiset). */
+/** H8 — the 181 harness literals that carry a product actor, action or verdict word, «sim», or a quoted Cyrillic title (a multiset;
+ *  H2: 183 — + the event-shot line's «painted at mount by the HUD census's test» clause, and the reload start's lesson address;
+ *  H2 round 2: 184 — the positive-control clause re-worded in place («the pedal is UP as this control ends», no longer «…entering
+ *  the drive», which the reload start made false), and + the ENTERED THE LOOP line's reload-start branch, whose last piece quotes
+ *  «top N км/ч»: it names the harness's own second load and held throttle, never a product act). */
 const CLAIM_LITERALS_PIN = `
-  004023491c5e 02bd34929917 051d81b89678 060e8e245a76 061cac01aaca 080762b222d1 0893a5d41be5 08bdcacbbde8 097f79851f10 0c743517fd16
-  0dd8569d379f 0de9379c541b 0fb0e7c75d00 1191edb62131 145dcbdbd226 163b63a21144 1670d70075e5 1945d5131231 1be2b99b1d57 1c0b72773eec
-  1cdc1280c06b 1dd390096f27 1e03f3f7749b 1f63078fa46b 2385d29d7599 253f68bba701 254ef00b5e5f 27ac48640750 28646b2cd605 29381249455d
-  2a8011473c55 301e1a739897 30574facdbbc 305e30962810 305e30962810 305e30962810 320b8bfef76f 3368ca7a84ca 36900ea110f7 3a5fbfa80fe3
-  3aaf071b429b 3d01ed94e382 3d2c44b8bc10 3db781442f17 3e3d03a2efaf 406d1af81701 40c7ac37fdca 40cac85fa880 40f2cb94b309 417ca2135e33
-  429ecf752555 437adf6452df 444ea30d071d 464f9914025c 478c4eca5221 479b3d409125 479b3d409125 4f2b973d7215 4fa5be0c76a5 507088e9f166
-  50d2f8399150 50ed267b42e6 51daf8e852b7 5640d687a7b9 5775fa6952b8 5b0d7f164b4c 5cc22d6cbdd2 5e5bdf35280b 5eaeba4b31f8 5fb7242591a1
-  643fedc5b5e5 65f6241d1675 66ce5058a99e 66f6256a1340 677678afa0e8 67b680294980 6a6422b38adb 6a8cf17cf1c0 6c9dfd3e05e5 6d70013575f4
-  6fbea2d90e5c 72942ddbea19 75ccaa1b6a91 762a4d2b05fd 76b503c9358d 788c2b76f224 788c2b76f224 7ad7764dd49d 7e2ab4ada73f 7eb486bcbe8e
-  7f24ef6f9a1b 83524a614731 849e8677d3b6 87a75aa0a2d3 87e34f4c1367 89d5287718f1 8a744248e5a2 8bb97f9af2b5 8d31062a865a 8d80483dd36b
-  8dcb8206d157 8e9f0acad94e 92060ec09bee 9217cd97f4e1 930c09213122 938a5331bf6f 96b807cfc22c 97c6ec043898 98a2f19483af 9a36217c4b62
-  9c9c0b4ec749 9f8f72c9ca45 a1fa4e750e86 a3faa306c438 a476124e17ff a867027153c6 a9f225a30789 a9f7988b4505 aa969bd061bc ab019c3a0b95
-  ab6a93d01aca ac62a00db8cb ac78c1fa794a acec45b187cc b13c755bb06f b1bea117b153 b34962dc2942 b685ea26f5ee b77da9b10832 b8c9ad258da3
-  b92ec96af744 ba97c3abc214 bb187292fdf2 bc4719b56b82 bdbaa98b9c5a bddd09091d83 bea8a94b6836 bf5384d3b56e c090bf98c9dd c16447d5bcfd
-  c6915f4cec14 c8d65773e674 c928f973684a cefbf563cb01 cf87870910a0 d2eb917bf3f2 d3f0500249f7 d46879e1e50d d7b2889d3042 d7bcc73374f3
-  d9845cac570a d9d11c6d1f95 daa5906f3b57 db72cb2c2264 dbc86fef3268 dbe3467d5210 dd49fbb5f04f dd61f1649486 debf259403cb decb9dc530be
-  e097477f2152 e5a0eb01db90 e769ff184c23 e94fa6e89335 e9c2966ea64f eca90074afd4 ed57a1c0ce04 f02888834325 f21767885c06 f405227c928b
-  f5a10f187b15 f5fb40937c3d f7e8ba9bb2bb fab77a9a6955 fb10ebddd74f fb9cb7a0a6c3 fc246f0338fc fcdd33ffe384 fd084d524235 ff5d1f3cf809
-  ff97b335b90c
+  004023491c5e 02bd34929917 051d81b89678 060e8e245a76 061cac01aaca 080762b222d1 0893a5d41be5 08bdcacbbde8 097f79851f10 0b79336a0e00
+  0c743517fd16 0dd8569d379f 0de9379c541b 0fb0e7c75d00 1191edb62131 145dcbdbd226 163b63a21144 1670d70075e5 1945d5131231 1be2b99b1d57
+  1c0b72773eec 1cdc1280c06b 1dd390096f27 1e03f3f7749b 1f63078fa46b 2385d29d7599 253f68bba701 254ef00b5e5f 27ac48640750 28646b2cd605
+  29381249455d 2a8011473c55 301e1a739897 30574facdbbc 305e30962810 305e30962810 305e30962810 305e30962810 320b8bfef76f 3368ca7a84ca
+  36900ea110f7 3a5fbfa80fe3 3aaf071b429b 3d01ed94e382 3d2c44b8bc10 3db781442f17 3e3d03a2efaf 406d1af81701 40c7ac37fdca 40cac85fa880
+  40f2cb94b309 417ca2135e33 429ecf752555 437adf6452df 444ea30d071d 464f9914025c 478c4eca5221 479b3d409125 479b3d409125 4f2b973d7215
+  4fa5be0c76a5 507088e9f166 50d2f8399150 50ed267b42e6 51daf8e852b7 5640d687a7b9 5775fa6952b8 5b0d7f164b4c 5cc22d6cbdd2 5e5bdf35280b
+  5eaeba4b31f8 5fb7242591a1 643fedc5b5e5 65f6241d1675 66ce5058a99e 66f6256a1340 677678afa0e8 67b680294980 6a6422b38adb 6a8cf17cf1c0
+  6c9dfd3e05e5 6d70013575f4 6fbea2d90e5c 72942ddbea19 75ccaa1b6a91 762a4d2b05fd 76b503c9358d 772d0d2f37e6 788c2b76f224 788c2b76f224
+  7ad7764dd49d 7e2ab4ada73f 7eb486bcbe8e 7f24ef6f9a1b 83524a614731 849e8677d3b6 87a75aa0a2d3 87e34f4c1367 89d5287718f1 8a744248e5a2
+  8bb97f9af2b5 8d31062a865a 8d80483dd36b 8dcb8206d157 8e9f0acad94e 92060ec09bee 9217cd97f4e1 930c09213122 938a5331bf6f 96b807cfc22c
+  97c6ec043898 98a2f19483af 9a36217c4b62 9c9c0b4ec749 9f8f72c9ca45 a3faa306c438 a476124e17ff a867027153c6 a9f225a30789 a9f7988b4505
+  aa969bd061bc ab019c3a0b95 ab6a93d01aca ac62a00db8cb ac78c1fa794a acec45b187cc b13c755bb06f b1bea117b153 b34962dc2942 b685ea26f5ee
+  b77da9b10832 b8c9ad258da3 b92ec96af744 ba97c3abc214 bb187292fdf2 bc4719b56b82 bdbaa98b9c5a bddd09091d83 bea8a94b6836 bf5384d3b56e
+  c090bf98c9dd c16447d5bcfd c6915f4cec14 c8d65773e674 c928f973684a cefbf563cb01 cf87870910a0 d2eb917bf3f2 d3f0500249f7 d46879e1e50d
+  d7b2889d3042 d7bcc73374f3 d9845cac570a d9d11c6d1f95 daa5906f3b57 db72cb2c2264 dbc86fef3268 dbe3467d5210 dd49fbb5f04f dd61f1649486
+  debf259403cb decb9dc530be e097477f2152 e5a0eb01db90 e769ff184c23 e94fa6e89335 e9c2966ea64f eca90074afd4 ed57a1c0ce04 f02888834325
+  f21767885c06 f405227c928b f5a10f187b15 f5fb40937c3d f7e8ba9bb2bb fa86c39fefc8 fab77a9a6955 fb10ebddd74f fb9cb7a0a6c3 fc246f0338fc
+  fcdd33ffe384 fd084d524235 ff5d1f3cf809 ff97b335b90c
 `;
 /** H10 — the distinctive keys of the profile's state that the harness names (on its enumerated profile lines). */
 const HARNESS_NAMED_STATE_KEYS = Object.freeze(["dangerousAboveKmh","driveEnded","everyM","flatTicks","forceRest","gradedAboveKmh","heldAsSized","heldMs","holdMs","maxMs","postedKmh","qualAt","startedAt","suppressRest","topKmh"]);
@@ -6028,21 +6138,24 @@ const CENSUS_RECEIVER_PIN = `
   9e69329cfd8f b1292a86017e b325ed24b4fd b860cd41ac8b bbcecb1fb54d c0b6356b1396 d55864c20f3c d9f7644b498b dab85c101eb8 dc2d625ebd61
   e06cdeca19bb e17729279a63 e66e1565c795 e66e1565c795 f07946c36fe1 f4563d1791f1 f9cd7ae8a86f fa5359db9cc8
 `;
-/** H3d — every harness code line that reads the scenario id (or the out dir as a receiver or comparand, or the page's URL) (42; H1 round 2: + the lane's H1 reads, `const H1_READS = h1ProbeReads(SCENARIO);`, which gates the P1 witness and the rear read and prints nothing). */
+/** H3d — every harness code line that reads the scenario id (or the out dir as a receiver or comparand, or the page's URL) (42; H1 round 2: + the lane's H1 reads, `const H1_READS = h1ProbeReads(SCENARIO);`, which gates the P1 witness and the rear read and prints nothing; H2: 44 — + the reload start's declaration read,
+ *  `wrongLegStartFor(… SCENARIO)`, and its navigation to the lesson's own address). */
 const SCENARIO_READS_PIN = `
   007256b529e3 066ce66b740d 08aa8b1a7709 08fd5478aab4 0ccf487ffa63 1606f049408f 16e32f0f6c00 187e660aaa04 1ed830244195 3036906e1f9d
   372dad712335 390d96202f62 3b7f2534bcf6 40bc61b095c8 40bc61b095c8 420735f1d42d 44f65007dbe0 47f3a85e4c6a 539029965b5d 56f9dbd1d022
-  597a10e2a5a2 648221597d62 6b5ba62b8628 7328bcf51139 94ddc7b1299a 9619f067b5d3 a4643742d111 a6f74ada4f0e bb3f2216b8da bc5ca2aae17b
-  c2f56f8bb8d3 c6e9d8fc681e c6e9d8fc681e c954fe065af3 c954fe065af3 c9b8a4f4f2ba d4324d9a9780 d59a7ff22aca e140b6ce7d64 e676f54efde3
-  ec474b3dc0af f0c00c957720
+  597a10e2a5a2 648221597d62 6b5ba62b8628 7328bcf51139 94ddc7b1299a 9619f067b5d3 98b32b0f5af7 a4643742d111 a6f74ada4f0e bb3f2216b8da
+  bc5ca2aae17b bc8fc50c3f33 c2f56f8bb8d3 c6e9d8fc681e c6e9d8fc681e c954fe065af3 c954fe065af3 c9b8a4f4f2ba d4324d9a9780 d59a7ff22aca
+  e140b6ce7d64 e676f54efde3 ec474b3dc0af f0c00c957720
 `;
-/** L14 — every lib literal carrying a product actor, action or verdict word, «sim», or a quoted Cyrillic title (96; H1: + 13 — four provenance references naming engine.ts, and the H1 templates, template key and brake-check told that say the harness BOOKED braking; H1 round 2: the sizing.brake template and the brake-check told re-worded in place — each now says the booking is never made on a tick that reaches a ceiling (the template: nor over the speed its stop room is sized at) — 96 still). */
+/** L14 — every lib literal carrying a product actor, action or verdict word, «sim», or a quoted Cyrillic title (H2: still 97 — the
+ *  pace.governor template re-worded in place for the throttle modulator, its words about the harness's own pedals; H2 round 2:
+ *  still 97 — pace.governor's rate clause re-worded in place to what the code does (the tick before, none after an unread dial); 96; H1: + 13 — four provenance references naming engine.ts, and the H1 templates, template key and brake-check told that say the harness BOOKED braking; H1 round 2: the sizing.brake template and the brake-check told re-worded in place — each now says the booking is never made on a tick that reaches a ceiling (the template: nor over the speed its stop room is sized at) — 96 still). */
 const LIB_CLAIM_LITERALS_PIN = `
   036551469de9 04b1ca94f1c6 06f729e0ddff 0c668d290428 14a45384dc21 15ec7d0ea698 17c10a86a281 17de592ceca6 1810428983ae 198b97c1a29b
   1c1c88110177 223d7a57311d 23dc351fd331 23deb105ccec 24ef4cbe8e6a 281aee39f620 2bdac95d78bc 2de4d8014338 2fbf8e3f0d77 30f219446632
   316115f26883 31fbab700060 3438d0a03e9e 3533032ba71e 3533032ba71e 35812f0af13d 398ff2db538b 3a34acd5b16f 40803c63c176 446ae4838a34
-  4cfb6bf679ec 4f19b5dfded8 52a95b443d18 554033f2b48c 5d1ef6d3e289 5df97fb143bf 5df97fb143bf 5df97fb143bf 5df97fb143bf 5ee3a0d712e1
-  5f6046e4a863 6ed7ede70ce5 7119ccb72cc6 7270e89961b0 76a6caae0d2d 775b538ac9ad 7dabcb8468f6 7dc2bc17cd42 8003b44157d5 8003b44157d5
+  4cfb6bf679ec 4f19b5dfded8 52a95b443d18 554033f2b48c 5d1ef6d3e289 5df97fb143bf 5df97fb143bf 5df97fb143bf 5ee3a0d712e1 5f6046e4a863
+  5fcb2094772f 6ed7ede70ce5 7119ccb72cc6 7270e89961b0 76a6caae0d2d 775b538ac9ad 7dabcb8468f6 7dc2bc17cd42 8003b44157d5 8003b44157d5
   8450c6c48a41 84a59d4c93ad 84a75da47c55 8605443568ca 87f1cac089ba 88bf0e10f01a 88f0f6837254 8ffe5228a775 91a0c2dff3c4 9281f4b5c965
   9281f4b5c965 94ebd86e9e2f 954d6285cce7 9bc26a0e29af a079724ba555 a09440465f07 a42290ce13d8 a765936bdec5 aa9b14fb2ff6 ab39874ffd76
   ad665c6e413e ade099b12bb6 ae02ab8a7fde b245dc0130ce b9ea5960685f bb95a0625c3c bc565f983152 c78716497bb2 c9a1e0c67eaf c9abbbc1793f
@@ -6078,10 +6191,11 @@ const H1 = {
   impact: "sc-hz-brake-dont-swerve",
   brake: "sc-follow-tailgater",
 };
-/** A tick of an H1 profile: the flat tick's own arguments, the observations defaulted. */
+/** A tick of an H1 profile: the flat tick's own arguments, the observations defaulted. (H2: and the harness's wall
+ *  interval — the pace run's clock — the same 500 ms here.) */
 const h1Tick = (now, kmh, over = {}) => ({
   now, t0: 10_000, kmh, flatStepM: (Math.max(0, kmh) / 3.6) * 0.5, dtMs: 500, postedKmh: 50, follow: null, probeAt: now,
-  rear: { ok: true, present: false, parsed: false, meters: null, kind: null }, impact: 0, ...over,
+  rear: { ok: true, present: false, parsed: false, meters: null, kind: null }, impact: 0, wallDtMs: 500, ...over,
 });
 /** Drive a profile over a dial series (500 ms ticks), recording every step. `over(i)` adds tick fields. */
 function h1Drive(id, series, over = () => ({}), platform = "pc") {
@@ -6096,9 +6210,11 @@ function h1Drive(id, series, over = () => ({}), platform = "pc") {
   }
   return { state: st, steps, now };
 }
-/** A plant the pace governor steers in closed loop: a flat-throttle launch, then +11.3 км/ч/s while the throttle is
- *  down and −1.9 км/ч/s while it is up (tuning.ts at 45 км/ч, `paceDutyBase`'s own arithmetic, engine braking left
- *  out). A MODEL for fixtures, never a claim about the product. */
+/** A plant the pace governor steers in closed loop (H2): one 500 ms modulator cycle a tick, and the cycle's speed change
+ *  read off the H2 model (harness-h2/builder/duty-eq.mjs — the keyboard pedal's ramps and the default tier at 45 км/ч):
+ *  −1.92 км/ч/s with the throttle up, 0 at the duty base's equilibrium (0.415), +8.2 км/ч/s with it held down, linear
+ *  between. A MODEL for fixtures, never a claim about the product. */
+const paceAccel = (duty) => (duty <= 0.415 ? -1.92 + (1.92 / 0.415) * duty : (8.2 / 0.585) * (duty - 0.415));
 function paceLoop(id, ticks, { platform = "pc", disturb = () => 0 } = {}) {
   let st = createWrongLegProfile(id, { platform });
   let now = 10_000;
@@ -6114,10 +6230,8 @@ function paceLoop(id, ticks, { platform = "pc", disturb = () => 0 } = {}) {
     steps.push(r);
     const p = r.pedal;
     if (!p) v = Math.min(59, v + 5);
-    else if (p.act === "down") v += 5.65;
-    else if (p.act === "pulse") v += (11.3 * p.ms) / 1000 - (1.9 * (500 - p.ms)) / 1000;
-    else v -= 0.95;
-    v += disturb(i);
+    else v += 0.5 * paceAccel(p.act === "down" ? 1 : p.act === "up" ? 0 : p.ms / 500);
+    v = Math.max(0, v) + disturb(i);
   }
   return { state: st, steps, dial, now };
 }
@@ -6145,38 +6259,65 @@ describe("§W12 HARNESS STAGE H1 — four pedal profiles, the rear badge, the im
     for (const id of WITHDRAWN_WRONG_LEG_PROFILES.keys()) assert.equal(WRONG_LEG_PROFILES.has(id), false);
   });
 
-  it("THE PACE PEDAL (pacePedal): an unread dial, or one at or over the target, lets the throttle up; under target − PACE_FULL_BAND_KMH it is down for the tick; between, a pulse of (paceDutyBase + gain × shortfall) × the tick's interval, clamped", () => {
+  it("THE PACE PEDAL (pacePedal, H2): an unread dial lets the throttle up; otherwise the command is a fraction of each PACE_CYCLE_MS cycle — paceDutyBase + the gain per км/ч under the target − the rate gain per км/ч a second the dial rose — held down at 1 or more, let up at 0 or less, clamped between", () => {
     const P = LIBNS.pacePedal;
     const t = 45;
-    assert.deepEqual({ ...P(-1, { targetKmh: t, dtMs: 500 }) }, { act: "up", ms: null });
-    assert.deepEqual({ ...P(null, { targetKmh: t, dtMs: 500 }) }, { act: "up", ms: null });
-    assert.deepEqual({ ...P(30, { targetKmh: null, dtMs: 500 }) }, { act: "up", ms: null });
-    assert.deepEqual({ ...P(45, { targetKmh: t, dtMs: 500 }) }, { act: "up", ms: null });
-    assert.deepEqual({ ...P(52, { targetKmh: t, dtMs: 500 }) }, { act: "up", ms: null });
-    assert.deepEqual({ ...P(38, { targetKmh: t, dtMs: 500 }) }, { act: "down", ms: null });
-    assert.equal(LIBNS.PACE_FULL_BAND_KMH, 6);
-    assert.deepEqual({ ...P(39, { targetKmh: t, dtMs: 500 }) }, { act: "pulse", ms: Math.round((0.15 + 0.05 * 6) * 500) });
-    assert.deepEqual({ ...P(44, { targetKmh: t, dtMs: 500 }) }, { act: "pulse", ms: Math.round((0.15 + 0.05 * 1) * 500) });
-    assert.deepEqual({ ...P(44, { targetKmh: t, dtMs: 100 }) }, { act: "pulse", ms: LIBNS.PACE_MIN_PULSE_MS }, "the pulse is not clamped at its floor");
-    assert.deepEqual({ ...P(40, { targetKmh: t, dtMs: 3000 }) }, { act: "pulse", ms: LIBNS.PACE_MAX_PULSE_MS }, "the pulse is not clamped at its ceiling");
-    assert.deepEqual({ ...P(44, { targetKmh: t, dtMs: 0 }) }, { act: "pulse", ms: LIBNS.PACE_MIN_PULSE_MS });
-    assert.equal(D("paceDutyBase"), 0.15);
-    assert.equal(LIBNS.PACE_DUTY_GAIN_PER_KMH, 0.05);
-    assert.ok(Object.isFrozen(P(44, { targetKmh: t, dtMs: 500 })));
-    // …and the duty base IS the model's arithmetic at 45 км/ч (tuning.ts at 01de885): throttle 4200 N, drag
-    // 0.42·v² + 0.02·1220·v, rolling 280 N on the coast.
-    const v = 45 / 3.6;
-    const R0 = 0.42 * v * v + 0.02 * 1220 * v;
-    const up = (4200 - R0) / 1220;
-    const down = (R0 + 280) / 1220;
-    assert.equal(Number((down / (up + down)).toFixed(2)), 0.15);
+    const base = D("paceDutyBase");
+    const cyc = LIBNS.PACE_CYCLE_MS;
+    assert.deepEqual({ ...P(-1, { targetKmh: t }) }, { act: "up", ms: null });
+    assert.deepEqual({ ...P(null, { targetKmh: t }) }, { act: "up", ms: null });
+    assert.deepEqual({ ...P(30, { targetKmh: null }) }, { act: "up", ms: null });
+    assert.equal("PACE_FULL_BAND_KMH" in LIBNS, false, "H1's whole-tick band is back");
+    assert.deepEqual({ ...P(45, { targetKmh: t }) }, { act: "pulse", ms: Math.round(base * cyc) });
+    assert.deepEqual({ ...P(44, { targetKmh: t }) }, { act: "pulse", ms: Math.round((base + 0.04) * cyc) });
+    assert.deepEqual({ ...P(52, { targetKmh: t }) }, { act: "pulse", ms: Math.round((base - 0.28) * cyc) });
+    assert.deepEqual({ ...P(30, { targetKmh: t }) }, { act: "down", ms: null }, "15 км/ч short is past a fraction of 1");
+    assert.deepEqual({ ...P(60, { targetKmh: t }) }, { act: "up", ms: null }, "15 км/ч over is under a fraction of 0");
+    // the rate term, over the wall interval between the two readings (floored), and no rate without a reading before
+    assert.deepEqual({ ...P(40, { targetKmh: t, prevKmh: 36, wallDtMs: 500 }) }, { act: "pulse", ms: Math.round((base + 0.2 - 0.015 * 8) * cyc) });
+    assert.deepEqual({ ...P(40, { targetKmh: t, prevKmh: 39, wallDtMs: 50 }) }, { ...P(40, { targetKmh: t, prevKmh: 39, wallDtMs: 250 }) });
+    assert.deepEqual({ ...P(40, { targetKmh: t, prevKmh: null, wallDtMs: 500 }) }, { ...P(40, { targetKmh: t }) });
+    // the clamps
+    assert.deepEqual({ ...P(53, { targetKmh: t, prevKmh: 52, wallDtMs: 500 }) }, { act: "pulse", ms: LIBNS.PACE_MIN_PULSE_MS }, "the down time is not clamped at its floor");
+    assert.deepEqual({ ...P(31, { targetKmh: t, prevKmh: 31.5, wallDtMs: 500 }) }, { act: "pulse", ms: LIBNS.PACE_MAX_PULSE_MS }, "the down time is not clamped at its ceiling");
+    assert.equal(LIBNS.PACE_DUTY_GAIN_PER_KMH, 0.04);
+    assert.equal(LIBNS.PACE_RATE_GAIN_PER_KMH_S, 0.015);
+    assert.equal(LIBNS.PACE_RATE_MIN_INTERVAL_MS, 250);
+    assert.equal(cyc, 500);
+    assert.deepEqual([LIBNS.PACE_MIN_PULSE_MS, LIBNS.PACE_MAX_PULSE_MS], [40, 460]);
+    assert.ok(Object.isFrozen(P(44, { targetKmh: t })));
+    // …and the duty base IS the H2 model's equilibrium at 45 км/ч (harness-h2/builder/duty-eq.mjs; tuning.ts, input.ts and
+    // difficulty.ts at 9ab89b8): the pedal ramped 0 → 1 in 0.35 s and 1 → 0 in 0.25 s against the key, the force 4200 N ×
+    // 0.75 × pedal^1.4, the drag 0.42·v² + 0.02·1220·v, and 280 N of rolling while the pedal is at 0 — the cycle's net speed
+    // change is zero at a fraction of 0.415.
+    const net = (duty) => {
+      const dt = 1 / 2000;
+      const v = 45 / 3.6;
+      let pedal = 0;
+      let dv = 0;
+      for (let c = 0; c < 20; c++) {
+        for (let k = 0; k < cyc / 1000 / dt; k++) {
+          const key = k * dt * 1000 < duty * cyc;
+          pedal = key ? Math.min(1, pedal + dt / 0.35) : Math.max(0, pedal - dt / 0.25);
+          let F = 4200 * 0.75 * Math.pow(pedal, 1.4) - (0.42 * v * v + 0.02 * 1220 * v);
+          if (pedal === 0) F -= 280;
+          if (c >= 10) dv += (F / 1220) * dt;
+        }
+      }
+      return dv;
+    };
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (net(m) > 0) hi = m; else lo = m; }
+    // (0.4149… on the float: paceDutyBase is it to the hundredth, the half rounded up)
+    assert.ok(lo > 0.41 && lo < 0.42 && Math.abs(lo - base) <= 0.0051, `the model's equilibrium is ${lo.toFixed(4)}, paceDutyBase ${base}`);
   });
 
-  it("THE LAMP PACE (sc-vp-telltale-red:c172d48b): in closed loop the governor holds one steady run — no rest, no brake, never over the disc, no 4 км/ч gap under the fastest of the 6 s before — and it holds AS SIZED at warningLampBillSec + WARNING_LAMP_REGRADE_SEC + 1 s", () => {
+  it("THE LAMP PACE (sc-vp-telltale-red:c172d48b): in closed loop the governor holds one steady run — no rest, no brake, never over the disc, no 4 км/ч gap under the fastest of the 6 s before — and it holds AS SIZED (H2) WARNING_LAMP_REGRADE_SEC + 1 s on the harness's wall clock after its wall-clock dial odometer reads warningLampIgnoreRouteM", () => {
     const run = paceLoop(H1.lamp, 90);
     const st = run.state;
-    // (H1 round 3, N5a: + the 7 s lag allowance — §W14 checks it against its ratio.)
-    assert.equal(st.pace.sizedRunSec, 23.7 + 6 + 7 + 1);
+    // (H2: the re-grade window + the margin, counted after the gate tick; no lag allowance.)
+    assert.equal(st.pace.sizedRunSec, 6 + 1);
+    assert.equal(st.pace.gateM, 260);
     assert.equal(st.pace.goalKmh, 45);
     assert.equal(st.pace.floorKmh, 5);
     assert.equal(st.pace.dropLimitKmh, 4);
@@ -6200,11 +6341,11 @@ describe("§W12 HARNESS STAGE H1 — four pedal profiles, the rear badge, the im
     assert.ok(Math.max(...run.dial.slice(0, heldAt + 1)) <= 50, `the model's dial topped ${Math.max(...run.dial.slice(0, heldAt + 1))} while governed`);
     const line = run.steps[heldAt].say.line;
     assertObservationLine(line, "lamp held");
-    assert.match(line, /one run of 3\d\.\d s on the profile clock from its first reading at t=\d+s \(flat odometer [\d.]+ m there\): every read dial over 5 км\/ч by its rounding and at or under the posted 50, the disc it started under \(no other disc read inside it; 0 tick\(s\) inside it with the disc unread\), and no reading 4 км\/ч or more under the fastest of the 6 s before it \(the largest such gap read \d+ км\/ч\), no rest held, 0 unread tick\(s\) inside it not credited — against the sized 37\.7 s/);
+    assert.match(line, /one run of \d+\.\d s on the harness's wall clock from its first reading at t=\d+s \(flat odometer [\d.]+ m there\), 7\.0 s of it after the tick at t=\d+s on which the harness's wall-clock dial odometer read 26\d\.\d m, its first reading at or over warningLampIgnoreRouteM 260 m \([\d.]+ m at the run's first reading\): every read dial over 5 км\/ч by its rounding and at or under the posted 50, the disc it started under \(no other disc read inside it; 0 tick\(s\) inside it with the disc unread\), and no reading 4 км\/ч or more under the fastest of the 6 s before it \(the largest such gap read \d+ км\/ч\), no rest held, 0 unread tick\(s\) inside it not credited — against the sized 7\.0 s after the tick on which that odometer reads warningLampIgnoreRouteM 260 m or more/);
     const out = wrongLegProfileOutcomeLine(wrongLegProfileFinish(st, { now: run.now, t0: 10_000, driveEnded: true }).state);
     assertObservationLine(out, "lamp outcome");
     // (H1 round 2, F1: the commands the harness APPLIED — §W13 checks each number against the steps' own pedals.)
-    assert.match(out, /governor commands the harness applied: throttle held down \d+ tick\(s\), pulsed \d+ \(\d+ ms in all\), let up \d+/);
+    assert.match(out, /governor commands the harness set on its throttle modulator, one on each flat tick the profile ran: throttle held down \d+, down for a fraction of each cycle \d+ \(those commands' down times a cycle sum to \d+ ms\), let up \d+ · 0 unread dial reading\(s\) · 0 flat tick\(s\) with no wall interval, credited nothing/);
   });
 
   it("THE LAMP PACE BREAKS on a reading 4 км/ч under the fastest of the 6 s before it — loud, NOT HELD, released on that tick (no pedal, no suppression) — and NOT on a 3 км/ч dip", () => {
@@ -6215,7 +6356,7 @@ describe("§W12 HARNESS STAGE H1 — four pedal profiles, the rear badge, the im
     const s = r.steps[i];
     assert.deepEqual([s.say.loud, s.suppressRest, s.pedal], [true, false, null]);
     assertNotHeldLine(s.say.line, "lamp gap");
-    assert.match(s.say.line, /the first run broke at t=\d+s after [\d.]+ s on the profile clock, against the sized 37\.7 s: the dial read 41 км\/ч, 4 км\/ч under the fastest reading of the 6 s before it/);
+    assert.match(s.say.line, /the first run broke at t=\d+s after [\d.]+ s on the harness's wall clock, the harness's wall-clock dial odometer at [\d.]+ m on the profile's last flat tick \([\d.]+ m at the run's first reading\), under warningLampIgnoreRouteM 260 m, against the sized 7\.0 s after the tick on which that odometer reads warningLampIgnoreRouteM 260 m or more: the dial read 41 км\/ч, 4 км\/ч under the fastest reading of the 6 s before it/);
     assert.deepEqual([r.state.done, r.state.active, r.state.heldAsSized], ["run-broken", false, false]);
     const ok = h1Drive(H1.lamp, [8, 16, 24, 32, 40, 45, ...Array(10).fill(45), 42, ...Array(80).fill(45)]);
     assert.equal(ok.state.heldAsSized, true, "a 3 км/ч dip broke the run");
@@ -6490,6 +6631,8 @@ function h1Ticks(id, ticks, platform = "pc") {
     const r = wrongLegFlatStep(st, {
       now, t0: 10_000, kmh: t.kmh, flatStepM: (Math.max(0, t.kmh ?? 0) / 3.6) * (dt / 1000), dtMs: dt, postedKmh: "posted" in t ? t.posted : 50, follow: null, probeAt: now,
       rear: "rear" in t ? t.rear : { ok: true, present: false, parsed: false, meters: null, kind: null }, impact: "impact" in t ? t.impact : 0,
+      // (H2) the harness's wall interval — the pace run's clock: the tick's own length unless the tick names one
+      wallDtMs: "wall" in t ? t.wall : dt,
     });
     st = r.state;
     steps.push(r);
@@ -6524,12 +6667,13 @@ describe("§W13 H1 ROUND 2 — the round-1 verifier's findings, each ported as a
       const P = r.state.pace;
       const applied = appliedPedals(r.steps);
       assert.deepEqual({ down: P.down, up: P.up, pulse: P.pulse, pulseMs: P.pulseMs }, applied, `${label}: the governor's tally is not the acts the harness applied`);
-      const m = outcomeOf(r).match(/governor commands the harness applied: throttle held down (\d+) tick\(s\), pulsed (\d+) \((\d+) ms in all\), let up (\d+)/);
+      // (H2: the commands are SET on the harness's throttle modulator, one a flat tick, and it runs each until the next)
+      const m = outcomeOf(r).match(/governor commands the harness set on its throttle modulator, one on each flat tick the profile ran: throttle held down (\d+), down for a fraction of each cycle (\d+) \(those commands' down times a cycle sum to (\d+) ms\), let up (\d+)/);
       assert.ok(m, `${label}: the outcome does not say the commands are the ones the harness applied`);
       assert.deepEqual(m.slice(1).map(Number), [applied.down, applied.pulse, applied.pulseMs, applied.up], `${label}: the printed commands are not the applied ones`);
     }
     // …and the sentence «applied» is registered against the harness's own wiring of the command.
-    assert.ok(HARNESS_SELF_CLAIMS.some(([tpl, says, needs]) => tpl === "readings.pace" && says.includes("governor commands the harness applied") && needs.includes("paceApplied")), "the applied-commands sentence is not registered against paceApplied");
+    assert.ok(HARNESS_SELF_CLAIMS.some(([tpl, says, needs]) => tpl === "readings.pace" && says.includes("governor commands the harness set on its throttle modulator") && needs.includes("paceApplied")), "the applied-commands sentence is not registered against paceApplied");
   });
 
   it("F2 · the impact count's base is what the line says it is: read on the first flat tick, or a certain 0 read after unread ticks — and a first reading OVER 0 after unread ticks, or a count that falls, is refused LOUDLY, never absorbed into the base", () => {
@@ -6748,7 +6892,8 @@ describe("§W13 H1 ROUND 2 — the round-1 verifier's findings, each ported as a
     const after = code.indexOf("each shot's step (its DOM dump, then its frame) ran inside ");
     assert.ok(loop > 0 && after > loop, "the real offsets are not printed after the series");
     assert.match(code, /\n\s*note\(`      EVENT SHOT \$\{rec\.n\}: each shot's step \(its DOM dump, then its frame\) ran inside \$\{rec\.shots\.map\(\(x\) => `\[\+\$\{\(Math\.floor\(x\.startedMs \/ 100\) \/ 10\)\.toFixed\(1\)\}/);
-    assert.match(code, /painted at mount by its own box and computed style only: \$\{ev\.cardPainted\} — necessary, not sufficient: its ancestors' opacity, a layer over it and clipping are not read, so the frames are the evidence/);
+    // (H2: the witness reads the HUD census's test — the ancestor chain — so the line names it, and what it still does not read)
+    assert.match(code, /painted at mount by the HUD census's test — display, opacity and content-visibility up its ancestor chain, its own visibility, a box of 1 px or more: \$\{ev\.cardPainted\} — necessary, not sufficient: a layer over it and clipping are not read, so the frames are the evidence/);
   });
 
   it("C1/C2 · the pace sentence rests on the throttle helper's own body and on the probe's dial read — a throttle() that never lets W up, or a narrowed dial selector, turns the self-claims red (the round-1 verifier's V21 and V24)", () => {
@@ -6774,7 +6919,10 @@ describe("§W13 H1 ROUND 2 — the round-1 verifier's findings, each ported as a
     assert.equal(st.pace.sizedRunSec, arm + D("emResponseWindowSec") + D("emResponseJitterSec") + LIBNS.EM_RUN_LAG_MARGIN_SEC + PROFILE_SUSTAIN_MARGIN_SEC);
     assert.ok(arm > (st.pace.goalKmh + D("EM_CLOSING_MIN_KMH")) / 3.6 / D("emActorAccelMps2"), "the arm is sized on the target again");
     assert.ok(st.pace.sizedRunSec >= 11 + D("emResponseWindowSec") + D("emResponseJitterSec") + PROFILE_SUSTAIN_MARGIN_SEC, `the run ${st.pace.sizedRunSec} s does not cover an 11 s arm + the window + its spread + 1 s`);
-    const why = st.sizedFrom.f.detail.f.why;
+    // (H2: the run's clause is its own fragment, pace.runEm, carrying the why)
+    assert.equal(st.sizedFrom.f.detail.f.run.tpl, "pace.runEm");
+    assert.equal(st.sizedFrom.f.detail.f.run.f.run, st.pace.sizedRunSec);
+    const why = st.sizedFrom.f.detail.f.run.f.why;
     assert.equal(why.tpl, "pace.whyEm");
     assert.deepEqual([why.f.top, why.f.hq, why.f.closing, why.f.accel, why.f.win, why.f.jit, why.f.lag, why.f.margin], [50, DIAL_HALF_QUANTUM_KMH, 3, 1.5, 7, 0.4, LIBNS.EM_RUN_LAG_MARGIN_SEC, PROFILE_SUSTAIN_MARGIN_SEC]);
     assert.equal(why.f.arm, arm);
@@ -6948,22 +7096,29 @@ describe("§W14 H1 ROUND 3 — the round-2 verifier's findings, each ported as a
     assert.equal(em.steps.findIndex((s) => s.state.pace.started), 3);
   });
 
-  it("N5a · the lamp run carries a LAG ALLOWANCE, a declared harness constant with its provenance: ceil(PRODUCT_CLOCK_LAG_RATIO × (warningLampBillSec + WARNING_LAMP_REGRADE_SEC)) = 7 s — the same ratio the emergency run's 4 s is — printed in the sizing, and the lamp's ceilings leave room for the run", () => {
+  it("N5a, H2 · the lamp run carries NO lag allowance any more (H1's 7 s sized it past the end of the road on w69): it is sized to WARNING_LAMP_REGRADE_SEC + the harness's 1 s on the harness's wall clock AFTER the tick on which its wall-clock dial odometer reads warningLampIgnoreRouteM — a declared design constant with its provenance — printed in the sizing, and the lamp's ceilings leave room for the route and the run", () => {
     assert.equal(LIBNS.PRODUCT_CLOCK_LAG_RATIO, 0.23);
-    assert.equal(LIBNS.LAMP_RUN_LAG_MARGIN_SEC, Math.ceil(LIBNS.PRODUCT_CLOCK_LAG_RATIO * (D("warningLampBillSec") + D("WARNING_LAMP_REGRADE_SEC"))));
-    assert.equal(LIBNS.LAMP_RUN_LAG_MARGIN_SEC, 7);
+    assert.equal("LAMP_RUN_LAG_MARGIN_SEC" in LIBNS, false, "the lamp's lag allowance is back");
+    assert.equal("warningLampBillSec" in PROFILE_DESIGN, false, "the one drive's bill time sizes the lamp run again");
     const arm = (D("emRunTopKmh") + DIAL_HALF_QUANTUM_KMH + D("EM_CLOSING_MIN_KMH")) / 3.6 / D("emActorAccelMps2");
-    assert.equal(LIBNS.EM_RUN_LAG_MARGIN_SEC, Math.ceil(LIBNS.PRODUCT_CLOCK_LAG_RATIO * (arm + D("emResponseWindowSec") + D("emResponseJitterSec"))), "the emergency's lag allowance is not the same ratio");
+    assert.equal(LIBNS.EM_RUN_LAG_MARGIN_SEC, Math.ceil(LIBNS.PRODUCT_CLOCK_LAG_RATIO * (arm + D("emResponseWindowSec") + D("emResponseJitterSec"))), "the emergency's lag allowance is not its ratio");
+    // the route: the red lamp's trigger + its ignore distance, less the spawn's own y (templates-cockpit2.ts, ln-v1.json)
+    assert.deepEqual({ ...PROFILE_DESIGN.warningLampIgnoreRouteM }, { value: 260, unit: "m", from: "templates-cockpit2.ts TTR_TRIGGER, templates-cockpit2.ts VP_TELLTALE_RED_LAMP.ignoreBeyondM, ln-v1.json spawnPoints", at: LIBNS.PROFILE_SIZED_AT_H2 });
+    assert.ok(wrongLegProfileFor(H1.lamp).sizedBy.includes("warningLampIgnoreRouteM"));
     const st = createWrongLegProfile(H1.lamp, { platform: "pc" });
-    assert.equal(st.pace.sizedRunSec, D("warningLampBillSec") + D("WARNING_LAMP_REGRADE_SEC") + LIBNS.LAMP_RUN_LAG_MARGIN_SEC + PROFILE_SUSTAIN_MARGIN_SEC);
-    const why = st.sizedFrom.f.detail.f.why;
-    assert.equal(why.tpl, "pace.whyLamp");
-    assert.deepEqual([why.f.lampSec, why.f.rg, why.f.lag, why.f.margin, why.f.pace], [23.7, 6, 7, PROFILE_SUSTAIN_MARGIN_SEC, 45]);
-    assert.match(R(st.sizedFrom), /one run sized to 37\.7 s \(warningLampBillSec 23\.7 \+ WARNING_LAMP_REGRADE_SEC 6 \+ the harness's 7 s lag allowance \+ the harness's 1 s, measured on a drive held at warningLampHeldPaceKmh 45 км\/ч\)/);
-    // the ceilings leave room for a 6 s launch and the sized run at the disc (the emergency's own check, N5)
+    assert.equal(st.pace.sizedRunSec, D("WARNING_LAMP_REGRADE_SEC") + PROFILE_SUSTAIN_MARGIN_SEC);
+    assert.equal(st.pace.gateM, D("warningLampIgnoreRouteM"));
+    const run = st.sizedFrom.f.detail.f.run;
+    assert.equal(run.tpl, "pace.runLamp");
+    assert.deepEqual([run.f.gate, run.f.after], [260, 7]);
+    assert.equal(run.f.why.tpl, "pace.whyLamp");
+    assert.deepEqual(Object.keys(run.f.why.f).sort(), ["margin", "rg"]);
+    assert.deepEqual([run.f.why.f.rg, run.f.why.f.margin], [6, PROFILE_SUSTAIN_MARGIN_SEC]);
+    assert.match(R(st.sizedFrom), /one run, started with the harness's wall-clock dial odometer under warningLampIgnoreRouteM 260 m of route, sized to last 7\.0 s on the harness's wall clock after the tick on which that odometer reads 260 m or more \(WARNING_LAMP_REGRADE_SEC 6 \+ the harness's 1 s, with no lag allowance; warningLampIgnoreRouteM is the route from the lesson's authored start to the red lamp's ignore point\)/);
+    // the ceilings leave room for a 6 s launch, the route at the governor's target and the sized run at the disc
     const decl = wrongLegProfileFor(H1.lamp);
-    assert.ok((st.pace.sizedRunSec + 6) * 1000 < decl.maxMs, `the lamp's clock ceiling ${decl.maxMs} ms is inside the sized run`);
-    assert.ok((st.pace.sizedRunSec + 6) * (50 / 3.6) < decl.maxM, `the lamp's metre ceiling ${decl.maxM} m is inside the sized run at the posted 50`);
+    assert.ok((6 + st.pace.gateM / (st.pace.goalKmh / 3.6) + st.pace.sizedRunSec) * 1000 < decl.maxMs, `the lamp's clock ceiling ${decl.maxMs} ms is inside the route and the run`);
+    assert.ok(st.pace.gateM + (6 + st.pace.sizedRunSec) * (50 / 3.6) < decl.maxM, `the lamp's metre ceiling ${decl.maxM} m is inside the route and the run at the posted 50`);
   });
 });
 
@@ -7016,7 +7171,7 @@ describe("§W15 H1 ROUND 4 — the round-3 verifier's survivors, each ported as 
     const line = r.steps[heldAt].say.line;
     assertObservationLine(line, "lamp held on a slow sag");
     assertObservationLine(outcomeOf(r), "lamp outcome on a slow sag");
-    assert.match(line, /one run of 3\d\.\d s on the profile clock from its first reading at t=\d+s \(flat odometer [\d.]+ m there\)/);
+    assert.match(line, /one run of \d+\.\d s on the harness's wall clock from its first reading at t=\d+s \(flat odometer [\d.]+ m there\), 7\.0 s of it after the tick at t=\d+s on which the harness's wall-clock dial odometer read 2\d\d\.\d m/);
     assert.match(line, /no reading 4 км\/ч or more under the fastest of the 6 s before it \(the largest such gap read 3 км\/ч\)/);
     assert.ok(!/under the fastest reading of the 6 s before it/.test(line), `a drop-limit break reason is in the held line: ${line}`);
     // THE PROPERTY, fuzzed: on any started lamp run whose readings stay over the floor, at or under the disc and move
@@ -7165,8 +7320,10 @@ describe("§W15 H1 ROUND 4 — the round-3 verifier's survivors, each ported as 
  *  row's two ceilings. The oracle reads THESE, never the lib's exports, so a change to any of them in the lib disagrees
  *  with the census — and §W17 pins each against the lib's export (a deliberate change is a visible re-pin here). */
 const PACE_HARNESS_NUMBERS = Object.freeze({
-  PACE_FULL_BAND_KMH: 6, PACE_DUTY_GAIN_PER_KMH: 0.05, PACE_MIN_PULSE_MS: 40, PACE_MAX_PULSE_MS: 600, EM_PACE_ABOVE_FLOOR_KMH: 5,
-  LAMP_RUN_LAG_MARGIN_SEC: 7, EM_RUN_LAG_MARGIN_SEC: 4, OVER_LIMIT_STEP_CAP_SEC: 2, PROFILE_SUSTAIN_MARGIN_SEC: 1,
+  // (H2: the governor is a PD law on a 500 ms modulator cycle — H1's whole-tick band and the lamp's lag allowance are gone)
+  PACE_CYCLE_MS: 500, PACE_DUTY_GAIN_PER_KMH: 0.04, PACE_RATE_GAIN_PER_KMH_S: 0.015, PACE_RATE_MIN_INTERVAL_MS: 250,
+  PACE_MIN_PULSE_MS: 40, PACE_MAX_PULSE_MS: 460, EM_PACE_ABOVE_FLOOR_KMH: 5,
+  EM_RUN_LAG_MARGIN_SEC: 4, OVER_LIMIT_STEP_CAP_SEC: 2, PROFILE_SUSTAIN_MARGIN_SEC: 1,
   ceilings: Object.freeze({ "sc-vp-telltale-red": Object.freeze({ maxM: 610, maxMs: 60_000 }), "sc-vu-emergency": Object.freeze({ maxM: 400, maxMs: 40_000 }) }),
 });
 /** The pace profiles' numbers, from the DECLARED constants (PROFILE_DESIGN), the harness's own numbers written down above and
@@ -7185,35 +7342,60 @@ function paceK(id) {
     win: lamp ? D("WARNING_LAMP_REGRADE_SEC") : null,
     cap: lamp ? null : D("emRunTopKmh"),
     start: lamp ? D("warningLampRunStartKmh") : null,
-    lag: lamp ? HN.LAMP_RUN_LAG_MARGIN_SEC : HN.EM_RUN_LAG_MARGIN_SEC,
+    lag: lamp ? null : HN.EM_RUN_LAG_MARGIN_SEC,
     margin: HN.PROFILE_SUSTAIN_MARGIN_SEC,
+    // (H2) the lamp run's sized seconds are counted AFTER the tick on which its wall-clock dial odometer reads the lamp's
+    // ignore route (gate); the emergency run is sized whole (gate null)
+    gate: lamp ? D("warningLampIgnoreRouteM") : null,
     sized: lamp
-      ? D("warningLampBillSec") + D("WARNING_LAMP_REGRADE_SEC") + HN.LAMP_RUN_LAG_MARGIN_SEC + HN.PROFILE_SUSTAIN_MARGIN_SEC
+      ? D("WARNING_LAMP_REGRADE_SEC") + HN.PROFILE_SUSTAIN_MARGIN_SEC
       : arm + D("emResponseWindowSec") + D("emResponseJitterSec") + HN.EM_RUN_LAG_MARGIN_SEC + HN.PROFILE_SUSTAIN_MARGIN_SEC,
-    band: HN.PACE_FULL_BAND_KMH, base: D("paceDutyBase"), gain: HN.PACE_DUTY_GAIN_PER_KMH,
+    cycle: HN.PACE_CYCLE_MS, base: D("paceDutyBase"), gain: HN.PACE_DUTY_GAIN_PER_KMH, rate: HN.PACE_RATE_GAIN_PER_KMH_S, rateMinMs: HN.PACE_RATE_MIN_INTERVAL_MS,
     pulseLo: HN.PACE_MIN_PULSE_MS, pulseHi: HN.PACE_MAX_PULSE_MS, stepCapMs: HN.OVER_LIMIT_STEP_CAP_SEC * 1000,
   };
 }
 /** A programme tick: the dial (−1 unread), the interval, the posted disc (null or 0: unread), and (round 6) optionally the
  *  flat step itself, so a programme can land the flat odometer EXACTLY on a metre ceiling. */
-const pt = (kmh, o = {}) => ({ kmh, dt: o.dt ?? 500, posted: "posted" in o ? o.posted : 50, ...("step" in o ? { step: o.step } : {}) });
+const pt = (kmh, o = {}) => ({ kmh, dt: o.dt ?? 500, posted: "posted" in o ? o.posted : 50, ...("step" in o ? { step: o.step } : {}), ...("wall" in o ? { wall: o.wall } : {}) });
 const pts = (n, kmh, o) => Array.from({ length: n }, () => pt(kmh, o));
 /** The flat step the census hands each tick: its own `step` when it has one, else the dial's metres over its own interval. */
 const ptStep = (t) => ("step" in t ? t.step : (Math.max(0, t.kmh) / 3.6) * (t.dt / 1000));
+/** (H2) The wall interval the census hands each tick: its own `wall` when it has one, else its own interval. */
+const ptWall = (t) => ("wall" in t ? t.wall : t.dt);
+/** (H2) A dial that puts the governor's fraction EXACTLY on `want` with no rate term (two equal readings in a row) — searched
+ *  on the float from the analytic value, so a boundary of the law is met AT equality. Chooses an input; decides nothing. */
+function aimDuty(K, test, d0) {
+  for (let k = 0; k < 4000; k++) {
+    for (const sgn of [1, -1]) {
+      let d = d0;
+      for (let j = 0; j < k; j++) d += (sgn * Number.EPSILON * Math.max(1, Math.abs(d))) / 2;
+      if (test(K.base + K.gain * (K.target - d) - K.rate * 0)) return d;
+    }
+  }
+  throw new Error("no dial meets the governor's boundary");
+}
+const dutyOneKmh = (K) => aimDuty(K, (x) => x === 1, K.target - (1 - K.base) / K.gain);
+const dutyZeroKmh = (K) => aimDuty(K, (x) => x === 0, K.target + K.base / K.gain);
+const dutyHalfMsKmh = (K) => aimDuty(K, (x) => x * K.cycle === 300.5, K.target - (300.5 / K.cycle - K.base) / K.gain);
 
 /* ── THE DECLARED RULES OF THE TWO PACE PROFILES (round 6) — what the oracle below is written from ────────────────────
  * The sizing sentence (sizing.pace, pace.drop, pace.startLamp), the two `told` texts and the §5 header, read as rules;
  * each number from PROFILE_DESIGN or the harness's declared constants (paceK):
- *   R1  the profile clock credits each interval as min(max(0, the interval — 0 when not a finite number), 2 s);
+ *   R1  the profile clock (the trailing window's) credits each interval as min(max(0, the interval — 0 when not a finite
+ *       number), 2 s); (H2) the RUN's clock is the harness's WALL interval handed with the tick: min(it, 2 s) when it is a
+ *       finite number at or over 0, else nothing credited and the tick counted; the wall-clock dial odometer adds each read
+ *       dial over that interval, uncapped;
  *   R2  the flat odometer adds the tick's flat step when it is a finite number over 0;
  *   R3  t= is the drive's clock in whole seconds, rounded, never negative; the profile's wall clock runs from its FIRST
  *       flat tick, never negative;
  *   R4  the disc is read when it is a finite number over 0 (else unread, counted); a read disc other than the last read
  *       disc is a change (the first read disc is not);
  *   R5  the dial is read when it is a finite number at or over 0 (else unread, counted); the top is the fastest read;
- *   R6  the governor, on the dial and the tick's own interval (0 when not a finite number over 0): unread or at/over the
- *       target → up; under target − band → down; else a pulse of round(clamp((base + gain·(target − dial))·interval,
- *       40, 600)) ms; a command is counted — and handed out — only on a tick after which the profile is still running;
+ *   R6  (H2) the governor, on the dial: unread → up; else the fraction base + gain·(target − dial) − rate·(the dial less the
+ *       read dial on the tick before, per second of this tick's wall interval floored at 250 ms — 0 when the tick before
+ *       was unread or the interval is not over 0): at 1 or more → down; at 0 or less → up; else a pulse of
+ *       round(clamp(fraction · 500, 40, 460)) ms; a command is counted — and handed out — only on a tick after which the
+ *       profile is still running;
  *   R7  (lamp) before a read dial is tested, every reading more than WIN s older on the profile clock leaves the window
  *       (a reading exactly WIN s old stays); the gap is the fastest window reading less the dial, 0 when none is faster
  *       or the window is empty; then the reading joins the window — whether or not the run has started;
@@ -7222,7 +7404,10 @@ const ptStep = (t) => ("step" in t ? t.step : (Math.max(0, t.kmh) / 3.6) * (t.dt
  *       start reading credits no seconds; the run's disc is the last read disc); inside it, a dial passing every test
  *       credits the tick's interval, and the FIRST failing test is the break reason; an unread dial inside the run with a
  *       read disc other than the run's is a disc-change break;
- *   R9  the run holds as sized on the tick its credited seconds reach the sized run (after the break test);
+ *   R9  the run holds as sized on the tick its credited seconds reach the sized run (after the break test) — (H2) on the
+ *       lamp, its credited seconds AFTER the gate tick (R12), and never without one;
+ *   R12 (H2, lamp) the gate tick is the first tick of an unbroken run, started with the wall-clock dial odometer under
+ *       warningLampIgnoreRouteM, on which that odometer reads it or more (after the break test);
  *   R10 otherwise the ceilings: the flat odometer at or over maxM (metres), else the wall clock at or over maxMs (clock);
  *   R11 the rest is held back on every tick after which the profile is still running, and on no other.
  * Every value a line prints is then rendered from THE ONE TEMPLATE TABLE by THIS FILE's own renderer (`referenceRender`),
@@ -7250,18 +7435,20 @@ function paceSizingOracle(K) {
   const label = ats.length === 1 && ats[0] === PROFILE_SIZED_AT ? S("sizing.label", { at: PROFILE_SIZED_AT }) : S("sizing.labelAt", { at: ats });
   const hq = K.hq;
   const detail = S("sizing.pace", {
-    governor: S("pace.governor", { target: K.target, full: K.target - K.band, base: K.base, gain: K.gain, pulseLoMs: K.pulseLo, pulseHiMs: K.pulseHi }),
+    governor: S("pace.governor", { target: K.target, cycle: K.cycle, base: K.base, gain: K.gain, rate: K.rate, rateFloorMs: K.rateMinMs, pulseLoMs: K.pulseLo, pulseHiMs: K.pulseHi }),
     floor: K.floor,
     hq,
     cap: K.cap === null ? null : S("pace.capSized", { cap: K.cap }),
     drop: K.lim === null ? null : S("pace.drop", { win: K.win, lim: K.lim, drop: D("WARNING_LAMP_COMPLY_DROP_KMH") }),
     start: K.start === null ? null : S("pace.startLamp", { start: K.start, hq, pace: D("warningLampHeldPaceKmh"), drop: D("WARNING_LAMP_COMPLY_DROP_KMH") }),
-    run: K.sized,
-    why: K.lamp
-      ? S("pace.whyLamp", { lampSec: D("warningLampBillSec"), rg: D("WARNING_LAMP_REGRADE_SEC"), lag: K.lag, margin: K.margin, pace: D("warningLampHeldPaceKmh") })
-      : S("pace.whyEm", {
-        top: D("emRunTopKmh"), hq, closing: D("EM_CLOSING_MIN_KMH"), accel: D("emActorAccelMps2"), arm: K.arm, win: D("emResponseWindowSec"),
-        jit: D("emResponseJitterSec"), lag: K.lag, margin: K.margin,
+    run: K.lamp
+      ? S("pace.runLamp", { gate: K.gate, after: K.sized, why: S("pace.whyLamp", { rg: D("WARNING_LAMP_REGRADE_SEC"), margin: K.margin }) })
+      : S("pace.runEm", {
+        run: K.sized,
+        why: S("pace.whyEm", {
+          top: D("emRunTopKmh"), hq, closing: D("EM_CLOSING_MIN_KMH"), accel: D("emActorAccelMps2"), arm: K.arm, win: D("emResponseWindowSec"),
+          jit: D("emResponseJitterSec"), lag: K.lag, margin: K.margin,
+        }),
       }),
   });
   return S("sizing", { label, detail });
@@ -7284,6 +7471,16 @@ function paceOracle(id, source, { lead = 0 } = {}) {
     K, done: null, startIdx: null, endIdx: null, at: null, why: null, fails: null, sayObs: null, loud: null,
     clockMs: 0, odo: 0, lastDisc: null, discChanges: 0, discUnread: 0, top: -1, dialUnread: 0,
     run: null, win: [], down: 0, up: 0, pulse: 0, pulseMs: 0, cmds: [], heldTicks: 0, prog: [], now: 10_000 + lead, firstNow: null,
+    road: 0, wallUnread: 0, prevDial: null,
+  };
+  // (H2) what the run's seconds are measured against, and where its odometer stood against the lamp's ignore route
+  const sizedSpec = K.gate === null ? S("pace.sizedEm", { target: K.sized }) : S("pace.sizedLamp", { target: K.sized, gate: K.gate });
+  const gateSpec = () => {
+    if (K.gate === null) return null;
+    if (o.run === null) return S("pace.gateNoRun", { m: o.road });
+    if (o.run.gateSec !== null) return S("pace.gateRead", { after: o.run.sec - o.run.gateSec, at: o.run.gateAt, m: o.run.gateRoad, gate: K.gate, fromM: o.run.fromRoad });
+    if (!(o.run.fromRoad < K.gate)) return S("pace.gateLate", { fromM: o.run.fromRoad, gate: K.gate });
+    return S("pace.gateUnder", { m: o.road, fromM: o.run.fromRoad, gate: K.gate });
   };
   const order = PACE_BREAK_ORDER.map(([k]) => k);
   for (let i = 0; ; i++) {
@@ -7304,6 +7501,16 @@ function paceOracle(id, source, { lead = 0 } = {}) {
     if (t.dt === 0) feat.add("dt=0");
     if (t.dt > K.stepCapMs) feat.add("dt>cap");
     o.clockMs += dtEff;
+    // R1 (H2) — the run's clock: the harness's wall interval
+    const wall = ptWall(t);
+    const wallOk = finNum(wall) && wall >= 0;
+    if (!wallOk) {
+      o.wallUnread += 1;
+      feat.add("wallUnread");
+    }
+    if (wallOk && wall === K.stepCapMs) edges.add("wallCap");
+    if (wallOk && wall > K.stepCapMs) feat.add("wall>cap");
+    const wallCredit = wallOk ? Math.min(wall, K.stepCapMs) / 1000 : 0;
     const step = ptStep(t);
     if (finNum(step) && step > 0) o.odo += step;
     const atSec = Math.round(Math.max(0, o.now - 10_000) / 1000);
@@ -7316,19 +7523,28 @@ function paceOracle(id, source, { lead = 0 } = {}) {
     }
     // R5 · R6
     const dial = finNum(t.kmh) && t.kmh >= 0 ? t.kmh : null;
+    if (dial !== null && wallOk) o.road += (dial / 3.6) * (wall / 1000);
     let cmd;
-    if (dial === null || dial >= K.target) cmd = { act: "up", ms: null };
-    else if (dial < K.target - K.band) cmd = { act: "down", ms: null };
+    if (dial === null) cmd = { act: "up", ms: null };
     else {
-      const dtG = finNum(t.dt) && t.dt > 0 ? t.dt : 0;
-      const raw = (K.base + K.gain * (K.target - dial)) * dtG;
-      if (raw < K.pulseLo) edges.add("pulseLo");
-      if (raw > K.pulseHi) edges.add("pulseHi");
-      if (Math.abs(raw - Math.floor(raw) - 0.5) < 1e-9) edges.add("pulseHalf");
-      cmd = { act: "pulse", ms: Math.round(Math.min(K.pulseHi, Math.max(K.pulseLo, raw))) };
+      const rated = o.prevDial !== null && wallOk && wall > 0;
+      if (rated && wall < K.rateMinMs) feat.add("rateFloor");
+      const rate = rated ? (dial - o.prevDial) / (Math.max(wall, K.rateMinMs) / 1000) : 0;
+      if (rated && wall === K.rateMinMs) edges.add("rateMin");
+      const duty = K.base + K.gain * (K.target - dial) - K.rate * rate;
+      if (duty === 1) edges.add("dutyOne");
+      if (duty === 0) edges.add("dutyZero");
+      if (duty >= 1) cmd = { act: "down", ms: null };
+      else if (duty <= 0) cmd = { act: "up", ms: null };
+      else {
+        const raw = duty * K.cycle;
+        if (raw < K.pulseLo) edges.add("pulseLo");
+        if (raw > K.pulseHi) edges.add("pulseHi");
+        if (raw - Math.floor(raw) === 0.5) edges.add("pulseHalf");
+        cmd = { act: "pulse", ms: Math.round(Math.min(K.pulseHi, Math.max(K.pulseLo, raw))) };
+      }
     }
-    if (dial !== null && dial === K.target) edges.add("govTarget");
-    if (dial !== null && dial === K.target - K.band) edges.add("govFull");
+    o.prevDial = dial;
     if (dial !== null && dial > o.top) o.top = dial;
     const inRun = o.run !== null;
     let failed = [];
@@ -7366,13 +7582,14 @@ function paceOracle(id, source, { lead = 0 } = {}) {
       const failing = order.filter((k) => !passes[k]);
       if (!inRun) {
         if (failing.length === 0 && (K.start === null || dial - K.hq >= K.start)) {
-          o.run = { from: atSec, fromOdo: o.odo, disc: o.lastDisc, sec: 0, low: dial, startKmh: dial, maxGap: gap, dialUnread: 0, discUnread: 0 };
+          o.run = { from: atSec, fromOdo: o.odo, disc: o.lastDisc, sec: 0, low: dial, startKmh: dial, maxGap: gap, dialUnread: 0, discUnread: 0, fromRoad: o.road, gateSec: null, gateAt: null, gateRoad: null };
+          if (K.gate !== null && !(o.road < K.gate)) feat.add("gateLate");
           o.startIdx = i;
           if (K.lamp && o.win.some((r) => r.kmh > o.lastDisc)) feat.add("preStartOverDiscInWindowAtStart");
           if (gap !== null && gap > 0) feat.add("startGapOver0");
         }
       } else if (failing.length === 0) {
-        o.run.sec += dtEff / 1000;
+        o.run.sec += wallCredit;
         if (dial < o.run.startKmh) feat.add("creditedUnderStart");
         o.run.low = Math.min(o.run.low, dial);
         if (gap !== null) o.run.maxGap = Math.max(o.run.maxGap, gap);
@@ -7398,21 +7615,29 @@ function paceOracle(id, source, { lead = 0 } = {}) {
       for (let a = 0; a < failed.length; a++) for (let b = a + 1; b < failed.length; b++) feat.add(`pair:${failed[a]}+${failed[b]}`);
     }
     if (o.done === null && o.run !== null && disc === null) o.run.discUnread += 1;
+    // R12 (H2, lamp) — the gate tick
+    if (K.gate !== null && o.done === null && o.run !== null && o.run.gateSec === null && o.run.fromRoad < K.gate && o.road >= K.gate) {
+      if (o.road === K.gate) edges.add("gate");
+      o.run.gateSec = o.run.sec;
+      o.run.gateAt = atSec;
+      o.run.gateRoad = o.road;
+    }
+    const counted = o.run === null ? null : K.gate === null ? o.run.sec : o.run.gateSec === null ? null : o.run.sec - o.run.gateSec;
     // R9 · R10
     if (o.done === "run-broken") {
       o.at = atSec;
       o.loud = true;
-      o.sayObs = S("obs.paceBroken", { at: atSec, run: o.run.sec, target: K.sized, why: o.why });
-    } else if (o.run !== null && o.run.sec >= K.sized) {
-      if (o.run.sec === K.sized) edges.add("sustain");
+      o.sayObs = S("obs.paceBroken", { at: atSec, run: o.run.sec, gate: gateSpec(), sized: sizedSpec, why: o.why });
+    } else if (counted !== null && counted >= K.sized) {
+      if (counted === K.sized) edges.add("sustain");
       o.done = "held-as-sized";
       o.at = atSec;
       o.loud = false;
       o.sayObs = S("obs.paceHeld", {
-        run: o.run.sec, from: o.run.from, odo: o.run.fromOdo, floor: K.floor, disc: o.run.disc, discUnread: o.run.discUnread,
+        run: o.run.sec, from: o.run.from, odo: o.run.fromOdo, gate: gateSpec(), floor: K.floor, disc: o.run.disc, discUnread: o.run.discUnread,
         cap: K.cap === null ? null : S("pace.capHeld", { cap: K.cap }),
         drop: K.lim === null ? null : S("pace.dropHeld", { lim: K.lim, win: K.win, max: o.run.maxGap }),
-        unread: o.run.dialUnread, target: K.sized,
+        unread: o.run.dialUnread, sized: sizedSpec,
       });
     } else {
       const ms = Math.max(0, o.now - o.firstNow);
@@ -7448,11 +7673,11 @@ function paceOracle(id, source, { lead = 0 } = {}) {
   const broken = o.done === "run-broken";
   const held = o.done === "held-as-sized";
   o.readings = S("readings.pace", {
-    disc: o.lastDisc, changes: o.discChanges, unreadDisc: o.discUnread, first: o.run ? o.run.sec : 0, target: K.sized,
+    disc: o.lastDisc, changes: o.discChanges, unreadDisc: o.discUnread, first: o.run ? o.run.sec : 0, gate: gateSpec(), sized: sizedSpec,
     broke: broken ? S("pace.brokeAt", { at: o.at }) : null,
     top: o.top >= 0 ? o.top : null, notBroke: broken ? S("pace.notBroke") : null, low: o.run ? o.run.low : null,
     gap: K.lamp ? S("pace.gapRead", { win: K.win, gap: o.run ? o.run.maxGap : null }) : null,
-    down: o.down, pulse: o.pulse, pulseMs: o.pulseMs, up: o.up, unread: o.dialUnread,
+    down: o.down, pulse: o.pulse, pulseMs: o.pulseMs, up: o.up, unread: o.dialUnread, wallUnread: o.wallUnread,
   });
   o.say = o.done === null ? null : held ? S("say.held", { name: K.name, how: "pace", at: o.at, obs: o.sayObs }) : S("say.notHeld", { name: K.name, obs: o.sayObs });
   o.sayLine = o.say === null ? null : referenceRender(o.say);
@@ -7460,7 +7685,7 @@ function paceOracle(id, source, { lead = 0 } = {}) {
   const common = {
     name: K.name, obs: o.finalObs, readings: o.readings,
     rests: S("rests", { opp: 0, every: null, maxS: null, held: o.heldTicks, forced: 0 }),
-    end: S("end.reached"), clock: S("outcome.clock", { cap: K.stepCapMs / 1000 }), sizing: paceSizingOracle(K),
+    end: S("end.reached"), clock: S("outcome.clockPace", { cap: K.stepCapMs / 1000 }), sizing: paceSizingOracle(K),
   };
   o.outcome = held ? S("outcome.held", { ...common, how: "pace", at: o.at }) : S("outcome.notHeld", { ...common, done: o.done ?? "ended" });
   o.outcomeLine = referenceRender(o.outcome);
@@ -7478,7 +7703,7 @@ function paceReal(id, prog, { lead = 0, platform = "pc" } = {}) {
     now += t.dt;
     const r = wrongLegFlatStep(st, {
       now, t0: 10_000, kmh: t.kmh, flatStepM: ptStep(t), dtMs: t.dt, postedKmh: t.posted, follow: null, probeAt: now,
-      rear: { ok: true, present: false, parsed: false, meters: null, kind: null }, impact: 0,
+      rear: { ok: true, present: false, parsed: false, meters: null, kind: null }, impact: 0, wallDtMs: ptWall(t),
     });
     st = r.state;
     steps.push(r);
@@ -7520,22 +7745,32 @@ function paceDisagreement(o, r) {
   return null;
 }
 
-/** The final tick of a run whose credited seconds land EXACTLY on the sized run (an interval searched on the float). */
-function exactFinalDt(runSec, sized) {
-  const want = sized - runSec;
+/** The final tick's wall interval that lands a run's counted seconds EXACTLY on the sized run (searched on the float) —
+ *  (H2) the seconds counted after the gate tick on the lamp (`gateSec`, the run's seconds then; 0 for a run sized whole). */
+function exactFinalDt(runSec, sized, gateSec = 0) {
+  const want = sized - (runSec - gateSec);
   for (const base of [want * 1000, Math.round(want * 1e6) / 1e3]) {
     for (let k = -64; k <= 64; k++) {
       const dt = base + k * Number.EPSILON * Math.max(1, Math.abs(base));
-      if (runSec + Math.min(Math.max(0, dt), OVER_LIMIT_STEP_CAP_SEC * 1000) / 1000 === sized) return dt;
+      if (runSec + Math.min(Math.max(0, dt), OVER_LIMIT_STEP_CAP_SEC * 1000) / 1000 - gateSec === sized) return dt;
     }
   }
   return null;
 }
-/** Credited seconds of a programme's run, the way both sides sum them (to find the exact-sustain interval). */
-function creditedAfter(prog, startIdx) {
-  let s = 0;
-  for (let i = startIdx + 1; i < prog.length; i++) s += Math.min(Math.max(0, prog[i].dt), OVER_LIMIT_STEP_CAP_SEC * 1000) / 1000;
-  return s;
+/** (H2) A programme extended at `kmh` until the oracle's run is less than one 500 ms tick short of its sized seconds (the
+ *  lamp: after its gate tick), and that tick's exact final wall interval. */
+function toSustainEdge(id, prog, kmh = 44) {
+  const K = paceK(id);
+  const p = [...prog];
+  for (let n = 0; n < 400; n++) {
+    const o = paceOracle(id, p);
+    const counted = o.run === null ? null : K.gate === null ? o.run.sec : o.run.gateSec === null ? null : o.run.sec - o.run.gateSec;
+    if (o.done === null && counted !== null && K.sized - counted > 0 && K.sized - counted <= 0.5) {
+      return { prog: p, wall: exactFinalDt(o.run.sec, K.sized, K.gate === null ? 0 : o.run.gateSec) };
+    }
+    p.push(pt(kmh));
+  }
+  throw new Error(`${id}: the programme never came within one tick of the sized run`);
 }
 
 /** THE PROGRAMME TABLE — every row built from the declared constants at one comparison's boundary. `want` is the
@@ -7592,15 +7827,28 @@ function pacePrograms() {
   row("L the start reading is the lowest (V4-18)", H1.lamp, [...launchL, pt(41), ...hold(90, 46)], "held-as-sized");
   row("L the lowest is a later reading, not the floor (V4-08)", H1.lamp, [...launchL, pt(44), pt(42), pt(43), ...hold(90, 45)], "held-as-sized");
   // ── the lamp: the step cap, the governor's clamps and its bands ──
-  row("L governor: bands and clamps, the step cap AT and past its bound", H1.lamp, [
-    pt(0), pt(L.target - L.band - ε), pt(L.target - L.band), pt(L.target - L.band, { dt: L.stepCapMs }), pt(40),
-    pt(44, { dt: 100 }), pt(44, { dt: 502.5 }), pt(L.target - ε), pt(L.target), pt(-1), pt(44, { dt: 5000 }), ...hold(80),
+  // (H2) the PD law's boundaries: a fraction of exactly 1 (down) and exactly 0 (up), each a hair inside; a raw down time
+  // ending in .5; under the 40 ms clamp and over the 460 ms one; the rate term's 250 ms floor and a wall interval AT it;
+  // the step cap AT and past its bound on both clocks
+  const d1 = dutyOneKmh(L), d0 = dutyZeroKmh(L), dh = dutyHalfMsKmh(L);
+  row("L governor (H2): the fraction's bounds, the clamps, the rate floor, the step cap AT and past its bound", H1.lamp, [
+    pt(0), pt(d1), pt(d1), pt(d1, { dt: L.stepCapMs }), pt(d1 + ε), pt(d1 + ε), pt(d0), pt(d0), pt(d0 - ε), pt(d0 - ε), pt(54), pt(54), pt(-1),
+    pt(32), pt(33, { dt: 100 }), pt(34, { dt: L.rateMinMs }), pt(dh), pt(dh), pt(44, { dt: 5000 }), pt(41), ...hold(70),
   ], "held-as-sized");
   row("L not started: the drive ends with no run", H1.lamp, [...launchL, pt(35), pt(38), pt(40)], "open");
   row("L started and not held: the drive ends mid-run", H1.lamp, [...launchL, pt(41), ...hold(20)], "open");
   row("L the flat-odometer ceiling", H1.lamp, pts(130, 38), "metres");
   row("L the wall-clock ceiling", H1.lamp, pts(130, 30), "clock");
   row("L the flat-odometer ceiling landed EXACTLY on maxM (round 6)", H1.lamp, pts(L.maxM / 10, 38, { step: 10 }), "metres");
+  // ── the lamp (H2): the wall clock and the lamp's ignore route ──
+  // 45 км/ч over a 400 ms wall interval is 5 m exactly, so the wall-clock dial odometer lands ON warningLampIgnoreRouteM
+  row("L the gate AT warningLampIgnoreRouteM: the odometer lands on it, and the sized seconds run from that tick", H1.lamp, pts(L.gate / 5 + 20, 45, { wall: 400 }), "held-as-sized");
+  row("L a run started with the odometer already at the route is never held", H1.lamp, [...pts(70, 30), ...hold(40)], "open");
+  row("L a run broken after the gate prints the gate tick", H1.lamp, [...launchL, pt(41), ...hold(45), pt(50 + ε), ...hold(5)], "run-broken:pace.brokeDisc");
+  row("L a tick with no wall interval credits nothing and is counted", H1.lamp, [...launchL, pt(41), pt(44, { wall: null }), pt(44, { wall: -5 }), pt(44, { wall: NaN }), pt(44, { wall: Infinity }), ...hold(90)], "held-as-sized");
+  row("L the run credits the wall interval, not the tick's own (a long wall, a short tick; a short wall, a long tick)", H1.lamp, [...launchL, pt(41), ...pts(20, 44, { wall: 1500 }), ...pts(10, 44, { dt: 1500, wall: 200 }), ...hold(60)], "held-as-sized");
+  row("L the wall interval capped AT and past the step cap", H1.lamp, [...launchL, pt(41), pt(44, { wall: L.stepCapMs }), pt(44, { wall: L.stepCapMs + 1 }), pt(44, { wall: 9000 }), ...hold(60)], "held-as-sized");
+  row("L no run: the odometer is printed with no run started", H1.lamp, [...launchL, ...pts(20, 38)], "open");
   // ── the emergency ──
   row("E floor (its start) AT its boundary does not start", H1.em, [...launchE, pt(EF0), pt(EF0), ...hold(60)], "held-as-sized");
   row("E floor a hair over starts", H1.em, [...launchE, pt(EF0 + ε), ...hold(60)], "held-as-sized");
@@ -7618,15 +7866,14 @@ function pacePrograms() {
   row("E the flat-odometer ceiling", H1.em, pts(90, 38), "metres");
   row("E the wall-clock ceiling", H1.em, pts(90, 30), "clock");
   row("E the flat-odometer ceiling landed EXACTLY on maxM (round 6)", H1.em, pts(E.maxM / 10, 38, { step: 10 }), "metres");
+  row("E (H2) the fraction's bounds and the rate term on the emergency's target", H1.em, [pt(10), pt(dutyOneKmh(E)), pt(dutyOneKmh(E)), pt(dutyZeroKmh(E)), pt(dutyZeroKmh(E)), pt(30), pt(41), pt(44, { wall: null }), ...hold(60)].map((t) => ({ ...t, posted: 60 })), "held-as-sized");
   // ── the sized run, AT its boundary and a hair short, both profiles (the final interval searched on the float) ──
   for (const [tag, id, pre] of [["L", H1.lamp, [...launchL, pt(41)]], ["E", H1.em, [...launchE, pt(41)]]]) {
     const K = id === H1.lamp ? L : E;
-    const body = pts(Math.floor(K.sized / 0.5) - 1, 44);
-    const prog = [...pre, ...body];
-    const dt = exactFinalDt(creditedAfter(prog, pre.length - 1), K.sized);
-    assert.ok(dt !== null && dt > 0 && dt < 1000, `${tag}: no final interval lands the run exactly on the sized ${K.sized} s`);
-    row(`${tag} the run AT the sized seconds holds on that tick`, id, [...prog, pt(44, { dt })], "held-as-sized");
-    row(`${tag} the run a hair short of the sized seconds is still open`, id, [...prog, pt(44, { dt: dt - 1 })], "open");
+    const { prog, wall } = toSustainEdge(id, pre);
+    assert.ok(wall !== null && wall > 0 && wall < 1000, `${tag}: no final wall interval lands the run exactly on the sized ${K.sized} s`);
+    row(`${tag} the run AT the sized seconds holds on that tick`, id, [...prog, pt(44, { wall })], "held-as-sized");
+    row(`${tag} the run a hair short of the sized seconds is still open`, id, [...prog, pt(44, { wall: wall - 1 })], "open");
   }
   return rows;
 }
@@ -7656,8 +7903,8 @@ describe("§W16 H1 ROUND 5 — the execution census: every pace comparison at it
     // EVERY COMPARISON WAS MET AT EQUALITY (and each clamp met) by some programme, on the profile that makes it — the two
     // ceilings (round 6) with the flat odometer EXACTLY at maxM and the wall clock EXACTLY at maxMs
     const want = {
-      [H1.lamp]: ["start", "floor", "disc", "drop", "window", "sustain", "govTarget", "govFull", "pulseLo", "pulseHi", "pulseHalf", "stepCap", "ceilingM", "ceilingS"],
-      [H1.em]: ["floor", "disc", "cap", "sustain", "ceilingM", "ceilingS"],
+      [H1.lamp]: ["start", "floor", "disc", "drop", "window", "sustain", "gate", "dutyOne", "dutyZero", "rateMin", "pulseLo", "pulseHi", "pulseHalf", "stepCap", "wallCap", "ceilingM", "ceilingS"],
+      [H1.em]: ["floor", "disc", "cap", "sustain", "dutyOne", "dutyZero", "ceilingM", "ceilingS"],
     };
     for (const id of [H1.lamp, H1.em]) {
       const missing = want[id].filter((e) => !edges[id].has(e));
@@ -7669,15 +7916,15 @@ describe("§W16 H1 ROUND 5 — the execution census: every pace comparison at it
   });
 
   it("THE ORACLE IS NOT THE LIB — it reads no lib function but the template table, the profile table as data and the declared constants, renders with this file's own renderer, and a planted change to one of its own comparisons turns the census red (the census can fail)", () => {
-    const src = [paceOracle, paceK, paceSizingOracle, S].map((f) => f.toString()).join("\n");
+    const src = [paceOracle, paceK, paceSizingOracle, S, ptWall].map((f) => f.toString()).join("\n");
     for (const f of ["wrongLegFlatStep", "pacePedal", "paceNumbers", "createWrongLegProfile", "wrongLegProfileFinish", "profileText", "renderProfileText", "wrongLegProfileFor"]) {
       assert.ok(!new RegExp(`\\b${f}\\b`).test(src), `the oracle calls ${f}`);
     }
     // a sabotaged oracle (its drop test at `<=` instead of `<`) disagrees with the lib on some row — so agreement is evidence
     const from = "drop: gap === null || gap < K.lim,";
     assert.equal(paceOracle.toString().split(from).length, 2);
-    const bad = new Function("paceK", "PACE_BREAK_ORDER", "finNum", "S", "ptStep", "referenceRender", "paceSizingOracle", `return (${paceOracle.toString().replace(from, "drop: gap === null || gap <= K.lim,")});`)(
-      paceK, PACE_BREAK_ORDER, finNum, S, ptStep, referenceRender, paceSizingOracle);
+    const bad = new Function("paceK", "PACE_BREAK_ORDER", "finNum", "S", "ptStep", "ptWall", "referenceRender", "paceSizingOracle", `return (${paceOracle.toString().replace(from, "drop: gap === null || gap <= K.lim,")});`)(
+      paceK, PACE_BREAK_ORDER, finNum, S, ptStep, ptWall, referenceRender, paceSizingOracle);
     let disagree = 0;
     for (const { id, prog } of pacePrograms()) if (paceDisagreement(bad(id, prog), paceReal(id, prog)) !== null) disagree += 1;
     assert.ok(disagree >= 1, "a sabotaged oracle agrees with the lib on every row — the census could not fail");
@@ -7734,7 +7981,7 @@ describe("§W16 H1 ROUND 5 — the execution census: every pace comparison at it
     const win = {};
     const doc = { querySelectorAll: () => [], documentElement: { getAttribute: () => null } };
     const init = new Function("window", "document", "MutationObserver", "getComputedStyle", "Date", `"use strict"; return (${log.inits[0].fn.toString()});`)(
-      win, doc, class { constructor(cb) { obs.push(cb); } observe() {} }, () => ({ visibility: "visible", display: "block", opacity: "1" }), { now: () => pc.now });
+      win, doc, p1FakeObserver(obs, doc), () => ({ visibility: "visible", display: "block", opacity: "1" }), { now: () => pc.now });
     init(log.inits[0].arg);
     assert.equal(obs.length, 1);
     // the binding as Playwright hands it: a serialised copy of the report — frozen here, so a write to it throws
@@ -7859,7 +8106,7 @@ function paceSource(K, rnd) {
   const S0 = K.start === null ? null : K.start + K.hq;
   const DOM = POSTED_DISC_DOMAIN;
   const OFF = POSTED_DISC_DECLARED.offDomain;
-  const style = pick(["chaos", "chaos", "chaos", "steady", "steady", "near-start", "near-start", "degenerate", "ceiling", "disc", "disc", ...(K.lamp ? ["window"] : [])]);
+  const style = pick(["chaos", "chaos", "chaos", "steady", "steady", "near-start", "near-start", "degenerate", "ceiling", "disc", "disc", ...(K.lamp ? ["window", "gate"] : [])]);
   let posted = rnd() < 0.15 ? pick(DOM) : pick([50, 50, 50, 60, 45, K.lamp ? 50 : 60]);
   const odd = () => pick([0, 1, 250, 499, 501, 1000, 1999, 2000, 2001, 3500, 5000, -1, -400, -2600]);
   const dtFor = (p) => (rnd() < p ? odd() : 500);
@@ -7887,8 +8134,9 @@ function paceSource(K, rnd) {
     const dt = oldest.at + K.win * 1000 - o.clockMs + pick([0, 0, 1]);
     return dt > 0 && dt <= K.stepCapMs ? dt : null;
   };
+  const D1 = dutyOneKmh(K), DZ = dutyZeroKmh(K);
   const absolute = (disc) => pick([
-    0, F0, F0 - ε, F0 + ε, disc, disc - ε, disc + ε, K.target, K.target - ε, K.target - K.band, K.target - K.band - ε, K.target - K.band + ε,
+    0, F0, F0 - ε, F0 + ε, disc, disc - ε, disc + ε, K.target, K.target - ε, D1, D1 - ε, D1 + ε, DZ, DZ - ε, DZ + ε,
     ...(S0 === null ? [] : [S0, S0 - ε, S0 + ε, K.start]), ...(K.cap === null ? [] : [K.cap, K.cap + ε, K.cap - ε]),
   ]);
   /** A reading built to fail SEVERAL break tests at once (inside the run). */
@@ -7909,7 +8157,10 @@ function paceSource(K, rnd) {
     const other = rnd() < 0.5 ? pick([rd + 10, rd - 5, rd + 0.5, rd - 10]) : pick(DOM);
     return { kmh: Math.max(0, kmh), dt, posted: dc && other > 0 ? other : rd };
   };
-  const chaosTick = (o) => {
+  /** (H2) now and then a wall interval that is not the tick's own — unread, negative, 0, under the rate floor, at and past the cap. */
+  const oddWall = (t) => (rnd() < 0.1 ? { ...t, wall: pick([null, NaN, -1, -600, 0, 100, 249, 250, 1999, 2000, 2001, 4000, 900]) } : t);
+  const chaosTick = (o) => oddWall(chaosTick0(o));
+  const chaosTick0 = (o) => {
     let dt = dtFor(0.25);
     if (rnd() < 0.08) dt = edgeDt(o) ?? dt;
     const r = rnd();
@@ -7934,7 +8185,7 @@ function paceSource(K, rnd) {
   const preTop = Math.max(...pre);
   const starter = pick([preTop - K.hq * 8 + ε, preTop - 3.5, preTop - 3, posted, S0 ?? F0 + ε, posted - 1, preTop - (K.lim ?? 4) + ε]);
   const after = Array.from({ length: 1 + Math.floor(rnd() * 5) }, () => pick([starter - 1, preTop - (K.lim ?? 4), preTop - (K.lim ?? 4) - ε, preTop - (K.lim ?? 4) + ε, starter, starter - 0.5, S0 ?? F0]));
-  const degenerate = pick(["zeros", "unread", "zeros+unread", "under-floor", "over-disc", "no-disc", "on-start", "on-floor"]);
+  const degenerate = pick(["zeros", "unread", "zeros+unread", "under-floor", "over-disc", "no-disc", "on-start", "on-floor", "on-duty-one", "on-duty-zero"]);
   const ceilingKind = pick(["metres", "metres", "metres-short", "clock", "clock-short", "both"]);
   const ceilingDial = pick([30, 35, 38, 20, K.target]);
   // disc: the run's disc (one a reading over the floor — and, on the lamp, at the start line — by the rounding fits under),
@@ -7960,6 +8211,11 @@ function paceSource(K, rnd) {
   const wUnread = Math.floor((wAge - 1) / 500);
   const wRdt = pick([0, 1, 100, 6000 - wAge]);
   const wR = wP - (K.lim ?? 4) - pick([0, ε, 1]);
+  // (H2) gate (lamp): 5 m a tick on the wall-clock dial odometer — 36 км/ч over 500 ms before the run, 45 over 400 ms in
+  // it — so the odometer lands EXACTLY on warningLampIgnoreRouteM; then a break, an unread wall, or nothing, after it
+  const gLaunch = Math.floor(rnd() * 20);
+  const gAfter = pick([null, null, 2, 9, 13, 14, 15]);
+  const gOdd = pick(["break", "wall", "dial"]);
   return {
     style,
     windowAgeMs: style === "window" ? wAge : null,
@@ -7973,6 +8229,12 @@ function paceSource(K, rnd) {
         if (k <= heldN + blindN + blindDialN) return { kmh: -1, dt: 500, posted: rnd() < 0.5 ? runDisc : null };
         if (k === heldN + blindN + blindDialN + 1) return { kmh: changeDialUnread ? -1 : startR, dt: dtFor(0.1), posted: changeTo };
         return k <= heldN + blindN + blindDialN + 4 ? { kmh: startR, dt: 500, posted: changeTo } : null;
+      }
+      if (style === "gate") {
+        if (i < gLaunch) return { kmh: 36, dt: 500, posted: 50 };
+        const g = K.gate === null ? 0 : (K.gate - 5 * gLaunch) / 5 + gLaunch; // the tick index that lands the odometer on the route
+        if (gAfter !== null && i === Math.round(g) + gAfter) return gOdd === "break" ? { kmh: 50 + ε, dt: 500, wall: 400, posted: 50 } : gOdd === "wall" ? { kmh: 45, dt: 500, wall: null, posted: 50 } : { kmh: -1, dt: 500, wall: 400, posted: 50 };
+        return i < 120 ? { kmh: 45, dt: 500, wall: 400, posted: 50 } : null;
       }
       if (style === "window") {
         // [launch…, P, unread × u, the start S (P now wAge ms old), R (P still in the window), S held]
@@ -7991,7 +8253,9 @@ function paceSource(K, rnd) {
         if (rnd() < 0.03) return chaosTick(o);
         let dt = dtFor(0.05);
         // the sized run landed EXACTLY on its seconds (an interval searched on the float), or a millisecond short of them
-        if (o.run !== null && K.sized - o.run.sec <= 1.9 && rnd() < 0.5) dt = (exactFinalDt(o.run.sec, K.sized) ?? dt) - pick([0, 0, 1]);
+        // (H2: the lamp's seconds are counted after its gate tick, so its exact final interval is aimed only once there is one)
+        const gs = o.run === null ? null : K.gate === null ? 0 : o.run.gateSec;
+        if (gs !== null && K.sized - (o.run.sec - gs) <= 1.9 && rnd() < 0.5) dt = (exactFinalDt(o.run.sec, K.sized, gs) ?? dt) - pick([0, 0, 1]);
         return { kmh: Math.max(0, level + pick([0, 0, 0, 0.5, -0.5, 1, -1, 1.5, -1.5])), dt, posted: discTick(0.02, 0.005) };
       }
       if (style === "near-start") {
@@ -8014,6 +8278,8 @@ function paceSource(K, rnd) {
         if (degenerate === "over-disc") return { kmh: posted + ε + Math.round(rnd() * 40) / 2, dt, posted };
         if (degenerate === "no-disc") return { kmh: i < launch.length ? launch[i] : level, dt, posted: pick([null, 0, -5, NaN]) };
         if (degenerate === "on-start") return { kmh: S0 ?? F0 + ε, dt, posted };
+        if (degenerate === "on-duty-one") return { kmh: D1, dt, posted };
+        if (degenerate === "on-duty-zero") return { kmh: DZ, dt, posted };
         return { kmh: F0, dt, posted };
       }
       // ceiling: the flat odometer or the wall clock landed EXACTLY on its ceiling (or a hair short), from its first flat tick
@@ -8078,6 +8344,8 @@ class FakeEl {
     const b = this.box;
     return { width: b.w ?? 100, height: b.h ?? 20, top: b.top ?? 0, bottom: (b.top ?? 0) + (b.h ?? 20) };
   }
+  /** (H2) the element's line boxes — none unless its box names some (an inline box whose border box is degenerate). */
+  getClientRects() { return (this.box.rects ?? []).map((r) => ({ width: r.w, height: r.h })); }
 }
 function fakeMatch(el, sel) {
   if (sel === "*") return true;
@@ -8086,7 +8354,74 @@ function fakeMatch(el, sel) {
   if (/^[a-z]+$/.test(sel)) return el.tagName === sel.toUpperCase();
   throw new Error(`the fake document has no selector «${sel}»`);
 }
-const fakeStyle = (el) => ({ visibility: el.box.visibility ?? "visible", display: el.box.display ?? "block", opacity: el.box.opacity ?? "1" });
+const fakeStyle = (el) => ({ visibility: el.box.visibility ?? "visible", display: el.box.display ?? "block", opacity: el.box.opacity ?? "1", contentVisibility: el.box.cv ?? "visible" });
+/** (H2) THE FAKE MUTATION OBSERVER — it hears what its `observe` options ask, as the DOM's does: a mount is never a direct
+ *  child of the document, so the callback a census hands records to (`obs[k]`) passes them on only when this observer was
+ *  asked to observe `doc` with `childList` AND `subtree`; otherwise it hears nothing. */
+function p1FakeObserver(obs, doc) {
+  return class {
+    constructor(cb) {
+      this.asked = [];
+      obs.push((recs) => { if (this.asked.some((o) => o.target === doc && o.childList === true && o.subtree === true)) cb(recs); });
+    }
+    observe(target, o = {}) { this.asked.push({ target, childList: o.childList, subtree: o.subtree }); }
+  };
+}
+/** (H2) A TOAST CARD AS THE PRODUCT MOUNTS IT (HudToasts.tsx at 9ab89b8: `ToastShell` around `ViolationToast`) — a
+ *  <button> whose first child is the scrim (`ToastGround`, a `[data-hud="toast-scrim"]` <div>), then the header row (a
+ *  <div>: the severity label's <span>, and a <span> holding the points' <span> and the dismiss glyph's), the title <p>, the
+ *  body's <div> (the «Защо» chip's <span> when the paragraph was summarised, then the body <p> carrying
+ *  `data-hud-toast-body`), and the footer <div> (`ToastFooter`: its <span>s — here the spec's rows) when there is one.
+ *  H1 round 15's cards were a <div> with a bare <span>, a <p> and a body <div>: no product card is that shape. */
+function p1CardEl(c) {
+  const card = new FakeEl("button", { type: "button", "aria-label": "Скрий известието" }, { ...(c.box ?? {}), innerText: c.innerText ?? "" });
+  card.isCard = true;
+  card.add(new FakeEl("div", { "data-hud": "toast-scrim", "data-hud-ink": "", "aria-hidden": "true" }, c.scrimBox ?? {}));
+  if (c.head !== null && c.head !== undefined) {
+    const marks = new FakeEl("span");
+    if (typeof c.points === "string") marks.add(new FakeEl("span", {}, {}, c.points));
+    if (typeof c.glyph === "string") marks.add(new FakeEl("span", { "aria-hidden": "true" }, {}, c.glyph));
+    card.add(new FakeEl("div").add(new FakeEl("span", {}, { innerText: p1Rendered(c.head) }, c.head), marks));
+  }
+  card.add(new FakeEl("p", {}, { innerText: p1Rendered(c.title) }, c.title));
+  const flow = new FakeEl("div");
+  if (c.why === true) flow.add(new FakeEl("span", { "data-hud-toast-why": "closed" }, {}, "Защо"));
+  const bodyEl = new FakeEl("p", { "data-hud-toast-body": c.bodyChoice ?? "paragraph" }, {}, c.bodyText ?? "");
+  flow.add(bodyEl);
+  card.add(flow);
+  // (round 8, V7-53 decided) a fixed row may give a card more toast bodies; the census's cards have one, as the product's do
+  for (let k = 1; k < (c.bodies ?? 1); k++) card.add(new FakeEl("div").add(new FakeEl("p", { "data-hud-toast-body": "paragraph" })));
+  if ((c.rows ?? []).length > 0) card.add(new FakeEl("div").add(...c.rows.map((r) => new FakeEl(r.tag ?? "span", {}, r.box, r.text))));
+  return { card, bodyEl };
+}
+/** (H2) THE WITNESS'S PAINT TEST, AS THE P1 COMMENT STATES IT (the HUD census's test, with round 12's visibility table) — the
+ *  oracles' own, on the census's own element tree: the element's own computed visibility paints (P1_VISIBILITY_PAINTS); no
+ *  element up its ancestor chain, itself included, has display «none», opacity 0 or content-visibility «hidden»; and its
+ *  border box, or one of its line boxes, is 1 px or more each way. */
+function p1PaintedEl(e) {
+  if (P1_VISIBILITY_PAINTS[e.box.visibility ?? "visible"] !== true) return false;
+  for (let n = e; n; n = n.parentElement) {
+    const b = n.box;
+    if ((b.display ?? "block") === "none" || Number(b.opacity ?? "1") === 0 || (b.cv ?? "visible") === "hidden") return false;
+  }
+  if ((e.box.w ?? 100) >= 1 && (e.box.h ?? 20) >= 1) return true;
+  return (e.box.rects ?? []).some((r) => r.w >= 1 && r.h >= 1);
+}
+/** (H2) Which of the paint test's clauses decided a card the box and the own visibility would have painted: an ancestor's
+ *  display, opacity or content-visibility, or a line box under a degenerate border box — null when none of those decided. */
+function p1PaintDecider(e) {
+  const b = e.box;
+  const ownOk = P1_VISIBILITY_PAINTS[b.visibility ?? "visible"] === true && (b.display ?? "block") !== "none" && Number(b.opacity ?? "1") !== 0 && (b.cv ?? "visible") !== "hidden";
+  if (!ownOk) return null;
+  for (let n = e.parentElement; n; n = n.parentElement) {
+    const a = n.box;
+    if ((a.display ?? "block") === "none") return "card:an-ancestor-hides=display";
+    if (Number(a.opacity ?? "1") === 0) return "card:an-ancestor-hides=opacity";
+    if ((a.cv ?? "visible") === "hidden") return "card:an-ancestor-hides=content-visibility";
+  }
+  if (!((b.w ?? 100) >= 1 && (b.h ?? 20) >= 1) && (b.rects ?? []).some((r) => r.w >= 1 && r.h >= 1)) return "card:a-line-box-paints";
+  return null;
+}
 const deepFreeze = (v) => {
   if (v && typeof v === "object" && !Object.isFrozen(v)) {
     Object.freeze(v);
@@ -8287,7 +8622,8 @@ const P1_TITLE_FLOOR = Object.freeze([
 function p1DriveSpec(rnd) {
   const pick = (a) => a[Math.floor(rnd() * a.length)];
   const int = (a, b) => a + Math.floor(rnd() * (b - a + 1));
-  const box = () => ({ w: pick([0, 1, 1.4, 2, 280, 280.6]), h: pick([0, 1, 2, 40, 39.5]), top: pick([0, 10, 10.5, 300, -5]), visibility: pick(["visible", "visible", "hidden", "collapse"]), display: pick(["block", "block", "none", "flex"]), opacity: pick(["1", "1", "0", "0.5", "0.001", ""]) });
+  // (H2: and its content-visibility, and its line boxes — the two clauses of the witness's paint test a box alone never decides)
+  const box = () => ({ w: pick([0, 1, 1.4, 2, 280, 280.6]), h: pick([0, 1, 2, 40, 39.5]), top: pick([0, 10, 10.5, 300, -5]), visibility: pick(["visible", "visible", "hidden", "collapse"]), display: pick(["block", "block", "none", "flex"]), opacity: pick(["1", "1", "0", "0.5", "0.001", ""]), cv: pick(["visible", "visible", "visible", "auto", "hidden"]), rects: pick([undefined, undefined, undefined, [{ w: 0, h: 0 }], [{ w: 24, h: 14 }], [{ w: 0.5, h: 14 }, { w: 30, h: 1 }]]) });
   // (round 15) the titles are drawn by p1TitleSource — the thrown census's text generator, and variants of the drive's earlier
   // titles — and a card's column may hold OTHER cards before and after it. This census is serial (one report a mount at most),
   // so each of those is drawn to be a card the rule does not report: a copy of a title already reported (the same text, or
@@ -8316,6 +8652,8 @@ function p1DriveSpec(rnd) {
       bodyText: pick(["", "тяло"]),
       added: pick(["column", "column", "card", "body"]),
       before: [], after: [],
+      // (H2) the product card's own parts: the header's points and dismiss glyph, the «Защо» chip, the body's choice, the scrim
+      points: pick(["−10 т.", "−3 изпитни т.", "", null]), glyph: pick(["✕", null]), why: rnd() < 0.3, bodyChoice: pick(["paragraph", "paragraph", "summary", "pending"]), scrimBox: box(),
     };
     if (kind === "card" && card.column) {
       const t = p1TitleOf(card.title);
@@ -8429,19 +8767,16 @@ function p1Document(mt) {
     body.add(added);
   } else {
     const c = mt.card;
-    const card = new FakeEl("div", {}, { ...c.box, innerText: c.innerText });
-    if (c.head !== null) card.add(new FakeEl("span", {}, { innerText: p1Rendered(c.head) }, c.head));
-    card.add(new FakeEl("p", {}, { innerText: p1Rendered(c.title) }, c.title));
-    const bodyEl = new FakeEl("div", { "data-hud-toast-body": "" }, {}, c.bodyText);
-    for (const r of c.rows) bodyEl.add(new FakeEl(r.tag ?? "span", {}, r.box, r.text));
-    card.add(bodyEl);
-    // (round 15) the column's other cards — a <p> and a toast body each — before and after the card, in document order
-    const other = (s) => new FakeEl("div", {}, s.box).add(new FakeEl("p", {}, { innerText: p1Rendered(s.title) }, s.title), new FakeEl("div", { "data-hud-toast-body": "" }));
+    // (H2) the product's card (p1CardEl), and the column's other cards — product cards too — before and after it
+    const { card, bodyEl } = p1CardEl(c);
+    const other = (s) => p1CardEl({ title: s.title, box: s.box, head: null, innerText: "" }).card;
     const column = c.column ? new FakeEl("div", { "data-hud": "toasts" }, c.columnBox).add(...(c.before ?? []).map(other), card, ...(c.after ?? []).map(other)) : null;
     body.add(column ?? card);
     added = c.added === "column" && column ? column : c.added === "body" ? bodyEl : card;
+    // (the environment's own handles, for the oracle — the harness reads attributes, never these)
+    return { html, added, root: body.kids[body.kids.length - 1], card, column };
   }
-  return { html, added, root: body.kids[body.kids.length - 1] };
+  return { html, added, root: body.kids[body.kids.length - 1], card: null, column: null };
 }
 
 /** Run the HARNESS's P1 block (lesson-audit.mjs, `p1Block`) over one generated drive, on the fake document. */
@@ -8489,7 +8824,7 @@ async function p1Run(spec, block = p1Block()) {
   const obs = [];
   const win = {};
   new Function("window", "document", "MutationObserver", "getComputedStyle", "Date", `"use strict"; return (${env.inits[0].fn.toString()});`)(
-    win, doc, class { constructor(cb) { obs.push(cb); } observe() {} }, fakeStyle, { now: () => pc.now })(env.inits[0].arg);
+    win, doc, p1FakeObserver(obs, doc), fakeStyle, { now: () => pc.now })(env.inits[0].arg);
   win.__auditEvent = (ev) => {
     hc.now += env.lat;
     env.bindings.__auditEvent(null, deepFreeze(structuredClone(ev)));
@@ -8523,10 +8858,18 @@ async function p1Run(spec, block = p1Block()) {
 function p1Oracle(spec) {
   const OFFSETS = [0, 1000, 3000];
   const MAX = 8;
-  const painted = (b) => (b.w ?? 100) > 1 && (b.h ?? 20) > 1 && P1_VISIBILITY_PAINTS[b.visibility ?? "visible"] === true && (b.display ?? "block") !== "none" && Number(b.opacity ?? "1") > 0;
+  // (H2) the witness's paint test as the P1 comment states it, on the oracle's OWN copy of the mount's document (p1Document,
+  // the environment's builder — the harness's witness and dump never run here), walked in document order by the oracle
+  const painted = p1PaintedEl;
   // (round 15) white space by the P1 comment's rule, written out (p1TitleOf) — never the harness's own expression
   const collapse = p1TitleOf;
   const box = (b) => ({ visibility: b.visibility ?? "visible", display: b.display ?? "block", opacity: b.opacity ?? "1", w: Math.round(b.w ?? 100), h: Math.round(b.h ?? 20), top: Math.round(b.top ?? 0), bottom: Math.round((b.top ?? 0) + (b.h ?? 20)) });
+  const walk = (root) => {
+    const out = [];
+    const rec = (e) => { for (const k of e.kids) { out.push(k); rec(k); } };
+    rec(root);
+    return out;
+  };
   const feat = new Set();
   let h = 2_000_000;
   let ji = 0, di = 0, si = 0, n = 0, seen = 0, writes = 0;
@@ -8544,6 +8887,7 @@ function p1Oracle(spec) {
     const mt = spec.mounts[k];
     const pageAt = h + mt.gap;
     h = Math.max(h, pageAt);
+    const mine = p1Document(mt);
     let title = null, head = null, cardPainted = null;
     if (mt.kind === "card") {
       const c = mt.card;
@@ -8567,19 +8911,22 @@ function p1Oracle(spec) {
         if (examined.length > 1) feat.add("subtree:the-new-card-among-others");
       }
       if (!isNew) continue;
-      head = c.head === null ? "" : collapse(c.head);
-      cardPainted = painted(c.box);
+      // (H2) the head is the header row's text — the severity label, then the points and the glyph, as the product lays them out
+      head = c.head === null ? "" : collapse(`${c.head}${typeof c.points === "string" ? c.points : ""}${typeof c.glyph === "string" ? c.glyph : ""}`);
+      cardPainted = painted(mine.card);
       feat.add(`card:painted=${cardPainted}`);
-      // (round 12) the card's own box, display and opacity all pass, so its visibility alone decides the flag
-      if ((c.box.w ?? 100) > 1 && (c.box.h ?? 20) > 1 && (c.box.display ?? "block") !== "none" && Number(c.box.opacity ?? "1") > 0) feat.add(`card:visibility-decides=${c.box.visibility ?? "visible"}`);
+      // (round 12) everything else the paint test reads passes — the chain, the box — so its visibility alone decides the flag
+      if (painted({ ...mine.card, box: { ...mine.card.box, visibility: "visible" } })) feat.add(`card:visibility-decides=${c.box.visibility ?? "visible"}`);
+      // (H2) an ancestor's display, opacity or content-visibility, or a line box, decided it
+      const decider = p1PaintDecider(mine.card);
+      if (decider !== null) feat.add(decider);
     }
     n += 1;
     feat.add(`callback:${mt.noise ?? "none"}:the-mount-reported`);
-    const huds = [
-      ...mt.huds.filter((x) => painted(x.box)).map((x) => x.name),
-      ...(mt.kind === "impact" ? (painted(mt.flash.box) ? ["impact-flash"] : []) : painted(mt.card.columnBox) ? ["toasts"] : []),
-    ];
-    const layers = mt.layers.map((l) => ({ layer: l.name, painted: painted(l.box) }));
+    // (H2) every painted [data-hud] in document order — the column, and each card's scrim, among them — and every layer
+    const all = walk(mine.html);
+    const huds = all.filter((e) => Object.hasOwn(e.attrs, "data-hud") && painted(e)).map((e) => e.attrs["data-hud"]);
+    const layers = all.filter((e) => Object.hasOwn(e.attrs, "data-sim-overlay")).map((e) => ({ layer: e.attrs["data-sim-overlay"], painted: painted(e) }));
     const ev = { n, kind: mt.kind, title, head, cardPainted, at: pageAt, overlay: { layers, huds, dialogs: mt.dialogs, camera: mt.camera } };
     for (const l of layers) feat.add(`layer:painted=${l.painted}`);
     feat.add(`camera:${mt.camera === null ? "unset" : mt.camera === "" ? "empty" : "set"}`);
@@ -8600,7 +8947,7 @@ function p1Oracle(spec) {
     series.push(rec);
     const out = { n, series: true, ended: null, frames: 0, why: null };
     ledger.push(out);
-    notes.push(`      EVENT SHOT ${n}: a${mt.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${tSec}s${mt.kind === "card" ? ` (${p1JsonQuoted(title)}, painted at mount by its own box and computed style only: ${cardPainted} — necessary, not sufficient: its ancestors' opacity, a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(layers)}, camera ${mt.camera ?? "(unset)"}; shots scheduled at +0/+1/+3 s after the witness reported the mount`);
+    notes.push(`      EVENT SHOT ${n}: a${mt.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${tSec}s${mt.kind === "card" ? ` (${p1JsonQuoted(title)}, painted at mount by the HUD census's test — display, opacity and content-visibility up its ancestor chain, its own visibility, a box of 1 px or more: ${cardPainted} — necessary, not sufficient: a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(layers)}, camera ${mt.camera ?? "(unset)"}; shots scheduled at +0/+1/+3 s after the witness reported the mount`);
     let removed = false;
     let threw = null;
     let steps = 0;
@@ -8635,12 +8982,12 @@ function p1Oracle(spec) {
           const c = mt.card;
           const cb = box(c.box);
           const rows = [];
-          const els = [...(c.head === null ? [] : [{ tag: "span", own: c.head, b: {} }]), { tag: "p", own: c.title, b: {} }, { tag: "div", own: c.bodyText, b: {} }, ...c.rows.map((r) => ({ tag: r.tag ?? "span", own: r.text, b: r.box }))];
-          for (const e of els) {
+          // (H2) every element under the card with text of its own, in document order — the product card's parts
+          for (const e of walk(mine.card)) {
             const own = collapse(e.own);
             if (own === "") continue;
-            const b = box(e.b);
-            rows.push({ tag: e.tag, text: own.slice(0, 200), ...b, insideCard: b.top >= cb.top - 1 && b.bottom <= cb.bottom + 1 });
+            const b = box(e.box);
+            rows.push({ tag: e.tagName.toLowerCase(), text: own.slice(0, 200), ...b, insideCard: b.top >= cb.top - 1 && b.bottom <= cb.bottom + 1 });
           }
           dump.card = { innerText: c.innerText, box: cb, rows };
         }
@@ -8716,9 +9063,11 @@ function pacePairRows() {
 describe("§W17 H1 ROUND 6 — the generative census: thousands of programmes per profile against an independent oracle, the break-reason priority written down, the P1 block over generated drives", () => {
   it("THE ORACLE'S OWN NUMBERS ARE PINNED — each harness number the oracle writes down (the governor's band, gain and pulse clamps, the emergency target over its floor, the two lag allowances, the step cap, the sustain margin, each pace row's ceilings) is the lib's own; a change to one is a visible re-pin here", () => {
     const HN = PACE_HARNESS_NUMBERS;
-    for (const k of ["PACE_FULL_BAND_KMH", "PACE_DUTY_GAIN_PER_KMH", "PACE_MIN_PULSE_MS", "PACE_MAX_PULSE_MS", "EM_PACE_ABOVE_FLOOR_KMH", "LAMP_RUN_LAG_MARGIN_SEC", "EM_RUN_LAG_MARGIN_SEC", "OVER_LIMIT_STEP_CAP_SEC", "PROFILE_SUSTAIN_MARGIN_SEC"]) {
+    for (const k of ["PACE_CYCLE_MS", "PACE_DUTY_GAIN_PER_KMH", "PACE_RATE_GAIN_PER_KMH_S", "PACE_RATE_MIN_INTERVAL_MS", "PACE_MIN_PULSE_MS", "PACE_MAX_PULSE_MS", "EM_PACE_ABOVE_FLOOR_KMH", "EM_RUN_LAG_MARGIN_SEC", "OVER_LIMIT_STEP_CAP_SEC", "PROFILE_SUSTAIN_MARGIN_SEC"]) {
       assert.equal(LIBNS[k], HN[k], `the lib's ${k} is ${LIBNS[k]}, the oracle's ${HN[k]}`);
     }
+    // (H2) H1's whole-tick band and the lamp's lag allowance are gone from the lib, not left behind unread
+    for (const k of ["PACE_FULL_BAND_KMH", "LAMP_RUN_LAG_MARGIN_SEC"]) assert.equal(k in LIBNS, false, `the lib still exports ${k}`);
     for (const id of [H1.lamp, H1.em]) {
       const decl = WRONG_LEG_PROFILES.get(id);
       assert.deepEqual({ maxM: decl.maxM, maxMs: decl.maxMs }, { ...HN.ceilings[id] }, `${id}: the table's ceilings`);
@@ -8781,14 +9130,14 @@ describe("§W17 H1 ROUND 6 — the generative census: thousands of programmes pe
         ? {
           decisions: ["held-as-sized", "run-broken:disc-change", "run-broken:floor", "run-broken:disc", "run-broken:drop", "open:notStarted", "open:started", "metres", "clock"],
           pairs: ["pair:disc-change+floor", "pair:disc-change+disc", "pair:disc-change+drop", "pair:floor+drop"],
-          feat: ["dt<0", "dt=0", "dt>cap", "top0", "noRead", "unreadDialDiscChange", "preStartOverDiscInWindowAtStart", "dropAgainstPreStartReading", "startGapOver0", "creditedUnderStart", "bothCeilings", "break:disc-change+floor+drop"],
-          edges: ["start", "floor", "disc", "drop", "window", "sustain", "govTarget", "govFull", "pulseLo", "pulseHi", "stepCap", "ceilingM", "ceilingS"],
+          feat: ["dt<0", "dt=0", "dt>cap", "top0", "noRead", "unreadDialDiscChange", "preStartOverDiscInWindowAtStart", "dropAgainstPreStartReading", "startGapOver0", "creditedUnderStart", "bothCeilings", "break:disc-change+floor+drop", "wallUnread", "wall>cap", "rateFloor", "gateLate"],
+          edges: ["start", "floor", "disc", "drop", "window", "sustain", "gate", "dutyOne", "dutyZero", "pulseLo", "pulseHi", "stepCap", "wallCap", "ceilingM", "ceilingS"],
         }
         : {
           decisions: ["held-as-sized", "run-broken:disc-change", "run-broken:floor", "run-broken:disc", "run-broken:cap", "open:notStarted", "open:started", "metres", "clock"],
           pairs: ["pair:disc-change+floor", "pair:disc-change+disc", "pair:disc-change+cap", "pair:disc+cap"],
-          feat: ["dt<0", "dt=0", "dt>cap", "top0", "noRead", "unreadDialDiscChange", "creditedUnderStart", "bothCeilings"],
-          edges: ["floor", "disc", "cap", "govTarget", "govFull", "pulseLo", "pulseHi", "stepCap", "ceilingM", "ceilingS"],
+          feat: ["dt<0", "dt=0", "dt>cap", "top0", "noRead", "unreadDialDiscChange", "creditedUnderStart", "bothCeilings", "wallUnread", "wall>cap", "rateFloor"],
+          edges: ["floor", "disc", "cap", "dutyOne", "dutyZero", "pulseLo", "pulseHi", "stepCap", "wallCap", "ceilingM", "ceilingS"],
         };
       const short = [
         ...want.decisions.filter((d) => (seen.decisions.get(d) ?? 0) < 10).map((d) => `decision ${d}: ${seen.decisions.get(d) ?? 0}`),
@@ -8830,7 +9179,7 @@ describe("§W17 H1 ROUND 6 — the generative census: thousands of programmes pe
   });
 
   it("THE CENSUS CAN FAIL — the oracle reads no lib function, and the oracle with each round-5 survivor's change planted in IT disagrees with the lib on the first seed's programmes (agreement is evidence, not two copies of one mistake)", () => {
-    const helpers = [paceOracle, paceK, paceSizingOracle, S, finNum, ptStep, referenceRender].map((f) => f.toString()).join("\n");
+    const helpers = [paceOracle, paceK, paceSizingOracle, S, finNum, ptStep, ptWall, referenceRender].map((f) => f.toString()).join("\n");
     for (const f of ["wrongLegFlatStep", "pacePedal", "paceNumbers", "createWrongLegProfile", "wrongLegProfileFinish", "profileText", "renderProfileText", "wrongLegProfileFor", "sizingSpec", "readingsSpec"]) {
       assert.ok(!new RegExp(`\\b${f}\\b`).test(helpers), `the oracle (or a helper it uses) calls ${f}`);
     }
@@ -8841,15 +9190,20 @@ describe("§W17 H1 ROUND 6 — the generative census: thousands of programmes pe
       ["V5-06's class: the floor before the disc change", "const order = PACE_BREAK_ORDER.map(([k]) => k);", 'const order = ["floor", "disc-change", "disc", "cap", "drop"];'],
       ["V5-07's class: the disc before the disc change", "const order = PACE_BREAK_ORDER.map(([k]) => k);", 'const order = ["disc", "disc-change", "floor", "cap", "drop"];'],
       ["V5-11's class: a top of 0 not recorded", "top: o.top >= 0 ? o.top : null", "top: o.top > 0 ? o.top : null"],
-      ["V5-15's class: a negative interval credited", "const dtEff = Math.min(Math.max(0, dtFin), K.stepCapMs);", "const dtEff = Math.min(Math.abs(dtFin), K.stepCapMs);"],
+      ["V5-15's class: a negative interval credited (H2: the run's clock is the wall interval)", "const wallOk = finNum(wall) && wall >= 0;", "const wallOk = finNum(wall);"],
+      ["H2: the lamp run sized whole, not after its gate tick", "const counted = o.run === null ? null : K.gate === null ? o.run.sec : o.run.gateSec === null ? null : o.run.sec - o.run.gateSec;", "const counted = o.run === null ? null : o.run.sec;"],
+      ["H2: the governor's rate term left out", "const duty = K.base + K.gain * (K.target - dial) - K.rate * rate;", "const duty = K.base + K.gain * (K.target - dial);"],
+      ["H2: the rate term's 250 ms floor left out", "(Math.max(wall, K.rateMinMs) / 1000)", "(wall / 1000)"],
+      ["H2: the wall interval left uncapped", "const wallCredit = wallOk ? Math.min(wall, K.stepCapMs) / 1000 : 0;", "const wallCredit = wallOk ? wall / 1000 : 0;"],
+      ["H2: the gate read past the route only", "o.run.fromRoad < K.gate && o.road >= K.gate", "o.run.fromRoad < K.gate && o.road > K.gate"],
       ["V5-21's class: the lowest tracked on the lamp only", "o.run.low = Math.min(o.run.low, dial);", "if (gap !== null) o.run.low = Math.min(o.run.low, dial);"],
       ["V4-06's class: a reading AT the disc breaks", "disc: ref !== null && dial <= ref,", "disc: ref !== null && dial < ref,"],
       ["V5-09's class: the metre ceiling only PAST maxM", "if (o.odo >= K.maxM || ms >= K.maxMs) {", "if (o.odo > K.maxM || ms >= K.maxMs) {"],
     ];
     for (const [label, from, to] of plants) {
       assert.equal(src.split(from).length, 2, `${label}: the plant's anchor is not unique in the oracle`);
-      const bad = new Function("paceK", "PACE_BREAK_ORDER", "finNum", "S", "ptStep", "referenceRender", "paceSizingOracle", `return (${src.replace(from, to)});`)(
-        paceK, PACE_BREAK_ORDER, finNum, S, ptStep, referenceRender, paceSizingOracle);
+      const bad = new Function("paceK", "PACE_BREAK_ORDER", "finNum", "S", "ptStep", "ptWall", "referenceRender", "paceSizingOracle", `return (${src.replace(from, to)});`)(
+        paceK, PACE_BREAK_ORDER, finNum, S, ptStep, ptWall, referenceRender, paceSizingOracle);
       let disagree = 0;
       for (const id of [H1.lamp, H1.em]) {
         const K = paceK(id);
@@ -8896,6 +9250,8 @@ describe("§W17 H1 ROUND 6 — the generative census: thousands of programmes pe
       "camera:unset", "camera:empty", "camera:set", "layer:painted=true", "layer:painted=false", "huds", "card:painted=true", "card:painted=false",
       // (round 12) each computed visibility the specification has decides a card's painted flag on some drive
       "card:visibility-decides=visible", "card:visibility-decides=hidden", "card:visibility-decides=collapse",
+      // (H2) each clause of the witness's paint test a card's own box and visibility never decide, deciding a card
+      "card:an-ancestor-hides=display", "card:an-ancestor-hides=opacity", "card:an-ancestor-hides=content-visibility", "card:a-line-box-paints",
       "card:no-column", "card:empty-title", "card:repeat-title", "not-driving", "series-cap", "tSec<0", "start%100", "done%100",
       // (round 8) a thrown step at EVERY step index it can happen at: the frame of step 1, 2 and 3, the wait of step 2 and 3
       "threw@0:shot", "threw@1:shot", "threw@2:shot", "threw@1:wait", "threw@2:wait",
@@ -9223,18 +9579,8 @@ function p1SharedDoc(spec) {
       put(body, root, mt.flash.where);
       return { added: root, root, flashes: [f], cards: [] };
     }
-    const cardOf = (c) => {
-      const cardEl = new FakeEl("div", {}, { ...c.box, innerText: c.innerText });
-      cardEl.isCard = true;
-      if (c.head !== null) cardEl.add(new FakeEl("span", {}, { innerText: p1Rendered(c.head) }, c.head));
-      cardEl.add(new FakeEl("p", {}, { innerText: p1Rendered(c.title) }, c.title));
-      const bodyEl = new FakeEl("div", { "data-hud-toast-body": "" }, {}, c.bodyText);
-      for (const r of c.rows) bodyEl.add(new FakeEl(r.tag ?? "span", {}, r.box, r.text));
-      cardEl.add(bodyEl);
-      // (round 8, V7-53 decided) a fixed row may give a card more toast bodies; the census's cards have one, as the product's do
-      for (let k = 1; k < (c.bodies ?? 1); k++) cardEl.add(new FakeEl("div", { "data-hud-toast-body": "" }));
-      return cardEl;
-    };
+    // (H2) the product's card (p1CardEl)
+    const cardOf = (c) => p1CardEl(c).card;
     if (mt.kind === "subtree") {
       // (round 15) ONE ADDED SUBTREE: the root — a new toast column, or a plain wrapper — and under it, in the order drawn (which
       // is their document order), each flash (wrapped or not) and each card: in a column root as its child; in a wrapper, in a
@@ -9331,7 +9677,7 @@ async function p1RunOverlap(spec, block = p1Block()) {
   const obs = [];
   const win = {};
   new Function("window", "document", "MutationObserver", "getComputedStyle", "Date", `"use strict"; return (${env.inits[0].fn.toString()});`)(
-    win, doc, class { constructor(cb) { obs.push(cb); } observe() {} }, fakeStyle, clock)(env.inits[0].arg);
+    win, doc, p1FakeObserver(obs, doc), fakeStyle, clock)(env.inits[0].arg);
   let mounting = null;
   win.__auditEvent = (ev) => {
     const copy = deepFreeze(structuredClone(ev));
@@ -9397,7 +9743,8 @@ function p1OverlapOracle(spec) {
     last = JSON.parse(JSON.stringify({ offsetsMs: OFFSETS, maxSeries: MAX, pendingAtWrite: open, ...S0 }));
   };
   const sd = p1SharedDoc(spec);
-  const painted = (b) => (b.w ?? 100) > 1 && (b.h ?? 20) > 1 && P1_VISIBILITY_PAINTS[b.visibility ?? "visible"] === true && (b.display ?? "block") !== "none" && Number(b.opacity ?? "1") > 0;
+  // (H2) the witness's paint test as the P1 comment states it — on the oracle's own copy of the shared document's elements
+  const painted = p1PaintedEl;
   // (round 15) white space by the P1 comment's rule, written out (p1TitleOf) — never the harness's own expression
   const collapse = p1TitleOf;
   // (round 15) the mount line's title, in JSON's quoting written out (p1JsonQuoted) — never the harness's own call
@@ -9417,8 +9764,8 @@ function p1OverlapOracle(spec) {
   const overlayNow = () => {
     const all = walk();
     return {
-      layers: all.filter((e) => Object.hasOwn(e.attrs, "data-sim-overlay")).map((e) => ({ layer: e.attrs["data-sim-overlay"], painted: painted(e.box) })),
-      huds: all.filter((e) => Object.hasOwn(e.attrs, "data-hud") && painted(e.box)).map((e) => e.attrs["data-hud"]),
+      layers: all.filter((e) => Object.hasOwn(e.attrs, "data-sim-overlay")).map((e) => ({ layer: e.attrs["data-sim-overlay"], painted: painted(e) })),
+      huds: all.filter((e) => Object.hasOwn(e.attrs, "data-hud") && painted(e)).map((e) => e.attrs["data-hud"]),
       dialogs: all.filter((e) => e.attrs.role === "dialog").length,
       camera: camera(),
     };
@@ -9498,7 +9845,7 @@ function p1OverlapOracle(spec) {
     run.kind = ev.kind;
     run.mountedAt = ev.at;
     if (ev.kind === "card" && runs.some((r) => r !== run && !r.settled && r.kind === "impact" && ev.at - r.mountedAt <= 200)) feat.add("collision-overlap");
-    notes.push(`      EVENT SHOT ${ev.n}: a${ev.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${rec.tSec}s${ev.kind === "card" ? ` (${quoted(ev.title)}, painted at mount by its own box and computed style only: ${ev.cardPainted} — necessary, not sufficient: its ancestors' opacity, a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(ev.overlay.layers)}, camera ${ev.overlay.camera ?? "(unset)"}; shots scheduled at +0/+1/+3 s after the witness reported the mount`);
+    notes.push(`      EVENT SHOT ${ev.n}: a${ev.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${rec.tSec}s${ev.kind === "card" ? ` (${quoted(ev.title)}, painted at mount by the HUD census's test — display, opacity and content-visibility up its ancestor chain, its own visibility, a box of 1 px or more: ${ev.cardPainted} — necessary, not sufficient: a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(ev.overlay.layers)}, camera ${ev.overlay.camera ?? "(unset)"}; shots scheduled at +0/+1/+3 s after the witness reported the mount`);
     // (round 8, P-e) a throw ends the series where it happens: marked, written, its own line, and NOT a refusal
     const threw = (msg, where) => {
       feat.add(`threw@${rec.shots.length}:${where}`);
@@ -9605,8 +9952,9 @@ function p1OverlapOracle(spec) {
         seenTitles.set(title, card.title);
         here.add(title);
         cardReports += 1;
-        if (cardReports >= 2) feat.add(`subtree:a-later-card-reported:painted=${painted(card.box)}`);
-        report("card", title, card.head === null ? "" : collapse(card.head), painted(card.box));
+        if (cardReports >= 2) feat.add(`subtree:a-later-card-reported:painted=${painted(el)}`);
+        // (H2) the head is the header row's text; the flag is the paint test on the card element, up its ancestor chain
+        report("card", title, card.head === null ? "" : collapse(`${card.head}${typeof card.points === "string" ? card.points : ""}${typeof card.glyph === "string" ? card.glyph : ""}`), painted(el));
       }
       if (part.kind === "subtree") {
         feat.add(part.isColumn ? "subtree:a-column" : "subtree:a-wrapper");
@@ -9821,7 +10169,10 @@ describe("§W18 H1 ROUND 7 — the posted-disc domain the product can publish, a
       // …and its end line: the thrown series counted where no series began
       ["round 7's class: a thrown series counted as no series", "      out.ended = \"threw\";", "      out.series = false;\n      out.why = `threw: ${msg}`;"],
       // (round 15, the round-14 verifier's V14-P1-TITLE-AND-SUBTREE) the four witness edits that survived round 14, each as its class
-      ["V14-Q24B's class: one card report for each added subtree", "        report(\"card\", title, card.head === null ? \"\" : collapse(card.head), painted(card.box));\n", "        report(\"card\", title, card.head === null ? \"\" : collapse(card.head), painted(card.box));\n        break;\n"],
+      // (H2: the report line names the header row's text and the paint test on the card element)
+      ["V14-Q24B's class: one card report for each added subtree", "        report(\"card\", title, card.head === null ? \"\" : collapse(`${card.head}${typeof card.points === \"string\" ? card.points : \"\"}${typeof card.glyph === \"string\" ? card.glyph : \"\"}`), painted(el));\n", "        report(\"card\", title, card.head === null ? \"\" : collapse(`${card.head}${typeof card.points === \"string\" ? card.points : \"\"}${typeof card.glyph === \"string\" ? card.glyph : \"\"}`), painted(el));\n        break;\n"],
+      // (H2) H1's paint test back in the oracle — the card's own box and style only, no ancestor chain, no line box
+      ["H1's paint test: the element's own box and style only", "  const painted = p1PaintedEl;", "  const painted = (e) => { const b = e.box; return (b.w ?? 100) >= 1 && (b.h ?? 20) >= 1 && P1_VISIBILITY_PAINTS[b.visibility ?? \"visible\"] === true && (b.display ?? \"block\") !== \"none\" && Number(b.opacity ?? \"1\") > 0; };"],
       ["V14-Q23's class: one flash report for each added subtree", "      for (let k = 0; k < placed.flashes.length; k++) report(\"impact\", null, null, null);", "      for (let k = 0; k < Math.min(1, placed.flashes.length); k++) report(\"impact\", null, null, null);"],
       ["V14-Q16's class: the title between plain quotes", "  const quoted = p1JsonQuoted;", "  const quoted = (s) => `\"${s}\"`;"],
       ["V14-Q17's class: titles compared without their letter case", "        const how = title === \"\" ? \"empty\" : seenTitles.has(title) ? \"repeat\" : \"new\";", "        const how = title === \"\" ? \"empty\" : [...seenTitles.keys()].some((x) => x.toLowerCase() === title.toLowerCase()) ? \"repeat\" : \"new\";"],
@@ -9831,7 +10182,8 @@ describe("§W18 H1 ROUND 7 — the posted-disc domain the product can publish, a
     ];
     // (round 12: + P1_VISIBILITY_PAINTS, the specification's painted table the oracle now decides by; round 15: + the title
     // rule, JSON's quoting and the title features, each written out in this file)
-    const OV = (text) => new Function("P1_OVERLAP_BASE", "p1SharedDoc", "TOAST_COLUMN_ATTR", "p1EndLineFrom", "p1ThrownNote", "P1_VISIBILITY_PAINTS", "p1TitleOf", "p1JsonQuoted", "p1TitleFeats", `return (${text});`)(P1_OVERLAP_BASE, p1SharedDoc, TOAST_COLUMN_ATTR, p1EndLineFrom, p1ThrownNote, P1_VISIBILITY_PAINTS, p1TitleOf, p1JsonQuoted, p1TitleFeats);
+    // (H2: + p1PaintedEl, the witness's paint test as the P1 comment states it, written out in this file)
+    const OV = (text) => new Function("P1_OVERLAP_BASE", "p1SharedDoc", "TOAST_COLUMN_ATTR", "p1EndLineFrom", "p1ThrownNote", "P1_VISIBILITY_PAINTS", "p1TitleOf", "p1JsonQuoted", "p1TitleFeats", "p1PaintedEl", `return (${text});`)(P1_OVERLAP_BASE, p1SharedDoc, TOAST_COLUMN_ATTR, p1EndLineFrom, p1ThrownNote, P1_VISIBILITY_PAINTS, p1TitleOf, p1JsonQuoted, p1TitleFeats, p1PaintedEl);
     // the control: the oracle, compiled the same way and unplanted, agrees with the harness on every drive the plants use
     {
       const good = OV(src);
@@ -10340,7 +10692,7 @@ describe("§W19 H1 ROUND 8 — the end line adds up: a throw is classified once,
     const obs = [];
     const win = {};
     new Function("window", "document", "MutationObserver", "getComputedStyle", "Date", `"use strict"; return (${env.inits[0].fn.toString()});`)(
-      win, doc, class { constructor(cb) { obs.push(cb); } observe() {} }, fakeStyle, { now: () => 1000 })(env.inits[0].arg);
+      win, doc, p1FakeObserver(obs, doc), fakeStyle, { now: () => 1000 })(env.inits[0].arg);
     const reports = [];
     win.__auditEvent = (ev) => void reports.push(ev);
     const b0 = { w: 280, h: 40, top: 10, visibility: "visible", display: "block", opacity: "1" };

@@ -278,6 +278,7 @@ import {
   refusalExpired,
   routeDeviation,
   routeDeviationRefusal,
+  routeTurnAhead,
   scanBand,
   steerCommand,
   summariseTracking,
@@ -378,8 +379,8 @@ import {
 // both halves — the arithmetic AND the fact that this file still calls it.
 // §5 of lib/driveline.mjs — the per-lesson WRONG-LEG PROFILES (pedals only).
 // A separate statement so the long import below stays byte-identical.
-import { createWrongLegProfile, flatRestDue, flatRestHoldDone, h1ProbeReads, parseRearProximity, readZoneRouteSpan, resumeThrottleAfterPause, wrongLegFlatStep, wrongLegProfileFinish, wrongLegProfileFor, wrongLegProfileOutcomeLine, wrongLegProfileStartLine, wrongLegRestBooked, wrongLegRestEnded, wrongLegRestHoldNote, wrongLegRestHoldsClause, wrongLegRestOpportunity, wrongLegRestSummary, wrongLegRestTick } from "./lib/driveline.mjs";
-import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, OVER_LIMIT_MAX_MS, OVER_LIMIT_SUSTAIN_SEC, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, POSTED_LIMIT_SEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, admitDraw, cabinActuationSafe, drawWitnesses, elapsedSec, errorBoundaryVerdict, holdCeilingFeeds, overCapHold, overCapScanStep, overLimitHold, overLimitLedgerStep, overLimitNoteLine, overLimitScanStep, overLimitSearchCeiling, overLimitSearchClock, parkingBrakeRoute, parkingBrakeVerdict, parseClaim, passRate, postedLimitKmh, rateVerdict, readSpeedingConfig, releaseVerdict, sustainedOverLimitLane, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
+import { PACE_CYCLE_MS, RELOAD_START_MAX_MS, RELOAD_START_POLL_MS, createWrongLegProfile, flatRestDue, flatRestHoldDone, h1ProbeReads, parseRearProximity, readZoneRouteSpan, resumeThrottleAfterPause, wrongLegFlatStep, wrongLegProfileFinish, wrongLegProfileFor, wrongLegProfileOutcomeLine, wrongLegProfileStartLine, wrongLegReloadStartLine, wrongLegRestBooked, wrongLegRestEnded, wrongLegRestHoldNote, wrongLegRestHoldsClause, wrongLegRestOpportunity, wrongLegRestSummary, wrongLegRestTick, wrongLegStartFor } from "./lib/driveline.mjs";
+import { CABIN_BLOCKER_SEL, CAR_SHEET_LABEL, DRIVELINE_CARD_SEL, ERROR_BOUNDARY_RETRIES, ERROR_BOUNDARY_RETRY_LABEL, OVER_CAP_MARGIN_KMH, OVER_CAP_MAX_M, OVER_CAP_MAX_MS, OVER_LIMIT_MAX_MS, OVER_LIMIT_SUSTAIN_SEC, PARKING_BRAKE_CARD_RE, PARKING_BRAKE_KEY, PARKING_BRAKE_LABEL, POSTED_LIMIT_SEL, SEATBELT_LABEL, STUCK_START_OTHER_RE, TASK_CAP_STRIP_SEL, admitDraw, cabinActuationSafe, drawWitnesses, elapsedSec, errorBoundaryVerdict, holdCeilingFeeds, overCapHold, overCapScanStep, overLimitHold, overLimitLedgerStep, overLimitNoteLine, overLimitScanStep, overLimitSearchCeiling, overLimitSearchClock, parkingBrakeRoute, parkingBrakeVerdict, parseClaim, parseTaskCapsKmh, passRate, postedLimitKmh, rateVerdict, readSpeedingConfig, releaseVerdict, sustainedOverLimitLane, taskCapKmh, taskCapPhrase } from "./lib/driveline.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -1124,10 +1125,11 @@ const shot = async (n) => {
  * before the page's own scripts, watches the DOM for two mounts —
  *   · a toast card body (`[data-hud-toast-body]`, the same surface the probe's
  *     `faultCards` reads), the first mount of each distinct title, PAINTED OR
- *     NOT by its own box, visibility, display and opacity — a NECESSARY test,
- *     not a sufficient one: an ancestor's opacity, a layer over the card and
- *     clipping are not read, so the frames, not the flag, say what was on the
- *     glass;
+ *     NOT by the HUD census's own test (H2: `read()`'s `painted` — display,
+ *     opacity and content-visibility up the ancestor chain, the element's own
+ *     visibility, a border box or a line box of 1 px or more) — a NECESSARY
+ *     test, not a sufficient one: a layer over the card and clipping are not
+ *     read, so the frames, not the flag, say what was on the glass;
  *   · the impact flash (`[data-hud="impact-flash"]`), every mount counted —
  * and records, AT THE MOUNT, the overlay stack (every `[data-sim-overlay]`
  * layer, every painted `[data-hud]` surface, the dialogs, and
@@ -1199,10 +1201,23 @@ const installEventWitness = async () => {
     // «visible» paints — CSS 2.1 §11.2 and CSS Display 3 §4: «hidden» paints nothing, and «collapse» paints nothing either
     // (outside table rows, row groups, columns and column groups it is «hidden»; on those it removes the row or column).
     // Round 11's `!== "hidden"` called a collapsed element painted.
+    // H2 (doc 93 GAP-9 items 1 and 5): THE HUD CENSUS'S OWN TEST, `read()`'s `painted` — H1's read the element's own box
+    // and style alone, the box-size test the census rejected, so a card under an `opacity: 0` column read painted and a
+    // `display: contents` card with a degenerate box read unpainted. Display, opacity and content-visibility are read up
+    // the ancestor chain (each hides everything under it); the visibility is the ELEMENT's own computed value (it is
+    // inherited, and a descendant may set «visible» under a «hidden» ancestor and paint); the box is the border box or any
+    // line box, 1 px or more each way.
     const painted = (el) => {
+      if (getComputedStyle(el).visibility !== "visible") return false;
+      for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+        const cs = getComputedStyle(n);
+        if (cs.display === "none" || Number(cs.opacity) === 0) return false;
+        if (cs.contentVisibility === "hidden") return false;
+      }
       const r = el.getBoundingClientRect();
-      const st = getComputedStyle(el);
-      return r.width > 1 && r.height > 1 && st.visibility === "visible" && st.display !== "none" && Number(st.opacity) > 0;
+      if (r.width >= 1 && r.height >= 1) return true;
+      for (const q of el.getClientRects()) if (q.width >= 1 && q.height >= 1) return true;
+      return false;
     };
     const overlayNow = () => {
       const layers = [];
@@ -1564,7 +1579,7 @@ const eventSeries = async (ev) => {
   if (eventShots.series.length >= EVENT_SHOT_MAX_SERIES) { eventShots.refused.push({ n: ev.n, kind: ev.kind, title: ev.title, why: "series-cap" }); writeEventShots(); return; }
   rec = { n: ev.n, kind: ev.kind, title: ev.title, head: ev.head, cardPainted: ev.cardPainted, tSec: Math.round((ev.at - eventShots.t0) / 100) / 10, overlayAtMount: ev.overlay, shots: [] };
   eventShots.series.push(rec);
-  note(`      EVENT SHOT ${rec.n}: a${ev.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${rec.tSec}s${ev.kind === "card" ? ` (${JSON.stringify(ev.title)}, painted at mount by its own box and computed style only: ${ev.cardPainted} — necessary, not sufficient: its ancestors' opacity, a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(ev.overlay.layers)}, camera ${ev.overlay.camera ?? "(unset)"}; shots scheduled at +${EVENT_SHOT_OFFSETS_MS.map((o) => o / 1000).join("/+")} s after the witness reported the mount`);
+  note(`      EVENT SHOT ${rec.n}: a${ev.kind === "impact" ? "n impact-flash element" : " toast card"} mounted at t=${rec.tSec}s${ev.kind === "card" ? ` (${JSON.stringify(ev.title)}, painted at mount by the HUD census's test — display, opacity and content-visibility up its ancestor chain, its own visibility, a box of 1 px or more: ${ev.cardPainted} — necessary, not sufficient: a layer over it and clipping are not read, so the frames are the evidence)` : ""} — overlay layers ${JSON.stringify(ev.overlay.layers)}, camera ${ev.overlay.camera ?? "(unset)"}; shots scheduled at +${EVENT_SHOT_OFFSETS_MS.map((o) => o / 1000).join("/+")} s after the witness reported the mount`);
   for (const off of EVENT_SHOT_OFFSETS_MS) {
     const wait = ev.at + off - Date.now();
     if (wait > 0) await page.waitForTimeout(wait);
@@ -2357,15 +2372,50 @@ const throttle = async (on) => {
   inputChannel.driveKeyEvents += 1;
   holdW = on;
 };
-/** HARNESS STAGE H1 — THE PACE GOVERNOR'S COMMAND, APPLIED (§5 `pacePedal`): the throttle held down for the
- *  tick, let up for the tick, or pressed for `ms` of wall clock and let up again inside the tick. The throttle
- *  only: this helper never touches the brake. */
+/** HARNESS STAGE H1 — THE PACE GOVERNOR'S COMMAND (§5 `pacePedal`), AND H2 — THE THROTTLE MODULATOR THAT RUNS IT.
+ *
+ *  H1 applied a command once, inside the tick that handed it out: the throttle held down, let up, or pressed for `ms`
+ *  and let up again — and then nothing until the next tick, however long this tick's own work (a frame, a DOM read)
+ *  took. On .audit-frames/w69-h1-pc that left the car on a held or a lifted throttle for a whole frame, and one press a
+ *  tick is not a pace on a pedal that ramps (§5, THE PACE GOVERNOR).
+ *
+ *  H2: `paceThrottle(cmd)` SETS the command on a modulator and returns; the modulator runs it on its own clock —
+ *  `down`: the throttle held down; `up`: held up; `pulse`: down for `cmd.ms` of every `PACE_CYCLE_MS` cycle of wall
+ *  clock, up for the rest — cycle after cycle, beside whatever the tick is doing (the road witness's poll is run beside
+ *  the idle wait the same way), THROUGH A PAUSE LAYER TOO (the world is frozen under one, and the cycle is still
+ *  running when it comes back), until the next command is set or `paceRelease()` stops it. `paceRelease()` waits for
+ *  the cycle in hand to end (at most one cycle) and leaves the throttle wherever that cycle left it; it is a no-op on
+ *  every lane whose modulator never started — every lane without a running pace profile. It is the first statement
+ *  after the drive loop: the modulator's last cycle is the drive's last actuation, so the road witness's drive-end poll
+ *  right after it still follows every actuation and still precedes the keys' release. The throttle only: neither
+ *  helper touches the brake, and the keys go through `throttle()`, so the belief about the pedal and the key-event count
+ *  stay the ones every other pedal uses. */
+const paceMod = { cmd: null, run: null, stop: false };
+const paceModRun = async () => {
+  while (!paceMod.stop) {
+    const cmd = paceMod.cmd;
+    if (cmd.act === "pulse") {
+      await throttle(true);
+      await page.waitForTimeout(cmd.ms);
+      await throttle(false);
+      await page.waitForTimeout(PACE_CYCLE_MS - cmd.ms);
+    } else {
+      await throttle(cmd.act === "down");
+      await page.waitForTimeout(PACE_CYCLE_MS);
+    }
+  }
+};
 const paceThrottle = async (cmd) => {
-  if (cmd.act === "down") return throttle(true);
-  if (cmd.act !== "pulse") return throttle(false);
-  await throttle(true);
-  await page.waitForTimeout(cmd.ms);
-  await throttle(false);
+  paceMod.cmd = cmd;
+  if (paceMod.run !== null) return;
+  paceMod.stop = false;
+  paceMod.run = paceModRun().catch(() => {});
+};
+const paceRelease = async () => {
+  if (paceMod.run === null) return;
+  paceMod.stop = true;
+  await paceMod.run;
+  paceMod.run = null;
 };
 let refusedReversePress = 0;
 /**
@@ -5317,7 +5367,7 @@ if (exitIsBackwards !== null || (STEER_BY === "authored-path" && PATH_PLAN.segme
   movedKnown = true;
   note(
     `  POSITIVE CONTROL: ${moved} км/ч after ${(positiveControl.heldMs / 1000).toFixed(1)} s of throttle` +
-      `${moved >= POSITIVE_CONTROL_MOVING_KMH ? ` (released on the product's own ${POSITIVE_CONTROL_MOVING_KMH} км/ч moving latch — the pedal is UP entering the drive)` : ` (the full ${POSITIVE_CONTROL_MS / 1000} s ceiling; pedal released)`}`,
+      `${moved >= POSITIVE_CONTROL_MOVING_KMH ? ` (released on the product's own ${POSITIVE_CONTROL_MOVING_KMH} км/ч moving latch — the pedal is UP as this control ends)` : ` (the full ${POSITIVE_CONTROL_MS / 1000} s ceiling; pedal released)`}`,
   );
   if (moved <= 0) {
     // ── THE LEVER IS ASKED ABOUT HERE AND NOWHERE EARLIER ──────────────────
@@ -5613,6 +5663,12 @@ const guidance = {
   phaseExitReleases: 0,
   /** sightings too thin to command a manoeuvre on — see CONFIDENT_BAND_PX */
   thinSightings: 0,
+  /** H2 (GAP-8a / 8d): scans on which an arrow-shaped component was refused because the lesson's AUTHORED route has
+   *  no junction turn ahead (`routeTurnAhead`, indexed by the dial odometer); commands whose sustained-turn press was
+   *  refused for the same reason; and corrections that inherited the length of the sustained press before them. */
+  chevronRefusals: 0,
+  turnRefusals: 0,
+  flipInherits: 0,
   tracking: null,
   witness: null,
   caveat: null,
@@ -5631,6 +5687,8 @@ let guidePrevErrDeg = null;
 let guideSustainRun = 0;
 let guideSustainDir = 0;
 let guideHeldBySustain = false;
+/** H2 (GAP-8d): `{ dir, holdMs }` of the sustained press the LAST scan made, or null — what a flipped error inherits. */
+let guideLastSustain = null;
 /** The sub-floor bank — see THE SUB-FLOOR ACCUMULATOR in TUNE. The caller's book, like the
  *  run: `steerCommand` is pure and returns the new value each tick. */
 let guideCarryMs = 0;
@@ -6081,6 +6139,10 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
       // A ceiling is final for this drive. Without the latch the next tick
       // re-enters, counts a fresh episode and refuses it again — see `exhausted`.
       recovery.exhausted = true;
+      // H2 (GAP-8f): …AND THE DRIVE STOPS. w67's sc-merge-lane-end mobile-right rolled the pace tape open-loop for ~34 s
+      // after this refusal, off the road, until a building stopped it, and the collision it was billed was this
+      // instrument's act. The roll brakes the car to rest and the drive phase ends (phase "halt").
+      recoveryHalt = true;
       push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, loop: false, recovery: true, why: budget.why });
       return;
     }
@@ -6191,6 +6253,7 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
      *
      * The WHEEL is still released, unconditionally, exactly as before. */
     if (guideHeldBySustain) { await steer(null, kmh); guideHeldBySustain = false; guidance.sustainReleases += 1; }
+    guideLastSustain = null;
     guideSlowTicks += 1;
     let carried = false;
     if (guideSustainRun > 0) {
@@ -6234,6 +6297,14 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
   }
 
   const t0scan = Date.now();
+  /* H2 (GAP-8a / 8d): IS A JUNCTION TURN AHEAD ON THE LESSON'S OWN AUTHORED ROUTE? Read off `AUTHORED_LINE` (the
+   * shadow trace — content, not product source) at the harness's dial odometer, `paceOdoM` (the pace tape's index);
+   * never the pose. `known: false` with no authored line, and then readAim and steerCommand act as they did. */
+  const guideTurn = AUTHORED_LINE === null ? { known: false, ahead: false, maxDeg: null } : routeTurnAhead(AUTHORED_LINE, paceOdoM);
+  // …and the sustained press the LAST scan made is inherited by THIS scan only: it is taken here and cleared, so a
+  // scan that never reaches the law (a throw, a refusal) leaves nothing for a later one to inherit.
+  const guideFlipFrom = guideLastSustain;
+  guideLastSustain = null;
   let aim;
   try {
     const masks = await guideMasks(guideBandGeom);
@@ -6248,6 +6319,8 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
       register: guideFurniture,
       moving: kmh >= TUNE.MOVING_KMH,
       dpr: guideBandGeom.dpr,
+      // H2 (GAP-8a): the arrow outranks the ribbon only where the lesson's authored route turns ahead.
+      junctionAhead: guideTurn.known ? guideTurn.ahead : undefined,
     });
   } catch (error) {
     guidance.errors += 1;
@@ -6321,8 +6394,16 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
     sustainRun: guideSustainRun,
     confident: aim.confident === true,
     carryMs: guideCarryMs,
+    // H2 (GAP-8d): no sustained press where the authored route has no junction turn ahead, and a flipped error
+    // inherits the length of the sustained press the last scan made.
+    turnAhead: guideTurn.known ? guideTurn.ahead : undefined,
+    flipFrom: guideFlipFrom,
   });
   guideCarryMs = cmd.carryMs ?? 0;
+  guideLastSustain = cmd.sustain === true ? { dir: cmd.dir, holdMs: cmd.holdMs } : null;
+  if (aim.shape && aim.shape.chevronRefused) guidance.chevronRefusals += 1;
+  if (cmd.turnRefused === true) guidance.turnRefusals += 1;
+  if (cmd.inherited === true) guidance.flipInherits += 1;
   if (aim.seen && !aim.confident) guidance.thinSightings += 1;
   if (cmd.tooSmall) guidance.tooSmall += 1;
   if (cmd.carried) guidance.carriedPulses += 1;
@@ -6451,11 +6532,17 @@ async function guideTick(kmh, tElapsedMs, dtMs) {
           objectPx: aim.shape.objectPx,
           fixedPx: aim.shape.fixedPx,
           chevronPx: aim.shape.chevronPx,
+          chevronRefused: aim.shape.chevronRefused ?? null,
         }
       : null,
+    // H2: what the authored route said at this odometer, and what the law did with it.
+    turnAhead: guideTurn.known ? guideTurn.ahead : null,
+    routeTurnDeg: guideTurn.maxDeg,
     dir: cmd.dir,
     holdMs: cmd.holdMs,
     sustain: cmd.sustain === true,
+    inherited: cmd.inherited === true,
+    turnRefused: cmd.turnRefused === true,
     scanMs,
     why: aim.seen ? cmd.why : aim.why,
   });
@@ -6505,6 +6592,7 @@ async function guideLeaveRoll() {
   guideSustainDir = 0;
   guideSlowTicks = 0;
   guideCarryMs = 0;
+  guideLastSustain = null;
   guidance.sustainReleases += 1;
   guidance.phaseExitReleases += 1;
 }
@@ -7405,6 +7493,13 @@ const pace = {
    *  sentence is FALSE: the length is the HARNESS's caution at a scan chip.
    *  Conflating the two would file a box-speed finding against a hazard cap. */
   capHitsHazard: 0,
+  /** H2 (GAP-8b / 8e): roll ticks whose frame (the periodic beat, or a fault card's beat) was taken with the throttle
+   *  LET UP first, and roll ticks whose throttle press was WITHHELD because the steering loop's last tick was more than
+   *  `GUIDE_GAP_PEDAL_MS` ago. Both exist because a press held across seconds of the harness's own work ran the
+   *  pace away from the tape (sc-pe-zone-living mobile-right on w66: 12–18 → 25 км/ч; sc-merge-lane-end mobile-right
+   *  on w67: 26 → 42 км/ч across an 8 s gap between scans). */
+  beatReleases: 0,
+  gapHolds: 0,
   /** every CHANGE of target OR OF ITS PROVENANCE, with the metre it happened
    *  at. Each row is `{tSec, odoM, kmh, pacedKmh, hazardCapKmh, src}`:
    *  `kmh` is what the car was asked for, `pacedKmh` what the PACE LAW alone
@@ -7418,6 +7513,22 @@ const pace = {
 };
 /** Metres since the control law started, integrated from the dial. */
 let paceOdoM = 0;
+/** H2 (GAP-8e): a roll tick that comes more than this long after the steering loop's last tick (`guideLastTickAt`)
+ *  does not press the throttle — it coasts while this tick's scan looks again. 3 s is about 1.5 × the slowest median scan period the guidance books
+ *  record on a phone leg (the w33 measurement in lib/guidance.mjs TUNE.TICK_MS_ASSUMED is 1,021 ms on pc; mobile ticks
+ *  run 1.5–2 s), so an ordinary tick never trips it and a tick that followed pause drains and a frame does. */
+const GUIDE_GAP_PEDAL_MS = 3000;
+/** H2 (GAP-8b): roll time spent with the task cap on the glass holding the target BELOW the tape's pace, and the most it
+ *  may add to the drive budget. Obeying «дръж под 5 км/ч» through sc-pe-zone-living's zone took the first H2
+ *  mobile-right drive 100 s for 58 m, and it ran out of its 210 s budget 37 m before the end of a route the tape
+ *  drives in 71 s; the budget is the harness's own limit, and time the lesson's own cap asked for is not this box's
+ *  slowness. Ribbon legs only (the authored-path leg owns its own budget). */
+let rollTaskCapMs = 0;
+const TASK_CAP_BUDGET_MAX_MS = 150_000;
+let taskCapBudgetSaid = false;
+/** H2 (GAP-8f): set when the recovery ceiling refuses (`recovery.exhausted`); the roll then brakes the car to rest and
+ *  the drive phase ends there (phase "halt"). */
+let recoveryHalt = false;
 
 const loadPaceTape = () => {
   // pc-path: speed is indexed by POSE along the committed witness, never by the tape.
@@ -8495,6 +8606,50 @@ async function engageManualGear() {
  *  never in N, i.e. an automatic, which is 160 of the 161 lessons. */
 const manualGear = await engageManualGear();
 
+/* ── HARNESS STAGE H2 — A DECLARED WRONG-LEG PROFILE MAY ASK FOR THE DRIVE FROM THE LESSON'S OWN START ──────
+ *
+ * Everything above this line — the arrival wait, the briefing, the steering liveness check, the positive control —
+ * runs with the lesson already live and the car standing on its spawn mark. On one lesson that is the whole drill gone:
+ * .audit-frames/w69-h1-pc/frames/sc-vu-emergency__pc-wrong stamped the lesson's make-way credit at 0:07 of its own
+ * clock, while this file was still in its 25 s arrival wait, and the wrong leg that then drove off had nothing left to
+ * fail to give way to. §5 of lib/driveline.mjs declares, per row, how such a leg starts (`wrongLegStartFor`): "reload"
+ * — the harness loads the lesson AGAIN and holds the throttle down from that load, so the drive loop below opens on a
+ * car already launching in the lesson's first second. `null` on every lesson with no such row, on every `right` leg
+ * and on a steering-proof lane, and then nothing in this block runs: those lanes start exactly as they did.
+ *
+ * PEDALS ONLY: a navigation, the throttle key, the belt key (the same one press the first load got, for the same
+ * reason — a fresh load is unbelted). No wheel, no pose. The key is pressed AGAIN every RELOAD_START_POLL_MS because a
+ * key-down sent before the page has its key listener is seen by nobody, and the dial is read only once the page has
+ * reported its content loaded — before that the document under `page` may still be the first load's, whose car is
+ * rolling off the positive control. The record rides the status file, and the line that says what happened is §5's
+ * (`wrongLegReloadStartLine`), printed with the profile's start line below. */
+const wrongLegStart = wrongLegStartFor(MODE === "right" || STEER_PROOF ? null : SCENARIO);
+const reloadStart = { applies: wrongLegStart === "reload", navMs: null, keyDowns: 0, unreadDial: 0, goKmh: null, goMs: null, beltPresses: 0 };
+if (reloadStart.applies) {
+  const askedAt = Date.now();
+  let loaded = false;
+  // The lesson's own address again, as the first load took it — a bare reload does not land on the lesson (the first H2
+  // drive photographed the lesson catalogue for 170 s: the address the page holds by then is not the one it was opened by).
+  const nav = page
+    .goto(`${BASE}/simulator?scenario=${SCENARIO}&level=1`, { waitUntil: "domcontentloaded", timeout: 300_000 })
+    .then(() => { loaded = true; reloadStart.navMs = Date.now() - askedAt; })
+    .catch(() => {});
+  while (Date.now() - askedAt < RELOAD_START_MAX_MS) {
+    await page.keyboard.down("KeyW").catch(() => {});
+    reloadStart.keyDowns += 1;
+    const kmh = loaded ? await speedNow() : -1;
+    if (loaded && kmh < 0) reloadStart.unreadDial += 1;
+    if (kmh > 0) { reloadStart.goKmh = kmh; reloadStart.goMs = Date.now() - askedAt; break; }
+    await page.waitForTimeout(RELOAD_START_POLL_MS);
+  }
+  await nav;
+  // The belief about the pedal, and the count of key events, as every other pedal keeps them.
+  holdW = true;
+  inputChannel.driveKeyEvents += reloadStart.keyDowns;
+  if (!DRIVE_UNBELTED) { await page.keyboard.press("KeyB").catch(() => {}); reloadStart.beltPresses += 1; }
+  saveStatus({ reloadStart });
+}
+
 let ended = false;
 let topSpeed = 0;
 /**
@@ -8510,6 +8665,10 @@ let topSpeed = 0;
  * every run rather than argued for once in a comment. If it ever comes back
  * large again, the drive report says so on the same line as `top`, and no
  * verifier can quote the one without meeting the other.
+ * (H2 ROUND 2: except on a lane that took the reload start above — there the
+ * loop opens on the second load, onto the car the reload start's own held
+ * throttle launched, and the ENTERED line says so instead of naming the
+ * positive control.)
  *
  * −1 is „the first tick found no dial at all", which is a third answer and is
  * printed as one.
@@ -8710,6 +8869,9 @@ const wrongProfileStart = wrongLegProfileStartLine(wrongProfile, { everyM: FLAT_
 // Not on a STEERING PROOF lane: that lane exits before the drive and never
 // reaches the flat phase, so a profile announced there would be one that ran.
 if (wrongProfileStart !== null && !STEER_PROOF) loud(wrongProfileStart);
+// …and, on a lane whose row asked for the reload start (H2), what that start did and read — §5's line, `null` elsewhere.
+const wrongProfileReload = reloadStart.applies ? wrongLegReloadStartLine(wrongProfile, reloadStart) : null;
+if (wrongProfileReload !== null) loud(wrongProfileReload);
 let prevKmh = -1;
 let lostKeys = 0;
 let lastTickAt = Date.now();
@@ -8950,6 +9112,18 @@ while (!ended && Date.now() - t0 < budgetMs) {
       );
     }
   }
+  // H2 (GAP-8b): …and the task cap's share of the roll is given back to the budget, bounded, and said once.
+  if (STEER_BY === "ribbon" && rollTaskCapMs > 0 && budgetMs < DRIVE_BUDGET_MS + Math.min(TASK_CAP_BUDGET_MAX_MS, rollTaskCapMs)) {
+    const budgetBefore = budgetMs;
+    budgetMs = DRIVE_BUDGET_MS + Math.min(TASK_CAP_BUDGET_MAX_MS, rollTaskCapMs);
+    if (!taskCapBudgetSaid) {
+      taskCapBudgetSaid = true;
+      note(
+        `  (the task cap on the glass is holding this roll under the tape's pace — the drive budget grows from ${budgetBefore / 1000}s by ` +
+          `the roll time spent under it, up to ${TASK_CAP_BUDGET_MAX_MS / 1000}s more; the TASK CAP line below says how much it grew)`,
+      );
+    }
+  }
   const tickStart = Date.now();
   const p = await timed("probe", probe);
   // …AND ON EVERY DRIVE TICK. `topSpeed` on the next line is the record this
@@ -9037,7 +9211,13 @@ while (!ended && Date.now() - t0 < budgetMs) {
     // of the drain: the world is frozen so a held brake costs nothing, and
     // lifting it at a standstill is what makes the next press select reverse
     // (see the note on brake()).
-    await throttle(false);
+    // (H2: NOT WHILE A `pace` PROFILE'S THROTTLE MODULATOR IS RUNNING. The first H2 drive stopped it here and set it
+    // going again after the drain, and the car coasted for the 1.3 s between the press that cleared the layer and the
+    // modulator's next cycle — 45 → 42 км/ч on the dial, a 3 км/ч gap in a run that breaks at 4. The modulator keys
+    // the throttle on its own cycle against a frozen world, which moves nothing, and is still cycling when the world
+    // comes back. `paceMod.run` is null on every lane with no running pace profile, and the throttle is let up here
+    // exactly as it always was.)
+    if (paceMod.run === null) await throttle(false);
     const drained = await drainPause();
     teachDrained += drained;
     // The frozen seconds are not driving seconds: the phase clock does not run
@@ -9121,6 +9301,10 @@ while (!ended && Date.now() - t0 < budgetMs) {
    * ON `paceLastAt` AND NOT ON `lastTickAt` — see the note where it is
    * declared. The tick's own work is seconds of real road and `lastTickAt` does
    * not cover them. */
+  // (H2: the same interval, kept for this tick — the wall clock since the tick before this one took its `now`, or
+  // since a pause drain ended. A wrong leg's `pace` profile times its run and sums its own dial odometer on it; no
+  // other reader.)
+  const wallDtMs = now - paceLastAt;
   paceOdoM += (Math.max(0, p.kmh) / 3.6) * ((now - paceLastAt) / 1000);
   paceLastAt = now;
   // THE CLUSTER IS RECORDED ON EVERY TICK, ON EVERY LESSON, IN BOTH MODES.
@@ -9320,8 +9504,14 @@ while (!ended && Date.now() - t0 < budgetMs) {
     //
     // A LAWFUL WAIT OUTRANKS IT. While the product declares that standing
     // still IS the manoeuvre, shifting to R would be inventing a fault.
+    //
+    // AND A HALT OUTRANKS IT (H2 round-2 verifier): this gate runs before the
+    // phase branch, so a halted car at rest under a banner that asks for R was
+    // armed and handed to the reverse phase — which drives, and ends in a roll
+    // that presses the throttle. Once halted, nothing drives.
     if (
       phase !== "reverse" &&
+      phase !== "halt" &&
       p.kmh >= 0 &&
       p.kmh <= 1 &&
       p.lawfulWait === null &&
@@ -9605,7 +9795,13 @@ while (!ended && Date.now() - t0 < budgetMs) {
         await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "roll-path"));
       } else {
       // `capKmh` folds by `min`, and `null` is the identity — see (1) above.
-      target = Math.min(paced, hz.capKmh ?? Number.POSITIVE_INFINITY);
+      // H2 (GAP-8b): …and so does the strictest TASK CAP on the glass («дръж под N км/ч», «задачата иска ≤N»), the
+      // lesson's own instruction to the student; `null` (no cap shown) is the identity too, so a lane whose glass
+      // shows none drives as it did. The row below says when it was the cap that lowered the target.
+      const rollTaskCaps = parseTaskCapsKmh(p.taskCapText);
+      const rollTaskCap = rollTaskCaps.length ? Math.min(...rollTaskCaps) : null;
+      target = Math.min(paced, hz.capKmh ?? Number.POSITIVE_INFINITY, rollTaskCap ?? Number.POSITIVE_INFINITY);
+      if (rollTaskCap !== null && rollTaskCap < Math.min(paced, hz.capKmh ?? Number.POSITIVE_INFINITY)) rollTaskCapMs += now - lastTickAt;
       const lift = paceLift(target);
       /* ── AND THE ROW SAYS WHO ASKED FOR IT ───────────────────────────────
        * `pace` is published as „the authored shadow's speed-by-distance
@@ -9621,14 +9817,18 @@ while (!ended && Date.now() - t0 < budgetMs) {
         odoM: paceOdoM,
         pacedKmh: paced,
         capKmh: hz.capKmh,
+        taskCapKmh: rollTaskCap,
       });
       if (row !== null) pace.targets.push(row);
+      // H2 (GAP-8e): a tick that comes long after the steering loop's last tick coasts — see GUIDE_GAP_PEDAL_MS.
+      const rollGapHold = guideLastTickAt !== null && now - guideLastTickAt > GUIDE_GAP_PEDAL_MS;
+      if (rollGapHold) pace.gapHolds += 1;
       await timed("pedals", async () => {
         // `hz.brake` folds by `||`, and `false` is the identity — see (1).
         // `brake()`'s own standstill refusal still applies on top, so the
         // hazard channel cannot select R by pressing S at rest (LAW 1).
         await brake(hz.brake || p.kmh > target + BRAKE_CAP_OVER_KMH, p.kmh);
-        await throttle(!hz.brake && p.kmh >= 0 && p.kmh < target - lift);
+        await throttle(!hz.brake && !rollGapHold && p.kmh >= 0 && p.kmh < target - lift);
       });
       // ── AND THE WHEEL, ON THE SAME TICK AS THE PEDALS ────────────────────
       // Only in the roll phase, and only forward: the stop phase is braking to
@@ -9636,6 +9836,13 @@ while (!ended && Date.now() - t0 < budgetMs) {
       // `guideTick` is a no-op that RECORDS ITSELF whenever it cannot see, so
       // a lane that stops steering never stops saying so.
       await timed("guide", () => guideTick(p.kmh, now - t0, now - lastTickAt));
+      }
+      // H2 (GAP-8f): the recovery ceiling refused on this tick — brake to rest and end the drive phase (phase "halt").
+      if (recoveryHalt && phase === "roll") {
+        await guideLeaveRoll();
+        phase = "halt";
+        phaseAt = now;
+        phaseTicks = 0;
       }
       drivingTicks++;
       phaseTicks++;
@@ -9654,7 +9861,10 @@ while (!ended && Date.now() - t0 < budgetMs) {
       const capMs = STEER_BY === "authored-path" ? Infinity : paceRollCapMs(target);
       const cappedOut = now - phaseAt >= capMs;
       // pc-path: the roll ends when the runner has brought the car to rest at a stop (§7.3).
-      if ((STEER_BY === "authored-path" ? pathFollow.wantStop === true : rollM >= lookM || cappedOut) && phaseTicks >= 1) {
+      // (H2 ROUND 2, C1: …and only while the phase IS still the roll. The halt above may have been set on this very tick,
+      // and a refusal that lands on a roll's last tick would otherwise be overwritten here by `phase = "stop"` — whose
+      // ending hands back to a roll that presses the throttle before the halt re-latches. Once halted, the halt stands.)
+      if (phase === "roll" && (STEER_BY === "authored-path" ? pathFollow.wantStop === true : rollM >= lookM || cappedOut) && phaseTicks >= 1) {
         if (cappedOut && rollM < lookM) {
           pace.capHits += 1;
           /* ── AND WHOSE CLOCK IT WAS ────────────────────────────────────────
@@ -9767,6 +9977,21 @@ while (!ended && Date.now() - t0 < budgetMs) {
         phase = "roll";
         phaseAt = now;
         phaseTicks = 0;
+      }
+    } else if (phase === "halt") {
+      // H2 (GAP-8f): THE RECOVERY CEILING REFUSED, SO THE DRIVE STOPS HERE. The throttle is let up and the brake held
+      // until the dial reads 0–1 км/ч; then the drive loop ends. Nothing past this point is driven.
+      phaseTicks++;
+      await timed("guide", () => guidePose(p.kmh, now - t0, now - lastTickAt, "halt"));
+      await throttle(false);
+      await brake(true, p.kmh);
+      if (p.kmh >= 0 && p.kmh <= 1) {
+        loud(
+          `THE RECOVERY CEILING REFUSED, SO THIS DRIVE STOPS HERE — the harness let the throttle up, braked the car to ` +
+            `rest at t=${Math.round((now - t0) / 1000)}s and ended its drive phase. Nothing after this line is driven, so no ` +
+            `collision, route or speed reading after it is this drive's.`,
+        );
+        break;
       }
     } else if (phase === "reverse") {
       // ── THE REVERSE HALF OF THE MANOEUVRE ────────────────────────────────
@@ -9981,11 +10206,16 @@ while (!ended && Date.now() - t0 < budgetMs) {
         // pose), and the page-side count of impact-flash mounts (the no-rest-into-the-obstacle profile reads it).
         rear: wrongProfile.on ? parseRearProximity(p.rearProx) : null,
         impact: wrongProfile.on ? p.impactMounts : null,
+        // H2: the wall interval this tick's dial reading closes (see `wallDtMs` above) — the `pace` profile's clock.
+        wallDtMs: wrongProfile.on ? wallDtMs : null,
       });
       wrongProfile = wrongProfileStep.state;
       if (wrongProfileStep.say !== null) (wrongProfileStep.say.loud ? loud : note)(wrongProfileStep.say.line);
       // The plain flat throttle — unless a `pace` profile (§5, H1) hands out the governor's command for this
-      // tick, which `paceThrottle` applies: the throttle only, never the brake.
+      // tick, which `paceThrottle` sets on the throttle modulator (H2): the throttle only, never the brake.
+      // (H2: a `pace` step whose profile stopped on this tick carries `pedal: null` — no other step carries the
+      // key — and the modulator is stopped before the plain flat throttle below takes the pedal back.)
+      if (wrongProfileStep.pedal === null) await paceRelease();
       if (!wrongProfileStep.pedal) await timed("pedals", () => throttle(true));
       else await timed("pedals", () => paceThrottle(wrongProfileStep.pedal));
       drivingTicks++;
@@ -10465,6 +10695,15 @@ while (!ended && Date.now() - t0 < budgetMs) {
     }
     const withShot = now - lastShot >= spacing;
     if (withShot) lastShot = now;
+    // H2 (GAP-8b): ON A RIBBON LEG'S ROLL THE THROTTLE IS LET UP BEFORE THE FRAME — the beat (a screenshot and a DOM
+    // read) is the longest work a tick does, and a press held across it ran the pace away from the tape on w66
+    // (sc-pe-zone-living mobile-right, 12–18 → 25 км/ч). The next roll tick presses again if the pace law asks.
+    // (The fault-card beats below are pc-only, and stay photograph-only: driveline.test.mjs §M keeps every pedal out of
+    // that block.)
+    if (MODE === "right" && STEER_BY === "ribbon" && phase === "roll" && holdW) {
+      await throttle(false);
+      pace.beatReleases += 1;
+    }
     // Integer seconds, zero-padded. A bare `i * 3.5` produces «04-t92.5s»,
     // which sorts between «04-t089s» and «04-t096s» as a STRING — a judge
     // reading the folder in name order would see the drive out of sequence and
@@ -10516,6 +10755,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
     if (pathFollow.refusedRestTicks * TICK_MS >= 10_000) break;
   }
 }
+await paceRelease();
 if (roadWitness !== null) await roadWitness.poll();
 await throttle(false);
 await brake(false);
@@ -10676,10 +10916,18 @@ saveStatus({ hazard: hazardBooks });
  * ordinary drive data and needs no warning; at or above it, `top` is mostly
  * inheritance and a reader about to quote it must be stopped. */
 if (enteredLoopKmh !== null) {
-  const inherited = enteredLoopKmh >= 0 && topSpeed > 0 && enteredLoopKmh * 2 >= topSpeed;
-  const line =
-    `  ENTERED THE LOOP AT: ${enteredLoopKmh} км/ч — the first tick's dial, which is speed this drive did NOT earn ` +
-    `(the positive control's press, and its decay). «top ${topSpeed} км/ч» above must be read against it.`;
+  // H2 ROUND 2 (F1): on a lane that took the reload start, the first tick's dial is not the positive control's — that
+  // press was made on the FIRST load, and the drive loop opens on the SECOND, onto the car the reload start launched with
+  // its own held throttle (it sets `holdW`, and nothing lets the throttle up between it and the loop's first reading).
+  // There the speed is this leg's own launch from the lesson's start, so «top» is not inheritance and is not called it.
+  const inherited = !reloadStart.applies && enteredLoopKmh >= 0 && topSpeed > 0 && enteredLoopKmh * 2 >= topSpeed;
+  const line = reloadStart.applies
+    ? `  ENTERED THE LOOP AT: ${enteredLoopKmh} км/ч — the first tick's dial, which the drive loop did NOT earn: the ` +
+      `harness loaded the lesson again after its checks and held the throttle down from that load` +
+      `${reloadStart.goKmh !== null ? " (pressing its key again until the dial first read over 0)" : ""}, and had not let it up when the loop took ` +
+      `its first reading (the WRONG-LEG START line above). «top ${topSpeed} км/ч» above must be read against it.`
+    : `  ENTERED THE LOOP AT: ${enteredLoopKmh} км/ч — the first tick's dial, which is speed this drive did NOT earn ` +
+      `(the positive control's press, and its decay). «top ${topSpeed} км/ч» above must be read against it.`;
   if (inherited) {
     loud(
       `${line.trim()} AT OR OVER HALF OF «top», SO «top» IS MOSTLY INHERITANCE: it is not evidence about how fast this ` +
@@ -10799,6 +11047,16 @@ if (MODE === "right") {
           : " · every roll ended on its METRES, not on the clock"),
     );
     note(`        PACE PROVENANCE: ${hazardPaceProvenance(pace.targets)}`);
+    note(
+      `        TASK CAP (H2): ${Math.round(rollTaskCapMs / 1000)} s of roll ran with the task cap on the glass under the tape's pace` +
+        (rollTaskCapMs > 0 ? `; the drive budget was ${Math.round(budgetMs / 1000)} s at the end (${DRIVE_BUDGET_MS / 1000} s + that time, at most ${TASK_CAP_BUDGET_MAX_MS / 1000} s more)` : "") +
+        ".",
+    );
+    note(
+      `        THE THROTTLE AROUND THE HARNESS'S OWN WORK (H2): let up before ${pace.beatReleases} frame(s) taken on a roll ` +
+        `tick, and not pressed on ${pace.gapHolds} roll tick(s) that came more than ${GUIDE_GAP_PEDAL_MS / 1000} s after ` +
+        `the steering loop's last tick.`,
+    );
     note(
       `        THE LOOK CADENCE IS NO LONGER BLANKET, and a reader must know it. At or below ${CRUISE_KMH} км/ч it is ` +
         `${ROLL_DISTANCE_M} m exactly as it has always been; above it the car holds ${LOOK_EVERY_S.toFixed(1)}s of cruising ` +
