@@ -424,7 +424,7 @@ describe("lessonMistakeCopy — retrieval only (ADR-002)", () => {
     expect(codes.length).toBeGreaterThanOrEqual(58);
   });
 
-  it("conceptId is the one field whose null is REACHABLE — the EXACT set, 3 of 58 codes", () => {
+  it("conceptId is the one field whose null is REACHABLE — the EXACT set, 3 of 60 codes", () => {
     // Stated as an assertion because lanes D and F branch on it. If this set
     // ever empties, that branch is dead and the declaration should be narrowed
     // exactly the way `peekBg` just was, rather than left as a guard that
@@ -453,7 +453,11 @@ describe("lessonMistakeCopy — retrieval only (ADR-002)", () => {
     // concept, and move both halves together.
     // 59 since LANE_ENTRY_FORCED_BRAKING (founder ruling 2026-09-30); it carries
     // a conceptId (c-lane-change), so the null set above is unchanged.
-    expect(Object.keys(VIOLATIONS).length).toBe(59);
+    // 58 → 59 (2026-09-25, founder ruling on register item 17): the 59th is
+    // TASK_SPEED_CAP_EXCEEDED, re-measured — it carries `c-speed-adaptation`, so
+    // the no-concept set above is unchanged at three.
+    // INTEGRATED: both of the above (each written against its own base) — 60.
+    expect(Object.keys(VIOLATIONS).length).toBe(60);
   });
 });
 

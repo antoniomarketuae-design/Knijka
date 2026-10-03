@@ -1334,14 +1334,26 @@ export function SessionEndScreen({
     // opens: a stored row from before the ADR carries none, and its praise is
     // then byte-identical to what it printed yesterday.
     const lessonMistakes = result.lessonMistakes ?? [];
+    // 2026-09-25 (task-cap ruling, round 2): the taught-and-uncharged speed
+    // breaches are the fourth argument of the same pair, for the same reason
+    // the hits are the third — they are not on the лист, and the prose reads
+    // them. Dropping it here would put an unscoped ✓ «Чисто и спокойно
+    // каране» on the card over a cap breach the «Разбор» below qualifies.
+    const coachedMistakes = result.coachedMistakes ?? [];
+    // Round 3 (verifier R4): the task ceilings the drive blew — a breach at the
+    // mark too short to bill leaves no row of any code, and without this the
+    // card would print an unscoped ✓ the «Разбор» below scopes.
+    const taskCapBreaches = result.taskCapBreaches ?? [];
     return summary.commendations.map((c) =>
       commendationRiderBg(
         summary,
-        commendationRiderFlags(summary, c, lessonMistakes),
+        commendationRiderFlags(summary, c, lessonMistakes, coachedMistakes, taskCapBreaches),
         lessonMistakes,
+        coachedMistakes,
+        taskCapBreaches,
       ),
     );
-  }, [summary, result.lessonMistakes]);
+  }, [summary, result.lessonMistakes, result.coachedMistakes, result.taskCapBreaches]);
   /**
    * Does ANY praise on this card stand unqualified? A card on which not one
    * does is not a certificate surface, and its heading stops being painted in

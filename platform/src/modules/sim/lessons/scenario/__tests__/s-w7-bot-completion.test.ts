@@ -404,8 +404,16 @@ describe("wave-7 bot completion — sc-pe-zone-living at L3", () => {
     const l3 = replay("mistake-city-speed", 3);
     // опасна ⇒ SCORED with a non-blocking toast, never a teach-pause modal — so
     // the A9 teach channel is EMPTY even at L3, where an основна would earn a
-    // free first lesson (teach-first-then-grade, doc 76 §0).
-    expect(l3.taught).toEqual([]);
+    // free first lesson (teach-first-then-grade, doc 76 §0). Round 1 of the
+    // 2026-09-25 task-cap ruling put a TASK card here (the ≤20 zone mark blown
+    // at 50, the car still at 29 under the same live objective at ~58 s);
+    // ROUND 2 binds the task's ceiling only from its mark to the next goal
+    // (verifier C2), and at ~58 s the car is long past it — so, as before the
+    // ruling, the channel is empty.
+    // ROUND 14 (founder ruling 2026-10-03, «Cap adds, never removes … Its bill stands on its own»): the ≤20 zone mark
+    // blown at 50 is the cap's own offence — rounds 7–13 let the speeding's опасна bill absorb it; now it is taught on
+    // the cap's own grace (no point), beside the speeding's charge, which is unchanged.
+    expect(l3.taught).toEqual(["TASK_SPEED_CAP_EXCEEDED"]);
     expect(l3.scored).toEqual(["SPEEDING_DANGEROUS"]);
     expect(l3.r.score).toBe(10); // one опасна > the 9-point budget (Наредба-38)
     expect(l3.r.passed).toBe(false);

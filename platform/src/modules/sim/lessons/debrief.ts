@@ -330,6 +330,36 @@ export function buildDebrief(
   const nearMisses = result.nearMisses ?? [];
   const nearMissCount = nearMisses.length;
   const closestNearMiss = nearMissClosest(nearMisses);
+  /**
+   * DID THIS DRIVE BREAK A TASK CEILING? — founder ruling 2026-09-25 (register
+   * item 17: «a debrief must NEVER praise a drive that broke the cap»), round 3
+   * (verifier R4, C2). True when the lesson latched a graded cap
+   * (`result.taskCapBreaches` — written even when the breach at the mark was
+   * shorter than the task code's sustain and billed nothing), or the task code
+   * is on the sheet or among the teach moments. It is read by every sentence
+   * below that holds the drive up — the verdict's superlative, the spotless-
+   * sheet line, the no-commendation praise, the practice line, and (through
+   * `commendationRiderFlags`) every CLEAN_DRIVING bullet.
+   *
+   * IT READS ONLY THE TASK CAP (C2). Round 2 also let a taught weather or bend
+   * row scope the praise, which changed the debrief of drives that never had a
+   * cap; the ruling covers the task cap, so a drive with no task cap — and a
+   * capped drive that honoured its caps — reads exactly as base.
+   */
+  const taskCapBroken = taskCapBrokenOn(result, context.coachedMistakes ?? []);
+  /**
+   * …AND A TAUGHT WEATHER OR BEND OVERSPEED, ON ANY DRIVE — founder ruling
+   * 2026-09-25 «Yes, same as speeding» (round 4). Round 3 held these out of
+   * the praise guards on drives with no task cap, pending the founder («C2»);
+   * the answer is that a taught SPEED_TOO_FAST_FOR_CONDITIONS or bend row rules
+   * out unscoped CLEAN_DRIVING praise exactly as a broken cap does. Read by the
+   * no-commendation praise below and (through `commendationRiderFlags`) by every
+   * CLEAN_DRIVING bullet. It does NOT feed the cap-specific sentences (the
+   * reservation and the practice line that name the task's number): those
+   * already say what a coached row is («…беше показано и … не влезе в
+   * точките», «внимавай за учебния момент»).
+   */
+  const adaptationTaught = adaptationBreachTaught(context.coachedMistakes ?? []);
 
   // -- verdict ---------------------------------------------------------------
   /**
@@ -509,13 +539,19 @@ export function buildDebrief(
     // claim about the same drive, and two copies of one judgement diverge.
     // Their headers carry the reasoning that used to sit here.
     reservations.push(...unscoredReservationsBg(coachedKinds, nearMisses));
+    // Round 3 (R4): a passed drive that blew a task cap on the way (a fresh
+    // approach later honoured it) is not what the examiner wants to see either.
+    if (taskCapBroken) reservations.push(TASK_CAP_RESERVATION_BG);
+    const pointsAt = summary.score.totalPoints > 0 || coachedKinds > 0 || closestNearMiss !== null;
     const where = unscoredPointerBg(summary.score.totalPoints > 0, coachedKinds, closestNearMiss);
     lines.push(
       reservations.length === 0
         ? `${head} Точно това иска да види изпитващият.`
         : `${head} Но „издържан“ не значи „чисто“: ${reservations.join("; ")}. ` +
-          `Изпитващият гледа цялото каране, а не само дали запасът е стигнал — прочети ${where} ` +
-          `и повтори урока с тях наум.`,
+          (pointsAt
+            ? `Изпитващият гледа цялото каране, а не само дали запасът е стигнал — прочети ${where} ` +
+              `и повтори урока с тях наум.`
+            : `Изпитващият гледа цялото каране, а не само дали запасът е стигнал — ${TASK_CAP_PRACTICE_BG}.`),
     );
   } else if (summary.passed && hits.length > 0) {
     /**
@@ -741,13 +777,25 @@ export function buildDebrief(
     // things pointed at here — the pointer is the teach section and the
     // near-miss paragraph, and each prints on exactly the flag that named it.
     const reservations = unscoredReservationsBg(coachedKinds, nearMisses);
+    // Round 3 (R4): «…, не за карането» is false on a drive whose task was
+    // refused BECAUSE of the driving — through its mark over the ceiling.
+    if (taskCapBroken) reservations.push(TASK_CAP_RESERVATION_BG);
+    const pointsAt = coachedKinds > 0 || closestNearMiss !== null;
     const sheetBg = "По изпитния лист нямаш нито една наказателна точка (0 при допустими 9)";
     lines.push(
       reservations.length === 0
         ? `${sheetBg} — оценката е за ${forWhat}, не за карането.`
         : `${sheetBg} — оценката е за ${forWhat}. Но чистият лист не значи чисто каране: ` +
-          `${reservations.join("; ")}. Прочети ` +
-          `${unscoredPointerBg(false, coachedKinds, closestNearMiss)} и повтори урока с тях наум.`,
+          `${reservations.join("; ")}. ` +
+          (pointsAt
+            ? `Прочети ${unscoredPointerBg(false, coachedKinds, closestNearMiss)} и повтори урока с тях наум.`
+            : // Only the task-cap reservation: the corrective is the foot's
+              // «Какво да упражниш» line, which prints on an unfinished route
+              // and not on an aborted one — so it is said here only then, and
+              // never twice.
+              result.aborted
+              ? `${TASK_CAP_PRACTICE_BG[0].toUpperCase()}${TASK_CAP_PRACTICE_BG.slice(1)}.`
+              : "Какво да промениш, е в края на разбора."),
     );
   }
 
@@ -835,7 +883,28 @@ export function buildDebrief(
     goodBlock.push("");
     goodBlock.push("Какво се получи добре:");
     goodBlock.push(...goodLines);
-  } else if (summary.mistakes.length === 0 && !result.aborted && hits.length === 0) {
+  } else if (
+    summary.mistakes.length === 0 &&
+    !result.aborted &&
+    hits.length === 0 &&
+    // FOUNDER RULING 2026-09-25 (register item 17): «a debrief must NEVER
+    // praise a drive that broke the cap». With the breach charged the sheet is
+    // not empty and this branch is already closed; this is the drive where it
+    // was TAUGHT and never charged. The scoped variant below is true of the
+    // sheet, but it sits under «Какво се получи добре», and a drive over the
+    // ceiling the glass printed is not one to hold up — so the praise is
+    // withheld outright, exactly as for an ADR-009 hit, and «Учебни моменти»
+    // below says what happened (THEO-4).
+    // ROUND 3 (R4, C2): whenever the drive broke a task cap — even a breach AT
+    // the mark too short to bill, which leaves no row of any code — and ONLY
+    // then: a taught weather or bend row on a drive with no cap keeps base's
+    // sentence (round 2 withheld it on every lesson, beyond the ruling).
+    // ROUND 4 (founder ruling «Yes, same as speeding»): and a taught weather or
+    // bend overspeed withholds it too, on every drive — the founder's answer to
+    // round 3's C2 question. «Учебни моменти» says what happened (THEO-4).
+    !taskCapBroken &&
+    !adaptationTaught
+  ) {
     goodBlock.push("");
     /**
      * SCOPED TO THE SHEET IT READ. This said «чисто каране без нито едно
@@ -1593,7 +1662,12 @@ export function buildDebrief(
           ? // Its own branch and not the teach one: „внимавай за учебния момент"
             // would point at a section this drive does not have.
             "Какво да упражниш: повтори урока, завърши всички задачи от маршрута и мини по-широко там, където се размина на косъм."
-          : "Какво да упражниш: повтори урока и завърши всички задачи от маршрута — карането беше чисто по изпитния лист.",
+          : taskCapBroken
+            ? // Round 3 (R4): „карането беше чисто" about a drive that went
+              // through its task's mark over the ceiling — the very reason the
+              // task stayed open — is the praise the ruling forbids.
+              `Какво да упражниш: ${TASK_CAP_PRACTICE_BG}.`
+            : "Какво да упражниш: повтори урока и завърши всички задачи от маршрута — карането беше чисто по изпитния лист.",
     );
   }
 
@@ -2121,12 +2195,24 @@ function commendationLines(result: LessonResult): string[] {
   // the result, so a stored row from before the ADR has none and its praise is
   // byte-identical.
   const lessonMistakes = result.lessonMistakes ?? [];
+  // Round 2 of the task-cap ruling: the taught-and-uncharged speed breaches
+  // travel in too (see `commendationRiderFlags`), off the same result field
+  // the «Учебни моменти» section is built from.
+  const coachedMistakes = result.coachedMistakes ?? [];
+  // Round 3 (R4): the caps the drive blew, for the same question.
+  const taskCapBreaches = result.taskCapBreaches ?? [];
   const seen = new Map<string, { count: number; contradicted: boolean; unclean: boolean }>();
   for (const c of result.summary.commendations) {
     // ONE derivation, two surfaces — see `commendationRiderFlags`. The card
     // asks the same question per ROW; this block ORs the answers across the
     // rows a title pools, because the bullet stands for all of them.
-    const { contradicted, unclean } = commendationRiderFlags(result.summary, c, lessonMistakes);
+    const { contradicted, unclean } = commendationRiderFlags(
+      result.summary,
+      c,
+      lessonMistakes,
+      coachedMistakes,
+      taskCapBreaches,
+    );
     const prev = seen.get(c.titleBg);
     if (prev === undefined) seen.set(c.titleBg, { count: 1, contradicted, unclean });
     else {
@@ -2138,7 +2224,7 @@ function commendationLines(result: LessonResult): string[] {
   return [...seen.entries()]
     .slice(0, MAX_COMMENDATION_LINES)
     .map(([title, g]) => {
-      const rider = commendationRiderBg(result.summary, g, lessonMistakes);
+      const rider = commendationRiderBg(result.summary, g, lessonMistakes, coachedMistakes, taskCapBreaches);
       // The dash is this medium's punctuation — see COMMENDATION_CONTRADICTED_BG.
       return `• ${title}${g.count > 1 ? ` ×${g.count}` : ""}${rider === null ? "" : ` — ${rider}`}`;
     });
@@ -2194,6 +2280,47 @@ export function commendationRiderFlags(
    * and JUNCTION_SCAN_INCOMPLETE are both `c-give-way-stop-behavior`).
    */
   lessonMistakes: readonly { code: string }[] = [],
+  /**
+   * THE TAUGHT-AND-UNCHARGED SPEED BREACHES — founder ruling 2026-09-25
+   * (register item 17: «a debrief must NEVER praise a drive that broke the
+   * cap»), round 2, verifier F3. OPTIONAL and empty by default, so every
+   * caller that does not pass it is byte-identical.
+   *
+   * WHY. Both questions below are asked of the SHEET, and a cap breach whose
+   * charge was withheld (the first-fault grace, founder ruling 16) is on the
+   * sheet nowhere — it is a coached row. MEASURED on round 1: a ≤30 mark on a
+   * 50 street, 29 on the approach (a CLEAN_DRIVING earned there, lawfully), 45
+   * through the mark — the breach taught and never charged — and the debrief
+   * printed «Какво се получи добре: • Чисто и спокойно каране» unscoped.
+   * Round 1 closed only the no-commendation branch.
+   *
+   * WHAT IS READ: only the TASK code's row (round 3, verifier C2). Round 2
+   * read all three чл. 20, ал. 2 codes, and a taught weather or bend row then
+   * scoped the praise of drives that never had a cap — beyond the ruling,
+   * which covers the task cap only. A blown graded cap whose bill is not a TASK
+   * row is still caught, by the fifth argument: any drive that latched a graded
+   * cap carries a `taskCapBreaches` row. Every other coached row keeps base's
+   * praise.
+   *
+   * SCOPED, NOT DELETED — the choice, and why. The commendation EVENT stays:
+   * those metres were driven lawfully (a task cap is an arrival demand, and the
+   * catalogue's correct demonstrations approach above theirs), the XP for them
+   * is booked off the event, and this file's standing rule for CLEAN_DRIVING
+   * over a faulted drive is „NOT A DELETION" (`commendationLines`). What the
+   * student stops being handed is the unscoped sentence: the rider says the
+   * praise is for the stretch, names the breach, and says it is not praise of
+   * the lesson.
+   */
+  coachedMistakes: readonly { code: string }[] = [],
+  /**
+   * THE TASK CEILINGS THE DRIVE BLEW — round 3 (verifier R4, C2). OPTIONAL and
+   * empty by default, like the two before it. A breach AT the mark shorter than
+   * the task code's sustain leaves no row of any code (measured on round 2: 100
+   * through the spray's ≤80 mark, then 78 — «• Чисто и спокойно каране ×3»
+   * unscoped), and the objective has still refused the arrival; this list is
+   * the record of it (`LessonResult.taskCapBreaches`).
+   */
+  taskCapBreaches: readonly { objectiveId: string }[] = [],
 ): CommendationRiders {
   return {
     contradicted:
@@ -2207,9 +2334,54 @@ export function commendationRiderFlags(
     // match is not a code match on this channel.
     unclean:
       c.code === "CLEAN_DRIVING" &&
-      (summary.mistakes.length > 0 || lessonMistakes.length > 0),
+      (summary.mistakes.length > 0 ||
+        lessonMistakes.length > 0 ||
+        taskCapBreaches.length > 0 ||
+        coachedMistakes.some((m) => m.code === TASK_CAP_CODE) ||
+        // Round 4 (founder ruling «Yes, same as speeding»): a taught weather or
+        // bend overspeed scopes the praise too, on any drive.
+        adaptationBreachTaught(coachedMistakes)),
   };
 }
+
+/** The weather envelope's and the bend's codes — the other two measures of чл. 20, ал. 2. */
+const ADAPTATION_CODES: ReadonlySet<string> = new Set(["SPEED_TOO_FAST_FOR_CONDITIONS", "SPEED_TOO_FAST_FOR_CURVE"]);
+
+/**
+ * Was a weather or bend overspeed TAUGHT on this drive (a coached row — shown,
+ * not charged)? Round 4, founder ruling 2026-09-25 «Yes, same as speeding»:
+ * such a row rules out unscoped CLEAN_DRIVING praise, as a broken task cap
+ * does. A CHARGED one is already on the sheet and scopes the praise that way.
+ */
+function adaptationBreachTaught(coachedMistakes: ReadonlyArray<{ code: string }>): boolean {
+  return coachedMistakes.some((m) => ADAPTATION_CODES.has(m.code));
+}
+
+/** The task ceiling's own code (founder ruling 2026-09-25). */
+const TASK_CAP_CODE = "TASK_SPEED_CAP_EXCEEDED";
+
+/**
+ * Did the drive break a task ceiling? — the ONE derivation every praise guard
+ * in this file reads (round 3, R4/C2): a latched, graded cap
+ * (`taskCapBreaches`), or the task code charged or taught. Nothing else — a
+ * weather or bend row on a drive with no cap moves no praise (C2).
+ */
+function taskCapBrokenOn(
+  result: Pick<LessonResult, "summary" | "taskCapBreaches">,
+  coachedMistakes: ReadonlyArray<{ code: string }>,
+): boolean {
+  return (
+    (result.taskCapBreaches ?? []).length > 0 ||
+    coachedMistakes.some((c) => c.code === TASK_CAP_CODE) ||
+    result.summary.mistakes.some((m) => m.code === TASK_CAP_CODE)
+  );
+}
+
+/** The reservation a drive that broke its task's ceiling carries (R4). */
+const TASK_CAP_RESERVATION_BG = "мина точката на задачата над тавана, който тя показва";
+/** …and what to practise instead of it (R4) — lower-case, completes a sentence. */
+const TASK_CAP_PRACTICE_BG =
+  "повтори урока и мини точката на задачата под тавана, който тя показва — погледни скоростомера и слез под числото още преди нея";
 
 /**
  * The rider text for a set of flags, WITHOUT leading punctuation — null when
@@ -2221,10 +2393,14 @@ export function commendationRiderBg(
   flags: CommendationRiders,
   /** ADR-009's hits — see `commendationRiderFlags`; empty by default. */
   lessonMistakes: readonly { code: string }[] = [],
+  /** The taught speed breaches — see `commendationRiderFlags`; empty by default. */
+  coachedMistakes: readonly { code: string }[] = [],
+  /** The task ceilings the drive blew — see `commendationRiderFlags`; empty by default. */
+  taskCapBreaches: readonly { objectiveId: string }[] = [],
 ): string | null {
   const parts: string[] = [];
   if (flags.contradicted) parts.push(COMMENDATION_CONTRADICTED_BG);
-  if (flags.unclean) parts.push(cleanDrivingScopeBg(summary, lessonMistakes));
+  if (flags.unclean) parts.push(cleanDrivingScopeBg(summary, lessonMistakes, coachedMistakes, taskCapBreaches));
   return parts.length === 0 ? null : parts.join(" — ");
 }
 
@@ -2245,8 +2421,15 @@ function cleanDrivingScopeBg(
   summary: LessonResult["summary"],
   /** ADR-009's hits — see `commendationRiderFlags`; empty by default. */
   lessonMistakes: readonly { code: string }[] = [],
+  /** The taught speed breaches — see `commendationRiderFlags`; empty by default. */
+  coachedMistakes: readonly { code: string }[] = [],
+  /** The task ceilings the drive blew — see `commendationRiderFlags`; empty by default. */
+  taskCapBreaches: readonly { objectiveId: string }[] = [],
 ): string {
   const opasni = summary.score.opasniCount;
+  const taughtTask = coachedMistakes.some((m) => m.code === TASK_CAP_CODE);
+  const taughtCond = coachedMistakes.some((m) => m.code === "SPEED_TOO_FAST_FOR_CONDITIONS");
+  const taughtCurve = coachedMistakes.some((m) => m.code === "SPEED_TOO_FAST_FOR_CURVE");
   const alsoBg =
     opasni === 1
       ? "в същия урок има и опасна грешка"
@@ -2259,13 +2442,34 @@ function cleanDrivingScopeBg(
           // thing that makes „чисто" false on this drive.
           summary.mistakes.length === 0 && lessonMistakes.length > 0
           ? "в същия урок се случи грешката, която той учи"
-          : "в същия урок има и отбелязани грешки";
+          : summary.mistakes.length === 0 && (taskCapBreaches.length > 0 || taughtTask || taughtCond || taughtCurve)
+            ? // ROUNDS 2–4 (task-cap ruling, F3/R4; round 4 «Yes, same as
+              // speeding»). The sheet is empty, so «има и отбелязани грешки»
+              // would point at a block that does not print; the rider names each
+              // breach that was taught or recorded, and points at «Учебни
+              // моменти» only when a card is there to read.
+              speedBreachRiderBg(taskCapBreaches.length > 0 || taughtTask, taughtCond, taughtCurve, taughtTask || taughtCond || taughtCurve)
+            : "в същия урок има и отбелязани грешки";
   // No leading „ — ": the sentence is shared with the result screen's «Похвали»
   // card, which prints it as a line of its own. See COMMENDATION_CONTRADICTED_BG.
   return (
     `но само на отделни отсечки от маршрута: ${alsoBg}. Похвалата е за метрите без` +
     ` нито едно нарушение, не за урока — „чисто каране“ се брои чак когато ЦЯЛОТО каране е такова.`
   );
+}
+
+/**
+ * «в същия урок …» for the чл. 20, ал. 2 breaches a sheet-clean drive still
+ * committed — each in the student's words, joined, and pointed at «Учебни
+ * моменти» only when a teach card is there. With the task alone it is round 3's
+ * sentence, byte for byte.
+ */
+function speedBreachRiderBg(task: boolean, cond: boolean, curve: boolean, pointer: boolean): string {
+  const acts: string[] = [];
+  if (task) acts.push("мина над тавана на задачата");
+  if (cond) acts.push("кара по-бързо, отколкото позволяват условията");
+  if (curve) acts.push("влезе в завой по-бързо от табелата");
+  return `в същия урок ${acts.join(" и ")}${pointer ? " (виж «Учебни моменти»)" : ""}`;
 }
 
 /** Excess over the limit, for picking the worst event in a speeding group. */

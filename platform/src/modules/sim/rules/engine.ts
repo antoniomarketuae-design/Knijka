@@ -86,9 +86,11 @@ import {
   type GlanceKind,
   type RuleEngineConfig,
   type RuleEvent,
+  type SignBoundArrival,
   type SimTick,
   type SimTickEvent,
   type TurnDirection,
+  type ViolationCode,
   type ViolationEvent,
 } from "./types";
 
@@ -328,6 +330,55 @@ export interface RuleEngineState {
   conditionsSpeed: EpisodeState;
   /** The post-teach re-grade clock for `conditionsSpeed` — see `speedingMinorRegrade`. */
   conditionsSpeedRegrade: EpisodeState;
+  /**
+   * Over the ACTIVE lesson task's own ceiling (`SimTick.taskSpeedCap`) — founder
+   * ruling 2026-09-25, TASK_SPEED_CAP_EXCEEDED. THE CAP LEDGER (round 14,
+   * founder ruling 2026-10-03 «Cap adds, never removes»): see the detector.
+   */
+  taskCap: EpisodeState;
+  /** The post-teach re-grade clock for `taskCap` — the `conditionsSpeedRegrade` shape. */
+  taskCapRegrade: EpisodeState;
+  /**
+   * The `blownAtSec` of the last task latch this reducer saw on a tick —
+   * round 3 (verifier R2/R4). A stamp whose value differs is a NEW blow: the
+   * task episodes restart at once and the clean-driving window in progress is
+   * voided. null until the first stamp of the drive.
+   */
+  taskCapBlownAtSeen: number | null;
+  /**
+   * THE CAP LEDGER'S ACT (round 14; rounds 2–6's task act): named by its first bill, carrying at most one charge.
+   * IDLE (`IDLE_TASK_ACT`) whenever no act is open. See „THE CAP LEDGER'S ACT" in `reduceTick`.
+   */
+  taskAct: TaskCapAct;
+  /**
+   * ROUND 6 — THE ARRIVAL'S ACT, KEPT WITH ITS LATCH: the latch whose arrival was billed into the act and, once that act
+   * has ended with the latch still current, the act as it stood (`kept`), so the same latch taking the car over its
+   * bill line again resumes it. null until an arrival is billed, and again from the next NEW latch.
+   */
+  taskArrival: TaskArrivalAct | null;
+  /**
+   * A SIGN-BOUND ARRIVAL WAITING FOR ITS BILL (rounds 7, 8 and 12, inside the cap ledger since round 14): billed on its
+   * latch's first stamp, on the held correction, or at the ending of a drive that ends while it waits. null on every
+   * other frame.
+   */
+  taskArrivalPending: TaskArrivalPending | null;
+  /**
+   * ROUND 14 — THE CAP LEDGER'S OWN READING OF THE M-16 CORRECTION: the frame since which the car has been at or under
+   * the posted sign without a break (null while it is over it) — the definition `stepSustainedEpisode` keeps
+   * `speedingMinor.resetSince` by, kept HERE so the cap ledger reads no speeding episode.
+   */
+  taskSignResetSince: number | null;
+  /**
+   * The sign-bound act (round 8): open from a sign-bound blow to the held correction; `billed` once its one bill is
+   * out. No praise accrues while it is open (GATE 1). null on every frame of every drive that never blew a sign-bound
+   * cap.
+   */
+  taskSignAct: { billed: boolean } | null;
+  /**
+   * ROUND 10 — the latches blown inside a sign-bound act AFTER it had its bill (round 7: «a second blow … adds
+   * nothing»): their stretches are that act carrying on until the whole act has ended. null otherwise.
+   */
+  taskSignLatches: readonly number[] | null;
   rainLights: EpisodeState;
   /** Driving in FOG without front fog lamps (AC-03, чл. 74). */
   fogLights: EpisodeState;
@@ -731,6 +782,33 @@ const IDLE_EPISODE: EpisodeState = {
   qualifiedSec: 0,
   lastQualAt: null,
 };
+
+/** See `RuleEngineState.taskAct`. Replaced, never mutated in place. */
+export interface TaskCapAct {
+  /** The act's ONE first bill has been put before the student (the arrival's, or a first sustained bill). */
+  named: boolean;
+  /** The act's ONE charge-carrying re-grade has been emitted. */
+  charged: boolean;
+}
+const IDLE_TASK_ACT: TaskCapAct = { named: false, charged: false };
+
+/** See `RuleEngineState.taskArrival`. Replaced, never mutated in place. */
+export interface TaskArrivalAct {
+  /** The latch (`blownAtSec`) whose arrival was billed into the act. */
+  latch: number;
+  /** The act as it stood when it ended with this latch still current; null while it is open. */
+  kept: TaskCapAct | null;
+}
+
+/** See `RuleEngineState.taskArrivalPending`. Replaced, never mutated in place. */
+export interface TaskArrivalPending {
+  /** The latch (`blownAtSec`) whose arrival waits. */
+  latch: number;
+  /** The blow its bill will quote. */
+  arrival: SignBoundArrival;
+  /** Later sign-bound blows in the same act while it waits — one act, one bill (round 7). */
+  laterLatches: readonly number[];
+}
 
 /**
  * HOW FAR A CAR MUST DRIVE BEFORE IT CAN HAVE HAD A SECOND ACCIDENT, metres.
@@ -1325,6 +1403,12 @@ const HANDBRAKE_MOVE_OFF_PEDAL_ON = 0.1;
  *    with a lawRef and a severity, not a bug fix — the same line
  *    `lessons/advisor.ts` draws at its own 32 above-the-street gates. Filed,
  *    not patched.
+ *    DECIDED 2026-09-25 (register item 17, „Bill it"): the cap is now graded
+ *    by TASK_SPEED_CAP_EXCEEDED on THIS clock (see the detector after the
+ *    curve block), fed by `SimTick.taskSpeedCap`, which `lessons/engine.ts`
+ *    stamps from the active objective. Of the ~950, only the flow caps that
+ *    bind under the sign reach it — the halt band (≤ 8 км/ч, „come to rest
+ *    here") and every cap at or above the posted limit are never stamped.
  */
 const SPEED_REGRADE_SEC = 6;
 
@@ -2222,6 +2306,15 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     laneKeeping: { ...IDLE_EPISODE },
     conditionsSpeed: { ...IDLE_EPISODE },
     conditionsSpeedRegrade: { ...IDLE_EPISODE },
+    taskCap: { ...IDLE_EPISODE },
+    taskCapRegrade: { ...IDLE_EPISODE },
+    taskCapBlownAtSeen: null,
+    taskAct: { ...IDLE_TASK_ACT },
+    taskArrival: null,
+    taskArrivalPending: null,
+    taskSignResetSince: null,
+    taskSignAct: null,
+    taskSignLatches: null,
     rainLights: { ...IDLE_EPISODE },
     fogLights: { ...IDLE_EPISODE },
     snowLights: { ...IDLE_EPISODE },
@@ -2314,6 +2407,8 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     laneKeeping: { ...s.laneKeeping },
     conditionsSpeed: { ...s.conditionsSpeed },
     conditionsSpeedRegrade: { ...s.conditionsSpeedRegrade },
+    taskCap: { ...s.taskCap },
+    taskCapRegrade: { ...s.taskCapRegrade },
     rainLights: { ...s.rainLights },
     fogLights: { ...s.fogLights },
     snowLights: { ...s.snowLights },
@@ -2746,6 +2841,144 @@ export function settleUnpaidSpeedingTeach(
     }),
     regrade: true,
   };
+}
+
+/** Which condition governs the envelope — the one with the smallest factor. */
+export type ConditionsCause = "snow" | "fog" | "rain" | "night";
+
+/**
+ * THE PRUDENT-SPEED ENVELOPE THE WORLD DECLARES, or null when nothing reduces it
+ * — the number SPEED_TOO_FAST_FOR_CONDITIONS grades against (ЗДвП чл. 20,
+ * ал. 2). Factors compose by MIN, so the single most restrictive condition
+ * governs and a rainy night grades once (see the detector in `reduceTick`,
+ * which reads this function — one derivation).
+ *
+ * Exported for the two readers that must quote the SAME number the detector
+ * used: the task and conditions cards (`lessons/engine.ts
+ * withSpeedMeasurement`, round-2 C4 — both numbers on the glass) and the
+ * finish-time settlement below, which re-checks the tick in hand.
+ */
+export function conditionsSpeedEnvelope(
+  tick: Pick<SimTick, "maxSpeedKmh"> & Partial<Pick<SimTick, "rain" | "fog" | "snow" | "isNight">>,
+  cfg: RuleEngineConfig,
+): { limitKmh: number; cause: ConditionsCause } | null {
+  const arms: Array<[ConditionsCause, number]> = [];
+  if (tick.snow === true) arms.push(["snow", cfg.conditionSpeedSnowFactor]);
+  if (tick.fog === true) arms.push(["fog", cfg.conditionSpeedFogFactor]);
+  if (tick.rain === true) arms.push(["rain", cfg.conditionSpeedRainFactor]);
+  if (tick.isNight === true) arms.push(["night", cfg.conditionSpeedNightFactor]);
+  let governing: [ConditionsCause, number] | null = null;
+  for (const a of arms) if (governing === null || a[1] < governing[1]) governing = a;
+  if (governing === null || !(governing[1] < 1)) return null;
+  return { limitKmh: tick.maxSpeedKmh * governing[1], cause: governing[0] };
+}
+
+/**
+ * What the finish-time settlements of ЗДвП чл. 20, ал. 2 read off the drive's last tick: the speeding settlement's
+ * three scalars, the four condition flags the weather envelope is derived from, and the task stamp the reducer graded
+ * that tick against.
+ */
+export type KinSettleTick = Pick<SimTick, "t" | "speedKmh" | "maxSpeedKmh"> &
+  Partial<Pick<SimTick, "rain" | "fog" | "snow" | "isNight" | "taskSpeedCap">>;
+
+/**
+ * ROUND 7 — A DRIVE THAT ENDS WHILE A SIGN-BOUND ARRIVAL WAITS (see „THE SIGN-BOUND ARRIVAL" in `reduceTick`): the
+ * ending hands its bill over, as the cap's first bill at the moment the drive ended, carrying its blow. Round 14: the
+ * cap ledger's own — nothing of another code can have taken it. null on every drive with nothing waiting.
+ */
+export function settlePendingTaskArrival(state: RuleEngineState, tick: { t: number }): ViolationEvent | null {
+  const waiting = state.taskArrivalPending;
+  if (waiting === null) return null;
+  // Inside a cap act already named, the waiting arrival is that act's (one act, one bill) and nothing is handed over.
+  if (state.taskAct.named) return null;
+  return { ...makeViolation("TASK_SPEED_CAP_EXCEEDED", tick.t), signBoundArrival: waiting.arrival };
+}
+
+/**
+ * THE CAP'S WITHHELD CHARGE, SETTLED AT THE END OF THE DRIVE — round 2 of the 2026-09-25 ruling (verifier F2), in the
+ * shape of `settleUnpaidSpeedingTeach` (commit 0e58070): a drive that ends before the route does no longer forgives an
+ * overspeed it was TAUGHT about and was still committing on the chequered flag. MEASURED before it: the neighbours of
+ * the photographed `sc-ac-truck-spray` wrong leg — through the ≤80 mark at 116, then 130 held to the route end —
+ * finished «0 / 0 / 0» with «Чисто и спокойно каране»: the card at 25.0 s, the route's end at 30.8 s, inside
+ * SPEED_REGRADE_SEC. Six seconds granted to a drive that has ENDED are not mercy, they are an acquittal.
+ *
+ * ROUND 14 — THE CAP LEDGER'S ALONE (founder ruling 2026-10-03, «Cap adds, never removes»). Rounds 2–13 settled here the
+ * one charge of a „kin ledger" act shared by the cap, the weather and the bend, handed to whichever ceiling was broken.
+ * Under the ruling the weather and the bend settle exactly as with no cap (`settleUnpaidAdaptationTeach`), and this
+ * settles the cap's own act: its first bill was SHOWN (round 3, R3 — its own teach first), its one re-grade has not
+ * landed, its current episode's first bill was emitted and its re-grade clock is running, and the car is over the cap's
+ * bill line on the last tick. One `regrade`-marked bill, so the lesson drops it wherever the cap was already charged.
+ * A12 — one frame back under the line acquits, exactly as mid-drive.
+ */
+export function settleUnpaidTaskTeach(state: RuleEngineState, tick: KinSettleTick): ViolationEvent | null {
+  const act = state.taskAct;
+  if (!act.named || act.charged) return null;
+  const cap = tick.taskSpeedCap;
+  if (cap === undefined || !(Math.abs(tick.speedKmh) > cap.capKmh + cap.graceKmh)) return null;
+  if (!state.taskCap.emitted || state.taskCapRegrade.activeSince === null || state.taskCapRegrade.emitted) return null;
+  return { ...makeViolation("TASK_SPEED_CAP_EXCEEDED", tick.t), regrade: true };
+}
+
+/**
+ * Was the bend overspeed TAUGHT in its current episode (its one bill emitted —
+ * the curve code has no re-grade family) and is the car still over the
+ * advisory plus its grace on the tick in hand? The episode's own onset is read
+ * off the reducer (`activeSince`, set only while `curveOverspeed` held on the
+ * last frame reduced) and the tick is re-checked so the question is honest when
+ * asked standalone, exactly as `settleUnpaidSpeedingTeach` re-checks its band.
+ */
+function curveStillOver(state: RuleEngineState, tick: AdaptationSettleTick): boolean {
+  const adv = tick.curveAdvisoryKmh;
+  return (
+    state.curveSpeed.emitted &&
+    state.curveSpeed.activeSince !== null &&
+    adv !== undefined &&
+    Math.abs(tick.speedKmh) > adv + state.config.curveSpeedGraceKmh
+  );
+}
+
+/** What the weather/bend settlement reads: the settlement tick, plus the bend's advisory on it. */
+export type AdaptationSettleTick = KinSettleTick & Partial<Pick<SimTick, "curveAdvisoryKmh">>;
+
+/**
+ * THE WITHHELD WEATHER OR BEND CHARGE, SETTLED AT THE END — founder ruling 2026-09-25, «Yes, same as speeding» (round 4
+ * of register item 17).
+ *
+ * The founder was asked whether a weather overspeed, taught and still running when a drive ends, should be settled the
+ * way SPEEDING_OVER_LIMIT is since 0e58070 — and answered yes, for the weather code AND the bend code. So this is
+ * `settleUnpaidSpeedingTeach`'s shape, applied to each code on ITS OWN guards:
+ *
+ *  · SPEED_TOO_FAST_FOR_CONDITIONS — its first bill was emitted in this episode (`conditionsSpeed.emitted`: the
+ *    no-cap ledger always shows it), its re-grade has not landed, its re-grade clock is still running
+ *    (`activeSince`: the last frame reduced was over), and the car is over the envelope on the tick in hand;
+ *  · SPEED_TOO_FAST_FOR_CURVE — its one bill was emitted in this episode and the car is still over the advisory plus
+ *    its grace inside the span on the tick in hand (`curveStillOver`). The curve code has NO re-grade family, so
+ *    mid-drive a taught bend overspeed is never charged at all; this settles it only when the drive ENDS inside the
+ *    bend.
+ *
+ * Each bill is `regrade`-marked, so `lessons/engine.ts` drops it wherever the code was already charged (exam mode, a
+ * spent topic, a repeat) and wherever it is the lesson's own ADR-009 target. A12 — NOTHING INNOCENT MOVES.
+ *
+ * ROUND 14 (founder ruling 2026-10-03, «the bend/weather bills are charged exactly as they would be in a lesson with no
+ * cap»): THE NO-CAP LEDGER'S SETTLEMENT, on every drive. Rounds 3–13 handed the acts a task took part in to the kin
+ * settlement instead; nothing about the cap reaches this function any more.
+ */
+export function settleUnpaidAdaptationTeach(state: RuleEngineState, tick: AdaptationSettleTick): ViolationEvent[] {
+  const out: ViolationEvent[] = [];
+  const envelope = conditionsSpeedEnvelope(tick, state.config);
+  if (
+    state.conditionsSpeed.emitted &&
+    state.conditionsSpeedRegrade.activeSince !== null &&
+    !state.conditionsSpeedRegrade.emitted &&
+    envelope !== null &&
+    Math.abs(tick.speedKmh) > envelope.limitKmh
+  ) {
+    out.push({ ...makeViolation("SPEED_TOO_FAST_FOR_CONDITIONS", tick.t), regrade: true });
+  }
+  if (curveStillOver(state, tick)) {
+    out.push({ ...makeViolation("SPEED_TOO_FAST_FOR_CURVE", tick.t), regrade: true });
+  }
+  return out;
 }
 
 /**
@@ -3676,14 +3909,14 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const raining = tick.rain === true;
   const foggy = tick.fog === true;
   const snowy = tick.snow === true;
-  const conditionFactor = Math.min(
-    raining ? cfg.conditionSpeedRainFactor : 1,
-    foggy ? cfg.conditionSpeedFogFactor : 1,
-    snowy ? cfg.conditionSpeedSnowFactor : 1,
-    tick.isNight ? cfg.conditionSpeedNightFactor : 1,
-  );
-  const conditionsReduced = conditionFactor < 1;
-  const conditionLimit = limit * conditionFactor;
+  // ONE DERIVATION (2026-09-25, round 2): the envelope is also printed on the
+  // task and conditions cards (`lessons/engine.ts withSpeedMeasurement`, C4) and
+  // re-checked by the finish-time settlement, so it lives in one exported
+  // function and this line reads it. Arithmetic identical to the inline MIN it
+  // replaces: null ⇔ factor 1 ⇔ the limit itself.
+  const envelope = conditionsSpeedEnvelope(tick, cfg);
+  const conditionsReduced = envelope !== null;
+  const conditionLimit = envelope?.limitKmh ?? limit;
   /*
    * THE WINTER RULE USED TO SWITCH ITSELF OFF AT THE EXACT SPEED IT IS ABOUT
    * (2026-08-27, `sc-ac-snow:6ed473c3`). This condition carried a fourth
@@ -3840,6 +4073,231 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     )
   ) {
     events.push(makeViolation("SPEED_TOO_FAST_FOR_CURVE", t));
+  }
+
+  /*
+   * THE TASK'S OWN CEILING — founder ruling 2026-09-25 (register item 17, answered „Bill it"). `sc-ac-truck-spray`
+   * paints «задачата иска ≤80» beside a 140 disc, the banner states it, the objective refuses above it — and until this
+   * block nothing on the изпитен лист could see it. MEASURED on the tree before it
+   * (`lessons/__tests__/task-cap-ceiling.test.ts`): 110–115 км/ч through that ≤80 task in the rain books ZERO violations,
+   * mints «Чисто и спокойно каране» three times over the breach, and the debrief closes on «карането беше чисто по
+   * изпитния лист».
+   *
+   * THE NUMBERS. `SimTick.taskSpeedCap` is stamped ONLY by `lessons/engine.ts` (see the type), only once the student has
+   * gone THROUGH the task's mark over it (`approachCap === "blown"`), and only over the stretch that cap governs (the mark
+   * to the end of the feature its task names — `lessons/finish.ts taskCapStretch`; founder ruling 2, «only the named
+   * stretch»). It bills above `capKmh + graceKmh` — the gate plus the objective's own slack, the number the mark itself
+   * was blown at. A return to `shownKmh`, the number the glass printed, is the correction that ends the episode. Between
+   * the two the episode neither accrues nor ends: the SPEEDING_OVER_LIMIT shape.
+   *
+   * THE CLOCK IS THE CONDITIONS DUTY'S, because the duty is (ЗДвП чл. 20, ал. 2, the lawRef the ruling cites): the
+   * sustain is `conditionsSpeedSustainSec` and the continuing breach re-grades on `SPEED_REGRADE_SEC` — two bills per
+   * episode, the second `regrade`-marked so it only ever reaches the charge the teach-first free lesson consumed (founder
+   * ruling 16, 2026-09-21: the first-fault grace is KEPT). The episode accrues (`SPEEDING_SUSTAIN_ACCRUES`) and re-arms
+   * only on a correction held `speedingRearmSec` (M-16).
+   *
+   * WHAT IT CANNOT DO: bill a lesson that never stamped a cap (every recorder, replay and exam rung), bill a stopped car
+   * (`moving`), or bill a right leg held at or under the gate plus its slack.
+   *
+   * ROUND 14 — THE CAP LEDGER. FOUNDER RULING 2026-10-03, verbatim: «Cap adds, never removes. The task cap is an extra
+   * rule on top. Its bill stands on its own; the bend/weather bills are charged exactly as they would be in a lesson with
+   * no cap. Blowing the cap can only add, never lower the score, and order never matters.»
+   *
+   * Rounds 2–13 folded this code, the weather's and the bend's into ONE „kin ledger" act with one name and one charge,
+   * and — inside a sign-bound arrival's M-16 act — the SPEEDING_* bills too: a cap bill could absorb a weather or bend
+   * bill, or be absorbed by one, or by a speeding bill, and which happened depended on the order the cards landed in.
+   * Measured on round 13 (the round-13 verifier's long act): posted 50, a ≤50 mark passed at 56,2, then 53 through three
+   * bends in the rain — 7 points with no cap, 1 with the mark blown. The ruling supersedes every such reading. What is
+   * left is two ledgers:
+   *  · THE NO-CAP LEDGER — the weather, bend and speeding detectors above, pushed exactly as they ship. Nothing below
+   *    writes to their episodes or reads their bills: the same frames with the cap fields removed bill them identically
+   *    (`rules/__tests__/taskCapTwoLedgers.ts` L1, censused over every generated family and through every committed
+   *    capped lesson).
+   *  · THE CAP LEDGER — this block. It reads the tick (the stamp, the arrival, the speed, the posted sign) and its own
+   *    state, never a weather, bend or speeding episode or bill, and it bills TASK_SPEED_CAP_EXCEEDED alone, with the
+   *    cap's OWN first-fault grace (`scenarios/mapping.ts teachTopicForCode` — ruling 16 applied to the cap's own fault,
+   *    so a cap teach spends no weather/bend grace and a weather teach spends none of the cap's).
+   * The lesson's total is the sum of the two, so blowing a cap can only add, in any order.
+   */
+  const taskCap = tick.taskSpeedCap;
+  /*
+   * ROUND 3 (verifier R2) — A NEW LATCH IS A NEW ACT; A GAP IN THE SAME LATCH IS NOT. The lesson keeps one latch per
+   * blow (`lessons/engine.ts stepTaskCapLatch`) and names it on the stamp (`blownAtSec`):
+   *  · a stamp whose latch the reducer has not seen before is a NEW blow — the next objective's mark, or the same mark
+   *    blown again on a fresh approach — and it restarts the task's two episodes and its act at once;
+   *  · a stamp that merely goes missing is a reset like any other, and ends a billed episode only after it has been HELD
+   *    `speedingRearmSec` — the same hysteresis a dip back to the shown figure has (M-16).
+   * ROUND 5 — A LATCH ALSO NAMES ITSELF BY ITS ARRIVAL (`SimTick.taskCapArrival`, founder ruling 2026-09-26 «Bill the
+   * arrival»), so the blow is a new act here whether or not a stamp follows it. `taskLatchFresh` is read again at the
+   * praise gate below (R4).
+   */
+  const taskArrival = tick.taskCapArrival;
+  const taskLatchName = taskCap?.blownAtSec ?? taskArrival?.blownAtSec;
+  const taskLatchFresh = taskLatchName !== undefined && taskLatchName !== s.taskCapBlownAtSeen;
+  if (taskLatchFresh) {
+    if (s.taskCapBlownAtSeen !== null) {
+      s.taskCap = { ...IDLE_EPISODE };
+      s.taskCapRegrade = { ...IDLE_EPISODE };
+      s.taskAct = { ...IDLE_TASK_ACT };
+    }
+    s.taskCapBlownAtSeen = taskLatchName;
+    // ROUND 6: a new blow is a new act — the old latch's kept act is never resumed by it.
+    s.taskArrival = null;
+  }
+  const overTaskCap = taskCap !== undefined && moving && speed > taskCap.capKmh + taskCap.graceKmh;
+  /*
+   * ROUND 6 — THE ARRIVAL'S ACT, KEPT WITH ITS LATCH (founder ruling 4 in the integrator's reading: the arrival «is one
+   * act with any sustained over-cap stretch that follows on the named feature»). The act ends by the plain rule — the
+   * task's episode no longer live (below) — and, ending while the latch whose arrival it billed is still the current
+   * one, it is KEPT as it stood (`taskArrival.kept`): the SAME latch taking the car over its bill line again RESUMES it,
+   * its first bill and its one charge with it. So the student cannot make a later stretch on the same feature a new act
+   * (a second card, a second charge) by hovering in the grace band, correcting, or leaving the graded road between
+   * the blow and the stretch. A NEW latch drops it (above).
+   */
+  const heldArrival = s.taskArrival;
+  if (heldArrival !== null && heldArrival.kept !== null && overTaskCap && taskCap !== undefined && taskCap.blownAtSec === heldArrival.latch) {
+    if (!s.taskAct.named) s.taskAct = { ...heldArrival.kept };
+    s.taskArrival = { latch: heldArrival.latch, kept: null };
+  }
+  /*
+   * ROUND 5 — THE ARRIVAL IS THE OFFENCE (founder ruling 2026-09-26, «Bill the arrival», ruling 4 of register item 17):
+   * «passing the mark over the cap IS the offence. It is billed as ONE EVENT at the blow: a teach card the first time
+   * (per-topic grace), a point on a repeat.» So: ONE first bill of this code, on the frame the lesson latches the blow
+   * (the arrival rides only that frame), once per latch, and only above the blow line — `capKmh + graceKmh`, re-checked
+   * here against the measured arrival so no stamp can bill a speed its evaluator would not have refused.
+   */
+  const arrivalOver =
+    taskLatchFresh &&
+    taskArrival !== undefined &&
+    taskArrival.blownAtSec === taskLatchName &&
+    Math.abs(taskArrival.arrivalKmh) > taskArrival.capKmh + taskArrival.graceKmh;
+  /*
+   * ROUND 7 / 8 / 12 — THE SIGN-BOUND ARRIVAL, inside the cap ledger (round 14). A mark whose cap the glass showed AT or
+   * ABOVE the sign on the blow frame (`signBound`) is blown while the car is over the sign too. Rounds 7–13 let its one
+   * bill WAIT so that a SPEEDING_*, weather or bend bill in the same act could absorb it; under the ruling the cap's
+   * bill stands on its own, so nothing of another code absorbs it any more. What stays is the cap ledger's own act —
+   * from the blow to the held correction (`taskSignAct`) — and the wait's three ends:
+   *  · ROUND 12, THE STAMP RULE — the first frame one of its latches STAMPS the car (the cap then binds under the sign on
+   *    its named stretch): the arrival is billed there, quoting its blow, exactly as its graded twin is billed at its
+   *    blow, and the stretch that follows is that act carrying on, with its one re-grade;
+   *  · ROUND 8, THE HELD CORRECTION — the frame the car has been back at or under the sign for `speedingRearmSec` (the
+   *    product's M-16 definition of a correction, `stepSustainedEpisode`'s), read off the cap ledger's OWN record of it
+   *    (`taskSignResetSince`, kept by the same rule `resetSince` is kept by), never off a speeding episode;
+   *  · the ending of a drive that ends while it waits (`settlePendingTaskArrival`).
+   * Inside one such act (round 7): a second sign-bound blow while the arrival waits waits with it — one bill; a blow
+   * after the act has its bill adds none, and its latch is that act's (`taskSignLatches`: its stretch carries the act
+   * on until the whole act has ended); any other task first bill while the arrival waits — a graded mark's arrival —
+   * takes the act's one bill. No praise accrues while the act runs (round 8, GATE 1).
+   */
+  const signBound = arrivalOver && taskArrival !== undefined && taskArrival.shownKmh >= tick.maxSpeedKmh;
+  if (speedReset) {
+    if (s.taskSignResetSince === null) s.taskSignResetSince = t;
+  } else {
+    s.taskSignResetSince = null;
+  }
+  const signCorrectionHeld = speedReset && s.taskSignResetSince !== null && t - s.taskSignResetSince >= cfg.speedingRearmSec;
+  if (signBound && taskArrival !== undefined && taskLatchName !== undefined) {
+    const blow: SignBoundArrival = { arrivalKmh: Math.abs(taskArrival.arrivalKmh), shownKmh: taskArrival.shownKmh, postedKmh: tick.maxSpeedKmh };
+    const act = s.taskSignAct ?? { billed: false };
+    if (s.taskArrivalPending !== null) {
+      s.taskArrivalPending = { ...s.taskArrivalPending, laterLatches: [...s.taskArrivalPending.laterLatches, taskLatchName] };
+    } else if (act.billed) {
+      s.taskSignLatches = [...(s.taskSignLatches ?? []), taskLatchName];
+    } else {
+      s.taskArrivalPending = { latch: taskLatchName, arrival: blow, laterLatches: [] };
+    }
+    s.taskSignAct = act;
+  }
+  // THE WAIT'S END, read on every frame — a blow frame included (a correction already held there bills at once).
+  let signArrival: { latch: number; arrival: SignBoundArrival } | null = null;
+  if (s.taskArrivalPending !== null) {
+    const waiting = s.taskArrivalPending;
+    const waitingLatches = [waiting.latch, ...waiting.laterLatches];
+    if (taskCap !== undefined && waitingLatches.includes(taskCap.blownAtSec)) {
+      signArrival = { latch: taskCap.blownAtSec, arrival: waiting.arrival };
+      s.taskArrivalPending = null;
+    } else if (signCorrectionHeld) {
+      signArrival = { latch: waiting.latch, arrival: waiting.arrival };
+      s.taskArrivalPending = null;
+    }
+  }
+  // …and the sign-bound act ends on that same held correction.
+  if (s.taskSignAct !== null && signCorrectionHeld) s.taskSignAct = null;
+  const arrivalFirst = (arrivalOver && !signBound) || signArrival !== null;
+  const arrivalLatch = signArrival !== null ? signArrival.latch : taskLatchName;
+  const taskCapReset = taskCap === undefined || speed <= taskCap.shownKmh;
+  // THE M-16 HYSTERESIS, borrowed with the band shape: a dip back to the shown figure only ENDS the episode once it has
+  // been held `speedingRearmSec` — otherwise a driver hovering one km/h either side of an L3 cap (where gate and figure
+  // are the same number) opens a fresh episode on every crossing and is billed as a repeat for one continuing breach.
+  const taskCapRearmSec = cfg.speedingRearmSec;
+  const taskFirst = stepSustainedEpisode(
+    s.taskCap,
+    overTaskCap,
+    taskCapReset,
+    t,
+    cfg.conditionsSpeedSustainSec,
+    taskCapRearmSec,
+    0,
+    0,
+    SPEEDING_SUSTAIN_ACCRUES,
+  );
+  const taskCapCorrectionHeld =
+    taskCapReset &&
+    s.taskCap.resetSince !== null &&
+    t - s.taskCap.resetSince >= taskCapRearmSec;
+  const taskRegrade = stepEpisode(
+    s.taskCapRegrade,
+    overTaskCap,
+    taskCapCorrectionHeld,
+    t,
+    cfg.conditionsSpeedSustainSec + SPEED_REGRADE_SEC,
+    SPEEDING_SUSTAIN_ACCRUES,
+  );
+  /*
+   * THE CAP LEDGER'S ACT — ONE FIRST BILL, ONE CHARGE (founder ruling 4, in the integrator's reading). The act is named by
+   * its first bill — the arrival, or (where no arrival named it) the stretch's first sustained bill — and that bill is
+   * the only one put before the student: every later first bill inside it is the act carrying on, emitted `absorbedBy`
+   * the cap itself and dropped by the lesson. It carries at most ONE re-grade (`charged`), the second bill of the
+   * conditions duty's cadence, so it only ever reaches the charge the teach-first free lesson consumed (ruling 16).
+   * A latch blown after a sign-bound act already had its bill (round 7's later blow, `taskSignLatches`) names nothing:
+   * its stretch is that act carrying on — absorbed, and charged only through an act of its latch that is open.
+   */
+  const signLatchActs = s.taskSignLatches;
+  const carriesSignAct =
+    !arrivalFirst && signLatchActs !== null && s.taskCapBlownAtSeen !== null && signLatchActs.includes(s.taskCapBlownAtSeen);
+  const namedBefore = s.taskAct.named;
+  if (!namedBefore && ((taskFirst && !carriesSignAct) || arrivalFirst)) s.taskAct = { ...s.taskAct, named: true };
+  if (taskFirst || arrivalFirst) {
+    const blowMark = signArrival !== null ? { signBoundArrival: signArrival.arrival } : {};
+    if (carriesSignAct || namedBefore) {
+      events.push({ ...makeViolation("TASK_SPEED_CAP_EXCEEDED", t), ...blowMark, absorbedBy: "TASK_SPEED_CAP_EXCEEDED" });
+    } else {
+      events.push({ ...makeViolation("TASK_SPEED_CAP_EXCEEDED", t), ...blowMark });
+    }
+    // ROUND 6: the arrival is in this act now, and the act lives with its latch.
+    if (arrivalFirst && arrivalLatch !== undefined) s.taskArrival = { latch: arrivalLatch, kept: null };
+    // ROUND 7: a task first bill inside the act a sign-bound arrival still waits in is that act's one bill.
+    s.taskArrivalPending = null;
+    if (s.taskSignAct !== null) s.taskSignAct = { billed: true };
+  }
+  if (taskRegrade && (!carriesSignAct || s.taskAct.named) && !s.taskAct.charged) {
+    events.push({ ...makeViolation("TASK_SPEED_CAP_EXCEEDED", t), regrade: true });
+    s.taskAct = { ...s.taskAct, charged: true };
+  }
+  // THE ACT ENDS when the task's episode is no longer live (corrected and re-armed, nothing banked); the arrival's act,
+  // its latch still current, is KEPT (round 6, above).
+  const taskActOver = s.taskCap.activeSince === null && !s.taskCap.emitted && s.taskCap.qualifiedSec === 0;
+  if (taskActOver) {
+    if (s.taskArrival !== null && s.taskArrival.kept === null && s.taskAct.named) s.taskArrival = { latch: s.taskArrival.latch, kept: { ...s.taskAct } };
+    s.taskAct = { ...IDLE_TASK_ACT };
+  }
+  // ROUND 10: the latches a billed sign-bound act took on are its act until the WHOLE act has ended — the sign-bound
+  // act (held correction) and the task's own; a later stretch of one of them is then a new act — and the kept act of
+  // any of them goes with it.
+  if (s.taskSignLatches !== null && s.taskSignAct === null && taskActOver) {
+    const ended = s.taskSignLatches;
+    if (s.taskArrival !== null && ended.includes(s.taskArrival.latch)) s.taskArrival = null;
+    s.taskSignLatches = null;
   }
 
   // Lights in rain (daytime — night is covered by HEADLIGHTS_OFF_AT_NIGHT).
@@ -5491,6 +5949,10 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.headlights,
     s.laneKeeping,
     s.conditionsSpeed,
+    // 2026-09-25 — the task ceiling (TASK_SPEED_CAP_EXCEEDED): a car billed over
+    // «задачата иска ≤N» and not yet back at N banks no clean metres, the
+    // contract every row on this list keeps.
+    s.taskCap,
     s.rainLights,
     s.fogLights,
     // O28: without this row a snow drive that is STILL unlit keeps banking
@@ -5589,13 +6051,24 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * grace and never trips the reset. Withholding credit the student earned is
    * the A12 direction this file does not move in.
    */
-  const billedAndUncorrected = EPISODES.some(
-    // `qualifiedSec` is optional in the parameter type because `harshBrake`
-    // carries its own narrower shape (onsetKmh / causeSeen, no ledger) — it
-    // never accrues, so the clause is vacuous for it by construction.
-    (ep: { activeSince: number | null; emitted: boolean; qualifiedSec?: number }) =>
-      ep.emitted && (ep.activeSince !== null || (ep.qualifiedSec ?? 0) > 0),
-  );
+  const billedAndUncorrected =
+    EPISODES.some(
+      // `qualifiedSec` is optional in the parameter type because `harshBrake`
+      // carries its own narrower shape (onsetKmh / causeSeen, no ledger) — it
+      // never accrues, so the clause is vacuous for it by construction.
+      (ep: { activeSince: number | null; emitted: boolean; qualifiedSec?: number }) =>
+        ep.emitted && (ep.activeSince !== null || (ep.qualifiedSec ?? 0) > 0),
+    ) ||
+    // ROUND 8 (round-7 verifier R6) — a sign-bound blow's act still running
+    // (`taskSignAct`: from the blow to the held M-16 correction, the cap ledger's
+    // own record of it since round 14), whether its arrival waits or has billed.
+    // Round 7 withheld only the PAYOUT while the arrival waited (GATE 2), so the
+    // sign's grace band after it counted as clean metres (its H1: praise at 20.7
+    // and 38.0 at 54 on a 50). The metres of that act are not clean ones, and they
+    // are not banked for a payout after it either: once the act has ended under
+    // M-16, the streak starts from that frame, by the base rules. (It can only
+    // WITHHOLD praise — the cap adds, never removes.)
+    s.taskSignAct !== null;
   /**
    * GATE 2 — A BREACH IS LIVE ON THIS FRAME BUT HAS NOT RUN ITS SUSTAIN YET.
    *
@@ -5661,11 +6134,18 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * is the OBJECTIVE's «задачата иска ≤80», and no field on `SimTick` carries
    * it — see `SPEED_REGRADE_SEC`'s „THE TASK CAP" clause for why feeding it
    * here is a founder decision and not a bug fix.
+   * The founder decided it on 2026-09-25: `SimTick.taskSpeedCap` now carries
+   * it, and `s.taskCap` sits on this list and on GATE 1's.
    */
   const breachAwaitingSustain = [
     s.speedingMinor,
     s.speedingDangerous,
     s.conditionsSpeed,
+    // 2026-09-25 — over the task's own gate is unlawful at every instant in the
+    // sense this list means (the sustain is a debounce, not a licence), and it is
+    // the half of the spray drive the paragraph above names as NOT closed: the
+    // 92 and 111 км/ч commendations were minted over «задачата иска ≤80».
+    s.taskCap,
     s.seatbelt,
     s.handbrake,
     s.headlights,
@@ -5673,7 +6153,31 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.fogLights,
     s.snowLights,
   ].some((ep) => ep.activeSince !== null);
-  if (events.some((e) => e.kind === "violation")) {
+  // ROUND 8: no sign-bound clause here. Round 7 held the PAYOUT while an arrival
+  // waited (`taskArrivalPending`); GATE 1 now stops the ACCRUAL for the whole
+  // act (`taskSignAct`, which is open whenever an arrival waits), and the blow
+  // frame itself voids the window (`taskLatchFresh`, below) — so no metre of
+  // the act is ever banked and there is nothing here to hold. A clause would be
+  // a predicate no frame could make true on its own.
+  /*
+   * …AND A NEW TASK LATCH VOIDS THE WINDOW IN PROGRESS (round 3, verifier R4).
+   * The window open when the stamp first arrives is the one that covers the
+   * blown mark: measured on round 2, 100 through the spray's ≤80 mark and then
+   * 78 minted «Чисто и спокойно каране» at 23.1 s over y 266 → 517, the mark at
+   * 450 crossed at 100 inside it — because a breach shorter than the task
+   * code's 3 s sustain never bills, and GATE 2 only DEFERS a payout while it
+   * runs. The objective has already refused that arrival (`approachCap:
+   * "blown"`, speed over the gate plus its slack, past the mark), so the metres
+   * spanning it are not clean metres; the blow is the breach, and it resets the
+   * streak exactly as a bill does. It WITHHOLDS rather than scopes that one
+   * window, because a rider saying „the praise is for the metres without a
+   * violation" would be false about a window containing one. Windows paid out
+   * before the mark stand (they end before it), and later ones start after it;
+   * `lessons/debrief.ts` scopes both on a drive whose cap was blown.
+   * Every drive with no task stamp — every recorder, replay, exam rung and
+   * uncapped lesson — never sets `taskLatchFresh`, and is byte-identical.
+   */
+  if (events.some((e) => e.kind === "violation") || taskLatchFresh) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak
   } else if (!billedAndUncorrected && !s.terminated && moving && s.prevT !== null) {
     // Clamp dt so a pause/resume time jump can't fabricate a huge distance.

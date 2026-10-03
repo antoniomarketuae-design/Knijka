@@ -540,9 +540,18 @@ describe("scenario-world-referent gate", () => {
     // laneEntryForcedBrakingEnabled like CLOSING_ON_LEAD_TOO_FAST, so every
     // lesson that does not arm it is outside its fault surface.
     // `NO_WORLD_REFERENT` does NOT move: 15 again.
+    //
+    // 15 → 16 / 65 → 66 (2026-09-25, founder ruling on register item 17):
+    // TASK_SPEED_CAP_EXCEEDED, ЗДвП чл. 20, ал. 2 measured against the active
+    // task's own ceiling. EXEMPTED, with the telltale's reason: the referent
+    // is the lesson's objective (`SimTick.taskSpeedCap`, stamped by
+    // lessons/engine.ts), not a world body — no district can lack it. `checked`
+    // does NOT move: 50.
+    // INTEGRATED (both of the above, each written against its own base): main checks LANE_ENTRY_FORCED_BRAKING,
+    // the cap lane exempts TASK_SPEED_CAP_EXCEEDED — 51 checked + 16 exempted = 67.
     expect(checked.size).toBe(51);
-    expect(NO_WORLD_REFERENT.size).toBe(15);
-    expect(all.length).toBe(66);
+    expect(NO_WORLD_REFERENT.size).toBe(16);
+    expect(all.length).toBe(67);
   });
 
   it("never exceeds doc 86 on the four classes §10 counts to ±0 (T1 90 · T2 31 · T3 9 · T4 83)", () => {

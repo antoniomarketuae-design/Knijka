@@ -29,6 +29,14 @@ export {
   type SeverityClass,
   type SimTick,
   type SimTickEvent,
+  /** The active lesson task's own ceiling — stamped by `lessons/engine.ts`
+   *  only, graded by TASK_SPEED_CAP_EXCEEDED (see `SimTick.taskSpeedCap`). */
+  type TaskSpeedCap,
+  /** The arrival at a zone-default task mark over its cap (founder ruling
+   *  2026-09-26 «Bill the arrival») — stamped by `lessons/engine.ts` only. */
+  type TaskCapArrival,
+  /** Round 7: the blow a sign-bound arrival's bill is for (`ViolationEvent.signBoundArrival`). */
+  type SignBoundArrival,
   type TurnDirection,
   type Vec2,
   type ViolationCode,
@@ -280,6 +288,19 @@ export {
   createRuleEngine,
   reduceTick,
   settleUnpaidSpeedingTeach,
+  // Round 2 of the 2026-09-25 task-cap ruling (the cap ledger's alone since round
+  // 14): a drive that ends inside a taught, not-yet-re-graded task act; and the
+  // one derivation of the weather envelope the cards quote.
+  settleUnpaidTaskTeach,
+  // Round 4 — founder ruling «Yes, same as speeding»: the taught weather / bend
+  // overspeed still running at the end of the drive (the no-cap ledger's).
+  settleUnpaidAdaptationTeach,
+  // Round 7 — a drive that ends inside a sign-bound arrival's act settles its one bill.
+  settlePendingTaskArrival,
+  conditionsSpeedEnvelope,
+  type AdaptationSettleTick,
+  type ConditionsCause,
+  type KinSettleTick,
   type ReduceResult,
   type RuleEngineState,
 } from "./engine";

@@ -165,7 +165,12 @@ describe("wave-4 bot completion — sc-pe-night-unlit at L3", () => {
     const codes = s.events.filter((e) => e.kind === "violation").map((e) => e.code);
     expect(codes).toContain("PEDESTRIAN_CROSSING_TOO_FAST");
     expect(codes).toContain("COLLISION");
-    expect(taught).toEqual([]);
+    // ROUND 5 (2026-09-26, founder ruling «Bill the arrival»): the dangerous
+    // codes are still scored, never a card. The one card is the ARRIVAL at the
+    // ≤30 «Приближи неосветената пътека…» mark, passed at 39.9 — an arrival cap,
+    // so the pass itself is one TASK event, taught on its topic's first encounter.
+    expect(taught.filter((c) => c !== "TASK_SPEED_CAP_EXCEEDED")).toEqual([]);
+    expect(taught).toEqual(["TASK_SPEED_CAP_EXCEEDED"]);
     // The lawful-but-blind driver never stops for her: the halt mark is exactly
     // what a 40 km/h approach cannot reach, and the drill is unwinnable from
     // there — not one of the three objectives lands. That asymmetry IS the
@@ -601,7 +606,12 @@ describe("wave-4 bot completion — sc-merge-bus-pullout at L3", () => {
     // onto session.events at L3 and the teach-card channel stays empty. The §9
     // exact-code assert lives on the trace gate, where the recorder's own engine
     // grades every encounter: traces/__tests__/sc-merge-bus-pullout-traces.
-    expect(taught).toEqual([]);
+    // ROUND 5 (2026-09-26, founder ruling «Bill the arrival»): the collision is
+    // still scored, never a card. The one card is the ARRIVAL at the ≤30
+    // «Намали, за да пропуснеш потеглящия автобус» mark, passed at 47.9 — an
+    // arrival cap, so the pass itself is one TASK event, taught.
+    expect(taught.filter((c) => c !== "TASK_SPEED_CAP_EXCEEDED")).toEqual([]);
+    expect(taught).toEqual(["TASK_SPEED_CAP_EXCEEDED"]);
     expect(s.events.some((e) => e.kind === "violation" && e.code === "COLLISION")).toBe(true);
     // …and the drill's own verdict is independent of the crash: this driver was
     // doing ~48 through the ease gate, so he misses it — and objectives advance

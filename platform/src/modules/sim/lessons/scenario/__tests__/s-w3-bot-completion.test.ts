@@ -1097,7 +1097,10 @@ describe("wave-3 bot completion — sc-fo-brakelight-chain at L3", () => {
     // — the student is taught чл. 23, not merely docked. The §9 code assert lives
     // on the trace gate, where the recorder's own engine grades every encounter:
     // traces/__tests__/sc-fo-brakelight-chain-traces.
-    expect(taught).toEqual(["FOLLOWING_TOO_CLOSE"]);
+    // ROUND 14 (founder ruling 2026-10-03, «Cap adds, never removes»): the ≤32 «read» mark is passed at 47,9, and the
+    // cap's own card (its own grace, its own pause clock) now pauses at ~13,2 s where round 13 turned it into a toast
+    // because the gap's teach card had paused 5 s earlier — the cap's cards no longer share the rate limit with the rest.
+    expect(taught).toEqual(["FOLLOWING_TOO_CLOSE", "TASK_SPEED_CAP_EXCEEDED"]);
     expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
     // The gap is PINNED by the actor — this driver holds the SAME metres the
     // shadow does. Only the speed differs, which is exactly чл. 23's point: the
@@ -1118,8 +1121,11 @@ describe("wave-3 bot completion — sc-fo-brakelight-chain at L3", () => {
     });
     const r = buildLessonResult(s);
     // COLLISION is опасна + terminateSession — scored straight onto the session,
-    // never softened to a card.
-    expect(taught).toEqual([]);
+    // never softened to a card. The ONE card this drive does earn is the task
+    // ceiling's (founder ruling 2026-09-25, register item 17): it goes through
+    // the ≤32 «read» mark at 38 (`approachCap: "blown"`) and holds 38 until the
+    // crash, so TASK_SPEED_CAP_EXCEEDED — a второстепенна — is taught at ~18 s.
+    expect(taught).toEqual(["TASK_SPEED_CAP_EXCEEDED"]);
     expect(s.events.some((e) => e.kind === "violation" && e.code === "COLLISION")).toBe(true);
     // THE HONEST POINT of this demo: the GAP DETECTOR never speaks. He holds the
     // same pinned metres as the shadow at a legal 38 km/h — ~1.4 s, worse than

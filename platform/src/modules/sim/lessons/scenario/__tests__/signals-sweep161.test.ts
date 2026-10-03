@@ -1210,7 +1210,14 @@ describe("§7 sc-signal-flashing — the 59-in-a-50 the audit filmed, at HEAD", 
     // …and the disclosure that stood in for the charge steps aside, because a
     // fault that IS in the points is not «показано и не влезе в точките».
     expect(out.debriefText).not.toContain("чистият лист не значи чисто каране");
-    expect(out.debriefText).not.toContain("Учебни моменти");
+    // ROUND 5 (2026-09-26, founder ruling «Bill the arrival»): this drive also
+    // passes the ≤25 «Приближи мигащото жълто…» mark at 59 — an arrival cap, so
+    // the pass is one TASK event, taught on its topic's first encounter, and it
+    // is listed under «Учебни моменти». The SPEEDING fault is still billed and
+    // is NOT among them: the section holds the task cap and nothing else.
+    const moments = out.debriefText.split("Учебни моменти")[1] ?? "";
+    expect(moments).toContain("Скорост над тавана на задачата");
+    expect(moments).not.toContain("Превишена скорост");
   });
 
   it("…and the false-refusal direction: a clean drive is still praised, invitation and all", () => {

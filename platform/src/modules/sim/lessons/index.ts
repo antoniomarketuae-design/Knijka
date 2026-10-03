@@ -168,6 +168,10 @@ export {
   routeHoldAdvisorPrompt,
   routeHoldForSession,
   serializeAdvisorSetting,
+  // Founder ruling 2026-09-25 «Only the named stretch» (round 4): the ACTIVE
+  // objective's task cap has stopped binding, so the strip and the banner stop
+  // printing it — `LessonPlayShell snapshotOf` reads this, the sentence drops it.
+  taskCapReleased,
   // O51 — the figure this objective already put on the glass. On the barrel
   // because the WORLD plaque (`components/sim/RouteGuidance.capLineBg`) is the
   // fourth surface that has to name the same cap, and it sits outside this
@@ -332,6 +336,8 @@ export {
   serializeCoachedMistakes,
   serializeNearMisses,
   serializeRuleEvents,
+  // Round 3 of the 2026-09-25 task-cap ruling (R4): the blown task ceilings.
+  serializeTaskCapBreaches,
   type FinishLessonWire,
   type GradedFinishWire,
   type WireCoachedMistake,
@@ -339,6 +345,7 @@ export {
   type WireNearMiss,
   type WireObjectiveOutcome,
   type WireRuleEvent,
+  type WireTaskCapBreach,
 } from "./wire";
 
 // Shared types

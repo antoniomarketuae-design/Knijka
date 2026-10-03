@@ -488,6 +488,101 @@ export interface EdgeAlignment {
   roundabout?: boolean;
 }
 
+/**
+ * The numbers one task ceiling carries — `SimTick.taskSpeedCap`.
+ *
+ * `shownKmh` is the figure the student READ (the advisor's «дръж под N» and the
+ * strip's «задачата иска ≤N» — `lessons/advisor.ts shownObjectiveCapKmh`);
+ * coming back to it or under it is the correction that ends an episode.
+ * `capKmh` is the objective's own compiled gate (the author's figure plus the
+ * rung's grace, never above the sign). `shownKmh <= capKmh` always (the
+ * advisor's closing `Math.min`); on L3+ the two are equal.
+ *
+ * `graceKmh` — ROUND 2 (verifier C1). Only a speed above `capKmh + graceKmh`
+ * bills. Round 1 billed above `capKmh` itself, i.e. with 0 km/h of slack,
+ * while the objective blows its own mark only above `capKmh +
+ * REACH_ZONE_CAP_SLACK_KMH` and a posted limit bills only above
+ * `limit + min(10 %, 5)` (`speedingBands`): 83 after crossing an ≤80 mark cost
+ * a point that 83 against a posted 80 never does. The only producer
+ * (`lessons/engine.ts activeTaskSpeedCap`) stamps the objective's own slack
+ * here, so the mark and the ceiling refuse at the same speed and the sheet is
+ * never stricter than the gate that armed it. It travels ON the stamp because
+ * the rules module may not import a lesson constant (doc 05).
+ */
+export interface TaskSpeedCap {
+  capKmh: number;
+  shownKmh: number;
+  graceKmh: number;
+  /**
+   * ROUND 3 (verifier R2/R4). The session second at which the lesson LATCHED
+   * this ceiling — the frame the objective's mark was blown and the stretch it
+   * governs was fixed (`lessons/engine.ts stepTaskCapLatch`). It names the
+   * breach, not the frame: every stamp of one latch carries the same number,
+   * however the stamp flickers (a lateral step out of the corridor, a frame on
+   * which the sign is not above the cap, the objective's fresh-approach reset),
+   * and only a NEW blow — the next objective's mark, or the same mark blown
+   * again after the stretch was spent — moves it. The reducer reads it twice:
+   *  · a new value is a new act at once (`taskCap` and its re-grade restart),
+   *    while a gap in the SAME latch ends the act only after a correction's
+   *    hold, exactly like a dip back to the shown figure (no flicker bill);
+   *  · a new value voids the clean-driving window in progress — the window
+   *    that covers the mark (R4: the blow is the breach, measured by the
+   *    objective, whether or not the speed runs the task code's sustain).
+   */
+  blownAtSec: number;
+}
+
+/**
+ * THE ARRIVAL AT A TASK'S MARK OVER ITS CAP — founder ruling 2026-09-26, «Bill
+ * the arrival» (register item 17, ruling 4) — `SimTick.taskCapArrival`.
+ *
+ * Passing a capped objective's mark over its cap IS the offence, billed as ONE
+ * event at the blow — round 5 for the caps that ask only to arrive, round 6
+ * (the integrator's reading of ruling 4: «every capped objective has a mark»)
+ * for every capped objective, a named feature's included; an over-cap stretch
+ * along the feature after it is the same act (`rules/engine.ts`
+ * `RuleEngineState.taskArrival`). The lesson engine writes this on the
+ * one frame its latch is created (`lessons/engine.ts stepTaskCapLatch`); the
+ * reducer bills TASK_SPEED_CAP_EXCEEDED once per latch (`blownAtSec`, the name
+ * `TaskSpeedCap` also carries) and only above `capKmh + graceKmh` — the line
+ * the objective itself blows the mark at, re-checked here so a stamp can never
+ * bill a speed its own evaluator would not have refused.
+ *
+ * `arrivalKmh` is the speed on the frame the evaluator judged the mark blown —
+ * the figure the card prints beside `shownKmh` (the cap the student read).
+ * Absent on every other frame, and on every recorder, replay, exam rung and
+ * drive that never blows such a mark, so their rule streams are unchanged.
+ */
+export interface TaskCapArrival {
+  capKmh: number;
+  shownKmh: number;
+  graceKmh: number;
+  blownAtSec: number;
+  arrivalKmh: number;
+}
+
+/**
+ * ROUND 7 — THE BLOW A SIGN-BOUND ARRIVAL'S BILL IS FOR
+ * (`ViolationEvent.signBoundArrival`).
+ *
+ * A cap the glass shows AT or ABOVE the sign is billed at its blow too (founder
+ * ruling 4, in the integrator's reading binding for round 7: «the arrival is
+ * billed at EVERY blown cap mark, INCLUDING caps at or above the sign»).
+ * Passing such a mark over its cap is passing it over the sign, so its bill is
+ * ONE act with the speeding the car is in and lands where that act ends —
+ * often frames after the blow, when the tick no longer carries the arrival
+ * (`rules/engine.ts` „THE SIGN-BOUND ARRIVAL"). So the bill carries the three
+ * numbers its card states: the speed the mark was passed at, the cap the glass
+ * read, and the sign on the blow frame. Display data only: the lesson engine
+ * reads it for the card and strips it, with the kin marks, before anything is
+ * scored, serialised or stored.
+ */
+export interface SignBoundArrival {
+  arrivalKmh: number;
+  shownKmh: number;
+  postedKmh: number;
+}
+
 export interface SimTick {
   /** Seconds since session start. Monotonic. */
   t: number;
@@ -951,6 +1046,38 @@ export interface SimTick {
    * `maxSpeedKmh` governing, exactly as before.
    */
   curveAdvisoryKmh?: number;
+  /**
+   * THE LESSON TASK'S OWN SPEED CEILING, while the objective that states it is
+   * the active one — founder ruling 2026-09-25 (register item 17, „Bill it"):
+   * the «· задачата иска ≤N» the glass shows is graded as a real ceiling by
+   * TASK_SPEED_CAP_EXCEEDED.
+   *
+   * NOT WORLD DATA, AND NO SCENE PRODUCER SETS IT. The only writer is
+   * `lessons/engine.ts applyTick`, which stamps the tick it hands this reducer
+   * from the active objective (the rules module never learns what a lesson or
+   * an objective is). It is stamped from the moment the student goes THROUGH
+   * the task's mark over the cap (the evaluator's `approachCap: "blown"`) —
+   * the catalogue's caps are arrival demands, and its correct demonstrations
+   * approach above them legally — and ONLY over the stretch that cap governs:
+   * from the mark to the next goal of the route (round 2, verifier C2; see
+   * `lessons/finish.ts taskCapStretch`). It no longer rides the objective's
+   * whole life, because a blown objective never completes and the chain is
+   * sequential, so „while the objective is live" had quietly meant „for the
+   * rest of the drive".
+   * Absent — every recorder, every replay, every exam rung, every approach
+   * that has not blown its mark, every metre past the stretch, every uncapped
+   * or halt-band objective, every cap at or above the sign — means there is no
+   * task ceiling and the detector is silent, so every committed trace's rule
+   * stream is byte-identical.
+   */
+  taskSpeedCap?: TaskSpeedCap;
+  /**
+   * THE ARRIVAL AT A ZONE-DEFAULT TASK MARK OVER ITS CAP, on the one frame the
+   * lesson latches it — founder ruling 2026-09-26 «Bill the arrival». See
+   * `TaskCapArrival`. Stamped only by `lessons/engine.ts`, like
+   * `taskSpeedCap`; absent everywhere else.
+   */
+  taskCapArrival?: TaskCapArrival;
   // -- MOTORWAY-SEGMENT slice (doc 72 SP-10 „Магистрала"; motorway-segment
   // archetype). Same contract as every world-context field above: authored
   // district DATA only, never heuristics — absent = not a motorway = every
@@ -1061,6 +1188,15 @@ export type ViolationCode =
   | "FOG_LIGHTS_OFF_IN_FOG" // второстепенна: dense fog without front fog lamps (AC-03, чл. 74)
   | "POOR_LANE_KEEPING" // второстепенна: sustained off-centre / straddling positioning
   | "SPEED_TOO_FAST_FOR_CONDITIONS" // второстепенна: within the limit but imprudent for rain/night
+  // FOUNDER RULING 2026-09-25 (register item 17, „Bill it"). The lesson task's
+  // own ceiling — «задачата иска ≤N» on the glass and in the banner — graded as
+  // a real ceiling under the SAME duty as the conditions code (чл. 20, ал. 2),
+  // fed only by `SimTick.taskSpeedCap` (stamped by lessons/engine.ts). Billed in
+  // a ledger of its own that never absorbs, and is never absorbed by, the
+  // conditions, curve or speeding codes, with its own first-fault grace
+  // (founder ruling 2026-10-03, «Cap adds, never removes» — the cap ledger in
+  // rules/engine.ts).
+  | "TASK_SPEED_CAP_EXCEEDED" // второстепенна: sustained speed above the active task's own ceiling (чл. 20, ал. 2)
   // THE OTHER SIDE OF THE SAME ENVELOPE (audit sc-vu-emergency-junction:853790f7).
   // Every speed code in this file graded the FAST half only. A reference drive
   // held 10–11 км/ч for over two minutes on a street posted 40 and booked
@@ -1187,7 +1323,8 @@ export interface ViolationEvent {
    *  · the six one-switch duties — belt, handbrake, the four lamp arms (see
    *    `STANDING_DUTY_REGRADE_SEC`);
    *  · the two второстепенни speed codes — SPEEDING_OVER_LIMIT and
-   *    SPEED_TOO_FAST_FOR_CONDITIONS (see `SPEED_REGRADE_SEC`).
+   *    SPEED_TOO_FAST_FOR_CONDITIONS (see `SPEED_REGRADE_SEC`) — and, since the
+   *    2026-09-25 ruling, TASK_SPEED_CAP_EXCEEDED on the same clock.
    * Each of them adds exactly ONE such bill per episode, because the FIRST bill
    * is spent by the founder-approved teach-first free mini-lesson, and without
    * it an entire lesson driven unbelted, unlit, or 59 км/ч through a posted 50
@@ -1208,6 +1345,40 @@ export interface ViolationEvent {
    * (`lessons/wire.ts` builds its own picked shape) and nothing scores on it.
    */
   regrade?: true;
+  /**
+   * ONE ACT OF THE CAP LEDGER, ONE FIRST BILL (founder ruling 4, «Bill the
+   * arrival»: the blown mark «is one act with any sustained over-cap stretch
+   * that follows on the named feature»; see `rules/engine.ts` „THE CAP
+   * LEDGER'S ACT").
+   *
+   * Present on a later FIRST bill of TASK_SPEED_CAP_EXCEEDED inside a cap act
+   * whose first bill has already been put before the student — the stretch of a
+   * mark whose arrival was billed; the value is always
+   * TASK_SPEED_CAP_EXCEEDED. Such a bill is not a new act and names nothing:
+   * `lessons/engine.ts` drops it before the coach — with one exception, a
+   * lesson's own ADR-009 target, whose first occurrence is the only record the
+   * lesson has that its mistake happened (it is never charged, so it cannot
+   * become a second bill).
+   *
+   * ROUND 14 (founder ruling 2026-10-03, «Cap adds, never removes»): NEVER on a
+   * bill of any other code, and never naming another code. Rounds 2–13 used it
+   * to fold the cap, the weather and the bend (and, inside a sign-bound act,
+   * the speeding bills) into one act; the two companion marks of that ledger
+   * (`kinOwner`, a re-grade handed to another ceiling, and `kinSurface`, a
+   * free card for a new breach after the owner's lapse) were removed with it.
+   *
+   * It exists only where a task stamp took part, and the only producer of the
+   * stamp is a lesson session — so no recorder, replay or committed trace can
+   * ever see it.
+   */
+  absorbedBy?: ViolationCode;
+  /**
+   * ROUND 7 — present only on a TASK_SPEED_CAP_EXCEEDED first bill for a mark
+   * whose cap the glass showed AT or ABOVE the sign (see `SignBoundArrival`):
+   * the blow it is for, which the card quotes. Absent everywhere else, so every
+   * other bill keeps exactly the shape it had; stripped by the lesson engine.
+   */
+  signBoundArrival?: SignBoundArrival;
 }
 
 export interface CommendationEvent {

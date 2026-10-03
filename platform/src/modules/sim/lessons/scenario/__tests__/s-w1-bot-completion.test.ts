@@ -767,7 +767,10 @@ describe("wave-1 bot completion — sc-pe-school-patrol at L3", () => {
     // SPEEDING_OVER_LIMIT is a teachable второстепенна fault, so its FIRST
     // encounter lands on the A9 teach-moment channel (pause + card), not on
     // session.events — the student is taught the rule, not merely docked.
-    expect(taught).toEqual(["SPEEDING_OVER_LIMIT"]);
+    // ROUND 14 (founder ruling 2026-10-03, «Cap adds, never removes … Its bill stands on its own»): the L3 zone mark is
+    // passed at 38 over its task cap, and that is the cap's own offence — rounds 7–13 let the speeding's teach absorb
+    // it; now it is taught too (~23,8 s), on the cap's own grace and with no point, beside the speeding's unchanged teach.
+    expect(taught).toEqual(["SPEEDING_OVER_LIMIT", "TASK_SPEED_CAP_EXCEEDED"]);
     expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
     // The bite is the зона-30 gate: y = 170 must be reached at ≤ 30, and this
     // drive was doing 38 there — so „влязох в зоната" is not satisfied and the

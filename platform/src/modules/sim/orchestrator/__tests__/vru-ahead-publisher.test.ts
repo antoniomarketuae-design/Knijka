@@ -67,6 +67,8 @@ import { createWorldRuntime } from "../../runtime";
 import type { StagedActorView } from "../../traffic/types";
 import type { VehicleSample } from "../../contracts";
 import { SCENARIO_TEMPLATES } from "../../lessons/scenario";
+import { applyTick, createLessonSession } from "../../lessons/engine";
+import { compileScenario } from "../../lessons/scenario/compile";
 import { vruAheadMeters } from "../contact";
 import type { ContactCastMember, StagedTrafficPort } from "../index";
 
@@ -315,8 +317,122 @@ describe("no channel the rule engine reads is written by nothing", () => {
     expect(isWritten("noStopZone", runtime)).toBe(true);
   });
 
+  /**
+   * THE ONE CHANNEL WHOSE WRITER IS NOT THE RUNTIME — `taskSpeedCap`, founder
+   * ruling 2026-09-25 (register item 17, „Bill it"; round 3, verifier R5).
+   *
+   * The task's own speed ceiling is a fact about the LESSON, not the world: the
+   * rules module may not know what a lesson or an objective is (doc 05), so
+   * `lessons/engine.ts applyTick` stamps it onto the tick it hands the reducer
+   * (`{ ...tick, taskSpeedCap }`), after `worldRuntime.sample` built that
+   * tick. So this gate — which asks only whether `runtime/worldRuntime.ts`
+   * assigns a name — could never see its writer, and went red the day the
+   * ruling landed. The codebase had no precedent for a lesson-stamped channel;
+   * this is the first, and the exemption is written to be exactly as wide as
+   * that one field:
+   *  · it names ONE field and ONE writer, and nothing else is ever filtered;
+   *  · it must still be READ by the law — a stale exemption fails;
+   *  · the runtime must NOT write it — if it ever does, the exemption is
+   *    obsolete and this fails until it is deleted;
+   *  · the named writer is proved by SOURCE (the stamp spread in applyTick) AND
+   *    by EXECUTION: a real lesson session, driven through its blown mark,
+   *    hands the reducer a tick the reducer has actually graded against — the
+   *    question this gate exists to ask („is there a path from /simulator that
+   *    reaches it?"), answered for the one field the walk cannot.
+   */
+  //
+  // ROUND 5 (2026-09-26, founder ruling «Bill the arrival»): a SECOND field
+  // from the same writer — `taskCapArrival`, the blow of a zone-default task
+  // mark, stamped on the one frame the lesson latches it. Same exemption, same
+  // four proofs, and the list is still closed: exactly these two.
+  const LESSON_STAMPED: ReadonlyMap<string, string> = new Map([
+    ["taskSpeedCap", "modules/sim/lessons/engine.ts"],
+    ["taskCapArrival", "modules/sim/lessons/engine.ts"],
+  ]);
+
+  it("the lesson-stamped exemption is exactly two fields, still read by the law, and NOT written by the runtime", () => {
+    expect([...LESSON_STAMPED.keys()]).toEqual(["taskSpeedCap", "taskCapArrival"]);
+    for (const field of LESSON_STAMPED.keys()) {
+      expect(readFields, `${field} is exempted but the rule engine no longer reads it`).toContain(field);
+      expect(isWritten(field, runtime), `the runtime now writes ${field}: delete its exemption`).toBe(false);
+    }
+  });
+
+  it("…its named writer stamps it onto the tick the reducer grades (source)", () => {
+    for (const [field, writer] of LESSON_STAMPED) {
+      const src = stripComments(read(writer));
+      // Round 5: the two stamps ride one object, each spread only when present.
+      expect(src, `${writer} must spread ${field} onto the rule tick`).toMatch(
+        new RegExp(`\\.\\.\\.tick,[\\s\\S]{0,160}?\\.\\.\\.\\(\\s*${field}\\s*!==\\s*undefined\\s*\\?\\s*\\{\\s*${field}\\s*\\}\\s*:\\s*\\{\\}\\s*\\)`),
+      );
+      expect(src).toMatch(/reduceTick\(prev\.rules,\s*ruleTick\)/);
+    }
+  });
+
+  it("…and a real lesson session reaches the reducer with it (execution: the spray's ≤80 mark blown at 110)", () => {
+    const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-ac-truck-spray");
+    expect(spec).toBeDefined();
+    let s = createLessonSession(compileScenario(spec!, 3));
+    let y = 15;
+    let stamped = 0;
+    for (let i = 1; i <= 400 && s.phase === "driving"; i++) {
+      const t = Math.round(i) / 10;
+      const v = Math.min(110, i * 1.5);
+      y += (v / 3.6) * 0.1;
+      s = applyTick(s, {
+        t,
+        speedKmh: v,
+        maxSpeedKmh: 140,
+        position: { x: 0, y },
+        headingDeg: 0,
+        laneOffsetM: 0,
+        laneId: 0,
+        indicator: "off",
+        headlights: "low",
+        seatbeltOn: true,
+        handbrakeOn: false,
+        gear: 4,
+        isNight: false,
+        events: [],
+      }).state;
+      if (s.lastTick?.taskSpeedCap !== undefined) stamped += 1;
+    }
+    expect(stamped).toBeGreaterThan(0);
+    // The reducer itself saw the latch — not merely the session's copy of it.
+    expect((s.rules as unknown as { taskCapBlownAtSeen: number | null }).taskCapBlownAtSeen).not.toBeNull();
+  });
+
+  it("…and the arrival too (execution: sc-junction-gap's ≤30 approach mark blown at 43 on its posted-40 arm)", () => {
+    const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-junction-gap");
+    expect(spec).toBeDefined();
+    let s = createLessonSession(compileScenario(spec!, 3));
+    let y = -120;
+    for (let i = 1; i <= 200 && s.phase === "driving" && y < -20; i++) {
+      y += (43 / 3.6) * 0.1;
+      s = applyTick(s, {
+        t: i / 10,
+        speedKmh: 43,
+        maxSpeedKmh: 40,
+        position: { x: 4.06, y },
+        headingDeg: 0,
+        laneOffsetM: 0,
+        laneId: 0,
+        indicator: "off",
+        headlights: "low",
+        seatbeltOn: true,
+        handbrakeOn: false,
+        gear: 3,
+        isNight: false,
+        events: [],
+      }).state;
+    }
+    // The reducer saw the latch by its arrival, and billed it once.
+    expect((s.rules as unknown as { taskCapBlownAtSeen: number | null }).taskCapBlownAtSeen).not.toBeNull();
+    expect((s.coachedMistakes ?? []).filter((c) => c.code === "TASK_SPEED_CAP_EXCEEDED").length).toBe(1);
+  });
+
   it("every field the law consults is set somewhere in the runtime that builds the tick", () => {
-    const orphans = readFields.filter((f) => !isWritten(f, runtime));
+    const orphans = readFields.filter((f) => !isWritten(f, runtime) && !LESSON_STAMPED.has(f));
     expect(orphans, `channels the rule engine reads and nothing publishes: ${orphans.join(", ")}`)
       .toEqual([]);
   });

@@ -196,6 +196,20 @@ export interface CommendationSpec {
   conceptId?: string;
 }
 
+/**
+ * THE STREET HALF OF THE ЧЛ. 20, АЛ. 2 DUTY, written ONCE and shared by the two
+ * codes that grade that duty against a number the student can read: the
+ * weather envelope (SPEED_TOO_FAST_FOR_CONDITIONS) and the lesson task's own
+ * ceiling (TASK_SPEED_CAP_EXCEEDED, founder ruling 2026-09-25). Lifted out of
+ * the conditions row verbatim so the second row re-uses the retrieved sentence
+ * and its citation instead of carrying a second copy that could drift; every
+ * figure and quote in it is still pinned by `__tests__/catalog-consequences
+ * .test.ts`, once per row that prints it.
+ */
+const CONDITIONS_DUTY_REAL_WORLD_BG =
+  "Извън изпита несъобразената скорост няма собствена глоба в ЗДвП — до момента, в който от нея излезе удар. Тогава чл. 179, ал. 2 наказва с глоба в размер 300 лв. водача, който „поради движение с несъобразена скорост… причини пътнотранспортно произшествие… ако деянието не съставлява престъпление“. Последната уговорка е важната: с пострадал човек случаят вече не се решава по ЗДвП.";
+const CONDITIONS_DUTY_REAL_WORLD_REFS: readonly string[] = ["ЗДвП чл. 179, ал. 2"];
+
 export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
   SPEEDING_OVER_LIMIT: {
     severityClass: "vtorostepenna",
@@ -541,10 +555,44 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // атмосферните условия… за да бъдат в състояние да спрат пред всяко
     // предвидимо препятствие"); ал. 1 is the general control duty.
     lawRef: "ЗДвП чл. 20, ал. 2",
-    realWorldBg:
-      "Извън изпита несъобразената скорост няма собствена глоба в ЗДвП — до момента, в който от нея излезе удар. Тогава чл. 179, ал. 2 наказва с глоба в размер 300 лв. водача, който „поради движение с несъобразена скорост… причини пътнотранспортно произшествие… ако деянието не съставлява престъпление“. Последната уговорка е важната: с пострадал човек случаят вече не се решава по ЗДвП.",
-    realWorldRefs: ["ЗДвП чл. 179, ал. 2"],
+    realWorldBg: CONDITIONS_DUTY_REAL_WORLD_BG,
+    realWorldRefs: CONDITIONS_DUTY_REAL_WORLD_REFS,
     conceptId: "c-speed-limits",
+  },
+  // FOUNDER RULING 2026-09-25 (register item 17, „Bill it") — the lesson
+  // task's own ceiling, graded under the SAME duty as the row above: ЗДвП
+  // чл. 20, ал. 2, the lawRef this catalogue already carries, re-used rather
+  // than recalled (ADR-002). второстепенна like the conditions code, because
+  // it is that duty measured against the lesson's number instead of the
+  // weather's. The street half is the conditions duty's street half, shared
+  // by reference (`CONDITIONS_DUTY_REAL_WORLD_*`), never re-typed. Fed only by
+  // `SimTick.taskSpeedCap` and `SimTick.taskCapArrival` — see the detector in
+  // engine.ts for the one-act rule.
+  //
+  // ROUND 5 (2026-09-26, round-4 verifier F1) — EVERY SENTENCE TRUE FOR BOTH
+  // KINDS OF BILL. The row now carries two bills: the arrival at a mark whose
+  // task names nothing beyond it («Bill the arrival» — billed AT the blow), and
+  // the sustained breach along the feature a task names («Only the named
+  // stretch»). So the explanation no longer says the student «продължи над
+  // него» (an arrival need not continue), and no longer quotes «дръж под … км/ч»
+  // (a title that states its own figure prints no such tail — the banner shows
+  // the title); and the corrective no longer says the ceiling holds «до
+  // следващата точка от маршрута», which was round 3's rule and is false under
+  // ruling 2: it holds through the stretch the task names and stops where that
+  // stretch ends — for an arrival mark, its own zone.
+  TASK_SPEED_CAP_EXCEEDED: {
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Скорост над тавана на задачата",
+    explanationBg:
+      "Задачата на този участък ти показа таван: числото стоеше в самата задача, а лентата горе го повтаряше като «задачата иска ≤…». Ти мина точката ѝ над него. Това число не е украса: урокът го е поставил заради онова, което предстои точно тук — видимостта, настилката, пешеходната пътека, завоя или колата пред теб. Знакът казва колко е позволено на чисто и сухо шосе; задачата казва при каква скорост тук можеш да спреш навреме в рамките на видимото пред теб. Когато двете числа се различават, важи по-строгото.",
+    peekBg: "По-строгият таван важи.",
+    correctiveBg:
+      "Щом лентата горе покаже тавана на задачата, погледни скоростомера и слез под това число още преди точката, за която е поставено: отпусни газта рано и спирай плавно, вместо да натискаш в последния момент. Пропуснал ли си я — слез под числото веднага: таванът важи през целия участък, който задачата назовава (завоя, пелената, зоната), дори знакът да позволява повече, и спира да важи там, където този участък свършва.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    realWorldBg: CONDITIONS_DUTY_REAL_WORLD_BG,
+    realWorldRefs: CONDITIONS_DUTY_REAL_WORLD_REFS,
+    conceptId: "c-speed-adaptation",
   },
   HEADLIGHTS_OFF_IN_RAIN: {
     severityClass: "vtorostepenna",

@@ -184,8 +184,14 @@ describe("sc-follow-tailgater · the audit's wrong leg reaches the изпите�
     // Taught at the FIRST occurrence, which is the arm the ruling protects.
     const speeding = out.engine.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
     const coached = out.result.coachedMistakes ?? [];
-    expect(coached.map((c) => c.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
-    expect(coached[0]!.t).toBeCloseTo(speeding[0]!.t, 5);
+    // ROUND 5 (2026-09-26, founder ruling «Bill the arrival»): this wrong leg
+    // also passes the ≤36 «Успокой темпото» mark over its cap — an ARRIVAL cap
+    // (its task names nothing beyond the mark), so the pass is one TASK event,
+    // taught (its topic's first encounter; SPEEDING is another topic) and never
+    // charged. The sheet stays empty (below) and the speeding row is unchanged.
+    expect(coached.filter((c) => c.code !== "TASK_SPEED_CAP_EXCEEDED").map((c) => c.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(coached.filter((c) => c.code === "TASK_SPEED_CAP_EXCEEDED").length).toBe(1);
+    expect(coached.find((c) => c.code === "SPEEDING_OVER_LIMIT")!.t).toBeCloseTo(speeding[0]!.t, 5);
     // …AND NOTHING ELSE COULD HAVE BILLED IT EITHER. `speedingRepeatSec` is
     // 20 s and this drive is shorter than that, so the dropped re-grade was the
     // only charge available — the empty sheet above is ADR-009's doing and not

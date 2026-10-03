@@ -66,7 +66,7 @@
 import { actCopy } from "../rules";
 import type { ViolationCode } from "../rules";
 import { getScenarioEvent } from "./events";
-import { repeatFamilyForCode, scenarioForCode } from "./mapping";
+import { repeatFamilyForCode, scenarioForCode, teachTopicForCode } from "./mapping";
 import { policyForViolation, recordEncounter, resolveEncounter } from "./policy";
 import type { EncounterMode, ViolationSeverity } from "./policy";
 
@@ -256,7 +256,9 @@ export function coachStep(
   // offset: a mistake that was taught the first time never incremented it.
   const scenarioId = scenarioForCode(v.code);
   const repeatKey = encounterKey(v);
-  const teachKey = `teach:${scenarioId ?? repeatKey}`;
+  // The TOPIC of the free teach (founder ruling 16) — the scenario, unless a ruling gives the code a grace of its
+  // own (`teachTopicForCode`: the task cap, founder ruling 2026-10-03 «Cap adds, never removes»).
+  const teachKey = `teach:${teachTopicForCode(v.code) ?? repeatKey}`;
   const seenKey = `seen:${repeatKey}`;
   const gradedKey = `graded:${repeatKey}`;
   /**

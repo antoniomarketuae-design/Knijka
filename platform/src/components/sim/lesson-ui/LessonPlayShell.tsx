@@ -143,9 +143,12 @@ import {
   serializeCoachedMistakes,
   serializeNearMisses,
   serializeRuleEvents,
+  serializeTaskCapBreaches,
+  taskCapReleased,
   teachChipBg,
   teachStakeBg,
   type AdvisorPrompt,
+  type FinishLessonWire,
   type LessonResult,
   type LessonSessionState,
   type LessonSpec,
@@ -168,6 +171,7 @@ import {
   compactTraceForStorage,
   createTraceRecorder,
   type LiveTraceRecorder,
+  type ScenarioTrace,
 } from "@/modules/sim/traces";
 import {
   PRE_DRIVE_STEP_ORDER,
@@ -1291,6 +1295,173 @@ export function calibrationLessonMistakeBg(
   return { namesBg: lessonMistakeNamesBg(hits), one: hits.length === 1 };
 }
 
+/**
+ * THE PAYLOAD `finishLessonAction` RECEIVES — built here, as a pure function,
+ * and called by `finalize` below (round-3 verifier COND-C 2).
+ *
+ * The SERVER grades and debriefs from exactly this object, and the debrief the
+ * student reads is the server's (`saveResult.debriefText`). It used to be an
+ * object literal inside `finalize`, a `useCallback` no node test can run, and
+ * the only test near it rebuilt the payload by hand — so dropping a line here
+ * (round 3's `taskCapBreaches`, or the older `coachedMistakes`) left every test
+ * green while the server debrief went back to praising a drive that broke a
+ * task cap. `__tests__/finish-payload.test.ts` now RUNS this function on a real
+ * session and grades its output with the server's own `gradeFinishWire`.
+ *
+ * Every field is exactly what `finalize` sent before, in the same order.
+ */
+export function finishLessonPayload(args: {
+  lessonId: string;
+  startedAtMs: number;
+  finishedAtMs: number;
+  state: LessonSessionState;
+  result: LessonResult;
+  microQuiz: { total: number; correct: number };
+  observedMomentIds?: string[];
+  attemptTrace?: FinishLessonWire["attemptTrace"];
+}): FinishLessonWire {
+  const { state, result: r } = args;
+  return {
+    lessonId: args.lessonId,
+    startedAtMs: args.startedAtMs,
+    finishedAtMs: args.finishedAtMs,
+    aborted: r.aborted,
+    // A9: escalation multipliers ride along so the authoritative server
+    // grade/debrief carries the same „повторна грешка ×1.5" annotations
+    // (validated server-side; official score stays catalog-rebuilt).
+    // A15: event positions ride the same refs (validated server-side,
+    // display metadata only); near-misses go as the additive session stat.
+    ruleEvents: serializeRuleEvents(state.events, state.penaltyEscalations, state.eventPositions ?? []),
+    // S1: the A10 measurement detail rides along (validated server-side;
+    // rubric/display metadata — never the official score).
+    objectives: r.objectives.map((o) => ({
+      id: o.id,
+      done: o.done,
+      completedAtSec: o.completedAtSec,
+      ...(o.detail !== undefined ? { detail: o.detail } : {}),
+    })),
+    microQuiz: { ...args.microQuiz },
+    nearMisses: serializeNearMisses(state.nearMisses ?? []),
+    // The shown-but-not-charged violations (teach / learn-only arms), so
+    // the SERVER debrief — the text the student actually reads — can stop
+    // calling such a drive «чисто каране». Codes, times and the ACT
+    // (`detail`, since ADR-009) — never a title: the server re-titles from
+    // its own catalog, and a detail only SELECTS a row there (ADR-002).
+    // Since ADR-009 this list also reaches the VERDICT through
+    // `foldLessonMistakes`, so it is no longer display-only metadata.
+    ...(r.coachedMistakes !== undefined && r.coachedMistakes.length > 0
+      ? { coachedMistakes: serializeCoachedMistakes(r.coachedMistakes) }
+      : {}),
+    // Round 3 of the task-cap ruling (R4): the task ceilings the drive
+    // blew, so the SERVER debrief — the text the student reads — never
+    // praises such a drive unscoped. Ids and times only (WireTaskCapBreach).
+    ...(r.taskCapBreaches !== undefined && r.taskCapBreaches.length > 0
+      ? { taskCapBreaches: serializeTaskCapBreaches(r.taskCapBreaches) }
+      : {}),
+    ...(args.observedMomentIds !== undefined ? { observedMomentIds: args.observedMomentIds } : {}),
+    ...(args.attemptTrace !== undefined ? { attemptTrace: args.attemptTrace } : {}),
+  };
+}
+
+/**
+ * WHAT `finalize` NEEDS FROM THE COMPONENT — its refs, setters and the server
+ * action, handed in so the body can be a plain function (round-4 verifier F6).
+ */
+export interface FinalizeLessonDeps {
+  lessonId: string;
+  /** THEO-3: a mistake-experience session is a sandbox and is never persisted. */
+  mistakeExperience: boolean;
+  /** The S1 scenario rubric, when the lesson is a compiled scenario. */
+  rubric: ScenarioSpec["rubric"] | undefined;
+  startedAtMs: number | null;
+  microQuiz: { total: number; correct: number };
+  /** Closes the recorded attempt — exactly once, here. */
+  finishTrace: () => ScenarioTrace | null;
+  now: () => number;
+  setResult: (r: LessonResult) => void;
+  setRubric: (r: RubricScore) => void;
+  setTraceUploaded: (uploaded: boolean) => void;
+  /** `finishLessonAction` in the shell; a capture in a test. */
+  send: (wire: FinishLessonWire) => Promise<FinishLessonActionResult>;
+  setSaveResult: (r: FinishLessonActionResult) => void;
+}
+
+/**
+ * THE BODY OF `finalize` — round-4 verifier F6, its surviving mutant PAY6.
+ *
+ * Round 4 made the payload a pure builder (`finishLessonPayload`) and a test
+ * ran it, but the builder's CALL SITE stayed inside a `useCallback` no node
+ * test can call: `result: { ...r, taskCapBreaches: undefined, coachedMistakes:
+ * undefined }` there stayed green across 33 files, and the server debrief the
+ * student reads would have gone back to unscoped praise over a broken cap. The
+ * whole body now lives here, byte-for-byte what `finalize` did, and
+ * `__tests__/finish-payload.test.ts` RUNS it with a fake `send` — whatever this
+ * call site does to the result reaches the server's own grader in that test.
+ * The callback itself only guards, keeps the session and hands it over (its
+ * one remaining line is pinned by its source in the same file).
+ */
+export function finalizeLessonSession(state: LessonSessionState, deps: FinalizeLessonDeps): void {
+  const r = buildLessonResult(state);
+  deps.setResult(r);
+
+  // The recorded attempt, closed ONCE here: finish() rebases and allocates
+  // the whole sample array, and both consumers below (the rubric's glance
+  // mapping and the persisted trace) must read the SAME drive.
+  const trace = deps.finishTrace();
+
+  // S1 scenario rubric (doc 76 §6): observation from the recorded
+  // attempt's glance events (honest measured:false when no trace), the
+  // stars from the pure scorer. Display here; the SERVER recomputes the
+  // persisted stars from the same validated wire channels.
+  let observedMomentIds: string[] | undefined;
+  if (deps.rubric !== undefined) {
+    let observation: RubricObservationInput | undefined;
+    const moments = deps.rubric.observation?.moments;
+    if (trace !== null && moments !== undefined && moments.length > 0) {
+      const mapped = parkingObservationFromTrace(trace, moments);
+      if (mapped !== null) {
+        observation = mapped;
+        observedMomentIds = [...mapped.observedMomentIds];
+      }
+    }
+    deps.setRubric(scoreRubric(r, deps.rubric, observation));
+  }
+
+  // THEO-3: a mistake-experience session is a SANDBOX — never persisted
+  // (no attempt rows, no stars, no XP; the wire refuses the foreign `~m`
+  // id anyway). The graded retry that follows persists normally.
+  if (deps.mistakeExperience) return;
+
+  // I-2 „Твоят дубъл": the drive itself rides along, REDUCED here rather
+  // than server-side so a 4G phone uploads ~87 KB of 10 Hz kinematics for a
+  // 60 s drill instead of the 250 KB of raw float64 it recorded. Display
+  // data — the server validates it and drops it silently if it is anything
+  // but this session's own attempt.
+  const storedTrace = trace !== null ? compactTraceForStorage(trace) : null;
+  // …and whether it did decides whether the result screen may offer
+  // „Виж своя дубъл". A curriculum lesson records no attempt trace, so the
+  // link must not appear there — a dead link on the result screen is worse
+  // than no link.
+  deps.setTraceUploaded(storedTrace !== null);
+
+  // The payload is built by `finishLessonPayload` (above, pure, exported),
+  // so the object the server grades is the object a test can run.
+  void deps
+    .send(
+      finishLessonPayload({
+        lessonId: deps.lessonId,
+        startedAtMs: deps.startedAtMs ?? deps.now(),
+        finishedAtMs: deps.now(),
+        state,
+        result: r,
+        microQuiz: deps.microQuiz,
+        ...(observedMomentIds !== undefined ? { observedMomentIds } : {}),
+        ...(storedTrace !== null ? { attemptTrace: storedTrace } : {}),
+      }),
+    )
+    .then(deps.setSaveResult, () => deps.setSaveResult({ ok: false, code: "SAVE_FAILED" }));
+}
+
 export function snapshotOf(
   s: LessonSessionState,
   lastTick: SimTick | null,
@@ -1346,11 +1517,17 @@ export function snapshotOf(
     // join itself is what a refuter neutralised with a single `undefined` while
     // 1,036 tests stayed green — `__tests__/taskCapThread.test.ts` now drives a
     // real compiled session through `snapshotOf` for exactly that reason.
-    taskCapKmh: heldTaskCapKmh(
-      taskCapKmhFromPrompt(advisorPrompt),
-      active?.spec.id ?? null,
-      prev,
-    ),
+    //
+    // …AND DROPPED THE FRAME THE SHEET STOPS GRADING IT (founder ruling
+    // 2026-09-25 «Only the named stretch», round-3 verifier COND-C 1). A blown
+    // objective stays active, so the hold above would carry its figure for the
+    // rest of the drive; once the car has left the feature the task names the
+    // latch is spent (`taskCapReleased`), the advisor's sentence has already
+    // dropped the tail, and the HELD figure must go with it — the strip and the
+    // banner may not print a ceiling nothing grades.
+    taskCapKmh: taskCapReleased(s)
+      ? undefined
+      : heldTaskCapKmh(taskCapKmhFromPrompt(advisorPrompt), active?.spec.id ?? null, prev),
     taskFloorKmh:
       s.phase === "driving" && active && active.params.kind === "reachZone"
         ? active.params.minSpeedKmh
@@ -5407,87 +5584,20 @@ export function LessonPlayShell({
       if (finalizedRef.current) return; // exactly one grade + one save per session
       finalizedRef.current = true;
       sessionRef.current = state;
-      const r = buildLessonResult(state);
-      setResult(r);
-
-      // The recorded attempt, closed ONCE here: finish() rebases and allocates
-      // the whole sample array, and both consumers below (the rubric's glance
-      // mapping and the persisted trace) must read the SAME drive.
-      const trace = attemptRecorderRef.current?.finish() ?? null;
-
-      // S1 scenario rubric (doc 76 §6): observation from the recorded
-      // attempt's glance events (honest measured:false when no trace), the
-      // stars from the pure scorer. Display here; the SERVER recomputes the
-      // persisted stars from the same validated wire channels.
-      let observedMomentIds: string[] | undefined;
-      if (scenarioSpec?.rubric !== undefined) {
-        let observation: RubricObservationInput | undefined;
-        const moments = scenarioSpec.rubric.observation?.moments;
-        if (trace !== null && moments !== undefined && moments.length > 0) {
-          const mapped = parkingObservationFromTrace(trace, moments);
-          if (mapped !== null) {
-            observation = mapped;
-            observedMomentIds = [...mapped.observedMomentIds];
-          }
-        }
-        setRubric(scoreRubric(r, scenarioSpec.rubric, observation));
-      }
-
-      // THEO-3: a mistake-experience session is a SANDBOX — never persisted
-      // (no attempt rows, no stars, no XP; the wire refuses the foreign `~m`
-      // id anyway). The graded retry that follows persists normally.
-      if (lesson.mistakeExperience !== undefined) return;
-
-      // I-2 „Твоят дубъл": the drive itself rides along, REDUCED here rather
-      // than server-side so a 4G phone uploads ~87 KB of 10 Hz kinematics for a
-      // 60 s drill instead of the 250 KB of raw float64 it recorded. Display
-      // data — the server validates it and drops it silently if it is anything
-      // but this session's own attempt.
-      const storedTrace = trace !== null ? compactTraceForStorage(trace) : null;
-      // …and whether it did decides whether the result screen may offer
-      // „Виж своя дубъл". A curriculum lesson records no attempt trace, so the
-      // link must not appear there — a dead link on the result screen is worse
-      // than no link.
-      setTraceUploaded(storedTrace !== null);
-
-      void finishLessonAction({
+      finalizeLessonSession(state, {
         lessonId: lesson.id,
-        startedAtMs: startedAtMsRef.current ?? Date.now(),
-        finishedAtMs: Date.now(),
-        aborted: r.aborted,
-        // A9: escalation multipliers ride along so the authoritative server
-        // grade/debrief carries the same „повторна грешка ×1.5" annotations
-        // (validated server-side; official score stays catalog-rebuilt).
-        // A15: event positions ride the same refs (validated server-side,
-        // display metadata only); near-misses go as the additive session stat.
-        ruleEvents: serializeRuleEvents(
-          state.events,
-          state.penaltyEscalations,
-          state.eventPositions ?? [],
-        ),
-        // S1: the A10 measurement detail rides along (validated server-side;
-        // rubric/display metadata — never the official score).
-        objectives: r.objectives.map((o) => ({
-          id: o.id,
-          done: o.done,
-          completedAtSec: o.completedAtSec,
-          ...(o.detail !== undefined ? { detail: o.detail } : {}),
-        })),
-        microQuiz: { ...quizStatsRef.current },
-        nearMisses: serializeNearMisses(state.nearMisses ?? []),
-        // The shown-but-not-charged violations (teach / learn-only arms), so
-        // the SERVER debrief — the text the student actually reads — can stop
-        // calling such a drive «чисто каране». Codes, times and the ACT
-        // (`detail`, since ADR-009) — never a title: the server re-titles from
-        // its own catalog, and a detail only SELECTS a row there (ADR-002).
-        // Since ADR-009 this list also reaches the VERDICT through
-        // `foldLessonMistakes`, so it is no longer display-only metadata.
-        ...(r.coachedMistakes !== undefined && r.coachedMistakes.length > 0
-          ? { coachedMistakes: serializeCoachedMistakes(r.coachedMistakes) }
-          : {}),
-        ...(observedMomentIds !== undefined ? { observedMomentIds } : {}),
-        ...(storedTrace !== null ? { attemptTrace: storedTrace } : {}),
-      }).then(setSaveResult, () => setSaveResult({ ok: false, code: "SAVE_FAILED" }));
+        mistakeExperience: lesson.mistakeExperience !== undefined,
+        rubric: scenarioSpec?.rubric,
+        startedAtMs: startedAtMsRef.current,
+        microQuiz: quizStatsRef.current,
+        finishTrace: () => attemptRecorderRef.current?.finish() ?? null,
+        now: Date.now,
+        setResult,
+        setRubric,
+        setTraceUploaded,
+        send: finishLessonAction,
+        setSaveResult,
+      });
     },
     [lesson.id, lesson.mistakeExperience, scenarioSpec],
   );

@@ -10362,3 +10362,41 @@ gate runs before the phase branch, so a halted car at rest under an R banner was
 `phase !== "halt"` in that gate with an executed test (sabotage red). **Nothing closes by this landing**: `platform/` and `content/`
 are byte-identical to 9ab89b8. Owed: the impact burst inside `IMPACT_SHAKE_MS` and the fault-card full text/clipping capture
 (item 5), pedestrians in the hazard loop, the lamp leg's post-release run into the road end.
+
+## Wave C verdicts — 2026-10-03
+
+This run retired 3 row(s). Their evidence frames were driven at `9e09e1865bf2` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`9e09e1865bf2`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 3 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 10 |
+| STILL (symptom reproduces) | 4 |
+| UNJUDGED (re-drive did not exercise it) | 33 |
+
+**Open list: 50 → 47**, out of 1525 filed across the whole programme (1475 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Task cap bills — landed 2026-10-03 (founder rulings 2026-09-25 and 2026-10-03)
+
+Fourteen rounds; round 14 (wf_10355a1b-254) SIGNED OFF WITH CONDITIONS under the stop rule. The task cap BILLS (2026-09-25: «Bill
+it», only the named stretch, «bill the arrival») and it ADDS, NEVER REMOVES (2026-10-03): two ledgers that never read each other —
+weather, bend, speeding, fog-lamp and off-carriageway bills are produced exactly as in the same lesson with the cap removed; the cap's
+own bills (TASK_SPEED_CAP_EXCEEDED) have their own first-fault grace and pause clock; total = sum, the verdict is never better with the
+cap, and order never matters. Verified by an independent harness: 0 failures on 1,946 recorder legs, 2,605 committed capped-objective
+drives, 123 sandbox drives, 2,500 generated drives and 51,180 order variants. Against base: 158 recorder legs changed, 28 scores +1 (the
+cap's own point), 0 verdicts, 0 bills on correct legs. THEO-4 class fix (R1): printed thresholds are exact, so «и над N км/ч, които
+дъждът оставя» is said only when both the measured and the printed speed are over it; the objective toast that printed a rounded speed
+beside a strict comparison («не повече от 10 км/ч, а стигна дотук с 10 км/ч», 9 committed legs incl. sc-park-45 L3/L5 shadow-correct —
+accepted by the integrator as the required R1 fix) and the speeding arithmetic above 100 km/h are true. Conditions: V5/V8/TL11 survivors
+(no committed drive changes), the shared 100-row coached-mistakes ceiling in a synthetic sandbox, praise timing, X19/X21/X22. Rows made
+judgeable: sc-ac-truck-spray:990e5f64 (critical) and :8ed4d8b3 (the wrong leg ran 127–131 km/h against a task cap of 80 and booked 0).

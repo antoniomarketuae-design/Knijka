@@ -35,7 +35,7 @@ export {
   type ViolationSeverity,
 } from "./policy";
 
-export { scenarioForCode } from "./mapping";
+export { scenarioForCode, teachTopicForCode } from "./mapping";
 export {
   coachStep,
   type CoachInput,

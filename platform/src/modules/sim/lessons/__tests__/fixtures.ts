@@ -140,3 +140,16 @@ export function createFakeSimSessionStore(): FakeSimSessionStore {
     },
   };
 }
+
+/**
+ * A capped objective id whose NAMED FEATURE runs past its next goal — the spray
+ * curtain of `sc-ac-truck-spray` (founder ruling 2026-09-25 «Only the named
+ * stretch»; `taskCapFeatures.ts`). A hand-built test lesson that borrows it
+ * for its capped mark gets round 3's stretch (the region to the next goal),
+ * which is what the task-cap MECHANICS suites (sustain, re-grade, the kin
+ * ledger, settlement, praise) exercise over a long straight. A capped mark with
+ * any other id names only its own zone and binds across that zone — that case
+ * is `task-cap-round4.test.ts`'s. `task-cap-features.test.ts` pins that this id
+ * resolves to the next goal.
+ */
+export const CURTAIN_OBJECTIVE_ID = "sc-acts-gap";

@@ -158,6 +158,25 @@ export interface WireCoachedMistake {
   detail?: string;
 }
 
+/**
+ * One task ceiling the drive BLEW and was graded for — founder ruling
+ * 2026-09-25, round 3 (verifier R4; `lessons/types.ts TaskCapBreach`). An
+ * objective id and a time, never copy. It feeds ONLY the praise guards of the
+ * SERVER debrief — the text the student reads — so that a drive which went
+ * through its task's mark over the ceiling is never praised unscoped, even when
+ * the breach was too short to bill and left no row of any code.
+ *
+ * TRUST. It moves no point and no verdict: the server re-validates every id
+ * against the lesson it recompiles and keeps only a capped reachZone's. A
+ * FORGED row can only scope the student's own praise (self-harm); an OMITTED
+ * row restores the unscoped praise round 2 printed — the same footing as the
+ * client-claimed objective flags and `coachedMistakes` omissions.
+ */
+export interface WireTaskCapBreach {
+  objectiveId: string;
+  t: number;
+}
+
 export interface FinishLessonWire {
   lessonId: string;
   startedAtMs: number;
@@ -176,6 +195,11 @@ export interface FinishLessonWire {
    * Absent on older clients → the debrief scopes its claims to the sheet.
    */
   coachedMistakes?: WireCoachedMistake[];
+  /**
+   * The task ceilings the drive blew (WireTaskCapBreach above). Absent on
+   * older clients and on every drive that never blew a graded cap.
+   */
+  taskCapBreaches?: WireTaskCapBreach[];
   /**
    * S1 (scenario sessions): ids of the template's rubric observation moments
    * the student's recorded glances covered (lessons/scenario/observation.ts
@@ -211,6 +235,9 @@ const MAX_MOMENT_ID_LEN = 64;
 /** Coached-mistake list cap — mirrors engine.ts MAX_COACHED_MISTAKES. */
 const MAX_COACHED_MISTAKES_WIRE = 100;
 const MAX_CODE_LEN = 64;
+/** Task-cap breach list cap — one row per latch; a lesson authors a handful of caps. */
+const MAX_TASK_CAP_BREACHES_WIRE = 64;
+const MAX_OBJECTIVE_ID_LEN = 64;
 
 // ---------------------------------------------------------------------------
 // Client side: serialize
@@ -291,6 +318,13 @@ export function serializeNearMisses(
  * and the ACT is kept (see WireCoachedMistake); the cap matches the engine's,
  * so a capped state serializes whole.
  */
+/** Round 3 (R4): the blown task ceilings, as ids and times — see WireTaskCapBreach. */
+export function serializeTaskCapBreaches(
+  breaches: ReadonlyArray<{ objectiveId: string; t: number }>,
+): WireTaskCapBreach[] {
+  return breaches.slice(0, MAX_TASK_CAP_BREACHES_WIRE).map((b) => ({ objectiveId: b.objectiveId, t: b.t }));
+}
+
 export function serializeCoachedMistakes(
   coached: ReadonlyArray<{ code: string; t: number; detail?: string }>,
 ): WireCoachedMistake[] {
@@ -369,6 +403,9 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   const coachedMistakes = parseCoachedMistakes(o.coachedMistakes);
   if (coachedMistakes === "invalid") return null;
 
+  const taskCapBreaches = parseTaskCapBreaches(o.taskCapBreaches);
+  if (taskCapBreaches === "invalid") return null;
+
   const observedMomentIds = parseObservedMomentIds(o.observedMomentIds);
   if (observedMomentIds === "invalid") return null;
 
@@ -383,6 +420,7 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   if (microQuiz !== null) wire.microQuiz = microQuiz;
   if (nearMisses !== null) wire.nearMisses = nearMisses;
   if (coachedMistakes !== null) wire.coachedMistakes = coachedMistakes;
+  if (taskCapBreaches !== null) wire.taskCapBreaches = taskCapBreaches;
   if (observedMomentIds !== null) wire.observedMomentIds = observedMomentIds;
 
   const attemptTrace = parseAttemptTrace(o.attemptTrace, o.lessonId);
@@ -593,6 +631,20 @@ function parseCoachedMistakes(value: unknown): WireCoachedMistake[] | null | "in
       row.detail = c.detail;
     }
     out.push(row);
+  }
+  return out;
+}
+
+function parseTaskCapBreaches(value: unknown): WireTaskCapBreach[] | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.length > MAX_TASK_CAP_BREACHES_WIRE) return "invalid";
+  const out: WireTaskCapBreach[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) return "invalid";
+    const b = item as Record<string, unknown>;
+    if (typeof b.objectiveId !== "string" || b.objectiveId.length > MAX_OBJECTIVE_ID_LEN) return "invalid";
+    if (!isFiniteNum(b.t) || b.t < 0 || b.t > MAX_SESSION_SEC) return "invalid";
+    out.push({ objectiveId: b.objectiveId, t: b.t });
   }
   return out;
 }
@@ -829,6 +881,18 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
    */
   const lessonMistakes = foldLessonMistakes(lesson, events, coachedMistakes);
 
+  /**
+   * Round 3 (R4) — the blown task ceilings, kept only where the id names one of
+   * THIS lesson's capped reachZone objectives (the server's own recompiled
+   * rung). Display-side evidence for the praise guards; see WireTaskCapBreach.
+   */
+  const cappedIds = new Set(
+    lesson.objectives
+      .filter((o) => o.kind === "reachZone" && typeof (o.params as { maxSpeedKmh?: unknown }).maxSpeedKmh === "number")
+      .map((o) => o.id),
+  );
+  const taskCapBreaches = (wire.taskCapBreaches ?? []).filter((b) => cappedIds.has(b.objectiveId));
+
   const result: LessonResult = {
     lessonId: lesson.id,
     summary,
@@ -845,6 +909,32 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
     ...(examTermination !== null ? { examTermination } : {}),
     ...(coachedMistakes.length > 0 ? { coachedMistakes } : {}),
     ...(lessonMistakes.length > 0 ? { lessonMistakes } : {}),
+    ...(taskCapBreaches.length > 0 ? { taskCapBreaches } : {}),
+    /*
+     * The near-misses the drive recorded, for the DEBRIEF the student reads
+     * (task-cap lane, round 9 — found by the payload census once it drove the
+     * near-miss channel over its whole domain). `buildDebrief` reads
+     * `result.nearMisses` so that a drive that brushed a cyclist at 0.5 m is not
+     * praised as spotless (`sc-vu-pass-clearance:54930e5c`), but this result —
+     * the one `actions.ts` debriefs and stores — never carried them: only the
+     * shell's transient fallback said «Разминавания на косъм», and the server's
+     * text replaced it without the sentence. A session stat, graded at nothing
+     * (`SessionNearMiss`): it moves no point, star or verdict.
+     */
+    ...(wire.nearMisses !== undefined && wire.nearMisses.length > 0
+      ? {
+          nearMisses: wire.nearMisses.map(
+            (n): SessionNearMiss => ({
+              tSec: n.tSec,
+              kind: n.kind,
+              clearanceM: n.clearanceM,
+              relSpeedMps: n.relSpeedMps,
+              x: n.x ?? null,
+              y: n.y ?? null,
+            }),
+          ),
+        }
+      : {}),
   };
 
   return { status: "ok", lesson, wire, events, result };

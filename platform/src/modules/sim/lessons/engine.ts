@@ -30,17 +30,25 @@ import type {
 } from "../contracts";
 import {
   buildSessionSummary,
+  conditionsSpeedEnvelope,
   createRuleEngine,
   isScorableEvent,
   parseSpeedMeasurement,
   reduceTick,
+  settlePendingTaskArrival,
+  settleUnpaidAdaptationTeach,
   settleUnpaidSpeedingTeach,
+  settleUnpaidTaskTeach,
   violationPeekBg,
+  type ConditionsCause,
   type RuleEngineConfig,
   type RuleEngineState,
   type RuleEvent,
   type ScorableEvent,
+  type SignBoundArrival,
   type SimTick,
+  type TaskCapArrival,
+  type TaskSpeedCap,
   type ViolationEvent,
 } from "../rules";
 import { coachStep } from "../scenarios";
@@ -50,6 +58,7 @@ import {
   type PreDriveStepId,
 } from "../procedures";
 import {
+  REACH_ZONE_CAP_SLACK_KMH,
   REACH_ZONE_GRACE_M,
   brakingFaultVoidsObjective,
   contactVoidsObjective,
@@ -89,9 +98,13 @@ import {
   stepOffNetwork,
   stepFinishGate,
   stepYieldWait,
+  TASK_CAP_STRETCH_START,
+  stepTaskCapStretch,
+  taskCapStretch,
   terminalDepartureZone,
   terminalRescueZone,
 } from "./finish";
+import { taskCapFeatureFor } from "./taskCapFeatures";
 import type {
   CoachedMistake,
   EventPosition,
@@ -105,6 +118,8 @@ import type {
   ObjectiveOutcome,
   SessionNearMiss,
   SpeedingSettleTick,
+  TaskCapBreach,
+  TaskCapLatch,
   TeachMoment,
 } from "./types";
 
@@ -193,6 +208,47 @@ export interface LessonStepResult {
 export const TEACH_PAUSE_MIN_GAP_S = 15;
 
 /**
+ * A LOWER-CLASS TEACH CARD NEVER HOLDS THE PAUSE AGAINST A DANGEROUS OR CHARGED
+ * FAULT (round 6 of the 2026-09-25 task-cap ruling; round-5 verifier F5).
+ *
+ * On L1 (`pauseOnError`) a charged fault ALSO pauses with its card, rate-limited
+ * like every pause. Measured on round 5: the new TASK card — a второстепенна,
+ * uncharged first encounter — took the 15 s slot on five L1 mistake legs, and the
+ * pause the base product gave a charged опасна fault a few seconds later went
+ * down to a toast: `sc-sig-flash-amber-ped` and `sc-pe-parked-row-scan`
+ * (PEDESTRIAN_CROSSING_TOO_FAST), `sc-merge-bus-pullout`, `sc-ac-ice`,
+ * `sc-ac-bridge-ice` (COLLISION). A free 1-point-class lesson must not decide
+ * whether the student stops for an exam-ending fault.
+ *
+ * So the slot a CHARGED card sees is closed only by a HEAVY pause — one that
+ * held any card other than such a lower card: a charged card of any class, an
+ * основна or опасна teach card — for the same 15 s (`applyTick`,
+ * `lastHeavyTeachMomentAtSec`). A pause made only of lower cards (uncharged
+ * teach cards of the второстепенна class — the task cap is one) never refuses
+ * it, and on a frame where both land the lower card YIELDS its place in the
+ * queue (`orderTeachMoments`). Everything else is unchanged: every pause still
+ * closes the slot to every later TEACH card for 15 s, and a lower card that
+ * pauses after a charged one (the ADR-009 first card of the lesson's own
+ * mistake does) does not re-open it: measured on `sc-pe-parked-row-scan` L1,
+ * where that card lands 0.04 s after the pedestrian card and the collision
+ * 0.6 s later keeps its toast, as on base.
+ */
+export function isLowerClassTeach(m: Pick<TeachMoment, "severity" | "charged">): boolean {
+  return m.charged !== true && m.severity === "vtorostepenna";
+}
+
+/**
+ * The cards of ONE frame's pause, queued in the order the shell shows them: a
+ * lower-class teach card yields to a charged card landing on the same frame
+ * (see `isLowerClassTeach`). Identity whenever the frame has no charged card or
+ * no lower one, so every other pause is queued exactly as before.
+ */
+export function orderTeachMoments(moments: TeachMoment[]): TeachMoment[] {
+  if (!moments.some((m) => m.charged === true) || !moments.some(isLowerClassTeach)) return moments;
+  return [...moments.filter((m) => !isLowerClassTeach(m)), ...moments.filter(isLowerClassTeach)];
+}
+
+/**
  * Cap on the shown-but-not-charged record (CoachedMistake) — the same
  * discipline as every additive channel (wire.ts MAX_NEAR_MISSES): a continuing
  * offence re-raised every few seconds for an hour must not grow the state or
@@ -260,6 +316,43 @@ function withFollowingGapDetail(
 function kmhTxt(v: number): string {
   return (Math.round(v * 10) / 10).toString().replace(".", ",");
 }
+
+/**
+ * A THRESHOLD, PRINTED AS IT IS — round 14 (R1-THEO4-ROUNDED-ENVELOPE). Every line a speed card states the measured
+ * speed is over — the sign, the bend's advisory, the task's ceiling, what the weather leaves of the sign — is printed
+ * with every decimal it has (to the hundredth: the envelope is the sign × a factor in hundredths — «42,5», «38,25»,
+ * «119»), a decimal comma, never rounded to a whole number. Round 13 printed `Math.round` beside a strict «над», so a
+ * committed lesson read «… с 42,8 км/ч … — и над 43 км/ч, които дъждът оставя от знака 50»: a false sentence. A whole
+ * number prints exactly as `Math.round` printed it, so every card whose numbers were whole is byte-identical.
+ */
+function kmhExact(v: number): string {
+  return (Math.round(v * 100) / 100).toString().replace(".", ",");
+}
+/** The number a printed figure reads as — the card's own comparison is made on what it prints. */
+const printedValue = (txt: string): number => Number(txt.replace(",", "."));
+
+/**
+ * A MEASURED SPEED PRINTED BESIDE THE LINE IT IS COMPARED WITH — round 14, R1 answered as a class (THEO-4: every
+ * comparison a sentence states holds between the numbers it PRINTS). The objective's own two speed toasts fire on a
+ * strict comparison — «Стигна точката, но твърде бързо» on `speed > cap`, «Мина точката твърде бавно» on `speed <
+ * floor` — and printed `Math.round(speed)`, so a car at 10,3 on a «не повече от 10 км/ч» mark read «… не повече от 10
+ * км/ч, а стигна дотук с 10 км/ч». Measured before the fix on 9 committed recorder legs (sc-park-45 L3/L5,
+ * sc-park-perp-forward L1/L2/L3/L5 — base behaviour). The whole number stays wherever it bears the comparison out
+ * (every other such toast is byte-identical); otherwise the cluster's one decimal; otherwise «малко над/под N», which
+ * the toast's own trigger makes true. Nothing here decides anything: the objective's outcome is read where it was.
+ */
+function speedBeyondTxt(v: number, line: number, side: "over" | "under"): string {
+  const printedLine = printedValue(kmhExact(line));
+  const holds = (x: number) => (side === "over" ? x > printedLine : x < printedLine);
+  const whole = Math.round(v);
+  if (holds(whole)) return `${whole} км/ч`;
+  const tenth = kmhTxt(v);
+  if (holds(printedValue(tenth))) return `${tenth} км/ч`;
+  return `малко ${side === "over" ? "над" : "под"} ${kmhExact(line)} км/ч`;
+}
+
+/** The task cap's code — the one code of the cap ledger (`rules/engine.ts` „THE CAP LEDGER'S ACT"). */
+const TASK_CAP_CODE = "TASK_SPEED_CAP_EXCEEDED";
 
 /**
  * THE SPEED THE CARD CONVICTED ON, SAID FIRST — w10-4, 2026-08-24.
@@ -334,20 +427,303 @@ function kmhTxt(v: number): string {
  * goes red the moment the first of them lands. That is the owner; the third
  * clause is filed against it, not against this line.
  */
-function withSpeedMeasurement(e: ViolationEvent, tick: SimTick, explanationBg: string): string {
+function withSpeedMeasurement(
+  e: ViolationEvent,
+  tick: SimTick,
+  explanationBg: string,
+  cfg: RuleEngineConfig,
+  signArrival?: SignBoundArrival,
+): string {
   if (e.code === "SPEEDING_OVER_LIMIT" || e.code === "SPEEDING_DANGEROUS") {
     const m = parseSpeedMeasurement(e.detail);
     if (m === null) return explanationBg;
-    return `Отчетена скорост ${kmhTxt(m.measuredKmh)} км/ч при разрешени ${Math.round(m.limitKmh)} км/ч. ${explanationBg}`;
+    return `Отчетена скорост ${kmhTxt(m.measuredKmh)} км/ч при разрешени ${kmhExact(m.limitKmh)} км/ч. ${explanationBg}`;
   }
   if (e.code === "SPEED_TOO_FAST_FOR_CURVE") {
     const advisory = tick.curveAdvisoryKmh;
     const measured = tick.speedKmh;
     if (advisory === undefined || !Number.isFinite(advisory) || advisory <= 0) return explanationBg;
     if (!Number.isFinite(measured) || measured <= 0) return explanationBg;
-    return `Отчетена скорост ${kmhTxt(measured)} км/ч при препоръчителни ${Math.round(advisory)} км/ч от табелата. ${explanationBg}`;
+    return `Отчетена скорост ${kmhTxt(measured)} км/ч при препоръчителни ${kmhExact(advisory)} км/ч от табелата. ${explanationBg}`;
+  }
+  // The task ceiling (founder ruling 2026-09-25): the figure the student READ
+  // (`shownKmh`), off the stamped tick the reducer graded — never a `detail`,
+  // because a `v…/l…` measurement on the event is priced as a SPEEDING rung by
+  // `FaultCard` and the debrief, and a task number is not a posted limit.
+  //
+  // …AND WHAT THE WEATHER LEAVES OF THE SIGN, WHERE THE CAR IS OVER THAT TOO (round 2, verifier C4): a card that
+  // quoted only the task's 80 at a measured 127 in the rain would hide that the drive was also over the 119 the rain
+  // leaves of a 140 — read off the SAME derivation the weather detector uses (`conditionsSpeedEnvelope`), never
+  // re-typed, and said only where it is TRUE AS PRINTED (`overEnvelopeClause`).
+  //
+  // ROUND 14 (founder ruling 2026-10-03, «Cap adds, never removes»): this is the CAP's card; the weather card below
+  // is what it is on the same drive with no cap (round 2–13 gave it a second number, «и над тавана на задачата N
+  // км/ч», so the weather bill's text depended on the cap — the cap's own card speaks for the cap).
+  const measured = tick.speedKmh;
+  if (e.code === "TASK_SPEED_CAP_EXCEEDED") {
+    // ROUND 7 — A SIGN-BOUND ARRIVAL (a cap the glass showed at or above the
+    // sign; `rules/engine.ts` „THE SIGN-BOUND ARRIVAL"). Its bill can land frames
+    // after the blow, so it carries the blow itself (`signBoundArrival`), and the
+    // card says all three numbers: the speed the mark was passed at, the cap the
+    // student read, and the sign — which a car over such a cap is over too, and
+    // which is the stricter ceiling there (the catalogue's «важи по-строгото»).
+    if (signArrival !== undefined && e.regrade !== true) {
+      const v = signArrival.arrivalKmh;
+      if (Number.isFinite(v) && v > 0) {
+        return `Мина точката на задачата с ${kmhTxt(v)} км/ч при таван на задачата ${kmhExact(signArrival.shownKmh)} км/ч — и над ограничението от знака ${kmhExact(signArrival.postedKmh)} км/ч. ${explanationBg}`;
+      }
+    }
+    // ROUND 5 — THE ARRIVAL (founder ruling 2026-09-26 «Bill the arrival»): the
+    // bill raised AT the blow says what the student did there — the speed the
+    // mark was passed at and the cap he read — off the arrival the reducer
+    // graded (`SimTick.taskCapArrival`, on this frame only). It is never a
+    // re-grade, so a settled or re-graded bill keeps the sustained copy below.
+    const arrival = tick.taskCapArrival;
+    if (arrival !== undefined && e.regrade !== true) {
+      const v = Math.abs(arrival.arrivalKmh);
+      if (Number.isFinite(v) && v > 0) {
+        return `Мина точката на задачата с ${kmhTxt(v)} км/ч при таван на задачата ${kmhExact(arrival.shownKmh)} км/ч${overEnvelopeClause(v, tick, cfg)}. ${explanationBg}`;
+      }
+    }
+    const cap = tick.taskSpeedCap;
+    if (cap === undefined || !Number.isFinite(measured) || measured <= 0) return explanationBg;
+    return `Отчетена скорост ${kmhTxt(measured)} км/ч при таван на задачата ${kmhExact(cap.shownKmh)} км/ч${overEnvelopeClause(measured, tick, cfg)}. ${explanationBg}`;
   }
   return explanationBg;
+}
+
+/**
+ * «— и над N км/ч, които дъждът оставя от знака S» — said ONLY WHERE IT IS TRUE AS PRINTED (round 14,
+ * R1-THEO4-ROUNDED-ENVELOPE): the measured speed is over the envelope (the weather detector's own comparison,
+ * unchanged — WHO IS BILLED does not move, this is a sentence) AND the speed as this card prints it (`kmhTxt`, one
+ * decimal) is over the envelope as it prints it (`kmhExact`, every decimal it has). Round 13 printed the envelope
+ * rounded to a whole number beside the strict «над»: 42,8 «над 43». Where the two printed numbers do not bear the
+ * comparison out (42,53 prints «42,5» against a 42,5 envelope) the clause is not said at all — the card names only what
+ * its own numbers show, and the weather's own card, if it billed, says the rest.
+ */
+function overEnvelopeClause(v: number, tick: SimTick, cfg: RuleEngineConfig): string {
+  const env = conditionsSpeedEnvelope(tick, cfg);
+  if (env === null || !(v > env.limitKmh)) return "";
+  if (!(printedValue(kmhTxt(v)) > printedValue(kmhExact(env.limitKmh)))) return "";
+  return ` — и над ${kmhExact(env.limitKmh)} км/ч, които ${CONDITIONS_CAUSE_BG[env.cause]} оставя от знака ${kmhExact(tick.maxSpeedKmh)}`;
+}
+
+/** The governing condition, as the subject of «… оставя от знака N». */
+const CONDITIONS_CAUSE_BG: Record<ConditionsCause, string> = {
+  rain: "дъждът",
+  fog: "мъглата",
+  snow: "снегът",
+  night: "тъмното",
+};
+
+/** A bill without the cap ledger's bookkeeping marks — see `capLedgerAdmits`. */
+function withoutKinMarks(e: ViolationEvent): ViolationEvent {
+  if (e.absorbedBy === undefined && e.signBoundArrival === undefined) return e;
+  // Round 7: the sign-bound arrival's blow is display data for the card, read
+  // off the RAW bill before this strip — never scored, serialised or stored.
+  const { absorbedBy: _absorbedBy, signBoundArrival: _signBoundArrival, ...plain } = e;
+  return plain;
+}
+
+/**
+ * THE ACTIVE TASK'S OWN CEILING, stamped onto the tick the rule engine grades —
+ * founder ruling 2026-09-25 (register item 17, „Bill it"; rows
+ * `sc-ac-truck-spray:990e5f64` / `:8ed4d8b3`).
+ *
+ * THIS IS THE ONLY PRODUCER of `SimTick.taskSpeedCap`, and it lives here
+ * because this is the only module that knows which objective is active and
+ * what the student did at its mark; the rules module keeps knowing nothing
+ * about lessons (doc 05). The scene, every recorder and every replay hand the
+ * reducer ticks without it, so every committed trace's rule stream is
+ * byte-identical by construction.
+ *
+ * FROM WHERE THE CEILING BINDS — MEASURED, NOT ASSUMED. The first cut stamped
+ * the cap for the whole life of the objective, as the strip prints it from the
+ * spawn. Driven through the bot-completion suites that put every committed
+ * CORRECT demonstration through this engine, it billed ten of them, every one
+ * on the approach and every one arriving legally (`sc-ac-ice`, `sc-merge-bus-
+ * pullout`, `sc-ac-bridge-ice`, `sc-ed-d2-stop-address`, `sc-follow-tailgater`,
+ * `sc-ov-crest-curve`, `sc-mv-uturn-ban`, `sc-pe-zone-living`, `sc-park-45`,
+ * `sc-speed-creep`). The catalogue authors these caps as ARRIVAL demands, and
+ * every gate in `objectives.ts` grades them that way. So the ceiling binds from
+ * the mark the task names: it is LATCHED once the student has gone THROUGH that
+ * mark over it — `approachCap === "blown"`, the evaluator's own verdict (flow
+ * caps only; more than the slack over the gate; past the mark, never having
+ * honoured it). A student who brakes in time is never latched at all.
+ *
+ * ROUND 3 — ONE LATCH PER BLOW (verifier R2). Round 2 re-derived the stamp every
+ * frame from `approachCap`, and `stepReachZone` CLEARS that verdict on a fresh
+ * approach (the ring-entry edge); round a ring the stamp therefore dropped out
+ * once a lap at the mark (and once more at the half-line's far edge), each drop
+ * ended the act, and each re-appearance charged a new one — a constant 30 round
+ * the ≤20 ring paid 3 points in 2.5 laps and 5 in 3.5. The latch is created on
+ * the first blown frame and then holds on its own: it stamps whenever the car
+ * is inside the stretch it fixed at the blow, whatever `approachCap` does in
+ * between, and it is released only when the objective changes. Once the car
+ * leaves the stretch's goal behind it is SPENT and stamps nothing; the mark
+ * blown AGAIN after the verdict has cleared (`rearmed`) is a new latch — a new
+ * `blownAtSec` — and the reducer treats it as a new act.
+ *
+ * …OVER THE STRETCH THE CAP GOVERNS (rounds 2–3, verifier C2 then R1): a bounded
+ * region, the carriageway from the mark to the next goal (`finish.ts
+ * taskCapStretch` / `stepTaskCapStretch`), fixed at the blow on the student's
+ * own approach axis. Past it, the sign and the weather are still graded by their
+ * own codes; the task's number no longer is.
+ *
+ * IT STAMPS ONLY WHAT THE GLASS SHOWS AS A CEILING:
+ *  · the ACTIVE objective of a DRIVING session — the strip's «задачата иска
+ *    ≤N» and the banner's task line both drop the figure the moment the
+ *    objective changes (`LessonPlayShell heldTaskCapKmh`);
+ *  · never the halt band: „blown" is a flow-cap verdict by construction
+ *    (`isFlowCap`, `objectives.ts`);
+ *  · strictly UNDER the posted limit on this frame — at or above it the strip
+ *    stays silent and the sign is the stricter ceiling, which SPEEDING_*
+ *    already grades (`readSpeedContract`'s `binding`); a silent frame does not
+ *    break the latch, it only places no stamp;
+ *  · never on an EXAM rung: the advisor says nothing there, and an exam grades
+ *    exactly the official sheet (A13).
+ *
+ * THE NUMBERS. `shownKmh` is `shownObjectiveCapKmh` (the figure the strip
+ * reads its number out of), `capKmh` the objective's compiled gate, `graceKmh`
+ * REACH_ZONE_CAP_SLACK_KMH (round 2, C1 — the reducer bills only above the
+ * speed this mark was BLOWN at, so the sheet is never stricter than the gate
+ * that armed it), `blownAtSec` the latch's name (round 3).
+ *
+ * ROUND 4 — ONLY THE NAMED STRETCH (founder ruling 2026-09-25). The stretch
+ * fixed at the blow now also ends where the feature the task NAMES ends
+ * (`taskCapFeatures.ts`: the bend's exit, the end of the ice, of a posted-limit
+ * zone, the ring's edge — or, for a task that names nothing beyond its mark,
+ * the capped zone's own edge). Past it the latch is SPENT, the stamp stops, and
+ * `advisor.ts taskCapReleased` takes the figure off the strip and the banner in
+ * the same frame, so the glass never shows a cap the sheet no longer grades.
+ *
+ * THE BREACH ROW. The first frame a latch actually stamps writes one
+ * `TaskCapBreach` — the debrief's evidence that the drive broke a cap even when
+ * the breach was too short to bill (round 3, R4). Round 4: so does the latch's
+ * own first frame whenever the cap is graded there (under the sign), even if the
+ * car is already past the end of its (now often short) stretch — a mark blown at
+ * a graded cap is a broken cap, whether or not a stamped frame follows it.
+ */
+function stepTaskCapLatch(
+  prev: LessonSessionState,
+  tick: SimTick,
+): {
+  cap: TaskSpeedCap | undefined;
+  latch: TaskCapLatch | undefined;
+  breach: TaskCapBreach | undefined;
+  arrival: TaskCapArrival | undefined;
+} {
+  const none = { cap: undefined, latch: undefined, breach: undefined, arrival: undefined };
+  if (prev.lesson.examMode === true || prev.phase !== "driving") return none;
+  const idx = prev.currentObjectiveIndex;
+  const active = prev.objectives[idx];
+  if (active === undefined || active.params.kind !== "reachZone") return none;
+  const capKmh = active.params.maxSpeedKmh;
+  if (capKmh === undefined || !Number.isFinite(capKmh)) return none;
+  const st = prev.evalStates[idx];
+  if (st === undefined || st.type !== "reachZone") return none;
+  const blownNow = st.approachCap === "blown";
+  let latch = prev.taskCapLatch !== undefined && prev.taskCapLatch.objectiveIndex === idx ? prev.taskCapLatch : undefined;
+  if (latch !== undefined && latch.progress.spent) {
+    if (!blownNow && !latch.rearmed) latch = { ...latch, rearmed: true };
+    // A spent cap blown AGAIN after its verdict cleared: a new latch below.
+    if (latch.rearmed && blownNow) latch = undefined;
+  }
+  // Round 4: where the feature the task names ends — absent is its own zone.
+  // (Round 6: whatever it names, the blow at its mark is billed as the arrival.)
+  const feature = taskCapFeatureFor(active.spec.id);
+  let created = false;
+  if (latch === undefined) {
+    if (!blownNow) return none;
+    const stretch = taskCapStretch(
+      prev.objectives.map((o) => o.params),
+      idx,
+      st.approachFrom,
+      feature?.end,
+    );
+    if (stretch === null) return none;
+    latch = {
+      objectiveIndex: idx,
+      blownAtSec: tick.t,
+      stretch,
+      progress: TASK_CAP_STRETCH_START,
+      stamped: false,
+      rearmed: false,
+    };
+    created = true;
+  }
+  const shownKmh = shownObjectiveCapKmh(active.spec, capKmh, prev.lesson.postedLimitKmh);
+  const graded = shownKmh < tick.maxSpeedKmh;
+  /*
+   * ROUND 5 — THE ARRIVAL (founder ruling 2026-09-26 «Bill the arrival»). On the
+   * one frame a latch is created, graded under the sign here, the reducer is
+   * handed the blow itself, so it can bill passing the mark over the cap as ONE
+   * event whatever the stretch does next — including a zone swept faster than
+   * itself, whose latch is spent on this very frame. The speed is the one the
+   * evaluator judged the mark blown at: the previous frame's, which `lastTick`
+   * holds (its own `Math.abs`, as the evaluator reads it).
+   *
+   * ROUND 6 — ON EVERY CAPPED OBJECTIVE (the integrator's reading of ruling 4,
+   * binding: «every capped objective has a mark, so the arrival event applies
+   * to every blown cap, not only the zone-default ones»). Round 5 handed the
+   * reducer the arrival only where the task names nothing beyond its mark, and
+   * the round-5 verifier measured what that left unbilled: `sc-acbi-deck`
+   * («Стигни края на хлъзгавото…», an arrival by its own title),
+   * `sc-ovb-patience`, `sc-lnom-round`, `sc-rbg-past-east` — named stretches
+   * of 5–20 m, under the sustained code's 3 s at any realistic speed — and
+   * `sc-prs-row` at the demo mistake's 50 km/h (43 m in 2.95 s). A named
+   * feature (`taskCapFeatures.ts`) now bounds the stretch the latch stamps and
+   * nothing else: the blow at its mark is the same arrival, and a sustained
+   * over-cap stretch along the feature after it is the SAME act (the reducer's
+   * `taskArrival` keeps the act with this latch), so it adds at most the act's
+   * one charge and never a second first bill.
+   */
+  /*
+   * ROUND 7 — AND AT A CAP THE GLASS SHOWS AT OR ABOVE THE SIGN TOO (round-6
+   * verifier R2; the integrator's reading of ruling 4, binding for round 7:
+   * «the arrival is billed at EVERY blown cap mark, INCLUDING caps at or above
+   * the sign»). Round 6 handed over only a GRADED blow (the glass cap under the
+   * sign), and the verifier measured what that left: 192 blown caps per profile
+   * of its arrival census, 18 of which billed nothing of any speed code while
+   * CLEAN_DRIVING was minted at the blow — the motorway «≤140» passed at 145.2,
+   * the works zone's glass «≤33» on a posted 30 passed at 38.2. Every blow is
+   * handed over now; the reducer tells the two apart on the same frame
+   * (`shownKmh` against the sign) and bills a sign-bound one as ONE act with the
+   * speeding the car is in (`rules/engine.ts` „THE SIGN-BOUND ARRIVAL"). The
+   * stamp and the breach row still bind only under the sign, as since round 2.
+   */
+  const arrival: TaskCapArrival | undefined =
+    created
+      ? {
+          capKmh,
+          shownKmh,
+          graceKmh: REACH_ZONE_CAP_SLACK_KMH,
+          blownAtSec: latch.blownAtSec,
+          arrivalKmh: Math.abs(
+            prev.lastTick !== undefined && prev.lastTick.t < tick.t ? prev.lastTick.speedKmh : tick.speedKmh,
+          ),
+        }
+      : undefined;
+  if (latch.progress.spent) return { cap: undefined, latch, breach: undefined, arrival: undefined };
+  const step = stepTaskCapStretch(latch.stretch, latch.progress, tick.position);
+  if (step.progress !== latch.progress) latch = { ...latch, progress: step.progress };
+  if (!step.inside || !graded) {
+    // Round 4: the latch's first frame, graded here, but already past the end
+    // of its stretch (a short zone swept in one frame) — the breach is still a
+    // breach and is recorded; nothing is stamped.
+    if (!latch.stamped && graded && latch.blownAtSec === tick.t) {
+      return {
+        cap: undefined,
+        latch: { ...latch, stamped: true },
+        breach: { objectiveId: active.spec.id, t: tick.t },
+        arrival,
+      };
+    }
+    return { cap: undefined, latch, breach: undefined, arrival };
+  }
+  const cap: TaskSpeedCap = { capKmh, shownKmh, graceKmh: REACH_ZONE_CAP_SLACK_KMH, blownAtSec: latch.blownAtSec };
+  if (latch.stamped) return { cap, latch, breach: undefined, arrival };
+  return { cap, latch: { ...latch, stamped: true }, breach: { objectiveId: active.spec.id, t: tick.t }, arrival };
 }
 
 /**
@@ -395,7 +771,8 @@ function objectiveNotice(
     // closing `Math.min` keeps the spoken figure at or under the gate — the
     // card can only ever be stricter than the grader, never looser.
     const shownCapKmh = shownObjectiveCapKmh(spec, params.maxSpeedKmh, postedLimitKmh);
-    const measuredKmh = Math.round(Math.abs(tick.speedKmh));
+    // Round 14: printed so that «не повече от N …, а стигна дотук с M» holds between the printed N and M (`speedBeyondTxt`).
+    const measuredTxt = speedBeyondTxt(Math.abs(tick.speedKmh), shownCapKmh, "over");
     // ── WHICH FRAME IS THIS? — the half the tense fix cannot skip ───────────
     //
     // `overCapNoted` latches on the first frame that is `!done && inAcceptance
@@ -435,8 +812,8 @@ function objectiveNotice(
     // observed, what is wanted, what to do — never a bare verdict), and both
     // leave «тази скорост» two clauses down resolving to it.
     const measuredBg = arrivedOnThisFrame
-      ? `а стигна дотук с ${measuredKmh} км/ч`
-      : `а върху точката вдигна скоростта до ${measuredKmh} км/ч`;
+      ? `а стигна дотук с ${measuredTxt}`
+      : `а върху точката вдигна скоростта до ${measuredTxt}`;
     // ── AND THE ADVICE HAS TO MATCH THE GRADER (round 11, 2026-08-26) ────────
     //
     // «Намали СЕГА, докато си върху точката» is true only while the approach
@@ -795,8 +1172,10 @@ function objectiveNotice(
     // twin: the ladder does not touch the floor (`scenario/params.ts`), so
     // there is only ever one figure for it and the two-numbers-for-one-task
     // split that card had to fix cannot arise here.
-    const wantedKmh = Math.round(params.minSpeedKmh);
-    const measuredKmh = Math.round(Math.abs(tick.speedKmh));
+    // Round 14 (R1 as a class): the floor printed as authored (`kmhExact`, never rounded), and the measured speed
+    // printed so that «с поне N …, а мина с M» holds between the printed N and M (`speedBeyondTxt`).
+    const wantedTxt = kmhExact(params.minSpeedKmh);
+    const measuredTxt = speedBeyondTxt(Math.abs(tick.speedKmh), params.minSpeedKmh, "under");
     const dM = Math.hypot(tick.position.x - params.x, tick.position.y - params.y);
     const stillAtTheMark = dM <= params.radiusM + REACH_ZONE_GRACE_M;
     return {
@@ -807,7 +1186,7 @@ function objectiveNotice(
       // of the drill: пълзенето не е решение на задачата «съобразена скорост»,
       // а нейното избягване — беглецът от преценката не се учи да я прави.
       explanationBg:
-        `Задачата иска да минеш тук с поне ${wantedKmh} км/ч, а мина с ${measuredKmh} км/ч. ` +
+        `Задачата иска да минеш тук с поне ${wantedTxt} км/ч, а мина с ${measuredTxt}. ` +
         "„Съобразена скорост“ не значи „възможно най-бавно“: тя е най-високата скорост, от която " +
         "спираш в осветеното пред теб. Пълзенето не решава тази преценка, а я заобикаля — а " +
         "в същото време бавната кола в тъмното сама става пречка за движението: задните я виждат " +
@@ -1471,35 +1850,93 @@ function settleSpeedingTeach(args: {
   alreadyCharged: (code: string) => boolean;
 }): {
   encounters: Record<string, number>;
-  scored: ViolationEvent | null;
-  escalation: PenaltyEscalation | null;
+  scored: ViolationEvent[];
+  escalations: PenaltyEscalation[];
+  /** Round 7: a sign-bound arrival settled at the end and TAUGHT — the coached row it leaves. */
+  coached: ViolationEvent[];
 } {
-  const none = { encounters: args.encounters, scored: null, escalation: null };
-  const settled = settleUnpaidSpeedingTeach(args.rules, args.tick);
-  if (settled === null) return none;
-  const settledIsTarget = args.lessonTargets?.has(settled.code) === true;
-  if (args.alreadyCharged(settled.code) || settledIsTarget) return none;
-  const step = coachStep(
-    args.encounters,
-    {
-      code: settled.code,
-      severityClass: settled.severityClass,
-      terminateSession: settled.terminateSession,
-      detail: settled.detail,
-    },
-    args.coachOpts,
-  );
-  if (!step.decision.scored) {
-    return { encounters: step.encounters, scored: null, escalation: null };
+  /*
+   * EVERY LEDGER SETTLES ITS OWN (round 2 of the 2026-09-25 task-cap ruling,
+   * verifier F2; round 14, founder ruling 2026-10-03 «Cap adds, never
+   * removes»). The sign's withheld charge (`settleUnpaidSpeedingTeach`,
+   * чл. 21), the cap's (`settleUnpaidTaskTeach` — the cap ledger's own act) and
+   * the weather's and the bend's (`settleUnpaidAdaptationTeach` — exactly as
+   * with no cap) are asked in turn, through the SAME guards and the same coach,
+   * so no ending path can reach one and walk past another, and none reads what
+   * another settled.
+   */
+  let encounters = args.encounters;
+  const scored: ViolationEvent[] = [];
+  const escalations: PenaltyEscalation[] = [];
+  const charged = (code: string): boolean =>
+    args.alreadyCharged(code) || scored.some((x) => x.code === code);
+  const candidates = [
+    settleUnpaidSpeedingTeach(args.rules, args.tick),
+    settleUnpaidTaskTeach(args.rules, args.tick),
+    // FOUNDER RULING 2026-09-25 «Yes, same as speeding»: a TAUGHT weather or bend
+    // overspeed still running at the end is settled through these same guards —
+    // on every drive, capped or not (round 14).
+    ...settleUnpaidAdaptationTeach(args.rules, args.tick),
+  ];
+  for (const raw of candidates) {
+    if (raw === null) continue;
+    const settledIsTarget = args.lessonTargets?.has(raw.code) === true;
+    if (charged(raw.code) || settledIsTarget) continue;
+    const settled = withoutKinMarks(raw);
+    const step = coachStep(
+      encounters,
+      {
+        code: settled.code,
+        severityClass: settled.severityClass,
+        terminateSession: settled.terminateSession,
+        detail: settled.detail,
+      },
+      args.coachOpts,
+    );
+    encounters = step.encounters;
+    if (!step.decision.scored) continue;
+    scored.push(settled);
+    if (step.decision.penaltyMultiplier > 1) {
+      escalations.push({ code: settled.code, t: settled.t, multiplier: step.decision.penaltyMultiplier });
+    }
   }
-  return {
-    encounters: step.encounters,
-    scored: settled,
-    escalation:
-      step.decision.penaltyMultiplier > 1
-        ? { code: settled.code, t: settled.t, multiplier: step.decision.penaltyMultiplier }
-        : null,
-  };
+  /*
+   * ROUND 7 — THE SIGN-BOUND ARRIVAL'S ONE BILL, when the drive ends inside its
+   * act (`rules/engine.ts settlePendingTaskArrival`: a mark whose cap the glass
+   * showed at or above the sign, blown while the car was over the sign, with no
+   * speeding bill in that act and the car never back at the sign). Unlike the
+   * three settlements above it is a FIRST bill, not a withheld re-grade — so it
+   * passes neither `alreadyCharged` nor the target drop, and the coach decides it
+   * exactly as it decides an arrival during the drive: TAUGHT the first time the
+   * topic is met (a coached row, so the debrief lists it and scopes its praise),
+   * charged on a repeat.
+   */
+  const coached: ViolationEvent[] = [];
+  const waiting = settlePendingTaskArrival(args.rules, args.tick);
+  if (waiting !== null) {
+    const settled = withoutKinMarks(waiting);
+    const step = coachStep(
+      encounters,
+      {
+        code: settled.code,
+        severityClass: settled.severityClass,
+        terminateSession: settled.terminateSession,
+        detail: settled.detail,
+        lessonMistakeTarget: args.lessonTargets?.has(settled.code) === true,
+      },
+      args.coachOpts,
+    );
+    encounters = step.encounters;
+    if (step.decision.scored) {
+      scored.push(settled);
+      if (step.decision.penaltyMultiplier > 1) {
+        escalations.push({ code: settled.code, t: settled.t, multiplier: step.decision.penaltyMultiplier });
+      }
+    } else {
+      coached.push(settled);
+    }
+  }
+  return { encounters, scored, escalations, coached };
 }
 
 /**
@@ -1536,29 +1973,47 @@ function settleEndedSession(ended: LessonSessionState): LessonSessionState {
     lessonTargets: lessonMistakeTargetCodes(ended.lesson),
     alreadyCharged,
   });
-  if (out.scored === null) {
+  // Round 7: a sign-bound arrival taught at the ending leaves its coached row
+  // (under the same cap every coached row keeps).
+  const coachedMistakes =
+    out.coached.length > 0 && ended.coachedMistakes.length < MAX_COACHED_MISTAKES
+      ? [
+          ...ended.coachedMistakes,
+          ...out.coached.map((e) => ({
+            code: e.code,
+            titleBg: e.titleBg,
+            t: e.t,
+            ...(e.detail !== undefined ? { detail: e.detail } : {}),
+          })),
+        ]
+      : ended.coachedMistakes;
+  if (out.scored.length === 0) {
     // Identity on the overwhelmingly common answer (nothing was withheld), so
     // an ordinary ending allocates nothing at all.
+    if (coachedMistakes !== ended.coachedMistakes) {
+      return { ...ended, scenarioEncounters: out.encounters, coachedMistakes };
+    }
     return out.encounters === ended.scenarioEncounters
       ? ended
       : { ...ended, scenarioEncounters: out.encounters };
   }
-  const position: EventPosition = {
-    kind: out.scored.kind,
-    code: out.scored.code,
-    t: out.scored.t,
+  const positions: EventPosition[] = out.scored.map((e) => ({
+    kind: e.kind,
+    code: e.code,
+    t: e.t,
     x: tick.position.x,
     y: tick.position.y,
-  };
+  }));
   return {
     ...ended,
-    events: [...ended.events, out.scored],
+    events: [...ended.events, ...out.scored],
+    coachedMistakes,
     scenarioEncounters: out.encounters,
     penaltyEscalations:
-      out.escalation !== null
-        ? [...ended.penaltyEscalations, out.escalation]
+      out.escalations.length > 0
+        ? [...ended.penaltyEscalations, ...out.escalations]
         : ended.penaltyEscalations,
-    eventPositions: [...(ended.eventPositions ?? []), position],
+    eventPositions: [...(ended.eventPositions ?? []), ...positions],
   };
 }
 
@@ -1576,7 +2031,25 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     return { state: prev, hudEvents: [] };
   }
 
-  const { state: rules, events: ruleEvents } = reduceTick(prev.rules, tick);
+  // The active task's ceiling rides the tick the reducer grades — and ONLY that
+  // tick: the objective evaluator below and every other reader keep the frame
+  // exactly as the scene produced it. See `stepTaskCapLatch` (round 3: one
+  // latch per blow, walked through a bounded stretch).
+  const capStep = stepTaskCapLatch(prev, tick);
+  const taskSpeedCap = capStep.cap;
+  // ROUND 5: …and, on the one frame a latch is created (round 6: for every
+  // capped objective), the arrival the reducer bills (founder ruling
+  // 2026-09-26 «Bill the arrival»).
+  const taskCapArrival = capStep.arrival;
+  const ruleTick: SimTick =
+    taskSpeedCap === undefined && taskCapArrival === undefined
+      ? tick
+      : {
+          ...tick,
+          ...(taskSpeedCap !== undefined ? { taskSpeedCap } : {}),
+          ...(taskCapArrival !== undefined ? { taskCapArrival } : {}),
+        };
+  const { state: rules, events: ruleEvents } = reduceTick(prev.rules, ruleTick);
 
   // A13: exam sessions bypass the whole teach-first layer — see coach.ts.
   // THEO-3: mistake-experience sessions ride the coach's learn-only
@@ -1620,11 +2093,38 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   let encounters = prev.scenarioEncounters;
   let escalations = prev.penaltyEscalations;
   let lastTeachAt = prev.lastTeachMomentAtSec;
+  // Round 6 (verifier F5): the last pause that held a card other than a
+  // lower-class teach card — the only kind that refuses a charged card
+  // (`isLowerClassTeach`). `?? null`: absent until the drive's first one.
+  let lastHeavyTeachAt = prev.lastHeavyTeachMomentAtSec ?? null;
+  /*
+   * ROUND 14 — THE CAP'S OWN PAUSE CLOCKS (founder ruling 2026-10-03, «Cap adds, never removes … the bend/weather bills
+   * are charged exactly as they would be in a lesson with no cap»). The pause rate limit is a clock every card used
+   * to share, so a cap card moved the weather's and the bend's: a blown mark taught at 5,0 s turned the bend's own teach
+   * card at 7,5 s from a pause into a toast — a card the same drive with no cap pauses on. The cap's cards keep their
+   * own pair of clocks (`TASK_CAP_CODE` only), so every other card pauses, or is downgraded, exactly as with no cap,
+   * and the cap's card is scheduled by nothing of another code. The cost is bounded and stated: within one window a
+   * drive can pause once for the cap and once for everything else.
+   */
+  let lastCapTeachAt = prev.lastCapTeachMomentAtSec ?? null;
+  let lastCapHeavyTeachAt = prev.lastCapHeavyTeachMomentAtSec ?? null;
+  const capCard = (code: string): boolean => code === TASK_CAP_CODE;
   let mistakeHitAt = prev.mistakeExperienceHitAtSec;
   let mistakeMoment: TeachMoment | undefined;
   const hudEvents: HudEvent[] = [];
   const scoredEvents: ScorableEvent[] = [];
   const teachMoments: TeachMoment[] = [];
+  /** Queue a card for this frame's pause and move the pause slot to this frame. */
+  const notePause = (m: TeachMoment): void => {
+    teachMoments.push(m);
+    if (capCard(m.code)) {
+      if (!isLowerClassTeach(m)) lastCapHeavyTeachAt = tick.t;
+      lastCapTeachAt = tick.t;
+      return;
+    }
+    if (!isLowerClassTeach(m)) lastHeavyTeachAt = tick.t;
+    lastTeachAt = tick.t;
+  };
   /**
    * SHOWN-BUT-NOT-CHARGED, RECORDED WHERE THE DECISION IS MADE. Every unscored
    * arm below still DISPLAYS the violation — the teach pause, its rate-limited
@@ -1724,7 +2224,35 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     (chargedCodes ??= new Set(
       prev.events.filter((x) => x.kind === "violation").map((x) => x.code as string),
     )).has(code) || scoredEvents.some((x) => x.kind === "violation" && x.code === code);
-  for (const e of ruleEvents) {
+  /**
+   * THE CAP LEDGER'S ONE MARK, READ WHERE CHARGES ARE KNOWN (`rules/engine.ts` „THE CAP LEDGER'S ACT").
+   *
+   * `absorbedBy` — a later FIRST bill of the cap inside a cap act whose first bill was already put before the
+   * student (the stretch after a billed arrival: one act, one bill, founder ruling 4). It names nothing and is dropped
+   * here, before the coach — so it is neither a card nor a charge nor a coached row. ONE exception, and it is
+   * ADR-009's: the lesson's own target, on its first occurrence of the session, is let through, because that
+   * occurrence is the only record the lesson has that its mistake happened. A target's first occurrence is never
+   * charged (Ruling A) and its re-grades are dropped below, so letting it through cannot make a second bill.
+   *
+   * ROUND 14 (founder ruling 2026-10-03, «Cap adds, never removes»): the cap's own bills only. Rounds 2–13 also
+   * dropped weather bills absorbed into a cap act (and, inside a sign-bound act, bend bills), let a re-grade handed to
+   * another ceiling through only to an uncharged OWNER (`kinOwner`), and turned a new breach after the owner's lapse
+   * into a free card that never reached the coach (`kinSurface`). The reducer produces none of those any more: every
+   * weather, bend and speeding bill reaches the coach exactly as it does with no cap.
+   *
+   * The mark is STRIPPED before anything else sees the event, so the scored ledger, the wire and every surface carry
+   * exactly the shape a plain bill or re-grade has always had.
+   */
+  const capLedgerAdmits = (e: ViolationEvent): boolean =>
+    e.absorbedBy === undefined ||
+    (lessonTargets?.has(e.code) === true &&
+      e.regrade !== true &&
+      !alreadyCharged(e.code) &&
+      !coachedPrev.some((c) => c.code === e.code) &&
+      !coachedNew.some((c) => c.code === e.code));
+  for (const raw of ruleEvents) {
+    if (raw.kind === "violation" && !capLedgerAdmits(raw)) continue;
+    const e = raw.kind === "violation" ? withoutKinMarks(raw) : raw;
     if (e.kind === "commendation") {
       hudEvents.push({ kind: "commendation", titleBg: e.titleBg });
       scoredEvents.push(e);
@@ -1743,13 +2271,19 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     if (e.regrade === true && (alreadyCharged(e.code) || lessonTargets?.has(e.code) === true)) {
       continue;
     }
+    // (ROUND 1's RUN-WIDE KIN GUARD — „a task re-grade is dropped once the
+    // conditions or curve code has been charged" — IS GONE, and so, in round 14,
+    // is every later cross-code guard: the cap's re-grade is dropped once the CAP
+    // was charged, exactly as any code's is — «Cap adds, never removes».)
     // SPD #39/#48: DISPLAY text only — the FOLLOWING family carries the
     // measured time-gap readout; every other code passes through unchanged.
     // The scored event (scoredEvents/state.events/wire) keeps catalog copy.
     const explanationBg = withSpeedMeasurement(
       e,
-      tick,
+      ruleTick,
       withFollowingGapDetail(e, tick, prev.rules.config),
+      prev.rules.config,
+      raw.kind === "violation" ? raw.signBoundArrival : undefined,
     );
     // …AND THE ONE-LINE VERSION OF IT, for the phone card's body row
     // (`sc-pk-driveway:fa602d10`). Keyed on the ACT (`e.detail`), so the four
@@ -1802,12 +2336,19 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // S1 pauseOnError: the scored violation ADDITIONALLY pauses with the
       // teach card (rate-limited like every pause; same-tick moments merge).
       if (pauseOnError) {
+        // Round 6 (verifier F5): only a HEAVY pause refuses a charged card —
+        // a slot held by lower-class teach cards alone does not (`isLowerClassTeach`).
+        const lt = capCard(e.code) ? lastCapTeachAt : lastTeachAt;
+        const lh = capCard(e.code) ? lastCapHeavyTeachAt : lastHeavyTeachAt;
         const canPause =
-          lastTeachAt === null ||
-          lastTeachAt === tick.t ||
-          tick.t - lastTeachAt >= TEACH_PAUSE_MIN_GAP_S;
+          lt === null ||
+          lt === tick.t ||
+          tick.t - lt >= TEACH_PAUSE_MIN_GAP_S ||
+          lh === null ||
+          lh === tick.t ||
+          tick.t - lh >= TEACH_PAUSE_MIN_GAP_S;
         if (canPause) {
-          teachMoments.push({
+          notePause({
             code: e.code,
             scenarioId: null,
             titleBg: e.titleBg,
@@ -1827,7 +2368,6 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
             // pauseOnError session already pauses on everything it grades.
             ...(lessonTargets?.has(e.code) === true ? { lessonMistake: true as const } : {}),
           });
-          lastTeachAt = tick.t;
         }
       }
       if (step.decision.penaltyMultiplier > 1) {
@@ -1873,13 +2413,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // moments all emit (the shell merges them into ONE pause with queued
       // cards); a moment inside the min-gap window after the previous pause
       // downgrades to the classic lesson toast instead of chaining pauses.
-      const canPause =
-        firstLessonCard ||
-        lastTeachAt === null ||
-        lastTeachAt === tick.t ||
-        tick.t - lastTeachAt >= TEACH_PAUSE_MIN_GAP_S;
+      const lt = capCard(e.code) ? lastCapTeachAt : lastTeachAt;
+      const canPause = firstLessonCard || lt === null || lt === tick.t || tick.t - lt >= TEACH_PAUSE_MIN_GAP_S;
       if (canPause) {
-        teachMoments.push({
+        notePause({
           code: e.code,
           scenarioId: step.decision.scenarioId,
           titleBg: e.titleBg,
@@ -1893,7 +2430,6 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           // promising a free first encounter it is not going to be.
           ...(isTarget ? { lessonMistake: true as const } : {}),
         });
-        lastTeachAt = tick.t;
       } else {
         // The SAME catalogue row as the violation card, so the same summary
         // (`peekBg` above, keyed on the act). Before `HudEvent`'s `lesson`
@@ -2310,6 +2846,47 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
                 fromY: tick.position.y,
                 elapsedSec: 0,
               };
+      }
+    }
+  }
+
+  /*
+   * THE BLOW'S OWN FRAME (round 3, verifier R4). The reducer voids the clean-
+   * driving window in progress on a latch's first stamped frame — the one AFTER
+   * the objective recorded the blow, because the stamp is read off the previous
+   * frame's verdict. A window that happened to fall due ON the blow's frame was
+   * minted before anyone knew, and it covers the mark crossed over the cap. So
+   * on the frame a graded cap is first blown (no stamp yet on this frame, the
+   * verdict flipped to „blown" by the evaluation above) a CLEAN_DRIVING minted
+   * this frame is withdrawn — from the scored ledger and from the glass — and
+   * the next frame's stamp resets the streak. Nothing else on the frame moves.
+   */
+  if (taskSpeedCap === undefined && scoredEvents.some((e) => e.kind === "commendation" && e.code === "CLEAN_DRIVING")) {
+    const i0 = prev.currentObjectiveIndex;
+    const o0 = prev.objectives[i0];
+    const before = prev.evalStates[i0];
+    const after = evalStates[i0];
+    const cap0 = o0 !== undefined && o0.params.kind === "reachZone" ? o0.params.maxSpeedKmh : undefined;
+    const blownThisFrame =
+      before !== undefined &&
+      after !== undefined &&
+      before.type === "reachZone" &&
+      after.type === "reachZone" &&
+      before.approachCap !== "blown" &&
+      after.approachCap === "blown";
+    if (
+      blownThisFrame &&
+      prev.lesson.examMode !== true &&
+      prev.phase === "driving" &&
+      cap0 !== undefined &&
+      shownObjectiveCapKmh(o0.spec, cap0, prev.lesson.postedLimitKmh) < tick.maxSpeedKmh
+    ) {
+      for (let i = scoredEvents.length - 1; i >= 0; i--) {
+        const e = scoredEvents[i];
+        if (e.kind !== "commendation" || e.code !== "CLEAN_DRIVING") continue;
+        scoredEvents.splice(i, 1);
+        const h = hudEvents.findIndex((x) => x.kind === "commendation" && x.titleBg === e.titleBg);
+        if (h >= 0) hudEvents.splice(h, 1);
       }
     }
   }
@@ -3058,15 +3635,19 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
      */
     const out = settleSpeedingTeach({
       rules,
-      tick,
+      // The STAMPED tick: the task ceiling the reducer graded this frame
+      // against is what the kin settlement re-checks (round 2, F2).
+      tick: ruleTick,
       encounters,
       coachOpts,
       lessonTargets,
       alreadyCharged,
     });
     encounters = out.encounters;
-    if (out.scored !== null) scoredEvents.push(out.scored);
-    if (out.escalation !== null) escalations = [...escalations, out.escalation];
+    if (out.scored.length > 0) scoredEvents.push(...out.scored);
+    if (out.escalations.length > 0) escalations = [...escalations, ...out.escalations];
+    // Round 7: a sign-bound arrival taught on the frame the drive completes.
+    for (const c of out.coached) recordCoached(c);
   }
 
   // A15: record WHERE each scored event happened — the tick in hand at
@@ -3085,6 +3666,12 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     eventPositions = [...(eventPositions ?? []), ...recs];
   }
 
+  // What the hand-ended settlement must be able to re-check on `lastTick`: the
+  // condition flags while a TAUGHT weather episode is open (round 4, ruling «Yes,
+  // same as speeding»). Round 14: the cap's settlement reads only the stamp, so
+  // the flags are kept exactly as on the same drive with no cap.
+  const weatherRecord = rules.conditionsSpeed.emitted;
+
   return {
     state: {
       ...prev,
@@ -3098,6 +3685,13 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       scenarioEncounters: encounters,
       penaltyEscalations: escalations,
       lastTeachMomentAtSec: lastTeachAt,
+      // Round 6 (verifier F5): written on the frame of a HEAVY pause only; a
+      // drive that never paused on a charged card or an основна/опасна teach
+      // card never carries it.
+      ...(lastHeavyTeachAt !== null && lastHeavyTeachAt === tick.t ? { lastHeavyTeachMomentAtSec: lastHeavyTeachAt } : {}),
+      // Round 14: the cap's own pause clocks, written on the frame of a cap pause only.
+      ...(lastCapTeachAt !== null && lastCapTeachAt === tick.t ? { lastCapTeachMomentAtSec: lastCapTeachAt } : {}),
+      ...(lastCapHeavyTeachAt !== null && lastCapHeavyTeachAt === tick.t ? { lastCapHeavyTeachMomentAtSec: lastCapHeavyTeachAt } : {}),
       coachedMistakes: coachedNew.length > 0 ? [...coachedPrev, ...coachedNew] : coachedPrev,
       lastT: Math.max(prev.lastT, tick.t),
       // THE DRIVE'S LAST TESTIMONY, kept so the endings that carry no tick can
@@ -3111,7 +3705,36 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // which prove those fields are not graded by stripping them and asserting
       // the state does not move — went red, correctly. The settlement reads
       // only these three.
-      lastTick: { t: tick.t, speedKmh: tick.speedKmh, maxSpeedKmh: tick.maxSpeedKmh, position: tick.position },
+      lastTick: {
+        t: tick.t,
+        speedKmh: tick.speedKmh,
+        maxSpeedKmh: tick.maxSpeedKmh,
+        position: tick.position,
+        // ROUND 2 (F2): what the settlements re-check at a hand ending — the task
+        // stamp the reducer graded this frame against (the cap's), and, while a
+        // TAUGHT weather episode is open (its first bill emitted), the four
+        // condition flags the envelope is derived from, and the bend's advisory
+        // while a taught bend episode is open (round 4, founder ruling «Yes, same
+        // as speeding»). Round 14: the weather's flags follow the weather alone.
+        // A lawful drive, and every drive with no taught weather or bend
+        // overspeed running, keeps exactly the four fields base kept.
+        ...(weatherRecord && ruleTick.rain === true ? { rain: true } : {}),
+        ...(weatherRecord && ruleTick.fog === true ? { fog: true } : {}),
+        ...(weatherRecord && ruleTick.snow === true ? { snow: true } : {}),
+        ...(weatherRecord && ruleTick.isNight === true ? { isNight: true } : {}),
+        ...(rules.curveSpeed.emitted && ruleTick.curveAdvisoryKmh !== undefined
+          ? { curveAdvisoryKmh: ruleTick.curveAdvisoryKmh }
+          : {}),
+        ...(ruleTick.taskSpeedCap !== undefined ? { taskSpeedCap: ruleTick.taskSpeedCap } : {}),
+      },
+      // ROUND 3 (verifier R1/R2/R4): the task ceiling's latch, and a row per
+      // latch that stamped. The latch is written while it lives and once more
+      // to CLEAR it (`...prev` cannot express a field going back to absent);
+      // a drive that never blows a graded cap writes neither.
+      ...(capStep.latch !== undefined || prev.taskCapLatch !== undefined ? { taskCapLatch: capStep.latch } : {}),
+      ...(capStep.breach !== undefined
+        ? { taskCapBreaches: [...(prev.taskCapBreaches ?? []), capStep.breach] }
+        : {}),
       ...(posedAtSec !== undefined ? { posedAtSec } : {}),
       ...(eventPositions !== undefined ? { eventPositions } : {}),
       ...(examTermination !== undefined ? { examTermination } : {}),
@@ -3135,7 +3758,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       ...(mistakeHitAt !== undefined ? { mistakeExperienceHitAtSec: mistakeHitAt } : {}),
     },
     hudEvents,
-    teachMoments,
+    teachMoments: orderTeachMoments(teachMoments),
     ...(mistakeMoment !== undefined ? { mistakeMoment } : {}),
   };
 }
@@ -3455,5 +4078,9 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     // before this ADR and a clean drive after it are the same shape, and no
     // surface has to tell «[]» from «never measured».
     ...(lessonMistakes.length > 0 ? { lessonMistakes } : {}),
+    // Round 3 of the task-cap ruling (verifier R4): the caps this drive blew
+    // and was graded for — the debrief's evidence against unscoped praise.
+    // Absent when none, the same shape rule.
+    ...((state.taskCapBreaches ?? []).length > 0 ? { taskCapBreaches: state.taskCapBreaches } : {}),
   };
 }

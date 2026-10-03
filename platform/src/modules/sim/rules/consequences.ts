@@ -894,6 +894,20 @@ export function formatKmh(v: number): string {
   return Number.isInteger(r) ? String(r) : String(r).replace(".", ",");
 }
 
+/**
+ * „101,85" — every decimal the value carries, to the thousandth the tolerance is kept in (round 14, R1 answered as a
+ * class: every number a card prints is true and every relation it states holds between the PRINTED numbers). The
+ * speeding arithmetic «Измерено X …; минус … T = C …, тоест превишаване с E» printed each term rounded to one decimal
+ * on its own, so above 100 km/h, where the tolerance is a percentage, it stated sums that are false as printed:
+ * «Измерено 105 km/h …; минус … 3,2 km/h = 101,9 km/h» (105 − 3,2 = 101,8) — 324 of the 39,000 (speed, limit, alinea)
+ * combinations a speeding bill can reach (measured in tenths, as the bill's detail carries it), none produced by a
+ * committed drive. Up to 100 km/h every term has at most one decimal and prints exactly as `formatKmh` printed it.
+ */
+export function formatKmhExact(v: number): string {
+  const r = Math.round(v * 1000) / 1000;
+  return String(r).replace(".", ",");
+}
+
 export interface DeviceTolerance {
   /** km/h subtracted from the measured speed. */
   kmh: number;
@@ -922,7 +936,7 @@ export function deviceToleranceKmh(measuredKmh: number): DeviceTolerance {
     branch: flat ? "flat" : "percent",
     labelBg: flat
       ? `± ${formatKmh(TOLERANCE.flatKmh)} km/h (за скорости до ${formatKmh(TOLERANCE.upToKmh)} km/h)`
-      : `± ${formatKmh(TOLERANCE.percent)} % от измерената стойност (за скорости над ${formatKmh(TOLERANCE.upToKmh)} km/h) = ${formatKmh((measuredKmh * TOLERANCE.percent) / 100)} km/h`,
+      : `± ${formatKmh(TOLERANCE.percent)} % от измерената стойност (за скорости над ${formatKmh(TOLERANCE.upToKmh)} km/h) = ${formatKmhExact((measuredKmh * TOLERANCE.percent) / 100)} km/h`,
     delegation: TOLERANCE_DELEGATION,
     subtraction: TOLERANCE_SUBTRACTION,
     size: TOLERANCE_SIZE,
@@ -1058,9 +1072,9 @@ export function deriveSpeedingBand(input: SpeedingBandInput): SpeedingBand {
 
   const scopeBg = SPEEDING_SCOPE_BG[scope];
   const arithmeticBg =
-    `Измерено ${formatKmh(measuredKmh)} km/h при ограничение ${formatKmh(limitKmh)} km/h; ` +
-    `минус максимално допустимата грешка на уреда ${formatKmh(tolerance.kmh)} km/h = ` +
-    `${formatKmh(chargedKmh)} km/h, тоест превишаване с ${formatKmh(Math.max(excessKmh, 0))} km/h.`;
+    `Измерено ${formatKmhExact(measuredKmh)} km/h при ограничение ${formatKmhExact(limitKmh)} km/h; ` +
+    `минус максимално допустимата грешка на уреда ${formatKmhExact(tolerance.kmh)} km/h = ` +
+    `${formatKmhExact(chargedKmh)} km/h, тоест превишаване с ${formatKmhExact(Math.max(excessKmh, 0))} km/h.`;
   const toleranceBg =
     `Грешката на уреда е ${tolerance.labelBg} — „${TOLERANCE_SIZE.quoteBg}“ ` +
     `(${TOLERANCE_SIZE.citationBg}). Приспада се по ${TOLERANCE_SUBTRACTION.citationBg}, ` +
@@ -1077,7 +1091,7 @@ export function deriveSpeedingBand(input: SpeedingBandInput): SpeedingBand {
   if (tier === null) {
     const verdictBg =
       excessWholeKmh < 1
-        ? `След приспадането няма превишаване по чл. 182 — ${formatKmh(chargedKmh)} km/h при ограничение ${formatKmh(limitKmh)} km/h. ` +
+        ? `След приспадането няма превишаване по чл. 182 — ${formatKmhExact(chargedKmh)} km/h при ограничение ${formatKmhExact(limitKmh)} km/h. ` +
           `Приспадането важи за санкцията на пътя (${TOLERANCE_SUBTRACTION.citationBg} говори за акт, наказателно постановление и електронен фиш) и не е част от оценката на урока.`
         : `Стъпало за превишаване с ${excessWholeKmh} km/h ${scopeBg} не е намерено в стълбицата — не се показва число.`;
     return {
@@ -2047,6 +2061,21 @@ const MANOEUVRE_AND_JUDGEMENT_ROADS: Partial<Record<ViolationCode, RoadConsequen
     duties: [D_SPEED_FOR_CONDITIONS],
     headlineBg:
       "Несъобразената скорост няма собствена глоба в ЗДвП. В рамките на ограничението контролният орган няма какво да ти напише — на изпита обаче се брои, защото изпитващият вижда това, което камерата не измерва.",
+    controlPoints: CP_NONE_SPEED_DISTANCE,
+    branches: [CRASH_CASE],
+  },
+  // FOUNDER RULING 2026-09-25 (register item 17). The task's ceiling is the
+  // conditions duty measured against the lesson's own number, so on the street
+  // it is the conditions row: the same offence, the same retrieved duty, the
+  // same licence answer and the same crash branch — built from the SAME
+  // constants, never re-typed. Only the headline differs, and only to say what
+  // the task's number is; the one legal sentence in it is the row above's.
+  TASK_SPEED_CAP_EXCEEDED: {
+    kind: "conditional",
+    offenceBg: "движение с несъобразена скорост",
+    duties: [D_SPEED_FOR_CONDITIONS],
+    headlineBg:
+      "Таванът на задачата не е пътен знак — той е задължението да караш със съобразена скорост, преведено в число за това място. Несъобразената скорост няма собствена глоба в ЗДвП; на изпита обаче се брои, защото изпитващият вижда това, което камерата не измерва.",
     controlPoints: CP_NONE_SPEED_DISTANCE,
     branches: [CRASH_CASE],
   },

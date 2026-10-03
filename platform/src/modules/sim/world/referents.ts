@@ -15,9 +15,9 @@
  * and asserts a REQUIRED-REFERENT predicate per fault code: if the code can
  * fire on this rung, the world must contain the thing the code is about.
  *
- * 51 codes carry a referent. The other 15 are listed in `NO_WORLD_REFERENT`,
- * so the exemption is a reviewed decision rather than an oversight. 51 + 15 =
- * 66 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
+ * 51 codes carry a referent. The other 16 are listed in `NO_WORLD_REFERENT`,
+ * so the exemption is a reviewed decision rather than an oversight. 51 + 16 =
+ * 67 = every code in `rules/catalog.ts`; the module asserts that arithmetic on
  * itself, so a new code cannot ship unchecked and unexempted. (The pin the tree
  * ENFORCES lives in `world/__tests__/world-referent.gate.test.ts`; this
  * paragraph tracks it and is not a second source of truth.)
@@ -136,6 +136,15 @@ export const NO_WORLD_REFERENT: ReadonlySet<FaultCode> = new Set<FaultCode>([
   // and a required-referent rule could only assert that the lesson stages what
   // it stages.
   "WARNING_LAMP_IGNORED",
+  // The sixteenth (founder ruling 2026-09-25, register item 17). The task
+  // ceiling is a fact about the LESSON, not about the world: its referent is
+  // the active objective's own `maxSpeedKmh`, stamped onto the tick by
+  // `lessons/engine.ts` and nowhere else, so no district can be wrong about
+  // it. A required-referent rule could only assert that the objective carries
+  // the cap it carries. What guards the other direction — that the cap is only
+  // graded where the student was shown it — is `lessons/__tests__/
+  // task-cap-ceiling.test.ts` (halt band, cap at or above the sign, exam rung).
+  "TASK_SPEED_CAP_EXCEEDED",
 ]);
 
 /**

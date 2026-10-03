@@ -783,7 +783,19 @@ describe("wave-8 bot completion — sc-hz-accident-scene at L3", () => {
     // dangerous code must never pop a modal mid-manoeuvre); the A9 teach channel
     // is EMPTY even at L3.
     const l3 = replay("mistake-squeeze", 3);
-    expect(l3.taught).toEqual([]);
+    // The collisions are never a card. Round 1 of the 2026-09-25 task-cap
+    // ruling taught TASK_SPEED_CAP_EXCEEDED at ~14.3 s (the ≤35 «slow» mark
+    // went by at 46); ROUND 2 binds that ceiling only over its 36 m stretch to
+    // the next goal (verifier C2) and bills only above gate + 5 (C1), and the
+    // squeeze never spends 3 s over 40 inside it — so, as before the ruling,
+    // the channel is empty.
+    // ROUND 5 (2026-09-26, round-4 verifier F2 — «the named FEATURE governs»):
+    // the ceiling now binds through the scene the task names, to its authored
+    // end at y 195, not to the next goal's far edge (≈158) — and the squeeze
+    // holds 46 over the ≤35 cap (bill line 40) for more than 3 s inside it, so
+    // the task code teaches ONCE. The collisions themselves are still scored on
+    // the spot and never a card, which is what this counter-proof is about.
+    expect(l3.taught).toEqual(["TASK_SPEED_CAP_EXCEEDED"]);
     // TWO BODIES, TWO ROWS — and the BODIES are the assertion, never the count.
     //
     // MEASURED (2026-08-18) on this exact drive's contact channel — 26 reports

@@ -57,6 +57,10 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   // CURVE-ENVELOPE slice (doc 72 SP-05) — the library event explicitly lists
   // curve geometry among its detections („в завой карай осезаемо по-бавно").
   SPEED_TOO_FAST_FOR_CURVE: "ev-speed-for-conditions",
+  // Founder ruling 2026-09-25 (register item 17): the task ceiling is the same
+  // чл. 20, ал. 2 duty as the two rows above, so it is the same mini-lesson. Its
+  // first-fault GRACE is its own since round 14 (`teachTopicForCode` below).
+  TASK_SPEED_CAP_EXCEEDED: "ev-speed-for-conditions",
   // MOTORWAY-SEGMENT slice (doc 72 SP-10) — ev-speed-limit explicitly covers
   // „don't crawl below a posted minimum"; the emergency-lane ban is the lane-
   // legality discipline (which lane may be travelled — ev-lane-discipline).
@@ -67,6 +71,25 @@ const CODE_TO_SCENARIO: Record<string, string> = {
 /** Scenario event id for a catalog code, or null when it maps to no scenario. */
 export function scenarioForCode(code: string): string | null {
   return CODE_TO_SCENARIO[code] ?? null;
+}
+
+/**
+ * THE FIRST-FAULT GRACE'S TOPIC — the key `coach.ts` counts the free teach on (founder ruling 16, 2026-09-21: one free
+ * teach per TOPIC, not per code). It is the scenario a code maps to, except where a ruling gives a code a grace of its
+ * own:
+ *  · TASK_SPEED_CAP_EXCEEDED — founder ruling 2026-10-03, verbatim: «Cap adds, never removes. The task cap is an extra
+ *    rule on top. Its bill stands on its own; the bend/weather bills are charged exactly as they would be in a lesson
+ *    with no cap. Blowing the cap can only add, never lower the score, and order never matters.» Sharing the чл. 20,
+ *    ал. 2 topic (ruling 1's first reading) made a cap teach spend the weather's and the bend's free teach — so the
+ *    same bend cost 3 after a blown mark and 0 without it — and made a weather teach spend the cap's. So the cap is
+ *    graced on its OWN fault (ruling 16 applied to the cap's own fault), while it keeps its mini-lesson
+ *    (`scenarioForCode`).
+ */
+const OWN_TEACH_TOPIC: Readonly<Record<string, string>> = {
+  TASK_SPEED_CAP_EXCEEDED: "task-speed-cap",
+};
+export function teachTopicForCode(code: string): string | null {
+  return OWN_TEACH_TOPIC[code] ?? scenarioForCode(code);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +149,14 @@ export function scenarioForCode(code: string): string | null {
  *  - SPEED_TOO_FAST_FOR_CONDITIONS vs SPEED_TOO_FAST_FOR_CURVE — one чл. 20,
  *    ал. 2 duty but two independent triggers (weather vs an authored curve
  *    advisory), and a rainy bend can arm both at once.
+ *  - TASK_SPEED_CAP_EXCEEDED (2026-09-25) vs either of those two — the same
+ *    duty, but a different number: the task's own ceiling, an extra rule on top
+ *    (founder ruling 2026-10-03, «Cap adds, never removes»). `rules/engine.ts`
+ *    bills it in a ledger of its own that never absorbs, and is never absorbed
+ *    by, a weather, bend or speeding bill, and its first-fault grace is its own
+ *    (`teachTopicForCode`) — so a repeat of the cap is a repeat of the cap
+ *    alone, and pooling it with either code would print «повторна грешка ×1.5»
+ *    for a mistake made once.
  *  - STANDSTILL_GAP_TOO_CLOSE — Наредба № 38 приложение № 5, a standstill
  *    positioning rule, and `rules/engine.ts` says in as many words that a
  *    moving queue „is the FOLLOWING_TOO_CLOSE family's business", not its.

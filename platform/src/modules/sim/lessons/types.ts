@@ -25,6 +25,7 @@ import type {
 } from "../rules";
 import type { PreDriveMachine } from "../procedures";
 import type { EscalatedMistake, PenaltyEscalation } from "./escalation";
+import type { TaskCapStretch, TaskCapStretchProgress } from "./finish";
 
 /**
  * The FOUR fields the end-of-drive speeding settlement needs — and the WHOLE
@@ -36,8 +37,25 @@ import type { EscalatedMistake, PenaltyEscalation } from "./escalation";
  * tick it is taken from, and it is deliberately not widened: every field added
  * here becomes a field the session state carries, which is measured by the two
  * `*-not-graded` guard suites as a change in state. See `lastTick`.
+ *
+ * WIDENED ONCE, ON PURPOSE (2026-09-25, round 2 of the task-cap ruling,
+ * verifier F2): the SAME principle now settles the task ceiling's act
+ * (`rules/engine.ts settleUnpaidTaskTeach`, the cap ledger's own since round
+ * 14) and the weather envelope's — and those re-checks need the task stamp the
+ * reducer graded the last frame against and the four condition flags the
+ * envelope is derived from. They are OPTIONAL and written only when set, so a dry,
+ * uncapped frame keeps exactly the four fields above; and none of them is a
+ * field the `*-not-graded` suites strip (`edgeAlignment`, `sM`, `distM` stay
+ * out), so those guards stay as sharp as they were.
+ *
+ * AND ONCE MORE (round 4, founder ruling 2026-09-25 «Yes, same as speeding»):
+ * `curveAdvisoryKmh`, so the no-task settlement (`rules/engine.ts
+ * settleUnpaidAdaptationTeach`) can re-check a taught bend overspeed at a hand
+ * ending. Written only while a taught bend episode is open; the condition flags
+ * are now also written while a taught weather episode is open.
  */
-export type SpeedingSettleTick = Pick<SimTick, "t" | "speedKmh" | "maxSpeedKmh" | "position">;
+export type SpeedingSettleTick = Pick<SimTick, "t" | "speedKmh" | "maxSpeedKmh" | "position"> &
+  Partial<Pick<SimTick, "rain" | "fog" | "snow" | "isNight" | "taskSpeedCap" | "curveAdvisoryKmh">>;
 
 // ---------------------------------------------------------------------------
 // Objective parameters (typed views over LessonObjective.params)
@@ -1737,6 +1755,21 @@ export interface LessonSessionState {
    */
   lastTeachMomentAtSec: number | null;
   /**
+   * Round 6 of the 2026-09-25 task-cap ruling (verifier F5): session time of the
+   * last HEAVY teach pause — one that held a card other than a lower-class teach
+   * card (uncharged, второстепенна — the task cap is one). On L1 only a heavy
+   * pause refuses a charged card for `TEACH_PAUSE_MIN_GAP_S`
+   * (`engine.ts isLowerClassTeach`). Absent until the drive's first one.
+   */
+  lastHeavyTeachMomentAtSec?: number;
+  /**
+   * Round 14 (founder ruling 2026-10-03, «Cap adds, never removes»): the same two clocks for the task cap's cards
+   * alone, so a cap card never turns another code's teach pause into a toast (`engine.ts` „THE CAP'S OWN PAUSE
+   * CLOCKS"). Absent until the drive's first cap pause.
+   */
+  lastCapTeachMomentAtSec?: number;
+  lastCapHeavyTeachMomentAtSec?: number;
+  /**
    * Every violation shown to the student that the score deliberately did not
    * charge (see CoachedMistake): the teach-pause card, its rate-limited toast
    * downgrade, the learn-only ambient toast and the THEO-3 consequence moment
@@ -1791,6 +1824,39 @@ export interface LessonSessionState {
    * instead of teaching them to ignore a field.
    */
   lastTick?: SpeedingSettleTick;
+  /**
+   * THE TASK CEILING'S LATCH — round 3 of the 2026-09-25 ruling (verifier R1,
+   * R2). Created on the first frame the active objective's mark is blown
+   * (`approachCap: "blown"`): it fixes the STRETCH that cap governs
+   * (`finish.ts taskCapStretch`, a bounded region) and walks the car through
+   * it (`stepTaskCapStretch`). While it is live and the car is inside the
+   * stretch the reducer's tick carries the task stamp, whatever the objective's
+   * own `approachCap` does in the meantime — its fresh-approach reset on the
+   * ring was one of the two flickers that billed one continuous overspeed once
+   * per lap. Released when the objective changes; once SPENT (the goal left
+   * behind) it stamps nothing until the mark is blown AGAIN after the objective
+   * has stopped reading „blown" (`rearmed`), which is a new latch and a new
+   * act. Absent on every drive that never blows a flow cap under the sign, and
+   * written back only when present or being cleared, so those drives' state is
+   * unchanged. `blownAtSec` is the latch's name on the stamp.
+   * ROUND 4 (founder ruling 2026-09-25 «Only the named stretch»): the stretch
+   * also ends where the feature the task names ends (`taskCapFeatures.ts`; by
+   * default the capped zone itself), and a spent, un-re-armed latch on the
+   * active objective is what takes the cap off the strip and the banner
+   * (`advisor.ts taskCapReleased`).
+   */
+  taskCapLatch?: TaskCapLatch;
+  /**
+   * EVERY TASK CEILING THIS DRIVE BLEW AND WAS GRADED FOR — round 3 (verifier
+   * R4). One row per latch, written on the latch's first STAMPED frame (so a cap
+   * at or above the sign, the halt band and exam rungs never write one) — or,
+   * since round 4, on the latch's own first frame when the cap is graded there
+   * and the (often zone-short) stretch is already behind the car. It is
+   * the debrief's evidence that the drive broke a cap even when the breach was
+   * shorter than the task code's sustain and left no bill or card: praise on
+   * such a drive is scoped, never unscoped. Absent when empty.
+   */
+  taskCapBreaches?: TaskCapBreach[];
   /**
    * FRAME-ZERO POSE GUARD (doc 87 B3/B10/B11 — „it states 2 tasks and it is
    * only 1 task"). Session time of the first tick that DESCRIBED THE VEHICLE:
@@ -2100,4 +2166,41 @@ export interface LessonResult {
    * `lessonMistake.ts foldLessonMistakes` on BOTH sides (see `LessonMistakeHit`).
    */
   lessonMistakes?: LessonMistakeHit[];
+  /**
+   * The task ceilings this drive BLEW and was graded for (round 3, verifier
+   * R4) — `LessonSessionState.taskCapBreaches`, carried to both debrief
+   * sites (and across the wire, `FinishLessonWire.taskCapBreaches`) so that a
+   * drive that broke a cap is never praised unscoped, even when the breach at
+   * the mark was too short to bill. Absent when none — every uncapped drive and
+   * every drive that honoured its caps keeps today's shape and today's praise.
+   */
+  taskCapBreaches?: TaskCapBreach[];
+}
+
+/**
+ * One blown task ceiling (round 3, verifier R4): which objective's cap, and the
+ * session second its latch first stamped the reducer's tick — or, since round 4
+ * (the stretch is often only the capped zone), the second the latch was created
+ * if the cap was graded there and no stamped frame followed. An objective id
+ * and a time, never copy — the server re-validates the id against the lesson
+ * it recompiles (`wire.ts`).
+ */
+export interface TaskCapBreach {
+  objectiveId: string;
+  t: number;
+}
+
+/** The task ceiling's latch — see `LessonSessionState.taskCapLatch`. */
+export interface TaskCapLatch {
+  /** The objective whose blown cap this is. */
+  objectiveIndex: number;
+  /** Session second the latch was created — the stamp's `blownAtSec`. */
+  blownAtSec: number;
+  /** The region the cap governs, fixed at the blow — and, since round 4, where the feature its task names ends (`stretch.featureEnd`). */
+  stretch: TaskCapStretch;
+  progress: TaskCapStretchProgress;
+  /** The latch's breach row is written (it stamped, or — round 4 — it was created at a graded cap). */
+  stamped: boolean;
+  /** Spent, and the objective has since stopped reading „blown": the next blow is a new latch. */
+  rearmed: boolean;
 }

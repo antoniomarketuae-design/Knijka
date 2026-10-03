@@ -1174,6 +1174,13 @@ export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPr
     return yieldWaitAdvisorPrompt(waiting.reason, heldWaitSec(s, waiting), convicted);
   }
 
+  // «WHEREVER THE GRADING STOPS, THE SCREEN MUST STOP TOO» (founder ruling
+  // 2026-09-25 «Only the named stretch»): once the blown cap's stretch is spent
+  // the sheet no longer grades it, so the sentence stops asking for it — and
+  // with it the strip and the banner, which print this sentence's figure
+  // (`LessonPlayShell taskCapKmhFromPrompt` / `snapshotOf`).
+  if (taskCapReleased(s)) return taskSentencePrompt(active.spec.titleBg, []);
+
   // The author's own cap comes off the RAW compiled objective, not off
   // `active.params` — `parseObjectiveParams` built those from a whitelist and
   // dropped the key on the way, which is the property that keeps a coaching
@@ -1185,6 +1192,35 @@ export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPr
     s.evalStates[s.currentObjectiveIndex],
     s.lesson.postedLimitKmh,
     authoredCapOf(active.spec),
+  );
+}
+
+/**
+ * HAS THE ACTIVE OBJECTIVE'S TASK CAP STOPPED BINDING? — founder ruling
+ * 2026-09-25 «Only the named stretch», round-3 verifier COND-C 1.
+ *
+ * A blown objective never completes, so it stays active for the rest of the
+ * drive, and every surface that states the task's ceiling kept stating it:
+ * the advisor's «— дръж под N км/ч», the strip's «задачата иска ≤N», the
+ * banner's task line. The sheet stops grading that ceiling once the car leaves
+ * the feature the task names (`lessons/engine.ts stepTaskCapLatch`: the latch
+ * is SPENT), so from that frame the glass may not print it either — a number
+ * nothing grades teaches the student that the numbers are decoration.
+ *
+ * True exactly while the ACTIVE objective's latch is spent and has not been
+ * re-armed. A fresh approach that clears the objective's verdict re-arms it
+ * (`rearmed`), and the cap is an arrival demand again — so it is shown again.
+ * No latch (never blown, honoured, an exam rung, a halt cap) → false: those
+ * surfaces keep exactly what they printed before.
+ */
+export function taskCapReleased(s: LessonSessionState): boolean {
+  const l = s.taskCapLatch;
+  return (
+    s.phase === "driving" &&
+    l !== undefined &&
+    l.objectiveIndex === s.currentObjectiveIndex &&
+    l.progress.spent &&
+    !l.rearmed
   );
 }
 

@@ -1189,6 +1189,362 @@ function targetPoint(params: ObjectiveParams): Point | null {
 }
 
 /**
+ * THE STRETCH A TASK'S SPEED CAP GOVERNS — a BOUNDED REGION (round 3 of the
+ * founder ruling 2026-09-25, register item 17, „Bill it"; adversarial verifier
+ * R1 on round 2).
+ *
+ * WHY IT IS NEEDED. Round 1 stamped the task ceiling for as long as the capped
+ * objective stayed live — and a blown objective never completes, so that was
+ * „for the rest of the drive". Round 2 bounded it to „the mark to the far edge
+ * of the next goal", but measured only ALONG the chord between the two marks:
+ * a half-plane strip with no sideways limit. On a roundabout the next goal
+ * collapsed to the ring's centre with radius 0 (`targetPoint`), the strip ran
+ * from (0, 21.94) to (0, 0), and every point with 0 ≤ y ≤ 21.94 counted as
+ * inside — the whole west exit arm, indefinitely. Measured by the verifier on
+ * `sc-rb-lane-choice`: 32 through the ≤20 mark, corrected to 18 on the ring,
+ * then 30–45 km/h on the posted-50 arm — taught, then charged 60–150 m past
+ * the ring, at every rung. Its census along the committed shadow routes found
+ * 60 of 521 capped rows still stamped past the next goal's far edge
+ * (`sc-junction-gap`: 30 m of a posted-50 road under ≤30).
+ *
+ * WHAT THE STRETCH IS NOW — the carriageway from the mark to the next goal,
+ * and nothing else:
+ *  · THE GOAL'S OWN AREA — the next located objective's work site, the one the
+ *    finish gates use (`finishAnchor`): a waypoint's or a junction's
+ *    acceptance disc, a roundabout's ARMING circle (`enterRadiusM`, the circle
+ *    that CONTAINS the ring — O23), a turn box's circumradius, a bay's finish
+ *    disc. Never a point: a ring is a place, not its centre.
+ *  · THE ROAD TO IT, as far as the objectives can say where it runs: never
+ *    behind the mark (the half-plane ahead of it on the student's own approach,
+ *    `approachFrom`, latched by the evaluator), and
+ *      – when the goal lies ahead within a corridor's width of the approach
+ *        line, a straight corridor ±TASK_CAP_CORRIDOR_HALF_WIDTH_M along the
+ *        chord to it;
+ *      – when it lies ahead and off to one side — a junction turn, a bend —
+ *        the TRIANGLE between the mark, the CORNER (the goal's foot on the
+ *        approach line) and the goal, widened by the same half-width along
+ *        its three sides. Any road that carries straight on and then turns for
+ *        the goal, and any convex bend from the mark's tangent round to the
+ *        goal, lies inside it; a straight corridor alone did not (measured on
+ *        the committed shadows: 212 m of `sc-sp-curve`'s bend and 195 m of
+ *        `sc-ov-crest-curve`'s fell outside), and neither did a car that
+ *        changed lanes just before the mark and so latched a slanted approach.
+ *  · IT ENDS WHERE THE CAR LEAVES IT — having been in the goal's area and left
+ *    it, whichever way (the ring's exit arm, the priority road past the stop
+ *    line's disc, back down the approach after a U-turn box), or having left
+ *    the region without reaching the goal (a crossing street, a side turning).
+ *    Either way the stretch is SPENT for good (`stepTaskCapStretch`): a spent
+ *    stretch cannot be re-entered, so no gap in it can ever close a billed act
+ *    and open a second one (verifier R2). The only way back under this cap is
+ *    to blow its mark again, which is a new latch (`lessons/engine.ts`).
+ *
+ * WITH NO LATER GOAL (the cap is on the route's last located objective), the
+ * goal is the capped zone itself and the corridor runs its radius past the
+ * mark: the ceiling binds until the car leaves the zone it was put for. An
+ * unknown approach there ⇒ null ⇒ no ceiling: an unknown never convicts.
+ *
+ * ROUND 4 — ONLY THE NAMED STRETCH (founder ruling 2026-09-25 «Only the named
+ * stretch»; round-3 verifier COND-B). The region above is an OUTER bound, and
+ * it was being used as the whole answer: `sc-sp-curve`'s mid-curve ≤50 mark has
+ * the finish zone 160 m down the straight posted 90 as its next goal, so a
+ * driver who blew the mark at 70, corrected to 45 through the rest of the bend
+ * and then drove 60–80 on the straight was taught and charged there. The
+ * founder: «a breached task cap binds ONLY through the feature the task names —
+ * the bend, the spray curtain, the zone — and stops where that feature ends.
+ * After it, only the posted limit grades.» So the stretch now also carries
+ * WHERE THAT FEATURE ENDS (`featureEnd`), and the car leaving the feature
+ * spends it exactly as leaving the region does:
+ *  · a GATE — the authored end of a span the task names (the bend's exit, the
+ *    end of the ice, of the В24 zone, of a posted-limit zone, of the works):
+ *    spent once the car is past the line through that point, square to the
+ *    road there (`taskCapFeatures.ts`, pinned to the committed world);
+ *  · an AREA — the ring the task says to stay in, or, BY DEFAULT, the capped
+ *    zone ITSELF: a task that names nothing beyond its own mark («Мини
+ *    контролната зона…», «Приближи…», «Дръж своята лента под 45 км/ч») names
+ *    its zone, and the cap binds across that zone and not a metre further;
+ *  · the NEXT GOAL — a feature that travels with the car past the next goal
+ *    (the spray curtain behind its paced truck, a lead the task says to follow,
+ *    a condition over the whole section): the region is then the tighter bound
+ *    and is the whole answer, as in round 3.
+ * The region never grows (a feature end can only shorten it), so the ruling
+ * can only ever acquit a frame round 3 billed, never bill one it acquitted.
+ *
+ * ROUND 5 — THE NAMED FEATURE GOVERNS, BOTH WAYS (round-4 verifier F2). Keeping
+ * round 3's region as the outer bound made «stops where that feature ends»
+ * false wherever the feature runs on past the next goal: the accident scene's
+ * В27 span ends at 195 but its next goal's far edge is ≈158, so 37 m of the
+ * scene were left unbound (and a car held over the cap through it was never
+ * even taught, 2.5 s of stretch against a 3 s sustain); the ice ends at 300 and
+ * the next goal's edge is 286. The ruling names the FEATURE, so the feature is
+ * now the whole answer wherever the task names one:
+ *  · a GATE — the region is built toward the GATE, not toward the next goal:
+ *    the corridor (or widened triangle, for a gate off to one side — a bend's
+ *    exit) from the mark to the gate point, with a corridor-width disc round
+ *    the gate so the lane either side of it is inside. The corridor is still
+ *    what keeps a car that turns off before the gate from carrying the cap
+ *    down a side street; the next goal no longer cuts the span short;
+ *  · an AREA — the ring the task says to stay in, or the capped zone itself:
+ *    the area alone, entered or not by the region (a ring is circulated, so
+ *    «never behind the mark» was never its shape);
+ *  · the NEXT GOAL — unchanged: a feature that travels with the car (the
+ *    curtain, a lead, a section) ends where the next goal's area is left.
+ * The span census (`task-cap-span-census.test.ts`) measures both directions:
+ * no stamped metre past a feature's end, and no graded, unstamped metre short
+ * of it.
+ *
+ * Past the stretch the sign (SPEEDING_*) and the weather (SPEED_TOO_FAST_FOR_
+ * CONDITIONS) are still graded, by their own codes. Pure; a null stretch is
+ * never graded.
+ */
+
+/**
+ * WHERE THE FEATURE A TASK NAMES ENDS — see ROUND 4 above. Every value is in
+ * world metres; a gate's (ux, uy) is the direction of travel through it (unit).
+ */
+export type TaskCapFeatureEnd =
+  | { kind: "gate"; x: number; y: number; ux: number; uy: number }
+  | { kind: "area"; x: number; y: number; radiusM: number }
+  | { kind: "goal" };
+
+export interface TaskCapStretch {
+  /** The capped mark. */
+  markX: number;
+  markY: number;
+  /** The student's approach direction at the mark (unit), or null when unknown. */
+  approach: { ux: number; uy: number } | null;
+  /** The goal's foot on the approach line — present only when the goal lies ahead and off to one side. */
+  corner: Point | null;
+  /** Half the corridor's width, either side of every side of the region. */
+  halfWidthM: number;
+  /**
+   * The area the region leads to; the stretch is spent once the car has been in
+   * it and left. The next goal's own area — or, since round 5, for a feature
+   * that ends at a GATE, a corridor-width disc round the gate itself (the next
+   * goal no longer bounds a span the task names), and for an AREA feature the
+   * area.
+   */
+  goal: { x: number; y: number; radiusM: number };
+  /** Where the feature the task names ends (round 4) — the stretch is spent once the car is past it. */
+  featureEnd: TaskCapFeatureEnd;
+}
+
+/**
+ * HALF THE CORRIDOR'S WIDTH, metres — one and a half lane pitches: the lane the
+ * mark stands in plus one whole lane on either side of it, to their outer
+ * edges. The pitch is the product's `LANE_WIDTH_M` (3.25 m × the 2.5
+ * perceptual road scale = 8.125 m — `runtime/spatial.ts`, `world/builders/
+ * constants.ts`; restated as a number because a lesson may not import the
+ * world, the same way `scenario/templates-flow.ts` restates it). On the widest
+ * carriageway the catalogue drives — the three-lane motorway, marks on its
+ * middle lane — that is the whole carriageway; on a two-way street it is both
+ * lanes and the kerb. A car that leaves it has left the road the cap was
+ * written for.
+ */
+export const TASK_CAP_CORRIDOR_HALF_WIDTH_M = 1.5 * 8.125;
+
+/** The next objective's work site — where it happens, as an AREA. See `finishAnchor`. */
+function goalArea(params: ObjectiveParams): { x: number; y: number; radiusM: number } | null {
+  switch (params.kind) {
+    case "reachZone":
+    case "passSignal":
+      return { x: params.x, y: params.y, radiusM: params.radiusM };
+    case "driveDistance":
+      return null;
+    case "completeManeuver":
+      switch (params.maneuver) {
+        case "parkInBay":
+          return { x: params.bay.x, y: params.bay.y, radiusM: FINISH_BAY_RADIUS_M };
+        case "roundabout":
+          return { x: params.x, y: params.y, radiusM: params.enterRadiusM };
+        case "threePointTurn":
+          return {
+            x: params.corridor.x,
+            y: params.corridor.y,
+            radiusM: Math.hypot(params.corridor.halfWidthM, params.corridor.halfLengthM),
+          };
+        case "smoothStop":
+        case "emergencyStop":
+          return null;
+      }
+  }
+}
+
+export function taskCapStretch(
+  objectives: readonly ObjectiveParams[],
+  index: number,
+  approachFrom: Point | null,
+  /**
+   * Where the feature the task names ends (`taskCapFeatures.ts`). Absent — a
+   * task that names nothing beyond its own mark — is THE ZONE: the capped disc
+   * itself, left behind once the car is outside it (round 4, the default).
+   */
+  featureEndOrZone?: TaskCapFeatureEnd,
+): TaskCapStretch | null {
+  const capped = objectives[index];
+  if (capped === undefined || capped.kind !== "reachZone") return null;
+  const W = TASK_CAP_CORRIDOR_HALF_WIDTH_M;
+  const mx = capped.x;
+  const my = capped.y;
+  const featureEnd: TaskCapFeatureEnd = featureEndOrZone ?? { kind: "area", x: mx, y: my, radiusM: capped.radiusM };
+  let approach: { ux: number; uy: number } | null = null;
+  if (approachFrom !== null) {
+    const ax = mx - approachFrom.x;
+    const ay = my - approachFrom.y;
+    const m = Math.hypot(ax, ay);
+    if (m >= 1e-6) approach = { ux: ax / m, uy: ay / m };
+  }
+  const cornerFor = (goal: { x: number; y: number }): Point | null => {
+    if (approach === null) return null;
+    const dx = goal.x - mx;
+    const dy = goal.y - my;
+    const ahead = dx * approach.ux + dy * approach.uy;
+    const across = Math.abs(dx * approach.uy - dy * approach.ux);
+    return ahead > 0 && across > W ? { x: mx + approach.ux * ahead, y: my + approach.uy * ahead } : null;
+  };
+  // ROUND 5 — THE NAMED FEATURE GOVERNS (see the header): a span the task names
+  // is led to by the region up to its own end, whatever the next goal is; an
+  // area the task names is its own stretch.
+  if (featureEnd.kind === "gate") {
+    const goal = { x: featureEnd.x, y: featureEnd.y, radiusM: W };
+    return { markX: mx, markY: my, approach, corner: cornerFor(goal), halfWidthM: W, goal, featureEnd };
+  }
+  if (featureEnd.kind === "area") {
+    const goal = { x: featureEnd.x, y: featureEnd.y, radiusM: featureEnd.radiusM };
+    return { markX: mx, markY: my, approach, corner: null, halfWidthM: W, goal, featureEnd };
+  }
+  for (let j = index + 1; j < objectives.length; j++) {
+    const goal = goalArea(objectives[j]);
+    if (goal === null) continue;
+    return { markX: mx, markY: my, approach, corner: cornerFor(goal), halfWidthM: W, goal, featureEnd };
+  }
+  if (approach === null) return null;
+  return {
+    markX: mx,
+    markY: my,
+    approach,
+    corner: null,
+    halfWidthM: W,
+    goal: { x: mx, y: my, radiusM: capped.radiusM },
+    featureEnd,
+  };
+}
+
+/** Is the point inside the goal's own area? */
+function inTaskCapGoal(stretch: TaskCapStretch, position: Point): boolean {
+  return (
+    Math.hypot(position.x - stretch.goal.x, position.y - stretch.goal.y) <= stretch.goal.radiusM
+  );
+}
+
+/** Within `w` of the segment a→b, between perpendiculars at its ends (`backM` more behind a). */
+function inBand(ax: number, ay: number, bx: number, by: number, p: Point, w: number, backM = 0): boolean {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return false;
+  const ux = dx / len;
+  const uy = dy / len;
+  const rx = p.x - ax;
+  const ry = p.y - ay;
+  const s = rx * ux + ry * uy;
+  if (s < -backM || s > len) return false;
+  return Math.abs(rx * uy - ry * ux) <= w;
+}
+
+/** Inside (or on) the triangle a–b–c. */
+function inTriangle(a: Point, b: Point, c: Point, p: Point): boolean {
+  const d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
+  const d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
+  const d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
+  const neg = d1 < 0 || d2 < 0 || d3 < 0;
+  const pos = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(neg && pos);
+}
+
+/**
+ * Is the point inside the stretch's REGION — the goal's area, or (never behind
+ * the mark) the corridor or widened triangle that leads to it? Geometry only:
+ * whether the stretch has already been spent is `stepTaskCapStretch`'s question.
+ */
+export function withinTaskCapStretch(stretch: TaskCapStretch, position: Point): boolean {
+  if (inTaskCapGoal(stretch, position)) return true;
+  const W = stretch.halfWidthM;
+  const m = { x: stretch.markX, y: stretch.markY };
+  const g = { x: stretch.goal.x, y: stretch.goal.y };
+  const u = stretch.approach;
+  if (u !== null && (position.x - m.x) * u.ux + (position.y - m.y) * u.uy < 0) return false;
+  // With the approach known the half-plane above is the „never behind the mark"
+  // clip, so the chord's own band may start a corridor's width back (a blow
+  // point just past the mark but beside it must not read as outside).
+  const back = u !== null ? W : 0;
+  if (stretch.corner === null) return inBand(m.x, m.y, g.x, g.y, position, W, back);
+  const c = stretch.corner;
+  return (
+    inTriangle(m, c, g, position) ||
+    inBand(m.x, m.y, c.x, c.y, position, W, back) ||
+    inBand(c.x, c.y, g.x, g.y, position, W) ||
+    inBand(m.x, m.y, g.x, g.y, position, W, back)
+  );
+}
+
+/** Whether the car has been inside the goal's area, and whether the stretch is spent. */
+export interface TaskCapStretchProgress {
+  reached: boolean;
+  spent: boolean;
+}
+
+export const TASK_CAP_STRETCH_START: TaskCapStretchProgress = { reached: false, spent: false };
+
+/**
+ * One frame of the stretch: the car is INSIDE it while it is within the region
+ * and the stretch has not been spent. It is SPENT — for good — on the first
+ * frame the car is outside the region, and on the first frame it is outside the
+ * goal's area after having been in it (so a car that re-enters the corridor
+ * behind the goal, driving back after a U-turn, is not re-bound). The only way
+ * to be bound by this cap again is to blow its mark again — a new latch.
+ */
+export function stepTaskCapStretch(
+  stretch: TaskCapStretch,
+  progress: TaskCapStretchProgress,
+  position: Point,
+): { inside: boolean; progress: TaskCapStretchProgress } {
+  if (progress.spent) return { inside: false, progress };
+  // ROUND 4: past the end of the feature the task names — spent, whatever the
+  // region would still allow.
+  if (pastTaskCapFeature(stretch.featureEnd, position)) {
+    return { inside: false, progress: { reached: progress.reached, spent: true } };
+  }
+  // ROUND 5: an AREA the task names (the ring, the capped zone) is its own
+  // stretch because `taskCapStretch` makes the area the region's GOAL: inside
+  // it is the goal's own area (below), and leaving it is past the feature
+  // (above) — so no region test is ever reached for it (verifier F2).
+  if (inTaskCapGoal(stretch, position)) {
+    return { inside: true, progress: progress.reached ? progress : { reached: true, spent: false } };
+  }
+  if (progress.reached || !withinTaskCapStretch(stretch, position)) {
+    return { inside: false, progress: { reached: progress.reached, spent: true } };
+  }
+  return { inside: true, progress };
+}
+
+/**
+ * Has the car left the feature the task names (round 4)? A gate is left once
+ * the car is past the line through its point, square to the direction of
+ * travel there; an area once the car is outside it; `goal` never (the region's
+ * own goal rule ends it). Pure; also read by the span census.
+ */
+export function pastTaskCapFeature(end: TaskCapFeatureEnd, position: Point): boolean {
+  switch (end.kind) {
+    case "gate":
+      return (position.x - end.x) * end.ux + (position.y - end.y) * end.uy > 0;
+    case "area":
+      return Math.hypot(position.x - end.x, position.y - end.y) > end.radiusM;
+    case "goal":
+      return false;
+  }
+}
+
+/**
  * The terminal objective's zone BEFORE clamping — null only when the route
  * genuinely ends nowhere (a distance to cover, a stop to perform anywhere).
  *

@@ -536,7 +536,11 @@ describe("census — every lesson card engine.ts writes either carries a summary
   it("the endings really are unreachable — the three facts the exemption rests on", () => {
     expect(SHELL_SRC).toContain("const ended = result !== null;");
     expect(SHELL_SRC).toContain('if (state.phase === "completed") finalize(state);');
-    expect(SHELL_SRC).toMatch(/const r = buildLessonResult\(state\);\s*setResult\(r\);/);
+    // Round 5 (2026-09-26, verifier F6): finalize's body is now the exported
+    // `finalizeLessonSession`, which the callback calls synchronously with the
+    // shell's own `setResult` — the same fact, one call deeper.
+    expect(SHELL_SRC).toMatch(/const r = buildLessonResult\(state\);\s*deps\.setResult\(r\);/);
+    expect(SHELL_SRC).toMatch(/finalizeLessonSession\(state, \{[\s\S]{0,600}?\bsetResult,/);
   });
 
   it("MUTATION: the census catches a card that loses its line, and refuses an unreadable one", () => {
@@ -576,6 +580,12 @@ describe("census — every lesson card engine.ts writes either carries a summary
       // Single-quoted ON PURPOSE: law-citations.test.ts reads every double-quoted
       // lawRef value under modules/sim as a citation (comments included), and
       // «e.lawRef» is a source expression, not law. Same string value either way.
+      // 3 → 4 → 3. Round 3 of the task-cap ruling (2026-09-25, verifier C3) added
+      // a fourth catalogue-retrieved card — a kin bill SURFACED inside an open
+      // чл. 20, ал. 2 act (`kinSurface`); round 14 (founder ruling 2026-10-03,
+      // «Cap adds, never removes») removed it with the kin ledger, so the three
+      // cards base had are the three there are. Frozen at the exact count so
+      // dropping the citation from ANY of them is caught.
       { title: 'e.titleBg', lawRef: 'e.lawRef', count: 3 },
     ];
 

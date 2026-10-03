@@ -3,19 +3,19 @@
  "command": "RECORD_REVIEWED_TEXT_MANIFEST=1 npx vitest run --maxWorkers=1 src/modules/sim/lessons/scenario/__tests__/reviewed-text-manifest.test.ts",
  "surfaces": {
   "catalog": {
-   "fingerprint": "eb75718250eee68c66853766b8523d7a971d13ff8afc33c31883fb87adf70d03",
+   "fingerprint": "a65693ac3f46942277b1415c28481bb7cf94fbf4063a69b97aaf94602e57693e",
    "units": 12,
-   "strings": 558
+   "strings": 564
   },
   "consequences": {
-   "fingerprint": "bc6c53ce4dc40688ee87d3da62d70804379b6024e53430cf80994edceafc53ec",
+   "fingerprint": "a9827e20b7e5941fb8941d47ba49040cc69104de6f17d3cf3027bc949a056b72",
    "units": 16,
-   "strings": 920
+   "strings": 922
   },
   "n38": {
-   "fingerprint": "7b3022853613fe84f2141a886a64d52e9480218a60b000cb6746c6b30f162514",
+   "fingerprint": "199315591cf4ade6aba8bfd7bed5b44a6d38ab45bbb84a1d32d85777e76c59c2",
    "units": 11,
-   "strings": 136
+   "strings": 138
   },
   "template": {
    "fingerprint": "f5869317bd6d73c0ae3152b265c412103335ba2f4b1d11693d3506c08a19715a",
@@ -48,9 +48,9 @@
    "strings": 1615
   },
   "source": {
-   "fingerprint": "60873c9d81da923fd84cea0c5240006bfb765b584354e0b82ec489c45a988b2d",
-   "units": 485,
-   "strings": 13111
+   "fingerprint": "9ed0f8253424b833c37f1c9efeaecdbaf41d30244b5507768c635a43cfbd6d74",
+   "units": 486,
+   "strings": 13189
   },
   "world": {
    "fingerprint": "755b24e4dd706ac2025f5a5c71a781c93984d73f0c7a17bcf147fc61de1b69ba",

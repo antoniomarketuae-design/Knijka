@@ -316,7 +316,9 @@ export const GATED_SHARED_PROVISIONS: readonly GatedSharedProvision[] = [
   {
     citationBg: "ЗДвП чл. 179, ал. 2",
     amountBgn: 300,
-    codeCount: 11,
+    // 11 → 12 (2026-09-25): TASK_SPEED_CAP_EXCEEDED carries the conditions
+    // duty's crash branch (`CRASH_CASE`), because on the street it IS that duty.
+    codeCount: 12,
     noteBg:
       "Ударът. COLLISION го носи БЕЗ условие; останалите го носят като „ако причини ПТП“. След реален удар една и съща сума се появява веднъж като факт и веднъж като хипотеза.",
   },
